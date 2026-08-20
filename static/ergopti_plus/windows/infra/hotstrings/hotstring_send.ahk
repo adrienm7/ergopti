@@ -113,6 +113,13 @@ _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
 ; where Text is a control sequence ("{BackSpace 5}") rather than a real
 ; emitted character — SubStr(Text, -1) on that sequence would record its
 ; trailing "}" instead of what actually landed on screen.
+_SendVerdictSucceeded(Result) {
+		; Legacy recorder hooks return an empty string after capturing a send. Only an
+		; explicit Boolean false is a failure; type-checking first prevents the AHK v2
+		; `"0" = false` coercion from rejecting a string token as a failed injection.
+		return !((Result is Integer) and Result = 0)
+}
+
 SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 		; Every layout/hotstring callback reaches this primitive.  A failed OS send
 		; must be contained here and must NOT advance the output ring: advancing it
@@ -121,7 +128,8 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 		try {
 				if _SendHook {
 						Hook := _SendHook
-						Hook("SendNewResult", Text, OnlyText)
+						if !_SendVerdictSucceeded(Hook("SendNewResult", Text, OnlyText))
+								return false
 				} else {
 						if OnlyText {
 								SendEvent("{Text}" Text)
@@ -153,24 +161,34 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 
 ; SendInput prevents other hotstrings/hotkeys from activating, so this is the
 ; "final" result — used when we do not want cascading expansion.
-SendFinalResult(Text, OnlyText := False) {
+_SendFinalResultUnchecked(Text, OnlyText) {
+		if _SendHook {
+				Hook := _SendHook
+				return _SendVerdictSucceeded(Hook("SendFinalResult", Text, OnlyText))
+		}
+		if OnlyText
+				SendInput("{Text}" Text)
+		else
+				SendInput(Text)
+		return true
+}
+
+; @param DeclareBufferEffect {Boolean} True when Text is a caret/document edit
+; invisible to the prefix InputHook. The declaration and SendInput then share the
+; canonical Critical transaction instead of being two interruptible statements.
+SendFinalResult(Text, OnlyText := False, DeclareBufferEffect := false) {
 		try {
-				if _SendHook {
-						Hook := _SendHook
-						Hook("SendFinalResult", Text, OnlyText)
-				} else if OnlyText {
-						SendInput("{Text}" Text)
-				} else {
-						SendInput(Text)
-				}
+				if DeclareBufferEffect and IsSet(HS_RunSyntheticInputTransaction)
+						return _SendVerdictSucceeded(HS_RunSyntheticInputTransaction(Text,
+								_SendFinalResultUnchecked.Bind(Text, OnlyText)))
+				return _SendFinalResultUnchecked(Text, OnlyText)
 		} catch as Err {
 				LoggerError("Hotstrings", "SendFinalResult failed: {1}", Err.Message)
 				return false
 		}
-		return true
 }
 
-_SendInstant_RestoreClipboard(OldClip, OwnedSequence) {
+_SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 	global _SEND_INSTANT_CLIP_BUSY
 	try {
 		; A delayed restore owns exactly the payload sequence it wrote. A user copy
@@ -179,6 +197,8 @@ _SendInstant_RestoreClipboard(OldClip, OwnedSequence) {
 		if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
 			CB_RestoreAll(OldClip)
 	} finally {
+		if OwnerToken
+			CB_EndOwnedTransaction(OwnerToken)
 		; Release even when the clipboard is locked: a failed restore must not
 		; permanently force every later expansion onto the slow text path.
 		_SEND_INSTANT_CLIP_BUSY := false
@@ -192,9 +212,13 @@ SendInstant(Text, Prefix := "") {
 	; Uses try so the user's clipboard is restored even on error/crash.
 	global _SEND_INSTANT_CLIP_BUSY
 	if _SendHook {
-		Hook := _SendHook
-		Hook("SendInstant", Text, Prefix)
-		return
+		try {
+			Hook := _SendHook
+			return _SendVerdictSucceeded(Hook("SendInstant", Text, Prefix))
+		} catch as Err {
+			try LoggerError("Hotstrings", "SendInstant hook failed: {1}", Err.Message)
+			return false
+		}
 	}
 	; Reentrancy guard: a previous SendInstant's deferred restore has not run
 	; yet, so the clipboard still holds its payload. Touching A_Clipboard now
@@ -204,12 +228,13 @@ SendInstant(Text, Prefix := "") {
 	; with the InputHook, which processes SendEvent characters as physical input.
 	if _SEND_INSTANT_CLIP_BUSY {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
-		SendInput(Prefix . "{Text}" . Text)
-		; MUST report success: the text HAS been injected on this path. A bare
-		; return yields a falsy value, and WrapTextIfSelected treats falsy as
-		; "emitted nothing" and re-sends the bare symbol on top of the text that
-		; just landed.
-		return true
+		try {
+			SendInput(Prefix . "{Text}" . Text)
+			return true
+		} catch as Err {
+			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
+			return false
+		}
 	}
 	; The Notepad caller holds Critical across this whole call, so anything slow
 	; here starves the keyboard hook rather than merely delaying one expansion.
@@ -222,8 +247,13 @@ SendInstant(Text, Prefix := "") {
 	; reentrancy branch above already accepts.
 	if (CB_IsBusy() or CB_HasImage()) {
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
-		SendInput(Prefix . "{Text}" . Text)
-		return true
+		try {
+			SendInput(Prefix . "{Text}" . Text)
+			return true
+		} catch as Err {
+			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
+			return false
+		}
 	}
 	OldClipboard := CB_SaveAll()
 	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {
@@ -231,28 +261,57 @@ SendInstant(Text, Prefix := "") {
 		return false
 	}
 	_SEND_INSTANT_CLIP_BUSY := true
+	OwnerToken := 0
+	RestoreCallback := false
+	RestoreTimerArmed := false
 	try {
+		OwnerToken := CB_BeginOwnedTransaction("hotstring_send_instant", true)
 		if !CB_Write(Text)
 			throw Error("clipboard write failed")
 		OwnedSequence := CB_GetSequenceNumber()
 		if !OwnedSequence
 			throw Error("clipboard sequence unavailable")
+		; Arm every fallible post-paste stage before the irreversible injection. If
+		; timer registration fails, no erase/paste has reached the application and
+		; the caller can safely leave its engine and preview state untouched.
+		RestoreCallback := _SendInstant_RestoreClipboard.Bind(OldClipboard, OwnedSequence, OwnerToken)
+		SetTimer(RestoreCallback, -SEND_INSTANT_PASTE_DELAY_MS)
+		RestoreTimerArmed := true
 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
 		; therefore cannot be interrupted after the erase but before the paste.
 		SendInput(Prefix . "^v")
-		SetTimer(_SendInstant_RestoreClipboard.Bind(OldClipboard, OwnedSequence), -SEND_INSTANT_PASTE_DELAY_MS)
 		return true
 	} catch as err {
+		; SendInput can fail after the restore timer was armed. Cancel that exact
+		; callback before doing the cleanup inline so ownership is ended once.
+		if RestoreTimerArmed
+			try SetTimer(RestoreCallback, 0)
 		try CB_RestoreAll(OldClipboard)
+		if OwnerToken
+			try CB_EndOwnedTransaction(OwnerToken)
 		_SEND_INSTANT_CLIP_BUSY := false
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
 }
 
+; Mirror a literal edit which this module has already proven reached the screen.
+; Synthetic sends below the prefix watcher's I1 level never reach its OnChar, so
+; callers must publish the same edit to the longer LLM context themselves. Keep
+; this helper side-effect-free when the bridge is inactive and require the owner
+; to hold the same Critical transaction as the matching HSE mutation.
+_HSE_MirrorLiteralEditToLlm(DeleteFromEnd, InsertedText := "") {
+		if !A_IsCritical
+				throw Error("_HSE_MirrorLiteralEditToLlm requires a Critical buffer transaction.")
+		if (IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
+				and IsSet(_LLM_Bridge_ApplyBufferEdit))
+				_LLM_Bridge_ApplyBufferEdit(DeleteFromEnd, InsertedText)
+}
+
 ; Commit any pending end-char hotstring before the next symbol is emitted.
-; The space/backspace dance puts a space on screen so an end-char-gated trigger
-; can claim it, then takes the space back away.
+; The temporary space is first put on screen so an end-char-gated trigger can
+; claim it. A successful dispatch is forced to consume that space; only a
+; declined/no-match attempt needs the compensating backspace.
 ;
 ; The commit itself is NOT a hook round-trip any more. It used to be: the space
 ; was injected at the caller's send level, the prefix-watcher InputHook observed
@@ -277,10 +336,10 @@ SendInstant(Text, Prefix := "") {
 ; a hot, default key set. IsSet guards the load order: the engine buffer global
 ; lives in hotstring_engine_main.ahk, included alongside this file.
 ActivateHotstrings() {
-		global HSE_LastEndChar
+		global HSE_LastEndChar, _PrefixPrivateResidue
 		; Nothing to flush — no pending abbreviation, so skip the costly poke.
 		if (IsSet(HSE_Buffer) and HSE_Buffer == "") {
-				return
+				return true
 		}
 		previous_critical := Critical("On")
 		PreviousSendLevel := A_SendLevel
@@ -289,22 +348,30 @@ ActivateHotstrings() {
 				; what it accepts: the poke lands on screen without ever coming back as
 				; an OnChar the engine would count twice.
 				SendLevel(0)
-				SendNewResult(" ")
+				; The poke is temporary and is therefore not ring history. A successful
+				; fire lets the dispatcher record its real final output; a failed cleanup
+				; below records the Space only once it becomes permanent.
+				if !SendNewResult(" ", true, false)
+						return false
 				; IsPhysical=true on both feeds: the dispatch below holds HSE_Suppressed
 				; for its own send burst (released on a deferred timer), and a
 				; non-physical feed is a no-op while it is up.
 				PendingMatch := HSE_FeedChar(" ", true)
+				_HSE_MirrorLiteralEditToLlm(0, " ")
+				Fired := false
 				if (PendingMatch != "") {
 						; Contained: this runs inside a layer callback that still owes the
 						; user its punctuation, so a throwing expansion must not abort the
 						; emit that follows.
 						try {
-								Fired := HSE_DispatchMatch(PendingMatch, HSE_LastEndChar)
+								CommittedScreenEffect := 0
+								Fired := HSE_DispatchMatch(PendingMatch, HSE_LastEndChar,
+										&CommittedScreenEffect, true)
 								; Same metrics contract the prefix-watcher fire path follows:
 								; only a real expansion is a fire, and the record is queued
 								; rather than logged inline so no disk work lands on the
 								; keyboard thread.
-								if (Fired and IsSet(_HSE_QueueFireLog)) {
+								if Fired {
 										FiredReplacement := PendingMatch.HasOwnProp("Replacement") ? PendingMatch.Replacement : PendingMatch.Trigger
 										FiredCategory := PendingMatch.HasOwnProp("Category") ? PendingMatch.Category : ""
 										FiredSection := PendingMatch.HasOwnProp("Section") ? PendingMatch.Section : ""
@@ -313,7 +380,12 @@ ActivateHotstrings() {
 										; expansion committed by a punctuation key leaks while the
 										; other two paths are clean.
 										FiredIsPrivate := PendingMatch.HasOwnProp("IsPrivate") && PendingMatch.IsPrivate
-										try _HSE_QueueFireLog(PendingMatch.Trigger, FiredReplacement, "endchar", FiredCategory, FiredSection, FiredIsPrivate)
+										if FiredIsPrivate and IsSet(_PrefixPrivateResidue)
+												_PrefixPrivateResidue := true
+										if IsSet(_PrefixCommitPostFireEffect)
+												_PrefixCommitPostFireEffect(CommittedScreenEffect)
+										if IsSet(_HSE_QueueFireLog)
+												try _HSE_QueueFireLog(PendingMatch.Trigger, FiredReplacement, "endchar", FiredCategory, FiredSection, FiredIsPrivate)
 								}
 						} catch as CommitErr {
 								; ERROR is severity 40 — ABOVE the default INFO level — so unlike the
@@ -327,8 +399,22 @@ ActivateHotstrings() {
 										CommitErr.Message)
 						}
 				}
-				SendNewResult("{BackSpace}", False)
+				; A successful forced commit consumed the temporary Space as part of its
+				; canonical edit. Backspacing here would erase the replacement's last
+				; character, especially when Space is also a configured consumed delimiter.
+				if Fired
+						return true
+				if !SendNewResult("{BackSpace}", False, false) {
+						; Cleanup failed, so the poke is now real screen state. Preserve the
+						; already-appended HSE/LLM Space and publish it to the output ring.
+						if IsSet(_ResetPrefixBuffer)
+								try _ResetPrefixBuffer()
+						UpdateLastSentCharacter(" ")
+						return false
+				}
 				HSE_FeedBackspace(true)
+				_HSE_MirrorLiteralEditToLlm(1)
+				return true
 		} finally {
 				SendLevel(PreviousSendLevel)
 				Critical(previous_critical)
@@ -366,19 +452,29 @@ GetSelectionAsync(OnReady) {
 				"foreground", WinExist("A"),
 				"clipboard", "",
 				"clear_sequence", 0,
+				"owner_token", 0,
+				"expected_change", 0,
 				"timer", 0
 		)
 		try {
 				Job["clipboard"] := ClipboardAll()
-				A_Clipboard := ""
+				Job["owner_token"] := CB_BeginOwnedTransaction("selection_capture")
+				if !CB_Write("")
+						throw Error("clipboard clear failed")
 				Job["clear_sequence"] := _SelectionClipboardSequence()
+				Job["expected_change"] := CB_ExpectOwnedChange()
 				SendEvent("^c")
 				Job["timer"] := _SelectionCapturePoll.Bind(Job)
 				_SelectionCaptureJob := Job
 				SetTimer(Job["timer"], SELECTION_CAPTURE_POLL_MS)
 				return true
 		} catch as Err {
-				try A_Clipboard := Job["clipboard"]
+				if Job["expected_change"]
+						CB_CancelExpectedChange(Job["expected_change"])
+				if Job["owner_token"] {
+						try CB_RestoreAll(Job["clipboard"])
+						CB_EndOwnedTransaction(Job["owner_token"])
+				}
 				Job["clipboard"] := ""
 				try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
 				return false
@@ -391,7 +487,7 @@ _SelectionCapturePoll(Job) {
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
-		Elapsed := A_TickCount - Job["started"]
+	Elapsed := TickElapsed(Job["started"])
 		if A_IsSuspended {
 				_SelectionCaptureFinish(Job, "", false, "suspended")
 				return
@@ -435,12 +531,14 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason) {
 		; exactly the prior clipboard contents.
 		PreserveCurrent := (Reason == "superseded by input"
 				and _SelectionClipboardSequence() != Job["clear_sequence"])
+		if Job["expected_change"]
+				CB_CancelExpectedChange(Job["expected_change"])
 		if !PreserveCurrent {
-				try A_Clipboard := Job["clipboard"]
-				catch as Err {
-						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed: {1}", Err.Message)
-				}
+				if !CB_RestoreAll(Job["clipboard"])
+						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
 		}
+		if Job["owner_token"]
+				CB_EndOwnedTransaction(Job["owner_token"])
 		Job["clipboard"] := ""
 
 		if !Deliver || A_IsSuspended

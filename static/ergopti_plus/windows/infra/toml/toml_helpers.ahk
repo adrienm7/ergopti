@@ -129,17 +129,33 @@ global _ConfigBootReadFailed := false
 ; ``FileExist``.
 ; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
+		return _ParseTomlFileImpl(Path, true, true)
+}
+
+; Transactional candidate rendering must observe bytes only after its terminal
+; owner is acquired. It therefore bypasses the boot/UI cache and deliberately
+; does not replace that cache object; a refused Reload continues on the exact
+; pre-transition in-memory state.
+TOML_ParseFreshFile(Path) {
+		return _ParseTomlFileImpl(Path, false, false)
+}
+
+_ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
-		if _ParseTomlCache.Has(Path)
+		if UseCache && _ParseTomlCache.Has(Path)
 				return _ParseTomlCache[Path]
 		Sections := Map()
 		; Map.Delete raises on a missing key, so this must be guarded.
 		if _TomlReadFailures.Has(Path)
 				_TomlReadFailures.Delete(Path)
-		if !FileExist(Path)
+		if !IsSet(ProvidedContent) && !FileExist(Path)
 				return Sections
 		Content := ""
-		try {
+		if IsSet(ProvidedContent) {
+				if !(ProvidedContent is String)
+						return Sections
+				Content := ProvidedContent
+		} else try {
 				Content := FileRead(Path, "UTF-8")
 		} catch as Err {
 				; Record the failure instead of throwing: the fuzz corpus requires this
@@ -165,6 +181,8 @@ ParseTomlFile(Path) {
 		; so anything derived from it is safe to persist again.
 		if _TomlUnreadableFiles.Has(Path)
 				_TomlUnreadableFiles.Delete(Path)
+		if SubStr(Content, 1, 1) == Chr(0xFEFF)
+				Content := SubStr(Content, 2)
 		if (Content = "")
 				return Sections
 
@@ -266,7 +284,8 @@ ParseTomlFile(Path) {
 		}
 		if (PendingKey != "")
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
-		_ParseTomlCache[Path] := Sections
+		if StoreCache
+			_ParseTomlCache[Path] := Sections
 		return Sections
 }
 
@@ -432,8 +451,11 @@ TOML_Write(Value, Path, Section, Key) {
 ; ===============================
 
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
-; Preserves keys we did not touch; sections appear in the original order
-; followed by any newly introduced section. Returns true on success.
+; Preserves keys we did not touch and renders the complete result canonically
+; (sorted sections/keys and stable spacing) before the one atomic replace.
+; It must not call SaveFullConfig afterward: targeted writers persist before
+; publishing their candidate globals, so a nested full save would serialize
+; the stale live state back over the just-committed values.
 ; Delete scratch files left next to Path by a hard kill. Per-invocation names
 ; no longer overwrite each other, so nothing self-cleans any more; the age
 ; threshold is what keeps this a tidy-up rather than a new race — an
@@ -450,8 +472,62 @@ _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 		}
 }
 
-TOML_BatchWrite(Path, Updates) {
-		if (Updates.Length = 0)
+; A successful Write call is not proof that the complete canonical image
+; reached the stage. Read it back exactly before any rename can make it live.
+_TOML_StageMatches(Path, Expected, ReadFn := 0) {
+	try {
+		Actual := HasMethod(ReadFn, "Call")
+			? ReadFn.Call(Path) : FileRead(Path, "UTF-8")
+	} catch {
+		return false
+	}
+	return (Actual is String) && StrCompare(Actual, Expected, true) == 0
+}
+
+; Builds the same canonical image used by TOML_BatchWrite without publishing a
+; target. Multi-file transactions need the complete new bytes before their WAL
+; can capture the old image; routing both modes through one renderer prevents a
+; subtly different onboarding serializer from drifting from ordinary saves.
+TOML_BuildUpdatedContent(Path, Updates, ExactSectionPrefixes := []) {
+	SourcePresent := FileExist(Path) ? 1 : 0
+	SourceBytes := SourcePresent ? FSReadUtf8Exact(Path) : ""
+	if SourcePresent && !(SourceBytes is String)
+		return Map("status", "error", "kind", "source_unreadable",
+			"content", "")
+	Result := _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "build",
+		SourceBytes)
+	return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)
+}
+
+_TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes) {
+	if (Result is Map) && Result.Has("status") && Result.Has("kind")
+			&& Result.Has("content") && (Result["status"] is String)
+			&& (Result["kind"] is String) && (Result["status"] == "ok")
+			&& (Result["kind"] == "rendered")
+			&& (Result["content"] is String) {
+		Result["source_present"] := SourcePresent
+		Result["source_content"] := SourceBytes
+		return Result
+	}
+	return Map("status", "error", "kind", "render_failed", "content", "")
+}
+
+TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := []) {
+		return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")
+}
+
+_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
+		ProvidedContent := unset) {
+		if !(Mode is String) || (Mode != "write" && Mode != "build")
+				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
+		BuildOnly := Mode == "build"
+		if !(ExactSectionPrefixes is Array)
+				throw TypeError("ExactSectionPrefixes must be an Array")
+		for _, Prefix in ExactSectionPrefixes {
+				if !(Prefix is String) or Prefix = ""
+						throw ValueError("ExactSectionPrefixes must contain non-empty strings")
+		}
+		if (!BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
 				return true
 
 		; A config save is a full read-modify-write plus a canonicalisation pass, and
@@ -460,7 +536,9 @@ TOML_BatchWrite(Path, Updates) {
 		; that felt stuck. Two QPC reads, gated by the profiler floor.
 		_hpTomlWrite := HotPath_Now()
 
-		Cached := ParseTomlFile(Path)
+		Cached := BuildOnly && IsSet(ProvidedContent)
+			? _ParseTomlFileImpl(Path, false, false, ProvidedContent)
+			: (BuildOnly ? TOML_ParseFreshFile(Path) : ParseTomlFile(Path))
 		; Refuse to rebuild a file we could not read. Everything below serializes
 		; ONLY what this parse returned and then moves the result over the original,
 		; so proceeding on a failed read would replace the user's whole config with
@@ -484,20 +562,46 @@ TOML_BatchWrite(Path, Updates) {
 		for sec in Sections
 				order.Push(sec)
 
+		; Dynamic record namespaces need replace semantics: a merge-only write
+		; retains records omitted by the caller and resurrects deleted profiles on
+		; the next boot. Match only the exact section or a dot-delimited child so a
+		; sibling such as ``user_profiles_backup`` remains untouched.
+		if (ExactSectionPrefixes.Length > 0) {
+				KeptOrder := []
+				for _, SecName in order {
+						DropSection := false
+						for _, Prefix in ExactSectionPrefixes {
+								if (SecName = Prefix or InStr(SecName, Prefix . ".") = 1) {
+										DropSection := true
+										break
+								}
+						}
+						if DropSection
+								Sections.Delete(SecName)
+						else
+								KeptOrder.Push(SecName)
+				}
+				order := KeptOrder
+		}
+
 		for _, U in Updates {
 				Sec := U.Section
 				K := U.Key
-				V := U.Value
+				DeleteRequested := U.HasOwnProp("Delete")
+					&& (U.Delete is Integer) && U.Delete == 1
+				if U.HasOwnProp("Delete")
+						&& (!(U.Delete is Integer)
+							|| (U.Delete != 0 && U.Delete != 1))
+						throw TypeError("Delete must be the Integer 0 or 1")
 				if !Sections.Has(Sec) {
 						Sections[Sec] := Map()
 						order.Push(Sec)
 				}
-				; Sentinel value "_DELETE_" removes the key rather than writing it
-				if (V == "_DELETE_") {
+				if DeleteRequested {
 						if Sections[Sec].Has(K)
 								Sections[Sec].Delete(K)
 				} else {
-						Sections[Sec][K] := V
+						Sections[Sec][K] := U.Value
 				}
 		}
 
@@ -543,6 +647,15 @@ TOML_BatchWrite(Path, Updates) {
 				for _, k in SortedKeys
 						body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(Sections[sec][k]) . "`n"
 		}
+		if BuildOnly {
+				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
+					Updates.Length . " update(s)")
+				; Ordinary write mode opens its stage as UTF-8 (with BOM). Return the
+				; identical byte image so the transition does not silently change the
+				; repository's canonical encoding policy.
+				return Map("status", "ok", "kind", "rendered",
+					"content", Chr(0xFEFF) . body)
+		}
 
 		; Per-invocation scratch name. A fixed ``Path . ".tmp"`` made the staging
 		; file a shared resource between every writer of the same target, and the
@@ -558,6 +671,7 @@ TOML_BatchWrite(Path, Updates) {
 		tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
 		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
 		try FileDelete(tmp)
+		f := 0
 		try {
 				f := FileOpen(tmp, "w", "UTF-8")
 				if !f {
@@ -572,22 +686,36 @@ TOML_BatchWrite(Path, Updates) {
 						return false
 				}
 				f.Write(body)
+				if !FSFlushFileBuffers(f)
+						throw Error("FlushFileBuffers refused the staging handle")
 				f.Close()
+				f := 0
 		} catch as Err {
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
 						_ParseTomlCache.Delete(Path)
 				try LoggerError("TomlWrite", "Writing the staging file for '{1}' failed: {2}. The change is NOT persisted.", Path, Err.Message)
 				return false
+		} finally {
+				if IsObject(f)
+						try f.Close()
 		}
-	; Atomic replace: FileMove with overwrite=true swaps the file in one OS call.
-	; If the move fails, the original config.toml remains intact.
-	try FileMove(tmp, Path, true)
-	catch as Err {
+		if !_TOML_StageMatches(tmp, body) {
+				global _ParseTomlCache
+				if _ParseTomlCache.Has(Path)
+						_ParseTomlCache.Delete(Path)
+				try LoggerError("TomlWrite", "The staging file for '{1}' did not match the complete canonical image. The previous contents are intact, so the change is NOT persisted.", Path)
+				return false
+		}
+	; Publish only through the same-volume write-through adapter. The WAL may
+	; promote immediately after this return, so a merely visible rename is not a
+	; sufficient durability boundary.
+	Moved := FSAtomicMoveReplace(tmp, Path)
+	if !((Moved is Integer) && Moved == 1) {
 		global _ParseTomlCache
 		if _ParseTomlCache.Has(Path)
 			_ParseTomlCache.Delete(Path)
-		try LoggerError("TomlWrite", "Atomic replace of '{1}' failed: {2}. The previous contents are intact, so the change is NOT persisted.", Path, Err.Message)
+		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted.", Path)
 		return false
 	}
 
@@ -597,35 +725,8 @@ TOML_BatchWrite(Path, Updates) {
 		if _ParseTomlCache.Has(Path)
 				_ParseTomlCache.Delete(Path)
 
-		TOML_RunStrictCanonicalization(Path)
 		HotPath_LogIfSlow("Config.TomlWrite", _hpTomlWrite, Updates.Length . " update(s)")
 		return true
-}
-
-; Re-canonicalize the unified driver config: after any successful TOML write
-; targeting ConfigurationFile, re-serialize via SaveFullConfig so the on-disk
-; layout (section order, sorted keys, spacing) is normalized.
-; NOTE: this is a read-modify-MERGE, not a from-scratch rebuild. Sections and
-; keys that SaveFullConfig does not re-collect are PRESERVED — the parse cache
-; feeds their previous values back into TOML_BatchWrite. Do not rely on this
-; step to remove stale keys; it normalizes formatting only.
-TOML_RunStrictCanonicalization(Path) {
-		global ConfigurationFile, _SaveFullConfigReady, _TOML_STRICT_CANON_IN_PROGRESS
-
-		if !IsSet(_TOML_STRICT_CANON_IN_PROGRESS)
-				return
-		if _TOML_STRICT_CANON_IN_PROGRESS
-				return
-		if !IsSet(ConfigurationFile)
-				return
-		if (Path != ConfigurationFile)
-				return
-		if !IsSet(_SaveFullConfigReady)
-				return
-
-		_TOML_STRICT_CANON_IN_PROGRESS := true
-		try SaveFullConfig()
-		finally _TOML_STRICT_CANON_IN_PROGRESS := false
 }
 
 TOML_RenderKey(k) {

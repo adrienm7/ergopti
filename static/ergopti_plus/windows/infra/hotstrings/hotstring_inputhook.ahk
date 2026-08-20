@@ -22,24 +22,11 @@
 ; Included by infra/hotstrings/hotstring_prefix_watcher.ahk.
 ; ==============================================================================
 
-; The prefix index built at boot. Map(lowerPrefix -> Array of entries), where
-; each entry is { Trigger, Output, Category, Section, Length }.
+; Auxiliary file catalogue built at boot. Map(lowerPrefix -> Array of entries),
+; where each entry is { Trigger, Output, Category, Section, Length }. It is kept
+; for catalogue diagnostics/tests only; visible candidate selection belongs to
+; HSE_PreviewNextDecision and never reads this Map.
 global _PrefixIndex := Map()
-
-; Candidate sources for triggers the prefix index cannot hold. _PrefixIndex is
-; built exclusively from FILES — the bundled category TOMLs, their in-memory
-; cache and the extension packs — so a trigger created imperatively by
-; CreateHotstring at boot has no key in it and can never be previewed. The whole
-; @ family is registered that way (personal-info tags and combos, the three
-; dates), which is why none of it produced a tooltip while every one of those
-; triggers expanded normally.
-;
-; A provider takes the ENGINE's buffer and returns an Array of rows shaped like
-; index entries. Registering the triggers into _PrefixIndex instead is NOT an
-; option: HotstringPrefixWatcherRebuildIndex builds a fresh Map and swaps it in,
-; so anything inserted outside that loop is erased by the next live section
-; toggle, personal save or boot-tail warm-up.
-global _PrefixPreviewProviders := []
 
 ; Flat set of all known trigger strings (lower-cased) → entry object.
 ; Used by the near-miss detector in _ResetPrefixBuffer so it can check
@@ -47,12 +34,23 @@ global _PrefixPreviewProviders := []
 ; the prefix tree.
 global _TriggerSet := Map()
 
-; Live keystroke buffer with original casing preserved — the index now holds
-; one entry per case variant (``ct`` / ``Ct`` / ``CT`` for non-strict
-; triggers, exactly mirroring CreateCaseSensitiveHotstrings), so the lookup
-; is a byte-for-byte match against this buffer. Trimmed to MAX_BUFFER_LEN
-; whenever it would overflow so memory and lookup cost stay bounded.
+; Live display buffer with original casing preserved. Candidate selection reads
+; the engine's HSE_Buffer; this sibling tracks the same screen context for
+; lifecycle invalidation, analytics and post-fire rendering. Trimmed to
+; MAX_BUFFER_LEN whenever it would overflow so memory stays bounded.
 global _PrefixBuffer := ""
+; Monotonic owner for the exact text represented by _PrefixBuffer. Lifecycle
+; generation is intentionally separate: ordinary physical typing stays in one
+; lifecycle but must still invalidate a render that yielded in GUI/UIA work.
+global _PrefixContentGeneration := 0
+
+; The control identity and monotonically increasing generation to which BOTH
+; HSE_Buffer and _PrefixBuffer belong. A top-level window can host several input
+; controls, so foreground-window identity alone is not sufficient: Ctrl+F and
+; Ctrl+L routinely move focus without producing an OnChar event. Every physical
+; character verifies this token before the engine can consume it.
+global _PrefixFocusedControlToken := 0
+global _PrefixInputContextGeneration := 0
 
 ; Set when a PRIVATE expansion has written its resolved value into the buffers.
 ; After a star fire the watcher takes the engine's buffer verbatim, so
@@ -66,9 +64,8 @@ global _PrefixPrivateResidue := false
 global _PrefixInputHook := 0
 
 ; Set when HotstringPrefixWatcherRebuildIndex is asked to rebuild while the driver
-; is suspended (a live section toggle during pause). The rebuild is deferred and
-; replayed by Ergopti_OnSuspendResume, mirroring LLM_Menu_OnResume — otherwise the
-; preview index stays permanently diverged from the engine after resume.
+; is suspended. The rebuild is deferred and replayed by Ergopti_OnSuspendResume,
+; mirroring LLM_Menu_OnResume, so near-miss analytics do not stay stale.
 global _PrefixIndexRebuildPending := false
 
 ; When True, OnChar / OnKeyDown callbacks short-circuit. Toggled by the
@@ -86,6 +83,12 @@ global _PrefixWatcherSuppressed := 0  ; depth counter — mirrors HSE_Suppressed
 ; logging — HS pairs every "suggested" with exactly one "dismissed" or one
 ; "fired", never both, so we track state here to enforce the same contract.
 global _KLLastShownSuggestion := ""
+
+; Canonical engine decisions currently represented by visible tooltip pixels.
+; They are published only after the renderer reveals the surface and cleared by
+; every authorised hide. A dynamic replacement may therefore be resolved once
+; for the preview and claimed by dispatch without a second, divergent call.
+global _PrefixVisibleFireDecisions := []
 
 ; Configuration constants.
 global _MIN_PREFIX_LEN := 2
@@ -115,6 +118,17 @@ global _PREFIX_RENDER_DEBOUNCE_MS := 150
 global HSE_FIRE_LOG_DEFER_MS := 90
 global _HSE_FireLogQueue := []
 global _HSE_FireLogScheduled := false
+global _HSE_FireLogScheduledGeneration := -1
+global _HSE_FireLogTimer := 0
+
+; Every timer carrying captured hotstring state belongs to one lifecycle
+; generation. Suspend/stop invalidates that generation before any teardown, so
+; an already-dispatched callback can no longer publish a pre-transition buffer.
+; Fired records are deliberately retained and transferred to a fresh owner on
+; resume; near-miss/render work is derived state and is simply recomputed.
+global _PrefixDeferredGeneration := 0
+global _PrefixRenderScheduledGeneration := -1
+global _PrefixRenderTimer := 0
 
 ; What a diagnostic line may print of a keystroke buffer.
 ;
@@ -152,112 +166,8 @@ _PrefixWordBoundaries() {
     return _HSE_WordBoundarySet()
 }
 
-; Would the ENGINE actually fire this trigger right now? Asked of the engine's own
-; Spec and its own buffer, never re-derived here.
-;
-; The preview used to infer "am I at a word start?" from its own anchor — the
-; suffix after the last boundary character in _PrefixBuffer. That is a DIFFERENT
-; question from the one the engine answers, and it rests on a DIFFERENT buffer.
-; The two diverge after any expansion, because _PrefixBuffer is rebuilt by the
-; sync block below (strip + replacement + suffix truncation) while HSE_Buffer
-; keeps the real typed context. Measured case: typing "at" then the magic key
-; fired the repeat (t★ → tt); _PrefixBuffer became "tt" while HSE_Buffer still
-; ended "...att". The preview saw "tt" as word-initial and offered tt★ →
-; télétravail; the engine, holding "att", refused it. The user got a tooltip that
-; could not be validated — the tooltip lied about what the engine would do.
-;
-; Fails OPEN: a trigger the engine does not know is left visible rather than
-; silently dropped, so a registry gap degrades to the old behaviour instead of
-; emptying the tooltip.
-; @param Trigger The candidate trigger, exactly as registered.
-; @return true when the engine would fire it against its current buffer.
-_PreviewEngineWouldFire(Trigger) {
-    global HSE_Buffer
-    if (Trigger == "")
-        return false
-    Spec := _PreviewSpecForTrigger(Trigger)
-    ; Fails OPEN: no index holds this trigger, so leave the row visible.
-    if (Spec == "")
-        return true
-    ; A star trigger is evaluated against the buffer as it will be ONE
-    ; keystroke from now — the magic key has not been typed yet at preview
-    ; time, but it is the trigger's last character, so appending it
-    ; reconstructs exactly what the engine will match against.
-    EvalBuf := HSE_Buffer
-    if (Spec.HasOwnProp("Star") and Spec.Star)
-        EvalBuf .= SubStr(Trigger, -1)
-    CaseSensitive := (Spec.HasOwnProp("CaseSensitive") and Spec.CaseSensitive)
-    if !HSE_SuffixMatches(EvalBuf, Trigger, CaseSensitive)
-        return false
-    return _HSE_WordBoundaryAllows(EvalBuf, Spec)
-}
-
-; Resolve a candidate trigger to the engine's own Spec through the SAME O(1)
-; by-trigger indexes HSE_FindMatchAtEnd probes, CS before CI, star before
-; end-char.
-;
-; This used to walk HSE_RegistryByLastChar[SubStr(Trigger, -1)] linearly. Every
-; star trigger ends in the magic key, so they all share ONE ~2100-entry bucket —
-; the exact scan hotstring_match.ahk documents at "~21 ms per press" as the
-; reason the matcher stopped using it. The preview was the one production reader
-; left behind, and it paid the FULL scan precisely in the useless case (a trigger
-; the bucket does not hold, where the answer is the fail-open default). Worse,
-; the raw last character was used as the bucket key while HSE_Register buckets
-; case-insensitive triggers under the LOWERCASED one, so any CI trigger ending
-; in an uppercase character always took that full-scan fail-open path.
-;
-; @param Trigger The candidate trigger, exactly as registered.
-; @return The first matching Spec, or "" when no index holds the trigger.
-_PreviewSpecForTrigger(Trigger) {
-    global HSE_StarByTriggerCS, HSE_StarByTriggerCI
-    global HSE_EndByTriggerCS, HSE_EndByTriggerCI
-    Lower := StrLower(Trigger)
-    if IsSet(HSE_StarByTriggerCS) {
-        Found := _PreviewSpecFromBucket(HSE_StarByTriggerCS, Trigger, Trigger)
-        if (Found != "")
-            return Found
-    }
-    if IsSet(HSE_StarByTriggerCI) {
-        Found := _PreviewSpecFromBucket(HSE_StarByTriggerCI, Lower, Trigger)
-        if (Found != "")
-            return Found
-    }
-    if IsSet(HSE_EndByTriggerCS) {
-        Found := _PreviewSpecFromBucket(HSE_EndByTriggerCS, Trigger, Trigger)
-        if (Found != "")
-            return Found
-    }
-    if IsSet(HSE_EndByTriggerCI) {
-        Found := _PreviewSpecFromBucket(HSE_EndByTriggerCI, Lower, Trigger)
-        if (Found != "")
-            return Found
-    }
-    return ""
-}
-
-; One by-trigger index probe. Map[missing] THROWS in v2, so the key is tested
-; with .Has() first. The trigger comparison stays case-INSENSITIVE, exactly as
-; the bucket walk this replaced was: a case variant is registered under its own
-; trigger string on both sides, and tightening the test here would change which
-; rows the preview validates rather than only how fast it finds them.
-; @param Index The by-trigger Map to probe.
-; @param Key The lookup key (exact for CS indexes, lowercased for CI ones).
-; @param Trigger The candidate trigger to confirm on the resolved Spec.
-; @return The matching Spec, or "" when the bucket does not hold it.
-_PreviewSpecFromBucket(Index, Key, Trigger) {
-    if !Index.Has(Key)
-        return ""
-    for _, Spec in Index[Key] {
-        if (Spec.Trigger != Trigger)
-            continue
-        return Spec
-    }
-    return ""
-}
-
-; Categories scanned at boot. The order matches Hammerspoon's default load
-; order so a tie on the prefix index returns the same first-match across
-; both drivers.
+; Categories scanned into the auxiliary near-miss catalogue at boot. Collision
+; ordering for visible rows is owned exclusively by the live engine registry.
 global _PREFIX_WATCHER_CATEGORIES := [
     "distancesreduction", "sfbsreduction", "rolls",
     "autocorrection", "magickey", "personal"
@@ -310,25 +220,18 @@ global _UIA_WRAP_PAIRS := Map(
 ; ============================================================
 ; ============================================================
 
-; Build the prefix index from every category TOML and start the InputHook.
+; Start the InputHook. The auxiliary catalogue is built later for analytics.
 ; Idempotent — calling it twice is a no-op (the second call only logs).
 HotstringPrefixWatcherInit() {
-	global _PrefixInputHook, _PrefixIndex, _PREFIX_WATCHER_CATEGORIES
+	global _PrefixInputHook
 	if _PrefixInputHook {
 		LoggerWarn("PrefixWatcher", "Init called twice — ignoring duplicate.")
 		return
 	}
 	LoggerStart("PrefixWatcher", "Initializing prefix watcher…")
 
-	; The trigger index (~3180 entries) is too heavy for the boot critical path, so
-	; start the InputHook with an EMPTY index here (cheap). It is built ONCE, off the
-	; critical path, at the end of RegisterEmojisSymbolsDeferred — by then the boot has
-	; settled and HotstringsResolve is memoised for every section, so the single
-	; HotstringPrefixWatcherRebuildIndex (now a fast in-memory cache build, not a TOML
-	; rescan) runs reliably in ~220 ms. That function requires the InputHook to already
-	; exist — it does, created just below. _LookupAndRender hides the tooltip gracefully
-	; while the index is empty, so the only visible effect is no live preview for the
-	; brief window between "ready" and that deferred build.
+	; The ~3180-entry analytics catalogue is deferred to the boot tail. Preview is
+	; already complete during that window because it asks the live engine directly.
 	_StartInputHook()
 	_InstallMouseClickResetHooks()
 	LoggerSuccess("PrefixWatcher", "Watcher started (index build deferred off the boot path).")
@@ -359,8 +262,7 @@ _OnMouseClickReset(*) {
 		; A click places the cursor at an unknown position, but the next
 		; keystroke will start a fresh run — treat it as a word boundary so
 		; is_word triggers (e.g. "c★ → c'est") fire immediately.
-                                HSE_FeedReset(true, true)
-		_ResetPrefixBuffer()
+		_PrefixInvalidateInputContext(0, true)
 		if IsSet(LLM_Bridge_ResetPredictions)
 			LLM_Bridge_ResetPredictions()
 	} catch as Err {
@@ -417,24 +319,186 @@ _KLEmitSuggestionDismissed(Rec) {
 	if (Rec.HasOwnProp("IsPrivate") and Rec.IsPrivate) {
 		return
 	}
+	; A token-aware post-present callback may be invalidated while the keylogger
+	; performs privacy checks. In that case no suggested row reached the queue, so
+	; emitting its dismissed half would corrupt the lifecycle pair.
+	if (Rec.HasOwnProp("SuggestedPublished") and !Rec.SuggestedPublished)
+		return
 	try KL_LogHotstringDismissed(Rec.Trigger, Rec.Output, Rec.Category)
+}
+
+; A record is detached from shared state before this phase, so deferring its
+; logger work cannot clear or otherwise affect a newer suggestion owner.
+_PrefixEmitDetachedSuggestionDismissal(Rec) {
+	if !IsObject(Rec)
+		return false
+	if A_IsCritical {
+		SetTimer(_PrefixEmitDetachedSuggestionDismissal.Bind(Rec), -1)
+		return true
+	}
+	_KLEmitSuggestionDismissed(Rec)
+	return true
 }
 
 _NotifySuggestionDismissed() {
 	global _KLLastShownSuggestion
-	Prev := _KLLastShownSuggestion
-	if !IsObject(Prev) {
-		return
+	Prev := 0
+	PreviousCritical := Critical("On")
+	try {
+		Prev := _KLLastShownSuggestion
+		if !IsObject(Prev)
+			return false
+		_KLLastShownSuggestion := ""
+	} finally {
+		Critical(PreviousCritical)
 	}
-	_KLLastShownSuggestion := ""
-	_KLEmitSuggestionDismissed(Prev)
+	_PrefixEmitDetachedSuggestionDismissal(Prev)
+	return true
+}
+
+; A direct (LLM/notification) surface replaces hotstring pixels by publishing
+; zero FireDecisions. Close the old metric owner only while that replacement's
+; immutable surface token is still current; logging happens after the pure
+; detach and cannot mutate a newer owner.
+_NotifySuggestionDismissedForSurfaceReplacement(SurfaceToken) {
+	global _KLLastShownSuggestion
+	Prev := 0
+	PreviousCritical := Critical("On")
+	try {
+		if !TooltipSurfaceTokenIsCurrent(SurfaceToken)
+			return false
+		Prev := _KLLastShownSuggestion
+		_KLLastShownSuggestion := ""
+	} finally {
+		Critical(PreviousCritical)
+	}
+	_PrefixEmitDetachedSuggestionDismissal(Prev)
+	return true
 }
 
 ; Silent clear — used by the fire path so a single user action emits
 ; ``hotstring`` (fired) without a paired ``hotstring_dismissed``.
 _NotifySuggestionConsumed() {
 	global _KLLastShownSuggestion
-	_KLLastShownSuggestion := ""
+	PreviousCritical := Critical("On")
+	try _KLLastShownSuggestion := ""
+	finally Critical(PreviousCritical)
+}
+
+; A fire resolves the suggestion instead of dismissing it. Detach that metric
+; owner before TooltipHide clears the visible decisions, otherwise the hide
+; callback can emit a dismissed row for the same suggestion that just fired.
+_PrefixRetireConsumedSuggestion(DbgTag, HideFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		_NotifySuggestionConsumed()
+		if HasMethod(HideFn, "Call")
+			return HideFn.Call(DbgTag, true)
+		return TooltipHide(DbgTag, true)
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_PrefixSuggestionMarkPublished(Record) {
+	Record.SuggestedPublished := true
+}
+
+; A same-text surface may reuse a metric record only after its suggested row
+; actually reached the keylogger queue. An unpublished record is still owned by
+; the yielded publisher that created it; lending it to another surface creates
+; an ABA cleanup race when the first publisher resumes.
+_PrefixSuggestionRecordIsPublished(Record) {
+	return IsObject(Record)
+		and (!Record.HasOwnProp("SuggestedPublished")
+			or Record.SuggestedPublished)
+}
+
+_PrefixSuggestionRecordOwnsSurface(Record, SurfaceToken) {
+	return IsObject(Record) and Record.HasOwnProp("SurfaceToken")
+		and IsObject(Record.SurfaceToken) and IsObject(SurfaceToken)
+		and ObjPtr(Record.SurfaceToken) == ObjPtr(SurfaceToken)
+}
+
+; Clear only the exact record + surface pair installed by this publisher. Object
+; identity alone is insufficient because the historical same-text fast path
+; mutated SurfaceToken in place while the original guarded log call had yielded.
+_PrefixClearSuggestionIfOwned(Record, SurfaceToken) {
+	global _KLLastShownSuggestion
+	PreviousCritical := Critical("On")
+	try {
+		if (IsObject(Record) and IsObject(_KLLastShownSuggestion)
+			and ObjPtr(_KLLastShownSuggestion) == ObjPtr(Record)
+			and _PrefixSuggestionRecordOwnsSurface(Record, SurfaceToken)) {
+			_KLLastShownSuggestion := ""
+			return true
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return false
+}
+
+; Atomically bind the metric state to the surface that actually won the pixel
+; commit, while leaving privacy checks and keylogger work outside Critical. The
+; keylogger's final queue mutation rechecks the same token and marks the record
+; published in that transaction, preserving suggested/dismissed pairing even if
+; OnChar invalidates the surface during privacy filtering.
+_NotifySuggestionShownForSurface(Trigger, Output, Category, IsPrivate,
+	SurfaceToken) {
+	global _KLLastShownSuggestion
+	Prev := 0
+	Record := 0
+	PreviousCritical := Critical("On")
+	try {
+		if !TooltipSurfaceTokenIsCurrent(SurfaceToken)
+			return false
+		Prev := _KLLastShownSuggestion
+		if (IsObject(Prev) and _PrefixSuggestionRecordIsPublished(Prev)
+			and Prev.Trigger == Trigger
+			and Prev.Output == Output) {
+			Prev.SurfaceToken := SurfaceToken
+			return true
+		}
+		Record := { Trigger: Trigger, Output: Output, Category: Category,
+			IsPrivate: IsPrivate ? true : false, SurfaceToken: SurfaceToken,
+			SuggestedPublished: false }
+		_KLLastShownSuggestion := Record
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	; Replacement dismissed the old visible suggestion at the atomic surface
+	; commit. This log is about that old owner and is independent of whether the
+	; new surface survives its guarded suggested publication below.
+	if IsObject(Prev)
+		_KLEmitSuggestionDismissed(Prev)
+	if IsPrivate
+		return true
+
+	Published := false
+	if IsSet(KL_LogHotstringSuggestedGuarded) {
+		try Published := KL_LogHotstringSuggestedGuarded(Trigger, Output,
+			Category, TooltipSurfaceTokenIsCurrent.Bind(SurfaceToken),
+			_PrefixSuggestionMarkPublished.Bind(Record))
+	} else if TooltipSurfaceTokenIsCurrent(SurfaceToken) {
+		; Headless unit harnesses do not include the production keylogger. Preserve
+		; their recording stub while production always uses the guarded queue path.
+		try {
+			KL_LogHotstringSuggested(Trigger, Output, Category)
+			Record.SuggestedPublished := true
+			Published := true
+		} catch {
+			Published := false
+		}
+	}
+	if Published
+		return true
+
+	; Guard rejection means the surface changed during privacy/context work.
+	; Remove only this record; a newer callback may already own the global.
+	_PrefixClearSuggestionIfOwned(Record, SurfaceToken)
+	return false
 }
 
 ; Decide which ``h_type`` value to log for a fired hotstring. The richest
@@ -489,7 +553,12 @@ PrefixWatcherSuppress(YesNo) {
 ; ``tag`` marker). Redacting at the enqueue would also destroy the exact strings
 ; the sink measures net_saved_chars and the WPM pushes from.
 _HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section, IsPrivate := false) {
-	global _HSE_FireLogQueue, _HSE_FireLogScheduled, HSE_FIRE_LOG_DEFER_MS
+	global _HSE_FireLogQueue
+	; InputHook callbacks and timers survive native Suspend. A fire reaching this
+	; funnel after the lifecycle boundary is not owned by the active generation
+	; and must not create deferred work for a paused driver.
+	if A_IsSuspended
+		return false
 	; Dynamic hotstrings (@dt, @date, the phone/SSN/IBAN prefixes…) store a
 	; CALLABLE in Spec.Replacement and resolve it at fire time. HSE_DispatchMatch
 	; resolves it into a local and never writes it back, so the fire paths read
@@ -504,29 +573,225 @@ _HSE_QueueFireLog(Trigger, Replacement, HType, Category, Section, IsPrivate := f
 	_HSE_FireLogQueue.Push({ Trigger: Trigger, Replacement: Replacement,
 		HType: HType, Category: Category, Section: Section,
 		IsPrivate: IsPrivate ? true : false })
-	if !_HSE_FireLogScheduled {
+	_HSE_ArmFireLogDrain()
+	return true
+}
+
+; Whether a deferred callback still owns the current lifecycle and may publish.
+; PausedOverride is a deterministic test seam; production callers omit it and
+; always read native A_IsSuspended at every mutation boundary.
+_PrefixDeferredCanPublish(Generation, PausedOverride := unset) {
+	global _PrefixDeferredGeneration
+	if (Generation != _PrefixDeferredGeneration)
+		return false
+	if IsSet(PausedOverride)
+		return !PausedOverride
+	return !A_IsSuspended
+}
+
+; Arm exactly one fire-log owner for the current generation. ArmTimer=false is
+; used only by the headless behavior test, which invokes the callback directly.
+_HSE_ArmFireLogDrain(ArmTimer := true) {
+	global _HSE_FireLogQueue, _HSE_FireLogScheduled
+	global _HSE_FireLogScheduledGeneration, _HSE_FireLogTimer
+	global _PrefixDeferredGeneration
+	global HSE_FIRE_LOG_DEFER_MS
+	if (_HSE_FireLogQueue.Length == 0 or _HSE_FireLogScheduled or A_IsSuspended)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if (_HSE_FireLogQueue.Length == 0 or _HSE_FireLogScheduled or A_IsSuspended)
+			return false
 		_HSE_FireLogScheduled := true
-		; Negative period = run once after the delay. The delay exceeds the
-		; suppress release so this drain is always scheduled to fire AFTER it,
-		; never delaying it even though both run on the single AHK thread.
-		SetTimer(_HSE_DrainFireLog, -HSE_FIRE_LOG_DEFER_MS)
+		_HSE_FireLogScheduledGeneration := _PrefixDeferredGeneration
+		if ArmTimer {
+			; Negative period = run once after the delay. The delay exceeds the
+			; suppress release so this drain is always scheduled to fire AFTER it.
+			; Bind freezes the owner: a pre-suspend message already in the queue
+			; cannot impersonate a new resume timer by reading mutable globals.
+			try _HSE_FireLogTimer := TimerAfter(HSE_FIRE_LOG_DEFER_MS / 1000,
+				_HSE_DrainFireLog.Bind(_PrefixDeferredGeneration))
+			catch {
+				; TimerAfter already emitted the OS failure. Relinquish ownership so
+				; the next fire/resume can retry; the durable records stay queued.
+				_HSE_FireLogScheduled := false
+				_HSE_FireLogScheduledGeneration := -1
+				_HSE_FireLogTimer := 0
+				return false
+			}
+		} else {
+			_HSE_FireLogTimer := 0
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; Retire all callbacks carrying captured state. The fired records themselves
+; stay queued across suspend; resume transfers them to one fresh generation.
+_PrefixInvalidateDeferredEffects() {
+	global _PrefixDeferredGeneration, _HSE_FireLogScheduled
+	global _HSE_FireLogScheduledGeneration, _HSE_FireLogTimer
+	global _PrefixRenderScheduledGeneration, _PrefixRenderTimer
+	PreviousCritical := Critical("On")
+	try {
+		_PrefixDeferredGeneration += 1
+		_HSE_FireLogScheduled := false
+		_HSE_FireLogScheduledGeneration := -1
+		TimerCancel(_HSE_FireLogTimer)
+		_HSE_FireLogTimer := 0
+		TimerCancel(_PrefixRenderTimer)
+		_PrefixRenderTimer := 0
+		_PrefixRenderScheduledGeneration := -1
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return _PrefixDeferredGeneration
+}
+
+; Lifecycle hooks called by infra/lifecycle.ahk. Suspend retains the fire batch;
+; resume re-arms it exactly once; shutdown drains it before KL_Stop closes the
+; durable keylogger sinks and then invalidates every remaining timer owner.
+HotstringPrefixWatcherOnSuspend() {
+	_PrefixInvalidateDeferredEffects()
+	HotstringPrefixWatcherClearVisibleDecisions()
+}
+
+HotstringPrefixWatcherOnResume(ArmTimer := true) {
+	return _HSE_ArmFireLogDrain(ArmTimer)
+}
+
+; Drains the terminal fire batch without stopping the InputHook, invalidating
+; render callbacks, or clearing visible decisions. OnExit is non-interruptible,
+; so a successful drain is a reversible refusal gate; permanent teardown runs
+; only after every terminal commit has accepted.
+HotstringPrefixWatcherPrepareShutdown() {
+	global _HSE_FireLogQueue, _HSE_FireLogScheduled
+	global _HSE_FireLogScheduledGeneration, _HSE_FireLogTimer
+	global _PrefixDeferredGeneration
+	if (_HSE_FireLogQueue.Length == 0)
+		return true
+	OwnerGeneration := _PrefixDeferredGeneration
+	PreviousCritical := Critical("On")
+	try {
+		_HSE_FireLogScheduled := true
+		_HSE_FireLogScheduledGeneration := OwnerGeneration
+		TimerCancel(_HSE_FireLogTimer)
+		_HSE_FireLogTimer := 0
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Drained := _HSE_DrainFireLog(OwnerGeneration, false)
+	if !Drained and !A_IsSuspended
+		_HSE_ArmFireLogDrain()
+	return Drained
+}
+
+HotstringPrefixWatcherOnShutdown() {
+	global _HSE_FireLogQueue, _HSE_FireLogScheduled
+	global _HSE_FireLogScheduledGeneration, _PrefixDeferredGeneration
+	_PrefixInvalidateDeferredEffects()
+	HotstringPrefixWatcherClearVisibleDecisions()
+	if (_HSE_FireLogQueue.Length == 0)
+		return true
+	_HSE_FireLogScheduled := true
+	_HSE_FireLogScheduledGeneration := _PrefixDeferredGeneration
+	; The process is already terminating, so there is no future idle tick. The
+	; keylogger shutdown lease permits durable pre-pause rows, while its realtime
+	; ROI/WPM sinks remain pause-gated.
+	return _HSE_DrainFireLog(_PrefixDeferredGeneration, false)
+}
+
+; Put an unprocessed suffix back ahead of records queued by a newer callback.
+; The reference swap is atomic and preserves chronological order.
+_HSE_RestoreFireLogSuffix(Batch, StartIndex) {
+	global _HSE_FireLogQueue
+	PreviousCritical := Critical("On")
+	try {
+		Restored := []
+		Loop Batch.Length - StartIndex + 1
+			Restored.Push(Batch[StartIndex + A_Index - 1])
+		for _, Rec in _HSE_FireLogQueue
+			Restored.Push(Rec)
+		_HSE_FireLogQueue := Restored
+	} finally {
+		Critical(PreviousCritical)
 	}
 }
 
-; Drain every queued fired-hotstring record through KL_LogHotstring. Runs off the
-; keystroke path (armed by _HSE_QueueFireLog). Swaps the queue out first so fires
-; that land while we drain accumulate into a fresh batch and re-arm the timer.
-_HSE_DrainFireLog() {
+; Drain every queued fired-hotstring record through KL_LogHotstring. Ownership
+; and pause are checked BEFORE the queue swap and again before every sink call.
+; A stale/paused callback leaves the batch untouched for one resumed owner.
+_HSE_DrainFireLog(Generation := unset, PausedOverride := unset) {
 	global _HSE_FireLogQueue, _HSE_FireLogScheduled
-	_HSE_FireLogScheduled := false
-	Batch := _HSE_FireLogQueue
-	_HSE_FireLogQueue := []
-	for _, Rec in Batch {
+	global _HSE_FireLogScheduledGeneration, _HSE_FireLogTimer
+	global _PrefixDeferredGeneration
+	OwnerGeneration := IsSet(Generation)
+		? Generation
+		: _HSE_FireLogScheduledGeneration
+	CanPublish := IsSet(PausedOverride)
+		? _PrefixDeferredCanPublish(OwnerGeneration, PausedOverride)
+		: _PrefixDeferredCanPublish(OwnerGeneration)
+	if (!_HSE_FireLogScheduled or !CanPublish) {
+		; A paused attempt relinquishes its timer lease but never its records.
+		if (OwnerGeneration == _HSE_FireLogScheduledGeneration) {
+			PreviousCritical := Critical("On")
+			try {
+				if (OwnerGeneration == _HSE_FireLogScheduledGeneration) {
+					_HSE_FireLogScheduled := false
+					_HSE_FireLogScheduledGeneration := -1
+					TimerCancel(_HSE_FireLogTimer)
+					_HSE_FireLogTimer := 0
+				}
+			} finally {
+				Critical(PreviousCritical)
+			}
+		}
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		CanPublish := IsSet(PausedOverride)
+			? _PrefixDeferredCanPublish(OwnerGeneration, PausedOverride)
+			: _PrefixDeferredCanPublish(OwnerGeneration)
+		if (!_HSE_FireLogScheduled or !CanPublish)
+			return false
+		_HSE_FireLogScheduled := false
+		_HSE_FireLogScheduledGeneration := -1
+		TimerCancel(_HSE_FireLogTimer)
+		_HSE_FireLogTimer := 0
+		Batch := _HSE_FireLogQueue
+		_HSE_FireLogQueue := []
+	} finally {
+		Critical(PreviousCritical)
+	}
+	PublishGuard := IsSet(PausedOverride)
+		? _PrefixDeferredCanPublish.Bind(OwnerGeneration, PausedOverride)
+		: _PrefixDeferredCanPublish.Bind(OwnerGeneration)
+	for Index, Rec in Batch {
+		CanPublish := PublishGuard.Call()
+		if !CanPublish {
+			_HSE_RestoreFireLogSuffix(Batch, Index)
+			return false
+		}
 		; A bare try here swallowed a TypeError for weeks with no trace at all.
 		; The drain is the last stop before the metrics pipeline, so a failure
 		; must at least name itself instead of silently dropping the record.
 		try {
-			KL_LogHotstring(Rec.Trigger, Rec.Replacement, Rec.HType, "", Rec.Category, Rec.Section, Rec.IsPrivate)
+			Consumed := KL_LogHotstring(Rec.Trigger, Rec.Replacement, Rec.HType,
+				"", Rec.Category, Rec.Section, Rec.IsPrivate, PublishGuard)
+			; A false return caused by lifecycle loss means none of this fire is
+			; owned any more. Put it and the untouched suffix back for resume.
+			if (Consumed is Integer and !Consumed) {
+				_HSE_RestoreFireLogSuffix(Batch, Index)
+				; A non-lifecycle refusal means an older typing snapshot still owns
+				; publication. Re-arm the retained suffix; suspend itself leaves the
+				; queue dormant until the explicit resume transfer.
+				if !IsSet(PausedOverride)
+					_HSE_ArmFireLogDrain()
+				return false
+			}
 		} catch as Err {
 			; The failure line names the trigger so the dropped record is
 			; identifiable — but a private trigger is itself a fragment of the
@@ -534,17 +799,27 @@ _HSE_DrainFireLog() {
 			; alongside the one the redaction exists to protect.
 			Named := Rec.IsPrivate ? PersonalInfoRedactForLog(Rec.Trigger) : Rec.Trigger
 			try LoggerError("PrefixWatcher", "Fire-log drain failed for trigger '{1}': {2}.", Named, Err.Message)
+			; The row has no durable owner yet. Retain it and the untouched suffix;
+			; shutdown consumes the false result and refuses process teardown rather
+			; than turning a sink exception into silent telemetry loss.
+			_HSE_RestoreFireLogSuffix(Batch, Index)
+			if !IsSet(PausedOverride)
+				_HSE_ArmFireLogDrain()
+			return false
 		}
 	}
+	; A fire can arrive while the detached batch drains. Its enqueue normally
+	; arms the next owner; this fallback closes the re-entrancy edge if lifecycle
+	; invalidation landed between that push and its arm.
+	_HSE_ArmFireLogDrain()
+	return true
 }
 
-; Rebuild the prefix index from the CURRENT Features state without restarting
-; the InputHook. Called after a live section toggle (ui/tray_menu.ahk
-; _HS_TryLiveToggle) so the preview tooltip stops/starts in lockstep with the
-; HSE expansion: _RegisterCategoryTriggers only indexes sections whose Features
-; "enabled" flag is set, so a freshly disabled section's triggers disappear from
-; the index and a freshly enabled one's appear — exactly what a full Reload did.
-; No-op when the watcher is not running (the index is intentionally empty then).
+; Rebuild the auxiliary file catalogue from CURRENT Features without restarting
+; the InputHook. _TriggerSet feeds deferred near-miss analytics; _PrefixIndex is
+; retained for catalogue diagnostics and compatibility tests. Neither selects a
+; tooltip row — HSE_PreviewNextDecision owns that live answer. No-op when the
+; watcher is not running (both catalogues are intentionally empty then).
 HotstringPrefixWatcherRebuildIndex() {
 	global _PrefixInputHook, _PrefixIndex, _TriggerSet, _PREFIX_WATCHER_CATEGORIES
 	global _HS_CACHE_ROWS
@@ -556,17 +831,15 @@ HotstringPrefixWatcherRebuildIndex() {
 	; A_IsSuspended. Mirror that here so a rebuild armed before Pause does not
 	; quietly churn the index while the user expects the watcher to be silent.
 	; Record the deferred request so Ergopti_OnSuspendResume can replay it — a live
-	; section toggle made during pause must not leave the preview index diverged from
-	; the engine after resume (deferred-replay pattern, like LLM_Menu_OnResume).
+	; section toggle made during pause must not leave near-miss analytics stale after
+	; resume (deferred-replay pattern, like LLM_Menu_OnResume).
 	if A_IsSuspended {
 		global _PrefixIndexRebuildPending := true
 		return
 	}
-	; Build-then-swap so a concurrent OnChar preview lookup never observes an
-	; empty or partially-populated index mid-rebuild. The fresh maps are built
-	; in locals and assigned to the live globals in a single statement each at
-	; the end — the reader always sees either the old index or the complete new
-	; one, never the transient empty Map() that an in-place clear would expose.
+	; Build-then-swap so a deferred near-miss scan never observes an empty or
+	; partially-populated catalogue mid-rebuild. The reader sees either the old
+	; complete maps or the new complete maps.
 	NewIndex := Map()
 	NewSet := Map()
 	_rebuildStart := A_TickCount
@@ -581,7 +854,7 @@ HotstringPrefixWatcherRebuildIndex() {
 	_ensureStart := A_TickCount
 	if IsSet(HotstringsCacheEnsure)
 		try HotstringsCacheEnsure()
-	_ensureMs := A_TickCount - _ensureStart
+	_ensureMs := TickElapsed(_ensureStart)
 	; Build each category from the in-memory precompiled cache when available
 	; (_HS_CACHE_ROWS, populated once at boot for the HSE fast path) instead of
 	; re-reading + regex-parsing its TOML from disk. The disk rescan was the cost
@@ -614,7 +887,7 @@ HotstringPrefixWatcherRebuildIndex() {
 		_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], NewIndex, NewSet)
 		_extPacks += 1
 	}
-	_buildMs := A_TickCount - _buildStart
+	_buildMs := TickElapsed(_buildStart)
 	_PrefixIndex := NewIndex
 	_TriggerSet := NewSet
 	; Bundled categories now rebuild from memory (no FileRead, no regex); only
@@ -625,45 +898,27 @@ HotstringPrefixWatcherRebuildIndex() {
 	; (cache=0 toml=6 would mean the cache path silently broke).
 	try LoggerInfo("PrefixWatcher",
 		"Index rebuilt: {1} trigger(s) in {2} ms (ensure={3}ms build={4}ms cache={5} toml={6} ext={7} rows={8}).",
-		NewSet.Count, A_TickCount - _rebuildStart, _ensureMs, _buildMs, _cachedCats, _tomlCats, _extPacks,
+		NewSet.Count, TickElapsed(_rebuildStart), _ensureMs, _buildMs, _cachedCats, _tomlCats, _extPacks,
 		(IsSet(_HS_CACHE_ROWS) ? _HS_CACHE_ROWS.Count : "unset"))
 	; A just-disabled section may still have a tooltip on screen — hide it so the
 	; preview cannot outlive the expansion it was advertising.
 	TooltipHide("LiveToggleRebuild", true)
 }
 
-; Register a preview candidate source for triggers the file-driven index cannot
-; hold — see _PrefixPreviewProviders. Idempotent by identity so a module that is
-; loaded twice does not offer its rows twice.
-; @param Fn A callable taking the engine buffer and returning an Array of rows.
-; @return true when the provider was added.
-HotstringPrefixWatcherRegisterPreviewProvider(Fn) {
-	global _PrefixPreviewProviders
-	if !HasMethod(Fn) {
-		try LoggerError("PrefixWatcher", "RegisterPreviewProvider: the argument is not callable — the provider is ignored and its triggers stay unpreviewable.")
-		return false
-	}
-	for _, Existing in _PrefixPreviewProviders {
-		if (Existing == Fn) {
-			try LoggerDebug("PrefixWatcher", "Preview provider already registered — duplicate ignored.")
-			return false
-		}
-	}
-	_PrefixPreviewProviders.Push(Fn)
-	try LoggerDebug("PrefixWatcher", "Preview provider registered ({1} total).", _PrefixPreviewProviders.Length)
-	return true
-}
-
 ; Stop the InputHook and clear the index. Useful when the user disables the
 ; preview from the tray menu or before reloading.
 HotstringPrefixWatcherStop() {
-	global _PrefixInputHook, _PrefixIndex, _PrefixBuffer
+	global _PrefixInputHook, _PrefixIndex
+	; Stop is a terminal lifecycle boundary (the sole production caller is the
+	; global shutdown handler). Retire every timer owner before clearing state so
+	; no captured callback can publish after teardown.
+	_PrefixInvalidateDeferredEffects()
 	if _PrefixInputHook {
 		try _PrefixInputHook.Stop()
 		_PrefixInputHook := 0
 	}
 	_PrefixIndex := Map()
-	_PrefixBuffer := ""
+	_PrefixSetBuffer("")
 	TooltipHide("WatcherStop")
 	; Close out any tooltip that was on screen — the user disabling the
 	; watcher mid-suggestion is functionally a dismissal, not a fire.
@@ -709,6 +964,220 @@ _OnPrefixCharProfiled(IH, Char) {
 	HotPath_LogIfSlow("OnChar", _HotStart, Char)
 }
 
+; Snapshot the exact tooltip owner alongside a RAM mutation. Generations alone
+; are not sufficient: an active surface can be replaced without the buffer text
+; changing, and the request serial closes the pending-request half of that ABA.
+_PrefixCaptureTooltipOwner() {
+	global _TooltipGeneration, _TooltipActiveSurface, _TooltipRequestSerial
+	return {
+		Generation: _TooltipGeneration,
+		Surface: _TooltipActiveSurface,
+		RequestSerial: _TooltipRequestSerial
+	}
+}
+
+_PrefixTooltipOwnerStillCurrent(Owner) {
+	global _TooltipGeneration, _TooltipActiveSurface, _TooltipRequestSerial
+	if !(IsObject(Owner) and Owner.HasOwnProp("Generation")
+		and Owner.HasOwnProp("Surface")
+		and Owner.HasOwnProp("RequestSerial"))
+		return false
+	if (!(Owner.Generation is Integer)
+		or !(Owner.RequestSerial is Integer)
+		or Owner.Generation != _TooltipGeneration
+		or Owner.RequestSerial != _TooltipRequestSerial)
+		return false
+	if IsObject(Owner.Surface) {
+		return IsObject(_TooltipActiveSurface)
+			and ObjPtr(Owner.Surface) == ObjPtr(_TooltipActiveSurface)
+	}
+	return !IsObject(_TooltipActiveSurface)
+}
+
+; Commit the in-memory half of an input-context invalidation. The caller owns
+; serialization: production callers enter Critical before invoking this helper.
+; Keeping the state transition separate from its tooltip/analytics effects lets
+; a synthetic sender commit BOTH buffers and its OS keystroke in one short
+; transaction without dragging GUI or file-backed logging under Critical.
+; @param FocusToken {Integer} New focused-control identity, or 0 while unknown.
+; @param KnownBoundary {Boolean} Whether the new run starts at a word boundary.
+; @return {Object} Immutable state needed by the post-commit effects phase.
+_PrefixCommitInputContext(FocusToken := 0, KnownBoundary := true) {
+	global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixInputContextGeneration
+	ClearedBuffer := _PrefixBuffer
+	HSE_FeedReset(KnownBoundary, true)
+	ContentGeneration := _PrefixSetBuffer("")
+	_PrefixFocusedControlToken := FocusToken
+	_PrefixInputContextGeneration += 1
+	return {
+		ClearedBuffer: ClearedBuffer,
+		Generation: _PrefixInputContextGeneration,
+		ContentGeneration: ContentGeneration,
+		TooltipOwner: _PrefixCaptureTooltipOwner()
+	}
+}
+
+; Run the side effects for a committed context transition. This stays separate
+; from _PrefixCommitInputContext so a synthetic sender can emit its OS key first,
+; then enters one short Critical transaction to validate and retire the exact
+; tooltip owner. TooltipHide detaches pixels synchronously and defers disposal.
+_PrefixFinishInputContext(Commit) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_PrefixInputCommitStillCurrent(Commit)
+			return false
+		_ResetPrefixBuffer(false, Commit.ClearedBuffer)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; A RAM commit and its presentation work are separated specifically to keep GUI
+; and analytics outside Critical. That creates an async boundary: a newer input
+; can publish another context before the old finalizer runs. Both generations
+; are required because text can return to the same value (ABA) while focus or
+; boundary knowledge changes independently. The tooltip owner additionally
+; rejects a new surface/request published without another text mutation.
+_PrefixInputCommitStillCurrent(Commit) {
+	global _PrefixInputContextGeneration, _PrefixContentGeneration
+	if !IsObject(Commit)
+		return false
+	if !Commit.HasOwnProp("Generation") or !(Commit.Generation is Integer)
+			or !Commit.HasOwnProp("ContentGeneration")
+			or !(Commit.ContentGeneration is Integer)
+		return false
+	if (Commit.Generation != _PrefixInputContextGeneration
+		or Commit.ContentGeneration != _PrefixContentGeneration)
+		return false
+	return Commit.HasOwnProp("TooltipOwner")
+		and _PrefixTooltipOwnerStillCurrent(Commit.TooltipOwner)
+}
+
+; Clear the engine and preview as one input-context transaction. The RAM commit
+; stays separate from its finalizer so a synthetic sender can emit atomically;
+; the finalizer then uses its own short Critical owner-check + pure pixel detach.
+; Logging and retired-Gui disposal remain deferred off the keyboard transaction.
+; @param FocusToken {Integer} New focused-control identity, or 0 while unknown.
+; @param KnownBoundary {Boolean} Whether the new run starts at a word boundary.
+; @return {Integer} Published input-context generation.
+_PrefixInvalidateInputContext(FocusToken := 0, KnownBoundary := true) {
+	PreviousCritical := Critical("On")
+	try {
+		Commit := _PrefixCommitInputContext(FocusToken, KnownBoundary)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	_PrefixFinishInputContext(Commit)
+	return Commit.Generation
+}
+
+; Verify that the next character still targets the control which owns the two
+; buffers. An explicit token is a deterministic test seam; production callers
+; omit it and use the WindowInfo adapter. Failure to resolve focus is fail-closed:
+; discard any armed expansion and ignore this character rather than backspacing
+; against an unverifiable target.
+; @param FocusToken {Integer} Optional focused-control token override.
+; @return {Boolean} True when the character may safely enter the buffers.
+_PrefixEnsureInputContext(FocusToken := unset) {
+	global _PrefixBuffer, _PrefixFocusedControlToken, HSE_Buffer, HSE_StartIsWordBoundary
+	if !IsSet(FocusToken)
+		FocusToken := WIGetFocusedControlToken()
+	if !FocusToken {
+		if (_PrefixFocusedControlToken or _PrefixBuffer != "" or HSE_Buffer != "")
+			_PrefixInvalidateInputContext(0, false)
+		return false
+	}
+	if (_PrefixFocusedControlToken != FocusToken) {
+		; An unresolved probe deliberately marks the left context unknown. Preserve
+		; that verdict when focus becomes observable again; otherwise ignored text
+		; could be mistaken for a word boundary and a suffix could backspace it.
+		KnownBoundary := (_PrefixFocusedControlToken == 0) ? HSE_StartIsWordBoundary : true
+		_PrefixInvalidateInputContext(FocusToken, KnownBoundary)
+	}
+	return true
+}
+
+; Handle the two genuine Ctrl chords proven to relocate focus without OnChar.
+; AltGr synthesizes Ctrl on Windows, so RAlt/SC138 ownership is resolved by the
+; caller and explicitly excludes that path.
+; @return {Boolean} True when the chord consumed the context-reset decision.
+_PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld) {
+	static RelocatingVKs := Map(
+		0x46, true,  ; F — Find box
+		0x4C, true   ; L — browser address/location control
+	)
+	if (!CtrlHeld or AltGrHeld or !RelocatingVKs.Has(VK))
+		return false
+	; Focus usually moves only after this keydown callback returns. Publish an
+	; unknown token now; the next OnChar binds the new control generation.
+	_PrefixInvalidateInputContext(0, true)
+	return true
+}
+
+; Replace the physical wrapping symbol with a selection wrapper as one
+; status-bearing transaction. SendInstant prepares the clipboard before its Prefix
+; is injected, so a failed preparation leaves the already-visible symbol intact.
+; Both buffers are invalidated only after the wrapped text was actually emitted.
+_PrefixTryWrapSelection(Selection, Pair) {
+	global _PrefixFocusedControlToken
+	Left := Pair["left"]
+	Right := Pair["right"]
+	Wrapped := false
+	PrefixWatcherSuppress(true)
+	try {
+		; The pass-through InputHook already delivered Char. Keeping its erase in
+		; SendInstant's Prefix prevents a clipboard failure from deleting the only
+		; output that still truthfully represents the user's keystroke.
+		Wrapped := SendInstant(Left . Selection . Right, "{BackSpace}")
+		; A physical InputHook callback can interrupt TooltipHide. Resetting the
+		; preview first and the engine second therefore exposed a window where the
+		; next key entered only one buffer. Publish the new input context through
+		; the shared atomic pair, while retaining ownership of the focused control.
+		if Wrapped
+			_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
+	} finally {
+		PrefixWatcherSuppress(false)
+	}
+	return Wrapped
+}
+
+; Decide the watcher state from the engine's already-committed screen effect.
+; The completion key is not itself proof of a boundary: a consumed delimiter is
+; absent from the screen, so its replacement can immediately prefix a cascade.
+_PrefixPostFireDecision(Effect, EngineBuffer, MaxBufferLen) {
+	if !(IsObject(Effect) and Effect.HasOwnProp("ClearAll")
+		and Effect.HasOwnProp("KnownBoundaryAfter"))
+		return { Reset: true, Buffer: "", Schedule: false }
+	if Effect.ClearAll or Effect.KnownBoundaryAfter
+		return { Reset: true, Buffer: "", Schedule: false }
+	NextBuffer := EngineBuffer
+	if StrLen(NextBuffer) > MaxBufferLen
+		NextBuffer := SubStr(NextBuffer, -MaxBufferLen)
+	return {
+		Reset: NextBuffer == "",
+		Buffer: NextBuffer,
+		Schedule: NextBuffer != ""
+	}
+}
+
+_PrefixCommitPostFireEffect(Effect) {
+	global HSE_Buffer, _MAX_BUFFER_LEN
+	Decision := _PrefixPostFireDecision(Effect, HSE_Buffer, _MAX_BUFFER_LEN)
+	if Decision.Reset {
+		_ResetPrefixBuffer(true)
+		return false
+	}
+	; Retire the pre-fire pixels and decision owner before publishing the cascade
+	; buffer. Leaving them visible through the render/UIA debounce window made the
+	; old answer claimable after its trigger had already fired.
+	_PrefixRetireConsumedSuggestion("PostFire")
+	_PrefixSetBuffer(Decision.Buffer)
+	if Decision.Schedule
+		_PrefixScheduleRender()
+	return Decision.Schedule
+}
+
 ; OnChar — called for every printable character produced by the active
 ; keyboard layout. We keep this fast: append, trim, lookup, render. Anything
 ; heavy belongs out of the hot path.
@@ -716,7 +1185,7 @@ _OnPrefixCharProfiled(IH, Char) {
 ; does not silently kill the InputHook callback chain — AHK v2 stops invoking
 ; the OnChar callback permanently if an unhandled error propagates out of it.
 _OnPrefixChar(IH, Char) {
-	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixIndex, HSE_Buffer
+	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, HSE_Buffer
 	global _PrefixPrivateResidue
 	; No hotstring preview tooltip and no expansion dispatch while the script is
 	; paused or the Hotstrings master gate is off — this watcher uses its OWN
@@ -731,6 +1200,17 @@ _OnPrefixChar(IH, Char) {
 		LLM_Bridge_FeedCharIfActive(Char)
 	if !IsCategoryGated("Hotstrings")
 		return
+	; The pass-through character is already on screen. Before it can participate
+	; in a match, prove that the screen target still owns the buffered prefix. This
+	; guard sits before the main dispatch try, so contain it independently: an
+	; unhandled InputHook callback error permanently silences later characters.
+	try {
+		if !_PrefixEnsureInputContext()
+			return
+	} catch as ContextErr {
+		try LoggerError("PrefixWatcher", "Input-context verification failed: {1}.", ContextErr.Message)
+		return
+	}
 	; UIA selection-wrap: when the user types a symbol while text is selected,
 	; wrap the selection instead of inserting the bare symbol.
 	; Active pairs come from WrapSymbols_GetActivePairs() so the user's enabled/
@@ -754,35 +1234,9 @@ _OnPrefixChar(IH, Char) {
 			try {
 				UIASel := GetUIASelection()
 				if (UIASel != "") {
-					Pair  := _ActivePairsSnap[Char]
-					Left  := Pair["left"]
-					Right := Pair["right"]
-					; Erase the character already delivered by the pass-through hook,
-					; then send the wrapped replacement without re-triggering hotstrings.
-					; Release the suppression in a finally: a throwing SendEvent/SendInstant
-					; would otherwise leave the depth counter latched at >=1, silently killing
-					; the whole hotstring engine + preview for the session (uia-wrap-suppress-latch).
-					PrefixWatcherSuppress(true)
-					try {
-						SendEvent("{BackSpace}")
-						SendInstant(Left . UIASel . Right)
-					} finally {
-						PrefixWatcherSuppress(false)
-						; Both buffers or neither. The wrap deletes the character the
-						; pass-through hook already delivered and inserts a selection
-						; of unknown extent, then returns BEFORE HSE_FeedChar runs — so
-						; resetting the preview alone leaves the ENGINE holding text
-						; that is no longer left of the caret, and its next expansion
-						; backspaces over the wrapped selection. IsPhysical must be
-						; true: the wrap runs with the suppression held, and
-						; HSE_FeedReset is a no-op for non-physical callers while
-						; HSE_Suppressed is up. KnownTerminatorBefore is true because
-						; the caret lands right after the closing symbol, which the
-						; next typed run may legitimately treat as a word start.
-						_ResetPrefixBuffer()
-						HSE_FeedReset(true, true)
-					}
-					return
+					Pair := _ActivePairsSnap[Char]
+					if _PrefixTryWrapSelection(UIASel, Pair)
+						return
 				}
 			} catch as _UIAErr {
 				LoggerError("PrefixWatcher", "UIA wrap error for char '{1}': {2}.", Char, _UIAErr.Message)
@@ -853,7 +1307,8 @@ _OnPrefixChar(IH, Char) {
 			; the driver's rotating log with no user action at all — unlike the DEBUG
 			; sites, which at least need the user to switch the level on.
 			HotstringIsPrivate := HSEMatch.HasOwnProp("IsPrivate") && HSEMatch.IsPrivate
-			_HseFired := HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+			_HseFired := HSE_DispatchMatch(
+				HSEMatch, HSE_LastEndChar, &CommittedScreenEffect)
 			; The trigger is the profiler's only context here, and a slow-dispatch
 			; warning without it cannot be attributed to a mapping — so it is
 			; redacted, not dropped. The redaction preserves length, which is the
@@ -912,49 +1367,11 @@ _OnPrefixChar(IH, Char) {
 			; preview because the word-anchored lookup had no terminator to
 			; anchor against.
 			;
-			; End-char fires are the original "word is done" case: the user
-			; pressed a terminator, the trigger fired, the cursor is now at
-			; a fresh word boundary. The old wipe behaviour is correct there.
-			if (HSE_LastEndChar == "") {
-				; Take the engine's buffer verbatim instead of replaying the edit
-				; here with a second set of rules.
-				;
-				; HSE_FeedChar has ALREADY applied this expansion to HSE_Buffer:
-				; strip Spec.Length, append the replacement. Recomputing the same
-				; result from _PrefixBuffer needed a parallel arithmetic — and a
-				; different one, because this buffer does not hold the magic key the
-				; engine's does, hence the old Length-1. Two derivations of one fact
-				; is the shape that drifts, and it did.
-				;
-				; Measured (driver DEBUG log, 2026-07-21 18:10:30): typing "at" then
-				; the magic key fired the repeat t★ → tt and left this buffer holding
-				; "tt" while HSE_Buffer held "…att". Two consequences, both wrong:
-				; the preview offered "tt", a trigger the engine refuses mid-word;
-				; and the real "att" → "attention" was never even looked up, because
-				; the SearchKey computed from "tt" cannot reach it. Typing "att" by
-				; hand showed the tooltip, pressing at★ did not — same text on
-				; screen, different suggestion.
-				;
-				; The old index-based truncation is gone with it. It existed to stop
-				; a mis-derived buffer accumulating junk; with the buffer no longer
-				; mis-derived there is nothing to trim, and trimming would throw away
-				; the left context _LookupAndRender needs to place a word boundary.
-				_PrefixBuffer := HSE_Buffer
-				if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
-					_PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
-				}
-				; The roll/cascade injected new text into the buffer — check
-				; if it prefixes a registered trigger and show the tooltip
-				; immediately. This handles « p'★ → c'était »: the roll fires
-				; p' → ct, the buffer becomes "ct", and the tooltip for ct★
-				; should appear right away so the user knows to press ★.
-				; Without this call, TooltipHide() would clear the display and
-				; the next keystroke (★) would look up "ct★" instead of "ct".
-				_PrefixScheduleRender()
-				_NotifySuggestionConsumed()
-			} else {
-				_ResetPrefixBuffer(true)
-			}
+			; The engine effect owns whether the screen now ends at a boundary.
+			; A consumed end character is absent from that screen, so it follows
+			; the same cascade path as a star fire. Send-key payloads and emitted
+			; terminators remain conservative resets.
+			_PrefixCommitPostFireEffect(CommittedScreenEffect)
 			return
 		}
 
@@ -986,7 +1403,11 @@ _OnPrefixChar(IH, Char) {
 ; are not handled here; the InputHook does not see them. We rely on the
 ; tooltip's auto-hide timer for that case.
 _OnPrefixKeyDown(IH, VK, SC) {
-	global _PrefixWatcherSuppressed, HSE_Suppressed
+	global _PrefixWatcherSuppressed, HSE_Suppressed, _PrefixFocusedControlToken
+	; The prefix watcher is the newest InputHook and normally authorizes Tab
+	; acceptance before HookDispatcher sees the same physical down. Record it
+	; here; the shared key-state owner deduplicates the later dispatcher callback.
+	KS_RecordPhysicalKeyDown(VK, SC, "prefix")
 	; Inert while paused — pairs with the _OnPrefixChar guard so this watcher's
 	; private InputHook is fully silent during suspend.
 	if A_IsSuspended
@@ -1027,15 +1448,17 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		; not surface modifier flags. Done before the plain-VK branches
 		; so Ctrl+A/X/V/Z/Y do not also fall through to (e.g.) the « no
 		; printable » case.
-		CtrlHeld := GetKeyState("Control", "P")
-		if CtrlHeld {
+		CtrlHeld := KS_IsDown("Control")
+		AltGrHeld := KS_IsDown("RAlt") or KS_IsDown("SC138")
+		if _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld)
+			return
+		if (CtrlHeld and !AltGrHeld) {
 			if (VK == 0x41) {
 				; Ctrl+A — select-all. The next typed char replaces the
 				; entire selection, landing at a fresh word-start.
 				; IsPhysical=true so a real Ctrl+A landing inside the post-expansion
 				; suppress window is honoured instead of being filtered as engine output.
-				HSE_FeedReset(true, true)
-				_ResetPrefixBuffer()
+				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
 				return
 			}
 			if (VK == 0x58 or VK == 0x56 or VK == 0x5A or VK == 0x59 or VK == 0x08) {
@@ -1047,22 +1470,19 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				; left. Falling through to the plain VK==0x08 branch below would
 				; chop only ONE char, leaving the buffer ahead of the screen and
 				; later firing an expansion with backspaces into unrelated text.
-                                HSE_FeedReset(false, true)
-				_ResetPrefixBuffer()
+				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
 				return
 			}
 		}
 
-		; Feed HSE with the appropriate buffer mutation. Backspace
-		; decrements its buffer (preserving word context, the whole point
-		; of the rewrite); Tab/Enter/arrows/Escape/mouse-click all declare
-		; a word boundary — the cursor lands somewhere unknown but the next
-		; typed run always starts fresh. Space is already handled by
-		; HSE_FeedChar via OnChar's terminator path, but we also reset here
-		; so a Space whose char event was swallowed (e.g. layered on
-		; tap-hold) still flips the boundary flag.
+		; Publish every context mutation to HSE_Buffer and _PrefixBuffer as one
+		; transaction. A hook/timer callback may interrupt this keydown thread;
+		; separate engine and preview writes exposed a window where the next
+		; physical character entered only one side. Space is the deliberate
+		; exception: HSE_FeedChar must keep its terminator and left context for
+		; triggers that contain a boundary internally, while the preview starts a
+		; fresh word.
 		if (VK == 0x08) {
-			HSE_FeedBackspace(true)
 			; The preview must shrink by exactly one character too. It used to be
 			; WIPED here (VK_BACK sat in ResetVKs) while the engine merely
 			; decremented — preserving in-word context is the whole point of
@@ -1072,48 +1492,20 @@ _OnPrefixKeyDown(IH, VK, SC) {
 			; the other way.
 			_PrefixFeedBackspace()
 			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
-				LLM_Bridge_FeedKeyDownIfActive(VK)
-		} else if (VK == 0x09 or VK == 0x0D) {
-			if (VK == 0x09 and IsSet(LLM_Tooltip_TryAcceptTab) and LLM_Tooltip_TryAcceptTab())
-				return
-                        HSE_FeedReset(true, true)
-			; Flush the rolling LLM context on Tab (when no suggestion was
-			; accepted above) and Enter, mirroring the macOS reset_on_nav
-			; contract. Previously the Enter flush lived in an unreachable
-			; trailing else-if and silently never ran on this hook path.
-			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
-				LLM_Bridge_FeedKeyDownIfActive(VK)
-		} else if (VK == 0x2D or VK == 0x2E) {
-			; Insert toggles overwrite mode and Delete removes text the watcher
-			; never saw. Neither moves the caret, so unlike the pure cursor
-			; movers below they cannot promise a word boundary on the left —
-			; the engine contract lists them with the disruptive Ctrl combos,
-			; and they take the same boundary-false reset those do.
-			;
-			; Resetting BOTH buffers here is the point: they were previously in
-			; neither branch, and adding them to the preview reset alone would
-			; simply move the divergence rather than close it.
-			HSE_FeedReset(false, true)
-			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
-				LLM_Bridge_FeedKeyDownIfActive(VK)
-		} else if (VK == 0x1B
-				or VK == 0x25 or VK == 0x26
-				or VK == 0x27 or VK == 0x28
-				or VK == 0x21 or VK == 0x22
-				or VK == 0x23 or VK == 0x24) {
-			; Cursor movers: Escape, the four arrows, and the rest of the
-			; navigation cluster (PgUp/PgDn/End/Home). All of them move the
-			; caret to a position this watcher cannot observe, but the next
-			; typed run starts fresh — treat as word boundary. The engine
-			; buffer must be reset here as well as the preview: resetting only
-			; the preview leaves the engine expanding against text that is no
-			; longer to the left of the caret.
-                        HSE_FeedReset(true, true)
-			if (IsSet(LLM_Bridge_FeedKeyDownIfActive))
-				LLM_Bridge_FeedKeyDownIfActive(VK)
-		}
-		if ResetVKs.Has(VK) {
+				LLM_Bridge_FeedKeyDownIfActive(VK, true)
+		} else if (VK == 0x20) {
 			_ResetPrefixBuffer()
+		} else if ResetVKs.Has(VK) {
+			; Insert/Delete rewrite text without promising a boundary. Tab/Enter
+			; and Escape may move or destroy the focused control, so publish an
+			; unknown focus token; cursor movers and Space retain the current owner.
+			KnownBoundary := !(VK == 0x2D or VK == 0x2E)
+			FocusToken := (VK == 0x09 or VK == 0x0D or VK == 0x1B)
+				? 0
+				: _PrefixFocusedControlToken
+			_PrefixInvalidateInputContext(FocusToken, KnownBoundary)
+			if IsSet(LLM_Bridge_FeedKeyDownIfActive)
+				LLM_Bridge_FeedKeyDownIfActive(VK, true)
 		}
 	} catch as Err {
 		LoggerError("PrefixWatcher", "OnKeyDown error for VK {1}: {2}.", VK, Err.Message)
@@ -1151,42 +1543,77 @@ _PrefixWordTail(Buf) {
 	return Tail
 }
 
-; Shrink the watcher buffer by one character, mirroring HSE_FeedBackspace on the
-; engine side so the tooltip keeps describing the same text the matcher will
-; gate on. The tooltip is re-rendered from the shortened buffer rather than
+; Commit one backspace to both in-memory buffers. The caller owns serialization;
+; the physical wrapper and synthetic transaction both hold Critical here.
+; @return {Object} The preview value plus immutable content/tooltip owners.
+_PrefixCommitBackspace() {
+	global _PrefixBuffer
+	HSE_FeedBackspace(true)
+	if (_PrefixBuffer == "") {
+		; Empty does not always mean "nothing to step back over". Typing a
+		; terminator resets the preview while the engine keeps it, so deleting
+		; that terminator re-exposes the previous word. Recover the authoritative
+		; engine tail after its decrement.
+		NextPrefixBuffer := _PrefixWordTailFromEngine()
+	} else {
+		NextPrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - 1)
+	}
+	ContentGeneration := _PrefixSetBuffer(NextPrefixBuffer)
+	return {
+		Buffer: NextPrefixBuffer,
+		ContentGeneration: ContentGeneration,
+		TooltipOwner: _PrefixCaptureTooltipOwner()
+	}
+}
+
+_PrefixBackspaceCommitStillCurrent(Commit) {
+	global _PrefixContentGeneration
+	if !IsObject(Commit) or !Commit.HasOwnProp("Buffer")
+			or !Commit.HasOwnProp("ContentGeneration")
+			or !(Commit.ContentGeneration is Integer)
+			or Commit.ContentGeneration != _PrefixContentGeneration
+		return false
+	return Commit.HasOwnProp("TooltipOwner")
+		and _PrefixTooltipOwnerStillCurrent(Commit.TooltipOwner)
+}
+
+; Validate and retire the exact pre-backspace surface in one transaction. The
+; RAM commit remains separate so synthetic senders can preserve their shorter
+; engine+preview+OS-send Critical span without giving an old finalizer authority
+; over pixels published after that span.
+_PrefixFinishBackspace(Commit) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_PrefixBackspaceCommitStillCurrent(Commit)
+			return false
+		; The suggestion that was showing described the pre-backspace text, so it is
+		; stale the moment the character disappears. Drop it before re-rendering so a
+		; stale tooltip is never left standing if the new buffer matches nothing.
+		TooltipHide("Backspace", true)
+		_NotifySuggestionDismissed()
+		if (Commit.Buffer != "")
+			_PrefixScheduleRender()
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; Shrink the engine and watcher buffers by one character as one input-context
+; transaction. The tooltip is re-rendered from the shortened buffer rather than
 ; merely hidden: after deleting a typo the user is usually back on a live
 ; trigger prefix, and that suggestion should reappear.
 ;
 ; An empty buffer stays empty — there is nothing on screen to step back over,
 ; and the engine's own buffer is equally unable to go negative.
 _PrefixFeedBackspace() {
-	global _PrefixBuffer
-	if (_PrefixBuffer == "") {
-		; Empty does not always mean "nothing to step back over". Typing a
-		; terminator resets the preview while the engine keeps it, so a backspace
-		; that deletes that terminator re-exposes the PREVIOUS word on the engine
-		; side and left the preview stranded at empty. The tooltip then stayed
-		; silent for a word the engine was still perfectly able to expand — and
-		; stayed silent for the rest of that word, because the preview could never
-		; catch back up. Recover it from the engine, which is the side that still
-		; knows what is on screen.
-		Recovered := _PrefixWordTailFromEngine()
-		TooltipHide("Backspace", true)
-		_NotifySuggestionDismissed()
-		if (Recovered == "")
-			return
-		_PrefixBuffer := Recovered
-		_PrefixScheduleRender()
-		return
+	PreviousCritical := Critical("On")
+	try {
+		Commit := _PrefixCommitBackspace()
+	} finally {
+		Critical(PreviousCritical)
 	}
-	_PrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - 1)
-	; The suggestion that was showing described the pre-backspace text, so it is
-	; stale the moment the character disappears. Drop it before re-rendering so a
-	; stale tooltip is never left standing if the new buffer matches nothing.
-	TooltipHide("Backspace", true)
-	_NotifySuggestionDismissed()
-	if (_PrefixBuffer != "")
-		_PrefixScheduleRender()
+	_PrefixFinishBackspace(Commit)
 }
 
 ; Record a character that is now on screen into the watcher buffer. The ONE
@@ -1196,21 +1623,29 @@ _PrefixFeedBackspace() {
 ; them separately is how the declined case came to rewrite the buffer with a
 ; replacement that was never typed.
 _PrefixAppendTypedChar(Char) {
-	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixIndex
+	global _PrefixBuffer, _MAX_BUFFER_LEN
 	; A boundary character ends the word: nothing typed before it can still be a
 	; live trigger prefix. HSE_Buffer deliberately keeps the terminator (triggers
 	; may contain one as a non-final char); the preview only tracks the current
 	; word, so it starts fresh here.
 	if InStr(_PrefixWordBoundaries(), Char) {
 		_ResetPrefixBuffer(false)
+		; The boundary itself may be the body of a boundary-leading star trigger
+		; (for example " ★"). HSE_Buffer retains it, so ask the canonical oracle
+		; after the normal reset instead of assuming no next action can start here.
+		_PrefixScheduleRender()
 		return
 	}
-	_PrefixBuffer .= Char
-	if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
-		_PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
-	}
+	; A visible or already-requested row describes the text BEFORE Char. Hide and
+	; invalidate it synchronously through TooltipHide's Win32-only fast teardown;
+	; the replacement remains debounced, so GUI/UIA work never moves onto OnChar.
+	_PrefixDismissStaleSuggestion("PrefixChanged")
+	NextPrefixBuffer := _PrefixBuffer . Char
+	if (StrLen(NextPrefixBuffer) > _MAX_BUFFER_LEN)
+		NextPrefixBuffer := SubStr(NextPrefixBuffer, -_MAX_BUFFER_LEN)
+	_PrefixSetBuffer(NextPrefixBuffer)
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG about to _LookupAndRender: buf='{1}' indexSize={2}.", _PrefixLogSafe(_PrefixBuffer), _PrefixIndex.Count)
+		LoggerDebug("PrefixWatcher", "DBG render scheduled for buf='{1}'.", _PrefixLogSafe(_PrefixBuffer))
 	_PrefixScheduleRender()
 }
 
@@ -1221,15 +1656,21 @@ _PrefixAppendTypedChar(Char) {
 ; suggestion, never a parallel dismissal. Every other caller (word
 ; terminator, mouse click, navigation key, prefix lost) leaves the default
 ; in place so the tooltip's disappearance is properly logged.
-_ResetPrefixBuffer(ConsumedByFire := false) {
+_ResetPrefixBuffer(ConsumedByFire := false, AlreadyClearedBuffer := unset) {
 	global _PrefixBuffer, _TriggerSet, _TooltipDequeueActive
-	Buf := _PrefixBuffer
-	_PrefixBuffer := ""
-	; Tooltips must disappear immediately upon hotstring firing.
-	TooltipHide("ResetBuf", true)
-	if ConsumedByFire {
-		_NotifySuggestionConsumed()
+	global _PrefixDeferredGeneration
+	if IsSet(AlreadyClearedBuffer) {
+		Buf := AlreadyClearedBuffer
 	} else {
+		Buf := _PrefixBuffer
+		_PrefixSetBuffer("")
+	}
+	if ConsumedByFire {
+		; Consume first: TooltipHide clears visible decisions and would otherwise
+		; publish a dismissal for the suggestion resolved by this same fire.
+		_PrefixRetireConsumedSuggestion("ResetBuf")
+	} else {
+		TooltipHide("ResetBuf", true)
 		_NotifySuggestionDismissed()
 		; Near-miss / manual-trigger detection is pure keylogger analytics with no
 		; ordering requirement, so (a) skip it entirely when the keylogger is inactive
@@ -1238,8 +1679,250 @@ _ResetPrefixBuffer(ConsumedByFire := false) {
 		; session never pays it on the typing path (near-miss-on-hotpath-scan). Buf is a
 		; value copy, so the deferred scan sees the buffer as it was at reset time.
 		if (StrLen(Buf) >= 2 and Keylogger.initialized)
-			SetTimer(_CheckNearMiss.Bind(Buf), -1)
+			SetTimer(_CheckNearMiss.Bind(Buf, _PrefixDeferredGeneration), -1)
 	}
+}
+
+; The only writer for preview text. Every mutation receives a new immutable
+; generation so an older render cannot pass an ABA buffer comparison after a
+; type/backspace pair restores the same characters.
+_PrefixSetBuffer(Value) {
+	global _PrefixBuffer, _PrefixContentGeneration
+	_PrefixBuffer := Value
+	_PrefixContentGeneration += 1
+	return _PrefixContentGeneration
+}
+
+; Hide only when a suggestion lifecycle is actually armed. This keeps the
+; ordinary no-match keystroke path allocation-free while immediately removing
+; pixels that stopped describing the engine's next outcome.
+_PrefixDismissStaleSuggestion(DbgTag := "PrefixChanged", HideFn := 0) {
+	global _KLLastShownSuggestion, _PrefixVisibleFireDecisions
+	HasVisibleDecision := IsObject(_PrefixVisibleFireDecisions)
+		and _PrefixVisibleFireDecisions.Length > 0
+	if !IsObject(_KLLastShownSuggestion) and !HasVisibleDecision
+		return false
+	if HasMethod(HideFn, "Call")
+		HideFn.Call(DbgTag, true)
+	else
+		TooltipHide(DbgTag, true)
+	_NotifySuggestionDismissed()
+	return true
+}
+
+_PrefixRenderStillCurrent(PrefixSnapshot, ContentGeneration) {
+	global _PrefixBuffer, _PrefixContentGeneration
+	return ContentGeneration == _PrefixContentGeneration
+		&& PrefixSnapshot == _PrefixBuffer
+}
+
+_PrefixFireDecisionStillCurrent(Decision, CompletedBuffer := unset,
+		ExpectedEndChar := unset) {
+	global HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+	global HSE_RegistryTransitionDepth
+	global HSE_RebuildInProgress, HSE_Buffer
+	global _PrefixContentGeneration, _PrefixInputContextGeneration
+	if !(IsObject(Decision)
+		and Decision.HasOwnProp("RegistryGeneration")
+		and Decision.HasOwnProp("BufferBefore")
+		and Decision.HasOwnProp("BufferAfterCompletion")
+		and Decision.HasOwnProp("EndChar")
+		and Decision.HasOwnProp("RuntimeDecisionGeneration")
+		and Decision.HasOwnProp("PrefixContentGeneration")
+		and Decision.HasOwnProp("PrefixInputContextGeneration"))
+		return false
+	; Text equality alone is not an owner: reset/Home followed by retyping the
+	; same characters is an ABA transition and can change the engine's word-start
+	; context. The decision must retain both epochs through pixel publication and
+	; the later dispatch claim.
+	if (Decision.PrefixContentGeneration != _PrefixContentGeneration
+		or Decision.PrefixInputContextGeneration
+			!= _PrefixInputContextGeneration)
+		return false
+	if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0
+		or Decision.RuntimeDecisionGeneration
+			!= HSE_RuntimeDecisionGeneration
+		or Decision.RegistryGeneration != HSE_RegistryGeneration)
+		return false
+	if IsSet(CompletedBuffer) {
+		if Decision.BufferAfterCompletion !== CompletedBuffer
+			return false
+		if IsSet(ExpectedEndChar) and Decision.EndChar !== ExpectedEndChar
+			return false
+		return true
+	}
+	return Decision.BufferBefore == HSE_Buffer
+}
+
+; Renderer callback: every FireDecision row must still describe the exact live
+; engine buffer and registry generation. Non-hotstring surfaces carry no such
+; rows and are valid; presenting one will clear the prior snapshot at publish.
+HotstringPrefixWatcherDecisionItemsStillCurrent(Items) {
+	if !IsObject(Items)
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		for _, Item in Items {
+			if (IsObject(Item) and Item.HasOwnProp("FireDecision")
+				and !_PrefixFireDecisionStillCurrent(Item.FireDecision))
+				return false
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; Renderer callback invoked at the pixel commit point. Publish only decisions
+; that were revalidated in the same Critical span as reveal; otherwise clear the
+; old owner and make the renderer tear the just-revealed stale surface down.
+HotstringPrefixWatcherPublishVisibleDecisions(Items) {
+	global _PrefixVisibleFireDecisions
+	Next := []
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Items) {
+			for _, Item in Items {
+				if !(IsObject(Item) and Item.HasOwnProp("FireDecision"))
+					continue
+				if !_PrefixFireDecisionStillCurrent(Item.FireDecision) {
+					_PrefixVisibleFireDecisions := []
+					return false
+				}
+				Next.Push(Item.FireDecision)
+			}
+		}
+		_PrefixVisibleFireDecisions := Next
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+HotstringPrefixWatcherClearVisibleDecisions(EmitDismissed := true) {
+	global _PrefixVisibleFireDecisions, _KLLastShownSuggestion
+	DismissedRecord := 0
+	PreviousCritical := Critical("On")
+	try {
+		_PrefixVisibleFireDecisions := []
+		DismissedRecord := _KLLastShownSuggestion
+		_KLLastShownSuggestion := ""
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if EmitDismissed
+		_PrefixEmitDetachedSuggestionDismissal(DismissedRecord)
+	return DismissedRecord
+}
+
+; TooltipHide uses the pure clear mode inside its pixel transaction, then calls
+; this only after restoring interruptibility. Kept public so the renderer never
+; reaches into the watcher's private metric state.
+HotstringPrefixWatcherEmitDismissedRecord(DismissedRecord) {
+	return _PrefixEmitDetachedSuggestionDismissal(DismissedRecord)
+}
+
+; Renderer post-commit callback, intentionally outside its Critical pixel swap.
+; TooltipShow is asynchronous, so scheduling/logging at request time produced
+; phantom suggestion rows and LLM timers when UIA later rejected the render.
+HotstringPrefixWatcherOnSurfacePresented(Items, SurfaceToken) {
+	global _PrefixVisibleFireDecisions
+	if !IsObject(Items) or !IsObject(SurfaceToken)
+		return false
+	PrimaryItem := 0
+	ClosesHotstringSuggestion := false
+	PreviousCritical := Critical("On")
+	try {
+		if !TooltipSurfaceTokenIsCurrent(SurfaceToken)
+			return false
+		if (_PrefixVisibleFireDecisions.Length == 0) {
+			ClosesHotstringSuggestion := true
+		} else {
+		for _, Item in Items {
+			if !(IsObject(Item) and Item.HasOwnProp("FireDecision"))
+				continue
+			if Item.FireDecision !== _PrefixVisibleFireDecisions[1]
+				return false
+			PrimaryItem := Item
+			break
+		}
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if ClosesHotstringSuggestion
+		return _NotifySuggestionDismissedForSurfaceReplacement(SurfaceToken)
+	if !IsObject(PrimaryItem)
+		return false
+	; This callback is deliberately outside the renderer Critical span. The metric
+	; helper binds its state + final keylogger queue push to SurfaceToken without
+	; running privacy work under Critical.
+	if !_NotifySuggestionShownForSurface(PrimaryItem.Trigger, PrimaryItem.Text,
+		PrimaryItem.Category, PrimaryItem.IsPrivate, SurfaceToken)
+		return false
+	if IsSet(LLM_Bridge_ScheduleAfterHotstring)
+		try LLM_Bridge_ScheduleAfterHotstring(Items, SurfaceToken)
+	return true
+}
+
+; Dispatch callback. Registered Specs match by object identity; transient
+; repeat/personal fallbacks are recreated on every probe, so they match by their
+; engine-owned kind + trigger. Exact completed-buffer and end-char equality
+; prevents an old visible row from donating its frozen dynamic value elsewhere.
+HotstringPrefixWatcherClaimVisibleDecision(Spec, EndChar, BufferAfterCompletion) {
+	global _PrefixVisibleFireDecisions
+	if !IsObject(Spec) or !IsObject(_PrefixVisibleFireDecisions)
+		return 0
+	PreviousCritical := Critical("On")
+	try {
+		for _, Decision in _PrefixVisibleFireDecisions {
+			if !_PrefixFireDecisionStillCurrent(
+				Decision, BufferAfterCompletion, EndChar)
+				continue
+			IdentityMatches := false
+			if (Decision.HasOwnProp("SpecIdentity") and Decision.SpecIdentity != 0) {
+				IdentityMatches := ObjPtr(Spec) == Decision.SpecIdentity
+			} else if (Decision.HasOwnProp("TransientKind")
+				and Spec.HasOwnProp("TransientKind")
+				and Decision.HasOwnProp("Spec")
+				and IsObject(Decision.Spec)
+				and Decision.Spec.HasOwnProp("Trigger")
+				and Spec.HasOwnProp("Trigger")) {
+				IdentityMatches := Spec.TransientKind == Decision.TransientKind
+					and Spec.Trigger == Decision.Spec.Trigger
+			}
+			if IdentityMatches
+				return Decision
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return 0
+}
+
+; A batch registry writer calls this after raising its transition fence. The
+; existing pixels and queued render belong to the old generation and are torn
+; down synchronously; no matcher/index reconstruction is performed here.
+HotstringPrefixWatcherInvalidateRegistryProjection() {
+	global _PrefixBuffer, _PrefixInputHook, _PrefixVisibleFireDecisions
+	if !_PrefixInputHook and (!IsObject(_PrefixVisibleFireDecisions)
+		or _PrefixVisibleFireDecisions.Length == 0)
+		return false
+	_PrefixSetBuffer(_PrefixBuffer)
+	_PrefixCancelRender()
+	TooltipHide("RegistryProjection", true)
+	_NotifySuggestionDismissed()
+	return true
+}
+
+; Once the outermost registry transition commits, recompute the current answer
+; without waiting for another physical key. The render remains debounced and
+; runs only while the watcher lifecycle is active.
+HotstringPrefixWatcherRefreshRegistryProjection() {
+	global _PrefixInputHook, HSE_Buffer
+	if A_IsSuspended or !_PrefixInputHook or HSE_Buffer == ""
+		return false
+	return _PrefixScheduleRender()
 }
 
 ; Whether a near-miss record must be withheld whole rather than written.
@@ -1252,12 +1935,10 @@ _ResetPrefixBuffer(ConsumedByFire := false) {
 ;
 ; HONEST SCOPE: this guard is defence in depth, not a fix for a demonstrated
 ; leak. Today _TriggerSet is built only by _AddTriggerToIndex from the TOML /
-; cache pipeline, which sets no IsPrivate property, while the personal-info
-; family is registered imperatively and reaches the preview through the PROVIDER
-; — a separate candidate source that never enters _TriggerSet. So no private
-; entry can arrive here as the code stands. The guard exists because that is one
-; registration change away, every sibling sink already reads the flag, and this
-; is the only one of them that had no privacy concept at all.
+; cache pipeline, whose rows carry no private values; imperative personal-info
+; registrations live only in the engine registry and never enter this analytics
+; set. The guard exists because that is one registration change away and every
+; sibling persisted sink already honours the same flag.
 ; @param Entry {Object} A _TriggerSet entry.
 ; @return {Boolean} True when the row must not be written.
 _NearMissIsWithheld(Entry) {
@@ -1267,8 +1948,15 @@ _NearMissIsWithheld(Entry) {
 ; Checks whether the typed buffer (at word boundary) is a known trigger
 ; typed manually (manual_typed_known_trigger) or within edit distance 1
 ; of a known trigger (hotstring_near_miss).
-_CheckNearMiss(Buf) {
-	global _TriggerSet
+_CheckNearMiss(Buf, Generation := unset, PausedOverride := unset) {
+	global _TriggerSet, _PrefixDeferredGeneration
+	if !IsSet(Generation)
+		Generation := _PrefixDeferredGeneration
+	CanPublish := IsSet(PausedOverride)
+		? _PrefixDeferredCanPublish(Generation, PausedOverride)
+		: _PrefixDeferredCanPublish(Generation)
+	if !CanPublish
+		return
 	; Defense in depth: the sole consumer (KL_LogHotstringNearMiss) is inert when the
 	; keylogger is off, so the whole O(n) scan is dead work then. _ResetPrefixBuffer
 	; already gates + defers this, but guard here too in case the keylogger stopped
@@ -1290,6 +1978,11 @@ _CheckNearMiss(Buf) {
 		Entry := _TriggerSet[key]
 		if _NearMissIsWithheld(Entry)
 			return
+		CanPublish := IsSet(PausedOverride)
+			? _PrefixDeferredCanPublish(Generation, PausedOverride)
+			: _PrefixDeferredCanPublish(Generation)
+		if !CanPublish
+			return
 		try KL_LogHotstringNearMiss("manual_typed_known_trigger",
 			Entry.Trigger, Entry.Output, Entry.Category)
 		return
@@ -1302,6 +1995,11 @@ _CheckNearMiss(Buf) {
 			continue
 		if (_EditDistance1(key, trig)) {
 			if _NearMissIsWithheld(Entry)
+				return
+			CanPublish := IsSet(PausedOverride)
+				? _PrefixDeferredCanPublish(Generation, PausedOverride)
+				: _PrefixDeferredCanPublish(Generation)
+			if !CanPublish
 				return
 			try KL_LogHotstringNearMiss("hotstring_near_miss",
 				Entry.Trigger, Entry.Output, Entry.Category)
@@ -1361,21 +2059,8 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 	))
 }
 
-; Look up the current buffer in the prefix index and update the tooltip.
-;
-; ── Word-anchored lookup ──
-; The buffer holds every keystroke since the last reset (word-breaker, mouse
-; click, arrow key…), so for a mid-word context like ``l'ia`` the literal
-; buffer is "l'ia" but the trigger the user is reaching for is the substring
-; AFTER the last word-boundary char — here ``ia``. Looking up the full buffer
-; means we miss every trigger whose context includes an in-word terminator
-; (apostrophes for French contractions, punctuation, …) even though the
-; HSE engine itself fires those triggers correctly via suffix matching.
-;
-; We slide a cursor across _PrefixWordBoundaries() to find the rightmost
-; boundary in the buffer; everything to its right is the effective "word
-; under typing", and that is what we look up. When no boundary is present
-; we fall back to the full buffer.
+; Ask the canonical engine oracle for the current completion decisions and
+; project them into tooltip rows. The file catalogue is deliberately absent.
 ; Debounced render scheduler — see _PREFIX_RENDER_DEBOUNCE_MS. Each keystroke
 ; re-arms a one-shot timer (negative period), so a burst of keystrokes collapses
 ; into ONE trailing render once typing pauses. The flush re-runs the lookup
@@ -1385,7 +2070,36 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 ; immediate hide so a fired hotstring's tooltip vanishes at once.
 _PrefixScheduleRender() {
 	global _PREFIX_RENDER_DEBOUNCE_MS
-	SetTimer(_PrefixRenderFlush, -_PREFIX_RENDER_DEBOUNCE_MS)
+	global _PrefixRenderScheduledGeneration, _PrefixRenderTimer
+	global _PrefixDeferredGeneration
+	PreviousCritical := Critical("On")
+	try {
+		; Reuse one adapter handle and BoundFunc throughout a lifecycle so the
+		; per-keystroke debounce stays allocation-free. A new lifecycle gets a
+		; new immutable owner.
+		if (!(_PrefixRenderTimer is Map)
+			or _PrefixRenderScheduledGeneration != _PrefixDeferredGeneration) {
+			TimerCancel(_PrefixRenderTimer)
+			_PrefixRenderScheduledGeneration := _PrefixDeferredGeneration
+			try _PrefixRenderTimer := TimerAfter(_PREFIX_RENDER_DEBOUNCE_MS / 1000,
+				_PrefixRenderFlush.Bind(_PrefixDeferredGeneration))
+			catch {
+				_PrefixRenderTimer := 0
+				_PrefixRenderScheduledGeneration := -1
+				return false
+			}
+		} else {
+			try TimerRestartAfter(_PrefixRenderTimer, _PREFIX_RENDER_DEBOUNCE_MS / 1000)
+			catch {
+				_PrefixRenderTimer := 0
+				_PrefixRenderScheduledGeneration := -1
+				return false
+			}
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
 }
 ; Cancel any pending debounced render. Called the instant a hotstring fires:
 ; the preview armed for the PRE-expansion buffer is now obsolete, and leaving
@@ -1394,14 +2108,37 @@ _PrefixScheduleRender() {
 ; expansion (~35 ms added to that keystroke at speed). The fire path schedules a
 ; fresh render for the POST-expansion state itself, so nothing wanted is lost.
 _PrefixCancelRender() {
-	SetTimer(_PrefixRenderFlush, 0)
+	global _PrefixRenderScheduledGeneration, _PrefixRenderTimer
+	PreviousCritical := Critical("On")
+	try {
+		TimerCancel(_PrefixRenderTimer)
+		_PrefixRenderTimer := 0
+		_PrefixRenderScheduledGeneration := -1
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
-_PrefixRenderFlush() {
+_PrefixRenderFlush(Generation := unset) {
 	global _PrefixWatcherSuppressed, HSE_Suppressed
-	SetTimer(_PrefixRenderFlush, 0)   ; belt-and-suspenders: never re-fire on its own
-	; A render queued just before suspend must not paint a preview while paused —
-	; timer callbacks bypass native Suspend, so guard it explicitly.
-	if A_IsSuspended
+	global _PrefixRenderScheduledGeneration, _PrefixRenderTimer
+	if !IsSet(Generation)
+		Generation := _PrefixRenderScheduledGeneration
+	; Belt-and-suspenders: retire only this exact owner. A stale callback must
+	; never cancel the fresh timer that resume installed in the same global slot.
+	PreviousCritical := Critical("On")
+	try {
+		if (Generation == _PrefixRenderScheduledGeneration) {
+			TimerCancel(_PrefixRenderTimer)
+			_PrefixRenderTimer := 0
+			_PrefixRenderScheduledGeneration := -1
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	; A render queued before suspend/stop belongs to the previous lifecycle even
+	; if it happens to dispatch after resume. Gate on both generation and native
+	; pause so the old state can never repaint itself into the new context.
+	if !_PrefixDeferredCanPublish(Generation)
 		return
 	; Skip while a send burst is in flight: TooltipShow is a ~20-55 ms Gui rebuild
 	; (Build + Present + DWM border) that pumps the message loop, so running it
@@ -1417,164 +2154,138 @@ _PrefixRenderFlush() {
 		try LoggerError("PrefixWatcher", "Deferred render failed: {1}.", Err.Message)
 }
 
-; True when candidate A outranks candidate B under the engine's collision
-; tie-break: a longer trigger wins (the engine fires the longest match), then a
-; higher priority, then — when both are equal — a false return preserves the
-; original registration order (the engine's final ``Seq`` tiebreak). HasOwnProp
-; guards keep it safe against entries built before the Priority field existed.
-; Delegates to the ENGINE's rule rather than restating it. This function used to
-; carry its own copy, and the copy had drifted: it defaulted a missing Priority
-; to 0 where the engine defaults to 50, and it had no GroupOrder or Seq tiebreak
-; at all. Two implementations of "which trigger wins" mean the tooltip can rank a
-; collision differently from the engine that will fire it — the tooltip shows one
-; expansion and the user gets another. The correct cure for a duplicated rule is
-; to delete the second copy, not to keep the two in step by hand.
-_PrefixCandidateBeats(A, B) {
-	return _HSE_Beats(A, B)
+; Project one immutable engine decision into a display row. Candidate discovery,
+; collision ordering and all fire gates stay owned by HSE_PreviewNextDecision;
+; this layer only formats what that oracle already decided.
+_PrefixDecisionDisplayText(Decision) {
+	if !(IsObject(Decision) and Decision.HasOwnProp("Spec")
+		and IsObject(Decision.Spec))
+		return ""
+	Spec := Decision.Spec
+	; Personal values carry an immutable field/value snapshot on the same Spec
+	; that will fire. Mask that snapshot for display without re-reading mutable
+	; personal state or changing the complete value frozen for dispatch.
+	if (Spec.HasOwnProp("PreviewFields") and Spec.HasOwnProp("PreviewValues")) {
+		if !IsSet(_PIPreviewMaskedText)
+			return ""
+		try return _PIPreviewMaskedText(Spec.PreviewFields, Spec.PreviewValues)
+		catch
+			return ""
+	}
+	; Send-key syntax is not literal screen text: showing `""{Left}` as five
+	; printable characters would be another prediction engine. Such mappings may
+	; opt in later with an explicit, engine-owned PreviewOutput snapshot.
+	if !(Decision.HasOwnProp("OnlyText") and Decision.OnlyText) {
+		return (Spec.HasOwnProp("PreviewOutput") and Spec.PreviewOutput is String)
+			? Spec.PreviewOutput : ""
+	}
+	return (Decision.HasOwnProp("Replacement") and Decision.Replacement is String)
+		? Decision.Replacement : ""
 }
 
-; Return a NEW array of the candidates ordered by _PrefixCandidateBeats. A stable
-; insertion sort (swap only on a strict beat) keeps equal-rank candidates in their
-; original order, so the first item is exactly the mapping the engine would fire.
-; The source array (the live prefix-index bucket) is never mutated.
-_PrefixSortCandidates(Candidates) {
-	Sorted := []
-	for _, E in Candidates {
-		Sorted.Push(E)
-	}
-	N := Sorted.Length
-	I := 2
-	while (I <= N) {
-		Pivot := Sorted[I]
-		J := I - 1
-		while (J >= 1 and _PrefixCandidateBeats(Pivot, Sorted[J])) {
-			Sorted[J + 1] := Sorted[J]
-			J -= 1
-		}
-		Sorted[J + 1] := Pivot
-		I += 1
-	}
-	return Sorted
+_PrefixDecisionCategory(Spec) {
+	if (Spec.HasOwnProp("Category") and Spec.Category != "")
+		return Spec.Category
+	if Spec.HasOwnProp("PreviewFields")
+		return "personal"
+	if (Spec.HasOwnProp("IsRepeat") and Spec.IsRepeat)
+		return "magickey"
+	return ""
 }
 
-; Build the preview's candidate set from the ENGINE's buffer, ranked by the
-; engine's own tie-break. Returns a (possibly empty) Array of index entries.
-;
-; The preview used to derive its candidates from ONE index key: the tail of
-; _PrefixBuffer after the last word-boundary character. That is a second,
-; NARROWER derivation than the matcher's. _PrefixAppendTypedChar wipes
-; _PrefixBuffer on every boundary character, so a key containing a space or an
-; apostrophe could never be produced — while _AddTriggerToIndex happily indexes
-; « la dispo★ » under the key « la dispo ». The engine, which probes EVERY
-; suffix of HSE_Buffer and prefers the longer trigger, therefore fired
-; « la disposition » while the tooltip had promised « disponible », and
-; _PreviewEngineWouldFire could not catch it: it only validates the candidate
-; the preview already chose, it never asks which candidate the engine would pick.
-;
-; Probing the same suffixes the matcher probes deletes that second derivation
-; instead of patching it. The probe is bounded by the longest registered trigger
-; (the engine already tracks it for exactly this purpose), so the cost is
-; O(longest trigger) Map lookups, not O(buffer).
-_PrefixCollectCandidates() {
-	global _PrefixIndex, HSE_Buffer, HSE_MaxStarTriggerLen, HSE_MaxEndTriggerLen
+_PrefixCandidateFromDecision(Decision, ContentGeneration,
+		InputContextGeneration) {
+	if !(IsObject(Decision) and Decision.HasOwnProp("Spec")
+		and IsObject(Decision.Spec))
+		return ""
+	; The HSE answer is local to this lookup. Clone it before adding the preview
+	; owner's epochs so no renderer mutation leaks back into engine state.
+	Decision := Decision.Clone()
+	Decision.PrefixContentGeneration := ContentGeneration
+	Decision.PrefixInputContextGeneration := InputContextGeneration
+	Text := _PrefixDecisionDisplayText(Decision)
+	if !(Text is String) or Text == ""
+		return ""
+	Spec := Decision.Spec
+	Category := _PrefixDecisionCategory(Spec)
+	Section := Spec.HasOwnProp("Section") ? Spec.Section : ""
+	return {
+		Trigger: Spec.HasOwnProp("Trigger") ? Spec.Trigger : "",
+		Output: Text,
+		Category: Category,
+		Section: Section,
+		Length: Spec.HasOwnProp("Length") ? Spec.Length : 0,
+		Priority: Spec.HasOwnProp("Priority") ? Spec.Priority : "",
+		GroupOrder: Spec.HasOwnProp("GroupOrder") ? Spec.GroupOrder : 0,
+		Seq: Spec.HasOwnProp("Seq") ? Spec.Seq : 0,
+		Delay: Decision.HasOwnProp("GateDurationMs")
+			? Decision.GateDurationMs / 1000 : 0,
+		IsPrivate: (Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate) ? true : false,
+		Completion: Decision.HasOwnProp("Completion") ? Decision.Completion : "",
+		FireDecision: Decision
+	}
+}
+
+; Ask the engine the only two questions represented by the bubble: what fires
+; on a normal end character, and what fires on the configured magic key. The
+; old collector walked a second file-derived index, ranked its own candidate
+; union, then asked the matcher whether the chosen row happened to be valid.
+; That could never discover a different live winner or a same-trigger reload.
+_PrefixCollectCandidates(ContentGeneration := unset,
+		InputContextGeneration := unset) {
+	global HSE_Buffer, HSE_WORD_TERMINATORS, ScriptInformation
+	global _PrefixContentGeneration, _PrefixInputContextGeneration
 	Candidates := []
-	if (!IsSet(HSE_Buffer) or HSE_Buffer == "")
+	if !IsSet(HSE_Buffer) or HSE_Buffer == ""
 		return Candidates
-	; An empty index is not an empty candidate set any more: the providers below
-	; answer for triggers the index structurally cannot hold, so returning early
-	; here would silence them for the whole window between boot and the deferred
-	; index build — and permanently on a build that failed.
-	if (IsSet(_PrefixIndex) and _PrefixIndex.Count > 0) {
-		MaxKeyLen := IsSet(HSE_MaxStarTriggerLen) ? HSE_MaxStarTriggerLen : 0
-		if (IsSet(HSE_MaxEndTriggerLen) and HSE_MaxEndTriggerLen > MaxKeyLen)
-			MaxKeyLen := HSE_MaxEndTriggerLen
-		; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
-		; ``ct`` from ``CT`` — the index registers each case variant separately with
-		; its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
-		if (MaxKeyLen >= 1) {
-			Loop Min(StrLen(HSE_Buffer), MaxKeyLen) {
-				Suffix := SubStr(HSE_Buffer, -A_Index)
-				if !_PrefixIndex.Has(Suffix)
-					continue
-				for _, Entry in _PrefixIndex[Suffix]
-					Candidates.Push(Entry)
-			}
-		}
-	}
-	_PrefixCollectFromProviders(HSE_Buffer, Candidates)
-	if (Candidates.Length == 0)
-		return Candidates
-	return _PrefixSortCandidates(Candidates)
-}
+	if !IsSet(ContentGeneration)
+		ContentGeneration := _PrefixContentGeneration
+	if !IsSet(InputContextGeneration)
+		InputContextGeneration := _PrefixInputContextGeneration
 
-; Append every registered provider's rows to the candidate set.
-;
-; Runs AFTER the index probe so a provider can never shadow a trigger the index
-; already answered for: the index row carries the real category, section and
-; priority of the mapping that will fire, and two rows for one trigger would
-; show the user the same expansion twice, the second one dimmed.
-;
-; A throwing provider costs its own rows and nothing else — the preview is a
-; hint, and one broken source must not empty the bubble for the others.
-; @param Buffer The engine's buffer, the same string the suffix probe read.
-; @param Candidates The array to append to, already holding the index rows.
-_PrefixCollectFromProviders(Buffer, Candidates) {
-	global _PrefixPreviewProviders
-	if (!IsSet(_PrefixPreviewProviders) or _PrefixPreviewProviders.Length == 0)
-		return
-	Seen := Map()
-	for _, Entry in Candidates
-		Seen[StrLower(Entry.Trigger)] := true
-	for _, Provider in _PrefixPreviewProviders {
-		Rows := ""
-		try {
-			Rows := Provider.Call(Buffer)
-		} catch as Err {
-			try LoggerError("PrefixWatcher", "A preview provider failed: {1}. Its rows are dropped for this render.", Err.Message)
-			continue
-		}
-		if !(Rows is Array)
-			continue
-		for _, Row in Rows {
-			if (!IsObject(Row) or !Row.HasOwnProp("Trigger") or !Row.HasOwnProp("Output"))
-				continue
-			Key := StrLower(Row.Trigger)
-			if Seen.Has(Key)
-				continue
-			Seen[Key] := true
-			; Stamped HERE and unconditionally, not left to each provider. A
-			; provider exists to resolve values the driver holds precisely because
-			; they are the user's own, and one that forgot the flag would write the
-			; phone / IBAN / SSN / card into the 14-day keylogger on every preview
-			; keystroke. macOS makes the same call for the same reason. The bubble
-			; still SHOWS the value — putting the user's data on the user's own
-			; screen is the feature; it is only the persisted sink that withholds it.
-			Row.IsPrivate := true
-			Candidates.Push(Row)
-		}
+	EndCompletion := SubStr(HSE_WORD_TERMINATORS, 1, 1)
+	if EndCompletion != "" {
+		EndDecision := HSE_PreviewNextDecision(HSE_Buffer, EndCompletion)
+		EndCandidate := _PrefixCandidateFromDecision(EndDecision,
+			ContentGeneration, InputContextGeneration)
+		if IsObject(EndCandidate)
+			Candidates.Push(EndCandidate)
 	}
+
+	MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
+		? ScriptInformation["MagicKey"] : ""
+	if MagicKey != "" and MagicKey !== EndCompletion {
+		MagicDecision := HSE_PreviewNextDecision(HSE_Buffer, MagicKey)
+		MagicCandidate := _PrefixCandidateFromDecision(MagicDecision,
+			ContentGeneration, InputContextGeneration)
+		if IsObject(MagicCandidate)
+			Candidates.Push(MagicCandidate)
+	}
+	return Candidates
 }
 
 _LookupAndRender() {
-	global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation
-	PrefixSnapshot := _PrefixBuffer
+	global _PrefixBuffer
+	global _PrefixContentGeneration, _PrefixInputContextGeneration
+	; Capture text and both ownership epochs as one in-memory context. Candidate
+	; resolution may yield in a callable; these immutable values follow every
+	; FireDecision through the renderer's final commit oracle.
+	PreviousCritical := Critical("On")
+	try {
+		PrefixSnapshot := _PrefixBuffer
+		ContentGeneration := _PrefixContentGeneration
+		InputContextGeneration := _PrefixInputContextGeneration
+	} finally {
+		Critical(PreviousCritical)
+	}
 	Len := StrLen(PrefixSnapshot)
 	; This render is scheduled by the post-fire buffer sync, so it prints the
 	; resolved replacement without the user typing anything further — the one
 	; DEBUG site that fires on the expansion itself rather than on a keystroke.
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2} indexSize={3}.", _PrefixLogSafe(PrefixSnapshot), Len, _PrefixIndex.Count)
-	; Short buffers are only skipped when they have no entry in the index.
-	; A 1-char buffer may validly match a magic-key trigger body (e.g. "c"
-	; is the body of "c★"), so we let the lookup below decide — the early
-	; exit here only avoids the Map lookup for guaranteed-empty cases.
-	if (Len < 1) {
-		TooltipHide("LookupLen0", true)
-		_NotifySuggestionDismissed()
-		return
-	}
-
-	Candidates := _PrefixCollectCandidates()
+		LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2}.", _PrefixLogSafe(PrefixSnapshot), Len)
+	Candidates := _PrefixCollectCandidates(
+		ContentGeneration, InputContextGeneration)
 	if (Candidates.Length == 0) {
 		if LoggerIsDebugEnabled()
 			LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", _PrefixLogSafe(PrefixSnapshot))
@@ -1585,82 +2296,34 @@ _LookupAndRender() {
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", _PrefixLogSafe(PrefixSnapshot), Candidates.Length)
 
-	; Lay the candidates out per group as the user requested:
-	; end-char (↵) triggers FIRST (top), then magic-key (★) triggers below.
-	; End-char triggers usually have a shorter delay (the user types
-	; space/tab/enter quickly) so they need maximum visibility on top.
-	; Within each group, the FIRST surviving candidate is the one the engine
-	; will actually fire — it is rendered normally. Every subsequent candidate
-	; of the same group is rendered dimmed + strikethrough (IsDimmed flag,
-	; consumed by tooltip.ahk's _TooltipBuildGui).
-	; Rank colliding candidates by the engine's tie-break (longer trigger first,
-	; then higher priority, then registration order) BEFORE splitting into display
-	; groups. The split is stable, so the FIRST item in each group is the candidate
-	; the engine would actually fire — it is rendered normally while the losers are
-	; dimmed. Without this the non-dimmed preview was just the first-scanned trigger
-	; (category load order), which made a personal trigger that the engine fires show
-	; up dimmed beneath a common one it loses to.
-	MK := ScriptInformation["MagicKey"]
-	EndItems := []
-	StarItems := []
+	; Candidate collection already returns the engine's one canonical winner for
+	; each completion key, ordered end-char then magic. There are no speculative
+	; losers to dim and no trigger-suffix heuristic to classify.
+	Items := []
 	for _, Entry in Candidates {
 		Cfg := HotstringsResolve(Entry.Category, Entry.Section)
-		if !Cfg.ShowTooltip {
+		if !Cfg.ShowTooltip
 			continue
-		}
-		; Only offer what the engine would actually fire. The suffix probe above
-		; decides WHICH candidates to consider; it is not a word-boundary verdict,
-		; and treating it as one is what let a mid-word "tt" be advertised as a
-		; word-initial trigger the engine then refused.
-		if !_PreviewEngineWouldFire(Entry.Trigger) {
-			; The candidate list is the union of the index and the provider, and only
-			; the provider's rows are personal — so this line prints a private trigger
-			; exactly when the @-family bubble declines to render. Redacted rather
-			; than dropped: the reason a candidate was skipped is the whole point of
-			; the trace, and the length is what identifies which one it was.
-			if LoggerIsDebugEnabled()
-				LoggerDebug("PrefixWatcher", "DBG candidate '{1}' skipped — the engine would not fire it here.",
-					(Entry.HasOwnProp("IsPrivate") and Entry.IsPrivate) ? PersonalInfoRedactForLog(Entry.Trigger) : Entry.Trigger)
-			continue
-		}
 		Color := (Cfg.Color != "") ? Cfg.Color : ""
-		; The tooltip must stay visible as long as the expansion is still
-		; armed — so the display duration equals the expansion window exactly.
-		; When Delay = 0 the hotstring has no expiry window (DurationSec = 0
-		; leaves the tooltip up until the safety timer fires), mirroring the
-		; HS INFINITE_TOOLTIP_SEC convention. Each row carries its own delay
-		; so rows with distinct delays activate the dequeue path in TooltipShow,
-		; which removes each row individually as its deadline passes.
-		; A provider row carries the ENGINE's own activation window for its
-		; trigger, which is the window the bubble has to match. Index rows have no
-		; such field and keep the category's resolved delay.
-		ExpansionDelay := Entry.HasOwnProp("Delay")
-			? Entry.Delay
-			: ((Cfg.Delay != "") ? Cfg.Delay : 0)
-		TooltipDuration := ExpansionDelay
-		; Only triggers whose LAST chars ARE the magic key qualify as star
-		; triggers — a trigger containing MK in its body (but not as a suffix)
-		; must be classified as an end-char trigger, otherwise it lands in the
-		; wrong display bucket and shows the wrong completion key label
-		MkLen := StrLen(MK)
-		IsMagic := (MkLen > 0 and StrLen(Entry.Trigger) > MkLen and SubStr(Entry.Trigger, -MkLen) == MK)
-		; Trigger label shown on the right side of the row:
-		;   ★ (or the configured magic key) for star triggers,
-		;   ↵  for end-char-gated triggers (space / punctuation / enter).
-		TriggerLabel := IsMagic ? MK : "↵"
-		Bucket := IsMagic ? StarItems : EndItems
+		Decision := Entry.FireDecision
+		GateDurationMs := Decision.HasOwnProp("GateDurationMs")
+			? Decision.GateDurationMs : 0
+		RemainingMs := Decision.HasOwnProp("RemainingMs")
+			? Decision.RemainingMs : 0
+		; Equality is technically fireable in the dispatch gate, but a row with no
+		; remaining interaction window cannot be honestly painted after a debounce.
+		if (GateDurationMs > 0 and RemainingMs <= 0)
+			continue
+		TriggerLabel := (Decision.EndChar == "") ? Decision.Completion : "↵"
 		Item := { Text: Entry.Output, TriggerLabel: TriggerLabel,
-		          ColorHex: Color, DurationSec: TooltipDuration,
+		          ColorHex: Color, DurationSec: GateDurationMs / 1000,
 		          Trigger: Entry.Trigger, Category: Entry.Category,
-		          IsDimmed: Bucket.Length > 0,
+		          IsDimmed: false, FireDecision: Decision,
 		          IsPrivate: (Entry.HasOwnProp("IsPrivate") and Entry.IsPrivate) ? true : false }
-		Bucket.Push(Item)
-	}
-	Items := []
-	for _, Item in EndItems {
-		Items.Push(Item)
-	}
-	for _, Item in StarItems {
+		if GateDurationMs > 0 {
+			Item.ExpireOriginTick := Decision.GateOriginTick
+			Item.ExpireDurationMs := GateDurationMs
+		}
 		Items.Push(Item)
 	}
 	if (Items.Length == 0) {
@@ -1681,10 +2344,12 @@ _LookupAndRender() {
 		else
 			LoggerDebug("PrefixWatcher", "DBG calling TooltipShow: {1} item(s), first='{2}'.", Items.Length, Items[1].Text)
 	}
+	; Candidate collection and config resolution can yield to a physical OnChar.
+	; Refuse the old answer at the last boundary before it becomes a tooltip
+	; request; comparing the content generation also closes ABA mutations.
+	if !_PrefixRenderStillCurrent(PrefixSnapshot, ContentGeneration)
+		return
+	if !HotstringPrefixWatcherDecisionItemsStillCurrent(Items)
+		return
 	TooltipShow(Items)
-	if IsSet(LLM_Bridge_ScheduleAfterHotstring)
-		try LLM_Bridge_ScheduleAfterHotstring(Items)
-	; Log the suggestion based on the first (top) item only.
-	Primary := Items[1]
-	_NotifySuggestionShown(Primary.Trigger, Primary.Text, Primary.Category, Primary.IsPrivate)
 }

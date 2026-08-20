@@ -256,28 +256,146 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
 }
 
 
-; Set a single override field for (category, section). Pass SectionName as ""
-; to set the file-level override. ``Field`` must be "delay" or "color".
-; Persists immediately and refreshes the in-memory cache.
-HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
+; Copy the mutable category branch used by one candidate transaction. The
+; top-level Map and Sections Map use copy-on-write, while untouched section
+; objects remain shared because the transaction never mutates them.
+_HotstringsCloneOverrideCategory(Source) {
+		return {
+				Delay: Source.Delay,
+				Color: Source.Color,
+				ShowTooltip: Source.ShowTooltip,
+				Priority: Source.HasOwnProp("Priority") ? Source.Priority : "",
+				Sections: Source.Sections.Clone()
+		}
+}
+
+; Copy one mutable section leaf before changing it in a candidate transaction.
+_HotstringsCloneOverrideSection(Source) {
+		return {
+				Delay: Source.Delay,
+				Color: Source.Color,
+				ShowTooltip: Source.ShowTooltip,
+				Priority: Source.HasOwnProp("Priority") ? Source.Priority : ""
+		}
+}
+
+; Claim the physical override path before any candidate snapshot is taken.
+; Config I/O can yield to another AHK thread, so process-local execution alone
+; does not serialize two logical writers.
+_HotstringsOverrideLeaseAcquire(Action) {
+		global _HotstringsOverridesPath
+		if (_HotstringsOverridesPath == "") {
+				try LoggerError("HotstringsConfig", "Cannot {1}: HotstringsConfigInit has not provided an override path. The change is NOT persisted.", Action)
+				return false
+		}
+		OwnerToken := _ConfigWriteLeaseTryAcquire(_HotstringsOverridesPath,
+				"hotstrings-overrides")
+		if !(OwnerToken is Object) {
+				try LoggerError("HotstringsConfig", "Cannot {1} for '{2}': another configuration transaction already owns the path. The change is NOT persisted.", Action, _HotstringsOverridesPath)
+				return false
+		}
+		return OwnerToken
+}
+
+; Release only the opaque token returned for this transaction. A failed release
+; is impossible in normal flow but must remain visible because it blocks all
+; later writers on the same path.
+_HotstringsOverrideLeaseRelease(OwnerToken) {
+		if _ConfigWriteLeaseRelease(OwnerToken)
+				return true
+		try LoggerError("HotstringsConfig", "Failed to release the hotstrings override write lease; later changes may be refused.")
+		return false
+}
+
+; Revalidate both authorities immediately before durable publication. A terminal
+; path transition cannot rebase the store while an ordinary owner is alive, and
+; an injected/yielding writer that bypasses that contract is refused after its
+; private stage has been completed.
+_HotstringsAuthorizeOverrideCommit(OwnerToken, BoundPath) {
+		global _HotstringsOverridesPath
+		if !(BoundPath is String) || BoundPath == ""
+				return false
+		if !_ConfigWriteLeaseOwns(OwnerToken, BoundPath)
+				return false
+		return _ConfigWriteLeaseKey(_HotstringsOverridesPath)
+				== _ConfigWriteLeaseKey(BoundPath)
+}
+
+; Publish the detached catalogue and invalidate every resolved-cache entry in
+; one memory-only Critical callback supplied to _SaveOverrides.
+_HotstringsPublishOverrideCandidate(Candidate) {
 		global _HotstringsOverrides
+		_HotstringsOverrides := Candidate
+		HotstringsResolveBumpGen()
+		return 1
+}
+
+; Persist one detached catalogue while retaining the exact owner and path that
+; admitted its snapshot. Delimiter state is captured explicitly so serialization
+; never consults mutable globals after the candidate has begun staging.
+_HotstringsPersistOverrideCandidate(Candidate, OwnerToken, BoundPath,
+		WriterFn, ReplaceFn) {
+		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+		return _SaveOverrides(Candidate, WriterFn, ReplaceFn,
+				_HotstringsWordDelimiters, _HotstringsConsumedDelimiters,
+				BoundPath,
+				_HotstringsAuthorizeOverrideCommit.Bind(OwnerToken, BoundPath),
+				_HotstringsPublishOverrideCandidate.Bind(Candidate))
+}
+
+; Set a single override field for (category, section). Pass SectionName as ""
+; to set the file-level override. The live Map changes only after the complete
+; candidate file has replaced the durable file successfully.
+HotstringsSetOverride(CategoryName, SectionName, Field, Value,
+		WriterFn := 0, ReplaceFn := 0) {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				; A caller-level Critical span must not leak into staging, replacement,
+				; logging, or cleanup. The global owner provides transaction isolation.
+				Critical("Off")
+				try return HotstringsSetOverride(CategoryName, SectionName, Field,
+						Value, WriterFn, ReplaceFn)
+				finally Critical(InheritedCritical)
+		}
 		if (Field != "delay" and Field != "color" and Field != "show_tooltip" and Field != "priority") {
 				try LoggerError("HotstringsConfig", "SetOverride: field must be 'delay', 'color', 'show_tooltip', or 'priority', got '{1}'.", Field)
 				return false
 		}
 		Cat := StrLower(CategoryName)
 		Sec := StrLower(SectionName)
+		OwnerToken := _HotstringsOverrideLeaseAcquire("set override")
+		if !(OwnerToken is Object)
+				return false
+		BoundPath := _HotstringsOverridesPath
+		try return _HotstringsSetOverrideOwned(Cat, Sec, Field, Value,
+				WriterFn, ReplaceFn, OwnerToken, BoundPath)
+		finally _HotstringsOverrideLeaseRelease(OwnerToken)
+}
 
-		if !_HotstringsOverrides.Has(Cat) {
-				_HotstringsOverrides[Cat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+; Build, persist, and publish one set candidate while the caller owns the path.
+_HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
+		OwnerToken, BoundPath) {
+		global _HotstringsOverrides
+		if !_HotstringsAuthorizeOverrideCommit(OwnerToken, BoundPath) {
+				try LoggerError("HotstringsConfig", "Cannot set override: the admitted owner no longer owns the exact override path. The change is NOT persisted.")
+				return false
 		}
-		Entry := _HotstringsOverrides[Cat]
+		Candidate := _HotstringsOverrides.Clone()
+
+		if Candidate.Has(Cat) {
+				Entry := _HotstringsCloneOverrideCategory(Candidate[Cat])
+		} else {
+				Entry := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+		}
+		Candidate[Cat] := Entry
 
 		if (Sec != "") {
-				if !Entry.Sections.Has(Sec) {
-						Entry.Sections[Sec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
+				if Entry.Sections.Has(Sec) {
+						Target := _HotstringsCloneOverrideSection(Entry.Sections[Sec])
+				} else {
+						Target := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
 				}
-				Target := Entry.Sections[Sec]
+				Entry.Sections[Sec] := Target
 		} else {
 				Target := Entry
 		}
@@ -292,29 +410,60 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
 				Target.ShowTooltip := Value
 		}
 
+		if !_HotstringsPersistOverrideCandidate(Candidate, OwnerToken,
+				BoundPath, WriterFn, ReplaceFn)
+				return false
+
 		try LoggerDebug("HotstringsConfig", "Override set: {1}{2}.{3} = {4}.",
 				Cat, (Sec != "") ? "." . Sec : "", Field, Value)
-		HotstringsResolveBumpGen()
-		return _SaveOverrides()
+		return true
 }
 
 ; Remove a single override field, or both fields when Field is empty.
 ; Reverts the resolution to the TOML default (or global fallback).
-HotstringsClearOverride(CategoryName, SectionName, Field := "") {
-		global _HotstringsOverrides
+HotstringsClearOverride(CategoryName, SectionName, Field := "",
+		WriterFn := 0, ReplaceFn := 0) {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				; Match the set path: no external wrapper may turn configuration I/O
+				; into a keyboard-starving Critical span.
+				Critical("Off")
+				try return HotstringsClearOverride(CategoryName, SectionName, Field,
+						WriterFn, ReplaceFn)
+				finally Critical(InheritedCritical)
+		}
 		Cat := StrLower(CategoryName)
 		Sec := StrLower(SectionName)
+		OwnerToken := _HotstringsOverrideLeaseAcquire("clear override")
+		if !(OwnerToken is Object)
+				return false
+		BoundPath := _HotstringsOverridesPath
+		try return _HotstringsClearOverrideOwned(Cat, Sec, Field,
+				WriterFn, ReplaceFn, OwnerToken, BoundPath)
+		finally _HotstringsOverrideLeaseRelease(OwnerToken)
+}
 
+; Build, persist, and publish one clear candidate while the caller owns the path.
+_HotstringsClearOverrideOwned(Cat, Sec, Field, WriterFn, ReplaceFn,
+		OwnerToken, BoundPath) {
+		global _HotstringsOverrides
+		if !_HotstringsAuthorizeOverrideCommit(OwnerToken, BoundPath) {
+				try LoggerError("HotstringsConfig", "Cannot clear override: the admitted owner no longer owns the exact override path. The change is NOT persisted.")
+				return false
+		}
 		if !_HotstringsOverrides.Has(Cat) {
 				return true
 		}
-		Entry := _HotstringsOverrides[Cat]
+		Candidate := _HotstringsOverrides.Clone()
+		Entry := _HotstringsCloneOverrideCategory(Candidate[Cat])
+		Candidate[Cat] := Entry
 
 		if (Sec != "") {
 				if !Entry.Sections.Has(Sec) {
 						return true
 				}
-				Target := Entry.Sections[Sec]
+				Target := _HotstringsCloneOverrideSection(Entry.Sections[Sec])
+				Entry.Sections[Sec] := Target
 		} else {
 				Target := Entry
 		}
@@ -332,23 +481,78 @@ HotstringsClearOverride(CategoryName, SectionName, Field := "") {
 				Target.Priority := ""
 		}
 
+		if !_HotstringsPersistOverrideCandidate(Candidate, OwnerToken,
+				BoundPath, WriterFn, ReplaceFn)
+				return false
+
 		try LoggerDebug("HotstringsConfig", "Override cleared: {1}{2}{3}.",
 				Cat,
 				(Sec != "") ? "." . Sec : "",
 				(Field != "") ? "." . Field : "")
-		HotstringsResolveBumpGen()
-		return _SaveOverrides()
+		return true
 }
 
 ; Reload the override file from disk — useful after Hammerspoon has written
-; to it while AHK was running. AHK is single-process so we don't need locks.
-HotstringsConfigReload() {
-		global _HotstringsOverridesPath, _HotstringsOverrides
-		if (_HotstringsOverridesPath == "") {
+; to it while AHK was running. It shares path ownership with Set/Clear because
+; an AHK callback can interrupt another callback inside configuration I/O.
+HotstringsConfigReload(ParseFn := 0) {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				; FileRead and logging can block. The path lease, followed by one
+				; memory-only publication span, supplies the required serialization.
+				Critical("Off")
+				try return HotstringsConfigReload(ParseFn)
+				finally Critical(InheritedCritical)
+		}
+		global _HotstringsOverridesPath
+		OwnerToken := _HotstringsOverrideLeaseAcquire("reload overrides")
+		if !(OwnerToken is Object)
+				return false
+		BoundPath := _HotstringsOverridesPath
+		try return _HotstringsConfigReloadOwned(OwnerToken, BoundPath, ParseFn)
+		finally _HotstringsOverrideLeaseRelease(OwnerToken)
+}
+
+; Parse one detached candidate outside Critical, then revalidate the same owner
+; and exact path in the tiny Critical span that swaps the Map and generation.
+; ParseFn is an internal test seam for yielded/re-entrant parser behaviour.
+_HotstringsConfigReloadOwned(OwnerToken, BoundPath, ParseFn := 0) {
+		Candidate := 0
+		try Candidate := HasMethod(ParseFn, "Call")
+				? ParseFn.Call(BoundPath) : _ParseOverrides(BoundPath)
+		catch as Err {
+				try LoggerError("HotstringsConfig",
+						"Cannot reload overrides from '{1}': {2}. The live catalogue is unchanged.",
+						BoundPath, Err.Message)
 				return false
 		}
-		_HotstringsOverrides := _ParseOverrides(_HotstringsOverridesPath)
-		HotstringsResolveBumpGen()
+		if !(Candidate is Map) {
+				try LoggerError("HotstringsConfig",
+						"Cannot reload overrides from '{1}': the parser returned no Map. The live catalogue is unchanged.",
+						BoundPath)
+				return false
+		}
+
+		Authorized := false
+		Published := false
+		PreviousCritical := Critical("On")
+		try {
+				Authorized := _HotstringsAuthorizeOverrideCommit(OwnerToken, BoundPath)
+				if Authorized
+						Published := _HotstringsPublishOverrideCandidate(Candidate)
+		} finally Critical(PreviousCritical)
+		if !(Authorized is Integer) || Authorized != 1 {
+				try LoggerError("HotstringsConfig",
+						"Cannot reload overrides from '{1}': the admitted owner no longer owns the exact path. The live catalogue is unchanged.",
+						BoundPath)
+				return false
+		}
+		if !(Published is Integer) || Published != 1 {
+				try LoggerError("HotstringsConfig",
+						"Cannot reload overrides from '{1}': live publication was refused.",
+						BoundPath)
+				return false
+		}
 		try LoggerDebug("HotstringsConfig", "Overrides reloaded from disk.")
 		return true
 }

@@ -9,10 +9,11 @@
 ; sharing the shared frontend — and each has its own "reset all" handler. Two
 ; hardenings were applied to the native one and not to its twin:
 ;
-;   1. FLUSH FIRST. A numeric edit armed by _HCW_ArmNumericWrite up to
-;      _HCW_NUMERIC_DEBOUNCE_MS ago lands on a timer. If the reset loop runs
-;      first, that pending write persists on top of the override the loop just
-;      cleared, silently un-resetting one field.
+;   1. CANCEL FIRST. A numeric edit armed by _HCW_ArmNumericWrite up to
+;      _HCW_NUMERIC_DEBOUNCE_MS ago lands on a timer. Reset All invalidates that
+;      candidate, so it must disarm the timer without persisting the value the
+;      action is about to clear. Flushing performs redundant I/O and can make a
+;      refused obsolete write prevent the reset itself.
 ;   2. REPUBLISH AFTER. The loop clears delay and priority through the storage
 ;      primitives DIRECTLY, bypassing the _HCW_SetOverride / _HCW_ClearOverride
 ;      choke point where the republish lives. Delay and priority are baked into
@@ -40,7 +41,7 @@
 
 ; =====================================================================
 ; =====================================================================
-; ======= 1/ Every reset handler flushes, then republishes =============
+; ======= 1/ Every reset handler cancels, then republishes =============
 ; =====================================================================
 ; =====================================================================
 
@@ -48,6 +49,14 @@
 ; to one file, so moving a handler between files does not silently drop it.
 _HRR_ResetHandlers() {
 	return ["_HCW_ResetAll", "_HCWWeb_ResetAll"]
+}
+
+_HRR_ReconcileHelper(Name) {
+	static Helpers := Map(
+		"_HCW_ResetAll", "_HCW_ReconcileNativeReset",
+		"_HCWWeb_ResetAll", "_HCWWeb_ReconcileReset"
+	)
+	return Helpers[Name]
 }
 
 _HRR_EveryResetHandlerRepublishes() {
@@ -58,32 +67,39 @@ _HRR_EveryResetHandlerRepublishes() {
 		Assert(Body != "", Name . "() must exist in the driver source")
 		Checked += 1
 
-		; Non-vacuity: it must really be a reset, or the assertions below could pass
-		; against a stub that does nothing.
+		; Non-vacuity: it must really build the reset plan, or the assertions below
+		; could pass against a stub that does nothing.
 		Assert(InStr(Body, "_HCW_CATEGORY_LIST") > 0,
-			Name . " must still walk the category list — otherwise it is not the reset handler this guard means")
-		ClearPos := InStr(Body, "HotstringsClearOverride(")
-		Assert(ClearPos > 0, Name . " must still clear the overrides")
+			Name . " must still consume the category list")
+		BuildPos := InStr(Body, "_HCW_BuildResetAllWrites(_HCW_CATEGORY_LIST)")
+		Assert(BuildPos > 0, Name . " must still build every reset write")
 
-		FlushPos := InStr(Body, "_HCW_FlushNumericWrite(")
-		Assert(FlushPos > 0,
-			Name . " must flush a pending debounced numeric edit BEFORE clearing. A write armed up to "
-			. "_HCW_NUMERIC_DEBOUNCE_MS ago otherwise lands after the loop and persists on top of the override it "
-			. "just cleared, silently un-resetting that field (hcw-webview-reset-does-not-republish)")
-		Assert(FlushPos < ClearPos,
-			Name . " flushes the pending numeric edit AFTER the clearing loop, which is the ordering the flush "
-			. "exists to prevent — the pending write becomes the last writer")
+		CancelPos := InStr(Body, "_HCW_CancelAllNumericWrites(")
+		Assert(CancelPos > 0 and BuildPos > CancelPos,
+			Name . " must cancel every pending numeric edit before clearing — the reset invalidates those candidates, so persisting them first is redundant and lets an obsolete refused write block the reset")
+		Assert(InStr(Body, "_HCW_FlushNumericWrite(") == 0,
+			Name . " must not flush an invalidated numeric edit during Reset All")
 
-		RepublishPos := InStr(Body, "_HCW_RepublishIfBakedField(")
-		Assert(RepublishPos > 0,
-			Name . " must republish after clearing. Delay and priority are baked into every Spec at registration and "
+		ReconcileName := _HRR_ReconcileHelper(Name)
+		ReconcilePos := InStr(Body, ReconcileName . ".Bind()")
+		Assert(ReconcilePos > 0,
+			Name . " must pass its aggregate outcome to " . ReconcileName . ". Delay and priority are baked into every Spec at registration and "
 			. "this loop clears them through the storage primitives directly, bypassing the choke point where the "
 			. "republish lives — so the window and the tooltip advertise the default delay while the engine keeps "
 			. "gating on the old value, and the tooltip promises an expansion the engine refuses "
 			. "(hcw-webview-reset-does-not-republish)")
-		Assert(RepublishPos > ClearPos,
-			Name . " republishes BEFORE it finishes clearing, so the rebuild captures state the loop then changes")
+		Assert(ReconcilePos > BuildPos,
+			Name . " schedules reconciliation BEFORE it finishes collecting the writes")
+		ReconcileBody := _DriverFuncBody(ReconcileName)
+		Assert(InStr(ReconcileBody, "_HCW_RepublishIfBakedField(") > 0,
+			ReconcileName . " must actually republish the live engine after the durable batch")
 	}
+	Builder := _DriverFuncBody("_HCW_BuildResetAllWrites")
+	Assert(InStr(Builder, "_HCW_BuildResetAllPlan(") > 0,
+		"the writer builder must consume the shared backend-neutral reset plan")
+	Assert(InStr(Builder, "_HCW_PatchTomlMeta.Bind(") > 0
+		and InStr(Builder, "HotstringsClearOverride.Bind(") > 0,
+		"the shared builder must cover both personal TOML and override-store backends")
 	Assert(Checked == Handlers.Length,
 		"every enumerated reset handler must have been checked (checked " . Checked . " of " . Handlers.Length . ")")
 }
@@ -110,12 +126,28 @@ _HRR_TheHandlerListIsComplete() {
 		. "the tier it missed")
 	Assert(Missing == "",
 		"a reset-all handler exists that this guard does not check: " . Missing . ". Add it to _HRR_ResetHandlers() "
-		. "— the flush-then-republish rule belongs to the ACTION, and every presentation tier that offers it owes "
+		. "— the cancel-then-republish rule belongs to the ACTION, and every presentation tier that offers it owes "
 		. "the user the same guarantee (hcw-webview-reset-does-not-republish)")
 }
 
+_HRR_PersonalResetUsesTheCanonicalOverrideFieldPlan() {
+	Builder := _DriverFuncBody("_HCW_BuildResetAllWrites")
+	Assert(Builder != "",
+		"both reset presentations must share one reset-plan writer instead of duplicating the personal TOML field list")
+	PlanBuilder := _DriverFuncBody("_HCW_BuildResetAllPlan")
+	Assert(InStr(PlanBuilder, "_PersonalTomlOverrideFields()") > 0,
+		"the shared reset plan must derive personal fields from the canonical personal TOML override-field list, including show_tooltip")
+	for Name in _HRR_ResetHandlers() {
+		Body := _DriverFuncBody(Name)
+		Assert(InStr(Body, "_HCW_BuildResetAllWrites(_HCW_CATEGORY_LIST)") > 0,
+			Name . " must use the shared reset plan — a private delay/color/priority copy previously omitted show_tooltip in both frontends")
+	}
+}
 
-Test("meta hcw-reset: every reset-all handler flushes then republishes (hcw-webview-reset-does-not-republish)",
+
+Test("meta hcw-reset: every reset-all handler cancels then republishes (hcw-webview-reset-does-not-republish)",
 	_HRR_EveryResetHandlerRepublishes)
 Test("meta hcw-reset: no reset-all handler escapes the guard (hcw-webview-reset-does-not-republish)",
 	_HRR_TheHandlerListIsComplete)
+Test("meta hcw-reset: personal reset derives every override field from one plan (hcw-reset-personal-fields)",
+	_HRR_PersonalResetUsesTheCanonicalOverrideFieldPlan)

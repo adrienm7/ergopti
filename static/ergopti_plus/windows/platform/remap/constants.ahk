@@ -58,6 +58,11 @@ global ONE_SHOT_SHIFT_TIMEOUT_SEC := 0
 ; tunable behaviour, so it stays a fixed local constant rather than a registry key.
 global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC := 5
 
+; A failed synthetic Up keeps an explicit release owner and is retried without
+; sleeping. Three immediate attempts bound the keyboard-thread work while
+; still absorbing a transient injection failure before lifecycle cleanup runs.
+global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := 3
+
 ; Reassign the tap-hold timing constants from the shared registry. Called once
 ; from the auto-execute body at boot (after TimingsLoadShared(), before any
 ; tap-hold hotkey arms). Fail-fast: a missing key throws via TimingsGet.
@@ -88,6 +93,10 @@ global _TH_TapHoldTrackState := Map()
 ; already-running KeyWait pseudo-thread, so its normal finally can be seconds
 ; too late and the synthetic modifier would alter physical input while paused.
 global _TH_SyntheticHeldKeys := Map()
+; A zero-count key whose final Up was not proven must remain owned separately
+; from active reference counts. Lifecycle cleanup retries this ledger instead
+; of forgetting an OS-level modifier that may still be logically down.
+global _TH_SyntheticReleasePendingKeys := Map()
 global _TH_TapHoldVkToKeyId := Map(
 	0x1B, "escape",
 	0x09, "tab",
@@ -313,18 +322,22 @@ TapHoldShouldSuppressHold(KeyId, GuardMs := 250) {
 ; holding. The count then degraded to "release on the first Up" for every combo,
 ; exactly the failure reference counting exists to prevent. Counting the
 ; individual key names is what makes the invariant true for both shapes.
-; Empty entries are dropped only for the Array shape, mirroring TextPressKey's
-; own combo branch; a scalar "" is passed through so its existing ERROR (a
-; hold_modifier the resolver could not map) is still reported at the adapter.
+; Empty and duplicate entries are dropped only for the Array shape, mirroring
+; TextPressKey's combo branch while ensuring one caller cannot count the same
+; physical modifier twice. A scalar "" stays visible so the owner can reject
+; it with a false verdict instead of publishing fictional state.
 ; @param Key {String|Array} Scalar key name, or a combo array of key names.
 ; @return {Array} The individual key names to reference-count.
 _TH_SyntheticKeyList(Key) {
 	if !(Key is Array)
 		return [Key]
 	Names := []
+	Seen := Map()
 	for _, Name in Key {
-		if (Name != "")
-			Names.Push(Name)
+		if (Name == "" or Seen.Has(Name))
+			continue
+		Seen[Name] := true
+		Names.Push(Name)
 	}
 	return Names
 }
@@ -338,64 +351,274 @@ _TH_SyntheticKeyLabel(Key) {
 	return Label
 }
 
+; Move a final active reference into the release-pending ledger before sending
+; its Up. The OS transition is then owned even when injection fails.
+_TH_MarkSyntheticKeyReleasePending(Key) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	if _TH_SyntheticHeldKeys.Has(Key)
+		_TH_SyntheticHeldKeys.Delete(Key)
+	_TH_SyntheticReleasePendingKeys[Key] := true
+}
+
+; Retry a release-pending key without sleeping or yielding. The caller holds
+; the short synthetic-ledger Critical span, so success and ledger deletion are
+; one commit and Suspend cannot interleave between them.
+_TH_RetrySyntheticKeyRelease(Key) {
+	global _TH_SyntheticReleasePendingKeys
+	global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS
+	loop TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS {
+		if !TextPressKey(Key, "Up", false)
+			continue
+		if _TH_SyntheticReleasePendingKeys.Has(Key)
+			_TH_SyntheticReleasePendingKeys.Delete(Key)
+		return true
+	}
+	return false
+}
+
+; End a pass-through PHYSICAL modifier before dispatching its tap action. This
+; is deliberately separate from TapHoldSyntheticKeyUp: there is no synthetic
+; Down/refcount to decrement, and the eventual physical key-up remains the
+; release backstop if injection fails. Folding this into the synthetic ledger
+; would let an unrelated synthetic owner consume the physical release (or make
+; its active count fictional). The caller must consume the boolean verdict and
+; suppress its tap action when this early release was not proven.
+TapHoldReleasePhysicalKey(Key) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	if (Key == "") {
+		try LoggerError("TapHoldDispatch", "Cannot release an empty pass-through physical key.")
+		return false
+	}
+
+	PreviousCritical := Critical("On")
+	Ok := false
+	FailureKind := ""
+	try {
+		if A_IsSuspended {
+			FailureKind := "suspended"
+		} else if _TH_SyntheticHeldKeys.Has(Key) {
+			; An unrelated synthetic owner still requires this OS key Down. Do not
+			; consume its refcount and do not make that count fictional with a
+			; force-Up; suppress the tap action until that owner releases normally.
+			FailureKind := "active synthetic owner"
+		} else if _TH_SyntheticReleasePendingKeys.Has(Key) {
+			Ok := _TH_RetrySyntheticKeyRelease(Key)
+			if !Ok
+				FailureKind := "pending synthetic release"
+		} else {
+			Ok := TextPressKey(Key, "Up", false)
+			if !Ok
+				FailureKind := "physical release"
+		}
+	}
+	finally {
+		Critical(PreviousCritical)
+	}
+
+	if !Ok {
+		if (FailureKind == "suspended" or FailureKind == "active synthetic owner") {
+			try LoggerDebug("TapHoldDispatch", "Not releasing pass-through physical '{1}' ({2}).", Key, FailureKind)
+		} else {
+			try LoggerError("TapHoldDispatch", "Pass-through physical release failed for '{1}' ({2}); tap action suppressed.", Key, FailureKind)
+		}
+	}
+	return Ok
+}
+
 ; Acquire/release synthetic keys whose lifetime crosses a KeyWait. Reference
 ; counting keeps independently overlapping tap-hold branches from releasing a
 ; key another branch still owns; the physical Send happens only on the 0->1 and
 ; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
 TapHoldSyntheticKeyDown(Key) {
-	global _TH_SyntheticHeldKeys
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	Keys := _TH_SyntheticKeyList(Key)
+	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
+		try LoggerError("TapHoldDispatch", "Cannot arm an empty synthetic modifier — the hold resolver must return a key name.")
+		return false
+	}
 	if A_IsSuspended {
 		try LoggerDebug("TapHoldDispatch", "Not arming synthetic '{1}' while the driver is suspended.", _TH_SyntheticKeyLabel(Key))
 		return false
 	}
-	; The loop variable is the parameter itself: each iteration rebinds Key to one
-	; scalar key name, so a combo and a plain modifier share the same counters
-	for Key in _TH_SyntheticKeyList(Key) {
-		Count := _TH_SyntheticHeldKeys.Has(Key) ? _TH_SyntheticHeldKeys[Key] : 0
-		_TH_SyntheticHeldKeys[Key] := Count + 1
-		if (Count = 0)
-			TextPressKey(Key, "Down")
+
+	PreviousCritical := Critical("On")
+	Ok := true
+	FailureKind := ""
+	FailureKey := ""
+	RollbackFailedKeys := []
+	try {
+		if A_IsSuspended {
+			Ok := false
+			FailureKind := "suspended"
+		} else {
+			KeysToPress := []
+			for _, Name in Keys {
+				; A new owner cannot adopt an indeterminate OS state. First prove
+				; the previous failed Up, then include the key in this transaction.
+				if _TH_SyntheticReleasePendingKeys.Has(Name) {
+					if !_TH_RetrySyntheticKeyRelease(Name) {
+						Ok := false
+						FailureKind := "pending release"
+						FailureKey := Name
+						break
+					}
+				}
+				if !_TH_SyntheticHeldKeys.Has(Name)
+					KeysToPress.Push(Name)
+			}
+
+			; TextPressKey's Array branch is the sender-owned transaction: a
+			; second Down failure rolls earlier Downs back in reverse order and
+			; reports any rollback Up that could not be proven. Those keys may
+			; still be down at the OS, so retain them before leaving Critical.
+			if Ok and KeysToPress.Length > 0 {
+				Transition := { RollbackFailedKeys: [] }
+				if !TextPressKey(KeysToPress, "Down", false, Transition) {
+					Ok := false
+					FailureKind := "down transaction"
+					for _, Name in Transition.RollbackFailedKeys {
+						_TH_MarkSyntheticKeyReleasePending(Name)
+						RollbackFailedKeys.Push(Name)
+					}
+				}
+			}
+			; Counts describe only a fully proven OS transaction. No partial
+			; send can publish an owner that never reached the keyboard state.
+			if Ok {
+				for _, Name in Keys
+					_TH_SyntheticHeldKeys[Name] := _TH_SyntheticHeldKeys.Get(Name, 0) + 1
+			}
+		}
 	}
-	return true
+	finally {
+		Critical(PreviousCritical)
+	}
+
+	if !Ok {
+		if (FailureKind == "suspended") {
+			try LoggerDebug("TapHoldDispatch", "Not arming synthetic '{1}' because Suspend won the ownership race.", _TH_SyntheticKeyLabel(Keys))
+		} else if (FailureKind == "pending release") {
+			try LoggerError("TapHoldDispatch", "Cannot arm synthetic '{1}' because the prior release of '{2}' is still pending.", _TH_SyntheticKeyLabel(Keys), FailureKey)
+		} else if (FailureKind == "down transaction") {
+			if (RollbackFailedKeys.Length > 0) {
+				try LoggerError("TapHoldDispatch", "Synthetic Down transaction failed for '{1}'; rollback remains release-pending for '{2}'.", _TH_SyntheticKeyLabel(Keys), _TH_SyntheticKeyLabel(RollbackFailedKeys))
+			} else {
+				try LoggerError("TapHoldDispatch", "Synthetic Down transaction failed for '{1}' — no ownership counts were published.", _TH_SyntheticKeyLabel(Keys))
+			}
+		}
+	}
+	return Ok
 }
 
 TapHoldSyntheticKeyUp(Key) {
-	global _TH_SyntheticHeldKeys
-	for Key in _TH_SyntheticKeyList(Key) {
-		if !_TH_SyntheticHeldKeys.Has(Key) {
-			; A suspend cleanup (TapHoldReleaseSyntheticKeys) may already have released the
-			; key. Never inject a synthetic Up while suspended (« pause = tout éteint ») — it
-			; would land in a paused session and could clear a modifier the user is
-			; physically holding. Only re-balance an untracked key while the driver is live.
-			if A_IsSuspended {
-				try LoggerDebug("TapHoldDispatch", "Not releasing untracked synthetic '{1}' while the driver is suspended.", Key)
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	Keys := _TH_SyntheticKeyList(Key)
+	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
+		try LoggerError("TapHoldDispatch", "Cannot release an empty synthetic modifier — the hold resolver must return a key name.")
+		return false
+	}
+
+	PreviousCritical := Critical("On")
+	Ok := true
+	FailedKeys := []
+	SkippedKeys := []
+	try {
+		for _, Name in Keys {
+			; A tracked pending release is safe and necessary even during
+			; Suspend. Only the untracked fallback is forbidden while paused.
+			if _TH_SyntheticReleasePendingKeys.Has(Name) {
+				if !_TH_RetrySyntheticKeyRelease(Name) {
+					Ok := false
+					FailedKeys.Push(Name)
+				}
 				continue
 			}
-			; Keep the ordinary finally path idempotent so it can still balance any direct
-			; Send failure for a key that was armed but somehow lost from the map.
-			TextPressKey(Key, "Up")
-			continue
+			if !_TH_SyntheticHeldKeys.Has(Name) {
+				; Suspend cleanup may already have proven this Up. A second,
+				; untracked Up could clear the same modifier held physically.
+				if A_IsSuspended {
+					Ok := false
+					SkippedKeys.Push(Name)
+					continue
+				}
+				_TH_MarkSyntheticKeyReleasePending(Name)
+				if !_TH_RetrySyntheticKeyRelease(Name) {
+					Ok := false
+					FailedKeys.Push(Name)
+				}
+				continue
+			}
+
+			Count := _TH_SyntheticHeldKeys[Name] - 1
+			if (Count > 0) {
+				_TH_SyntheticHeldKeys[Name] := Count
+				continue
+			}
+			_TH_MarkSyntheticKeyReleasePending(Name)
+			if !_TH_RetrySyntheticKeyRelease(Name) {
+				Ok := false
+				FailedKeys.Push(Name)
+			}
 		}
-		Count := _TH_SyntheticHeldKeys[Key] - 1
-		if (Count > 0) {
-			_TH_SyntheticHeldKeys[Key] := Count
-			continue
+	}
+	finally {
+		Critical(PreviousCritical)
+	}
+
+	for _, Name in SkippedKeys
+		try LoggerDebug("TapHoldDispatch", "Not releasing untracked synthetic '{1}' while the driver is suspended.", Name)
+	if (FailedKeys.Length > 0)
+		try LoggerError("TapHoldDispatch", "Synthetic release remains pending for '{1}' after bounded retries.", _TH_SyntheticKeyLabel(FailedKeys))
+	return Ok
+}
+
+TapHoldReleaseSyntheticKeys() {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	Keys := []
+	Seen := Map()
+	FailedKeys := []
+	PreviousCritical := Critical("On")
+	try {
+		for Name in _TH_SyntheticHeldKeys {
+			Seen[Name] := true
+			Keys.Push(Name)
 		}
-		_TH_SyntheticHeldKeys.Delete(Key)
-		TextPressKey(Key, "Up")
+		for Name in _TH_SyntheticReleasePendingKeys {
+			if Seen.Has(Name)
+				continue
+			Seen[Name] := true
+			Keys.Push(Name)
+		}
+
+		; Lifecycle teardown invalidates every active owner, but the failed
+		; release remains explicit until an Up is proven.
+		for _, Name in Keys
+			_TH_MarkSyntheticKeyReleasePending(Name)
+		for _, Name in Keys {
+			if !_TH_RetrySyntheticKeyRelease(Name)
+				FailedKeys.Push(Name)
+		}
+	}
+	finally {
+		Critical(PreviousCritical)
+	}
+
+	if (FailedKeys.Length > 0) {
+		try LoggerError("TapHoldDispatch", "Lifecycle cleanup retained release-pending synthetic key(s) '{1}' after bounded retries.", _TH_SyntheticKeyLabel(FailedKeys))
+		return false
 	}
 	return true
 }
 
-TapHoldReleaseSyntheticKeys() {
-	global _TH_SyntheticHeldKeys
-	Keys := []
-	for Key in _TH_SyntheticHeldKeys
-		Keys.Push(Key)
-	_TH_SyntheticHeldKeys := Map()
-	for Key in Keys {
-		try TextPressKey(Key, "Up")
-	}
+; OnExit must not destroy this process while a balancing Up is still owned by
+; its release-pending ledger. The optional callback is a deterministic failure
+; seam for the shutdown contract test; production uses the real bounded drain.
+TapHoldShutdownReleaseGate(ReleaseFn := 0) {
+	if !IsObject(ReleaseFn)
+		ReleaseFn := TapHoldReleaseSyntheticKeys
+	try return ReleaseFn.Call() == true
+	catch
+		return false
 }
 
 ; Remove tracked state for a key once tap resolution has completed.

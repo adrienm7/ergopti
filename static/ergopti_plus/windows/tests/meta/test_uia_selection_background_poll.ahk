@@ -7,8 +7,9 @@
 ;
 ; UIA selection queries (COM round-trips) must not run on the synchronous
 ; keyboard hot-path (GetUIASelection called from _OnChar/WrapTextIfSelected).
-; They must be moved to a background polling timer, with GetUIASelection()
-; merely returning the cached value.
+; A SetTimer still runs on the keyboard thread, so "background timer" is not
+; sufficient. UIA must run in a killable detached process, with the timer posting
+; one non-blocking request and GetUIASelection() merely reading the cache.
 ;
 ; The fix introduces _UIA_SelectionPollTick() and _UIA_SelectionCache.
 ; ==============================================================================
@@ -40,13 +41,18 @@ _USBP_ReadSource(RelPath) {
 _USBP_SelectionIsPolledInBackground() {
 	Src := _USBP_ReadSource("modules/keymap/layout.ahk")
 	
-	; 1. Verify background tick exists and does the heavy lifting.
+	; 1. The resident tick may dispatch, but must never enter COM itself.
 	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
 	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/keymap/layout.ahk")
-	Assert(InStr(TickBody, "UIA.GetFocusedElement()") > 0,
-		"_UIA_SelectionPollTick must perform the UIA query (uia-selection-blocks-keyboard-thread)")
-	Assert(InStr(TickBody, "_UIA_SelectionCache :=") > 0,
-		"_UIA_SelectionPollTick must update the _UIA_SelectionCache")
+	Assert(InStr(TickBody, "UIASW_Request(") > 0,
+		"_UIA_SelectionPollTick must hand selection work to the detached worker")
+	for Forbidden in ["UIA.GetFocusedElement", ".GetPattern(", ".GetSelection(", ".GetText("] {
+		Assert(InStr(TickBody, Forbidden) = 0,
+			"the resident selection timer must not execute cross-process COM on the keyboard thread: " . Forbidden)
+	}
+	WorkerBody := _DriverFuncBody("UIASW_WorkerHandleRequest")
+	Assert(WorkerBody != "" && InStr(WorkerBody, "UIA.GetFocusedElement()") > 0,
+		"the real UIA query must exist in the detached worker handler")
 	
 	; 2. Verify GetUIASelection is now just a cache reader.
 	GetterBody := _DriverFuncBody("GetUIASelection")
@@ -59,11 +65,26 @@ _USBP_SelectionIsPolledInBackground() {
 	; 3. Verify timer is armed.
 	Assert(InStr(Src, "SetTimer(_UIA_SelectionPollTimer, 500)") > 0,
 		"UIA selection poll timer must be armed with a periodic interval")
+
+	Root := _USBP_ReadSource("ErgoptiPlus.ahk")
+	ReadyPos := InStr(Root, '_DriverBootPhase := "ready"')
+	WarmPos := InStr(Root, "SetTimer(UIASW_Start, -1)")
+	Assert(ReadyPos > 0 && WarmPos > ReadyPos,
+		"the persistent worker must warm immediately after ready so the first wrap action cannot race a cold full-driver child")
+	StartBody := _DriverFuncBody("UIASW_Start")
+	Assert(InStr(StartBody, "UIASW_WorkerEntryPath()") > 0,
+		"source mode must launch the minimal UIA worker entry instead of reparsing the full driver on first use")
+	Entry := _USBP_ReadSource("modules/keymap/uia_selection_worker_entry.ahk")
+	Assert(InStr(Entry, "vendor\UIA.ahk") > 0
+		&& InStr(Entry, "adapters\uia_worker.ahk") > 0
+		&& InStr(Entry, "#Include %A_ScriptDir%\uia_selection_worker.ahk") = 0
+		&& InStr(Entry, "ErgoptiPlus.ahk") = 0,
+		"the source worker entry must contain only its UIA/protocol dependencies, never the resident controller or normal driver boot")
 }
 Test("layout: UIA selection is polled in background (uia-selection-blocks-keyboard-thread)", _USBP_SelectionIsPolledInBackground)
 
-; The poll tick runs on a SetTimer, which bypasses native Suspend, and does a
-; 3-hop UIA COM round-trip + an unbounded GetText(-1). It must early-return while
+; The poll tick runs on a SetTimer, which bypasses native Suspend. It must stop
+; the detached worker while
 ; paused (« pause = tout éteint ») and skip the COM work when its only consumer
 ; (WrapTextIfSelected, gated on wrap_text_if_selected) is disabled.
 _USBP_PollTickSuspendAndFeatureGated() {
@@ -71,22 +92,31 @@ _USBP_PollTickSuspendAndFeatureGated() {
 	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
 	Assert(TickBody != "", "_UIA_SelectionPollTick must exist in modules/keymap/layout.ahk")
 	Assert(InStr(TickBody, "A_IsSuspended") > 0,
-		"_UIA_SelectionPollTick must early-return on A_IsSuspended — SetTimer bypasses native Suspend, so the synchronous UIA COM poll would keep firing on the keyboard thread while paused (uia-poll-bypasses-suspend)")
+		"_UIA_SelectionPollTick must early-return on A_IsSuspended — SetTimer bypasses native Suspend")
+	Assert(InStr(TickBody, 'UIASW_Stop("canceled")') > 0,
+		"Suspend must terminate the detached UIA worker, not merely stop posting new requests")
 	Assert(InStr(TickBody, "wrap_text_if_selected") > 0,
 		"_UIA_SelectionPollTick must skip the COM round-trip when wrap_text_if_selected (its only consumer) is disabled, so non-users never pay the per-tick cost or the large-selection stall risk (uia-poll-bypasses-suspend)")
+	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
+	Assert(ShutdownBody != "" && InStr(ShutdownBody, 'UIASW_Stop("canceled")') > 0,
+		"driver shutdown must retire and terminate the persistent UIA worker so Reload/ExitApp cannot orphan it")
+	ResumeBody := _DriverFuncBody("Ergopti_OnSuspendResume")
+	Assert(ResumeBody != "" && InStr(ResumeBody, "SetTimer(UIASW_Start, -1)") > 0,
+		"resume must warm the worker that suspend terminated before the next wrap action")
 }
 Test("layout: UIA selection poll is gated by suspend + the wrap feature flag (uia-poll-bypasses-suspend)", _USBP_PollTickSuspendAndFeatureGated)
 
-; A timer still runs on AHK's sole message thread. It must not start a COM call
-; during active typing, and it must never request an unbounded TextPattern range.
+; A timer still runs on AHK's sole message thread. It must not post work during
+; active typing, and the detached worker must cap the requested TextPattern range.
 _USBP_PollTickIsIdleGatedAndBounded() {
 	TickBody := _DriverFuncBody("_UIA_SelectionPollTick")
 	Assert(InStr(TickBody, "A_TimeIdlePhysical < UIA_SELECTION_IDLE_REQUIRED_MS") > 0,
 		"_UIA_SelectionPollTick must skip new UIA COM work while physical input is active, so its timer cannot contend with keyboard dispatch")
-	Assert(InStr(TickBody, "GetText(UIA_SELECTION_MAX_TEXT_CHARS)") > 0,
-		"_UIA_SelectionPollTick must cap TextPattern.GetText so a document-sized selection cannot monopolise the AHK thread")
-	Assert(InStr(TickBody, "GetText(-1)") = 0,
-		"_UIA_SelectionPollTick must not request an unbounded UIA text range on the driver thread")
+	WorkerBody := _DriverFuncBody("UIASW_WorkerHandleRequest")
+	Assert(WorkerBody != "" && InStr(WorkerBody, "GetText(MaxTextChars)") > 0,
+		"the detached worker must cap TextPattern.GetText instead of reading an unbounded document range")
+	Assert(InStr(WorkerBody, "GetText(-1)") = 0,
+		"the UIA worker must never request an unbounded selection")
 }
 Test("layout: UIA selection poll waits for idle input and caps retrieved text (uia-selection-poll-budget)", _USBP_PollTickIsIdleGatedAndBounded)
 

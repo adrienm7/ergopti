@@ -54,6 +54,22 @@ class KLWV {
 		; Last metrics_dir we built a prefetch for. Used by the ingest tick
 		; refresh path so callers don't have to re-pass the dir.
 		static metrics_dir := ""
+
+		; A cold first paint gets two replacement workers before falling back to
+		; any last-known sidecar and admitting live-tick recovery.
+		static FIRST_PAINT_MAX_RETRIES := 2
+		static FIRST_PAINT_RETRY_MS := 500
+		; The historical projection has a separate recovery budget. Once that
+		; budget is exhausted, the next ingest tick retries it instead of letting
+		; live-only projections permanently replace the missing history.
+		static FULL_BUILD_MAX_RETRIES := 2
+		static FULL_BUILD_DELAY_MS := 2000
+		static FULL_BUILD_RETRY_MS := 1000
+		; Test seams; production uses KLWV_PushPrefetch and SetTimer directly.
+		static first_paint_push_fn := 0
+		static first_paint_timer_fn := 0
+		static full_build_timer_fn := 0
+		static ingest_drain_timer_fn := 0
 }
 
 
@@ -305,14 +321,16 @@ KLWV_Open(which, metrics_dir) {
 		; is enough for a local file:// page + CDN-backed scripts to be ready.
 		KLWV.windows[which] := Map(
 				"which", which,
-		"epoch", Epoch,
+				"epoch", Epoch,
 				"gui", g,
 				"controller", controller,
 				"webview", webview,
 				"udir", udir,
-				"msg_sub", msg_sub
+				"msg_sub", msg_sub,
+				"pending_ingest_mode", "",
+				"ingest_drain_armed", false
 		)
-	SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
+		SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
 		KLWV_FitWebView(which)
 		return true
 }
@@ -433,11 +451,6 @@ KLWV_OnGuiClose(which, *) {
 ; JSON command of the form {"action":"...", ...}.
 KLWV_OnWebMessage(which, Epoch, sender, args) {
 		global _ConfigDir, _AhkSubDir
-		; WebMessageReceived is a COM callback and therefore bypasses native
-		; Suspend. A paused dashboard must not rebuild caches, project SQL, or
-		; push UI state from a late Refresh/Clear/Range click.
-		if A_IsSuspended
-				return
 	if !KLWV_IsCurrent(which, Epoch)
 		return
 	entry := KLWV.windows[which]
@@ -455,6 +468,12 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		action := ""
 		if RegExMatch(msg, '"action"\s*:\s*"([^"]+)"', &m)
 				action := m[1]
+		; WebMessageReceived bypasses native Suspend. Most dashboard actions become
+		; inert while paused. A range request is the exception only long enough to
+		; capture its request id and queue a canceled terminal for resume; it must
+		; never start the detached projection while suspended.
+		if A_IsSuspended && (action != "range")
+				return
 		switch action {
 				case "ready":
 						; Page just finished loading and signals it's ready to
@@ -465,15 +484,26 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						KLWV_PushPrefetch(which)
 		case "request_refresh":
 			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
-				KLWV_OnBuildReady.Bind(which, Epoch))
+				KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0))
 		case "range":
 			; A selected-range projection can be large enough to stall the hook.
 			; Build it in a detached worker; the completion asks WebView to fetch
 			; the staged JSON directly, so AHK never decodes the large payload.
-			query := KLWV_NormalizeRangeRequest(msg)
-			if query
-				KLPF_RequestRange(which, KLWV.metrics_dir, query, Epoch,
-					KLWV_OnRangeBuildReady.Bind(which, Epoch))
+			normalized := KLWV_NormalizeRangeRequest(msg)
+			request_id := normalized["request_id"]
+			query := normalized["query"]
+			if !request_id
+				return
+			if A_IsSuspended {
+				KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
+				return
+			}
+			if !(query is Map) {
+				KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
+				return
+			}
+			KLPF_RequestRange(which, KLWV.metrics_dir, query, Epoch,
+				KLWV_OnRangeBuildTerminal.Bind(which, Epoch, request_id))
 		case "clear_cache":
 						; Purge every layer of cache so the next rebuild is a full cold read:
 						; - KLPF_MANIFEST_CACHE: manifest projection (historical days)
@@ -487,11 +517,13 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(which)
 								KLPF_LAST_JSON.Delete(which)
 						try FileDelete(KLPF_PrefetchPath(which))
+						if KLWV_IsCurrent(which, Epoch)
+								KLWV.windows[which]["full_build_done"] := false
 						try FileAppend("[" . A_Now . "] clear_cache(" . which . "): caches purged`r`n", log, "UTF-8")
 						; Projection runs in a detached worker; a late pre-clear result is
 						; fenced by the generation held by KLPF_RequestBuild.
 						KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
-								KLWV_OnBuildReady.Bind(which, Epoch))
+								KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0))
 		}
 }
 
@@ -499,37 +531,47 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 ; Date strings are deliberately constrained before reaching KLR_DateFilter, and
 ; only non-empty string app names make it into the SQLite IN clause.
 KLWV_NormalizeRangeRequest(msg) {
-		try query := KL_JsonDecode(msg)
-		catch
-				return 0
-		if !(query is Map)
-				return 0
+		result := Map("request_id", 0, "query", 0)
+		try payload := KL_JsonDecode(msg)
+		catch {
+				try LoggerWarn("Keylogger", "Range request rejected — malformed JSON payload.")
+				return result
+		}
+		if !(payload is Map)
+				return result
+		if !payload.Has("request_id") || (Type(payload["request_id"]) != "Integer")
+						|| (payload["request_id"] <= 0) {
+				try LoggerWarn("Keylogger", "Range request rejected — missing or invalid request id.")
+				return result
+		}
+		result["request_id"] := payload["request_id"]
 
-		start_date := query.Has("start_date") ? String(query["start_date"]) : ""
-		end_date := query.Has("end_date") ? String(query["end_date"]) : ""
+		start_date := payload.Has("start_date") ? String(payload["start_date"]) : ""
+		end_date := payload.Has("end_date") ? String(payload["end_date"]) : ""
 		; Reject loudly: a bare 0 makes "malformed request" indistinguishable from
 		; "no request", which is why the broken date pattern above silently killed
 		; every range query with nothing in the log to point at it.
 		if !KLWV_IsIsoDate(start_date) || !KLWV_IsIsoDate(end_date) {
 				try LoggerWarn("Keylogger", "Range request rejected — non-ISO date(s) '{1}'…'{2}'.", start_date, end_date)
-				return 0
+				return result
 		}
 		if (start_date != "" && end_date != "" && StrCompare(start_date, end_date) > 0) {
 				try LoggerWarn("Keylogger", "Range request rejected — start '{1}' is after end '{2}'.", start_date, end_date)
-				return 0
+				return result
 		}
 
 		apps := []
 		seen := Map()
-		if query.Has("apps") && query["apps"] is Array {
-				for _, app_name in query["apps"] {
+		if payload.Has("apps") && payload["apps"] is Array {
+				for _, app_name in payload["apps"] {
 						if (Type(app_name) != "String" || app_name = "" || seen.Has(app_name))
 								continue
 						seen[app_name] := true
 						apps.Push(app_name)
 				}
 		}
-		return Map("start_date", start_date, "end_date", end_date, "apps", apps)
+		result["query"] := Map("start_date", start_date, "end_date", end_date, "apps", apps)
+		return result
 }
 
 ; ISO-8601 calendar date, exactly YYYY-MM-DD. NOTE: AHK v2 escapes with a
@@ -543,22 +585,85 @@ KLWV_IsIsoDate(value) {
 		return value = "" || RegExMatch(value, KLWV_ISO_DATE_PATTERN)
 }
 
-KLWV_OnRangeBuildReady(which, Epoch, stage, *) {
-		if A_IsSuspended || !KLWV_IsCurrent(which, Epoch) || !FileExist(stage) {
-				try FileDelete(stage)
-				return
+KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
+		if !KLWV_IsCurrent(which, Epoch) {
+				FSDelete(stage)
+				return false
 		}
+		if A_IsSuspended {
+				FSDelete(stage)
+				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
+		}
+		if (status != "ok") {
+				FSDelete(stage)
+				return KLWV_SendRangeTerminal(which, Epoch, request_id, status)
+		}
+		if (stage = "") || !FSExists(stage)
+				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 		; ``ExecuteScriptAsync`` is fire-and-forget: WebView performs the file read,
 		; JSON parse and range render in its own process, not on the keyboard thread.
 		url := "file:///" . StrReplace(stage, "\", "/")
-		js := "fetch('" . url . "').then(r=>r.json()).then(p=>window.receive_range_data(p)).catch(()=>{});"
+		js := "fetch(" . KL_JsonEncode(url) . ").then(r=>r.json()).then(p=>window.receive_range_data(p," . request_id
+				. ")).catch(()=>window.complete_range_request(" . request_id . ",'failed'));"
 		try KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
 		catch as err {
-				try LoggerError("Keylogger", "KLWV_OnRangeBuildReady: range delivery failed for '{1}': {2}", which, err.Message)
+				FSDelete(stage)
+				try LoggerError("Keylogger", "KLWV_OnRangeBuildTerminal: range delivery failed for '{1}': {2}", which, err.Message)
+				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 		}
 		; Give the renderer ample time to open the file, then clean the private
 		; staged result.  A late timer only removes this generation's unique path.
 		SetTimer(KLWV_DeleteRangeStage.Bind(stage), -60000)
+		return true
+}
+
+KLWV_QueueRangeTerminal(which, Epoch, request_id, status) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		if entry.Has("pending_range_terminal")
+				&& entry["pending_range_terminal"]["request_id"] > request_id
+				return false
+		entry["pending_range_terminal"] := Map(
+				"epoch", Epoch, "request_id", request_id, "status", status)
+		return true
+}
+
+KLWV_SendRangeTerminal(which, Epoch, request_id, status) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		if A_IsSuspended
+				return KLWV_QueueRangeTerminal(which, Epoch, request_id, status)
+
+		entry := KLWV.windows[which]
+		; This is a WebView bridge envelope, not a keylogger event. Assign its
+		; discriminator explicitly so the event-ingest inventory does not mistake
+		; the Map for a row destined for today.log/data.sql.
+		envelope := Map()
+		envelope["type"] := "range_terminal"
+		envelope["request_id"] := request_id
+		envelope["status"] := status
+		msg := KL_JsonEncode(envelope)
+		try entry["webview"].PostWebMessageAsString(msg)
+		catch as err {
+				try LoggerError("Keylogger", "KLWV_SendRangeTerminal: terminal delivery failed for '{1}': {2}", which, err.Message)
+				return KLWV_QueueRangeTerminal(which, Epoch, request_id, status)
+		}
+		if entry.Has("pending_range_terminal")
+				&& entry["pending_range_terminal"]["request_id"] = request_id
+				entry.Delete("pending_range_terminal")
+		return true
+}
+
+KLWV_FlushPendingRangeTerminals() {
+		if A_IsSuspended
+				return
+		for which, entry in KLWV.windows.Clone() {
+				if !entry.Has("pending_range_terminal")
+						continue
+				pending := entry["pending_range_terminal"]
+				KLWV_SendRangeTerminal(which, pending["epoch"], pending["request_id"], pending["status"])
+		}
 }
 
 KLWV_DeleteRangeStage(stage) {
@@ -683,11 +788,25 @@ KLWV_MonitorFromPoint(x, y) {
 		return 0
 }
 
-KLWV_DelayedFirstPush(which, Epoch) {
+KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		global _ConfigDir, _AhkSubDir
 		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
 		try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): fired, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
-		if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
+		if !KLWV_IsCurrent(which, Epoch)
+				return
+		entry := KLWV.windows[which]
+		; A canceled predecessor may already have armed this callback before its
+		; replacement completed. First-paint ownership is terminal: once the
+		; replacement painted, that older retry must not push or schedule phase 2.
+		if entry.Has("first_paint_done") && entry["first_paint_done"]
+				return false
+		if A_IsSuspended {
+				KLWV_QueueFirstPaintRetry(which, Epoch, attempt, false)
+				return
+		}
+		; A superseding refresh owns first-paint recovery through its terminal.
+		; Never cancel that live replacement merely because this retry timer fired.
+		if KLPFWorker.jobs.Has(which)
 				return
 		global KLPF_LAST_JSON
 		; Inject i18n first — must happen before any DB build which can block
@@ -699,41 +818,340 @@ KLWV_DelayedFirstPush(which, Epoch) {
 		need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
 		if need_manifest_build && KLWV.metrics_dir {
 				KLPF_RequestBuild(which, KLWV.metrics_dir, "manifest", Epoch,
-						KLWV_OnFirstBuildReady.Bind(which, Epoch))
+						KLWV_OnFirstBuildTerminal.Bind(which, Epoch, attempt))
 				return
 		}
-		FirstPaintOk := KLWV_PushPrefetch(which)
+		FirstPaintOk := KLWV_FirstPaintPush(which)
+		if !FirstPaintOk {
+				KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, "push failed")
+				return
+		}
 		; Mark first paint done so live ticks can fan out from now on.
 		if FirstPaintOk && KLWV_IsCurrent(which, Epoch)
 				KLWV.windows[which]["first_paint_done"] := true
 		; Phase 2 — full historical build in a deferred timer (2 s later).
 		; Provides the historical n-gram tables without blocking the first paint.
 		if FirstPaintOk
-		SetTimer(KLWV_DelayedFullBuild.Bind(which, Epoch), -2000)
+				KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
+						-KLWV.FULL_BUILD_DELAY_MS)
 }
 
-KLWV_DelayedFullBuild(which, Epoch) {
-		if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
-				return
-		if KLWV.metrics_dir
-				KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
-						KLWV_OnBuildReady.Bind(which, Epoch))
+KLWV_DelayedFullBuild(which, Epoch, attempt := 0) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		if entry.Has("full_build_done") && entry["full_build_done"]
+				return false
+		if A_IsSuspended
+				return KLWV_QueueFullBuildRetry(which, Epoch, attempt)
+		; A newer projection owns recovery through its terminal. In particular,
+		; never let an older retry evict the replacement that canceled it.
+		if KLPFWorker.jobs.Has(which)
+				return false
+		if !KLWV.metrics_dir
+				return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, "missing metrics dir")
+		if entry.Has("full_build_retry_exhausted")
+				entry.Delete("full_build_retry_exhausted")
+		return KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
+				KLWV_OnFullBuildTerminal.Bind(which, Epoch, attempt))
 }
 
-KLWV_OnFirstBuildReady(which, Epoch, *) {
-		if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
-				return
-		if !KLWV_PushPrefetch(which)
-				return
-		if KLWV_IsCurrent(which, Epoch)
-				KLWV.windows[which]["first_paint_done"] := true
-		SetTimer(KLWV_DelayedFullBuild.Bind(which, Epoch), -2000)
+KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, *) {
+		try {
+				if !KLWV_IsCurrent(which, Epoch)
+						return false
+				if A_IsSuspended
+						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
+				if (status != "ok")
+						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
+				if !KLWV_FirstPaintPush(which)
+						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, "push failed")
+				if KLWV_IsCurrent(which, Epoch)
+						KLWV.windows[which]["first_paint_done"] := true
+				KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
+						-KLWV.FULL_BUILD_DELAY_MS)
+				return true
+		} finally {
+				KLWV_ScheduleIngestDrain(which, Epoch)
+		}
 }
 
-KLWV_OnBuildReady(which, Epoch, *) {
-		if A_IsSuspended || !KLWV_IsCurrent(which, Epoch)
+KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
+		try {
+				if !KLWV_IsCurrent(which, Epoch)
+						return false
+				if A_IsSuspended || (status != "ok")
+						return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, status)
+				if !KLWV_FirstPaintPush(which)
+						return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, "push failed")
+				entry := KLWV.windows[which]
+				entry["first_paint_done"] := true
+				entry["full_build_done"] := true
+				if entry.Has("pending_full_build_retry")
+						entry.Delete("pending_full_build_retry")
+				if entry.Has("full_build_retry_exhausted")
+						entry.Delete("full_build_retry_exhausted")
+				return true
+		} finally {
+				KLWV_ScheduleIngestDrain(which, Epoch)
+		}
+}
+
+KLWV_OnBuildTerminal(which, Epoch, status, *) {
+		try {
+				if !KLWV_IsCurrent(which, Epoch)
+						return false
+				entry := KLWV.windows[which]
+				first_paint_pending := !entry.Has("first_paint_done") || !entry["first_paint_done"]
+				if A_IsSuspended {
+						if first_paint_pending
+								KLWV_QueueFirstPaintRetry(which, Epoch, 0, false)
+						return false
+				}
+				if (status != "ok") {
+						if first_paint_pending
+								return KLWV_ScheduleFirstPaintRetry(which, Epoch, 0, status)
+						return false
+				}
+				if !KLWV_FirstPaintPush(which) {
+						if first_paint_pending
+								return KLWV_ScheduleFirstPaintRetry(which, Epoch, 0, "push failed")
+						return false
+				}
+				if first_paint_pending && KLWV_IsCurrent(which, Epoch)
+						KLWV.windows[which]["first_paint_done"] := true
+				if first_paint_pending
+						KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
+								-KLWV.FULL_BUILD_DELAY_MS)
+				return true
+		} finally {
+				KLWV_ScheduleIngestDrain(which, Epoch)
+		}
+}
+
+KLWV_QueueFirstPaintRetry(which, Epoch, attempt, fallback) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		if entry.Has("pending_first_paint_retry") {
+				pending := entry["pending_first_paint_retry"]
+				if pending["fallback"] || (!fallback && pending["attempt"] > attempt)
+						return false
+		}
+		entry["pending_first_paint_retry"] := Map(
+				"epoch", Epoch, "attempt", attempt, "fallback", fallback)
+		return true
+}
+
+KLWV_FirstPaintPush(which) {
+		if IsObject(KLWV.first_paint_push_fn)
+				return KLWV.first_paint_push_fn.Call(which)
+		return KLWV_PushPrefetch(which)
+}
+
+KLWV_ArmFirstPaintTimer(callback, period) {
+		if IsObject(KLWV.first_paint_timer_fn)
+				return KLWV.first_paint_timer_fn.Call(callback, period)
+		; Recovery timers are one-shot by contract, regardless of caller sign.
+		SetTimer(callback, -Abs(period))
+		return true
+}
+
+KLWV_ArmFullBuildTimer(callback, period) {
+		if IsObject(KLWV.full_build_timer_fn)
+				return KLWV.full_build_timer_fn.Call(callback, period)
+		; Recovery timers are one-shot by contract, regardless of caller sign.
+		SetTimer(callback, -Abs(period))
+		return true
+}
+
+KLWV_IngestModePriority(mode) {
+		switch mode {
+				case "manifest":
+						return 1
+				case "live":
+						return 2
+				case "full":
+						return 3
+		}
+		return 0
+}
+
+; Collapse an arbitrary ingest cadence into one pending projection per window.
+; A richer pending mode wins over a cheaper one, so a later manifest tick cannot
+; downgrade live/full work already promised by an earlier ingest.
+KLWV_MarkIngestDirty(which, Epoch, mode := "live") {
+		if !KLWV_IsCurrent(which, Epoch) || !KLWV_IngestModePriority(mode)
+				return false
+		entry := KLWV.windows[which]
+		pending_mode := entry.Get("pending_ingest_mode", "")
+		if KLWV_IngestModePriority(mode) >= KLWV_IngestModePriority(pending_mode)
+				entry["pending_ingest_mode"] := mode
+		return true
+}
+
+KLWV_ArmIngestDrainTimer(callback, period) {
+		if IsObject(KLWV.ingest_drain_timer_fn)
+				return KLWV.ingest_drain_timer_fn.Call(callback, period)
+		SetTimer(callback, -Abs(period))
+		return true
+}
+
+; Completion callbacks run while KLPF still retains their terminal owner. Defer
+; the drain one turn so job retirement happens first, then start at most one
+; coalesced successor. The armed flag makes duplicate terminals/ticks harmless.
+KLWV_ScheduleIngestDrain(which, Epoch) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		if entry.Get("pending_ingest_mode", "") = ""
+				return false
+		if entry.Get("ingest_drain_armed", false)
+				return true
+		entry["ingest_drain_armed"] := true
+		try return KLWV_ArmIngestDrainTimer(
+				KLWV_DrainPendingIngest.Bind(which, Epoch), -1)
+		catch as err {
+				entry["ingest_drain_armed"] := false
+				try LoggerError("Keylogger", "Could not arm coalesced metrics drain for '{1}': {2}", which, err.Message)
+				return false
+		}
+}
+
+KLWV_DrainPendingIngest(which, Epoch) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		entry["ingest_drain_armed"] := false
+		if A_IsSuspended
+				return false
+		pending_mode := entry.Get("pending_ingest_mode", "")
+		if pending_mode = ""
+				return false
+		if !entry.Get("first_paint_done", false) || KLPFWorker.jobs.Has(which)
+				return false
+
+		; Until the historical seed lands, every dirty signal is satisfied by one
+		; full build. Only after that owner commits may manifest/live work run.
+		mode := entry.Get("full_build_done", false) ? pending_mode : "full"
+		entry["pending_ingest_mode"] := ""
+		terminal := (mode = "full")
+				? KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0)
+				: KLWV_OnBuildTerminal.Bind(which, Epoch)
+		started := KLPF_RequestBuild(which, KLWV.metrics_dir, mode, Epoch,
+				terminal, false)
+		if !started
+				KLWV_MarkIngestDirty(which, Epoch, pending_mode)
+		return started
+}
+
+KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, reason) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		if entry.Has("first_paint_done") && entry["first_paint_done"]
+				return false
+		if (attempt >= KLWV.FIRST_PAINT_MAX_RETRIES) {
+				if A_IsSuspended
+						return KLWV_QueueFirstPaintRetry(which, Epoch, attempt, true)
+				fallback_ok := KLWV_FirstPaintPush(which)
+				; Even without an old sidecar, admitting live ticks is the bounded
+				; recovery path: their next terminal can populate the blank window.
+				if KLWV_IsCurrent(which, Epoch)
+						KLWV.windows[which]["first_paint_done"] := true
+				if fallback_ok
+						KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
+								-KLWV.FULL_BUILD_DELAY_MS)
+				else
+						try LoggerError("Keylogger", "First metrics paint exhausted retries for '{1}' ({2}); waiting for live recovery.", which, reason)
+				return fallback_ok
+		}
+		if A_IsSuspended
+				return KLWV_QueueFirstPaintRetry(which, Epoch, attempt + 1, false)
+		try LoggerWarn("Keylogger", "First metrics paint retry {1}/{2} for '{3}' after {4}.",
+				attempt + 1, KLWV.FIRST_PAINT_MAX_RETRIES, which, reason)
+		KLWV_ArmFirstPaintTimer(KLWV_DelayedFirstPush.Bind(which, Epoch, attempt + 1),
+				-KLWV.FIRST_PAINT_RETRY_MS)
+		return true
+}
+
+KLWV_QueueFullBuildRetry(which, Epoch, attempt) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		if entry.Has("full_build_done") && entry["full_build_done"]
+				return false
+		if entry.Has("pending_full_build_retry") {
+				pending := entry["pending_full_build_retry"]
+				if pending["attempt"] >= attempt
+						return false
+		}
+		entry["pending_full_build_retry"] := Map("epoch", Epoch, "attempt", attempt)
+		return true
+}
+
+KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, reason) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		entry := KLWV.windows[which]
+		if entry.Has("full_build_done") && entry["full_build_done"]
+				return false
+		if (attempt >= KLWV.FULL_BUILD_MAX_RETRIES) {
+				; Keep the already-rendered manifest/live payload intact. The next
+				; ingest tick sees full_build_done=false and becomes the low-frequency
+				; fallback, forcing another non-blocking full worker.
+				entry["full_build_retry_exhausted"] := true
+				try LoggerError("Keylogger", "Full metrics build exhausted retries for '{1}' ({2}); next ingest will retry.", which, reason)
+				return false
+		}
+		next_attempt := attempt + 1
+		if A_IsSuspended
+				return KLWV_QueueFullBuildRetry(which, Epoch, next_attempt)
+		try LoggerWarn("Keylogger", "Full metrics build retry {1}/{2} for '{3}' after {4}.",
+				next_attempt, KLWV.FULL_BUILD_MAX_RETRIES, which, reason)
+		KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, next_attempt),
+				-KLWV.FULL_BUILD_RETRY_MS)
+		return true
+}
+
+KLWV_FlushPendingFirstPaintRetries() {
+		if A_IsSuspended
 				return
-		KLWV_PushPrefetch(which)
+		for which, entry in KLWV.windows.Clone() {
+				if !entry.Has("pending_first_paint_retry")
+						continue
+				pending := entry["pending_first_paint_retry"]
+				entry.Delete("pending_first_paint_retry")
+				if pending["fallback"]
+						KLWV_ScheduleFirstPaintRetry(which, pending["epoch"], pending["attempt"], "suspend")
+				else
+						KLWV_ArmFirstPaintTimer(
+								KLWV_DelayedFirstPush.Bind(which, pending["epoch"], pending["attempt"]), -1)
+		}
+}
+
+KLWV_FlushPendingFullBuildRetries() {
+		if A_IsSuspended
+				return
+		for which, entry in KLWV.windows.Clone() {
+				if !entry.Has("pending_full_build_retry")
+						continue
+				pending := entry["pending_full_build_retry"]
+				entry.Delete("pending_full_build_retry")
+				KLWV_ArmFullBuildTimer(
+						KLWV_DelayedFullBuild.Bind(which, pending["epoch"], pending["attempt"]), -1)
+		}
+}
+
+KLWV_OnSuspendResume() {
+		KLWV_FlushPendingRangeTerminals()
+		KLWV_FlushPendingFirstPaintRetries()
+		KLWV_FlushPendingFullBuildRetries()
+		for which, entry in KLWV.windows.Clone() {
+				if !(entry is Map) || (entry.Get("pending_ingest_mode", "") = "")
+						continue
+				KLWV_ScheduleIngestDrain(which, entry.Get("epoch", 0))
+		}
 }
 
 ; Called by the ingest tick after data.sql has new rows. Rebuilds the
@@ -751,21 +1169,24 @@ KLWV_OnBuildReady(which, Epoch, *) {
 KLWV_NotifyIngest(mode := "live") {
 		global _ConfigDir, _AhkSubDir
 		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
-		if !KLWV.metrics_dir {
+		if !KLWV.metrics_dir || !KLWV_IngestModePriority(mode) {
 				return
 		}
 		n := 0
 		for which, entry in KLWV.windows {
-				; Skip live ticks until the first FULL paint has landed —
-				; otherwise an empty-historical live blob would race the full
-				; one and leave the dashboard with wiped n-gram tables.
+				; Skip live ticks until the first visible paint has landed.
 				if !(entry is Map && entry.Has("first_paint_done") && entry["first_paint_done"])
 						continue
+				Epoch := entry.Get("epoch", 0)
+				if !KLWV_MarkIngestDirty(which, Epoch, mode)
+						continue
 				n += 1
-				KLPF_RequestBuild(which, KLWV.metrics_dir, mode, entry["epoch"],
-						KLWV_OnBuildReady.Bind(which, entry["epoch"]))
+				; The active job is never replaced by ingest. Its terminal schedules one
+				; deferred drain; an idle window can consume the dirty bit immediately.
+				if !KLPFWorker.jobs.Has(which)
+						KLWV_DrainPendingIngest(which, Epoch)
 		}
 		if n
-				try FileAppend("[" . A_Now . "] NotifyIngest(" . mode . ") fanned out to " . n . " window(s)`r`n", log, "UTF-8"
+				try FileAppend("[" . A_Now . "] NotifyIngest(" . mode . ") coalesced for " . n . " window(s)`r`n", log, "UTF-8"
 				)
 }

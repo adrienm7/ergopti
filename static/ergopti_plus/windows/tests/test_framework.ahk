@@ -270,16 +270,66 @@ _DriverFuncBody(Name) {
 ; Same scan as _DriverFuncBody but returns "" instead of throwing when the
 ; function is absent. Reserved for the handful of tests whose assertion IS the
 ; absence (e.g. "this dead helper must stay deleted").
+_DriverFindFunctionDefinition(Src, Name) {
+	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
+		throw ValueError("Invalid driver function name: " . Name)
+	Pattern := "m)^[ \t]*" . Name . "\("
+	SearchPos := 1
+	SourceLen := StrLen(Src)
+	while RegExMatch(Src, Pattern, &Match, SearchPos) {
+		SignatureOpen := InStr(Src, "(", , Match.Pos)
+		Depth := 0
+		Quote := ""
+		Cursor := SignatureOpen
+		while Cursor <= SourceLen {
+			Ch := SubStr(Src, Cursor, 1)
+			if (Quote != "") {
+				if (Ch == Chr(96)) {
+					Cursor += 2
+					continue
+				}
+				if (Ch == Quote)
+					Quote := ""
+			} else if (Ch == Chr(34) or Ch == Chr(39)) {
+				Quote := Ch
+			} else if (Ch == ";") {
+				LineEnd := InStr(Src, "`n", , Cursor)
+				Cursor := LineEnd > 0 ? LineEnd : SourceLen + 1
+				continue
+			} else if (Ch == "(") {
+				Depth += 1
+			} else if (Ch == ")") {
+				Depth -= 1
+				if (Depth == 0)
+					break
+			}
+			Cursor += 1
+		}
+		if (Depth == 0) {
+			OpenPos := Cursor + 1
+			while (OpenPos <= SourceLen
+				and InStr(" `t`r`n", SubStr(Src, OpenPos, 1)) > 0)
+				OpenPos += 1
+			if (SubStr(Src, OpenPos, 1) == "{")
+				return { Idx: Match.Pos, OpenPos: OpenPos }
+		}
+		; A column-zero call is not a definition. Continue after this exact name
+		; instead of letting a multiline regex consume through a later function.
+		SearchPos := Match.Pos + Max(1, StrLen(Match[0]))
+	}
+	return 0
+}
+
 _DriverFuncBodyOrEmpty(Name) {
 	Src := _DriverSourceConcat()
-	; Match a function DEFINITION line — the name, its (...) params and the opening
-	; brace — optionally indented (nested functions), never a bare call site (a
-	; call has no trailing ") {"). This distinguishes def from call without relying
-	; on column 0, so nested helpers like _OneShot/_Repeating resolve too.
-	if !RegExMatch(Src, "m)^[ \t]*" . Name . "\([^\r\n]*\)\s*\{", &m)
+	; Match a definition, not a same-named column-zero call. The scanner balances
+	; nested parameter expressions and quoted parentheses before requiring the
+	; opening brace immediately after the real outer close.
+	Definition := _DriverFindFunctionDefinition(Src, Name)
+	if !IsObject(Definition)
 		return ""
-	Idx := m.Pos
-	OpenPos := InStr(Src, "{", , Idx)
+	Idx := Definition.Idx
+	OpenPos := Definition.OpenPos
 	if (!OpenPos)
 		return ""
 	depth := 0

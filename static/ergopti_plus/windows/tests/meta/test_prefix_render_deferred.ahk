@@ -15,8 +15,9 @@
 ; itself (_LookupAndRender) must therefore never be called directly from the hot
 ; OnChar path — only from the debounce flush (_PrefixRenderFlush).
 ;
-; This source-level assertion mirrors the sibling meta/test_llm_ensure_model_ready_guard.ahk:
-; scope to the _OnPrefixChar body and assert it schedules rather than renders.
+; This source-level assertion traces the immediate helpers reached from
+; _OnPrefixChar and proves that the expensive renderer has one caller only: the
+; deferred flush. That survives refactors which move buffer commits into helpers.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -52,12 +53,38 @@ _MetaCheckPrefixRenderDeferred() {
 	Assert(FnBody != "",
 		"hotstring_prefix_watcher.ahk must define _OnPrefixChar(IH, Char) — entry point not found")
 
-	Assert(InStr(FnBody, "_PrefixScheduleRender(") > 0,
-		"_OnPrefixChar must defer the preview render via _PrefixScheduleRender")
+	AppendBody := _DriverFuncBody("_PrefixAppendTypedChar")
+	PostFireBody := _DriverFuncBody("_PrefixCommitPostFireEffect")
+	FlushBody := _DriverFuncBody("_PrefixRenderFlush")
+	Assert(AppendBody != "", "_PrefixAppendTypedChar() must own the no-fire buffer commit")
+	Assert(PostFireBody != "", "_PrefixCommitPostFireEffect() must own the fired buffer commit")
+	Assert(FlushBody != "", "_PrefixRenderFlush() must own the deferred renderer call")
+	Assert(InStr(FnBody, "_PrefixAppendTypedChar(") > 0
+		and InStr(FnBody, "_PrefixCommitPostFireEffect(") > 0,
+		"_OnPrefixChar must route both no-fire and fired buffer states through their canonical helpers")
 
-	Assert(!InStr(FnBody, "_LookupAndRender("),
-		"_OnPrefixChar must NOT call _LookupAndRender() synchronously — the ~60 ms "
-		. "render must stay off the keystroke path (route it through the debounce)")
+	for Name, HelperBody in Map(
+		"_PrefixAppendTypedChar", AppendBody,
+		"_PrefixCommitPostFireEffect", PostFireBody
+	) {
+		Assert(InStr(HelperBody, "_PrefixScheduleRender(") > 0,
+			Name . " must request preview work through the debounce scheduler")
+		Assert(InStr(HelperBody, "_LookupAndRender(") == 0,
+			Name . " is synchronous keystroke work and must never rebuild the tooltip directly")
+	}
+
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "driver source must be readable for the renderer caller-class guard")
+	LookupCount := 0
+	Pos := 1
+	while (Pos := InStr(Src, "_LookupAndRender(", true, Pos)) {
+		LookupCount += 1
+		Pos += StrLen("_LookupAndRender(")
+	}
+	AssertEqual(2, LookupCount,
+		"_LookupAndRender must have exactly one production caller: its definition plus _PrefixRenderFlush")
+	Assert(InStr(FlushBody, "_LookupAndRender()") > 0,
+		"the sole expensive-render caller must remain the deferred flush")
 }
 
 Test("meta prefix: _OnPrefixChar defers the tooltip render off the keystroke path",

@@ -57,11 +57,18 @@ _EBA_AssertBurstIsAssembledWhole() {
 		. "being sent. Emitting them as separate injections is what let the backspaces go missing "
 		. "and let a physical keystroke land in the middle of the replacement")
 
-	; And that single payload is what reaches the OS.
-	Assert(InStr(Src, "SendInput(Burst)") > 0,
-		"the assembled burst must be handed to a single SendInput call — SendInput is atomic, and "
-		. "that atomicity is the only thing keeping a key typed during an expansion from being "
-		. "spliced into it")
+	; The production path must hand that payload to one kernel SendInput, while
+	; the recorder path consumes the same transaction verdict. Keeping both in
+	; the dispatch body pins atomicity and the AHK-04 failure boundary together.
+	Dispatch := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
+	Assert(Dispatch != "", "HSE_DispatchMatch must exist in the driver source")
+	SendPos := InStr(Dispatch, "SendInput(Burst)")
+	Assert(SendPos > 0 and InStr(Dispatch, "SendInput(Burst)", , SendPos + 1) = 0,
+		"the assembled burst must reach exactly one SendInput — splitting the erase, replacement "
+		. "and terminator is what lets a physical key splice into an expansion")
+	Assert(InStr(Dispatch,
+		'Fired := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))') > 0,
+		"the recorder path must publish the same atomic burst only after its sender reports success")
 }
 Test("hotstrings: the expansion burst is one atomic SendInput (typing-order-atomicity)", _EBA_AssertBurstIsAssembledWhole)
 

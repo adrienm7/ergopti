@@ -75,8 +75,9 @@ Test("ErgoptiPlus: SaveFullConfig has no FileDelete before TOML_BatchWrite (save
 ; ====================================================
 
 _SFND_BuildTrayMenuDeferredTryFinally() {
-	Raw := _DriverSourceConcat()
-	Src := _SFND_StripComments(Raw)
+	Src := _DriverFuncBody("_TrayRootBuildBoot")
+	Assert(Src != "",
+		"the deferred boot tray request must carry its _DriverReady scope in its root worker")
 
 	; _DriverReady must be restored via a finally block, not conditionally
 	Assert(InStr(Src, "_DriverReady := _SavedReady") > 0,
@@ -92,37 +93,52 @@ _SFND_BuildTrayMenuDeferredTryFinally() {
 	PosRestore := InStr(Src, "_DriverReady := _SavedReady")
 	Assert(ActualFin > 0 and PosRestore > ActualFin,
 		"_DriverReady := _SavedReady must appear AFTER the finally keyword, not only on the success path (buildtraymenu-driverready-lost-on-error)")
+	BootRequest := _DriverFuncBody("BuildTrayMenuDeferred")
+	Assert(BootRequest != "" and InStr(BootRequest,
+		"RebuildTrayMenu(0, _TrayRootBuildBoot, false)") > 0,
+		"the deferred boot root must use the same generation owner as every live tray rebuild")
+	Assert(InStr(BootRequest, "initMenu(") = 0,
+		"the boot timer must not bypass the shared tray-root generation owner")
+	Worker := _DriverFuncBody("_TrayRootBuildBoot")
+	PublishPos := InStr(Worker, "Published := initMenu(PublishAuthorizeFn)")
+	MarkPos := InStr(Worker, 'BootProfile_Mark("Tray menu built', false,
+		PublishPos)
+	Assert(PublishPos > 0 and MarkPos > PublishPos
+		and InStr(BootRequest, 'BootProfile_Mark("Tray menu built') = 0,
+		"the boot profiler may report the root only after its actual terminal publication")
 }
 Test("ErgoptiPlus: BuildTrayMenuDeferred restores _DriverReady in finally block (buildtraymenu-driverready-lost-on-error)", _SFND_BuildTrayMenuDeferredTryFinally)
 
 
 
 
+
 ; ====================================================
 ; ====================================================
-; ======= 3/ PrevCanonState is function-local ========
+; ======= 3/ Save has one non-reentrant writer =======
 ; ====================================================
 ; ====================================================
 
-_SFND_PrevCanonStateIsLocal() {
+_SFND_SaveFullConfigOwnsOneCausalBatchWrite() {
 	Body := _DriverFuncBody("SaveFullConfig")
 	Assert(Body != "", "SaveFullConfig() must exist in the driver source")
-
-	Assert(RegExMatch(Body, "global\s+([^\r\n]+)", &m) > 0,
-		"SaveFullConfig must declare its global dependencies")
-	GlobalLine := m[1]
-
-	Assert(!InStr(GlobalLine, "PrevCanonState"),
-		"SaveFullConfig must NOT declare PrevCanonState as global -- a shared global "
-		. "canonicalization-guard snapshot lets a re-entrant call (e.g. the boot retry "
-		. "timer landing mid-execution of another SaveFullConfig caller) clobber the "
-		. "outer call's captured value, permanently wedging _TOML_STRICT_CANON_IN_PROGRESS "
-		. "to true and silently disabling future TOML re-normalization (savefullconfig-prevcanonstate-shared-global)")
-
-	Assert(InStr(Body, "PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS") > 0,
-		"SaveFullConfig must still snapshot the previous canonicalization-guard state")
-	Assert(InStr(Body, "_TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState") > 0,
-		"SaveFullConfig must still restore the previous canonicalization-guard state")
+	Assert(InStr(Body, "PrevCanonState") = 0
+		and InStr(Body, "_TOML_STRICT_CANON_IN_PROGRESS") = 0,
+		"SaveFullConfig must not carry the obsolete guard for a nested full save that the batch writer no longer performs")
+	WriteNeedle := "TOML_BatchWrite(BoundPath, Updates)"
+	WritePos := InStr(Body, WriteNeedle)
+	Assert(WritePos > 0,
+		"SaveFullConfig must write through the path selected by its exact lease owner")
+	StrictPos := InStr(Body, "Written is Integer", true, WritePos)
+	ResultPos := InStr(Body, "Result := CONFIG_SAVE_OK", true, StrictPos)
+	AckPos := InStr(Body, "_ConfigFullSaveAcknowledge(TargetGeneration)")
+	ReturnPos := InStr(Body, "return Result", true, AckPos)
+	StrReplace(Body, WriteNeedle, "", true, &WriteCount)
+	Assert(WriteCount = 1,
+		"SaveFullConfig must own exactly one atomic batch write")
+	Assert(StrictPos > WritePos and ResultPos > StrictPos
+		and AckPos > ResultPos and ReturnPos > AckPos,
+		"SaveFullConfig must acknowledge a generation only after durable success and return its named status")
 }
-Test("ErgoptiPlus: SaveFullConfig's PrevCanonState is function-local, not a shared global (savefullconfig-prevcanonstate-shared-global)", _SFND_PrevCanonStateIsLocal)
-
+Test("ErgoptiPlus: SaveFullConfig owns one non-reentrant batch write",
+	_SFND_SaveFullConfigOwnsOneCausalBatchWrite)

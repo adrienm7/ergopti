@@ -14,29 +14,48 @@
 
 
 
-; ── Filter toggles. Each persists + flips the corresponding flag and
-; triggers a reload so the menu rerenders with the new checkmark state
-; (AHK Menu.Check / Uncheck cannot retro-update an entry whose label was
-; built into the submenu reference; rebuilding the whole tray is cleaner
-; than playing with .ToggleCheck on a stale label). The reload goes through
-; ReloadPreservingSuspend because a tray click stays reachable while the
-; driver is paused, and a bare Reload comes back armed.
+; Filter preferences publish from the configuration gateway only after the
+; candidate is durable. Reload is a second, strictly gated side effect: a
+; terminal transition that refuses the commit must never receive a nested
+; Reload request from the losing menu callback.
+_MetricsReloadAfterCommit(Committed, ReloadFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _MetricsReloadAfterCommit(Committed, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+	try {
+		Reloaded := HasMethod(ReloadFn, "Call")
+			? ReloadFn.Call()
+			: ReloadPreservingSuspend()
+	} catch as Err {
+		try LoggerError("MetricsMenu",
+			"Could not reload after the durable metrics preference commit: {1}.",
+			Err.Message)
+		return false
+	}
+	return (Reloaded is Integer) && Reloaded == 1
+}
+
+_MetricsToggleFilterAndReload(Prop, WriterFn := 0, NotifyFn := 0,
+		ReloadFn := 0) {
+	Committed := MF_CommitFilterToggle(Prop, WriterFn, NotifyFn)
+	return _MetricsReloadAfterCommit(Committed, ReloadFn)
+}
+
 ToggleFilterPrivate(*) {
-	MetricsFilters.private_browsing := !MetricsFilters.private_browsing
-	MF_SaveToIni()
-	ReloadPreservingSuspend()
+	return _MetricsToggleFilterAndReload("private_browsing")
 }
 
 ToggleFilterSecureField(*) {
-	MetricsFilters.secure_field := !MetricsFilters.secure_field
-	MF_SaveToIni()
-	ReloadPreservingSuspend()
+	return _MetricsToggleFilterAndReload("secure_field")
 }
 
 ToggleFilterSystemAuth(*) {
-	MetricsFilters.system_auth := !MetricsFilters.system_auth
-	MF_SaveToIni()
-	ReloadPreservingSuspend()
+	return _MetricsToggleFilterAndReload("system_auth")
 }
 
 ; At-rest encryption of the typed-text columns. Refuses to enable when no key can
@@ -49,23 +68,30 @@ ToggleFilterSystemAuth(*) {
 ; KL_Mig_SyncToPosture, which compares the ledger's recorded posture against the
 ; new one and starts the rewrite there.
 ToggleAtRestEncryption(*) {
-	want := !MetricsFilters.encrypt
-	if (want && !KL_Enc_IsAvailable()) {
-		LoggerError("Keylogger", "At-rest encryption requested but no key can be derived - staying off.")
-		return
-	}
-	MetricsFilters.encrypt := want
-	KL_Enc_SetEnabled(want)
-	MF_SaveToIni()
-	ReloadPreservingSuspend()
+	return _MetricsToggleEncryptionAndReload()
+}
+
+_MetricsToggleEncryptionAndReload(WriterFn := 0, NotifyFn := 0,
+		ReloadFn := 0, ApplyFn := 0, AvailableFn := 0) {
+	Committed := MF_CommitEncryptionToggle(WriterFn, NotifyFn, ApplyFn,
+		AvailableFn)
+	return _MetricsReloadAfterCommit(Committed, ReloadFn)
 }
 
 ; ── WPM toggle helpers — closures capture the menu reference and label strings
 ; from BuildMetricsMenu locals, so no global state is needed. ──────────────────
 
-_ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl) {
-    if !WPMWidget_Toggle()
-        return
+_ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl, ToggleFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl,
+			ToggleFn)
+		finally Critical(InheritedCritical)
+	}
+	Toggled := HasMethod(ToggleFn, "Call") ? ToggleFn.Call() : WPMWidget_Toggle()
+	if !(Toggled is Integer) || Toggled != 1
+		return
 	try menu.ToggleCheck(widget_lbl)
 	if WPMWidget.visible {
 		try menu.Enable(colors_lbl)
@@ -76,26 +102,40 @@ _ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl) {
 	}
 }
 
-_ToggleWpmWidgetColors(menu, label) {
-    TargetColors := !WPMWidget.use_colors
-    if !WPMWidget_SaveConfig(TargetColors)
-        return
-    WPMWidget.use_colors := TargetColors
-    try menu.ToggleCheck(label)
+_ToggleWpmWidgetColors(menu, label, WriterFn := 0, NotifyFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ToggleWpmWidgetColors(menu, label, WriterFn, NotifyFn)
+		finally Critical(InheritedCritical)
+	}
+	if !WPMWidget_ToggleColorsConfig(WriterFn, NotifyFn)
+		return
+	try menu.ToggleCheck(label)
 }
 
-_ToggleWpmWidgetGraph(menu, label) {
-    was_visible := WPMWidget.visible
-    TargetGraph := !WPMWidget.show_graph
+_ToggleWpmWidgetGraph(menu, label, WriterFn := 0, NotifyFn := 0, HideFn := 0,
+		ShowFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _ToggleWpmWidgetGraph(menu, label, WriterFn, NotifyFn,
+			HideFn, ShowFn)
+		finally Critical(InheritedCritical)
+	}
     ; Graph and its anchor form one persisted state. Commit the reset before
     ; destroying the live surface, so a disk failure leaves the current widget
     ; fully usable and its menu checkmark unchanged.
-    if !WPMWidget_SaveConfig(unset, TargetGraph, -1, -1)
+    if !WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn)
         return
+    was_visible := WPMWidget.visible
     ; Rebuild the widget in the new mode — compact and graph use different Gui layouts.
-    if was_visible
-        WPMWidget_Hide()
-    WPMWidget.show_graph := TargetGraph
+	if was_visible {
+		if HasMethod(HideFn, "Call")
+			HideFn.Call()
+		else
+			WPMWidget_Hide()
+	}
 	; Destroy existing GUI so it is rebuilt in the correct layout on next show.
 	if WPMWidget._gui {
 		try WPMWidget._gui.Destroy()
@@ -107,12 +147,13 @@ _ToggleWpmWidgetGraph(menu, label) {
 		try WPMWidget._graph_gui.Destroy()
 		WPMWidget._graph_gui := false
 	}
-	; Reset saved position so default bottom-right is recalculated for new size.
-    WpmWidget.pos_x := -1
-    WpmWidget.pos_y := -1
     try menu.ToggleCheck(label)
-	if was_visible
-		WPMWidget_Show()
+	if was_visible {
+		if HasMethod(ShowFn, "Call")
+			ShowFn.Call()
+		else
+			WPMWidget_Show()
+	}
 }
 
 OpenMetricsAppPicker(*) {
@@ -125,15 +166,28 @@ OpenMetricsAppPicker(*) {
 	))
 }
 
-OnMetricsAppPickerSave(selected) {
-	; Replace the disabled-apps map wholesale with the picker's result —
-	; the user expects "what's checked = what's filtered", not "diff
-	; against the previous state".
-	MetricsFilters.disabled_apps := Map()
-	for _, proc in selected
-		MetricsFilters.disabled_apps[StrLower(proc)] := true
-	MF_SaveToIni()
-	ReloadPreservingSuspend()
+OnMetricsAppPickerSave(Selected) {
+	return _MetricsSaveAppPickerAndReload(Selected)
+}
+
+_MetricsSaveAppPickerAndReload(Selected, WriterFn := 0, NotifyFn := 0,
+		ReloadFn := 0) {
+	; The picker result is normalized into a detached Map by the owned builder;
+	; the live exclusion lookup remains unchanged while config.toml is written.
+	Committed := MF_CommitDisabledApps(Selected, WriterFn, NotifyFn)
+	return _MetricsReloadAfterCommit(Committed, ReloadFn)
+}
+
+_MetricsSetPreferenceAndReload(Prop, Target, WriterFn := 0, NotifyFn := 0,
+		ReloadFn := 0) {
+	Committed := MS_CommitPreference(Prop, Target, WriterFn, NotifyFn)
+	return _MetricsReloadAfterCommit(Committed, ReloadFn)
+}
+
+_MetricsSetEnabledAndReload(Target, WriterFn := 0, NotifyFn := 0,
+		ReloadFn := 0) {
+	return _MetricsSetPreferenceAndReload("enabled", Target, WriterFn,
+		NotifyFn, ReloadFn)
 }
 
 ; Flip the global keylogger feature with a warning dialog before enabling.
@@ -150,10 +204,7 @@ ToggleMetricsEnabled() {
 		)
 		if (res != "OK")
 			return
-		MetricsShortcuts.enabled := false
-		MS_SaveToIni()
-		ReloadPreservingSuspend()
-		return
+		return _MetricsSetEnabledAndReload(false)
 	}
 
 	; Enabling — explicit warning, OK is the dangerous action. The metrics
@@ -169,7 +220,5 @@ ToggleMetricsEnabled() {
 	res := MsgBox(warn, t("dialog.metrics.security_warning_title"), "OKCancel Icon!")
 	if (res != "OK")
 		return
-	MetricsShortcuts.enabled := true
-	MS_SaveToIni()
-	ReloadPreservingSuspend()
+	return _MetricsSetEnabledAndReload(true)
 }

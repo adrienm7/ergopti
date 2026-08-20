@@ -112,6 +112,7 @@ class KeylogConst {
 
 class Keylogger {
     static initialized      := false
+	static lifecycle_generation := 0
     static device_id        := ""
     static device_obj       := Map()
     static metrics_dir      := ""
@@ -137,6 +138,14 @@ class Keylogger {
     static rich_chunks      := []
     static last_time        := 0
     static last_flush_time  := 0
+	; Serialises detached typing snapshots without holding Critical across focus
+	; classification or queue publication. A re-entrant fire must retry later;
+	; otherwise two rejected snapshots can restore in reverse screen order.
+	static _flush_in_progress := false
+	; Lifecycle-rejected detached snapshots retain their reserved event ids here
+	; instead of merging back into newer physical input. This preserves the true
+	; prefix -> completion -> following-input order across Suspend/retry.
+	static _retry_snapshots := []
     static session_app      := "Unknown"
     static session_title    := ""
     static session_layout   := ""
@@ -521,35 +530,7 @@ KL_SaveState() {
 ; starts after it. Pure helpers (no OS calls beyond the one FileRead in
 ; KL_ScanMaxEventId) so the resolve arithmetic stays unit-testable.
 
-; Scans a data.sql text body for the highest event id already persisted for
-; the given device-id SQL literal (e.g. "'uuid'"). Every INSERT row has the
-; shape `... VALUES (<device_id_lit>, <id>, ...)`, so we anchor on the literal
-; immediately followed by the id field. Returns 0 when no row matches (fresh
-; device / empty file). Pure: takes the text, never reads the disk itself.
-KL_ScanMaxEventId(sql_text, device_id_lit) {
-    ; O(1) search: the file is append-only, so the highest ID is always at the end.
-    ; Find the last occurrence of the device literal.
-    prefix := "VALUES (" . device_id_lit . ","
-    pos := InStr(sql_text, prefix, false, -1)
-    if (!pos)
-        return 0
-    
-    pos += StrLen(prefix)
-    if (RegExMatch(sql_text, "^\s*(\d+)", &m, pos))
-        return Integer(m[1])
-    
-    return 0
-}
-
-; Single source of truth for the starting next_event_id: the larger of the
-; value persisted in state.json and one past the highest id already in
-; data.sql. Pure arithmetic so it can be exercised headlessly. A persisted
-; value that is AHEAD of the file (the normal case) wins; a persisted value
-; that LAGS the file (the Reload-mid-burst data-loss case) is corrected up.
-KL_ResolveStartId(persisted_next_id, max_id_in_sql) {
-    candidate := max_id_in_sql + 1
-    return (persisted_next_id > candidate) ? persisted_next_id : candidate
-}
+#Include keylogger_event_id.ahk
 
 
 
@@ -567,7 +548,9 @@ KL_ResolveStartId(persisted_next_id, max_id_in_sql) {
 ; ========================================
 ; ========================================
 
-KL_AppendLog(entry) {
+KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
+	PublishCommit := unset) {
+	RejectedBySuspend := false
     ; Hot path. Optimisations applied (see Section 2 latency caches):
     ;  - persistent FileObject handle: avoids open/close ≈ 0.5-2 ms each
     ;    that NTFS + AV filter drivers tax on every keystroke flush;
@@ -576,9 +559,9 @@ KL_AppendLog(entry) {
     ;    redoes on every call;
     ;  - no FormatTime when timestamp is already set by the caller.
     if !Keylogger.initialized
-        return
+        return false
     if !(entry is Map) || !entry.Has("type")
-        return
+        return false
     ; Pause must silence everything. Native Suspend only disarms hotkeys/hotstrings,
     ; but the keylogger feeds on an InputHook + ~10 SetTimer / OnClipboardChange
     ; sources that bypass it. KL_AppendLog is the single chokepoint every telemetry
@@ -587,8 +570,13 @@ KL_AppendLog(entry) {
     ; _pending_entries data.sql queue). system_event lifecycle markers (e.g. the
     ; "paused" marker itself) are exempt so the pause transition stays diagnosable.
     ; See project_suspend_pause_invariant.
-    if A_IsSuspended && entry["type"] != "system_event" && !Keylogger._shutting_down
-        return
+	if A_IsSuspended && entry["type"] != "system_event" && !Keylogger._shutting_down {
+		; Callers that detached mutable state need to distinguish a lifecycle
+		; refusal (safe to retry) from a privacy/validation drop (must never be
+		; replayed in a later foreground context).
+		RejectedBySuspend := true
+		return false
+	}
     ; Privacy filters — drop anything captured while the focused window is
     ; on the user's exclusion list, in private browsing, or in a system-
     ; auth dialog. The check is cached for ~250 ms so the per-keystroke
@@ -604,7 +592,7 @@ KL_AppendLog(entry) {
         try LoggerWarn("Keylogger", "MF_ShouldFilter unavailable — defaulting to filtered.")
     }
     if filtered
-        return
+        return false
     ; MF_ShouldFilter() above evaluated MetricsFocusCache, which MF_RefreshFocus
     ; repoints within MF_FOCUS_TTL_MS (50 ms). The PAYLOAD, however, describes
     ; whatever window its producer saw, and every producer lags that cache:
@@ -641,14 +629,34 @@ KL_AppendLog(entry) {
             try LoggerWarn("Keylogger", "MF_ShouldFilterFor unavailable — defaulting to filtered.")
         }
         if outgoing_filtered
-            return
+            return false
     }
-    if !entry.Has("timestamp")
-        entry["timestamp"] := KL_NowTimestamp()
+	if !entry.Has("timestamp")
+		entry["timestamp"] := KL_NowTimestamp()
 	; Queue the live Map for the ingest tick — no JSON round-trip needed
 	; for entries originating in this process. The JSON stringification and disk
 	; append are deferred to KL_IngestOnce so we never block the keystroke thread.
-	Keylogger._pending_entries.Push(entry)
+	; Privacy checks and timestamp formatting above can yield. Pair the final
+	; lifecycle recheck with the shared-queue mutation so Suspend cannot land in
+	; the one-statement gap and publish a row after the pause boundary.
+	AppendCritical := Critical("On")
+	try {
+		if A_IsSuspended && entry["type"] != "system_event" && !Keylogger._shutting_down {
+			RejectedBySuspend := true
+			return false
+		}
+		; Async producers may do privacy/context preparation above, then discover
+		; that their immutable UI owner was replaced. Recheck at the exact queue
+		; mutation; the optional commit is memory-only and shares that transaction.
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
+		Keylogger._pending_entries.Push(entry)
+		if IsSet(PublishCommit)
+			PublishCommit.Call()
+	} finally {
+		Critical(AppendCritical)
+	}
+	return true
 }
 
 
@@ -661,80 +669,168 @@ KL_AppendLog(entry) {
 ; ========================================
 ; ========================================
 
-KL_FlushBuffer() {
-    if !Keylogger.initialized
-        return
-    if (Keylogger.buffer_events.Length = 0
-        && Keylogger.session_clicks  = 0
-        && Keylogger.session_scrolls = 0)
-        return
-
-    ; Atomically snapshot and reset the shared buffer so that Critical InputHook
-    ; callbacks (KL_Hook_OnChar) that fire between the snapshot and the reset
-    ; go into the freshly cleared buffer and are never lost silently.
-    previous_critical := Critical("On")
+; Queue a detached typing snapshot when its lifecycle owner was invalidated.
+; It must stay separate from newer live input: merging would replay characters
+; typed after an accepted completion under the older snapshot's reserved id.
+_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick) {
+    PreviousCritical := Critical("On")
     try {
-        snap_events  := Keylogger.buffer_events
-        snap_text    := Keylogger.buffer_text
-        snap_clicks  := Keylogger.session_clicks
-        snap_scrolls := Keylogger.session_scrolls
-        snap_dist    := Keylogger.mouse_distance
-        ; The delay of the first keystroke in the buffer is the inter-burst gap:
-        ; the time elapsed since the previous burst ended. The old stale per-snapshot
-        ; pause field (always 0, never updated) was producing null analytics.
-        snap_pause   := (snap_events.Length > 0) ? snap_events[1][2] : 0
-        Keylogger.buffer_events    := []
-        Keylogger.buffer_text      := ""
-        Keylogger.rich_chunks      := []
-        Keylogger.last_time        := 0
-        Keylogger.session_clicks   := 0
-        Keylogger.session_scrolls  := 0
-        Keylogger.mouse_distance   := 0
-        Keylogger.last_flush_time  := A_TickCount
+		InsertAt := Keylogger._retry_snapshots.Length + 1
+		for Index, Queued in Keylogger._retry_snapshots {
+			if (Queued.EventId > Snapshot.EventId) {
+				InsertAt := Index
+				break
+			}
+		}
+		Keylogger._retry_snapshots.InsertAt(InsertAt, Snapshot)
+		if (Keylogger.last_flush_time == AttemptFlushTick)
+			Keylogger.last_flush_time := Snapshot.LastFlushTime
     } finally {
-        Critical(previous_critical)
+        Critical(PreviousCritical)
     }
+}
 
-    if (snap_events.Length = 0 && snap_clicks = 0 && snap_scrolls = 0)
-        return
+KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
+	DeferredByActiveFlush := false
+	if !Keylogger.initialized
+		return false
 
-    total_time_ms := 0
-    total_chars   := 0
-    for _, ev in snap_events {
-        meta := ev[3]
-        if !(meta is Map) || !meta.Has("s") || !meta["s"] {
-            d := ev[2]
-            if (d > KeylogConst.WPM_MAX_DELAY_MS)
-                d := KeylogConst.WPM_MAX_DELAY_MS
-            total_time_ms += d
-            total_chars   += 1
-        }
-    }
-    wpm := (total_time_ms > 0) ? ((total_chars / 5) / (total_time_ms / 60000)) : 0
+	; Claim one detached-snapshot owner in the same short transaction as the
+	; generation check and reference swap. The expensive classification below is
+	; deliberately outside Critical, but a sibling flush then leaves the live
+	; buffer untouched and tells its fire-log owner to retry.
+	previous_critical := Critical("On")
+	try {
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
+		if Keylogger._flush_in_progress {
+			DeferredByActiveFlush := true
+			return false
+		}
+		RetryingSnapshot := Keylogger._retry_snapshots.Length > 0
+		if RetryingSnapshot {
+			Snapshot := Keylogger._retry_snapshots.RemoveAt(1)
+			AttemptFlushTick := A_TickCount
+			Keylogger._flush_in_progress := true
+		} else {
+		if (Keylogger.buffer_events.Length = 0
+			&& Keylogger.session_clicks = 0
+			&& Keylogger.session_scrolls = 0)
+			return true
 
-    app_cat := "unknown"
-    try app_cat := KL_AppCat_Get(Keylogger.session_app)
+		Keylogger._flush_in_progress := true
+		AttemptFlushTick := A_TickCount
+		snap_events := Keylogger.buffer_events
+		snap_text := Keylogger.buffer_text
+		snap_rich := Keylogger.rich_chunks
+		snap_clicks := Keylogger.session_clicks
+		snap_scrolls := Keylogger.session_scrolls
+		snap_dist := Keylogger.mouse_distance
+		snap_last_time := Keylogger.last_time
+		snap_last_flush_time := Keylogger.last_flush_time
+		Snapshot := {
+			EventId: KL_AllocEventId(),
+			Events: snap_events,
+			Text: snap_text,
+			RichChunks: snap_rich,
+			Clicks: snap_clicks,
+			Scrolls: snap_scrolls,
+			Distance: snap_dist,
+			LastTime: snap_last_time,
+			LastFlushTime: snap_last_flush_time,
+			Pause: (snap_events.Length > 0) ? snap_events[1][2] : 0,
+			App: Keylogger.session_app,
+			Title: Keylogger.session_title,
+			Url: Keylogger.session_url,
+			FieldRole: Keylogger.session_field_role,
+			Layout: Keylogger.session_layout
+		}
+		Keylogger.buffer_events    := []
+		Keylogger.buffer_text := ""
+		Keylogger.rich_chunks := []
+		Keylogger.last_time := 0
+		Keylogger.session_clicks := 0
+		Keylogger.session_scrolls := 0
+		Keylogger.mouse_distance := 0
+		Keylogger.last_flush_time := AttemptFlushTick
+		}
+	} finally {
+		Critical(previous_critical)
+	}
 
-    entry := Map(
-        "type",              "typing",
-        "text",              snap_text,
-        "rich_text",         "",
-        "app",               Keylogger.session_app,
-        "app_category",      app_cat,
-        "title",             Keylogger.session_title,
-        "url",               Keylogger.session_url,
-        "field_role",        Keylogger.session_field_role,
-        "layout",            Keylogger.session_layout,
-        "is_fullscreen",     0,
-        "in_meeting",        0,
-        "mouse_clicks",      snap_clicks,
-        "mouse_scrolls",     snap_scrolls,
-        "mouse_distance_px", snap_dist,
-        "pause_before_ms",   snap_pause,
-        "wpm",               Round(wpm, 1),
-        "events",            snap_events
-    )
-    KL_AppendLog(entry)
+	Published := false
+	try {
+		Published := _KL_PublishBufferSnapshot(
+			Snapshot, AttemptFlushTick, PublishGuard?)
+	} finally {
+		ReleaseCritical := Critical("On")
+		try Keylogger._flush_in_progress := false
+		finally Critical(ReleaseCritical)
+	}
+	; A successful retry precedes the live buffer in screen order. Drain the
+	; latter now so a caller asking for a flush (notably output preparation and
+	; shutdown) still gets the historical all-buffer contract.
+	if (Published && RetryingSnapshot)
+		return KL_FlushBuffer(PublishGuard?)
+	return Published
+}
+
+; Builds and publishes one already-detached typing snapshot. The lifecycle
+; owner is checked after classification and immediately before publication; a
+; rejected owner restores the snapshot while the outer serialisation latch is
+; still held.
+_KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
+	if (Snapshot.Events.Length = 0 && Snapshot.Clicks = 0 && Snapshot.Scrolls = 0)
+		return true
+	total_time_ms := 0
+	total_chars := 0
+	for _, ev in Snapshot.Events {
+		meta := ev[3]
+		if !(meta is Map) || !meta.Has("s") || !meta["s"] {
+			d := ev[2]
+			if (d > KeylogConst.WPM_MAX_DELAY_MS)
+				d := KeylogConst.WPM_MAX_DELAY_MS
+			total_time_ms += d
+			total_chars += 1
+		}
+	}
+	wpm := (total_time_ms > 0)
+		? ((total_chars / 5) / (total_time_ms / 60000)) : 0
+	app_cat := "unknown"
+	try app_cat := KL_AppCat_Get(Snapshot.App)
+	entry := Map(
+		"_event_id", Snapshot.EventId,
+		"type", "typing",
+		"text", Snapshot.Text,
+		"rich_text", "",
+		"app", Snapshot.App,
+		"app_category", app_cat,
+		"title", Snapshot.Title,
+		"url", Snapshot.Url,
+		"field_role", Snapshot.FieldRole,
+		"layout", Snapshot.Layout,
+		"is_fullscreen", 0,
+		"in_meeting", 0,
+		"mouse_clicks", Snapshot.Clicks,
+		"mouse_scrolls", Snapshot.Scrolls,
+		"mouse_distance_px", Snapshot.Distance,
+		"pause_before_ms", Snapshot.Pause,
+		"wpm", Round(wpm, 1),
+		"events", Snapshot.Events
+	)
+	if IsSet(PublishGuard) && !PublishGuard.Call() {
+		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick)
+		return false
+	}
+	Accepted := KL_AppendLog(entry, &RejectedBySuspend)
+	; Only an explicit lifecycle refusal restores the buffer. A false return can
+	; also mean a privacy/validation drop; replaying that text after resume under a
+	; different foreground window would defeat the filter that rejected it.
+	if RejectedBySuspend {
+		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick)
+		return false
+	}
+	return Accepted
 }
 
 
@@ -805,6 +901,24 @@ KL_LogHotstringSuggested(trigger, replacement, h_type := "unknown", app_name := 
         "replacement", replacement,
         "h_type",      h_type
     ))
+}
+
+; Token-aware sibling for a tooltip post-present callback. All privacy/context
+; work in KL_AppendLog stays outside Critical; only the final owner guard,
+; in-memory queue push and state commit are atomic.
+KL_LogHotstringSuggestedGuarded(trigger, replacement, h_type, PublishGuard,
+	PublishCommit, app_name := "") {
+    if !Keylogger.initialized
+        return false
+    app := (app_name != "") ? app_name : Keylogger.session_app
+    RejectedBySuspend := false
+    return KL_AppendLog(Map(
+        "type",        "hotstring_suggested",
+        "app",         app,
+        "trigger",     trigger,
+        "replacement", replacement,
+        "h_type",      h_type
+    ), &RejectedBySuspend, PublishGuard, PublishCommit)
 }
 
 ; Logs that a previously-suggested hotstring tooltip was dismissed without
@@ -885,6 +999,8 @@ KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
         "net_saved_chars", StrLen(prediction_text)
     ))
 }
+
+#Include keylogger_llm_journal.ahk
 
 KL_LogSession(kind, duration_ms := unset) {
     e := Map("type", kind)
@@ -975,7 +1091,7 @@ KL_IngestOnce(force := false, rollover_owned := false) {
     ; read and that move would be overwritten and lost for good. Deferring is
     ; free: today.log is the durable buffer and keeps accepting events, exactly as
     ; during the typing-burst deferral below.
-    if (IsSet(KLMigration) && KLMigration.active && !Keylogger._shutting_down)
+    if (IsSet(KL_Mig_IsActive) && KL_Mig_IsActive() && !Keylogger._shutting_down)
         return Map("ok", false, "eof", false, "reason", "migrating")
     ; Guard against running the heavy SQL/I/O path during a typing burst.
     ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
@@ -1302,13 +1418,22 @@ KL_MidnightCheck() {
 
 KL_BootstrapDataSql() {
     if FileExist(Keylogger.data_sql_path)
-        return
+        return true
     header := "-- ergopti metrics — device " . Keylogger.device_id
         .  " — schema_version " . KeylogConst.SCHEMA_VERSION . "`n"
         .  "-- This file is APPEND-ONLY. Do not edit by hand.`n"
         .  "-- The launcher rebuilds db.sqlite from this file on demand.`n"
         .  "PRAGMA foreign_keys = OFF;`n"
-    FileAppend(header, Keylogger.data_sql_path, "UTF-8")
+    try FileAppend(header, Keylogger.data_sql_path, "UTF-8")
+    catch as err {
+        try LoggerError("Keylogger", "Could not create data.sql: {1}", err.Message)
+        return false
+    }
+
+    ; A brand-new ledger contains no legacy/mixed rows: every later local row is
+    ; emitted under the cipher posture already in force. Commit that trustworthy
+    ; O(1) fact now so the deferred boot sync never proof-scans an empty ledger.
+    return KL_Mig_RecordNewLedgerPosture()
 }
 
 
@@ -1364,7 +1489,14 @@ KL_Init(metrics_dir) {
     if (Keylogger.today_log_date = "")
         Keylogger.today_log_date := KL_Today()
 
-    Keylogger.initialized := true
+	InitCritical := Critical("On")
+	try {
+		Keylogger._shutting_down := false
+		Keylogger.lifecycle_generation += 1
+		Keylogger.initialized := true
+	} finally {
+		Critical(InitCritical)
+	}
     KL_BootstrapDataSql()
     try KL_AppCat_Init(metrics_dir)
 
@@ -1386,7 +1518,43 @@ KL_Init(metrics_dir) {
     ; A no-op unless they disagree, and deferred either way: the comparison is
     ; cheap but the rewrite it may start is not, and neither belongs on the boot
     ; critical path.
-    SetTimer(KL_Mig_SyncToPosture, -KL_MIG_BOOT_DELAY_MS)
+    KL_Mig_RequestPostureSync(KL_MIG_BOOT_DELAY_MS)
+}
+
+; Publish the terminal ownership lease before any other subsystem drains into
+; the keylogger. The global shutdown handler calls this before the deferred
+; hotstring fire queue, and KL_Stop repeats it for direct callers.
+KL_BeginShutdown() {
+	ShutdownCritical := Critical("On")
+	try {
+		if !Keylogger.initialized
+			return false
+		if !Keylogger._shutting_down {
+			Keylogger._shutting_down := true
+			Keylogger.lifecycle_generation += 1
+		}
+		return true
+	} finally {
+		Critical(ShutdownCritical)
+	}
+}
+
+; Rolls back the reversible shutdown lease when an OnExit gate refuses before
+; any producer is stopped. Durable rows already drained remain consumed, while
+; future keylogger callbacks receive a fresh lifecycle generation.
+KL_CancelShutdown() {
+	ShutdownCritical := Critical("On")
+	try {
+		if !Keylogger.initialized
+			return false
+		if Keylogger._shutting_down {
+			Keylogger._shutting_down := false
+			Keylogger.lifecycle_generation += 1
+		}
+		return true
+	} finally {
+		Critical(ShutdownCritical)
+	}
 }
 
 KL_Stop() {
@@ -1402,7 +1570,7 @@ KL_Stop() {
     ; the flag only just before the trailing KL_FlushBuffer() protected the two
     ; explicit flushes but none of the six module drains that carry most of the
     ; shutdown write traffic.
-    Keylogger._shutting_down := true
+    KL_BeginShutdown()
     ; Drop any in-flight ledger rewrite before the shutdown drain: its staging
     ; file describes a data.sql that the flush below is about to extend, and the
     ; ingest guard bypasses on _shutting_down, so leaving it armed would publish a

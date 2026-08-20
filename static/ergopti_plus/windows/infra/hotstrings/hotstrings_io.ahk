@@ -140,20 +140,15 @@ HotstringsGetWordDelimiters() {
 		return (_HotstringsWordDelimiters != "") ? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
 }
 
-; Persist a new word-delimiter string to the [__global__] section of the
-; override file and propagate it immediately into the live engine variable
-; HSE_WORD_TERMINATORS so the change takes effect without a Reload.
-HotstringsSetWordDelimiters(Delimiters) {
-		global _HotstringsOverridesPath, _HotstringsWordDelimiters, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-		global HSE_WORD_TERMINATORS
-		_HotstringsWordDelimiters := Delimiters
-		; Mirror the live engine variable so the next keystroke already uses the
-		; updated set — mirrors the pattern used by HotstringsSetConsumedDelimiters.
-		HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
-
-		; No preview set to refresh: _PrefixWordBoundaries() derives from the live
-		; HSE_WORD_TERMINATORS on every read, so this assignment is all it takes.
-		_SaveGlobalWordDelimiters(Delimiters)
+; Persist a new word-delimiter string and publish it to the live engine only
+; after the complete override candidate is durable. The builder preserves the
+; consumed set from the snapshot taken after write admission.
+HotstringsSetWordDelimiters(Delimiters, WriterFn := 0, ReplaceFn := 0) {
+		return HotstringsCommitDelimiterUpdate(
+				(CurrentWord, CurrentConsumed) => {
+						Word: Delimiters,
+						Consumed: CurrentConsumed
+				}, WriterFn, ReplaceFn)
 }
 
 ; Return the effective consumed-delimiter string: user override when present,
@@ -164,113 +159,152 @@ HotstringsGetConsumedDelimiters() {
 		return (_HotstringsConsumedDelimiters != "") ? _HotstringsConsumedDelimiters : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
 }
 
-; Persist a new consumed-delimiter string to [__global__] and update in memory.
-; Pass "" to fall back to the catalogue default (the magic key stays consumed).
-HotstringsSetConsumedDelimiters(Consumed) {
-		global _HotstringsConsumedDelimiters, HSE_CONSUMED_DELIMITERS
-		_HotstringsConsumedDelimiters := Consumed
-		HSE_CONSUMED_DELIMITERS       := Consumed
-		_SaveGlobalKey("consumed_delimiters", Consumed, "")
+; Persist a new consumed-delimiter string and publish the effective catalogue
+; default when the stored candidate is empty.
+HotstringsSetConsumedDelimiters(Consumed, WriterFn := 0, ReplaceFn := 0) {
+		return HotstringsCommitDelimiterUpdate(
+				(CurrentWord, CurrentConsumed) => {
+						Word: CurrentWord,
+						Consumed: Consumed
+				}, WriterFn, ReplaceFn)
+}
+
+; Change both delimiter sets in one whole-file transaction. This is the only
+; safe primitive for menu actions such as adding/removing a consumed custom
+; delimiter: two independent writes expose a half-applied state and let the
+; second writer erase a concurrent sibling update.
+HotstringsSetBothDelimiters(Delimiters, Consumed, WriterFn := 0, ReplaceFn := 0) {
+		return HotstringsCommitDelimiterUpdate(
+				(CurrentWord, CurrentConsumed) => {
+						Word: Delimiters,
+						Consumed: Consumed
+				}, WriterFn, ReplaceFn)
+}
+
+; Claim the exact override store before reading any live delimiter state, ask
+; BuildFn for one detached {Word, Consumed} candidate, atomically replace the
+; whole file, then publish both caches and both engine variables while the same
+; owner is still held. A process-wide terminal transition therefore refuses
+; before even invoking BuildFn.
+HotstringsCommitDelimiterUpdate(BuildFn, WriterFn := 0, ReplaceFn := 0) {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				; Candidate construction, durable staging, atomic replacement and
+				; logging must remain interruptible. The override-path lease supplies
+				; serialization; only the final live projection becomes Critical.
+				Critical("Off")
+				try return HotstringsCommitDelimiterUpdate(BuildFn, WriterFn,
+						ReplaceFn)
+				finally Critical(InheritedCritical)
+		}
+		global _HotstringsOverridesPath, _HotstringsOverrides
+		global _HotstringsWordDelimiters
+		global _HotstringsConsumedDelimiters
+		global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+		global HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+
+		OwnerToken := _HotstringsOverrideLeaseAcquire("change delimiters")
+		if !(OwnerToken is Object)
+				return false
+		try {
+				BoundPath := _HotstringsOverridesPath
+				if !_ConfigWriteLeaseOwns(OwnerToken, BoundPath) {
+						try LoggerError("HotstringsConfig",
+								"Cannot change delimiters: the admitted owner no longer owns the override path. The change is NOT persisted.")
+						return false
+				}
+				if !HasMethod(BuildFn, "Call") {
+						try LoggerError("HotstringsConfig",
+								"Cannot change delimiters: the candidate builder is not callable. The change is NOT persisted.")
+						return false
+				}
+
+				CurrentWord := (_HotstringsWordDelimiters != "")
+						? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+				CurrentConsumed := (_HotstringsConsumedDelimiters != "")
+						? _HotstringsConsumedDelimiters : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+				Candidate := 0
+				try Candidate := BuildFn.Call(CurrentWord, CurrentConsumed)
+				catch as Err {
+						try LoggerError("HotstringsConfig",
+								"Cannot change delimiters: candidate construction failed: {1}. The change is NOT persisted.",
+								Err.Message)
+						return false
+				}
+				if !(Candidate is Object)
+						|| !Candidate.HasOwnProp("Word")
+						|| !Candidate.HasOwnProp("Consumed")
+						|| !(Candidate.Word is String)
+						|| !(Candidate.Consumed is String) {
+						try LoggerError("HotstringsConfig",
+								"Cannot change delimiters: candidate must contain String Word and Consumed fields. The change is NOT persisted.")
+						return false
+				}
+
+				; Store catalogue defaults canonically as an absent override. The live
+				; engine still receives the effective strings after durable publication.
+				WordCandidate := (Candidate.Word == HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
+						? "" : Candidate.Word
+				ConsumedCandidate := (Candidate.Consumed == HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS)
+						? "" : Candidate.Consumed
+
+				if !_SaveOverrides(_HotstringsOverrides, WriterFn, ReplaceFn,
+						WordCandidate, ConsumedCandidate, BoundPath,
+						_HotstringsAuthorizeOverrideCommit.Bind(
+								OwnerToken, BoundPath),
+						_HotstringsPublishDelimiterCandidate.Bind(
+								WordCandidate, ConsumedCandidate))
+						return false
+
+				; The in-memory publisher advanced the canonical runtime-decision
+				; epoch in the same Critical span as both delimiter sets. Remove any
+				; pre-commit pixels only now, after the persistence helper restored
+				; interruptibility; TooltipHide performs Win32 work.
+				if IsSet(HSE_InvalidateRuntimeDecisionProjection)
+						HSE_InvalidateRuntimeDecisionProjection()
+
+				try LoggerDebug("HotstringsConfig",
+						"Global delimiter sets published after durable override replacement.")
+				return true
+		} finally _HotstringsOverrideLeaseRelease(OwnerToken)
+}
+
+; This memory-only projection runs in the same tiny Critical span as the durable
+; catalogue publication. It cannot expose one live delimiter cache without the
+; matching engine variable to an interrupting callback.
+_HotstringsPublishDelimiterCandidate(WordCandidate, ConsumedCandidate) {
+		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+		global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+		global HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+		global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+		_HotstringsWordDelimiters := WordCandidate
+		_HotstringsConsumedDelimiters := ConsumedCandidate
+		HSE_WORD_TERMINATORS := (WordCandidate != "")
+				? WordCandidate : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
+		HSE_CONSUMED_DELIMITERS := (ConsumedCandidate != "")
+				? ConsumedCandidate : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
+				HSE_AdvanceRuntimeDecisionGeneration()
+		return 1
 }
 
 ; Write (or clear) the ``word_delimiters`` key in ``[__global__]``.
 _SaveGlobalWordDelimiters(Delimiters) {
-		global _HotstringsOverridesPath, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-		IsDefault := (Delimiters == HOTSTRINGS_DEFAULT_WORD_DELIMITERS or Delimiters == "")
-		_SaveGlobalKey("word_delimiters", IsDefault ? "" : Delimiters, "")
+		return HotstringsSetWordDelimiters(Delimiters)
 }
 
-; Generic writer for a quoted-string key inside [__global__].
-; Writes KeyName = "Value" when Value is non-empty, removes the line otherwise.
-; Creates the [__global__] section when it doesn't exist yet.
-_SaveGlobalKey(KeyName, Value, _Unused := "") {
-		global _HotstringsOverridesPath
-		Path := _HotstringsOverridesPath
-		if (Path == "") {
-				return
-		}
-
-		if FileExist(Path) {
-				Content := FileRead(Path, "UTF-8")
-		} else {
-				Content := "# Hotstrings — overrides utilisateur`n`n"
-		}
-
-		Lines     := StrSplit(Content, "`n", "`r")
-		InGlobal  := false
-		Found     := false
-		FieldDone := false
-		Out       := []
-		IsEmpty   := (Value == "")
-		Pattern   := "^" . KeyName . "\s*="
-
-		for _i, RawLine in Lines {
-				Line := Trim(RawLine, " `t`r")
-				if (Line == "[__global__]") {
-						InGlobal := true
-						Found    := true
-						Out.Push(RawLine)
-						continue
-				}
-				if InGlobal and SubStr(Line, 1, 1) == "[" {
-						if !FieldDone and !IsEmpty {
-								Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
-								FieldDone := true
-						}
-						InGlobal := false
-				}
-				if InGlobal and RegExMatch(Line, Pattern) {
-						if !IsEmpty and !FieldDone {
-								Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
-								FieldDone := true
-						}
-						continue  ; Skip old line (drop it when IsEmpty)
-				}
-				Out.Push(RawLine)
-		}
-
-		if InGlobal and !FieldDone and !IsEmpty {
-				Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
-		}
-
-		if !Found and !IsEmpty {
-				if (Out.Length > 0 and Out[Out.Length] != "") {
-						Out.Push("")
-				}
-				Out.Push("[__global__]")
-				Out.Push(KeyName . ' = "' . _EscapeTomlString(Value) . '"')
-		}
-
-		while Out.Length > 1 and Out[Out.Length] == "" and Out[Out.Length - 1] == "" {
-				Out.Pop()
-		}
-
-		NewContent := ""
-		for I, L in Out {
-				NewContent .= L
-				if (I < Out.Length) {
-						NewContent .= "`n"
-				}
-		}
-		; Mirror _SaveOverrides: explicit Close so the buffer is flushed before any
-		; reader sees the file, and a LOGGED failure with a boolean return so a
-		; read-only or cloud-locked config cannot look like a successful save. The
-		; in-memory value has already changed by the time we get here, so a bare
-		; `try` with no catch (the previous form) meant every observable signal in the
-		; session said "saved" while the setting silently reverted at next boot.
-		try {
-				FileHandle := FileOpen(Path, "w", "UTF-8")
-				if !IsObject(FileHandle)
-						throw Error("FileOpen returned no handle.")
-				FileHandle.Write(NewContent)
-				FileHandle.Close()
-		} catch as Err {
-				try LoggerError("HotstringsConfig",
-						"Failed to write [__global__] {1} to '{2}': {3}.", KeyName, Path, Err.Message)
-				return false
-		}
-		try LoggerDebug("HotstringsConfig", "[__global__] {1} written to '{2}'.", KeyName, Path)
-		return true
+; Compatibility entrypoint for the two historical [__global__] keys. It no
+; longer owns a second truncating writer; every call joins the same atomic
+; whole-file delimiter transaction as the public setters.
+_SaveGlobalKey(KeyName, Value, _Unused := "", WriterFn := 0, ReplaceFn := 0) {
+		if (KeyName == "word_delimiters")
+				return HotstringsSetWordDelimiters(Value, WriterFn, ReplaceFn)
+		if (KeyName == "consumed_delimiters")
+				return HotstringsSetConsumedDelimiters(Value, WriterFn, ReplaceFn)
+		try LoggerError("HotstringsConfig",
+				"Cannot write unknown [__global__] key '{1}'. The change is NOT persisted.",
+				KeyName)
+		return false
 }
 
 _EscapeTomlString(S) {
@@ -400,12 +434,42 @@ HotstringsSerialiseDelay(Value) {
 		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Num)
 }
 
-; Serialise the in-memory override Map back to TOML and write it to disk.
+; Serialise an override candidate and atomically publish it to disk. Callers
+; pass the candidate explicitly so durable publication can precede the live Map
+; swap; omitting it retains compatibility for internal full-state saves.
 ; Stable ordering: alphabetical category, alphabetical section.
-_SaveOverrides() {
+_SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
+		WordDelimiters := unset, ConsumedDelimiters := unset,
+		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0) {
 		global _HotstringsOverrides, _HotstringsOverridesPath
 		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-		if (_HotstringsOverridesPath == "") {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical
+				Critical("Off")
+		try {
+		Path := IsSet(TargetPath) ? TargetPath : _HotstringsOverridesPath
+		if !(Path is String) || Path == "" {
+				try LoggerError("HotstringsConfig", "Cannot write overrides before HotstringsConfigInit has provided a target path. The change is NOT persisted.")
+				return false
+		}
+		HasAuthorizer := !((AuthorizeFn is Integer) && AuthorizeFn == 0)
+		HasPublisher := !((PublishFn is Integer) && PublishFn == 0)
+		if (HasAuthorizer && !HasMethod(AuthorizeFn, "Call"))
+				|| (HasPublisher && !HasMethod(PublishFn, "Call")) {
+				try LoggerError("HotstringsConfig", "Cannot write overrides: a transaction callback is not callable. The change is NOT persisted.")
+				return false
+		}
+		Source := IsSet(Overrides) ? Overrides : _HotstringsOverrides
+		if !(Source is Map) {
+				try LoggerError("HotstringsConfig", "Cannot write overrides: the candidate state is not a Map. The change is NOT persisted.")
+				return false
+		}
+		WordSource := IsSet(WordDelimiters)
+				? WordDelimiters : _HotstringsWordDelimiters
+		ConsumedSource := IsSet(ConsumedDelimiters)
+				? ConsumedDelimiters : _HotstringsConsumedDelimiters
+		if !(WordSource is String) || !(ConsumedSource is String) {
+				try LoggerError("HotstringsConfig", "Cannot write overrides: delimiter candidates must be strings. The change is NOT persisted.")
 				return false
 		}
 
@@ -416,21 +480,19 @@ _SaveOverrides() {
 
 		; Re-emit [__global__] so a category/section edit never erases the
 		; cross-driver word/consumed delimiter customisation.
-		if (_HotstringsWordDelimiters != "" or _HotstringsConsumedDelimiters != "") {
+		if (WordSource != "" or ConsumedSource != "") {
 				Out .= "[__global__]`n"
-				; Escape exactly like _SaveGlobalKey does: these are the SAME [__global__]
-				; keys written by two different writers, and concatenating raw here meant a
-				; delimiter containing a quote or backslash produced malformed TOML — the next
-				; read then silently reverted the user's whole delimiter set.
-				if (_HotstringsWordDelimiters != "")
-						Out .= 'word_delimiters = "' . _EscapeTomlString(_HotstringsWordDelimiters) . '"`n'
-				if (_HotstringsConsumedDelimiters != "")
-						Out .= 'consumed_delimiters = "' . _EscapeTomlString(_HotstringsConsumedDelimiters) . '"`n'
+				; Both keys share this one serializer and escape path. The explicit
+				; candidates keep an uncommitted delimiter set detached from live RAM.
+				if (WordSource != "")
+						Out .= 'word_delimiters = "' . _EscapeTomlString(WordSource) . '"`n'
+				if (ConsumedSource != "")
+						Out .= 'consumed_delimiters = "' . _EscapeTomlString(ConsumedSource) . '"`n'
 				Out .= "`n"
 		}
 
 		Cats := []
-		for Cat in _HotstringsOverrides {
+		for Cat in Source {
 				Cats.Push(Cat)
 		}
 		_SortStringsInPlace(Cats)
@@ -438,7 +500,7 @@ _SaveOverrides() {
 		for _, Cat in Cats {
 				if (Cat == "__global__")   ; reserved — handled above
 						continue
-				Entry := _HotstringsOverrides[Cat]
+				Entry := Source[Cat]
 				; Extension keys are stored as "ext.name" — the header must be written
 				; as [ext.name] (2 segments), not [ext.name] which would be ambiguous
 				; when parsed back. Section headers for ext keys: [ext.name.section].
@@ -490,14 +552,145 @@ _SaveOverrides() {
 				}
 		}
 
+		static STALE_TEMP_MS := 60000  ; One minute distinguishes abandoned stages from live writers
+		static WriteSeq := 0
+		LocalSeq := ++WriteSeq
+		StagePath := Path . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
+		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
+
+		FileHandle := 0
+		Written := false
 		try {
-				FileHandle := FileOpen(_HotstringsOverridesPath, "w", "UTF-8")
-				FileHandle.Write(Out)
-				FileHandle.Close()
-				try LoggerDebug("HotstringsConfig", "Override file written: '{1}'.", _HotstringsOverridesPath)
+				if HasMethod(WriterFn, "Call") {
+						Written := WriterFn.Call(StagePath, Out)
+				} else {
+						FileHandle := FileOpen(StagePath, "w", "UTF-8")
+						if !IsObject(FileHandle)
+								throw Error("FileOpen returned no staging handle")
+						FileHandle.Write(Out)
+						FileHandle.Close()
+						FileHandle := 0
+						Written := true
+				}
+		} catch as Err {
+				if IsObject(FileHandle)
+						try FileHandle.Close()
+				_HotstringsRemoveOverrideStage(StagePath)
+				try LoggerError("HotstringsConfig", "Failed to write override staging file for '{1}': {2}. The previous contents are intact and the change is NOT persisted.", Path, Err.Message)
+				return false
+		}
+		if !(Written is Integer) || Written != 1 {
+				_HotstringsRemoveOverrideStage(StagePath)
+				try LoggerError("HotstringsConfig", "Writing override staging file for '{1}' was refused. The previous contents are intact and the change is NOT persisted.", Path)
+				return false
+		}
+
+		Authorized := !HasAuthorizer
+		AuthorizeError := ""
+		if HasAuthorizer {
+				; The authorizer is memory-only and reads both the lease table and the
+				; module target. Keep that pair coherent without extending Critical over I/O.
+				PreviousCritical := Critical("On")
+				try {
+						try Authorized := AuthorizeFn.Call()
+						catch as Err {
+								Authorized := false
+								AuthorizeError := Err.Message
+						}
+				} finally Critical(PreviousCritical)
+				Authorized := (Authorized is Integer) && Authorized == 1
+		}
+
+		Published := false
+		ReplaceError := ""
+		MoveError := 0
+		if Authorized {
+				; Atomic replacement can block in filesystem/AV code and must never hold
+				; Critical. The exact logical owner remains held across this call.
+				try Published := HasMethod(ReplaceFn, "Call")
+						? ReplaceFn.Call(StagePath, Path)
+						: FSAtomicMoveReplace(StagePath, Path)
+				catch as Err {
+						Published := false
+						ReplaceError := Err.Message
+				}
+				Published := (Published is Integer) && Published == 1
+				if !Published
+						MoveError := A_LastError
+		}
+
+		LivePublished := !HasPublisher
+		PublishError := ""
+		if Published && HasPublisher {
+				; Publication is deliberately the only post-I/O Critical span and each
+				; publisher is constrained to memory projection plus generation updates.
+				PreviousCritical := Critical("On")
+				try {
+						try LivePublished := PublishFn.Call()
+						catch as Err {
+								LivePublished := false
+								PublishError := Err.Message
+						}
+				} finally Critical(PreviousCritical)
+				LivePublished := (LivePublished is Integer) && LivePublished == 1
+		}
+
+		if !Authorized {
+				_HotstringsRemoveOverrideStage(StagePath)
+				if (AuthorizeError != "") {
+						try LoggerError("HotstringsConfig",
+								"Authorization before publishing override file '{1}' raised: {2}. The previous contents are intact and the change is NOT persisted.",
+								Path, AuthorizeError)
+				} else {
+						try LoggerError("HotstringsConfig",
+								"Authorization before publishing override file '{1}' was refused. The previous contents are intact and the change is NOT persisted.",
+								Path)
+				}
+				return false
+		}
+		if !(Published is Integer) || Published != 1 {
+				_HotstringsRemoveOverrideStage(StagePath)
+				if (ReplaceError != "") {
+						try LoggerError("HotstringsConfig",
+								"Atomic replacement of override file '{1}' raised: {2}. The previous contents are intact and the change is NOT persisted.",
+								Path, ReplaceError)
+				} else {
+						try LoggerError("HotstringsConfig",
+								"Atomic replacement of override file '{1}' failed (Windows error {2}). The previous contents are intact and the change is NOT persisted.",
+								Path, MoveError)
+				}
+				return false
+		}
+		if !LivePublished {
+				if (PublishError != "") {
+						try LoggerError("HotstringsConfig",
+								"Override file '{1}' was replaced but live publication raised: {2}. Reload is required.",
+								Path, PublishError)
+				} else {
+						try LoggerError("HotstringsConfig",
+								"Override file '{1}' was replaced but live publication was refused. Reload is required.",
+								Path)
+				}
+				return false
+		}
+
+		try LoggerDebug("HotstringsConfig", "Override file written: '{1}'.", Path)
+		return true
+		} finally {
+				if InheritedCritical
+						Critical(InheritedCritical)
+		}
+}
+
+; Remove a rejected transaction's private stage and surface cleanup failure.
+_HotstringsRemoveOverrideStage(StagePath) {
+		if !FileExist(StagePath)
+				return true
+		try {
+				FileDelete(StagePath)
 				return true
 		} catch as Err {
-				try LoggerError("HotstringsConfig", "Failed to write override file: {1}.", Err.Message)
+				try LoggerError("HotstringsConfig", "Failed to remove rejected override staging file '{1}': {2}.", StagePath, Err.Message)
 				return false
 		}
 }

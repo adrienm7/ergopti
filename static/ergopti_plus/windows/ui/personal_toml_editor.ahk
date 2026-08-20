@@ -45,11 +45,14 @@ _EditorPrefGet(Key, Default) {
 	Val := TOML_Read(ConfigurationFile, "personal_editor", Key, "_MISSING_")
 	return (Val == "_MISSING_") ? Default : Val
 }
-_EditorPrefSet(Key, Value) {
+_EditorPrefSet(Key, Value, WriterFn := 0, NotifyFn := 0) {
 	global ConfigurationFile
-	if IsSet(ConfigurationFile) {
-		TOML_Write(Value, ConfigurationFile, "personal_editor", Key)
-	}
+	if !IsSet(ConfigurationFile)
+		return ConfigReportPersistenceFailure("the personal-editor preference", NotifyFn,
+			"ConfigurationFile is not initialized")
+	Updates := [{ Section: "personal_editor", Key: Key, Value: Value }]
+	return ConfigCommitUpdates(ConfigurationFile, Updates,
+		"the personal-editor preference '" . Key . "'", WriterFn, NotifyFn)
 }
 
 
@@ -403,26 +406,66 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
 	)
 }
 
-_SaveData(W, LV, StatusText) {
+_PersonalEditorDeferredSaveCompleted(LV, StatusText, Candidate, SectionName,
+		SuccessFn, CommitResult) {
+	global PERSONAL_TOML_COMMIT_FAILED
+	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
+		try StatusText.Value := t("editor.hotstrings.err_write")
+		try LoggerError("PersonalEditor",
+			"A deferred personal-hotstring save failed; the editor data remains unsaved.")
+		return
+	}
+	try _PopulateList(LV, Candidate, SectionName)
+	try StatusText.Value := t("editor.hotstrings.saved_prefix") . A_Now
+	if HasMethod(SuccessFn, "Call") {
+		try SuccessFn.Call()
+		catch as Err {
+			try LoggerError("PersonalEditor",
+				"The deferred save completed, but its UI completion failed: {1}.",
+				Err.Message)
+		}
+	}
+	try LoggerInfo("PersonalEditor",
+		"The deferred personal-hotstring save completed.")
+}
+
+_SaveData(W, LV, StatusText, DeferredSuccessFn := 0) {
 	global _PersonalEditorData, _PersonalEditorSection
-	if !WritePersonalToml(_PersonalEditorData) {
+	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
+	Candidate := _PersonalTomlCloneDetached(_PersonalEditorData)
+	CompletionFn := _PersonalEditorDeferredSaveCompleted.Bind(
+		LV, StatusText, Candidate, _PersonalEditorSection,
+		DeferredSuccessFn)
+	CommitResult := PersonalTomlCommitAndReload(
+		Candidate, [_PersonalEditorSection], 0, 0, 0, 0, 0, CompletionFn)
+	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		StatusText.Value := t("editor.hotstrings.err_write")
 		return false
 	}
-	; Read autocorrection TimeActivationSeconds from the v2 hotstrings.personal
-	; sub-Map — hydrated at boot from the [hotstrings.personal.autocorrection]
-	; section of the user's config.toml by ApplyConfigToml.
-	FeatureConfig := { TimeActivationSeconds: 0 }
-	if (IsSet(Features)
-		and Features.Has("hotstrings")
-		and Features["hotstrings"].Has("personal")
-		and Features["hotstrings"]["personal"].Has("autocorrection")) {
-		FeatureConfig := Features["hotstrings"]["personal"]["autocorrection"]
+	if (CommitResult == PERSONAL_TOML_COMMIT_DEFERRED) {
+		try LoggerInfo("PersonalEditor", "The personal-hotstring save was deferred behind an active publication; the newest editor snapshot will be committed next.")
+		; A deferred admission is not a save. Keep the action visibly incomplete
+		; until its terminal callback replaces this conservative failure state.
+		StatusText.Value := t("editor.hotstrings.err_write")
+		return false
 	}
-	ReloadPersonalSection(_PersonalEditorData, _PersonalEditorSection, FeatureConfig)
-	_PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
+	_PopulateList(LV, Candidate, _PersonalEditorSection)
 	StatusText.Value := t("editor.hotstrings.saved_prefix") . A_Now
 	return true
+}
+
+_PersonalEditorCompleteAddedEntry(W, TriggerEdit, OutputEdit, ChkIsWord,
+		ChkAutoExp, ChkCaseSens, ChkFinal, CloseAfterSave) {
+	_ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens,
+		ChkFinal)
+	if CloseAfterSave {
+		try W.Destroy()
+		catch as Err {
+			try LoggerError("PersonalEditor",
+				"Closing the editor after a completed save failed: {1}.",
+				Err.Message)
+		}
+	}
 }
 
 _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, CloseOnAddChk, StatusText) {
@@ -453,12 +496,12 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
 	}
 	Entry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
 	_PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Push(Entry)
-	if _SaveData(W, LV, StatusText) {
-		_ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
-		if CloseOnAddChk.Value {
-			W.Destroy()
-		}
-	}
+	CloseAfterSave := CloseOnAddChk.Value
+	CompleteFn := _PersonalEditorCompleteAddedEntry.Bind(W, TriggerEdit,
+		OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal,
+		CloseAfterSave)
+	if _SaveData(W, LV, StatusText, CompleteFn)
+		CompleteFn.Call()
 }
 
 _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {

@@ -27,10 +27,15 @@ package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 
 -- Stub adapters.file_system so load_json_file never hits the real disk.
--- Tests that need FileSystem.read to return data override _fs_data below.
+-- Tests that need a classified read to return data override _fs_data below.
 local _fs_data = {}
 package.loaded["adapters.file_system"] = {
-	read  = function(path) return _fs_data[path] end,
+	read = function(path) return _fs_data[path] end,
+	read_with_status = function(path)
+		local content = _fs_data[path]
+		if content == nil then return nil, "absent" end
+		return content, "ok"
+	end,
 	write = function(_path, _content) return true end,
 }
 
@@ -409,7 +414,7 @@ end)
 
 helpers.describe("Generator.merge_into_existing_config: no existing file", function()
 	helpers.it("returns the hs_config directly when the file cannot be read", function()
-		-- FileSystem.read is already stubbed to return nil for unknown paths
+		-- The classified read is already stubbed to return absent for unknown paths.
 		local hs_config = {
 			profiles = {
 				{

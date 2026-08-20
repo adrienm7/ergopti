@@ -76,7 +76,7 @@ global _TH_HoldOptions := _TH_BuildHoldOptions()
 _TH_ReadHoldPickerArray(FieldName) {
 	global _SharedDir
 	Out := []
-	Path := _SharedDir . "	ap_hold\defaults.toml"
+	Path := _SharedDir . "\tap_hold\defaults.toml"
 	Content := ""
 	try Content := ReadTomlFile(Path)
 	if (Content == "") {
@@ -279,126 +279,79 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
 ; ``ActionId`` is a GESTURE_ACTIONS id string, or "" to force native passthrough
 ; while still persisting an explicit per-key override (so shipped defaults do not
 ; leak back on reload).
-WriteTapHoldTap(KeyId, ActionId) {
-        global TapHold
-	if !IsSet(TapHold) {
-		try LoggerWarn("TapHoldWriter", "TapHold global unset — skipping WriteTapHoldTap.")
-		return
+WriteTapHoldTap(KeyId, ActionId, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldTap(KeyId, ActionId, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
 	}
-        Candidate := _TH_CloneData(TapHold)
-        if !Candidate.Has("keys") {
-                Candidate["keys"] := Map()
-        }
-
-        if !Candidate["keys"].Has(KeyId) {
-                Candidate["keys"][KeyId] := Map()
-        }
-        Entry := Candidate["keys"][KeyId]
-	PrevTap      := Entry.Has("tap_action") ? (Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]) : "<unset>"
-	PrevHoldMod  := Entry.Has("hold_modifier") ? Entry["hold_modifier"] : "<unset>"
-	PrevHoldLay  := Entry.Has("hold_layer") ? Entry["hold_layer"] : "<unset>"
-	try LoggerDebug("TapHoldWriter", "WriteTapHoldTap requested: key='{1}', action='{2}' (prev_tap='{3}', prev_hold_modifier='{4}', prev_hold_layer='{5}').",
-		KeyId, (ActionId == "" ? "<native>" : ActionId), PrevTap, PrevHoldMod, PrevHoldLay)
-
-	if (ActionId == "") {
-		; Empty string means explicit native passthrough for this key and must
-		; stay in the merged map to block default fallback on reload.
-		Entry["tap_action"] := ""
-	} else {
-		Entry["tap_action"] := ActionId
+	if !(KeyId is String) || KeyId == "" || !(ActionId is String) {
+		try LoggerError("TapHoldWriter", "Refusing an invalid tap-hold tap update.")
+		return false
 	}
-	NewTap := Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]
-	try LoggerDebug("TapHoldWriter", "WriteTapHoldTap applied: key='{1}', new_tap='{2}'.", KeyId, NewTap)
-
-        if !_TH_WriteTapHoldToml(Candidate)
-                return false
-        TapHold := Candidate
-        try LoggerDebug("TapHoldWriter", "Tap persisted: '{1}' -> '{2}'.", KeyId, NewTap)
-        return true
+	try LoggerDebug("TapHoldWriter",
+		"WriteTapHoldTap requested: key='{1}', action='{2}'.",
+		KeyId, ActionId == "" ? "<native>" : ActionId)
+	return _TH_CommitTapHoldMutation("tap",
+		_TH_BuildTapCandidate.Bind(KeyId, ActionId),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
 }
 
 ; Apply a new hold option for a key directly to TapHold + tap_hold.toml.
 ; ``HoldOpt`` is one entry from ``_TH_HoldOptions``.
-WriteTapHoldHold(KeyId, HoldOpt) {
-	global TapHold
-	if !IsSet(TapHold) {
-		try LoggerWarn("TapHoldWriter", "TapHold global unset — skipping WriteTapHoldHold.")
-		return
+WriteTapHoldHold(KeyId, HoldOpt, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldHold(KeyId, HoldOpt, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
 	}
-        Candidate := _TH_CloneData(TapHold)
-        if !Candidate.Has("keys") {
-                Candidate["keys"] := Map()
+	if !(KeyId is String) || KeyId == "" || !(HoldOpt is Map)
+			|| !HoldOpt.Has("kind") || !HoldOpt.Has("id")
+			|| !(HoldOpt["kind"] is String) || !(HoldOpt["id"] is String) {
+		try LoggerError("TapHoldWriter", "Refusing an invalid tap-hold hold update.")
+		return false
 	}
-
-        if !Candidate["keys"].Has(KeyId) {
-                Candidate["keys"][KeyId] := Map()
-	}
-        Entry := Candidate["keys"][KeyId]
-	PrevHoldMod  := Entry.Has("hold_modifier") ? Entry["hold_modifier"] : "<unset>"
-	PrevHoldLay  := Entry.Has("hold_layer") ? Entry["hold_layer"] : "<unset>"
-	PrevTap      := Entry.Has("tap_action") ? (Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]) : "<unset>"
-	try LoggerDebug("TapHoldWriter", "WriteTapHoldHold requested: key='{1}', kind='{2}', id='{3}' (prev_tap='{4}', prev_hold_modifier='{5}', prev_hold_layer='{6}').",
-		KeyId, HoldOpt["kind"], HoldOpt["id"], PrevTap, PrevHoldMod, PrevHoldLay)
-
-	; Always clear both hold fields before writing the new one — they are
-	; mutually exclusive and a stale field would confuse IsTapHoldVariantActive.
-	; Map.Delete() throws if the key is absent, so guard with Has().
-	if Entry.Has("hold_modifier")
-		Entry.Delete("hold_modifier")
-	if Entry.Has("hold_layer")
-		Entry.Delete("hold_layer")
-
 	Kind := HoldOpt["kind"]
-	Id   := HoldOpt["id"]
-
-	if (Kind == "modifier") {
-		Entry["hold_modifier"] := Id
-	} else if (Kind == "layer") {
-		Entry["hold_layer"] := Id
-	} else if (Kind == "none") {
-		; Explicit "none" by writing an empty hold slot, preventing defaults
-		; from reintroducing a hold value on merge.
-		Entry["hold_modifier"] := ""
+	Id := HoldOpt["id"]
+	if (Kind != "modifier" && Kind != "layer" && Kind != "none")
+			|| (Kind == "none" && Id != "") {
+		try LoggerError("TapHoldWriter",
+			"Refusing unknown hold option kind='{1}', id='{2}'.", Kind, Id)
+		return false
 	}
-
-	; Remove the entry entirely when both tap and hold are now empty.
-	if (!Entry.Has("tap_action") and !Entry.Has("hold_modifier") and !Entry.Has("hold_layer")) {
-                Candidate["keys"].Delete(KeyId)
-	}
-	NewHoldMod  := Entry.Has("hold_modifier") ? Entry["hold_modifier"] : "<unset>"
-	NewHoldLay  := Entry.Has("hold_layer") ? Entry["hold_layer"] : "<unset>"
-	NewTap      := Entry.Has("tap_action") ? (Entry["tap_action"] == "" ? "<native>" : Entry["tap_action"]) : "<unset>"
-	try LoggerDebug("TapHoldWriter", "WriteTapHoldHold applied: key='{1}', new_tap='{2}', new_hold_modifier='{3}', new_hold_layer='{4}'.", KeyId, NewTap, NewHoldMod, NewHoldLay)
-
-        if !_TH_WriteTapHoldToml(Candidate)
-                return false
-        TapHold := Candidate
-        try LoggerDebug("TapHoldWriter", "Hold persisted: '{1}' -> kind='{2}', id='{3}'.", KeyId, Kind, Id)
-        return true
+	try LoggerDebug("TapHoldWriter",
+		"WriteTapHoldHold requested: key='{1}', kind='{2}', id='{3}'.",
+		KeyId, Kind, Id)
+	return _TH_CommitTapHoldMutation("hold",
+		_TH_BuildHoldCandidate.Bind(KeyId, Kind, Id),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
 }
 
 ; Atomically switch one key back to native tap + no hold.  The tray's Disable
 ; action used to call WriteTapHoldTap then WriteTapHoldHold, which could persist
 ; only the first half if the second write failed.
-WriteTapHoldNative(KeyId) {
-        global TapHold
-        if !IsSet(TapHold)
-                return false
-        Candidate := _TH_CloneData(TapHold)
-        if !Candidate.Has("keys")
-                Candidate["keys"] := Map()
-        if !Candidate["keys"].Has(KeyId)
-                Candidate["keys"][KeyId] := Map()
-        Entry := Candidate["keys"][KeyId]
-        Entry["tap_action"] := ""
-        if Entry.Has("hold_modifier")
-                Entry.Delete("hold_modifier")
-        if Entry.Has("hold_layer")
-                Entry.Delete("hold_layer")
-        if !_TH_WriteTapHoldToml(Candidate)
-                return false
-        TapHold := Candidate
-        return true
+WriteTapHoldNative(KeyId, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WriteTapHoldNative(KeyId, WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
+	}
+	if !(KeyId is String) || KeyId == "" {
+		try LoggerError("TapHoldWriter", "Refusing an invalid native tap-hold update.")
+		return false
+	}
+	return _TH_CommitTapHoldMutation("native",
+		_TH_BuildNativeCandidate.Bind(KeyId),
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
 }
 
 
@@ -411,41 +364,250 @@ WriteTapHoldNative(KeyId) {
 ; =======================================
 ; =======================================
 
-; Persist an explicit « all tap-holds disabled » state. Without
+; Standalone tray action: persist first, then publish. Without
 ; ``inherit_defaults = false`` the loader would re-merge shipped defaults on
 ; the next reload, undoing « Tout désactiver ».
-_TH_WriteTapHoldDisabled() {
-	global TapHold
-	if !IsSet(TapHold) {
-		try LoggerWarn("TapHoldWriter", "TapHold global unset — cannot disable tap-holds.")
-		return false
+_TH_WriteTapHoldDisabled(WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_WriteTapHoldDisabled(WriterFn, ReplaceFn,
+			DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
 	}
-	; Never mutate the live map before the on-disk transaction succeeds.  A
-	; failed FileMove used to leave the running driver disabled while its next
-	; reload restored the old file, producing an unexplained state reversal.
-	Candidate := _TH_CloneData(TapHold)
+	Result := _TH_CommitTapHoldMutation("disable-all",
+		_TH_BuildDisabledCandidate,
+		WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
+	if (Result is Integer) && Result == 1
+		try LoggerInfo("TapHoldWriter", "All tap-hold mappings disabled and persisted.")
+	return Result
+}
+
+; Resolve the exact physical target before acquiring its global configuration
+; owner. A path relocation cannot redirect a transaction after its snapshot.
+_TH_TapHoldConfigPath() {
+	global _ConfigDir, _AhkSubDir
+	if !IsSet(_ConfigDir) || !IsSet(_AhkSubDir)
+			|| !(_ConfigDir is String) || _ConfigDir == ""
+			|| !(_AhkSubDir is String)
+		return false
+	return _ConfigDir . _AhkSubDir . "tap_hold.toml"
+}
+
+; Return one mutable per-key entry from a detached candidate.
+_TH_CandidateEntry(Candidate, KeyId, &EntryOut) {
+	if !(Candidate is Map) || !(KeyId is String) || KeyId == ""
+		return false
+	if !Candidate.Has("keys")
+		Candidate["keys"] := Map()
+	if !(Candidate["keys"] is Map)
+		return false
+	if !Candidate["keys"].Has(KeyId)
+		Candidate["keys"][KeyId] := Map()
+	if !(Candidate["keys"][KeyId] is Map)
+		return false
+	EntryOut := Candidate["keys"][KeyId]
+	return 1
+}
+
+_TH_BuildTapCandidate(KeyId, ActionId, Candidate) {
+	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
+		return false
+	Entry["tap_action"] := ActionId
+	return 1
+}
+
+_TH_BuildHoldCandidate(KeyId, Kind, Id, Candidate) {
+	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
+		return false
+	if Entry.Has("hold_modifier")
+		Entry.Delete("hold_modifier")
+	if Entry.Has("hold_layer")
+		Entry.Delete("hold_layer")
+	if (Kind == "modifier")
+		Entry["hold_modifier"] := Id
+	else if (Kind == "layer")
+		Entry["hold_layer"] := Id
+	else if (Kind == "none")
+		Entry["hold_modifier"] := ""
+	else
+		return false
+	return 1
+}
+
+_TH_BuildNativeCandidate(KeyId, Candidate) {
+	if !_TH_CandidateEntry(Candidate, KeyId, &Entry)
+		return false
+	Entry["tap_action"] := ""
+	if Entry.Has("hold_modifier")
+		Entry.Delete("hold_modifier")
+	if Entry.Has("hold_layer")
+		Entry.Delete("hold_layer")
+	return 1
+}
+
+_TH_BuildDisabledCandidate(Candidate) {
+	if !(Candidate is Map)
+		return false
 	Candidate["keys"] := Map()
 	Candidate["layers"] := Map()
 	Candidate["inherit_defaults"] := false
-	if !_TH_WriteTapHoldToml(Candidate)
-		return false
-	TapHold := Candidate
-	try LoggerInfo("TapHoldWriter", "All tap-hold mappings disabled and persisted.")
-	return true
+	return 1
 }
 
-; Rewrite ``<config>/autohotkey/tap_hold.toml`` from scratch from the current
-; in-memory ``TapHold`` global. Preserves the ``layers`` block verbatim
-; so any user-customised layer mappings survive a key-section write.
-_TH_WriteTapHoldToml(Data := unset) {
-        global TapHold, _ConfigDir, _AhkSubDir
-        if !IsSet(Data)
-                Data := TapHold
-	if !IsSet(_ConfigDir) {
-		try LoggerWarn("TapHoldWriter", "_ConfigDir unset — cannot persist tap_hold.toml.")
-		return
+; Re-check every revocable fact after the complete stage exists. The optional
+; callback is a deterministic test seam; its success is sampled strictly and
+; all real authorities are checked again after it returns.
+_TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState,
+		AuthorizeFn := 0) {
+	global TapHold
+	if !_ConfigWriteLeaseOwns(OwnerToken, BoundPath)
+		return false
+	CurrentPath := _TH_TapHoldConfigPath()
+	if !(CurrentPath is String)
+			|| _ConfigWriteLeaseKey(CurrentPath)
+				!= _ConfigWriteLeaseKey(BoundPath)
+		return false
+	if !(TapHold is Map) || !(StartState is Map)
+			|| ObjPtr(TapHold) != ObjPtr(StartState)
+		return false
+	if HasMethod(AuthorizeFn, "Call") {
+		Result := AuthorizeFn.Call()
+		if !(Result is Integer) || Result != 1
+			return false
+		if !_ConfigWriteLeaseOwns(OwnerToken, BoundPath)
+			return false
+		CurrentPath := _TH_TapHoldConfigPath()
+		if !(CurrentPath is String)
+				|| _ConfigWriteLeaseKey(CurrentPath)
+					!= _ConfigWriteLeaseKey(BoundPath)
+			return false
+		if !(TapHold is Map) || !(StartState is Map)
+				|| ObjPtr(TapHold) != ObjPtr(StartState)
+			return false
 	}
-	Path := _ConfigDir . _AhkSubDir . "tap_hold.toml"
+	return 1
+}
+
+; Publish only the detached candidate. The caller invokes this helper inside a
+; short Critical span after the durable atomic replacement has completed.
+_TH_PublishTapHoldCandidate(Candidate, OwnerToken, BoundPath, StartState) {
+	global TapHold
+	if !_TH_AuthorizeTapHoldCommit(OwnerToken, BoundPath, StartState)
+		return false
+	TapHold := Candidate
+	return 1
+}
+
+; Acquire the global config admission gate before cloning live state. A
+; terminal relocation/reload refuses this lease process-wide, and a re-entrant
+; tap-hold writer on the same path cannot build from a stale snapshot.
+_TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn := 0,
+		ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0) {
+	global TapHold
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_CommitTapHoldMutation(ActionName, BuildFn, WriterFn,
+			ReplaceFn, DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
+	}
+	if !HasMethod(BuildFn, "Call") {
+		try LoggerError("TapHoldWriter", "Refusing a tap-hold update with no candidate builder.")
+		return false
+	}
+	for Adapter in [WriterFn, ReplaceFn, DeleteFn, AuthorizeFn] {
+		if !((Adapter is Integer) && Adapter == 0)
+				&& !HasMethod(Adapter, "Call") {
+			try LoggerError("TapHoldWriter", "Refusing a tap-hold update with an invalid transaction adapter.")
+			return false
+		}
+	}
+	if !(TapHold is Map) {
+		try LoggerError("TapHoldWriter", "TapHold state is unavailable; the change was not persisted.")
+		return false
+	}
+	BoundPath := _TH_TapHoldConfigPath()
+	if !(BoundPath is String) || BoundPath == "" {
+		try LoggerError("TapHoldWriter", "The tap-hold target path is unavailable; the change was not persisted.")
+		return false
+	}
+	OwnerToken := _ConfigWriteLeaseTryAcquire(BoundPath,
+		"tap-hold-" . ActionName)
+	if !(OwnerToken is Object) {
+		try LoggerError("TapHoldWriter",
+			"Cannot persist tap-hold change '{1}': another configuration transaction is in progress.",
+			ActionName)
+		return false
+	}
+	Result := false
+	Released := false
+	try {
+		BuildError := ""
+		Built := false
+		try {
+			StartState := TapHold
+			Candidate := _TH_CloneData(StartState)
+			Built := BuildFn.Call(Candidate)
+		} catch as Err {
+			BuildError := Err.Message
+		}
+		if (BuildError != "") {
+			try LoggerError("TapHoldWriter",
+				"Building tap-hold change '{1}' failed: {2}.",
+				ActionName, BuildError)
+		} else if !(Built is Integer) || Built != 1 {
+			try LoggerError("TapHoldWriter",
+				"Building tap-hold change '{1}' was refused.", ActionName)
+		} else {
+			PersistError := ""
+			try Result := _TH_WriteTapHoldToml(Candidate, OwnerToken,
+				BoundPath, StartState, WriterFn, ReplaceFn, DeleteFn,
+				AuthorizeFn)
+			catch as Err {
+				Result := false
+				PersistError := Err.Message
+			}
+			if (PersistError != "")
+				try LoggerError("TapHoldWriter",
+					"Persisting tap-hold change '{1}' failed: {2}.",
+					ActionName, PersistError)
+		}
+	} finally {
+		Released := _ConfigWriteLeaseRelease(OwnerToken)
+	}
+	if !(Released is Integer) || Released != 1 {
+		try LoggerError("TapHoldWriter",
+			"The tap-hold write owner could not be released; later configuration changes may be refused.")
+		return false
+	}
+	return (Result is Integer) && Result == 1 ? 1 : false
+}
+
+; Rewrite the captured tap_hold.toml target from one detached candidate. The
+; caller owns BoundPath from before the snapshot through durable replacement
+; and the final memory-only publication.
+_TH_WriteTapHoldToml(Data, OwnerToken, BoundPath, StartState,
+		WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_WriteTapHoldToml(Data, OwnerToken, BoundPath,
+			StartState, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn)
+		finally Critical(InheritedCritical)
+	}
+	if !(Data is Map) || !(BoundPath is String) || BoundPath == ""
+			|| !_ConfigWriteLeaseOwns(OwnerToken, BoundPath) {
+		try LoggerError("TapHoldWriter", "Refusing an incomplete tap-hold persistence transaction.")
+		return false
+	}
+	if (Data.Has("keys") && !(Data["keys"] is Map))
+			|| (Data.Has("layers") && !(Data["layers"] is Map)) {
+		try LoggerError("TapHoldWriter",
+			"Refusing malformed tap-hold state; keys and layers must be Maps.")
+		return false
+	}
 	; Refuse to rebuild a file the loader could not READ. Everything below is
 	; serialized from the in-memory map, and when the load saw nothing that map
 	; is the shipped defaults overlay — byte-for-byte what a user who customised
@@ -453,12 +615,12 @@ _TH_WriteTapHoldToml(Data := unset) {
 	; hand-edited layer mappings and their explicit disable-all opt-out, and
 	; every caller here re-publishes TapHold only on a true return, so refusing
 	; leaves memory and disk consistent.
-	if TOML_UnreadableFile(Path) {
-		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': it could not be read at load, so the in-memory tap-hold map holds the shipped defaults rather than the user's configuration. Restart the driver once the file is readable.", Path)
+	if TOML_UnreadableFile(BoundPath) {
+		try LoggerError("TapHoldWriter", "Refusing to rewrite '{1}': it could not be read at load, so the in-memory tap-hold map holds the shipped defaults rather than the user's configuration. Restart the driver once the file is readable.", BoundPath)
 		return false
 	}
 	try LoggerDebug("TapHoldWriter", "Persisting tap-hold config to '{1}' (keys={2}, layers={3}, inherit_defaults={4}).",
-                Path, Data.Has("keys") ? Data["keys"].Count : 0, Data.Has("layers") ? Data["layers"].Count : 0,
+		BoundPath, Data.Has("keys") ? Data["keys"].Count : 0, Data.Has("layers") ? Data["layers"].Count : 0,
                 Data.Has("inherit_defaults") ? (Data["inherit_defaults"] ? "true" : "false") : "unset")
 
 	Lines := []
@@ -520,25 +682,139 @@ _TH_WriteTapHoldToml(Data := unset) {
 		Content .= L . "`r`n"
 	}
 
-	; Atomic write: stage the content in a sibling temp file, then rename over
-	; the target. FileMove with overwrite=true is atomic on NTFS, so a crash or
-	; power loss between the old non-atomic FileDelete and FileAppend can no
-	; longer leave a truncated tap_hold.toml that silently drops every remap.
-	Tmp := Path . ".tmp"
-	try {
-		if FileExist(Tmp) {
-			FileDelete(Tmp)
+	static WriteSequence := 0
+	PreviousCritical := Critical("On")
+	try LocalSequence := ++WriteSequence
+	finally Critical(PreviousCritical)
+	StagePath := BoundPath . "." . A_ScriptHwnd . "-" . LocalSequence . ".tmp"
+
+	Written := false
+	WriteError := ""
+	try Written := HasMethod(WriterFn, "Call")
+		? WriterFn.Call(StagePath, Content)
+		: FSWriteDurable(StagePath, Content)
+	catch as Err {
+		Written := false
+		WriteError := Err.Message
+	}
+	Written := (Written is Integer) && Written == 1
+	if !Written {
+		if (WriteError != "") {
+			try LoggerError("TapHoldWriter",
+				"Writing staging file for '{1}' failed: {2}. The previous contents are intact.",
+				BoundPath, WriteError)
+		} else {
+			try LoggerError("TapHoldWriter",
+				"Writing staging file for '{1}' was refused. The previous contents are intact.",
+				BoundPath)
 		}
-		FileAppend(Content, Tmp, "UTF-8-RAW")
-		FileMove(Tmp, Path, true)
-		try LoggerDebug("TapHoldWriter", "tap_hold.toml rewritten ({1} key(s)).",
-                        Data.Has("keys") ? Data["keys"].Count : 0)
-                return true
-	} catch as Err {
-		try FileDelete(Tmp)
-                try LoggerError("TapHoldWriter", "Could not write tap_hold.toml: {1}.", Err.Message)
-                return false
-        }
+		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+		return false
+	}
+
+	Authorized := false
+	AuthorizeError := ""
+	PreviousCritical := Critical("On")
+	try {
+		try Authorized := _TH_AuthorizeTapHoldCommit(OwnerToken,
+			BoundPath, StartState, AuthorizeFn)
+		catch as Err {
+			Authorized := false
+			AuthorizeError := Err.Message
+		}
+		Authorized := (Authorized is Integer) && Authorized == 1
+	} finally Critical(PreviousCritical)
+	if !Authorized {
+		if (AuthorizeError != "") {
+			try LoggerError("TapHoldWriter",
+				"Authorization before publishing '{1}' failed: {2}. The previous contents are intact.",
+				BoundPath, AuthorizeError)
+		} else {
+			try LoggerError("TapHoldWriter",
+				"Authorization before publishing '{1}' was refused. The previous contents are intact.",
+				BoundPath)
+		}
+		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+		return false
+	}
+
+	Replaced := false
+	ReplaceError := ""
+	try Replaced := HasMethod(ReplaceFn, "Call")
+		? ReplaceFn.Call(StagePath, BoundPath)
+		: FSAtomicMoveReplace(StagePath, BoundPath)
+	catch as Err {
+		Replaced := false
+		ReplaceError := Err.Message
+	}
+	Replaced := (Replaced is Integer) && Replaced == 1
+	if !Replaced {
+		if (ReplaceError != "") {
+			try LoggerError("TapHoldWriter",
+				"Atomic replacement of '{1}' failed: {2}. The previous contents are intact.",
+				BoundPath, ReplaceError)
+		} else {
+			try LoggerError("TapHoldWriter",
+				"Atomic replacement of '{1}' was refused. The previous contents are intact.",
+				BoundPath)
+		}
+		_TH_CleanupTapHoldStage(StagePath, DeleteFn)
+		return false
+	}
+
+	Published := false
+	PublishError := ""
+	PreviousCritical := Critical("On")
+	try {
+		try Published := _TH_PublishTapHoldCandidate(Data, OwnerToken,
+			BoundPath, StartState)
+		catch as Err {
+			Published := false
+			PublishError := Err.Message
+		}
+		Published := (Published is Integer) && Published == 1
+	} finally Critical(PreviousCritical)
+	if !Published {
+		if (PublishError != "") {
+			try LoggerError("TapHoldWriter",
+				"Tap-hold state became durable at '{1}', but live publication failed: {2}. Reload is required.",
+				BoundPath, PublishError)
+		} else {
+			try LoggerError("TapHoldWriter",
+				"Tap-hold state became durable at '{1}', but live publication was refused. Reload is required.",
+				BoundPath)
+		}
+		return false
+	}
+
+	try LoggerDebug("TapHoldWriter", "tap_hold.toml rewritten ({1} key(s)).",
+		Data.Has("keys") ? Data["keys"].Count : 0)
+	return 1
+}
+
+; A private stage never owns user data until atomic replacement succeeds.
+_TH_CleanupTapHoldStage(StagePath, DeleteFn := 0) {
+	Deleted := false
+	DeleteError := ""
+	try Deleted := HasMethod(DeleteFn, "Call")
+		? DeleteFn.Call(StagePath) : FSDeleteStrict(StagePath)
+	catch as Err {
+		Deleted := false
+		DeleteError := Err.Message
+	}
+	Deleted := (Deleted is Integer) && Deleted == 1
+	if Deleted
+		return 1
+	if (DeleteError != "") {
+		try LoggerError("TapHoldWriter",
+			"Could not remove rejected staging file '{1}': {2}.",
+			StagePath, DeleteError)
+	} else {
+		try LoggerError("TapHoldWriter",
+			"Could not remove rejected staging file '{1}': the delete adapter refused it.",
+			StagePath)
+	}
+	return false
 }
 
 _TH_CloneData(Value) {

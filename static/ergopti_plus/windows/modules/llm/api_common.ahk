@@ -424,7 +424,7 @@ _LLM_ApiCommon_PredText(pred) {
  * @returns {Integer} 1 (true) when timed out, 0 (false) otherwise.
  */
 _LLM_DeadlineExpired(start_tick, timeout_ms) {
-	return (((A_TickCount - start_tick) + 0x100000000) & 0xFFFFFFFF) >= timeout_ms
+	return TickExpired(start_tick, timeout_ms)
 }
 
 

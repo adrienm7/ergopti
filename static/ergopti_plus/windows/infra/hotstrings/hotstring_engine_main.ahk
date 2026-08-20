@@ -164,6 +164,27 @@ global HSE_DisabledGroups := Map()
 ; when length and group_order are equal (stable sort tiebreaker).
 global HSE_SeqCounter := 0
 
+; Monotonic identity of the active registry projection. Unlike HSE_SeqCounter,
+; this value is never reset: a tooltip decision captured before a clear/reload
+; must not become current again merely because the rebuilt registry reused the
+; same sequence numbers. Every registry writer bumps it at publication time.
+global HSE_RegistryGeneration := 0
+
+; Monotonic identity of every non-registry input that can change a canonical
+; decision while the registry itself stays untouched (repeat-key enablement,
+; live delimiter sets, personal-information values, ...). A visible tooltip
+; decision captures this epoch and is rejected as soon as any such publisher
+; commits. Keep this separate from HSE_RegistryGeneration: a delimiter toggle
+; does not rebuild thousands of specs, but it still changes whether — and what —
+; the next completion key will output.
+global HSE_RuntimeDecisionGeneration := 0
+
+; Section-scoped live reloads publish several registrations as one logical
+; registry transition. The normal full-rebuild coordinator owns
+; HSE_RebuildInProgress; this independent depth avoids one owner lowering the
+; other's Boolean fence. Matchers decline while either fence is active.
+global HSE_RegistryTransitionDepth := 0
+
 ; Flat array of all star-trigger Spec objects. Maintained alongside
 ; HSE_RegistryByLastChar so _HSE_StarTriggerCoversBody can scan only star
 ; triggers without iterating the full registry — avoids an O(all_triggers)
@@ -255,6 +276,89 @@ global HSE_TypoNbspStripped := false
 ; ======================================
 ; ======================================
 
+; Fence one multi-registration publication without holding Critical across the
+; whole batch. Registration remains interruptible, but the matcher cannot see a
+; half-cleared/half-populated group. The generation bump invalidates decisions
+; that were computed before the transition began.
+HSE_BeginRegistryTransition() {
+		global HSE_RegistryTransitionDepth, HSE_RegistryGeneration
+		PreviousCritical := Critical("On")
+		try {
+				HSE_RegistryTransitionDepth += 1
+				HSE_RegistryGeneration += 1
+		} finally {
+				Critical(PreviousCritical)
+		}
+		; Pixels and queued renders describe the pre-transition registry. Invalidate
+		; them after releasing Critical because TooltipHide performs Win32 work.
+		if IsSet(HotstringPrefixWatcherInvalidateRegistryProjection)
+				try HotstringPrefixWatcherInvalidateRegistryProjection()
+}
+
+HSE_EndRegistryTransition() {
+		global HSE_RegistryTransitionDepth, HSE_RegistryGeneration
+		TransitionFinished := false
+		PreviousCritical := Critical("On")
+		try {
+				if (HSE_RegistryTransitionDepth <= 0)
+						throw Error("HSE_EndRegistryTransition called without an owner.")
+				HSE_RegistryTransitionDepth -= 1
+				HSE_RegistryGeneration += 1
+				TransitionFinished := HSE_RegistryTransitionDepth == 0
+		} finally {
+				Critical(PreviousCritical)
+		}
+		if TransitionFinished and IsSet(HotstringPrefixWatcherRefreshRegistryProjection)
+				try HotstringPrefixWatcherRefreshRegistryProjection()
+}
+
+; Invalidate a visible/pending projection after one standalone registry commit.
+; A batch owner already invalidated at Begin and refreshes once at End, so its
+; individual registrations deliberately do no renderer work.
+HSE_InvalidateRegistryProjection(Force := false) {
+		global HSE_RegistryTransitionDepth, HSE_RebuildInProgress
+		; Full and section-scoped rebuild owners invalidate once at their boundary.
+		; Calling TooltipHide + scheduling a render for every one of ~3000 boot/live
+		; registrations would turn an in-memory generation bump into thousands of
+		; Win32/timer operations. HSE_RegistryClear force-invalidates at the start of
+		; a full rebuild; HSE_BeginRegistryTransition does the same for section reload.
+		if !Force and (HSE_RegistryTransitionDepth > 0 or HSE_RebuildInProgress)
+				return false
+		if IsSet(HotstringPrefixWatcherInvalidateRegistryProjection)
+				try HotstringPrefixWatcherInvalidateRegistryProjection()
+		if IsSet(HotstringPrefixWatcherRefreshRegistryProjection)
+				try HotstringPrefixWatcherRefreshRegistryProjection()
+		return true
+}
+
+; Advance the epoch inside the same short memory-publication transaction as a
+; runtime decision source. This helper performs no renderer or OS work, so it is
+; safe when a config commit already owns Critical. Call
+; HSE_InvalidateRuntimeDecisionProjection only after that outer transaction has
+; restored interruptibility.
+HSE_AdvanceRuntimeDecisionGeneration() {
+		global HSE_RuntimeDecisionGeneration
+		PreviousCritical := Critical("On")
+		try {
+				HSE_RuntimeDecisionGeneration += 1
+				return HSE_RuntimeDecisionGeneration
+		} finally {
+				Critical(PreviousCritical)
+		}
+}
+
+; Tear down pixels and queued work belonging to a pre-mutation runtime epoch,
+; then recompute the current answer. Reuse the registry projection lifecycle:
+; its buffer generation/token cancellation is generic even though the historical
+; callback name predates non-registry decision sources.
+HSE_InvalidateRuntimeDecisionProjection() {
+		if IsSet(HotstringPrefixWatcherInvalidateRegistryProjection)
+				try HotstringPrefixWatcherInvalidateRegistryProjection()
+		if IsSet(HotstringPrefixWatcherRefreshRegistryProjection)
+				try HotstringPrefixWatcherRefreshRegistryProjection()
+		return true
+}
+
 ; Register a trigger. The Flags string mirrors the AHK Hotstring() option
 ; letters so existing callers (CreateHotstring, CreateCaseSensitiveHotstrings,
 ; LoadHotstringsSection) translate one-for-one once the wire-up commit lands.
@@ -281,6 +385,7 @@ global HSE_TypoNbspStripped := false
 HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 		global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
 		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter, HSE_PRIORITY_COMMON
+		global HSE_RegistryGeneration
 		if (Trigger == "") {
 				return
 		}
@@ -374,10 +479,13 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 				}
 		}
 
-		; Only insert into the live index when the group is not disabled.
-		if !HSE_DisabledGroups.Has(Group) {
-				_HsCrit := Critical("On")
-				try {
+		; Publish the live and group indexes as one in-memory transaction. A preview
+		; may retain the returned Spec beyond this call, so the generation is bumped
+		; only after every index that owns it is complete.
+		_HsCrit := Critical("On")
+		try {
+				; Only insert into the live index when the group is not disabled.
+				if !HSE_DisabledGroups.Has(Group) {
 						LastChar := TailChar
 						LookupKey := Spec.CaseSensitive ? LastChar : StrLower(LastChar)
 						if !HSE_RegistryByLastChar.Has(LookupKey) {
@@ -393,17 +501,18 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 						} else {
 								_HSE_IndexEndTrigger(Spec)
 						}
-				} finally {
-						Critical(_HsCrit)
 				}
-		}
 
-		; Always store in the group index regardless of enabled/disabled state
-		; so HSE_EnableGroup can restore them without re-registration.
-		if !HSE_RegistryByGroup.Has(Group) {
-				HSE_RegistryByGroup[Group] := []
+				; Always store in the group index regardless of enabled/disabled state
+				; so HSE_EnableGroup can restore it without re-registration.
+				if !HSE_RegistryByGroup.Has(Group)
+						HSE_RegistryByGroup[Group] := []
+				HSE_RegistryByGroup[Group].Push(Spec)
+				HSE_RegistryGeneration += 1
+		} finally {
+				Critical(_HsCrit)
 		}
-		HSE_RegistryByGroup[Group].Push(Spec)
+		HSE_InvalidateRegistryProjection()
 
 		return Spec
 }
@@ -416,19 +525,27 @@ HSE_RegistryClear() {
 		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_SeqCounter
 		global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
 		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
-		HSE_RegistryByLastChar := Map()
-		HSE_StarSpecs := []
-		HSE_StarPrefixSetCI := Map()
-		HSE_StarPrefixSetCS := Map()
-		HSE_StarByTriggerCI := Map()
-		HSE_StarByTriggerCS := Map()
-		HSE_MaxStarTriggerLen := 0
-		HSE_EndByTriggerCI := Map()
-		HSE_EndByTriggerCS := Map()
-		HSE_MaxEndTriggerLen := 0
-		HSE_RegistryByGroup := Map()
-		HSE_DisabledGroups := Map()
-		HSE_SeqCounter := 0
+		global HSE_RegistryGeneration
+		PreviousCritical := Critical("On")
+		try {
+				HSE_RegistryByLastChar := Map()
+				HSE_StarSpecs := []
+				HSE_StarPrefixSetCI := Map()
+				HSE_StarPrefixSetCS := Map()
+				HSE_StarByTriggerCI := Map()
+				HSE_StarByTriggerCS := Map()
+				HSE_MaxStarTriggerLen := 0
+				HSE_EndByTriggerCI := Map()
+				HSE_EndByTriggerCS := Map()
+				HSE_MaxEndTriggerLen := 0
+				HSE_RegistryByGroup := Map()
+				HSE_DisabledGroups := Map()
+				HSE_SeqCounter := 0
+				HSE_RegistryGeneration += 1
+		} finally {
+				Critical(PreviousCritical)
+		}
+		HSE_InvalidateRegistryProjection(true)
 }
 
 ; Return all active mappings whose trigger ends with TailChar, sorted
@@ -498,12 +615,18 @@ HSE_MappingsForTail(TailChar) {
 ; HSE_RegistryByGroup so HSE_EnableGroup can restore them later.
 HSE_DisableGroup(Group) {
 		global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-		global HSE_RegistryByGroup, HSE_DisabledGroups
+		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_RegistryGeneration
 		if !HSE_RegistryByGroup.Has(Group) {
-				HSE_DisabledGroups[Group] := true
+				PreviousCritical := Critical("On")
+				try {
+						HSE_DisabledGroups[Group] := true
+						HSE_RegistryGeneration += 1
+				} finally {
+						Critical(PreviousCritical)
+				}
+				HSE_InvalidateRegistryProjection()
 				return
 		}
-		HSE_DisabledGroups[Group] := true
 		; ATOMICITY — same contract as HSE_Register: the splice below resets the whole
 		; star prefix set / by-trigger index to empty before re-indexing the survivors,
 		; opening a wide window where an OnChar reader (HSE_FindMatchAtEnd) would see an
@@ -515,6 +638,7 @@ HSE_DisableGroup(Group) {
 		; this guards becomes a live high-severity star-expansion drop.
 		_DgCrit := Critical("On")
 		try {
+				HSE_DisabledGroups[Group] := true
 				; Remove each spec from the live index.
 				for _, Spec in HSE_RegistryByGroup[Group] {
 						LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
@@ -548,19 +672,28 @@ HSE_DisableGroup(Group) {
 				}
 				_HSE_RebuildStarTriggerIndex()
 				_HSE_RebuildEndTriggerIndex()
+				HSE_RegistryGeneration += 1
 		} finally {
 				Critical(_DgCrit)
 		}
+		HSE_InvalidateRegistryProjection()
 }
 
 ; Restore all mappings in Group to the live index.
 HSE_EnableGroup(Group) {
 		global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-		global HSE_RegistryByGroup, HSE_DisabledGroups
-		if HSE_DisabledGroups.Has(Group) {
-				HSE_DisabledGroups.Delete(Group)
-		}
+		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_RegistryGeneration
 		if !HSE_RegistryByGroup.Has(Group) {
+				PreviousCritical := Critical("On")
+				try {
+						if HSE_DisabledGroups.Has(Group) {
+								HSE_DisabledGroups.Delete(Group)
+								HSE_RegistryGeneration += 1
+						}
+				} finally {
+						Critical(PreviousCritical)
+				}
+				HSE_InvalidateRegistryProjection()
 				return
 		}
 		; ATOMICITY — same contract as HSE_DisableGroup: re-inserting specs into the live
@@ -569,6 +702,8 @@ HSE_EnableGroup(Group) {
 		; against stale (duplicate or missing) specs for the rebuild duration.
 		_EgCrit := Critical("On")
 		try {
+				if HSE_DisabledGroups.Has(Group)
+						HSE_DisabledGroups.Delete(Group)
 				; Re-insert each spec into the live index.
 				for _, Spec in HSE_RegistryByGroup[Group] {
 						LookupKey := Spec.CaseSensitive ? Spec.TailChar : StrLower(Spec.TailChar)
@@ -603,9 +738,11 @@ HSE_EnableGroup(Group) {
 								_HSE_IndexEndTrigger(Spec)
 						}
 				}
+				HSE_RegistryGeneration += 1
 		} finally {
 				Critical(_EgCrit)
 		}
+		HSE_InvalidateRegistryProjection()
 }
 
 ; Fully wipe a single HSE group in preparation for a live section-scoped
@@ -618,11 +755,18 @@ HSE_EnableGroup(Group) {
 ; (personal-hotstring-live-reload-stale-group).
 ; @param Group {String} HSE group string ("<loader_category>.<section>").
 HSE_ClearGroupForReload(Group) {
-		global HSE_RegistryByGroup, HSE_DisabledGroups
+		global HSE_RegistryByGroup, HSE_DisabledGroups, HSE_RegistryGeneration
 		HSE_DisableGroup(Group)
-		HSE_RegistryByGroup[Group] := []
-		if HSE_DisabledGroups.Has(Group)
-				HSE_DisabledGroups.Delete(Group)
+		PreviousCritical := Critical("On")
+		try {
+				HSE_RegistryByGroup[Group] := []
+				if HSE_DisabledGroups.Has(Group)
+						HSE_DisabledGroups.Delete(Group)
+				HSE_RegistryGeneration += 1
+		} finally {
+				Critical(PreviousCritical)
+		}
+		HSE_InvalidateRegistryProjection()
 }
 
 ; Return the total number of active mappings across all groups.
@@ -757,11 +901,36 @@ HSE_HardReset() {
 ; sits behind » exactly, regardless of whether the end char was a word
 ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
-HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
+HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
 		global HSE_CONSUMED_DELIMITERS
 
 		StripLen := Spec.Length + (EndChar != "" ? 1 : 0) + (HSE_TypoNbspStripped ? 1 : 0)
+		EmittedEndChar := (EndChar != "" and !ForceConsumeEndChar
+				and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+		ClearAll := Spec.HasOwnProp("OnlyText") and !Spec.OnlyText
+		InsertedText := ClearAll ? "" : Replacement . EmittedEndChar
+		Effect := {
+				ClearAll: ClearAll,
+				DeleteFromEnd: StripLen,
+				InsertedText: InsertedText,
+				EndCharEmitted: EmittedEndChar != "",
+				; A consumed end character is absent from the screen and cannot
+				; terminate the replacement context merely because it selected the match.
+				; The replacement itself may nevertheless end at a real boundary, so
+				; publish the actual final inserted character rather than the selector.
+				KnownBoundaryAfter: !ClearAll and InsertedText != ""
+						and InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -1)) > 0
+		}
+		; Send-key syntax can move the caret, change focus, or emit text that is
+		; intentionally different from the payload (for example '""{Left}'). The
+		; exact left-of-caret text is therefore unknowable without duplicating AHK's
+		; parser. Clear the model rather than publishing a confidently false buffer.
+		if Effect.ClearAll {
+				HSE_Buffer := ""
+				HSE_StartIsWordBoundary := false
+				return Effect
+		}
 		BufLen := StrLen(HSE_Buffer)
 
 		; Strip the trigger suffix (and the end char when present). Be
@@ -778,14 +947,13 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
 		; Consumed delimiters are swallowed by the dispatcher and never re-injected
 		; into the app — appending them to the buffer here would desync it with the
 		; actual screen state and make the next trigger match against a ghost char.
-		HSE_Buffer .= Replacement
-		if (EndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, EndChar))
-				HSE_Buffer .= EndChar
+		HSE_Buffer .= Effect.InsertedText
 
 		if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
 				HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
 				HSE_StartIsWordBoundary := false
 		}
+		return Effect
 }
 
 
@@ -799,7 +967,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
 ; trigger, no end char) or "" when the repeat condition is not met.
 HSE_TryRepeatKey(MagicKey) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
-		global HSE_RebuildInProgress
+		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 		; The live-rebuild fence belongs here as much as in HSE_FindMatchAtEnd. While
 		; the registry is being rewritten the matcher answers "" for EVERY sequence —
 		; that means "the registry cannot answer right now", not "no trigger claims
@@ -807,7 +975,8 @@ HSE_TryRepeatKey(MagicKey) {
 		; fallback and the doubling replaces the expansion the user asked for with
 		; different text for the ~1.3 s a live toggle takes. Passing the keystroke
 		; through unexpanded is the contract RebuildHotstringsLive advertises.
-		if (HSE_RebuildInProgress or !HSE_RepeatEnabled or HSE_Suppressed) {
+		if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0
+				or !HSE_RepeatEnabled or HSE_Suppressed) {
 				return ""
 		}
 		MkLen := StrLen(MagicKey)
@@ -858,9 +1027,12 @@ HSE_TryRepeatKey(MagicKey) {
 				Star:        true,
 				InWord:      true,
 				IsRepeat:    true,
+				TransientKind: "repeat",
 				Replacement: RepeatChar . RepeatChar,
 				OnlyText:    true,
-				FinalResult: false
+				FinalResult: false,
+				Category:    "magickey",
+				Section:     "repeat_corrections"
 		}
 }
 
@@ -888,21 +1060,22 @@ HSE_TryRepeatKey(MagicKey) {
 ; registration is what decides. It runs BEFORE HSE_TryRepeatKey because it is the
 ; more specific of the two: @nn★ must expand two fields, not double an "n".
 ;
-; SINGLE SOURCE: the tag walk and the letters→fields resolution are the preview's
-; own helpers, not a second copy. The bubble and the expansion answering the same
-; question differently is the exact failure the provider module was written to end.
+; SINGLE SOURCE: the engine owns the tag walk and letters-to-fields resolution;
+; the tooltip receives this transient Spec through HSE_PreviewNextDecision and
+; only masks its immutable field/value snapshot for display.
 ;
 ; @param MagicKey {String} The user's magic key, i.e. the trigger's last character.
 ; @return A transient Spec compatible with HSE_DispatchMatch, or "" when the
 ;   buffer does not end with a resolvable @-combo.
 HSE_TryPersonalInfoCombo(MagicKey) {
-		global HSE_Buffer, HSE_Suppressed, HSE_RebuildInProgress
+		global HSE_Buffer, HSE_Suppressed, HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 		global HSE_PersonalInfoCombosEnabled, PersonalInformation, PI_PREVIEW_CATEGORY
 		; Same live-rebuild fence as HSE_TryRepeatKey: while the registry is being
 		; rewritten the matcher answers "" for every sequence, which means "cannot
 		; answer now", not "nothing claims this". Expanding here during that window
 		; would beat a registered tag that is about to come back.
-		if (HSE_RebuildInProgress or HSE_Suppressed or !HSE_PersonalInfoCombosEnabled) {
+		if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0
+				or HSE_Suppressed or !HSE_PersonalInfoCombosEnabled) {
 				return ""
 		}
 		MkLen := StrLen(MagicKey)
@@ -927,6 +1100,7 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 		; A Tab between fields: the values land in consecutive form fields, which is
 		; what a multi-field combo is for.
 		Replacement := ""
+		PreviewValues := []
 		for Index, Field in Fields {
 				; An alias pointing at a field the user has not filled in must decline
 				; the whole combo rather than expand a shorter one — a partial expansion
@@ -938,6 +1112,7 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 				if (Value == "") {
 						return ""
 				}
+				PreviewValues.Push(Value)
 				if (Index > 1) {
 						Replacement .= "{Tab}"
 				}
@@ -959,8 +1134,112 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 				OnlyText:    false,
 				FinalResult: true,
 				IsPrivate:   true,
+				TransientKind: "personal_combo",
+				PreviewFields:  Fields.Clone(),
+				PreviewValues:  PreviewValues,
 				Category:    IsSet(PI_PREVIEW_CATEGORY) ? PI_PREVIEW_CATEGORY : "personal"
 		}
+}
+
+; Ask the real engine for the complete decision the next physical character
+; would produce, without changing live state. Candidate selection is simulated
+; under a short Critical snapshot; callable resolution and case/time gates then
+; run through the SAME preflight HSE_DispatchMatch uses, outside Critical.
+; Raw callbacks deliberately fail closed: calling one to preview it would execute
+; its side effects, while guessing its verdict would recreate a second engine.
+; @return A canonical decision object, or "" when the actual dispatch would decline.
+HSE_PreviewNextDecision(Buffer, NextChar) {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_LastMatch, HSE_LastEndChar
+		global HSE_TypoNbspStripped, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+		global HSE_RegistryTransitionDepth
+		global HSE_RebuildInProgress, ScriptInformation
+		if !(Buffer is String) or !(NextChar is String) or NextChar == ""
+				return ""
+
+		PreviousCritical := Critical("On")
+		; A transition is an unavailable answer, not an empty registry. Decline the
+		; whole preview transaction before touching the simulation globals so a
+		; mid-reload bubble can never advertise an old/fallback decision.
+		if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0) {
+				Critical(PreviousCritical)
+				return ""
+		}
+		SavedBuffer := HSE_Buffer
+		SavedStartBoundary := HSE_StartIsWordBoundary
+		SavedLastMatch := HSE_LastMatch
+		SavedLastEndChar := HSE_LastEndChar
+		SavedTypoNbsp := HSE_TypoNbspStripped
+		RegistryGeneration := HSE_RegistryGeneration
+		RuntimeDecisionGeneration := HSE_RuntimeDecisionGeneration
+		Match := ""
+		SimulatedBuffer := ""
+		SimulatedEndChar := ""
+		SimulatedTypoNbsp := false
+		try {
+				HSE_Buffer := Buffer
+				Match := HSE_FeedChar(NextChar, true)
+				MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
+						? ScriptInformation["MagicKey"] : ""
+				; These are MAGIC-KEY fallbacks, not generic completion fallbacks. Passing
+				; Space here used to invent a repeat such as "b " that can never fire.
+				if (Match == "" and NextChar == MagicKey)
+						Match := HSE_TryPersonalInfoCombo(MagicKey)
+				if (Match == "" and NextChar == MagicKey)
+						Match := HSE_TryRepeatKey(MagicKey)
+				SimulatedBuffer := HSE_Buffer
+				SimulatedEndChar := HSE_LastEndChar
+				SimulatedTypoNbsp := HSE_TypoNbspStripped
+		} finally {
+				HSE_Buffer := SavedBuffer
+				HSE_StartIsWordBoundary := SavedStartBoundary
+				HSE_LastMatch := SavedLastMatch
+				HSE_LastEndChar := SavedLastEndChar
+				HSE_TypoNbspStripped := SavedTypoNbsp
+				Critical(PreviousCritical)
+		}
+		if !IsObject(Match)
+				return ""
+		if (Match.HasOwnProp("RawCallback") and Match.RawCallback)
+				return ""
+
+		Decision := ""
+		try Decision := _HSE_PrepareDispatchDecision(
+				Match, SimulatedBuffer, SimulatedEndChar, SimulatedTypoNbsp)
+		catch as Err {
+				try LoggerError("HSEPreview", "Preparing the canonical decision failed: {1}.", Err.Message)
+				return ""
+		}
+		if !IsObject(Decision)
+				return ""
+
+		; A callable may yield. Refuse to publish the answer if any registry writer
+		; committed while it ran, even when the new registry reused the same trigger.
+		PreviousCritical := Critical("On")
+		try {
+				if (RegistryGeneration != HSE_RegistryGeneration
+						or RuntimeDecisionGeneration != HSE_RuntimeDecisionGeneration)
+						return ""
+				Decision.RegistryGeneration := RegistryGeneration
+				Decision.RuntimeDecisionGeneration := RuntimeDecisionGeneration
+				Decision.BufferBefore := Buffer
+				Decision.BufferAfterCompletion := SimulatedBuffer
+				Decision.Completion := NextChar
+				Decision.EndChar := SimulatedEndChar
+				Decision.TypoNbspStripped := SimulatedTypoNbsp
+				Decision.SpecIdentity := Match.HasOwnProp("TransientKind") ? 0 : ObjPtr(Match)
+				Decision.TransientKind := Match.HasOwnProp("TransientKind") ? Match.TransientKind : ""
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return Decision
+}
+
+; Compatibility accessor for tests and callers interested only in selection.
+; It still routes through the complete decision, so a timed/case/dynamic mapping
+; that dispatch would decline is never reported as a match.
+HSE_PreviewNextMatch(Buffer, NextChar) {
+		Decision := HSE_PreviewNextDecision(Buffer, NextChar)
+		return IsObject(Decision) ? Decision.Spec : ""
 }
 
 #Include hotstring_match.ahk

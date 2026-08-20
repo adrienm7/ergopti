@@ -3,13 +3,11 @@
 ; ==============================================================================
 ; MODULE: Logger Lifecycle Pairing Test
 ; DESCRIPTION:
-; For each AHK source file in infra/ and modules/, counts LoggerStart vs
-; LoggerSuccess and LoggerTrace vs LoggerDone occurrences. Imbalances are
-; flagged as warnings (not errors) because legitimate early-return control
-; flow can produce natural asymmetries.
-;
-; The test always passes; its value is the OutputDebug report attached to
-; CI logs so reviewers can spot unpaired lifecycle calls at a glance.
+; For each production AHK source file, counts LoggerStart vs LoggerSuccess and
+; LoggerTrace vs LoggerDone occurrences. A lifecycle opener with no terminal,
+; or more TRACE operations than DONE terminals, fails the suite. The generated
+; TOML fast path historically returned after TRACE while an unrelated fallback
+; DONE made the old presence-only gate pass. (AHK-28.)
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -79,6 +77,10 @@ _MetaCountPattern(Body, Pattern) {
 	return N
 }
 
+_MetaLifecycleHasShortfall(OpenCount, CloseCount) {
+	return OpenCount > CloseCount
+}
+
 
 
 
@@ -117,9 +119,9 @@ _MetaRunLoggerPairingTests() {
 				Imbalanced++
 				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NStart . " LoggerStart but 0 LoggerSuccess"
 			}
-			if NTrace > 0 and NDone = 0 {
+			if _MetaLifecycleHasShortfall(NTrace, NDone) {
 				Imbalanced++
-				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NTrace . " LoggerTrace but 0 LoggerDone"
+				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NTrace . " LoggerTrace but " . NDone . " LoggerDone"
 			}
 		}
 	}
@@ -138,6 +140,31 @@ _MetaRunLoggerPairingTests() {
 }
 
 _MetaRunLoggerPairingTests()
+
+_MetaLoggerPairingRejectsPartialTracePair() {
+	Assert(_MetaLifecycleHasShortfall(2, 1),
+		"two TRACE operations with one DONE terminal must be rejected, even though both tokens exist")
+	Assert(!_MetaLifecycleHasShortfall(1, 1),
+		"a balanced TRACE/DONE operation count must remain accepted")
+}
+Test("meta logger pairing: partial TRACE/DONE pairs fail (logger-partial-pairing)",
+	_MetaLoggerPairingRejectsPartialTracePair)
+
+_MetaTomlGeneratedLoaderClosesTrace() {
+	Body := _DriverFuncBody("LoadHotstringsSection")
+	Assert(Body != "", "LoadHotstringsSection must exist for the generated-loader lifecycle guard")
+
+	TracePos := InStr(Body, 'LoggerTrace("TomlLoader", "Using generated loader')
+	CallPos := InStr(Body, "GeneratedFn(", , TracePos)
+	ReturnPos := InStr(Body, "return", , CallPos)
+	DonePos := InStr(Body, 'LoggerDone("TomlLoader"', , CallPos)
+	Assert(TracePos > 0 && CallPos > TracePos && ReturnPos > CallPos,
+		"the generated-loader fast path must remain structurally reachable")
+	Assert(DonePos > CallPos && DonePos < ReturnPos,
+		"the generated-loader fast return must close its TRACE with DONE after registration succeeds")
+}
+Test("toml loader: generated fast path closes TRACE before return (toml-generated-loader-pairing)",
+	_MetaTomlGeneratedLoaderClosesTrace)
 
 ; F-L08: a LoggerStart immediately before Reload() leaves a START with no reachable
 ; SUCCESS — the process restarts before the pair closes, so it reads as a silent failure

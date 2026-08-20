@@ -278,11 +278,7 @@ GestureScreenshotInstant() {
 						try TrayTip(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "Iconx Mute")
 						return
 				}
-				PicsDir := EnvGet("USERPROFILE") . "\Pictures\screenshots"
-				if !DirExist(PicsDir)
-						DirCreate(PicsDir)
-				Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
-				FilePath := PicsDir . "\screenshot_" . Timestamp . ".png"
+				FilePath := GestureScreenshotPath()
 				; Route through the hardened shared capture path instead of an inline
 				; fire-and-forget PowerShell block. GestureCaptureRegion escapes the path for
 				; PowerShell (a USERPROFILE containing an apostrophe used to break the inline
@@ -331,54 +327,9 @@ GesturePickColor() {
 }
 
 GestureTakeNote() {
-		global Features
-		DatedNotes := false
-		DestFolder := A_Desktop
-		if IsSet(Features) and Features.Has("shortcuts")
-				and Features["shortcuts"].Has("take_note")
-				and IsObject(Features["shortcuts"]["take_note"]) {
-				TN := Features["shortcuts"]["take_note"]
-				if TN.Has("dated_notes")
-						DatedNotes := (TN["dated_notes"] = true)
-				if TN.Has("destination_folder") and TN["destination_folder"] != ""
-						DestFolder := TN["destination_folder"]
-		}
-		FileName := DatedNotes
-				? "Notes_" . FormatTime(, "dd_MM_yyyy") . ".txt"
-				: "Notes.txt"
-		FilePath := DestFolder . "\" . FileName
-		if not FileExist(FilePath)
-				FileAppend("", FilePath)
-		PreviousTitleMatchMode := A_TitleMatchMode
-		try {
-				SetTitleMatchMode(2)
-				; Qualify with ahk_exe notepad.exe to avoid stealing focus from any
-				; other window (Explorer, browser tab…) whose title happens to contain
-				; the note filename (e.g. "Notes.txt" in the address bar).
-				NotepadMatch := FileName . " ahk_exe notepad.exe"
-				if WMExists(NotepadMatch) {
-						WMActivate(NotepadMatch)
-						NoteWindowIsActive := WinWaitActive(NotepadMatch, , 3)
-				} else {
-						Run('notepad.exe "' . FilePath . '"')
-						WinWait(NotepadMatch, , 7)
-						WMActivate(NotepadMatch)
-						NoteWindowIsActive := WinWaitActive(FileName . " ahk_exe notepad.exe", , 3)
-				}
-				; WinWaitActive returns 0 (not a throw) on timeout, so a slow/blocked
-				; Notepad launch must not fall through to a bare WinMaximize -- that
-				; operates on the last-found-window and throws TargetError when the
-				; wait never actually found one (same bug as the already-fixed sibling
-				; TakeNote in modules/shortcuts/win.ahk).
-				if not NoteWindowIsActive {
-						LoggerWarn("GestureTakeNote", "Notepad window '{1}' never became active -- skipping maximize.", NotepadMatch)
-				} else {
-						WinMaximize()
-						Sleep(100)
-				}
-		} finally {
-				SetTitleMatchMode(PreviousTitleMatchMode)
-		}
+		; Preserve the gesture's historical no-newline behaviour while delegating
+		; every blocking/OS step to the same job used by the Win+N shortcut.
+		return _TakeNoteQueueFromFeatures(false)
 }
 
 
@@ -489,7 +440,7 @@ _GestureToggleTitleCaseSelection(Text) {
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
-_GesturePastePlainRestore(OldClip, OwnedSequence) {
+_GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
 		global _SEND_INSTANT_CLIP_BUSY
 		try {
 				; A user's later copy owns a different sequence and must survive this
@@ -497,6 +448,8 @@ _GesturePastePlainRestore(OldClip, OwnedSequence) {
 				if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
 						CB_RestoreAll(OldClip)
 		} finally {
+				if OwnerToken
+						CB_EndOwnedTransaction(OwnerToken)
 				_SEND_INSTANT_CLIP_BUSY := false
 		}
 }
@@ -530,17 +483,21 @@ GesturePastePlain() {
 						PlainText := CB_Read()
 						_SEND_INSTANT_CLIP_BUSY := true
 						OwnedSequence := 0
+						OwnerToken := 0
 						try {
+								OwnerToken := CB_BeginOwnedTransaction("gesture_paste_plain", true)
 								if !CB_Write(PlainText)
 										throw Error("clipboard write failed")
 								OwnedSequence := CB_GetSequenceNumber()
 								if !OwnedSequence
 										throw Error("clipboard sequence unavailable")
 								SendFinalResult("^v")
-								SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence), -SEND_INSTANT_PASTE_DELAY_MS)
+								SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 						} catch as e {
 								if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
 										CB_RestoreAll(OldClip)
+								if OwnerToken
+										CB_EndOwnedTransaction(OwnerToken)
 								_SEND_INSTANT_CLIP_BUSY := false
 								try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard and guard restored: {1}.", e.Message)
 						}
@@ -730,8 +687,17 @@ GestureEditPersonalShortcuts() {
 		; (the unconditional Reload/ExitApp in EnsurePersonalShortcutsFile would kill this
 		; process before the Run below, so the editor never opened when the file/stub was
 		; freshly (re)created).
-		EnsurePersonalShortcutsFile(Path, false)
-		Run('notepad.exe "' . Path . '"')
+		if !EnsurePersonalShortcutsFile(Path, false) {
+				ConfigReportPersistenceFailure("the personal shortcuts bootstrap")
+				return false
+		}
+		try {
+				Run('notepad.exe "' . Path . '"')
+				return true
+		} catch as Err {
+				try LoggerError("Gestures", "Could not open personal shortcuts at '{1}': {2}.", Path, Err.Message)
+				return false
+		}
 }
 
 ; Ordered list of action names for the menu — built from the shared TOML so

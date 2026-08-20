@@ -29,8 +29,12 @@ _HSPIP_PhysicalFeedsDeclareProvenance() {
 		"_SpaceTap must feed its space as PHYSICAL (IsPhysical=true) so it survives the post-expansion suppress window")
 
 	KeyDown := _DriverFuncBody("_OnPrefixKeyDown")
+	Invalidate := _DriverFuncBody("_PrefixInvalidateInputContext")
+	Commit := _DriverFuncBody("_PrefixCommitInputContext")
 	Assert(KeyDown != "", "_OnPrefixKeyDown must exist")
-	Assert(InStr(KeyDown, "HSE_FeedReset(true, true)") > 0,
-		"the Ctrl+A branch must reset with IsPhysical=true so a real select-all inside the suppress window is honoured")
+	Assert(InStr(KeyDown, "_PrefixInvalidateInputContext(") > 0
+		and InStr(Invalidate, "_PrefixCommitInputContext(FocusToken, KnownBoundary)") > 0
+		and InStr(Commit, "HSE_FeedReset(KnownBoundary, true)") > 0,
+		"physical keydown resets must route through the paired transaction whose engine mutation declares IsPhysical=true")
 }
 Test("HSE: physical feeds outside the InputHook declare IsPhysical", _HSPIP_PhysicalFeedsDeclareProvenance)

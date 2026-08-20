@@ -66,7 +66,7 @@ WPMWidget_BuildCompact() {
 		lbl_wpm.OnEvent("Click",   WPMWidget_DragStart)
 		lbl_unit.OnEvent("Click",  WPMWidget_DragStart)
 		lbl_strip.OnEvent("Click", WPMWidget_DragStart)
-		g.OnEvent("Close", (*) => WPMWidget_Hide())
+		g.OnEvent("Close", WPMWidget_Close)
 		; WM_EXITSIZEMOVE fires after the OS native move loop completes (PostMessage WM_NCLBUTTONDOWN).
 		OnMessage(0x0232, WPMWidget_DragEnd, 1)
 
@@ -96,10 +96,40 @@ WPMWidget_BuildGraph() {
 				. " h" . WPMWidgetConst.GRAPH_H . " BackgroundTrans", "")
 		drag_area.OnEvent("Click", WPMWidget_DragStart)
 
-		g.OnEvent("Close", (*) => WPMWidget_Hide())
+		g.OnEvent("Close", WPMWidget_Close)
 		OnMessage(0x0232, WPMWidget_DragEnd, 1)
 
 		WPMWidget._graph_gui := g
+}
+
+; Gui.Close hides a window by default after its callback returns. Always return
+; non-zero so a refused config transaction cannot be bypassed by that native
+; fallback; the surface is hidden explicitly only after visibility is durable.
+WPMWidget_Close(GuiObj, WriterFn := 0, NotifyFn := 0, HideFn := 0, *) {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				Critical("Off")
+				try return WPMWidget_Close(GuiObj, WriterFn, NotifyFn, HideFn)
+				finally Critical(InheritedCritical)
+		}
+		if !WPMWidget_SaveVisible(false, WriterFn, NotifyFn)
+				return true
+		try {
+				if HasMethod(HideFn, "Call")
+						HideFn.Call()
+				else
+						WPMWidget_Hide()
+		} catch as Err {
+				try LoggerError("WPMWidget",
+						"Could not hide the widget after its close preference was persisted: {1}.",
+						Err.Message)
+				try GuiObj.Hide()
+				catch as FallbackErr
+						try LoggerError("WPMWidget",
+								"Could not apply the native close fallback after persistence: {1}.",
+								FallbackErr.Message)
+		}
+		return true
 }
 
 
@@ -290,7 +320,15 @@ WPMWidget_DragStart(ctrl, info, *) {
 		PostMessage(0x00A1, 2, 0, , gui_ref)
 }
 
-WPMWidget_DragEnd(*) {
+WPMWidget_DragEnd(WParam := 0, LParam := 0, Message := 0, Hwnd := 0,
+		MoveFn := 0, WriterFn := 0, NotifyFn := 0, *) {
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				Critical("Off")
+				try return WPMWidget_DragEnd(WParam, LParam, Message, Hwnd,
+						MoveFn, WriterFn, NotifyFn)
+				finally Critical(InheritedCritical)
+		}
 		if !WPMWidget._dragging
 				return
 		WPMWidget._dragging := false
@@ -306,8 +344,16 @@ WPMWidget_DragEnd(*) {
 				NewX := fx
 				NewY := fy
 		}
-		if !WPMWidget_SavePosition(NewX, NewY)
+		if !WPMWidget_SavePosition(NewX, NewY, WriterFn, NotifyFn) {
+				; Native dragging has already moved the window. A refused durable
+				; candidate must restore the retained anchor as well as retain RAM.
+				try {
+						if HasMethod(MoveFn, "Call")
+								MoveFn.Call(gui_ref)
+						else
+								_WPMWidget_ApplySurfaceGeometry(gui_ref)
+				} catch as Err
+						try LoggerError("WPMWidget", "Could not restore the widget after its dragged position was refused: {1}.", Err.Message)
 				return
-		WPMWidget.pos_x := NewX
-		WPMWidget.pos_y := NewY
+		}
 }

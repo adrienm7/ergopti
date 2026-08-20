@@ -3,10 +3,11 @@
 ; ==============================================================================
 ; MODULE: Hotstring Registry Construction
 ; DESCRIPTION:
-; Builds the prefix-watcher index from TOML files and the in-memory precompiled
+; Builds the auxiliary hotstring catalogue from TOML files and the precompiled
 ; cache. Exposes _RegisterCategoryTriggers (TOML path) and
 ; _RegisterCategoryTriggersFromCache (cache fast-path) which populate the
-; prefix index and trigger set used by the InputHook for live preview.
+; compatibility index and near-miss trigger set. Tooltip selection does not use
+; either structure; it asks the live HSE registry directly.
 ;
 ; FEATURES & RATIONALE:
 ; 1. TOML path — parses each category file directly; always up-to-date but
@@ -15,9 +16,8 @@
 ;    _HS_CACHE_ROWS (pre-parsed at boot) so the deferred rebuild completes in
 ;    < 10 ms instead of multi-second disk scans. Personal hotstrings are
 ;    excluded from the cache as their TOML path is user-relocatable.
-; 3. Case-variant expansion (_AddTriggerVariants) mirrors exactly what
-;    CreateCaseSensitiveHotstrings registers in the live engine so tooltip
-;    and expansion can never disagree.
+; 3. Case-variant expansion (_AddTriggerVariants) keeps catalogue analytics
+;    comparable with the live registrations.
 ;
 ; Included by infra/hotstrings/hotstring_prefix_watcher.ahk.
 ; ==============================================================================
@@ -45,8 +45,8 @@ _PrefixWatcherTomlPath(Category) {
 	return _SharedDir . "\modules\hotstrings\" . LowerCat . ".toml"
 }
 
-; Scan a category TOML and add every (trigger, output) pair to the prefix
-; index. Returns the number of entries registered. Lightweight regex scan —
+; Scan a category TOML and add every (trigger, output) pair to the auxiliary
+; catalogue. Returns the number of entries registered. Lightweight regex scan —
 ; we capture trigger, output and the case-sensitivity flags so we can
 ; pre-compute the exact same case variants the engine registers.
 ; IndexTarget / SetTarget — optional Maps to populate. When omitted they
@@ -56,13 +56,10 @@ _PrefixWatcherTomlPath(Category) {
 ; One TOML hotstring entry, as written by the generator.
 ; Capture: 1=trigger, 2=output, 3=is_case_sensitive,
 ; 4=is_case_sensitive_strict (optional), 5=priority (optional). The individual
-; priority is captured so the preview can rank colliding candidates by the same
-; tie-break the engine uses (so the non-dimmed winner matches what actually fires).
+; priority is retained as catalogue metadata; collision selection is engine-owned.
 ;
 ; Hoisted to a single constant because the extension-pack indexer below parses the
-; SAME file shape: two copies of a regex this size drift, and a drift here shows up
-; as a hotstring that expands but is never previewed — the exact class of defect
-; the ext-pack indexing was added to close.
+; same file shape; two copies of a regex this size drift.
 global HS_PREFIX_ENTRY_PATTERN :=
 	'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?(?:\s*,\s*priority\s*=\s*([0-9]+))?\s*\}'
 
@@ -167,10 +164,8 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 ; produce hierarchical labels ("work / snippets"), matching what the engine's
 ; registration already builds.
 ;
-; Extracted so the engine registration and the preview index walk the SAME tree.
-; They used to disagree structurally — the engine recursed, the preview read one
-; hardcoded path — and every pack therefore expanded with no tooltip, forever. A
-; second copy of the walk would just drift back to that.
+; Extracted so catalogue consumers share one recursive walk. Visible preview no
+; longer depends on this filesystem projection.
 ; @returns {Array} Items of Map("Path", <full path>, "Label", <category label>).
 HS_EnumeratePersonalExtFiles() {
 	global ScriptInformation
@@ -207,12 +202,12 @@ HS_EnumeratePersonalExtFiles() {
 	return Found
 }
 
-; Indexes one extension-pack TOML into the preview index.
+; Indexes one extension-pack TOML into the auxiliary catalogue.
 ;
 ; Deliberately does NOT apply the per-section Features gate _RegisterCategoryTriggers
 ; applies: an extension pack has no per-section toggle in the menu — the engine loads
-; every section of it (LoadExtTomlFile, "all sections enabled") — so gating the preview
-; on a Features node that cannot exist would index nothing and reproduce the defect.
+; every section of it (LoadExtTomlFile, "all sections enabled") — so applying a
+; Features node that cannot exist would erase the pack from analytics.
 ; The master hotstrings gate still applies, because that one really can silence a pack.
 ; @param Path        {String} Full path to the pack's TOML.
 ; @param Label       {String} Category label to attribute previews to.

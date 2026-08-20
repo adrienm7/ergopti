@@ -488,11 +488,15 @@ Test("i18n I18nSetLocale: no longer logs LoggerStart at the call site (F51)", _I
 
 _I18nSLP_DoReloadLogsPair() {
 	Body := _DriverFuncBody("_I18nDoReload")
+	Ready := _DriverFuncBody("_I18nReloadReady")
 	AssertTrue(Body != "", "_I18nDoReload must be defined in infra/i18n.ahk")
+	AssertTrue(Ready != "", "_I18nReloadReady must be defined in infra/i18n.ahk")
 	AssertTrue(InStr(Body, "LoggerStart") > 0,
 		"_I18nDoReload must log LoggerStart right before the real reload work happens (F51)")
-	AssertTrue(InStr(Body, "LoggerSuccess") > 0,
-		"_I18nDoReload must still log LoggerSuccess - the Start/Success pair now lives together where the reload actually happens")
+	AssertTrue(InStr(Body, "_I18nReloadReady.Bind") > 0,
+		"_I18nDoReload must hand its terminal log to ReloadPreservingSuspend so marker publication failure cannot be reported as SUCCESS")
+	AssertTrue(InStr(Ready, "LoggerSuccess") > 0,
+		"the successful reload callback must complete the Start/Success pair immediately before Reload")
 }
 Test("i18n _I18nDoReload: logs a matched Start/Success pair (F51)", _I18nSLP_DoReloadLogsPair)
 

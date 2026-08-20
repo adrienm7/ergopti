@@ -86,26 +86,39 @@ _MetaCheckInputSerialization() {
 
 	; The debounced render must skip while a burst is in flight (TooltipShow pumps
 	; the message loop and could otherwise straddle an expansion).
-	FlushPos := InStr(W, "_PrefixRenderFlush() {")
-	Assert(FlushPos > 0, "watcher must define _PrefixRenderFlush()")
-	GuardPos := InStr(W, "_PrefixWatcherSuppressed or HSE_Suppressed", , FlushPos)
-	LookupPos := InStr(W, "_LookupAndRender()", , FlushPos)
+	FlushBody := _DriverFuncBody("_PrefixRenderFlush")
+	Assert(FlushBody != "", "watcher must define _PrefixRenderFlush()")
+	GuardPos := InStr(FlushBody, "_PrefixWatcherSuppressed or HSE_Suppressed")
+	LookupPos := InStr(FlushBody, "_LookupAndRender()")
 	Assert(GuardPos > 0 and LookupPos > 0 and GuardPos < LookupPos,
 		"_PrefixRenderFlush must early-return while suppressed, before _LookupAndRender")
 
     ; --- Dispatch: every erase/output burst, including Notepad, is Critical ---
-	EngineFile := WindowsDir . "\infra\hotstrings\hotstring_engine_main.ahk"
-	EShim := ""
-	try EShim := FileRead(EngineFile)
-	Assert(EShim != "", "hotstring_engine_main.ahk must be readable")
-	; hotstring_engine_main.ahk is likewise a shim -- HSE_DispatchMatch lives in
-	; the included hotstring_dispatch.ahk sub-module.
-	E := EShim . _DriverDirConcat("infra/hotstrings")
+	; Scope each assertion to HSE_DispatchMatch itself. Searching the concatenated
+	; directory after an exact signature was both refactor-fragile and could pass
+	; on an unrelated Critical in a later function.
+	DispatchBody := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
+	Assert(DispatchBody != "", "engine must define HSE_DispatchMatch")
+	NotepadStart := InStr(DispatchBody, "if IsNotepadApp")
+	AtomicStart := NotepadStart > 0
+		? InStr(DispatchBody, "} else {", true, NotepadStart)
+		: 0
+	Assert(NotepadStart > 0 and AtomicStart > NotepadStart,
+		"HSE_DispatchMatch must retain distinct Notepad and atomic output branches")
 
-	DispPos := InStr(E, "HSE_DispatchMatch(Spec, EndChar) {")
-	Assert(DispPos > 0, "engine must define HSE_DispatchMatch(Spec, EndChar)")
-	Assert(InStr(E, 'Critical("On")', , DispPos) > 0,
-		"HSE_DispatchMatch atomic send must be wrapped in Critical On so non-OnChar callers (e.g. the Space tap-hold) serialize too")
+	NotepadBlock := SubStr(DispatchBody, NotepadStart, AtomicStart - NotepadStart)
+	NotepadCritical := InStr(NotepadBlock, 'Critical("On")')
+	NotepadSend := InStr(NotepadBlock, "SendInstant(")
+	Assert(NotepadCritical > 0 and NotepadSend > NotepadCritical,
+		"the Notepad erase+paste transaction must enter Critical before SendInstant")
+
+	AtomicBlock := SubStr(DispatchBody, AtomicStart)
+	AtomicCritical := InStr(AtomicBlock, 'Critical("On")')
+	HookSend := InStr(AtomicBlock, 'Hook("SendFinalResult", Burst, false)')
+	DirectSend := InStr(AtomicBlock, "SendInput(Burst)")
+	Assert(AtomicCritical > 0 and HookSend > AtomicCritical
+		and DirectSend > AtomicCritical,
+		"both atomic sender implementations must run after their branch enters Critical")
 }
 
 Test("meta input: keystroke path is Critical-serialized (no fast-typing reorder / expansion interleave)",

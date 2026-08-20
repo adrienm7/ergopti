@@ -110,7 +110,7 @@ _BootProfileReplayStamps(ProcessStartTick) {
 	Prev := Origin
 	for , Stamp in Stamps {
 		try LoggerInfo("BootProfile", "(pre-logger) {1}: +{2} ms (at {3} ms since process start).",
-			Stamp.Name, Stamp.Tick - Prev, Stamp.Tick - Origin)
+			Stamp.Name, TickElapsed(Prev, Stamp.Tick), TickElapsed(Origin, Stamp.Tick))
 		Prev := Stamp.Tick
 	}
 }
@@ -126,8 +126,8 @@ BootProfile_Mark(PhaseName) {
 		_BOOT_PROFILE_START := Now
 		_BOOT_PROFILE_LAST  := Now
 	}
-	Delta := Now - _BOOT_PROFILE_LAST
-	Total := Now - _BOOT_PROFILE_START
+	Delta := TickElapsed(_BOOT_PROFILE_LAST, Now)
+	Total := TickElapsed(_BOOT_PROFILE_START, Now)
 	_BOOT_PROFILE_LAST := Now
 	try LoggerInfo("BootProfile", "{1}: +{2} ms (total {3} ms).", PhaseName, Delta, Total)
 }

@@ -50,7 +50,7 @@ _NotifierKindToFlag(Kind) {
 ; @param Opts    {Map|0}  Options Map: { title?, level? }
 ;                           title {String} Notification title (bold text).
 ;                           level {String} "info" | "success" | "warning" | "error".
-NotifierSend(Message, Opts) {
+NotifierSend(Message, Opts, DisplayFn := 0) {
 	Title := "Ergopti+"
 	Level := "info"
 	if (Opts is Map) {
@@ -61,11 +61,22 @@ NotifierSend(Message, Opts) {
 	}
 	Flag := _NotifierKindToFlag(Level)
 
-	; Skip actual OS display in CI to avoid environment-specific hangs or failures.
-	if (EnvGet("GITHUB_ACTIONS") = "true")
-		return
-
-	try TrayTip(Message, Title, Flag)
+	try {
+		; An injected display seam remains active in CI so the adapter's typed
+		; acknowledgement contract can be exercised without touching the desktop.
+		if IsObject(DisplayFn) {
+			Result := DisplayFn.Call(Message, Title, Flag)
+			return Type(Result) == "Integer" and Result != 0
+		}
+		; Skip actual OS display in CI to avoid environment-specific hangs or failures.
+		if (EnvGet("GITHUB_ACTIONS") = "true")
+			return true
+		TrayTip(Message, Title, Flag)
+		return true
+	} catch as Err {
+		try LoggerError("Notifier", "Tray notification failed: {1}.", Err.Message)
+		return false
+	}
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test

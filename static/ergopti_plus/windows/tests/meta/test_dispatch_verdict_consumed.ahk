@@ -87,11 +87,10 @@ _DVC_CallLines() {
 		Trimmed := Trim(Line, " `t")
 		if !InStr(Trimmed, "HSE_DispatchMatch(")
 			continue
-		; The definition itself, not a call. Matched on the trailing `) {` rather
-		; than on the line merely STARTING with the name: a bare, unguarded call
-		; also starts with it once trimmed, and excluding those would make this
-		; scan blind to the exact shape it exists to catch.
-		if RegExMatch(Trimmed, "^HSE_DispatchMatch\([^\r\n]*\)\s*\{")
+		; The definition itself, not a call. Its signature is multiline now, so
+		; key on the declared parameter names rather than a same-line closing brace.
+		; A bare production call still remains visible to the verdict assertion.
+		if RegExMatch(Trimmed, "^HSE_DispatchMatch\(Spec,\s*EndChar,")
 			continue
 		Lines.Push(Trimmed)
 	}
@@ -110,7 +109,7 @@ _DVC_EveryCallSiteConsumesTheVerdict() {
 		"the scan must reach the real dispatch call sites (found only " . Calls.Length . ") — a scan that matches nothing cannot fail")
 
 	for Line in Calls {
-		Consumed := RegExMatch(Line, ":=\s*HSE_DispatchMatch\(")
+		Consumed := RegExMatch(Line, ":=[^\r\n]*HSE_DispatchMatch\(")
 			or RegExMatch(Line, "i)\bif\b[^\r\n]*HSE_DispatchMatch\(")
 			or RegExMatch(Line, "i)\breturn\b[^\r\n]*HSE_DispatchMatch\(")
 		Assert(Consumed,
@@ -125,11 +124,16 @@ _DVC_SpaceTapFallsThroughOnDecline() {
 	Body := _DriverFuncBody("_SpaceTap")
 	Assert(Body != "", "_SpaceTap() must exist in the driver source")
 
-	DispatchPos := InStr(Body, "HSE_DispatchMatch")
 	PressPos    := InStr(Body, 'TextPressKey("Space"')
+	FeedPos     := InStr(Body, 'HSE_FeedChar(" ", true)')
+	DispatchPos := InStr(Body, "HSE_DispatchMatch")
 	Assert(DispatchPos > 0, "_SpaceTap must still route the candidate through the dispatch")
-	Assert(PressPos > DispatchPos,
-		"the literal space must be emitted AFTER the expansion decision, so a decline still produces a space")
+	Assert(PressPos > 0 and FeedPos > PressPos and DispatchPos > FeedPos,
+		"the suppressed tap must be emitted once before HSE/dispatch model it; a decline then falls through with that same literal Space already visible")
+	Assert(InStr(Body, 'TextPressKey("Space"', true, PressPos + 1) == 0,
+		"the decline path must not emit a second literal Space")
+	Assert(InStr(Body, "&CommittedScreenEffect", true, DispatchPos) > DispatchPos,
+		"the Space caller must consume the dispatcher's canonical screen effect")
 
 	; The keylogger fire record must live inside the fired branch. Logging it
 	; before the verdict is what put phantom expansions in the metrics.
@@ -145,8 +149,9 @@ _DVC_SpaceTapFallsThroughOnDecline() {
 		"_SpaceTap must still record the fire for the metrics pipeline, through the deferred queue or directly")
 	Assert(LogPos > DispatchPos,
 		"the hotstring fire must be logged only after the dispatch has confirmed it — a fire logged on a declined match is an expansion the user never saw")
-	Assert(LogPos < PressPos,
-		"the fire log belongs in the fired branch, above the literal-space fallthrough")
+	RingPos := InStr(Body, 'UpdateLastSentCharacter(" ")')
+	Assert(RingPos > LogPos,
+		"the fire log belongs in the fired branch, while the literal Space ring update belongs only to the later no-fire fallthrough")
 }
 
 

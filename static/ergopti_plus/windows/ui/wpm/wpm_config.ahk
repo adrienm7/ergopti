@@ -112,60 +112,206 @@ WPMWidget_LoadConfig(Cache) {
 				WPMWidget.use_colors, WPMWidget.show_graph)
 }
 
-_WPMWidget_SaveBatch(Updates, Operation) {
-		global ConfigurationFile
-		try {
-				if TOML_BatchWrite(ConfigurationFile, Updates)
-						return true
-				LoggerError("WPMWidget", "Could not persist {1}; live widget state was not changed.", Operation)
-		} catch as err {
-				LoggerError("WPMWidget", "Could not persist {1}: {2}; live widget state was not changed.",
-						Operation, err.Message)
-		}
+_WPMWidget_SaveBuilt(BuildFn, Operation, WriterFn := 0, NotifyFn := 0) {
+	global ConfigurationFile
+	Committed := ConfigCommitBuilt(ConfigurationFile, Operation, BuildFn,
+		WriterFn, NotifyFn)
+	return (Committed is Integer) && Committed == 1
+}
+
+; Publication stays inside the gateway's short Critical window. Direct callers
+; own only GUI effects after the durable configuration and live state agree.
+_WPMWidget_PublishVisibleCandidate(TargetVisible) {
+	WPMWidget.visible := TargetVisible
+}
+
+_WPMWidget_PublishPositionCandidate(TargetX, TargetY) {
+	WPMWidget.pos_x := TargetX
+	WPMWidget.pos_y := TargetY
+}
+
+_WPMWidget_PublishDisplayCandidate(TargetColors, TargetGraph, TargetX, TargetY) {
+	WPMWidget.use_colors := TargetColors
+	WPMWidget.show_graph := TargetGraph
+	WPMWidget.pos_x := TargetX
+	WPMWidget.pos_y := TargetY
+}
+
+_WPMWidget_BuildVisibleCandidate(HasVisible, Visible) {
+	TargetVisible := HasVisible ? !!Visible : WPMWidget.visible
+	PublishFn := _WPMWidget_PublishVisibleCandidate.Bind(TargetVisible)
+	return { updates: [
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: TargetVisible ? "1" : "0" },
+	], publish: PublishFn }
+}
+
+_WPMWidget_BuildVisibleToggleCandidate() {
+	return _WPMWidget_BuildVisibleCandidate(true, !WPMWidget.visible)
+}
+
+WPMWidget_SaveVisible(Visible := unset, WriterFn := 0, NotifyFn := 0) {
+	HasVisible := IsSet(Visible)
+	VisibleValue := false
+	if HasVisible
+		VisibleValue := Visible
+	BuildFn := _WPMWidget_BuildVisibleCandidate.Bind(HasVisible, VisibleValue)
+	return _WPMWidget_SaveBuilt(BuildFn, "widget visibility", WriterFn, NotifyFn)
+}
+
+WPMWidget_ToggleVisibleConfig(WriterFn := 0, NotifyFn := 0) {
+	return _WPMWidget_SaveBuilt(_WPMWidget_BuildVisibleToggleCandidate,
+		"widget visibility", WriterFn, NotifyFn)
+}
+
+WPMWidget_Toggle(WriterFn := 0, NotifyFn := 0, ShowFn := 0, HideFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WPMWidget_Toggle(WriterFn, NotifyFn, ShowFn, HideFn)
+		finally Critical(InheritedCritical)
+	}
+	if !WPMWidget_ToggleVisibleConfig(WriterFn, NotifyFn)
 		return false
+	if WPMWidget.visible {
+		if HasMethod(ShowFn, "Call")
+			ShowFn.Call()
+		else
+			WPMWidget_Show()
+	} else {
+		if HasMethod(HideFn, "Call")
+			HideFn.Call()
+		else
+			WPMWidget_Hide()
+	}
+	return true
 }
 
-WPMWidget_SaveVisible(Visible := unset) {
-		TargetVisible := IsSet(Visible) ? !!Visible : WPMWidget.visible
-		return _WPMWidget_SaveBatch([
-				{ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: TargetVisible ? "1" : "0" },
-		], "widget visibility")
+_WPMWidget_BuildPositionCandidate(HasX, X, HasY, Y) {
+	TargetX := HasX ? X : WPMWidget.pos_x
+	TargetY := HasY ? Y : WPMWidget.pos_y
+	PublishFn := _WPMWidget_PublishPositionCandidate.Bind(TargetX, TargetY)
+	return { updates: [
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_X, Value: String(TargetX) },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y, Value: String(TargetY) },
+	], publish: PublishFn }
 }
 
-WPMWidget_SavePosition(X := unset, Y := unset) {
-		TargetX := IsSet(X) ? X : WPMWidget.pos_x
-		TargetY := IsSet(Y) ? Y : WPMWidget.pos_y
-		return _WPMWidget_SaveBatch([
-				{ Section: "metrics", Key: WPMWidgetConst.CFG_X, Value: String(TargetX) },
-				{ Section: "metrics", Key: WPMWidgetConst.CFG_Y, Value: String(TargetY) },
-		], "widget position")
+WPMWidget_SavePosition(X := unset, Y := unset, WriterFn := 0, NotifyFn := 0) {
+	HasX := IsSet(X)
+	HasY := IsSet(Y)
+	XValue := 0
+	YValue := 0
+	if HasX
+		XValue := X
+	if HasY
+		YValue := Y
+	BuildFn := _WPMWidget_BuildPositionCandidate.Bind(HasX, XValue,
+		HasY, YValue)
+	return _WPMWidget_SaveBuilt(BuildFn, "widget position", WriterFn, NotifyFn)
 }
 
 ; Resets the widget to its default bottom-right position and saves it to config.
-WPMWidget_ResetPosition() {
+WPMWidget_ResetPosition(WriterFn := 0, NotifyFn := 0, DefaultPosFn := 0,
+		ShowPosFn := 0, MoveFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return WPMWidget_ResetPosition(WriterFn, NotifyFn, DefaultPosFn,
+			ShowPosFn, MoveFn)
+		finally Critical(InheritedCritical)
+	}
+	if HasMethod(DefaultPosFn, "Call") {
+		DefaultPos := DefaultPosFn.Call()
+		def_x := DefaultPos.x
+		def_y := DefaultPos.y
+	} else
 		WPMWidget_DefaultPos(&def_x, &def_y)
-		if !WPMWidget_SavePosition(def_x, def_y)
-				return false
-		WPMWidget.pos_x := def_x
-		WPMWidget.pos_y := def_y
-		if WPMWidget.visible {
-				WPMWidget_ShowPos(&show_x, &show_y)
-				gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-				if gui_ref
-						try gui_ref.Move(show_x, show_y)
+	if !WPMWidget_SavePosition(def_x, def_y, WriterFn, NotifyFn)
+		return false
+	if WPMWidget.visible {
+		if HasMethod(ShowPosFn, "Call") {
+			ShowPos := ShowPosFn.Call()
+			show_x := ShowPos.x
+			show_y := ShowPos.y
+		} else
+			WPMWidget_ShowPos(&show_x, &show_y)
+		gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+		if gui_ref {
+			try {
+				if HasMethod(MoveFn, "Call")
+					MoveFn.Call(gui_ref, show_x, show_y)
+				else
+					gui_ref.Move(show_x, show_y)
+			}
 		}
-		return true
+	}
+	return true
 }
 
-WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset) {
-		TargetColors := IsSet(Colors) ? !!Colors : WPMWidget.use_colors
-		TargetGraph := IsSet(Graph) ? !!Graph : WPMWidget.show_graph
-		TargetX := IsSet(X) ? X : WPMWidget.pos_x
-		TargetY := IsSet(Y) ? Y : WPMWidget.pos_y
-		return _WPMWidget_SaveBatch([
-				{ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors ? "1" : "0" },
-				{ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: TargetGraph  ? "1" : "0" },
-				{ Section: "metrics", Key: WPMWidgetConst.CFG_X,      Value: String(TargetX) },
-				{ Section: "metrics", Key: WPMWidgetConst.CFG_Y,      Value: String(TargetY) },
-		], "widget display settings")
+_WPMWidget_BuildDisplayCandidate(HasColors, Colors, HasGraph, Graph, HasX, X,
+		HasY, Y) {
+	TargetColors := HasColors ? !!Colors : WPMWidget.use_colors
+	TargetGraph := HasGraph ? !!Graph : WPMWidget.show_graph
+	TargetX := HasX ? X : WPMWidget.pos_x
+	TargetY := HasY ? Y : WPMWidget.pos_y
+	PublishFn := _WPMWidget_PublishDisplayCandidate.Bind(TargetColors,
+		TargetGraph, TargetX, TargetY)
+	return { updates: [
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors ? "1" : "0" },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: TargetGraph  ? "1" : "0" },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_X,      Value: String(TargetX) },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y,      Value: String(TargetY) },
+	], publish: PublishFn }
+}
+
+_WPMWidget_BuildDisplayToggleCandidate(Field) {
+	switch Field {
+	case "colors":
+		return _WPMWidget_BuildDisplayCandidate(true,
+			!WPMWidget.use_colors, false, false, false, 0, false, 0)
+	case "graph":
+		return _WPMWidget_BuildDisplayCandidate(false, false,
+			true, !WPMWidget.show_graph, true, -1, true, -1)
+	default:
+		throw ValueError("Unknown WPM display toggle field: " . Field)
+	}
+}
+
+WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset,
+		WriterFn := 0, NotifyFn := 0) {
+	HasColors := IsSet(Colors)
+	HasGraph := IsSet(Graph)
+	HasX := IsSet(X)
+	HasY := IsSet(Y)
+	ColorsValue := false
+	GraphValue := false
+	XValue := 0
+	YValue := 0
+	if HasColors
+		ColorsValue := Colors
+	if HasGraph
+		GraphValue := Graph
+	if HasX
+		XValue := X
+	if HasY
+		YValue := Y
+	BuildFn := _WPMWidget_BuildDisplayCandidate.Bind(
+		HasColors, ColorsValue,
+		HasGraph, GraphValue,
+		HasX, XValue,
+		HasY, YValue)
+	return _WPMWidget_SaveBuilt(BuildFn, "widget display settings",
+		WriterFn, NotifyFn)
+}
+
+WPMWidget_ToggleColorsConfig(WriterFn := 0, NotifyFn := 0) {
+	BuildFn := _WPMWidget_BuildDisplayToggleCandidate.Bind("colors")
+	return _WPMWidget_SaveBuilt(BuildFn, "widget display settings",
+		WriterFn, NotifyFn)
+}
+
+WPMWidget_ToggleGraphConfig(WriterFn := 0, NotifyFn := 0) {
+	BuildFn := _WPMWidget_BuildDisplayToggleCandidate.Bind("graph")
+	return _WPMWidget_SaveBuilt(BuildFn, "widget display settings",
+		WriterFn, NotifyFn)
 }

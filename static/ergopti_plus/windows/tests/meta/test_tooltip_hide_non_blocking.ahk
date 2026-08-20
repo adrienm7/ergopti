@@ -56,10 +56,13 @@ _TTHNB_TooltipHideIsNonBlocking() {
 		"TooltipHide must not pump the message loop (MsgSleep) — it runs under the fire-path Critical")
 	Assert(InStr(Body, ".Destroy()") == 0 and InStr(Body, "GR_DestroyWindow") == 0,
 		"TooltipHide must hand GUI destruction to a deferred worker so DWM/GDI teardown cannot consume the keyboard-path Critical")
-	Assert(InStr(Body, "SetTimer(_TooltipDisposeRetired.Bind") > 0,
-		"TooltipHide must schedule deferred disposal after detaching the retired surface")
+	Assert(InStr(Body, "_TooltipQueueSurfaceDisposal(RetiredSurface)") > 0,
+		"TooltipHide must hand the detached surface to the one disposal gateway")
+	Queue := _DriverFuncBody("_TooltipQueueSurfaceDisposal")
+	Assert(InStr(Queue, "SetTimer(_TooltipDisposeRetired.Bind(Surface), -1)") > 0,
+		"the disposal gateway must schedule a fresh timer instead of destroying windows inline")
 	Dispose := _DriverFuncBody("_TooltipDisposeRetired")
-	Assert(Dispose != "" and InStr(Dispose, "RetiredBorder.Destroy()") > 0 and InStr(Dispose, "Row.Gui.Destroy()") > 0,
+	Assert(Dispose != "" and InStr(Dispose, "RetiredSurface.Border.Destroy()") > 0 and InStr(Dispose, "Row.Gui.Destroy()") > 0,
 		"the deferred tooltip disposer must own border and row GUI destruction")
 
 	; The invariant must be documented at the function so the constraint is not

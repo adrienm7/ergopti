@@ -134,14 +134,14 @@ TestAuditV4_SaveFullConfigReschedule() {
 
 	; The bug: boot timer is one-shot (-500 ms); if SaveFullConfig runs before
 	; _DriverReady is set, it returns immediately, silently dropping the save.
-	; The fix: reschedule with SetTimer(SaveFullConfig, -100) before returning.
+	; The fix: preserve a generation and arm the coalesced deferred wrapper.
 	GuardPos := InStr(Src, "if !_DriverReady")
 	AssertTrue(GuardPos > 0, "SaveFullConfig must guard on !_DriverReady")
 
-	; Verify reschedule appears inside the guard block (within 200 chars after it)
-	GuardBlock := SubStr(Src, GuardPos, 200)
+	; Verify the durable coordinator owns the wake-up inside the guard block.
+	GuardBlock := SubStr(Src, GuardPos, 400)
 	AssertTrue(
-		InStr(GuardBlock, "SetTimer(SaveFullConfig,"),
+		InStr(GuardBlock, "_ConfigArmFullSaveRetry("),
 		"SaveFullConfig must reschedule itself when !_DriverReady — one-shot timer is not re-fired otherwise"
 	)
 }

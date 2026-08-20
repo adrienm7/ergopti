@@ -20,6 +20,12 @@
 ; Critical section. This prevents both the empty-menu click window and a long
 ; Critical section around TOML, i18n, and renderer work.
 global _TrayMenuStage := false
+global _TrayRootRequestedGeneration := 0
+global _TrayRootPublishedGeneration := 0
+global _TrayRootActive := false
+global _TrayRootLifecycleEpoch := 0
+global _TrayRootLatestAuthorizeFn := 0
+global _TrayRootLatestWorkerFn := 0
 
 TrayMenuStage_Begin() {
 	global _TrayMenuStage
@@ -65,13 +71,30 @@ TrayMenuStage_Abort() {
 	_TrayMenuStage := false
 }
 
-TrayMenuStage_Publish() {
+TrayMenuStage_Publish(AuthorizeFn := 0, ApplyFn := 0) {
 	global _TrayMenuStage
 	if !IsObject(_TrayMenuStage)
 		throw Error("Tray-menu publication requires an active stage")
 	Stage := _TrayMenuStage
 	_PublishCritical := Critical("On")
 	try {
+		; The potentially yielding menu build happened before this lock. Revalidate
+		; its lifecycle/generation ticket at the irreversible root-swap boundary so
+		; a pause or a newer request cannot publish a stale dispatcher tree.
+		if HasMethod(AuthorizeFn, "Call") {
+			Authorized := AuthorizeFn.Call()
+			if !((Authorized is Integer) and Authorized == 1) {
+				_TrayMenuStage := false
+				return false
+			}
+		}
+		if HasMethod(ApplyFn, "Call") {
+			Applied := ApplyFn.Call(Stage)
+			if !((Applied is Integer) and Applied == 1)
+				throw Error("Tray-menu publication adapter refused the staged tree")
+			_TrayMenuStage := false
+			return true
+		}
 		; Invalidate retries for the retired tree, but retain dispatcher entries
 		; for detached child menus that were registered during staging.
 		MenuDispatcher_BeginReplacement()
@@ -94,10 +117,158 @@ TrayMenuStage_Publish() {
 		; The new subtrees are now reachable from the tray. One whole-tree walk
 		; drops only registrations left behind by the retired generation.
 		MenuDispatcher_PruneMenu(A_TrayMenu)
+		return true
 	} finally {
 		_TrayMenuStage := false
 		Critical(_PublishCritical)
 	}
+}
+
+_TrayRootRequestAndTryAcquire(AuthorizeFn := 0, WorkerFn := 0,
+		&RequestedGeneration := 0) {
+	global _TrayRootRequestedGeneration, _TrayRootActive
+	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	PreviousCritical := Critical("On")
+	try {
+		_TrayRootRequestedGeneration += 1
+		RequestedGeneration := _TrayRootRequestedGeneration
+		_TrayRootLatestAuthorizeFn := AuthorizeFn
+		_TrayRootLatestWorkerFn := WorkerFn
+		if _TrayRootActive
+			return false
+		_TrayRootActive := true
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn) {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	PreviousCritical := Critical("On")
+	try {
+		if _TrayRootActive
+			return false
+		if _TrayRootRequestedGeneration <= _TrayRootPublishedGeneration
+			return false
+		_TrayRootActive := true
+		TargetGeneration := _TrayRootRequestedGeneration
+		AuthorizeFn := _TrayRootLatestAuthorizeFn
+		WorkerFn := _TrayRootLatestWorkerFn
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_TrayRootClaimLatest(&TargetGeneration, &AuthorizeFn, &WorkerFn,
+		&LifecycleEpoch) {
+	global _TrayRootRequestedGeneration, _TrayRootLifecycleEpoch
+	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	PreviousCritical := Critical("On")
+	try {
+		TargetGeneration := _TrayRootRequestedGeneration
+		AuthorizeFn := _TrayRootLatestAuthorizeFn
+		WorkerFn := _TrayRootLatestWorkerFn
+		LifecycleEpoch := _TrayRootLifecycleEpoch
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_TrayRootPublishAuthorized(TargetGeneration, LifecycleEpoch,
+		UpstreamAuthorizeFn := 0) {
+	global _TrayRootRequestedGeneration, _TrayRootLifecycleEpoch
+	if A_IsSuspended
+		return false
+	if TargetGeneration != _TrayRootRequestedGeneration
+		or LifecycleEpoch != _TrayRootLifecycleEpoch
+		return false
+	if HasMethod(UpstreamAuthorizeFn, "Call") {
+		try Authorized := UpstreamAuthorizeFn.Call()
+		catch
+			return false
+		return (Authorized is Integer) and Authorized == 1
+	}
+	return true
+}
+
+_TrayRootRelease(PublishedGeneration := 0) {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive
+	PreviousCritical := Critical("On")
+	try {
+		if PublishedGeneration > 0
+			_TrayRootPublishedGeneration := Max(
+				_TrayRootPublishedGeneration, PublishedGeneration)
+		if _TrayRootPublishedGeneration < _TrayRootRequestedGeneration
+			return false
+		_TrayRootActive := false
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_TrayRootTryReleaseFailed(TargetGeneration) {
+	global _TrayRootRequestedGeneration, _TrayRootActive
+	PreviousCritical := Critical("On")
+	try {
+		; A request accepted while the failed builder yielded already believes
+		; this owner will consume it. Keep ownership when that generation exists;
+		; otherwise release atomically so a later requester can acquire itself.
+		if _TrayRootRequestedGeneration > TargetGeneration
+			return false
+		_TrayRootActive := false
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0) {
+	if HasMethod(WorkerFn, "Call")
+		return WorkerFn.Call(PublishAuthorizeFn)
+	_HS_InvalidatePersonalCache()
+	InitSubMenus()
+	return initMenu(PublishAuthorizeFn)
+}
+
+_TrayRootDrain() {
+	loop {
+		_TrayRootClaimLatest(&TargetGeneration, &UpstreamAuthorizeFn,
+			&WorkerFn, &LifecycleEpoch)
+		PublishAuthorizeFn := _TrayRootPublishAuthorized.Bind(
+			TargetGeneration, LifecycleEpoch, UpstreamAuthorizeFn)
+		try Published := _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn)
+		catch as Err {
+			if !_TrayRootTryReleaseFailed(TargetGeneration)
+				continue
+			try LoggerError("Menu", "Tray-root reconstruction failed and remains pending: {1}", Err.Message)
+			return false
+		}
+		if !((Published is Integer) and Published == 1) {
+			; A newer request invalidated this detached stage: keep the same owner
+			; and immediately build the latest candidate. Suspend/upstream refusal
+			; has no newer generation, so release for its lifecycle-specific owner.
+			if !_TrayRootTryReleaseFailed(TargetGeneration)
+				continue
+			return false
+		}
+		if _TrayRootRelease(TargetGeneration)
+			return true
+	}
+}
+
+_TrayRootServiceRetained() {
+	global _TrayRootLatestAuthorizeFn
+	; A caller-specific ticket (HSLR/updater) must be refreshed by that caller;
+	; replaying it here would spin forever on a deliberately stale generation.
+	if HasMethod(_TrayRootLatestAuthorizeFn, "Call")
+		return false
+	if !_TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn)
+		return true
+	return _TrayRootDrain()
+}
+
+_TrayRootOnSuspendEnter() {
+	global _TrayRootLifecycleEpoch
+	PreviousCritical := Critical("On")
+	try _TrayRootLifecycleEpoch += 1
+	finally Critical(PreviousCritical)
+	return true
 }
 
 ; Re-run the hotstring registration in-process so a section toggle takes effect
@@ -108,7 +279,175 @@ TrayMenuStage_Publish() {
 ; re-registered here like every other section; they stay reload-only in the
 ; blocklist, so toggling one of them DIRECTLY still reloads (see
 ; hotstring_live_toggle.ahk). Finally rebuilds the preview index and tray.
-RebuildHotstringsLive() {
+global _HSLR_RequestedGeneration := 0
+global _HSLR_PublishedGeneration := 0
+global _HSLR_Active := false
+
+; Request one publication and atomically acquire its long-running owner when no
+; earlier pseudo-thread has it. Critical covers three scalar writes only; it is
+; restored before any registry, filesystem, index, or tray work begins.
+_HSLR_RequestAndTryAcquire() {
+	global _HSLR_RequestedGeneration, _HSLR_Active, HSE_RebuildInProgress
+	PreviousCritical := Critical("On")
+	try {
+		_HSLR_RequestedGeneration += 1
+		if _HSLR_Active
+			return false
+		_HSLR_Active := true
+		HSE_RebuildInProgress := true
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Snapshot all work known at the start of one pass. Publication uses the same
+; short state lock, but the expensive registry rebuild between them never does.
+_HSLR_ClaimNext(&TargetGeneration) {
+	global _HSLR_RequestedGeneration, _HSLR_PublishedGeneration
+	PreviousCritical := Critical("On")
+	try {
+		TargetGeneration := _HSLR_RequestedGeneration
+		return TargetGeneration > _HSLR_PublishedGeneration
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_HSLR_PublishGeneration(TargetGeneration) {
+	global _HSLR_PublishedGeneration
+	PreviousCritical := Critical("On")
+	try {
+		_HSLR_PublishedGeneration := Max(
+			_HSLR_PublishedGeneration, TargetGeneration)
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_HSLR_IsDrained() {
+	global _HSLR_RequestedGeneration, _HSLR_PublishedGeneration
+	PreviousCritical := Critical("On")
+	try return _HSLR_PublishedGeneration >= _HSLR_RequestedGeneration
+	finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Release only if a second check inside the state lock still sees no work. A
+; request delivered after the optimistic _HSLR_IsDrained check increments the
+; generation while the owner remains active, so this refuses release and the
+; existing owner performs another pass instead of losing the wake-up.
+_HSLR_TryReleaseIfDrained() {
+	global _HSLR_RequestedGeneration, _HSLR_PublishedGeneration, _HSLR_Active
+	global HSE_RebuildInProgress
+	PreviousCritical := Critical("On")
+	try {
+		if (_HSLR_PublishedGeneration < _HSLR_RequestedGeneration)
+			return false
+		_HSLR_Active := false
+		HSE_RebuildInProgress := false
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; A coordinator invariant failure has no trustworthy generation to hand off.
+; Release its owner and matcher fence together before surfacing the failure.
+_HSLR_ReleaseAfterInvariantFailure() {
+	global _HSLR_Active, HSE_RebuildInProgress
+	PreviousCritical := Critical("On")
+	try {
+		_HSLR_Active := false
+		HSE_RebuildInProgress := false
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; A failed registry pass never publishes its target. If another pseudo-thread
+; requested a newer generation while the failed pass yielded, keep the current
+; owner and fence so that accepted request receives its own bounded retry pass.
+; Otherwise release atomically and let the caller surface the terminal failure.
+_HSLR_TryReleaseFailedGeneration(TargetGeneration) {
+	global _HSLR_RequestedGeneration, _HSLR_Active, HSE_RebuildInProgress
+	PreviousCritical := Critical("On")
+	try {
+		if (_HSLR_RequestedGeneration > TargetGeneration)
+			return false
+		_HSLR_Active := false
+		HSE_RebuildInProgress := false
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Serialize live rebuild requests across AHK pseudo-threads. Registration does
+; file I/O and deliberately yields for ~1.3 s, so a tray callback can interrupt
+; an editor-triggered rebuild. Entering the old body recursively let the inner
+; finally lower HSE_RebuildInProgress while the outer registry was still torn.
+; A request that arrives during an active pass is acknowledged immediately but
+; consumed only after the current owner finishes; one following pass snapshots
+; every generation accumulated while it yielded.
+RebuildHotstringsLive(RebuildOnceFn := 0, BeforeIdleReleaseFn := 0,
+	AfterIdleReleaseFn := 0) {
+	if !_HSLR_RequestAndTryAcquire()
+		return true
+	return _HSLR_DrainOwner(
+		RebuildOnceFn, BeforeIdleReleaseFn, AfterIdleReleaseFn)
+}
+
+_HSLR_DrainOwner(RebuildOnceFn := 0, BeforeIdleReleaseFn := 0,
+	AfterIdleReleaseFn := 0) {
+	TargetGeneration := 0
+	loop {
+		if !_HSLR_ClaimNext(&TargetGeneration) {
+			_HSLR_ReleaseAfterInvariantFailure()
+			throw Error("Live-rebuild owner has no pending generation")
+		}
+
+		try Result := HasMethod(RebuildOnceFn, "Call")
+			? RebuildOnceFn.Call() : _RebuildHotstringsLiveOnce()
+		catch as Err {
+			if !_HSLR_TryReleaseFailedGeneration(TargetGeneration)
+				continue
+			throw Err
+		}
+		if !((Result is Integer) && Result == 1) {
+			if !_HSLR_TryReleaseFailedGeneration(TargetGeneration)
+				continue
+			return false
+		}
+		_HSLR_PublishGeneration(TargetGeneration)
+		if _HSLR_IsDrained() {
+			; The test seam runs after the optimistic drain observation and
+			; before the authoritative release/recheck — the old lost-wakeup
+			; window, not merely another point inside the loop.
+			if HasMethod(BeforeIdleReleaseFn, "Call") {
+				try BeforeIdleReleaseFn.Call()
+				catch as Err {
+					if !_HSLR_TryReleaseFailedGeneration(TargetGeneration)
+						continue
+					throw Err
+				}
+			}
+			if _HSLR_TryReleaseIfDrained() {
+				; Test-only seam for the stale-cleanup/ABA window after the old
+				; owner has released itself. Production never supplies a callback.
+				if HasMethod(AfterIdleReleaseFn, "Call")
+					AfterIdleReleaseFn.Call()
+				return true
+			}
+		}
+	}
+}
+
+; One indivisible registry publication pass. Only the coordinator above may
+; call this function. The coordinator holds HSE_RebuildInProgress across every
+; coalesced pass and lowers it atomically with final owner release.
+_RebuildHotstringsLiveOnce() {
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
 	try {
 		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
@@ -121,29 +460,23 @@ RebuildHotstringsLive() {
 		; froze the keyboard for 1-2 s on every tray hotstring toggle (worse on
 		; cloud-synced dirs). The per-mutation Criticals inside
 		; HSE_Register/HSE_DisableGroup/HSE_EnableGroup still prevent torn reads.
-		HSE_RebuildInProgress := true
-		try {
-			HSE_RegistryClear()
-			RegisterAllHotstrings()
-		} finally {
-			HSE_RebuildInProgress := false
-		}
-		; HardReset only after the registry is fully populated and the guard is
-		; cleared; skip when a send burst is in flight (HSE_Suppressed > 0) so we
-		; do not clobber a live expansion's buffer state. Pair with
-		; _ResetPrefixBuffer() — every other HSE_HardReset call site (LLM_Bridge_OnAccept,
-		; LLM_Engine_OnResults inline auto-type) does the same, and this was the sole
-		; production call site that omitted it, leaving the tooltip preview buffer
-		; desynced from the freshly rebuilt matching engine.
+		HSE_RegistryClear()
+		RegisterAllHotstrings()
+		; Reset only after the registry is fully populated; skip when a send
+		; burst is in flight (HSE_Suppressed > 0) so we
+		; do not clobber a live expansion's buffer state. The registration pass above
+		; intentionally stays interruptible for ~1.3 s, so its final buffer reset must
+		; use the short paired transaction: an OnChar queued between two raw reset
+		; calls otherwise entered HSE_Buffer and was then erased only from the preview.
 		if HSE_Suppressed == 0 {
-			HSE_HardReset()
-			_ResetPrefixBuffer()
+			_PrefixInvalidateInputContext(0, false)
 		}
 		if IsSet(HotstringPrefixWatcherRebuildIndex) {
 			HotstringPrefixWatcherRebuildIndex()
 		}
 		RebuildTrayMenu()
 		try LoggerSuccess("Menu", "Hotstrings rebuilt in-process.")
+		return true
 	} catch as e {
 		try LoggerError("Menu", "Hotstring live rebuild failed: {1}", e.Message)
 		throw e
@@ -155,50 +488,54 @@ RebuildHotstringsLive() {
 ; do not require re-parsing config or rebinding hotkeys. State-changing
 ; hotstring section toggles rebuild in-process via RebuildHotstringsLive; other
 ; state-changing toggles (layout, tap-holds, shortcuts) still call Reload().
-RebuildTrayMenu() {
-	global SubMenus
-	; Force a fresh personal-hotstrings extension-tree scan on every explicit
-	; rebuild. Without this, _HS_PreScanPersonalCacheLoaded latches true after
-	; the first scan and a personal extension .toml added/edited mid-session
-	; (outside the editor) never surfaces in the tray menu again
-	; (personal-hotstring-cache-never-invalidated). Safe here specifically
-	; because RebuildTrayMenu, unlike BuildTrayMenuDeferred's boot pass, runs
-	; off the Critical path — see BuildTrayMenuDeferred's own comment on why
-	; its InitSubMenus() call must keep hitting an already-warm cache instead.
-	_HS_InvalidatePersonalCache()
-	InitSubMenus()
-	initMenu()
+RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
+		QueuedOutcome := true) {
+	; Every root reconstruction—tray click, editor projection, updater, HSLR—uses
+	; one generation owner. A request delivered while an older detached tree is
+	; building only invalidates that tree; it never enters TrayMenuStage_Begin
+	; recursively or throws out of the user callback.
+	Acquired := _TrayRootRequestAndTryAcquire(
+		PublishAuthorizeFn, WorkerFn, &RequestedGeneration)
+	if !Acquired
+		return QueuedOutcome
+	return _TrayRootDrain()
 }
 
-; Sets the active log level at runtime without a full script restart.
-; Mutates LOGGER_MIN_LEVEL, refreshes the cached fast-path flags, and
-; persists the choice under [Script] LogLevel in the user's config.toml
-; so the level is restored on the next boot.
-LoggerSetLevel(Level) {
-	global LOGGER_MIN_LEVEL, LOGGER_SEVERITY, ConfigurationFile
+; Sets the active log level without a restart. Disk and the cached hot-path
+; flags are one transaction: a terminal config transition or failed writer must
+; leave both the level and its menu projection unchanged.
+LoggerSetLevel(Level, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	global LOGGER_SEVERITY, ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LoggerSetLevel(Level, WriterFn, NotifyFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
 	if !LOGGER_SEVERITY.Has(Level) {
 		try LoggerWarn("Menu", "LoggerSetLevel: unknown level '{1}' — ignoring.", Level)
-		return
+		return false
 	}
+	Updates := [{ Section: "script", Key: "log_level", Value: Level }]
+	Persisted := ConfigCommitUpdates(ConfigurationFile, Updates,
+		"the runtime log level", WriterFn, NotifyFn,
+		_LoggerSetLevelPublish.Bind(Level))
+	if !Persisted {
+		try LoggerError("Menu", "Log level {1} was refused because config.toml could not accept the transaction; the live level was left unchanged.", Level)
+		return false
+	}
+	try LoggerInfo("Menu", "Log level set to {1}.", Level)
+	if HasMethod(RebuildFn, "Call")
+		RebuildFn.Call()
+	else
+		RebuildTrayMenu()
+	return true
+}
+
+_LoggerSetLevelPublish(Level) {
+	global LOGGER_MIN_LEVEL
 	LOGGER_MIN_LEVEL := Level
 	_LoggerRefreshFastFlags()
-	; The level is applied live above, so a failed write leaves the running
-	; driver logging at a level the file does not record — the setting silently
-	; reverts on the next restart with nothing to explain it. TOML_Write fails
-	; without throwing, so the bare `try` swallowed both the exception and the
-	; false. Surface it instead; the level itself stays applied for this session,
-	; which is what the user asked for and is strictly better than reverting it.
-	Persisted := false
-	try Persisted := TOML_Write(Level, ConfigurationFile, "script", "log_level")
-	; Braces are load-bearing: AHK v2's `try` carries its OWN optional `else`
-	; clause, so a one-line `try` as an if-body captures the `else` that was meant
-	; for the `if` and the parser aborts the whole script with `Unexpected "Else"`.
-	if !Persisted {
-		try LoggerError("Menu", "Log level set to {1} for this session, but it could NOT be written to config.toml — it will revert on the next restart.", Level)
-	} else {
-		try LoggerInfo("Menu", "Log level set to {1}.", Level)
-	}
-	RebuildTrayMenu()
 }
 
 ; Returns the label shown for the log-level submenu entry, including the

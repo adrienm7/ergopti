@@ -44,17 +44,23 @@ _CLRS_ReadyIsNotGatedAway() {
 	Body := _DriverFuncBody("_CLW_OnWebMessage")
 	Assert(Body != "", "_CLW_OnWebMessage must exist in the driver source")
 
-	SuspendPos := InStr(Body, "A_IsSuspended")
-	Assert(SuspendPos > 0,
-		"prerequisite: the bridge still honours the suspend invariant — WebMessageReceived is a COM callback and bypasses native Suspend")
-
-	MsgPos := InStr(Body, "TryGetWebMessageAsString")
+	CapturePos := InStr(Body, "_Updater_ReadManualBridgeMessage(")
+	Assert(CapturePos > 0,
+		"the bridge must capture manual request provenance before reading the one-shot page message")
+	MsgPos := CapturePos > 0 ? InStr(Body, "TryGetWebMessageAsString", , CapturePos) : 0
 	Assert(MsgPos > 0, "prerequisite: the handler still reads the page message")
-	Assert(MsgPos < SuspendPos,
-		"the message must be READ before the suspend gate, or the gate has nothing to exempt and every payload — lifecycle signals included — is dropped alike")
-
-	Assert(RegExMatch(Body, 'A_IsSuspended\s*&&\s*Msg\s*!=\s*"ready"') > 0,
-		'the suspend guard must exempt the `ready` page-lifecycle signal, exactly as every hardened sibling host does. The page posts it exactly once: gating it strands the window for the rest of its life, because resuming the driver re-triggers nothing and the SafetyFlush then latches _CLW_Ready without ever fetching')
+	ReadyPos := MsgPos > 0 ? InStr(Body, 'if (Msg == "ready")', , MsgPos) : 0
+	ReadyHandlerPos := ReadyPos > 0 ? InStr(Body, "_CLW_OnPageReady()", , ReadyPos) : 0
+	BornPausedPos := ReadyHandlerPos > 0
+		? InStr(Body, "Request.BornSuspended", , ReadyHandlerPos)
+		: 0
+	PolicyPos := BornPausedPos > 0
+		? InStr(Body, "_Updater_RequestMayPublish(Request)", , BornPausedPos)
+		: 0
+	Assert(CapturePos > 0 and MsgPos > CapturePos and ReadyPos > MsgPos
+		and ReadyHandlerPos > ReadyPos and BornPausedPos > ReadyHandlerPos
+		and PolicyPos > BornPausedPos,
+		'the one-shot `ready` lifecycle signal must route before both captured pause gates, while every user action after it remains guarded. Gating `ready` strands the window because resume re-triggers nothing')
 }
 Test("meta changelog-ready-not-stranded: the suspend guard exempts the page's ready signal",
 	_CLRS_ReadyIsNotGatedAway)

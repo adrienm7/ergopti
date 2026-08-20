@@ -1,0 +1,43 @@
+{
+	"version": 1,
+	"app_entry": {
+		"burst_length_buckets": {
+			"kind": "number_map",
+			"merge": "sum"
+		},
+		"session_durations": {
+			"kind": "number_array",
+			"merge": "append"
+		},
+		"hourly": {
+			"item_fields": {
+				"e_buckets": {
+					"kind": "number_map",
+					"merge": "sum"
+				}
+			}
+		},
+		"hourly_min5": {
+			"item_fields": {
+				"e_buckets": {
+					"kind": "number_map",
+					"merge": "sum"
+				}
+			}
+		},
+		"kc_hold": {
+			"item_fields": {
+				"s": "sum",
+				"n": "sum",
+				"m": "max",
+				"tap": "sum",
+				"hold": "sum"
+			}
+		}
+	},
+	"forbidden_transport_fields": [
+		"burst_length_buckets_json",
+		"session_durations_json",
+		"e_buckets_json"
+	]
+}

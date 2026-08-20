@@ -13,11 +13,11 @@
 ;       request was rejected by KLWV_NormalizeRangeRequest with a bare 0 and
 ;       dropped with no log — the spinner span forever.
 ;
-; F-10  _SR_Poll deleted its task key unguarded, while _SR_HandleTerminate 70
-;       lines earlier guards the identical call and documents why. The poll
-;       iterates a .Clone() snapshot and yields inside FileRead, so a concurrent
-;       terminate() can drop the key mid-iteration; Map.Delete then throws out of
-;       the timer callback and OnDone never fires for this task or any later one.
+; F-10  _SR_Poll used to delete its task key after yielding in FileRead. A
+;       Has-then-Delete guard prevented Map.Delete from throwing but did not make
+;       completion and terminate one atomic winner: OnDone could still fire from
+;       the stale snapshot after terminate had retired ownership. The poll now
+;       claims the exact ObjPtr before any exit lookup, file I/O, or callback.
 ;
 ; F-12  LLM_OllamaCancelWarmupRetry never bumped _LLM_Ollama_WarmupGeneration.
 ;       The counter moved only on the START path, so the gen guard in the
@@ -65,15 +65,22 @@ Test("keylogger-webview: a rejected range request is logged, not dropped silentl
 	_A0720B2_RangeRejectionIsLogged)
 
 
-_A0720B2_SRPollDeleteIsKeyGuarded() {
+_A0720B2_SRPollClaimsBeforeYielding() {
 	Body := _DriverFuncBody("_SR_Poll")
 	Assert(Body != "", "_SR_Poll must exist in adapters/shell_runner.ahk")
-	Assert(InStr(Body, "_SR_ActiveTasks.Delete(task_id)") > 0,
-		"prerequisite: _SR_Poll must delete the completed task from the active map")
-	Assert(InStr(Body, "_SR_ActiveTasks.Has(task_id)") > 0,
-		"_SR_Poll must .Has()-guard its Delete: it iterates a .Clone() snapshot and yields inside FileRead, so a concurrent terminate() can remove the key first, and Map.Delete throws on a missing key — the throw escapes the timer callback and OnDone never fires for this task or any later one in the loop")
+	ClaimPos := InStr(Body, "_SR_LegacyClaimCompletion(task_id, task)")
+	FinishPos := InStr(Body, "_SR_LegacyFinishCompletion(claim, exit_code)")
+	Assert(ClaimPos > 0,
+		"_SR_Poll must atomically claim the exact task from its stale snapshot")
+	Assert(FinishPos > ClaimPos,
+		"_SR_Poll must claim ownership before output capture and OnDone dispatch")
+	Assert(InStr(Body, "_SR_ActiveTasks.Delete(task_id)") = 0,
+		"_SR_Poll must not perform a Has-then-Delete itself because that does not stop OnDone after a concurrent terminate")
+	ClaimBody := _DriverFuncBody("_SR_LegacyClaimCompletion")
+	Assert(InStr(ClaimBody, "_SR_LegacyRegistryOwnsLocked") > 0,
+		"the completion claim must verify exact live identity before deletion")
 }
-Test("shell-runner: _SR_Poll guards its task-map Delete (F-10)", _A0720B2_SRPollDeleteIsKeyGuarded)
+Test("shell-runner: _SR_Poll claims exact ownership before yielding (F-10)", _A0720B2_SRPollClaimsBeforeYielding)
 
 
 _A0720B2_WarmupCancelBumpsGeneration() {

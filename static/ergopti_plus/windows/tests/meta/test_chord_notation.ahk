@@ -166,13 +166,22 @@ _ChordNative_RunAll() {
 	}
 	Test("chord native: modifiers map to AutoHotkey prefixes", _ChordNative_Modifiers)
 
-	_ChordNative_BracedKeys() {
-		AssertEqual(HotkeyRegistrarNativeSpec(["ctrl"], "space"), "^{Space}",
-			"AutoHotkey spells Space with braces; a raw 'space' binds nothing")
-		AssertEqual(HotkeyRegistrarNativeSpec(["ctrl"], "return"), "^{Enter}",
-			"the canonical key is 'return'; AutoHotkey calls it Enter")
+	_ChordNative_NamedKeys() {
+		Cases := Map(
+			"space", "^space",
+			"return", "^enter",
+			"enter", "^enter",
+			"tab", "^tab",
+			"escape", "^escape",
+			"backspace", "^backspace",
+			"delete", "^delete")
+		for KeyName, ExpectedSpec in Cases {
+			AssertEqual(ExpectedSpec, HotkeyRegistrarNativeSpec(["ctrl"], KeyName),
+				"Hotkey names must use bare syntax for '" . KeyName . "'")
+		}
 	}
-	Test("chord native: braced key names are translated", _ChordNative_BracedKeys)
+	Test("chord native: every named key uses Hotkey syntax, not Send syntax "
+		. "(hotkey-native-named-key-syntax)", _ChordNative_NamedKeys)
 
 	_ChordNative_ScanCodes() {
 		AssertEqual(HotkeyRegistrarNativeSpec(["cmd"], "sc029"), "#SC029",

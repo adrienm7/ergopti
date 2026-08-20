@@ -11,8 +11,8 @@
 ; dropping keystrokes.
 ;
 ; The fix adds two guards to api_remote.ahk:
-; a) An absolute-time deadline_tick computed at dispatch and stored in the
-;    registry entry.  _LLMRemote_PollRequest checks it and calls on_fail()
+; a) A start_tick + timeout_ms interval stored in the registry entry.
+;    _LLMRemote_PollRequest checks it with wrap-safe elapsed arithmetic and calls on_fail()
 ;    then returns without re-arming when the deadline passes.
 ; b) LLM_RemoteCancelAsync() and LLM_RemoteCancelAllAsync() call .Abort() on
 ;    the WinHTTP ComObject immediately so stalled requests do not keep
@@ -36,16 +36,18 @@ _RPD_PollHasDeadlineCheck() {
 	; helper (also strips full-line comments) instead of a pinned api_remote.ahk path.
 	Body := _DriverFuncBody("_LLMRemote_PollRequest")
 	Assert(Body != "", "_LLMRemote_PollRequest must exist in modules/llm/api_remote.ahk")
-	Assert(InStr(Body, "deadline_tick") > 0,
-		"_LLMRemote_PollRequest must check deadline_tick — without a cap the poll timer fires forever on a stalled WinHTTP request (remote-poll-no-deadline-cap)")
+	Assert(InStr(Body, '_LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])') > 0,
+		"_LLMRemote_PollRequest must check its wrap-safe start/timeout interval — without a cap the poll timer fires forever on a stalled WinHTTP request (remote-poll-no-deadline-cap)")
 }
 Test("api_remote: _LLMRemote_PollRequest checks deadline_tick to cap infinite poll loop (remote-poll-no-deadline-cap)", _RPD_PollHasDeadlineCheck)
 
 _RPD_DeadlineTickStoredAtDispatch() {
 	Body := _DriverFuncBody("LLM_RemoteGenerate_Async")
 	Assert(Body != "", "LLM_RemoteGenerate_Async must exist in modules/llm/api_remote.ahk")
-	Assert(InStr(Body, "deadline_tick") > 0,
-		"LLM_RemoteGenerate_Async must store deadline_tick in the registry entry so _LLMRemote_PollRequest can enforce it")
+	Assert(InStr(Body, '"start_tick"') > 0 and InStr(Body, '"timeout_ms"') > 0,
+		"LLM_RemoteGenerate_Async must store the wrap-safe start/timeout pair so _LLMRemote_PollRequest can enforce it")
+	Assert(InStr(Body, '"deadline_tick"') == 0,
+		"LLM_RemoteGenerate_Async must not store an absolute A_TickCount deadline that breaks at rollover")
 }
 Test("api_remote: LLM_RemoteGenerate_Async stores deadline_tick in the registry entry (remote-poll-no-deadline-cap)", _RPD_DeadlineTickStoredAtDispatch)
 

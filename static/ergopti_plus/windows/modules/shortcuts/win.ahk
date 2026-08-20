@@ -34,8 +34,7 @@ if Features["shortcuts"]["select_line"] {
 				; Synthetic Home/End are invisible to the prefix watcher's InputHook, so
 				; the hotstring buffers must be told the caret moved — otherwise the next
 				; expansion backspaces over the selected line instead of its own trigger.
-				HS_DeclareSyntheticEffect("{Home}{Shift Down}{End}{Shift Up}")
-				SendFinalResult("{Home}{Shift Down}{End}{Shift Up}")
+				SendFinalResult("{Home}{Shift Down}{End}{Shift Up}", false, true)
 		}
 }
 
@@ -89,99 +88,6 @@ if Features["shortcuts"]["get_hex_value"] {
 if Features["shortcuts"]["take_note"]["enabled"] {
 		; Win + N (Note)
 		AddShortcut("#", "n", TakeNote)
-
-		global _TakeNotePending := Map()
-		global _TakeNoteNextId := 0
-		global TAKE_NOTE_POLL_INTERVAL_MS := 50
-		global TAKE_NOTE_LAUNCH_TIMEOUT_MS := 7000
-
-		TakeNote(*) {
-		global _TakeNotePending
-				; Determine the file name (with or without date)
-				if (Features["shortcuts"]["take_note"]["dated_notes"]) {
-						Date := FormatTime(, "dd_MM_yyyy")
-						FileName := "Notes_" Date ".txt"
-				} else {
-						FileName := "Notes.txt"
-				}
-
-				; Build the full file path
-				FilePath := Features["shortcuts"]["take_note"]["destination_folder"] "\" FileName
-
-				PreviousTitleMatchMode := A_TitleMatchMode
-				try {
-						; Create the file before launching Notepad. File I/O and shell launch
-						; can throw; contain both boundaries because this is a hotkey entry.
-						if not FileExist(FilePath)
-								FileAppend("", FilePath)
-
-						; Never WinWait/WinWaitActive from the keyboard hotkey thread. Queue
-						; a bounded poll that owns the later activation/maximise/newline work.
-						; This preserves the original behaviour without delaying remapping
-						; while a slow Notepad launch or window-manager transition completes.
-						SetTitleMatchMode(2) ; Partial match
-						WindowAlreadyOpen := WMExists(FileName)
-						JobId := _TakeNoteQueueFinalize(FileName, !WindowAlreadyOpen)
-						if !WindowAlreadyOpen {
-								Run('notepad.exe "' . FilePath . '"')
-						}
-				} catch as Err {
-			if IsSet(JobId) and _TakeNotePending.Has(JobId)
-				_TakeNotePending.Delete(JobId)
-						LoggerError("TakeNote", "TakeNote launch failed: {1}", Err.Message)
-						try TrayTip("Could not open the note file.", "ErgoptiPlus", "Iconx Mute")
-				} finally {
-						SetTitleMatchMode(PreviousTitleMatchMode)
-				}
-		}
-
-		_TakeNoteQueueFinalize(WinPattern, AppendNewline) {
-				global _TakeNotePending, _TakeNoteNextId, TAKE_NOTE_POLL_INTERVAL_MS, TAKE_NOTE_LAUNCH_TIMEOUT_MS
-				JobId := ++_TakeNoteNextId
-				TimerFn := _TakeNotePoll.Bind(JobId)
-				_TakeNotePending[JobId] := Map(
-						"pattern", WinPattern,
-						"append_newline", AppendNewline,
-						"deadline", A_TickCount + TAKE_NOTE_LAUNCH_TIMEOUT_MS,
-						"timer", TimerFn
-				)
-				SetTimer(TimerFn, -TAKE_NOTE_POLL_INTERVAL_MS)
-		return JobId
-		}
-
-		_TakeNotePoll(JobId) {
-				global _TakeNotePending, TAKE_NOTE_POLL_INTERVAL_MS
-				if !_TakeNotePending.Has(JobId)
-						return
-				Job := _TakeNotePending[JobId]
-				if A_IsSuspended {
-						_TakeNotePending.Delete(JobId)
-						return
-				}
-				PreviousTitleMatchMode := A_TitleMatchMode
-				try {
-						SetTitleMatchMode(2)
-						if WMExists(Job["pattern"]) {
-								WMActivate(Job["pattern"])
-								WinMaximize(Job["pattern"])
-								if Job["append_newline"]
-										SendFinalResult("^{End}{Enter}")
-								_TakeNotePending.Delete(JobId)
-								return
-						}
-						if (A_TickCount >= Job["deadline"]) {
-								LoggerWarn("TakeNote", "Notepad window '{1}' did not appear before the bounded launch deadline.", Job["pattern"])
-								_TakeNotePending.Delete(JobId)
-								return
-						}
-						SetTimer(Job["timer"], -TAKE_NOTE_POLL_INTERVAL_MS)
-				} catch as Err {
-						_TakeNotePending.Delete(JobId)
-						LoggerError("TakeNote", "Deferred note-window finalization failed: {1}", Err.Message)
-				} finally {
-						SetTitleMatchMode(PreviousTitleMatchMode)
-				}
-		}
 }
 
 if Features["shortcuts"]["move"] {
@@ -367,8 +273,7 @@ if Features["shortcuts"]["surround_with_parentheses"] {
 		AddShortcut("#", "o", SurroundLineWithParentheses)
 
 		SurroundLineWithParentheses(*) {
-				HS_DeclareSyntheticEffect("{Home}({End}){Home}")
-				SendFinalResult("{Home}({End}){Home}")
+				SendFinalResult("{Home}({End}){Home}", false, true)
 		}
 }
 
@@ -509,7 +414,7 @@ if Features["shortcuts"]["search"]["enabled"] {
 		GetPath(Path) {
 				PathWithBackslash := Path
 				PathWithSlash := StrReplace(Path, "\", "/")
-				A_Clipboard := PathWithSlash
+				CB_Write(PathWithSlash)
 
 				; One-shot timer (-50 ms): fires once only, so it auto-cancels even if the
 				; MsgBox is dismissed before the timer tick, preventing an infinite loop.
@@ -518,12 +423,12 @@ if Features["shortcuts"]["search"]["enabled"] {
 				; compatibility with the Hammerspoon driver. AHK v2's Format() expects
 				; ``{1}``-style placeholders and would leave ``%s`` verbatim, so the
 				; substitution is done with StrReplace here.
-				Result := MsgBox(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", A_Clipboard),
+				Result := MsgBox(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", PathWithSlash),
 						t("dialog.path_copy.title"), "YesNo")
 				if (Result == "No") {
-						A_Clipboard := PathWithBackslash
+						CB_Write(PathWithBackslash)
 						Sleep(200)
-						MsgBox(StrReplace(t("dialog.path_copy.msg_simple"), "%s", A_Clipboard))
+						MsgBox(StrReplace(t("dialog.path_copy.msg_simple"), "%s", PathWithBackslash))
 				}
 		}
 		ChangeButtonNames() {
@@ -641,40 +546,13 @@ if Features["shortcuts"]["spotlight_mouse"] {
 		AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
 
-; Builds the PowerShell -Command string that captures WX,WY,WW,WH into FilePath.
-; Separated so SC029 stays compact enough for the source-inspection test window.
-_SC029_BuildPsCapture(WX, WY, WW, WH, FilePath) {
-		return "Add-Type -AssemblyName System.Drawing;"
-				. " $b=New-Object System.Drawing.Bitmap(" . WW . "," . WH . ");"
-				. " $g=[System.Drawing.Graphics]::FromImage($b);"
-				. " $g.CopyFromScreen(" . WX . "," . WY . ",0,0,$b.Size);"
-				. " $b.Save('" . FilePath . "');"
-				. " $g.Dispose();$b.Dispose()"
-}
-
 #HotIf IsSet(Features) and Features["shortcuts"]["screen_instant"]
 ; SC029 (²/$ -- key left of 1) -- instant screenshot of the active window, saved to Pictures
 SC029:: {
-		; Keep every desktop/filesystem/shell boundary contained: this is a raw
-		; keyboard hotkey, so a modal error dialog or uncaught launch failure stalls
-		; the same thread that dispatches remaps.
-		try {
-				WinGetPos(&WX, &WY, &WW, &WH, "A")
-				if (WW = 0 or WH = 0) {
-						try TrayTip(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "Iconx Mute")
-						return
-				}
-				PicsDir := EnvGet("USERPROFILE") . "\Pictures\screenshots"
-				if !DirExist(PicsDir)
-						DirCreate(PicsDir)
-				FilePath := PicsDir . "\screenshot_" . FormatTime(, "yyyy_MM_dd_HH_mm_ss") . ".png"
-				; Run async — hook thread returns immediately, no keyboard blocking during capture.
-				Run('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command "' . _SC029_BuildPsCapture(WX, WY, WW, WH, FilePath) . '"',, "Hide")
-				try TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
-		} catch as Err {
-				LoggerError("shortcuts", "SC029 screenshot launch failed: {1}", Err.Message)
-				try TrayTip("Screenshot could not start.", "ErgoptiPlus", "Iconx Mute")
-		}
+		; The gesture entry owns the shared staged worker and contains every OS
+		; boundary. Keeping the hotkey as a pure delegate prevents a future sibling
+		; PowerShell process from escaping suspend and shutdown cancellation.
+		GestureScreenshotInstant()
 }
 #HotIf
 

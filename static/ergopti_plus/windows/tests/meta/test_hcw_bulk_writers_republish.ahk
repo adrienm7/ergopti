@@ -41,7 +41,10 @@
 ; _HCW_ClearOverride by design (they call the storage primitives directly), so
 ; the republish they skip has to be asserted here.
 _HCWBR_BulkWriters() {
-	return ["_HCW_ResetAll", "_HCW_SetAllGrey"]
+	return [
+		{ Name: "_HCW_ResetAll", Reconcile: "_HCW_ReconcileNativeReset" },
+		{ Name: "_HCW_SetAllGrey", Reconcile: "_HCW_ReconcileNativeCurrent" }
+	]
 }
 
 ; The fields the engine bakes into each spec at registration. Colour and
@@ -64,24 +67,43 @@ _HCWBR_BakedFields() {
 ; Conditional on purpose: it pins the baked/derived split from both sides. A bulk
 ; writer that touches delay or priority must republish; _HCW_SetAllGrey writes
 ; only colour and therefore must stay free to skip the rebuild.
+_HCWBR_TransitiveWriteBody(FuncName, Body) {
+	if (InStr(Body, "_HCW_BuildResetAllWrites(") == 0)
+		return Body
+	WritesBody := _DriverFuncBody("_HCW_BuildResetAllWrites")
+	PlanBody := _DriverFuncBody("_HCW_BuildResetAllPlan")
+	FieldsBody := _DriverFuncBody("_PersonalTomlOverrideFields")
+	Assert(InStr(WritesBody, "_HCW_BuildResetAllPlan(") > 0,
+		FuncName . " delegates to a reset writer that no longer consumes the canonical plan")
+	Assert(InStr(PlanBody, "_PersonalTomlOverrideFields()") > 0,
+		FuncName . " reset plan no longer derives the complete personal override-field set")
+	return Body . "`n" . WritesBody . "`n" . PlanBody . "`n" . FieldsBody
+}
+
 _HCWBR_BulkWritersRepublishBakedFields() {
 	Checked := 0
 	WithBaked := 0
-	for FuncName in _HCWBR_BulkWriters() {
+	for Spec in _HCWBR_BulkWriters() {
+		FuncName := Spec.Name
 		Body := _DriverFuncBody(FuncName)
 		Assert(Body != "", FuncName . "() must exist in the driver source")
 		Checked += 1
 
+		WriteBody := _HCWBR_TransitiveWriteBody(FuncName, Body)
 		TouchesBaked := false
 		for Field in _HCWBR_BakedFields()
-			if (InStr(Body, '"' . Field . '"') > 0)
+			if (InStr(WriteBody, '"' . Field . '"') > 0)
 				TouchesBaked := true
 		if !TouchesBaked
 			continue
 		WithBaked += 1
 
-		Assert(InStr(Body, "_HCW_RepublishIfBakedField") > 0,
-			FuncName . " clears the same baked delay/priority overrides the per-field writers republish for, so it must republish too — without it the window and the tooltip show the default while the registered specs keep gating on the value the user just reset away, until the next reload")
+		Assert(InStr(Body, Spec.Reconcile . ".Bind()") > 0,
+			FuncName . " must route its durable outcome through " . Spec.Reconcile
+			. " instead of leaving the live engine unreconciled")
+		ReconcileBody := _DriverFuncBody(Spec.Reconcile)
+		Assert(InStr(ReconcileBody, "_HCW_RepublishIfBakedField") > 0,
+			Spec.Reconcile . " must re-register after a successful or partial baked-field bulk write — without it the window and the tooltip show the durable default while registered specs keep the old value")
 	}
 
 	Assert(Checked == 2,

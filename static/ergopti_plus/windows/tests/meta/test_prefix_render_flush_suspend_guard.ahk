@@ -10,10 +10,10 @@
 ; render queued just before the script was suspended (password field, manual
 ; pause) would still paint a preview while the driver is meant to be silent.
 ;
-; The fix adds "if A_IsSuspended\n\treturn" right after the SetTimer cancel and
-; before the suppression check, so a paused script never renders. This test
-; extracts the function body, asserts A_IsSuspended is present, and asserts it
-; precedes _LookupAndRender, so a regression that drops the guard fails CI.
+; The render now delegates to the shared lifecycle predicate immediately after
+; canceling its timer. The predicate checks both native Suspend and the captured
+; generation, so even a pre-pause callback dispatched after resume stays inert.
+; This test verifies the indirection as a whole and its position before render.
 ;
 ; SCOPE: source introspection of infra/hotstrings/hotstring_prefix_watcher.ahk.
 ; ==============================================================================
@@ -49,12 +49,18 @@ _PRFSG_FlushGuardsSuspend() {
 	FlushBody := _DriverFuncBody("_PrefixRenderFlush")
 	Assert(FlushBody != "", "_PrefixRenderFlush() must exist in hotstring_prefix_watcher.ahk")
 
-	SuspendPos := InStr(FlushBody, "A_IsSuspended")
-	Assert(SuspendPos > 0,
-		"_PrefixRenderFlush must check A_IsSuspended — timer callbacks bypass native Suspend (LOW-02)")
+	GuardPos := InStr(FlushBody, "_PrefixDeferredCanPublish")
+	Assert(GuardPos > 0,
+		"_PrefixRenderFlush must call the shared pause+generation predicate — timer callbacks bypass native Suspend (LOW-02)")
 	LookupPos := InStr(FlushBody, "_LookupAndRender")
 	Assert(LookupPos > 0, "_PrefixRenderFlush must call _LookupAndRender")
-	Assert(SuspendPos < LookupPos,
-		"A_IsSuspended guard must precede _LookupAndRender so a paused script never renders a preview (LOW-02)")
+	Assert(GuardPos < LookupPos,
+		"the lifecycle guard must precede _LookupAndRender so a paused or stale callback never renders a preview (LOW-02)")
+
+	GuardBody := _DriverFuncBody("_PrefixDeferredCanPublish")
+	Assert(InStr(GuardBody, "A_IsSuspended") > 0,
+		"the shared deferred-callback predicate must still check native A_IsSuspended (LOW-02)")
+	Assert(InStr(GuardBody, "_PrefixDeferredGeneration") > 0,
+		"the shared deferred-callback predicate must reject a stale lifecycle generation (LOW-02)")
 }
-Test("meta prefix-render-flush-suspend: _PrefixRenderFlush guards A_IsSuspended (LOW-02)", _PRFSG_FlushGuardsSuspend)
+Test("meta prefix-render-flush-suspend: _PrefixRenderFlush guards pause and generation (LOW-02)", _PRFSG_FlushGuardsSuspend)

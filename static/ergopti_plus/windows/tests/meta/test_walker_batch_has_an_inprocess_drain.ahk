@@ -112,8 +112,13 @@ Test("walker batch: the ingest tick never feeds an accumulator it cannot drain (
 _WBID_WorkerRebuildsWalkerAggregates() {
 	Body := _DriverFuncBody("KLR_RebuildWalkerAggregates")
 	Assert(Body != "", "KLR_RebuildWalkerAggregates must exist — it is the sole producer of the walker-owned aggregates now that the ingest tick no longer walks")
-	Assert(InStr(Body, "KLR_ReplayTypingRow") > 0,
-		"KLR_RebuildWalkerAggregates must still replay events_typing through the walker")
+	Assert(InStr(Body, "FROM events_typing") > 0,
+		"the cold replay must still select every durable typing row")
+	Assert(InStr(Body, "KLR_ReplayLogicalRow") > 0,
+		"KLR_RebuildWalkerAggregates must route the merged typing/accepted stream through its logical-order dispatcher")
+	LogicalReplay := _DriverFuncBody("KLR_ReplayLogicalRow")
+	Assert(LogicalReplay != "" and InStr(LogicalReplay, "KLR_ReplayTypingRow") > 0,
+		"the logical-order dispatcher must still route ordinary events_typing rows to the typing replay")
 	Replay := _DriverFuncBody("KLR_ReplayTypingRow")
 	Assert(Replay != "" and InStr(Replay, "KLW_WalkTypingEntry") > 0,
 		"the replay must still feed KLW_WalkTypingEntry, otherwise no process produces the n-gram aggregates at all")

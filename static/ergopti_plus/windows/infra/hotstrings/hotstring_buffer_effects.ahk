@@ -61,34 +61,48 @@ global HS_BUFFER_BACKSPACE_PAYLOAD := "i)^\{BackSpace(?:\s+(\d+))?\}$"
 ; ================================================================
 ; ================================================================
 
-; Tell both hotstring buffers what a synthetic keystroke payload is about to do.
-; Call this BEFORE the send: if the send throws, the buffers have already been
-; invalidated, which is the safe direction — a lost tooltip preview costs the
-; user a suggestion, a stale buffer costs them the characters an expansion
-; backspaces over.
+; Commit only the in-memory effect of a synthetic payload. The caller MUST own a
+; Critical transaction which continues through the matching OS send. Otherwise a
+; queued physical OnChar can enter the future buffer state before the caret move
+; reaches Windows, leaving the buffers on the wrong side of the caret.
 ;
-; @param Payload string The exact Send/SendInput payload about to be emitted.
-HS_DeclareSyntheticEffect(Payload) {
+; The returned token owns every tooltip/analytics side effect. Finish it only
+; after leaving Critical; those effects may pump the message loop or log to disk.
+; @param Payload {String} The exact Send/SendInput payload about to be emitted.
+; @return {Object} Post-commit effects token.
+HS_CommitSyntheticEffect(Payload) {
 	global HS_BUFFER_NEUTRAL_PAYLOAD, HS_BUFFER_BACKSPACE_PAYLOAD
+	if !A_IsCritical
+		throw Error("HS_CommitSyntheticEffect requires a Critical send transaction.")
 
 	if RegExMatch(Payload, HS_BUFFER_NEUTRAL_PAYLOAD) {
-		try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}' is text-neutral — buffers untouched.", Payload)
-		return
+		return { Kind: "neutral", Payload: Payload }
 	}
 
 	if RegExMatch(Payload, HS_BUFFER_BACKSPACE_PAYLOAD, &BsMatch) {
 		Reps := (BsMatch[1] != "") ? BsMatch[1] + 0 : 1
+		HasPreviewCommit := IsSet(_PrefixCommitBackspace)
+		BackspaceCommit := 0
 		loop Reps {
 			; IsPhysical := true — this deletion really happened on screen, so it
 			; must apply even inside a suppress window, exactly like the watcher's
 			; physical VK_BACK branch.
-			if IsSet(HSE_FeedBackspace)
+			; Production commits BOTH mutations through the state-only watcher helper.
+			; Engine-only harnesses keep the fallback, but never call both or one
+			; emitted backspace would decrement HSE_Buffer twice.
+			if HasPreviewCommit {
+				BackspaceCommit := _PrefixCommitBackspace()
+			} else if IsSet(HSE_FeedBackspace) {
 				HSE_FeedBackspace(true)
-			if IsSet(_PrefixFeedBackspace)
-				try _PrefixFeedBackspace()
+			}
 		}
-		try LoggerDebug("HotstringBuffers", "Synthetic backspace ×{1} fed to both buffers.", Reps)
-		return
+		return {
+			Kind: "backspace",
+			Payload: Payload,
+			Repetitions: Reps,
+			HasPreviewCommit: HasPreviewCommit,
+			BackspaceCommit: BackspaceCommit
+		}
 	}
 
 	; Everything else moves the caret, changes focus, or rewrites the line. What
@@ -96,9 +110,85 @@ HS_DeclareSyntheticEffect(Payload) {
 	; fresh — the same verdict the watcher reaches for a physical arrow key.
 	; KnownTerminatorBefore := true because the cursor lands at a position the
 	; next run may legitimately treat as a word start.
-	if IsSet(HSE_FeedReset)
-		HSE_FeedReset(true, true)
-	if IsSet(_ResetPrefixBuffer)
+	if IsSet(_PrefixCommitInputContext) {
+		PrefixCommit := _PrefixCommitInputContext(0, true)
+		NeedsLegacyPrefixReset := false
+	} else {
+		; Engine-only/unit harness fallback. Production always has the paired
+		; commit above, so no user-reachable path publishes one buffer first.
+		if IsSet(HSE_FeedReset)
+			HSE_FeedReset(true, true)
+		PrefixCommit := 0
+		NeedsLegacyPrefixReset := IsSet(_ResetPrefixBuffer)
+	}
+	return {
+		Kind: "reset",
+		Payload: Payload,
+		PrefixCommit: PrefixCommit,
+		NeedsLegacyPrefixReset: NeedsLegacyPrefixReset
+	}
+}
+
+; Complete tooltip/analytics work for one committed synthetic effect. This phase
+; is intentionally best-effort and always runs after the Critical send boundary.
+HS_FinishSyntheticEffect(Token) {
+	if !IsObject(Token)
+		return
+	if (Token.Kind == "neutral") {
+		try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}' is text-neutral — buffers untouched.", Token.Payload)
+		return
+	}
+	if (Token.Kind == "backspace") {
+		if Token.HasPreviewCommit and IsSet(_PrefixFinishBackspace)
+			try _PrefixFinishBackspace(Token.BackspaceCommit)
+		try LoggerDebug("HotstringBuffers", "Synthetic backspace ×{1} fed to both buffers.", Token.Repetitions)
+		return
+	}
+	if IsObject(Token.PrefixCommit) and IsSet(_PrefixFinishInputContext) {
+		try _PrefixFinishInputContext(Token.PrefixCommit)
+	} else if Token.NeedsLegacyPrefixReset and IsSet(_ResetPrefixBuffer) {
 		try _ResetPrefixBuffer()
-	try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}' moved the caret — both buffers reset.", Payload)
+	}
+	try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}' moved the caret — both buffers reset.", Token.Payload)
+}
+
+; Canonical declaration + OS-send owner. Both buffer mutations and the matching
+; keystroke are one short Critical transaction; GUI/analytics effects run after
+; the caller's previous Critical state is restored. Send exceptions are rethrown
+; only after restoration so the caller can log without putting file I/O under the
+; keyboard-blocking span.
+; @param Payload {String} Exact Send/SendInput payload.
+; @param SendFn {Func} Zero-arity function which performs the OS send.
+; @return {*} The sender's return value.
+HS_RunSyntheticInputTransaction(Payload, SendFn) {
+	PreviousCritical := Critical("On")
+	Token := 0
+	SendError := 0
+	Result := false
+	try {
+		Token := HS_CommitSyntheticEffect(Payload)
+		try Result := SendFn.Call()
+		catch as Err
+			SendError := Err
+	} finally {
+		Critical(PreviousCritical)
+	}
+	HS_FinishSyntheticEffect(Token)
+	if IsObject(SendError)
+		throw SendError
+	return Result
+}
+
+; Compatibility entry point for callers which only need to update the logical
+; buffers (principally behavioural tests). Production senders must use
+; HS_RunSyntheticInputTransaction so declaration and OS output cannot interleave.
+; @param Payload {String} The exact Send/SendInput payload being modelled.
+HS_DeclareSyntheticEffect(Payload) {
+	PreviousCritical := Critical("On")
+	try {
+		Token := HS_CommitSyntheticEffect(Payload)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	HS_FinishSyntheticEffect(Token)
 }

@@ -111,6 +111,84 @@ const LUA_REDACTORS = [
  */
 const JUDGED = [
 	{
+		file: 'infra/config_io.ahk',
+		match: 'Reset to defaults refused because LLM trigger',
+		verdict: 'not-personal',
+		why: 'both constant diagnostics refer to the LLM keyboard-shortcut recovery state and interpolate no value.'
+	},
+	{
+		file: 'infra/hotstrings/hotstrings_io.ahk',
+		match: 'Global delimiter sets published after durable override replacement.',
+		verdict: 'not-personal',
+		why: 'replacement describes the completed atomic file operation; the constant diagnostic carries no mapping value.'
+	},
+	{
+		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		match: 'Resolving a dynamic replacement failed; exception detail withheld.',
+		verdict: 'not-personal',
+		why: 'the call deliberately withholds the resolver exception and interpolates no trigger or replacement content.'
+	},
+	{
+		file: 'infra/hotstrings/hotstring_dispatch.ahk',
+		match: "A hotstring replacement resolved to '{1}', not String",
+		verdict: 'not-personal',
+		why: 'the only interpolation is Type(ResolvedBase), a runtime type name rather than the resolved value.'
+	},
+	{
+		file: 'infra/hotstrings/personal_toml_io.ahk',
+		match: "Atomic replacement of '{1}' succeeded, but live publication",
+		verdict: 'not-personal',
+		why: 'both calls interpolate the bounded personal-TOML config path and, on failure, publication error metadata; no file contents or mapping values.'
+	},
+	{
+		file: 'infra/lifecycle.ahk',
+		match: 'Reload refused because LLM trigger recovery is incomplete.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic refers to LLM keyboard-shortcut recovery and carries no user value.'
+	},
+	{
+		file: 'infra/lifecycle.ahk',
+		match: 'LLM trigger journal shutdown recovery failed: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is recovery-service error metadata; trigger means the LLM keyboard shortcut.'
+	},
+	{
+		file: 'infra/lifecycle.ahk',
+		match: 'Shutdown refused because LLM trigger journal recovery is incomplete.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic carries no value; trigger means the LLM keyboard shortcut.'
+	},
+	{
+		file: 'infra/wrap_symbols_config.ahk',
+		match: "Atomic replacement of '{1}' failed: {2}.",
+		verdict: 'not-personal',
+		why: 'the interpolation is the bounded wrap-symbols config path plus filesystem error metadata, never hotstring content.'
+	},
+	{
+		file: 'infra/wrap_symbols_config.ahk',
+		match: "Atomic replacement of '{1}' was refused.",
+		verdict: 'not-personal',
+		why: 'the interpolation is the bounded wrap-symbols config path, never hotstring content.'
+	},
+	{
+		file: 'platform/remap/tap_hold_writer.ahk',
+		match: "Atomic replacement of '{1}' failed: {2}.",
+		verdict: 'not-personal',
+		why: 'the interpolation is the bounded tap-hold config path plus filesystem error metadata, never hotstring content.'
+	},
+	{
+		file: 'platform/remap/tap_hold_writer.ahk',
+		match: "Atomic replacement of '{1}' was refused.",
+		verdict: 'not-personal',
+		why: 'the interpolation is the bounded tap-hold config path, never hotstring content.'
+	},
+	{
+		file: 'ui/menu/menu_llm/actions.ahk',
+		match: "is not installed — switched to",
+		verdict: 'not-personal',
+		why: 'replacement is the fallback LLM model name; all interpolations are model identifiers and fixed backend tags.'
+	},
+	{
 		file: 'infra/hotstrings/hotstring_dispatch.ahk',
 		match: 'FIRE private mapping',
 		verdict: 'not-personal',
@@ -141,10 +219,22 @@ const JUDGED = [
 		why: 'KL_LogHotstringNearMiss; both call sites return early via _NearMissIsWithheld before reaching it.'
 	},
 	{
-		file: 'infra/personal_info_preview.ahk',
-		match: 'Resolving the dynamic value',
+		file: 'infra/lifecycle.ahk',
+		match: 'LLM trigger recovery watchdog service failed: {1}.',
 		verdict: 'not-personal',
-		why: 'only reachable in the HasMethod(Replacement) branch, i.e. a callable replacement — the three DATE tags, whose Category is PI_PREVIEW_DYNAMIC_CATEGORY. Spec.Trigger there is "@<date tag>★"; redacting it would cost the only diagnostic the line carries and hide nothing.'
+		why: 'the interpolation is recovery-service error metadata; trigger means the LLM keyboard shortcut, never hotstring content.'
+	},
+	{
+		file: 'infra/hotstrings/hotstrings_io.ahk',
+		match: "Atomic replacement of override file '{1}' raised: {2}.",
+		verdict: 'not-personal',
+		why: 'the interpolated value is the fixed config-directory overrides filename plus OS error metadata, never a trigger or replacement.'
+	},
+	{
+		file: 'infra/hotstrings/hotstrings_io.ahk',
+		match: "Atomic replacement of override file '{1}' failed (Windows error {2}).",
+		verdict: 'not-personal',
+		why: 'the interpolated value is the fixed config-directory overrides filename plus an OS error code, never a trigger or replacement.'
 	},
 	{
 		file: 'modules/keylogger/keylogger_hotstring_log.ahk',
@@ -177,6 +267,12 @@ const JUDGED = [
 		why: '_KLEmitSuggestionDismissed returns on Rec.IsPrivate; writing only the second half of the pair would leak by the back door.'
 	},
 	{
+		file: 'modules/updater/self_update.ahk',
+		match: 'Background checks refused during channel replacement.',
+		verdict: 'not-personal',
+		why: '"replacement" describes replacing the updater channel lifecycle; the constant log call interpolates no hotstring trigger, replacement text or other value.'
+	},
+	{
 		file: 'ui/menu/menu_llm/actions.ahk',
 		match: 'direct install trigger',
 		verdict: 'not-personal',
@@ -184,15 +280,285 @@ const JUDGED = [
 	},
 	{
 		file: 'ui/menu/menu_llm/actions.ahk',
-		match: 'is not installed — switching to',
+		match: 'Trigger shortcut recovery resume service failed: {1}.',
 		verdict: 'not-personal',
-		why: '`replacement` here is a replacement MODEL tag (e.g. "llama3:8b"), not a hotstring replacement.'
+		why: 'the interpolation is recovery-service error metadata; trigger means the LLM keyboard shortcut.'
 	},
 	{
-		file: 'ui/menu/menu_llm/menu_settings.ahk',
-		match: 'Trigger shortcut binding failed',
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Could not publish committed-new trigger journal before native activation.',
 		verdict: 'not-personal',
-		why: 'the LLM tooltip trigger SHORTCUT (a hotkey string), and only e.Message is interpolated.'
+		why: 'the constant diagnostic carries no user value; trigger means the LLM keyboard shortcut.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Rejected trigger shortcut '{1}': {2}.",
+		verdict: 'not-personal',
+		why: '`raw` is the LLM keyboard chord rejected by the shared chord parser, never a hotstring trigger or replacement.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Rejected trigger shortcut '{1}': a modifier has no Windows equivalent.",
+		verdict: 'not-personal',
+		why: '`raw` is the LLM keyboard chord whose platform modifier mapping failed, never hotstring content.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Could not {1} trigger shortcut '{2}': {3}.",
+		verdict: 'not-personal',
+		why: 'the interpolated value is an LLM keyboard chord plus closed transaction-stage/error metadata, not a hotstring mapping.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Trigger shortcut failure notification was refused or returned a malformed status.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic contains no interpolated user value; trigger means the LLM keyboard shortcut.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Could not surface incomplete trigger shortcut activation: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is notifier error metadata; trigger means the LLM keyboard shortcut.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Could not retain trigger shortcut recovery: another record is still authoritative.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic contains no interpolated user value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Trigger shortcut automatic recovery exhausted after {1} attempts;',
+		verdict: 'not-personal',
+		why: 'the only interpolation is a bounded retry count.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Could not schedule trigger shortcut recovery: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is scheduler error metadata, not hotstring content.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Trigger shortcut recovery scheduling was refused.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic contains no interpolated user value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Trigger shortcut rollback recovery failed: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is config-writer failure metadata, not a hotstring trigger or replacement.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Unknown trigger shortcut recovery stage '{1}'.",
+		verdict: 'not-personal',
+		why: 'the interpolation is a closed transaction-stage token.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Trigger shortcut recovery attempt raised: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is recovery error metadata, not hotstring content.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Could not refresh the recovered trigger shortcut row: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is menu-refresh error metadata; the row belongs to the LLM keyboard shortcut.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Trigger shortcut replayed as '{1}'.",
+		verdict: 'not-personal',
+		why: 'the interpolation is the accepted LLM keyboard chord, never a hotstring trigger or replacement.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: 'Refusing unknown trigger recovery stage',
+		verdict: 'not-personal',
+		why: 'Stage is a closed transaction-state token supplied only by ConfigCommitBuilt, never user text.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Trigger shortcut committed as '{1}'.",
+		verdict: 'not-personal',
+		why: 'the interpolation is the accepted LLM keyboard chord, never a hotstring trigger or replacement.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal rollback found a third durable value and refused to overwrite it.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic carries no trigger or replacement value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal left read-only quarantine',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports only a closed recovery-state transition.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Recovered a pending trigger shortcut transaction',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports recovery of the LLM keyboard shortcut without printing its value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'A terminal trigger journal could not be removed',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports artifact cleanup state and interpolates no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal entered read-only quarantine ({1})',
+		verdict: 'not-personal',
+		why: 'the interpolation is a closed internal quarantine-reason token, never journal contents or a hotstring value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal existence probe failed: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is filesystem error metadata from an existence check; no journal contents were read.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal existence probe returned a malformed status.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports adapter status and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal bounded read failed: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is reader error metadata; the journal payload itself is never passed to the logger.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal bounded read was refused.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports adapter refusal and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: "Trigger journal filesystem operation '{1}' failed: {2}.",
+		verdict: 'not-personal',
+		why: 'Method is a closed adapter operation name and the second interpolation is filesystem error metadata, not journal contents.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: "Trigger journal filesystem operation '{1}' returned a malformed or refused status.",
+		verdict: 'not-personal',
+		why: 'the only interpolation is a closed adapter operation name.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal staging verification failed.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports transaction state and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal is malformed; recovery was refused',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports validation state and does not print the malformed payload.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal delete reported success but the artifact remains.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports cleanup state and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal config reader failed: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is config-reader error metadata; no configuration value is logged.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal config reader returned a malformed snapshot.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports adapter status and carries no snapshot content.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal could not read its owner configuration.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports a read failure and carries no configuration value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal found a non-string durable shortcut value.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports only the rejected value type category, not the value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal configuration writer failed: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is writer error metadata; no shortcut or journal value is logged.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal configuration writer returned a malformed or refused status.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports adapter status and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal rollback verification failed.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports transaction state and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Pending trigger journal conflicts with a third durable value',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports a conflict class without printing any of the conflicting values.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Committed-new trigger journal conflicts with durable configuration',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports a conflict class without printing either value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Committed-old trigger journal conflicts with durable configuration',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports a conflict class without printing either value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal recovery could not acquire its owner configuration lease.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports lease state and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal owner changed while recovery was acquiring its lease.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports an ownership race and carries no value.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_journal.ahk',
+		match: 'Trigger journal preparation refused a stale configuration owner.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic reports ownership state and carries no value.'
+	},
+	{
+		file: 'ui/paths_editor/init.ahk',
+		match: 'Could not change the config directory while LLM trigger recovery is incomplete.',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic carries no user value; trigger means the LLM keyboard shortcut.'
+	},
+	{
+		file: 'ui/menu/menu_llm/init.ahk',
+		match: 'Initial trigger shortcut activation remained incomplete',
+		verdict: 'not-personal',
+		why: 'the constant diagnostic contains no interpolated value; trigger means the LLM keyboard shortcut, not a hotstring mapping.'
 	}
 ];
 

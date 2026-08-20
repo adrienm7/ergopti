@@ -15,10 +15,10 @@
 ; 1. Behavioural anchor: asserts the adapter really does answer with a boolean,
 ;    so the premise of the guard is checked against the live function rather
 ;    than assumed from its docstring.
-; 2. Loops the CLASS, not the one site that bit us: every `X := WMExists(...)`
-;    in the whole driver is found from source, and each is rejected if that same
-;    variable is later concatenated into an "ahk_id " spec. A new caller making
-;    the same mistake joins this test automatically.
+; 2. Loops the CLASS, not the one site that bit us: every variable assigned from
+;    WMExists or an injected `.WindowExists(...)` predicate is found, and each is
+;    rejected if it later enters an "ahk_id " spec. A wrapper cannot make the
+;    predicate's Boolean return into a handle.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,8 +36,8 @@ _WINH_AdapterAnswersWithABoolean() {
 }
 Test("window_manager: WMExists answers with a boolean, not a handle", _WINH_AdapterAnswersWithABoolean)
 
-; Class guard — find every variable assigned from WMExists() anywhere in the
-; driver and prove none of them is used to build an "ahk_id" spec.
+; Class guard — find every variable assigned from the adapter directly or from
+; a seam method named WindowExists() and prove none builds an "ahk_id" spec.
 _WINH_NoWMExistsResultUsedAsHandle() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable")
@@ -45,7 +45,8 @@ _WINH_NoWMExistsResultUsedAsHandle() {
 	Offenders := ""
 	Checked := 0
 	Pos := 1
-	while (FoundPos := RegExMatch(Src, "im)^\s*(\w+)\s*:=\s*WMExists\s*\(", &M, Pos)) {
+	while (FoundPos := RegExMatch(Src,
+		"im)^\s*(\w+)\s*:=\s*(?:WMExists|[\w.]+\.WindowExists)\s*\(", &M, Pos)) {
 		Pos := FoundPos + M.Len
 		VarName := M[1]
 		Checked += 1
@@ -58,8 +59,7 @@ _WINH_NoWMExistsResultUsedAsHandle() {
 	}
 
 	Assert(Checked > 0,
-		"the scan must find at least one WMExists() assignment — if none remain, delete this "
-		. "guard deliberately rather than letting it pass vacuously")
+		"the scan must find at least one direct or injected window-existence assignment")
 	Assert(Offenders == "",
 		'a WMExists() boolean must never be used as a window handle:' . Offenders
 		. '`nUse WMGetFocused()["hwnd"] (or another adapter that returns a real handle) instead.')

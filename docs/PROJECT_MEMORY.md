@@ -46,7 +46,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-ahk-unreadable-config-persists-defaults](#project-ahk-unreadable-config-persists-defaults) — A config reader that returns "" on a locked file makes the next save persist DEFAULTS over the user's real config — the TOML_ReadFailed rule exists but is unapplied at five readers
 - [project-macos-absence-needs-lstat-proof](#project-macos-absence-needs-lstat-proof) — `io.open(..., "r")` returning ENOENT does not prove a macOS path is absent; dangling symlinks, missing prefixes, and probe/write races require the FileSystem transaction adapter
 - [project-audit-ahk-2026-07-21-adversarial](#project-audit-ahk-2026-07-21-adversarial) — Fifth adversarial AHK pass: 52 confirmed / 10 refuted, full list in AUDIT_AHK_2026-07-21.md; two confident false-positives killed by measurement
-- [project-webview2-bridge-gotchas](#project-webview2-bridge-gotchas) — Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FOUR distinct gotchas that each silently break the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit all four in sequence; model_browser predates some of the fixes.
+- [project-webview2-bridge-gotchas](#project-webview2-bridge-gotchas) — Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FIVE distinct gotchas that can silently break or stale the JS↔AHK bridge.
 - [project-config-v2-refactor](#project-config-v2-refactor) — La migration v1 → v2 est terminee ; ne restent que les gotchas transversaux qu'elle a mis au jour
 - [project_debug_menu_sync](#project_debug_menu_sync) — L'ordre du sous-menu Debug est defini une seule fois dans `_shared/modules/menu/menu_manifest.json` (cle `debug_menu`) ; les deux drivers le consomment
 - [project-menu-manifest-macos-hotstrings-layout-gap](#project-menu-manifest-macos-hotstrings-layout-gap) — macOS never reads menu_manifest.json's hotstrings_menu/layout_menu keys (unlike gestures_menu/metrics_menu/shortcuts_menu, which ARE manifest-driven on both platforms) — a drift gate exists, the actual migration does not
@@ -1222,8 +1222,16 @@ enumerate that scope. `test_menu_reload_preserves_suspend` and
   `[excl … , nested …]` breakdown the profiler now emits.
 - The `UIA.SelectionPoll` probe reached **301.0 ms**, past Windows'
   ~300 ms `LowLevelHooksTimeout`, where the keystroke is delivered WITHOUT the
-  hook's verdict. Per-call timeout clamps cannot bound a five-hop COM sequence;
-  that is why the segment now has its own deadline.
+  hook's verdict. A `SetTimer` callback is not a background thread, and neither
+  per-call clamps nor a deadline checked between COM hops can interrupt the hop
+  already in progress. The selection probe therefore runs in a disposable
+  process: the resident driver owns a 60 ms timer, retires the request first,
+  then terminates the worker. Apply the same boundary to any future provider
+  call which needs a deadline the provider itself cannot enforce.
+  Retain a kernel process `HANDLE` from the worker's ready-window handshake and
+  call asynchronous `TerminateProcess` on that handle at the deadline. A numeric
+  PID can be recycled, while `ProcessClose` or synchronous cleanup can itself
+  consume the keyboard-thread budget the worker boundary was meant to protect.
 
 **Coverage gaps left open — silence here would read as covered:**
 `modules/keylogger/*` (24 files, the largest unaudited subsystem) was not
@@ -1970,7 +1978,7 @@ Related [[project_ahk_unreadable_config_persists_defaults]], [[project_updater_n
 
 ### project-webview2-bridge-gotchas
 
-_Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FOUR distinct gotchas that each silently break the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit all four in sequence; model_browser predates some of the fixes._
+_Hosting a shared HTML/JS frontend in a WebView2 control (thqby `vendor/WebView2.ahk`) on Windows has FIVE distinct gotchas that can silently break or stale the JS↔AHK bridge. The onboarding wizard (`ui/onboarding/webview.ahk`) hit the first four in sequence; the changelog exposed the fifth._
 
 <sub>slug: `project_webview2_bridge_gotchas`</sub>
 
@@ -1980,12 +1988,13 @@ Symptom progression while bringing up the onboarding webview: blank gray panel �
 2. **`file://` is an opaque/unique origin** — Chromium logs "Unsafe attempt to load URL … 'file:' URLs are treated as unique security origins" and the `window.chrome.webview` message channel does not reliably deliver from it. `postMessage` returns `undefined` (looks fine) but nothing arrives host-side. FIX: `SetVirtualHostNameToFolderMapping("ergopti.onboarding", folder, 1)` and navigate to `https://<host>/index.html`. Map a second host for assets outside the page folder (flag PNGs, layout JPG live under `_StaticDir`, not the onboarding folder). Windows also has no flag-emoji font, so flags MUST be `<img>` PNGs served via the host, never emoji text.
 3. **`X.WebMessageReceived(cb)` returns a subscription object whose `__Delete` unsubscribes.** Discarding the return value lets AHK GC it immediately → the handler is removed the instant it's added → exactly zero messages delivered. FIX: store the handle in a persistent global (`_OnbWeb_MsgSub`); clear it only on teardown.
 4. **`ExecuteScript()` is `ExecuteScriptAsync().await()`, and `.await()` spins a NESTED message loop.** Calling it synchronously inside the `WebMessageReceived` STA callback wedges further event delivery (channel delivers exactly one message — `ready` — then goes silent). Even deferred out of the callback, the `.await()` on a large (~135 KB locale-string) injection can fail to complete and freeze the AHK thread (the script's side effect runs — button updates — but `.await()` never returns). FIX: use **fire-and-forget `ExecuteScriptAsync` (NO `.await()`)** for host→page injection; we don't need the result, and WebView2 holds the completion handler so the script still runs. See `_OnbWeb_RunScript`.
+5. **An async result and its deferred script must retain both request and window identity.** A channel response that is current when WinHTTP completes can become stale before its one-shot `SetTimer` executes; after close/reopen, reading the global WebView at execution time can even repaint a different controller. FIX: allocate monotonically increasing request + window epochs, carry both through fetch/poll/queue/script work, revalidate after every yield, abort the superseded WinHTTP object, and capture the epoch-matched WebView under a short `Critical` before the COM call (which itself stays off-Critical). `tests/unit/test_changelog_request_epoch.ahk` exercises response ordering, stale errors, close/reopen, and the completion→script gap.
 
 **How to apply / diagnose:**
 - When a webview bridge "renders but is dead," confirm message arrival host-side first (log the raw inbound message — but strip `{ }` from the logged substring, or the AHK logger's `Format()` chokes on JSON braces and the `try`-wrapped log silently no-ops, hiding the very messages you're hunting). Use Info level, not Debug, while diagnosing.
 - WebView2 caches virtual-host sub-resources by URL: navigate `index.html?cb=<A_TickCount>` (fresh HTML each launch) and bump `?v=N` on `script.js`/`style.css` when they change, else an edited frontend is served stale.
 - A `SafetyFlush` timer that injects initData if `ready` never arrives keeps the wizard from being blank; if it fires regularly, the channel is broken.
-- These four are independent — fixing one reveals the next. Any new WebView2 window (e.g. the hotstring editor) should clone `webview.ahk`'s post-fix shape wholesale.
+- These five are independent — fixing one can reveal the next. Any new WebView2 window must pair the post-fix host shape with explicit epoch ownership for every asynchronous producer.
 
 ### project-config-v2-refactor
 

@@ -48,8 +48,11 @@ _A0720B3_ShutdownFlagPrecedesEveryDrain() {
 	Body := _DriverFuncBody("KL_Stop")
 	Assert(Body != "", "KL_Stop must exist in modules/keylogger/keylogger.ahk")
 
-	FlagIdx := InStr(Body, "_shutting_down := true")
-	Assert(FlagIdx > 0, "KL_Stop must set Keylogger._shutting_down := true")
+	FlagIdx := InStr(Body, "KL_BeginShutdown()")
+	Assert(FlagIdx > 0, "KL_Stop must publish its shutdown lease through KL_BeginShutdown")
+	BeginBody := _DriverFuncBody("KL_BeginShutdown")
+	Assert(InStr(BeginBody, "_shutting_down := true") > 0,
+		"KL_BeginShutdown must publish Keylogger._shutting_down := true")
 
 	for _, Drain in ["KL_Hook_Stop()", "KL_Watchers_Stop()", "KL_Mouse_Stop()"
 	               , "KL_AV_Stop()", "KL_Net_Stop()", "KL_Roi_Stop()"] {
@@ -57,7 +60,7 @@ _A0720B3_ShutdownFlagPrecedesEveryDrain() {
 		if (Idx == 0)
 			continue
 		Assert(FlagIdx < Idx,
-			"KL_Stop must set _shutting_down BEFORE " . Drain . " — that drain emits a closing lifecycle event through KL_AppendLog, whose pause guard drops it while the flag is still false, leaving a dangling session_start after a quit or reload issued while paused")
+			"KL_Stop must publish _shutting_down BEFORE " . Drain . " — that drain emits a closing lifecycle event through KL_AppendLog, whose pause guard drops it while the flag is still false, leaving a dangling session_start after a quit or reload issued while paused")
 	}
 }
 Test("keylogger: KL_Stop raises the shutdown bypass before every drain (F-07)",

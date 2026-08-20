@@ -65,21 +65,14 @@ class KLHookConst {
 		; still bounding typing entries to ~25-30 events at peak rate.
 		static FLUSH_PERIOD_MS := 200
 
-		; Window context (active app + title) is cheap to refresh but the
-		; per-keystroke cost adds up — cache for this many ms. 1000 ms avoids
-		; double Win32 calls (WinGetTitle + WinGetProcessName) at high typing
-		; speed while still detecting app switches within 1 s.
+		; Project the shared metrics focus snapshot at most once per second. The
+		; acquisition itself belongs exclusively to MetricsFocusCache; this module
+		; performs no Win32 query and only emits app/window transition events.
 		static CONTEXT_TTL_MS := 1000
 
-		; Context refresh now runs on its own SetTimer rather than lazily from
-		; the keystroke callbacks. WinGetTitle / WinGetProcessName send messages
-		; to the foreground window's thread (WM_GETTEXT etc.) and can BLOCK when
-		; that thread is busy or Not Responding (a common Electron/Office cold-
-		; start state). Running them on the cooperative keyboard-hook thread would
-		; stall the in-flight keystroke past LowLevelHooksTimeout and drop it —
-		; precisely at an app switch, when the user is starting to type. A 250 ms
-		; timer detects app/title switches promptly while keeping the hook path
-		; free of any blocking Win32 call.
+		; This SetTimer is resident on the same AHK thread as keyboard dispatch. Its
+		; callback is safe because it consumes memory only; treating SetTimer as an
+		; off-thread escape hatch was the false premise behind the previous fix.
 		static CONTEXT_REFRESH_MS := 250
 
 		; Debounce window for the live dashboard push after a flush. Coalesces
@@ -121,7 +114,7 @@ global KLHOOK_SPECIAL := Map(
 class KLHook {
 		static ih := unset           ; the live InputHook object
 		static flush_timer := unset  ; bound function reference for SetTimer
-		static context_timer := unset  ; bound ref for the off-thread context refresh
+		static context_timer := unset  ; bound ref for the memory-only context projection
 		static live_push_timer := unset  ; one-shot debounce for KLWV_NotifyIngest
 		static last_tick := 0        ; A_TickCount of the last captured event
 
@@ -183,7 +176,7 @@ KL_Hook_AdvanceContextWatermarks(Elapsed) {
 		KLHook.title_entered_at := Min(KLHook.title_entered_at + Elapsed, Now)
 }
 
-KL_Hook_RefreshContext(force := false) {
+KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 		; Driven by SetTimer, which bypasses native Suspend — stay silent while
 		; the driver is paused so no app/title switch is observed or flushed.
 		;
@@ -213,21 +206,21 @@ KL_Hook_RefreshContext(force := false) {
 				return
 		if !force and (A_TickCount - (KLHook.context_at) & 0xFFFFFFFF) < KLHookConst.CONTEXT_TTL_MS
 				return
-		; The two Win32 calls below are the ones that block: WinGetTitle sends a
-		; message to the foreground window, and a Not Responding window makes it wait
-		; out the timeout. This refresh runs up to 20x/s and had no trace at all, so
-		; a blocking foreground window was invisible in the profile and showed up
-		; only as unexplained idle cost.
-		_hpFocus := HotPath_Now()
-		NewTitle := ""
-		NewApp := ""
-		try {
-				NewTitle := WinGetTitle("A")
+		; The 50 ms metrics poll is the sole OS acquisition owner. This resident
+		; timer reads that already-published object and refuses an invalid snapshot;
+		; MF_ShouldFilter independently sees the same invalid marker and drops every
+		; payload until acquisition recovers.
+		try Snapshot := HasMethod(SnapshotFn, "Call")
+			? SnapshotFn.Call() : MF_GetFocusSnapshot()
+		catch as Err {
+				try LoggerError("keylogger_hook",
+						"Canonical focus snapshot read failed: {1}.", Err.Message)
+				return false
 		}
-		try {
-				NewApp := WinGetProcessName("A")
-		}
-		HotPath_LogIfSlow("Metrics.FocusRefresh", _hpFocus, NewApp)
+		if !IsObject(Snapshot) || !Snapshot.HasOwnProp("valid") || !Snapshot.valid
+				return false
+		NewTitle := Snapshot.title
+		NewApp := Snapshot.process_name
 		Now := A_TickCount
 
 		; Snapshot the outgoing app BEFORE any mutation below. The app-switch
@@ -246,7 +239,7 @@ KL_Hook_RefreshContext(force := false) {
 		; double-counting as an app switch.
 		if (NewApp != "" and NewApp != KLHook.prev_app) {
 				if (KLHook.prev_app != "") {
-						duration := Now - KLHook.app_entered_at
+		duration := TickElapsed(KLHook.app_entered_at, Now)
 						; Flush before logging so the typing buffer is attributed to the
 						; previous app, not the new one. Mirrors HS log_manager flush_buffer
 						; calls on app_switch.
@@ -258,7 +251,7 @@ KL_Hook_RefreshContext(force := false) {
 		}
 		if (NewTitle != KLHook.prev_title) {
 				if (KLHook.prev_title != "" and outgoing_app != "") {
-						duration := Now - KLHook.title_entered_at
+		duration := TickElapsed(KLHook.title_entered_at, Now)
 						; Flush before logging so the typing buffer is attributed to
 						; the previous window context, not the new one. Mirrors the
 						; flush that already precedes KL_LogAppSwitch above (M-01 fix).
@@ -272,6 +265,7 @@ KL_Hook_RefreshContext(force := false) {
 		Keylogger.session_title := NewTitle
 		Keylogger.session_app := NewApp
 		KLHook.context_at := Now
+		return true
 }
 
 
@@ -386,8 +380,12 @@ KL_Hook_OnChar(ih, c) {
 
 				; Privacy filters short-circuit before any allocation, but AFTER the
 				; watermark has already advanced above.
-				filtered := false
+				filtered := true
 				try filtered := MF_ShouldFilter()
+				catch as FilterErr
+						try LoggerWarn("keylogger_hook",
+								"Character privacy classification failed closed: {1}.",
+								FilterErr.Message)
 				if filtered
 						return
 
@@ -498,8 +496,12 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				; branch already called it for this same physical keydown (H-01 fix).
 				delay := KL_Hook_NoteActivity(activity_already_noted)
 
-				filtered := false
+				filtered := true
 				try filtered := MF_ShouldFilter()
+				catch as FilterErr
+						try LoggerWarn("keylogger_hook",
+								"Key privacy classification failed closed: {1}.",
+								FilterErr.Message)
 				if filtered
 						return
 
@@ -618,13 +620,9 @@ KL_Hook_Start() {
 		KLHook.flush_timer := KL_Hook_Tick.Bind()
 		SetTimer(KLHook.flush_timer, KLHookConst.FLUSH_PERIOD_MS)
 
-		; Window-context refresh runs on its OWN timer, NOT lazily from the
-		; keystroke callbacks. WinGetTitle / WinGetProcessName can block on a busy
-		; or Not-Responding foreground window; doing that on the keyboard-hook
-		; thread would stall the in-flight keystroke past LowLevelHooksTimeout and
-		; drop it. Off-thread, the hook path reads the cached session_app / title
-		; with zero Win32 cost. Seed once immediately so the first keystroke has a
-		; valid context before the timer's first tick.
+		; Project the canonical focus snapshot from memory on a resident timer. The
+		; metrics owner seeds its bounded snapshot before KL_Hook_Start, so the first
+		; keystroke has context without any target-window call on this path.
 		KL_Hook_RefreshContext()
 		KLHook.context_timer := KL_Hook_RefreshContext.Bind()
 		SetTimer(KLHook.context_timer, KLHookConst.CONTEXT_REFRESH_MS)

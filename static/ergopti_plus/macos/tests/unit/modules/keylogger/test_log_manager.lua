@@ -43,6 +43,7 @@ package.loaded["infra.i18n"] = {
 -- prerequisite owned by the filesystem adapter, not the behavior under test.
 package.loaded["adapters.file_system"] = {
 	write = function() return true end,
+	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
 }
 

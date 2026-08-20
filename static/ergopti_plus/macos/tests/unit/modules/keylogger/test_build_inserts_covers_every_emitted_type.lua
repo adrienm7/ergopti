@@ -143,6 +143,7 @@ local function load_real_keylogger()
 	local saved_file_system = package.loaded["adapters.file_system"]
 	package.loaded["adapters.file_system"] = {
 		write = function() return true end,
+		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,
 		read_with_status = function() return nil, "absent" end,
 	}

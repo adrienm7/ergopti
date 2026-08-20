@@ -185,7 +185,7 @@ KL_Ergo_CheckHesitation(delay_ms, now, app) {
     if (delay_ms >= KLErgoConst.HESITATION_MAX_MS)
         return
     if (KLErgo.last_hesitation > 0
-            and (now - KLErgo.last_hesitation) < KLErgoConst.HESITATION_COOLDOWN_MS)
+		and TickElapsed(KLErgo.last_hesitation, now) < KLErgoConst.HESITATION_COOLDOWN_MS)
         return
     KLErgo.last_hesitation := now
     KL_LogErgoEvent("hesitation", app, Map("delay_ms", delay_ms))

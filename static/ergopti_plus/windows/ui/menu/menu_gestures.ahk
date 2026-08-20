@@ -55,8 +55,9 @@ _GES_SetEverySlot(ActionName) {
 	Assignments := Map()
 	for _, Slot in GESTURE_SLOTS
 		Assignments[Slot] := ActionName
-	GestureSaveAllAssignments(Assignments)
-	ReloadPreservingSuspend()
+	if !GestureSaveAllAssignments(Assignments)
+		return false
+	return ReloadPreservingSuspend()
 }
 
 _GES_RestoreFactoryDefaults() {
@@ -64,8 +65,9 @@ _GES_RestoreFactoryDefaults() {
 	Assignments := Map()
 	for _, Slot in GESTURE_SLOTS
 		Assignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
-	GestureSaveAllAssignments(Assignments)
-	ReloadPreservingSuspend()
+	if !GestureSaveAllAssignments(Assignments)
+		return false
+	return ReloadPreservingSuspend()
 }
 
 ; List provider: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
@@ -111,10 +113,11 @@ _GES_Slots5(M, _Cat) {
 
 ; Applies a new action to a gesture slot and reloads.
 SetGestureSlotAction(Slot, ActionName) {
-	if !GestureEnsureActionParameter(GestureBindingId("gesture", Slot), ActionName)
-		return
-	GestureSaveAssignment(Slot, ActionName)
-	ReloadPreservingSuspend()
+	global GestureAssignments
+	if !GestureAssignConfiguredAction(&GestureAssignments,
+			"gesture", "gestures", Slot, ActionName)
+		return false
+	return ReloadPreservingSuspend()
 }
 
 ; Toggles the Gestures enabled state and reloads.
@@ -125,8 +128,9 @@ ToggleGesturesEnabled() {
 	; v2-native write via the canonical manifest path — no v1->v2 translation.
 	; WriteFeatureV2 derives the [gestures] section + the Features node from
 	; the path and persists in lock-step (see infra/feature_io.ahk).
-	WriteFeatureV2(Features, "gestures.enabled", NewVal)
-	ReloadPreservingSuspend()
+	if !WriteFeatureV2(Features, "gestures.enabled", NewVal)
+		return ConfigReportPersistenceFailure("the gestures enable toggle")
+	return ReloadPreservingSuspend()
 }
 
 
@@ -170,4 +174,3 @@ AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
 ; ======= 1.X / Metrics menu =======
 ; ==================================
 ; ==================================
-

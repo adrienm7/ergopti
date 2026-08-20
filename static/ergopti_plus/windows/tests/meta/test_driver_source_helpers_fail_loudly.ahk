@@ -84,6 +84,48 @@ Test("meta source-helpers: a real symbol still resolves (driver-source-helpers-r
 	_DSHFL_RealSymbolStillResolves)
 
 
+; A line-oriented signature regex silently classified a real multiline function
+; as absent. That made positive guards fail and could make tolerant absence
+; checks pass for the wrong reason. Keep a production multiline definition as a
+; positive control so wrapping parameters cannot disarm source introspection.
+_DSHFL_MultilineSignatureStillResolves() {
+	Body := _DriverFuncBody("_Updater_SurfaceFailure")
+	Assert(InStr(Body, "Options := Map") > 0
+		and InStr(Body, "NotifierSend") > 0,
+		"_DriverFuncBody must resolve a function whose parameter list spans lines")
+}
+Test("meta source-helpers: multiline signatures resolve (driver-source-helper-multiline-signature)",
+	_DSHFL_MultilineSignatureStillResolves)
+
+
+; The production control above proves integration with the concatenated tree;
+; this fixture pins the grammar independently of future source reformatting.
+_DSHFL_BalancedSignatureFixtureResolves() {
+	Src := "SyntheticDefinition(`n"
+		. '`tOptions := Map("key", Factory())`n'
+		. ") {`n"
+		. "`treturn Options`n"
+		. "}`n"
+	Definition := _DriverFindFunctionDefinition(Src, "SyntheticDefinition")
+	Assert(IsObject(Definition) and Definition.OpenPos > Definition.Idx,
+		"the definition scanner must balance multiline parameters and nested default calls")
+}
+Test("meta source-helpers: balanced signature fixture resolves (driver-source-helper-balanced-signature)",
+	_DSHFL_BalancedSignatureFixtureResolves)
+
+
+; Defaults such as Map() add an inner parenthesis pair. A flat `[^)]*` parser
+; stops at that inner close and reports a real one-line definition as absent.
+_DSHFL_NestedDefaultSignatureStillResolves() {
+	Body := _DriverFuncBody("LoadHotstringsSection")
+	Assert(InStr(Body, "ExtraOptions := Map()") > 0
+		and InStr(Body, "FeatureConfig") > 0,
+		"_DriverFuncBody must resolve a function whose default argument contains nested parentheses")
+}
+Test("meta source-helpers: nested default signatures resolve (driver-source-helper-nested-default)",
+	_DSHFL_NestedDefaultSignatureStillResolves)
+
+
 _DSHFL_RealDirectoryStillResolves() {
 	Src := _DriverDirConcat("infra/hotstrings")
 	Assert(StrLen(Src) > 1000,

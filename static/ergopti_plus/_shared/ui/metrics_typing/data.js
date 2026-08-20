@@ -169,23 +169,27 @@ function process_manifest() {
 			});
 		});
 
-		const prev_apps = new Set(app_state.available_apps);
-		const had_all_selected =
-			app_state.available_apps.length > 0 &&
-			app_state.selected_apps.size === app_state.available_apps.length;
+		const previous_selection = new Set(app_state.selected_apps);
+		const previous_mode =
+			app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
 
 		app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
 
-		// Preserve existing selection; add new apps if everything was selected before
-		if (app_state.selected_apps.size === 0 || had_all_selected) {
-			app_state.selected_apps.clear();
-			app_state.available_apps.forEach((app) => app_state.selected_apps.add(app));
+		if (
+			previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
+			previous_mode === APP_SELECTION_MODE.ALL
+		) {
+			app_state.selected_apps = new Set(app_state.available_apps);
+			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+		} else if (previous_mode === APP_SELECTION_MODE.NONE) {
+			app_state.selected_apps = new Set();
 		} else {
 			const next_sel = new Set();
 			app_state.available_apps.forEach((app) => {
-				if (app_state.selected_apps.has(app) || !prev_apps.has(app)) next_sel.add(app);
+				if (previous_selection.has(app)) next_sel.add(app);
 			});
 			app_state.selected_apps = next_sel;
+			if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
 		}
 
 		const start_input = document.getElementById('date_start');
@@ -205,8 +209,7 @@ function process_manifest() {
 		// cancel that pending round-trip and render immediately with zero additional latency.
 		if (window._prefetch_data) {
 			window._lua_request = null;
-			app_state.loading_data = false;
-			receive_range_data(window._prefetch_data);
+			receive_range_data(window._prefetch_data, app_state.active_range_request_id);
 			window._prefetch_data = null;
 		}
 		return;
@@ -764,7 +767,12 @@ function apply_local_filters() {
 			if (app_name !== 'Unknown' && !app_state.available_apps.includes(app_name)) {
 				app_state.available_apps.push(app_name);
 				app_state.available_apps.sort((a, b) => a.localeCompare(b));
-				app_state.selected_apps.add(app_name);
+				if (
+					app_state.app_selection_mode === APP_SELECTION_MODE.UNINITIALIZED ||
+					app_state.app_selection_mode === APP_SELECTION_MODE.ALL
+				) {
+					app_state.selected_apps.add(app_name);
+				}
 				update_app_btn_text();
 			}
 
@@ -3244,29 +3252,88 @@ function render_wellness_kpi() {
 // ============================================
 
 /**
- * Signals the Lua backend to send n-gram data for the current range/app
- * selection. The Lua timer polls window._lua_request every 300ms.
+ * Completes only the currently-owned range request. Native responses can race
+ * cancellation, a watchdog, or a newer request; their monotonic id prevents a
+ * stale terminal from unlocking or overwriting the newer request.
+ * @param {number} request_id - Monotonic request ownership token.
+ * @param {string} [status='failed'] - Terminal status from the native host.
+ * @returns {boolean} Whether this terminal owned and completed the live request.
+ */
+function complete_range_request(request_id, status = 'failed') {
+	if (
+		!Number.isSafeInteger(request_id) ||
+		request_id <= 0 ||
+		request_id !== app_state.active_range_request_id
+	) {
+		return false;
+	}
+
+	if (app_state.range_request_watchdog !== null) {
+		clearTimeout(app_state.range_request_watchdog);
+	}
+	const restore_loader = status !== 'ok' && app_state.range_request_show_loader;
+	const previous_html = app_state.range_request_previous_table_html;
+	app_state.range_request_watchdog = null;
+	app_state.range_request_show_loader = false;
+	app_state.range_request_previous_table_html = null;
+	app_state.active_range_request_id = 0;
+	app_state.loading_data = false;
+
+	if (restore_loader) {
+		const table_body = document.getElementById('metrics_table_body');
+		if (table_body && previous_html !== null) table_body.innerHTML = previous_html;
+	}
+	return true;
+}
+
+/**
+ * Signals the active native backend to send n-gram data for the current
+ * range/app selection. The macOS timer polls window._lua_request every 300ms.
  * @param {boolean} [show_loader=true] - Whether to show the loading spinner.
  */
+function get_app_selection_request_apps() {
+	if (app_state.app_selection_mode === APP_SELECTION_MODE.NONE) return [];
+	if (
+		app_state.app_selection_mode === APP_SELECTION_MODE.UNINITIALIZED ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.ALL
+	) {
+		return Array.from(app_state.available_apps);
+	}
+	return Array.from(app_state.selected_apps);
+}
+
 function request_range_data(show_loader = true) {
 	if (app_state.loading_data) return;
+	const request_id = ++app_state.range_request_sequence;
 	app_state.loading_data = true;
+	app_state.active_range_request_id = request_id;
+	app_state.range_request_show_loader = show_loader;
 
 	const req = {
+		request_id,
 		start_date: document.getElementById('date_start').value,
 		end_date: document.getElementById('date_end').value,
-		apps: Array.from(app_state.selected_apps)
+		apps: get_app_selection_request_apps()
 	};
 
 	if (show_loader) {
-		document.getElementById('metrics_table_body').innerHTML =
+		const table_body = document.getElementById('metrics_table_body');
+		app_state.range_request_previous_table_html = table_body.innerHTML;
+		table_body.innerHTML =
 			'<tr><td colspan="8" style="text-align:center;padding:30px;">' +
 			'<div class="loader-spinner"></div> R\u00E9cup\u00E9ration et d\u00E9chiffrement depuis la DB...' +
 			'</td></tr>';
+	} else {
+		app_state.range_request_previous_table_html = null;
 	}
+	app_state.range_request_watchdog = setTimeout(
+		() => complete_range_request(request_id, 'timeout'),
+		RANGE_REQUEST_WATCHDOG_MS
+	);
 
 	// Slight delay so the UI renders the loader before the heavy decode starts
 	setTimeout(() => {
+		if (request_id !== app_state.active_range_request_id) return;
 		// Windows WebView2 can serve the exact selected range directly. Without
 		// this request, Windows retained the all-time first-paint n-grams after a
 		// date/app change and the spinner had no matching response to clear it.
@@ -3274,7 +3341,10 @@ function request_range_data(show_loader = true) {
 			try {
 				window.chrome.webview.postMessage(JSON.stringify({ action: 'range', ...req }));
 				return;
-			} catch (_) {}
+			} catch (_) {
+				complete_range_request(request_id, 'failed');
+				return;
+			}
 		}
 		// Linux has a real WebKit bridge (unlike the macOS polling path).
 		// Send the selected range directly so date/app changes refresh the
@@ -3286,7 +3356,10 @@ function request_range_data(show_loader = true) {
 			try {
 				window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'range', ...req });
 				return;
-			} catch (_) {}
+			} catch (_) {
+				complete_range_request(request_id, 'failed');
+				return;
+			}
 		}
 		window._lua_request = JSON.stringify(req);
 	}, 50);
@@ -3296,13 +3369,23 @@ function request_range_data(show_loader = true) {
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
  * @param {Object} payload - Contains { historical, today } n-gram dictionaries.
+ * @param {number|null} [request_id=null] - Native request ownership token.
+ * @returns {boolean} Whether the payload was current and rendered.
  */
-function receive_range_data(payload) {
-	app_state.loading_data = false;
-	if (!payload) return;
+function receive_range_data(payload, request_id = null) {
+	if (request_id === null) {
+		// Untagged prefetch/live pushes are valid only while no selected-range
+		// request owns the table. Otherwise they would overwrite its filtered
+		// result and release the wrong loading latch.
+		if (app_state.active_range_request_id !== 0) return false;
+	} else if (!complete_range_request(request_id, payload ? 'ok' : 'failed')) {
+		return false;
+	}
+	if (!payload) return false;
 	app_state.historical_cache = payload.historical;
 	app_state.today_live_data = payload.today;
 	apply_local_filters();
+	return true;
 }
 
 /**

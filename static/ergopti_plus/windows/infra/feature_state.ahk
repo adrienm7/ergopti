@@ -207,8 +207,11 @@ ReadScriptConfig(Cache) {
 		; Restore the engine-level repeat-key toggle (defaults to enabled when absent).
 		global HSE_RepeatEnabled
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
-		if RawRepeat != "_"
+		if RawRepeat != "_" {
 				HSE_RepeatEnabled := (RawRepeat == "1" or RawRepeat == "true")
+				if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
+						HSE_AdvanceRuntimeDecisionGeneration()
+		}
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
 }
 

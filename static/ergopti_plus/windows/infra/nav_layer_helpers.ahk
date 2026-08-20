@@ -96,7 +96,8 @@ AppState_SetNumberOfRepetitions(N) {
 ; hotstring engine still believed the caret sat where the user stopped typing,
 ; and the next expansion backspaced over text at the NEW position.
 ActionLayer(action) {
-	HS_DeclareSyntheticEffect(action)
-	SendInput(action)
+	; The adapter's key-press path owns declaration + SendInput as one Critical
+	; transaction, then performs tooltip effects and error logging after release.
+	_TextSenderSendInput(action, "key press")
 	ResetNumberOfRepetitions()
 }

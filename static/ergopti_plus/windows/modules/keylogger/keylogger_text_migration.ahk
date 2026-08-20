@@ -69,6 +69,12 @@ global KL_MIG_MARKER_FILE := "encrypt_migrated.txt"
 global KL_MIG_STATEMENTS_PER_SLICE := 200
 global KL_MIG_SLICE_INTERVAL_MS := 25
 
+; A converted ledger is not durably complete until its posture marker commits.
+; One delayed retry absorbs a transient AV/indexer lock without spinning forever
+; on a permanently unwritable directory; the pending state survives for resume
+; or the next posture sync when that retry also fails.
+global KL_MIG_MARKER_RETRY_MS := 1000
+
 ; Characters pulled from the ledger per read. Large enough that a 100 MB file is
 ; not read a statement at a time, small enough that memory stays flat.
 global KL_MIG_READ_CHUNK_CHARS := 65536
@@ -114,6 +120,30 @@ class KLMigration {
 
 		static scanned := 0
 		static converted := 0
+
+		; Native Suspend does not stop one-shot timers. Keep the open stream and
+		; cursor resumable, but let lifecycle ownership disarm every migration timer
+		; until the matching resume reactor schedules exactly one continuation.
+		static paused := false
+		static syncPending := false
+
+		; Publishing data.sql and publishing its posture are one logical commit. If
+		; the marker write fails after the ledger move, retain the known posture and
+		; completion counters so a cheap marker-only retry can finish the transaction.
+		static pendingMarker := ""
+		static pendingMarkerScanned := 0
+		static pendingMarkerConverted := 0
+		static pendingMarkerAnnounceSuccess := false
+		; The ledger move itself is resumable too. This Map exists from handle close
+		; through publish/marker/log completion, keeping ingest fenced across every
+		; yield in what used to be an unowned active=false window.
+		static commitPending := 0
+
+		; Deterministic seams for lifecycle/commit regression tests. Production uses
+		; SetTimer, the filesystem adapter, and LoggerSuccess directly.
+		static timer_fn := 0
+		static marker_commit_fn := 0
+		static success_fn := 0
 }
 
 
@@ -380,6 +410,22 @@ KL_Mig_MarkerPath() {
 		return Keylogger.by_device_dir . KL_MIG_MARKER_FILE
 }
 
+; Timer boundary shared by boot sync, slice continuation, marker retry, suspend,
+; and tests. A false return never discards the associated pending state.
+_KL_Mig_ArmTimer(callback, period) {
+		if IsObject(KLMigration.timer_fn)
+				return KLMigration.timer_fn.Call(callback, period)
+		try {
+				; Every migration continuation is a one-shot. -Abs(0) is AHK's
+				; documented cancel form, so this site can never become a poller.
+				SetTimer(callback, -Abs(period))
+				return true
+		} catch as err {
+				try LoggerError("Keylogger", "At-rest migration could not schedule lifecycle work: {1}", err.Message)
+				return false
+		}
+}
+
 ; Reads that marker: "on", "off", or "" when no pass has ever completed.
 KL_Mig_ReadMarker() {
 		try {
@@ -394,8 +440,116 @@ KL_Mig_ReadMarker() {
 ; a writer that emits a byte-order mark and a reader that does not strip one
 ; would compare "﻿on" against "on" and rewrite the whole ledger at every
 ; single launch.
+_KL_Mig_CommitMarker(path, posture) {
+		static WriteSeq := 0
+		if _KL_Mig_PauseRequested()
+				return false
+		WriteSeq += 1
+		tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".marker.tmp"
+		FSDelete(tmp)
+		if !FSWrite(tmp, posture)
+				return false
+		if _KL_Mig_PauseRequested()
+				return false
+		if !FSMove(tmp, path, true) {
+				FSDelete(tmp)
+				return false
+		}
+		if _KL_Mig_PauseRequested()
+				return false
+		; A successful rename is necessary but the readback is the durable contract:
+		; a malformed/empty marker must never suppress the next proof scan.
+		written := FSRead(path)
+		return (written is String) && (Trim(written) = posture)
+}
+
 KL_Mig_WriteMarker(posture) {
-		FSWrite(KL_Mig_MarkerPath(), posture)
+		if (posture != "on" && posture != "off")
+				return false
+		commit := IsObject(KLMigration.marker_commit_fn)
+				? KLMigration.marker_commit_fn : _KL_Mig_CommitMarker
+		try return commit.Call(KL_Mig_MarkerPath(), posture) ? true : false
+		catch as err {
+				try LoggerError("Keylogger", "At-rest migration marker commit threw: {1}", err.Message)
+				return false
+		}
+}
+
+_KL_Mig_LogSuccess(converted, scanned) {
+		if IsObject(KLMigration.success_fn)
+				return KLMigration.success_fn.Call(converted, scanned)
+		try LoggerSuccess("Keylogger",
+				"At-rest migration finished: {1} row(s) converted, {2} statement(s) scanned.",
+				converted, scanned)
+		return true
+}
+
+_KL_Mig_ClearPendingMarker() {
+		KLMigration.pendingMarker := ""
+		KLMigration.pendingMarkerScanned := 0
+		KLMigration.pendingMarkerConverted := 0
+		KLMigration.pendingMarkerAnnounceSuccess := false
+		_KL_Mig_ArmTimer(KL_Mig_RetryMarker, 0)
+}
+
+; Preserve the already-published ledger's known posture after marker failure.
+; Retrying this tiny commit is O(1); rescanning the ledger is only the crash
+; recovery fallback when process memory can no longer carry this state.
+_KL_Mig_RememberMarkerRetry(posture, converted, scanned, announceSuccess) {
+		KLMigration.pendingMarker := posture
+		KLMigration.pendingMarkerScanned := scanned
+		KLMigration.pendingMarkerConverted := converted
+		KLMigration.pendingMarkerAnnounceSuccess := announceSuccess
+		if A_IsSuspended {
+				KLMigration.paused := true
+				return false
+		}
+		return _KL_Mig_ArmTimer(KL_Mig_RetryMarker, -KL_MIG_MARKER_RETRY_MS)
+}
+
+KL_Mig_RetryMarker() {
+		posture := KLMigration.pendingMarker
+		if (posture = "")
+				return false
+		if A_IsSuspended || KLMigration.paused {
+				KL_Mig_OnSuspend()
+				return false
+		}
+
+		; A setting change invalidates an older marker retry. Do not publish stale
+		; posture over a ledger that now needs the reverse conversion.
+		want := KL_Enc_IsEnabled() ? "on" : "off"
+		if (posture != want) {
+				KLMigration.syncPending := true
+				_KL_Mig_ArmTimer(KL_Mig_SyncToPosture, -1)
+				return false
+		}
+		if !KL_Mig_WriteMarker(posture) {
+				try LoggerError("Keylogger",
+						"At-rest migration marker retry failed; durable completion remains pending.")
+				return false
+		}
+
+		converted := KLMigration.pendingMarkerConverted
+		scanned := KLMigration.pendingMarkerScanned
+		announceSuccess := KLMigration.pendingMarkerAnnounceSuccess
+		_KL_Mig_ClearPendingMarker()
+		if announceSuccess
+				_KL_Mig_LogSuccess(converted, scanned)
+		return true
+}
+
+; Called only after bootstrap has created a brand-new ledger. With no legacy
+; rows present, the cipher flag is a trustworthy O(1) description of every
+; local row that can subsequently be appended.
+KL_Mig_RecordNewLedgerPosture() {
+		posture := KL_Enc_IsEnabled() ? "on" : "off"
+		if KL_Mig_WriteMarker(posture)
+				return true
+		_KL_Mig_RememberMarkerRetry(posture, 0, 0, false)
+		try LoggerError("Keylogger",
+				"Created data.sql but could not commit its initial posture marker; marker retry remains pending.")
+		return false
 }
 
 ; Releases the handles and drops the staging file. The original ledger has not
@@ -409,7 +563,7 @@ _KL_Mig_Release() {
 		KLMigration.writeFh := ""
 		KLMigration.buffer := ""
 		KLMigration.active := false
-		SetTimer(KL_Mig_Tick, 0)
+		_KL_Mig_ArmTimer(KL_Mig_Tick, 0)
 }
 
 _KL_Mig_Abort(reason) {
@@ -426,23 +580,61 @@ _KL_Mig_Abort(reason) {
 ; instant at which anything the user relies on changes.
 _KL_Mig_Finish() {
 		posture := (KLMigration.mode = KL_MIG_MODE_ENCRYPT) ? "on" : "off"
-		source := KLMigration.sourcePath
-		stage  := KLMigration.stagePath
-		scanned := KLMigration.scanned
-		converted := KLMigration.converted
+		KLMigration.commitPending := Map(
+				"posture", posture,
+				"source", KLMigration.sourcePath,
+				"stage", KLMigration.stagePath,
+				"scanned", KLMigration.scanned,
+				"converted", KLMigration.converted,
+				"published", false,
+				"marker_committed", false
+		)
 		_KL_Mig_Release()
+		return _KL_Mig_ContinueFinish()
+}
+
+_KL_Mig_ContinueFinish() {
+		if !(KLMigration.commitPending is Map)
+				return false
+		if _KL_Mig_PauseRequested()
+				return false
+		commit := KLMigration.commitPending
 		; One move, and it is the only instant at which anything the user relies on
 		; changes. Everything before it wrote to the staging file alone.
-		if !FSMove(stage, source, true) {
-				FSDelete(stage)
+		if !commit["published"] && !FSMove(commit["stage"], commit["source"], true) {
+				FSDelete(commit["stage"])
+				KLMigration.commitPending := 0
 				try LoggerError("Keylogger",
 						"At-rest migration could not publish the converted ledger - data.sql is unchanged.")
 				return false
 		}
-		KL_Mig_WriteMarker(posture)
-		try LoggerSuccess("Keylogger",
-				"At-rest migration finished: {1} row(s) converted, {2} statement(s) scanned.",
-				converted, scanned)
+		commit["published"] := true
+		if _KL_Mig_PauseRequested()
+				return false
+		if !commit["marker_committed"] && !KL_Mig_WriteMarker(commit["posture"]) {
+				KLMigration.commitPending := 0
+				_KL_Mig_RememberMarkerRetry(commit["posture"],
+						commit["converted"], commit["scanned"], true)
+				if !KLMigration.paused
+						try LoggerError("Keylogger",
+								"At-rest migration published data.sql but could not commit its posture marker; success remains pending.")
+				return false
+		}
+		commit["marker_committed"] := true
+		if _KL_Mig_PauseRequested()
+				return false
+		KLMigration.commitPending := 0
+		_KL_Mig_LogSuccess(commit["converted"], commit["scanned"])
+		return false
+}
+
+_KL_Mig_PauseRequested() {
+		if KLMigration.paused
+				return true
+		if A_IsSuspended {
+				KL_Mig_OnSuspend()
+				return true
+		}
 		return false
 }
 
@@ -451,6 +643,8 @@ _KL_Mig_Finish() {
 KL_Mig_Slice() {
 		if (!KLMigration.active)
 				return false
+		if _KL_Mig_PauseRequested()
+				return true
 		; A tick that lands while a slice is already running must yield, not run a
 		; second slice over the same handles. Returning true keeps the pass alive:
 		; the slice already in flight will schedule the next tick itself.
@@ -470,16 +664,24 @@ _KL_Mig_SliceBody() {
 		deviceIdLit := Keylogger._device_id_lit
 		processed := 0
 		while (processed < KL_MIG_STATEMENTS_PER_SLICE) {
+				if _KL_Mig_PauseRequested()
+						return true
 				endPos := _KL_Mig_StatementEnd(KLMigration.buffer)
 				if (!endPos) {
 						if (KLMigration.eof) {
 								; Whatever is left is a trailing comment or a partial line: it
 								; carries no statement, so it is copied through verbatim.
+								if _KL_Mig_PauseRequested()
+										return true
 								if (KLMigration.buffer != "")
 										KLMigration.writeFh.Write(KLMigration.buffer)
 								KLMigration.buffer := ""
+								if _KL_Mig_PauseRequested()
+										return true
 								return _KL_Mig_Finish()
 						}
+						if _KL_Mig_PauseRequested()
+								return true
 						chunk := ""
 						try chunk := KLMigration.readFh.Read(KL_MIG_READ_CHUNK_CHARS)
 						if (chunk = "") {
@@ -495,6 +697,12 @@ _KL_Mig_SliceBody() {
 				result := KL_Mig_ConvertStatement(statement, deviceIdLit, KLMigration.mode)
 				if (!result["ok"])
 						return _KL_Mig_Abort("a row could not be converted")
+				; Suspend can interrupt the crypto call above. Put the statement back
+				; before yielding so resume neither drops nor duplicates it.
+				if _KL_Mig_PauseRequested() {
+						KLMigration.buffer := statement . KLMigration.buffer
+						return true
+				}
 				KLMigration.writeFh.Write(result["sql"])
 				KLMigration.scanned += 1
 				if (result["changed"])
@@ -508,8 +716,11 @@ KL_Mig_Tick() {
 		; Re-armed as a ONE-SHOT rather than left running as a periodic timer: a
 		; repeating sub-second timer is a permanent stall inserted into typing, and
 		; this one only has work to do while a pass is in flight.
-		if KL_Mig_Slice()
-				SetTimer(KL_Mig_Tick, -KL_MIG_SLICE_INTERVAL_MS)
+		if _KL_Mig_PauseRequested()
+				return false
+		if KL_Mig_Slice() && !_KL_Mig_PauseRequested()
+		_KL_Mig_ArmTimer(KL_Mig_Tick, -KL_MIG_SLICE_INTERVAL_MS)
+		return true
 }
 
 
@@ -523,20 +734,76 @@ KL_Mig_Tick() {
 
 ; Whether a pass is in flight. KL_IngestOnce defers while it is true.
 KL_Mig_IsActive() {
-		return KLMigration.active
+		return KLMigration.active || (KLMigration.commitPending is Map)
+}
+
+; Native Suspend owns migration timers explicitly. Open handles and the cursor
+; stay intact so a 20-minute proof scan resumes instead of restarting, while no
+; read/write/marker callback remains armed during the pause.
+KL_Mig_OnSuspend() {
+		hasWork := KLMigration.active || KLMigration.syncPending
+				|| (KLMigration.pendingMarker != "")
+				|| (KLMigration.commitPending is Map)
+		if !hasWork
+				return false
+		KLMigration.paused := true
+		_KL_Mig_ArmTimer(KL_Mig_Tick, 0)
+		_KL_Mig_ArmTimer(KL_Mig_RetryMarker, 0)
+		_KL_Mig_ArmTimer(KL_Mig_SyncToPosture, 0)
+		return true
+}
+
+; Resume exactly one owner. Priority mirrors durability: finish an active scan,
+; then its pending marker commit, then a boot/config posture comparison.
+KL_Mig_OnResume() {
+		if A_IsSuspended || !KLMigration.paused
+				return false
+		callback := 0
+		period := -1
+		if (KLMigration.commitPending is Map) {
+				callback := _KL_Mig_ContinueFinish
+		} else if KLMigration.active {
+				callback := KL_Mig_Tick
+				period := -KL_MIG_SLICE_INTERVAL_MS
+		} else if (KLMigration.pendingMarker != "") {
+				callback := KL_Mig_RetryMarker
+				period := -KL_MIG_MARKER_RETRY_MS
+		} else if KLMigration.syncPending {
+				callback := KL_Mig_SyncToPosture
+		}
+		if !IsObject(callback) {
+				KLMigration.paused := false
+				return false
+		}
+		if !_KL_Mig_ArmTimer(callback, period)
+				return false
+		KLMigration.paused := false
+		return true
 }
 
 ; Stops the pass. The original ledger was never touched, so this reverts
 ; nothing; the next attempt simply starts over, and the idempotent conversion
 ; makes that converge.
 KL_Mig_Cancel() {
-		if (!KLMigration.active)
-				return
+		wasActive := KLMigration.active
 		stage := KLMigration.stagePath
-		_KL_Mig_Release()
-		FSDelete(stage)
-		try LoggerInfo("Keylogger", "At-rest migration cancelled after {1} converted row(s).",
-				KLMigration.converted)
+		if wasActive {
+				_KL_Mig_Release()
+				FSDelete(stage)
+				try LoggerInfo("Keylogger", "At-rest migration cancelled after {1} converted row(s).",
+						KLMigration.converted)
+		}
+		if (KLMigration.commitPending is Map) {
+				commit := KLMigration.commitPending
+				if !commit["published"]
+						FSDelete(commit["stage"])
+				KLMigration.commitPending := 0
+		}
+		_KL_Mig_ClearPendingMarker()
+		KLMigration.syncPending := false
+		KLMigration.paused := false
+		_KL_Mig_ArmTimer(KL_Mig_SyncToPosture, 0)
+		return wasActive
 }
 
 ; Starts a pass over the ledger.
@@ -547,6 +814,11 @@ KL_Mig_Start(mode, schedule := true) {
 		KL_Mig_Cancel()
 		if (mode != KL_MIG_MODE_ENCRYPT && mode != KL_MIG_MODE_DECRYPT) {
 				try LoggerError("Keylogger", "At-rest migration: unknown mode '{1}'.", mode)
+				return false
+		}
+		if A_IsSuspended {
+				KLMigration.syncPending := true
+				KLMigration.paused := true
 				return false
 		}
 		if (Keylogger.device_id = "" || Keylogger.data_sql_path = "")
@@ -560,6 +832,7 @@ KL_Mig_Start(mode, schedule := true) {
 		}
 
 		KLMigration.mode := mode
+		KLMigration.commitPending := 0
 		KLMigration.sourcePath := Keylogger.data_sql_path
 		KLMigration.stagePath := Keylogger.data_sql_path . KL_MIG_STAGING_SUFFIX
 		KLMigration.buffer := ""
@@ -580,9 +853,19 @@ KL_Mig_Start(mode, schedule := true) {
 
 		KLMigration.active := true
 		try LoggerStart("Keylogger", "At-rest migration ({1}) over data.sql...", mode)
-		if (schedule)
-				SetTimer(KL_Mig_Tick, -KL_MIG_SLICE_INTERVAL_MS)
+		if schedule && !_KL_Mig_ArmTimer(KL_Mig_Tick, -KL_MIG_SLICE_INTERVAL_MS)
+				return _KL_Mig_Abort("the slice timer could not be scheduled")
 		return true
+}
+
+; Owns the delayed boot comparison so Suspend can disarm and later replay it.
+KL_Mig_RequestPostureSync(delayMs := 1) {
+		KLMigration.syncPending := true
+		if A_IsSuspended {
+				KLMigration.paused := true
+				return false
+		}
+		return _KL_Mig_ArmTimer(KL_Mig_SyncToPosture, -Abs(delayMs))
 }
 
 ; Brings the ledger in line with the posture now in force, and ONLY when they
@@ -590,12 +873,28 @@ KL_Mig_Start(mode, schedule := true) {
 ; would rewrite a year of history to change nothing.
 ; @return Boolean True when a pass was started.
 KL_Mig_SyncToPosture() {
+		if A_IsSuspended || KLMigration.paused {
+				KLMigration.syncPending := true
+				KLMigration.paused := true
+				return false
+		}
+		KLMigration.syncPending := false
 		if (!Keylogger.initialized)
 				return false
 		; The cipher's own flag IS the posture in force — the config loader drives it
 		; at boot and the menu drives it on a toggle. Reading it here rather than the
 		; settings object keeps the ledger aligned with what actually encrypts.
 		want := KL_Enc_IsEnabled() ? "on" : "off"
+		if (KLMigration.pendingMarker != "") {
+				if (KLMigration.pendingMarker = want) {
+						KL_Mig_RetryMarker()
+						return false
+				}
+				; The pending marker is the only trustworthy description of the ledger
+				; after its move succeeded. If the setting flipped, force the reverse
+				; pass even when an older on-disk marker happens to equal `want`.
+				return KL_Mig_Start(want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
+		}
 		if (KL_Mig_ReadMarker() = want)
 				return false
 		return KL_Mig_Start(want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)

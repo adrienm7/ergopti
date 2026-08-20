@@ -190,24 +190,23 @@ Test("shell_runner: _SR_TaskCounter/_SR_PollRunning are declared global where as
 
 ; ======================================================================
 ; ======================================================================
-; ======= 6/ terminate() guards Map.Delete with .Has() =================
+; ======= 6/ terminate() claims exact task before Map.Delete ===========
 ; ======================================================================
 ; ======================================================================
 
-_TSRBC_TerminateHasGuard() {
-	Body := _DriverFuncBody("_SR_HandleTerminate")
-	Assert(Body != "", "_SR_HandleTerminate must exist as a standalone nested function")
+_TSRBC_TerminateUsesExactClaim() {
+	HandleBody := _DriverFuncBody("_SR_HandleTerminate")
+	Assert(InStr(HandleBody, "_SR_LegacyClaimTerminate(state)") > 0,
+		"_SR_HandleTerminate must delegate pre-start and live-task ownership to the atomic claim helper")
+	Assert(InStr(HandleBody, "_SR_ActiveTasks.Delete(") = 0,
+		"the public handle must not perform a racy Has-then-Delete itself")
 
-	HasPos := InStr(Body, "_SR_ActiveTasks.Has(task_id)")
-	DelPos := InStr(Body, "_SR_ActiveTasks.Delete(task_id)")
-	Assert(HasPos > 0 and DelPos > 0,
-		"_SR_HandleTerminate must guard _SR_ActiveTasks.Delete(task_id) with a "
-		. ".Has(task_id) check — Map.Delete() throws on a key that was never "
-		. "inserted, which happens whenever terminate() is called before start() "
-		. "(shell-runner-terminate-delete-unguarded)")
-	Assert(HasPos < DelPos,
-		"_SR_HandleTerminate's .Has(task_id) guard must appear BEFORE .Delete(task_id) "
-		. "(shell-runner-terminate-delete-unguarded)")
+	ClaimBody := _DriverFuncBody("_SR_LegacyClaimTerminate")
+	ReadyPos := InStr(ClaimBody, "phase = SR_LEGACY_PHASE_READY")
+	IdentityPos := InStr(ClaimBody, "_SR_LegacyRegistryOwnsLocked(State)")
+	DeletePos := InStr(ClaimBody, '_SR_ActiveTasks.Delete(State["TaskId"])')
+	Assert(ReadyPos > 0 and IdentityPos > ReadyPos and DeletePos > IdentityPos,
+		"terminate-before-start must return before deletion, while a live task must pass exact identity before Delete (shell-runner-terminate-delete-unguarded)")
 }
-Test("shell_runner: _SR_HandleTerminate guards Map.Delete with .Has() so calling it before start() is a no-op (shell-runner-terminate-delete-unguarded)",
-	_TSRBC_TerminateHasGuard)
+Test("shell_runner: terminate-before-start is a no-op and live deletion is exact (shell-runner-terminate-delete-unguarded)",
+	_TSRBC_TerminateUsesExactClaim)

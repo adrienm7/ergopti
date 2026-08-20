@@ -1,31 +1,21 @@
 ﻿; tests/meta/test_hcw_patch_toml_meta_refuses_unread_file.ahk
 
 ; ==============================================================================
-; MODULE: Regression — the config window must not rewrite a personal TOML it
-;         could not read (hcw-patch-toml-meta-unread-file)
+; MODULE: HCW personal TOML metadata transaction guard
 ; DESCRIPTION:
-; _HCW_PatchTomlMeta is a read-modify-rewrite over a file that holds the user's
-; own hotstrings. It seeds itself from ReadTomlFile, which returns "" for an
-; EXISTING file it could not open (an exclusive handle from a sync client, an AV
-; scan, the file open in another editor) and records the path in the shared
-; _TomlUnreadableFiles sentinel precisely so writers of this shape refuse.
+; Verifies that _HCW_PatchTomlMeta delegates its complete read-modify-publish
+; lifetime to the path-owned personal TOML transaction helper. The helper must
+; reject unreadable source state before publishing through the atomic writer.
 ;
-; ROOT CAUSE ENCODED: without that check, "I could not read it" is
-; indistinguishable from "it was empty". The scan finds nothing, the rewrite
-; serialises that emptiness back over the original, and "Réinitialiser tout" —
-; which calls this six times per personal entry, each invalidating the cache so
-; the next call really hits the disk — truncates personal_hotstrings.toml to zero
-; bytes under a success notification. The three siblings of the same shape
-; (ApplyConfigToml, WritePersonalToml, TOML_BatchWrite) all consult the sentinel;
-; this was the one that did not.
+; ROOT CAUSE ENCODED: a lease acquired after ReadTomlFile cannot protect the
+; snapshot it is meant to serialize, while FileOpen(Path, "w") destroys the old
+; target before any later failure can be rolled back. Keeping the read,
+; unreadable-file guard and same-directory atomic publication in one shared
+; helper removes both failure windows.
 ;
-; The ORDER matters as much as the presence: FileOpen(Path, "w") truncates
-; immediately, so a guard placed after it would run on an already-emptied file.
-;
-; SCOPE: source-level. The config window builds a native Gui at top level and is
-; outside the headless include graph, exactly like
-; test_config_window_patch_toml_meta_error.ahk, whose assertions cover the failed
-; WRITE — this file covers the failed READ, which is the destructive half.
+; SCOPE: this source-level delegation guard complements behavioural tests in
+; test_personal_toml_io.ahk, where the shared helper is in the headless include
+; graph and injected failures prove byte preservation and lease ordering.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -34,45 +24,48 @@
 
 
 
-; ==================================================================
-; ==================================================================
-; ======= 1/ The refusal exists, and comes before the write ========
-; ==================================================================
-; ==================================================================
+; ==========================================================
+; ==========================================================
+; ======= 1/ Owned transaction delegation ================
+; ==========================================================
+; ==========================================================
 
-_PTMU_PatchTomlMetaRefusesAnUnreadFile() {
-	Body := _DriverFuncBody("_HCW_PatchTomlMeta")
-	Assert(Body != "", "_HCW_PatchTomlMeta must exist in the driver source")
+_PTMU_PatcherDelegatesWithoutDirectIo() {
+	PatcherBody := _DriverFuncBody("_HCW_PatchTomlMeta")
+	Assert(InStr(PatcherBody, "_PersonalTomlCommitPatch(") > 0,
+		"_HCW_PatchTomlMeta must delegate the whole read-modify-publish lifetime to the path-owned helper")
+	Assert(InStr(PatcherBody, "ReadTomlFile(") == 0,
+		"the HCW wrapper must not read before the shared helper acquires ownership")
+	Assert(InStr(PatcherBody, "FileOpen(") == 0,
+		"the HCW wrapper must never truncate the durable target in place")
+	Assert(InStr(PatcherBody, "_PersonalTomlWriteAtomic(") == 0,
+		"only the owned transaction helper may invoke the atomic publisher")
+}
+Test("meta hcw-personal-meta-transaction: patcher delegates without direct file I/O",
+	_PTMU_PatcherDelegatesWithoutDirectIo)
 
+_PTMU_OwnedHelperOrdersReadGuardAndAtomicPublish() {
+	Body := _DriverFuncBody("_PersonalTomlCommitPatch")
+	LeasePos := InStr(Body, "_PersonalTomlWriteLeaseTryAcquire(")
+	InvalidatePos := InStr(Body, "_PersonalTomlInvalidateCaches(")
 	ReadPos := InStr(Body, "ReadTomlFile(")
-	Assert(ReadPos > 0,
-		"prerequisite: the patcher still seeds its rewrite from ReadTomlFile — that read is what makes the guard necessary")
-
 	GuardPos := InStr(Body, "TOML_UnreadableFile")
-	Assert(GuardPos > 0,
-		"_HCW_PatchTomlMeta must ask whether ReadTomlFile actually read the file. It rewrites the user's personal_hotstrings.toml from that content, so a failed read serialises an empty file over every personal hotstring it holds — silently, under a success notification")
-	Assert(ReadPos < GuardPos,
-		"the guard must follow the read that sets the sentinel, or it inspects the previous call's verdict")
-
-	WritePos := InStr(Body, "FileOpen(")
-	Assert(WritePos > 0, "prerequisite: the patcher still opens the file for writing")
-	Assert(GuardPos < WritePos,
-		'the refusal must come BEFORE the file is opened for writing — FileOpen(Path, "w") truncates in place the moment it succeeds, so a guard placed after it would only ever report on a file that is already empty')
+	PublishPos := InStr(Body, "_PersonalTomlWriteAtomic(")
+	Assert(LeasePos > 0, "the metadata transaction helper must acquire path ownership")
+	Assert(InvalidatePos > LeasePos,
+		"reader caches must be invalidated only after the transaction owns the path")
+	Assert(ReadPos > InvalidatePos,
+		"the durable source read must happen after ownership and cache invalidation")
+	Assert(GuardPos > ReadPos,
+		"the unreadable sentinel must be inspected after the read that sets it")
+	Assert(PublishPos > GuardPos,
+		"an unreadable source must be refused before any atomic publication attempt")
+	Assert(InStr(Body, "FileOpen(") == 0,
+		"the owned transaction helper must publish only through the tested atomic writer")
+	Assert(RegExMatch(Body, "TOML_UnreadableFile[\s\S]{0,600}?LoggerError") > 0,
+		"an unreadable source refusal must be logged as an ERROR")
+	Assert(RegExMatch(Body, "TOML_UnreadableFile[\s\S]{0,600}?return false") > 0,
+		"the unreadable source guard must stop the transaction")
 }
-Test("meta hcw-patch-toml-meta-unread-file: the patcher refuses a file it could not read",
-	_PTMU_PatchTomlMetaRefusesAnUnreadFile)
-
-
-; A guard that neither stops the function nor says anything would satisfy the
-; ordering assertions above while still destroying the file.
-_PTMU_RefusalIsLoudAndStopsTheRewrite() {
-	Body := _DriverFuncBody("_HCW_PatchTomlMeta")
-	Assert(Body != "", "_HCW_PatchTomlMeta must exist in the driver source")
-
-	Assert(RegExMatch(Body, "TOML_UnreadableFile[\s\S]{0,400}?LoggerError") > 0,
-		"the refusal must be logged as an ERROR — the user sees a success TrayTip either way, so the log is the only place this failure can surface")
-	Assert(RegExMatch(Body, "TOML_UnreadableFile[\s\S]{0,400}?return false") > 0,
-		"the refusal must RETURN — falling through after logging still rewrites the file from the content that was never read")
-}
-Test("meta hcw-patch-toml-meta-unread-file: the refusal is logged and stops the rewrite",
-	_PTMU_RefusalIsLoudAndStopsTheRewrite)
+Test("meta hcw-personal-meta-transaction: owned helper guards the read before publish",
+	_PTMU_OwnedHelperOrdersReadGuardAndAtomicPublish)

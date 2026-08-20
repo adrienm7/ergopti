@@ -39,10 +39,16 @@ _UCIG_CheckInstallSelectedUsesCloseGui() {
 	Assert(IdxNext > IdxAssign, "could not bound the InstallSelected closure for inspection")
 	InstallSelectedBody := SubStr(Body, IdxAssign, IdxNext - IdxAssign)
 
-	Assert(InStr(InstallSelectedBody, "_Updater_CloseGui(G)") > 0,
-		"InstallSelected must close the window via _Updater_CloseGui(G), matching every other close path in modules/updater/changelog.ahk -- a bare G.Destroy() skips closing the WebView2 Controller first (updater-changelog-install-bare-destroy)")
+	HelperCall := InStr(InstallSelectedBody, "_Updater_OpenSelectedReleasePrompt(G,")
+	Assert(HelperCall > 0,
+		"InstallSelected must delegate to the guarded release-prompt helper")
+	Helper := _DriverFuncBody("_Updater_OpenSelectedReleasePrompt")
+	Assert(InStr(Helper, "_Updater_CloseGui(G)") > 0,
+		"the guarded InstallSelected helper must close via _Updater_CloseGui(G), matching every other close path -- a bare G.Destroy() skips closing the WebView2 Controller first (updater-changelog-install-bare-destroy)")
 	Assert(InStr(InstallSelectedBody, "G.Destroy()") = 0,
 		"InstallSelected must not call the bare G.Destroy() -- it bypasses the _Updater_CloseGui helper that closes the WebView2 Controller before destroying the Gui (updater-changelog-install-bare-destroy)")
+	Assert(InStr(Helper, "G.Destroy()") = 0,
+		"the delegated InstallSelected helper must not destroy the Gui directly")
 }
 Test("updater changelog: InstallSelected closes via _Updater_CloseGui, not a bare G.Destroy() (updater-changelog-install-bare-destroy)",
 	_UCIG_CheckInstallSelectedUsesCloseGui)

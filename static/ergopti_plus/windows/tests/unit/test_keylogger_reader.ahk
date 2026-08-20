@@ -269,7 +269,7 @@ Test("KLR_BumpMap: multiple keys are independent", _KLR_BumpMap_MultipleKeysInde
 ; ==========================================
 
 _KLR_NewNgramItem_FieldsSet() {
-	item := KLR_NewNgramItem(10, 200, 3, "")
+	item := KLR_NewNgramItem(10, 200, 3)
 	AssertEqual(10, item["c"])
 	AssertEqual(200, item["t"])
 	AssertEqual(3, item["e"])
@@ -277,26 +277,21 @@ _KLR_NewNgramItem_FieldsSet() {
 Test("KLR_NewNgramItem: c/t/e fields reflect constructor arguments", _KLR_NewNgramItem_FieldsSet)
 
 _KLR_NewNgramItem_HsAndLlmDefaultZero() {
-	item := KLR_NewNgramItem(1, 2, 3, "")
+	item := KLR_NewNgramItem(1, 2, 3)
 	AssertEqual(0, item["hs"])
 	AssertEqual(0, item["llm"])
 	AssertEqual(0, item["o"])
 }
 Test("KLR_NewNgramItem: hs/llm/o always initialised to 0", _KLR_NewNgramItem_HsAndLlmDefaultZero)
 
-_KLR_NewNgramItem_EsrcJsonStoredWhenNonEmpty() {
-	item := KLR_NewNgramItem(1, 2, 3, '{"hotstring":4}')
-	AssertTrue(item.Has("esrc_json"))
-	AssertEqual('{"hotstring":4}', item["esrc_json"])
+_KLR_NewNgramItem_SourceCountsAreNumericFields() {
+	item := KLR_NewNgramItem(7, 2, 3, 4, 2, 1)
+	AssertEqual(4, item["hs"])
+	AssertEqual(2, item["llm"])
+	AssertEqual(1, item["o"])
 }
-Test("KLR_NewNgramItem: esrc_json stored when non-empty", _KLR_NewNgramItem_EsrcJsonStoredWhenNonEmpty)
-
-_KLR_NewNgramItem_EsrcJsonOmittedWhenEmpty() {
-	; When esrc_json is empty the key must not be added (saves memory)
-	item := KLR_NewNgramItem(1, 2, 3, "")
-	AssertFalse(item.Has("esrc_json"))
-}
-Test("KLR_NewNgramItem: esrc_json key absent when empty string provided", _KLR_NewNgramItem_EsrcJsonOmittedWhenEmpty)
+Test("KLR_NewNgramItem: projected source counts remain numeric fields",
+	_KLR_NewNgramItem_SourceCountsAreNumericFields)
 
 
 
@@ -385,12 +380,12 @@ Test("KLR__JsonEscape: empty string -> empty string", _KLR_JsonEscape_EmptyStrin
 ; ===============================================
 
 _KLR_BuildNgramFilter_NoArgs() {
-	AssertEqual("", KLR_BuildNgramFilter("", "", []))
+	AssertEqual("", KLR_BuildNgramFilter("", ""))
 }
 Test("KLR_BuildNgramFilter: no args -> empty string", _KLR_BuildNgramFilter_NoArgs)
 
 _KLR_BuildNgramFilter_StartOnly() {
-	result := KLR_BuildNgramFilter("2024-01-01", "", [])
+	result := KLR_BuildNgramFilter("2024-01-01", "")
 	AssertTrue(InStr(result, "WHERE") > 0)
 	AssertTrue(InStr(result, "2024-01-01") > 0)
 }
@@ -401,14 +396,19 @@ _KLR_BuildNgramFilter_AppsFilter() {
 	AssertTrue(InStr(result, "app IN") > 0)
 	AssertTrue(InStr(result, "code.exe") > 0)
 	AssertTrue(InStr(result, "notepad.exe") > 0)
+	AssertTrue(InStr(result, "Unknown") > 0,
+		"a real-app filter must retain the non-selectable Unknown bucket")
 }
 Test("KLR_BuildNgramFilter: non-empty apps array adds app IN clause", _KLR_BuildNgramFilter_AppsFilter)
 
-_KLR_BuildNgramFilter_EmptyAppsArraySkipped() {
+_KLR_BuildNgramFilter_EmptyAppsArrayMeansNoNamedApps() {
 	result := KLR_BuildNgramFilter("", "", [])
-	AssertFalse(InStr(result, "app IN") > 0)
+	AssertTrue(InStr(result, "Unknown") > 0)
+	AssertFalse(InStr(result, "app IN") > 0,
+		"an explicit empty selection must not become an unrestricted app query")
 }
-Test("KLR_BuildNgramFilter: empty apps array -> no app IN clause", _KLR_BuildNgramFilter_EmptyAppsArraySkipped)
+Test("KLR_BuildNgramFilter: empty apps array retains only Unknown",
+	_KLR_BuildNgramFilter_EmptyAppsArrayMeansNoNamedApps)
 
 
 

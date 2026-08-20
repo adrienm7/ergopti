@@ -361,7 +361,7 @@ HealthCheck_ShowWindow() {
 		BtnLabel)
 
 	G.WVC := 0
-	CloseAndCopy := (*) => (A_Clipboard := PlainText, _HealthCheck_CloseGui(G))
+	CloseAndCopy := (*) => (CB_Write(PlainText), _HealthCheck_CloseGui(G))
 	G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
 	G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
 	BtnCopy.OnEvent("Click", CloseAndCopy)
@@ -627,7 +627,6 @@ HealthCheck_FormatPlain(Snapshot) {
 		Out .= (i > 1 ? "`r`n" : "") . L
 	return Out
 }
-
 
 
 

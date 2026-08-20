@@ -89,6 +89,10 @@ _HCWWeb_TryOpen() {
 
 	; Singleton — bring the existing editor to the front.
 	if (_HCWWeb_Gui != 0) {
+		_HCW_InitLocaleStrings()
+		_HCW_BuildCategoryList()
+		_HCW_BuildGroupList()
+		_HCWWeb_PushState()
 		try WinActivate("ahk_id " . _HCWWeb_Gui.Hwnd)
 		return true
 	}
@@ -208,14 +212,16 @@ _HCWWeb_Dispatch(Payload) {
 		return
 	}
 	if (Action == "reset_all") {
-		_HCWWeb_ResetAll()
-		_HCWWeb_PushState()
-		return
+		Outcome := _HCWWeb_ResetAll()
+		if !Outcome["ok"] && !Outcome["failure_reported"]
+			_HCW_ReportWriteFailure(Outcome)
+		return Outcome["ok"]
 	}
 	if (Action == "set_all_grey") {
-		_HCWWeb_SetAllGrey()
-		_HCWWeb_PushState()
-		return
+		Outcome := _HCWWeb_SetAllGrey()
+		if !Outcome["ok"] && !Outcome["failure_reported"]
+			_HCW_ReportWriteFailure(Outcome)
+		return Outcome["ok"]
 	}
 
 	CatKey := Payload.Has("category") ? Payload["category"] : ""
@@ -224,95 +230,85 @@ _HCWWeb_Dispatch(Payload) {
 		return
 	Sec := (Payload.Has("section") && Payload["section"] != "") ? Payload["section"] : ""
 
+	WriteFn := 0
 	switch Action {
 		case "set_delay":
 			if Payload.Has("ms")
-				_HCW_SetOverride(Entry, Sec, "delay", Payload["ms"] / 1000)
+				WriteFn := _HCW_SetOverride.Bind(Entry, Sec, "delay", Payload["ms"] / 1000)
 		case "clear_delay":
-			_HCW_ClearOverride(Entry, Sec, "delay")
+			WriteFn := _HCW_ClearOverride.Bind(Entry, Sec, "delay")
 		case "set_color":
 			if (Payload.Has("hex") && Payload["hex"] != "")
-				_HCW_SetOverride(Entry, Sec, "color", Payload["hex"])
+				WriteFn := _HCW_SetOverride.Bind(Entry, Sec, "color", Payload["hex"])
 		case "clear_color":
-			_HCW_ClearOverride(Entry, Sec, "color")
+			WriteFn := _HCW_ClearOverride.Bind(Entry, Sec, "color")
 		case "set_priority":
 			if Payload.Has("priority")
-				_HCW_SetOverride(Entry, Sec, "priority", Payload["priority"])
+				WriteFn := _HCW_SetOverride.Bind(Entry, Sec, "priority", Payload["priority"])
 		case "clear_priority":
-			_HCW_ClearOverride(Entry, Sec, "priority")
+			WriteFn := _HCW_ClearOverride.Bind(Entry, Sec, "priority")
 		case "set_tooltip":
-			_HCW_SetOverride(Entry, Sec, "show_tooltip",
+			WriteFn := _HCW_SetOverride.Bind(Entry, Sec, "show_tooltip",
 				Payload.Has("show_tooltip") && Payload["show_tooltip"] == true)
 		case "clear_tooltip":
-			_HCW_ClearOverride(Entry, Sec, "show_tooltip")
+			WriteFn := _HCW_ClearOverride.Bind(Entry, Sec, "show_tooltip")
 		default:
 			return
 	}
+	if !HasMethod(WriteFn, "Call")
+		return false
+	Outcome := _HCW_RunWriteBatch([WriteFn], _HCWWeb_ReconcileState.Bind(),
+		0, _HCW_ReportWriteFailure.Bind())
+	return Outcome["ok"]
+}
+
+_HCWWeb_ReconcileState(Outcome) {
 	_HCWWeb_PushState()
+}
+
+_HCWWeb_ReconcileReset(Outcome) {
+	if Outcome["succeeded"] > 0
+		_HCW_RepublishIfBakedField("delay")
+	_HCWWeb_PushState()
+}
+
+_HCWWeb_ReportResetSuccess(Outcome) {
+	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
 }
 
 ; Clear every override across all categories (common / personal / extension),
 ; matching the native _HCW_ResetAll loop minus the Gui teardown.
 _HCWWeb_ResetAll() {
 	global _HCW_CATEGORY_LIST
-	; Same two steps as the native _HCW_ResetAll, and for the same reasons — this
-	; twin had neither.
-	;
-	; FLUSH FIRST: a numeric edit armed up to _HCW_NUMERIC_DEBOUNCE_MS ago would
-	; otherwise land AFTER the loop below and persist on top of the override it just
-	; cleared, silently un-resetting that one field.
-	_HCW_FlushNumericWrite()
-	for _, E in _HCW_CATEGORY_LIST {
-		if E.IsPersonal {
-			_HCW_PatchTomlMeta(E.Path, "", "delay", "")
-			_HCW_PatchTomlMeta(E.Path, "", "color", "")
-			_HCW_PatchTomlMeta(E.Path, "", "priority", "")
-			for _, Sec in _HCW_GetSections(E) {
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "delay", "")
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "color", "")
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "priority", "")
-			}
-		} else if E.IsExtension {
-			HotstringsClearOverride("ext." . E.ExtId, "", "")
-			for _, Sec in _HCW_GetSections(E)
-				HotstringsClearOverride("ext." . E.ExtId, Sec.Name, "")
-		} else {
-			HotstringsClearOverride(E.Key, "", "")
-			for _, Sec in _HCW_GetSections(E)
-				HotstringsClearOverride(E.Key, Sec.Name, "")
-		}
-	}
-	; REPUBLISH AFTER: the loop clears delay and priority through the storage
-	; primitives DIRECTLY, bypassing the _HCW_SetOverride / _HCW_ClearOverride choke
-	; point where the republish lives. Both fields are baked into every Spec at
-	; registration, so clearing them only bumps the resolve generation: without this,
-	; the window and the TOOLTIP advertise the default delay while the engine keeps
-	; gating on the value the user had set — the tooltip promising an expansion the
-	; engine will refuse (hcw-webview-reset-does-not-republish). One rebuild for the
-	; whole reset, because the reset is a single user action rather than N of them.
-	_HCW_RepublishIfBakedField("delay")
-	try TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
+	; Match the native action: Reset All supersedes pending numeric candidates,
+	; so cancel them without first performing writes that the loop will erase.
+	_HCW_CancelAllNumericWrites()
+	Writes := _HCW_BuildResetAllWrites(_HCW_CATEGORY_LIST)
+	return _HCW_RunWriteBatch(Writes, _HCWWeb_ReconcileReset.Bind(),
+		_HCWWeb_ReportResetSuccess.Bind())
 }
 
 ; Force every category/extension to grey at file level and clear per-section
 ; colour overrides so the grey cascades down. Mirrors the native _HCW_SetAllGrey.
 _HCWWeb_SetAllGrey() {
 	global _HCW_CATEGORY_LIST, HCWWEB_GREY
+	Writes := []
 	for _, E in _HCW_CATEGORY_LIST {
 		if E.IsPersonal {
-			_HCW_PatchTomlMeta(E.Path, "", "color", HCWWEB_GREY)
+			Writes.Push(_HCW_PatchTomlMeta.Bind(E.Path, "", "color", HCWWEB_GREY))
 			for _, Sec in _HCW_GetSections(E)
-				_HCW_PatchTomlMeta(E.Path, Sec.Name, "color", "")
+				Writes.Push(_HCW_PatchTomlMeta.Bind(E.Path, Sec.Name, "color", ""))
 		} else if E.IsExtension {
-			HotstringsSetOverride("ext." . E.ExtId, "", "color", HCWWEB_GREY)
+			Writes.Push(HotstringsSetOverride.Bind("ext." . E.ExtId, "", "color", HCWWEB_GREY))
 			for _, Sec in _HCW_GetSections(E)
-				HotstringsClearOverride("ext." . E.ExtId, Sec.Name, "color")
+				Writes.Push(HotstringsClearOverride.Bind("ext." . E.ExtId, Sec.Name, "color"))
 		} else {
-			HotstringsSetOverride(E.Key, "", "color", HCWWEB_GREY)
+			Writes.Push(HotstringsSetOverride.Bind(E.Key, "", "color", HCWWEB_GREY))
 			for _, Sec in _HCW_GetSections(E)
-				HotstringsClearOverride(E.Key, Sec.Name, "color")
+				Writes.Push(HotstringsClearOverride.Bind(E.Key, Sec.Name, "color"))
 		}
 	}
+	return _HCW_RunWriteBatch(Writes, _HCWWeb_ReconcileState.Bind())
 }
 
 ; Find a category entry by its unique key (the "name" the frontend echoes back).

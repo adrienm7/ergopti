@@ -13,11 +13,11 @@ local helpers = require("tests.helpers")
 
 
 
--- =========================================
--- =========================================
--- ======= 1/ Exact Storage Operations =====
--- =========================================
--- =========================================
+-- ===========================================
+-- ===========================================
+-- ======= 1/ Exact Storage Operations =======
+-- ===========================================
+-- ===========================================
 
 helpers.describe("Storage exact operations", function()
 	helpers.it("read_exact preserves an absent value without reporting failure", function()

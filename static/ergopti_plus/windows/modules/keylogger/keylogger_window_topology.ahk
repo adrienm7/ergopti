@@ -294,7 +294,7 @@ KL_Topo_IsLikelyDesktopSwitch(prev_alive, incoming_last_seen, now) {
 				return false
 		if (incoming_last_seen = 0)
 				return true
-		return (now - incoming_last_seen) > KLTopoConst.DESKTOP_SWITCH_MIN_GAP_MS
+	return TickElapsed(incoming_last_seen, now) > KLTopoConst.DESKTOP_SWITCH_MIN_GAP_MS
 }
 
 

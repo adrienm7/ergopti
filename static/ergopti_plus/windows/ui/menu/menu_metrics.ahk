@@ -96,11 +96,29 @@ BuildMetricsMenu() {
 }
 
 ; List provider: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
+_MET_PromptShortcutAndRefresh(which, ToggleFn, PromptFn := 0, RefreshFn := 0) {
+	Before := MS_GetDisplayLabel(which)
+	Result := HasMethod(PromptFn, "Call")
+		? PromptFn.Call(which, ToggleFn)
+		: MS_PromptShortcut(which, ToggleFn)
+	After := MS_GetDisplayLabel(which)
+	CommitOk := (Result is Integer) && Result == 1
+	; A partial commit deliberately returns false, but may have published a new
+	; durable binding plus cleanup warning. Refresh that changed projection too.
+	if !CommitOk && After == Before
+		return false
+	RefreshResult := HasMethod(RefreshFn, "Call")
+		? RefreshFn.Call()
+		: RebuildTrayMenu()
+	RefreshOk := (RefreshResult is Integer) && RefreshResult == 1
+	return CommitOk && RefreshOk
+}
+
 _MET_ShortcutTypingRows(Getters) {
 	return [Map(
 		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing")) . MS_GetDisplayLabel("typing"),
 		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters),
-		"action",   (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))]
+		"action",   (*) => _MET_PromptShortcutAndRefresh("typing", KLUI_ToggleTyping))]
 }
 
 ; List provider: Apps shortcut picker (ZWS differentiates from typing sc label).
@@ -108,7 +126,7 @@ _MET_ShortcutAppsRows(Getters) {
 	return [Map(
 		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_apps")) . MS_GetDisplayLabel("apps") . Chr(0x200B),
 		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_apps", Getters),
-		"action",   (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))]
+		"action",   (*) => _MET_PromptShortcutAndRefresh("apps", KLUI_ToggleApps))]
 }
 
 

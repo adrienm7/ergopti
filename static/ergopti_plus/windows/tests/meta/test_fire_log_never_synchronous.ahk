@@ -123,10 +123,22 @@ _FLNS_NoUnexpectedSynchronousCaller() {
 _FLNS_QueueIsActuallyDeferred() {
 	Body := _DriverFuncBody("_HSE_QueueFireLog")
 	Assert(Body != "", "_HSE_QueueFireLog() must exist in the driver source")
-	Assert(InStr(Body, "SetTimer") > 0,
-		"the enqueue must hand the drain to a timer — that is the only thing that moves the flush off the keystroke thread")
+	Assert(InStr(Body, "_HSE_ArmFireLogDrain") > 0,
+		"the enqueue must hand the record to the lifecycle-owned timer arm — that is the only thing that moves the flush off the keystroke thread without losing suspend ownership")
 	Assert(InStr(Body, "KL_LogHotstring(") == 0,
 		"the enqueue must not log inline; it exists precisely to avoid that")
+
+	ArmBody := _DriverFuncBody("_HSE_ArmFireLogDrain")
+	Assert(ArmBody != "", "_HSE_ArmFireLogDrain() must exist in the driver source")
+	Assert(InStr(ArmBody, "_HSE_DrainFireLog.Bind(_PrefixDeferredGeneration)") > 0,
+		"the lifecycle-owned arm must freeze the exact generation in its callback — a stale queued timer must not impersonate the resumed owner")
+	Assert(InStr(ArmBody, "TimerAfter(") > 0,
+		"the lifecycle-owned callback must schedule through the TimerScheduler port")
+	AdapterBody := _DriverFuncBody("TimerAfter")
+	Assert(InStr(AdapterBody, "SetTimer(BoundFn, Ms)") > 0,
+		"TimerAfter must still reach the OS one-shot primitive — a synchronous fake adapter would make the deferral assertion false-green")
+	Assert(InStr(ArmBody, "KL_LogHotstring(") == 0,
+		"the timer arm must not hide a synchronous sink call")
 }
 
 

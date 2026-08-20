@@ -71,12 +71,16 @@ CryptoSha256(Data) {
 						throw Error("BCryptOpenAlgorithmProvider(SHA256) failed")
 
 				Discarded := 0, ObjectLength := 0, DigestLength := 0
-				DllCall("bcrypt\BCryptGetProperty", "Ptr", hAlg, "Str", CRYPTO_BCRYPT_PROP_OBJECT_LENGTH,
-						"UInt*", &ObjectLength, "UInt", 4, "UInt*", &Discarded, "UInt", 0)
-				DllCall("bcrypt\BCryptGetProperty", "Ptr", hAlg, "Str", CRYPTO_BCRYPT_PROP_DIGEST_LENGTH,
-						"UInt*", &DigestLength, "UInt", 4, "UInt*", &Discarded, "UInt", 0)
-				if (!ObjectLength or !DigestLength)
-						throw Error("BCryptGetProperty returned no buffer sizes")
+				ObjectStatus := DllCall("bcrypt\BCryptGetProperty", "Ptr", hAlg,
+						"Str", CRYPTO_BCRYPT_PROP_OBJECT_LENGTH, "UInt*", &ObjectLength,
+						"UInt", 4, "UInt*", &Discarded, "UInt", 0, "UInt")
+				DigestStatus := DllCall("bcrypt\BCryptGetProperty", "Ptr", hAlg,
+						"Str", CRYPTO_BCRYPT_PROP_DIGEST_LENGTH, "UInt*", &DigestLength,
+						"UInt", 4, "UInt*", &Discarded, "UInt", 0, "UInt")
+				if ObjectStatus != 0 || DigestStatus != 0
+						throw Error("BCryptGetProperty failed")
+				if !ObjectLength || DigestLength != 32
+						throw Error("BCryptGetProperty returned invalid SHA-256 buffer sizes")
 
 				HashObject := Buffer(ObjectLength, 0)
 				Digest     := Buffer(DigestLength, 0)
@@ -89,8 +93,14 @@ CryptoSha256(Data) {
 				Utf8      := Buffer(ByteCount < 1 ? 1 : ByteCount, 0)
 				if (ByteCount > 0)
 						StrPut(Data, Utf8, ByteCount, "UTF-8")
-				DllCall("bcrypt\BCryptHashData", "Ptr", hHash, "Ptr", Utf8, "UInt", ByteCount, "UInt", 0)
-				DllCall("bcrypt\BCryptFinishHash", "Ptr", hHash, "Ptr", Digest, "UInt", DigestLength, "UInt", 0)
+				HashStatus := DllCall("bcrypt\BCryptHashData", "Ptr", hHash,
+						"Ptr", Utf8, "UInt", ByteCount, "UInt", 0, "UInt")
+				if HashStatus != 0
+						throw Error("BCryptHashData failed")
+				FinishStatus := DllCall("bcrypt\BCryptFinishHash", "Ptr", hHash,
+						"Ptr", Digest, "UInt", DigestLength, "UInt", 0, "UInt")
+				if FinishStatus != 0
+						throw Error("BCryptFinishHash failed")
 
 				out := ""
 				loop DigestLength
@@ -260,6 +270,20 @@ CryptoBase64Encode(buf) {
 		DllCall("Crypt32\CryptBinaryToStringW", "Ptr", buf.Ptr, "UInt", buf.Size,
 				"UInt", flags, "Ptr", out.Ptr, "UInt*", &required)
 		return StrGet(out.Ptr, required, "UTF-16")
+}
+
+; Encodes a string as UTF-8 without a terminating NUL, then Base64-encodes the
+; exact bytes. Keeping both conversions here prevents transport code from
+; reaching around the crypto adapter for WideCharToMultiByte.
+CryptoBase64EncodeUtf8(Text) {
+		if !(Text is String)
+				throw TypeError("CryptoBase64EncodeUtf8 requires a String")
+		ByteCount := StrPut(Text, "UTF-8") - 1
+		if (ByteCount <= 0)
+				return ""
+		Utf8 := Buffer(ByteCount, 0)
+		StrPut(Text, Utf8, ByteCount, "UTF-8")
+		return CryptoBase64Encode(Utf8)
 }
 
 ; Base64-decodes to a Buffer.

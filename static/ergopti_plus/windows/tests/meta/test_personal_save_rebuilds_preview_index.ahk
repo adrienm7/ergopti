@@ -1,27 +1,26 @@
 ﻿; tests/meta/test_personal_save_rebuilds_preview_index.ahk
 
 ; ==============================================================================
-; MODULE: Regression - a live personal reload must resync the preview index
+; MODULE: Regression - a live personal reload must resync the analytics catalogue
 ;         (personal-save-leaves-preview-index-stale)
 ; DESCRIPTION:
-; Saving from the personal-hotstring editor re-registered the ENGINE in place
-; and left the tooltip's PREVIEW index holding whatever the last full rebuild
-; had put there. Typing "zz" advertised the pre-edit expansion while typing the
-; final character emitted the new one. Deleting a trigger was worse: the preview
-; kept offering it, and _PreviewEngineWouldFire fails OPEN for a trigger it can
-; no longer find in the registry.
+; Saving from the personal-hotstring editor re-registers the ENGINE in place.
+; The tooltip now asks that registry directly, which removes the former stale
+; preview bug by construction. The file-derived `_TriggerSet` remains as a
+; separate near-miss analytics catalogue, however, and must be refreshed after
+; a live save or persisted metrics describe triggers and outputs that no longer
+; exist.
 ;
-; ROOT CAUSE ENCODED: the two sides are rebuilt by different code, and only one
-; of them was on the save path. RebuildHotstringsLive already pairs its registry
-; rewrite with a preview-index rebuild; the editor path was the sibling that was
-; forgotten. The pairing is therefore asserted on the function that MUTATES the
-; registry, not on the two save handlers that happen to call it today - a fix
-; scoped to the callers would have to be repeated for every caller added later,
-; which is the exact shape of the bug.
+; ROOT CAUSE ENCODED: the engine and auxiliary catalogue are rebuilt by
+; different code, and only one was on the save path. The pairing is asserted on
+; the function that MUTATES the registry, not on today's save handlers. A fix
+; scoped to callers would have to be repeated for every caller added later,
+; which is the exact sibling-site bug shape. A separate ownership assertion
+; prevents that catalogue from regaining user-facing decision authority.
 ;
 ; SCOPE: source-introspective. HotstringPrefixWatcherRebuildIndex early-returns
 ; whenever _PrefixInputHook is 0, which it always is under the headless harness
-; (the watcher's InputHook is never started there), so the resync cannot be
+; (the watcher's InputHook is never started there), so the catalogue resync cannot be
 ; observed by running it - only the wiring can be asserted. The one runtime
 ; assertion below covers the coalescing constant, which IS reachable.
 ; ==============================================================================
@@ -32,11 +31,11 @@
 
 
 
-; ==================================================================
-; ==================================================================
-; ======= 1/ Whoever rewrites the registry resyncs the index =======
-; ==================================================================
-; ==================================================================
+; ===================================================================
+; ===================================================================
+; ======= 1/ Registry rewrites resync the analytics catalogue =======
+; ===================================================================
+; ===================================================================
 
 ; Every function whose body CALLS Token, excluding Token's own definition.
 ; Derived from source so a second live-reload path added tomorrow joins the
@@ -62,8 +61,9 @@ _PSR_EnclosingFunctions(Token) {
 }
 
 ; The live-reload path clears an HSE group and re-registers into it, which is
-; precisely "the engine registry now says something the preview index does not".
-_PSR_EveryGroupReloadResyncsThePreviewIndex() {
+; precisely "the engine registry now says something the analytics catalogue
+; does not".
+_PSR_EveryGroupReloadResyncsTheAnalyticsCatalogue() {
 	Callers := _PSR_EnclosingFunctions("HSE_ClearGroupForReload(")
 	; Non-vacuity floor: the live-reload path exists. A scan that stopped
 	; matching would otherwise make the loop below unable to fail.
@@ -74,8 +74,23 @@ _PSR_EveryGroupReloadResyncsThePreviewIndex() {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . "() must exist in the driver source")
 		Assert(InStr(Body, "HotstringPrefixWatcherRebuildIndex") > 0,
-			Name . " rewrites the engine registry in place, so it must also resync the tooltip's preview index. Without it the editor's Save left the tooltip advertising the pre-edit expansion while the engine emitted the new one, and a deleted trigger kept being previewed because _PreviewEngineWouldFire fails open for a trigger it cannot find in the registry")
+			Name . " rewrites the engine registry in place, so it must also resync the auxiliary near-miss catalogue. Without it persisted analytics keep naming the pre-edit trigger and output after Save")
 	}
+}
+
+; `_TriggerSet` is deliberately a second data structure, but only for the
+; observational near-miss sink. It must never again become a candidate source.
+_PSR_TriggerSetIsAnalyticsOnly() {
+	Collect := _DriverFuncBody("_PrefixCollectCandidates")
+	NearMiss := _DriverFuncBody("_CheckNearMiss")
+	Assert(Collect != "" and NearMiss != "",
+		"the canonical collector and near-miss consumer must both exist")
+	Assert(InStr(Collect, "HSE_PreviewNextDecision") > 0,
+		"the tooltip collector must ask the live engine decision directly")
+	Assert(InStr(Collect, "_TriggerSet") == 0 and InStr(Collect, "_PrefixIndex") == 0,
+		"neither auxiliary catalogue may participate in the user-facing decision")
+	Assert(InStr(NearMiss, "_TriggerSet") > 0,
+		"the catalogue rebuild must still serve its real consumer: near-miss analytics")
 }
 
 ; The reload must still BE a reload. If it stopped clearing and re-registering,
@@ -93,11 +108,11 @@ _PSR_ReloadStillRewritesTheRegistry() {
 
 
 
-; ============================================================
-; ============================================================
-; ======= 2/ The resync coalesces instead of repeating =======
-; ============================================================
-; ============================================================
+; ======================================================================
+; ======================================================================
+; ======= 2/ The analytics resync coalesces instead of repeating =======
+; ======================================================================
+; ======================================================================
 
 ; The webview save reloads every edited section in a loop, and a full index
 ; rebuild costs ~150 ms warm (far more on a cold TOML read). A one-shot timer
@@ -107,7 +122,7 @@ _PSR_ReloadStillRewritesTheRegistry() {
 _PSR_ResyncIsAOneShotTimer() {
 	Body := _DriverFuncBody("ReloadPersonalSection")
 	Assert(RegExMatch(Body, "SetTimer\(\s*HotstringPrefixWatcherRebuildIndex\s*,\s*-") > 0,
-		"the preview-index resync must be armed as a ONE-SHOT timer (negative period). A positive period installs a repeating full rebuild that re-reads every hotstring TOML forever, and a synchronous call would make the webview save pay the rebuild once per edited section")
+		"the analytics-catalogue resync must be armed as a ONE-SHOT timer (negative period). A positive period installs a repeating full rebuild that re-reads every hotstring TOML forever, and a synchronous call would make the webview save pay the rebuild once per edited section")
 }
 
 ; The coalescing delay must be a real, positive delay: zero or a negative
@@ -122,8 +137,10 @@ _PSR_CoalescingDelayIsPositive() {
 }
 
 
-Test("personal-save-preview-index: every live registry reload resyncs the preview index",
-	_PSR_EveryGroupReloadResyncsThePreviewIndex)
+Test("personal-save-preview-index: every live registry reload resyncs the analytics catalogue",
+	_PSR_EveryGroupReloadResyncsTheAnalyticsCatalogue)
+Test("personal-save-preview-index: the trigger set remains analytics-only",
+	_PSR_TriggerSetIsAnalyticsOnly)
 Test("personal-save-preview-index: the live reload still rewrites the engine registry",
 	_PSR_ReloadStillRewritesTheRegistry)
 Test("personal-save-preview-index: the resync is armed as a coalescing one-shot timer",

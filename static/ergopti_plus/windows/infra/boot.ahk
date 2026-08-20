@@ -37,7 +37,6 @@ global LAST_SENT_KEY_TIME_PRUNE_AT := 150
 global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times, we can do the same in the navigation layer
 global ActivitySimulation := False
 global OneShotShiftEnabled := False
-global _TOML_STRICT_CANON_IN_PROGRESS := false
 
 ; Read path overrides from paths.toml — same file format as Hammerspoon.
 ; Auto-generated with defaults if absent.
@@ -50,6 +49,10 @@ global _TOML_STRICT_CANON_IN_PROGRESS := false
 global _PathsFile := A_IsCompiled
 		? (A_AppData . "\Ergopti\paths.toml")
 		: (A_ScriptDir . "\_generated\paths.toml")
+; A valid transition chooses one complete old/new image before the locator is
+; read. Quarantine is visible and fatal: continuing would let a mixed image
+; select the wrong config directory and later be persisted as coherent state.
+ConfigTransitionRecoverAtBootOrThrow(_PathsFile)
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.

@@ -100,7 +100,10 @@ _TDB_TheArmedDelayIsNotComputed() {
 	Body := _DriverFuncBody("TooltipShow")
 	Assert(Body != "", "TooltipShow() must exist in the driver source")
 
-	Assert(RegExMatch(Body, "SetTimer\(_TooltipDeferredShowFn,\s*-TOOLTIP_RENDER_DEBOUNCE_MS\s*\)") > 0,
+	Assert(InStr(Body,
+		"Request.TimerFn := _TooltipDeferredShowFn.Bind(Request.Serial)") > 0
+		and RegExMatch(Body,
+			"SetTimer\(Request\.TimerFn,\s*-TOOLTIP_RENDER_DEBOUNCE_MS\s*\)") > 0,
 		"TooltipShow must arm the deferred render with TOOLTIP_RENDER_DEBOUNCE_MS itself, not with a computed delay. A leading-edge or otherwise shortened delay leaves all three constants untouched, so the arithmetic guard above still passes while the preview render moves back below the UIA idle gate and stage 2 of the position cascade becomes unreachable again")
 
 	; The specific shape that was proposed and rejected: a last-render timestamp

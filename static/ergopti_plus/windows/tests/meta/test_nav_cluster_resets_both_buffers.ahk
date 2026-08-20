@@ -114,36 +114,13 @@ _NCR_PreviewResetsForEveryNavKey() {
 ; ==================================================================
 ; ==================================================================
 
-; The two reset branches, isolated so each key can be attributed to the right
-; boundary-flag promise.
-_NCR_BranchFor(Marker) {
-	Body := _DriverFuncBody("_OnPrefixKeyDown")
-	if (Body == "")
-		return ""
-	Start := InStr(Body, Marker)
-	if (!Start)
-		return ""
-	Stop := InStr(Body, "HSE_FeedReset", , Start)
-	return (Stop > 0) ? SubStr(Body, Start, Stop - Start) : ""
-}
-
 _NCR_EngineResetsForEveryNavKey() {
-	global _NCR_CURSOR_MOVERS, _NCR_CONTEXT_REWRITERS
 	Body := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Body != "", "_OnPrefixKeyDown() must exist in the driver source")
-
-	; Every cursor mover must appear in a VK test that leads to a reset. The
-	; comparison text is what the branch conditions are written in.
-	for VK, Name in _NCR_CURSOR_MOVERS {
-		Hex := Format("0x{:02X}", VK)
-		Assert(RegExMatch(Body, "VK\s*==\s*" . Hex),
-			Name . " (" . Hex . ") must be tested in _OnPrefixKeyDown's reset chain. Without it the ENGINE buffer survives the caret move, so the next expansion backspaces over whatever now sits at the new position — the tooltip half of the fix alone does not prevent the text corruption")
-	}
-	for VK, Name in _NCR_CONTEXT_REWRITERS {
-		Hex := Format("0x{:02X}", VK)
-		Assert(RegExMatch(Body, "VK\s*==\s*" . Hex),
-			Name . " (" . Hex . ") must be tested in _OnPrefixKeyDown's reset chain — it rewrites context the engine buffer still claims to describe")
-	}
+	Gate := InStr(Body, "else if ResetVKs.Has(VK)")
+	Pair := InStr(Body, "_PrefixInvalidateInputContext(FocusToken, KnownBoundary)", true, Gate)
+	Assert(Gate > 0 and Pair > Gate,
+		"every key enumerated by ResetVKs must flow through the same paired engine+preview transaction; a second VK list is the N-of-M drift this test prevents")
 }
 
 ; The boundary flag each group promises. Getting this wrong is silent: too
@@ -153,14 +130,10 @@ _NCR_BoundaryPromiseMatchesTheContract() {
 	Body := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Body != "", "_OnPrefixKeyDown() must exist")
 
-	; Insert/Delete branch: reset with boundary FALSE.
-	RewriteBranch := _NCR_BranchFor("VK == 0x2D")
-	Assert(RewriteBranch != "", "the Insert/Delete branch must exist and reach a reset")
-	Assert(InStr(Body, "HSE_FeedReset(false, true)") > 0,
+	; Insert/Delete select boundary FALSE; all other ResetVKs keep TRUE.
+	Assert(InStr(Body, "KnownBoundary := !(VK == 0x2D or VK == 0x2E)") > 0,
 		"Insert and Delete must reset with the boundary flag FALSE, like the disruptive Ctrl combos: they rewrite text in place without moving the caret, so nothing can be assumed about what now sits to its left")
-
-	; Cursor movers: reset with boundary TRUE, the treatment the arrows had.
-	Assert(InStr(Body, "HSE_FeedReset(true, true)") > 0,
+	Assert(InStr(Body, "_PrefixInvalidateInputContext(FocusToken, KnownBoundary)") > 0,
 		"the cursor movers must keep resetting with the boundary flag TRUE — the caret landed somewhere unknown, but the next typed run legitimately starts a fresh word")
 }
 

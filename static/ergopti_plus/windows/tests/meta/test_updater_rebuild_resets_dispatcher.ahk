@@ -12,15 +12,19 @@
 ; would erase callbacks registered in detached child menus before they attach.
 ;
 ; The fix wraps all updater-originated menu rebuilds in _Updater_RebuildMenu(),
-; which calls initMenu(), the single staged publication path used by every tray
-; rebuild.
+; which enters RebuildTrayMenu's shared root coordinator. Lifecycle-owned
+; callbacks bind their immutable generation/request authorization into that
+; coordinator, so it is rechecked inside TrayMenuStage_Publish immediately
+; before the irreversible root replacement.
 ;
 ; This test asserts:
 ;   1. _Updater_RebuildMenu is defined in the updater module.
-;   2. _Updater_RebuildMenu delegates directly to staged initMenu() and does not
-;      perform an unsafe pre-stage dispatcher reset.
+;   2. _Updater_RebuildMenu delegates to the root coordinator with causal
+;      queued-outcome semantics and does not perform an unsafe pre-stage reset.
 ;   3. All SetTimer(-50) tray-rebuild calls in the updater go through
 ;      _Updater_RebuildMenu, not bare initMenu() calls.
+;   4. Generation and request runners pass a terminal authorizer, while every
+;      non-success terminal retains the updater replay obligation.
 ;
 ; SCOPE: source introspection of modules/updater/.
 ; ==============================================================================
@@ -63,12 +67,15 @@ _URRD_RebuildMenuUsesStagedPublisher() {
 	Body := _DriverFuncBody("_Updater_RebuildMenu")
 	Assert(Body != "", "_Updater_RebuildMenu must be defined — prerequisite for this test")
 
-	RebuildPos := InStr(Body, "initMenu()")
+	RebuildPos := InStr(Body,
+		"RebuildTrayMenu(PublishAuthorizeFn, WorkerFn, false)")
 
 	Assert(RebuildPos > 0,
-		"_Updater_RebuildMenu must call initMenu() so every updater rebuild uses staged publication")
+		"_Updater_RebuildMenu must enter the shared root coordinator and require an actual terminal outcome instead of acknowledging a queued build")
 	Assert(InStr(Body, "MenuDispatcher_Reset()") = 0,
 		"_Updater_RebuildMenu must not clear dispatcher Maps before staged child menus publish; TrayMenuStage_Publish owns epoch invalidation and pruning")
+	Assert(InStr(Body, "_Updater_MarkMenuRebuildPending()") > 0,
+		"_Updater_RebuildMenu must retain refused, malformed, and thrown terminal outcomes for replay")
 }
 
 Test("updater: _Updater_RebuildMenu delegates to staged publication (updater-rebuild-resets-dispatcher)",
@@ -89,3 +96,23 @@ _URRD_NoBareinitMenuInSetTimerCalls() {
 
 Test("updater: no bare initMenu() in SetTimer calls (updater-rebuild-resets-dispatcher)",
 	_URRD_NoBareinitMenuInSetTimerCalls)
+
+
+_URRD_LifecycleRunnersPassTerminalAuthorizers() {
+	GenerationBody := _DriverFuncBody(
+		"_Updater_RunMenuRebuildForGeneration")
+	RequestBody := _DriverFuncBody("_Updater_RunMenuRebuildForRequest")
+	Assert(GenerationBody != "",
+		"_Updater_RunMenuRebuildForGeneration must exist")
+	Assert(RequestBody != "",
+		"_Updater_RunMenuRebuildForRequest must exist")
+	Assert(InStr(GenerationBody,
+		"_Updater_MenuGenerationAuthorized.Bind(Generation)") > 0,
+		"the generation runner must carry its immutable lifecycle ticket to terminal tray publication")
+	Assert(InStr(RequestBody,
+		"_Updater_MenuRequestAuthorized.Bind(Request)") > 0,
+		"the request runner must carry its immutable provenance ticket to terminal tray publication")
+}
+
+Test("updater: lifecycle runners authorize the terminal root swap (updater-tray-terminal-authorization)",
+	_URRD_LifecycleRunnersPassTerminalAuthorizers)

@@ -51,6 +51,7 @@
 ; behaviour keeps that order intact while standalone validation resolves
 ; LoggerDebug instead of treating it as an uninitialised local callable.
 #Include logger.ahk
+#Include ../adapters/key_state.ahk
 
 
 
@@ -298,6 +299,7 @@ class HookDispatcher {
 	; consumer. Two QPC reads; the log line is gated by the profiler floor.
 	static _OnKeyDown(ih, vk, sc) {
 		_hpKeyDown := HotPath_Now()
+		KS_RecordPhysicalKeyDown(vk, sc, "dispatcher")
 		try TapHoldTrackKeyDownByScancode(vk, sc)
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackKeyDownByScancode", _thTrackErr)
@@ -334,6 +336,7 @@ class HookDispatcher {
 	; =====================================================
 
 	static _OnLDown(*) {
+		KS_RecordPhysicalInput()
 		HookDispatcher._CancelTapHoldActivity()
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LDOWN)
 	}
@@ -342,6 +345,7 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_LUP)
 	}
 	static _OnRDown(*) {
+		KS_RecordPhysicalInput()
 		HookDispatcher._CancelTapHoldActivity()
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RDOWN)
 	}
@@ -350,6 +354,7 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_RUP)
 	}
 	static _OnMDown(*) {
+		KS_RecordPhysicalInput()
 		HookDispatcher._CancelTapHoldActivity()
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MDOWN)
 	}
@@ -358,18 +363,21 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_MUP)
 	}
 	static _OnX1Down(*) {
+		KS_RecordPhysicalInput()
 		HookDispatcher._CancelTapHoldActivity("extra mouse button during hold")
 	}
 	static _OnX1Up(*) {
 		HookDispatcher._CancelTapHoldActivity("extra mouse button release during hold")
 	}
 	static _OnX2Down(*) {
+		KS_RecordPhysicalInput()
 		HookDispatcher._CancelTapHoldActivity("extra mouse button during hold")
 	}
 	static _OnX2Up(*) {
 		HookDispatcher._CancelTapHoldActivity("extra mouse button release during hold")
 	}
 	static _OnWheelUp(*) {
+		KS_RecordPhysicalInput()
 		try TapHoldTrackScrollCancel()
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
@@ -379,6 +387,7 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WUP)
 	}
 	static _OnWheelDown(*) {
+		KS_RecordPhysicalInput()
 		try TapHoldTrackScrollCancel()
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
@@ -388,6 +397,7 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WDN)
 	}
 	static _OnWheelRight(*) {
+		KS_RecordPhysicalInput()
 		try TapHoldTrackScrollCancel()
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
@@ -397,6 +407,7 @@ class HookDispatcher {
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_WRIGHT)
 	}
 	static _OnWheelLeft(*) {
+		KS_RecordPhysicalInput()
 		try TapHoldTrackScrollCancel()
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackScrollCancel", _thTrackErr)
@@ -410,6 +421,7 @@ class HookDispatcher {
 	; touchpad devices). Updates `_last_wheel_tick` even when hotkey binding does
 	; not emit due OS/driver message variation.
 	static _OnWheelMessage(wparam, lparam, msg, hwnd) {
+		KS_RecordPhysicalInput()
 		local delta := (wparam >> 16) & 0xFFFF
 		if (delta > 0x7FFF)
 			delta := delta - 0x10000

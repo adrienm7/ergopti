@@ -462,15 +462,18 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("returns nil for unknown actions", function()
       helpers.assert_eq(handler.on_message("unknown", state), nil)
     end)
-    helpers.it("returns a selected n-gram range over the native Linux bridge", function()
-      local result = handler.on_message({
-        action = "range", start_date = "2026-07-01", end_date = "2026-07-18", apps = { "firefox" },
-      }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result._prefetch_data.historical.c.a.c, 2)
-      helpers.assert_eq(result._prefetch_data.today.firefox.c.b.c, 3)
-      helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
-    end)
+		helpers.it("returns a selected n-gram range over the native Linux bridge", function()
+			local result = handler.on_message({
+				action = "range", request_id = 41,
+				start_date = "2026-07-01", end_date = "2026-07-18", apps = { "firefox" },
+			}, state)
+			helpers.assert_true(type(result) == "table")
+			helpers.assert_eq(result._prefetch_data.historical.c.a.c, 2)
+			helpers.assert_eq(result._prefetch_data.today.firefox.c.b.c, 3)
+			helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
+			helpers.assert_eq(result.range_request_id, 41,
+				"range replies must preserve the UI request owner across the native bridge")
+		end)
   end)
 
   -- ===========================================================================

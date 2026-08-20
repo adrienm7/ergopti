@@ -25,18 +25,6 @@
 ; AHK uses two HWNDs (content + border); PREPARE keeps both hidden until the
 ; border DIB and content controls are ready, then REVEAL shows them together.
 
-; Hide content + border without destroying HWNDs. Used before in-place rebuilds
-; (LLM streaming refresh, dequeue destack) so a lone border ring never lingers.
-_TooltipSuspendSurfaces() {
-		global _TooltipBorderGui, _TooltipRowGuis
-		if _TooltipBorderGui {
-				try GR_Hide(_TooltipBorderGui.Hwnd)
-		}
-		for , Row in _TooltipRowGuis {
-				try DllCall("User32\ShowWindow", "Ptr", Row.Gui.Hwnd, "Int", 0)
-		}
-}
-
 ; Show content + border together after PREPARE completed while hidden.
 ; The content is a normal Gui (background + text controls); the border is a
 ; separate pre-painted layered window. ShowWindow only QUEUES a WM_PAINT for the
@@ -46,15 +34,51 @@ _TooltipSuspendSurfaces() {
 ; flushes the content's paint SYNCHRONOUSLY (it bypasses the queue), so the
 ; background+text are on screen BEFORE the border is revealed and the two surfaces
 ; appear as one. This keeps the two-window design but removes the visible seam.
-_TooltipRevealSurfaces() {
-		global _TooltipBorderGui, _TooltipRowGuis
-		if (_TooltipRowGuis.Length > 0) {
-				try DllCall("User32\ShowWindow", "Ptr", _TooltipRowGuis[1].Gui.Hwnd, "Int", 4)
-				try DllCall("User32\UpdateWindow", "Ptr", _TooltipRowGuis[1].Gui.Hwnd)
+_TooltipRevealPreparedSurfaces(Surface) {
+		if (Surface.Rows.Length > 0) {
+				try DllCall("User32\ShowWindow", "Ptr", Surface.Rows[1].Gui.Hwnd, "Int", 4)
+				try DllCall("User32\UpdateWindow", "Ptr", Surface.Rows[1].Gui.Hwnd)
 		}
-		if _TooltipBorderGui {
-				GR_Show(_TooltipBorderGui.Hwnd)
+		if Surface.Border {
+				GR_Show(Surface.Border.Hwnd)
 		}
+}
+
+; Hide only the explicit owner passed by the caller. Never consult the active
+; global here: a stale renderer may resume after a newer one has committed.
+_TooltipHideSurfaceObjects(Surface) {
+		if !IsObject(Surface)
+			return
+		if Surface.Border
+			try GR_Hide(Surface.Border.Hwnd)
+		for , Row in Surface.Rows
+			try DllCall("User32\ShowWindow", "Ptr", Row.Gui.Hwnd, "Int", 0)
+}
+
+; Candidate wrapper shared by stale-build cleanup and the final presenter.
+; HWND reads are best-effort because a concurrently destroyed detached Gui can
+; already have lost its native window; Gui.Destroy remains the second backstop.
+_TooltipCreateDetachedSurface(Row, Generation, Pos := 0) {
+		Surface := { Gui: Row.Gui, Rows: [Row], Border: 0, Pos: Pos,
+			ContentHwnds: [], BorderHwnds: [], Generation: Generation,
+			LlmPresented: 0 }
+		try Surface.ContentHwnds.Push(Row.Gui.Hwnd)
+		return Surface
+}
+
+_TooltipQueueSurfaceDisposal(Surface) {
+		if IsObject(Surface)
+			SetTimer(_TooltipDisposeRetired.Bind(Surface), -1)
+}
+
+; Pure selection used by the production commit and its re-entrance test. A
+; candidate that lost its immutable generation never becomes active and never
+; retires the surface installed by the newer renderer.
+_TooltipChoosePreparedSurface(ExpectedGeneration, CurrentGeneration,
+	CurrentSurface, CandidateSurface) {
+		if (ExpectedGeneration != CurrentGeneration)
+			return { Committed: false, Active: CurrentSurface, Retired: 0 }
+		return { Committed: true, Active: CandidateSurface, Retired: CurrentSurface }
 }
 
 ; PREPARE + REVEAL for a built stack. Pos = { X, Y }, Row = { Gui, W, H }.
@@ -103,124 +127,510 @@ _TooltipClampToScreen(X, Y, W, H) {
 		return _TooltipClampRect(X, Y, W, H, L, Top, R, B, MARGIN)
 }
 
+_TooltipItemHasAbsoluteDeadline(Item) {
+		return (IsObject(Item)
+			and Item.HasOwnProp("ExpireOriginTick")
+			and Item.HasOwnProp("ExpireDurationMs")
+			and Item.ExpireDurationMs > 0)
+}
+
+; Keep the canonical origin/duration pair intact. In particular, never turn an
+; already-expired row into a live one by replacing a zero remainder with an
+; arbitrary positive SetTimer floor.
+_TooltipFilterUnexpiredDeadlineItems(Items, NowTick?) {
+		if !IsSet(NowTick)
+			NowTick := A_TickCount
+		LiveItems := []
+		for , Item in Items {
+			if (_TooltipItemHasAbsoluteDeadline(Item)
+				and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
+				continue
+			LiveItems.Push(Item)
+		}
+		return LiveItems
+}
+
+_TooltipAbsoluteDeadlinesStillLive(Items, NowTick?) {
+		if !IsSet(NowTick)
+			NowTick := A_TickCount
+		for , Item in Items {
+			if (_TooltipItemHasAbsoluteDeadline(Item)
+				and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
+				return false
+		}
+		return true
+}
+
+; Build the immutable lifecycle plan before any GUI/UIA work. The plan carries
+; origin/duration pairs, never a sampled remainder: a remainder becomes stale as
+; soon as an interruptible renderer pumps the message queue.
+_TooltipCreateLifecyclePlan(Items, DurationSec, OriginMs) {
+		global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
+		HasAnyDur := false
+		HasMixedDur := false
+		FirstDur := 0
+		for , Item in Items {
+			D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+			if (D > 0) {
+				HasAnyDur := true
+				if (FirstDur == 0)
+					FirstDur := D
+				else if (D != FirstDur)
+					HasMixedDur := true
+			}
+		}
+
+		HasAbsoluteDeadlines := false
+		for , Item in Items {
+			if Item.HasOwnProp("ExpireDurationMs") {
+				HasAbsoluteDeadlines := true
+				break
+			}
+		}
+
+		Plan := {
+			DequeueItems: 0,
+			DequeueActive: false,
+			DeadlineItems: [],
+			ArmExactDeadline: false
+		}
+		if (HasAbsoluteDeadlines or (HasAnyDur and HasMixedDur)) {
+			Plan.DequeueItems := []
+			for , Item in Items {
+				D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+				HasAbsoluteDeadline := (Item.HasOwnProp("ExpireOriginTick")
+					and Item.HasOwnProp("ExpireDurationMs"))
+				if (HasAbsoluteDeadlines and HasAbsoluteDeadline) {
+					ExpOriginTick := Item.ExpireOriginTick
+					ExpDurationMs := Item.ExpireDurationMs
+				} else if (D > 0) {
+					Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
+						D - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+					ExpOriginTick := OriginMs
+					ExpDurationMs := Round(Effective * 1000)
+				} else {
+					ExpOriginTick := OriginMs
+					ExpDurationMs := 0
+				}
+				Copy := {}
+				for Key, Value in Item.OwnProps()
+					Copy.%Key% := Value
+				Copy.ExpireOriginTick := ExpOriginTick
+				Copy.ExpireDurationMs := ExpDurationMs
+				Plan.DequeueItems.Push(Copy)
+				if (ExpDurationMs > 0)
+					Plan.DeadlineItems.Push(Copy)
+			}
+			Plan.DequeueActive := true
+			Plan.ArmExactDeadline := Plan.DeadlineItems.Length > 0
+			return Plan
+		}
+
+		EffectiveDur := DurationSec
+		for , Item in Items {
+			D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+			if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
+				EffectiveDur := D
+		}
+		if (EffectiveDur > 0) {
+			Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
+				EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+			Plan.DeadlineItems.Push({
+				ExpireOriginTick: OriginMs,
+				ExpireDurationMs: Round(Effective * 1000)
+			})
+			Plan.DequeueActive := true
+		}
+		return Plan
+}
+
+; Resolve the plan at the exact publication fence. Both timer owners derive
+; from one current tick, so GUI/UIA or callback latency cannot extend either.
+_TooltipLifecycleDeadlineBounds(Plan, NowTick?) {
+		if !IsSet(NowTick)
+			NowTick := A_TickCount
+		Bounds := { Expired: false, EarliestMs: 0, LatestMs: 0 }
+		if !IsObject(Plan) or !Plan.HasOwnProp("DeadlineItems")
+			return Bounds
+		for , Item in Plan.DeadlineItems {
+			Remaining := TickRemaining(
+				Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick)
+			if (Remaining <= 0) {
+				Bounds.Expired := true
+				continue
+			}
+			if (Bounds.EarliestMs == 0 or Remaining < Bounds.EarliestMs)
+				Bounds.EarliestMs := Remaining
+			if (Remaining > Bounds.LatestMs)
+				Bounds.LatestMs := Remaining
+		}
+		return Bounds
+}
+
+; The watcher owns the single source of truth for whether a decision still
+; describes the current engine buffer. Missing integration is legitimate for
+; isolated tooltip tests; a present-but-failing integration must fail closed.
+_TooltipDecisionItemsStillCurrent(Items) {
+		if !IsSet(HotstringPrefixWatcherDecisionItemsStillCurrent)
+			return true
+		return HotstringPrefixWatcherDecisionItemsStillCurrent(Items)
+}
+
+_TooltipPublishVisibleDecisions(Items) {
+		if !IsSet(HotstringPrefixWatcherPublishVisibleDecisions)
+			return true
+		return HotstringPrefixWatcherPublishVisibleDecisions(Items)
+}
+
+; Non-transactional follow-up for work that belongs to a successfully visible
+; hotstring surface but may schedule more async work (metrics / LLM bridge).
+; Publication above remains the in-memory commit. This notification deliberately
+; runs only after Critical is restored; the watcher can no-op if its generation
+; changed between commit and callback.
+_TooltipNotifySurfacePresented(Items, SurfaceToken) {
+		if !IsSet(HotstringPrefixWatcherOnSurfacePresented)
+			return
+		; Restoring an inherited Critical state still leaves this thread critical.
+		; Hop to a fresh timer turn so metrics/privacy/LLM follow-up is never invoked
+		; under either our transaction or a keyboard caller's outer transaction.
+		if A_IsCritical {
+			SetTimer(_TooltipNotifySurfacePresented.Bind(Items, SurfaceToken), -1)
+			return
+		}
+		try HotstringPrefixWatcherOnSurfacePresented(Items, SurfaceToken)
+		catch Error as Err
+			_UiOracleReportError(
+				"Visible-decision post-present callback failed: " . Err.Message)
+}
+
+; Oracle hooks are intentionally invoked inside short presentation/hide
+; transactions. Their exceptional diagnostics must not turn an inherited
+; keyboard-path Critical span into synchronous logger I/O.
+_UiOracleReportError(Message) {
+		if A_IsCritical {
+			SetTimer(_UiOracleReportError.Bind(Message), -1)
+			return
+		}
+		try LoggerError("Tooltip", "{1}", Message)
+}
+
 ; Sub-segmented on purpose. Tooltip.Present is the dominant hot-path offender in
 ; production (102 of 194 slow lines on the first day after the UIA fix, ~12.9 ms
-; mean), but it aggregates six steps whose individual costs all sit BELOW the
+; mean), but it aggregates steps whose individual costs all sit BELOW the
 ; profiler's 5 ms reporting floor — so the parent's number never said which of
 ; them moved, and every optimisation proposed against it was speculation. The
 ; marks below cost two QPC reads each, accumulate without logging, and are
 ; rendered into the parent's own already-gated line by HotPath_BreakdownDetail()
 ; in _TooltipShowNow. This runs on the deferred render timer, never on the
 ; keystroke callback.
-_TooltipPresentStack(Pos, Row, ArmSafety := true) {
-		global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP, _TOOLTIP_SAFETY_SEC
-		global _TooltipLastPos
+_TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
+	ClearDequeue := false, ExpectedRequestSerial := -1,
+	LifecyclePlan := 0, CommitFn := 0) {
+		global _TOOLTIP_SAFETY_SEC
+		global _TooltipActiveSurface
+		global _TooltipGeneration, _TooltipTimerGeneration
+		global _TooltipRequestSerial, _TooltipPendingRequest
+		global _TooltipDequeueItems, _TooltipDequeueActive
+		global _TooltipDequeueDeadlineTimer
+		; Every presenter carries the immutable generation it reserved. All expensive
+		; preparation below is detached: it cannot hide, destroy, round or reposition
+		; the active surface even if a newer renderer interrupts it.
 		HotPath_BreakdownBegin()
-		; Keep the whole tooltip on-screen — a wide prediction near the bottom-right
-		; corner would otherwise overflow and be clipped.
-		_hpClamp := HotPath_Now()
-		Pos := _TooltipClampToScreen(Pos.X, Pos.Y, Row.W, Row.H)
-		_TooltipLastPos := Pos
-		HotPath_BreakdownMark("clamp", _hpClamp)
+		_hpCandidate := HotPath_Now()
+		PreparedSurface := _TooltipCreateDetachedSurface(Row,
+			ExpectedGeneration, Pos)
+		HotPath_BreakdownMark("candidate", _hpCandidate)
+		try {
+			_hpClamp := HotPath_Now()
+			Pos := _TooltipClampToScreen(Pos.X, Pos.Y, Row.W, Row.H)
+			PreparedSurface.Pos := Pos
+			HotPath_BreakdownMark("clamp", _hpClamp)
 
-		; PREPARE — hidden at final coordinates (Hwnd valid, nothing painted yet).
-		_hpPrepare := HotPath_Now()
-		Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x{3} y{4}", Row.W, Row.H, Pos.X, Pos.Y))
-		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
-		if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
-				DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
-				GR_DestroyWindow(DroppedHwnd)
+			_hpPrepare := HotPath_Now()
+			Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x{3} y{4}",
+				Row.W, Row.H, Pos.X, Pos.Y))
+			_TooltipDisableDwmRounding(Row.Gui.Hwnd)
+			if (PreparedSurface.ContentHwnds.Length == 0)
+				PreparedSurface.ContentHwnds.Push(Row.Gui.Hwnd)
+			HotPath_BreakdownMark("prepare", _hpPrepare)
+
+			_hpCorners := HotPath_Now()
+			_TooltipApplyStackedCorners(Row)
+			HotPath_BreakdownMark("corners", _hpCorners)
+
+			_hpBorder := HotPath_Now()
+			PreparedSurface.Border := _TooltipBuildBorder(
+				Pos.X, Pos.Y, Row.W, Row.H)
+			if PreparedSurface.Border
+				PreparedSurface.BorderHwnds := [PreparedSurface.Border.Hwnd]
+			HotPath_BreakdownMark("border", _hpBorder)
+		} catch Error as Err {
+			SetTimer(_TooltipDisposeRetired.Bind(PreparedSurface), -1)
+			throw Err
 		}
-		_TooltipShownHwnds.Push(Row.Gui.Hwnd)
-		if ArmSafety
-				SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
-		HotPath_BreakdownMark("prepare", _hpPrepare)
 
-		_hpCorners := HotPath_Now()
-		_TooltipApplyStackedCorners()
-		HotPath_BreakdownMark("corners", _hpCorners)
+		CommitError := 0
+		CommitAllowed := false
+		SurfaceSwapped := false
+		RetiredSurface := 0
+		Selection := { Committed: false }
+		PublishItems := IsObject(Items) ? Items : []
+		PreviousCritical := Critical("On")
+		try {
+			; A deferred request has a second owner in addition to its render
+			; generation. A may reserve a render, yield in GUI/UIA, then resume after
+			; request B was queued but before B's debounce fired; only this serial
+			; fence prevents A from repainting stale pixels during that interval.
+			_hpRequestOwner := HotPath_Now()
+			RequestOwnerCurrent := _TooltipRequestOwnerMatches(
+				ExpectedRequestSerial, _TooltipRequestSerial)
+			HotPath_BreakdownMark("request_owner", _hpRequestOwner)
+			_hpOwner := HotPath_Now()
+			if RequestOwnerCurrent {
+				Selection := _TooltipChoosePreparedSurface(ExpectedGeneration,
+					_TooltipGeneration, _TooltipActiveSurface, PreparedSurface)
+			}
+			HotPath_BreakdownMark("owner", _hpOwner)
+			if Selection.Committed {
+				_hpDecision := HotPath_Now()
+				DecisionCurrent := _TooltipDecisionItemsStillCurrent(PublishItems)
+				HotPath_BreakdownMark("decision", _hpDecision)
+				if DecisionCurrent {
+					; Deadline is the last predicate before commit/reveal. A row with 1 ms
+					; remaining cannot expire while a slower decision oracle runs afterward.
+					_hpAbsoluteDeadline := HotPath_Now()
+					DeadlinesLive := _TooltipAbsoluteDeadlinesStillLive(
+						PublishItems)
+					HotPath_BreakdownMark("absolute_deadline",
+						_hpAbsoluteDeadline)
+					_hpDeadline := HotPath_Now()
+					DeadlineBounds := _TooltipLifecycleDeadlineBounds(
+						LifecyclePlan)
+					if DeadlineBounds.Expired
+						DeadlinesLive := false
+					HotPath_BreakdownMark("deadline", _hpDeadline)
+					if DeadlinesLive {
+						RetiredSurface := Selection.Retired
 
-		_hpBorder := HotPath_Now()
-		_TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H, false)
-		HotPath_BreakdownMark("border", _hpBorder)
+						; Attach all semantic ownership to the detached candidate before
+						; the one active-surface publication. LLM candidates provide a
+						; pure commit callback; ordinary tooltip candidates retire any
+						; LLM lifecycle owned by the surface they replace. The callback
+						; must run before the old pixels are hidden so an invalid candidate
+						; cannot blank a still-valid visible prediction.
+						if HasMethod(CommitFn, "Call")
+							CommitFn.Call(PreparedSurface, RetiredSurface)
+						else if IsSet(_LLM_TooltipRetireSurfaceRecord)
+							_LLM_TooltipRetireSurfaceRecord(RetiredSurface)
 
-		_hpReveal := HotPath_Now()
-		_TooltipRevealSurfaces()
-		HotPath_BreakdownMark("reveal", _hpReveal)
+						_hpRetire := HotPath_Now()
+						_TooltipHideSurfaceObjects(RetiredSurface)
+						HotPath_BreakdownMark("retire", _hpRetire)
+
+						; One assignment publishes content, border, trackers, position and
+						; owner generation together. No callback can observe a half-swap.
+						_TooltipActiveSurface := PreparedSurface
+						SurfaceSwapped := true
+						; Retire the exact pending request in the same pixel transaction.
+						; A newer B tuple has a different serial and remains untouched.
+						if (ExpectedRequestSerial != -1
+							and IsObject(_TooltipPendingRequest)
+							and _TooltipPendingRequest.Serial
+								== ExpectedRequestSerial)
+							_TooltipPendingRequest := 0
+						if ClearDequeue {
+							_TooltipDequeueItems := 0
+							_TooltipDequeueActive := false
+						}
+						if IsObject(LifecyclePlan) {
+							_TooltipDequeueItems := LifecyclePlan.DequeueItems
+							_TooltipDequeueActive := LifecyclePlan.DequeueActive
+						}
+						; Publish every expiry owner before revealing pixels or running
+						; interruptible post-present privacy/focus work.
+						_TooltipTimerGeneration := ExpectedGeneration
+						LlmPresented := IsSet(_LLM_TooltipPresentedFromSurface)
+							? _LLM_TooltipPresentedFromSurface(PreparedSurface) : 0
+						if (IsObject(LlmPresented)
+							and LlmPresented.Kind == "prediction"
+							and LlmPresented.TimeoutRemainingMs > 0) {
+							SetTimer(_TooltipTimerFn,
+								-Max(1, LlmPresented.TimeoutRemainingMs))
+						} else if (DeadlineBounds.LatestMs > 0) {
+							SetTimer(_TooltipTimerFn,
+								-Max(1, DeadlineBounds.LatestMs))
+						} else if ArmSafety {
+							SetTimer(_TooltipTimerFn,
+								-Round(_TOOLTIP_SAFETY_SEC * 1000))
+						}
+						if IsObject(_TooltipDequeueDeadlineTimer)
+							SetTimer(_TooltipDequeueDeadlineTimer, 0)
+						_TooltipDequeueDeadlineTimer := 0
+						if (IsObject(LifecyclePlan)
+							and LifecyclePlan.ArmExactDeadline
+							and DeadlineBounds.EarliestMs > 0) {
+							_TooltipDequeueDeadlineTimer :=
+								_TooltipDequeueDeadlineFn.Bind(
+									ExpectedGeneration, PreparedSurface)
+							SetTimer(_TooltipDequeueDeadlineTimer,
+								-Max(1, DeadlineBounds.EarliestMs))
+						}
+
+						_hpReveal := HotPath_Now()
+						_TooltipRevealPreparedSurfaces(PreparedSurface)
+						HotPath_BreakdownMark("reveal", _hpReveal)
+
+						_hpPublish := HotPath_Now()
+						Published := _TooltipPublishVisibleDecisions(PublishItems)
+						HotPath_BreakdownMark("publish", _hpPublish)
+						if !Published
+							throw Error("Visible-decision publication refused the revealed surface.")
+						if IsSet(_LLM_TooltipMarkSurfaceSuggested)
+							_LLM_TooltipMarkSurfaceSuggested(PreparedSurface)
+						CommitAllowed := true
+					}
+				}
+			}
+		} catch Error as Err {
+			CommitError := Err
+		} finally {
+			Critical(PreviousCritical)
+		}
+
+		; Metrics and LLM scheduling may yield, so they are explicitly post-commit.
+		_hpPostPresent := HotPath_Now()
+		if CommitAllowed
+			_TooltipNotifySurfacePresented(PublishItems, PreparedSurface)
+		if IsSet(_LLM_TooltipScheduleMetricDrain)
+			_LLM_TooltipScheduleMetricDrain()
+		HotPath_BreakdownMark("post_present", _hpPostPresent)
+
+		; Destruction stays outside Critical and owns one detached record. If an
+		; exception happened after the swap, retire the OLD record; the caller's
+		; fail-closed hide owns the newly active candidate.
+		DisposalSurface := SurfaceSwapped ? RetiredSurface : PreparedSurface
+		_hpDispose := HotPath_Now()
+		_TooltipQueueSurfaceDisposal(DisposalSurface)
+		HotPath_BreakdownMark("dispose_schedule", _hpDispose)
+		if IsObject(CommitError) {
+			_UiOracleReportError("Presentation commit failed: " . CommitError.Message)
+			throw CommitError
+		}
+		return CommitAllowed
 }
 
-; In-place destack rebuild — SUSPEND → build → PREPARE → REVEAL without TEARDOWN.
-; Preserves dequeue state and avoids border-only flashes during row expiry.
-_TooltipDequeueRebuild(Items) {
+; Detached destack rebuild owned by the exact generation/surface snapshot the
+; poll observed. A resumed old poll may dispose its own candidate, but it can
+; never hide, retire or republish over a newer tooltip.
+_TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 		global _TooltipGeneration, _TooltipTimerGeneration, _TooltipDequeueActive
-		global _TooltipDequeueItems, _TooltipLastPos
-		global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
+		global _TooltipDequeueItems, _TooltipActiveSurface
+		global _TooltipDequeueDeadlineTimer
+		global _TooltipRequestSerial, _TooltipPendingRequest
 
-		_TooltipGeneration += 1
-		_TooltipTimerGeneration := _TooltipGeneration
-		SetTimer(_TooltipTimerFn, 0)
-		_TooltipSuspendSurfaces()
-
+		if !_TooltipSurfaceOwnerMatches(ExpectedGeneration,
+			_TooltipGeneration, ExpectedSurface, _TooltipActiveSurface)
+			return false
+		; The poll selected these rows before this deferred rebuild began. Drop any
+		; row that expired in between, and never build a stack for a stale engine
+		; decision. The full-stack abort is intentional: correctness beats a flash
+		; of content whose advertised action can no longer fire.
+		Items := _TooltipFilterUnexpiredDeadlineItems(Items)
+		DecisionCurrent := false
+		try DecisionCurrent := _TooltipDecisionItemsStillCurrent(Items)
+		catch Error as Err {
+			_UiOracleReportError(
+				"Visible-decision freshness check failed during destack: " . Err.Message)
+			TooltipHide("DequeueDecisionCheckFail", true,
+				ExpectedGeneration, ExpectedSurface)
+			return false
+		}
+		if (Items.Length == 0 or !DecisionCurrent) {
+			TooltipHide("DequeueStaleBeforeBuild", true,
+				ExpectedGeneration, ExpectedSurface)
+			return false
+		}
+		; Preserve the original absolute deadlines through detached preparation.
+		; Their remainder is resolved only inside the common pixel commit.
+		LifecyclePlan := _TooltipCreateLifecyclePlan(
+			Items, 0, A_TickCount)
+		; Reserve the rebuild only if the polled owner is still exact. Clearing the
+		; old dequeue data prevents the repeating watchdog from starting a sibling
+		; rebuild while GUI/UIA preparation pumps messages.
+		PreviousCritical := Critical("On")
 		try {
-				_TooltipBuildGui(Items)
+			if IsObject(_TooltipPendingRequest)
+				return false
+			if !_TooltipSurfaceOwnerMatches(ExpectedGeneration,
+				_TooltipGeneration, ExpectedSurface, _TooltipActiveSurface)
+				return false
+			if IsObject(_TooltipDequeueDeadlineTimer)
+				SetTimer(_TooltipDequeueDeadlineTimer, 0)
+			_TooltipDequeueDeadlineTimer := 0
+			_TooltipDequeueItems := 0
+			_TooltipDequeueActive := false
+			_TooltipGeneration += 1
+			RenderGeneration := _TooltipGeneration
+			RebuildRequestSerial := _TooltipRequestSerial
+			_TooltipTimerGeneration := RenderGeneration
+			SetTimer(_TooltipTimerFn, 0)
+			Pos := IsObject(ExpectedSurface.Pos)
+				? ExpectedSurface.Pos : 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+
+		Row := 0
+		try {
+				Row := _TooltipBuildGui(Items)
 		} catch {
-				TooltipHide("DequeueBuildFail", true)
-				return
+				TooltipHide("DequeueBuildFail", true, RenderGeneration,
+					unset, RebuildRequestSerial)
+				return false
+		}
+		if (RenderGeneration != _TooltipGeneration) {
+				if IsObject(Row)
+					_TooltipQueueSurfaceDisposal(
+						_TooltipCreateDetachedSurface(Row, RenderGeneration))
+			return false
 		}
 
-		Rows := _TooltipRowGuis
-		if (Rows.Length == 0) {
-				TooltipHide("DequeueNoRows", true)
-				return
+		if !IsObject(Row) {
+				TooltipHide("DequeueNoRows", true, RenderGeneration,
+					unset, RebuildRequestSerial)
+				return false
 		}
 
-		Pos := IsObject(_TooltipLastPos) ? _TooltipLastPos : _TooltipResolvePosition()
-		Row := Rows[1]
+		if !IsObject(Pos)
+			Pos := _TooltipResolvePosition()
+		if (RenderGeneration != _TooltipGeneration) {
+				_TooltipQueueSurfaceDisposal(
+					_TooltipCreateDetachedSurface(Row, RenderGeneration))
+			return false
+		}
 		; The destack rebuild presents the same stack the render path does, so it must
 		; carry the same attribution — otherwise a slow row expiry looks like a slow
 		; render and the two are indistinguishable in the log.
 		_hpDqPresent := HotPath_Now()
+		Presented := false
 		try {
-				_TooltipPresentStack(Pos, Row, false)
+				Presented := _TooltipPresentStack(Pos, Row, false, Items,
+					RenderGeneration, false, RebuildRequestSerial,
+					LifecyclePlan)
 		} catch {
-				TooltipHide("DequeuePresentFail", true)
-				return
+				TooltipHide("DequeuePresentFail", true, RenderGeneration,
+					unset, RebuildRequestSerial)
+				return false
 		}
+		; Drain even a refused commit so its sub-step marks cannot be attributed
+		; to the next unrelated presentation.
 		HotPath_LogIfSlow("Tooltip.DequeuePresent", _hpDqPresent, HotPath_BreakdownDetail())
-
-		MaxMs := 0
-		Now := A_TickCount
-		; Snapshot before iterating — _TooltipDequeueItems may have been reset to 0
-		; by a concurrent TooltipHide() (e.g. the safety timer firing between the
-		; _TooltipBuildGui call above and this point). Iterating 0 throws
-		; "Value not enumerable", which is the crash reported by the user.
-		DequeueSnapshot := _TooltipDequeueItems
-		if IsObject(DequeueSnapshot) {
-				for , Item in DequeueSnapshot {
-						if (Item.ExpireMs > 0) {
-								Remaining := Max(50, Item.ExpireMs - Now)
-								if (Remaining > MaxMs)
-										MaxMs := Remaining
-						}
-				}
+		if !Presented {
+			TooltipHide("DequeueStaleBeforeReveal", true, RenderGeneration,
+				unset, RebuildRequestSerial)
+			return false
 		}
-		if (MaxMs > 0)
-				SetTimer(_TooltipTimerFn, -MaxMs)
-		_TooltipDequeueActive := true
-}
-
-; Tear down only the border overlay (used before LLM content rebuild).
-_TooltipTeardownBorder() {
-		global _TooltipBorderGui, _TooltipShownBorderHwnds
-		if _TooltipBorderGui {
-				try GR_Hide(_TooltipBorderGui.Hwnd)
-				try _TooltipBorderGui.Destroy()
-				_TooltipBorderGui := 0
-		}
-		for , Hwnd in _TooltipShownBorderHwnds {
-				GR_DestroyWindow(Hwnd)
-		}
-		_TooltipShownBorderHwnds := []
+		return true
 }
 
 ; Does a row need its own full-width background band?
@@ -244,16 +654,11 @@ _TooltipRowNeedsBand(BgHex, GuiBgHex) {
 ; Using one Gui eliminates all inter-window overlap — the only rendered surface
 ; is a single window with a single GDI region, exactly like the Hammerspoon canvas.
 _TooltipBuildGui(Items) {
-		global _TooltipGui, _TooltipRowGuis
 		global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_LABEL_GAP
 		global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
 
-		if _TooltipGui {
-				try _TooltipGui.Destroy()
-		}
-		_TooltipGui := 0
-		_TooltipRowGuis := []
-
+		G := 0
+		try {
 		; WinGetClientPos returns physical pixels — divide by DpiScale to get logical.
 		DpiScale := A_ScreenDPI / 96
 
@@ -377,9 +782,24 @@ _TooltipBuildGui(Items) {
 				}
 		}
 
-		_TooltipGui := G
-		; Store a single metadata record for the corner/border helper.
-		_TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]
+		; Return a detached candidate. Nothing in the shared surface globals is
+		; touched until _TooltipPresentStack wins its final generation fence.
+		return { Gui: G, H: TotalH, W: TotalW, IsSep: false }
+		} catch Error as Err {
+			; Once Gui construction starts, the caller cannot see the partial object
+			; when a control/font operation throws. Retire it locally so an error can
+			; never leave an untracked top-level ghost behind.
+			if IsObject(G) {
+				try {
+					CleanupRow := { Gui: G, H: 0, W: 0, IsSep: false }
+					_TooltipQueueSurfaceDisposal(
+						_TooltipCreateDetachedSurface(CleanupRow, 0))
+				} catch {
+					; Best effort after the original build exception.
+				}
+			}
+			throw Err
+		}
 }
 
 ; Cache of measurement HFONTs keyed by device-pixel height. The tooltip only
@@ -455,13 +875,10 @@ _TooltipMeasureTextSize(Text, FontSize) {
 ; Apply a fully-rounded region to the single unified tooltip Gui.
 ; Since the stack is now a single window, all four corners are always
 ; rounded — no top/middle/bottom split needed.
-_TooltipApplyStackedCorners() {
-		global _TooltipRowGuis, _TOOLTIP_CORNER_RADIUS
-		Rows := _TooltipRowGuis
-		if (Rows.Length == 0)
+_TooltipApplyStackedCorners(Row) {
+		global _TOOLTIP_CORNER_RADIUS
+		if !IsObject(Row)
 				return
-
-		Row := Rows[1]
 		G := Row.Gui
 
 		; SetWindowRgn operates in physical pixels.
@@ -551,15 +968,11 @@ _TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx) {
 ; writes opaque pixels), then every non-zero pixel's alpha channel is set to the
 ; desired opacity (0x40 = 25 %).  No DWM rounding can affect the result because
 ; the window has zero client area — it is just a bitmap handed to the compositor.
-_TooltipShowBorder(X, Y, W, H, Reveal := true) {
-		global _TooltipBorderGui, _TOOLTIP_CORNER_RADIUS
+_TooltipBuildBorder(X, Y, W, H) {
+		global _TOOLTIP_CORNER_RADIUS
 
-		if _TooltipBorderGui {
-				try GR_Hide(_TooltipBorderGui.Hwnd)
-				try _TooltipBorderGui.Destroy()
-				_TooltipBorderGui := 0
-		}
-
+		BorderGui := 0
+		try {
 		DpiScale := A_ScreenDPI / 96
 		Wp := Round(W * DpiScale)
 		Hp := Round(H * DpiScale)
@@ -637,8 +1050,8 @@ _TooltipShowBorder(X, Y, W, H, Reveal := true) {
 		; WS_EX_TOOLWINDOW (0x80) suppresses DWM automatic corner rounding, same as
 		; the content Gui.  UpdateLayeredWindow is called BEFORE ShowWindow so the
 		; window is never visible in an unpainted state (no ghost flash).
-		_TooltipBorderGui := Gui("+AlwaysOnTop -Caption +E0x80000 +E0x20 +E0x80 +LastFound")
-		Hwnd := _TooltipBorderGui.Hwnd
+		BorderGui := Gui("+AlwaysOnTop -Caption +E0x80000 +E0x20 +E0x80 +LastFound")
+		Hwnd := BorderGui.Hwnd
 		_TooltipDisableDwmRounding(Hwnd)
 
 		; UpdateLayeredWindow expects screen physical pixels — same coordinate space as
@@ -671,17 +1084,15 @@ _TooltipShowBorder(X, Y, W, H, Reveal := true) {
 		DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
 		DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
 
-		; REVEAL is deferred to _TooltipRevealSurfaces() when Reveal=false so
-		; content and border become visible in the same composition pass.
-		if Reveal
-				GR_Show(Hwnd)
-
-		global _TooltipShownBorderHwnds, _TOOLTIP_HWND_TRACK_CAP
-		if (_TooltipShownBorderHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
-				DroppedHwnd := _TooltipShownBorderHwnds.RemoveAt(1)
-				GR_DestroyWindow(DroppedHwnd)
+		; Detached and hidden. The final owner commit decides whether this exact
+		; object becomes global or is disposed as a stale candidate.
+		return BorderGui
+		} catch Error as Err {
+			if IsObject(BorderGui) {
+				try BorderGui.Destroy()
+			}
+			throw Err
 		}
-		_TooltipShownBorderHwnds.Push(Hwnd)
 }
 
 ; Tell DWM not to apply Windows 11 automatic corner rounding on this window.
@@ -818,7 +1229,8 @@ _TooltipUiaProcessIsHostile(ProcName) {
 		global _TooltipUiaHostileCache
 		if (ProcName == "" or !_TooltipUiaHostileCache.Has(ProcName))
 				return false
-		if (A_TickCount < _TooltipUiaHostileCache[ProcName])
+		Entry := _TooltipUiaHostileCache[ProcName]
+		if !TickExpired(Entry.Tick, Entry.DurationMs)
 				return true
 		_TooltipUiaHostileCache.Delete(ProcName)
 		return false
@@ -831,7 +1243,10 @@ _TooltipMarkUiaHostile(ProcName) {
 		global _TooltipUiaHostileCache, TOOLTIP_UIA_HOSTILE_TTL_MS
 		if (ProcName == "")
 				return
-		_TooltipUiaHostileCache[ProcName] := A_TickCount + TOOLTIP_UIA_HOSTILE_TTL_MS
+		_TooltipUiaHostileCache[ProcName] := {
+				Tick: A_TickCount,
+				DurationMs: TOOLTIP_UIA_HOSTILE_TTL_MS
+		}
 }
 
 ; Record which stage of the position cascade answered this call.
@@ -934,8 +1349,8 @@ _TooltipResolvePosition() {
 
 		ActiveHwnd := WinExist("A")
 		if IsObject(_TooltipPositionCache) {
-				Age := A_TickCount - _TooltipPositionCache["tick"]
-				if (_TooltipPositionCache["hwnd"] == ActiveHwnd and Age >= 0
+				Age := TickElapsed(_TooltipPositionCache["tick"])
+				if (_TooltipPositionCache["hwnd"] == ActiveHwnd
 						and Age <= TOOLTIP_POSITION_CACHE_MS) {
 						_TooltipCountResolveExit("cache")
 						return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
@@ -1075,6 +1490,3 @@ _TooltipCachePosition(Hwnd, Pos) {
 		)
 		return Pos
 }
-
-
-

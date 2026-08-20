@@ -65,7 +65,8 @@ _DeleteHoldModKey() {
 		return
 	}
 	ModKey := _DeleteHoldModKey()
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	try {
 		KeyWait("Delete", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {

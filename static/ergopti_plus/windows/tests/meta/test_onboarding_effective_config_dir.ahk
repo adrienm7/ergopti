@@ -70,11 +70,15 @@ _OEC_EmptyChoiceRevertsToTheDefault() {
 _OEC_PublishStillFollowsPersistence() {
 	Body := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Body != "", "_Onboarding_Commit() must exist")
-	WritePos := InStr(Body, "TOML_BatchWrite(")
+	BuildPos := InStr(Body, "TOML_BuildUpdatedContent(")
+	CommitPos := InStr(Body, "ConfigTransitionCommitOwned(")
+	StrictPos := InStr(Body,
+		'ConfigTransitionResultIs(CommitResult, "committed_new")')
 	PublishPos := InStr(Body, "_ConfigDir := CandidateDir")
-	Assert(WritePos > 0 and PublishPos > 0,
-		"the commit must still write the config and then publish the directory")
-	Assert(WritePos < PublishPos,
+	Assert(BuildPos > 0 && CommitPos > BuildPos && StrictPos > CommitPos
+		&& PublishPos > StrictPos,
+		"the commit must render, durably commit, verify, then publish the directory")
+	Assert(CommitPos < PublishPos,
 		"_ConfigDir must be published only AFTER the config has been persisted — moving it earlier would leave the driver pointing at a folder whose config was never written")
 }
 

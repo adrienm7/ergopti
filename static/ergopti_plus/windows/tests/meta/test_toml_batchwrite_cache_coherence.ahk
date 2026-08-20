@@ -28,8 +28,13 @@ _TBCC_ReadSource(RelPath) {
 
 _TBCC_DeepCopyPresent() {
 	Src := _TBCC_ReadSource("infra/toml/toml_helpers.ahk")
-	Seg := _DriverFuncBody("TOML_BatchWrite")
-	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
+	Wrapper := _DriverFuncBody("TOML_BatchWrite")
+	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
+	Assert(Wrapper != "" && Seg != "",
+		"TOML_BatchWrite and its shared implementation must exist")
+	Assert(InStr(Wrapper,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
+		"the public writer must delegate to the implementation whose cache isolation is checked below")
 
 	; The cached Map must be cloned before any mutation so that a write failure
 	; cannot leave stale un-persisted values in the in-memory cache.
@@ -43,8 +48,13 @@ Test("toml_helpers: TOML_BatchWrite deep-copies cached Map before mutation", _TB
 
 _TBCC_FailurePathsInvalidateCache() {
 	Src := _TBCC_ReadSource("infra/toml/toml_helpers.ahk")
-	Seg := _DriverFuncBody("TOML_BatchWrite")
-	Assert(Seg != "", "TOML_BatchWrite declaration must exist")
+	Wrapper := _DriverFuncBody("TOML_BatchWrite")
+	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
+	Assert(Wrapper != "" && Seg != "",
+		"TOML_BatchWrite and its shared implementation must exist")
+	Assert(InStr(Wrapper,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
+		"cache invalidation must be checked on the implementation reached by the public writer")
 
 	; Count distinct cache-invalidation blocks inside the function body.
 	; There must be at least three: one for each failure return path

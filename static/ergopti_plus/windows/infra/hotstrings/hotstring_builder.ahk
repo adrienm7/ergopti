@@ -76,18 +76,35 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 		; ":flags:B0O:abbrev" string — both pure boot-time waste. The ternaries
 		; short-circuit, so neither is constructed unless a recorder is present.
 		Rec := _HotstringRegistrar
+		Meta := _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult,
+				TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate)
+		; Personal-info previews must render the value snapshot carried by the
+		; registered Spec, not re-read the mutable PersonalInformation Map.  The
+		; editor publishes that Map before its terminal Reload, so a second read in
+		; the preview otherwise advertises the NEW value while this Spec still emits
+		; the OLD one.  Keep this generic: the builder only transports optional
+		; display metadata and does not learn which fields are personal.
+		if (IsSet(options) and options.Has("PreviewFields")
+				and options["PreviewFields"] is Array) {
+			Meta.PreviewFields := options["PreviewFields"].Clone()
+		}
+		if (IsSet(options) and options.Has("PreviewValues")
+				and options["PreviewValues"] is Array) {
+			Meta.PreviewValues := options["PreviewValues"].Clone()
+		}
 		_RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags), Abbreviation,
 				Rec ? (":" Flags "B0O:" Abbreviation) : "",
 				Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
-				_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate)
+				Meta
 		)
 }
 
 ; Register a "raw callback" hotstring: the callback does ALL of its own
-; conditional, variable-length sending/backspacing and returns a { Bs, Ins }
-; effect (Bs chars removed from the buffer's right, Ins appended) for HSE buffer
-; resync — see _HSE_DispatchRawCallback. Used by the formerly-native E-circumflex
+; conditional, variable-length sending/backspacing and returns an { Ok, Bs, Ins }
+; transaction. Ok is true only after output succeeds; Bs chars are then removed
+; from the buffer's right and Ins is appended for HSE resync. See
+; _HSE_DispatchRawCallback. Used by the formerly-native E-circumflex
 ; deadkey + "..." ellipsis so no AHK-native Hotstring() (hence no A_InputLevel
 ; dependency) remains. The B0O flag suffix matches CreateHotstring: the engine
 ; never auto-backspaces — the callback owns the screen edit.
@@ -159,7 +176,7 @@ _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeAct
 ; does zero allocation / string work before dispatching the three sends.
 _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds, AbbreviationLen := 0, Trigger := "", Category := "", Section := "", IsPrivate := false) {
 		if IsTimeActivationExpired(PrevCharKey, TimeActivationSeconds) {
-				return
+				return false
 		}
 		; Yield to a longer registered trigger that covers the same suffix.
 		; AHK native dispatches the most-recently-registered hotstring when two
@@ -170,7 +187,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		if (AbbreviationLen > 0 and HSE_LastMatch != ""
 				and HSE_LastMatch.HasOwnProp("Length")
 				and HSE_LastMatch.Length > AbbreviationLen) {
-				return
+				return false
 		}
 		; Allow Replacement to be a zero-argument callable — resolved at fire time
 		; so dynamic values (dates, live data) are computed on each keystroke.
@@ -181,7 +198,8 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				; Only needed when AltGr (SC138) is remapped to Kana at the driver
 				; level — without that remap the Up is a wasted SendEvent on the
 				; hottest path. ``HotstringEngineInit`` sets the flag at boot.
-				SendEvent("{SC138 Up}")
+				if !SendNewResult("{SC138 Up}", false, false)
+						return false
 		}
 
 		; Mute the prefix watcher's InputHook for the duration of the send burst.
@@ -205,6 +223,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		; typing row keeps the replacement this path redacts from the fire row.
 		try KL_MarkSynthetic("hotstring", IsPrivate)
 
+		Fired := false
 		try {
 				isNotepad := false
 				try {
@@ -218,15 +237,20 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 						; a physical key interleave before the clipboard paste.
 						_HsNotepadCritical := Critical("On")
 						try SendInstant(Replacement . EndChar, BackSpaceSeq)
+								? (Fired := true) : (Fired := false)
 						finally Critical(_HsNotepadCritical)
 				} else if FinalResult {
-						SendFinalResult(BackSpaceSeq, False)
-						SendFinalResult(Replacement, OnlyText)
-						SendFinalResult(EndChar, False)
+						if !SendFinalResult(BackSpaceSeq, False)
+								return false
+						if !SendFinalResult(Replacement, OnlyText)
+								return false
+						Fired := SendFinalResult(EndChar, False)
 				} else {
-						SendNewResult(BackSpaceSeq, False)
-						SendNewResult(Replacement, OnlyText)
-						SendNewResult(EndChar, False)
+						if !SendNewResult(BackSpaceSeq, False, false)
+								return false
+						if !SendNewResult(Replacement, OnlyText)
+								return false
+						Fired := SendNewResult(EndChar, False)
 				}
 		}
 		finally {
@@ -235,11 +259,17 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				; longest replacements we ship (~30 chars) and against the Notepad
 				; clipboard path which is slower than the direct event injection.
 				if IsSet(PrefixWatcherSuppress) {
-						SetTimer((*) => PrefixWatcherSuppress(false), -60)
+						if Fired
+								SetTimer((*) => PrefixWatcherSuppress(false), -60)
+						else
+								PrefixWatcherSuppress(false)
 				}
 				; Release the synthetic flag on the same flush window — clearing it
 				; inline would let trailing replacement keystrokes look manual.
-				SetTimer((*) => KL_ClearSynthetic(), -60)
+				if Fired
+						SetTimer((*) => KL_ClearSynthetic(), -60)
+				else
+						KL_ClearSynthetic()
 		}
 		; Notify the WPM widget for end-char fires only — star (immediate) fires
 		; are already logged by the prefix watcher via HSE_DispatchMatch.
@@ -250,7 +280,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		; disk spike there swallows the next physical keys. The direct call below is
 		; kept only as the fallback for contexts where the prefix watcher — which
 		; owns the queue — is not loaded (tools/, standalone tests).
-		if (EndChar != "") and (Trigger != "") and (Category != "") {
+		if Fired and (EndChar != "") and (Trigger != "") and (Category != "") {
 				repl_str := HasMethod(Replacement) ? "" : Replacement
 				if IsSet(_HSE_QueueFireLog) {
 						try _HSE_QueueFireLog(Trigger, repl_str, "endchar", Category, Section, IsPrivate)
@@ -262,6 +292,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 								try WPMWidget_Push(true, false, false, Category, Section)
 				}
 		}
+		return Fired
 }
 
 IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
@@ -278,7 +309,7 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 				}
 				CharacterSentTime := LastSentCharacterKeyTime[PreviousCharacter]
 				; We need to convert into milliseconds, hence the multiplication by 1000
-				if (Now - CharacterSentTime > OptionTimeActivationSeconds * 1000) {
+				if (TickElapsed(CharacterSentTime, Now) > OptionTimeActivationSeconds * 1000) {
 						return True
 				}
 		}

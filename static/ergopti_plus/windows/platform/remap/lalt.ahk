@@ -92,12 +92,14 @@ SC038:: {
 		return
 	}
 
-	TextPressKey("LAlt", "Up")
+	if !TapHoldReleasePhysicalKey("LAlt")
+		return
 	OneShotShift()
 	; Arm LShift for the hold, then release it in a finally so it can NEVER latch.
 	; The wait is capped (U T<timeout>) so a lost SC038 key-up (focus stolen by a
 	; UAC prompt, Suspend toggled mid-press) cannot block the release forever.
-	TapHoldSyntheticKeyDown("LShift")
+	if !TapHoldSyntheticKeyDown("LShift")
+		return
 	try {
 		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
 	} finally {
@@ -144,8 +146,9 @@ SC038::
 
 	Now := A_TickCount
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	tap := ((Now - CharacterSentTime) <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if (tap and (Now - CharacterSentTime) >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	ElapsedMs := TickElapsed(CharacterSentTime, Now)
+	tap := (ElapsedMs <= TapHoldDuration(TapHold, "left_alt") * 1000)
+	if (tap and ElapsedMs >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))
 	}
 }
@@ -181,13 +184,15 @@ SC11D & SC038:: {
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and not LayerEnabled
 SC038::
 {
-	TapHoldSyntheticKeyDown("LAlt")
+	if !TapHoldSyntheticKeyDown("LAlt")
+		return
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
 		; The synthetic LAlt Down armed above must always be released regardless
 		; of Suspend state; only the AltTabMonitor() side effect is guarded —
 		; native Suspend() never disarms this hotkey's own KeyWait/dispatch.
-		TapHoldSyntheticKeyUp("LAlt")
+		if !TapHoldSyntheticKeyUp("LAlt")
+			return
 		TapHoldDispatchTap("left_alt", AltTabMonitor)
 	} else {
 		; Bound the wait and release LAlt in a finally so a lost SC038 key-up (Alt+Tab
@@ -309,10 +314,12 @@ $SC038:: {
 			LoggerDebug("TapHold", "LAlt (backspace) hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
 	if tap {
-		TapHoldSyntheticKeyUp(ModKey)
+		if !TapHoldSyntheticKeyUp(ModKey)
+			return
 		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
 		return
 	}
@@ -362,7 +369,8 @@ $SC038:: {
 			LoggerDebug("TapHold", "LAlt hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	; Bound the wait and release in a finally so a lost key-up or thrown Send can
 	; never latch the modifier Down (tap_holds/constants.ahk explains the cap)
 	try {
@@ -412,8 +420,9 @@ $SC038:: {
 
 	Now := A_TickCount
 	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	tap := ((Now - CharacterSentTime) <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if (tap and (Now - CharacterSentTime) >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	ElapsedMs := TickElapsed(CharacterSentTime, Now)
+	tap := (ElapsedMs <= TapHoldDuration(TapHold, "left_alt") * 1000)
+	if (tap and ElapsedMs >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		_LAltDispatch()
 	}
 }

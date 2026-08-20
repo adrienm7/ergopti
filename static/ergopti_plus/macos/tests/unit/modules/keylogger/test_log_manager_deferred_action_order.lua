@@ -140,6 +140,7 @@ local function load_fixture(options)
 	local saved_file_system = package.loaded["adapters.file_system"]
 	package.loaded["adapters.file_system"] = {
 		write = function() return true end,
+		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,
 	}
 	local log_manager = helpers.load_with_stubs("modules.keylogger.log_manager", {

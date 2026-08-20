@@ -115,8 +115,11 @@ _LFGY_RenderCarriesItsOwnGuard() {
 		"LLM_Engine_OnResults must re-check staleness before it paints. LLM_Diff_Compute runs a RegExMatch per character over every slot and the display-opts resolution queries the focused window, so the caller's check is already stale by the time the paint happens")
 
 	Fin := _DriverFuncBody("_LLM_Engine_FinalizeRequest")
-	Assert(RegExMatch(Fin, 'LLM_Engine_OnResults\([^\r\n]*state\["request_id"\]') > 0,
-		'_LLM_Engine_FinalizeRequest must thread state["request_id"] into the render — a guard inside the render with nothing to compare against is decoration')
+	Fin := RegExReplace(Fin, "\s+", " ")
+	Assert(InStr(Fin,
+		'LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true, state["request_id"], state["semantic_signature"])',
+		true) > 0,
+		'_LLM_Engine_FinalizeRequest must thread request and semantic identities into the render — a guard inside the render with nothing to compare against is decoration')
 }
 
 

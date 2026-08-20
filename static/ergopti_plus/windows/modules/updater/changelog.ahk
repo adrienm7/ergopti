@@ -56,6 +56,14 @@ Updater_GetUpdateMenuLabel() {
 
 ; Displays the current version in a MsgBox and offers to open the releases page.
 Updater_ShowVersion(*) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if A_IsSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	if !_Updater_RequestMayPublish(Request)
+		return
 	Ver := Updater_CurrentVersion()
 	global UPDATER_CHANNEL
 	if Updater_IsLocalSource()
@@ -70,7 +78,7 @@ Updater_ShowVersion(*) {
 		"YesNo Iconi"
 	)
 	if (Res == "Yes")
-		Run(Updater_ReleasesPageUrl())
+		_Updater_OpenManualUrl(Updater_ReleasesPageUrl, Request)
 }
 
 ; One-click update entry point wired to the dynamic tray menu item.
@@ -84,6 +92,14 @@ Updater_ShowVersion(*) {
 ; "checking". A single click therefore always does the right thing.
 Updater_OneClickUpdate(*) {
 	global UPDATER_CHANNEL, UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if A_IsSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	if !_Updater_RequestMayPublish(Request)
+		return
 	if Updater_IsLocalSource()
 		return
 	State := Updater_GetUpdateState()
@@ -92,59 +108,69 @@ Updater_OneClickUpdate(*) {
 
 	; Fast path: update already cached by background poller — install straight away.
 	if (State == "available") {
-		Updater_DownloadAndInstall(UPDATER_LATEST_RELEASE)
+		_Updater_ActivateCachedRelease(UPDATER_LATEST_RELEASE, Request)
 		return
 	}
 
 	; Slow path: need to check first. Mark in-progress and rebuild the menu so the
 	; item shows "Vérification…" and is disabled while the network call runs.
 	_UpdaterCheckInProgress := true
-	try SetTimer((*) => _Updater_RebuildMenu(), -50)
+	_Updater_ScheduleMenuRebuildForRequest(Request)
 
 	Current := Updater_CurrentVersion()
 	try LoggerStart("Updater", "One-click update check (channel: {1}, current: {2})…", UPDATER_CHANNEL, Current)
 	
-	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, (Json) => _Updater_OneClickUpdateCallback(Json, Current))
+	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, Request,
+		(Json, CompletedRequest, Terminal := 0) => _Updater_OneClickUpdateCallback(
+			Json, Current, CompletedRequest, Terminal))
 }
 
-_Updater_OneClickUpdateCallback(Json, Current) {
-	global UPDATER_LATEST_RELEASE, _UpdaterCheckInProgress
+_Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
+	global _UpdaterCheckInProgress
 	_UpdaterCheckInProgress := false
 	; Physical menu state must be reconciled even when the result is discarded
 	; during Suspend; otherwise the row remains permanently disabled as
 	; “checking” after resume.
-	try SetTimer((*) => _Updater_RebuildMenu(), -50)
+	_Updater_ScheduleMenuRebuildForRequest(Request)
 
-	; The fetch callback arrives on an AHK pseudo-thread that bypasses native
-	; Suspend. Skip all UI and install work while the script is paused.
-	if A_IsSuspended {
-		try LoggerInfo("Updater", "One-click check finalised while suspended; result discarded.")
+	if !_Updater_RequestMayPublish(Request) {
+		try LoggerDone("Updater", "One-click update check cancelled at a suspend boundary.")
+		return
+	}
+	if _Updater_AsyncTerminalIsCancelled(Terminal) {
+		try LoggerDone("Updater", "One-click update check cancelled ({1}).", Terminal.Reason)
 		return
 	}
 
-	if (Json == "") {
+	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerWarn("Updater", "One-click check: network unreachable.")
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		try LoggerDone("Updater", "One-click update check finished without a network response.")
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+		if !_Updater_RequestMayPublish(Request)
+			return
 		TrayTip(t("updater.no_connection"), t("updater.title_update"))
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
 		try LoggerWarn("Updater", "One-click check: tag parse failed.")
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		try LoggerDone("Updater", "One-click update check finished with invalid release metadata.")
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+		if !_Updater_RequestMayPublish(Request)
+			return
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
 	if !_Updater_IsNewerVersion(Latest, Current) {
 		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
-		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+		if !_Updater_RequestMayPublish(Request)
+			return
 		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
 		return
 	}
 
-	; New version found — cache it, rebuild menu (label becomes "Mettre à jour vers vX"),
-	; then install immediately since the user explicitly clicked.
-	UPDATER_LATEST_RELEASE := {
+	Release := {
 		Tag:         Latest,
 		Body:        Updater_ParseBody(Json),
 		RawJson:     Json,
@@ -152,9 +178,60 @@ _Updater_OneClickUpdateCallback(Json, Current) {
 		PublishedAt: _Updater_ParsePublishedAt(Json),
 		Prerelease:  _Updater_ParsePrerelease(Json)
 	}
-	try LoggerSuccess("Updater", "One-click check: new version {1} found — installing.", Latest)
-	try SetTimer((*) => _Updater_RebuildMenu(), -50)
-	Updater_DownloadAndInstall(UPDATER_LATEST_RELEASE)
+	if !_Updater_PublishOneClickRelease(Release, Request)
+		try LoggerDone("Updater", "One-click update check completed without starting staging.")
+}
+
+_Updater_PublishOneClickRelease(Release, Request, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0, InstallFn := 0) {
+	HasSuspendOverride := IsSet(IsSuspended)
+	if HasSuspendOverride {
+		if !_Updater_TryPublishRelease(Request, Release, IsSuspended)
+			return false
+	} else if !_Updater_TryPublishRelease(Request, Release) {
+		return false
+	}
+	if IsObject(RebuildFn)
+		RebuildFn.Call()
+	else
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended)
+			return false
+		return _Updater_ActivateCachedRelease(
+			Release, Request, IsSuspended, NotifyFn, InstallFn)
+	}
+	if !_Updater_RequestMayPublish(Request)
+		return false
+	return _Updater_ActivateCachedRelease(Release, Request)
+}
+
+_Updater_ActivateCachedRelease(Release, Request, IsSuspended := unset, NotifyFn := 0, InstallFn := 0, SuccessFn := 0) {
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	HasSuspendOverride := IsSet(IsSuspended)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended)
+			return false
+	} else if !_Updater_RequestMayPublish(Request) {
+		return false
+	}
+	Tag := Release.HasProp("Tag") ? Release.Tag : ""
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended)
+			return false
+	} else if !_Updater_RequestMayPublish(Request) {
+		return false
+	}
+	Started := IsObject(InstallFn)
+		? InstallFn.Call(Release)
+		: Updater_DownloadAndInstall(Release, Request)
+	if !Started
+		return false
+	if IsObject(SuccessFn)
+		SuccessFn.Call(Tag)
+	else
+		try LoggerSuccess("Updater", "One-click check: new version {1} found — installing.", Tag)
+	return true
 }
 
 ; Opens a window that lists every release and lets the user read its notes.
@@ -183,25 +260,160 @@ _Updater_RefreshInstallBtn(BtnInstall, Releases, Idx, IsLocal) {
 	BtnInstall.Text    := IsCurrent ? t("updater.changelog_install_current") : t("updater.changelog_install")
 }
 
+_Updater_OpenSelectedReleaseUrl(ListBox, Releases, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	Request := HasSuspendOverride
+		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
+		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended)
+			return false
+	} else if !_Updater_RequestMayPublish(Request) {
+		return false
+	}
+	Idx := ListBox.Value
+	if !(Releases is Array) or Idx < 1 or Idx > Releases.Length
+		return false
+	Release := Releases[Idx]
+	Url := (Type(Release) == "Object" and Release.HasProp("HtmlUrl") and Release.HtmlUrl != "")
+		? Release.HtmlUrl : Updater_ReleasesPageUrl()
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended)
+			return false
+	} else if !_Updater_RequestMayPublish(Request) {
+		return false
+	}
+	try {
+		if IsObject(RunFn)
+			RunFn.Call(Url)
+		else
+			Run(Url)
+	} catch as Err {
+		try LoggerError("Updater", "Could not open changelog URL '{1}': {2}.", Url, Err.Message)
+		return false
+	}
+	return true
+}
+
+_Updater_SwitchChangelogChannel(G, IsLocal, OtherChannel, IsSuspended := unset, NotifyFn := 0, CloseFn := 0, OpenFn := 0, SetChannelFn := 0) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	Request := HasSuspendOverride
+		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
+		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended)
+			return false
+	} else if !_Updater_RequestMayPublish(Request) {
+		return false
+	}
+	if IsObject(CloseFn)
+		CloseFn.Call(G)
+	else
+		_Updater_CloseGui(G)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended)
+			return false
+	} else if !_Updater_RequestMayPublish(Request) {
+		return false
+	}
+	if IsLocal {
+		if IsObject(OpenFn)
+			return OpenFn.Call(OtherChannel, Request)
+		return _Updater_OpenChangelogWindow(OtherChannel, Request)
+	}
+	if IsObject(SetChannelFn)
+		SetChannelFn.Call(OtherChannel)
+	else
+		Updater_SetChannel(OtherChannel, Request)
+	return true
+}
+
+_Updater_RefreshChangelogSelection(ListBox, Releases, BtnInstall, IsLocal, ShowBodyFn, IsSuspended := unset, NotifyFn := 0, RefreshInstallFn := 0) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	Request := HasSuspendOverride
+		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
+		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+			return false
+	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+		return false
+	}
+	Idx := ListBox.Value
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+			return false
+	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+		return false
+	}
+	if (Idx < 1 or Idx > Releases.Length) {
+		if IsObject(RefreshInstallFn)
+			RefreshInstallFn.Call(BtnInstall, Releases, 0, IsLocal)
+		else
+			_Updater_RefreshInstallBtn(BtnInstall, Releases, 0, IsLocal)
+		return true
+	}
+	if IsObject(RefreshInstallFn)
+		RefreshInstallFn.Call(BtnInstall, Releases, Idx, IsLocal)
+	else
+		_Updater_RefreshInstallBtn(BtnInstall, Releases, Idx, IsLocal)
+	if HasSuspendOverride {
+		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
+			return false
+	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+		return false
+	}
+	ShowBodyFn.Call(Releases[Idx].Body)
+	return true
+}
+
 ; Internal helper — builds (or rebuilds) the changelog GUI for a given channel.
 ; Dispatches an async WinHTTP fetch so the keyboard hook is not blocked while
 ; GitHub responds; _Updater_BuildChangelogGui builds the window once JSON lands.
-_Updater_OpenChangelogWindow(Channel) {
-	_Updater_FetchReleasesListJsonAsync(Channel, (Json) => _Updater_BuildChangelogGui(Json, Channel))
+_Updater_OpenChangelogWindow(Channel, Request := unset) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !IsSet(Request) {
+		if A_IsSuspended
+			return _Updater_RefuseManualWhileSuspended()
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	}
+	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
+		return _Updater_RefuseManualWhileSuspended()
+	if !_Updater_RequestMayPublish(Request)
+		return false
+	_Updater_FetchReleasesListJsonAsync(Channel, Request,
+		(Json, CompletedRequest, Terminal := 0) => _Updater_BuildChangelogGui(
+			Json, Channel, CompletedRequest, Terminal))
 }
 
 ; Constructs the changelog Gui from the already-fetched releases JSON.
 ; Separated from _Updater_OpenChangelogWindow so the WinHTTP call runs async.
 ; The notes pane uses WebView2 (NavigateToString) for Markdown rendering and
 ; falls back to a plain-text Edit when WebView2 is unavailable.
-_Updater_BuildChangelogGui(Json, Channel) {
+_Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	global _VendorDir
-	; The async WinHTTP fetch this callback answers bypasses native Suspend()
-	; (which only disarms Hotkeys/Hotstrings), so a pause toggled while the
-	; request was in flight must not still pop the changelog window on return.
-	if A_IsSuspended
+	if !_Updater_RequestMayPublish(Request)
 		return
-	if (Json == "") {
+	if _Updater_AsyncTerminalIsCancelled(Terminal) {
+		try LoggerDebug("Updater", "Changelog fetch cancelled ({1}).", Terminal.Reason)
+		return
+	}
+	if _Updater_JsonPayloadIsFailure(Json) {
 		; Surface non-blocking — a modal MsgBox here would starve the keyboard hook
 		try NotifierSend(t("updater.no_connection"), Map("title", t("updater.title_changelog"), "level", "warning"))
 		return
@@ -221,6 +433,8 @@ _Updater_BuildChangelogGui(Json, Channel) {
 		Label  := (Date != "") ? (R.Tag . "  —  " . Date . Marker) : (R.Tag . Marker)
 		Labels.Push(Label)
 	}
+	if !_Updater_RequestMayPublish(Request)
+		return
 
 	WinTitle := t("updater.title_changelog")
 
@@ -306,33 +520,20 @@ _Updater_BuildChangelogGui(Json, Channel) {
 			: (IsSet(RightPaneEdit) ? (RightPaneEdit.Value := _Updater_MarkdownToPlain(md)) : 0)
 	)
 
-	OpenSelected := (*) => (
-		(Idx := Lb.Value) > 0 ? Run(Releases[Idx].HtmlUrl != ""
-			? Releases[Idx].HtmlUrl
-			: Updater_ReleasesPageUrl()) : ""
-	)
+	OpenSelected := (*) => _Updater_OpenSelectedReleaseUrl(Lb, Releases)
 
-	RefreshBody := (*) => (
-		(Idx := Lb.Value) > 0
-			? (_Updater_RefreshInstallBtn(BtnInstall, Releases, Lb.Value, IsLocal),
-			   ShowBody(Releases[Idx].Body))
-			: _Updater_RefreshInstallBtn(BtnInstall, Releases, 0, IsLocal)
-	)
+	RefreshBody := (*) => _Updater_RefreshChangelogSelection(
+		Lb, Releases, BtnInstall, IsLocal, ShowBody)
 
 	; Capture Idx before _Updater_CloseGui(G) — Lb.Value returns 0 once the window is gone.
 	InstallSelected := (*) => (
 		((Idx2 := Lb.Value) > 0 and !IsLocal)
-			? (_Updater_CloseGui(G),
-			   Updater_ShowUpdatePrompt(Releases[Idx2]))
+			? _Updater_OpenSelectedReleasePrompt(G, Releases[Idx2])
 			: ""
 	)
 
-	BtnSwitch.OnEvent("Click", (*) => (
-		_Updater_CloseGui(G),
-		IsLocal
-			? _Updater_OpenChangelogWindow(OtherChannel)
-			: Updater_SetChannel(OtherChannel)
-	))
+	BtnSwitch.OnEvent("Click", (*) => _Updater_SwitchChangelogChannel(
+		G, IsLocal, OtherChannel))
 
 	Lb.OnEvent("Change", RefreshBody)
 	Lb.OnEvent("DoubleClick", OpenSelected)
@@ -342,7 +543,15 @@ _Updater_BuildChangelogGui(Json, Channel) {
 	G.OnEvent("Close",  (*) => _Updater_CloseGui(G))
 	G.OnEvent("Escape", (*) => _Updater_CloseGui(G))
 
+	if !_Updater_RequestMayPublish(Request) {
+		_Updater_CloseGui(G)
+		return
+	}
 	G.Show("w930 AutoSize")
+	if !_Updater_RequestMayPublish(Request) {
+		_Updater_CloseGui(G)
+		return
+	}
 
 	; Spin up the WebView2 controller now that the window Hwnd is valid.
 	if (UseWV) {
@@ -354,6 +563,11 @@ _Updater_BuildChangelogGui(Json, Channel) {
 			; Reuse the shared session environment (infra/webview_utils.ahk) so no
 			; second Chromium process boots and reopens are near-instant.
 			WVC := WebView2.create(RightPane.Hwnd, , WebView_SharedEnvironment(loader))
+			if !_Updater_RequestMayPublish(Request) {
+				try WVC.Close()
+				_Updater_CloseGui(G)
+				return
+			}
 			G.WVC := WVC
 		} catch as Err {
 			try LoggerWarn("Updater", "WebView2 create failed: {1} — falling back.", Err.Message)
@@ -369,6 +583,10 @@ _Updater_BuildChangelogGui(Json, Channel) {
 				s.IsSwipeNavigationEnabled         := false
 			}
 			WVC.Fill()
+			if !_Updater_RequestMayPublish(Request) {
+				_Updater_CloseGui(G)
+				return
+			}
 			; NavigateToString is synchronous enough here — no "ready" handshake needed.
 			if (HasReleases) {
 				Lb.Choose(1)
@@ -384,6 +602,10 @@ _Updater_BuildChangelogGui(Json, Channel) {
 	; Native fallback: a selectable read-only Edit over the right-pane slot, showing
 	; the raw Markdown. Used when WebView2 is unavailable or free RAM is too low.
 	if (!UseWV) {
+		if !_Updater_RequestMayPublish(Request) {
+			_Updater_CloseGui(G)
+			return
+		}
 		RightPane.GetPos(&rpx, &rpy, &rpw, &rph)
 		RightPaneEdit := G.Add("Edit", "x" . rpx . " y" . rpy . " w" . rpw . " h" . rph
 			. " ReadOnly +Multi -Wrap +VScroll", "")
@@ -396,6 +618,22 @@ _Updater_BuildChangelogGui(Json, Channel) {
 			ShowBody(t("updater.changelog_empty"))
 		}
 	}
+}
+
+_Updater_OpenSelectedReleasePrompt(G, Release) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if A_IsSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	if !_Updater_RequestMayPublish(Request)
+		return false
+	_Updater_CloseGui(G)
+	if !_Updater_RequestMayPublish(Request)
+		return false
+	Updater_ShowUpdatePrompt(Release, Request)
+	return true
 }
 
 ; Escapes a string for safe embedding as a JS string literal (single-quoted).
@@ -501,7 +739,3 @@ _Updater_MarkdownToPlain(md) {
 	s := RegExReplace(s, "(?<!\w)_(.+?)_(?!\w)", "$1")
 	return s
 }
-
-
-
-

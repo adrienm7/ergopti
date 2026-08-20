@@ -80,7 +80,38 @@ class KLClip {
 		static paste_ticks      := []   ; ring of recent paste A_TickCounts
 
 		; OnClipboardChange reference
-		static clip_handler     := unset
+	static clip_handler     := unset
+}
+
+; Optional zero-arity privacy probe used only by the headless regression suite.
+; Production keeps the sentinel 0 and resolves the real cached focus filter.
+global _KL_CLIP_FILTER_PROBE := 0
+
+_KL_Clip_ShouldFilter() {
+	global _KL_CLIP_FILTER_PROBE
+	if IsObject(_KL_CLIP_FILTER_PROBE)
+		return _KL_CLIP_FILTER_PROBE.Call()
+	try return MF_ShouldFilter()
+	catch as Err {
+		; Provenance is privacy-sensitive too: retaining a secret generation's
+		; length/source after the filter failed would leak it on a later paste.
+		try LoggerWarn("Keylogger", "Clipboard privacy probe failed closed: {1}", Err.Message)
+		return true
+	}
+}
+
+; The three fields describe one clipboard generation and must never be observed
+; half-updated by the paste hotkey.  Keep only the in-memory swap Critical; OS
+; clipboard probes and the deferred log sink stay outside it.
+_KL_Clip_InvalidateProvenance() {
+	PreviousCritical := Critical("On")
+	try {
+		KLClip.last_copy_tick := 0
+		KLClip.last_copy_len := 0
+		KLClip.last_copy_app := ""
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 
@@ -94,18 +125,41 @@ class KLClip {
 ; ===========================================
 
 KL_Clip_OnChange(data_type) {
+		; Consume ownership before every lifecycle/privacy return. Otherwise a
+		; callback delivered while suspended leaves its FIFO record behind and the
+		; next genuine user copy is mistaken for driver traffic after resume.
+		OwnedKind := CB_ConsumeOwnedChange()
+		if OwnedKind is String {
+				; A persistent driver write (copy path, colour value, health report)
+				; replaces the clipboard but is not a user copy. Suppress its row and
+				; make the next paste provenance unknown. Temporary transport mutations
+				; preserve the genuine snapshot which their restore puts back.
+				if (OwnedKind == "replace")
+						_KL_Clip_InvalidateProvenance()
+				return
+		}
 		if !Keylogger.initialized
 				return
-		if A_IsSuspended
+		filtered := _KL_Clip_ShouldFilter()
+		if filtered {
+				; The callback still proves the clipboard generation changed. Keeping
+				; public metadata A here attributes a later paste of private B to A.
+				_KL_Clip_InvalidateProvenance()
 				return
-		filtered := false
-		try filtered := MF_ShouldFilter()
-		if filtered
-				return
+		}
 
 		; data_type: 1 = text, 2 = image, 0 = clipboard cleared
-		if (data_type = 0)
+		if (data_type = 0) {
+				_KL_Clip_InvalidateProvenance()
 				return
+		}
+		; Pause suppresses telemetry but not Windows clipboard notifications. A
+		; change made while paused must still retire pre-pause provenance so resume
+		; cannot publish a stale source/length on the next physical paste.
+		if A_IsSuspended {
+				_KL_Clip_InvalidateProvenance()
+				return
+		}
 
 		content_type := (data_type = 1) ? "text" : "other"
 		char_count   := 0
@@ -126,13 +180,20 @@ KL_Clip_OnChange(data_type) {
 				}
 		}
 
-		KLClip.last_copy_tick := A_TickCount
-		KLClip.last_copy_len  := char_count
-		KLClip.last_copy_app  := Keylogger.session_app
+		Now := A_TickCount
+		App := Keylogger.session_app
+		PreviousCritical := Critical("On")
+		try {
+				KLClip.last_copy_tick := Now
+				KLClip.last_copy_len  := char_count
+				KLClip.last_copy_app  := App
+		} finally {
+				Critical(PreviousCritical)
+		}
 
 		KL_AppendLog(Map(
 				"type",         "clipboard_copy",
-				"app",          Keylogger.session_app,
+				"app",          App,
 				"content_type", content_type,
 				"char_count",   char_count
 		))
@@ -149,45 +210,53 @@ KL_Clip_OnChange(data_type) {
 ; ========================================
 
 KL_Clip_OnPaste() {
+		; Synthetic Ctrl+V can arrive while the clipboard's deferred restore is
+		; still pending. The shared transaction token, not keyboard timing, owns it.
+		if CB_IsDriverPasteActive()
+				return
 		if !Keylogger.initialized
 				return
 		if A_IsSuspended
 				return
-		filtered := false
-		try filtered := MF_ShouldFilter()
+		filtered := _KL_Clip_ShouldFilter()
 		if filtered
 				return
 
 		now := A_TickCount
-		copy_lag := (KLClip.last_copy_tick > 0) ? ((now - KLClip.last_copy_tick) & 0xFFFFFFFF) : -1
+		App := Keylogger.session_app
+		PreviousCritical := Critical("On")
+		try {
+				CopyTick := KLClip.last_copy_tick
+				CopyLen := KLClip.last_copy_len
+				CopyApp := KLClip.last_copy_app
+				copy_lag := (CopyTick > 0) ? ((now - CopyTick) & 0xFFFFFFFF) : -1
+				KLClip.paste_ticks.Push(now)
+				fresh := []
+				for _, PasteTick in KLClip.paste_ticks {
+						if (((now - PasteTick) & 0xFFFFFFFF) <= KLClipConst.PASTE_BURST_WINDOW_MS)
+								fresh.Push(PasteTick)
+				}
+				EmitBurst := fresh.Length >= KLClipConst.PASTE_BURST_THRESHOLD
+				KLClip.paste_ticks := EmitBurst ? [] : fresh
+		} finally {
+				Critical(PreviousCritical)
+		}
 
 		KL_AppendLog(Map(
 				"type",         "clipboard_paste",
-				"app",          Keylogger.session_app,
-				"char_count",   KLClip.last_copy_len,
+				"app",          App,
+				"char_count",   CopyLen,
 				"copy_lag_ms",  copy_lag,
-				"source_app",   KLClip.last_copy_app
+				"source_app",   CopyApp
 		))
 
-		; Burst detection
-		KLClip.paste_ticks.Push(now)
-		; Prune ticks outside the window
-		fresh := []
-		for _, PasteTick in KLClip.paste_ticks {
-				if (((now - PasteTick) & 0xFFFFFFFF) <= KLClipConst.PASTE_BURST_WINDOW_MS)
-						fresh.Push(PasteTick)
-		}
-		KLClip.paste_ticks := fresh
-
-		if (fresh.Length >= KLClipConst.PASTE_BURST_THRESHOLD) {
+		if EmitBurst {
 				KL_AppendLog(Map(
 						"type",   "paste_burst",
-						"app",    Keylogger.session_app,
+						"app",    App,
 						"count",  fresh.Length,
 						"window_ms", KLClipConst.PASTE_BURST_WINDOW_MS
 				))
-				; Reset so we don't emit a burst event on every subsequent paste
-				KLClip.paste_ticks := []
 		}
 }
 
@@ -211,6 +280,9 @@ KL_Clip_Start() {
 		Handler := KL_Clip_OnChange
 		ClipboardRegistered := false
 		try {
+				; Adapter writes made before observation started have no corresponding
+				; callback for this handler and must not consume the first user change.
+				CB_DiscardOwnedNotifications()
 				OnClipboardChange(Handler)
 				ClipboardRegistered := true
 				; ``~`` ensures the paste still reaches the active application unchanged.
@@ -239,4 +311,7 @@ KL_Clip_Stop() {
 		}
 		try Hotkey("~^v",      KL_Clip_OnPasteHK, "Off")
 		try Hotkey("~+Insert", KL_Clip_OnPasteHK, "Off")
+		CB_DiscardOwnedNotifications()
+		_KL_Clip_InvalidateProvenance()
+		KLClip.paste_ticks := []
 }

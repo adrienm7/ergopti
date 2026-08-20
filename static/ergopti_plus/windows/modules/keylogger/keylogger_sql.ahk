@@ -212,7 +212,12 @@ KL_TypingRow(sql) {
 
 KL_BuildInserts(entry) {
     EventType := entry["type"]
-    id := KL_AllocEventId()
+	; Output transactions reserve ids at their real screen-order boundary. A
+	; detached typing flush can publish after the accepted completion that
+	; interrupted it, but its lower reserved id still replays first. Ordinary
+	; event producers keep the existing ingest-time allocation path.
+	id := (entry.Has("_event_id") && entry["_event_id"] is Integer
+		&& entry["_event_id"] > 0) ? entry["_event_id"] : KL_AllocEventId()
     switch EventType {
         case "typing":              return KL_TypingRow(KL_BuildInsertTyping(entry, id))
         case "app_switch":          return [KL_BuildInsertAppSwitch(entry, id)]

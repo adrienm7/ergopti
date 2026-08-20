@@ -320,8 +320,10 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			local before = Logger.async_sink_status().queued
 			local ok, callback_err = pcall(keydown, {})
 			local after = Logger.async_sink_status().queued
-			helpers.assert_true(ok, "the production callback must contain the injected failure: "
-				.. tostring(callback_err))
+			if not ok then
+				error("the production callback must contain the injected failure: "
+					.. tostring(callback_err), 0)
+			end
 			helpers.assert_true(after > before, "the callback must enqueue at least one diagnostic record")
 			for _, name in ipairs(hid_boundary_keys) do
 				helpers.assert_eq(boundary_calls[name], before_keydown[name],

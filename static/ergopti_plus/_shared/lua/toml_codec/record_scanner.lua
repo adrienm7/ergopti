@@ -1,4 +1,4 @@
---- toml_codec/record_scanner.lua
+--- _shared/lua/toml_codec/record_scanner.lua
 
 --- ==============================================================================
 --- MODULE: TOML Record Scanner (shared)

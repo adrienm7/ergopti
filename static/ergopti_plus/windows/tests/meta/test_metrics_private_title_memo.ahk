@@ -10,8 +10,8 @@
 ; driver.
 ;
 ; ROOT CAUSE ENCODED: the title it scans comes from MetricsFocusCache, which a
-; 50 ms timer refreshes off-thread; between two refreshes the input is
-; byte-identical, so the scan re-derived a value that could not have changed.
+; bounded resident timer refreshes every 50 ms; between two refreshes the input
+; is byte-identical, so the scan re-derived a value that could not have changed.
 ; The scan is now memoized on the title itself and only re-runs when the title
 ; actually changes.
 ;

@@ -218,14 +218,22 @@ GestureActivateWindow(HWnd) {
 		; Mark this as a self-induced activation so _GestureOnForeground can fence the async
 		; EVENT_SYSTEM_FOREGROUND it triggers (gesture-cycle-winevent-async-fence).
 		_GestureSelfActivated[HWnd] := A_TickCount
+		Activated := false
 		try {
 				if (WinGetMinMax("ahk_id " . HWnd) = -1) {
 						WinRestore("ahk_id " . HWnd)
 				}
-		return WMForceForeground(HWnd)
+				Activated := WMForceForeground(HWnd)
+				return Activated
 		} catch as e {
 				LoggerWarn("gestures", "WinActivate failed for HWND {1}: {2}.", HWnd, e.Message)
 				return False
+		} finally {
+				; A rejected/vanished target cannot emit the foreground WinEvent that
+				; consumes this speculative fence. Remove it now so no later unrelated
+				; activation of a recycled HWND is mistaken for our own request.
+				if !Activated && _GestureSelfActivated.Has(HWnd)
+						_GestureSelfActivated.Delete(HWnd)
 		}
 }
 

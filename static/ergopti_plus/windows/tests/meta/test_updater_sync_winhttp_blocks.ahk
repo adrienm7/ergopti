@@ -2,19 +2,8 @@
 
 #Requires AutoHotkey v2.0
 
-_USWB_FuncBodyStripped(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Rest := SubStr(Src, Idx)
-	if RegExMatch(Rest, "m)^\}", &Match)
-		Rest := SubStr(Rest, 1, Match.Pos)
-	return Rest
-}
-
 _USWB_AssertOneClickUpdateAsync() {
-	Src := _DriverDirConcat("modules/updater")
-	Body := _USWB_FuncBodyStripped(Src, "Updater_OneClickUpdate(*) {")
+	Body := _DriverFuncBody("Updater_OneClickUpdate")
 	Assert(Body != "", "Updater_OneClickUpdate must exist in modules/updater.ahk")
 	
 	SyncIdx := InStr(Body, "Updater_FetchLatestJson(")
@@ -25,8 +14,7 @@ _USWB_AssertOneClickUpdateAsync() {
 }
 
 _USWB_AssertDownloadAndInstallAsync() {
-	Src := _DriverDirConcat("modules/updater")
-	Body := _USWB_FuncBodyStripped(Src, "Updater_DownloadAndInstall(Release) {")
+	Body := _DriverFuncBody("Updater_DownloadAndInstall")
 	Assert(Body != "", "Updater_DownloadAndInstall must exist in modules/updater.ahk")
 	
 	Assert(InStr(Body, "ComObject(") = 0 and InStr(Body, "Req.Open(") = 0,
@@ -36,14 +24,21 @@ _USWB_AssertDownloadAndInstallAsync() {
 }
 
 _USWB_AssertShowAvailableUpdateAsync() {
-	Src := _DriverDirConcat("modules/updater")
-	Body := _USWB_FuncBodyStripped(Src, "Updater_ShowAvailableUpdate(*) {")
+	Body := _DriverFuncBody("Updater_ShowAvailableUpdate")
 	Assert(Body != "", "Updater_ShowAvailableUpdate must exist in modules/updater.ahk")
+	Entry := _DriverFuncBody("_Updater_ShowAvailableUpdateEntry")
+	Running := _DriverFuncBody("_Updater_ShowAvailableUpdateRunning")
+	Assert(Entry != "" and Running != "",
+		"the public update action's policy and running delegates must remain defined")
+	Assert(InStr(Body, "_Updater_ShowAvailableUpdateEntry(") > 0
+		and InStr(Entry, "_Updater_ShowAvailableUpdateRunning(") > 0,
+		"the public update action must delegate through pause policy before network dispatch")
+	Flow := Body . Entry . Running
 
-	SyncIdx := InStr(Body, "Updater_FetchLatestJson(")
+	SyncIdx := InStr(Flow, "Updater_FetchLatestJson(")
 	Assert(!SyncIdx, "Updater_ShowAvailableUpdate must not call synchronous Updater_FetchLatestJson — it blocks keyboard remapping on the menu/notification path (sync-winhttp-blocks-keyboard-on-user-check)")
 
-	AsyncIdx := InStr(Body, "_Updater_FetchLatestJsonAsync(")
+	AsyncIdx := InStr(Flow, "_Updater_FetchLatestJsonAsync(")
 	Assert(AsyncIdx > 0, "Updater_ShowAvailableUpdate must use _Updater_FetchLatestJsonAsync (sync-winhttp-blocks-keyboard-on-user-check)")
 }
 

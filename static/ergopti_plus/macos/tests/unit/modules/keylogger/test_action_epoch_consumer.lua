@@ -165,10 +165,11 @@ local function load_timer_allocation_failure_fixture()
 	end
 
 	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
-		write = function() return true end,
-		read = function() return nil end,
-	}
+package.loaded["adapters.file_system"] = {
+	write = function() return true end,
+	create_if_absent = function() return true, "created" end,
+	read = function() return nil end,
+}
 	local log_manager = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		timer = timer_stub,
 		fs = {

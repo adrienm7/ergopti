@@ -266,7 +266,7 @@ _LLM_Ollama_PollCurl(req_id) {
 	if (entry.Has("start_tick") and entry.Has("timeout_ms") and _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
 		if entry.Has("pid") and entry["pid"] > 0
 			try ProcessClose(entry["pid"])
-		elapsed := entry.Has("start_tick") ? (A_TickCount - entry["start_tick"]) : 0
+		elapsed := entry.Has("start_tick") ? TickElapsed(entry["start_tick"]) : 0
 		try LoggerWarn("LLM.ollama", "curl request timed out after {1} ms.", elapsed)
 		on_fail := entry["on_fail"]
 		_LLM_Ollama_CleanupCurlFiles(entry)
@@ -543,7 +543,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 			try ProcessClose(handle.Pid)
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		_LLM_Ollama_RemoveStreamHandle(handle)
-		elapsed := state.Has("start_tick") ? (A_TickCount - state["start_tick"]) : 0
+		elapsed := state.Has("start_tick") ? TickElapsed(state["start_tick"]) : 0
 		try LoggerWarn("LLM.ollama", "Streaming timed out after {1} ms.", elapsed)
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
@@ -818,6 +818,5 @@ _LLM_Ollama_TryDeleteIfOld(path, file_time, now) {
 _Q(s) {
 	return '"' . s . '"'
 }
-
 
 

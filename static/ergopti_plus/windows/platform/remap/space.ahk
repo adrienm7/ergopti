@@ -166,49 +166,52 @@ _SpaceDispatch() {
 _SpaceTap() {
 		PrevCrit := A_IsCritical
 		Critical("On")
-		global HSE_LastEndChar
-		; IsPhysical=true: this space came from a real key tap, not the engine's own
-		; SendInput. Without the flag it is discarded whenever it lands inside the ~60 ms
-		; post-expansion suppress window (which exists to filter the engine's output), so
-		; the space silently never reaches the buffer and the next trigger mis-frames.
-		HSEMatch := HSE_FeedChar(" ", true)
-		; A match is only a CANDIDATE. HSE_DispatchMatch declines on the
-		; time-activation gate, a mixed-case conform verdict, or a raw callback that
-		; refused — and it says so through its return value. Discarding that verdict
-		; swallowed the space entirely: no expansion reached the screen, no space was
-		; typed, and KL_LogHotstring still recorded a fire that never happened while
-		; HSE_Buffer kept a space the screen did not have. Falling through to the
-		; literal-space path below is what makes the declined case indistinguishable
-		; from "there was never a match". Same class as 356ba64c0's _OnPrefixChar
-		; fix, at the sibling site it missed.
-		if (HSEMatch != "" and HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)) {
-				HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
-						? "repeat_key"
-						: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
-				HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
-				HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-				; Carried through for the same reason the prefix-watcher path carries
-				; it: this sibling reaches the same metrics sink, and a fix applied to
-				; only one of the three fire paths leaks from the other two.
-				HotstringIsPrivate := HSEMatch.HasOwnProp("IsPrivate") && HSEMatch.IsPrivate
-				; Queue the metrics record instead of writing it here. This runs under
-				; Critical("On") on the keystroke thread, BEFORE the post-expansion
-				; suppress release, and KL_LogHotstring is a buffer flush plus a JSONL
-				; append plus WPM pushes — a disk spike inside that window swallows the
-				; next physical keys (the abcd→acd class). The prefix-watcher fire path
-				; was moved off KL_LogHotstring onto this queue for exactly that reason;
-				; this sibling kept the synchronous call.
-				if IsSet(_HSE_QueueFireLog)
-						try _HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, "endchar", HotstringCategory, HotstringSection, HotstringIsPrivate)
+		global HSE_LastEndChar, _PrefixPrivateResidue
+		try {
+				; SC039 is suppressing, so the physical tap is not on screen yet. Emit it
+				; before feeding the engine: HSE_DispatchMatch's backspace count includes
+				; the end character and may only erase text which has actually landed.
+				if !TextPressKey("Space", "")
+						return false
+
+				; IsPhysical=true: this space came from a real key tap, not the engine's
+				; SendInput. Mirror the same proven screen character into the longer LLM
+				; context inside this Critical transaction; the I1 watcher deliberately
+				; ignores TextPressKey's synthetic replacement send.
+				HSEMatch := HSE_FeedChar(" ", true)
+				_HSE_MirrorLiteralEditToLlm(0, " ")
+				CommittedScreenEffect := 0
+				Fired := HSEMatch != "" and HSE_DispatchMatch(
+						HSEMatch, HSE_LastEndChar, &CommittedScreenEffect)
+				if Fired {
+						HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
+								? "repeat_key"
+								: (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
+						HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
+						HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
+						HotstringIsPrivate := HSEMatch.HasOwnProp("IsPrivate") && HSEMatch.IsPrivate
+						if HotstringIsPrivate and IsSet(_PrefixPrivateResidue)
+								_PrefixPrivateResidue := true
+						; Consume the engine's canonical effect instead of re-deriving whether
+						; the end character was emitted or consumed. The dispatcher owns the
+						; output ring on this branch, so recording Space here would duplicate it.
+						if IsSet(_PrefixCommitPostFireEffect)
+								_PrefixCommitPostFireEffect(CommittedScreenEffect)
+						if IsSet(_HSE_QueueFireLog)
+								try _HSE_QueueFireLog(HSEMatch.Trigger, HotstringRepl, "endchar", HotstringCategory, HotstringSection, HotstringIsPrivate)
+						return true
+				}
+
+				; No candidate, or a candidate which declined: the already-emitted Space
+				; is the user's literal output. HSE and LLM already contain it; reset the
+				; boundary preview and publish it to the ring exactly once.
+				if IsSet(_ResetPrefixBuffer)
+						try _ResetPrefixBuffer()
 				UpdateLastSentCharacter(" ")
+				return true
+		} finally {
 				Critical(PrevCrit ? PrevCrit : "Off")
-				return
 		}
-		TextPressKey("Space", "")
-		if IsSet(_ResetPrefixBuffer)
-				try _ResetPrefixBuffer()
-		UpdateLastSentCharacter(" ")
-	Critical(PrevCrit ? PrevCrit : "Off")
 }
 
 _SpaceHoldModKey() {
@@ -221,7 +224,8 @@ _SpaceHoldWithModifier(captured) {
 		_SpaceTapOrDispatch()
 		return
 	}
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return false
 	try {
 		if (captured != "" and captured != " ")
 			_SpaceSendWithModifiers(captured, ModKey)
@@ -229,6 +233,7 @@ _SpaceHoldWithModifier(captured) {
 	} finally {
 		TapHoldSyntheticKeyUp(ModKey)
 	}
+	return true
 }
 
 _SpaceSendWithModifiers(captured, modKey) {

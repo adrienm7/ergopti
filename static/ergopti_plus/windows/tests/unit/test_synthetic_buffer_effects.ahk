@@ -39,17 +39,23 @@
 ; ==================================================================
 ; ==================================================================
 
-; Set both buffers to a known state, declare a payload, and report what the
-; engine buffer became. The preview buffer is not asserted here: the tooltip
-; watcher is not part of this runner's include graph, so _PrefixBuffer does not
-; exist and HS_DeclareSyntheticEffect's IsSet guards skip it. Section 3 covers
-; that half positionally.
+; Set both buffers to a known state, declare a payload, and report both results.
+; The full runner includes the watcher before this file; asserting only HSE_Buffer
+; let _PrefixBuffer retain a previous case and made this suite falsely green.
 _SBE_FeedFrom(Start, Payload) {
-	global HSE_Buffer, HSE_Suppressed
+	global HSE_Buffer, HSE_Suppressed, _PrefixBuffer
 	HSE_Suppressed := 0
 	HSE_Buffer := Start
+	_PrefixSetBuffer(Start)
 	HS_DeclareSyntheticEffect(Payload)
-	return HSE_Buffer
+	return { engine: HSE_Buffer, preview: _PrefixBuffer }
+}
+
+_SBE_AssertBoth(Expected, Start, Payload, Message) {
+	Result := _SBE_FeedFrom(Start, Payload)
+	AssertEqual(Expected, Result.engine, Message . " (engine)")
+	AssertEqual(Expected, Result.preview, Message . " (preview)")
+	return Result
 }
 
 ; The audit's own repro, reduced: the tooltip offers an expansion for "att",
@@ -58,11 +64,11 @@ _SBE_FeedFrom(Start, Payload) {
 ; resetting) is deliberate — after fixing a typo the user is usually back on a
 ; live trigger and that suggestion should reappear.
 _SBE_BackspaceShrinksBuffer() {
-	AssertEqual("at", _SBE_FeedFrom("att", "{BackSpace}"),
+	_SBE_AssertBoth("at", "att", "{BackSpace}",
 		"a layer backspace must shrink the engine buffer by one, exactly as the physical VK_BACK branch does")
-	AssertEqual("a", _SBE_FeedFrom("att", "{BackSpace 2}"),
+	_SBE_AssertBoth("a", "att", "{BackSpace 2}",
 		"a repeated layer backspace must shrink the buffer once per repetition — the layer's repetition count is applied by the OS, so feeding it once leaves the buffer one or more characters ahead of the screen")
-	AssertEqual("", _SBE_FeedFrom("att", "{BackSpace 9}"),
+	_SBE_AssertBoth("", "att", "{BackSpace 9}",
 		"deleting past the start of the buffer must empty it, never underflow")
 }
 
@@ -72,7 +78,7 @@ _SBE_BackspaceShrinksBuffer() {
 _SBE_CaretMoveResetsBuffer() {
 	for Payload in ["{Up 1}", "{Down 3}", "{Home}", "{End}", "^{Home}", "^+{End}",
 		"!{Up 2}", "{End}{Enter 1}", "{Escape 1}", "+{Left 4}", "{F2}"] {
-		AssertEqual("", _SBE_FeedFrom("att", Payload),
+		_SBE_AssertBoth("", "att", Payload,
 			"payload '" . Payload . "' moves the caret or the focus, so the engine buffer must be invalidated — leaving it makes the next expansion backspace over text it never saw")
 	}
 }
@@ -81,16 +87,16 @@ _SBE_CaretMoveResetsBuffer() {
 ; live preview on a volume tap and the guard would be indistinguishable from
 ; wiping the buffer on every layer key.
 _SBE_NeutralPayloadIsPreserved() {
-	AssertEqual("att", _SBE_FeedFrom("att", "{Volume_Up 1}"),
+	_SBE_AssertBoth("att", "att", "{Volume_Up 1}",
 		"a volume payload touches neither the caret nor the document, so it must leave both buffers alone")
-	AssertEqual("att", _SBE_FeedFrom("att", "{Volume_Down 2}"),
+	_SBE_AssertBoth("att", "att", "{Volume_Down 2}",
 		"a volume payload touches neither the caret nor the document, so it must leave both buffers alone")
 }
 
 ; A payload that deletes AND moves must not be mistaken for a plain deletion —
 ; the backspace branch is anchored precisely so it cannot swallow one.
 _SBE_MixedPayloadIsTreatedAsAMove() {
-	AssertEqual("", _SBE_FeedFrom("att", "{End}{BackSpace 2}"),
+	_SBE_AssertBoth("", "att", "{End}{BackSpace 2}",
 		"a payload that also moves the caret must fall through to the reset branch — feeding it as two backspaces would leave the buffer describing a position the caret has left")
 }
 
@@ -134,7 +140,10 @@ _SBE_EveryLayerPayloadIsClassified() {
 		"the scan must reach the real nav-layer bindings (found only " . Payloads.Length . ") — a scan that matches nothing passes every assertion below")
 
 	for Payload in Payloads {
-		Result := _SBE_FeedFrom("att", Payload)
+		Pair := _SBE_FeedFrom("att", Payload)
+		Result := Pair.engine
+		AssertEqual(Pair.engine, Pair.preview,
+			"layer payload '" . Payload . "' must leave engine and preview identical")
 		; Match the DRIVER's own anchored pattern, never a copy of its logic.
 		; This loop used to re-implement the substring scan, so the test and the
 		; driver could drift apart about what "text-neutral" means and both stay
@@ -175,7 +184,7 @@ _SBE_EveryLayerPayloadIsClassified() {
 ; test is the very duplication this change removes.
 _SBE_NeutralAllowlistIsAnchored() {
 	for Payload in ["{Volume_Up}", "{Volume_Up 3}", "{Volume_Down}", "{Volume_Mute 2}"] {
-		AssertEqual("att", _SBE_FeedFrom("att", Payload),
+		_SBE_AssertBoth("att", "att", Payload,
 			"payload '" . Payload . "' is a bare text-neutral key press — it touches neither caret nor document, "
 			. "so both buffers must be left intact")
 	}
@@ -183,7 +192,7 @@ _SBE_NeutralAllowlistIsAnchored() {
 	; The fail-open shapes. Each CONTAINS a neutral token but also moves the
 	; caret or edits the line, so it must fall through to the reset branch.
 	for Payload in ["{End}{Volume_Up}", "{Volume_Up}{End}", "{Volume_Up 2}{Left}"] {
-		AssertEqual("", _SBE_FeedFrom("att", Payload),
+		_SBE_AssertBoth("", "att", Payload,
 			"payload '" . Payload . "' carries a neutral token but ALSO moves the caret, so it must invalidate both "
 			. "buffers. Testing the allowlist with a substring match anywhere in the payload waves it through as "
 			. "text-neutral and leaves both hotstring buffers describing text no longer on screen — the next "
@@ -206,37 +215,33 @@ Test("hotstring buffers: the text-neutral allowlist is anchored to a single key 
 ; ===================================================================
 ; ===================================================================
 
-; ActionLayer's SendInput is a live OS call here, so the wiring is asserted on
-; the source instead of by firing it at whatever window has focus. The ordering
-; matters: declaring AFTER the send leaves a window in which a hotstring thread
-; can fire against a buffer that already describes the wrong caret position.
-_SBE_ActionLayerDeclaresBeforeSending() {
+; ActionLayer must use the adapter path whose canonical owner commits both
+; buffers and the OS send under one Critical span. A raw declaration followed by
+; SendInput is still racy: the declaration's tooltip effects restore the initial
+; thread shield before Windows receives the caret move.
+_SBE_ActionLayerUsesAtomicSender() {
 	Body := _DriverFuncBody("ActionLayer")
 	Assert(Body != "", "ActionLayer() must exist in the driver source")
 
-	DeclarePos := InStr(Body, "HS_DeclareSyntheticEffect")
-	SendPos    := InStr(Body, "SendInput")
-	Assert(DeclarePos > 0,
-		"ActionLayer must declare its effect on the hotstring buffers — its SendInput runs at SendLevel 0 and is filtered out by the prefix watcher's own input level, so no existing reset site can ever observe it")
-	Assert(SendPos > 0, "ActionLayer must still perform the send")
-	Assert(DeclarePos < SendPos,
-		"the declaration must come BEFORE the send, so no thread can observe a buffer that still describes the old caret position")
+	Assert(InStr(Body, '_TextSenderSendInput(action, "key press")') > 0,
+		"ActionLayer must route its invisible SendInput through the canonical declared-send owner — separate HS_DeclareSyntheticEffect/SendInput statements let physical OnChar interleave between future buffer state and the real caret move")
+	Assert(InStr(Body, "HS_DeclareSyntheticEffect") == 0 and InStr(Body, "SendInput(action)") == 0,
+		"ActionLayer must not restore the former raw declaration/send pair")
 }
 
 ; The two Win-shortcut siblings named in the same finding. They reach the caret
 ; through SendFinalResult rather than ActionLayer, so the ActionLayer wiring
 ; above does not cover them.
-_SBE_WinCaretShortcutsDeclare() {
+_SBE_WinCaretShortcutsUseAtomicSender() {
 	for FuncName in ["SelectLine", "SurroundLineWithParentheses"] {
 		Body := _DriverFuncBody(FuncName)
 		Assert(Body != "", FuncName . "() must exist in the driver source")
 		Assert(InStr(Body, "{Home}") > 0,
 			FuncName . " must still be the caret-moving shortcut this guard was written for")
-		DeclarePos := InStr(Body, "HS_DeclareSyntheticEffect")
-		SendPos    := InStr(Body, "SendFinalResult")
-		Assert(DeclarePos > 0,
-			FuncName . " sends synthetic Home/End, which the prefix watcher cannot see — it must declare the caret move or the next expansion backspaces over the line it just selected")
-		Assert(DeclarePos < SendPos, "the declaration must come BEFORE the send in " . FuncName)
+		Assert(RegExMatch(Body, "SendFinalResult\([^\r\n]+,\s*false,\s*true\)") > 0,
+			FuncName . " must request SendFinalResult's atomic buffer-effect transaction for its invisible Home/End payload")
+		Assert(InStr(Body, "HS_DeclareSyntheticEffect") == 0,
+			FuncName . " must not restore a separate declaration which can become interruptible before SendFinalResult")
 	}
 }
 
@@ -251,7 +256,7 @@ Test("synthetic-buffer-effects: a payload that moves and deletes is treated as a
 	_SBE_MixedPayloadIsTreatedAsAMove)
 Test("synthetic-buffer-effects: every nav-layer payload in source is classified",
 	_SBE_EveryLayerPayloadIsClassified)
-Test("synthetic-buffer-effects: ActionLayer declares before it sends",
-	_SBE_ActionLayerDeclaresBeforeSending)
-Test("synthetic-buffer-effects: the Win caret shortcuts declare before they send",
-	_SBE_WinCaretShortcutsDeclare)
+Test("synthetic-buffer-effects: ActionLayer uses the atomic declared sender",
+	_SBE_ActionLayerUsesAtomicSender)
+Test("synthetic-buffer-effects: the Win caret shortcuts use the atomic declared sender",
+	_SBE_WinCaretShortcutsUseAtomicSender)

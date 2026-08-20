@@ -43,6 +43,8 @@ const INVENTORY = {
 	'HSE.Dispatch': 'the hotstring engine deciding and firing an expansion',
 	'LLM.OnChar': 'the other consumer of every character — the profiler showed slow OnChar events with no matching slow HSE.FeedChar, and this was the only unattributed candidate',
 	'KL.Ingest': 'the keylogger ingest, which closes the per-keystroke budget with the hook fan-out',
+	'KL.RoiPrune': 'the bounded trigger-ROI survivor selection, measured separately so pruning cost stays distinguishable from per-keystroke ingest',
+	'KLR.CandidateClone': 'the O(database-size) SQLite backup paid before an incremental metrics projection can publish atomically',
 	'Tooltip.Build': 'building the tooltip GUI rows',
 	'Tooltip.ResolvePos': 'resolving where the tooltip goes, including the UIA path',
 	'Tooltip.Present': 'the composite present: clamp, prepare, corners, border, reveal (sub-attributed by HotPath_BreakdownMark)',
@@ -51,10 +53,11 @@ const INVENTORY = {
 	'Tooltip.BorderPixelLoop': 'the per-pixel border draw, the one step that scales with tooltip size',
 	'Gesture.Invoke': 'the single choke point all three dispatchers share (gesture, shortcut slot, tap-hold), so one segment covers every user-triggered action',
 	'Config.TomlWrite': 'a config save: full read-modify-write plus canonicalisation, run from menu callbacks, so a slow one blocks the tray menu while the user watches',
+	'Config.TomlBuild': 'the detached TOML candidate build before a transactional config publication, including exact-subtree reconstruction and stage verification',
 	'Updater.Poll': 'the async update check, which calls WaitForResponse(0) on a COM object every tick — a COM call that blocks stalls the whole message pump',
 	'Webview.Eval': 'the host-to-page half of the webview bridge — ExecuteScriptAsync is named async but the COM marshalling is not free, and this is what pushes the init payload',
 	'UIA.SelectionPoll': 'the idle UI-Automation selection poll',
-	'Metrics.FocusRefresh': 'WinGetTitle on the foreground window, up to 20x/s — a Not Responding window makes it wait out the timeout'
+	'Metrics.FocusRefresh': 'the canonical 20 Hz focus snapshot — WM_GETTEXT has a 5 ms SendMessageTimeoutW deadline and every partial identity fails privacy closed'
 };
 
 const errors = [];

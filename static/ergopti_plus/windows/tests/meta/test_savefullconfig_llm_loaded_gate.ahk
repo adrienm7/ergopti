@@ -17,24 +17,27 @@
 #Requires AutoHotkey v2.0
 
 _SFLG_LlmPersistGatedOnLoaded() {
-	Body := _DriverFuncBody("SaveFullConfig")
-	Assert(Body != "", "SaveFullConfig must exist in infra/config_io.ahk")
+	Body := _DriverFuncBody("_ConfigCollectFullSaveUpdates")
+	Assert(Body != "", "the full-save collector must exist in infra/config_io.ahk")
 
-	First := InStr(Body, "_LLM_Menu_Loaded")
-	Second := InStr(Body, "_LLM_Menu_Loaded", , First + 1)
+	First := InStr(Body, "HasMenuCandidate := IsSet(MenuSource)")
+	Second := InStr(Body, "if (MenuReady && (MenuState is Map))")
 	OnbPos := InStr(Body, "onboarding_seen")
 	OvrPos := InStr(Body, "app_profile_overrides")
 	AppendPos := InStr(Body, "_LLM_Menu_AppendPersistedUpdates")
 
-	Assert(First > 0, "SaveFullConfig must gate _LLM_Menu_SyncToFeatures on _LLM_Menu_Loaded")
+	Assert(First > 0,
+		"the collector must distinguish an explicit detached menu candidate from the live boot state")
 	Assert(Second > 0,
-		"the flat [llm] persistence needs its OWN _LLM_Menu_Loaded gate; without it a boot-timer flush before LLM_Menu_Init clobbers saved LLM values with module defaults")
+		"the flat [llm] persistence needs its own MenuReady gate; without it a boot-timer flush before LLM_Menu_Init clobbers saved LLM values with module defaults")
 	Assert(OnbPos > Second && OvrPos > Second && AppendPos > Second,
 		"onboarding_seen / app_profile_overrides / _LLM_Menu_AppendPersistedUpdates must sit AFTER the dedicated _LLM_Menu_Loaded gate")
 
-	FirstMenuRead := InStr(Body, "_LLM_Menu[")
-	Assert(FirstMenuRead = 0 || FirstMenuRead > Second,
-		"no _LLM_Menu[...] read may occur before the flat-keys _LLM_Menu_Loaded gate")
+	Assert(InStr(Body, "IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded") > First,
+		"MenuReady must continue to include the live _LLM_Menu_Loaded gate")
+	Assert(InStr(Body, "MenuState[") > Second,
+		"flat LLM keys must read the gated explicit/live MenuState, never the "
+		. "global menu directly")
 }
 Test("config: flat [llm] persistence is gated on _LLM_Menu_Loaded (no boot-timer default clobber)",
 	_SFLG_LlmPersistGatedOnLoaded)

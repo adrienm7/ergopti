@@ -13,7 +13,7 @@
 ;    every NETWORK_TICK_MS. On change emits a network_change event with
 ;    a SHA-256 hash of the SSID (never the raw name — privacy) and the
 ;    signal-strength bracket (excellent/good/fair/poor) derived from the
-;    RSSI reported by netsh wlan show interfaces.
+;    signal-quality percentage reported by the native WLAN API.
 ; 2. Internet reachability — polls internet connectivity via a lightweight
 ;    DNS lookup (resolve a known stable hostname) every REACH_TICK_MS.
 ;    Emits internet_up / internet_down events on transition. This surfaces
@@ -49,11 +49,10 @@ class KLNetConst {
 		static REACH_TICK_MS    := 30000   ; Internet reachability check
 		static VPN_TICK_MS      := 20000   ; VPN adapter poll interval
 
-		; RSSI thresholds (dBm) for signal-strength bracket
-		static RSSI_EXCELLENT   := -50
-		static RSSI_GOOD        := -65
-		static RSSI_FAIR        := -75
-		; Below RSSI_FAIR → "poor"
+		; WLAN signal-quality percentage thresholds. Below FAIR is "poor".
+		static SIGNAL_EXCELLENT_MIN := 80
+		static SIGNAL_GOOD_MIN      := 60
+		static SIGNAL_FAIR_MIN      := 40
 
 		; Windows NCSI hostname — always resolves when internet is up
 		static NCSI_HOST := "dns.msftncsi.com"
@@ -70,8 +69,11 @@ class KLNetConst {
 ; ===============================
 
 class KLNet {
+		static wifi_status      := NI_WIFI_STATUS_UNKNOWN
 		static last_ssid_hash   := ""
 		static last_signal      := ""
+		static wifi_poll_active := false
+		static wifi_snapshot_fn := NI_GetWifiSnapshot
 		static internet_up      := true   ; assume up until first check
 		static vpn_active       := false
 		static vpn_adapter_name := ""
@@ -91,46 +93,116 @@ class KLNet {
 ; ====================================
 ; ====================================
 
+; Pure transition reducer used by the live poll and unit tests. An unknown
+; observation is rejected and preserves the previous accepted state. A proven
+; disconnect clears it and emits a transition only when the prior state was
+; connected; a later observation of the same SSID is therefore a reconnect.
+KL_Net_ReduceWifiSample(previous_status, previous_hash, previous_signal, sample) {
+		result := Map(
+				"accepted",    false,
+				"next_status", previous_status,
+				"next_hash",   previous_hash,
+				"next_signal", previous_signal
+		)
+		if !(sample is Map)
+				return result
+
+		status := sample.Get("status", NI_WIFI_STATUS_UNKNOWN)
+		if (status = NI_WIFI_STATUS_UNKNOWN)
+				return result
+
+		if (status = NI_WIFI_STATUS_DISCONNECTED) {
+				result["accepted"]    := true
+				result["next_status"] := NI_WIFI_STATUS_DISCONNECTED
+				result["next_hash"]   := ""
+				result["next_signal"] := ""
+				if (previous_status = NI_WIFI_STATUS_CONNECTED) {
+						result["event"] := Map(
+								"connection_state", NI_WIFI_STATUS_DISCONNECTED,
+								"ssid_hash",        "",
+								"signal",           "",
+								"prev_ssid_hash",   previous_hash
+						)
+				}
+				return result
+		}
+
+		if (status != NI_WIFI_STATUS_CONNECTED)
+				return result
+
+		ssid_hash  := sample.Get("ssid_hash", "")
+		signal_pct := sample.Get("signal_pct", "")
+		if !(ssid_hash is String) or ssid_hash = "" or !(signal_pct is Number)
+				return result
+
+		signal := "poor"
+		if (signal_pct >= KLNetConst.SIGNAL_EXCELLENT_MIN)
+				signal := "excellent"
+		else if (signal_pct >= KLNetConst.SIGNAL_GOOD_MIN)
+				signal := "good"
+		else if (signal_pct >= KLNetConst.SIGNAL_FAIR_MIN)
+				signal := "fair"
+
+		result["accepted"]    := true
+		result["next_status"] := NI_WIFI_STATUS_CONNECTED
+		result["next_hash"]   := ssid_hash
+		result["next_signal"] := signal
+		if (previous_status != NI_WIFI_STATUS_CONNECTED
+				or ssid_hash != previous_hash or signal != previous_signal) {
+				result["event"] := Map(
+						"connection_state", NI_WIFI_STATUS_CONNECTED,
+						"ssid_hash",        ssid_hash,
+						"signal",           signal
+				)
+				if (previous_status = NI_WIFI_STATUS_CONNECTED and previous_hash != "")
+						result["event"]["prev_ssid_hash"] := previous_hash
+		}
+		return result
+}
+
+
 KL_Net_WifiTick() {
 		if !Keylogger.initialized
 				return
 		if A_IsSuspended
 				return
+		if KLNet.wifi_poll_active
+				return
+		KLNet.wifi_poll_active := true
 
 		; Wrap the entire poll in try so a transient WLAN API failure (unavailable
 		; adapter, mid-suspend state) never surfaces as an uncaught error that would
 		; cascade into PrefixWatcher and other per-keystroke callbacks.
 		try {
-				; Delegate to the NetworkInfo adapter — no DllCall plumbing in this module
-				ssid_hash  := NI_GetSsidHash()
-				signal_pct := NI_GetSignalStrength()
-
-				; NI_GetSsidHash() returns "" when no Wi-Fi is connected
-				if (ssid_hash = "")
+				; One typed snapshot keeps disconnects distinct from transient adapter
+				; failures and guarantees the hash/signal pair came from one query.
+				; Copy the property-stored Func before calling so AHK does not inject
+				; KLNet as an implicit first argument.
+				snapshot_fn := KLNet.wifi_snapshot_fn
+				sample := snapshot_fn.Call()
+				transition := KL_Net_ReduceWifiSample(
+						KLNet.wifi_status,
+						KLNet.last_ssid_hash,
+						KLNet.last_signal,
+						sample
+				)
+				if !transition["accepted"]
 						return
 
-				; signal_pct is 0-100 from the WLAN API signal quality field
-				signal := "poor"
-				if (signal_pct >= 80)
-						signal := "excellent"
-				else if (signal_pct >= 60)
-						signal := "good"
-				else if (signal_pct >= 40)
-						signal := "fair"
-
-				if (ssid_hash != KLNet.last_ssid_hash or signal != KLNet.last_signal) {
-						entry := Map(
-								"type",      "network_change",
-								"app",       Keylogger.session_app,
-								"ssid_hash", ssid_hash,
-								"signal",    signal
-						)
-						if (KLNet.last_ssid_hash != "")
-								entry["prev_ssid_hash"] := KLNet.last_ssid_hash
+				if transition.Has("event") {
+						entry := transition["event"]
+						entry["type"] := "network_change"
+						entry["app"]  := Keylogger.session_app
 						KL_AppendLog(entry)
-						KLNet.last_ssid_hash := ssid_hash
-						KLNet.last_signal    := signal
 				}
+				KLNet.wifi_status    := transition["next_status"]
+				KLNet.last_ssid_hash := transition["next_hash"]
+				KLNet.last_signal    := transition["next_signal"]
+		} catch as err {
+				try LoggerError("Keylogger",
+						"Wi-Fi poll failed; preserving the last accepted state: {1}", err.Message)
+		} finally {
+				KLNet.wifi_poll_active := false
 		}
 }
 

@@ -97,10 +97,11 @@ local function load_log_manager()
 	package.loaded["infra.i18n"]    = { t = function(key) return key end }
 	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
 	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
-		write = function() return true end,
-		read = function() return nil end,
-	}
+package.loaded["adapters.file_system"] = {
+	write = function() return true end,
+	create_if_absent = function() return true, "created" end,
+	read = function() return nil end,
+}
 
 	package.loaded["modules.keylogger.log_manager"] = nil
 	local lm = helpers.load_with_stubs("modules.keylogger.log_manager", {

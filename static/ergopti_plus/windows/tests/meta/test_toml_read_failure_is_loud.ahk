@@ -97,8 +97,8 @@ _TRF_SuccessfulReadIsStillCached() {
 ; over the original, so it must be able to tell "empty" from "unreadable" and
 ; refuse in the second case.
 _TRF_BatchWriteRefusesToRewriteAnUnreadFile() {
-	Body := _DriverFuncBody("TOML_BatchWrite")
-	Assert(Body != "", "TOML_BatchWrite() must exist")
+	Body := _DriverFuncBody("_TOML_BatchWriteImpl")
+	Assert(Body != "", "_TOML_BatchWriteImpl() must exist")
 	Assert(InStr(Body, "ReadFailed") > 0,
 		"TOML_BatchWrite must ask whether the seed parse actually read the file — it serializes only what that parse returned and then moves the result over the original, so an unreadable config would be rewritten as a one-key file")
 
@@ -111,8 +111,8 @@ _TRF_BatchWriteRefusesToRewriteAnUnreadFile() {
 ; ParseTomlFile must stay non-throwing: the fuzz corpus asserts it never raises,
 ; so the failure has to be signalled out of band rather than by an exception.
 _TRF_ParseStaysNonThrowing() {
-	Body := _DriverFuncBody("ParseTomlFile")
-	Assert(Body != "", "ParseTomlFile() must exist")
+	Body := _DriverFuncBody("_ParseTomlFileImpl")
+	Assert(Body != "", "_ParseTomlFileImpl() must exist")
 	Assert(InStr(Body, "catch") > 0,
 		"the FileRead must be caught explicitly rather than swallowed by a bare try — a bare try discards the OSError with no log and no signal")
 	Assert(InStr(Body, "LoggerError") > 0,

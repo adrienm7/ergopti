@@ -12,15 +12,13 @@
 ; a personal extension .toml added or edited mid-session (outside the editor)
 ; never refreshed the tray-menu display for the rest of the session.
 ;
-; The fix wires the invalidator into RebuildTrayMenu() — the runtime rebuild
-; path (log-level change, shortcut letter picks, hotstring live toggles,
-; editor close) — right before InitSubMenus() re-scans. It is deliberately NOT
-; wired into InitSubMenus() itself or into BuildTrayMenuDeferred(): the boot
-; pass warms this exact cache OFF the boot Critical("On") section specifically
-; so InitSubMenus()'s own (under-Critical) call to it hits only the warm cache
-; (see test_deferred_menu_critical_file_io.ahk) — invalidating inside
-; InitSubMenus would force the unbounded personal-folder disk walk back under
-; Critical on every boot and reintroduce a keyboard-hook freeze.
+; The fix wires the invalidator into _TrayRootBuildOnce() — the canonical
+; runtime worker reached by log-level changes, shortcut letter picks, hotstring
+; live toggles and editor close — immediately before InitSubMenus() re-scans.
+; It is deliberately NOT wired into InitSubMenus() itself or into the boot root
+; worker: the boot pass warms this exact cache before menu construction, so
+; invalidating inside InitSubMenus would force the unbounded personal-folder
+; disk walk back into every construction path.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,20 +26,21 @@
 
 
 
-_HSC_InvalidateWiredIntoRebuild() {
-	Body := _DriverFuncBody("RebuildTrayMenu")
-	Assert(Body != "", "RebuildTrayMenu() declaration must exist in ui/menu/menu_rebuild.ahk")
+_HSC_InvalidateWiredIntoRootWorker() {
+	Body := _DriverFuncBody("_TrayRootBuildOnce")
+	Assert(Body != "", "_TrayRootBuildOnce() must exist")
 
 	InvalidatePos := InStr(Body, "_HS_InvalidatePersonalCache()")
 	InitPos := InStr(Body, "InitSubMenus()")
 	Assert(InvalidatePos > 0,
-		"RebuildTrayMenu must call _HS_InvalidatePersonalCache() so a personal extension .toml added/edited mid-session refreshes the tray menu (personal-hotstring-cache-never-invalidated)")
-	Assert(InitPos > 0, "RebuildTrayMenu must call InitSubMenus()")
+		"the canonical tray-root worker must invalidate the personal-hotstring cache so a personal extension .toml added/edited mid-session refreshes the tray menu (personal-hotstring-cache-never-invalidated)")
+	Assert(InitPos > 0,
+		"the canonical tray-root worker must call InitSubMenus()")
 	Assert(InvalidatePos < InitPos,
 		"the personal cache must be invalidated BEFORE InitSubMenus() re-scans it, not after (personal-hotstring-cache-never-invalidated)")
 }
-Test("menu: RebuildTrayMenu invalidates the personal-hotstring cache before rescanning (personal-hotstring-cache-never-invalidated)",
-	_HSC_InvalidateWiredIntoRebuild)
+Test("menu: canonical root worker invalidates personal-hotstring cache before rescanning (personal-hotstring-cache-never-invalidated)",
+	_HSC_InvalidateWiredIntoRootWorker)
 
 _HSC_NotWiredIntoInitSubMenus() {
 	; Guards against the "obvious but wrong" fix: invalidating inside

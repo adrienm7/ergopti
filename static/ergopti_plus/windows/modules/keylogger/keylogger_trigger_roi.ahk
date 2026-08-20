@@ -97,6 +97,9 @@ class KLRoi {
 		; Word frequency counter for candidate detection
 		; Map(lower_word → count)
 		static word_counts          := Map()
+		; Advanced by every live-map mutation. A prune publishes its precomputed
+		; survivor Map only when this still matches the snapshot generation.
+		static word_counts_generation := 0
 		static current_word         := ""   ; in-progress word buffer
 
 		; Set true once the in-progress run exceeds MAX_INPROGRESS_WORD_LEN. The
@@ -154,25 +157,45 @@ KL_Roi_RequireInit(func_name) {
 ; @param net_saved {Integer} Characters saved by this expansion.
 ; @param is_private {Boolean} True when the mapping is the user's personal data.
 KL_Roi_OnHotstring(trigger, net_saved, is_private := false) {
+	; Deferred fire callbacks outlive native Suspend unless their generation is
+	; retired. Keep the sink itself fail-closed too: no stale caller may mutate
+	; session savings or half-life state while the driver is paused.
+	if A_IsSuspended
+		return
 	if !KL_Roi_RequireInit("KL_Roi_OnHotstring")
 		return
-		if (net_saved <= 0)
-				return
+	if (net_saved <= 0)
+		return
+	; Require-init may log and therefore yield. Recheck pause inside the same short
+	; transaction as every ROI mutation; the periodic append stays outside so no
+	; privacy lookup or logger call can starve the keyboard hook under Critical.
+	RoiCritical := Critical("On")
+	try {
+		if A_IsSuspended
+			return
 		KLRoi.session_saved_chars += net_saved
 		KLRoi.session_fired_count += 1
 		if !is_private
-				KLRoi.trigger_last_use[StrLower(trigger)] := A_TickCount
+			KLRoi.trigger_last_use[StrLower(trigger)] := A_TickCount
+		EmitSnapshot := (Mod(KLRoi.session_fired_count,
+			KLRoiConst.ROI_SNAPSHOT_EVERY) = 0)
+		SnapshotSaved := KLRoi.session_saved_chars
+		SnapshotFired := KLRoi.session_fired_count
+		SnapshotApp := Keylogger.session_app
+	} finally {
+		Critical(RoiCritical)
+	}
 
-		; Emit a periodic roi_snapshot so the dashboard can plot savings over time
-		; without aggregating over the entire hotstring table.
-		if (Mod(KLRoi.session_fired_count, KLRoiConst.ROI_SNAPSHOT_EVERY) = 0) {
-				KL_AppendLog(Map(
-						"type",              "roi_snapshot",
-						"app",               Keylogger.session_app,
-						"session_saved",     KLRoi.session_saved_chars,
-						"session_fired",     KLRoi.session_fired_count
-				))
-		}
+	; Emit a periodic roi_snapshot so the dashboard can plot savings over time
+	; without aggregating over the entire hotstring table.
+	if EmitSnapshot {
+		KL_AppendLog(Map(
+			"type",          "roi_snapshot",
+			"app",           SnapshotApp,
+			"session_saved", SnapshotSaved,
+			"session_fired", SnapshotFired
+		))
+	}
 }
 
 
@@ -229,10 +252,10 @@ KL_Roi_ProcessWord(word) {
 		if IsSet(_TriggerSet) && _TriggerSet.Has(key)
 				return
 
-		; Bump count
-		cnt := KLRoi.word_counts.Has(key) ? KLRoi.word_counts[key] : 0
-		cnt += 1
-		KLRoi.word_counts[key] := cnt
+		; Bump count in a short transaction so snapshot generations cannot observe
+		; half of the read/modify/write pair.
+		cnt := 0
+		map_size := KL_Roi_IncrementWordCount(KLRoi, key, &cnt)
 
 		; Emit candidate event on threshold crossing
 		if (cnt = KLRoiConst.REPEAT_THRESHOLD) {
@@ -249,7 +272,7 @@ KL_Roi_ProcessWord(word) {
 		; PRUNE_TARGET_WORDS) so a saturated map cannot re-trigger this full scan on
 		; every subsequent word boundary — keeping the guard amortised, not O(n)
 		; per word once the cap is reached.
-		if (KLRoi.word_counts.Count > KLRoiConst.MAX_TRACKED_WORDS)
+		if (map_size > KLRoiConst.MAX_TRACKED_WORDS)
 				KL_Roi_PruneWordCounts()
 }
 
@@ -259,63 +282,25 @@ KL_Roi_ProcessWord(word) {
 ; ===== 4.1) Bounded tracking-map prune =====
 ; ===========================================
 
-; Shrinks word_counts to PRUNE_TARGET_WORDS, guaranteed to leave it strictly
-; below MAX_TRACKED_WORDS. First drops count = 1 noise; if that is not enough,
-; evicts the lowest-count entries until the target is reached. Bounded so the
-; map always falls back under the cap and the next word cannot immediately
-; re-trigger another full scan (keeps the saturation guard amortised).
+; Shrinks word_counts to PRUNE_TARGET_WORDS. Snapshot and publication are short
+; Critical transactions; bounded frequency selection runs outside Critical so the
+; keystroke thread stays serviceable. A generation mismatch retains the live Map
+; and the next word boundary retries instead of overwriting a concurrent word.
 KL_Roi_PruneWordCounts() {
-		previous_critical := Critical("On")
-		try {
-		; Pass 1 — drop single-occurrence noise (the cheapest, most disposable words)
-		prune := []
-		for k, v in KLRoi.word_counts {
-				if (v = 1)
-						prune.Push(k)
+		Started := HotPath_Now()
+		Generation := 0
+		Snapshot := KL_Roi_SnapshotWordCounts(KLRoi, &Generation)
+		Operations := 0
+		Published := true
+		if (Snapshot.Count > KLRoiConst.PRUNE_TARGET_WORDS) {
+				NextCounts := KL_Roi_SelectWordCountSurvivors(
+						Snapshot, KLRoiConst.PRUNE_TARGET_WORDS, &Operations)
+				Published := KL_Roi_TryPublishPrunedCounts(KLRoi, Generation, NextCounts)
 		}
-		for _, k in prune
-				KLRoi.word_counts.Delete(k)
-
-		; Pass 2 — if still over target (map saturated with count >= 2 entries),
-		; evict the lowest-count entries until the map is down to the target. This
-		; is what guarantees the map drops below the cap even when no count = 1
-		; words exist, so the guard cannot degrade to O(n) on every word.
-		if (KLRoi.word_counts.Count > KLRoiConst.PRUNE_TARGET_WORDS) {
-				; Collect (key, count) pairs, then insertion-sort ascending by count so
-				; the lowest-frequency (most disposable) words are evicted first. The
-				; array is at most MAX_TRACKED_WORDS entries and this runs only on the
-				; rare prune path, so a simple insertion sort is preferred over cleverness.
-				keys := []
-				counts := []
-				for k, v in KLRoi.word_counts {
-						keys.Push(k)
-						counts.Push(v)
-				}
-				i := 2
-				n := keys.Length
-				while (i <= n) {
-						cur_key := keys[i]
-						cur_cnt := counts[i]
-						j := i - 1
-						while (j >= 1 && counts[j] > cur_cnt) {
-								keys[j + 1] := keys[j]
-								counts[j + 1] := counts[j]
-								j -= 1
-						}
-						keys[j + 1] := cur_key
-						counts[j + 1] := cur_cnt
-						i += 1
-				}
-				excess := KLRoi.word_counts.Count - KLRoiConst.PRUNE_TARGET_WORDS
-				i := 1
-				while (i <= excess && i <= keys.Length) {
-						KLRoi.word_counts.Delete(keys[i])
-						i += 1
-				}
-		}
-		} finally {
-				Critical(previous_critical)
-		}
+		Detail := Snapshot.Count . " entries, " . Operations . " bounded selection step(s), "
+				. (Published ? "published" : "stale snapshot retained")
+		HotPath_LogIfSlow("KL.RoiPrune", Started, Detail)
+		return Published
 }
 
 

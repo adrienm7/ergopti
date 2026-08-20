@@ -317,24 +317,10 @@ GesturesReadConfig()
 ; every subsequent reload (the tray menu's "Auto-configure" action stays the
 ; supported way to retry if something failed here).
 global _IniCache, ConfigurationFile
+global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS := 2000
 RawAutoConfig := IniCacheGet(_IniCache, "gestures", "auto_configure_on_next_start")
-if (RawAutoConfig == "1" or RawAutoConfig == "true") {
-		LoggerStart("gestures", "Consuming auto_configure_on_next_start flag from onboarding…")
-
-		; Clear the flag FIRST, before the asynchronous touchpad worker starts —
-		; the PnP cycle can still kill the AHK process by tearing down the HID hook.
-		; Clearing after launch would leave the flag set and the auto-relaunched
-		; script could loop forever, never reaching initMenu.
-		try TOML_BatchWrite(ConfigurationFile,
-				[{ Section: "gestures", Key: "auto_configure_on_next_start", Value: false }])
-
-		; Defer the registry write + worker launch until the auto-execute tail
-		; (notably initMenu in ErgoptiPlus.ahk) has settled. The PnP operation then
-		; runs in its own elevated process and is polled without blocking AHK.
-		SetTimer(_DeferredGestureAutoConfigure, -2000)
-
-		LoggerSuccess("gestures", "AutoConfigureOnNextStart flag cleared — touchpad config deferred to T+2s.")
-}
+if (RawAutoConfig == "1" or RawAutoConfig == "true")
+		GestureConsumeAutoConfigureFlag(ConfigurationFile)
 
 ; Arm the WinEvent hook that tracks manual window activations.
 ; Skipped in the headless test runner (_AHK_DRY_RUN is defined by run_all.ahk)
@@ -357,7 +343,6 @@ if !IsSet(_AHK_DRY_RUN) {
 				"UInt", 0,
 				"UInt", 0,
 				"UInt", 0x0000)           ; WINEVENT_OUTOFCONTEXT
-		OnExit(_GestureUnhook)
 		; SetWinEventHook returns 0 on failure. Unchecked, a failed hook left
 		; window-order tracking silently dead while the line below still announced
 		; the module ready — so window-cycle gestures did nothing, with no clue why.

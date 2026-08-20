@@ -58,6 +58,8 @@ JsonParse(text) {
 	pos := 1
 	val := _JsonParseValue(&text, &pos)
 	_JsonSkipWs(&text, &pos)
+	if (pos <= StrLen(text))
+		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
 	return val
 }
 

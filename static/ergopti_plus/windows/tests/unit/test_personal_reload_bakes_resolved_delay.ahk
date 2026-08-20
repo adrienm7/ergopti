@@ -43,10 +43,12 @@ _PRBD_ReloadBakesTheResolvedDelay() {
 	SavedFeatures := IsSet(Features) ? Features : ""
 	SavedOverrides := _HotstringsOverrides
 	SavedOverridesPath := _HotstringsOverridesPath
+	OverridesPath := A_Temp . "\personal_reload_delay_overrides.toml"
+	try FileDelete(OverridesPath)
 	HSE_RegistryClear()
-	; Persistence off: the override setter would otherwise write the developer's
-	; real hotstrings config from a test run.
-	_HotstringsOverridesPath := ""
+	; Use a private writable target: a setter now publishes memory only after the
+	; durable write succeeds, and the test must never touch the developer's file.
+	_HotstringsOverridesPath := OverridesPath
 	_HotstringsOverrides := Map()
 	Features := Map("hotstrings", Map("personal", Map(Section, Map("enabled", true))))
 	HotstringsResolveBumpGen()
@@ -77,6 +79,7 @@ _PRBD_ReloadBakesTheResolvedDelay() {
 		HSE_RegistryClear()
 		_HotstringsOverrides := SavedOverrides
 		_HotstringsOverridesPath := SavedOverridesPath
+		try FileDelete(OverridesPath)
 		if (SavedFeatures != "")
 			Features := SavedFeatures
 		HotstringsResolveBumpGen()

@@ -531,11 +531,39 @@ document.addEventListener('click', function (e) {
 // ==============================
 // ==============================
 
+var activePromptContext = Object.freeze({ edit_id: '', epoch: 0 });
+
 /**
- * Initializes the interface with data passed from the Hammerspoon backend.
+ * Reads an immutable host context while preserving legacy macOS payloads.
+ * @param {Object} data - The initialization payload.
+ * @returns {{edit_id: string, epoch: number}} The page-owned context.
+ */
+function readPromptContext(data) {
+	if (
+		data &&
+		typeof data.edit_id === 'string' &&
+		Number.isSafeInteger(data.epoch) &&
+		data.epoch > 0
+	) {
+		return Object.freeze({ edit_id: data.edit_id, epoch: data.epoch });
+	}
+	return Object.freeze({ edit_id: '', epoch: 0 });
+}
+
+/**
+ * Initializes the interface with data passed from the active host.
  * @param {Object} data - The initialization payload.
  */
 function init(data) {
+	var nextContext = readPromptContext(data);
+	if (
+		(activePromptContext.epoch > 0 && nextContext.epoch === 0) ||
+		(nextContext.epoch > 0 && nextContext.epoch < activePromptContext.epoch)
+	) {
+		return;
+	}
+	activePromptContext = nextContext;
+
 	document.getElementById('title').textContent = data.title;
 	document.getElementById('p-name').value = data.name;
 	document.getElementById('p-mode').value = data.mode;
@@ -560,7 +588,11 @@ var post = makeHostBridge('prompt_bridge');
  * Communicates the cancellation request back to the host.
  */
 function doCancel() {
-	post({ action: 'cancel' });
+	post({
+		action: 'cancel',
+		edit_id: activePromptContext.edit_id,
+		epoch: activePromptContext.epoch
+	});
 }
 
 /**
@@ -578,6 +610,8 @@ function doSave() {
 
 	post({
 		action: 'save',
+		edit_id: activePromptContext.edit_id,
+		epoch: activePromptContext.epoch,
 		name: promptName,
 		batch: promptMode === 'batch',
 		prompt: promptContent

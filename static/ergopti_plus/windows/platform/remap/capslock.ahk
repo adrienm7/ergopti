@@ -152,11 +152,13 @@ SC03A:: {
 			LoggerDebug("TapHold", "CapsLock hold suppressed after long press because wheel activity was detected.")
 		return
 	}
-	TapHoldSyntheticKeyDown(ModKey)
+	if !TapHoldSyntheticKeyDown(ModKey)
+		return
 	tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
 	if tap {
 		; Short press — release modifier then dispatch tap action.
-		TapHoldSyntheticKeyUp(ModKey)
+		if !TapHoldSyntheticKeyUp(ModKey)
+			return
 		_CapsLockDispatch(CtrlActivated)
 		return
 	}
@@ -221,10 +223,11 @@ $SC03A:: {
 
 	Now           := A_TickCount
 	CharTime      := LastSentCharacterKeyTime.Has("CapsLock") ? LastSentCharacterKeyTime["CapsLock"] : Now
-	tap           := ((Now - CharTime) <= TapHoldDuration(TapHold, "caps_lock") * 1000)
+	ElapsedMs     := TickElapsed(CharTime, Now)
+	tap           := (ElapsedMs <= TapHoldDuration(TapHold, "caps_lock") * 1000)
 	if (
 		tap
-		and (Now - CharTime) >= TapMinDurationMs()
+		and ElapsedMs >= TapMinDurationMs()
 		and A_PriorKey == "CapsLock"
 	) { ; A_PriorKey + TapMinDurationMs floor suppress spurious taps when CapsLock is brushed mid-roll
 		_CapsLockDispatch(False)
@@ -279,7 +282,8 @@ _CapsLockDispatch(CtrlActivated) {
 ; a configured action throws.
 _CapsLockInvokeTap(CtrlActivated) {
 	if CtrlActivated {
-		TapHoldSyntheticKeyDown("LCtrl")
+		if !TapHoldSyntheticKeyDown("LCtrl")
+			return false
 	}
 	try {
 		; Special cases that cannot be handled by GESTURE_ACTIONS.Fn.Call() directly.
@@ -296,4 +300,5 @@ _CapsLockInvokeTap(CtrlActivated) {
 			TapHoldSyntheticKeyUp("LCtrl")
 		}
 	}
+	return true
 }

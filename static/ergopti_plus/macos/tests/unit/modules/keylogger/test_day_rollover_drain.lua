@@ -240,10 +240,11 @@ local function load_real_day_rollover(stall)
 		get_db_rev              = function() return 0 end,
 		sync_foreign_data_sql   = function() end,
 	}
-	package.loaded["adapters.file_system"] = {
-		write = function() return true end,
-		read = function() return nil end,
-	}
+package.loaded["adapters.file_system"] = {
+	write = function() return true end,
+	create_if_absent = function() return true, "created" end,
+	read = function() return nil end,
+}
 
 	package.loaded["infra.i18n"] = { t = function(key) return key end }
 	package.loaded["infra.timings"] = {

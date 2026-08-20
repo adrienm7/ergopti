@@ -95,7 +95,7 @@ _LLM_Menu_TriggerRows() {
 	Rows := []
 
 	; Trigger shortcut (fires prediction on demand)
-	sc_display := _LLM_Menu["trigger_shortcut"] != "" ? _LLM_Menu["trigger_shortcut"] : t("common.none")
+	sc_display := LLM_Menu_TriggerDisplayValue()
 	Rows.Push(Map(
 		"label",  StrReplace(t("menu.llm.trigger_shortcut_label"), "%s", sc_display),
 		"action", (*) => LLM_Menu_PromptTriggerShortcut()))
@@ -409,6 +409,12 @@ _LLM_Menu_NavRows() {
  * @param {number} max_val - Maximum valid value (0 = no maximum).
  */
 LLM_Menu_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptNumeric(key, title, prompt, min_val, max_val)
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	ib := InputBox(prompt, title, "w400 h120", _LLM_Menu[key])
 	if (ib.Result != "OK" || ib.Value == "")
@@ -422,10 +428,9 @@ LLM_Menu_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
 	val := Integer(ib.Value)
 	if (min_val > 0 && val < min_val) || (max_val > 0 && val > max_val)
 		return
-	_LLM_Menu[key] := val
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM numeric '" . key . "' setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, key, val),
+		_LLM_Menu_ApplyStandardCommitted)
 }
 
 ; Resolve the shared default for ``shared_key`` (e.g. "llm_debounce_ms") from the
@@ -444,11 +449,9 @@ _LLM_DefaultFor(shared_key, fallback := "") {
 ; tail every prompt setter runs. Factored out so the "Reset to N" rows can do
 ; the right thing without copying the boilerplate inline at every call site.
 _LLM_AssignAndRebuild(tray_key, value) {
-	global _LLM_Menu
-	_LLM_Menu[tray_key] := value
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM '" . tray_key . "' reset",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, tray_key, value),
+		_LLM_Menu_ApplyStandardCommitted)
 }
 
 ; Append a "Reset to <default>" row immediately below a setting when the
@@ -494,6 +497,12 @@ LLM_Menu_PromptDebounce() {
 ; the value through LLM_Engine_Init(LLM_Menu_BuildOpts()) — the port is a property
 ; of the api_ollama client, not of the engine options.
 LLM_Menu_PromptOllamaPort() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptOllamaPort()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
 	ib := InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
@@ -504,19 +513,22 @@ LLM_Menu_PromptOllamaPort() {
 	val := Integer(ib.Value)
 	if (val < 1024 || val > 65535)
 		return
-	_LLM_Menu["ollama_port"] := val
-	LLM_Ollama_SetPort(val)
-	LLM_Menu_SaveConfig()
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the Ollama port setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"ollama_port", val), _LLM_Menu_ApplyOllamaPortCommitted)
 }
 
 ; Resets the Ollama port to its shared default and applies it live.
 LLM_Menu_ResetOllamaPort(default_port) {
-	global _LLM_Menu
-	_LLM_Menu["ollama_port"] := default_port
-	LLM_Ollama_SetPort(default_port)
-	LLM_Menu_SaveConfig()
+	return LLM_Menu_CommitMutation("the Ollama port reset",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"ollama_port", default_port), _LLM_Menu_ApplyOllamaPortCommitted)
+}
+
+_LLM_Menu_ApplyOllamaPortCommitted(Candidate) {
+	LLM_Ollama_SetPort(Candidate["ollama_port"])
 	LLM_Menu_Build()
+	return true
 }
 
 LLM_Menu_PromptCtxChars() {
@@ -530,6 +542,12 @@ LLM_Menu_PromptMinWords() {
 }
 
 LLM_Menu_PromptMaxWords() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptMaxWords()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.max_words_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["max_words"])
 	if (ib.Result != "OK" || ib.Value == "")
@@ -541,13 +559,18 @@ LLM_Menu_PromptMaxWords() {
 	val := Integer(ib.Value)
 	if (val < 0)
 		return
-	_LLM_Menu["max_words"] := val  ; 0 = unlimited
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM maximum-word setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"max_words", val), _LLM_Menu_ApplyStandardCommitted)
 }
 
 LLM_Menu_PromptTemperature() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptTemperature()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.temperature_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["temperature"])
 	if (ib.Result != "OK" || ib.Value == "")
@@ -562,34 +585,48 @@ LLM_Menu_PromptTemperature() {
 	val := Float(raw)
 	if (val < 0.0 || val > 2.0)
 		return
-	_LLM_Menu["temperature"] := Format("{:.2f}", val)
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM temperature setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"temperature", Format("{:.2f}", val)),
+		_LLM_Menu_ApplyStandardCommitted)
 }
 
 LLM_Menu_PromptNavModifiers() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptNavModifiers()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.nav_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["nav_modifiers"])
 	if (ib.Result != "OK")
 		return
-	_LLM_Menu["nav_modifiers"] := Trim(ib.Value)
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
-	LLM_Menu_BindNavHotkeys()
+	return LLM_Menu_CommitMutation("the LLM navigation-modifier setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"nav_modifiers", Trim(ib.Value)), _LLM_Menu_ApplyNavCommitted)
 }
 
 LLM_Menu_PromptValModifiers() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptValModifiers()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.val_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["val_modifiers"])
 	if (ib.Result != "OK")
 		return
-	_LLM_Menu["val_modifiers"] := Trim(ib.Value)
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM validation-modifier setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"val_modifiers", Trim(ib.Value)), _LLM_Menu_ApplyNavCommitted)
+}
+
+_LLM_Menu_ApplyNavCommitted(*) {
+	_LLM_Menu_ApplyStandardCommitted()
 	LLM_Menu_BindNavHotkeys()
+	return true
 }
 
 
@@ -608,85 +645,23 @@ LLM_Menu_PromptValModifiers() {
  * An empty input clears the shortcut.
  */
 LLM_Menu_PromptTriggerShortcut() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptTriggerShortcut()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.shortcut_prompt"), t("menu.llm.trigger_shortcut_title"), "w450 h140", _LLM_Menu["trigger_shortcut"])
 	if (ib.Result != "OK")
 		return
 	raw := Trim(ib.Value)
-	_LLM_Menu["trigger_shortcut"] := raw
-	LLM_Menu_ApplyTriggerShortcut(raw)
-	LLM_Menu_SaveConfig()
-	LLM_Menu_Build()
-}
-
-/**
- * Registers (or removes) the global trigger hotkey from the active shortcut string.
- * @param {string} raw - Hotkey string like "ctrl+alt+p" or "" to disable.
- */
-LLM_Menu_ApplyTriggerShortcut(raw) {
-	global _LLM_Menu_TriggerHk
-
-	; Remove the previous hotkey if one was set
-	if IsSet(_LLM_Menu_TriggerHk) {
-		try Hotkey(_LLM_Menu_TriggerHk, "Off")
-		_LLM_Menu_TriggerHk := unset
-	}
-
-	if (raw == "")
-		return
-
-	; Convert "ctrl+alt+p" → "^!p" AHK format
-	converted := LLM_Menu_ShortcutToAhk(raw)
-	if (converted == "")
-		return
-
-	try {
-		Hotkey(converted, (*) => LLM_Menu_TriggerPrediction(), "On")
-		_LLM_Menu_TriggerHk := converted
-	} catch as e {
-		LoggerWarn("LLM", "Trigger shortcut binding failed: " e.Message)
-	}
-}
-
-/**
- * Converts a human-readable shortcut string to AHK hotkey notation.
- * e.g. "ctrl+alt+p" → "^!p"
- * @param {string} raw - Human-readable shortcut string.
- * @returns {string} AHK hotkey string, or "" on failure.
- */
-LLM_Menu_ShortcutToAhk(raw) {
-	if (raw == "")
-		return ""
-
-	parts  := StrSplit(raw, "+")
-	key    := ""
-	prefix := ""
-
-	for part in parts {
-		p := StrLower(Trim(part))
-		if (p == "ctrl") {
-			prefix .= "^"
-			continue
-		}
-		if (p == "alt") {
-			prefix .= "!"
-			continue
-		}
-		if (p == "shift") {
-			prefix .= "+"
-			continue
-		}
-		if (p == "win") {
-			prefix .= "#"
-			continue
-		}
-		; Everything else is treated as the key
-		key := p
-	}
-
-	if (key == "")
-		return ""
-	return prefix . key
+	Committed := LLM_Menu_CommitTriggerShortcut(raw)
+	; A partial native cleanup failure returns false but publishes an explicit
+	; recovery projection. Rebuild that warning instead of leaving a stale label
+	if Committed || LLM_Menu_TriggerNeedsAttention()
+		LLM_Menu_Build()
+	return Committed
 }
 
 /**
@@ -705,6 +680,12 @@ LLM_Menu_TriggerPrediction() {
  * Prompts the user to enter a custom Ollama model identifier.
  */
 LLM_Menu_PromptAddModel() {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_PromptAddModel()
+		finally Critical(InheritedCritical)
+	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.ollama_model_hint"), t("menu.llm.add_custom_model"), "w450 h130")
 	if (ib.Result != "OK" || Trim(ib.Value) == "")

@@ -28,12 +28,11 @@
 ; ========================================================
 ; ========================================================
 
-; Wrap-safe elapsed check -- mirrors _LLM_DeadlineExpired exactly.
-; Defined locally so this test file can run standalone without the full
-; module graph loaded (run_all.ahk includes api_common.ahk first, but a
-; targeted test run must not depend on that ordering).
+; Route every assertion through the production timing primitive.  The former
+; version duplicated the formula locally, so it stayed green even when a
+; production caller used an unsafe absolute deadline.
 _TDW_DeadlineExpired(start_tick, timeout_ms, now_tick) {
-	return (((now_tick - start_tick) + 0x100000000) & 0xFFFFFFFF) >= timeout_ms
+	return TickExpired(start_tick, timeout_ms, now_tick)
 }
 
 ; Naive (buggy) form for documentation: fails after 32-bit wrap.
@@ -137,3 +136,25 @@ _TDW_ExactBoundary() {
 		"wrap-safe check must treat elapsed == timeout_ms as expired (llm-deadline-wrap)")
 }
 Test("_LLM_DeadlineExpired: elapsed equal to timeout counts as expired (llm-deadline-wrap)", _TDW_ExactBoundary)
+
+
+_TDW_SharedPrimitiveVectors() {
+	start := 0xFFFFFFD0
+	now := 40
+	AssertEqual(88, TickElapsed(start, now),
+		"TickElapsed must preserve elapsed time across rollover (llm-deadline-wrap)")
+	AssertEqual(112, TickRemaining(start, 200, now),
+		"TickRemaining must preserve the pre-expiry remainder across rollover (llm-deadline-wrap)")
+	Assert(!TickExpired(start, 200, now),
+		"TickExpired must not expire a live interval after rollover (llm-deadline-wrap)")
+
+	start := 0xFFFFFF9C
+	now := 150
+	AssertEqual(250, TickElapsed(start, now),
+		"TickElapsed must report the full post-rollover duration (llm-deadline-wrap)")
+	AssertEqual(0, TickRemaining(start, 200, now),
+		"TickRemaining must clamp expired intervals to zero (llm-deadline-wrap)")
+	Assert(TickExpired(start, 200, now),
+		"TickExpired must expire a post-rollover interval (llm-deadline-wrap)")
+}
+Test("Shared tick primitive handles elapsed, remaining, and expiry across rollover (llm-deadline-wrap)", _TDW_SharedPrimitiveVectors)

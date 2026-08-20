@@ -51,6 +51,7 @@ function M.on_message(payload, state)
 				metrics_manifest = state.keylogger.get_dashboard_payload({ include_prefetch = false }).metrics_manifest,
 				app_icons = {},
 				_prefetch_data = range,
+				range_request_id = payload.request_id,
 				driver_meta = { os = "linux", heatmap_id = "kc" },
 			}
 		end

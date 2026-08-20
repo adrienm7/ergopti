@@ -22,10 +22,10 @@
 ; 1. Per-driver subfolder: ``<config_dir>/ahk/`` is auto-created on first
 ;    save. Disjoint from ``<config_dir>/hammerspoon/`` so the two drivers
 ;    never touch the same file.
-; 2. Read-only module: this file parses config.toml, it never writes it.
-;    Persistence goes through the single canonical writer (SaveFullConfig →
-;    TOML_BatchWrite), which preserves every section it does not re-collect
-;    and refuses to rebuild a file it could not read.
+; 2. Single writer: this file parses config.toml and routes targeted metrics
+;    updates through ConfigCommitUpdates → TOML_BatchWrite. The canonical
+;    writer preserves every untouched section and refuses to rebuild a file it
+;    could not read.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -313,24 +313,37 @@ CS_Load() {
 		}
 }
 
-; Serialise the in-memory state back to disk. config.toml has exactly ONE
-; writer — SaveFullConfig, which routes through TOML_BatchWrite's atomic write
-; and its read-failure refusal — and the metrics keys this module owns are part
-; of the payload it collects.
-CS_Save() {
-		global _SaveFullConfigReady
-		if IsSet(_SaveFullConfigReady) {
-				SaveFullConfig()
-				return
+; Commit an explicit metrics candidate through the one atomic config.toml
+; writer. PublishFn is invoked by the gateway before config ownership is
+; released; callers must never perform the matching live swap after return.
+CS_Save(Updates := unset, Context := "the metrics settings", WriterFn := 0,
+		NotifyFn := 0, PublishFn := 0,
+		FinalizeFn := 0, CompensateFn := 0) {
+		global _SaveFullConfigReady, ConfigurationFile
+		if !(IsSet(_SaveFullConfigReady) && _SaveFullConfigReady
+				&& IsSet(ConfigurationFile) && ConfigurationFile != "") {
+				return ConfigReportPersistenceFailure(Context, NotifyFn,
+						"the full-config writer is not initialized")
+		}
+		; Compatibility for callers migrated in the following subsystem commits.
+		; SaveFullConfig is tri-state, so DEFERRED must be accepted explicitly.
+		if !IsSet(Updates) {
+				global CONFIG_SAVE_OK, CONFIG_SAVE_DEFERRED
+				Result := SaveFullConfig()
+				return Result = CONFIG_SAVE_OK || Result = CONFIG_SAVE_DEFERRED
 		}
 
-		; No second writer for config.toml exists here on purpose. The section
-		; splicer that used to live in this branch seeded its rewrite from a bare-try
-		; FileRead: an unreadable file left the body empty, the section merge then
-		; short-circuited to the rendered [metrics] block alone, and the atomic
-		; move replaced the user's entire configuration with that one section —
-		; silently, because the only catch covered the write. Every caller reaching
-		; CS_Save is a post-boot menu handler, i.e. long after the full-config writer
-		; is armed, so refusing here costs nothing and keeps one owner for the file.
-		try LoggerWarn("ConfigShortcuts", "CS_Save called before the full-config writer was armed — metrics preferences kept in memory only; the next SaveFullConfig persists them.")
+		return ConfigCommitUpdates(ConfigurationFile, Updates, Context, WriterFn, NotifyFn,
+				PublishFn, FinalizeFn, CompensateFn)
+}
+
+CS_SaveBuilt(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
+		global _SaveFullConfigReady, ConfigurationFile
+		if !(IsSet(_SaveFullConfigReady) && _SaveFullConfigReady
+				&& IsSet(ConfigurationFile) && ConfigurationFile != "") {
+				return ConfigReportPersistenceFailure(Context, NotifyFn,
+						"the full-config writer is not initialized")
+		}
+		return ConfigCommitBuilt(ConfigurationFile, Context, BuildFn,
+				WriterFn, NotifyFn)
 }

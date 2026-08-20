@@ -55,12 +55,35 @@ _STRP_WithCleanBuffer(Body) {
 	PrevDepth   := Keylogger.synth_active
 	PrevType    := Keylogger.synth_type
 	PrevPrivate := Keylogger.synth_private
+	PrevFocus   := MetricsFocusCache.state
+	PrevDisabledApps := MetricsFilters.disabled_apps
+	PrevPrivateBrowsing := MetricsFilters.private_browsing
+	PrevSecureField := MetricsFilters.secure_field
+	PrevSystemAuth := MetricsFilters.system_auth
 	Keylogger.initialized   := true
 	Keylogger.buffer_events := []
 	Keylogger.buffer_text   := ""
 	Keylogger.synth_active  := 0
 	Keylogger.synth_type    := "none"
 	Keylogger.synth_private := false
+	; The production focus cache now starts invalid and deliberately filters every
+	; token until its first bounded probe succeeds. This test owns the downstream
+	; typing-row seam, so publish a complete neutral focus and disable the unrelated
+	; predicates; otherwise every privacy assertion is vacuously green on no row.
+	MetricsFocusCache.state := {
+		valid: true,
+		last_at: A_TickCount,
+		hwnd: 1,
+		process_name: "synthetic-privacy-test.exe",
+		title: "Synthetic privacy test",
+		class: "SyntheticPrivacyTest",
+		failure_reason: "",
+		timed_out: false
+	}
+	MetricsFilters.disabled_apps := Map()
+	MetricsFilters.private_browsing := false
+	MetricsFilters.secure_field := false
+	MetricsFilters.system_auth := false
 	Captured := { text: "", events: [] }
 	try {
 		Body()
@@ -72,6 +95,11 @@ _STRP_WithCleanBuffer(Body) {
 		Keylogger.synth_active  := PrevDepth
 		Keylogger.synth_type    := PrevType
 		Keylogger.synth_private := PrevPrivate
+		MetricsFocusCache.state := PrevFocus
+		MetricsFilters.disabled_apps := PrevDisabledApps
+		MetricsFilters.private_browsing := PrevPrivateBrowsing
+		MetricsFilters.secure_field := PrevSecureField
+		MetricsFilters.system_auth := PrevSystemAuth
 	}
 	return Captured
 }
@@ -355,9 +383,11 @@ _STRP_FlushPersistsTheBufferVerbatim() {
 		"KL_FlushBuffer must snapshot Keylogger.buffer_text — the field this file asserts on")
 	Assert(RegExMatch(Body, "snap_events[ \t]*:=[ \t]*Keylogger\.buffer_events"),
 		"and Keylogger.buffer_events likewise")
-	Assert(RegExMatch(Body, '"text",[ \t]*snap_text'),
+	PublishBody := _DriverFuncBody("_KL_PublishBufferSnapshot")
+	Assert(PublishBody != "", "the detached typing snapshot publisher must exist")
+	Assert(RegExMatch(PublishBody, '"text",[ \t]*Snapshot\.Text'),
 		"and write that snapshot into the row's text field with nothing in between — a transformation here would mean the redaction is asserted one step away from what is persisted")
-	Assert(RegExMatch(Body, '"events",[ \t]*snap_events'),
+	Assert(RegExMatch(PublishBody, '"events",[ \t]*Snapshot\.Events'),
 		"and into its events field the same way")
 }
 Test("meta keylogger: the typing buffer is persisted into the typing row verbatim (personal-info-typing-row-leak)",

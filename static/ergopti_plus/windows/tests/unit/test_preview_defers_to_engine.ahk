@@ -30,10 +30,10 @@
 ; which reads as "the magic key didn't work" rather than as a preview defect.
 ;
 ; THE FIX:
-; _PreviewEngineWouldFire asks the ENGINE, using the engine's own Spec from
-; HSE_RegistryByLastChar and the engine's own HSE_Buffer. A star trigger is
-; evaluated against HSE_Buffer plus the magic key, which is exactly the buffer
-; the engine will match against one keystroke later.
+; _PrefixCollectCandidates asks HSE_PreviewNextDecision directly. That oracle
+; runs the real matcher, ordered personal/repeat fallbacks and dispatch gates,
+; so no preview-local candidate exists to bypass a boundary or hide a different
+; fallback winner.
 ; ==============================================================================
 
 
@@ -47,7 +47,7 @@
 ; ===================================================
 
 ; Registers a single star trigger with the real engine and points the engine
-; buffer at `Buf`, so the predicate under test sees a faithful registry.
+; buffer at `Buf`, so the collector sees a faithful registry.
 ; @param Trigger The trigger to register (e.g. "tt★").
 ; @param Buf     The engine buffer to simulate.
 _PreviewAgree_Setup(Trigger, Buf) {
@@ -63,19 +63,32 @@ _PreviewAgree_Setup(Trigger, Buf) {
 	HSE_RegistryClear()
 	; "*" marks a star trigger, no "?" so the trigger is word-anchored — the
 	; same flags a normal magic-key hotstring is registered with.
-	HSE_Register("*", Trigger, (*) => "")
+	Spec := HSE_Register("*", Trigger, 0,
+		Map("Replacement", "expanded", "OnlyText", true,
+			"Category", "test", "Section", "boundary"))
 	HSE_Buffer := Buf
 	; The buffer start is a real word boundary in every case below, so a refusal
 	; can only come from the character preceding the trigger — never from an
 	; unknown left edge.
 	HSE_StartIsWordBoundary := true
+	return Spec
+}
+
+; @return The canonical row for Trigger, or "" when that trigger is not the
+; engine's complete next decision.
+_PreviewAgree_RowFor(Trigger) {
+	for _, Row in _PrefixCollectCandidates() {
+		if Row.Trigger == Trigger
+			return Row
+	}
+	return ""
 }
 
 TestPreviewAgree_RefusesMidWordStarTrigger() {
 	; The measured case: engine buffer ends "att", so the "tt" body of "tt★" is
 	; preceded by a letter and the engine will not fire it.
 	_PreviewAgree_Setup("tt" . "★", "je viens d’activer att")
-	AssertFalse(_PreviewEngineWouldFire("tt" . "★"),
+	Assert(!IsObject(_PreviewAgree_RowFor("tt" . "★")),
 		"a star trigger whose body sits mid-word must NOT be offered — the engine refuses it, "
 		. "so advertising it produces a tooltip the magic key cannot validate")
 }
@@ -84,10 +97,14 @@ Test("preview: a mid-word star trigger is not offered",
 
 TestPreviewAgree_OffersStarTriggerAtWordStart() {
 	; The mirror case — the fix must not silence legitimate suggestions.
-	_PreviewAgree_Setup("tt" . "★", "je viens d’activer tt")
-	AssertTrue(_PreviewEngineWouldFire("tt" . "★"),
+	Spec := _PreviewAgree_Setup("tt" . "★", "je viens d’activer tt")
+	Row := _PreviewAgree_RowFor("tt" . "★")
+	Assert(IsObject(Row),
 		"the same trigger at a genuine word start must still be offered, or the fix has "
 		. "traded a false positive for a false negative")
+	Assert(Row.HasOwnProp("FireDecision")
+		and ObjPtr(Row.FireDecision.Spec) == ObjPtr(Spec),
+		"the offered row must carry the exact live Spec selected by the canonical engine decision")
 }
 Test("preview: a word-initial star trigger is still offered",
 	TestPreviewAgree_OffersStarTriggerAtWordStart)
@@ -97,20 +114,78 @@ TestPreviewAgree_RefusesWhenBodyIsNotTheSuffix() {
 	; the end of the engine buffer. Offering it would advertise an expansion for
 	; text the user has not typed.
 	_PreviewAgree_Setup("tt" . "★", "je viens d’activer atx")
-	AssertFalse(_PreviewEngineWouldFire("tt" . "★"),
+	Assert(!IsObject(_PreviewAgree_RowFor("tt" . "★")),
 		"a candidate whose body does not end the engine buffer must not be offered")
 }
 Test("preview: a candidate that does not match the buffer suffix is not offered",
 	TestPreviewAgree_RefusesWhenBodyIsNotTheSuffix)
 
-TestPreviewAgree_FailsOpenForUnknownTrigger() {
-	; A trigger the engine has never registered is left visible rather than
-	; silently dropped: a registry gap must degrade to the previous behaviour,
-	; not empty the tooltip.
-	_PreviewAgree_Setup("tt" . "★", "je viens d’activer att")
-	AssertTrue(_PreviewEngineWouldFire("zz" . "★"),
-		"an unregistered trigger must fail OPEN — hiding it would turn a registry gap into a "
-		. "silently empty tooltip, which is harder to diagnose than an over-eager one")
+TestPreviewAgree_FailsClosedForUnknownTrigger() {
+	global _PrefixIndex, _TriggerSet
+	SavedIndex := _PrefixIndex
+	SavedSet := _TriggerSet
+	try {
+		_PreviewAgree_Setup("tt" . "★", "je viens d’activer zz")
+		_PrefixIndex := Map()
+		_TriggerSet := Map()
+		_AddTriggerToIndex("zz" . "★", "stale", "test", "removed", 999)
+		Assert(_PrefixIndex.Has("zz"),
+			"sanity: the obsolete catalogue row must exist for this test to prove it has no authority")
+		Assert(!IsObject(_PreviewAgree_RowFor("zz" . "★")),
+			"an unregistered trigger must fail closed even when the auxiliary catalogue still contains it")
+	} finally {
+		_PrefixIndex := SavedIndex
+		_TriggerSet := SavedSet
+	}
 }
-Test("preview: an unknown trigger fails open",
-	TestPreviewAgree_FailsOpenForUnknownTrigger)
+Test("preview: an unknown trigger fails closed",
+	TestPreviewAgree_FailsClosedForUnknownTrigger)
+
+
+; During a live rebuild the engine refuses every registered match and both
+; fallbacks, so every preview source must stay closed until the new generation
+; is published.
+TestPreviewAgree_RebuildFenceOverridesFailOpen() {
+	global HSE_RebuildInProgress
+	PreviousRebuild := HSE_RebuildInProgress
+	_PreviewAgree_Setup("tt" . "★", "je viens d’activer tt")
+	try {
+		HSE_RebuildInProgress := true
+		AssertEqual(0, _PrefixCollectCandidates().Length,
+			"a registered trigger must not be offered while the engine’s rebuild fence makes it unavailable")
+	} finally {
+		HSE_RebuildInProgress := PreviousRebuild
+	}
+}
+Test("preview: the live-rebuild fence keeps every candidate closed",
+	TestPreviewAgree_RebuildFenceOverridesFailOpen)
+
+TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_RepeatEnabled
+	global ScriptInformation
+	MK := ScriptInformation["MagicKey"]
+	SavedRepeat := HSE_RepeatEnabled
+	HSE_RegistryClear()
+	try {
+		HSE_RepeatEnabled := true
+		HSE_Register("*", "ok" . MK, 0,
+			Map("Replacement", "ok" . MK, "Category", "test", "Section", "noop"))
+		HSE_Buffer := "ok"
+		HSE_StartIsWordBoundary := true
+
+		Rows := _PrefixCollectCandidates()
+		AssertEqual(1, Rows.Length,
+			"the collector must expose only the canonical repeat decision")
+		AssertEqual("k" . MK, Rows[1].Trigger,
+			"the tooltip must advertise the repeat fallback, never the rejected no-op mapping")
+		Assert(Rows[1].FireDecision.Spec.HasOwnProp("TransientKind")
+			and Rows[1].FireDecision.Spec.TransientKind == "repeat",
+			"the row must transport the engine-owned repeat decision, not rebuild a lookalike from the rejected candidate")
+	} finally {
+		HSE_RepeatEnabled := SavedRepeat
+		HSE_RegistryClear()
+		HSE_HardReset()
+	}
+}
+Test("preview: a no-op candidate cannot hide the canonical repeat winner",
+	TestPreviewAgree_NoOpCandidateLosesToCanonicalFallback)

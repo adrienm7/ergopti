@@ -323,7 +323,7 @@ KL_Mouse_AccumScroll(delta) {
 				return
 		now := A_TickCount
 		if (KLMouse.scroll_last > 0
-						and (now - KLMouse.scroll_last) > KLMouseConst.SCROLL_BURST_GAP_MS) {
+			and TickElapsed(KLMouse.scroll_last, now) > KLMouseConst.SCROLL_BURST_GAP_MS) {
 				; Gap exceeded — flush the previous burst before starting a new one
 				KL_Mouse_FlushScroll()
 		}
@@ -347,7 +347,7 @@ KL_Mouse_AccumScrollH(delta) {
 				return
 		now := A_TickCount
 		if (KLMouse.scroll_last > 0
-						and (now - KLMouse.scroll_last) > KLMouseConst.SCROLL_BURST_GAP_MS) {
+			and TickElapsed(KLMouse.scroll_last, now) > KLMouseConst.SCROLL_BURST_GAP_MS) {
 				KL_Mouse_FlushScroll()
 		}
 		if (KLMouse.scroll_start = 0)
