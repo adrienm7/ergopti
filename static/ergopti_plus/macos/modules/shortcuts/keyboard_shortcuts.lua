@@ -195,20 +195,33 @@ end
 --- @return boolean committed True when no binding is needed or one is owned.
 local function bind_slot(slot_id, action_id)
 	if action_id == "none" then return true end
+	if _hotkeys[slot_id] then
+		local ok_enable, enabled = xpcall(Registrar.setEnabled, debug.traceback,
+			_hotkeys[slot_id], true)
+		if ok_enable and enabled == true then return true end
+		Logger.error(LOG, "Failed to re-enable retained slot '%s': %s.",
+			slot_id, tostring(enabled))
+		return false
+	end
 	local chord = slot_to_chord(slot_id)
 	if not chord then
 		Logger.error(LOG, "Slot '%s' has no valid chord mapping — startup refused.", slot_id)
 		return false
 	end
 	local ok_bind, handle = xpcall(Registrar.bind, debug.traceback, chord, function()
-		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, action_id)
+		local current_action = _actions[slot_id] or "none"
+		if current_action == "none" then
+			Logger.debug(LOG, "Ignored inactive configurable shortcut slot '%s'.", slot_id)
+			return false
+		end
+		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, current_action)
 		local ok_action, handled = Logger.callback(LOG,
 			"Configurable shortcut '" .. tostring(slot_id) .. "'",
-			GestActions.execute_single, action_id, "keyboard__" .. slot_id)
+			GestActions.execute_single, current_action, "keyboard__" .. slot_id)
 		if not ok_action then return false end
 		if handled ~= true then
 			Logger.error(LOG, "Configurable shortcut '%s' was not handled by action '%s'.",
-				tostring(slot_id), tostring(action_id))
+				tostring(slot_id), tostring(current_action))
 			return false
 		end
 		return true
@@ -222,6 +235,54 @@ local function bind_slot(slot_id, action_id)
 			slot_id, chord, tostring(handle))
 		return false
 	end
+end
+
+--- Changes whether an exact retained slot handle may deliver callbacks.
+--- @param slot_id string
+--- @param enabled boolean
+--- @return boolean settled
+local function set_slot_enabled(slot_id, enabled)
+	local handle = _hotkeys[slot_id]
+	if not handle then return false end
+	local ok, result = xpcall(Registrar.setEnabled, debug.traceback, handle, enabled)
+	if ok and result == true then return true end
+	Logger.error(LOG, "Failed to set slot '%s' enabled=%s: %s — exact handle retained.",
+		slot_id, tostring(enabled), tostring(result))
+	return false
+end
+
+--- Reads the exact persisted value before a mutation.
+--- @param key string
+--- @return boolean ok
+--- @return any value_or_error
+local function read_setting(key)
+	local ok, value = xpcall(hs.settings.get, debug.traceback, key)
+	if not ok then
+		Logger.error(LOG, "Shortcut setting snapshot failed for '%s': %s.", key, tostring(value))
+		return false, value
+	end
+	return true, value
+end
+
+--- Writes a value and restores the snapshot when the write raises after mutation.
+--- @param key string
+--- @param value any
+--- @param snapshot any
+--- @return boolean committed
+local function persist_setting(key, value, snapshot)
+	local ok, err = xpcall(hs.settings.set, debug.traceback, key, value)
+	if ok then return true end
+
+	local restored, restore_err = xpcall(hs.settings.set, debug.traceback, key, snapshot)
+	if not restored then
+		Logger.error(LOG,
+			"Shortcut setting write failed for '%s': %s; snapshot restore also failed: %s.",
+			key, tostring(err), tostring(restore_err))
+	else
+		Logger.error(LOG, "Shortcut setting write failed for '%s': %s; snapshot restored.",
+			key, tostring(err))
+	end
+	return false
 end
 
 --- Releases the hotkey for a slot if active.
@@ -310,7 +371,7 @@ function M.assigned_slots(prefix)
 	return out
 end
 
---- Configures the action for a slot and hot-rebinds without a full reload.
+--- Configures the action for a slot without replacing an already-owned chord.
 --- Persists the assignment in hs.settings so it survives reloads.
 --- @param slot_id string
 --- @param action_id string
@@ -321,24 +382,37 @@ function M.set_action(slot_id, action_id)
 	end
 	local old_action = _actions[slot_id] or "none"
 	if old_action == action_id then return true end
-	if _started then
-		if unbind_slot(slot_id) ~= true then return false end
-		if action_id ~= "none" and bind_slot(slot_id, action_id) ~= true then
-			if old_action ~= "none" then bind_slot(slot_id, old_action) end
-			return false
-		end
+
+	local setting_key = _settings_prefix .. slot_id
+	local snap_ok, persisted_snapshot = read_setting(setting_key)
+	if not snap_ok then return false end
+
+	local native_transition = nil
+	if _started and old_action == "none" and action_id ~= "none" then
+		if bind_slot(slot_id, action_id) ~= true then return false end
+		native_transition = "enabled"
+	elseif _started and old_action ~= "none" and action_id == "none" then
+		if set_slot_enabled(slot_id, false) ~= true then return false end
+		native_transition = "disabled"
 	end
-	local persisted, persist_err = pcall(hs.settings.set,
-		_settings_prefix .. slot_id, action_id)
-	if not persisted then
-		if _started then
-			unbind_slot(slot_id)
-			if old_action ~= "none" then bind_slot(slot_id, old_action) end
+
+	if persist_setting(setting_key, action_id, persisted_snapshot) ~= true then
+		if native_transition == "enabled" then
+			if set_slot_enabled(slot_id, false) ~= true then
+				Logger.error(LOG,
+					"Slot '%s' publication rollback is incomplete; retained handle remains fenced for retry.",
+					slot_id)
+			end
+		elseif native_transition == "disabled" then
+			if set_slot_enabled(slot_id, true) ~= true then
+				Logger.error(LOG,
+					"Slot '%s' rollback could not restore delivery; exact handle retained for retry.",
+					slot_id)
+			end
 		end
-		Logger.error(LOG, "Shortcut setting write failed for slot '%s': %s.",
-			slot_id, tostring(persist_err))
 		return false
 	end
+
 	_actions[slot_id] = action_id
 	Logger.debug(LOG, "Slot '%s' → '%s' persisted.", slot_id, action_id)
 
