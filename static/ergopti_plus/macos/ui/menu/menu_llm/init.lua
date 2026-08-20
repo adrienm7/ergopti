@@ -143,13 +143,8 @@ local function invalidate_llm_health()
 	_llm_health_status = nil
 end
 
---- Resets the cached health-status flag to nil (not-yet-checked).
---- probe_llm_health() intentionally skips the "api" backend entirely (no
---- local server to probe there), so without this the status dot could show
---- a stale MLX/Ollama reading (e.g. a residual orange "warming up") that
---- leaked into the API backend's display until the user switched away and
---- back again (F-LOW-6). Call this whenever the active backend changes to
---- "api" so the indicator starts from a clean, honest "not applicable" state.
+--- Revokes pending health callbacks and resets the display to not-yet-checked.
+--- Call this after backend or enable-state commits and before teardown.
 function M.reset_llm_health_status()
 	invalidate_llm_health()
 	Logger.debug(LOG, "Invalidated LLM health status.")
