@@ -409,20 +409,33 @@ Test("ApplyConfigToml: [layout] lands on Features[layout]",
 ; manifest filed AHK features under an "ahk." silo. Lot 4 removed the silo, so
 ; the driver namespace is no longer a spelling of anything — reintroducing the
 ; strip would make "[ahk.layout]" and "[layout]" two names for one section, and
-; a config carrying both would apply in file order with no warning. Pin the
-; rejection: an unknown section is skipped, not silently rewritten.
+; a config carrying both would apply in file order. Pin the rejection while
+; also proving an expected migration remnant no longer emits a red ERROR.
 TestFMv2_DriverNamespacedSectionIsRejected() {
 	OldFeatures := _FM_BeginIsolated()
+	Captured := []
 	try {
 		Path := _FM_WriteFixture("ahk_layout",
 			"[ahk.layout]`r`nergopti_base = false`r`n")
+		LoggerSetTestSink((Line) => Captured.Push(Line))
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied, "a driver-namespaced section must apply nothing")
 		AssertEqual(true, Features["layout"]["ergopti_base"],
 			"the manifest default must survive an [ahk.layout] section")
+		Joined := ""
+		for Line in Captured
+			Joined .= Line . "`n"
+		AssertFalse(InStr(Joined, "[ERROR]") > 0,
+			"an obsolete driver namespace is migration input, not a runtime error")
+		AssertTrue(InStr(Joined, "[WARNING]") > 0,
+			"the ignored migration remnant must remain visible until cleanup")
 		FileDelete(Path)
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: [ahk.layout] is rejected, not stripped",
 	TestFMv2_DriverNamespacedSectionIsRejected)
@@ -841,4 +854,3 @@ TestFMv2_ShortcutDispatchersUseGuardedLeafReads() {
 }
 Test("shortcuts: chord dispatchers read action flags with guarded .Get, not raw indexes",
 	TestFMv2_ShortcutDispatchersUseGuardedLeafReads)
-

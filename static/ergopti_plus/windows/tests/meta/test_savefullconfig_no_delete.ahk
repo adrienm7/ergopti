@@ -125,7 +125,7 @@ _SFND_SaveFullConfigOwnsOneCausalBatchWrite() {
 	Assert(InStr(Body, "PrevCanonState") = 0
 		and InStr(Body, "_TOML_STRICT_CANON_IN_PROGRESS") = 0,
 		"SaveFullConfig must not carry the obsolete guard for a nested full save that the batch writer no longer performs")
-	WriteNeedle := "TOML_BatchWrite(BoundPath, Updates)"
+	WriteNeedle := "TOML_BatchWrite(BoundPath, Updates,"
 	WritePos := InStr(Body, WriteNeedle)
 	Assert(WritePos > 0,
 		"SaveFullConfig must write through the path selected by its exact lease owner")

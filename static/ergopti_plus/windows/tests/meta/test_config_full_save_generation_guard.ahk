@@ -18,7 +18,7 @@ _CFGFM_OwnerSpansCollectionAndAcknowledgement() {
 	OwnerPos := InStr(Body, "_ConfigWriteLeaseTryAcquire")
 	CapturePos := InStr(Body, "TargetGeneration := _ConfigFullSaveCapture()")
 	CollectPos := InStr(Body, "_ConfigCollectFullSaveUpdates()")
-	WritePos := InStr(Body, "TOML_BatchWrite(BoundPath, Updates)")
+	WritePos := InStr(Body, "TOML_BatchWrite(BoundPath, Updates,")
 	AckPos := InStr(Body, "_ConfigFullSaveAcknowledge(TargetGeneration)")
 	ReleasePos := InStr(Body, "_ConfigWriteLeaseRelease(OwnerToken)")
 	Assert(BoundPos > 0 and MatchPos > BoundPos and OwnerPos > MatchPos
@@ -27,6 +27,8 @@ _CFGFM_OwnerSpansCollectionAndAcknowledgement() {
 		"one path-bound config owner must span capture, collection, write and exact acknowledgement")
 	Assert(InStr(Body, "WriterFn.Call(BoundPath, Updates)") > 0,
 		"both injected and production writers must receive the accepted generation path")
+	Assert(InStr(Body, "CONFIG_OBSOLETE_SECTION_PREFIXES", true, WritePos) > 0,
+		"the production full writer must retire obsolete driver namespaces")
 	Assert(InStr(Body, "Written is Integer") > 0,
 		"durability acknowledgement must reject truthy non-boolean statuses")
 }

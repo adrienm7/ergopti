@@ -159,6 +159,7 @@ ApplyConfigToml(Features, FilePath) {
 
 	CurrentSection := ""
 	SkippingForeign := false
+	ObsoleteDriverSections := 0
 
 	loop parse, Content, "`n", "`r" {
 		Line := Trim(A_LoopField, " `t")
@@ -180,13 +181,17 @@ ApplyConfigToml(Features, FilePath) {
 			; driver features. ``[updater]`` is consumed by the updater module at
 			; start-up independently of the Features Map. Both skip silently.
 			;
-			; There is no driver-namespace case to handle here any more. Before
-			; Lot 4 this branch also skipped every ``[hs.*]`` header and stripped
-			; the ``ahk.`` prefix off the rest, because the same schema described
-			; two silos and each driver had to ignore half of it. Sections are now
-			; named after what they configure, so a header the manifest does not
-			; know is a genuine mistake and reaches the loud unknown-section error
-			; below instead of being swallowed as "someone else's".
+			; Lot 4 dissolved the old ``[ahk.*]`` silo. Reject those sections
+			; without treating an expected migration remnant as a runtime failure;
+			; the next canonical full save removes the obsolete subtree. Do not
+			; strip the prefix and apply it: a file carrying both spellings would
+			; otherwise become order-dependent.
+			if (Header == "ahk" or InStr(Header, "ahk.") == 1) {
+				CurrentSection := ""
+				SkippingForeign := true
+				ObsoleteDriverSections += 1
+				continue
+			}
 			if (SubStr(Header, 1, 1) == "_" or Header == "updater") {
 				CurrentSection := ""
 				SkippingForeign := true
@@ -284,6 +289,11 @@ ApplyConfigToml(Features, FilePath) {
 		}
 	}
 
+	if ObsoleteDriverSections > 0 {
+		try LoggerWarn("TomlConfigLoader",
+			"Ignored {1} obsolete [ahk.*] section(s); the next canonical save removes them.",
+			ObsoleteDriverSections)
+	}
 	try LoggerSuccess("TomlConfigLoader", "v2 config applied ({1} value(s)).", Applied)
 	return Applied
 }
