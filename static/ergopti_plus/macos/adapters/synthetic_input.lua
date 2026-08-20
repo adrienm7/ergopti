@@ -3,10 +3,10 @@
 --- ==============================================================================
 --- MODULE: Synthetic Input Adapter
 --- DESCRIPTION:
---- Builds explicitly tagged Quartz keyboard events and dispatches them in one
---- eventtap callback-return batch. Domain modules never post individual events:
---- originating callbacks return the prebuilt table directly, while timer/menu
---- producers use one tagged otherMouseUp trigger posted outside the input callback.
+--- Builds explicitly tagged Quartz keyboard events and normally dispatches them
+--- in one eventtap callback-return batch. Terminal compatibility may target-post
+--- a collected batch with bounded pacing while the originating callback remains
+--- open; timer/menu producers use one tagged otherMouseUp broker trigger.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact Provenance: Every emitted event carries a unique user-data tag whose
@@ -59,6 +59,7 @@ local absolute_time = assert(timer_api.absoluteTime,
 	"adapters.synthetic_input: hs.timer.absoluteTime is unavailable")
 local seconds_since_epoch = assert(timer_api.secondsSinceEpoch,
 	"adapters.synthetic_input: hs.timer.secondsSinceEpoch is unavailable")
+local usleep = timer_api.usleep
 local CURRENT_PROCESS_ID = assert(hs.processInfo and tonumber(hs.processInfo.processID),
 	"adapters.synthetic_input: hs.processInfo.processID is unavailable")
 local mouse_position = assert(hs.mouse and hs.mouse.absolutePosition,
@@ -1994,6 +1995,64 @@ function M.emit_key_strokes(value, explicit_tx)
 	if not scheduled then cancel_failed_emission(tx, "key-strokes") end
 	if implicit and not tx.cancelled then M.seal(tx) end
 	return scheduled
+end
+
+
+--- Target-posts one callback transaction, pausing after each leading deletion
+--- pair. The originating eventtap callback stays open for the entire operation,
+--- so later physical keys remain queued behind it while terminal/TUI render loops
+--- get a turn between Backspaces. Every event retains its immutable Ergopti tag.
+--- @param tx table Active transaction represented in the ambient collector.
+--- @param delete_pairs number Number of leading Backspace pairs to pace.
+--- @param delay_us number Inter-pair delay in microseconds.
+--- @param app userdata|table Target hs.application.
+--- @return boolean|nil delivered True when posted; nil outside a callback batch.
+function M.deliver_collected_paced(tx, delete_pairs, delay_us, app)
+	tx = require_transaction(tx)
+	assert(type(delete_pairs) == "number" and delete_pairs >= 1
+		and delete_pairs == math.floor(delete_pairs),
+		"adapters.synthetic_input.deliver_collected_paced: delete_pairs must be a positive integer")
+	assert(type(delay_us) == "number" and delay_us >= 1000,
+		"adapters.synthetic_input.deliver_collected_paced: delay must be at least 1000 us")
+	assert(type(usleep) == "function",
+		"adapters.synthetic_input.deliver_collected_paced: hs.timer.usleep is unavailable")
+	assert(app ~= nil,
+		"adapters.synthetic_input.deliver_collected_paced: target application is required")
+
+	local collector = _callback_stack[#_callback_stack]
+	if collector == nil then return nil end
+	local batch = collector.batch_by_tx[tx]
+	if batch == nil or batch.status ~= "building" then return nil end
+	local events = batch.events
+	local delete_event_count = delete_pairs * 2
+	assert(#events >= delete_event_count,
+		"adapters.synthetic_input.deliver_collected_paced: collected batch is shorter than its deletion prefix")
+	for _, event in ipairs(events) do
+		assert(type(event) == "table" or type(event) == "userdata",
+			"adapters.synthetic_input.deliver_collected_paced: invalid event")
+		assert(type(event.post) == "function",
+			"adapters.synthetic_input.deliver_collected_paced: event cannot be posted")
+	end
+
+	for index, event in ipairs(events) do
+		event:post(app)
+		if index % 2 == 0 and index <= delete_event_count and index < #events then
+			usleep(delay_us)
+		end
+	end
+
+	-- These exact objects have already crossed the application boundary. Remove
+	-- them from the callback return table without discarding their tags: normal
+	-- handoff confirmation still owns record retirement and transaction completion.
+	local delivered = {}
+	for _, event in ipairs(events) do delivered[event] = true end
+	local remaining = {}
+	for _, event in ipairs(collector.events) do
+		if not delivered[event] then remaining[#remaining + 1] = event end
+	end
+	collector.events = remaining
+	batch.events = {}
+	return true
 end
 
 

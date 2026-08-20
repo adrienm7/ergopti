@@ -36,3 +36,11 @@ helpers.assert_true(
 )
 
 print("[PASS] test_text_sender_nil_guard")
+
+local TextSender = helpers.load_with_stubs("adapters.text_sender")
+helpers.assert_true(TextSender.isTerminalInputHost("com.apple.Terminal", ""))
+helpers.assert_true(TextSender.isTerminalInputHost("COM.GOOGLECODE.ITERM2", ""),
+	"terminal bundle matching must be case-insensitive")
+helpers.assert_true(TextSender.isTerminalInputHost("", "Ghostty"))
+helpers.assert_true(not TextSender.isTerminalInputHost("com.apple.TextEdit", "TextEdit"),
+	"ordinary GUI editors must retain the zero-latency callback-return path")

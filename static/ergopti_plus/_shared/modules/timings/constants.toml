@@ -200,6 +200,11 @@ layout_tis_settle_ms = 500
 # UI: hotstrings_config_window GLOBAL_DEFAULT_DELAY_MS.
 hotstring_expansion_ms = 750
 
+# Inter-key pause for deletion prefixes sent to terminal/TUI prompt controls.
+# Their render loop may otherwise evaluate every Backspace against one stale
+# state snapshot before the replacement text arrives.
+terminal_hotstring_key_delay_ms = 12
+
 # Text-sender inter-keystroke settle (used when injecting expanded text).
 # HS: adapters/text_sender.lua inline 0.15 s delay.
 text_sender_settle_ms = 150
