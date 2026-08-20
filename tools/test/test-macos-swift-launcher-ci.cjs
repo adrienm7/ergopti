@@ -116,13 +116,15 @@ check(!/\bDarwin\.flock\s*\(/.test(SWIFT_SOURCES),
 check(!/\b_NSGetEnviron\s*\(/.test(SWIFT_SOURCES),
 	'the current macOS SDK does not expose `_NSGetEnviron`; use duplicateProcessEnvironment');
 check(!/\bDarwin\.fork\s*\(/.test(SWIFT_SOURCES),
-	'Swift 6.3 marks `Darwin.fork()` unavailable; use the test-only symbol wrapper');
+	'Swift 6.3 marks `Darwin.fork()` unavailable; use the posix_spawn test helper');
 check(/@_silgen_name\("flock"\)[\s\S]*?func c_flock\s*\(/.test(SWIFT_SOURCES),
 	'the Swift launcher must retain its libc flock symbol binding');
 check(/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),
 	'the Swift launcher must retain its owned posix_spawn environment builder');
-check(/@_silgen_name\("fork"\)[\s\S]*?func c_testFork\s*\(/.test(SWIFT_SOURCES),
-	'the descriptor-inheritance tests must retain their test-only fork symbol binding');
+check(/let kPOSIXTestHelperFlag\s*=\s*"--posix-test-helper"/.test(SWIFT_SOURCES),
+	'the cross-process POSIX tests must retain their debug-only helper role');
+check(/func runPOSIXTestHelper\s*\(/.test(SWIFT_SOURCES),
+	'the real launcher must implement the cross-process POSIX test helper');
 
 const macosGate = withoutFullLineComments(jobBody('macos-ok'));
 check(macosGate.length > 100, '`macos-ok` is absent or empty');

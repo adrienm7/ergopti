@@ -16,14 +16,6 @@ import Foundation
 import XCTest
 @testable import ErgoptiPlus
 
-@_silgen_name("fork")
-private func c_testFork() -> pid_t
-
-/// Preserves the test harness's pre-exec descriptor inheritance on Swift 6.3.
-func ergoptiForkForTesting() -> pid_t {
-	c_testFork()
-}
-
 final class POSIXCompatibilityTests: XCTestCase {
 	/// Proves the symbol-level wrapper still reaches BSD flock on the active SDK.
 	func testFlockCompatibilityWrapperLocksAndUnlocks() throws {

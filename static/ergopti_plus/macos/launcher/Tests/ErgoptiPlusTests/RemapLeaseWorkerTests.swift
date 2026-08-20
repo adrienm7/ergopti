@@ -57,6 +57,14 @@ private struct ProgressingTestSibling {
 	let progressFile: URL
 }
 
+/// Owns one real launcher process used by cross-exec POSIX regression tests.
+private struct POSIXTestHelperProcess {
+	let process: Process
+	let input: Pipe
+	let output: Pipe
+	let completion: DispatchSemaphore
+}
+
 /// Deterministic independent-guardian boundary for outer protocol tests.
 private final class ScriptedLeaseGuardianRegistration: LeaseGuardianRegistering {
 	let armResult: Bool
@@ -381,18 +389,28 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 	}
 
-	/// Reaps one exact raw-fork test child without an unbounded XCTest wait.
-	private func stopExactForkedTestChild(_ processID: pid_t) {
-		_ = Darwin.kill(processID, SIGTERM)
-		let deadline = ProcessInfo.processInfo.systemUptime + 0.5
-		var status: Int32 = 0
-		while ProcessInfo.processInfo.systemUptime < deadline {
-			let waited = Darwin.waitpid(processID, &status, WNOHANG)
-			if waited == processID || (waited == -1 && errno == ECHILD) { return }
-			usleep(kSiblingProgressPollMicroseconds)
-		}
-		_ = Darwin.kill(processID, SIGKILL)
-		while Darwin.waitpid(processID, &status, 0) == -1 && errno == EINTR {}
+	/// Starts one debug-only role through Process, whose implementation uses posix_spawn.
+	private func startPOSIXTestHelper(
+		mode: String,
+		path: String? = nil
+	) throws -> POSIXTestHelperProcess {
+		let process = Process()
+		let input = Pipe()
+		let output = Pipe()
+		let completion = DispatchSemaphore(value: 0)
+		process.executableURL = try guardianTestExecutable()
+		process.arguments = [kPOSIXTestHelperFlag, mode] + (path.map { [$0] } ?? [])
+		process.standardInput = input
+		process.standardOutput = output
+		process.standardError = FileHandle.nullDevice
+		process.terminationHandler = { _ in completion.signal() }
+		try process.run()
+		return POSIXTestHelperProcess(
+			process: process,
+			input: input,
+			output: output,
+			completion: completion
+		)
 	}
 
 	/// Refuses every inner spawn when the independent survivor did not ACK ARM.
@@ -583,47 +601,22 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			token: "abcdefabcdefabcdefabcdefabcdefab"
 		)
 		defer { try? FileManager.default.removeItem(at: fixture.home) }
-		let inheritedDescriptor = Darwin.open(
-			fixture.paths.singletonLock,
-			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
-			S_IRUSR | S_IWUSR
+		let holder = try startPOSIXTestHelper(
+			mode: "hold-shared",
+			path: fixture.paths.singletonLock
 		)
-		XCTAssertGreaterThanOrEqual(inheritedDescriptor, 0)
-		guard inheritedDescriptor >= 0 else { return }
-
-		var ready = [Int32](repeating: -1, count: 2)
-		XCTAssertEqual(Darwin.pipe(&ready), 0)
-		guard ready.allSatisfy({ $0 >= 0 }) else {
-			Darwin.close(inheritedDescriptor)
-			return
-		}
-		let holderPID = ergoptiForkForTesting()
-		if holderPID == 0 {
-			Darwin.close(ready[0])
-			_ = Darwin.signal(SIGTERM, SIG_DFL)
-			var result: UInt8 = ergoptiFlock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
-			_ = Darwin.write(ready[1], &result, 1)
-			while true { _ = Darwin.pause() }
-		}
-		XCTAssertGreaterThan(holderPID, 0)
-		Darwin.close(inheritedDescriptor)
-		Darwin.close(ready[1])
-		guard holderPID > 0 else {
-			Darwin.close(ready[0])
-			return
-		}
 		defer {
-			Darwin.close(ready[0])
-			stopExactForkedTestChild(holderPID)
+			stopExactGuardianTestProcess(holder.process, completion: holder.completion)
 		}
 
-		var readyPoll = pollfd(fd: ready[0], events: Int16(POLLIN), revents: 0)
+		let readyDescriptor = holder.output.fileHandleForReading.fileDescriptor
+		var readyPoll = pollfd(fd: readyDescriptor, events: Int16(POLLIN), revents: 0)
 		guard Darwin.poll(&readyPoll, 1, 2_000) > 0 else {
 			XCTFail("the exact shared-lock child did not become ready within its bound")
 			return
 		}
 		var childLocked: UInt8 = 0
-		XCTAssertEqual(Darwin.read(ready[0], &childLocked, 1), 1)
+		XCTAssertEqual(Darwin.read(readyDescriptor, &childLocked, 1), 1)
 		XCTAssertEqual(childLocked, 1)
 
 		let probe = Darwin.open(
@@ -652,54 +645,17 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			withIntermediateDirectories: true,
 			attributes: [.posixPermissions: 0o700]
 		)
-		let inheritedDescriptor = Darwin.open(
-			paths.singletonLock,
-			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
-			S_IRUSR | S_IWUSR
+		let holder = try startPOSIXTestHelper(
+			mode: "hold-shared",
+			path: paths.singletonLock
 		)
-		XCTAssertGreaterThanOrEqual(inheritedDescriptor, 0)
-		guard inheritedDescriptor >= 0 else { return }
-		var ready = [Int32](repeating: -1, count: 2)
-		var release = [Int32](repeating: -1, count: 2)
-		XCTAssertEqual(Darwin.pipe(&ready), 0)
-		XCTAssertEqual(Darwin.pipe(&release), 0)
-		guard ready.allSatisfy({ $0 >= 0 }), release.allSatisfy({ $0 >= 0 }) else {
-			Darwin.close(inheritedDescriptor)
-			for descriptor in ready + release where descriptor >= 0 { Darwin.close(descriptor) }
-			return
-		}
-		let readyReadDescriptor = ready[0]
-		let readyWriteDescriptor = ready[1]
-		let releaseReadDescriptor = release[0]
-		let releaseWriteDescriptor = release[1]
-		let holderPID = ergoptiForkForTesting()
-		if holderPID == 0 {
-			Darwin.close(readyReadDescriptor)
-			Darwin.close(releaseWriteDescriptor)
-			_ = Darwin.signal(SIGTERM, SIG_DFL)
-			var locked: UInt8 = ergoptiFlock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
-			_ = Darwin.write(readyWriteDescriptor, &locked, 1)
-			if locked == 1 {
-				var released: UInt8 = 0
-				while Darwin.read(releaseReadDescriptor, &released, 1) == -1 && errno == EINTR {}
-			}
-			Darwin._exit(locked == 1 ? 0 : 1)
-		}
-		Darwin.close(inheritedDescriptor)
-		Darwin.close(readyWriteDescriptor)
-		Darwin.close(releaseReadDescriptor)
-		XCTAssertGreaterThan(holderPID, 0)
-		guard holderPID > 0 else {
-			Darwin.close(readyReadDescriptor)
-			Darwin.close(releaseWriteDescriptor)
-			return
-		}
 		var holderReaped = false
 		defer {
-			Darwin.close(readyReadDescriptor)
-			Darwin.close(releaseWriteDescriptor)
-			if !holderReaped { stopExactForkedTestChild(holderPID) }
+			if !holderReaped {
+				stopExactGuardianTestProcess(holder.process, completion: holder.completion)
+			}
 		}
+		let readyReadDescriptor = holder.output.fileHandleForReading.fileDescriptor
 		var readyPoll = pollfd(fd: readyReadDescriptor, events: Int16(POLLIN), revents: 0)
 		guard Darwin.poll(&readyPoll, 1, 2_000) > 0 else {
 			XCTFail("the shared presence probe did not acquire its cross-process lock")
@@ -738,34 +694,20 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var releaseByte: UInt8 = 1
 		var releaseResult: Int
 		repeat {
-			releaseResult = Darwin.write(releaseWriteDescriptor, &releaseByte, 1)
+			releaseResult = Darwin.write(
+				holder.input.fileHandleForWriting.fileDescriptor,
+				&releaseByte,
+				1
+			)
 		} while releaseResult == -1 && errno == EINTR
 		guard releaseResult == 1 else {
 			XCTFail("the shared-lock child release byte must be delivered exactly once")
 			return
 		}
-		var holderStatus: Int32 = 0
-		let reapDeadline = ProcessInfo.processInfo.systemUptime + 1
-		var waited: pid_t = 0
-		var waitError: Int32 = 0
-		repeat {
-			waited = Darwin.waitpid(holderPID, &holderStatus, WNOHANG)
-			if waited == -1 { waitError = errno }
-			if waited == holderPID || (waited == -1 && waitError != EINTR) { break }
-			usleep(kSiblingProgressPollMicroseconds)
-		} while ProcessInfo.processInfo.systemUptime < reapDeadline
-		if waited == -1, waitError == ECHILD {
-			holderReaped = true
-			XCTFail("the exact shared-lock child was reaped outside this test's ownership")
-			return
-		}
-		guard waited == holderPID else {
-			XCTFail("the released shared-lock child must be reaped within its bound")
-			return
-		}
+		XCTAssertEqual(holder.completion.wait(timeout: .now() + 1), .success)
 		holderReaped = true
-		XCTAssertEqual(holderStatus & 0x7F, 0)
-		XCTAssertEqual((holderStatus >> 8) & 0xFF, 0)
+		XCTAssertEqual(holder.process.terminationReason, .exit)
+		XCTAssertEqual(holder.process.terminationStatus, 0)
 		XCTAssertEqual(completed.wait(timeout: .now() + 2), .success)
 		XCTAssertEqual(result.snapshot(), true)
 	}
@@ -1688,47 +1630,26 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	func testGuardianFencesLiveOwnerAfterSIGKILL() throws {
 		let fixture = try makeAbandonedGuardianRecord(token: token)
 		defer { try? FileManager.default.removeItem(at: fixture.home) }
-		let recordDescriptor = Darwin.open(
-			fixture.paths.recordPath(token: token),
-			O_RDWR | O_CLOEXEC | O_NOFOLLOW
+		let owner = try startPOSIXTestHelper(
+			mode: "hold-exclusive",
+			path: fixture.paths.recordPath(token: token)
 		)
-		XCTAssertGreaterThanOrEqual(recordDescriptor, 0)
-		guard recordDescriptor >= 0 else { return }
-		var ready = [Int32](repeating: -1, count: 2)
-		XCTAssertEqual(Darwin.pipe(&ready), 0)
-		guard ready.allSatisfy({ $0 >= 0 }) else {
-			Darwin.close(recordDescriptor)
-			return
+		var ownerStopped = false
+		defer {
+			if !ownerStopped {
+				stopExactGuardianTestProcess(owner.process, completion: owner.completion)
+			}
 		}
-		let ownerPID = ergoptiForkForTesting()
-		if ownerPID == 0 {
-			Darwin.close(ready[0])
-			var armed: UInt8 = ergoptiFlock(recordDescriptor, LOCK_EX | LOCK_NB) == 0
-				? 1
-				: 0
-			_ = Darwin.write(ready[1], &armed, 1)
-			while armed == 1 { _ = Darwin.pause() }
-			Darwin._exit(1)
-		}
-		Darwin.close(recordDescriptor)
-		XCTAssertGreaterThan(ownerPID, 0)
-		Darwin.close(ready[1])
-		guard ownerPID > 0 else {
-			Darwin.close(ready[0])
-			return
-		}
-		defer { Darwin.close(ready[0]) }
-		var readyPoll = pollfd(fd: ready[0], events: Int16(POLLIN), revents: 0)
+		let readyDescriptor = owner.output.fileHandleForReading.fileDescriptor
+		var readyPoll = pollfd(fd: readyDescriptor, events: Int16(POLLIN), revents: 0)
 		guard Darwin.poll(&readyPoll, 1, 2_000) > 0 else {
-			stopExactForkedTestChild(ownerPID)
 			XCTFail("the exact LIVE owner did not acquire flock within its bound")
 			return
 		}
 		var childArmed: UInt8 = 0
-		XCTAssertEqual(Darwin.read(ready[0], &childArmed, 1), 1)
+		XCTAssertEqual(Darwin.read(readyDescriptor, &childArmed, 1), 1)
 		guard childArmed == 1 else {
-			stopExactForkedTestChild(ownerPID)
-			XCTFail("the exact LIVE owner failed to acquire its inherited record descriptor")
+			XCTFail("the exact LIVE owner failed to acquire its record descriptor")
 			return
 		}
 
@@ -1742,9 +1663,11 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(FileManager.default.fileExists(
 			atPath: fixture.paths.acknowledgementPath(token: token)
 		))
-		XCTAssertEqual(Darwin.kill(ownerPID, SIGKILL), 0)
-		var status: Int32 = 0
-		while Darwin.waitpid(ownerPID, &status, 0) == -1 && errno == EINTR {}
+		XCTAssertEqual(Darwin.kill(owner.process.processIdentifier, SIGKILL), 0)
+		XCTAssertEqual(owner.completion.wait(timeout: .now() + 1), .success)
+		ownerStopped = true
+		XCTAssertEqual(owner.process.terminationReason, .uncaughtSignal)
+		XCTAssertEqual(owner.process.terminationStatus, SIGKILL)
 		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
 		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
 		XCTAssertEqual(executor.snapshot().payloads, [exactFence, exactFence])
@@ -2902,6 +2825,10 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			"ErgoptiPlus",
 			kLauncherLogAppendTestFlag,
 		]))
+		XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: [
+			"ErgoptiPlus",
+			kPOSIXTestHelperFlag,
+		]))
 		#endif
 		XCTAssertFalse(KarabinerLeaseWorker.handles(arguments: ["ErgoptiPlus"]))
 	}
@@ -2969,83 +2896,15 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 	}
 
 	/// Reproduces the reservation root cause with inherited fd 0...3 all closed.
-	func testReservedSocketsStayAboveFD3WhenLowDescriptorsAreClosed() {
-		var rawReportPipe = [Int32](repeating: -1, count: 2)
-		let pipeStatus = rawReportPipe.withUnsafeMutableBufferPointer { buffer in
-			Darwin.pipe(buffer.baseAddress!)
-		}
-		XCTAssertEqual(pipeStatus, 0)
-		guard pipeStatus == 0 else { return }
-		let reportRead = fcntl(rawReportPipe[0], F_DUPFD_CLOEXEC, 10)
-		let reportWrite = fcntl(rawReportPipe[1], F_DUPFD_CLOEXEC, 10)
-		_ = Darwin.close(rawReportPipe[0])
-		_ = Darwin.close(rawReportPipe[1])
-		XCTAssertGreaterThanOrEqual(reportRead, 10)
-		XCTAssertGreaterThanOrEqual(reportWrite, 10)
-		guard reportRead >= 10, reportWrite >= 10 else {
-			if reportRead >= 0 { _ = Darwin.close(reportRead) }
-			if reportWrite >= 0 { _ = Darwin.close(reportWrite) }
-			return
-		}
-
-		let harnessPID = ergoptiForkForTesting()
-		guard harnessPID >= 0 else {
-			XCTFail("the closed-descriptor harness must fork")
-			_ = Darwin.close(reportRead)
-			_ = Darwin.close(reportWrite)
-			return
-		}
-		if harnessPID == 0 {
-			_ = Darwin.close(reportRead)
-			_ = Darwin.close(0)
-			_ = Darwin.close(1)
-			_ = Darwin.close(2)
-			_ = Darwin.close(3)
-			var succeeded = false
-			if let sockets = makeReservedLeaseSocketEndpoints() {
-				succeeded = sockets.outerDescriptor > kInnerControlDescriptor
-					&& sockets.innerDescriptor > kInnerControlDescriptor
-					&& sockets.outerDescriptor != sockets.innerDescriptor
-					&& fcntl(sockets.outerDescriptor, F_GETFD) & FD_CLOEXEC != 0
-					&& fcntl(sockets.innerDescriptor, F_GETFD) & FD_CLOEXEC != 0
-				_ = Darwin.close(sockets.outerDescriptor)
-				_ = Darwin.close(sockets.innerDescriptor)
-			}
-			var report: UInt8 = succeeded ? 1 : 0
-			_ = withUnsafePointer(to: &report) { pointer in
-				Darwin.write(reportWrite, pointer, 1)
-			}
-			_ = Darwin.close(reportWrite)
-			Darwin._exit(succeeded ? 0 : 1)
-		}
-		XCTAssertGreaterThan(harnessPID, 0)
-
-		_ = Darwin.close(reportWrite)
-		var reportPoll = pollfd(
-			fd: reportRead,
-			events: Int16(POLLIN | POLLHUP | POLLERR),
-			revents: 0
-		)
-		guard Darwin.poll(&reportPoll, 1, 5_000) > 0 else {
-			_ = Darwin.kill(harnessPID, SIGKILL)
-			var status: Int32 = 0
-			while waitpid(harnessPID, &status, 0) == -1 && errno == EINTR {}
-			_ = Darwin.close(reportRead)
+	func testReservedSocketsStayAboveFD3WhenLowDescriptorsAreClosed() throws {
+		let helper = try startPOSIXTestHelper(mode: "reserved-sockets")
+		guard helper.completion.wait(timeout: .now() + 5) == .success else {
+			stopExactGuardianTestProcess(helper.process, completion: helper.completion)
 			XCTFail("the closed-descriptor subprocess exceeded its bounded deadline")
 			return
 		}
-		var report: UInt8 = 0
-		let reportBytes = withUnsafeMutablePointer(to: &report) { pointer in
-			Darwin.read(reportRead, pointer, 1)
-		}
-		_ = Darwin.close(reportRead)
-		var status: Int32 = 0
-		let waited = waitpid(harnessPID, &status, 0)
-
-		XCTAssertEqual(waited, harnessPID)
-		XCTAssertEqual(reportBytes, 1)
-		XCTAssertEqual(report, 1)
-		XCTAssertEqual((status >> 8) & 0xFF, 0)
+		XCTAssertEqual(helper.process.terminationReason, .exit)
+		XCTAssertEqual(helper.process.terminationStatus, 0)
 	}
 
 	/// Proves the exact inner socket cannot leak through exec into a CLI child.
