@@ -43,7 +43,8 @@ local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for
 local TokenCrypto    = require("modules.llm.api_token_crypto")
 local _http_adapter  = require("adapters.http_client")
 local _infer_client  = _http_adapter.new()   -- used for inference POST requests
-local _check_client  = _http_adapter.new()   -- used for health-check GET requests
+local _check_client  = _http_adapter.new()   -- used for explicit availability checks
+local _warmup_client = _http_adapter.new()   -- warmup has independent cancellation ownership
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
@@ -183,6 +184,7 @@ local _entries = {}
 local _active_id = ""
 local _is_ready = false
 local _identity_generation = 0
+local _warmup_generation = 0
 local _token_cache = {}
 local _token_inflight = {}
 
@@ -235,12 +237,17 @@ end
 local function invalidate_identity()
 	invalidate_token_resolutions("identity_changed")
 	_identity_generation = _identity_generation + 1
+	_warmup_generation = _warmup_generation + 1
 	_is_ready = false
-	for label, client in pairs({ health = _check_client, inference = _infer_client }) do
-		local ok, err = xpcall(function() return client.cancel() end, debug.traceback)
-		if not ok then
-			Logger.error(LOG, "Remote %s cancellation raised during identity change: %s",
-				tostring(label), tostring(err))
+	for label, client in pairs({
+		availability = _check_client,
+		inference = _infer_client,
+		warmup = _warmup_client,
+	}) do
+		local ok, result = xpcall(function() return client.cancel() end, debug.traceback)
+		if not ok or result == false then
+			Logger.error(LOG, "Remote %s cancellation failed during identity change: %s.",
+				tostring(label), tostring(result))
 		end
 	end
 end
@@ -614,8 +621,12 @@ end
 --- A successful ping flips ``_is_ready`` so the prediction engine starts
 --- dispatching real requests immediately.
 function M.warmup(_model_name, _profile)
+	_warmup_generation = _warmup_generation + 1
+	local my_warmup = _warmup_generation
+	local my_identity = _identity_generation
 	_is_ready = false
 	M.resolve_active_entry(function(resolved, entry, reason)
+		if my_warmup ~= _warmup_generation or my_identity ~= _identity_generation then return end
 		if resolved ~= true or not entry then
 			Logger.debug(LOG, "warmup: active API token unavailable (%s).", tostring(reason))
 			return
@@ -638,7 +649,6 @@ function M.warmup(_model_name, _profile)
 
 		local identity_entry = find_active_entry()
 		local format = provider.format
-		local my_identity = _identity_generation
 		local ping_url
 		if format == "gemini" then
 			local enc = _http_adapter.encodeForQuery(token)
@@ -647,8 +657,12 @@ function M.warmup(_model_name, _profile)
 			ping_url = rtrim_slash(base) .. "/models"
 		end
 
-		_check_client.get(ping_url, build_headers(format, token), function(r)
-			if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then return end
+		_warmup_client.get(ping_url, build_headers(format, token), function(r)
+			if my_warmup ~= _warmup_generation
+				or my_identity ~= _identity_generation
+				or find_active_entry() ~= identity_entry then
+				return
+			end
 			local was_ready = _is_ready
 			_is_ready = r.ok
 			if _is_ready and not was_ready then
@@ -660,6 +674,17 @@ function M.warmup(_model_name, _profile)
 			end
 		end)
 	end)
+end
+
+function M.stop_warmup()
+	_warmup_generation = _warmup_generation + 1
+	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
+	if not ok or result == false then
+		Logger.error(LOG, "Remote warmup cancellation failed: %s.", tostring(result))
+		return false
+	end
+	Logger.debug(LOG, "Remote warmup stopped (generation %d).", _warmup_generation)
+	return true
 end
 
 --- Cancels the active request/response inference, if any.
