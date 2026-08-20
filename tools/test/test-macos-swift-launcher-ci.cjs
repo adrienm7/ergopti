@@ -37,6 +37,10 @@ const PACKAGE = fs.readFileSync(
 	'utf8'
 );
 const SWIFT_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher');
+const MAIN_SWIFT = fs.readFileSync(
+	path.join(SWIFT_ROOT, 'Sources', 'ErgoptiPlus', 'main.swift'),
+	'utf8'
+);
 const POSIX_SHIM = fs.readFileSync(
 	path.join(SWIFT_ROOT, 'Sources', 'CPOSIXCompatibility', 'CPOSIXCompatibility.c'),
 	'utf8'
@@ -135,6 +139,8 @@ check(/let kPOSIXTestHelperFlag\s*=\s*"--posix-test-helper"/.test(SWIFT_SOURCES)
 	'the cross-process POSIX tests must retain their debug-only helper role');
 check(/func runPOSIXTestHelper\s*\(/.test(SWIFT_SOURCES),
 	'the real launcher must implement the cross-process POSIX test helper');
+check(!/let k[A-Za-z0-9]+TestFlag\s*=/.test(MAIN_SWIFT),
+	'XCTest-visible debug flags must not live in executable main.swift globals');
 
 const macosGate = withoutFullLineComments(jobBody('macos-ok'));
 check(macosGate.length > 100, '`macos-ok` is absent or empty');

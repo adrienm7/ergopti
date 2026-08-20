@@ -2626,6 +2626,8 @@ final class KarabinerLeaseOuterRuntime {
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
 /// Debug-only subprocess role for POSIX behavior that must cross an exec boundary.
 let kPOSIXTestHelperFlag = "--posix-test-helper"
+/// Debug-only subprocess role for launcher-log append concurrency tests.
+let kLauncherLogAppendTestFlag = "--launcher-log-append-test"
 
 /// Runs one bounded POSIX regression-test role in the real launcher executable.
 private func runPOSIXTestHelper(arguments: [String]) -> Int32 {
