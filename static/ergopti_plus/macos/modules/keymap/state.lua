@@ -87,6 +87,10 @@ function M.new(defaults, delays_default)
 
 	local s = {
 		buffer                     = "",
+		-- LLM prompt context is intentionally distinct from the cursor-relative
+		-- hotstring buffer. Navigation always invalidates hotstring eligibility,
+		-- while the user-facing llm_reset_on_nav preference may retain this text.
+		llm_buffer                 = "",
 		-- True when the character immediately to the LEFT of `buffer` is
 		-- known to be a word terminator (or there is no character at all
 		-- — start of input). Flipped to false whenever the cursor moves
@@ -145,6 +149,7 @@ function M.new(defaults, delays_default)
 		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
 		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
 		s.buffer = ""
+		s.llm_buffer = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
 		-- new cursor position as abutting a word boundary so the next typed
 		-- char can fire word-boundary-required triggers — that mirrors the

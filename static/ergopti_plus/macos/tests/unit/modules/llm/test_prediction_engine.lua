@@ -90,8 +90,10 @@ end
 -- Stub PromptBuilder — build() (the real export shape) is called inside
 -- perform_check. It returns (params, skip_reason, signature); a non-nil params
 -- table drives the dispatch path exercised by §8.
+local last_prompt_buffer = nil
 package.loaded["modules.llm.prompt_builder"] = {
-	build = function(_buf, _cfg, _last_sig, _force)
+	build = function(buf, _cfg, _last_sig, _force)
+		last_prompt_buffer = buf
 		return {
 			tail            = "wor",
 			context_buffer  = "hello wor",
@@ -449,7 +451,12 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 		)
 
 		PE.set_llm_enabled(true)
-		PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+		PE.init({
+			buffer = "stale cursor text",
+			llm_buffer = "hello wor",
+			mappings = {},
+			DELAYS = { llm_prediction = 0 },
+		})
 
 		-- force_trigger = true bypasses the freshness and backend-floor guards so
 		-- the call goes straight to dispatch.
@@ -460,6 +467,8 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 
 		helpers.assert_true(ok, "perform_check must not throw on the dispatch path: " .. tostring(err))
 		helpers.assert_true(dispatched, "perform_check must dispatch fetch_llm_prediction when the backend is ready")
+		helpers.assert_eq(last_prompt_buffer, "hello wor",
+			"prompt construction must read only the independent LLM context")
 	end)
 
 	helpers.it("(no-model-runtime) ready MLX cannot render, fetch, or warm without an active model", function()
@@ -487,7 +496,12 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 			PE.set_llm_enabled(true)
 			warmups = 0
 			PE.set_llm_model("")
-			PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.init({
+				buffer = "hello wor",
+				llm_buffer = "hello wor",
+				mappings = {},
+				DELAYS = { llm_prediction = 0 },
+			})
 			PE.perform_check(true)
 			helpers.assert_eq(shows, 0,
 				"a stale MLX ready flag must not paint a loading or prediction surface")
@@ -543,7 +557,12 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 
 		local ok, err = xpcall(function()
 			PE.set_llm_enabled(true)
-			PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.init({
+				buffer = "hello wor",
+				llm_buffer = "hello wor",
+				mappings = {},
+				DELAYS = { llm_prediction = 0 },
+			})
 			PE.perform_check(true)
 			helpers.assert_true(PE.is_visible())
 

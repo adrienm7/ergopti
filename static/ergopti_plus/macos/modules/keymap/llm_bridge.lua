@@ -188,13 +188,16 @@ end
 
 --- Invalidates cursor-relative hotstring eligibility and returns the exact state
 --- needed to compensate a refusal at the eventtap deferral boundary.
+--- @param clear_llm boolean|nil Whether the independent LLM context is revoked too.
 --- @return table snapshot
-local function invalidate_cursor_context()
+local function invalidate_cursor_context(clear_llm)
 	local snapshot = {
 		buffer = _state.buffer,
+		llm_buffer = _state.llm_buffer,
 		start_is_word_boundary = _state.start_is_word_boundary,
 	}
 	_state.buffer = ""
+	if clear_llm == true then _state.llm_buffer = "" end
 	_state.start_is_word_boundary = false
 	return snapshot
 end
@@ -204,6 +207,7 @@ end
 --- @param snapshot table
 local function restore_cursor_context(snapshot)
 	_state.buffer = snapshot.buffer
+	_state.llm_buffer = snapshot.llm_buffer
 	_state.start_is_word_boundary = snapshot.start_is_word_boundary
 end
 
@@ -214,9 +218,10 @@ end
 --- silently destroy an otherwise fireable buffer.
 --- @param label string
 --- @param callback function
+--- @param clear_llm boolean|nil
 --- @return boolean committed
-local function defer_escape_dismissal(label, callback)
-	local snapshot = invalidate_cursor_context()
+local function defer_escape_dismissal(label, callback, clear_llm)
+	local snapshot = invalidate_cursor_context(clear_llm)
 	local schedule_ok, scheduled_or_err = xpcall(function()
 		return SyntheticInput.defer_after_callback(label, callback)
 	end, debug.traceback)
@@ -513,12 +518,12 @@ function M.set_llm_after_hotstring(v)
 	Logger.debug(LOG, "LLM chain after hotstring: %s.", fire_llm_after_hotstring and "on" or "off")
 end
 
---- Sets the "reset buffer on navigation" flag, owned here because
+--- Sets the "reset LLM context on navigation" flag, owned here because
 --- check_escape_reset() and check_nav_reset() consume it directly.
 --- @param v boolean
 function M.set_llm_reset_on_nav(v)
 	reset_buffer_on_navigation = (v == true)
-	Logger.debug(LOG, "Buffer reset on nav: %s.", reset_buffer_on_navigation and "yes" or "no")
+	Logger.debug(LOG, "LLM context reset on nav: %s.", reset_buffer_on_navigation and "yes" or "no")
 end
 
 
@@ -591,6 +596,11 @@ end
 --- @param buf string The current typed buffer.
 function M.update_preview(buf)
 	if not require_state("update_preview") then return end
+	-- This is the sole observation seam for physical text. Hotstring matching owns
+	-- `_state.buffer`; LLM prompting owns this separate context so navigation can
+	-- revoke cursor-relative actions without defeating the user's keep-context
+	-- preference.
+	_state.llm_buffer = buf
 
 	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
 	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
@@ -1219,7 +1229,7 @@ local function arm_escape_trap()
 							invalidate_pending_preview()
 							local hide = tooltip.hide_forced_silent or tooltip.hide_forced
 							if type(hide) == "function" then hide() end
-						end)
+						end, reset_buffer_on_navigation)
 					return finish(scheduled)
 				end
 				return finish(false)
@@ -1232,7 +1242,7 @@ local function arm_escape_trap()
 					if not M.is_runtime_available() or not tooltip.is_visible() then return end
 					Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
 					M.reset_predictions()
-				end)
+				end, reset_buffer_on_navigation)
 			return finish(scheduled)
 		end, debug.traceback)
 		if not callback_ok then
@@ -1511,6 +1521,7 @@ function M.apply_prediction(idx)
 				end
 				_state.buffer = (_state.buffer:sub(1, start_pos - 1) or "") .. text_to_type
 			end
+			_state.llm_buffer = _state.buffer
 		end,
 		true,   -- is_final
 		true,   -- is_ignored
@@ -1639,10 +1650,13 @@ end
 function M.check_escape_reset()
 	if not require_state("check_escape_reset") then return false end
 	if not M.is_runtime_available() then
-		if reset_buffer_on_navigation then _state.buffer = "" end
+		if reset_buffer_on_navigation then
+			_state.buffer = ""
+			_state.llm_buffer = ""
+		end
 		if type(tooltip.is_hotstring_visible) == "function"
 			and tooltip.is_hotstring_visible() then
-			invalidate_cursor_context()
+			invalidate_cursor_context(reset_buffer_on_navigation)
 			invalidate_pending_preview()
 			local hide = tooltip.hide_forced_silent or tooltip.hide_forced
 			if type(hide) == "function" then pcall(hide) end
@@ -1656,26 +1670,28 @@ function M.check_escape_reset()
 	-- tooltip module but do not set the prediction-engine "visible" flag.
 	if tooltip.is_visible() then
 		Logger.debug(LOG, "Escape — tooltip dismissed.")
-		invalidate_cursor_context()
+		invalidate_cursor_context(reset_buffer_on_navigation)
 		M.reset_predictions()
 		return true
 	end
 	if reset_buffer_on_navigation then
 		Logger.debug(LOG, "Escape — buffer cleared.")
 		_state.buffer = ""
+		_state.llm_buffer = ""
 	end
 	M.reset_predictions()
 	return false
 end
 
 --- Handles navigation keys (arrows, Enter, mouse) outside prediction mode.
---- Optionally clears the buffer depending on the reset_buffer_on_navigation flag.
+--- Cursor-relative hotstring eligibility is always revoked by the caller. The
+--- preference controls only whether the separate LLM prompt context is retained.
 function M.check_nav_reset()
 	if not require_state("check_nav_reset") then return end
 
-	if reset_buffer_on_navigation and _state.buffer ~= "" then
-		Logger.debug(LOG, "Buffer cleared on navigation.")
-		_state.buffer = ""
+	if reset_buffer_on_navigation and _state.llm_buffer ~= "" then
+		Logger.debug(LOG, "LLM context cleared on navigation.")
+		_state.llm_buffer = ""
 	end
 	M.reset_predictions()
 end
