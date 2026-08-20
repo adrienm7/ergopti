@@ -185,6 +185,50 @@ local function invalidate_pending_preview(keep_visible_lease)
 	if not keep_visible_lease then _visible_magic_lease = nil end
 end
 
+
+--- Invalidates cursor-relative hotstring eligibility and returns the exact state
+--- needed to compensate a refusal at the eventtap deferral boundary.
+--- @return table snapshot
+local function invalidate_cursor_context()
+	local snapshot = {
+		buffer = _state.buffer,
+		start_is_word_boundary = _state.start_is_word_boundary,
+	}
+	_state.buffer = ""
+	_state.start_is_word_boundary = false
+	return snapshot
+end
+
+
+--- Restores a cursor-context snapshot after ownership was not transferred.
+--- @param snapshot table
+local function restore_cursor_context(snapshot)
+	_state.buffer = snapshot.buffer
+	_state.start_is_word_boundary = snapshot.start_is_word_boundary
+end
+
+
+--- Transfers Escape dismissal to the retained post-eventtap scheduler. Cursor
+--- eligibility is invalidated before publication, but is restored exactly when
+--- scheduling throws or refuses so a physical Escape that passes through cannot
+--- silently destroy an otherwise fireable buffer.
+--- @param label string
+--- @param callback function
+--- @return boolean committed
+local function defer_escape_dismissal(label, callback)
+	local snapshot = invalidate_cursor_context()
+	local schedule_ok, scheduled_or_err = xpcall(function()
+		return SyntheticInput.defer_after_callback(label, callback)
+	end, debug.traceback)
+	if not schedule_ok or scheduled_or_err ~= true then
+		restore_cursor_context(snapshot)
+		Logger.error(LOG, "%s could not be deferred; Escape passed through and cursor context was restored: %s",
+			label, tostring(scheduled_or_err))
+		return false
+	end
+	return true
+end
+
 --- Returns whether a visibly committed row leases this exact magic action.
 --- O(1) and safe on the eventtap path; TooltipHotstring.is_visible is local state.
 --- @param action_token any Exact mapping/provider action identity.
@@ -1170,7 +1214,7 @@ local function arm_escape_trap()
 				-- must never make Escape consume an application keystroke.
 				if type(tooltip.is_hotstring_visible) == "function"
 					and tooltip.is_hotstring_visible() then
-					local scheduled = SyntheticInput.defer_after_callback(
+					local scheduled = defer_escape_dismissal(
 						"hotstring Escape dismissal", function()
 							invalidate_pending_preview()
 							local hide = tooltip.hide_forced_silent or tooltip.hide_forced
@@ -1183,7 +1227,7 @@ local function arm_escape_trap()
 			-- Let Escape through when no tooltip is on screen — Raycast (or the system)
 			-- should handle it normally in that case.
 			if not tooltip.is_visible() then return finish(false) end
-			local scheduled = SyntheticInput.defer_after_callback(
+			local scheduled = defer_escape_dismissal(
 				"LLM Escape dismissal", function()
 					if not M.is_runtime_available() or not tooltip.is_visible() then return end
 					Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
@@ -1598,6 +1642,7 @@ function M.check_escape_reset()
 		if reset_buffer_on_navigation then _state.buffer = "" end
 		if type(tooltip.is_hotstring_visible) == "function"
 			and tooltip.is_hotstring_visible() then
+			invalidate_cursor_context()
 			invalidate_pending_preview()
 			local hide = tooltip.hide_forced_silent or tooltip.hide_forced
 			if type(hide) == "function" then pcall(hide) end
@@ -1611,6 +1656,7 @@ function M.check_escape_reset()
 	-- tooltip module but do not set the prediction-engine "visible" flag.
 	if tooltip.is_visible() then
 		Logger.debug(LOG, "Escape — tooltip dismissed.")
+		invalidate_cursor_context()
 		M.reset_predictions()
 		return true
 	end
