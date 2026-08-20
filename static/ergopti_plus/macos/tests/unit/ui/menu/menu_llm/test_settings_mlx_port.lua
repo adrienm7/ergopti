@@ -38,11 +38,11 @@ local Settings = require("ui.menu.menu_llm.settings_manager")
 package.loaded["modules.llm.api_mlx"] = nil
 local ApiMlx = require("modules.llm.api_mlx")
 
-local function make_settings()
+local function make_settings(update_menu)
 	local deps = {
 		state       = { llm_backend = "mlx" },
 		save_prefs  = function() end,
-		update_menu = function() end,
+		update_menu = update_menu or function() end,
 		keymap      = nil,
 	}
 	return Settings.new(deps)
@@ -95,6 +95,31 @@ helpers.describe("settings_manager — MLX port configuration", function()
 		make_settings().reset_mlx_port(function() applied = true end)
 		helpers.assert_eq(ApiMlx.get_port(), ApiMlx.get_default_port())
 		helpers.assert_true(applied, "on_applied must fire after reset")
+	end)
+
+	helpers.it("refreshes the menu after a throwing apply callback and returns false (HS-016)", function()
+		local Logger = require("infra.logger")
+		Logger.ring_buffer_clear()
+		ApiMlx.set_port(ApiMlx.get_default_port())
+		prompt_value[1] = "54321"
+		local refreshes = 0
+		local settings = make_settings(function() refreshes = refreshes + 1 end)
+		local result = settings.set_mlx_port(function() error("port apply exploded") end)
+		local matching = 0
+		for _, line in ipairs(Logger.ring_buffer_snapshot()) do
+			if line:find("[ERROR]", 1, true)
+				and line:find("MLX port apply", 1, true)
+				and line:find("port apply exploded", 1, true)
+				and line:find("stack traceback", 1, true) then
+				matching = matching + 1
+			end
+		end
+
+		helpers.assert_eq(result, false,
+			"a thrown apply callback cannot publish a successful settings action")
+		helpers.assert_eq(refreshes, 1,
+			"menu refresh is finally-style cleanup after the port itself committed")
+		helpers.assert_eq(matching, 1)
 	end)
 end)
 

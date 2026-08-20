@@ -719,6 +719,9 @@ M.unavailable = {
 		path = "llm.app_profile_overrides", section = "llm", reason_key = "", platforms = { "ahk" },
 	},
 	{
+		path = "llm.user_profiles", section = "llm", reason_key = "", platforms = { "ahk" },
+	},
+	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },
 	},
 	{

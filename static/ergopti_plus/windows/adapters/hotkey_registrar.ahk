@@ -678,7 +678,10 @@ _HotkeyRegistrarSetEnabled(handle, enabled, HotkeyFn := 0, HotIfFn := 0) {
 HotkeyRegistrarChordOf(handle) {
 	global HOTKEY_REGISTRAR_BINDINGS
 
-	if (!IsSet(handle) || Type(handle) != "String")
+	; Parse-time #HotIf helpers may query a retained binding during Bundle_Init's
+	; first message pump, before this adapter's registry assignment executes.
+	if (!IsSet(HOTKEY_REGISTRAR_BINDINGS)
+			|| !IsSet(handle) || Type(handle) != "String")
 		return ""
 	Chord := ""
 	PreviousCritical := Critical("On")

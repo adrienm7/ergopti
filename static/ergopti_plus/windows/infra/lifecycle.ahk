@@ -288,6 +288,8 @@ _SuspendPendingPoll() {
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook, _OneShotShiftInputHook, _DeadKeyInputHook
 	global _MagicKeyEditorInputHook
+	if IsSet(LLM_AuxInvalidate)
+		try LLM_AuxInvalidate("suspend")
 	; Release OS-level modifiers before even the lifecycle START log: LoggerStart
 	; flushes synchronously to disk and a slow/locked config drive must not delay
 	; the balancing Up. The same bounded owner drain is the first shutdown step.

@@ -64,4 +64,18 @@ helpers.describe("F-MED-7: vscode_bridge.setup() failure is logged at the boot c
 		helpers.assert_true(log_line:find("vscode", 1, true) ~= nil or log_line:find("VS Code", 1, true) ~= nil,
 			"the Logger.error message must mention the VS Code bridge so the failure is identifiable in the log")
 	end)
+
+	helpers.it("a false VS Code bridge setup rolls back and aborts root initialization", function()
+		local src = read_init_src()
+		local guard_pos = src:find("if not ok_vscode or vscode_result ~= true then", 1, true)
+		helpers.assert_true(guard_pos ~= nil,
+			"root initialization must treat an exact false setup result as failure")
+		local guard_window = src:sub(guard_pos, math.min(#src, guard_pos + 1200))
+		local rollback_pos = guard_window:find("stop_server()", 1, true)
+		local abort_pos = guard_window:find('error("VS Code caret bridge setup did not commit")', 1, true)
+		helpers.assert_true(rollback_pos ~= nil,
+			"root initialization must retry exact VS Code server cleanup before aborting")
+		helpers.assert_true(abort_pos ~= nil and rollback_pos < abort_pos,
+			"root initialization must abort only after attempting bridge rollback")
+	end)
 end)

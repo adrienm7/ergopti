@@ -1202,13 +1202,11 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		; it does not re-collect, so the on-disk values survive until the menu has loaded.
 		if (MenuReady && (MenuState is Map)) {
 				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: MenuState["onboarding_seen"] ? "1" : "0" })
-				_AppOverridesStr := ""
-				for _AppName, _AppProfileId in MenuState["app_profile_overrides"] {
-						if (_AppOverridesStr != "")
-								_AppOverridesStr .= ";"
-						_AppOverridesStr .= _AppName . "=" . _AppProfileId
-				}
-				Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
+				_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
+						MenuState["app_profile_overrides"])
+				if !(_AppOverridesPayload is String)
+						throw Error("Could not serialize LLM app-profile overrides")
+				Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesPayload })
 				if IsSet(_LLM_Menu_AppendPersistedUpdates)
 						_LLM_Menu_AppendPersistedUpdates(Updates, MenuState)
 		}

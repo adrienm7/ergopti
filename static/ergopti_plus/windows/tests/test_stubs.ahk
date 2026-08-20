@@ -560,19 +560,41 @@ UninstallHotstringHooks() {
 ; assigning to the name makes AHK treat KLHook as a global variable, and the
 ; class declaration then fails to load with "conflicts with an existing global
 ; variable" — a parse error, so the whole suite dies before test one.
+global _Stub_OutputHostExe := "test.exe"
+global _Stub_OutputHostTitle := "Test App"
+
+_Stub_OutputHostIdentity() {
+	return Map("Hwnd", 4242, "Pid", 4343)
+}
+
+_Stub_OutputHostMetadata(Hwnd, Pid) {
+	global _Stub_OutputHostExe, _Stub_OutputHostTitle
+	return Map("Exe", _Stub_OutputHostExe, "Class", "fixture", "Title", _Stub_OutputHostTitle)
+}
+
+_Stub_SetOutputHost(Exe, Title) {
+	global _Stub_OutputHostExe, _Stub_OutputHostTitle
+	_Stub_OutputHostExe := Exe
+	_Stub_OutputHostTitle := Title
+	OutputHostResolverConfigure(_Stub_OutputHostIdentity, _Stub_OutputHostMetadata)
+}
+
 SimulateNotepadActive() {
     KLHook.prev_app := "notepad.exe"
     KLHook.prev_title := "Untitled - Notepad"
+	_Stub_SetOutputHost("notepad.exe", "Untitled - Notepad")
 }
 
 SimulateRegularApp() {
     KLHook.prev_app := "test.exe"
     KLHook.prev_title := "Test App"
+	_Stub_SetOutputHost("test.exe", "Test App")
 }
 
 SimulateMicrosoftOffice() {
     KLHook.prev_app := "WINWORD.EXE"
     KLHook.prev_title := "Document - Word"
+	_Stub_SetOutputHost("WINWORD.EXE", "Document - Word")
 }
 
 

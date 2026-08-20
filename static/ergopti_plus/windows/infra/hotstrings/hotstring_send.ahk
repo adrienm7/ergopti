@@ -20,6 +20,93 @@
 ; =======================================
 ; =======================================
 
+; Functional output routing must never depend on the optional metrics snapshot: it is
+; an optional metrics snapshot and can be empty or one foreground transition
+; behind. This resolver owns a cache only while the exact foreground HWND/PID
+; pair remains current. Tests can inject the two probes without teaching
+; production callers about the keylogger.
+global _OUTPUT_HOST_CACHE := 0
+global _OUTPUT_HOST_IDENTITY_PROBE := 0
+global _OUTPUT_HOST_METADATA_PROBE := 0
+
+OutputHostResolverConfigure(IdentityProbe := 0, MetadataProbe := 0) {
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE, _OUTPUT_HOST_METADATA_PROBE
+	_OUTPUT_HOST_CACHE := 0
+	_OUTPUT_HOST_IDENTITY_PROBE := IdentityProbe
+	_OUTPUT_HOST_METADATA_PROBE := MetadataProbe
+}
+
+_OutputHostForegroundIdentity() {
+	Hwnd := DllCall("GetForegroundWindow", "ptr")
+	if !Hwnd
+		return Map("Hwnd", 0, "Pid", 0)
+	Pid := WinGetPID("ahk_id " . Hwnd)
+	return Map("Hwnd", Hwnd, "Pid", Pid)
+}
+
+_OutputHostReadMetadata(Hwnd, Pid) {
+	Target := "ahk_id " . Hwnd
+	return Map(
+		"Exe", WinGetProcessName(Target),
+		"Class", WinGetClass(Target),
+		"Title", WinGetTitle(Target)
+	)
+}
+
+OutputHostResolve() {
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE, _OUTPUT_HOST_METADATA_PROBE
+	; MicrosoftApps() is a parse-time #HotIf criterion and reaches this resolver
+	; during Bundle_Init's first message pump, before these module globals exist.
+	if (!IsSet(_OUTPUT_HOST_CACHE) || !IsSet(_OUTPUT_HOST_IDENTITY_PROBE)
+			|| !IsSet(_OUTPUT_HOST_METADATA_PROBE))
+		return Map("Hwnd", 0, "Pid", 0, "Exe", "", "Class", "", "Title", "")
+	try Identity := HasMethod(_OUTPUT_HOST_IDENTITY_PROBE, "Call")
+		? _OUTPUT_HOST_IDENTITY_PROBE.Call() : _OutputHostForegroundIdentity()
+	catch as Err {
+		try LoggerWarn("OutputHost", "Foreground identity probe failed: {1}", Err.Message)
+		_OUTPUT_HOST_CACHE := 0
+		return Map("Hwnd", 0, "Pid", 0, "Exe", "", "Class", "", "Title", "")
+	}
+	if !(Identity is Map) || !Identity.Has("Hwnd") || !Identity.Has("Pid")
+			|| !Identity["Hwnd"] || !Identity["Pid"] {
+		_OUTPUT_HOST_CACHE := 0
+		return Map("Hwnd", 0, "Pid", 0, "Exe", "", "Class", "", "Title", "")
+	}
+	if (_OUTPUT_HOST_CACHE is Map
+			&& _OUTPUT_HOST_CACHE["Hwnd"] == Identity["Hwnd"]
+			&& _OUTPUT_HOST_CACHE["Pid"] == Identity["Pid"])
+		return _OUTPUT_HOST_CACHE
+	try Metadata := HasMethod(_OUTPUT_HOST_METADATA_PROBE, "Call")
+		? _OUTPUT_HOST_METADATA_PROBE.Call(Identity["Hwnd"], Identity["Pid"])
+		: _OutputHostReadMetadata(Identity["Hwnd"], Identity["Pid"])
+	catch as Err {
+		try LoggerWarn("OutputHost", "Foreground metadata probe failed: {1}", Err.Message)
+		_OUTPUT_HOST_CACHE := 0
+		return Map("Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
+			"Exe", "", "Class", "", "Title", "")
+	}
+	if !(Metadata is Map) || !Metadata.Has("Exe") {
+		_OUTPUT_HOST_CACHE := 0
+		return Map("Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
+			"Exe", "", "Class", "", "Title", "")
+	}
+	_OUTPUT_HOST_CACHE := Map(
+		"Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
+		"Exe", Metadata["Exe"],
+		"Class", Metadata.Has("Class") ? Metadata["Class"] : "",
+		"Title", Metadata.Has("Title") ? Metadata["Title"] : ""
+	)
+	return _OUTPUT_HOST_CACHE
+}
+
+OutputHostResolverPrimeForTest(Exe, Title := "", ClassName := "") {
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE
+	Identity := HasMethod(_OUTPUT_HOST_IDENTITY_PROBE, "Call")
+		? _OUTPUT_HOST_IDENTITY_PROBE.Call() : _OutputHostForegroundIdentity()
+	_OUTPUT_HOST_CACHE := Map("Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
+		"Exe", Exe, "Class", ClassName, "Title", Title)
+}
+
 ; Internal — the production-lean registration path used by every CreateHotstring
 ; / CreateCaseSensitiveHotstrings / CreateRawCallbackHotstring call. It hands the
 ; already-known matching flags (the ``*?C`` subset) straight to HSE_Register,
@@ -367,6 +454,8 @@ ActivateHotstrings() {
 								CommittedScreenEffect := 0
 								Fired := HSE_DispatchMatch(PendingMatch, HSE_LastEndChar,
 										&CommittedScreenEffect, true)
+								if (Fired is Map) && Fired.Has("Pending")
+										return true
 								; Same metrics contract the prefix-watcher fire path follows:
 								; only a real expansion is a fire, and the record is queued
 								; rather than logged inline so no disk work lands on the
@@ -584,7 +673,7 @@ global MICROSOFT_OFFICE_EXES := Map(
 
 MicrosoftApps() {
 		try {
-				exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+				exe := OutputHostResolve()["Exe"]
 				return MICROSOFT_OFFICE_EXES.Has(exe)
 		}
 		return false

@@ -18,12 +18,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local model_setters = 0
 		local prediction_states = {}
 
-		package.loaded["infra.logger"] = {
-			debug = noop,
-			info = noop,
-			warn = noop,
-			error = noop,
-		}
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
@@ -95,9 +90,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local noop = function() end
 		local pending_ok
 		local prediction_states = {}
-		package.loaded["infra.logger"] = {
-			debug = noop, info = noop, warn = noop, error = noop,
-		}
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
@@ -152,9 +145,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local pending_ok
 		local runtime_available = true
 		local prediction_states = {}
-		package.loaded["infra.logger"] = {
-			debug = noop, info = noop, warn = noop, error = noop,
-		}
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
@@ -206,9 +197,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local runtime_models = {}
 		local display_models = {}
 		local saves, updates = 0, 0
-		package.loaded["infra.logger"] = {
-			debug = noop, info = noop, warn = noop, error = noop,
-		}
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["infra.notifications"] = { notify = noop }
@@ -259,6 +248,76 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		helpers.assert_eq(saves, 1)
 		helpers.assert_eq(updates, 1,
 			"the stale requirements callback must not publish its candidate")
+	end)
+
+	helpers.it("releases the MLX prediction lock when success cleanup throws (HS-016)", function()
+		local noop = function() end
+		local pending_ok
+		local prediction_states = {}
+		local errors = {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, message, ...)
+			errors[#errors + 1] = string.format(message, ...)
+		end
+		logger.callback = function(_, label, fn, ...)
+			local results = table.pack(xpcall(fn, debug.traceback, ...))
+			if not results[1] then
+				errors[#errors + 1] = "Callback '" .. tostring(label)
+					.. "' raised: " .. tostring(results[2])
+			end
+			return table.unpack(results, 1, results.n)
+		end
+		package.loaded["infra.logger"] = logger
+		package.loaded["infra.i18n"] = {get = function(key) return key end}
+		package.loaded["infra.dialog_util"] = {block_alert = function() return false end}
+		package.loaded["infra.notifications"] = {notify = noop}
+		package.loaded["ui.menu.menu_llm.profile_label"] = {
+			format = function(label) return label end,
+		}
+		package.loaded["modules.llm"] = {
+			DEFAULT_STATE = {llm_num_predictions = 1},
+			set_active_profile = noop,
+			set_llm_model_mlx = noop,
+			set_llm_model_ollama = noop,
+		}
+		package.loaded["ui.menu.menu_llm.model_switcher"] = nil
+
+		local state = {
+			llm_backend = "mlx", llm_enabled = true,
+			llm_active_profile = "basic", llm_model = "old-model",
+		}
+		local switcher = require("ui.menu.menu_llm.model_switcher").new({
+			state = state,
+			models_mgr = {
+				check_requirements = function(_, on_ok) pending_ok = on_ok end,
+				get_presets = function() return {} end,
+				get_model_info = function() return {} end,
+				get_actual_model_name = function(name) return name end,
+			},
+			keymap = {
+				set_llm_enabled = function(enabled)
+					prediction_states[#prediction_states + 1] = enabled
+				end,
+				set_llm_model = noop,
+				set_llm_display_model_name = noop,
+			},
+			save_prefs = function() return true end,
+			update_menu = function() error("menu refresh exploded") end,
+		})
+
+		switcher.switch_model("candidate-model")
+		local call_ok, callback_result = pcall(pending_ok)
+
+		helpers.assert_true(call_ok,
+			"the manager success continuation must contain its cleanup exception")
+		helpers.assert_eq(callback_result, false,
+			"a failed success continuation cannot publish a truthful success")
+		helpers.assert_eq(prediction_states, {false, true},
+			"prediction unlock is mandatory cleanup even after update_menu throws")
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_contains(errors[1], "Model-switch menu refresh")
+		helpers.assert_contains(errors[1], "menu refresh exploded")
+		helpers.assert_contains(errors[1], "stack traceback")
 	end)
 end)
 

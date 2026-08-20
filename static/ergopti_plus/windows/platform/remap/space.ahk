@@ -183,6 +183,8 @@ _SpaceTap() {
 				CommittedScreenEffect := 0
 				Fired := HSEMatch != "" and HSE_DispatchMatch(
 						HSEMatch, HSE_LastEndChar, &CommittedScreenEffect)
+				if (Fired is Map) && Fired.Has("Pending")
+						return true
 				if Fired {
 						HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
 								? "repeat_key"

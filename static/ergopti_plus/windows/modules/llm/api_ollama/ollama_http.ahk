@@ -14,6 +14,56 @@
 ; =====================================
 ; =====================================
 
+_LLM_CurlTerminalPaths(BasePath) {
+	return Map("status", BasePath . ".status", "exit", BasePath . ".exit")
+}
+
+_LLM_CurlOwnedCommand(CurlCommand, StatusPath, ExitPath) {
+	return A_ComSpec . ' /D /V:ON /S /C ""' . CurlCommand
+		. ' --write-out "%{http_code}" > ' . _Q(StatusPath)
+		. ' & set "_ergopti_ec=!errorlevel!"'
+		. ' & > ' . _Q(ExitPath) . ' echo !_ergopti_ec!'
+		. ' & exit /b !_ergopti_ec!"'
+}
+
+_LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath) {
+	Result := Map("exit", -1, "status", 0, "body_read", false, "body", "")
+	try {
+		ExitText := Trim(FileRead(ExitPath, "UTF-8-RAW"))
+		if RegExMatch(ExitText, "^-?\d+$")
+			Result["exit"] := Integer(ExitText)
+	}
+	try {
+		StatusText := Trim(FileRead(StatusPath, "UTF-8-RAW"))
+		if RegExMatch(StatusText, "^\d{3}$")
+			Result["status"] := Integer(StatusText)
+	}
+	try {
+		Result["body"] := FileRead(BodyPath, "UTF-8-RAW")
+		Result["body_read"] := true
+	}
+	return Result
+}
+
+_LLM_CurlTerminalOk(Result) {
+	return Result is Map and Result["exit"] = 0 and Result["body_read"]
+		and Result["status"] >= 200 and Result["status"] < 300
+}
+
+_LLM_OllamaPingTerminalOk(ExitCode, HttpStatus, BodyRead, Body) {
+	if (ExitCode != 0 or HttpStatus < 200 or HttpStatus >= 300 or !BodyRead)
+		return false
+	try Root := JsonParse(Body)
+	catch
+		return false
+	return Root is Map and Root.Has("version") and Type(Root["version"]) = "String"
+		and Root["version"] != ""
+}
+
+_LLM_OllamaDeleteTerminalOk(ExitCode, HttpStatus, BodyRead, Body) {
+	return ExitCode = 0 and HttpStatus >= 200 and HttpStatus < 300 and BodyRead
+}
+
 /**
  * Sends a JSON body via WinHTTP. Async ``Open(..., true)`` rejects ADODB binary
  * SafeArrays (hard failure / E_NOINTERFACE); sync mode tolerated them but the
@@ -92,14 +142,17 @@ LLM_OllamaIsRunning_Async(on_result) {
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_ping_" . uid . ".out"
+		terminal := _LLM_CurlTerminalPaths(tmp_out)
+		owner_generation := LLM_AuxGeneration()
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
 		; one that needs longer is "not ready yet" for our purposes — the deps poll
 		; retries, and the health tick re-probes, so a slow first answer self-heals.
-		cmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/version")
+		curlCmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/version")
+		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Run(cmd, , "Hide", &pid)
-		_LLM_Ollama_PingPoll(pid, tmp_out, on_result, A_TickCount)
+		_LLM_Ollama_PingPoll(pid, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, owner_generation)
 	} catch {
 		_LLM_InvokeCallback(on_result, "on_result", false)
 	}
@@ -115,22 +168,26 @@ LLM_OllamaIsRunning_Async(on_result) {
  * @param {function} on_result  - Callback receiving the boolean reachability.
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_PingPoll(pid, tmp_out, on_result, start_tick) {
+_LLM_Ollama_PingPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, owner_generation) {
 	; 4 s backstop: curl -m 2 should exit by ~2 s, but ProcessClose if it overruns so
 	; a wedged child can never keep the poll chain (or its temp handle) alive.
 	if (pid > 0 and ProcessExist(pid)) {
 		if (_LLM_DeadlineExpired(start_tick, 4000)) {
 			try ProcessClose(pid)
-			try FSDelete(tmp_out)
+			for Path in [tmp_out, tmp_status, tmp_exit]
+				try FSDelete(Path)
 			_LLM_InvokeCallback(on_result, "on_result", false)
 			return
 		}
-		SetTimer(() => _LLM_Ollama_PingPoll(pid, tmp_out, on_result, start_tick), -150)
+		SetTimer(() => _LLM_Ollama_PingPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, owner_generation), -150)
 		return
 	}
-	reachable := false
-	try reachable := (FileExist(tmp_out) and FileGetSize(tmp_out) > 0)
-	try FSDelete(tmp_out)
+	Terminal := _LLM_CurlReadTerminal(tmp_status, tmp_exit, tmp_out)
+	reachable := _LLM_OllamaPingTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
+	for Path in [tmp_out, tmp_status, tmp_exit]
+		try FSDelete(Path)
+	if owner_generation != LLM_AuxGeneration()
+		return
 	_LLM_InvokeCallback(on_result, "on_result", reachable)
 }
 
@@ -195,13 +252,16 @@ LLM_OllamaListModels_Async(on_result) {
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_tags_" . uid . ".out"
+		terminal := _LLM_CurlTerminalPaths(tmp_out)
+		owner_generation := LLM_AuxGeneration()
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: a local daemon lists installed tags in well under a second; a slower
 		; answer is "not ready" — the installed-cache TTL re-probes on the next rebuild.
-		cmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
+		curlCmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
+		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Run(cmd, , "Hide", &pid)
-		_LLM_Ollama_TagsPoll(pid, tmp_out, on_result, A_TickCount)
+		_LLM_Ollama_TagsPoll(pid, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, owner_generation)
 	} catch {
 		_LLM_InvokeCallback(on_result, "on_result", [])
 	}
@@ -216,26 +276,26 @@ LLM_OllamaListModels_Async(on_result) {
  * @param {function} on_result  - Callback receiving an Array of tag names ([] on failure).
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick) {
+_LLM_Ollama_TagsPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, owner_generation) {
 	if (pid > 0 and ProcessExist(pid)) {
 		; 4 s backstop: curl -m 2 should exit by ~2 s; ProcessClose a wedged child so it
 		; can never keep the poll chain (or its temp handle) alive.
 		if (_LLM_DeadlineExpired(start_tick, 4000)) {
 			try ProcessClose(pid)
-			try FSDelete(tmp_out)
+			for Path in [tmp_out, tmp_status, tmp_exit]
+				try FSDelete(Path)
 			_LLM_InvokeCallback(on_result, "on_result", [])
 			return
 		}
-		SetTimer(() => _LLM_Ollama_TagsPoll(pid, tmp_out, on_result, start_tick), -150)
+		SetTimer(() => _LLM_Ollama_TagsPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, owner_generation), -150)
 		return
 	}
-	tags := []
-	try {
-		body := FileExist(tmp_out) ? FileRead(tmp_out, "UTF-8-RAW") : ""
-		if (body != "")
-			tags := _LLM_Ollama_ParseTagNames(body)
-	}
-	try FSDelete(tmp_out)
+	Terminal := _LLM_CurlReadTerminal(tmp_status, tmp_exit, tmp_out)
+	tags := _LLM_CurlTerminalOk(Terminal) ? _LLM_Ollama_ParseTagNames(Terminal["body"]) : []
+	for Path in [tmp_out, tmp_status, tmp_exit]
+		try FSDelete(Path)
+	if owner_generation != LLM_AuxGeneration()
+		return
 	_LLM_InvokeCallback(on_result, "on_result", tags)
 }
 
@@ -257,10 +317,15 @@ LLM_OllamaDeleteModel_Async(tag, on_result) {
 		_LLM_InvokeCallback(on_result, "on_result", false)
 		return
 	}
+	tmp_payload := ""
+	tmp_out := ""
+	Transferred := false
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_payload := _LLM_Ollama_TempDir() . "\ergopti_ollama_delete_" . uid . ".json"
 		tmp_out     := _LLM_Ollama_TempDir() . "\ergopti_ollama_delete_" . uid . ".out"
+		terminal := _LLM_CurlTerminalPaths(tmp_out)
+		owner_generation := LLM_AuxGeneration()
 		; The payload is intentionally minimal — Ollama tolerates the
 		; ``model`` field too on newer versions, but ``name`` is the
 		; documented one and works on every release we care about
@@ -272,17 +337,31 @@ LLM_OllamaDeleteModel_Async(tag, on_result) {
 			return
 		}
 		curl_exe := A_WinDir . "\System32\curl.exe"
-		cmdLine := '"' . curl_exe . '" -s -S -m ' . (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' -X DELETE '
+		curlCmd := '"' . curl_exe . '" -s -S -m ' . (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' -X DELETE '
 			. '-H "Content-Type: application/json" '
 			. '--data-binary @' . _Q(tmp_payload) . ' '
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/delete") . ' '
 			. '-o ' . _Q(tmp_out)
+		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Run(cmdLine, , "Hide", &pid)
-		_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, A_TickCount)
+		Transferred := true
+		_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, A_TickCount, owner_generation)
 	} catch as e {
 		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
 		_LLM_InvokeCallback(on_result, "on_result", false)
+	} finally {
+		; Ownership transfers to the poller only after the child launched. Every
+		; earlier exit is complete-or-absent, including a Run() exception.
+		if !Transferred {
+			if tmp_payload != ""
+				try FSDelete(tmp_payload)
+			if tmp_out != ""
+				try FSDelete(tmp_out)
+			if IsSet(terminal)
+				for Path in [terminal["status"], terminal["exit"]]
+					try FSDelete(Path)
+		}
 	}
 }
 
@@ -298,7 +377,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result) {
  * @param {function} on_result   - Callback receiving a Boolean (true on success).
  * @param {integer}  start_tick  - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick) {
+_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tmp_status, tmp_exit, tag, on_result, start_tick, owner_generation) {
 	global LLM_OLLAMA_POLL_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	if (pid > 0 and ProcessExist(pid)) {
 		; 5 s backstop beyond curl's own -m ceiling: ProcessClose a wedged
@@ -307,26 +386,28 @@ _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick) {
 			try ProcessClose(pid)
 			try FSDelete(tmp_payload)
 			try FSDelete(tmp_out)
+			try FSDelete(tmp_status)
+			try FSDelete(tmp_exit)
 			try LoggerWarn("LLM.ollama", "Ollama delete '{1}' timed out.", tag)
 			_LLM_InvokeCallback(on_result, "on_result", false)
 			return
 		}
-		SetTimer(() => _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tag, on_result, start_tick), -LLM_OLLAMA_POLL_MS)
+		SetTimer(() => _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tmp_status, tmp_exit, tag, on_result, start_tick, owner_generation), -LLM_OLLAMA_POLL_MS)
 		return
 	}
-	body := ""
-	try {
-		if FileExist(tmp_out)
-			body := FileRead(tmp_out, "UTF-8-RAW")
-	}
+	Terminal := _LLM_CurlReadTerminal(tmp_status, tmp_exit, tmp_out)
 	try FSDelete(tmp_payload)
-	try FSDelete(tmp_out)
-	ok := (body == "")
+	for Path in [tmp_out, tmp_status, tmp_exit]
+		try FSDelete(Path)
+	ok := _LLM_OllamaDeleteTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
+	if owner_generation != LLM_AuxGeneration()
+		return
 	try {
 		if (ok)
 			LoggerSuccess("LLM.ollama", "Deleted Ollama model '{1}'.", tag)
 		else
-			LoggerWarn("LLM.ollama", "Ollama delete '{1}' failed: {2}.", tag, body)
+			LoggerWarn("LLM.ollama", "Ollama delete '{1}' failed (exit={2}, status={3}): {4}.",
+				tag, Terminal["exit"], Terminal["status"], Terminal["body"])
 	}
 	_LLM_InvokeCallback(on_result, "on_result", ok)
 }

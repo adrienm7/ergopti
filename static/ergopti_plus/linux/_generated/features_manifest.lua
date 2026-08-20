@@ -452,6 +452,9 @@ M.unavailable = {
 		path = "llm.app_profile_overrides", section = "llm", reason_key = "", platforms = { "ahk" },
 	},
 	{
+		path = "llm.user_profiles", section = "llm", reason_key = "", platforms = { "ahk" },
+	},
+	{
 		path = "llm.display.pred_indent", section = "llm.display", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{

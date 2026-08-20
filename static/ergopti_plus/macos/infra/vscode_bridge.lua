@@ -221,36 +221,127 @@ end
 
 local _caret  = nil
 local _server = nil
+local _server_cleanup = nil
+
+--- Handles one request from the local VS Code extension.
+--- @param method string HTTP method.
+--- @param path string Request path.
+--- @param _headers table Request headers.
+--- @param body string Request body.
+--- @return string body Response body.
+--- @return number status HTTP status.
+--- @return table headers Response headers.
+local function handle_server_request(method, path, _headers, body)
+	if path == "/caret" and method == "POST" then
+		local ok, data = pcall(hs.json.decode, body)
+		if ok and data then
+			data._ts = hs.timer.secondsSinceEpoch()
+			_caret = data
+		end
+	end
+	return "{}", 200, { ["Content-Type"] = "application/json" }
+end
+
+--- Stops the exact committed server or uncommitted cleanup candidate.
+--- Ownership is released only after the native result and listening port both
+--- prove settlement, so a throw, refusal, or still-live socket remains retryable.
+--- @param context string Lifecycle context for diagnostics.
+--- @return boolean stopped Exact settlement result.
+local function stop_owned_server(context)
+	if _server and _server_cleanup and _server ~= _server_cleanup then
+		Logger.error(LOG, "HTTP server %s found conflicting native owners.", context)
+		return false
+	end
+	local owned = _server_cleanup or _server
+	if not owned then return true end
+
+	local stopped, stop_result = xpcall(function() return owned:stop() end, debug.traceback)
+	if not stopped or stop_result ~= owned then
+		Logger.error(LOG, "HTTP server %s did not stop transactionally: %s.",
+			context, tostring(stop_result))
+		return false
+	end
+	local port_ok, listening_port = xpcall(function() return owned:getPort() end, debug.traceback)
+	if not port_ok or listening_port ~= 0 then
+		Logger.error(LOG, "HTTP server %s remained live after stop (reported=%s).",
+			context, tostring(listening_port))
+		return false
+	end
+
+	if _server == owned then _server = nil end
+	if _server_cleanup == owned then _server_cleanup = nil end
+	return true
+end
+
+--- Rejects one uncommitted candidate and attempts exact rollback.
+--- @param stage string Failed lifecycle stage.
+--- @param detail any Native result or traceback.
+--- @return boolean Always false.
+local function reject_server_candidate(stage, detail)
+	Logger.error(LOG, "HTTP server %s failed on port %d: %s.",
+		stage, PORT, tostring(detail))
+	if _server_cleanup and stop_owned_server("startup rollback") ~= true then
+		Logger.error(LOG, "HTTP server cleanup remains pending after %s failure.", stage)
+	end
+	return false
+end
 
 --- Starts the HTTP server listening for caret payloads.
+--- @return boolean started Exact commitment result.
 function M.start_server()
-	if _server then _server:stop() end
-	Logger.debug(LOG, string.format("Starting HTTP server on port %d…", PORT))
-	
-	_server = hs.httpserver.new(false, false)
-	_server:setPort(PORT)
-	_server:setCallback(function(method, path, _, body)
-		if path == "/caret" and method == "POST" then
-			local ok, data = pcall(hs.json.decode, body)
-			if ok and data then
-				data._ts = hs.timer.secondsSinceEpoch()
-				_caret = data
-			end
-		end
-		return "{}", 200, { ["Content-Type"] = "application/json" }
-	end)
-	_server:start()
+	if _server or _server_cleanup then
+		if M.stop_server() ~= true then return false end
+	end
+	Logger.debug(LOG, "Starting HTTP server on port %d…", PORT)
+
+	local constructed, candidate = xpcall(function()
+		return hs.httpserver.new(false, false)
+	end, debug.traceback)
+	if not constructed or candidate == nil or candidate == false then
+		Logger.error(LOG, "HTTP server construction failed on port %d: %s.",
+			PORT, tostring(candidate))
+		return false
+	end
+	-- Publish cleanup ownership before the first native configuration call;
+	-- `_server` itself remains unpublished until the socket proves its bind
+	_server_cleanup = candidate
+
+	local port_set, port_result = xpcall(function()
+		return candidate:setPort(PORT)
+	end, debug.traceback)
+	if not port_set or port_result ~= candidate then
+		return reject_server_candidate("port configuration", port_result)
+	end
+	local callback_set, callback_result = xpcall(function()
+		return candidate:setCallback(handle_server_request)
+	end, debug.traceback)
+	if not callback_set or callback_result ~= candidate then
+		return reject_server_candidate("callback configuration", callback_result)
+	end
+
+	local started, start_result = xpcall(function() return candidate:start() end, debug.traceback)
+	if not started or start_result ~= candidate then
+		return reject_server_candidate("activation", start_result)
+	end
+	local port_ok, bound_port = xpcall(function() return candidate:getPort() end, debug.traceback)
+	if not port_ok or bound_port ~= PORT then
+		return reject_server_candidate("bind verification", bound_port)
+	end
+
+	_server = candidate
+	_server_cleanup = nil
 	Logger.info(LOG, "HTTP server started successfully.")
+	return true
 end
 
 --- Stops the HTTP server.
+--- @return boolean stopped Exact settlement result.
 function M.stop_server()
-	if _server then
-		Logger.debug(LOG, "Stopping HTTP server…")
-		_server:stop()
-		_server = nil
-		Logger.info(LOG, "HTTP server stopped.")
-	end
+	if not _server and not _server_cleanup then return true end
+	Logger.debug(LOG, "Stopping HTTP server…")
+	if stop_owned_server("shutdown") ~= true then return false end
+	Logger.info(LOG, "HTTP server stopped.")
+	return true
 end
 
 --- Returns the latest caret data if it is fresh enough.
@@ -366,13 +457,15 @@ end
 --- boot that installed or updated the extension, and init.lua's call site pcalls
 --- setup(), so the log said the bridge had failed and nothing said the server had
 --- never been reached.
+--- @return boolean started True when the caret server owns port 7878.
 function M.setup()
-	M.start_server()
+	if M.start_server() ~= true then return false end
 	local ok, err = pcall(M.install_extension)
 	if not ok then
 		Logger.error(LOG, "Extension install failed: %s — the caret server is up regardless.",
 			tostring(err))
 	end
+	return true
 end
 
 return M

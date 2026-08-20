@@ -48,12 +48,20 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	for key in _str_keys
 		if saved_opts.Has(key)
 			_LLM_Menu[key] := saved_opts[key]
+	for key in ["nav_modifiers", "val_modifiers"] {
+		if !LLM_Menu_IsValidModifierString(_LLM_Menu[key]) {
+			LoggerError("LLM", "Ignoring invalid persisted {1} value: '{2}'.", key, _LLM_Menu[key])
+			_LLM_Menu[key] := (key == "val_modifiers") ? "alt" : ""
+		}
+	}
 	for key in _num_keys
 		if saved_opts.Has(key)
 			_LLM_Menu[key] := saved_opts[key]
 	for key in _bool_keys
 		if saved_opts.Has(key)
 			_LLM_Menu[key] := saved_opts[key]
+	if !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"]
+		_LLM_Menu["streaming"] := false
 	for key in _arr_keys
 		if saved_opts.Has(key) && (saved_opts[key] is Array)
 			_LLM_Menu[key] := saved_opts[key]
@@ -92,6 +100,8 @@ LLM_Menu_Init(saved_opts := Map()) {
 	if FirstRestore && saved_opts.Has("app_profile_overrides")
 			&& (saved_opts["app_profile_overrides"] is Map)
 		_LLM_Menu["app_profile_overrides"] := saved_opts["app_profile_overrides"]
+	if FirstRestore && _LLM_Menu_PruneOrphanProfileOverrides(_LLM_Menu)
+		LoggerWarn("LLM", "Removed orphan per-application profile override(s) during startup.")
 
 	; Keep Features["llm"] aligned with tray state so the deferred startup
 	; SaveFullConfig() (~500 ms) does not rewrite num_predictions (etc.) back
@@ -175,7 +185,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; the missing-install state in the menu so the user can re-trigger the
 	; install themselves when they're ready.
 	if _LLM_Menu["enabled"]
-		SetTimer(() => LLM_Menu_BootstrapOllama(false), -1)
+		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
 
 	; Background health-tick: refreshes the dot on the shared cadence without
 	; waiting for the user to open the menu. The previous "probe on menu open"

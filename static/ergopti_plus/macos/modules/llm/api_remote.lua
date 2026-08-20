@@ -112,22 +112,23 @@ local function load_api_providers()
 				if type(desc) ~= "table" then
 					Logger.warn("llm.api_remote", "api_providers.json: missing providers.%s — skipped.", tostring(pid))
 				else
-					local missing_key = false
+					local invalid_descriptor = false
 					for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
-						if desc[key] == nil then
-							Logger.warn("llm.api_remote", "api_providers.json: providers.%s missing %s — skipped.", pid, key)
-							missing_key = true
+						if type(desc[key]) ~= "string"
+							or ((key == "label" or key == "format") and desc[key] == "") then
+							Logger.warn("llm.api_remote", "api_providers.json: providers.%s has invalid %s — skipped.", pid, key)
+							invalid_descriptor = true
 						end
 					end
 					local fmt = desc.format
-					if not missing_key then
+					if not invalid_descriptor then
 						if fmt ~= "openai" and fmt ~= "anthropic" and fmt ~= "gemini" then
 							Logger.warn("llm.api_remote", "api_providers.json: providers.%s invalid format '%s' — skipped.", pid, tostring(fmt))
 						else
 							out_providers[pid] = {
-								label         = tostring(desc.label),
-								base_url      = tostring(desc.base_url),
-								default_model = tostring(desc.default_model),
+								label         = desc.label,
+								base_url      = desc.base_url,
+								default_model = desc.default_model,
 								format        = fmt,
 							}
 						end
@@ -137,7 +138,11 @@ local function load_api_providers()
 		end
 		local out_prices = {}
 		for model, row in pairs(p_prices) do
-			if type(row) == "table" and row["in"] ~= nil and row["out"] ~= nil then
+			if type(model) == "string" and model ~= ""
+				and type(row) == "table"
+				and type(row["in"]) == "number" and row["in"] >= 0
+				and type(row["out"]) == "number" and row["out"] >= 0
+			then
 				out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
 			else
 				Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", tostring(model))

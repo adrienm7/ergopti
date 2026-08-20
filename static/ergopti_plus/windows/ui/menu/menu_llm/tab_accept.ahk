@@ -25,6 +25,11 @@
 
 #Requires AutoHotkey v2.0
 
+LLM_Menu_IsValidModifierString(Raw) {
+	Value := Trim(String(Raw))
+	return (Value == "") || (LLM_Menu_ShortcutToAhk(Value . "+a") != "")
+}
+
 
 
 
@@ -60,23 +65,26 @@ global _LLM_Nav_HotIfPred := (*) => LLM_Tooltip_GetText() != ""
 LLM_Menu_BindNavHotkeys() {
 	global _LLM_Menu, _LLM_Menu_NavHotkeysBound, _LLM_Nav_HotIfPred
 
+	nav_mod := _LLM_Menu.Has("nav_modifiers") ? Trim(_LLM_Menu["nav_modifiers"]) : ""
+	val_mod := _LLM_Menu.Has("val_modifiers") ? Trim(_LLM_Menu["val_modifiers"]) : "alt"
+	nav_prefix := LLM_Menu_ShortcutToAhk(nav_mod == "" ? "a" : nav_mod . "+a")
+	val_prefix := LLM_Menu_ShortcutToAhk(val_mod == "" ? "a" : val_mod . "+a")
+	if (!LLM_Menu_IsValidModifierString(nav_mod) || !LLM_Menu_IsValidModifierString(val_mod)) {
+		LoggerError("LLM", "Navigation hotkeys rejected: invalid modifier configuration (nav='{1}', val='{2}').",
+			nav_mod, val_mod)
+		return false
+	}
+	if (nav_prefix != "")
+		nav_prefix := SubStr(nav_prefix, 1, -1)
+	if (val_prefix != "")
+		val_prefix := SubStr(val_prefix, 1, -1)
+
 	HotIf _LLM_Nav_HotIfPred
 	try {
 		for hk in _LLM_Menu_NavHotkeysBound {
 			try Hotkey(hk, "Off")
 		}
 		_LLM_Menu_NavHotkeysBound := []
-
-		nav_mod := _LLM_Menu.Has("nav_modifiers") ? _LLM_Menu["nav_modifiers"] : ""
-		val_mod := _LLM_Menu.Has("val_modifiers") ? _LLM_Menu["val_modifiers"] : "alt"
-
-		nav_prefix := LLM_Menu_ShortcutToAhk(nav_mod == "" ? "dummy" : nav_mod . "+dummy")
-		if (nav_prefix != "")
-			nav_prefix := SubStr(nav_prefix, 1, -5)
-
-		val_prefix := LLM_Menu_ShortcutToAhk(val_mod == "" ? "dummy" : val_mod . "+dummy")
-		if (val_prefix != "")
-			val_prefix := SubStr(val_prefix, 1, -5)
 
 		nav_up := "~" . nav_prefix . "Up"
 		nav_dn := "~" . nav_prefix . "Down"
@@ -117,6 +125,7 @@ LLM_Menu_BindNavHotkeys() {
 		; every subsequent Hotkey() call in the process to target the wrong scope
 		HotIf
 	}
+	return true
 }
 
 _LLM_Menu_MakeNavJump(idx) {

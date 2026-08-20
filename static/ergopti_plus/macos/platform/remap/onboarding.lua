@@ -57,6 +57,7 @@ M._active_tasks = {}
 -- One lifecycle epoch owns every poll, delayed continuation, and installer
 -- completion spawned by the current wizard chain
 local _wizard_epoch = 0
+local _install_epoch = 0
 local _timer_owner = nil
 local run_wizard_step
 
@@ -259,9 +260,11 @@ end
 --- @param expected_sha string Expected SHA-256, lowercase hex.
 --- @param callback function fun(ok: boolean, err: string|nil)
 local function verify_sha256_async(path, expected_sha, callback)
+	local epoch = _install_epoch
 	local task
 	task = TaskLifecycle.native("Karabiner installer checksum", "/usr/bin/shasum", function(rc, stdout)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
+		if epoch ~= _install_epoch then return end
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "shasum exit code " .. tostring(rc))
 			return
@@ -291,6 +294,7 @@ end
 --- @param dest string Absolute destination path.
 --- @param callback function fun(ok: boolean, err: string|nil)
 local function download_async(url, dest, callback)
+	local epoch = _install_epoch
 	local parent = dest:match("^(.*/)") or ""
 	if parent ~= "" then
 		hs.execute("/bin/mkdir -p " .. text_utils.shell_quote(parent))
@@ -298,6 +302,7 @@ local function download_async(url, dest, callback)
 	local task
 	task = TaskLifecycle.native("Karabiner installer download", "/usr/bin/curl", function(rc, _, stderr)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
+		if epoch ~= _install_epoch then return end
 		if rc ~= 0 then
 			callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -315,9 +320,11 @@ end
 --- @param dmg_path string Absolute path to the .dmg.
 --- @param callback function fun(ok: boolean, mount_point_or_err: string)
 local function mount_dmg_async(dmg_path, callback)
+	local epoch = _install_epoch
 	local task
 	task = TaskLifecycle.native("Karabiner installer DMG mount", "/usr/bin/hdiutil", function(rc, stdout, stderr)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
+		if epoch ~= _install_epoch then return end
 		if rc ~= 0 or type(stdout) ~= "string" then
 			callback(false, "hdiutil rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -368,6 +375,7 @@ end
 --- @param pkg_path string Absolute path to the .pkg.
 --- @param callback function fun(ok: boolean, err: string|nil)
 local function run_pkg_with_sudo_async(pkg_path, callback)
+	local epoch = _install_epoch
 	-- `quoted form of` operates on the AppleScript VALUE, and that value is
 	-- produced by PARSING the literal below — so anything the literal itself
 	-- mis-parses is already lost before `quoted form of` ever runs. The escape must
@@ -381,6 +389,7 @@ local function run_pkg_with_sudo_async(pkg_path, callback)
 	local task
 	task = TaskLifecycle.native("Karabiner package install", "/usr/bin/osascript", function(rc, _, stderr)
 		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
+		if epoch ~= _install_epoch then return end
 		if rc ~= 0 then
 			callback(false, "osascript rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
 			return
@@ -452,6 +461,11 @@ end
 --- @param callback function fun(ok: boolean, err: string|nil) optional.
 function M.install_karabiner_elements(callback)
 	callback = callback or function() end
+	for _ in pairs(M._active_tasks) do
+		callback(false, "An installer operation is already active.")
+		return false
+	end
+	_install_epoch = _install_epoch + 1
 
 	local manifest = M.load_manifest()
 	if not manifest then
@@ -731,10 +745,22 @@ end
 --- @return boolean settled True only when no native onboarding timer can remain.
 function M.stop()
 	_wizard_epoch = _wizard_epoch + 1
-	if not _timer_owner then return true end
-	local owner = _timer_owner
-	owner.committed = false
-	local settled = cancel_timer_owner(owner, "M.stop")
+	_install_epoch = _install_epoch + 1
+	local settled = true
+	for task in pairs(M._active_tasks) do
+		local ok, result = xpcall(function() return task:terminate() end, debug.traceback)
+		if ok and result == true then
+			M._active_tasks[task] = nil
+		else
+			settled = false
+			Logger.error(LOG, "Onboarding task termination refused; owner retained: %s", tostring(result))
+		end
+	end
+	if _timer_owner then
+		local owner = _timer_owner
+		owner.committed = false
+		settled = cancel_timer_owner(owner, "M.stop") and settled
+	end
 	if not settled then
 		Logger.error(LOG, "Onboarding stop incomplete; exact timer cleanup retained for retry.")
 	end

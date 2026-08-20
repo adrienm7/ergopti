@@ -112,6 +112,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "llm.enabled", "id", "enabled", "section", "llm", "default", false, "type", "boolean", "description_key", "menu.llm.enabled", "platforms", ["ahk", "hs", "linux"]),
         Map("path", "llm.onboarding_seen", "id", "onboarding_seen", "section", "llm", "default", false, "type", "boolean", "description_key", "menu.llm.onboarding_seen", "platforms", ["ahk"]),
         Map("path", "llm.app_profile_overrides", "id", "app_profile_overrides", "section", "llm", "default", "", "type", "string", "description_key", "menu.llm.app_profile_overrides", "platforms", ["ahk"]),
+        Map("path", "llm.user_profiles", "id", "user_profiles", "section", "llm", "default", "", "type", "string", "description_key", "menu.llm.profiles", "platforms", ["ahk"]),
         Map("path", "llm.display.pred_indent", "id", "pred_indent", "section", "llm.display", "default", 0, "type", "number", "description_key", "menu.llm.display.pred_indent", "platforms", ["ahk", "hs"]),
         Map("path", "llm.display.show_info_bar", "id", "show_info_bar", "section", "llm.display", "default", true, "type", "boolean", "description_key", "menu.llm.display.show_info_bar", "platforms", ["ahk", "hs"]),
         Map("path", "llm.display.streaming", "id", "streaming", "section", "llm.display", "default", true, "type", "boolean", "description_key", "menu.llm.display.streaming", "platforms", ["ahk", "hs"]),

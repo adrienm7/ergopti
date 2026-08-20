@@ -464,6 +464,16 @@ _LTST_SharedGrammar() {
 Test("[llm-trigger-tx] translation delegates to the shared chord grammar",
 	_LTST_SharedGrammar)
 
+_LTST_NavigationModifierValidation() {
+	AssertEqual(true, LLM_Menu_IsValidModifierString(""))
+	AssertEqual(true, LLM_Menu_IsValidModifierString("ctrl"))
+	AssertEqual(true, LLM_Menu_IsValidModifierString("control+shift"))
+	AssertEqual(false, LLM_Menu_IsValidModifierString("crtl"))
+	AssertEqual(false, LLM_Menu_IsValidModifierString("alt+unknown"))
+}
+Test("[llm-trigger-tx] navigation modifier typos are rejected before rebinding",
+	_LTST_NavigationModifierValidation)
+
 _LTST_ZeroArityCore() {
 	global _LTST_LlmCalls
 	AssertTrue(LLM_Menu_ApplyTriggerShortcut("Ctrl+L", _LTST_Hotkey,

@@ -35,6 +35,20 @@ _KLSql_LlmGeneration_BuildsRealInsert() {
 }
 Test("KL_BuildInserts: llm_generation reaches events_llm instead of being silently skipped (F19)", _KLSql_LlmGeneration_BuildsRealInsert)
 
+_KLSql_LlmGeneration_PersistsUsageAccounting() {
+	Keylogger.next_event_id := 1
+	entry := Map(
+		"type", "llm_generation", "timestamp", "2026-08-20 10:00:00.000",
+		"prompt_tokens", 111, "completion_tokens", 222,
+		"total_tokens", 333, "est_cost_usd", 4.56789)
+	Sql := KL_BuildInserts(entry)[1]
+	for Column in ["prompt_tokens", "completion_tokens", "total_tokens", "est_cost_usd"]
+		AssertContains(Sql, Column, "events_llm must retain " . Column)
+	for Sentinel in ["111", "222", "333", "4.56789"]
+		AssertContains(Sql, Sentinel, "usage accounting value must reach the SQL row: " . Sentinel)
+}
+Test("KL_BuildInserts: LLM usage and cost survive durable ingestion", _KLSql_LlmGeneration_PersistsUsageAccounting)
+
 _KLSql_LlmSuggested_BuildsRealInsert() {
 	Keylogger.next_event_id := 1
 	entry := Map("type", "llm_suggested", "timestamp", "2026-07-02 10:00:00.000", "app", "TestApp", "count", 3)

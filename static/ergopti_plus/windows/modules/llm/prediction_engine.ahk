@@ -94,6 +94,7 @@ global _LLM_Engine := Map(
 ; an otherwise identical result is requested/consumed, not what the model sees.
 global LLM_ENGINE_SEMANTIC_CONFIG_KEYS := [
 	"backend",
+	"ollama_port",
 	"model",
 	"profile_id",
 	"user_profiles",
@@ -117,6 +118,13 @@ global LLM_ENGINE_DISPLAY_ONLY_CONFIG_KEYS := [
 	"nav_modifiers",
 	"val_modifiers"
 ]
+
+LLM_BackendCapabilities(Backend) {
+	; Windows has no typed/reliable partial-frame transport yet. The same
+	; capability object drives both the menu and dispatch so an unsupported
+	; backend can never persist a checked control that runtime overrides.
+	return Map("streaming", false)
+}
 
 global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
 	"debounce_ms",

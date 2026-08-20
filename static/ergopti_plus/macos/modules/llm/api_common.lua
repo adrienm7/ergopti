@@ -350,17 +350,11 @@ end
 ---        `type(x) == "function"` guards these call sites already carried.
 --- @param name string Callback name, for the log line.
 --- @param ... any Forwarded verbatim.
+--- @return boolean|nil ok True only when a callable callback completed.
+--- @return any result_or_error Exact callback result, or traceback on failure.
 function M.protected_call(fn, name, ...)
 	if type(fn) ~= "function" then return end
-	local args = table.pack(...)
-	local ok, err = xpcall(function()
-		return fn(table.unpack(args, 1, args.n))
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Callback '%s' raised: %s. This request is abandoned — nothing "
-			.. "downstream retries it, so the user simply never sees a prediction.",
-			tostring(name), tostring(err))
-	end
+	return Logger.callback(LOG, name, fn, ...)
 end
 
 return M

@@ -332,10 +332,133 @@ _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
 			Candidate["user_profiles"].RemoveAt(Index)
 			if Candidate["profile_id"] == ProfileId
 				Candidate["profile_id"] := "basic"
+			if Candidate.Has("app_profile_overrides")
+					&& (Candidate["app_profile_overrides"] is Map) {
+				for AppName, OverrideId in Candidate["app_profile_overrides"] {
+					if (OverrideId == ProfileId)
+						Candidate["app_profile_overrides"].Delete(AppName)
+				}
+			}
 			return true
 		}
 	}
 	return false
+}
+
+_LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
+	if !(MenuState is Map) || !(MenuState["app_profile_overrides"] is Map)
+		return false
+	Valid := Map("raw", true, "basic", true, "advanced", true, "batch_advanced", true)
+	for Profile in MenuState["user_profiles"] {
+		if (Profile is Map) && Profile.Has("id")
+			Valid[Profile["id"]] := true
+	}
+	Changed := false
+	for AppName, ProfileId in MenuState["app_profile_overrides"] {
+		if !Valid.Has(ProfileId) {
+			MenuState["app_profile_overrides"].Delete(AppName)
+			Changed := true
+		}
+	}
+	return Changed
+}
+
+_LLM_Menu_SerializeUserProfiles(Profiles) {
+	if !(Profiles is Array)
+		return false
+	Rows := []
+	for Profile in Profiles {
+		if !(Profile is Map) || !Profile.Has("id") || !(Profile["id"] is String)
+				|| Profile["id"] == ""
+			return false
+		Fields := []
+		for Key in ["id", "label", "system_single", "system_multi", "system_multi_template"] {
+			Value := Profile.Has(Key) ? Profile[Key] : ""
+			if !(Value is String)
+				return false
+			Fields.Push('"' . Key . '":"' . _LLM_MenuApiJsonEscape(Value) . '"')
+		}
+		Fields.Push('"batch":' . ((Profile.Has("batch") && Profile["batch"] == true) ? "true" : "false"))
+		Rows.Push("{" . _LLM_MenuJoin(Fields, ",") . "}")
+	}
+	return "v1:" . CryptoBase64EncodeUtf8("[" . _LLM_MenuJoin(Rows, ",") . "]")
+}
+
+_LLM_Menu_DeserializeUserProfiles(Payload) {
+	if !(Payload is String) || SubStr(Payload, 1, 3) != "v1:"
+		return false
+	try Bytes := CryptoBase64Decode(SubStr(Payload, 4))
+	catch
+		return false
+	try Parsed := JsonParse(StrGet(Bytes, Bytes.Size, "UTF-8"))
+	catch
+		return false
+	if !(Parsed is Array)
+		return false
+	Validated := []
+	Seen := Map()
+	for Profile in Parsed {
+		if !(Profile is Map) || !Profile.Has("id") || !(Profile["id"] is String)
+				|| Profile["id"] == "" || Seen.Has(Profile["id"])
+			return false
+		for Key in ["label", "system_single", "system_multi", "system_multi_template"]
+			if Profile.Has(Key) && !(Profile[Key] is String)
+				return false
+		Profile["batch"] := Profile.Has("batch") && Profile["batch"] == true
+		Seen[Profile["id"]] := true
+		Validated.Push(Profile)
+	}
+	return Validated
+}
+
+_LLM_Menu_SerializeAppProfileOverrides(Overrides) {
+	if !(Overrides is Map)
+		return false
+	Rows := []
+	for AppName, ProfileId in Overrides {
+		if !(AppName is String) || AppName == "" || !(ProfileId is String) || ProfileId == ""
+			return false
+		Rows.Push('{"app":"' . _LLM_MenuApiJsonEscape(AppName)
+			. '","profile":"' . _LLM_MenuApiJsonEscape(ProfileId) . '"}')
+	}
+	return "v1:" . CryptoBase64EncodeUtf8("[" . _LLM_MenuJoin(Rows, ",") . "]")
+}
+
+_LLM_Menu_DeserializeAppProfileOverrides(Payload) {
+	if !(Payload is String)
+		return false
+	if SubStr(Payload, 1, 3) != "v1:" {
+		; Strict migration reader for the legacy app=profile;... representation.
+		Decoded := Map()
+		for Pair in StrSplit(Payload, ";") {
+			Pair := Trim(Pair)
+			if Pair == ""
+				continue
+			Parts := StrSplit(Pair, "=", , 2)
+			if Parts.Length != 2 || Parts[1] == "" || Parts[2] == "" || Decoded.Has(Parts[1])
+				return false
+			Decoded[Parts[1]] := Parts[2]
+		}
+		return Decoded
+	}
+	try Bytes := CryptoBase64Decode(SubStr(Payload, 4))
+	catch
+		return false
+	try Parsed := JsonParse(StrGet(Bytes, Bytes.Size, "UTF-8"))
+	catch
+		return false
+	if !(Parsed is Array)
+		return false
+	Decoded := Map()
+	for Row in Parsed {
+		if !(Row is Map) || !Row.Has("app") || !Row.Has("profile")
+				|| !(Row["app"] is String) || Row["app"] == ""
+				|| !(Row["profile"] is String) || Row["profile"] == ""
+				|| Decoded.Has(Row["app"])
+			return false
+		Decoded[Row["app"]] := Row["profile"]
+	}
+	return Decoded
 }
 
 _LLM_Menu_ApplyProfileCommitted(*) {

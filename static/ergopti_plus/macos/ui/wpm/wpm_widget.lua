@@ -720,6 +720,10 @@ function M.stop()
 	return true
 end
 
+function M.is_running()
+	return _running == true
+end
+
 --- Resets the widget to its default bottom-right position.
 function M.reset_position()
 	_pos_x = nil

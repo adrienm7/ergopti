@@ -909,19 +909,36 @@ function M.build(ctx)
 			Logger.start(LOG, "Clearing every tap/hold and combo slot…")
 			local cleared = 0
 			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
-				pcall(karabiner.set_tap_action,  key_def.id, "none")
-				pcall(karabiner.set_hold_action, key_def.id, "none")
+				local ok_tap, tap_result = pcall(karabiner.set_tap_action, key_def.id, "none")
+				local ok_hold, hold_result = pcall(karabiner.set_hold_action, key_def.id, "none")
+				if not ok_tap or tap_result ~= true or not ok_hold or hold_result ~= true then
+					Logger.error(LOG, "Clear All refused at tap/hold slot %s; no success published.", tostring(key_def.id))
+					return false
+				end
 				cleared = cleared + 1
 			end
 			for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
-				pcall(karabiner.set_combo_combo_action, combo_def.id, "none")
-				pcall(karabiner.set_combo_tap_action,   combo_def.id, "none")
-				pcall(karabiner.set_combo_hold_action,  combo_def.id, "none")
+				for _, setter in ipairs({
+					karabiner.set_combo_combo_action,
+					karabiner.set_combo_tap_action,
+					karabiner.set_combo_hold_action,
+				}) do
+					local ok_set, set_result = pcall(setter, combo_def.id, "none")
+					if not ok_set or set_result ~= true then
+						Logger.error(LOG, "Clear All refused at combo slot %s; no success published.", tostring(combo_def.id))
+						return false
+					end
+				end
 				cleared = cleared + 1
 			end
-			pcall(karabiner.regenerate)
+			local ok_regen, regen_result = pcall(karabiner.regenerate)
+			if not ok_regen or regen_result ~= true then
+				Logger.error(LOG, "Clear All regeneration refused; no success published.")
+				return false
+			end
 			Logger.success(LOG, "Cleared %d entry/entries — all slots are now 'none'.", cleared)
 			if update_menu then update_menu() end
+			return true
 		end,
 		["karabiner_restore_defaults"] = function()
 			pcall(karabiner.reset_to_defaults)
