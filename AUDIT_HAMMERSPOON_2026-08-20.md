@@ -6,13 +6,14 @@ Scope: `static/ergopti_plus/macos/`, its shared Lua/data dependencies, relevant 
 
 ## 1. Executive summary
 
-This pass found **19 confirmed defects**: **11 High**, **8 Medium**, **0 Low**, and **0 Critical**. “Confirmed” means that the state is reachable, the exact source path was re-opened, a concrete reproduction sequence exists, and the existing tests were inspected for a contradiction. No candidate was promoted merely because a source pattern looked suspicious.
+This pass found **21 confirmed defects**: **12 High**, **8 Medium**, **1 Low**, and **0 Critical**. “Confirmed” means that the state is reachable, the exact source path was re-opened, a concrete reproduction sequence exists, and the existing tests were inspected for a contradiction. No candidate was promoted merely because a source pattern looked suspicious.
 
 | Severity       | Count | IDs               |
 | -------------- | ----: | ----------------- |
-| High           |    11 | `HS-001`–`HS-011` |
+| High           |    12 | `HS-001`–`HS-011`, `HS-021` |
 | Medium         |     8 | `HS-012`–`HS-019` |
-| Low / Critical |     0 | —                 |
+| Low            |     1 | `HS-020`          |
+| Critical       |     0 | —                 |
 
 The most fragile areas are:
 
@@ -154,35 +155,39 @@ This is distinct from the intentional kernel gate: `running()==true` with no fir
 - **Severity:** High
 - **Confidence:** High
 - **Guarantees:** `G2`, `G3`
-- **Source:** `ui/menu/menu_llm/model_switcher.lua:261-303`, `ui/menu/menu_llm/models_manager_mlx.lua:205-305`, `ui/menu/menu_llm/models_manager_mlx_server.lua:141-175`
+- **Source:** `ui/menu/menu_llm/model_switcher.lua:261-303`, `ui/menu/menu_llm/models_manager_mlx.lua:205-305`, `ui/menu/menu_llm/models_manager_mlx_server.lua:141-175`, `ui/menu/menu_llm/models_manager_ollama.lua:328-448`
 - **Recent-fix blind spots:** `3e50bb392`, `37da444bd`
 
 **Reproduction.** With installed MLX models A and B, select A then B. Complete B’s dependency probe first so B starts; complete A’s probe second. A’s manager continuation calls `start_server(A)`, which can terminate B and start A. Only afterward does the final callback reach `model_switcher`’s stale-token check, so state/menu may still say B while A owns the server.
+
+The Ollama sibling has the same fence placement. Select absent A then installed B; let B’s list/loadability path commit, then complete stale A’s list and system check. The stale continuation can prompt/pull A, and `pull_model(A)` publishes runtime, keymap, display, and persistent model state before its terminal callback reaches the switcher token. `HS-010` does not absorb this ordering when B never needed a pull.
 
 **Root cause and silence.** The generation token guards terminal callbacks one layer above destructive manager side effects. Dropping the final stale callback hides rather than prevents the mutation.
 
 **Existing test/backstop checked.** `test_model_switcher_backend_guard.lua` replaces the manager with a final-callback fake and cannot see inner terminate/start effects. `test_mlx_server_readiness_is_shared.lua` covers intentional same-target joining only.
 
-**Fix.** Pass an operation token or `is_current` predicate into the manager and recheck it before prompt, pull, terminate, start, preference publish, and every yielded continuation.
+**Fix.** Pass the switcher-owned operation token or `is_current` predicate into both MLX and Ollama managers and recheck it before loadability checks, prompt, pull, terminate, start, preference publish, and every yielded continuation.
 
-**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_model_switcher_manager_generation.lua`. Defer real manager task completions; run A→B, finish B then A, and assert no `start_server(A)`, no B termination, and B remains current. Repeat for missing-model prompt/pull.
+**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_model_switcher_manager_generation.lua`. Defer real manager task completions; run MLX A→B, finish B then A, and assert no `start_server(A)`, no B termination, and B remains current. Repeat with Ollama absent A/installed B and assert zero A prompt, pull, runtime publication, or persistence.
 
 ### `HS-008` — MLX replacement starts a successor before exact teardown and broad cleanup settle
 
 - **Severity:** High
 - **Confidence:** High
 - **Guarantees:** `G1`, `G2`, `G3`
-- **Source:** `ui/menu/menu_llm/models_manager_mlx_server.lua:141-175`, `ui/menu/menu_llm/models_manager_mlx_server.lua:212-249`
+- **Source:** `ui/menu/menu_llm/models_manager_mlx_server.lua:141-175`, `ui/menu/menu_llm/models_manager_mlx_server.lua:212-249`, `ui/menu/menu_llm/models_manager.lua:477-488`
 
 **Reproduction.** With server A active, make its task’s `terminate()` throw or return false, then select B. The code clears the active slot and proceeds to B. Independently, delay the fire-and-forget `ps/lsof ... kill -9` sweep until B appears; the broad filter can select and kill the successor it was supposed to protect.
 
+The public stop sibling has the same ownership loss: call `stop_mlx_server_if_needed()` with an active task whose `terminate()` throws or returns false. The function unconditionally clears `active_tasks["mlx_server"]`, resets endpoint identity, and logs “stopped safely,” so the still-live exact server can no longer be retried through that owner.
+
 **Root cause and silence.** A signal request is treated as settlement, its result is discarded, the exact task handle is dropped, and the global sweep is not serialized with launch or scoped to an operation identity.
 
-**Existing test/backstop checked.** `test_mlx_server_readiness_is_shared.lua` uses always-successful termination. `test_mlx_stop_clears_readiness.lua` is source-only. `test_models_manager_mlx_adopt.lua` counts relaunches but does not order sweep completion before launch.
+**Existing test/backstop checked.** `test_mlx_server_readiness_is_shared.lua` uses always-successful termination. `test_mlx_stop_clears_readiness.lua` is source-only. `test_models_manager_mlx_adopt.lua` counts relaunches but does not order sweep completion before launch. `test_backend_panel_save_gate.lua` replaces the public stop method with a counter and cannot represent refusal.
 
-**Fix.** Retain A until confirmed stopped, refuse B while teardown debt remains, and launch only after a generation-scoped cleanup completes. Prefer exact PID/process-group ownership over a broad post-hoc sweep.
+**Fix.** Make both replacement and public-stop paths share one exact settlement primitive: retain A until confirmed stopped, return false while teardown debt remains, and launch only after a generation-scoped cleanup completes. Prefer exact PID/process-group ownership over a broad post-hoc sweep.
 
-**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_mlx_server_replacement_transaction.lua`. For throw/false terminate, assert no successor and unchanged exact owner. Delay sweep completion and assert B starts exactly once afterward; make the stale sweep enumerate B and assert it cannot kill it.
+**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_mlx_server_replacement_transaction.lua`. For throw/false terminate through both replacement and public stop, assert no successor, no false success log, and unchanged exact owner. Delay sweep completion and assert B starts exactly once afterward; make the stale sweep enumerate B and assert it cannot kill it.
 
 ### `HS-009` — Single-slot HTTP clients silently cancel independent semantic operations
 
@@ -253,13 +258,17 @@ This is distinct from the intentional kernel gate: `running()==true` with no fir
 
 **Reproduction D — startup MLX.** Boot with MLX enabled and pause before the one-/three-second startup timers. They check persisted `state.llm_enabled`, which pause preserves, and can call `force_mlx_check`, start the server, and re-enable predictions while paused.
 
-**Root cause and silence.** Pause is implemented as a manually enumerated transaction, but these sibling producers live behind deferred UI reconciliation or outside the list. Each late callback can complete normally, so no error identifies the invariant breach.
+**Reproduction E — cleanup refusal hidden by gesture lifecycle.** Arm a gesture clipboard/click cleanup owner, make `Actions.force_cleanup()` return `false`, then pause or disable gestures. `modules/gestures/init.lua:515-540` discards both the protected-call status and explicit result, and `M.suspend()` returns `nil`; `script_control.call_lifecycle_operation()` treats that legacy nil as success and can publish PAUSED while exact cleanup debt remains. `M.stop()` repeats the same discarded-result shape at `:1011-1019`.
+
+**Reproduction F — already-dispatched startup work crosses pause.** Let the one- or three-second startup timer dispatch `force_mlx_check()`, pause before its dependency probe completes, then deliver that probe. The startup generation guards only the terminal `on_ok`/`on_fail`; the manager can still start/publish an MLX server below that fence while PAUSED. Merely parking timers therefore does not absorb in-flight work.
+
+**Root cause and silence.** Pause is implemented as a manually enumerated transaction, but these sibling producers live behind deferred UI reconciliation or outside the list. Gesture lifecycle additionally converts explicit cleanup refusal into legacy nil-success through a bare `pcall`. Startup generation is checked above, rather than below, destructive manager continuations. Each late callback can complete normally, so no error identifies the invariant breach.
 
 **Existing test/backstop checked.** `test_menu_metrics_wpm_pause_gate.lua` source-scans and incorrectly assumes `updateMenu() -> build()` is synchronous. `test_suspend_quiesces_scroll_and_clicklock.lua` stubs `Actions.force_cleanup` and cannot inspect production search ownership. `test_warmup_gate_respects_pause.lua` and `test_warmup_parked_during_pause.lua` assert MLX/Ollama only despite broader descriptions. `test_startup_controller_generation_guard.lua` has no pause state.
 
-**Fix.** Maintain one enumerated pause-owner registry. Every owner must synchronously fence callbacks and return exact settlement before `_is_paused` is published; resume may re-arm only previously committed owners.
+**Fix.** Maintain one enumerated pause-owner registry. Every owner must synchronously fence callbacks and return exact settlement before `_is_paused` is published; resume may re-arm only previously committed owners. Bump a startup operation token on pause and pass it through the manager-side operation guard from `HS-007`, so an already-dispatched probe cannot mutate native state.
 
-**Regression test.** Add `tests/unit/modules/shortcuts/test_pause_owner_inventory.lua`. The class-wide state×owner test must inject WPM stop refusal, a live search timer, Remote warmup, and both startup timers. Assert pause returns false or leaves every callback inert before publication; after a successful retry, no URL, readiness, model start, WPM timer, tap, or canvas update occurs until resume.
+**Regression test.** Add `tests/unit/modules/shortcuts/test_pause_owner_inventory.lua`. The class-wide state×owner test must inject WPM stop refusal, a live search timer, Remote warmup, both startup timers, and `Actions.force_cleanup=false`. Also dispatch requirements, pause, then complete the dependency probe. Assert pause returns false or leaves every callback inert before publication; after a successful retry, no URL, readiness, model start, WPM timer, tap, canvas update, or gesture cleanup owner occurs until resume.
 
 ### `HS-013` — Configurable shortcut edits persist and unbind before replacement acquisition commits
 
@@ -385,6 +394,66 @@ A faithful server harness produced `start_result=nil`, `native_port=0`, `getPort
 
 **Regression test.** Add `tests/unit/test_init_karabiner_fail_fast.lua`. The root harness injects `karabiner.init=false/nil` and asserts no operational remap menu, no boot success/ready flag, and a visible boot failure. An integration case loads malformed TOML and invokes Clear All, asserting zero success claim and unchanged state.
 
+### `HS-020` — The Hammerspoon `--only` runner still loads every test module
+
+- **Severity:** Low
+- **Confidence:** High
+- **Guarantee:** verification integrity and developer feedback latency
+- **Source:** `tests/run.lua:70-85`, `tests/run.lua:184-198`, `tests/helpers/init.lua:523-530`
+
+**Reproduction.** Run `lua tests/run.lua --only "rejects native watcher start mode false"`. Although only one assertion body matches, the runner still requires all `813` discovered modules before it reaches the filtered result. Unrelated property suites execute at module load, native/scratch fixtures emit logs and attempt filesystem writes, and the focused replay takes the full-suite path. During this audit it had to be interrupted after more than a minute despite the target test itself taking under one second when loaded directly.
+
+**Root cause and silence.** `helpers.it()` owns the only filter, but filtering happens after `tests/run.lua` has already purged state and required each test module. Module-level setup and generated property registration therefore remain unfiltered. The final passed-test count can look focused while load-time work was global.
+
+**Existing test/backstop checked.** No test covers `--only` discovery behavior. The runner's replay hint promises `lua tests/run.lua --only <name>`, but existing tests check neither loaded-module count nor unrelated module side effects.
+
+**Fix.** Add a conservative source selector before `require`: load only modules whose source can register the requested plain-text case, with token-aware handling for dynamically concatenated names and a correctness-preserving full-load fallback when no candidate can be identified. Keep the existing assertion-level filter as the final authority and report selected versus discovered module counts.
+
+**Regression test.** Add `tests/unit/test_runner_only_selector.lua` for exact, dynamically concatenated, unrelated, and zero-candidate fallback cases, plus a runner integration assertion that an unrelated load-time sentinel is absent under `--only` while the target assertion executes. The test must fail against the current load-all runner and pass without weakening discovery for an unfiltered run.
+
+### `HS-021` — Escape hides a fireable hotstring without invalidating its cursor-relative buffer
+
+- **Severity:** High
+- **Confidence:** High
+- **Guarantees:** `G2`, `G5`
+- **Source:** `modules/keymap/llm_bridge.lua:1155-1192`, `modules/keymap/llm_bridge.lua:1595-1623`
+
+**Reproduction.** Enable hotstring preview, type a non-auto trigger whose row is visible, press Escape, then press the magic key. The persistent Escape trap consumes Escape and defers only the tooltip hide/reset. The main `check_escape_reset()` path likewise returns immediately when a tooltip is visible. Neither path invalidates the cursor-relative hotstring buffer, so the row disappears but the next magic key still fires the hidden action.
+
+**Root cause and silence.** Tooltip dismissal and engine eligibility are mutated on separate paths. The early return treats presentation reset as context invalidation; no callback throws and no log exposes the divergence.
+
+**Existing test/backstop checked.** `test_llm_bridge_stop.lua` covers exact native ownership and callback error visibility for the Escape tap. `test_preview_render_off_hid_thread.lua` covers render invalidation ordering. Neither drives a visible fireable row through Escape and then replays the magic key, and no test contradicts retained eligibility.
+
+**Fix.** Reuse one cursor-context invalidator for navigation and Escape. It must always clear the hotstring buffer and unknown-boundary state before consuming Escape; any separately preserved LLM context remains governed by the explicit reset-on-navigation policy.
+
+**Regression test.** Add `tests/unit/modules/keymap/test_escape_invalidates_hotstring_buffer.lua`. Drive the real trap and resolver in both runtime-available and hotstring-only quarantine branches; after Escape, assert the row is hidden, the hotstring buffer is empty, and the next magic key passes through with zero synthetic output.
+
+### Cross-driver parity findings discovered during implementation
+
+These two confirmed Linux defects are outside the Hammerspoon severity total above. They were re-derived while implementing `HS-006` and are retained here because they share its byte/codepoint class and otherwise risk disappearing between implementation commits.
+
+#### `PARITY-001` — Linux dynamic rules over-delete non-ASCII suffixes
+
+- **Severity:** High
+- **Confidence:** High
+- **Guarantee:** output integrity
+- **Source:** `static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua:351-358`
+
+**Reproduction.** Register or load a dynamic rule with suffix `été`, type `zzété` followed by an ASCII trigger, and fire it. The manager computes `#match.rule.suffix + 1`, so it requests six codepoint Backspaces for a three-codepoint suffix plus one trigger and erases the two preceding characters as collateral.
+
+**Test gap and fix.** Existing dynamic-manager tests force the ASCII trigger `\\` and use ASCII rules. Add a behavioral Unicode rule test asserting four deletions total (three suffix codepoints plus one trigger), and derive both suffix and trigger lengths with strict UTF-8 validation rather than Lua byte length.
+
+#### `PARITY-002` — Linux cannot recognize the shipped multibyte magic key
+
+- **Severity:** High
+- **Confidence:** High
+- **Guarantee:** output availability
+- **Source:** `static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua:325-343`, `static/ergopti_plus/_shared/modules/features/manifest.toml:307-309`
+
+**Reproduction.** Use the canonical default trigger `★`, then type `td★` or `@p★`. `buffer:sub(-1)` extracts one byte and can never equal the three-byte trigger; `buffer:sub(1, -2)` would likewise remove only one byte. The dynamic path returns false, so the shipped default cannot fire any Linux dynamic rule.
+
+**Test gap and fix.** Existing manager tests initialize with `trigger_char = "\\"`; the separate magic-key tests prove `★` is a valid single codepoint but never feed it through `on_trigger()`. Add `linux/tests/unit/modules/hotstrings/test_dynamic_multibyte_trigger.lua`, compare the full byte suffix with `buffer:sub(-#t)`, strip exactly `#t` bytes after strict one-codepoint validation, and assert the default fires without malformed intermediate text.
+
 ## 3. Refuted claims
 
 The following claims were actively investigated and rejected:
@@ -478,7 +547,7 @@ Each memory item was treated as a hypothesis/watch-list entry; current code and 
 | `project-typing-order-and-atomicity` versus eventtap rule | Documentation collision                                   | `docs/project-memory/text-input-and-config.md` describes exact-app terminal pacing, while `docs/project-memory/macos-hammerspoon.md` forbids blocking in the callback. Current code eagerly posts and sleeps before callback exit (`HS-003`); the behavior description must not be read as an exception to the eventtap invariant. |
 | `project-macos-llm-runtime-enable-gate`                   | Base fix in place; pause side channels                    | Profile restoration alone cannot warm. Remote/startup continuations can cross pause (`HS-012`).                                                                                                                                                                                                                                    |
 | Daily logger rollover/purge                               | Fix in place                                              | Re-derived from `infra/logger.lua`; rollover/purge tests cover both sink date and retained timer ownership.                                                                                                                                                                                                                        |
-| Tooltip/engine single resolver                            | Fix in place, but state mutation siblings diverge         | Matching itself is shared. Navigation and repeat break truth through state/presentation mutation (`HS-002`, `HS-005`).                                                                                                                                                                                                             |
+| Tooltip/engine single resolver                            | Fix in place, but state mutation siblings diverge         | Matching itself is shared. Navigation, Escape, and repeat break truth through state/presentation mutation (`HS-002`, `HS-021`, `HS-005`).                                                                                                                                                                                           |
 | Reload-vs-quit sentinel narrative                         | Documentation drift                                       | Current exact lease revocation supersedes the older broad “kill on quit” model; no stock Karabiner process ownership was found.                                                                                                                                                                                                    |
 
 Recent-fix collateral checked:
@@ -495,7 +564,7 @@ Legend: `B` = audited and behaviorally/source-blanched; `F` = confirmed finding;
 
 | Area                                                                                 | `G1`           | `G2`                   | `G3`               | `G4`                   | `G5`       | Dry status / evidence                                                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------ | -------------- | ---------------------- | ------------------ | ---------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `modules/keymap/{init,state,registry,utils,terminators}`                             | `B`            | `F HS-002`             | `B`                | `B/R`                  | `F HS-002` | Input pass 3 dry; registry tail indexes, case-conform fast path, ignored/private gates and Backspace were rechecked.                                                                                                                                                       |
+| `modules/keymap/{init,state,registry,utils,terminators}`                             | `B`            | `F HS-002,021`         | `B`                | `B/R`                  | `F HS-002,021` | Input pass 3 was dry before the implementation-phase Escape sibling rescan; that new finding resets this zone to one unclean follow-up pass. Registry tail indexes, case-conform fast path, ignored/private gates and Backspace were rechecked.                                                                                 |
 | `modules/keymap/expander`, `adapters/{synthetic_input,event_provenance,text_sender}` | `B/F`          | `F HS-003,005`         | `F HS-003,005`     | `F HS-003`             | `F HS-005` | Input pass 3 dry after enumerating every producer/transaction mutation.                                                                                                                                                                                                    |
 | `modules/dynamic_hotstrings/**`, personal hotstrings                                 | `B`            | `F HS-006`             | `B`                | `B`                    | `B/R`      | Input pass 3 dry; normal preview/action snapshot path is single-source.                                                                                                                                                                                                    |
 | `modules/keylogger/**`                                                               | `B`            | `B`                    | `B`                | `F HS-004`             | n/a        | Input pass 3 dry for requested lens; persistence refusal correctness is blanched, tap cost is not.                                                                                                                                                                         |
@@ -545,8 +614,9 @@ Legend: `B` = audited and behaviorally/source-blanched; `F` = confirmed finding;
 
 1. `HS-003`, `HS-004`: remove blocking/eager work from input callbacks before another correctness change increases callback duration.
 2. `HS-001`, `HS-007`, `HS-008`, `HS-010`, `HS-011`: restore exact native/task ownership and generation fencing.
-3. `HS-002`, `HS-005`, `HS-006`: repair text/tooltip correctness through shared transactions and codepoint units.
+3. `HS-002`, `HS-005`, `HS-006`, `HS-021`: repair text/tooltip correctness through shared transactions and codepoint units.
 4. `HS-009`, `HS-012`: make semantic clients and pause an explicit owner registry.
-5. `HS-013`–`HS-019`: make configuration/UI publication transactional and eliminate silent callback success.
+5. `HS-013`–`HS-020`: make configuration/UI publication transactional and eliminate silent callback success; keep the focused runner fast enough to replay each test in isolation.
+6. `PARITY-001`, `PARITY-002`: carry the strict UTF-8 fix through the Linux sibling and exercise the shipped default trigger end to end.
 
 Each fix should land with the behavioral test described in its finding, run alone, in the full Lua suite, and—where native contracts are involved—in a macOS integration harness with faithful refusal and reordered-completion cases.
