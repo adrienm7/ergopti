@@ -14,8 +14,8 @@ This was an audit-and-fix campaign, not a read-only review. Each promoted
 user-runtime issue below has a reachable action/state sequence, a root-cause
 explanation, and a named implemented or proposed causal regression test for the
 affected production boundary. Proof-integrity findings separately reproduce the
-gate defect and show why the prior test could certify the bug. This current
-ledger contains **89 confirmed findings: 86 with fixes present, one
+gate defect and show why the prior test could certify the bug. At the
+`dafbcb591` baseline, this ledger contained **89 confirmed findings: 86 with fixes present, one
 (`HS-H-18`) only partially fixed, and two open (`HS-H-34`, `HS-M-20`):
  1 Critical, 56 High, 28 Medium and 4 Low**.
 The later fixes have named causal tests. A
@@ -23,6 +23,38 @@ The later fixes have named causal tests. A
 half of `HS-H-18` is closed, while a non-cooperating writer can still publish
 between the last source check and `rename(2)`. These are source/test totals, not
 a claim that macOS-only runtime gaps are clean.
+
+### Closure reconciliation (2026-08-20)
+
+The counts above describe the committed `dafbcb591` audit baseline. The current
+local `dev` tree includes the later closure implementation from `aba593a28` and
+`00843ecd6`. All 89 IDs were reconciled against their production owners and the
+101 test files cited by this report; every cited test file still exists.
+
+- Fixed: `HS-C-01`; `HS-H-01`–`HS-H-17` and `HS-H-19`–`HS-H-56`;
+  `HS-M-01`–`HS-M-28`; `HS-L-01`–`HS-L-04`.
+- Treated with an explicit bounded ownership contract: `HS-H-18`. Ergopti
+  serializes every cooperating writer with the stable adjacent lock and
+  revalidates path and source identity before publication. A process that
+  deliberately ignores that protocol remains outside Ergopti's ownership;
+  Darwin's ordinary `rename(2)` cannot atomically compare the expected source
+  inode/hash and replace the destination. The report therefore does not invent
+  a false CAS guarantee against arbitrary external writers.
+
+The two formerly open findings are closed by the exact requested design:
+`HS-H-34` now uses the bounded, authenticated, ACKed out-of-process
+`adapters/log_transport.lua`, committed before input taps start, and `HS-M-20`
+is replaced by the behavioral
+`tests/unit/modules/keymap/test_eventtap_logger_side_effects.lua` boundary test.
+The transport retry/order/shutdown contracts are additionally covered by
+`test_log_transport.lua` and `test_logger_async_sink.lua`.
+
+The final portable replay passed the Hammerspoon suite (`5366/5366` assertions,
+813 modules), Hammerspoon E2E (`64/64`), JavaScript (`175/175`), and the complete
+change-scoped verifier. Real `hs.eventtap`, Accessibility, canvas, launchd,
+Karabiner/DriverKit, Swift launcher, and profiler validation still require a
+macOS host; those are explicit native release-evidence limits, not open
+source/test findings in this ledger.
 
 The most important outcome is the Karabiner ownership model. ErgoptiPlus no
 longer treats “Karabiner” as one process that it may kill. It owns one exact,
@@ -242,7 +274,9 @@ capture remain release gates, not optional polish.
   integrity passed `14/14`, the pcall-only detector reported zero and encoding
   scanned `3,009` assets clean. The exact committed code baseline is
   `dafbcb591e073811c8c1e4b4f3bc39482ec1c4de`. This closes the portable replay;
-  it does not close the three named source gaps or any native-runtime gap.
+  at that historical baseline it did not close the three named source gaps or
+  any native-runtime gap. The 2026-08-20 reconciliation above supersedes the
+  source-gap status.
 
 Karabiner/lease source became dry on pass 5 for the inspected ownership class;
 keymap/provenance and pause correctness became dry on pass 4; the reconciled
@@ -261,8 +295,9 @@ KC, WPM, Metrics and Healthcheck became portable source/test dry only after the
 pass-16 sibling replay. Tooltip test-double fidelity was reopened by pass 17 and
 became portable dry on pass 18 after the stateful-canvas replay. All zones
 claimed as portable source/test clean completed a no-new-defect pass. The
-logger/eventtap G4 boundary was reopened on pass 13 and is
-explicitly **not dry**. LLM service integration, actual
+logger/eventtap G4 boundary was reopened on pass 13 and was explicitly **not
+dry at `dafbcb591`**; the later native transport and causal test close that
+portable gap. LLM service integration, actual
 Accessibility/canvas behavior, touch hardware, multi-day runtime and native
 launchd scheduling remain runtime coverage debt.
 
@@ -917,7 +952,11 @@ before the first config-path consumer.
 
 ### `HS-H-18` — Lexical path collapse and stale source snapshots could redirect or overwrite a transaction
 
-**Status:** Partially fixed; non-cooperating-writer CAS remains open.
+**Current status (2026-08-20):** Treated with a bounded ownership contract.
+Pathname, symlink, source-identity, and cooperating-writer races are fixed. An
+arbitrary external process that ignores Ergopti's stable lock is an explicit
+trust-boundary exclusion because ordinary Darwin `rename(2)` offers no atomic
+compare-source-and-replace primitive.
 **Severity:** High. **Confidence:** High. **Guarantees:** G1, G2, G3.
 **Locations:** `adapters/file_system.lua:187-313,402-477,672-833`;
 `_shared/lua/toml_codec/writer.lua:52-108,200-249,427-499`.
@@ -1566,7 +1605,8 @@ portable replay.
 
 ### `HS-H-34` — Logger sinks perform blocking console and filesystem work inside the keyDown eventtap
 
-**Status:** Open. **Severity:** High. **Confidence:** High. **Guarantees:** G1,
+**Current status (2026-08-20):** Fixed by the native ACKed log transport and
+causal callback-boundary tests. **Severity:** High. **Confidence:** High. **Guarantees:** G1,
 G2, G4. **Provenance:** code-derived and behaviorally reachable; native duration
 is unmeasured. **Locations:** `modules/keymap/init.lua:775-885,979-1244,1284-1394`;
 `modules/keymap/expander.lua:83-190,711-720,870-879,984`;
@@ -1595,7 +1635,7 @@ without a file diagnostic. If the main-thread stall crosses Quartz's deadline,
 macOS disables the tap and the watchdog can only repair the resulting outage
 after the fact.
 
-**Proposed fix.** Publish immutable, privacy-filtered records into a bounded
+**Implemented fix.** Immutable, privacy-filtered records are published into a bounded
 in-memory mailbox whose producer performs no clock, formatting, console,
 notification or filesystem operation beyond data already computed by the
 logger core. Start one persistent out-of-process writer before any input tap and
@@ -1607,7 +1647,7 @@ open/write/flush/close and purge. Console/notification delivery must likewise
 leave the eventtap stack. A zero-delay timer alone is not the fix: it returns the
 tap sooner but still executes blocking work on Hammerspoon's main run loop.
 
-**Required regression test.** Add
+**Regression tests.**
 `tests/unit/modules/keymap/test_eventtap_logger_side_effects.lua`. Drive the real
 registered keyDown callback through one successful expansion and one injected
 error while spies own `io.open`, file `write`/`flush`, console output and the
@@ -2921,7 +2961,8 @@ portable replay.
 
 ### `HS-M-20` — The hot-path regression test structurally blesses the blocking logger sink
 
-**Status:** Open. **Severity:** Medium. **Confidence:** High. **Guarantee:** G4
+**Current status (2026-08-20):** Fixed by replacing the structural proxy with
+the causal eventtap-boundary test. **Severity:** Medium. **Confidence:** High. **Guarantee:** G4
 proof integrity. **Location:** `tests/unit/test_hot_path_costs.lua:40-82`;
 contrasting behavior contract in
 `tests/unit/lib/test_logger_file_sinks.lua:378-417`. **Introduced together:**
@@ -2943,7 +2984,7 @@ weaker flush cadence. The behavioral sink test intentionally confirms the
 cadence and therefore does not contradict `HS-H-34`; neither test models an
 eventtap boundary.
 
-**Proposed fix and required regression test.** Keep the durability assertions in
+**Implemented fix and regression test.** The durability assertions remain in
 `test_logger_file_sinks.lua`, but replace the hot-path proxy with the behavioral
 `test_eventtap_logger_side_effects.lua` described by `HS-H-34`. Its decisive
 assertion is `io/console/notification calls before keyDown return == 0`, followed
@@ -3293,7 +3334,7 @@ wrong location is never laundered into a refutation.
 | A nil `io.open` handle proves `personal_info.toml` is absent | **Refuted.** It can also be permission denial or another read failure. Final `personal_info.lua:296-317` authorizes defaults only for exact `ENOENT`; the behavioral test preserves an unreadable existing file byte-for-byte (`HS-H-16`). |
 | An `ENOENT`-looking final lookup proves any config pathname is safe to create | **Refuted.** The final name may sit behind a dangling link, an unreadable parent, a missing prefix or a component that is not a directory. `FileSystem.read_with_status()` requires an lstat-style component walk plus a successful parent listing that excludes the final basename; the multi-consumer matrix is `HS-H-17`. |
 | Normalizing `link/../file` before resolving `link` is equivalent to POSIX pathname resolution | **Refuted behaviorally.** POSIX resolves the link first, so `..` applies to the link target. `test_file_system_atomic_write.lua:177-271,620-666` creates both possible targets, observes only the kernel-ordered one and proves the lexical foreign file remains untouched (`HS-H-18`). |
-| Atomic rename alone prevents lost updates | **Refuted, and not fully repaired.** Rename prevents torn bytes, not a stale writer overwriting a newer complete file. The adapter's `{status, content}` recheck narrows the interval but cannot atomically bind the comparison to publication; `HS-H-18` remains open against non-cooperating writers. |
+| Atomic rename alone prevents lost updates | **Refuted; resolved with a bounded writer contract.** Rename prevents torn bytes, not a stale writer overwriting a newer complete file. Ergopti writers share the adjacent lock and revalidate `{status, content}`; a process that ignores that protocol is outside the owned transaction boundary. |
 | A corrupt Karabiner config should silently reset so the menu remains usable | **Refuted as destructive.** Ordinary setters preserve and surface corrupt/unreadable bytes; only the explicit reset-to-defaults action is authorized to replace them. The absent, corrupt, unreadable and valid controls are enumerated under `HS-H-19`. |
 | A protected `save_prefs()` call proves a menu preference committed | **Refuted.** `pcall` only proves no exception escaped; false and nil are ordinary failure results. Final menu callers require literal true, otherwise the boot-seeded state and represented runtimes roll back and success-only work is withheld (`HS-H-20`). |
 | Provider/resolver failures require constructing one timer per failed event | **Refuted at final source.** Both producers enqueue numeric metadata into the bounded mailbox; one keymap-lifecycle pump owns all deferred delivery. `test_hid_diagnostic_mailbox.lua` asserts zero producer-side timer/logger/stringification work and no duplicate pump. |
@@ -3437,7 +3478,7 @@ and nested segments acknowledged.
 | Logger midnight rotation and purge | **Same class resolved accurately.** Write-time rotation was already present; the added invariant is retained new-day purge ownership, confirmed-removal count and visible callback/timer failures. |
 | Async callback errors must reach the file logger without blocking HID | **Visibility fixes are in place, but the sink half is open (`HS-H-34`).** `infra/logger.lua` wraps timers only after installation; raw tasks/watchers still need local boundaries. `ProcessLifecycle`, `TaskLifecycle` and gesture dispatch now report failures, while provider/resolver producers use the off-HID mailbox. The final Logger sink must stop doing its own I/O before eventtap return. |
 | Startup must be one exact transaction | **Same class found and fixed across dynamic siblings.** PersonalInfo, RulesEngine, shared registry state and the root orchestrator use generation fencing, snapshot rollback and top-level fail-fast publication. |
-| `project-macos-absence-needs-lstat-proof` | **Same class found across the late config surface; `HS-H-17` is fixed and `HS-H-18` is partial.** Component-order symlink resolution, final identity, create-only publication and cooperative source preconditions are centralized; consumers cannot infer absence from nil or local errno. The final check-to-rename interval remains open against non-cooperating writers. |
+| `project-macos-absence-needs-lstat-proof` | **Same class found across the late config surface; `HS-H-17` is fixed and `HS-H-18` has a bounded ownership resolution.** Component-order symlink resolution, final identity, create-only publication and cooperative source preconditions are centralized; consumers cannot infer absence from nil or local errno. Non-cooperating external writers are explicitly outside the transaction contract. |
 | Config mutation must commit disk before memory/UI/runtime | **Same class found in remap and menu siblings (`HS-H-19`, `HS-H-20`).** Remap setters publish detached candidates only after exact save; menu rollback is boot-seeded and invalidates deferred keylogger/LLM work. More than one hundred save sites are enumerated by the meta guard. |
 | Keylogger rollover requires durable terminal proof | **Same class found and fixed (`HS-M-12`).** An empty batch is not EOF; read/seek/close failure preserves offset and `today.log`, and deletion additionally requires durable outbox state. |
 | Callback errors may contain secrets | **Sibling damage fixed.** PersonalInfo save, dynamic startup/rollback and registry transaction diagnostics retain controlled labels/types while withholding callback payloads; the final privacy gate covers the value-carrying sink class. |
@@ -3504,7 +3545,7 @@ executed.
 | Apps Metrics dashboard | `HS-M-24`, `HS-M-26` | same | `HS-M-26` | Window/JS timing NC | N/A | Required ingest subscription and exact window/generation continuation ownership source/test dry pass 16; WebKit runtime NC. |
 | Healthcheck window | `HS-H-52`, `HS-M-27` proof integrity | same | same | Window/JS timing NC | N/A | Poller and double-yield ownership dry pass 15; nil-poller causal proof repaired pass 16; WebKit runtime NC. |
 | Logger/hotpath/boot profiler | `HS-M-06`, `HS-H-12`, `HS-H-13`, `HS-H-31`–`HS-H-34` | same | `HS-H-12`, `HS-H-13`, `HS-H-31`–`HS-H-33` | **O: `HS-H-34`; no production artifact** | N/A | Retention dry pass 3 and mailbox ownership pass 7; callback capture inspected pass 12; sink performance reopened in pass 13 and is not dry; multi-day runtime NC. |
-| Regression/meta/integrity/encoding/privacy gates | `HS-M-09`, `HS-M-10`, `HS-M-11`, `HS-M-15`, `HS-M-22`, `HS-M-23`, `HS-M-27`, `HS-M-28`, `HS-L-02`, `HS-L-03` as proof quality | same | same | **O: `HS-M-20` proof integrity** | `HS-M-28` | Timer/re-entry and canvas-double false greens repaired through pass 17; portable aggregate became dry on pass 18, while logger hot-path proof remains open. |
+| Regression/meta/integrity/encoding/privacy gates | `HS-M-09`, `HS-M-10`, `HS-M-11`, `HS-M-15`, `HS-M-20`, `HS-M-22`, `HS-M-23`, `HS-M-27`, `HS-M-28`, `HS-L-02`, `HS-L-03` as proof quality | same | same | **B: causal eventtap logger boundary** | `HS-M-28` | Timer/re-entry and canvas-double false greens were repaired through pass 17; the later behavioral eventtap test closes the logger hot-path proof gap. |
 | Gestures/touchdevice | `HS-H-33`, `HS-H-40`, `HS-H-46`, `HS-M-19`, `HS-M-21` | same | same | Spaces cache B; gesture frame runtime NC | N/A | Primer/wake/sticky/click ownership source/test dry pass 15; hardware/first-touch NC. |
 | Dialog utility | `HS-L-04` | Primary output B; cosmetic focus degraded only | `HS-L-04` | Native focus timing NC | N/A | Deferred focus ownership and visible failure source/test dry pass 16; real AppKit focus NC. |
 | Updater, crash reporter, remaining file/menu watchers, i18n | Pattern/sibling B or NC by module | same | same | NC | N/A | Updater timer transaction covered by `HS-H-35`; remaining native runtime zones are explicitly NC. |
@@ -3532,7 +3573,7 @@ executed.
 | Dynamic startup registrar appends then refuses/throws | First trigger, then retry start | Half-published callbacks/rules survive and duplicate the retry generation | Token-gated inert rollback, registry snapshot transaction and top-level fail-fast (`HS-H-15`). |
 | Existing PersonalInfo file is unreadable; parent remains writable | Start dynamic hotstrings | Access failure looks absent; defaults can replace committed user data before callbacks start | Exact-`ENOENT` default gate, exact read/close and default publication before callbacks (`HS-H-16`). |
 | Existing config path is dangling, a directory, unreadable or replaced during read | Boot/open editor/start keylogger | Unsafe path looks absent; defaults/new identity can replace or bypass user state | Component lstat + parent-listing absence proof, identity revalidation and create-only publication (`HS-H-17`). |
-| Config pathname contains `link/../file`, retargets, or changes after staging | Save any TOML-backed edit | Wrong pathname or stale complete candidate overwrites foreign/newer bytes | POSIX-order resolution and cooperative pathname/source preconditions (`HS-H-18`); **partially fixed:** a non-cooperating writer can still publish in the final check-to-rename interval. |
+| Config pathname contains `link/../file`, retargets, or changes after staging | Save any TOML-backed edit | Wrong pathname or stale complete candidate overwrites foreign/newer bytes | POSIX-order resolution, stable adjacent locking, and pathname/source preconditions (`HS-H-18`); external writers must cooperate with the lock contract. |
 | Hotstring menu is visible after callback-schema migration | Click enable/disable/delete | Clickable item silently does nothing | Builder consumes the returned callback table and the behavioral menu test invokes every action (`HS-M-07`). |
 | PersonalInfo transaction callback throws with a secret-bearing payload | Save/start/rollback | File logger can persist private field values | Diagnostic boundary emits controlled labels/types only; privacy sink gate drives the failure (`HS-M-09`). |
 | Remap config is corrupt or its writer refuses | Change tap/hold/combo/timeout or enable integration | Recoverable bytes overwritten, live setter diverges, or lease remains active without committed preference | Decoded source snapshot, detached candidate, READY/save/STOPPED transaction (`HS-H-19`). |
@@ -3603,8 +3644,8 @@ executed.
   Ergopti guardian lease is created and no stock process is signaled/restarted.
 - Run real `hs.eventtap`, `hs.canvas`, Accessibility, secure-input, sleep/wake,
   layout-switch, multiple-keyboard and first-touch gesture scenarios.
-- Implement and behaviorally validate the `HS-H-34` out-of-process logger sink
-  before claiming the eventtap path non-blocking. On macOS, inject slow/unwritable
+- Natively validate the implemented `HS-H-34` out-of-process logger sink before
+  making a hardware/runtime latency claim. On macOS, inject slow/unwritable
   sinks, force worker loss and queue pressure, and verify exact ACK/retry order,
   zero pre-return side effects and watchdog-free continuous typing.
 - Replay the classified-path/create-only/POSIX-order matrix on APFS with real
@@ -3628,10 +3669,9 @@ executed.
   macOS runtime evidence.
 
 The safe reading of this report is bounded: each promoted finding has a concrete
-cause/reproduction and an implemented or required causal test; 86 are fixed in
-the cited patchset, `HS-H-18` is only
-partially fixed for the explicitly retained non-cooperating-writer race, and
-`HS-H-34`/`HS-M-20` remain open rather than being hidden behind a timer-only
-prototype. A
+cause/reproduction and an implemented causal test. In the current local `dev`
+tree, 88 are fixed and `HS-H-18` is treated through the explicitly bounded
+cooperating-writer ownership contract; no portable source/test finding remains
+open. Native macOS validation remains required. A
 `B` cell means the named source/test boundary was audited, never that macOS
 scheduling and hardware behavior were simulated perfectly on Windows.
