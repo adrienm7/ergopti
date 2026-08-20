@@ -385,7 +385,7 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 		local dispatched = Actions2.execute_single("mission_control")
 		SyntheticInput.emit_key_stroke = original_emit
 
-		helpers.assert_eq(true, dispatched,
+		helpers.assert_eq(dispatched, true,
 			"the registered action remains owned by the gesture dispatcher")
 		local found_refusal = false
 		for _, line in ipairs(FreshLogger.ring_buffer_snapshot()) do
