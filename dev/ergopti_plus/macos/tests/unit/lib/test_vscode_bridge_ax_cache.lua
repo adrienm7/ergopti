@@ -4,7 +4,7 @@
 --- MODULE: vscode_bridge AX Frame Cache Regression Tests
 --- DESCRIPTION:
 --- Source-level guard for the "vscode-bridge-blocking-ax-call" bug in
---- lib/vscode_bridge.lua.
+--- infra/vscode_bridge.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- get_editor_ax_frame() called hs.axuielement synchronously on every invocation
@@ -24,19 +24,20 @@ local helpers = require("tests.helpers")
 
 
 
--- =============================================================================================================
+-- ============================================================================================================
 -- ============================================================================================================
 -- ======= 1/ AX frame is cached with a TTL to avoid per-call blocking (vscode-bridge-blocking-ax-call) =======
 -- ============================================================================================================
--- =============================================================================================================
+-- ============================================================================================================
 
 helpers.describe("vscode_bridge — AX frame cache (vscode-bridge-blocking-ax-call)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "lib/vscode_bridge.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "vscode_bridge.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to infra/vscode_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_editor_ax_frame")
+		helpers.assert_true(src ~= nil, "infra/vscode_bridge.lua source must be locatable")
 		return src
 	end
 
@@ -108,7 +109,7 @@ helpers.describe("vscode_bridge — a negative AX lookup is cached (behaviour)",
 		local ax_calls = 0
 		local captured_callback
 
-		local Bridge = helpers.load_with_stubs("lib.vscode_bridge", {
+		local Bridge = helpers.load_with_stubs("infra.vscode_bridge", {
 			application = {
 				frontmostApplication = function()
 					return { bundleID = function() return "com.microsoft.VSCode" end }

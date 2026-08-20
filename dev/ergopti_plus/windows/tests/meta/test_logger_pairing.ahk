@@ -3,13 +3,11 @@
 ; ==============================================================================
 ; MODULE: Logger Lifecycle Pairing Test
 ; DESCRIPTION:
-; For each AHK source file in lib/ and modules/, counts LoggerStart vs
-; LoggerSuccess and LoggerTrace vs LoggerDone occurrences. Imbalances are
-; flagged as warnings (not errors) because legitimate early-return control
-; flow can produce natural asymmetries.
-;
-; The test always passes; its value is the OutputDebug report attached to
-; CI logs so reviewers can spot unpaired lifecycle calls at a glance.
+; For each production AHK source file, counts LoggerStart vs LoggerSuccess and
+; LoggerTrace vs LoggerDone occurrences. A lifecycle opener with no terminal,
+; or more TRACE operations than DONE terminals, fails the suite. The generated
+; TOML fast path historically returned after TRACE while an unrelated fallback
+; DONE made the old presence-only gate pass. (AHK-28.)
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -33,11 +31,11 @@ _MetaLoggerPairingExempt(Rel) {
 
 
 
-; =====================================
+; ======================================
 ; ======================================
 ; ======= 1/ File listing helper =======
 ; ======================================
-; =====================================
+; ======================================
 
 _MetaListAhkFilesLogger(Dir) {
 	Files := []
@@ -79,6 +77,10 @@ _MetaCountPattern(Body, Pattern) {
 	return N
 }
 
+_MetaLifecycleHasShortfall(OpenCount, CloseCount) {
+	return OpenCount > CloseCount
+}
+
 
 
 
@@ -95,7 +97,7 @@ _MetaRunLoggerPairingTests() {
 	Imbalanced := 0
 	Report := ""
 
-	for Sub in ["lib", "modules", "ui"] {
+	for Sub in ["infra", "modules", "platform", "ui"] {
 		for AbsPath in _MetaListAhkFilesLogger(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -117,9 +119,9 @@ _MetaRunLoggerPairingTests() {
 				Imbalanced++
 				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NStart . " LoggerStart but 0 LoggerSuccess"
 			}
-			if NTrace > 0 and NDone = 0 {
+			if _MetaLifecycleHasShortfall(NTrace, NDone) {
 				Imbalanced++
-				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NTrace . " LoggerTrace but 0 LoggerDone"
+				Report .= (Report == "" ? "" : "; ") . Rel . " has " . NTrace . " LoggerTrace but " . NDone . " LoggerDone"
 			}
 		}
 	}
@@ -139,6 +141,31 @@ _MetaRunLoggerPairingTests() {
 
 _MetaRunLoggerPairingTests()
 
+_MetaLoggerPairingRejectsPartialTracePair() {
+	Assert(_MetaLifecycleHasShortfall(2, 1),
+		"two TRACE operations with one DONE terminal must be rejected, even though both tokens exist")
+	Assert(!_MetaLifecycleHasShortfall(1, 1),
+		"a balanced TRACE/DONE operation count must remain accepted")
+}
+Test("meta logger pairing: partial TRACE/DONE pairs fail (logger-partial-pairing)",
+	_MetaLoggerPairingRejectsPartialTracePair)
+
+_MetaTomlGeneratedLoaderClosesTrace() {
+	Body := _DriverFuncBody("LoadHotstringsSection")
+	Assert(Body != "", "LoadHotstringsSection must exist for the generated-loader lifecycle guard")
+
+	TracePos := InStr(Body, 'LoggerTrace("TomlLoader", "Using generated loader')
+	CallPos := InStr(Body, "GeneratedFn(", , TracePos)
+	ReturnPos := InStr(Body, "return", , CallPos)
+	DonePos := InStr(Body, 'LoggerDone("TomlLoader"', , CallPos)
+	Assert(TracePos > 0 && CallPos > TracePos && ReturnPos > CallPos,
+		"the generated-loader fast path must remain structurally reachable")
+	Assert(DonePos > CallPos && DonePos < ReturnPos,
+		"the generated-loader fast return must close its TRACE with DONE after registration succeeds")
+}
+Test("toml loader: generated fast path closes TRACE before return (toml-generated-loader-pairing)",
+	_MetaTomlGeneratedLoaderClosesTrace)
+
 ; F-L08: a LoggerStart immediately before Reload() leaves a START with no reachable
 ; SUCCESS — the process restarts before the pair closes, so it reads as a silent failure
 ; to anyone auditing the prior process's rolled-over log. Guard the whole driver source.
@@ -146,7 +173,7 @@ _MetaNoStartBeforeReload() {
 	SplitPath(A_ScriptDir, , &Root)
 	Root := StrReplace(Root, "\", "/")
 	offenders := ""
-	for Sub in ["lib", "modules", "ui"] {
+	for Sub in ["infra", "modules", "platform", "ui"] {
 		Loop Files, Root . "/" . Sub . "/*.ahk", "FR" {
 			src := FileRead(A_LoopFileFullPath)
 			if RegExMatch(src, "LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")
@@ -162,7 +189,7 @@ Test("logger: no LoggerStart immediately precedes Reload (dangling-start-before-
 ; so it must close its START with LoggerSuccess, not LoggerInfo.
 _MetaUpdaterUpToDateLogsSuccess() {
 	SplitPath(A_ScriptDir, , &Root)
-	src := FileRead(StrReplace(Root, "\", "/") . "/lib/updater/changelog.ahk")
+	src := FileRead(StrReplace(Root, "\", "/") . "/modules/updater/changelog.ahk")
 	Assert(InStr(src, "already up to date") > 0, "sanity: the up-to-date message must exist in changelog.ahk")
 	Assert(RegExMatch(src, "LoggerInfo\([^\r\n]*already up to date") == 0,
 		"the one-click up-to-date path must close its START with LoggerSuccess, not LoggerInfo (updater-up-to-date-pairing)")

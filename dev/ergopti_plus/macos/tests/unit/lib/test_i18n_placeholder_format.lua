@@ -26,8 +26,8 @@ helpers.describe("i18n.format: {n} placeholders are substituted, not printed", f
 	-- test would be checking the stub's own substitution rather than the
 	-- implementation this regression is about.
 	local function load_i18n_with(strings)
-		package.loaded["lib.i18n"] = nil
-		local i18n = dofile(helpers.driver_root() .. "/lib/i18n.lua")
+		package.loaded["infra.i18n"] = nil
+		local i18n = dofile(helpers.driver_root() .. "/infra/i18n.lua")
 		i18n.get = function(key) return strings[key] end
 		return i18n
 	end

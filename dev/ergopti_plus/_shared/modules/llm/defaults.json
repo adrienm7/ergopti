@@ -19,7 +19,7 @@
 	"llm_reset_on_nav": true,
 	"llm_auto_raise_temp": true,
 	"llm_disable_url_bars": false,
-	"llm_disable_password_fields": false,
+	"llm_disable_password_fields": true,
 	"llm_nav_modifiers": [],
 	"llm_val_modifiers": ["alt"],
 	"llm_ollama_port": 11434,

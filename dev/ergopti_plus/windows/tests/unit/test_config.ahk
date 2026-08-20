@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Configuration Helpers Tests
 ; DESCRIPTION:
-; Covers the TOML parser and cache accessors in lib/toml_helpers.ahk.
+; Covers the TOML parser and cache accessors in infra/toml_helpers.ahk.
 ; ==============================================================================
 
 

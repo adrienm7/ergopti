@@ -20,6 +20,33 @@
 ; ====================================
 ; ====================================
 
+; Capture the top-level window and focused-control identity as one immutable
+; acceptance origin. Both values are required: two editors can share a single
+; top-level HWND, while a windowless/restricted control may only expose the
+; adapter's foreground-window fallback. Any probe failure returns BOTH fields
+; zeroed so acceptance fails closed instead of reusing an older request origin.
+; @returns {Map} Map("hwnd", Integer, "control", Integer).
+_LLM_Engine_CaptureAcceptSource() {
+	Source := Map("hwnd", 0, "control", 0)
+	PreviousCritical := Critical("On")
+	try {
+		try {
+			Hwnd := WinGetID("A")
+			ControlToken := WIGetFocusedControlToken()
+			if (Hwnd is Integer and Hwnd > 0
+					and ControlToken is Integer and ControlToken > 0) {
+				Source["hwnd"] := Hwnd
+				Source["control"] := ControlToken
+			}
+		} catch {
+			; Keep the zeroed pair: focus could not be verified.
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return Source
+}
+
 /**
  * Called on every relevant keystroke. Resets the debounce timer.
  * Callers (llm_bridge.ahk) pass the current typed buffer.
@@ -41,18 +68,18 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "") {
 		; previously cancelled only the debounce timer here.
 		LLM_Engine_CancelInflight()
 
-		; Arm debounce timer — closure captures the full buffer. PromptBuilder
-		; (macOS parity) derives capped context + tail inside FirePrediction.
+		; Arm debounce timer — closure captures the full buffer AND its focused
+		; control. PromptBuilder (macOS parity) derives capped context + tail
+		; inside FirePrediction. Binding the origin prevents a later keystroke in
+		; another control from re-attributing this request before the timer fires.
+		AcceptSource := _LLM_Engine_CaptureAcceptSource()
 		_LLM_Engine["last_buffer"] := buffer
-		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
 		; A word-end fast-fire (instant_on_word_end) passes a delay override; otherwise the
 		; configured debounce applies. Max(1, ...) keeps an override of 0 near-immediate.
 		_arm_ms := (delay_override_ms != "" and IsNumber(delay_override_ms)) ? Max(1, delay_override_ms) : _LLM_Engine["debounce_ms"]
 		SetTimer(_LLM_Engine["pending_timer"], -_arm_ms)
 		_LLM_Engine["timer_active"] := true
-		; Capture the source window so the accept guard can verify the user
-		; hasn't switched focus between prediction trigger and Tab press
-		try _LLM_Engine["source_hwnd"] := WinGetID("A")
 	} finally {
 		Critical(_c)
 	}
@@ -66,10 +93,10 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "") {
  * @param {number} delaySec - Optional timer delay in seconds (0 = immediate).
  * @param {string} buffer - Optional context override captured at schedule time.
  */
-LLM_Engine_StartTimer(delaySec := "", buffer := "") {
+LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset) {
 	global _LLM_Engine
 	if !_LLM_Engine["enabled"]
-		return
+		return false
 
 	if (buffer == "") {
 		buffer := _LLM_Engine.Has("last_buffer") ? _LLM_Engine["last_buffer"] : ""
@@ -77,16 +104,29 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "") {
 			buffer := _LLM_Bridge_Buffer
 	}
 	if (buffer == "")
-		return
+		return false
 
-	LLM_Engine_CancelTimer()
-	_LLM_Engine["last_buffer"] := buffer
+	; Focus capture and delay calculation may query adapters; perform them before
+	; the guarded mutation span. A token-aware caller rechecks only at the exact
+	; cancel/re-arm transaction, so a stale callback cannot cancel a newer timer.
+	AcceptSource := _LLM_Engine_CaptureAcceptSource()
 	delay_ms := (delaySec != "" and IsNumber(delaySec))
 		? Max(1, Round(delaySec * 1000))
 		: _LLM_Engine["debounce_ms"]
-	_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer)
-	SetTimer(_LLM_Engine["pending_timer"], -delay_ms)
-	_LLM_Engine["timer_active"] := true
+	PendingTimer := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
+		LLM_Engine_CancelTimer()
+		_LLM_Engine["last_buffer"] := buffer
+		_LLM_Engine["pending_timer"] := PendingTimer
+		SetTimer(_LLM_Engine["pending_timer"], -delay_ms)
+		_LLM_Engine["timer_active"] := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
 }
 
 /**
@@ -141,19 +181,23 @@ LLM_Engine_IsBusy() {
 LLM_Engine_StopGeneration() {
 	global _LLM_Engine
 	local _c := Critical("On")
+	NewRequestId := -1
 	try {
 		LLM_Engine_CancelTimer()
 		if IsSet(_LLM_Engine) {
 			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
+			NewRequestId := _LLM_Engine["request_id"]
 			; Drop the prediction cache on every explicit stop (navigation reset,
-			; pause/suspend). The cache is keyed only on context-string equality, so
-			; without this a context the user returns to — or rebuilds after a
+			; pause/suspend). Context and semantic configuration jointly own a cache
+			; entry; without this a context the user returns to — or rebuilds after a
 			; pause/resume — would instantly replay a prediction they already
 			; dismissed, surfacing as a "ghost" suggestion. The next fire on that
 			; context must take the network path, not the cache branch.
 			_LLM_Engine["last_ctx"]     := ""
 			_LLM_Engine["last_results"] := []
 			_LLM_Engine["last_result"]  := ""
+			_LLM_Engine["last_semantic_signature"]  := ""
+			_LLM_Engine["active_request_signature"] := ""
 		}
 		try LLM_OllamaCancelStreams()
 		try LLM_OllamaCancelAllAsync()
@@ -161,6 +205,7 @@ LLM_Engine_StopGeneration() {
 	} finally {
 		Critical(_c)
 	}
+	return NewRequestId
 }
 
 /**
@@ -175,8 +220,10 @@ LLM_Engine_CancelInflight() {
 	global _LLM_Engine
 	local _c := Critical("On")
 	try {
-		if IsSet(_LLM_Engine)
+		if IsSet(_LLM_Engine) {
 			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
+			_LLM_Engine["active_request_signature"] := ""
+		}
 		try LLM_OllamaCancelStreams()
 		try LLM_OllamaCancelAllAsync()
 		try LLM_RemoteCancelAllAsync()

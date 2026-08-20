@@ -98,29 +98,57 @@ local function load_real_keylogger()
 		get_sqlite_path = function() return "/tmp/test.sqlite" end,
 		get_db_rev = function() return 0 end, sync_foreign_data_sql = function() end,
 	}
-	package.loaded["lib.i18n"] = { t = function(k) return k end, get = function(k) return k end }
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.i18n"] = { t = function(k) return k end, get = function(k) return k end }
+	package.loaded["infra.timings"] = {
 		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
 		sec = function() return 1.0 end,
 	}
+	local context_state = nil
 	package.loaded["modules.keylogger.context_tracker"] = {
-		init = function() end, update_private_status = function() end,
+		init = function(state) context_state = state; return true end, update_private_status = function() end,
 		app_watcher_cb = function() end, update_ax_observer = function() end,
+		capture_frontmost_app = function()
+			context_state.is_secure_field = false
+			return true
+		end,
+	}
+	package.loaded["adapters.process_lifecycle"] = {
+		onAppActivate = function() end,
+		start = function() return true end,
+		stop = function() return true end,
+	}
+	package.loaded["adapters.input_source_broker"] = {
+		subscribe = function() return true end,
+		unsubscribe = function() return true end,
 	}
 	package.loaded["adapters.keyboard_hook"] = {
-		start = function() end, stop = function() end, isRunning = function() return true end,
+		start = function() return true end,
+		stop = function() return true end,
+		isRunning = function() return true end,
 	}
 
 	package.loaded["modules.keylogger.log_manager"] = nil
-	package.loaded["modules.keylogger.kc_bridge"]   = nil
+	-- This fixture verifies producer -> LogManager -> Rotation coverage.  Keep the
+	-- independent always-on KC drain at its I/O boundary: its cold-start contract
+	-- intentionally refuses startup unless a real EOF seek can be proven.
+	package.loaded["modules.keylogger.kc_bridge"] = {
+		init                    = function() return true end,
+		set_log_manager         = function() return true end,
+		start                   = function() return true end,
+		stop                    = function() return true end,
+		is_ke_managed_output_kc = function() return false end,
+	}
 	package.loaded["modules.keylogger.watchers"]    = nil
 
+	local saved_file_system = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = {
+		write = function() return true end,
+		create_if_absent = function() return true, "created" end,
+		read = function() return nil end,
+		read_with_status = function() return nil, "absent" end,
+	}
 	local KL = helpers.load_with_stubs("modules.keylogger.init", {
-		eventtap = {
-			new = function() return { start = function() end, stop = function() end, isEnabled = function() return true end } end,
-			event = { types = { keyDown = 10, keyUp = 11, flagsChanged = 12, leftMouseDown = 1, rightMouseDown = 2, scrollWheel = 3 } },
-			checkKeyboardModifiers = function() return {} end,
-		},
+		processInfo = { processID = 7001 },
 		application = {
 			watcher = { new = function() return { start = function() end, stop = function() end } end, activated = 1 },
 			frontmostApplication = function()
@@ -130,10 +158,43 @@ local function load_real_keylogger()
 				}
 			end,
 		},
-		caffeinate = { watcher = { new = function() return { start = function() end, stop = function() end } end } },
+		caffeinate = {
+			watcher = {
+				new = function()
+					local watcher = {}
+					watcher.start = function(self) return self end
+					watcher.stop = function(self) return self end
+					return watcher
+				end,
+			},
+		},
 		timer = {
-			doAfter = function(_d, fn) fn() end,
-			new = function() return { start = function() end, stop = function() end } end,
+			doAfter = function(_d, fn)
+				fn()
+				return { stop = function(self) return self end }
+			end,
+			doEvery = function()
+				return {
+					start = function(self) return self end,
+					stop = function(self) return self end,
+				}
+			end,
+			new = function()
+				local timer = { active = false }
+				timer.start = function(self) self.active = true; return self end
+				timer.stop = function(self) self.active = false; return self end
+				timer.running = function(self) return self.active end
+				return timer
+			end,
+			delayed = {
+				new = function(_delay, fn)
+					return {
+						start = function(self) fn(); return self end,
+						stop = function(self) return self end,
+					}
+				end,
+			},
+			secondsSinceEpoch = function() return 1 end,
 			absoluteTime = (function()
 				local STEP_NS = 80 * 1000000
 				local t = 0
@@ -144,8 +205,10 @@ local function load_real_keylogger()
 		keycodes = { currentLayout = function() return "ABC" end },
 		execute = function() return "" end,
 	})
+	package.loaded["adapters.file_system"] = saved_file_system
 
-	KL.start({ is_paused = function() return false end })
+	helpers.assert_eq(KL.start({ is_paused = function() return false end }), true,
+		"the coverage fixture must start the real producer before reflecting on it")
 	return KL, captured_entries
 end
 
@@ -336,6 +399,14 @@ helpers.describe("keylogger/sqlite_writer: no emitted row violates a schema CHEC
 					local columns = {}
 					for column in column_blob:gmatch("[%w_]+") do columns[#columns + 1] = column end
 					local values = split_sql_values(value_blob)
+					-- Floored: the per-column CHECK assertions live inside a loop over
+					-- the parsed column list, so one that parsed to nothing would skip every
+					-- one of them and report a clean run over an INSERT nobody inspected.
+					helpers.assert_true(#columns > 0,
+						"no columns parsed out of: " .. tostring(column_blob))
+					helpers.assert_eq(#values, #columns,
+						"column and value counts must match, or the index pairing below is comparing "
+							.. "the wrong pairs: " .. tostring(column_blob))
 
 					for index, column in ipairs(columns) do
 						local allowed = per_column[column]

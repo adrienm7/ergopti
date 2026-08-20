@@ -30,7 +30,7 @@
 
 local helpers = require("tests.helpers")
 
-local Logger = helpers.load_with_stubs("lib.logger")
+local Logger = helpers.load_with_stubs("infra.logger")
 
 -- Days of staleness stamped on the fake sub-file, so "mtime is not today" is
 -- unambiguous regardless of the hour the suite runs at.

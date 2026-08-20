@@ -4,7 +4,7 @@
 ; MODULE: TomlCoerceValueExt Quote-Aware Comma Split Guard
 ; DESCRIPTION:
 ; Static source guard for the TomlCoerceValueExt quote-aware comma-scan fix in
-; lib/toml/toml_config_loader.ahk.
+; infra/toml/toml_config_loader.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original TomlCoerceValueExt used StrSplit(Inner, ",") to parse array
@@ -45,11 +45,11 @@ _TTCQC_StripLineComments(Src) {
 ; =========================================================================
 
 _TTCQC_QuoteAwareScanner() {
-	Src := _TTCQC_StripLineComments(_TTCQC_ReadSource("lib/toml/toml_config_loader.ahk"))
-	Assert(Src != "", "lib/toml/toml_config_loader.ahk must be readable")
+	Src := _TTCQC_StripLineComments(_TTCQC_ReadSource("infra/toml/toml_config_loader.ahk"))
+	Assert(Src != "", "infra/toml/toml_config_loader.ahk must be readable")
 
 	Body := _DriverFuncBody("TomlCoerceValueExt")
-	Assert(Body != "", "TomlCoerceValueExt must be defined in lib/toml/toml_config_loader.ahk")
+	Assert(Body != "", "TomlCoerceValueExt must be defined in infra/toml/toml_config_loader.ahk")
 
 	; Quote-state tracking variable must be present
 	Assert(InStr(Body, "in_str") > 0,

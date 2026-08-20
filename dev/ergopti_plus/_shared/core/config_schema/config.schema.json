@@ -5,7 +5,7 @@
 	"description": "JSON Schema strict for the unified config.toml consumed by both the AHK and Hammerspoon drivers. Validated at boot — strict in dev (ERGOPTI_DEV=1), warn-only in prod.",
 	"type": "object",
 	"additionalProperties": false,
-	"required": ["script"],
+	"_comment_required": "Deliberately absent. Which top-level sections a config.toml must carry is per-driver, and the feature manifest's `platforms` list already says so — [sections.script] is [\"ahk\", \"hs\"] because Linux keeps its locale in its own XDG store. A hardcoded `required` here restated that in a second place, disagreed with the first, and the disagreement had to be pinned as a known gap. test-config-schema.cjs derives the presence rule from the manifest instead, per driver.",
 
 	"properties": {
 		"script": { "$ref": "#/$defs/script" },
@@ -13,8 +13,9 @@
 		"llm": { "$ref": "#/$defs/llm" },
 		"metrics": { "$ref": "#/$defs/metrics" },
 		"shortcuts": { "$ref": "#/$defs/shortcuts" },
-		"ahk": { "$ref": "#/$defs/ahk_specific" },
-		"hs": { "$ref": "#/$defs/hs_specific" }
+		"gestures": { "$ref": "#/$defs/gestures" },
+		"layout": { "$ref": "#/$defs/layout" },
+		"category_enabled": { "$ref": "#/$defs/category_enabled" }
 	},
 
 	"$defs": {
@@ -60,6 +61,11 @@
 			"properties": {
 				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 4 },
 				"repeat_key_enabled": { "type": "boolean" },
+				"expansion_delay": { "type": "number", "minimum": 0 },
+				"preview_ai_enabled": { "type": "boolean" },
+				"preview_autocorrect_enabled": { "type": "boolean" },
+				"preview_colored_tooltips": { "type": "boolean" },
+				"preview_star_enabled": { "type": "boolean" },
 
 				"autocorrection": { "$ref": "#/$defs/feature_group" },
 				"distances_reduction": { "$ref": "#/$defs/feature_group" },
@@ -228,48 +234,32 @@
 			}
 		},
 
-		"ahk_specific": {
-			"description": "Sections AHK-only. HS warns if present in its config.",
+		"gestures": {
+			"description": "Trackpad gestures. Which drivers implement them is the manifest's \"platforms\" field, not a namespace here — a driver that does not support gestures simply never writes the section.",
 			"type": "object",
-			"additionalProperties": false,
+			"additionalProperties": true,
 			"properties": {
-				"layout": {
-					"type": "object",
-					"additionalProperties": false,
-					"properties": {
-						"ergopti_base": { "type": "boolean" },
-						"direct_access_digits": { "type": "boolean" },
-						"ergopti_alt_gr": { "type": "boolean" },
-						"ergopti_plus": { "type": "boolean" },
-						"ctrl_magic_save": { "type": "boolean" }
-					}
-				},
-				"shortcuts": { "type": "object", "additionalProperties": true },
-				"gestures": { "type": "object", "additionalProperties": true },
-				"metrics": { "type": "object", "additionalProperties": true },
-				"category_enabled": {
-					"type": "object",
-					"additionalProperties": { "type": "boolean" }
-				}
+				"enabled": { "type": "boolean" },
+				"modes": { "type": "object" },
+				"sensitivities": { "type": "object" }
 			}
 		},
 
-		"hs_specific": {
-			"description": "Sections HS-only. AHK warns if present in its config.",
+		"layout": {
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"gestures": {
-					"type": "object",
-					"additionalProperties": true,
-					"properties": {
-						"modes": { "type": "object" },
-						"sensitivities": { "type": "object" }
-					}
-				},
-				"hotstrings": { "type": "object", "additionalProperties": true },
-				"karabiner": { "type": "object", "additionalProperties": true }
+				"ergopti_base": { "type": "boolean" },
+				"direct_access_digits": { "type": "boolean" },
+				"ergopti_alt_gr": { "type": "boolean" },
+				"ergopti_plus": { "type": "boolean" },
+				"ctrl_magic_save": { "type": "boolean" }
 			}
+		},
+
+		"category_enabled": {
+			"type": "object",
+			"additionalProperties": { "type": "boolean" }
 		}
 	}
 }

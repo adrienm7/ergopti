@@ -4,7 +4,7 @@
 ; MODULE: AltGr Latch Dispatch Abort Meta Test
 ; DESCRIPTION:
 ; Regression guard for the non-physical AltGr abort path in
-; _ScriptAltGrDispatch (lib/script_altgr_hotkeys.ahk).
+; _ScriptAltGrDispatch (infra/script_altgr_hotkeys.ahk).
 ;
 ; When the SC138 (AltGr/Kana) prefix flag is latched but the key is NOT
 ; physically held (e.g. following a rapid press/release that kept the prefix
@@ -23,7 +23,7 @@
 ;   3. The abort path sends the native key so the chord still produces the
 ;      expected character rather than silently dropping the keystroke.
 ;
-; SCOPE: source introspection of lib/script_altgr_hotkeys.ahk.
+; SCOPE: source introspection of infra/script_altgr_hotkeys.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,7 +38,7 @@
 ; ====================================================
 
 _ALDA_ReadSource() {
-	return _DriverDirConcat("lib")
+	return _DriverDirConcat("infra")
 }
 
 
@@ -50,10 +50,10 @@ _ALDA_ReadSource() {
 
 _ALDA_DispatchCallsIsPhysical() {
 	Src := _ALDA_ReadSource()
-	Assert(Src != "", "lib/ source must be readable")
+	Assert(Src != "", "infra/ source must be readable")
 
 	Body := _DriverFuncBody("_ScriptAltGrDispatch")
-	Assert(Body != "", "_ScriptAltGrDispatch must be defined in lib/script_altgr_hotkeys.ahk")
+	Assert(Body != "", "_ScriptAltGrDispatch must be defined in infra/script_altgr_hotkeys.ahk")
 
 	Assert(InStr(Body, "_ScriptAltGrIsPhysical(SuffixSC)") > 0,
 		"_ScriptAltGrDispatch must call _ScriptAltGrIsPhysical(SuffixSC) to verify the chord is a genuine physical AltGr press — a latched prefix flag without physical hold must not fire user script actions")
@@ -92,7 +92,7 @@ Test("script_altgr: non-physical abort path appears before RunScriptShortcutActi
 
 _ALDA_IsPhysicalChecksSC138State() {
 	Body := _DriverFuncBody("_ScriptAltGrIsPhysical")
-	Assert(Body != "", "_ScriptAltGrIsPhysical must be defined in lib/script_altgr_hotkeys.ahk")
+	Assert(Body != "", "_ScriptAltGrIsPhysical must be defined in infra/script_altgr_hotkeys.ahk")
 
 	; Must check that SC138 (AltGr/Kana) is physically held
 	Assert(InStr(Body, "SC138") > 0,

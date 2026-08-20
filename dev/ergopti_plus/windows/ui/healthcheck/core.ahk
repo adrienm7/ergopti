@@ -9,7 +9,7 @@
 ; shared frontend _shared/ui/healthcheck/ (loaded via virtual host); the
 ; snapshot is injected as JSON after navigation completes.
 ;
-; Split out of the former lib/healthcheck.ahk (P5 refactor); see
+; Split out of the former infra/healthcheck.ahk (the module split); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the healthcheck/*.ahk files is irrelevant.
 ; ==============================================================================
@@ -361,7 +361,7 @@ HealthCheck_ShowWindow() {
 		BtnLabel)
 
 	G.WVC := 0
-	CloseAndCopy := (*) => (A_Clipboard := PlainText, _HealthCheck_CloseGui(G))
+	CloseAndCopy := (*) => (CB_Write(PlainText), _HealthCheck_CloseGui(G))
 	G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
 	G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
 	BtnCopy.OnEvent("Click", CloseAndCopy)
@@ -627,7 +627,6 @@ HealthCheck_FormatPlain(Snapshot) {
 		Out .= (i > 1 ? "`r`n" : "") . L
 	return Out
 }
-
 
 
 

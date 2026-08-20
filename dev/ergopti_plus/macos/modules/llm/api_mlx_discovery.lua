@@ -27,11 +27,11 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
+local Logger         = require("infra.logger")
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
-local Timings        = require("lib.timings")
+local Timings        = require("infra.timings")
 local ApiCommon = require("modules.llm.api_common")
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover() POST probes; never shares state with warmup
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
@@ -41,11 +41,11 @@ local LOG            = "llm.api_mlx"
 
 
 
--- ===========================================
+--- ===========================================
 --- ===========================================
 --- ======= 1/ Route & Identifier State =======
 --- ===========================================
--- ===========================================
+--- ===========================================
 
 -- Discovered endpoint paths. Different mlx-lm releases have shipped completions
 -- and chat-completions under different routes (with/without the `/v1/` prefix);
@@ -64,6 +64,31 @@ local _completions_endpoint = nil
 local _chat_endpoint        = nil
 local _endpoints_discovered = false
 local _endpoint_probe_in_flight = false
+
+-- When the last probe cycle ENDED, for the inter-cycle cooldown. A failed cycle
+-- fires its queued callbacks synchronously, each of which is a warmup that
+-- re-tests is_discovered() — still false on the failure path — and calls
+-- discover() again inline. The new cycle then resets BOTH pacing variables, so
+-- the exponential backoff never applied across cycles and the retry landed on
+-- the very next run-loop tick: a curl + HTTP storm on the main thread, happening
+-- exactly when the server is not answering.
+local _last_cycle_finished_at   = nil
+-- The pending deferred re-entry, so a burst of callers arms ONE timer.
+local _cooldown_timer           = nil
+-- Exact async capabilities for the current poll. They remain owned until a
+-- verified cancel/terminate or their identity-matched callback completes.
+local _poll_timer               = nil
+local _poll_task                = nil
+-- One cycle token prevents a late duplicate callback from clearing a newer
+-- cycle that happens to share the same model-switch generation.
+local _active_cycle             = nil
+-- A failed cycle invokes every waiter. A waiter may immediately call discover()
+-- again; finish the whole fan-out before dispatching one coalesced retry.
+local _discovery_callbacks_draining = false
+-- One synchronous infrastructure retry is allowed after fan-out. If the
+-- scheduler rejects that retry too, keep the waiter queued for the next external
+-- signal rather than recursing until the Lua stack overflows.
+local _infrastructure_retry_in_progress = false
 
 -- Inter-probe delay, carried ACROSS discovery cycles. Declared here rather than
 -- inside discover() so a failed cycle's backoff is still in force when the next
@@ -134,13 +159,21 @@ local CHAT_CANDIDATES = {
 	"/chat/completions",
 }
 
-local DISCOVERY_MAX_WAIT_SEC        = 180  -- Stop polling /v1/models after this much real time
+-- Read from the shared registry rather than hardcoded. The key existed there with
+-- NO reader while this file carried its own literal, so one concept had two values
+-- and the registry's was the stale one.
+local DISCOVERY_MAX_WAIT_SEC        = Timings.sec("llm", "discovery_max_wait_ms")
+                                           -- Stop polling /v1/models after this much real time
                                            -- (a cold mlx_lm import + 2B model load can take 45-70 s+
                                            -- on a slow disk; 60 s gave up prematurely. Warmup keeps
                                            -- retrying regardless, but a longer window keeps the
                                            -- discovered routes fresh and silences the scary warning).
 local DISCOVERY_POLL_INITIAL_SEC    = Timings.sec("llm", "discovery_poll_initial_ms")  -- First inter-probe delay (doubles each miss, capped below)
 local DISCOVERY_POLL_MAX_SEC        = Timings.sec("llm", "discovery_poll_max_ms")       -- Cap for the exponential backoff interval
+-- Minimum gap between the END of one probe cycle and the START of the next.
+-- Distinct from the backoff above, which paces probes WITHIN a cycle and is reset
+-- every time a cycle begins.
+local DISCOVERY_RETRY_COOLDOWN_SEC  = Timings.sec("llm", "discovery_retry_cooldown_ms")
 
 -- Seeded once the initial value is known; reset to it on a successful discovery.
 _poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
@@ -149,11 +182,11 @@ _poll_delay_sec = DISCOVERY_POLL_INITIAL_SEC
 
 
 
--- ============================================
+--- ===========================================
 --- ===========================================
 --- ======= 2/ Lifecycle & Route Access =======
 --- ===========================================
--- ============================================
+--- ===========================================
 
 --- Initialises the route cache from the controller's base URL. Must be called
 --- once at module wiring time before any discover()/warmup.
@@ -211,6 +244,57 @@ function M.is_discovered() return _endpoints_discovered end
 --- Called by warmup when its own POST returns 404 (the routes it cached are dead).
 function M.mark_undiscovered() _endpoints_discovered = false end
 
+
+--- Reports whether after() explicitly committed one native timer while keeping
+--- its cancellation handle opaque.
+--- @param handle any Scheduler result.
+--- @param committed any Explicit second return from TimerScheduler.after().
+--- @return boolean committed True only when one timer became live.
+local function timer_committed(handle, committed)
+	return type(handle) == "table" and committed == true
+end
+
+
+--- Cancels one scheduler handle without discarding an unrevoked capability.
+--- @param handle table TimerScheduler handle.
+--- @param label string Stable diagnostic label.
+--- @return boolean stopped True only when no live timer remains.
+local function cancel_timer(handle, label)
+	local ok, result = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	-- The shared port declares cancel() void; the macOS adapter additionally
+	-- returns false when native stop fails. Accept nil/true, retain only on a
+	-- throw or the adapter's explicit failure extension.
+	if not ok or result == false then
+		Logger.error(LOG, "Cannot cancel %s timer; handle retained for retry (result: %s).",
+			tostring(label), tostring(result))
+		return false
+	end
+	return true
+end
+
+
+--- Terminates one poll task without losing the exact retry capability.
+--- @param task table ShellRunner handle.
+--- @param label string Stable diagnostic label.
+--- @return boolean stopped True only when task termination committed.
+local function terminate_task(task, label)
+	if type(task) ~= "table" or type(task.terminate) ~= "function" then
+		Logger.error(LOG, "Cannot terminate %s task; terminate() is unavailable.", tostring(label))
+		return false
+	end
+	local ok, result = xpcall(function()
+		return task.terminate()
+	end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Cannot terminate %s task; handle retained for retry (result: %s).",
+			tostring(label), tostring(result))
+		return false
+	end
+	return true
+end
+
 --- Resets the discovery state (flags, pending callbacks, model identifiers) so the
 --- next warmup re-probes the live server. The cached route URLs are deliberately
 --- NOT reset here — only set_base_url() rewrites them — so a server relaunch on the
@@ -218,6 +302,7 @@ function M.mark_undiscovered() _endpoints_discovered = false end
 function M.reset()
 	_endpoints_discovered        = false
 	_endpoint_probe_in_flight    = false
+	_active_cycle                = nil
 	_discovery_pending_callbacks = {}
 	_server_model_id             = nil
 	_expected_model_id           = nil
@@ -226,17 +311,34 @@ function M.reset()
 	-- background chat-route probe) so a stale response cannot overwrite the
 	-- routes the NEXT discovery cycle caches (F-MED-8).
 	_discovery_gen = _discovery_gen + 1
+	-- The inter-cycle cooldown goes with it. reset() means the server changed —
+	-- a relaunch, a model switch — so the next probe is about a DIFFERENT server
+	-- and must not be held back by how the previous one failed. Keeping the
+	-- timestamp here would make a model switch wait out a cooldown earned by the
+	-- model the user just left.
+	_last_cycle_finished_at = nil
+	if _poll_timer and cancel_timer(_poll_timer, "discovery poll") then
+		_poll_timer = nil
+	end
+	if _poll_task and terminate_task(_poll_task, "discovery poll") then
+		_poll_task = nil
+	end
+	if _cooldown_timer then
+		if cancel_timer(_cooldown_timer, "discovery cooldown") then
+			_cooldown_timer = nil
+		end
+	end
 end
 
 
 
 
 
--- =====================================
+--- =====================================
 --- =====================================
 --- ======= 3/ Endpoint Discovery =======
 --- =====================================
--- =====================================
+--- =====================================
 
 --- Probes the MLX server to discover which endpoint paths are valid in this
 --- mlx-lm install. Two phases:
@@ -277,8 +379,79 @@ function M.discover(on_done)
 	if type(on_done) == "function" then
 		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = on_done
 	end
+	if _discovery_callbacks_draining then return end
 	if _endpoint_probe_in_flight then return end
+	-- A prior reset or failed launch can retain an exact native capability when
+	-- cancellation itself refused. Retry that cleanup before starting a sibling
+	-- poll; otherwise two curl tasks can race the same route cache.
+	if _poll_timer then
+		if cancel_timer(_poll_timer, "stale discovery poll") then
+			_poll_timer = nil
+		else
+			return
+		end
+	end
+	if _poll_task then
+		if terminate_task(_poll_task, "stale discovery poll") then
+			_poll_task = nil
+		else
+			return
+		end
+	end
+
+	-- Inter-cycle cooldown. Owned here rather than at the one caller that
+	-- re-enters, because every caller of discover() would otherwise have to
+	-- remember it — and the queued-callback path that caused the storm is not the
+	-- only way in.
+	--
+	-- The cycle is DEFERRED, never dropped: the caller's on_done is already queued
+	-- above, so refusing outright would strand it. Re-entering through
+	-- TimerScheduler keeps the contract and only moves it later.
+	if _last_cycle_finished_at then
+		local waited = TimerScheduler.now() - _last_cycle_finished_at
+		if waited < DISCOVERY_RETRY_COOLDOWN_SEC then
+			if not _cooldown_timer then
+				local remaining = DISCOVERY_RETRY_COOLDOWN_SEC - waited
+				Logger.debug(LOG, "Discovery retry deferred %.2fs by the inter-cycle cooldown.", remaining)
+				local generation = _discovery_gen
+				local candidate
+				local arm_committed
+				local ok, result = xpcall(function()
+					candidate, arm_committed = TimerScheduler.after(remaining, function()
+						if _cooldown_timer ~= candidate then return end
+						_cooldown_timer = nil
+						if generation ~= _discovery_gen then return end
+						-- nil so this re-entry cannot be deferred again by the same window.
+						_last_cycle_finished_at = nil
+						M.discover()
+					end)
+					return candidate
+				end, debug.traceback)
+				if ok and timer_committed(result, arm_committed) then
+					_cooldown_timer = result
+				else
+					-- A table result is an opaque capability that may still own a
+					-- timer. Revoke it through the port; retain it only when the
+					-- adapter explicitly reports that cancellation failed.
+					if type(result) == "table"
+						and not cancel_timer(result, "invalid discovery cooldown") then
+						_cooldown_timer = result
+					end
+					Logger.error(LOG,
+						"Discovery cooldown timer did not commit (result: %s, committed: %s).",
+						tostring(result), tostring(arm_committed))
+				end
+				if not _cooldown_timer then
+					_last_cycle_finished_at = nil
+				end
+			end
+			if _cooldown_timer then return end
+		end
+	end
+
 	_endpoint_probe_in_flight = true
+	local cycle = {}
+	_active_cycle = cycle
 	-- Captured now so every async callback below (including the opportunistic
 	-- background chat probe, which can outlive finish_discovery) can detect a
 	-- reset() that started a newer cycle and discard its own stale write (F-MED-8).
@@ -292,11 +465,18 @@ function M.discover(on_done)
 	local headers    = { ["Content-Type"] = "application/json" }
 	local started_at = TimerScheduler.now()
 
-	local function finish_discovery(success)
+	local function finish_discovery(success, record_cooldown)
+		if cycle ~= _active_cycle or my_discovery_gen ~= _discovery_gen then return false end
 		-- Stop the poll timer before firing callbacks so a callback that calls
 		-- reset() + discover() again does not find the timer
 		-- still running and incorrectly skip starting a fresh one.
 		_endpoint_probe_in_flight = false
+		_active_cycle             = nil
+		if record_cooldown == false then
+			_last_cycle_finished_at = nil
+		else
+			_last_cycle_finished_at = TimerScheduler.now()
+		end
 		if success then
 			_endpoints_discovered = true
 			-- The server answered — that, and only that, justifies probing eagerly
@@ -312,7 +492,27 @@ function M.discover(on_done)
 		-- of them is correct and idempotent.
 		local cbs = _discovery_pending_callbacks
 		_discovery_pending_callbacks = {}
-		for _, cb in ipairs(cbs) do pcall(cb) end
+		local was_draining = _discovery_callbacks_draining
+		_discovery_callbacks_draining = true
+		for _, cb in ipairs(cbs) do ApiCommon.protected_call(cb, "discovery on_done") end
+		_discovery_callbacks_draining = was_draining
+
+		-- api_mlx.warmup() is itself one of these callbacks. On failure it
+		-- immediately calls discover() again, which was queued by the draining
+		-- guard above. Dispatch that queue only AFTER every original waiter ran so
+		-- one callback cannot overtake or strand its siblings.
+		if #_discovery_pending_callbacks > 0 then
+			local infrastructure_failure = record_cooldown == false
+			if not infrastructure_failure or not _infrastructure_retry_in_progress then
+				if infrastructure_failure then _infrastructure_retry_in_progress = true end
+				local retry_ok, retry_err = xpcall(function() M.discover() end, debug.traceback)
+				if infrastructure_failure then _infrastructure_retry_in_progress = false end
+				if not retry_ok then
+					Logger.error(LOG, "Discovery callback retry dispatch raised: %s.", tostring(retry_err))
+				end
+			end
+		end
+		return true
 	end
 
 	local function run_post_probes()
@@ -409,37 +609,64 @@ function M.discover(on_done)
 	-- The inter-probe delay uses exponential backoff (1 s → 2 s → 4 s → … → 10 s)
 	-- so we react quickly on fast starts while not hammering the kernel during a
 	-- slow model load (weights can take 30 s+ to map into GPU memory).
-	local poll_timer       = nil
 	-- Backoff read from module scope, not re-initialised here. As a local it
 	-- restarted at the shortest interval on every discover() call, so a cycle
 	-- that gave up followed by a retry on the next run-loop tick probed as
 	-- eagerly as the first attempt — a curl spawn and an HTTP POST per tick
 	-- against a server that is down, with the backoff resetting each time it was
 	-- supposed to grow.
-	local poll_delay_sec   = _poll_delay_sec
-	local function do_poll()
+	local poll_delay_sec = _poll_delay_sec
+	local do_poll
+
+	--- Arms one identity-checked poll timer through the strict scheduler contract.
+	--- @param delay number Seconds before the poll.
+	--- @param stage string Stable diagnostic label.
+	--- @return boolean committed True only when the timer is live and owned.
+	local function schedule_poll(delay, stage)
+		local candidate
+		local arm_committed
+		local ok, result = xpcall(function()
+			candidate, arm_committed = TimerScheduler.after(delay, function()
+				if _poll_timer ~= candidate then return end
+				_poll_timer = nil
+				if cycle ~= _active_cycle or my_discovery_gen ~= _discovery_gen then return end
+				local callback_ok, callback_err = xpcall(do_poll, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "Discovery %s poll callback raised: %s.",
+						tostring(stage), tostring(callback_err))
+					finish_discovery(false, false)
+				end
+			end)
+			return candidate
+		end, debug.traceback)
+		if not ok or not timer_committed(result, arm_committed) then
+			-- A table result is an opaque capability that may still own a timer.
+			-- Revoke it through the port; if the adapter explicitly refuses, publish
+			-- that exact handle so reset()/the next discover() can retry cancellation.
+			if type(result) == "table" and not cancel_timer(result, stage .. " invalid poll") then
+				_poll_timer = result
+			end
+			Logger.error(LOG, "Discovery %s poll timer did not commit (result: %s, committed: %s).",
+				tostring(stage), tostring(result), tostring(arm_committed))
+			return false
+		end
+		_poll_timer = result
+		return true
+	end
+
+	do_poll = function()
 		-- Guard: a reset() since this cycle started makes this an ORPHANED chain.
 		-- Relying on _endpoint_probe_in_flight alone is not enough — a newer
 		-- discover() re-sets that flag to true, silently resurrecting this chain, and
 		-- both chains then contend for the single module-level _probe_client whose
 		-- adapter contract is one request at a time. Same generation guard this file
 		-- already applies to its three probe callbacks (F-MED-8).
-		if my_discovery_gen ~= _discovery_gen then
-			if poll_timer then TimerScheduler.cancel(poll_timer) end
-			poll_timer = nil
-			return
-		end
+		if my_discovery_gen ~= _discovery_gen or cycle ~= _active_cycle then return end
 		-- Guard: if discovery was reset externally (model switch) while the
 		-- timer was in flight, stop quietly without firing callbacks.
-		if not _endpoint_probe_in_flight then
-			if poll_timer then TimerScheduler.cancel(poll_timer) end
-			poll_timer = nil
-			return
-		end
+		if not _endpoint_probe_in_flight then return end
 		local elapsed = TimerScheduler.now() - started_at
 		if elapsed >= DISCOVERY_MAX_WAIT_SEC then
-			if poll_timer then TimerScheduler.cancel(poll_timer) end
-			poll_timer = nil
 			Logger.warn(LOG,
 				"Endpoint discovery: gave up waiting for MLX server after %.1fs. " ..
 				"Falling back to default routes; warmup will keep retrying.", elapsed)
@@ -453,70 +680,85 @@ function M.discover(on_done)
 		-- lingers in CLOSE_WAIT), making the poll see the zombie's stale model ID
 		-- indefinitely. curl --no-keepalive forces a fresh TCP handshake every call,
 		-- so the moment the zombie's socket closes the next poll reaches the new server.
-		local curl_task = ShellRunner.spawn("/usr/bin/curl", {
-			"--silent", "--max-time", "5", "--no-keepalive",
-			"-H", "Connection: close",
-			_base_url .. "/v1/models",
-		}, function(exit_code, stdout, _stderr)
-			if poll_timer then TimerScheduler.cancel(poll_timer) end
-			poll_timer = nil
-			local status = (exit_code == 0) and 200 or -1
-			local body   = stdout or ""
-			Logger.debug(LOG, "Endpoint discovery: /v1/models -> HTTP %s.", tostring(status))
-			-- A curl already in flight when reset() ran belongs to a superseded cycle.
-			-- Letting it reach run_post_probes() would POST on the SHARED _probe_client
-			-- and cancel the live cycle's in-flight probe, whose callback then never
-			-- fires — and since finish_discovery() is the only writer that clears the
-			-- mutex, discovery deadlocks until the user switches model again.
-			if my_discovery_gen ~= _discovery_gen then
-				Logger.debug(LOG, "Endpoint discovery: stale poll result discarded (gen %d != %d).",
-					my_discovery_gen, _discovery_gen)
-				return
-			end
-			if not _endpoint_probe_in_flight then return end  -- reset externally
-			if status == 200 then
-				-- mlx_lm.server's /v1/models endpoint returns the LIST of models
-				-- discoverable in the local HF cache, NOT the currently loaded
-				-- model. data[] can have 30+ entries and their order is dictated
-				-- by cache ordering, not load state. Earlier code read data[1].id
-				-- as if it were the loaded model and then tried to "fix" mismatches
-				-- via zombie kills and forced restarts — all chasing a phantom.
-				-- The right semantic: a 200 here means the server is reachable.
-				-- The model we passed to --model in bash is the one that actually
-				-- gets loaded; trust that and proceed straight to POST probes.
-				-- For the warmup payload’s "model" field, prefer _model_hf_path
-				-- (the canonical --model arg) over anything from /v1/models.
-				_server_model_id = nil
-				if type(body) == "string" and type(_expected_model_id) == "string"
-					and _expected_model_id ~= "" then
-					-- Informational: confirm the expected model is at least
-					-- visible in the cache list. If it is not, the user likely
-					-- has a misconfigured preset; log a warning but do not block.
-					local needle = _expected_model_id:lower()
-					if not body:lower():find(needle, 1, true) then
-						Logger.warn(LOG,
-							"Endpoint discovery: expected model '%s' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.",
-							_expected_model_id)
+		-- Forward-declare so the completion closure captures this local capability.
+		local curl_task
+		local spawn_ok, spawned_or_err = xpcall(function()
+			curl_task = ShellRunner.spawn("/usr/bin/curl", {
+				"--silent", "--max-time", "5", "--no-keepalive",
+				"-H", "Connection: close",
+				_base_url .. "/v1/models",
+			}, function(exit_code, stdout, _stderr)
+				-- Only the callback for the exact published task may release it.
+				if _poll_task ~= curl_task then return end
+				_poll_task = nil
+				if my_discovery_gen ~= _discovery_gen or cycle ~= _active_cycle then return end
+
+				local callback_ok, callback_err = xpcall(function()
+					local status = (exit_code == 0) and 200 or -1
+					local body   = stdout or ""
+					Logger.debug(LOG, "Endpoint discovery: /v1/models -> HTTP %s.", tostring(status))
+					if not _endpoint_probe_in_flight then return end
+					if status == 200 then
+						-- /v1/models lists the cache, not the currently loaded model.
+						-- Reachability is the only fact this response commits.
+						_server_model_id = nil
+						if type(body) == "string" and type(_expected_model_id) == "string"
+							and _expected_model_id ~= "" then
+							local needle = _expected_model_id:lower()
+							if not body:lower():find(needle, 1, true) then
+								Logger.warn(LOG,
+									"Endpoint discovery: expected model '%s' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.",
+									_expected_model_id)
+							end
+						end
+						if not _endpoint_probe_in_flight then return end
+						Logger.info(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
+						run_post_probes()
+					else
+						-- Server not ready yet — apply exponential backoff before the next tick.
+						Logger.debug(LOG,
+							"Endpoint discovery: server not ready — next probe in %.1fs.", poll_delay_sec)
+						if not schedule_poll(poll_delay_sec, "rearm") then
+							finish_discovery(false, false)
+							return
+						end
+						poll_delay_sec = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
+						-- Persist growth only after the new timer owns the continuation.
+						_poll_delay_sec = poll_delay_sec
 					end
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "Discovery poll completion callback raised: %s.", tostring(callback_err))
+					finish_discovery(false, false)
 				end
-				if not _endpoint_probe_in_flight then return end
-				Logger.info(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
-				run_post_probes()
-			else
-				-- Server not ready yet — apply exponential backoff before the next tick
-				-- so we back off gracefully during a slow model-weight load.
-				Logger.debug(LOG,
-					"Endpoint discovery: server not ready — next probe in %.1fs.", poll_delay_sec)
-				poll_timer   = TimerScheduler.after(poll_delay_sec, do_poll)
-				poll_delay_sec  = math.min(poll_delay_sec * 2, DISCOVERY_POLL_MAX_SEC)
-				-- Persist it: the growth has to outlive the call that earned it.
-				_poll_delay_sec = poll_delay_sec
+			end)
+			return curl_task
+		end, debug.traceback)
+
+		if not spawn_ok or type(spawned_or_err) ~= "table"
+			or type(spawned_or_err.start) ~= "function" then
+			Logger.error(LOG, "Discovery poll task construction did not commit (result: %s).",
+				tostring(spawned_or_err))
+			finish_discovery(false, false)
+			return
+		end
+
+		_poll_task = spawned_or_err
+		local start_ok, start_result = xpcall(function()
+			return spawned_or_err.start()
+		end, debug.traceback)
+		if not start_ok or start_result ~= true then
+			if terminate_task(spawned_or_err, "uncommitted discovery poll")
+				and _poll_task == spawned_or_err then
+				_poll_task = nil
 			end
-		end)
-		curl_task.start()
+			Logger.error(LOG, "Discovery poll task start did not commit (result: %s).",
+				tostring(start_result))
+			finish_discovery(false, false)
+		end
 	end
 
-	poll_timer = TimerScheduler.after(0, do_poll)
+	if not schedule_poll(0, "initial") then finish_discovery(false, false) end
 end
 
 return M

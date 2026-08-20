@@ -54,7 +54,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(fh ~= nil, "daemon file is readable")
       local src = fh:read("*a"); fh:close()
 
-      helpers.assert_true(src:find('require("lib.monotonic")', 1, true) ~= nil,
+      helpers.assert_true(src:find('require("infra.monotonic")', 1, true) ~= nil,
         "daemon must source its keystroke clock from lib.monotonic")
       helpers.assert_true(src:find("Monotonic.now_ms()", 1, true) ~= nil,
         "the per-keystroke timestamp must come from the monotonic wall clock")
@@ -143,7 +143,19 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local ok, ir = pcall(require, "modules.hotstrings.input_reader")
       helpers.assert_true(ok, "input_reader module loads")
       if ok then
-        helpers.assert_true(type(ir.new) == "function", "input_reader.new is a function")
+        -- resolve_char, not new(). The reader instance this used to name had no
+        -- production caller for its whole life; reading the device belongs to
+        -- adapters/evdev_reader.lua now, and what remains here is the layout.
+        helpers.assert_true(type(ir.resolve_char) == "function", "input_reader.resolve_char is a function")
+      end
+    end)
+
+    helpers.it("evdev_reader can be required", function()
+      local ok, er = pcall(require, "adapters.evdev_reader")
+      helpers.assert_true(ok, "evdev_reader module loads")
+      if ok then
+        helpers.assert_true(type(er.grab) == "function", "evdev_reader.grab is a function")
+        helpers.assert_true(type(er.drain) == "function", "evdev_reader.drain is a function")
       end
     end)
 
@@ -196,15 +208,14 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("adapter modules", function()
     local adapters = {
-      "adapters.notifier",
       "adapters.http_client",
       "adapters.tray_menu",
-      "adapters.tooltip_renderer",
     }
     for _, name in ipairs(adapters) do
       helpers.it(name .. " loads", function()
         local ok, mod = pcall(require, name)
-        helpers.assert_true(ok, name .. " module loads")
+        helpers.assert_true(ok, name .. " module loads: " .. tostring(mod))
+        helpers.assert_eq(type(mod), "table", name .. " must load as a table")
       end)
     end
   end)
@@ -223,15 +234,16 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       "keylogger.aggregator_helpers",
       "keycodes.evdev",
       "json",
-      "linux.tray_protocol",
+      "tray.protocol",
       "llm.prompt_builder",
-      "llm.linux_bridge",
+      "infra.llm_bridge",
       "updater.version",
     }
     for _, name in ipairs(shared_mods) do
       helpers.it("require('" .. name .. "') loads", function()
         local ok, mod = pcall(require, name)
-        helpers.assert_true(ok, name .. " module loads")
+        helpers.assert_true(ok, name .. " module loads: " .. tostring(mod))
+        helpers.assert_eq(type(mod), "table", name .. " must load as a table")
       end)
     end
   end)

@@ -4,7 +4,7 @@
 --- MODULE: Onboarding Wizard — Config Schema (regression)
 --- DESCRIPTION:
 --- Locks down that the first-run wizard writes config.toml keys using the SAME
---- schema the macOS Preferences loader reads (ui/menu/preferences.lua KEY_MAP):
+--- schema the macOS Preferences loader reads (infra/preferences.lua KEY_MAP):
 --- lowercase sections + clean ``enabled`` flags.
 ---
 --- ROOT CAUSE ENCODED: the wizard used to write AHK-style keys — [Metrics]

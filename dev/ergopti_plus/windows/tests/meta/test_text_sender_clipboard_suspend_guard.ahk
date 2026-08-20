@@ -38,10 +38,15 @@ _TSCSG_ClipboardHasSuspendGuardBeforeWrite() {
 	Assert(GuardPos < WritePos,
 		"_TextSendClipboard: the A_IsSuspended guard must appear BEFORE CB_Write — a guard placed after the write still overwrites the clipboard while paused")
 
-	PastePos := InStr(Body, '_TextSenderSendInput("^v", "clipboard paste")')
-	Assert(PastePos > 0, "_TextSendClipboard must still paste via the guarded TextSender helper")
-	Assert(GuardPos < PastePos,
-		"_TextSendClipboard: the A_IsSuspended guard must appear BEFORE the paste")
+	ClipWaitPos := InStr(Body, "ClipWait(", true, WritePos)
+	SecondGuardPos := InStr(Body, "A_IsSuspended", true, ClipWaitPos)
+	AtomicPastePos := InStr(Body, '_AHK_SendInput.Bind("^v")', true, SecondGuardPos)
+	FallbackPastePos := InStr(Body,
+		'_TextSenderSendInput("^v", "clipboard paste")', true, SecondGuardPos)
+	Assert(ClipWaitPos > WritePos and SecondGuardPos > ClipWaitPos,
+		"_TextSendClipboard must recheck suspension AFTER ClipWait yields; the entry guard alone lets a pause requested during the wait paste anyway")
+	Assert(AtomicPastePos > SecondGuardPos and FallbackPastePos > SecondGuardPos,
+		"the post-ClipWait suspend guard must precede both atomic and ordinary Ctrl+V paths")
 }
-Test("text_sender: _TextSendClipboard has A_IsSuspended guard before clipboard write/paste (suspend-guard-pattern-1)",
+Test("text_sender: _TextSendClipboard guards entry and post-ClipWait paste (suspend-guard-pattern-1)",
 	_TSCSG_ClipboardHasSuspendGuardBeforeWrite)

@@ -22,12 +22,14 @@
 
 local M = {}
 local hs        = hs
-local Logger    = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n      = require("lib.i18n")
-local dialog    = require("lib.dialog_util")
+local Logger    = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n      = require("infra.i18n")
+local dialog    = require("infra.dialog_util")
 local changelog = require("ui.changelog")
-local Updater   = require("lib.updater")
+local Updater   = require("modules.updater")
+local ManifestMenu = require("infra.manifest_menu")
+local TaskLifecycle = require("adapters.task_lifecycle")
 local LOG       = "menu_about"
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
@@ -54,11 +56,11 @@ M.DEFAULT_STATE = {
 
 
 
--- =====================================
+-- ======================================
 -- ======================================
 -- ======= 1/ Constants & helpers =======
 -- ======================================
--- =====================================
+-- ======================================
 
 local GH_OWNER      = "adrienm7"
 local GH_REPO       = "ergopti"
@@ -183,7 +185,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	-- Hammerspoon's hs.task pcall to the Console, wedging the update at
 	-- "installing" forever (the project_lua_closure_before_local_nil_global class).
 	local unzip_task
-	unzip_task = hs.task.new("/usr/bin/unzip", function(exit_code, _, stderr)
+	unzip_task = TaskLifecycle.native("Update archive extraction", "/usr/bin/unzip", function(exit_code, _, stderr)
 		if unzip_task then M._active_tasks[unzip_task] = nil end  -- guarded clear: never write a nil key
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
@@ -246,9 +248,18 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		-- Short delay lets the log flush before hs.reload tears everything down.
 		hs.timer.doAfter(0.3, function() hs.reload() end)
 	end, { "-o", zip_path, "-d", tmp_dir })
+	if not unzip_task then
+		Updater.set_update_state("idle")
+		update_menu_fn()
+		return
+	end
 
 	M._active_tasks[unzip_task] = true
-	unzip_task:start()
+	if not TaskLifecycle.start(unzip_task, "Update archive extraction") then
+		M._active_tasks[unzip_task] = nil
+		Updater.set_update_state("idle")
+		update_menu_fn()
+	end
 end
 
 --- One-click update entry point.
@@ -377,7 +388,7 @@ function M.build(ctx)
 
 	local function set_channel(c)
 		state.update_channel = c
-		if type(ctx.save_prefs) == "function" then ctx.save_prefs() end
+		if type(ctx.save_prefs) == "function" and ctx.save_prefs() ~= true then return false end
 		Updater.restart_background_checks(
 			c,
 			tonumber(state.update_check_interval_seconds) or Updater.get_check_interval(),
@@ -389,7 +400,7 @@ function M.build(ctx)
 	local function set_check_interval(seconds)
 		interval_sec = tonumber(seconds) or 0
 		state.update_check_interval_seconds = interval_sec
-		if type(ctx.save_prefs) == "function" then ctx.save_prefs() end
+		if type(ctx.save_prefs) == "function" and ctx.save_prefs() ~= true then return false end
 		Updater.restart_background_checks(
 			state.update_channel or channel,
 			interval_sec,
@@ -422,27 +433,33 @@ function M.build(ctx)
 		or  i18n.get("menu.about.channel_main")
 	local channel_items = {
 		{
-			title   = i18n.get("menu.about.channel_main"),
+			label   = i18n.get("menu.about.channel_main"),
 			checked = (channel == "main") or nil,
-			fn      = function() set_channel("main") end,
+			action      = function() set_channel("main") end,
 		},
 		{
-			title   = i18n.get("menu.about.channel_dev"),
+			label   = i18n.get("menu.about.channel_dev"),
 			checked = (channel == "dev") or nil,
-			fn      = function() set_channel("dev") end,
+			action      = function() set_channel("dev") end,
 		},
 	}
 
 	local menu_items = {}
 
 	-- Version header — always the first item, always disabled.
-	table.insert(menu_items, { title = ver_display, disabled = true })
+	--
+	-- `label`, not `title`. This array is what the `about_updates` list provider
+	-- returns, so the renderer reads it as provider DATA: a row keyed `title` has
+	-- no label, and the renderer drops it with one warning. This row and the
+	-- channel selector below were both invisible in the About submenu from the
+	-- day the block became a provider until 2026-08-07.
+	table.insert(menu_items, { label = ver_display, disabled = true })
 
-	table.insert(menu_items, { title = "-" })
+	table.insert(menu_items, { separator = true })
 
 	-- Channel selector submenu — always shown so the user can switch.
 	local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. channel_display
-	table.insert(menu_items, { title = channel_title, menu = channel_items })
+	table.insert(menu_items, { label = channel_title, items = channel_items })
 
 	if not local_src then
 		local freq_items = {}
@@ -453,46 +470,51 @@ function M.build(ctx)
 				current_freq_code = preset.code
 			end
 			table.insert(freq_items, {
-				title   = label,
+				label   = label,
 				checked = (preset.seconds == interval_sec) or nil,
-				fn      = function() set_check_interval(preset.seconds) end,
+				action      = function() set_check_interval(preset.seconds) end,
 			})
 		end
 		local freq_display = (current_freq_code ~= "") and current_freq_code or "?"
 		table.insert(menu_items, {
-			title = i18n.get("menu.about.frequency_menu") .. ": " .. freq_display,
-			menu  = freq_items,
+			label = i18n.get("menu.about.frequency_menu") .. ": " .. freq_display,
+			items  = freq_items,
 		})
 
 		-- Dynamic one-click update item — only meaningful for bundled builds.
 		local upd_state = Updater.get_update_state()
 		local is_busy = (upd_state == "checking" or upd_state == "installing")
 		table.insert(menu_items, {
-			title    = get_update_menu_label(),
+			label    = get_update_menu_label(),
 			disabled = is_busy or nil,
-			fn       = not is_busy and function()
+			action       = not is_busy and function()
 				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
 				one_click_update(channel, update_menu_fn)
 			end or nil,
 		})
 	end
 
-	table.insert(menu_items, { title = "-" })
-	table.insert(menu_items, {
-		title = i18n.get("menu.about.changelog"),
-		fn    = function()
+	-- The updater block above is the manifest's `about_updates` list; the two rows
+	-- below it are `command` declarations. The separator between them is a `---`
+	-- row. Until 2026-08-07 the whole submenu was assembled here and described
+	-- nowhere, on all three drivers at once.
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = {
+		["about_changelog"] = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
 			show_changelog(channel)
 		end,
-	})
-	table.insert(menu_items, {
-		title = i18n.get("menu.about.open_releases_page"),
-		fn    = function() hs.urlevent.openURL(releases_page_url()) end,
+		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
+	}
+
+	local rendered = ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {
+		["about_updates"] = function() return menu_items end,
 	})
 
 	-- The submenu title uses the generic i18n label (e.g. "Version / Mise à jour")
 	-- so the menubar entry stays compact; the version detail is inside the submenu.
-	return { title = ver_label, menu = menu_items }
+	return { label = ver_label, submenu = rendered }
 end
 
 return M

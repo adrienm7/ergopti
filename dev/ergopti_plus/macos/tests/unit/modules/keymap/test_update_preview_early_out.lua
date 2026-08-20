@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Regression — update_preview early-out when everything is off
 --- DESCRIPTION:
---- update_preview runs full provider iteration, star-bucket scan, and autocorrect
---- tail-bucket scan on every keystroke — even when LLM is disabled and both
+--- update_preview runs full provider iteration and prospective engine resolution
+--- on every keystroke — even when LLM is disabled and both
 --- hotstring preview toggles (star + autocorrect) are off. In that state no
 --- tooltip can ever surface and no inactivity timer needs arming, so all the
 --- per-keystroke work is pure waste on the latency-critical keymap event tap.
@@ -17,17 +17,20 @@ local helpers = require("tests.helpers")
 
 helpers.describe("update_preview early-out when LLM and both previews are off", function()
 	helpers.it("the early-out guard appears before last_word and scans when everything is off", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keymap/llm_bridge.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_pending_preview")
+		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 
 		-- Locate the early-out guard after the empty-buffer early-return.
-		local empty_buf = src:find('if not buf or #buf == 0 then', 1, true)
+		local empty_buf = src:find('if not buf then', 1, true)
 		helpers.assert_true(empty_buf ~= nil, "could not find empty-buffer check")
 
 		-- The early-out guard must appear between the empty-buffer block and the
 		-- `last_word` computation, so the last_word match plus all provider/bucket
 		-- scans are skipped when everything is off.
-		local last_word = src:find('local last_word = buf:match', empty_buf, true)
+		local last_word = src:find('local last_word = empty_buffer and "" or buf:match', empty_buf, true)
 		helpers.assert_true(last_word ~= nil, "could not find last_word computation after empty-buffer block")
 
 		local region = src:sub(empty_buf, last_word)
@@ -49,34 +52,39 @@ helpers.describe("update_preview early-out when LLM and both previews are off", 
 			"early-out must return")
 	end)
 
-	helpers.it("provider iteration, star bucket, and tail bucket are all AFTER the early-out guard", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keymap/llm_bridge.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+	helpers.it("provider iteration and prospective resolution are AFTER the early-out guard", function()
+		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_pending_preview")
+		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 
 		-- Find the early-out guard block.
 		local guard = src:find("not llm_on and not is_star_preview_enabled and not is_autocorrect_preview_enabled", 1, true)
 		helpers.assert_true(guard ~= nil, "could not find the three-condition early-out guard")
 
-		-- Everything that follows the guard (provider loop, star bucket,
-		-- tail bucket) must appear AFTER it in the source.
+		-- Everything that follows the guard (engine resolution and provider loop)
+		-- must appear AFTER it in the source.
 		local after_guard = src:sub(guard)
 
 		-- Provider iteration must be AFTER the guard.
-		local prov = after_guard:find("for _, provider in ipairs(_state.preview_providers)", 1, true)
+		local prov = after_guard:find("in ipairs(_state.preview_providers)", 1, true)
 		helpers.assert_true(prov ~= nil, "provider iteration must appear after the guard")
 
-		-- Star bucket lookup must be AFTER the guard.
-		local star = after_guard:find("Registry.mappings_for_star_tail", 1, true)
-		helpers.assert_true(star ~= nil, "star bucket lookup must appear after the guard")
-
-		-- Tail bucket lookup must be AFTER the guard.
-		local tail = after_guard:find("Registry.mappings_for_tail(buf_tail_char)", 1, true)
-		helpers.assert_true(tail ~= nil, "tail bucket lookup must appear after the guard")
+		local resolve = after_guard:find(
+			"expander.resolve_magic_action(buf, literal_preview_allowed)", 1, true)
+		helpers.assert_true(resolve ~= nil,
+			"prospective engine resolution must appear after the guard")
+		helpers.assert_true(after_guard:find("Registry.mappings_for_", 1, true) == nil,
+			"the bridge must not regain direct registry scans after the guard")
 	end)
 
 	helpers.it("source-level: the guard short-circuits before any per-keystroke allocation", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/keymap/llm_bridge.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function invalidate_pending_preview")
+		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 
 		-- The `llm_on` variable is declared before the early-out so it can be checked.
 		local llm_on_line = src:find("local llm_on =", 1, true)

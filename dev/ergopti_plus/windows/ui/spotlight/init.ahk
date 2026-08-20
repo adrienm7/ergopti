@@ -25,17 +25,18 @@
 
 
 
-; =======================================
+; =====================================
 ; =====================================
 ; ======= 1/ Spotlight renderer =======
 ; =====================================
-; =======================================
+; =====================================
 
 global _Spotlight_State := Map(
 	"Active", false,
 	"StartX", 0,
 	"StartY", 0,
-	"Deadline", 0,
+	"StartedTick", 0,
+	"DurationMs", 0,
 	"CircleHwnd", 0,
 	"CrossHwnds", [],
 	"pToken", 0,
@@ -180,7 +181,8 @@ SpotlightMouseAt(X, Y, DurationMs) {
 		_Spotlight_State["Active"] := true
 		_Spotlight_State["StartX"] := X
 		_Spotlight_State["StartY"] := Y
-		_Spotlight_State["Deadline"] := A_TickCount + DurationMs
+		_Spotlight_State["StartedTick"] := A_TickCount
+		_Spotlight_State["DurationMs"] := DurationMs
 		_Spotlight_State["CircleHwnd"] := CircleHwnd
 		_Spotlight_State["CrossHwnds"] := CrossHwnds
 		_Spotlight_State["pToken"] := pToken
@@ -212,7 +214,9 @@ _SpotlightTick() {
 		return
 	}
 	MouseGetPos(&NowX, &NowY)
-	if (A_TickCount >= _Spotlight_State["Deadline"] or Abs(NowX - _Spotlight_State["StartX"]) > 5 or Abs(NowY - _Spotlight_State["StartY"]) > 5) {
+	if (TickExpired(_Spotlight_State["StartedTick"], _Spotlight_State["DurationMs"])
+		or Abs(NowX - _Spotlight_State["StartX"]) > 5
+		or Abs(NowY - _Spotlight_State["StartY"]) > 5) {
 		_SpotlightDismiss()
 	}
 }

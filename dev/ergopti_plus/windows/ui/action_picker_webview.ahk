@@ -28,11 +28,11 @@
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 1/ Lifecycle / open =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Singleton window + WebView2 plumbing. Subscription handles live in globals so
 ; the binding does not GC them; they are released BEFORE Controller.Close() in
@@ -154,11 +154,11 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 
 
 
-; ==============================================================
+; ====================================
 ; ====================================
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
-; ==============================================================
+; ====================================
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 channel, so each message is an object {action, …}. Work is
@@ -215,11 +215,11 @@ _ActPickWeb_Confirm(Id) {
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 3/ initData builder =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Build the `init({...})` call string consumed by the frontend.
 _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
@@ -262,11 +262,11 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative) {
 
 
 
-; ==============================================================
+; =====================================
 ; =====================================
 ; ======= 4/ Helpers / teardown =======
 ; =====================================
-; ==============================================================
+; =====================================
 
 ; Builds one JSON key/value pair (key:"value") with the value safely escaped.
 _ActPickWeb_Kv(Key, Value) {
@@ -301,11 +301,18 @@ _ActPickWeb_HtmlUrl() {
 
 ; Fire-and-forget script eval. ExecuteScript().await() wedges the thread when
 ; called from inside a WebView2 callback, so never await here.
+; The host-to-page half of the webview bridge. ExecuteScriptAsync is named async
+; but the COM marshalling to the WebView2 process is not free, and this is what
+; pushes the init payload — a picker that opens slowly is almost always this call
+; rather than the page. It had no segment, so the cost sat between "menu clicked"
+; and "picker visible" with nothing measuring it.
 _ActPickWeb_Eval(Js) {
 	global _ActPickWeb_WebView
 	if !IsSet(_ActPickWeb_WebView)
 		return
+	_hpWebEval := HotPath_Now()
 	try _ActPickWeb_WebView.ExecuteScriptAsync(Js)
+	HotPath_LogIfSlow("Webview.Eval", _hpWebEval, StrLen(Js) . " char(s)")
 }
 
 _ActPickWeb_OnResize(GuiObj, MinMax, Width, Height) {

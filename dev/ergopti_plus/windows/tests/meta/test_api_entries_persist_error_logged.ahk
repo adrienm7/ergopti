@@ -46,20 +46,22 @@ _APEL_CheckCatchBlockExists() {
 	Src := _APEL_ReadSource("ui/menu/menu_llm/menu_api_entries.ahk")
 	Assert(Src != "", "ui/menu/menu_llm/menu_api_entries.ahk must be readable")
 
-	Body := _DriverFuncBody("_LLM_Menu_PersistApiEntries")
-	Assert(Body != "", "_LLM_Menu_PersistApiEntries must be present in menu_api_entries.ahk")
+	Body := _DriverFuncBody("_LLM_Menu_PersistApiEntriesNonCritical")
+	Assert(Body != "", "the strict API-entry writer must be present in menu_api_entries.ahk")
 
 	; Must have a catch block in the write section
 	Assert(InStr(Body, "catch"),
-		"_LLM_Menu_PersistApiEntries must have a catch block on the write try — bare try silently drops disk errors")
+		"the strict API-entry writer must catch disk errors")
+	Assert(InStr(Body, "return false") > 0,
+		"a logged API-entry error must also return strict false to its caller")
 }
 
 _APEL_CheckCatchLogsError() {
 	Src := _APEL_ReadSource("ui/menu/menu_llm/menu_api_entries.ahk")
 	Assert(Src != "", "ui/menu/menu_llm/menu_api_entries.ahk must be readable")
 
-	Body := _DriverFuncBody("_LLM_Menu_PersistApiEntries")
-	Assert(Body != "", "_LLM_Menu_PersistApiEntries must be present in menu_api_entries.ahk")
+	Body := _DriverFuncBody("_LLM_Menu_PersistApiEntriesNonCritical")
+	Assert(Body != "", "the strict API-entry writer must be present in menu_api_entries.ahk")
 
 	; The catch must log an error so the failure is diagnosable
 	Assert(InStr(Body, "LoggerError"),

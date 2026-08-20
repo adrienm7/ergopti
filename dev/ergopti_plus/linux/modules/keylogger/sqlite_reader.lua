@@ -11,10 +11,31 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local SqliteCommand = require("modules.keylogger.sqlite_command")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keylogger.sqlite_reader"
 
 local EMPTY_NGRAMS = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc", "sc_kb" }
+
+-- Which table backs each code the dashboard asks for. Only "c" was ever read
+-- here: the other eight codes were handed back as permanently empty maps, so
+-- the word lists, the pair lists and every panel keyed on a sequence longer
+-- than one character rendered blank whatever the database held.
+local NGRAM_TYPE_TABLE = {
+	c    = "ngram_chars",
+	bg   = "ngram_bigrams",
+	tg   = "ngram_trigrams",
+	qg   = "ngram_quadgrams",
+	pg   = "ngram_pentagrams",
+	hx   = "ngram_hexagrams",
+	hp   = "ngram_heptagrams",
+	w    = "ngram_words",
+	w_bg = "ngram_word_bigrams",
+}
+
+-- Read in a fixed order so a failure is reproducible and the SQL a test greps
+-- for is the SQL that runs. `pairs` over the map above would do neither.
+local NGRAM_CODES = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "w_bg" }
 
 local function sql_quote(value)
 	return "'" .. tostring(value or ""):gsub("'", "''") .. "'"
@@ -27,18 +48,14 @@ end
 --- Executes a read-only JSON query through sqlite3.
 local function read_rows(sqlite_path, sql)
 	if not ok_json or type(sqlite_path) ~= "string" or sqlite_path == "" then return {} end
-	local tmp = (os.tmpname and os.tmpname() or "/tmp/ergopti_reader_" .. tostring(os.time()))
-	os.remove(tmp)
-	local tmp_sql = tmp .. ".sql"
-	local fh = io.open(tmp_sql, "w")
-	if not fh then return {} end
-	fh:write(sql); fh:close()
-	local db_esc = sqlite_path:gsub("'", "'\\''")
-	local cmd = string.format("sqlite3 -json '%s' < '%s' 2>/dev/null", db_esc, tmp_sql:gsub("'", "'\\''"))
+	-- Same rule as the writer: the script goes on stdin, never through a file in
+	-- a world-writable directory.
+	local cmd = SqliteCommand.build(sqlite_path, sql, { flags = { "-json" } })
+	if not cmd then return {} end
 	local pipe = io.popen(cmd, "r")
-	local body = pipe and pipe:read("*a") or ""
-	if pipe then pipe:close() end
-	os.remove(tmp_sql)
+	if not pipe then return {} end
+	local body = pipe:read("*a") or ""
+	pipe:close()
 	if body == "" then return {} end
 	local ok, rows = pcall(Json.decode, body)
 	if not ok or type(rows) ~= "table" then
@@ -110,7 +127,233 @@ FROM agg_app_day%s GROUP BY date, app;
 		entry.app_time_ms = row.app_time_ms or 0
 		entry.category = row.category or "Unknown"
 	end
+
+	-- The per-app-day aggregates. Field names match the macOS projection exactly,
+	-- because the dashboard that reads them is the same one.
+	local where = filters(start_date, end_date, apps)
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
+       SUM(space) AS space, SUM(other) AS other,
+       MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min
+FROM agg_app_day_chars_class%s GROUP BY date, app;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.char_letter = row.letter or 0
+		entry.char_digit = row.digit or 0
+		entry.char_punct = row.punct or 0
+		entry.char_space = row.space or 0
+		entry.char_other = row.other or 0
+		-- MIN and MAX rather than the last row's value: several devices sync into
+		-- one database, and the earliest keystroke of the day is the earliest
+		-- across all of them.
+		entry.first_typed_min = row.first_min
+		entry.last_typed_min = row.last_min
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,
+       MAX(cascade_max_len) AS cascade_max_len,
+       SUM(recovery_sum_ms) AS recovery_sum, SUM(recovery_count) AS recovery_count
+FROM agg_app_day_errors%s GROUP BY date, app;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.bs_total = row.bs_total or 0
+		entry.cascade_count_total = row.cascade_count or 0
+		entry.cascade_max_len = row.cascade_max_len or 0
+		entry.recovery_time_sum_ms = row.recovery_sum or 0
+		entry.recovery_time_count = row.recovery_count or 0
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, MAX(same_finger_streak_max) AS f_max,
+       MAX(same_hand_streak_max) AS h_max, SUM(auto_repeat_count) AS ar_count,
+       SUM(focus_to_first_key_sum_ms) AS focus_sum,
+       SUM(focus_to_first_key_count) AS focus_count
+FROM agg_app_day_ergo%s GROUP BY date, app;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		-- MAX, not SUM: the longest same-finger run of the day is a record. Adding
+		-- two devices' records would invent a streak nobody typed.
+		entry.same_finger_streak_max = row.f_max or 0
+		entry.same_hand_streak_max = row.h_max or 0
+		entry.auto_repeat_count = row.ar_count or 0
+		entry.focus_to_first_key_sum_ms = row.focus_sum or 0
+		entry.focus_to_first_key_count = row.focus_count or 0
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, keycode, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
+       MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count,
+       SUM(hold_count) AS hold_count
+FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.kc_hold = entry.kc_hold or {}
+		entry.kc_hold[tostring(row.keycode)] = {
+			sum_ms = row.sum_ms or 0, count = row.count or 0,
+			-- MAX, not SUM: the longest hold of the day is a record across devices.
+			max_ms = row.max_ms or 0,
+			tap_count = row.tap_count or 0, hold_count = row.hold_count or 0,
+		}
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, layout, SUM(count) AS count
+FROM agg_app_day_layouts%s GROUP BY date, app, layout;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.layouts = entry.layouts or {}
+		entry.layouts[row.layout] = (entry.layouts[row.layout] or 0) + (row.count or 0)
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
+FROM agg_app_day_titles%s GROUP BY date, app, title;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.titles = entry.titles or {}
+		entry.titles[row.title] = { c = row.c or 0, ms = row.ms or 0 }
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es
+FROM agg_app_day_hourly%s GROUP BY date, app, hour;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.hourly[row.hour] = {
+			c = row.c or 0, e = row.e or 0, em = row.em or 0, es = row.es or 0,
+			e_buckets = {},
+		}
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es
+FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.hourly_min5[row.slot] = {
+			c = row.c or 0, e = row.e or 0, es = row.es or 0, e_buckets = {},
+		}
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, bucket_ms, SUM(time_sum) AS time_sum, SUM(credited) AS credited,
+       SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,
+       SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c
+FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		local key = tostring(row.bucket_ms)
+		entry.time_buckets[key] = (entry.time_buckets[key] or 0) + (row.time_sum or 0)
+		entry.credited_buckets[key] = (entry.credited_buckets[key] or 0) + (row.credited or 0)
+		entry.hs_input_time_buckets[key] = (entry.hs_input_time_buckets[key] or 0) + (row.hs_in_t or 0)
+		entry.hs_input_credited_buckets[key] = (entry.hs_input_credited_buckets[key] or 0) + (row.hs_in_c or 0)
+		entry.llm_input_time_buckets[key] = (entry.llm_input_time_buckets[key] or 0) + (row.llm_in_t or 0)
+		entry.llm_input_credited_buckets[key] = (entry.llm_input_credited_buckets[key] or 0) + (row.llm_in_c or 0)
+	end
+
+	-- Grouped by the histogram blob as well as by app-day, so two devices'
+	-- distinct blobs each come back as their own row and are merged below.
+	-- Collapsing them in SQL would take one arbitrarily and discard the other.
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
+       MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
+       SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
+       length_buckets_json
+FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.burst_count_total = (entry.burst_count_total or 0) + (row.count_total or 0)
+		entry.burst_max_cpm = math.max(entry.burst_max_cpm or 0, row.max_cpm or 0)
+		entry.burst_max_chars = math.max(entry.burst_max_chars or 0, row.max_chars or 0)
+		entry.burst_inter_delay_count = (entry.burst_inter_delay_count or 0) + (row.inter_count or 0)
+		entry.burst_inter_delay_sum = (entry.burst_inter_delay_sum or 0) + (row.inter_sum or 0)
+		entry.burst_inter_delay_sumsq = (entry.burst_inter_delay_sumsq or 0) + (row.inter_sumsq or 0)
+		entry.burst_length_buckets = entry.burst_length_buckets or {}
+		if ok_json and type(row.length_buckets_json) == "string" then
+			local decoded_ok, buckets = pcall(Json.decode, row.length_buckets_json)
+			if decoded_ok and type(buckets) == "table" then
+				for label, count in pairs(buckets) do
+					entry.burst_length_buckets[label] =
+						(entry.burst_length_buckets[label] or 0) + (tonumber(count) or 0)
+				end
+			end
+		end
+	end
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json
+FROM agg_app_day_session%s;
+]], where))) do
+		local entry = get_entry(manifest, row.date, row.app)
+		entry.session_count_total = (entry.session_count_total or 0) + (row.count_total or 0)
+		-- The longest session of the day is a record across devices, not a sum:
+		-- adding two machines' longest stretches would invent one nobody sat through.
+		if (row.longest_ms or 0) > (entry.session_longest_ms or 0) then
+			entry.session_longest_ms = row.longest_ms
+		end
+		if (row.longest_chars or 0) > (entry.session_longest_chars or 0) then
+			entry.session_longest_chars = row.longest_chars
+		end
+		entry.session_total_active_ms = (entry.session_total_active_ms or 0) + (row.total_active_ms or 0)
+		entry.session_durations = entry.session_durations or {}
+		if ok_json and type(row.durations_json) == "string" then
+			local decoded_ok, durations = pcall(Json.decode, row.durations_json)
+			if decoded_ok and type(durations) == "table" then
+				for _, duration in ipairs(durations) do
+					entry.session_durations[#entry.session_durations + 1] = duration
+				end
+			end
+		end
+	end
+
 	return manifest
+end
+
+--- Reads the machine's own state for a range.
+---
+--- Separate from the manifest, which is keyed by (date, app): this table has no
+--- application, and folding it into an app-keyed structure would make the
+--- dashboard pick one arbitrarily and attribute the machine's battery to it.
+--- @param sqlite_path string
+--- @param start_date string|nil
+--- @param end_date string|nil
+--- @return table date → row
+function M.read_system_days(sqlite_path, start_date, end_date)
+	local out = {}
+	local clauses = {}
+	if valid_date(start_date) then clauses[#clauses + 1] = "date >= " .. sql_quote(start_date) end
+	if valid_date(end_date) then clauses[#clauses + 1] = "date <= " .. sql_quote(end_date) end
+	local where = #clauses > 0 and (" WHERE " .. table.concat(clauses, " AND ")) or ""
+
+	for _, row in ipairs(read_rows(sqlite_path, string.format([[
+SELECT date, SUM(wifi_changes) AS wifi_changes, SUM(space_switches) AS space_switches,
+       SUM(battery_sum) AS battery_sum, SUM(battery_count) AS battery_count,
+       MIN(battery_min) AS battery_min, MAX(battery_max) AS battery_max,
+       SUM(audio_muted_ms) AS audio_muted_ms, SUM(locked_ms) AS locked_ms,
+       SUM(sleep_ms) AS sleep_ms, SUM(awake_ms) AS awake_ms,
+       SUM(passive_count) AS passive_count, SUM(night_wake_count) AS night_wake_count
+FROM agg_system_day%s GROUP BY date;
+]], where))) do
+		out[row.date] = {
+			wifi_changes = row.wifi_changes or 0,
+			space_switches = row.space_switches or 0,
+			battery_sum = row.battery_sum or 0,
+			battery_count = row.battery_count or 0,
+			-- MIN and MAX across devices, not the last row's: the lowest charge of
+			-- the day is the lowest on whichever machine reached it.
+			battery_min = row.battery_min,
+			battery_max = row.battery_max,
+			audio_muted_ms = row.audio_muted_ms or 0,
+			locked_ms = row.locked_ms or 0,
+			sleep_ms = row.sleep_ms or 0,
+			awake_ms = row.awake_ms or 0,
+			passive_count = row.passive_count or 0,
+			night_wake_count = row.night_wake_count or 0,
+		}
+	end
+	return out
 end
 
 local function empty_ngrams()
@@ -129,10 +372,15 @@ local function source_count(esrc_json, source)
 	return tonumber(raw) or 0
 end
 
-local function merge_ngram(target, token, count, esrc_json)
+local function merge_ngram(target, token, count, esrc_json, total_delay, error_count)
 	if type(token) ~= "string" or token == "" then return end
 	local item = target[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 	item.c = item.c + (tonumber(count) or 0)
+	-- The delay total and the error count are what turn a frequency list into a
+	-- cost ranking. Both were dropped on the floor here while the writer stored
+	-- them, so the dashboard sorted "your most expensive sequences" by zero.
+	item.t = item.t + (tonumber(total_delay) or 0)
+	item.e = item.e + (tonumber(error_count) or 0)
 	item.hs = item.hs + source_count(esrc_json, "hotstring")
 	item.llm = item.llm + source_count(esrc_json, "llm")
 	item.o = item.o + source_count(esrc_json, "other")
@@ -144,10 +392,14 @@ end
 --- are additive across dates and devices, just like the token count itself.
 function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	local out = empty_ngrams()
-	local rows = read_rows(sqlite_path, string.format(
-		"SELECT token, c, esrc_json FROM ngram_chars%s;",
-		filters(start_date, end_date, apps)))
-	for _, row in ipairs(rows) do merge_ngram(out.c, row.token, row.c, row.esrc_json) end
+	local where = filters(start_date, end_date, apps)
+	for _, code in ipairs(NGRAM_CODES) do
+		local rows = read_rows(sqlite_path, string.format(
+			"SELECT token, c, td, e, esrc_json FROM %s%s;", NGRAM_TYPE_TABLE[code], where))
+		for _, row in ipairs(rows) do
+			merge_ngram(out[code], row.token, row.c, row.esrc_json, row.td, row.e)
+		end
+	end
 	local sc_rows = read_rows(sqlite_path, string.format(
 		"SELECT scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY scancode;",
 		filters(start_date, end_date, apps)))
@@ -162,12 +414,15 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
 	local historical_end = valid_date(end_date) and end_date < today and end_date or yesterday
 	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
-	local rows = read_rows(sqlite_path, string.format(
-		"SELECT app, token, c, esrc_json FROM ngram_chars%s;",
-		filters(today, today, apps)))
-	for _, row in ipairs(rows) do
-		today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
-		merge_ngram(today_by_app[row.app].c, row.token, row.c, row.esrc_json)
+	local today_where = filters(today, today, apps)
+	for _, code in ipairs(NGRAM_CODES) do
+		local rows = read_rows(sqlite_path, string.format(
+			"SELECT app, token, c, td, e, esrc_json FROM %s%s;",
+			NGRAM_TYPE_TABLE[code], today_where))
+		for _, row in ipairs(rows) do
+			today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
+			merge_ngram(today_by_app[row.app][code], row.token, row.c, row.esrc_json, row.td, row.e)
+		end
 	end
 	local sc_rows = read_rows(sqlite_path, string.format(
 		"SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY app, scancode;",

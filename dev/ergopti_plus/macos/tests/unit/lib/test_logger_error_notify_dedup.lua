@@ -25,13 +25,16 @@ local helpers = require("tests.helpers")
 
 helpers.describe("logger: error notifications respect dedup (no toast storm)", function()
 	helpers.it("fires the notification handler once for N identical errors in the dedup window", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.set_level("DEBUG")
 
 		local log_emits  = 0
 		local notif_count = 0
 		Logger.set_sink(function(_line) log_emits = log_emits + 1 end)
-		Logger.set_error_notification_handler(function(_mod, _msg) notif_count = notif_count + 1 end)
+		Logger.set_error_notification_handler(function(_mod, _msg)
+			notif_count = notif_count + 1
+			return true
+		end)
 
 		-- Same error 5 times back-to-back — well inside the 5 s dedup window.
 		for _ = 1, 5 do
@@ -50,11 +53,14 @@ helpers.describe("logger: error notifications respect dedup (no toast storm)", f
 	end)
 
 	helpers.it("still fires the handler for a genuinely new error after a deduped run", function()
-		local Logger = helpers.load_with_stubs("lib.logger")
+		local Logger = helpers.load_with_stubs("infra.logger")
 		Logger.set_level("DEBUG")
 
 		local notif = {}
-		Logger.set_error_notification_handler(function(_mod, msg) notif[#notif + 1] = msg end)
+		Logger.set_error_notification_handler(function(_mod, msg)
+			notif[#notif + 1] = msg
+			return true
+		end)
 
 		Logger.error("notif_dedup_test", "first failure")
 		Logger.error("notif_dedup_test", "first failure")  -- suppressed (dup)

@@ -80,10 +80,10 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		"adapters.json_codec",
 		"adapters.timer_scheduler",
 		"adapters.shell_runner",
-		"lib.logger",
-		"lib.notifications",
-		"lib.paths",
-		"lib.i18n",
+		"infra.logger",
+		"infra.notifications",
+		"infra.paths",
+		"infra.i18n",
 		"hs",
 		"tests.stubs.hs",
 	}
@@ -98,12 +98,12 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	package.loaded["hs"] = hs_stub
 
 	-- Standard stubs (mirror what load_with_stubs injects)
-	package.loaded["lib.i18n"] = {
+	package.loaded["infra.i18n"] = {
 		get        = function(key) return key end,
 		get_locale = function() return "fr" end,
 		set_locale = function() end,
 	}
-	package.loaded["lib.paths"] = {
+	package.loaded["infra.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name)
@@ -113,7 +113,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 			return helpers.driver_root() .. "../../" .. relative_target
 		end,
 	}
-	package.loaded["lib.notifications"] = {
+	package.loaded["infra.notifications"] = {
 		send  = function() end,
 		error = function() end,
 	}
@@ -181,7 +181,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
 		"modules.llm.api_common", "modules.llm.parser", "adapters.http_client",
 		"adapters.json_codec", "adapters.timer_scheduler", "adapters.shell_runner",
-		"lib.logger", "lib.notifications", "lib.paths", "lib.i18n", "hs", "tests.stubs.hs",
+		"infra.logger", "infra.notifications", "infra.paths", "infra.i18n", "hs", "tests.stubs.hs",
 	}
 	for _, key in ipairs(keys_to_clear) do package.loaded[key] = nil end
 
@@ -190,12 +190,12 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 
-	package.loaded["lib.i18n"] = {
+	package.loaded["infra.i18n"] = {
 		get        = function(key) return key end,
 		get_locale = function() return "fr" end,
 		set_locale = function() end,
 	}
-	package.loaded["lib.paths"] = {
+	package.loaded["infra.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name) return helpers.shared("modules/llm/" .. name) end,
@@ -203,7 +203,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 			return helpers.driver_root() .. "../../" .. relative_target
 		end,
 	}
-	package.loaded["lib.notifications"] = { send = function() end, error = function() end }
+	package.loaded["infra.notifications"] = { send = function() end, error = function() end }
 
 	package.loaded["modules.llm.profiles"]         = make_profiles_stub()
 	package.loaded["modules.llm.api_ollama"]       = make_api_stub()
@@ -239,11 +239,11 @@ end
 
 
 
--- ====================================================================
+-- ===================================================================
 -- ===================================================================
 -- ======= 1/ set_backend() override survives probe completion =======
 -- ===================================================================
--- ====================================================================
+-- ===================================================================
 
 helpers.describe("llm.init — set_backend() override survives probe completion", function()
 

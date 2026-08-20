@@ -9,8 +9,8 @@
 
 local M = {}
 
-local Logger      = require("lib.logger")
-local i18n        = require("lib.i18n")
+local Logger      = require("infra.logger")
+local i18n        = require("infra.i18n")
 local ShellRunner = require("adapters.shell_runner")
 local LOG         = "gestures.conflicts"
 
@@ -153,7 +153,7 @@ end
 --- @param key string The macOS preference key.
 --- @return string The escaped Lua pattern.
 local function escape_lua_pattern(key)
-	return key:gsub("([^%w])", "%%%1")
+	return (key:gsub("([^%w])", "%%%1"))
 end
 
 --- Parses a defaults-read value into a numeric on/off state.

@@ -1,4 +1,4 @@
-# config_schema/examples/hs_config.example.toml
+# _shared/core/config_schema/examples/hs_config.example.toml
 # Example Hammerspoon v2 configuration — target schema after the Scope C refactor.
 # Generated at first boot by the HS driver from _shared/modules/features/manifest.toml.
 # The user edits this file freely; any unknown key triggers a warn at boot
@@ -7,7 +7,8 @@
 # Conventions are identical to ahk_config.example.toml:
 #   - Universal sections: [script], [hotstrings], [llm], [metrics], [shortcuts]
 #     — IDENTICAL to the AHK config, same exact schema.
-#   - HS-only sections are prefixed [hs.*].
+#   - No section is prefixed by driver. A section is named after what it
+#     configures; which drivers honour it is the manifest's "platforms" field.
 #   - Tap-hold lives in hammerspoon/tap_hold.toml and is delegated to Karabiner.
 
 
@@ -36,6 +37,15 @@ log_level = "INFO"
 
 [hotstrings]
 trigger_char = "★"
+
+# Only the HS driver implements the expansion preview today, but the keys are
+# not namespaced by driver — a key belongs to the feature it configures, and
+# which drivers honour it is declared in the manifest's "platforms" field.
+expansion_delay = 0.75
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
 
 
 
@@ -259,21 +269,22 @@ return_key = "open_metrics_typing"
 
 
 
-# ===================================
-# ===================================
-# ======= 6. HS-only sections =======
-# ===================================
-# ===================================
-
-
-
 # ===========================
-# ===== 6.1 hs.gestures =====
+# ===========================
+# ======= 6. Gestures =======
+# ===========================
 # ===========================
 
-# Richer HS vocabulary (Mac trackpad — 2/3/4/5 fingers + diagonals).
 
-[hs.gestures]
+
+# ========================
+# ===== 6.1 gestures =====
+# ========================
+
+# Richer HS vocabulary (Mac trackpad — 2/3/4/5 fingers + diagonals). The AHK
+# driver reads the same section and simply supports fewer of these keys.
+
+[gestures]
 enabled = true
 space_wrap = true
 swipe_2_left = "arrow_up"
@@ -302,13 +313,13 @@ tap_5 = "none"
 
 
 
-# =================================
-# ===== 6.2 hs.gestures.modes =====
-# =================================
+# ==============================
+# ===== 6.2 gestures.modes =====
+# ==============================
 
 # Per-direction mode: "x1" (fire once) or "incremental" (repeats on long swipe).
 
-[hs.gestures.modes]
+[gestures.modes]
 swipe_2_left = "x1"
 swipe_2_right = "x1"
 swipe_2_up = "x1"
@@ -328,13 +339,13 @@ swipe_5_down = "x1"
 
 
 
-# =========================================
-# ===== 6.3 hs.gestures.sensitivities =====
-# =========================================
+# ======================================
+# ===== 6.3 gestures.sensitivities =====
+# ======================================
 
 # Per-direction activation sensitivity (centimetres of travel before firing).
 
-[hs.gestures.sensitivities]
+[gestures.sensitivities]
 swipe_2_left = 3.5
 swipe_2_right = 3.5
 swipe_2_up = 3.5
@@ -354,20 +365,16 @@ swipe_5_down = 3.5
 
 
 
-# ==================================
-# ===== 6.4 hs.hotstrings (UI) =====
-# ==================================
+# ======================================
+# ===== 6.4 hotstrings editor (UI) =====
+# ======================================
 
-[hs.hotstrings]
-expansion_delay = 0.75
-preview_ai_enabled = true
-preview_autocorrect_enabled = true
-preview_colored_tooltips = true
-preview_star_enabled = true
+# The expansion-preview keys themselves live with the rest of [hotstrings] at
+# the top of this file; only the editor window's own state is left here.
 
-[hs.hotstrings.editor]
+[hotstrings.editor]
 close_on_add = false
 
-[hs.hotstrings.editor.shortcut]
+[hotstrings.editor.shortcut]
 key = "★"
 mods = ["ctrl"]

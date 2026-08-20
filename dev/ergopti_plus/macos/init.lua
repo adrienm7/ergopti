@@ -11,7 +11,7 @@
 --- 2. File Discovery: Dynamically loads private and public configuration files.
 --- ==============================================================================
 
--- Inject the _shared/lua root into package.path so that lib/ shims for
+-- Inject the _shared/lua root into package.path so that infra/ shims for
 -- lib.toml.codec, lib.toml.reader, and lib.toml.writer can resolve their shared modules.
 -- This must run before any require() that pulls in those libs.
 do
@@ -76,7 +76,8 @@ do
 	end
 end
 
-local Logger             = require("lib.logger")
+local Logger             = require("infra.logger")
+local TimerScheduler     = require("adapters.timer_scheduler")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -84,7 +85,17 @@ local LOG                = "init"
 -- future rename in only one file used to silently desync the boot-readiness
 -- notification with no error — reading it here instead of re-declaring the
 -- literal makes that impossible.
-local HS_BOOT_READY_SETTING_KEY = require("modules.karabiner.ke_lifecycle").HS_BOOT_READY_SETTING_KEY
+local HS_BOOT_READY_SETTING_KEY = require("platform.remap.ke_lifecycle").HS_BOOT_READY_SETTING_KEY
+
+-- Loaded before any config-dependent Karabiner module so the early shutdown
+-- callback can revoke an already-prepared generation even if a later require
+-- aborts boot. Requiring the controller is side-effect free; init/start happen
+-- only inside platform.remap after its own validation.
+local ok_lease_controller, LeaseController = pcall(require, "platform.remap.lease_controller")
+if not ok_lease_controller then
+	LeaseController = nil
+	Logger.error(LOG, "Exact Karabiner lease controller failed to load — remapping remains fail-closed.")
+end
 
 -- Guard setting consumed by KE lifecycle notifications. It is set to false at
 -- boot start and flipped to true only once init has fully completed.
@@ -127,25 +138,32 @@ end
 -- Boot-phase profiler — ported from the AHK driver. Begin timing as early as the
 -- logger is ready so every subsequent Boot.mark() reports its delta + running
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
-local Boot               = require("lib.boot_profiler")
+local Boot               = require("infra.boot_profiler")
 Boot.begin()
 
-local i18n               = require("lib.i18n")
-local locale_mod         = require("lib.locale")
-local crash_reporter     = require("lib.crash_reporter")
-local reload_guard       = require("lib.reload_guard")
+local i18n               = require("infra.i18n")
+local locale_mod         = require("infra.locale")
+local crash_reporter     = require("modules.diagnostics.crash_reporter")
+local reload_guard       = require("infra.reload_guard")
+local EmergencyExit      = require("infra.emergency_exit")
+local TerminationCoordinator = require("infra.termination_coordinator")
+local TeardownTransaction = require("infra.teardown_transaction")
+local StartupTransaction = require("infra.startup_transaction")
 
--- Tell a reload apart from a real quit. A fresh boot starts with the sentinel
--- cleared, then every controlled hs.reload() drops it again right before the VM
--- re-execs; the shutdown handler reads it to keep the Karabiner bridge alive
--- across reloads (a real quit, where no reload was marked, still tears it down).
+-- Tell a reload apart from a real quit. The coordinator marks the sentinel only
+-- after the old exact Karabiner token is fenced and immediately before the real
+-- reload. Shared Karabiner processes remain live; the old Ergopti lease does not.
 reload_guard.clear()
-do
-	local _orig_reload = hs.reload
-	hs.reload = function(...)
-		pcall(reload_guard.mark_reload)
-		return _orig_reload(...)
+local _native_hs_reload = hs.reload
+hs.reload = function(...)
+	-- A boot error before coordinator wiring cannot have started a Karabiner
+	-- generation. Preserve the native recovery path instead of trapping the user
+	-- in a half-loaded Lua VM whose reload wrapper can only reject.
+	if type(TerminationCoordinator.is_initialized) ~= "function"
+		or TerminationCoordinator.is_initialized() ~= true then
+		return _native_hs_reload(...)
 	end
+	return TerminationCoordinator.request_reload("hammerspoon_reload", ...)
 end
 
 -- Wire i18n → locale so set_locale() updates the JSON loader's active locale.
@@ -153,11 +171,19 @@ end
 i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
 i18n.init()
 
-local menu_paths         = require("ui.menu.menu_paths")
+local config_paths       = require("infra.config_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
+local ManifestReader     = require("infra.manifest_reader")
 -- Wire keymap → locale so trigger-character substitutions (★) use the live char.
-locale_mod.set_trigger_provider(function() return keymap.get_trigger_char and keymap.get_trigger_char() or "★" end)
+-- Read from the manifest rather than from the `magic_key` local: that one is
+-- declared ~500 lines below, so naming it here would capture the GLOBAL of the
+-- same name — nil — and every ★ substitution would silently render empty. Same
+-- trap as project-lua-closure-before-local-nil-global.
+locale_mod.set_trigger_provider(function()
+	return keymap.get_trigger_char and keymap.get_trigger_char()
+		or ManifestReader.default_for("hotstrings.trigger_char")
+end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
 -- having to type out require("modules.keymap") each time.
@@ -180,14 +206,66 @@ if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
 local base_dir = script_path:match("^(.*[/\\])") or "./"
 if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 
-menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
-Boot.mark("Path: config dir + paths.toml (menu_paths.init)")
+-- Boot initialises the RESOLVER, not the path editor: every consumer below
+-- resolves through it, and none of them draws a UI. The editor's reload
+-- callback is wired later by ui/menu/init.lua, which is the only caller that
+-- can act on it.
+local config_paths_ready = config_paths.init(base_dir)
+if config_paths_ready ~= true then
+	Logger.error(LOG, "Config-path initialization did not commit — startup aborted before input or remap activation.")
+	return
+end
+Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 
 -- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
 -- the user config dir is known. Earlier boot lines went to the fallback file.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
-Logger.init_log_path(menu_paths.get_config_dir(), 14)
+Logger.init_log_path(config_paths.get_config_dir(), 14)
 Boot.mark("Path: log file open (retention purge deferred)")
+
+-- The launcher exports one indivisible identity+logger authority. Complete
+-- absence and every partial/stale subset fail closed: the full driver may never
+-- arm an input owner while its logger can still perform synchronous I/O on the
+-- Hammerspoon callback loop. Developer runs must therefore use the launcher too.
+local function abort_logger_boot(detail)
+	Logger.error(LOG, "Native asynchronous logger transport unavailable — startup aborted before input: %s.",
+		tostring(detail))
+	Logger.stop_async_sink()
+	-- i18n is initialized above, but menu/notifications are deliberately not: a
+	-- bounded native alert is the only visible fail-fast surface that cannot arm
+	-- input or leave an inert embedded Hammerspoon process behind.
+	local BOOT_FAILURE_ALERT_SECONDS = 5
+	pcall(function()
+		local alert = hs.alert
+		if type(alert) == "table" and type(alert.show) == "function" then
+			alert.show(
+				i18n.get("startup.native_logger_unavailable"),
+				BOOT_FAILURE_ALERT_SECONDS)
+		end
+	end)
+	os.exit(1)
+	return false
+end
+
+local logger_boot_mode, logger_boot_policy_err = Logger.classify_async_sink_boot_environment()
+if logger_boot_mode ~= "managed" then
+	local refusal_detail = logger_boot_policy_err
+	if logger_boot_mode == "standalone" then
+		refusal_detail = "native logger authority absent; launch the full driver through the ErgoptiPlus launcher"
+	end
+	abort_logger_boot(refusal_detail)
+	return
+end
+
+-- The native launcher binds its authenticated loopback worker before spawning
+-- Hammerspoon. Commit the socket and pump while boot can still fail closed
+-- without exposing an eventtap. Runtime producers then only enqueue memory.
+local async_log_ready, async_log_err = Logger.start_async_sink(TimerScheduler)
+if async_log_ready ~= true then
+	abort_logger_boot(async_log_err)
+	return
+end
+Boot.mark("Path: native asynchronous logger transport committed")
 
 -- Make the file log self-sufficient: capture errors that Hammerspoon would
 -- otherwise only print to its (unexportable, far-too-noisy) Console. Wraps
@@ -216,7 +294,7 @@ do
 	local ok_cache, toml_cache = pcall(require, "adapters.toml_cache")
 	if ok_cache and type(toml_cache) == "table" and type(toml_cache.init) == "function" then
 		toml_cache.init(TOML_CACHE_DIR)
-		local ok_reader, toml_reader = pcall(require, "lib.toml.reader")
+		local ok_reader, toml_reader = pcall(require, "infra.toml.reader")
 		if ok_reader and type(toml_reader) == "table" and type(toml_reader.set_cache_provider) == "function" then
 			toml_reader.set_cache_provider(toml_cache)
 		end
@@ -230,137 +308,416 @@ Boot.mark("TOML hotstring cache wired")
 -- A reference written above the `local` would bind the nil global of the same
 -- name instead, and the teardown would silently never touch Karabiner.
 local karabiner
+local LauncherGuard
+local _termination_coordinator_ready = false
+local _local_teardown_state = TeardownTransaction.new_state()
+local _local_teardown_started = false
+-- Set only after the controlled path has drained and released the logger. The
+-- native shutdown callback still fires for hs.reload(); without this fence it
+-- would reopen the synchronous fallback sink and request the already-STOPPED
+-- lease a second time after the coordinator's final ACK boundary.
+local _controlled_terminal_finalized = false
 
--- Armed HERE, not at the end of boot. The body is fully defensive — every
--- module reference is nil-checked inside its own pcall — and every upvalue it
--- needs exists by this line. Installed as the LAST boot phase, a reload whose
--- new boot threw anywhere in between left the previous session's teardown
--- already gone and the new one not yet installed: Karabiner kept remapping the
--- keyboard with ZERO teardown on the next quit, taps and timers were never
--- released, and the only way out was killing the grabber by hand.
-hs.shutdownCallback = function()
-	pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end)
-	Logger.info(LOG, "Hammerspoon is shutting down — cleaning up resources…")
-
-	-- 1. Stop core modules (releases eventtaps, timers, watchers)
-	pcall(function() if keymap and type(keymap.stop) == "function" then keymap.stop() end end)
-	pcall(function() if gestures and type(gestures.stop) == "function" then gestures.stop() end end)
-	pcall(function() if shortcuts and type(shortcuts.stop) == "function" then shortcuts.stop() end end)
-
-	-- 2. Restore system overrides
-	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
-		pcall(gestures.restore_all_overrides)
+--- Delivers a lifecycle completion without letting an async callback exception
+--- disappear into the Hammerspoon Console.
+local function invoke_lifecycle_callback(label, callback, ...)
+	if type(callback) ~= "function" then return end
+	local args = table.pack(...)
+	local ok, err = xpcall(function()
+		callback(table.unpack(args, 1, args.n))
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s callback failed: %s", tostring(label), tostring(err))
 	end
+end
 
-	-- 3. Tear down the Karabiner-Elements bridge — but ONLY on a genuine quit.
-	-- Skip it entirely on a reload: the root grabber reapplies karabiner.json via
-	-- FSEvents, so killing the user-level bridge here would needlessly drop
-	-- remapping and, on some KE versions, cascade the grabber down — surfacing the
-	-- native "install Karabiner" prompt on the next boot. Only a genuine quit (no
-	-- reload sentinel) should stop remapping.
-	if reload_guard.is_reloading() then
-		Logger.info(LOG, "Reload in progress — leaving KE bridge alive (FSEvents will reapply the config).")
-	else
-		-- Genuine quit: use karabiner.kill(), which runs the launchctl BOOTOUT
-		-- (KILL_CMD) synchronously. A bare pkill (KILL_FAST_CMD) is respawned within
-		-- milliseconds by launchd's KeepAlive plist, so the keyboard would stay
-		-- remapped after HS has exited. kill() also gates on is_hs_owned_bridge,
-		-- leaving a user-managed KE setup untouched (a bare pkill killed it blindly).
-		pcall(function()
-			if karabiner and type(karabiner.kill) == "function" then
-				karabiner.kill()
-				Logger.info(LOG, "Shutdown KE bridge torn down via bootout (genuine quit).")
-				return
-			end
-
-			-- The module never loaded. Until now this branch simply no-opped, which is
-			-- the worst possible outcome: Karabiner-Elements keeps remapping after
-			-- Hammerspoon exits, launchd's KeepAlive restarts the grabber, and the two
-			-- things that could recover it — the menubar and the panic-button eventtap
-			-- — are required BELOW the raise and were never created either.
-			--
-			-- ke_lifecycle is required near the top of this file, far above the module
-			-- that can raise, and it owns both KILL_CMD and is_hs_owned_bridge: exactly
-			-- what karabiner.kill() consumes. So it is the one teardown path guaranteed
-			-- to be reachable here.
-			local ok_kl, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-			if not ok_kl or type(kl) ~= "table" then
-				Logger.error(LOG, "Shutdown: neither the Karabiner module nor ke_lifecycle "
-					.. "could be loaded — the KE bridge cannot be torn down from here.")
-				return
-			end
-			-- Still gated on ownership: a bare kill would boot out a user-managed
-			-- Karabiner setup, which is the regression the ownership marker exists for.
-			if type(kl.is_hs_owned_bridge) == "function" and kl.is_hs_owned_bridge() then
-				pcall(function() hs.execute(kl.KILL_CMD) end)
-				Logger.info(LOG, "Shutdown KE bridge torn down via the ke_lifecycle "
-					.. "fallback (the Karabiner module had failed to load).")
-			else
-				Logger.info(LOG, "Shutdown: KE bridge left alive — not owned by Hammerspoon.")
-			end
-		end)
-	end
-
-	-- 4. Flush the keylogger buffer so in-memory keystrokes are not lost on reload
-	pcall(function()
-		local ok_kl, kl = pcall(require, "modules.keylogger")
-		if ok_kl and kl and type(kl.stop) == "function" then
-			kl.stop()
+--- Requests the exact token-scoped lease fence. A controller that has not been
+--- initialized cannot own a generation in this Lua VM, which matters for the
+--- first-run wizard: its reload occurs before platform.remap.init().
+--- @param reason string Stable diagnostic reason.
+--- @param on_done function|nil Callback fn(ok, detail).
+--- @return boolean accepted
+local function request_exact_lease_revoke(reason, on_done)
+	local callback_fired = false
+	local callback_succeeded = false
+	local function finish(ok, detail)
+		if callback_fired then
+			Logger.warn(LOG, "Duplicate root lease-revocation completion ignored.")
+			return
 		end
-	end)
-
-	-- 5. Stop the VS Code caret bridge HTTP server
-	pcall(function()
-		local ok_vb, vb = pcall(require, "lib.vscode_bridge")
-		if ok_vb and vb and type(vb.stop_server) == "function" then vb.stop_server() end
-	end)
-
-	-- 7. Terminate any running MLX server process
-	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
-
-	-- 8. Kill orphan child processes — shared with the script_quit action via
-	-- menu_llm.terminate_helper_processes() so the os.exit quit path performs the
-	-- identical teardown and the two paths can never drift.
-	pcall(function() require("ui.menu.menu_llm").terminate_helper_processes() end)
-	-- Kill any orphan mlx_lm.server on genuine quit only — not on reload.
-	-- Boot logic deliberately spares a healthy server across sessions; killing it
-	-- on every reload makes the cold-restart avoidance dead code. Shared with the
-	-- script_quit (os.exit) action so the two quit paths cannot drift (F-M7).
-	if not reload_guard.is_reloading() then
-		pcall(function() require("ui.menu.menu_llm").terminate_orphan_mlx_server() end)
+		callback_fired = true
+		callback_succeeded = ok == true
+		invoke_lifecycle_callback("Root lease revocation", on_done, ok == true, detail)
 	end
-	-- Stop all path-watchers that were pinned at module scope to survive GC.
-	-- Explicit :stop() prevents stray file-system callbacks from firing during
-	-- the Lua state teardown window.
+
+	if type(LeaseController) ~= "table" or type(LeaseController.status) ~= "function" then
+		-- A controller module that failed to load could not have spawned the exact
+		-- native guardian in this Lua generation. Any guardian inherited from the
+		-- previous VM independently observes its old stdin EOF.
+		finish(true, "controller-unavailable-no-generation")
+		return true
+	end
+	if type(LeaseController.is_initialized) == "function" then
+		local initialized_ok, initialized = xpcall(LeaseController.is_initialized, debug.traceback)
+		if not initialized_ok then
+			Logger.error(LOG, "Exact Karabiner lease initialization query failed: %s", tostring(initialized))
+			finish(false, "lease-init-status-failed")
+			return false
+		end
+		if initialized ~= true then
+			finish(true, "controller-uninitialized-no-generation")
+			return true
+		end
+	end
+	local status_ok, phase = xpcall(LeaseController.status, debug.traceback)
+	if not status_ok then
+		Logger.error(LOG, "Exact Karabiner lease status query failed: %s", tostring(phase))
+		finish(false, "lease-status-failed")
+		return false
+	end
+	if phase == "uninitialized" then
+		finish(true, "controller-uninitialized-no-generation")
+		return true
+	end
+
+	if karabiner and type(karabiner.revoke) == "function" then
+		local call_ok, accepted_or_err = xpcall(function()
+			return karabiner.revoke(reason, finish)
+		end, debug.traceback)
+		if call_ok then
+			if accepted_or_err ~= true and not callback_fired then
+				finish(false, "module-rejected")
+			end
+			if callback_fired then return callback_succeeded end
+			return accepted_or_err == true
+		end
+		Logger.error(LOG,
+			"Karabiner module lease revocation raised: %s — using the controller fallback.",
+			tostring(accepted_or_err))
+	end
+
+	if type(LeaseController.stop) ~= "function" then
+		finish(false, "controller-stop-unavailable")
+		return false
+	end
+	local call_ok, accepted_or_err = xpcall(function()
+		return LeaseController.stop(reason .. "_fallback", finish)
+	end, debug.traceback)
+	if not call_ok then
+		Logger.error(LOG, "Controller fallback lease revocation raised: %s", tostring(accepted_or_err))
+		if not callback_fired then finish(false, "controller-stop-raised") end
+		return false
+	end
+	if accepted_or_err ~= true and not callback_fired then
+		finish(false, "controller-stop-rejected")
+		return false
+	end
+	if callback_fired then return callback_succeeded end
+	return true
+end
+
+--- Releases every Lua-owned resource. This function never owns Karabiner's
+--- shared processes; controlled callers invoke it only after the exact token
+--- fence. The native shutdown callback intentionally does not call it because
+--- its asynchronous fence cannot be awaited safely.
+--- @param termination_kind string|nil `reload` or `exit` for diagnostics.
+--- @return boolean completed
+local function teardown_all_resources(termination_kind)
+	if not _local_teardown_started then
+		_local_teardown_started = true
+		Logger.info(LOG, "Hammerspoon local teardown started (%s).", tostring(termination_kind or "shutdown"))
+	end
+	local steps = {
+		{
+			name = "boot-ready-setting",
+			run = function() return hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end,
+		},
+		{
+			name = "launcher-guard",
+			run = function()
+				if not LauncherGuard then return true end
+				if type(LauncherGuard.stop) ~= "function" then error("LauncherGuard.stop is unavailable") end
+				return LauncherGuard.stop()
+			end,
+		},
+		{
+			name = "karabiner-local",
+			run = function()
+				if not karabiner then return true end
+				if type(karabiner.teardown_local) ~= "function" then
+					error("platform.remap.teardown_local is unavailable")
+				end
+				return karabiner.teardown_local()
+			end,
+		},
+		{
+			name = "keymap",
+			run = function()
+				if type(keymap) ~= "table" then return true end
+				if type(keymap.stop) ~= "function" then error("keymap.stop is unavailable") end
+				return keymap.stop(true)
+			end,
+		},
+		{
+			name = "gestures",
+			run = function()
+				if type(gestures) ~= "table" then return true end
+				if type(gestures.stop) ~= "function" then error("gestures.stop is unavailable") end
+				return gestures.stop()
+			end,
+		},
+		{
+			name = "shortcuts",
+			run = function()
+				if type(shortcuts) ~= "table" then return true end
+				if type(shortcuts.stop) ~= "function" then error("shortcuts.stop is unavailable") end
+				return shortcuts.stop()
+			end,
+		},
+		{
+			name = "gesture-overrides",
+			run = function()
+				if type(gestures) ~= "table" then return true end
+				if type(gestures.restore_all_overrides) ~= "function" then
+					error("gestures.restore_all_overrides is unavailable")
+				end
+				return gestures.restore_all_overrides()
+			end,
+		},
+		{
+			name = "keylogger",
+			run = function()
+				local module = package.loaded["modules.keylogger"]
+				if module == nil then return true end
+				if type(module) ~= "table" or type(module.shutdown) ~= "function" then
+					error("modules.keylogger.shutdown is unavailable")
+				end
+				return module.shutdown()
+			end,
+		},
+		{
+			name = "vscode-bridge",
+			run = function()
+				local module = package.loaded["infra.vscode_bridge"]
+				if module == nil then return true end
+				if type(module) ~= "table" or type(module.stop_server) ~= "function" then
+					error("infra.vscode_bridge.stop_server is unavailable")
+				end
+				return module.stop_server()
+			end,
+		},
+		{
+			name = "mlx-server",
+			run = function()
+				local module = package.loaded["ui.menu.menu_llm"]
+				if module == nil then return true end
+				if type(module.stop_mlx_server) ~= "function" then error("stop_mlx_server is unavailable") end
+				return module.stop_mlx_server()
+			end,
+		},
+		{
+			name = "llm-helper-processes",
+			run = function()
+				local module = package.loaded["ui.menu.menu_llm"]
+				if module == nil then return true end
+				if type(module.terminate_helper_processes) ~= "function" then
+					error("terminate_helper_processes is unavailable")
+				end
+				return module.terminate_helper_processes()
+			end,
+		},
+	}
+	if termination_kind == "exit" then
+		steps[#steps + 1] = {
+			name = "orphan-mlx-server",
+			run = function()
+				local module = package.loaded["ui.menu.menu_llm"]
+				if module == nil then return true end
+				if type(module.terminate_orphan_mlx_server) ~= "function" then
+					error("terminate_orphan_mlx_server is unavailable")
+				end
+				return module.terminate_orphan_mlx_server()
+			end,
+		}
+	end
 	if type(_G.script_watchers) == "table" then
-		for _, w in ipairs(_G.script_watchers) do
-			pcall(function() w:stop() end)
+		for index, watcher in ipairs(_G.script_watchers) do
+			local captured = watcher
+			steps[#steps + 1] = {
+				name = "script-watcher-" .. tostring(index),
+				run = function() return captured:stop() end,
+			}
 		end
 	end
-	-- The menubar owns watchers of its own (the config path watcher and the theme
-	-- watcher) that are NOT in that table, so they could still fire during the
-	-- teardown window — the exact hazard the comment above cites. Ask the module
-	-- that owns them to stop them; it is the only thing holding the handles.
-	pcall(function()
-		local ok_menu, menu_mod = pcall(require, "ui.menu")
-		if ok_menu and type(menu_mod) == "table" and type(menu_mod.stop_watchers) == "function" then
-			menu_mod.stop_watchers()
+	steps[#steps + 1] = {
+		name = "menu-watchers",
+		run = function()
+			local module = package.loaded["ui.menu"]
+			if module == nil then return true end
+			if type(module) ~= "table" or type(module.stop_watchers) ~= "function" then
+				error("ui.menu.stop_watchers is unavailable")
+			end
+			return module.stop_watchers()
+		end,
+	}
+	steps[#steps + 1] = {
+		name = "logger-drain-announcement",
+		run = function()
+			-- This is intentionally the final Lua-produced completion line. The
+			-- asynchronous finalizer below cannot stop its socket until the native
+			-- worker has acknowledged this record and every earlier teardown line.
+			Logger.info(LOG, "Hammerspoon local owners stopped; draining acknowledged diagnostics.")
+			return true
+		end,
+	}
+	-- The logger pump is intentionally NOT finalized here. The coordinator first
+	-- asks its native worker to ACK this final announcement and every earlier
+	-- teardown record; only that asynchronous completion may call
+	-- finalize_teardown_resources() below.
+	local completed = TeardownTransaction.run(_local_teardown_state, steps)
+	if completed == false then
+		Logger.error(LOG, "Hammerspoon local teardown remains incomplete and retryable.")
+	end
+	return completed
+end
+
+--- Settles scheduler capabilities after the native drain callback, then closes
+--- the logger socket. The logger remains logically active during cancelAll so a
+--- refusing timer cannot resurrect the synchronous legacy sink; the coordinator
+--- exits non-zero on either refusal because no local-owner rollback remains.
+--- @return boolean completed
+local function finalize_teardown_resources()
+	if TimerScheduler.cancelAll() ~= true then return false end
+	if Logger.stop_async_sink() ~= true then return false end
+	_controlled_terminal_finalized = true
+	return true
+end
+
+-- Armed HERE, not at the end of boot. This callback is an unawaitable native
+-- shutdown backstop, so it must keep every F17 consumer alive and return quickly.
+-- Controlled menu/script reload and quit use TerminationCoordinator and perform
+-- the retryable local teardown only after STOPPED. Native SIGTERM instead closes
+-- the process promptly; the worker's stdin EOF is then the authoritative fence.
+local function shutdown_all_resources()
+	-- A controlled reload has already fenced the lease, stopped every local owner,
+	-- drained the exact native log queue and closed its socket. This callback must
+	-- be strictly inert: any Logger call here would reopen the synchronous sink.
+	if _controlled_terminal_finalized then return end
+	Logger.info(LOG, "Hammerspoon is shutting down — requesting exact lease revocation first.")
+	-- Revoke this Lua generation's exact lease on EVERY shutdown, including a
+	-- reload. Each reload receives a distinct token, so leaving the old token live
+	-- until the next boot succeeds would keep stale rules active if that boot fails.
+	-- hs.shutdownCallback cannot wait for asynchronous work, so this is a
+	-- fire-and-forget request. Do not dismantle ScriptControl or run synchronous
+	-- process cleanup here: both would create a missing-output window before the
+	-- guardian sees EOF. Controlled paths already completed their local teardown.
+	local is_reload = false
+	pcall(function() is_reload = reload_guard.is_reloading() == true end)
+	local lease_reason = is_reload and "hammerspoon_reload" or "hammerspoon_quit"
+	local accepted = request_exact_lease_revoke(lease_reason, function(fenced, detail)
+		if fenced then
+			Logger.info(LOG, "Shutdown exact Ergopti lease fence completed: %s", tostring(detail))
+		else
+			Logger.error(LOG, "Shutdown exact Ergopti lease fence failed: %s", tostring(detail))
 		end
 	end)
-	Logger.info(LOG, "Hammerspoon shut down.")
+	if not accepted then
+		Logger.error(LOG, "Shutdown could not request the exact Ergopti lease fence; native EOF remains armed.")
+	end
+	Logger.info(LOG, "Native shutdown handoff complete; local consumers stay live until process exit.")
+end
+
+hs.shutdownCallback = shutdown_all_resources
+
+-- Activity Monitor can SIGKILL the visible Swift launcher, bypassing Cocoa's
+-- applicationWillTerminate hook and leaving its embedded Hammerspoon child
+-- alive. Arm the exact-PID launcher guard only AFTER the complete shutdown
+-- callback exists. Its bounded emergency path either completes the controlled
+-- fence/teardown or exits to hand revocation to native stdin EOF. Direct
+-- module tests may omit the launcher PID, but root boot already required the
+-- complete native authority above and cannot reach this point without it.
+local _runtime_emergency_exit_requested = false
+local RUNTIME_FAILURE_EXIT_DEADLINE_SEC = 0.25
+local RUNTIME_FAILURE_EXIT_CODE = 70
+
+local function managed_launcher_expected()
+	local ok, raw_pid = pcall(os.getenv, "ERGOPTI_LAUNCHER_PID")
+	return ok and type(raw_pid) == "string" and raw_pid ~= ""
+end
+
+local function emergency_exit_after_runtime_failure(owner, reason)
+	if _runtime_emergency_exit_requested then return end
+	_runtime_emergency_exit_requested = true
+	local exact_owner = tostring(owner or "runtime_dependency")
+	local exact_reason = tostring(reason or "unknown_failure")
+	Logger.error(LOG,
+		"ErgoptiPlus runtime dependency failed (%s: %s) — shutting down embedded Hammerspoon.",
+		exact_owner, exact_reason)
+
+	-- Arm the deadline BEFORE starting a request that may never settle. If exact
+	-- STOPPED arrives in time, the normal coordinator fences, tears down, and exits.
+	-- Otherwise process exit closes the native worker's stdin and the independent
+	-- guardian revokes this exact token. Never stop F17 consumers before either
+	-- fence: doing so would create missing Enter/Backspace/Escape output.
+	local accepted = EmergencyExit.request({
+		reason = "runtime_failure_" .. exact_owner .. "_" .. exact_reason,
+		deadline_seconds = RUNTIME_FAILURE_EXIT_DEADLINE_SEC,
+		exit_code = RUNTIME_FAILURE_EXIT_CODE,
+		schedule = function(delay, callback)
+			return hs.timer.doAfter(delay, callback)
+		end,
+		request_exit = function(exit_reason, exit_code, on_aborted)
+			if not _termination_coordinator_ready then return false end
+			return TerminationCoordinator.request_exit(exit_reason, exit_code, on_aborted)
+		end,
+		exit = function(code) return os.exit(code) end,
+	})
+	if not accepted then
+		Logger.error(LOG,
+			"Runtime-failure controlled exit was not accepted; native EOF fallback was requested.")
+	end
+end
+
+local function emergency_exit_after_launcher_loss(reason)
+	return emergency_exit_after_runtime_failure("launcher_liveness", reason)
+end
+
+do
+	local guard_ok, loaded_guard = pcall(require, "infra.launcher_guard")
+	LauncherGuard = guard_ok and loaded_guard or nil
+	if not guard_ok or type(LauncherGuard) ~= "table" or type(LauncherGuard.init) ~= "function" then
+		Logger.error(LOG, "Swift launcher liveness guard failed to load — managed launch is fail-closed: %s",
+			tostring(loaded_guard))
+		if managed_launcher_expected() then
+			emergency_exit_after_launcher_loss("launcher_guard_unavailable")
+		end
+	else
+		local init_ok, started_or_err = xpcall(function()
+			return LauncherGuard.init(emergency_exit_after_launcher_loss)
+		end, debug.traceback)
+		if not init_ok then
+			Logger.error(LOG, "Swift launcher liveness guard initialization threw: %s",
+				tostring(started_or_err))
+			if managed_launcher_expected() then
+				emergency_exit_after_launcher_loss("launcher_guard_init_failed")
+			end
+		elseif started_or_err ~= true and managed_launcher_expected() then
+			emergency_exit_after_launcher_loss("launcher_guard_init_rejected")
+		end
+	end
 end
 
 -- Now safe to load modules that depend on config_dir
 local file_system        = require("adapters.file_system")
--- Guarded: modules.karabiner reaches modules/karabiner/defaults.lua, whose
+-- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
 -- This require sits above the menubar, the panic-button eventtap and every other
 -- line of boot, so a missing or truncated tap_hold defaults.toml used to cost the
 -- whole session rather than one feature.
 local ok_karabiner
-ok_karabiner, karabiner = pcall(require, "modules.karabiner")
+ok_karabiner, karabiner = pcall(require, "platform.remap")
 if not ok_karabiner then
-	Logger.error(LOG, "modules.karabiner failed to load: %s — the Karabiner bridge is "
+	Logger.error(LOG, "platform.remap failed to load: %s — the Karabiner bridge is "
 		.. "disabled for this session; everything else continues.", tostring(karabiner))
 	karabiner = nil
 end
@@ -368,14 +725,63 @@ local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 local backend_detector    = require("modules.llm.backend_detector")
-local notifications       = require("lib.notifications")
-local ui_restore         = require("lib.ui_restore")
+local notifications       = require("infra.notifications")
+local ui_restore         = require("infra.ui_restore")
+
+do
+	local init_ok, initialized_or_err = xpcall(function()
+		return TerminationCoordinator.init({
+			request_lease = request_exact_lease_revoke,
+			teardown = teardown_all_resources,
+			begin_drain = Logger.begin_async_sink_shutdown,
+			finalize_teardown = finalize_teardown_resources,
+			reload = function(...) return _native_hs_reload(...) end,
+			exit = function(code) return os.exit(code) end,
+			fatal_exit = function(code) return os.exit(code) end,
+			fatal_exit_code = RUNTIME_FAILURE_EXIT_CODE,
+			mark_reload = function()
+				reload_guard.mark_reload()
+				return reload_guard.is_reloading() == true
+			end,
+			clear_reload = function()
+				reload_guard.clear_silent()
+				return reload_guard.is_reloading() == false
+			end,
+		})
+	end, debug.traceback)
+	_termination_coordinator_ready = init_ok and initialized_or_err == true
+	if not _termination_coordinator_ready then
+		Logger.error(LOG,
+			"Controlled termination coordinator unavailable (%s) — Karabiner remapping is disabled for this session.",
+			tostring(initialized_or_err))
+		karabiner = nil
+	end
+end
+
+-- The transport may discover queue exhaustion, repeated ACK loss, or a native
+-- NACK only after boot. Route every such failure through the same bounded exact
+-- lease fence used for launcher loss; an unresponsive coordinator still reaches
+-- os.exit(), whose stdin EOF lets the independent lease guardian revoke only
+-- the exact ErgoptiPlus token-scoped variables and rules. No stock Karabiner
+-- process belongs to ErgoptiPlus or may be signalled by this path.
+do
+	local handler_ok, handler_err = Logger.set_async_sink_failure_handler(function(detail)
+		emergency_exit_after_runtime_failure("native_logger", detail)
+	end)
+	if handler_ok ~= true then
+		emergency_exit_after_runtime_failure("native_logger_handler", handler_err)
+	end
+end
 
 -- Wire Logger.error → system notification so every ERROR surfaces to the user
 -- without any module needing to call notifications.notify() directly.
 -- Registered here (after notifications is loaded) to keep logger dependency-free.
 Logger.set_error_notification_handler(function(module_name, message)
-	pcall(notifications.notify, i18n.get("common.error_prefix") .. tostring(module_name), message, "error")
+	return notifications.notify(
+		i18n.get("common.error_prefix") .. tostring(module_name),
+		message,
+		"error"
+	)
 end)
 Boot.mark("Config-dependent module requires")
 
@@ -413,7 +819,7 @@ do
 		Logger.error(LOG, "ui.onboarding failed to load (%s) — first-launch guard cannot run; aborting boot to avoid arming input modules without consent.", tostring(onboarding_mod))
 		return
 	end
-	local cfg_path = menu_paths.get("ConfigTomlPath")
+	local cfg_path = config_paths.get("ConfigTomlPath")
 	if onboarding_mod.should_run(cfg_path) then
 		onboarding_mod.run(cfg_path)
 		return
@@ -427,15 +833,10 @@ end
 -- ====================================
 -- ===================================
 
--- Pre-start modules so they are active before menu.lua reads saved prefs
--- Menu.lua will honor saved state and stop/start them as needed
-Logger.debug(LOG, "Starting gestures module…")
-gestures.start()
-Logger.debug(LOG, "Starting shortcuts module…")
-shortcuts.start()
-Logger.info(LOG, "Main modules initialized successfully.")
-Boot.mark("Gestures + shortcuts pre-start")
-
+-- Pre-start modules so they are active before menu.lua reads saved prefs.
+-- Menu.lua will honor saved state and stop/start them as needed. All three
+-- input owners share one transaction because continuing after a refused start
+-- leaves a half-functional keyboard while the boot log still claims success.
 -- Script control (the AltGr+Enter/Backspace/Escape panic-button eventtap) is
 -- armed as early as its real dependencies allow. M.start() only stores the
 -- keymap/shortcuts/gestures/karabiner module TABLES for later pause/resume
@@ -446,8 +847,38 @@ Boot.mark("Gestures + shortcuts pre-start")
 -- recourse exists for the entire remainder of a slow boot, instead of only
 -- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
 -- have all completed (F-MED-19).
-Logger.debug(LOG, "Starting script control engine…")
-shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
+local prestart_committed = StartupTransaction.run({
+	{
+		name = "gestures",
+		allow_unavailable = true,
+		start = function()
+			Logger.debug(LOG, "Starting gestures module…")
+			return gestures.start()
+		end,
+		stop = gestures.stop,
+	},
+	{
+		name = "shortcuts",
+		start = function()
+			Logger.debug(LOG, "Starting shortcuts module…")
+			return shortcuts.start()
+		end,
+		stop = shortcuts.pause_bindings,
+	},
+	{
+		name = "script_control",
+		start = function()
+			Boot.mark("Gestures + shortcuts pre-start")
+			Logger.debug(LOG, "Starting script control engine…")
+			return shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
+		end,
+		stop = shortcuts.stop_script_control,
+	},
+})
+if prestart_committed ~= true then
+	error("input subsystem pre-start did not commit")
+end
+Logger.info(LOG, "Main modules initialized successfully.")
 Boot.mark("Script control engine started (panic-button eventtap)")
 
 -- Fast-path LLM check: if LLM is explicitly disabled in hs.settings, skip the
@@ -463,8 +894,8 @@ Boot.mark("Script control engine started (panic-button eventtap)")
 -- so a user who turned the LLM off in the file still paid the synchronous
 -- lsof + curl cleanup on every boot. The two readers of this one setting sat on
 -- opposite sides of the layer that populates it.
-local config_overrides = require("lib.config_overrides")
-config_overrides.apply(menu_paths.get("ConfigTomlPath"))
+local config_overrides = require("infra.config_overrides")
+config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
 local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
 
@@ -534,9 +965,9 @@ do
 	end
 end
 
-local Preferences = require("ui.menu.preferences")
+local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
-local boot_saved_prefs = Preferences.load(menu_paths.get("ConfigTomlPath"))
+local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
 local boot_llm_enabled = hs.settings.get("llm.enabled")
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
@@ -574,7 +1005,7 @@ end
 
 Boot.mark("LLM backend bootstrap")
 
-local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
+local configured_hotstrings_dir = config_paths.get("HotstringsDirPath")
 local bundled_hotstrings_dir    = base_dir .. "../_shared/modules/hotstrings/"
 local hotstrings_dir            = configured_hotstrings_dir
 
@@ -586,10 +1017,10 @@ local HOTSTRINGS_EXCLUDED_STEMS = {
 	paths = true,
 }
 
--- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in lib/fs_dir so
+-- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is honoured in exactly one place across the driver; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
-local safe_dir_entries = require("lib.fs_dir").entries
+local safe_dir_entries = require("infra.fs_dir").entries
 
 local function has_common_hotstring_groups(dir)
 	if type(dir) ~= "string" or dir == "" then return false end
@@ -620,19 +1051,19 @@ end
 -- relocated) personal_hotstrings.toml; everything else lives in `hotstrings_dir`.
 do
 	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-	local override_path = menu_paths.get_config_dir()
+	local override_path = config_paths.get_config_dir()
 	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
 	override_path = override_path .. "hotstrings_config.toml"
 	hotstrings_config.init({
 		override_path = override_path,
 		toml_resolver = function(category)
 			if category == "personal" then
-				return menu_paths.get("PersonalTomlPath")
+				return config_paths.get("PersonalTomlPath")
 			end
 			-- Extension personal TOML groups: personal_ext_<stem> → hotstrings/<stem>.toml
 			local ext_stem = category:match("^personal_ext_(.+)$")
 			if ext_stem then
-				return menu_paths.get("PersonalHotstringsDir") .. ext_stem:gsub("__", "/") .. ".toml"
+				return config_paths.get("PersonalHotstringsDir") .. ext_stem:gsub("__", "/") .. ".toml"
 			end
 			return hotstrings_dir .. category .. ".toml"
 		end,
@@ -641,9 +1072,9 @@ do
 	-- Wire the config window so it can discover personal + extension files.
 	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
 	if ok_cw and cw and type(cw.setup) == "function" then
-		local extensions_dir = base_dir .. "../../extensions"
+		local extensions_dir = base_dir .. "../extensions"
 		cw.setup({
-			personal_dir   = menu_paths.get("PersonalHotstringsDir"),
+			personal_dir   = config_paths.get("PersonalHotstringsDir"),
 			extensions_dir = extensions_dir,
 		})
 	end
@@ -662,7 +1093,7 @@ end
 -- Magic key (the hotstring trigger character) defaults here; a user's custom
 -- value and per-section enabled states are restored from config.toml by
 -- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
-local magic_key = "★"
+local magic_key = ManifestReader.default_for("hotstrings.trigger_char")
 
 -- Pass the trigger char to keymap before loading files so magic-key hotstrings
 -- register against the right character.
@@ -793,10 +1224,10 @@ Boot.mark("TOML discovery + ordering")
 -- personal_hotstrings.toml lives in <config_dir>/hotstrings/ (configurable via
 -- the paths editor). Additional *.toml files placed in the same folder are loaded
 -- automatically as extra personal extension groups in alphabetical order by stem.
--- The personal group + recursive extension scan live in lib/personal_hotstrings;
+-- The personal group + recursive extension scan live in infra/personal_hotstrings;
 -- it registers each group with keymap and returns them in load order so they keep
 -- the lowest group_order (= highest priority). Extracted from init.lua Section 5.1.
-for _, g in ipairs(require("lib.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })) do
+for _, g in ipairs(require("infra.personal_hotstrings").load({ bundled_hotstrings_dir = bundled_hotstrings_dir })) do
 	table.insert(hotfiles, g.name)
 	hotfile_paths[g.name] = g.path
 end
@@ -804,8 +1235,11 @@ end
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
 -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
-local personal_info_toml_path = menu_paths.get("PersonalInfoTomlPath")
-dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
+local personal_info_toml_path = config_paths.get("PersonalInfoTomlPath")
+local dynamic_hotstrings_started = dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
+if dynamic_hotstrings_started ~= true then
+	error("dynamic_hotstrings.start did not commit")
+end
 table.insert(hotfiles, "dynamichotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.
@@ -843,7 +1277,10 @@ Boot.mark("Final mapping sort + tail-index rebuild")
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
 -- This call was previously auto-invoked at the end of modules/keymap/init.lua
 -- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
-keymap.start()
+local keymap_started = keymap.start()
+if keymap_started ~= true then
+	error("keymap.start did not commit")
+end
 Boot.mark("Keymap engine started")
 
 
@@ -878,7 +1315,7 @@ Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 -- here previously discarded both return values, so a setup() throw (e.g. a
 -- failed extension install or a port bind failure) vanished with no trace.
 do
-	local ok_vscode, vscode_err = pcall(function() require("lib.vscode_bridge").setup() end)
+	local ok_vscode, vscode_err = pcall(function() require("infra.vscode_bridge").setup() end)
 	if not ok_vscode then
 		Logger.error(LOG, "VS Code caret bridge setup() failed: %s.", tostring(vscode_err))
 	end
@@ -910,12 +1347,12 @@ ui_restore.restore()
 -- ================================
 
 -- Auto-reload file watchers (hotstrings dir + personal tree + project .lua) live
--- in lib/file_watchers; _G.script_watchers (the GC root the shutdown callback
+-- in infra/file_watchers; _G.script_watchers (the GC root the shutdown callback
 -- stops) is populated there. Extracted from init.lua Section 7 — same behaviour.
-require("lib.file_watchers").start({
+require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
-	personal_hotstrings_dir = (menu_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
 	-- and the pathwatcher is recursive, so these two would otherwise register as
@@ -924,8 +1361,8 @@ require("lib.file_watchers").start({
 	-- it again. Resolved from menu_paths so the watcher and the writers cannot
 	-- disagree about where these files are.
 	self_written_files      = {
-		menu_paths.get("ConfigTomlPath"),
-		menu_paths.get("KarabinerConfigPath"),
+		config_paths.get("ConfigTomlPath"),
+		config_paths.get("KarabinerConfigPath"),
 	},
 	-- Runtime store, not source: the TOML snapshot cache lives inside the
 	-- watched driver tree and writes .lua files, so without this every cache
@@ -935,7 +1372,7 @@ require("lib.file_watchers").start({
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
 	git_roots               = {
 		base_dir,
-		(menu_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
+		(config_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
 	},
 })
 
@@ -978,7 +1415,7 @@ pcall(function()
 	end
 end)
 pcall(function()
-	local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+	local ok_l, kl = pcall(require, "platform.remap.ke_lifecycle")
 	if ok_l and kl and type(kl.flush_pending_ready_notification) == "function" then
 		kl.flush_pending_ready_notification()
 	end

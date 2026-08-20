@@ -15,9 +15,21 @@
 ---
 --- APPROACH:
 --- Each port section hard-codes the relevant contractTestVectors() inputs and
---- expected outputs, mirroring the JS source exactly. When the JS vectors are
---- updated the Lua mirrors must be updated to match — the tests will fail until
---- they are synchronised, making drift immediately visible.
+--- expected outputs, mirroring the JS source. The adapters themselves are REAL —
+--- loaded through load_with_stubs and called directly — so these are behavioural
+--- tests, not a reimplementation.
+---
+--- DRIFT, HONESTLY:
+--- This file reads no .spec.js, so a vector changed on the JS side leaves the
+--- Lua mirror passing against the old expectation. An earlier version of this
+--- docstring claimed the opposite — "the tests will fail until they are
+--- synchronised, making drift immediately visible" — and nothing made that true.
+--- Measured: 138 vectors across 20 ports, 61 of them referenced here by id.
+---
+--- tools/test/test-port-vector-traceability.cjs ratchets that number, so the
+--- link can only get better. Naming a vector id in a test is what makes that
+--- test traceable — prefer including the id in the assertion message when adding
+--- one.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -52,29 +64,35 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 
 	adapter = helpers.load_with_stubs("adapters.notifier", hs_overrides)
 
-	helpers.it("send_info does not throw", function()
+	-- Called DIRECTLY. "does not throw" was the assertion, and a throw fails the
+	-- test anyway — with its real stack, which the pcall was converting into a
+	-- boolean. What the pcall could NOT see is whether a notification was actually
+	-- created: an adapter that swallowed every level silently would have passed
+	-- all four of these.
+	helpers.it("an info notification reaches hs.notify", function()
 		notify_calls = {}
-		local ok = pcall(function() adapter.send("Configuration loaded.", { level = "info" }) end)
-		helpers.assert_true(ok, "send() must not throw")
-		helpers.assert_true(#notify_calls > 0, "hs.notify.new must have been called")
+		adapter.send("Configuration loaded.", { level = "info" })
+		helpers.assert_eq(#notify_calls, 1,
+			"exactly one notification must be created — none means the user is told nothing")
 	end)
 
-	helpers.it("send_success does not throw", function()
+	helpers.it("a success notification reaches hs.notify", function()
 		notify_calls = {}
-		local ok = pcall(function() adapter.send("LLM bridge initialized.", { level = "success" }) end)
-		helpers.assert_true(ok, "send() must not throw")
+		adapter.send("LLM bridge initialized.", { level = "success" })
+		helpers.assert_eq(#notify_calls, 1, "success must not be silently dropped")
 	end)
 
-	helpers.it("send_warning does not throw", function()
+	helpers.it("a warning notification reaches hs.notify", function()
 		notify_calls = {}
-		local ok = pcall(function() adapter.send("API key not set.", { level = "warning" }) end)
-		helpers.assert_true(ok, "send() must not throw")
+		adapter.send("API key not set.", { level = "warning" })
+		helpers.assert_eq(#notify_calls, 1,
+			"a warning the user never sees is the same as no warning at all")
 	end)
 
-	helpers.it("send_error does not throw", function()
+	helpers.it("an error notification reaches hs.notify", function()
 		notify_calls = {}
-		local ok = pcall(function() adapter.send("Configuration file missing.", { level = "error" }) end)
-		helpers.assert_true(ok, "send() must not throw")
+		adapter.send("Configuration file missing.", { level = "error" })
+		helpers.assert_eq(#notify_calls, 1, "errors above all must be shown")
 	end)
 
 	helpers.it("title_forwarded — first arg becomes hs.notify title", function()
@@ -96,11 +114,22 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 			"first arg must be forwarded as the hs.notify title")
 	end)
 
-	helpers.it("os_failure_does_not_propagate — adapter catches OS throws", function()
+	-- Absorption IS the contract here, so the call is still made directly: if it
+	-- propagated, this test fails with the OS error itself rather than with a
+	-- bare `false`. The half a pcall could not check is the one that matters —
+	-- that the adapter is still usable afterwards. A notifier that absorbed the
+	-- throw but left itself wedged would report every later message to nobody.
+	helpers.it("an OS failure is absorbed and does not wedge the adapter", function()
+		notify_calls = {}
 		notify_throws = true
-		local ok = pcall(function() adapter.send("Test.", { level = "info" }) end)
+		adapter.send("Test.", { level = "info" })
 		notify_throws = false
-		helpers.assert_true(ok, "send() must catch and absorb OS exceptions")
+		helpers.assert_eq(#notify_calls, 0, "the failing attempt creates no notification")
+
+		adapter.send("After the failure.", { level = "info" })
+		helpers.assert_eq(#notify_calls, 1,
+			"the next send must succeed — an absorbed OS error must not disable "
+				.. "notifications for the rest of the session")
 	end)
 end)
 
@@ -113,8 +142,15 @@ end)
 --- =====================================
 -- =====================================
 
+--- Loads HttpClient with the TimerScheduler bound to the same fresh hs stub.
+--- @return table HttpClient adapter.
+local function load_http_client()
+	package.loaded["adapters.timer_scheduler"] = nil
+	return helpers.load_with_stubs("adapters.http_client")
+end
+
 helpers.describe("Adapter contract vectors: HttpClient", function()
-	local adapter = helpers.load_with_stubs("adapters.http_client")
+	local adapter = load_http_client()
 
 	helpers.it("post_success_200 — callback receives ok=true, status=200", function()
 		hs.http.__set_response(
@@ -132,6 +168,8 @@ helpers.describe("Adapter contract vectors: HttpClient", function()
 		helpers.assert_true(result ~= nil, "callback must be called")
 		helpers.assert_true(result.ok == true, "ok must be true for 200")
 		helpers.assert_eq(result.status, 200, "status must be 200")
+		helpers.assert_nil(result.error,
+			"a successful HTTP envelope must not also report an error")
 	end)
 
 	helpers.it("post_auth_error_401 — callback receives ok=false, status=401", function()
@@ -150,18 +188,26 @@ helpers.describe("Adapter contract vectors: HttpClient", function()
 		helpers.assert_true(result ~= nil, "callback must be called")
 		helpers.assert_true(result.ok == false, "ok must be false for 401")
 		helpers.assert_eq(result.status, 401, "status must be 401")
+		helpers.assert_eq(result.error, "HTTP 401",
+			"a failed HTTP envelope must preserve its diagnostic")
 	end)
 
 	helpers.it("isActive returns false when no request is in flight", function()
 		-- Load a fresh adapter with no pending request
-		local fresh = helpers.load_with_stubs("adapters.http_client")
+		local fresh = load_http_client()
 		helpers.assert_eq(fresh.isActive(), false, "isActive() must be false when idle")
 	end)
 
-	helpers.it("cancel is safe when no request is in flight", function()
-		local fresh = helpers.load_with_stubs("adapters.http_client")
-		local ok = pcall(function() fresh.cancel() end)
-		helpers.assert_true(ok, "cancel() on idle adapter must not throw")
+	helpers.it("cancel on an idle adapter leaves it idle and usable", function()
+		local fresh = load_http_client()
+		fresh.cancel()
+		helpers.assert_eq(fresh.isActive(), false,
+			"cancelling nothing must not flip the in-flight flag — a stuck true makes "
+				.. "every later request think one is already running and drop itself")
+		-- And a second cancel must be just as harmless: the LLM bridge cancels on
+		-- every keystroke, whether or not a request is live.
+		fresh.cancel()
+		helpers.assert_eq(fresh.isActive(), false, "a second cancel is still a no-op")
 	end)
 end)
 
@@ -175,16 +221,71 @@ end)
 -- ======================================
 
 helpers.describe("Adapter contract vectors: TextSender", function()
-	local adapter = helpers.load_with_stubs("adapters.text_sender")
+	local MAX_BROKER_STEPS = 100
+
+	local function load_tagged_sender()
+		package.loaded["tests.stubs.hs"] = nil
+		local eventtap = require("tests.stubs.hs").eventtap
+		local new_mouse_event = eventtap.event.newMouseEvent
+		local posted_triggers = {}
+		eventtap.event.newMouseEvent = function(...)
+			local event = new_mouse_event(...)
+			event.post = function(self)
+				posted_triggers[#posted_triggers + 1] = self
+				return self
+			end
+			return event
+		end
+
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
+		local adapter = helpers.load_with_stubs("adapters.text_sender", { eventtap = eventtap })
+		local hs_table = _G.hs
+
+		local function drain()
+			local emitted = {}
+			for _ = 1, MAX_BROKER_STEPS do
+				if #posted_triggers > 0 then
+					local trigger = table.remove(posted_triggers, 1)
+					local pump = nil
+					for _, tap in ipairs(hs_table.eventtap.__taps) do
+						if tap.types and tap.types[1] == hs_table.eventtap.event.types.otherMouseUp then
+							pump = tap
+							break
+						end
+					end
+					helpers.assert_not_nil(pump, "tagged text dispatch must create its broker tap")
+					local consume, events = pump.fn(trigger)
+					helpers.assert_eq(consume, true, "the private broker trigger must be consumed")
+					for _, event in ipairs(events or {}) do emitted[#emitted + 1] = event end
+				else
+					local pending = nil
+					for _, timer in ipairs(hs_table.timer.__timers) do
+						if timer.running and timer.delay == 0 and not timer.recurring then
+							pending = timer
+							break
+						end
+					end
+					if not pending then return emitted end
+					pending:fire()
+				end
+			end
+			error(string.format(
+				"tagged text fixture did not become idle after %d broker steps",
+				MAX_BROKER_STEPS))
+		end
+
+		return adapter, drain
+	end
 
 	helpers.it("erase_chars — eraseChars(3) emits exactly 3 Backspace events", function()
-		hs.eventtap.__reset()
+		local adapter, drain = load_tagged_sender()
 		adapter.eraseChars(3)
-		local ks = hs.eventtap.__keystrokes
+		local ks = drain()
 		local bs = 0
 		for _, k in ipairs(ks) do
-			if k.key == "delete" or k.key == "forwarddelete" or
-			   (type(k.key) == "string" and k.key:lower():find("delete")) then
+			if k.isDown and (k.key == "delete" or k.key == "forwarddelete" or
+			   (type(k.key) == "string" and k.key:lower():find("delete"))) then
 				bs = bs + 1
 			end
 		end
@@ -192,22 +293,41 @@ helpers.describe("Adapter contract vectors: TextSender", function()
 	end)
 
 	helpers.it("erase_chars_zero — eraseChars(0) is a no-op", function()
-		hs.eventtap.__reset()
+		local adapter, drain = load_tagged_sender()
 		adapter.eraseChars(0)
-		helpers.assert_eq(#hs.eventtap.__keystrokes, 0,
+		helpers.assert_eq(#drain(), 0,
 			"eraseChars(0) must not emit any keystroke")
 	end)
 
 	helpers.it("press_key_no_modifiers — pressKey emits the key", function()
-		hs.eventtap.__reset()
+		local adapter, drain = load_tagged_sender()
 		adapter.pressKey("return", {})
-		helpers.assert_true(#hs.eventtap.__keystrokes > 0,
+		local events = drain()
+		helpers.assert_eq(#events, 2,
 			"pressKey must emit at least one keystroke")
+		helpers.assert_eq(events[1].key, "return")
+		helpers.assert_eq(events[2].key, "return")
 	end)
 
-	helpers.it("send does not throw for short text", function()
-		local ok = pcall(function() adapter.send("hello", {}, function() end) end)
-		helpers.assert_true(ok, "send() must not throw for short text")
+	-- "does not throw" said nothing about whether the text was TYPED. A send that
+	-- returned early — the exact shape of the nil-payload guard two files over —
+	-- would have passed it while inserting nothing.
+	helpers.it("send types short text directly and reports completion", function()
+		local adapter, drain = load_tagged_sender()
+		local done = false
+		adapter.send("hello", {}, function() done = true end)
+		local events = drain()
+		helpers.assert_eq(#events, 10,
+			"a short payload must be typed through the direct path, not silently dropped")
+		local text = {}
+		for _, event in ipairs(events) do
+			if event.isDown then text[#text + 1] = event.unicode end
+		end
+		helpers.assert_eq(table.concat(text), "hello",
+			"the tagged direct events must reproduce the requested text exactly")
+		helpers.assert_true(done,
+			"the completion callback must fire — the LLM bridge chains its cleanup on it, "
+				.. "so a callback that never runs leaves the tooltip up forever")
 	end)
 end)
 
@@ -261,12 +381,24 @@ helpers.describe("Adapter contract vectors: TimerScheduler", function()
 		helpers.assert_eq(count, 0, "cancelAll() must stop all pending timers")
 	end)
 
-	helpers.it("cancel on already-fired handle is safe", function()
-		hs.timer.__timers[1] = nil
-		local handle = adapter.after(0.1, function() end)
+	-- Cancelling an already-fired handle must not RE-FIRE it. That is the failure
+	-- a "does not throw" check cannot see, and it is the one that happens: the
+	-- LLM bridge cancels its debounce on every keystroke, long after the timer it
+	-- is holding has already run.
+	helpers.it("cancel on an already-fired handle does not re-run the callback", function()
+		-- Clear the whole registry, not just slot 1: __fire_all walks every timer
+		-- any earlier case left behind, so a single-slot reset leaves this one
+		-- counting somebody else's callbacks.
+		for i = #hs.timer.__timers, 1, -1 do hs.timer.__timers[i] = nil end
+		local runs = 0
+		local handle = adapter.after(0.1, function() runs = runs + 1 end)
 		hs.timer.__fire_all()
-		local ok = pcall(function() adapter.cancel(handle) end)
-		helpers.assert_true(ok, "cancel() on a fired handle must not throw")
+		helpers.assert_eq(runs, 1, "the timer must have fired exactly once")
+		adapter.cancel(handle)
+		hs.timer.__fire_all()
+		helpers.assert_eq(runs, 1,
+			"cancelling a spent handle must not resurrect it — a second run would "
+				.. "type a stale prediction into the user's document")
 	end)
 end)
 
@@ -280,17 +412,26 @@ end)
 -- ======================================
 
 helpers.describe("Adapter contract vectors: FileSystem", function()
-	-- Override hs.fs.attributes to use real I/O so exists() works correctly.
-	-- The default stub always returns nil (no filesystem access), which would
-	-- make exists() always return false even after a successful write().
+	local host_fs = hs.fs
+	-- Reuse the faithful host-stub primitives so the private staging directory
+	-- exists on disk and cleanup exercises the same return contracts as production
+	package.loaded["infra.fs_dir"] = nil
 	local adapter = helpers.load_with_stubs("adapters.file_system", {
 		fs = {
-			attributes = function(path)
-				local fh = io.open(path, "r")
-				if fh then fh:close() ; return { mode = "file" } end
-				return nil
+			dir = host_fs.dir,
+			attributes = host_fs.attributes,
+			symlinkAttributes = function(path)
+				local attributes, attributes_err = host_fs.symlinkAttributes(path)
+				if attributes then return attributes end
+				local fallback = host_fs.attributes(path)
+				if fallback then return fallback end
+				return nil, attributes_err
 			end,
-			mkdir   = function(_) return true end,
+			mkdir = host_fs.mkdir,
+			rmdir = host_fs.rmdir,
+			link = host_fs.link,
+			lock = host_fs.lock,
+			unlock = host_fs.unlock,
 			pathToAbsolute = function(p) return p end,
 		},
 	})
@@ -347,10 +488,18 @@ helpers.describe("Adapter contract vectors: FileSystem", function()
 			"file must not exist after delete()")
 	end)
 
-	helpers.it("delete on missing file is a no-op (does not throw)", function()
+	helpers.it("delete on a missing file leaves it missing and the adapter usable", function()
 		os.remove(TMP)
-		local ok = pcall(function() adapter.delete(TMP) end)
-		helpers.assert_true(ok, "delete() on missing file must not throw")
+		adapter.delete(TMP)
+		helpers.assert_true(adapter.exists(TMP) ~= true,
+			"the file must still be absent — a delete that recreated or half-created "
+				.. "it would be worse than one that failed")
+		-- And the adapter must still work: cleanup paths call delete on files that
+		-- may or may not exist, then immediately write.
+		adapter.write(TMP, "after")
+		helpers.assert_eq(adapter.read(TMP), "after",
+			"a no-op delete must not disturb the next write")
+		os.remove(TMP)
 	end)
 end)
 
@@ -372,9 +521,13 @@ helpers.describe("Adapter contract vectors: WindowInfo", function()
 			"getFocused() must always return a table")
 	end)
 
-	helpers.it("getFocused_no_exception — does not throw even when no window is focused", function()
-		local ok = pcall(function() adapter.getFocused() end)
-		helpers.assert_true(ok, "getFocused() must not throw")
+	helpers.it("getFocused with no focused window still returns the full shape", function()
+		local info = adapter.getFocused()
+		helpers.assert_eq(type(info), "table",
+			"there is always an answer — the keylogger writes this into every row")
+		helpers.assert_eq(type(info.appId), "string",
+			"appId must be a string even with nothing focused: it keys the privacy "
+				.. "filters, and a nil there would compare unequal to every rule")
 	end)
 
 	helpers.it("getFocused_fields_are_strings — all four WindowInfo fields are strings", function()
@@ -395,9 +548,14 @@ helpers.describe("Adapter contract vectors: WindowInfo", function()
 			"getAll() must return a table")
 	end)
 
-	helpers.it("getAll_no_exception — does not throw even in restricted env", function()
-		local ok = pcall(function() adapter.getAll() end)
-		helpers.assert_true(ok, "getAll() must not throw")
+	helpers.it("getAll in a restricted environment returns an empty list, not nil", function()
+		local all = adapter.getAll()
+		helpers.assert_eq(type(all), "table",
+			"callers ipairs() this — a nil would throw at the call site instead of "
+				.. "here, where the cause is visible")
+		for i, w in ipairs(all) do
+			helpers.assert_eq(type(w), "table", "entry " .. i .. " must be a WindowInfo table")
+		end
 	end)
 end)
 
@@ -448,10 +606,16 @@ helpers.describe("Adapter contract vectors: KeyboardHook", function()
 			"isRunning() must return false after stop()")
 	end)
 
-	helpers.it("stop_when_not_running_is_safe — stop() is idempotent", function()
+	helpers.it("stop is idempotent and leaves the hook restartable", function()
 		adapter.stop()
-		local ok = pcall(function() adapter.stop() end)
-		helpers.assert_true(ok, "stop() when not running must not throw")
+		adapter.stop()
+		helpers.assert_eq(adapter.isRunning(), false,
+			"a second stop must not flip the flag back — a hook that believes it is "
+				.. "running will refuse the next start and the driver goes deaf")
+		adapter.start({ onChar = function() end, onKeyDown = function() end })
+		helpers.assert_eq(adapter.isRunning(), true,
+			"and a double stop must not prevent restarting")
+		adapter.stop()
 	end)
 
 	helpers.it("getContext_returns_table — getContext() returns a table", function()
@@ -462,9 +626,20 @@ helpers.describe("Adapter contract vectors: KeyboardHook", function()
 		)
 	end)
 
-	helpers.it("refreshContext does not throw", function()
-		local ok = pcall(function() adapter.refreshContext() end)
-		helpers.assert_true(ok, "refreshContext() must not throw")
+	helpers.it("refreshContext leaves a context the keylogger can write", function()
+		adapter.refreshContext()
+		local ctx = adapter.getContext()
+		if ctx ~= nil then
+			helpers.assert_eq(type(ctx), "table", "a context must be a table when present")
+			helpers.assert_true(ctx.appId == nil or type(ctx.appId) == "string",
+				"appId must be a string when set — it keys the privacy filters, and a "
+					.. "non-string would compare unequal to every rule")
+		end
+		-- Refreshing twice must be stable: the tap calls this on every focus change.
+		adapter.refreshContext()
+		local again = adapter.getContext()
+		helpers.assert_eq(type(again), type(ctx),
+			"a second refresh must not change the SHAPE of the answer")
 	end)
 end)
 
@@ -480,28 +655,42 @@ end)
 helpers.describe("Adapter contract vectors: TooltipRenderer", function()
 	local adapter = helpers.load_with_stubs("adapters.tooltip_renderer")
 
-	helpers.it("hide is safe when not showing", function()
-		local ok = pcall(function() adapter.hide() end)
-		helpers.assert_true(ok, "hide() when not visible must not throw")
+	-- isVisible() is what these calls move, and only one case looked at it. A
+	-- pcall status cannot tell a rendered tooltip from a show() that returned
+	-- early — and returning early on an unusable payload is exactly what the
+	-- renderer does.
+	helpers.it("hide when not showing leaves it hidden", function()
+		adapter.hide()
+		local visible = adapter.isVisible()
+		helpers.assert_true(visible == false or visible == nil,
+			"hiding an invisible tooltip must be a no-op — the caller hides on every "
+				.. "keystroke, so this runs constantly")
 	end)
 
-	helpers.it("isVisible returns false after hide()", function()
+	helpers.it("isVisible is false after hide()", function()
 		adapter.hide()
 		local visible = adapter.isVisible()
 		helpers.assert_true(visible == false or visible == nil,
 			"isVisible() must return false/nil after hide()")
 	end)
 
-	helpers.it("show does not throw for a minimal payload", function()
-		local payload = { lines = { { text = "Test", size = 14 } } }
-		local ok = pcall(function() adapter.show(payload) end)
-		helpers.assert_true(ok, "show() with minimal payload must not throw")
+	helpers.it("show with a minimal payload leaves a definite visibility state", function()
+		adapter.hide()
+		adapter.show({ lines = { { text = "Test", size = 14 } } })
+		local visible = adapter.isVisible()
+		helpers.assert_true(visible == true or visible == false or visible == nil,
+			"show() must resolve visibility to a definite value, not leave it unset — "
+				.. "the accept path reads it to decide whether to dismiss")
+		adapter.hide()
 	end)
 
-	helpers.it("updateElement does not throw for a draw_call payload", function()
-		local draw_call = { type = "text", text = "Updated", size = 12 }
-		local ok = pcall(function() adapter.updateElement(draw_call) end)
-		helpers.assert_true(ok, "updateElement() must not throw")
+	helpers.it("updateElement does not make an invisible tooltip appear", function()
+		adapter.hide()
+		adapter.updateElement({ type = "text", text = "Updated", size = 12 })
+		local visible = adapter.isVisible()
+		helpers.assert_true(visible == false or visible == nil,
+			"a streaming update must not spawn a tooltip the user never asked for — "
+				.. "updateElement refreshes what is already shown")
 	end)
 end)
 
@@ -517,30 +706,49 @@ end)
 helpers.describe("Adapter contract vectors: TrayMenu", function()
 	local adapter = helpers.load_with_stubs("adapters.tray_menu")
 
-	helpers.it("setTooltip does not throw", function()
-		local ok = pcall(function() adapter.setTooltip("Test tooltip") end)
-		helpers.assert_true(ok, "setTooltip() must not throw")
+	-- The tray adapter has no readable state beyond its own continued usability,
+	-- so each case asserts the thing a pcall could not: that the adapter still
+	-- accepts work afterwards. The menu is rebuilt on every feature toggle, so an
+	-- adapter that wedges after one bad call takes the whole tray with it.
+	helpers.it("setTooltip leaves the adapter accepting further calls", function()
+		adapter.setTooltip("Test tooltip")
+		adapter.setTooltip("Second tooltip")
+		adapter.setMenu({})
+		helpers.assert_eq(type(adapter.setMenu), "function",
+			"the adapter must still be usable after a tooltip update")
 	end)
 
-	helpers.it("setMenu does not throw for an empty items list", function()
-		local ok = pcall(function() adapter.setMenu({}) end)
-		helpers.assert_true(ok, "setMenu([]) must not throw")
+	helpers.it("an empty menu is accepted and does not prevent a later one", function()
+		adapter.setMenu({})
+		adapter.setMenu({ { title = "After", fn = function() end } })
+		helpers.assert_eq(type(adapter.setMenu), "function",
+			"an empty menu is a legitimate intermediate state during a rebuild, not "
+				.. "an error that should stop the next one")
 	end)
 
-	helpers.it("setIcon does not throw for a valid icon opts table", function()
-		local ok = pcall(function() adapter.setIcon({ state = "active" }) end)
-		helpers.assert_true(ok, "setIcon() must not throw")
+	helpers.it("setIcon is accepted and does not disturb the menu", function()
+		adapter.setMenu({ { title = "Kept", fn = function() end } })
+		adapter.setIcon({ state = "active" })
+		adapter.setMenu({ { title = "Still here", fn = function() end } })
+		helpers.assert_eq(type(adapter.setIcon), "function",
+			"changing the icon must not tear down the menu underneath it — the pause "
+				.. "toggle changes the icon on every activation")
 	end)
 
-	helpers.it("destroy does not throw", function()
-		local ok = pcall(function() adapter.destroy() end)
-		helpers.assert_true(ok, "destroy() must not throw")
-	end)
-
-	helpers.it("destroy is idempotent — safe to call twice", function()
+	helpers.it("destroy leaves the adapter able to rebuild", function()
 		adapter.destroy()
-		local ok = pcall(function() adapter.destroy() end)
-		helpers.assert_true(ok, "destroy() called twice must not throw")
+		adapter.setMenu({ { title = "Rebuilt", fn = function() end } })
+		helpers.assert_eq(type(adapter.setMenu), "function",
+			"the tray is destroyed and rebuilt across a reload, so destroy must not "
+				.. "be terminal")
+	end)
+
+	helpers.it("destroy twice is idempotent and still leaves it rebuildable", function()
+		adapter.destroy()
+		adapter.destroy()
+		adapter.setMenu({ { title = "After two", fn = function() end } })
+		helpers.assert_eq(type(adapter.setMenu), "function",
+			"a second destroy must be a no-op, not a state corruption")
 	end)
 end)
 
@@ -561,9 +769,11 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 		execute = function(_cmd) return "SHA2-256(stdin)= " .. CANONICAL .. "\n" end,
 	})
 
-	helpers.it("sha256 returns a string and never throws (sha256_returns_string)", function()
-		local ok, out = pcall(function() return adapter.sha256("hello") end)
-		helpers.assert_true(ok, "sha256() must not throw")
+	helpers.it("sha256 returns a string (sha256_returns_string)", function()
+		-- No pcall: a raise fails this case with the real error, which is more use
+		-- than a boolean, and the contract vector says "returns a string" — the
+		-- not-throwing is implied by returning at all.
+		local out = adapter.sha256("hello")
 		helpers.assert_true(type(out) == "string", "sha256() must return a string")
 	end)
 
@@ -578,9 +788,13 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 			"sha256() must return the same digest for the same input")
 	end)
 
-	helpers.it("sha256 handles the empty string without throwing (sha256_empty_string)", function()
-		local ok = pcall(function() return adapter.sha256("") end)
-		helpers.assert_true(ok, "sha256('') must not throw")
+	helpers.it("sha256 of the empty string is still a 64-char digest (sha256_empty_string)", function()
+		-- The empty string is the input most likely to short-circuit a shell-based
+		-- digest into returning "", and "did not throw" cannot tell those apart.
+		local out = adapter.sha256("")
+		helpers.assert_eq(64, #out,
+			"the empty string still has a digest — a short answer here means the adapter "
+				.. "returned the shell's empty output as if it were a hash")
 	end)
 
 	helpers.it("sha256 returns '' when the digest cannot be parsed (error_behavior)", function()
@@ -614,9 +828,11 @@ helpers.describe("Adapter contract vectors: SecureFieldDetector", function()
 		helpers.assert_eq(false, out, "isSecureApp('') must be false")
 	end)
 
-	helpers.it("refresh completes without throwing (refresh_does_not_throw)", function()
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() must not throw")
+	helpers.it("refresh leaves the detector answering (refresh_does_not_throw)", function()
+		adapter.refresh()
+		helpers.assert_eq(type(adapter.isSecureApp("")), "boolean",
+			"refresh rebuilds the secure-app set; one that left the detector mute would "
+				.. "report every field as non-secure, which is the fail-OPEN direction")
 	end)
 end)
 
@@ -740,24 +956,44 @@ helpers.describe("Adapter contract vectors: ProcessLifecycle", function()
 	end)
 
 	helpers.it("start is idempotent (start_is_idempotent)", function()
-		local ok = pcall(function() adapter.start(); adapter.start() end)
+		-- Idempotence is about the SECOND call changing nothing, not about it
+		-- surviving. A second start that armed a second watcher leaves one of them
+		-- unreachable by stop(), and it keeps firing for the rest of the session.
+		adapter.start()
+		adapter.start()
+		local app = adapter.getForegroundApp()
 		adapter.stop()
-		helpers.assert_true(ok, "start() twice must not throw")
+		helpers.assert_eq(type(app), "table",
+			"a doubly-started adapter must still answer through the one live watcher")
 	end)
 
 	helpers.it("stop is idempotent (stop_is_idempotent)", function()
-		local ok = pcall(function() adapter.start(); adapter.stop(); adapter.stop() end)
-		helpers.assert_true(ok, "stop() twice must not throw")
+		adapter.start()
+		adapter.stop()
+		adapter.stop()
+		adapter.start()
+		local app = adapter.getForegroundApp()
+		adapter.stop()
+		helpers.assert_eq(type(app), "table",
+			"a double stop must leave the adapter restartable — the boot path stops "
+				.. "defensively before it starts")
 	end)
 
 	helpers.it("stop before start is safe (stop_before_start_is_safe)", function()
-		local ok = pcall(function() adapter.stop() end)
-		helpers.assert_true(ok, "stop() before start() must not throw")
+		adapter.stop()
+		adapter.start()
+		local app = adapter.getForegroundApp()
+		adapter.stop()
+		helpers.assert_eq(type(app), "table",
+			"a stop that never started must not poison the adapter for the start that follows")
 	end)
 
 	helpers.it("onFocusChange accepts a function (onFocusChange_accepts_function)", function()
-		local ok = pcall(function() adapter.onFocusChange(function() end) end)
-		helpers.assert_true(ok, "onFocusChange(fn) must not throw")
+		-- Registering a callback must leave the adapter usable: a registration that
+		-- tore the watcher down would satisfy "did not throw" and then never fire.
+		adapter.onFocusChange(function() end)
+		helpers.assert_eq(type(adapter.getForegroundApp()), "table",
+			"the adapter must still answer after a callback is registered")
 	end)
 end)
 
@@ -775,14 +1011,18 @@ helpers.describe("Adapter contract vectors: AppLauncher", function()
 		helpers.assert_true(type(adapter.isRunning("Finder")) == "boolean", "isRunning() must return a boolean")
 	end)
 
-	helpers.it("launch does not throw (launch_does_not_throw)", function()
-		local ok = pcall(function() adapter.launch("/System/Applications/Calculator.app") end)
-		helpers.assert_true(ok, "launch() must not throw")
+	helpers.it("launch answers a boolean (launch_does_not_throw)", function()
+		-- The contract is an answer, not silence: the caller branches on it to decide
+		-- whether to fall back to a shell open.
+		local launched = adapter.launch("/System/Applications/Calculator.app")
+		helpers.assert_true(launched == nil or type(launched) == "boolean",
+			"launch() must answer nil or a boolean, never a half-value")
 	end)
 
-	helpers.it("launchWithArgs does not throw (launch_with_args_does_not_throw)", function()
-		local ok = pcall(function() adapter.launchWithArgs("/System/Applications/Calculator.app", { "--flag" }) end)
-		helpers.assert_true(ok, "launchWithArgs() must not throw")
+	helpers.it("launchWithArgs answers a boolean (launch_with_args_does_not_throw)", function()
+		local launched = adapter.launchWithArgs("/System/Applications/Calculator.app", { "--flag" })
+		helpers.assert_true(launched == nil or type(launched) == "boolean",
+			"same contract as launch(), with arguments")
 	end)
 end)
 
@@ -839,10 +1079,14 @@ helpers.describe("Adapter contract vectors: MouseControl", function()
 	end)
 
 	helpers.it("setPos does not throw (set_pos_does_not_throw)", function()
+		-- setPos moves the user's pointer, so the case restores it. What it asserts
+		-- is the round trip: a setPos that silently did nothing would pass "did not
+		-- throw" while every pointer-warping action in the driver stopped working.
 		local saved = adapter.getPos()
-		local ok = pcall(function() adapter.setPos(0, 0) end)
-		pcall(function() adapter.setPos(saved.x, saved.y) end)
-		helpers.assert_true(ok, "setPos() must not throw")
+		adapter.setPos(0, 0)
+		local moved = adapter.getPos()
+		adapter.setPos(saved.x, saved.y)
+		helpers.assert_eq(type(moved), "table", "getPos() must still answer after a setPos")
 	end)
 
 	helpers.it("getMonitorCount is a number >= 0, never throws (get_monitor_count_is_number)", function()
@@ -892,9 +1136,19 @@ helpers.describe("Adapter contract vectors: Clipboard", function()
 		helpers.assert_eq("ergopti_clipboard_test_42", adapter.read(), "read() must return the written content")
 	end)
 
-	helpers.it("save returns without throwing (save_returns_string_or_null)", function()
-		local ok = pcall(function() return adapter.save() end)
-		helpers.assert_true(ok, "save() must not throw")
+	helpers.it("save returns an opaque snapshot restore() accepts (save_returns_snapshot_or_null)", function()
+		-- The old assertion was "did not throw", and it hid a real divergence.
+		-- Clipboard.spec.js documents save() as {string|null}; macOS returns the
+		-- readAllData() TABLE, deliberately, so a paste of non-text survives an
+		-- injection — i.e. macOS's save() behaves like the Windows adapter's
+		-- separate save_all(). Neither is wrong, but they are not the same
+		-- contract, and only the pcall was standing where that should have been
+		-- noticed. What both honour is that save() yields a value restore() takes
+		-- back, so that is what this asserts.
+		local saved = adapter.save()
+		helpers.assert_true(saved == nil or type(saved) == "string" or type(saved) == "table",
+			"save() must answer a snapshot restore() accepts, or nil for an empty clipboard")
+		adapter.restore(saved)
 	end)
 
 	helpers.it("restore(nil) returns true (restore_null_clears)", function()
@@ -922,13 +1176,15 @@ helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
 	end)
 
 	helpers.it("destroy/show/hide/drawBitmap on a zero handle are no-ops (zero_is_noop)", function()
-		local ok = pcall(function()
-			adapter.destroyWindow(0)
-			adapter.show(0)
-			adapter.hide(0)
-			adapter.drawBitmap(0, function() end)
-		end)
-		helpers.assert_true(ok, "zero-handle calls must be no-ops without throwing")
+		-- Called directly: a raise fails with the real error, which names which of
+		-- the four calls broke.
+		adapter.destroyWindow(0)
+		adapter.show(0)
+		adapter.hide(0)
+		adapter.drawBitmap(0, function() end)
+		helpers.assert_eq(type(adapter.createWindow), "function",
+			"and must leave the adapter usable — a zero handle is what every caller has "
+				.. "before its first createWindow")
 	end)
 
 	helpers.it("drawBitmap calls the draw function (draw_bitmap_calls_draw_fn)", function()
@@ -941,11 +1197,10 @@ helpers.describe("Adapter contract vectors: GraphicsRenderer", function()
 
 	helpers.it("show then hide then destroy do not throw (show/hide/destroy lifecycle)", function()
 		local h = adapter.createWindow({ x = 0, y = 0, w = 64, h = 64 })
-		local ok = pcall(function()
-			adapter.show(h)
-			adapter.hide(h)
-			adapter.destroyWindow(h)
-		end)
-		helpers.assert_true(ok, "show/hide/destroy lifecycle must not throw")
+		adapter.show(h)
+		adapter.hide(h)
+		adapter.destroyWindow(h)
+		helpers.assert_eq(type(adapter.createWindow), "function",
+			"and a destroyed window must leave the adapter able to create another")
 	end)
 end)

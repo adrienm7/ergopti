@@ -44,7 +44,9 @@ Test("keylogger: ingest queue transactions restore caller Critical state (keylog
 
 _KCR_MouseAndRoiTransactionsPreserveCritical() {
 	_KCR_AssertPreservesCallerCritical("KL_Mouse_FlushScroll", "KLMouse.scroll_ticks   := 0")
-	_KCR_AssertPreservesCallerCritical("KL_Roi_PruneWordCounts", "KLRoi.word_counts.Delete")
+	_KCR_AssertPreservesCallerCritical("KL_Roi_IncrementWordCount", "word_counts_generation += 1")
+	_KCR_AssertPreservesCallerCritical("KL_Roi_SnapshotWordCounts", "word_counts.Clone()")
+	_KCR_AssertPreservesCallerCritical("KL_Roi_TryPublishPrunedCounts", "State.word_counts := NextCounts")
 	_KCR_AssertPreservesCallerCritical("KL_Roi_HalflifeTick", "snapshot[trig] := last_tick")
 }
 Test("keylogger: mouse and ROI snapshots preserve caller Critical state (keylogger-critical-restore)", _KCR_MouseAndRoiTransactionsPreserveCritical)

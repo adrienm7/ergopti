@@ -54,11 +54,12 @@ _KLSD_ReadSource(RelPath) {
 ; ====================================================
 
 _KLSD_HardeningHelpersExist() {
-	Src := _KLSD_ReadSource("modules/keylogger/keylogger.ahk")
-	Assert(InStr(Src, "KL_ScanMaxEventId(") > 0,
-		"keylogger.ahk must define KL_ScanMaxEventId - the data.sql scan that finds the highest id already persisted for the device")
-	Assert(InStr(Src, "KL_ResolveStartId(") > 0,
-		"keylogger.ahk must define KL_ResolveStartId - the pure resolver that returns max(persisted, max_in_sql + 1) so a new event can never collide with an existing id")
+	ScanBody := _DriverFuncBody("KL_ScanMaxEventId")
+	ResolveBody := _DriverFuncBody("KL_ResolveStartId")
+	Assert(ScanBody != "",
+		"KL_ScanMaxEventId must exist in the driver source and scan the durable ledger tail")
+	Assert(ResolveBody != "",
+		"KL_ResolveStartId must exist in the driver source and keep event identifiers monotonic")
 }
 Test("keylogger: id-collision hardening helpers exist (kl-stop-dead-no-exit-flush)", _KLSD_HardeningHelpersExist)
 

@@ -15,10 +15,11 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local Manifest      = require("lib.manifest_reader")
-local Timings       = require("lib.timings")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local Manifest      = require("infra.manifest_reader")
+local Timings       = require("infra.timings")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG           = "gestures"
 
 local function load_touchdevice_module()
@@ -112,7 +113,7 @@ M.DEFAULT_STATE = {
 	gestures = false,
 	modes = {},
 	sensitivities = {},
-	space_wrap = Manifest.default_for("hs.gestures.space_wrap"),
+	space_wrap = Manifest.default_for("gestures.space_wrap"),
 }
 
 -- Initialize modes and sensitivities
@@ -184,6 +185,8 @@ local touch_watchers = _G.ERGOPTI_TOUCH_WATCHERS
 
 -- Global discovery timer and event loop primer
 local discovery_timer = nil
+local discovery_generation = 0
+local discovery_cleanup_debt = {}
 
 -- Wake-from-sleep watcher. On some hardware (notably external Magic Trackpads
 -- and after long sleeps), macOS tears down the multitouch subscription during
@@ -192,6 +195,7 @@ local discovery_timer = nil
 -- screensDidUnlock to recover, mirroring the pattern BetterTouchTool uses.
 _G.ERGOPTI_SLEEP_WATCHER = _G.ERGOPTI_SLEEP_WATCHER or nil
 local sleep_watcher = _G.ERGOPTI_SLEEP_WATCHER
+local sleep_watcher_committed = false
 
 -- Vital: Permanent eventtap to keep the macOS gesture subsystem "awake".
 -- Also serves as a wakeup signal: if a gesture-class event reaches the primer
@@ -200,6 +204,8 @@ local sleep_watcher = _G.ERGOPTI_SLEEP_WATCHER
 -- user's CURRENT gesture rather than waiting for the next discovery tick.
 _G.ERGOPTI_GESTURE_PRIMER = _G.ERGOPTI_GESTURE_PRIMER or nil
 local gesture_primer = _G.ERGOPTI_GESTURE_PRIMER
+local gesture_primer_committed = false
+local engine_needs_init = false
 
 -- Debounce for primer-triggered emergency recycles
 local last_emergency_recycle = 0
@@ -573,6 +579,84 @@ local EMERGENCY_RECYCLE_COOLDOWN = 1.0
 local start_health_check_loop
 local start_startup_probe_loop
 
+--- Retires all exact recurring-timer capabilities left by earlier stop refusal.
+--- @return boolean settled True only when every cleanup debt was released.
+local function retry_discovery_timer_cleanup()
+	local snapshot = {}
+	for handle in pairs(discovery_cleanup_debt) do snapshot[#snapshot + 1] = handle end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		if TimerScheduler.cancel(handle) == true then
+			discovery_cleanup_debt[handle] = nil
+		else
+			settled = false
+		end
+	end
+	if not settled then
+		Logger.error(LOG, "Gesture discovery timer cleanup remains pending; exact handles retained.")
+	end
+	return settled
+end
+
+--- Fences callbacks before cancelling the currently owned recurring timer.
+--- @param reason string Lifecycle reason included in diagnostics.
+--- @return boolean settled True only when no owned recurring timer remains.
+local function cancel_discovery_timer(reason)
+	discovery_generation = discovery_generation + 1
+	local settled = retry_discovery_timer_cleanup()
+	local handle = discovery_timer
+	discovery_timer = nil
+	if handle and TimerScheduler.cancel(handle) ~= true then
+		discovery_cleanup_debt[handle] = true
+		Logger.error(LOG, "Gesture discovery timer stop failed during %s.", tostring(reason))
+		settled = false
+	end
+	return settled
+end
+
+--- Acquires one generation-fenced recurring timer transactionally.
+--- @param interval_sec number Repeat interval in seconds.
+--- @param label string Diagnostic timer-mode label.
+--- @param callback function Generation-current callback body.
+--- @return boolean started True only when the native timer is committed.
+local function start_discovery_timer(interval_sec, label, callback)
+	if retry_discovery_timer_cleanup() ~= true then return false end
+
+	local generation = discovery_generation + 1
+	local candidate
+	local committed
+	candidate, committed = TimerScheduler.every(interval_sec, function()
+		if not candidate then return end
+		retry_discovery_timer_cleanup()
+		if generation ~= discovery_generation then return end
+		if not CoreState.enabled or CoreState.suspended then return end
+		callback()
+	end)
+
+	if committed == true and type(candidate) == "table" then
+		local previous = discovery_timer
+		discovery_timer = candidate
+		discovery_generation = generation
+		if previous and TimerScheduler.cancel(previous) ~= true then
+			discovery_cleanup_debt[previous] = true
+			Logger.error(LOG,
+				"Gesture %s timer replaced its predecessor, whose cleanup remains retryable.", label)
+		end
+		Logger.debug(LOG, "Gesture %s recurring timer committed.", label)
+		return true
+	end
+
+	-- The adapter returns the exact candidate even when native start activated
+	-- before raising, so acquisition rollback never depends on a nil assignment
+	if type(candidate) == "table" and TimerScheduler.cancel(candidate) ~= true then
+		discovery_cleanup_debt[candidate] = true
+		Logger.error(LOG, "Gesture %s timer acquisition failed; cleanup retained for retry.", label)
+	else
+		Logger.error(LOG, "Gesture %s timer acquisition failed.", label)
+	end
+	return false
+end
+
 --- Schedules a single safety-net recycle at +STARTUP_SAFETY_PROBE_SEC if no
 --- frame has been received by then, and arms a one-shot watcher for the very
 --- first frame at which point we hand off to the slow health-check loop.
@@ -582,27 +666,26 @@ local start_startup_probe_loop
 --- See project_touchdevice_dormancy_is_kernel memory for the full audit.
 start_startup_probe_loop = function()
 	local started_at = hs.timer.secondsSinceEpoch()
-	if discovery_timer then pcall(function() discovery_timer:stop() end) end
 	Logger.info(LOG, "ENTER startup phase — single safety probe scheduled at +%.1fs, watching for first frame",
 		STARTUP_SAFETY_PROBE_SEC)
 
 	-- Fast poll just to detect the first-frame moment so we can hand off to
 	-- the health-check loop. The poll itself does no recycling.
-	discovery_timer = hs.timer.doEvery(0.5, function()
+	local started = start_discovery_timer(0.5, "startup probe", function()
 		local elapsed = hs.timer.secondsSinceEpoch() - started_at
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			Logger.success(LOG, "Startup phase EXIT — first frame received after %.2fs.", elapsed)
-			pcall(function() discovery_timer:stop() end)
 			start_health_check_loop()
 			return
 		end
 		if elapsed > STARTUP_PHASE_TIMEOUT_SEC then
 			Logger.info(LOG, "Startup phase timeout (%.1fs) — switching to slow health-check (subsystem will wake on first physical touch).", elapsed)
-			pcall(function() discovery_timer:stop() end)
 			start_health_check_loop()
 			return
 		end
 	end)
+	if started ~= true then return false end
+	local startup_generation = discovery_generation
 
 	-- One-shot safety recycle: in the rare case the very first attach was
 	-- somehow dropped, give it ONE retry. Beyond that, recycling is futile.
@@ -615,6 +698,7 @@ start_startup_probe_loop = function()
 		-- synthetic scroll while the script was paused, which the invariant
 		-- "pause = everything off" forbids — and a cursor that jumps during a
 		-- pause is the most visible way to break it.
+		if startup_generation ~= discovery_generation then return end
 		if not CoreState.enabled or CoreState.suspended then return end
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then return end
 		Logger.info(LOG, "Safety-net recycle at +%.1fs (no frame yet) — one-shot, will not retry further",
@@ -622,6 +706,7 @@ start_startup_probe_loop = function()
 		kickstart_hid()
 		recycle_watchers()
 	end)
+	return true
 end
 
 --- Runs the slow health-check loop once frames are flowing.
@@ -629,14 +714,12 @@ end
 --- If for some reason the frame stream stops entirely, we switch back to the
 --- aggressive startup probe so recovery is fast.
 start_health_check_loop = function()
-	if discovery_timer then pcall(function() discovery_timer:stop() end) end
 	Logger.info(LOG, "ENTER slow health-check loop (cadence=%.0fs)", HEALTH_CHECK_INTERVAL_SEC)
-	discovery_timer = hs.timer.doEvery(HEALTH_CHECK_INTERVAL_SEC, function()
+	return start_discovery_timer(HEALTH_CHECK_INTERVAL_SEC, "health check", function()
 		if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			-- Defensive: should not happen, but if we lost the stream entirely,
 			-- restart the aggressive probe loop so the user is not stuck waiting.
 			Logger.warn(LOG, "Health-check: frame stream lost — switching back to startup probe loop.")
-			pcall(function() discovery_timer:stop() end)
 			start_startup_probe_loop()
 			return
 		end
@@ -668,12 +751,14 @@ local function schedule_emergency_recycle()
 	last_emergency_recycle = now
 	Logger.debug(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
+	local emergency_generation = discovery_generation
 	hs.timer.doAfter(0.02, function()
 		-- CoreState.enabled is the FEATURE flag; CoreState.suspended is the pause.
 		-- Checking only the first let kickstart_hid warp the cursor and post a
 		-- synthetic scroll while the script was paused, which the invariant
 		-- "pause = everything off" forbids — and a cursor that jumps during a
 		-- pause is the most visible way to break it.
+		if emergency_generation ~= discovery_generation then return end
 		if not CoreState.enabled or CoreState.suspended then return end
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			Logger.done(LOG, "Emergency recycle ABORTED — first frame arrived in the meantime.")
@@ -690,6 +775,58 @@ end
 local primer_event_count = 0
 local primer_last_log_time = 0
 
+--- Stops and unpublishes the exact primer only after native release succeeds.
+--- The callback is fenced first so queued delivery cannot run during rollback.
+--- @return boolean settled True only when no primer capability remains owned.
+local function stop_gesture_primer()
+	local candidate = gesture_primer
+	if not candidate then return true end
+	gesture_primer_committed = false
+	local stopped, result_or_err = xpcall(function() return candidate:stop() end,
+		debug.traceback)
+	if not stopped or result_or_err == false then
+		Logger.error(LOG, "Gesture primer stop failed; exact cleanup remains owned: %s.",
+			tostring(result_or_err))
+		return false
+	end
+	if gesture_primer == candidate then
+		gesture_primer = nil
+		_G.ERGOPTI_GESTURE_PRIMER = nil
+	end
+	return true
+end
+
+--- Stops and unpublishes the exact wake watcher after native release succeeds.
+--- @return boolean settled True only when no wake-watcher capability remains owned.
+local function stop_sleep_watcher()
+	local candidate = sleep_watcher
+	if not candidate then return true end
+	sleep_watcher_committed = false
+	local stopped, result_or_err = xpcall(function() return candidate:stop() end,
+		debug.traceback)
+	if not stopped or result_or_err == false then
+		Logger.error(LOG, "Gesture wake watcher stop failed; exact cleanup remains owned: %s.",
+			tostring(result_or_err))
+		return false
+	end
+	if sleep_watcher == candidate then
+		sleep_watcher = nil
+		_G.ERGOPTI_SLEEP_WATCHER = nil
+	end
+	return true
+end
+
+--- Rejects startup and rolls back every capability acquired by this attempt.
+--- @param reason string Exact failed startup boundary.
+--- @return boolean Always false.
+local function reject_gesture_start(reason)
+	Logger.error(LOG, "Gesture startup rejected: %s.", tostring(reason))
+	if M.stop() ~= true then
+		Logger.error(LOG, "Gesture startup rollback remains incomplete and retryable.")
+	end
+	return false
+end
+
 --- Initializes and binds multi-touch listeners.
 function M.start()
 	Logger.start(LOG, "Starting gestures module…")
@@ -699,6 +836,24 @@ function M.start()
 	if not touchdevice then
 		Logger.warn(LOG, "Touchdevice API is not available — gestures module disabled on this runtime.")
 		return
+	end
+	-- A reload, duplicate start, or earlier failed rollback can leave exact native
+	-- owners published. Settle them before creating any successor capability.
+	if gesture_primer or sleep_watcher or discovery_timer
+		or next(discovery_cleanup_debt) ~= nil then
+		if M.stop() ~= true then
+			Logger.error(LOG, "Gesture startup refused while prior cleanup remains pending.")
+			return false
+		end
+	end
+	if engine_needs_init then
+		local engine_ok, engine_err = xpcall(function()
+			return Engine.init(CoreState, Actions)
+		end, debug.traceback)
+		if not engine_ok or engine_err == false then
+			return reject_gesture_start("engine reinitialization failed: " .. tostring(engine_err))
+		end
+		engine_needs_init = false
 	end
 
 	-- Dump touchdevice top-level methods so we can spot missing APIs.
@@ -734,28 +889,26 @@ function M.start()
 	-- so the user's current gesture is captured rather than lost.
 	Logger.info(LOG, "STEP 2/4: configuring gesture primer eventtap…")
 	local ev = hs.eventtap.event.types
-	if not gesture_primer then
-		local types_to_watch = { ev.gesture, ev.scrollWheel }
-		local extra_names = {"beginGesture", "endGesture", "swipe", "magnify", "rotate", "directTouch", "smartMagnify"}
-		local added = { "gesture", "scrollWheel" }
-		for _, name in ipairs(extra_names) do
-			if ev[name] then
-				table.insert(types_to_watch, ev[name])
-				table.insert(added, name)
-			else
-				Logger.debug(LOG, "  primer event type '%s' is unavailable in this Hammerspoon version (skipped).", name)
-			end
+	local types_to_watch = { ev.gesture, ev.scrollWheel }
+	local extra_names = {"beginGesture", "endGesture", "swipe", "magnify", "rotate", "directTouch", "smartMagnify"}
+	local added = { "gesture", "scrollWheel" }
+	for _, name in ipairs(extra_names) do
+		if ev[name] then
+			table.insert(types_to_watch, ev[name])
+			table.insert(added, name)
+		else
+			Logger.debug(LOG, "  primer event type '%s' is unavailable in this Hammerspoon version (skipped).", name)
 		end
-		Logger.info(LOG, "  primer subscribing to %d types: %s", #types_to_watch, table.concat(added, ", "))
-		local ok_tap, new_tap = pcall(hs.eventtap.new, types_to_watch, function(event)
-			local t = event:getType()
-			primer_event_count = primer_event_count + 1
-			-- Re-engage if macOS disabled our tap (slow callback or accessibility toggle)
-			if t == ev.tapDisabledByTimeout or t == ev.tapDisabledByUserInput then
-				Logger.warn(LOG, "PRIMER tap DISABLED by OS (type=%d) — re-engaging immediately", t)
-				pcall(function() gesture_primer:start() end)
+	end
+	Logger.info(LOG, "  primer subscribing to %d types: %s", #types_to_watch, table.concat(added, ", "))
+	local primer_candidate = nil
+	local ok_tap, new_tap = xpcall(function()
+		primer_candidate = hs.eventtap.new(types_to_watch, function(event)
+			if gesture_primer ~= primer_candidate or gesture_primer_committed ~= true then
 				return false
 			end
+			local t = event:getType()
+			primer_event_count = primer_event_count + 1
 			-- Throttled visibility: 5 events/sec max, so we see something is happening
 			-- without flooding the log during normal use.
 			local now = hs.timer.secondsSinceEpoch()
@@ -773,19 +926,28 @@ function M.start()
 			end
 			return false
 		end)
-		if not ok_tap or not new_tap then
-			Logger.error(LOG, "  hs.eventtap.new FAILED for primer (ok=%s, tap=%s)", tostring(ok_tap), tostring(new_tap))
-		else
-			gesture_primer = new_tap
-			_G.ERGOPTI_GESTURE_PRIMER = gesture_primer
-			local ok_start = pcall(function() gesture_primer:start() end)
-			Logger.info(LOG, "  primer eventtap CREATED and started (start_pcall=%s)", tostring(ok_start))
-		end
-	else
-		-- Reuse across module reloads, but make sure it is still alive
-		local ok_start = pcall(function() gesture_primer:start() end)
-		Logger.info(LOG, "  primer eventtap already exists — restarting (start_pcall=%s)", tostring(ok_start))
+		return primer_candidate
+	end, debug.traceback)
+	if not ok_tap or new_tap == nil or type(new_tap.start) ~= "function" then
+		return reject_gesture_start("primer construction failed: " .. tostring(new_tap))
 	end
+	gesture_primer = new_tap
+	_G.ERGOPTI_GESTURE_PRIMER = gesture_primer
+	local primer_start_ok, primer_start_result = xpcall(function()
+		return gesture_primer:start()
+	end, debug.traceback)
+	local primer_enabled_ok, primer_enabled = true, true
+	if type(gesture_primer.isEnabled) == "function" then
+		primer_enabled_ok, primer_enabled = pcall(function()
+			return gesture_primer:isEnabled()
+		end)
+	end
+	if not primer_start_ok or primer_start_result == false
+		or not primer_enabled_ok or primer_enabled ~= true then
+		return reject_gesture_start("primer start failed: " .. tostring(primer_start_result))
+	end
+	gesture_primer_committed = true
+	Logger.info(LOG, "  primer eventtap committed")
 
 	-- 3. Immediate first attachment attempt.
 	Logger.info(LOG, "STEP 3/4: kickstart HID + first watcher recycle…")
@@ -798,32 +960,49 @@ function M.start()
 	-- no userspace recycling changes that. See project_touchdevice_dormancy
 	-- memory for the full audit.
 	Logger.info(LOG, "STEP 4/5: starting first-frame watcher…")
-	start_startup_probe_loop()
+	if start_startup_probe_loop() ~= true then
+		Logger.error(LOG, "Gesture startup aborted because the discovery timer could not be committed.")
+		M.stop()
+		return false
+	end
 
 	-- 5. Wake-from-sleep watcher (BetterTouchTool pattern). Sleep can silently
 	-- tear down the multitouch subscription on some hardware; we re-create the
 	-- device when the system or screens wake so frames resume reliably.
 	Logger.info(LOG, "STEP 5/5: arming wake-from-sleep watcher…")
-	if sleep_watcher then
-		pcall(function() sleep_watcher:stop() end)
-	end
 	local ok_cw, cw_module = pcall(require, "hs.caffeinate.watcher")
-	if ok_cw and cw_module then
-		sleep_watcher = cw_module.new(function(event)
+	if not ok_cw or type(cw_module) ~= "table" or type(cw_module.new) ~= "function" then
+		return reject_gesture_start("wake watcher module unavailable: " .. tostring(cw_module))
+	end
+	local wake_candidate = nil
+	local wake_new_ok, wake_or_err = xpcall(function()
+		wake_candidate = cw_module.new(function(event)
+			if sleep_watcher ~= wake_candidate or sleep_watcher_committed ~= true then return end
 			if event == cw_module.systemDidWake or event == cw_module.screensDidUnlock then
+				if not CoreState.enabled or CoreState.suspended then return end
 				Logger.info(LOG, "Wake-from-sleep detected (event=%d) — recycling watchers", event)
 				kickstart_hid()
 				recycle_watchers()
 			end
 		end)
-		_G.ERGOPTI_SLEEP_WATCHER = sleep_watcher
-		pcall(function() sleep_watcher:start() end)
-		Logger.info(LOG, "  wake-from-sleep watcher armed")
-	else
-		Logger.warn(LOG, "  hs.caffeinate.watcher unavailable — wake-from-sleep recovery disabled")
+		return wake_candidate
+	end, debug.traceback)
+	if not wake_new_ok or wake_or_err == nil or type(wake_or_err.start) ~= "function" then
+		return reject_gesture_start("wake watcher construction failed: " .. tostring(wake_or_err))
 	end
+	sleep_watcher = wake_or_err
+	_G.ERGOPTI_SLEEP_WATCHER = sleep_watcher
+	local wake_start_ok, wake_start_result = xpcall(function()
+		return sleep_watcher:start()
+	end, debug.traceback)
+	if not wake_start_ok or wake_start_result == false then
+		return reject_gesture_start("wake watcher start failed: " .. tostring(wake_start_result))
+	end
+	sleep_watcher_committed = true
+	Logger.info(LOG, "  wake-from-sleep watcher committed")
 
 	Logger.success(LOG, "============== gestures module startup COMPLETE — primer events so far: %d ==============", primer_event_count)
+	return true
 end
 
 --- Stops all multitouch listeners and background timers.
@@ -842,30 +1021,30 @@ function M.stop()
 	recycle_watchers(false)
 	
 	-- 2. Stop eventtap primer
-	if gesture_primer then
-		pcall(function() gesture_primer:stop() end)
-		gesture_primer = nil
-		_G.ERGOPTI_GESTURE_PRIMER = nil
-	end
+	local primer_stopped = stop_gesture_primer()
 
 	-- 3. Stop timers
-	if discovery_timer then
-		pcall(function() discovery_timer:stop() end)
-		discovery_timer = nil
-	end
+	local timer_stopped = cancel_discovery_timer("module stop")
 
 	-- 4. Stop sleep watcher
-	if sleep_watcher then
-		pcall(function() sleep_watcher:stop() end)
-		sleep_watcher = nil
-		_G.ERGOPTI_SLEEP_WATCHER = nil
-	end
+	local wake_watcher_stopped = stop_sleep_watcher()
 
 	-- 5. Stop engine (releases scroll-blocker eventtap; must come after primer/watchers
 	--    so any in-flight frame processing sees CoreState.enabled=false first)
-	pcall(Engine.stop)
+	local engine_stopped, engine_stop_result = xpcall(Engine.stop, debug.traceback)
+	if engine_stopped and engine_stop_result ~= false then
+		engine_needs_init = true
+	else
+		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
+	end
 
+	if timer_stopped ~= true or primer_stopped ~= true or wake_watcher_stopped ~= true
+		or not engine_stopped or engine_stop_result == false then
+		Logger.error(LOG, "Gestures module stop incomplete; native cleanup is retryable.")
+		return false
+	end
 	Logger.success(LOG, "Gestures module stopped.")
+	return true
 end
 
 --- Dumps a complete snapshot of the gestures runtime state to the log.

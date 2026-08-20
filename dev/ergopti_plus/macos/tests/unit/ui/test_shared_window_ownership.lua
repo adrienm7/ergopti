@@ -53,7 +53,12 @@ helpers.describe("download_window: auto-hide timers are session-guarded", functi
 			pos = at + 1
 
 			local window = code:sub(at, at + 500)
-			if window:find("M.hide", 1, true) or window:find("hide)", 1, true) then
+			-- Scope this class to the single-instance progress window. TooltipLLM has
+			-- its own session_id and generation-fenced M.hide_silent() timer; treating
+			-- that separate owner as this surface makes the scan fail for being safe.
+			local hides_download_window = window:find("pcall(M.hide)", 1, true) ~= nil
+			local hides_dependency_window = window:find("pcall(llm_progress.hide)", 1, true) ~= nil
+			if hides_download_window or hides_dependency_window then
 				checked = checked + 1
 				local before = code:sub(math.max(1, at - 300), at)
 				-- Either evidence is acceptable: the window module captures

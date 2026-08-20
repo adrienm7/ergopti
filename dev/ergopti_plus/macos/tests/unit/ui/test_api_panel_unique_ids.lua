@@ -11,10 +11,11 @@
 local helpers = require("tests.helpers")
 
 -- api_panel.lua
-local api_src_path = helpers.driver_root() .. "ui/menu/menu_llm/api_panel.lua"
-local fh = io.open(api_src_path, "r")
-if not fh then error("api_panel.lua not readable at: " .. api_src_path) end
-local api_src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/menu/menu_llm/api_panel.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local api_src = helpers.read_driver_source("function M.build_model_picker")
+helpers.assert_true(api_src ~= nil, "ui/menu/menu_llm/api_panel.lua source must be locatable")
 
 -- Test 1: _entry_seq counter must be declared.
 local has_entry_seq = api_src:find("local _entry_seq", 1, true) ~= nil
@@ -33,10 +34,11 @@ helpers.assert_true(
 )
 
 -- profiles_manager.lua
-local pm_src_path = helpers.driver_root() .. "ui/menu/menu_llm/profiles_manager.lua"
-local fh2 = io.open(pm_src_path, "r")
-if not fh2 then error("profiles_manager.lua not readable at: " .. pm_src_path) end
-local pm_src = fh2:read("*a") ; fh2:close()
+-- Selected by a declaration unique to ui/menu/menu_llm/profiles_manager.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local pm_src = helpers.read_driver_source("local function clone_builtin_profile")
+helpers.assert_true(pm_src ~= nil, "ui/menu/menu_llm/profiles_manager.lua source must be locatable")
 
 -- Test 3: _profile_seq counter must be declared.
 local has_profile_seq = pm_src:find("local _profile_seq", 1, true) ~= nil

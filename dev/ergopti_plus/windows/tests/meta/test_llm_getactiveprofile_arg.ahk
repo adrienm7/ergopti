@@ -31,11 +31,22 @@
 ; ==========================================================================
 
 _TLGAA_ProfileArgPresent() {
-	Src := _DriverDirConcat("modules/llm")
-
-	; The call must include user_profiles as the second argument
-	; The fix uses _LLM_Engine["user_profiles"] or [] as fallback
-	Assert(InStr(Src, "LLM_GetActiveProfile(effective_profile_id, _LLM_Engine.Has(" . Chr(0x22) . "user_profiles" . Chr(0x22) . ")") > 0,
-		"LLM_GetActiveProfile must be called with user_profiles as second argument in prediction_engine.ahk")
+	; Enumerate the three production callers. A whitespace-normalized body keeps
+	; this guard insensitive to line wrapping while still requiring the actual
+	; user_profiles expression at every site.
+	Expected := Map(
+		"_LLM_Engine_RequestSemanticSignature",
+			'LLM_GetActiveProfile(EffectiveProfileId,_LLM_Engine.Get("user_profiles",[]))',
+		"LLM_Engine_FirePrediction",
+			'LLM_GetActiveProfile(effective_profile_id,_LLM_Engine.Has("user_profiles")?_LLM_Engine["user_profiles"]:[])',
+		"_LLM_Engine_ApplyTooltipDisplayOpts",
+			'LLM_GetActiveProfile(_LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"]),_LLM_Engine.Has("user_profiles")?_LLM_Engine["user_profiles"]:[])'
+	)
+	for FunctionName, RequiredCall in Expected {
+		Body := RegExReplace(_DriverFuncBody(FunctionName), "\s+", "")
+		Assert(Body != "", FunctionName . " must exist in the driver source")
+		Assert(InStr(Body, RequiredCall, true) > 0,
+			FunctionName . " must pass user_profiles as LLM_GetActiveProfile's second argument")
+	}
 }
 Test("prediction_engine: LLM_GetActiveProfile called with user_profiles as second argument", _TLGAA_ProfileArgPresent)

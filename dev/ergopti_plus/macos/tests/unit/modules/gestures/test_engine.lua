@@ -19,8 +19,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local Engine = helpers.load_with_stubs("modules.gestures.engine")
 
@@ -29,8 +29,13 @@ local _time = 0
 _G.hs.timer.secondsSinceEpoch = function() return _time end
 
 -- Mock script control for pause invariant tests in engine
-local _mock_sc = { paused = false }
-package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return _mock_sc.paused end }
+-- script_control is stubbed only so a TRANSITIVE require cannot pull the real
+-- module (and hs.*) into a headless run. The engine itself never consults it —
+-- the gesture pause gate is CoreState.suspended, checked by
+-- modules/gestures/init.lua — which is asserted below, so this stub is a load
+-- guard and not a pause switch. It used to carry a `paused` flag that two
+-- placeholder tests toggled to no effect whatsoever.
+package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return false end }
 
 
 
@@ -109,11 +114,11 @@ end
 
 
 
--- ======================================
+-- =====================================
 -- =====================================
 -- ======= 2/ Module API Surface =======
 -- =====================================
--- ======================================
+-- =====================================
 
 helpers.describe("gestures.engine: module API surface", function()
 	helpers.it("exposes process_frame as a function", function()
@@ -133,21 +138,36 @@ end)
 
 
 
--- ==============================================================
+-- =============================================================
 -- =============================================================
 -- ======= 3/ process_frame: nil and invalid input guard =======
 -- =============================================================
--- ==============================================================
+-- =============================================================
 
+-- "does not crash" was the whole assertion here: the call ran, then
+-- assert_true(true) passed whatever happened. Not crashing is table stakes for a
+-- frame callback fed by the trackpad driver — the invariant that matters is that
+-- garbage input FIRES NOTHING, because a spurious action reaches the user's
+-- desktop.
 helpers.describe("gestures.engine: nil/invalid input guard", function()
-	helpers.it("process_frame(nil) does not crash", function()
-		Engine.process_frame(nil)
-		helpers.assert_true(true)
+	helpers.it("process_frame(nil) fires no action", function()
+		local fired = make_fired()
+		local E = fresh_engine()
+		E.init(make_state(), fired.actions)
+		reset_engine(E)
+		E.process_frame(nil)
+		helpers.assert_eq(#fired.singles, 0, "a nil frame must fire no single action")
+		helpers.assert_eq(#fired.axes, 0, "and no axis action")
 	end)
 
-	helpers.it("process_frame(string) does not crash", function()
-		Engine.process_frame("not a table")
-		helpers.assert_true(true)
+	helpers.it("process_frame(string) fires no action", function()
+		local fired = make_fired()
+		local E = fresh_engine()
+		E.init(make_state(), fired.actions)
+		reset_engine(E)
+		E.process_frame("not a table")
+		helpers.assert_eq(#fired.singles, 0, "a non-table frame must fire no single action")
+		helpers.assert_eq(#fired.axes, 0, "and no axis action")
 	end)
 end)
 
@@ -162,12 +182,16 @@ end)
 -- ==================================================================
 
 helpers.describe("gestures.engine: empty frame after init", function()
-	helpers.it("process_frame({}) after init does not crash", function()
+	-- An empty frame is what the driver sends when every finger has lifted. It is
+	-- the most common frame there is, and it must be inert: firing on it would mean
+	-- an action every time the user takes their hand off the trackpad.
+	helpers.it("process_frame({}) after init fires nothing", function()
 		local fired = make_fired()
 		local E = fresh_engine()
 		E.init(make_state(), fired.actions)
 		reset_engine(E)
-		helpers.assert_true(true)
+		helpers.assert_eq(#fired.singles, 0, "an empty frame must fire no single action")
+		helpers.assert_eq(#fired.axes, 0, "and no axis action")
 	end)
 end)
 
@@ -340,7 +364,13 @@ helpers.describe("gestures.engine: swipe detection", function()
 			end
 			return false
 		end)(), "tap_3 sentinel must not fire (test is directional)")
-		helpers.assert_true(true)
+		-- A directional swipe must not also register as a tap. The two share the
+		-- same finger count, so a commit that fired both would give the user an
+		-- unrequested action alongside the one they made.
+		for _, a in ipairs(fired.singles) do
+			helpers.assert_true(a ~= "tap_3",
+				"a 3-finger swipe must not also fire the 3-finger tap")
+		end
 	end)
 
 	helpers.it("swipe too small (delta < SWIPE_MIN) does not fire at commit", function()
@@ -537,17 +567,48 @@ helpers.describe("gestures.engine: finger count tracking", function()
 		helpers.assert_true(found, "tap_3 must fire after immediate 2->3 join")
 	end)
 
-	helpers.it("pause must silence all dispatch + primer/wakeup under touchdevice dormancy (project_suspend_pause_invariant)", function()
-		-- Even primer-as-wakeup after kernel gate must produce zero actions when paused.
-		-- Reversal mid-gesture must also be suppressed.
-		_mock_sc.paused = true
-		-- simulate frames + lift
-		_mock_sc.paused = false
-		helpers.assert_true(true, "gestures engine must early-return on pause (no action, no stuck primer state)")
+	--- Feeds a complete 3-finger right swipe: touch down, move, lift.
+	--- Mirrors the working swipe tests above; the delta is well past SWIPE_MIN.
+	local function swipe_right(E)
+		_time = 0
+		E.process_frame({ make_touch(100, 100), make_touch(110, 100), make_touch(105, 110) })
+		_time = 0.05
+		E.process_frame({ make_touch(120, 100), make_touch(130, 100), make_touch(125, 110) })
+		_time = 0.1
+		E.process_frame({})
+	end
+
+	-- The two placeholders these replace set _mock_sc.paused = true, immediately
+	-- set it back to false, fed no frames, and asserted assert_true(true).
+	--
+	-- Driving them revealed the placeholders' premise was WRONG. The engine does
+	-- not consult script_control at all — it never requires it — so
+	-- _mock_sc.paused has no effect here, and a swipe fired straight through the
+	-- "paused" test. The pause gate for gestures is CoreState.suspended, checked
+	-- by modules/gestures/init.lua before it dispatches. The engine is pure, and
+	-- pinning that purity is what actually protects the seam: the day someone
+	-- adds a pause check in here, there would be two gates disagreeing.
+	helpers.it("the engine is pure with respect to pause — the gate lives in its caller", function()
+		local src = helpers.read_driver_source("local function triggerLiveAxisIfNeeded")
+		helpers.assert_true(src ~= nil, "modules/gestures/engine.lua source must be locatable")
+		helpers.assert_true(src:find("script_control", 1, true) == nil,
+			"the engine must not consult script_control — the pause gate is CoreState.suspended in modules/gestures/init.lua, and a second gate here would let the two disagree")
 	end)
 
-	helpers.it("high volume (200+) frames + pause mid-gesture + reversal must stay correct", function()
-		-- 200+ process_frame with pause/resume + direction reversal must not corrupt state or leak actions.
-		helpers.assert_true(true, "volume + pause + reversal must not degrade (would have caught stuck gesture or wrong reversal)")
+	helpers.it("a swipe fires, and a second identical swipe fires again — no stuck primer", function()
+		local fired = make_fired()
+		local E = fresh_engine()
+		E.init(make_state({ ga = { swipe_3_right = "tab_next" } }), fired.actions)
+		reset_engine(E)
+
+		swipe_right(E)
+		swipe_right(E)
+
+		local count = 0
+		for _, a in ipairs(fired.singles) do
+			if a == "tab_next" then count = count + 1 end
+		end
+		helpers.assert_eq(count, 2,
+			"each completed swipe must fire once — a primer left half-armed by the previous gesture silently kills every gesture after it, which is the failure the placeholder named and never checked")
 	end)
 end)

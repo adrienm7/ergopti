@@ -15,7 +15,7 @@
 ; pinning every delay write to a single millisecond-quantised rule.
 ;
 ; This is a behavioural test: HotstringsSerialiseDelay lives in
-; lib/hotstrings/hotstrings_config.ahk, which IS in the run_all include graph
+; infra/hotstrings/hotstrings_config.ahk, which IS in the run_all include graph
 ; and is a pure function (no OS / file / network side effects), so it can be
 ; called directly. A meta-static guard additionally pins the config-window side
 ; (_HCW_TomlValue, NOT in the run_all graph) to the same helper.

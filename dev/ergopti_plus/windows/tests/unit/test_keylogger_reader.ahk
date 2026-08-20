@@ -40,16 +40,50 @@ _KLR_DateFilter_EndOnly() {
 }
 
 ; ULTIMATE encore plus: healthcheck/diagnostic integration + pause (diagnostic must use reader safely under pause for troubleshooting, surface errors sink, no side effects).
+; The reader is what the healthcheck window calls, and the healthcheck is most
+; useful precisely when the driver is paused. So the query builders must be pure
+; string assembly: no suspend check, no writes. A reader that returned a
+; different WHERE clause while paused would show the user a different history
+; than the one on disk.
 _KLR_PauseSafeForDiagnostic() {
-	; Simulate A_IsSuspended. Reader functions must be safe to call from healthcheck (which is always-available for debug).
-	; No writes, no activation, just pure query builders.
-	AssertTrue(true, "keylogger reader must be pause-resilient (project_suspend_pause_invariant) — healthcheck can read logs/paths/errors sink even when paused")
+	Body := _DriverFuncBody("KLR_DateFilter")
+	Assert(InStr(Body, "A_IsSuspended") == 0,
+		"KLR_DateFilter() must not read A_IsSuspended — the diagnostic has to report the same "
+		. "history whether or not the driver is paused")
+
+	; Pure assembly: same inputs, same clause, twice.
+	A := KLR_DateFilter("2024-01-01", "2024-12-31")
+	B := KLR_DateFilter("2024-01-01", "2024-12-31")
+	AssertEqual(A, B, "the query builder must be deterministic")
+	AssertTrue(InStr(A, "WHERE") > 0, "and it must actually build a WHERE clause for two dates")
+
+	; No arguments at all yields no clause rather than a malformed one.
+	AssertEqual("", KLR_DateFilter("", ""),
+		"with neither bound the builder must return an empty string, not a dangling WHERE")
 }
 Test("KLR: reader must be safe for healthcheck under pause (diagnostic troubleshooting)", _KLR_PauseSafeForDiagnostic)
 
+; A date bound reaches SQL, so it goes through SQLite_Q. The clause must quote
+; what it interpolates — the reader takes its dates from a WebView2 message, and
+; an unquoted bound there is an injection into the metrics database.
 _KLR_DiagnosticSeesErrorsSinkAndVolume() {
-	; Healthcheck keylogger summary + reader must see errors sink path + high volume events without leaking PII or corrupting under pause + rollover sim.
-	AssertTrue(true, "diagnostic using reader must report errors sink + volume counts correctly under pause + edges (would have caught missing errors log visibility in troubleshooting report)")
+	One := KLR_DateFilter("2024-01-01", "")
+	AssertTrue(InStr(One, "date >=") > 0, "a start bound must produce a lower-bound comparison")
+	AssertTrue(InStr(One, "date <=") == 0, "and must not invent an upper bound")
+
+	Two := KLR_DateFilter("", "2024-12-31")
+	AssertTrue(InStr(Two, "date <=") > 0, "an end bound must produce an upper-bound comparison")
+	AssertTrue(InStr(Two, "date >=") == 0, "and must not invent a lower bound")
+
+	; Both bounds are joined, never concatenated into one broken predicate.
+	Both := KLR_DateFilter("2024-01-01", "2024-12-31")
+	AssertTrue(InStr(Both, " AND ") > 0, "two bounds must be joined with AND")
+
+	; The values are quoted through SQLite_Q rather than pasted in raw.
+	Quoted := KLR_DateFilter("2024-01-01' OR 1=1 --", "")
+	AssertTrue(InStr(Quoted, "OR 1=1") == 0 or InStr(Quoted, "''") > 0,
+		"a quote in a date bound must be escaped by SQLite_Q — this clause is built from a "
+		. "WebView2 message and lands in the metrics database")
 }
 Test("KLR: healthcheck via reader must expose errors sink + volume under pause + rollover (errors sink + privacy)", _KLR_DiagnosticSeesErrorsSinkAndVolume)
 
@@ -235,7 +269,7 @@ Test("KLR_BumpMap: multiple keys are independent", _KLR_BumpMap_MultipleKeysInde
 ; ==========================================
 
 _KLR_NewNgramItem_FieldsSet() {
-	item := KLR_NewNgramItem(10, 200, 3, "")
+	item := KLR_NewNgramItem(10, 200, 3)
 	AssertEqual(10, item["c"])
 	AssertEqual(200, item["t"])
 	AssertEqual(3, item["e"])
@@ -243,26 +277,21 @@ _KLR_NewNgramItem_FieldsSet() {
 Test("KLR_NewNgramItem: c/t/e fields reflect constructor arguments", _KLR_NewNgramItem_FieldsSet)
 
 _KLR_NewNgramItem_HsAndLlmDefaultZero() {
-	item := KLR_NewNgramItem(1, 2, 3, "")
+	item := KLR_NewNgramItem(1, 2, 3)
 	AssertEqual(0, item["hs"])
 	AssertEqual(0, item["llm"])
 	AssertEqual(0, item["o"])
 }
 Test("KLR_NewNgramItem: hs/llm/o always initialised to 0", _KLR_NewNgramItem_HsAndLlmDefaultZero)
 
-_KLR_NewNgramItem_EsrcJsonStoredWhenNonEmpty() {
-	item := KLR_NewNgramItem(1, 2, 3, '{"hotstring":4}')
-	AssertTrue(item.Has("esrc_json"))
-	AssertEqual('{"hotstring":4}', item["esrc_json"])
+_KLR_NewNgramItem_SourceCountsAreNumericFields() {
+	item := KLR_NewNgramItem(7, 2, 3, 4, 2, 1)
+	AssertEqual(4, item["hs"])
+	AssertEqual(2, item["llm"])
+	AssertEqual(1, item["o"])
 }
-Test("KLR_NewNgramItem: esrc_json stored when non-empty", _KLR_NewNgramItem_EsrcJsonStoredWhenNonEmpty)
-
-_KLR_NewNgramItem_EsrcJsonOmittedWhenEmpty() {
-	; When esrc_json is empty the key must not be added (saves memory)
-	item := KLR_NewNgramItem(1, 2, 3, "")
-	AssertFalse(item.Has("esrc_json"))
-}
-Test("KLR_NewNgramItem: esrc_json key absent when empty string provided", _KLR_NewNgramItem_EsrcJsonOmittedWhenEmpty)
+Test("KLR_NewNgramItem: projected source counts remain numeric fields",
+	_KLR_NewNgramItem_SourceCountsAreNumericFields)
 
 
 
@@ -351,12 +380,12 @@ Test("KLR__JsonEscape: empty string -> empty string", _KLR_JsonEscape_EmptyStrin
 ; ===============================================
 
 _KLR_BuildNgramFilter_NoArgs() {
-	AssertEqual("", KLR_BuildNgramFilter("", "", []))
+	AssertEqual("", KLR_BuildNgramFilter("", ""))
 }
 Test("KLR_BuildNgramFilter: no args -> empty string", _KLR_BuildNgramFilter_NoArgs)
 
 _KLR_BuildNgramFilter_StartOnly() {
-	result := KLR_BuildNgramFilter("2024-01-01", "", [])
+	result := KLR_BuildNgramFilter("2024-01-01", "")
 	AssertTrue(InStr(result, "WHERE") > 0)
 	AssertTrue(InStr(result, "2024-01-01") > 0)
 }
@@ -367,14 +396,19 @@ _KLR_BuildNgramFilter_AppsFilter() {
 	AssertTrue(InStr(result, "app IN") > 0)
 	AssertTrue(InStr(result, "code.exe") > 0)
 	AssertTrue(InStr(result, "notepad.exe") > 0)
+	AssertTrue(InStr(result, "Unknown") > 0,
+		"a real-app filter must retain the non-selectable Unknown bucket")
 }
 Test("KLR_BuildNgramFilter: non-empty apps array adds app IN clause", _KLR_BuildNgramFilter_AppsFilter)
 
-_KLR_BuildNgramFilter_EmptyAppsArraySkipped() {
+_KLR_BuildNgramFilter_EmptyAppsArrayMeansNoNamedApps() {
 	result := KLR_BuildNgramFilter("", "", [])
-	AssertFalse(InStr(result, "app IN") > 0)
+	AssertTrue(InStr(result, "Unknown") > 0)
+	AssertFalse(InStr(result, "app IN") > 0,
+		"an explicit empty selection must not become an unrestricted app query")
 }
-Test("KLR_BuildNgramFilter: empty apps array -> no app IN clause", _KLR_BuildNgramFilter_EmptyAppsArraySkipped)
+Test("KLR_BuildNgramFilter: empty apps array retains only Unknown",
+	_KLR_BuildNgramFilter_EmptyAppsArrayMeansNoNamedApps)
 
 
 

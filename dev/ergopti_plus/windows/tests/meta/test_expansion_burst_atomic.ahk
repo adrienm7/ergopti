@@ -57,11 +57,18 @@ _EBA_AssertBurstIsAssembledWhole() {
 		. "being sent. Emitting them as separate injections is what let the backspaces go missing "
 		. "and let a physical keystroke land in the middle of the replacement")
 
-	; And that single payload is what reaches the OS.
-	Assert(InStr(Src, "SendInput(Burst)") > 0,
-		"the assembled burst must be handed to a single SendInput call — SendInput is atomic, and "
-		. "that atomicity is the only thing keeping a key typed during an expansion from being "
-		. "spliced into it")
+	; The production path must hand that payload to one kernel SendInput, while
+	; the recorder path consumes the same transaction verdict. Keeping both in
+	; the dispatch body pins atomicity and the AHK-04 failure boundary together.
+	Dispatch := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
+	Assert(Dispatch != "", "HSE_DispatchMatch must exist in the driver source")
+	SendPos := InStr(Dispatch, "SendInput(Burst)")
+	Assert(SendPos > 0 and InStr(Dispatch, "SendInput(Burst)", , SendPos + 1) = 0,
+		"the assembled burst must reach exactly one SendInput — splitting the erase, replacement "
+		. "and terminator is what lets a physical key splice into an expansion")
+	Assert(InStr(Dispatch,
+		'Fired := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))') > 0,
+		"the recorder path must publish the same atomic burst only after its sender reports success")
 }
 Test("hotstrings: the expansion burst is one atomic SendInput (typing-order-atomicity)", _EBA_AssertBurstIsAssembledWhole)
 
@@ -126,3 +133,39 @@ _EBA_AssertProvenanceFilterNotATimeWindow() {
 		. "replaced also threw away real typing that arrived just after an expansion")
 }
 Test("hotstrings: synthetic input is filtered by provenance, not by a time window (swallowed-keystrokes)", _EBA_AssertProvenanceFilterNotATimeWindow)
+
+
+
+
+; =============================================================
+; =============================================================
+; ======= 3/ Terminal TUIs receive paced deletion =============
+; =============================================================
+; =============================================================
+
+_EBA_AssertTerminalTuiDeletionIsPaced() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "driver source must be readable for the terminal-TUI regression test")
+
+	; React/OpenTUI-style prompt controls can batch a zero-delay Backspace run
+	; against one stale render. The replacement then appends to the untouched
+	; trigger (for example xgboostXGBoost). Terminal hosts therefore need one
+	; protected transaction made of explicitly paced events while ordinary
+	; controls retain the zero-latency SendInput path above. SetKeyDelay plus a
+	; compact ``{BackSpace N}`` is specifically insufficient: AHK expands those
+	; repetitions without an observable delay between them.
+	Assert(InStr(Src, "_HSE_IsTerminalInputHost") > 0,
+		"the hotstring dispatcher must classify terminal input hosts before choosing its sender")
+	Assert(InStr(Src, "_HSE_BeginTerminalTransaction(") > 0,
+		"the terminal branch must defer the behavior-tested edit beyond the visible InputHook callback")
+	Assert(InStr(Src, 'Burst .= "{BackSpace}"') > 0,
+		"terminal deletion must expand each Backspace token; repeat-count syntax bypasses pacing")
+	Assert(InStr(Src, "SetTimer(Runner, -Max(1, Floor(DelayMs)))") > 0,
+		"the paced sender must run on a later timer turn so sleeps can yield real render opportunities")
+	Assert(InStr(Src, '_HSE_SetTerminalSendBlock("Send", BlockFn)') > 0,
+		"one BlockInput Send window must buffer physical typing for the full paced command")
+	Assert(InStr(Src, "SendEvent(Burst)") > 0,
+		"all explicit deletions and replacement text must remain one protected SendEvent command")
+}
+Test("hotstrings: terminal TUI deletion uses explicit paced events in one protected transaction (terminal-stale-render)",
+	_EBA_AssertTerminalTuiDeletionIsPaced)

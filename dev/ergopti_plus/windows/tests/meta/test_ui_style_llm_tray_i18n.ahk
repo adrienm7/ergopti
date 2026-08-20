@@ -4,7 +4,7 @@
 ; MODULE: UiStyle Fatal MsgBox + LLM Tray i18n Guard
 ; DESCRIPTION:
 ; Regression guard for two hardcoded-French sites that bypassed i18n despite
-; it being fully initialized at both call sites: lib/ui_style.ahk's
+; it being fully initialized at both call sites: infra/ui_style.ahk's
 ; fatal-startup MsgBox, and ui/menu/menu_llm/actions.ahk's install TrayTip
 ; (3 call sites — the warning-row click handler's title/launching/error, and
 ; the debug hotkey's title/launching).
@@ -15,11 +15,11 @@
 _MetaUiStyleAndLlmTrayI18n() {
 	Src := _DriverSourceNoComments()
 
-	; lib/ui_style.ahk must not hardcode the French fatal-error strings.
+	; infra/ui_style.ahk must not hardcode the French fatal-error strings.
 	Assert(!InStr(Src, "Erreur fatale : _shared/modules/tooltip/constants.toml"),
-		'lib/ui_style.ahk must not hardcode the French fatal-error message — use t("dialog.fatal_error.*")')
+		'infra/ui_style.ahk must not hardcode the French fatal-error message — use t("dialog.fatal_error.*")')
 	Assert(!InStr(Src, "ne peut pas démarrer"),
-		'lib/ui_style.ahk must not hardcode "ne peut pas démarrer" — use t("dialog.fatal_error.cannot_start")')
+		'infra/ui_style.ahk must not hardcode "ne peut pas démarrer" — use t("dialog.fatal_error.cannot_start")')
 	Assert(InStr(Src, 't("dialog.fatal_error.toml_key_missing")') > 0,
 		'_UiStyleFatal must build its message via t("dialog.fatal_error.toml_key_missing")')
 	Assert(InStr(Src, 't("dialog.fatal_error.toml_not_found")') > 0,

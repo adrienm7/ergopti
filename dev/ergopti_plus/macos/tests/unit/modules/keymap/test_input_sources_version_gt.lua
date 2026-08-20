@@ -40,7 +40,7 @@ helpers.describe("input_sources.resolve_installed_ergopti_version", function()
 		-- load_with_stubs() resets the hs stub AND nils both keymap layout modules
 		-- (helpers/init.lua), so install our layout_install stub AFTER it and require
 		-- input_sources by hand so the stub is the one captured at its require-time.
-		helpers.load_with_stubs("lib.logger")
+		helpers.load_with_stubs("infra.logger")
 
 		-- Stub the install layer: report an Ergopti bundle in BOTH scopes so the
 		-- `if user_best and system_best then` branch (the one calling version_gt) is taken.

@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
--- The 21 supported locale codes (must match lib/i18n.lua LOCALES). Hardcoded so
+-- The 21 supported locale codes (must match infra/i18n.lua LOCALES). Hardcoded so
 -- the test also fails loudly if a locale file goes missing.
 local LOCALE_CODES = {
 	"ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
@@ -30,7 +30,7 @@ local COUNT_LABEL_KEY = "llm.profile.batch_advanced.label"
 
 --- Reads a shared locale file and extracts every "llm.profile.*.label" pair.
 --- Pattern-based (no full JSON decode) so the test stays independent of the
---- decoder — exactly how lib/locale's own probe test reads raw locale text.
+--- decoder — exactly how infra/locale's own probe test reads raw locale text.
 --- @param code string Locale code (e.g. "fr").
 --- @return table|nil Map of key → value, or nil when the file is unreadable.
 local function profile_labels(code)

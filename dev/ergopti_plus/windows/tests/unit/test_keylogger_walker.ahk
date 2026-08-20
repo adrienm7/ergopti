@@ -30,9 +30,18 @@ _KLW_CharClass_TabIsSpace() {
 Test("KLW_CharClass: tab -> space", _KLW_CharClass_TabIsSpace)
 
 ; Privacy and pause regression
+; KLW_CharClass is a pure classifier used by both the recorder and the metrics
+; reader, and the reader runs while the driver is paused. So the classifier must
+; not consult suspend state — the same character has to land in the same class
+; whenever the report is generated. The gate belongs on the capture path, and
+; that is asserted separately in test_keylogger_app_categories.
 _KLW_CharClass_PauseNoLeak() {
-	; In full keylogger, pause (A_IsSuspended) must prevent recording
-	AssertTrue(true, "keylogger walker must be used only when not paused")
+	Body := _DriverFuncBody("KLW_CharClass")
+	Assert(InStr(Body, "A_IsSuspended") == 0,
+		"KLW_CharClass() must not read A_IsSuspended — it classifies for the reader too, and "
+		. "the reader runs while paused")
+	; Same input, same class, twice — the property that makes it safe to share.
+	AssertEqual(KLW_CharClass("a"), KLW_CharClass("a"), "classification must be deterministic")
 }
 Test("KLW_CharClass: pause invariant skeleton", _KLW_CharClass_PauseNoLeak)
 

@@ -1336,7 +1336,7 @@
 					if (merged && typeof window.receive_range_data === 'function') {
 						try {
 							window._lua_request = null;
-							window.receive_range_data(merged);
+							window.receive_range_data(merged, blob.range_request_id ?? null);
 						} catch (e) {
 							console.error('receive_range_data failed:', e);
 						}
@@ -1421,7 +1421,13 @@
 						if (!payload) return;
 						if (payload.type === 'range_data') {
 							if (typeof window.receive_range_data === 'function') {
-								window.receive_range_data(payload.payload);
+								window.receive_range_data(payload.payload, payload.request_id);
+							}
+							return;
+						}
+						if (payload.type === 'range_terminal') {
+							if (typeof window.complete_range_request === 'function') {
+								window.complete_range_request(payload.request_id, payload.status);
 							}
 							return;
 						}

@@ -50,7 +50,7 @@ helpers.describe("preview: a no-op mapping is treated exactly like no match", fu
 
 		local m = {
 			trigger = "ok", trigger_bytes = 2, tlen = 2,
-			repl = "ok", plain_repl = "ok", is_word = false, case_conform = false,
+			repl = "ok", plain_repl = "ok", is_word = false, match_mode = "exact",
 		}
 		local plain, typed, _repl, is_noop = E.would_fire(m, "ok")
 
@@ -62,21 +62,19 @@ helpers.describe("preview: a no-op mapping is treated exactly like no match", fu
 		helpers.assert_eq(is_noop, true, "and it flags the outcome explicitly")
 	end)
 
-	helpers.it("the autocorrect bucket gates on the expansion, not the input", function()
-		local src = helpers.read_driver_source("_preview_render_generation")
-		helpers.assert_true(src ~= nil and src ~= "", "llm_bridge must be locatable")
+	helpers.it("the prospective resolver gates candidates on the expansion, not the input", function()
+		local src = helpers.read_driver_source("function M.resolve_magic_action")
+		helpers.assert_true(src ~= nil and src ~= "", "prospective resolver must be locatable")
 
 		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("matched_plain, matched_input = expander.would_fire", 1, true)
-		helpers.assert_true(at ~= nil, "the autocorrect bucket must still call would_fire")
-
-		local body = code:sub(at, at + 400)
-		helpers.assert_true(body:find("if matched_plain then", 1, true) ~= nil,
-			"the row must be gated on the resolved expansion. Gating on matched_input admits the "
-				.. "no-op case, whose expansion is nil — and a nil-text row makes render_stacked "
-				.. "throw, which drops every other suggestion in the same stack")
-		helpers.assert_true(body:find("if matched_input then", 1, true) == nil,
-			"and it must not gate on the typed text, which is truthy for a no-op")
+		local at = code:find("function M.resolve_magic_action", 1, true)
+		local body = code:sub(at, at + 9000)
+		local _, display_gate_count = body:gsub(
+			"if action%.reachable and action%.eff_plain then", "")
+		helpers.assert_true(display_gate_count >= 2,
+			"both auto and end-character candidate ledgers must be gated on the resolved expansion")
+		helpers.assert_true(body:find("if action.typed then", 1, true) == nil,
+			"typed text is truthy for a no-op and must never admit a nil-text row")
 	end)
 end)
 
@@ -115,14 +113,13 @@ end)
 -- =================================================================
 
 helpers.describe("preview: turning it off clears what is already on screen", function()
-	helpers.it("every preview-disable path forces the hide", function()
+	helpers.it("every preview-disable path crosses the transactional hide fence", function()
 		local src = helpers.read_driver_source("_preview_render_generation")
 		local code = src:gsub("%-%-[^\n]*", "")
 
-		-- Each setter that turns a preview OFF must dismiss unconditionally.
-		-- tooltip.hide() is a deliberate no-op during a dequeue cycle so a
-		-- multi-row preview survives the first row's expiry — which is exactly
-		-- wrong when the user has just switched the feature off.
+		-- Each setter that turns a preview OFF must cross the same transactional
+		-- fence. It forces the native hide when a visible owner exists and refuses
+		-- the semantic toggle if those pixels cannot be revoked.
 		local setters = {
 			"function M.set_preview_star_enabled",
 			"function M.set_preview_autocorrect_enabled",
@@ -134,11 +131,19 @@ helpers.describe("preview: turning it off clears what is already on screen", fun
 			helpers.assert_true(at ~= nil, name .. " must exist")
 
 			local body = code:sub(at, at + 600)
-			helpers.assert_true(body:find("hide_forced", 1, true) ~= nil,
-				name .. " must force the hide. The dequeue-guarded hide() is ignored while a "
-					.. "multi-row preview is cycling, so the rows the user just disabled stayed "
-					.. "on screen until they timed out on their own")
+			local fence_at = body:find("M.invalidate_hotstring_preview()", 1, true)
+			local mutation_at = body:find("is_star_preview_enabled =", 1, true)
+				or body:find("is_autocorrect_preview_enabled =", 1, true)
+			helpers.assert_true(fence_at ~= nil and mutation_at ~= nil and fence_at < mutation_at,
+				name .. " must revoke the visible promise before publishing the disabled state")
 		end
+
+		local fence_at = code:find("function M.invalidate_hotstring_preview", 1, true)
+		helpers.assert_true(fence_at ~= nil, "the shared preview invalidation fence must exist")
+		local fence_body = code:sub(fence_at, fence_at + 1200)
+		helpers.assert_true(fence_body:find(
+			"tooltip.hide_forced_silent or tooltip.hide_forced", 1, true) ~= nil,
+			"the shared fence must bypass dequeue guards with an authoritative hide")
 	end)
 end)
 
@@ -172,24 +177,32 @@ helpers.describe("preview: the rows describe the outcome the engine will produce
 			"the nil-section resolve must be gone, not merely joined by a correct one")
 	end)
 
-	helpers.it("advances the primary ledger before the display gate", function()
+	helpers.it("gates every alternative on the global engine winner", function()
 		local code = builder_code():gsub("%-%-[^\n]*", "")
-		local ledger = code:find("primary_seen%[m%.type%]%s*=%s*true")
-		local gate   = code:find("if%s+enabled%s+and%s+not%s+kind_suppressed")
-		helpers.assert_true(ledger ~= nil, "the row builder must keep a primary ledger")
-		helpers.assert_true(gate ~= nil, "the display gate must consult the suppression ledger")
-		helpers.assert_true(ledger < gate,
-			"the winner of each kind must claim primary status even when it cannot be shown; "
-			.. "advancing the ledger only for RENDERED rows promoted the runner-up and drew it "
-			.. "undimmed, presenting as certain an expansion the engine will not produce")
+		local winner_gate = code:find("local winner_enabled%s*=%s*preview_enabled%(primary_match%)")
+		local row_gate = code:find("local enabled%s*=%s*winner_enabled%s+and%s+preview_enabled%(m%)")
+		helpers.assert_true(winner_gate ~= nil,
+			"the row builder must resolve displayability of the engine winner")
+		helpers.assert_true(row_gate ~= nil and winner_gate < row_gate,
+			"every alternative must be suppressed when the real winner is hidden; promoting a "
+			.. "runner-up presents an expansion the engine will not produce")
+		helpers.assert_true(code:find("dimmed%s*=%s*not%s+m%.is_winner") ~= nil,
+			"only the resolver-owned global winner may be rendered undimmed")
 	end)
 
 	helpers.it("labels a provider row with the magic key, not Enter", function()
 		local code = builder_code():gsub("%-%-[^\n]*", "")
-		helpers.assert_true(code:find('is_star%s+or%s+m%.type%s*==%s*"provider"') ~= nil,
+		local provider_at = code:find('type%s*=%s*"provider"')
+		helpers.assert_true(provider_at ~= nil,
+			"the provider match record must remain locatable")
+		local provider_record = provider_at and code:sub(provider_at, provider_at + 700) or ""
+		helpers.assert_true(provider_record:find('validation_key%s*=%s*"magic"') ~= nil,
+			"a provider must declare the same magic validation action as its interceptor")
+		helpers.assert_true(code:find(
+			'trigger_label%s*=%s*validates_magic%s+and%s+magic_key%s+or%s+"↵"') ~= nil,
 			"both shipped providers fire from the interceptor on the trigger character, so a "
-			.. "row labelled with the terminator tells the user to press Enter — which destroys "
-			.. "the pending expansion instead of firing it")
+				.. "row labelled with the terminator tells the user to press Enter — which destroys "
+				.. "the pending expansion instead of firing it")
 	end)
 
 end)

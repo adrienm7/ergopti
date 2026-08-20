@@ -38,8 +38,11 @@ local DELTA_PROPERTY = "scrollWheelEventDeltaAxis1"
 --- scroll tap under test) plus every system key event posted.
 --- @return table ctx {key_cb, scroll_cb, posted=array of {key, isDown}, f19=int}.
 local function make_layer_scroll_ctx()
-	package.loaded["lib.keycodes"] = nil
+	package.loaded["infra.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["adapters.event_provenance"] = nil
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
 	local hs  = _G.hs
@@ -50,10 +53,14 @@ local function make_layer_scroll_ctx()
 	-- scroll tap. Capture both callbacks in creation order.
 	hs.eventtap.new = function(_types, cb)
 		ctx.taps[#ctx.taps + 1] = cb
-		return { start = function() end, stop = function() end }
+		local tap = { enabled = false }
+		function tap:start() self.enabled = true; return self end
+		function tap:stop() self.enabled = false; return self end
+		function tap:isEnabled() return self.enabled end
+		return tap
 	end
 
-	hs.eventtap.event.properties = { [DELTA_PROPERTY] = DELTA_PROPERTY }
+	hs.eventtap.event.properties[DELTA_PROPERTY] = DELTA_PROPERTY
 	hs.eventtap.event.newSystemKeyEvent = function(key, isDown)
 		return { post = function() ctx.posted[#ctx.posted + 1] = { key = key, isDown = isDown } end }
 	end
@@ -64,8 +71,21 @@ local function make_layer_scroll_ctx()
 	helpers.assert_true(type(ctx.key_cb) == "function",    "the key tap callback must be captured")
 	helpers.assert_true(type(ctx.scroll_cb) == "function", "the scroll tap callback must be captured")
 
-	ctx.f19 = require("lib.keycodes").F19_VOLUME_SCROLL_MODIFIER
+	ctx.f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
+	ctx.hs = hs
 	return ctx
+end
+
+--- Drains the retained FIFO that runs media output after the eventtap returns.
+--- @param ctx table Harness context.
+local function fire_post_callback_actions(ctx)
+	for _, candidate in ipairs(ctx.hs.timer.__timers or {}) do
+		if candidate.running and candidate.delay == 0 and type(candidate.fire) == "function" then
+			candidate:fire()
+			return
+		end
+	end
+	error("no retained post-eventtap dispatcher is running", 2)
 end
 
 --- Fires a fake F19 keyDown through the key tap so the scroll tap sees the layer
@@ -76,6 +96,7 @@ local function hold_layer_key(ctx)
 		getKeyCode = function() return ctx.f19 end,
 		getType    = function() return _G.hs.eventtap.event.types.keyDown end,
 		getFlags   = function() return {} end,
+		getProperty = function() return 0 end,
 	})
 end
 
@@ -84,7 +105,10 @@ end
 --- @return table Fake CGEvent.
 local function fake_scroll_event(delta)
 	return {
-		getProperty = function(_self, _prop) return delta end,
+		getProperty = function(_self, property)
+			if property == DELTA_PROPERTY then return delta end
+			return 0
+		end,
 		getType     = function() return _G.hs.eventtap.event.types.scrollWheel end,
 		getFlags    = function() return {} end,
 	}
@@ -152,6 +176,9 @@ helpers.describe("shortcuts.bind_layer_scroll: real movement still drives the vo
 		hold_layer_key(ctx)
 
 		local consumed = ctx.scroll_cb(fake_scroll_event(3))
+		helpers.assert_eq(#ctx.posted, 0,
+			"volume output must not run inside the CGEventTap callback")
+		fire_post_callback_actions(ctx)
 
 		helpers.assert_eq(#ctx.posted, 6, "three repetitions must post three down/up pairs")
 		for i = 1, 6 do
@@ -171,6 +198,9 @@ helpers.describe("shortcuts.bind_layer_scroll: real movement still drives the vo
 		hold_layer_key(ctx)
 
 		local consumed = ctx.scroll_cb(fake_scroll_event(-2))
+		helpers.assert_eq(#ctx.posted, 0,
+			"volume output must not run inside the CGEventTap callback")
+		fire_post_callback_actions(ctx)
 
 		helpers.assert_eq(#ctx.posted, 4, "two repetitions must post two down/up pairs")
 		helpers.assert_eq(ctx.posted[1].key, "SOUND_DOWN", "a negative delta must lower the volume")

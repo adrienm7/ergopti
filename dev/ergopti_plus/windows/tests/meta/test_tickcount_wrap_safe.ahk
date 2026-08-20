@@ -80,19 +80,19 @@ Test("llm_bridge: TickCount delta uses wrap-safe (now - last + 0x100000000) & 0x
 
 ; ==========================================================================
 ; ==========================================================================
-; ======= 3/ lib/logger.ahk uses the wrap-safe ERROR dedup formula (F38) ===
+; ======= 3/ infra/logger.ahk uses the wrap-safe ERROR dedup formula (F38) ===
 ; ==========================================================================
 ; ==========================================================================
 
 _TTCWS_LoggerWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("lib/logger.ahk"))
-	Assert(Src != "", "lib/logger.ahk must be readable")
+	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("infra/logger.ahk"))
+	Assert(Src != "", "infra/logger.ahk must be readable")
 
 	; Both halves of the wrap-safe formula must be present in the ERROR dedup path
 	Assert(InStr(Src, "0x100000000") > 0,
-		"lib/logger.ahk must use the wrap-safe constant 0x100000000 in ERROR dedup TickCount delta (F38)")
+		"infra/logger.ahk must use the wrap-safe constant 0x100000000 in ERROR dedup TickCount delta (F38)")
 	Assert(InStr(Src, "0xFFFFFFFF") > 0,
-		"lib/logger.ahk must mask with 0xFFFFFFFF in ERROR dedup TickCount delta (F38)")
+		"infra/logger.ahk must mask with 0xFFFFFFFF in ERROR dedup TickCount delta (F38)")
 }
 Test("logger: ERROR dedup TickCount delta uses wrap-safe (now - last + 0x100000000) & 0xFFFFFFFF formula (F38)", _TTCWS_LoggerWrapSafe)
 

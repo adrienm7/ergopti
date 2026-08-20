@@ -2,7 +2,21 @@
 
 ## Purpose
 
-Cross-driver specification and test vectors for the 8-variant logger contract. Both `windows/lib/logger.ahk` and `macos/lib/logger.lua` must conform to this spec; conformance is verified by the `_shared/core/domain/Logger.spec.js` suite.
+Cross-driver specification and test vectors for the 8-variant logger contract.
+
+Three implementations must conform: `windows/lib/logger.ahk` (1 077 l),
+`macos/lib/logger.lua` (1 145 l) and `_shared/lua/logger/init.lua` (281 l, the
+platform-neutral core). Conformance to the **line format** is verified by replaying
+`test_vectors.json` from each driver suite — `windows/tests/unit/test_logger.ahk` and
+`macos/tests/unit/lib/test_logger.lua`. There is no `_shared/core/domain/Logger.spec.js`;
+that file has never existed, and no behavioural corpus covers the rest of the spec
+(severity filtering, ring order, forced flush, dedup, date rollover) — adding one is
+still to be written.
+
+> ⚠ The shared core is currently consumed by **Linux only**, through
+> `logger/shim.lua`, and the Linux driver installs no sink — so every `Logger.*` call
+> on Linux reaches a 200-entry ring buffer and is discarded. That is a blocker, not a
+> design: see B1 in the plan.
 
 The 8 variants are organised on two axes — importance (`DEBUG`/`INFO`/`WARNING`/`ERROR`) and lifecycle role (`Misc`/`Start`/`End`) — giving `debug`, `trace`, `done`, `info`, `start`, `success`, `warn`, `error`.
 

@@ -1,7 +1,7 @@
 --- tests/unit/lib/test_file_watchers_git_defer.lua
 
 --- ==============================================================================
---- MODULE: lib/file_watchers git-pull reload deferral
+--- MODULE: infra/file_watchers git-pull reload deferral
 --- DESCRIPTION:
 --- Regression test for macos-reload-during-git-pull. A `git pull` run against a
 --- live driver rewrites init.lua and dozens of modules; the project .lua watcher
@@ -20,7 +20,7 @@
 local helpers = require("tests.helpers")
 
 -- ui_restore pass-through so the deferred reload fn actually runs when fired.
-package.loaded["lib.ui_restore"] = {
+package.loaded["infra.ui_restore"] = {
 	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
 	snapshot     = function() end,
 	restore      = function() end,
@@ -28,14 +28,14 @@ package.loaded["lib.ui_restore"] = {
 
 -- Controllable git gate: the test flips git_busy to simulate an in-flight pull.
 local git_busy = false
-package.loaded["lib.git_status"] = {
+package.loaded["infra.git_status"] = {
 	operation_in_progress = function() return git_busy end,
 }
 
-package.loaded["lib.file_watchers"] = nil
-local FW = require("lib.file_watchers")
+package.loaded["infra.file_watchers"] = nil
+local FW = require("infra.file_watchers")
 
-helpers.describe("lib/file_watchers — reload deferral during git pull (macos-reload-during-git-pull)", function()
+helpers.describe("infra/file_watchers — reload deferral during git pull (macos-reload-during-git-pull)", function()
 	helpers.it("holds the reload while git writes the tree, then fires exactly once when it settles", function()
 		local prev_pw, prev_timer, prev_attr, prev_reload =
 			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload

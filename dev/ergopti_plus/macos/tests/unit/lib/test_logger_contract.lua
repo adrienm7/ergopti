@@ -79,7 +79,7 @@ end
 
 helpers.describe("Logger: shared contract vectors", function()
 	-- Load Logger with level forced to DEBUG so every variant is emitted
-	local Logger = helpers.load_with_stubs("lib.logger")
+	local Logger = helpers.load_with_stubs("infra.logger")
 	Logger.set_level(Logger.LEVELS.DEBUG)
 
 	local VARIANT_FN = {
@@ -106,9 +106,11 @@ helpers.describe("Logger: shared contract vectors", function()
 
 	for _, vec in ipairs(vectors) do
 		local id       = vec.id or "unknown"
-		-- Driver-specific fields take priority over the common "message" / "expected"
-		local msg      = vec.message_hs or vec.message
-		local expected = vec.expected_hs or vec.expected
+		-- Language-specific fields take priority over the common "message" /
+		-- "expected". The override is keyed by LANGUAGE, not by driver: Lua takes
+		-- %s and AutoHotkey takes {1}, so Linux reads the same _lua pair macOS does.
+		local msg      = vec.message_lua or vec.message
+		local expected = vec.expected_lua or vec.expected
 
 		-- Vectors without a message or expected string are skipped gracefully;
 		-- they may be AHK-only placeholders or documentation entries.

@@ -13,7 +13,7 @@
 ; never be wrongly toggled live.
 ;
 ; Only the pure, dependency-light helpers from
-; lib/hotstrings/hotstring_live_toggle.ahk are exercised here - the tray glue
+; infra/hotstrings/hotstring_live_toggle.ahk are exercised here - the tray glue
 ; (_HS_TryLiveToggle / _HS_ApplyLiveToggle / RebuildHotstringsLive) needs the
 ; menu and is covered by live testing.
 ; ==============================================================================

@@ -31,8 +31,8 @@ helpers.describe("logger: configuring the log path spawns no subprocess", functi
 			timer = { doAfter = function() return { stop = function() end } end },
 		}
 
-		package.loaded["lib.logger"] = nil
-		local Logger = helpers.load_with_stubs("lib.logger", hs_overrides)
+		package.loaded["infra.logger"] = nil
+		local Logger = helpers.load_with_stubs("infra.logger", hs_overrides)
 		Logger.init_log_path("/tmp/ergopti_logger_test/", 14)
 
 		helpers.assert_eq(#execs, 0,

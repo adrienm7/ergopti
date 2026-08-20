@@ -1,7 +1,7 @@
 --- tests/unit/lib/test_file_watchers_adaptive_settle.lua
 
 --- ==============================================================================
---- MODULE: lib/file_watchers adaptive quiescence for bulk writes
+--- MODULE: infra/file_watchers adaptive quiescence for bulk writes
 --- DESCRIPTION:
 --- The git guard only covers git; a OneDrive / Dropbox / rsync sync (or any bulk
 --- write) leaves no lock and would still let the watcher reload mid-operation.
@@ -18,19 +18,19 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.ui_restore"] = {
+package.loaded["infra.ui_restore"] = {
 	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
 	snapshot     = function() end,
 	restore      = function() end,
 }
 -- git idle throughout: isolate the source-agnostic quiescence hold from the git gate.
-package.loaded["lib.git_status"] = { operation_in_progress = function() return false end }
+package.loaded["infra.git_status"] = { operation_in_progress = function() return false end }
 
-package.loaded["lib.file_watchers"] = nil
-local FW          = require("lib.file_watchers")
+package.loaded["infra.file_watchers"] = nil
+local FW          = require("infra.file_watchers")
 local reload_gate = require("reload_gate")
 
-helpers.describe("lib/file_watchers — adaptive quiescence for bulk writes (macos-reload-during-git-pull)", function()
+helpers.describe("infra/file_watchers — adaptive quiescence for bulk writes (macos-reload-during-git-pull)", function()
 	helpers.it("holds a many-file burst until the bulk settle, not the lone-edit settle", function()
 		local prev_pw, prev_timer, prev_attr, prev_reload =
 			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload

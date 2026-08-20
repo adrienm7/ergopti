@@ -131,8 +131,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
         "http", http, "format", resolved["Format"],
         "model_id_at_dispatch", resolved["Model"],
         "on_success", on_success, "on_fail", on_fail, "cancelled", false,
-        "start_tick", A_TickCount, "timeout_ms", timeout_ms,
-        "deadline_tick", A_TickCount + timeout_ms)
+        "start_tick", A_TickCount, "timeout_ms", timeout_ms)
     _LLMRemote_PollRequest(req_id)
     return req_id
 }
@@ -364,7 +363,7 @@ _LLMRemote_PollRequest(req_id) {
     ; network change mid-request), the poll loop would run forever without this
     ; cap. Uses elapsed-delta arithmetic via _LLM_DeadlineExpired so the guard
     ; remains correct across the 32-bit A_TickCount wrap (~49.7 days uptime).
-    if (entry.Has("deadline_tick") and _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
+    if _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"]) {
         on_fail := entry["on_fail"]
         ; Abort the stalled request so the COM object + socket are released now
         ; rather than lingering until WinHTTP's internal receive timeout fires.

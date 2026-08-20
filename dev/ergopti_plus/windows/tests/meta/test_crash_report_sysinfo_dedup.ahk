@@ -17,7 +17,7 @@
 ; The fix reuses HC["sys"] when HealthCheck_Run succeeded, only falling back to
 ; a fresh _CrashReport_SysInfo() probe if it did not.
 ;
-; SCOPE: source introspection of lib/crash_reporter.ahk's CrashReport_Build.
+; SCOPE: source introspection of modules/diagnostics/crash_reporter.ahk's CrashReport_Build.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -34,7 +34,7 @@
 
 _CRSD_CheckSysReusesHealthcheck() {
 	Body := _DriverFuncBody("CrashReport_Build")
-	Assert(Body != "", "CrashReport_Build must exist in lib/crash_reporter.ahk")
+	Assert(Body != "", "CrashReport_Build must exist in modules/diagnostics/crash_reporter.ahk")
 
 	HcPos  := InStr(Body, "HealthCheck_Run()")
 	SysPos := InStr(Body, "Sys := ")
@@ -60,9 +60,11 @@ Test("crash_reporter: CrashReport_Build reuses HC[sys] instead of double-probing
 
 
 
-; ======================================================================
+; ========================================================================
 ; ========================================================================
 ; ======= 2/ Every field CrashReport_Build reads from Sys is still =======
+; ========================================================================
+; ========================================================================
 ; =======    produced by _HealthCheck_SysInfo ==========================
 ; ======================================================================
 ; ======================================================================

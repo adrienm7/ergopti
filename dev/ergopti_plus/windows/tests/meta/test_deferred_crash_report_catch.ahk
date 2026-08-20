@@ -10,7 +10,7 @@
 ; in a bare try with no catch, so a failure inside the safety net itself was
 ; completely silent — no trace of either the original crash or this one.
 ;
-; SCOPE: source introspection of lib/error_net.ahk.
+; SCOPE: source introspection of infra/error_net.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -26,7 +26,7 @@
 
 _DCRC_CheckCatchPresent() {
 	Body := _DriverFuncBody("_ErgoptiDeferredCrashReport")
-	Assert(Body != "", "_ErgoptiDeferredCrashReport must exist in lib/error_net.ahk")
+	Assert(Body != "", "_ErgoptiDeferredCrashReport must exist in infra/error_net.ahk")
 
 	TryPos := InStr(Body, "CrashReport_Build(")
 	Assert(TryPos > 0, "_ErgoptiDeferredCrashReport must still call CrashReport_Build")

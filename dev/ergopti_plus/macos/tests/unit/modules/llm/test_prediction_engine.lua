@@ -24,16 +24,16 @@ local helpers = require("tests.helpers")
 
 
 
--- =====================================================
+-- ====================================================
 -- ====================================================
 -- ======= 1/ Dependency stubs pre-registration =======
 -- ====================================================
--- =====================================================
+-- ====================================================
 
 -- Reset the hs stub and package cache for a clean load.
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 -- Stub modules.llm (core_llm) — only the surface prediction_engine uses at
 -- module-load time and in setters is needed.
@@ -62,7 +62,7 @@ package.loaded["modules.llm"] = {
 	set_llm_model_ollama    = function(_) end,
 	set_runtime_llm_enabled = function(_) end,
 	set_llm_streaming       = function(_) end,
-	cancel_streaming        = function() end,
+	cancel_streaming        = function() return true end,
 	-- Dispatch-path surface (exercised by the perform_check regression in §8).
 	is_backend_ready        = function() return true end,
 	get_active_profile      = function() return { label = "Test profile" } end,
@@ -72,7 +72,7 @@ package.loaded["modules.llm"] = {
 -- Stub WarmupController — used as a module singleton, not instantiated.
 package.loaded["modules.llm.warmup_controller"] = {
 	schedule_warmup_with_retry = function(_reason) end,
-	init                       = function(_cfg) end,
+	init                       = function(_cfg) return true end,
 	start                      = function() end,
 	stop                       = function() end,
 }
@@ -107,12 +107,12 @@ package.loaded["modules.llm.prompt_builder"] = {
 -- defined ngram_predict here, masking the dangling prediction_engine call that
 -- crashed every live request (the §8 regression locks this down).
 package.loaded["modules.llm.streaming_handler"] = {
-	init                 = function(_cfg) end,
+	init                 = function(_cfg) return true end,
 	build_callbacks      = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog         = function(_cfg) end,
-	stop_watchdog        = function() end,
+	arm_watchdog         = function(_cfg) return true end,
+	stop_watchdog        = function() return true end,
 	reset_failure_count  = function() end,
-	cancel_streaming     = function() end,
+	cancel_streaming     = function() return true end,
 }
 
 -- Stub AppFilter — the real export is is_blocked(state, apps, url_filter, secure_filter).
@@ -129,13 +129,13 @@ package.loaded["modules.llm.api_common"] = {
 }
 
 -- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
 -- Stub lib.keycodes.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	F16_LLM_CHAIN_SIGNAL = 106,
 }
 
@@ -144,17 +144,17 @@ package.loaded["lib.keycodes"] = {
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
-	set_chain_start       = function(_) end,
-	mark_chain_complete   = function() end,
+	set_chain_start       = function(_) return true end,
+	mark_chain_complete   = function() return true end,
 	get_current_index     = function() return nil end,
 	navigate              = function(_) end,
 	show                  = function() end,
-	hide                  = function() end,
+	hide                  = function() return true end,
 	-- Dispatch-path surface (exercised by §8).
 	set_llm_timeout       = function(_) end,
-	reset_llm_timer       = function() end,
-	show_loading          = function(...) end,
-	show_predictions      = function(...) end,
+	reset_llm_timer       = function() return true end,
+	show_loading          = function(...) return true end,
+	show_predictions      = function(...) return true end,
 	tint                  = function(_) return nil end,
 }
 
@@ -205,7 +205,7 @@ helpers.describe("prediction_engine — module surface", function()
 	helpers.it("calls tooltip.hide_forced immediately on reset (e.g. after prediction apply)", function()
 		local tt_hidden_forced = false
 		local old_hide_forced = package.loaded["ui.tooltip"].hide_forced
-		package.loaded["ui.tooltip"].hide_forced = function() tt_hidden_forced = true end
+		package.loaded["ui.tooltip"].hide_forced = function() tt_hidden_forced = true; return true end
 		PE.reset()
 		helpers.assert_true(tt_hidden_forced, "tooltip.hide_forced must be called on reset")
 		package.loaded["ui.tooltip"].hide_forced = old_hide_forced
@@ -257,11 +257,11 @@ end)
 
 
 
--- ===========================================
+-- ==========================================
 -- ==========================================
 -- ======= 4/ Initial state accessors =======
 -- ==========================================
--- ===========================================
+-- ==========================================
 
 helpers.describe("prediction_engine — initial state", function()
 	helpers.it("is_visible returns false initially", function()
@@ -317,7 +317,9 @@ helpers.describe("prediction_engine — configuration setters", function()
 		local mx = hs.settings.get("llm_max_words")
 		helpers.assert_eq(type(mx), "number")
 		-- Exactly the comparison that crashed on the raw string.
-		helpers.assert_true(pcall(function() return mx > 0 end))
+		-- The comparison crashed pre-fix on a string. Asserting the TYPE is what the
+		-- fix guarantees, and it is stronger than "this one comparison did not raise".
+		helpers.assert_eq(type(mx), "number", "a coerced max must be a number, not a string")
 
 		PE.set_llm_min_words("seven")
 		helpers.assert_eq(type(hs.settings.get("llm_min_words")), "number")
@@ -356,6 +358,7 @@ helpers.describe("prediction_engine — configuration setters", function()
 	helpers.it("set_preview_ai_enabled accepts boolean", function()
 		PE.set_preview_ai_enabled(true)
 		PE.set_preview_ai_enabled(false)
+		PE.set_preview_ai_enabled(true)
 	end)
 end)
 
@@ -400,8 +403,9 @@ helpers.describe("prediction_engine — timer safety", function()
 	end)
 
 	helpers.it("start_timer with override does not throw (regression for timer replacement)", function()
-		local ok = pcall(function() PE.start_timer(10.0) end)
-		helpers.assert_true(ok)
+		-- Called directly: a raise fails with the real error.
+		PE.start_timer(10.0)
+		helpers.assert_eq(type(PE.start_timer), "function", "and must leave the engine callable")
 	end)
 
 	helpers.it("start_timer_word_end does not throw", function()
@@ -457,17 +461,121 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 		helpers.assert_true(ok, "perform_check must not throw on the dispatch path: " .. tostring(err))
 		helpers.assert_true(dispatched, "perform_check must dispatch fetch_llm_prediction when the backend is ready")
 	end)
+
+	helpers.it("(no-model-runtime) ready MLX cannot render, fetch, or warm without an active model", function()
+		local core = package.loaded["modules.llm"]
+		local tooltip = package.loaded["ui.tooltip"]
+		local warmup = package.loaded["modules.llm.warmup_controller"]
+		local previous_model = core.get_current_model
+		local previous_backend = core.get_backend
+		local previous_ready = core.is_backend_ready
+		local previous_fetch = core.fetch_llm_prediction
+		local previous_show_loading = tooltip.show_loading
+		local previous_show_predictions = tooltip.show_predictions
+		local previous_schedule = warmup.schedule_warmup_with_retry
+		local shows, fetches, warmups = 0, 0, 0
+
+		core.get_current_model = function() return "" end
+		core.get_backend = function() return "mlx" end
+		core.is_backend_ready = function() return true end
+		core.fetch_llm_prediction = function() fetches = fetches + 1 end
+		tooltip.show_loading = function() shows = shows + 1; return true end
+		tooltip.show_predictions = function() shows = shows + 1; return true end
+		warmup.schedule_warmup_with_retry = function() warmups = warmups + 1 end
+
+		local ok, err = xpcall(function()
+			PE.set_llm_enabled(true)
+			warmups = 0
+			PE.set_llm_model("")
+			PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_eq(shows, 0,
+				"a stale MLX ready flag must not paint a loading or prediction surface")
+			helpers.assert_eq(fetches, 0)
+			helpers.assert_eq(warmups, 0,
+				"No Model is a disabled identity, not an empty model to warm")
+		end, debug.traceback)
+
+		core.get_current_model = previous_model
+		core.get_backend = previous_backend
+		core.is_backend_ready = previous_ready
+		core.fetch_llm_prediction = previous_fetch
+		tooltip.show_loading = previous_show_loading
+		tooltip.show_predictions = previous_show_predictions
+		warmup.schedule_warmup_with_retry = previous_schedule
+		PE.set_llm_enabled(false)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("prediction_engine — reset stays off the input I/O path", function()
+	helpers.it("clears visible state synchronously but defers dismissal persistence", function()
+		local core = package.loaded["modules.llm"]
+		local streaming = package.loaded["modules.llm.streaming_handler"]
+		local keylogger = package.loaded["modules.keylogger"]
+		local scheduler = require("adapters.timer_scheduler")
+		local previous_fetch = core.fetch_llm_prediction
+		local previous_build = streaming.build_callbacks
+		local previous_log = keylogger.log_llm_dismissed
+		local previous_after = scheduler.after
+		local scheduled = {}
+		local dismissal_calls = 0
+
+		scheduler.after = function(_, callback)
+			scheduled[#scheduled + 1] = callback
+			return { timer = {}, fired = false }
+		end
+		keylogger.log_llm_dismissed = function()
+			dismissal_calls = dismissal_calls + 1
+		end
+		streaming.build_callbacks = function(config)
+			local function success(predictions)
+				config.pending_predictions_ref.value = predictions
+				config.predictions_visible_ref.value = true
+			end
+			return nil, success, function() end
+		end
+		core.fetch_llm_prediction = function(...)
+			local on_success = select(7, ...)
+			on_success({ { to_type = " completion", deletes = 0 } }, 1, true, false)
+		end
+
+		local ok, err = xpcall(function()
+			PE.set_llm_enabled(true)
+			PE.init({ buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_true(PE.is_visible())
+
+			PE.reset()
+			helpers.assert_true(not PE.is_visible(),
+				"stale predictions must be invalid immediately")
+			helpers.assert_eq(dismissal_calls, 0,
+				"reset must not persist telemetry in the caller's eventtap stack")
+			helpers.assert_true(#scheduled > 0,
+				"dismissal persistence must have a deferred continuation")
+			for _, callback in ipairs(scheduled) do callback() end
+			helpers.assert_eq(dismissal_calls, 1)
+		end, debug.traceback)
+
+		core.fetch_llm_prediction = previous_fetch
+		streaming.build_callbacks = previous_build
+		keylogger.log_llm_dismissed = previous_log
+		scheduler.after = previous_after
+		PE.set_llm_enabled(false)
+		if not ok then error(err, 0) end
+	end)
 end)
 
 
 
 
 
--- ==================================================================
+-- ====================================================================
 -- ====================================================================
 -- ======= 9/ Disabling the AI bubble is a teardown, not a hide =======
 -- ====================================================================
--- ==================================================================
+-- ====================================================================
 
 --- set_preview_ai_enabled(false) used to call a bare tooltip.hide(). That clears
 --- the canvas and nothing else: predictions_visible stayed true, the pending set
@@ -481,8 +589,8 @@ helpers.describe("prediction_engine: turning the AI preview off tears the state 
 		local calls = {}
 		local tt = package.loaded["ui.tooltip"]
 		local old_hide, old_forced = tt.hide, tt.hide_forced
-		tt.hide        = function() calls[#calls + 1] = "hide" end
-		tt.hide_forced = function() calls[#calls + 1] = "hide_forced" end
+		tt.hide        = function() calls[#calls + 1] = "hide"; return true end
+		tt.hide_forced = function() calls[#calls + 1] = "hide_forced"; return true end
 
 		PE.set_preview_ai_enabled(false)
 

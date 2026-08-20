@@ -5,6 +5,7 @@
 --- JSON export, file flush, session lifecycle, edge cases.
 
 local helpers   = require("tests.helpers")
+local Fakes     = helpers.load_module("tests.fakes")
 local keylogger = helpers.load_module("modules.keylogger.keylogger")
 
 helpers.describe("keylogger", function()
@@ -53,22 +54,38 @@ helpers.describe("keylogger", function()
   -- 2. init()
   -- ==========================================================================
 
+  -- Each of these four called init() and then asserted assert_true(true) — "it
+  -- did not crash". init()'s job is to leave the module USABLE, so that is what
+  -- is asserted now: after any of the four argument shapes, the module must
+  -- accept a keystroke and count it. An init that silently failed halfway and
+  -- left the collector dead passed every one of them before.
   helpers.describe("init()", function()
-    helpers.it("init with no opts does not crash", function()
+    --- Feeds one keystroke and returns how many the module counted for that app.
+    local function keystrokes_for(app)
+      keylogger.on_keydown("a", 1000, app)
+      local stats = keylogger.get_app_stats()[app]
+      return stats and stats.keystrokes or 0
+    end
+
+    helpers.it("init with no opts leaves the collector usable", function()
       keylogger.init({})
-      helpers.assert_true(true)
+      helpers.assert_true(keystrokes_for("probe-empty-opts") > 0,
+        "after init({}) a keystroke must be counted — init leaving the collector dead is the failure this covers")
     end)
-    helpers.it("init with nil does not crash", function()
+    helpers.it("init with nil leaves the collector usable", function()
       keylogger.init(nil)
-      helpers.assert_true(true)
+      helpers.assert_true(keystrokes_for("probe-nil-opts") > 0,
+        "init(nil) must behave like init({}), not disable collection")
     end)
-    helpers.it("init with custom log_dir does not crash", function()
+    helpers.it("init with a custom log_dir leaves the collector usable", function()
       keylogger.init({ log_dir = "/tmp/ergopti_test_logs" })
-      helpers.assert_true(true)
+      helpers.assert_true(keystrokes_for("probe-log-dir") > 0,
+        "a custom log_dir must not stop keystrokes being counted")
     end)
-    helpers.it("init with custom password_apps does not crash", function()
+    helpers.it("init with custom password_apps applies them", function()
       keylogger.init({ password_apps = { "custom-vault" } })
-      helpers.assert_true(true)
+      helpers.assert_true(keylogger.is_password_app("custom-vault"),
+        "a password app passed to init must be recognised — accepting the option and dropping it is the failure this covers")
     end)
   end)
 
@@ -76,23 +93,46 @@ helpers.describe("keylogger", function()
   -- 3. on_keydown()
   -- ==========================================================================
 
+  -- Same treatment: these three fed the collector and asserted nothing about
+  -- what it recorded, so a no-op on_keydown passed all three.
   helpers.describe("on_keydown()", function()
-    helpers.it("valid input does not crash", function()
+    helpers.it("a keystroke is counted against its app", function()
       keylogger.init({})
-      keylogger.on_keydown("a", 1000, "firefox")
-      helpers.assert_true(true)
+      local before = (keylogger.get_app_stats()["kd-firefox"] or {}).keystrokes or 0
+      keylogger.on_keydown("a", 1000, "kd-firefox")
+      local after = (keylogger.get_app_stats()["kd-firefox"] or {}).keystrokes or 0
+      helpers.assert_eq(after, before + 1, "on_keydown must increment the app's keystroke count by exactly one")
     end)
-    helpers.it("without app_id does not crash", function()
+
+    helpers.it("a keystroke with no app_id is still counted somewhere", function()
       keylogger.init({})
-      keylogger.on_keydown("b", 2000)
-      helpers.assert_true(true)
-    end)
-    helpers.it("many keystrokes do not crash", function()
-      keylogger.init({})
-      for i = 1, 500 do
-        keylogger.on_keydown("x", i * 10, "app" .. (i % 5))
+      local function total()
+        local n = 0
+        for _, s in pairs(keylogger.get_app_stats()) do n = n + (s.keystrokes or 0) end
+        return n
       end
-      helpers.assert_true(true)
+      local before = total()
+      keylogger.on_keydown("b", 2000)
+      helpers.assert_eq(total(), before + 1,
+        "a keystroke with no app id must be attributed to a fallback bucket, not dropped")
+    end)
+
+    helpers.it("500 keystrokes across five apps are all counted", function()
+      keylogger.init({})
+      local before = {}
+      for i = 0, 4 do
+        before["vol-app" .. i] = (keylogger.get_app_stats()["vol-app" .. i] or {}).keystrokes or 0
+      end
+      for i = 1, 500 do
+        keylogger.on_keydown("x", i * 10, "vol-app" .. (i % 5))
+      end
+      local counted = 0
+      for i = 0, 4 do
+        local now = (keylogger.get_app_stats()["vol-app" .. i] or {}).keystrokes or 0
+        counted = counted + (now - before["vol-app" .. i])
+      end
+      helpers.assert_eq(counted, 500,
+        "every keystroke must reach its app's counter — a batch that silently drops some is the failure this covers")
     end)
   end)
 
@@ -189,8 +229,10 @@ helpers.describe("keylogger", function()
     helpers.it("flush with configured log_dir does not crash", function()
       keylogger.init({ log_dir = os.getenv("TEMP") or "/tmp" })
       keylogger.on_keydown("f", 1234, "flush-test")
-      local ok = pcall(function() keylogger.flush() end)
-      helpers.assert_true(ok)
+      -- Called directly. flush answers what it wrote, and the caller advances on it.
+      local flushed = keylogger.flush()
+      helpers.assert_true(flushed == nil or type(flushed) == "boolean" or type(flushed) == "number",
+        "flush must answer something the caller can act on")
     end)
 
     helpers.it("flushes one canonical raw batch and never replays it", function()
@@ -226,6 +268,12 @@ helpers.describe("keylogger", function()
 		  return true
 		end,
       }
+      -- Layered over the shared double rather than replacing it: the overrides
+      -- above are what this test asserts on, and everything else the writer
+      -- exports is inherited. Written out by hand, this table went stale the
+      -- moment the writer grew a method, and the failure surfaced as a nil call
+      -- inside the code under test.
+      setmetatable(fake_writer, { __index = Fakes.sqlite_writer() })
       local writer_name = "modules.keylogger.sqlite_writer"
       local logger_name = "modules.keylogger.keylogger"
       local previous_writer = package.loaded[writer_name]
@@ -416,15 +464,42 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("edge cases", function()
-    helpers.it("on_keydown with nil app_id does not crash", function()
+    helpers.it("on_keydown with nil app_id still records the keystroke", function()
       keylogger.init({})
+      local function total()
+        local n = 0
+        for _, s in pairs(keylogger.get_app_stats()) do n = n + (s.keystrokes or 0) end
+        return n
+      end
+      local before = total()
       keylogger.on_keydown("x", 100, nil)
-      helpers.assert_true(true)
+      helpers.assert_eq(total(), before + 1,
+        "a nil app id must fall back to a bucket, not silently discard the keystroke")
     end)
-    helpers.it("rapid suppress/unsuppress does not crash", function()
+
+    -- suppress()/unsuppress() are a COUNTER in every driver, not a boolean: a
+    -- pair that leaves the module suppressed silently stops all collection,
+    -- which is exactly what "does not crash" could never notice.
+    helpers.it("balanced suppress/unsuppress leaves collection on", function()
       keylogger.init({})
       for _ = 1, 20 do keylogger.suppress(); keylogger.unsuppress() end
-      helpers.assert_true(true)
+      helpers.assert_true(not keylogger.is_suppressed(),
+        "20 balanced suppress/unsuppress pairs must leave the keylogger collecting")
+
+      local before = (keylogger.get_app_stats()["suppress-probe"] or {}).keystrokes or 0
+      keylogger.on_keydown("z", 4242, "suppress-probe")
+      helpers.assert_eq((keylogger.get_app_stats()["suppress-probe"] or {}).keystrokes or 0, before + 1,
+        "and a keystroke after them must still be counted")
+    end)
+
+    helpers.it("suppress actually stops collection until unsuppressed", function()
+      keylogger.init({})
+      keylogger.suppress()
+      local before = (keylogger.get_app_stats()["suppressed-probe"] or {}).keystrokes or 0
+      keylogger.on_keydown("z", 5252, "suppressed-probe")
+      helpers.assert_eq((keylogger.get_app_stats()["suppressed-probe"] or {}).keystrokes or 0, before,
+        "a suppressed keylogger must record nothing — without this the pair above passes on a suppress() that does nothing at all")
+      keylogger.unsuppress()
     end)
   end)
 

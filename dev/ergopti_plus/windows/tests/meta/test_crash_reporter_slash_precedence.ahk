@@ -13,7 +13,7 @@
 ;
 ; The fix: !(BaseDir ~= "[/\\]$") — NOT applied to the full match expression.
 ;
-; SCOPE: source introspection of lib/crash_reporter.ahk.
+; SCOPE: source introspection of modules/diagnostics/crash_reporter.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,10 +28,10 @@
 ; ===================================================
 
 _CRSP_CheckNoBadPrecedence() {
-	; Move-resilient: scan the lib module tree via the framework helper instead of
+	; Move-resilient: scan the module tree via the framework helper instead of
 	; a pinned crash_reporter path. The BaseDir precedence forms are unique to
-	; crash_reporter within lib/, so the scope stays meaningful.
-	Src := _DriverDirConcat("lib")
+	; crash_reporter within modules/diagnostics/, so the scope stays meaningful.
+	Src := _DriverDirConcat("modules/diagnostics")
 
 	; The wrong form: (!BaseDir ~= "[/\\]$") — NOT binds to BaseDir, not the regex result
 	Assert(!InStr(Src, "if (!BaseDir ~="),
@@ -39,7 +39,7 @@ _CRSP_CheckNoBadPrecedence() {
 }
 
 _CRSP_CheckCorrectPrecedence() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("modules/diagnostics")
 
 	; The correct form: !(BaseDir ~= "[/\\]$")
 	Assert(InStr(Src, "if !(BaseDir ~="),

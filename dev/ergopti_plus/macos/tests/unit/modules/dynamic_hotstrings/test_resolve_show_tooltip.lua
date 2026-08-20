@@ -31,20 +31,20 @@ helpers.describe("hotstrings_config.resolve early-return — show_tooltip defaul
 		-- lib.toml_reader requires toml_codec (a Hammerspoon C extension). Stub it so
 		-- the module loads cleanly in headless tests. load_shared_defaults() at module
 		-- level calls parse() and requires a valid sections structure or it errors out.
-		package.loaded["lib.toml.reader"] = {
+		package.loaded["infra.toml.reader"] = {
 			parse = function()
 				return {
 					sections = {
 						delays = { default_sec = 0.05 },
 						colors = { global_default = "#cccccc", personal = "#aaaaaa" },
 					},
-				}
+				}, true
 			end,
 		}
 		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 		-- Clear the stub so it doesn't leak into subsequent test files that require
 		-- the real lib.toml_reader (e.g. ui.tooltip.config reads constants.toml).
-		package.loaded["lib.toml.reader"] = nil
+		package.loaded["infra.toml.reader"] = nil
 		return mod
 	end
 

@@ -12,17 +12,18 @@
 --- (see test_ollama_manager_nonblocking.lua); this MLX twin was never brought
 --- in line.
 ---
---- Fix: delete_model now spawns /bin/rm -rf via hs.task.new (async), with the
+--- Fix: delete_model now spawns /bin/rm -rf via TaskLifecycle.native (async), with the
 --- task forward-declared per the closure-before-local convention and pinned
 --- in M._active_tasks so Hammerspoon's GC cannot SIGTERM it mid-delete.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "ui/menu/menu_llm/models_manager_mlx.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("models_manager_mlx.lua not readable at: " .. src_path) end
-local src = fh:read("*a"); fh:close()
+-- Selected by a declaration unique to ui/menu/menu_llm/models_manager_mlx.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("\"Cause inconnue. Consultez la console Hammerspoon.\"")
+helpers.assert_true(src ~= nil, "ui/menu/menu_llm/models_manager_mlx.lua source must be locatable")
 
 -- Scope every check to the delete_model FUNCTION BODY only (up to the next
 -- top-level `function obj.` or `return obj`), not the whole file — the fix's
@@ -42,15 +43,15 @@ helpers.assert_true(
 	'delete_model must not call os.execute("rm -rf ...") — it blocks the Hammerspoon run loop'
 )
 
--- Test 2: delete_model must dispatch the delete via hs.task.new with -rf args,
+-- Test 2: delete_model must dispatch the delete via TaskLifecycle.native with -rf args,
 -- mirroring the Ollama manager's async fix.
 helpers.assert_true(
-	delete_fn_body:find("hs%.task%.new", 1, false) ~= nil,
-	"delete_model must use hs.task.new for the async rm -rf"
+	delete_fn_body:find("TaskLifecycle%.native", 1, false) ~= nil,
+	"delete_model must use TaskLifecycle.native for the async rm -rf"
 )
 helpers.assert_true(
 	delete_fn_body:find('"%-rf"', 1, false) ~= nil,
-	'delete_model\'s hs.task.new call must pass "-rf" as a task argument'
+	'delete_model\'s TaskLifecycle.native call must pass "-rf" as a task argument'
 )
 
 -- Test 3: the spawned task must be GC-root pinned (M._active_tasks), matching

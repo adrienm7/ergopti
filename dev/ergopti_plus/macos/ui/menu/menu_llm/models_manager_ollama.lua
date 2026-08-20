@@ -13,9 +13,13 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local i18n          = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local i18n          = require("infra.i18n")
+local text_utils    = require("infra.text_utils")
+local OllamaBinary = require("modules.llm.ollama_binary")
+local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 -- GC-root table: hs.task objects pinned here survive until their callback fires.
 local _active_tasks = {}
@@ -38,15 +42,18 @@ if not ok_dw then download_window = nil end
 --- Finds the absolute path to the Ollama binary.
 --- @return string|nil The path or nil if not found.
 local function get_ollama_path()
-	-- Prefer explicit Homebrew paths to avoid stale app binaries in PATH
-	local candidates = {"/opt/homebrew/bin/ollama", "/usr/local/bin/ollama"}
-	for _, c in ipairs(candidates) do
-		local attr_ok, attr = pcall(hs.fs.attributes, c)
-		if attr_ok and attr then return c end
-	end
+	local path = OllamaBinary.resolve()
+	return path
+end
 
-	local ok, p = pcall(hs.execute, "command -v ollama 2>/dev/null")
-	if ok and type(p) == "string" and p ~= "" then return p:gsub("%s+", "") end
+--- Resolves the executable for an action that cannot proceed without it.
+--- @param operation string Developer-facing operation label.
+--- @return string|nil path
+local function require_ollama_path(operation)
+	local path, resolve_err = OllamaBinary.resolve()
+	if path then return path end
+	Logger.error(LOG, "Cannot %s because Ollama executable resolution failed: %s",
+		tostring(operation), tostring(resolve_err))
 	return nil
 end
 
@@ -139,23 +146,22 @@ function M.new(deps, presets, ram_getter)
 	end
 
 	local function restart_ollama_daemon()
-		local ollama_bin = get_ollama_path()
-		if not ollama_bin or ollama_bin == "" then return false end
+		local ollama_bin = require_ollama_path("restart the daemon")
+		if not ollama_bin then return false end
 		
-		-- Launch daemon via bash nohup to ensure it survives subprocess termination,
-		-- and funnel its output into the unified Ergopti log with an
-		-- [OLLAMA-SERVER] prefix (single tail target for the whole stack).
-		-- Uses a `while read` loop instead of awk: macOS' default BWK awk
-		-- lacks gawk's strftime() / fflush(file) builtins, so the previous
-		-- awk pipeline crashed on the first line and killed ollama on SIGPIPE.
-		local log_path = Logger.UNIFIED_LOG_FILE
-		local ok = pcall(hs.execute,
-			"nohup bash -c \"" .. ollama_bin .. " serve 2>&1 | " ..
-			"while IFS= read -r LINE; do " ..
-			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
-			">> " .. string.format("%q", log_path) .. "; " ..
-			"done\" &")
-		return ok == true
+		-- Launch daemon via bash nohup to ensure it survives subprocess termination.
+		-- The shared foreground pipeline uses a `while read` loop because macOS'
+		-- default BWK awk lacks gawk's strftime() / fflush(file) builtins.
+		local launch_cmd, command_err = OllamaServerCommand.build(
+			ollama_bin, Logger.UNIFIED_LOG_FILE)
+		if not launch_cmd then
+			Logger.error(LOG, "Could not build Ollama daemon command: %s", tostring(command_err))
+			return false
+		end
+		local detached_cmd = "nohup /bin/bash -c " .. text_utils.shell_quote(launch_cmd)
+			.. " </dev/null >/dev/null 2>&1 &"
+		local call_ok, _, command_ok = pcall(hs.execute, detached_cmd)
+		return call_ok == true and command_ok ~= false
 	end
 
 	--- Ensures the Ollama daemon is running, starts it otherwise.
@@ -225,12 +231,16 @@ function M.new(deps, presets, ram_getter)
 	local function refresh_installed_async()
 		if _installed_loading then return end
 		_installed_loading = true
-		local bin = get_ollama_path() or "/usr/local/bin/ollama"
+		local bin = require_ollama_path("refresh installed models")
+		if not bin then
+			_installed_loading = false
+			return
+		end
 		-- hs.task is non-blocking unlike hs.execute.
 		-- Pinned to _active_tasks so the GC cannot SIGTERM it before the callback
 		-- fires and resets _installed_loading — a GC kill would deadlock the lock.
 		local task
-		task = hs.task.new(bin, function(code, stdout)
+		task = TaskLifecycle.native("Ollama installed-model refresh", bin, function(code, stdout)
 			if task then _active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
 			_installed_loading = false
 			local installed = {}
@@ -245,7 +255,12 @@ function M.new(deps, presets, ram_getter)
 		end, {"list"})
 		if task then
 			_active_tasks[task] = true
-			pcall(function() task:start() end)
+			if not TaskLifecycle.start(task, "Ollama installed-model refresh") then
+				_active_tasks[task] = nil
+				_installed_loading = false
+			end
+		else
+			_installed_loading = false
 		end
 	end
 
@@ -302,7 +317,12 @@ function M.new(deps, presets, ram_getter)
 	end
 
 	function obj.pull_model(target_model, repo, on_success)
-		local bin = get_ollama_path() or "/usr/local/bin/ollama"
+		local bin = require_ollama_path("pull a model")
+		if not bin then
+			pcall(notifications.notify, i18n.get("ollama.fail_title"),
+				string.format(i18n.get("ollama.download_error"), tostring(target_model)), "error")
+			return
+		end
 		local pull_output = ""
 		
 		local function do_retry()
@@ -314,7 +334,7 @@ function M.new(deps, presets, ram_getter)
 		
 		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_pull_and_upgrade, do_retry)
 		
-		local task = hs.task.new(bin, function(code)
+		local task = TaskLifecycle.native("Ollama model pull", bin, function(code)
 			if deps.active_tasks then deps.active_tasks["ollama_pull"] = nil end
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
@@ -346,7 +366,7 @@ function M.new(deps, presets, ram_getter)
 					if type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
 					if type(deps.keymap.set_llm_display_model_name) == "function" then pcall(deps.keymap.set_llm_display_model_name, display_model) end
 				end
-				pcall(deps.save_prefs)
+				if deps.save_prefs() ~= true then return false end
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
@@ -390,7 +410,12 @@ function M.new(deps, presets, ram_getter)
 		if task then
 			deps.active_tasks = deps.active_tasks or {}
 			deps.active_tasks["ollama_pull"] = task
-			pcall(function() task:start() end)
+			if not TaskLifecycle.start(task, "Ollama model pull") then
+				deps.active_tasks["ollama_pull"] = nil
+				complete_progress_ui(false, target_model)
+			end
+		else
+			complete_progress_ui(false, target_model)
 		end
 	end
 
@@ -410,9 +435,13 @@ function M.new(deps, presets, ram_getter)
 		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
 		
 		ensure_ollama_running(function()
-			local bin = get_ollama_path() or "/usr/local/bin/ollama"
+			local bin = require_ollama_path("check model requirements")
+			if not bin then
+				if type(on_cancel) == "function" then on_cancel() end
+				return
+			end
 			local task
-			task = hs.task.new(bin, function(code, stdout)
+				task = TaskLifecycle.native("Ollama model requirement check", bin, function(code, stdout)
 				if task then _active_tasks[task] = nil end
 				local installed = {}
 				if code == 0 and type(stdout) == "string" then
@@ -450,11 +479,16 @@ function M.new(deps, presets, ram_getter)
 						else obj.install_ollama_then_pull(target_model, repo, on_success) end
 					end
 				end
-			end, {"list"})
-			if task then
-				_active_tasks[task] = true
-				pcall(function() task:start() end)
-			end
+				end, {"list"})
+				if task then
+					_active_tasks[task] = true
+					if not TaskLifecycle.start(task, "Ollama model requirement check") then
+						_active_tasks[task] = nil
+						if type(on_cancel) == "function" then on_cancel() end
+					end
+				elseif type(on_cancel) == "function" then
+					on_cancel()
+				end
 		end, on_cancel)
 	end
 
@@ -463,9 +497,15 @@ function M.new(deps, presets, ram_getter)
 		Logger.debug(LOG, string.format("Deleting Ollama model %s…", model_name))
 		
 		ensure_ollama_running(function()
-			local bin = get_ollama_path() or "/usr/local/bin/ollama"
+			local bin = require_ollama_path("delete a model")
+			if not bin then
+				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+					string.format(i18n.get("ollama.delete_error"), model_name,
+						"Ollama executable unavailable"), "error")
+				return
+			end
 			local task
-			task = hs.task.new(bin, function(code, stdout)
+				task = TaskLifecycle.native("Ollama model delete", bin, function(code, stdout)
 				if task then _active_tasks[task] = nil end
 				if code == 0 then
 					pcall(notifications.notify, i18n.get("ollama.deleted_title"), string.format(i18n.get("ollama.model_deleted"), model_name), "success")
@@ -474,11 +514,20 @@ function M.new(deps, presets, ram_getter)
 				else
 					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(stdout)), "error")
 				end
-			end, {"rm", model_name})
-			if task then
-				_active_tasks[task] = true
-				pcall(function() task:start() end)
-			end
+				end, {"rm", model_name})
+				if task then
+					_active_tasks[task] = true
+					if not TaskLifecycle.start(task, "Ollama model delete") then
+						_active_tasks[task] = nil
+						pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+							string.format(i18n.get("ollama.delete_error"), model_name,
+								"task start failed"), "error")
+					end
+				else
+					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+						string.format(i18n.get("ollama.delete_error"), model_name,
+							"task creation failed"), "error")
+				end
 		end)
 	end
 

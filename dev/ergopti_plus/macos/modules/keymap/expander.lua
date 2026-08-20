@@ -20,13 +20,20 @@ local M = {}
 
 local hs = hs
 
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
+-- The shared matcher core. Only M.decide is used: the firing DECISION is shared,
+-- the buffer traversal is not — macOS slices a byte string, the core an array of
+-- codepoints, and neither has to convert for the other.
+local HotstringCore = require("infra.hotstring_engine")
 local km_utils   = require("modules.keymap.utils")
-local Logger     = require("lib.logger")
+local Logger     = require("infra.logger")
+local Timings    = require("infra.timings")
 local CoreStateM = require("modules.keymap.state")
 local TextSender = require("adapters.text_sender")
+local SyntheticInput = require("adapters.synthetic_input")
 local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
+local Terminators      = require("modules.keymap.terminators")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -36,7 +43,6 @@ if not ok_kl then keylogger = nil end
 local _state    = nil  -- Shared CoreState injected via M.init().
 local _registry = nil  -- Registry module injected via M.init().
 local _llm      = nil  -- LLMBridge module injected via M.init().
-
 
 --- Guard: verifies that M.init() was called before any public function that
 --- depends on the injected dependencies. Logs an error and returns false on failure.
@@ -75,58 +81,99 @@ end
 --- @param source_type string Telemetry label passed to the keylogger.
 --- @param source_variant string|nil Optional sub-type for the keylogger.
 function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant, is_private)
+	if not require_state("perform_text_replacement") then return false end
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
-	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
-	-- Record the arm timestamp so the stuck-counter reset guard in onKeyDownRaw
-	-- does not wipe these counters if a runloop lag creates a false 0.5 s gap
-	-- between the arm and the first synthetic echo (A6 audit fix).
-	if hs and hs.timer then
-		_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+	-- Every logical producer receives a fresh immutable generation. A previous
+	-- terminator cannot remain owned by this replacement, even when two producers
+	-- start within the old timing window.
+	TerminatorReplay.flush_now("superseded by a new replacement")
+	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")
+	local terminal_target = nil
+	if deletes > 0 and type(TextSender.terminalInputTarget) == "function" then
+		terminal_target = TextSender.terminalInputTarget()
 	end
 	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 
-	TextSender.eraseChars(deletes, 0)
+	-- The preview refresh belongs to the same replacement transaction as its
+	-- Quartz output. A second raw doAfter timer could be refused independently,
+	-- leaving a successful chained expansion with no preview, and its callback
+	-- could outlive a stop/re-init. Transaction completion already provides the
+	-- required post-eventtap ordering, so make it the sole refresh authority.
+	if not is_ignored then
+		local preview_state = _state
+		local preview_llm = _llm
+		local registered, register_err = pcall(SyntheticInput.on_complete,
+			transaction, function(_completed_tx, status)
+				if status ~= "complete"
+					or _state ~= preview_state or _llm ~= preview_llm then return end
+				local ok, err = pcall(preview_llm.update_preview, preview_state.buffer)
+				if not ok then
+					Logger.error(LOG, "Replacement preview refresh failed: %s.", tostring(err))
+				end
+			end)
+		if not registered then
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Replacement preview completion could not be registered: %s.",
+				tostring(register_err))
+			return false, transaction
+		end
+	end
 
-	local ok, emit_count, emitted_str, logical_text = pcall(emit_action)
+	local ok, emit_count, emitted_str, logical_text = pcall(function()
+		return SyntheticInput.with_transaction(transaction, function()
+			assert(TextSender.eraseChars(deletes, 0) ~= false,
+				"replacement deletion could not be constructed")
+			return emit_action()
+		end)
+	end)
 	if not ok then
-		-- The emit failed — emitted_str contains the error message from pcall.
+		-- Nothing in the callback collector has reached Quartz yet. Cancel removes
+		-- every already-built prefix, so a producer that emits one token and then
+		-- raises cannot leave half a replacement on screen or advance action state.
+		pcall(SyntheticInput.cancel, transaction)
 		Logger.error(LOG, "emit_action failed: %s.", tostring(emit_count))
-		emitted_str = ""
-		logical_text = ""
+		return false, transaction
+	end
+	if terminal_target then
+		local terminal_key_delay_us = Timings.ms(
+			"debounce", "terminal_hotstring_key_delay_ms") * 1000
+		local paced_ok, paced_or_error = pcall(SyntheticInput.deliver_collected_paced,
+			transaction, deletes, terminal_key_delay_us, terminal_target)
+		if not paced_ok then
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Terminal replacement delivery failed: %s.",
+				tostring(paced_or_error))
+			return false, transaction
+		end
 	end
 	emitted_str = emitted_str or ""
 	-- Keep extensions that still return the historical two values working. The
 	-- built-in clipboard emitter supplies an explicit logical value instead.
 	logical_text = logical_text or emitted_str
 
-	-- Track the emitted characters so the main event loop knows to skip them.
-	-- Guard against a nil field: the E2E stub state may not include this slot.
-	_state.expected_synthetic_chars = (_state.expected_synthetic_chars or "") .. emitted_str
-
-	-- When the emission used clipboard paste, register the expected Cmd+V echoes
-	-- in a dedicated counter instead of expected_synthetic_chars. Paste does not
-	-- produce individual character echoes, so expected_synthetic_chars must stay
-	-- empty to avoid absorbing real keystrokes typed after the expansion.
-	local paste_ops = km_utils.take_paste_ops and km_utils.take_paste_ops() or 0
-	if paste_ops > 0 then
-		_state.expected_synthetic_pastes = (_state.expected_synthetic_pastes or 0) + paste_ops
+	if type(buffer_action) == "function" then
+		local ok_buf, buf_err = pcall(buffer_action)
+		if not ok_buf then
+			-- Buffer commit and synthetic output are one transaction. Since the batch
+			-- is still only being built, roll it back instead of displaying output the
+			-- engine cannot describe afterwards.
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "buffer_action failed: %s.", tostring(buf_err))
+			return false, transaction
+		end
 	end
 
-	-- Guard: skip notify when nothing was actually injected (deletes=0 and logical_text="")
-	-- to avoid a no-op synth_queue entry that would absorb the first real keystroke typed
-	-- immediately after a cancelled or empty expansion.
+	-- Guard: skip telemetry when nothing was actually injected. This runs only
+	-- after the buffer commit succeeded, so a rolled-back replacement cannot be
+	-- persisted as output the application never received.
 	if (deletes > 0 or logical_text ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
-		-- pcall-wrapped like the neighboring buffer_action call below: a truncated
+		-- pcall-wrapped like the neighboring buffer_action call above: a truncated
 		-- LLM completion cut mid-codepoint (French accents, curly quotes, em-dashes)
 		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
-		-- would otherwise raise, aborting the expansion mid-flight and leaving the
-		-- synthetic-injection trackers desynced (F-HIGH-16 fix).
-		-- is_private is forwarded, NOT used to skip the call. Skipping would let
-		-- the physical echoes fall through handle_key unclaimed and be logged as
-		-- ordinary human keystrokes in buffer_text - the same secret, recorded in
-		-- a worse place. The keylogger's private mode keeps the discard markers
-		-- intact and redacts only what it persists.
+		-- would otherwise raise and abort the expansion mid-flight. is_private is
+		-- forwarded so every logical persistence field is redacted; immutable event
+		-- tags exclude the later OS echoes independently of payload contents.
 		local ok_notify, notify_err = pcall(keylogger.notify_synthetic,
 			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str,
 			is_private)
@@ -135,48 +182,35 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
-	if type(buffer_action) == "function" then
-		local ok_buf, buf_err = pcall(buffer_action)
-		if not ok_buf then
-			-- Buffer desync after an expansion leads to phantom chars or missed
-			-- triggers downstream; surfacing the failure loudly makes it
-			-- traceable instead of masking it as a silent inconsistency.
-			Logger.error(LOG, "buffer_action failed: %s.", tostring(buf_err))
-		end
+	-- Deferred emitters retain the transaction before arming their timer. Sealing
+	-- closes the synchronous producer boundary; completion waits for those holds
+	-- and for every tagged batch to be handed to Quartz.
+	local sealed, seal_err = pcall(SyntheticInput.seal, transaction)
+	if not sealed then
+		pcall(SyntheticInput.cancel, transaction)
+		Logger.error(LOG, "replacement transaction could not be sealed: %s.", tostring(seal_err))
+		return false, transaction
 	end
 
 	if keylogger and type(keylogger.set_buffer) == "function" then
-		keylogger.set_buffer(_state.buffer)
-	end
-
-	-- Re-evaluate preview on the updated buffer to support chained autocorrections.
-	-- Deferred via doAfter(0) so all synthetic echoes produced by the expansion
-	-- (deletes + chars) have already been processed by onKeyDownRaw before the
-	-- watcher armed by update_preview sees any keyDown event. Without this
-	-- deferral the synthetic chars trigger the preview watcher and call
-	-- hide_forced(), destroying the chained preview immediately (E2 audit fix).
-	if not is_ignored then
-		hs.timer.doAfter(0, function()
-			-- Deferring moved this call off the eventtap stack and onto a timer, where a
-			-- throw reaches only the HS Console and never the file logger. It is the one
-			-- update_preview call site of four still outside a pcall — the same guard the
-			-- notify_synthetic and buffer_action calls above already carry.
-			local ok, err = pcall(_llm.update_preview, _state.buffer)
-			if not ok then
-				Logger.error(LOG, "Deferred update_preview failed: %s.", tostring(err))
-			end
-		end)
+		local ok_set, set_err = pcall(keylogger.set_buffer, _state.buffer)
+		if not ok_set then
+			Logger.error(LOG, "keylogger.set_buffer failed: %s.", tostring(set_err))
+		end
 	end
 
 	-- Named constant rather than a bare 1.0: it is deliberately DOUBLE the module
 	-- default, and that relationship is invisible when the literal sits here.
 	if is_final then _state.suppress_rescan(CoreStateM.FINAL_RESULT_SUPPRESS_SEC) end
 
-	if not is_ignored and _llm.get_llm_enabled() then
+	if not is_ignored
+		and (type(_llm.is_runtime_available) ~= "function" or _llm.is_runtime_available())
+		and _llm.get_llm_enabled() then
 		_llm.start_timer()
 	end
 
 	Logger.done(LOG, "Replacement complete.")
+	return true, transaction
 end
 
 
@@ -189,43 +223,29 @@ end
 -- ===================================
 -- ===================================
 
---- Returns true when an is_word mapping should be REJECTED because the
---- character immediately before the trigger's start position is a letter
---- (or "@", which marks personal-info triggers). Centralised here so auto
---- and terminator expansion apply the exact same word-boundary policy.
+--- Extracts the one codepoint sitting immediately before a candidate trigger —
+--- the only piece of left-hand context the word-boundary rule consults.
 ---
---- When the trigger starts at byte index 1 of the buffer, the buffer holds
---- no observable left-hand context. The decision is then delegated to
---- `_state.start_is_word_boundary`: true means the buffer's start is known
---- to abut a word terminator (fresh launch, post-expansion, post-Cmd+A,
---- post-word-timeout) and the match is allowed; false means the cursor
---- moved into territory we never observed (BS past the buffer's start,
---- nav keys, mouse click, Ctrl/Cmd combos other than select-all, paste,
---- undo, etc.) and the match is rejected. This is the Hammerspoon mirror
---- of the AHK HSEv2 word-boundary contract.
+--- The rule itself is NOT here any more. It moved into the shared matcher core
+--- (`HotstringCore.decide`), because macOS, Windows and Linux each carried their
+--- own version and no two of them ever agreed at once. What stays here is the
+--- part that is genuinely macOS's: pulling that codepoint out of a BYTE-string
+--- buffer, which is an O(1) offset rather than the array index the core uses.
 ---
 --- @param buffer string The current rolling buffer.
---- @param trigger string The trigger whose match is being considered.
---- @param trigger_start_byte number 1-based byte index where the trigger
----   starts inside `buffer`. Must be >= 1.
---- @param start_is_word_boundary boolean Whether the buffer's start
----   abuts a known word terminator.
---- @return boolean True when the word boundary blocks the match.
-local function word_boundary_blocks(buffer, trigger, trigger_start_byte, start_is_word_boundary)
-	-- Triggers that start with a separator carry their own boundary and skip this
-	-- check: whitespace, nbsp (U+00A0), nnbsp (U+202F), and the comma-layer ";".
-	-- Including ";" guarantees the comma→J expansion (";e" → "Je") fires in every
-	-- context, never word-boundary-gated — the mirror of the AHK "*?C" in-word flag.
-	if trigger:match("^[ \194\160\226\128\175;]") then return false end
-	if trigger_start_byte <= 1 then
-		return not start_is_word_boundary
-	end
-	local before             = buffer:sub(1, trigger_start_byte - 1)
+--- @param trigger_start_byte number 1-based byte index where the trigger starts
+---   inside `buffer`. Must be >= 1.
+--- @return string|nil The preceding codepoint; nil when the trigger starts the
+---   buffer, so the caller falls back to `start_is_word_boundary`; an EMPTY
+---   string when a character is there but could not be decoded, which the core
+---   treats as "does not open a word" exactly as this function always has.
+local function prev_char_before(buffer, trigger_start_byte)
+	if trigger_start_byte <= 1 then return nil end
+	local before            = buffer:sub(1, trigger_start_byte - 1)
 	local ok_utf8, prev_off = pcall(utf8.offset, before, -1)
 	-- Treat malformed UTF-8 the same as an absent left-hand char: no block
 	if not ok_utf8 then prev_off = nil end
-	local prev_char = prev_off and before:sub(prev_off) or ""
-	return text_utils.is_letter_char(prev_char) or prev_char == "@"
+	return prev_off and before:sub(prev_off) or ""
 end
 
 --- Chooses the right emitter for a mapping's replacement: plain_text uses
@@ -272,50 +292,371 @@ end
 --- match while the engine consulted start_is_word_boundary and refused it.
 ---
 --- Returns the EFFECTIVE plain replacement for this firing: conformed to the typed
---- casing for a case_conform entry, the stored replacement otherwise. nil means
+--- casing for a "conform" entry, the stored replacement otherwise. nil means
 --- the mapping does not fire, for any reason.
+---
+--- THE DECISION ITSELF IS NO LONGER HERE. It is `HotstringCore.decide`, shared
+--- with the Linux engine, and this function is now the macOS half of that split:
+--- it does the two slices a BYTE-string buffer makes cheap — the trigger-length
+--- tail and the codepoint in front of it — and hands them over. Nothing converts
+--- and nothing is duplicated, which is what the adoption was blocked on.
 --- @param m table The mapping entry.
 --- @param buffer string The buffer to evaluate against, as the engine will see it.
 --- @return string|nil eff_plain The plain replacement, or nil when it will not fire.
 --- @return string|nil typed The matched trigger text as typed, or nil.
 --- @return string|nil eff_repl The raw replacement (may carry {Token} directives).
+--- @return boolean is_noop True when it matched but replaces the text with itself.
 function M.would_fire(m, buffer)
 	if type(buffer) ~= "string" or type(m) ~= "table" then return nil end
 
-	local trigger = m.trigger
-	local tb      = m.trigger_bytes
+	local tb = m.trigger_bytes
 	if not tb or #buffer < tb then return nil end
 	local typed = buffer:sub(-tb)
 
-	local eff_repl, eff_plain
-	if m.case_conform then
-		if text_utils.trig_lower(typed) ~= trigger then return nil end
-		local conformed = text_utils.conform_replacement(m.plain_repl, typed, trigger)
-		-- nil means the typed case was mixed (not a clean lower/Title/UPPER), for
-		-- which no variant was ever registered: the hotstring must NOT fire.
-		if conformed == nil then return nil end
-		eff_repl, eff_plain = conformed, conformed
-	else
-		if typed ~= trigger then return nil end
-		eff_repl, eff_plain = m.repl, m.plain_repl
-	end
+	local eff_plain, is_noop = HotstringCore.decide(
+		m,
+		m.plain_repl,
+		typed,
+		prev_char_before(buffer, #buffer - tb + 1),
+		_state and _state.start_is_word_boundary
+	)
 
-	local tstart_byte = #buffer - tb + 1
-	if m.is_word and word_boundary_blocks(buffer, trigger, tstart_byte, _state and _state.start_is_word_boundary) then
-		return nil
+	-- Equal visible text is not an identity operation when the raw replacement
+	-- also carries key directives: `go -> go{Tab}` must still emit Tab even though
+	-- plain_text deliberately strips that action before matching. Unknown
+	-- placeholders remain literal, so raw ~= plain identifies a recognised
+	-- key/newline directive on this registry path
+	if is_noop and m.repl ~= m.plain_repl then
+		eff_plain = m.plain_repl
+		is_noop = false
 	end
 
 	-- A replacement identical to what was typed is a no-op: the engine passes the
 	-- keystroke through rather than expanding, so the preview must not offer it.
 	-- Reported as a distinct outcome because the engine still has cleanup to do
 	-- for it, while the preview treats it exactly like "no match".
-	if eff_plain == typed then return nil, typed, nil, true end
+	if not eff_plain then
+		if is_noop then return nil, typed, nil, true end
+		return nil
+	end
 
+	-- The raw replacement, which may carry {Token} directives — EXCEPT in conform
+	-- mode, where the effective text was re-cased and is plain by construction.
+	-- Emitting the stored raw one there would undo the conformance.
+	local eff_repl = (m.match_mode == "conform") and eff_plain or m.repl
 	return eff_plain, typed, eff_repl, false
 end
 
-function M.try_auto_expand(m, char_len, is_ignored)
+--- Returns whether a mapping's runtime group currently permits it to fire.
+--- The explicit-validation path may bypass typing delay, never feature state.
+--- @param mapping table Registry mapping.
+--- @return boolean
+local function mapping_group_active(mapping)
+	if not mapping.group then return true end
+	local groups = _state and _state.groups
+	local group = groups and groups[mapping.group]
+	return not group or not not group.enabled
+end
+
+local NNBSP = "\xE2\x80\xAF"  -- U+202F, 3 UTF-8 bytes
+local NBSP  = "\xC2\xA0"      -- U+00A0, 2 UTF-8 bytes
+
+--- Resolves the pure matching half of a terminator expansion.
+---
+--- Both the emitter and the prospective magic-key resolver call this function.
+--- It owns terminator enablement, French typography stripping, word/case/no-op
+--- matching and consume state, so the tooltip cannot reconstruct a looser
+--- answer than the action path.
+--- @param mapping table Registry mapping.
+--- @param buffer string Buffer including the terminator event.
+--- @param chars string Terminator character(s) appended to the buffer.
+--- @param explicit_magic boolean|nil True when the configured magic action is
+---        being resolved. Bare `:`/`;` are then valid on non-Ergopti layouts.
+--- @return table|nil match Matching metadata, including a possible `is_noop`.
+local function resolve_terminator_match(mapping, buffer, chars, explicit_magic)
+	if type(mapping) ~= "table" or type(buffer) ~= "string" or type(chars) ~= "string" then
+		return nil
+	end
+	if not _registry.is_terminator(chars) then return nil end
+
+	local trigger = mapping.trigger
+	local tb = mapping.trigger_bytes
+	if type(trigger) ~= "string" or type(tb) ~= "number" then return nil end
+
+	local chars_bytes = #chars
+	local extra_bs_bytes = 0
+	local is_typo_endchar = (chars == ":" or chars == ";")
+	if is_typo_endchar and not explicit_magic then
+		local nnbsp_pos = #buffer - chars_bytes - #NNBSP + 1
+		local nbsp_pos  = #buffer - chars_bytes - #NBSP + 1
+		if nnbsp_pos >= 1 and buffer:sub(nnbsp_pos, nnbsp_pos + #NNBSP - 1) == NNBSP then
+			extra_bs_bytes = #NNBSP
+		elseif nbsp_pos >= 1 and buffer:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
+			extra_bs_bytes = #NBSP
+		else
+			return nil
+		end
+	end
+
+	local effective_chars_bytes = chars_bytes + extra_bs_bytes
+	if #buffer < tb + effective_chars_bytes then return nil end
+	local buf_start = #buffer - effective_chars_bytes - tb + 1
+	local body = buffer:sub(1, buf_start + tb - 1)
+	local eff_plain, typed_trigger, eff_repl, is_noop = M.would_fire(mapping, body)
+	if not eff_plain and not is_noop then return nil end
+
+	return {
+		buf_start       = buf_start,
+		eff_plain       = eff_plain,
+		typed_trigger   = typed_trigger,
+		eff_repl        = eff_repl,
+		is_noop         = is_noop == true,
+		extra_bs_bytes  = extra_bs_bytes,
+		consume_term    = _registry.terminator_is_consumed(chars),
+	}
+end
+
+--- Resolves every static action reachable by pressing the magic key now.
+---
+--- This is the shared arbitration boundary for the keyboard engine and tooltip.
+--- It returns the exact first action the engine will attempt plus the remaining
+--- eligible rows. A strictly longer end-character mapping beats an auto mapping;
+--- equal length stays with the auto mapping. Group state, terminator state,
+--- auto-expand eligibility and case/word matching are all resolved here. The
+--- optional predicate is the eventtap's ordinary-auto timing gate; explicit
+--- magic mappings bypass it, while literal mappings that merely happen to end
+--- with a newly selected magic key retain their historical timing semantics.
+---
+--- `attempts` preserves the engine's fallback order. `candidates` contains each
+--- displayable candidate once, in the UI's end-char then star order.
+--- @param buffer string Buffer before the magic key is pressed.
+--- @param ordinary_auto_allowed function|nil Runtime eligibility for literal autos.
+--- @param event_chars string|nil Real physical payload at commit time. Preview
+---        callers omit it and resolve the configured logical action.
+--- @return table|nil resolution
+function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
+	if not require_state("resolve_magic_action") then return nil end
+	if type(buffer) ~= "string" then return nil end
+	if ordinary_auto_allowed ~= nil and type(ordinary_auto_allowed) ~= "function" then return nil end
+
+	local magic = _state.magic_key
+	if type(magic) ~= "string" or magic == "" then return nil end
+	if event_chars ~= nil and not Terminators.matches_magic_event(event_chars, magic) then return nil end
+	local physical_magic = event_chars or magic
+	local auto_buffer = nil
+	local star_attempts = {}
+	local literal_attempts = {}
+	local end_attempts = {}
+
+	do
+		local ok_tail, tail_offset = pcall(utf8.offset, buffer, -1)
+		local tail_char = (ok_tail and tail_offset) and buffer:sub(tail_offset) or nil
+		local star_bucket = tail_char and _registry.mappings_for_star_tail(tail_char) or nil
+		local bare_star_bucket = _registry.mappings_for_star_tail("")
+		auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. magic) or nil
+		-- A bare magic-key mapping is globally shortest, so scanning it after the
+		-- tail-specific bucket preserves the registry's longest-first order without
+		-- rebuilding or linearly scanning the full magic-key bucket per preview.
+		for bucket_index = 1, 2 do
+			local bucket
+			if bucket_index == 1 then bucket = star_bucket else bucket = bare_star_bucket end
+			if bucket then
+				for _, mapping in ipairs(bucket) do
+					if mapping.auto and mapping.has_magic and mapping_group_active(mapping) then
+						local eff_plain, typed, eff_repl, is_noop = M.would_fire(mapping, auto_buffer)
+						if eff_plain or is_noop then
+							local action = {
+								mapping = mapping,
+								kind = "star",
+								eff_plain = eff_plain,
+								typed = typed,
+								eff_repl = eff_repl,
+								is_noop = is_noop == true,
+							}
+							star_attempts[#star_attempts + 1] = action
+						end
+					end
+				end
+			end
+		end
+
+		-- update_trigger_char deliberately leaves unrelated mappings untouched when
+		-- their literal suffix happens to equal the newly selected magic key. They
+		-- still fire through the ordinary auto path (including its timing gate), so
+		-- both the preview and magic dispatch must retain them in the same ledger.
+		local literal_tail_bucket = type(_registry.mappings_for_literal_magic_tail) == "function"
+			and tail_char and _registry.mappings_for_literal_magic_tail(tail_char) or nil
+		local literal_bare_bucket = type(_registry.mappings_for_literal_magic_tail) == "function"
+			and _registry.mappings_for_literal_magic_tail("") or nil
+		if literal_tail_bucket or literal_bare_bucket then auto_buffer = auto_buffer or (buffer .. magic) end
+		for bucket_index = 1, 2 do
+			local literal_bucket = bucket_index == 1 and literal_tail_bucket or literal_bare_bucket
+			if literal_bucket then
+				for _, mapping in ipairs(literal_bucket) do
+					local timing_allowed, remaining_delay = true, nil
+					if ordinary_auto_allowed ~= nil then
+						timing_allowed, remaining_delay = ordinary_auto_allowed(mapping)
+					end
+					if mapping.auto and not mapping.has_magic and mapping_group_active(mapping)
+						and timing_allowed
+					then
+						local eff_plain, typed, eff_repl, is_noop = M.would_fire(mapping, auto_buffer)
+						if eff_plain or is_noop then
+							literal_attempts[#literal_attempts + 1] = {
+								mapping = mapping,
+								kind = "literal_auto",
+								eff_plain = eff_plain,
+								typed = typed,
+								eff_repl = eff_repl,
+								is_noop = is_noop == true,
+								remaining_delay = remaining_delay,
+							}
+						end
+					end
+				end
+			end
+		end
+
+		if buffer ~= "" and _registry.is_terminator(magic) then
+			local end_bucket = tail_char and _registry.mappings_for_tail(tail_char) or nil
+			if end_bucket then
+				local end_buffer = buffer .. physical_magic
+				for _, mapping in ipairs(end_bucket) do
+					if not mapping.auto and mapping_group_active(mapping) then
+						local match = resolve_terminator_match(mapping, end_buffer, physical_magic, true)
+						if match then
+							local action = {
+								mapping = mapping,
+								kind = "autocorrect",
+								eff_plain = match.eff_plain,
+								typed = match.typed_trigger,
+								eff_repl = match.eff_repl,
+								is_noop = match.is_noop,
+							}
+							end_attempts[#end_attempts + 1] = action
+						end
+					end
+				end
+			end
+		end
+	end
+
+	if #star_attempts == 0 and #literal_attempts == 0 and #end_attempts == 0 then return nil end
+
+	-- True star mappings and literal autos come from two narrow indexes. Merge
+	-- only the actions that actually matched, using the rank assigned by the
+	-- registry's one canonical comparator; this preserves its length/priority/
+	-- group/sequence order without copying that comparator into the expander.
+	local auto_attempts = {}
+	for _, action in ipairs(star_attempts) do auto_attempts[#auto_attempts + 1] = action end
+	for _, action in ipairs(literal_attempts) do auto_attempts[#auto_attempts + 1] = action end
+	if #literal_attempts > 0 and #auto_attempts > 1 then
+		table.sort(auto_attempts, function(a, b)
+			return (a.mapping.registry_rank or math.huge) < (b.mapping.registry_rank or math.huge)
+		end)
+	end
+
+	local attempts = {}
+	local first_auto_len = 0
+	for _, action in ipairs(auto_attempts) do
+		if action.eff_plain then
+			first_auto_len = action.mapping.tlen
+			break
+		end
+	end
+	if first_auto_len > 0 then
+		for _, candidate in ipairs(end_attempts) do
+			if candidate.mapping.tlen > first_auto_len then
+				attempts[#attempts + 1] = candidate
+			end
+		end
+		for _, candidate in ipairs(auto_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+		-- Preserve the historical fallback: if every auto action declines during
+		-- commit, the engine gives every end-char candidate one final chance.
+		for _, candidate in ipairs(end_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+	else
+		for _, candidate in ipairs(end_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+		for _, candidate in ipairs(auto_attempts) do
+			attempts[#attempts + 1] = candidate
+		end
+	end
+
+	-- A no-op final action still mutates runtime state: try_*_expand calls
+	-- suppress_rescan(), which clears the buffer before returning false. Every
+	-- later attempt would therefore re-match against an empty buffer and cannot
+	-- fire. Keep the terminal attempt for that cleanup, but do not advertise or
+	-- dispatch actions beyond it.
+	local attempt_count = #attempts
+	local reachable_count = attempt_count
+	for index = 1, attempt_count do
+		local action = attempts[index]
+		action.reachable = true
+		if action.is_noop and action.mapping.final_result then
+			reachable_count = index
+			break
+		end
+	end
+	for index = reachable_count + 1, attempt_count do attempts[index] = nil end
+
+	local end_candidates = {}
+	local star_candidates = {}
+	local literal_candidates = {}
+	local candidates = {}
+	for _, action in ipairs(end_attempts) do
+		if action.reachable and action.eff_plain then
+			end_candidates[#end_candidates + 1] = action
+			candidates[#candidates + 1] = action
+		end
+	end
+	for _, action in ipairs(auto_attempts) do
+		if action.reachable and action.eff_plain then
+			if action.kind == "star" then
+				star_candidates[#star_candidates + 1] = action
+			else
+				literal_candidates[#literal_candidates + 1] = action
+			end
+			candidates[#candidates + 1] = action
+		end
+	end
+
+	local winner = nil
+	for _, action in ipairs(attempts) do
+		if action.eff_plain then winner = action; break end
+	end
+
+	return {
+		winner = winner,
+		attempts = attempts,
+		candidates = candidates,
+		star_candidates = star_candidates,
+		literal_candidates = literal_candidates,
+		end_candidates = end_candidates,
+	}
+end
+
+--- Commits one automatic mapping against either the live buffer or an exact
+--- prospective buffer supplied by magic-key arbitration.
+--- @param m table Mapping entry.
+--- @param char_len number Logical codepoint count of the current trigger event.
+--- @param is_ignored boolean Whether the physical event is already on screen.
+--- @param match_buffer string|nil Immutable buffer used for matching/splicing.
+--- @return boolean True when the expansion committed.
+function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	if not require_state("try_auto_expand") then return false end
+	local active_buffer = type(match_buffer) == "string" and match_buffer or _state.buffer
+
+	-- The `*` flag, and the only place it is checked. An entry that does not opt in
+	-- waits for a terminator — "ya" must not fire inside "yaourt". Neither
+	-- would_fire, this function, nor the tail index filtered on it, so a non-auto
+	-- entry expanded the moment its trigger was complete
+	-- (test_auto_expand_flag_gate.lua carries the full account).
+	if not m.auto then return false end
 
 	local trigger = m.trigger
 
@@ -323,7 +664,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	-- lives in M.would_fire, which the tooltip preview calls too. Keeping it in one
 	-- place is what guarantees the preview cannot promise an expansion this
 	-- function then declines to perform.
-	local eff_plain, typed, eff_repl, is_noop = M.would_fire(m, _state.buffer)
+	local eff_plain, typed, eff_repl, is_noop = M.would_fire(m, active_buffer)
 
 	if not eff_plain then
 		-- No-op guard: when the plain-text expansion equals what was typed, signal
@@ -341,7 +682,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	-- 1-based byte index where the matched trigger starts, used below to splice the
 	-- replacement into the buffer. Derived from the same trigger_bytes would_fire
 	-- matched on, so the two can never disagree about where the trigger began.
-	local tstart_byte = #_state.buffer - m.trigger_bytes + 1
+	local tstart_byte = #active_buffer - m.trigger_bytes + 1
 
 	-- Compute how many backspaces and what to type, keeping common prefix chars.
 	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
@@ -351,11 +692,9 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	local char_offset      = is_ignored and 0 or char_len
 	local screen_len       = trig_len - char_offset
 	-- Clamped at zero. A trigger shorter than the typed event's codepoint count
-	-- (a multi-codepoint composed character arriving as one event) made this
-	-- negative, and the negative flowed straight into expected_synthetic_deletes:
-	-- the counter then read as "fewer than zero deletes outstanding", so the NEXT
-	-- expansion's real deletes were mis-accounted and its echoes leaked into the
-	-- buffer as human keystrokes.
+	-- (a multi-codepoint composed character arriving as one event) cannot require
+	-- a negative number of on-screen deletions. Keeping the clamp at the operation
+	-- boundary also prevents malformed replacement transactions.
 	if screen_len < 0 then
 		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
 			trig_len, char_offset)
@@ -373,11 +712,11 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		to_type = text_utils.utf8_sub(repl_text, common + 1)
 	end
 
-	M.perform_text_replacement(
+	local replaced = M.perform_text_replacement(
 		deletes,
 		function() return emit_dispatch(m, to_type) end,
 		function()
-			_state.buffer = _state.buffer:sub(1, tstart_byte - 1) .. repl_text
+			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. repl_text
 		end,
 		m.final_result,
 		is_ignored,
@@ -385,6 +724,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		m.group or nil,
 		m.is_private
 	)
+	if not replaced then return false end
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
 	-- IBAN). keylogger.log_hotstring writes trigger + replacement verbatim into
@@ -410,66 +750,36 @@ end
 --- @param chars string The latest typed character(s) (potential terminator).
 --- @param char_len number UTF-8 length of `chars`.
 --- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
+--- @param explicit_magic boolean|nil True when the configured magic action owns
+---        this event, allowing bare French punctuation on another input source.
 --- @return boolean True when the expansion fired.
-function M.try_terminator_expand(m, chars, char_len, is_ignored)
+function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 	if not require_state("try_terminator_expand") then return false end
+	local match = resolve_terminator_match(m, _state.buffer, chars, explicit_magic)
+	if not match then return false end
 
-	if not _registry.is_terminator(chars) then return false end
+	local trigger        = m.trigger
+	local buf_start      = match.buf_start
+	local eff_plain      = match.eff_plain
+	local typed_trigger  = match.typed_trigger
+	local eff_repl       = match.eff_repl
+	local is_noop        = match.is_noop
+	local extra_bs_bytes = match.extra_bs_bytes
 
-	-- Byte-direct segment match: byte equality implies UTF-8 equality, so we skip
-	-- the utf8.offset pair entirely. trigger_bytes is precomputed; #chars is the
-	-- byte length of the terminator character(s) that were just typed.
-	local trigger     = m.trigger
-	local tb          = m.trigger_bytes
-	local chars_bytes = #chars
-	local buf         = _state.buffer
-
-	-- French-typography rule: ``:`` and ``;`` are emitted by the layout as
-	-- NNBSP+``:`` or NNBSP+``;``. The NNBSP (UTF-8: 0xE2 0x80 0xAF, 3 bytes)
-	-- or NBSP (UTF-8: 0xC2 0xA0, 2 bytes) lands in the buffer just before the
-	-- terminator, so the effective trigger is ``…trigger NNBSP :``.
-	-- We strip that nbsp from buf_start so matching finds the bare trigger,
-	-- and record extra_bs_bytes so the correct number of characters is deleted.
-	local NNBSP = "\xE2\x80\xAF"  -- U+202F, 3 UTF-8 bytes
-	local NBSP  = "\xC2\xA0"      -- U+00A0, 2 UTF-8 bytes
-	local extra_bs_bytes = 0
-	local is_typo_endchar = (chars == ":" or chars == ";")
-	if is_typo_endchar then
-		-- Check for NNBSP immediately before the terminator in the buffer.
-		local nnbsp_pos = #buf - chars_bytes - #NNBSP + 1
-		local nbsp_pos  = #buf - chars_bytes - #NBSP  + 1
-		if nnbsp_pos >= 1 and buf:sub(nnbsp_pos, nnbsp_pos + #NNBSP - 1) == NNBSP then
-			extra_bs_bytes = #NNBSP
-		elseif nbsp_pos >= 1 and buf:sub(nbsp_pos, nbsp_pos + #NBSP - 1) == NBSP then
-			extra_bs_bytes = #NBSP
-		else
-			-- Bare ``:`` / ``;`` without preceding nbsp: a mid-sequence char
-			-- (e.g. the ``:`` in ``:D``). Must not trigger expansion.
-			return false
-		end
-	end
-
-	local effective_chars_bytes = chars_bytes + extra_bs_bytes
-	if #buf < tb + effective_chars_bytes then return false end
-	local buf_start   = #buf - effective_chars_bytes - tb + 1
-	if buf:sub(buf_start, buf_start + tb - 1) ~= trigger then return false end
 	-- Precomputed trigger length; avoids a hot-path utf8.len call.
 	local trig_len    = m.tlen
 
-	-- Word-boundary check (shared helper — same policy as try_auto_expand).
-	if m.is_word and word_boundary_blocks(buf, trigger, buf_start, _state.start_is_word_boundary) then
-		return false
-	end
+	local consume_term = match.consume_term
 
-	local consume_term = _registry.terminator_is_consumed(chars)
-
-	-- No-op guard: when the replacement equals the trigger, signal
-	-- pass-through so the terminating character is NOT consumed. It must
-	-- stay on screen — returning true would suppress it with nothing
-	-- injected (the dropped-terminator-chars bug).
-	if m.plain_repl == trigger then
-		if m.final_result then _state.suppress_rescan() end
-		if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+	if not eff_plain then
+		-- No-op guard: when the replacement equals what is on screen, signal
+		-- pass-through so the terminating character is NOT consumed. It must stay
+		-- on screen — returning true would suppress it with nothing injected (the
+		-- dropped-terminator-chars bug).
+		if is_noop then
+			if m.final_result then _state.suppress_rescan() end
+			if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+		end
 		return false
 	end
 
@@ -485,17 +795,22 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	-- inside the HID callback.
 
 	local function do_expansion()
-		-- Use the precomputed plain_repl; tokens_from_repl() is only called below
-		-- when we actually need to emit tokens (replacements with {Token} directives)
-		local repl_text        = m.plain_repl
+		-- The EFFECTIVE replacement, which in conform mode carries the casing the
+		-- user typed. tokens_from_repl() is only called below when we actually need
+		-- to emit tokens (replacements with {Token} directives).
+		local repl_text        = eff_plain
 		local deletes, to_type = trig_len, repl_text
-		-- Filled in by the emit closure and consumed AFTER perform_text_replacement
-		-- has armed the echo bookkeeping the replay gate reads.
+		-- Filled in by the emit closure and completed with the immutable transaction
+		-- returned by perform_text_replacement below.
 		local replay_spec      = nil
 
-		if repl_text == m.repl then
-			-- Simple text: keep common prefix to reduce backspaces.
-			local common = text_utils.get_common_prefix_utf8(trigger, repl_text)
+		if repl_text == eff_repl then
+			-- Simple text: keep common prefix to reduce backspaces. Compared against
+			-- the trigger AS TYPED, not the registered canonical, so the characters
+			-- left on screen are the ones actually there — they differ for a "fold"
+			-- entry, and keeping a "matching" prefix that is cased
+			-- differently would leave the user's capital in front of the expansion.
+			local common = text_utils.get_common_prefix_utf8(typed_trigger, repl_text)
 			deletes = trig_len - common
 			to_type = text_utils.utf8_sub(repl_text, common + 1)
 		end
@@ -507,7 +822,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		-- add 1 extra backspace to erase the nbsp that sits between trigger and endchar.
 		if extra_bs_bytes > 0 then deletes = deletes + 1 end
 
-		M.perform_text_replacement(
+		local replacement_ok, replacement_transaction = M.perform_text_replacement(
 			deletes,
 			function()
 				local c, s, logical, order_delay = emit_dispatch(m, to_type)
@@ -524,9 +839,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 				if not consume_term then
 					if chars == "\r" or chars == "\n" then
 						replay_spec = { kind = "key", key = "return", chars = chars }
-						-- Track the re-typed terminator so expected_synthetic_chars
-						-- and notify_synthetic see it; without this the keylogger
-						-- flushes its buffer mid-expansion on the Enter/Tab echo.
+						-- Keep the logical replacement and keylogger record aligned with
+						-- the terminator replay. Its later OS event is excluded
+						-- independently by the immutable provenance tag.
 						s = s .. chars
 						logical = logical .. chars
 					elseif chars == "\t" then
@@ -538,7 +853,6 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 						s = s .. chars
 						logical = logical .. chars
 					end
-					replay_spec.echo_bytes = #chars
 					replay_spec.min_delay  = (type(order_delay) == "number" and order_delay > 0)
 						and order_delay or 0
 					c = c + text_utils.utf8_len(chars)
@@ -558,19 +872,20 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.group or nil,
 			m.is_private
 		)
+		if not replacement_ok then return false end
 
-		-- Armed only now: the replay gate reads the synthetic-echo bookkeeping
-		-- that perform_text_replacement writes AFTER emit_action returns. Arming
-		-- from inside the emit closure would test an expectation that had not
-		-- been recorded yet and release the terminator immediately — the very
-		-- race this indirection exists to close.
+		-- Armed only now because perform_text_replacement creates and returns the
+		-- transaction after invoking the emit closure. on_complete is safe even if
+		-- an unusual adapter completes synchronously: late registration immediately
+		-- receives the terminal status.
 		if replay_spec then
-			TerminatorReplay.arm(replay_spec)
-			if is_ignored then
-				-- The keyboard handler exits before its synthetic-echo drain for
-				-- these windows, so no echo can ever be observed here. Waiting for
-				-- one would stall every Enter until the watchdog expired.
-				TerminatorReplay.flush_now("ignored window — echoes unobservable")
+			replay_spec.transaction = replacement_transaction
+			if not TerminatorReplay.arm(replay_spec) then
+				-- The replacement batch is returned before the original event. If an
+				-- older undeliverable terminator prevented arming this one, passing the
+				-- physical terminator through preserves the current user's key instead
+				-- of consuming it with no replay owner.
+				return false
 			end
 		end
 
@@ -581,17 +896,17 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			Logger.debug(LOG, "Terminator-expand: private mapping fired (content withheld).")
 		else
 			if keylogger and type(keylogger.log_hotstring) == "function" then
-				pcall(keylogger.log_hotstring, trigger, m.plain_repl)
+				pcall(keylogger.log_hotstring, trigger, repl_text)
 			end
-			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
+			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", typed_trigger, repl_text)
 		end
+		return true
 	end
 
-	-- Run synchronously: CGEventPost() is non-blocking so calling keyStroke()
-	-- inside the HID callback is safe. expected_synthetic_chars is already
-	-- armed before events fire, preventing re-entrancy into the trigger loop.
-	do_expansion()
-	return true
+	-- Build synchronously. Inside the keymap eventtap the adapter returns the
+	-- tagged batch to Quartz as the callback's second result; it never posts or
+	-- sleeps in this HID callback.
+	return do_expansion()
 end
 
 --- Fires the magic-key "repeat last character" feature when the user types
@@ -606,7 +921,7 @@ end
 function M.try_repeat_feature(chars, is_ignored)
 	if not require_state("try_repeat_feature") then return false end
 	if not _state.is_repeat_feature_enabled() then return false end
-	if chars ~= _state.magic_key then return false end
+	if not Terminators.matches_magic_event(chars, _state.magic_key) then return false end
 
 	local char_len = text_utils.utf8_len(chars)
 	local buf_len  = text_utils.utf8_len(_state.buffer)
@@ -647,30 +962,44 @@ function M.try_repeat_feature(chars, is_ignored)
 	end
 
 	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
+	TerminatorReplay.flush_now("superseded by repeat-key replacement")
+	local transaction = SyntheticInput.begin("repeat_key", "replacement")
+	local emitted, emit_err = pcall(SyntheticInput.with_transaction, transaction, function()
+		-- In ignored windows, the magic key is already on screen and must be deleted.
+		if is_ignored then
+			assert(TextSender.eraseChars(char_len, 0) ~= false,
+				"repeat-key deletion could not be constructed")
+		end
 
-	-- In ignored windows, the magic key is already on screen and must be deleted.
-	if is_ignored then
-		_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + 1
-		TextSender.eraseChars(1, 0)
+		if keylogger and type(keylogger.notify_synthetic) == "function" then
+			local notify_ok, notify_err = pcall(keylogger.notify_synthetic,
+				last_char, "hotstring", is_ignored and char_len or 0, "repeat_key")
+			if not notify_ok then
+				Logger.error(LOG, "repeat-key notify_synthetic failed: %s.", tostring(notify_err))
+			end
+		end
+		assert(TextSender.send(last_char, { mode = "direct" }) ~= false,
+			"repeat-key output could not be constructed")
+	end)
+	if not emitted then
+		pcall(SyntheticInput.cancel, transaction)
+		Logger.error(LOG, "Repeat feature emission failed: %s.", tostring(emit_err))
+		return false
 	end
-
-	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. last_char
-	-- Update the arm timestamp so the stuck-counter reset guard does not wipe
-	-- expected_synthetic_chars if run-loop lag creates a false gap before the echo.
-	if hs and hs.timer then
-		_state.last_synthetic_arm_time = hs.timer.secondsSinceEpoch()
+	local sealed, seal_err = pcall(SyntheticInput.seal, transaction)
+	if not sealed then
+		pcall(SyntheticInput.cancel, transaction)
+		Logger.error(LOG, "Repeat feature transaction could not be sealed: %s.", tostring(seal_err))
+		return false
 	end
-
-	if keylogger and type(keylogger.notify_synthetic) == "function" then
-		keylogger.notify_synthetic(last_char, "hotstring", is_ignored and 1 or 0, "repeat_key")
-	end
-	TextSender.send(last_char, { mode = "direct" })
 
 	-- Update the buffer: strip the magic key and append the repeated character.
 	-- magic_offset is already the byte start of the magic key — reuse it.
 	_state.buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
 
-	if not is_ignored and _llm.get_llm_enabled() then
+	if not is_ignored
+		and (type(_llm.is_runtime_available) ~= "function" or _llm.is_runtime_available())
+		and _llm.get_llm_enabled() then
 		_llm.start_timer()
 	end
 
@@ -707,7 +1036,7 @@ function M.try_expand(chars, is_ignored)
 
 	local char_len = 1  -- ASCII fallback; accurate enough for the E2E corpus
 	local ok_len, n = pcall(function()
-		local text_u = require("lib.text_utils")
+		local text_u = require("infra.text_utils")
 		return text_u.utf8_len(chars)
 	end)
 	if ok_len and type(n) == "number" and n > 0 then char_len = n end
@@ -768,24 +1097,43 @@ end
 --- @param core_state table The shared CoreState object.
 --- @param registry_mod table The registry module.
 --- @param llm_mod table The LLM bridge module.
+--- @return boolean committed True only when every dependency is ready.
 function M.init(core_state, registry_mod, llm_mod)
-	if type(core_state)  ~= "table" then Logger.error(LOG, "M.init(): core_state must be a table."); return end
-	if type(registry_mod) ~= "table" then Logger.error(LOG, "M.init(): registry_mod must be a table."); return end
-	if type(llm_mod)     ~= "table" then Logger.error(LOG, "M.init(): llm_mod must be a table."); return end
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.init(): core_state must be a table.")
+		return false
+	end
+	if type(registry_mod) ~= "table" then
+		Logger.error(LOG, "M.init(): registry_mod must be a table.")
+		return false
+	end
+	if type(llm_mod) ~= "table" then
+		Logger.error(LOG, "M.init(): llm_mod must be a table.")
+		return false
+	end
 
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state and _registry == registry_mod and _llm == llm_mod then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
 	end
 
 	Logger.start(LOG, "Initializing expander…")
+	-- The replay gate reads the same synthetic-echo counters the expander writes,
+	-- so it is handed the identical state object before this module publishes any
+	-- of its own dependencies.
+	if TerminatorReplay.init(core_state) ~= true then
+		Logger.error(LOG, "M.init(): terminator replay dependency initialization refused.")
+		return false
+	end
 	_state    = core_state
 	_registry = registry_mod
 	_llm      = llm_mod
-	-- The replay gate reads the same synthetic-echo counters the expander writes,
-	-- so it is handed the identical state object rather than a copy.
-	TerminatorReplay.init(core_state)
 	Logger.success(LOG, "Expander initialized.")
+	return true
 end
 
 return M

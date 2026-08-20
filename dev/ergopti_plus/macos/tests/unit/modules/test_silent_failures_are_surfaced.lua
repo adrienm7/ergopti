@@ -27,7 +27,7 @@ local function capture_logger()
 			table.insert(captured[level], ok and line or tostring(fmt))
 		end
 	end
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		error = sink("error"), warn = sink("warn"), success = sink("success"),
 		debug = sink("debug"), info = sink("info"), start = sink("start"),
 		trace = function() end, done = function() end,
@@ -68,7 +68,17 @@ helpers.describe("registry: loading a mapping file that yields nothing is not a 
 			mappings_by_tail_char = {}, mappings_by_star_tail_char = {},
 			seq_counter = 0, current_group = nil,
 		}
-		Groups.init(state, { add = function() end, sort_mappings = function() end })
+		local initialized = Groups.init(state, {
+			add = function() end,
+			sort_mappings = function() end,
+			is_section_enabled = function() return true end,
+			resolve_priority = function() return 0 end,
+			rebuild_lookup = function() end,
+			rebuild_tail_indexes = function() end,
+			drop_classify_cache = function() end,
+		})
+		helpers.assert_eq(initialized, true,
+			"the unrelated empty-file probe requires a fully committed registry fixture")
 
 		-- A path that cannot be read. The shared reader never raises for this: it
 		-- returns an empty table, which is exactly why the caller could not tell
@@ -84,6 +94,28 @@ helpers.describe("registry: loading a mapping file that yields nothing is not a 
 			"and it must not claim success for a file it did not load")
 	end)
 
+end)
+
+helpers.describe("registry: injected dependencies fail initialization atomically", function()
+	helpers.it("publishes no usable state when any required callback is missing", function()
+		package.loaded["modules.keymap.registry_groups"] = nil
+		local Groups = helpers.load_with_stubs("modules.keymap.registry_groups")
+		local state = {
+			mappings = {}, mappings_lookup = {}, groups = {},
+			mappings_by_tail_char = {}, mappings_by_star_tail_char = {},
+			seq_counter = 0, current_group = nil,
+		}
+		local initialized = Groups.init(state, {
+			add = function() end,
+			sort_mappings = function() end,
+		})
+
+		helpers.assert_eq(initialized, false)
+		helpers.assert_eq(Groups.load_toml("must_not_load", "/virtual/source.toml"), false,
+			"a refused dependency set must leave every public mutation behind require_state")
+		helpers.assert_eq(#state.mappings, 0)
+		helpers.assert_nil(state.groups.must_not_load)
+	end)
 end)
 
 

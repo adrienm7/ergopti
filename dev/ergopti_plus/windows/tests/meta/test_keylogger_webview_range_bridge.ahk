@@ -26,13 +26,17 @@ _KLWVRange_CheckSelectedRangeBridge() {
     Assert(InStr(NormalizeBody, "seen.Has(app_name)") > 0,
         "range requests must de-duplicate selected applications")
 
-    ReadyBody := _DriverFuncBody("KLWV_OnRangeBuildReady")
-    Assert(ReadyBody != "", "KLWV_OnRangeBuildReady must exist")
-    Assert(InStr(ReadyBody, "ExecuteScriptAsync") > 0
-            && InStr(ReadyBody, "window.receive_range_data") > 0,
+    TerminalBody := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
+    Assert(TerminalBody != "", "KLWV_OnRangeBuildTerminal must exist")
+    Assert(InStr(TerminalBody, "ExecuteScriptAsync") > 0
+            && InStr(TerminalBody, "window.receive_range_data") > 0
+            && InStr(TerminalBody, "request_id") > 0,
         "WebView must fetch and parse the staged range JSON in its own process")
-    Assert(InStr(ReadyBody, "FileRead") = 0,
+    Assert(InStr(TerminalBody, "FileRead") = 0,
         "the AHK driver must not synchronously read a selected-range JSON payload")
+	SendBody := _DriverFuncBody("KLWV_SendRangeTerminal")
+	Assert(InStr(SendBody, '"range_terminal"') > 0 && InStr(SendBody, '"request_id"') > 0,
+		"every Windows range failure/cancel must send the owning request id back to the page")
 }
 Test("keylogger_webview: date/app range changes use a detached projection instead of retaining the initial all-time n-grams (metrics-range-bridge-stale-filter)",
     _KLWVRange_CheckSelectedRangeBridge)

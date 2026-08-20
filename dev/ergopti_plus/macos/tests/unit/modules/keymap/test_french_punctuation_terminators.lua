@@ -98,6 +98,23 @@ helpers.describe("terminators: French punctuation arrives space-prefixed", funct
 		helpers.assert_true(not T.is_terminator("ab"),
 			"the tail probe must not turn arbitrary text into a terminator — only a genuinely "
 				.. "enabled terminator character may match")
+
+		local STAR = utf8.char(0x2605)
+		T.update_magic_key(":")
+		local ok, err = pcall(function()
+			helpers.assert_true(not T.is_terminator("x:"),
+				"even when ':' is the consumed magic terminator, an arbitrary suffix event must pass")
+			helpers.assert_true(not T.terminator_is_consumed("x:"),
+				"a rejected composite must never swallow both of its physical codepoints")
+			helpers.assert_true(T.is_terminator(":x"),
+				"the documented leading-codepoint IME terminator behavior must remain available")
+			helpers.assert_true(not T.matches_magic_event(":x", ":"),
+				"an IME payload must not acquire configured-magic identity from its first codepoint")
+			helpers.assert_true(not T.terminator_is_consumed(":x"),
+				"a leading consumed terminator may fire, but the full IME payload must be replayed")
+		end)
+		T.update_magic_key(STAR)
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("the consume verdict tracks the same tail", function()
@@ -114,6 +131,22 @@ helpers.describe("terminators: French punctuation arrives space-prefixed", funct
 					.. "prepended its typographic space")
 		end
 	end)
+
+	helpers.it("recognises only exact or known French composite magic events", function()
+		local T = terminators()
+		for _, ch in ipairs({ "?", "!", ":", ";", "%", "€" }) do
+			helpers.assert_true(T.matches_magic_event(ch, ch),
+				"an exact configured magic key must always validate itself")
+			helpers.assert_true(T.matches_magic_event(NBSP .. ch, ch),
+				"NBSP-prefixed French punctuation must validate its configured tail")
+			helpers.assert_true(T.matches_magic_event(NNBSP .. ch, ch),
+				"NNBSP-prefixed French punctuation must validate its configured tail")
+		end
+		helpers.assert_true(not T.matches_magic_event("x:", ":"),
+			"an arbitrary multi-codepoint event must never acquire magic-key identity by suffix")
+		helpers.assert_true(not T.matches_magic_event(NBSP .. "?", ":"),
+			"a known carrier for a different punctuation key must not validate the configured key")
+	end)
 end)
 
 
@@ -125,41 +158,140 @@ end)
 -- =========================================================================
 -- =========================================================================
 
+--- Returns every `function M.resync_context` body found in the driver, keyed by
+--- nothing — order is deliberately not relied on.
+---
+--- There are TWO definitions: the real one in the context tracker, and a thin
+--- forwarder in the keylogger that delegates to it. `read_driver_source` returns
+--- them concatenated, and the concatenation ORDER depends on how the corpus was
+--- walked — lfs on one machine, a shell listing on another. The first version of
+--- these cases looked only at the first occurrence, so it read the real
+--- implementation locally and the forwarder on CI, where it failed for a reason
+--- that had nothing to do with the code under test.
+--- @return table Array of body strings.
+local function resync_bodies()
+	local src = helpers.read_driver_source("resync_context")
+	helpers.assert_true(src ~= nil and src ~= "",
+		"the context tracker must be locatable by its resync_context symbol")
+
+	-- Comments stripped FIRST. The fix's own comment explains why title() is wrong
+	-- and therefore contains the string "app:title()" — scanning raw source flags
+	-- the fix as the bug. The repo's meta-test guidance calls this out explicitly.
+	local code = src:gsub("%-%-[^\n]*", "")
+
+	local bodies, from = {}, 1
+	while true do
+		local at = code:find("function M.resync_context", from, true)
+		if not at then break end
+		table.insert(bodies, code:sub(at, at + 900))
+		from = at + 1
+	end
+	return bodies
+end
+
+
+--- True when a body delegates instead of resolving the app itself.
+--- @param body string
+--- @return boolean
+local function delegates(body)
+	return body:find("ContextTracker.resync_context", 1, true) ~= nil
+end
+
+
+--- Returns every `function M.resync_context` body found in the driver, keyed by
+--- nothing — order is deliberately not relied on.
+---
+--- There are TWO definitions: the real one in the context tracker, and a thin
+--- forwarder in the keylogger that delegates to it. `read_driver_source` returns
+--- them concatenated, and the concatenation ORDER depends on how the corpus was
+--- walked — lfs on one machine, a shell listing on another. The first version of
+--- these cases looked only at the first occurrence, so it read the real
+--- implementation locally and the forwarder on CI, where it failed for a reason
+--- that had nothing to do with the code under test.
+--- @return table Array of body strings.
+local function resync_bodies()
+	local src = helpers.read_driver_source("resync_context")
+	helpers.assert_true(src ~= nil and src ~= "",
+		"the context tracker must be locatable by its resync_context symbol")
+
+	-- Comments stripped FIRST. The fix's own comment explains why title() is wrong
+	-- and therefore contains the string "app:title()" — scanning raw source flags
+	-- the fix as the bug. The repo's meta-test guidance calls this out explicitly.
+	local code = src:gsub("%-%-[^\n]*", "")
+
+	local bodies, from = {}, 1
+	while true do
+		local at = code:find("function M.resync_context", from, true)
+		if not at then break end
+		table.insert(bodies, code:sub(at, at + 900))
+		from = at + 1
+	end
+	return bodies
+end
+
+
+--- True when a body delegates instead of resolving the app itself.
+--- @param body string
+--- @return boolean
+local function delegates(body)
+	return body:find("ContextTracker.resync_context", 1, true) ~= nil
+end
+
+
 helpers.describe("context_tracker: resync identifies the app by name", function()
-	helpers.it("resync_context reads app:name(), not app:title()", function()
-		local src = helpers.read_driver_source("resync_context")
-		helpers.assert_true(src ~= nil and src ~= "",
-			"the context tracker must be locatable by its resync_context symbol")
 
-		-- Comments stripped FIRST. The fix's own comment explains why title() is
-		-- wrong and therefore contains the string "app:title()" — scanning raw
-		-- source flags the fix as the bug. The repo's meta-test guidance calls
-		-- this out explicitly; it caught this test on its first run.
-		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("function M.resync_context", 1, true)
-		helpers.assert_true(at ~= nil, "M.resync_context must exist")
-		local body = code:sub(at, at + 900)
+	helpers.it("every resync_context either reads app:name() or delegates", function()
+		local bodies = resync_bodies()
+		helpers.assert_true(#bodies >= 1,
+			"at least one M.resync_context must exist; zero would make every assertion "
+			.. "below vacuous")
 
-		helpers.assert_true(body:find("app:name()", 1, true) ~= nil,
-			"resync_context must resolve the app through name(). The whole pipeline is keyed on "
-				.. "display names — SecureFieldDetector.isSecureApp exact-matches them — so reading "
-				.. "title() means a vault whose title is nil or differs is not re-recognised as "
-				.. "secure on resume, and keystrokes typed into it get logged")
-		helpers.assert_true(body:find("app:title()", 1, true) == nil,
-			"and it must no longer read title(), which its own sibling documents as absent for "
-				.. "some application instances")
+		local offenders = {}
+		local resolvers = 0
+		for i, body in ipairs(bodies) do
+			if delegates(body) then
+				-- A forwarder must not ALSO reach for the app itself, or the two would
+				-- disagree about what the active context is.
+				if body:find("app:name()", 1, true) or body:find("app:title()", 1, true) then
+					table.insert(offenders, "#" .. i .. " both delegates and resolves")
+				end
+			else
+				resolvers = resolvers + 1
+				if body:find("app:name()", 1, true) == nil then
+					table.insert(offenders, "#" .. i .. " resolves without app:name()")
+				end
+				if body:find("app:title()", 1, true) ~= nil then
+					table.insert(offenders, "#" .. i .. " still reads app:title()")
+				end
+			end
+		end
+
+		helpers.assert_true(resolvers >= 1,
+			"exactly one definition must actually resolve the app; if they all delegate, "
+			.. "nothing does the work and this test would pass over a driver that never "
+			.. "identifies the foreground app at all")
+
+		helpers.assert_eq(#offenders, 0,
+			"the whole pipeline is keyed on display names — SecureFieldDetector.isSecureApp "
+			.. "exact-matches them — so reading title() means a vault whose title is nil or "
+			.. "differs is not re-recognised as secure on resume, and keystrokes typed into "
+			.. "it get logged: " .. table.concat(offenders, ", "))
 	end)
 
-	helpers.it("it rejects an empty name as well as a missing one", function()
-		local src = helpers.read_driver_source("resync_context")
-		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("function M.resync_context", 1, true)
-		local body = code:sub(at, at + 900)
+	helpers.it("the resolver rejects an empty name as well as a missing one", function()
+		local bodies = resync_bodies()
 
-		helpers.assert_true(body:find('app_name == ""', 1, true) ~= nil,
-			"an app with a blank name must not be adopted as the active context — the type check "
-				.. "alone accepts \"\", which would set an unusable active_app_name and defeat every "
-				.. "later comparison against it")
+		local checked = 0
+		for _, body in ipairs(bodies) do
+			if not delegates(body) then
+				checked = checked + 1
+				helpers.assert_true(body:find('app_name == ""', 1, true) ~= nil,
+					"an app with a blank name must not be adopted as the active context — the "
+					.. "type check alone accepts \"\", which would set an unusable "
+					.. "active_app_name and defeat every later comparison against it")
+			end
+		end
+		helpers.assert_true(checked >= 1, "at least one resolver must have been checked")
 	end)
 
 	helpers.it("it matches the sibling resume helper", function()
@@ -168,10 +300,24 @@ helpers.describe("context_tracker: resync identifies the app by name", function(
 			"the sibling resume helper must be locatable")
 
 		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("capture_frontmost_app", 1, true)
-		local body = code:sub(at, at + 900)
-		helpers.assert_true(body:find("app:name()", 1, true) ~= nil,
-			"capture_frontmost_app must still use name(). It is the reference implementation this "
-				.. "fix aligns resync_context with — if it ever changes, the two must change together")
+		-- Same hazard as above: iterate every occurrence rather than trusting the
+		-- first, so a second file merely MENTIONING the helper cannot decide the
+		-- outcome depending on how the corpus was walked.
+		local found_with_name = false
+		local from = 1
+		while true do
+			local at = code:find("capture_frontmost_app", from, true)
+			if not at then break end
+			if code:sub(at, at + 900):find("app:name()", 1, true) then
+				found_with_name = true
+				break
+			end
+			from = at + 1
+		end
+
+		helpers.assert_true(found_with_name,
+			"capture_frontmost_app must still use name(). It is the reference implementation "
+			.. "the resync fix aligns with — if it ever changes, the two must change together")
 	end)
+
 end)

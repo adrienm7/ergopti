@@ -14,9 +14,18 @@
 ---      preceded the trigger. word_boundary_blocks returns `not
 ---      start_is_word_boundary` — so with the buffer starting mid-word the engine
 ---      REFUSED a match the tooltip had already promised.
----   2. Triggers starting with a separator (" ", NBSP, NNBSP, ";") are exempt from
+---   2. Triggers starting with a separator (" ", NBSP, NNBSP, ";") were exempt from
 ---      the boundary rule in the engine; the preview applied it anyway, hiding
----      rows for expansions that do fire (the comma-layer ";e" -> "Je").
+---      rows for expansions that did fire.
+---      RESOLVED 2026-08-04, AND NOT IN THE DIRECTION THIS FILE ASSUMED. The
+---      exemption was macOS's alone: AutoHotkey has none and neither does the
+---      shared Lua core, so a trigger with a leading space fired here and was
+---      refused on the other two drivers. Its stated carrier — the comma-layer
+---      ";e" -> "Je" — turned out not to exist: zero shipped triggers begin with
+---      ";". Three that DO begin with a space carried is_word purely by mistake,
+---      which is what the exemption was really covering for. The flag came off
+---      those three, the exemption came off macOS, and the preview's original
+---      rule is now everyone's.
 ---   3. case_conform resolution existed in the preview's autocorrect bucket but
 ---      not in its star bucket, so a cased ★ trigger previewed wrong or not at all.
 ---   4. The no-op guards were written against different operands: the preview
@@ -59,8 +68,6 @@ local function load_expander(state_overrides)
 	local state = {
 		buffer                 = "",
 		start_is_word_boundary = true,
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
 		suppress_rescan        = function() end,
 		suppress_rescan_keep_buffer = function() end,
 	}
@@ -85,7 +92,11 @@ local function mapping(t)
 		repl          = t.repl,
 		plain_repl    = t.plain_repl or t.repl,
 		is_word       = t.is_word == true,
-		case_conform  = t.case_conform == true,
+		-- The registry resolves the two old case booleans into this one field, and
+		-- the shared predicate refuses a mapping that has none rather than guessing
+		-- — so a fixture that omits it fails loudly instead of silently matching
+		-- case-insensitively, which is what "conform is the else branch" used to do.
+		match_mode    = t.case_conform and "conform" or (t.match_mode or "exact"),
 		tlen          = t.tlen or #trigger,
 	}
 end
@@ -123,15 +134,31 @@ helpers.describe("would_fire is the single answer both sides get", function()
 			.. "only make the preview agree with it")
 	end)
 
-	helpers.it("exempts a separator-prefixed trigger from the boundary rule", function()
-		-- DIVERGENCE 2. The comma-layer ";e" -> "Je" must fire in every context.
+	helpers.it("word-gates a separator-prefixed trigger like any other", function()
+		-- DIVERGENCE 2, RESOLVED THE OTHER WAY ON 2026-08-04 — see the header.
+		-- The engine used to exempt these; it no longer does, because Windows and
+		-- Linux never did and the exemption's stated carrier (";e" -> "Je") does not
+		-- exist: measured over the whole catalogue, ZERO shipped triggers begin with
+		-- ";". What did depend on it were three space-leading entries whose is_word
+		-- flag was simply wrong data, and they no longer carry it.
 		local E = load_expander({ start_is_word_boundary = false })
 		local m = mapping({ trigger = ";e", repl = "Je", is_word = true })
 
-		helpers.assert_eq(E.would_fire(m, "mot;e"), "Je",
-			"a trigger starting with a separator carries its own boundary and must fire "
-			.. "even directly after a letter. The preview applied the boundary rule anyway "
-			.. "and hid a row for an expansion that does happen")
+		helpers.assert_nil(E.would_fire(m, "mot;e"),
+			"an is_word trigger preceded by a letter must be refused whatever its first "
+			.. "character is. Re-exempting separator-prefixed triggers here would make macOS "
+			.. "the only driver that does, which is the state this divergence came from")
+	end)
+
+	helpers.it("still fires that trigger when a boundary really does precede it", function()
+		-- The positive control. Without it, the assertion above is satisfied by a
+		-- predicate that refuses everything — the failure mode a negative-only test
+		-- cannot see.
+		local E = load_expander({ start_is_word_boundary = false })
+		local m = mapping({ trigger = ";e", repl = "Je", is_word = true })
+
+		helpers.assert_eq(E.would_fire(m, "mot ;e"), "Je",
+			"a space in front of the trigger is a boundary, so the same mapping must fire")
 	end)
 
 	helpers.it("blocks a word trigger glued to a preceding letter", function()
@@ -241,7 +268,15 @@ helpers.describe("the old preview rule really did disagree with the engine", fun
 			.. "the state that decays back into a bug")
 	end)
 
-	helpers.it("hid a separator-prefixed match the engine performs", function()
+	helpers.it("no longer diverges on a separator-prefixed match, because the ENGINE moved", function()
+		-- This case used to assert a divergence in the opposite direction: the engine
+		-- exempted separator-prefixed triggers and expanded something the tooltip had
+		-- never offered. It was closed on 2026-08-04 by removing the exemption, not by
+		-- adding one to the preview — the old preview rule was the one the other two
+		-- drivers already implemented.
+		--
+		-- Kept rather than deleted because the pair still has to AGREE, and agreement
+		-- is the invariant. What changed is which answer they agree on.
 		local E = load_expander({ start_is_word_boundary = false })
 		local m = mapping({ trigger = ";e", repl = "Je", is_word = true })
 
@@ -250,11 +285,12 @@ helpers.describe("the old preview rule really did disagree with the engine", fun
 
 		helpers.assert_true(not old_says,
 			"the old preview rule blocked ';e' after a letter")
-		helpers.assert_true(engine_says,
-			"the engine exempts separator-prefixed triggers and fires it")
-		helpers.assert_true(old_says ~= engine_says,
-			"the divergence in the other direction: the engine expanded something the "
-			.. "tooltip never offered, so the text changed with no preview at all")
+		helpers.assert_true(not engine_says,
+			"and the engine now blocks it too — no separator exemption remains")
+		helpers.assert_eq(old_says, engine_says,
+			"the two sides must reach the same verdict. If this ever fails again, one of "
+			.. "them has grown a rule the other does not have, which is exactly how the "
+			.. "original bug was built")
 	end)
 end)
 
@@ -266,14 +302,15 @@ helpers.describe("the preview only offers what a future keystroke can still fire
 		-- mapping_fires' typing-speed gate rejected a slow typist. Nothing retries
 		-- it: the auto path matches on the trigger's tail being the character just
 		-- typed, and any further keystroke pushes the trigger off the end.
-		local src = helpers.read_driver_source("function M.update_preview")
-		helpers.assert_true(src ~= nil, "llm_bridge source must be locatable")
+		local src = helpers.read_driver_source("function M.resolve_magic_action")
+		helpers.assert_true(src ~= nil, "prospective resolver source must be locatable")
 		if not src then return end
 
-		local bucket_at = src:find("mappings_for_tail", 1, true)
-		helpers.assert_true(bucket_at ~= nil, "the autocorrect bucket walk must be locatable")
-		local window = src:sub(bucket_at, bucket_at + 1400)
-
+		local at = src:find("function M.resolve_magic_action", 1, true)
+		local window = src:sub(at, at + 6500)
+		helpers.assert_true(window:find("mapping%.auto%s+and%s+mapping%.has_magic") ~= nil,
+			"an auto mapping is prospectively reachable only when its trigger includes the "
+			.. "magic key; a completed ordinary auto trigger already had its one chance")
 		helpers.assert_true(window:find("not mapping%.auto") ~= nil,
 			"the autocorrect preview must skip auto mappings. Offering one shows the user an "
 			.. "expansion that no keystroke can produce — the engine already refused it on the "
@@ -283,7 +320,7 @@ helpers.describe("the preview only offers what a future keystroke can still fire
 	end)
 
 	helpers.it("still offers a terminator-driven mapping", function()
-		local src = helpers.read_driver_source("function M.update_preview")
+		local src = helpers.read_driver_source("function M.resolve_magic_action")
 		if not src then return end
 
 		-- A non-auto mapping waits for a terminator, and ★ validates it with the
@@ -312,10 +349,13 @@ helpers.describe("neither side reimplements the match decision", function()
 		local src = helpers.read_driver_source("function M.update_preview")
 		if not src then return end
 
-		helpers.assert_true(src:find("expander%.would_fire") ~= nil,
-			"update_preview must obtain its matches from expander.would_fire, the same "
-			.. "function try_auto_expand uses, so the row shown is the replacement that "
-			.. "keystroke will actually produce")
+		helpers.assert_true(src:find(
+			"expander%.resolve_magic_action%(buf,%s*literal_preview_allowed%)") ~= nil,
+			"update_preview must consume the engine's prospective resolution rather than "
+				.. "rebuilding star/end-char candidates and arbitration in the UI layer")
+		helpers.assert_true(src:find("mappings_for_star_tail", 1, true) == nil
+			and src:find("mappings_for_tail", 1, true) == nil,
+			"the bridge must own no registry candidate walk of its own")
 	end)
 
 	helpers.it("the engine decides through the same function", function()

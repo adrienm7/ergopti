@@ -140,17 +140,49 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_true(#label > 0, "menu label should not be empty")
 	end)
 
+	-- Every one of these labels was hardcoded French, so a user on any of the
+	-- other 20 locales read French in the update menu. "not empty" above could
+	-- never have caught that, and neither can it catch i18n.get echoing the raw
+	-- key back on a miss.
+	helpers.it("the idle label comes from the shared catalogue", function()
+		local i18n = require("infra.i18n")
+		M.clear_cached_release()
+		local label = M.get_menu_label()
+		helpers.assert_eq(label, i18n.get("menu.about.check_for_updates"),
+			"the idle label must be whatever the catalogue says for the active locale")
+		helpers.assert_true(label ~= "menu.about.check_for_updates",
+			"an echoed key means the catalogue was never reached")
+	end)
+
+	helpers.it("the update-available label carries the tag through the catalogue template", function()
+		local i18n = require("infra.i18n")
+		-- A tag containing "%" is the reason the substitution is done on plain
+		-- indices: gsub would read it as a capture reference in the REPLACEMENT
+		-- string and raise "invalid use of '%'".
+		M._test_set_cached_release({ tag = "v9.9.9-100%", prerelease = false })
+		local label = M.get_menu_label()
+		helpers.assert_true(label:find("v9.9.9-100%", 1, true) ~= nil,
+			"the tag must appear verbatim in the label, percent signs included")
+		helpers.assert_true(label:find("{tag}", 1, true) == nil,
+			"the {tag} placeholder must be substituted, not rendered")
+		helpers.assert_true(label ~= i18n.get("menu.about.update_now"),
+			"the template must have been filled in, not returned as-is")
+		M.clear_cached_release()
+	end)
+
 	helpers.it("stop_background_checks is safe to call even without active timers", function()
 		-- Should not error.
-		local ok = pcall(M.stop_background_checks)
-		helpers.assert_true(ok, "stop_background_checks should not error")
+		M.stop_background_checks()
+		helpers.assert_eq(type(M.start_background_checks), "function",
+			"a stop with no timers armed must leave the checks restartable")
 	end)
 
 	helpers.it("init loads persisted settings and initialises", function()
 		local orig_channel = M.get_channel()
 		-- init() should work without opts.
-		local ok = pcall(function() M.init({}) end)
-		helpers.assert_true(ok, "init() should not error")
+		M.init({})
+		helpers.assert_eq(M.get_channel(), orig_channel,
+			"init with no opts must not silently move the user off their release channel")
 		-- Channel should still be the same.
 		local ch = M.get_channel()
 		helpers.assert_true(ch == "stable" or ch == "dev", "channel should be valid after init")
@@ -158,8 +190,11 @@ helpers.describe("modules/updater/manager.lua", function()
 
 	helpers.it("check_for_updates does not crash (may fail without network)", function()
 		-- This may fail due to no network, but it must not crash.
-		local ok = pcall(function() M.check_for_updates("stable") end)
-		helpers.assert_true(ok, "check_for_updates should not error even without network")
+		-- With no network the check must ANSWER, not hang or vanish: the menu row
+		-- shows "up to date" or "check failed" on it, and a nil leaves it blank.
+		local result = M.check_for_updates("stable")
+		helpers.assert_true(result == nil or type(result) == "boolean" or type(result) == "table",
+			"check_for_updates must answer something the menu row can render")
 	end)
 
 	helpers.it("fetch command delegates ETag to curl, never a client-side timestamp", function()
@@ -253,11 +288,12 @@ helpers.describe("modules/updater/manager.lua", function()
 	-- ========================================
 
 	helpers.it("menu_builder renders updater section when updater context is present", function()
-		local ok_mb, menu_builder = pcall(require, "modules.menu.menu_builder")
-		if not ok_mb or not menu_builder then
-			helpers.assert_true(true, "menu_builder not available — skipping")
-			return
-		end
+		local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
+		-- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+		-- "not available" can only mean it stopped loading — and the skip made that
+		-- indistinguishable from a pass in six cases across three files.
+		helpers.assert_true(ok_mb and menu_builder ~= nil,
+			"ui.menu.menu_builder must load: " .. tostring(menu_builder))
 
 		local items = menu_builder.build({
 			_version = "3.0.0",
@@ -278,11 +314,12 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	helpers.it("menu_builder handles nil updater context gracefully", function()
-		local ok_mb, menu_builder = pcall(require, "modules.menu.menu_builder")
-		if not ok_mb or not menu_builder then
-			helpers.assert_true(true, "menu_builder not available — skipping")
-			return
-		end
+		local ok_mb, menu_builder = pcall(require, "ui.menu.menu_builder")
+		-- Asserted, not skipped. ui/menu/menu_builder.lua ships with this driver, so
+		-- "not available" can only mean it stopped loading — and the skip made that
+		-- indistinguishable from a pass in six cases across three files.
+		helpers.assert_true(ok_mb and menu_builder ~= nil,
+			"ui.menu.menu_builder must load: " .. tostring(menu_builder))
 
 		local items = menu_builder.build({
 			_version = "3.0.0",

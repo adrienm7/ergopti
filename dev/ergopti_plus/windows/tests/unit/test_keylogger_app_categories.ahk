@@ -44,10 +44,26 @@ Test("KLAppCatConst.DEFAULTS: spotify.exe -> distracting", _KLAppCat_Defaults_Sp
 
 ; Encore plus: pause/privacy — classification logic itself is pure, but the writer/hook must gate on A_IsSuspended.
 ; Reports may still classify paused periods for aggregation boundaries (privacy).
+; The division of labour is the invariant: the HOOK silences keystroke logging
+; while suspended, and the classifier stays a pure lookup so reports can still
+; draw aggregation boundaries across a paused period. A suspend check inside the
+; classifier would make the same app classify differently depending on when the
+; report ran.
 _KLAppCat_PauseNoWrite() {
-	; Actual logging of keystrokes must be silenced by pause higher up (keylogger_hook).
-	; This pure lookup must remain callable for report boundaries.
-	AssertTrue(true, "app categories must be pause-safe for privacy boundaries in agg")
+	Classifier := _DriverFuncBody("KL_AppCat_Get")
+	Assert(InStr(Classifier, "A_IsSuspended") == 0,
+		"KL_AppCat_Get() must not read A_IsSuspended — the same app has to classify the same "
+		. "way whether or not the driver was paused when the report ran")
+
+	; And the gate has to exist somewhere on the capture side, or a paused driver
+	; keeps recording keystrokes.
+	Hook := _DriverDirConcat("modules\keylogger")
+	Assert(InStr(Hook, "A_IsSuspended") > 0,
+		"the keylogger capture path must gate on A_IsSuspended — pause has to mean pause")
+
+	; The lookup itself is deterministic for a known app.
+	AssertEqual(KLAppCatConst.DEFAULTS["code.exe"], StrLower(KLAppCatConst.DEFAULTS["code.exe"]),
+		"category values are lowercase tokens")
 }
 Test("KeyloggerAppCategories: pause must not affect pure classification (writer gated higher)", _KLAppCat_PauseNoWrite)
 
@@ -277,11 +293,11 @@ Test("KL_SortArray: sorts ordinary alphabetic app-name strings without throwing"
 
 
 
-; ============================================================
+; ==============================================================
 ; ==============================================================
 ; ======= 4/ KL_AppCat_DeferredSave — suspend guard (1g) =======
 ; ==============================================================
-; ============================================================
+; ==============================================================
 
 ; Regression for Pattern 1 (1g): KL_AppCat_DeferredSave runs on a SetTimer,
 ; which native Suspend() never disarms. A pending write must be deferred

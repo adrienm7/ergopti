@@ -10,7 +10,7 @@
 ; produce identical Menu labels; AHK's name-based Menu.Check/Uncheck always
 ; resolves to the FIRST item carrying that label, so toggling/selecting the
 ; SECOND section silently painted the checkmark on the FIRST. The fix builds a
-; per-section disambiguated label (lib/menu_helpers.ahk's
+; per-section disambiguated label (infra/menu_helpers.ahk's
 ; _HS_BuildDisambiguatedSectionLabels) and threads it through every
 ; Check/Uncheck-relevant call site in the personal-section submenus instead of
 ; the raw TomlData[...]["description"].

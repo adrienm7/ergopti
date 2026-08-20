@@ -4,7 +4,7 @@
 ; MODULE: Navigation Layer Helpers Tests
 ; DESCRIPTION:
 ; Unit-tests for the five nav-layer state helpers extracted to
-; lib/nav_layer_helpers.ahk: ActivateLayer, DisableLayer,
+; infra/nav_layer_helpers.ahk: ActivateLayer, DisableLayer,
 ; SetNumberOfRepetitions, ResetNumberOfRepetitions, and ActionLayer.
 ; ==============================================================================
 
@@ -12,11 +12,11 @@
 
 
 
-; ==========================================
+; =========================================
 ; =========================================
 ; ======= 1/ Layer state management =======
 ; =========================================
-; ==========================================
+; =========================================
 
 _NL_ActivateLayerSetsEnabled() {
 	global LayerEnabled := false
@@ -51,11 +51,11 @@ Test("DisableLayer: sets LayerEnabled to false", _NL_DisableLayerSetsDisabled)
 
 
 
-; ==============================================
+; =============================================
 ; =============================================
 ; ======= 2/ Repetition counter helpers =======
 ; =============================================
-; ==============================================
+; =============================================
 
 _NL_SetRepetitionsSetsCounter() {
 	global NumberOfRepetitions := 1

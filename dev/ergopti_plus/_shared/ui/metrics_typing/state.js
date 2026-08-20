@@ -25,6 +25,19 @@ function _t(key) {
 window.keycode_layout = window.keycode_layout || {};
 window._lua_request = null;
 
+// A detached range projection normally finishes in 30–75 s on a cold DB.
+// This is the final UI-side backstop when a native host or WebView callback
+// disappears without a terminal response; it must stay longer than that cold
+// path while remaining finite so one lost response cannot disable filters.
+const RANGE_REQUEST_WATCHDOG_MS = 120_000;
+
+const APP_SELECTION_MODE = Object.freeze({
+	UNINITIALIZED: 'uninitialized',
+	ALL: 'all',
+	NONE: 'none',
+	SUBSET: 'subset'
+});
+
 // ===================================
 // ===================================
 // ======= 1/ Mutable App State =======
@@ -53,6 +66,7 @@ const app_state = {
 	minute5_series: {},
 	available_apps: [],
 	selected_apps: new Set(),
+	app_selection_mode: APP_SELECTION_MODE.UNINITIALIZED,
 	did_apply_initial_reset: false,
 	current_tab: 'c',
 	sort_col: 'count',
@@ -60,6 +74,11 @@ const app_state = {
 	search_query: '',
 	rendered_list: [],
 	loading_data: false,
+	range_request_sequence: 0,
+	active_range_request_id: 0,
+	range_request_watchdog: null,
+	range_request_show_loader: false,
+	range_request_previous_table_html: null,
 	manifest_dates_sorted: [],
 	render_timer: null,
 	live_update_timer: null,

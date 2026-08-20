@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the config-shortcuts-array-parse-escape-bug finding.
 ;
-; CS_CoerceValue() in lib/config_shortcuts.ahk hand-rolls a TOML array
+; CS_CoerceValue() in infra/config_shortcuts.ahk hand-rolls a TOML array
 ; tokenizer for the metrics_disabled_apps privacy filter. The original
 ; tokenizer probed the ACCUMULATED string (SubStr(cur, -1)) to decide whether
 ; a quote was escaped. That lookbehind is unreliable: an escaped backslash
@@ -55,7 +55,7 @@ _CSAE_ReadSource(RelPath) {
 ; ==================================================
 
 _CSAE_TokenizerTracksRawEscape() {
-	Src := _CSAE_ReadSource("lib/config_shortcuts.ahk")
+	Src := _CSAE_ReadSource("infra/config_shortcuts.ahk")
 	Seg := _DriverFuncBody("CS_CoerceValue")
 	Assert(Seg != "", "CS_CoerceValue(raw) declaration must exist in config_shortcuts.ahk")
 	; The fixed tokenizer carries a dedicated raw-stream escape flag.
@@ -68,7 +68,7 @@ _CSAE_TokenizerTracksRawEscape() {
 Test("config_shortcuts: array tokenizer tracks raw-stream escape flag (config-shortcuts-array-parse-escape-bug)", _CSAE_TokenizerTracksRawEscape)
 
 _CSAE_ElementsUnescapedExactlyOnce() {
-	Src := _CSAE_ReadSource("lib/config_shortcuts.ahk")
+	Src := _CSAE_ReadSource("infra/config_shortcuts.ahk")
 	; A dedicated element coercer guarantees each quoted element is unescaped
 	; exactly once instead of recursing through CS_CoerceValue again.
 	Assert(InStr(Src, "CS_CoerceElement(token) {") > 0,

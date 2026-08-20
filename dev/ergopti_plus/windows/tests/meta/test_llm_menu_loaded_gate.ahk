@@ -17,13 +17,13 @@
 ; The fix:
 ;   - Declare global _LLM_Menu_Loaded := false at module load in menu_llm.ahk.
 ;   - Set _LLM_Menu_Loaded := true at the END of LLM_Menu_Init().
-;   - Gate the _LLM_Menu_SyncToFeatures() call in SaveFullConfig() on the flag.
+;   - Gate detached LLM reconciliation in the full-save collector on the flag.
 ;
 ; This test asserts:
 ;   (a) menu_llm.ahk declares _LLM_Menu_Loaded := false before LLM_Menu_Init.
 ;   (b) LLM_Menu_Init() sets _LLM_Menu_Loaded := true before returning.
-;   (c) SaveFullConfig() checks _LLM_Menu_Loaded before calling
-;       _LLM_Menu_SyncToFeatures().
+;   (c) The collector checks _LLM_Menu_Loaded before reconciling a detached
+;       feature snapshot, without mutating live Features.
 ;
 ; SCOPE: source introspection of ui/menu/menu_llm.ahk, ui/menu/menu_llm/init.ahk,
 ;        and ErgoptiPlus.ahk.
@@ -80,17 +80,26 @@ _LTLG_CheckSaveConfigGated() {
 	Src := _DriverSourceConcat()
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
 
-	Body := _DriverFuncBody("SaveFullConfig")
-	Assert(Body != "", "SaveFullConfig must be present in the driver source")
+	Body := _DriverFuncBody("_ConfigCollectFullSaveUpdates")
+	Assert(Body != "", "the full-save collector must be present in the driver source")
 
-	; _LLM_Menu_SyncToFeatures call must be guarded by _LLM_Menu_Loaded
-	SyncPos   := InStr(Body, "_LLM_Menu_SyncToFeatures()")
-	GatePos   := InStr(Body, "_LLM_Menu_Loaded")
-	Assert(SyncPos > 0, "SaveFullConfig must call _LLM_Menu_SyncToFeatures()")
+	; Reconciliation must be loaded-gated and operate on a detached snapshot.
+	GatePos   := InStr(Body, "MenuReady := HasMenuCandidate")
+	ClonePos  := InStr(Body, "FeatureSnapshot := _HSDeepCloneMap(FeatureState)")
+	SyncPos   := InStr(Body,
+		"_LLM_Menu_SyncToFeatures(FeatureSnapshot, MenuState)")
+	Assert(ClonePos > 0, "the full-save collector must clone Features before LLM reconciliation")
+	Assert(SyncPos > 0,
+		"the full-save collector must reconcile LLM state into its detached snapshot")
 	Assert(GatePos > 0,
-		"SaveFullConfig must check _LLM_Menu_Loaded before calling _LLM_Menu_SyncToFeatures()")
-	Assert(GatePos < SyncPos,
-		"_LLM_Menu_Loaded gate must appear before _LLM_Menu_SyncToFeatures() call in SaveFullConfig")
+		"the full-save collector must derive a loaded-or-explicit menu gate before LLM reconciliation")
+	Assert(GatePos < ClonePos and ClonePos < SyncPos,
+		"the loaded gate must precede reconciliation of the detached full-save snapshot")
+	Assert(InStr(Body, "_LLM_Menu_SyncToFeatures()") = 0,
+		"the collector must never reconcile menu state into live Features")
+	Assert(InStr(Body, "IsSet(_LLM_Menu_Loaded) && _LLM_Menu_Loaded") > 0,
+		"ordinary full saves must still require _LLM_Menu_Loaded, while an "
+		. "explicit transaction candidate may bypass only that boot-order gate")
 }
 
 
@@ -100,5 +109,5 @@ Test("meta llm-tray-loaded-gate: menu_llm.ahk declares _LLM_Menu_Loaded := false
 Test("meta llm-tray-loaded-gate: LLM_Menu_Init() sets _LLM_Menu_Loaded := true before returning",
 	_LTLG_CheckInitSetsFlag)
 
-Test("meta llm-tray-loaded-gate: SaveFullConfig() gates _LLM_Menu_SyncToFeatures on _LLM_Menu_Loaded",
+Test("meta llm-tray-loaded-gate: full-save collector gates detached LLM reconciliation",
 	_LTLG_CheckSaveConfigGated)

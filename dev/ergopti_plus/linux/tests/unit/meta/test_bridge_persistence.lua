@@ -23,6 +23,7 @@ local helpers = require("tests.helpers")
 
 
 
+
 -- ====================================
 -- ====================================
 -- ======= 1/ Writer spy helper =======
@@ -65,6 +66,7 @@ end
 
 
 
+
 -- ====================================
 -- ====================================
 -- ======= 2/ Persistence spies =======
@@ -75,7 +77,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("paths_editor_bridge.save persists {paths,key,value} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.paths_editor_bridge",
+			"ui.paths_editor.bridge",
 			function(handler)
 				handler.on_message({ action = "save", key = "config_dir", value = "/tmp/test" }, {})
 			end)
@@ -88,7 +90,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("prompt_editor_bridge.set_model persists {llm,model} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.prompt_editor_bridge",
+			"ui.prompt_editor.bridge",
 			function(handler)
 				handler.on_message({ action = "set_model", model = "llama3" }, {})
 			end)
@@ -100,7 +102,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("prompt_editor_bridge.save_prompt persists {llm,prompt} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.prompt_editor_bridge",
+			"ui.prompt_editor.bridge",
 			function(handler)
 				handler.on_message({ action = "save_prompt", title = "My Prompt" }, {})
 			end)
@@ -112,7 +114,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 	helpers.it("onboarding_bridge layout step persists {script,layout} via batch_write", function()
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.onboarding_bridge",
+			"ui.onboarding.bridge",
 			function(handler)
 				handler.on_message({ step = "layout", data = { layout = "azerty" } }, {})
 			end)
@@ -122,32 +124,32 @@ helpers.describe("bridge handler TOML persistence", function()
 		})
 	end)
 
-	helpers.it("hotstrings_config_bridge.add_hotstring persists the entry via write", function()
+	-- The `add_hotstring` case that stood here was removed on 2026-08-05: the
+	-- shared settings window has never sent that action, so it asserted a write
+	-- path nothing could reach. Writing hotstrings is the editor's job, below.
+	helpers.it("hotstring_editor_bridge.save writes the personal file, named by its stem", function()
 		local state = { config = { get_config_dir = function() return "/home/user/.config/ergopti/hotstrings" end } }
 		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.hotstrings_config_bridge",
+			"ui.hotstring_editor.bridge",
 			function(handler)
-				handler.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
-			end)
-		helpers.assert_not_nil(captured, "add_hotstring must reach the writer")
-		helpers.assert_eq(captured.method, "write")
-		helpers.assert_eq(captured.path, "/home/user/.config/ergopti/hotstrings/english.toml")
-		helpers.assert_eq(captured.data.sections_order, { "english" })
-		local entry = captured.data.sections.english.entries[1]
-		helpers.assert_eq(entry.trigger, "btw")
-		helpers.assert_eq(entry.output, "by the way")
-	end)
-
-	helpers.it("hotstring_editor_bridge.save persists the entry via write", function()
-		local state = { config = { get_config_dir = function() return "/home/user/.config/ergopti/hotstrings" end } }
-		local captured = with_writer_spy(
-			"modules.ui.bridge_handlers.hotstring_editor_bridge",
-			function(handler)
-				handler.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
+				handler.on_message({
+					action = "save",
+					data = {
+						sections_order = { "english" },
+						sections = { english = { description = "English", entries = {
+							{ trigger = "btw", output = "by the way" },
+						} } },
+					},
+				}, state)
 			end)
 		helpers.assert_not_nil(captured, "save must reach the writer")
 		helpers.assert_eq(captured.method, "write")
-		helpers.assert_eq(captured.path, "/home/user/.config/ergopti/hotstrings/english.toml")
+		-- personal.toml, not <section>.toml. The loader groups by FILE STEM, so the
+		-- filename decides which category these entries join; writing english.toml
+		-- would invent a category the menu, the priority table and the settings
+		-- window all know nothing about.
+		helpers.assert_eq(captured.path, "/home/user/.config/ergopti/hotstrings/personal.toml")
+		helpers.assert_eq(captured.data.sections_order, { "english" })
 		local entry = captured.data.sections.english.entries[1]
 		helpers.assert_eq(entry.trigger, "btw")
 		helpers.assert_eq(entry.output, "by the way")

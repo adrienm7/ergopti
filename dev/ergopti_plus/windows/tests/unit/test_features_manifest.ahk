@@ -35,11 +35,11 @@
 
 
 
-; ==================================
+; ================================
 ; ================================
 ; ======= 1/ Test fixtures =======
 ; ================================
-; ==================================
+; ================================
 
 ; Swap ``Features`` for a fresh manifest build and return the old value so
 ; the test can restore it afterward. Isolates each test from the shared stub.
@@ -72,11 +72,11 @@ _FM_WriteFixture(Tag, Content) {
 
 
 
-; ==============================================
+; =============================================
 ; =============================================
 ; ======= 2/ Manifest sanity assertions =======
 ; =============================================
-; ==============================================
+; =============================================
 
 TestFMv2_ManifestLoaded() {
 	AssertTrue(ManifestEnsureLoaded(),
@@ -89,17 +89,26 @@ TestFMv2_ManifestVersion() {
 }
 Test("manifest_v2: version is 2.0.0", TestFMv2_ManifestVersion)
 
+; section_order drives both the tray-menu order and the order sections are
+; written to config.toml, so it is user-visible twice. It names what each
+; section CONFIGURES; a driver name in it would mean the config file is laid
+; out by implementer rather than by subject, which is the shape Lot 4 removed.
 TestFMv2_SectionOrder() {
 	Order := ManifestSectionOrder()
 	AssertEqual("Array", Type(Order))
-	AssertEqual(7, Order.Length)
+	AssertEqual(8, Order.Length)
 	AssertEqual("script", Order[1])
 	AssertEqual("hotstrings", Order[2])
 	AssertEqual("llm", Order[3])
 	AssertEqual("metrics", Order[4])
 	AssertEqual("shortcuts", Order[5])
-	AssertEqual("ahk", Order[6])
-	AssertEqual("hs", Order[7])
+	AssertEqual("gestures", Order[6])
+	AssertEqual("layout", Order[7])
+	AssertEqual("category_enabled", Order[8])
+	for Name in Order {
+		AssertTrue(Name != "ahk" and Name != "hs" and Name != "linux",
+			"section_order must not name a driver — it orders what is configured, not who implements it")
+	}
 }
 Test("manifest_v2: section_order matches v2 schema design", TestFMv2_SectionOrder)
 
@@ -131,11 +140,11 @@ Test("manifest_v2: codegen filters out hs.* features from the AHK manifest",
 
 
 
-; ===================================================
+; =================================================
 ; =================================================
 ; ======= 3/ ManifestBuildFeaturesMap shape =======
 ; =================================================
-; ===================================================
+; =================================================
 
 TestFMv2_BuildReturnsMap() {
 	Built := ManifestBuildFeaturesMap()
@@ -147,22 +156,29 @@ TestFMv2_BuildHasSectionOrder() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built.Has("section_order"))
 	AssertEqual("Array", Type(Built["section_order"]))
-	AssertEqual(7, Built["section_order"].Length)
+	AssertEqual(8, Built["section_order"].Length)
 }
 Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
 	TestFMv2_BuildHasSectionOrder)
 
-TestFMv2_AhkPrefixStripped() {
-	; ahk.layout.ergopti_base in the manifest must land at Features[layout][ergopti_base]
-	; after the ahk. prefix strip. Call sites must NOT see Features[ahk].
+; No driver branch may appear at the root of the Features tree. This used to be
+; a statement about the STRIPPER — the manifest filed AHK features under "ahk."
+; and the builder cut it off, so a missed strip showed up as Features["ahk"].
+; Lot 4 removed the silo, so it is now a statement about the MANIFEST: a driver
+; branch here means a driver namespace came back. Both failures look the same
+; from the tree, which is why the assertion outlives the mechanism it was
+; written for.
+TestFMv2_NoDriverBranchAtRoot() {
 	Built := ManifestBuildFeaturesMap()
-	AssertFalse(Built.Has("ahk"),
-		"ahk prefix must be stripped at build time; found stray ahk branch.")
+	for Name in ["ahk", "hs", "linux"] {
+		AssertFalse(Built.Has(Name),
+			"Features has a '" . Name . "' branch — a feature is filed under what it configures, never under a driver")
+	}
 	AssertTrue(Built.Has("layout"),
-		"Layout (ahk.layout in manifest) must land at Features[layout] after strip.")
+		"layout.ergopti_base must land at Features[layout].")
 }
-Test("ManifestBuildFeaturesMap: ahk. prefix is stripped from section paths",
-	TestFMv2_AhkPrefixStripped)
+Test("ManifestBuildFeaturesMap: no driver branch at the root of the tree",
+	TestFMv2_NoDriverBranchAtRoot)
 
 TestFMv2_LayoutDefaults() {
 	Built := ManifestBuildFeaturesMap()
@@ -230,9 +246,23 @@ TestFMv2_BadOverrideTomlGraceful() {
 }
 Test("Features manifest: bad override toml must not crash build (graceful fallback)", TestFMv2_BadOverrideTomlGraceful)
 
+; Building the features map is a pure read of the manifest plus the override
+; file. It must not itself activate anything — the activation happens later, at
+; the call sites that consult the map, and those are what the pause gate covers.
+; A build that registered a hotstring would create one while the driver is
+; paused, no matter what any gate said.
 TestFMv2_PausePlusOverrideNoSideEffects() {
-	; Even with override + pause, no feature (e.g. hotstring creation) may activate.
-	AssertTrue(true, "manifest + override under pause must produce zero side effects")
+	Body := _DriverFuncBody("ManifestBuildFeaturesMap")
+	for Forbidden in ["Hotstring(", "SetTimer", "A_IsSuspended", "Send("] {
+		Assert(InStr(Body, Forbidden) == 0,
+			"ManifestBuildFeaturesMap() must not reference " . Forbidden . " — building the map "
+			. "is a read, and anything it activates would bypass every pause gate downstream")
+	}
+	; And it is repeatable: two builds agree, so a caller can rebuild after a
+	; resume without the map having drifted.
+	A := ManifestBuildFeaturesMap()
+	B := ManifestBuildFeaturesMap()
+	AssertEqual(A.Count, B.Count, "two builds must produce the same number of features")
 }
 Test("Features manifest: pause + override must cause zero activations", TestFMv2_PausePlusOverrideNoSideEffects)
 
@@ -330,11 +360,11 @@ Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree",
 
 
 
-; ====================================================
+; ==================================================
 ; ==================================================
 ; ======= 4/ ApplyConfigToml override engine =======
 ; ==================================================
-; ====================================================
+; ==================================================
 
 TestFMv2_ApplyNonexistentFileReturnsZero() {
 	OldFeatures := _FM_BeginIsolated()
@@ -360,11 +390,11 @@ TestFMv2_ApplyUniversalScriptOverride() {
 }
 Test("ApplyConfigToml: applies a [script] override", TestFMv2_ApplyUniversalScriptOverride)
 
-TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
+TestFMv2_ApplyLayoutOverride() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
-		Path := _FM_WriteFixture("ahk_layout",
-			"[ahk.layout]`r`nergopti_base = false`r`n")
+		Path := _FM_WriteFixture("layout",
+			"[layout]`r`nergopti_base = false`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual(false, Features["layout"]["ergopti_base"])
@@ -372,8 +402,43 @@ TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
 	}
 	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigToml: [ahk.layout] strips prefix to Features[layout]",
-	TestFMv2_ApplyAhkLayoutOverrideStripsPrefix)
+Test("ApplyConfigToml: [layout] lands on Features[layout]",
+	TestFMv2_ApplyLayoutOverride)
+
+; The loader used to accept "[ahk.layout]" and strip the prefix, because the
+; manifest filed AHK features under an "ahk." silo. Lot 4 removed the silo, so
+; the driver namespace is no longer a spelling of anything — reintroducing the
+; strip would make "[ahk.layout]" and "[layout]" two names for one section, and
+; a config carrying both would apply in file order. Pin the rejection while
+; also proving an expected migration remnant no longer emits a red ERROR.
+TestFMv2_DriverNamespacedSectionIsRejected() {
+	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	try {
+		Path := _FM_WriteFixture("ahk_layout",
+			"[ahk.layout]`r`nergopti_base = false`r`n")
+		LoggerSetTestSink((Line) => Captured.Push(Line))
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied, "a driver-namespaced section must apply nothing")
+		AssertEqual(true, Features["layout"]["ergopti_base"],
+			"the manifest default must survive an [ahk.layout] section")
+		Joined := ""
+		for Line in Captured
+			Joined .= Line . "`n"
+		AssertFalse(InStr(Joined, "[ERROR]") > 0,
+			"an obsolete driver namespace is migration input, not a runtime error")
+		AssertTrue(InStr(Joined, "[WARNING]") > 0,
+			"the ignored migration remnant must remain visible until cleanup")
+		FileDelete(Path)
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: [ahk.layout] is rejected, not stripped",
+	TestFMv2_DriverNamespacedSectionIsRejected)
 
 TestFMv2_ApplyNestedSubSection() {
 	OldFeatures := _FM_BeginIsolated()
@@ -546,11 +611,11 @@ Test("ApplyConfigToml: comments and blank lines are skipped",
 
 
 
-; =====================================================
+; ===================================================
 ; ===================================================
 ; ======= 5/ TomlCoerceValue primitive parser =======
 ; ===================================================
-; =====================================================
+; ===================================================
 
 TestFMv2_CoerceArrayEmpty() {
 	Result := TomlCoerceValueExt("[]")
@@ -649,11 +714,11 @@ Test("ManifestBuildFeaturesMap: all keys are snake_case (no v1 PascalCase residu
 
 
 
-; ====================================================================
+; ===============================================================
 ; ===============================================================
 ; ======= 7/ #HotIf Features[] safety guard (source-scan) =======
 ; ===============================================================
-; ====================================================================
+; ===============================================================
 
 ; Every #HotIf that dereferences Features[] must include IsSet(Features) to
 ; prevent an "uninitialized global" crash when an error fires before boot
@@ -789,4 +854,3 @@ TestFMv2_ShortcutDispatchersUseGuardedLeafReads() {
 }
 Test("shortcuts: chord dispatchers read action flags with guarded .Get, not raw indexes",
 	TestFMv2_ShortcutDispatchersUseGuardedLeafReads)
-

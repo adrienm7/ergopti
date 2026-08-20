@@ -22,64 +22,68 @@
 
 
 
-; ===================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ===================================
+; ============================
 
 class KLReadConst {
-    ; Maximum number of n-gram rows projected per (date-range, table). We
-    ; ship the whole dataset to the page (filters apply client-side per
-    ; the « niveau 1 » contract) so this only kicks in to defuse a corner
-    ; case where the user has accumulated millions of rows after months
-    ; of capture. 50_000 keeps the JSON under ~5 MB which Edge handles
-    ; without breaking a sweat.
-    static MAX_NGRAM_ROWS := 50000
-    ; Bound the transient walker batch during a cold reconstruction.  Raw
-    ; events remain the durable source of truth, while this cap keeps a large
-    ; multi-month history from creating one enormous AHK Map / SQL string.
-    static REPLAY_FLUSH_ENTRIES := 500
+		; Maximum number of n-gram rows projected per (date-range, table). We
+		; ship the whole dataset to the page (filters apply client-side per
+		; the « niveau 1 » contract) so this only kicks in to defuse a corner
+		; case where the user has accumulated millions of rows after months
+		; of capture. 50_000 keeps the JSON under ~5 MB which Edge handles
+		; without breaking a sweat.
+		static MAX_NGRAM_ROWS := 50000
+		; Bound the transient walker batch during a cold reconstruction.  Raw
+		; events remain the durable source of truth, while this cap keeps a large
+		; multi-month history from creating one enormous AHK Map / SQL string.
+		static REPLAY_FLUSH_ENTRIES := 500
 }
 
 
 
 
 
-; ===================================
+; ================================
 ; ================================
 ; ======= 2/ Schema loader =======
 ; ================================
-; ===================================
+; ================================
 
 ; Resolve the canonical schema.sql path. The shared schema lives at
 ; `static/ergopti_plus/_shared/data/db/schema.sql`; _StaticDir already
 ; resolves to the right root in both dev and compiled modes.
 KLR_ResolveSchemaPath() {
-    global _SharedDir
-    base := _SharedDir . "\data\db\schema.sql"
-    loop files, base
-        return A_LoopFileFullPath
-    return base
+		global _SharedDir
+		base := _SharedDir . "\data\db\schema.sql"
+		loop files, base
+				return A_LoopFileFullPath
+		return base
 }
 
 KLR_LoadSchema(db) {
-    schema_path := KLR_ResolveSchemaPath()
-    if !FileExist(schema_path)
-        return false
-    schema := FileRead(schema_path, "UTF-8")
-    return SQLite_Exec(db, schema)
+		schema_path := KLR_ResolveSchemaPath()
+		if !FileExist(schema_path)
+				return false
+		try schema := FileRead(schema_path, "UTF-8")
+		catch as err {
+				try LoggerError("KLReader", "Schema read failed: {1}.", err.Message)
+				return false
+		}
+		return SQLite_Exec(db, schema)
 }
 
 
 
 
 
-; =========================================
+; =======================================
 ; =======================================
 ; ======= 3/ Database materialise =======
 ; =======================================
-; =========================================
+; =======================================
 
 ; Module-level cache for the in-memory SQLite database. Rebuilding the
 ; entire schema + every device's data.sql on every ingest tick was
@@ -87,16 +91,21 @@ KLR_LoadSchema(db) {
 ; alive across calls and only exec the NEW bytes appended to each
 ; data.sql since the last call.
 class KLRCache {
-    static db := 0
-    static last_sizes := Map()    ; absolute_path → byte_offset already loaded
+		static db := 0
+		static last_sizes := Map()    ; absolute_path → byte_offset already loaded
+		; Only bounded file metadata survives an incomplete writer boundary. SQL is
+		; reread from last_sizes[path] after a snapshot changes, so a transaction
+		; containing hundreds of MB cannot become session-lifetime AHK heap state.
+		static pending_snapshots := Map() ; absolute_path → {snapshot, end_offset}
 }
 
 KLR_ResetCache() {
-    if KLRCache.db {
-        try SQLite_Close(KLRCache.db)
-        KLRCache.db := 0
-    }
-    KLRCache.last_sizes := Map()
+		if KLRCache.db {
+				try SQLite_Close(KLRCache.db)
+				KLRCache.db := 0
+		}
+		KLRCache.last_sizes := Map()
+		KLRCache.pending_snapshots := Map()
 }
 
 ; Append a single diagnostic line to prefetch.log, but only when the logger
@@ -107,132 +116,225 @@ KLR_ResetCache() {
 ; the whole instrumentation path a single boolean test in normal operation
 ; (LOGGER_MIN_LEVEL=INFO) while keeping full tracing available on demand.
 KLR_PrefetchDebug(logPath, line) {
-    if !LoggerIsDebugEnabled()
-        return
-    try FileAppend("[" . A_Now . "] " . line . "`r`n", logPath, "UTF-8")
+		if !LoggerIsDebugEnabled()
+				return
+		try FileAppend("[" . A_Now . "] " . line . "`r`n", logPath, "UTF-8")
 }
 
 ; Build a fresh in-memory SQLite from the union of every device's
 ; data.sql under the metrics directory. Returns a handle the caller
 ; closes via SQLite_Close when done.
 KLR_BuildDatabase(metrics_dir) {
-    md := metrics_dir
-    if !RegExMatch(md, "[\\/]$")
-        md .= "\"
-    global _ConfigDir, _AhkSubDir
-    logPath := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
-    KLR_PrefetchDebug(logPath, "KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL)
-    KLR_PrefetchDebug(logPath, "KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!"))
-    ; Explicit LoadLibrary so we know whether the DLL even maps into the
-    ; process. A nullptr from LoadLibrary means a dependency is missing
-    ; or the binary is malformed. AHK's DllCall hits LoadLibrary too,
-    ; but it does so silently and a load failure on some hosts comes
-    ; back as a hard process crash rather than an exception.
-    hmod := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
-    KLR_PrefetchDebug(logPath, "LoadLibrary returned hmod=" . hmod)
-    if !hmod {
-        gle := DllCall("kernel32\GetLastError", "UInt")
-        KLR_PrefetchDebug(logPath, "LoadLibrary FAILED, GetLastError=" . gle)
-        try LoggerError("KLReader", "Metrics DB build failed — winsqlite3.dll not loadable (GetLastError={1}). Dashboard shows no data.", gle)
-        return 0
-    }
-    proc := DllCall("kernel32\GetProcAddress", "Ptr", hmod, "AStr", "sqlite3_libversion", "Ptr")
-    KLR_PrefetchDebug(logPath, "GetProcAddress(libversion)=" . proc)
-    if !proc {
-        KLR_PrefetchDebug(logPath, "symbol not found - wrong DLL?")
-        try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion symbol not found in winsqlite3.dll. Dashboard shows no data.")
-        return 0
-    }
-    try {
-        ver_ptr := DllCall(proc, "Ptr")
-        ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
-        KLR_PrefetchDebug(logPath, "pre-open libversion=" . ver)
-    } catch as err {
-        KLR_PrefetchDebug(logPath, "pre-open libversion FAILED: " . err.Message)
-        try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion call failed ({1}). Dashboard shows no data.", err.Message)
-        return 0
-    }
-    KLR_PrefetchDebug(logPath, "KLR opening :memory:")
-    ; Reuse the cached DB when present — only the new bytes of each
-    ; device's data.sql get exec'd this round. First call (cache empty)
-    ; loads the schema + the entire current contents.
-    if KLRCache.db {
-        KLR_PrefetchDebug(logPath, "KLR reusing cached db=" . KLRCache.db)
-        ; Only need to exec deltas; skip the libversion / schema loads.
-        if !KLR_ApplyIncremental(KLRCache.db, md, logPath)
-            return 0
-        ; Re-project only the SQL-owned fields from the append-only raw
-        ; events.  Do not clear the tables here: walker-owned metrics (WPM,
-        ; ngrams, correction and ergonomic details) exist only in this cache
-        ; and are updated below from the incremental KLW batch.
-        KLR_RebuildAggregates(KLRCache.db)
-        KLR_InjectKlwBatch(KLRCache.db)
-        return KLRCache.db
-    }
-    db := SQLite_Open(":memory:")
-    KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
-    if !db {
-        try LoggerError("KLReader", "Metrics DB build failed — SQLite :memory: open returned null. Dashboard shows no data.")
-        return 0
-    }
-    KLR_PrefetchDebug(logPath, "KLR loading schema...")
-    if !KLR_LoadSchema(db) {
-        KLR_PrefetchDebug(logPath, "KLR schema load FAILED")
-        try LoggerError("KLReader", "Metrics DB build failed — schema.sql missing or invalid. Dashboard shows no data.")
-        SQLite_Close(db)
-        return 0
-    }
-    KLR_PrefetchDebug(logPath, "KLR schema OK")
+		md := metrics_dir
+		if !RegExMatch(md, "[\\/]$")
+				md .= "\"
+		global _ConfigDir, _AhkSubDir
+		logPath := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
+		KLR_PrefetchDebug(logPath, "KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL)
+		KLR_PrefetchDebug(logPath, "KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!"))
+		; Explicit LoadLibrary so we know whether the DLL even maps into the
+		; process. A nullptr from LoadLibrary means a dependency is missing
+		; or the binary is malformed. AHK's DllCall hits LoadLibrary too,
+		; but it does so silently and a load failure on some hosts comes
+		; back as a hard process crash rather than an exception.
+		hmod := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
+		KLR_PrefetchDebug(logPath, "LoadLibrary returned hmod=" . hmod)
+		if !hmod {
+				gle := DllCall("kernel32\GetLastError", "UInt")
+				KLR_PrefetchDebug(logPath, "LoadLibrary FAILED, GetLastError=" . gle)
+				try LoggerError("KLReader", "Metrics DB build failed — winsqlite3.dll not loadable (GetLastError={1}). Dashboard shows no data.", gle)
+				return 0
+		}
+		proc := DllCall("kernel32\GetProcAddress", "Ptr", hmod, "AStr", "sqlite3_libversion", "Ptr")
+		KLR_PrefetchDebug(logPath, "GetProcAddress(libversion)=" . proc)
+		if !proc {
+				KLR_PrefetchDebug(logPath, "symbol not found - wrong DLL?")
+				try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion symbol not found in winsqlite3.dll. Dashboard shows no data.")
+				return 0
+		}
+		try {
+				ver_ptr := DllCall(proc, "Ptr")
+				ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
+				KLR_PrefetchDebug(logPath, "pre-open libversion=" . ver)
+		} catch as err {
+				KLR_PrefetchDebug(logPath, "pre-open libversion FAILED: " . err.Message)
+				try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion call failed ({1}). Dashboard shows no data.", err.Message)
+				return 0
+		}
+		KLR_PrefetchDebug(logPath, "KLR opening :memory:")
+		; A warm refresh never mutates the published handle. Collect all new bytes,
+		; clone the last-good database, and apply/re-project on that private handle.
+		; Publication swaps both DB and offsets only after every ledger reaches a
+		; complete autocommit boundary.
+		if KLRCache.db {
+				KLR_PrefetchDebug(logPath, "KLR reusing cached db=" . KLRCache.db)
+				update := KLR_PrepareIncremental(md, logPath)
+				if !update.Get("ok", false) {
+						if update.Get("rebuild", false) {
+								cold := KLR_BuildColdCandidate(md, logPath)
+								if cold.Get("ok", false) {
+										KLR_PublishCandidate(cold["db"], cold["sizes"])
+										return KLRCache.db
+								}
+						}
+						return KLRCache.db
+				}
+				if (KLRCache.pending_snapshots.Count > 0
+								&& !update.Get("changed", false)) {
+						; A crashed/interrupted writer can leave a tail incomplete for hours.
+						; Retry only after a participating snapshot changes, instead of cloning
+						; the whole database every five seconds while all files are stable.
+						return KLRCache.db
+				}
+				if (update["tails"].Count = 0) {
+						if update.Get("changed", false)
+								KLRCache.pending_snapshots := Map()
+						; Preserve the existing zero-copy live-walker path. In production each
+						; projection already runs in a disposable worker, and an unchanged
+						; ledger must not pay an O(database-size) sqlite3_backup every tick.
+						KLR_RebuildAggregates(KLRCache.db)
+						KLR_InjectKlwBatch(KLRCache.db)
+						return KLRCache.db
+				}
 
-    ; Fan out: every per-device folder under by_device/<uuid>/data.sql
-    ; gets exec()-ed in. The schema's INSERT OR IGNORE / UPSERT clauses
-    ; make this idempotent across overlapping device files.
-    by_root := md . "by_device\"
-    if !DirExist(by_root) {
-        ; No device folder yet (first run / metrics reset) — still need to
-        ; rebuild aggregates and inject the walker batch so today's live
-        ; typing shows up immediately without requiring a data.sql.
-        KLRCache.db := db
-        KLR_ClearAggregates(db)
-        KLR_RebuildAggregates(db)
-        KLR_InjectKlwBatch(db)
-        return db
-    }
-    loop files, by_root . "*", "D" {
-        sql_path := A_LoopFileFullPath . "\data.sql"
-        if !FileExist(sql_path)
-            continue
-        ; Read in 4 MB chunks to avoid OOM on large data.sql files (can be
-        ; several GB after months of capture). SQLite_Exec handles partial
-        ; statements gracefully — each chunk ends on a COMMIT boundary so we
-        ; accumulate a carry buffer of any trailing incomplete transaction and
-        ; prepend it to the next chunk.
-        KLR_ExecLargeFile(db, sql_path)
-        try KLRCache.last_sizes[sql_path] := FileGetSize(sql_path)
-    }
-    KLRCache.db := db
-    ; Rebuild every derived table from durable events_* on a cold cache.  The
-    ; live walker deliberately no longer writes aggregate UPSERTs to data.sql
-    ; (they caused disproportionate file growth), so SQL-only rollups are not
-    ; enough after a restart: speed, corrections, ergonomics and n-grams must
-    ; be replayed from their raw event payloads too.
-    KLR_ClearAggregates(db)
-    KLR_RebuildAggregates(db)
-    replayed := KLR_RebuildWalkerAggregates(db)
-    if (replayed < 0) {
-        KLR_ResetCache()
-        return 0
-    }
-    if (replayed > 0) {
-        ; KLUI flushes raw events before opening a dashboard.  Those same
-        ; events are therefore represented by the replay above; discarding the
-        ; live delta prevents a second warm refresh from adding them again.
-        KLW_ResetBatch()
-    } else {
-        ; First run with no durable raw events yet: expose the in-RAM delta.
-        KLR_InjectKlwBatch(db)
-    }
-    return db
+				clone_tick := HotPath_Now()
+				candidate := 0
+				try {
+						candidate := SQLite_CloneMemory(KLRCache.db)
+				} finally {
+						HotPath_LogIfSlow("KLR.CandidateClone", clone_tick,
+								update["tails"].Count . " ledger tail(s)")
+				}
+				if !candidate {
+						try LoggerError("KLReader", "Metrics DB candidate clone failed; retaining the last-good dashboard projection.")
+						return KLRCache.db
+				}
+				applied := KLR_ApplyIncremental(candidate, update["tails"], logPath)
+				if !applied.Get("ok", false) {
+						try SQLite_Close(candidate)
+						; Retain only bounded identity/size/mtime metadata. Whether the tail
+						; is incomplete or invalid, a stable file cannot become valid; after
+						; any append or in-place repair, all discarded sibling tails are read
+						; again from their unchanged published offsets.
+						KLRCache.pending_snapshots := KLR_TailSnapshots(update["tails"])
+						return KLRCache.db
+				}
+
+				; Re-project only the SQL-owned fields from append-only raw events, then
+				; drain the live walker delta into the same unpublished candidate.
+				KLR_RebuildAggregates(candidate)
+				KLR_InjectKlwBatch(candidate)
+				next_sizes := KLR_CopyOffsets(KLRCache.last_sizes)
+				for sql_path, tail in update["tails"]
+						next_sizes[sql_path] := tail["end_offset"]
+				KLR_PublishCandidate(candidate, next_sizes)
+				return KLRCache.db
+		}
+
+		cold := KLR_BuildColdCandidate(md, logPath)
+		if !cold.Get("ok", false)
+				return 0
+		KLR_PublishCandidate(cold["db"], cold["sizes"])
+		return KLRCache.db
+}
+
+KLR_CopyOffsets(offsets) {
+		copy := Map()
+		for path, offset in offsets
+				copy[path] := offset
+		return copy
+}
+
+KLR_TailSnapshots(tails) {
+		snapshots := Map()
+		for path, tail in tails {
+				snapshots[path] := Map(
+						"snapshot", tail["snapshot"],
+						"end_offset", tail["end_offset"]
+				)
+		}
+		return snapshots
+}
+
+KLR_PublishCandidate(candidate, sizes) {
+		old_db := 0
+		previous_critical := A_IsCritical
+		Critical("On")
+		try {
+				; This three-field tuple is the reader's publication boundary. No timer
+				; or WebView callback may observe a new handle with old offsets/carry.
+				old_db := KLRCache.db
+				KLRCache.db := candidate
+				KLRCache.last_sizes := sizes
+				KLRCache.pending_snapshots := Map()
+		} finally {
+				Critical(previous_critical ? previous_critical : "Off")
+		}
+		; sqlite3_close_v2 may enter the OS allocator. Keep it outside the critical
+		; publication window. Immediate close relies on KLR_BuildDatabase running in
+		; the disposable, single-flow /force worker guarded by
+		; tests/meta/test_keylogger_prefetch_worker.ahk. A future in-process caller
+		; must add borrower ownership/deferred close before reusing this publication.
+		if (old_db && old_db != candidate)
+				try SQLite_Close(old_db)
+}
+
+; Materialise a cold database without touching KLRCache.  This also supplies
+; the recovery path for a ledger that was compacted, removed, or replaced while
+; a dashboard was open: the old projection remains live until this candidate is
+; completely rebuilt and atomically published.
+KLR_BuildColdCandidate(md, logPath) {
+		db := SQLite_Open(":memory:")
+		KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
+		if !db {
+				try LoggerError("KLReader", "Metrics DB build failed — SQLite :memory: open returned null. Dashboard shows no data.")
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
+		KLR_PrefetchDebug(logPath, "KLR loading schema...")
+		if !KLR_LoadSchema(db) {
+				KLR_PrefetchDebug(logPath, "KLR schema load FAILED")
+				try LoggerError("KLReader", "Metrics DB build failed — schema.sql missing or invalid. Dashboard shows no data.")
+				try SQLite_Close(db)
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
+		KLR_PrefetchDebug(logPath, "KLR schema OK")
+
+		loaded_sizes := Map()
+		by_root := md . "by_device\"
+		if DirExist(by_root) {
+				; Fan out every device ledger into the private handle.  The offset
+				; comes from the FileObject position actually read, never a later
+				; FileGetSize that could include a concurrent append not yet executed.
+				loop files, by_root . "*", "D" {
+						sql_path := A_LoopFileFullPath . "\data.sql"
+						if !FileExist(sql_path)
+								continue
+						loaded_offset := 0
+						if !KLR_ExecLargeFile(db, sql_path, &loaded_offset) {
+								try LoggerError("KLReader", "Metrics DB build failed while loading a device ledger. Dashboard retains its last-good data.")
+								try SQLite_Close(db)
+								return Map("ok", false, "db", 0, "sizes", Map())
+						}
+						loaded_sizes[sql_path] := loaded_offset
+				}
+		}
+
+		; Durable raw rows are authoritative on a cold build. Reconstruct every
+		; derived table on the candidate before it becomes observable.
+		KLR_ClearAggregates(db)
+		KLR_RebuildAggregates(db)
+		replayed := KLR_RebuildWalkerAggregates(db)
+		if (replayed < 0) {
+				try SQLite_Close(db)
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
+		if (replayed > 0) {
+				; The live batch contains the same flushed events that replay consumed.
+				KLW_ResetBatch()
+		} else {
+				KLR_InjectKlwBatch(db)
+		}
+		return Map("ok", true, "db", db, "sizes", loaded_sizes)
 }
 
 ; Stream a potentially multi-GB SQL file into `db` in 4 MB chunks.
@@ -241,136 +343,329 @@ KLR_BuildDatabase(metrics_dir) {
 ; any incomplete statement that was split across a chunk boundary —
 ; sqlite3_prepare_v2 consumes one statement per call via the tail pointer,
 ; so it is safe to split between complete statements at any semicolon.
-KLR_ExecLargeFile(db, path) {
-    static CHUNK_BYTES := 4 * 1024 * 1024   ; 4 MB per read
-    ; Open in binary mode (no encoding conversion). The raw bytes are UTF-8
-    ; exactly as SQLite expects — StrPut inside SQLite_ExecBuf handles the
-    ; AHK-side conversion only for the tiny carry string.
-    fh := FileOpen(path, "r`n", "UTF-8")
-    if !fh
-        return
-    carry := ""
-    loop {
-        chunk := fh.Read(CHUNK_BYTES)
-        if (chunk = "")
-            break
-        ; Append the previous carry (incomplete statement tail) and exec.
-        ; The carry is at most one SQL line (a few hundred bytes) so
-        ; concatenation cost is negligible.
-        sql := carry . chunk
-        carry := SQLite_ExecReturnCarry(db, sql)
-    }
-    fh.Close()
-    ; Flush any trailing SQL (open transaction being written by keylogger,
-    ; or a compacted file whose last COMMIT has no trailing newline).
-    if (carry != "")
-        SQLite_Exec(db, carry)
+KLR_ExecLargeFile(db, path, &loaded_offset) {
+		static CHUNK_BYTES := 4 * 1024 * 1024   ; 4 MB per read
+		loaded_offset := 0
+		; Open in binary mode (no encoding conversion). The raw bytes are UTF-8
+		; exactly as SQLite expects — StrPut inside SQLite_ExecBuf handles the
+		; AHK-side conversion only for the tiny carry string.
+		try fh := FileOpen(path, "r`n", "UTF-8")
+		catch as err {
+				try LoggerError("KLReader", "Metrics ledger open failed: {1}.", err.Message)
+				return false
+		}
+		if !IsObject(fh)
+				return false
+		carry := ""
+		try {
+				loop {
+						chunk := fh.Read(CHUNK_BYTES)
+						if (chunk = "")
+								break
+						; Append the previous incomplete tail and execute every complete
+						; statement. A complete invalid statement fails immediately.
+						result := SQLite_ExecReturnCarry(db, carry . chunk)
+						if !result.Get("ok", false)
+								return false
+						carry := result.Get("carry", "")
+				}
+				loaded_offset := fh.Pos
+		} catch as err {
+				try LoggerError("KLReader", "Metrics ledger read failed: {1}.", err.Message)
+				return false
+		} finally {
+				try fh.Close()
+		}
+		; Flush any trailing SQL (open transaction being written by keylogger,
+		; or a compacted file whose last COMMIT has no trailing newline).
+		if (carry != "" && !SQLite_Exec(db, carry))
+				return false
+		; A writer can be pre-empted after a complete INSERT semicolon but before
+		; COMMIT. sqlite3_prepare then reports no textual carry even though the
+		; transaction is incomplete. Never publish or advance that boundary.
+		if !SQLite_IsAutocommit(db) {
+				try LoggerError("KLReader", "Metrics ledger ended inside an open transaction; retaining the last-good projection.")
+				return false
+		}
+		return true
 }
 
 ; Execute as many complete SQL statements from `sql` as sqlite3_prepare_v2
-; can parse, and return whatever tail bytes remain (the start of an
-; incomplete statement that was cut at the chunk boundary). This lets
+; can parse. Returns {ok, carry, error}: carry is populated only when
+; sqlite3_complete proves the remaining bytes are an incomplete statement,
+; while complete invalid SQL and step failures return ok=false. This lets
 ; KLR_ExecLargeFile keep a carry of ≤ 1 statement rather than the entire
 ; pre-COMMIT block (which can be 170 MB for compacted files).
 SQLite_ExecReturnCarry(db, sql) {
-    if !db
-        return sql
-    n := StrPut(sql, "UTF-8")
-    if (n <= 1)
-        return ""
-    sql_buf := Buffer(n, 0)
-    StrPut(sql, sql_buf, "UTF-8")
+		if !db
+				return Map("ok", false, "carry", "", "error", "missing database")
+		n := StrPut(sql, "UTF-8")
+		if (n <= 1)
+				return Map("ok", true, "carry", "", "error", "")
+		sql_buf := Buffer(n, 0)
+		StrPut(sql, sql_buf, "UTF-8")
 
-    cur  := sql_buf.Ptr
-    tail := cur
-    end_ := cur + n - 1   ; exclude trailing NUL
-    pstmt_buf := Buffer(8, 0)
-    ptail_buf := Buffer(8, 0)
-    while (cur < end_) {
-        NumPut("Ptr", 0, pstmt_buf, 0)
-        NumPut("Ptr", 0, ptail_buf, 0)
-        rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
-            "Ptr",  db,
-            "Ptr",  cur,
-            "Int",  -1,
-            "Ptr",  pstmt_buf.Ptr,
-            "Ptr",  ptail_buf.Ptr,
-            "Int")
-        pstmt := NumGet(pstmt_buf, 0, "Ptr")
-        ptail := NumGet(ptail_buf, 0, "Ptr")
-        if (rc != SQLiteConst.OK) {
-            ; Incomplete statement (syntax error OR statement cut at boundary).
-            ; Return remainder as carry so the caller can prepend the next chunk.
-            break
-        }
-        if pstmt {
-            Loop {
-                step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step", "Ptr", pstmt, "Int")
-                if (step_rc != SQLiteConst.ROW)
-                    break
-            }
-            DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
-        }
-        if (!ptail || ptail <= cur)
-            break
-        tail := ptail
-        cur  := ptail
-    }
-    ; Return the unparsed tail as a UTF-16 AHK string so the caller can
-    ; prepend it to the next chunk. The tail is at most one SQL statement
-    ; (typically a single INSERT line), so StrGet cost is negligible.
-    remaining_bytes := end_ - cur
-    if (remaining_bytes <= 0)
-        return ""
-    return StrGet(cur, remaining_bytes, "UTF-8")
+		cur  := sql_buf.Ptr
+		end_ := cur + n - 1   ; exclude trailing NUL
+		pstmt_buf := Buffer(8, 0)
+		ptail_buf := Buffer(8, 0)
+		while (cur < end_) {
+				NumPut("Ptr", 0, pstmt_buf, 0)
+				NumPut("Ptr", 0, ptail_buf, 0)
+				rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
+						"Ptr",  db,
+						"Ptr",  cur,
+						"Int",  -1,
+						"Ptr",  pstmt_buf.Ptr,
+						"Ptr",  ptail_buf.Ptr,
+						"Int")
+				pstmt := NumGet(pstmt_buf, 0, "Ptr")
+				ptail := NumGet(ptail_buf, 0, "Ptr")
+				if (rc != SQLiteConst.OK) {
+						remaining_bytes := end_ - cur
+						remaining := remaining_bytes > 0
+								? StrGet(cur, remaining_bytes, "UTF-8") : ""
+						complete := DllCall(SQLiteConst.DLL . "\sqlite3_complete",
+								"Ptr", cur, "Int")
+						if !complete
+								return Map("ok", true, "carry", remaining, "error", "")
+						try LoggerError("KLReader", "Metrics SQL prepare failed (rc={1}): {2}", rc, SQLite_LastError(db))
+						return Map("ok", false, "carry", "", "error", SQLite_LastError(db))
+				}
+				if pstmt {
+						Loop {
+								step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step", "Ptr", pstmt, "Int")
+								if (step_rc != SQLiteConst.ROW)
+										break
+						}
+						if (step_rc != SQLiteConst.DONE) {
+								try LoggerError("KLReader", "Metrics SQL step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
+								SQLite_FinalizeStatement(pstmt)
+								return Map("ok", false, "carry", "", "error", SQLite_LastError(db))
+						}
+						finalize_rc := SQLite_FinalizeStatement(pstmt)
+						if (finalize_rc != SQLiteConst.OK) {
+								try LoggerError("KLReader", "Metrics SQL finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
+								return Map("ok", false, "carry", "", "error", SQLite_LastError(db))
+						}
+				}
+				if (!ptail || ptail <= cur) {
+						try LoggerError("KLReader", "Metrics SQL parser made no forward progress.")
+						return Map("ok", false, "carry", "", "error", "no parser progress")
+				}
+				cur  := ptail
+		}
+		return Map("ok", true, "carry", "", "error", "")
 }
 
-; Apply only the bytes appended to each device's data.sql since the
-; previous KLR_BuildDatabase / KLR_ApplyIncremental pass. Returns true
-; on success (regardless of whether anything actually changed); false
-; on a hard read failure.
-KLR_ApplyIncremental(db, md, logPath) {
-    by_root := md . "by_device\"
-    if !DirExist(by_root)
-        return true
-    total_new := 0
-    loop files, by_root . "*", "D" {
-        sql_path := A_LoopFileFullPath . "\data.sql"
-        if !FileExist(sql_path)
-            continue
-        size := FileGetSize(sql_path)
-        prev := KLRCache.last_sizes.Has(sql_path) ? KLRCache.last_sizes[sql_path] : 0
-        if (size <= prev)
-            continue   ; no new data on this device.
-        ; Read just the new tail. AHK's FileRead doesn't support offsets
-        ; so we open a FileObject and Seek explicitly. ReadString reads
-        ; the rest of the file from the current position. Encoding must
-        ; match what the writer produced (UTF-8 with BOM).
-        fh := FileOpen(sql_path, "r", "UTF-8")
-        if !fh
-            continue
-        try fh.Seek(prev, 0)
-        delta := fh.Read()
-        fh.Close()
-        if (delta = "")
-            continue
-        SQLite_Exec(db, delta)
-        KLRCache.last_sizes[sql_path] := size
-        total_new += size - prev
-    }
-    KLR_PrefetchDebug(logPath, "KLR incremental: " . total_new . " new byte(s) exec'd")
-    return true
+; Read from a byte boundary that was observed on the FileObject itself.  The
+; returned end_offset therefore names exactly the bytes present in `sql`, even
+; when the writer appends between FileGetSize and Read.
+KLR_LedgerSnapshotFromHandle(file_handle) {
+		; The adapter owns the Win32 call. Volume/file index identifies replacement
+		; files; the 100 ns FILETIME detects a same-length in-place repair.
+		return FSHandleSnapshot(file_handle)
+}
+
+KLR_LedgerSnapshot(path) {
+		try fh := FileOpen(path, "r")
+		catch as err {
+				try LoggerError("KLReader", "Metrics ledger snapshot open failed: {1}.", err.Message)
+				return Map("ok", false)
+		}
+		if !IsObject(fh)
+				return Map("ok", false)
+		try {
+				return KLR_LedgerSnapshotFromHandle(fh.Handle)
+		} finally {
+				try fh.Close()
+		}
+}
+
+KLR_LedgerFileIsSame(left, right) {
+		if !(left is Map) || !(right is Map)
+				return false
+		return left.Get("ok", false) && right.Get("ok", false)
+				&& left.Get("volume", -1) = right.Get("volume", -2)
+				&& left.Get("index_high", -1) = right.Get("index_high", -2)
+				&& left.Get("index_low", -1) = right.Get("index_low", -2)
+}
+
+KLR_LedgerSnapshotIsSame(left, right) {
+		return KLR_LedgerFileIsSame(left, right)
+				&& left.Get("size", -1) = right.Get("size", -2)
+				&& left.Get("write_high", -1) = right.Get("write_high", -2)
+				&& left.Get("write_low", -1) = right.Get("write_low", -2)
+}
+
+KLR_ReadLedgerTail(path, start_offset) {
+		try fh := FileOpen(path, "r", "UTF-8")
+		catch as err {
+				try LoggerError("KLReader", "Incremental ledger open failed: {1}.", err.Message)
+				return Map("ok", false, "sql", "", "end_offset", start_offset)
+		}
+		if !IsObject(fh)
+				return Map("ok", false, "sql", "", "end_offset", start_offset)
+		try {
+				fh.Seek(start_offset, 0)
+				appended := fh.Read()
+				end_offset := fh.Pos
+				snapshot := KLR_LedgerSnapshotFromHandle(fh.Handle)
+				if !snapshot.Get("ok", false) {
+						try LoggerError("KLReader", "Incremental ledger snapshot failed after reading '{1}'.", path)
+						return Map("ok", false, "sql", "",
+								"end_offset", start_offset)
+				}
+		} catch as err {
+				try LoggerError("KLReader", "Incremental ledger read failed: {1}.", err.Message)
+				return Map("ok", false, "sql", "", "end_offset", start_offset)
+		} finally {
+				try fh.Close()
+		}
+		return Map("ok", true, "sql", appended,
+				"end_offset", end_offset, "snapshot", snapshot)
+}
+
+; Snapshot every ledger without mutating the published DB or offsets. A failed
+; candidate retains only bounded snapshots. Once any participating file changes,
+; every tail is reread from its unchanged published offset so multiple devices
+; still participate in one all-or-nothing publication.
+KLR_PrepareIncremental(md, logPath) {
+		by_root := md . "by_device\"
+		if !DirExist(by_root) {
+				if KLRCache.last_sizes.Count {
+						try LoggerError("KLReader", "The cached metrics ledger root disappeared; rebuilding from source.")
+						return Map("ok", false, "rebuild", true, "changed", false,
+								"tails", Map())
+				}
+				return Map("ok", true, "rebuild", false, "changed", false,
+						"tails", Map())
+		}
+
+		current_snapshots := Map()
+		seen_paths := Map()
+		changed := false
+		loop files, by_root . "*", "D" {
+				sql_path := A_LoopFileFullPath . "\data.sql"
+				if !FileExist(sql_path)
+						continue
+				seen_paths[sql_path] := true
+				snapshot := KLR_LedgerSnapshot(sql_path)
+				if !snapshot.Get("ok", false) {
+						try LoggerError("KLReader", "Incremental ledger snapshot failed for '{1}'.", sql_path)
+						return Map("ok", false, "rebuild", false, "changed", changed,
+								"tails", Map())
+				}
+				current_snapshots[sql_path] := snapshot
+				size := snapshot["size"]
+				published := KLRCache.last_sizes.Has(sql_path)
+						? KLRCache.last_sizes[sql_path] : 0
+				if (size < published) {
+						try LoggerError("KLReader", "Metrics ledger shrank after its cached offset; rebuilding from source.")
+						return Map("ok", false, "rebuild", true, "changed", changed,
+								"tails", Map())
+				}
+
+				if KLRCache.pending_snapshots.Has(sql_path) {
+						pending := KLRCache.pending_snapshots[sql_path]
+						pending_end := pending.Get("end_offset", published)
+						pending_snapshot := pending.Get("snapshot", 0)
+						if !KLR_LedgerFileIsSame(snapshot, pending_snapshot) {
+								; A replacement file invalidates every old byte boundary. Rebuild
+								; all ledgers cold rather than seeking an offset from another file.
+								try LoggerWarn("KLReader", "Metrics ledger identity changed for '{1}' while a writer tail was pending; rebuilding from source.", sql_path)
+								return Map("ok", false, "rebuild", true,
+										"changed", true, "tails", Map())
+						}
+						if !KLR_LedgerSnapshotIsSame(snapshot, pending_snapshot)
+								|| pending_end < published || size != pending_end {
+								; Size alone cannot distinguish a stable partial write from an in-place
+								; repair of exactly the same byte length. Identity + 100 ns FILETIME +
+								; the exact FileObject end offset form the retry-change detector.
+								changed := true
+						}
+				} else if (size > published) {
+						changed := true
+				}
+		}
+
+		for cached_path, _ in KLRCache.last_sizes {
+				if !seen_paths.Has(cached_path) {
+						try LoggerError("KLReader", "A cached metrics ledger disappeared; rebuilding from source.")
+						return Map("ok", false, "rebuild", true, "changed", changed,
+								"tails", Map())
+				}
+		}
+		for pending_path, _ in KLRCache.pending_snapshots {
+				if !seen_paths.Has(pending_path) {
+						; A never-published new ledger can disappear without appearing in
+						; last_sizes. Mark the pending snapshot consumed so the stable-tail
+						; fast path cannot retain an orphan forever.
+						changed := true
+				}
+		}
+
+		; A stable failed boundary cannot become valid. Avoid both the O(database)
+		; clone and rereading a potentially huge SQL transaction until its snapshot
+		; changes. No SQL string survives the call that first observed the failure.
+		if (KLRCache.pending_snapshots.Count > 0 && !changed)
+				return Map("ok", true, "rebuild", false, "changed", false,
+						"tails", Map())
+
+		tails := Map()
+		for sql_path, snapshot in current_snapshots {
+				published := KLRCache.last_sizes.Has(sql_path)
+						? KLRCache.last_sizes[sql_path] : 0
+				if (snapshot["size"] = published)
+						continue
+				tail := KLR_ReadLedgerTail(sql_path, published)
+				if !tail.Get("ok", false)
+						return Map("ok", false, "rebuild", false,
+								"changed", changed, "tails", tails)
+				if (tail.Get("end_offset", published) <= published
+								|| tail.Get("sql", "") = "") {
+						try LoggerError("KLReader", "Incremental ledger grew but produced no readable SQL bytes.")
+						return Map("ok", false, "rebuild", false, "changed", changed,
+								"tails", tails)
+				}
+				tails[sql_path] := tail
+		}
+		return Map("ok", true, "rebuild", false, "changed", changed,
+				"tails", tails)
+}
+
+; Execute prepared tails on an unpublished candidate. A textual carry OR an
+; open SQLite transaction is an interrupted append, not a successful refresh.
+; The caller discards the candidate and retains bounded path-specific metadata.
+KLR_ApplyIncremental(db, tails, logPath) {
+		total_new := 0
+		for sql_path, tail in tails {
+				result := SQLite_ExecReturnCarry(db, tail["sql"])
+				if !result.Get("ok", false) {
+						try LoggerError("KLReader", "Incremental metrics SQL is invalid; retaining the last-good dashboard projection.")
+						return Map("ok", false, "incomplete", false)
+				}
+				if (result.Get("carry", "") != "" || !SQLite_IsAutocommit(db)) {
+						KLR_PrefetchDebug(logPath, "KLR incremental writer boundary incomplete for " . sql_path)
+						return Map("ok", false, "incomplete", true)
+				}
+				published := KLRCache.last_sizes.Has(sql_path)
+						? KLRCache.last_sizes[sql_path] : 0
+				total_new += tail["end_offset"] - published
+		}
+		KLR_PrefetchDebug(logPath, "KLR incremental: " . total_new . " new byte(s) validated")
+		return Map("ok", true, "incomplete", false)
 }
 
 
 
 
 
-; =================================================================
+; ================================================================
 ; ================================================================
 ; ======= 4/ Aggregate rebuild from raw events (in-memory) =======
 ; ================================================================
-; =================================================================
+; ================================================================
 
 ; Delete all agg_* rows from the in-memory DB so that KLR_RebuildAggregates
 ; can recalculate them cleanly from events_*.  Called once per refresh cycle
@@ -429,7 +724,6 @@ KLR_RebuildAggregates(db) {
 	; was previously written to but never read anywhere (F19); this is the
 	; SQL-side half of wiring it up end-to-end.
 	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=excluded.llm_suggested;")
-
 	; agg_app_day — app foreground time from events_app_switch.
 	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=excluded.app_time_ms;")
 
@@ -483,70 +777,79 @@ KLR_RebuildAggregates(db) {
 global KLRReplay := Map()
 
 KLR_RebuildWalkerAggregates(db) {
-    global KLRReplay
-    if !db
-        return -1
+		global KLRReplay
+		if !db
+				return -1
 
-    ; Live capture keeps its current per-app context.  The replay uses the
-    ; same walker implementation, temporarily with a fresh context, then
-    ; restores the live state without leaking historic n-grams into new input.
-    saved_ctx := KLW.ctx
-    saved_batch := KLW.batch
-    replayed := 0
-    ok := true
-    try {
-        devices := SQLite_Query(db,
-            "SELECT DISTINCT device_id FROM ("
-            . "SELECT device_id FROM events_typing "
-            . "UNION SELECT device_id FROM events_window_switch "
-            . "UNION SELECT device_id FROM events_system"
-            . ") WHERE device_id IS NOT NULL AND device_id != '' ORDER BY device_id;")
-        for _, device_row in devices {
-            device_id := KLR_RowValue(device_row, "device_id", "")
-            if (device_id = "")
-                continue
-            KLW.ctx := Map()
-            KLW_ResetBatch()
-            KLRReplay := Map(
-                "db", db,
-                "device_lit", SQLite_Q(device_id),
-                "entries_since_flush", 0,
-                "replayed", 0,
-                "ok", true
-            )
+		; Live capture keeps its current per-app context.  The replay uses the
+		; same walker implementation, temporarily with a fresh context, then
+		; restores the live state without leaking historic n-grams into new input.
+		saved_ctx := KLW.ctx
+		saved_batch := KLW.batch
+		replayed := 0
+		ok := true
+		try {
+				accepted_marker := SQLite_Q(KLWConst.LLM_ACCEPTED_METRICS_SOURCE)
+				devices := SQLite_Query(db,
+						"SELECT DISTINCT device_id FROM ("
+						. "SELECT device_id FROM events_typing "
+						. "UNION SELECT device_id FROM events_llm WHERE kind='accepted' "
+						. "AND context=" . accepted_marker . " "
+						. "UNION SELECT device_id FROM events_window_switch "
+						. "UNION SELECT device_id FROM events_system"
+						. ") WHERE device_id IS NOT NULL AND device_id != '' ORDER BY device_id;")
+				for _, device_row in devices {
+						device_id := KLR_RowValue(device_row, "device_id", "")
+						if (device_id = "")
+								continue
+						KLW.ctx := Map()
+						KLW_ResetBatch()
+						KLRReplay := Map(
+								"db", db,
+								"device_lit", SQLite_Q(device_id),
+								"entries_since_flush", 0,
+								"replayed", 0,
+								"ok", true
+						)
 
-            device_where := " WHERE device_id=" . SQLite_Q(device_id)
-            typed_sql := "SELECT ts, app, title, layout, events_json FROM events_typing"
-                . device_where . " ORDER BY ts, id;"
-            window_sql := "SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch"
-                . device_where . " ORDER BY ts, id;"
-            system_sql := "SELECT ts, action, metadata_json FROM events_system"
-                . device_where . " ORDER BY ts, id;"
+						device_where := " WHERE device_id=" . SQLite_Q(device_id)
+						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, title, layout, "
+								. "events_json, '' AS context, '' AS prediction, 0 AS deletes "
+								. "FROM events_typing" . device_where
+								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
+								. "'' AS title, '' AS layout, '' AS events_json, context, prediction, "
+								. "COALESCE(deletes,0) AS deletes FROM events_llm"
+								. device_where . " AND kind='accepted' AND context=" . accepted_marker
+								. " ORDER BY id;"
+						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch"
+								. device_where . " ORDER BY ts, id;"
+						system_sql := "SELECT ts, action, metadata_json FROM events_system"
+								. device_where . " ORDER BY ts, id;"
 
-            if (SQLite_EachRow(db, typed_sql, Func("KLR_ReplayTypingRow")) < 0
-                    || SQLite_EachRow(db, window_sql, Func("KLR_ReplayWindowRow")) < 0
-                    || SQLite_EachRow(db, system_sql, Func("KLR_ReplaySystemRow")) < 0
-                    || !KLR_ReplayFlush()) {
-                ok := false
-                break
-            }
-            replayed += KLRReplay["replayed"]
-        }
-    } catch {
-        ok := false
-    } finally {
-        KLW.ctx := saved_ctx
-        KLW.batch := saved_batch
-        KLRReplay := Map()
-    }
-    return ok ? replayed : -1
+						if (SQLite_EachRow(db, logical_sql, KLR_ReplayLogicalRow) < 0
+										|| SQLite_EachRow(db, window_sql, KLR_ReplayWindowRow) < 0
+										|| SQLite_EachRow(db, system_sql, KLR_ReplaySystemRow) < 0
+										|| !KLR_ReplayFlush()) {
+								ok := false
+								break
+						}
+						replayed += KLRReplay["replayed"]
+				}
+		} catch {
+				ok := false
+		} finally {
+				KLW.ctx := saved_ctx
+				KLW.batch := saved_batch
+				KLRReplay := Map()
+		}
+		return ok ? replayed : -1
 }
 
 ; Pull a value from a SQLite row without allowing a missing nullable column to
 ; abort the whole recovery.  All supplied defaults are intentionally neutral
 ; values for the walker.
 KLR_RowValue(row, key, default := "") {
-    return (row is Map && row.Has(key)) ? row[key] : default
+		return (row is Map && row.Has(key)) ? row[key] : default
 }
 
 ; Convert a durable typing row back to the exact entry shape the live walker
@@ -554,80 +857,122 @@ KLR_RowValue(row, key, default := "") {
 ; unlike the old ScriptControl path, so historical physical key metadata (`kc`
 ; and `sk`) survives the round trip as well.
 KLR_TypingRowToEntry(row) {
-    events := KL_JsonDecode(KLR_RowValue(row, "events_json", ""))
-    if !(events is Array)
-        return 0
-    return Map(
-        "timestamp", KLR_RowValue(row, "ts", ""),
-        "app", KLR_RowValue(row, "app", "Unknown"),
-        "title", KLR_RowValue(row, "title", ""),
-        "layout", KLR_RowValue(row, "layout", ""),
-        "events", events
-    )
+		events := KL_JsonDecode(KLR_RowValue(row, "events_json", ""))
+		if !(events is Array)
+				return 0
+		return Map(
+				"timestamp", KLR_RowValue(row, "ts", ""),
+				"app", KLR_RowValue(row, "app", "Unknown"),
+				"title", KLR_RowValue(row, "title", ""),
+				"layout", KLR_RowValue(row, "layout", ""),
+				"events", events
+		)
+}
+
+; Turn one accepted-only events_llm row into the synthetic typing burst the
+; legacy walker already understands. Unmarked rows are ignored: their output
+; came through the old hook path and is already canonical in events_typing.
+KLR_LlmAcceptedRowToEntry(row) {
+		if !(row is Map)
+				return 0
+		if (KLR_RowValue(row, "context", "") != KLWConst.LLM_ACCEPTED_METRICS_SOURCE)
+				return 0
+
+		Deletes := 0
+		RawDeletes := KLR_RowValue(row, "deletes", 0)
+		try {
+				if IsNumber(RawDeletes)
+						Deletes := Max(0, Round(Number(RawDeletes)))
+		}
+		Events := []
+		Loop Deletes
+				Events.Push(["[BS]", 0, Map("s", 1, "st", "llm")])
+		for _, Character in KLW_StringToLogicalCharacters(
+				KLR_RowValue(row, "prediction", ""))
+				Events.Push([Character, 0, Map("s", 1, "st", "llm")])
+
+		return Map(
+				"timestamp", KLR_RowValue(row, "ts", ""),
+				"app", KLR_RowValue(row, "app", "Unknown"),
+				"title", KLR_RowValue(row, "title", ""),
+				"layout", KLR_RowValue(row, "layout", ""),
+				"events", Events
+		)
 }
 
 KLR_WindowRowToEntry(row) {
-    return Map(
-        "timestamp", KLR_RowValue(row, "ts", ""),
-        "app", KLR_RowValue(row, "app", "Unknown"),
-        "prev_title", KLR_RowValue(row, "prev_title", ""),
-        "next_title", KLR_RowValue(row, "next_title", ""),
-        "duration_ms", KLR_RowValue(row, "duration_ms", 0)
-    )
+		return Map(
+				"timestamp", KLR_RowValue(row, "ts", ""),
+				"app", KLR_RowValue(row, "app", "Unknown"),
+				"prev_title", KLR_RowValue(row, "prev_title", ""),
+				"next_title", KLR_RowValue(row, "next_title", ""),
+				"duration_ms", KLR_RowValue(row, "duration_ms", 0)
+		)
 }
 
 KLR_SystemRowToEntry(row) {
-    metadata := KL_JsonDecode(KLR_RowValue(row, "metadata_json", ""))
-    if !(metadata is Map)
-        metadata := Map()
-    metadata["timestamp"] := KLR_RowValue(row, "ts", "")
-    metadata["action"] := KLR_RowValue(row, "action", "")
-    return metadata
+		metadata := KL_JsonDecode(KLR_RowValue(row, "metadata_json", ""))
+		if !(metadata is Map)
+				metadata := Map()
+		metadata["timestamp"] := KLR_RowValue(row, "ts", "")
+		metadata["action"] := KLR_RowValue(row, "action", "")
+		return metadata
 }
 
 KLR_ReplayTypingRow(row) {
-    global KLRReplay
-    entry := KLR_TypingRowToEntry(row)
-    if !entry
-        return true                         ; malformed legacy payload: skip safely.
-    KLW_WalkTypingEntry(entry)
-    return KLR_ReplayCountAndMaybeFlush()
+		global KLRReplay
+		entry := KLR_TypingRowToEntry(row)
+		if !entry
+				return true                         ; malformed legacy payload: skip safely.
+		KLW_WalkTypingEntry(entry)
+		return KLR_ReplayCountAndMaybeFlush()
+}
+
+KLR_ReplayLogicalRow(row) {
+		if (KLR_RowValue(row, "source_kind", "typing") = "llm_accepted") {
+				entry := KLR_LlmAcceptedRowToEntry(row)
+				if !entry
+						return true
+				KLW_WalkTypingEntry(entry)
+				return KLR_ReplayCountAndMaybeFlush()
+		}
+		return KLR_ReplayTypingRow(row)
 }
 
 KLR_ReplayWindowRow(row) {
-    global KLRReplay
-    KLW_WalkWindowSwitch(KLR_WindowRowToEntry(row))
-    return KLR_ReplayCountAndMaybeFlush()
+		global KLRReplay
+		KLW_WalkWindowSwitch(KLR_WindowRowToEntry(row))
+		return KLR_ReplayCountAndMaybeFlush()
 }
 
 KLR_ReplaySystemRow(row) {
-    global KLRReplay
-    KLW_WalkSystemEvent(KLR_SystemRowToEntry(row))
-    return KLR_ReplayCountAndMaybeFlush()
+		global KLRReplay
+		KLW_WalkSystemEvent(KLR_SystemRowToEntry(row))
+		return KLR_ReplayCountAndMaybeFlush()
 }
 
 KLR_ReplayCountAndMaybeFlush() {
-    global KLRReplay
-    KLRReplay["replayed"] += 1
-    KLRReplay["entries_since_flush"] += 1
-    if (KLRReplay["entries_since_flush"] < KLReadConst.REPLAY_FLUSH_ENTRIES)
-        return true
-    return KLR_ReplayFlush()
+		global KLRReplay
+		KLRReplay["replayed"] += 1
+		KLRReplay["entries_since_flush"] += 1
+		if (KLRReplay["entries_since_flush"] < KLReadConst.REPLAY_FLUSH_ENTRIES)
+				return true
+		return KLR_ReplayFlush()
 }
 
 KLR_ReplayFlush() {
-    global KLRReplay
-    if !KLRReplay.Count
-        return false
-    sql := KLW_BuildBatchSql(KLRReplay["device_lit"])
-    KLRReplay["entries_since_flush"] := 0
-    if (sql = "")
-        return true
-    if !SQLite_Exec(KLRReplay["db"], "BEGIN TRANSACTION;`n" . sql . "`nCOMMIT;") {
-        KLRReplay["ok"] := false
-        return false
-    }
-    return true
+		global KLRReplay
+		if !KLRReplay.Count
+				return false
+		sql := KLW_BuildBatchSql(KLRReplay["device_lit"])
+		KLRReplay["entries_since_flush"] := 0
+		if (sql = "")
+				return true
+		if !SQLite_Exec(KLRReplay["db"], "BEGIN TRANSACTION;`n" . sql . "`nCOMMIT;") {
+				KLRReplay["ok"] := false
+				return false
+		}
+		return true
 }
 
 ; Drain KLW.batch (the in-RAM walker accumulator) into the in-memory DB.

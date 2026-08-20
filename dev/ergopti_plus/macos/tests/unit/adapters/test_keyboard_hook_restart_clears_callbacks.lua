@@ -38,11 +38,14 @@ local helpers = require("tests.helpers")
 --- Builds an hs.eventtap override whose .new() records the handler closure
 --- and exposes fire_char() and fire_key() helpers for synchronous invocation.
 --- The stub also satisfies isEnabled() so keyboard_hook.isRunning() works.
+--- @param options table|nil Failure controls.
 --- @return table eventtap_stub, fire_char function, fire_key function
-local function make_eventtap_stub()
+local function make_eventtap_stub(options)
+	options = options or {}
 	-- Shared state: the handler installed by the MOST RECENT hs.eventtap.new() call
 	local _handler   = nil
 	local _running   = false
+	local _taps = {}
 
 	local stub = {}
 
@@ -59,12 +62,39 @@ local function make_eventtap_stub()
 	stub.new = function(_types, fn)
 		-- Capture the new handler; previous tap's handler is discarded
 		_handler = fn
-		local tap = {}
-		function tap:start()  _running = true  ; return self end
-		function tap:stop()   _running = false ; return self end
-		function tap:isEnabled() return _running end
+		local tap = {
+			handler = fn,
+			start_failures = (#_taps == 0 and options.start_failures) or 0,
+			stop_failures = (#_taps == 0 and options.stop_failures) or 0,
+			start_calls = 0,
+			stop_calls = 0,
+		}
+		function tap:start()
+			self.start_calls = self.start_calls + 1
+			_running = true
+			if self.start_failures > 0 then
+				self.start_failures = self.start_failures - 1
+				error("native start exploded")
+			end
+			return self
+		end
+		function tap:stop()
+			self.stop_calls = self.stop_calls + 1
+			if self.stop_failures > 0 then
+				self.stop_failures = self.stop_failures - 1
+				error("native stop exploded")
+			end
+			_running = false
+			return self
+		end
+		function tap:isEnabled()
+			if options.is_enabled_error then error("native state query exploded") end
+			return _running
+		end
+		_taps[#_taps + 1] = tap
 		return tap
 	end
+	stub.__taps = _taps
 
 	--- Fires the current handler with a synthetic printable-character event.
 	--- @param char string Single printable character to deliver.
@@ -219,6 +249,62 @@ helpers.describe("KeyboardHook restart — old onKey cleared when omitted on sec
 
 end)
 
+helpers.describe("KeyboardHook native state query", function()
+	helpers.it("fails closed when eventtap:isEnabled() throws", function()
+		local eventtap_stub = make_eventtap_stub({ is_enabled_error = true })
+		local M = helpers.load_with_stubs("adapters.keyboard_hook", {
+			eventtap = eventtap_stub,
+		})
+
+		M.start({})
+		local ok, running = pcall(M.isRunning)
+		helpers.assert_true(ok,
+			"a native eventtap state error must not escape into its caller")
+		helpers.assert_eq(false, running,
+			"an uncertain native eventtap state must fail closed")
+	end)
+end)
+
+helpers.describe("KeyboardHook exact native ownership", function()
+	helpers.it("retains a failed-stop tap, makes it inert and refuses replacement", function()
+		local eventtap_stub, fire_char = make_eventtap_stub({ stop_failures = 1 })
+		local M = helpers.load_with_stubs("adapters.keyboard_hook", {
+			eventtap = eventtap_stub,
+		})
+		local calls = 0
+
+		helpers.assert_eq(true, M.start({ onChar = function() calls = calls + 1 end }))
+		helpers.assert_eq(false, M.stop(),
+			"failed native stop must retain cleanup debt")
+		fire_char("a")
+		helpers.assert_eq(0, calls,
+			"a retained cleanup-debt callback must be generation-inert")
+		helpers.assert_eq(true, M.start({}),
+			"a later start must first retry the exact retained cleanup")
+		helpers.assert_eq(2, eventtap_stub.__taps[1].stop_calls)
+		helpers.assert_eq(2, #eventtap_stub.__taps,
+			"a successor may exist only after exact cleanup commits")
+		helpers.assert_eq(true, M.stop())
+	end)
+
+	helpers.it("rolls back a partially enabled tap whose start throws", function()
+		local eventtap_stub, fire_char = make_eventtap_stub({ start_failures = 1 })
+		local M = helpers.load_with_stubs("adapters.keyboard_hook", {
+			eventtap = eventtap_stub,
+		})
+		local calls = 0
+
+		helpers.assert_eq(false, M.start({ onChar = function() calls = calls + 1 end }),
+			"partial native activation must reject the adapter start")
+		fire_char("a")
+		helpers.assert_eq(0, calls,
+			"the rejected candidate callback must be inert")
+		helpers.assert_eq(1, eventtap_stub.__taps[1].stop_calls,
+			"start failure must roll back the exact candidate")
+		helpers.assert_eq(false, M.isRunning())
+	end)
+end)
+
 helpers.describe("KeyboardHook raw event mode", function()
 	helpers.it("preserves an advanced handler's event types and consume decision", function()
 		local eventtap_stub, _fire_char, fire_key = make_eventtap_stub()
@@ -227,16 +313,66 @@ helpers.describe("KeyboardHook raw event mode", function()
 		})
 
 		local received = nil
+		local returned_events = { { tag = "older-action" } }
 		M.start({
 			eventTypes = { 42 },
 			onEvent = function(event)
 				received = event
-				return true
+				return false, returned_events
 			end,
 		})
 
-		local consumed = fire_key(42)
+		local consumed, events = fire_key(42)
 		helpers.assert_true(received ~= nil, "raw callback must receive the native event")
-		helpers.assert_true(consumed == true, "raw callback must retain its consume decision")
+		helpers.assert_true(consumed == false, "raw callback must retain its consume decision")
+		helpers.assert_true(events == returned_events,
+			"raw callback must preserve the ordered event table returned to Hammerspoon")
+	end)
+end)
+
+helpers.describe("KeyboardHook callback visibility", function()
+	helpers.it("contains and file-logs throws from every eventtap callback kind", function()
+		local eventtap_stub, fire_char, fire_key = make_eventtap_stub()
+		local errors = {}
+		local logger = helpers.make_logger_stub()
+		logger.pcall = function(module_name, callback, ...)
+			local results = table.pack(pcall(callback, ...))
+			if not results[1] then
+				errors[#errors + 1] = {
+					module_name = module_name,
+					error = tostring(results[2]),
+				}
+			end
+			return table.unpack(results, 1, results.n)
+		end
+		package.loaded["infra.logger"] = logger
+		local M = helpers.load_with_stubs("adapters.keyboard_hook", {
+			eventtap = eventtap_stub,
+		})
+
+		helpers.assert_eq(true, M.start({
+			onEvent = function() error("raw callback exploded") end,
+		}))
+		local raw_ok, raw_consumed = pcall(fire_key, 42)
+		helpers.assert_eq(true, raw_ok,
+			"a raw callback throw must not escape and disable the native tap")
+		helpers.assert_eq(false, raw_consumed)
+
+		helpers.assert_eq(true, M.start({
+			onChar = function() error("character callback exploded") end,
+		}))
+		helpers.assert_eq(true, pcall(fire_char, "a"))
+
+		helpers.assert_eq(true, M.start({
+			onKey = function() error("key callback exploded") end,
+		}))
+		helpers.assert_eq(true, pcall(fire_key, 53))
+
+		helpers.assert_eq(3, #errors,
+			"every contained callback failure must reach the file logger boundary")
+		for _, item in ipairs(errors) do
+			helpers.assert_eq("adapters.keyboard_hook", item.module_name)
+			helpers.assert_true(item.error:find("callback exploded", 1, true) ~= nil)
+		end
 	end)
 end)

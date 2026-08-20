@@ -39,7 +39,6 @@ local _saved_ir = package.loaded["modules.hotstrings.input_reader"]
 local function install_recording_input_reader()
 	local shift_seen = {}
 	package.loaded["modules.hotstrings.input_reader"] = {
-		new = function() return {} end,
 		resolve_char = function(_code, _layout, shift)
 			shift_seen[#shift_seen + 1] = shift and true or false
 			-- Distinguishable char so on_char still delivers something.
@@ -49,18 +48,25 @@ local function install_recording_input_reader()
 	return shift_seen
 end
 
---- Loads a fresh keyboard_hook and pumps one evtest line per event.
---- @param lines table Evtest-format event lines in arrival order.
+--- Loads a fresh keyboard_hook and drives the given events through it.
+--- @param events table Decoded { type, code, value } events in arrival order.
 --- @return table received The chars delivered to on_char.
-local function pump_lines(lines)
+local function pump_events(events)
 	local kh = helpers.load_module("adapters.keyboard_hook")
 	local received = {}
-	local idx = 0
-	local pipe = { read = function() idx = idx + 1; return lines[idx] end }
-	for _ = 1, #lines do
-		kh._test_inject_and_pump(pipe, function(ch) received[#received + 1] = ch end, true)
-	end
+	kh._test_drive(events, {
+		onChar    = function(ch) received[#received + 1] = ch end,
+		onEmitRaw = function() end,
+	}, true)
 	return received
+end
+
+--- One EV_KEY event.
+--- @param code integer
+--- @param value integer
+--- @return table
+local function key(code, value)
+	return { type = 1, code = code, value = value }
 end
 
 
@@ -68,10 +74,10 @@ helpers.describe("keyboard_hook: shift tracking from key transitions", function(
 
 	helpers.it("keeps Shift held across two letters (both resolved shifted)", function()
 		local shift_seen = install_recording_input_reader()
-		local received = pump_lines({
-			"Event: code 42 (KEY_LEFTSHIFT), value 1",  -- Shift down
-			"Event: code 30 (KEY_A), value 1",           -- A down (shift held)
-			"Event: code 48 (KEY_B), value 1",           -- B down (shift STILL held)
+		local received = pump_events({
+			key(42, 1),   -- Shift down
+			key(30, 1),   -- A down (shift held)
+			key(48, 1),   -- B down (shift STILL held)
 		})
 		-- The old code force-reset _shift_held after the first printable key, so
 		-- B resolved unshifted. Assert BOTH letters saw a held Shift — this is
@@ -86,11 +92,11 @@ helpers.describe("keyboard_hook: shift tracking from key transitions", function(
 
 	helpers.it("clears Shift on real release so the next letter is unshifted", function()
 		local shift_seen = install_recording_input_reader()
-		pump_lines({
-			"Event: code 42 (KEY_LEFTSHIFT), value 1",   -- Shift down
-			"Event: code 30 (KEY_A), value 1",             -- A down (shift held)
-			"Event: code 42 (KEY_LEFTSHIFT), value 0",     -- Shift up (release)
-			"Event: code 48 (KEY_B), value 1",             -- B down (NOT shifted)
+		pump_events({
+			key(42, 1),   -- Shift down
+			key(30, 1),   -- A down (shift held)
+			key(42, 0),   -- Shift up (release)
+			key(48, 1),   -- B down (NOT shifted)
 		})
 		-- Verifies the release path actually clears the flag (the fix processes
 		-- releases instead of early-dropping them).

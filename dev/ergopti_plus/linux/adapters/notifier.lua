@@ -4,45 +4,107 @@
 --- MODULE: Notifier Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the Notifier port contract defined in
---- static/ergopti_plus/_shared/core/ports/Notifier.spec.js. Wraps the D-Bus
---- org.freedesktop.Notifications interface (notify-send CLI) to deliver
---- desktop notifications without coupling domain modules to any OS API.
+--- _shared/core/ports/Notifier.spec.js. Sends desktop notifications through the
+--- freedesktop `notify-send` command.
+---
+--- WHY THIS DRIVER HAD NONE:
+--- The port has existed since the driver did, macOS and Windows both implement
+--- it, and the strings every caller would use are already translated into all
+--- twenty-one locales. What was missing was the twenty lines that reach the
+--- desktop — so every message the other two drivers show their users, this one
+--- kept to its log file.
 ---
 --- FEATURES & RATIONALE:
---- 1. Kind-to-urgency mapping: the optional "kind" field (info, warn, error)
----    maps to the --urgency flag of notify-send so the DE renders the
----    notification with the correct visual weight.
---- 2. Graceful degradation: if notify-send is absent (headless / server),
----    the adapter logs a warning and silently no-ops instead of crashing.
---- 3. Defensive pcall: io.popen can raise on permission errors; every OS
----    call is wrapped so a notification failure never propagates upward.
+--- 1. `notify-send` rather than a D-Bus binding. It ships with the notification
+---    daemon on every desktop that has one, needs no library, and works
+---    identically under X11 and Wayland. A direct
+---    org.freedesktop.Notifications call would need a D-Bus binding this driver
+---    does not have and could not add without a C dependency.
+--- 2. The four contract levels map to the two urgencies the freedesktop spec
+---    actually defines, plus one that is deliberately not "critical": a
+---    critical notification does not time out on most desktops, and nothing
+---    this daemon reports is worth a message the user must dismiss by hand.
+--- 3. Never fatal, and never blocking. A notification that fails is logged and
+---    forgotten — the contract says so, and a keystroke path must not wait on a
+---    desktop service that may not be running at all.
+--- 4. Absence is detected once and reported once. On a headless machine or a
+---    minimal install there is no notification daemon, and a warning per
+---    notification would drown the log the message was trying to complement.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
-local Shell  = require("adapters.shell_runner")
+local Shell = require("adapters.shell_runner")
 
 local LOG = "adapters.notifier"
 
+-- The title shown when a caller supplies none. From the port contract, so the
+-- three drivers name the application identically in the user's notification
+-- centre.
+local DEFAULT_TITLE = "Ergopti+"
 
--- =============================================
--- =============================================
--- ======= 1/ Kind → Urgency Mapping ==========
--- =============================================
--- =============================================
-
--- Set by M._set_runner(); see the seam in send(). Declared above every closure
--- that reads it, so it can never be bound as a nil global.
-local _test_runner = nil
-
--- Maps the port "kind" field to a notify-send --urgency value.
--- D-Bus org.freedesktop.Notifications accepts low/normal/critical.
-local KIND_URGENCY = {
-	info  = "normal",
-	warn  = "normal",
-	error = "critical",
+-- The freedesktop urgency for each contract level.
+--
+-- "critical" is deliberately unused. On most desktops a critical notification
+-- never times out and has to be dismissed by hand, and nothing this daemon
+-- reports is worth interrupting someone that way — an unreadable keymap is a
+-- log line and a degraded feature, not a modal.
+local URGENCY_FOR_LEVEL = {
+	info    = "low",
+	success = "low",
+	warning = "normal",
+	error   = "normal",
 }
+
+-- What a level prefixes its title with, so severity survives a desktop that
+-- renders every notification identically.
+local PREFIX_FOR_LEVEL = {
+	info    = "",
+	success = "",
+	warning = "⚠ ",
+	error   = "✖ ",
+}
+
+-- How long a notification stays up, in milliseconds. Long enough to read a
+-- sentence, short enough not to stack up during a burst of them.
+local TIMEOUT_MS = 5000
+
+-- Whether `notify-send` is present. nil until the first send probes for it.
+local _available = nil
+
+-- Whether the absence has already been reported. A warning per notification
+-- would drown the log that the notification was meant to complement.
+local _absence_logged = false
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 1/ Availability ===================
+-- ===========================================
+-- ===========================================
+
+--- Whether this machine can show a desktop notification at all.
+---
+--- Probed once. A headless daemon, a container, or a minimal install has no
+--- notification daemon, and asking every time costs a subprocess on a path that
+--- can be reached from a keystroke.
+--- @return boolean
+local function available()
+	if _available ~= nil then return _available end
+	_available = Shell.has_command("notify-send")
+	if not _available and not _absence_logged then
+		_absence_logged = true
+		Logger.warn(LOG,
+			"notify-send is not installed — notifications stay in the log. "
+				.. "Install libnotify-bin (Debian) or libnotify-tools (Fedora/Arch).")
+	end
+	return _available
+end
+
+
 
 
 -- =========================================
@@ -51,58 +113,51 @@ local KIND_URGENCY = {
 -- =========================================
 -- =========================================
 
---- Sends a desktop notification via notify-send (D-Bus backend).
---- @param title string  The notification title.
---- @param opts  table   Options table: { body?, kind? }
----                        body  string  Notification body text.
----                        kind  string  "info" | "warn" | "error" (default "info").
-function M.send(title, opts)
-	-- TODO(linux): implement via D-Bus org.freedesktop.Notifications or notify-send
-	-- Guard explicitly: quote() degrades a nil title to an empty argument, which
-	-- would post a blank notification instead of reporting the caller's mistake.
-	if type(title) ~= "string" then
-		Logger.error(LOG, "send(): title must be a string, got %s — notification dropped.", type(title))
+--- Displays a system notification.
+---
+--- @param message string Body text.
+--- @param opts table|nil { title?, level?, onClick? }
+---        level is one of "info", "success", "warning", "error" (default "info").
+---        onClick is accepted and ignored: `notify-send` returns as soon as the
+---        notification is posted and cannot report a click without holding the
+---        process open, which this daemon will not do on a keystroke path.
+function M.send(message, opts)
+	if type(message) ~= "string" or message == "" then
+		Logger.error(LOG, "send(): a message is required — nothing was shown.")
 		return
 	end
-	local options  = type(opts) == "table" and opts or {}
-	local body     = type(options.body) == "string" and options.body or ""
-	local kind     = type(options.kind) == "string" and options.kind or "info"
-	local urgency  = KIND_URGENCY[kind] or "normal"
-
-	local ok, err = pcall(function()
-		-- Quoting goes through the shell_runner so the driver has exactly one
-		-- escaping implementation to keep correct, instead of one per call site.
-		local cmd = string.format(
-			"notify-send --urgency=%s %s %s 2>/dev/null",
-			urgency, Shell.quote(title), Shell.quote(body)
-		)
-		-- Test seam: io.popen never RAISES on unescaped input, it executes it, so
-		-- a test that only checks "nothing crashed" passes whether or not the
-		-- escaping above exists. Handing the composed command over is the only
-		-- way a test can verify the quoting at all.
-		if _test_runner then
-			_test_runner(cmd)
-			return
-		end
-		local pipe = io.popen(cmd)
-		if pipe then pipe:close() end
-	end)
-
-	if not ok then
-		Logger.error(LOG, "send(): notify-send failed — %s", tostring(err))
+	local options = type(opts) == "table" and opts or {}
+	local level = type(options.level) == "string" and options.level or "info"
+	local urgency = URGENCY_FOR_LEVEL[level]
+	if not urgency then
+		-- Named but unknown. Reported rather than silently treated as info: a
+		-- caller passing "critical" or "fatal" believes it is asking for
+		-- something, and quietly downgrading it hides the disagreement for ever.
+		Logger.warn(LOG, "send(): unknown level '%s' — shown as info.", level)
+		level, urgency = "info", URGENCY_FOR_LEVEL.info
 	end
-end
 
---- Installs a test runner: the composed command is handed to `fn` instead of
---- being executed. Mirrors the injector's seam of the same name.
---- @param fn function|nil Receives the command string; nil resets.
-function M._set_runner(fn)
-	_test_runner = (type(fn) == "function") and fn or nil
-end
+	if not available() then
+		-- The log is the fallback surface, so the message is not simply dropped.
+		Logger.info(LOG, "[notification] %s: %s", tostring(options.title or DEFAULT_TITLE), message)
+		return
+	end
 
---- Restores real execution.
-function M._reset_runner()
-	_test_runner = nil
+	local title = (PREFIX_FOR_LEVEL[level] or "")
+		.. (type(options.title) == "string" and options.title ~= "" and options.title or DEFAULT_TITLE)
+
+	-- Backgrounded, and its output discarded. notify-send returns once the
+	-- daemon acknowledges, which is fast but not instant, and this can be
+	-- reached from the keystroke path.
+	local command = string.format(
+		"notify-send --app-name=%s --urgency=%s --expire-time=%d %s %s >/dev/null 2>&1 &",
+		Shell.quote(DEFAULT_TITLE), urgency, TIMEOUT_MS,
+		Shell.quote(title), Shell.quote(message))
+
+	local ok = Shell.run(command)
+	if not ok then
+		Logger.error(LOG, "send(): notify-send failed — the message stays in the log: %s", message)
+	end
 end
 
 return M

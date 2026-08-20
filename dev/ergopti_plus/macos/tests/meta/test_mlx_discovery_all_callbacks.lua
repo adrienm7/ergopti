@@ -22,13 +22,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -52,7 +51,7 @@ end
 helpers.describe("llm/api_mlx.lua: all discovery callbacks fired (mlx-discovery-callbacks-loss)", function()
 
 	helpers.it("finish_discovery iterates all callbacks with ipairs", function()
-		local src = strip_comments(read_source("modules/llm/api_mlx_discovery.lua"))
+		local src = strip_comments(read_source("local function read_active_model_arg"))
 		-- The fix uses: for _, cb in ipairs(cbs) do pcall(cb) end
 		helpers.assert_true(
 			src:match("for%s*_%s*,%s*cb%s+in%s+ipairs%(cbs%)") ~= nil,
@@ -60,7 +59,7 @@ helpers.describe("llm/api_mlx.lua: all discovery callbacks fired (mlx-discovery-
 	end)
 
 	helpers.it("finish_discovery does NOT use only-last-callback pattern", function()
-		local src = strip_comments(read_source("modules/llm/api_mlx_discovery.lua"))
+		local src = strip_comments(read_source("local function read_active_model_arg"))
 		-- The old bug: pcall(cbs[#cbs])
 		helpers.assert_true(
 			src:match("pcall%(cbs%[#cbs%]%)") == nil,

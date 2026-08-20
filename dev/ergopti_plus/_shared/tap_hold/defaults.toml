@@ -1,14 +1,34 @@
 # _shared/tap_hold/defaults.toml
 # Canonical default values for the tap-hold configuration.
 #
-# Generation source only: at first boot, each driver renders this template into
-# its own ``config/ergopti_plus/<driver>/tap_hold.toml``. After that initial
-# generation, the per-driver file IS the complete config — there is no runtime
-# merge with this file, and the two drivers' configs may diverge freely.
+# READ AT RUNTIME, ON EVERY BOOT, BY ALL THREE DRIVERS. This header used to say
+# the opposite — "generation source only … there is no runtime merge with this
+# file" — and so did SCHEMA.md, in three places. Editing this file changes the
+# behaviour of already-installed drivers on their next reload. Do not treat it
+# as a template that only affects fresh installs.
+#
+# The three loaders do not agree with each other, and each one's own comments
+# claim that it matches the others:
+#   - Windows  lib/tap_hold/tap_hold_loader.ahk parses [tap_hold.*] here FIRST,
+#              then merges the user file on top PER KEY. A key the user has not
+#              overridden inherits the value below.
+#   - Linux    platform/remap/manager.lua reads [tap_hold.*], but a user
+#              tap_hold.toml, when present, REPLACES these defaults wholesale —
+#              no per-key merge, so an edit here reaches only users without one.
+#   - macOS    platform/remap/defaults.lua reads [hs_timeouts], [hs_tap_hold]
+#              and [hs_combos] in its module body at require time. There is no
+#              user file for those sections, so an edit here always applies.
+#
+# The two namespaces below describe the SAME seven physical keys under different
+# ids (left_ctrl/left_control, left_alt/left_option), with different thresholds
+# (0.2–0.35 s per key vs a flat 1000 ms global) and in places different actions
+# — caps_lock holds ctrl under [tap_hold.*] and cmd under [hs_tap_hold].
+# Unifying them is tracked as Lot 8(7); until then, a change to one namespace is
+# NOT a change to the other.
 #
 # Consumers of the generated per-driver file:
-#   - AHK : ``modules/tap_holds.ahk`` arms the corresponding hotkeys.
-#   - HS  : ``modules/karabiner/generator.lua`` produces the Karabiner JSON.
+#   - AHK : ``platform/remap.ahk`` arms the corresponding hotkeys.
+#   - HS  : ``platform/remap/generator.lua`` produces the Karabiner JSON.
 
 
 
@@ -27,6 +47,27 @@
 #   - ``hold_modifier``: modifier emitted on hold (mutex with hold_layer).
 #
 # tap_action and hold_* are independent — a key may declare only one of them.
+
+
+
+# ===============================
+# ===== 1.0 The hold picker =====
+# ===============================
+
+# The modifiers a hold may emit, IN THE ORDER the menu offers them, and the
+# layers it may activate. Every driver's hold picker is built from this list:
+# the "none" sentinel, then every non-empty combination of the modifiers below
+# (depth-first, left to right — ctrl, ctrl+shift, ctrl+shift+alt, …), then one
+# entry per layer.
+#
+# It lived in windows/platform/remap/tap_hold_writer.ahk until 2026-08-08, as a
+# hardcoded array whose comment said it "mirrors _shared/modules/menu/
+# menu_manifest.json hold_options" — a key that has never existed in that file.
+# So the canonical list was a copy pointing at nothing, and the two Lua drivers
+# offered no hold picker at all.
+[tap_hold.hold_picker]
+modifiers = ["ctrl", "shift", "alt", "alt_gr", "win"]
+layers = ["nav"]
 
 
 
@@ -171,7 +212,7 @@ delete = "delete_word_forward"
 # =================================================
 # =================================================
 
-# Read by macos/modules/karabiner/defaults.lua via lib.toml_reader. These keep
+# Read by macos/platform/remap/defaults.lua via lib.toml_reader. These keep
 # the macOS-specific paradigm (Karabiner key codes, the N*N modifier-combo
 # matrix, a single global tap/hold timeout) that has no AutoHotkey analog, so
 # they live in their own [hs_*] sections rather than the AHK [tap_hold.*] ones
@@ -179,17 +220,34 @@ delete = "delete_word_forward"
 # reader ignores the dotted [tap_hold.*] headers — each driver reads only its
 # own sections from this single shared file.
 #
-# Values mirror the former modules/karabiner/defaults.lua exactly (generated and
+# Values mirror the former platform/remap/defaults.lua exactly (generated and
 # byte-verified against it). "Reset to defaults" on macOS restores these.
 
 # Slot encodings:
 #   [hs_tap_hold]  key = { tap = <action_id>, hold = <action_id> }
 #   [hs_combos]    id  = { combo = <action_id>, tap = <action_id>, hold = <action_id> }
-# Action ids reference macos/modules/karabiner/data/actions.json.
+# Action ids reference macos/platform/remap/data/actions.json.
 
 [hs_timeouts]
 # Global tap-vs-hold threshold (KE basic.to_if_alone_timeout_milliseconds).
-tap_hold_timeout_ms = 1000
+#
+# 250 ms, not 1000. The old value was Karabiner-Elements' own default for
+# to_if_alone_timeout_milliseconds rather than a decision, and it made macOS
+# 3-5x slower than the other two drivers on the SAME setting: the
+# [tap_hold.keys.*] block above — which Windows and Linux read and macOS does
+# not — declares 0.20 s for five of its seven keys and 0.35 s for the other two.
+# A full second means every hold takes a second to register, and any deliberate
+# tap that overruns it silently becomes a hold.
+#
+# 250 ms sits inside the range the other two already use, so no key is more than
+# 100 ms away from its Windows/Linux twin, against 650-800 ms before.
+#
+# The remaining gap is that this is ONE global where the others are per-key. The
+# generator already supports a per-manipulator override
+# (basic.to_if_alone_timeout_milliseconds, generator.lua), so wiring the
+# [tap_hold.keys.*] values into it is the follow-up; it needs the two id
+# vocabularies reconciled first (left_ctrl/left_control, left_alt/left_option).
+tap_hold_timeout_ms = 250
 # One-shot modifier auto-cancel delay.
 sticky_timeout_ms = 3000
 # Max delay between the two keys of a shortcut for the combo slot to fire.

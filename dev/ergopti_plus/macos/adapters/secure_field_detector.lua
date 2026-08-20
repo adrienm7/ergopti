@@ -24,9 +24,10 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "adapters.secure_field_detector"
+
 
 
 
@@ -59,6 +60,7 @@ local SECURE_APP_IDS = {
 
 
 
+
 -- =================================
 -- =================================
 -- ======= 2/ Internal State =======
@@ -72,6 +74,7 @@ local _cached_role = nil
 -- the role because Chromium-family browsers report a password input as
 -- AXRole = AXTextField with the secure marker demoted to the subrole.
 local _cached_subrole = nil
+
 
 
 

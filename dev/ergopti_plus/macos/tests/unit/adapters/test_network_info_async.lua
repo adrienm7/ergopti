@@ -13,7 +13,7 @@
 --- Fix: both methods now return a cached boolean immediately (never blocking)
 --- and kick off an async refresh through adapters.shell_runner.spawn() (the
 --- same hs.task-based async pattern used throughout modules/llm/api_*.lua and
---- modules/karabiner/watchers.lua's read_layout_async()).
+--- platform/remap/watchers.lua's read_layout_async()).
 ---
 --- Two angles, matching the style of tests/unit/adapters/test_shell_runner_on_done_visible.lua:
 ---   1. Source check: neither method calls hs.execute directly anymore.
@@ -24,10 +24,11 @@
 local helpers = require("tests.helpers")
 
 local function read_network_info_src()
-	local path = helpers.driver_root() .. "adapters/network_info.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "adapters/network_info.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to adapters/network_info.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function _refresh_internet_reachable")
+	helpers.assert_true(src ~= nil, "adapters/network_info.lua source must be locatable")
 	return src
 end
 
@@ -228,6 +229,11 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 		local ok, result = pcall(function() return NI.isInternetReachable() end)
 		helpers.assert_true(ok, "isInternetReachable() must not throw even if the async adapter fails to spawn: "
 			.. tostring(result))
+		-- And it must ANSWER. A probe that failed to spawn and returned nil reads as
+		-- falsy at the caller, which is the same as "no internet" — so an unlaunchable
+		-- probe would look identical to a genuinely offline machine.
+		helpers.assert_eq(type(result), "boolean",
+			"a failed spawn must still answer a boolean, not nil")
 	end)
 
 end)

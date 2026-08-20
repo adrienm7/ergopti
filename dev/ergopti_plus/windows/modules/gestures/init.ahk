@@ -55,16 +55,16 @@ global GESTURE_REG_PATH := "HKEY_CURRENT_USER\Software\Microsoft\Windows\Current
 
 ; Registry value names for each gesture action type
 global GESTURE_REG_ACTIONS := Map(
-    "tap_3", "ThreeFingerTapAction",
-    "swipe_3_up", "ThreeFingerSlideUpAction",
-    "swipe_3_down", "ThreeFingerSlideDownAction",
-    "swipe_3_left", "ThreeFingerSlideLeftAction",
-    "swipe_3_right", "ThreeFingerSlideRightAction",
-    "tap_4", "FourFingerTapAction",
-    "swipe_4_up", "FourFingerSlideUpAction",
-    "swipe_4_down", "FourFingerSlideDownAction",
-    "swipe_4_left", "FourFingerSlideLeftAction",
-    "swipe_4_right", "FourFingerSlideRightAction",
+		"tap_3", "ThreeFingerTapAction",
+		"swipe_3_up", "ThreeFingerSlideUpAction",
+		"swipe_3_down", "ThreeFingerSlideDownAction",
+		"swipe_3_left", "ThreeFingerSlideLeftAction",
+		"swipe_3_right", "ThreeFingerSlideRightAction",
+		"tap_4", "FourFingerTapAction",
+		"swipe_4_up", "FourFingerSlideUpAction",
+		"swipe_4_down", "FourFingerSlideDownAction",
+		"swipe_4_left", "FourFingerSlideLeftAction",
+		"swipe_4_right", "FourFingerSlideRightAction",
 )
 
 ; Value meaning "Custom keyboard shortcut" in the registry
@@ -78,60 +78,60 @@ global GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT := 0x07
 ; All slots (taps and swipes) use (VK << 16) | modifiers — confirmed by
 ; reading the registry after manual configuration in Windows Settings.
 global GESTURE_REG_KEY_PARAMS := Map(
-    "tap_3", (0x70 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F1
-    "swipe_3_up", (0x71 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F2
-    "swipe_3_down", (0x72 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F3
-    "swipe_3_left", (0x73 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F4
-    "swipe_3_right", (0x74 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F5
-    "tap_4", (0x75 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F6
-    "swipe_4_up", (0x76 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F7
-    "swipe_4_down", (0x77 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F8
-    "swipe_4_left", (0x78 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F9
-    "swipe_4_right", (0x79 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F10
+		"tap_3", (0x70 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F1
+		"swipe_3_up", (0x71 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F2
+		"swipe_3_down", (0x72 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F3
+		"swipe_3_left", (0x73 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F4
+		"swipe_3_right", (0x74 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F5
+		"tap_4", (0x75 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F6
+		"swipe_4_up", (0x76 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F7
+		"swipe_4_down", (0x77 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F8
+		"swipe_4_left", (0x78 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F9
+		"swipe_4_right", (0x79 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F10
 )
 
 ; Old-system KeyParams registry value names (the ones Windows actually reads
 ; when sending the synthesised shortcut). Tap slots use Custom*Tap + KeyParams,
 ; swipe slots use direction-specific *KeyParams pair.
 global GESTURE_REG_KEY_PARAMS_NAMES := Map(
-    "tap_3", "CustomThreeFingerTapKeyParams",
-    "swipe_3_up", "ThreeFingerUpKeyParams",
-    "swipe_3_down", "ThreeFingerDownKeyParams",
-    "swipe_3_left", "ThreeFingerLeftKeyParams",
-    "swipe_3_right", "ThreeFingerRightKeyParams",
-    "tap_4", "CustomFourFingerTapKeyParams",
-    "swipe_4_up", "FourFingerUpKeyParams",
-    "swipe_4_down", "FourFingerDownKeyParams",
-    "swipe_4_left", "FourFingerLeftKeyParams",
-    "swipe_4_right", "FourFingerRightKeyParams",
+		"tap_3", "CustomThreeFingerTapKeyParams",
+		"swipe_3_up", "ThreeFingerUpKeyParams",
+		"swipe_3_down", "ThreeFingerDownKeyParams",
+		"swipe_3_left", "ThreeFingerLeftKeyParams",
+		"swipe_3_right", "ThreeFingerRightKeyParams",
+		"tap_4", "CustomFourFingerTapKeyParams",
+		"swipe_4_up", "FourFingerUpKeyParams",
+		"swipe_4_down", "FourFingerDownKeyParams",
+		"swipe_4_left", "FourFingerLeftKeyParams",
+		"swipe_4_right", "FourFingerRightKeyParams",
 )
 
 ; Old-system "enable" registry values that must be set to 65535 to activate
 ; the gesture / direction. Tap slots use a CustomXxxTap=7 sentinel instead.
 global GESTURE_REG_ENABLE_NAMES := Map(
-    "swipe_3_up", "ThreeFingerUp",
-    "swipe_3_down", "ThreeFingerDown",
-    "swipe_3_left", "ThreeFingerLeft",
-    "swipe_3_right", "ThreeFingerRight",
-    "swipe_4_up", "FourFingerUp",
-    "swipe_4_down", "FourFingerDown",
-    "swipe_4_left", "FourFingerLeft",
-    "swipe_4_right", "FourFingerRight",
+		"swipe_3_up", "ThreeFingerUp",
+		"swipe_3_down", "ThreeFingerDown",
+		"swipe_3_left", "ThreeFingerLeft",
+		"swipe_3_right", "ThreeFingerRight",
+		"swipe_4_up", "FourFingerUp",
+		"swipe_4_down", "FourFingerDown",
+		"swipe_4_left", "FourFingerLeft",
+		"swipe_4_right", "FourFingerRight",
 )
 
 ; Tap slots use a "Custom*Tap=7" sentinel that means "user-defined shortcut".
 global GESTURE_REG_CUSTOM_TAP_NAMES := Map(
-    "tap_3", "CustomThreeFingerTap",
-    "tap_4", "CustomFourFingerTap",
+		"tap_3", "CustomThreeFingerTap",
+		"tap_4", "CustomFourFingerTap",
 )
 global GESTURE_REG_CUSTOM_TAP_VALUE := 7
 
 ; Master enables — must be 65535 for the gesture family to be active
 global GESTURE_REG_MASTER_ENABLES := [
-    "ThreeFingerSlideEnabled",
-    "ThreeFingerTapEnabled",
-    "FourFingerSlideEnabled",
-    "FourFingerTapEnabled",
+		"ThreeFingerSlideEnabled",
+		"ThreeFingerTapEnabled",
+		"FourFingerSlideEnabled",
+		"FourFingerTapEnabled",
 ]
 
 ; Slot names — mirrors Hammerspoon's slot identifiers. The data itself lives in
@@ -144,8 +144,8 @@ global GESTURE_SLOTS := GestureSlotIds()
 ; Human-readable labels for each slot
 global GESTURE_SLOT_LABELS := Map()
 for _GestureLabelIndex, _GestureLabelSlot in ["tap_3", "swipe_3_up", "swipe_3_down", "swipe_3_left", "swipe_3_right",
-              "tap_4", "swipe_4_up", "swipe_4_down", "swipe_4_left", "swipe_4_right"] {
-    GESTURE_SLOT_LABELS[_GestureLabelSlot] := t("gesture.slots." . _GestureLabelSlot)
+							"tap_4", "swipe_4_up", "swipe_4_down", "swipe_4_left", "swipe_4_right"] {
+		GESTURE_SLOT_LABELS[_GestureLabelSlot] := t("gesture.slots." . _GestureLabelSlot)
 }
 
 ; Shortcut labels for setup instructions — same order-independence story as
@@ -159,56 +159,56 @@ global GESTURE_SHORTCUT_LABELS := GestureShortcutLabels()
 
 
 
-; ===========================================
+; ==========================================
 ; ==========================================
 ; ======= 2/ Right-Click Hold Toggle =======
 ; ==========================================
-; ===========================================
+; ==========================================
 
 ; Parses an AHK v2 shortcut string (e.g. "^+{Tab}", "!{Left}", "^t") into a
 ; TextPressKey-compatible (Key, Modifiers) pair and dispatches via the adapter.
 ; Handles: ^ = Ctrl, + = Shift, ! = Alt, # = Win.
 ; Bare letters (no braces) are passed as-is; {…} keys strip the braces.
 _GestureParseAndPressKey(Keys) {
-    Mods := []
-    Pos  := 1
-    ; Consume modifier prefix characters one by one. AHK v2 has no break N;
-    ; use a flag to exit the outer loop when a non-modifier char is encountered.
-    FoundKey := false
-    loop {
-        if FoundKey
-            break
-        Ch := SubStr(Keys, Pos, 1)
-        switch Ch {
-            case "^":
-                Mods.Push("Ctrl")
-                Pos++
-            case "+":
-                Mods.Push("Shift")
-                Pos++
-            case "!":
-                Mods.Push("Alt")
-                Pos++
-            case "#":
-                Mods.Push("Win")
-                Pos++
-            default:
-                FoundKey := true
-        }
-    }
-    KeyPart := SubStr(Keys, Pos)
-    ; Strip braces from {Key} notation
-    if SubStr(KeyPart, 1, 1) = "{" and SubStr(KeyPart, -1) = "}"
-        KeyPart := SubStr(KeyPart, 2, StrLen(KeyPart) - 2)
-    TextPressKey(KeyPart, Mods)
+		Mods := []
+		Pos  := 1
+		; Consume modifier prefix characters one by one. AHK v2 has no break N;
+		; use a flag to exit the outer loop when a non-modifier char is encountered.
+		FoundKey := false
+		loop {
+				if FoundKey
+						break
+				Ch := SubStr(Keys, Pos, 1)
+				switch Ch {
+						case "^":
+								Mods.Push("Ctrl")
+								Pos++
+						case "+":
+								Mods.Push("Shift")
+								Pos++
+						case "!":
+								Mods.Push("Alt")
+								Pos++
+						case "#":
+								Mods.Push("Win")
+								Pos++
+						default:
+								FoundKey := true
+				}
+		}
+		KeyPart := SubStr(Keys, Pos)
+		; Strip braces from {Key} notation
+		if SubStr(KeyPart, 1, 1) = "{" and SubStr(KeyPart, -1) = "}"
+				KeyPart := SubStr(KeyPart, 2, StrLen(KeyPart) - 2)
+		TextPressKey(KeyPart, Mods)
 }
 
 ; Sends a shortcut while neutralising the Ctrl+Win+Shift modifiers that the
 ; touchpad gesture itself is still holding down at callback time. Without this,
 ; e.g. Ctrl+Shift+Tab sent on top of held Ctrl+Win+Shift collapses to plain Tab.
 GestureSendShortcut(Keys) {
-    Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
-    _GestureParseAndPressKey(Keys)
+		Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
+		_GestureParseAndPressKey(Keys)
 }
 
 
@@ -223,56 +223,56 @@ GestureSendShortcut(Keys) {
 
 ; Executes the action assigned to a gesture slot.
 GestureDispatch(slot) {
-    global GestureAssignments, GESTURE_ACTIONS, Features
+		global GestureAssignments, GESTURE_ACTIONS, Features
 
-    ; Guard against being called before auto-execute completes (e.g. hotkey fires
-    ; during a Reload triggered by enabling metrics)
-    if !IsSet(GestureAssignments) or !IsSet(GESTURE_ACTIONS) or !IsSet(Features)
-        return
+		; Guard against being called before auto-execute completes (e.g. hotkey fires
+		; during a Reload triggered by enabling metrics)
+		if !IsSet(GestureAssignments) or !IsSet(GESTURE_ACTIONS) or !IsSet(Features)
+				return
 
-    if !Features["gestures"]["enabled"] {
-        return
-    }
+		if !Features["gestures"]["enabled"] {
+				return
+		}
 
-    if !GestureAssignments.Has(slot) {
-        return
-    }
+		if !GestureAssignments.Has(slot) {
+				return
+		}
 
-    ActionName := GestureAssignments[slot]
-    if (ActionName == "none" or !GESTURE_ACTIONS.Has(ActionName)) {
-        return
-    }
+		ActionName := GestureAssignments[slot]
+		if (ActionName == "none" or !GESTURE_ACTIONS.Has(ActionName)) {
+				return
+		}
 
-    ; Release all modifiers held down by the touchpad shortcut (Ctrl+Win+Shift)
-    ; before firing the action — otherwise SendEvent/Send calls inherit the
-    ; still-down state and produce wrong combos on every swipe after the first.
-    Send("{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
-    LoggerDebug("gestures", "Dispatching gesture: {1} -> {2}.", slot, ActionName)
+		; Release all modifiers held down by the touchpad shortcut (Ctrl+Win+Shift)
+		; before firing the action — otherwise SendEvent/Send calls inherit the
+		; still-down state and produce wrong combos on every swipe after the first.
+		Send("{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
+		LoggerDebug("gestures", "Dispatching gesture: {1} -> {2}.", slot, ActionName)
 
-    ; Any tap action (other than the click-toggle itself) must deactivate a held click
-    ; so that a selection started with left_click_toggle is properly released first.
-    if (ActionName != "left_click_toggle" && ActionName != "right_click_toggle") {
-        GestureReleaseLeftClick()
-        GestureReleaseRightClick()
-    }
+		; Any tap action (other than the click-toggle itself) must deactivate a held click
+		; so that a selection started with left_click_toggle is properly released first.
+		if (ActionName != "left_click_toggle" && ActionName != "right_click_toggle") {
+				GestureReleaseLeftClick()
+				GestureReleaseRightClick()
+		}
 
-    try {
+		try {
 		GestureInvokeAction(ActionName, GestureBindingId("gesture", slot))
-        LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
-    } catch as e {
-        try LoggerError("gestures", "Gesture {1} action '{2}' threw: {3}.", slot, ActionName, e.Message)
-    }
+				LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
+		} catch as e {
+				try LoggerError("gestures", "Gesture {1} action '{2}' threw: {3}.", slot, ActionName, e.Message)
+		}
 }
 
 
 
 
 
-; =============================================
+; ==============================================
 ; ==============================================
 ; ======= 4/ Hotkey Bindings (Listeners) =======
 ; ==============================================
-; =============================================
+; ==============================================
 
 ; These shortcuts must be assigned in Windows Settings > Bluetooth & devices
 ; > Touchpad > Advanced gesture configuration.
@@ -317,24 +317,10 @@ GesturesReadConfig()
 ; every subsequent reload (the tray menu's "Auto-configure" action stays the
 ; supported way to retry if something failed here).
 global _IniCache, ConfigurationFile
-RawAutoConfig := IniCacheGet(_IniCache, "ahk.gestures", "auto_configure_on_next_start")
-if (RawAutoConfig == "1" or RawAutoConfig == "true") {
-    LoggerStart("gestures", "Consuming auto_configure_on_next_start flag from onboarding…")
-
-    ; Clear the flag FIRST, before the asynchronous touchpad worker starts —
-    ; the PnP cycle can still kill the AHK process by tearing down the HID hook.
-    ; Clearing after launch would leave the flag set and the auto-relaunched
-    ; script could loop forever, never reaching initMenu.
-    try TOML_BatchWrite(ConfigurationFile,
-        [{ Section: "ahk.gestures", Key: "auto_configure_on_next_start", Value: false }])
-
-    ; Defer the registry write + worker launch until the auto-execute tail
-    ; (notably initMenu in ErgoptiPlus.ahk) has settled. The PnP operation then
-    ; runs in its own elevated process and is polled without blocking AHK.
-    SetTimer(_DeferredGestureAutoConfigure, -2000)
-
-    LoggerSuccess("gestures", "AutoConfigureOnNextStart flag cleared — touchpad config deferred to T+2s.")
-}
+global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS := 2000
+RawAutoConfig := IniCacheGet(_IniCache, "gestures", "auto_configure_on_next_start")
+if (RawAutoConfig == "1" or RawAutoConfig == "true")
+		GestureConsumeAutoConfigureFlag(ConfigurationFile)
 
 ; Arm the WinEvent hook that tracks manual window activations.
 ; Skipped in the headless test runner (_AHK_DRY_RUN is defined by run_all.ahk)
@@ -346,23 +332,22 @@ _GestureWinOrder   := []
 _GestureWinHook    := 0
 _GestureCallbackPtr := 0
 if !IsSet(_AHK_DRY_RUN) {
-    ; Store the callback pointer so _GestureUnhook can free it with CallbackFree,
-    ; preventing the fixed-size thunk leak on every script reload
-    _GestureCallbackPtr := CallbackCreate(_GestureOnForeground, "F", 7)
-    _GestureWinHook := DllCall("SetWinEventHook",
-        "UInt", 0x0003,           ; EVENT_SYSTEM_FOREGROUND
-        "UInt", 0x0003,
-        "Ptr",  0,
-        "Ptr",  _GestureCallbackPtr,
-        "UInt", 0,
-        "UInt", 0,
-        "UInt", 0x0000)           ; WINEVENT_OUTOFCONTEXT
-    OnExit(_GestureUnhook)
-    ; SetWinEventHook returns 0 on failure. Unchecked, a failed hook left
-    ; window-order tracking silently dead while the line below still announced
-    ; the module ready — so window-cycle gestures did nothing, with no clue why.
-    if !_GestureWinHook
-        LoggerError("gestures", "SetWinEventHook failed — window-order tracking disabled; window-cycle gestures will not work.")
+		; Store the callback pointer so _GestureUnhook can free it with CallbackFree,
+		; preventing the fixed-size thunk leak on every script reload
+		_GestureCallbackPtr := CallbackCreate(_GestureOnForeground, "F", 7)
+		_GestureWinHook := DllCall("SetWinEventHook",
+				"UInt", 0x0003,           ; EVENT_SYSTEM_FOREGROUND
+				"UInt", 0x0003,
+				"Ptr",  0,
+				"Ptr",  _GestureCallbackPtr,
+				"UInt", 0,
+				"UInt", 0,
+				"UInt", 0x0000)           ; WINEVENT_OUTOFCONTEXT
+		; SetWinEventHook returns 0 on failure. Unchecked, a failed hook left
+		; window-order tracking silently dead while the line below still announced
+		; the module ready — so window-cycle gestures did nothing, with no clue why.
+		if !_GestureWinHook
+				LoggerError("gestures", "SetWinEventHook failed — window-order tracking disabled; window-cycle gestures will not work.")
 }
 
 ; The readiness claim reports what was actually achieved rather than asserting
@@ -372,4 +357,4 @@ if !IsSet(_AHK_DRY_RUN) {
 ; log line whatsoever, and "gestures failed" was indistinguishable from
 ; "gestures was never reached".
 LoggerSuccess("gestures", "Gestures module initialised — ready (window hook: {1}).",
-    _GestureWinHook ? "active" : "unavailable")
+		_GestureWinHook ? "active" : "unavailable")

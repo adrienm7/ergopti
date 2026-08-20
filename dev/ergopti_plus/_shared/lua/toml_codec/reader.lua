@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Parses the hotstrings TOML format produced by the generation scripts.
 --- Canonical source shared by all Lua-based drivers (Hammerspoon, future Linux
---- driver). Previously lived at hammerspoon/lib/toml_reader.lua; moved here so
+--- driver). Previously lived at hammerspoon/infra/toml_reader.lua; moved here so
 --- both drivers share one implementation without duplication.
 ---
 --- FEATURES & RATIONALE:
@@ -25,9 +25,9 @@ local M = {}
 -- macOS driver. The macOS driver logger (ring buffer + file, read by the
 -- healthcheck diagnostic) is preferred when present so on-macOS routing is
 -- unchanged; otherwise the platform-neutral print shim takes over. A hard
--- require("lib.logger") here was the impurity that forced the Linux driver to
+-- require("infra.logger") here was the impurity that forced the Linux driver to
 -- fork its own TOML parser (audit SS-2).
-local _ok_log, Logger = pcall(require, "lib.logger")
+local _ok_log, Logger = pcall(require, "infra.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
@@ -44,10 +44,11 @@ local _cache_provider = nil
 
 
 
+
 -- ========================================
--- =========================================
+-- ========================================
 -- ======= 1/ String Parser Helpers =======
--- =========================================
+-- ========================================
 -- ========================================
 
 --- Parses a TOML double-quoted string starting at an index.
@@ -131,10 +132,11 @@ end
 
 
 
+
 -- ===============================
--- ================================
+-- ===============================
 -- ======= 2/ Line Parsers =======
--- ================================
+-- ===============================
 -- ===============================
 
 --- Parses a hotstring entry line.
@@ -209,6 +211,13 @@ local function parse_entry(line)
 		is_word           = result.is_word           or false,
 		auto_expand       = result.auto_expand       or false,
 		is_case_sensitive = result.is_case_sensitive or false,
+		-- Optional in the schema, so it must be carried explicitly: the returned
+		-- table is a fixed field set, not a pass-through of `result`, and every key
+		-- absent from this list is silently dropped. It was, which made the flag
+		-- unreachable from TOML on both Lua drivers — the engines read it, the
+		-- loaders forwarded it, and the value they forwarded was always false.
+		-- 1 302 shared entries declare it.
+		is_case_sensitive_strict = result.is_case_sensitive_strict or false,
 		final_result      = result.final_result      or false,
 		-- Individual collision-priority override (top of the cascade). nil when
 		-- the entry has no `priority` key, so the loader falls back to the
@@ -357,20 +366,25 @@ local function parse_kv_value(line)
 end
 
 
+
+
+
 -- =============================
--- ==============================
+-- =============================
 -- ======= 3/ Public API =======
--- ==============================
+-- =============================
 -- =============================
 
 
---- =============================
+
+-- =============================
 -- ===== 3.1) Parse Method =====
---- =============================
+-- =============================
 
 --- Parses a given TOML file and returns a structured table.
 --- @param path string The absolute path to the TOML file.
 --- @return table The structured metadata and sections.
+--- @return boolean committed True only after the complete file was read and closed.
 function M.parse(path)
 	local empty_result = {
 		meta = { description = "", sections = {}, sections_order = {}, section_delays = {} },
@@ -378,7 +392,7 @@ function M.parse(path)
 		sections = {}
 	}
 
-	if type(path) ~= "string" then return empty_result end
+	if type(path) ~= "string" then return empty_result, false end
 
 	-- Fast path: a precompiled snapshot of an unchanged file loads ~10x faster
 	-- than the character-level parse below. A miss (nil) or any provider error
@@ -386,7 +400,7 @@ function M.parse(path)
 	if _cache_provider and type(_cache_provider.load) == "function" then
 		local ok_load, cached = pcall(_cache_provider.load, path)
 		if ok_load and type(cached) == "table" then
-			return cached
+			return cached, true
 		end
 	end
 
@@ -395,7 +409,7 @@ function M.parse(path)
 	local ok, f = pcall(io.open, path, "r")
 	if not ok or not f then
 		Logger.warn(LOG, string.format("Impossible d'ouvrir le fichier : %s.", tostring(path)))
-		return empty_result
+		return empty_result, false
 	end
 
 	local result = {
@@ -571,11 +585,11 @@ function M.parse(path)
 		end
 	end)
 
-	if not read_ok then
-		Logger.error(LOG, string.format("Erreur de lecture du fichier : %s.", tostring(read_err)))
+	local close_ok, closed = pcall(f.close, f)
+	if not read_ok or not close_ok or closed ~= true then
+		Logger.error(LOG, "TOML file read did not commit (failure content withheld).")
+		return empty_result, false
 	end
-
-	pcall(function() f:close() end)
 
 	-- Rebuild sections_order from TOML metadata order when available;
 	-- otherwise fall back to the order sections appeared in the file.
@@ -623,7 +637,7 @@ function M.parse(path)
 	end
 
 	Logger.info(LOG, "TOML file parsed successfully.")
-	return result
+	return result, true
 end
 
 --- Injects an optional disk-cache provider so repeat parses of an unchanged
@@ -639,9 +653,9 @@ end
 
 
 
---- ============================
+-- ============================
 -- ===== 3.2) Load Method =====
---- ============================
+-- ============================
 
 --- Loads all hotstring entries from a path and registers them into the keymap.
 --- @param path          string The absolute path to the TOML file.

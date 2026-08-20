@@ -1,184 +1,149 @@
 --- tests/unit/modules/keymap/test_synthetic_reset_guard.lua
 
 --- ==============================================================================
---- MODULE: Synthetic-Reset Guard Regression Tests
+--- MODULE: Explicit Synthetic Transaction Producer Coverage Guard
 --- DESCRIPTION:
---- Regression tests for the synthetic-event filter race condition in
---- modules/keymap/init.lua (onKeyDownRaw). The old guard reset the
---- expected_synthetic_* counters as soon as (dt > 0.5 AND arm_age > 1.0),
---- regardless of whether there were still events in flight. Under extreme OS load
---- (synthetic injection delayed > 1 s) this caused character duplication.
----
---- Fix: the guard now only resets when there are no pending events (safe) OR when
---- the arm is older than SYNTHETIC_STALE_SEC = 5.0 s (cleanup of truly lost
---- events). Events in flight are never discarded prematurely.
+--- Enumerates every production call to SyntheticInput.begin(). A new explicit
+--- producer makes the inventory fail until its lifecycle is reviewed. Each known
+--- family is required to keep its construction scope and terminal seal/cancel
+--- paths, preventing a partially built transaction from leaking across actions.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 
---- Encodes the OLD (buggy) reset-guard condition.
---- @param dt number Seconds since last keystroke.
---- @param arm_age number Seconds since last arm_synthetic call.
---- @return boolean True if the reset would fire.
-local function old_guard_fires(dt, arm_age)
-	return dt > 0.5 and arm_age > 1.0
-end
-
---- Encodes the FIXED reset-guard condition.
---- @param dt number Seconds since last keystroke.
---- @param arm_age number Seconds since last arm_synthetic call.
---- @param pending_deletes number Number of expected synthetic backspaces.
---- @param pending_chars string Expected synthetic characters not yet filtered.
---- @param STALE_SEC number Maximum arm age before forced cleanup.
---- @return boolean True if the reset should fire.
---- @param pending_pastes number|nil Expected synthetic Cmd+V echoes not yet filtered.
-local function new_guard_fires(dt, arm_age, pending_deletes, pending_chars, STALE_SEC, pending_pastes)
-	pending_pastes = pending_pastes or 0
-	local events_in_flight = pending_deletes > 0 or #pending_chars > 0 or pending_pastes > 0
-	return dt > 0.5 and (not events_in_flight or arm_age > STALE_SEC)
+--- Removes line comments before counting executable call sites.
+--- @param source string
+--- @return string code
+local function strip_line_comments(source)
+	local lines = {}
+	for line in source:gmatch("[^\n]*") do
+		lines[#lines + 1] = line:gsub("%-%-.*$", "")
+	end
+	return table.concat(lines, "\n")
 end
 
 
+--- Counts literal occurrences.
+--- @param source string
+--- @param literal string
+--- @return integer count
+local function count_literal(source, literal)
+	local count = 0
+	local cursor = 1
+	while true do
+		local found = source:find(literal, cursor, true)
+		if not found then return count end
+		count = count + 1
+		cursor = found + #literal
+	end
+end
 
 
--- ================================================================
--- ================================================================
--- ======= 1/ Old Guard — Race Condition Demonstration ============
--- ================================================================
--- ================================================================
+--- Reads one production unit selected by a unique symbol.
+--- @param selector string
+--- @return string source
+local function read_unit(selector)
+	local source, err = helpers.read_driver_unit(selector)
+	helpers.assert_not_nil(source, err)
+	return strip_line_comments(source)
+end
 
-helpers.describe("synthetic reset guard old formula: demonstrates the race condition", function()
-	helpers.it("fires when dt > 0.5 AND arm_age > 1.0, even with events in flight", function()
-		-- Scenario: arm at t=0, user types at t=1.5 (dt from last key > 0.5)
-		-- → arm_age = 1.5 > 1.0 → reset fires regardless of pending events
-		local fires = old_guard_fires(0.9, 1.5)
-		helpers.assert_eq(fires, true,
-			"old guard fires at arm_age=1.5, discarding in-flight synthetic events")
+
+helpers.describe("SyntheticInput explicit producer inventory", function()
+	local calls = {
+		'SyntheticInput.begin("terminator_replay", "replacement")',
+		'SyntheticInput.begin("external_replacement", "replacement")',
+		'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")',
+		'SyntheticInput.begin("repeat_key", "replacement")',
+		'SyntheticInput.begin("shortcuts.text.reselect", "action")',
+		'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
+	}
+
+	helpers.it("enumerates the complete non-vacuous class", function()
+		local all = strip_line_comments(helpers.read_driver_source())
+		helpers.assert_eq(count_literal(all, "SyntheticInput.begin("), #calls,
+			"a new explicit producer needs a lifecycle assertion in this inventory")
+		for _, call in ipairs(calls) do
+			helpers.assert_eq(count_literal(all, call), 1,
+				"each reviewed producer declaration must occur exactly once: " .. call)
+		end
 	end)
 
-	helpers.it("does NOT fire when arm_age is 0.8 s (within the old 1 s window)", function()
-		local fires = old_guard_fires(0.9, 0.8)
-		helpers.assert_eq(fires, false,
-			"old guard: arm_age=0.8 is below the 1.0 s threshold — no reset")
-	end)
-end)
+	helpers.it("keeps raw keyboard injection behind the tagged adapter", function()
+		local all = strip_line_comments(helpers.read_driver_source())
+		helpers.assert_eq(count_literal(all, "eventtap.keyStroke("), 0,
+			"production code must not bypass SyntheticInput with eventtap.keyStroke")
+		helpers.assert_eq(count_literal(all, "eventtap.keyStrokes("), 0,
+			"production code must not bypass SyntheticInput with eventtap.keyStrokes")
+		local compact = all:gsub("%s+", "")
+		helpers.assert_eq(count_literal(compact, ".newKeyEvent("), 0,
+			"production code must not call the raw Quartz key-event constructor")
+		helpers.assert_eq(count_literal(all, "System Events\\\" to key code"), 0,
+			"AppleScript keyboard injection bypasses immutable SyntheticInput provenance")
 
-
-
-
-
--- ================================================================
--- ================================================================
--- ======= 2/ Fixed Guard — No Reset While Events in Flight =======
--- ================================================================
--- ================================================================
-
-helpers.describe("synthetic reset guard fixed formula: no reset with events in flight", function()
-	local STALE = 5.0  -- SYNTHETIC_STALE_SEC
-
-	helpers.it("does NOT reset when deletes are still pending (arm_age = 1.5 s)", function()
-		-- arm_age > 1.0 s would have fired the old guard; new guard holds back
-		local fires = new_guard_fires(0.9, 1.5, 3, "", STALE)
-		helpers.assert_eq(fires, false,
-			"with 3 pending deletes at arm_age=1.5 s the reset must not fire")
-	end)
-
-	helpers.it("does NOT reset when chars are still pending (arm_age = 2.0 s)", function()
-		local fires = new_guard_fires(0.9, 2.0, 0, "hello", STALE)
-		helpers.assert_eq(fires, false,
-			"with pending chars at arm_age=2.0 s the reset must not fire")
-	end)
-
-	helpers.it("DOES reset when nothing is pending (safe to clean up)", function()
-		local fires = new_guard_fires(0.9, 1.5, 0, "", STALE)
-		helpers.assert_eq(fires, true,
-			"with no pending events the reset is safe and should fire")
-	end)
-
-	helpers.it("DOES reset when arm_age exceeds STALE_SEC even with pending events", function()
-		-- Truly lost events: arm_age > 5.0 s → force cleanup to recover the engine
-		local fires = new_guard_fires(0.9, 5.1, 3, "abc", STALE)
-		helpers.assert_eq(fires, true,
-			"stale arm (age > 5 s) must force a cleanup reset even if items appear pending")
-	end)
-
-	helpers.it("does NOT reset when only a PASTE echo is pending (F-MED-1, arm_age = 1.5 s)", function()
-		-- A 0-delete paste expansion (LLM completion / >50-cp hotstring) leaves
-		-- deletes==0 and chars=="" — the paste counter is the ONLY in-flight marker.
-		local fires = new_guard_fires(0.9, 1.5, 0, "", STALE, 1)
-		helpers.assert_eq(fires, false,
-			"with 1 pending paste echo at arm_age=1.5 s the reset must not fire (else the Cmd+V echo wipes the buffer)")
-	end)
-
-	helpers.it("DOES reset a stale pending paste once arm_age exceeds STALE_SEC", function()
-		local fires = new_guard_fires(0.9, 5.1, 0, "", STALE, 1)
-		helpers.assert_eq(fires, true,
-			"a truly lost paste echo (arm_age > 5 s) must still be cleaned up")
-	end)
-
-	helpers.it("does NOT reset when dt <= 0.5 (user typing continuously)", function()
-		-- The dt guard ensures we only reset during a genuine typing pause
-		local fires = new_guard_fires(0.3, 6.0, 0, "", STALE)
-		helpers.assert_eq(fires, false,
-			"dt=0.3 s is below the 0.5 s pause threshold — no reset")
-	end)
-
-	helpers.it("race condition scenario: arm at t=0, delayed delivery at t=2.0 s", function()
-		-- arm_synthetic at t=0 → expected_synthetic_chars = "hello"
-		-- user types at t=1.5 (dt=1.5 > 0.5, arm_age=1.5 < 5.0)
-		-- old guard: fires (arm_age > 1.0) → events arrive unfiltered → duplication
-		-- new guard: does NOT fire (pending_chars="hello", arm_age=1.5 < STALE)
-		local old_fires = old_guard_fires(1.5, 1.5)
-		local new_fires = new_guard_fires(1.5, 1.5, 0, "hello", STALE)
-
-		helpers.assert_eq(old_fires, true,  "old guard wrongly resets before delayed events arrive")
-		helpers.assert_eq(new_fires, false, "new guard correctly holds back while events are in flight")
-	end)
-end)
-
-
-
-
--- ================================================================
--- ================================================================
--- ======= 3/ Source Guard — Fix Permanence ======================
--- ================================================================
--- ================================================================
-
-helpers.describe("synthetic reset guard: production source contains the fix", function()
-	helpers.it("init.lua defines SYNTHETIC_STALE_SEC", function()
-		local driver_root = helpers.driver_root()
-		local src_path    = driver_root .. "modules/keymap/init.lua"
-		local fh          = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil,
-			"could not open init.lua at " .. tostring(src_path))
-		local src = fh:read("*a")
-		fh:close()
-
+		local adapter = read_unit("M.MAGIC = \"ERGOPTI_SYNTHETIC_V1\"")
+		helpers.assert_eq(count_literal(adapter,
+			"local new_key_event = assert(event_api.newKeyEvent"), 1,
+			"the tagged adapter must remain the sole raw key-event constructor owner")
 		helpers.assert_true(
-			src:find("SYNTHETIC_STALE_SEC", 1, true) ~= nil,
-			"source must define SYNTHETIC_STALE_SEC constant")
+			count_literal(adapter, "setProperty(USER_DATA_PROPERTY") >= 2,
+			"both payload key events and the broker control event need immutable tags")
+	end)
 
-		helpers.assert_true(
-			src:find("events_in_flight", 1, true) ~= nil,
-			"source must check events_in_flight before resetting")
+	helpers.it("external replacement exposes begin, scoped build, and seal as one API", function()
+		local source = read_unit("local function invalidate_observed_context")
+		local begin_pos = source:find(calls[2], 1, true)
+		local scope_pos = source:find("SyntheticInput.with_transaction(transaction, fn", 1, true)
+		local seal_pos = source:find("SyntheticInput.seal(transaction)", 1, true)
+		helpers.assert_true(begin_pos and scope_pos and seal_pos,
+			"external callers need all three lifecycle operations")
+		helpers.assert_true(begin_pos < scope_pos and scope_pos < seal_pos)
+	end)
 
-		-- F-MED-1: the in-flight predicate must count pastes too, or a 0-delete
-		-- paste expansion (its echo the sole in-flight marker) is wiped on a stall.
-		local eif_line = src:match("events_in_flight%s*=[^\n]*")
-		helpers.assert_true(eif_line ~= nil, "source must compute an events_in_flight predicate")
-		helpers.assert_true(
-			eif_line:find("pending_pastes", 1, true) ~= nil,
-			"events_in_flight must include pending_pastes (the paste echo is the only in-flight marker for a 0-delete paste expansion)")
-		helpers.assert_true(
-			src:find("pending_pastes%s*=%s*CoreState%.expected_synthetic_pastes", 1, false) ~= nil,
-			"pending_pastes must be read from CoreState.expected_synthetic_pastes")
+	helpers.it("expander replacement and repeat both retain rollback and commit paths", function()
+		local source = read_unit("function M.try_terminator_expand")
+		helpers.assert_eq(count_literal(source, "SyntheticInput.begin("), 2)
+		helpers.assert_true(count_literal(source, "SyntheticInput.with_transaction") >= 2,
+			"both expander producers must build inside their own transaction")
+		helpers.assert_true(count_literal(source, "SyntheticInput.seal") >= 2,
+			"both expander producers must commit explicitly")
+		helpers.assert_true(count_literal(source, "SyntheticInput.cancel") >= 2,
+			"every fallible construction needs rollback")
+	end)
 
-		-- Old fixed-threshold pattern (> 1.0) must be replaced in the guard block
-		helpers.assert_eq(
-			src:find("arm_age > 1%.0", 1, false),
-			nil,
-			"source must NOT contain the old 'arm_age > 1.0' hard-coded threshold")
+	helpers.it("terminator replay commits only after scoped construction succeeds", function()
+		local source = read_unit("local REPLAY_RETRY_BASE_SEC")
+		local begin_pos = source:find(calls[1], 1, true)
+		local scope_pos = source:find("pcall(SyntheticInput.with_transaction", 1, true)
+		local seal_pos = source:find("pcall(SyntheticInput.seal", 1, true)
+		local cancel_pos = source:find("pcall(SyntheticInput.cancel", 1, true)
+		helpers.assert_true(begin_pos and scope_pos and seal_pos and cancel_pos)
+		helpers.assert_true(begin_pos < scope_pos and scope_pos < seal_pos,
+			"the replay must build before it can commit")
+	end)
+
+	helpers.it("deferred text reselection owns dispatch through terminal cleanup", function()
+		local source = read_unit("local TRANSFORM_LOCK_TIMEOUT_SEC")
+		local begin_pos = source:find(calls[5], 1, true)
+		local batch_pos = source:find("SyntheticInput.begin_batch(tx)", begin_pos, true)
+		local dispatch_pos = source:find("SyntheticInput.dispatch(batch)", begin_pos, true)
+		local seal_pos = source:find("SyntheticInput.seal(tx)", begin_pos, true)
+		local cancel_pos = source:find("SyntheticInput.cancel, tx", begin_pos, true)
+		helpers.assert_true(begin_pos and batch_pos and dispatch_pos and seal_pos and cancel_pos,
+			"deferred action must retain batch, dispatch, seal, and rollback sites")
+		helpers.assert_true(begin_pos < batch_pos and batch_pos < dispatch_pos and dispatch_pos < seal_pos)
+	end)
+
+	helpers.it("keep-awake heartbeat is an explicit non-observable transaction with rollback", function()
+		local source = read_unit("local function emit_activity_keystroke")
+		local begin_pos = source:find(calls[6], 1, true)
+		local emit_pos = source:find("SyntheticInput.emit_key_stroke", begin_pos, true)
+		local seal_pos = source:find("SyntheticInput.seal", begin_pos, true)
+		local cancel_pos = source:find("SyntheticInput.cancel, transaction", begin_pos, true)
+		helpers.assert_true(begin_pos and emit_pos and seal_pos and cancel_pos,
+			"the keep-awake transaction needs tagged emission, commit, and rollback sites")
+		helpers.assert_true(begin_pos < emit_pos and emit_pos < seal_pos,
+			"F18 must be built before its replacement transaction is sealed")
 	end)
 end)

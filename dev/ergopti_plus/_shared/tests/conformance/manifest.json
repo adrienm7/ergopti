@@ -1,0 +1,51 @@
+{
+	"_comment": "Conformance ledger — every shared behaviour a driver suite does NOT exercise, and why. A skip that is only prose is indistinguishable from a skip nobody remembers; each entry below is referenced by id from the skip site itself, and tools/test/test-conformance-skips-declared.cjs fails on a skip with no entry, an entry no skip references, or an entry missing a field.",
+	"_status_values": {
+		"platform_gap": "The driver does not implement the behaviour at all. Closing the gap means writing the feature, not the test.",
+		"by_design": "The behaviour is deliberately somewhere else — another layer owns it, and replaying it here would test the wrong component.",
+		"environment": "The behaviour is implemented and tested, but this particular host lacks a tool the test needs. Skipped conditionally, not always."
+	},
+	"_tracked": "Where the work to remove the skip is recorded. \"none\" means there is nothing to remove — the skip is permanent by design.",
+	"entries": [
+		{
+			"id": "CONF-LINUX-TAPHOLD",
+			"driver": "linux",
+			"subject": "_shared/tests/corpus/tap_hold/vectors.json",
+			"status": "platform_gap",
+			"reason": "Linux delegates tap-hold remapping to kanata, so there is no Lua engine to replay the vectors through. The corpus is still loaded and counted, so a malformed file fails here.",
+			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
+		},
+		{
+			"id": "CONF-LINUX-LLM-PARSER",
+			"driver": "linux",
+			"subject": "_shared/tests/corpus/llm/parser_test_vectors.json",
+			"status": "platform_gap",
+			"reason": "The Linux daemon has no Lua reply parser; the LLM bridge is macOS-only today.",
+			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
+		},
+		{
+			"id": "CONF-LINUX-PROMPT-BUILDER",
+			"driver": "linux",
+			"subject": "_shared/tests/corpus/prompt_builder/vectors.json",
+			"status": "platform_gap",
+			"reason": "The Linux daemon does not load the shared PromptBuilder, so no code path consumes these vectors.",
+			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
+		},
+		{
+			"id": "CONF-LINUX-LOCALE-CASCADE",
+			"driver": "linux",
+			"subject": "_shared/tests/corpus/locale/resolution_vectors.json",
+			"status": "platform_gap",
+			"reason": "Linux resolves locales through lib/locale.lua rather than the shared cascade these vectors describe. Replaying the shared backbone here is a roadmap item, not a design decision.",
+			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
+		},
+		{
+			"id": "CONF-LINUX-STAT-MTIME",
+			"driver": "linux",
+			"subject": "lib/file_watchers.lua — mtime detection",
+			"status": "environment",
+			"reason": "The watcher tests shell out to stat(1) to observe mtime changes. On a host without stat(1) the behaviour is untestable, not unimplemented — these skip conditionally and run everywhere stat(1) exists, including CI.",
+			"tracked": "none"
+		}
+	]
+}

@@ -20,7 +20,7 @@
 local M = {}
 
 local hs        = hs
-local Logger    = require("lib.logger")
+local Logger    = require("infra.logger")
 local llm_mod   = require("modules.llm")
 local shortcut_ui = require("ui.menu.shortcut_utils")
 
@@ -30,11 +30,11 @@ local LOG = "menu_llm.trigger_orchestrator"
 
 
 
--- ======================================
+-- =====================================
 -- =====================================
 -- ======= 1/ Module Constructor =======
 -- =====================================
--- ======================================
+-- =====================================
 
 --- Creates a new trigger orchestrator bound to the given context.
 --- @param ctx table Required fields: state, keymap, save_prefs, update_menu,
@@ -152,7 +152,7 @@ function M.new(ctx)
 	--- Writes back to state.llm_trigger_shortcut and persists via save_prefs.
 	--- @param mods table|nil Modifier list.
 	--- @param key string|nil Key name.
-	function inst.apply_llm_shortcut(mods, key)
+	function inst.apply_llm_shortcut(mods, key, opts)
 		local current_hk = get_trigger_hk()
 		if current_hk then
 			pcall(function() current_hk:delete() end)
@@ -174,7 +174,40 @@ function M.new(ctx)
 			set_trigger_hk(nil)
 		end
 
-		save_prefs(); update_menu()
+		if not (type(opts) == "table" and opts.persist == false) then
+			if save_prefs() ~= true then return false end
+			update_menu()
+		end
+	end
+
+	--- Rebuilds both native hotkey sets from an acknowledged preference snapshot.
+	--- @param snapshot table Last committed preference snapshot.
+	--- @return boolean restored
+	function inst.restore_shortcuts(snapshot)
+		if type(snapshot) ~= "table" then return false end
+		local trigger = snapshot.llm_trigger_shortcut
+		if type(trigger) == "table" then
+			inst.apply_llm_shortcut(trigger.mods, trigger.key, { persist = false })
+		else
+			inst.apply_llm_shortcut(nil, nil, { persist = false })
+		end
+
+		local desired = type(snapshot.llm_profile_shortcuts) == "table"
+			and snapshot.llm_profile_shortcuts or {}
+		local existing_ids = {}
+		for profile_id in pairs(get_profile_hks()) do existing_ids[#existing_ids + 1] = profile_id end
+		for _, profile_id in ipairs(existing_ids) do
+			if desired[profile_id] == nil then
+				inst.apply_llm_profile_shortcut(profile_id, nil, nil, { persist = false })
+			end
+		end
+		for profile_id, shortcut in pairs(desired) do
+			if type(shortcut) == "table" then
+				inst.apply_llm_profile_shortcut(profile_id, shortcut.mods, shortcut.key,
+					{ persist = false })
+			end
+		end
+		return true
 	end
 
 
@@ -224,8 +257,9 @@ function M.new(ctx)
 			Logger.debug(LOG, "Shortcut disabled for profile '%s'", profile_id)
 		end
 
-		if not (type(opts) == "table" and opts.silent == true) then
-			save_prefs(); update_menu()
+		if not (type(opts) == "table" and (opts.silent == true or opts.persist == false)) then
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end
 	end
 

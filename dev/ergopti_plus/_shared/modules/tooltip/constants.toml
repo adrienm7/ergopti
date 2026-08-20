@@ -1,4 +1,4 @@
-# static/ergopti_plus/_shared/modules/tooltip/constants.toml
+# _shared/modules/tooltip/constants.toml
 #
 # ==============================================================================
 # SCHEMA: Tooltip Visual Constants — Cross-Driver Canon
@@ -44,20 +44,29 @@
 # ".AppleSystemUIFont". Both resolve to the OS default sans-serif UI typeface.
 font_main_ahk = "Segoe UI"
 font_main_hs  = ".AppleSystemUIFont"
+# Linux has no single system UI font name. "Sans" is the fontconfig alias every
+# distribution defines, so Pango always resolves it to whatever the user
+# actually has — a literal family name would silently fall back to a default
+# on any machine that lacks it.
+font_main_linux = "Sans"
 font_bold_hs  = ".AppleSystemUIFontBold"
+font_bold_linux = "Sans Bold"
 
 # Main body font size in layout units.
 # AHK value (11) matches Hammerspoon (14) visually at typical DPI/scale ratios.
 font_size_main_ahk = 11
 font_size_main_hs  = 14
+font_size_main_linux = 13
 
 # Hint / trigger-label font size (trigger symbols ★ ↵ [Tab] ⌥1…⌥0).
 font_size_hint_ahk = 11
 font_size_hint_hs  = 11
+font_size_hint_linux = 11
 
 # Info-bar font size (model name, TTFT/TTLT timing line).
 font_size_info_ahk = 10
 font_size_info_hs  = 10
+font_size_info_linux = 10
 
 
 # =========================
@@ -121,6 +130,9 @@ window_offset_y = 5
 # AHK uses a larger value (60) because the taskbar intrudes more on Windows.
 window_bottom_inset_ahk = 60
 window_bottom_inset_hs  = 40
+# Larger than macOS: a Linux panel is commonly at the bottom and taller than
+# the macOS Dock, and a tooltip drawn under it is a tooltip nobody reads.
+window_bottom_inset_linux = 50
 
 # Height threshold that distinguishes a "caret-like" AX element from an
 # "input-box-like" one. Elements shorter than this are treated as carets
@@ -128,13 +140,19 @@ window_bottom_inset_hs  = 40
 # below, centred) (layout units).
 max_caret_height = 80
 
-# Anchor resolution priority order (informative — drivers implement this):
+# Anchor resolution priority order, as PROSE. It used to also be a four-element
+# `anchor_cascade` array labelled "informative — drivers implement this", which no
+# driver read and which the paragraph beside it already contradicted: AHK has a
+# fifth step. A constant nothing consumes cannot go out of date loudly, so it went
+# out of date quietly, and the array said one thing while the comment above it
+# said another. Prose alone is worse than data — but wrong data beside correct
+# prose is worse than both.
+#
 #   1. Platform caret API (CaretGetPos on AHK / AXBoundsForRange on HS)
 #   2. Accessibility focused element bounding rect
-#   3. Active window frame (bottom-centre)
-#   4. Screen centre-bottom (last resort, never nil)
-# AHK adds a step between 2 and 3: mouse cursor coordinates.
-anchor_cascade = ["caret", "ax_element", "window_frame", "screen_center"]
+#   3. Mouse cursor coordinates — AHK only
+#   4. Active window frame (bottom-centre)
+#   5. Screen centre-bottom (last resort, never nil)
 
 
 # =========================
@@ -155,16 +173,23 @@ bg_alpha  = 1.0     # canvas background panel alpha (fully opaque panel)
 # see-through feel while keeping text readable). AHK does not support
 # per-panel transparency; it uses bg_hex at full opacity.
 canvas_alpha_hs = 0.97
+# Fully opaque: a compositor may not composite at all (Weston without a blur or
+# alpha path, or X11 with no compositing manager running), and a partly
+# transparent panel over an unpainted background renders as garbage rather than
+# as translucency.
+canvas_alpha_linux = 1.0
 
 # Border ring: white stroke at reduced opacity so it reads as a subtle outline.
 border_white = 1.0
 border_alpha_ahk = 0.25   # → #40 pre-multiplied byte in AHK's DIB border
 border_alpha_hs  = 0.13   # hs.canvas strokeColor alpha
+border_alpha_linux = 0.13 # cairo stroke alpha, same value as macOS
 
 # Separator line between stacked rows.
 sep_white = 1.0
 sep_alpha_ahk = 0.25   # alpha-blended onto 0x1A → 0x54 (#545454) in AHK
 sep_alpha_hs  = 0.09   # hs.canvas fillColor alpha (darker on macOS)
+sep_alpha_linux = 0.09 # cairo fill alpha
 
 # Trigger-label color (★ ↵ symbols, right column in stacked tooltips).
 label_white = 0.45

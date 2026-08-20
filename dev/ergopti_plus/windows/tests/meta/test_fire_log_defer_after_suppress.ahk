@@ -21,12 +21,12 @@
 _MetaCheckFireLogDeferAfterSuppress() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 
-	InputFile := WindowsDir . "\lib\hotstrings\hotstring_inputhook.ahk"
+	InputFile := WindowsDir . "\infra\hotstrings\hotstring_inputhook.ahk"
 	InputSrc := ""
 	try InputSrc := FileRead(InputFile)
 	Assert(InputSrc != "", "hotstring_inputhook.ahk must be readable")
 
-	DispatchFile := WindowsDir . "\lib\hotstrings\hotstring_dispatch.ahk"
+	DispatchFile := WindowsDir . "\infra\hotstrings\hotstring_dispatch.ahk"
 	DispatchSrc := ""
 	try DispatchSrc := FileRead(DispatchFile)
 	Assert(DispatchSrc != "", "hotstring_dispatch.ahk must be readable")

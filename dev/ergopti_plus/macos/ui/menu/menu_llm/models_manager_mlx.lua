@@ -12,10 +12,12 @@
 
 local M = {}
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger = require("lib.logger")
-local fs_dir       = require("lib.fs_dir")
-local i18n = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger = require("infra.logger")
+local fs_dir       = require("infra.fs_dir")
+local i18n = require("infra.i18n")
+local ApiCommon = require("modules.llm.api_common")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
@@ -246,7 +248,7 @@ function M.new(deps, presets)
 		-- model_switcher and startup_controller set. Predictions then stay locked
 		-- with no START-without-SUCCESS trail, and only a full reload recovers.
 		local check_task
-		check_task = hs.task.new("/bin/bash", function(code)
+		check_task = TaskLifecycle.native("MLX requirement check", "/bin/bash", function(code)
 			if check_task then M._active_tasks[check_task] = nil end
 			if code == 0 then
 				do_check()
@@ -291,16 +293,18 @@ function M.new(deps, presets)
 					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
 						i18n.get("mlx.deps_missing_body"), "error")
 				end
-				if on_cancel then pcall(on_cancel) end
+				ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
 			end
 		end, {"-c", check_cmd})
 		
 		if check_task then
 			M._active_tasks[check_task] = true
-			pcall(function() check_task:start() end)
+			if not TaskLifecycle.start(check_task, "MLX requirement check") then
+				M._active_tasks[check_task] = nil
+				ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
+			end
 		else
-			Logger.error(LOG, "Failed to create MLX requirement check task.")
-			if on_cancel then pcall(on_cancel) end
+			ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
 		end
 	end
 
@@ -319,7 +323,7 @@ function M.new(deps, presets)
 		-- and the menubar for the whole deletion (mirrors the identical bug class
 		-- already fixed on the Ollama manager's task-based deletes).
 		local delete_task
-		delete_task = hs.task.new("/bin/rm", function(code, _stdout, stderr)
+		delete_task = TaskLifecycle.native("MLX model deletion", "/bin/rm", function(code, _stdout, stderr)
 			if delete_task then M._active_tasks[delete_task] = nil end  -- delete_task captured by closure
 			invalidate_installed_cache()
 			if code == 0 then
@@ -334,9 +338,9 @@ function M.new(deps, presets)
 
 		if delete_task then
 			M._active_tasks[delete_task] = true
-			pcall(function() delete_task:start() end)
-		else
-			Logger.error(LOG, "Failed to create MLX model delete task for %s.", tostring(model_name))
+			if not TaskLifecycle.start(delete_task, "MLX model deletion") then
+				M._active_tasks[delete_task] = nil
+			end
 		end
 	end
 

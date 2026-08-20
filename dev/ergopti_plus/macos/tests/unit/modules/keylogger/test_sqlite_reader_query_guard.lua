@@ -61,7 +61,7 @@ end
 --- @return table module, table error_calls
 local function load_reader_with(sqlite_stub)
 	local error_calls = {}
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info  = function() end, start = function() end, success = function() end,
 		warn  = function() end,
@@ -100,8 +100,12 @@ helpers.describe("sqlite_reader — read_manifest survives a throwing db:nrows()
 	helpers.it("a throwing agg_app_day query does not prevent agg_app_day_errors from being read", function()
 		-- Only agg_app_day throws; agg_app_day_errors must still populate normally.
 		local reader = load_reader_with(make_sqlite_stub("FROM agg_app_day "))
-		local ok = pcall(function() reader.read_manifest("/fake/db.sqlite") end)
+		-- The containment IS the subject. What it was missing: containment that
+		-- returned nothing is the same as aborting, from the dashboard's point of view.
+		local ok, manifest = pcall(function() return reader.read_manifest("/fake/db.sqlite") end)
 		helpers.assert_true(ok, "one throwing table must not abort the whole read_manifest call")
+		helpers.assert_true(manifest == nil or type(manifest) == "table",
+			"and the tables that did read must still come back")
 	end)
 
 end)

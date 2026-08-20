@@ -16,7 +16,8 @@ _TLRE_LlmRenderIsGenerationFenced() {
     Hide := _DriverFuncBody("TooltipHide")
     Assert(Show != "" and Build != "" and Hide != "", "LLM tooltip show/build/hide functions must exist")
     Assert(InStr(Show, "RenderGeneration := _TooltipGeneration + 1") > 0
-        and InStr(Show, "_TooltipBuildGuiLlm(slots, _LLM_Tooltip_ActiveIdx, RenderGeneration)") > 0,
+        and InStr(Show,
+            "_TooltipBuildGuiLlm(slots, active_idx, RenderGeneration, Meta)") > 0,
         "LLM_TooltipShow must reserve a generation before building and pass that ownership to the renderer")
     Assert(InStr(Build, "if (RenderGeneration != _TooltipGeneration)") > 0
         and InStr(Build, "Pos := _TooltipResolvePosition()") > 0,
@@ -34,3 +35,37 @@ _TLRE_LlmRenderIsGenerationFenced() {
 
 Test("tooltip: LLM renders are fenced by a pre-build generation epoch (tooltip-llm-render-epoch)",
     _TLRE_LlmRenderIsGenerationFenced)
+
+_TLRE_AcceptStatePublishesWithPixels() {
+	Show := _DriverFuncBody("LLM_TooltipShow")
+	Build := _DriverFuncBody("_TooltipBuildGuiLlm")
+	Commit := _DriverFuncBody("_LLM_TooltipCommitSurfaceState")
+	Present := _DriverFuncBody("_TooltipPresentStack")
+	Current := _DriverFuncBody("_LLM_TooltipGetCurrentPresentation")
+	Assert(Show != "" and Build != "" and Commit != "" and Present != "",
+		"LLM show/build/state commit and common presenter must exist")
+	Reservation := SubStr(Show, 1, InStr(Show, "_TooltipBuildGuiLlm("))
+	Assert(InStr(Reservation, "_LLM_Tooltip_Slots := slots") == 0
+		and InStr(Reservation, "_LLM_Tooltip_Visible := true") == 0
+		and InStr(Reservation, "_LLM_Tooltip_ShownAt := A_TickCount") == 0,
+		"detached B preparation must leave A's Tab/accept state visible until B wins the pixel commit")
+	Assert(InStr(Commit, "Slots: slots.Clone()") > 0
+		and InStr(Commit, "ActiveIdx:") > 0
+		and InStr(Commit, "ShownAt:") > 0
+		and InStr(Commit, "SurfaceToken.LlmPresented := Record") > 0,
+		"the exact pixel-owner callback must attach every value Tab reads to one detached surface record")
+	Assert(InStr(Build, "_LLM_TooltipCommitSurfaceState.Bind(") > 0
+		and InStr(Build, "StateCommit") > 0,
+		"the detached LLM builder must carry its pending state to the common commit")
+	StateCommit := InStr(Present,
+		"CommitFn.Call(PreparedSurface, RetiredSurface)")
+	SurfaceSwap := InStr(Present, "_TooltipActiveSurface := PreparedSurface")
+	Reveal := InStr(Present, "_TooltipRevealPreparedSurfaces(")
+	Assert(StateCommit > 0 and SurfaceSwap > StateCommit and Reveal > SurfaceSwap,
+		"LLM acceptance state must attach before the single surface publication and B reveal")
+	Assert(InStr(Current, "Record.Generation != Surface.Generation") > 0
+		and InStr(Current, "Surface.Generation != _TooltipGeneration") == 0,
+		"candidate B's reserved build generation must not invalidate still-visible surface A semantics")
+}
+Test("tooltip: Tab sees A until B pixels and accept state commit together (llm-presented-record)",
+	_TLRE_AcceptStatePublishesWithPixels)

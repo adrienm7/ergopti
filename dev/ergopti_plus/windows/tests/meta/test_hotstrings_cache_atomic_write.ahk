@@ -4,7 +4,7 @@
 ; MODULE: Hotstrings Cache Atomic Write Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "hotstrings-cache-non-atomic-write" audit finding
-; in lib/hotstrings/hotstrings_cache.ahk.
+; in infra/hotstrings/hotstrings_cache.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; _HotstringsCacheWriteTsv called FileDelete(TsvPath) then FileAppend(Content,
@@ -37,7 +37,7 @@ _HCA_ReadSource(RelPath) {
 }
 
 _HCA_UsesAtomicWrite() {
-	Src := _HCA_ReadSource("lib/hotstrings/hotstrings_cache.ahk")
+	Src := _HCA_ReadSource("infra/hotstrings/hotstrings_cache.ahk")
 	Body := _DriverFuncBody("_HotstringsCacheWriteTsv")
 
 	Assert(Body != "", "_HotstringsCacheWriteTsv must exist in hotstrings_cache.ahk")

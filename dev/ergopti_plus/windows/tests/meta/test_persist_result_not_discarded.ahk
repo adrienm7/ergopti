@@ -29,15 +29,10 @@
 
 #Requires AutoHotkey v2.0
 
-; Call sites allowed to discard the result, each for a stated reason. Kept tiny
-; and re-verified: an entry naming a site that no longer exists suppresses
-; nothing and merely hides that its successor was never triaged.
-;
-;   TOML_RunStrictCanonicalization — a cosmetic re-serialization of a file that
-;   was ALREADY written successfully. Failing to re-pretty-print it changes no
-;   setting, and it is invoked from inside the writer itself, so surfacing from
-;   there would report a failure the caller has already been told about.
-global _PRND_DISCARD_ALLOWED := ["TOML_RunStrictCanonicalization"]
+; No production call site is exempt: every full save must consume its boolean.
+; Keeping the explicit empty list makes a future exception a reviewed diff
+; rather than an ad-hoc weakening inside the scanner.
+global _PRND_DISCARD_ALLOWED := []
 
 
 
@@ -52,8 +47,8 @@ global _PRND_DISCARD_ALLOWED := ["TOML_RunStrictCanonicalization"]
 ; only evidence that the write did not happen — and this whole finding is about
 ; that boolean being dropped.
 _PRND_WriterLogsEveryFailureBranch() {
-	Body := _DriverFuncBody("TOML_BatchWrite")
-	Assert(Body != "", "TOML_BatchWrite() must exist in the driver source")
+	Body := _DriverFuncBody("_TOML_BatchWriteImpl")
+	Assert(Body != "", "_TOML_BatchWriteImpl() must exist in the driver source")
 
 	; Count the non-throwing failure exits and require a log for each.
 	Returns := 0
@@ -82,7 +77,7 @@ _PRND_WriterLogsEveryFailureBranch() {
 ; only because it logs too — assert it still does, so the count above cannot be
 ; satisfied by removing a guard rather than adding a log.
 _PRND_UnreadableRefusalStillLogs() {
-	Body := _DriverFuncBody("TOML_BatchWrite")
+	Body := _DriverFuncBody("_TOML_BatchWriteImpl")
 	Assert(InStr(Body, "ReadFailed") > 0,
 		"TOML_BatchWrite must still refuse to rebuild a file it could not read")
 }
@@ -96,15 +91,20 @@ _PRND_UnreadableRefusalStillLogs() {
 ; ==================================================================
 ; ==================================================================
 
-; Every SaveFullConfig call site, with the line it appears on.
-_PRND_SaveCallLines() {
+; Every SaveFullConfig call site left after removing the exact bodies of the
+; reviewed best-effort functions. Removing the bodies before scanning matters:
+; the old implementation noticed that *some* allowlisted body contained a bare
+; call, then accidentally exempted every bare call anywhere in the driver.
+_PRND_SaveCallLines(Src := "") {
+	if (Src = "")
+		Src := _DriverSourceNoComments()
 	Lines := []
-	for Line in StrSplit(_DriverSourceNoComments(), "`n", "`r") {
+	for Line in StrSplit(Src, "`n", "`r") {
 		Trimmed := Trim(Line, " `t")
-		if !InStr(Trimmed, "SaveFullConfig()")
+		if !RegExMatch(Trimmed, "\bSaveFullConfig\s*\(")
 			continue
 		; The definition, not a call.
-		if RegExMatch(Trimmed, "^SaveFullConfig\(\)\s*\{")
+		if RegExMatch(Line, "^SaveFullConfig\s*\(")
 			continue
 		Lines.Push(Trimmed)
 	}
@@ -113,26 +113,33 @@ _PRND_SaveCallLines() {
 
 _PRND_EverySaveCallSiteConsumesTheResult() {
 	global _PRND_DISCARD_ALLOWED
-	Calls := _PRND_SaveCallLines()
-	Assert(Calls.Length >= 2,
-		"the scan must reach the real SaveFullConfig call sites (found only " . Calls.Length . ") — a scan that matches nothing cannot fail")
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "the persistence caller scan must read production source")
+	for FuncName in _PRND_DISCARD_ALLOWED {
+		Body := _DriverFuncBody(FuncName)
+		Assert(Body != "", "reviewed discard function '" . FuncName . "' must still exist")
+		Assert(RegExMatch(Body, "\bSaveFullConfig\s*\(") > 0,
+			"reviewed discard function '" . FuncName . "' must still contain the call it exempts")
+		Assert(!RegExMatch(Body, ":=\s*SaveFullConfig\s*\(")
+			and !RegExMatch(Body, "i)\bif\b[^\r\n]*SaveFullConfig\s*\(")
+			and !RegExMatch(Body, "i)\breturn\b[^\r\n]*SaveFullConfig\s*\("),
+			"reviewed function '" . FuncName . "' no longer discards SaveFullConfig; remove its stale exemption")
+		Src := StrReplace(Src, Body, "")
+	}
+	Calls := _PRND_SaveCallLines(Src)
+	Assert(Calls.Length >= 1,
+		"the scan must reach a real non-exempt SaveFullConfig call site — a scan that matches nothing cannot fail")
+	Assert(RegExMatch(_DriverFuncBody("LLM_Menu_SaveConfig"),
+		"\bSaveFullConfig\s*\(") > 0,
+		"the positive-control LLM full-save caller must remain inside the scanned production source")
 
-	; Which allowlisted functions actually contain a discarding call, so a stale
-	; allowlist entry is visible rather than silently protective.
 	for Line in Calls {
-		Consumed := RegExMatch(Line, ":=\s*SaveFullConfig\(\)")
-			or RegExMatch(Line, "i)\bif\b[^\r\n]*SaveFullConfig\(\)")
-			or RegExMatch(Line, "i)\breturn\b[^\r\n]*SaveFullConfig\(\)")
+		Consumed := RegExMatch(Line, ":=\s*SaveFullConfig\s*\(")
+			or RegExMatch(Line, "i)\bif\b[^\r\n]*SaveFullConfig\s*\(")
+			or RegExMatch(Line, "i)\breturn\b[^\r\n]*SaveFullConfig\s*\(")
 		if Consumed
 			continue
-		; Allowed only inside an explicitly-exempt function.
-		Exempt := false
-		for FuncName in _PRND_DISCARD_ALLOWED {
-			Body := _DriverFuncBody(FuncName)
-			if (Body != "" and InStr(Body, "SaveFullConfig()"))
-				Exempt := true
-		}
-		Assert(Exempt,
+		Assert(false,
 			"this SaveFullConfig call discards its result: '" . Line . "'. It fails without throwing, so a dropped boolean is a setting the user saw applied, saw in the menu, and will lose at the next restart with nothing in the log. Consume it, or add the enclosing function to _PRND_DISCARD_ALLOWED with the reason")
 	}
 }
@@ -142,8 +149,10 @@ _PRND_EverySaveCallSiteConsumesTheResult() {
 _PRND_LlmSaveSurfacesAndRecovers() {
 	Body := _DriverFuncBody("LLM_Menu_SaveConfig")
 	Assert(Body != "", "LLM_Menu_SaveConfig() must exist in the driver source")
-	Assert(RegExMatch(Body, "i)\bif\b[^\r\n]*SaveFullConfig\(\)"),
-		"LLM_Menu_SaveConfig must test SaveFullConfig's result — the LLM toggles never reach a Reload, so nothing else can notice the write failed")
+	Assert(RegExMatch(Body, "i)\b\w+\s*:=\s*SaveFullConfig\s*\(")
+		and InStr(Body, "CONFIG_SAVE_OK") > 0
+		and InStr(Body, "CONFIG_SAVE_DEFERRED") > 0,
+		"LLM_Menu_SaveConfig must capture and classify every typed SaveFullConfig result — the LLM toggles never reach a Reload, so nothing else can notice the write failed")
 	Assert(InStr(Body, "LoggerError") > 0,
 		"a failed LLM persist must be logged at ERROR: the user's setting is gone and every other signal reported success")
 	; Any of the driver's reload entry points satisfies this: what matters is that
@@ -158,12 +167,19 @@ _PRND_LlmSaveSurfacesAndRecovers() {
 
 ; The two siblings that had the same shape.
 _PRND_SiblingWritersSurfaceTheirFailure() {
-	for FuncName in ["LoggerSetLevel", "_HS_TryLiveToggleV2"] {
+	for FuncName in ["_HS_TryLiveToggleV2"] {
 		Body := _DriverFuncBody(FuncName)
 		Assert(Body != "", FuncName . "() must exist in the driver source")
 		Assert(InStr(Body, "LoggerError") > 0,
 			FuncName . " must surface a failed persist at ERROR. It applies its change live and then writes; a dropped write result means the running driver and the file disagree, and the setting reverts at the next restart with nothing to explain it")
 	}
+	LoggerBody := _DriverFuncBody("LoggerSetLevel")
+	Assert(LoggerBody != "", "LoggerSetLevel() must exist in the driver source")
+	CommitPos := InStr(LoggerBody, "ConfigCommitUpdates(")
+	PublishPos := InStr(LoggerBody, "_LoggerSetLevelPublish.Bind(Level)")
+	ErrorPos := InStr(LoggerBody, "LoggerError")
+	Assert(CommitPos > 0 and PublishPos > CommitPos and ErrorPos > PublishPos,
+		"LoggerSetLevel must transact disk before live publication and visibly reject failures")
 }
 
 

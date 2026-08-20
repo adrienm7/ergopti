@@ -8,79 +8,84 @@
 --- must put every consumed event back, in order and without loss.
 ---
 --- ROOT CAUSE ENCODED:
---- The daemon runs in observe mode, so physical keys reach the application while
---- an expansion is erasing and retyping — the "abcd"→"acd" corruption. The cure
---- is to grab, and the reason grabbing was never viable is that _pump_one()
---- forwarded nothing at all: it early-returned on releases, swallowed modifiers
---- and control keys, and its semantic parser drops the autorepeat value and any
---- KEY_* name containing a second underscore. Grabbing on top of that would have
---- made normal typing vanish.
+--- The daemon used to run in observe mode, so physical keys reached the
+--- application while an expansion was erasing and retyping — the "abcd"→"acd"
+--- corruption. The cure is to grab, and the reason grabbing was never viable is
+--- that the pump forwarded nothing at all: it early-returned on releases,
+--- swallowed modifiers and control keys, and its semantic parser dropped the
+--- autorepeat value and any KEY_* name containing a second underscore. Grabbing
+--- on top of that would have made normal typing vanish.
 ---
 --- HOW THIS TEST IS GENUINE (not a delivery-only tautology):
---- The evdev source is a scripted list of real evtest lines and the injector is
---- replaced by a recorder, so the assertion is on the exact ordered sequence of
---- (code, value) pairs that reach the uinput channel — every case in it is a
---- class the old code lost. It is RED before the pass-through exists (nothing is
---- emitted at all), and section 3 closes the loop by driving the REAL injector so
---- the recorder cannot drift away from the command actually run.
+--- The events are encoded into real struct input_event bytes and fed through the
+--- REAL reader over a recorded syscall backend, so the assertion is on the exact
+--- ordered sequence of (code, value) pairs that reach the uinput channel — every
+--- case in it is a class the old code lost. It is RED before the pass-through
+--- exists (nothing is emitted at all), and section 3 closes the loop on the real
+--- injector so the recorder cannot drift away from what is actually written.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Real evtest output, in the exact shape the daemon reads from `evtest --grab`.
--- The mixed stream is deliberate: a held modifier, a press/repeat/release triad,
--- a control key, a key whose name the semantic parser cannot resolve, and the
--- two non-EV_KEY reports that must NOT be forwarded.
-local EVTEST_STREAM = {
-	"Event: time 1700000000.100001, type 1 (EV_KEY), code 42 (KEY_LEFTSHIFT), value 1",
-	"Event: time 1700000000.100002, type 4 (EV_MSC), code 4 (MSC_SCAN), value 458756",
-	"Event: time 1700000000.100003, type 1 (EV_KEY), code 30 (KEY_A), value 1",
-	"Event: time 1700000000.200000, type 1 (EV_KEY), code 30 (KEY_A), value 2",
-	"Event: time 1700000000.300000, type 1 (EV_KEY), code 30 (KEY_A), value 0",
-	"Event: time 1700000000.300001, type 1 (EV_KEY), code 42 (KEY_LEFTSHIFT), value 0",
-	"Event: time 1700000000.400000, type 1 (EV_KEY), code 28 (KEY_ENTER), value 1",
-	"Event: time 1700000000.500000, type 1 (EV_KEY), code 243 (KEY_BRIGHTNESS_CYCLE), value 1",
-	"Event: time 1700000000.500001, -------------- SYN_REPORT ------------",
+local EV_KEY = 1
+local EV_MSC = 4
+local EV_SYN = 0
+
+--- One kernel event, as the reader will decode it.
+--- @param ev_type integer
+--- @param code integer
+--- @param value integer
+--- @return table
+local function ev(ev_type, code, value)
+	return { type = ev_type, code = code, value = value }
+end
+
+-- A mixed stream, deliberately: a held modifier, a press/repeat/release triad, a
+-- control key, a keycode above 255 that the old name pattern could not match,
+-- and the two non-EV_KEY reports that must NOT be forwarded.
+local GRABBED_STREAM = {
+	ev(EV_KEY, 42, 1),    -- KEY_LEFTSHIFT down
+	ev(EV_MSC, 4, 458756),-- MSC_SCAN, duplicate metadata
+	ev(EV_KEY, 30, 1),    -- KEY_A press
+	ev(EV_KEY, 30, 2),    -- KEY_A autorepeat
+	ev(EV_KEY, 30, 0),    -- KEY_A release
+	ev(EV_KEY, 42, 0),    -- KEY_LEFTSHIFT up
+	ev(EV_KEY, 28, 1),    -- KEY_ENTER
+	ev(EV_KEY, 243, 1),   -- KEY_BRIGHTNESS_CYCLE
+	ev(EV_SYN, 0, 0),     -- SYN_REPORT
 }
 
--- libinput debug-events output — the observe-mode format, where the kernel has
--- already delivered the event to the application.
-local LIBINPUT_STREAM = {
-	"event3  KEYBOARD_KEY  +1.234s  KEY_A (30) pressed",
-	"event3  KEYBOARD_KEY  +1.456s  KEY_A (30) released",
-	"event3  KEYBOARD_KEY  +1.678s  KEY_ENTER (28) pressed",
+-- The same device read without a grab: the kernel already delivered each event
+-- to the application.
+local OBSERVED_STREAM = {
+	ev(EV_KEY, 30, 1),
+	ev(EV_KEY, 30, 0),
+	ev(EV_KEY, 28, 1),
 }
 
---- Drives a scripted evdev stream through a freshly loaded hook.
---- @param lines     table   Event lines in arrival order.
+--- Drives a scripted event stream through a freshly loaded hook.
+--- @param events    table   Decoded events in arrival order.
 --- @param intercept boolean Whether the device was grabbed.
 --- @return table emitted Ordered "code:value" strings sent to the uinput channel.
 --- @return table chars   Characters delivered to on_char.
 --- @return table keys    Control-key names delivered to on_key.
-local function drive(lines, intercept)
+local function drive(events, intercept)
 	local kh      = helpers.load_module("adapters.keyboard_hook")
 	local emitted = {}
 	local chars   = {}
 	local keys    = {}
-	local idx     = 0
-	local pipe    = { read = function() idx = idx + 1; return lines[idx] end }
 
-	local function record_raw(code, value)
-		emitted[#emitted + 1] = string.format("%d:%d", code, value)
-	end
+	kh._test_drive(events, {
+		onChar     = function(ch) chars[#chars + 1] = ch end,
+		onKey      = function(name) keys[#keys + 1] = name end,
+		onEmitRaw  = function(code, value)
+			emitted[#emitted + 1] = string.format("%d:%d", code, value)
+		end,
+	}, intercept)
 
-	for _ = 1, #lines do
-		kh._test_inject_and_pump(
-			pipe,
-			function(ch) chars[#chars + 1] = ch end,
-			intercept,
-			nil,
-			record_raw,
-			function(name) keys[#keys + 1] = name end
-		)
-	end
 	return emitted, chars, keys
 end
+
 
 
 
@@ -94,11 +99,11 @@ end
 helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", function()
 
 	helpers.it("forwards modifiers, autorepeat and releases in arrival order", function()
-		local emitted = drive(EVTEST_STREAM, true)
+		local emitted = drive(GRABBED_STREAM, true)
 		-- Every class the pre-fix pump destroyed, in one sequence: the modifier
-		-- down/up pair, the autorepeat (value 2, which the semantic parser maps to
-		-- nil and drops), the release, and KEY_BRIGHTNESS_CYCLE whose second
-		-- underscore the name pattern cannot match. Under a grab, each one of
+		-- down/up pair, the autorepeat (value 2, which the semantic parser mapped
+		-- to nil and dropped), the release, and KEY_BRIGHTNESS_CYCLE whose second
+		-- underscore the name pattern could not match. Under a grab, each one of
 		-- these is a keystroke the user made and the application never sees.
 		helpers.assert_eq(
 			table.concat(emitted, " "),
@@ -108,10 +113,11 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 	end)
 
 	helpers.it("forwards only EV_KEY reports", function()
-		local emitted = drive(EVTEST_STREAM, true)
+		local emitted = drive(GRABBED_STREAM, true)
 		-- MSC_SCAN (type 4) is duplicate scancode metadata and SYN_REPORT is the
-		-- frame terminator ydotool writes itself. Replaying either would put a
-		-- second, contradictory report on the wire for the same keystroke.
+		-- frame terminator the uinput channel writes itself after every key.
+		-- Replaying either would put a second, contradictory report on the wire
+		-- for the same keystroke.
 		for _, pair in ipairs(emitted) do
 			helpers.assert_true(pair ~= "4:458756",
 				"MSC_SCAN must not be replayed as a key event")
@@ -120,25 +126,48 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 	end)
 
 	helpers.it("still dispatches the domain callbacks it forwards", function()
-		local _, chars, keys = drive(EVTEST_STREAM, true)
+		local _, chars, keys = drive(GRABBED_STREAM, true)
 		-- Pass-through runs before the semantic dispatch, so it must not consume
 		-- anything: the hotstring engine still has to see the typed character.
-		helpers.assert_eq(chars, { "A" },
-			"the shifted letter must still reach on_char exactly once (the repeat and the release are not new characters)")
+		--
+		-- TWO characters, not one. The autorepeat is re-emitted, so the
+		-- application inserts a second "A" — and a buffer that counted one while
+		-- the screen showed two would erase the wrong number of characters on the
+		-- next expansion. Ignoring value 2 here was a divergence the grab turned
+		-- into corruption.
+		helpers.assert_eq(chars, { "A", "A" },
+			"the press and the autorepeat each produce a character, because each one "
+				.. "produces a character in the application; the release does not")
 		helpers.assert_eq(keys, { "enter" }, "the control key must still reach on_key")
 	end)
 
+	helpers.it("counts a held key as one physical press", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local physical = {}
+		kh._test_drive({ ev(EV_KEY, 30, 1), ev(EV_KEY, 30, 2), ev(EV_KEY, 30, 2) }, {
+			onPhysical = function(code) physical[#physical + 1] = code end,
+			onEmitRaw  = function() end,
+		}, true)
+		-- The opposite rule to on_char above, and deliberately so: the heatmap
+		-- measures keys the user pressed, and a held key is one press however long
+		-- it is held. Counting repeats would make a stuck key the most-used key on
+		-- the board.
+		helpers.assert_eq(#physical, 1,
+			"autorepeat produces characters but not keystrokes; got " .. #physical)
+	end)
+
 	helpers.it("emits nothing in observe mode", function()
-		local emitted, chars = drive(LIBINPUT_STREAM, false)
-		-- libinput never took the event away, so re-emitting it would type every
-		-- keystroke twice. This is the assertion that keeps the forward inside the
-		-- intercept branch.
+		local emitted, chars = drive(OBSERVED_STREAM, false)
+		-- Without a grab the kernel never took the event away, so re-emitting it
+		-- would type every keystroke twice. This is the assertion that keeps the
+		-- forward inside the intercept branch.
 		helpers.assert_eq(#emitted, 0,
 			"observe mode must not re-emit — the application already received the event")
 		helpers.assert_eq(chars, { "a" }, "observe-mode dispatch is unaffected")
 	end)
 
 end)
+
 
 
 
@@ -178,17 +207,89 @@ helpers.describe("keyboard_hook: refuses to grab without a way back", function()
 			"observe mode consumes nothing, so it needs no emitter")
 	end)
 
-	helpers.it("the daemon supplies the channel it would need to grab", function()
-		-- The flip to intercept must stay a one-word change. If the daemon ever
-		-- stops wiring onEmitRaw, can_capture would refuse at start() and the
-		-- daemon would exit — so this pins the wiring, not the spelling of a flag.
+	--- Reads the daemon entry point's source once for the wiring assertions below.
+	--- @return string The file contents.
+	local function daemon_source()
 		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
-		local src = fh:read("*a"); fh:close()
-		helpers.assert_true(src:find("onEmitRaw", 1, true) ~= nil,
+		local src = fh:read("*a")
+		fh:close()
+		return src
+	end
+
+	helpers.it("the daemon supplies the channel the grab needs", function()
+		-- Without onEmitRaw, can_capture refuses at start() and the daemon exits.
+		-- Pins the wiring, not the spelling of a flag.
+		helpers.assert_true(daemon_source():find("onEmitRaw", 1, true) ~= nil,
 			"ergopti_hotstrings.lua must pass onEmitRaw to keyboard_hook.start")
 	end)
 
+	helpers.it("the daemon opens the non-forking channel, and opens it before grabbing", function()
+		-- The grab was enabled on the strength of a comment claiming re-emission no
+		-- longer forks. It did fork: open_fast_channel() had no caller outside its
+		-- own test, so `_uinput` was always nil and emit_key fell through to
+		-- `ydotool key` — one subprocess per physical keystroke, under a grab that
+		-- was already on by default. The justification for the default was true of
+		-- the code that existed and false of the code that ran.
+		--
+		-- Order is the assertion, not presence. Between taking the grab and opening
+		-- the channel the daemon owns the keyboard and can only hand keys back one
+		-- fork at a time, which is precisely the state the grab was held back for.
+		local src = daemon_source()
+		local open_at  = src:find("injector%.open_fast_channel%(%)")
+		local start_at = src:find("keyboard_hook%.start%(")
+		helpers.assert_true(open_at ~= nil,
+			"the daemon must call injector.open_fast_channel() — without it the FFI "
+				.. "uinput writer is unreachable and every re-emit is a subprocess")
+		helpers.assert_true(start_at ~= nil, "and it must still start the keyboard hook")
+		helpers.assert_true(open_at < start_at,
+			"open_fast_channel() must come BEFORE keyboard_hook.start(): opening after "
+				.. "the grab leaves a window in which the daemon owns the keyboard and "
+				.. "forks once per key to give it back")
+	end)
+
+	helpers.it("the daemon closes the channel on both exit paths", function()
+		-- UI_DEV_DESTROY never ran either: close_fast_channel() had no caller. A
+		-- daemon killed with SIGTERM left its uinput device behind, and the next
+		-- start enumerated two of them.
+		local src = daemon_source()
+		local closes = 0
+		for _ in src:gmatch("injector%.close_fast_channel%(%)") do closes = closes + 1 end
+		helpers.assert_true(closes >= 2,
+			"close_fast_channel() must run on the signal path AND on the normal exit "
+				.. "path; a daemon that only tidies up when asked politely leaks the "
+				.. "device on every SIGTERM, and found " .. closes .. " call site(s)")
+	end)
+
+	helpers.it("the daemon grabs the device by default", function()
+		-- THE regression this whole item exists for. Observe mode lets physical
+		-- keystrokes reach the application while an expansion is being typed, so
+		-- the user's next keys interleave with the synthetic backspaces and the
+		-- text is scrambled non-deterministically — "abcd" becoming "acd". The
+		-- daemon shipped in observe mode for its whole life because `intercept`
+		-- was simply never passed, and nothing said so: an absent option reads as
+		-- a default, not as a bug.
+		local src = daemon_source()
+		helpers.assert_true(src:find("intercept%s*=%s*opts%.grab") ~= nil,
+			"keyboard_hook.start must be given intercept = opts.grab — a daemon that "
+				.. "omits the option silently reverts to the corrupting observe mode")
+		helpers.assert_true(src:find("grab%s*=%s*true") ~= nil,
+			"opts.grab must DEFAULT to true; --no-grab is the escape hatch, and a "
+				.. "default of false makes the escape hatch the norm again")
+	end)
+
+	helpers.it("--no-grab still exists as the way out", function()
+		-- The grab has never run on real hardware. The two daemons now agree on
+		-- which device is whose, but agreement in the config is not the same as
+		-- agreement on a machine we have never booted, so there has to be a way
+		-- back that does not need a rebuild.
+		local src = daemon_source()
+		helpers.assert_true(src:find('"%-%-no%-grab"') ~= nil,
+			"the --no-grab flag must remain parseable — it is the only recovery path "
+				.. "if the grab picks the wrong device")
+	end)
+
 end)
+
 
 
 
@@ -201,43 +302,51 @@ end)
 
 helpers.describe("injector: emit_key puts a raw event back on the wire", function()
 
-	--- Captures the commands the real injector would run.
-	--- @param fn function Body executed with the capturing runner installed.
-	--- @return table Commands in emission order.
-	local function capture(fn)
-		local injector = helpers.load_module("modules.hotstrings.injector")
-		local cmds = {}
-		injector._set_runner(function(cmd)
-			cmds[#cmds + 1] = cmd
-			return true
-		end)
-		local ok, err = pcall(fn, injector)
-		injector._reset_runner()
-		if not ok then error(err, 0) end
-		return cmds
+	--- Records what the uinput channel is asked to emit.
+	--- @return table channel, table emitted
+	local function recorder()
+		local emitted = {}
+		return {
+			is_open = function() return true end,
+			emit = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}, emitted
 	end
 
-	helpers.it("emits a press and a release with the ydotool code:value form", function()
-		local cmds = capture(function(injector)
-			injector.emit_key(30, 1)
-			injector.emit_key(30, 0)
-		end)
-		helpers.assert_eq(cmds, { "ydotool key 30:1", "ydotool key 30:0" },
-			"a forwarded event must reach ydotool as its own keycode and direction")
+	helpers.it("hands the channel the keycode and direction unchanged", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local channel, emitted = recorder()
+		injector._set_uinput(channel)
+		injector.emit_key(30, 1)
+		injector.emit_key(30, 0)
+		injector._set_uinput(nil)
+		helpers.assert_eq(emitted, { "30:1", "30:0" },
+			"a forwarded event must reach the wire as its own keycode and direction")
 	end)
 
-	helpers.it("re-emits an autorepeat as a press", function()
-		local cmds = capture(function(injector) injector.emit_key(30, 2) end)
-		-- ydotool's wire format has no repeat encoding. Dropping the event instead
-		-- would make a held key stop repeating the moment the daemon grabs it.
-		helpers.assert_eq(cmds, { "ydotool key 30:1" },
-			"evdev value 2 must be forwarded as a press, never dropped")
+	helpers.it("re-emits an autorepeat as an autorepeat", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local channel, emitted = recorder()
+		injector._set_uinput(channel)
+		injector.emit_key(30, 2)
+		injector._set_uinput(nil)
+		-- uinput carries value 2 natively. Collapsing it into a press was a
+		-- ydotool limitation, and a pass-through that rewrites what it passes is
+		-- not a pass-through.
+		helpers.assert_eq(emitted, { "30:2" },
+			"evdev value 2 must be forwarded as itself, never rewritten or dropped")
 	end)
 
 	helpers.it("emits nothing for a non-numeric event", function()
-		local cmds = capture(function(injector) injector.emit_key("30", nil) end)
-		helpers.assert_eq(#cmds, 0,
-			"a malformed event must be rejected before it reaches the shell")
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local channel, emitted = recorder()
+		injector._set_uinput(channel)
+		injector.emit_key("30", nil)
+		injector._set_uinput(nil)
+		helpers.assert_eq(#emitted, 0,
+			"a malformed event must be rejected before it reaches the device")
 	end)
 
 end)

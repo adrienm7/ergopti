@@ -21,13 +21,19 @@ local helpers = require("tests.helpers")
 
 
 
--- ==============================================================================
+-- =============================================================================
 -- =============================================================================
 -- ======= 1/ app_filter.is_blocked empty-name guard (llm-api-support-1) =======
 -- =============================================================================
--- ==============================================================================
+-- =============================================================================
 
 helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
+	local function load_filter(ignored_state)
+		package.loaded["modules.keymap.utils"] = {
+			is_ignored_window = function() return ignored_state end,
+		}
+		return helpers.load_with_stubs("modules.llm.app_filter")
+	end
 
 	-- Each fake app must include all three methods that is_blocked() calls on the
 	-- front object (bundleID, path, name). The default hs.application stub only has
@@ -57,7 +63,7 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 	end
 
 	helpers.it("does NOT block a nameless app when exclusion is name-only", function()
-		local AF = helpers.load_with_stubs("modules.llm.app_filter")
+		local AF = load_filter(false)
 		set_front(make_nameless_front())
 
 		local exclusions = { { name = "Slack" } }
@@ -68,7 +74,7 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 	end)
 
 	helpers.it("DOES block a matching named app (non-regression)", function()
-		local AF = helpers.load_with_stubs("modules.llm.app_filter")
+		local AF = load_filter(false)
 		set_front(make_named_front("Slack"))
 
 		local exclusions = { { name = "Slack" } }
@@ -79,7 +85,7 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 	end)
 
 	helpers.it("does NOT block a non-matching named app", function()
-		local AF = helpers.load_with_stubs("modules.llm.app_filter")
+		local AF = load_filter(false)
 		set_front(make_named_front("Terminal"))
 
 		local exclusions = { { name = "Slack" } }
@@ -88,17 +94,35 @@ helpers.describe("llm.app_filter — is_blocked empty-name guard", function()
 		helpers.assert_true(result == false,
 			"is_blocked must return false for an app that does not match any exclusion")
 	end)
+
+	helpers.it("blocks while ignored-window ownership is unknown", function()
+		local AF = load_filter(nil)
+		local front_reads = 0
+		_G.hs.application.frontmostApplication = function()
+			front_reads = front_reads + 1
+			return make_named_front("Terminal")
+		end
+
+		local result = AF.is_blocked({
+			ignored_window_titles = {},
+			ignored_window_patterns = {},
+		}, {}, false, false)
+		helpers.assert_eq(result, true,
+			"an unclassified focus transition must fail closed before an LLM request")
+		helpers.assert_eq(front_reads, 0,
+			"the fail-closed cache result must avoid every later application/AX query")
+	end)
 end)
 
 
 
 
 
--- =====================================================
+-- ====================================================
 -- ====================================================
 -- ======= 2/ CoreState model seed (llm-core-1) =======
 -- ====================================================
--- =====================================================
+-- ====================================================
 
 helpers.describe("llm.init — CoreState seeded with default model names", function()
 
@@ -117,12 +141,12 @@ helpers.describe("llm.init — CoreState seeded with default model names", funct
 			get_model_prices_for = function() return nil end,
 		}
 
+		-- Asserted, not skipped. Every dependency this module needs is stubbed a few
+		-- lines above, so "could not load in this environment" describes an
+		-- environment that no longer exists — while making a genuine load failure
+		-- pass silently, in the file that exists to check what the module seeds.
 		local ok, Core = pcall(helpers.load_with_stubs, "modules.llm")
-		if not ok then
-			-- The module may fail to load in CI without all deps; skip gracefully
-			helpers.assert_true(true, "skipped — modules.llm could not load in this environment")
-			return
-		end
+		helpers.assert_true(ok, "modules.llm must load against the stubs above: " .. tostring(Core))
 
 		-- Without any setter call, get_current_model() must not be nil or ""
 		local model = Core.get_current_model()
@@ -143,10 +167,7 @@ helpers.describe("llm.init — CoreState seeded with default model names", funct
 		}
 
 		local ok, Core = pcall(helpers.load_with_stubs, "modules.llm")
-		if not ok then
-			helpers.assert_true(true, "skipped — modules.llm could not load in this environment")
-			return
-		end
+		helpers.assert_true(ok, "modules.llm must load against the stubs above: " .. tostring(Core))
 
 		Core.set_backend("mlx")
 		local model = Core.get_current_model()

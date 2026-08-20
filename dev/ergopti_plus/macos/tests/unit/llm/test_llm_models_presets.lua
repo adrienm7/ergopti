@@ -2,18 +2,18 @@
 local helpers = require("tests.helpers")
 
 -- Bootstrap the hs stub so hs.json.decode is available
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
--- Mock required modules that might be missing or fail without full environment
-package.loaded["modules.llm.models_mgr"] = {
-	get_model_ram = function() return 0 end,
-	is_model_installed = function() return false end
-}
+-- No models_mgr stub here. Two used to sit at this spot — "modules.llm.models_mgr"
+-- and "ui.menu.menu_llm.models_mgr" — and neither module has ever existed:
+-- models_manager requires models_manager_ollama and models_manager_mlx. Both
+-- stubs were inert from the day they were written, and the comment above them
+-- ("modules that might be missing") shows the doubt was there at the time. An
+-- inert stub is indistinguishable from a working one from inside the test, which
+-- is why they survived; test-stubs-intercept-something.cjs now says so out loud.
 
-package.loaded["ui.menu.menu_llm.models_mgr"] = package.loaded["modules.llm.models_mgr"]
-
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	get = function(key) return key end
 }
 

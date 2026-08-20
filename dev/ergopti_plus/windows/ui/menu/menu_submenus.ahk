@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; InitSubMenus and the dynamic-hotstrings submenu builder plus the per-category enabled/total counters that feed the menu title suffixes.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -33,12 +33,48 @@ InitSubMenus() {
 	; includes "-" separators); falls back to manifest declaration order when
 	; the TOML has no sections_order.
 	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
-		SubMenu := Menu()
+		; Rows first, in the order the user sees them, and the renderer draws them
+		; at the end. This block used to append the open-file item and the sections
+		; and THEN splice the category toggle and the two bulk actions on top with
+		; RegisterMenuItemInsert("1&"/"2&"/"3&") — three inserts by position to
+		; express « these three come first », which building the array in order says
+		; on its own.
+		Rows := []
+		; THE ORDER BELOW IS THE SHARED ONE, and the three drivers had three of
+		; them until 2026-08-07: this driver put the two bulk actions above
+		; « ouvrir le fichier », Linux put them below it, and macOS had no category
+		; gate row at all. Same submenu, same five categories, three layouts.
+		;
+		;   1. the category gate — everything under it is inert while it is off
+		;   2. « ouvrir le fichier », when the category has one
+		;   3. ─────────
+		;   4. « tout activer »
+		;   5. « tout désactiver »
+		;   6. ─────────
+		;   7. the sections
+		;
+		; Its state drives the parent menu checkmark (IsCategoryGated), independent
+		; of how many individual sections are checked. Capture V1Cat by value so
+		; each closure toggles its own category.
+		Rows.Push(Map(
+			"label",  IsCategoryGated(V1Cat)
+				? t("menu.hotstrings.category_on")
+				: t("menu.hotstrings.category_off"),
+			"action", ((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat)))
+
 		TomlPath := _SharedDir . "\modules\hotstrings\" . StrLower(V1Cat) . ".toml"
 		if FileExist(TomlPath) {
-			RegisterMenuItem(SubMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TomlPath))
-			SubMenu.Add()
+			Rows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath)))
 		}
+		Rows.Push(Map("separator", true))
+		; Section-level bulk actions for this category.
+		Rows.Push(Map(
+			"label",  t("menu.hotstrings.enable_all"),
+			"action", ((c) => (*) => ToggleCategoryAllSections(c, true))(V1Cat)))
+		Rows.Push(Map(
+			"label",  t("menu.hotstrings.disable_all"),
+			"action", ((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat)))
+		Rows.Push(Map("separator", true))
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		if (V2Section != "") {
 			Entries := ManifestFeaturesForSection(V2Section)
@@ -59,7 +95,7 @@ InitSubMenus() {
 				for _, SecId in SectionsOrder {
 					if (SecId == "-") {
 						if !_PrevWasSep {
-							SubMenu.Add()
+							Rows.Push(Map("separator", true))
 							_PrevWasSep := true
 						}
 						continue
@@ -68,8 +104,11 @@ InitSubMenus() {
 						continue
 					}
 					if EntryBySectionId.Has(SecId) {
-						MenuAddItemFromManifest(SubMenu, EntryBySectionId[SecId], V1Cat)
-						_PrevWasSep := false
+						Row := MenuRowFromManifest(EntryBySectionId[SecId], V1Cat)
+						if (Row != "") {
+							Rows.Push(Row)
+							_PrevWasSep := false
+						}
 					}
 				}
 			} else {
@@ -80,26 +119,15 @@ InitSubMenus() {
 					if (V1Cat == "MagicKey" and Parts[Parts.Length] == "replace") {
 						continue
 					}
-					MenuAddItemFromManifest(SubMenu, Entry, V1Cat)
+					Row := MenuRowFromManifest(Entry, V1Cat)
+					if (Row != "") {
+						Rows.Push(Row)
+					}
 				}
 			}
 		}
-		; Top of the submenu: an enable/disable toggle for the whole TOML file,
-		; mirroring the module toggles (Disposition, Metrics, ...). Inserted at
-		; position 1& so it sits directly above the open-file item with NO
-		; separator between them. Its state drives the parent menu checkmark
-		; (IsCategoryGated), independent of how many individual sections are
-		; checked. Capture V1Cat by value so each closure toggles its own category.
-		_CatToggleLabel := IsCategoryGated(V1Cat)
-			? t("menu.hotstrings.category_on")
-			: t("menu.hotstrings.category_off")
-		RegisterMenuItemInsert(SubMenu, "1&", _CatToggleLabel,
-			((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat))
-		; Section-level bulk actions for this category, just under its gate toggle.
-		RegisterMenuItemInsert(SubMenu, "2&", t("menu.hotstrings.enable_all"),
-			((c) => (*) => ToggleCategoryAllSections(c, true))(V1Cat))
-		RegisterMenuItemInsert(SubMenu, "3&", t("menu.hotstrings.disable_all"),
-			((c) => (*) => ToggleCategoryAllSections(c, false))(V1Cat))
+		SubMenu := Menu()
+		MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_" . V1Cat, Rows)
 		SubMenus[V1Cat] := SubMenu
 		; Per-category attribution. This loop is the largest post-ready boot
 		; segment by a wide margin — 1094 ms of a 3406 ms warm boot on 2026-07-30,
@@ -120,16 +148,6 @@ InitSubMenus() {
 
 	; Shortcuts — Accents + WrapTextIfSelected + Modifier combos + transitional Personal.
 	SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()
-	; Splice the Alt/Ctrl/Ctrl+Shift/Win keyboard-shortcut groups in above the
-	; modifier-combos anchor HERE, at the single construction point of the menu
-	; object. InsertKeyboardShortcutGroups is a plain Menu.Insert sequence with no
-	; idempotence check, and AHK v2's Menu.Insert appends on an existing label
-	; instead of merging the way Menu.Add does — so running it twice on the same
-	; Menu duplicates all four groups plus their separator. It used to run from
-	; initMenu(), which _Updater_RebuildMenu calls ALONE (no InitSubMenus), so
-	; every updater-driven tray refresh grew the submenu by five more rows,
-	; unbounded until the next Reload.
-	InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
 	BootProfile_Mark("MENU/InitSub: shortcuts submenu")
 
 	; TapHolds — built from the v2 variant tables in tap_hold_writer.ahk.
@@ -142,14 +160,18 @@ InitSubMenus() {
 ; the personal-info editor entry right after the text-expansion item.
 _BuildDynamicHotstringsSubmenu() {
 	global _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
-	SubMenu := Menu()
+	Rows := []
 	; Section-level bulk actions for the dynamic-hotstrings category.
-	RegisterMenuItem(SubMenu, t("menu.hotstrings.enable_all"),  (*) => ToggleCategoryAllSections("DynamicHotstrings", true))
-	RegisterMenuItem(SubMenu, t("menu.hotstrings.disable_all"), (*) => ToggleCategoryAllSections("DynamicHotstrings", false))
-	SubMenu.Add()
+	Rows.Push(Map(
+		"label",  t("menu.hotstrings.enable_all"),
+		"action", (*) => ToggleCategoryAllSections("DynamicHotstrings", true)))
+	Rows.Push(Map(
+		"label",  t("menu.hotstrings.disable_all"),
+		"action", (*) => ToggleCategoryAllSections("DynamicHotstrings", false)))
+	Rows.Push(Map("separator", true))
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
-			SubMenu.Add()
+			Rows.Push(Map("separator", true))
 			continue
 		}
 		if !_LegacyDynamicHotstringsKeyMap.Has(V1Id) {
@@ -164,12 +186,18 @@ _BuildDynamicHotstringsSubmenu() {
 				"DynamicHotstrings: no manifest entry for '{1}' — skipped.", V1Id)
 			continue
 		}
-		MenuAddItemFromManifest(SubMenu, Entry, "DynamicHotstrings")
+		Row := MenuRowFromManifest(Entry, "DynamicHotstrings")
+		if (Row != "") {
+			Rows.Push(Row)
+		}
 		if (V1Id == "TextExpansionPersonalInformation") {
-			RegisterMenuItem(SubMenu,
-				t("menu.shortcuts.edit_personal_info"), PersonalInformationEditor)
+			Rows.Push(Map(
+				"label",  t("menu.shortcuts.edit_personal_info"),
+				"action", PersonalInformationEditor))
 		}
 	}
+	SubMenu := Menu()
+	MenuRenderer_AppendRows(SubMenu, "hotstrings_menu", "hotstring_category_DynamicHotstrings", Rows)
 	return SubMenu
 }
 
@@ -197,9 +225,10 @@ _CountEnabledForCategory(V1Cat) {
 
 ; Collect every canonical v2 feature path that belongs to the Hotstrings
 ; category: flat TOML categories (autocorrection, distances_reduction, …),
-; dynamic hotstrings, and personal TOML sections. Used by the "tout activer"
-; actions to enable every individual feature in one v2 batch write.
-_CollectAllHotstringsV2Paths() {
+; dynamic hotstrings, and personal TOML sections. Runtime-discovered personal
+; nodes are seeded only in the caller's detached candidate, never in live state
+; before persistence succeeds.
+_CollectAllHotstringsV2Paths(FeaturesTarget) {
 	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
 	Paths := []
 
@@ -226,7 +255,7 @@ _CollectAllHotstringsV2Paths() {
 		PersonalTomlData := ReadPersonalToml()
 		for _, SecName in PersonalTomlData["sections_order"] {
 			if (SecName != "-") {
-				EnsurePersonalHotstringFeature(SecName)
+				_ConfigSeedPersonalHotstring(FeaturesTarget, SecName)
 				Paths.Push("hotstrings.personal." . StrLower(SecName))
 			}
 		}
@@ -234,5 +263,4 @@ _CollectAllHotstringsV2Paths() {
 
 	return Paths
 }
-
 

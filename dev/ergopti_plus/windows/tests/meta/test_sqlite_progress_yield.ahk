@@ -4,7 +4,7 @@
 
 _SSPY_AssertYieldOpsParams() {
 	; Move-resilient: scan the whole driver source via the framework helper instead
-	; of a pinned lib/sqlite3.ahk read. The exact signature strings below are unique
+	; of a pinned infra/sqlite3.ahk read. The exact signature strings below are unique
 	; to sqlite3.ahk, so the whole-tree scope cannot trivially satisfy them.
 	Src := _DriverSourceConcat()
 
@@ -33,16 +33,23 @@ _SSPY_AssertProgressHandler() {
 }
 
 _SSPY_AssertProgressHandlerDeregisteredOnError() {
-	; Locate the prepare-failure block inside SQLite_Exec and verify it
-	; deregisters the progress handler (Int 0 disables it) before returning.
-	; Without this the handler stays installed permanently after a bad SQL string.
+	; The direct DllCall is centralized so every error exit shares the same
+	; deregistration contract instead of growing sibling copies that can drift.
+	ClearBody := _DriverFuncBody("SQLite_ClearProgressHandler")
+	Assert(ClearBody != "", "SQLite_ClearProgressHandler must exist")
+	Assert(InStr(ClearBody, "sqlite3_progress_handler") > 0
+		&& InStr(ClearBody, '"Int", 0') > 0,
+		"the shared cleanup helper must disable sqlite3_progress_handler with Int 0")
+
+	; Locate the prepare-failure block inside SQLite_Exec and verify it routes
+	; through that helper before returning. Without this the handler stays
+	; installed permanently after a bad SQL string.
 	ExecBody := _DriverFuncBody("SQLite_Exec")
 	ExecPrepErrIdx := InStr(ExecBody, "sqlite3_prepare_v2 failed")
 	Assert(ExecPrepErrIdx > 0, "SQLite_Exec must have a prepare-failure error path (sqlite-progress-handler-leaked-on-prepare-error)")
 	ExecErrBlock := SubStr(ExecBody, ExecPrepErrIdx)
-	; The deregistration call uses "Int", 0 to disable the handler
-	ExecDeregIdx := InStr(ExecErrBlock, '"Int", 0')
-	Assert(ExecDeregIdx > 0, "SQLite_Exec prepare-failure path must deregister the progress handler with sqlite3_progress_handler(..., Int 0, ...) (sqlite-progress-handler-leaked-on-prepare-error)")
+	ExecDeregIdx := InStr(ExecErrBlock, "SQLite_ClearProgressHandler")
+	Assert(ExecDeregIdx > 0, "SQLite_Exec prepare-failure path must route through the shared progress-handler cleanup (sqlite-progress-handler-leaked-on-prepare-error)")
 
 	; Locate the early-return block inside SQLite_Query (prepare failure /
 	; null statement) and verify the same deregistration is present there.
@@ -50,8 +57,8 @@ _SSPY_AssertProgressHandlerDeregisteredOnError() {
 	QueryPrepErrIdx := InStr(QueryBody, "rc != SQLiteConst.OK || !pstmt")
 	Assert(QueryPrepErrIdx > 0, "SQLite_Query must have a prepare-failure early-return path (sqlite-progress-handler-leaked-on-prepare-error)")
 	QueryErrBlock := SubStr(QueryBody, QueryPrepErrIdx)
-	QueryDeregIdx := InStr(QueryErrBlock, '"Int", 0')
-	Assert(QueryDeregIdx > 0, "SQLite_Query prepare-failure path must deregister the progress handler with sqlite3_progress_handler(..., Int 0, ...) (sqlite-progress-handler-leaked-on-prepare-error)")
+	QueryDeregIdx := InStr(QueryErrBlock, "SQLite_ClearProgressHandler")
+	Assert(QueryDeregIdx > 0, "SQLite_Query prepare-failure path must route through the shared progress-handler cleanup (sqlite-progress-handler-leaked-on-prepare-error)")
 }
 
 Test("sqlite: SQLite_Exec and SQLite_Query expose YieldOps (sqlite-wrapper-no-bounded-blocking-on-main-thread)", _SSPY_AssertYieldOpsParams)

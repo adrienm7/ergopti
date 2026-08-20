@@ -26,37 +26,54 @@ helpers.describe("wpm_widget: update_widget() survives a nil hs.screen.mainScree
 	local function load_widget_with_nil_screen()
 		local logged_errors = {}
 		package.loaded["modules.keylogger"] = { get_live_stats = function() return { wpm = 5 } end }
-		package.loaded["lib.logger"] = helpers.make_logger_stub()
-		package.loaded["lib.logger"].error = function(_log, fmt, ...)
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end
 		local Widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
 			screen = { mainScreen = function() return nil end },
 			timer  = {
-				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
+				new = function(_interval, fn)
+					local timer = { active = false, _fn = fn }
+					timer.start = function() timer.active = true; return timer end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
+				end,
 				absoluteTime = function() return 0 end,
 			},
 			eventtap = {
-				new = function(_types, _cb) return { start = function() end, stop = function() end } end,
+				new = function(_types, _cb)
+					local tap = { enabled = false }
+					tap.start = function(self) self.enabled = true; return self end
+					tap.stop = function(self) self.enabled = false; return self end
+					tap.isEnabled = function(self) return self.enabled end
+					return tap
+				end,
 				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
 			},
 		})
 		-- Re-bind the logger the widget module already captured a local reference
 		-- to at require-time — load_with_stubs sets package.loaded before require,
-		-- so the module's `local Logger = require("lib.logger")` sees our stub.
+		-- so the module's `local Logger = require("infra.logger")` sees our stub.
 		-- Release the stub from the cache now that wpm_widget has already bound
 		-- its own upvalue to it — otherwise this incomplete stub (no .LEVELS/
-		-- .current_level) leaks into every later require("lib.logger") for the
+		-- .current_level) leaks into every later require("infra.logger") for the
 		-- rest of the full-suite process (the exact test-harness stale-cache
 		-- class documented for F-HIGH-23).
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		return Widget, logged_errors
 	end
 
 	helpers.it("does not propagate an error when mainScreen() is nil", function()
 		local Widget = load_widget_with_nil_screen()
-		local ok = pcall(function() Widget.start(false) end)
-		helpers.assert_true(ok, "M.start() (which calls update_widget()) must not raise when mainScreen() is nil")
+		-- Called directly: a raise fails with the real error. What the guard must
+		-- leave behind is a stoppable widget — a start that wedged itself would leak
+		-- its timer for the session.
+		Widget.start(false)
+		Widget.stop()
+		helpers.assert_eq(type(Widget.start), "function",
+			"a start with no main screen must leave the widget restartable")
 	end)
 
 	helpers.it("logs an ERROR-level line when mainScreen() is nil", function()
@@ -69,10 +86,11 @@ end)
 
 helpers.describe("wpm_widget: update_widget() body is pcall-guarded at source (F-HIGH-11)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/wpm/wpm_widget.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open wpm_widget.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/wpm/wpm_widget.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_shared_constants_path")
+		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 		return src
 	end
 
@@ -97,26 +115,34 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 		package.loaded["modules.keylogger"] = {
 			get_live_stats = function() error("simulated keylogger failure") end,
 		}
-		package.loaded["lib.logger"] = helpers.make_logger_stub()
-		package.loaded["lib.logger"].error = function(_log, fmt, ...)
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end
 		local Menubar = helpers.load_with_stubs("ui.wpm.wpm_menubar", {
 			timer = {
-				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
+				new = function(_interval, fn)
+					local timer = { active = false, _fn = fn }
+					timer.start = function() timer.active = true; return timer end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
+				end,
 				absoluteTime = function() return 0 end,
 			},
 		})
 		-- See load_widget_with_nil_screen() above: release the stub from the
 		-- cache now that wpm_menubar has already bound its own upvalue to it.
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		return Menubar, logged_errors
 	end
 
 	helpers.it("does not propagate an error when get_live_stats() throws", function()
 		local Menubar = load_menubar_with_throwing_stats()
-		local ok = pcall(function() Menubar.start() end)
-		helpers.assert_true(ok, "M.start() (which calls update_menubar()) must not raise on a downstream failure")
+		Menubar.start()
+		Menubar.stop()
+		helpers.assert_eq(type(Menubar.start), "function",
+			"a start that hit a downstream failure must leave the menubar restartable")
 	end)
 
 	helpers.it("logs an ERROR-level line when the update body throws", function()

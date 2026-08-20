@@ -26,8 +26,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 -- =====================================
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local ROT = helpers.load_with_stubs("modules.keylogger.rotation")
 
@@ -84,24 +84,28 @@ end)
 helpers.describe("rotation — pre-init guard", function()
 	helpers.it("append_log before init does not crash", function()
 		local r = helpers.load_with_stubs("modules.keylogger.rotation")
-		local ok = pcall(function()
-			r.append_log({ type = "typing", text = "hello" })
-		end)
-		helpers.assert_true(ok)
+		-- Called directly. An append before init must write NOTHING: the offset is
+		-- still zero, and a line written past it is a line the next flush replays.
+		helpers.assert_eq(r.append_log({ type = "typing", text = "hello" }), false,
+			"an append rejected by the pre-init guard must report exact false")
+		helpers.assert_eq(r.get_offset(), 0,
+			"an append before init must not advance the offset")
 	end)
 
-	helpers.it("read_new_entries before init returns empty list and offset 0", function()
+	helpers.it("read_new_entries before init returns a failed status at offset 0", function()
 		local r = helpers.load_with_stubs("modules.keylogger.rotation")
-		local entries, off = r.read_new_entries()
+		local entries, off, status = r.read_new_entries()
 		helpers.assert_eq(type(entries), "table")
 		helpers.assert_eq(#entries, 0)
 		helpers.assert_eq(off, 0)
+		helpers.assert_eq(status, r.READ_STATUS_FAILED)
 	end)
 
 	helpers.it("rollover before init does not crash", function()
 		local r = helpers.load_with_stubs("modules.keylogger.rotation")
-		local ok = pcall(function() r.rollover("/tmp/data.sql") end)
-		helpers.assert_true(ok)
+		r.rollover("/tmp/data.sql")
+		helpers.assert_eq(r.get_offset(), 0,
+			"a rollover before init must leave the offset where it was")
 	end)
 end)
 
@@ -171,14 +175,32 @@ helpers.describe("rotation — init validation", function()
 		helpers.assert_eq(r.get_offset(), 512)
 	end)
 
-	helpers.it("pause must silence rollover and append in real driver paths (project_suspend_pause_invariant)", function()
-		-- rotation.rollover / append_log must be no-op or gated when script_control.is_paused.
-		helpers.assert_true(true, "keylogger rotation must not write or rollover while paused")
+	-- Rotation owns file offsets and day boundaries, not the decision to record.
+	-- Both claims below used to be assert_true(true) with the sentence attached;
+	-- both are checkable against the module's own source.
+	helpers.it("holds no pause state of its own (project_suspend_pause_invariant)", function()
+		-- The gate is the keystroke path's early return. A second check here would
+		-- mean two modules decide whether a keystroke is recorded, and the one
+		-- that loses silently advances an offset past bytes nobody wrote.
+		local src = helpers.read_driver_source("function M.set_offset")
+		helpers.assert_true(src ~= nil, "modules/keylogger/rotation.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"rotation must not gate on pause — the ingest path early-returns before reaching it")
+		helpers.assert_true(src:find("suspend") == nil, "same for suspend")
 	end)
 
-	helpers.it("rollover on day boundary must preserve privacy (no PII in offset state)", function()
-		-- Rollover must not leak raw keys into state or logs.
-		helpers.assert_true(true)
+	helpers.it("the offset state it exposes carries no keystroke content", function()
+		-- The privacy claim is narrow and precise: rotation's public state is an
+		-- integer and a date. If a future change parked the pending buffer here
+		-- so a rollover could re-emit it, this module would start holding raw
+		-- keys — in a table that is written to disk on every rotation.
+		local r = helpers.load_with_stubs("modules.keylogger.rotation")
+		r.init({ paths = { today_log_path = "/tmp/today.log" }, state = {} })
+		r.set_offset(4096, "2024-06-15")
+		helpers.assert_eq(type(r.get_offset()), "number", "the offset must stay a byte count")
+		helpers.assert_eq(type(r.get_date()), "string", "the date must stay a date")
+		helpers.assert_eq(r.get_date(), "2024-06-15",
+			"and it must be the date that was set, not a value derived from what was typed")
 	end)
 end)
 
@@ -200,7 +222,10 @@ helpers.describe("rotation — set_offset / get_offset / get_date", function()
 			paths = { today_log_path = "/tmp/today.log" },
 			state = {},
 		})
-		helpers.assert_true(true)
+		-- The setup case earns its place by asserting the starting point the cases
+		-- below depend on: they all measure a CHANGE from zero, and read as passing
+		-- if init silently left a stale offset behind.
+		helpers.assert_eq(r.get_offset(), 0, "a fresh init must start at offset zero")
 	end)
 
 	helpers.it("set_offset updates both offset and date", function()
@@ -245,8 +270,10 @@ helpers.describe("rotation — rollover", function()
 		-- rollover writes a comment line to data_sql_path; the hs stub intercepts io.
 		-- We use a non-existent path — io.open in append mode will silently fail or
 		-- succeed depending on the OS; either way, rollover must not throw.
-		local ok = pcall(function() r.rollover("/tmp/test_data.sql") end)
-		helpers.assert_true(ok)
+		-- Called directly. A rollover RESETS the offset — that is what it is for, and
+		-- an offset left where it was means the next read replays a whole day.
+		r.rollover("/tmp/test_data.sql", r.READ_STATUS_EOF)
+		helpers.assert_eq(r.get_offset(), 0, "a rollover must reset the offset to zero")
 
 		-- Offset must be 0 after rollover regardless of io success.
 		helpers.assert_eq(r.get_offset(), 0)

@@ -47,21 +47,16 @@
 ; ======================================================
 
 _PBT_BackspaceIsNotAResetKey() {
-	Body := _DriverFuncBody("_PrefixWatcherOnKeyDown")
-	if (Body == "")
-		Body := _DriverDirConcat("lib/hotstrings")
-	Assert(Body != "", "the watcher key-down path must be readable")
+	Body := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(InStr(Body, "_PrefixFeedBackspace()") > 0,
 		"backspace must shrink the watcher buffer by one character — wiping it left the engine still able to fire a hotstring the tooltip had stopped offering, because HSE_FeedBackspace only decrements")
 }
 
 ; The decrement must actually be a decrement, and must not underflow.
 ;
-; HSE_Buffer is set explicitly throughout: the production caller always runs
-; HSE_FeedBackspace immediately BEFORE this helper, so the engine side is
-; already up to date by the time it is entered. Leaving it to whatever a
-; previous test happened to leave behind would make these assertions depend on
-; execution order.
+; HSE_Buffer is set explicitly throughout: the production helper owns both
+; decrements as one transaction. Leaving it to whatever a previous test happened
+; to leave behind would make these assertions depend on execution order.
 _PBT_BackspaceDecrementsByOne() {
 	global _PrefixBuffer, HSE_Buffer
 	Saved := _PrefixBuffer
@@ -72,6 +67,8 @@ _PBT_BackspaceDecrementsByOne() {
 		_PrefixFeedBackspace()
 		Assert(_PrefixBuffer == "ab",
 			"one backspace must remove exactly one character — got '" . _PrefixBuffer . "'")
+		Assert(HSE_Buffer == "ab",
+			"the same backspace must decrement the engine exactly once — got '" . HSE_Buffer . "'")
 
 		_PrefixFeedBackspace()
 		_PrefixFeedBackspace()
@@ -100,12 +97,14 @@ _PBT_BackspaceRecoversTheWordTheEngineStillHolds() {
 	Saved := _PrefixBuffer
 	SavedEngine := HSE_Buffer
 	try {
-		; State right after backspacing the space out of "bonjour ": the engine
-		; has shrunk back to the word, the preview was reset when the space was
-		; typed and has nothing of its own left.
-		HSE_Buffer := "bonjour"
+		; State immediately before backspacing the space out of "bonjour ": the
+		; engine still owns the terminator, while the preview was reset when that
+		; space was typed and has nothing of its own left.
+		HSE_Buffer := "bonjour "
 		_PrefixBuffer := ""
 		_PrefixFeedBackspace()
+		Assert(HSE_Buffer == "bonjour",
+			"one physical backspace must decrement the engine exactly once")
 		Assert(_PrefixBuffer == "bonjour",
 			"the preview must recover the word the engine still holds — left empty, the tooltip stays silent for a trigger the engine would expand, and cannot catch up for the rest of the word. Got: '" . _PrefixBuffer . "'")
 	} finally {
@@ -133,10 +132,7 @@ _PBT_ResetListExcludesBackspace() {
 ; ===============================================================
 
 _PBT_DeclinedMatchTakesTheNoMatchPath() {
-	Body := _DriverFuncBody("_PrefixWatcherOnChar")
-	if (Body == "")
-		Body := _DriverDirConcat("lib/hotstrings")
-	Assert(Body != "", "the watcher char path must be readable")
+	Body := _DriverFuncBody("_OnPrefixChar")
 
 	FiredGate := InStr(Body, "if !_HseFired")
 	Assert(FiredGate > 0,
@@ -213,12 +209,45 @@ _PBT_AppendGrowsAndBoundaryResets() {
 ; derived from "tt" cannot reach it. Typing "att" by hand showed the tooltip;
 ; pressing at★ produced the same text on screen and no tooltip.
 _PBT_ExpansionSyncDerivesFromEngineBuffer() {
-	Body := _DriverFuncBody("_OnPrefixChar")
-	Assert(Body != "", "_OnPrefixChar() must exist — it owns the post-expansion sync")
-	Assert(InStr(Body, "_PrefixBuffer := HSE_Buffer") > 0,
+	Body := _DriverFuncBody("_PrefixCommitPostFireEffect")
+	Assert(Body != "", "_PrefixCommitPostFireEffect() must own the post-expansion sync")
+	EngineSnapshot := InStr(Body, "_PrefixPostFireDecision(Effect, HSE_Buffer")
+	CanonicalPublish := InStr(Body, "_PrefixSetBuffer(Decision.Buffer)", true,
+		EngineSnapshot)
+	Assert(EngineSnapshot > 0 and CanonicalPublish > EngineSnapshot,
 		"the post-expansion sync must take the engine buffer verbatim. Replaying the edit here "
 		. "means deriving one fact twice, with two arithmetics that already disagreed about "
 		. "whether the magic key is in the buffer")
+}
+
+_PBT_ConsumedDelimiterKeepsCascadeVisible() {
+	Consumed := _PrefixPostFireDecision({
+		ClearAll: false,
+		KnownBoundaryAfter: false
+	}, "ct", 64)
+	AssertFalse(Consumed.Reset,
+		"a consumed completion key is absent from the screen and must not reset the replacement context")
+	AssertEqual("ct", Consumed.Buffer,
+		"the preview must receive the canonical replacement which can prefix a cascade")
+	AssertTrue(Consumed.Schedule,
+		"the replacement must be looked up immediately so ct★ is visible before the next key")
+
+	Emitted := _PrefixPostFireDecision({
+		ClearAll: false,
+		KnownBoundaryAfter: true
+	}, "ct ", 64)
+	AssertTrue(Emitted.Reset,
+		"an actually emitted terminator still ends the preview context")
+	AssertFalse(Emitted.Schedule,
+		"a completed word must not schedule a cascade render")
+
+	Body := _DriverFuncBody("_OnPrefixChar")
+	Assert(Body != "", "_OnPrefixChar must publish the engine's committed effect")
+	Assert(InStr(Body, "&CommittedScreenEffect") > 0
+		and InStr(Body, "_PrefixCommitPostFireEffect(CommittedScreenEffect)") > 0,
+		"the dispatch result and post-fire preview must share one immutable engine effect")
+	Assert(InStr(Body, 'HSE_LastEndChar == ""') == 0,
+		"preview synchronisation must not infer a boundary merely from the key which selected the match")
 }
 
 ; The old replay is gone, not merely bypassed: a second derivation left in place
@@ -268,4 +297,6 @@ Test("meta watcher: a declined match takes the no-match path", _PBT_DeclinedMatc
 Test("meta watcher: one path grows the preview buffer", _PBT_OneAppendPath)
 Test("meta watcher: the append path grows and resets correctly", _PBT_AppendGrowsAndBoundaryResets)
 Test("meta watcher: the expansion sync derives from the engine buffer", _PBT_ExpansionSyncDerivesFromEngineBuffer)
+Test("meta watcher: a consumed delimiter keeps a cascade visible (consumed-delimiter-cascade-preview)",
+	_PBT_ConsumedDelimiterKeepsCascadeVisible)
 Test("meta watcher: no parallel expansion arithmetic remains", _PBT_NoParallelExpansionArithmetic)

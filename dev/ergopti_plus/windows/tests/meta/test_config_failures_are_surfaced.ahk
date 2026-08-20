@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Config-Write Failure Surfacing Meta Test
 ; DESCRIPTION:
-; Four places in lib/config_io.ahk where an operation the user explicitly asked
+; Four places in infra/config_io.ahk where an operation the user explicitly asked
 ; for could fail, or decline to run, without saying anything.
 ;
 ; ReloadWithDefaultConfig was the worst of them. Its delete loop sat in a bare
@@ -23,7 +23,7 @@
 ; swallowed the one write that disables tap-holds, so "tout desactiver" could
 ; report success while they stayed enabled on disk.
 ;
-; SCOPE: source introspection of lib/config_io.ahk.
+; SCOPE: source introspection of infra/config_io.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -32,38 +32,89 @@
 
 
 
-; ==============================================
+; ===============================================
 ; ===============================================
 ; ======= 1/ Reset to defaults fails loud =======
 ; ===============================================
-; ==============================================
+; ===============================================
 
 _CFAS_ResetReportsUndeletedFiles() {
 	Body := _DriverFuncBody("ReloadWithDefaultConfig")
-	Assert(Body != "", "ReloadWithDefaultConfig() must exist")
-
-	Assert(InStr(Body, "catch as") > 0,
-		"the delete loop must catch explicitly — a bare try turns a locked or read-only config into a silent no-op")
-	Assert(InStr(Body, "LoggerError") > 0,
-		"a file that could not be deleted must be reported")
-
-	; Aborting matters more than logging here: continuing to the FSAppend after a
-	; failed delete is what appends a SECOND [_meta] section to the surviving
-	; config, leaving it in a state the user never chose.
-	AbortPos := InStr(Body, "return")
-	AppendPos := InStr(Body, "FSAppend(")
-	Assert(AbortPos > 0 and AppendPos > 0, "prerequisite: both the abort and the placeholder write must exist")
-	Assert(AbortPos < AppendPos,
-		"a failed delete must return BEFORE the placeholder write — otherwise the append lands on the file that was not deleted and duplicates its [_meta] section")
+	NoticeBody := _DriverFuncBody("_ConfigResetShowFailure")
+	Assert(Body != "" && NoticeBody != "",
+		"ReloadWithDefaultConfig() and its refusal presenter must exist")
+	AcquirePos := InStr(Body, "ConfigTransitionAcquireLifecycleBundle(")
+	QuiescePos := InStr(Body, "LLM_Menu_QuiesceTriggerForLifecycle(")
+	BuildPos := InStr(Body, "_ConfigResetTransitionTargets(")
+	CommitPos := InStr(Body, "ConfigTransitionCommitOwned(")
+	StrictPos := InStr(Body,
+		'ConfigTransitionResultIs(CommitResult, "committed_new")')
+	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle)")
+	RollbackPos := InStr(Body, "ConfigTransitionRollbackOwned(")
+	ReleasePos := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)")
+	Assert(AcquirePos > 0 && QuiescePos > AcquirePos && BuildPos > QuiescePos
+		&& CommitPos > BuildPos && StrictPos > CommitPos && ReloadPos > StrictPos
+		&& RollbackPos > ReloadPos && ReleasePos > RollbackPos,
+		"reset must hold one terminal owner from quiescence through strict commit, Reload, rollback, then release")
+	Assert(InStr(Body, "ConfigTransitionLogFailure") > 0
+		&& InStr(Body, "_ConfigResetShowFailure(") > 0
+		&& InStr(NoticeBody, "MsgBox(") > 0
+		&& InStr(Body, "return false") > 0,
+		"a refused reset transition must be logged, shown, and abort before Reload")
+	Assert(InStr(Body, "FileDelete(") == 0 && InStr(Body, "FSAppend(") == 0,
+		"reset must not bypass its WAL with raw delete/append operations")
 }
 
 ; FSAppend signals failure by return value, not by throwing, so ignoring it is
 ; the same as swallowing an exception.
 _CFAS_PlaceholderWriteIsChecked() {
+	Helper := _DriverFuncBody("_ConfigResetTransitionTargets")
 	Body := _DriverFuncBody("ReloadWithDefaultConfig")
-	Assert(Body != "", "ReloadWithDefaultConfig() must exist")
-	Assert(RegExMatch(Body, "if\s*!FSAppend\(") > 0,
-		"the placeholder write's return value must be checked — FSAppend reports failure rather than throwing, so an ignored return means the promise that the wizard is skipped can silently not hold")
+	Assert(Helper != "" && Body != "")
+	Assert(InStr(Helper, "ConfigTransitionPresentTarget(ConfigPath") > 0
+		&& InStr(Helper, "[_meta]") > 0
+		&& InStr(Helper, "schema_version = 2") > 0,
+		"the reset transaction must declare one complete valid placeholder image")
+	Assert(InStr(Helper, "ConfigTransitionAbsentTarget(TapHoldPath)") > 0
+		&& InStr(Helper, "ConfigTransitionAbsentTarget(ApiEntriesPath)") > 0,
+		"the sibling deletes must be intentions in the same WAL")
+	Assert(InStr(Body,
+		'ConfigTransitionResultIs(CommitResult, "committed_new")') > 0,
+		"the complete three-target result must be checked before Reload")
+}
+
+; Every refusal branch must explain the operation that failed. The shared
+; template still owns the sentence structure, while typed results contribute
+; their exact status/kind instead of inheriting the old deletion-only text.
+_CFAS_ResetFailureMessagesCarryPreciseReasons() {
+	Body := _StripFullLineComments(_DriverFuncBody("ReloadWithDefaultConfig"))
+	Helper := _StripFullLineComments(
+		_DriverFuncBody("_ConfigResetShowFailure"))
+	Assert(Body != "" && Helper != "",
+		"reset and its localized failure helper must remain source-visible")
+	RegExReplace(Body, "_ConfigResetShowFailure\(", "", &FailureCallCount)
+	AssertEqual(6, FailureCallCount,
+		"the complete reset refusal class must remain enumerated")
+	for Key in [
+		"dialog.reset_defaults.reason.acquire",
+		"dialog.reset_defaults.reason.trigger_recovery",
+		"dialog.reset_defaults.reason.trigger_journal",
+		"dialog.reset_defaults.reason.commit",
+		"dialog.reset_defaults.reason.reload_refused",
+		"dialog.reset_defaults.reason.rollback"
+	] {
+		Assert(InStr(Body, Key) > 0,
+			"every reset refusal branch must pass its precise reason key: " . Key)
+	}
+	Assert(InStr(Body, 'MsgBox(t("dialog.reset_defaults.failed")') == 0,
+		"reset branches must not display the unformatted placeholder directly")
+	Assert(InStr(Helper,
+		'Format(t("dialog.reset_defaults.failed"), Reason)') > 0,
+		"the shared reset template must always receive the localized reason")
+	Assert(InStr(Helper, 'Result.Has("status")') > 0
+		&& InStr(Helper, 'Result.Has("kind")') > 0
+		&& InStr(Helper, "Format(Reason, Status, Kind)") > 0,
+		"typed transition refusals must preserve their exact status/kind")
 }
 
 
@@ -97,17 +148,29 @@ _CFAS_BothSectionTogglesReport() {
 	}
 }
 
-; The tap-hold disable is the only write that turns tap-holds off. Swallowing it
-; lets "tout desactiver" report success over a config that still says enabled.
+; The bulk toggle now owns only the config.toml master gate. The standalone
+; destructive action still owns tap_hold.toml, so its false result must abort
+; before the detached candidate reaches live state
 _CFAS_TapHoldDisableIsNotSwallowed() {
-	Body := _DriverFuncBody("_GlobalClearAllBindings")
-	Assert(Body != "", "_GlobalClearAllBindings() must exist")
+	Body := _DriverFuncBody("_TH_WriteTapHoldDisabled")
+	Assert(Body != "", "_TH_WriteTapHoldDisabled() must exist")
 
-	ThPos := InStr(Body, "_TH_WriteTapHoldDisabled")
-	Assert(ThPos > 0, "the tap-hold disable must still be attempted")
-	Tail := SubStr(Body, ThPos)
-	Assert(InStr(Tail, "catch as") > 0 and InStr(Tail, "LoggerError") > 0,
-		"a failed tap-hold disable must be caught and reported — otherwise the bulk disable claims success while tap-holds remain enabled on disk")
+	Assert(InStr(Body, "_TH_CommitTapHoldMutation(") > 0,
+		"the standalone disable must consume the shared admitted transaction result")
+	Assert(InStr(Body, "TapHold :=") == 0,
+		"the standalone disable must not publish live state outside the shared transaction")
+	CommitBody := _DriverFuncBody("_TH_CommitTapHoldMutation")
+	WriterBody := _DriverFuncBody("_TH_WriteTapHoldToml")
+	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
+	Assert(CommitBody != "" && WriterBody != "" && Publisher != "")
+	Assert(InStr(CommitBody, "Result := _TH_WriteTapHoldToml(Candidate") > 0,
+		"the transaction result must be retained through owner release")
+	Assert(InStr(WriterBody, "if !Written") > 0
+		&& InStr(WriterBody, "if !Replaced") > 0
+		&& InStr(WriterBody, "if !Published") > 0,
+		"every non-throwing persistence refusal must abort explicitly")
+	Assert(InStr(Publisher, "TapHold := Candidate") > 0,
+		"only the post-replacement publisher may swap live TapHold")
 }
 
 
@@ -115,6 +178,9 @@ Test("meta config: a failed reset reports and aborts before the placeholder writ
 	_CFAS_ResetReportsUndeletedFiles)
 Test("meta config: the placeholder write's return value is checked",
 	_CFAS_PlaceholderWriteIsChecked)
+Test("meta config: every reset refusal formats its precise transaction reason "
+	. "(reset-failure-reason-i18n)",
+	_CFAS_ResetFailureMessagesCarryPreciseReasons)
 Test("meta config: both shortcut readers report an unresolvable action",
 	_CFAS_BothShortcutReadersReport)
 Test("meta config: both section toggles explain a refusal to act",
@@ -122,30 +188,22 @@ Test("meta config: both section toggles explain a refusal to act",
 Test("meta config: the tap-hold disable failure is not swallowed",
 	_CFAS_TapHoldDisableIsNotSwallowed)
 
-; A bulk toggle mutates Features, CategoryEnabled and the WPMWidget fields in
-; MEMORY before it persists. If the write throws — the same locked or read-only
-; trigger as the reset path — memory and disk disagree, and the trailing Reload
-; that would have resynced them is skipped, so the tray goes on rendering a
-; state that was never saved. On the live-category path the engine rebuild is
-; skipped too, leaving memory, disk and the hotstring engine in three different
-; states.
+; A boolean-returning write failure must be detected BEFORE any candidate is
+; published. Reload is not recovery: it is itself a side effect and cannot be
+; used to hide a mutation that never committed.
 _CFAS_BulkTogglesRecoverFromAFailedWrite() {
 	for Name in ["ToggleAllFeatures", "ToggleCategoryAllFeatures"] {
-		Body := _DriverFuncBody(Name)
+		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", Name . "() must exist")
-
-		Assert(InStr(Body, "catch as") > 0,
-			Name . " must catch a failed persist — the in-memory flip has already happened by then, so an uncaught throw leaves memory and disk disagreeing")
-		Assert(InStr(Body, "LoggerError") > 0,
-			Name . " must report a failed persist")
-
-		; Reload is the recovery: it re-reads the config from disk and therefore
-		; discards the unpersisted flip. Without it the driver keeps running on
-		; state the user never saved.
-		CatchPos := InStr(Body, "catch as")
-		Recovery := SubStr(Body, CatchPos, 700)
-		Assert(InStr(Recovery, "Reload") > 0,
-			Name . " must Reload after a failed persist — re-reading disk is what discards the unpersisted mutation and puts the driver back in a state that matches what was saved")
+		PersistPos := InStr(Body, "ConfigCommitUpdates(")
+		PublishPos := InStr(Body, "Features := CandidateFeatures")
+		ReloadPos := InStr(Body, "ReloadPreservingSuspend()")
+		Assert(PersistPos > 0 and InStr(Body, "if !ConfigCommitUpdates(") > 0,
+			Name . " must test the non-throwing persistence result")
+		Assert(PublishPos == 0 or PublishPos > PersistPos,
+			Name . " must publish detached state only after persistence succeeds")
+		Assert(ReloadPos == 0 or ReloadPos > PersistPos,
+			Name . " must never reload on the failed-commit branch")
 	}
 }
 Test("meta config: a bulk toggle recovers when its write fails",
@@ -155,13 +213,13 @@ Test("meta config: a bulk toggle recovers when its write fails",
 ; agree. None has a caller that reaches it today, which is precisely why they
 ; would have surfaced as a puzzle rather than a regression.
 _CFAS_LatentContractsAreConsistent() {
-	; _HSCategorySnapshot is declared in ErgoptiPlus.ahk, not in lib/, so the
+	; _HSCategorySnapshot is declared in ErgoptiPlus.ahk, not in infra/, so the
 	; headless harness does not load it. Guarding one global of a pair and not
 	; the other means the unguarded read throws before the guard can apply.
 	Body := _DriverFuncBody("_HSRestoreCategory")
 	Assert(Body != "", "_HSRestoreCategory() must exist")
 	Assert(InStr(Body, "IsSet(_HSCategorySnapshot)") > 0,
-		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside lib/, so reading it first throws under the headless harness")
+		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside infra/, so reading it first throws under the headless harness")
 
 	; AltGr is Ctrl + right Alt. Without its own case it fell through to the
 	; default and returned "", dropping the modifier from the sent keystroke.

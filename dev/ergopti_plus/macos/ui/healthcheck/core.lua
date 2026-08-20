@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck Core
 --- DESCRIPTION:
 --- The healthcheck probe, public API, and report window. Extracted from the
---- former monolithic lib/healthcheck.lua (audit F2) so the macOS driver mirrors
+--- former monolithic infra/healthcheck.lua (audit F2) so the macOS driver mirrors
 --- the Windows ui/healthcheck/{init,core,helpers} layout.
 ---
 --- FEATURES & RATIONALE:
@@ -30,12 +30,21 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("lib.logger")
+local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
-local Paths    = require("lib.paths")
+local Paths    = require("infra.paths")
 local Snapshot = require("healthcheck.snapshot")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "healthcheck"
+
+-- The default build pin and this reviewed native contract are locked together
+-- by the native event-tap contract tests. Hammerspoon 1.1.1 consumes
+-- both CoreGraphics disable signals in Objective-C, attempts to re-enable the
+-- tap, and returns before the registered Lua callback. The build version can be
+-- overridden, so diagnostics must compare the live runtime before claiming that
+-- this reviewed behavior applies.
+local EVENT_TAP_REVIEWED_VERSION = "1.1.1"
 
 -- Module load timestamp — used to approximate driver uptime.
 local _load_time = os.time()
@@ -49,24 +58,122 @@ local _window = nil
 -- Poll timer for the copy-button JS flag; module-level so show_window() can
 -- stop the PREVIOUS timer when reopening (a local would be orphaned on reopen).
 local _poll_timer = nil
+local _window_generation = 0
+local _continuation_timers = {}
+
+--- Returns an isolated description of the live eventtap telemetry contract.
+--- @param runtime_version string|nil Hammerspoon version reported at runtime.
+--- @return table Contract status safe to expose in a diagnostic snapshot.
+local function event_tap_timeout_telemetry(runtime_version)
+	local runtime = type(runtime_version) == "string" and runtime_version ~= ""
+		and runtime_version or "unknown"
+	local reviewed = runtime == EVENT_TAP_REVIEWED_VERSION
+	local summary
+	if reviewed then
+		summary = string.format(
+			"unavailable — reviewed Hammerspoon %s consumes tap-disable signals and attempts native re-enable before Lua callbacks",
+			EVENT_TAP_REVIEWED_VERSION)
+	else
+		summary = string.format(
+			"unavailable — unreviewed runtime Hammerspoon %s; native contract reviewed only for %s",
+			runtime, EVENT_TAP_REVIEWED_VERSION)
+	end
+	return {
+		available                    = false,
+		runtime_hammerspoon_version = runtime,
+		reviewed_hammerspoon_version = EVENT_TAP_REVIEWED_VERSION,
+		native_contract_reviewed     = reviewed,
+		summary                      = summary,
+	}
+end
 
 local function _stop_poll()
-	if _poll_timer then
-		_poll_timer:stop()
-		_poll_timer = nil
-		Logger.debug(LOG, "Copy-button poll timer stopped.")
+	if not _poll_timer then return true end
+	local handle = _poll_timer
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "Copy-button poll timer cleanup failed; exact handle retained: %s.",
+			tostring(ok and settled or settled))
+		return false
 	end
+	if _poll_timer == handle then _poll_timer = nil end
+	Logger.debug(LOG, "Copy-button poll timer stopped.")
+	return true
+end
+
+--- Cancels every delayed window continuation independently.
+--- @return boolean settled True only when all exact handles were released.
+local function stop_continuations()
+	local snapshot = {}
+	for handle in pairs(_continuation_timers) do snapshot[#snapshot + 1] = handle end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		local ok, cancelled = xpcall(function()
+			return TimerScheduler.cancel(handle)
+		end, debug.traceback)
+		if ok and cancelled == true then
+			_continuation_timers[handle] = nil
+		else
+			settled = false
+			Logger.error(LOG, "Healthcheck continuation cleanup failed; exact handle retained: %s.",
+				tostring(ok and cancelled or cancelled))
+		end
+	end
+	return settled
+end
+
+--- Schedules one exact window-generation continuation.
+--- @param delay number Delay in seconds.
+--- @param generation integer Window generation.
+--- @param webview table Exact webview owner.
+--- @param callback function Continuation body.
+--- @param label string Diagnostic label.
+--- @return boolean committed True only when the timer was armed.
+local function schedule_continuation(delay, generation, webview, callback, label)
+	local handle
+	local timer_committed = false
+	local ok, candidate, committed = xpcall(function()
+		return TimerScheduler.after(delay, function()
+			if timer_committed ~= true then return end
+			if handle and handle.timer ~= nil then
+				-- One-shot delivery is already fenced by TimerScheduler. Retain the
+				-- cleanup capability without turning a committed focus action into a no-op.
+				Logger.error(LOG, "%s retained timer cleanup debt.", label)
+			else
+				if handle then _continuation_timers[handle] = nil end
+			end
+			if generation ~= _window_generation or _window ~= webview then return end
+			callback()
+		end)
+	end, debug.traceback)
+	handle = candidate
+	if type(handle) == "table" then _continuation_timers[handle] = true end
+	if not ok or type(handle) ~= "table" or committed ~= true then
+		if type(handle) == "table" then
+			local cancel_ok, cancelled = xpcall(function()
+				return TimerScheduler.cancel(handle)
+			end, debug.traceback)
+			if cancel_ok and cancelled == true then _continuation_timers[handle] = nil end
+		end
+		Logger.error(LOG, "%s timer was not committed: %s.", label,
+			tostring(ok and committed or candidate))
+		return false
+	end
+	timer_committed = true
+	return true
 end
 
 
 
 
 
---- ============================================
+--- ==========================================
 --- ==========================================
 --- ======= 1/ Adapter & Port Registry =======
 --- ==========================================
---- ============================================
+--- ==========================================
 
 -- Each entry: { id = "require.path", contract = { "method1", "method2", … }, wired = bool }
 -- Contract methods are the minimal public surface that must be present for the
@@ -97,18 +204,23 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.event_tap_guard",
-		contract = { "handle_disabled" },
+		id       = "adapters.event_provenance",
+		contract = { "classify", "classify_with_fence", "is_owned" },
 		wired    = true,
 	},
 	{
 		id       = "adapters.file_system",
-		contract = { "read", "write", "exists" },
+		contract = { "read", "write", "exists", "prepare_parent_for_create" },
 		wired    = true,
 	},
 	{
 		id       = "adapters.graphics_renderer",
 		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.hotkey_registrar",
+		contract = { "bind", "unbind", "setEnabled" },
 		wired    = true,
 	},
 	{
@@ -132,6 +244,16 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.log_transport",
+		contract = { "start", "enqueue", "drain", "stop", "status" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.modifier_injector",
+		contract = { "arm", "disarm", "is_armed" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.mouse_control",
 		contract = { "setPos", "getPos" },
 		wired    = true,
@@ -144,6 +266,11 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.notifier",
 		contract = { "send" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.input_source_broker",
+		contract = { "subscribe", "unsubscribe", "is_subscribed" },
 		wired    = true,
 	},
 	{
@@ -164,6 +291,20 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.storage",
 		contract = { "get", "set" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.synthetic_input",
+		contract = {
+			"begin", "emit_key_stroke", "claim_tag", "claim_physical_fence",
+			"current_action_epoch", "register_action_listener", "enter_callback",
+			"leave_callback",
+		},
+		wired    = true,
+	},
+	{
+		id       = "adapters.task_lifecycle",
+		contract = { "guard_callback", "create", "native", "start" },
 		wired    = true,
 	},
 	{
@@ -207,11 +348,11 @@ local ADAPTER_SPECS = {
 
 
 
---- ============================================
+--- =============================
 --- =============================
 --- ======= 2/ Public API =======
 --- =============================
---- ============================================
+--- =============================
 
 --- Records the most recent driver error so M.run() can surface it.
 --- Call this from any error handler that wants healthcheck visibility.
@@ -299,6 +440,7 @@ function M.run()
 		return val
 	end
 
+	local sys = safe_collect("sys_info", H.sys_info)
 	local result = {
 		version          = version,
 		loaded_adapters  = loaded_adapters,
@@ -312,7 +454,8 @@ function M.run()
 		warn_count       = warn_count,
 		err_count        = err_count,
 		recent_issues    = recent_issues,
-		sys              = safe_collect("sys_info",            H.sys_info),
+		event_tap_timeout_telemetry = event_tap_timeout_telemetry(sys and sys.hs_version),
+		sys              = sys,
 		pause_state      = safe_collect("pause_state",         H.collect_pause_state),
 		keylogger        = safe_collect("keylogger_summary",   H.collect_keylogger_summary),
 		llm              = safe_collect("llm_state",           H.collect_llm_state),
@@ -320,6 +463,7 @@ function M.run()
 		hotstrings       = safe_collect("hotstrings_state",    H.collect_hotstrings_state),
 		logs             = safe_collect("logs_info",           H.collect_logs_info),
 		config           = safe_collect("config_summary",      H.collect_config_summary),
+		coverage         = safe_collect("platform_coverage",   H.collect_platform_coverage),
 	}
 
 	Logger.success(LOG, "Healthcheck complete — %d/%d adapter(s) wired, %d contract-healthy, %d failed, uptime %ds.",
@@ -336,9 +480,15 @@ function M.show_window()
 
 	if _window then
 		Logger.debug(LOG, "Closing existing healthcheck window before reopening.")
-		_stop_poll()
-		pcall(function() _window:delete() end)
+		local previous = _window
 		_window = nil
+		_window_generation = _window_generation + 1
+		local poll_stopped = _stop_poll()
+		local continuations_stopped = stop_continuations()
+		if not poll_stopped or not continuations_stopped then
+			Logger.error(LOG, "Healthcheck reopen retained timer cleanup debt.")
+		end
+		pcall(function() previous:delete() end)
 	end
 
 	local ok_snap, snapshot = pcall(M.run)
@@ -353,7 +503,7 @@ function M.show_window()
 		plain = "(format error)"
 	end
 
-	local i18n_ok, i18n = pcall(require, "lib.i18n")
+	local i18n_ok, i18n = pcall(require, "infra.i18n")
 	if not i18n_ok then
 		Logger.warn(LOG, "lib.i18n unavailable — using key names as labels.")
 	end
@@ -372,7 +522,7 @@ function M.show_window()
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if not ok_ui or not ui_builder then
 		Logger.error(LOG, "ui.ui_builder unavailable — falling back to text alert: %s.", tostring(ui_builder))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
@@ -381,7 +531,7 @@ function M.show_window()
 	local ok_html, html = pcall(ui_builder.build_injected_html, shared_ui_dir)
 	if not ok_html or not html then
 		Logger.error(LOG, "build_injected_html() failed: %s.", tostring(html))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
@@ -392,7 +542,7 @@ function M.show_window()
 	local ok_enc, snapshot_json = pcall(hs.json.encode, snapshot)
 	if not ok_enc or not snapshot_json then
 		Logger.error(LOG, "hs.json.encode() failed: %s.", tostring(snapshot_json))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
@@ -407,25 +557,36 @@ function M.show_window()
 	local sf = (ok_scr and screen and type(screen.frame) == "function" and screen:frame())
 		or { x = 0, y = 0, w = 1440, h = 900 }
 
-	local W, H_ = 700, 600
+	-- Geometry comes from _shared/ui/apps.manifest.json (SSoT). This window used
+	-- to hardcode 700x600 while Windows opened the same diagnostic at the
+	-- manifest's 740x560 — the drift the manifest exists to prevent, invisible
+	-- because the geometry gate had no entry for the macOS healthcheck.
+	local geo = ui_builder.get_app_geometry("healthcheck")
+	if not geo then
+		Logger.error(LOG, "No geometry for 'healthcheck' in apps.manifest.json — cannot open the window.")
+		return
+	end
 	local frame = {
-		x = math.floor(sf.x + (sf.w - W) / 2),
-		y = math.floor(sf.y + (sf.h - H_) / 2),
-		w = W,
-		h = H_,
+		x = math.floor(sf.x + (sf.w - geo.width) / 2),
+		y = math.floor(sf.y + (sf.h - geo.height) / 2),
+		w = geo.width,
+		h = geo.height,
 	}
 	Logger.debug(LOG, "Webview frame: x=%d y=%d w=%d h=%d.", frame.x, frame.y, frame.w, frame.h)
 
 	local ok_wv, wv = pcall(hs.webview.new, frame, { developerExtrasEnabled = false })
 	if not ok_wv or not wv then
 		Logger.error(LOG, "hs.webview.new() failed — falling back to text alert: %s.", tostring(wv))
-		local ok_d, dialog = pcall(require, "lib.dialog_util")
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
 		return
 	end
 	Logger.debug(LOG, "Webview created.")
+	_window_generation = _window_generation + 1
+	local generation = _window_generation
+	_window = wv
 
 	local masks = hs.webview.windowMasks
 	local ok_style, style_err = pcall(function()
@@ -450,10 +611,16 @@ function M.show_window()
 
 	local ok_wcb, wcb_err = pcall(function()
 		wv:windowCallback(function(action)
+			if generation ~= _window_generation or _window ~= wv then return end
 			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
 			if action == "closing" or action == "closed" then
-				_stop_poll()
 				_window = nil
+				_window_generation = _window_generation + 1
+				local poll_stopped = _stop_poll()
+				local continuations_stopped = stop_continuations()
+				if not poll_stopped or not continuations_stopped then
+					Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
+				end
 			end
 		end)
 	end)
@@ -461,6 +628,7 @@ function M.show_window()
 
 	local ok_ncb, ncb_err = pcall(function()
 		wv:navigationCallback(function(action, _)
+			if generation ~= _window_generation or _window ~= wv then return end
 			Logger.debug(LOG, "Navigation callback: action='%s'.", tostring(action))
 			if action == "didFinishNavigation" then
 				-- Render the report from the snapshot JSON, then wire the
@@ -490,10 +658,14 @@ function M.show_window()
 				-- Stop any previous poll timer before arming a new one; a second
 				-- didFinishNavigation (re-navigation or webview redraw) would otherwise
 				-- orphan the existing timer and leave two timers polling in parallel.
-				_stop_poll()
+				if not _stop_poll() then
+					Logger.error(LOG, "Copy-button poll restart refused: prior cleanup remains pending.")
+					return
+				end
 				-- Poll every 200 ms for the flag; stop and clean up when triggered
-				_poll_timer = hs.timer.new(0.2, function()
-					if not wv then _stop_poll(); return end
+				local poll_ok, poll_candidate, poll_committed = xpcall(function()
+					return TimerScheduler.every(0.2, function()
+					if generation ~= _window_generation or _window ~= wv then return end
 					-- Wrap in pcall: a natively-closed webview is NOT nil in Lua but
 					-- becomes "dead userdata" — a stale Lua handle whose backing C object
 					-- is gone. :evaluateJavaScript() on a dead userdata raises a runtime
@@ -501,23 +673,48 @@ function M.show_window()
 					-- (healthcheck-webview-dead-userdata).
 					local ok_ev, ev_err = pcall(function()
 						wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
+							-- evaluateJavaScript yields to WebKit. The window may close or
+							-- be replaced before this completion arrives, so the entry fence
+							-- above is insufficient on its own.
+							if generation ~= _window_generation or _window ~= wv then return end
 							if result == true then
 								Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
-								hs.pasteboard.setContents(plain)
-								_stop_poll()
-								if _window then
-									pcall(function() _window:delete() end)
-									_window = nil
+								local ok_write, write_result = pcall(hs.pasteboard.setContents, plain)
+								if not ok_write or write_result ~= true then
+									Logger.error(LOG, "Healthcheck clipboard write was refused: %s.",
+										tostring(write_result))
+									pcall(function()
+										wv:evaluateJavaScript("window.__hs_copy_requested=false")
+									end)
+									return
 								end
+								local window = _window
+								_window = nil
+								_window_generation = _window_generation + 1
+								local poll_stopped = _stop_poll()
+								local continuations_stopped = stop_continuations()
+								if not poll_stopped or not continuations_stopped then
+									Logger.error(LOG, "Healthcheck copy-close retained timer cleanup debt.")
+								end
+								if window then pcall(function() window:delete() end) end
 							end
 						end)
 					end)
 					if not ok_ev then
 						Logger.warn(LOG, "evaluateJavaScript on dead webview — stopping poll: %s.", tostring(ev_err))
-						_stop_poll()
+						if not _stop_poll() then
+							Logger.error(LOG, "Dead-webview poll cleanup remains pending.")
+						end
 					end
-				end)
-				_poll_timer:start()
+					end)
+				end, debug.traceback)
+				if type(poll_candidate) == "table" then _poll_timer = poll_candidate end
+				if not poll_ok or type(poll_candidate) ~= "table" or poll_committed ~= true then
+					if type(poll_candidate) == "table" then _stop_poll() end
+					Logger.error(LOG, "Copy-button poll timer was not committed: %s.",
+						tostring(poll_ok and poll_committed or poll_candidate))
+					return
+				end
 				Logger.debug(LOG, "Copy-button poll timer started.")
 			end
 		end)
@@ -532,15 +729,13 @@ function M.show_window()
 		Logger.error(LOG, "wv:show() failed — window will not appear: %s.", tostring(sh_err))
 	end
 
-	_window = wv
-
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if ok_ui and ui_builder then
 		Logger.debug(LOG, "Delegating focus to ui_builder.force_focus().")
 		ui_builder.force_focus(wv, true)
 	else
 		Logger.warn(LOG, "ui.ui_builder unavailable (%s) — using fallback focus.", tostring(ui_builder))
-		hs.timer.doAfter(0.08, function()
+		if not schedule_continuation(0.08, generation, wv, function()
 			pcall(hs.focus)
 			local ok_win, win = pcall(function() return wv:hswindow() end)
 			if ok_win and win and type(win.focus) == "function" then
@@ -548,7 +743,9 @@ function M.show_window()
 			else
 				pcall(function() wv:bringToFront() end)
 			end
-		end)
+		end, "Healthcheck fallback focus") then
+			Logger.error(LOG, "Healthcheck fallback focus could not be scheduled.")
+		end
 	end
 
 	Logger.success(LOG, "Healthcheck window opened.")
@@ -612,6 +809,27 @@ function M.format_plain(snapshot)
 	if s.hotstrings then
 		local hs = s.hotstrings
 		table.insert(lines, string.format("Hotstrings       : terminators=%s personal=%s dyn=%s magic=%s", tostring(hs.terminators), tostring(hs.personal_count), tostring(hs.dynamic_count), tostring(hs.magic_key)))
+	end
+
+	-- Absence is explicit: zero would claim that a real timeout measurement ran.
+	-- The fallback keeps copied/plain reports honest for older stored snapshots.
+	local event_tap_telemetry = s.event_tap_timeout_telemetry
+		or event_tap_timeout_telemetry(s.sys and s.sys.hs_version)
+	table.insert(lines, string.format("Native tap timeout telemetry: %s",
+		tostring(event_tap_telemetry.summary)))
+
+	-- Platform coverage: the only place a user can ask why a feature they read
+	-- about is not in their menu. The SILENT count is reported next to the
+	-- explained one on purpose — a list of only the explained absences would look
+	-- complete while hiding the ones that matter most.
+	if s.coverage then
+		local cv = s.coverage
+		table.insert(lines, "")
+		table.insert(lines, string.format("Unavailable here : %d feature(s) — %d explained, %d with no reason recorded",
+			cv.total or 0, cv.explained or 0, cv.silent or 0))
+		for _, entry in ipairs(cv.entries or {}) do
+			table.insert(lines, string.format("  · %s (only %s) — %s", entry.path, entry.only, entry.reason))
+		end
 	end
 
 	local ok_list      = s.ports_validated  or {}

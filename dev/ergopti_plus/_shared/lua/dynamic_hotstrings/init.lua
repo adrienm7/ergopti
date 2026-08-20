@@ -33,23 +33,27 @@ local LOG = "dynamic_hotstrings.shared"
 
 
 
--- ===================================
--- ===================================
+
+-- =====================================
+-- =====================================
 -- ======= 1/ Module-Level State =======
--- ===================================
--- ===================================
+-- =====================================
+-- =====================================
 
 --- @type table[] List of registered rules: {suffix, section, resolver}.
 local _rules = {}
+--- @type function|nil Platform reporter: (rule, failure) -> strict boolean.
+local _resolver_error_reporter = nil
 
 
 
 
--- =============================================
--- =============================================
+
+-- ===============================================
+-- ===============================================
 -- ======= 2/ Prefix Computation Utilities =======
--- =============================================
--- =============================================
+-- ===============================================
+-- ===============================================
 
 --- Returns the shortest prefix of a spaced string containing exactly raw_count
 --- non-space characters.
@@ -100,11 +104,12 @@ end
 
 
 
--- =================================
--- =================================
+
+-- ==================================
+-- ==================================
 -- ======= 3/ Rule Management =======
--- =================================
--- =================================
+-- ==================================
+-- ==================================
 
 --- Registers a suffix/resolver pair.
 --- The resolver is called at match time and must return a non-empty string.
@@ -121,6 +126,22 @@ function M.add_rule(suffix, section, resolver)
 end
 
 
+--- Installs the platform reporter used when a rule resolver raises.
+--- A nil reporter restores the portable direct-logger fallback.
+--- @param reporter function|nil Reporter returning true only after ownership.
+--- @return boolean committed
+function M.set_resolver_error_reporter(reporter)
+	if reporter ~= nil and type(reporter) ~= "function" then
+		Logger.error(LOG, "set_resolver_error_reporter: expected function or nil, got %s.",
+			type(reporter))
+		return false
+	end
+	_resolver_error_reporter = reporter
+	Logger.debug(LOG, "Resolver error reporter: %s.", reporter and "installed" or "direct logger")
+	return true
+end
+
+
 --- Returns the full list of registered rules (read-only reference).
 --- @return table[]
 function M.get_rules()
@@ -134,6 +155,32 @@ function M.reset_rules()
 	_rules = {}
 	Logger.debug(LOG, "All rules cleared.")
 end
+
+
+--- Reports one resolver failure without preventing later sibling rules.
+--- @param rule table Failing rule record.
+--- @param failure any Error object returned by pcall.
+local function report_resolver_failure(rule, failure)
+	if rule.resolver_error_reported then return end
+	if _resolver_error_reporter then
+		local reporter_ok, reported = pcall(_resolver_error_reporter, rule, failure)
+		if reporter_ok and reported == true then
+			rule.resolver_error_reported = true
+			return
+		end
+		Logger.error(LOG, "Resolver error reporter failed for section '%s' (details withheld).",
+			tostring(rule.section))
+	end
+	-- An error object may define a throwing or expensive __tostring metamethod.
+	-- The fallback needs only a privacy-safe size hint, so never execute foreign
+	-- code while reporting the resolver that already failed.
+	local failure_size = type(failure) == "string" and #failure or 0
+	Logger.error(LOG, "Dynamic resolver failed in section '%s' "
+		.. "(%d-byte suffix; %d-byte failure content withheld).",
+		tostring(rule.section), #rule.suffix, failure_size)
+	rule.resolver_error_reported = true
+end
+
 
 
 
@@ -160,8 +207,21 @@ function M.match_buffer(buffer, group_name, is_section_enabled_fn)
 			local suf = rule.suffix
 			if #suf > 0 and buffer:sub(-(#suf)) == suf then
 				local ok, result = pcall(rule.resolver)
+				if not ok then report_resolver_failure(rule, result) end
 				if ok and type(result) == "string" and result ~= "" then
-					Logger.debug(LOG, "Buffer match: suffix='%s' → result='%s'.", suf, result)
+					-- `result` is whatever the resolver produced, and the resolvers
+					-- registered against this engine include every @-tag: for "@i" it
+					-- is the user's IBAN. This printed it in full — and DEBUG is not
+					-- the safeguard it looks like here, because the shared logger's
+					-- default minimum level is 10, i.e. debug included. So the value
+					-- reached the log on every expansion, on every driver using this
+					-- engine, with nothing switched on.
+					--
+					-- The length is kept because it is the diagnostic that matters
+					-- when a rule misfires (which field answered), and it is what the
+					-- other two drivers keep at their equivalent sites.
+					Logger.debug(LOG, "Buffer match: suffix='%s' → %d char(s) (content withheld).",
+						suf, #result)
 					return { rule = rule, result = result }
 				end
 			end
@@ -187,11 +247,12 @@ end
 
 
 
--- =========================================
--- =========================================
+
+-- ==========================================
+-- ==========================================
 -- ======= 5/ Built-In Date Resolvers =======
--- =========================================
--- =========================================
+-- ==========================================
+-- ==========================================
 
 --- Registers the three standard date rules (ISO, French short, French long).
 --- Called by each driver's start() function after the engine is initialized.

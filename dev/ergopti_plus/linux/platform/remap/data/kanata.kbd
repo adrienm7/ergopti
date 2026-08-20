@@ -1,0 +1,174 @@
+;; === Configuration ===
+;;
+;; The three linux-* keys below are device coordination, not preference. kanata
+;; grabs every keyboard-like device it finds, and two of the devices on this
+;; machine are software keyboards that must never be grabbed:
+;;   - "Ergopti Virtual Keyboard" is what our daemon injects through. Grabbing it
+;;     means kanata re-maps text we already mapped, so an expansion comes out
+;;     mangled in a way that looks like a hotstring bug.
+;;   - "ydotoold virtual device" belongs to a third-party injector a user may run
+;;     alongside; the same corruption applies to whatever it types.
+;; Both names are matched EXACTLY by kanata and are pinned to
+;; linux/infra/device_names.lua by a gate — never edit them here alone.
+;;
+;; keyboard-only keeps kanata off pointers and tablets, whose event streams it
+;; has no reason to own. continue-if-no-devs-found lets it start before the
+;; keyboard is enumerated, which is normal ordering under a user unit rather than
+;; an error worth exiting for.
+(defcfg
+  process-unmapped-keys yes
+  linux-dev-names-exclude (
+    "ydotoold virtual device"
+    "Ergopti Virtual Keyboard"
+  )
+  linux-device-detect-mode keyboard-only
+  linux-continue-if-no-devs-found yes
+)
+
+;; === Physical key source ===
+;; Pointer buttons and all wheel directions are transparent inputs on every
+;; layer. Kanata can then treat them like any other intervening input and force
+;; a pending tap-hold-press to its hold branch, preventing the tap output when
+;; a dual-role key was used for scrolling/clicking.
+(defsrc
+    `           1           2           3           4           5                       6           7           8           9           0
+    tab         q           w           e           r           t                       y           u           i           o           p           [
+    caps        a           s           d           f           g                       h           j           k           l           ;           '
+    lsft        <           z           x           c           v           b           n           m           ,           .           /           ]
+    lctl                                lmet        lalt                   spc                      ralt        rctl                    rsft
+    mwu         mwd         mwl         mwr         mlft        mrgt                    mmid        mbck        mfwd
+)
+
+;; === Default layer ===
+(deflayer default
+    _           _           _           _           _           _                       _           _           _           _           _
+    @alttab     _           _           _           _           _                       _           _           _           _           @rollx      _
+    @cap        _           _           _           _           _                       _           _           _           _           _           _
+    @lsft       _           _           _           _           _            _          _           _           _           _           _           @deadtrema
+    @lctl                               _           @lalt                    _                      @ralt       @ossft                  _
+    _           _           _           _           _           _                       _           _           _
+)
+
+;; === Navigation layer ===
+(deflayer navigation
+    _           _           _           _           _           _                       _           _           _           _           _
+    _           S-C-home    C-home      C-end       S-C-end     f12                     S-home      S-C-left    S-left      S-right     S-C-right   S-end
+    _           C-up        up          down        C-down      f2                      M-S-left    C-left      left        right       C-right     M-S-right
+    _           S-A-up      A-up        A-down      S-A-down    _            _          M-up        home        M-left      M-right     end         _
+    _                                   _           _                        _                      _           _                       _
+    ;; The wheel, while navigation is held: volume instead of scroll. This row
+    ;; was transparent, so the layer that remaps the whole keyboard left the one
+    ;; input the hand is already on doing exactly what it does unmodified.
+    ;;
+    ;; Only the vertical pair is claimed. Horizontal scroll and the five buttons
+    ;; stay transparent because a held layer that swallows the click the user is
+    ;; about to make is worse than one that does less: a dead middle-click has no
+    ;; visible cause.
+    volu        vold        _           _           _           _                       _           _           _
+)
+
+;; ==================================
+;; === Ergopti ➜ QWERTY mappings ===
+;; ==================================
+
+(defalias
+  ;; === Numbers and symbols ===
+  $ `
+  1 1
+  2 2
+  3 3
+  4 4
+  5 5
+  6 6
+  7 7
+  8 8
+  9 9
+  0 0
+  % -
+  = =
+
+  ;; === Top row ===
+  è q
+  y w
+  o e
+  w r
+  b t
+  f y
+  g u
+  h i
+  c o
+  x p
+  z [
+  trema ]
+
+  ;; === Middle row ===
+  a a
+  i s
+  e d
+  u f
+  : g
+  . AG-g
+  v h
+  s j
+  n k
+  t l
+  r ;
+  q '
+  circ \
+
+  ;; === Bottom row ===
+  é z
+  à x
+  j c
+  , v
+  ; AG-v
+  k b
+  m n
+  d m
+  l ,
+  p .
+  ' /
+)
+
+;; ===============================
+;; === Functions and shortcuts ===
+;; ===============================
+
+;; Hand-maintained. These are kanata-native expressions with no equivalent in
+;; the shared data model, so nothing generates them. They MUST stay in their own
+;; (defalias) block: the LAST block of this file is replaced wholesale by
+;; platform/remap/manager.lua, and anything defined there would vanish. The
+;; generated block below references @copy and @paste, and the layers above
+;; reference @rollx and @deadtrema — kanata resolves every @name at load time,
+;; so one dangling reference makes the WHOLE file unloadable.
+(defalias
+    rollc (switch
+        ((key-history i 1)) (macro bspc 50 @w 30 @h 30) break ;; HC --> WH
+        () @c break
+    )
+    rollx (switch
+        ((key-history j 1)) b break ;; SX --> SK
+        () @x break
+    )
+    deadtrema (multi lsft ralt @trema)
+    copy (multi lctl @c)
+    paste (multi lctl @v)
+)
+
+;; ================================================================
+;; === GENERATED BLOCK — DO NOT EDIT BY HAND ======================
+;; ================================================================
+;; Replaced in full by platform/remap/manager.lua, which renders it from
+;; _shared/tap_hold/defaults.toml through _shared/lua/tap_hold/kanata_generator.lua.
+;; The copy committed here is what that generator produces, byte for byte; a
+;; test pins the two together, so editing this block by hand only makes the
+;; suite red.
+(defalias
+    alttab     (tap-hold-press 200 200 (multi lalt tab) lalt)
+    cap        (tap-hold-press 350 350 enter lctl)
+    lsft       (tap-hold-press 350 350 @copy lsft)
+    lctl       (tap-hold-press 200 200 @paste lctl)
+    lalt       (tap-hold-press 200 200 bspc (layer-toggle navigation))
+    ralt       (tap-hold-press 200 200 (multi (release-key lctl) (release-key lalt) tab) (multi ralt (release-key lctl)))
+    ossft      (one-shot 2000 lsft)
+)

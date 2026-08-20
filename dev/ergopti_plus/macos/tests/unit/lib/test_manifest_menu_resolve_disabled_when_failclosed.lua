@@ -50,7 +50,7 @@ local function write_fixture_manifest()
 end
 
 --- Builds a logger stub that records every Logger.error call's formatted message.
---- @return table logger_stub Injectable package.loaded["lib.logger"] replacement.
+--- @return table logger_stub Injectable package.loaded["infra.logger"] replacement.
 --- @return table error_messages Array of formatted strings passed to Logger.error (grows live).
 local function make_error_capturing_logger()
 	local error_messages = {}
@@ -65,15 +65,15 @@ end
 helpers.describe("ManifestMenu.resolve_disabled_when: fails CLOSED on a manifest lookup miss (F-MED-10)", function()
 	helpers.it("returns true (disabled) and logs Logger.error for an item_id absent from the manifest", function()
 		local logger_stub, error_messages = make_error_capturing_logger()
-		-- manifest_menu.lua captures `local Logger = require("lib.logger")` at
+		-- manifest_menu.lua captures `local Logger = require("infra.logger")` at
 		-- require-time, so the stub must be installed BEFORE load_with_stubs
 		-- forces a fresh require of lib.manifest_menu below.
-		package.loaded["lib.logger"] = logger_stub
+		package.loaded["infra.logger"] = logger_stub
 
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 
 		local tmp_dir = write_fixture_manifest()
-		package.loaded["lib.paths"].shared = function(rel)
+		package.loaded["infra.paths"].shared = function(rel)
 			if rel and rel ~= "" then return tmp_dir .. "/" .. rel end
 			return tmp_dir
 		end
@@ -96,10 +96,10 @@ helpers.describe("ManifestMenu.resolve_disabled_when: fails CLOSED on a manifest
 	end)
 
 	helpers.it("still returns false (enabled) for a real item whose disabled_when keys are all truthy (positive control)", function()
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 
 		local tmp_dir = write_fixture_manifest()
-		package.loaded["lib.paths"].shared = function(rel)
+		package.loaded["infra.paths"].shared = function(rel)
 			if rel and rel ~= "" then return tmp_dir .. "/" .. rel end
 			return tmp_dir
 		end

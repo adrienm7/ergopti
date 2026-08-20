@@ -23,11 +23,11 @@ local helpers = require("tests.helpers")
 
 
 
--- =================================================================================
+-- ================================================================================
 -- ================================================================================
 -- ======= 1/ build_inserts does not raise on missing timestamp (storage-1) =======
 -- ================================================================================
--- =================================================================================
+-- ================================================================================
 
 helpers.describe("sqlite_writer: build_inserts does not raise on missing timestamp", function()
 
@@ -38,34 +38,36 @@ helpers.describe("sqlite_writer: build_inserts does not raise on missing timesta
 		package.loaded["modules.keylogger.sqlite_writer"] = nil
 
 		-- Stub dependencies so the module loads without a real DB or device
-		package.loaded["lib.logger"] = helpers.make_logger_stub()
-		package.loaded["lib.json"] = helpers.make_json_stub and helpers.make_json_stub() or
-			{ encode = function(v) return tostring(v) end,
-			  decode = function(s) return nil, "stub" end }
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		-- No "infra.json" stub: sqlite_writer requires hs.json, and nothing in the
+		-- macOS driver requires lib.json at all. The stub that used to sit here
+		-- intercepted nothing — the module took the real hs.json from the hs stub
+		-- either way, so removing it changes no behaviour, only the impression
+		-- that a dependency was being controlled.
 
-		local ok, mod = pcall(require, "modules.keylogger.sqlite_writer")
-		if not ok then
-			-- Skip: module cannot load in this headless environment
-			writer = nil
-			return
-		end
+		-- load_with_stubs, not a bare require: sqlite_writer pulls in hs.fs, which
+		-- does not exist outside Hammerspoon. A raw require therefore ALWAYS failed
+		-- here, the pcall swallowed it, and all three cases below took their skip
+		-- branch on every run since the file was written — a regression test for a
+		-- crash that stalled the whole ingest loop, which had never once executed.
+		local mod = helpers.load_with_stubs("modules.keylogger.sqlite_writer")
+		helpers.assert_not_nil(mod,
+			"sqlite_writer must load under the test stubs — if it cannot, this file proves nothing")
 
-		-- Initialize with minimal stubs so build_inserts is callable
-		local ok_init = pcall(mod.init, {
+		-- Called directly, not through pcall: a failed init used to be downgraded to
+		-- a skip, and wrapping it again would only turn the throw into a boolean.
+		-- Letting it propagate means a broken init fails here with its real stack.
+		mod.init({
 			paths     = { keylogger_db_path = function() return "/tmp/test_kl.db" end,
 			              keylogger_log_path = function() return "/tmp/test_kl.log" end },
 			device_obj = { id = function() return "test-device-001" end,
 			               name = function() return "TestDevice" end },
 			device_id  = "test-device-001",
 		})
-		writer = ok_init and mod or nil
+		writer = mod
 	end)
 
 	helpers.it("build_inserts survives a 'typing' entry with no timestamp field", function()
-		if not writer then
-			helpers.assert_true(true, "skipped — sqlite_writer could not load in this environment")
-			return
-		end
 		-- Pre-fix: this raises with "attempt to index a nil value (field 'timestamp')"
 		-- Post-fix: timestamp is coerced to _now_ts() and the call returns a table
 		local ok, result = pcall(writer.build_inserts, {
@@ -80,10 +82,6 @@ helpers.describe("sqlite_writer: build_inserts does not raise on missing timesta
 	end)
 
 	helpers.it("build_inserts survives a 'shortcut' entry with no timestamp field", function()
-		if not writer then
-			helpers.assert_true(true, "skipped — sqlite_writer could not load in this environment")
-			return
-		end
 		local ok, result = pcall(writer.build_inserts, {
 			type = "shortcut",
 			app  = "TestApp",
@@ -97,10 +95,6 @@ helpers.describe("sqlite_writer: build_inserts does not raise on missing timesta
 	end)
 
 	helpers.it("build_inserts accepts an entry with a valid timestamp (non-regression)", function()
-		if not writer then
-			helpers.assert_true(true, "skipped — sqlite_writer could not load in this environment")
-			return
-		end
 		local ok, result = pcall(writer.build_inserts, {
 			type      = "shortcut",
 			app       = "TestApp",
@@ -118,11 +112,11 @@ end)
 
 
 
--- ===============================================================================
+-- ==============================================================================
 -- ==============================================================================
 -- ======= 2/ rotation.lua filters out timestamp-less entries (storage-1) =======
 -- ==============================================================================
--- ===============================================================================
+-- ==============================================================================
 
 helpers.describe("rotation: read_today_log_batch filters entries without timestamp", function()
 

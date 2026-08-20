@@ -32,7 +32,7 @@ _G.hs.settings = {
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("lib.config_overrides")
+local Overrides = helpers.load_with_stubs("infra.config_overrides")
 -- helpers.load_with_stubs calls __reset() which reinstalls the canonical
 -- hs.settings stub; re-apply the inspectable override so the suites below
 -- still write into the local `stored` table.
@@ -174,6 +174,24 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			helpers.assert_true(applied >= 1, "applied count")
 			helpers.assert_eq(stored["key"], 'a "quoted" word',
 				"escaped quotes inside the value must round-trip and the trailing comment must be stripped")
+		end)
+	end)
+
+	helpers.it("never executes table-looking text inside a multiline string", function()
+		stored = {}
+		_G.hs.settings.set = function(k, v) stored[k] = v end
+
+		with_tmp([==[[llm]
+app_profile_overrides = """
+[features]
+llm.enabled = false
+"""
+]==], function(path)
+			local applied = Overrides.apply(path)
+			helpers.assert_eq(applied, 0,
+				"only the owned [script]/[features] tables may publish settings")
+			helpers.assert_nil(stored["llm.enabled"],
+				"a header and assignment inside a string are inert user data")
 		end)
 	end)
 

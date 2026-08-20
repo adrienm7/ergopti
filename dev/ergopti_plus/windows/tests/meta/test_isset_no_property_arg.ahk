@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: IsSet-Requires-a-Variable Meta Test
 ; DESCRIPTION:
-; Regression guard for the WebViewHost startup crash: lib/webview_utils.ahk
+; Regression guard for the WebViewHost startup crash: infra/webview_utils.ahk
 ; probed its manifest cache with IsSet(WebViewHost._ManifestCache), and the
 ; WebViewHost lifecycle probed IsSet(this.WebView) / IsSet(this.Controller).
 ; In AHK v2, IsSet accepts ONLY a plain variable, never a property or index
@@ -75,7 +75,7 @@ Test("driver: IsSet() is never applied to a property/index expression (isset-req
 _INPA_ManifestCacheGuardIsSafe() {
 	Src := _DriverSourceNoComments()
 	Assert(InStr(Src, "class WebViewHost") > 0,
-		"WebViewHost must exist in lib/webview_utils.ahk")
+		"WebViewHost must exist in infra/webview_utils.ahk")
 	Assert(!RegExMatch(Src, "IsSet\(\s*WebViewHost\."),
 		"WebViewHost.TryOpen must not probe the manifest cache with IsSet(WebViewHost._ManifestCache) -- that is an AHK v2 load-time error that aborts app startup (isset-requires-variable)")
 	Assert(InStr(Src, "static _ManifestCache := unset") == 0,

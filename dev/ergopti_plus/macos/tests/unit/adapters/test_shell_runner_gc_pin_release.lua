@@ -11,12 +11,13 @@
 ---     (an integer key) was a no-op. The GC pin on the real task object was
 ---     never released. Table grew unbounded across all spawned commands.
 ---
---- F35: _safe_terminate() called _task:terminate() without first removing
----     M._active_tasks[_task]. If on_done never fired, the pin leaked.
+--- F35 originally treated a successful SIGTERM request as process settlement
+--- and released the GC pin immediately. Hammerspoon documents terminate() as
+--- signal-only; releasing before on_done loses the sole native-exit capability.
 ---
 --- Fix (2026-06-19): changed wrapped_on_done signature to (exit_code, stdout,
 ---     stderr) and used the closure upvalue '_task' for pin release;
----     added M._active_tasks[_task] = nil in _safe_terminate() before terminating.
+---     native task and pin now remain owned until wrapped_on_done observes exit.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -53,7 +54,7 @@ helpers.describe("ShellRunner: GC pin release", function()
 		)
 	end)
 
-	helpers.it("wrapped_on_done releases pin via closure _task, not the first arg", function()
+	helpers.it("wrapped_on_done captures and releases the exact closure task", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
 		local src_file = base .. "/adapters/shell_runner.lua"
@@ -63,17 +64,19 @@ helpers.describe("ShellRunner: GC pin release", function()
 		local src = fh:read("*a")
 		fh:close()
 
-		-- Find wrapped_on_done function body and verify it uses _task for the pin
+		-- Capture the closure task before clearing the mutable upvalue. The callback's
+		-- first argument is only an exit code, never the native task object.
 		local fn_start = src:find("local function wrapped_on_done", 1, true)
 		helpers.assert_true(fn_start ~= nil, "wrapped_on_done not found")
-		local region = src:sub(fn_start, fn_start + 200)
+		local region = src:sub(fn_start, fn_start + 500)
 		helpers.assert_true(
-			region:find("M._active_tasks[_task]", 1, true) ~= nil,
-			"wrapped_on_done must release pin via M._active_tasks[_task], not M._active_tasks[task]"
+			region:find("local completed_task = _task", 1, true) ~= nil
+				and region:find("M._active_tasks[completed_task]", 1, true) ~= nil,
+			"wrapped_on_done must release the exact task captured from its closure"
 		)
 	end)
 
-	helpers.it("_safe_terminate releases GC pin before terminating", function()
+	helpers.it("_safe_terminate retains the exact task until native termination succeeds", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
 		local src_file = base .. "/adapters/shell_runner.lua"
@@ -86,39 +89,90 @@ helpers.describe("ShellRunner: GC pin release", function()
 		-- Find _safe_terminate and verify it clears the GC pin
 		local fn_start = src:find("local function _safe_terminate", 1, true)
 		helpers.assert_true(fn_start ~= nil, "_safe_terminate not found")
-		local region = src:sub(fn_start, fn_start + 300)
+		local region = src:sub(fn_start, fn_start + 1200)
 		helpers.assert_true(
-			region:find("M._active_tasks[_task]", 1, true) ~= nil,
-			"_safe_terminate must remove M._active_tasks[_task] to prevent GC pin leak"
+			region:find("local task = _task", 1, true) ~= nil
+				and region:find("M._active_tasks[task]", 1, true) ~= nil,
+			"_safe_terminate must retain and then release the exact captured task"
 		)
 	end)
 
-	-- Behavioural regression for the streaming-supersede crash: terminate() nils the
-	-- closure `_task`, then the OS delivers the SIGTERM completion callback. Without a
-	-- nil guard, wrapped_on_done evaluates `M._active_tasks[nil] = nil` and raises
-	-- "table index is nil" on every superseded/cancelled stream (seen on each LLM
-	-- prediction in the field logs).
-	helpers.it("wrapped_on_done tolerates a nil _task after terminate (no 'table index is nil')", function()
-		local captured_done
+	helpers.it("terminate failure and accepted SIGTERM keep the task pinned until completion", function()
+		local attempts = 0
+		local fake_task, captured_done
+		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
+			task = {
+				new = function(_exe, done_cb)
+					captured_done = done_cb
+					fake_task = {
+						start = function(self) return self end,
+						terminate = function(self)
+							attempts = attempts + 1
+							if attempts == 1 then error("synthetic terminate failure") end
+							return self
+						end,
+					}
+					return fake_task
+				end,
+			},
+		})
+
+		local handle = ShellRunner.spawn("/usr/bin/defaults", {}, function() end)
+		helpers.assert_true(handle.start())
+		helpers.assert_eq(handle.terminate(), false,
+			"a native exception must not be reported as settled")
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == true,
+			"the exact retry capability must remain GC-pinned after failure")
+		local accepted, state = handle.terminate()
+		helpers.assert_eq(accepted, true,
+			"the compatibility boolean reports that SIGTERM was accepted")
+		helpers.assert_eq(state, "pending")
+		helpers.assert_eq(attempts, 2)
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == true,
+			"an accepted signal must retain the exact native-exit capability")
+		captured_done(15, "", "")
+		helpers.assert_nil(ShellRunner._active_tasks[fake_task])
+		helpers.assert_eq(handle.terminate(), true,
+			"only the completion callback settles termination ownership")
+	end)
+
+	-- Behavioural regression for the signal-versus-settlement race. The process
+	-- may continue after terminate() returns, so the native handle must remain
+	-- pinned and its eventual completion must be the only release boundary.
+	helpers.it("accepted termination retains the exact task until native completion", function()
+		local captured_done, fake_task
 		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
 			task = {
 				new = function(_exe, done_cb, _a3, _a4)
 					captured_done = done_cb
-					return { start = function() end, terminate = function() end }
+					fake_task = {
+						start = function(self) return self end,
+						terminate = function(self) return self end,
+					}
+					return fake_task
 				end,
 			},
 		})
 
 		local handle = ShellRunner.spawn("/usr/bin/curl", { "-s", "-N" }, function() end)
-		handle.start()
-		handle.terminate()  -- supersede: clears the closure `_task`
+		helpers.assert_true(handle.start(), "the fake task must reach the live state")
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == true,
+			"the live task must be pinned before termination")
+		local accepted, state = handle.terminate()
+		helpers.assert_eq(accepted, true,
+			"a live caller must not mistake an accepted SIGTERM for cancellation failure")
+		helpers.assert_eq(state, "pending")
+		helpers.assert_true(ShellRunner._active_tasks[fake_task] == true,
+			"SIGTERM acceptance must not be laundered into native exit")
 
 		helpers.assert_true(type(captured_done) == "function",
 			"the spawn wrapper must register a completion callback")
-		-- The OS fires the completion callback for the terminated task AFTER _task was nilled.
-		local ok = pcall(captured_done, 15, "", "")  -- 15 = SIGTERM
-		helpers.assert_true(ok,
-			"wrapped_on_done must not raise when _task was already cleared by terminate()")
+		-- The OS fires the completion callback only after the terminated task exits.
+		captured_done(15, "", "")  -- 15 = SIGTERM
+		helpers.assert_nil(ShellRunner._active_tasks[fake_task],
+			"a completion arriving after terminate() must still RELEASE the pin — a task "
+				.. "left pinned is never collected, and the process holds its pipes for the "
+				.. "rest of the session")
 	end)
 
 	-- Regression: hs.task.new() RETURNS nil (it does not raise) when the launch
@@ -134,18 +188,23 @@ helpers.describe("ShellRunner: GC pin release", function()
 		local ok, err = pcall(function()
 			handle = ShellRunner.spawn("/nonexistent/binary", { "-x" }, function() end)
 		end)
-		helpers.assert_true(ok,
-			"spawn() must not raise when hs.task.new returns nil for a non-executable path: " .. tostring(err))
+		helpers.assert_true(ok, "spawn() must not raise when hs.task.new returns nil: " .. tostring(err))
+		helpers.assert_nil(err, "and must report no error")
 
 		helpers.assert_true(ShellRunner._active_tasks[nil] == nil,
 			"a nil task must never be pinned in _active_tasks")
 
 		-- The handle must still honour its contract so callers need no nil checks.
 		helpers.assert_true(type(handle) == "table", "spawn() must still return a handle")
-		local ok_start = pcall(function() return handle.start() end)
-		helpers.assert_true(ok_start, "handle.start() must be safe to call when no task was created")
-		local ok_term = pcall(function() return handle.terminate() end)
-		helpers.assert_true(ok_term, "handle.terminate() must be safe to call when no task was created")
+		-- Called directly: a raise fails with the real error. What the contract
+		-- promises is that the handle stays USABLE, so callers need no nil checks —
+		-- that is observable as both methods still being there afterwards.
+		handle.start()
+		handle.terminate()
+		helpers.assert_eq(type(handle.start), "function",
+			"handle.start() must survive being called when no task was created")
+		helpers.assert_eq(type(handle.terminate), "function",
+			"and terminate() likewise")
 	end)
 
 	-- Regression (latch release): _safe_start logs a launch failure but never
@@ -247,8 +306,8 @@ helpers.describe("ShellRunner: GC pin release", function()
 			"a running task must be pinned in _active_tasks against premature GC")
 
 		-- Normal (non-terminated) completion: pin released, callback forwarded verbatim.
-		local ok = pcall(captured_done, 0, "hi\n", "")
-		helpers.assert_true(ok, "completion callback must not raise on a normal exit")
+		-- Called directly — a raise here should fail with its own error.
+		captured_done(0, "hi\n", "")
 		helpers.assert_true(ShellRunner._active_tasks[fake_task] == nil,
 			"wrapped_on_done must release the GC pin once the subprocess exits")
 		helpers.assert_eq(seen.code, 0)

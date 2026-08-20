@@ -84,7 +84,6 @@ local function drive_writers(paused)
 	local state = {
 		active_app_name  = "Safari",
 		active_app_start = 0,
-		synth_queue      = {},
 	}
 	tracker.init(state, log_manager, function() return paused end)
 

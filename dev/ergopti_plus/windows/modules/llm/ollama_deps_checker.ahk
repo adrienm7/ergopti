@@ -27,11 +27,11 @@
 
 
 
-; ==========================================
+; ====================================
 ; ====================================
 ; ======= 1/ State & Constants =======
 ; ====================================
-; ==========================================
+; ====================================
 
 ; AHK-30: ceiling for the daemon-reachability poll to prevent AHK from being
 ; held at High priority indefinitely when the user installs Ollama via the
@@ -60,11 +60,11 @@ global _LLM_Deps_InstallerPid   := 0
 
 
 
-; ====================================
+; =============================
 ; =============================
 ; ======= 2/ Public API =======
 ; =============================
-; ====================================
+; =============================
 
 /**
  * Returns the current bootstrap state.
@@ -106,11 +106,11 @@ LLM_Deps_GetFailureMessage() {
 
 
 
-; ============================================
+; ========================================
 ; ========================================
 ; ======= 3/ Bootstrap Entry Point =======
 ; ========================================
-; ============================================
+; ========================================
 
 /**
  * Asynchronously verifies and bootstraps the Ollama backend.
@@ -204,7 +204,7 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 		LoggerInfo("LLM", "DoCheck_Result — stale epoch " captured_epoch " (current=" _LLM_Deps_Epoch "), discarding.")
 		return
 	}
-	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " (A_TickCount - t_start) " ms, result=" (running ? "running" : "not running") ".")
+	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " TickElapsed(t_start) " ms, result=" (running ? "running" : "not running") ".")
 	if running {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
@@ -230,11 +230,11 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 
 
 
-; =============================================
+; ======================================
 ; ======================================
 ; ======= 4/ Installer Execution =======
 ; ======================================
-; =============================================
+; ======================================
 
 /**
  * Hands Ollama installation off to the OS-native installer flow, then
@@ -307,7 +307,7 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 			Run('https://ollama.com/download')
 		} catch as err {
 			LoggerError("LLM", "Could not open the download page: " err.Message ".")
-			LLM_Deps_Fail("Impossible d'ouvrir la page de téléchargement Ollama.", on_failed)
+			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"), on_failed)
 			return
 		}
 		; Surface a tray tip so the user knows what to do — without it,

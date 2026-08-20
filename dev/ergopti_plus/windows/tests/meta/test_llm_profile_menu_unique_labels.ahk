@@ -70,25 +70,31 @@ Test("menu_profiles: the row-label disambiguator suffixes repeats (duplicate-use
 ; ==========================================================
 ; ==========================================================
 
+; The rows became provider DATA on 2026-08-07, so the subject is the function
+; that builds them - the renderer's Add collapses two identical labels exactly
+; as a hand-written one did, which is why the guard follows the rows rather than
+; the Menu calls.
 _LPUL_ProfileRowsUseUniqueLabels() {
-	Body := _DriverFuncBody("LLM_Menu_BuildProfileMenu")
-	Assert(Body != "", "LLM_Menu_BuildProfileMenu must be defined in menu_profiles.ahk")
+	Body := _DriverFuncBody("_LLM_Menu_ProfileRows")
+	Assert(Body != "", "_LLM_Menu_ProfileRows must be defined in menu_profiles.ahk")
 
 	Second := InStr(Body, "_LLM_Menu_UniqueMenuLabel(", , 1, 2)
 	Assert(Second > 0,
-		"BOTH row loops in LLM_Menu_BuildProfileMenu - built-ins and user profiles - must take their "
+		"BOTH row loops in _LLM_Menu_ProfileRows - built-ins and user profiles - must take their "
 		. "label from the disambiguator. The counter is shared across the whole menu, so a user "
 		. "profile whose label matches a built-in row is covered too")
 
 	; The user-profile row is the reachable case: its label is free user text.
-	; The disambiguation must land on the variable, so the checkmark and the
-	; registration both see the same unique string.
-	AssignPos := InStr(Body, "plabel := _LLM_Menu_UniqueMenuLabel(")
+	; The disambiguated string must be what the row CARRIES, so the checkmark and
+	; the click handler cannot end up on a different label than the one drawn.
 	HandlerPos := InStr(Body, "_LLM_Menu_MakeUserProfileClickHandler(")
-	Assert(AssignPos > 0 and HandlerPos > AssignPos,
-		"the user-profile label must be made unique BEFORE it is registered - an identical label "
-		. "silently overwrites the earlier profile's row, orphaning it and painting the checkmark on "
-		. "the wrong profile (duplicate-user-profile-label-menu-collapse)")
+	Assert(HandlerPos > Second,
+		"the user-profile label must be made unique inside the same row as its handler - an identical "
+		. "label silently overwrites the earlier profile's row, orphaning it and painting the checkmark "
+		. "on the wrong profile (duplicate-user-profile-label-menu-collapse)")
+	Assert(!RegExMatch(Body, 'i)"label"\s*,\s*plabel\b'),
+		"the raw user label must never reach the row - it has to go through the disambiguator first "
+		. "(duplicate-user-profile-label-menu-collapse)")
 }
 Test("menu_profiles: two profiles sharing a label render as two rows (duplicate-user-profile-label-menu-collapse)",
 	_LPUL_ProfileRowsUseUniqueLabels)

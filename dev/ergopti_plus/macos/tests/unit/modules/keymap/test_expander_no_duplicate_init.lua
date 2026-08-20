@@ -20,10 +20,15 @@
 
 local helpers = require("tests.helpers")
 
+-- The module tag keymap/expander.lua logs under. Every driver instance now shares
+-- one logger core, so a sink sees warnings from every module at once — these
+-- cases are about the expander's own duplicate-init guard and say so.
+local EXPANDER_LOG_TAG = "keymap.expander"
+
 -- Force a fresh Logger so the sink installed below does not inherit state from
 -- other suites that may have run before this file in the same process.
-package.loaded["lib.logger"] = nil
-local Logger = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = helpers.load_with_stubs("infra.logger")
 Logger.set_level(Logger.LEVELS.DEBUG)
 
 
@@ -43,8 +48,6 @@ local function make_state(sentinel)
 	return {
 		_sentinel              = sentinel,
 		buffer                 = "",
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
 		start_is_word_boundary = true,
 		magic_key              = "★",
 		suppress_rescan        = function() end,
@@ -82,9 +85,10 @@ local function fresh_expander()
 	-- load_with_stubs() forces a full re-execution of the module body.
 	local to_wipe = {
 		"modules.keymap.expander",
-		"lib.text_utils",
+		"modules.keymap.terminator_replay",
+		"infra.text_utils",
 		"modules.keymap.utils",
-		"lib.logger",
+		"infra.logger",
 		"modules.keylogger",
 		"ui.tooltip",
 	}
@@ -94,9 +98,9 @@ local function fresh_expander()
 
 	-- Reinstall Logger with the same fresh stub so the sink we install in the
 	-- test body reaches the Logger instance used by the expander.
-	local L = helpers.load_with_stubs("lib.logger")
+	local L = helpers.load_with_stubs("infra.logger")
 	L.set_level(L.LEVELS.DEBUG)
-	package.loaded["lib.logger"] = L
+	package.loaded["infra.logger"] = L
 
 	return require("modules.keymap.expander")
 end
@@ -125,10 +129,13 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		local llm2      = make_llm()
 
 		-- First legitimate initialisation.
-		expander.init(state1, registry1, llm1)
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true)
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true,
+			"the exact active dependencies must be an idempotent success")
 
 		-- Second call with entirely different objects — must be ignored.
-		expander.init(state2, registry2, llm2)
+		helpers.assert_eq(expander.init(state2, registry2, llm2), false,
+			"different dependency objects must be refused")
 
 		-- The expander must still be bound to state1. We probe this by verifying
 		-- that try_expand() operates on state1.buffer: we write a sentinel string
@@ -149,9 +156,9 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 	end)
 
 
-	helpers.it("second init() emits exactly one WARN log line", function()
+	helpers.it("a conflicting init() emits exactly one ERROR log line", function()
 		local expander = fresh_expander()
-		local L = require("lib.logger")
+		local L = require("infra.logger")
 		L.set_level(L.LEVELS.DEBUG)
 
 		local state1    = make_state("FIRST")
@@ -163,57 +170,78 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		local llm2      = make_llm()
 
 		-- Collect every WARNING line emitted during the two init() calls.
-		local warn_lines = {}
+		-- Scoped to the expander's OWN tag, which is what these cases have always
+		-- meant. It used to count every WARNING reaching the sink, and that only
+		-- worked because the sink could not see most of them: each infra.logger
+		-- instance ran its own pipeline, so a warning emitted through a different
+		-- instance — keymap.terminator_replay's own duplicate-init guard, fired by
+		-- an earlier case in this same file — never arrived. Now every driver
+		-- instance funnels through the one shared core and they all do. Counting
+		-- "any WARNING from anywhere" would make this test fail whenever an
+		-- unrelated module warns, which is not the invariant it is guarding.
+		local error_lines = {}
 		L.set_sink(function(line, variant)
-			if variant == "warn" then
-				warn_lines[#warn_lines + 1] = line
+			if variant == "error" and line:find("[" .. EXPANDER_LOG_TAG .. "]", 1, true) then
+				error_lines[#error_lines + 1] = line
 			end
 		end)
+		local function error_dump() return table.concat(error_lines, " || ") end
 
-		expander.init(state1, registry1, llm1)   -- legitimate — no WARN expected
-		expander.init(state2, registry2, llm2)   -- duplicate — must emit one WARN
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true)
+		helpers.assert_eq(expander.init(state2, registry2, llm2), false)
 
 		L.set_sink(nil)
 
-		helpers.assert_eq(#warn_lines, 1,
-			"expected exactly one WARN from the duplicate init() call, got " .. tostring(#warn_lines))
+		helpers.assert_eq(#error_lines, 1,
+			"expected exactly one ERROR from the conflicting init() call, got "
+			.. tostring(#error_lines) .. ": " .. error_dump())
 
 		-- Confirm the message text matches the guard wording in the source.
-		local line = warn_lines[1] or ""
-		helpers.assert_true(
-			line:find("more than once", 1, true) ~= nil or line:find("duplicate", 1, true) ~= nil,
-			"WARN message should mention 'more than once' or 'duplicate', got: " .. line
-		)
+		local line = error_lines[1] or ""
+		helpers.assert_true(line:find("replacement refused", 1, true) ~= nil,
+			"ERROR message should identify the refused dependency replacement, got: " .. line)
 	end)
 
 
 	helpers.it("first init() emits no WARN and leaves the module functional", function()
 		local expander = fresh_expander()
-		local L = require("lib.logger")
+		local L = require("infra.logger")
 		L.set_level(L.LEVELS.DEBUG)
 
 		local state1    = make_state("ONLY")
 		local registry1 = make_registry()
 		local llm1      = make_llm()
 
+		-- Scoped to the expander's OWN tag, which is what these cases have always
+		-- meant. It used to count every WARNING reaching the sink, and that only
+		-- worked because the sink could not see most of them: each infra.logger
+		-- instance ran its own pipeline, so a warning emitted through a different
+		-- instance — keymap.terminator_replay's own duplicate-init guard, fired by
+		-- an earlier case in this same file — never arrived. Now every driver
+		-- instance funnels through the one shared core and they all do. Counting
+		-- "any WARNING from anywhere" would make this test fail whenever an
+		-- unrelated module warns, which is not the invariant it is guarding.
 		local warn_lines = {}
 		L.set_sink(function(line, variant)
-			if variant == "warn" then
+			if variant == "warn" and line:find("[" .. EXPANDER_LOG_TAG .. "]", 1, true) then
 				warn_lines[#warn_lines + 1] = line
 			end
 		end)
+		local function warn_dump() return table.concat(warn_lines, " || ") end
 
-		expander.init(state1, registry1, llm1)
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true)
 
 		L.set_sink(nil)
 
 		helpers.assert_eq(#warn_lines, 0,
-			"first init() must not emit any WARN — got " .. tostring(#warn_lines))
+			"first init() must not emit any WARN — got "
+			.. tostring(#warn_lines) .. ": " .. warn_dump())
 
 		-- Module must be functional: try_expand must not crash and must bind buffer.
 		state1.buffer = ""
-		local ok = pcall(expander.try_expand, "a", false)
-		helpers.assert_true(ok, "try_expand must not throw after a clean single init()")
+		-- Called directly: this is the happy path after one clean init, so a raise
+		-- is a plain bug and should fail with its own error.
+		expander.try_expand("a", false)
 		helpers.assert_eq(state1.buffer, "a",
 			"buffer must be updated by try_expand after a successful init()")
 	end)

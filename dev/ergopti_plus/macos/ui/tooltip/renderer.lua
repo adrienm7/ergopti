@@ -12,16 +12,20 @@
 
 local M = {}
 local hs = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
+-- The two pieces of tooltip maths that must not differ between drivers, and
+-- are pinned to the same JSON vectors on both.
+local SharedTint   = require("tooltip.tint")
+local SharedLayout = require("tooltip.layout")
 
 -- Corner arc radius for ALL tooltip rounding (single + stacked canvases). Read
 -- from the shared cross-driver source (_shared/modules/tooltip/constants.toml → Config)
 -- so macOS and Windows round identically — never hardcode it here.
 local CORNER_RADIUS = Config.layout.corner_radius
 
-local ok_bridge, vscode_bridge = pcall(require, "lib.vscode_bridge")
+local ok_bridge, vscode_bridge = pcall(require, "infra.vscode_bridge")
 if not ok_bridge then vscode_bridge = nil end
 
 
@@ -60,22 +64,166 @@ if M.canvas then
 	)
 end
 
+--- Compares a requested canvas element value with the native value read back.
+--- Styled-text userdata may be copied by the Objective-C bridge, so the native
+--- identity predicate must compare both its text and rendering attributes.
+--- @param expected any Requested attribute value.
+--- @param observed any Native attribute value read after the write.
+--- @return boolean matches Whether the native value represents the request.
+local function canvas_values_match(expected, observed)
+	if type(expected) ~= "userdata" and type(observed) ~= "userdata" then
+		return observed == expected
+	end
+	if type(expected) ~= "userdata" or type(observed) ~= "userdata" then return false end
+	local method_ok, identity_method = pcall(function() return expected.isIdentical end)
+	if not method_ok or type(identity_method) ~= "function" then return false end
+	local identity_ok, identical = pcall(identity_method, expected, observed)
+	return identity_ok and identical == true
+end
+
+--- Hides one native canvas and verifies the resulting visibility state.
+--- A nil canvas is already absent; a live canvas must satisfy both the native
+--- return contract and the independent isShowing() observation.
+--- @param canvas table|userdata|nil Canvas object to hide.
+--- @param label string Diagnostic canvas label.
+--- @return boolean hidden Whether no owned native surface remains shown.
+local function hide_canvas_verified(canvas, label)
+	if canvas == nil then return true end
+	local hide_method_ok, hide_method = pcall(function() return canvas.hide end)
+	if not hide_method_ok or type(hide_method) ~= "function" then
+		Logger.error(LOG, "Failed to hide %s: native hide method is unavailable (%s).",
+			label, tostring(hide_method))
+		return false
+	end
+	local status_method_ok, status_method = pcall(function() return canvas.isShowing end)
+	if not status_method_ok or type(status_method) ~= "function" then
+		Logger.error(LOG, "Failed to hide %s: native visibility method is unavailable (%s).",
+			label, tostring(status_method))
+		return false
+	end
+
+	local hide_ok, hide_result = pcall(hide_method, canvas)
+	if not hide_ok then
+		Logger.error(LOG, "Failed to hide %s: %s.", label, tostring(hide_result))
+		return false
+	end
+	if hide_result == nil or hide_result == false then
+		Logger.error(LOG, "Failed to hide %s: invalid native result (%s).",
+			label, tostring(hide_result))
+		return false
+	end
+
+	local status_ok, is_showing = pcall(status_method, canvas)
+	if not status_ok then
+		Logger.error(LOG, "Failed to verify hidden %s: %s.", label, tostring(is_showing))
+		return false
+	end
+	if is_showing == true then
+		Logger.error(LOG, "%s remained visible after native hide.", label)
+		return false
+	end
+	if is_showing ~= false then
+		Logger.error(LOG, "Failed to verify hidden %s: invalid native status (%s).",
+			label, tostring(is_showing))
+		return false
+	end
+	return true
+end
+
+--- Shows one native canvas and verifies the resulting visibility state.
+--- The Objective-C bridge documents show() as returning the canvas object, so
+--- nil/false is a rejected commit even if no Lua exception escaped.  The
+--- independent isShowing() read-back prevents a no-op native call from arming
+--- interaction watchers for pixels that never became visible.
+--- @param canvas table|userdata|nil Canvas object to show.
+--- @param label string Diagnostic canvas label.
+--- @return boolean shown Whether the owned native surface is observably shown.
+local function show_canvas_verified(canvas, label)
+	if canvas == nil then
+		Logger.error(LOG, "Failed to show %s: canvas is unavailable.", label)
+		return false
+	end
+	local show_method_ok, show_method = pcall(function() return canvas.show end)
+	if not show_method_ok or type(show_method) ~= "function" then
+		Logger.error(LOG, "Failed to show %s: native show method is unavailable (%s).",
+			label, tostring(show_method))
+		return false
+	end
+	local status_method_ok, status_method = pcall(function() return canvas.isShowing end)
+	if not status_method_ok or type(status_method) ~= "function" then
+		Logger.error(LOG, "Failed to show %s: native visibility method is unavailable (%s).",
+			label, tostring(status_method))
+		return false
+	end
+
+	local show_ok, show_result = pcall(show_method, canvas)
+	if not show_ok then
+		Logger.error(LOG, "Failed to show %s: %s.", label, tostring(show_result))
+		return false
+	end
+	if show_result == nil or show_result == false then
+		Logger.error(LOG, "Failed to show %s: invalid native result (%s).",
+			label, tostring(show_result))
+		return false
+	end
+
+	local status_ok, is_showing = pcall(status_method, canvas)
+	if not status_ok then
+		Logger.error(LOG, "Failed to verify visible %s: %s.", label, tostring(is_showing))
+		return false
+	end
+	if is_showing == false then
+		Logger.error(LOG, "%s remained hidden after native show.", label)
+		return false
+	end
+	if is_showing ~= true then
+		Logger.error(LOG, "Failed to verify visible %s: invalid native status (%s).",
+			label, tostring(is_showing))
+		return false
+	end
+	return true
+end
+
 --- Updates a single text element without redrawing the rest of the canvas.
 --- Used by tooltip_llm during streaming to refresh the info bar / model header
 --- without recreating the canvas — `hs.canvas` element assignment is the
 --- documented anti-flicker path.
 --- @param element_index integer Canvas element index (use M.ELEM_* constants).
 --- @param styled_text userdata|nil Styled text to install, or nil to skip the element.
+--- @return boolean updated Whether the requested native element state was observed.
 function M.set_element_text(element_index, styled_text)
-	pcall(function()
-		if not M.canvas then return end
+	local ok, committed, detail = pcall(function()
+		if not M.canvas then return false, "canvas is unavailable" end
+		local element = M.canvas[element_index]
+		if element == nil then return false, "element is unavailable" end
 		if styled_text == nil then
-			M.canvas[element_index].action = "skip"
-			return
+			element.action = "skip"
+			if element.action ~= "skip" then
+				return false, "action write did not commit"
+			end
+			return true
 		end
-		M.canvas[element_index].action = "fill"
-		M.canvas[element_index].text   = styled_text
+		element.text = styled_text
+		if not canvas_values_match(styled_text, element.text) then
+			return false, "text write did not commit"
+		end
+		element.action = "fill"
+		if element.action ~= "fill" then
+			return false, "action write did not commit"
+		end
+		return true
 	end)
+	if not ok then
+		Logger.error(LOG, "Failed to update canvas element %s: %s.",
+			tostring(element_index), tostring(committed))
+		return false
+	end
+	if committed ~= true then
+		Logger.error(LOG, "Canvas element %s update did not commit: %s.",
+			tostring(element_index), tostring(detail))
+		return false
+	end
+	return true
 end
 
 
@@ -89,6 +237,12 @@ end
 -- ====================================
 
 --- Generates a dark background color while injecting a slight tint hue if permitted.
+---
+--- The maths lives in _shared/lua/tooltip/tint.lua and is shared with Linux.
+--- Keeping the hue while imposing one lightness and one saturation is what makes
+--- every category recognisable AND every panel equally readable — darkening each
+--- accent by a fixed amount instead produces visibly different brightnesses side
+--- by side, because accents differ wildly in lightness to begin with.
 --- @param requested_tint table|nil Requested RGBA color tint.
 --- @return table The resolved background color object.
 function M.apply_tint(requested_tint)
@@ -96,54 +250,14 @@ function M.apply_tint(requested_tint)
 		return Config.colors.bg
 	end
 
-	if not requested_tint or type(requested_tint) ~= "table" then 
-		return Config.colors.bg 
-	end
-
-	local r = math.max(0, math.min(1, requested_tint.red or 0))
-	local g = math.max(0, math.min(1, requested_tint.green or 0))
-	local b = math.max(0, math.min(1, requested_tint.blue or 0))
-
-	local max_c = math.max(r, g, b)
-	local min_c = math.min(r, g, b)
-	local delta = max_c - min_c
-
-	-- Achromatic accent carries no hue — fall back to the neutral dark background,
-	-- matching the JS reference (mixTint in tint.js checks delta < 0.0001).
-	if delta < 0.0001 then
-		return Config.colors.bg
-	end
-
-	local hue = 0
-	if max_c == r then hue = ((g - b) / delta) % 6
-	elseif max_c == g then hue = (b - r) / delta + 2
-	else hue = (r - g) / delta + 4
-	end
-	hue = hue / 6
-
-	local lightness  = Config.tint_config.lightness
-	local saturation = Config.tint_config.saturation
-
-	local c = (1 - math.abs(2 * lightness - 1)) * saturation
-	local x = c * (1 - math.abs((hue * 6) % 2 - 1))
-	local m = lightness - c / 2
-	local h6 = hue * 6
-	local nr, ng, nb
-	
-	if h6 < 1 then nr, ng, nb = c, x, 0
-	elseif h6 < 2 then nr, ng, nb = x, c, 0
-	elseif h6 < 3 then nr, ng, nb = 0, c, x
-	elseif h6 < 4 then nr, ng, nb = 0, x, c
-	elseif h6 < 5 then nr, ng, nb = x, 0, c
-	else nr, ng, nb = c, 0, x
-	end
-
-	return {
-		red   = math.max(0, math.min(1, nr + m)),
-		green = math.max(0, math.min(1, ng + m)),
-		blue  = math.max(0, math.min(1, nb + m)),
-		alpha = Config.colors.bg_alpha,
-	}
+	return SharedTint.mix(requested_tint, {
+		lightness  = Config.tint_config.lightness,
+		saturation = Config.tint_config.saturation,
+		alpha      = Config.colors.bg_alpha,
+		-- An achromatic accent has no hue to keep, and inventing one produces a
+		-- red panel for a grey category.
+		neutral    = Config.colors.bg,
+	})
 end
 
 --- Resolves the best screen coordinates to display the tooltip.
@@ -209,13 +323,41 @@ end
 -- ====================================
 -- ====================================
 
+--- Resolves where the tooltip canvas goes, given an anchor and a screen frame.
+---
+--- Pure: the only OS-derived inputs are the two parameters, so a test can drive
+--- it with the shared corpus's synthetic screenFrame. That is the whole reason
+--- it exists as a function. This maths used to be inline in M.render(), so the
+--- corpus test replayed a CLONE of it defined inside the test file — while its
+--- docstring claimed to catch "any divergence in clamping or positioning". It
+--- pinned the clone; a divergence here was caught by nothing.
+---
+--- Mirrors _shared/modules/tooltip/layout.js resolvePosition + clampToScreen,
+--- and the Windows _TooltipClampRect.
+--- @param anchor table|nil { type = "caret"|…, x, y, w, h }; nil = screen centre-bottom.
+--- @param canvas table { w, h } The canvas size in layout units.
+--- @param screen_frame table { x, y, w, h } The frame to place and clamp within.
+--- @return table { x, y } The clamped top-left corner.
+function M.compute_position(anchor, canvas, screen_frame)
+	return SharedLayout.compute_position(anchor, canvas, screen_frame, {
+		caret_offset_x  = Config.layout.caret_offset_x,
+		caret_offset_y  = Config.layout.caret_offset_y,
+		window_offset_y = Config.layout.window_offset_y,
+		screen_margin   = Config.layout.screen_margin,
+	})
+end
+
 --- Compiles the component blocks, applies layout logic, and draws the canvas.
 --- @param blocks table|userdata The text payloads to draw.
 --- @param state table The orchestrator state object.
 --- @param start_watchers_callback function Function to execute event watchers post-render.
+--- @return boolean rendered Whether the canvas became natively visible and the callback completed.
 function M.render(blocks, state, start_watchers_callback)
-	local ok, err = pcall(function()
-		if not M.canvas or (type(blocks) ~= "table" and type(blocks) ~= "userdata") then return end
+	if not M.canvas or (type(blocks) ~= "table" and type(blocks) ~= "userdata") then
+		Logger.error(LOG, "Cannot render tooltip: canvas or content is unavailable.")
+		return false
+	end
+	local ok, rendered_or_err = xpcall(function()
 
 		local size_predictions = { w = 0, h = 0 }
 		if type(blocks) == "userdata" then
@@ -307,46 +449,37 @@ function M.render(blocks, state, start_watchers_callback)
 		end
 		local screen_frame = (window_screen or hs.screen.mainScreen()):frame()
 
-		local pos_x, pos_y
-		if anchor then
-			if anchor.type == "caret" then
-				pos_x = anchor.x + Config.layout.caret_offset_x
-				pos_y = anchor.y + anchor.h + Config.layout.caret_offset_y
-			else
-				pos_x = anchor.x - canvas_width / 2
-				pos_y = anchor.y + Config.layout.window_offset_y
-				if pos_y + canvas_height > screen_frame.y + screen_frame.h then 
-					pos_y = anchor.y - canvas_height - Config.layout.window_offset_y 
-				end
-			end
-		else
-			pos_x = screen_frame.x + (screen_frame.w - canvas_width) / 2
-			pos_y = screen_frame.y + screen_frame.h - canvas_height - Config.layout.window_offset_y
-		end
-
-		pos_x = math.max(screen_frame.x + Config.layout.screen_margin, math.min(pos_x, screen_frame.x + screen_frame.w - canvas_width - Config.layout.screen_margin))
-		pos_y = math.max(screen_frame.y + Config.layout.screen_margin, math.min(pos_y, screen_frame.y + screen_frame.h - canvas_height - Config.layout.screen_margin))
+		local placed = M.compute_position(anchor, { w = canvas_width, h = canvas_height }, screen_frame)
+		local pos_x, pos_y = placed.x, placed.y
 
 		M.canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = canvas_height })
 		M.canvas[2].frame = { x = 0, y = 0, w = canvas_width, h = canvas_height }
-		M.canvas:show()
-		
+		if not show_canvas_verified(M.canvas, "tooltip canvas") then return false end
+
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
-	end)
+		return true
+	end, debug.traceback)
 
 	if not ok then
-		Logger.error(LOG, "Crash during UI rendering: " .. tostring(err) .. ".")
+		Logger.error(LOG, "Crash during UI rendering: " .. tostring(rendered_or_err) .. ".")
 		M.hide()
+		return false
 	end
+	if rendered_or_err ~= true then
+		M.hide()
+		return false
+	end
+	return true
 end
 
 --- Safely hides the canvas. Also clears the stable model-info zone so the
 --- next session starts with no stale header from a previous chain.
+--- @return boolean hidden Whether the canvas and stable zone reached hidden state.
 function M.hide()
-	pcall(function()
-		if M.canvas and type(M.canvas.hide) == "function" then M.canvas:hide() end
-		if M.canvas then M.canvas[M.ELEM_MODEL_INFO].action = "skip" end
-	end)
+	if M.canvas == nil then return true end
+	local hidden = hide_canvas_verified(M.canvas, "tooltip canvas")
+	local model_info_cleared = M.set_element_text(M.ELEM_MODEL_INFO, nil)
+	return hidden and model_info_cleared
 end
 
 
@@ -502,10 +635,17 @@ M._measure_styled = measure_styled
 --- @param rows table Array of row descriptors.
 --- @param state table Must contain fixed_width (or nil) and timeout_sec.
 --- @param start_watchers_callback function|nil Called after canvas is shown.
+--- @return boolean rendered Whether the canvas became natively visible and the callback completed.
 function M.render_stacked(rows, state, start_watchers_callback)
-	local ok, err = pcall(function()
-		if not rows or #rows == 0 then return end
-		if not _ensure_stacked_canvas(#rows) then return end
+	if not rows or #rows == 0 then
+		Logger.error(LOG, "Cannot render stacked tooltip: rows are unavailable.")
+		return false
+	end
+	local ok, rendered_or_err = xpcall(function()
+		if not _ensure_stacked_canvas(#rows) then
+			Logger.error(LOG, "Cannot render stacked tooltip: canvas is unavailable.")
+			return false
+		end
 
 		local pad_x     = Config.layout.pad_x
 		local pad_y     = Config.layout.pad_y
@@ -676,22 +816,26 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		local border_idx = row_count * 5
 		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
 
-		M.stacked_canvas:show()
+		if not show_canvas_verified(M.stacked_canvas, "stacked tooltip canvas") then return false end
 		if type(start_watchers_callback) == "function" then start_watchers_callback() end
-	end)
+		return true
+	end, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".")
+		Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(rendered_or_err) .. ".")
 		M.hide_stacked()
+		return false
 	end
+	if rendered_or_err ~= true then
+		M.hide_stacked()
+		return false
+	end
+	return true
 end
 
 --- Hides the stacked canvas.
+--- @return boolean hidden Whether the native stacked surface reached hidden state.
 function M.hide_stacked()
-	pcall(function()
-		if M.stacked_canvas and type(M.stacked_canvas.hide) == "function" then
-			M.stacked_canvas:hide()
-		end
-	end)
+	return hide_canvas_verified(M.stacked_canvas, "stacked tooltip canvas")
 end
 
 return M

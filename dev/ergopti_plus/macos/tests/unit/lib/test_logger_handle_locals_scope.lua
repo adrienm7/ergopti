@@ -4,7 +4,7 @@
 --- MODULE: Logger — File-sink Locals Are Declared Above Their Users
 --- DESCRIPTION:
 --- Guards a live instance of the project's documented
---- `project-lua-closure-before-local-nil-global` foot-gun inside lib/logger.lua.
+--- `project-lua-closure-before-local-nil-global` foot-gun inside infra/logger.lua.
 ---
 --- ROOT CAUSE ENCODED: `_file_handle`, `_last_log_date` and `_last_log_path` were
 --- declared as top-level locals ~173 lines BELOW M.init_log_path(). In Lua a
@@ -37,8 +37,8 @@ helpers.describe("logger — file-sink locals are declared above every user", fu
 		local decl_at = src:find("local _file_handle", 1, true)
 		local user_at = src:find("function M.init_log_path", 1, true)
 
-		helpers.assert_true(decl_at ~= nil, "lib/logger.lua must declare a local _file_handle")
-		helpers.assert_true(user_at ~= nil, "lib/logger.lua must define M.init_log_path")
+		helpers.assert_true(decl_at ~= nil, "infra/logger.lua must declare a local _file_handle")
+		helpers.assert_true(user_at ~= nil, "infra/logger.lua must define M.init_log_path")
 		helpers.assert_true(decl_at < user_at,
 			"`local _file_handle` must appear BEFORE M.init_log_path — declared after it, the "
 			.. "function's handle-close block binds a nil global and never runs "
@@ -64,7 +64,7 @@ helpers.describe("logger — file-sink locals are declared above every user", fu
 		local init_at  = src:find("function M.init_log_path", 1, true)
 
 		helpers.assert_true(decl_at ~= nil,
-			"lib/logger.lua must forward-declare `local _log` for the functions defined above it")
+			"infra/logger.lua must forward-declare `local _log` for the functions defined above it")
 		helpers.assert_true(decl_at < init_at,
 			"`local _log` must be declared before M.init_log_path, which logs the sub-file fallback")
 		helpers.assert_true(decl_at < purge_at,

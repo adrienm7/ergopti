@@ -45,20 +45,17 @@ helpers.describe("text_sender: a throw mid-send does not keep the clipboard", fu
 		local write_at = code:find("Clipboard.write(text)", 1, true)
 		helpers.assert_true(write_at ~= nil, "the clipboard send must still write the payload")
 
-		-- Bounded by the restore TIMER, not by a byte count. That timer already
-		-- calls Clipboard.restore on the happy path, so any window wide enough to
-		-- reach it reports the unfixed file as fixed.
-		local timer_at = code:find("doAfter(CLIPBOARD_RESTORE_DELAY_S", write_at, true)
-		helpers.assert_true(timer_at ~= nil, "the restore timer must still be armed")
-
-		local between = code:sub(write_at, timer_at)
-		helpers.assert_true(between:find("Clipboard.restore", 1, true) ~= nil,
-			"a failure between writing the payload and arming the restore timer must hand the "
-				.. "clipboard back BEFORE that timer exists — it is never armed on this path. "
-				.. "Left alone, our payload stays on the clipboard for the rest of the session")
-		helpers.assert_true(between:find("_paste_saved_original = nil", 1, true) ~= nil,
-			"and it must clear the saved original, or the next send treats OUR payload as the "
-				.. "user's clipboard")
+		local arm_at = code:find("schedule_restore()", write_at, true)
+		local emit_at = code:find("SyntheticInput.emit_key_stroke", arm_at or write_at, true)
+		helpers.assert_true(arm_at ~= nil and emit_at ~= nil and arm_at < emit_at,
+			"exact restoration must be armed BEFORE Cmd+V is published; otherwise a timer "
+				.. "refusal leaves no callback capable of returning the user's clipboard")
+		local helper_at = code:find("local function restore_clipboard", 1, true)
+		local helper_body = helper_at and code:sub(helper_at, helper_at + 600) or ""
+		helpers.assert_true(helper_body:find("Clipboard.restore", 1, true) ~= nil,
+			"both rollback and timer completion must use the retained exact-restore helper")
+		helpers.assert_true(helper_body:find("restored ~= true", 1, true) ~= nil,
+			"a false/nil adapter result must retain ownership rather than release it")
 	end)
 end)
 

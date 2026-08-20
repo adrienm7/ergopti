@@ -12,7 +12,7 @@
 ; capsword.ahk arms `#HotIf CapsWordEnabled` → SC039 to unlatch, and space.ahk
 ; arms the tap-hold variant. Both criteria are true simultaneously, and this
 ; repo's own pinned precedence is that the most-recently-DEFINED variant wins.
-; modules/tap_holds.ahk is included AFTER modules/shortcuts.ahk, so the tap-hold
+; platform/remap.ahk is included AFTER modules/shortcuts.ahk, so the tap-hold
 ; variant fires and the unlatch hotkey is dead code whenever a space tap-hold is
 ; configured. Enter is shadowed identically.
 ;
@@ -97,7 +97,7 @@ _CTU_TapHoldsAreIncludedAfterShortcuts() {
 	Code := _StripFullLineComments(Src)
 
 	ShortcutsPos := InStr(Code, "#Include modules/shortcuts.ahk")
-	TapHoldsPos  := InStr(Code, "#Include modules/tap_holds.ahk")
+	TapHoldsPos  := InStr(Code, "#Include platform/remap.ahk")
 	Assert(ShortcutsPos > 0 and TapHoldsPos > 0,
 		"both module groups must still be included from the entry")
 	Assert(TapHoldsPos > ShortcutsPos,

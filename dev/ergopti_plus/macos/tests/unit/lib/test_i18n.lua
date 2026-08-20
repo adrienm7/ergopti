@@ -3,12 +3,12 @@
 --- ==============================================================================
 --- MODULE: i18n Unit Tests
 --- DESCRIPTION:
---- Behavioral tests for lib/i18n.lua — the iOS UI locale manager. Covers
+--- Behavioral tests for infra/i18n.lua — the iOS UI locale manager. Covers
 --- system-locale detection, persistence via hs.settings, locale switching
 --- (with debounced reload), language-menu building, locale sorting, and
 --- the get() → lib.locale delegation with key fallback.
 ---
---- Before this file, lib/i18n.lua had zero test coverage — every function
+--- Before this file, infra/i18n.lua had zero test coverage — every function
 --- (detect_system_locale, init, set_locale, build_language_menu_items, etc.)
 --- was exercised only by manual end-to-end interaction. This test locks the
 --- contract: supported-locale detection, persistence ordering, debounce
@@ -31,12 +31,12 @@ package.loaded["menu.labels"] = {
 
 -- Stub lib.locale so get() returns controlled values.
 local _locale_store = {}
-package.loaded["lib.locale"] = {
+package.loaded["infra.locale"] = {
 	get = function(key) return _locale_store[key] end,
 }
 
 -- Stub lib.logger (silent no-op).
-package.loaded["lib.logger"] = helpers.make_logger_stub()
+package.loaded["infra.logger"] = helpers.make_logger_stub()
 
 -- Save original hs.host.locale so we can override it per test.
 local _orig_host_locale = hs.host.locale
@@ -53,8 +53,8 @@ end
 
 --- Load a fresh i18n module (wipes upvalues _locale, _reload_timer, etc.).
 local function load_i18n()
-	package.loaded["lib.i18n"] = nil
-	return require("lib.i18n")
+	package.loaded["infra.i18n"] = nil
+	return require("infra.i18n")
 end
 
 -- Save the original hs.reload so we can restore it if a test overrides it.
@@ -73,6 +73,42 @@ local function reset_state()
 	-- Restore hs.host.locale and hs.reload.
 	hs.host.locale = _orig_host_locale
 	hs.reload = _orig_hs_reload
+end
+
+--- Reloads i18n with a deterministic transactional timer adapter.
+--- @param failure string|nil settled|debt for the next acquisition.
+--- @return table i18n
+--- @return table controller
+local function load_i18n_with_scheduler(failure)
+	local controller = { failure = failure, cancel_refusals = failure == "debt" and 1 or 0, calls = {} }
+	local scheduler = {}
+	function scheduler.after(delay, callback)
+		local handle = { timer = {}, committed = false, fired = false }
+		controller.calls[#controller.calls + 1] = { delay = delay, callback = callback, handle = handle }
+		local mode = controller.failure
+		controller.failure = nil
+		if mode == "settled" then
+			handle.timer = nil
+			handle.fired = true
+			return handle, false
+		elseif mode == "debt" then
+			return handle, false
+		end
+		handle.committed = true
+		return handle, true
+	end
+	function scheduler.cancel(handle)
+		if controller.cancel_refusals > 0 then
+			controller.cancel_refusals = controller.cancel_refusals - 1
+			return false
+		end
+		handle.timer = nil
+		handle.committed = false
+		handle.fired = true
+		return true
+	end
+	package.loaded["adapters.timer_scheduler"] = scheduler
+	return load_i18n(), controller
 end
 
 
@@ -125,16 +161,24 @@ helpers.describe("i18n: pure getters", function()
 		helpers.assert_eq(#i18n.locales(), 21, "original LOCALES must be unaffected by mutation of sorted copy")
 	end)
 
-	helpers.it("build_language_menu_items() returns menu items with title/checked/fn", function()
+	-- The row shape moved from title/fn to label/action on 2026-08-07: these rows
+	-- are the `locales` list provider's answer, and the shared renderer reads the
+	-- PROVIDER field names. They used to be built in the hs.menubar shape and
+	-- translated one by one on the way into the provider — a conversion layer that
+	-- existed only because the two halves of one path disagreed on the spelling.
+	helpers.it("build_language_menu_items() returns provider rows with label/checked/action", function()
 		local i18n = load_i18n()
 		-- Default locale is "fr" — items should mark French as checked.
 		local items = i18n.build_language_menu_items()
 		helpers.assert_eq(#items, 21, "must return 21 menu items")
 		local checked_count = 0
 		for _, item in ipairs(items) do
-			helpers.assert_true(type(item.title) == "string", "each item must have a title string")
-			helpers.assert_true(type(item.checked) == "boolean", "each item must have a checked boolean")
-			helpers.assert_true(type(item.fn) == "function", "each item must have an fn")
+			helpers.assert_true(type(item.label) == "string", "each row must have a label string")
+			helpers.assert_true(item.title == nil,
+				"`title` is the hs.menubar field: a row carrying it is dropped by the renderer, so the "
+				.. "language menu would come out empty")
+			helpers.assert_true(type(item.checked) == "boolean", "each row must have a checked boolean")
+			helpers.assert_true(type(item.action) == "function", "each row must have an action")
 			if item.checked then checked_count = checked_count + 1 end
 		end
 		helpers.assert_eq(checked_count, 1, "exactly one locale must be checked")
@@ -386,6 +430,27 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 			"only one reload after rapid locale switches")
 	end)
 
+	helpers.it("set_locale() leaves memory and settings unchanged when reload scheduling refuses", function()
+		local i18n = load_i18n_with_scheduler("settled")
+		helpers.assert_eq(i18n.set_locale("de"), false)
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_nil(hs.settings.get("i18n_locale"))
+	end)
+
+	helpers.it("set_locale() blocks a sibling while exact timer cleanup is pending", function()
+		local i18n, controller = load_i18n_with_scheduler("debt")
+		helpers.assert_eq(i18n.set_locale("de"), false)
+		helpers.assert_eq(i18n.set_locale("en"), false)
+		helpers.assert_eq(#controller.calls, 1)
+		helpers.assert_eq(i18n.get_locale(), "fr")
+		helpers.assert_nil(hs.settings.get("i18n_locale"))
+
+		helpers.assert_true(i18n.set_locale("en"))
+		helpers.assert_eq(#controller.calls, 2)
+		helpers.assert_eq(i18n.get_locale(), "en")
+		helpers.assert_eq(hs.settings.get("i18n_locale"), "en")
+	end)
+
 	helpers.it("set_locale() ignores unknown codes", function()
 		local i18n = load_i18n()
 		i18n.set_locale_injector(function(_) end)
@@ -531,5 +596,5 @@ end)
 -- (needed real by test_log_level_emojis.lua and ui/menu/builder.lua) and the
 -- stub-wired lib.i18n / lib.locale pair must not leak either.
 package.loaded["menu.labels"] = nil
-package.loaded["lib.locale"]  = nil
-package.loaded["lib.i18n"]    = nil
+package.loaded["infra.locale"]  = nil
+package.loaded["infra.i18n"]    = nil

@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/modules/updater/version.js
+// _shared/modules/updater/version.js
 
 /**
  * Cross-driver version comparison and GitHub Releases URL helpers.

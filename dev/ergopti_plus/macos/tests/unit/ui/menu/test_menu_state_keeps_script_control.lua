@@ -18,10 +18,11 @@
 local helpers = require("tests.helpers")
 
 local function read_menu_state_src()
-	local path = helpers.driver_root() .. "ui/menu/menu_state.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "ui/menu/menu_state.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to ui/menu/menu_state.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("function M.sync_state_to_modules")
+	helpers.assert_true(src ~= nil, "ui/menu/menu_state.lua source must be locatable")
 	return src
 end
 
@@ -29,11 +30,11 @@ end
 
 
 
--- ===========================================================================
+-- ==========================================================================
 -- ==========================================================================
 -- ======= 1/ Source invariant: binding-only helpers in sync function =======
 -- ==========================================================================
--- ===========================================================================
+-- ==========================================================================
 
 helpers.describe("menu_state: sync_state_to_modules uses pause/resume_bindings (H-1)", function()
 
@@ -80,11 +81,11 @@ end)
 
 
 
--- ========================================================================
+-- =======================================================================
 -- =======================================================================
 -- ======= 2/ Behaviour: spy confirms only pause_bindings is fired =======
 -- =======================================================================
--- ========================================================================
+-- =======================================================================
 
 helpers.describe("menu_state: spy — disable shortcuts calls pause_bindings not stop (H-1)", function()
 
@@ -97,8 +98,8 @@ helpers.describe("menu_state: spy — disable shortcuts calls pause_bindings not
 		local called_start   = false
 
 		local spy_shortcuts = {
-			pause_bindings  = function() called_pause  = true end,
-			resume_bindings = function() called_resume = true end,
+			pause_bindings  = function() called_pause  = true; return true end,
+			resume_bindings = function() called_resume = true; return true end,
 			stop            = function() called_stop   = true end,
 			start           = function() called_start  = true end,
 		}
@@ -136,8 +137,8 @@ helpers.describe("menu_state: spy — disable shortcuts calls pause_bindings not
 		local called_stop    = false
 
 		local spy_shortcuts = {
-			pause_bindings  = function() called_pause  = true end,
-			resume_bindings = function() called_resume = true end,
+			pause_bindings  = function() called_pause  = true; return true end,
+			resume_bindings = function() called_resume = true; return true end,
 			stop            = function() called_stop   = true end,
 			start           = function() end,
 		}

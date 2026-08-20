@@ -4,16 +4,25 @@
 --- MODULE: Logger-Shim-Only Invariant Test (Linux driver)
 --- DESCRIPTION:
 --- Regression guard for the P0 bug where 9 of the 20 Linux port adapters did
---- `require("lib.logger")` — a module that does NOT exist on the Linux daemon's
---- package.path (there is no linux/lib/ directory). Every such require would
---- raise a "module 'lib.logger' not found" error the moment the adapter loaded,
---- silently crashing whichever feature pulled it in. The canonical Linux logger
---- is the shared print-fallback shim at _shared/lua/logger/shim.lua, required as
---- `require("logger.shim")` by the other 11 adapters.
+--- `require("infra.logger")` — a module this driver does not have. Every such
+--- require raised "module 'infra.logger' not found" the moment the adapter loaded,
+--- silently crashing whichever feature pulled it in. The canonical entry point is
+--- `require("logger.shim")`, used by the other 11 adapters.
+---
+--- Two facts this docstring previously got wrong, corrected here because a stale
+--- rationale is how the sink bug survived:
+--- 1. `linux/infra/` DOES exist (file_watchers, i18n, locale, logger_sink,
+---    monotonic, timings, version). The forbidden module is `lib.logger`
+---    specifically, not the whole namespace.
+--- 2. `logger.shim` is NOT the print-fallback in production. Because _shared/lua
+---    is on package.path, its `pcall(require, "logger")` succeeds and it returns
+---    the shared CORE, whose print fallback is never reached. The core writes only
+---    to an injected sink — which is why `infra/logger_sink.lua` exists and is
+---    installed by the entry point. See tests/unit/meta/test_logger_sink.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Root-cause encoding: the test fails if ANY production Lua file under
----    adapters/ or modules/ requires "lib.logger", so the exact regression can
+---    adapters/ or modules/ requires "infra.logger", so the exact regression can
 ---    never silently return (project rule 5.9).
 --- 2. Production scope only: tests/ and vendor/ are excluded so the scan can
 ---    name the forbidden require pattern without matching its own source.
@@ -27,12 +36,12 @@ local DRIVER_ROOT = helpers.driver_root()
 
 -- Production directories to scan — deliberately excludes tests/ (this file
 -- mentions the forbidden pattern in prose) and vendor/ (third-party code).
-local SCAN_DIRS = { "adapters", "modules" }
+local SCAN_DIRS = { "adapters", "modules", "platform" }
 
 -- The forbidden require, in both quote styles AHK/Lua authors might type.
 local FORBIDDEN_PATTERNS = {
-	'require%("lib%.logger"%)',
-	"require%('lib%.logger'%)",
+	'require%("infra%.logger"%)',
+	"require%('infra%.logger'%)",
 }
 
 
@@ -94,6 +103,9 @@ local function read_file(path)
 	fh:close()
 	return content
 end
+
+
+
 
 
 -- ==================================================

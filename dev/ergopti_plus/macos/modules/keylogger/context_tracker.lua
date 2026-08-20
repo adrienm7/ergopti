@@ -20,8 +20,8 @@
 --- ==============================================================================
 
 local hs     = hs
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local i18n   = require("infra.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local LOG    = "keylogger.context_tracker"
 local M      = {}
@@ -43,11 +43,17 @@ local _last_ax_value        = ""
 local _last_win_title       = nil
 local _last_win_time        = 0
 
--- Incognito / private browsing window title keywords across all major browsers
-local PRIVATE_KEYWORDS = {
-	-- Populated at first use via i18n to pick the locale-correct term
-	"Private Browsing", "Incognito", "InPrivate", "Anonymous",
-}
+-- Incognito / private browsing window title markers. The list itself lives in
+-- _shared/lua/keylogger/private_window.lua: "drop keystrokes typed in a private
+-- window" is one of the four categories of the shared no-persist corpus, so it
+-- cannot be one driver's private variable — the Linux driver had no such filter
+-- at all precisely because this list was never shared.
+local PrivateWindow = require("keylogger.private_window")
+
+local PRIVATE_KEYWORDS = {}
+for _, keyword in ipairs(PrivateWindow.KEYWORDS) do
+	PRIVATE_KEYWORDS[#PRIVATE_KEYWORDS + 1] = keyword
+end
 local function get_private_keywords()
 	local localized = i18n.get("keylogger.category_private")
 	if localized ~= "keylogger.category_private" then
@@ -81,11 +87,11 @@ end
 
 
 
--- =========================================
+-- ==========================================
 -- ==========================================
 -- ======= 2/ Accessibility Observers =======
 -- ==========================================
--- =========================================
+-- ==========================================
 
 --- Inspects a focused UI element and updates the secure-field flag on CoreState.
 --- Called whenever the focused element changes so the engine can stop logging
@@ -119,10 +125,6 @@ local function update_secure_field_state(element)
 			_state.buffer_events = {}
 			_state.buffer_text   = ""
 			_state.rich_chunks   = {}
-			-- Also drop the synthetic queue: a suppressed expansion in a secure field
-			-- leaves stale synth_queue entries that would mis-tag the first real
-			-- keystroke on return as synthetic (C6 made deterministic, not drain-timed)
-			_state.synth_queue   = {}
 			Logger.debug(LOG, "Secure text field detected — buffer cleared, logging suppressed.")
 		else
 			Logger.debug(LOG, "Focus moved away from secure field — logging resumed.")
@@ -257,11 +259,11 @@ end
 
 
 
--- ==========================================
+-- =============================================
 -- =============================================
 -- ======= 3/ Application Switch Tracker =======
 -- =============================================
--- ==========================================
+-- =============================================
 
 --- Returns the unpersisted foreground duration for the active application.
 --- App-time events are normally committed only on a focus transition. The
@@ -406,6 +408,10 @@ function M.update_private_status()
 	end
 	_last_win_title = title
 	_last_win_time  = now
+	-- Published into the shared state so the keystroke path can read the focused
+	-- window title instead of making its own cross-process AX call for it. This
+	-- function already has the title in hand on every window change.
+	_state.active_win_title = title
 
 	-- Check for private/incognito mode keywords in the window title
 	for _, keyword in ipairs(get_private_keywords()) do
@@ -465,10 +471,6 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 		end
 	end
 
-	-- Any app activation is a context boundary: clear the synthetic queue so a
-	-- synthetic echo suppressed in the previous app (disabled/private/secure)
-	-- cannot mis-tag the first keystroke in the new app as synthetic (C6)
-	_state.synth_queue = {}
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now
 	_state.active_app_bundle = new_bundle
@@ -503,7 +505,7 @@ end
 ---
 --- app_watcher_cb returns early while paused — correctly, since « pause = tout
 --- éteint » — but that early return also skips the pure state synchronisation that
---- follows its single write: active_app_*, the synthetic queue, is_secure_field and
+--- follows its single write: active_app_*, synthetic action accounting, is_secure_field and
 --- the AX observer's target PID. Nothing re-syncs them afterwards, because
 --- resume_all() never touched this module and no fresh activation event fires when
 --- the user resumes in the app they already switched to while paused. The cached
@@ -538,9 +540,6 @@ function M.resync_context()
 
 	local now = hs.timer.absoluteTime() / 1000000
 
-	-- A resume is a context boundary exactly like an app activation: a synthetic
-	-- echo suppressed before the pause must not mis-tag the first key after it.
-	_state.synth_queue       = {}
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now
 	pcall(function() _state.active_app_bundle = app:bundleID() end)
@@ -567,11 +566,11 @@ end
 
 
 
--- =============================
+-- ============================
 -- ============================
 -- ======= 4/ Lifecycle =======
 -- ============================
--- =============================
+-- ============================
 
 --- Initializes the context tracker with its three injected dependencies.
 --- Must be called exactly once before any callbacks are registered.
@@ -582,28 +581,37 @@ end
 --- @param core_state table The shared state object from init.lua.
 --- @param log_manager_mod table The log manager module reference.
 --- @param is_paused_fn function Predicate returning true while the script is paused.
+--- @return boolean initialized True only when the exact dependency set is active.
 function M.init(core_state, log_manager_mod, is_paused_fn)
 	Logger.start(LOG, "Initializing context tracker…")
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — context tracker non-functional.")
-		return
+		return false
 	end
 	if type(log_manager_mod) ~= "table" then
 		Logger.error(LOG, "M.init(): log_manager_mod must be a table — context tracker non-functional.")
-		return
+		return false
 	end
 	if type(is_paused_fn) ~= "function" then
 		Logger.error(LOG, "M.init(): is_paused_fn must be a function — context tracker non-functional.")
-		return
+		return false
 	end
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state
+		and _log_manager == log_manager_mod
+		and _is_paused == is_paused_fn
+		then
+			Logger.warn(LOG, "M.init() called more than once — exact dependencies already active.")
+			return true
+		end
+		Logger.error(LOG, "M.init() dependency mismatch — refusing split context state.")
+		return false
 	end
 	_state       = core_state
 	_log_manager = log_manager_mod
 	_is_paused   = is_paused_fn
 	Logger.success(LOG, "Context tracker initialized.")
+	return true
 end
 
 return M

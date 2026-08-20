@@ -33,12 +33,11 @@ local KNOWN_VIOLATIONS = {
 
 	-- Additional for max coverage: personal, karabiner, llm api, gestures actions must not bypass pause
 	["modules/dynamic_hotstrings/personal_info.lua"] = true,
-	["modules/karabiner/init.lua"] = true,
+	["platform/remap/init.lua"] = true,
 	["modules/llm/api_common.lua"] = true,
 	["modules/gestures/actions.lua"] = true,
 
 	-- Encore plus: more modules for full pause coverage
-	["modules/keymap/expander.lua"] = true,
 	["modules/llm/prediction_engine.lua"] = true,
 	["modules/metrics/aggregator.lua"] = true,
 	["ui/menu/builder.lua"] = true,

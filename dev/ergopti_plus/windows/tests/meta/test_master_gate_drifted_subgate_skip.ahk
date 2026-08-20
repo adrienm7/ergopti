@@ -18,7 +18,7 @@
 
 _MGDS_DriftedSubGateSkippedBeforeProbe() {
 	Body := _DriverFuncBody("ApplyMasterGatesToFeatures")
-	Assert(Body != "", "ApplyMasterGatesToFeatures must exist in lib/master_gates.ahk")
+	Assert(Body != "", "ApplyMasterGatesToFeatures must exist in infra/master_gates.ahk")
 
 	LoopPos := InStr(Body, "for SubV1, SubV2 in SubGates")
 	Assert(LoopPos > 0, "ApplyMasterGatesToFeatures must iterate the manifest sub-gates")
@@ -43,7 +43,7 @@ Test("master-gates: drifted hotstring sub-gate is skipped before the category-ga
 ; open-coding an exclusion at each call site.
 _MGDS_NoGateCategoriesFollowMaster() {
 	Body := _DriverFuncBody("IsCategoryGated")
-	Assert(Body != "", "IsCategoryGated must exist in lib/feature_state.ahk")
+	Assert(Body != "", "IsCategoryGated must exist in infra/feature_state.ahk")
 
 	PassPos := InStr(Body, "CATEGORY_FOLLOWS_HOTSTRINGS_MASTER.Has(Category)")
 	WarnPos := InStr(Body, "schema drift")

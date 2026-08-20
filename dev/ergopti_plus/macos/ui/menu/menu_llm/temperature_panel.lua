@@ -15,21 +15,23 @@
 local M = {}
 
 local llm_mod = require("modules.llm")
-local i18n    = require("lib.i18n")
+local i18n    = require("infra.i18n")
 
 
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
---- Builds temperature-related menu items and appends them to the target table.
+--- Appends the temperature rows to the generation submenu's row array.
+--- Row DATA since 2026-08-07: the caller renders the whole array through the
+--- shared renderer, so this panel says what its rows are and nothing more.
 --- @param ctx table Context: { state, keymap, is_disabled, save_prefs, update_menu, settings_mgr, llm_mod }.
---- @param out table The destination menu table to append items into.
+--- @param out table The destination ROW array to append to.
 function M.build(ctx, out)
 	local state        = ctx.state
 	local keymap       = ctx.keymap
@@ -40,15 +42,15 @@ function M.build(ctx, out)
 
 	-- Temperature input with reset if changed from default
 	table.insert(out, {
-		title    = string.format(i18n.get("menu.llm.temperature_label"), tostring(state.llm_temperature)),
+		label    = string.format(i18n.get("menu.llm.temperature_label"), tostring(state.llm_temperature)),
 		disabled = is_disabled or nil,
-		fn       = settings_mgr.set_temperature,
+		action   = settings_mgr.set_temperature,
 	})
 	if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
 		table.insert(out, {
-			title    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_temperature)),
+			label    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_temperature)),
 			disabled = is_disabled or nil,
-			fn       = settings_mgr.reset_temperature,
+			action   = settings_mgr.reset_temperature,
 		})
 	end
 
@@ -56,15 +58,16 @@ function M.build(ctx, out)
 	-- multiple predictions are requested so the variants explore different
 	-- temperature regions (disabled badge when num_predictions < 2)
 	table.insert(out, {
-		title    = i18n.get("menu.llm.auto_raise_temp"),
+		label    = i18n.get("menu.llm.auto_raise_temp"),
 		checked  = state.llm_auto_raise_temp,
 		disabled = (is_disabled or (tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions) < 2) or nil,
-		fn       = function()
+		action   = function()
 			state.llm_auto_raise_temp = not state.llm_auto_raise_temp
 			if keymap and type(keymap.set_llm_auto_raise_temp) == "function" then
 				pcall(keymap.set_llm_auto_raise_temp, state.llm_auto_raise_temp)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end,
 	})
 end

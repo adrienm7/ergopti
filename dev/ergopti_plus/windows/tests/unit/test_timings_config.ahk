@@ -4,7 +4,7 @@
 ; MODULE: Timings Config Tests
 ; DESCRIPTION:
 ; A3 — the AHK driver now reads its timing constants from the cross-driver
-; registry _shared/modules/timings/constants.toml via lib/timings/timings_config.ahk
+; registry _shared/modules/timings/constants.toml via infra/timings/timings_config.ahk
 ; instead of hardcoding the same literals the macOS driver also carries. These
 ; tests pin:
 ;   1. TimingsGet returns the raw millisecond value and TimingsGetSec is

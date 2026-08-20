@@ -78,6 +78,8 @@ _CWDW_ArmUsesOneShotTimer() {
 	Src := _CWDW_Source()
 	Seg := _DriverFuncBody("_HCW_ArmNumericWrite")
 	Assert(Seg != "", "_HCW_ArmNumericWrite must exist in hotstrings_config_window.ahk")
+	Assert(InStr(Seg, "_HCW_QueueNumericWrite") > 0,
+		"_HCW_ArmNumericWrite must queue by entry/section/field instead of replacing one global slot — typing delay then priority inside the same debounce window must persist both values")
 	Assert(InStr(Seg, "SetTimer(_HCW_FlushNumericWrite, -_HCW_NUMERIC_DEBOUNCE_MS)") > 0,
 		"_HCW_ArmNumericWrite must re-arm a one-shot SetTimer (negative _HCW_NUMERIC_DEBOUNCE_MS) so each keystroke coalesces into a single deferred write")
 }
@@ -88,7 +90,17 @@ _CWDW_FlushPerformsSingleWrite() {
 	Src := _CWDW_Source()
 	Seg := _DriverFuncBody("_HCW_FlushNumericWrite")
 	Assert(Seg != "", "_HCW_FlushNumericWrite must exist in hotstrings_config_window.ahk")
-	Assert(InStr(Seg, "_HCW_SetOverride") > 0,
-		"_HCW_FlushNumericWrite must perform the single _HCW_SetOverride once the edit burst settles")
+	Assert(InStr(Seg, "_HCW_RunNumericWriteBatch") > 0,
+		"_HCW_FlushNumericWrite must drain every distinct queued field through one aggregate persistence batch")
 }
-Test("hs_config: debounce flush performs the single override write (config-window-delay-write-per-keystroke)", _CWDW_FlushPerformsSingleWrite)
+Test("hs_config: debounce flush drains every queued field (config-window-delay-write-per-keystroke)", _CWDW_FlushPerformsSingleWrite)
+
+_CWDW_FieldResetCancelsItsPendingWrite() {
+	Body := _DriverFuncBody("_HCW_ClearField")
+	CancelPos := InStr(Body, "_HCW_CancelNumericWrite(Entry, Sec, Field)")
+	ClearPos := InStr(Body, "_HCW_ClearOverride.Bind(")
+	Assert(CancelPos > 0 and ClearPos > CancelPos,
+		"_HCW_ClearField must cancel the matching debounced value before clearing it — otherwise the armed timer silently restores the value the user just reset")
+}
+Test("hs_config: field reset invalidates its matching debounced write",
+	_CWDW_FieldResetCancelsItsPendingWrite)

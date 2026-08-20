@@ -9,7 +9,7 @@
 ;   - steps_keyboard.ahk — Ergopti layout choice, magic-key binding
 ;   - steps_metrics.ahk  — typing metrics opt-in, trackpad gestures setup
 ;
-; Split out of the former lib/onboarding.ahk (P5 refactor); see
+; Split out of the former infra/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the onboarding/*.ahk files is irrelevant.
 ; ==============================================================================

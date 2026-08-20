@@ -11,7 +11,7 @@
 #Requires AutoHotkey v2.0
 
 _AKTE_AltGrOwnsKanaTap() {
-    Src := _DriverDirConcat("modules/tap_holds")
+    Src := _DriverDirConcat("platform/remap")
     Assert(InStr(Src, '#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled') > 0,
         "altgr.ahk must register a Kana-only SC138 tap-hold context")
     Assert(InStr(Src, "SC138::") > 0 && InStr(Src, 'KeyWait("SC138"') > 0,
@@ -25,7 +25,7 @@ _AKTE_AltGrOwnsKanaTap() {
 Test("tap-holds: Kana SC138 owns configured AltGr tap exactly once", _AKTE_AltGrOwnsKanaTap)
 
 _AKTE_NavigationOwnsKanaEscape() {
-    Src := _DriverDirConcat("modules/tap_holds")
+    Src := _DriverDirConcat("platform/remap")
     Q := Chr(34)
     Assert(InStr(Src, "#HotIf LayerEnabled and _ALTGR_KANA_FIXUP") > 0,
         "nav_layer.ahk must gate the SC138 Escape handler on both navigation and Kana state")

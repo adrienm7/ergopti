@@ -12,11 +12,11 @@
 
 
 
-; ======================================
+; =======================================
 ; =======================================
 ; ======= 1/ DEAD KEY DEFINITIONS =======
 ; =======================================
-; ======================================
+; =======================================
 
 ; TODO : if KbdEdit is upgraded, some "NEW" Unicode characters will become available
 ; This AutoHotkey script has all the characters, and the KbdEdit file has some missing ones
@@ -382,7 +382,7 @@ DeadKey(Mapping) {
 
 UpdateLastSentCharacter(Character) {
 	; Ring-buffer push is O(1) and does not reallocate past boot — see
-	; ``_LSCPush`` in lib/hotstring_engine.ahk.
+	; ``_LSCPush`` in infra/hotstring_engine.ahk.
 	_LSCPush(Character)
 	AppState_TouchLastSentKey(Character)
 }
@@ -395,7 +395,7 @@ AppState_TouchLastSentKey(Character) {
 	if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
 		Now := A_TickCount
 		for k, ts in LastSentCharacterKeyTime.Clone() {
-			if (Now - ts > LAST_SENT_KEY_TIME_MAX_AGE_MS)
+			if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now)
 				LastSentCharacterKeyTime.Delete(k)
 		}
 	}
@@ -450,7 +450,7 @@ _RemapEmit(SendStr, KeyChar, *) {
 ; emitting its own result but leaves the sequence flag set until afterwards, so
 ; gating on the flag would suppress the push for the one character that IS
 ; visible.
-; THREE hooks share this shape, not one. The dead-key hook was the one the
+; FOUR hooks share this shape, not one. The dead-key hook was the one the
 ; original probe used, but _OneShotShiftInputHook and _SpaceHoldInputHook are
 ; both armed "L1" with VisibleText off and consume the character an emit just
 ; produced in exactly the same way. Tap RCtrl for a one-shot shift and type "a":
@@ -458,10 +458,16 @@ _RemapEmit(SendStr, KeyChar, *) {
 ; OSS hook ate that "a", and OneShotShift emitted and recorded "A" — two ring
 ; entries for one visible capital.
 ;
-; Enumerated as a list rather than a chain of ors so a fourth suppressive hook
+; The magic-key editor is suppressive too: its ``InputHook("L1 I")`` captures
+; one remapped output for the editor instead of letting it reach the application.
+;
+; Enumerated as a list rather than a chain of ors so another suppressive hook
 ; is a one-line addition next to its siblings, and so the regression test can
 ; require every _*InputHook global in the driver to appear here.
-global _EMIT_SUPPRESSING_HOOKS := ["_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook"]
+global _EMIT_SUPPRESSING_HOOKS := [
+	"_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook",
+	"_MagicKeyEditorInputHook"
+]
 
 ; Capture hooks that deliberately do NOT suppress, listed so every hook in the
 ; driver is accounted for in exactly one of the two sets and a new one cannot
@@ -474,7 +480,7 @@ global _EMIT_NONSUPPRESSING_HOOKS := ["_PrefixInputHook"]
 _EmitReachedScreen() {
 	global _EMIT_SUPPRESSING_HOOKS
 	for HookName in _EMIT_SUPPRESSING_HOOKS {
-		; Read through the global namespace: these hooks live in three different
+		; Read through the global namespace: these hooks live in four different
 		; modules and only one of them is this file's own.
 		if !IsSet(%HookName%)
 			continue
@@ -590,20 +596,9 @@ global _UIA_SelectionPollTimer := unset
 ; shares AHK's only message thread with the keyboard hook; a probe is useful
 ; only after a selection gesture has settled, not between successive keys.
 global UIA_SELECTION_IDLE_REQUIRED_MS := 250
-; TextPattern.GetText(-1) asks a provider for an unbounded document range. A
-; selection wrap is a convenience action, so cap the snapshot rather than let a
-; large document selection monopolise the keyboard/message thread.
-global UIA_SELECTION_MAX_TEXT_CHARS := 8192
-
-; Deadline for the WHOLE probe, not for one COM call. The timeout clamp below
-; bounds each individual call; this bounds their SUM, because a provider that
-; answers just under the per-call limit on each of five hops still owns the
-; keystroke-dispatch thread for a multiple of it. Measured 2026-07-29: one tick
-; reached 301.0 ms, i.e. past Windows' ~300 ms LowLevelHooksTimeout, where the
-; keystroke is delivered WITHOUT the hook's verdict — silent data loss, not a slow
-; feel. Chosen well under that ceiling while still leaving room for a healthy
-; probe (mean 14.3 ms over 2993 measured round trips).
-global UIA_SELECTION_SEGMENT_BUDGET_MS := 60
+; A provider that exhausts the killable worker deadline is not retried on every
+; idle tick. The focus/input gates still release immediately for another app.
+global _UIA_WORKER_BACKOFF_CACHE := Map()
 
 ; Inputs of the last probe. A selection cannot appear unless the FOCUS moved or
 ; the user touched the input stream, so a probe whose inputs are identical to the
@@ -613,87 +608,106 @@ global UIA_SELECTION_SEGMENT_BUDGET_MS := 60
 global _UIA_LastProbeHwnd := 0
 global _UIA_LastProbeIdleEpoch := 0
 
-; Bound UIA's own waits before this poll makes its first COM round-trip.
-;
-; The library ships Windows' defaults — 2000 ms TransactionTimeout, 20000 ms
-; ConnectionTimeout — and the driver's worst measured stall (2560 ms, logged as
-; "Slow Tooltip.ResolvePos: 2560.32 ms") is exactly that 2000 ms plus overhead.
-; This poll fires twice a second, unattended, on the SAME message thread that
-; dispatches keystrokes, so an unresponsive provider blocks typing for as long
-; as Windows lets it. The idle gate below decides whether to START the round
-; trip; it does nothing at all about how long the round-trip may then take.
-;
-; Kept module-local, mirroring _SFD_ClampUiaTimeouts in the secure-field adapter
-; and _TooltipClampUiaTimeouts in ui/tooltip. A single shared helper would be
-; tidier, but the three owners sit in three layers that must not depend on each
-; other (an adapter may not reach into ui/, a module may not reach into an
-; adapter for a UI concern), and the driver's headless test runner loads those
-; trees selectively — a helper hoisted into any one of them would break the load
-; of the others. All three write the same two process-wide singleton properties
-; and are one-shot, so whichever probe touches UIA first wins and the rest are
-; no-ops; what matters is only that no probe can reach the COM call unclamped.
-; @returns {void}
-_UIA_ClampSelectionTimeouts() {
-	global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
-	static Clamped := false
-	; Throttles the diagnostics below to one line per process. This runs twice a
-	; second, so an unthrottled warning would itself become the flood it exists to
-	; report.
-	static Warned := false
-	if Clamped
-		return
-	if !IsSet(UIA)
-		return
-	if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
-		if !Warned {
-			Warned := true
-			try LoggerWarn("Layout", "UIA timeout constants are unavailable — the selection poll would run against Windows' 2000 ms default; skipping the clamp.")
+_UIA_CurrentInputEpoch() {
+	return KS_GetPhysicalInputEpoch()
+}
+
+_UIA_CurrentSelectionContext(ProcName := "") {
+	Hwnd := WIGetForegroundHwnd()
+	Control := WIGetFocusedControlToken()
+	if !Hwnd || !Control
+		return 0
+	return Map(
+		"Hwnd", Hwnd,
+		"Control", Control,
+		"InputEpoch", _UIA_CurrentInputEpoch(),
+		"ProcName", ProcName
+	)
+}
+
+_UIA_OnSelectionWorkerTerminal(Status, Context, Result) {
+	global _UIA_SelectionCache, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
+	global _UIA_WORKER_BACKOFF_CACHE, UIASW_DEADLINE_MS
+	LogKind := ""
+	LogDetail := ""
+	; Validate text before entering Critical so even a maximum-sized provider
+	; result cannot extend the input-ownership transaction with a regex scan.
+	PublishableText := ""
+	if (Status = "ok" && Result is Map) {
+		CandidateText := Result.Get("Text", "")
+		if CandidateText != "" && !RegExMatch(CandidateText, "^(\r\n|\r|\n)+$")
+			PublishableText := CandidateText
+	} else if (Status = "failed") {
+		LogDetail := (Result is Map)
+			? Result.Get("Error", Result.Get("Text", "unknown worker failure"))
+			: "unknown worker failure"
+	}
+
+	; A keyboard/InputHook callback can interrupt an OnMessage callback. Context
+	; validation and cache publication therefore form one short transaction:
+	; otherwise a physical character can clear the old cache after the live check,
+	; then this callback resumes and republishes a selection from the old epoch.
+	PreviousCritical := A_IsCritical
+	Critical("On")
+	try {
+		if A_IsSuspended {
+			_UIA_SelectionCache := 0
+		} else if (Status = "timeout") {
+			_UIA_WORKER_BACKOFF_CACHE[Context["ProcName"]] := {
+				Tick: A_TickCount,
+				DurationMs: _UIA_NO_TP_TTL_MS
+			}
+			_UIA_SelectionCache := 0
+			LogKind := "timeout"
+		} else if (Status = "failed") {
+			_UIA_SelectionCache := 0
+			LogKind := "failed"
+		} else if (Status = "canceled") {
+			_UIA_SelectionCache := 0
+		} else {
+			Live := _UIA_CurrentSelectionContext(Context["ProcName"])
+			if !(Live is Map) || !(Result is Map)
+				|| !UIASW_ContextMatches(Context, Result, Live) {
+				_UIA_SelectionCache := 0
+			} else if (Status = "no_text_pattern") {
+				_UIA_NO_TP_CACHE[Context["ProcName"]] := {
+					Tick: A_TickCount,
+					DurationMs: _UIA_NO_TP_TTL_MS
+				}
+				_UIA_SelectionCache := 0
+			} else if (Status != "ok" || PublishableText = "") {
+				_UIA_SelectionCache := 0
+			} else {
+				_UIA_SelectionCache := {
+					Text: PublishableText,
+					Hwnd: Context["Hwnd"],
+					Control: Context["Control"],
+					InputEpoch: Context["InputEpoch"],
+					CapturedAt: A_TickCount,
+					Consumed: false
+				}
+			}
 		}
-		return
+	} finally {
+		Critical(PreviousCritical ? PreviousCritical : "Off")
 	}
-	; Both properties are IUIAutomation2 vtable slots; an older interface must not
-	; throw into this callback, which shares the keystroke-dispatch thread.
-	Supported := false
-	try Supported := UIA.IsIUIAutomation2Available ? true : false
-	if !Supported {
-		; Latch: there is nothing to retry on an older interface. But SAY so — the
-		; poll now runs against Windows' 2000 ms transaction default, and the
-		; caller's own comment promises the round trip is bounded before it starts.
-		Clamped := true
-		if !Warned {
-			Warned := true
-			try LoggerWarn("Layout", "IUIAutomation2 is unavailable — the selection poll runs against Windows' 2000 ms transaction default and cannot be bounded here.")
-		}
-		return
-	}
-	; Latch only once the writes have LANDED. Setting the flag before attempting
-	; them meant a failed write left the driver believing it was clamped, for the
-	; whole session, with two bare `try`s swallowing the reason (conventions 5.3).
-	; That is the exact state behind the worst stall this driver ever logged.
-	Ok := true
-	try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
-	catch
-		Ok := false
-	try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
-	catch
-		Ok := false
-	if Ok {
-		Clamped := true
-		return
-	}
-	if !Warned {
-		Warned := true
-		try LoggerWarn("Layout", "Could not apply the UIA timeout clamp — the selection poll is NOT bounded; retrying on the next tick.")
+
+	; File/log sinks never run inside the keyboard-ownership transaction.
+	if (LogKind = "timeout") {
+		try LoggerWarn("Layout", "UIA selection worker exceeded its {1} ms deadline; the provider is backed off for this process.", UIASW_DEADLINE_MS)
+	} else if (LogKind = "failed") {
+		try LoggerWarn("Layout", "UIA selection worker failed: {1}", LogDetail)
 	}
 }
 
-; Background timer to poll the current UIA selection. Moves the expensive
-; COM round-trip off the synchronous keyboard path (uia-selection-blocks-keyboard-thread).
+; The repeating tick performs only cheap state gates and one PostMessage. Every
+; UIA/COM hop lives in the disposable worker process; its 60 ms owner timer can
+; terminate a call already in progress instead of checking a budget after it.
 _UIA_SelectionPollTick() {
-	global _UIA_SelectionCache, UIA, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
-	global UIA_SELECTION_IDLE_REQUIRED_MS, UIA_SELECTION_MAX_TEXT_CHARS
+	global _UIA_SelectionCache, _UIA_NO_TP_CACHE, _UIA_NO_TP_TTL_MS
+	global _UIA_WORKER_BACKOFF_CACHE, UIA_SELECTION_IDLE_REQUIRED_MS
 	global _DriverBootPhase
-	global _UIA_LastProbeHwnd, _UIA_LastProbeIdleEpoch, UIA_SELECTION_SEGMENT_BUDGET_MS
+	global _UIA_LastProbeHwnd, _UIA_LastProbeIdleEpoch
 	; No UIA/COM work before the driver is ready. This timer is armed at include
 	; position, so without this gate it fires several times during the multi-second
 	; RegisterAllHotstrings boot phase — each tick doing out-of-proc STA COM round-trips
@@ -706,13 +720,13 @@ _UIA_SelectionPollTick() {
 	; the phase before any include — but the polarity should match the claim.
 	if (!IsSet(_DriverBootPhase) || _DriverBootPhase != "ready")
 		return
-    ; SetTimer bypasses native Suspend — a paused driver must do ZERO UIA work
-    ; (« pause = tout éteint »): the 3-hop COM round-trip + unbounded GetText(-1)
-    ; would keep firing every 500 ms on the keyboard thread while paused.
-    if A_IsSuspended {
+    ; SetTimer bypasses native Suspend. Retire an in-flight worker as well as
+    ; clearing its cache; otherwise the detached process continues during pause.
+	if A_IsSuspended {
 		_UIA_SelectionCache := 0
-        return
-    }
+		UIASW_Stop("canceled")
+		return
+	}
     ; The ONLY consumer of the cache is WrapTextIfSelected, gated on this flag.
     ; When the wrap feature is off, skip the COM round-trip entirely so non-users
     ; never pay the per-tick cost or the large-selection keyboard-thread stall
@@ -726,7 +740,7 @@ _UIA_SelectionPollTick() {
     ; starting new COM work until the input stream has been quiet long enough.
     if (A_TimeIdlePhysical < UIA_SELECTION_IDLE_REQUIRED_MS)
         return
-    ; Nothing can have changed since the last probe unless the FOCUS moved or the
+	; Nothing can have changed since the last probe unless the FOCUS moved or the
     ; user touched the input stream, and a selection cannot appear without one of
     ; those. So once a probe has answered "no selection" for this window, repeating
     ; it every 500 ms on an idle machine buys nothing and costs a cross-process COM
@@ -739,98 +753,57 @@ _UIA_SelectionPollTick() {
     ; selection IS physical input, which resets A_TimeIdlePhysical and therefore
     ; the epoch below. It only suppresses probes whose inputs are provably
     ; identical to the previous one.
-    ActiveHwnd := WinExist("A")
+	ActiveHwnd := WIGetForegroundHwnd()
     ; A_TimeIdlePhysical counts DOWN from the last input, so the moment of that
     ; input is what identifies the input stream's state, not the idle time itself.
-    IdleEpoch := A_TickCount - A_TimeIdlePhysical
-    if (_UIA_LastProbeHwnd == ActiveHwnd and _UIA_LastProbeIdleEpoch == IdleEpoch
-        and !IsObject(_UIA_SelectionCache))
-        return
-    _UIA_LastProbeHwnd := ActiveHwnd
-    _UIA_LastProbeIdleEpoch := IdleEpoch
-    if (!IsSet(UIA))
-        return
-    ; Bound the round-trip BEFORE making it. The gate above only decides whether
-    ; to start; without this the wait itself is unbounded, and a keystroke
-    ; arriving one millisecond later queues behind it on this same thread.
-    _UIA_ClampSelectionTimeouts()
-
-    ; This tick is the driver's only unattended repeating COM round-trip. It was
-    ; the one probe with no hot-path segment at all, so a provider that answered
-    ; slowly showed up in the logs as an unexplained gap rather than as itself.
-    _hpPoll := HotPath_Now()
-    try {
-        ProcName := ""
-        try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
-        if (ProcName == "" or ProcName == "Code.exe") {
+	IdleEpoch := _UIA_CurrentInputEpoch()
+	if (_UIA_LastProbeHwnd == ActiveHwnd and _UIA_LastProbeIdleEpoch == IdleEpoch
+		and !IsObject(_UIA_SelectionCache))
+		return
+	ProcName := ""
+	try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+	if (ProcName == "" or ProcName == "Code.exe") {
+		_UIA_SelectionCache := 0
+		return
+	}
+	Now := A_TickCount
+	for Cache in [_UIA_NO_TP_CACHE, _UIA_WORKER_BACKOFF_CACHE] {
+		if !Cache.Has(ProcName)
+			continue
+		Entry := Cache[ProcName]
+		if !TickExpired(Entry.Tick, Entry.DurationMs, Now) {
 			_UIA_SelectionCache := 0
-            return
-        }
+			return
+		}
+		Cache.Delete(ProcName)
+	}
+	Context := _UIA_CurrentSelectionContext(ProcName)
+	if !(Context is Map) {
+		_UIA_SelectionCache := 0
+		return
+	}
+	; Focus or physical input may change between the first idle check and the
+	; context snapshot. Do not post a request for that split generation.
+	if Context["Hwnd"] != ActiveHwnd || Context["InputEpoch"] != IdleEpoch
+		|| A_TimeIdlePhysical < UIA_SELECTION_IDLE_REQUIRED_MS
+		return
 
-        Now := A_TickCount
-        if (_UIA_NO_TP_CACHE.Has(ProcName) and Now < _UIA_NO_TP_CACHE[ProcName]) {
-			_UIA_SelectionCache := 0
-            return
-        }
-
-        ; Deadline for the WHOLE probe, checked between hops. The timeout clamp
-        ; above bounds each individual COM call, so a provider that answers just
-        ; under the per-call limit five times over still owns this thread for a
-        ; multiple of it — which is how a single tick reached 301.0 ms, past
-        ; Windows' ~300 ms LowLevelHooksTimeout. Abandoning mid-probe yields "no
-        ; selection", the same safe fallback every other early exit takes.
-        Deadline := Now + UIA_SELECTION_SEGMENT_BUDGET_MS
-
-        el := UIA.GetFocusedElement()
-        if !el.IsTextPatternAvailable {
-            _UIA_NO_TP_CACHE[ProcName] := Now + _UIA_NO_TP_TTL_MS
-			_UIA_SelectionCache := 0
-            return
-        }
-        if (A_TickCount > Deadline) {
-            try LoggerWarn("Layout", "UIA selection probe abandoned after the focused element: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
-			_UIA_SelectionCache := 0
-            return
-        }
-
-        tp := el.GetPattern("Text")
-        if (A_TickCount > Deadline) {
-            try LoggerWarn("Layout", "UIA selection probe abandoned after the text pattern: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
-			_UIA_SelectionCache := 0
-            return
-        }
-        ranges := tp.GetSelection()
-        if (ranges.Length > 0) {
-            if (A_TickCount > Deadline) {
-                try LoggerWarn("Layout", "UIA selection probe abandoned before reading the selection: {1} ms budget exceeded on the keystroke thread.", UIA_SELECTION_SEGMENT_BUDGET_MS)
-				_UIA_SelectionCache := 0
-                return
-            }
-            Text := ranges[1].GetText(UIA_SELECTION_MAX_TEXT_CHARS)
-            ; Blank-only selections (newlines) are not meaningful to wrap
-            if (Text != "" and !RegExMatch(Text, "^(\r\n|\r|\n)+$")) {
-				_UIA_SelectionCache := {
-					Text: Text,
-					Hwnd: WinExist("A"),
-					CapturedAt: A_TickCount,
-					Consumed: false
-				}
-				return
-            }
-        }
-    } catch as e {
-        ; A bare catch-less try here would discard UIA/COM failures silently
-        ; (project rule 5.3). Log at WARNING so a chronically failing automation
-        ; provider is diagnosable (uia-error-swallowed-silently). The poll then
-        ; degrades to "no selection" below, which is the safe fallback.
-        try LoggerWarn("Layout", "UIA selection probe failed: {1}.", e.Message)
-    } finally {
-        ; finally, not a trailing statement: the block above returns from four
-        ; places, and a segment that is only closed on the fall-through path
-        ; would silently stop measuring the exact cases that are slow.
-        HotPath_LogIfSlow("UIA.SelectionPoll", _hpPoll, "")
-    }
-	_UIA_SelectionCache := 0
+	_HpPoll := HotPath_Now()
+	try {
+		if !UIASW_IsReady() {
+			UIASW_Start()
+			return
+		}
+		if UIASW_Request(Context, _UIA_OnSelectionWorkerTerminal) {
+			_UIA_LastProbeHwnd := ActiveHwnd
+			_UIA_LastProbeIdleEpoch := IdleEpoch
+		}
+	} catch as Err {
+		_UIA_SelectionCache := 0
+		try LoggerWarn("Layout", "UIA selection worker dispatch failed: {1}", Err.Message)
+	} finally {
+		HotPath_LogIfSlow("UIA.SelectionPoll", _HpPoll, "")
+	}
 }
 
 ; Start the background selection poll.
@@ -852,12 +825,15 @@ GetUIASelection() {
 	if !IsObject(Snapshot)
 		return ""
 	if !(Snapshot.HasOwnProp("Text") and Snapshot.HasOwnProp("Hwnd")
+		and Snapshot.HasOwnProp("Control") and Snapshot.HasOwnProp("InputEpoch")
 		and Snapshot.HasOwnProp("CapturedAt") and Snapshot.HasOwnProp("Consumed")) {
 		_UIA_SelectionCache := 0
 		return ""
 	}
-	Elapsed := A_TickCount - Snapshot.CapturedAt
-	if Snapshot.Consumed or Snapshot.Hwnd != WinExist("A") or Elapsed < 0 or Elapsed > UIA_SELECTION_MAX_AGE_MS {
+	Elapsed := TickElapsed(Snapshot.CapturedAt)
+	if Snapshot.Consumed || Snapshot.Hwnd != WIGetForegroundHwnd()
+		|| Snapshot.Control != WIGetFocusedControlToken()
+		|| Elapsed > UIA_SELECTION_MAX_AGE_MS {
 		_UIA_SelectionCache := 0
 		return ""
 	}
@@ -934,11 +910,11 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 
 
 
-; ============================
+; =============================
 ; =============================
 ; ======= 3/ BASE LAYER =======
 ; =============================
-; ============================
+; =============================
 
 
 ; Returns true when digit keys 1-0 require Shift on the active OS keyboard
@@ -1165,11 +1141,11 @@ RegisterCapsLockLayer()
 
 
 
-; =============================================
+; ==============================================
 ; ==============================================
 ; ======= 6/ ALTGR AND SHIFT+ALTGR LAYER =======
 ; ==============================================
-; =============================================
+; ==============================================
 
 ; The AltGr roll for SC012 (= / Œ / %) is registered dynamically via
 ; _RegisterRollsAltGrHotkeys() below. Static ``SC138 & SC012::`` would have AHK

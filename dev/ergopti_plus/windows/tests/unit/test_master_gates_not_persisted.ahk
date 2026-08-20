@@ -195,14 +195,19 @@ _MGP_GatedSubCategoryContributesNoWrite() {
 ; ==============================================================
 
 ; The behavioural cases above exercise the composition directly; this pins that
-; SaveFullConfig is what performs it, so the filter cannot be left orphaned.
+; the collector reached by SaveFullConfig performs it, so the filter cannot be
+; left orphaned during extraction or refactoring.
 _MGP_SaveFullConfigFiltersBeforeCollecting() {
-	Body := _DriverFuncBody("SaveFullConfig")
-	Assert(Body != "", "SaveFullConfig() must exist")
-	Assert(InStr(Body, "_CollectFeatureUpdates") > 0,
-		"SaveFullConfig must still flatten the feature tree")
-	Assert(InStr(Body, "_PruneMasterGatedFeatures") > 0,
-		"SaveFullConfig must feed the collector a gate-filtered view of Features — walking the live map serialises the runtime zeroes ApplyMasterGatesToFeatures wrote for gating purposes only")
+	SaveBody := _DriverFuncBody("SaveFullConfig")
+	Collector := _DriverFuncBody("_ConfigCollectFullSaveUpdates")
+	Assert(InStr(SaveBody, "_ConfigCollectFullSaveUpdates()") > 0,
+		"SaveFullConfig must invoke the authoritative full-save collector")
+	FlattenPos := InStr(Collector, "_CollectFeatureUpdates")
+	FilterPos := InStr(Collector, "_PruneMasterGatedFeatures")
+	Assert(FlattenPos > 0,
+		"the full-save collector must still flatten the feature tree")
+	Assert(FilterPos > FlattenPos,
+		"the full-save collector must feed the walker a gate-filtered snapshot — walking live runtime zeroes destroys persisted per-feature choices")
 }
 
 

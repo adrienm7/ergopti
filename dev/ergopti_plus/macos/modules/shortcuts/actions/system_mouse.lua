@@ -18,13 +18,13 @@
 local M = {}
 
 local hs            = hs
-local Logger        = require("lib.logger")
-local EventTapGuard = require("adapters.event_tap_guard")
-local text_utils = require("lib.text_utils")
-local notifications = require("lib.notifications")
-local i18n          = require("lib.i18n")
+local Logger        = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local notifications = require("infra.notifications")
+local i18n          = require("infra.i18n")
 local MouseControl  = require("adapters.mouse_control")
 local ShellRunner   = require("adapters.shell_runner")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "shortcuts.actions.system"
 
@@ -132,7 +132,7 @@ end
 function M.open_emoji_picker()
 	Logger.start(LOG, "Opening emoji picker…")
 	local ok, err = pcall(function()
-		hs.eventtap.keyStroke({"ctrl", "cmd"}, "space", 0)
+		SyntheticInput.emit_key_stroke({"ctrl", "cmd"}, "space", 0)
 	end)
 	if ok then
 		Logger.success(LOG, "Emoji picker triggered.")
@@ -369,7 +369,6 @@ function M.spotlight_mouse(duration_s)
 		if dismissed then return end
 		local ok_tap, tap
 		ok_tap, tap = pcall(hs.eventtap.new, {hs.eventtap.event.types.mouseMoved}, function(e)
-			if EventTapGuard.handle_disabled(e, tap, "shortcuts.spotlight_mouse") then return false end
 			dismiss()
 			return false  -- Do not consume the event; the cursor must keep moving normally
 		end)

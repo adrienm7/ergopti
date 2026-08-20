@@ -3,9 +3,8 @@
 ; ==============================================================================
 ; MODULE: Metrics Shortcut Persist-On-Failure Test
 ; DESCRIPTION:
-; Guards MS_ShouldPersistShortcut(), the decision helper that stops
-; MS_PromptShortcut from persisting a shortcut string that failed Hotkey()
-; registration.
+; Guards MS_ShouldPersistShortcut(), the syntactic eligibility helper used by
+; the transactional shortcut owner before it touches Hotkey() or config.toml.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Regression for F38: MS_PromptShortcut used to write the raw user string
@@ -14,8 +13,9 @@
 ;    bad string was then replayed on every future boot by MS_ApplyAll(),
 ;    re-triggering the Hotkey() registration failure (and its blocking
 ;    MsgBox) forever.
-; 2. The fix only persists a non-empty raw string when MS_BindHotkey()
-;    actually bound it; an explicit clear (raw == "") is always persisted.
+; 2. A non-empty raw string needs a translated native candidate. An explicit
+;    clear is syntactically eligible; the transaction test separately proves
+;    that a failed durable clear leaves the old binding live.
 ; ==============================================================================
 
 
@@ -29,21 +29,21 @@
 ; =====================================================
 
 _MSPF_ExplicitClearIsPersisted() {
-	; Clearing the shortcut (raw == "") must always be persisted, regardless
-	; of what MS_BindHotkey() returned for the (irrelevant) empty input.
-	AssertTrue(MS_ShouldPersistShortcut("", ""), "an explicit clear must be persisted")
+	AssertTrue(MS_ShouldPersistShortcut("", ""),
+		"an explicit clear must be eligible for the transactional commit")
 }
 Test("MS_ShouldPersistShortcut: explicit clear is always persisted", _MSPF_ExplicitClearIsPersisted)
 
 _MSPF_SuccessfulBindIsPersisted() {
-	; A non-empty raw string that Hotkey() accepted must be persisted.
+	; A non-empty raw string with a translated native candidate may proceed to
+	; the OS-registration and durable-commit steps.
 	AssertTrue(MS_ShouldPersistShortcut("ctrl+alt+m", "^!m"), "a successfully bound shortcut must be persisted")
 }
 Test("MS_ShouldPersistShortcut: a successfully bound shortcut is persisted", _MSPF_SuccessfulBindIsPersisted)
 
 _MSPF_FailedBindIsNotPersisted() {
-	; A non-empty raw string that Hotkey() rejected (MS_BindHotkey returns "")
-	; must NOT be persisted -- else it replays forever via MS_ApplyAll() at boot.
+	; A non-empty raw string with no native candidate must NOT be persisted --
+	; else it replays forever via MS_ApplyAll() at boot.
 	AssertFalse(MS_ShouldPersistShortcut("ctrl+alt+boguskey", ""),
 		"a shortcut that failed Hotkey() registration must not be persisted (F38 — replayed forever otherwise)")
 }

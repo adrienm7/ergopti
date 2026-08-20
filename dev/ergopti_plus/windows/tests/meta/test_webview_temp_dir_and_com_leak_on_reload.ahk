@@ -61,8 +61,8 @@ _WVRL_CloseAllWiredToOnExit() {
 	Assert(Seg != "", "Ergopti_OnShutdown(reason, code) must exist in ErgoptiPlus.ahk")
 	Assert(InStr(Seg, "KLWV_CloseAll()") > 0,
 		"Ergopti_OnShutdown must call KLWV_CloseAll() - without it a Reload orphans the WebView2 host process and leaks its locked ergopti_webview2_* temp profile dir")
-	Assert(InStr(Src, "OnExit(Ergopti_OnShutdown)") > 0,
-		"ErgoptiPlus.ahk must register OnExit(Ergopti_OnShutdown) - the handler only runs on shutdown if it is wired to OnExit")
+	Assert(InStr(Src, "OnExit(Ergopti_OnShutdown, -1)") > 0,
+		"ErgoptiPlus.ahk must prepend Ergopti_OnShutdown to OnExit: a refusal must stop later logger teardown, while accepted shutdown still closes every WebView")
 }
 Test("keylogger: KLWV_CloseAll runs on shutdown via OnExit (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseAllWiredToOnExit)
 

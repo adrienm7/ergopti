@@ -1,4 +1,4 @@
-# static/ergopti_plus/_shared/modules/timings/constants.toml
+# _shared/modules/timings/constants.toml
 #
 # Canonical registry of all timing constants used across Ergopti drivers.
 #
@@ -41,6 +41,11 @@ chain_fallback_ms = 500
 # HS:  api_remote.lua REQUEST_TIMEOUT_S.
 request_timeout_ms = 30000
 
+# Hard deadline for one macOS Keychain security(1) subprocess. This does not
+# block input, but it bounds every credential CRUD callback and owned task.
+# HS: api_token_crypto.lua OPERATION_TIMEOUT_SEC.
+keychain_operation_timeout_ms = 10000
+
 # HTTP polling interval when the remote driver polls a streaming response.
 # AHK: api_remote.ahk LLM_REMOTE_POLL_MS / api_ollama.ahk LLM_OLLAMA_POLL_MS.
 poll_interval_ms = 50
@@ -77,13 +82,21 @@ zombie_kill_min_interval_ms = 3000
 fresh_launch_grace_ms = 90000
 
 # Discovery: stop polling /v1/models after this much real time.
-discovery_max_wait_ms = 60000
+discovery_max_wait_ms = 180000
 
 # Discovery: first inter-probe delay (doubles each miss, up to the cap).
 discovery_poll_initial_ms = 1000
 
 # Discovery: cap for the exponential backoff interval.
 discovery_poll_max_ms = 10000
+
+# Discovery: minimum gap between the END of one probe cycle and the START of the
+# next. Distinct from the backoff above, which paces probes WITHIN a cycle and is
+# reset every time a cycle begins — so without this a failed cycle restarted on
+# the next run-loop tick with the backoff back at its initial value, and the
+# pacing that exists never got to apply. The failure path is the one that
+# retries, so the storm happens exactly when the server is not answering.
+discovery_retry_cooldown_ms = 5000
 
 # Streaming watchdog: kill the handler if no token arrives within this window.
 # AHK streaming_handler equivalent; HS streaming_handler.lua STREAM_WATCHDOG_SEC.
@@ -186,6 +199,11 @@ layout_tis_settle_ms = 500
 # keep it in sync if the canonical default_sec ever changes.
 # UI: hotstrings_config_window GLOBAL_DEFAULT_DELAY_MS.
 hotstring_expansion_ms = 750
+
+# Inter-key pause for deletion prefixes sent to terminal/TUI prompt controls.
+# Their render loop may otherwise evaluate every Backspace against one stale
+# state snapshot before the replacement text arrives.
+terminal_hotstring_key_delay_ms = 20
 
 # Text-sender inter-keystroke settle (used when injecting expanded text).
 # HS: adapters/text_sender.lua inline 0.15 s delay.
@@ -334,8 +352,8 @@ wpm_min_duration_ms = 2000
 # HS: keylogger/init.lua SYSTEM_LOAD_POLL_INTERVAL_MS.
 system_load_poll_ms = 300000
 
-# Tolerance window for matching synthetic vs. physical keystrokes.
-# HS: keylogger/init.lua SYNTH_MATCH_DELAY_MS.
+# Legacy registry value retained for shared schema and test-vector compatibility.
+# macOS synthetic ownership must never consume this timing heuristic.
 synth_match_delay_ms = 3
 
 # Auto-flush trigger: flush buffer when typing has been idle this long.
@@ -521,3 +539,38 @@ onboarding_startup_delay_ms = 2000
 # LLM deps checker: Ollama poll interval (readiness probe loop).
 # AHK: ollama_deps_checker.ahk 3000 ms SetTimer.
 ollama_deps_poll_ms = 3000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Logger
+# ──────────────────────────────────────────────────────────────────────
+#
+# Four scalars that every driver's logger declares for itself. Each was
+# written out independently, and the dedup window was worse than duplicated:
+# it existed only as a bare literal, in SECONDS on macOS (`< 5`) and in
+# MILLISECONDS on Windows (`< 5000`), with a comment on each side asserting it
+# matched the other and nothing checking that it did.
+# test-logger-scalars-single-source.cjs pins every copy to the values here.
+
+[logger]
+
+# Days of rolled log files kept before purging.
+# AHK: logger.ahk LOGGER_RETENTION_DAYS. HS: logger.lua max_age_days default
+# (declared twice — purge_old_logs and the rolled-dir purge).
+retention_days = 14
+
+# Entries held in the in-memory ring buffer the crash reporter dumps.
+# AHK: logger.ahk LOGGER_RING_BUFFER_SIZE. HS: logger.lua RING_BUFFER_SIZE.
+# Shared core: _shared/lua/logger/init.lua RING_CAPACITY.
+ring_buffer_size = 200
+
+# Window during which a repeated identical line is suppressed rather than
+# re-emitted. A streak outliving the window re-surfaces, so a recurring line is
+# de-bounced and never permanently silenced.
+# AHK: logger.ahk LOGGER_DEDUP_WINDOW_MS. HS: logger.lua DEDUP_WINDOW_SEC (the
+# same duration expressed in seconds — the gate converts and compares).
+dedup_window_ms = 5000
+
+# Interval at which the queued-write drain appends pending lines in one call.
+# AHK: logger.ahk LOGGER_FLUSH_INTERVAL_MS.
+flush_interval_ms = 500

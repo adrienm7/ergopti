@@ -25,10 +25,11 @@
 local helpers = require("tests.helpers")
 
 local function read_src()
-	local path = helpers.driver_root() .. "ui/menu/menu_metrics.lua"
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "cannot open menu_metrics.lua at " .. tostring(path))
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to ui/menu/menu_metrics.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("\"dialog.metrics.security_warning_title\"")
+	helpers.assert_true(src ~= nil, "ui/menu/menu_metrics.lua source must be locatable")
 	return src
 end
 
@@ -54,14 +55,16 @@ helpers.describe("menu_metrics: master toggle gates WPM start() on pause (F-LOW-
 	helpers.it("gates the master-toggle WpmMenubar.start() on not paused_now()", function()
 		local src = read_src()
 		helpers.assert_true(
-			src:find("state.keylogger_menubar_wpm and not paused_now() and WpmMenubar and type(WpmMenubar.start)", 1, true) ~= nil,
+			src:find("if state.keylogger_menubar_wpm and not paused_now() then", 1, true) ~= nil
+				and src:find('call_wpm_lifecycle("WPM menubar", WpmMenubar, "start")', 1, true) ~= nil,
 			"the master toggle must gate WpmMenubar.start() on `not paused_now()`, mirroring dyn_wpm_menubar")
 	end)
 
 	helpers.it("gates the master-toggle WpmWidget.start() on not paused_now()", function()
 		local src = read_src()
 		helpers.assert_true(
-			src:find("state.keylogger_float_wpm and not paused_now() and WpmWidget and type(WpmWidget.start)", 1, true) ~= nil,
+			src:find("if state.keylogger_float_wpm and not paused_now() then", 1, true) ~= nil
+				and src:find('call_wpm_lifecycle("WPM widget", WpmWidget, "start",', 1, true) ~= nil,
 			"the master toggle must gate WpmWidget.start() on `not paused_now()`, mirroring dyn_wpm_widget")
 	end)
 end)

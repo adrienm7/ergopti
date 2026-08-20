@@ -4,7 +4,7 @@
 ; MODULE: TOML Unescape Ordering Guard
 ; DESCRIPTION:
 ; Static source guard for the _WS_UnescapeToml ordering fix in
-; lib/wrap_symbols_config.ahk.
+; infra/wrap_symbols_config.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; If _WS_UnescapeToml replaced \" before \\, the sequence \\" would first have
@@ -26,10 +26,10 @@
 
 _TTUO_UnescapeOrderingCheck() {
 	; Move-resilient: extract _WS_UnescapeToml()'s body by name via the framework
-	; helper instead of a pinned lib/wrap_symbols_config.ahk read. The helper anchors
+	; helper instead of a pinned infra/wrap_symbols_config.ahk read. The helper anchors
 	; on the DEFINITION, so the earlier call site no longer confuses the extraction.
 	Snippet := _DriverFuncBody("_WS_UnescapeToml")
-	Assert(Snippet != "", "_WS_UnescapeToml must be defined in lib/wrap_symbols_config.ahk")
+	Assert(Snippet != "", "_WS_UnescapeToml must be defined in infra/wrap_symbols_config.ahk")
 
 	; Both replacements must be present in the function
 	BackslashPos := InStr(Snippet, "StrReplace(S, " . Chr(0x22) . "\\" . Chr(0x22))

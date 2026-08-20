@@ -19,7 +19,7 @@
 local M = {}
 
 local llm_mod = require("modules.llm")
-local Logger  = require("lib.logger")
+local Logger  = require("infra.logger")
 
 local LOG = "menu_llm.warmup"
 
@@ -27,11 +27,11 @@ local LOG = "menu_llm.warmup"
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Fires a model warmup for the currently active model.
 --- Safe to call even when no model is configured: exits silently in that case.

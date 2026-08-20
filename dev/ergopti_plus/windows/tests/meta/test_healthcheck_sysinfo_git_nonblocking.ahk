@@ -14,7 +14,7 @@
 ; git (unavailable, network drive, credential prompt) freezes input for up to
 ; 30 seconds.
 ;
-; The fix mirrors the pattern already used in lib/crash_reporter.ahk: replace
+; The fix mirrors the pattern already used in modules/diagnostics/crash_reporter.ahk: replace
 ; RunWait with a non-blocking Run + 500 ms poll so the stall budget is bounded.
 ; These tests assert the blocking form is gone and the deadline pattern is in
 ; place.

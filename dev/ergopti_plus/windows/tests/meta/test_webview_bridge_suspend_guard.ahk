@@ -62,26 +62,29 @@ Test("model browser: _LLM_MBW_OnWebMessage guards A_IsSuspended before select_mo
 
 
 
-; ========================================================================
-; ========================================================================
-; ======= 2/ Changelog bridge guards A_IsSuspended before mutating =======
-; ========================================================================
-; ========================================================================
+; ===============================================================================
+; ===============================================================================
+; ======= 2/ Changelog bridge guards captured pause state before mutating =======
+; ===============================================================================
+; ===============================================================================
 
 _WBSG_CheckChangelogGuard() {
 	Body := _DriverFuncBody("_CLW_OnWebMessage")
 	Assert(Body != "", "_CLW_OnWebMessage must exist in ui/changelog/init.ahk")
 
-	SuspendPos := InStr(Body, "A_IsSuspended")
-	Assert(SuspendPos > 0,
-		"_CLW_OnWebMessage must check A_IsSuspended -- WebMessageReceived is a COM callback that bypasses native Suspend (webview-bridge-suspend-guard)")
-
+	CapturePos := InStr(Body, "_Updater_ReadManualBridgeMessage(")
+	ReadPos := CapturePos > 0 ? InStr(Body, "TryGetWebMessageAsString()", , CapturePos) : 0
+	BornPausedPos := ReadPos > 0 ? InStr(Body, "Request.BornSuspended", , ReadPos) : 0
+	PolicyPos := BornPausedPos > 0
+		? InStr(Body, "_Updater_RequestMayPublish(Request)", , BornPausedPos)
+		: 0
 	CallPos := InStr(Body, "_CLW_FetchAndInject(")
 	Assert(CallPos > 0, "_CLW_OnWebMessage must still call _CLW_FetchAndInject(...) on a ready/fetch action")
-	Assert(SuspendPos < CallPos,
-		"_CLW_OnWebMessage: A_IsSuspended guard must precede the first _CLW_FetchAndInject(...) call, otherwise a paused driver still dispatches a network fetch and mutates module state (webview-bridge-suspend-guard)")
+	Assert(CapturePos > 0 and ReadPos > CapturePos and BornPausedPos > ReadPos
+		and PolicyPos > BornPausedPos and CallPos > PolicyPos,
+		"_CLW_OnWebMessage must capture entry-time pause provenance before its yielding COM read, then reject born-paused or interrupted actions before a fetch mutates channel/network state")
 }
-Test("changelog: _CLW_OnWebMessage guards A_IsSuspended before fetch mutates channel/network state (webview-bridge-suspend-guard)",
+Test("changelog: _CLW_OnWebMessage guards captured pause provenance before fetch mutation (webview-bridge-suspend-guard)",
 	_WBSG_CheckChangelogGuard)
 
 _WBSG_CheckKeyloggerGuard() {

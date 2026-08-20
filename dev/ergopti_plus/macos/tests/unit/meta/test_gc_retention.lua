@@ -6,7 +6,7 @@
 --- Static source guard for the "hs.task silent death by GC" bug. Hammerspoon's
 --- GC kills any hs.task whose Lua object is held only in a local variable the
 --- moment the enclosing function returns, sending a SIGTERM to the subprocess
---- mid-run. This test ensures every hs.task.new() call site keeps a GC-root
+--- mid-run. This test ensures every guarded native-task launch keeps a GC-root
 --- reference (_active_tasks) so the task survives until its callback fires.
 ---
 --- WHY PER-SITE AND NOT PER-FILE (gc-guard-file-granular): this guard used to
@@ -37,11 +37,11 @@ local DRIVER_ROOT = helpers.driver_root()
 local PIN_LOOKBACK  = 12
 local PIN_LOOKAHEAD = 40
 
-local function read_source(rel_path)
-	local f = io.open(DRIVER_ROOT .. rel_path, "r")
-	if not f then return nil, "cannot open: " .. DRIVER_ROOT .. rel_path end
-	local src = f:read("*a")
-	f:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -75,7 +75,7 @@ local function window_has_pin(window)
 		or window:find("waitUntilExit", 1, true) ~= nil
 end
 
---- Reports every hs.task.new call site in a source that has no pin near it.
+--- Reports every raw or TaskLifecycle.native task site with no pin near it.
 ---
 --- Comments are stripped first, and this is load-bearing rather than cosmetic:
 --- two modules DISCUSS `hs.task.new(...)` in prose while spawning nothing there
@@ -92,7 +92,9 @@ local function scan_unpinned_sites(src)
 
 	local out = {}
 	for i, line in ipairs(lines) do
-		if line:find("hs%.task%.new") then
+		if line:find("hs%.task%.new%s*%(")
+				or line:find("pcall%s*%(%s*hs%.task%.new")
+				or line:find("TaskLifecycle%.native") then
 			local window = table.concat(lines, "\n",
 				math.max(1, i - PIN_LOOKBACK), math.min(#lines, i + PIN_LOOKAHEAD))
 			if not window_has_pin(window) then
@@ -105,13 +107,16 @@ end
 
 --- Asserts a driver file has no unpinned spawn.
 --- @param rel_path string Relative path from the macos/ root.
-local function assert_gc_pinned(rel_path)
-	local src, err = read_source(rel_path)
-	assert(src, (err or "missing") .. " — " .. rel_path)
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function assert_gc_pinned(selector)
+	local src, err = read_source(selector)
+	assert(src, (err or "missing") .. " — " .. selector)
 	local offenders = scan_unpinned_sites(src)
 	if #offenders == 0 then return end
 	local where = {}
-	for _, o in ipairs(offenders) do where[#where + 1] = rel_path .. ":" .. o.line end
+	for _, o in ipairs(offenders) do where[#where + 1] = selector .. ":" .. o.line end
 	error(table.concat(where, ", ") .. ": hs.task.new with no GC-root pin within "
 		.. PIN_LOOKAHEAD .. " lines — add M._active_tasks = {} (own root) or pin via "
 		.. "deps.active_tasks / active_tasks_gc_root (delegated root) before :start()", 0)
@@ -121,11 +126,11 @@ end
 
 
 
--- ==================================================
+-- ===================================================
 -- ===================================================
 -- ======= 2/ The scanner catches what it must =======
 -- ===================================================
--- ==================================================
+-- ===================================================
 
 helpers.describe("GC retention: the guard is per-site, not per-file", function()
 	helpers.it("an unpinned spawn is caught even when the file pins elsewhere", function()
@@ -215,7 +220,7 @@ local function all_driver_sources()
 				end
 			end
 		end
-		for _, d in ipairs({ "adapters", "lib", "modules", "ui" }) do walk(d .. "/", d .. "/") end
+		for _, d in ipairs({ "adapters", "infra", "modules", "platform", "ui" }) do walk(d .. "/", d .. "/") end
 		-- Root-level sources are NOT inside those four directories, and init.lua is
 		-- the largest of them. The shell fallback below scans the whole tree, so
 		-- coverage silently depended on which of the two paths ran — green on a
@@ -244,7 +249,7 @@ local function all_driver_sources()
 	return out
 end
 
-helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned", function()
+helpers.describe("GC retention: EVERY native task site in the driver is pinned", function()
 	helpers.it("no call site spawns without a GC-root pin near it", function()
 		local files = all_driver_sources()
 		helpers.assert_true(#files > 0,
@@ -254,8 +259,16 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 		for _, rel in ipairs(files) do
 			local src = read_source(rel)
 			if src then
-				local sites = scan_unpinned_sites(src)
-				if src:gsub("%-%-[^\n]*", ""):find("hs%.task%.new") then scanned = scanned + 1 end
+				local code = src:gsub("%-%-[^\n]*", "")
+				-- TaskLifecycle owns construction only; its callers own the handle and
+				-- pin before start. Judge each caller launch, not the adapter's return.
+				local sites = rel == "adapters/task_lifecycle.lua" and {}
+					or scan_unpinned_sites(src)
+				if code:find("hs%.task%.new%s*%(")
+						or code:find("pcall%s*%(%s*hs%.task%.new")
+						or code:find("TaskLifecycle%.native") then
+					scanned = scanned + 1
+				end
 				for _, o in ipairs(sites) do
 					offenders[#offenders + 1] = rel .. ":" .. o.line .. "  " .. o.text
 				end
@@ -263,12 +276,12 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 		end
 
 		helpers.assert_true(scanned >= 10,
-			"the walk must actually reach the spawning modules (found " .. scanned
+			"the walk must actually reach the native-task launchers (found " .. scanned
 				.. ") — a scan that matches nothing cannot fail")
 
 		-- The walk has two implementations — an lfs recursion and a shell fallback
 		-- — and they must enumerate the same tree. The lfs branch descended only
-		-- into adapters/lib/modules/ui and skipped every ROOT-level source,
+		-- into adapters/infra/modules/ui and skipped every ROOT-level source,
 		-- init.lua included, so coverage silently depended on which branch ran:
 		-- complete on a machine without lfs, blind on one with it. Asserting a
 		-- known root file is present holds whichever branch executes here.
@@ -282,7 +295,7 @@ helpers.describe("GC retention: EVERY hs.task.new site in the driver is pinned",
 				.. "installed, and the suite reports coverage it does not have")
 
 		helpers.assert_true(#offenders == 0, string.format(
-			"%d hs.task.new call site(s) have no GC-root pin. An unreferenced hs.task is "
+				"%d native task launch site(s) have no GC-root pin. An unreferenced hs.task is "
 			.. "collected mid-run: the subprocess is killed and its completion callback never "
 			.. "fires, so whatever it was supposed to finish silently never happens. Pin before "
 			.. ":start(), release in the callback:\n  %s",
@@ -297,19 +310,19 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- _active_tasks table so the task survives until its callback fires.
 
 	helpers.it("menu_about: unzip and rm tasks are pinned", function()
-		assert_gc_pinned("ui/menu/menu_about.lua")
+		assert_gc_pinned("local function get_update_menu_label") -- ui/menu/menu_about.lua
 	end)
 
 	helpers.it("models_manager_ollama: ollama-list task is pinned", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_ollama.lua")
+		assert_gc_pinned("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
 	end)
 
 	helpers.it("models_manager_mlx: download/check tasks are pinned", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx.lua")
+		assert_gc_pinned("\"Cause inconnue. Consultez la console Hammerspoon.\"") -- ui/menu/menu_llm/models_manager_mlx.lua
 	end)
 
 	helpers.it("models_manager_mlx_server: sweep and probe tasks are pinned", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_server.lua")
+		assert_gc_pinned("\"a healthy mlx_lm.server is answering on the configured port\"") -- ui/menu/menu_llm/models_manager_mlx_server.lua
 	end)
 
 	-- F-MED-20: these 2 of the 6 files split out of the old
@@ -319,23 +332,23 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- substring check did not recognize. New unpinned hs.task.new() calls in
 	-- these files could previously ship with the suite still green.
 	helpers.it("models_manager_mlx_download: pull/tail tasks are pinned (F-MED-20)", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_download.lua")
+		assert_gc_pinned("\"mlx.download_interrupted_body\"") -- ui/menu/menu_llm/models_manager_mlx_download.lua
 	end)
 
 	helpers.it("models_manager_mlx_hf: hf_login task is pinned (F-MED-20)", function()
-		assert_gc_pinned("ui/menu/menu_llm/models_manager_mlx_hf.lua")
+		assert_gc_pinned("local HF_TOKEN_FILE") -- ui/menu/menu_llm/models_manager_mlx_hf.lua
 	end)
 
 	helpers.it("onboarding: shasum / curl / hdiutil / osascript tasks are pinned", function()
-		assert_gc_pinned("modules/karabiner/onboarding.lua")
+		assert_gc_pinned("local function run_pkg_with_sudo_async") -- platform/remap/onboarding.lua
 	end)
 
 	helpers.it("menu_apps: open task is pinned", function()
-		assert_gc_pinned("ui/menu/menu_apps.lua")
+		assert_gc_pinned("local function discover_bundled_apps") -- ui/menu/menu_apps.lua
 	end)
 
 	helpers.it("dialog_util: no direct hs.task.new (replaced with hs.timer.doAfter)", function()
-		local src = read_source("lib/dialog_util.lua")
+		local src = read_source("local function focus_hammerspoon") -- infra/dialog_util.lua
 		assert(src, "dialog_util.lua must exist")
 		-- After the fix, dialog_util uses hs.timer.doAfter instead of hs.task.
 		assert(not src:find("hs%.task%.new", 1, false),
@@ -343,7 +356,7 @@ helpers.describe("GC retention: hs.task pinning", function()
 	end)
 
 	helpers.it("shell_runner: canonical GC-root table is present", function()
-		local src = read_source("adapters/shell_runner.lua")
+		local src = read_source("local function invoke_guarded") -- adapters/shell_runner.lua
 		assert(src, "shell_runner.lua must exist")
 		assert(src:find("_active_tasks", 1, false),
 			"shell_runner: must maintain M._active_tasks as GC root for all spawned tasks")

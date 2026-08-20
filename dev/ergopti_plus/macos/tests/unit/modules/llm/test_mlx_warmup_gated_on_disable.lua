@@ -45,11 +45,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel_path)
-	local path = helpers.driver_root() .. rel_path
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, rel_path .. " must be readable")
-	local src = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -57,30 +57,30 @@ end
 
 
 
--- =======================================================================
+-- ======================================================================
 -- ======================================================================
 -- ======= 1/ api_mlx exports stop_warmup and resume_warmup (M-3) =======
 -- ======================================================================
--- =======================================================================
+-- ======================================================================
 
 helpers.describe("M-3: api_mlx self-retry gate (source — public API)", function()
 
 	helpers.it("api_mlx.lua defines M.stop_warmup", function()
-		local src = read_src("modules/llm/api_mlx.lua")
+		local src = read_src("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		helpers.assert_true(src:find("function M%.stop_warmup", 1, false) ~= nil
 			or src:find("M.stop_warmup", 1, true) ~= nil,
 			"api_mlx must expose M.stop_warmup() so pause_all can stop the self-retry chain")
 	end)
 
 	helpers.it("api_mlx.lua defines M.resume_warmup", function()
-		local src = read_src("modules/llm/api_mlx.lua")
+		local src = read_src("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		helpers.assert_true(src:find("function M%.resume_warmup", 1, false) ~= nil
 			or src:find("M.resume_warmup", 1, true) ~= nil,
 			"api_mlx must expose M.resume_warmup() so resume_all can re-enable the retry chain")
 	end)
 
 	helpers.it("api_mlx.lua has a _warmup_stopped guard in M.warmup()", function()
-		local src = read_src("modules/llm/api_mlx.lua")
+		local src = read_src("local function read_user_port_override") -- modules/llm/api_mlx.lua
 		helpers.assert_true(src:find("_warmup_stopped", 1, true) ~= nil,
 			"M.warmup() must check _warmup_stopped to short-circuit mid-pause retries")
 	end)
@@ -90,29 +90,29 @@ end)
 
 
 
--- =====================================================================================
+-- ====================================================================================
 -- ====================================================================================
 -- ======= 2/ script_control.lua calls stop/resume_warmup on pause/resume (M-3) =======
 -- ====================================================================================
--- =====================================================================================
+-- ====================================================================================
 
 helpers.describe("M-3: script_control wires api_mlx stop/resume (source)", function()
 
 	helpers.it("pause_all calls api.stop_warmup", function()
-		local src = read_src("modules/shortcuts/script_control.lua")
+		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
 		-- The pause block must call stop_warmup() on the api_mlx handle
 		helpers.assert_true(src:find("stop_warmup", 1, true) ~= nil,
 			"script_control.pause_all must call api.stop_warmup() to halt the api_mlx self-retry chain (M-3)")
 	end)
 
 	helpers.it("resume_all calls api.resume_warmup", function()
-		local src = read_src("modules/shortcuts/script_control.lua")
+		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
 		helpers.assert_true(src:find("resume_warmup", 1, true) ~= nil,
 			"script_control.resume_all must call api.resume_warmup() to re-enable the api_mlx self-retry chain (M-3)")
 	end)
 
 	helpers.it("resume_warmup appears before schedule_warmup_with_retry in resume_all", function()
-		local src = read_src("modules/shortcuts/script_control.lua")
+		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
 		local resume_pos = src:find("resume_warmup", 1, true)
 		local sched_pos  = src:find("schedule_warmup_with_retry", 1, true)
 		helpers.assert_true(resume_pos ~= nil and sched_pos ~= nil,
@@ -150,7 +150,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
-			"ui.tooltip", "modules.keylogger", "lib.notifications", "lib.keycodes",
+			"ui.tooltip", "modules.keylogger", "infra.notifications", "infra.keycodes",
 		}) do
 			saved[name] = package.loaded[name]
 		end
@@ -161,10 +161,13 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn, cancelled = false }
 				timer_queue[#timer_queue + 1] = handle
-				return handle
+				return handle, true
 			end,
-			every     = function(_, _) return { cancelled = false } end,
-			cancel    = function(handle) if type(handle) == "table" then handle.cancelled = true end end,
+			every     = function(_, _) return { cancelled = false }, true end,
+			cancel    = function(handle)
+				if type(handle) == "table" then handle.cancelled = true; handle.timer = nil end
+				return true
+			end,
 			cancelAll = function() end,
 			now       = function() return 0 end,
 		}
@@ -202,7 +205,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		}
 
 		-- Silence the "server ready" notification path
-		package.loaded["lib.notifications"] = { notify = function() end }
+		package.loaded["infra.notifications"] = { notify = function() end }
 
 		-- Load the REAL api_mlx against those adapters
 		package.loaded["modules.llm.api_mlx"] = nil
@@ -224,21 +227,21 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			set_llm_model_ollama    = function(_) end,
 			set_runtime_llm_enabled = function(_) end,
 			set_llm_streaming       = function(_) end,
-			cancel_streaming        = function() end,
+			cancel_streaming        = function() return true end,
 			is_backend_ready        = function() return false end,
 			get_active_profile      = function() return nil end,
 			fetch_llm_prediction    = function(...) end,
 		}
 		package.loaded["modules.llm.warmup_controller"] = {
 			schedule_warmup_with_retry = function(_) end,
-			init = function(_) end, start = function() end, stop = function() end,
+			init = function(_) return true end, start = function() end, stop = function() end,
 		}
 		package.loaded["modules.llm.prompt_builder"]    = { build = function() return nil, "stubbed", nil end }
 		package.loaded["modules.llm.streaming_handler"] = {
-			init = function(_) end,
+			init = function(_) return true end,
 			build_callbacks = function(_) return function() end, function() end, function() end end,
-			arm_watchdog = function(_) end, stop_watchdog = function() end,
-			reset_failure_count = function() end, cancel_streaming = function() end,
+			arm_watchdog = function(_) return true end, stop_watchdog = function() return true end,
+			reset_failure_count = function() end, cancel_streaming = function() return true end,
 		}
 		package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
 		package.loaded["modules.llm.api_common"] = {
@@ -246,14 +249,14 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			get_retry_policy = function() return 2, 0.18, 5 end,
 			get_rate_limit_min_interval_s = function(_) return 0 end,
 		}
-		package.loaded["lib.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		package.loaded["ui.tooltip"] = {
 			set_navigate_callback = function(_) end, set_enter_validates = function(_) end,
-			set_chain_start = function(_) end, mark_chain_complete = function() end,
+			set_chain_start = function(_) return true end, mark_chain_complete = function() return true end,
 			get_current_index = function() return nil end, navigate = function(_) end,
-			show = function() end, hide = function() end, hide_forced = function() end,
+			show = function() end, hide = function() return true end, hide_forced = function() return true end,
 			set_llm_timeout = function(_) end, reset_llm_timer = function() end,
-			show_loading = function() end, show_predictions = function() end,
+			show_loading = function() return true end, show_predictions = function() return true end,
 			tint = function(_) return nil end,
 		}
 		package.loaded["modules.keylogger"] = {

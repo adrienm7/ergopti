@@ -7,10 +7,10 @@
 --- ==============================================================================
 
 local M = {}
-local Logger  = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Notifications = require("lib.notifications")
-local i18n    = require("lib.i18n")
+local Logger  = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Notifications = require("infra.notifications")
+local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
@@ -21,7 +21,10 @@ local _infer_client  = require("adapters.http_client").new()
 local _check_client  = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local ShellRunner    = require("adapters.shell_runner")
+local OllamaBinary = require("modules.llm.ollama_binary")
+local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local LOG            = "llm.api_ollama"
 
 -- Ollama bind address. The default port is the single source in
@@ -73,6 +76,12 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local _ollama_started = false
+local _ollama_starting = false
+local _ollama_start_generation = 0
+local _ollama_kill_task = nil
+local _ollama_launch_timer = nil
+local _ollama_serve_task = nil
+local _ollama_ambiguous_task = nil
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
 -- the same numbers. ``max_mult`` is the upper bound on attempts as a
@@ -145,39 +154,158 @@ local STREAM_TMPFILE_CLEANUP_SEC = 70
 -- Ensure Ollama daemon is running — fully async to avoid blocking the Cocoa
 -- run loop. Previous implementation used synchronous hs.execute + usleep which
 -- permanently corrupted the CFRunLoop and killed timers/menubar/eventtaps.
+-- @return boolean accepted True when a daemon is running or one launch attempt
+-- was committed to native async ownership.
 local function ensure_ollama_running()
-	if _ollama_started then return end
-	_ollama_started = true
+	-- A thrown start is outside ShellRunner's normal contract, but an injected or
+	-- future adapter can still leave native ownership ambiguous. Do not launch a
+	-- sibling until the exact retained capability has been terminated.
+	if _ollama_ambiguous_task then
+		local ambiguous = _ollama_ambiguous_task
+		local stop_ok, stop_result = xpcall(function() return ambiguous.terminate() end, debug.traceback)
+		if not stop_ok or stop_result ~= true then
+			Logger.error(LOG, "Ambiguous Ollama startup task could not be revoked; launch remains fenced: %s",
+				tostring(stop_result))
+			return false
+		end
+		if _ollama_ambiguous_task == ambiguous then _ollama_ambiguous_task = nil end
+		_ollama_start_generation = _ollama_start_generation + 1
+		_ollama_starting = false
+	end
 
-	-- Step 1: kill any stale Ollama process (async via hs.task)
-	local kill_handle = ShellRunner.spawn("/bin/sh", {
-		"-c", "pkill -f '[o]llama serve' 2>/dev/null || true"
-	}, function()
-		-- Step 2: after kill finishes, wait a short beat then launch the server
-		TimerScheduler.after(OLLAMA_KILL_SETTLE_SEC, function()
-			-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
-			-- [OLLAMA-SERVER] prefix so the user has a single tail target for the
-			-- whole stack (HS + MLX + Ollama land in the same rotating daily file)
-			local log_path = Logger.UNIFIED_LOG_FILE
-			local launch_cmd = "/opt/homebrew/bin/ollama serve 2>&1 | " ..
-				"while IFS= read -r LINE; do " ..
-				"printf '%s [OLLAMA-SERVER] %s\\n' \"$(date +%H:%M:%S)\" \"$LINE\" " ..
-				-- shell_quote, not string.format("%q"). %q escapes for a LUA
-				-- literal: it handles backslashes and quotes but leaves $,
-				-- backticks and ! untouched, every one of which /bin/sh expands.
-				-- The log path derives from the configurable config directory, so
-				-- this is the injection hazard shell_quote exists for — and the
-				-- shell-quoting guard cannot see a %q call to flag it.
-				">> " .. text_utils.shell_quote(log_path) .. "; " ..
-				"done"
-			local serve_handle = ShellRunner.spawn("/bin/sh", {
-				"-c", launch_cmd
-			}, nil)
-			serve_handle.start()
-			Logger.debug(LOG, "Ollama server launched asynchronously.")
-		end)
-	end)
-	kill_handle.start()
+	if _ollama_started or _ollama_starting then return true end
+
+	_ollama_start_generation = _ollama_start_generation + 1
+	local my_generation = _ollama_start_generation
+	_ollama_starting = true
+
+	local function fail_start(stage, result, ambiguous_task)
+		if my_generation ~= _ollama_start_generation then return false end
+		_ollama_kill_task = nil
+		_ollama_launch_timer = nil
+		if ambiguous_task then
+			local stop_ok, stop_result = xpcall(function() return ambiguous_task.terminate() end, debug.traceback)
+			if not stop_ok or stop_result ~= true then
+				_ollama_ambiguous_task = ambiguous_task
+				_ollama_starting = true
+				Logger.error(LOG, "Ollama %s left ambiguous native ownership; retry fenced: %s",
+					tostring(stage), tostring(stop_result))
+				return false
+			end
+		end
+		_ollama_starting = false
+		Logger.error(LOG, "Ollama %s did not commit (result: %s); launch remains retryable.",
+			tostring(stage), tostring(result))
+		return false
+	end
+
+	-- Locals are declared above the callbacks that capture them. Moving either
+	-- declaration below its closure silently binds a nil global in Lua.
+	local kill_handle
+	local function on_kill_done()
+		local callback_ok, callback_err = xpcall(function()
+			if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
+			if _ollama_kill_task ~= kill_handle then return end
+			_ollama_kill_task = nil
+
+			local launch_handle
+			local launch_callback_ran = false
+			local function launch_server()
+				launch_callback_ran = true
+				local launch_ok, launch_err = xpcall(function()
+					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
+					_ollama_launch_timer = nil
+
+					-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
+					-- [OLLAMA-SERVER] prefix. The shared builder captures only the stable
+					-- directory; its shell loop derives the dated filename for every line.
+					local ollama_bin, binary_err = OllamaBinary.resolve()
+					if not ollama_bin then
+						fail_start("server executable resolution", binary_err)
+						return
+					end
+					local launch_cmd, command_err = OllamaServerCommand.build(
+						ollama_bin, Logger.UNIFIED_LOG_FILE)
+					if not launch_cmd then
+						fail_start("server command creation", command_err)
+						return
+					end
+
+					local serve_handle
+					local serve_completed = false
+					local function on_serve_done()
+						local done_ok, done_err = xpcall(function()
+							serve_completed = true
+							if my_generation ~= _ollama_start_generation then return end
+							if _ollama_serve_task ~= serve_handle then return end
+							_ollama_serve_task = nil
+							_ollama_started = false
+							_ollama_starting = false
+							Logger.warn(LOG, "Ollama server task exited; the next demand will relaunch it.")
+						end, debug.traceback)
+						if not done_ok then Logger.error(LOG, "Ollama server completion callback raised: %s", tostring(done_err)) end
+					end
+
+					local spawn_ok, spawned = xpcall(function()
+						return ShellRunner.spawn("/bin/sh", { "-c", launch_cmd }, on_serve_done)
+					end, debug.traceback)
+					if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
+						fail_start("server task creation", spawned)
+						return
+					end
+					serve_handle = spawned
+					_ollama_serve_task = serve_handle
+					local start_ok, start_result = xpcall(function() return serve_handle.start() end, debug.traceback)
+					if not start_ok then
+						_ollama_serve_task = nil
+						fail_start("server task start", start_result, serve_handle)
+						return
+					end
+					if start_result ~= true then
+						_ollama_serve_task = nil
+						fail_start("server task start", start_result)
+						return
+					end
+					if not serve_completed and my_generation == _ollama_start_generation then
+						_ollama_started = true
+						_ollama_starting = false
+						Logger.debug(LOG, "Ollama server launched asynchronously.")
+					end
+				end, debug.traceback)
+				if not launch_ok then fail_start("server launch callback", launch_err) end
+			end
+
+			local schedule_ok, scheduled, settle_committed = xpcall(function()
+				return TimerScheduler.after(OLLAMA_KILL_SETTLE_SEC, launch_server)
+			end, debug.traceback)
+			if not schedule_ok or settle_committed ~= true then
+				fail_start("settle timer", scheduled)
+				return
+			end
+			launch_handle = scheduled
+			if not launch_callback_ran then _ollama_launch_timer = launch_handle end
+		end, debug.traceback)
+		if not callback_ok then fail_start("kill completion callback", callback_err) end
+	end
+
+	local spawn_ok, spawned = xpcall(function()
+		return ShellRunner.spawn("/bin/sh", {
+			"-c", "pkill -f '[o]llama serve' 2>/dev/null || true"
+		}, on_kill_done)
+	end, debug.traceback)
+	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
+		return fail_start("stale-process task creation", spawned)
+	end
+	kill_handle = spawned
+	_ollama_kill_task = kill_handle
+	local start_ok, start_result = xpcall(function() return kill_handle.start() end, debug.traceback)
+	if not start_ok then
+		return fail_start("stale-process task start", start_result, kill_handle)
+	end
+	if start_result ~= true then
+		return fail_start("stale-process task start", start_result)
+	end
+	return true
 end
 
 --- Ensures the Ollama daemon is running.
@@ -185,7 +313,12 @@ end
 --- Ollama — calling it unconditionally at require-time launches Ollama even for
 --- MLX or API users who never selected it.
 function M.ensure_running()
-	pcall(ensure_ollama_running)
+	local ok, result = xpcall(ensure_ollama_running, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "ensure_running() did not commit: %s", tostring(result))
+		return false
+	end
+	return true
 end
 
 --- Sends a minimal 1-token inference to load model weights into GPU memory.
@@ -241,10 +374,16 @@ function M.cancel_streaming()
 	-- Bump generation so any stale on_done from a terminated stream becomes a no-op
 	_stream_generation = _stream_generation + 1
 	if _active_stream_task then
-		_active_stream_task.terminate()
+		local task = _active_stream_task
+		local ok, result = xpcall(function() return task.terminate() end, debug.traceback)
+		if not ok or result ~= true then
+			Logger.error(LOG, "Active Ollama stream cancellation failed; retained for retry: %s", tostring(result))
+			return false
+		end
 		_active_stream_task = nil
 		Logger.debug(LOG, "Active Ollama stream cancelled.")
 	end
+	return true
 end
 
 
@@ -547,9 +686,10 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
                                          temperature, num_predict_tokens, num_predictions, is_batch,
                                          on_success, on_fail, dedup_stats, on_partial)
 	-- Terminate any previous stream so resources are not leaked
-	if _active_stream_task then
-		_active_stream_task.terminate()
-		_active_stream_task = nil
+	if _active_stream_task and M.cancel_streaming() ~= true then
+		Logger.error(LOG, "Cannot start Ollama stream while the previous task remains owned.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
 	end
 
 	_stream_generation = _stream_generation + 1
@@ -602,6 +742,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	local accumulated = ""
 	local line_buf    = ""
+	local task = nil
+	local task_completed = false
 
 	-- Parse one complete NDJSON line and append its content to accumulated
 	local function process_line(line)
@@ -638,7 +780,13 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	end
 
 	-- Completion callback: fired when curl exits
-	local function on_done(_, remaining, _)
+	local function on_done(exit_code, remaining, stderr_out)
+		task_completed = true
+		-- Relinquish the exact native capability before any parser/file/logger call
+		-- can raise. A callback throw must never leave a completed task published.
+		if my_generation == _stream_generation and _active_stream_task == task then
+			_active_stream_task = nil
+		end
 		-- Remove the payload temp file as soon as curl exits so it doesn't linger
 		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window.
 		os.remove(tmp_path)
@@ -648,7 +796,13 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			Logger.debug(LOG, "[%s] #%d STREAM: superseded — discarding on_done.", model_name, req_id)
 			return
 		end
-		_active_stream_task = nil
+		if exit_code ~= 0 then
+			Logger.error(LOG, "[%s] #%d STREAM transport failed (exit=%s, stderr=%s) — discarding partial output.",
+				tostring(model_name), req_id, tostring(exit_code),
+				tostring((stderr_out or ""):sub(1, 200)))
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
+		end
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
@@ -693,23 +847,65 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 	end
 
-	local task = ShellRunner.spawn("/usr/bin/curl", {
-		"-s", "-N", "-X", "POST",
-		"-H", "Content-Type: application/json",
-		"--connect-timeout", "5",   -- abort if TCP handshake exceeds 5 s (Ollama dead)
-		"--max-time", tostring(STREAM_MAX_TIME_SEC),  -- hard ceiling; also drives cleanup delay
-		"--data-binary", "@" .. tmp_path,
-		M.get_base_url() .. "/api/chat",
-	}, on_done, on_chunk)
-	task.start()
+	local spawn_ok, spawned = xpcall(function()
+		return ShellRunner.spawn("/usr/bin/curl", {
+			"-s", "-N", "-X", "POST",
+			"-H", "Content-Type: application/json",
+			"--connect-timeout", "5",   -- abort if TCP handshake exceeds 5 s (Ollama dead)
+			"--max-time", tostring(STREAM_MAX_TIME_SEC),  -- hard ceiling; also drives cleanup delay
+			"--data-binary", "@" .. tmp_path,
+			M.get_base_url() .. "/api/chat",
+		}, on_done, on_chunk)
+	end, debug.traceback)
+	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
+		pcall(os.remove, tmp_path)
+		Logger.error(LOG, "[%s] #%d STREAM task creation did not commit (result: %s).",
+			tostring(model_name), req_id, tostring(spawned))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+	task = spawned
+	-- Publish before start(): a very short task may complete synchronously from a
+	-- test/native shim, and on_done must be able to revoke the exact capability.
 	_active_stream_task = task
+	local start_ok, start_result = xpcall(function() return task.start() end, debug.traceback)
+	if not start_ok or start_result ~= true then
+		if not start_ok then
+			local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
+			if stop_ok and stop_result == true then
+				if _active_stream_task == task then _active_stream_task = nil end
+			else
+				Logger.error(LOG, "[%s] #%d STREAM ambiguous task retained for cancellation retry: %s",
+					tostring(model_name), req_id, tostring(stop_result))
+			end
+		elseif _active_stream_task == task then
+			-- ShellRunner's false result proves hs.task never launched.
+			_active_stream_task = nil
+		end
+		local removed, remove_err = pcall(os.remove, tmp_path)
+		if not removed then
+			Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
+				tostring(model_name), req_id, tostring(remove_err))
+		end
+		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
+			tostring(model_name), req_id, tostring(start_result))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+	if task_completed then return end
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
 
 	-- Safety-net: remove the payload temp file even if on_done fires late or not
 	-- at all. Delay must be > STREAM_MAX_TIME_SEC so curl has finished reading.
-	TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
-		os.remove(tmp_path)
-	end)
+	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
+		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
+			os.remove(tmp_path)
+		end)
+	end, debug.traceback)
+	if not cleanup_ok or cleanup_committed ~= true then
+		Logger.error(LOG, "[%s] #%d STREAM payload cleanup timer did not commit (result: %s).",
+			tostring(model_name), req_id, tostring(cleanup_handle))
+	end
 end
 
 
@@ -745,11 +941,18 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and post_and_parse_streaming or post_and_parse
+	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
+	local function request_is_current()
+		return type(request_id_provider) ~= "function"
+			or initial_request_id == nil
+			or request_id_provider() == initial_request_id
+	end
 
 	local t0 = TimerScheduler.now()
 	post_fn(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
+			if not request_is_current() then return end
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
 			-- With streaming OFF: reveal each prediction one by one (complete, no animation) so
@@ -758,17 +961,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 			-- With streaming ON: on_partial_cb already showed each pred token by token;
 			-- emit the final call directly to replace stream placeholders with diff colors.
 			if not streaming and #results > 1 then
-				local function reveal_next(idx)
-					if idx > #results then return end
-					local subset = {}
-					for j = 1, idx do subset[j] = results[j] end
-					local is_final = (idx == #results)
-					-- Pass is_batch_progressive=true so prediction_engine bypasses the
-					-- streaming_multi early-return for these intermediate calls
-					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
-					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
-				end
-				reveal_next(1)
+				ProgressiveReveal.deliver(results, on_success, ms, request_is_current)
 			else
 				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end

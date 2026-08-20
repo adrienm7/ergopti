@@ -94,14 +94,21 @@ local function load_log_manager()
 		_last_complete_batch_offset = 0,
 	}
 
-	package.loaded["lib.i18n"]    = { t = function(key) return key end }
-	package.loaded["lib.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
+	package.loaded["infra.i18n"]    = { t = function(key) return key end }
+	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
+	local saved_file_system = package.loaded["adapters.file_system"]
+package.loaded["adapters.file_system"] = {
+	write = function() return true end,
+	create_if_absent = function() return true, "created" end,
+	read = function() return nil end,
+}
 
 	package.loaded["modules.keylogger.log_manager"] = nil
 	local lm = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		fs      = { attributes = function() return nil end, dir = function() return function() return nil end end },
 		execute = function() return "" end,
 	})
+	package.loaded["adapters.file_system"] = saved_file_system
 	lm.init({
 		LOG_DIR = "/tmp/test_ingest_stop_start",
 		buffer_events = {}, buffer_text = "", rich_chunks = {},
@@ -131,7 +138,8 @@ helpers.describe("ingest survives a Metrics OFF/ON toggle", function()
 		-- stubbed for a precondition this test does not measure.
 		sqlite.open = false
 
-		lm.ensure_ingest_running()
+		helpers.assert_eq(true, lm.ensure_ingest_running(),
+			"re-arm must report that the timer ownership committed")
 
 		helpers.assert_true(sqlite.open == true,
 			"ensure_ingest_running() must re-open the cache M.stop() closed. Re-arming only the "
@@ -146,7 +154,8 @@ helpers.describe("ingest survives a Metrics OFF/ON toggle", function()
 		sqlite.open = true
 		local before = sqlite.open_calls
 
-		lm.ensure_ingest_running()
+		helpers.assert_eq(true, lm.ensure_ingest_running(),
+			"an already-live timer must satisfy the exact re-arm contract")
 
 		helpers.assert_eq(sqlite.open_calls, before,
 			"an already-open cache must not be re-opened — ensure_ingest_running() is called "

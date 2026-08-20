@@ -9,9 +9,11 @@
 ; The actual registration logic lives in the sub-modules below:
 ;   hotstrings/hotstrings_distances.ahk    — distances + SFBs + rolls.
 ;   hotstrings/hotstrings_autocorrection.ahk — autocorrection categories.
-;   hotstrings/hotstrings_text_expansion.ahk — text expansion + dynamic hotstrings.
+;   hotstrings/hotstrings_text_expansion.ahk — text expansion (magic-key entries).
 ;   hotstrings/hotstrings_personal.ahk     — personal + extension TOML files.
 ;   hotstrings/hotstrings_helpers.ahk      — deferred emoji pass + deadkey helpers.
+;   ../dynamic_hotstrings/dynamic_hotstrings.ahk — dates + phone/SSN/IBAN prefixes,
+;     the folder name macOS and Linux already use for the same behaviour.
 ; ==============================================================================
 
 #Include hotstrings\hotstrings_distances.ahk
@@ -19,6 +21,9 @@
 #Include hotstrings\hotstrings_text_expansion.ahk
 #Include hotstrings\hotstrings_personal.ahk
 #Include hotstrings\hotstrings_helpers.ahk
+; Sibling folder, not a hotstrings/ sub-file: the three drivers name this
+; subsystem modules/dynamic_hotstrings/ and the tree-parity gate counts it.
+#Include dynamic_hotstrings\dynamic_hotstrings.ahk
 
 
 

@@ -6,7 +6,7 @@
 --- Guards that the macOS tooltip reads its visual style (corner radius, border
 --- ring, separator) from the SINGLE shared source — _shared/modules/tooltip/constants.toml
 --- — rather than hardcoded literals. Both drivers consume that file (HS here, AHK
---- via lib/ui_style.ahk) so the tooltips look identical across platforms.
+--- via infra/ui_style.ahk) so the tooltips look identical across platforms.
 ---
 --- ROOT CAUSE ENCODED: the stacked LLM tooltip used to hardcode the AHK-tuned
 --- border/separator alpha (0.25) on the macOS canvas and a literal corner radius,
@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 -- the source of truth, not to a copied literal. The reader wraps named TOML
 -- sections under `.sections`, mirroring how config.lua's require_key indexes them.
 local function shared_constants()
-	local toml_reader = require("lib.toml.reader")
+	local toml_reader = require("infra.toml.reader")
 	local path = helpers.shared("modules/tooltip/constants.toml")
 	local ok, data = pcall(toml_reader.parse, path)
 	helpers.assert_true(ok and type(data) == "table" and type(data.sections) == "table",

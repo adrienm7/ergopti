@@ -21,9 +21,9 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
-local Paths  = require("lib.paths")
+local Logger = require("infra.logger")
+local i18n   = require("infra.i18n")
+local Paths  = require("infra.paths")
 
 local LOG   = "personal_info_editor"
 
@@ -59,11 +59,11 @@ local _current     = {}
 
 
 
--- =============================
+-- ============================
 -- ============================
 -- ======= 1/ Internals =======
 -- ============================
--- =============================
+-- ============================
 
 --- Closes and cleans up the editor webview.
 local function close_webview()
@@ -121,8 +121,15 @@ local function handle_message(body)
 		inject_init_data()
 	elseif action == "save" then
 		local values = type(body.values) == "table" and body.values or {}
-		if type(_save_cb) == "function" then
-			pcall(_save_cb, values)
+		if type(_save_cb) ~= "function" then
+			Logger.error(LOG, "Personal info save refused because no save callback is registered.")
+			return
+		end
+		local ok, committed = xpcall(function() return _save_cb(values) end, debug.traceback)
+		if not ok or committed ~= true then
+			Logger.error(LOG, "Personal info save callback did not commit (result: %s).",
+				tostring(committed))
+			return
 		end
 		close_webview()
 	elseif action == "cancel" then
@@ -147,7 +154,7 @@ end
 
 --- Opens the editor as a standalone WKWebView window.
 --- @param current_info table Current data used to populate form fields.
---- @param save_callback function Invoked with the edited {key=value} map on save.
+--- @param save_callback function Returns true after committing the edited {key=value} map.
 function M.open(current_info, save_callback)
 	_current = type(current_info) == "table" and current_info or {}
 	_save_cb = save_callback

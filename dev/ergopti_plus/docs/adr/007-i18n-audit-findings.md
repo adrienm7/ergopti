@@ -43,7 +43,7 @@ replace hardcoded strings with `i18n.get("menu.about.update.up_to_date")` etc.
 
 ---
 
-### Cluster B — `modules/karabiner/onboarding.lua` (~5 violations, French)
+### Cluster B — `platform/remap/onboarding.lua` (~5 violations, French)
 
 The Karabiner onboarding error-path calls `callback(false, "…")` and
 `hs.alert.show("…")` with hardcoded French strings.
@@ -78,7 +78,7 @@ The Karabiner onboarding error-path calls `callback(false, "…")` and
 
 ---
 
-### Minor — `modules/karabiner/ke_lifecycle.lua`
+### Minor — `platform/remap/ke_lifecycle.lua`
 
 One callback string: `"Karabiner-Elements non disponible — vérifier l'installation."`.
 Should be `i18n.get("karabiner.lifecycle.unavailable")`.

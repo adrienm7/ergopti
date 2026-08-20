@@ -23,7 +23,7 @@
 ; the tap-hold writer — the same file, the same config directory — ask too.
 ;
 ; SCOPE: behavioural for the loader (it is in the headless include graph);
-; source introspection for the writer (lib/tap_hold/tap_hold_writer.ahk is not
+; source introspection for the writer (platform/remap/tap_hold_writer.ahk is not
 ; loaded headlessly, so its guard cannot be provoked from here).
 ; ==============================================================================
 

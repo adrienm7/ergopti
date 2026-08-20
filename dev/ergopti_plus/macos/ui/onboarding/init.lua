@@ -20,13 +20,15 @@
 
 local M = {}
 
-local i18n         = require("lib.i18n")
-local toml_writer  = require("lib.toml.writer")
-local toml_codec   = require("lib.toml.codec")
-local notifications = require("lib.notifications")
-local Paths        = require("lib.paths")
-local Logger       = require("lib.logger")
-local text_utils   = require("lib.text_utils")
+local i18n         = require("infra.i18n")
+local toml_writer  = require("infra.toml.writer")
+local toml_codec   = require("infra.toml.codec")
+local notifications = require("infra.notifications")
+local Paths        = require("infra.paths")
+local Logger       = require("infra.logger")
+local text_utils   = require("infra.text_utils")
+local ManifestReader = require("infra.manifest_reader")
+local FileSystem    = require("adapters.file_system")
 local LOG          = "onboarding"
 
 local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
@@ -76,11 +78,11 @@ end
 
 
 
--- ============================================
+-- ==========================================
 -- ==========================================
 -- ======= 1/ Locale string injection =======
 -- ==========================================
--- ============================================
+-- ==========================================
 
 --- Loads the strings for a given locale code and injects them into the webview
 --- via window.applyStrings().  Used both for the initial render and for the
@@ -236,7 +238,7 @@ local function inject_init_data()
 			-- of the app already calls "the magic key". Step 3 will
 			-- swap this to ù / ; if the user picks a non-Ergopti layout
 			-- on step 2 and the system KB is AZERTY / QWERTY.
-			magic_key    = "★",
+			magic_key    = ManifestReader.default_for("hotstrings.trigger_char"),
 			-- Pre-fill with the current config dir when it diverges from
 			-- the OS default — otherwise leave empty so the placeholder
 			-- shows the default and the wizard treats "no change" as the
@@ -280,7 +282,7 @@ local function to_bool(value)
 end
 
 --- Builds the config.toml update list from the wizard answers, using the CANONICAL
---- HS config schema (ui/menu/preferences.lua KEY_MAP) — lowercase sections, clean
+--- HS config schema (infra/preferences.lua KEY_MAP) — lowercase sections, clean
 --- ``enabled`` flags. Pure (no I/O) so the schema is unit-testable: a regression
 --- to AHK-style keys (which the macOS loader ignores, silently dropping every
 --- wizard choice) is caught by tests/unit/ui/test_onboarding_config_schema.lua.
@@ -291,7 +293,7 @@ function M._build_config_updates(answers)
 	return {
 		-- use_ergopti = "use the Ergopti hotstring engine" → [hotstrings].enabled.
 		{ section = "hotstrings", key = "enabled",      value = to_bool(answers.use_ergopti)  },
-		{ section = "hotstrings", key = "trigger_char", value = answers.magic_key or "★"       },
+		{ section = "hotstrings", key = "trigger_char", value = answers.magic_key or ManifestReader.default_for("hotstrings.trigger_char") },
 		{ section = "metrics",    key = "enabled",      value = to_bool(answers.use_metrics)   },
 		{ section = "gestures",   key = "enabled",      value = to_bool(answers.use_gestures)  },
 	}
@@ -355,6 +357,10 @@ end
 --- @return boolean ok True only when the file was actually written.
 --- @return string|nil err Failure reason, from either the raise or the return.
 function M._commit_write(writer, path, updates)
+	local _, read_status, read_detail = FileSystem.read_with_status(path)
+	if read_status ~= "ok" and read_status ~= "absent" then
+		return false, tostring(read_detail or "destination is not safely readable")
+	end
 	local ok, wrote, write_err = pcall(function()
 		return writer.batch_write(path, updates)
 	end)
@@ -362,6 +368,24 @@ function M._commit_write(writer, path, updates)
 	-- nil is treated like false: a writer that returns nothing has not confirmed
 	-- the write, and this path must never assume success it was not told about.
 	if wrote ~= true then return false, tostring(write_err) end
+	return true
+end
+
+--- Persists the wizard's selected config directory and requires an explicit
+--- acknowledgement from the menu_paths bridge. pcall success is insufficient:
+--- the filesystem writer reports ordinary I/O failures by returning false.
+--- @param menu_paths table Resolver/UI bridge.
+--- @param new_dir string User-selected directory.
+--- @return boolean persisted
+--- @return string|nil err
+function M._persist_config_dir(menu_paths, new_dir)
+	if type(menu_paths) ~= "table"
+			or type(menu_paths.persist_config_dir_for_wizard) ~= "function" then
+		return false, "config path persistence is unavailable"
+	end
+	local ok, persisted, detail = pcall(menu_paths.persist_config_dir_for_wizard, new_dir)
+	if not ok then return false, tostring(persisted) end
+	if persisted ~= true then return false, tostring(detail or "write was not confirmed") end
 	return true
 end
 
@@ -409,19 +433,26 @@ local function commit(answers)
 	-- "drop the override" case internally).
 	if type(answers.config_dir) == "string" and answers.config_dir ~= "" then
 		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-		if ok_mp and menu_paths and menu_paths.persist_config_dir_for_wizard then
-			local ok_persist, err = pcall(menu_paths.persist_config_dir_for_wizard, answers.config_dir)
-			if ok_persist then
-				-- _config_path was captured in M.run() from the config dir as it
-				-- stood BEFORE the wizard ran; the persist above just moved the
-				-- resolver. Writing through the stale path would leave the NEW
-				-- directory without a config.toml, so should_run() fires again and
-				-- the wizard re-opens blank with every answer lost.
-				_config_path = M._resolve_commit_path(menu_paths, _config_path)
-			else
-				Logger.warn(LOG, "Failed to persist config dir override: %s.", tostring(err))
-			end
+		local persisted, persist_err = M._persist_config_dir(
+			ok_mp and menu_paths or nil,
+			answers.config_dir
+		)
+		if not persisted then
+			Logger.error(LOG, "Failed to persist config dir override: %s.", tostring(persist_err))
+			close_webview()
+			local dialog = require("infra.dialog_util")
+			dialog.block_alert(
+				i18n.get("paths_editor.save_failed_title"),
+				i18n.get("paths_editor.save_failed"),
+				i18n.get("onboarding.btn.ok")
+			)
+			return
 		end
+		-- _config_path was captured in M.run() from the config dir as it stood
+		-- BEFORE the wizard ran; persistence above moved the resolver. Writing
+		-- through the stale path would leave the NEW directory without config.toml,
+		-- so should_run() would reopen the wizard with every answer lost.
+		_config_path = M._resolve_commit_path(menu_paths, _config_path)
 	end
 
 	local locale = type(answers.locale) == "string" and answers.locale ~= "" and answers.locale or "en"
@@ -443,7 +474,7 @@ local function commit(answers)
 	if not ok then
 		Logger.error(LOG, "commit: toml_writer failed — %s.", tostring(err))
 		close_webview()
-		local dialog = require("lib.dialog_util")
+		local dialog = require("infra.dialog_util")
 		dialog.block_alert(
 			i18n.get("onboarding.error.title"),
 			i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err),

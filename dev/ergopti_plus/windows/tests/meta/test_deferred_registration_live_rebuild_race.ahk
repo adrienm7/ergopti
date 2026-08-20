@@ -34,8 +34,8 @@ _DRLR_AssertCancelOnLiveRebuild() {
 	CancelIdx1 := InStr(BodyRAH, "SetTimer(RegisterEmojisSymbolsDeferred, 0)")
 	Assert(CancelIdx1 > 0, "RegisterAllHotstrings must cancel the deferred timer when DeferHeavy=false (deferred-queue-not-cancelled-on-live-rebuild)")
 
-	BodyRHL := _DriverFuncBody("RebuildHotstringsLive")
-	Assert(BodyRHL != "", "RebuildHotstringsLive must exist in the driver source")
+	BodyRHL := _DriverFuncBody("_RebuildHotstringsLiveOnce")
+	Assert(BodyRHL != "", "the serialized live-rebuild pass must exist in the driver source")
 	
 	CancelIdx2 := InStr(BodyRHL, "SetTimer(RegisterEmojisSymbolsDeferred, 0)")
 	Assert(CancelIdx2 > 0, "RebuildHotstringsLive must cancel the deferred timer before wiping registry (deferred-queue-not-cancelled-on-live-rebuild)")

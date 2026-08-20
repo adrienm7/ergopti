@@ -22,9 +22,10 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "adapters.clipboard"
+
 
 
 
@@ -58,12 +59,12 @@ end
 --- @param text string The text to place on the clipboard.
 --- @return boolean True on success, false on error.
 function M.write(text)
-	local ok, err = pcall(function()
-		hs.pasteboard.setContents(text)
+	local ok, result = pcall(function()
+		return hs.pasteboard.setContents(text)
 	end)
 
-	if not ok then
-		Logger.error(LOG, "write(): pasteboard error — %s", tostring(err))
+	if not ok or result ~= true then
+		Logger.error(LOG, "write(): pasteboard error — %s", tostring(result))
 		return false
 	end
 
@@ -74,7 +75,8 @@ end
 --- Saves ALL current clipboard data (all pasteboard types: text, images, files, etc.).
 --- Uses readAllData() so non-text content (images, RTF, file URLs) is preserved.
 --- Returns nil when the clipboard is empty; a truthy table otherwise.
---- @return table|nil Pasteboard data table, or nil if empty.
+--- @return table|nil Pasteboard data table, or nil if empty/error.
+--- @return boolean read_ok True when nil means an empty clipboard, false on error.
 function M.save()
 	local ok, result = pcall(function()
 		return hs.pasteboard.readAllData()
@@ -82,12 +84,16 @@ function M.save()
 
 	if not ok then
 		Logger.error(LOG, "save(): pasteboard error — %s", tostring(result))
-		return nil
+		return nil, false
 	end
 
-	-- readAllData() returns an empty table when clipboard is empty
-	if type(result) ~= "table" or next(result) == nil then
-		return nil
+	if type(result) ~= "table" then
+		Logger.error(LOG, "save(): pasteboard returned %s instead of a data table", type(result))
+		return nil, false
+	end
+	-- readAllData() returns an empty table when clipboard is empty.
+	if next(result) == nil then
+		return nil, true
 	end
 
 	-- readAllData() is a UTI-string-keyed HASH table, not an array, so `#result`
@@ -95,7 +101,7 @@ function M.save()
 	local n = 0
 	for _ in pairs(result) do n = n + 1 end
 	Logger.debug(LOG, "save(): clipboard snapshot taken (%d type(s)).", n)
-	return result
+	return result, true
 end
 
 --- Restores the clipboard to a previously saved value.
@@ -104,16 +110,17 @@ end
 --- @param saved table|nil The pasteboard data to restore, or nil to clear.
 --- @return boolean True on success, false on error.
 function M.restore(saved)
-	local ok, err = pcall(function()
+	local ok, result = pcall(function()
 		if saved == nil then
 			hs.pasteboard.clearContents()
+			return true
 		else
-			hs.pasteboard.writeAllData(saved)
+			return hs.pasteboard.writeAllData(saved)
 		end
 	end)
 
-	if not ok then
-		Logger.error(LOG, "restore(): pasteboard error — %s", tostring(err))
+	if not ok or result ~= true then
+		Logger.error(LOG, "restore(): pasteboard error — %s", tostring(result))
 		return false
 	end
 

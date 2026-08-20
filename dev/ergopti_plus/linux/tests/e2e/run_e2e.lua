@@ -59,6 +59,12 @@ package.path = table.concat({
 	package.path,
 }, ";")
 
+-- The SAME terminator set the driver consults (ergopti_hotstrings.lua:443), so
+-- this harness cannot open the end-char path for a character the driver would
+-- leave alone. Deciding that here by hand is what made a correct engine look
+-- wrong against a correct vector.
+local terminators = require("keymap.terminators")
+
 
 -- ============================================================================
 -- 1. Test Infrastructure
@@ -136,7 +142,9 @@ end
 ---   vkb.inject(buffer, terminator) — feed + assert on match result
 --- @param trigger     string The hotstring trigger.
 --- @param replacement string The expansion text.
---- @param opts        table  {is_word?, is_case_sensitive?}
+--- @param opts        table  Per-entry flags, exactly as the shared corpus
+---                          declares them (is_word, auto_expand, is_case_sensitive,
+---                          is_case_sensitive_strict, final_result).
 --- @return table Virtual keyboard context.
 local function make_vkb(trigger, replacement, opts)
 	opts = opts or {}
@@ -145,13 +153,18 @@ local function make_vkb(trigger, replacement, opts)
 	local engine_mod = require("modules.hotstrings.engine")
 	local engine     = engine_mod.new()
 
-	-- Build a single mapping matching the expected format.
+	-- Every per-entry flag, driven off a list. Naming a subset is what broke this
+	-- harness: `auto_expand` was omitted, so every mapping it built waited for a
+	-- terminator it never announced, and the whole run reported "no match" for
+	-- everything that should have matched.
 	local mapping = {
-		trigger          = trigger,
-		replacement      = replacement,
-		is_word          = opts.is_word          == true,
-		is_case_sensitive = opts.is_case_sensitive == true,
+		trigger     = trigger,
+		replacement = replacement,
 	}
+	for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive",
+		"is_case_sensitive_strict", "final_result" }) do
+		mapping[flag] = opts[flag] == true
+	end
 
 	engine:load_mappings({ mapping })
 
@@ -193,8 +206,22 @@ local function make_vkb(trigger, replacement, opts)
 		-- Return the first non-nil match (the trigger match, not nil from terminator).
 		for i, ch in ipairs(chars) do
 			local is_last = (i == #chars)
-			local term_consumed = is_last and terminator ~= ""
-			local result = engine:on_char(ch, { terminator_consumed = term_consumed })
+			-- is_terminator is what OPENS the end-char path; terminator_consumed only
+			-- says whether the character is swallowed. Sending the second without the
+			-- first meant a non-auto trigger could never fire in this harness.
+			--
+			-- ASKED, NOT ASSUMED. This used to read `is_last and terminator ~= ""`,
+			-- which declared whatever character came last to BE a terminator. The
+			-- production driver asks terminators.is_terminator(ch) — so the harness
+			-- opened the end-char path for characters the driver never would, and a
+			-- corpus vector describing "a non-auto trigger followed by an ordinary
+			-- letter does not fire" was replayed as "…followed by a terminator", which
+			-- fires and is supposed to. The vector failed against correct behaviour.
+			local is_term = is_last and terminator ~= "" and terminators.is_terminator(ch)
+			local result = engine:on_char(ch, {
+				is_terminator        = is_term,
+				terminator_consumed  = is_term,
+			})
 			if result then
 				return result
 			end
@@ -266,7 +293,7 @@ local function run_hardcoded_scenarios()
 	print("\n--- Hardcoded E2E scenarios ---")
 
 	-- Scenario 1: basic expansion fires.
-	local ok1, vkb1 = pcall(make_vkb, "btw", "by the way", {})
+	local ok1, vkb1 = pcall(make_vkb, "btw", "by the way", { auto_expand = true })
 	if ok1 then
 		vkb1.inject_assert("btw", " ", true, "by the way", 3)
 	else
@@ -274,7 +301,7 @@ local function run_hardcoded_scenarios()
 	end
 
 	-- Scenario 2: no match when buffer does not end with trigger.
-	local ok2, vkb2 = pcall(make_vkb, "btw", "by the way", {})
+	local ok2, vkb2 = pcall(make_vkb, "btw", "by the way", { auto_expand = true })
 	if ok2 then
 		vkb2.inject_assert("hello", " ", false)
 	else
@@ -282,7 +309,7 @@ local function run_hardcoded_scenarios()
 	end
 
 	-- Scenario 3: is_word trigger blocked when preceded by a word character.
-	local ok3, vkb3 = pcall(make_vkb, "the", "THE", { is_word = true })
+	local ok3, vkb3 = pcall(make_vkb, "the", "THE", { is_word = true, auto_expand = true })
 	if ok3 then
 		vkb3.inject_assert("othe", " ", false)
 	else
@@ -290,7 +317,7 @@ local function run_hardcoded_scenarios()
 	end
 
 	-- Scenario 4: is_word trigger fires at start-of-buffer.
-	local ok4, vkb4 = pcall(make_vkb, "the", "THE", { is_word = true })
+	local ok4, vkb4 = pcall(make_vkb, "the", "THE", { is_word = true, auto_expand = true })
 	if ok4 then
 		vkb4.inject_assert("the", " ", true, "THE", 3)
 	else
@@ -298,7 +325,7 @@ local function run_hardcoded_scenarios()
 	end
 
 	-- Scenario 5: case-sensitive trigger does not match wrong case.
-	local ok5, vkb5 = pcall(make_vkb, "BTW", "by the way", { is_case_sensitive = true })
+	local ok5, vkb5 = pcall(make_vkb, "BTW", "by the way", { is_case_sensitive = true, is_case_sensitive_strict = true, auto_expand = true })
 	if ok5 then
 		vkb5.inject_assert("btw", " ", false)
 	else
@@ -306,7 +333,7 @@ local function run_hardcoded_scenarios()
 	end
 
 	-- Scenario 6: empty trigger (should not crash).
-	local ok6, vkb6 = pcall(make_vkb, "", "nope", {})
+	local ok6, vkb6 = pcall(make_vkb, "", "nope", { auto_expand = true })
 	if ok6 then
 		vkb6.inject_assert("test", " ", false)
 	else
@@ -314,7 +341,7 @@ local function run_hardcoded_scenarios()
 	end
 
 	-- Scenario 7: trigger with special French characters.
-	local ok7, vkb7 = pcall(make_vkb, "bjr", "bonjour", {})
+	local ok7, vkb7 = pcall(make_vkb, "bjr", "bonjour", { auto_expand = true })
 	if ok7 then
 		vkb7.inject_assert("bjr", " ", true, "bonjour", 3)
 	else
@@ -322,7 +349,7 @@ local function run_hardcoded_scenarios()
 	end
 
 	-- Scenario 8: multiple consecutive matches (engine reset between).
-	local ok8, vkb8 = pcall(make_vkb, "mdr", "mort de rire", {})
+	local ok8, vkb8 = pcall(make_vkb, "mdr", "mort de rire", { auto_expand = true })
 	if ok8 then
 		vkb8.inject_assert("mdr", " ", true, "mort de rire", 3)
 		-- Engine should have reset after match; second call with same buffer
@@ -342,10 +369,9 @@ end
 --- @param v table A vector from vectors.json.
 local function run_corpus_vector(v)
 	local prefix = string.format("e2e[%s]", v.id)
-	local ok_vkb, vkb_or_err = pcall(make_vkb, v.trigger, v.replacement, {
-		is_word           = v.is_word,
-		is_case_sensitive = v.is_case_sensitive,
-	})
+	-- The vector itself IS the flag set; forwarding a hand-picked subset is how
+	-- this harness silently replayed every vector as a different one.
+	local ok_vkb, vkb_or_err = pcall(make_vkb, v.trigger, v.replacement, v)
 
 	if not ok_vkb then
 		fail(prefix .. " — setup", "ok", tostring(vkb_or_err))

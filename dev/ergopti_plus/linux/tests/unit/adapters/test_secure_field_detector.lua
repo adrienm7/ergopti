@@ -35,8 +35,9 @@ helpers.describe("SecureFieldDetector: isSecureApp (Linux)", function()
 	local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
 
 	helpers.it("module loads without error", function()
-		helpers.assert_true(ok,
-			"adapters.secure_field_detector must be requireable: " .. tostring(adapter))
+		helpers.assert_eq(type(adapter), "table",
+			"adapters.secure_field_detector must load as a table — every case below calls "
+				.. "through it: " .. tostring(adapter))
 	end)
 
 	if not ok then
@@ -86,10 +87,13 @@ helpers.describe("SecureFieldDetector: isSecureApp (Linux)", function()
 	end)
 
 	helpers.it("returns a boolean for every call", function()
-		local ok1 = pcall(function() return adapter.isSecureApp("AnyApp") end)
-		helpers.assert_true(ok1, "isSecureApp must not throw")
-		local ok2 = pcall(function() return adapter.isSecureApp(nil) end)
-		helpers.assert_true(ok2, "isSecureApp(nil) must not throw")
+		-- The case title is the assertion; "did not throw" was not. A detector that
+		-- answered nil would satisfy the old check and then be read as falsy by the
+		-- caller — which is the fail-OPEN direction for a privacy filter.
+		helpers.assert_eq(type(adapter.isSecureApp("AnyApp")), "boolean",
+			"isSecureApp must answer a boolean, not nil")
+		helpers.assert_eq(type(adapter.isSecureApp(nil)), "boolean",
+			"including for a nil appId — the caller does not check before asking")
 	end)
 
 	-- Cleanup
@@ -135,9 +139,10 @@ helpers.describe("SecureFieldDetector: D-Bus availability", function()
 		helpers.assert_true(ok, "adapter loads with D-Bus available")
 
 		if ok then
-			local refresh_ok = pcall(function() adapter.refresh() end)
-			helpers.assert_true(refresh_ok,
-				"refresh() must not throw when D-Bus is available")
+			adapter.refresh()
+			helpers.assert_eq(type(adapter.isSecureField()), "boolean",
+				"with D-Bus available, refresh must leave the detector answering — a mute "
+					.. "detector reports every field as non-secure")
 		end
 	end)
 
@@ -152,9 +157,7 @@ helpers.describe("SecureFieldDetector: D-Bus availability", function()
 		helpers.assert_true(ok, "adapter loads without D-Bus")
 
 		if ok then
-			local refresh_ok = pcall(function() adapter.refresh() end)
-			helpers.assert_true(refresh_ok,
-				"refresh() must not throw when D-Bus is unavailable")
+			adapter.refresh()
 			helpers.assert_eq(adapter.isSecureField(), false,
 				"isSecureField must be false when D-Bus is not available")
 		end
@@ -171,9 +174,7 @@ helpers.describe("SecureFieldDetector: D-Bus availability", function()
 		helpers.assert_true(ok, "adapter loads with empty D-Bus address")
 
 		if ok then
-			local refresh_ok = pcall(function() adapter.refresh() end)
-			helpers.assert_true(refresh_ok,
-				"refresh() must not throw with empty D-Bus address")
+			adapter.refresh()
 			helpers.assert_eq(adapter.isSecureField(), false,
 				"isSecureField must be false with empty D-Bus address")
 		end
@@ -296,8 +297,10 @@ helpers.describe("SecureFieldDetector: refresh → AT-SPI2 → isSecureField", f
 		package.loaded["adapters.secure_field_detector"] = nil
 		local adapter = helpers.load_module("adapters.secure_field_detector")
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() with unparseable gdbus output must not throw")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"unparseable gdbus output must resolve to a definite false — leaving whatever "
+				.. "the previous refresh decided is how a stale secure flag outlives its field")
 		helpers.assert_eq(adapter.isSecureField(), false,
 			"unparseable gdbus output must leave isSecureField false")
 	end)
@@ -313,8 +316,9 @@ helpers.describe("SecureFieldDetector: refresh → AT-SPI2 → isSecureField", f
 		package.loaded["adapters.secure_field_detector"] = nil
 		local adapter = helpers.load_module("adapters.secure_field_detector")
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() with nil io.popen must not throw")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"same when io.popen itself is unavailable")
 		helpers.assert_eq(adapter.isSecureField(), false,
 			"nil io.popen must leave isSecureField false")
 	end)
@@ -332,8 +336,9 @@ helpers.describe("SecureFieldDetector: refresh → AT-SPI2 → isSecureField", f
 		package.loaded["adapters.secure_field_detector"] = nil
 		local adapter = helpers.load_module("adapters.secure_field_detector")
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() must catch internal error and not rethrow")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"an internal error must be absorbed into an answer, not swallowed into silence")
 		helpers.assert_eq(adapter.isSecureField(), false,
 			"throwing io.popen must leave isSecureField false")
 	end)

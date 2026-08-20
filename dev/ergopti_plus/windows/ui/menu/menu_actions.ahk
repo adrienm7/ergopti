@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Standalone tray actions: metrics-frequency setter, open-personal-shortcuts, and the log-folder / today-log / error-log openers, with the personal-shortcuts file template.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -28,8 +28,17 @@ _MakeFreqSetter(Seconds) {
 ; from the tray menu so the user has both entry points.
 OpenPersonalShortcuts(*) {
 	Path := ScriptInformation["PersonalAhkPath"]
-	EnsurePersonalShortcutsFile(Path)
-	Run('notepad.exe "' . Path . '"')
+	if !EnsurePersonalShortcutsFile(Path, false) {
+		ConfigReportPersistenceFailure("the personal shortcuts bootstrap")
+		return false
+	}
+	try {
+		Run('notepad.exe "' . Path . '"')
+		return true
+	} catch as Err {
+		try LoggerError("Menu", "Could not open personal shortcuts at '{1}': {2}.", Path, Err.Message)
+		return false
+	}
 }
 
 ; Opens the per-user log directory (under <ConfigDir>/autohotkey/logs/) in Explorer.

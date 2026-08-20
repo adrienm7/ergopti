@@ -24,21 +24,22 @@ local helpers = require("tests.helpers")
 
 
 
--- ===========================================================================================================
+-- ==========================================================================================================
 -- ==========================================================================================================
 -- ======= 1/ build_kl_name_to_tis_id forward-declared before set_input_source (ui-menu-layout-hot-1) =======
 -- ==========================================================================================================
--- ===========================================================================================================
+-- ==========================================================================================================
 
 helpers.describe("input_sources: build_kl_name_to_tis_id forward-declared (ui-menu-layout-hot-1 regression)", function()
 
 	-- After the F4 split, build_kl_name_to_tis_id (and its set_input_source call
 	-- site) live in modules/keymap/input_sources.lua, not the menu module.
 	helpers.it("source: 'local build_kl_name_to_tis_id' appears before the call site", function()
-		local src_path = helpers.driver_root() .. "modules/keymap/input_sources.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "input_sources.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/input_sources.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_installed_ergopti_version")
+		helpers.assert_true(src ~= nil, "modules/keymap/input_sources.lua source must be locatable")
 
 		-- Forward declaration must exist
 		local fwd_pos  = src:find("local build_kl_name_to_tis_id", 1, true)
@@ -61,10 +62,11 @@ helpers.describe("input_sources: build_kl_name_to_tis_id forward-declared (ui-me
 	end)
 
 	helpers.it("source: no 'local function build_kl_name_to_tis_id' (which would shadow the forward decl)", function()
-		local src_path = helpers.driver_root() .. "modules/keymap/input_sources.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/input_sources.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_installed_ergopti_version")
+		helpers.assert_true(src ~= nil, "modules/keymap/input_sources.lua source must be locatable")
 
 		-- If 'local function build_kl_name_to_tis_id' exists, the forward-declare
 		-- and the definition are in two different scopes — the call site sees the wrong one.
@@ -81,19 +83,20 @@ end)
 
 
 
--- =======================================================================================
+-- ======================================================================================
 -- ======================================================================================
 -- ======= 2/ update_menu_fn forward-declared before set_channel (ui-menu-misc-1) =======
 -- ======================================================================================
--- =======================================================================================
+-- ======================================================================================
 
 helpers.describe("menu_about: update_menu_fn forward-declared before set_channel (ui-menu-misc-1 regression)", function()
 
 	helpers.it("source: 'local update_menu_fn' appears before its first use in set_channel", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_about.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "menu_about.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_about.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_update_menu_label")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_about.lua source must be locatable")
 
 		-- Forward declaration (bare local, no function body)
 		local fwd_pos      = src:find("local update_menu_fn\n", 1, true)
@@ -115,10 +118,11 @@ helpers.describe("menu_about: update_menu_fn forward-declared before set_channel
 	end)
 
 	helpers.it("source: no 'local function update_menu_fn' (which would leave earlier uses pointing at global nil)", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_about.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_about.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_update_menu_label")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_about.lua source must be locatable")
 
 		local has_local_function = src:find("local function update_menu_fn", 1, true) ~= nil
 		helpers.assert_true(

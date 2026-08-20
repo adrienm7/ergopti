@@ -245,7 +245,7 @@ Test("HSE final_result: expansion is one atomic send burst, not a 3-call split",
 ; the queue and arms the drain once; drain empties it and disarms so the heavy work
 ; is the drain's, off the keystroke path.
 TestFireLog_EnqueuesAndDrainsOffHotPath() {
-	global _HSE_FireLogQueue, _HSE_FireLogScheduled
+	global _HSE_FireLogQueue, _HSE_FireLogScheduled, _HSE_FireLogTimer
 	_HSE_FireLogQueue := []
 	_HSE_FireLogScheduled := false
 	Star := Chr(0x2605)
@@ -263,10 +263,8 @@ TestFireLog_EnqueuesAndDrainsOffHotPath() {
 	_HSE_DrainFireLog()
 	Assert(_HSE_FireLogQueue.Length == 0, "drain must empty the queue")
 	Assert(_HSE_FireLogScheduled == false, "drain must disarm so the next fire re-schedules")
-
-	; Cancel the still-pending production timer armed by the enqueues so it cannot
-	; fire a stray (harmless, empty) drain during a later test that pumps messages.
-	SetTimer(_HSE_DrainFireLog, 0)
+	Assert(!IsObject(_HSE_FireLogTimer),
+		"a synchronous drain must cancel and release its bound timer owner so no stale callback reaches a later test or lifecycle")
 }
 Test("HSE fire-log: metrics are enqueued and drained off the keystroke path",
 	TestFireLog_EnqueuesAndDrainsOffHotPath)

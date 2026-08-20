@@ -1,11 +1,27 @@
 --- _shared/lua/toml_codec/codec.lua
 
+
 --- ==============================================================================
+
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table,
+-- and a shared module cannot depend on its caller having installed the compat
+-- shim — it does not know its callers. terminators.lua crashed from the E2E
+-- runner for exactly that reason while working from the daemon and the unit
+-- runner, both of which install one.
+local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+
+
+-- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
+-- unless the build enabled 5.2 compatibility, which the one CI and the Linux
+-- daemon run does not. Resolved once here rather than at each call site, and
+-- table-first so a 5.4 interpreter keeps using the modern spelling.
+local table_unpack = table.unpack or unpack
+local RecordScanner = require("toml_codec.record_scanner")
 --- MODULE: TOML Codec (shared)
 --- DESCRIPTION:
 --- Generic TOML encoder + decoder for arbitrarily nested Lua tables.
 --- Canonical source shared by all Lua-based drivers (Hammerspoon, future Linux
---- driver). Previously lived at hammerspoon/lib/toml_codec.lua; moved here so
+--- driver). Previously lived at hammerspoon/infra/toml_codec.lua; moved here so
 --- both drivers share one implementation without duplication.
 ---
 --- FEATURES & RATIONALE:
@@ -281,12 +297,12 @@ local function unescape_string(s)
 	s = s:gsub("\\\\", "\1"):gsub('\\"', '\2')
 	     :gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\r", "\r")
 	     :gsub("\\b", "\8"):gsub("\\f", "\12")
-	     :gsub("\\u(%x%x%x%x)", function(h) return utf8.char(tonumber(h, 16)) end)
+	     :gsub("\\u(%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
 	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h)
 	         local cp = tonumber(h, 16)
-	         -- Codepoints above U+10FFFF are not valid Unicode; utf8.char would throw.
+	         -- Codepoints above U+10FFFF are not valid Unicode; utf8_lib.char would throw.
 	         if cp > 0x10FFFF then return "\xEF\xBF\xBD" end  -- replacement char U+FFFD
-	         return utf8.char(cp)
+	         return utf8_lib.char(cp)
 	     end)
 	     :gsub("\1", "\\"):gsub("\2", '"')
 	return s
@@ -295,14 +311,178 @@ end
 -- Sentinel returned by coerce_value on parse failure; propagated to M.decode.
 local PARSE_ERROR = {}
 
+--- Removes comments only when they occur outside every TOML string form.
+--- Newlines are preserved so multiline-string and array coercion retain their
+--- record structure.
+--- @param source string Complete value or physical line.
+--- @return string uncommented
+local function strip_comments(source)
+	local out = {}
+	local quote = nil
+	local index = 1
+	while index <= #source do
+		local char = source:sub(index, index)
+		local triple = source:sub(index, index + 2)
+		if quote == '"""' or quote == "'''" then
+			if quote == '"""' and char == "\\" then
+				out[#out + 1] = source:sub(index, math.min(index + 1, #source))
+				index = index + 2
+			elseif triple == quote then
+				out[#out + 1] = triple
+				quote = nil
+				index = index + 3
+			else
+				out[#out + 1] = char
+				index = index + 1
+			end
+		elseif quote == '"' then
+			out[#out + 1] = char
+			if char == "\\" then
+				if index < #source then out[#out + 1] = source:sub(index + 1, index + 1) end
+				index = index + 2
+			elseif char == '"' then
+				quote = nil
+				index = index + 1
+			else
+				index = index + 1
+			end
+		elseif quote == "'" then
+			out[#out + 1] = char
+			if char == "'" then quote = nil end
+			index = index + 1
+		elseif triple == '"""' or triple == "'''" then
+			quote = triple
+			out[#out + 1] = triple
+			index = index + 3
+		elseif char == '"' or char == "'" then
+			quote = char
+			out[#out + 1] = char
+			index = index + 1
+		elseif char == "#" then
+			local newline = source:find("\n", index + 1, true)
+			if not newline then break end
+			out[#out + 1] = "\n"
+			index = newline + 1
+		else
+			out[#out + 1] = char
+			index = index + 1
+		end
+	end
+	return table.concat(out)
+end
+
+--- Splits a TOML array or inline-table body on top-level commas.
+--- Both basic and literal strings, including their multiline forms, suppress
+--- structural delimiters inside their content.
+--- @param body string Container body without its outer brackets/braces.
+--- @return table|nil fragments
+local function split_top_level_commas(body)
+	local fragments = {}
+	local current = {}
+	local quote = nil
+	local depth = 0
+	local index = 1
+	while index <= #body do
+		local char = body:sub(index, index)
+		local triple = body:sub(index, index + 2)
+		if quote == '"""' or quote == "'''" then
+			if quote == '"""' and char == "\\" then
+				current[#current + 1] = body:sub(index, math.min(index + 1, #body))
+				index = index + 2
+			elseif triple == quote then
+				current[#current + 1] = triple
+				quote = nil
+				index = index + 3
+			else
+				current[#current + 1] = char
+				index = index + 1
+			end
+		elseif quote == '"' then
+			current[#current + 1] = char
+			if char == "\\" then
+				if index < #body then current[#current + 1] = body:sub(index + 1, index + 1) end
+				index = index + 2
+			elseif char == '"' then
+				quote = nil
+				index = index + 1
+			else
+				index = index + 1
+			end
+		elseif quote == "'" then
+			current[#current + 1] = char
+			if char == "'" then quote = nil end
+			index = index + 1
+		elseif triple == '"""' or triple == "'''" then
+			quote = triple
+			current[#current + 1] = triple
+			index = index + 3
+		elseif char == '"' or char == "'" then
+			quote = char
+			current[#current + 1] = char
+			index = index + 1
+		elseif char == "[" or char == "{" then
+			depth = depth + 1
+			current[#current + 1] = char
+			index = index + 1
+		elseif char == "]" or char == "}" then
+			depth = depth - 1
+			if depth < 0 then return nil end
+			current[#current + 1] = char
+			index = index + 1
+		elseif char == "," and depth == 0 then
+			fragments[#fragments + 1] = table.concat(current)
+			current = {}
+			index = index + 1
+		else
+			current[#current + 1] = char
+			index = index + 1
+		end
+	end
+	if quote ~= nil or depth ~= 0 then return nil end
+	if #current > 0 then fragments[#fragments + 1] = table.concat(current) end
+	return fragments
+end
+
+local function collapse_multiline_continuations(body)
+	local out = {}
+	local index = 1
+	while index <= #body do
+		if body:sub(index, index) == "\\" and body:sub(index + 1, index + 1) == "\n" then
+			index = index + 2
+			while index <= #body and body:sub(index, index):match("[ \t\n]") do
+				index = index + 1
+			end
+		else
+			out[#out + 1] = body:sub(index, index)
+			index = index + 1
+		end
+	end
+	return table.concat(out)
+end
+
 --- Coerce a raw RHS into a Lua value (string / boolean / number / array / inline-table).
 --- Returns PARSE_ERROR on malformed input so M.decode can return nil.
 local function coerce_value(raw)
-	raw = trim(raw)
+	raw = trim(strip_comments(raw))
 	if raw == "" then return PARSE_ERROR end  -- Missing value (e.g., "key =")
 	-- Booleans
 	if raw == "true"  then return true  end
 	if raw == "false" then return false end
+	if raw:sub(1, 3) == "'''" then
+		if raw:sub(-3) ~= "'''" or #raw < 6 then return PARSE_ERROR end
+		local body = raw:sub(4, -4)
+		if body:sub(1, 1) == "\n" then body = body:sub(2) end
+		return body
+	end
+	if raw:sub(1, 3) == '"""' then
+		if raw:sub(-3) ~= '"""' or #raw < 6 then return PARSE_ERROR end
+		local body = raw:sub(4, -4)
+		if body:sub(1, 1) == "\n" then body = body:sub(2) end
+		body = collapse_multiline_continuations(body)
+		local unescaped = unescape_string(body)
+		if unescaped == nil then return PARSE_ERROR end
+		return unescaped
+	end
 	-- Single-quoted string — TOML literal strings are valid, but single-quoted
 	-- strings that are unclosed (no matching closing apostrophe) are an error.
 	if raw:sub(1, 1) == "'" then
@@ -327,21 +507,18 @@ local function coerce_value(raw)
 		local body = trim(raw:sub(2, -2))
 		local tbl = {}
 		if body == "" then return tbl end
-		local in_str, escape = false, false
-		local pairs_raw = {}
-		local cur = {}
-		for i = 1, #body do
-			local c = body:sub(i, i)
-			if escape then cur[#cur+1]=c; escape=false
-			elseif c=="\\" and in_str then cur[#cur+1]=c; escape=true
-			elseif c=='"' then cur[#cur+1]=c; in_str=not in_str
-			elseif not in_str and c=="," then
-				pairs_raw[#pairs_raw+1] = table.concat(cur); cur={}
-			else
-				cur[#cur+1]=c
-			end
-		end
-		if #cur>0 then pairs_raw[#pairs_raw+1]=table.concat(cur) end
+		-- `depth` tracks nested [ ] and { } so a comma INSIDE a nested value does
+		-- not split the pair list. Without it, { key = "Left", mods = ["ctrl",
+		-- "super"] } split into three fragments — `key = "Left"`, `mods = ["ctrl"`
+		-- and `"super"]` — the last two of which have no `=`, so split_kv failed
+		-- and decode returned nil for the WHOLE document with no error message.
+		-- A single-element nested array worked, which is what made it look fine.
+		--
+		-- Same shape as the logger sub-files bug: a scanner that tracks quotes but
+		-- not nesting. Quotes alone are not enough whenever the delimiter being
+		-- searched for can also appear one level down.
+		local pairs_raw = split_top_level_commas(body)
+		if not pairs_raw then return PARSE_ERROR end
 		for _, pair in ipairs(pairs_raw) do
 			local k, v_raw = split_kv(trim(pair))
 			if not k or k=="" then return PARSE_ERROR end
@@ -353,37 +530,16 @@ local function coerce_value(raw)
 	end
 	-- Array — split on commas at depth 0, ignoring quoted regions
 	if raw:sub(1, 1) == "[" then
-		-- Multi-line array: value does not close on the same line — skip gracefully
-		if raw:sub(-1) ~= "]" then return {} end
+		if raw:sub(-1) ~= "]" then return PARSE_ERROR end
 		local body = trim(raw:sub(2, -2))
 		local out = {}
 		if body == "" then return out end
-		local depth, in_str, escape, cur = 0, false, false, {}
-		for i = 1, #body do
-			local c = body:sub(i, i)
-			if escape then
-				cur[#cur + 1] = c
-				escape = false
-			elseif c == "\\" and in_str then
-				cur[#cur + 1] = c
-				escape = true
-			elseif c == '"' then
-				cur[#cur + 1] = c
-				in_str = not in_str
-			elseif not in_str and c == "[" then
-				depth = depth + 1; cur[#cur + 1] = c
-			elseif not in_str and c == "]" then
-				depth = depth - 1; cur[#cur + 1] = c
-			elseif not in_str and depth == 0 and c == "," then
-				out[#out + 1] = coerce_value(table.concat(cur))
-				cur = {}
-			else
-				cur[#cur + 1] = c
-			end
-		end
-		if #cur > 0 then
-			local final = trim(table.concat(cur))
-			if final ~= "" then out[#out + 1] = coerce_value(final) end
+		local elements = split_top_level_commas(body)
+		if not elements then return PARSE_ERROR end
+		for _, element in ipairs(elements) do
+			local final = trim(element)
+			if final == "" then return PARSE_ERROR end
+			out[#out + 1] = coerce_value(final)
 		end
 		-- Propagate any element-level parse errors
 		for _, v in ipairs(out) do
@@ -413,16 +569,18 @@ end
 --- Parse a single key=value line, splitting on the FIRST '=' that is not
 --- inside a quoted region. Returns key, raw_value (or nil on malformed input).
 split_kv = function(line)
-	local in_str, escape = false, false
+	local in_dbl, in_sgl, escape = false, false, false
 	for i = 1, #line do
 		local c = line:sub(i, i)
 		if escape then
 			escape = false
-		elseif c == "\\" and in_str then
+		elseif c == "\\" and in_dbl then
 			escape = true
-		elseif c == '"' then
-			in_str = not in_str
-		elseif not in_str and c == "=" then
+		elseif c == '"' and not in_sgl then
+			in_dbl = not in_dbl
+		elseif c == "'" and not in_dbl then
+			in_sgl = not in_sgl
+		elseif not in_dbl and not in_sgl and c == "=" then
 			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1))
 		end
 	end
@@ -442,18 +600,7 @@ end
 --- @param s string The raw line.
 --- @return string The line with any inline comment removed.
 local function strip_inline_comment(s)
-	local in_dbl, in_sgl, escape = false, false, false
-	for ci = 1, #s do
-		local c = s:sub(ci, ci)
-		if escape then escape = false
-		elseif c == "\\" and in_dbl then escape = true
-		elseif c == '"' and not in_sgl then in_dbl = not in_dbl
-		elseif c == "'" and not in_dbl then in_sgl = not in_sgl
-		elseif not in_dbl and not in_sgl and c == "#" then
-			return trim(s:sub(1, ci - 1))
-		end
-	end
-	return s
+	return trim(strip_comments(s))
 end
 
 --- Advance the array-bracket nesting depth across a line fragment, honouring
@@ -465,17 +612,8 @@ end
 --- @param in_str boolean Whether we start inside a double-quoted string.
 --- @param escape boolean Whether the previous char was a backslash escape.
 --- @return number, boolean, boolean The depth, in_str and escape state on exit.
-local function scan_bracket_depth(s, depth, in_str, escape)
-	for i = 1, #s do
-		local c = s:sub(i, i)
-		if escape then escape = false
-		elseif c == "\\" and in_str then escape = true
-		elseif c == '"' then in_str = not in_str
-		elseif not in_str and c == "[" then depth = depth + 1
-		elseif not in_str and c == "]" then depth = depth - 1
-		end
-	end
-	return depth, in_str, escape
+local function scan_bracket_depth(s, depth, multiline_quote)
+	return RecordScanner.advance(s, depth, multiline_quote)
 end
 
 --- Decode a TOML body into a nested Lua table.
@@ -495,17 +633,17 @@ function M.decode(content)
 	local pending = nil
 	if type(content) ~= "string" or content == "" then return root end
 	for line in (content .. "\n"):gmatch("([^\r\n]*)\r?\n") do
-		local trimmed = trim(line)
+		local trimmed = trim(strip_comments(line))
 
 		if pending then
-			-- Inside a multi-line array: append this line (comment-stripped) and
-			-- re-check whether the brackets have finally balanced.
-			local frag = strip_inline_comment(trimmed)
-			pending.parts[#pending.parts + 1] = frag
-			pending.depth, pending.in_str, pending.escape =
-				scan_bracket_depth(frag, pending.depth, pending.in_str, pending.escape)
-			if pending.depth <= 0 then
-				local v = coerce_value(table.concat(pending.parts, " "))
+			-- Preserve physical newlines until the complete value settles. A line
+			-- resembling `[section]` is data while either a container or triple
+			-- quoted string remains open.
+			pending.parts[#pending.parts + 1] = line
+			pending.depth, pending.multiline_quote =
+				scan_bracket_depth(line, pending.depth, pending.multiline_quote)
+			if pending.depth == 0 and pending.multiline_quote == nil then
+				local v = coerce_value(table.concat(pending.parts, "\n"))
 				if v == PARSE_ERROR then return nil end
 				local sk = seen_keys[pending.target]
 				if not sk then sk = {}; seen_keys[pending.target] = sk end
@@ -534,7 +672,7 @@ function M.decode(content)
 				if aot_path == "" then return nil end
 				-- Array-of-tables: append a new table to the array; no duplicate check
 				local segments = split_section_path(aot_path)
-				local parent = nav(root, { table.unpack(segments, 1, #segments - 1) })
+				local parent = nav(root, { table_unpack(segments, 1, #segments - 1) })
 				local last = segments[#segments]
 				if type(parent[last]) ~= "table" then parent[last] = {} end
 				local arr = parent[last]
@@ -573,22 +711,18 @@ function M.decode(content)
 			local raw_trimmed = raw and trim(raw) or ""
 			if raw_trimmed == "" then return nil end
 			local parsed_key = parse_key(key)
-			-- Multi-line array: the value opens a '[' that does not balance on
-			-- this line. Defer coercion to the accumulator above, which joins the
-			-- continuation lines and coerces the whole array once it closes.
-			if raw_trimmed:sub(1, 1) == "[" then
-				local d, is, es = scan_bracket_depth(raw_trimmed, 0, false, false)
-				if d > 0 then
-					pending = {
-						key    = parsed_key,
-						target = current,
-						parts  = { raw_trimmed },
-						depth  = d,
-						in_str = is,
-						escape = es,
-					}
-					goto continue_decode
-				end
+			-- Arrays and multiline strings share one exact record boundary. Defer
+			-- coercion until neither a container nor a triple quote remains open.
+			local depth, multiline_quote = scan_bracket_depth(raw_trimmed, 0, nil)
+			if multiline_quote ~= nil or (raw_trimmed:sub(1, 1) == "[" and depth > 0) then
+				pending = {
+					key = parsed_key,
+					target = current,
+					parts = { raw_trimmed },
+					depth = depth,
+					multiline_quote = multiline_quote,
+				}
+				goto continue_decode
 			end
 			local v = coerce_value(raw_trimmed)
 			-- Propagate parse errors from coerce_value

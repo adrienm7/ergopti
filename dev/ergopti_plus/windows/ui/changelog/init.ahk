@@ -23,11 +23,11 @@
 
 
 
-; ==========================================
+; =====================================
 ; =====================================
 ; ======= 1/ Module-level State =======
 ; =====================================
-; ==========================================
+; =====================================
 
 global _CLW_Gui        := unset
 global _CLW_WebView    := unset
@@ -36,6 +36,17 @@ global _CLW_MsgSub     := unset
 global _CLW_Ready      := false
 global _CLW_Queue      := []
 global _CLW_Channel    := "dev"
+global _CLW_Request    := unset
+
+; Every asynchronous fetch owns both the WebView session that started it and a
+; monotonically increasing request epoch.  A channel switch invalidates the
+; request epoch; close/reopen also invalidates the window epoch.  Keeping both
+; identities is necessary because deferred ExecuteScript timers otherwise use
+; whichever global WebView happens to exist when they finally run.
+global _CLW_WindowEpoch        := 0
+global _CLW_RequestEpoch       := 0
+global _CLW_ActiveRequest      := 0
+global _CLW_ActiveRequestEpoch := 0
 
 ; True once _CLW_Reset() has torn the controller down. Close and Escape are wired
 ; to the SAME handler, and Controller.Close() pumps messages — so a second Close
@@ -55,40 +66,59 @@ global CHANGELOG_HOST_ACCESS_ALLOW := 1
 
 
 
-; ==========================================
+; =====================================
 ; =====================================
 ; ======= 2/ Public Entry Point =======
 ; =====================================
-; ==========================================
+; =====================================
 
 /**
  * Opens (or brings to front) the shared changelog webview window.
  * @param {string} Channel - "main" or "dev" (default "dev").
  */
 Changelog_Open(Channel := "dev") {
-	global _CLW_Gui, _CLW_Channel
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if A_IsSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	return _CLW_OpenCapturedRequest(Channel, Request)
+}
+
+_CLW_OpenCapturedRequest(Channel, Request) {
+	global _CLW_Gui, _CLW_Channel, _CLW_Ready, _CLW_Queue
+	global _CLW_Request
+	if !_Updater_RequestMayPublish(Request)
+		return false
 
 	; Singleton: reuse the existing window.
 	if IsSet(_CLW_Gui) {
 		try _CLW_Gui.Restore()
+		if !_Updater_RequestMayPublish(Request)
+			return false
 		try WinActivate(_CLW_Gui.Hwnd)
+		if !_Updater_RequestMayPublish(Request)
+			return false
 		_CLW_Channel := Channel
-		_CLW_FetchAndInject(Channel)
+		_CLW_Request := Request
+		_CLW_FetchAndInject(Channel, Request)
 		return
 	}
 
 	_CLW_Channel := Channel
+	_CLW_Request := Request
 	_CLW_Ready   := false
 	_CLW_Queue   := []
 
 	; Bail early if WebView2 is unavailable, or if free RAM is too low to absorb
 	; the Chromium cold start — fall back to the lighter native changelog window.
 	if (!_CLW_WebView2Available() || WebView_ShouldUseNativeFallback()) {
-		_Updater_OpenChangelogWindow(Channel)
+		_Updater_OpenChangelogWindow(Channel, Request)
 		return
 	}
 
-	_CLW_BuildWindow(Channel)
+	_CLW_BuildWindow(Channel, Request)
 }
 
 /**
@@ -112,14 +142,20 @@ Changelog_Close() {
 
 
 
-; ==========================================
+; =================================
 ; =================================
 ; ======= 3/ Window Builder =======
 ; =================================
-; ==========================================
+; =================================
 
-_CLW_BuildWindow(Channel) {
+_CLW_BuildWindow(Channel, Request) {
 	global _CLW_Gui, _CLW_Controller, _CLW_WebView, _CLW_ResetDone, _VendorDir
+	if !_Updater_RequestMayPublish(Request)
+		return false
+
+	; Allocate the session identity before any deferred page work is queued.
+	; This also aborts a request retained by an incompletely torn-down session.
+	_CLW_BeginWindowSession()
 
 	WinTitle := t("changelog_window.window_title")
 	g := Gui_Create("+Resize +MinSize860x540", WinTitle)
@@ -138,12 +174,16 @@ _CLW_BuildWindow(Channel) {
 
 	g.Show("w860 h580")
 	_CLW_Gui := g
+	if !_Updater_RequestMayPublish(Request) {
+		_CLW_OnClose()
+		return false
+	}
 
 	; Spin up WebView2 now that the Hwnd is valid.
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
 	try {
-		; Reuse the shared session environment (lib/webview_utils.ahk) so no
+		; Reuse the shared session environment (infra/webview_utils.ahk) so no
 		; second Chromium process boots and reopens are near-instant.
 		_CLW_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
@@ -156,8 +196,12 @@ _CLW_BuildWindow(Channel) {
 		; singleton branch forever.
 		_CLW_Gui := unset
 		; Graceful degradation to the old AHK-native changelog window.
-		_Updater_OpenChangelogWindow(Channel)
+		_Updater_OpenChangelogWindow(Channel, Request)
 		return
+	}
+	if !_Updater_RequestMayPublish(Request) {
+		_CLW_OnClose()
+		return false
 	}
 
 	_CLW_WebView := _CLW_Controller.CoreWebView2
@@ -229,32 +273,67 @@ _CLW_BuildWindow(Channel) {
 
 
 
-; ==========================================
+; ====================================
 ; ====================================
 ; ======= 4/ JS Bridge & Queue =======
 ; ====================================
-; ==========================================
+; ====================================
 
 /**
  * Evaluates JS in the WebView, queuing it until the page signals "ready".
  * @param {string} Js - JavaScript expression.
+ * @param {object|integer} Context - Optional immutable fetch context.
  */
-_CLW_Eval(Js) {
-	global _CLW_WebView, _CLW_Ready, _CLW_Queue
-	if (_CLW_Ready && IsSet(_CLW_WebView)) {
+_CLW_Eval(Js, Context := 0, NotifyFn := 0) {
+	global _CLW_WebView, _CLW_Ready, _CLW_Queue, _CLW_WindowEpoch
+	global UPDATER_REQUEST_POLICY_ALLOW
+	ShouldSchedule := false
+	AcceptWork := true
+	NeedsRequestTerminal := false
+	Request := 0
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Context) {
+			Request := Context.HasProp("Request") ? Context.Request : 0
+			NeedsRequestTerminal := _Updater_RequestPolicy(Request) != UPDATER_REQUEST_POLICY_ALLOW
+			AcceptWork := !NeedsRequestTerminal && _CLW_RequestEpochIsCurrent(Context)
+		}
+
+		if AcceptWork {
+			Work := {
+				Js: Js,
+				WindowEpoch: _CLW_WindowEpoch,
+				RequestEpoch: IsObject(Context) ? Context.RequestEpoch : 0,
+				Request: Request
+			}
+			ShouldSchedule := _CLW_Ready && IsSet(_CLW_WebView)
+			if !ShouldSchedule {
+				_CLW_Queue.Push(Work)
+				; Cap the queue to avoid unbounded growth if the page never becomes ready.
+				if (_CLW_Queue.Length > 200)
+					_CLW_Queue.RemoveAt(1)
+			}
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if NeedsRequestTerminal {
+		_Updater_RequestMayPublish(Request, , NotifyFn)
+		return false
+	}
+	if !AcceptWork
+		return false
+
+	if ShouldSchedule {
 		; Run OUTSIDE the current call stack via a one-shot timer. ExecuteScript
 		; is ExecuteScriptAsync().await(), which spins a NESTED message loop;
 		; calling it synchronously from inside the WebMessageReceived COM
 		; callback (as the "ready" handler does) re-enters the STA apartment
 		; and wedges further WebView2 message delivery -- the channel then
 		; delivers exactly one message then goes silent.
-		SetTimer(_CLW_RunScript.Bind(Js), -1)
-	} else {
-		_CLW_Queue.Push(Js)
-		; Cap the queue to avoid unbounded growth if the page never becomes ready.
-		if (_CLW_Queue.Length > 200)
-			_CLW_Queue.RemoveAt(1)
+		SetTimer(_CLW_RunScript.Bind(Work), -1)
 	}
+	return true
 }
 
 /**
@@ -262,16 +341,42 @@ _CLW_Eval(Js) {
  * -1 timer). Uses ExecuteScriptAsync fire-and-forget (no .await()) -- we do
  * not need the script's return value, and awaiting it here would reintroduce
  * the same nested-message-loop wedge _CLW_Eval's deferral avoids.
- * @param {string} Js - JavaScript expression.
+ * @param {object} Work - Script plus its bound window/request epochs.
  */
-_CLW_RunScript(Js) {
+_CLW_RunScript(Work, NotifyFn := 0) {
 	global _CLW_WebView
-	if !IsSet(_CLW_WebView)
+	global UPDATER_REQUEST_POLICY_ALLOW
+	ShouldRun := false
+	NeedsRequestTerminal := false
+	Request := 0
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(Work) {
+			Request := Work.HasProp("Request") ? Work.Request : 0
+			if IsObject(Request)
+				NeedsRequestTerminal := _Updater_RequestPolicy(Request) != UPDATER_REQUEST_POLICY_ALLOW
+			ShouldRun := !NeedsRequestTerminal
+				&& _CLW_ScriptWorkEpochIsCurrent(Work)
+				&& IsSet(_CLW_WebView)
+			if ShouldRun {
+				; Capture the controller-owned WebView in the same atomic read that
+				; validates its session.  The COM call itself remains off-Critical.
+				WebView := _CLW_WebView
+			}
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if NeedsRequestTerminal {
+		_Updater_RequestMayPublish(Request, , NotifyFn)
+		return
+	}
+	if !ShouldRun
 		return
 	try {
-		_CLW_WebView.ExecuteScriptAsync(Js)
+		WebView.ExecuteScriptAsync(Work.Js)
 	} catch as Err {
-		try LoggerError("Changelog", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), Err.Message)
+		try LoggerError("Changelog", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Work.Js), Err.Message)
 	}
 }
 
@@ -280,14 +385,18 @@ _CLW_RunScript(Js) {
  */
 _CLW_FlushQueue() {
 	global _CLW_Ready, _CLW_Queue, _CLW_WebView
-	_CLW_Ready := true
+	PreviousCritical := Critical("On")
+	try {
+		_CLW_Ready := true
+		Pending := _CLW_Queue
+		_CLW_Queue := []
+	} finally {
+		Critical(PreviousCritical)
+	}
 	; Defer each queued script (see _CLW_Eval) so none runs re-entrantly inside
 	; the WebMessageReceived callback that typically triggers this flush.
-	for _, Js in _CLW_Queue {
-		if IsSet(_CLW_WebView)
-			SetTimer(_CLW_RunScript.Bind(Js), -1)
-	}
-	_CLW_Queue := []
+	for _, Work in Pending
+		SetTimer(_CLW_RunScript.Bind(Work), -1)
 }
 
 /**
@@ -301,10 +410,11 @@ _CLW_FlushQueue() {
  * through this one for the same reason.
  */
 _CLW_OnPageReady() {
-	global _CLW_Channel
+	global _CLW_Channel, _CLW_Request
 	_CLW_FlushQueue()
 	; Kick off the first fetch from AHK so the page receives data immediately.
-	_CLW_FetchAndInject(_CLW_Channel)
+	if IsSet(_CLW_Request) and _Updater_RequestMayPublish(_CLW_Request)
+		_CLW_FetchAndInject(_CLW_Channel, _CLW_Request)
 }
 
 /**
@@ -327,24 +437,28 @@ _CLW_SafetyFlush() {
  */
 _CLW_OnWebMessage(Handler, Args) {
 	global _CLW_Channel
-	try Msg := Args.TryGetWebMessageAsString()
-	if !IsSet(Msg)
+	; Capture entry-time pause provenance before the COM read can pump messages.
+	Envelope := _Updater_ReadManualBridgeMessage(
+		() => Args.TryGetWebMessageAsString())
+	if (!IsObject(Envelope) or !Envelope.Ok)
 		return
-	; WebMessageReceived is a COM callback that bypasses native Suspend, so
-	; without this guard a paused driver would still dispatch a network fetch
-	; and mutate _CLW_Channel ("pause = tout éteint" invariant).
+	Request := Envelope.Request
+	Msg := Envelope.Message
 	; Page-lifecycle signals are deliberately NOT gated — the page posts "ready"
 	; exactly once, so dropping it while suspended stranded the window forever:
 	; the SafetyFlush then latched _CLW_Ready without fetching, and resuming the
 	; driver could not re-trigger anything. Same exemption as every hardened
 	; sibling host.
-	if (A_IsSuspended && Msg != "ready")
-		return
-
 	if (Msg == "ready") {
 		_CLW_OnPageReady()
 		return
 	}
+	; WebMessageReceived bypasses native Suspend. A click born paused refuses
+	; visibly; a click interrupted during TryGet retains one resume terminal.
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	if !_Updater_RequestMayPublish(Request)
+		return
 
 	; Try to parse as JSON action payload.
 	try Payload := JsonParse(Msg)
@@ -354,15 +468,17 @@ _CLW_OnWebMessage(Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
+	if !_Updater_RequestMayPublish(Request)
+		return
 
 	if (Action == "fetch") {
 		Ch := Payload.Has("channel") ? Payload["channel"] : _CLW_Channel
 		_CLW_Channel := Ch
-		_CLW_FetchAndInject(Ch)
+		_CLW_FetchAndInject(Ch, Request)
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
 		if (Url != "")
-			try Run(Url)
+			_Updater_OpenManualUrl(() => Url, Request)
 	}
 }
 
@@ -371,26 +487,36 @@ _CLW_OnWebMessage(Handler, Args) {
 
 
 
-; ==========================================
+; ========================================
 ; ========================================
 ; ======= 5/ GitHub Fetch & Inject =======
 ; ========================================
-; ==========================================
+; ========================================
 
 /**
  * Fetches releases from GitHub (asynchronous WinHTTP) and injects them via JS.
  * Defers to next message-loop tick; fetch is non-blocking async WinHttp.
  * @param {string} Channel - "main" or "dev".
  */
-_CLW_FetchAndInject(Channel) {
+_CLW_FetchAndInject(Channel, Request := unset) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !IsSet(Request)
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if !_Updater_RequestMayPublish(Request)
+		return false
+	Context := _CLW_BeginFetchRequest(Channel, Request)
 	; Defer to a fresh call stack so the WebMessage callback returns immediately.
-	SetTimer(() => _CLW_DoFetch(Channel), -1)
+	SetTimer(_CLW_DoFetch.Bind(Context), -1)
+	return true
 }
 
-_CLW_DoFetch(Channel) {
+_CLW_DoFetch(Context) {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	if !_CLW_RequestIsCurrent(Context)
+		return
+	Channel := Context.Channel
 
 	try LoggerTrace("Changelog", "Fetching releases (channel={1})…", Channel)
 
@@ -410,16 +536,30 @@ _CLW_DoFetch(Channel) {
 		; Reuse the shared updater constants so all network calls have the same budget.
 		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+		; Publish ownership immediately before Send.  A superseding fetch or a
+		; close can now abort this exact request even if Send pumps messages.
+		if !_CLW_RegisterActiveRequest(Context, Req) {
+			_CLW_AbortRequest(Req)
+			return
+		}
 		Req.Send()
 	} catch as Err {
+		_CLW_ReleaseActiveRequest(Context)
+		if !_CLW_RequestIsCurrent(Context)
+			return
 		try LoggerWarn("Changelog", "GitHub API request failed: {1}.", Err.Message)
 		ErrMsg := _CLW_JsStr(t("changelog_window.error_network"))
-		_CLW_Eval("injectError(" . ErrMsg . ")")
+		_CLW_Eval("injectError(" . ErrMsg . ")", Context)
+		return
+	}
+	if !_CLW_RequestIsCurrent(Context) {
+		_CLW_AbortRequest(Req)
+		_CLW_ReleaseActiveRequest(Context)
 		return
 	}
 
 	; Arm the non-blocking completion poll for this request.
-	_CLW_PollFetch(Req, Channel, 0)
+	_CLW_PollFetch(Req, Context, 0)
 }
 
 ; Non-blocking completion poll for one in-flight async changelog fetch. Asks
@@ -427,8 +567,14 @@ _CLW_DoFetch(Channel) {
 ; re-arms itself until ready, then harvests ResponseText and injects it. The
 ; poll budget mirrors the updater's so a wedged request can never leave a timer
 ; running forever.
-_CLW_PollFetch(Req, Channel, Polls) {
+_CLW_PollFetch(Req, Context, Polls) {
 	global UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
+	if !_CLW_RequestIsCurrent(Context) {
+		_CLW_AbortRequest(Req)
+		_CLW_ReleaseActiveRequest(Context)
+		return
+	}
+	Channel := Context.Channel
 
 	ready  := false
 	failed := false
@@ -436,16 +582,25 @@ _CLW_PollFetch(Req, Channel, Polls) {
 		ready := Req.WaitForResponse(0)
 	} catch as Err {
 		failed := true
-		try LoggerWarn("Changelog", "GitHub API request failed: {1}.", Err.Message)
+		if _CLW_RequestIsCurrent(Context)
+			try LoggerWarn("Changelog", "GitHub API request failed: {1}.", Err.Message)
 	}
+	if !_CLW_RequestIsCurrent(Context) {
+		_CLW_AbortRequest(Req)
+		_CLW_ReleaseActiveRequest(Context)
+		return
+	}
+	if failed
+		_CLW_AbortRequest(Req)
 
 	if (!failed and !ready) {
 		Polls += 1
 		if (Polls > UPDATER_ASYNC_MAX_POLLS) {
 			failed := true
 			try LoggerWarn("Changelog", "GitHub API request exceeded its poll budget — aborting.")
+			_CLW_AbortRequest(Req)
 		} else {
-			SetTimer(() => _CLW_PollFetch(Req, Channel, Polls), -UPDATER_ASYNC_POLL_MS)
+			SetTimer(_CLW_PollFetch.Bind(Req, Context, Polls), -UPDATER_ASYNC_POLL_MS)
 			return
 		}
 	}
@@ -458,9 +613,13 @@ _CLW_PollFetch(Req, Channel, Polls) {
 			if (Status == 200)
 				Json := Req.ResponseText
 		} catch as Err {
-			try LoggerWarn("Changelog", "GitHub API response read failed: {1}.", Err.Message)
+			if _CLW_RequestIsCurrent(Context)
+				try LoggerWarn("Changelog", "GitHub API response read failed: {1}.", Err.Message)
 		}
 	}
+	_CLW_ReleaseActiveRequest(Context)
+	if !_CLW_RequestIsCurrent(Context)
+		return
 
 	if (Json == "") {
 		; Every non-200 used to leave through here in complete silence: the
@@ -476,14 +635,14 @@ _CLW_PollFetch(Req, Channel, Polls) {
 			? "changelog_window.error_rate_limited"
 			: "changelog_window.error_network"
 		ErrMsg := _CLW_JsStr(t(ErrKey))
-		_CLW_Eval("injectError(" . ErrMsg . ")")
+		_CLW_Eval("injectError(" . ErrMsg . ")", Context)
 		return
 	}
 
 	; Pass the raw JSON array to the JS side; injectReleases filters pre-releases
 	; for the "main" channel. Doing it in JS avoids a fragile AHK JSON parser.
 	try LoggerDone("Changelog", "Injecting releases (channel={1})…", Channel)
-	_CLW_Eval("injectReleases(" . Json . "," . _CLW_JsStr(Channel) . ")")
+	_CLW_Eval("injectReleases(" . Json . "," . _CLW_JsStr(Channel) . ")", Context)
 }
 
 
@@ -491,11 +650,148 @@ _CLW_PollFetch(Req, Channel, Polls) {
 
 
 
-; ==========================================
+; ==========================
 ; ==========================
 ; ======= 6/ Helpers =======
 ; ==========================
-; ==========================================
+; ==========================
+
+/**
+ * Starts a distinct WebView lifetime and cancels any retained HTTP request.
+ * @returns {integer} The new window epoch.
+ */
+_CLW_BeginWindowSession() {
+	global _CLW_WindowEpoch, _CLW_RequestEpoch
+	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	OldRequest := 0
+	PreviousCritical := Critical("On")
+	try {
+		_CLW_WindowEpoch += 1
+		_CLW_RequestEpoch += 1
+		OldRequest := _CLW_ActiveRequest
+		_CLW_ActiveRequest := 0
+		_CLW_ActiveRequestEpoch := 0
+		WindowEpoch := _CLW_WindowEpoch
+	} finally {
+		Critical(PreviousCritical)
+	}
+	_CLW_AbortRequest(OldRequest)
+	return WindowEpoch
+}
+
+/**
+ * Invalidates all work owned by the closing WebView session.
+ */
+_CLW_InvalidateWindowSession() {
+	_CLW_BeginWindowSession()
+}
+
+/**
+ * Allocates immutable provenance for one channel request and aborts its
+ * superseded predecessor outside Critical.
+ * @param {string} Channel - "main" or "dev".
+ * @returns {object} Bound window/request epochs and channel.
+ */
+_CLW_BeginFetchRequest(Channel, Request := unset) {
+	global _CLW_WindowEpoch, _CLW_RequestEpoch
+	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !IsSet(Request)
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if !_Updater_RequestContextValid(Request)
+		throw TypeError("Invalid changelog updater request provenance")
+	OldRequest := 0
+	PreviousCritical := Critical("On")
+	try {
+		_CLW_RequestEpoch += 1
+		OldRequest := _CLW_ActiveRequest
+		_CLW_ActiveRequest := 0
+		_CLW_ActiveRequestEpoch := 0
+		Context := {
+			WindowEpoch: _CLW_WindowEpoch,
+			RequestEpoch: _CLW_RequestEpoch,
+			Channel: Channel,
+			Request: Request
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	_CLW_AbortRequest(OldRequest)
+	return Context
+}
+
+_CLW_RequestIsCurrent(Context) {
+	if (!IsObject(Context) or !Context.HasProp("Request")
+			or !_Updater_RequestMayPublish(Context.Request))
+		return false
+	return _CLW_RequestEpochIsCurrent(Context)
+}
+
+_CLW_ScriptWorkIsCurrent(Work) {
+	if !IsObject(Work)
+		return false
+	if (Work.HasProp("Request") and IsObject(Work.Request)
+			and !_Updater_RequestMayPublish(Work.Request))
+		return false
+	return _CLW_ScriptWorkEpochIsCurrent(Work)
+}
+
+; Epoch-only predicates are safe under a caller's short Critical transaction.
+; Pause terminals and logging stay in the side-effecting wrappers above.
+_CLW_RequestEpochIsCurrent(Context) {
+	global _CLW_WindowEpoch, _CLW_RequestEpoch
+	if (!IsObject(Context)
+			or !Context.HasProp("WindowEpoch")
+			or !Context.HasProp("RequestEpoch"))
+		return false
+	return Context.WindowEpoch == _CLW_WindowEpoch
+		&& Context.RequestEpoch == _CLW_RequestEpoch
+}
+
+_CLW_ScriptWorkEpochIsCurrent(Work) {
+	global _CLW_WindowEpoch, _CLW_RequestEpoch
+	if (!IsObject(Work)
+			or !Work.HasProp("WindowEpoch")
+			or !Work.HasProp("RequestEpoch"))
+		return false
+	if (Work.WindowEpoch != _CLW_WindowEpoch)
+		return false
+	return Work.RequestEpoch == 0 || Work.RequestEpoch == _CLW_RequestEpoch
+}
+
+_CLW_RegisterActiveRequest(Context, Request) {
+	global _CLW_WindowEpoch, _CLW_RequestEpoch
+	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	PreviousCritical := Critical("On")
+	try {
+		if (Context.WindowEpoch != _CLW_WindowEpoch
+				|| Context.RequestEpoch != _CLW_RequestEpoch)
+			return false
+		_CLW_ActiveRequest := Request
+		_CLW_ActiveRequestEpoch := Context.RequestEpoch
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_CLW_ReleaseActiveRequest(Context) {
+	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	PreviousCritical := Critical("On")
+	try {
+		if (IsObject(Context) && _CLW_ActiveRequestEpoch == Context.RequestEpoch) {
+			_CLW_ActiveRequest := 0
+			_CLW_ActiveRequestEpoch := 0
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_CLW_AbortRequest(Request) {
+	if IsObject(Request)
+		try Request.Abort()
+}
 
 /**
  * Returns true when WebView2 is available and the loader DLL exists.
@@ -551,7 +847,7 @@ _CLW_JsStr(s) {
 	s := StrReplace(s, "\",  "\\")
 	s := StrReplace(s, '"',  '\"')
 	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "")
+	s := StrReplace(s, "`r", "\r")
 	s := StrReplace(s, "`t", "\t")
 	return '"' . s . '"'
 }
@@ -561,6 +857,7 @@ _CLW_JsStr(s) {
  */
 _CLW_Reset() {
 	global _CLW_Gui, _CLW_WebView, _CLW_Controller, _CLW_MsgSub, _CLW_Ready, _CLW_Queue, _CLW_ResetDone
+	global _CLW_Request
 	; Close and Escape are wired to the same handler and Controller.Close() pumps
 	; messages, so a second dispatch can re-enter this function while the first
 	; teardown is still in flight. Short-circuit instead of running the release +
@@ -568,6 +865,9 @@ _CLW_Reset() {
 	if _CLW_ResetDone
 		return
 	_CLW_ResetDone := true
+	; Invalidate request and script provenance before releasing the controller.
+	; Abort is performed outside the helper's short Critical transaction.
+	_CLW_InvalidateWindowSession()
 	; Release the subscription FIRST, while the controller is still alive. Its
 	; __Delete unsubscribes via remove_WebMessageReceived on the live
 	; controller; doing it AFTER Controller.Close() raises a COM error.
@@ -579,6 +879,7 @@ _CLW_Reset() {
 	_CLW_Controller := unset
 	_CLW_Ready      := false
 	_CLW_Queue      := []
+	_CLW_Request    := unset
 }
 
 
@@ -586,11 +887,11 @@ _CLW_Reset() {
 
 
 
-; ==========================================
+; ========================================
 ; ========================================
 ; ======= 7/ Window Event Handlers =======
 ; ========================================
-; ==========================================
+; ========================================
 
 _CLW_OnClose(*) {
 	global _CLW_Gui

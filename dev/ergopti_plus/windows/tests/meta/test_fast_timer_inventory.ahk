@@ -68,24 +68,24 @@ _FTI_Inventory() {
 	return Map(
 		'Job["timer"]',                 "15",    ; selection capture, torn down on completion
 		"_SuspendPendingPoll",          "25",    ; short-lived, awaits a pending suspend
-		"MF_RefreshFocus",              "50",    ; metrics focus cache TTL
+		"FocusTimerFn",                 "50",    ; generation-bound focus snapshot, title deadline <= 5 ms
 		"_LLM_PointerWatch_MoveFn",     "50",    ; only armed while a prediction is on screen
 		"WPMWidget_MouseWatch",         "50",    ; only armed while the WPM widget is visible
 		"_SR_Poll",                     "100",   ; shell_runner completion poll
+		"_SR_TreePoll",                 "100",   ; only armed while a Job-owned process tree is live
 		"_SpotlightTick",               "100",   ; only armed while spotlight is open
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
 		"KLHook.flush_timer",           "200",   ; keylogger buffer flush
 		"PLC_Poll",                     "250",   ; process lifecycle watch
 		"_Updater_MonitorStagingWorker", "250",  ; only armed while staging an update
-		"KLHook.context_timer",         "250",   ; keylogger focus context refresh
+		"KLHook.context_timer",         "250",   ; memory-only projection of shared focus snapshot
 		"KLMouse.park_timer_fn",        "250",   ; mouse park detection
 		"_LoggerFlush",                 "500",   ; batched log write
 		"_UIA_SelectionPollTimer",      "500",   ; cross-process COM round-trip
 		"WPMWidget_Tick",               "500",   ; only armed while the WPM widget is visible
 		"BoundFn",                      "?",     ; generic scheduler adapter, period is the caller's
 		"_SuspendStateWatchdog",        "?",     ; period is a non-global constant
-		"_UpdaterBackgroundFn",         "?",     ; interval expression in minutes
 		"SimulateActivity",             "?")     ; randomised interval, awake mode only
 }
 
@@ -134,12 +134,12 @@ _FTI_SplitArgs(Src, OpenPos) {
 		} else if (Ch == ")" or Ch == "]" or Ch == "}") {
 			Depth -= 1
 			if (Depth == 0) {
-				Args.Push(Trim(Cur))
+				Args.Push(Trim(Cur, " `t`r`n"))
 				return Args
 			}
 			Cur .= Ch
 		} else if (Ch == "," and Depth == 1) {
-			Args.Push(Trim(Cur))
+			Args.Push(Trim(Cur, " `t`r`n"))
 			Cur := ""
 		} else {
 			Cur .= Ch
@@ -147,6 +147,15 @@ _FTI_SplitArgs(Src, OpenPos) {
 		Idx += 1
 	}
 	return Args
+}
+
+_FTI_MultilineOneShotKeepsItsSign() {
+	Src := "SetTimer(_DeadlineOwner,`n`t-Max(1, DelayMs))"
+	Args := _FTI_SplitArgs(Src, InStr(Src, "("))
+	AssertEqual(2, Args.Length,
+		"the timer scanner fixture must produce both SetTimer arguments")
+	AssertEqual("-Max(1, DelayMs)", Args[2],
+		"argument trimming must remove line breaks without dropping the unary minus; otherwise a multiline one-shot is misclassified as an unresolved repeating poller")
 }
 
 ; Resolve a period expression to milliseconds, or "" when it cannot be read
@@ -237,3 +246,5 @@ Test("meta timers: no sub-second repeating timer exists outside the inventory",
 	_FTI_NoUnlistedFastPoller)
 Test("meta timers: the timer inventory has no stale entries",
 	_FTI_InventoryHasNoStaleEntries)
+Test("meta timers: multiline one-shot periods retain their negative sign",
+	_FTI_MultilineOneShotKeepsItsSign)

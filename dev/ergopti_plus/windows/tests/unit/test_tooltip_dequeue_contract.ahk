@@ -226,8 +226,10 @@ _DequeueContract_RegisterAll() {
 		Id := Vec.Has("id") ? Vec["id"] : "unknown"
 		Desc := Vec.Has("description") ? Vec["description"] : Id
 		NameCopy := "[corpus:dequeue:" . Id . "] " . SubStr(Desc, 1, 50)
-		VecCopy := Vec
-		Test(NameCopy, () => _DequeueContract_RunVector(VecCopy))
+		; .Bind, never an inline fat-arrow over a loop-scoped copy — see
+		; project_ahk_loop_capture_copy_freezes_nothing. Every closure would share
+		; the one VecCopy slot and replay the LAST vector under every name.
+		Test(NameCopy, _DequeueContract_RunVector.Bind(Vec))
 	}
 }
 

@@ -58,8 +58,6 @@
 
 
 
-
-
 # ================================
 # ================================
 # ======= 1. Manifest meta =======
@@ -72,8 +70,6 @@ config_schema = "https://ergopti.com/schema/config.schema.json"
 
 
 
-
-
 # ===========================
 # ===========================
 # ======= 2. Sections =======
@@ -81,7 +77,7 @@ config_schema = "https://ergopti.com/schema/config.schema.json"
 # ===========================
 
 [sections]
-order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "ahk", "hs"]
+order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled"]
 
 
 
@@ -101,36 +97,36 @@ platforms = ["ahk", "hs"]
 
 [sections.hotstrings]
 description_key = "menu.hotstrings"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "dynamic", "personal"]
 
 [sections.hotstrings.autocorrection]
 description_key = "menu.hotstrings.autocorrection"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.distances_reduction]
 description_key = "menu.hotstrings.distances_reduction"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.sfbs_reduction]
 description_key = "menu.hotstrings.sfbs_reduction"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.rolls]
 description_key = "menu.hotstrings.rolls"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.magic_key]
 description_key = "menu.hotstrings.magic_key"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.dynamic]
 description_key = "menu.hotstrings.dynamic"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.personal]
 description_key = "menu.hotstrings.personal"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 
@@ -140,7 +136,7 @@ platforms = ["ahk", "hs"]
 
 [sections.llm]
 description_key = "menu.llm"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["display", "generation", "models", "profiles", "trigger", "navigation"]
 
 [sections.llm.display]
@@ -148,12 +144,16 @@ description_key = "menu.llm.display"
 platforms = ["ahk", "hs"]
 
 [sections.llm.generation]
+# Linux joined on 2026-08-06, when the two settings below gained a control. It
+# read both from the shared canonical defaults and had no way to change either,
+# so they were constants wearing the shape of settings — and declaring a
+# capability with no control is what ADR-008 removed a notifier for.
 description_key = "menu.llm.generation"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.models]
 description_key = "menu.llm.models"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.profiles]
 description_key = "menu.llm.profiles"
@@ -175,7 +175,7 @@ platforms = ["ahk", "hs"]
 
 [sections.metrics]
 description_key = "menu.metrics"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 
@@ -186,91 +186,73 @@ platforms = ["ahk", "hs"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs"]
+subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
 
-
-
-# =====================
-# ===== 2.6 ahk.* =====
-# =====================
-
-[sections.ahk]
-description_key = "menu.ahk"
-platforms = ["ahk"]
-subsections = ["category_enabled", "layout", "shortcuts", "gestures", "metrics"]
-
-[sections.ahk.category_enabled]
-description_key = "menu.ahk.category_enabled"
+[sections.category_enabled]
+description_key = "menu.category_enabled"
 platforms = ["ahk"]
 
-[sections.ahk.layout]
+[sections.layout]
 description_key = "menu.layout"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts]
-description_key = "menu.ahk.shortcuts"
-platforms = ["ahk"]
-subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
-
-[sections.ahk.shortcuts.alt_gr_caps_lock]
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock"
+[sections.shortcuts.alt_gr_caps_lock]
+description_key = "menu.shortcuts.alt_gr_caps_lock"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.alt_gr_lalt]
-description_key = "menu.ahk.shortcuts.alt_gr_lalt"
+[sections.shortcuts.alt_gr_lalt]
+description_key = "menu.shortcuts.alt_gr_lalt"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.keyboard]
-description_key = "menu.ahk.shortcuts.keyboard"
+[sections.shortcuts.keyboard]
+description_key = "menu.shortcuts.keyboard"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.lalt_caps_lock]
-description_key = "menu.ahk.shortcuts.lalt_caps_lock"
+[sections.shortcuts.lalt_caps_lock]
+description_key = "menu.shortcuts.lalt_caps_lock"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.personal]
-description_key = "menu.ahk.shortcuts.personal"
+[sections.shortcuts.personal]
+description_key = "menu.shortcuts.personal"
 platforms = ["ahk"]
 
-[sections.ahk.shortcuts.script_control]
-description_key = "menu.ahk.shortcuts.script_control"
+[sections.shortcuts.script_control]
+description_key = "menu.shortcuts.script_control"
 platforms = ["ahk"]
 
-[sections.ahk.gestures]
+# ⚠ OPEN QUESTION, measured 2026-08-04 and left for the maintainer.
+# This section and all 45 of its features exclude Linux — 11 are ["ahk","hs"],
+# 34 are ["hs"], none mentions linux. But the Linux driver ships
+# modules/gestures/manager.lua, a _build_gestures tray submenu, Linux-specific
+# defaults (swipe_3_left, swipe_4_up, tap_3, tap_4) and a test file. What it has
+# no reader for is TOUCH INPUT: manager.lua's own header calls the libinput
+# subprocess a TODO.
+#
+# So "platforms" is being used for two different questions here — "which drivers
+# implement this?" and "which drivers can actuate it?" — and the answers differ.
+# That is the same shape as kanata / updates / apps, three rows found in 2026-08
+# to be built by Linux and undescribed by the manifest.
+#
+# DO NOT resolve it by writing a shared reason_key across the 34: the Linux half
+# would read "not coded yet", which is the one thing the restriction-reason model
+# forbids, and it would freeze that in twenty-one languages.
+[sections.gestures]
+# Linux joined on 2026-08-06, when its gesture assignments moved off a
+# driver-private `[linux.gestures]` key space and onto the one declared here.
+# Two vocabularies for one setting is the same defect as two defaults for one
+# setting: it made every feature below undeclarable for Linux without the
+# declaration being false.
 description_key = "menu.gestures"
-platforms = ["ahk"]
-
-[sections.ahk.metrics]
-description_key = "menu.ahk.metrics"
-platforms = ["ahk"]
-
-
-
-# ====================
-# ===== 2.7 hs.* =====
-# ====================
-
-[sections.hs]
-description_key = "menu.hs"
-platforms = ["hs"]
-subsections = ["gestures", "hotstrings"]
-
-[sections.hs.gestures]
-description_key = "menu.gestures"
-platforms = ["hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["modes", "sensitivities"]
 
-[sections.hs.gestures.modes]
-description_key = "menu.hs.gestures.modes"
+[sections.gestures.modes]
+description_key = "menu.gestures.modes"
 platforms = ["hs"]
 
-[sections.hs.gestures.sensitivities]
-description_key = "menu.hs.gestures.sensitivities"
+[sections.gestures.sensitivities]
+description_key = "menu.gestures.sensitivities"
 platforms = ["hs"]
-
-[sections.hs.hotstrings]
-description_key = "menu.hs.hotstrings"
-platforms = ["hs"]
-
 
 
 
@@ -280,6 +262,7 @@ platforms = ["hs"]
 # ======= 3. Features =======
 # ===========================
 # ===========================
+
 
 
 
@@ -307,6 +290,12 @@ type = "enum"
 enum_values = ["auto", true, false]
 description_key = "menu.script.alt_gr_is_kana_remap"
 platforms = ["ahk"]
+# Première raison écrite (2026-08-03), et elle sert de modèle : elle dit ce que
+# la plateforme ne peut pas faire, pas ce qui n'a pas été codé. Le réglage
+# compense les dispositions Windows personnalisées (KbdEdit/MSKLC) qui
+# réassignent AltGr à une autre touche virtuelle — une notion de pilote clavier
+# Windows (HKL, MapVirtualKeyExW, VK_RMENU) sans équivalent ailleurs.
+reason_key = "platform_reason.alt_gr_is_kana_remap"
 
 
 
@@ -320,12 +309,55 @@ default = "★"
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
 
+# Unrestricted since 2026-08-05. The ["ahk"] restriction was already false when
+# it was written: macOS ships the engine (modules/keymap/expander.lua
+# try_repeat_feature) AND the toggle, and has for as long as that file has
+# existed. It recorded who implemented the feature first, not what the platforms
+# can do — the same mistake already corrected for hotstring_extensions and
+# magic_key_config. Nothing here touches an OS API: it is "if the character just
+# typed is the magic key and nothing matched, replace it with the one before it",
+# which is as portable as the buffer it reads.
+# Linux gained it in modules/hotstrings/repeat_key.lua.
 [[features.hotstrings]]
 id = "repeat_key_enabled"
 default = true
 type = "boolean"
 description_key = "menu.hotstrings.repeat_key_enabled"
-platforms = ["ahk"]
+
+[[features.hotstrings]]
+id = "expansion_delay"
+platforms = ["hs"]
+default = 0.75
+type = "number"
+description_key = "menu.hotstrings.expansion_delay"
+
+[[features.hotstrings]]
+id = "preview_ai_enabled"
+platforms = ["hs", "linux"]
+default = true
+type = "boolean"
+description_key = "menu.hotstrings.preview_ai_enabled"
+
+[[features.hotstrings]]
+id = "preview_autocorrect_enabled"
+platforms = ["hs", "linux"]
+default = true
+type = "boolean"
+description_key = "menu.hotstrings.preview_autocorrect_enabled"
+
+[[features.hotstrings]]
+id = "preview_colored_tooltips"
+platforms = ["hs", "linux"]
+default = true
+type = "boolean"
+description_key = "menu.hotstrings.preview_colored_tooltips"
+
+[[features.hotstrings]]
+id = "preview_star_enabled"
+default = true
+type = "boolean"
+description_key = "menu.hotstrings.preview_star_enabled"
+platforms = ["hs", "linux"]
 
 
 
@@ -883,13 +915,17 @@ description_key = "menu.llm.generation.sequential_mode"
 
 [[features.llm.models]]
 id = "selected"
-default_per_platform = { ahk = "ollama", hs = "mlx" }
+# Linux has one backend and it is Ollama — see the MLX restriction below, which
+# is the same fact stated from the other side. Declaring the default here rather
+# than letting the driver pick one is what keeps the menu tick and the request
+# payload agreeing about which backend is in use.
+default_per_platform = { ahk = "ollama", hs = "mlx", linux = "ollama" }
 type = "string"
 description_key = "menu.llm.models.selected"
 
 [[features.llm.models]]
 id = "ollama"
-default_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it" }
+default_per_platform = { ahk = "Qwen3.5-0.8B", hs = "gemma-4-E2B-it", linux = "Qwen3.5-0.8B" }
 type = "string"
 description_key = "menu.llm.models.ollama"
 
@@ -899,6 +935,13 @@ default = "Qwen3.5-2B"
 type = "string"
 description_key = "menu.llm.models.mlx"
 platforms = ["hs"]
+# Deuxième raison écrite (2026-08-04), même forme que la première : elle dit ce
+# que la plateforme ne peut pas faire. MLX est le moteur d'inférence local
+# d'Apple, bâti sur Metal et la mémoire unifiée d'Apple Silicon ; il n'en existe
+# pas de version Windows ni Linux, donc la restriction ne dépend d'aucun travail
+# à faire ici. C'est le critère : une raison ne s'écrit que quand elle reste
+# vraie même si tout le reste était codé.
+reason_key = "platform_reason.llm_mlx_is_apple_silicon"
 
 
 
@@ -1027,8 +1070,83 @@ description_key = "menu.metrics.system_auth_filter_enabled"
 id = "encrypt"
 default = false
 type = "boolean"
-description_key = "menu.metrics.encrypt"
-platforms = ["hs"]
+description_key = "menu.metrics.encrypt_toggle"
+
+[[features.metrics]]
+id = "metrics_enabled"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.metrics.metrics_enabled"
+
+[[features.metrics]]
+id = "metrics_shortcut_typing"
+platforms = ["ahk"]
+default = ""
+type = "string"
+description_key = "menu.metrics.metrics_shortcut_typing"
+
+[[features.metrics]]
+id = "metrics_shortcut_apps"
+platforms = ["ahk"]
+default = ""
+type = "string"
+description_key = "menu.metrics.metrics_shortcut_apps"
+
+[[features.metrics]]
+id = "metrics_wpm_menubar_colors"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.metrics.metrics_wpm_menubar_colors"
+
+[[features.metrics]]
+id = "metrics_disabled_apps"
+platforms = ["ahk"]
+default = []
+type = "array"
+description_key = "menu.metrics.metrics_disabled_apps"
+
+[[features.metrics]]
+id = "wpm_widget_visible"
+platforms = ["ahk", "linux"]
+default = false
+type = "boolean"
+description_key = "menu.metrics.wpm_widget_visible"
+
+[[features.metrics]]
+id = "wpm_widget_x"
+platforms = ["ahk"]
+default = -1
+type = "number"
+description_key = "menu.metrics.wpm_widget_x"
+
+[[features.metrics]]
+id = "wpm_widget_y"
+platforms = ["ahk"]
+default = -1
+type = "number"
+description_key = "menu.metrics.wpm_widget_y"
+
+[[features.metrics]]
+id = "wpm_widget_colors"
+platforms = ["ahk", "linux"]
+# The two drivers disagree, and the disagreement is recorded here rather than
+# resolved. Windows ships the pill neutral; Linux has shipped it coloured by
+# keystroke origin since its widget existed. Picking one is a product decision
+# about what a fresh install looks like, not something to settle inside a
+# refactor — and silently flipping Linux would change what every existing user
+# sees on their next start, for no reason they could find.
+default_per_platform = { ahk = false, linux = true }
+type = "boolean"
+description_key = "menu.metrics.wpm_widget_colors"
+
+[[features.metrics]]
+id = "wpm_widget_graph"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.metrics.wpm_widget_graph"
 
 
 
@@ -1140,16 +1258,50 @@ type = "boolean"
 description_key = "shortcuts.label_wrap_text"
 platforms = ["ahk"]
 
+[[features.shortcuts]]
+id = "open_downloads"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.open_downloads"
+
+[[features.shortcuts]]
+id = "move"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.move"
+
+[[features.shortcuts]]
+id = "screen"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.screen"
+
+[[features.shortcuts]]
+id = "screen_instant"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "shortcuts.label_at_hash"
+
+[[features.shortcuts]]
+id = "win_caps_lock"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.win_caps_lock"
 
 
-# ======================================
-# ===== 3.5.1 shortcuts.<accented> =====
-# ======================================
+
+# ===================================
+# ===== 3.5.1 shortcuts.a_grave =====
+# ===================================
 
 # Accented-letter shortcuts. Each entry emits a sub-section
 # [shortcuts.<key>] with enabled + letter (the destination letter to press
 # while the accented key is held).
-
 [[features.shortcuts.a_grave]]
 id = "enabled"
 default = true
@@ -1163,6 +1315,12 @@ default = "v"
 type = "string"
 description_key = "menu.shortcuts.a_grave.letter"
 platforms = ["ahk"]
+
+
+
+# ===================================
+# ===== 3.5.2 shortcuts.e_acute =====
+# ===================================
 
 [[features.shortcuts.e_acute]]
 id = "enabled"
@@ -1178,6 +1336,12 @@ type = "string"
 description_key = "menu.shortcuts.e_acute.letter"
 platforms = ["ahk"]
 
+
+
+# ==================================
+# ===== 3.5.3 shortcuts.e_circ =====
+# ==================================
+
 [[features.shortcuts.e_circ]]
 id = "enabled"
 default = true
@@ -1191,6 +1355,12 @@ default = "x"
 type = "string"
 description_key = "menu.shortcuts.e_circ.letter"
 platforms = ["ahk"]
+
+
+
+# ===================================
+# ===== 3.5.4 shortcuts.e_grave =====
+# ===================================
 
 [[features.shortcuts.e_grave]]
 id = "enabled"
@@ -1208,654 +1378,506 @@ platforms = ["ahk"]
 
 
 
+# ============================================
+# ===== 3.5.5 shortcuts.alt_gr_caps_lock =====
+# ============================================
 
-
-# ====================================
-# ====================================
-# ======= 4. AHK-only features =======
-# ====================================
-# ====================================
-
-
-
-# ==========================
-# ===== 4.1 ahk.layout =====
-# ==========================
-
-[[features.ahk.layout]]
-id = "ergopti_base"
-default = true
-type = "boolean"
-description_key = "menu.layout.ergopti_base"
-
-[[features.ahk.layout]]
-id = "direct_access_digits"
-default = true
-type = "boolean"
-description_key = "menu.layout.direct_access_digits"
-
-[[features.ahk.layout]]
-id = "ergopti_alt_gr"
-default = true
-type = "boolean"
-description_key = "menu.layout.ergopti_alt_gr"
-
-[[features.ahk.layout]]
-id = "ergopti_plus"
-default = true
-type = "boolean"
-description_key = "menu.layout.ergopti_plus"
-
-[[features.ahk.layout]]
-id = "ctrl_magic_save"
-default = false
-type = "boolean"
-description_key = "menu.layout.ctrl_magic_save"
-
-
-
-# =============================
-# ===== 4.2 ahk.shortcuts =====
-# =============================
-
-[[features.ahk.shortcuts]]
-id = "open_downloads"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.open_downloads"
-
-[[features.ahk.shortcuts]]
-id = "move"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.move"
-
-[[features.ahk.shortcuts]]
-id = "screen"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.screen"
-
-[[features.ahk.shortcuts]]
-id = "screen_instant"
-default = true
-type = "boolean"
-description_key = "shortcuts.label_at_hash"
-
-[[features.ahk.shortcuts]]
-id = "win_caps_lock"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.win_caps_lock"
-
-
-
-# ==============================================
-# ===== 4.3 ahk.shortcuts.alt_gr_caps_lock =====
-# ==============================================
-
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "backspace"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.backspace"
+description_key = "menu.shortcuts.alt_gr_caps_lock.backspace"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "caps_lock"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.caps_lock"
+description_key = "menu.shortcuts.alt_gr_caps_lock.caps_lock"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "caps_word"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.caps_word"
+description_key = "menu.shortcuts.alt_gr_caps_lock.caps_word"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "ctrl_backspace"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.ctrl_backspace"
+description_key = "menu.shortcuts.alt_gr_caps_lock.ctrl_backspace"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "ctrl_delete"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.ctrl_delete"
+description_key = "menu.shortcuts.alt_gr_caps_lock.ctrl_delete"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "delete"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.delete"
+description_key = "menu.shortcuts.alt_gr_caps_lock.delete"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "enter"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.enter"
+description_key = "menu.shortcuts.alt_gr_caps_lock.enter"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "escape"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.escape"
+description_key = "menu.shortcuts.alt_gr_caps_lock.escape"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "one_shot_shift"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.one_shot_shift"
+description_key = "menu.shortcuts.alt_gr_caps_lock.one_shot_shift"
 
-[[features.ahk.shortcuts.alt_gr_caps_lock]]
+[[features.shortcuts.alt_gr_caps_lock]]
 id = "tab"
+platforms = ["ahk"]
 default = false
 type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_caps_lock.tab"
+description_key = "menu.shortcuts.alt_gr_caps_lock.tab"
 
 
 
-# ============================
-# ===== 4.4 ahk.gestures =====
-# ============================
+# =======================================
+# ===== 3.5.6 shortcuts.alt_gr_lalt =====
+# =======================================
 
-[[features.ahk.gestures]]
+[[features.shortcuts.alt_gr_lalt]]
+id = "backspace"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.backspace"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "caps_lock"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.caps_lock"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "caps_word"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.caps_word"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "ctrl_backspace"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.ctrl_backspace"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "ctrl_delete"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.ctrl_delete"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "delete"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.delete"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "enter"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.enter"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "escape"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.escape"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "one_shot_shift"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.one_shot_shift"
+
+[[features.shortcuts.alt_gr_lalt]]
+id = "tab"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.alt_gr_lalt.tab"
+
+
+
+# ==========================================
+# ===== 3.5.7 shortcuts.lalt_caps_lock =====
+# ==========================================
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "backspace"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.backspace"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "caps_lock"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.caps_lock"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "caps_word"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.caps_word"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "ctrl_backspace"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.ctrl_backspace"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "ctrl_delete"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.ctrl_delete"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "delete"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.delete"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "enter"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.enter"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "escape"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.escape"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "one_shot_shift"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.one_shot_shift"
+
+[[features.shortcuts.lalt_caps_lock]]
+id = "tab"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.lalt_caps_lock.tab"
+
+
+
+# ====================================
+# ===== 3.5.8 shortcuts.personal =====
+# ====================================
+
+[[features.shortcuts.personal]]
+id = "laptop_broken_key"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.personal.laptop_broken_key"
+
+[[features.shortcuts.personal]]
+id = "mouse_drag_window"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.personal.mouse_drag_window"
+
+[[features.shortcuts.personal]]
+id = "mouse_tab_switching"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.personal.mouse_tab_switching"
+
+[[features.shortcuts.personal]]
+id = "professional_environment"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.shortcuts.personal.professional_environment"
+
+[[features.shortcuts.personal]]
+id = "programmable_keyboard"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.shortcuts.personal.programmable_keyboard"
+
+
+
+# ==========================================
+# ===== 3.5.9 shortcuts.script_control =====
+# ==========================================
+
+[[features.shortcuts.script_control]]
+id = "script_altgr_backspace"
+platforms = ["ahk"]
+default = "script_reload"
+type = "action"
+description_key = "menu.shortcuts.script_control.script_altgr_backspace"
+
+[[features.shortcuts.script_control]]
+id = "script_altgr_delete"
+platforms = ["ahk"]
+default = "open_personal_shortcuts"
+type = "action"
+description_key = "menu.shortcuts.script_control.script_altgr_delete"
+
+[[features.shortcuts.script_control]]
+id = "script_altgr_enter"
+platforms = ["ahk"]
+default = "script_pause_toggle"
+type = "action"
+description_key = "menu.shortcuts.script_control.script_altgr_enter"
+
+[[features.shortcuts.script_control]]
+id = "script_altgr_escape"
+platforms = ["ahk"]
+default = "script_quit"
+type = "action"
+description_key = "menu.shortcuts.script_control.script_altgr_escape"
+
+
+
+# =====================================
+# ===== 3.5.10 shortcuts.keyboard =====
+# =====================================
+
+# ===== 4.8b ahk.shortcuts.keyboard ========
+[[features.shortcuts.keyboard]]
+id = "ctrl_b"
+platforms = ["ahk"]
+default = "microsoft_bold"
+type = "action"
+description_key = "menu.shortcuts.keyboard.ctrl_b"
+
+[[features.shortcuts.keyboard]]
+id = "ctrl_shift_v"
+platforms = ["ahk"]
+default = "paste_plain"
+type = "action"
+description_key = "menu.shortcuts.keyboard.ctrl_shift_v"
+
+[[features.shortcuts.keyboard]]
+id = "win_a"
+platforms = ["ahk"]
+default = "select_line"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_a"
+
+[[features.shortcuts.keyboard]]
+id = "win_d"
+platforms = ["ahk"]
+default = "open_hotstrings_editor"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_d"
+
+[[features.shortcuts.keyboard]]
+id = "win_g"
+platforms = ["ahk"]
+default = "open_url"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_g"
+
+[[features.shortcuts.keyboard]]
+id = "win_h"
+platforms = ["ahk"]
+default = "screen_capture"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_h"
+
+[[features.shortcuts.keyboard]]
+id = "win_m"
+platforms = ["ahk"]
+default = "activity_simulation"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_m"
+
+[[features.shortcuts.keyboard]]
+id = "win_n"
+platforms = ["ahk"]
+default = "take_note"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_n"
+
+[[features.shortcuts.keyboard]]
+id = "win_o"
+platforms = ["ahk"]
+default = "surround_parens"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_o"
+
+[[features.shortcuts.keyboard]]
+id = "win_s"
+platforms = ["ahk"]
+default = "search_web"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_s"
+
+[[features.shortcuts.keyboard]]
+id = "win_sc029"
+platforms = ["ahk"]
+default = "screen_capture_instant"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_sc029"
+
+[[features.shortcuts.keyboard]]
+id = "win_t"
+platforms = ["ahk"]
+default = "teleport_mouse"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_t"
+
+[[features.shortcuts.keyboard]]
+id = "win_u"
+platforms = ["ahk"]
+default = "uppercase_selection"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_u"
+
+[[features.shortcuts.keyboard]]
+id = "win_w"
+platforms = ["ahk"]
+default = "titlecase_selection"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_w"
+
+[[features.shortcuts.keyboard]]
+id = "win_x"
+platforms = ["ahk"]
+default = "pick_color"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_x"
+
+
+
+# ========================
+# ===== 3.6 gestures =====
+# ========================
+
+[[features.gestures]]
 id = "enabled"
+platforms = ["ahk", "hs", "linux"]
 default = true
 type = "boolean"
 description_key = "menu.gestures.enabled"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_3_down"
-default = "tab_close"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_down"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_3_left"
-default = "tab_prev"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_prev", hs = "word_prev", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_3_right"
-default = "tab_next"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_next", hs = "word_next", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_3_up"
-default = "tab_new"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_up"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_4_down"
-default = "win_app_prev"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "win_app_prev", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_down"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_4_left"
-default = "desktop_prev"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_4_right"
-default = "desktop_next"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "swipe_4_up"
-default = "win_app_next"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "win_app_next", hs = "none", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_4_up"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "tap_3"
-default = "left_click_toggle"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "none" }
 type = "action"
 description_key = "menu.gestures.tap_3"
 
-[[features.ahk.gestures]]
+[[features.gestures]]
 id = "tap_4"
-default = "screenshot_window_clipboard"
+platforms = ["ahk", "hs", "linux"]
+default_per_platform = { ahk = "screenshot_window_clipboard", hs = "app_window_previous", linux = "none" }
 type = "action"
 description_key = "menu.gestures.tap_4"
 
-# =========================================
-# ===== 4.5 ahk.shortcuts.alt_gr_lalt =====
-# =========================================
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "backspace"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.backspace"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "caps_lock"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.caps_lock"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "caps_word"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.caps_word"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "ctrl_backspace"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.ctrl_backspace"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "ctrl_delete"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.ctrl_delete"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "delete"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.delete"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "enter"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.enter"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "escape"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.escape"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "one_shot_shift"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.one_shot_shift"
-
-[[features.ahk.shortcuts.alt_gr_lalt]]
-id = "tab"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.alt_gr_lalt.tab"
-
-
-
-# ============================================
-# ===== 4.6 ahk.shortcuts.lalt_caps_lock =====
-# ============================================
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "backspace"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.backspace"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "caps_lock"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.caps_lock"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "caps_word"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.caps_word"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "ctrl_backspace"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.ctrl_backspace"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "ctrl_delete"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.ctrl_delete"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "delete"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.delete"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "enter"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.enter"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "escape"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.escape"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "one_shot_shift"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.one_shot_shift"
-
-[[features.ahk.shortcuts.lalt_caps_lock]]
-id = "tab"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.lalt_caps_lock.tab"
-
-
-
-# ======================================
-# ===== 4.7 ahk.shortcuts.personal =====
-# ======================================
-
-[[features.ahk.shortcuts.personal]]
-id = "laptop_broken_key"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.personal.laptop_broken_key"
-
-[[features.ahk.shortcuts.personal]]
-id = "mouse_drag_window"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.personal.mouse_drag_window"
-
-[[features.ahk.shortcuts.personal]]
-id = "mouse_tab_switching"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.personal.mouse_tab_switching"
-
-[[features.ahk.shortcuts.personal]]
-id = "professional_environment"
-default = false
-type = "boolean"
-description_key = "menu.ahk.shortcuts.personal.professional_environment"
-
-[[features.ahk.shortcuts.personal]]
-id = "programmable_keyboard"
-default = true
-type = "boolean"
-description_key = "menu.ahk.shortcuts.personal.programmable_keyboard"
-
-
-
-# ============================================
-# ===== 4.8 ahk.shortcuts.script_control =====
-# ============================================
-
-[[features.ahk.shortcuts.script_control]]
-id = "script_altgr_backspace"
-default = "script_reload"
-type = "action"
-description_key = "menu.ahk.shortcuts.script_control.script_altgr_backspace"
-
-[[features.ahk.shortcuts.script_control]]
-id = "script_altgr_delete"
-default = "open_personal_shortcuts"
-type = "action"
-description_key = "menu.ahk.shortcuts.script_control.script_altgr_delete"
-
-[[features.ahk.shortcuts.script_control]]
-id = "script_altgr_enter"
-default = "script_pause_toggle"
-type = "action"
-description_key = "menu.ahk.shortcuts.script_control.script_altgr_enter"
-
-[[features.ahk.shortcuts.script_control]]
-id = "script_altgr_escape"
-default = "script_quit"
-type = "action"
-description_key = "menu.ahk.shortcuts.script_control.script_altgr_escape"
-
-
-
-# ==========================================
-# ===== 4.8b ahk.shortcuts.keyboard ========
-# ==========================================
-
-[[features.ahk.shortcuts.keyboard]]
-id = "ctrl_b"
-default = "microsoft_bold"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.ctrl_b"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "ctrl_shift_v"
-default = "paste_plain"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.ctrl_shift_v"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_a"
-default = "select_line"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_a"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_d"
-default = "open_hotstrings_editor"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_d"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_g"
-default = "open_url"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_g"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_h"
-default = "screen_capture"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_h"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_m"
-default = "activity_simulation"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_m"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_n"
-default = "take_note"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_n"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_o"
-default = "surround_parens"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_o"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_s"
-default = "search_web"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_s"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_sc029"
-default = "screen_capture_instant"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_sc029"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_t"
-default = "teleport_mouse"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_t"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_u"
-default = "uppercase_selection"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_u"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_w"
-default = "titlecase_selection"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_w"
-
-[[features.ahk.shortcuts.keyboard]]
-id = "win_x"
-default = "pick_color"
-type = "action"
-description_key = "menu.ahk.shortcuts.keyboard.win_x"
-
-
-
-# ===========================
-# ===== 4.9 ahk.metrics =====
-# ===========================
-
-[[features.ahk.metrics]]
-id = "filter_private_browsing"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.filter_private_browsing"
-
-[[features.ahk.metrics]]
-id = "metrics_enabled"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_enabled"
-
-[[features.ahk.metrics]]
-id = "metrics_shortcut_typing"
-default = ""
-type = "string"
-description_key = "menu.ahk.metrics.metrics_shortcut_typing"
-
-[[features.ahk.metrics]]
-id = "metrics_shortcut_apps"
-default = ""
-type = "string"
-description_key = "menu.ahk.metrics.metrics_shortcut_apps"
-
-[[features.ahk.metrics]]
-id = "metrics_wpm_menubar_colors"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_wpm_menubar_colors"
-
-[[features.ahk.metrics]]
-id = "metrics_filter_secure_field"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_filter_secure_field"
-
-[[features.ahk.metrics]]
-id = "metrics_filter_system_auth"
-default = true
-type = "boolean"
-description_key = "menu.ahk.metrics.metrics_filter_system_auth"
-
-[[features.ahk.metrics]]
-id = "metrics_disabled_apps"
-default = []
-type = "array"
-description_key = "menu.ahk.metrics.metrics_disabled_apps"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_visible"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.wpm_widget_visible"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_x"
-default = -1
-type = "number"
-description_key = "menu.ahk.metrics.wpm_widget_x"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_y"
-default = -1
-type = "number"
-description_key = "menu.ahk.metrics.wpm_widget_y"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_colors"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.wpm_widget_colors"
-
-[[features.ahk.metrics]]
-id = "wpm_widget_graph"
-default = false
-type = "boolean"
-description_key = "menu.ahk.metrics.wpm_widget_graph"
-
-
-
-# =====================================
-# ===== 4.10 ahk.category_enabled =====
-# =====================================
-
-[[features.ahk.category_enabled]]
-id = "hotstrings"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.hotstrings"
-
-[[features.ahk.category_enabled]]
-id = "layout"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.layout"
-
-[[features.ahk.category_enabled]]
-id = "shortcuts"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.shortcuts"
-
-[[features.ahk.category_enabled]]
-id = "tap_holds"
-default = true
-type = "boolean"
-description_key = "menu.ahk.category_enabled.tap_holds"
-
-
-
-
-
-# ===================================
-# ===================================
-# ======= 5. HS-only features =======
-# ===================================
-# ===================================
-
-
-
-# ===========================
-# ===== 5.1 hs.gestures =====
-# ===========================
-
-[[features.hs.gestures]]
-id = "enabled"
-default = true
-type = "boolean"
-description_key = "menu.gestures.enabled"
-
-[[features.hs.gestures]]
+# --- 2-finger remaining directions ---
+[[features.gestures]]
 id = "space_wrap"
+platforms = ["hs"]
 default = true
 type = "boolean"
 # The config id stays "space_wrap" (persisted setting + get/set_space_wrap), but
@@ -1865,775 +1887,824 @@ type = "boolean"
 # point at the surviving key or it resolves to nothing.
 description_key = "menu.gestures.circular_spaces"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_left"
+platforms = ["hs"]
 default = "arrow_up"
 type = "action"
 description_key = "menu.gestures.swipe_2_left"
 
-[[features.hs.gestures]]
-id = "swipe_3_left"
-default = "word_prev"
-type = "action"
-description_key = "menu.gestures.swipe_3_left"
-
-[[features.hs.gestures]]
-id = "swipe_3_right"
-default = "word_next"
-type = "action"
-description_key = "menu.gestures.swipe_3_right"
-
-[[features.hs.gestures]]
-id = "swipe_3_up"
-default = "tab_prev"
-type = "action"
-description_key = "menu.gestures.swipe_3_up"
-
-[[features.hs.gestures]]
-id = "swipe_3_down"
-default = "tab_next"
-type = "action"
-description_key = "menu.gestures.swipe_3_down"
-
-[[features.hs.gestures]]
-id = "swipe_4_up"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_up"
-
-[[features.hs.gestures]]
-id = "swipe_4_down"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_down"
-
-[[features.hs.gestures]]
-id = "swipe_4_left"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_left"
-
-[[features.hs.gestures]]
-id = "swipe_4_right"
-default = "none"
-type = "action"
-description_key = "menu.gestures.swipe_4_right"
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_left"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_right"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right"
 
-[[features.hs.gestures]]
-id = "tap_3"
-default = "left_click_toggle"
-type = "action"
-description_key = "menu.gestures.tap_3"
-
-[[features.hs.gestures]]
-id = "tap_4"
-default = "app_window_previous"
-type = "action"
-description_key = "menu.gestures.tap_4"
-
-# --- 2-finger remaining directions ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_right"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_left_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_left_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_right_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_right_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_2_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_diag"
 
-
-
 # --- 3-finger diagonals + horiz aggregator ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_left_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_left_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_right_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_right_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_diag"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_3_horiz"
+platforms = ["hs"]
 default = "words"
 type = "action"
 description_key = "menu.gestures.swipe_3_horiz"
 
-
-
 # --- 4-finger diagonals + horiz aggregator ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_left_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_left_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_right_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_right_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_diag"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_4_horiz"
+platforms = ["hs"]
 default = "spaces"
 type = "action"
 description_key = "menu.gestures.swipe_4_horiz"
 
-
-
 # --- 5-finger diagonals + horiz aggregator ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_left_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_left_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_left_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_right_down"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_down"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_right_up"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_right_up"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_diag"
+platforms = ["hs"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_diag"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "swipe_5_horiz"
+platforms = ["hs"]
 default = "windows"
 type = "action"
 description_key = "menu.gestures.swipe_5_horiz"
 
-
-
 # --- Taps ---
-
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "tap_2"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.tap_2"
 
-[[features.hs.gestures]]
+[[features.gestures]]
 id = "tap_5"
+platforms = ["hs", "linux"]
 default = "none"
 type = "action"
 description_key = "menu.gestures.tap_5"
 
 
 
-# =================================
-# ===== 5.2 hs.gestures.modes =====
-# =================================
+# ================================
+# ===== 3.6.1 gestures.modes =====
+# ================================
 
 # Per-direction firing mode ("x1" or "incremental"). Defaults from the existing
 # HS config are: 2-fingers = x1, 3-fingers = incremental, 4-fingers = x1,
 # 5-fingers horiz = incremental + vert = x1.
 
 # --- 2-finger (all x1) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_left"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_left"
+description_key = "menu.gestures.modes.swipe_2_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_right"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_right"
+description_key = "menu.gestures.modes.swipe_2_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_up"
+description_key = "menu.gestures.modes.swipe_2_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_down"
+description_key = "menu.gestures.modes.swipe_2_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_left_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_left_down"
+description_key = "menu.gestures.modes.swipe_2_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_left_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_left_up"
+description_key = "menu.gestures.modes.swipe_2_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_right_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_right_down"
+description_key = "menu.gestures.modes.swipe_2_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_2_right_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_2_right_up"
-
-
+description_key = "menu.gestures.modes.swipe_2_right_up"
 
 # --- 3-finger (all incremental) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_left"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_left"
+description_key = "menu.gestures.modes.swipe_3_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_right"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_right"
+description_key = "menu.gestures.modes.swipe_3_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_up"
+description_key = "menu.gestures.modes.swipe_3_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_down"
+description_key = "menu.gestures.modes.swipe_3_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_left_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_left_down"
+description_key = "menu.gestures.modes.swipe_3_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_left_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_left_up"
+description_key = "menu.gestures.modes.swipe_3_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_right_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_right_down"
+description_key = "menu.gestures.modes.swipe_3_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_3_right_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_3_right_up"
-
-
+description_key = "menu.gestures.modes.swipe_3_right_up"
 
 # --- 4-finger (all x1) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_left"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_left"
+description_key = "menu.gestures.modes.swipe_4_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_right"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_right"
+description_key = "menu.gestures.modes.swipe_4_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_up"
+description_key = "menu.gestures.modes.swipe_4_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_down"
+description_key = "menu.gestures.modes.swipe_4_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_left_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_left_down"
+description_key = "menu.gestures.modes.swipe_4_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_left_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_left_up"
+description_key = "menu.gestures.modes.swipe_4_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_right_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_right_down"
+description_key = "menu.gestures.modes.swipe_4_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_4_right_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_4_right_up"
-
-
+description_key = "menu.gestures.modes.swipe_4_right_up"
 
 # --- 5-finger (horiz incremental, vert x1) ---
-
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_left"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_left"
+description_key = "menu.gestures.modes.swipe_5_left"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_right"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_right"
+description_key = "menu.gestures.modes.swipe_5_right"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_up"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_up"
+description_key = "menu.gestures.modes.swipe_5_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_down"
+platforms = ["hs"]
 default = "x1"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_down"
+description_key = "menu.gestures.modes.swipe_5_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_left_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_left_down"
+description_key = "menu.gestures.modes.swipe_5_left_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_left_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_left_up"
+description_key = "menu.gestures.modes.swipe_5_left_up"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_right_down"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_right_down"
+description_key = "menu.gestures.modes.swipe_5_right_down"
 
-[[features.hs.gestures.modes]]
+[[features.gestures.modes]]
 id = "swipe_5_right_up"
+platforms = ["hs"]
 default = "incremental"
 type = "enum"
 enum_values = ["x1", "incremental"]
-description_key = "menu.hs.gestures.modes.swipe_5_right_up"
+description_key = "menu.gestures.modes.swipe_5_right_up"
 
 
 
-# =========================================
-# ===== 5.3 hs.gestures.sensitivities =====
-# =========================================
+# ========================================
+# ===== 3.6.2 gestures.sensitivities =====
+# ========================================
 
 # Activation threshold per direction (travel distance in centimetres).
 
 # All directions default to 3.5 cm of trackpad travel before firing.
-
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_left"
+description_key = "menu.gestures.sensitivities.swipe_2_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_right"
+description_key = "menu.gestures.sensitivities.swipe_2_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_up"
+description_key = "menu.gestures.sensitivities.swipe_2_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_down"
+description_key = "menu.gestures.sensitivities.swipe_2_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_left_down"
+description_key = "menu.gestures.sensitivities.swipe_2_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_left_up"
+description_key = "menu.gestures.sensitivities.swipe_2_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_right_down"
+description_key = "menu.gestures.sensitivities.swipe_2_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_2_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_2_right_up"
+description_key = "menu.gestures.sensitivities.swipe_2_right_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_left"
+description_key = "menu.gestures.sensitivities.swipe_3_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_right"
+description_key = "menu.gestures.sensitivities.swipe_3_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_up"
+description_key = "menu.gestures.sensitivities.swipe_3_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_down"
+description_key = "menu.gestures.sensitivities.swipe_3_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_left_down"
+description_key = "menu.gestures.sensitivities.swipe_3_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_left_up"
+description_key = "menu.gestures.sensitivities.swipe_3_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_right_down"
+description_key = "menu.gestures.sensitivities.swipe_3_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_3_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_3_right_up"
+description_key = "menu.gestures.sensitivities.swipe_3_right_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_left"
+description_key = "menu.gestures.sensitivities.swipe_4_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_right"
+description_key = "menu.gestures.sensitivities.swipe_4_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_up"
+description_key = "menu.gestures.sensitivities.swipe_4_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_down"
+description_key = "menu.gestures.sensitivities.swipe_4_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_left_down"
+description_key = "menu.gestures.sensitivities.swipe_4_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_left_up"
+description_key = "menu.gestures.sensitivities.swipe_4_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_right_down"
+description_key = "menu.gestures.sensitivities.swipe_4_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_4_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_4_right_up"
+description_key = "menu.gestures.sensitivities.swipe_4_right_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_left"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_left"
+description_key = "menu.gestures.sensitivities.swipe_5_left"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_right"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_right"
+description_key = "menu.gestures.sensitivities.swipe_5_right"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_up"
+description_key = "menu.gestures.sensitivities.swipe_5_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_down"
+description_key = "menu.gestures.sensitivities.swipe_5_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_left_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_left_down"
+description_key = "menu.gestures.sensitivities.swipe_5_left_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_left_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_left_up"
+description_key = "menu.gestures.sensitivities.swipe_5_left_up"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_right_down"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_right_down"
+description_key = "menu.gestures.sensitivities.swipe_5_right_down"
 
-[[features.hs.gestures.sensitivities]]
+[[features.gestures.sensitivities]]
 id = "swipe_5_right_up"
+platforms = ["hs"]
 default = 3.5
 type = "number"
-description_key = "menu.hs.gestures.sensitivities.swipe_5_right_up"
+description_key = "menu.gestures.sensitivities.swipe_5_right_up"
 
 
 
-# =============================
-# ===== 5.4 hs.hotstrings =====
-# =============================
+# ======================
+# ===== 3.7 layout =====
+# ======================
 
-[[features.hs.hotstrings]]
-id = "expansion_delay"
-default = 0.75
-type = "number"
-description_key = "menu.hs.hotstrings.expansion_delay"
-
-[[features.hs.hotstrings]]
-id = "preview_ai_enabled"
+[[features.layout]]
+id = "ergopti_base"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_ai_enabled"
+description_key = "menu.layout.ergopti_base"
 
-[[features.hs.hotstrings]]
-id = "preview_autocorrect_enabled"
+[[features.layout]]
+id = "direct_access_digits"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_autocorrect_enabled"
+description_key = "menu.layout.direct_access_digits"
 
-[[features.hs.hotstrings]]
-id = "preview_colored_tooltips"
+[[features.layout]]
+id = "ergopti_alt_gr"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_colored_tooltips"
+description_key = "menu.layout.ergopti_alt_gr"
 
-[[features.hs.hotstrings]]
-id = "preview_star_enabled"
+[[features.layout]]
+id = "ergopti_plus"
+platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "menu.hs.hotstrings.preview_star_enabled"
+description_key = "menu.layout.ergopti_plus"
+
+[[features.layout]]
+id = "ctrl_magic_save"
+platforms = ["ahk"]
+default = false
+type = "boolean"
+description_key = "menu.layout.ctrl_magic_save"
 
 
+
+# ================================
+# ===== 3.8 category_enabled =====
+# ================================
+
+[[features.category_enabled]]
+id = "hotstrings"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.category_enabled.hotstrings"
+
+[[features.category_enabled]]
+id = "layout"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.category_enabled.layout"
+
+[[features.category_enabled]]
+id = "shortcuts"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.category_enabled.shortcuts"
+
+[[features.category_enabled]]
+id = "tap_holds"
+platforms = ["ahk"]
+default = true
+type = "boolean"
+description_key = "menu.category_enabled.tap_holds"
 
 
 
 # =====================================
 # =====================================
-# ======= 6. Tap-hold reference =======
+# ======= 4. Tap-hold reference =======
 # =====================================
 # =====================================
 
@@ -2650,13 +2721,11 @@ description_key = "menu.hs.hotstrings.preview_star_enabled"
 
 
 
-
-
-# =================================================
-# =================================================
+# ================================================
+# ================================================
 # ======= 5. Tray menu structure (codegen) =======
-# =================================================
-# =================================================
+# ================================================
+# ================================================
 
 # Source of truth for the cross-driver tray-menu tree. Hand-edited here; the
 # codegen tools/build/build-menu-manifest.js emits _shared/modules/menu/
@@ -2666,7 +2735,12 @@ description_key = "menu.hs.hotstrings.preview_star_enabled"
 # letter_picker / "---" separator. platforms = ["ahk"|"hs"] gates per driver.
 
 [menu]
-dynamic_hotstrings_order = ["DateLongFr", "DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "---", "TextExpansionPersonalInformation"]
+# dynamic_hotstrings_order lived here and was read by nobody. The order that
+# actually renders is _DYNAMIC_HOTSTRINGS_ORDER in windows/ui/tray_menu.ahk,
+# which spells its separator "-" where this spelled it "---" — two sources for
+# one order, disagreeing, one of them dead. Removed rather than reconciled: the
+# live one is the one the menu uses, and a second copy that nothing reads is a
+# trap for whoever edits it next expecting the menu to change.
 
 [menu.gesture_slots]
 2 = ["tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"]
@@ -2702,21 +2776,44 @@ id = "metrics"
 [[menu.top_level]]
 id = "shortcuts"
 
+# Windows only. The "hs" value was measured false on 2026-08-04: no macOS file
+# builds a tap-holds menu, and every row of menu.tap_holds_menu below is already
+# restricted to "ahk" — so macOS declared a top-level entry that opened an empty
+# submenu. Tap-holds on macOS are configured through Karabiner, which has its own
+# top-level row. Nothing could see this before: the top-level parity gate reads
+# the macOS dispatch chain only from `global_actions` onward, and this row sits
+# above that boundary.
 [[menu.top_level]]
 id = "tap_holds"
 platforms = ["ahk"]
-
+reason_key = "platform_reason.remap_engine_is_per_driver"
 [[menu.top_level]]
 id = "karabiner"
 platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
+# Le pendant Linux de Karabiner. Absent du manifeste jusqu'au 2026-08-03 alors
+# que menu_builder.lua le construit depuis toujours : le manifeste ne portait
+# aucune valeur "linux", donc rien ne pouvait constater le manque.
+[[menu.top_level]]
+id = "kanata"
+platforms = ["linux"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 [[menu.top_level]]
 id = "gestures"
 
+# Mesuré le 2026-08-03 : Linux construit bien un sous-menu Apps
+# (_build_apps dans menu_builder.lua), la restriction "hs" était fausse.
 [[menu.top_level]]
 id = "apps"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
+# Linux uniquement : les deux autres drivers n'ont aucun menu de mise à jour.
+[[menu.top_level]]
+id = "updates"
+platforms = ["linux"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 [[menu.top_level]]
 id = "---"
 
@@ -2741,7 +2838,7 @@ id = "---"
 [[menu.top_level]]
 id = "suspend"
 platforms = ["ahk"]
-
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 [[menu.top_level]]
 id = "reload"
 
@@ -2751,93 +2848,575 @@ id = "quit"
 [[menu.top_level]]
 id = "debug"
 
-[[menu.global_actions]]
-id = "enable_all"
+# The kanata submenu, which only the Linux driver has — kanata is its remap
+# daemon, as Karabiner-Elements is macOS's. Declared as a `list` rather than four
+# `action` rows on purpose: an `action` names a handler and the handler appends
+# the row IN THE DRIVER, so the manifest would describe the slot while the driver
+# still built the menu. A `list` provider returns row DATA and the shared
+# renderer materialises it, which is the only shape that actually moves a row out
+# of the driver — see the header of tools/test/test-menu-rows-outside-renderer.cjs,
+# which records that a `list` migration is the only kind that has ever lowered
+# that count.
+#
+# Its four rows were hand-built in linux/ui/menu/menu_builder.lua until
+# 2026-08-05. This is the first block of that file to move, and the pattern the
+# rest of M3.3 follows.
+[[menu.kanata_menu]]
+type = "list"
+id = "kanata_actions"
+platforms = ["linux"]
 
-[[menu.global_actions]]
-id = "disable_all"
+# The tap-hold read-out, added 2026-08-07.
+#
+# kanata IS the tap-hold engine on Linux — the defalias block it runs is
+# generated from _shared/tap_hold/defaults.toml, the same file Windows parses and
+# macOS's Karabiner defaults derive from. Yet `tap_holds_menu` said ["ahk"] and
+# `karabiner_menu` said ["hs"], so the one driver whose remap daemon exists
+# precisely to do tap-holds had no row about them anywhere in its tray. A user
+# could not see which key taps to what, or how long a hold takes, without
+# opening a generated .kbd.
+#
+# What it is NOT: the Windows menu lets the user CHANGE a tap action from the
+# tray, and this does not, because this driver has no writer for the user's
+# tap_hold.toml — only a reader. Declaring an editable row would promise a
+# control that does nothing. The edit row below opens the file instead, which is
+# the honest version of "configure this" for a driver that reads a file it
+# cannot yet write.
+[[menu.kanata_menu]]
+type = "---"
+platforms = ["linux"]
 
-[[menu.global_actions]]
-id = "reset_defaults"
+[[menu.kanata_menu]]
+type = "section_header"
+i18n = "menu.kanata.header_tap_holds"
+platforms = ["linux"]
+reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
 
-[[menu.debug_menu]]
-id = "window_spy"
-platforms = ["ahk"]
+[[menu.kanata_menu]]
+type = "list"
+id = "kanata_tap_holds"
+platforms = ["linux"]
+reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
 
-[[menu.debug_menu]]
-id = "list_vars"
-platforms = ["ahk"]
+[[menu.kanata_menu]]
+type = "command"
+id = "kanata_edit_tap_holds"
+i18n = "menu.kanata.edit_tap_holds"
+platforms = ["linux"]
+reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
 
-[[menu.debug_menu]]
-id = "key_history"
-platforms = ["ahk"]
 
-[[menu.debug_menu]]
-id = "console"
+# The Karabiner submenu.
+#
+# It did not exist either, and it is the largest hand-built menu in the project:
+# thirty-six rows assembled in macos/ui/menu/menu_remap.lua with nothing
+# describing them. Karabiner is macOS's own tap-hold and chord engine — the
+# maintainer's decision, as the best answer found for that platform — so every
+# row here is platforms = ["hs"]. What is shared is the SHAPE: process control,
+# then the destructive resets, then the timings, then two clearly separated
+# sections for tap-holds and for chords.
+#
+# That split is the point. The menu used to run the two families together under
+# one heading, and the request was to tell them apart the way Windows does: a
+# section header each, with the Karabiner-wide controls above both rather than
+# buried among them.
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_status"
 platforms = ["hs"]
 
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "command"
+id = "karabiner_clear_all"
+i18n = "menu.karabiner.clear_all"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "command"
+id = "karabiner_restore_defaults"
+i18n = "menu.karabiner.restore_defaults"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "command"
+id = "karabiner_copy_tap_to_combo"
+i18n = "menu.karabiner.copy_tap_to_combo"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_delays"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_tap_holds"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "section_header"
+i18n = "menu.karabiner.header_shortcuts"
+platforms = ["hs"]
+
+[[menu.karabiner_menu]]
+type = "list"
+id = "karabiner_shortcuts"
+platforms = ["hs"]
+
+# The LLM submenu.
+#
+# It did not exist. `llm` has been a top-level row on all three drivers since
+# the feature shipped, and each driver built the submenu beneath it by hand —
+# so `[sections.llm]` and its six subsections described capabilities with no
+# manifest rows behind them, and there was nowhere to declare a control without
+# also writing it three times.
+#
+# The two `list` rows are Linux's. Their contents are the models the machine
+# actually has and the values the user has chosen, which no static entry can
+# enumerate, and a `list` is what puts them in the shared renderer instead of in
+# each driver. They say `platforms = ["linux"]` since 2026-08-07: the paragraph
+# below has claimed since the day it was written that they were "restricted to
+# linux", and they never carried the restriction — so the manifest promised
+# macOS and Windows two rows neither has ever drawn, which is precisely the
+# failure this file exists to prevent.
+#
+# The eight `dynamic` rows are what macOS and Windows draw. They lived in a
+# SECOND shared file (_shared/modules/llm/menu_layout.json) with its own reader
+# on each of those two drivers, so one menu had two shared descriptions and
+# neither mentioned the other. That file is retired; its row order, its
+# disabled-when-off policy and its health-dot flag are these rows' fields. They
+# stay `dynamic` because their submenus read Win32 and hs state — see the
+# investigation below, which this change does not overturn: what moves here is
+# the DESCRIPTION of the menu, not its rendering.
+#
+# WHY macOS AND WINDOWS ARE NOT SIMPLY MOVED ONTO IT (investigated 2026-08-06):
+# The macOS LLM menu is 7 578 lines across 21 files, and almost all of it is
+# MLX model management — HuggingFace downloads, a local inference server,
+# per-model state — for an engine that exists only on Apple Silicon and already
+# carries its own restriction below. There is no manifest description of that;
+# it is an application, not a menu.
+#
+# The small overlapping part does not port either, and the reason is a platform
+# constraint rather than an omission. macOS sets the temperature through a
+# free-text numeric dialog (`generic_numeric_prompt`, bounds 0.0–1.0); the Linux
+# tray has no text input at all, which is why it offers presets. Declaring one
+# shared row would force one of those shapes onto the other, and on macOS that
+# means REMOVING the free-text entry — a downgrade dressed as convergence.
+#
+# What IS shared is the SETTING, and it already is: `llm.generation.temperature`
+# and `llm.generation.context_length` are declared for all three drivers, with
+# one default. The control differs because the platforms differ, and that is
+# what per-platform rows are for. Moving macOS onto this tree is worth doing the
+# day its menu is decomposed; it is not a projection job.
+
+# `disabled_when_off` is the greying policy the retired spec owned: false means
+# the row stays usable while the feature is OFF, so the user can configure a
+# backend and a model before enabling anything. Everything else greys out.
+# `health_dot` marks the one row that carries the backend-reachability dot.
+# The IA master gate. Its two labels have been translated in twenty-one locales
+# since the menu was written and read by nobody — this driver glued " ✓" onto a
+# generic « Activé » instead, and the other two toggle from the tray parent, which
+# is a driver answer expressed by registering the command or not.
+[[menu.llm_menu]]
+type = "toggle"
+id = "llm_toggle"
+i18n_on = "menu.llm.toggle_disable"
+i18n_off = "menu.llm.toggle_enable"
+checked_when = ["llm_enabled"]
+category = "LLM"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_backend"
+i18n = "menu.llm.model_backend"
+disabled_when_off = false
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_model"
+i18n = "menu.llm.model_label"
+disabled_when_off = false
+health_dot = true
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "list"
+id = "llm_models"
+platforms = ["linux"]
+reason_key = "platform_reason.llm_lists_are_inline_on_linux"
+
+[[menu.llm_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_profile"
+i18n = "menu.profiles.profile_label_prefix"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_num_predictions"
+i18n = "menu.llm.num_predictions_label"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_trigger"
+i18n = "menu.llm.trigger_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_generation_settings"
+i18n = "menu.llm.generation_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "list"
+id = "llm_generation"
+platforms = ["linux"]
+reason_key = "platform_reason.llm_lists_are_inline_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_display"
+i18n = "menu.llm.display_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+[[menu.llm_menu]]
+type = "dynamic"
+id = "llm_navigation"
+i18n = "menu.llm.nav_menu_title"
+disabled_when_off = true
+health_dot = false
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+
+# The About submenu. Declared 2026-08-07; it had no description on any driver,
+# and the three carried the same shapes independently.
+#
+# The updater block and the releases link are ahk and hs only, and the reason is
+# already written for the top-level rows: Linux has its updater as its own
+# top-level entry (`updates_menu`), where the other two keep theirs under About.
+# The changelog is the one row all three share.
+[[menu.about_menu]]
+type = "list"
+id = "about_updates"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+
+[[menu.about_menu]]
+type = "---"
+platforms = ["ahk", "hs"]
+
+[[menu.about_menu]]
+type = "command"
+id = "about_changelog"
+i18n = "menu.about.changelog"
+
+[[menu.about_menu]]
+type = "command"
+id = "about_releases_page"
+i18n = "menu.about.open_releases_page"
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+
+# The Applications submenu. Declared 2026-08-07; it had no description at all,
+# and the two drivers that have it put different things under the same title.
+#
+# macOS lists the bundled applications it finds on disk and launches them.
+# Linux has no such bundles: its Applications menu is where per-application
+# hotstring configuration lives, beside a shortcut to the config folder. Two
+# concepts, one title — so two declarations with the reason written, rather than
+# one row pretending the drivers agree.
+[[menu.apps_menu]]
+type = "list"
+id = "apps_installed"
+platforms = ["hs"]
+reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
+
+[[menu.apps_menu]]
+type = "command"
+id = "apps_per_app_config"
+i18n = "menu.apps.config_per_app"
+platforms = ["linux"]
+reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
+
+[[menu.apps_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.apps_menu]]
+type = "command"
+id = "apps_config_folder"
+i18n = "menu.global.config_folder"
+platforms = ["linux"]
+reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
+
+# The language selector. It had no declaration of any kind: three drivers each
+# listed the same twenty-one locales from the same shared catalogue, and nothing
+# described the menu they were listing them into.
+#
+# All three. It was very nearly declared for two, because Windows draws a flag
+# ICON on each row and a shared row carried a label, a tick, an action and a
+# submenu — not an icon. Restricting it would have bought a shared declaration
+# with that driver's flags. The row contract gained an optional `icon` instead:
+# the driver that can draw one does, the two that cannot ignore the field, and
+# the menu is described once.
+[[menu.language_menu]]
+type = "list"
+id = "locales"
+
+# The updates submenu — Linux is the only driver with an in-app updater surface
+# at top level; the other two carry theirs under "about". Same reasoning as the
+# kanata block above for why this is a `list`: its rows are the current version,
+# the channel the user picked and the interval presets, none of which a static
+# entry can enumerate, and a `list` is what puts them in the renderer rather than
+# in the driver.
+[[menu.updates_menu]]
+type = "list"
+id = "updates_actions"
+platforms = ["linux"]
+
+[[menu.global_actions]]
+type = "command"
+id = "enable_all"
+i18n = "menu.global.enable_all"
+
+[[menu.global_actions]]
+type = "command"
+id = "disable_all"
+i18n = "menu.global.disable_all"
+
+[[menu.global_actions]]
+type = "---"
+
+[[menu.global_actions]]
+type = "command"
+id = "reset_defaults"
+i18n = "menu.global.reset_defaults"
+
+# These four carried an id and nothing else until 2026-08-07 — no type, no label
+# key — so every driver that drew one spelled its label out in its own source.
+# They are `command` now, like the four rows below them, and the label is the
+# manifest's. macOS reads only the id from this array, so the added type changes
+# nothing there.
 [[menu.debug_menu]]
+type = "command"
+id = "window_spy"
+i18n = "menu.debug.window_spy"
+platforms = ["ahk"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+[[menu.debug_menu]]
+type = "command"
+id = "list_vars"
+i18n = "menu.debug.list_vars"
+platforms = ["ahk"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+[[menu.debug_menu]]
+type = "command"
+id = "key_history"
+i18n = "menu.debug.key_history"
+platforms = ["ahk"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+[[menu.debug_menu]]
+type = "command"
+id = "console"
+i18n = "menu.debug.console"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+# `type` AND `id` on the separators: the shared renderer keys on the type, and
+# both driver-side loaders that predate it key on the id.
+[[menu.debug_menu]]
+type = "---"
 id = "---"
 
 [[menu.debug_menu]]
+type = "list"
 id = "log_level"
 
 [[menu.debug_menu]]
+type = "command"
 id = "open_logs"
+i18n = "menu.debug.open_logs"
 
 [[menu.debug_menu]]
+type = "command"
 id = "open_today_log"
+i18n = "menu.debug.open_today_log"
 
 [[menu.debug_menu]]
+type = "command"
 id = "open_error_log"
+i18n = "menu.debug.open_error_log"
 
 [[menu.debug_menu]]
+type = "---"
 id = "---"
 
 [[menu.debug_menu]]
+type = "command"
 id = "healthcheck"
+i18n = "menu.debug.healthcheck"
 
 [[menu.shortcuts_menu]]
 type = "toggle"
+id = "shortcuts_toggle"
 i18n_on = "menu.shortcuts.on"
 i18n_off = "menu.shortcuts.off"
+checked_when = ["shortcuts_enabled"]
 category = "Shortcuts"
 
 [[menu.shortcuts_menu]]
 type = "feature"
-path = "ahk.shortcuts.screen_instant"
+path = "shortcuts.screen_instant"
 platforms = ["ahk"]
-
+reason_key = "platform_reason.chord_families_are_each_platforms"
 [[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.wrap_text_if_selected"
 
+# The wrap-symbol picker. Declared platforms = ["ahk"] until 2026-08-06, and all
+# three drivers had been building it the whole time: macOS in
+# build_wrap_symbols_submenu, Linux in menu_builder's wrap_items. The restriction
+# recorded who wrote it first rather than what the platforms can do — the third
+# time this exact shape has been found in this manifest.
+#
+# `list`, because the rows are the user's own symbol pairs and no static entry
+# can enumerate them. Making it a row of its own also settles WHERE it hangs:
+# Windows and Linux showed it as a sibling row, macOS as a submenu of the
+# wrap-text toggle, so the same feature sat in two different places.
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "wrap_symbols_menu"
-platforms = ["ahk"]
+
+# The selection operations this driver performs on the current X11 selection —
+# CapsWord, the three case transforms, select word, select line, paste without
+# formatting. Declared 2026-08-07; they were built by hand in
+# linux/ui/menu/menu_builder.lua and described nowhere, so no gate could see
+# seven rows of a shared menu.
+#
+# A `list` rather than seven `command` rows because the set is one block with one
+# provider behind it, and because a `list` is what carries the rows themselves
+# out of the driver.
+#
+# Restricted to linux, with the reason attached, because the same operations are
+# reached differently elsewhere: macOS binds them to ctrl chords and lists them
+# under `ctrl_shortcuts`, and Windows exposes its own combinations under
+# `modifier_combos`. Declaring one shared row would put a second copy of these
+# operations in two menus that already have them.
+[[menu.shortcuts_menu]]
+type = "section_header"
+i18n = "menu.shortcuts.header_selection"
+platforms = ["linux"]
+reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
+
+[[menu.shortcuts_menu]]
+type = "list"
+id = "selection_operations"
+platforms = ["linux"]
+reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
+
+[[menu.shortcuts_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.shortcuts_menu]]
+type = "list"
+id = "keyboard_slots"
+# The configurable keyboard-shortcut groups. A "list" rather than a "group"
+# because there are several of them and their contents are the user's own
+# assignments, which no static entry can enumerate; the driver supplies the rows
+# as data and the renderer draws them, so no menu row is built outside it.
+#
+# Both drivers render it from here. The Windows driver used to splice the same
+# groups in with a Menu.Insert sequence that had already duplicated them once
+# per updater refresh; a list entry cannot, because the renderer builds the menu
+# fresh every time.
+#
+# Restricted on 2026-08-05 because Linux had no slot-binding surface at all:
+# modules/shortcuts/manager.lua was toggles, selection transforms and wrap
+# pairs, with no chord capture, no assignment store, and nothing for a list to
+# enumerate. The note beside it said widening this again was a feature job
+# rather than a projection job.
+#
+# Widened on 2026-08-06 because that feature job was done. The hook now reports
+# which key a modified keystroke was rather than the bare string "shortcut",
+# modules/shortcuts/keyboard_shortcuts.lua owns the slot space and the
+# assignments, and the menu answers this row from them. Matching happens in the
+# daemon rather than the kernel — there is no userland API on Linux to reserve a
+# chord — which is why nothing is bound by default there.
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.shortcuts_menu]]
 type = "group"
 id = "modifier_combos"
 i18n = "menu.shortcuts.group_modifiers"
 platforms = ["ahk"]
-
+reason_key = "platform_reason.chord_families_are_each_platforms"
 [[menu.shortcuts_menu]]
 type = "group"
 id = "ctrl_shortcuts"
 i18n = "menu.shortcuts.submenu_ctrl"
 platforms = ["hs"]
-
+reason_key = "platform_reason.chord_families_are_each_platforms"
 [[menu.shortcuts_menu]]
 type = "group"
 id = "cmd_shortcuts"
 i18n = "menu.shortcuts.submenu_cmd"
 platforms = ["hs"]
-
+reason_key = "platform_reason.chord_families_are_each_platforms"
+# `list` since 2026-08-08: the handler's whole body was one row with a static
+# label whose submenu another subsystem builds, which is what a provider
+# returning a single `submenu` row says.
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "script_control_shortcuts"
+
+# AHK-only, on the same evidence as personal_shortcuts below: the four
+# features.shortcuts.script_control entries this row lists are each Windows-only,
+# so on macOS and Linux it had nothing to enumerate.
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.shortcuts_menu]]
 type = "dynamic"
@@ -2849,80 +3428,166 @@ id = "personal_shortcuts"
 # introspectable), so there is no equivalent registry to render here — the
 # macOS "edit_shortcuts" action below already covers "open the file to edit".
 platforms = ["ahk"]
-
+reason_key = "platform_reason.chord_families_are_each_platforms"
+# `command` since 2026-08-08, not `action`: the handler's whole body was one row
+# with a static label and a click, which is exactly what a declaration carries.
 [[menu.shortcuts_menu]]
-type = "action"
+type = "command"
 id = "edit_shortcuts"
+# "Open the personal shortcuts file." macOS has one — infra/personal_shortcuts.lua,
+# resolved through config_paths PersonalShortcutsLuaPath — and Windows has
+# personal_shortcuts.ahk. Linux has no personal shortcuts file at all: its
+# shortcuts module is toggles and selection transforms, with nothing on disk
+# for the user to edit.
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.no_personal_shortcuts_file_on_linux"
 i18n = "menu.global.edit_shortcuts"
 
+# `list` since 2026-08-07: one row per installed extension that ships a shortcuts
+# menu, behind its own separator and header. All three drivers walked the same
+# extensions directory and built the same three shapes by hand, because `dynamic`
+# hands the id straight back. The submenu under each extension is still the
+# driver's — it is whatever that extension's own menu file declares.
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "extensions_shortcuts"
+# One submenu per installed extension that ships shortcuts/menu.lua (menu.ahk on
+# Windows). All three drivers walk the extensions tree, load each file in a
+# sandbox and render what the extension collects.
+#
+# This carried platforms = ["ahk"] with the reason "neither Lua driver has that
+# concept", which was false for both: macOS has done it since
+# ui/menu/menu_shortcuts.lua:543 was written, and Linux since 2026-08-05
+# (ui/menu/menu_builder.lua, _extension_shortcut_rows). The restriction survived
+# a correction attempt because Linux's shortcuts menu was hand-rolled and could
+# not render any row BY ID, so widening it would have made the manifest promise
+# something the handler-bijection ratchet would flag. That menu now dispatches
+# through the shared renderer, which is what let the restriction go.
 
 [[menu.modifier_combos_group]]
 type = "feature"
-path = "ahk.shortcuts.alt_gr_lalt"
+path = "shortcuts.alt_gr_lalt"
+group_label = "AltGrLAlt"
 platforms = ["ahk"]
 
 [[menu.modifier_combos_group]]
 type = "feature"
-path = "ahk.shortcuts.alt_gr_caps_lock"
+path = "shortcuts.alt_gr_caps_lock"
+group_label = "AltGrCapsLock"
 platforms = ["ahk"]
 
 [[menu.modifier_combos_group]]
 type = "feature"
-path = "ahk.shortcuts.lalt_caps_lock"
+path = "shortcuts.lalt_caps_lock"
+group_label = "LAltCapsLock"
 platforms = ["ahk"]
 
+# Every driver DRAWS this toggle; only macOS may declare it, and the difference
+# is the two renderers rather than the feature. The AHK renderer materialises a
+# `toggle` row (infra/manifest_menu.ahk, _MR_RenderToggle) while the shared Lua
+# one skips it by contract and leaves it to the caller. So an unrestricted
+# declaration gives Windows a SECOND toggle beside the one menu_metrics.ahk
+# already builds — which is what tests/meta/test_menu_metrics_disabled_when.ahk
+# was written to prevent, and what it caught when this restriction was briefly
+# lifted on 2026-08-07.
+# The row exists wherever a driver registers a command for it: macOS toggles
+# metrics from the tray parent and registers none, Linux cannot and does. The
+# platforms list was recording which driver BUILT it, which is the driver's
+# answer rather than the manifest's.
 [[menu.metrics_menu]]
 type = "toggle"
+id = "metrics_toggle"
 i18n_on = "menu.metrics.on"
 i18n_off = "menu.metrics.off"
+checked_when = ["keylogger_enabled"]
 category = "Metrics"
-platforms = ["hs"]
+# ahk is excluded and must stay excluded: that driver builds this row itself in
+# BuildMetricsMenu (AddCategoryToggleItem), so an unrestricted declaration makes
+# its renderer draw a SECOND, non-functional master row. Linux joined the list on
+# 2026-08-08 — it registers a `metrics_toggle` command, which is what asks the
+# shared renderer for the row.
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
 
+# `command` since 2026-08-07. These two are buttons: a label, a greying rule and
+# a click. `action` hands the id back, so all three drivers built the same row
+# three times from a declaration that already carried both.
 [[menu.metrics_menu]]
-type = "action"
+type = "command"
 id = "show_typing"
 i18n = "menu.metrics.show_typing"
 disabled_when = ["keylogger_enabled"]
 
+# `list` since 2026-08-07, not `action`/`dynamic`: each of these three rows
+# carries a label built from runtime state — the shortcut currently assigned, the
+# number of excluded apps — so no static i18n key can express it. A provider that
+# returns ONE row is still the renderer drawing it, which is the difference that
+# matters: the driver answers what the row says and the renderer decides what a
+# row looks like.
 [[menu.metrics_menu]]
-type = "action"
+type = "list"
 id = "shortcut_typing"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
 disabled_when = ["keylogger_enabled"]
-
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 
 [[menu.metrics_menu]]
-type = "action"
+type = "command"
 id = "show_apps"
 i18n = "menu.metrics.show_apps"
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "action"
+type = "list"
 id = "shortcut_apps"
 i18n_dynamic = "menu.metrics.shortcut_prefix"
 disabled_when = ["keylogger_enabled"]
-
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 
+# `check` since 2026-08-07: a checkbox whose label, tick and greying are all in
+# the declaration, so this driver supplies only the toggle and the state behind
+# the tick. It was `dynamic`, which hands the id back and had the driver build a
+# checkbox the renderer already knows how to draw.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "wpm_menubar"
+i18n = "menu.metrics.show_wpm_menubar"
+checked_when = ["metrics_menubar_wpm"]
 platforms = ["hs"]
 disabled_when = ["keylogger_enabled"]
-
+reason_key = "platform_reason.wpm_readout_is_a_macos_menubar_item"
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "menubar_colors"
+i18n = "menu.metrics.colors_by_source"
+checked_when = ["metrics_menubar_colors"]
 platforms = ["hs"]
 disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
+reason_key = "platform_reason.wpm_readout_is_a_macos_menubar_item"
 
+# Linux joined on 2026-08-06. The restriction was accurate when written — that
+# driver had no floating widget at all — and is not any more: ui/wpm/widget.lua
+# draws the same pill on the GTK surface the preview bubble already uses, and
+# reads its geometry and colours from _shared/modules/wpm_widget/constants.toml
+# rather than mirroring them the way the other two do.
+# `dynamic` ON PURPOSE, and this note exists because the obvious change is
+# wrong. These two are checkboxes, so `check` looks like the right type — the
+# menubar pair above became exactly that on 2026-08-07. It does not port here.
+#
+# The Windows handlers mutate the LIVE menu when clicked (Menu.ToggleCheck,
+# Enable/Disable on the two dependent rows) instead of rebuilding the tray, which
+# is what keeps a click on this row from costing a full tray rebuild. A `check`
+# row is drawn by the renderer, so its tick would not move until the next
+# rebuild: either the feedback regresses, or every click pays for a rebuild.
+#
+# The row stays `dynamic` on all three rather than splitting into two
+# declarations, which is the duplication this file spent the day removing.
 [[menu.metrics_menu]]
 type = "dynamic"
 id = "wpm_widget"
@@ -2937,12 +3602,18 @@ disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 type = "dynamic"
 id = "include_realtime"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
-
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.metrics_extras_are_not_on_linux"
+# `command` since 2026-08-07: a button with a label, a greying rule and a click.
+# Its two neighbours stay `dynamic` for the reason written above wpm_widget —
+# they mutate the live menu — but this one sets nothing on it.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "command"
 id = "reset_wpm_position"
+i18n = "menu.metrics.reset_wpm_position"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
-
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 
@@ -2951,64 +3622,202 @@ type = "section_header"
 i18n = "menu.metrics.privacy_header"
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "filter_private"
+i18n = "menu.metrics.filter_private"
+checked_when = ["metrics_filter_private"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "filter_secure"
+i18n = "menu.metrics.filter_secure"
+checked_when = ["metrics_filter_secure"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "filter_sysauth"
+i18n = "menu.metrics.filter_sysauth"
+checked_when = ["metrics_filter_sysauth"]
 disabled_when = ["keylogger_enabled"]
 
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "list"
 id = "exclude_apps"
 disabled_when = ["keylogger_enabled"]
-
+platforms = ["ahk", "hs"]
+reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 
+# `check` since 2026-08-07, and the conversion settled a divergence nobody could
+# see: this row read "Encrypt logs on disk (Security)" on Windows and macOS and
+# "Encrypt data at rest" on Linux. Two labels for one switch, because each driver
+# picked its own key from a declaration that named neither.
+#
+# `menu.metrics.encrypt_toggle` wins because it says WHAT is encrypted — the logs
+# on disk — where the other names a category. `checked_when` closes the second
+# half of the same gap: the row had no predicate, so all three computed the tick
+# themselves, which the Linux builder had a comment apologising for.
 [[menu.metrics_menu]]
-type = "dynamic"
+type = "check"
 id = "encryption"
-platforms = ["hs"]
+i18n = "menu.metrics.encrypt_toggle"
+checked_when = ["metrics_encrypt_enabled"]
 disabled_when = ["keylogger_enabled"]
 
+# The readouts this driver answers in its log rather than in a window. They are
+# Linux's own — macOS and Windows open a metrics WINDOW for the same figures —
+# and until 2026-08-06 they were built in menu_builder.lua with nothing
+# describing them. A driver-specific row is fine; a driver-specific row nobody
+# declared is a row no gate can compare, reason about or find.
+
+[[menu.metrics_menu]]
+type = "---"
+platforms = ["linux"]
+
+# Three rows stood here until 2026-08-07 — "Session statistics", "Current WPM"
+# and "Per-application statistics" — and each one's entire effect was a line in
+# the driver's log. Their labels promised figures the user never saw. The same
+# menu already opens the windows that hold them: "Show typing metrics" and "Show
+# time per application" are declared above for all three drivers, and the WPM
+# widget toggle shows the live rate. They were removed rather than pointed at
+# those windows, which would have given this menu two rows opening one window.
+
+# Ticked from the keylogger's own suppression state. It used to glue a " ✓" onto
+# the label, which puts one platform's convention inside a string twenty other
+# languages also read — and bypasses the tray's native check item.
+[[menu.metrics_menu]]
+type = "check"
+id = "metrics_suspend"
+i18n = "menu.global.suspend"
+checked_when = ["metrics_suppressed"]
+platforms = ["linux"]
+reason_key = "platform_reason.metrics_collection_is_in_process_on_linux"
+
+[[menu.metrics_menu]]
+type = "command"
+id = "metrics_reset_session"
+i18n = "menu.metrics.reset_session"
+platforms = ["linux"]
+reason_key = "platform_reason.metrics_collection_is_in_process_on_linux"
+
+
+# The at-rest migration readout. Converting a year of stored rows takes minutes,
+# and without this row the user ticks « chiffrer au repos » and sees nothing
+# happen at all — so it reports progress and offers to stop. Linux's alone: it is
+# the driver that migrates in the background rather than on the next launch.
+#
+# A `list` because its label IS the progress — "n / total" — which no static
+# declaration can spell.
+[[menu.metrics_menu]]
+type = "list"
+id = "metrics_migration"
+platforms = ["linux"]
+reason_key = "platform_reason.only_linux_migrates_in_the_background"
 [[menu.layout_menu]]
 type = "toggle"
+id = "layout_toggle"
 i18n_on = "menu.layout.on"
 i18n_off = "menu.layout.off"
+checked_when = ["layout_enabled"]
 category = "Layout"
 
+# The two blocks macOS alone has. It installs a .bundle keyboard layout through
+# TIS — the OS's own input-source mechanism, with a user scope and a system scope
+# — and it draws a menubar icon whose variant the user picks. Neither concept
+# exists on the other two drivers: Windows installs a .klc through its own
+# installer and Linux generates a kanata layout, and neither has a menubar.
+#
+# Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
+# nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
+# and nothing to compare them against.
+# The base layout the Linux keyboard hook decodes keycodes with. Declared
+# 2026-08-07; the rows were two names written into menu_builder.lua while the
+# driver already owned the list — input_reader.get_layouts() is the table the
+# decoder itself uses, and a menu that enumerates it by hand goes stale the day a
+# third table is added.
+#
+# linux only, because the concept is this driver's: it reads raw evdev keycodes
+# and needs to know which physical layout produced them. macOS asks the system
+# for its input sources and Windows installs a .klc; neither has a decode table
+# to choose.
 [[menu.layout_menu]]
-type = "dynamic"
+type = "list"
+id = "base_layouts"
+platforms = ["linux"]
+reason_key = "platform_reason.base_layout_is_the_linux_decode_table"
+
+[[menu.layout_menu]]
+type = "list"
+id = "layout_bundle"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
+[[menu.layout_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.layout_menu]]
+type = "list"
+id = "layout_logo"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
+[[menu.layout_menu]]
+type = "---"
+platforms = ["hs"]
+
+# `list` rather than `dynamic` since 2026-08-07: the driver answers with row
+# DATA and the renderer materialises it, where a `dynamic` handler was handed the
+# menu object and built the rows itself.
+[[menu.layout_menu]]
+type = "list"
 id = "layout_features_base"
+
+# AHK-only, and the FEATURE manifest already said so. This row enumerates
+# features.layout.*, and all five of those entries are Windows-only
+# (ergopti_base, direct_access_digits, ergopti_alt_gr, ergopti_plus,
+# ctrl_magic_save). On the two Lua drivers it enumerated an empty set, so
+# the manifest promised a row neither of them could ever draw.
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.layout_menu]]
 type = "group"
 id = "accented_letters"
 i18n = "menu.shortcuts.group_accented"
 platforms = ["ahk"]
-
+reason_key = "platform_reason.lists_windows_only_settings"
 [[menu.layout_menu]]
 type = "---"
 
 [[menu.layout_menu]]
-type = "dynamic"
+type = "list"
 id = "layout_features_altgr"
 
-[[menu.layout_menu]]
-type = "dynamic"
-id = "active_layouts"
-platforms = ["hs"]
+# Same evidence as layout_features_base above: every features.layout.* entry
+# it would list is Windows-only.
+platforms = ["ahk"]
+reason_key = "platform_reason.lists_windows_only_settings"
 
 [[menu.layout_menu]]
+type = "list"
+id = "active_layouts"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+[[menu.layout_menu]]
 type = "---"
+
+# Which layout to switch to when the driver pauses and when it resumes. macOS's
+# alone, and for the same reason as the two blocks above: the choices are the
+# system's input sources.
+[[menu.layout_menu]]
+type = "list"
+id = "layout_switching"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
 [[menu.layout_menu]]
 type = "feature"
@@ -3017,9 +3826,9 @@ i18n = "menu.layout.replace"
 
 [[menu.layout_menu]]
 type = "feature"
-path = "ahk.layout.ctrl_magic_save"
+path = "layout.ctrl_magic_save"
 platforms = ["ahk"]
-
+reason_key = "platform_reason.lists_windows_only_settings"
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_grave"
@@ -3042,8 +3851,10 @@ platforms = ["ahk"]
 
 [[menu.hotstrings_menu]]
 type = "toggle"
+id = "hotstrings_toggle"
 i18n_on = "menu.hotstrings.on"
 i18n_off = "menu.hotstrings.off"
+checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
 
 [[menu.hotstrings_menu]]
@@ -3052,8 +3863,14 @@ id = "hotstrings_params"
 i18n = "menu.hotstrings.params"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
-id = "hotstring_bulk_actions"
+type = "command"
+id = "hotstrings_enable_all"
+i18n = "menu.hotstrings.enable_all"
+
+[[menu.hotstrings_menu]]
+type = "command"
+id = "hotstrings_disable_all"
+i18n = "menu.hotstrings.disable_all"
 
 [[menu.hotstrings_menu]]
 type = "---"
@@ -3063,11 +3880,11 @@ type = "section_header"
 i18n = "menu.hotstrings.header_common"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_categories_standard"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_categories_dynamic"
 
 [[menu.hotstrings_menu]]
@@ -3078,7 +3895,7 @@ type = "section_header"
 i18n = "menu.hotstrings.header_ergopti"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_categories_ergopti"
 
 [[menu.hotstrings_menu]]
@@ -3089,7 +3906,7 @@ type = "section_header"
 i18n = "menu.hotstrings.personal_header"
 
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_personal"
 
 [[menu.hotstrings_menu]]
@@ -3099,126 +3916,259 @@ type = "---"
 type = "section_header"
 i18n = "menu.extensions.header"
 
+# Unrestricted since 2026-08-04. The old "ahk" restriction said the row "scans a
+# Windows extensions directory", which described the reader and not the feature:
+# the directory is static/ergopti_plus/extensions, it is part of this repository,
+# it ships to all three drivers, and the demo extension in it has carried a
+# shortcuts/menu.lua beside its menu.ahk since it was written. The format was
+# cross-platform from the start and only AHK had a scanner. Both Lua drivers now
+# read it through _shared/lua/hotstrings/extensions.lua.
 [[menu.hotstrings_menu]]
-type = "dynamic"
+type = "list"
 id = "hotstring_extensions"
 
+
+# Reloading the catalogue from disk, and Linux's alone: it is the only driver
+# whose hotstrings can change under it without a restart — the daemon watches the
+# TOMLs — so the other two have nothing to offer here. Declared with the reason
+# rather than appended unannounced at the end of the submenu, which is where it
+# lived until 2026-08-08.
+[[menu.hotstrings_menu]]
+type = "---"
+platforms = ["linux"]
+
+[[menu.hotstrings_menu]]
+type = "command"
+id = "hotstrings_reload"
+i18n = "menu.global.reload"
+platforms = ["linux"]
+reason_key = "platform_reason.only_linux_rereads_its_catalogue"
 [[menu.hotstrings_params_group]]
-type = "dynamic"
+type = "list"
 id = "word_expanders"
 
+# `list` since 2026-08-07, the last row of this group to move. It opens the
+# settings window and offers the per-category delays beside it — the same rows on
+# all three drivers, built three times because `action` hands the id back.
 [[menu.hotstrings_params_group]]
-type = "action"
+type = "list"
 id = "delays_colors"
 i18n = "menu.hotstrings.delays_colors"
 
 [[menu.hotstrings_params_group]]
 type = "---"
 
+# Unrestricted since 2026-08-04. The "Linux has no way to change the key from its
+# menu at all" was accurate — every Linux reader called
+# ManifestReader.default_for, which is the shipped DEFAULT and never a user's
+# choice — and a declared gap closes by writing the feature, not by widening the
+# declaration over an absence. modules/hotstrings/magic_key.lua now owns the
+# value: one reader, one writer, validated (exactly one codepoint, and not a
+# character common in prose) and persisted.
+# `list` since 2026-08-07. The row shows the current magic key and opens a
+# dialog to change it, with a reset row beneath when the key has been
+# customised — two rows, built three times, from a declaration that named only
+# the slot. A `list` returns them as data and the renderer places them.
 [[menu.hotstrings_params_group]]
-type = "dynamic"
+type = "list"
 id = "magic_key_config"
 
+# The four preview-bubble toggles, declared here on 2026-08-05. They were the
+# only part of the hotstrings surface that no manifest row described: macOS built
+# the submenu by hand and Linux built nothing, while
+# `features.hotstrings.preview_*` had declared all four for BOTH drivers since
+# they were written. So the manifest promised the features and described no way
+# to reach them, and on Linux there was none — ui/tooltip/preview.lua honoured
+# its four switches and nothing ever called set_enabled, leaving them stuck at
+# their load-time value for the life of the process.
+#
+# Restricted to the two Lua drivers because the AHK tooltip is a different
+# surface with its own controls, not because Windows is behind.
 [[menu.hotstrings_params_group]]
-type = "dynamic"
-id = "repeat_key"
-platforms = ["ahk"]
+type = "---"
+platforms = ["hs", "linux"]
 
+# `list` since 2026-08-07. The row and the toggles under it are the same on both
+# Lua drivers — the same four switches, the same separator before the one that
+# governs appearance rather than presence — and each built the whole tree itself
+# because `dynamic` hands the id straight back. The provider returns the data
+# and the renderer builds the rows.
+[[menu.hotstrings_params_group]]
+type = "list"
+id = "preview_bubbles"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.preview_bubbles_are_lua_previews"
+
+# Unrestricted with the feature above, and for the same reason: macOS built this
+# row by hand while the manifest said it was Windows-only, which is why the
+# handler-bijection ratchet counted it as one of the rows macOS never wired.
+# `check` since 2026-08-07, and it was three copies of one checkbox before that.
+# Each driver built the row, its label and its tick — AutoHotkey with
+# RegisterMenuItem + M.Check, macOS and Linux each with their own table — from a
+# declaration that named only the slot. One declaration draws it on all three
+# now, and each driver supplies just the toggle and the state behind the tick.
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "repeat_key"
+i18n = "menu.hotstrings.repeat_key_toggle"
+checked_when = ["hotstrings_repeat_enabled"]
+
+# The "linux" values across this menu were added on 2026-08-04. Before them the
+# manifest projected exactly ONE row for Linux — a bare separator — while
+# _build_gestures in menu_builder.lua has always built a master toggle, both bulk
+# actions and every configurable slot. Same failure as kanata/updates/apps: the
+# manifest simply had no opinion about Linux, and an absent opinion reads as
+# "restricted elsewhere" rather than as the omission it was.
 [[menu.gestures_menu]]
+# Same asymmetry as the metrics toggle: Windows builds this row itself in
+# ui/menu/menu_gestures.ahk, and the AHK renderer would draw a second one from an
+# unrestricted declaration. No test guarded this one — the metrics test caught
+# the pair.
 type = "toggle"
+id = "gestures_toggle"
 i18n_on = "menu.gestures.on"
 i18n_off = "menu.gestures.off"
+checked_when = ["gestures_enabled"]
 category = "Gestures"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
 
+# `command` since 2026-08-07: the handler's whole body was one row with a static
+# label, which is what a declaration already expresses.
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "auto_configure"
 i18n = "menu.gestures.auto_configure"
 platforms = ["ahk"]
-
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "manual_tutorial"
 i18n = "menu.gestures.manual_tutorial"
 platforms = ["ahk"]
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
 
+# `command` since 2026-08-07: the row, its label and its position are the
+# manifest's, and each driver supplies only what the click does. It was an
+# `action` before, which hands the id back and had all three building the same
+# two rows with the same two labels.
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "disable_all"
 i18n = "menu.gestures.disable_all"
-platforms = ["hs", "ahk"]
+platforms = ["hs", "ahk", "linux"]
 
 [[menu.gestures_menu]]
-type = "action"
+type = "command"
 id = "restore_defaults"
 i18n = "menu.gestures.restore_defaults"
-platforms = ["hs", "ahk"]
+platforms = ["hs", "ahk", "linux"]
 
 [[menu.gestures_menu]]
 type = "---"
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "check"
 id = "circular_spaces"
+i18n = "menu.gestures.circular_spaces"
+checked_when = ["gesture_space_wrap"]
+disabled_when = ["gestures_enabled"]
 platforms = ["hs"]
-
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_2"
 platforms = ["hs"]
-
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_3"
 platforms = ["hs"]
-
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_4"
 platforms = ["hs"]
-
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["hs"]
 
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_5"
 platforms = ["hs"]
-
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
+# `list` since 2026-08-07, matching what Linux already declared: the slot rows
+# carry a computed label — the slot and the action currently bound to it — so the
+# provider says what each row reads and the renderer draws it.
 [[menu.gestures_menu]]
-type = "dynamic"
+type = "list"
 id = "gesture_slots_ahk"
 platforms = ["ahk"]
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
+
+# One flat list rather than the per-finger-count groups macOS uses. The slots come
+# from gestures.DEFAULT_GESTURES, which is keyed by slot name and not by finger
+# count, so grouping would mean parsing the names back apart to regroup them.
+# A `list`, not a `dynamic`, since 2026-08-05: a dynamic handler appends its rows
+# inside the driver, so the manifest would name the slot while menu_builder.lua
+# still built all thirty-odd rows and their nested action pickers. A list provider
+# returns row DATA and the shared renderer materialises it.
+[[menu.gestures_menu]]
+type = "list"
+id = "gesture_slots_linux"
+platforms = ["linux"]
+reason_key = "platform_reason.touchpad_stack_is_per_driver"
+[[menu.gestures_menu]]
+type = "---"
+platforms = ["linux"]
+
+# Linux reads gestures from libinput, which macOS gets from the OS and Windows
+# does not have at all — so the reader is startable and stoppable here and the row
+# has no counterpart elsewhere. It was drawn with a hardcoded French label until
+# 2026-08-04, which every non-French user read in French, and it was in no
+# manifest, so no gate could see either fact.
+[[menu.gestures_menu]]
+type = "list"
+id = "gesture_reading_linux"
+platforms = ["linux"]
+reason_key = "platform_reason.libinput_reader_is_linux_only"
 
 [[menu.tap_holds_menu]]
 type = "toggle"
+id = "tapholds_toggle"
 i18n_on = "menu.tapholds.on"
 i18n_off = "menu.tapholds.off"
+checked_when = ["tapholds_enabled"]
 category = "TapHolds"
 platforms = ["ahk"]
 
+# `command` since 2026-08-07, not `action`. Both were handlers whose whole body
+# was "add a button, and log that the action just happened" — at MENU BUILD time,
+# so the log claimed every tap-hold override had been reset each time the user
+# opened the tray. The declaration draws the button now and the log moved to the
+# function that does the work.
 [[menu.tap_holds_menu]]
-type = "action"
+type = "command"
 id = "reset_defaults"
 i18n = "tap_hold.reset_defaults"
 platforms = ["ahk"]
 
 [[menu.tap_holds_menu]]
-type = "action"
+type = "command"
 id = "disable_all"
 i18n = "tap_hold.disable_all"
 platforms = ["ahk"]
@@ -3227,87 +4177,14 @@ platforms = ["ahk"]
 type = "---"
 platforms = ["ahk"]
 
+# `list` since 2026-08-07: one row per configurable key, each holding its
+# disable / tap-picker / hold-picker rows, and the hold picker holding its
+# options. The renderer builds all three levels from the provider's data.
 [[menu.tap_holds_menu]]
-type = "dynamic"
+type = "list"
 id = "tap_hold_keys"
 platforms = ["ahk"]
 
-[[menu.word_delimiter_defs]]
-char = " "
-i18n = "hs_config.delim_space"
-
-[[menu.word_delimiter_defs]]
-char = "\t"
-i18n = "hs_config.delim_tab"
-
-[[menu.word_delimiter_defs]]
-char = "."
-label = "."
-
-[[menu.word_delimiter_defs]]
-char = ","
-label = ","
-
-[[menu.word_delimiter_defs]]
-char = ";"
-label = ";"
-
-[[menu.word_delimiter_defs]]
-char = ":"
-label = ":"
-
-[[menu.word_delimiter_defs]]
-char = "?"
-label = "?"
-
-[[menu.word_delimiter_defs]]
-char = "!"
-label = "!"
-
-[[menu.word_delimiter_defs]]
-char = "'"
-label = "' (ASCII)"
-
-[[menu.word_delimiter_defs]]
-char = "’"
-label = "’ (typogr.)"
-
-[[menu.word_delimiter_defs]]
-char = "-"
-label = "-"
-
-[[menu.word_delimiter_defs]]
-char = "="
-label = "="
-
-[[menu.word_delimiter_defs]]
-char = "("
-label = "("
-
-[[menu.word_delimiter_defs]]
-char = ")"
-label = ")"
-
-[[menu.word_delimiter_defs]]
-char = "["
-label = "["
-
-[[menu.word_delimiter_defs]]
-char = "]"
-label = "]"
-
-[[menu.word_delimiter_defs]]
-char = "/"
-label = "/"
-
-[[menu.word_delimiter_defs]]
-char = "\\"
-label = "\\"
-
-[[menu.word_delimiter_defs]]
-char = "+"
-label = "+"
-
-[[menu.word_delimiter_defs]]
-char = "*"
-label = "*"
+# word_delimiter_defs (20 entries) lived here and was read by nobody on any
+# driver — not a duplicate, simply unreferenced. Its i18n keys are still in the
+# locale files because the hotstrings config window uses them directly.

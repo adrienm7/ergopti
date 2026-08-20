@@ -33,7 +33,7 @@
 local helpers = require("tests.helpers")
 
 --- Stubs lib.timings so the module loads without the real TOML registry.
-package.loaded["lib.timings"] = {
+package.loaded["infra.timings"] = {
 	sec = function(_section, _key) return 5.0 end,
 	ms  = function(_section, _key) return 5000 end,
 }
@@ -58,12 +58,13 @@ local function make_tooltip_stub()
 	local stub = { show_predictions_calls = 0 }
 	stub.show_predictions   = function(_preds, _idx, _ai, _info, _val, _indent, _nav, _tint, _loading, _slots)
 		stub.show_predictions_calls = stub.show_predictions_calls + 1
+		return true
 	end
-	stub.hide                = function() end
+	stub.hide                = function() return true end
 	stub.get_current_index   = function() return 1 end
 	stub.make_diff_styled    = function(_chunks, _nw) return true end
 	stub.tint                = function(_name) return {} end
-	stub.mark_chain_complete = function() end
+	stub.mark_chain_complete = function() return true end
 	return stub
 end
 
@@ -114,10 +115,12 @@ local function make_ctx(fetch_id, get_fetch_id_fn, is_streaming_multi)
 		build_info_bar_text        = function() return nil end,
 		resolve_backend_label      = function() return "mlx" end,
 		is_noise_pred              = function(_) return false end,
-		reset_llm_dismiss_timer    = function() end,
+		reset_llm_dismiss_timer    = function() return true end,
 		pending_predictions_ref    = { value = {} },
 		predictions_visible_ref    = { value = false },
-		is_ai_preview_enabled      = false,
+		-- A live handler is built only after prediction_engine's preview gate.
+		-- Model the reachable production success path, not a disabled surface.
+		is_ai_preview_enabled      = true,
 	}
 end
 
@@ -173,19 +176,21 @@ end
 
 helpers.describe("streaming_handler.on_success: reset ordered after the stale guard (source)", function()
 
-	helpers.it("_consecutive_llm_failures = 0 appears AFTER the fetch_id stale-guard return", function()
-		local path = helpers.driver_root() .. "modules/llm/streaming_handler.lua"
-		local fh   = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "modules/llm/streaming_handler.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+	helpers.it("_consecutive_llm_failures = 0 appears AFTER the current-request guard", function()
+		-- Selected by a declaration unique to modules/llm/streaming_handler.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function build_dedup_key")
+		helpers.assert_true(src ~= nil, "modules/llm/streaming_handler.lua source must be locatable")
 
 		local success_start = src:find("local function on_success", 1, true)
 		helpers.assert_true(success_start ~= nil, "on_success must be defined")
 
-		local stale_guard_pos = src:find("get_fetch_id() ~= my_fetch_id", success_start, true)
+		local stale_guard_pos = src:find("if not request_is_current() then", success_start, true)
 		local reset_pos       = src:find("_consecutive_llm_failures = 0", success_start, true)
 
-		helpers.assert_true(stale_guard_pos ~= nil, "on_success must check get_fetch_id() ~= my_fetch_id")
+		helpers.assert_true(stale_guard_pos ~= nil,
+			"on_success must reject a stale runtime or fetch generation before mutation")
 		helpers.assert_true(reset_pos ~= nil, "on_success must reset _consecutive_llm_failures")
 		helpers.assert_true(reset_pos > stale_guard_pos,
 			"the failure-counter reset must appear AFTER the stale-guard check (D4 fix)")
@@ -196,11 +201,11 @@ end)
 
 
 
--- ================================================================
+-- =============================================================
 -- =============================================================
 -- ======= 2/ on_success stale-guard and failure-counter =======
 -- =============================================================
--- ================================================================
+-- =============================================================
 
 helpers.describe("streaming_handler.on_success: stale guard + failure counter (D4, real closure)", function()
 

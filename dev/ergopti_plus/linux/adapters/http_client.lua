@@ -109,7 +109,8 @@ function M.post(url, headers, body, callback)
 		if resp_fh then resp_fh:close() end
 
 		local is_ok  = status >= 200 and status < 300
-		local err_msg = is_ok and nil or string.format("HTTP %d", status)
+		local err_msg = nil
+		if not is_ok then err_msg = string.format("HTTP %d", status) end
 
 		if type(callback) == "function" then
 			pcall(callback, { ok = is_ok, status = status, body = resp_body, error = err_msg })

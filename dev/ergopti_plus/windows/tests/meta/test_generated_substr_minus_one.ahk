@@ -4,7 +4,7 @@
 ; MODULE: Hotstring Engine SubStr(-1) Guard
 ; DESCRIPTION:
 ; Static source guard for the SubStr(-0) tail-char bug in the live custom
-; hotstring engine (lib/hotstrings/hotstring_engine_main.ahk).
+; hotstring engine (infra/hotstrings/hotstring_engine_main.ahk).
 ;
 ; ROOT CAUSE ENCODED:
 ; SubStr(s, -0) is equivalent to SubStr(s, 0), which in AHK v2 returns the full
@@ -40,14 +40,14 @@ _TGS_StripLineComments(Src) {
 
 
 
-; =============================================================
+; =========================================================
 ; =========================================================
 ; ======= 1/ Hotstring engine SubStr(-1) tail guard =======
 ; =========================================================
-; =============================================================
+; =========================================================
 
 _TGS_EngineSubstrMinusOne() {
-	Src := _TGS_StripLineComments(_TGS_ReadSource("lib/hotstrings/hotstring_engine_main.ahk"))
+	Src := _TGS_StripLineComments(_TGS_ReadSource("infra/hotstrings/hotstring_engine_main.ahk"))
 	Assert(Src != "", "hotstring_engine_main.ahk must be readable")
 
 	; The fix: last character of the trigger is extracted with SubStr(Trigger, -1)

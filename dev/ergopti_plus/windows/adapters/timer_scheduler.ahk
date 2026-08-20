@@ -45,6 +45,10 @@ _TimerAdapterNextId() {
 	return _TIMER_ADAPTER_NEXT_ID
 }
 
+_TimerAdapterSetNative(BoundFn, IntervalMs) {
+	SetTimer(BoundFn, IntervalMs)
+}
+
 
 
 
@@ -67,7 +71,8 @@ _TimerAdapterNextId() {
 ; @return {Map}  Opaque cancellation handle.
 TimerAfter(DelaySec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
-	Handle := Map("Fn", 0, "Interval", 0, "Fired", false, "Id", _TimerAdapterNextId())
+	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
+		"Id", _TimerAdapterNextId(), "Kind", "after")
 	; Convert seconds to the negative milliseconds AHK uses for one-shot timers.
 	Ms := -Round(DelaySec * 1000)
 	; AHK v2 treats SetTimer(fn, 0) as cancel, not immediate-one-shot; use -1 ms
@@ -88,6 +93,48 @@ TimerAfter(DelaySec, Fn) {
 	return Handle
 }
 
+; Re-arms an existing one-shot handle with the same callback. This is the
+; allocation-free counterpart to cancel()+after() for hot-path debouncers: the
+; opaque handle, wrapper and captured callback keep their identity, while the OS
+; timer is restarted from now. A fired/cancelled handle may be restarted too.
+;
+; @param Handle   {Map}   Token returned by TimerAfter.
+; @param DelaySec {Float} New delay in seconds.
+; @return {Map} The same handle identity, now live again.
+TimerRestartAfter(Handle, DelaySec) {
+	global _TIMER_ADAPTER_REGISTRY
+	if !(Handle is Map) or !Handle.Has("Fn") or !Handle.Has("Id")
+		throw TypeError("TimerRestartAfter requires a TimerAfter handle.")
+	if Handle.Get("Kind", "") != "after"
+		throw TypeError("TimerRestartAfter cannot re-arm a repeating timer.")
+	BoundFn := Handle["Fn"]
+	if !HasMethod(BoundFn, "Call")
+		throw TypeError("TimerRestartAfter handle has no callable owner.")
+	; SetTimer on the same callback identity resets its due time in place. Do not
+	; cancel first: that would double the OS calls on the per-keystroke debounce.
+	if Handle.Has("RequeuedFn") {
+		try SetTimer(Handle["RequeuedFn"], 0)
+		catch as Err
+			try LoggerWarn("TimerScheduler", "re-queued timer restart cancellation failed: {1}", Err.Message)
+		Handle.Delete("RequeuedFn")
+	}
+	Ms := -Round(DelaySec * 1000)
+	if Ms = 0
+		Ms := -1
+	Handle["Interval"] := Ms
+	Handle["Fired"] := false
+	try SetTimer(BoundFn, Ms)
+	catch as Err {
+		Handle["Fired"] := true
+		if _TIMER_ADAPTER_REGISTRY.Has(Handle["Id"])
+			_TIMER_ADAPTER_REGISTRY.Delete(Handle["Id"])
+		try LoggerError("TimerScheduler", "one-shot restart failed: {1}", Err.Message)
+		throw Err
+	}
+	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
+	return Handle
+}
+
 ; Schedules Fn to fire repeatedly every IntervalSec seconds.
 ; The first firing happens after IntervalSec (not immediately).
 ;
@@ -101,7 +148,8 @@ TimerAfter(DelaySec, Fn) {
 ; @return {Map}  Opaque cancellation handle.
 TimerEvery(IntervalSec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
-	Handle := Map("Fn", 0, "Interval", 0, "Fired", false, "Id", _TimerAdapterNextId())
+	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
+		"Id", _TimerAdapterNextId(), "Kind", "every")
 	Ms := Round(IntervalSec * 1000)
 	; AHK treats SetTimer with interval=0 as a cancel; clamp to 1ms minimum so a
 	; near-zero interval still fires as a true repeating timer rather than silently
@@ -155,6 +203,27 @@ TimerCancelAll() {
 	global _TIMER_ADAPTER_REGISTRY
 	for Id, Handle in _TIMER_ADAPTER_REGISTRY.Clone() {
 		TimerCancel(Handle)
+	}
+}
+
+; Arms a native one-shot while preserving the caller's callback identity. This
+; is intentionally outside the portable TimerScheduler port: lifecycle state
+; machines use the same named callback as a coalescing owner, whereas TimerAfter
+; wraps every request in a fresh closure and therefore cannot replace an already
+; armed retry. Domain code still stays decoupled from AHK's negative-interval
+; SetTimer convention.
+TimerArmOneShotMs(Callback, DelayMs) {
+	if !HasMethod(Callback, "Call")
+		throw TypeError("TimerArmOneShotMs requires a callable callback")
+	if !IsNumber(DelayMs)
+		throw TypeError("TimerArmOneShotMs requires a numeric delay")
+	Delay := Max(1, Round(Abs(DelayMs)))
+	try {
+		_TimerAdapterSetNative(Callback, -Delay)
+		return true
+	} catch as Err {
+		try LoggerError("TimerScheduler", "native one-shot schedule failed: {1}", Err.Message)
+		throw Err
 	}
 }
 

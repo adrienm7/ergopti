@@ -22,10 +22,10 @@
 --- ==============================================================================
 
 local hs            = hs
-local Logger        = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n          = require("lib.i18n")
-local notifications = require("lib.notifications")
+local Logger        = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n          = require("infra.i18n")
+local notifications = require("infra.notifications")
 local LOG           = "menu.keyboard_layout"
 
 -- Target install paths on macOS

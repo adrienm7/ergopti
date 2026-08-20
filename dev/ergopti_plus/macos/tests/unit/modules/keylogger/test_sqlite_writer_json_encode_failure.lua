@@ -20,8 +20,8 @@
 local helpers = require("tests.helpers")
 
 -- lib.logger must load first so every subsequent require can resolve it.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local DEVICE_ID = "deadbeef-cafe-1234-5678-aabbccddeeff"
 
@@ -53,7 +53,7 @@ helpers.describe("sqlite_writer — json.encode failure is surfaced, not swallow
 		end
 
 		-- Spy the warn channel on the logger the writer already holds.
-		local logger    = require("lib.logger")
+		local logger    = require("infra.logger")
 		local orig_warn = logger.warn
 		local warns     = {}
 		logger.warn = function(_tag, fmt, ...)

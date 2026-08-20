@@ -33,7 +33,15 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger        = require("logger.shim")
+local SqliteCommand = require("modules.keylogger.sqlite_command")
+local TextCipher    = require("modules.keylogger.text_cipher")
+
+-- How many session durations one application-day keeps. Read from the shared
+-- accumulator rather than restated, because the walk caps the array it hands
+-- over with the same number and two independent caps would disagree the day
+-- either is tuned.
+local SESSION_DURATIONS_CAP = require("keylogger.aggregator_helpers").SESSION_DURATIONS_CAP
 
 local LOG = "modules.keylogger.sqlite_writer"
 
@@ -83,7 +91,7 @@ end
 --- @return string
 local function _sql_escape(s)
 	if type(s) ~= "string" then return "" end
-	return s:gsub("'", "''")
+	return (s:gsub("'", "''"))
 end
 
 --- Runs a SQL statement against the database via the sqlite3 CLI.
@@ -92,28 +100,26 @@ end
 local function _exec(sql)
 	if not _db_path or not _available then return false end
 
-	-- Write SQL to a temp file to avoid shell quoting issues with long/multi-line SQL.
-	local tmp = (os.tmpname and os.tmpname() or "/tmp/ergopti_sql_" .. tostring(os.time()))
-	os.remove(tmp)  -- os.tmpname() creates the file; remove it so we can write our own.
-	local tmp_sql = tmp .. ".sql"
-	local fh = io.open(tmp_sql, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot write temp SQL file: %s", tmp_sql)
+	-- The script carries the characters the user typed, so it travels on stdin.
+	-- Staging it in /tmp is what turned this module into a keystroke leak.
+	local cmd, reason = SqliteCommand.build(_db_path, sql, { capture_stderr = true })
+	if not cmd then
+		Logger.error(LOG, "Cannot compose the sqlite3 command: %s.", reason)
 		return false
 	end
-	fh:write(sql)
-	fh:close()
 
-	local db_esc = _db_path:gsub("'", "'\\''")
-	local cmd = string.format("sqlite3 '%s' < '%s' 2>&1", db_esc, tmp_sql:gsub("'", "'\\''"))
 	local pipe = io.popen(cmd, "r")
-	local err_out = pipe and pipe:read("*a") or ""
-	if pipe then pipe:close() end
-	os.remove(tmp_sql)
+	if not pipe then
+		Logger.error(LOG, "Cannot spawn the sqlite3 CLI.")
+		return false
+	end
+	local err_out = pipe:read("*a") or ""
+	pipe:close()
 
-	if err_out and err_out ~= "" and not err_out:match("^$") then
-		-- sqlite3 CLI only prints to stderr on actual errors.
-		Logger.error(LOG, "SQLite error: %s", err_out:gsub("\n", " | "):sub(1, 200))
+	if err_out ~= "" then
+		-- These statements select nothing, and stderr is merged into stdout, so
+		-- any output at all means the script failed.
+		Logger.error(LOG, "SQLite error: %s", SqliteCommand.sanitise_error(err_out))
 		return false
 	end
 	return true
@@ -124,18 +130,12 @@ end
 --- @return string|nil First output line, or nil when the query fails.
 local function _query_scalar(sql)
 	if not _db_path or not _available then return nil end
-	local tmp = (os.tmpname and os.tmpname() or "/tmp/ergopti_sql_" .. tostring(os.time()))
-	os.remove(tmp)
-	local tmp_sql = tmp .. ".sql"
-	local fh = io.open(tmp_sql, "w")
-	if not fh then return nil end
-	fh:write(sql); fh:close()
-	local db_esc = _db_path:gsub("'", "'\\''")
-	local cmd = string.format("sqlite3 -noheader '%s' < '%s' 2>/dev/null", db_esc, tmp_sql:gsub("'", "'\\''"))
+	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" } })
+	if not cmd then return nil end
 	local pipe = io.popen(cmd, "r")
-	local value = pipe and pipe:read("*l") or nil
-	if pipe then pipe:close() end
-	os.remove(tmp_sql)
+	if not pipe then return nil end
+	local value = pipe:read("*l")
+	pipe:close()
 	return value
 end
 
@@ -161,21 +161,22 @@ end
 --- Reads the canonical schema file from the _shared tree.
 --- @return string|nil Schema SQL, or nil on failure.
 local function _read_schema()
-	-- Resolve the _shared/data/db/ path relative to the driver root.
-	local src = debug.getinfo(1, "S").source:gsub("^@", "")
-	local driver_root = src:match("^(.*)[/\\]modules[/\\]keylogger[/\\]sqlite_writer%.lua$") or "."
-	driver_root = driver_root:gsub("\\", "/")
-	local schema_path = driver_root .. "/../../../_shared/data/db/schema.sql"
+	-- Through the shared resolver. This used to walk "../../../" from the driver
+	-- root — two levels too high — and fall back to a BARE RELATIVE path, which
+	-- made schema loading depend on the process's current directory rather than
+	-- on where the driver is installed. Started from anywhere but one exact
+	-- directory, the keylogger came up with no schema at all.
+	local Paths = require("infra.paths")
+	local schema_path = Paths.shared("data/db/schema.sql")
+	if not schema_path then
+		Logger.error(LOG, "Cannot locate the shared tree — schema.sql is unreachable.")
+		return nil
+	end
 
 	local fh = io.open(schema_path, "r")
 	if not fh then
-		-- Try relative path (works from the daemon entry point).
-		local alt = "../../_shared/data/db/schema.sql"
-		fh = io.open(alt, "r")
-		if not fh then
-			Logger.error(LOG, "Cannot read schema.sql from %s or %s.", schema_path, alt)
-			return nil
-		end
+		Logger.error(LOG, "Cannot read schema.sql at %s.", schema_path)
+		return nil
 	end
 	local content = fh:read("*a")
 	fh:close()
@@ -343,18 +344,36 @@ function M.insert_typing_events(device_id, events)
 
 	local parts = {}
 	for i, ev in ipairs(events) do
+		local event_id = first_id + i - 1
+
+		-- `text` and `events_json` are the only columns holding what the user
+		-- literally typed, so they are the only ones encrypted. Everything else
+		-- is aggregate data the dashboard computes over, and encrypting it would
+		-- cost every query a decryption it does not need.
+		local raw_text = ev.text or ""
+		local raw_json = ev.events_json or "[]"
+		local enc_text = TextCipher.encrypt(device_id, event_id, raw_text)
+		local enc_json = TextCipher.encrypt(device_id, tostring(event_id) .. "j", raw_json)
+		if enc_text == nil or enc_json == nil then
+			-- Encryption is on but could not run. Storing the plaintext would
+			-- silently defeat the setting the user turned on, so drop the batch.
+			Logger.error(LOG, "At-rest encryption failed — %d typing event(s) dropped rather than stored in clear.",
+				#events)
+			return false
+		end
+
 		local ts      = _sql_escape(ev.ts      or os.date("!%Y-%m-%d %H:%M:%S"))
 		local date    = _sql_escape(ev.date    or os.date("!%Y-%m-%d"))
 		local app     = _sql_escape(ev.app     or "unknown")
-		local text    = _sql_escape(ev.text    or "")
+		local text    = _sql_escape(enc_text)
 		local title   = _sql_escape(ev.title   or "")
 		local wpm     = tonumber(ev.wpm) or 0
 		local layout  = _sql_escape(ev.layout  or "")
-		local events_json = _sql_escape(ev.events_json or "[]")
+		local events_json = _sql_escape(enc_json)
 
 		parts[#parts + 1] = string.format(
 			"('%s',%d,'%s','%s','%s','%s','','',0,0,0,0,0,%d,0,0,0.0,'%s','','%s')",
-			_sql_escape(device_id), first_id + i - 1, ts, date, app, title,
+			_sql_escape(device_id), event_id, ts, date, app, title,
 			wpm, text, events_json
 		)
 	end
@@ -397,6 +416,39 @@ function M.insert_hotstring_events(device_id, events)
 		.. table.concat(parts, ",") .. ";")
 end
 
+--- Inserts shortcut firings — the actions a user triggers that type no text.
+---
+--- macOS has written this table since its keylogger existed; this driver wrote
+--- nothing, so CapsWord, the selection transforms, the wrapping pairs and every
+--- action an extension registers were invisible in the metrics. "What did I
+--- actually use" is the question the dashboard exists to answer, and it could
+--- only ever answer it about hotstrings here.
+---
+--- Both columns are TEXT NOT NULL: an event with no key name still records that
+--- something fired, which is worth more than a row lost to INSERT OR IGNORE.
+--- @param device_id string
+--- @param events table Array of { ts, date, app, key }.
+--- @return boolean|nil
+function M.insert_shortcut_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local parts = {}
+	for i, ev in ipairs(events) do
+		parts[#parts + 1] = string.format(
+			"('%s',%d,'%s','%s','%s','%s')",
+			_sql_escape(device_id), first_id + i - 1,
+			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			_sql_escape(ev.date or os.date("!%Y-%m-%d")),
+			_sql_escape(ev.app or "unknown"),
+			_sql_escape(ev.key or "")
+		)
+	end
+	return _exec("INSERT OR IGNORE INTO events_shortcut "
+		.. "(device_id,id,ts,date,app,key) VALUES "
+		.. table.concat(parts, ",") .. ";")
+end
+
 --- Inserts foreground transitions in the shared events_app_switch format.
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,prev_app,next_app,duration_ms}.
@@ -434,6 +486,11 @@ function M.upsert_app_day(device_id, date, app, fields)
 		chars = true, time_ms = true, app_time_ms = true,
 		hs_chars = true, hs_triggers = true, hs_input_chars = true,
 		llm_chars = true, llm_triggers = true, llm_input_chars = true,
+		-- How many suggestions were OFFERED, as against the triggers above, which
+		-- count the ones taken. The acceptance rate is the ratio of the two, and
+		-- with the denominator never written it read as zero on a driver whose
+		-- suggestions were being accepted all day.
+		hs_suggested = true, llm_suggested = true,
 	}
 	local sets = {}
 	for k, v in pairs(fields) do
@@ -445,8 +502,8 @@ function M.upsert_app_day(device_id, date, app, fields)
 	if #sets == 0 then return end
 
 	local sql = string.format(
-		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars, llm_chars, llm_triggers, llm_input_chars) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d) "
+		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars, llm_chars, llm_triggers, llm_input_chars, hs_suggested, llm_suggested) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d) "
 		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET %s;",
 		_sql_escape(device_id),
 		_sql_escape(date),
@@ -460,24 +517,443 @@ function M.upsert_app_day(device_id, date, app, fields)
 		tonumber(fields.llm_chars) or 0,
 		tonumber(fields.llm_triggers) or 0,
 		tonumber(fields.llm_input_chars) or 0,
+		tonumber(fields.hs_suggested) or 0,
+		tonumber(fields.llm_suggested) or 0,
 		table.concat(sets, ", ")
 	)
 	return _exec(sql)
 end
 
---- Inserts or upserts n-gram counts into the ngram_chars table.
+--- Upserts the per-app-day character-class breakdown.
+---
+--- The five counts are summed because a flush lands every few seconds and the
+--- day's composition is their total. The first and last typed minute are not:
+--- they are a MIN and a MAX, taken in SQL so a late flush cannot move the first
+--- keystroke of the morning forward.
+--- @param row table { date, app, letter, digit, punct, space, other,
+---        first_typed_min?, last_typed_min? }
+function M.upsert_chars_class(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local function quoted_or_null(value)
+		if type(value) ~= "string" or value == "" then return "NULL" end
+		return "'" .. _sql_escape(value) .. "'"
+	end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_chars_class "
+		.. "(device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%s,%s) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "letter = letter + excluded.letter, digit = digit + excluded.digit, "
+		.. "punct = punct + excluded.punct, space = space + excluded.space, "
+		.. "other = other + excluded.other, "
+		.. "first_typed_min = MIN(COALESCE(first_typed_min, excluded.first_typed_min), "
+		.. "COALESCE(excluded.first_typed_min, first_typed_min)), "
+		.. "last_typed_min = MAX(COALESCE(last_typed_min, excluded.last_typed_min), "
+		.. "COALESCE(excluded.last_typed_min, last_typed_min));",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.letter) or 0), math.floor(tonumber(row.digit) or 0),
+		math.floor(tonumber(row.punct) or 0), math.floor(tonumber(row.space) or 0),
+		math.floor(tonumber(row.other) or 0),
+		quoted_or_null(row.first_typed_min), quoted_or_null(row.last_typed_min))
+	return _exec(sql)
+end
+
+--- Upserts the per-app-day error analysis.
+---
+--- `cascade_max_len` is a MAX and everything else a sum, for the same reason:
+--- the longest correction of the day does not get longer by being flushed twice.
+--- @param row table { date, app, bs_total, cascade_count, cascade_max_len,
+---        recovery_sum_ms, recovery_count }
+function M.upsert_errors(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_errors "
+		.. "(device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "bs_total = bs_total + excluded.bs_total, "
+		.. "cascade_count = cascade_count + excluded.cascade_count, "
+		.. "cascade_max_len = MAX(cascade_max_len, excluded.cascade_max_len), "
+		.. "recovery_sum_ms = recovery_sum_ms + excluded.recovery_sum_ms, "
+		.. "recovery_count = recovery_count + excluded.recovery_count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.bs_total) or 0),
+		math.floor(tonumber(row.cascade_count) or 0),
+		math.floor(tonumber(row.cascade_max_len) or 0),
+		math.floor(tonumber(row.recovery_sum_ms) or 0),
+		math.floor(tonumber(row.recovery_count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one hour of the activity histogram.
+--- @param row table { date, app, hour, c, e, em, es }
+function M.upsert_hourly(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, hour) DO UPDATE SET "
+		.. "c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(tostring(row.hour or "")),
+		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
+		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one five-minute slot of the fine-grained activity histogram.
+--- @param row table { date, app, slot, c, e, es }
+function M.upsert_hourly_min5(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, slot) DO UPDATE SET "
+		.. "c = c + excluded.c, e = e + excluded.e, es = es + excluded.es;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(tostring(row.slot or "")),
+		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
+		math.floor(tonumber(row.es) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one pause-threshold bucket for an application-day.
+---
+--- The buckets are cumulative: a row for 5000 ms holds every delay at or below
+--- five seconds, so the dashboard's "ignore pauses longer than…" control reads
+--- one row and gets a total rather than a slice.
+--- @param row table { date, app, bucket_ms, time_sum, credited }
+function M.upsert_app_bucket(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET "
+		.. "time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.bucket_ms) or 0),
+		math.floor(tonumber(row.time_sum) or 0),
+		math.floor(tonumber(row.credited) or 0))
+	return _exec(sql)
+end
+
+--- Upserts the per-app-day burst record.
+---
+--- `max_cpm` and `max_chars` are records and take a MAX; the counts and the
+--- moment sums add. The length histogram is a JSON object merged in SQL, since
+--- each flush only knows about the bursts it saw.
+--- @param row table { date, app, count_total, max_cpm, max_chars, length_buckets,
+---        inter_count, inter_sum, inter_sumsq }
+function M.upsert_burst(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local parts = {}
+	for label, count in pairs(row.length_buckets or {}) do
+		if type(count) == "number" and count > 0 then
+			parts[#parts + 1] = string.format('"%s":%d',
+				tostring(label):gsub('"', '\\"'), math.floor(count))
+		end
+	end
+	local buckets_json = "{" .. table.concat(parts, ",") .. "}"
+	local sql = string.format(
+		"INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, "
+		.. "length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) "
+		.. "VALUES ('%s','%s','%s',%d,%f,%d,'%s',%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "count_total = count_total + excluded.count_total, "
+		.. "max_cpm = MAX(max_cpm, excluded.max_cpm), "
+		.. "max_chars = MAX(max_chars, excluded.max_chars), "
+		-- Merged key by key rather than replaced: each flush sees only its own
+		-- bursts, so overwriting would leave the histogram describing the last
+		-- few seconds of the day.
+		.. "length_buckets_json = (SELECT json_group_object(k, v) FROM ("
+		.. "SELECT key AS k, SUM(value) AS v FROM ("
+		.. "SELECT key, value FROM json_each(length_buckets_json) "
+		.. "UNION ALL SELECT key, value FROM json_each(excluded.length_buckets_json)"
+		.. ") GROUP BY key)), "
+		.. "inter_delay_count = inter_delay_count + excluded.inter_delay_count, "
+		.. "inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum, "
+		.. "inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.count_total) or 0),
+		tonumber(row.max_cpm) or 0,
+		math.floor(tonumber(row.max_chars) or 0),
+		_sql_escape(buckets_json),
+		math.floor(tonumber(row.inter_count) or 0),
+		math.floor(tonumber(row.inter_sum) or 0),
+		math.floor(tonumber(row.inter_sumsq) or 0))
+	return _exec(sql)
+end
+
+--- Sets an application's category across every day it appears on.
+---
+--- Applied to every row rather than today's: a category is a property of the
+--- application, not of a day. Writing only today would leave the dashboard's
+--- own history grouped under whatever the application was called before, and
+--- the user would have to re-categorise it once per day they wanted to look at.
+--- @param app_name string
+--- @param category string
+--- @param score number Productivity score.
+function M.set_app_category(device_id, app_name, category, score)
+	if not M.is_available() then return false end
+	if type(app_name) ~= "string" or app_name == "" then return false end
+	if type(category) ~= "string" or category == "" then return false end
+	local sql = string.format(
+		"UPDATE agg_app_day SET category = '%s' WHERE device_id = '%s' AND app = '%s';",
+		_sql_escape(category), _sql_escape(device_id), _sql_escape(app_name))
+	local ok = _exec(sql)
+	if ok then M.set_meta("app_score." .. app_name, tostring(math.floor(tonumber(score) or 0))) end
+	return ok
+end
+
+-- How many window titles one application-day keeps. From the shared accumulator
+-- so the three drivers cap at the same place; the schema's own comment says the
+-- trimming belongs to the ingest pipeline, which is here.
+local TITLE_CAP_PER_APP_DAY =
+	require("keylogger.aggregator_helpers").TITLE_CAP_PER_APP_DAY
+
+--- Upserts one window title's counters for an application-day.
+---
+--- Trimmed after the insert rather than before: which titles survive depends on
+--- every title of the day, and the caller only knows the ones in this flush.
+--- Lowest (c + ms) first, so a window the user glanced at loses to one they
+--- worked in.
+--- @param row table { date, app, title, c, ms }
+function M.upsert_title(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	if type(row.title) ~= "string" or row.title == "" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) "
+		.. "VALUES ('%s','%s','%s','%s',%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, title) DO UPDATE SET "
+		.. "c = c + excluded.c, ms = ms + excluded.ms; "
+		.. "DELETE FROM agg_app_day_titles WHERE device_id = '%s' AND date = '%s' "
+		.. "AND app = '%s' AND title NOT IN ("
+		.. "SELECT title FROM agg_app_day_titles WHERE device_id = '%s' AND date = '%s' "
+		.. "AND app = '%s' ORDER BY (c + ms) DESC LIMIT %d);",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(row.title),
+		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.ms) or 0),
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(TITLE_CAP_PER_APP_DAY))
+	return _exec(sql)
+end
+
+--- Upserts the machine's own state for a day.
+---
+--- Every duration sums; the battery bounds are a MIN and a MAX. Sent as the
+--- running total rather than as a delta, and the row REPLACES rather than adds,
+--- because the sampler holds one accumulating day in memory — adding would
+--- count every earlier minute again on each flush.
+--- @param row table The accumulated day from system_metrics.
+function M.upsert_system_day(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	if type(row.date) ~= "string" or row.date == "" then return end
+	local function number_or_null(value)
+		local n = tonumber(value)
+		if not n then return "NULL" end
+		return string.format("%d", math.floor(n))
+	end
+	local sql = string.format(
+		"INSERT INTO agg_system_day (device_id, date, wifi_changes, space_switches, "
+		.. "battery_sum, battery_count, battery_min, battery_max, audio_muted_ms, "
+		.. "locked_ms, sleep_ms, awake_ms, passive_count, night_wake_count) "
+		.. "VALUES ('%s','%s',%d,%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date) DO UPDATE SET "
+		.. "wifi_changes = excluded.wifi_changes, space_switches = excluded.space_switches, "
+		.. "battery_sum = excluded.battery_sum, battery_count = excluded.battery_count, "
+		.. "battery_min = excluded.battery_min, battery_max = excluded.battery_max, "
+		.. "audio_muted_ms = excluded.audio_muted_ms, locked_ms = excluded.locked_ms, "
+		.. "sleep_ms = excluded.sleep_ms, awake_ms = excluded.awake_ms, "
+		.. "passive_count = excluded.passive_count, night_wake_count = excluded.night_wake_count;",
+		_sql_escape(device_id), _sql_escape(row.date),
+		math.floor(tonumber(row.wifi_changes) or 0),
+		math.floor(tonumber(row.space_switches) or 0),
+		number_or_null(row.battery_sum), number_or_null(row.battery_count),
+		number_or_null(row.battery_min), number_or_null(row.battery_max),
+		math.floor(tonumber(row.audio_muted_ms) or 0),
+		math.floor(tonumber(row.locked_ms) or 0),
+		math.floor(tonumber(row.sleep_ms) or 0),
+		math.floor(tonumber(row.awake_ms) or 0),
+		math.floor(tonumber(row.passive_count) or 0),
+		math.floor(tonumber(row.night_wake_count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one key's hold statistics for an application-day.
+---
+--- The tap and hold counts are what make this table worth having on a keyboard
+--- whose whole design is dual-role keys: the average alone cannot say whether a
+--- key is being used both ways or neither.
+--- @param row table { date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count }
+function M.upsert_kc_hold(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local keycode = tonumber(row.keycode)
+	if not keycode then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, "
+		.. "max_ms, tap_count, hold_count) VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET "
+		.. "sum_ms = sum_ms + excluded.sum_ms, count = count + excluded.count, "
+		-- A record, not a sum: the longest hold of the day does not get longer by
+		-- being flushed twice.
+		.. "max_ms = MAX(max_ms, excluded.max_ms), "
+		.. "tap_count = tap_count + excluded.tap_count, "
+		.. "hold_count = hold_count + excluded.hold_count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(keycode),
+		math.floor(tonumber(row.sum_ms) or 0), math.floor(tonumber(row.count) or 0),
+		math.floor(tonumber(row.max_ms) or 0),
+		math.floor(tonumber(row.tap_count) or 0), math.floor(tonumber(row.hold_count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts how many keystrokes an application-day saw under one layout.
+---
+--- One row per (app, layout) rather than a single "current layout" column: a
+--- day spent switching between two of them is two rows, and a column would have
+--- to pick one and call the rest of the day a lie.
+--- @param row table { date, app, layout, count }
+function M.upsert_layout(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	if type(row.layout) ~= "string" or row.layout == "" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) "
+		.. "VALUES ('%s','%s','%s','%s',%d) "
+		.. "ON CONFLICT(device_id, date, app, layout) DO UPDATE SET "
+		.. "count = count + excluded.count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		_sql_escape(row.layout), math.floor(tonumber(row.count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts the per-app-day ergonomic record.
+---
+--- The two streak columns are records and take a MAX; the focus latency sums.
+--- A day's longest same-finger run does not get longer by being flushed twice.
+--- @param row table { date, app, same_finger_streak_max, same_hand_streak_max,
+---        auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count }
+function M.upsert_ergo(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, "
+		.. "same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, "
+		.. "focus_to_first_key_count) VALUES ('%s','%s','%s',%d,%d,%d,%d,%d) "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "same_finger_streak_max = MAX(same_finger_streak_max, excluded.same_finger_streak_max), "
+		.. "same_hand_streak_max = MAX(same_hand_streak_max, excluded.same_hand_streak_max), "
+		.. "auto_repeat_count = auto_repeat_count + excluded.auto_repeat_count, "
+		.. "focus_to_first_key_sum_ms = focus_to_first_key_sum_ms + excluded.focus_to_first_key_sum_ms, "
+		.. "focus_to_first_key_count = focus_to_first_key_count + excluded.focus_to_first_key_count;",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.same_finger_streak_max) or 0),
+		math.floor(tonumber(row.same_hand_streak_max) or 0),
+		math.floor(tonumber(row.auto_repeat_count) or 0),
+		math.floor(tonumber(row.focus_to_first_key_sum_ms) or 0),
+		math.floor(tonumber(row.focus_to_first_key_count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts one application-to-application transition count for a day.
+---
+--- The pair is the key, not just the destination: the panel this feeds asks
+--- which application the user leaves to reach another, and a count keyed on the
+--- destination alone cannot answer that.
+--- @param row table { date, app_from, app_to, count }
+function M.upsert_switch_to(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local sql = string.format(
+		"INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) "
+		.. "VALUES ('%s','%s','%s','%s',%d) "
+		.. "ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET "
+		.. "count = count + excluded.count;",
+		_sql_escape(device_id), _sql_escape(row.date),
+		_sql_escape(row.app_from), _sql_escape(row.app_to),
+		math.floor(tonumber(row.count) or 0))
+	return _exec(sql)
+end
+
+--- Upserts the per-app-day typing-session record.
+---
+--- The durations array is capped by the walk before it gets here, and truncated
+--- again in SQL: a day of short sessions would otherwise grow one JSON array
+--- without bound, and the dashboard only plots a sample of them.
+--- @param row table { date, app, count_total, longest_ms, longest_chars,
+---        total_active_ms, durations }
+function M.upsert_session(device_id, row)
+	if not M.is_available() or type(row) ~= "table" then return end
+	local parts = {}
+	for _, duration in ipairs(row.durations or {}) do
+		parts[#parts + 1] = string.format("%d", math.floor(tonumber(duration) or 0))
+	end
+	local durations_json = "[" .. table.concat(parts, ",") .. "]"
+	local sql = string.format(
+		"INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, "
+		.. "longest_chars, total_active_ms, durations_json) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,'%s') "
+		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
+		.. "count_total = count_total + excluded.count_total, "
+		.. "longest_ms = MAX(longest_ms, excluded.longest_ms), "
+		.. "longest_chars = MAX(longest_chars, excluded.longest_chars), "
+		.. "total_active_ms = total_active_ms + excluded.total_active_ms, "
+		.. "durations_json = (SELECT json_group_array(d) FROM ("
+		.. "SELECT value AS d FROM json_each(durations_json) "
+		.. "UNION ALL SELECT value FROM json_each(excluded.durations_json) "
+		.. "LIMIT " .. SESSION_DURATIONS_CAP .. "));",
+		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
+		math.floor(tonumber(row.count_total) or 0),
+		math.floor(tonumber(row.longest_ms) or 0),
+		math.floor(tonumber(row.longest_chars) or 0),
+		math.floor(tonumber(row.total_active_ms) or 0),
+		_sql_escape(durations_json))
+	return _exec(sql)
+end
+
+-- Every n-gram family the shared schema declares, and the only names this
+-- writer will target. A whitelist rather than a formatted parameter: the table
+-- name cannot be escaped as a value, so an unchecked caller is an injection —
+-- and the nine names are known at authoring time.
+local NGRAM_TABLES = {
+	ngram_chars = true, ngram_bigrams = true, ngram_trigrams = true,
+	ngram_quadgrams = true, ngram_pentagrams = true, ngram_hexagrams = true,
+	ngram_heptagrams = true, ngram_words = true, ngram_word_bigrams = true,
+}
+
+M.NGRAM_TABLES = NGRAM_TABLES
+
+--- Inserts or upserts n-gram counts into one of the shared n-gram tables.
+---
+--- Took no table name until 2026-08-06 and always wrote ngram_chars, so this
+--- driver produced single characters and nothing else. Eight of the nine
+--- families the dashboard reads were empty by construction: the same-finger
+--- bigram analysis, the word lists, the error analysis and the heatmap's
+--- first/last counts all had nothing to read on Linux and rendered blank.
 --- @param device_id string Device identifier.
 --- @param date      string "YYYY-MM-DD".
 --- @param app       string Application name.
 --- @param ngrams    table  { [token] = count|{c=count,sources={source=count}} } map.
-function M.upsert_ngrams(device_id, date, app, ngrams)
+--- @param table_name string|nil One of NGRAM_TABLES; defaults to ngram_chars.
+function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 	if not M.is_available() then return end
 	if type(ngrams) ~= "table" then return end
+	local target = table_name or "ngram_chars"
+	if not NGRAM_TABLES[target] then
+		Logger.error(LOG, "upsert_ngrams(): '%s' is not an n-gram table — nothing written.",
+			tostring(target))
+		return
+	end
 
 	local parts = {}
 	for token, value in pairs(ngrams) do
-		local count = type(value) == "table" and value.c or value
-		local sources = type(value) == "table" and value.sources or nil
+		local is_row  = type(value) == "table"
+		local count   = is_row and value.c or value
+		local sources = is_row and value.sources or nil
+		-- Total delay, delay sample count and error count. Hardcoded to zero
+		-- until 2026-08-06, which made every token read as free: the panel that
+		-- ranks sequences by what they cost ranked a column of zeroes.
+		local total_delay  = is_row and tonumber(value.td) or 0
+		local delay_count  = is_row and tonumber(value.cd) or 0
+		local error_count  = is_row and tonumber(value.e) or 0
 		if type(count) == "number" and count > 0 then
 			local source_parts = {}
 			for source, source_count in pairs(sources or {}) do
@@ -488,12 +964,15 @@ function M.upsert_ngrams(device_id, date, app, ngrams)
 			end
 			local source_json = "{" .. table.concat(source_parts, ",") .. "}"
 			parts[#parts + 1] = string.format(
-				"('%s','%s','%s','%s',%d,0,0,0,'%s')",
+				"('%s','%s','%s','%s',%d,%d,%d,%d,'%s')",
 				_sql_escape(device_id),
 				_sql_escape(date),
 				_sql_escape(app),
 				_sql_escape(token),
 				math.floor(count),
+				math.floor(total_delay or 0),
+				math.floor(delay_count or 0),
+				math.floor(error_count or 0),
 				_sql_escape(source_json)
 			)
 		end
@@ -501,10 +980,16 @@ function M.upsert_ngrams(device_id, date, app, ngrams)
 	if #parts == 0 then return end
 
 	local sql = string.format(
-		"INSERT INTO ngram_chars (device_id, date, app, token, c, td, cd, e, esrc_json) "
+		"INSERT INTO " .. target .. " (device_id, date, app, token, c, td, cd, e, esrc_json) "
 		.. "VALUES %s "
 		.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
 		.. "c = c + excluded.c, "
+		-- Summed, not replaced: the mean delay for a token is td/cd across the
+		-- whole day, and a flush lands every few seconds. Overwriting would
+		-- leave the average describing the last handful of keystrokes.
+		.. "td = td + excluded.td, "
+		.. "cd = cd + excluded.cd, "
+		.. "e = e + excluded.e, "
 		.. "esrc_json = json_object("
 		.. "'hotstring', COALESCE(json_extract(esrc_json, '$.hotstring'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.hotstring'), 0), "
 		.. "'llm', COALESCE(json_extract(esrc_json, '$.llm'), 0) + COALESCE(json_extract(excluded.esrc_json, '$.llm'), 0), "
@@ -533,6 +1018,53 @@ function M.upsert_scancodes(device_id, date, app, scancodes)
 	return _exec("INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES "
 		.. table.concat(parts, ",")
 		.. " ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;")
+end
+
+--- Runs an arbitrary SQL script through the same stdin path as every write.
+--- Exposed for the at-rest migration, which rewrites rows this module wrote and
+--- must not open a second, less careful route to the database: the script it
+--- builds embeds the characters the user typed, so it may never touch /tmp.
+--- @param sql string Complete SQL script.
+--- @return boolean True on success.
+function M.exec_sql(sql)
+	if not M.is_available() then return false end
+	if type(sql) ~= "string" or sql == "" then return false end
+	return _exec(sql)
+end
+
+--- Runs a SELECT and returns its output lines.
+--- @param sql string Complete SELECT statement.
+--- @return table|nil One entry per output line, or nil when no database is open.
+function M.query_rows(sql)
+	if not M.is_available() then return nil end
+	if type(sql) ~= "string" or sql == "" then return nil end
+	local cmd = SqliteCommand.build(_db_path, sql, { flags = { "-noheader" } })
+	if not cmd then return nil end
+	local pipe = io.popen(cmd, "r")
+	if not pipe then return nil end
+	local lines = {}
+	for line in pipe:lines() do lines[#lines + 1] = line end
+	pipe:close()
+	return lines
+end
+
+--- Reads one meta key. Used by the migration to resume where it stopped rather
+--- than re-reading every row of a year-long history at each daemon start.
+--- @param key string
+--- @return string|nil The stored value, or nil when absent.
+function M.get_meta(key)
+	if not M.is_available() or type(key) ~= "string" or key == "" then return nil end
+	return _query_scalar(string.format("SELECT value FROM meta WHERE key = '%s';", _sql_escape(key)))
+end
+
+--- Writes one meta key.
+--- @param key   string
+--- @param value string
+--- @return boolean True on success.
+function M.set_meta(key, value)
+	if not M.is_available() or type(key) ~= "string" or key == "" then return false end
+	return _exec(string.format("INSERT OR REPLACE INTO meta (key, value) VALUES ('%s', '%s');",
+		_sql_escape(key), _sql_escape(tostring(value))))
 end
 
 --- Bumps the meta.rev counter so the view cache knows new data is available.

@@ -14,26 +14,22 @@ local helpers = require("tests.helpers")
 
 
 
--- =========================================
+--- ==========================================
 --- ==========================================
 --- ======= 1/ Source-level invariants =======
 --- ==========================================
--- =========================================
+--- ==========================================
 
-local function read_source()
-	local path = helpers.driver_root() .. "modules/llm/mlx_deps_checker.lua"
-	local fh = io.open(path, "r")
-	if not fh then return "" end
-	local body = fh:read("*a") or ""
-	fh:close()
-	return body
-end
-
-local SOURCE = read_source()
+-- Selected by a declaration unique to modules/llm/mlx_deps_checker.lua rather
+-- than by path, so moving or splitting the module cannot turn these invariants
+-- into a path error. The old form returned "" on a missing file, which made
+-- every assertion below pass against an empty string.
+local SOURCE = helpers.read_driver_source("local function resolve_bootstrap_script_path")
+helpers.assert_true(SOURCE ~= nil, "modules/llm/mlx_deps_checker.lua source must be locatable")
 
 helpers.describe("mlx_deps_checker source invariants", function()
 	helpers.it("imports lib.paths for fallback discovery", function()
-		helpers.assert_true(SOURCE:find("local Paths        = require(\"lib.paths\")", 1, true) ~= nil)
+		helpers.assert_true(SOURCE:find("local Paths        = require(\"infra.paths\")", 1, true) ~= nil)
 	end)
 
 	helpers.it("defines resolve_hs_root from current file location", function()
@@ -97,16 +93,58 @@ end)
 
 
 
--- ====================================
+-- ===========================================================
+-- ===========================================================
+-- ======= 4/ Native Task Start Contract =====================
+-- ===========================================================
+-- ===========================================================
+
+helpers.describe("mlx_deps_checker: refused native launch settles immediately", function()
+	helpers.it("treats task:start() false as terminal failure (mlx-deps-false-start)", function()
+		package.loaded["infra.paths"] = {
+			find_from_configdir = function() return nil end,
+		}
+		package.loaded["ui.download_window"] = {
+			show = function() end, hide = function() end, set_step = function() end,
+			set_progress = function() end, set_error = function() end,
+			set_detail = function() end, append_log = function() end,
+			is_active = function() return false end,
+		}
+
+		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
+			task = {
+				new = function()
+					return {
+						start = function() return false end,
+					}
+				end,
+			},
+		})
+		local settled = "not called"
+		checker.check_and_install_deps(function(ok) settled = ok end)
+
+		helpers.assert_eq(false, settled,
+			"a refused launch has no completion callback, so pending callers must be "
+				.. "settled synchronously instead of waiting forever")
+		helpers.assert_eq("failed", checker.get_state(),
+			"the public state must describe the refused launch")
+	end)
+end)
+
+
+
+
+
+--- ======================================
 --- ======================================
 --- ======= 2/ Public API contract =======
 --- ======================================
--- ====================================
+--- ======================================
 
 helpers.describe("mlx_deps_checker public API", function()
-	local original_logger = package.loaded["lib.logger"]
+	local original_logger = package.loaded["infra.logger"]
 	local original_window = package.loaded["ui.download_window"]
-	local original_paths = package.loaded["lib.paths"]
+	local original_paths = package.loaded["infra.paths"]
 	local original_checker = package.loaded["modules.llm.mlx_deps_checker"]
 
 	local calls = {
@@ -118,7 +156,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		success = 0,
 	}
 
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		UNIFIED_LOG_FILE = "/tmp/ergopti_test.log",
 		start = function() calls.start = calls.start + 1 end,
 		debug = function() calls.debug = calls.debug + 1 end,
@@ -139,7 +177,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		is_active = function() return false end,
 	}
 
-	package.loaded["lib.paths"] = {
+	package.loaded["infra.paths"] = {
 		find_from_configdir = function() return nil end,
 	}
 
@@ -174,9 +212,9 @@ helpers.describe("mlx_deps_checker public API", function()
 		helpers.assert_eq(checker.get_state(), "pending")
 	end)
 
-	package.loaded["lib.logger"] = original_logger
+	package.loaded["infra.logger"] = original_logger
 	package.loaded["ui.download_window"] = original_window
-	package.loaded["lib.paths"] = original_paths
+	package.loaded["infra.paths"] = original_paths
 	package.loaded["modules.llm.mlx_deps_checker"] = original_checker
 end)
 
@@ -217,7 +255,7 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 			},
 		}
 
-		package.loaded["lib.paths"] = {
+		package.loaded["infra.paths"] = {
 			find_from_configdir = function() return nil end,
 		}
 		package.loaded["ui.download_window"] = {
@@ -226,6 +264,11 @@ helpers.describe("mlx_deps_checker: reset_bootstrap_state escapes the failed dea
 			append_log = function() end, is_active = function() return false end,
 		}
 
+		-- task_lifecycle captures the current global hs table at require time.
+		-- The refused-start test above intentionally loaded it against a task
+		-- stub that always returns false, so a cached adapter would make every
+		-- later "fresh" checker inherit that unrelated native result.
+		package.loaded["adapters.task_lifecycle"] = nil
 		package.loaded["modules.llm.mlx_deps_checker"] = nil
 		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", hs_overrides)
 

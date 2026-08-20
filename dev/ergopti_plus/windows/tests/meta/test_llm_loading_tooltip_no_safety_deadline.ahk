@@ -18,7 +18,7 @@
 ; ROOT CAUSE (what this test pins): the opt-out was an ORDERING ASSUMPTION
 ; across a boundary that later became asynchronous, with no assertion and no
 ; log to notice it. The fix makes it an explicit ARGUMENT threaded through the
-; debounce (_TooltipPendingArmSafety), so it cannot be broken by moving work
+; debounce (the immutable pending request's ArmSafety field), so it cannot be broken by moving work
 ; behind a timer again.
 ;
 ; F-20 is the enabling defect: _TooltipPresentStack already took an ArmSafety
@@ -46,8 +46,11 @@ _LLTS_SpinnerOptsOutExplicitly() {
 	Assert(InStr(Body, "SetTimer(_TooltipTimerFn, 0)") = 0,
 		"LLM_TooltipShowLoading must NOT cancel _TooltipTimerFn inline — TooltipShow defers rendering by TOOLTIP_RENDER_DEBOUNCE_MS, so the safety timer is armed AFTER this call returns and the cancel is a silent no-op that lets the spinner vanish mid-inference")
 
-	Assert(RegExMatch(Body, "TooltipShow\([^\n]*,\s*0\s*,\s*false\s*\)") > 0,
-		"LLM_TooltipShowLoading must opt out of the safety deadline via TooltipShow's ArmSafety argument (DurationSec 0, ArmSafety false) rather than racing the timer")
+	Normalized := RegExReplace(Body, "\s+", " ")
+	Assert(InStr(Normalized, "}], 0, false, CommitFn)") > 0
+		and InStr(Body,
+			"CommitFn := _LLM_TooltipCommitLoadingState.Bind(Meta)") > 0,
+		"LLM_TooltipShowLoading must carry loading semantics while opting out through TooltipShow's explicit DurationSec 0 / ArmSafety false arguments")
 }
 Test("llm-tooltip: the loading spinner opts out of the safety deadline by argument (F-05)", _LLTS_SpinnerOptsOutExplicitly)
 
@@ -70,21 +73,26 @@ _LLTS_ArmSafetyIsThreaded() {
 	Assert(Show != "", "TooltipShow must exist in ui/tooltip/core.ahk")
 	Assert(InStr(Show, "ArmSafety") > 0,
 		"TooltipShow must accept an ArmSafety parameter so a caller can opt out of the auto-hide deadline")
-	Assert(InStr(Show, "_TooltipPendingArmSafety") > 0,
-		"TooltipShow must stash ArmSafety in _TooltipPendingArmSafety — the render is deferred, so the choice has to survive until _TooltipDeferredShowFn runs")
+	Assert(InStr(Show, "ArmSafety: ArmSafety") > 0
+		and InStr(Show, "_TooltipPendingRequest := Request") > 0,
+		"TooltipShow must stash ArmSafety in the one immutable pending request — the render is deferred, so the choice has to survive until _TooltipDeferredShowFn runs")
 
 	Deferred := _DriverFuncBody("_TooltipDeferredShowFn")
 	Assert(Deferred != "", "_TooltipDeferredShowFn must exist")
-	Assert(InStr(Deferred, "_TooltipPendingArmSafety") > 0,
-		"_TooltipDeferredShowFn must read _TooltipPendingArmSafety back")
-	Assert(RegExMatch(Deferred, "_TooltipShowNow\([^\n]*ArmSafety") > 0,
+	Assert(InStr(Deferred, "Request.ArmSafety") > 0,
+		"_TooltipDeferredShowFn must read ArmSafety from the exact tuple it atomically detached")
+	Assert(RegExMatch(Deferred, "s)_TooltipShowNow\(.*?Request\.ArmSafety") > 0,
 		"_TooltipDeferredShowFn must forward ArmSafety to _TooltipShowNow")
 
 	Now := _DriverFuncBody("_TooltipShowNow")
 	Assert(Now != "", "_TooltipShowNow must exist")
 	Assert(InStr(Now, "ArmSafety") > 0,
 		"_TooltipShowNow must accept ArmSafety")
-	Assert(RegExMatch(Now, "_TooltipPresentStack\([^\n]*ArmSafety\s*\)") > 0,
-		"_TooltipShowNow must pass ArmSafety through to _TooltipPresentStack instead of hardcoding true — hardcoding it is what made the parameter unreachable and forced the fragile inline cancel (F-20)")
+	NormalizedNow := RegExReplace(Now, "\s+", " ")
+	Assert(InStr(NormalizedNow,
+		"_TooltipPresentStack(Pos, Row, ArmSafety,") > 0
+		and InStr(NormalizedNow,
+			"RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn)") > 0,
+		"_TooltipShowNow must pass ArmSafety and the exact owned-presentation tuple through to _TooltipPresentStack")
 }
 Test("tooltip: ArmSafety is threaded across the render debounce (F-20)", _LLTS_ArmSafetyIsThreaded)

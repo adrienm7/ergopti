@@ -21,11 +21,11 @@ local helpers = require("tests.helpers")
 
 
 
--- ===================================================
+-- ===============================================
 -- ===============================================
 -- ======= 1/ H3 — utf8.len char filtering =======
 -- ===============================================
--- ===================================================
+-- ===============================================
 
 helpers.describe("keyboard_hook H3: utf8.len char filtering", function()
 	--- Simulates the post-fix char-codepoint detection logic from keyboard_hook.lua.
@@ -67,11 +67,11 @@ end)
 
 
 
--- ==========================================================
+-- ===================================================
 -- ===================================================
 -- ======= 2/ H4 — key_state normalisation map =======
 -- ===================================================
--- ==========================================================
+-- ===================================================
 
 helpers.describe("key_state H4: key normalisation", function()
 	-- Mirror the normalisation table from key_state.lua
@@ -120,53 +120,87 @@ end)
 
 
 
--- ===================================================
+-- ================================================
 -- ================================================
 -- ======= 3/ H5 — tap lifecycle on start() =======
 -- ================================================
--- ===================================================
+-- ================================================
 
 helpers.describe("keyboard_hook H5: tap lifecycle on start()", function()
-	helpers.it("an existing tap is stopped before a new one is created", function()
-		-- Simulate the post-fix start() pre-flight
-		local old_tap_stopped = false
-		local new_tap_created = false
-
-		local fake_old_tap = {
-			stop       = function() old_tap_stopped = true end,
-			isEnabled  = function() return false end,  -- disabled (the bug scenario)
+	local function load_keyboard_hook()
+		local taps = {}
+		local eventtap = {
+			event = {
+				types = { keyDown = 10 },
+			},
 		}
-
-		local _tap = fake_old_tap
-
-		-- Post-fix preamble: stop any existing tap before creating a new one
-		if _tap then
-			pcall(function() _tap:stop() end)
-			_tap = nil
+		eventtap.new = function()
+			local tap = {
+				enabled = false,
+				stop_calls = 0,
+				stop_failures = 0,
+			}
+			function tap:start()
+				self.enabled = true
+				return self
+			end
+			function tap:stop()
+				self.stop_calls = self.stop_calls + 1
+				if self.stop_failures > 0 then
+					self.stop_failures = self.stop_failures - 1
+					error("native stop exploded")
+				end
+				self.enabled = false
+				return self
+			end
+			function tap:isEnabled() return self.enabled end
+			taps[#taps + 1] = tap
+			return tap
 		end
-		-- Simulate new tap creation
-		_tap = { start = function() new_tap_created = true end }
-		_tap:start()
+		return helpers.load_with_stubs("adapters.keyboard_hook", {
+			eventtap = eventtap,
+		}), taps
+	end
 
-		helpers.assert_eq(old_tap_stopped, true)
-		helpers.assert_eq(new_tap_created, true)
+	helpers.it("an existing tap is stopped before a new one is created", function()
+		local adapter, taps = load_keyboard_hook()
+		adapter.start({})
+		taps[1].enabled = false
+
+		adapter.start({})
+
+		helpers.assert_eq(1, taps[1].stop_calls)
+		helpers.assert_eq(2, #taps)
+		helpers.assert_eq(true, adapter.isRunning())
 	end)
 
 	helpers.it("start() does not leave a dangling disabled tap", function()
-		-- Pre-fix scenario: guard `if _tap and _tap:isEnabled()` would skip stop()
-		-- for a disabled tap, leaving it allocated. Post-fix always nils it.
-		local _tap = {
-			stop      = function() end,
-			isEnabled = function() return false end,
-		}
+		local adapter, taps = load_keyboard_hook()
+		adapter.start({})
+		taps[1].enabled = false
+		taps[1].stop_failures = 1
 
-		-- Apply post-fix cleanup
-		if _tap then
-			pcall(function() _tap:stop() end)
-			_tap = nil
-		end
+		helpers.assert_eq(false, adapter.start({}),
+			"a refused old-tap stop must reject replacement")
+		helpers.assert_eq(1, #taps,
+			"a retained cleanup debt must prevent duplicate native taps")
+		helpers.assert_eq(true, adapter.start({}),
+			"a later start must retry the exact retained tap")
+		helpers.assert_eq(2, taps[1].stop_calls)
+		helpers.assert_eq(2, #taps)
+	end)
 
-		helpers.assert_eq(_tap, nil)
+	helpers.it("stop() retains a failed native handle until exact retry", function()
+		local adapter, taps = load_keyboard_hook()
+		adapter.start({})
+		taps[1].stop_failures = 1
+
+		helpers.assert_eq(false, adapter.stop(),
+			"native stop failure must remain visible")
+		helpers.assert_eq(true, adapter.stop(),
+			"a second stop must retry the same native handle")
+		helpers.assert_eq(2, taps[1].stop_calls)
+		helpers.assert_eq(1, #taps)
 	end)
 end)
 
@@ -174,19 +208,20 @@ end)
 
 
 
--- =====================================================================================================
+-- ====================================================================================================
 -- ====================================================================================================
 -- ======= 4/ file_system.write() creates parent directories (filesystem-adapter-missing-mkdir) =======
 -- ====================================================================================================
--- =====================================================================================================
+-- ====================================================================================================
 
 helpers.describe("file_system.write — parent directory creation (filesystem-adapter-missing-mkdir)", function()
 
 	helpers.it("source defines ensure_dir to create missing parent directories", function()
-		local src_path = helpers.driver_root() .. "adapters/file_system.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "file_system.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to adapters/file_system.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.expand_path")
+		helpers.assert_true(src ~= nil, "adapters/file_system.lua source must be locatable")
 		helpers.assert_true(
 			src:find("ensure_dir", 1, true) ~= nil,
 			"file_system.write must call ensure_dir to create missing parent directories (filesystem-adapter-missing-mkdir)"
@@ -194,10 +229,11 @@ helpers.describe("file_system.write — parent directory creation (filesystem-ad
 	end)
 
 	helpers.it("source calls hs.fs.mkdir inside ensure_dir", function()
-		local src_path = helpers.driver_root() .. "adapters/file_system.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to adapters/file_system.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.expand_path")
+		helpers.assert_true(src ~= nil, "adapters/file_system.lua source must be locatable")
 		helpers.assert_true(
 			src:find("hs.fs.mkdir", 1, true) ~= nil,
 			"ensure_dir must invoke hs.fs.mkdir to create the directory (filesystem-adapter-missing-mkdir)"
@@ -211,13 +247,28 @@ helpers.describe("file_system.write — parent directory creation (filesystem-ad
 		-- no effect because load_with_stubs() discards the old _G.hs.
 		local mkdir_calls = {}
 		local mock_fs = {
+			dir = function()
+				local directory_state = {}
+				return function(state)
+					helpers.assert_eq(state, directory_state,
+						"the absence-proof iterator must receive hs.fs.dir's state")
+					return nil
+				end, directory_state
+			end,
 			attributes = function(_path, _mode) return nil end,  -- report all dirs missing
-			mkdir      = function(dir) mkdir_calls[#mkdir_calls + 1] = dir end,
+			symlinkAttributes = function() return nil, "missing fixture path" end,
+			mkdir = function(dir)
+				mkdir_calls[#mkdir_calls + 1] = dir
+				return true
+			end,
+			rmdir = function() return true end,
+			pathToAbsolute = function(path) return path end,
 		}
 
 		package.loaded["adapters.file_system"] = nil
-		package.loaded["lib.logger"] = nil
-		local _ = helpers.load_with_stubs("lib.logger")
+		package.loaded["infra.fs_dir"] = nil
+		package.loaded["infra.logger"] = nil
+		local _ = helpers.load_with_stubs("infra.logger")
 		-- Inject mock hs.fs via hs_overrides so it survives the fresh-stub replacement
 		local FS = helpers.load_with_stubs("adapters.file_system", { fs = mock_fs })
 

@@ -170,7 +170,7 @@ _UCP_PersonalWriteRefusesWhileFlagged() {
 ; ==================================================================
 ; ==================================================================
 
-; Source-level, not behavioural: lib/config_shortcuts.ahk is outside the
+; Source-level, not behavioural: infra/config_shortcuts.ahk is outside the
 ; headless include graph. The assertions below pin every part of the fix — the
 ; explicit catch, the ERROR, and the latch — and the latch's effect on
 ; persistence is covered behaviourally by

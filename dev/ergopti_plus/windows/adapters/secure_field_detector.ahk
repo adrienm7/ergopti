@@ -24,6 +24,8 @@
 
 
 
+
+
 ; ============================
 ; ============================
 ; ======= 1/ Constants =======
@@ -66,17 +68,19 @@ global SFD_UIA_IDLE_REQUIRED_MS := 250
 ; roughly once a second, on the thread that also dispatches keystrokes.
 global SFD_UIA_HOSTILE_TTL_MS := 30000
 
-; Process name => A_TickCount deadline until which probes against it are skipped.
+; Process name => wrap-safe {Tick, DurationMs} interval during which probes are skipped.
 ; Entries expire, so the map cannot grow without bound across a long session.
 global SFD_UIA_HOSTILE_CACHE := Map()
 
 
 
-; ======================================
-; ======================================
+
+
+; ====================================
+; ====================================
 ; ======= 2/ Adapter Functions =======
-; ======================================
-; ======================================
+; ====================================
+; ====================================
 
 ; Returns true if the focused control is secure OR cannot yet be classified.
 ; The cheap native path is synchronous; an inconclusive browser/Electron/WPF
@@ -187,7 +191,8 @@ _SFD_UiaProcessIsHostile(ProcName) {
 	global SFD_UIA_HOSTILE_CACHE
 	if (ProcName == "" or !SFD_UIA_HOSTILE_CACHE.Has(ProcName))
 		return false
-	if (A_TickCount < SFD_UIA_HOSTILE_CACHE[ProcName])
+	Entry := SFD_UIA_HOSTILE_CACHE[ProcName]
+	if !TickExpired(Entry.Tick, Entry.DurationMs)
 		return true
 	SFD_UIA_HOSTILE_CACHE.Delete(ProcName)
 	return false
@@ -199,7 +204,10 @@ _SFD_MarkUiaHostile(ProcName) {
 	global SFD_UIA_HOSTILE_CACHE, SFD_UIA_HOSTILE_TTL_MS
 	if (ProcName == "")
 		return
-	SFD_UIA_HOSTILE_CACHE[ProcName] := A_TickCount + SFD_UIA_HOSTILE_TTL_MS
+	SFD_UIA_HOSTILE_CACHE[ProcName] := {
+		Tick: A_TickCount,
+		DurationMs: SFD_UIA_HOSTILE_TTL_MS
+	}
 }
 
 ; Bound UIA's own waits before this adapter makes its first COM round-trip.

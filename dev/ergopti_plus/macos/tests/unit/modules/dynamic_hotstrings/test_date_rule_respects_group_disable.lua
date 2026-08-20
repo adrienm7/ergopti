@@ -43,6 +43,7 @@ local function make_fake_km(group_enabled)
 		-- register_interceptor is called as _km.register_interceptor(fn) — one arg
 		register_interceptor      = function(fn) captured_interceptor = fn end,
 		register_preview_provider = function(fn) captured_preview_provider = fn end,
+		registry_transaction      = function(_, mutation) return mutation() == true end,
 		inject_dynamic            = function() error("inject_dynamic must NOT be called when group disabled") end,
 		-- Expose captured closures for tests
 		get_interceptor           = function() return captured_interceptor end,
@@ -103,8 +104,11 @@ helpers.describe("M-9: rules_engine interceptor respects is_group_enabled=false"
 			getFlags      = function() return { cmd = false, ctrl = false } end,
 			getCharacters = function() return "x" end,  -- not the trigger char
 		}
-		local ok = pcall(interceptor, non_trigger_event, "xy")
-		helpers.assert_true(ok, "interceptor must not error on non-matching input when group is enabled")
+		-- Called directly: this runs on every keystroke, so a raise here is a dead
+		-- keyboard and should fail with its own error rather than a boolean.
+		local consumed = interceptor(non_trigger_event, "xy")
+		helpers.assert_true(consumed == nil or consumed == false,
+			"a non-matching character must not be consumed — swallowing it would delete the\n\t\t\tuser's keystroke")
 	end)
 end)
 

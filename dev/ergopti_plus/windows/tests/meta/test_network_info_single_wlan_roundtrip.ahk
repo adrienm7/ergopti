@@ -5,9 +5,9 @@
 ; DESCRIPTION:
 ; The NetworkInfo port exposes getSsidHash() and getSignalStrength() as two
 ; independent methods, but both values are read out of the SAME
-; WLAN_CONNECTION_ATTRIBUTES buffer (offsets +524 and +576). Every caller asks
-; for them back to back — the keylogger network tick does exactly that, every
-; 15 s — and a stateless adapter therefore performed the whole
+; WLAN_CONNECTION_ATTRIBUTES buffer (offsets +524 and +576). Before the
+; keylogger gained a typed one-shot snapshot, its 15 s network tick asked for
+; them back to back, and a stateless adapter therefore performed the whole
 ; WlanOpenHandle -> WlanEnumInterfaces -> WlanQueryInterface -> WlanFreeMemory
 ; -> WlanCloseHandle sequence twice for one buffer.
 ;

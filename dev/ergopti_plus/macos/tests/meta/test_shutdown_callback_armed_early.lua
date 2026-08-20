@@ -25,7 +25,7 @@
 --- Both bounds are asserted. It must come AFTER the requires it closes over: a
 --- closure written above the `local` it uses binds a nil GLOBAL instead, and the
 --- resulting error inside a shutdown callback is swallowed to the Hammerspoon
---- Console where lib/logger never sees it. And it must come BEFORE the boot
+--- Console where infra/logger never sees it. And it must come BEFORE the boot
 --- phases that can throw, which is the whole point.
 --- ==============================================================================
 
@@ -34,10 +34,11 @@ local helpers = require("tests.helpers")
 --- Reads the driver's init.lua.
 --- @return string
 local function init_source()
-	local f = io.open(helpers.driver_root() .. "init.lua", "r")
-	assert(f, "macos/init.lua must be readable")
-	local src = f:read("*a")
-	f:close()
+	-- Selected by a declaration unique to init.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+	helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 	return src
 end
 
@@ -62,14 +63,14 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 	helpers.it("is installed before every later boot phase", function()
 		local code = init_source():gsub("%-%-[^\n]*", "")
 
-		local shutdown = at(code, "hs.shutdownCallback = function()")
+		local shutdown = at(code, "hs.shutdownCallback = shutdown_all_resources")
 		helpers.assert_true(shutdown ~= nil, "init.lua must install a shutdown callback")
 
 		-- Each of these runs after the requires and can throw: a missing config, a
 		-- Karabiner deploy failure, a menu build error, an unreadable watch root.
 		-- Anything that throws here used to leave the session with no teardown.
 		local later_phases = {
-			'require("lib.file_watchers").start',
+			'require("infra.file_watchers").start',
 			"menu.start",
 			"Boot.mark(\"Boot complete",
 		}
@@ -94,7 +95,8 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 
 	helpers.it("is installed after the modules it closes over", function()
 		local code = init_source():gsub("%-%-[^\n]*", "")
-		local shutdown = at(code, "hs.shutdownCallback = function()")
+		local closure = at(code, "local function shutdown_all_resources()")
+		local shutdown = at(code, "hs.shutdownCallback = shutdown_all_resources")
 
 		-- The callback names these directly. A closure written ABOVE the local it
 		-- uses silently binds a nil global instead, and the error surfaces only in
@@ -103,7 +105,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- Anchored on the DECLARATION of each name, not on the whole
 		-- `local x = require(...)` line. karabiner is now forward-declared and
 		-- assigned later, because the shutdown callback had to move above the
-		-- requires that can raise: modules/karabiner/defaults.lua calls error()
+		-- requires that can raise: platform/remap/defaults.lua calls error()
 		-- by design when the shared tap-hold TOML is unreadable, and arming the
 		-- teardown after that meant the one failure which leaves the keyboard
 		-- remapped was also the one that prevented the teardown existing.
@@ -111,6 +113,8 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		-- a forward declaration satisfies exactly as an inline require does.
 		local required = {
 			"local karabiner",
+			"local LauncherGuard",
+			"local ok_lease_controller, LeaseController",
 			"local keymap",
 			"local gestures",
 			"local shortcuts",
@@ -125,7 +129,7 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 					.. "re-anchor this guard rather than dropping it")
 			if decl_at then
 				checked = checked + 1
-				helpers.assert_true(decl_at < shutdown,
+				helpers.assert_true(decl_at < closure,
 					"'" .. decl .. "' must be declared ABOVE the shutdown callback, which closes "
 						.. "over it. Below, the callback binds a nil global and the teardown fails "
 						.. "silently at the one moment nothing is watching the log")
@@ -134,20 +138,49 @@ helpers.describe("init: the shutdown callback is armed before the risky boot pha
 		helpers.assert_eq(checked, #required, "every closed-over module must be checked")
 	end)
 
-	helpers.it("still tears down every subsystem", function()
+	helpers.it("retains complete controlled teardown without running it in native shutdown", function()
 		local code = init_source():gsub("%-%-[^\n]*", "")
-		local shutdown = at(code, "hs.shutdownCallback = function()")
-		local body = code:sub(shutdown, shutdown + 4000)
+		local teardown = at(code, "local function teardown_all_resources")
+		local finalizer = at(code, "local function finalize_teardown_resources")
+		local shutdown = at(code, "local function shutdown_all_resources()")
+		local armed = at(code, "hs.shutdownCallback = shutdown_all_resources")
+		helpers.assert_true(teardown ~= nil and finalizer ~= nil and shutdown ~= nil and armed ~= nil)
+		local teardown_body = code:sub(teardown, finalizer - 1)
+		local finalizer_body = code:sub(finalizer, shutdown - 1)
+		local shutdown_body = code:sub(shutdown, armed - 1)
 
 		-- Moving the assignment must not have moved a truncated copy of it: the
 		-- teardown is only worth arming early if it is still the whole teardown.
 		for _, step in ipairs({
-			"keymap.stop", "gestures.stop", "shortcuts.stop",
-			"restore_all_overrides", "karabiner.kill",
+			"return keymap.stop(true)", "gestures.stop", "shortcuts.stop",
+			"LauncherGuard.stop",
+			"restore_all_overrides",
 			"terminate_helper_processes", "script_watchers",
 		}) do
-			helpers.assert_true(body:find(step, 1, true) ~= nil,
-				"the shutdown callback must still perform '" .. step .. "'")
+			helpers.assert_true(teardown_body:find(step, 1, true) ~= nil,
+				"the shared local teardown must still perform '" .. step .. "'")
 		end
+		helpers.assert_true(
+			teardown_body:match(
+				"TeardownTransaction%.run%s*%(%s*_local_teardown_state%s*,%s*steps%s*%)") ~= nil,
+			"throws and explicit false results must remain visible and retryable per local teardown step"
+		)
+		local cancel_at = at(finalizer_body, "TimerScheduler.cancelAll")
+		local logger_stop_at = at(finalizer_body, "Logger.stop_async_sink")
+		local terminal_at = at(finalizer_body, "_controlled_terminal_finalized = true")
+		helpers.assert_true(cancel_at ~= nil and logger_stop_at ~= nil and terminal_at ~= nil
+			and cancel_at < logger_stop_at and logger_stop_at < terminal_at,
+			"the post-drain finalizer must release timers then logger before publishing terminal state")
+		helpers.assert_true(code:find("teardown = teardown_all_resources", 1, true) ~= nil
+			and code:find("begin_drain = Logger.begin_async_sink_shutdown", 1, true) ~= nil
+			and code:find("finalize_teardown = finalize_teardown_resources", 1, true) ~= nil,
+			"the coordinator must preserve local teardown -> native drain -> finalizer ordering")
+		helpers.assert_true(teardown_body:find("_local_teardown_complete", 1, true) == nil,
+			"teardown must never certify itself before resource release has run")
+		helpers.assert_true(shutdown_body:find("request_exact_lease_revoke", 1, true) ~= nil,
+			"the armed callback must request the exact token fence")
+		helpers.assert_true(shutdown_body:find("teardown_all_resources", 1, true) == nil,
+			"the unawaitable callback must keep F17 consumers live until process EOF")
+		helpers.assert_true(shutdown_body:find("shortcuts.stop", 1, true) == nil)
 	end)
 end)

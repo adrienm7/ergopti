@@ -25,16 +25,15 @@
 
 local helpers = require("tests.helpers")
 
-local DRIVER_ROOT = helpers.driver_root()
 
 --- Reads a driver source file with Lua comments stripped, so counting a symbol
 --- never trips over the same symbol named in a comment. Block comments first,
 --- then line comments (`.` spans newlines in Lua patterns).
-local function read_code(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_code(selector)
+	local src = helpers.read_driver_source(selector)
 	src = src:gsub("%-%-%[%[.-%]%]", " ")
 	local out = {}
 	for line in (src .. "\n"):gmatch("([^\n]*)\n") do
@@ -54,7 +53,7 @@ end
 -- ===================================================
 
 helpers.describe("startup: keylogger creates its window.filter lazily (keylogger-winfilter-lazy)", function()
-	local src = read_code("modules/keylogger/init.lua")
+	local src = read_code("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
 
 	helpers.it("hs.window.filter.new appears exactly once, in the lazy helper", function()
 		local count = select(2, src:gsub("hs%.window%.filter%.new", ""))
@@ -87,7 +86,7 @@ end)
 -- ======================================================
 
 helpers.describe("startup: gestures pre-warm does not re-initialise its sub-modules (gestures-prewarm-no-reinit)", function()
-	local src = read_code("modules/gestures/init.lua")
+	local src = read_code("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 
 	helpers.it("Actions.init is called exactly once (at module load, not in pre-warm)", function()
 		local count = select(2, src:gsub("Actions%.init%(", ""))
@@ -95,10 +94,25 @@ helpers.describe("startup: gestures pre-warm does not re-initialise its sub-modu
 			"Actions.init must run once at module load — re-calling it in the pre-warm logs a spurious 'called more than once'")
 	end)
 
-	helpers.it("Engine.init is called exactly once (at module load, not in pre-warm)", function()
-		local count = select(2, src:gsub("Engine%.init%(", ""))
-		helpers.assert_eq(count, 1,
-			"Engine.init must run once at module load — re-calling it in the pre-warm logs a spurious 'called more than once'")
+	helpers.it("the pre-warm body never calls Engine.init", function()
+		local prewarm_at = src:find("local function prewarm_dependencies()", 1, true)
+		local prewarm_end = prewarm_at and src:find("\nlocal function kickstart_hid", prewarm_at, true)
+		helpers.assert_true(prewarm_at ~= nil and prewarm_end ~= nil,
+			"the pre-warm body must remain independently locatable")
+		local prewarm = src:sub(prewarm_at, prewarm_end - 1)
+		helpers.assert_true(prewarm:find("Engine.init", 1, true) == nil,
+			"pre-warming dependencies must not reinitialize the live engine at boot")
+	end)
+
+	helpers.it("a post-stop Engine.init remains lifecycle-gated", function()
+		local gate = src:find("if engine_needs_init then", 1, true)
+		local reinit = gate and src:find("Engine.init(CoreState, Actions)", gate, true)
+		local stop = src:find("xpcall(Engine.stop", 1, true)
+		local debt = stop and src:find("engine_needs_init = true", stop, true)
+		helpers.assert_true(gate ~= nil and reinit ~= nil and gate < reinit,
+			"Engine.init may recur only after the lifecycle marks a stopped engine for restart")
+		helpers.assert_true(stop ~= nil and debt ~= nil and stop < debt,
+			"the restart gate must be armed only after Engine.stop succeeds")
 	end)
 end)
 
@@ -112,7 +126,7 @@ end)
 -- ===========================================================
 
 helpers.describe("startup: duplicate shortcuts.bindings start() does not WARN (bindings-quiet-restart)", function()
-	local src = read_code("modules/shortcuts/bindings.lua")
+	local src = read_code("local function get_frontmost_app_name") -- modules/shortcuts/bindings.lua
 
 	helpers.it("the already-started guard logs at DEBUG, not WARNING", function()
 		-- init.lua starts the bindings early, then menu_state re-starts them to

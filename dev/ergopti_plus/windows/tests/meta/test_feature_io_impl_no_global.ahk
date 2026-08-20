@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; feedback_loader_target_explicit requires that any function mutating a shared
 ; Map (Features, TapHold, future v2/v3 globals) take that Map as an explicit
-; parameter, never reach for it via global. lib/feature_io.ahk's public
+; parameter, never reach for it via global. infra/feature_io.ahk's public
 ; FeatureLocateV2/WriteFeatureV2/WriteFeatureBatchV2 reintroduced the banned
 ; "global Features" pattern. An interim thin-wrapper fix (public function
 ; still bound the global, an internal *Impl function took FeaturesMap
@@ -21,7 +21,7 @@
 ; explicitly carved out by feedback_loader_target_explicit, may still bind
 ; the global itself (its own contract is "read the LIVE production state").
 ;
-; SCOPE: source introspection of lib/feature_io.ahk.
+; SCOPE: source introspection of infra/feature_io.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -37,7 +37,7 @@
 
 _FIONG_AssertNoGlobalFeatures(FuncName, ExplicitParamName) {
 	Body := _DriverFuncBody(FuncName)
-	Assert(Body != "", FuncName . " must exist in lib/feature_io.ahk")
+	Assert(Body != "", FuncName . " must exist in infra/feature_io.ahk")
 	Assert(InStr(Body, "global Features") = 0,
 		FuncName . " must not declare 'global Features' -- the target Map must be an explicit parameter (feedback_loader_target_explicit)")
 	Assert(InStr(Body, "(" . ExplicitParamName) > 0 or InStr(Body, ", " . ExplicitParamName) > 0,
@@ -76,7 +76,11 @@ Test("feature_io: WriteFeatureBatchV2 takes FeaturesMap explicitly and never rea
 ; (global Features in its own scope) rather than reintroducing a delegating
 ; wrapper around the fixed functions.
 _FIONG_NoBareCallShapesRemain() {
-	for _, FuncName in ["MenuAddItemFromManifest", "MenuAddItemWithLabel", "MenuAddLetterPicker",
+	; MenuRowFromManifest replaced MenuAddItemFromManifest here on 2026-08-07: the
+	; feature lookup moved into it when the row and the drawing were split, and
+	; MenuAddItemFromManifest is a two-line wrapper that no longer touches Features.
+	; The invariant is unchanged — whoever resolves the feature declares the global.
+	for _, FuncName in ["MenuRowFromManifest", "MenuRowWithLabel", "MenuAddLetterPicker",
 		"SetFeatureLetter", "SetFeatureLetterOff", "ToggleFeatureV2", "_HS_TryLiveToggleV2"] {
 		Body := _DriverFuncBody(FuncName)
 		Assert(Body != "", FuncName . " must exist in ui/menu/menu_engine.ahk")
@@ -89,7 +93,7 @@ Test("menu_engine: every FeatureLocateV2/WriteFeatureV2/WriteFeatureBatchV2 call
 _FIONG_ConfigIoCallersResolveFeatures() {
 	for _, FuncName in ["ToggleAllFeatures", "ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
 		Body := _DriverFuncBody(FuncName)
-		Assert(Body != "", FuncName . " must exist in lib/config_io.ahk")
+		Assert(Body != "", FuncName . " must exist in infra/config_io.ahk")
 		Assert(InStr(Body, "global") > 0 and InStr(Body, "Features") > 0,
 			FuncName . " must reference Features in its global declaration so it can pass it explicitly to WriteFeatureBatchV2 (F43)")
 	}
@@ -111,7 +115,7 @@ Test("config_io: every WriteFeatureBatchV2 caller resolves Features explicitly (
 ; explicitly into FeatureLocateV2 rather than relying on a delegating wrapper.
 _FIONG_ReadFeatureStateV2BindsGlobalButCallsExplicitly() {
 	Body := _DriverFuncBody("ReadFeatureStateV2")
-	Assert(Body != "", "ReadFeatureStateV2 must exist in lib/feature_io.ahk")
+	Assert(Body != "", "ReadFeatureStateV2 must exist in infra/feature_io.ahk")
 	Assert(InStr(Body, "global Features") > 0,
 		"ReadFeatureStateV2 is the documented read-only-accessor exception and may bind global Features itself")
 	Assert(InStr(Body, "FeatureLocateV2(Features, V2Path)") > 0,

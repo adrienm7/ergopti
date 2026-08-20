@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- A prior test may have installed a stub modules.llm.profiles (with empty
 -- get_all_profiles) that would leak into this file's top-level require.
@@ -27,34 +27,71 @@ local function load_core_with_timer_spy()
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	local timer_spy_calls = {}
-	local timer_stub = {}
-	for k, v in pairs(hs_stub.timer or {}) do
-		timer_stub[k] = v
+	local controller = { fail_next = nil, cancel_failures = 0 }
+	local scheduler_stub = {}
+	function scheduler_stub.after(delay, fn)
+		local handle = { timer = {}, committed = false, fired = false }
+		local call = { delay = delay, fn = fn, handle = handle }
+		timer_spy_calls[#timer_spy_calls + 1] = call
+		function call.fire()
+			if handle.committed ~= true or handle.fired then return false end
+			handle.committed = false
+			handle.fired = true
+			handle.timer = nil
+			fn()
+			return true
+		end
+		local failure = controller.fail_next
+		controller.fail_next = nil
+		if failure == "settled" then
+			handle.timer = nil
+			handle.fired = true
+			return handle, false
+		elseif failure == "debt" then
+			return handle, false
+		end
+		handle.committed = true
+		return handle, true
 	end
-	timer_stub.doAfter = function(delay, fn)
-		timer_spy_calls[#timer_spy_calls + 1] = { delay = delay, fn = fn }
-		return { stop = function() end }
+	function scheduler_stub.cancel(handle)
+		if controller.cancel_failures > 0 then
+			controller.cancel_failures = controller.cancel_failures - 1
+			return false
+		end
+		handle.committed = false
+		handle.fired = true
+		handle.timer = nil
+		return true
 	end
-	local fresh_core = helpers.load_with_stubs("modules.llm", { timer = timer_stub })
+	package.loaded["adapters.timer_scheduler"] = scheduler_stub
+	local fresh_core = helpers.load_with_stubs("modules.llm")
+	local loaded_hs = package.loaded["hs"]
+	local load_time_calls = {}
+	for index, call in ipairs(timer_spy_calls) do load_time_calls[index] = call end
+	for index = #timer_spy_calls, 1, -1 do timer_spy_calls[index] = nil end
 	_G.hs = INITIAL_HS
-	return fresh_core, timer_spy_calls, _G.hs
+	return fresh_core, timer_spy_calls, loaded_hs, controller, load_time_calls
 end
 
 
 
 
 
--- =====================================
+-- ======================================
 -- ======================================
 -- ======= 1/ DEFAULT_STATE shape =======
 -- ======================================
--- =====================================
+-- ======================================
 
 helpers.describe("Core.DEFAULT_STATE", function()
 	helpers.it("does not schedule a network bootstrap timer at require-time", function()
-		local _, timer_spy_calls = load_core_with_timer_spy()
+		local _, timer_spy_calls, hs_stub, _, load_time_calls = load_core_with_timer_spy()
 		helpers.assert_eq(#timer_spy_calls, 0,
 			"modules.llm must stay side-effect free until boot explicitly enables network bootstrap")
+		hs_stub.http.__reset()
+		for _, call in ipairs(load_time_calls) do call.fire() end
+		helpers.assert_eq(#hs_stub.http.__calls, 0,
+			"the intentional local API-entry load must not perform backend probes")
 	end)
 
 	local required_keys = {
@@ -99,11 +136,11 @@ end)
 
 
 
--- ===============================================
+-- ==============================================
 -- ==============================================
 -- ======= 1c/ explicit network bootstrap =======
 -- ==============================================
--- ===============================================
+-- ==============================================
 
 helpers.describe("Core.start_background_network_bootstrap", function()
 	helpers.it("primes backend probes only when explicitly called", function()
@@ -113,7 +150,7 @@ helpers.describe("Core.start_background_network_bootstrap", function()
 		fresh_core.start_background_network_bootstrap()
 		helpers.assert_eq(#timer_spy_calls, 1,
 			"explicit bootstrap must schedule exactly one deferred timer")
-		timer_spy_calls[1].fn()
+		helpers.assert_true(timer_spy_calls[1].fire())
 		helpers.assert_eq(#hs_stub.http.__calls, 4,
 			"bootstrap must issue two detection probes and two connection warmups")
 	end)
@@ -125,17 +162,42 @@ helpers.describe("Core.start_background_network_bootstrap", function()
 		helpers.assert_eq(#timer_spy_calls, 1,
 			"duplicate bootstrap calls must not schedule extra timers")
 	end)
+
+	helpers.it("a refused timer does not latch bootstrap as permanently started", function()
+		local fresh_core, timer_spy_calls, hs_stub, controller = load_core_with_timer_spy()
+		hs_stub.http.__reset()
+		controller.fail_next = "settled"
+		helpers.assert_eq(fresh_core.start_background_network_bootstrap(), false)
+		helpers.assert_true(fresh_core.start_background_network_bootstrap(),
+			"a settled refusal must leave the explicit bootstrap retryable")
+		helpers.assert_eq(#timer_spy_calls, 2)
+		helpers.assert_true(timer_spy_calls[2].fire())
+		helpers.assert_eq(#hs_stub.http.__calls, 4)
+	end)
+
+	helpers.it("cleanup debt blocks a sibling bootstrap timer until exact retry", function()
+		local fresh_core, timer_spy_calls, _, controller = load_core_with_timer_spy()
+		controller.fail_next = "debt"
+		helpers.assert_eq(fresh_core.start_background_network_bootstrap(), false)
+
+		controller.cancel_failures = 1
+		helpers.assert_eq(fresh_core.start_background_network_bootstrap(), false)
+		helpers.assert_eq(#timer_spy_calls, 1,
+			"an activated failed candidate must remain the sole native owner")
+		helpers.assert_true(fresh_core.start_background_network_bootstrap())
+		helpers.assert_eq(#timer_spy_calls, 2)
+	end)
 end)
 
 
 
 
 
--- =========================================================
+--- ============================================================
 --- ============================================================
 --- ======= 1b/ DEFAULT_STATE sourced from defaults.json =======
 --- ============================================================
--- =========================================================
+--- ============================================================
 
 -- Regression: the shared scalar defaults must come from _shared/modules/llm/defaults.json
 -- (the single source) and never from a hardcoded base table re-declared in
@@ -301,6 +363,61 @@ helpers.describe("Core profile accessors", function()
 			"a backend switch before the deferred warmup fires must discard the stale dispatch (F-MED-6)")
 	end)
 
+	helpers.it("does NOT dispatch a rejected profile warmup after rollback", function()
+		local captured = {}
+		local old_do_after = hs.timer.doAfter
+		hs.timer.doAfter = function(delay, fn)
+			captured[#captured + 1] = { delay = delay, fn = fn }
+			return { stop = function() end }
+		end
+		local warmup_calls = {}
+		local old_warmup_model = Core.warmup_model
+		Core.warmup_model = function(model_name, profile)
+			warmup_calls[#warmup_calls + 1] = { model = model_name, profile = profile }
+		end
+
+		Core.set_llm_model_ollama("gemma-4-E2B-it")
+		Core.set_runtime_llm_enabled(true)
+		Core.set_active_profile("advanced")
+		helpers.assert_eq(#captured, 1)
+		Core.set_active_profile("basic")
+		captured[1].fn()
+
+		hs.timer.doAfter = old_do_after
+		Core.warmup_model = old_warmup_model
+		Core.set_runtime_llm_enabled(false)
+		helpers.assert_eq(#warmup_calls, 0,
+			"the rollback profile generation must fence the rejected deferred warmup")
+	end)
+
+	helpers.it("(deferred-runtime-gate) does NOT dispatch a deferred profile warmup after runtime disable", function()
+		local captured = {}
+		local old_do_after = hs.timer.doAfter
+		hs.timer.doAfter = function(delay, fn)
+			captured[#captured + 1] = { delay = delay, fn = fn }
+			return { stop = function() end }
+		end
+		local warmup_calls = {}
+		local old_warmup_model = Core.warmup_model
+		Core.warmup_model = function(model_name, profile)
+			warmup_calls[#warmup_calls + 1] = { model = model_name, profile = profile }
+		end
+
+		Core.set_backend("ollama")
+		Core.set_llm_model_ollama("gemma-4-E2B-it")
+		Core.set_runtime_llm_enabled(true)
+		Core.set_active_profile("advanced")
+		helpers.assert_eq(#captured, 1,
+			"enabled profile change must really own one deferred warmup")
+		Core.set_runtime_llm_enabled(false)
+		captured[1].fn()
+
+		hs.timer.doAfter = old_do_after
+		Core.warmup_model = old_warmup_model
+		helpers.assert_eq(#warmup_calls, 0,
+			"a timer classified while enabled must re-read the live runtime gate")
+	end)
+
 	helpers.it("DOES dispatch the deferred warmup when the backend is unchanged (F-MED-6 control)", function()
 		local captured = {}
 		local old_do_after = hs.timer.doAfter
@@ -375,6 +492,36 @@ helpers.describe("Core.set_llm_streaming", function()
 	helpers.it("treats non-boolean as false", function()
 		Core.set_llm_streaming("yes")
 		-- No exception expected
+	end)
+end)
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 4b/ Cancellation contract ===
+-- =====================================
+-- =====================================
+
+helpers.describe("Core.cancel_streaming strict backend contract", function()
+	helpers.it("propagates true, false, and throw outcomes from the active backend", function()
+		local api = package.loaded["modules.llm.api_ollama"]
+		helpers.assert_not_nil(api)
+		local previous_cancel = api.cancel_streaming
+		Core.set_backend("ollama")
+
+		api.cancel_streaming = function() return true end
+		helpers.assert_eq(Core.cancel_streaming(), true)
+		api.cancel_streaming = function() return false end
+		helpers.assert_eq(Core.cancel_streaming(), false)
+		api.cancel_streaming = function() error("backend cancel failed") end
+		local ok, result = pcall(Core.cancel_streaming)
+		helpers.assert_true(ok, "backend cancellation errors must reach the file logger, not escape")
+		helpers.assert_eq(result, false)
+
+		api.cancel_streaming = previous_cancel
 	end)
 end)
 

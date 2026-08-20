@@ -15,9 +15,9 @@
 
 local M = {}
 
-local i18n   = require("lib.i18n")
-local Logger = require("lib.logger")
-local dialog = require("lib.dialog_util")
+local i18n   = require("infra.i18n")
+local Logger = require("infra.logger")
+local dialog = require("infra.dialog_util")
 
 local LOG = "models_selector"
 
@@ -31,11 +31,11 @@ local _model_browser_chooser = nil
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds the model-selection menu and returns it as a flat table.
 --- @param ctx table Context with fields:
@@ -50,12 +50,16 @@ function M.build(ctx)
 	local state         = ctx.state
 	local models_mgr    = ctx.models_mgr
 	local switch_model  = ctx.switch_model
+	local disable_model = ctx.disable_model
 	local save_prefs    = ctx.save_prefs
 	local update_menu   = ctx.update_menu
 	local DEFAULT_STATE = ctx.DEFAULT_STATE
 	-- Disable all model-switch rows while the driver is paused so a model
 	-- click cannot trigger backend loading mid-pause (M-16).
 	local paused        = ctx.paused or false
+	if type(disable_model) ~= "function" then
+		error("ModelsSelector.build requires ctx.disable_model")
+	end
 
 	Logger.debug(LOG, "Building models selection menu…")
 	local menu = {}
@@ -139,7 +143,7 @@ function M.build(ctx)
 			if type(entry) == "table" and entry.backend == backend and entry.name == name then
 				table.remove(state.llm_user_models, i)
 				Logger.info(LOG, string.format("User model removed: %s/%s.", backend, name))
-				return
+				return i, entry
 			end
 		end
 	end
@@ -151,7 +155,7 @@ function M.build(ctx)
 		local hint  = (active_backend == "mlx")
 			and i18n.get("menu.llm.mlx_model_hint")
 			or  i18n.get("menu.llm.ollama_model_hint")
-		local title = i18n.get("menu.llm.add_custom_model")
+		local window_title = i18n.get("menu.llm.add_custom_model")
 
 		local ok_uc, uc = pcall(hs.webview.usercontent.new, "addCustomModel")
 		if not ok_uc or not uc then
@@ -181,7 +185,7 @@ function M.build(ctx)
 					return
 				end
 				add_user_model(active_backend, name)
-				save_prefs()
+				if save_prefs() ~= true then return false end
 				switch_model(name)
 			end
 		end)
@@ -194,7 +198,7 @@ function M.build(ctx)
 
 		-- Escape a string for HTML attribute and text content
 		local function he(s)
-			return s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;")
+			return (s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"))
 		end
 
 		local css = table.concat({
@@ -240,7 +244,7 @@ function M.build(ctx)
 		if not geo then return end
 		_wv = ui_builder.show_webview({
 			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
-			title       = title,
+			title       = window_title,
 			style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
 			usercontent = uc,
 			html_string = html,
@@ -272,13 +276,12 @@ function M.build(ctx)
 
 	-- "No model" option so the user can explicitly disable predictions
 	table.insert(menu, {
-		title    = i18n.get("menu.llm.no_model"),
+		label    = i18n.get("menu.llm.no_model"),
 		checked  = (not state.llm_model or state.llm_model == ""),
 		disabled = paused or nil,
-		fn       = function()
+		action       = function()
 			Logger.info(LOG, "Switching model to None (disabled).")
-			state.llm_model = ""
-			save_prefs(); update_menu()
+			return disable_model()
 		end
 	})
 
@@ -288,10 +291,10 @@ function M.build(ctx)
 	local backend_default = get_display_model_name(backend_default_raw, presets)
 	if backend_default and backend_default ~= "" then
 		table.insert(menu, {
-			title    = string.format(i18n.get("menu.llm.backend_default_model"), backend_default),
+			label    = string.format(i18n.get("menu.llm.backend_default_model"), backend_default),
 			checked  = (active_display_model == backend_default),
 			disabled = paused or nil,
-			fn       = function()
+			action       = function()
 				Logger.info(LOG, string.format("Restoring backend default model -> %s", backend_default))
 				switch_model(backend_default)
 			end
@@ -311,19 +314,20 @@ function M.build(ctx)
 			and i18n.get("menu.llm.hf_token_set")
 			or  i18n.get("menu.llm.hf_token_unset")
 		table.insert(menu, {
-			title    = string.format(i18n.get("menu.llm.hf_token_label"), token_status),
+			label    = string.format(i18n.get("menu.llm.hf_token_label"), token_status),
 			disabled = paused or nil,
-			fn       = function()
+			action       = function()
 				if models_mgr and type(models_mgr.prompt_hf_login) == "function" then
 					models_mgr.prompt_hf_login(function()
-						save_prefs(); update_menu()
+						if save_prefs() ~= true then return false end
+						update_menu()
 					end)
 				end
 			end
 		})
 	end
 
-	table.insert(menu, { title = "-" })
+	table.insert(menu, { separator = true })
 
 
 	-- =====================================================
@@ -340,33 +344,40 @@ function M.build(ctx)
 			local prefix = (state.llm_model == m_name) and "✓ " or "  "
 			local model_submenu = {}
 			table.insert(model_submenu, {
-				title    = i18n.get("menu.llm.select_model"),
+				label    = i18n.get("menu.llm.select_model"),
 				checked  = (state.llm_model == m_name),
 				disabled = paused or nil,
-				fn       = function() switch_model(m_name) end
+				action       = function() switch_model(m_name) end
 			})
 			table.insert(model_submenu, {
-				title = i18n.get("menu.llm.remove_user_model"),
-				fn = function()
+				label = i18n.get("menu.llm.remove_user_model"),
+				action = function()
 					local ok, choice = pcall(dialog.block_alert,
 						i18n.get("menu.llm.remove_model_title"),
 						string.format(i18n.get("menu.llm.remove_model_body"), m_name),
 						i18n.get("button.remove"), i18n.get("button.cancel"), "warning")
 					if ok and choice == i18n.get("button.remove") then
-						remove_user_model(active_backend, m_name)
-						if state.llm_model == m_name then state.llm_model = "" end
-						save_prefs(); update_menu()
+						local removed_index, removed_entry = remove_user_model(active_backend, m_name)
+						if state.llm_model == m_name then
+							if disable_model() ~= true then
+								table.insert(state.llm_user_models, removed_index, removed_entry)
+								return false
+							end
+							return true
+						end
+						if save_prefs() ~= true then return false end
+						update_menu()
 					end
 				end
 			})
 			table.insert(user_sub, {
-				title    = prefix .. m_name,
-				menu     = model_submenu,
+				label    = prefix .. m_name,
+				items    = model_submenu,
 				disabled = paused or nil,
-				fn       = function() pcall(function() switch_model(m_name) end) end
+				action       = function() pcall(function() switch_model(m_name) end) end
 			})
 		end
-		table.insert(menu, { title = i18n.get("menu.llm.my_models"), menu = user_sub })
+		table.insert(menu, { label = i18n.get("menu.llm.my_models"), items = user_sub })
 	end
 
 
@@ -386,11 +397,13 @@ function M.build(ctx)
 
 				local prefix         = (active_display_model == m_name) and "✓ " or "  "
 				local status         = is_inst and "🟢 " or ""
-				local type_str       = (info.type == "completion") and " [📝 Complétion]" or " [💬 Chat]"
+				local type_str       = " [" .. i18n.get((info.type == "completion")
+					and "menu.llm.model_type_completion"
+					or  "menu.llm.model_type_chat") .. "]"
 				local params_ram_str = (info.params and info.params > 0)
 					and string.format(" (%gB params, ~%d Go RAM)", math.ceil(info.params * 10) / 10, math.ceil(ram))
 					or  string.format(" (~%d Go RAM)", math.ceil(ram))
-				local title = string.format("%s%s%s%s%s", prefix, status, m_name, type_str, params_ram_str)
+				local row_label = string.format("%s%s%s%s%s", prefix, status, m_name, type_str, params_ram_str)
 
 				local hw            = m.hardware_requirements or {}
 				local hw_active     = hw[active_backend] or {}
@@ -405,16 +418,16 @@ function M.build(ctx)
 				local model_submenu = {}
 
 				table.insert(model_submenu, {
-					title    = i18n.get("menu.llm.select_model"),
+					label    = i18n.get("menu.llm.select_model"),
 					checked  = (active_display_model == m_name),
 					disabled = paused or nil,
-					fn       = function() switch_model(m_name) end
+					action       = function() switch_model(m_name) end
 				})
 
 				if is_inst then
 					table.insert(model_submenu, {
-						title = i18n.get("menu.llm.delete_model_cache"),
-						fn = function()
+						label = i18n.get("menu.llm.delete_model_cache"),
+						action = function()
 							local ok, choice = pcall(dialog.block_alert,
 								i18n.get("menu.llm.delete_model_title"),
 								string.format(i18n.get("menu.llm.delete_model_body"), m_name),
@@ -426,117 +439,119 @@ function M.build(ctx)
 					})
 				end
 
-				table.insert(model_submenu, { title = "-" })
+				table.insert(model_submenu, { separator = true })
 				table.insert(model_submenu, {
-					title = string.format(i18n.get("menu.llm.model_backend"), display_backend),
-					fn    = function() end
+					label = string.format(i18n.get("menu.llm.model_backend"), display_backend),
+					action    = function() end
 				})
 				table.insert(model_submenu, {
-					title = string.format(i18n.get("menu.llm.model_source"), active_source),
-					fn    = function()
+					label = string.format(i18n.get("menu.llm.model_source"), active_source),
+					action    = function()
 						local hs = hs  -- luacheck: ignore — intentional global access
 						pcall(hs.urlevent.openURL, active_source)
 					end
 				})
 
-				table.insert(model_submenu, { title = "-" })
-				table.insert(model_submenu, { title = i18n.section("menu.llm.specs_header"), disabled = true })
+				table.insert(model_submenu, { separator = true })
+				table.insert(model_submenu, { label = i18n.section("menu.llm.specs_header"), disabled = true })
 
 				local m_type    = m.type or info.type or "Inconnu"
-				local type_label = (m_type == "completion") and "📝 Complétion" or "💬 Chat"
+				local type_label = i18n.get((m_type == "completion")
+					and "menu.llm.model_type_completion"
+					or  "menu.llm.model_type_chat")
 				table.insert(model_submenu, {
-					title = string.format(i18n.get("menu.llm.model_type"), type_label),
-					fn    = function() end
+					label = string.format(i18n.get("menu.llm.model_type"), type_label),
+					action    = function() end
 				})
 
 				if m.last_updated and m.last_updated ~= "Unknown" then
 					local y, mo, d = m.last_updated:match("^(%d+)%-(%d+)%-(%d+)$")
 					local formatted_date = (y and mo and d) and (d .. "/" .. mo .. "/" .. y) or m.last_updated
 					table.insert(model_submenu, {
-						title = string.format(i18n.get("menu.llm.model_date"), formatted_date),
-						fn    = function() end
+						label = string.format(i18n.get("menu.llm.model_date"), formatted_date),
+						action    = function() end
 					})
 				end
 
 				if m.parameters then
 					if m.parameters.total and m.parameters.total ~= "N/A" then
 						table.insert(model_submenu, {
-							title = string.format(i18n.get("menu.llm.model_params_total"), m.parameters.total),
-							fn    = function() end
+							label = string.format(i18n.get("menu.llm.model_params_total"), m.parameters.total),
+							action    = function() end
 						})
 					end
 					if m.parameters.active and m.parameters.active ~= "N/A" then
 						table.insert(model_submenu, {
-							title = string.format(i18n.get("menu.llm.model_params_active"), m.parameters.active),
-							fn    = function() end
+							label = string.format(i18n.get("menu.llm.model_params_active"), m.parameters.active),
+							action    = function() end
 						})
 					end
 				end
 
 				if m.capabilities then
-					table.insert(model_submenu, { title = "-" })
-					table.insert(model_submenu, { title = i18n.section("menu.llm.caps_header"), disabled = true })
+					table.insert(model_submenu, { separator = true })
+					table.insert(model_submenu, { label = i18n.section("menu.llm.caps_header"), disabled = true })
 					if m.capabilities.speed_tok_s then
 						table.insert(model_submenu, {
-							title = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s),
-							fn    = function() end
+							label = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s),
+							action    = function() end
 						})
 					end
 					local tags = m.capabilities.tags
 					if tags and type(tags) == "table" and #tags > 0 then
 						table.insert(model_submenu, {
-							title = string.format(i18n.get("menu.llm.model_tags"), table.concat(tags, ", ")),
-							fn    = function() end
+							label = string.format(i18n.get("menu.llm.model_tags"), table.concat(tags, ", ")),
+							action    = function() end
 						})
 					end
 				end
 
 				if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
-					table.insert(model_submenu, { title = "-" })
+					table.insert(model_submenu, { separator = true })
 					table.insert(model_submenu, {
-						title    = i18n.decorate_section(string.format(i18n.get("menu.llm.hw_header"), display_backend)),
+						label    = i18n.decorate_section(string.format(i18n.get("menu.llm.hw_header"), display_backend)),
 						disabled = true
 					})
 					if hw_active.download_gb then
 						table.insert(model_submenu, {
-							title = string.format(i18n.get("menu.llm.hw_download"), hw_active.download_gb),
-							fn    = function() end
+							label = string.format(i18n.get("menu.llm.hw_download"), hw_active.download_gb),
+							action    = function() end
 						})
 					end
 					if hw_active.disk_gb then
 						table.insert(model_submenu, {
-							title = string.format(i18n.get("menu.llm.hw_disk"), hw_active.disk_gb),
-							fn    = function() end
+							label = string.format(i18n.get("menu.llm.hw_disk"), hw_active.disk_gb),
+							action    = function() end
 						})
 					end
 					if hw_active.ram_gb then
 						table.insert(model_submenu, {
-							title = string.format(i18n.get("menu.llm.hw_ram"), hw_active.ram_gb),
-							fn    = function() end
+							label = string.format(i18n.get("menu.llm.hw_ram"), hw_active.ram_gb),
+							action    = function() end
 						})
 					end
 				end
 
 				table.insert(family_sub, {
-					title    = title,
-					menu     = model_submenu,
+					label    = row_label,
+					items    = model_submenu,
 					disabled = paused or nil,
 					-- Clicking the model row title selects it directly (same as "Select model")
-					fn       = function() pcall(function() switch_model(m_name) end) end
+					action       = function() pcall(function() switch_model(m_name) end) end
 				})
 
 				::continue_model::
 			end
 
 			if #family_sub > 0 then
-				if #sub > 0 then table.insert(sub, { title = "-" }) end
+				if #sub > 0 then table.insert(sub, { separator = true }) end
 				for _, model_entry in ipairs(family_sub) do
 					table.insert(sub, model_entry)
 				end
 			end
 		end
 		if #sub > 0 then
-			table.insert(menu, { title = provider.label, menu = sub })
+			table.insert(menu, { label = provider.label, items = sub })
 		end
 	end
 
@@ -642,16 +657,16 @@ function M.build(ctx)
 		end)
 	end
 
-	table.insert(menu, { title = "-" })
+	table.insert(menu, { separator = true })
 	table.insert(menu, {
-		title    = i18n.get("menu.llm.browse_models_entry"),
+		label    = i18n.get("menu.llm.browse_models_entry"),
 		disabled = paused or nil,
-		fn       = function() open_model_browser() end,
+		action       = function() open_model_browser() end,
 	})
 	table.insert(menu, {
-		title    = i18n.get("menu.llm.add_model_entry"),
+		label    = i18n.get("menu.llm.add_model_entry"),
 		disabled = paused or nil,
-		fn       = function() prompt_add_user_model() end,
+		action       = function() prompt_add_user_model() end,
 	})
 
 	return menu

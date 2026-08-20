@@ -3,273 +3,429 @@
 --- ==============================================================================
 --- MODULE: GraphicsRenderer Adapter (Linux)
 --- DESCRIPTION:
---- Linux implementation of the GraphicsRenderer port contract defined in
---- static/ergopti_plus/_shared/core/ports/GraphicsRenderer.spec.js. Provides
---- layered overlay windows backed by lgi (GTK + cairo) for the WPM widget and
---- metrics dashboard overlays.
+--- Draws the preview tooltip: an undecorated, click-through GTK window with a
+--- cairo-painted rounded panel and Pango-measured text.
 ---
---- When lgi is absent the adapter gracefully no-ops — every public method is
---- safe to call with pcall-wrapped GTK operations.
+--- WHY GTK AND CAIRO RATHER THAN A WEBVIEW:
+--- The driver already embeds WebKit2GTK for its settings windows, and a tooltip
+--- is not a settings window. It appears on a keystroke, must be measured before
+--- it is placed (the layout maths needs the panel's size to clamp it on screen),
+--- must never take focus, and must never eat a click. A WebView gives none of
+--- those cheaply and costs a page load per preview.
+---
+--- WHY IT IS AN ADAPTER AND NOT A UI MODULE:
+--- Everything here is the OS drawing surface. What to draw — which candidates,
+--- in what order, dimmed or not — is ui/tooltip/preview.lua, and the geometry
+--- and colours are shared with the other two drivers. This file knows about
+--- cairo and knows nothing about hotstrings.
 ---
 --- FEATURES & RATIONALE:
---- 1. lgi/cairo overlay: createWindow spawns a borderless, always-on-top GTK
----    window with a cairo drawing area. The caller's draw_fn receives a cairo
----    context and paints directly.
---- 2. Graceful no-op: when lgi/cairo is unavailable, createWindow returns
----    INVALID_HANDLE (0) and all methods are safe no-ops.
---- 3. Window pool: up to MAX_WINDOWS overlays tracked by integer handle.
---- 4. Pango text support: the draw_fn contract passes a {ctx, w, h} table so
----    callers can use cairo + PangoLayout for text rendering.
+--- 1. Measured, then placed. Pango reports the text extents, the panel size
+---    follows from them, and only then does the shared layout decide where the
+---    window goes — so the clamp has a real size to clamp.
+--- 2. Click-through and focus-free. An input region of zero area makes the
+---    window transparent to the pointer; accept-focus and focus-on-map are off,
+---    so a preview cannot steal the keystroke that produced it.
+--- 3. Degrades to nothing. Without lgi, GTK or a display, is_available() is
+---    false and every call is a no-op. A driver whose expansions work must not
+---    stop working because it cannot draw a hint about them.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
+local Tint = require("tooltip.tint")
+local Layout = require("tooltip.layout")
 
 local LOG = "adapters.graphics_renderer"
 
--- Sentinel returned on allocation failure so callers can branch on 0.
-local INVALID_HANDLE = 0
+-- Pango works in its own units; a point size is multiplied by this to get them.
+local PANGO_SCALE = 1024
 
--- =========================================
--- =========================================
--- ======= 1/ lgi Detection ================
--- =========================================
--- =========================================
+-- The window type that gets no decoration, no taskbar entry and stays above.
+-- "popup" in GTK terms; the enum value is GTK_WINDOW_POPUP.
+local GTK_WINDOW_POPUP = 1
 
--- Whether lgi + cairo + GTK are available.
-local _renderer_available = false
+-- The per-row accent bar: how wide, and how far in from the panel's left edge.
+-- Deliberately inside the padding, so it reads as a marker belonging to the row
+-- rather than as a border belonging to the panel, and so it cannot collide with
+-- the text that starts at pad_x.
+local ACCENT_BAR_WIDTH = 3
+local ACCENT_BAR_INSET = 4
 
--- lgi reference (stored after successful probe).
-local _lgi = nil
 
--- cairo namespace (from lgi.cairo).
-local _cairo = nil
 
--- GTK namespace (from lgi.Gtk).
-local _Gtk = nil
 
---- Probes lgi for cairo + GTK availability. Called once on module load.
-local function _probe()
-	local ok, lgi = pcall(require, "lgi")
+-- ==============================================
+-- ==============================================
+-- ======= 1/ Binding ===========================
+-- ==============================================
+-- ==============================================
+
+-- nil until probed; false when this machine cannot draw.
+local _gtk = nil
+
+-- The live window and its cached drawing state.
+local _window = nil
+local _surface_rows = nil
+local _style = nil
+local _size = { w = 0, h = 0 }
+
+--- Binds lgi and the GTK namespaces, or records that it cannot.
+--- @return table|nil { lgi, Gtk, Gdk, cairo, Pango, PangoCairo }
+local function bind()
+	if _gtk ~= nil then return _gtk or nil end
+	_gtk = false
+
+	local ok_lgi, lgi = pcall(require, "lgi")
+	if not ok_lgi or type(lgi) ~= "table" then
+		Logger.info(LOG, "lgi is not installed — no tooltip preview on this machine.")
+		return nil
+	end
+
+	local ok, bound = pcall(function()
+		return {
+			lgi        = lgi,
+			Gtk        = lgi.require("Gtk", "3.0"),
+			Gdk        = lgi.require("Gdk", "3.0"),
+			cairo      = lgi.cairo,
+			Pango      = lgi.require("Pango"),
+			PangoCairo = lgi.require("PangoCairo"),
+		}
+	end)
+	if not ok or type(bound) ~= "table" then
+		Logger.warn(LOG, "GTK 3 could not be bound through lgi — no tooltip preview.")
+		return nil
+	end
+
+	_gtk = bound
+	Logger.debug(LOG, "Tooltip renderer bound (lgi + GTK 3).")
+	return _gtk
+end
+
+--- Test seam: forces the binding without touching a library.
+--- @param value table|false|nil
+function M._set_binding_for_test(value)
+	_gtk = value
+end
+
+--- Whether a preview can be drawn at all.
+--- @return boolean
+function M.is_available()
+	return bind() ~= nil
+end
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 2/ Measuring =========================
+-- ==============================================
+-- ==============================================
+
+--- Measures one row of text with Pango.
+---
+--- Measurement has to happen before placement: the shared layout clamps the
+--- panel inside the screen, and it cannot do that without the panel's size. A
+--- renderer that drew first and measured after would place every tooltip using
+--- the PREVIOUS one's dimensions.
+--- @param layout userdata A Pango layout.
+--- @param text string
+--- @param font string
+--- @param size number Point size.
+--- @return number width, number height
+local function measure(layout, text, font, size)
+	local g = bind()
+	local description = g.Pango.FontDescription.from_string(font)
+	description:set_size(size * PANGO_SCALE)
+	layout:set_font_description(description)
+	layout:set_text(text, -1)
+	local w, h = layout:get_pixel_size()
+	return w, h
+end
+
+--- Computes the panel size for a set of rows.
+---
+--- @param rows table Array of { text, label }.
+--- @param style table From ui/tooltip/config.lua.
+--- @param pango_layout userdata
+--- @return table { w, h }, table Per-row metrics.
+function M.measure_rows(rows, style, pango_layout)
+	local g = bind()
+	if not g then return { w = 0, h = 0 }, {} end
+
+	local metrics = {}
+	local widest, total_height = 0, 0
+
+	for i, row in ipairs(rows) do
+		local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
+		local label_w, label_h = 0, 0
+		if row.label and row.label ~= "" then
+			label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
+		end
+
+		-- The label is right-aligned on the same line, so the row is as wide as
+		-- both plus the gap between them — not as wide as the wider of the two.
+		local row_w = text_w + (label_w > 0 and (style.layout.label_gap + label_w) or 0)
+		local row_h = math.max(text_h, label_h)
+
+		metrics[i] = { text_w = text_w, text_h = text_h, label_w = label_w, height = row_h }
+		widest = math.max(widest, row_w)
+		total_height = total_height + row_h
+		if i < #rows then total_height = total_height + style.layout.line_spacing end
+	end
+
+	return {
+		w = widest + style.layout.pad_x * 2,
+		h = total_height + style.layout.pad_y * 2,
+	}, metrics
+end
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 3/ Drawing ===========================
+-- ==============================================
+-- ==============================================
+
+--- Traces a rounded rectangle onto a cairo context.
+--- @param cr userdata Cairo context.
+--- @param w number
+--- @param h number
+--- @param radius number
+local function rounded_rect(cr, w, h, radius)
+	local pi = math.pi
+	cr:new_sub_path()
+	cr:arc(w - radius, radius,     radius, -pi / 2, 0)
+	cr:arc(w - radius, h - radius, radius, 0,       pi / 2)
+	cr:arc(radius,     h - radius, radius, pi / 2,  pi)
+	cr:arc(radius,     radius,     radius, pi,      3 * pi / 2)
+	cr:close_path()
+end
+
+--- Paints the panel and its rows.
+--- @param cr userdata Cairo context.
+--- @param rows table
+--- @param metrics table
+--- @param style table
+--- @param size table { w, h }
+--- @param background table { red, green, blue, alpha }
+local function paint(cr, rows, metrics, style, size, background)
+	local g = bind()
+
+	-- Transparent first, so the corners outside the rounded path are not black
+	-- squares on a compositor that honours alpha.
+	cr:set_operator("SOURCE")
+	cr:set_source_rgba(0, 0, 0, 0)
+	cr:paint()
+	cr:set_operator("OVER")
+
+	rounded_rect(cr, size.w, size.h, style.layout.corner_radius)
+	cr:set_source_rgba(background.red, background.green, background.blue,
+		background.alpha * style.colors.canvas_alpha)
+	cr:fill_preserve()
+
+	local border = style.colors.border_white
+	cr:set_source_rgba(border, border, border, style.colors.border_alpha)
+	cr:set_line_width(1)
+	cr:stroke()
+
+	local pango_layout = g.PangoCairo.create_layout(cr)
+	local y = style.layout.pad_y
+
+	for i, row in ipairs(rows) do
+		local m = metrics[i]
+		-- A dimmed row is one the engine will not fire — a candidate whose
+		-- category is off, or one a higher-priority mapping beats. Showing it
+		-- greyed rather than hiding it is what tells the user WHY nothing
+		-- happened.
+		local alpha = row.dimmed and 0.45 or 1.0
+
+		-- The row's own accent, as a bar down its left edge. One accent for the
+		-- WHOLE panel is what this used to draw, taken from the first candidate —
+		-- so when several categories were pending at once, which is the common
+		-- case, every row after the first was labelled by a colour belonging to
+		-- another category. A bar per row is the smallest thing that cannot lie.
+		if row.accent then
+			cr:set_source_rgba(row.accent.red, row.accent.green, row.accent.blue, alpha)
+			cr:rectangle(ACCENT_BAR_INSET, y, ACCENT_BAR_WIDTH, m.height)
+			cr:fill()
+		end
+
+		local description = g.Pango.FontDescription.from_string(style.fonts.main)
+		description:set_size(style.sizes.main * PANGO_SCALE)
+		pango_layout:set_font_description(description)
+		pango_layout:set_text(row.text or "", -1)
+
+		cr:set_source_rgba(1, 1, 1, alpha)
+		cr:move_to(style.layout.pad_x, y)
+		g.PangoCairo.show_layout(cr, pango_layout)
+
+		if row.struck then
+			-- Struck through, not omitted: a replacement the engine will refuse is
+			-- more useful shown crossed out than absent, because absent looks like
+			-- the driver failing to notice it.
+			cr:set_line_width(1)
+			cr:move_to(style.layout.pad_x, y + m.text_h / 2)
+			cr:line_to(style.layout.pad_x + m.text_w, y + m.text_h / 2)
+			cr:stroke()
+		end
+
+		if row.label and row.label ~= "" then
+			local label_description = g.Pango.FontDescription.from_string(style.fonts.main)
+			label_description:set_size(style.sizes.hint * PANGO_SCALE)
+			pango_layout:set_font_description(label_description)
+			pango_layout:set_text(row.label, -1)
+			cr:set_source_rgba(1, 1, 1, alpha * 0.6)
+			-- Right-aligned against the panel's inner edge, which is what makes a
+			-- column of triggers readable down the right-hand side.
+			cr:move_to(size.w - style.layout.pad_x - m.label_w, y)
+			g.PangoCairo.show_layout(cr, pango_layout)
+		end
+
+		y = y + m.height + style.layout.line_spacing
+	end
+end
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 4/ The window ========================
+-- ==============================================
+-- ==============================================
+
+--- Creates the popup window, once.
+--- @return userdata|nil
+local function ensure_window()
+	local g = bind()
+	if not g then return nil end
+	if _window then return _window end
+
+	local window = g.Gtk.Window({ type = GTK_WINDOW_POPUP })
+	window:set_app_paintable(true)
+	window:set_decorated(false)
+	window:set_skip_taskbar_hint(true)
+	window:set_skip_pager_hint(true)
+	window:set_keep_above(true)
+	-- A preview that took focus would swallow the next keystroke — the one the
+	-- user is in the middle of typing, which is what produced the preview.
+	window:set_accept_focus(false)
+	window:set_focus_on_map(false)
+
+	local screen = window:get_screen()
+	local visual = screen:get_rgba_visual()
+	if visual then window:set_visual(visual) end
+
+	window.on_draw = function(_, cr)
+		if _surface_rows and _style then
+			paint(cr, _surface_rows.rows, _surface_rows.metrics, _style, _size, _surface_rows.background)
+		end
+		return true
+	end
+
+	_window = window
+	return _window
+end
+
+--- Makes the window transparent to the pointer.
+---
+--- An empty input region rather than a hit-test callback: the region is set once
+--- and costs nothing per event, and a callback would be asked on every motion
+--- event that crosses the tooltip.
+--- @param window userdata
+local function make_click_through(window)
+	local g = bind()
+	local ok = pcall(function()
+		local region = g.cairo.Region.create()
+		window:get_window():input_shape_combine_region(region, 0, 0)
+	end)
 	if not ok then
-		Logger.debug(LOG, "lgi not available — graphics rendering disabled.")
-		return false
+		Logger.debug(LOG, "Click-through could not be set — the preview will absorb clicks.")
 	end
-	if not pcall(function() return lgi.cairo end) then
-		Logger.debug(LOG, "lgi.cairo not available — graphics rendering disabled.")
-		return false
-	end
-	if not pcall(function() return lgi.Gtk end) then
-		Logger.debug(LOG, "lgi.Gtk not available — graphics rendering disabled.")
-		return false
-	end
-	_lgi = lgi
-	_cairo = lgi.cairo
-	_Gtk = lgi.Gtk
-	Logger.success(LOG, "lgi/cairo/GTK available — graphics overlay rendering enabled.")
+end
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 5/ Public API ========================
+-- ==============================================
+-- ==============================================
+
+--- Shows the preview.
+---
+--- @param rows table Array of { text, label?, dimmed?, struck? }.
+--- @param opts table
+---   style table         From ui/tooltip/config.lua.
+---   accent table|nil    { red, green, blue } category accent, or nil.
+---   anchor table|nil    { type, x, y, h } from the anchoring cascade.
+---   screen table        { x, y, w, h } the frame to clamp within.
+--- @return boolean True when something was drawn.
+function M.show(rows, opts)
+	local g = bind()
+	if not g or type(rows) ~= "table" or #rows == 0 then return false end
+
+	local window = ensure_window()
+	if not window then return false end
+
+	_style = opts.style
+	local pango_layout = g.PangoCairo.create_layout(
+		g.cairo.Context.create(g.cairo.ImageSurface.create("ARGB32", 1, 1)))
+
+	local size, metrics = M.measure_rows(rows, _style, pango_layout)
+	_size = size
+
+	local background = Tint.mix(opts.accent, {
+		lightness  = _style.tint.lightness,
+		saturation = _style.tint.saturation,
+		alpha      = _style.colors.bg_alpha,
+		neutral    = {
+			red = _style.colors.bg.red, green = _style.colors.bg.green,
+			blue = _style.colors.bg.blue, alpha = _style.colors.bg_alpha,
+		},
+	})
+
+	_surface_rows = { rows = rows, metrics = metrics, background = background }
+
+	local position = Layout.compute_position(opts.anchor, size, opts.screen, {
+		caret_offset_x  = _style.positioning.caret_offset_x,
+		caret_offset_y  = _style.positioning.caret_offset_y,
+		window_offset_y = _style.positioning.window_offset_y,
+		screen_margin   = _style.layout.screen_margin,
+	})
+
+	window:resize(math.floor(size.w + 0.5), math.floor(size.h + 0.5))
+	window:move(math.floor(position.x + 0.5), math.floor(position.y + 0.5))
+	window:show_all()
+	make_click_through(window)
+	window:queue_draw()
 	return true
 end
 
-_renderer_available = _probe()
-
-
--- =========================================
--- =========================================
--- ======= 2/ Window Pool ==================
--- =========================================
--- =========================================
-
---- Maximum number of concurrent overlay windows.
-local MAX_WINDOWS = 8
-
---- Window pool: { [handle] = { window, drawing_area, surface, w, h } }
-local _windows = {}
-
---- Next available handle (starts at 1, INVALID_HANDLE = 0).
-local _next_handle = 1
-
---- Allocates a new handle and entry in the pool.
---- @return number Handle > 0, or INVALID_HANDLE if pool is full.
-local function _alloc()
-	if not _renderer_available then return INVALID_HANDLE end
-	for _ = 1, MAX_WINDOWS do
-		local h = _next_handle
-		_next_handle = (_next_handle % MAX_WINDOWS) + 1
-		if not _windows[h] then
-			_windows[h] = {}
-			return h
-		end
-	end
-	Logger.warn(LOG, "Window pool exhausted (%d windows).", MAX_WINDOWS)
-	return INVALID_HANDLE
+--- Hides the preview.
+function M.hide()
+	if _window then pcall(function() _window:hide() end) end
 end
 
-
--- =========================================
--- =========================================
--- ======= 3/ GTK Window Operations ========
--- =========================================
--- =========================================
-
---- Creates a borderless overlay GTK window with a cairo drawing area.
---- The window is positioned at (x, y) with size (w, h). When clickThrough
---- is true, input events pass through to the window underneath.
----
---- @param opts table { x, y, w, h, clickThrough?, alwaysOnTop? }
---- @return number Handle > 0, or INVALID_HANDLE on failure.
-function M.createWindow(opts)
-	if not _renderer_available then
-		Logger.debug(LOG, "createWindow(): no native renderer — returning stub handle.")
-		return INVALID_HANDLE
-	end
-
-	local options = type(opts) == "table" and opts or {}
-	local x = tonumber(options.x) or 0
-	local y = tonumber(options.y) or 0
-	local w = tonumber(options.w) or 200
-	local h = tonumber(options.h) or 100
-
-	local handle = _alloc()
-	if handle == INVALID_HANDLE then return INVALID_HANDLE end
-
-	-- Use POPUP windows for overlay semantics: borderless, transient,
-	-- and naturally above normal windows on most compositors.
-	local window = _Gtk.Window({
-		type            = _Gtk.WindowType.POPUP,
-		decorated       = false,
-		resizable       = false,
-		skip_taskbar_hint = true,
-		skip_pager_hint = true,
-		accept_focus    = not options.clickThrough,
-		app_paintable   = true,
-	})
-
-	window:set_default_size(w, h)
-	window:move(x, y)
-
-	-- If alwaysOnTop, set keep-above.
-	if options.alwaysOnTop ~= false then
-		pcall(function() window.keep_above = true end)
-	end
-
-	-- For click-through: make the window transparent to input.
-	if options.clickThrough then
-		pcall(function()
-			-- Set input shape to an empty region so clicks pass through.
-			local cairo_region = _cairo.Region.create()
-			window:input_shape_combine_region(cairo_region)
-			cairo_region:destroy()  -- Release local reference; GTK retained its own.
-		end)
-	end
-
-	-- Create cairo drawing area.
-	local drawing_area = _Gtk.DrawingArea()
-	window:add(drawing_area)
-
-	-- Connect the draw signal: caller's draw_fn gets a {ctx, w, h} table.
-	drawing_area.on_draw = function(da, cr)
-		local wref = _windows[handle]
-		if not wref or not wref.draw_fn then return false end
-		-- Wrap cairo context + dimensions in a table so the caller gets a
-		-- platform-agnostic canvas-like object.
-		local canvas = {
-			ctx = cr,
-			w   = wref.w or w,
-			h   = wref.h or h,
-		}
-		local ok, err = pcall(wref.draw_fn, canvas)
-		if not ok then
-			Logger.error(LOG, "draw_fn for handle %d raised: %s", handle, tostring(err))
-		end
-		return false  -- propagate further
-	end
-
-	-- Clean up pool entry when the window is destroyed externally
-	-- (e.g., window manager close, compositor teardown).
-	window.on_destroy = function()
-		_windows[handle] = nil
-		Logger.debug(LOG, "Overlay window externally destroyed: handle=%d.", handle)
-	end
-
-	-- Store references.
-	_windows[handle] = {
-		window       = window,
-		drawing_area = drawing_area,
-		w = w,
-		h = h,
-	}
-
-	Logger.debug(LOG, "Overlay window created: handle=%d pos=(%d,%d) size=%dx%d.",
-		handle, x, y, w, h)
-
-	-- Show if requested at creation time.
-	window:show_all()
-
-	return handle
+--- @return boolean True when a preview is on screen.
+function M.is_visible()
+	if not _window then return false end
+	local ok, visible = pcall(function() return _window:get_visible() end)
+	return ok and visible == true
 end
 
-
---- Destroys an overlay window and releases its resources.
---- Safe to call with INVALID_HANDLE or an already-destroyed handle.
---- @param handle number Canvas handle from createWindow.
-function M.destroyWindow(handle)
-	if not handle or handle == INVALID_HANDLE then return end
-	local wref = _windows[handle]
-	if not wref then return end
-	if wref.window then
-		pcall(function() wref.window:destroy() end)
-	end
-	_windows[handle] = nil
-	Logger.debug(LOG, "Overlay window destroyed: handle=%d.", handle)
+--- Destroys the window.
+function M.destroy()
+	if not _window then return end
+	pcall(function() _window:destroy() end)
+	_window = nil
+	_surface_rows = nil
 end
-
-
---- Paints the canvas surface via a caller-supplied draw function.
---- The draw function is called by GTK on the next expose event. Call
---- queue_draw() on the drawing area to trigger a repaint.
----
---- @param handle number Canvas handle from createWindow.
---- @param draw_fn function Called as draw_fn({ctx, w, h}).
-function M.drawBitmap(handle, draw_fn)
-	if not handle or handle == INVALID_HANDLE then return end
-	local wref = _windows[handle]
-	if not wref then
-		Logger.warn(LOG, "drawBitmap(): invalid handle %d.", handle)
-		return
-	end
-	if type(draw_fn) ~= "function" then
-		Logger.warn(LOG, "drawBitmap(): draw_fn is not a function.")
-		return
-	end
-
-	wref.draw_fn = draw_fn
-
-	-- Trigger an immediate repaint.
-	if wref.drawing_area then
-		pcall(function() wref.drawing_area:queue_draw() end)
-	end
-end
-
-
---- Makes the canvas visible.
---- @param handle number Canvas handle from createWindow.
-function M.show(handle)
-	if not handle or handle == INVALID_HANDLE then return end
-	local wref = _windows[handle]
-	if not wref or not wref.window then return end
-	pcall(function() wref.window:show_all() end)
-end
-
-
---- Hides the canvas.
---- @param handle number Canvas handle from createWindow.
-function M.hide(handle)
-	if not handle or handle == INVALID_HANDLE then return end
-	local wref = _windows[handle]
-	if not wref or not wref.window then return end
-	pcall(function() wref.window:hide() end)
-end
-
 
 return M

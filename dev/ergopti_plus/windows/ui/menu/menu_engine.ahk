@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Generic menu-item builders (manifest-driven and label-driven), letter pickers, dynamic title resolution and the path-based toggle dispatcher shared by every menu category.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -20,33 +20,52 @@
 ;
 ; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
 ; ``path`` (canonical v2), ``id``, ``description_key``, etc. The toggle, state
-; read and label are all driven by that v2 path through lib/feature_io.ahk.
+; read and label are all driven by that v2 path through infra/feature_io.ahk.
 ; ``V1CategoryPath`` is the PascalCase top-level category (``Layout``,
 ; ``Shortcuts``, ``Autocorrection``, …) used only for the master-gate greying.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
+	Row := MenuRowFromManifest(ManifestEntry, V1CategoryPath)
+	if (Row == "") {
+		return
+	}
+	MenuRenderer_AppendRows(MenuParent, "features", ManifestEntry["path"], [Row])
+}
+
+; The SAME feature item as row DATA — label, checkmark, greying and click — for a
+; caller that hands its rows to the renderer instead of a Menu object.
+;
+; This is where the feature row is decided, and MenuAddItemFromManifest above is
+; now a two-line wrapper over it. Splitting them is what let the hotstring
+; category submenus become data: they were the last caller assembling a native
+; Menu one manifest entry at a time, and the rule for a row's tick and its
+; greying is far too subtle to be worth a second copy.
+;
+; Returns "" — never a partial row — when the feature does not resolve.
+;
+; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
+; ``path`` (canonical v2), ``id``, ``description_key``, etc.
+; ``V1CategoryPath`` is the PascalCase top-level category used for the greying.
+MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 	global Features
 	V2Path := ManifestEntry["path"]
 	; Skip an item whose feature does not resolve in the live Features Map — it
 	; could not be toggled. Features is manifest-derived, so this only trips on a
 	; malformed or partial manifest entry.
 	if (FeatureLocateV2(Features, V2Path) == false) {
-		try LoggerWarn("Menu", "MenuAddItemFromManifest: '{1}' does not resolve in Features — skipping.", V2Path)
-		return
+		try LoggerWarn("Menu", "MenuRowFromManifest: '{1}' does not resolve in Features — skipping.", V2Path)
+		return ""
 	}
 	MenuTitle := MenuLabelFromManifestEntry(ManifestEntry)
 	; Apply the same runtime substitutions ``GetMenuTitleByPath`` does (count
 	; suffix " (N)" for hotstring categories, the live ``{date}`` for dynamic
 	; hotstrings entries) so the manifest-driven render is visually identical.
 	MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, V2Path)
-	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
 
 	State := ReadFeatureStateV2(V2Path)
-	IsEnabled := State.Has("enabled") and State["enabled"]
-	if IsEnabled {
-		MenuParent.Check(MenuTitle)
-	} else {
-		MenuParent.Uncheck(MenuTitle)
-	}
+	Row := Map(
+		"label",   MenuTitle,
+		"action",  (*) => ToggleFeatureV2(V2Path),
+		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
 
 	; Greying — off when the master category gate is off OR the per-file
 	; sub-category gate is off. The sub-category gate lets a single hotstring
@@ -66,8 +85,9 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	SubCategory := StrSplit(V1CategoryPath, ".")[1]
 	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath))
 		or (SubCategory != "DynamicHotstrings" and !IsCategoryGated(SubCategory)) {
-		try MenuParent.Disable(MenuTitle)
+		Row["disabled"] := true
 	}
+	return Row
 }
 
 ; Add a clickable menu item with a pre-resolved label and a canonical v2 path —
@@ -77,34 +97,45 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 ; shortcuts whose descriptions come from _PersonalShortcutsRegistry).
 ;
 ; ``V2Path`` is the canonical v2 path of the feature (e.g.
-; "hotstrings.personal.<id>", "ahk.shortcuts.personal.<name>"); toggles and state
-; reads go through lib/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
+; "hotstrings.personal.<id>", "shortcuts.personal.<name>"); toggles and state
+; reads go through infra/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
 ; top-level category whose master-gate state controls greying (``Hotstrings``,
 ; ``Shortcuts``).
 MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
+	Row := MenuRowWithLabel(V2Path, MenuTitle, MasterCategory)
+	if (Row == "") {
+		return
+	}
+	MenuRenderer_AppendRows(MenuParent, "features", V2Path, [Row])
+}
+
+; The SAME pre-resolved-label item as row DATA. Twin of MenuRowFromManifest, and
+; split from MenuAddItemWithLabel for the same reason: the personal-hotstrings
+; sections are the one block whose labels come from the USER's TOML rather than
+; the manifest, and they had to stay a hand-built Menu as long as the only way to
+; get one of these items was to hand over a Menu to add it to.
+;
+; Returns "" — never a partial row — when the feature does not resolve.
+MenuRowWithLabel(V2Path, MenuTitle, MasterCategory) {
 	global Features
-	; Mirror MenuAddItemFromManifest's guard: skip an item whose feature does not
+	; Mirror MenuRowFromManifest's guard: skip an item whose feature does not
 	; resolve in the live Features Map instead of wiring a toggle/Check call that
 	; can silently no-op forever (personal-hotstring-live-toggle-seed). This is a
 	; defensive backstop — the normal path always seeds the Features node first
 	; (see EnsurePersonalHotstringFeature / RegisterPersonalFeature).
 	if (FeatureLocateV2(Features, V2Path) == false) {
-		try LoggerWarn("Menu", "MenuAddItemWithLabel: '{1}' does not resolve in Features — skipping.", V2Path)
-		return
+		try LoggerWarn("Menu", "MenuRowWithLabel: '{1}' does not resolve in Features — skipping.", V2Path)
+		return ""
 	}
-	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleFeatureV2(V2Path))
-
 	State := ReadFeatureStateV2(V2Path)
-	IsEnabled := State.Has("enabled") and State["enabled"]
-	if IsEnabled {
-		MenuParent.Check(MenuTitle)
-	} else {
-		MenuParent.Uncheck(MenuTitle)
-	}
-
+	Row := Map(
+		"label",   MenuTitle,
+		"action",  (*) => ToggleFeatureV2(V2Path),
+		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
 	if !IsCategoryGated(MasterCategory) {
-		try MenuParent.Disable(MenuTitle)
+		Row["disabled"] := true
 	}
+	return Row
 }
 
 ; Reads master_gates.hotstring_sub_categories from menu_manifest.json (MG-3).
@@ -225,18 +256,20 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 }
 
 ; Sets the remap target letter on a feature and enables it. Persists both the
-; enabled flag and the letter to config.toml via lib/feature_io.ahk so the
+; enabled flag and the letter to config.toml via infra/feature_io.ahk so the
 ; change survives reload, then reloads to wire the new shortcut at the layer
 ; level. The Reload runs the boot pipeline which re-derives the v1 Features Map
-; from Features via lib/master_gates.ahk — no need to mutate v1 in-place.
+; from Features via infra/master_gates.ahk — no need to mutate v1 in-place.
 ; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
 SetFeatureLetter(V2Path, Letter) {
 	global Features
-	WriteFeatureBatchV2(Features, [
+	Entries := [
 		Map("path", V2Path, "value", true),
 		Map("path", V2Path, "value", Letter, "prop", "letter"),
-	])
-	ReloadPreservingSuspend()
+	]
+	if (WriteFeatureBatchV2(Features, Entries) != Entries.Length)
+		return ConfigReportPersistenceFailure("the feature-letter selection")
+	return ReloadPreservingSuspend()
 }
 
 ; Disables a letter-picker feature without touching its letter, so the
@@ -244,8 +277,9 @@ SetFeatureLetter(V2Path, Letter) {
 ; @param V2Path  Canonical v2 alpha path (e.g. "shortcuts.e_grave").
 SetFeatureLetterOff(V2Path) {
 	global Features
-	WriteFeatureV2(Features, V2Path, false)
-	ReloadPreservingSuspend()
+	if !WriteFeatureV2(Features, V2Path, false)
+		return ConfigReportPersistenceFailure("the feature-letter disable")
+	return ReloadPreservingSuspend()
 }
 
 global _TrayTitleCache := Map()
@@ -353,13 +387,16 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 ; v1 dispatcher exactly: a live-eligible hotstring section flips its registration
 ; in-process (no Reload); a Shortcuts modifier-combo sub-Map key forces its
 ; siblings off in the same atomic batch (mutual exclusion); everything else
-; persists the flip and Reloads. Reads + writes go through lib/feature_io.ahk, so
+; persists the flip and Reloads. Reads + writes go through infra/feature_io.ahk, so
 ; no v1 PascalCase path or rename table is consulted.
 ToggleFeatureV2(V2Path) {
 	global Features
 	; Fast path: live hotstring section toggle, no Reload (see _HS_TryLiveToggleV2).
-	if _HS_TryLiveToggleV2(V2Path) {
-		return
+	LiveResult := _HS_TryLiveToggleV2(V2Path)
+	if LiveResult.handled {
+		if !LiveResult.ok
+			return ConfigReportPersistenceFailure("the live feature toggle '" . V2Path . "'")
+		return true
 	}
 
 	CurrentState := ReadFeatureStateV2(V2Path)
@@ -373,44 +410,43 @@ ToggleFeatureV2(V2Path) {
 		Batch.Push(Map("path", SiblingPath, "value", false))
 	}
 	Batch.Push(Map("path", V2Path, "value", NewValue))
-	WriteFeatureBatchV2(Features, Batch)
-	ReloadPreservingSuspend()
+	if (WriteFeatureBatchV2(Features, Batch) != Batch.Length)
+		return ConfigReportPersistenceFailure("the feature toggle '" . V2Path . "'")
+	return ReloadPreservingSuspend()
 }
 
 ; v2-native live-toggle classifier + applier — the no-translation counterpart of
-; _HS_TryLiveToggle. Returns true when V2Path is a live-eligible bundled hotstring
-; section (flag persisted, registration rebuilt in-process); false when it is not
-; a hotstring section or is reload-only, so the caller takes the persist-and-Reload
-; path. Bundled hotstring entries are bare "hotstrings.<cat>.<id>" (no ahk. prefix);
-; personal sections never reach here (they keep the v1 MenuAddItemWithLabel path).
+; _HS_TryLiveToggle. The structured result distinguishes a handled success or
+; failure from a path that genuinely needs Reload. A persistence failure must not
+; fall through to the caller's second TOML write. Bundled hotstring entries are
+; bare "hotstrings.<cat>.<id>" (no ahk. prefix); personal sections never reach
+; here (they keep the v1 MenuAddItemWithLabel path).
 _HS_TryLiveToggleV2(V2Path) {
 	global Features
 	V2Parts := StrSplit(V2Path, ".")
 	if (V2Parts.Length != 3 or V2Parts[1] != "hotstrings") {
 		try LoggerDebug("Menu", "Live-toggle (v2): '{1}' is not a hotstring section → Reload.", V2Path)
-		return false
+		return {handled: false, ok: true}
 	}
 	Group := _HS_DeriveLiveToggleGroup(V2Parts[2], V2Parts[3])
 	if _HS_IsReloadOnlyGroup(Group) {
 		try LoggerDebug("Menu", "Live-toggle (v2): '{1}' is reload-only → Reload.", Group)
-		return false
+		return {handled: false, ok: true}
 	}
 	State := ReadFeatureStateV2(V2Path)
 	NewEnabled := !(State.Has("enabled") and State["enabled"])
 	; WriteFeatureV2 mutates the in-memory Features node AND persists to disk, so
 	; the rebuild below re-reads the new value with no Reload.
 	;
-	; Returning false on a failed persist hands the toggle back to the caller's
-	; Reload path, which re-reads the truth from disk. Ignoring the result made
-	; this the only toggle family that could no-op in silence: the bulk siblings
-	; report their write result, and the ~1.3 s engine rebuild below was paid in
-	; full for a change that never left memory.
+	; A failed persist is handled here without rebuilding, then surfaced by the
+	; caller. Returning the same false used by the reload-only classifier used to
+	; trigger a second write and violate the abort-on-false transaction boundary.
 	if !WriteFeatureV2(Features, V2Path, NewEnabled) {
-		try LoggerError("Menu", "Live-toggle (v2) for '{1}' could not be persisted — falling back to a reload so the menu and the engine match what is actually on disk.", V2Path)
-		return false
+		try LoggerError("Menu", "Live-toggle (v2) for '{1}' could not be persisted; the live state and registration remain unchanged.", V2Path)
+		return {handled: true, ok: false}
 	}
 	RebuildHotstringsLive()
-	return true
+	return {handled: true, ok: true}
 }
 
 GetCategoryTitle(Category) {
@@ -429,12 +465,16 @@ GetCategoryTitle(Category) {
 			return t("category.dynamic_hotstrings")
 		case "Personal":
 			return t("category.personal")
+		; The three top-level menus below read the SAME key the other two drivers
+		; read. Each existed twice in all twenty-one locale files — `category.x`
+		; here, `menu.x.title` on macOS and Linux — holding the same string, and
+		; two copies of one label is one translator away from two menus.
 		case "Shortcuts":
-			return t("category.shortcuts")
+			return t("menu.shortcuts.title")
 		case "TapHolds":
-			return t("category.tapholds")
+			return t("menu.tapholds.title")
 		case "Gestures":
-			return t("category.gestures")
+			return t("menu.gestures.title")
 		default:
 			return ""
 	}
@@ -443,4 +483,3 @@ GetCategoryTitle(Category) {
 ; ===================================
 ; Gestures menu builder
 ; ===================================
-

@@ -80,6 +80,38 @@ _SRIL_HelperReachesTheLogger() {
 		"the format arguments must reach the logger, or the message renders with its placeholders unfilled. Got: " . Joined)
 }
 
+; The async termination stack must return before LoggerError performs its forced
+; file flush, while the next message-loop turn must still deliver the diagnostic.
+_SRIL_DeferredHelperReturnsBeforeLogging() {
+	global _SRIL_Captured
+	_SRIL_Captured := []
+	local marker := "deferred-probe-" . A_TickCount
+	local captured_before_yield := false
+
+	LoggerSetTestSink(_SRIL_Sink)
+	try {
+		_SR_DeferLogError("deferred probe marker {1}", marker)
+		captured_before_yield := _SRIL_Captured.Length > 0
+		loop 100 {
+			if _SRIL_Captured.Length > 0
+				break
+			Sleep(5)
+		}
+	} finally {
+		LoggerClearTestSink()
+	}
+
+	AssertFalse(captured_before_yield,
+		"_SR_DeferLogError must return before LoggerError can force a filesystem flush")
+	Assert(_SRIL_Captured.Length >= 1,
+		"the one-shot deferred boundary must still deliver the shell_runner diagnostic")
+	local joined := ""
+	for line in _SRIL_Captured
+		joined .= line . "`n"
+	Assert(InStr(joined, marker) > 0,
+		"the deferred logger must preserve the exact format arguments")
+}
+
 ; Names the specific trap so it is not reintroduced while tidying up. The
 ; behavioural assertion above is the real guard; this one explains why.
 _SRIL_DoesNotUseTheThrowingFuncClass() {
@@ -103,7 +135,7 @@ _SRIL_DoesNotUseTheThrowingFuncClass() {
 ; The original purpose of this file: the adapter must stay parse-clean when
 ; validated on its own, so no call site may reference LoggerError statically.
 _SRIL_NoStaticLoggerDependency() {
-	for Name in ["ShellRunner_Exec", "_SR_HandleStart", "_SR_Poll"] {
+	for Name in ["ShellRunner_Exec", "_SR_HandleStart"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . "() must exist in the driver source")
 		Assert(InStr(Body, "_SR_LogError(") > 0,
@@ -111,11 +143,21 @@ _SRIL_NoStaticLoggerDependency() {
 		Assert(InStr(Body, 'LoggerError("') == 0,
 			Name . " must not call LoggerError statically — logger.ahk belongs to the outer driver include graph, and a static reference makes the adapter fail isolated validation under #Warn")
 	}
+	PollBody := _DriverFuncBody("_SR_Poll")
+	Assert(InStr(PollBody, "_SR_LegacyFinishCompletion(") > 0,
+		"_SR_Poll must route completion I/O and callback failures through its isolated finalizer")
+	FinishBody := _DriverFuncBody("_SR_LegacyFinishCompletion")
+	Assert(InStr(FinishBody, "_SR_LogError(") > 0,
+		"the finalizer reached by _SR_Poll must report failures through the adapter helper")
+	Assert(InStr(PollBody . FinishBody, 'LoggerError("') == 0,
+		"neither _SR_Poll nor its finalizer may acquire a static LoggerError dependency")
 }
 
 
 Test("shell_runner: the isolated logging helper actually delivers its line",
 	_SRIL_HelperReachesTheLogger)
+Test("shell_runner: deferred errors return before logging and still arrive (shellrunner-legacy-deferred-log)",
+	_SRIL_DeferredHelperReturnsBeforeLogging)
 Test("shell_runner: the helper does not resolve through the throwing Func class",
 	_SRIL_DoesNotUseTheThrowingFuncClass)
 Test("shell_runner: isolated validation has no static LoggerError dependency",

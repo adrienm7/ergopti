@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Tooltip Border Alpha-Fixup Tests
 ; DESCRIPTION:
-; Pins the correctness of _TooltipFixBorderAlpha (lib/tooltip.ahk), the optimized
+; Pins the correctness of _TooltipFixBorderAlpha (infra/tooltip.ahk), the optimized
 ; per-pixel pass that rewrites GDI RoundRect output to premultiplied border alpha
 ; for the layered border window. The production scan only visits the two
 ; horizontal edge rows, the corner-column zones of the top/bottom bands, and the

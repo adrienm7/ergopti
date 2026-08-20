@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local Logger = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = helpers.load_with_stubs("infra.logger")
 
 --- Collect all log calls so we can verify ERROR is logged on missing paths.
 local log_calls = {}
@@ -29,11 +29,11 @@ end
 
 
 
--- =====================================
+--- ======================================
 --- ======================================
 --- ======= 1/ WPM Widget Resolver =======
 --- ======================================
--- =====================================
+--- ======================================
 
 helpers.describe("wpm_widget.resolve_shared_constants_path", function()
 	helpers.it("resolves both shared constants files at load (no not-found ERROR)", function()
@@ -63,7 +63,7 @@ helpers.describe("wpm_widget.resolve_shared_constants_path", function()
 	helpers.it("logs ERROR when shared constants cannot be found", function()
 		-- Simulate by mocking Paths.find_from_configdir to return nil
 		log_calls = {}
-		local Paths = require("lib.paths")
+		local Paths = require("infra.paths")
 		local orig_find = Paths.find_from_configdir
 		Paths.find_from_configdir = function() return nil end
 
@@ -91,7 +91,7 @@ end)
 helpers.describe("locale.locale_path", function()
 	helpers.it("resolves locale JSON via module-relative path", function()
 		log_calls = {}
-		local Locale = helpers.load_with_stubs("lib.locale", {
+		local Locale = helpers.load_with_stubs("infra.locale", {
 			json = {
 				decode = function() return {} end,
 			},
@@ -105,11 +105,11 @@ helpers.describe("locale.locale_path", function()
 
 	helpers.it("logs ERROR when locale file cannot be found", function()
 		log_calls = {}
-		local Paths = require("lib.paths")
+		local Paths = require("infra.paths")
 		local orig_find = Paths.find_from_configdir
 		Paths.find_from_configdir = function() return nil end
 
-		local Locale = helpers.load_with_stubs("lib.locale", {
+		local Locale = helpers.load_with_stubs("infra.locale", {
 			json = {
 				decode = function() return {} end,
 			},
@@ -129,7 +129,7 @@ helpers.describe("locale.locale_path", function()
 		-- When locale path resolution fails completely, the module should
 		-- NOT secretly use English translations as a silent fallback.
 		-- Instead, it should log ERROR and return empty or minimal value.
-		local Locale = helpers.load_with_stubs("lib.locale", {
+		local Locale = helpers.load_with_stubs("infra.locale", {
 			json = {
 				decode = function() return {} end,
 			},
@@ -165,11 +165,13 @@ helpers.describe("ui_builder and asset path resolution", function()
 		local original_configdir = hs.configdir
 		hs.configdir = nil
 		-- Module should still work (no exception)
-		local ok, _ = pcall(function()
-			_ = UiBuilder
-		end)
+		-- The pcall wrapped a table read, which cannot raise — so the case asserted
+		-- nothing at all. The real claim is that the module resolved its own path
+		-- WITHOUT hs.configdir, and that is observable: it loaded, and it is a table.
 		hs.configdir = original_configdir
-		helpers.assert_true(ok)
+		helpers.assert_eq(type(UiBuilder), "table",
+			"ui_builder must load with hs.configdir unset — a module that resolved only "
+				.. "through configdir would have failed at require time")
 	end)
 end)
 
@@ -237,11 +239,10 @@ helpers.describe("menu.builder manifest resolution", function()
 		-- should log ERROR (not WARN) when the manifest is missing.
 		-- We can't directly call these private functions, but we can verify
 		-- the module loads and the logging is configured correctly.
-		local ok, _ = pcall(function()
-			require("ui.menu.builder")
-		end)
-		-- Module should load, and any manifest misses should be logged at ERROR level
-		helpers.assert_true(ok)
+		local builder = require("ui.menu.builder")
+		helpers.assert_eq(type(builder), "table",
+			"the menu builder must load even when the manifest cannot be found — a missing "
+				.. "manifest degrades the menu, it does not take the boot down")
 	end)
 
 	helpers.it("does not silently use FALLBACK constants without logging", function()
@@ -291,7 +292,7 @@ helpers.describe("path resolution anti-patterns", function()
 		hs.configdir = "/tmp/bogus_hs_config_dir_12345"
 
 		local ok1, _ = pcall(function() require("ui.wpm.wpm_widget") end)
-		local ok2, _ = pcall(function() require("lib.locale") end)
+		local ok2, _ = pcall(function() require("infra.locale") end)
 
 		hs.configdir = original_configdir
 

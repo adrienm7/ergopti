@@ -65,7 +65,7 @@ constructs from `tests/helpers`.
 
 ## Updating snapshot fixtures
 
-Snapshot tests under `tests/unit/modules/karabiner/` compare generated output
+Snapshot tests under `tests/unit/platform/remap/` compare generated output
 against committed `.expected.json` files in `tests/fixtures/karabiner_configs/`.
 To regenerate after an intentional change:
 
@@ -84,8 +84,10 @@ then runs `lua tests/run.lua`.
 
 ## Coverage status
 
-See `tests/COVERAGE.md` for a per-module breakdown of what is and isn't covered.
-
-The current suite holds **~380 unit-test cases** across ~32 test files, plus
-six architectural meta-tests. Roughly 55–60% of the testable surface is
-covered; the remaining gaps are documented (with reasons) in `COVERAGE.md`.
+`lua tests/run.lua` prints the module and case totals as it runs, and that run
+is the inventory. There used to be a `COVERAGE.md` here restating them by hand;
+it was deleted once it claimed "keylogger: 0% covered" against 66 keylogger test
+files and "ui/: 0% covered (intentional)" against 118. A hand-written census of
+a suite that grows every week is wrong within a fortnight and, being prose,
+fails no test when it goes wrong — see `docs/TESTING.md`, which states the rule
+this follows.

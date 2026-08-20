@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/ports/AppLauncher.spec.js
+// _shared/core/ports/AppLauncher.spec.js
 
 /**
  * ==============================================================================

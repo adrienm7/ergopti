@@ -3,6 +3,55 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; The real-process startup smoke runs this exact entry point under a uniquely
+; named wrapper and an isolated config tree. It exists because parsing the full
+; include graph cannot detect an auto-execute read of a global whose owning
+; include has not executed yet. Production launches leave the variable empty.
+global _DriverStartupSmokeDir := EnvGet("ERGOPTI_STARTUP_SMOKE_DIR")
+
+; A rollback recovery executable is a byte-for-byte copy of the last known-good
+; compiled driver named ``Current.exe.<guid>.recovery.exe``. Detect it before the
+; mutex and before any hook can be registered. The helper is defined in the
+; updater include below and is available here because AHK hoists function
+; definitions across the merged #Include graph.
+global _UpdaterRecoveryShapedTarget := A_IsCompiled
+	? _Updater_RecoveryTargetForExecutable(A_ScriptFullPath) : ""
+global _UpdaterRecoveryDescriptor := A_IsCompiled
+	? _Updater_LoadRecoveryDescriptor(A_ScriptFullPath) : 0
+; A recovery-shaped filename is data, never authority. A stale artifact that no
+; longer owns its tiny transaction claim exits before the mutex, Bundle_Init or
+; any message pump, so double-clicking it cannot downgrade a healthy driver.
+if (_UpdaterRecoveryShapedTarget != ""
+	and !(_UpdaterRecoveryDescriptor is Map))
+	ExitApp(0)
+if (_UpdaterRecoveryDescriptor is Map)
+	try A_TrayMenu.Delete()
+global _UpdaterRecoveryPublishTarget := (_UpdaterRecoveryDescriptor is Map)
+	? _UpdaterRecoveryDescriptor["Target"] : ""
+global _UpdaterRecoveryPublishStage := (_UpdaterRecoveryDescriptor is Map)
+	? _UpdaterRecoveryDescriptor["Stage"] : ""
+global _UpdaterRecoveryClaimPath := (_UpdaterRecoveryDescriptor is Map)
+	? _UpdaterRecoveryDescriptor["Claim"] : ""
+global _UpdaterRecoveryCleanupPath := ""
+if A_IsCompiled {
+	try _UpdaterRecoveryCleanupPath := _Updater_RecoveryCleanupPathForCurrent(
+		A_ScriptFullPath, EnvGet("ERGOPTI_UPDATER_RECOVERY_CLEANUP"))
+	; The value is single-use inheritance from the recovery process. Clear the
+	; parent copy before any later child is spawned.
+	try EnvSet("ERGOPTI_UPDATER_RECOVERY_CLEANUP", "")
+}
+global _UpdaterRecoveryPublishAttemptCount := 0
+global _UpdaterRecoveryCleanupAttemptCount := 0
+global _UpdaterRecoveryHandoffPending := false
+global _UpdaterRecoveryExitInvocation := false
+global _UpdaterRecoverySuspendPrepared := false
+global _UpdaterInheritedBootReadyName := ""
+if A_IsCompiled {
+	try _UpdaterInheritedBootReadyName := _Updater_ValidateBootReadyEventName(
+		EnvGet("ERGOPTI_UPDATER_BOOT_READY"))
+	try EnvSet("ERGOPTI_UPDATER_BOOT_READY", "")
+}
+
 ; --- Single-owner gate: establish exclusivity BEFORE any hook/log/message pump ---
 ; #SingleInstance Force only replaces the previous instance at the END of THIS
 ; script's load (~875-1460 ms parse), and terminating a hung/dialog-blocked old
@@ -18,9 +67,9 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; closed: the OS releases the mutex when this process exits, so a successor's wait
 ; unblocks the instant we die.
 ;
-; EXEMPT: the detached keylogger-prefetch worker. The driver deliberately
-; re-runs this entry with /force and --keylogger-prefetch-worker to compute a
-; metrics projection; that worker registers no hook, no log owner and no tray,
+; EXEMPT: detached keylogger-prefetch and UIA-selection workers. The driver
+; deliberately re-runs this entry with /force and a worker flag; those workers
+; register no hook, no log owner and no tray,
 ; so it is not what this gate exists to prevent. But the gate is the FIRST
 ; auto-execute statement while the worker's own gate sits ~300 lines below, so
 ; every worker spawned while the driver is alive blocked the full wait on the
@@ -30,7 +79,8 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
 global _DriverMutexHandle := 0
-if !KLPF_IsWorkerInvocation()
+if !(KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
+		|| _DriverStartupSmokeDir != "")
 	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
 if (_DriverMutexHandle) {
 	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
@@ -100,7 +150,7 @@ try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 ; a keystroke during early init causes a #HotIf expression to be evaluated.
 ;
 ; ``Bundle_Init()`` below shells out to PowerShell via ``RunWait`` (see
-; ``lib/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
+; ``infra/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
 ; ~250ms unzip would otherwise trigger #HotIf evaluation on hotkeys like
 ; ``#HotIf CapsWordEnabled`` or ``#HotIf LayerEnabled`` while those globals
 ; are still unset — assigning them here keeps the very first message pump
@@ -108,9 +158,9 @@ try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 global CapsWordEnabled := False
 global LayerEnabled := False
 global TapHold := Map("keys", Map(), "layers", Map())
-; Read in FIRST position by a parse-time #HotIf (modules/tap_holds/altgr.ahk), which
+; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
-; lib/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
+; infra/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
 ; real value (auto-probe + TOML override) later in boot.
 global _ALTGR_KANA_FIXUP := False
@@ -126,8 +176,8 @@ global _PersonalShortcutsRegistry := Map("__Order", [])
 ; this global. Assigned in the pre-pump block so it exists before the first
 ; LoggerStart and before any parse-time-armed callback or deferred worker reads it.
 global DriverPid := DllCall("GetCurrentProcessId", "UInt")
-#Include lib/manifest_reader.ahk
-#Include lib/feature_io.ahk
+#Include infra/manifest_reader.ahk
+#Include infra/feature_io.ahk
 
 ; ===== Global error net — armed BEFORE the first message pump =====
 ; Without this, any uncaught error pops an AHK dialog mid-keystroke and can leave
@@ -138,7 +188,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; parse-time #HotIf and throw with no net at all. error_net.ahk has no dependency
 ; that prevents loading it this early — its Logger calls are try-wrapped and function
 ; definitions are hoisted across the whole #Include graph before auto-execute runs.
-#Include lib/error_net.ahk
+#Include infra/error_net.ahk
 OnError(ErgoptiGlobalErrorHandler)
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
@@ -146,9 +196,9 @@ OnError(ErgoptiGlobalErrorHandler)
 ; bootstrapper extracts it next to the .exe on first launch so the rest of
 ; the driver can keep reading from _StaticDir without caring whether it runs
 ; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
-#Include lib/bundle.ahk
+#Include infra/bundle.ahk
 Bundle_Init()
-; First of the retroactive boot stamps (lib/boot_profiler.ahk). Everything from
+; First of the retroactive boot stamps (infra/boot_profiler.ahk). Everything from
 ; here to BootProfile_Begin() used to be one opaque "script parse + load: ~N ms"
 ; number, so a slow start could be attributed to "pre-boot" and no further. A
 ; stamp only records a tick — the logger does not exist yet — and BootProfile_Begin
@@ -162,18 +212,22 @@ BootProfile_Stamp("Bundle extracted")
 ; from the script location (static/ergopti_plus/windows → static) and _VendorDir
 ; is the vendor/ sibling of the entry script.
 if A_IsCompiled {
-    _StaticDir := _BundleDir . "\static"
-    _VendorDir := _BundleDir . "\vendor"
+		_StaticDir := _BundleDir . "\static"
+		_VendorDir := _BundleDir . "\vendor"
 } else {
-    SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/ergopti_plus
-    SplitPath(_DriversDir_early, , &_StaticDir)     ; static
-    _VendorDir := A_ScriptDir . "\vendor"
+		SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/ergopti_plus
+		SplitPath(_DriversDir_early, , &_StaticDir)     ; static
+		_VendorDir := A_ScriptDir . "\vendor"
 }
 global _StaticDir
 global _VendorDir
 ; Sub-roots derived from _StaticDir — declared here so every #Include below can use them.
 global _SharedDir := _StaticDir . "\ergopti_plus\_shared"
 global _DriverDir := _StaticDir . "\ergopti_plus\windows"
+; Extension packs sit beside _shared, not under static/. Resolved once here because
+; two read sites had independently derived the pre-reorg path and both failed
+; silently behind a DirExist() guard.
+global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 
 ; #Warn directives apply to the whole compilation unit in AHK v2 — they
 ; cannot be scoped to a single #Include. VarUnset and LocalSameAsGlobal are
@@ -192,8 +246,8 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 
 ; The global error net itself is armed far above, before Bundle_Init()'s
 ; message-pumping RunWait — see the "Global error net" block there.
-#Include lib/personal_features.ahk
-#Include lib/menu_helpers.ahk
+#Include infra/personal_features.ahk
+#Include infra/menu_helpers.ahk
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
@@ -203,7 +257,7 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 ; OnMessage handlers, SetTimer callbacks) once A_MaxThreads concurrent
 ; threads are already active. The default ceiling of 10 is easy to hit
 ; with the keylogger's ~6 background timers + mouse/keyboard hooks. The
-; menu-dispatcher bypass in lib/menu_dispatcher.ahk also relies on a free
+; menu-dispatcher bypass in infra/menu_dispatcher.ahk also relies on a free
 ; slot for its retry SetTimer, so the headroom matters even more there.
 A_MaxThreads := 64
 
@@ -211,23 +265,38 @@ SetKeyDelay(0) ; No delay between key presses
 SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
 ; Otherwise, we can't have a hotstring triggering another hotstring, triggering another hotstring, etc.
 
-; Logger pulled in first so every other lib/module can call it during init.
+; Logger pulled in first so every other infra/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
-#Include lib/logger.ahk
-#Include lib/boot_profiler.ahk
-#Include lib/hotpath_profiler.ahk
-#Include lib/registry.ahk
-#Include lib/app_state.ahk
+; Generated sub-file routing table, included before the logger that calls it.
+; It defines a FUNCTION rather than a global, so this ordering is a convenience
+; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
+#Include _generated/logger_sub_files.ahk
+#Include infra/tick_count.ahk
+#Include infra/logger.ahk
+#Include infra/boot_profiler.ahk
+#Include infra/hotpath_profiler.ahk
+#Include infra/registry.ahk
+#Include infra/app_state.ahk
+
+; The chord notation the HotkeyRegistrar adapter parses with, loaded before the
+; adapters block that consumes it
+#Include infra/chord.ahk
 
 ; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
-; WinGet* from the domain modules. Loaded before any lib/ or module/ file
+; WinGet* from the domain modules. Loaded before any infra/ or module/ file
 ; that references adapter functions (e.g. NI_GetSsidHash in keylogger_network).
 #Include adapters/crypto.ahk
 #Include adapters/clipboard.ahk
 #Include adapters/timer_scheduler.ahk
 #Include adapters/file_system.ahk
+; Crash-safe multi-file config transitions bind strict Windows-only filesystem
+; operations at this integration boundary; the portable core remains OS-free.
+#Include infra/config_transition.ahk
+#Include infra/config_transition_runtime.ahk
 #Include adapters/window_info.ahk
+#Include adapters/uia_worker.ahk
+#Include adapters/hotkey_registrar.ahk
 #Include adapters/notifier.ahk
 #Include adapters/tray_menu.ahk
 #Include adapters/text_sender.ahk
@@ -244,101 +313,111 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
+#Include modules/keymap/uia_selection_worker.ahk
+
+; Compiled workers reuse this executable. Exit into the minimal worker loop as
+; soon as its UIA/window dependencies exist, before loading keylogger/WebView
+; modules or running any normal-driver initialiser.
+if UIASW_IsWorkerInvocation()
+	UIASW_WorkerMain()
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
-#Include lib/toml/toml_helpers.ahk
+#Include infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet). Needs
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
-#Include lib/timings/timings_config.ahk
+#Include infra/timings/timings_config.ahk
 #Include modules/keymap/layout/layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
-#Include lib/window_utils.ahk
-#Include lib/text_utils.ahk
+#Include infra/window_utils.ahk
+#Include infra/text_utils.ahk
 #Include ui/spotlight/init.ahk
-#Include lib/nav_layer_helpers.ahk
+#Include infra/nav_layer_helpers.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
 ; FoldAsciiLower) extracted into dedicated submodules so the main file
 ; stays focused on ErgoptiPlus-specific logic.
-#Include lib/hotstrings/hotstring_engine.ahk
-#Include lib/hotstrings/hotstring_engine_main.ahk
-#Include lib/hotstrings/hotstring_buffer_effects.ahk
-#Include lib/hotstrings/hotstring_live_toggle.ahk
-#Include lib/hotstrings/hotstring_count_policy.ahk
+#Include infra/hotstrings/hotstring_engine.ahk
+#Include infra/hotstrings/hotstring_engine_main.ahk
+#Include infra/hotstrings/hotstring_buffer_effects.ahk
+#Include infra/hotstrings/hotstring_live_toggle.ahk
+#Include infra/hotstrings/hotstring_count_policy.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
 ; _shared/core/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
 ; drivers. Included before the menus and before HSE_Terminators is instantiated.
 #Include _generated/terminators.ahk
-#Include lib/toml/toml_loader.ahk
-#Include lib/toml/toml_config_loader.ahk
+#Include infra/toml/toml_loader.ahk
+#Include infra/toml/toml_config_loader.ahk
 ; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
 ; Features / feature-IO functions are available before any #HotIf expression is
 ; evaluated. Re-listing them here would cause AHK to complain about the same
 ; script being included twice.
-#Include lib/first_boot.ahk
-#Include lib/tap_hold/tap_hold_loader.ahk
-#Include lib/tap_hold/tap_hold_writer.ahk
-; Tap-hold timing constants must load HERE, before lib/boot.ahk calls
+#Include infra/first_boot.ahk
+#Include platform/remap/tap_hold_loader.ahk
+#Include platform/remap/tap_hold_writer.ahk
+; Tap-hold timing constants must load HERE, before infra/boot.ahk calls
 ; TapHoldsLoadTimings(): AHK v2 executes a file's top-level `global X := sentinel`
 ; assignments at its #Include position, so if constants.ahk loaded at its natural
-; spot (inside modules/tap_holds.ahk, far below boot.ahk) the sentinel 0s would
+; spot (inside platform/remap.ahk, far below boot.ahk) the sentinel 0s would
 ; re-clobber the registry values boot.ahk just loaded. #Include dedupes by path,
-; so the later include via modules/tap_holds.ahk is a no-op (mirrors the
+; so the later include via platform/remap.ahk is a no-op (mirrors the
 ; DYN_HOTSTRINGS_DEFAULT_DELAY early-layer precedent).
-#Include modules/tap_holds/constants.ahk
-#Include lib/master_gates.ahk
-#Include lib/manifest_descriptions.ahk
-#Include lib/menu_dispatcher.ahk
-#Include lib/hook_dispatcher.ahk
-#Include lib/menu_manifest.ahk
-#Include lib/manifest_menu.ahk
-#Include lib/llm_defaults.ahk
-#Include lib/updater.ahk
+#Include platform/remap/constants.ahk
+#Include infra/master_gates.ahk
+#Include infra/manifest_descriptions.ahk
+#Include infra/menu_dispatcher.ahk
+#Include infra/hook_dispatcher.ahk
+#Include infra/menu_manifest.ahk
+#Include infra/manifest_menu.ahk
+#Include infra/llm_defaults.ahk
+#Include modules/updater.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
-#Include lib/crash_reporter.ahk
-#Include lib/json.ahk
+#Include modules/diagnostics/crash_reporter.ahk
+#Include infra/json.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
-#Include lib/locale.ahk
-#Include lib/i18n.ahk
+#Include infra/locale.ahk
+#Include _generated/gesture_emit_actions.ahk
+#Include _generated/locale_table.ahk
+#Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk
-#Include lib/hotstrings/hotstrings_config.ahk
+#Include infra/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk
 #Include ui/prompt_editor/init.ahk
-#Include lib/wrap_symbols_config.ahk
-#Include lib/ui_style.ahk
+#Include infra/wrap_symbols_config.ahk
+#Include infra/ui_style.ahk
 #Include ui/tooltip/init.ahk
-#Include lib/llm_diff.ahk
-#Include lib/hotstrings/hotstring_prefix_watcher.ahk
+#Include infra/llm_diff.ahk
+#Include infra/hotstrings/hotstring_prefix_watcher.ahk
 ; Self-healing hotstring cache for the bundled TOMLs. Replaces the old ~1 MB of
 ; committed generated_*.ahk (tokenised at boot, before the tray icon could appear)
 ; with a gitignored flat .tsv read at registration — the same pattern as the i18n
 ; locale cache. LoadHotstringsSection ensures + consults it, falling back to the
 ; runtime TOML parser on a cache miss. No generated CODE is kept in the repo.
-#Include lib/hotstrings/hotstrings_cache.ahk
+#Include infra/hotstrings/hotstrings_cache.ahk
 #Include ui/personal_toml_editor.ahk
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
-#Include lib/app_picker.ahk
-#Include lib/config_shortcuts.ahk
-#Include lib/metrics/metrics_shortcuts.ahk
-#Include lib/metrics/metrics_filters.ahk
+#Include infra/app_picker.ahk
+#Include infra/config_shortcuts.ahk
+#Include infra/metrics/metrics_shortcuts.ahk
+#Include infra/metrics/metrics_filters.ahk
 #Include ui/wpm/init.ahk
-#Include lib/sqlite3.ahk
+#Include infra/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk
-#Include lib/webview_utils.ahk
+#Include infra/webview_utils.ahk
 #Include modules/keylogger/keylogger_app_categories.ahk
 #Include modules/keylogger/keylogger.ahk
+#Include modules/keylogger/keylogger_hotstring_log.ahk
 #Include modules/keylogger/keylogger_walker.ahk
 #Include modules/keylogger/keylogger_hook.ahk
 #Include modules/keylogger/keylogger_watchers.ahk
@@ -349,12 +428,18 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_av_state.ahk
 #Include modules/keylogger/keylogger_network.ahk
 #Include modules/keylogger/keylogger_clipboard.ahk
+#Include modules/keylogger/keylogger_roi_prune.ahk
 #Include modules/keylogger/keylogger_trigger_roi.ahk
 
 ; Bundled extension shortcut menus — each defines BuildExtMenu_<id>().
 ; ``*i`` keeps the driver runnable if an extension is removed without
-; updating this list.
-#Include *i ..\..\extensions\ergopti-demo\shortcuts\menu.ahk
+; updating this list. NOTE: one ``..`` only — this file lives in
+; static/ergopti_plus/windows/, so ``..\extensions`` is the real tree. The
+; previous ``..\..\extensions`` resolved to static/extensions/, which has not
+; existed since the static/ reorg, and ``*i`` suppressed the include error, so
+; BuildExtMenu_ergopti_demo() was never defined and the extensions submenu never
+; rendered.
+#Include *i ..\extensions\ergopti-demo\shortcuts\menu.ahk
 #Include modules/keylogger/keylogger_reader.ahk
 #Include modules/keylogger/keylogger_prefetch.ahk
 #Include modules/keylogger/keylogger_webview.ahk
@@ -365,7 +450,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; It publishes one staged JSON file and exits; the live instance validates the
 ; generation before atomically making that file visible to a dashboard.
 if KLPF_IsWorkerInvocation()
-    KLPF_WorkerMain()
+		KLPF_WorkerMain()
 
 #Include _generated/prompt_builder.ahk
 #Include modules/llm/api_common.ahk
@@ -404,9 +489,16 @@ BootProfile_Stamp("Module includes initialised")
 ; ======= 1.1) Variables initialization =======
 ; =============================================
 
-#Include lib/boot.ahk
+#Include infra/suspend_handoff.ahk
+#Include infra/boot.ahk
 
-#Include lib/feature_state.ahk
+; A pending trigger transaction belongs to the stable paths.toml locator, not
+; necessarily to the config directory selected for this boot. Resolve it before
+; onboarding or the first cached parse can observe and re-save split authority.
+if !LLM_TriggerJournalRecoverAtBoot()
+	throw Error("LLM trigger journal recovery failed before configuration boot")
+
+#Include infra/feature_state.ahk
 
 ; AHK-21: clear the stock AHK tray items (Pause/Suspend/Reload/Exit/Edit)
 ; BEFORE the blocking onboarding wizard so those stock actions are never live
@@ -414,7 +506,16 @@ BootProfile_Stamp("Module includes initialised")
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
 A_TrayMenu.Delete()
-Onboarding_Run()
+if (_DriverStartupSmokeDir != "") {
+		; The real onboarding WebView pumps messages while startup is incomplete.
+		; Reproduce that hazard without an interactive window: at least one suspend
+		; watchdog tick must execute here, before the later lifecycle include.
+		_StartupSmokePumpUntil := A_TickCount + 650
+		while (A_TickCount < _StartupSmokePumpUntil)
+				Sleep(20)
+} else {
+		Onboarding_Run()
+}
 ; Blocking on a first run, a no-op otherwise — which is exactly why it needs its
 ; own stamp: a first-run boot and a normal boot are otherwise indistinguishable
 ; in the timings.
@@ -429,8 +530,8 @@ global _IniCache := ParseTomlFile(ConfigurationFile)
 ; lock has usually cleared, so no write-time check can tell that the payload was
 ; derived from nothing; only latching at the instant of the failed read can.
 if TOML_UnreadableFile(ConfigurationFile) {
-    _ConfigBootReadFailed := true
-    try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
+		_ConfigBootReadFailed := true
+		try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
 }
 ReadScriptConfig(_IniCache)
 ReadCategoryEnabled(_IniCache)
@@ -450,10 +551,10 @@ BootProfile_Stamp("Hotstring engine initialised")
 LoggerInit()
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
-    bootScriptName := A_ScriptFullPath
+		bootScriptName := A_ScriptFullPath
 }
 if !IsSet(A_ScriptName) {
-    LoggerWarn("ErgoptiPlus", "A_ScriptName was not set during boot; using fallback name='{1}'.", bootScriptName)
+		LoggerWarn("ErgoptiPlus", "A_ScriptName was not set during boot; using fallback name='{1}'.", bootScriptName)
 }
 try Updater_LoadChannel()
 try Updater_LoadCheckInterval()
@@ -463,7 +564,7 @@ try Updater_StartBackgroundChecks()
 try Updater_InitTrayNotifyHandler()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')…", DriverPid, bootScriptName)
 ; Boot phase profiling — emits one INFO line per phase so a slow start can be
-; diagnosed from the log alone (see lib/boot_profiler.ahk).
+; diagnosed from the log alone (see infra/boot_profiler.ahk).
 BootProfile_Begin()
 
 ; Eager-load the ACTIVE i18n locale now. It is otherwise lazy on the first t()
@@ -494,9 +595,9 @@ HotstringsConfigLoadLlmPredictionColor()
 _DetectHKL := KS_ResolveKeyboardLayout()
 _DetectSC := KS_ProbeRightAltScancode(_DetectHKL)
 LoggerInfo("AltGrDetect",
-    "HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
-    _DetectHKL, _DetectSC,
-    _ALTGR_KANA_FIXUP ? "true" : "false")
+		"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
+		_DetectHKL, _DetectSC,
+		_ALTGR_KANA_FIXUP ? "true" : "false")
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -509,36 +610,36 @@ LoggerInfo("AltGrDetect",
 
 ; It is best to modify those values by using the option in the script menu
 global PersonalInformation := Map(
-    "first_name", "Prénom",
-    "last_name", "Nom",
-    "date_of_birth", "01/01/2000",
-    "email_address", "prenom.nom@mail.fr",
-    "work_email_address", "prenom.nom@mail.pro",
-    "phone_number", "0606060606",
-    "phone_number_clean", "06 06 06 06 06",
-    "street_address", "1 Rue de la Paix",
-    "city", "Paris",
-    "country", "France",
-    "postal_code", "75000",
-    "iban", "FR00 0000 0000 0000 0000 0000 000",
-    "bic", "ABCDFRPP",
-    "credit_card", "1234 5678 9012 3456",
-    "social_security_number", "1 99 99 99 999 999 99",
+		"first_name", "Prénom",
+		"last_name", "Nom",
+		"date_of_birth", "01/01/2000",
+		"email_address", "prenom.nom@mail.fr",
+		"work_email_address", "prenom.nom@mail.pro",
+		"phone_number", "0606060606",
+		"phone_number_clean", "06 06 06 06 06",
+		"street_address", "1 Rue de la Paix",
+		"city", "Paris",
+		"country", "France",
+		"postal_code", "75000",
+		"iban", "FR00 0000 0000 0000 0000 0000 000",
+		"bic", "ABCDFRPP",
+		"credit_card", "1234 5678 9012 3456",
+		"social_security_number", "1 99 99 99 999 999 99",
 )
 global PersonalInformationLetters := Map(
-    "a", "street_address",
-    "b", "bic",
-    "c", "credit_card",
-    "d", "date_of_birth",
-    "e", "email_address",
-    "f", "phone_number_clean",
-    "i", "iban",
-    "m", "email_address",
-    "n", "last_name",
-    "p", "first_name",
-    "s", "social_security_number",
-    "t", "phone_number",
-    "w", "work_email_address",
+		"a", "street_address",
+		"b", "bic",
+		"c", "credit_card",
+		"d", "date_of_birth",
+		"e", "email_address",
+		"f", "phone_number_clean",
+		"i", "iban",
+		"m", "email_address",
+		"n", "last_name",
+		"p", "first_name",
+		"s", "social_security_number",
+		"t", "phone_number",
+		"w", "work_email_address",
 )
 
 ; ======================================================================
@@ -639,91 +740,176 @@ global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceA
 
 
 
-EnsurePersonalShortcutsFile(Path, AllowReload := true) {
-    global PERSONAL_SHORTCUTS_TEMPLATE
-    if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
-        try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
-        return
-    }
-    FileWasCreated := false
-    if !FileExist(Path) {
-        try {
-            Dir := RegExReplace(Path, "\\[^\\]+$", "")
-            if (Dir != "" and !DirExist(Dir)) {
-                DirCreate(Dir)
-            }
-            Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
-            ; Every generated AHK source must be UTF-8 with BOM and LF.
-            ; `UTF-8-RAW` silently creates a parser-risking BOM-less file.
-            FileAppend(Template, Path, "UTF-8")
-            FileWasCreated := true
-            try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
-        } catch as e {
-            try LoggerWarn("ErgoptiPlus", "Could not create personal shortcuts file at '{1}': {2}.",
-                Path, e.Message)
-            return
-        }
-    }
-    StubDir := ""
-    if A_IsCompiled {
-        LocalAppData := ResolveLocalAppDataDir()
-        if (LocalAppData == "") {
-            try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
-            return
-        }
-        StubDir := LocalAppData . "\Ergopti\_generated"
-    } else {
-        StubDir := A_ScriptDir . "\_generated"
-    }
-    try DirCreate(StubDir)
-    StubPath := StubDir . "\personal_shortcuts.ahk"
-    DesiredStub := "; Auto-generated forwarding stub — do not edit.`n"
-        . "; Forwards to the user's personal shortcuts file located at:`n"
-        . ";     " . Path . "`n"
-        . "; Edit that file (e.g. via the tray menu) rather than this stub.`n"
-        . "#Include *i " . Path . "`n"
-    Existing := ""
-    if FileExist(StubPath) {
-        try Existing := FileRead(StubPath, "UTF-8-RAW")
-    }
-    StubMatches := (Existing == DesiredStub)
-    if !StubMatches {
-        try {
-            if FileExist(StubPath) {
-                FileDelete(StubPath)
-            }
-            FileAppend(DesiredStub, StubPath, "UTF-8")
-            try LoggerInfo("ErgoptiPlus", "Personal shortcuts forwarding stub refreshed at '{1}'.", StubPath)
-        } catch as e {
-            try LoggerWarn("ErgoptiPlus", "Could not write forwarding stub at '{1}': {2}.",
-                StubPath, e.Message)
-            return
-        }
-    }
-    if FileWasCreated or !StubMatches {
-        if !AllowReload {
-            ; A runtime caller (the "open personal shortcuts" gesture/menu) wants to open
-            ; the file for editing, NOT restart the driver mid-session — the freshly
-            ; written file is an empty template, so nothing needs re-including before the
-            ; user has even edited it. Their next Reload picks up the edits.
-            try LoggerInfo("ErgoptiPlus", "Personal shortcuts file/stub (re)created; skipping Reload (caller opted out).")
-            return
-        }
-        try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
-        Reload
-        ; Reload starts the replacement instance but returns to this
-        ; auto-execute thread. Continuing would register the old instance's
-        ; hooks/layout beside the replacement for one scheduling window.
-        ; Exit immediately: native input remains available until the new
-        ; process is ready, but there is never two owners of the keyboard.
-        ExitApp(0)
-    }
+EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
+		ReplaceFn := 0, ReadFn := 0) {
+		global PERSONAL_SHORTCUTS_TEMPLATE
+		InheritedCritical := A_IsCritical
+		if InheritedCritical {
+				Critical("Off")
+				try return EnsurePersonalShortcutsFile(Path, AllowReload,
+						WriterFn, ReplaceFn, ReadFn)
+				finally Critical(InheritedCritical)
+		}
+		if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
+				try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
+				return false
+		}
+		FileWasCreated := false
+		if !FileExist(Path) {
+				try {
+						Dir := RegExReplace(Path, "\\[^\\]+$", "")
+						if (Dir != "" and !DirExist(Dir)) {
+								DirCreate(Dir)
+						}
+						Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
+						; A complete same-directory stage is published atomically. The old
+						; FileAppend path could leave a truncated AHK source on interruption.
+						if !_PersonalShortcutsPublishFile(Path, Chr(0xFEFF) . Template,
+								WriterFn, ReplaceFn, ReadFn, true)
+								throw Error("the personal shortcuts file could not be published atomically")
+						FileWasCreated := true
+						try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
+				} catch as e {
+						try LoggerWarn("ErgoptiPlus", "Could not create personal shortcuts file at '{1}': {2}.",
+								Path, e.Message)
+						return false
+				}
+		}
+		StubDir := ""
+		if A_IsCompiled {
+				LocalAppData := ResolveLocalAppDataDir()
+				if (LocalAppData == "") {
+						try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
+						return false
+				}
+				StubDir := LocalAppData . "\Ergopti\_generated"
+		} else {
+				StubDir := A_ScriptDir . "\_generated"
+		}
+		try DirCreate(StubDir)
+		StubPath := StubDir . "\personal_shortcuts.ahk"
+		DesiredStub := "; Auto-generated forwarding stub — do not edit.`n"
+				. "; Forwards to the user's personal shortcuts file located at:`n"
+				. ";     " . Path . "`n"
+				. "; Edit that file (e.g. via the tray menu) rather than this stub.`n"
+				. "#Include *i " . Path . "`n"
+		Existing := ""
+		if FileExist(StubPath) {
+				try Existing := HasMethod(ReadFn, "Call")
+						? ReadFn.Call(StubPath) : FSRead(StubPath)
+		}
+		if (Existing is String) and SubStr(Existing, 1, 1) == Chr(0xFEFF)
+				Existing := SubStr(Existing, 2)
+		StubMatches := (Existing == DesiredStub)
+		if !StubMatches {
+				try {
+						if !_PersonalShortcutsPublishFile(StubPath,
+								Chr(0xFEFF) . DesiredStub, WriterFn, ReplaceFn, ReadFn)
+								throw Error("the forwarding stub could not be published atomically")
+						try LoggerInfo("ErgoptiPlus", "Personal shortcuts forwarding stub refreshed at '{1}'.", StubPath)
+				} catch as e {
+						try LoggerWarn("ErgoptiPlus", "Could not write forwarding stub at '{1}': {2}.",
+								StubPath, e.Message)
+						return false
+				}
+		}
+		if FileWasCreated or !StubMatches {
+				if !AllowReload {
+						; A runtime caller (the "open personal shortcuts" gesture/menu) wants to open
+						; the file for editing, NOT restart the driver mid-session — the freshly
+						; written file is an empty template, so nothing needs re-including before the
+						; user has even edited it. Their next Reload picks up the edits.
+						try LoggerInfo("ErgoptiPlus", "Personal shortcuts file/stub (re)created; skipping Reload (caller opted out).")
+						return true
+				}
+				try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
+				Reload
+				; Reload starts the replacement instance but returns to this
+				; auto-execute thread. Continuing would register the old instance's
+				; hooks/layout beside the replacement for one scheduling window.
+				; Exit immediately: native input remains available until the new
+				; process is ready, but there is never two owners of the keyboard.
+				ExitApp(0)
+		}
+		return true
+}
+
+; Publish one generated AHK file only after its full bytes can be re-read from
+; the stage. This helper is deliberately status-bearing so menu/gesture callers
+; never open a path whose creation silently failed.
+_PersonalShortcutsPublishFile(Path, Content, WriterFn := 0, ReplaceFn := 0,
+		ReadFn := 0, CreateOnly := false) {
+		static StageSequence := 0
+		OwnerToken := _ConfigWriteLeaseTryAcquire(
+				Path, "personal-shortcuts-publication")
+		if !(OwnerToken is Object) {
+				try LoggerError("ErgoptiPlus",
+						"Could not publish generated personal shortcuts at '{1}': another configuration transaction owns the target.",
+						Path)
+				return false
+		}
+		StagePath := ""
+		try {
+				StageSequence += 1
+				StagePath := Path . "." . A_NowUTC . "." . A_ScriptHwnd . "."
+						. A_TickCount . "." . StageSequence . ".stage"
+				Written := HasMethod(WriterFn, "Call")
+						? WriterFn.Call(StagePath, Content) : FSWriteDurable(StagePath, Content)
+				if !((Written is Integer) && Written == 1) {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts stage write was not durable at '{1}' (status={2}).",
+								StagePath, String(Written))
+						return false
+				}
+				Observed := HasMethod(ReadFn, "Call") ? ReadFn.Call(StagePath) : false
+				StageMatches := HasMethod(ReadFn, "Call")
+						? ((Observed is String) and Observed == Content)
+						: FSUtf8ExactMatches(StagePath, Content)
+				if !StageMatches {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts stage verification failed at '{1}' (expected={2} chars/U+{3}, observed={4} chars/U+{5}).",
+								StagePath, StrLen(Content), Ord(SubStr(Content, 1, 1)),
+								(Observed is String) ? StrLen(Observed) : -1,
+								(Observed is String) && Observed != "" ? Ord(SubStr(Observed, 1, 1)) : -1)
+						try FSDelete(StagePath)
+						return false
+				}
+				; The writer/read seam can yield to a path relocation or another
+				; user action. Only the exact still-live owner may publish its stage.
+				if !_ConfigWriteLeaseOwns(OwnerToken, Path) {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts publication lost its config lease for '{1}'.", Path)
+						try FSDelete(StagePath)
+						return false
+				}
+				Replaced := HasMethod(ReplaceFn, "Call")
+						? ReplaceFn.Call(StagePath, Path, CreateOnly)
+						: (CreateOnly ? FSAtomicMoveCreate(StagePath, Path)
+								: FSAtomicMoveReplace(StagePath, Path))
+				if !((Replaced is Integer) && Replaced == 1) {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts atomic publication failed from '{1}' to '{2}' (status={3}).",
+								StagePath, Path, String(Replaced))
+						try FSDelete(StagePath)
+						; Another process may have won creation after our initial absence
+						; probe. Its user-owned file is success, never something to replace.
+						if CreateOnly && FileExist(Path)
+								return true
+						return false
+				}
+				return true
+		} finally {
+				_ConfigWriteLeaseRelease(OwnerToken)
+		}
 }
 
 try {
-    EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
+				_DriverStartupSmokeDir == "")
+				throw Error("personal shortcuts bootstrap was not durable")
 } catch as _epsErr {
-    try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
+		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
+		ExitApp(1)
 }
 #InputLevel 2
 #Include *i _generated/personal_shortcuts.ahk
@@ -738,6 +924,7 @@ global _HSCategorySnapshot := Map()
 try _HSSnapshotAllCategories()
 ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
 
+#Include modules/take_note.ahk
 #Include modules/gestures/init.ahk
 #Include modules/gestures/click.ahk
 #Include modules/gestures/screenshots.ahk
@@ -749,28 +936,33 @@ ReadKeyboardShortcutsConfig()
 LoggerStart("KeyboardShortcuts", "Registering configurable keyboard hotkeys…")
 _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
-    if (_KbAction == "none")
-        continue
-    _KbSend := _KeyboardSlotSendCode(_KbSlot)
-    if (_KbSend == "") {
-        LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — send code not found.", _KbSlot)
-        continue
-    }
-    try {
-        Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-        LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
-        _KbBoundCount++
-    } catch as _KbErr {
-        LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}': {2}.", _KbSlot, _KbErr.Message)
-    }
+		if (_KbAction == "none")
+				continue
+		_KbChord := _KeyboardSlotChord(_KbSlot)
+		if (_KbChord == "") {
+				LoggerWarn("KeyboardShortcuts", "Slot '{1}' skipped — chord not resolvable.", _KbSlot)
+				continue
+		}
+		; The registrar owns the OS call and reports refusal by returning "", so the
+		; try/catch that used to wrap Hotkey() here would now only ever catch our own
+		; bugs — which must surface, not be logged as a skipped shortcut
+		_KbHandle := HotkeyRegistrarBind(_KbChord, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
+		if (_KbHandle == "") {
+				LoggerWarn("KeyboardShortcuts", "Failed to register hotkey '{1}' ({2}).", _KbSlot, _KbChord)
+				continue
+		}
+		LoggerDebug("KeyboardShortcuts", "Hotkey '{1}' → '{2}' registered.", _KbSlot, _KbAction)
+		_KbBoundCount++
 }
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
+
+#Include infra/config_io.ahk
 
 CS_Load()
 global _SaveFullConfigReady := true
 global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
-    WPMWidget_LoadConfig(_IniCache)
+		WPMWidget_LoadConfig(_IniCache)
 
 BootProfile_Mark("Config, features & shortcuts loaded")
 ; The tray menu build (~157 ms: per-category TOML submenus + manifest items) was the
@@ -787,7 +979,10 @@ _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
 A_TrayMenu.Delete()
-SetTimer(SaveFullConfig, -500)
+if !(IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
+	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
+		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
+}
 
 ; HookDispatcher owns the process-wide mouse Hotkeys consumed by four independent
 ; features (hotstring prefix-watcher click-reset, CapsWord cancel, gesture
@@ -798,42 +993,44 @@ SetTimer(SaveFullConfig, -500)
 ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
 ; can trigger a "hook already released" error on some AHK builds.
 if !HookDispatcher.Start() {
-    ; The shared hook is the driver’s keyboard ownership boundary. Publishing
-    ; readiness without it would create a half-boot where menu/UI state looks
-    ; healthy but remaps and hook consumers silently never receive input.
-    LoggerError("ErgoptiPlus", "Startup aborted: unified keyboard hook could not start.")
-    ExitApp(1)
+		; The shared hook is the driver’s keyboard ownership boundary. Publishing
+		; readiness without it would create a half-boot where menu/UI state looks
+		; healthy but remaps and hook consumers silently never receive input.
+		LoggerError("ErgoptiPlus", "Startup aborted: unified keyboard hook could not start.")
+		ExitApp(1)
 }
 
 if MetricsShortcuts.enabled {
-    LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
-        WPMWidget.visible, WPMWidget.show_graph)
-    ; Refresh the metrics focus cache off the keystroke thread via a periodic timer
-    ; so WinGetTitle/WinGetProcessName (which send WM_GETTEXT and can block on a
-    ; busy foreground window) never land on the hot path. Armed here — inside the
-    ; metrics gate and BEFORE KL_Init below — because the cache has exactly one
-    ; reader, MF_ShouldFilter, which the keylogger consults per event: with metrics
-    ; off the poll would issue blocking probes nobody reads.
-    MF_StartFocusRefresh()
-    ; (The WebView2 widget cold-start is armed at the very END of boot — after
-    ; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its
-    ; delay later, while the hotstring registration is still running, and AHK
-    ; preempts that auto-execute thread to run it: WebView2's ~3 s startup gets
-    ; dragged back onto the critical path, AND the interruption pumps the message
-    ; queue, painting a tray click queued during boot against a half-built menu.
-    ; See the deferred-task block after LoggerSuccess("…ready").)
-    KL_Init(_ConfigDir . "metrics")
-    MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
-    ; HookDispatcher is already started unconditionally above.
-    KL_Hook_Start()
-    KL_Watchers_Start()
-    KL_Mouse_Start()
-    KL_Sensors_Start()
-    KL_Topo_Start()
-    KL_AV_Start()
-    KL_Net_Start()
-    KL_Clip_Start()
-    KL_Roi_Start()
+		LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
+				WPMWidget.visible, WPMWidget.show_graph)
+		; Refresh one canonical focus snapshot from a resident periodic timer. The
+		; title transaction has an OS-enforced deadline and every partial identity is
+		; published invalid, so same-thread keyboard consumers remain bounded and
+		; privacy fail-closed. Arm inside the metrics gate and BEFORE KL_Init: with
+		; metrics off, no consumer needs this snapshot.
+		MF_StartFocusRefresh()
+		; (The WebView2 widget cold-start is armed at the very END of boot — after
+		; "Driver fully initialised" — NOT here. A timer armed mid-boot fires ~its
+		; delay later, while the hotstring registration is still running, and AHK
+		; preempts that auto-execute thread to run it: WebView2's ~3 s startup gets
+		; dragged back onto the critical path, AND the interruption pumps the message
+		; queue, painting a tray click queued during boot against a half-built menu.
+		; See the deferred-task block after LoggerSuccess("…ready").)
+		KL_Init(_ConfigDir . "metrics")
+		MetricsBindingsReady := MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+		if !((MetricsBindingsReady is Integer) && MetricsBindingsReady == 1)
+			try LoggerError("MetricsShortcuts",
+				"One or more metrics shortcuts could not be activated during boot; continuing with explicit recovery state.")
+		; HookDispatcher is already started unconditionally above.
+		KL_Hook_Start()
+		KL_Watchers_Start()
+		KL_Mouse_Start()
+		KL_Sensors_Start()
+		KL_Topo_Start()
+		KL_AV_Start()
+		KL_Net_Start()
+		KL_Clip_Start()
+		KL_Roi_Start()
 }
 
 BootProfile_Mark("Metrics/keylogger started")
@@ -842,7 +1039,10 @@ BootProfile_Mark("Metrics/keylogger started")
 ; RAM-buffered metrics (KL_Stop) before the process tears down. Registered
 ; unconditionally: the handler is fully try-wrapped and KL_Stop is a no-op when
 ; metrics are disabled (Keylogger.initialized stays false).
-OnExit(Ergopti_OnShutdown)
+; Prepend the refusal-capable lifecycle callback ahead of the logger flush.
+; Returning nonzero must stop every later callback before any teardown occurs;
+; on acceptance the logger remains last and persists terminal cleanup logs.
+OnExit(Ergopti_OnShutdown, -1)
 LoggerInfo("ErgoptiPlus", "Tray menu built and icon set.")
 
 
@@ -858,16 +1058,14 @@ global _FmtCountCache := Map()
 
 
 
-#Include lib/config_io.ahk
-
 #Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
 #Include ui/personal_info_editor/init.ahk
 
-#Include lib/lifecycle.ahk
+#Include infra/lifecycle.ahk
 
-#Include lib/script_altgr_hotkeys.ahk
+#Include infra/script_altgr_hotkeys.ahk
 _RegisterScriptAltGrHotkeys()
 
 ; Personal hotstrings are loaded exactly once, inside RegisterAllHotstrings()
@@ -881,7 +1079,7 @@ _RegisterScriptAltGrHotkeys()
 #InputLevel 2
 #Include modules/keymap/layout.ahk
 #Include modules/shortcuts.ahk
-#Include modules/tap_holds.ahk
+#Include platform/remap.ahk
 #Include modules/hotstrings.ahk
 ; The module now only DEFINES RegisterAllHotstrings(); invoke it here so the
 ; registration runs at the same boot point (and A_InputLevel) as before the
@@ -896,7 +1094,7 @@ BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; Clear any phantom modifier carried across a Reload BEFORE the input hook starts
 ; observing keystrokes, so a Reload that landed mid-AltGr cannot leave this fresh
 ; process stuck on the AltGr layer for the first keystrokes (transient
-; « AltGr bloqué »). See _ReleasePhantomModifiers in lib/lifecycle.ahk.
+; « AltGr bloqué »). See _ReleasePhantomModifiers in infra/lifecycle.ahk.
 _ReleasePhantomModifiers()
 ; Ready is an output contract: every advertised trigger, including emoji/symbol
 ; sections and its preview index, must exist before the driver publishes ready.
@@ -910,6 +1108,36 @@ BootProfile_Mark("Prefix watcher index complete")
 _DriverReady := true
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+if (_DriverStartupSmokeDir != "") {
+		; Ready precedes the deferred tray build in production, so process-alive at
+		; this point used to miss deterministic post-ready boot failures. Exercise
+		; that first deferred owner synchronously and consume its status before the
+		; isolated smoke exits; this caught Func("...") -> Invalid base in LLM replay.
+		if !BuildTrayMenuDeferred()
+				throw Error("deferred tray-menu construction failed after ready")
+		try _LoggerFlush(true)
+		; This isolated probe has just materialised a deep native Menu tree and must
+		; not run the production OnExit teardown against test-only paths/owners. AHK's
+		; immediate destruction of that fresh tree can itself raise STATUS_HEAP_CORRUPTION
+		; while the OS is already ending the disposable process. ExitProcess preserves
+		; the startup verdict without turning teardown into an unrelated smoke target.
+		DllCall("ExitProcess", "UInt", 0)
+}
+
+; A last-known-good rollback copy first becomes a fully functional driver. Only
+; after the ready contract exists may it republish itself atomically to the
+; canonical Current.exe and request the guarded OnExit handoff. A canonical
+; Current.exe similarly retires the old recovery copy only after it is ready.
+_Updater_ArmRecoveryMaintenanceAfterReady()
+
+; Warm the persistent selection worker after the ready contract is published.
+; Its dedicated source entry parses only UIA + the worker, so this does not
+; replay the full driver boot, and no provider call happens until an idle-gated
+; request arrives. Starting it here prevents the first wrap action after a
+; reload from racing a cold worker process.
+if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected")
+	&& Features["shortcuts"]["wrap_text_if_selected"]
+	SetTimer(UIASW_Start, -1)
 
 ; ── Deferred post-"ready" tasks ──────────────────────────────────────────────
 ; All the heavy off-critical-path work is armed HERE, after the driver is ready,
@@ -974,33 +1202,33 @@ global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
 global _PENDING_KEYBOARD_HKL := 0
 
-; The quiescence decision is a pure function extracted to lib/ so the headless
+; The quiescence decision is a pure function extracted to infra/ so the headless
 ; test suite can exercise it without #including this whole entry point (which
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
 
 CheckKeyboardLayoutChange() {
-    global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed
-    
-    suspended := A_IsSuspended
-    isBlacklisted := false
-    try {
-        if IsSet(MF_ShouldFilter) && MF_ShouldFilter()
-            isBlacklisted := true
-    }
-    
-    curHkl := GetForegroundKeyboardLayout()
-    hseSup := (IsSet(HSE_Suppressed)) ? HSE_Suppressed : 0
-    pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
+		global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed
+		
+		suspended := A_IsSuspended
+		isBlacklisted := false
+		try {
+				if IsSet(MF_ShouldFilter) && MF_ShouldFilter()
+						isBlacklisted := true
+		}
+		
+		curHkl := GetForegroundKeyboardLayout()
+		hseSup := (IsSet(HSE_Suppressed)) ? HSE_Suppressed : 0
+		pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
 	inputBusy := (IsSet(InDeadKeySequence) and InDeadKeySequence)
 		or (IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook))
 		or (IsSet(_OneShotShiftInputHook) and IsObject(_OneShotShiftInputHook))
 		or (IsSet(_DeadKeyInputHook) and IsObject(_DeadKeyInputHook))
 		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
-    
-    if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
-        Reload()
-    }
+		
+		if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
+				Reload()
+		}
 }
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)

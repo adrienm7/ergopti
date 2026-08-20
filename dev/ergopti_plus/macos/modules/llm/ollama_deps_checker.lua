@@ -24,9 +24,12 @@
 
 local M = {}
 local hs           = hs
-local Logger       = require("lib.logger")
-local i18n         = require("lib.i18n")
+local Logger       = require("infra.logger")
+local i18n         = require("infra.i18n")
 local llm_progress = require("ui.download_window")
+local OllamaBinary = require("modules.llm.ollama_binary")
+local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 local LOG = "ollama_deps"
 
@@ -242,8 +245,29 @@ function M.check_and_install_deps()
 		return
 	end
 
+	-- The bootstrap installs the executable, but the Lua owner still supplies the
+	-- canonical logging pipeline. This keeps fresh installs on the same rollover
+	-- and quoting contract as both normal daemon launch paths.
+	local resolved_bin, resolve_err, managed_override = OllamaBinary.resolve()
+	if managed_override and not resolved_bin then
+		Logger.error(LOG, "The launcher-owned Ollama executable is unavailable: %s",
+			tostring(resolve_err))
+		_bootstrap_state = "failed"
+		_last_failure_message = "The bundled Ollama executable is unavailable."
+		return
+	end
+	local server_cmd, command_err = OllamaServerCommand.build(
+		resolved_bin or "ollama", Logger.UNIFIED_LOG_FILE)
+	if not server_cmd then
+		Logger.error(LOG, "Could not build the Ollama bootstrap server command: %s",
+			tostring(command_err))
+		_bootstrap_state = "failed"
+		_last_failure_message = "Could not prepare the Ollama server command."
+		return
+	end
+
 	local task
-	task = hs.task.new("/bin/bash", function(exit_code, stdout, stderr)
+	task = TaskLifecycle.native("Ollama bootstrap", "/bin/bash", function(exit_code, stdout, stderr)
 		if task then _active_tasks[task] = nil end
 		_task_running = false
 		local combined = (stdout or "") .. (stderr or "")
@@ -295,23 +319,19 @@ function M.check_and_install_deps()
 			end
 			pcall(llm_progress.set_error, tail)
 		end
-	end, { script_path })
+	end, make_streaming_handler(), { script_path, server_cmd, resolved_bin or "" })
 
 	if not task then
-		Logger.error(LOG, "Failed to create hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("ollama.deps_task_create_failed")
 		return
 	end
 
-	pcall(function() task:setStreamingCallback(make_streaming_handler()) end)
-
 	_task_running = true
 	if task then _active_tasks[task] = true end
-	if not pcall(function() task:start() end) then
+	if not TaskLifecycle.start(task, "Ollama bootstrap") then
 		if task then _active_tasks[task] = nil end
 		_task_running = false
-		Logger.error(LOG, "Failed to start hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = i18n.get("ollama.deps_task_start_failed")
 	end
@@ -321,11 +341,11 @@ end
 
 
 
--- =================================
+--- ==================================
 --- ==================================
 --- ======= 5/ State Accessors =======
 --- ==================================
--- =================================
+--- ==================================
 
 --- @return string The current bootstrap state ("pending" / "ready" / "failed").
 function M.get_state() return _bootstrap_state end

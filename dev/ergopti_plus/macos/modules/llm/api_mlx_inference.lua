@@ -22,15 +22,15 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
-local text_utils = require("lib.text_utils")
+local Logger         = require("infra.logger")
+local text_utils = require("infra.text_utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
-local Timings        = require("lib.timings")
+local Timings        = require("infra.timings")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
@@ -66,6 +66,54 @@ local STREAM_TMPFILE_CLEANUP_SEC = STREAM_HARD_TIMEOUT_SEC + 10
 -- table (mutated here and by api_mlx's cancel_streaming). nil until init().
 local _ctx = nil
 
+-- Exact native timer capabilities whose cancellation was refused. The scheduler
+-- also keeps a strong registry, but this request layer must retain its own debt so
+-- it can prevent a sibling HTTP dispatch until the predecessor is proven inert.
+local _non_stream_timer_cleanup = {}
+
+--- Retains one exact non-stream timeout capability for a later cleanup attempt.
+--- @param handle table|nil TimerScheduler handle.
+local function retain_non_stream_timer_cleanup(handle)
+	if type(handle) == "table" and handle.timer ~= nil then
+		_non_stream_timer_cleanup[handle] = true
+	end
+end
+
+--- Cancels one non-stream timeout and retains it when native stop refuses.
+--- @param handle table|nil TimerScheduler handle.
+--- @return boolean settled True only when no native timer remains.
+local function cancel_non_stream_timer(handle)
+	if type(handle) ~= "table" or handle.timer == nil then
+		if type(handle) == "table" then _non_stream_timer_cleanup[handle] = nil end
+		return true
+	end
+	local ok, settled_or_err = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if ok and settled_or_err == true then
+		_non_stream_timer_cleanup[handle] = nil
+		return true
+	end
+	retain_non_stream_timer_cleanup(handle)
+	Logger.error(LOG, "Non-stream timeout cleanup was refused; retained exact handle: %s.",
+		tostring(settled_or_err))
+	return false
+end
+
+--- Retries all retained non-stream timeout cleanup before another HTTP dispatch.
+--- @return boolean settled True only when every predecessor timer settled.
+local function drain_non_stream_timer_cleanup()
+	local snapshot = {}
+	for handle in pairs(_non_stream_timer_cleanup) do
+		snapshot[#snapshot + 1] = handle
+	end
+	local settled = true
+	for _, handle in ipairs(snapshot) do
+		if cancel_non_stream_timer(handle) ~= true then settled = false end
+	end
+	return settled
+end
+
 --- Guard: every public request entry point reads injected controller state.
 --- Logs an ERROR and bails when called before M.init() so a wiring regression is
 --- loud instead of a nil-index crash deep inside a callback.
@@ -87,6 +135,7 @@ end
 ---   model_hf_path        = function():string?, -- launch --model HF path, or nil
 ---   read_active_model_arg = function():string?,-- exact --model arg written to disk
 ---   stream               = table,              -- shared { task, timeout, generation, has_chunks }
+---   cancel_streaming     = function():boolean, -- strict shared teardown contract
 --- }.
 function M.init(ctx)
 	if type(ctx) ~= "table" then
@@ -95,6 +144,10 @@ function M.init(ctx)
 	end
 	if type(ctx.stream) ~= "table" then
 		Logger.error(LOG, "ApiMlxInference.init(): ctx.stream must be the shared streaming-state table.")
+		return
+	end
+	if type(ctx.cancel_streaming) ~= "function" then
+		Logger.error(LOG, "ApiMlxInference.init(): ctx.cancel_streaming must be a function.")
 		return
 	end
 	_ctx = ctx
@@ -236,8 +289,20 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 		return
 	end
 
+	if drain_non_stream_timer_cleanup() ~= true then
+		Logger.error(LOG, "MLX request refused — predecessor timeout cleanup is still pending.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
 	local done = false
-	local timeout_handle = TimerScheduler.after(NON_STREAM_TIMEOUT_SEC, function()
+	local timeout_handle
+	local timeout_committed
+	local schedule_ok, schedule_err = xpcall(function()
+		timeout_handle, timeout_committed = TimerScheduler.after(NON_STREAM_TIMEOUT_SEC, function()
+			-- after() fences user delivery before attempting native stop. If that stop
+			-- refuses, retain the exact inert capability for the next request boundary.
+			retain_non_stream_timer_cleanup(timeout_handle)
 		if done then return end
 		done = true
 		-- A SUPERSEDED request must not report failure. Nothing cancels this timer
@@ -254,14 +319,22 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
 		end
 		Logger.warn(LOG, "[%s] #%d TIMEOUT after %.0fs", model_name, req_id, NON_STREAM_TIMEOUT_SEC)
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
-	end)
+		end)
+	end, debug.traceback)
+	if not schedule_ok or timeout_committed ~= true then
+		retain_non_stream_timer_cleanup(timeout_handle)
+		Logger.error(LOG, "MLX request timeout did not commit — HTTP dispatch refused: %s.",
+			tostring(schedule_ok and timeout_handle or schedule_err))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
 
 	_infer_client.post(endpoint, { ["Content-Type"] = "application/json" }, encoded,
 		function(r)
 			local status, body = r.status, r.body
 			if done then return end
 			done = true
-			TimerScheduler.cancel(timeout_handle)
+			cancel_non_stream_timer(timeout_handle)
 
 			if status ~= 200 then
 				Logger.error(LOG, "MLX HTTP %s :: %s", tostring(status), tostring((body or ""):sub(1, 260)))
@@ -369,10 +442,10 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		return
 	end
 	-- Supersede any previous stream: always terminate to free the MLX server connection
-	if _ctx.stream.task then
-		_ctx.stream.task.terminate()
-		_ctx.stream.task    = nil
-		_ctx.stream.has_chunks = false
+	if (_ctx.stream.task or _ctx.stream.timeout) and _ctx.cancel_streaming() ~= true then
+		Logger.error(LOG, "Cannot start MLX stream while the previous task remains owned.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
 	end
 
 	_ctx.stream.generation = _ctx.stream.generation + 1
@@ -499,6 +572,8 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local line_buf      = ""
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
 	local t0_req        = TimerScheduler.now()
+	local task = nil
+	local task_completed = false
 
 	-- Parse one SSE line (data: {...} or data: [DONE]) and append its token to accumulated
 	local function process_sse_line(line)
@@ -595,24 +670,76 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- first token, leaving a server that sent >=1 token then hung with NO bound at
 	-- all — curl blocked forever, on_done never fired, every later prediction was
 	-- blocked behind the held-open connection.
-	local function arm_stream_idle_watchdog()
+	local watchdog_epoch = 0
+	local arm_stream_idle_watchdog
+	arm_stream_idle_watchdog = function()
+		watchdog_epoch = watchdog_epoch + 1
+		local my_watchdog_epoch = watchdog_epoch
 		if _ctx.stream.timeout then
-			TimerScheduler.cancel(_ctx.stream.timeout)
-			_ctx.stream.timeout = nil
-		end
-		_ctx.stream.timeout = TimerScheduler.after(STREAM_HARD_TIMEOUT_SEC, function()
-			_ctx.stream.timeout = nil
-			-- Only fire if this stream is still the current one
-			if my_generation ~= _ctx.stream.generation then return end
-			if _ctx.stream.task then
-				Logger.warn(LOG, "[%s] #%d STREAM idle timeout (%gs) — terminating hung task.",
-					model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
-				_ctx.stream.task.terminate()
-				_ctx.stream.task       = nil
-				_ctx.stream.has_chunks = false
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			local old_timeout = _ctx.stream.timeout
+			local cancel_ok, cancel_result = xpcall(function()
+				return TimerScheduler.cancel(old_timeout)
+			end, debug.traceback)
+			local cancel_settled = cancel_ok and (cancel_result == nil or cancel_result == true)
+			if not cancel_settled then
+				-- The old callback is fenced by watchdog_epoch. Retain its exact handle;
+				-- when it eventually fires it will re-arm from that later instant instead
+				-- of terminating a healthy stream relative to the old deadline.
+				Logger.error(LOG, "[%s] #%d STREAM watchdog cancellation did not commit (result: %s).",
+					tostring(model_name), req_id, tostring(cancel_result))
+				-- The exact old timer remains live. Its epoch fence makes it harmless,
+				-- and when it fires it re-arms from that later instant, so the stream
+				-- remains bounded without creating a duplicate timer.
+				return true
 			end
-		end)
+			if _ctx.stream.timeout == old_timeout then _ctx.stream.timeout = nil end
+		end
+
+		local candidate
+		local schedule_ok, handle_or_err, watchdog_committed = xpcall(function()
+			local committed
+			candidate, committed = TimerScheduler.after(STREAM_HARD_TIMEOUT_SEC, function()
+				local callback_ok, callback_err = xpcall(function()
+					if _ctx.stream.timeout ~= candidate then return end
+					_ctx.stream.timeout = nil
+					if my_generation ~= _ctx.stream.generation then return end
+					if my_watchdog_epoch ~= watchdog_epoch then
+						-- A later chunk superseded this deadline but native cancellation
+						-- failed. It has now fired safely; start a fresh full deadline.
+						if _ctx.stream.task then arm_stream_idle_watchdog() end
+						return
+					end
+					local task = _ctx.stream.task
+					if not task then return end
+					Logger.warn(LOG, "[%s] #%d STREAM idle timeout (%gs) — terminating hung task.",
+						model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
+					local terminate_ok, terminate_result = xpcall(task.terminate, debug.traceback)
+					if not terminate_ok or terminate_result ~= true then
+						Logger.error(LOG, "[%s] #%d STREAM timeout termination did not commit (result: %s).",
+							tostring(model_name), req_id, tostring(terminate_result))
+						if _ctx.stream.task == task then arm_stream_idle_watchdog() end
+						return
+					end
+					if _ctx.stream.task == task then
+						_ctx.stream.task       = nil
+						_ctx.stream.has_chunks = false
+					end
+					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "[%s] #%d STREAM watchdog callback raised: %s",
+						tostring(model_name), req_id, tostring(callback_err))
+				end
+			end)
+			return candidate, committed
+		end, debug.traceback)
+		if not schedule_ok or watchdog_committed ~= true then
+			Logger.error(LOG, "[%s] #%d STREAM watchdog arm did not commit (result: %s).",
+				tostring(model_name), req_id, tostring(handle_or_err))
+			return false
+		end
+		_ctx.stream.timeout = candidate
+		return true
 	end
 
 	-- Streaming callback: fired each time curl writes a chunk to stdout
@@ -626,7 +753,24 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		end
 		-- Re-arm the idle watchdog on EVERY chunk so a mid-stream stall is bounded,
 		-- not just a pre-first-token hang (the watchdog used to be cancelled here).
-		arm_stream_idle_watchdog()
+		if arm_stream_idle_watchdog() ~= true then
+			-- The old deadline was already revoked and its replacement never became
+			-- native ownership. Keep no unbounded stream behind a successful chunk.
+			local owned_task = _ctx.stream.task
+			_ctx.stream.generation = _ctx.stream.generation + 1
+			if owned_task then
+				local stop_ok, stop_result = xpcall(function() return owned_task.terminate() end, debug.traceback)
+				if stop_ok and stop_result == true and _ctx.stream.task == owned_task then
+					_ctx.stream.task = nil
+				elseif not stop_ok or stop_result ~= true then
+					Logger.error(LOG, "[%s] #%d STREAM task retained after watchdog loss: %s",
+						tostring(model_name), req_id, tostring(stop_result))
+				end
+			end
+			_ctx.stream.has_chunks = false
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return false
+		end
 		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
 			model_name, req_id, #chunk, chunk:sub(1, 120))
 		line_buf = line_buf .. chunk
@@ -636,6 +780,14 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 
 	-- Completion callback: fired when curl exits
 	local function on_done(exit_code, remaining, stderr_out)
+		task_completed = true
+		-- A completion callback owns teardown before every fallible parser/file/log
+		-- operation. Otherwise a throw at line one leaves a dead curl published and
+		-- every later request refuses to start behind it.
+		if my_generation == _ctx.stream.generation and _ctx.stream.task == task then
+			_ctx.stream.task = nil
+			_ctx.stream.has_chunks = false
+		end
 		-- Remove the payload temp file as soon as curl exits so it doesn't linger
 		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window (mirrors the
 		-- Ollama backend's streaming twin; F-MED-3).
@@ -657,16 +809,29 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		end
 
 		-- This stream is still the current one — clear active state
-		_ctx.stream.task    = nil
-		_ctx.stream.has_chunks = false
 		if _ctx.stream.timeout then
-			TimerScheduler.cancel(_ctx.stream.timeout)
-			_ctx.stream.timeout = nil
+			local timeout = _ctx.stream.timeout
+			local cancel_ok, cancel_result = xpcall(function()
+				return TimerScheduler.cancel(timeout)
+			end, debug.traceback)
+			local cancel_settled = cancel_ok and (cancel_result == nil or cancel_result == true)
+			if cancel_settled then
+				if _ctx.stream.timeout == timeout then _ctx.stream.timeout = nil end
+			else
+				Logger.error(LOG, "[%s] #%d STREAM completion watchdog cancellation did not commit (result: %s).",
+					tostring(model_name), req_id, tostring(cancel_result))
+			end
 		end
 
 		-- SIGTERM (15) means this stream was explicitly terminated (mid-flight cancel)
 		if exit_code == 15 then
 			Logger.debug(LOG, "[%s] #%d STREAM: terminated mid-flight — no callbacks.", model_name, req_id)
+			return
+		end
+		if exit_code ~= 0 then
+			Logger.error(LOG, "[%s] #%d STREAM transport failed (exit=%s) — discarding partial output.",
+				tostring(model_name), req_id, tostring(exit_code))
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
 		end
 
@@ -728,40 +893,87 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results) end
 	end
 
-	if _ctx.stream.timeout then
-		TimerScheduler.cancel(_ctx.stream.timeout)
-		_ctx.stream.timeout = nil
+	local spawn_ok, spawned = xpcall(function()
+		return ShellRunner.spawn("/usr/bin/curl", {
+			"-s", "-N", "-X", "POST",
+			"-H", "Content-Type: application/json",
+			"--connect-timeout", tostring(STREAM_CONNECT_TIMEOUT_SEC),
+			-- Hard ceiling on TOTAL stream duration so curl ALWAYS exits and on_done
+			-- runs even if the server stalls mid-stream (mirrors the Ollama backend).
+			-- Without this a post-first-token hang left curl blocked forever, holding
+			-- the single-request MLX connection open against every later prediction.
+			"--max-time", tostring(STREAM_HARD_TIMEOUT_SEC),
+			"--data-binary", "@" .. tmp_path,
+			endpoint,
+		}, on_done, on_chunk)
+	end, debug.traceback)
+	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
+		pcall(os.remove, tmp_path)
+		Logger.error(LOG, "[%s] #%d STREAM task creation did not commit (result: %s).",
+			tostring(model_name), req_id, tostring(spawned))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
 	end
-
-	local task = ShellRunner.spawn("/usr/bin/curl", {
-		"-s", "-N", "-X", "POST",
-		"-H", "Content-Type: application/json",
-		"--connect-timeout", tostring(STREAM_CONNECT_TIMEOUT_SEC),
-		-- Hard ceiling on TOTAL stream duration so curl ALWAYS exits and on_done
-		-- runs even if the server stalls mid-stream (mirrors the Ollama backend).
-		-- Without this a post-first-token hang left curl blocked forever, holding
-		-- the single-request MLX connection open against every later prediction.
-		"--max-time", tostring(STREAM_HARD_TIMEOUT_SEC),
-		"--data-binary", "@" .. tmp_path,
-		endpoint,
-	}, on_done, on_chunk)
-	task.start()
-	_ctx.stream.task    = task
+	task = spawned
+	_ctx.stream.task = task
+	local start_ok, start_result = xpcall(function() return task.start() end, debug.traceback)
+	if not start_ok or start_result ~= true then
+		if not start_ok then
+			local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
+			if stop_ok and stop_result == true then
+				if _ctx.stream.task == task then _ctx.stream.task = nil end
+			else
+				Logger.error(LOG, "[%s] #%d STREAM ambiguous task retained for cancellation retry: %s",
+					tostring(model_name), req_id, tostring(stop_result))
+			end
+		elseif _ctx.stream.task == task then
+			_ctx.stream.task = nil
+		end
+		local removed, remove_err = pcall(os.remove, tmp_path)
+		if not removed then
+			Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
+				tostring(model_name), req_id, tostring(remove_err))
+		end
+		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
+			tostring(model_name), req_id, tostring(start_result))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+	if task_completed then return end
 	_ctx.stream.has_chunks = false
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
+
+	-- Own the payload cleanup before arming the watchdog. If watchdog creation
+	-- fails and task termination is itself ambiguous, curl may still be reading;
+	-- this later deadline remains the only safe cleanup owner.
+	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
+		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
+			os.remove(tmp_path)
+		end)
+	end, debug.traceback)
+	if not cleanup_ok or cleanup_committed ~= true then
+		Logger.error(LOG, "[%s] #%d STREAM payload cleanup timer did not commit (result: %s).",
+			tostring(model_name), req_id, tostring(cleanup_handle))
+	end
 
 	-- Idle watchdog: bound the stream in-process too (belt-and-suspenders with
 	-- --max-time). Armed now and re-armed on every chunk (see on_chunk), so a hung
 	-- server — connection accepted but no further tokens — is terminated and
 	-- surfaced via on_fail instead of freezing the UI on a stuck spinner.
-	arm_stream_idle_watchdog()
-
-	-- Safety-net: remove the payload temp file even if on_done fires late or not
-	-- at all. The normal-path removal now happens immediately in on_done above;
-	-- this is only the fallback for an on_done that never runs.
-	TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
-		os.remove(tmp_path)
-	end)
+	if arm_stream_idle_watchdog() ~= true then
+		_ctx.stream.generation = _ctx.stream.generation + 1
+		local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
+		if stop_ok and stop_result == true and _ctx.stream.task == task then
+			_ctx.stream.task = nil
+			pcall(os.remove, tmp_path)
+		elseif not stop_ok or stop_result ~= true then
+			Logger.error(LOG, "[%s] #%d STREAM task retained after initial watchdog failure: %s",
+				tostring(model_name), req_id, tostring(stop_result))
+		end
+		_ctx.stream.has_chunks = false
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
 end
 
 return M

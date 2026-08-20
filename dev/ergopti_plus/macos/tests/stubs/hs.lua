@@ -59,7 +59,7 @@ local function make_timer(delay, fn, recurring)
 		recurring = recurring or false,
 		fired = 0,
 	}
-	function t:stop() self.running = false end
+	function t:stop() self.running = false ; return self end
 	function t:start() self.running = true ; return self end
 	function t:fire()
 		if self.running and self.fn then self.fired = self.fired + 1 ; self.fn() end
@@ -72,7 +72,11 @@ end
 M.timer = {
 	doAfter = function(delay, fn) return make_timer(delay, fn, false) end,
 	doEvery = function(delay, fn) return make_timer(delay, fn, true) end,
-	new = function(delay, fn) return make_timer(delay, fn, true) end,
+	new = function(delay, fn)
+		local timer = make_timer(delay, fn, true)
+		timer.running = false
+		return timer
+	end,
 	secondsSinceEpoch = function() return os.time() end,
 	-- absoluteTime returns nanoseconds since an arbitrary epoch, matching macOS semantics
 	absoluteTime = function() return math.floor(os.clock() * 1e9) end,
@@ -83,7 +87,11 @@ M.timer = {
 			local t = make_timer(delay, fn, false)
 			t.running = false  -- delayed timers don't auto-run until setDelay/start
 			function t:setDelay(d) self.delay = d end
-			function t:start() self.running = true ; return self end
+			function t:start(next_delay)
+				if next_delay ~= nil then self.delay = next_delay end
+				self.running = true
+				return self
+			end
 			function t:stop()  self.running = false ; return self end
 			function t:running_() return self.running end
 			return t
@@ -277,11 +285,11 @@ M.logger = {
 
 
 
--- ============================
+--- =============================
 --- =============================
 --- ======= 6/ Filesystem =======
 --- =============================
--- ============================
+--- =============================
 
 -- Per-path directory listings a test can populate: __entries["/abs/path"] = { "a.toml", "b.toml" }.
 -- Empty by default so an un-populated directory simply iterates to nothing.
@@ -330,14 +338,123 @@ end
 local function probe_fs_without_lfs(path)
 	local fh = io.open(path, "r")
 	if fh then
-		local zero = fh:read(0)
+		-- The Windows CRT refuses directory handles. An opened zero-byte regular
+		-- file returns nil for read(0), so applying the POSIX discriminator here
+		-- would misclassify every empty file (including stable fcntl sidecars).
+		if package.config:sub(1, 1) == "\\" then
+			fh:close()
+			return { mode = "file" }
+		end
+		local zero, read_error = fh:read(0)
 		fh:close()
-		if zero then return { mode = "file" } end
+		-- POSIX Lua returns nil without an error for an empty regular file, while
+		-- reading a directory returns nil plus EISDIR. Keep those cases distinct.
+		if zero ~= nil or read_error == nil then return { mode = "file" } end
 		return { mode = "directory" }
 	end
 	local ok, _, code = os.rename(path, path)
 	if ok or (code and code ~= 2) then return { mode = "directory" } end
 	return nil
+end
+
+--- Resolves an optional LuaFileSystem method without fabricating host support.
+--- @param method_name string LuaFileSystem method name.
+--- @return function|nil method
+--- @return string|nil error_message
+local function optional_lfs_method(method_name)
+	local ok_lfs, lfs = pcall(require, "lfs")
+	if ok_lfs and type(lfs) == "table" and type(lfs[method_name]) == "function" then
+		return lfs[method_name]
+	end
+	return nil, "LuaFileSystem does not expose " .. tostring(method_name)
+end
+
+local function pack_results(...)
+	return { n = select("#", ...), ... }
+end
+
+--- Reads lstat-style attributes when the host test runtime supports them.
+--- @param path string Filesystem path.
+--- @param attribute string|nil Optional single attribute name.
+--- @return table|any|nil attributes
+--- @return string|nil error_message
+local function fs_symlink_attributes(path, attribute)
+	-- Mirror Hammerspoon's Lua wrapper, not bare lfs.symlinkattributes: the
+	-- synthetic "target" attribute bypasses lstat, while a one-table lstat
+	-- result gains the resolved target. Multi-result failures stay untouched.
+	if attribute == "target" then return M.fs.pathToAbsolute(path) end
+	local method, method_err = optional_lfs_method("symlinkattributes")
+	if not method then
+		-- Stock Windows Lua used by CI has no LuaFileSystem. Preserve useful
+		-- regular-file/directory lstat behavior through the stub's own attribute
+		-- probe; tests that need link identity inject symlinkAttributes explicitly.
+		local fallback = M.fs.attributes(path)
+		if type(fallback) == "table" then return fallback end
+		return nil, method_err
+	end
+	local results = attribute ~= nil
+		and pack_results(method(path, attribute))
+		or pack_results(method(path))
+	if results.n == 1 and type(results[1]) == "table" then
+		results[1].target = M.fs.pathToAbsolute(path)
+	end
+	return (table.unpack or unpack)(results, 1, results.n)
+end
+
+--- Creates a hard or symbolic link when LuaFileSystem exposes the operation.
+--- @param source_path string Existing source path.
+--- @param destination_path string New destination path.
+--- @param is_symlink boolean|nil Whether to create a symbolic link.
+--- @return boolean|nil linked
+--- @return string|nil error_message
+local function fs_link(source_path, destination_path, is_symlink)
+	if type(source_path) ~= "string" or source_path == "" then return nil, "invalid source path" end
+	if type(destination_path) ~= "string" or destination_path == "" then
+		return nil, "invalid destination path"
+	end
+	local method, method_err = optional_lfs_method("link")
+	if not method then return nil, method_err end
+	return method(source_path, destination_path, is_symlink == true)
+end
+
+--- Encodes bytes as shell-inert hexadecimal for the Windows test fallback.
+--- @param value string Raw UTF-8 pathname.
+--- @return string hexadecimal
+local function hex_encode(value)
+	return (value:gsub(".", function(character)
+		return string.format("%02X", string.byte(character))
+	end))
+end
+
+--- Removes an empty directory when LuaFileSystem exposes the operation.
+--- @param path string Directory path.
+--- @return boolean|nil removed
+--- @return string|nil error_message
+local function fs_rmdir(path)
+	if type(path) ~= "string" or path == "" then return nil, "invalid path" end
+	local method, method_err = optional_lfs_method("rmdir")
+	if method then return method(path) end
+
+	-- Never interpolate a caller-controlled pathname into a shell command. Lua's
+	-- os.remove handles empty directories on POSIX. Stock Windows Lua does not,
+	-- so pass only hexadecimal bytes to a fixed PowerShell Directory.Delete call.
+	local call_ok, removed, remove_err = pcall(os.remove, path)
+	if call_ok and removed == true and probe_fs_without_lfs(path) == nil then return true end
+	if probe_fs_without_lfs(path) == nil then return true end
+	if package.config:sub(1, 1) == "\\" then
+		local path_hex = hex_encode(path)
+		local script = "$h='" .. path_hex .. "';"
+			.. "$b=New-Object byte[] ($h.Length/2);"
+			.. "for($i=0;$i -lt $b.Length;$i++){$b[$i]=[Convert]::ToByte($h.Substring($i*2,2),16)};"
+			.. "$p=[Text.Encoding]::UTF8.GetString($b);"
+			.. "try{[IO.Directory]::Delete($p,$false)}catch{}"
+		pcall(
+			os.execute,
+			'powershell.exe -NoLogo -NoProfile -NonInteractive -Command "' .. script .. '"'
+		)
+		if probe_fs_without_lfs(path) == nil then return true end
+	end
+	return nil, tostring(call_ok and remove_err or removed or method_err)
 end
 
 M.fs = {
@@ -357,7 +474,34 @@ M.fs = {
 	-- Test hook: the lfs-free probe above, so a regression test can assert it
 	-- classifies an existing directory / file / missing path correctly on any OS.
 	__probe_no_lfs = probe_fs_without_lfs,
-	mkdir = function(_) return true end,
+	-- Honest, for the same reason `attributes` above is. It used to return true
+	-- without creating anything, which made every directory-creation invariant
+	-- untestable: production code that verifies its own mkdir with
+	-- hs.fs.attributes — as ensure_dir does, deliberately, because LuaFileSystem
+	-- returns nil rather than raising — saw the create "succeed" and the
+	-- directory stay missing. A stub that reports success for work it did not do
+	-- is the harness-stubs-the-subject false green, and the one class the
+	-- detector cannot see.
+	mkdir = function(path)
+		if type(path) ~= "string" or path == "" then return nil, "invalid path" end
+		local ok_lfs, lfs = pcall(require, "lfs")
+		if ok_lfs and lfs and lfs.mkdir then return lfs.mkdir(path) end
+		local is_windows = package.config:sub(1, 1) == "\\"
+		local quoted = '"' .. path:gsub('"', '') .. '"'
+		local cmd = is_windows
+			and ('cmd /c if not exist ' .. quoted .. ' mkdir ' .. quoted .. ' 2>nul')
+			or ('mkdir -p ' .. quoted .. ' 2>/dev/null')
+		os.execute(cmd)
+		return M.fs.attributes(path) ~= nil
+	end,
+	symlinkAttributes = fs_symlink_attributes,
+	link = fs_link,
+	-- Production delegates to non-blocking fcntl locks. The shared stub has no
+	-- cross-process kernel, so the default healthy adapter contract succeeds;
+	-- contention/cleanup semantics are exercised with explicit overrides.
+	lock = function(_) return true end,
+	unlock = function(_) return true end,
+	rmdir = fs_rmdir,
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,
 	-- Test hook: register the names a given absolute path should list.
@@ -370,11 +514,11 @@ M.fs = {
 
 
 
--- =================================
+-- ================================
 -- ================================
 -- ======= 6b/ SQLite3 Stub =======
 -- ================================
--- =================================
+-- ================================
 
 -- Minimal stub for hs.sqlite3 — records open() calls; exec/prepare/close are no-ops.
 -- Real DB logic is tested via integration tests with a temp SQLite file.
@@ -420,6 +564,9 @@ M.sqlite3 = {
 -- ============================
 
 local KEYSTROKES = {}
+-- Every eventtap built through this stub, in creation order, with the event
+-- types it was asked to watch and its start/stop counts.
+local TAPS = {}
 
 M.mouse = {
 	absolutePosition = function() return { x = 0, y = 0 } end,
@@ -433,18 +580,92 @@ M.eventtap = {
 	-- the omission (see tests/meta/test_keystroke_explicit_delay.lua).
 	keyStroke = function(mods, key, delay) table.insert(KEYSTROKES, { mods = mods, key = key, delay = delay }) end,
 	keyStrokes = function(s) table.insert(KEYSTROKES, { text = s }) end,
-	new = function(_, _) return { start = function() end, stop = function() end } end,
+	-- Both arguments are recorded, for the same reason the keyStroke delay is:
+	-- a stub that discards what it was given makes the harness structurally
+	-- unable to observe a caller that gets it wrong. This one dropped the event
+	-- type list, so "creates an event watcher with the correct events" could only
+	-- ever be written as assert_true(true) — and it was.
+	new = function(types, fn)
+		local tap = { types = types, fn = fn, started = 0, stopped = 0, enabled = false }
+		tap.start = function(self)
+			local t = self or tap
+			t.started = t.started + 1
+			t.enabled = true
+			return t
+		end
+		tap.stop  = function(self)
+			local t = self or tap
+			t.stopped = t.stopped + 1
+			t.enabled = false
+			return t
+		end
+		tap.isEnabled = function(self) return (self or tap).enabled end
+		table.insert(TAPS, tap)
+		return tap
+	end,
 	event = {
-		types = { keyDown = 10, keyUp = 11, flagsChanged = 12, leftMouseUp = 1, rightMouseUp = 2 },
-		newKeyEvent   = function(mods, key, isDown) return { mods = mods, key = key, isDown = isDown, post = function() end } end,
-		newMouseEvent = function(t, pos) return { t = t, pos = pos, post = function() end } end,
+		-- Quartz event fields used to distinguish hardware input from events
+		-- synthesized by this Hammerspoon process. Keep the values opaque: tests
+		-- must address them through the same names as production code.
+		properties = {
+			eventSourceUnixProcessID = 1,
+			eventSourceUserData      = 2,
+			eventSourceStateID       = 3,
+			scrollWheelEventDeltaAxis1 = 4,
+			mouseEventButtonNumber = 5,
+		},
+		-- Every type the driver actually names. It used to carry five, and the
+		-- gap was invisible in the worst way: keep-awake builds its watch list as
+		-- a table CONSTRUCTOR whose first element is ev.scrollWheel, so a missing
+		-- type left a nil at index 1 and `ipairs` over the list yielded nothing.
+		-- The watcher was created watching an empty set, and no test could see it
+		-- because the stub discarded the argument anyway.
+		--
+		-- The numbers are opaque handles here, not CGEventType values: three of
+		-- them predate this list and are relied on by tests that compare against
+		-- hs.eventtap.event.types themselves, so they keep the values they had.
+		types = {
+			keyDown = 10, keyUp = 11, flagsChanged = 12,
+			leftMouseUp = 1, rightMouseUp = 2,
+			leftMouseDown = 3, rightMouseDown = 4, mouseMoved = 5,
+			middleMouseDown = 6, otherMouseDown = 25, otherMouseUp = 26,
+			scrollWheel = 22,
+		},
+		newKeyEvent   = function(mods, key, isDown)
+			local properties = {}
+			local event = {
+				mods = mods, key = key, isDown = isDown,
+				getProperty = function(_, prop)
+					if prop == M.eventtap.event.properties.eventSourceUnixProcessID then
+						return M.processInfo and M.processInfo.processID or 0
+					end
+					return properties[prop] or 0
+				end,
+				setProperty = function(self, prop, value) properties[prop] = value; return self end,
+				setUnicodeString = function(self, value) self.unicode = value; return self end,
+				getUnicodeString = function(self) return self.unicode or "" end,
+				post = function() end,
+			}
+			return event
+		end,
+		newMouseEvent = function(t, pos, mods)
+			local properties = {}
+			return {
+				t = t, pos = pos, mods = mods,
+				getProperty = function(_, prop) return properties[prop] or 0 end,
+				setProperty = function(self, prop, value) properties[prop] = value; return self end,
+				post = function(self) return self end,
+			}
+		end,
 	},
 	checkKeyboardModifiers = function() return {} end,
 	keyRepeatInterval = function() return 0.05 end,
 	keyRepeatDelay = function() return 0.5 end,
 	__keystrokes = KEYSTROKES,
+	__taps = TAPS,
 	__reset = function()
 		for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
+		for i = #TAPS, 1, -1 do TAPS[i] = nil end
 		-- Tests that overwrite hs.keycodes.map (e.g. test_keycodes.lua) would
 		-- otherwise leak a stripped-down map into later tests. Rebuild the
 		-- metatabled map on every __reset so each test starts from the canonical
@@ -454,6 +675,10 @@ M.eventtap = {
 		end
 	end,
 }
+
+-- Identity of the Hammerspoon process. Quartz writes this value into
+-- eventSourceUnixProcessID for hs.eventtap.keyStroke/keyStrokes echoes.
+M.processInfo = { processID = 7001 }
 
 -- Concrete map for the F-key sentinels and core nav/edit keys, mirroring the
 -- macOS HID codes that the production driver compiles into Karabiner JSON.
@@ -468,6 +693,7 @@ local DEFAULT_KEYCODES_MAP = {
 }
 
 M.keycodes = {}
+local INPUT_SOURCE_CALLBACK = nil
 
 --- Rebuilds the metatabled keycodes.map. Called once at module load and again
 --- from __reset() so that tests which assign `hs.keycodes.map = { ... }` to
@@ -484,6 +710,17 @@ M.keycodes.__rebuild_map = function()
 end
 
 M.keycodes.__rebuild_map()
+
+--- Models Hammerspoon's setter-only, single-owner input-source callback.
+--- @param callback function|nil Replacement callback; nil unsets the prior one.
+M.keycodes.inputSourceChanged = function(callback)
+	INPUT_SOURCE_CALLBACK = callback
+end
+
+--- Fires the current input-source callback for behavioral tests.
+M.keycodes.__fire_input_source_changed = function()
+	if INPUT_SOURCE_CALLBACK then INPUT_SOURCE_CALLBACK() end
+end
 
 
 
@@ -520,10 +757,108 @@ M.drawing = {
 	windowLevels = setmetatable({}, { __index = function() return 0 end }),
 }
 
+local CANVASES = {}
+
+--- Builds a stateful canvas double that preserves the native commit surface.
+--- Returning one generic function for every lookup made numeric element reads
+--- such as `canvas[7]` callable instead of mutable, while `isShowing()` returned
+--- the canvas table instead of a boolean. Render failures were therefore logged
+--- inside the E2E harness even though the gate itself stayed green.
+--- @param initial_frame table|nil Initial canvas frame.
+--- @return table canvas Stateful canvas double.
+local function make_canvas(initial_frame)
+	local canvas = {
+		_frame = initial_frame or { x = 0, y = 0, w = 0, h = 0 },
+		_showing = false,
+		_deleted = false,
+	}
+
+	function canvas:level(value)
+		if value == nil then return self._level end
+		self._level = value
+		return self
+	end
+
+	function canvas:behavior(value)
+		if value == nil then return self._behavior end
+		self._behavior = value
+		return self
+	end
+
+	function canvas:ignoresMouseEvents(value)
+		if value == nil then return self._ignores_mouse_events end
+		self._ignores_mouse_events = value == true
+		return self
+	end
+
+	function canvas:frame(value)
+		if value == nil then return self._frame end
+		self._frame = value
+		return self
+	end
+
+	function canvas:appendElements(...)
+		local args = { ... }
+		if #args == 1 and type(args[1]) == "table"
+				and args[1].type == nil and #args[1] > 0 then
+			args = args[1]
+		end
+		for _, element in ipairs(args) do self[#self + 1] = element end
+		return self
+	end
+
+	function canvas:replaceElements(elements)
+		for index = #self, 1, -1 do self[index] = nil end
+		if type(elements) == "table" then
+			for _, element in ipairs(elements) do self[#self + 1] = element end
+		end
+		return self
+	end
+
+	function canvas:minimumTextSize(_, styled_text)
+		local value = tostring(styled_text or "")
+		return { w = math.max(1, #value * 7), h = 20 }
+	end
+
+	function canvas:mouseCallback(callback)
+		if callback == nil then return self._mouse_callback end
+		self._mouse_callback = callback
+		return self
+	end
+
+	function canvas:show()
+		if self._deleted then return nil end
+		self._showing = true
+		return self
+	end
+
+	function canvas:hide()
+		self._showing = false
+		return self
+	end
+
+	function canvas:isShowing() return self._showing end
+
+	function canvas:imageFromCanvas()
+		local image = { _size = { w = self._frame.w or 0, h = self._frame.h or 0 } }
+		function image:size() return self._size end
+		function image:setSize(value) self._size = value; return self end
+		return image
+	end
+
+	function canvas:delete()
+		self._showing = false
+		self._deleted = true
+		return nil
+	end
+
+	CANVASES[#CANVASES + 1] = canvas
+	return canvas
+end
+
 M.canvas = {
-	new = function(_) return setmetatable({}, {
-		__index = function() return function(self) return self end end,
-	}) end,
+	new = make_canvas,
+	__instances = CANVASES,
 	-- Level and behavior constants used by renderer.lua at load time; the stub
 	-- must expose them as plain numbers so the canvas:level() / :behavior() calls
 	-- on the mock canvas object do not crash on nil indexing.
@@ -562,11 +897,12 @@ M.console = { printStyledtext = function(_) end }
 M.notify = {
 	new = function(arg1, arg2)
 		local opts = type(arg1) == "function" and arg2 or arg1
-		return {
-			send = function() end,
+		local notification = {
 			release = function() end,
 			opts = opts,
 		}
+		notification.send = function() return notification end
+		return notification
 	end,
 	show = function(_) end,
 }
@@ -576,14 +912,61 @@ M.dialog = {
 	chooseFromList = function() return nil end,
 }
 
+local APPLICATIONS_BY_PID = {}
+local APPLICATION_QUERIES = {}
+local APPLICATION_QUERY_WATCHER_COUNTS = {}
+-- Real application watchers die when Lua releases the userdata. Keep only weak
+-- test-hook values so the stub cannot conceal a missing production GC root
+local APPLICATION_WATCHERS = setmetatable({}, { __mode = "v" })
+local APPLICATION_WATCHER_COUNT = 0
+
 M.application = {
 	frontmostApplication = function() return { name = function() return "Test" end, bundleID = function() return "test.bundle" end } end,
 	get = function(_) return nil end,
 	launchOrFocus = function(_) end,
 	open = function(_) end,
 	applicationsForBundleID = function(_) return {} end,
+	applicationForPID = function(pid)
+		APPLICATION_QUERIES[#APPLICATION_QUERIES + 1] = pid
+		local active_watchers = 0
+		for _, watcher in pairs(APPLICATION_WATCHERS) do
+			if watcher.running then active_watchers = active_watchers + 1 end
+		end
+		APPLICATION_QUERY_WATCHER_COUNTS[#APPLICATION_QUERY_WATCHER_COUNTS + 1] = active_watchers
+		return APPLICATIONS_BY_PID[pid]
+	end,
+	__set_for_pid = function(pid, app) APPLICATIONS_BY_PID[pid] = app end,
+	__remove_for_pid = function(pid) APPLICATIONS_BY_PID[pid] = nil end,
+	__queries = APPLICATION_QUERIES,
+	__query_watcher_counts = APPLICATION_QUERY_WATCHER_COUNTS,
+	__emit = function(app_name, event_type, app)
+		for _, watcher in pairs(APPLICATION_WATCHERS) do
+			if watcher.running then watcher.fn(app_name, event_type, app) end
+		end
+	end,
 	watcher = {
-		new = function(_) return { start = function(self) return self end, stop = function() end } end,
+		new = function(fn)
+			local watcher = {
+				fn = fn,
+				started = 0,
+				stopped = 0,
+				running = false,
+			}
+			function watcher:start()
+				self.started = self.started + 1
+				self.running = true
+				return self
+			end
+			function watcher:stop()
+				self.stopped = self.stopped + 1
+				self.running = false
+				return self
+			end
+			APPLICATION_WATCHER_COUNT = APPLICATION_WATCHER_COUNT + 1
+			APPLICATION_WATCHERS[APPLICATION_WATCHER_COUNT] = watcher
+			return watcher
+		end,
+		__watchers = APPLICATION_WATCHERS,
 		activated = "activated",
 		deactivated = "deactivated",
 		launched = "launched",
@@ -632,13 +1015,53 @@ M.spaces = {
 }
 M.openConsole = function() end
 M.focus = function() end
-M.hotkey = { bind = function() return { delete = function() end } end }
+-- A hotkey stub that returned a bare {delete = noop} could not tell a test
+-- whether the binding was ever enabled, disabled, or released — every lifecycle
+-- assertion against it was vacuously true. This one records what it was asked to
+-- do and exposes the live set, so a leaked hotkey is visible to the suite.
+M.hotkey = {
+	_bound = {},
+	bind = function(mods, key, pressed_fn)
+		local entry = {
+			mods = mods, key = key, pressed_fn = pressed_fn,
+			enabled = true, deleted = false,
+		}
+		entry.enable = function(self)
+			local target = self or entry
+			target.enabled = true
+			return target
+		end
+		entry.disable = function(self)
+			local target = self or entry
+			target.enabled = false
+			return target
+		end
+		entry.delete = function(self)
+			local target = self or entry
+			target.deleted = true
+			target.enabled = false
+			for i, held in ipairs(M.hotkey._bound) do
+				if held == target then table.remove(M.hotkey._bound, i); break end
+			end
+			return nil
+		end
+		table.insert(M.hotkey._bound, entry)
+		return entry
+	end,
+}
 M.menubar = { new = function() return {
 	setTitle = function() end, setMenu = function() end,
 	delete = function() end, setIcon = function() end,
 } end }
 M.image = { imageFromPath = function(_) return nil end, imageFromName = function(_) return nil end }
-M.task = { new = function(_, _) return { start = function() end, terminate = function() end } end }
+M.task = { new = function(_, _)
+	local task
+	task = {
+		start = function() return task end,
+		terminate = function() end,
+	}
+	return task
+end }
 -- usercontent is the JavaScript bridge every webview UI builds at module load
 -- time (ui/download_window, ui/model_browser, …). Omitting it made those modules
 -- unloadable under the harness, so their logic could only ever be source-guarded.
@@ -680,10 +1103,16 @@ M.fnutils = {
 
 M.inspect = function(v) return tostring(v) end
 
+local HOST_UUID_COUNTER = 0
+
 M.host = {
 	operatingSystemVersion = function() return { major = 14, minor = 0, patch = 0 } end,
 	operatingSystemVersionString = function() return "macOS 14.0" end,
 	interfaceStyle = function() return "Dark" end,
+	uuid = function()
+		HOST_UUID_COUNTER = HOST_UUID_COUNTER + 1
+		return string.format("00000000-0000-4000-8000-%012x", HOST_UUID_COUNTER)
+	end,
 }
 
 
@@ -698,11 +1127,19 @@ M.host = {
 --- Resets all in-memory stub state. Test helpers should call this before each
 --- test to avoid cross-test pollution.
 function M.__reset()
+	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
 	for i = #TIMERS, 1, -1 do TIMERS[i] = nil end
 	for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
 	for i = #EXEC_CALLS, 1, -1 do EXEC_CALLS[i] = nil end
 	for k in pairs(EXEC_RESPONSES) do EXEC_RESPONSES[k] = nil end
+	for pid in pairs(APPLICATIONS_BY_PID) do APPLICATIONS_BY_PID[pid] = nil end
+	for i = #APPLICATION_QUERIES, 1, -1 do APPLICATION_QUERIES[i] = nil end
+	for i = #APPLICATION_QUERY_WATCHER_COUNTS, 1, -1 do APPLICATION_QUERY_WATCHER_COUNTS[i] = nil end
+	for id in pairs(APPLICATION_WATCHERS) do APPLICATION_WATCHERS[id] = nil end
+	for i = #CANVASES, 1, -1 do CANVASES[i] = nil end
+	APPLICATION_WATCHER_COUNT = 0
+	INPUT_SOURCE_CALLBACK = nil
 	M.http.__reset()
 	if M.fs and M.fs.__reset_entries then M.fs.__reset_entries() end
 	-- Rebuild the canonical keycodes.map: tests like test_keycodes deliberately

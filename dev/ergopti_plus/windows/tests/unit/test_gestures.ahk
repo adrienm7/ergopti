@@ -12,11 +12,11 @@
 
 
 
-; ====================================
+; ======================================
 ; ======================================
 ; ======= 1/ Configuration Tests =======
 ; ======================================
-; ====================================
+; ======================================
 
 TestGestures_DefaultAssignments() {
     AssertTrue(GestureAssignments.Has("tap_3"), "tap_3 should exist")
@@ -51,11 +51,11 @@ Test("Gestures: all slots have shortcut labels", TestGestures_AllSlotsHaveShortc
 
 
 
-; ====================================
+; ================================================
 ; ================================================
 ; ======= 2/ Pause and reversal regression =======
 ; ================================================
-; ====================================
+; ================================================
 
 ; Regression for project_suspend_pause_invariant: gestures must respect pause.
 TestGestures_RespectPause() {
@@ -164,11 +164,11 @@ Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_
 
 
 
-; ===============================================
+; =================================================
 ; =================================================
 ; ======= 3/ Right-Click Hold State Machine =======
 ; =================================================
-; ===============================================
+; =================================================
 
 TestGestures_RightClickStartsReleased() {
     AssertFalse(GestureLeftClickHeld, "right-click hold should start released")
@@ -252,10 +252,10 @@ TestGestures_ParameterizedActionValuesPersistToUserToml() {
         SearchTemplate := "https://search.example/?q=%s&source=ergopti"
         GestureSetActionParameter("keyboard__cmd_k", "search_web", SearchTemplate)
         Parsed := ParseTomlFile(TempConfig)
-        AssertTrue(Parsed.Has("ahk.action_parameters"), "action parameter section must be persisted")
+        AssertTrue(Parsed.Has("action_parameters"), "action parameter section must be persisted")
         Key := GestureActionParameterKey("gesture__tap_3", "open_url")
-        AssertEqual("https://saved.example/path", Parsed["ahk.action_parameters"][Key], "exact URL must round-trip through TOML")
-		AssertEqual(SearchTemplate, Parsed["ahk.action_parameters"][SearchKey], "search template must round-trip through TOML")
+        AssertEqual("https://saved.example/path", Parsed["action_parameters"][Key], "exact URL must round-trip through TOML")
+		AssertEqual(SearchTemplate, Parsed["action_parameters"][SearchKey], "search template must round-trip through TOML")
 
         ; A config reload must both restore the saved value and drop stale
         ; in-memory values that are no longer in the user TOML.
@@ -293,11 +293,11 @@ Test("Gestures: slot count is 10", TestGestures_SlotCountMatchesExpected)
 
 
 
-; =====================================================
+; ==========================================================
 ; ==========================================================
 ; ======= 5/ New actions (cycle / nav / screenshots) =======
 ; ==========================================================
-; =====================================================
+; ==========================================================
 
 TestGestures_NewActionsRegistered() {
     for Name in ["win_prev", "win_next", "win_app_prev", "win_app_next",
@@ -341,11 +341,11 @@ Test("Gestures: GestureNextIndex handles index=0 (active not in list)",
 
 
 
-; ===========================================================
+; =======================================================
 ; =======================================================
 ; ======= 6/ Registry encoding for auto-configure =======
 ; =======================================================
-; ===========================================================
+; =======================================================
 
 TestGestures_KeyParamsEncodingF1() {
     ; F1 = VK 0x70, modifiers Ctrl+Win+Shift = 0x07. The registry layout

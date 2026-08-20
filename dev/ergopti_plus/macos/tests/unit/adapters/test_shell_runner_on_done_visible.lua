@@ -20,10 +20,11 @@
 local helpers = require("tests.helpers")
 
 local function read_shell_runner_src()
-	local path = helpers.driver_root() .. "adapters/shell_runner.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "adapters/shell_runner.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to adapters/shell_runner.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function invoke_guarded")
+	helpers.assert_true(src ~= nil, "adapters/shell_runner.lua source must be locatable")
 	return src
 end
 
@@ -31,11 +32,11 @@ end
 
 
 
--- ===============================================================================
+-- ==============================================================================
 -- ==============================================================================
 -- ======= 1/ Source invariant: no bare pcall(on_done) in wrapped_on_done =======
 -- ==============================================================================
--- ===============================================================================
+-- ==============================================================================
 
 helpers.describe("ShellRunner: on_done throws are visible (M-4 source)", function()
 
@@ -68,11 +69,11 @@ end)
 
 
 
--- ==========================================================================
+-- =========================================================================
 -- =========================================================================
 -- ======= 2/ Behaviour: ERROR is captured when on_done throws (M-4) =======
 -- =========================================================================
--- ==========================================================================
+-- =========================================================================
 
 helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)", function()
 
@@ -98,7 +99,7 @@ helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)"
 		package.loaded["adapters.shell_runner"] = nil
 		local sr      = helpers.load_with_stubs("adapters.shell_runner", hs_overrides)
 		local hs_stub = _G.hs
-		local logger  = require("lib.logger")
+		local logger  = require("infra.logger")
 
 		-- Capture log output via Logger.set_sink. Real signature is
 		-- fn(console_line, sink_variant) — a 2-tuple, not (level, module, msg).

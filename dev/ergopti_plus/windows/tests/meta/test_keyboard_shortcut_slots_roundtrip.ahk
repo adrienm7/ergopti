@@ -23,7 +23,7 @@
 ;    exactly these non-default slots. The clear path and the read path must agree
 ;    about which slots exist, and this asserts both consult the same source.
 ;
-; SCOPE: source introspection of lib/config_io.ahk.
+; SCOPE: source introspection of infra/config_io.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -40,11 +40,11 @@
 
 _KSSR_ReadCoversPersistedSlots() {
 	Body := _DriverFuncBody("ReadKeyboardShortcutsConfig")
-	Assert(Body != "", "ReadKeyboardShortcutsConfig() must exist in lib/config_io.ahk")
+	Assert(Body != "", "ReadKeyboardShortcutsConfig() must exist in infra/config_io.ahk")
 
 	Assert(InStr(Body, "_IniCache") > 0,
 		"ReadKeyboardShortcutsConfig must consult the persisted config section — reading only KEYBOARD_SHORTCUT_DEFAULTS silently drops every slot the user added, on the very reload that was meant to save it")
-	Assert(InStr(Body, '"ahk.shortcuts.keyboard"') > 0,
+	Assert(InStr(Body, '"shortcuts.keyboard"') > 0,
 		"the read must enumerate the persisted ahk.shortcuts.keyboard section")
 
 	; The defaults must still seed the Map, or a slot the user never touched
@@ -68,7 +68,7 @@ _KSSR_ClearAndReadAgreeOnSlotSource() {
 	Assert(Clear != "" and Read != "", "both the clear and read paths must exist")
 
 	for Name, Body in Map("_GlobalClearAllBindings", Clear, "ReadKeyboardShortcutsConfig", Read) {
-		Assert(InStr(Body, '_IniCache["ahk.shortcuts.keyboard"]') > 0,
+		Assert(InStr(Body, '_IniCache["shortcuts.keyboard"]') > 0,
 			Name . " must enumerate the persisted keyboard-shortcut section — if only one of the two does, a slot exists for one operation and not the other")
 	}
 }

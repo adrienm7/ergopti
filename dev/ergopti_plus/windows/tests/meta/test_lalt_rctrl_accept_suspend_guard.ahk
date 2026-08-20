@@ -26,10 +26,12 @@
 ; =====================================================
 ; =====================================================
 
-_LARSG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+; Scans the whole platform/remap/ directory instead of one hardcoded file.
+; Every assertion below is a PRESENCE check, so widening the scope cannot weaken
+; one — and _DriverDirConcat throws when the directory moves, instead of dying
+; with an unreadable-path error that says nothing about the invariant at stake.
+_LARSG_ReadSource() {
+	return _DriverDirConcat("platform/remap")
 }
 
 ; =====================================================
@@ -39,7 +41,7 @@ _LARSG_ReadSource(RelPath) {
 ; =====================================================
 
 _LARSG_LaltAcceptHasSuspendGuard() {
-	Src := _LARSG_ReadSource("modules/tap_holds/lalt.ahk")
+	Src := _LARSG_ReadSource()
 	Assert(InStr(Src, 'TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))') > 0,
 		"lalt.ahk: delayed LLM accept must run through the central suspend/activity gate")
 }
@@ -47,7 +49,7 @@ Test("lalt: LLM accept path has A_IsSuspended guard", _LARSG_LaltAcceptHasSuspen
 
 
 _LARSG_RctrlAcceptHasSuspendGuard() {
-	Src := _LARSG_ReadSource("modules/tap_holds/rctrl.ahk")
+	Src := _LARSG_ReadSource()
 	Assert(InStr(Src, 'TapHoldDispatchTap("right_ctrl", LLM_Tooltip_FireTabOrAccept.Bind(""))') > 0,
 		"rctrl.ahk: delayed LLM accept must run through the central suspend/activity gate")
 }

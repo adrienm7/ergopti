@@ -29,11 +29,11 @@ local helpers = require("tests.helpers")
 
 local DRIVER_ROOT = helpers.driver_root()  -- trailing slash
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -41,11 +41,11 @@ end
 
 
 
--- ==============================================
+--- ================================================
 --- ================================================
 --- ======= 1/ Config file is TOML, not JSON =======
 --- ================================================
--- ==============================================
+--- ================================================
 
 helpers.describe("boot config: the TOML config is never JSON-decoded (json-decode-toml-config)", function()
 	helpers.it("ConfigTomlPath resolves to a .toml file", function()
@@ -60,7 +60,13 @@ helpers.describe("boot config: the TOML config is never JSON-decoded (json-decod
 		-- then io.open'd + hs.json.decode'd it. Legit consumers take the path inline
 		-- and parse it as TOML, so they never io.open a config.toml-bound local here.
 		-- Flag any config.toml-bound local that IS io.open'd — the JSON-priming shape.
-		local src = read_source("init.lua")
+		local src = read_source("local function has_common_hotstring_groups") -- init.lua
+		-- The anchor, before the scan: this check PASSES on an empty result, so a
+		-- rename of ConfigTomlPath would retire it silently rather than fail it.
+		helpers.assert_true(src:find("ConfigTomlPath", 1, true) ~= nil,
+			"init.lua no longer mentions ConfigTomlPath — the scan below would find no "
+			.. "offenders because it is looking for something that is gone, not because "
+			.. "the shape was fixed")
 		local offenders = {}
 		for var in src:gmatch('local%s+([%w_]+)%s*=%s*menu_paths%.get%("ConfigTomlPath"%)') do
 			if src:find("io%.open%(%s*" .. var) then

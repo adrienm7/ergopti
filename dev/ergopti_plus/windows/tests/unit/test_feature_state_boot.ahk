@@ -40,14 +40,14 @@ Test("Feature-state startup: non-Map cache cannot abort boot (feature-state-boot
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
     Source := FileRead(SourcePath, "UTF-8")
-    HelpersPos := InStr(Source, "#Include lib/toml/toml_helpers.ahk")
-    StatePos := InStr(Source, "#Include lib/feature_state.ahk")
-    ConfigIoPos := InStr(Source, "#Include lib/config_io.ahk")
+    HelpersPos := InStr(Source, "#Include infra/toml/toml_helpers.ahk")
+    StatePos := InStr(Source, "#Include infra/feature_state.ahk")
+    ConfigIoPos := InStr(Source, "#Include infra/config_io.ahk")
     AssertTrue(HelpersPos > 0 && StatePos > 0 && ConfigIoPos > 0,
         "driver must include the configuration helpers, feature state, and config I/O")
     AssertTrue(HelpersPos < StatePos && StatePos < ConfigIoPos,
         "driver include order must make configuration helpers available to feature state and category normalization available before auto-execute calls")
-    FeatureStateSource := FileRead(A_ScriptDir . "\..\lib\feature_state.ahk", "UTF-8")
+    FeatureStateSource := FileRead(A_ScriptDir . "\..\infra\feature_state.ahk", "UTF-8")
     AssertTrue(InStr(FeatureStateSource, "return IniCacheGet(Cache, Section, Key)") > 0,
         "feature-state must call the configuration accessor directly")
     AssertTrue(InStr(FeatureStateSource, 'Func("IniCacheGet").Call') = 0,

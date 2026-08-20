@@ -45,25 +45,35 @@ local LONG_B = string.rep("b", 80)
 
 --- Loads keymap.utils with every emission path recorded in a single ordered log,
 --- and with doAfter capturing its callbacks so they can be fired deliberately.
---- @return table utils, table log, function fire_pending
+--- @return table utils, table log, function fire_pending, table clipboard
 local function load_utils()
 	local emissions = {}
 	local pending   = {}
+	local clipboard = { clears = 0 }
 
 	package.loaded["modules.keymap.utils"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["adapters.synthetic_input"] = {
+		current_transaction = function() return nil end,
+		emit_key_stroke = function(_mods, key)
+			emissions[#emissions + 1] = "key:" .. tostring(key)
+			return true
+		end,
+		emit_key_strokes = function(text)
+			emissions[#emissions + 1] = "type:" .. tostring(text):sub(1, 6)
+			return true
+		end,
+	}
 	local KU = helpers.load_with_stubs("modules.keymap.utils", {
-		eventtap = {
-			keyStroke  = function(_mods, key) emissions[#emissions + 1] = "key:" .. tostring(key) end,
-			keyStrokes = function(s) emissions[#emissions + 1] = "type:" .. tostring(s):sub(1, 6) end,
-			event      = { types = { keyDown = 10 } },
-			new        = function() return { start = function() end, stop = function() end } end,
-		},
 		-- The override replaces hs.pasteboard wholesale, so it must carry every
 		-- member perform_paste touches (readAllData / writeAllData included).
 		pasteboard = {
 			getContents  = function() return "" end,
 			readAllData  = function() return {} end,
 			writeAllData = function(_) return true end,
+			clearContents = function()
+				clipboard.clears = clipboard.clears + 1
+			end,
 			setContents  = function(s)
 				-- perform_paste writes the clipboard then sends Cmd+V; the write is what
 				-- marks the segment as having been emitted, so record it here.
@@ -76,6 +86,21 @@ local function load_utils()
 				pending[#pending + 1] = { delay = delay, fn = fn }
 				return { stop = function() end }
 			end,
+			new = function(delay, fn)
+				local record = { delay = delay, fn = fn, running = false, stopped = false }
+				local native = {}
+				function native:start()
+					record.running = true
+					pending[#pending + 1] = record
+					return self
+				end
+				function native:stop()
+					record.running = false
+					record.stopped = true
+					return self
+				end
+				return native
+			end,
 			doEvery           = function() return { stop = function() end } end,
 			secondsSinceEpoch = function() return 1000 end,
 			absoluteTime      = function() return 0 end,
@@ -83,14 +108,21 @@ local function load_utils()
 		},
 	})
 
-	--- Fires captured callbacks in scheduled order, lowest delay first.
+	--- Fires only the callbacks owned at entry, lowest delay first.
+	--- A callback may schedule a later retry; iterating the live growing table
+	--- would execute that retry in the same turn and can make the harness loop
+	--- forever instead of modelling Hammerspoon's next run-loop delivery.
 	local function fire_pending()
-		table.sort(pending, function(x, y) return x.delay < y.delay end)
-		for _, p in ipairs(pending) do pcall(p.fn) end
+		local scheduled = pending
 		pending = {}
+		table.sort(scheduled, function(x, y) return x.delay < y.delay end)
+		for _, p in ipairs(scheduled) do
+			if p.running ~= false and p.stopped ~= true then pcall(p.fn) end
+		end
+		return #scheduled
 	end
 
-	return KU, emissions, fire_pending
+	return KU, emissions, fire_pending, clipboard
 end
 
 --- Returns the 1-based position of the first emission whose text contains needle.
@@ -213,13 +245,27 @@ end)
 
 
 
--- ==============================================
+
+-- ================================================
 -- ================================================
 -- ======= 3/ The Fence Is Reported Outward =======
 -- ================================================
--- ==============================================
+-- ================================================
 
 helpers.describe("emit_tokens reports its ordering fence to the caller", function()
+	helpers.it("faithfully restores an originally empty clipboard and settles the timer wave", function()
+		local KU, _log, fire_pending, clipboard = load_utils()
+		KU.emit_text(LONG_A)
+
+		helpers.assert_eq(fire_pending(), 1,
+			"one inline paste must own one delayed restoration attempt")
+		helpers.assert_eq(clipboard.clears, 1,
+			"an empty all-type snapshot is restored through hs.pasteboard.clearContents; "
+				.. "omitting that real API from the fixture turns the restore into an endless retry")
+		helpers.assert_eq(fire_pending(), 0,
+			"a successful restore must not leave a retry scheduled for the next run-loop turn")
+	end)
+
 	helpers.it("returns a positive delay once a paste has been deferred", function()
 		local KU, _log, fire_pending = load_utils()
 
@@ -284,3 +330,5 @@ helpers.describe("emit_tokens reports its ordering fence to the caller", functio
 			"short text goes out as keystrokes, which need no settle window")
 	end)
 end)
+
+package.loaded["adapters.synthetic_input"] = nil

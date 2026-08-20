@@ -21,11 +21,11 @@ local helpers = require("tests.helpers")
 
 
 
--- ==============================================================
+-- ===============================================================
 -- ===============================================================
 -- ======= 1/ Behavioural: geometry resolves from manifest =======
 -- ===============================================================
--- ==============================================================
+-- ===============================================================
 
 helpers.describe("ui_builder.get_app_geometry: single-sources window size from the shared manifest", function()
 	helpers.it("returns the manifest width/height for a known app id", function()

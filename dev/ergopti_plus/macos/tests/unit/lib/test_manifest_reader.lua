@@ -20,21 +20,21 @@
 local helpers = require("tests.helpers")
 
 -- manifest_reader logs through lib.logger; load the stub first.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-local Manifest = require("lib.manifest_reader")
+local Manifest = require("infra.manifest_reader")
 
 -- The canonical values that modules/keymap/init.lua DEFAULT_STATE is wired to.
 -- Mirror these in the AHK manifest too — they are the cross-driver canon.
 local STAR = "★" -- magic key trigger (UTF-8 literal, as used across the .lua sources)
 local KEYMAP_WIRED = {
-	["hs.hotstrings.expansion_delay"]             = 0.75,
+	["hotstrings.expansion_delay"]             = 0.75,
 	["hotstrings.trigger_char"]                   = STAR,
-	["hs.hotstrings.preview_star_enabled"]        = true,
-	["hs.hotstrings.preview_autocorrect_enabled"] = true,
-	["hs.hotstrings.preview_ai_enabled"]          = true,
-	["hs.hotstrings.preview_colored_tooltips"]    = true,
+	["hotstrings.preview_star_enabled"]        = true,
+	["hotstrings.preview_autocorrect_enabled"] = true,
+	["hotstrings.preview_ai_enabled"]          = true,
+	["hotstrings.preview_colored_tooltips"]    = true,
 }
 
 
@@ -52,7 +52,7 @@ helpers.describe("manifest_reader: load + accessors", function()
 	end)
 
 	helpers.it("find_entry_by_path resolves a known path and returns nil for unknown", function()
-		local e = Manifest.find_entry_by_path("hs.hotstrings.expansion_delay")
+		local e = Manifest.find_entry_by_path("hotstrings.expansion_delay")
 		helpers.assert_true(e ~= nil and e.default == 0.75, "known path resolves to its entry")
 		helpers.assert_nil(Manifest.find_entry_by_path("does.not.exist"), "unknown path -> nil")
 	end)
@@ -64,19 +64,26 @@ end)
 
 
 --- ==============================================
+--- ==============================================
 --- ======= 2/ default_for (single source) =======
+--- ==============================================
 --- ==============================================
 
 helpers.describe("manifest_reader: default_for", function()
 	helpers.it("returns the declared default for a known path", function()
 		helpers.assert_eq(Manifest.default_for("hotstrings.trigger_char"), STAR, "trigger_char default")
-		helpers.assert_eq(Manifest.default_for("hs.hotstrings.expansion_delay"), 0.75, "expansion_delay default")
-		helpers.assert_eq(Manifest.default_for("hs.hotstrings.preview_star_enabled"), true, "preview default")
+		helpers.assert_eq(Manifest.default_for("hotstrings.expansion_delay"), 0.75, "expansion_delay default")
+		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), true, "preview default")
 	end)
 
 	helpers.it("fails fast on an unknown path", function()
-		local ok = pcall(function() return Manifest.default_for("nope.not.here") end)
+		-- The raising IS the subject. What it was missing is the error TEXT: a
+		-- fail-fast that raised for an unrelated reason reads identically, and the
+		-- caller debugging a typo would be told nothing about which path it got wrong.
+		local ok, err = pcall(function() return Manifest.default_for("nope.not.here") end)
 		helpers.assert_eq(ok, false, "default_for raises on an unknown path")
+		helpers.assert_true(tostring(err):find("nope.not.here", 1, true) ~= nil,
+			"and the error must name the path it refused: " .. tostring(err))
 	end)
 end)
 
@@ -86,7 +93,9 @@ end)
 
 
 --- ==============================================
+--- ==============================================
 --- ======= 3/ keymap DEFAULT_STATE parity =======
+--- ==============================================
 --- ==============================================
 
 helpers.describe("manifest_reader: keymap DEFAULT_STATE wiring parity", function()
@@ -108,7 +117,9 @@ end)
 
 
 --- =======================================================
+--- =======================================================
 --- ======= 4/ Extended module DEFAULT_STATE parity =======
+--- =======================================================
 --- =======================================================
 
 -- The A2 follow-up wired more macOS modules to the manifest: keylogger (the
@@ -136,6 +147,6 @@ helpers.describe("manifest_reader: extended module wiring parity", function()
 	end)
 
 	helpers.it("gestures space_wrap default", function()
-		helpers.assert_eq(Manifest.default_for("hs.gestures.space_wrap"), true, "space_wrap default")
+		helpers.assert_eq(Manifest.default_for("gestures.space_wrap"), true, "space_wrap default")
 	end)
 end)

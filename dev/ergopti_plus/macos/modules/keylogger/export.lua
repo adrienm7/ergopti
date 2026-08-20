@@ -27,19 +27,19 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local i18n   = require("infra.i18n")
 local LOG    = "keylogger.export"
 
 
 
 
 
--- ==============================================
+-- =============================================
 -- =============================================
 -- ======= 1/ Module State and Constants =======
 -- =============================================
--- ==============================================
+-- =============================================
 
 --- macOS app category → i18n key mapping.
 --- MUST stay in sync with MAC_CATEGORIES_FR in log_manager if that table is
@@ -85,11 +85,11 @@ local _initialized = false
 
 
 
--- ====================================
+-- ===================================
 -- ===================================
 -- ======= 2/ Guards and Utils =======
 -- ===================================
--- ====================================
+-- ===================================
 
 --- Guards public functions against being called before M.init().
 local function _require_init(func_name)
@@ -109,15 +109,21 @@ local _now_ts = require("modules.keylogger.timestamp").now_ts
 
 
 
--- =======================================
+-- ======================================
 -- ======================================
 -- ======= 3/ App Category Lookup =======
 -- ======================================
--- =======================================
+-- ======================================
 
 -- Per-app-name category memo. Declared above the function that reads it: a local
 -- placed below would bind the nil global instead.
 local _category_cache = {}
+
+-- Memo sentinel for "this bundle was readable and declares no category". A plain
+-- nil cannot express it (nil is indistinguishable from "never looked"), and the
+-- localised fallback string cannot either, because the active locale can change at
+-- runtime and the memo must outlive that.
+local CATEGORY_NONE = "\0none"
 
 --- Return the human-readable category for an app, looked up via macOS
 --- LSApplicationCategoryType. Falls back to the i18n "general" label when
@@ -134,31 +140,60 @@ function M.get_native_app_category(app_name)
 	-- for the duration of a filesystem round-trip per distinct app, on a timer.
 	-- An app's LSApplicationCategoryType does not change while it is installed.
 	local cached = _category_cache[app_name]
+	if cached == CATEGORY_NONE then
+		-- Known to have no category. The label still goes through i18n on every
+		-- answer so a locale change at runtime is reflected.
+		return i18n.get("metrics_apps.general_category")
+	end
 	if cached ~= nil then return cached end
 
 	local resolved = nil
+	-- Two structurally different misses, and only one of them may be memoised.
+	-- `app` nil means "not running RIGHT NOW", which is a property of this instant
+	-- and not of the name.
 	local app = hs.application.get(app_name)
+	local bundle_was_readable = false
 	if app then
 		local app_path = app:path()
 		if type(app_path) == "string" then
 			local info = hs.application.infoForBundlePath(app_path)
-			if info and info.LSApplicationCategoryType then
-				local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
-				raw = raw:gsub("%-", " ")
-				local cap = raw:sub(1, 1):upper() .. raw:sub(2)
-				resolved = MAC_CATEGORIES_FR[cap] or cap
+			if info then
+				bundle_was_readable = true
+				if info.LSApplicationCategoryType then
+					local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
+					raw = raw:gsub("%-", " ")
+					local cap = raw:sub(1, 1):upper() .. raw:sub(2)
+					resolved = MAC_CATEGORIES_FR[cap] or cap
+				end
 			end
 		end
 	end
 
-	-- A miss is cached too: an app that is not running, or carries no category,
-	-- answers the same way on the next tick and re-scanning to learn that again
-	-- is exactly the cost this cache exists to remove. Only the localised
-	-- fallback is left uncached, since the active locale can change at runtime.
 	if resolved ~= nil then
 		_category_cache[app_name] = resolved
 		return resolved
 	end
+
+	-- The bundle was read and simply carries no LSApplicationCategoryType. That is
+	-- a property of the installed bundle, so it is learned once. The comment here
+	-- used to claim every miss was cached while the code stored only the successes,
+	-- which meant every uncategorised app re-ran the running-application scan AND
+	-- the Info.plist read on every ingest tick — inside the open SQLite write
+	-- transaction, so the database stayed locked for a filesystem round-trip each
+	-- time.
+	--
+	-- The sentinel is deliberately NOT the localised fallback string: the active
+	-- locale can change at runtime, so what is memoised is "this bundle has no
+	-- category" and the label is resolved fresh on every answer.
+	if bundle_was_readable then
+		_category_cache[app_name] = CATEGORY_NONE
+		return i18n.get("metrics_apps.general_category")
+	end
+
+	-- app was nil, or its bundle could not be read. Nothing is memoised: the
+	-- recovery path replays historic ledger rows whose apps are mostly not running,
+	-- so a permanent sentinel here would pin dozens of names to the general
+	-- fallback for the life of the Hammerspoon process.
 	return i18n.get("metrics_apps.general_category")
 end
 
@@ -166,11 +201,11 @@ end
 
 
 
--- ====================================
+-- ===================================
 -- ===================================
 -- ======= 4/ Device Accessors =======
 -- ===================================
--- ====================================
+-- ===================================
 
 --- Returns a stable short label for the current device. Used by menu modules
 --- that display device names without reading device.json directly.
@@ -205,11 +240,11 @@ end
 
 
 
--- ================================================
+-- ===============================================
 -- ===============================================
 -- ======= 5/ Foreign Device Data.sql Sync =======
 -- ===============================================
--- ================================================
+-- ===============================================
 
 --- Scan `metrics/by_device/*` and apply any data.sql bytes that the local
 --- db.sqlite has not yet ingested. KEYLOGGER_SPEC §16.
@@ -391,11 +426,11 @@ end
 
 
 
--- ===============================
+-- ==============================
 -- ==============================
 -- ======= 6/ Initializer =======
 -- ==============================
--- ===============================
+-- ==============================
 
 --- Initialize the export module with resolved paths and live db accessor.
 --- @param deps table Must contain: paths (table), device_id (string), get_db (function).

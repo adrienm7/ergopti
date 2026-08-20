@@ -445,13 +445,13 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 	; Layout: any of the three Ergopti switches ON means the user previously
 	; enabled the Ergopti emulation. The wizard treats this as a single yes/no
 	; choice so a partial state (only ergopti_alt_gr on, etc.) still flips Yes.
-	LayoutBase  := IniCacheGet(Cache, "ahk.layout", "ergopti_base")
-	LayoutAltGr := IniCacheGet(Cache, "ahk.layout", "ergopti_alt_gr")
-	LayoutPlus  := IniCacheGet(Cache, "ahk.layout", "ergopti_plus")
+	LayoutBase  := IniCacheGet(Cache, "layout", "ergopti_base")
+	LayoutAltGr := IniCacheGet(Cache, "layout", "ergopti_alt_gr")
+	LayoutPlus  := IniCacheGet(Cache, "layout", "ergopti_plus")
 	if (LayoutBase != "_" or LayoutAltGr != "_" or LayoutPlus != "_") {
-		_ob_layout := TomlCacheBool(Cache, "ahk.layout", "ergopti_base")
-			or TomlCacheBool(Cache, "ahk.layout", "ergopti_alt_gr")
-			or TomlCacheBool(Cache, "ahk.layout", "ergopti_plus")
+		_ob_layout := TomlCacheBool(Cache, "layout", "ergopti_base")
+			or TomlCacheBool(Cache, "layout", "ergopti_alt_gr")
+			or TomlCacheBool(Cache, "layout", "ergopti_plus")
 	}
 
 	; Magic key: TOML strings come in with surrounding quotes already stripped
@@ -465,13 +465,13 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 	; Metrics + gestures: boolean flags. ParseTomlFile coerces TOML's `true` to a
 	; real AHK boolean, so these must go through TomlCacheBool — a string compare
 	; against "true" is always false and would read every enabled setting as off.
-	MetricsEnabled := IniCacheGet(Cache, "ahk.metrics", "metrics_enabled")
+	MetricsEnabled := IniCacheGet(Cache, "metrics", "metrics_enabled")
 	if (MetricsEnabled != "_") {
-		_ob_metrics := TomlCacheBool(Cache, "ahk.metrics", "metrics_enabled")
+		_ob_metrics := TomlCacheBool(Cache, "metrics", "metrics_enabled")
 	}
-	GesturesEnabled := IniCacheGet(Cache, "ahk.gestures", "enabled")
+	GesturesEnabled := IniCacheGet(Cache, "gestures", "enabled")
 	if (GesturesEnabled != "_") {
-		_ob_gestures := TomlCacheBool(Cache, "ahk.gestures", "enabled")
+		_ob_gestures := TomlCacheBool(Cache, "gestures", "enabled")
 	}
 
 	try LoggerDone("onboarding", "Wizard pre-loaded (layout={1}, magic='{2}', metrics={3}, gestures={4}).",

@@ -88,35 +88,35 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 LLM_Menu_OnToggle(*) {
 	static _Toggling := false
 	if _Toggling
-		return
+		return false
 	_Toggling := true
 	try {
-		global _LLM_Menu, LLM_HEALTH_PROBE_INTERVAL_MS
-		_LLM_Menu["enabled"] := !_LLM_Menu["enabled"]
-		LoggerInfo("LLM", "Toggle clicked — enabled: " (_LLM_Menu["enabled"] ? "true" : "false") ".")
-		LLM_Menu_SaveConfig()
-		LLM_Menu_Build()
-		if _LLM_Menu["enabled"] {
-			; Re-arm the health probe timer so the dot updates promptly
-			; after re-enabling without waiting for the next tick
-			SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
-			LLM_Menu_EnsureModelReady()
-			SetTimer(() => LLM_Menu_BootstrapOllama(true), -1)
-		} else {
-			; Cancel the health probe timer — no point pinging a disabled feature
-			SetTimer(_LLM_Menu_FireHealthProbe, 0)
-			; OFF flow — kill any in-flight Ollama install AND close the
-			; WebView so the user's Cancel intent reaches every layer.
-			; Without these, toggling OFF mid-install would leave the
-			; hidden powershell.exe running and the install window open.
-			try LLM_Deps_Cancel()
-			try OllamaWV_Close()
-			try LLM_OllamaCancelWarmupRetry()
-			LLM_Bridge_Stop()
-		}
+		return LLM_Menu_CommitMutation("the LLM enabled-state change",
+			(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "enabled"),
+			_LLM_Menu_ApplyToggleCommitted)
 	} finally {
 		_Toggling := false
 	}
+}
+
+_LLM_Menu_ApplyToggleCommitted(Candidate) {
+	global LLM_HEALTH_PROBE_INTERVAL_MS
+	LoggerInfo("LLM", "Toggle clicked — enabled: "
+		. (Candidate["enabled"] ? "true" : "false") . ".")
+	LLM_Menu_Build()
+	if Candidate["enabled"] {
+		; Model readiness is checked by the deferred bootstrap after this global
+		; barrier releases, so it cannot start a nested persistence transaction.
+		SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
+		SetTimer(() => LLM_Menu_BootstrapOllama(true), -1)
+	} else {
+		SetTimer(_LLM_Menu_FireHealthProbe, 0)
+		try LLM_Deps_Cancel()
+		try OllamaWV_Close()
+		try LLM_OllamaCancelWarmupRetry()
+		LLM_Bridge_Stop()
+	}
+	return true
 }
 
 /**
@@ -143,19 +143,52 @@ LLM_Menu_SaveConfig() {
 	if !(IsSet(_SaveFullConfigReady) && _SaveFullConfigReady)
 		return true
 	_LLM_Menu_SyncToFeatures()
-	if SaveFullConfig()
+	global CONFIG_SAVE_OK, CONFIG_SAVE_DEFERRED
+	global CONFIG_SAVE_RESOLVE_RELOAD, CONFIG_SAVE_RESOLVE_DEFERRED
+	RequestedGeneration := 0
+	SaveResult := SaveFullConfig(0, 0, true, 0, 0, &RequestedGeneration)
+	if (SaveResult = CONFIG_SAVE_OK)
 		return true
-	try LoggerError("LLM_Menu", "The LLM settings could not be written to config.toml. Reloading so the menu, the engine and the file agree again — the change has been discarded rather than shown as saved.")
-	ReloadPreservingSuspend()
+	if (SaveResult = CONFIG_SAVE_DEFERRED) {
+		try LoggerInfo("LLM_Menu", "The LLM configuration save was deferred behind another config.toml transaction; a coalesced retry will persist the current live state.")
+		return true
+	}
+	Resolution := _ConfigFullSaveResolveFailure(RequestedGeneration)
+	if (Resolution = CONFIG_SAVE_RESOLVE_DEFERRED) {
+		try LoggerWarn("LLM_Menu", "The failed LLM save could not discard an older accepted generation; the coalesced retry retains the current live state.")
+		return true
+	}
+	if (Resolution = CONFIG_SAVE_RESOLVE_RELOAD) {
+		try LoggerError("LLM_Menu", "The LLM settings could not be written to config.toml. Reloading so the menu, the engine and the file agree again — the exact failed generation was rejected rather than shown as saved.")
+		ReloadAccepted := false
+		try ReloadAccepted := ReloadPreservingSuspend()
+		catch as Err
+			try LoggerError("LLM_Menu", "Reload raised after the failed LLM save: {1}.", Err.Message)
+		if !ReloadAccepted {
+			; An OnExit gate kept this process alive, so disk authority was never
+			; completed. Reopen only this exact generation and retry it; otherwise
+			; every later setter would mutate RAM while the save coordinator stayed
+			; permanently sealed behind the returned Reload.
+			if _ConfigFullSaveResumeRejected(RequestedGeneration) {
+				try LoggerWarn("LLM_Menu", "Reload was refused; the rejected LLM save was restored as a pending obligation and its retry was re-armed.")
+				return true
+			} else {
+				try LoggerError("LLM_Menu", "Reload was refused and the exact LLM save could not be restored as a pending obligation.")
+				try ConfigReportPersistenceFailure(
+					"the LLM configuration save after a refused Reload")
+			}
+		}
+		return false
+	}
+	try LoggerError("LLM_Menu", "The LLM settings could not be persisted or safely rejected because an older save remains pending and its retry could not be armed.")
+	try ConfigReportPersistenceFailure("the LLM configuration save")
 	return false
 }
 
 LLM_Menu_OnInstantToggle(*) {
-	global _LLM_Menu
-	_LLM_Menu["instant_on_word_end"] := !_LLM_Menu["instant_on_word_end"]
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the instant-on-word-end setting",
+		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate,
+			"instant_on_word_end"), _LLM_Menu_ApplyStandardCommitted)
 }
 
 /**
@@ -163,11 +196,9 @@ LLM_Menu_OnInstantToggle(*) {
  * @param {string} key - The _LLM_Menu key to flip.
  */
 LLM_Menu_ToggleBool(key) {
-	global _LLM_Menu
-	_LLM_Menu[key] := !_LLM_Menu[key]
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM '" . key . "' setting",
+		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, key),
+		_LLM_Menu_ApplyStandardCommitted)
 }
 
 /**
@@ -201,43 +232,43 @@ LLM_Menu_BootstrapOllama(show_ui := true) {
 
 
 
-; =====================================
+; ==================================
 ; ==================================
 ; ======= 2/ Setter Handlers =======
 ; ==================================
-; =====================================
+; ==================================
 
 LLM_Menu_SetBackend(id) {
-	global _LLM_Menu
-	_LLM_Menu["backend"] := id
-	LLM_Menu_SaveConfig()
-	; Every sibling setter (SetModel, SetProfile, SetN, SetIndent) re-inits the
-	; live engine; this one was the sole exception. Without it the engine kept
-	; dispatching to the stale backend until some other setter incidentally
-	; called Init, and LLM_Engine_Init's own "stop in-flight generation when
-	; the backend changes" safety net never triggered on a backend switch (F25).
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM backend selection",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "backend", id),
+		_LLM_Menu_ApplyStandardCommitted)
 }
 
 LLM_Menu_SetModel(tag) {
-	global _LLM_Menu
-	_LLM_Menu["model"] := tag
-	; Honour the auto-detect toggle BEFORE saving so the new profile id
-	; lands in the same config write — keeps the on-disk state consistent
-	; whatever path the user took to switch model.
-	LLM_Menu_AutoApplyProfileForModel()
-	LLM_Menu_SaveConfig()
+	return LLM_Menu_CommitMutation("the LLM model selection",
+		(Candidate) => _LLM_Menu_SetModelCandidate(Candidate, tag),
+		_LLM_Menu_ApplyModelCommitted)
+}
+
+_LLM_Menu_SetModelCandidate(Candidate, Tag) {
+	if !_LLM_Menu_SetCandidateValue(Candidate, "model", Tag)
+		return false
+	LLM_Menu_AutoApplyProfileForModel(Candidate)
+	return true
+}
+
+_LLM_Menu_ApplyModelCommitted(Candidate) {
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
 	; Pre-load the new model into Ollama's GPU cache asynchronously so the
 	; first real prediction skips the cold-start penalty. No-op for the
 	; remote API backend — there's no local server to warm.
-	if (_LLM_Menu["backend"] == "ollama") {
+	if (Candidate["backend"] == "ollama") {
 		global _LLM_Ollama_IsReady
 		_LLM_Ollama_IsReady := false
-		try LLM_OllamaScheduleWarmupRetry(tag)
+		try LLM_OllamaScheduleWarmupRetry(Candidate["model"])
 	}
 	LLM_Menu_Build()
+	return true
 }
 
 /**
@@ -366,47 +397,47 @@ _LLM_Menu_OnInstalledTagsProbeDone(tags) {
 }
 
 LLM_Menu_SetProfile(id) {
-	global _LLM_Menu
+	return LLM_Menu_CommitMutation("the LLM profile selection",
+		(Candidate) => _LLM_Menu_SetProfileCandidate(Candidate, id),
+		_LLM_Menu_ApplyStandardCommitted)
+}
+
+_LLM_Menu_SetProfileCandidate(Candidate, Id) {
 	; If the user picks a profile manually while auto-detection is on, they
 	; clearly want a non-default choice — turn auto off so the next model
 	; switch doesn't silently overwrite their pick. The recommended profile
 	; for the current model is still computed live by the auto-detect
 	; helper, so flipping the toggle back on later re-applies it.
-	recommended := LLM_RecommendProfileForModel(_LLM_Menu["model"])
-	if (_LLM_Menu["auto_profile_for_model"] and recommended != "" and id != recommended) {
-		_LLM_Menu["auto_profile_for_model"] := false
+	recommended := LLM_RecommendProfileForModel(Candidate["model"])
+	if (Candidate["auto_profile_for_model"] and recommended != ""
+			and Id != recommended) {
+		Candidate["auto_profile_for_model"] := false
 	}
-	_LLM_Menu["profile_id"] := id
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	Candidate["profile_id"] := Id
+	return true
 }
 
 LLM_Menu_SetN(n) {
-	global _LLM_Menu
-	_LLM_Menu["n_predictions"] := n
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM prediction-count setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"n_predictions", n), _LLM_Menu_ApplyStandardCommitted)
 }
 
 LLM_Menu_SetIndent(lvl) {
-	global _LLM_Menu
-	_LLM_Menu["pred_indent"] := lvl
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM indentation setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"pred_indent", lvl), _LLM_Menu_ApplyStandardCommitted)
 }
 
 
 
 
 
-; ==========================================
+; =======================================
 ; =======================================
 ; ======= 3/ App Exclusion Picker =======
 ; =======================================
-; ==========================================
+; =======================================
 
 /**
  * Opens the shared AppPicker_Show() GUI so the user can select processes
@@ -424,22 +455,21 @@ LLM_Menu_OpenAppPicker() {
 }
 
 LLM_Menu_OnAppPickerSave(selected) {
-	global _LLM_Menu
-	_LLM_Menu["disabled_apps"] := selected
-	LLM_Menu_SaveConfig()
-	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	return LLM_Menu_CommitMutation("the LLM disabled-applications setting",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"disabled_apps", LLM_Menu_DeepClone(selected)),
+		_LLM_Menu_ApplyStandardCommitted)
 }
 
 
 
 
 
-; ============================
+; =======================
 ; =======================
 ; ======= 4/ Misc =======
 ; =======================
-; ============================
+; =======================
 
 LLM_Menu_OnAbout(*) {
 	MsgBox(t("menu.llm.about_body"), t("menu.llm.title"))
@@ -473,13 +503,15 @@ LLM_Menu_StartBridge() {
 		_LLM_Menu["bootstrap_pending"] := true
 		return
 	}
-	LLM_Menu_EnsureModelReady()
+	if !LLM_Menu_EnsureModelReady()
+		return false
 	LLM_Bridge_Start(LLM_Menu_BuildOpts())
 	tag := LLM_ResolveOllamaTag(_LLM_Menu["model"])
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
 		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (PrefixWatcher hook).", _LLM_Menu["model"], tag)
 	else
 		LoggerInfo("LLM", "Bridge started — model: {1}, tag: {2} (HookDispatcher until PrefixWatcher).", _LLM_Menu["model"], tag)
+	return true
 }
 
 /**
@@ -490,7 +522,7 @@ LLM_Menu_StartBridge() {
 LLM_Menu_EnsureModelReady() {
 	global _LLM_Menu
 	if (_LLM_Menu["backend"] != "ollama")
-		return
+		return true
 	; Never run the blocking installed-models probe (GET /api/tags, up to a 5 s
 	; WinHTTP timeout) unless the Ollama daemon is confirmed reachable. At boot
 	; the deps state is "pending", so a dead-port connect to localhost:11434
@@ -500,7 +532,7 @@ LLM_Menu_EnsureModelReady() {
 	; bridge-start path (LLM_Menu_StartBridge) calls us again with
 	; LLM_Deps_IsReady() == true, where the same probe returns in milliseconds.
 	if !LLM_Deps_IsReady()
-		return
+		return true
 	; Deps are confirmed up — refresh the installed-tags cache with ONE synchronous
 	; probe so the model auto-correct below reads a trustworthy snapshot. This is the
 	; only sanctioned blocking /api/tags call (off the keyboard hot path, gated on
@@ -510,20 +542,26 @@ LLM_Menu_EnsureModelReady() {
 	if (model == "")
 		model := _LLM_DefaultFor("llm_model", _LLM_LOCAL_DEFAULTS["llm_model"])
 	if LLM_IsModelInstalled(model) {
-		if (_LLM_Menu["model"] == "")
-			_LLM_Menu["model"] := model
-		return
+		if (_LLM_Menu["model"] != "")
+			return true
+		return LLM_Menu_CommitMutation("the default installed LLM model",
+			(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+				"model", model))
 	}
 	replacement := LLM_PickBestInstalledDisplayName()
 	if (replacement == "")
-		return
+		return true
 	old_tag := _LLM_ResolveOllamaTagCore(model, false)
 	new_tag := _LLM_ResolveOllamaTagCore(replacement, false)
-	try LoggerWarn("LLM",
-		"Model '{1}' (tag '{2}') is not installed — switching to '{3}' (tag '{4}').",
-		model, old_tag, replacement, new_tag)
-	_LLM_Menu["model"] := replacement
-	LLM_Menu_SaveConfig()
+	Committed := LLM_Menu_CommitMutation("the installed LLM model correction",
+		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
+			"model", replacement))
+	if Committed {
+		try LoggerWarn("LLM",
+			"Model '{1}' (tag '{2}') is not installed — switched to '{3}' (tag '{4}').",
+			model, old_tag, replacement, new_tag)
+	}
+	return Committed
 }
 
 /**
@@ -568,11 +606,11 @@ LLM_Menu_BuildOpts() {
 
 
 
-; ==============================================
+; =============================================
 ; =============================================
 ; ======= 5/ Ollama Lifecycle Callbacks =======
 ; =============================================
-; ==============================================
+; =============================================
 
 /**
  * Called by the deps checker when Ollama is confirmed ready.
@@ -622,7 +660,18 @@ LLM_Menu_OnDepsFailed(msg) {
 ; inside the watchdog callback itself.
 LLM_Menu_OnResume() {
 	global _LLM_Menu
-	if A_IsSuspended or !_LLM_Menu["bootstrap_pending"]
+	if A_IsSuspended
+		return
+	; A trigger cleanup/rollback timer consumes its scheduled ownership before
+	; observing suspend. Transfer the retained record now that native Suspend no
+	; longer bypasses the callback guard.
+	if IsSet(LLM_Menu_ServiceTriggerRecovery) {
+		try LLM_Menu_ServiceTriggerRecovery()
+		catch as Err
+			try LoggerError("LLM",
+				"Trigger shortcut recovery resume service failed: {1}.", Err.Message)
+	}
+	if !_LLM_Menu["bootstrap_pending"]
 		return
 	_LLM_Menu["bootstrap_pending"] := false
 	if !_LLM_Menu["enabled"]

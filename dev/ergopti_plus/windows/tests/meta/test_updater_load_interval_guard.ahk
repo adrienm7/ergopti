@@ -30,7 +30,7 @@
 ;   (a) Updater_LoadCheckInterval source body uses IsNumber(raw) before Integer().
 ;   (b) The ErgoptiPlus.ahk call site uses try Updater_LoadCheckInterval().
 ;
-; SCOPE: source introspection of lib/updater.ahk and ErgoptiPlus.ahk.
+; SCOPE: source introspection of modules/updater.ahk and ErgoptiPlus.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -74,11 +74,11 @@ _ULIG_ExtractLoaderBody(Src) {
 ; =========================================================
 
 _ULIG_CheckIsNumberGuard() {
-	Src := _DriverDirConcat("lib/updater")
-	Assert(Src != "", "the lib/updater module must be readable")
+	Src := _DriverDirConcat("modules/updater")
+	Assert(Src != "", "the modules/updater module must be readable")
 
 	Body := _ULIG_ExtractLoaderBody(Src)
-	Assert(Body != "", "Updater_LoadCheckInterval must be present in the lib/updater module")
+	Assert(Body != "", "Updater_LoadCheckInterval must be present in the modules/updater module")
 
 	; (a) IsNumber(raw) validation must be present before the Integer() call.
 	Assert(InStr(Body, "IsNumber(raw)"),

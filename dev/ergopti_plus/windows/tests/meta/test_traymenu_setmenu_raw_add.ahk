@@ -8,7 +8,7 @@
 ; adapters/tray_menu.ahk TrayMenuSetMenu() is the contract-sanctioned path the
 ; cross-platform shared layer drives the Windows tray menu through. AHK 2.0's
 ; WM_COMMAND -> menu-callback dispatch intermittently drops ~1 click in 3 with
-; no error. lib/menu_dispatcher.ahk installs a parallel WM_COMMAND retry path,
+; no error. infra/menu_dispatcher.ahk installs a parallel WM_COMMAND retry path,
 ; but ONLY for items registered via RegisterMenuItem(MenuObj, Name, Callback).
 ; The original code used raw A_TrayMenu.Add(ItemTitle, ItemFn) for actionable
 ; items, so they never joined the retry path and dropped clicks vanished.
@@ -18,7 +18,7 @@
 ; keep the zero-argument A_TrayMenu.Add()).
 ;
 ; This is a meta-static test: TrayMenuSetMenu mutates the live A_TrayMenu and
-; now references RegisterMenuItem, which lives in lib/menu_dispatcher.ahk — a
+; now references RegisterMenuItem, which lives in infra/menu_dispatcher.ahk — a
 ; file NOT in the headless run_all include graph, so calling the function would
 ; be a load-time error that hangs the CI runner.
 ; ==============================================================================

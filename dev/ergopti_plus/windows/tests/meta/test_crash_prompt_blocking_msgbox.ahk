@@ -16,7 +16,7 @@
 ; function body contains no MsgBox( call and does use NotifierSend(, so a
 ; regression that reintroduces a modal dialog fails CI.
 ;
-; SCOPE: source introspection of lib/crash_reporter.ahk.
+; SCOPE: source introspection of modules/diagnostics/crash_reporter.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -46,9 +46,9 @@ _CPMB_ReadSource(RelPath) {
 ; ==================================================
 
 _CPMB_NoBlockingMsgBox() {
-	Src := _CPMB_ReadSource("lib/crash_reporter.ahk")
+	Src := _CPMB_ReadSource("modules/diagnostics/crash_reporter.ahk")
 	Body := _DriverFuncBody("CrashReport_PromptUser")
-	Assert(Body != "", "CrashReport_PromptUser(Report) must exist in lib/crash_reporter.ahk")
+	Assert(Body != "", "CrashReport_PromptUser(Report) must exist in modules/diagnostics/crash_reporter.ahk")
 	Assert(InStr(Body, "MsgBox(") = 0,
 		"CrashReport_PromptUser must NOT call a modal MsgBox — it runs on the input thread and starves the keyboard hook (HIGH-02)")
 	Assert(InStr(Body, "NotifierSend(") > 0,

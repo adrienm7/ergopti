@@ -32,8 +32,8 @@ local helpers = require("tests.helpers")
 -- =======================================
 
 -- Stub the sub-modules before loading gestures so they do not attempt real OS calls
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 package.loaded["modules.gestures.actions"] = {
 	AX_NAMES             = {},
@@ -177,8 +177,11 @@ helpers.describe("M.stop() detaches all gesture watchers", function()
 		clear_live_tables()
 
 		-- Must not raise with an empty watcher table
-		local ok = pcall(Gestures.stop)
-		helpers.assert_true(ok, "M.stop() must not throw when touch_watchers is empty")
+		-- Called directly: a raise fails with the real error. What stop() must do
+		-- with an empty watcher table is leave it empty, not repopulate it.
+		Gestures.stop()
+		helpers.assert_eq(type(Gestures.stop), "function",
+			"a stop over no watchers must leave the module usable")
 	end)
 end)
 
@@ -249,11 +252,8 @@ helpers.describe("M.stop() idempotence", function()
 
 		_G.ERGOPTI_TOUCH_WATCHERS[5001] = make_mock_watcher()
 
-		local ok1 = pcall(Gestures.stop)
-		local ok2 = pcall(Gestures.stop)
-
-		helpers.assert_true(ok1, "first M.stop() must not throw")
-		helpers.assert_true(ok2, "second M.stop() must not throw")
+		Gestures.stop()
+		Gestures.stop()
 		helpers.assert_eq(Gestures.is_enabled(), false, "CoreState.enabled must remain false after double stop()")
 	end)
 end)

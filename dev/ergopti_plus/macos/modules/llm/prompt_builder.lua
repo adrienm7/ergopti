@@ -24,7 +24,7 @@
 local M = {}
 
 local Shared = require("llm.prompt_builder")
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "llm.prompt_builder"
 

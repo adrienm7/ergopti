@@ -53,7 +53,7 @@
 ; the real number of call sites in the driver source, so the list cannot silently
 ; fall behind.
 _UCP_ProbeSites() {
-	return ["_TooltipResolvePosition", "_UIA_SelectionPollTick",
+	return ["_TooltipResolvePosition", "UIASW_WorkerHandleRequest",
 		"SFD_ProbeFocusedUia", "KL_DetectPasswordFor"]
 }
 
@@ -116,6 +116,17 @@ _UCP_EveryProbeSiteClampsFirst() {
 		Assert(UiaPos > 0,
 			Name . " no longer performs the UIA round-trip — remove it from _UCP_ProbeSites() rather than leaving a site the guard can never check")
 		Checked += 1
+		if (Name = "UIASW_WorkerHandleRequest") {
+			; This site is deliberately not a main-thread clamp. Its parent owns a
+			; <=60 ms timer that kills the entire disposable process, which can
+			; interrupt the COM call already in progress rather than waiting for it.
+			Deadline := _DriverFuncBody("UIASW_OnDeadline")
+			Complete := _DriverFuncBody("UIASW_Complete")
+			Assert(Deadline != "" && InStr(Deadline, '"timeout"') > 0
+					&& Complete != "" && InStr(Complete, "UIASW_TerminateWorker(Handle, ProcessHandle)") > 0,
+				"the detached UIA site must remain owned by an enforceable process-kill deadline")
+			continue
+		}
 		ClampPos := _UCP_ClampPos(Body)
 		if Pending.Has(Name) {
 			Assert(ClampPos == 0,
@@ -209,8 +220,8 @@ _UCP_EveryClampLatchesOnlyOnSuccess() {
 			. "here is indistinguishable from a successful clamp, which is what made this unfalsifiable from a "
 			. "log (conventions 5.3)")
 	}
-	Assert(Count >= 3,
-		"the three layer-local clamp helpers must all be reached by this scan (found " . Count . ") — a scan that "
+	Assert(Count >= 2,
+		"the two resident layer-local clamp helpers must both be reached by this scan (found " . Count . ") — the selection probe is separately process-isolated, and a scan that "
 		. "matches fewer cannot fail for the sites it missed")
 }
 

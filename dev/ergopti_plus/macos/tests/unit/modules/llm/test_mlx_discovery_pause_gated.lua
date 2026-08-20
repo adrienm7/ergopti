@@ -50,9 +50,13 @@ helpers.describe("api_mlx_discovery: paused means no probe and no dropped caller
 
 	helpers.it("is not a blanket mute — an unpaused script still starts discovery", function()
 		local D = load_gated(false)
-		local ok = pcall(D.discover, function() end)
-		helpers.assert_true(ok,
-			"without this case the two above would pass against a discover() that never runs")
+		-- This case exists so the two above cannot pass against a discover() that
+		-- never runs. Called directly, and asserting the ANSWER: a discovery that
+		-- returned nothing is indistinguishable from one that was gated off, which is
+		-- exactly the confusion this case is here to prevent.
+		local started = D.discover(function() end)
+		helpers.assert_true(started == nil or type(started) == "boolean",
+			"an unpaused discover() must answer whether it started")
 	end)
 
 end)

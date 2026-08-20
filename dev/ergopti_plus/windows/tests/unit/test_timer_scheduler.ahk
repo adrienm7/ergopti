@@ -89,6 +89,38 @@ _TSTest_AfterActiveCountDecrementsAfterFire() {
 }
 Test("TimerScheduler — after(): activeCount decrements after callback fires", _TSTest_AfterActiveCountDecrementsAfterFire)
 
+_TSTest_RestartAfterPreservesOwnerIdentity() {
+	_TS_ResetRegistry()
+	Calls := 0
+	H := TimerAfter(10, () => (Calls += 1))
+	Owner := H["Fn"]
+	TimerRestartAfter(H, 20)
+	AssertTrue(H["Fn"] == Owner,
+		"AHK-22: restart must reuse the captured callback instead of allocating per keystroke")
+	AssertFalse(H["Fired"], "AHK-22: restarted one-shot must be live")
+	AssertEqual(-20000, H["Interval"], "AHK-22: restart must publish the new delay")
+	AssertEqual(1, TimerActiveCount(), "AHK-22: restart must own exactly one registry slot")
+	H["Fn"]()
+	AssertEqual(1, Calls, "AHK-22: the restarted owner must publish exactly once")
+	AssertEqual(0, TimerActiveCount(), "AHK-22: firing must retire the restarted owner")
+}
+Test("AHK-22 TimerScheduler — restartAfter reuses one exact one-shot owner",
+	_TSTest_RestartAfterPreservesOwnerIdentity)
+
+_TSTest_RestartAfterRejectsRepeatingOwner() {
+	_TS_ResetRegistry()
+	H := TimerEvery(10, () => 0)
+	Threw := false
+	try TimerRestartAfter(H, 20)
+	catch TypeError
+		Threw := true
+	AssertTrue(Threw,
+		"AHK-22: a repeating wrapper cannot impersonate a restartable one-shot owner")
+	TimerCancel(H)
+}
+Test("AHK-22 TimerScheduler — restartAfter rejects a repeating owner",
+	_TSTest_RestartAfterRejectsRepeatingOwner)
+
 
 
 
@@ -271,25 +303,64 @@ _TSTest_EveryExceptionIsolation() {
 }
 Test("TimerScheduler — every(): callback exceptions are isolated", _TSTest_EveryExceptionIsolation)
 
-; ULTIMATE encore plus: deepen pause + diagnostic + pcall to errors sink + volume/re-init.
-_TSTest_EveryUnderPauseNoFire() {
-	; Under A_IsSuspended, TimerEvery must register but never fire callbacks (project_suspend_pause_invariant).
-	; Diagnostic / healthcheck must still be able to inspect scheduler state safely.
-	AssertTrue(true, "every() under pause must not invoke callbacks; diagnostic must see timer counts without side effects")
+; Three placeholders stood here, each asserting AssertTrue(true). A_IsSuspended
+; cannot be set from a test, but the wrapper the suspend check lives in CAN be
+; called directly — the tests above already do — and the ordering of that check
+; is what the invariant really is.
+_TSTest_RepeatingChecksSuspendBeforeTheCallback() {
+	Body := _DriverFuncBody("_Repeating")
+	GuardPos := InStr(Body, "if A_IsSuspended")
+	CallPos  := InStr(Body, "BoundFn()")
+	Assert(GuardPos > 0,
+		"the repeating wrapper must bail on A_IsSuspended — a paused driver that keeps firing its pollers is the whole of 'pause = everything off'")
+	Assert(CallPos > 0, "and it must still call the callback when not paused")
+	Assert(GuardPos < CallPos,
+		"the suspend check must come BEFORE the callback runs, not after it")
 }
-Test("TimerScheduler — every(): must be silent under pause (no callback fire) + diagnostic safe", _TSTest_EveryUnderPauseNoFire)
+Test("TimerScheduler — every(): the suspend check precedes the callback", _TSTest_RepeatingChecksSuspendBeforeTheCallback)
 
-_TSTest_PcallCallbackEmitsToErrorsSinkUnderPause() {
-	; If a timer callback throws, the wrapper must pcall it, log ERROR to the dedicated errors sink,
-	; and continue. Pause must keep the whole path silent except the error log.
-	AssertTrue(true, "timer callback pcall ERROR must go to errors sink; pause must silence activation (would have caught silent crash or missing error visibility in diagnostic)")
+
+_TSTest_ThrowingCallback_ThrowFn() {
+	throw Error("scheduler-probe-boom")
 }
-Test("TimerScheduler: pcall in callback must emit ERROR to errors sink under pause; diagnostic visibility", _TSTest_PcallCallbackEmitsToErrorsSinkUnderPause)
+_TSTest_ThrowingCallbackIsLoggedNotSwallowed() {
+	global _LOGGER_TEST_SINK
+	_TS_ResetRegistry()
+	Seen := []
+	Prev := IsSet(_LOGGER_TEST_SINK) ? _LOGGER_TEST_SINK : 0
+	_LOGGER_TEST_SINK := (Line) => Seen.Push(Line)
+	try {
+		H := TimerEvery(1, _TSTest_ThrowingCallback_ThrowFn)
+		H["Fn"]()
+	} finally {
+		_LOGGER_TEST_SINK := Prev
+	}
 
-_TSTest_HighVolumePauseReinitDiagnostic() {
-	; 200+ after/every + pause toggles mid-flight + re-init of scheduler + HealthCheck_Run.
-	; Must not leak handles, must preserve ability for diagnostic to report timer stats.
-	AssertTrue(true, "high volume timers + pause + re-init must be leak-free; diagnostic must see accurate scheduler state")
+	; Isolation alone is not enough: a wrapper that swallows silently is
+	; indistinguishable from one that never ran, and that is precisely how a
+	; broken poller hides. The throw has to leave a trace.
+	Found := ""
+	for _, Line in Seen {
+		if InStr(Line, "scheduler-probe-boom")
+			Found := Line
+	}
+	Assert(Found != "",
+		"a throwing repeating callback must be logged — the wrapper isolates it, and an isolated exception with no log is a silent dead timer")
+	AssertContains(Found, "ERROR",
+		"and logged at ERROR, so it reaches the dedicated errors sink a user is asked for when reporting a problem")
 }
-Test("TimerScheduler: high volume (200+) + pause transitions + re-init must preserve diagnostic scheduler visibility", _TSTest_HighVolumePauseReinitDiagnostic)
+Test("TimerScheduler: a throwing callback is logged at ERROR, not swallowed", _TSTest_ThrowingCallbackIsLoggedNotSwallowed)
 
+
+_TSTest_CancelAllLeavesNoHandles() {
+	global _TIMER_ADAPTER_REGISTRY
+	_TS_ResetRegistry()
+	Loop 200
+		TimerEvery(3600, _TSTest_ThrowingCallback_ThrowFn)   ; never fires within the test
+	AssertEqual(200, _TIMER_ADAPTER_REGISTRY.Count,
+		"every armed timer must be registered — a registry that silently drops entries cannot be cancelled")
+	TimerCancelAll()
+	AssertEqual(0, _TIMER_ADAPTER_REGISTRY.Count,
+		"cancelAll must leave no handle behind; a leaked one keeps an OS timer armed for the life of the process")
+}
+Test("TimerScheduler: 200 timers all register and cancelAll clears every one", _TSTest_CancelAllLeavesNoHandles)

@@ -81,17 +81,17 @@ _DESC_PrescanRunsOutsideCritical() {
 }
 
 _DESC_ExtMenuDoesNoFileIO() {
-	Body := _DriverFuncBody("_HS_Extensions")
-	Assert(Body != "", "_HS_Extensions must exist in the driver source")
+	Body := _DriverFuncBody("_HS_ExtensionRows")
+	Assert(Body != "", "_HS_ExtensionRows must exist in the driver source")
 
 	; Strip comments so a comment that names "Loop Files" / "FileRead" (explaining
 	; where the I/O moved to) cannot trip these assertions — only real code counts.
 	Code := _DESC_StripComments(Body)
 	Assert(InStr(Code, "Loop Files") = 0,
-		"_HS_Extensions must NOT iterate the extensions tree with Loop Files — read the pre-warmed cache instead (MEDIUM-03)")
+		"_HS_ExtensionRows must NOT iterate the extensions tree with Loop Files — read the pre-warmed cache instead (MEDIUM-03)")
 	Assert(InStr(Code, "FileRead(ManifestPath") = 0,
-		"_HS_Extensions must NOT FileRead(ManifestPath) — manifest parsing must happen in the off-Critical prescan (MEDIUM-03)")
+		"_HS_ExtensionRows must NOT FileRead(ManifestPath) — manifest parsing must happen in the off-Critical prescan (MEDIUM-03)")
 }
 
 Test("meta deferred-ext-scan: BuildTrayMenuDeferred keeps extension scan outside Critical (MEDIUM-03)", _DESC_PrescanRunsOutsideCritical)
-Test("meta deferred-ext-scan: _HS_Extensions does no file I/O at menu-build time (MEDIUM-03)", _DESC_ExtMenuDoesNoFileIO)
+Test("meta deferred-ext-scan: _HS_ExtensionRows does no file I/O at menu-build time (MEDIUM-03)", _DESC_ExtMenuDoesNoFileIO)

@@ -51,8 +51,21 @@ _AHSG_ReadSource(RelPath) {
 ; ==================================================
 ; ==================================================
 
+_AHSG_EngineBufferIsSuperGlobal() {
+	; ActivateHotstrings lives in the sibling hotstring_send module and reads
+	; HSE_Buffer without a function-local declaration. Under AHK v2 assume-local
+	; that is valid only because this explicit top-level declaration makes the
+	; engine buffer super-global across the included module.
+	EngineMain := _StripFullLineComments(
+		_AHSG_ReadSource("infra/hotstrings/hotstring_engine_main.ahk"))
+	Assert(RegExMatch(EngineMain, "m)^global[ \t]+[^\r\n]*\bHSE_Buffer\b") > 0,
+		"hotstring_engine_main must declare HSE_Buffer global at top level, or ActivateHotstrings' IsSet guard reads an unset local and silently misses the empty-buffer fast path")
+}
+Test("hotstring_engine: HSE_Buffer stays a module super-global for ActivateHotstrings",
+	_AHSG_EngineBufferIsSuperGlobal)
+
 _AHSG_GateBeforePoke() {
-	Src := _AHSG_ReadSource("lib/hotstrings/hotstring_engine.ahk")
+	Src := _AHSG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
 	Seg := _DriverFuncBody("ActivateHotstrings")
 	Assert(Seg != "", "ActivateHotstrings() declaration must exist in hotstring_engine.ahk")
 
@@ -61,25 +74,25 @@ _AHSG_GateBeforePoke() {
 	Assert(GateIdx > 0,
 		"ActivateHotstrings must gate the poke on HSE_Buffer — the 50 ms Sleep must not run on every Shift punctuation key when no abbreviation is pending")
 
-	; The gate must sit BEFORE the space poke, so an empty buffer returns early
-	; and never reaches SendNewResult(" ") nor the Sleep.
-	PokeIdx := InStr(Seg, "SendNewResult(" . Chr(0x22) . " " . Chr(0x22) . ")")
+	; The gate must sit BEFORE the unrecorded temporary poke, so an empty buffer
+	; returns early and never reaches any part of the transaction.
+	PokeIdx := InStr(Seg, 'SendNewResult(" ", true, false)')
 	Assert(PokeIdx > 0, "ActivateHotstrings must still emit the space poke when an abbreviation IS pending")
 	Assert(GateIdx < PokeIdx,
-		"the HSE_Buffer gate must precede the space poke so an empty buffer skips both the poke and the blocking Sleep")
+		"the HSE_Buffer gate must precede the space poke so an empty buffer skips the whole forced-commit transaction")
 }
 Test("hotstring_engine: ActivateHotstrings gates the Sleep poke on a pending HSE_Buffer (activate-hotstrings-sleep-on-keyboard-thread)", _AHSG_GateBeforePoke)
 
 _AHSG_GuardReturnsEarly() {
-	Src := _AHSG_ReadSource("lib/hotstrings/hotstring_engine.ahk")
+	Src := _AHSG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
 	Seg := _DriverFuncBody("ActivateHotstrings")
 	; Slice from the function head to the first space poke: the early-return that
 	; skips the dance on an empty buffer must live in that prologue.
-	PokeIdx := InStr(Seg, "SendNewResult(" . Chr(0x22) . " " . Chr(0x22) . ")")
+	PokeIdx := InStr(Seg, 'SendNewResult(" ", true, false)')
 	Assert(PokeIdx > 0, "space poke must exist in ActivateHotstrings")
 	Prologue := SubStr(Seg, 1, PokeIdx - 1)
 	Assert(InStr(Prologue, "return") > 0,
-		"ActivateHotstrings must early-return before the poke when HSE_Buffer is empty — otherwise the blocking Sleep still runs on the keyboard thread")
+		"ActivateHotstrings must early-return before the poke when HSE_Buffer is empty")
 	Assert(InStr(Prologue, "==") > 0 and InStr(Prologue, Chr(0x22) . Chr(0x22)) > 0,
 		"the gate must test HSE_Buffer for emptiness (== empty string) before returning")
 }
@@ -91,11 +104,18 @@ _AHSG_PokeIsAtomicWithoutSleep() {
 	Assert(!RegExMatch(Seg, "\bSleep\s*\("),
 		"ActivateHotstrings must not Sleep on the keyboard thread between its synthetic space and backspace")
 	OnPos := InStr(Seg, 'Critical("On")')
-	SpacePos := InStr(Seg, 'SendNewResult(" ")')
-	BackspacePos := InStr(Seg, 'SendNewResult("{BackSpace}", False)')
+	SpacePos := InStr(Seg, 'SendNewResult(" ", true, false)')
+	DispatchPos := InStr(Seg, "&CommittedScreenEffect, true", true, SpacePos)
+	FireMetricGatePos := InStr(Seg, "if Fired", true, DispatchPos)
+	FireReturnGatePos := InStr(Seg, "if Fired", true, FireMetricGatePos + 1)
+	FireReturnPos := InStr(Seg, "return true", true, FireReturnGatePos)
+	BackspacePos := InStr(Seg, 'SendNewResult("{BackSpace}", False, false)')
 	RestorePos := InStr(Seg, "Critical(previous_critical)")
-	Assert(OnPos > 0 && SpacePos > OnPos && BackspacePos > SpacePos && RestorePos > BackspacePos,
-		"ActivateHotstrings must keep the synthetic space/backspace pair inside a Critical transaction and restore the caller state afterwards")
+	Assert(OnPos > 0 && SpacePos > OnPos && DispatchPos > SpacePos
+		&& FireReturnGatePos > FireMetricGatePos && FireReturnPos > FireReturnGatePos
+		&& BackspacePos > FireReturnPos
+		&& RestorePos > BackspacePos,
+		"ActivateHotstrings must keep poke, forced dispatch and no-fire cleanup inside one Critical transaction, with fire returning before cleanup and caller state restored afterwards")
 }
 
 Test("hotstring_engine: ActivateHotstrings emits the poke atomically without keyboard-thread Sleep", _AHSG_PokeIsAtomicWithoutSleep)

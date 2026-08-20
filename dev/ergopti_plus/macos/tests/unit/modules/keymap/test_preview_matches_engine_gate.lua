@@ -65,6 +65,23 @@ helpers.describe("delay resolution: the engine and the preview share one chain",
 
 		helpers.assert_eq(s.resolve_mapping_delay({}), 0.5,
 			"and an unqualified mapping falls back to the base delay")
+
+		local live, remaining = s.mapping_delay_remaining({}, 0.2, 1)
+		helpers.assert_eq(live, true)
+		helpers.assert_eq(remaining, 0.3)
+		local at_deadline, zero_remaining = s.mapping_delay_remaining({}, 0.5, 1)
+		helpers.assert_eq(at_deadline, false,
+			"the engine must expire at the same >= boundary as tooltip dequeue")
+		helpers.assert_eq(zero_remaining, 0)
+		local complex_live, complex_remaining = s.mapping_delay_remaining({}, 0.5, 2)
+		helpers.assert_eq(complex_live, true,
+			"the shared policy must still expose the wider complex-key window")
+		helpers.assert_eq(complex_remaining, 0.5)
+		s.BASE_DELAY_SEC = 0
+		local infinite, no_deadline = s.mapping_delay_remaining({}, 999, 2)
+		helpers.assert_eq(infinite, true)
+		helpers.assert_nil(no_deadline,
+			"delay zero means always active and must never manufacture an expired deadline")
 	end)
 
 	helpers.it("the tap delegates rather than re-implementing", function()
@@ -76,7 +93,7 @@ helpers.describe("delay resolution: the engine and the preview share one chain",
 		helpers.assert_true(at ~= nil, "mapping_fires must exist")
 
 		local body = code:sub(at, at + 900)
-		helpers.assert_true(body:find("resolve_mapping_delay", 1, true) ~= nil,
+		helpers.assert_true(body:find("mapping_delay_remaining", 1, true) ~= nil,
 			"the tap must resolve through CoreState, not inline its own copy of the chain")
 		helpers.assert_true(body:find("CoreState.SECTION_DELAYS[m.section]", 1, true) == nil,
 			"and the inlined chain must be gone — two implementations is the drift itself")
@@ -86,11 +103,11 @@ helpers.describe("delay resolution: the engine and the preview share one chain",
 		local src = helpers.read_driver_source("_preview_render_generation")
 		local code = src:gsub("%-%-[^\n]*", "")
 
-		local at = code:find("local raw_delay", 1, true)
-		helpers.assert_true(at ~= nil, "the row lifetime must still be computed")
+		local at = code:find("local function literal_preview_allowed", 1, true)
+		helpers.assert_true(at ~= nil, "the literal-collision row lifetime must still be computed")
 
-		local body = code:sub(at, at + 400)
-		helpers.assert_true(body:find("resolve_mapping_delay", 1, true) ~= nil,
+		local body = code:sub(at, at + 800)
+		helpers.assert_true(body:find("mapping_delay_remaining", 1, true) ~= nil,
 			"the row's lifetime must come from the chain that decides whether the trigger can "
 				.. "still fire, or the tooltip goes on offering an expansion the engine refuses")
 
@@ -126,9 +143,10 @@ helpers.describe("preview: nothing is offered while the engine is suppressed", f
 			"read from the same CoreState field the tap tests, so the preview and the engine "
 				.. "cannot disagree about whether a trigger is live")
 
-		local walk_at = code:find("if #matches == 0 and not engine_blocked then", 1, true)
+		local walk_at = code:find(
+			"not%s+engine_blocked%s+and%s+expander%.resolve_magic_action%(buf,%s*literal_preview_allowed%)")
 		helpers.assert_true(walk_at ~= nil,
-			"and the static-mapping walk must actually be gated on it — knowing the engine is "
+			"and the shared prospective resolution must actually be gated on it — knowing the engine is "
 				.. "blocked while still offering rows changes nothing")
 	end)
 end)

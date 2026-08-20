@@ -10,16 +10,90 @@
 
 local helpers = require("tests.helpers")
 
--- Pause invariant for personal info hotstrings (must not expand when paused)
+-- Pause invariant for personal info hotstrings: they must not expand while the
+-- driver is paused. personal_info has no pause state of its own — the guard is
+-- the early return at the top of the keystroke path — so this case used to be
+-- "assert_true(true)" with a comment saying where the real guard lived.
+--
+-- What is checkable is WHERE that guard sits. Action-epoch reconciliation and
+-- stale internal-loopback disposal intentionally precede it in every state, but
+-- no physical event accessor, interceptor, or buffer mutation may. Otherwise the
+-- first thing typed after a resume could expand against a buffer built while the
+-- user thought nothing was listening.
+local PHYSICAL_OBSERVATION_MARKERS = {
+	"e:getKeyCode()",
+	"e:getFlags()",
+	"e:getCharacters(false)",
+	"CoreState.interceptors",
+	"LLMBridge.handle_llm_keys",
+	"CoreState.buffer",
+}
+
+
+--- @param source string
+--- @return string raw
+local function raw_keydown_slice(source)
+	local start_pos = source:find("local function onKeyDownRaw%(")
+	local end_pos = start_pos and source:find(
+		"\nlocal function merge_returned_events", start_pos, true)
+	helpers.assert_not_nil(start_pos, "onKeyDownRaw must remain locatable")
+	helpers.assert_not_nil(end_pos, "onKeyDownRaw must remain independently bounded")
+	return source:sub(start_pos, end_pos - 1)
+end
+
+
+--- @param raw string
+--- @return boolean valid
+local function pause_precedes_physical_observation(raw)
+	local code = raw:gsub("%-%-[^\n]*", "")
+	local parameters = code:match("local function onKeyDownRaw%s*%(([^)]*)%)")
+	parameters = parameters and parameters:gsub("%s+", "") or nil
+	if parameters ~= "e,provenance,provenance_status" then return false end
+	local stale_at = code:find(
+		"if provenance and provenance.stale_loopback then return true end", 1, true)
+	local unreadable_at = code:find(
+		"if provenance_status == EventProvenance.STATUS_UNREADABLE then", 1, true)
+	local owned_at = code:find(
+		"if provenance and not internal_loopback then return false end", 1, true)
+	local pause_at = code:find(
+		"if CoreState.processing_paused then return internal_loopback == true end", 1, true)
+	if not (stale_at and unreadable_at and owned_at and pause_at) then return false end
+	if not (stale_at < unreadable_at and unreadable_at < owned_at and owned_at < pause_at) then
+		return false
+	end
+	for _, marker in ipairs(PHYSICAL_OBSERVATION_MARKERS) do
+		local marker_at = code:find(marker, 1, true)
+		if marker_at == nil or marker_at <= pause_at then return false end
+	end
+	return true
+end
+
+
 helpers.describe("Personal info pause guard", function()
-	helpers.it("pause blocks personal dynamic expansions (regression)", function()
-		-- Guard in keymap/expander; test documents requirement
-		helpers.assert_true(true)
+	helpers.it("the keystroke path returns on pause before observing physical input", function()
+		local src, err = helpers.read_driver_unit("local function onKeyDownRaw")
+		helpers.assert_not_nil(src, err)
+		local raw = raw_keydown_slice(src)
+		helpers.assert_true(pause_precedes_physical_observation(raw),
+			"the current (event, provenance, status) handler must reconcile provenance, "
+				.. "then stop paused input before every enumerated physical observation")
+
+		local pause = "if CoreState.processing_paused then return internal_loopback == true end"
+		local pause_at = raw:find(pause, 1, true)
+		helpers.assert_not_nil(pause_at, "the sensitivity mutation needs the real pause gate")
+		for _, marker in ipairs(PHYSICAL_OBSERVATION_MARKERS) do
+			local mutant = raw:sub(1, pause_at - 1) .. marker .. "\n" .. raw:sub(pause_at)
+			helpers.assert_true(not pause_precedes_physical_observation(mutant),
+				"the pause guard must fail if physical work moves ahead of it: " .. marker)
+		end
 	end)
 end)
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+
+
+
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local PI = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
 
@@ -40,6 +114,80 @@ helpers.describe("PersonalInfo getters", function()
 
 	helpers.it("get_info returns a table (possibly empty before init)", function()
 		helpers.assert_eq(type(PI.get_info()), "table")
+	end)
+end)
+
+
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 5/ Runtime saves never mutate retained defaults =============
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("PersonalInfo defaults remain immutable across restart", function()
+	helpers.it("does not resurrect saved personal data after the file is removed", function()
+		local path = "/virtual/personal-info-default-alias.toml"
+		local disk = nil
+		local file_system = require("adapters.file_system")
+		local original_read = file_system.read_with_status
+		local original_create = file_system.create_if_absent
+		local original_write = file_system.write_if_unchanged
+		local ok, err = xpcall(function()
+			file_system.read_with_status = function(candidate)
+				if candidate ~= path then return original_read(candidate) end
+				if disk == nil then return nil, "absent" end
+				return disk, "ok"
+			end
+			file_system.create_if_absent = function(candidate, content)
+				helpers.assert_eq(candidate, path)
+				if disk ~= nil then return false, "exists" end
+				disk = content
+				return true, "created"
+			end
+			file_system.write_if_unchanged = function(candidate, content, expected_source)
+				helpers.assert_eq(candidate, path)
+				local unchanged = type(expected_source) == "table"
+					and expected_source.status == (disk == nil and "absent" or "ok")
+					and (disk == nil or expected_source.content == disk)
+				if not unchanged then return false, "source changed" end
+				disk = content
+				return true
+			end
+
+			PI.stop()
+			helpers.assert_eq(PI.start("", nil, path), true)
+			local info_section = type(disk) == "string"
+				and disk:match("%[info%]\n(.-)\n%[letters%]")
+			helpers.assert_true(type(info_section) == "string",
+				"first launch must publish the canonical [info]/[letters] schema")
+			helpers.assert_true(info_section:find('first_name = "', 1, true) ~= nil,
+				"the [info] section must contain real personal-information fields")
+			helpers.assert_true(disk:find('p = "first_name"', 1, true) ~= nil,
+				"the [letters] section must contain real aliases")
+			helpers.assert_true(disk:find('table:', 1, true) == nil,
+				"nested runtime tables must never be stringified into the persisted schema")
+			helpers.assert_true(info_section:find('info = "', 1, true) == nil
+				and info_section:find('letters = "', 1, true) == nil,
+				"runtime wrapper keys are not canonical personal-info fields")
+			local original_default = PI.get_info().first_name
+			helpers.assert_true(original_default ~= "PRIVATE-DEFAULT-ALIAS-SENTINEL")
+			helpers.assert_eq(PI.save_info({
+				first_name = "PRIVATE-DEFAULT-ALIAS-SENTINEL",
+			}), true)
+			PI.stop()
+			disk = nil
+
+			helpers.assert_eq(PI.start("", nil, path), true)
+			helpers.assert_eq(PI.get_info().first_name, original_default,
+				"a new missing file must use immutable defaults, not prior-session PII")
+		end, debug.traceback)
+		PI.stop()
+		file_system.read_with_status = original_read
+		file_system.create_if_absent = original_create
+		file_system.write_if_unchanged = original_write
+		if not ok then error(err, 0) end
 	end)
 end)
 

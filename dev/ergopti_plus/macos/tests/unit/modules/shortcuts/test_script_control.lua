@@ -11,13 +11,13 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Stub modules required at top-level by script_control.lua so that load_with_stubs
 -- can fully execute the module and expose pause_all/resume_all etc on the returned table.
-package.loaded["lib.notifications"] = { notify = function() end }
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.notifications"] = { notify = function() end }
+package.loaded["infra.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,
 	F14_KARABINER_BACKSPACE = 0x6B,
 	F15_KARABINER_ESCAPE = 0x6C,
@@ -25,7 +25,7 @@ package.loaded["lib.keycodes"] = {
 	RETURN = 0x24,
 	ESCAPE = 0x35,
 }
-package.loaded["lib.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
+package.loaded["infra.i18n"] = { get = function(k) return k end, get_locale = function() return "fr" end }
 package.loaded["modules.gestures.engine"] = {
   init = function() end
 }
@@ -38,6 +38,10 @@ package.loaded["modules.gestures.actions"] = {
   SG_NAMES = { "none", "script_pause_toggle", "script_reload", "script_quit", "other_action" },
   AX_NAMES = {}
 }
+-- Pause requires tooltip teardown to commit. Keep the generic state-machine
+-- tests independent from the real canvas-backed tooltip, which cannot own a
+-- surface under the headless hs stub.
+package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
 
 -- Force a fresh adapters.key_state so it captures THIS file's hs stub (the F-CRIT-1
 -- sentinel guard delegates the live right-AltGr query to that adapter).
@@ -96,11 +100,11 @@ end)
 
 
 
--- =====================================
+--- =======================================
 --- =======================================
 --- ======= 2/ Pause state accessor =======
 --- =======================================
--- =====================================
+--- =======================================
 
 helpers.describe("ScriptControl.is_paused", function()
 	helpers.it("starts as false", function()
@@ -135,11 +139,11 @@ end)
 
 
 
--- =====================================
+--- ========================================
 --- ========================================
 --- ======= 4/ Pause-change callback =======
 --- ========================================
--- =====================================
+--- ========================================
 
 helpers.describe("ScriptControl.set_on_pause_change", function()
 	helpers.it("accepts a function", function()
@@ -174,11 +178,11 @@ end)
 
 
 
--- =====================================
+-- ===============================================
 -- ===============================================
 -- ======= 6/ Pause invariant (regression) =======
 -- ===============================================
--- =====================================
+-- ===============================================
 -- Critical: pause must fully silence features (no LLM, keylogger, gestures, tooltips,
 -- predictions, etc.). See project_suspend_pause_invariant in PROJECT_MEMORY.
 -- These tests ensure the guard is present and works for new paths.
@@ -284,13 +288,13 @@ helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)",
 		-- Load shortcuts/init.lua with stubs to verify the API surface
 		package.loaded["modules.shortcuts.bindings"] = {
 			DEFAULT_CHATGPT_URL = "https://test",
-			start = function() end, stop = function() end,
+			start = function() return true end, stop = function() return true end,
 			enable = function() end, disable = function() end,
 			is_enabled = function() return true end,
 			list_shortcuts = function() return {} end,
 		}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-			start = function() end, stop = function() end,
+			start = function() return true end, stop = function() return true end,
 			set_action = function() end, get_action = function() return "none" end,
 			get_slot_label = function() return "" end,
 			get_assignments = function() return {} end,
@@ -318,11 +322,11 @@ helpers.describe("ScriptControl suspend-exempt regression (pause_bindings API)",
 end)
 
 helpers.describe("ScriptControl eventtap watchdog (tap-disable recovery regression)", function()
-	-- Regression: a blocking osascript on the run loop (the pause/resume layout
-	-- switch) can make macOS disable the script-control CGEventTap. A disabled tap
-	-- silently stops delivering events, so AltGr+Enter (right_command + Enter) no
-	-- longer toggles pause AT ALL. M.start now arms a watchdog that re-enables the
-	-- tap so the script-management shortcuts can never get permanently stuck off.
+	-- Hammerspoon 1.1.1 normally handles CoreGraphics timeout notifications and
+	-- re-enables the tap in native code. This simulates the residual state where
+	-- a native or lifecycle failure leaves the script-control tap disabled. The
+	-- watchdog must remain as an independent recovery path, or AltGr+Enter can
+	-- stay permanently unavailable.
 	helpers.it("re-enables the script-control tap after macOS disables it", function()
 		local started = 0
 		local enabled = true
@@ -367,11 +371,11 @@ helpers.describe("Karabiner layout-change must NOT kill the script-control event
 	-- feature triggers on every pause). The handler must rebind via pause_bindings /
 	-- resume_bindings, which leave the keycode-based eventtap alive.
 	helpers.it("karabiner/init.lua rebinds via rebind_for_layout, never shortcuts.stop/start", function()
-		-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+		-- Selected by a declaration unique to platform/remap/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_paused_ke_config")
-		helpers.assert_true(src ~= nil, "modules/karabiner/init.lua source must be locatable")
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
+		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 		if not src then return end
 
 		-- The layout-rebind path must use the binding-only helper…
@@ -398,19 +402,25 @@ helpers.describe("Karabiner layout-change must respect pause (« pause = tout é
 	-- Regression: the pause-layout feature switches the macOS layout on every pause,
 	-- which fires the karabiner input-source watcher. That handler would M.regenerate()
 	-- the FULL Ergopti config and re-arm the binding hotkeys — silently undoing the
-	-- pause (full remapping back, user-facing shortcuts live mid-pause). It must
-	-- short-circuit while the script is paused.
-	helpers.it("karabiner/init.lua skips the layout rebuild while the script is paused", function()
-		-- Selected by a declaration unique to modules/karabiner/init.lua rather than by
+	-- pause (full remapping back, user-facing shortcuts live mid-pause). It may
+	-- re-resolve the in-memory layout cache for the later resume, but must return
+	-- before deploy/rebind while the script is paused. The behavioral wake/layout
+	-- suite proves the absence of those side effects.
+	helpers.it("karabiner/init.lua keeps paused layout refresh in memory only", function()
+		-- Selected by a declaration unique to platform/remap/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_paused_ke_config")
-		helpers.assert_true(src ~= nil, "modules/karabiner/init.lua source must be locatable")
+		local src = helpers.read_driver_source("local KARABINER_KE_TILDE_PATH")
+		helpers.assert_true(src ~= nil, "platform/remap/init.lua source must be locatable")
 		if not src then return end
 		helpers.assert_true(src:find("is_paused", 1, true) ~= nil,
 			"layout-change handler must consult the pause state")
-		helpers.assert_true(src:find("Layout change ignored", 1, true) ~= nil,
-			"layout-change handler must short-circuit (and log) while paused")
+		helpers.assert_true(src:find('phase == "paused" and paused == true', 1, true) ~= nil,
+			"native PAUSED and the script pause commit must agree before consumption")
+		helpers.assert_true(src:find('if settled_mode == "paused" then', 1, true) ~= nil,
+			"layout-change handler must branch on the proven settled pause mode")
+		helpers.assert_true(src:find("not redeploying", 1, true) ~= nil,
+			"paused layout refresh must explicitly return without redeploying")
 	end)
 end)
 
@@ -512,7 +522,12 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 
 	-- F15_KARABINER_ESCAPE per the lib.keycodes stub above (0x6C) → escape slot → script_quit.
 	local ESCAPE_SENTINEL = 0x6C
-	local function make_event(code) return { getKeyCode = function() return code end } end
+	local function make_event(code)
+		return {
+			getProperty = function() return 0 end,
+			getKeyCode = function() return code end,
+		}
+	end
 
 	helpers.it("a bare physical F15 (no modifier held) does NOT dispatch and passes through", function()
 		dispatched = nil
@@ -534,8 +549,9 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0x40 }  -- right option held (KE-active: rcmd remapped to ropt)
 		local consumed = handler(make_event(ESCAPE_SENTINEL))
-		helpers.assert_eq(dispatched, "script_quit", "a genuine right-AltGr sentinel must dispatch its action")
 		helpers.assert_eq(consumed, true, "a genuine sentinel must be consumed")
+		_G.hs.timer.__fire_all()
+		helpers.assert_eq(dispatched, "script_quit", "a genuine right-AltGr sentinel must dispatch its action")
 	end)
 
 	-- F-HIGH-22 regression: a prior fix required a genuinely right-hand AltGr hold,
@@ -575,13 +591,15 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0 }  -- nothing held (consumed)
 		local tagged = {
+			getProperty = function() return 0 end,
 			getKeyCode = function() return ESCAPE_SENTINEL end,
 			getFlags   = function() return { ctrl = true, shift = true } end,  -- full two-modifier KE tag
 		}
 		local consumed = handler(tagged)
+		helpers.assert_eq(consumed, true)
+		_G.hs.timer.__fire_all()
 		helpers.assert_eq(dispatched, "script_quit",
 			"a KE-tagged sentinel (ctrl+shift) must dispatch even when no live modifier is detectable")
-		helpers.assert_eq(consumed, true)
 	end)
 
 	helpers.it("physical Ctrl+F15 (ctrl only, no shift) does NOT dispatch (M-6 regression)", function()
@@ -591,6 +609,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0 }  -- no live AltGr held
 		local ctrl_f15 = {
+			getProperty = function() return 0 end,
 			getKeyCode = function() return ESCAPE_SENTINEL end,
 			getFlags   = function() return { ctrl = true } end,  -- only ctrl, no shift
 		}
@@ -604,6 +623,7 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 		dispatched = nil
 		live_mods = { _raw = 0 }
 		local untagged = {
+			getProperty = function() return 0 end,
 			getKeyCode = function() return ESCAPE_SENTINEL end,
 			getFlags   = function() return {} end,  -- neither tag nor modifier
 		}
@@ -623,7 +643,10 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 	-- violation). pause_all() must cancel it via warmup_controller.stop().
 	helpers.it("pause_all() invokes warmup_controller.stop()", function()
 		local stopped = 0
-		package.loaded["modules.llm.warmup_controller"] = { stop = function() stopped = stopped + 1 end }
+		package.loaded["modules.llm.warmup_controller"] = {
+			stop = function() stopped = stopped + 1 end,
+			schedule_warmup_with_retry = function() end,
+		}
 
 		SC.pause_all()
 		SC.resume_all()  -- restore the un-paused state for any later test
@@ -643,6 +666,9 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 	helpers.it("pause_all invokes the real quiescence calls, resume_all the symmetric restores", function()
 		local calls = {}
 		local function rec(name) return function() calls[name] = (calls[name] or 0) + 1 end end
+		-- pause now treats tooltip teardown as required. Keep this unit test
+		-- behavioral and deterministic instead of loading the real TOML-backed UI.
+		package.loaded["ui.tooltip"] = { hide_forced = rec("tt_hide") }
 		local keymap_spy = {
 			pause_processing  = rec("km_pause"),
 			resume_processing = rec("km_resume"),
@@ -658,7 +684,19 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 			enable_all  = rec("g_enable"),
 			is_enabled  = function() return true end,
 		}
-		local karabiner_spy = { pause = rec("k_pause"), resume = rec("k_resume") }
+		local karabiner_spy = {
+			get_enabled = function() return true end,
+			pause = function(on_done)
+				rec("k_pause")()
+				on_done(true, "paused")
+				return true
+			end,
+			resume = function(on_done)
+				rec("k_resume")()
+				on_done(true, "resumed")
+				return true
+			end,
+		}
 
 		SC.stop()  -- release any tap from an earlier describe
 		SC.start(keymap_spy, shortcuts_spy, gestures_spy, karabiner_spy)
@@ -677,6 +715,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.km_reset or 0) >= 1, "pause must call keymap.reset_predictions")
 		helpers.assert_true((calls.sc_pause or 0) >= 1, "pause must call shortcuts.pause_bindings")
 		helpers.assert_true((calls.g_disable or 0) >= 1, "pause must call gestures.disable_all")
+		helpers.assert_true((calls.tt_hide or 0) >= 1, "pause must hide every visible tooltip")
 		helpers.assert_true((calls.k_pause or 0) >= 1, "pause must call karabiner.pause")
 
 		SC.resume_all()
@@ -687,6 +726,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.k_resume or 0) >= 1, "resume must call karabiner.resume")
 
 		SC.stop()
+		package.loaded["ui.tooltip"] = nil
 	end)
 end)
 

@@ -18,14 +18,14 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Loads a fresh reload_guard with a clean stubbed persistent store.
 local function fresh()
 	package.loaded["adapters.storage"] = nil
-	package.loaded["lib.reload_guard"] = nil
-	return helpers.load_with_stubs("lib.reload_guard")
+	package.loaded["infra.reload_guard"] = nil
+	return helpers.load_with_stubs("infra.reload_guard")
 end
 
 helpers.describe("reload_guard: reload-vs-quit signal", function()
@@ -64,5 +64,27 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		local storage = require("adapters.storage")
 		storage.set("ergopti_reload_in_progress", "garbage")
 		helpers.assert_eq(rg.is_reloading(), false)
+	end)
+
+	helpers.it("clears terminal rollback state without logging after sink finalization", function()
+		local previous_logger = package.loaded["infra.logger"]
+		local debug_calls = 0
+		package.loaded["infra.logger"] = {
+			debug = function() debug_calls = debug_calls + 1 end,
+		}
+		package.loaded["adapters.storage"] = nil
+		package.loaded["infra.reload_guard"] = nil
+		local rg = require("infra.reload_guard")
+		rg.mark_reload()
+		debug_calls = 0
+
+		rg.clear_silent()
+
+		helpers.assert_eq(rg.is_reloading(), false)
+		helpers.assert_eq(debug_calls, 0,
+			"post-finalizer sentinel cleanup must not reopen the synchronous logger")
+		package.loaded["infra.reload_guard"] = nil
+		package.loaded["adapters.storage"] = nil
+		package.loaded["infra.logger"] = previous_logger
 	end)
 end)

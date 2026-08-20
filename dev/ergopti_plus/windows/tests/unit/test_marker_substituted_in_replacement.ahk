@@ -18,13 +18,13 @@
 ; string with no marker is a no-op, and a replacement containing U+2605 is a
 ; perfectly valid string to send.
 ;
-; The shipped guard for the first fix was scoped to lib/hotstrings and anchored
+; The shipped guard for the first fix was scoped to infra/hotstrings and anchored
 ; on the cache registrar's own call-site text, so it could only ever police that
 ; one site — the class of loaders was never covered.
 ;
-; NOTE ON SCOPE: this file covers the loaders in lib/toml/toml_loader.ahk plus
+; NOTE ON SCOPE: this file covers the loaders in infra/toml/toml_loader.ahk plus
 ; the cache registrar. The live personal-editor reload path
-; (ReloadPersonalSection, lib/hotstrings/personal_toml_io.ahk) is the same class
+; (ReloadPersonalSection, infra/hotstrings/personal_toml_io.ahk) is the same class
 ; and is tracked separately.
 ; ==============================================================================
 

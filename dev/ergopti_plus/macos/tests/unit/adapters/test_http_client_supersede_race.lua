@@ -14,7 +14,7 @@
 --- slots would deliver a wrong/stale result to the wrong caller.
 ---
 --- Fix: adapters/http_client.lua now stamps every post()/get() call with a
---- monotonic per-instance generation counter (mirroring lib/updater.lua's
+--- monotonic per-instance generation counter (mirroring modules/updater/init.lua's
 --- _poll_generation). The wrapped callback captures its own generation and
 --- discards itself if the instance's generation has moved on by the time the
 --- OS-level completion arrives — regardless of callback firing order.
@@ -60,14 +60,17 @@ helpers.describe("HttpClient: superseded request's stale callback is discarded (
 				end,
 			},
 			timer = {
-				doAfter = function(_delay, _fn)
-					-- Timeout timer is irrelevant to this race; return an inert handle.
-					return { stop = function() end }
+				new = function(_delay, _fn)
+					local timer = {}
+					function timer:start() return self end
+					function timer:stop() return self end
+					return timer
 				end,
 			},
 		}
 
 		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		local HttpClient = helpers.load_with_stubs("adapters.http_client", hs_overrides)
 		local client = HttpClient.new()
 
@@ -112,11 +115,17 @@ helpers.describe("HttpClient: superseded request's stale callback is discarded (
 				end,
 			},
 			timer = {
-				doAfter = function(_delay, _fn) return { stop = function() end } end,
+				new = function(_delay, _fn)
+					local timer = {}
+					function timer:start() return self end
+					function timer:stop() return self end
+					return timer
+				end,
 			},
 		}
 
 		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		local HttpClient = helpers.load_with_stubs("adapters.http_client", hs_overrides)
 		local client = HttpClient.new()
 

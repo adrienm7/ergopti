@@ -175,29 +175,82 @@ WMUnhookWinEvent(HookHandle) {
 		return false
 }
 
-; Bypasses foreground-stealing protection before focusing an HWND. The thread
-; attachment is always released, including when an intermediate Win32 call
-; raises, so it cannot leak input attachment into subsequent UI interactions.
-WMForceForeground(HWnd) {
+; Injectable Win32 boundary for foreground activation. Keeping the native calls
+; behind typed Boolean methods lets the adapter contract exercise OS refusal
+; returns without focusing a real window in the headless test runner.
+class _WMForegroundNative {
+	static IsWindow(HWnd) {
+		return DllCall("IsWindow", "Ptr", HWnd, "Int") != 0
+	}
+
+	static GetForegroundWindow() {
+		return DllCall("GetForegroundWindow", "Ptr")
+	}
+
+	static GetWindowThreadProcessId(HWnd) {
+		return DllCall("GetWindowThreadProcessId", "Ptr", HWnd, "Ptr", 0, "UInt")
+	}
+
+	static AttachThreadInput(ForeThread, TargThread, Attach) {
+		return DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread,
+			"Int", Attach ? true : false) != 0
+	}
+
+	static BringWindowToTop(HWnd) {
+		return DllCall("BringWindowToTop", "Ptr", HWnd, "Int") != 0
+	}
+
+	static SetForegroundWindow(HWnd) {
+		return DllCall("SetForegroundWindow", "Ptr", HWnd, "Int") != 0
+	}
+
+	static Activate(HWnd) {
+		return WMActivate(HWnd)
+	}
+}
+
+; Bypasses foreground-stealing protection before focusing an HWND. Success is
+; reported only when every native request accepted the operation and Windows
+; exposes HWnd as the foreground postcondition. The thread attachment is always
+; released, including on Boolean refusal and exceptions.
+WMForceForeground(HWnd, Native := _WMForegroundNative) {
 	ForeThread := 0
 	TargThread := 0
 	Attached := false
+	Success := false
 	try {
-		ForeHwnd := DllCall("GetForegroundWindow", "Ptr")
-		ForeThread := DllCall("GetWindowThreadProcessId", "Ptr", ForeHwnd, "Ptr", 0, "UInt")
-		TargThread := DllCall("GetWindowThreadProcessId", "Ptr", HWnd, "Ptr", 0, "UInt")
-		if (ForeThread && TargThread && ForeThread != TargThread)
-			Attached := DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", true)
-		DllCall("BringWindowToTop", "Ptr", HWnd)
-		DllCall("SetForegroundWindow", "Ptr", HWnd)
-		WMActivate(HWnd)
-		return true
+		if !Native.IsWindow(HWnd)
+			return false
+		ForeHwnd := Native.GetForegroundWindow()
+		ForeThread := ForeHwnd ? Native.GetWindowThreadProcessId(ForeHwnd) : 0
+		TargThread := Native.GetWindowThreadProcessId(HWnd)
+		if !TargThread
+			return false
+		if (ForeThread && ForeThread != TargThread) {
+			Attached := Native.AttachThreadInput(ForeThread, TargThread, true)
+			if !Attached
+				return false
+		}
+		if !Native.BringWindowToTop(HWnd)
+			return false
+		if !Native.SetForegroundWindow(HWnd)
+			return false
+		if !Native.Activate(HWnd)
+			return false
+		Success := Native.GetForegroundWindow() = HWnd
 	} catch {
-		return false
+		Success := false
 	} finally {
-		if Attached
-			try DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", false)
+		if Attached {
+			try {
+				if !Native.AttachThreadInput(ForeThread, TargThread, false)
+					Success := false
+			} catch {
+				Success := false
+			}
+		}
 	}
+	return Success
 }
 
 ; Port dispatch map (ADAPTER_WINDOW_MANAGER) — the single-source-of-truth contract

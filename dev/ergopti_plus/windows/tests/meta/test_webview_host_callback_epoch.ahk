@@ -3,7 +3,7 @@
 
 Test_WebViewHostDeferredCallbacksHaveSessionOwnership() {
 	; Move-resilient: selected by content, not by path.
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 	Assert(InStr(Src, "Epoch      := 0") > 0,
 		"WebViewHost must keep an explicit callback-session epoch")
 	Assert(InStr(Src, "SetTimer(this._DispatchMessage.Bind(this, this.Epoch, Payload), -1)") > 0,

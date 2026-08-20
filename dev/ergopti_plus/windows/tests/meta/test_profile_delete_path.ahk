@@ -9,13 +9,22 @@
 #Requires AutoHotkey v2.0
 
 _TPD_Check() {
-	; Move-resilient: scan the menu_llm UI dir via the framework helper instead of
-	; a pinned menu_profiles.ahk path. The Cancel/RemoveAt tokens are unique to
-	; menu_profiles within the dir, so the present-string checks are unambiguous.
-	Src := _DriverDirConcat("ui/menu/menu_llm")
-	Assert(InStr(Src, 'choice == "Cancel"') > 0, "menu_profiles.ahk must handle Cancel choice")
-	Assert(InStr(Src, "RemoveAt(i)") > 0, "menu_profiles.ahk must delete profile from user_profiles")
-	Assert(InStr(Src, "LLM_Menu_BindProfileHotkeys") > 0, "menu_profiles.ahk must re-bind hotkeys")
+	Entry := _DriverFuncBody("LLM_Menu_OnUserProfileClick")
+	Candidate := _DriverFuncBody("_LLM_Menu_DeleteProfileCandidate")
+	Publisher := _DriverFuncBody("_LLM_Menu_ApplyProfileCommitted")
+	Assert(Entry != "" && Candidate != "" && Publisher != "",
+		"the profile delete entry, detached mutation, and committed publisher must exist")
+	Assert(InStr(Entry, 'choice == "Cancel"') > 0
+		&& InStr(Entry, "LLM_Menu_CommitMutation(") > 0
+		&& InStr(Entry, "_LLM_Menu_DeleteProfileCandidate") > 0
+		&& InStr(Entry, "_LLM_Menu_ApplyProfileCommitted") > 0,
+		"confirmed deletion must flow through the shared persist-before-publish transaction")
+	Assert(InStr(Candidate, 'Candidate["user_profiles"].RemoveAt(Index)') > 0,
+		"the detached candidate must remove the selected user profile")
+	Assert(InStr(Candidate, 'Candidate["profile_id"] := "basic"') > 0,
+		"deleting the active profile must select a valid built-in fallback")
+	Assert(InStr(Publisher, "LLM_Menu_BindProfileHotkeys") > 0,
+		"only the committed publisher may re-bind profile hotkeys")
 }
 
 Test("LLMTray: profiles can be deleted", _TPD_Check)

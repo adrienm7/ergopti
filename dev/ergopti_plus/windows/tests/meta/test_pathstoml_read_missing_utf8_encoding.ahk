@@ -47,7 +47,7 @@ _PRMUE_ReadSource(RelPath) {
 ; ==================================================
 
 _PRMUE_ReadPathsTomlUsesUtf8() {
-	Src := _PRMUE_ReadSource("lib/toml/toml_helpers.ahk")
+	Src := _PRMUE_ReadSource("infra/toml/toml_helpers.ahk")
 	Seg := _DriverFuncBody("ReadPathsToml")
 	Assert(Seg != "", "ReadPathsToml(FilePath) declaration must exist in toml_helpers.ahk")
 	; The parse loop must read with an explicit UTF-8 encoding so a BOM-less

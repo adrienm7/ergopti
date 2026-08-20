@@ -3,13 +3,14 @@
 --- ==============================================================================
 --- MODULE: Regression — menu_apps app-launch task closure-nil forward declaration
 --- DESCRIPTION:
---- menu_apps.lua spawns an hs.task("/usr/bin/open") to launch each app from the
---- menu. The completion callback clears the GC-root pin M._active_tasks[task].
---- The inline `local task = hs.task.new(...)` form compiled the closure before the
---- local was in scope, binding the nil global _G.task. The callback then attempted
---- M._active_tasks[nil] = nil → "table index is nil" (swallowed to HS Console).
+--- menu_apps.lua spawns an hs.task("/usr/bin/open") through TaskLifecycle to launch
+--- each app from the menu. The completion callback clears the GC-root pin
+--- M._active_tasks[task]. An inline `local task = <constructor>(...)` form compiles
+--- the callback closure before the local is in scope, binding the nil global
+--- _G.task. The callback then attempts M._active_tasks[nil] = nil → "table index
+--- is nil" (swallowed to HS Console).
 ---
---- Fix: forward-declare the handle before the hs.task.new call.
+--- Fix: forward-declare the handle before TaskLifecycle.native constructs the task.
 --- This test pins the ROOT CAUSE (declaration order).
 --- ==============================================================================
 
@@ -17,36 +18,40 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_apps: app-launch hs.task handle is forward-declared (closure-nil guard)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/menu/menu_apps.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open menu_apps.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_apps.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function discover_bundled_apps")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_apps.lua source must be locatable")
 		return src
 	end
 
-	helpers.it("no hs.task.new handle is assigned inline into a `local` on the same line", function()
+	helpers.it("no callback-captured task handle is assigned inline into a `local`", function()
 		local src = read_src()
 		local offending
 		for line in src:gmatch("[^\n]+") do
 			local stripped = line:match("^%s*(.-)%s*$") or line
-			if not stripped:match("^%-%-") and stripped:find("local%s+[%w_]+%s*=%s*hs%.task%.new") then
+			if not stripped:match("^%-%-")
+				and (stripped:find("local%s+[%w_]+%s*=%s*hs%.task%.new")
+					or stripped:find("local%s+[%w_]+%s*=%s*TaskLifecycle%.create")) then
 				offending = stripped
 				break
 			end
 		end
 		helpers.assert_true(offending == nil,
-			"hs.task.new handles referenced inside callbacks must be forward-declared. Offending: "
+			"task handles referenced inside callbacks must be forward-declared. Offending: "
 			.. tostring(offending))
 	end)
 
-	helpers.it("the app-launch task is forward-declared before the hs.task.new closure", function()
+	helpers.it("the app-launch task is forward-declared before the constructor closure", function()
 		local src = read_src()
 		local decl_pos = src:find("local task\n", 1, true)
-		local new_pos  = src:find("task = hs.task.new", 1, true)
+		local new_pos  = src:find("task = TaskLifecycle.native", 1, true)
 		helpers.assert_true(decl_pos ~= nil, "app-launch task must be forward-declared as `local task`")
-		helpers.assert_true(new_pos  ~= nil, "app-launch task must be assigned via `task = hs.task.new`")
+		helpers.assert_true(new_pos  ~= nil,
+			"app-launch task must be assigned via `task = TaskLifecycle.native`")
 		helpers.assert_true(decl_pos < new_pos,
-			"forward declaration must come before the hs.task.new closure so the callback captures the upvalue")
+			"forward declaration must come before the constructor closure so the callback captures the upvalue")
 	end)
 
 	helpers.it("the GC-pin release in the completion callback is guarded against nil task", function()

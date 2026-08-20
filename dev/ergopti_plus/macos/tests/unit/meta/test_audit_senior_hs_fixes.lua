@@ -15,13 +15,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel_path)
-	local f = io.open(DRIVER_ROOT .. rel_path, "r")
-	if not f then return nil, "cannot open: " .. DRIVER_ROOT .. rel_path end
-	local src = f:read("*a")
-	f:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -37,14 +36,14 @@ helpers.describe("Audit-senior Hammerspoon fixes", function()
 		-- The fix: resolve port via api_mlx.get_port(). The sweep moved into the shared
 		-- menu_llm.terminate_orphan_mlx_server() (called by BOTH the shutdown callback
 		-- and script_quit) so the two quit paths cannot drift (F-M7).
-		local init_src = read_source("init.lua")
+		local init_src = read_source("local function has_common_hotstring_groups") -- init.lua
 		assert(init_src, "init.lua must be readable")
 		assert(not init_src:find("tiTCP:49317", 1, true),
 			"init.lua: must not hard-code port 49317")
 		assert(init_src:find("terminate_orphan_mlx_server", 1, true),
 			"init.lua: shutdownCallback must delegate to the shared terminate_orphan_mlx_server")
 
-		local menu_src = read_source("ui/menu/menu_llm/init.lua")
+		local menu_src = read_source("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		assert(menu_src, "menu_llm/init.lua must be readable")
 		assert(not menu_src:find("tiTCP:49317", 1, true),
 			"menu_llm: terminate_orphan_mlx_server must not hard-code port 49317")
@@ -58,7 +57,7 @@ helpers.describe("Audit-senior Hammerspoon fixes", function()
 	-- ==================================================
 
 	helpers.it("init.lua shutdownCallback must stop all script_watchers", function()
-		local src = read_source("init.lua")
+		local src = read_source("local function has_common_hotstring_groups") -- init.lua
 		assert(src, "init.lua must be readable")
 		-- The bug: _G.script_watchers pinned to prevent GC but never :stop()'d.
 		-- The fix: loop over the table and pcall w:stop() in shutdownCallback.
@@ -74,7 +73,7 @@ helpers.describe("Audit-senior Hammerspoon fixes", function()
 	-- ============================================================
 
 	helpers.it("engine.lua must export M.emergency_reset() for scroll unblock on crash", function()
-		local src = read_source("modules/gestures/engine.lua")
+		local src = read_source("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
 		assert(src, "modules/gestures/engine.lua must be readable")
 		-- The bug: process_frame can crash after startScrollBlock(); isBlockingScroll
 		-- stays true forever because no cleanup runs on the error path.
@@ -97,7 +96,7 @@ helpers.describe("Audit-senior Hammerspoon fixes", function()
 	-- ======================================================================
 
 	helpers.it("gestures/init.lua frame callback must call emergency_reset on process_frame error", function()
-		local src = read_source("modules/gestures/init.lua")
+		local src = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		assert(src, "modules/gestures/init.lua must be readable")
 		-- The fix adds: if not Logger.pcall(...) then pcall(Engine.emergency_reset) end
 		assert(
@@ -113,7 +112,7 @@ helpers.describe("Audit-senior Hammerspoon fixes", function()
 	-- =====================================================================
 
 	helpers.it("models_selector.lua must delete old chooser before creating a new one", function()
-		local src = read_source("ui/menu/menu_llm/models_selector.lua")
+		local src = read_source("\"Failed to create usercontent bridge for custom model dialog.\"") -- ui/menu/menu_llm/models_selector.lua
 		assert(src, "models_selector.lua must be readable")
 		-- The bug: _model_browser_chooser is overwritten without calling :delete(),
 		-- leaking the previous C-backed hs.chooser object into process memory.
@@ -131,7 +130,7 @@ helpers.describe("Audit-senior Hammerspoon fixes", function()
 	-- ====================================================================
 
 	helpers.it("api_ollama.lua must use separate _infer_client and _check_client", function()
-		local src = read_source("modules/llm/api_ollama.lua")
+		local src = read_source("local function read_ollama_port_override") -- modules/llm/api_ollama.lua
 		assert(src, "modules/llm/api_ollama.lua must be readable")
 		-- The bug: a single HttpClient is reused for both inference POST /api/chat
 		-- and health-check GET /api/tags. A background ping would cancel any

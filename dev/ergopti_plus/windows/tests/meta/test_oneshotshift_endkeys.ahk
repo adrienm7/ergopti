@@ -11,7 +11,7 @@
 
 _OSEK_OneShotShiftResendsEndKeys() {
     Body := _DriverFuncBody("OneShotShift")
-    Assert(Body != "", "OneShotShift() must exist in modules/tap_holds/one_shot_shift.ahk")
+    Assert(Body != "", "OneShotShift() must exist in platform/remap/one_shot_shift.ahk")
 
     Assert(InStr(Body, 'KeyOpt("{BackSpace}{Enter}{Delete}", "E")') > 0,
         "OneShotShift must explicitly classify Backspace, Enter, and Delete as InputHook end keys")

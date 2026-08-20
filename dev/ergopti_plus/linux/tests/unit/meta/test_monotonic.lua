@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Monotonic Clock Source Guard (Linux)
 --- DESCRIPTION:
---- Guards lib/monotonic — the daemon's single sub-second, monotonic, wall-clock
+--- Guards infra/monotonic — the daemon's single sub-second, monotonic, wall-clock
 --- time source that replaces os.clock() (CPU time) for gesture and file-watcher
 --- timing. The contract: a real number of milliseconds/seconds, non-decreasing
 --- across readings, sourced from luv.hrtime when available and never os.clock.
@@ -19,15 +19,16 @@ local assert_eq   = helpers.assert_eq
 
 
 
--- ==========================================
--- ==========================================
--- ======= 1/ Monotonic clock contract ======
--- ==========================================
--- ==========================================
 
-describe("lib.monotonic", function()
+-- ===========================================
+-- ===========================================
+-- ======= 1/ Monotonic clock contract =======
+-- ===========================================
+-- ===========================================
 
-	local Monotonic = helpers.load_module("lib.monotonic")
+describe("infra.monotonic", function()
+
+	local Monotonic = helpers.load_module("infra.monotonic")
 
 	it("now_ms returns a positive number", function()
 		local t = Monotonic.now_ms()

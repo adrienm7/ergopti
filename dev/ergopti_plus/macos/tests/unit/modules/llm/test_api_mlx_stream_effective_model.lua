@@ -22,9 +22,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("MLX inference effective_model parity (streaming vs non-streaming)", function()
 	helpers.it("every effective_model chain includes the model_hf_path() fallback tier", function()
-		local path = helpers.driver_root() .. "modules/llm/api_mlx_inference.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/api_mlx_inference.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.post_and_parse_streaming")
+		helpers.assert_true(src ~= nil, "modules/llm/api_mlx_inference.lua source must be locatable")
 
 		local chains = {}
 		for line in src:gmatch("[^\n]+") do

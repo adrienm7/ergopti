@@ -9,8 +9,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Earlier test files (karabiner layout polling) install a shell_runner stub
 -- without exec(); purge it so conflicts.lua captures the real adapter — the
@@ -83,7 +83,7 @@ local function load_with_macos_preferences(defaults_output)
 	local warnings = {}
 	local commands = {}
 	package.loaded["modules.gestures.conflicts"] = nil
-	package.loaded["lib.logger"] = {
+	package.loaded["infra.logger"] = {
 		debug   = function() end,
 		info    = function() end,
 		warn    = function(_, message) table.insert(warnings, message) end,
@@ -103,7 +103,7 @@ local function load_with_macos_preferences(defaults_output)
 	local conflicts = helpers.load_with_stubs("modules.gestures.conflicts")
 	local function cleanup()
 		package.loaded["modules.gestures.conflicts"] = nil
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		package.loaded["adapters.shell_runner"] = nil
 	end
 	return conflicts, warnings, commands, cleanup
@@ -166,21 +166,42 @@ helpers.describe("Conflicts current macOS preference checks", function()
 	end)
 end)
 
-helpers.describe("Conflicts — pause safety + diagnostic integration (encore plus)", function()
-	helpers.it("pause must keep on_action_changed pure with zero side effects (project_suspend_pause_invariant)", function()
-		-- Conflicts detector is read-only config check; must be callable under pause
-		-- (e.g. from diagnostic or engine init) with no dispatch, no logging side effects beyond errors sink.
-		helpers.assert_true(true, "gestures conflicts must be pause-resilient and pure for diagnostic / engine use")
+-- Three placeholders stood here, all restating "the detector is pure, so it is
+-- pause-safe" and verifying none of it. Purity IS the claim, and purity is
+-- checkable: the same question must get the same answer however many times it
+-- is asked, and hostile input must not change what the next caller sees.
+helpers.describe("Conflicts — purity under repetition and hostile input", function()
+	helpers.it("the same slot and action give the same answer every time", function()
+		local first = Conflicts.on_action_changed("tap_3", "lookup")
+		for _ = 1, 150 do Conflicts.on_action_changed("tap_3", "lookup") end
+		local last = Conflicts.on_action_changed("tap_3", "lookup")
+
+		helpers.assert_eq(type(last), type(first),
+			"150 repetitions must not change the SHAPE of the answer — a detector that latches after the first call is the failure this covers")
+		if type(first) == "table" and type(last) == "table" then
+			helpers.assert_eq(last.msg, first.msg, "nor its content")
+		end
 	end)
 
-	helpers.it("high volume calls (150+) + pause transitions + bad/unknown slots must stay stable and not affect diagnostic gestures section", function()
-		-- Stress + pause must not corrupt internal tables; healthcheck (if it surfaces gesture conflicts)
-		-- must see consistent data.
-		helpers.assert_true(true, "conflicts volume + pause must be stable; diagnostic gestures data safe (would have caught stuck conflict state after pause)")
+	helpers.it("an unknown slot answers nil, and does not poison the next real query", function()
+		local before = Conflicts.on_action_changed("tap_3", "lookup")
+
+		helpers.assert_nil(Conflicts.on_action_changed("no_such_slot", "lookup"),
+			"an unrecognised slot has no group, so there is no conflict to report")
+
+		local after = Conflicts.on_action_changed("tap_3", "lookup")
+		helpers.assert_eq(type(after), type(before),
+			"a query about an unknown slot must leave the detector answering real slots exactly as before")
 	end)
 
-	helpers.it("unicode / special action names + pause must return nil or valid warning without crash; diagnostic remains usable", function()
-		helpers.assert_true(true, "conflicts bad unicode actions under pause must degrade gracefully; no impact on diagnostic")
+	helpers.it("non-ASCII and empty action names answer without crashing", function()
+		-- Called directly rather than through pcall: a throw fails this test with
+		-- the real stack, where a pcall status would prove only that it returned.
+		for _, action in ipairs({ "", "lookup ✎", "aç\tion" }) do
+			local w = Conflicts.on_action_changed("tap_3", action)
+			helpers.assert_true(w == nil or type(w) == "table",
+				"the answer for action " .. string.format("%q", action) .. " must be nil or a warning table, never something else")
+		end
 	end)
 end)
 
@@ -219,18 +240,25 @@ helpers.describe("Conflicts.restore_all_overrides", function()
 	end)
 end)
 
--- ULTIMATE MAX: pause must ensure conflict warnings never lead to user-visible actions or state changes
-helpers.describe("Conflicts pause and regression safety", function()
-	helpers.it("pause must silence any action from on_action_changed warnings (project_suspend_pause_invariant)", function()
-		-- Conflict detector may still return warnings (pure), but dispatch layer must drop them when paused.
-		-- No tooltip, no menu, no gesture activation.
-		helpers.assert_true(true, "conflict warnings under pause must produce zero side effects")
+-- The detector RETURNS a warning; it never acts on one. That separation is the
+-- real invariant behind the two placeholders removed from here — one of which
+-- claimed the dispatch layer drops warnings while paused, which is a property of
+-- the dispatch layer and not of this module.
+helpers.describe("Conflicts — the detector reports, it never acts", function()
+	helpers.it("the module does not reach for any user-visible surface", function()
+		local src = helpers.read_driver_source("local function macos_gesture_is_disabled")
+		helpers.assert_true(src ~= nil, "modules/gestures/conflicts.lua source must be locatable")
+		for _, forbidden in ipairs({ "hs.alert", "hs.dialog", "hs.menubar", "hs.notify" }) do
+			helpers.assert_true(src:find(forbidden, 1, true) == nil,
+				"conflicts.lua must not call " .. forbidden .. " — it returns a warning for its caller to decide about, and a detector that shows its own dialog cannot be silenced by a paused caller")
+		end
 	end)
 
-	helpers.it("high volume conflict checks must not degrade or leak (stress)", function()
-		for i = 1, 200 do
-			Conflicts.on_action_changed("tap_2", "lookup")
-		end
-		helpers.assert_true(true)
+	helpers.it("200 checks leave the answer unchanged", function()
+		local before = Conflicts.on_action_changed("tap_2", "lookup")
+		for _ = 1, 200 do Conflicts.on_action_changed("tap_2", "lookup") end
+		local after = Conflicts.on_action_changed("tap_2", "lookup")
+		helpers.assert_eq(type(after), type(before),
+			"the detector must be stateless across calls — the placeholder this replaces ran the same 200 iterations and asserted nothing about them")
 	end)
 end)

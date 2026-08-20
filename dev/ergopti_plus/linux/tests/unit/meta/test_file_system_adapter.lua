@@ -222,9 +222,15 @@ helpers.describe("file_system adapter", function()
 
   helpers.describe("cleanup", function()
     helpers.it("remove temp files", function()
+      -- "Mark as pass regardless" was literally the comment. A cleanup case that
+      -- cannot fail is worse than none: the suite writes into the user's tmp on
+      -- every run, and a remove that silently stops working leaves a growing
+      -- pile nobody notices — while this line reports success.
       os.remove(tmp_file)
-      -- Mark as pass regardless
-      helpers.assert_true(true, "cleanup done")
+      local leftover = io.open(tmp_file, "r")
+      if leftover then leftover:close() end
+      helpers.assert_true(leftover == nil,
+        "the temp file this suite created must be gone: " .. tostring(tmp_file))
     end)
   end)
 

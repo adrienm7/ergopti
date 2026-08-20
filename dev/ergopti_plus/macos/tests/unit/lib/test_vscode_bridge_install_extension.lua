@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "lib/vscode_bridge.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("vscode_bridge.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to infra/vscode_bridge.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function get_editor_ax_frame")
+helpers.assert_true(src ~= nil, "infra/vscode_bridge.lua source must be locatable")
 
 -- Locate install_extension body.
 local fn_start = src:find("function M.install_extension()", 1, true)

@@ -5,13 +5,13 @@
 ; DESCRIPTION:
 ; The Delete tap-hold bound *$SC053, which is NumpadDel/NumpadDot — NOT the
 ; nav-cluster Delete key, whose scancode is the EXTENDED one AHK reports for
-; "Delete". Every hotkey in modules/tap_holds/delete.ahk therefore sat on a key
+; "Delete". Every hotkey in platform/remap/delete.ahk therefore sat on a key
 ; the user was not pressing, so the configured Delete tap action, hold modifier
 ; and hold layer could never fire. The module docstring asserted the opposite
 ; ("this remaps the physical Delete/Suppr key (SC053)"), which is why several
 ; audits read past it.
 ;
-; The driver already knew the right value: lib/script_altgr_hotkeys.ahk binds the
+; The driver already knew the right value: infra/script_altgr_hotkeys.ahk binds the
 ; extended Delete scancode in four places. This was the single forgotten sibling.
 ;
 ; FEATURES & RATIONALE:

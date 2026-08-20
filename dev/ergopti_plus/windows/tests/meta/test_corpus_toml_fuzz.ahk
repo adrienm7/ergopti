@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: TOML Fuzz Corpus Consumer (AHK)
 ; DESCRIPTION:
-; Exercises the AHK TOML loader (lib/toml/toml_loader.ahk via ParseTomlFile
-; and lib/toml/toml_helpers.ahk via ParseTomlFile) against every entry in the
+; Exercises the AHK TOML loader (infra/toml/toml_loader.ahk via ParseTomlFile
+; and infra/toml/toml_helpers.ahk via ParseTomlFile) against every entry in the
 ; shared cross-driver fuzz corpus:
 ;   _shared/tests/corpus/toml/fuzz_corpus.json
 ;

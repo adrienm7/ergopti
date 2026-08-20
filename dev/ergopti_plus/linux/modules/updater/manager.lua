@@ -31,6 +31,7 @@
 local M = {}
 
 local Logger    = require("logger.shim")
+local Paths     = require("infra.paths")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
 local Json      = require("json")
@@ -43,7 +44,7 @@ if not ok_timer then Timer = nil end
 local LOG = "modules.updater.manager"
 
 -- Single source of the driver version.
-local DriverVersion = require("lib.version")
+local DriverVersion = require("infra.version")
 
 -- =========================================
 -- =========================================
@@ -58,20 +59,15 @@ local _DEFAULTS_FALLBACK = {
 	timing = { default_check_interval_sec = 86400, boot_check_delay_sec = 30 },
 }
 
---- Resolves the absolute path to _shared/modules/updater/defaults.json by
---- walking up from this file's own location (linux/modules/updater/ up to the
---- ergopti_plus root). cwd-independent so the daemon and test runner agree.
+--- Resolves the absolute path to _shared/modules/updater/defaults.json.
+---
+--- Through infra.paths, which knows both layouts that ship. Stripping four path
+--- components off this file's own location described the checkout only: an
+--- installed package stages the driver flat under /usr/lib/ergopti, so four up
+--- leaves the install and the updater falls back to its hardcoded scalars.
 --- @return string|nil Absolute path, or nil if it cannot be resolved.
 local function resolve_defaults_path()
-	local info = debug and debug.getinfo and debug.getinfo(1, "S")
-	if not (info and info.source) then return nil end
-	local s = info.source
-	if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-	s = s:gsub("\\", "/")
-	-- s is .../ergopti_plus/linux/modules/updater/manager.lua — strip 4 levels
-	local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+/[^/]+$")
-	if not root then return nil end
-	return root .. "/_shared/modules/updater/defaults.json"
+	return Paths.shared("modules/updater/defaults.json")
 end
 
 --- Loads the shared updater scalars from defaults.json. Falls back to
@@ -141,7 +137,7 @@ M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
 
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
-	local home = os.getenv("HOME") or "/tmp"
+	local home = require("infra.config_paths").home()
 	return home .. "/.cache/ergopti/updater_etag_" .. (channel or "stable") .. ".txt"
 end
 
@@ -520,7 +516,7 @@ function M.download_update(url)
 
 	_state = "downloading"
 
-	local home = os.getenv("HOME") or "/tmp"
+	local home = require("infra.config_paths").home()
 	local dest = home .. "/.cache/ergopti/ergopti_update.tar.gz"
 
 	-- Ensure cache directory exists.
@@ -719,6 +715,10 @@ function M.set_check_interval(seconds)
 	Logger.info(LOG, "Check interval set to %ds (persisted).", _check_interval)
 end
 
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 9/ Public State Accessors =======
@@ -743,27 +743,48 @@ function M.clear_cached_release()
 	_state = "idle"
 end
 
+--- Test seam: places the module in the "an update is available" state without a
+--- network round trip, so the label formatting can be exercised directly.
+---
+--- Reaching that state for real needs a GitHub response, and the one thing worth
+--- asserting about it — that the release tag is carried into the localised
+--- template intact — is pure formatting.
+--- @param release table { tag = string, prerelease = boolean }.
+function M._test_set_cached_release(release)
+	_cached_release = release
+	_state = "available"
+end
+
 --- Returns a user-facing label for the update menu item.
 --- @return string
 function M.get_menu_label()
+	local i18n = require("infra.i18n")
 	if _state == "checking" then
-		return "Vérification en cours…"
+		return i18n.get("menu.about.update_checking")
 	end
 	if _state == "downloading" then
-		return "Téléchargement en cours…"
+		return i18n.get("menu.about.update_downloading")
 	end
 	if _state == "installing" then
-		return "Installation en cours…"
+		return i18n.get("menu.about.update_installing")
 	end
 	if _state == "available" and _cached_release then
-		local tag = _cached_release.tag
-		local suffix = _cached_release.prerelease and " (dev)" or ""
-		return "Mettre à jour → " .. tag .. suffix
+		local tag = tostring(_cached_release.tag) ..
+			(_cached_release.prerelease and " (dev)" or "")
+		-- Plain-index substitution, not gsub: a tag is user-supplied data and a
+		-- "%" in it would be read as a capture reference in gsub's REPLACEMENT
+		-- string and raise "invalid use of '%'".
+		local template = i18n.get("menu.about.update_now")
+		local at = template:find("{tag}", 1, true)
+		if not at then return template .. " " .. tag end
+		return template:sub(1, at - 1) .. tag .. template:sub(at + 5)
 	end
+	-- "(dev)" is the channel's own name, the same token in every locale — see
+	-- changelog_window.channel_dev, which is "Dev" in English and in French.
 	if _channel == "dev" then
-		return "Rechercher les mises à jour (dev)"
+		return i18n.get("menu.about.check_for_updates") .. " (dev)"
 	end
-	return "Rechercher les mises à jour"
+	return i18n.get("menu.about.check_for_updates")
 end
 
 -- =========================================

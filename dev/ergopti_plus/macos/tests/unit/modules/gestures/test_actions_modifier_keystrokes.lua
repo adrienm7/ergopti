@@ -11,29 +11,30 @@
 ---
 --- The existing test only asserts SG_NAMES membership (built from the shared TOML
 --- order, independent of whether fn is a function), so a 2-arg revert would keep it
---- green. This BEHAVIORAL test drives execute_single() and asserts exactly one
---- keystroke with the expected modifiers+key is posted — it fails (0 keystrokes) if
---- sg() ever rebinds the label as the fn.
+--- green. This BEHAVIORAL test drives execute_single() through the production
+--- tagged broker and asserts exactly one action pair with the expected chord.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fixture = require("tests.support.synthetic_action_fixture")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
-local Actions = helpers.load_with_stubs("modules.gestures.actions")
+local fixture = Fixture.load("modules.gestures.actions")
+local Actions = fixture.subject
 
 helpers.describe("gestures.actions: modifier+key actions post the expected keystroke (G1)", function()
 	local function assert_single_keystroke(action, expected_mods, expected_key)
-		_G.hs.eventtap.__reset()
-		Actions.execute_single(action)
-		local ks = _G.hs.eventtap.__keystrokes
-		helpers.assert_eq(#ks, 1, action .. " must post exactly one keystroke (a label-bound fn would post zero)")
-		helpers.assert_eq(ks[1].key, expected_key, action .. " must target key '" .. tostring(expected_key) .. "'")
+		helpers.assert_true(Actions.execute_single(action),
+			action .. " must have a callable handler")
+		local events, down, up = fixture.drain("test.modifier." .. action)
+		helpers.assert_eq(events[1].key, expected_key,
+			action .. " must target key '" .. tostring(expected_key) .. "'")
 		local modset = {}
-		for _, m in ipairs(ks[1].mods or {}) do modset[m] = true end
+		for _, m in ipairs(events[1].mods or {}) do modset[m] = true end
 		for _, m in ipairs(expected_mods) do
 			helpers.assert_true(modset[m] == true, action .. " must include modifier '" .. m .. "'")
 		end
+		helpers.assert_eq(down.effect, "action")
+		helpers.assert_eq(up.effect, "action")
 	end
 
 	helpers.it("cmd_a posts Cmd+a", function()        assert_single_keystroke("cmd_a", {"cmd"}, "a") end)

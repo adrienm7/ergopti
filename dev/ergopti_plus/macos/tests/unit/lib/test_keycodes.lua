@@ -10,17 +10,17 @@
 
 local helpers = require("tests.helpers")
 
-local Keycodes = helpers.load_with_stubs("lib.keycodes")
+local Keycodes = helpers.load_with_stubs("infra.keycodes")
 
 
 
 
 
--- =====================================
+-- ======================================
 -- ======================================
 -- ======= 1/ Type & Range Sanity =======
 -- ======================================
--- =====================================
+-- ======================================
 
 helpers.describe("Keycodes: numeric constants", function()
 	local fields = {

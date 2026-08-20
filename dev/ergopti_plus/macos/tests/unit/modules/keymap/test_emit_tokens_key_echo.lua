@@ -1,135 +1,116 @@
 --- tests/unit/modules/keymap/test_emit_tokens_key_echo.lua
 
 --- ==============================================================================
---- MODULE: Regression — {Enter}/{Tab} tokens must appear in the physical echo
+--- MODULE: Regression — every emit_tokens key carries transaction provenance
 --- DESCRIPTION:
---- A hotstring expanding to text containing {Enter} or {Tab} left the keylogger
---- attributing one character per token to the human typist.
----
---- ROOT CAUSE ENCODED:
---- emit_tokens returns a "physical echo" string — what the OS will report back
---- through getCharacters() — which the keylogger uses to pre-seed its synth_queue
---- so it can tell its own synthetic keystrokes apart from real ones. Text tokens
---- appended to that echo; key tokens did not. But "return" and "tab" DO produce a
---- character (CR and HT respectively), so the OS echoed one more character than
---- the queue expected. The queue ran one entry short, and the surplus character
---- was recorded as human input, corrupting the typing statistics with keystrokes
---- the user never made.
----
---- Nav and escape tokens ({Left}, {Delete}, {Esc}) produce no character and must
---- stay OUT of the echo — a string-typed echo cannot represent them, and adding
---- them would push the error in the opposite direction.
----
---- WHY IT WAS SILENT:
---- Nothing fails and the expansion is correct on screen. Only the n-gram and WPM
---- aggregates drift, slowly, in a direction nobody can spot by inspection.
+--- Text, Enter, Tab, navigation, deletion, and Escape tokens all produce Quartz
+--- key events. Character content cannot identify their origin: named keys may
+--- have no Unicode payload, and a physical key can have exactly the same payload
+--- as an injected one. This test executes the production emitter inside one real
+--- SyntheticInput transaction and proves every returned event is owned by that
+--- exact replacement generation.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 
-
-
-
--- ============================================
--- ============================================
--- ======= 1/ Emission Recorder Harness =======
--- ============================================
--- ============================================
-
---- Loads keymap.utils with every emission path recorded, mirroring the harness in
---- test_emit_tokens_ordering.lua.
---- @return table utils, function fire_pending
-local function load_utils()
-	local pending = {}
-
-	package.loaded["modules.keymap.utils"] = nil
-	local KU = helpers.load_with_stubs("modules.keymap.utils", {
-		eventtap = {
-			keyStroke  = function(_mods, _key) end,
-			keyStrokes = function(_s) end,
-			event      = { types = { keyDown = 10 } },
-			new        = function() return { start = function() end, stop = function() end } end,
-		},
-		pasteboard = {
-			getContents  = function() return "" end,
-			readAllData  = function() return {} end,
-			writeAllData = function(_) return true end,
-			setContents  = function(_) return true end,
-		},
-		timer = {
-			doAfter = function(delay, fn)
-				pending[#pending + 1] = { delay = delay, fn = fn }
-				return { stop = function() end }
-			end,
-			doEvery           = function() return { stop = function() end } end,
-			secondsSinceEpoch = function() return 1000 end,
-			absoluteTime      = function() return 0 end,
-			usleep            = function() end,
-		},
-	})
-
-	local function fire_pending()
-		table.sort(pending, function(x, y) return x.delay < y.delay end)
-		for _, p in ipairs(pending) do pcall(p.fn) end
-		pending = {}
-	end
-
-	return KU, fire_pending
+--- Emits tokens through the production adapter inside an eventtap callback.
+--- @param tokens table
+--- @return table fixture
+local function emit_tokens(tokens)
+	local KU, SyntheticInput = SyntheticStack.load("modules.keymap.utils")
+	SyntheticInput.enter_callback()
+	local transaction = SyntheticInput.begin("test.emit_tokens", "replacement")
+	local count, _, logical_text = SyntheticInput.with_transaction(transaction, function()
+		return KU.emit_tokens(tokens)
+	end)
+	helpers.assert_true(SyntheticInput.seal(transaction))
+	local consume, events = SyntheticInput.leave_callback(true)
+	helpers.assert_true(consume)
+	helpers.assert_not_nil(events)
+	if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
+	helpers.assert_eq(SyntheticInput.stats().active_transactions, 0,
+		"the explicit replacement transaction must finish after callback handoff")
+	return {
+		count = count,
+		logical_text = logical_text,
+		events = events,
+		synthetic = SyntheticInput,
+	}
 end
 
 
+--- Proves all events form ordered pairs from one owned transaction.
+--- @param fixture table
+local function assert_owned_pairs(fixture)
+	local property = hs.eventtap.event.properties.eventSourceUserData
+	local generation = nil
+	for index, event in ipairs(fixture.events) do
+		local metadata = fixture.synthetic.lookup_tag(event:getProperty(property))
+		helpers.assert_true(metadata and metadata.owned,
+			"every emitted phase must carry an Ergopti-owned Quartz tag")
+		helpers.assert_eq(metadata.owner, "test.emit_tokens")
+		helpers.assert_eq(metadata.effect, "replacement")
+		generation = generation or metadata.generation
+		helpers.assert_eq(metadata.generation, generation,
+			"one token sequence must not be split across transaction generations")
+		helpers.assert_eq(metadata.ordinal, math.floor((index + 1) / 2))
+		helpers.assert_eq(metadata.phase, event.isDown and "down" or "up")
+	end
+end
 
 
+--- Renders keyDown events into a compact observable sequence.
+--- @param events table
+--- @return string signature
+local function down_signature(events)
+	local parts = {}
+	for _, event in ipairs(events) do
+		if event.isDown then
+			parts[#parts + 1] = event.unicode or ("{" .. tostring(event.key) .. "}")
+		end
+	end
+	return table.concat(parts)
+end
 
--- ================================================
--- ================================================
--- ======= 2/ Character-Producing Keys Echo =======
--- ================================================
--- ================================================
 
-helpers.describe("emit_tokens echoes the characters its key tokens produce", function()
-	helpers.it("includes CR for a {Enter} token", function()
-		local KU, fire = load_utils()
-		local _, echo = KU.emit_tokens({
+helpers.describe("emit_tokens exact event provenance", function()
+	helpers.it("tags text and {Enter} as one replacement", function()
+		local fixture = emit_tokens({
 			{ kind = "text", value = "line one" },
 			{ kind = "key",  value = "return" },
 			{ kind = "text", value = "line two" },
 		})
-		fire()
-
-		helpers.assert_eq(echo, "line one\rline two",
-			"the return key's synthetic keydown carries a CR back through getCharacters(), so it "
-			.. "must appear in the physical echo. Omitting it leaves the keylogger's synth_queue "
-			.. "one entry short, and the CR gets recorded as a keystroke the user never made")
+		assert_owned_pairs(fixture)
+		helpers.assert_eq(down_signature(fixture.events), "line one{return}line two")
+		helpers.assert_eq(fixture.count, #fixture.events / 2)
+		helpers.assert_eq(fixture.logical_text, "line one\rline two")
 	end)
 
-	helpers.it("includes HT for a {Tab} token", function()
-		local KU, fire = load_utils()
-		local _, echo = KU.emit_tokens({
+	helpers.it("tags text and {Tab} as one replacement", function()
+		local fixture = emit_tokens({
 			{ kind = "text", value = "col a" },
 			{ kind = "key",  value = "tab" },
 			{ kind = "text", value = "col b" },
 		})
-		fire()
-
-		helpers.assert_eq(echo, "col a\tcol b",
-			"the tab key produces HT and must be echoed for the same reason as return")
+		assert_owned_pairs(fixture)
+		helpers.assert_eq(down_signature(fixture.events), "col a{tab}col b")
+		helpers.assert_eq(fixture.count, #fixture.events / 2)
+		helpers.assert_eq(fixture.logical_text, "col a\tcol b")
 	end)
 
-	helpers.it("omits keys that produce no character", function()
-		local KU, fire = load_utils()
-		local _, echo = KU.emit_tokens({
+	helpers.it("tags navigation, deletion, and Escape even without Unicode content", function()
+		local fixture = emit_tokens({
 			{ kind = "text", value = "abc" },
 			{ kind = "key",  value = "left" },
 			{ kind = "key",  value = "delete" },
 			{ kind = "key",  value = "escape" },
 		})
-		fire()
-
-		helpers.assert_eq(echo, "abc",
-			"navigation and escape keys emit no character, so echoing anything for them would "
-			.. "overshoot the synth_queue and start swallowing the user's REAL keystrokes — the "
-			.. "same defect with the sign flipped")
+		assert_owned_pairs(fixture)
+		helpers.assert_eq(down_signature(fixture.events), "abc{left}{delete}{escape}")
+		helpers.assert_eq(fixture.count, #fixture.events / 2)
+		helpers.assert_eq(fixture.logical_text, "abc",
+			"navigation keys affect focus/cursor state but do not insert logical text")
 	end)
 end)

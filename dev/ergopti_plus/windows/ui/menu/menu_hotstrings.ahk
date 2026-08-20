@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Builds the Hotstrings category: grand-total counting, magic-key / repeat-key config, per-category delays, word expanders, delimiter editor, standard / dynamic / Ergopti / personal / extension sub-trees and their caches.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -69,51 +69,58 @@ _HS_InvalidateCaches() {
 }
 
 ; Dynamic handler: magic key config entry (prefix + current char + editor).
-_HS_MagicKeyConfig(M, _Cat) {
-	RegisterMenuItem(M, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+; List provider: the magic-key row. `type = "list"` since 2026-08-07, so this
+; returns row DATA and the renderer builds the item — the row was built three
+; times before that, once per driver, from a declaration that named only the slot.
+_HS_MagicKeyRows() {
+	return [Map(
+		"label",  t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"],
+		"action", MagicKeyEditor
+	)]
 }
 
 ; Dynamic handler: whole-tree bulk actions (force every hotstring section on/off).
 ; Rendered inside the "⚙️ Paramètres hotstrings" group, just after its separator.
-_HS_BulkActions(M, _Cat) {
-	RegisterMenuItem(M, t("menu.hotstrings.enable_all"),  ToggleAllHotstringsOn)
-	RegisterMenuItem(M, t("menu.hotstrings.disable_all"), ToggleAllHotstringsOff)
-}
-
-; Dynamic handler: repeat-key toggle (★ as repeat key).
-_HS_RepeatKey(M, _Cat) {
-	global HSE_RepeatEnabled
-	Label := t("menu.hotstrings.repeat_key_toggle")
-	RegisterMenuItem(M, Label, ToggleRepeatKeyEnabled)
-	if HSE_RepeatEnabled {
-		M.Check(Label)
-	}
-}
 
 ; Dynamic handler: delays & colours sub-menu. Mirrors the Hammerspoon "delays"
 ; submenu — the per-category config window, then quick-access per-delay items
 ; grouped by a separator, exactly like the HS make_delay_item rows: the base
 ; default expansion delay, then the ★ magic-key and autocorrection per-category
 ; delays (settable straight from the menu, not only buried in the config window).
-_HS_DelaysColors(M, _Cat) {
+; `list` since 2026-08-07: the row itself is the renderer's, and the submenu
+; hanging off it stays a native Menu this function owns and hands over — the same
+; `submenu` shape the category blocks use while their trees are still built here.
+_HS_DelaysColorsRows() {
 	global UI_LLM_TIMEOUT_SEC, DYN_HOTSTRINGS_DEFAULT_DELAY
-	Sub := Menu()
-	RegisterMenuItem(Sub, t("menu.hotstrings.config_item"), (*) => OpenHotstringsConfigWindow())
-	Sub.Add()
-	RegisterMenuItem(Sub, _HS_DefaultDelayLabel(), (*) => _HS_PromptDefaultDelay())
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"), (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key"))
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("autocorrection", "menu.hotstrings.delay_autocorrection"), (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection"))
-	; AI prediction tooltip auto-dismiss timeout — mirrors the HS "Délai
-	; d'acceptation IA" item. No TOML [_meta] delay backs the "llm_prediction"
-	; key, so its no-override default is the UI constant (20 s); the live tooltip
-	; timer reads the same override (lib/tooltip.ahk).
-	Sub.Add()
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC), (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC))
-	; Dynamic hotstrings (dates, phone/SSN/IBAN prefixes) activation delay —
-	; mirrors the HS "Délai autocomplétion" item. Backed by the "dynamichotstrings"
-	; override; the no-override default is DYN_HOTSTRINGS_DEFAULT_DELAY (2 s).
-	RegisterMenuItem(Sub, _HS_CategoryDelayLabel("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY), (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))
-	M.Add(t("menu.hotstrings.delays_colors"), Sub)
+	; Nested row DATA since 2026-08-07. This was a native Menu handed over in
+	; `submenu`, so the whole submenu was assembled here; none of these rows
+	; mutates the live menu — each opens a prompt and the tray rebuilds after —
+	; so nothing held them back.
+	Sub := [
+		Map("label", t("menu.hotstrings.config_item"), "action", (*) => OpenHotstringsConfigWindow()),
+		Map("separator", true),
+		Map("label", _HS_DefaultDelayLabel(), "action", (*) => _HS_PromptDefaultDelay()),
+		Map("label", _HS_CategoryDelayLabel("magickey", "menu.hotstrings.delay_magic_key"),
+			"action", (*) => _HS_PromptCategoryDelay("magickey", "menu.hotstrings.delay_magic_key")),
+		Map("label", _HS_CategoryDelayLabel("autocorrection", "menu.hotstrings.delay_autocorrection"),
+			"action", (*) => _HS_PromptCategoryDelay("autocorrection", "menu.hotstrings.delay_autocorrection")),
+		Map("separator", true),
+		; AI prediction tooltip auto-dismiss timeout — mirrors the HS "Délai
+		; d'acceptation IA" item. No TOML [_meta] delay backs the "llm_prediction"
+		; key, so its no-override default is the UI constant (20 s); the live
+		; tooltip timer reads the same override (infra/tooltip.ahk).
+		Map("label", _HS_CategoryDelayLabel("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC),
+			"action", (*) => _HS_PromptCategoryDelay("llm_prediction", "menu.hotstrings.tooltip_ai_acceptance", UI_LLM_TIMEOUT_SEC)),
+		; Dynamic hotstrings (dates, phone/SSN/IBAN prefixes) activation delay —
+		; mirrors the HS "Délai autocomplétion" item. Backed by the
+		; "dynamichotstrings" override; the no-override default is
+		; DYN_HOTSTRINGS_DEFAULT_DELAY (2 s).
+		Map("label", _HS_CategoryDelayLabel("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY),
+			"action", (*) => _HS_PromptCategoryDelay("dynamichotstrings", "menu.hotstrings.tooltip_autocompletion", DYN_HOTSTRINGS_DEFAULT_DELAY))
+	]
+	return [Map(
+		"label", t("menu.hotstrings.delays_colors"),
+		"items", Sub)]
 }
 
 ; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". The
@@ -146,12 +153,7 @@ _HS_PromptDefaultDelay() {
 		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
-	HotstringsSetOverride("_global", "", "delay", (Val + 0) / 1000)
-	; Persisting the override only bumps the resolve generation; delays are baked into
-	; each spec at REGISTRATION time (LoadHotstringsSection folds them into the spec
-	; meta), so re-register live — the same path a section toggle uses — or the new
-	; delay is silently ignored until the next Reload.
-	RebuildHotstringsLive()
+	return _HS_CommitDelayOverride("_global", (Val + 0) / 1000)
 }
 
 ; Label for a per-category default-delay item ("<name> : <ms>[ (default)]").
@@ -186,99 +188,185 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 		MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
-	HotstringsSetOverride(Cat, "", "delay", (Val + 0) / 1000)
-	; Re-register live (see _HS_PromptDefaultDelay) so the new per-category delay takes
-	; effect immediately instead of only after a Reload or an unrelated section toggle.
-	RebuildHotstringsLive()
+	return _HS_CommitDelayOverride(Cat, (Val + 0) / 1000)
 }
 
-; Dynamic handler: word-expanders sub-menu, mirroring the terminators sub-menu.
-; Built-ins are declared inline (manifest access is not available from tray context);
-; custom ones are any chars in the effective string that are not in the built-in list.
-_HS_WordExpanders(M, _Cat) {
-	Sub := _HS_BuildDelimiterSubMenu()
-	M.Add(t("menu.hotstrings.word_expanders"), Sub)
+; Persist first and rebuild only after a strict successful result. The injected
+; seams keep the menu's failure ordering behaviour-testable without opening an
+; InputBox or registering real hotstrings.
+_HS_CommitDelayOverride(Cat, Value, SetterFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		; Persistence and live hotstring registration may call filesystem/native
+		; adapters. Keep the complete menu action interruptible.
+		Critical("Off")
+		try return _HS_CommitDelayOverride(Cat, Value, SetterFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	try Committed := HasMethod(SetterFn, "Call")
+		? SetterFn.Call(Cat, "", "delay", Value)
+		: HotstringsSetOverride(Cat, "", "delay", Value)
+	catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Failed to persist the '{1}' delay override: {2}.", Cat, Err.Message)
+		return false
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+
+	; Delays are baked into specs at registration time, so the durable value must
+	; be re-registered live. A refused writer must never rebuild from stale RAM.
+	try {
+		if HasMethod(RebuildFn, "Call")
+			Rebuilt := RebuildFn.Call()
+		else
+			Rebuilt := RebuildHotstringsLive()
+	} catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Delay override for '{1}' was persisted but live rebuild failed: {2}.",
+			Cat, Err.Message)
+		return false
+	}
+	if !(Rebuilt is Integer) || Rebuilt != 1 {
+		try LoggerError("HotstringsMenu",
+			"Delay override for '{1}' was persisted but live rebuild was refused.",
+			Cat)
+		return false
+	}
+	return true
 }
 
-; Build the delimiter sub-menu fresh each time so checkbox states are always current.
-_HS_BuildDelimiterSubMenu() {
+; List provider: the word-expanders sub-menu, as ROWS.
+;
+; Returns data rather than a Menu so the shared renderer materialises every row.
+; The three drivers each rebuilt this submenu with the same logic and their own
+; row API; the manifest declares it `type = "list"` now and each one answers with
+; the same {label, action, checked, items} shape.
+_HS_WordExpanderRows() {
 	global HSE_Terminators
 	Current      := HotstringsGetWordDelimiters()
 	Consumed     := HotstringsGetConsumedDelimiters()
 	Defs         := HSE_Terminators.all()
 	BuiltinChars := HSE_TerminatorBuiltinChars()
 
-	Sub := Menu()
+	Rows := []
 
 	; ── Bulk actions ─────────────────────────────────────────────────────────
-	RegisterMenuItem(Sub, t("menu.hotstrings.check_all"),      (*) => _HS_DelimSetAll(true))
-	RegisterMenuItem(Sub, t("menu.hotstrings.uncheck_all"),    (*) => _HS_DelimSetAll(false))
-	RegisterMenuItem(Sub, t("menu.global.reset_defaults"),     (*) => _HS_DelimReset())
-	Sub.Add()
+	; A user turning delimiters off does it wholesale — the point of the feature
+	; is "expand only on the key I chose" — and the reset is the way back, since
+	; most of the catalogue ships disabled and "check all" is not that route.
+	Rows.Push(Map("label", t("menu.hotstrings.check_all"),   "action", (*) => _HS_DelimSetAll(true)))
+	Rows.Push(Map("label", t("menu.hotstrings.uncheck_all"), "action", (*) => _HS_DelimSetAll(false)))
+	Rows.Push(Map("label", t("menu.global.reset_defaults"),  "action", (*) => _HS_DelimReset()))
+	Rows.Push(Map("separator", true))
 
-	; ── Built-in catalogue entries — rendered in catalogue order with the same
-	;    separators as the macOS word-expander menu (single shared source). ──
+	; ── Built-in catalogue entries, in catalogue order ───────────────────────
 	for _, D in Defs {
 		if (D.Has("type") and D["type"] == "separator") {
-			Sub.Add()  ; "-" divider
+			Rows.Push(Map("separator", true))
 			continue
 		}
 		Chars := D["chars"]
 		Lbl   := D["label"]
-		; The "(consumed)" suffix reflects the actual consumed set — on Windows
-		; consumption is opt-in via consumed_delimiters, not the catalogue flag.
+		; A consumed delimiter is swallowed by the expansion, an unconsumed one is
+		; typed after it. The difference shows only in the output, so the row has
+		; to say which it is. On Windows consumption is opt-in via
+		; consumed_delimiters rather than the catalogue flag.
 		if HSE_TerminatorAnyCharIn(Chars, Consumed)
 			Lbl .= " " . t("menu.hotstrings.consumed_suffix")
-		; Actionable toggle — route through the dispatcher so AHK 2.0 never
-		; silently drops the click (see lib/menu_dispatcher.ahk).
-		RegisterMenuItem(Sub, Lbl, ((CharsArr) => (*) => _HS_DelimToggleEntry(CharsArr))(Chars))
-		if HSE_TerminatorEntryEnabled(Chars, Current)
-			Sub.Check(Lbl)
+		Rows.Push(Map(
+			"label",   Lbl,
+			"action",  ((CharsArr) => (*) => _HS_DelimToggleEntry(CharsArr))(Chars),
+			"checked", HSE_TerminatorEntryEnabled(Chars, Current) ? true : false))
 	}
-	Sub.Add()
+	Rows.Push(Map("separator", true))
 
-	; ── Custom delimiters (chars in the active string not owned by any built-in
-	;    catalogue entry). Structural CR/LF belong to the "enter" entry. ──
+	; ── Custom delimiters: chars in the active string that no catalogue entry
+	;    owns. Structural CR/LF belong to the "enter" entry. ──
 	Loop Parse, Current {
 		Ch := A_LoopField
 		if (Ch == "`r" or Ch == "`n" or InStr(BuiltinChars, Ch))
 			continue
-		IsConsumed  := InStr(Consumed, Ch) > 0
-		ConsumedSfx := IsConsumed ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
-		Lbl   := Ch . " : " . t("menu.hotstrings.custom_label") . ConsumedSfx
-		CtSub := Menu()
-		RegisterMenuItem(CtSub, t("menu.hotstrings.delete_delimiter"), ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))
-		Sub.Add(Lbl, CtSub)
-		; Custom delimiters are always active — they are present in the string
-		Sub.Check(Lbl)
+		ConsumedSfx := (InStr(Consumed, Ch) > 0) ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
+		Rows.Push(Map(
+			"label", Ch . " : " . t("menu.hotstrings.custom_label") . ConsumedSfx,
+			; Always ticked: a custom delimiter exists only while it is in the
+			; active string, so its presence IS its enabled state.
+			"checked", true,
+			"items", [Map(
+				"label",  t("menu.hotstrings.delete_delimiter"),
+				"action", ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch))]))
 	}
 
-	; ── Add custom delimiter button ───────────────────────────────────────────
-	RegisterMenuItem(Sub, t("menu.hotstrings.add_delimiter"), (*) => _HS_DelimAddCustom())
+	Rows.Push(Map("label", t("menu.hotstrings.add_delimiter"), "action", (*) => _HS_DelimAddCustom()))
 
-	return Sub
+	return [Map("label", t("menu.hotstrings.word_expanders"), "items", Rows)]
 }
 
 ; Toggle a whole catalogue entry (all of its chars) on/off and persist. The
-; toggle logic lives in HSE_TerminatorToggleString (lib/hotstrings_config.ahk)
+; toggle logic lives in HSE_TerminatorToggleString (infra/hotstrings_config.ahk)
 ; so it is shared with the config window and unit-tested.
-_HS_DelimToggleEntry(CharsArr) {
-	HotstringsSetWordDelimiters(HSE_TerminatorToggleString(HotstringsGetWordDelimiters(), CharsArr))
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+_HS_DelimToggleEntry(CharsArr, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: HSE_TerminatorToggleString(CurrentWord, CharsArr),
+		Consumed: CurrentConsumed
+	}
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Set every built-in catalogue entry on (true) or off (false), preserving any
 ; user-defined custom chars. Delegates to the shared, tested pure function.
-_HS_DelimSetAll(Enable) {
-	HotstringsSetWordDelimiters(HSE_TerminatorSetAllString(HotstringsGetWordDelimiters(), Enable))
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+_HS_DelimSetAll(Enable, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: HSE_TerminatorSetAllString(CurrentWord, Enable),
+		Consumed: CurrentConsumed
+	}
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Reset all delimiters to the built-in defaults.
-_HS_DelimReset() {
+_HS_DelimReset(WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
 	global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-	HotstringsSetWordDelimiters(HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: HOTSTRINGS_DEFAULT_WORD_DELIMITERS,
+		Consumed: CurrentConsumed
+	}
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+}
+
+; Execute one delimiter candidate transaction and show the success notice only
+; after strict durable success. A terminal transition or refused writer leaves
+; both engine variables untouched and produces no misleading notification.
+_HS_DelimCommit(BuildFn, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+		finally Critical(InheritedCritical)
+	}
+	try Committed := HotstringsCommitDelimiterUpdate(BuildFn, WriterFn, ReplaceFn)
+	catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Delimiter transaction raised before publication: {1}.", Err.Message)
+		return false
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+
+	try {
+		Message := t("hs_config.notify_delimiters_saved")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Message, "", "Iconi Mute")
+		else
+			TrayTip(Message, "", "Iconi Mute")
+	} catch as Err {
+		; The durable mutation already succeeded; confine a notifier failure so a
+		; tray callback cannot escape through AHK's menu dispatcher.
+		try LoggerError("HotstringsMenu",
+			"Delimiter settings were saved but the success notification failed: {1}.",
+			Err.Message)
+	}
+	return true
 }
 
 ; Mini GUI: one-shot dialog to pick a delimiter character and its consume mode.
@@ -306,19 +394,20 @@ _HS_DelimAddCustom() {
 	if (!Result.OK or Result.Char == "") {
 		return
 	}
-	Ch      := Result.Char
-	Current := HotstringsGetWordDelimiters()
-	if (InStr(Current, Ch) > 0) {
-		return  ; Already present — silently ignore
+	return _HS_DelimAddCustomCommit(Result.Char, Result.Consume)
+}
+
+; Add the word and optional consumed membership in ONE transaction. The previous
+; two-setter sequence could publish the word key while the consumed-key write
+; failed, and each setter rebuilt the same whole file from a different snapshot.
+_HS_DelimAddCustomCommit(Char, Consume, WriterFn := 0, ReplaceFn := 0,
+	NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: InStr(CurrentWord, Char) ? CurrentWord : CurrentWord . Char,
+		Consumed: (Consume && !InStr(CurrentConsumed, Char))
+			? CurrentConsumed . Char : CurrentConsumed
 	}
-	HotstringsSetWordDelimiters(Current . Ch)
-	if (Result.Consume) {
-		Consumed := HotstringsGetConsumedDelimiters()
-		if (!InStr(Consumed, Ch)) {
-			HotstringsSetConsumedDelimiters(Consumed . Ch)
-		}
-	}
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Called by the OK button of the add-delimiter GUI.
@@ -340,17 +429,24 @@ _HS_DelimRemoveCustom(Char) {
 	if (Res != "Yes") {
 		return
 	}
-	HotstringsSetWordDelimiters(StrReplace(HotstringsGetWordDelimiters(), Char, ""))
-	Consumed := HotstringsGetConsumedDelimiters()
-	if (InStr(Consumed, Char)) {
-		HotstringsSetConsumedDelimiters(StrReplace(Consumed, Char, ""))
+	return _HS_DelimRemoveCustomCommit(Char)
+}
+
+; Remove both memberships from the same admitted snapshot and publish them as a
+; single durable candidate.
+_HS_DelimRemoveCustomCommit(Char, WriterFn := 0, ReplaceFn := 0,
+	NotifyFn := 0) {
+	BuildFn := (CurrentWord, CurrentConsumed) => {
+		Word: StrReplace(CurrentWord, Char, ""),
+		Consumed: StrReplace(CurrentConsumed, Char, "")
 	}
-	TrayTip(t("hs_config.notify_delimiters_saved"), "", "Iconi Mute")
+	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Dynamic handler: standard hotstring categories.
-_HS_CategoriesStandard(M, _Cat) {
+_HS_CategoryRowsStandard() {
 	global HotstringCategoriesStd, SubMenus
+	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	; Section header is rendered by the manifest (section_header type), so we
 	; only add the actual category submenus here. The standard + dynamic grand
@@ -364,22 +460,25 @@ _HS_CategoriesStandard(M, _Cat) {
 		; full "what would reactivate" count.
 		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		M.Add(Title, SubMenus[Category])
 		; Checkmark follows the category's own enable toggle, not whether every
 		; section is checked: the category stays checked with its button on even
 		; if some or all sections inside are off.
-		if IsGated and IsCategoryGated(Category)
-			M.Check(Title)
+		Rows.Push(Map(
+			"label",   Title,
+			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
+			"submenu", SubMenus[Category]))
 	}
+	return Rows
 }
 
 ; Dynamic handler: dynamic hotstrings category.
-_HS_CategoriesDynamic(M, _Cat) {
+_HS_CategoryRowsDynamic() {
 	global SubMenus, Features
+	Rows := []
 	if !Features.Has("hotstrings") or !Features["hotstrings"].Has("dynamic")
-		return
+		return Rows
 	if !SubMenus.Has("DynamicHotstrings")
-		return
+		return Rows
 	IsGated := IsCategoryGated("Hotstrings")
 	DynMenu := SubMenus["DynamicHotstrings"]
 	DynEnabled := 0
@@ -391,7 +490,6 @@ _HS_CategoriesDynamic(M, _Cat) {
 	; sub-tree has no separate gate, so it follows the master directly).
 	DynTotal := _HS_GatedCount(IsGated, DynEnabled)
 	DynTitle := GetCategoryTitle("DynamicHotstrings") . " (" . FmtCount(DynTotal) . ")"
-	M.Add(DynTitle, DynMenu)
 	DynAllEnabled := true
 	DynCount := 0
 	for _, DCfg2 in Features["hotstrings"]["dynamic"] {
@@ -399,13 +497,25 @@ _HS_CategoriesDynamic(M, _Cat) {
 		if (IsObject(DCfg2) and DCfg2.Has("enabled") and !DCfg2["enabled"])
 			DynAllEnabled := false
 	}
-	if IsGated and DynAllEnabled and DynCount > 0
-		M.Check(DynTitle)
+	; This function became a `list` provider when the five category blocks moved
+	; onto the manifest, and half of it did not follow. It returned an EMPTY array
+	; — so the dynamic-hotstrings row was missing from the menu entirely — and it
+	; still called `M.Check(DynTitle)` on a menu object a provider is never handed.
+	; That reference is an unset local, and it threw straight through
+	; MenuRenderer_Build into the deferred tray build's catch, which meant the
+	; WHOLE tray vanished, leaving only the submenus that add themselves. Latent
+	; until a configuration satisfied the condition guarding it.
+	Rows.Push(Map(
+		"label",   DynTitle,
+		"checked", (IsGated and DynAllEnabled and DynCount > 0) ? true : false,
+		"submenu", DynMenu))
+	return Rows
 }
 
 ; Dynamic handler: Ergopti-specific hotstring categories.
-_HS_CategoriesErgopti(M, _Cat) {
+_HS_CategoryRowsErgopti() {
 	global HotstringCategoriesErgopti, SubMenus
+	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	for _, Category in HotstringCategoriesErgopti {
 		if !SubMenus.Has(Category)
@@ -415,10 +525,12 @@ _HS_CategoriesErgopti(M, _Cat) {
 		; checkmark follows the category's own toggle, not its section states.
 		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		M.Add(Title, SubMenus[Category])
-		if IsGated and IsCategoryGated(Category)
-			M.Check(Title)
+		Rows.Push(Map(
+			"label",   Title,
+			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
+			"submenu", SubMenus[Category]))
 	}
+	return Rows
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + ext tree).
@@ -511,10 +623,10 @@ _HS_InvalidatePersonalCache() {
 ; Pre-scans the bundled extensions directory to build the extension data
 ; so it is available for menu labels without doing file I/O under Critical.
 _HS_PreScanExtensions() {
-	global _StaticDir, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
+	global _ExtensionsDir, _HS_ExtensionsCacheLoaded, _HS_ExtensionsCache
 	if _HS_ExtensionsCacheLoaded
 		return
-	ExtensionsBaseDir := _StaticDir . "\extensions\"
+	ExtensionsBaseDir := _ExtensionsDir . "\"
 	_HS_ExtensionsCache := []
 	if DirExist(ExtensionsBaseDir) {
 		Loop Files ExtensionsBaseDir . "*", "D" {
@@ -566,8 +678,9 @@ _HS_GetOrCreateNode(Root, PathParts) {
 }
 
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
-_HS_Personal(M, _Cat) {
+_HS_PersonalRows() {
 	global ScriptInformation, Features, _PersonalExtTree
+	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	PersonalTomlData := false
 	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
@@ -585,48 +698,69 @@ _HS_Personal(M, _Cat) {
 		; relevant label below is built from this map instead of the raw
 		; (possibly-duplicate) description.
 		DisambiguatedLabels := _HS_BuildDisambiguatedSectionLabels(TomlData)
-		PersonalMenu := Menu()
-		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
-		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(PersonalTomlPath))
-		PersonalMenu.Add()
-		ShortcutLabel := t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]
-		PersonalMenu.Add(ShortcutLabel, (*) => NoAction())
-		PersonalMenu.Disable(ShortcutLabel)
-		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
+		; The two Menu objects are created here and kept, because two callbacks
+		; below REPAINT them: choosing a default section renames the parent row and
+		; moves the tick without rebuilding anything, and so does the close-on-add
+		; switch. A full RebuildTrayMenu costs about a second, which is not a price
+		; a checkmark can pay.
+		;
+		; That is not a reason for the rows themselves to be hand-built, which is
+		; what they were until 2026-08-07: MenuRenderer_AppendRows renders row DATA
+		; into a menu the CALLER owns, so the driver can hold the reference it needs
+		; and still let the renderer draw every row in it.
+		PersonalMenu       := Menu()
 		DefaultSectionMenu := Menu()
-		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"),
-			(*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
-		if (CurDefaultSec == "")
-			DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
-		DefaultSectionMenu.Add()
+		PersonalRows := []
+		PersonalRows.Push(Map("label", t("menu.hotstrings.open_editor"), "action", (*) => OpenPersonalEditor()))
+		PersonalRows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(PersonalTomlPath)))
+		PersonalRows.Push(Map("separator", true))
+		; A row with a label and nothing else renders inert and greyed — which is
+		; what this shortcut reminder is: it states the trigger, it is not a button.
+		PersonalRows.Push(Map("label", t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]))
+
+		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
+		DefaultRows := []
+		DefaultRows.Push(Map(
+			"label",   t("menu.hotstrings.default_none"),
+			"action",  (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
+			"checked", (CurDefaultSec == "") ? true : false))
+		DefaultRows.Push(Map("separator", true))
 		for _, SecName in TomlData["sections_order"] {
 			if (SecName == "-")
 				continue
 			if !TomlData["sections"].Has(SecName)
 				continue
 			SecLabel := DisambiguatedLabels[SecName]
-			RegisterMenuItem(DefaultSectionMenu, SecLabel,
-				_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
-			if (CurDefaultSec == SecName)
-				DefaultSectionMenu.Check(SecLabel)
+			DefaultRows.Push(Map(
+				"label",   SecLabel,
+				"action",  _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
+				"checked", (CurDefaultSec == SecName) ? true : false))
 		}
+		MenuRenderer_AppendRows(DefaultSectionMenu, "hotstrings_menu", "hotstring_personal_default", DefaultRows)
+
 		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
 			: (DisambiguatedLabels.Has(CurDefaultSec) ? DisambiguatedLabels[CurDefaultSec] : CurDefaultSec)
 		global _PrevDefaultLabel := CurDefaultLabel
-		PersonalMenu.Add(t("menu.hotstrings.default_category_prefix") . CurDefaultLabel, DefaultSectionMenu)
-		CloseOnAddLabel := t("menu.hotstrings.close_on_add")
-		RegisterMenuItem(PersonalMenu, CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
-		if (_EditorPrefGet("close_on_add", "1") == "1")
-			PersonalMenu.Check(CloseOnAddLabel)
+		PersonalRows.Push(Map(
+			"label",   t("menu.hotstrings.default_category_prefix") . CurDefaultLabel,
+			"submenu", DefaultSectionMenu))
+		PersonalRows.Push(Map(
+			"label",   t("menu.hotstrings.close_on_add"),
+			"action",  (*) => _TogglePersonalCloseOnAdd(PersonalMenu),
+			"checked", (_EditorPrefGet("close_on_add", "1") == "1") ? true : false))
 		if (TomlData["sections_order"].Length > 0) {
-			PersonalMenu.Add()
+			PersonalRows.Push(Map("separator", true))
 			; Section-level bulk actions for the personal hotstrings.
-			RegisterMenuItem(PersonalMenu, t("menu.hotstrings.enable_all"),  (*) => HS_TogglePersonalAllSections(true))
-			RegisterMenuItem(PersonalMenu, t("menu.hotstrings.disable_all"), (*) => HS_TogglePersonalAllSections(false))
-			PersonalMenu.Add()
+			PersonalRows.Push(Map(
+				"label",  t("menu.hotstrings.enable_all"),
+				"action", (*) => HS_TogglePersonalAllSections(true)))
+			PersonalRows.Push(Map(
+				"label",  t("menu.hotstrings.disable_all"),
+				"action", (*) => HS_TogglePersonalAllSections(false)))
+			PersonalRows.Push(Map("separator", true))
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {
-					PersonalMenu.Add()
+					PersonalRows.Push(Map("separator", true))
 					continue
 				}
 				if !TomlData["sections"].Has(SecName)
@@ -635,9 +769,13 @@ _HS_Personal(M, _Cat) {
 				SecLabel := DisambiguatedLabels[SecName] . " (" . FmtCount(SecData["entries"].Length) . ")"
 				; v2 path for a runtime-discovered personal section: the Features
 				; node (and config.toml section) key the lowercased TOML section name.
-				MenuAddItemWithLabel(PersonalMenu, "hotstrings.personal." . StrLower(SecName), SecLabel, "Hotstrings")
+				Row := MenuRowWithLabel("hotstrings.personal." . StrLower(SecName), SecLabel, "Hotstrings")
+				if (Row != "") {
+					PersonalRows.Push(Row)
+				}
 			}
 		}
+		MenuRenderer_AppendRows(PersonalMenu, "hotstrings_menu", "hotstring_personal", PersonalRows)
 		PersonalActiveCount := 0
 		PersonalAllEnabled  := true
 		PersonalSectionCount := 0
@@ -655,9 +793,10 @@ _HS_Personal(M, _Cat) {
 				PersonalAllEnabled := false
 		}
 		PersonalTitle := GetCategoryTitle("Personal") . " (" . FmtCount(PersonalActiveCount) . ")"
-		M.Add(PersonalTitle, PersonalMenu)
-		if IsGated and PersonalAllEnabled and PersonalSectionCount > 0
-			M.Check(PersonalTitle)
+		Rows.Push(Map(
+			"label",   PersonalTitle,
+			"checked", (IsGated and PersonalAllEnabled and PersonalSectionCount > 0) ? true : false,
+			"submenu", PersonalMenu))
 	}
 
 	RootNode := false
@@ -666,7 +805,7 @@ _HS_Personal(M, _Cat) {
 		RootNode := TreeCopy[""]
 		TreeCopy.Delete("")
 	}
-	_HS_RenderTree(TreeCopy, M)
+	_HS_RenderTree(TreeCopy, "", Rows)
 	if (RootNode != false) {
 		FileNodeList := RootNode["tomls"]
 		loop FileNodeList.Length {
@@ -681,19 +820,34 @@ _HS_Personal(M, _Cat) {
 			}
 		}
 		for _, TF in FileNodeList {
-			TFMenu := Menu()
-			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-			if (TF.sections.Length > 0) {
-				TFMenu.Add()
-				for _, ES in TF.sections {
-					SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
-					TFMenu.Add(SecLabel, (*) => NoAction())
-					TFMenu.Disable(SecLabel)
-				}
-			}
-			M.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
+			Rows.Push(_HS_TomlFileRow(TF))
 		}
 	}
+	return Rows
+}
+
+; One TOML file of the personal-extensions tree, as a row whose submenu holds
+; « ouvrir le fichier » and one inert line per section.
+;
+; Its own Menu, filled by the renderer from row data: a folder tree follows the
+; USER's directories, so each level builds a menu and hands the level below it
+; over as `submenu` rather than describing the whole tree as one nested array.
+; Every level is still drawn by the renderer, which is the point — the driver
+; decides the SHAPE of the tree, never how a row is drawn.
+_HS_TomlFileRow(TF) {
+	TFMenu := Menu()
+	FileRows := [Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path))]
+	if (TF.sections.Length > 0) {
+		FileRows.Push(Map("separator", true))
+		for _, ES in TF.sections {
+			; Label only: these state what the file contains, they toggle nothing.
+			FileRows.Push(Map("label", ES["description"] . " (" . FmtCount(ES["count"]) . ")"))
+		}
+	}
+	MenuRenderer_AppendRows(TFMenu, "hotstrings_menu", "hotstring_personal_ext", FileRows)
+	return Map(
+		"label",   TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
+		"submenu", TFMenu)
 }
 
 ; Sum all hotstring counts inside a node and its sub-nodes recursively.
@@ -706,8 +860,23 @@ _HS_NodeTotal(Node) {
 	return Total
 }
 
-; Render recursive ext tree (nested folder structure)
-_HS_RenderTree(Tree, ParentMenu) {
+; Render recursive ext tree (nested folder structure).
+;
+; ``Rows`` is how the TOP level is called since 2026-08-07: the personal block is
+; a `list` provider, which is handed no menu, so its folders have to come back as
+; row data. The nested levels still take a ParentMenu, because a folder's
+; children genuinely hang off the folder's own Menu. Passing `M` here — the name
+; a dynamic handler's menu parameter used to have — is what made the provider
+; throw and took the entire tray menu down with it.
+;
+; Every level is row DATA rendered into that level's own Menu since 2026-08-07.
+; The tree mirrors the user's folder layout, which has no depth limit, and the
+; renderer caps a NESTED row array at MR_MAX_LIST_DEPTH to stop a self-referential
+; provider from recursing until the stack gives out — but that cap counts nesting
+; inside one array, and this walk starts a fresh render at each level. So the walk
+; keeps its own recursion, which is what a filesystem needs, and the renderer
+; still draws every row, which is what one menu needs.
+_HS_RenderTree(Tree, ParentMenu, Rows := "") {
 	FolderNames := []
 	for FolderName in Tree
 		FolderNames.Push(FolderName)
@@ -722,6 +891,10 @@ _HS_RenderTree(Tree, ParentMenu) {
 			}
 		}
 	}
+	; The folder rows of THIS level. They go back to the caller when it asked for
+	; data (the top level, which is a list provider) and are rendered into the
+	; parent's menu otherwise (every level below it).
+	FolderRows := (Rows is Array) ? Rows : []
 	for _, FolderName in FolderNames {
 		Node := Tree[FolderName]
 		FolderMenu := Menu()
@@ -737,74 +910,72 @@ _HS_RenderTree(Tree, ParentMenu) {
 				}
 			}
 		}
+		; Subfolders first — they render themselves into FolderMenu — then the
+		; files of this folder, appended after them.
 		if (Node["subfolders"].Count > 0)
 			_HS_RenderTree(Node["subfolders"], FolderMenu)
+		FileRows := []
 		if (Node["subfolders"].Count > 0 and FileNodeList.Length > 0)
-			FolderMenu.Add()
+			FileRows.Push(Map("separator", true))
 		for _, TF in FileNodeList {
-			TFMenu := Menu()
-			RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-			if (TF.sections.Length > 0) {
-				TFMenu.Add()
-				for _, ES in TF.sections {
-					SecLabel := ES["description"] . " (" . FmtCount(ES["count"]) . ")"
-					TFMenu.Add(SecLabel, (*) => NoAction())
-					TFMenu.Disable(SecLabel)
-				}
-			}
-			FolderMenu.Add(TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""), TFMenu)
+			FileRows.Push(_HS_TomlFileRow(TF))
 		}
+		MenuRenderer_AppendRows(FolderMenu, "hotstrings_menu", "hotstring_personal_ext", FileRows)
 		FolderTotal := _HS_NodeTotal(Node)
 		FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
-		ParentMenu.Add(FolderLabel, FolderMenu)
+		FolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))
+	}
+	if !(Rows is Array) {
+		MenuRenderer_AppendRows(ParentMenu, "hotstrings_menu", "hotstring_personal_ext", FolderRows)
 	}
 }
 
-; Dynamic handler: bundled extension hotstrings.
-_HS_Extensions(M, _Cat) {
+; List provider: bundled extension hotstrings, as nested row DATA.
+;
+; Nothing here mutates the live menu — every leaf is either a label or « open the
+; file » — and the tree is exactly three levels deep (extension → TOML → its
+; sections), which is what the renderer allows. So since 2026-08-07 the renderer
+; builds all of it, and this only answers what the rows are.
+_HS_ExtensionRows() {
 	global _HS_ExtensionsCache
+	Rows := []
 	; Use the pre-warmed cache so menu build never does file I/O here — the heavy
 	; DirExist/Loop Files/FileRead scan runs in _HS_PreScanExtensions off-Critical.
 	_HS_PreScanExtensions()
 	BundledExtensions := _HS_ExtensionsCache
 	if (BundledExtensions.Length == 0) {
-		EmptyLabel := t("menu.extensions.empty")
-		M.Add(EmptyLabel, (*) => NoAction())
-		M.Disable(EmptyLabel)
-	} else {
-		for _, Ext in BundledExtensions {
-			ExtHsMenu    := Menu()
-			ExtTotalForExt := 0
-			for _, TF in Ext.toml_files
-				ExtTotalForExt += TF.count
-			if (Ext.toml_files.Length == 0) {
-				NoHsLabel := t("menu.extensions.empty")
-				ExtHsMenu.Add(NoHsLabel, (*) => NoAction())
-				ExtHsMenu.Disable(NoHsLabel)
-			} else {
-				for _, TF in Ext.toml_files {
-					TFMenu := Menu()
-					RegisterMenuItem(TFMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(TF.path))
-					if (TF.sections.Length == 0) {
-						TFMenu.Add()
-						NoSecLabel := t("menu.extensions.empty")
-						TFMenu.Add(NoSecLabel, (*) => NoAction())
-						TFMenu.Disable(NoSecLabel)
-					} else {
-						TFMenu.Add()
-						for _, Sec in TF.sections {
-							SecLabel := Sec["description"] . " (" . FmtCount(Sec["count"]) . ")"
-							TFMenu.Add(SecLabel, (*) => NoAction())
-							TFMenu.Disable(SecLabel)
-						}
-					}
-					TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
-					ExtHsMenu.Add(TFTitle, TFMenu)
-				}
-			}
-			M.Add(Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""), ExtHsMenu)
-		}
+		return [Map("label", t("menu.extensions.empty"), "disabled", true)]
 	}
+	for _, Ext in BundledExtensions {
+		ExtRows := []
+		ExtTotalForExt := 0
+		for _, TF in Ext.toml_files
+			ExtTotalForExt += TF.count
+		if (Ext.toml_files.Length == 0) {
+			ExtRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
+		} else {
+			for _, TF in Ext.toml_files {
+				TFRows := [
+					Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TF.path)),
+					Map("separator", true)
+				]
+				if (TF.sections.Length == 0) {
+					TFRows.Push(Map("label", t("menu.extensions.empty"), "disabled", true))
+				} else {
+					for _, Sec in TF.sections {
+						TFRows.Push(Map(
+							"label",    Sec["description"] . " (" . FmtCount(Sec["count"]) . ")",
+							"disabled", true))
+					}
+				}
+				ExtRows.Push(Map(
+					"label", TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : ""),
+					"items", TFRows))
+			}
+		}
+		Rows.Push(Map(
+			"label", Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : ""),
+			"items", ExtRows))
+	}
+	return Rows
 }
-
-

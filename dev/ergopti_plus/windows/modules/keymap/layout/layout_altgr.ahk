@@ -37,11 +37,11 @@
 
 
 
-; ==========================================
+; ===============================
 ; ===============================
 ; ======= 1/ Layer tables =======
 ; ===============================
-; ==========================================
+; ===============================
 
 ; The three tables below are populated lazily — at the time this file is
 ; loaded, the ``DeadkeyMappingX`` globals and ``SpaceAroundSymbols`` are not
@@ -198,11 +198,11 @@ _BuildAltGrTables() {
 
 
 
-; ==============================================
+; ===============================================
 ; ===============================================
 ; ======= 2/ Dispatchers and registration =======
 ; ===============================================
-; ==============================================
+; ===============================================
 
 ; Discriminate a real AltGr/Kana keypress from a ghost SC138 prefix injected
 ; by an OS keyboard driver (e.g. Bépo) around AltGr-mapped keys like `'`.
@@ -217,7 +217,7 @@ _BuildAltGrTables() {
 ;      Physical RAlt is never down, so the gate must accept SC138 directly.
 ;
 ; The discriminator is _ALTGR_KANA_FIXUP, auto-detected at boot via a reverse
-; VK_RMENU→SC probe in lib/hotstring_engine.ahk (re-evaluated on layout switch
+; VK_RMENU→SC probe in infra/hotstring_engine.ahk (re-evaluated on layout switch
 ; through the watcher’s Reload). Manual TOML override available via
 ; ScriptInformation["AltGrIsKanaRemap"] in case the probe ever misfires.
 IsRealAltGrPress() {

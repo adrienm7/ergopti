@@ -81,7 +81,7 @@ helpers.describe("MLX warmup: an abandoned POST cannot speak for its retry", fun
 
 		local body = code:sub(at, at + 800)
 		local bump_at  = body:find("_warmup_gen = _warmup_gen + 1", 1, true)
-		local retry_at = body:find("M.warmup(model_name, profile)", 1, true)
+		local retry_at = body:find("schedule_warmup_retry(model_name, profile)", 1, true)
 
 		helpers.assert_true(bump_at ~= nil,
 			"abandoning a POST does not stop the server answering it. Without retiring the "

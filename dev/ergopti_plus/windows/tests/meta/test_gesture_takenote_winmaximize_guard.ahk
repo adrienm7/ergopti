@@ -1,76 +1,51 @@
 ﻿; tests/meta/test_gesture_takenote_winmaximize_guard.ahk
 
 ; ==============================================================================
-; MODULE: GestureTakeNote WinMaximize Existence Guard Meta Test (Pattern 2)
+; MODULE: Shared Take-Note Focus/Maximize Guard
 ; DESCRIPTION:
-; Companion to test_takenote_winmaximize_guard.ahk (the F5 fix for the sibling
-; TakeNote in modules/shortcuts/win.ahk). GestureTakeNote
-; (modules/gestures/actions.ahk) had the exact same bug shape: WinWaitActive
-; called as a bare statement (return value discarded) on both branches, then
-; an unconditional WinMaximize on the next line. WinWaitActive does not throw
-; on timeout -- it returns 0/false -- so a slow or blocked Notepad launch let
-; execution fall through to WinMaximize with no valid last-found-window,
-; throwing TargetError.
-;
-; SCOPE: source introspection of modules/gestures/actions.ahk — GestureTakeNote
-; shells out to notepad.exe and mutates real window state, so it cannot be
-; safely invoked live from a test.
+; A target that exists is not necessarily focused. The shared async transaction
+; must observe both conditions before maximize/final input, and every partial
+; title-mode mutation must restore the caller's thread state.
 ; ==============================================================================
 
-#Requires AutoHotkey v2.0
-
-
-
-
-; =========================================================================
-; =========================================================================
-; ======= 1/ GestureTakeNote gates WinMaximize on the wait result =========
-; =========================================================================
-; =========================================================================
+#Requires AutoHotkey v2.0+
 
 _GTNWMG_CheckWinMaximizeGuard() {
-	Body := _DriverFuncBody("GestureTakeNote")
-	Assert(Body != "", "GestureTakeNote must exist in modules/gestures/actions.ahk")
-
-	Assert(InStr(Body, ":= WinWaitActive(") > 0,
-		"GestureTakeNote must capture WinWaitActive's return value (it returns 0 on timeout instead of throwing) -- calling it as a bare statement and falling through to WinMaximize regardless reintroduces the TargetError crash")
-
-	MaximizeIdx := InStr(Body, "WinMaximize")
-	Assert(MaximizeIdx > 0, "GestureTakeNote must still call WinMaximize on the success path")
-
-	BeforeMaximize := SubStr(Body, 1, MaximizeIdx - 1)
-	LastIfPos := 0
-	SearchPos := 1
-	loop {
-		Found := InStr(BeforeMaximize, "if ", , SearchPos)
-		if (Found = 0)
-			break
-		LastIfPos := Found
-		SearchPos := Found + 1
-	}
-	Assert(LastIfPos > 0, "WinMaximize must sit behind an 'if' that checks the WinWaitActive result -- an unconditional call reintroduces the TargetError crash on a timed-out wait")
-
-	GuardClause := SubStr(BeforeMaximize, LastIfPos)
-	Assert(InStr(GuardClause, "NoteWindowIsActive") > 0 or InStr(GuardClause, "WinWaitActive") > 0,
-		"The 'if' guarding WinMaximize must reference the captured WinWaitActive result, not an unrelated condition")
+	Body := _DriverFuncBody("_TakeNotePoll")
+	ExistsPos := InStr(Body, 'Ops.WindowExists(Job["pattern"])')
+	ActivatePos := InStr(Body, 'Ops.Activate(Job["pattern"])', , ExistsPos)
+	ActivePos := InStr(Body, 'Ops.IsActive(Job["pattern"])', , ActivatePos)
+	MaximizePos := InStr(Body, 'Ops.Maximize(Job["pattern"])', , ActivePos)
+	Assert(ExistsPos > 0 and ActivatePos > ExistsPos and ActivePos > ActivatePos
+		and MaximizePos > ActivePos,
+		"the shared job must observe existence and focus before maximizing the explicit target")
 }
-Test("gestures: GestureTakeNote gates WinMaximize on the captured WinWaitActive result (no bare TargetError on timeout)",
+Test("TakeNote: shared job observes existence and focus before explicit maximize",
 	_GTNWMG_CheckWinMaximizeGuard)
 
 _GTNWMG_CheckTimeoutIsLogged() {
-	Body := _DriverFuncBody("GestureTakeNote")
-	Assert(InStr(Body, "LoggerWarn(") > 0,
-		"GestureTakeNote must log a warning when the Notepad window never becomes active, so a skipped maximize is diagnosable instead of silently vanishing")
+	Body := _DriverFuncBody("_TakeNoteExpire")
+	Assert(InStr(Body, "WarnTimeout") > 0,
+		"the shared job must report a bounded focus/launch timeout instead of silently vanishing")
 }
-Test("gestures: GestureTakeNote logs a warning when the Notepad window never becomes active",
+Test("TakeNote: shared job reports a bounded focus/launch timeout",
 	_GTNWMG_CheckTimeoutIsLogged)
 
 _GTNWMG_CheckTitleMatchModeRestored() {
-	Body := _DriverFuncBody("GestureTakeNote")
-	Assert(InStr(Body, "} finally {") > 0,
-		"GestureTakeNote must keep restoring A_TitleMatchMode in a finally block on every exit path, including the new timeout/skip branch")
-	Assert(InStr(Body, "SetTitleMatchMode(PreviousTitleMatchMode)") > 0,
-		"GestureTakeNote's finally block must still restore the previous A_TitleMatchMode")
+	Src := _DriverSourceNoComments()
+	StartPos := InStr(Src, "class _TakeNoteNative")
+	EndPos := InStr(Src, "_TakeNoteQueueFromFeatures(", , StartPos)
+	Assert(StartPos > 0 and EndPos > StartPos,
+		"the shared native note boundary must remain discoverable")
+	NativeBody := SubStr(Src, StartPos, EndPos - StartPos)
+	RestoreCount := 0
+	SearchPos := 1
+	while (Found := InStr(NativeBody, "SetTitleMatchMode(PreviousMode)", , SearchPos)) {
+		RestoreCount += 1
+		SearchPos := Found + 1
+	}
+	Assert(RestoreCount >= 4,
+		"exists, activate, active-observation, and maximize must each restore title-match state")
 }
-Test("gestures: GestureTakeNote still restores A_TitleMatchMode via try/finally after the WinMaximize guard fix",
+Test("TakeNote: every native window probe restores A_TitleMatchMode",
 	_GTNWMG_CheckTitleMatchModeRestored)

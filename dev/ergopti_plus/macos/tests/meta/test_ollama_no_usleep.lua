@@ -20,13 +20,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -40,14 +39,14 @@ end
 helpers.describe("ui/menu/menu_llm/models_manager_ollama.lua: no usleep (ollama-usleep-main-thread-freeze)", function()
 
 	helpers.it("hs.timer.usleep is absent from models_manager_ollama.lua", function()
-		local src = read_source("ui/menu/menu_llm/models_manager_ollama.lua")
+		local src = read_source("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
 		helpers.assert_true(
 			src:find("hs%.timer%.usleep") == nil,
 			"models_manager_ollama.lua must NOT call hs.timer.usleep — it blocks the main thread and can kill eventtap hooks (ollama-usleep-main-thread-freeze)")
 	end)
 
 	helpers.it("async polling uses hs.timer.doAfter, not a blocking loop", function()
-		local src = read_source("ui/menu/menu_llm/models_manager_ollama.lua")
+		local src = read_source("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
 		helpers.assert_true(
 			src:find("hs%.timer%.doAfter") ~= nil,
 			"models_manager_ollama.lua must use hs.timer.doAfter for async Ollama readiness polling (ollama-usleep-main-thread-freeze)")

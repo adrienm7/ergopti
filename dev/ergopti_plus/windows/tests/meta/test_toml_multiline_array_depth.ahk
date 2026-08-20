@@ -4,7 +4,7 @@
 ; MODULE: TOML Multi-Line Array Bracket-Depth Guard
 ; DESCRIPTION:
 ; Static source guard for the multi-line TOML array terminator fix in
-; lib/toml/toml_helpers.ahk.
+; infra/toml/toml_helpers.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original multi-line array parser used a naive InStr(Line, "]") check to
@@ -34,10 +34,10 @@
 
 _TTMAD_BracketDepthCounter() {
 	; Move-resilient: scan the toml module dir via the framework helper instead of a
-	; pinned lib/toml/toml_helpers.ahk read. The Depth++/Depth--/Depth <= 0/InStr2
-	; tokens are unique to toml_helpers.ahk within lib/toml, so the scope stays tight.
-	Src := _DriverDirConcat("lib/toml")
-	Assert(Src != "", "lib/toml/toml_helpers.ahk must be readable")
+	; pinned infra/toml/toml_helpers.ahk read. The Depth++/Depth--/Depth <= 0/InStr2
+	; tokens are unique to toml_helpers.ahk within infra/toml, so the scope stays tight.
+	Src := _DriverDirConcat("infra/toml")
+	Assert(Src != "", "infra/toml/toml_helpers.ahk must be readable")
 
 	; The Depth variable must exist — it is the bracket-depth counter
 	Assert(InStr(Src, "Depth") > 0,

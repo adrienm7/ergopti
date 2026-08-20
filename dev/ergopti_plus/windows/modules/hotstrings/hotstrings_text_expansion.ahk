@@ -22,11 +22,11 @@
 
 
 
-; ===========================================================================
+; ============================================================================
 ; ============================================================================
 ; ======= 1/ Text expansion & dynamic hotstrings registration function =======
 ; ============================================================================
-; ===========================================================================
+; ============================================================================
 
 ; Registers Sections 4–5 of modules/hotstrings.ahk (text expansion + dynamic).
 ; DeferHeavy must match the caller's intent — true on the boot pass, false on
@@ -35,6 +35,7 @@
 _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global PersonalInformationHotstrings, DYN_HOTSTRINGS_DEFAULT_DELAY, SpaceAroundSymbols
+	global PERSONAL_INFO_TAGS, PERSONAL_INFO_TAG_ORDER, HSE_PersonalInfoCombosEnabled
 
 
 
@@ -65,26 +66,35 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	; ======================================================
 
 	if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["enabled"] {
-		CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["bic"], Map("FinalResult",
-			True))
-		CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["credit_card"], Map(
-			"FinalResult",
-			True))
-		CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["credit_card"], Map(
-			"FinalResult",
-			True))
-		CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["iban"], Map("FinalResult",
-			True))
-		CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["iban"], Map("FinalResult",
-			True))
-		CreateHotstring("*", "@ss" . ScriptInformation["MagicKey"], PersonalInformation["social_security_number"], Map(
-			"FinalResult", True))
-		CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["phone_number"], Map(
-			"FinalResult",
-			True))
-		CreateHotstring("*", "@tél" . ScriptInformation["MagicKey"], PersonalInformation["phone_number"], Map(
-			"FinalResult",
-			True))
+		; The single-field @-tags (@bic, @cb, @cc, @iban, @rib, @ss, @tel, @tél).
+		; Both the tag set and the field each one names come from
+		; PERSONAL_INFO_TAGS (infra/personal_info_preview.ahk), which the
+		; preview reads too — eight hand-written call sites here and a second copy
+		; of the same map over there is exactly how a tag comes to expand one field
+		; and preview another. PERSONAL_INFO_TAG_ORDER drives the loop because a
+		; Map does not enumerate in insertion order and registration order is the
+		; engine's last collision tie-break.
+		for _, InfoTag in PERSONAL_INFO_TAG_ORDER {
+			if !PERSONAL_INFO_TAGS.Has(InfoTag) {
+				LoggerWarn("hotstrings", "Personal-info tag '@{1}' is listed in the registration order but absent from the tag map -- skipped.", InfoTag)
+				continue
+			}
+			InfoTagField := PERSONAL_INFO_TAGS[InfoTag]
+			if !PersonalInformation.Has(InfoTagField) {
+				LoggerWarn("hotstrings", "Personal-info tag '@{1}' names the unknown field '{2}' -- skipped.", InfoTag, InfoTagField)
+				continue
+			}
+			; IsPrivate is what keeps the resolved value — an IBAN, a card number,
+			; a social-security number — out of the metrics row the fire writes and
+			; out of the debug fire-trace. Without it the expansion is recorded
+			; verbatim, twice per row, into a log that is replicated to every other
+			; device and kept for fourteen days.
+			InfoTagValue := PersonalInformation[InfoTagField]
+			CreateHotstring("*", "@" . InfoTag . ScriptInformation["MagicKey"],
+				InfoTagValue, Map("FinalResult", True).Set("IsPrivate", True)
+					.Set("Category", "personal")
+					.Set("PreviewFields", [InfoTagField]).Set("PreviewValues", [InfoTagValue]))
+		}
 
 		; Map a letter to a value (n ➜ Nom, t ➜ 0606060606, etc.)
 		; Declared global at the top of RegisterAllHotstrings — re-init it on every run.
@@ -96,10 +106,11 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 		; Generate all possible combinations of letters between 1 and PatternMaxLength characters
 		GeneratePersonalInformationHotstrings(
 			PersonalInformationHotstrings,
+			PersonalInformationLetters,
 			Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["pattern_max_length"]
 		)
 
-		GeneratePersonalInformationHotstrings(hotstrings, maxLen) {
+		GeneratePersonalInformationHotstrings(hotstrings, fieldsByLetter, maxLen) {
 			keys := []
 			; ``hotstrings`` is a Map keyed by the alias LETTER (n, t, …); the combo
 			; generator needs those keys, not the personal-data values. The 2-var Map
@@ -109,109 +120,77 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			for k, _ in hotstrings
 				keys.Push(k)
 			loop maxLen
-				Generate(keys, hotstrings, "", A_Index)
+				Generate(keys, hotstrings, fieldsByLetter, "", A_Index)
 		}
 
-		; In case email is "^a" we want to send raw string and not Ctrl + A
+		; In case email is "^a" we want to send raw string and not Ctrl + A.
+		; The transform itself is SendEscapeLiteral (infra/text_utils.ahk): the
+		; fire-time @-combo resolver needs the same escaping on the same values, and
+		; a nested copy here would be a second implementation to keep in step.
 		EscapeSpecialChars(text) {
-			; Escape braces atomically so the '{' -> '{{}'  expansion does not feed a
-			; '}' into a later StrReplace pass (which would corrupt '{' into '{{{}}}')
-			escaped := ""
-			loop parse, text {
-				c := A_LoopField
-				if (c == "{")
-					escaped .= "{{}"
-				else if (c == "}")
-					escaped .= "{}}"
-				else
-					escaped .= c
-			}
-			; The remaining escapes do not emit '{' or '}' so sequential StrReplace is safe
-			escaped := StrReplace(escaped, "^", "{Asc 94}")
-			escaped := StrReplace(escaped, "~", "{Asc 126}")
-			escaped := StrReplace(escaped, "+", "{+}")
-			escaped := StrReplace(escaped, "!", "{!}")
-			escaped := StrReplace(escaped, "#", "{#}")
-			return escaped
+			return SendEscapeLiteral(text)
 		}
 
-		Generate(keys, hotstrings, combo, len) {
+		Generate(keys, hotstrings, fieldsByLetter, combo, len) {
 			if (len == 0) {
 				value := ""
+				PreviewFields := []
+				PreviewValues := []
 				loop parse, combo {
-					if (hotstrings.Has(A_LoopField)) {
+					if (hotstrings.Has(A_LoopField) and fieldsByLetter.Has(A_LoopField)) {
 						if (value != "") {
 							value := value . "{Tab}"
 						}
 
 						value := value . hotstrings[A_LoopField]
+						PreviewFields.Push(fieldsByLetter[A_LoopField])
+						PreviewValues.Push(hotstrings[A_LoopField])
 					}
 				}
 				if (value != "") {
-					CreateHotstringCombo(combo, EscapeSpecialChars(value))
+					CreateHotstringCombo(combo, EscapeSpecialChars(value),
+						PreviewFields, PreviewValues)
 				}
 				return
 			}
 			for _, key in keys {
-				Generate(keys, hotstrings, combo . key, len - 1)
+				Generate(keys, hotstrings, fieldsByLetter, combo . key, len - 1)
 			}
 		}
 
-		CreateHotstringCombo(combo, value) {
+		; Every combo concatenates one or more personal_info fields, so the whole
+		; generated family is private for the same reason the single-field tags are.
+		CreateHotstringCombo(combo, value, PreviewFields, PreviewValues) {
 			CreateHotstring("*", "@" combo "" . ScriptInformation["MagicKey"], value, Map("OnlyText", False).Set(
-				"FinalResult", True))
+				"FinalResult", True).Set("IsPrivate", True)
+				.Set("Category", "personal")
+				.Set("PreviewFields", PreviewFields).Set("PreviewValues", PreviewValues))
 		}
 
-		; Generate manually longer shortcuts, as increasing PatternMaxLength expands memory exponentially
-		CreateHotstringComboAuto(Combo) {
-			global PersonalInformationHotstrings
-			Value := ""
-			loop StrLen(Combo) {
-				ComboLetter := SubStr(Combo, A_Index, 1)
-				; The letters Map is user-editable (personal_info.toml [letters]); a
-				; missing alias must skip this optional convenience combo, not throw an
-				; UnsetItemError on the boot-critical registration thread. Mirror the
-				; Generate() guard and fail loud in the log (fail-soft, §5.3)
-				if !PersonalInformationHotstrings.Has(ComboLetter) {
-					LoggerWarn("hotstrings", "CreateHotstringComboAuto: letter '{1}' absent from personal-info map -- skipping combo '@{2}'.", ComboLetter, Combo)
-					return
-				}
-				Value := Value . EscapeSpecialChars(PersonalInformationHotstrings[ComboLetter]) . "{Tab}"
-			}
-			CreateHotstring("*", "@" . Combo . ScriptInformation["MagicKey"], Value, Map("OnlyText", False).Set(
-				"FinalResult", True))
-		}
-		CreateHotstringComboAuto("mm")
-		CreateHotstringComboAuto("mnp")
-		CreateHotstringComboAuto("mpn")
-		CreateHotstringComboAuto("np")
-		CreateHotstringComboAuto("npam")
-		CreateHotstringComboAuto("npamm")
-		CreateHotstringComboAuto("npd")
-		CreateHotstringComboAuto("npdm")
-		CreateHotstringComboAuto("npdmm")
-		CreateHotstringComboAuto("npdmmt")
-		CreateHotstringComboAuto("npdmt")
-		CreateHotstringComboAuto("npm")
-		CreateHotstringComboAuto("npmd")
-		CreateHotstringComboAuto("npmm")
-		CreateHotstringComboAuto("npmmd")
-		CreateHotstringComboAuto("npmt")
-		CreateHotstringComboAuto("npt")
-		CreateHotstringComboAuto("nptm")
-		CreateHotstringComboAuto("nptmm")
-		CreateHotstringComboAuto("pn")
-		CreateHotstringComboAuto("pnam")
-		CreateHotstringComboAuto("pnamm")
-		CreateHotstringComboAuto("pnd")
-		CreateHotstringComboAuto("pndm")
-		CreateHotstringComboAuto("pndmm")
-		CreateHotstringComboAuto("pnm")
-		CreateHotstringComboAuto("pnmm")
-		CreateHotstringComboAuto("pntm")
-		CreateHotstringComboAuto("pntmd")
-		CreateHotstringComboAuto("pntmm")
-		CreateHotstringComboAuto("pntmmd")
+		; Every combo LONGER than pattern_max_length is resolved at fire time by
+		; HSE_TryPersonalInfoCombo instead of being registered here.
+		;
+		; This replaced a hand-written list of thirty-one CreateHotstringComboAuto
+		; calls. With thirteen alias letters the space is 169 combos at length two,
+		; 2 197 at three and 28 561 at four, so the list could only ever be a
+		; sample — and it was missing @npdt and @nt, which is how this surfaced:
+		; the letters resolved, the values existed, and the only thing absent was a
+		; line in a list. Nothing logged, nothing failed, the key just did nothing.
+		;
+		; Two behaviours changed with it, both toward the other drivers:
+		;   - No trailing Tab. The hand-listed combos appended one after the LAST
+		;     field; Generate() below never did, and neither does macOS
+		;     (modules/dynamic_hotstrings/personal_info.lua fires its tab only while
+		;     `i < #parts`). The bubble never showed one either, so preview and fire
+		;     now agree where they used to differ by a keystroke.
+		;   - An unknown letter declines the whole combo instead of skipping it, so
+		;     a typo cannot silently type a partial identity into a form.
+		HSE_PersonalInfoCombosEnabled := true
+	} else {
+		; Fail closed rather than leaving the resolver armed from a previous run:
+		; live rebuilds re-enter this function, and a toggle that only ever turns ON
+		; is a feature the user cannot switch off.
+		HSE_PersonalInfoCombosEnabled := false
 	}
 	try BootProfile_Mark("HS sub: @-personal-info combos registered")
 
@@ -252,142 +231,17 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 
 
 
-	; =====================================
-	; =====================================
-	; ======= 5/ Dynamic hotstrings =======
-	; =====================================
-	; =====================================
+	; ==========================================
+	; ==========================================
+	; ======= 5/ Dynamic hotstrings ============
+	; ==========================================
+	; ==========================================
 
-	; Effective activation delay for the dynamic hotstrings: the user's
-	; "dynamichotstrings" delay override when set, otherwise the shared default
-	; DYN_HOTSTRINGS_DEFAULT_DELAY (defined in lib/hotstrings/hotstrings_config.ahk,
-	; the early-loaded layer the tray menu also reads). No category TOML backs this
-	; key, so HotstringsResolve reports HasOverride=false until the user sets one
-	; from the tray "Delays" submenu (mirrors the macOS dynamichotstrings delay item).
-	_DynamicHotstringDelay() {
-		global DYN_HOTSTRINGS_DEFAULT_DELAY
-		R := HotstringsResolve("dynamichotstrings", "")
-		return R.HasOverride ? R.Delay : DYN_HOTSTRINGS_DEFAULT_DELAY
-	}
-
-	; Returns the shortest prefix of a spaced string that contains exactly RawCount
-	; non-space characters. Used to build the "spaced" trigger for SSN and IBAN.
-	SpacedPrefix(SpacedStr, RawCount) {
-		Seen := 0
-		Loop Parse, SpacedStr {
-			if A_LoopField != " "
-				Seen++
-			if Seen >= RawCount
-				return SubStr(SpacedStr, 1, A_Index)
-		}
-		return SpacedStr  ; Fallback — fewer raw chars than requested
-	}
-
-
-
-
-	; =====================
-	; ===== 5.1) Date =====
-	; =====================
-
-	; @dt★, @td★, @date★ resolved at fire time — cannot be static TOML entries.
-	; "??" flag required: after a prior expansion the output lands immediately
-	; before the next "@", so the word boundary before "@" is a digit or letter —
-	; not a terminator. Without "?", HSE rejects the match and the shorter
-	; "t★" (InWord=true) wins instead.
-	_DateShortFr(*) {
-		return FormatTime(, "dd/MM/yyyy")
-	}
-	_DateLongFr(*) {
-		; A_WDay: 1=Sunday, 2=Monday, …, 7=Saturday
-		days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
-		months := ["janvier", "février", "mars", "avril", "mai", "juin",
-		           "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
-		return days[A_WDay] . " " . FormatTime(, "d") . " " . months[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
-	}
-	_DateIso(*) {
-		return FormatTime(, "yyyy_MM_dd")
-	}
-	MK := ScriptInformation["MagicKey"]
-	; The dynamic hotstrings (dates + phone/SSN/IBAN prefixes) share one activation
-	; delay gate so they fire only when the trigger was typed within the configured
-	; window. Resolve it once and reuse the options Map for every registration below.
-	_DynOpts := Map("FinalResult", True, "TimeActivationSeconds", _DynamicHotstringDelay())
-	if Features["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
-		CreateHotstring("*?", "@dt" . MK, _DateShortFr, _DynOpts)
-	}
-	if Features["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
-		CreateHotstring("*?", "@date" . MK, _DateLongFr, _DynOpts)
-	}
-	if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
-		CreateHotstring("*?", "@td" . MK, _DateIso, _DynOpts)
-	}
-
-
-
-
-	; ==================================================
-	; ===== 5.2) Phone, SSN and IBAN prefix expand =====
-	; ==================================================
-
-	; Prefix-based hotstrings derived from the user's personal data.
-	; Registered once at startup from PersonalInformation — same logic as HS rules_engine.
-	; Each trigger auto-expands without end-char (*) and is case-sensitive (C).
-	Phone  := PersonalInformation["phone_number"]        ; e.g. "0606060606"
-	FPhone := PersonalInformation["phone_number_clean"]   ; e.g. "06 06 06 06 06"
-	Ssn    := PersonalInformation["social_security_number"] ; e.g. "1 99 99 99 999 999 99"
-	Iban   := PersonalInformation["iban"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
-
-	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
-	SsnRaw  := StrReplace(Ssn,  " ", "")
-	IbanRaw := StrReplace(Iban, " ", "")
-
-	if Features["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
-		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
-		MK := ScriptInformation["MagicKey"]
-		if StrLen(Phone) >= 2 {
-			CreateHotstring("*C", SubStr(Phone, 1, 2) . MK, (*) => Phone, _DynOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 1, 2), (*) => "+33" . SubStr(Phone, 2), _DynOpts)
-		}
-		if StrLen(Phone) >= 4 {
-			CreateHotstring("*C", SubStr(Phone, 1, 4), (*) => Phone, _DynOpts)
-			CreateHotstring("*C", "+33" . SubStr(Phone, 2, 3), (*) => "+33" . SubStr(Phone, 2), _DynOpts)
-		}
-		if StrLen(Phone) >= 6 {
-			CreateHotstring("*C", SubStr(Phone, 2, 4), (*) => Phone, _DynOpts)
-		}
-		if StrLen(FPhone) >= 5 {
-			CreateHotstring("*C", SubStr(FPhone, 1, 5), (*) => FPhone, _DynOpts)
-		}
-	}
-
-	if Features["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
-		; No-space trigger → SSN without spaces; spaced trigger → SSN with spaces.
-		; Both use the first 5 raw digits as the distinguishing prefix.
-		if StrLen(SsnRaw) >= 5 {
-			SsnRawPrefix  := SubStr(SsnRaw, 1, 5)
-			SsnSpacedPfx  := SpacedPrefix(Ssn, 5)
-			CreateHotstring("*C", SsnRawPrefix,  (*) => SsnRaw, _DynOpts)
-			if SsnSpacedPfx != SsnRawPrefix {
-				CreateHotstring("*C", SsnSpacedPfx, (*) => Ssn, _DynOpts)
-			}
-		}
-	}
-
-	if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
-		; 6 raw chars (case-insensitive) → IBAN without spaces.
-		; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
-		; Both triggers fire at the 6th raw character typed.
-		if StrLen(IbanRaw) >= 6 {
-			IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
-			IbanSpacedPfx    := SpacedPrefix(Iban, 6)
-			; No C flag = case-insensitive matching for the letter prefix (e.g. "fr76")
-			CreateHotstring("*", IbanRawPrefix,  (*) => StrReplace(Iban, " ", ""), _DynOpts)
-			if IbanSpacedPfx != IbanRawPrefix {
-				CreateHotstring("*", IbanSpacedPfx, (*) => Iban, _DynOpts)
-			}
-		}
-	}
+	; Moved to modules/dynamic_hotstrings/, which is the folder name macOS and
+	; Linux already use for the same behaviour. The CALL stays here: registration
+	; order feeds the engine's collision tiebreak, so this must still run after
+	; the emoji/symbol sections and before the repeat key below.
+	_DynHS_RegisterAll()
 
 
 

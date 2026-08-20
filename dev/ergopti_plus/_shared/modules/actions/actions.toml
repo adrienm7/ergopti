@@ -1,0 +1,1216 @@
+# _shared/modules/actions/actions.toml
+#
+# Source de vérité unique pour les actions de gestes.
+# Lue par Hammerspoon (modules/gestures/actions.lua) et AutoHotkey
+# (modules/gestures.ahk) au démarrage pour construire la liste ordonnée
+# du picker et valider les noms d'actions.
+#
+# platform : "all" | "hs" | "ahk" | "linux" | une liste séparée par des virgules
+#   "all"     — disponible sur tous les drivers
+#   "hs"      — macOS / Hammerspoon uniquement
+#   "ahk"     — Windows / AutoHotkey uniquement
+#   "linux"   — Linux / kanata uniquement
+#   "hs,ahk"  — exactement ces drivers-là
+#
+# La forme liste a été ajoutée le 2026-08-03 parce que le champ ne savait pas
+# dire « deux drivers sur trois ». Les deux cycleurs de fenêtres existent sur
+# macOS et Windows et pas sur Linux : les déclarer "all" mettait deux lignes
+# mortes dans le picker Linux, et les déclarer "hs" ou "ahk" cachait la moitié
+# du travail. Aucune des deux réponses n'était vraie, donc c'est le champ qui
+# était faux.
+#
+# type : "sg" (action ponctuelle) | "ax" (axe continu)
+#
+# Les séparateurs "--" et les titres "#Titre" dans [sg_order] / [ax_order]
+# sont des directives de mise en forme pour le picker — pas des actions.
+
+
+# ==============================================================================
+# Gesture slot key-space (single source of truth for the slot names)
+# ==============================================================================
+#
+# Both drivers (Linux modules/gestures/manager.lua and macOS
+# modules/gestures/init.lua) must build SINGLE_SLOTS / AXIS_SLOTS and the
+# DEFAULT_GESTURES key-space from these lists. The DEFAULT_GESTURES key-space is
+# exactly the union of single and axis. The default action VALUES stay
+# platform-specific and are intentionally not listed here.
+
+[slots]
+single = [
+	"tap_2", "tap_3", "tap_4", "tap_5",
+	"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
+	"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down",
+	"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down",
+	"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down",
+	"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down",
+	"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
+	"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down",
+	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
+]
+axis = [
+	"swipe_3_horiz",
+	"swipe_4_horiz",
+	"swipe_5_horiz",
+]
+
+
+# ==============================================================================
+# Axe actions (swipes continus / scalables)
+# ==============================================================================
+
+[ax_actions]
+
+[ax_actions.tabs]
+platform = "all"
+scalable = true
+
+[ax_actions.char]
+platform = "all"
+scalable = true
+
+[ax_actions.char_sel]
+platform = "all"
+scalable = true
+
+[ax_actions.line_arrow]
+platform = "all"
+scalable = true
+
+[ax_actions.line_sel]
+platform = "all"
+scalable = true
+
+[ax_actions.words]
+platform = "all"
+scalable = true
+
+[ax_actions.words_sel]
+platform = "all"
+scalable = true
+
+[ax_actions.windows]
+platform = "all"
+scalable = false
+
+[ax_actions.spaces]
+platform = "hs"
+scalable = false
+
+[ax_actions.desktops]
+platform = "ahk"
+scalable = false
+
+[ax_actions.volume]
+platform = "all"
+scalable = true
+
+[ax_actions.brightness]
+platform = "all"
+scalable = true
+
+[ax_actions.tracks]
+platform = "all"
+scalable = false
+
+[ax_actions.lines]
+platform = "all"
+scalable = true
+
+[ax_actions.line_bounds]
+platform = "all"
+scalable = false
+
+[ax_actions.paragraphs]
+platform = "all"
+scalable = true
+
+[ax_actions.document]
+platform = "all"
+scalable = false
+
+
+# ==============================================================================
+# Ordre du picker pour les axes
+# ==============================================================================
+
+[ax_order]
+items = [
+    "tabs",
+    "char",
+    "char_sel",
+    "line_arrow",
+    "line_sel",
+    "words",
+    "words_sel",
+    "windows",
+    "spaces",
+    "desktops",
+    "volume",
+    "brightness",
+    "tracks",
+    "lines",
+    "line_bounds",
+    "paragraphs",
+    "document",
+]
+
+
+# ==============================================================================
+# Actions ponctuelles (single-fire)
+# ==============================================================================
+
+[sg_actions]
+
+[sg_actions.none]
+platform = "all"
+
+# --- Souris ---
+
+[sg_actions.left_click_toggle]
+platform = "all"
+
+[sg_actions.right_click_toggle]
+platform = "all"
+
+[sg_actions.lookup]
+platform = "hs"
+
+# --- Navigation applications ---
+
+[sg_actions.app_switcher]
+platform = "all"
+emit_ahk_key = "Tab"
+emit_ahk_mods = ["alt"]
+emit_linux = "alt+Tab"
+
+[sg_actions.app_previous]
+platform = "hs"
+
+[sg_actions.app_window_previous]
+platform = "hs"
+emit_linux = "alt+Escape"
+
+# --- Édition (Windows uniquement — macOS utilise Cmd+C/V/X dans cmd_*) ---
+
+[sg_actions.copy]
+platform = "ahk"
+emit_ahk_key = "c"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.paste]
+platform = "ahk"
+emit_ahk_key = "v"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.cut]
+platform = "ahk"
+emit_ahk_key = "x"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.undo]
+platform = "ahk"
+emit_ahk_key = "z"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.redo]
+platform = "ahk"
+emit_ahk_key = "y"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.select_all]
+platform = "ahk"
+emit_ahk_key = "a"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.find]
+platform = "ahk"
+emit_ahk_key = "f"
+emit_ahk_mods = ["ctrl"]
+
+# --- Touches ---
+
+[sg_actions.enter]
+platform = "all"
+emit_ahk_key = "Enter"
+emit_ahk_mods = []
+emit_hs_key = "return"
+emit_hs_mods = []
+emit_linux = "Return"
+
+[sg_actions.tab]
+platform = "all"
+emit_hs_key = "tab"
+emit_hs_mods = []
+
+[sg_actions.escape]
+platform = "all"
+emit_ahk_key = "Escape"
+emit_ahk_mods = []
+emit_hs_key = "escape"
+emit_hs_mods = []
+emit_linux = "Escape"
+
+[sg_actions.backspace]
+platform = "all"
+emit_ahk_key = "BackSpace"
+emit_ahk_mods = []
+emit_hs_key = "delete"
+emit_hs_mods = []
+emit_linux = "BackSpace"
+
+[sg_actions.delete]
+platform = "all"
+emit_ahk_key = "Delete"
+emit_ahk_mods = []
+emit_hs_key = "forwarddelete"
+emit_hs_mods = []
+emit_linux = "Delete"
+
+# --- Onglets ---
+
+[sg_actions.tab_new]
+platform = "all"
+emit_ahk_key = "t"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "t"
+emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+t"
+
+[sg_actions.tab_close]
+platform = "all"
+emit_ahk_key = "w"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "w"
+emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+w"
+
+[sg_actions.tab_prev]
+platform = "all"
+emit_hs_key = "tab"
+emit_hs_mods = ["ctrl", "shift"]
+emit_linux = "ctrl+shift+Tab"
+
+[sg_actions.tab_next]
+platform = "all"
+emit_hs_key = "tab"
+emit_hs_mods = ["ctrl"]
+emit_linux = "ctrl+Tab"
+
+# --- Navigation navigateur ---
+
+[sg_actions.nav_back]
+platform = "ahk"
+
+[sg_actions.nav_forward]
+platform = "ahk"
+
+# --- Fenêtres ---
+
+[sg_actions.win_prev]
+platform = "all"
+
+[sg_actions.win_next]
+platform = "all"
+
+[sg_actions.win_app_prev]
+platform = "ahk"
+
+[sg_actions.win_app_next]
+platform = "ahk"
+
+[sg_actions.close_window]
+platform = "all"
+emit_ahk_key = "F4"
+emit_ahk_mods = ["alt"]
+emit_hs_key = "w"
+emit_hs_mods = ["cmd"]
+emit_linux = "alt+F4"
+
+[sg_actions.fullscreen]
+platform = "all"
+emit_ahk_key = "F11"
+emit_ahk_mods = []
+emit_hs_key = "f"
+emit_hs_mods = ["cmd", "ctrl"]
+emit_linux = "F11"
+
+[sg_actions.snap_left]
+platform = "all"
+emit_ahk_key = "Left"
+emit_ahk_mods = ["super"]
+emit_linux = "super+Left"
+
+[sg_actions.snap_right]
+platform = "all"
+emit_ahk_key = "Right"
+emit_ahk_mods = ["super"]
+emit_linux = "super+Right"
+
+[sg_actions.maximize]
+platform = "all"
+emit_ahk_key = "Up"
+emit_ahk_mods = ["super"]
+emit_linux = "super+Up"
+
+# --- Espaces / bureaux virtuels ---
+
+[sg_actions.space_prev]
+platform = "hs"
+
+[sg_actions.space_next]
+platform = "hs"
+
+[sg_actions.mission_control]
+platform = "hs"
+
+[sg_actions.app_expose]
+platform = "hs"
+
+[sg_actions.desktop_prev]
+platform = "ahk"
+emit_ahk_key = "Left"
+emit_ahk_mods = ["ctrl", "super"]
+
+[sg_actions.desktop_next]
+platform = "ahk"
+emit_ahk_key = "Right"
+emit_ahk_mods = ["ctrl", "super"]
+
+[sg_actions.desktop_new]
+platform = "ahk"
+emit_ahk_key = "d"
+emit_ahk_mods = ["ctrl", "super"]
+
+[sg_actions.desktop_close]
+platform = "ahk"
+emit_ahk_key = "F4"
+emit_ahk_mods = ["ctrl", "super"]
+
+[sg_actions.task_view]
+platform = "ahk"
+emit_ahk_key = "Tab"
+emit_ahk_mods = ["super"]
+
+[sg_actions.minimize_all]
+platform = "ahk"
+emit_ahk_key = "d"
+emit_ahk_mods = ["super"]
+
+# --- Déplacement curseur ---
+
+[sg_actions.word_prev]
+platform = "all"
+emit_ahk_key = "Left"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "left"
+emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Left"
+
+[sg_actions.word_next]
+platform = "all"
+emit_ahk_key = "Right"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "right"
+emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Right"
+
+[sg_actions.line_up]
+platform = "all"
+emit_ahk_key = "Up"
+emit_ahk_mods = []
+emit_linux = "Up"
+
+[sg_actions.line_down]
+platform = "all"
+emit_ahk_key = "Down"
+emit_ahk_mods = []
+emit_linux = "Down"
+
+[sg_actions.line_start]
+platform = "all"
+emit_ahk_key = "Home"
+emit_ahk_mods = []
+emit_linux = "Home"
+
+[sg_actions.line_end]
+platform = "all"
+emit_ahk_key = "End"
+emit_ahk_mods = []
+emit_linux = "End"
+
+[sg_actions.para_prev]
+platform = "all"
+emit_ahk_key = "Up"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "up"
+emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Up"
+
+[sg_actions.para_next]
+platform = "all"
+emit_ahk_key = "Down"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "down"
+emit_hs_mods = ["alt"]
+emit_linux = "ctrl+Down"
+
+[sg_actions.doc_start]
+platform = "all"
+emit_ahk_key = "Home"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "up"
+emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+Home"
+
+[sg_actions.doc_end]
+platform = "all"
+emit_ahk_key = "End"
+emit_ahk_mods = ["ctrl"]
+emit_hs_key = "down"
+emit_hs_mods = ["cmd"]
+emit_linux = "ctrl+End"
+
+# --- Flèches ---
+
+[sg_actions.arrow_up]
+platform = "all"
+emit_ahk_key = "Up"
+emit_ahk_mods = []
+emit_hs_key = "up"
+emit_hs_mods = []
+emit_linux = "Up"
+
+[sg_actions.arrow_down]
+platform = "all"
+emit_ahk_key = "Down"
+emit_ahk_mods = []
+emit_hs_key = "down"
+emit_hs_mods = []
+emit_linux = "Down"
+
+[sg_actions.arrow_left]
+platform = "all"
+emit_ahk_key = "Left"
+emit_ahk_mods = []
+emit_hs_key = "left"
+emit_hs_mods = []
+emit_linux = "Left"
+
+[sg_actions.arrow_right]
+platform = "all"
+emit_ahk_key = "Right"
+emit_ahk_mods = []
+emit_hs_key = "right"
+emit_hs_mods = []
+emit_linux = "Right"
+
+# --- Sélection ---
+
+[sg_actions.sel_up]
+platform = "all"
+emit_ahk_key = "Up"
+emit_ahk_mods = ["shift"]
+emit_hs_key = "up"
+emit_hs_mods = ["shift"]
+emit_linux = "shift+Up"
+
+[sg_actions.sel_down]
+platform = "all"
+emit_ahk_key = "Down"
+emit_ahk_mods = ["shift"]
+emit_hs_key = "down"
+emit_hs_mods = ["shift"]
+emit_linux = "shift+Down"
+
+[sg_actions.sel_left]
+platform = "all"
+emit_ahk_key = "Left"
+emit_ahk_mods = ["shift"]
+emit_hs_key = "left"
+emit_hs_mods = ["shift"]
+emit_linux = "shift+Left"
+
+[sg_actions.sel_right]
+platform = "all"
+emit_ahk_key = "Right"
+emit_ahk_mods = ["shift"]
+emit_hs_key = "right"
+emit_hs_mods = ["shift"]
+emit_linux = "shift+Right"
+
+[sg_actions.sel_word_prev]
+platform = "all"
+emit_ahk_key = "Left"
+emit_ahk_mods = ["ctrl", "shift"]
+emit_hs_key = "left"
+emit_hs_mods = ["shift", "alt"]
+emit_linux = "ctrl+shift+Left"
+
+[sg_actions.sel_word_next]
+platform = "all"
+emit_ahk_key = "Right"
+emit_ahk_mods = ["ctrl", "shift"]
+emit_hs_key = "right"
+emit_hs_mods = ["shift", "alt"]
+emit_linux = "ctrl+shift+Right"
+
+# --- Médias ---
+
+[sg_actions.vol_up]
+platform = "all"
+emit_ahk_key = "Volume_Up"
+emit_ahk_mods = []
+
+[sg_actions.vol_down]
+platform = "all"
+emit_ahk_key = "Volume_Down"
+emit_ahk_mods = []
+
+[sg_actions.mute]
+platform = "all"
+emit_ahk_key = "Volume_Mute"
+emit_ahk_mods = []
+
+[sg_actions.brightness_up]
+platform = "all"
+emit_ahk_key = "Brightness_Up"
+emit_ahk_mods = []
+
+[sg_actions.brightness_down]
+platform = "all"
+emit_ahk_key = "Brightness_Down"
+emit_ahk_mods = []
+
+[sg_actions.track_play]
+platform = "all"
+emit_ahk_key = "Media_Play_Pause"
+emit_ahk_mods = []
+
+[sg_actions.track_next]
+platform = "all"
+emit_ahk_key = "Media_Next"
+emit_ahk_mods = []
+
+[sg_actions.track_prev]
+platform = "all"
+emit_ahk_key = "Media_Prev"
+emit_ahk_mods = []
+
+# --- Captures d'écran ---
+
+[sg_actions.screenshot_window_clipboard]
+platform = "all"
+
+[sg_actions.screenshot_window_save]
+platform = "all"
+
+[sg_actions.screenshot_region_clipboard]
+platform = "all"
+
+[sg_actions.screenshot_region_save]
+platform = "all"
+
+[sg_actions.screenshot_fullscreen_clipboard]
+platform = "all"
+
+[sg_actions.screenshot_fullscreen_save]
+platform = "all"
+
+[sg_actions.screen_record]
+platform = "ahk"
+emit_ahk_key = "r"
+emit_ahk_mods = ["super", "alt"]
+
+# --- Système ---
+
+[sg_actions.lock_screen]
+platform = "all"
+
+[sg_actions.notification_center]
+platform = "all"
+emit_ahk_key = "n"
+emit_ahk_mods = ["super"]
+emit_linux = "super+v"
+
+# --- UI / Fenêtres de l'app ---
+
+[sg_actions.open_metrics_typing]
+platform = "all"
+
+[sg_actions.open_metrics_apps]
+platform = "all"
+
+[sg_actions.open_hotstrings_editor]
+platform = "all"
+
+[sg_actions.open_paths_editor]
+platform = "all"
+
+# --- Fichiers utilisateur ---
+
+[sg_actions.open_script_source]
+platform = "all"
+
+[sg_actions.open_personal_shortcuts]
+platform = "all"
+
+[sg_actions.open_personal_hotstrings]
+platform = "all"
+
+[sg_actions.open_personal_info]
+platform = "all"
+
+[sg_actions.open_config]
+platform = "all"
+
+[sg_actions.open_logs_folder]
+platform = "all"
+
+[sg_actions.open_today_log]
+platform = "all"
+
+[sg_actions.open_error_log]
+platform = "all"
+
+# --- Gestion du script ---
+
+[sg_actions.script_pause_toggle]
+platform = "all"
+
+[sg_actions.script_reload]
+platform = "all"
+
+[sg_actions.script_save_reload]
+platform = "all"
+
+[sg_actions.script_quit]
+platform = "all"
+
+# --- Actions système avancées ---
+
+[sg_actions.select_line]
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
+emit_ahk = "{Home}{Shift Down}{End}{Shift Up}"
+
+[sg_actions.screen_capture]
+platform = "ahk"
+emit_ahk = "#+s"
+
+[sg_actions.screen_capture_instant]
+platform = "ahk"
+
+[sg_actions.ocr_screenshot]
+platform = "ahk"
+emit_ahk = "#+t"
+
+[sg_actions.open_url]
+platform = "all"
+# The parameter belongs to a binding (gesture, tap-hold or shortcut), never to
+# the action globally: two bindings may legitimately open two different URLs.
+parameter = "url"
+
+[sg_actions.pick_color]
+platform = "ahk"
+
+[sg_actions.take_note]
+platform = "ahk"
+
+[sg_actions.activity_simulation]
+platform = "ahk"
+
+[sg_actions.surround_parens]
+platform = "ahk"
+emit_ahk = "{Home}({End}){Home}"
+
+[sg_actions.search_web]
+platform = "all"
+# URL template containing exactly one %s placeholder for the selected query.
+parameter = "search_url"
+
+[sg_actions.teleport_mouse]
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
+
+[sg_actions.uppercase_selection]
+platform = "ahk"
+
+[sg_actions.titlecase_selection]
+platform = "ahk"
+
+[sg_actions.spotlight_mouse]
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
+
+[sg_actions.toggle_capslock]
+# Implemented on BOTH: Windows in modules/shortcuts, macOS in
+# modules/shortcuts/actions/ and registered into the gesture registry.
+platform = "all"
+
+[sg_actions.microsoft_bold]
+platform = "ahk"
+
+[sg_actions.paste_plain]
+platform = "ahk"
+
+# --- Tap-Hold (actions disponibles uniquement comme valeur au tap d'une touche remappée) ---
+
+[sg_actions.one_shot_shift]
+platform = "ahk"
+
+[sg_actions.caps_word]
+platform = "ahk"
+
+[sg_actions.ctrl_backspace]
+platform = "ahk"
+emit_ahk_key = "BackSpace"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.ctrl_delete]
+platform = "ahk"
+emit_ahk_key = "Delete"
+emit_ahk_mods = ["ctrl"]
+
+[sg_actions.space]
+platform = "ahk"
+emit_ahk_key = "Space"
+emit_ahk_mods = []
+
+[sg_actions.caps_lock]
+platform = "ahk"
+
+# --- Actions du remap Karabiner (macOS) ---
+# Les 36 actions « tappables » de macos/platform/remap/data/actions.json qui
+# n'étaient déclarées nulle part ici : le picker de gestes ne pouvait donc pas
+# les proposer, alors que le remap clavier les exécute depuis toujours.
+#
+# Les 19 autres actions du catalogue Karabiner sont volontairement absentes :
+# elles sont « hold-only » (layer, shift, cmd, et douze combinaisons). Un geste
+# n'a pas de durée — un swipe se produit puis se termine — donc « maintenir
+# Shift » ne peut pas s'exprimer comme geste. Les déclarer créerait dix-neuf
+# lignes de picker qui ne peuvent pas fonctionner.
+#
+# Les identifiants sont ceux de Karabiner, jamais renommés : one_shot_shift
+# (AutoHotkey) et sticky_shift (Karabiner) restent deux orthographes que la
+# table SYNONYMS de test-tap-hold-namespace-correspondence.cjs apparie. Les
+# fusionner coûterait un renommage à travers les trois drivers.
+
+[sg_actions.layer_on]
+platform = "hs"
+
+[sg_actions.layer_off]
+platform = "hs"
+
+[sg_actions.capsword]
+platform = "hs"
+
+[sg_actions.save]
+platform = "hs"
+emit_hs_key = "s"
+emit_hs_mods = ["cmd"]
+
+[sg_actions.opt_backspace]
+platform = "hs"
+emit_hs_key = "delete"
+emit_hs_mods = ["alt"]
+
+[sg_actions.opt_delete_fwd]
+platform = "hs"
+emit_hs_key = "forwarddelete"
+emit_hs_mods = ["alt"]
+
+[sg_actions.cmd_backspace]
+platform = "hs"
+emit_hs_key = "delete"
+emit_hs_mods = ["cmd"]
+
+[sg_actions.cmd_delete_fwd]
+platform = "hs"
+emit_hs_key = "forwarddelete"
+emit_hs_mods = ["cmd"]
+
+[sg_actions.cmd_shift_tab]
+platform = "hs"
+emit_hs_key = "tab"
+emit_hs_mods = ["cmd", "shift"]
+
+# Ces trois-là émettent F17 : le driver lui-même l'écoute (watchers.lua lie F17,
+# Shift+F17 et Alt+F17), donc le geste passe par le même chemin que la touche
+# remappée au lieu de réimplémenter le cyclage une deuxième fois.
+[sg_actions.alt_tab_apps]
+platform = "hs"
+emit_hs_key = "f17"
+emit_hs_mods = ["alt"]
+
+[sg_actions.alt_tab_windows]
+platform = "hs,ahk"
+emit_hs_key = "f17"
+emit_hs_mods = ["shift"]
+
+# Cycle limité à l'écran sous le curseur. Windows le fait depuis toujours
+# (AltTabMonitor), macOS ne cyclait que globalement : la même touche se
+# comportait différemment sur les deux plateformes sans que rien ne l'écrive.
+# Les deux comportements sont voulus, et chacun est maintenant assignable
+# partout. Ctrl+F17 est le quatrième et dernier accord F17 libre — les trois
+# autres portent déjà cycle_windows_in_app, alt_tab_windows et alt_tab_apps.
+[sg_actions.alt_tab_monitor]
+platform = "hs,ahk"
+emit_hs_key = "f17"
+emit_hs_mods = ["ctrl"]
+
+[sg_actions.cycle_windows_in_app]
+platform = "hs"
+emit_hs_key = "f17"
+emit_hs_mods = []
+
+[sg_actions.home]
+platform = "hs"
+emit_hs_key = "home"
+emit_hs_mods = []
+
+[sg_actions.end]
+platform = "hs"
+emit_hs_key = "end"
+emit_hs_mods = []
+
+[sg_actions.page_up]
+platform = "hs"
+emit_hs_key = "pageup"
+emit_hs_mods = []
+
+[sg_actions.page_down]
+platform = "hs"
+emit_hs_key = "pagedown"
+emit_hs_mods = []
+
+[sg_actions.spotlight]
+platform = "hs"
+emit_hs_key = "space"
+emit_hs_mods = ["cmd"]
+
+# --- Modificateurs collants (one-shot) ---
+# Karabiner les exprime par `sticky_modifier`, une construction de manipulateur
+# qu'aucune IPC ne peut déclencher de l'extérieur. macOS les réimplémente donc
+# dans modules/gestures/sticky_modifiers.lua : chaque modificateur bascule
+# indépendamment, exactement comme le fait le catalogue Karabiner.
+
+[sg_actions.sticky_shift]
+platform = "hs"
+
+[sg_actions.sticky_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_cmd]
+platform = "hs"
+
+[sg_actions.sticky_option]
+platform = "hs"
+
+[sg_actions.sticky_cmd_shift]
+platform = "hs"
+
+[sg_actions.sticky_cmd_option]
+platform = "hs"
+
+[sg_actions.sticky_cmd_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_option_shift]
+platform = "hs"
+
+[sg_actions.sticky_option_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_ctrl_shift]
+platform = "hs"
+
+[sg_actions.sticky_cmd_option_shift]
+platform = "hs"
+
+[sg_actions.sticky_cmd_option_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_cmd_shift_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_option_shift_ctrl]
+platform = "hs"
+
+[sg_actions.sticky_hyper]
+platform = "hs"
+
+# --- Debug ---
+
+[sg_actions.open_console]
+platform = "hs"
+
+[sg_actions.open_window_spy]
+platform = "ahk"
+
+[sg_actions.open_list_vars]
+platform = "ahk"
+
+[sg_actions.open_key_history]
+platform = "ahk"
+
+# --- Raccourcis modificateur + touche ---
+# La matrice exhaustive est déclarée une seule fois dans
+# modifier_chords.json. Chaque driver génère toutes les combinaisons non vides
+# de ses modificateurs natifs et les expose sous des libellés non traduits comme
+# « Ctrl + A ». Les identifiants internes ne doivent jamais être affichés.
+
+[sg_actions._modifier_chords_placeholder]
+platform = "all"
+is_header = true
+
+
+# ==============================================================================
+# Alias : identifiants Karabiner d'actions déjà présentes sous un autre nom
+# ==============================================================================
+#
+# Mesuré le 2026-08-03 en fusionnant les deux espaces de noms : quatre des
+# trente-six actions « manquantes » du catalogue Karabiner ne manquaient pas.
+# Elles produisent EXACTEMENT la frappe d'une action déjà déclarée ici :
+#
+#   return            ≡ enter          (return)
+#   delete_fwd        ≡ delete         (forwarddelete)
+#   cmd_tab           ≡ app_switcher   (cmd+tab)
+#   alt_tab_apps_list ≡ app_switcher   (cmd+tab — Karabiner déclare lui-même
+#                                       deux ids pour un « karabiner_to »
+#                                       identique)
+#
+# Les déclarer comme lignes aurait mis quatre doublons dans le picker de
+# gestes : « ⌦ Suppr. avant » deux fois, à deux endroits, pour la même touche.
+# Un espace de noms qui porte deux noms pour une même chose n'en est pas un.
+#
+# L'alias sert au picker du REMAP, qui est indexé sur les identifiants
+# Karabiner : il résout son libellé vers celui de l'action partagée, si bien
+# que les deux vocabulaires affichent le même texte sans dupliquer une chaîne
+# dans vingt-et-un fichiers de locale.
+#
+# Ce n'est pas un fourre-tout : test-action-aliases-are-real-duplicates.cjs
+# exige que la cible existe, que l'alias ne soit pas lui-même une ligne, et que
+# deux lignes n'émettent jamais la même frappe macOS.
+
+[karabiner_aliases]
+return = "enter"
+delete_fwd = "delete"
+cmd_tab = "app_switcher"
+alt_tab_apps_list = "app_switcher"
+
+
+# ==============================================================================
+# Ordre du picker pour les actions ponctuelles
+# "--" = séparateur visuel
+# "#Titre" = titre de section (non sélectionnable)
+# Les entrées platform-spécifiques sont filtrées par chaque driver
+# ==============================================================================
+
+[sg_order]
+items = [
+    "none",
+    "--",
+    "#grp_input",
+    "##mouse_nav",
+    "left_click_toggle",
+    "right_click_toggle",
+    "lookup",
+    "app_switcher",
+    "app_previous",
+    "app_window_previous",
+    "alt_tab_apps",
+    "alt_tab_windows",
+    "alt_tab_monitor",
+    "cmd_shift_tab",
+    "--",
+    "##edition",
+    "copy",
+    "paste",
+    "cut",
+    "undo",
+    "redo",
+    "select_all",
+    "find",
+    "save",
+    "opt_backspace",
+    "opt_delete_fwd",
+    "cmd_backspace",
+    "cmd_delete_fwd",
+    "--",
+    "##keys",
+    "enter",
+    "tab",
+    "escape",
+    "backspace",
+    "delete",
+    "--",
+    "#grp_windows",
+    "##tabs",
+    "tab_new",
+    "tab_close",
+    "tab_prev",
+    "tab_next",
+    "--",
+    "##navigation",
+    "nav_back",
+    "nav_forward",
+    "--",
+    "##windows",
+    "win_prev",
+    "win_next",
+    "win_app_prev",
+    "win_app_next",
+    "cycle_windows_in_app",
+    "close_window",
+    "fullscreen",
+    "snap_left",
+    "snap_right",
+    "maximize",
+    "--",
+    "##spaces",
+    "space_prev",
+    "space_next",
+    "mission_control",
+    "app_expose",
+    "desktop_prev",
+    "desktop_next",
+    "desktop_new",
+    "desktop_close",
+    "task_view",
+    "minimize_all",
+    "--",
+    "#grp_text",
+    "##cursor",
+    "arrow_up",
+    "arrow_down",
+    "arrow_left",
+    "arrow_right",
+    "word_prev",
+    "word_next",
+    "line_up",
+    "line_down",
+    "line_start",
+    "line_end",
+    "para_prev",
+    "para_next",
+    "doc_start",
+    "doc_end",
+    "home",
+    "end",
+    "page_up",
+    "page_down",
+    "--",
+    "##selection",
+    "sel_up",
+    "sel_down",
+    "sel_left",
+    "sel_right",
+    "sel_word_prev",
+    "sel_word_next",
+    "--",
+    "#Raccourcis",
+    "_modifier_chords_placeholder",
+    "--",
+    "#grp_media",
+    "##media",
+    "vol_up",
+    "vol_down",
+    "mute",
+    "brightness_up",
+    "brightness_down",
+    "track_play",
+    "track_next",
+    "track_prev",
+    "--",
+    "##screenshot",
+    "screenshot_window_clipboard",
+    "screenshot_window_save",
+    "screenshot_region_clipboard",
+    "screenshot_region_save",
+    "screenshot_fullscreen_clipboard",
+    "screenshot_fullscreen_save",
+    "screen_record",
+    "--",
+    "#grp_system",
+    "##system",
+    "lock_screen",
+    "notification_center",
+    "spotlight",
+    "--",
+    "##system_actions",
+    "select_line",
+    "screen_capture",
+    "screen_capture_instant",
+    "ocr_screenshot",
+    "open_url",
+    "pick_color",
+    "take_note",
+    "activity_simulation",
+    "surround_parens",
+    "search_web",
+    "teleport_mouse",
+    "uppercase_selection",
+    "titlecase_selection",
+    "spotlight_mouse",
+    "toggle_capslock",
+    "microsoft_bold",
+    "paste_plain",
+    "--",
+    "##tapholds",
+    "one_shot_shift",
+    "caps_word",
+    "ctrl_backspace",
+    "ctrl_delete",
+    "space",
+    "caps_lock",
+    "layer_on",
+    "layer_off",
+    "capsword",
+    "sticky_shift",
+    "sticky_ctrl",
+    "sticky_cmd",
+    "sticky_option",
+    "sticky_cmd_shift",
+    "sticky_cmd_option",
+    "sticky_cmd_ctrl",
+    "sticky_option_shift",
+    "sticky_option_ctrl",
+    "sticky_ctrl_shift",
+    "sticky_cmd_option_shift",
+    "sticky_cmd_option_ctrl",
+    "sticky_cmd_shift_ctrl",
+    "sticky_option_shift_ctrl",
+    "sticky_hyper",
+    "--",
+    "#grp_app",
+    "##ui",
+    "open_metrics_typing",
+    "open_metrics_apps",
+    "open_hotstrings_editor",
+    "open_paths_editor",
+    "--",
+    "##files",
+    "open_script_source",
+    "open_personal_shortcuts",
+    "open_personal_hotstrings",
+    "open_personal_info",
+    "open_config",
+    "open_logs_folder",
+    "open_today_log",
+    "open_error_log",
+    "--",
+    "##script",
+    "script_pause_toggle",
+    "script_reload",
+    "script_save_reload",
+    "script_quit",
+    "--",
+    "##debug",
+    "open_console",
+    "open_window_spy",
+    "open_list_vars",
+    "open_key_history",
+]

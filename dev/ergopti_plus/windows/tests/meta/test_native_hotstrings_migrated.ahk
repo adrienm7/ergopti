@@ -42,13 +42,13 @@ _MetaCheckNativeHotstringsMigrated() {
 	; Both hotstring_engine_main.ahk and hotstring_engine.ahk are shims now
 	; (#Include hotstring_match.ahk/hotstring_dispatch.ahk and
 	; hotstring_send.ahk/hotstring_builder.ahk respectively) -- fold in the whole
-	; lib/hotstrings dir once and reuse it, while the individual FileReads still
+	; infra/hotstrings dir once and reuse it, while the individual FileReads still
 	; prove each shim file itself is present and readable.
-	LibHotstrings := _DriverDirConcat("lib/hotstrings")
+	LibHotstrings := _DriverDirConcat("infra/hotstrings")
 
 	; The HSE engine must provide the raw-callback dispatch path.
 	EngineMainShim := ""
-	try EngineMainShim := FileRead(WindowsDir . "\lib\hotstrings\hotstring_engine_main.ahk")
+	try EngineMainShim := FileRead(WindowsDir . "\infra\hotstrings\hotstring_engine_main.ahk")
 	Assert(EngineMainShim != "", "hotstring_engine_main.ahk must be readable")
 	EngineMain := EngineMainShim . LibHotstrings
 	Assert(InStr(EngineMain, "_HSE_DispatchRawCallback"),
@@ -59,14 +59,14 @@ _MetaCheckNativeHotstringsMigrated() {
 	; hotstring_engine.ahk must (transitively, via hotstring_builder.ahk) provide
 	; the CreateRawCallbackHotstring builder.
 	EngineShim := ""
-	try EngineShim := FileRead(WindowsDir . "\lib\hotstrings\hotstring_engine.ahk")
+	try EngineShim := FileRead(WindowsDir . "\infra\hotstrings\hotstring_engine.ahk")
 	Assert(EngineShim != "", "hotstring_engine.ahk must be readable")
 	Engine := EngineShim . LibHotstrings
 	Assert(InStr(Engine, "CreateRawCallbackHotstring("),
 		"hotstring_engine.ahk must define the CreateRawCallbackHotstring builder")
 
 	; The registration module must use the HSE raw-callback path for the deadkey +
-	; ellipsis, return their { Bs, Ins } buffer effects, and contain NO native
+	; ellipsis, return their { Ok, Bs, Ins } transaction effects, and contain NO native
 	; AHK-engine deadkey flag string (":*?CB0:" was unique to the old native call).
 	; modules/hotstrings.ahk is likewise a shim -- fold in modules/hotstrings/.
 	HsShim := ""
@@ -77,8 +77,8 @@ _MetaCheckNativeHotstringsMigrated() {
 		"deadkey + ellipsis must register via CreateRawCallbackHotstring")
 	Assert(InStr(Hs, "_EllipsisRawCallback"),
 		"the ellipsis raw-callback (_EllipsisRawCallback) must exist")
-	Assert(InStr(Hs, "{ Bs:"),
-		"the migrated callbacks must return a { Bs, Ins } buffer effect for HSE resync")
+	Assert(InStr(Hs, "Ok: true") and InStr(Hs, "Ok: false") and InStr(Hs, "Bs:"),
+		"the migrated callbacks must return a status-bearing { Ok, Bs, Ins } effect for HSE resync")
 	Assert(!InStr(Hs, ":*?CB0:"),
 		"modules\hotstrings.ahk must contain no native AHK Hotstring() deadkey registration "
 		. "(the ':*?CB0:' flag string) — the deadkey is now an HSE raw-callback")

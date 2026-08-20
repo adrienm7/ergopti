@@ -52,7 +52,7 @@ _RTNA_DispatchPutsNoCredentialOnTheCommandLine() {
 
 ; No surviving helper may put the token back on argv by another name.
 _RTNA_NoHelperEmitsATokenBearingHeaderArg() {
-	Args := _DriverFuncBody("_LLMRemote_BuildCurlAuthArgs")
+	Args := _DriverFuncBodyOrEmpty("_LLMRemote_BuildCurlAuthArgs")
 	Assert(Args == "" or InStr(Args, '"-H "') == 0,
 		"no surviving helper may emit a -H argument carrying the token — moving the splice one function away does not move it off the command line")
 

@@ -31,10 +31,11 @@
 local helpers = require("tests.helpers")
 
 local function read_init_src()
-	local path = helpers.driver_root() .. "init.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "init.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to init.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+	helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 	return src
 end
 

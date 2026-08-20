@@ -71,10 +71,16 @@ helpers.describe("pause: checked state must not depend on pause", function()
 			-- checked expression. A legit `not paused` can still appear in `fn` or
 			-- `disabled` — we only care about the `checked` field.
 			-- Strategy: find all lines that contain `checked` and assert none also
-			-- contain `not paused` on the same line.
+			-- contain either spelling of the guard on the same line.
+			--
+			-- The two spellings are ORed. They were ANDed, which no single line can
+			-- satisfy — `not paused` and `not ctx.paused` are alternatives, not
+			-- companions — so bad_count was structurally 0 and this test could not
+			-- fail. Verified by re-adding the exact bug it describes
+			-- (`checked = (state.gestures and not paused) or nil`): still green.
 			local bad_count = 0
 			for line in src:gmatch("[^\n]+") do
-				if line:find("checked") and line:find("not paused") and line:find("not ctx%.paused") then
+				if line:find("checked") and (line:find("not paused") or line:find("not ctx%.paused")) then
 					bad_count = bad_count + 1
 				end
 			end

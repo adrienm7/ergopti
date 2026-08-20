@@ -15,7 +15,7 @@
 ; The previous version of this test only grepped the raw source text for the
 ; substring "A_LocalAppData" — it never called the function, so it could not
 ; have caught the crash; worse, it actively enforced the buggy pattern by
-; asserting the substring's presence. lib/bundle.ahk was also never
+; asserting the substring's presence. infra/bundle.ahk was also never
 ; #Include'd into run_all.ahk, so nothing here ever executed at runtime. Both
 ; gaps are fixed: bundle.ahk is now wired into the runner (see run_all.ahk)
 ; and these tests call the real functions.
@@ -78,11 +78,11 @@ _BRDL_CheckResolveLocalAppDataDirMatchesEnv() {
 }
 
 _BRDL_CheckNoDoubleDot() {
-	Src := _BRDL_ReadSource("lib/bundle.ahk")
-	Assert(Src != "", "lib/bundle.ahk must be readable")
+	Src := _BRDL_ReadSource("infra/bundle.ahk")
+	Assert(Src != "", "infra/bundle.ahk must be readable")
 
 	Body := _DriverFuncBody("_Bundle_ResolveDir")
-	Assert(Body != "", "_Bundle_ResolveDir must be present in lib/bundle.ahk")
+	Assert(Body != "", "_Bundle_ResolveDir must be present in infra/bundle.ahk")
 
 	Assert(!InStr(Body, '".."') && !InStr(Body, '"\.."'),
 		"_Bundle_ResolveDir must not use A_AppData with a '..' segment to reach LocalAppData")
@@ -92,11 +92,11 @@ _BRDL_CheckNoDoubleDot() {
 ; must delegate to the shared, EnvGet-based resolver rather than referencing
 ; the nonexistent A_LocalAppData built-in directly.
 _BRDL_CheckUsesSharedResolver() {
-	Src := _BRDL_ReadSource("lib/bundle.ahk")
-	Assert(Src != "", "lib/bundle.ahk must be readable")
+	Src := _BRDL_ReadSource("infra/bundle.ahk")
+	Assert(Src != "", "infra/bundle.ahk must be readable")
 
 	Body := _DriverFuncBody("_Bundle_ResolveDir")
-	Assert(Body != "", "_Bundle_ResolveDir must be present in lib/bundle.ahk")
+	Assert(Body != "", "_Bundle_ResolveDir must be present in infra/bundle.ahk")
 
 	Assert(!InStr(Body, "A_LocalAppData"),
 		"_Bundle_ResolveDir must not reference the nonexistent A_LocalAppData built-in "

@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/modules/tooltip/layout.js
+// _shared/modules/tooltip/layout.js
 
 /**
  * ==============================================================================

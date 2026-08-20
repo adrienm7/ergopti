@@ -30,10 +30,10 @@ helpers.describe("preferences flatten_from_disk: table-valued scalar keys", func
 	helpers.it("source checks _reverse_scalar for table disk_val before sub-path walk", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/ui/menu/preferences.lua"
+		local src_file = base .. "/infra/preferences.lua"
 
 		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open ui/menu/preferences.lua at: " .. src_file)
+		helpers.assert_true(fh ~= nil, "Cannot open infra/preferences.lua at: " .. src_file)
 		local src = fh:read("*a")
 		fh:close()
 
@@ -60,10 +60,10 @@ helpers.describe("preferences flatten_from_disk: table-valued scalar keys", func
 	helpers.it("metrics_shortcut and apps_time_shortcut are in KEY_MAP as scalars", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/ui/menu/preferences.lua"
+		local src_file = base .. "/infra/preferences.lua"
 
 		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open ui/menu/preferences.lua")
+		helpers.assert_true(fh ~= nil, "Cannot open infra/preferences.lua")
 		local src = fh:read("*a")
 		fh:close()
 

@@ -22,7 +22,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local km_utils = require("modules.keymap.utils")
 
 local LOG = "llm.app_filter"
@@ -176,7 +176,12 @@ end
 --- @return boolean True if the active window or app should be excluded.
 function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field_filter_enabled)
 	if not state then return false end
-	if km_utils.is_ignored_window(state.ignored_window_titles, state.ignored_window_patterns) then
+	-- Nil is the fail-closed "focused window not classified yet" state. Treating
+	-- it like false can launch an LLM request during the exact focus-transition
+	-- window that the keymap has quarantined to avoid leaking private text.
+	if km_utils.is_ignored_window(
+		state.ignored_window_titles, state.ignored_window_patterns) ~= false
+	then
 		return true
 	end
 

@@ -26,7 +26,7 @@ Test("boot error net: boot phase becomes ready only after input registration", _
 
 _BEBFR_ErrorNetExitsBeforeReady() {
     Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-    Assert(Body != "", "ErgoptiGlobalErrorHandler must exist in lib/error_net.ahk")
+    Assert(Body != "", "ErgoptiGlobalErrorHandler must exist in infra/error_net.ahk")
     Guard := InStr(Body, '_DriverBootPhase != "ready"')
     ExitPos := InStr(Body, "ExitApp(1)")
     StopHook := InStr(Body, "HookDispatcher.Stop()")

@@ -83,9 +83,9 @@ end
 -- ========================================
 -- ========================================
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
-package.loaded["lib.timings"] = {
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["infra.timings"] = {
 	ms  = function() return 1000 end,
 	sec = function() return 1 end,
 }
@@ -140,19 +140,12 @@ local LM = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		if dir then mkdir_p(dir) end
 		return ""
 	end,
-	fs = {
-		-- nil attributes = "db.sqlite and data.sql do not exist yet".
-		attributes = function() return nil end,
-		dir = function()
-			local entries = { ".", "..", DEVICE_ID }
-			local i = 0
-			return function()
-				i = i + 1
-				return entries[i]
-			end
-		end,
-	},
 })
+-- Keep the canonical filesystem stub intact: the production identity reader
+-- now classifies every path component through symlinkAttributes(). Replacing
+-- hs.fs with an attributes/dir-only double makes that safety check fail before
+-- this scenario reaches the SQLite fallback it is meant to exercise
+hs.fs.__set_entries(SCRATCH_DIR .. "by_device/", { ".", "..", DEVICE_ID })
 local Rotation = require("modules.keylogger.rotation")
 
 
@@ -184,7 +177,8 @@ helpers.describe("keylogger/log_manager: a db.sqlite open failure must not silen
 	end)
 
 	helpers.it("writes the appended event to today.log as exactly one JSONL line", function()
-		LM.append_log({ type = "typing", text = "x" })
+		helpers.assert_true(LM.append_log({ type = "typing", text = "x" }),
+			"the JSONL-only append must cross the exact write+flush commit boundary")
 
 		local lines = read_lines(TODAY_LOG)
 		helpers.assert_eq(#lines, 1,

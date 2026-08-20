@@ -231,9 +231,11 @@ _KlgAggCorpus_RegisterAll() {
 		Id := Vec.Has("id") ? Vec["id"] : "unknown"
 		Desc := Vec.Has("description") ? Vec["description"] : Id
 		NameCopy := "[corpus:kl-agg:" . Id . "] " . SubStr(Desc, 1, 60)
-		VecCopy := Vec
-
-		Test(NameCopy, () => _KlgAggCorpus_RunVector(VecCopy))
+		; .Bind, never an inline fat-arrow over a loop-scoped copy: the copy is one
+		; variable in THIS function, every closure shares it, and they all run after
+		; the loop — so all 13 tests replayed the last vector. Measured: corrupting
+		; the FIRST vector produced zero failures.
+		Test(NameCopy, _KlgAggCorpus_RunVector.Bind(Vec))
 	}
 }
 
@@ -339,10 +341,15 @@ _KlgAggCorpus_RunVector(Vec) {
 		AssertEqual(300, R["max_ms"], "max_ms = 300")
 	}
 	else if (Id = "system_event_manifest_increment_hs") {
-		; AHK walker KLW_WalkSystemEvent has no manifest_increment branch —
-		; this is accepted divergence (macOS-only feature). Skip with a
-		; passing assertion so the test file stays green on AHK
-		AssertTrue(true, "manifest_increment is macOS-only — skipped on AHK")
+		; Accepted divergence: manifest_increment is a macOS-only feature and the AHK
+		; walker has no branch for it. Asserting true said nothing — and would keep
+		; saying nothing on the day someone implements it, leaving the corpus vector
+		; unverified on this driver forever. Assert the divergence instead, so it
+		; fails the moment it stops being true.
+		Body := _DriverFuncBody("KLW_WalkSystemEvent")
+		Assert(InStr(Body, "manifest_increment") == 0,
+			"KLW_WalkSystemEvent now handles manifest_increment — the vector is no longer a "
+			. "documented divergence and must be asserted like every other one")
 	}
 	else if (Id = "mixed_batch_typing_and_system") {
 		Row := _KlgAggCorpus_ReadAppDay("2024-07-02", "MixedApp")
@@ -354,6 +361,58 @@ _KlgAggCorpus_RunVector(Vec) {
 		; divergence (macOS-only feature, AHK walker handles modifier_hold +
 		; system_day but not focus_first_key)
 	}
+	else {
+		; An id with no branch used to fall straight off the end of this chain and
+		; report green having asserted nothing. That is how a vector added to the
+		; shared corpus would be "consumed" by this driver without being checked —
+		; and it is the same silent-coverage shape the loop-capture bug produced,
+		; which is why it is closed here too.
+		Assert(false,
+			"corpus vector '" . Id . "' has no branch in _KlgAggCorpus_RunVector — add one, or this driver silently ignores the case the vector was written for")
+	}
 }
 
 _KlgAggCorpus_RegisterAll()
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 9/ Pure Text Primitives ===============
+; ===============================================
+; ===============================================
+
+; The vectors above replay whole event batches, which covers the pure text
+; primitives only by implication — and an implication is exactly what let
+; KLW_PopLast drop half a surrogate pair for years without one failing test.
+; These two replay the shared corpus straight through the functions.
+
+_KlgAggCorpus_CharClassVectors() {
+	Data := _KlgAggCorpus_LoadCorpus()
+	Cases := Data["primitives"]["char_class"]
+	Assert(Cases.Length > 0, "the corpus must carry char_class vectors — an empty section asserts nothing")
+	for _, Vector in Cases {
+		AssertEqual(Vector["expect"], KLW_CharClass(Vector["input"]),
+			"KLW_CharClass must agree with the shared core on " . Chr(34) . Vector["input"] . Chr(34)
+			. ". This is the classifier every typing metric is bucketed by, and it is a hand-port: "
+			. "a drift changes every downstream aggregate and reports nothing")
+	}
+}
+
+_KlgAggCorpus_PopLastVectors() {
+	Data := _KlgAggCorpus_LoadCorpus()
+	Cases := Data["primitives"]["pop_utf8"]
+	Assert(Cases.Length > 0, "the corpus must carry pop_utf8 vectors")
+	for _, Vector in Cases {
+		AssertEqual(Vector["expect"], KLW_PopLast(Vector["input"]),
+			"KLW_PopLast must remove one whole CODEPOINT, as the shared core does. AutoHotkey "
+			. "counts UTF-16 code units, so the astral vector is the one that already diverged: "
+			. "dropping a single unit leaves half a surrogate pair in the word buffer")
+	}
+}
+
+Test("keylogger corpus: char_class matches the shared core on every vector (walker-shared-core-parity)",
+	_KlgAggCorpus_CharClassVectors)
+Test("keylogger corpus: pop_utf8 removes a whole codepoint on every vector (walker-shared-core-parity)",
+	_KlgAggCorpus_PopLastVectors)

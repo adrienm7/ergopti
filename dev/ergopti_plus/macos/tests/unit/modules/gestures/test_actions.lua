@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local Actions = helpers.load_with_stubs("modules.gestures.actions")
 
@@ -257,14 +257,36 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 		helpers.assert_true(v == true or v == false)
 	end)
 
-	helpers.it("pause must prevent execute_single / execute_axis / toggle from any side effect (project_suspend_pause_invariant)", function()
-		-- All dispatch paths must be skipped when script is paused.
-		helpers.assert_true(true, "gesture actions must early-return with zero OS effect under pause")
+	-- Dispatch is name-keyed: an action that is not registered must be REFUSED,
+	-- not guessed at. This is what makes a paused or partially-initialised driver
+	-- silent — a lookup miss returns false instead of reaching the OS. Asserting
+	-- the refusal is the only way to know the gate is a gate.
+	helpers.it("execute_single refuses an unregistered action instead of dispatching", function()
+		helpers.assert_eq(Actions.execute_single("no_such_action_at_all"), false,
+			"an unknown action name must be refused, not dispatched")
+		helpers.assert_eq(Actions.execute_single(nil), false,
+			"a nil action name must be refused too")
 	end)
 
-	helpers.it("force_cleanup must be safe to call under pause (no-op or guard)", function()
-		-- Cleanup is defensive; must not re-activate anything while paused.
-		helpers.assert_true(true)
+	helpers.it("execute_axis on an unknown axis fires nothing", function()
+		-- No return value to check: the assertion is that it completes without
+		-- reaching an axis function, which a missing guard would turn into an
+		-- index-a-nil error rather than a silent no-op.
+		Actions.execute_axis("no_such_axis", true)
+		Actions.execute_axis("no_such_axis", false)
+		helpers.assert_eq(type(Actions.execute_axis), "function",
+			"execute_axis survived two unknown-axis dispatches")
+	end)
+
+	-- force_cleanup releases held synthetic clicks. It has to be idempotent:
+	-- it runs on quit, on suspend, and on every tap that is not a click toggle,
+	-- so a second call must not post a second mouse-up into whatever the user is
+	-- doing.
+	helpers.it("force_cleanup is idempotent", function()
+		Actions.force_cleanup()
+		Actions.force_cleanup()
+		helpers.assert_eq(Actions.is_right_click_held(), false,
+			"after cleanup no synthetic right-click may remain held")
 	end)
 end)
 
@@ -289,8 +311,8 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 	-- replaced with a function that raises — driving an actual thrown exception through
 	-- the real action registry rather than a synthetic stub action.
 	local function make_actions_with_real_logger_and_throwing_timer()
-		package.loaded["lib.logger"] = nil
-		local FreshLogger = helpers.load_with_stubs("lib.logger")
+		package.loaded["infra.logger"] = nil
+		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 
 		package.loaded["modules.gestures.actions"] = nil
@@ -308,8 +330,15 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 
 		-- 'lookup' -> M.trigger_lookup() calls hs.timer.doAfter(...) UNPROTECTED
 		-- (no internal pcall), so stubbing it to error() reaches Logger.pcall's guard.
-		local ok = pcall(Actions2.execute_single, "lookup")
+		-- The containment IS the subject, so the pcall stays. What it was missing is
+		-- that the exception was CONTAINED rather than swallowed: Logger.pcall is
+		-- meant to log it, and a guard that silently discarded every failure would
+		-- leave a dead gesture with nothing in the logs to explain it.
+		local ok, result = pcall(Actions2.execute_single, "lookup")
 		helpers.assert_true(ok, "execute_single itself must never raise — Logger.pcall must contain the exception")
+		helpers.assert_true(result ~= nil,
+			"and must still ANSWER its caller — a contained exception that returned nothing "
+				.. "is indistinguishable from an action that was never dispatched")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false
@@ -326,8 +355,13 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
 
 		-- 'lines' next/prev call hs.timer.doAfter(...) UNPROTECTED directly.
-		local ok = pcall(Actions2.execute_axis, "lines", true)
+		-- execute_axis answers nil where execute_single answers true, and both are
+		-- deliberate: the axis dispatcher has no single result to report. Asserted as
+		-- a TYPE so a future change to either is visible here rather than at a caller.
+		local ok, result = pcall(Actions2.execute_axis, "lines", true)
 		helpers.assert_true(ok, "execute_axis itself must never raise — Logger.pcall must contain the exception")
+		helpers.assert_true(result == nil or type(result) == "boolean",
+			"and must answer nil or a boolean, never a half-value")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false
@@ -338,6 +372,28 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 		end
 		helpers.assert_true(found_error,
 			"a throwing axis action must leave an ERROR-level Logger trace (gestures-actions-silent-pcall)")
+	end)
+
+	helpers.it("logs a native false from the shared keystroke helper", function()
+		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
+		local SyntheticInput = require("adapters.synthetic_input")
+		local original_emit = SyntheticInput.emit_key_stroke
+		SyntheticInput.emit_key_stroke = function() return false end
+
+		local dispatched = Actions2.execute_single("mission_control")
+		SyntheticInput.emit_key_stroke = original_emit
+
+		helpers.assert_eq(true, dispatched,
+			"the registered action remains owned by the gesture dispatcher")
+		local found_refusal = false
+		for _, line in ipairs(FreshLogger.ring_buffer_snapshot()) do
+			if line:find("[ERROR]", 1, true)
+				and line:find("synthetic key stroke was refused", 1, true) then
+				found_refusal = true
+			end
+		end
+		helpers.assert_true(found_refusal,
+			"a false native dispatch must reach the file logger through a real registered action")
 	end)
 end)
 

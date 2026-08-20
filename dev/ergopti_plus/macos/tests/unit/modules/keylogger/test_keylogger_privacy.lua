@@ -52,7 +52,30 @@ local helpers = require("tests.helpers")
 -- Timings stub shared by every scenario load: returns fixed values so the
 -- harness never depends on the real _shared/modules/timings/constants.toml
 -- file being reachable from the unit-test cwd (mirrors test_log_manager.lua).
-local _TIMINGS_MS = { keylogger = { max_keystroke_delay_ms = 5000 } }
+local _TIMINGS_MS = {
+	keylogger = {
+		max_keystroke_delay_ms = 5000,
+		synth_match_delay_ms   = 3,
+	},
+}
+
+local OWN_PID     = 7001
+local FOREIGN_PID = 8002
+local SOURCE_PID_PROPERTY = 1
+local USER_DATA_PROPERTY = 2
+
+local function lifecycle_watcher()
+	local watcher = { _running = false }
+	function watcher:start()
+		self._running = true
+		return self
+	end
+	function watcher:stop()
+		self._running = false
+		return self
+	end
+	return watcher
+end
 
 --- Loads a fresh, fully-wired modules.keylogger.init with every I/O sub-module
 --- stubbed in-memory (mirrors the stubbing already established for
@@ -73,11 +96,15 @@ local function start_real_keylogger()
 	local captured_handle_key = nil
 	local captured_core_state = nil
 	local appended_entries    = {}
+	local context_capture_count = 0
 
 	package.loaded["modules.keylogger.rotation"] = {
-		init             = function() end,
+		init             = function() return true end,
 		is_initialized   = function() return true end,
-		append_log       = function(e) table.insert(appended_entries, e) end,
+		append_log       = function(e)
+			table.insert(appended_entries, e)
+			return true
+		end,
 		read_new_entries = function() return {}, 0 end,
 		get_offset       = function() return 0 end,
 		get_date         = function() return os.date("%Y-%m-%d") end,
@@ -85,7 +112,7 @@ local function start_real_keylogger()
 		rollover         = function() end,
 	}
 	package.loaded["modules.keylogger.sqlite_writer"] = {
-		init                  = function() end,
+		init                  = function() return true end,
 		open_db               = function() return true end,
 		close_db              = function() end,
 		get_db                = function() return nil end,
@@ -113,8 +140,8 @@ local function start_real_keylogger()
 		get_db_rev              = function() return 0 end,
 		sync_foreign_data_sql   = function() end,
 	}
-	package.loaded["lib.i18n"] = { t = function(key) return key end, get = function(key) return key end }
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.i18n"] = { t = function(key) return key end, get = function(key) return key end }
+	package.loaded["infra.timings"] = {
 		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
 		sec = function(_section, _key) return 1.0 end,
 	}
@@ -122,40 +149,99 @@ local function start_real_keylogger()
 	-- CoreState never crosses a public accessor in init.lua; capture the exact
 	-- live reference at the one point it is handed to a stubbable sub-module.
 	package.loaded["modules.keylogger.context_tracker"] = {
-		init                   = function(core_state, _log_manager) captured_core_state = core_state end,
+		init                   = function(core_state, _log_manager)
+			captured_core_state = core_state
+			return true
+		end,
 		update_private_status  = function() end,
 		app_watcher_cb         = function() end,
 		update_ax_observer     = function() end,
+		capture_frontmost_app  = function()
+			context_capture_count = context_capture_count + 1
+			captured_core_state.is_secure_field = false
+			return true
+		end,
+	}
+	package.loaded["adapters.process_lifecycle"] = {
+		onAppActivate = function() end,
+		start = function() return true end,
+		stop = function() return true end,
+	}
+	package.loaded["adapters.input_source_broker"] = {
+		subscribe = function() return true end,
+		unsubscribe = function() return true end,
 	}
 	-- The production engine owns the raw event tap through KeyboardHook. Capture
 	-- its onEvent callback at that boundary rather than relying on the retired
 	-- direct hs.eventtap.new() ownership in keylogger/init.lua.
 	package.loaded["adapters.keyboard_hook"] = {
-		start = function(opts) captured_handle_key = opts and opts.onEvent end,
-		stop = function() end,
+		start = function(opts) captured_handle_key = opts and opts.onEvent; return true end,
+		stop = function() return true end,
 		isRunning = function() return true end,
 	}
 
-	-- Force a fresh require of every sub-module that holds its own _state so a
-	-- prior scenario's M.init() cannot leak into this one (each is a singleton).
+	-- Force a fresh require of every stateful dependency captured by the real
+	-- LogManager. TimerScheduler owns native timer capabilities, so retaining it
+	-- across scenarios would bind later cleanup to an earlier scenario's hs table.
 	package.loaded["modules.keylogger.log_manager"] = nil
-	package.loaded["modules.keylogger.kc_bridge"]   = nil
-	package.loaded["modules.keylogger.watchers"]    = nil
+	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["adapters.event_provenance"] = nil
+
+	-- KC file draining and hardware sensor collection are independent of the
+	-- privacy pipeline under test. Their doubles still model committed lifecycle
+	-- ownership exactly, without touching a real metrics path on the test host.
+	local kc_running = false
+	package.loaded["modules.keylogger.kc_bridge"] = {
+		init = function(core_state, _pathwatcher, _timer, _log_manager, may_persist)
+			return type(core_state) == "table" and type(may_persist) == "function"
+		end,
+		set_log_manager = function(log_manager) return type(log_manager) == "table" end,
+		start = function() kc_running = true; return true end,
+		stop = function() kc_running = false; return true end,
+		is_running = function() return kc_running end,
+		is_ke_managed_output_kc = function() return false end,
+	}
+	local hardware_running = false
+	package.loaded["modules.keylogger.watchers"] = {
+		init = function(core_state, is_paused)
+			return type(core_state) == "table" and type(is_paused) == "function"
+		end,
+		init_hardware_watchers = function()
+			hardware_running = true
+			return true
+		end,
+		stop_hardware_watchers = function()
+			hardware_running = false
+			return true
+		end,
+		check_idle = function() end,
+		perform_maintenance = function() end,
+		caffeinate_cb = function() end,
+		is_running = function() return hardware_running end,
+	}
+
+	local timers = {}
+	local function new_timer(delay, callback)
+		local timer = { delay = delay, callback = callback, _running = false }
+		function timer:start()
+			self._running = true
+			return self
+		end
+		function timer:stop()
+			self._running = false
+			return self
+		end
+		function timer:running() return self._running end
+		function timer:fire()
+			if self._running and self.callback then self.callback() end
+		end
+		timers[#timers + 1] = timer
+		return timer
+	end
 
 	local hs_overrides = {
-		eventtap = {
-			new = function(_events, callback)
-				captured_handle_key = callback
-				return { start = function() end, stop = function() end, isEnabled = function() return true end }
-			end,
-			event = {
-				types = {
-					keyDown = 10, keyUp = 11, flagsChanged = 12,
-					leftMouseDown = 1, rightMouseDown = 2, scrollWheel = 3,
-				},
-			},
-			checkKeyboardModifiers = function() return {} end,
-		},
+		processInfo = { processID = OWN_PID },
 		application = {
 			watcher = {
 				new       = function() return { start = function() end, stop = function() end } end,
@@ -170,16 +256,28 @@ local function start_real_keylogger()
 				}
 			end,
 		},
-		caffeinate = { watcher = { new = function() return { start = function() end, stop = function() end } end } },
+		caffeinate = { watcher = { new = lifecycle_watcher } },
 		timer = {
-			doAfter      = function(_delay, fn) fn() end,
-			new          = function() return { start = function() end, stop = function() end } end,
+			doAfter = function(delay, fn) return new_timer(delay, fn):start() end,
+			doEvery = function(delay, fn) return new_timer(delay, fn):start() end,
+			new = new_timer,
+			delayed      = {
+				new = function(_delay, fn)
+					return {
+						start = function(self) fn(); return self end,
+						stop = function(self) return self end,
+					}
+				end,
+			},
+			secondsSinceEpoch = function() return 1 end,
 			-- Must be strictly monotonic: handle_key gates its one-shot
 			-- session_start log on `session_start_time == 0`, so a clock stuck at
 			-- a constant value (e.g. always 0) re-triggers "session_start" on
 			-- every single keystroke instead of once per session.
 			absoluteTime = (function()
-				local KEYSTROKE_STEP_NS = 80 * 1000000 -- 80 ms/keystroke in nanoseconds
+				-- One millisecond deliberately exercises the production <3 ms race:
+				-- speed is not proof that an event is synthetic.
+				local KEYSTROKE_STEP_NS = 1 * 1000000
 				local t = 0
 				return function()
 					t = t + KEYSTROKE_STEP_NS
@@ -195,10 +293,27 @@ local function start_real_keylogger()
 		execute  = function() return "" end,
 	}
 
+	local saved_file_system = package.loaded["adapters.file_system"]
+package.loaded["adapters.file_system"] = {
+	write            = function() return true end,
+	create_if_absent = function() return true, "created" end,
+	read             = function() return nil end,
+	read_with_status = function() return nil, "absent" end,
+}
 	local km = helpers.load_with_stubs("modules.keylogger.init", hs_overrides)
+	package.loaded["adapters.file_system"] = saved_file_system
+	local synthetic_input = require("adapters.synthetic_input")
 	local is_paused = false
 	local script_control = { is_paused = function() return is_paused end }
-	km.start(script_control)
+	helpers.assert_eq(km.start(script_control), true,
+		"the privacy fixture must own every required producer before driving events")
+	for _, timer in ipairs(timers) do
+		if timer.delay == 0 and timer:running() then
+			timer:fire()
+		end
+	end
+	helpers.assert_eq(context_capture_count, 1,
+		"exactly the foreground-context bootstrap must settle before privacy input")
 
 	return {
 		handle_key      = function(...) return captured_handle_key(...) end,
@@ -212,6 +327,14 @@ local function start_real_keylogger()
 		-- filters were never checked on the other two.
 		notify_synthetic = km.notify_synthetic,
 		log_hotstring    = km.log_hotstring,
+		new_owned_tag = function(modifiers, key)
+			local tx = synthetic_input.begin("test.keylogger-privacy", "replacement")
+			local batch = synthetic_input.begin_callback(tx)
+			synthetic_input.keyStroke(batch, modifiers or {}, key)
+			local _, events = synthetic_input.finish_callback(batch, true)
+			synthetic_input.seal(tx)
+			return events[1]:getProperty(USER_DATA_PROPERTY)
+		end,
 	}
 end
 
@@ -219,12 +342,18 @@ end
 --- @param char string The composed character this keystroke produces.
 --- @param keycode number|nil The physical keycode (defaults to 0 — ordinary letter).
 --- @return table A minimal event object satisfying handle_key's getters.
-local function fake_key_event(char, keycode)
+local function fake_key_event(char, keycode, source_pid, flags, user_data)
 	return {
 		getType       = function() return 10 end, -- keyDown
 		getKeyCode    = function() return keycode or 0 end,
-		getFlags      = function() return {} end,
+		getFlags      = function() return flags or {} end,
 		getCharacters = function(_raw) return char end,
+		getProperty   = function(_self, property)
+			if property == USER_DATA_PROPERTY then return user_data or 0 end
+			helpers.assert_eq(property, SOURCE_PID_PROPERTY,
+				"production may read eventSourceUnixProcessID only as diagnostics")
+			return source_pid or FOREIGN_PID
+		end,
 	}
 end
 
@@ -289,7 +418,7 @@ local function load_corpus()
 	local raw = fh:read("*a")
 	fh:close()
 	-- Reuse the hs.json.decode stub that the test harness provides
-	helpers.load_with_stubs("lib.logger")
+	helpers.load_with_stubs("infra.logger")
 	local ok, decoded = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(decoded) end
 	return decoded, nil
@@ -659,11 +788,81 @@ end)
 
 
 
--- ================================================================
+-- ==================================================================
 -- ==================================================================
 -- ======= 6/ The synthetic routes obey the same four filters =======
 -- ==================================================================
--- ================================================================
+-- ==================================================================
+
+helpers.describe("synthetic echo provenance - only explicit owned tags are filtered", function()
+
+	helpers.it("keeps private tagged AB echoes out after a 1 ms foreign mismatch", function()
+		local session = start_real_keylogger()
+		local state   = session.core_state()
+		local tag_a = session.new_owned_tag({}, "a")
+		local tag_b = session.new_owned_tag({}, "b")
+
+		session.handle_key(fake_key_event("x", 0, FOREIGN_PID))
+		helpers.assert_eq(state.buffer_text, "x", "the physical x must traverse the human path")
+
+		session.handle_key(fake_key_event("A", 0, OWN_PID, nil, tag_a))
+		session.handle_key(fake_key_event("B", 0, OWN_PID, nil, tag_b))
+		helpers.assert_eq(state.buffer_text, "x",
+			"explicitly tagged private echoes must never be persisted as physical text")
+		session.stop()
+	end)
+
+	helpers.it("does not use exact character equality as synthetic identity", function()
+		local session = start_real_keylogger()
+		local state   = session.core_state()
+		local owned_tag = session.new_owned_tag({}, "a")
+
+		session.handle_key(fake_key_event("A", 0, FOREIGN_PID))
+		helpers.assert_eq(state.buffer_text, "A", "the physical A must be recorded normally")
+
+		session.handle_key(fake_key_event("A", 0, OWN_PID, nil, owned_tag))
+		helpers.assert_eq(state.buffer_text, "A", "the own echo must be discarded")
+		session.stop()
+	end)
+
+	helpers.it("requires an owned tag before filtering Backspace", function()
+		local session = start_real_keylogger()
+		local state   = session.core_state()
+		local owned_tag = session.new_owned_tag({}, "delete")
+
+		session.handle_key(fake_key_event("x", 0, FOREIGN_PID))
+		session.handle_key(fake_key_event("", 51, FOREIGN_PID))
+		local after_physical = state.buffer_text
+		session.handle_key(fake_key_event("", 51, OWN_PID, nil, owned_tag))
+		helpers.assert_eq(state.buffer_text, after_physical,
+			"a tagged Backspace echo must not edit the human buffer a second time")
+		session.stop()
+	end)
+
+	helpers.it("logs foreign Cmd+V but never a Cmd+V emitted by this process", function()
+		local foreign = start_real_keylogger()
+		foreign.handle_key(fake_key_event("v", 9, FOREIGN_PID, { cmd = true }))
+		foreign.stop()
+		local foreign_shortcuts = 0
+		for _, entry in ipairs(foreign.appended) do
+			if entry.type == "shortcut" then foreign_shortcuts = foreign_shortcuts + 1 end
+		end
+		helpers.assert_eq(foreign_shortcuts, 1, "a physical Cmd+V must remain user telemetry")
+
+		local own = start_real_keylogger()
+		local owned_tag = own.new_owned_tag({ "cmd" }, "v")
+		own.handle_key(fake_key_event("v", 9, OWN_PID, { cmd = true }, owned_tag))
+		own.stop()
+		local own_shortcuts = 0
+		for _, entry in ipairs(own.appended) do
+			if entry.type == "shortcut" then own_shortcuts = own_shortcuts + 1 end
+		end
+		helpers.assert_eq(own_shortcuts, 0,
+			"a Hammerspoon-emitted Cmd+V is synthetic even if tap callback order changed")
+	end)
+
+end)
+
 
 --- Drives a SYNTHETIC expansion (not a keystroke) through the real engine under a
 --- given context, and returns everything that reached the persistence layer.

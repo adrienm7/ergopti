@@ -20,13 +20,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -40,7 +39,7 @@ end
 helpers.describe("gestures/init.lua: ghost timer guard (gesture-engine-ghost-timer)", function()
 
 	helpers.it("STARTUP_SAFETY_PROBE_SEC doAfter checks CoreState.enabled before acting", function()
-		local src = read_source("modules/gestures/init.lua")
+		local src = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		-- The callback around STARTUP_SAFETY_PROBE_SEC must guard with CoreState.enabled
 		-- Pattern: doAfter(STARTUP_SAFETY_PROBE_SEC, function() ... if not CoreState.enabled then return end
 		helpers.assert_true(
@@ -52,7 +51,7 @@ helpers.describe("gestures/init.lua: ghost timer guard (gesture-engine-ghost-tim
 	end)
 
 	helpers.it("emergency recycle doAfter(0.02) checks CoreState.enabled before acting", function()
-		local src = read_source("modules/gestures/init.lua")
+		local src = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		-- The 20ms emergency recycle callback must also guard
 		-- Matches the INVARIANT (the callback refuses to act when the engine is not
 		-- enabled), not one spelling of it. The guard was later widened to also

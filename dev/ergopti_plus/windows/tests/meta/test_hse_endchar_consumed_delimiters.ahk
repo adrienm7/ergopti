@@ -4,7 +4,7 @@
 ; MODULE: HSE_ApplyExpansion Consumed Delimiters Guard
 ; DESCRIPTION:
 ; Static source guard for the HSE_ApplyExpansion EndChar handling fix in
-; lib/hotstrings/hotstring_engine_main.ahk.
+; infra/hotstrings/hotstring_engine_main.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original expansion logic unconditionally appended EndChar to the output,
@@ -36,8 +36,8 @@ _THECE_StripLineComments(Src) {
 ; ==========================================================================
 
 _THECE_ConsumedDelimitersGuard() {
-	Src := _THECE_StripLineComments(_DriverDirConcat("lib/hotstrings"))
-	Assert(Src != "", "lib/hotstrings/hotstring_engine_main.ahk must be readable")
+	Src := _THECE_StripLineComments(_DriverDirConcat("infra/hotstrings"))
+	Assert(Src != "", "infra/hotstrings/hotstring_engine_main.ahk must be readable")
 
 	; The constant must be declared
 	Assert(InStr(Src, "HSE_CONSUMED_DELIMITERS") > 0,

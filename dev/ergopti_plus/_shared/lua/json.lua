@@ -7,6 +7,14 @@
 --- (fallback decoder), macOS locale module (fallback decoder), and any
 --- future driver that needs to read _shared JSON data without an OS JSON lib.
 
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table, and
+-- a shared module cannot depend on its caller having installed the compat shim —
+-- it does not know its callers. The decoder used to guard with `utf8 and … or
+-- string.char(code)`, which looks safe and is not: string.char refuses anything
+-- above 255 and truncates 128-255 to one byte, so every \uXXXX escape outside
+-- ASCII decoded to the wrong character on the one interpreter this driver runs.
+local utf8_lib = (type(utf8) == "table" and utf8.char) and utf8 or require("compat.utf8")
+
 local M = {}
 
 -- ============================================================================
@@ -61,7 +69,7 @@ function M.decode(raw)
 					pos = pos + 4
 					local code = tonumber(hex, 16)
 					if code and code >= 32 then
-						res[#res + 1] = utf8 and utf8.char(code) or string.char(code)
+						res[#res + 1] = utf8_lib.char(code)
 					end
 				else
 					res[#res + 1] = esc
@@ -149,7 +157,7 @@ function M.encode(val)
 		if val ~= val then return "null" end
 		if val == math.huge or val == -math.huge then return "null" end
 		return string.format("%.17g", val):gsub("%.%d+", function(frac)
-			return frac:gsub("0+$", "")
+			return (frac:gsub("0+$", ""))
 		end):gsub("%.$", "")
 	end
 	if t == "string" then

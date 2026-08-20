@@ -11,10 +11,10 @@
 local helpers = require("tests.helpers")
 
 -- toml_reader logs through lib.logger; load it first under the stub
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-local reader = helpers.load_with_stubs("lib.toml.reader")
+local reader = helpers.load_with_stubs("infra.toml.reader")
 
 local function write_temp(name, body)
 	local path = os.tmpname()
@@ -46,7 +46,8 @@ beta = "Beta section"
 "foo" = { output = "bar" }
 ]==]
 		local path = write_temp("min", body)
-		local data = reader.parse(path)
+		local data, committed = reader.parse(path)
+		helpers.assert_eq(committed, true, "a complete readable file must report an exact commit")
 		helpers.assert_eq(data.meta.description, "test fixture")
 		helpers.assert_eq(data.sections_order, { "alpha", "beta" })
 		helpers.assert_eq(#data.sections.alpha.entries, 1)
@@ -57,13 +58,47 @@ beta = "Beta section"
 	end)
 
 	helpers.it("returns the empty result for a missing file", function()
-		local data = reader.parse("/no/such/file/anywhere.toml")
+		local data, committed = reader.parse("/no/such/file/anywhere.toml")
 		helpers.assert_eq(data.sections, {})
+		helpers.assert_eq(committed, false, "a missing file must expose the failed read transaction")
 	end)
 
 	helpers.it("returns the empty result for non-string path", function()
-		local data = reader.parse(nil)
+		local data, committed = reader.parse(nil)
 		helpers.assert_eq(data.sections, {})
+		helpers.assert_eq(committed, false, "an invalid path must expose the failed read transaction")
+	end)
+
+	helpers.it("reports read and close failures instead of certifying partial data", function()
+		local original_open = io.open
+		local cases = {
+			{
+				label = "read failure",
+				handle = {
+					lines = function() error("PRIVATE-READ-FAILURE", 0) end,
+					close = function() return true end,
+				},
+			},
+			{
+				label = "close failure",
+				handle = {
+					lines = function() return function() return nil end end,
+					close = function() return false end,
+				},
+			},
+		}
+
+		local test_ok, test_err = xpcall(function()
+			for _, case in ipairs(cases) do
+				io.open = function() return case.handle end
+				local call_ok, data, committed = pcall(reader.parse, "/controlled/hotstrings.toml")
+				helpers.assert_true(call_ok, case.label .. " must not escape the parser")
+				helpers.assert_eq(data.sections, {}, case.label .. " must discard partial data")
+				helpers.assert_eq(committed, false, case.label .. " must never report a committed parse")
+			end
+		end, debug.traceback)
+		io.open = original_open
+		if not test_ok then error(test_err, 0) end
 	end)
 
 	helpers.it("preserves UTF-8 in values", function()

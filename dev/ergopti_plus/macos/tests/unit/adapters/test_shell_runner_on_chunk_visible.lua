@@ -26,10 +26,11 @@
 local helpers = require("tests.helpers")
 
 local function read_shell_runner_src()
-	local path = helpers.driver_root() .. "adapters/shell_runner.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "adapters/shell_runner.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to adapters/shell_runner.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function invoke_guarded")
+	helpers.assert_true(src ~= nil, "adapters/shell_runner.lua source must be locatable")
 	return src
 end
 
@@ -91,11 +92,11 @@ end)
 helpers.describe("ShellRunner: ERROR logged when on_chunk throws (F-HIGH-21 behaviour)", function()
 
 	helpers.it("captures Logger.error when on_chunk throws 'boom' and keeps streaming", function()
-		-- Capture log output via Logger.set_sink — the real contract (lib/logger.lua
+		-- Capture log output via Logger.set_sink — the real contract (infra/logger.lua
 		-- M.set_sink) invokes _test_sink(console_line, sink_variant) with the variant
 		-- as a lowercase string (see test_shell_runner_on_done_visible.lua).
 		local errors_logged = {}
-		local logger = helpers.load_with_stubs("lib.logger")
+		local logger = helpers.load_with_stubs("infra.logger")
 		if type(logger.set_sink) == "function" then
 			logger.set_sink(function(console_line, sink_variant)
 				if sink_variant == "error" then errors_logged[#errors_logged + 1] = console_line end

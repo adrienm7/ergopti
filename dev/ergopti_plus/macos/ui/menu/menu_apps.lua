@@ -10,7 +10,7 @@
 --- 1. Discovery: Scans the apps/ directory at build time so new bundles appear
 ---    automatically without touching this file.
 --- 2. Style Parity: Mirrors the icon + styled-text row format used in
----    lib/app_picker.lua for visual consistency across the menu.
+---    infra/app_picker.lua for visual consistency across the menu.
 --- 3. Icon Loading: Loads icons directly from the .icns file in Resources/ to
 ---    avoid relying on bundle ID registration (which may not be done on first
 ---    install). Falls back to AppIcon.svg, then to no icon.
@@ -21,9 +21,11 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("lib.logger")
-local Paths  = require("lib.paths")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local Paths  = require("infra.paths")
+local i18n   = require("infra.i18n")
+local ManifestMenu = require("infra.manifest_menu")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 local LOG = "menu_apps"
 
@@ -197,11 +199,11 @@ end
 
 
 
--- =====================================
+-- =======================================
 -- =======================================
 -- ======= 2/ Submenu Construction =======
 -- =======================================
--- =====================================
+-- =======================================
 
 --- Builds the Applications submenu for the Hammerspoon menubar.
 --- @param ctx table The global UI context.
@@ -220,9 +222,9 @@ function M.build(ctx)
 		local app_path = app.path
 		local app_name = app.name
 		table.insert(rows, {
-			title    = label,
+			label    = label,
 			image    = app.icon,
-			fn       = function()
+			action   = function()
 				Logger.info(LOG, "Opening bundled app '%s'…", app_name)
 				-- Resolve locale: Hammerspoon active locale → system locale → "en".
 				-- The two-letter ISO code is extracted from the system locale string
@@ -247,7 +249,8 @@ function M.build(ctx)
 				-- `setEnvironment` on the `open` process itself does not propagate
 				-- to the app it spawns; `--env KEY=VALUE` does.
 				local task
-				task = hs.task.new(
+				task = TaskLifecycle.native(
+					"Bundled app launch",
 					"/usr/bin/open",
 					function(code, _, stderr)
 						if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
@@ -263,24 +266,36 @@ function M.build(ctx)
 						app_path,
 					}
 				)
+				if not task then return end
 				M._active_tasks[task] = true
-				local ok_start, err = pcall(function() task:start() end)
-				if not ok_start then
+				if not TaskLifecycle.start(task, "Bundled app launch") then
 					M._active_tasks[task] = nil
-					Logger.error(LOG, "Failed to launch '%s': %s.", app_name, tostring(err))
 				end
 			end,
 		})
 	end
 
 	if #rows == 0 then
-		table.insert(rows, { title = i18n.get("menu.apps.no_apps"), disabled = true })
+		table.insert(rows, { label = i18n.get("menu.apps.no_apps"), disabled = true })
 	end
 
-	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rows)
+	-- The list the manifest declares for this driver. Its rows are the bundles
+	-- found on disk, which no static entry can enumerate — and Linux puts
+	-- something else entirely under the same title, which the declaration says
+	-- with its reason rather than leaving the two to be compared by hand.
+	--
+	-- Emitted as provider rows above rather than translated here: the adapter
+	-- carried the label, the tick and the greying and dropped the `image`, so
+	-- every application in this menu rendered without its icon. The renderer
+	-- carries the field now, the way the AutoHotkey one always has.
+	local rendered = ManifestMenu.build("apps_menu", "Apps", nil, nil, ctx, {
+		["apps_installed"] = function() return rows end,
+	})
+
+	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rendered)
 	return {
-		title    = i18n.get("menu.apps.title"),
-		menu     = rows,
+		label    = i18n.get("menu.apps.title"),
+		submenu  = rendered,
 	}
 end
 

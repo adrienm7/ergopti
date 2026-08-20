@@ -21,10 +21,10 @@
 local M = {}
 
 local llm_mod       = require("modules.llm")
-local i18n          = require("lib.i18n")
-local Logger        = require("lib.logger")
-local dialog        = require("lib.dialog_util")
-local notifications = require("lib.notifications")
+local i18n          = require("infra.i18n")
+local Logger        = require("infra.logger")
+local dialog        = require("infra.dialog_util")
+local notifications = require("infra.notifications")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 
 local LOG = "model_switcher"
@@ -52,11 +52,11 @@ local PROFILE_POWER_LEVELS = {
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Creates and returns a model-switcher instance bound to the given context.
 --- @param ctx table Context with fields:
@@ -65,7 +65,7 @@ local PROFILE_POWER_LEVELS = {
 ---   keymap        table    Keymap module (optional).
 ---   save_prefs    function Persists state to disk.
 ---   update_menu   function Redraws the tray menu.
---- @return table Instance with fields: switch_model, set_llm_profile,
+--- @return table Instance with fields: switch_model, disable_model, set_llm_profile,
 ---   apply_recommended_prompt_profile, get_display_model_name, get_model_power_level.
 function M.new(ctx)
 	local state       = ctx.state
@@ -73,6 +73,8 @@ function M.new(ctx)
 	local keymap      = ctx.keymap
 	local save_prefs  = ctx.save_prefs
 	local update_menu = ctx.update_menu
+	local runtime_gate = type(ctx.runtime_gate) == "function"
+		and ctx.runtime_gate or function() return true end
 
 	-- Monotonically-increasing token so stale async callbacks from a previous
 	-- switch attempt are silently discarded when a new switch is initiated.
@@ -262,20 +264,37 @@ function M.new(ctx)
 	--- @param on_ok function Callback when requirements are satisfied.
 	--- @param on_fail function Callback when requirements cannot be met.
 	--- @param opts table|nil Options forwarded to check_requirements.
-	local function guarded_check_requirements(model_name, on_ok, on_fail, opts)
+	--- @param on_stale function|nil Callback receiving the invalidation reason.
+	local function guarded_check_requirements(model_name, on_ok, on_fail, opts, on_stale)
 		req_token = req_token + 1
 		local my_token = req_token
+		local request_backend = state.llm_backend
+		local function stale_reason()
+			if state.llm_backend ~= request_backend then return "backend" end
+			if my_token ~= req_token then return "request" end
+			return nil
+		end
 		models_mgr.check_requirements(model_name,
 			function(...)
-				if my_token ~= req_token then
-					Logger.debug(LOG, string.format("Stale ok-callback discarded (model=%s).", tostring(model_name)))
+				local reason = stale_reason()
+				if reason then
+					Logger.debug(LOG, string.format(
+						"Stale ok-callback discarded (reason=%s, model=%s, backend=%s, current_backend=%s).",
+						tostring(reason), tostring(model_name), tostring(request_backend),
+						tostring(state.llm_backend)))
+					if type(on_stale) == "function" then on_stale(reason) end
 					return
 				end
 				if type(on_ok) == "function" then on_ok(...) end
 			end,
 			function(...)
-				if my_token ~= req_token then
-					Logger.debug(LOG, string.format("Stale fail-callback discarded (model=%s).", tostring(model_name)))
+				local reason = stale_reason()
+				if reason then
+					Logger.debug(LOG, string.format(
+						"Stale fail-callback discarded (reason=%s, model=%s, backend=%s, current_backend=%s).",
+						tostring(reason), tostring(model_name), tostring(request_backend),
+						tostring(state.llm_backend)))
+					if type(on_stale) == "function" then on_stale(reason) end
 					return
 				end
 				if type(on_fail) == "function" then on_fail(...) end
@@ -314,7 +333,8 @@ function M.new(ctx)
 		state.llm_active_profile = profile_id
 		llm_mod.set_active_profile(profile_id)
 		check_profile_power_mismatch(profile_id, state.llm_model)
-		save_prefs(); update_menu()
+		if save_prefs() ~= true then return false end
+		update_menu()
 	end
 
 	--- Offers to switch to the recommended profile when it differs from the current one.
@@ -336,13 +356,13 @@ function M.new(ctx)
 		-- Build a human-readable power description for the dialog body
 		local power_desc
 		if is_completion then
-			power_desc = "Profil de puissance détecté : complétion brute"
+			power_desc = i18n.get("menu.llm.power_completion")
 		elseif is_moe and active_params > 0 and total_params > 0 then
-			power_desc = string.format("Puissance détectée (MoE) : %gB actifs / %gB total", active_params, total_params)
+			power_desc = string.format(i18n.get("menu.llm.power_moe"), active_params, total_params)
 		elseif active_params > 0 then
-			power_desc = string.format("Puissance détectée : %gB", active_params)
+			power_desc = string.format(i18n.get("menu.llm.power_dense"), active_params)
 		else
-			power_desc = "Puissance détectée : inconnue"
+			power_desc = i18n.get("menu.llm.power_unknown")
 		end
 
 		local cur_profile = get_normalized_active_profile_id()
@@ -356,7 +376,8 @@ function M.new(ctx)
 					"Completion model: silently switching profile %s → %s.", cur_profile, rec_profile))
 				state.llm_active_profile = rec_profile
 				llm_mod.set_active_profile(rec_profile)
-				save_prefs(); update_menu()
+				if save_prefs() ~= true then return false end
+				update_menu()
 			else
 				local title = type(opts.dialog_title) == "string"
 					and opts.dialog_title
@@ -372,7 +393,8 @@ function M.new(ctx)
 					Logger.info(LOG, string.format("Profile changed to %s (accepted).", rec_profile))
 					state.llm_active_profile = rec_profile
 					llm_mod.set_active_profile(rec_profile)
-					save_prefs(); update_menu()
+					if save_prefs() ~= true then return false end
+					update_menu()
 				else
 					-- User refused — the profile is already cur_profile; no setter call
 					-- or save needed. Re-applying set_active_profile without persisting
@@ -381,7 +403,9 @@ function M.new(ctx)
 				end
 			end
 		elseif opts.force_dialog then
-			local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Profil recommandé"
+			local title = type(opts.dialog_title) == "string"
+				and opts.dialog_title
+				or  i18n.get("menu.llm.profile_recommended_title")
 			local msg = string.format(
 				i18n.get("menu.llm.profile_already_ok_msg"),
 				display_name, power_desc, cur_label, rec_label)
@@ -411,9 +435,17 @@ function M.new(ctx)
 		end
 
 		local function unlock_predictions()
-			if mlx_was_enabled and keymap and type(keymap.set_llm_enabled) == "function" then
+			local gate_ok, runtime_available = xpcall(runtime_gate, debug.traceback)
+			if not gate_ok then
+				Logger.error(LOG, "MLX model switch runtime gate raised: %s", tostring(runtime_available))
+				runtime_available = false
+			end
+			if mlx_was_enabled and state.llm_enabled == true and runtime_available == true
+				and keymap and type(keymap.set_llm_enabled) == "function" then
 				Logger.debug(LOG, "MLX model switch: predictions unlocked.")
 				pcall(keymap.set_llm_enabled, true)
+			elseif mlx_was_enabled then
+				Logger.debug(LOG, "MLX model switch: unlock skipped because the live runtime gate is closed.")
 			end
 		end
 
@@ -444,18 +476,68 @@ function M.new(ctx)
 				pcall(keymap.set_llm_display_model_name, new_model)
 			end
 
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then
+				unlock_predictions()
+				return false
+			end
+			update_menu()
 			unlock_predictions()
 			apply_recommended_prompt_profile(new_model, { dialog_title = i18n.get("menu.llm.model_change_title") })
 		end, function()
 			-- Requirements failed — restore predictions so the user is not left stranded
 			Logger.warn(LOG, string.format("switch_model('%s') failed — restoring predictions.", tostring(new_model)))
 			unlock_predictions()
+		end, nil, function(reason)
+			-- A superseding model request owns the existing prediction lock. A
+			-- backend change does not necessarily launch another model request, so
+			-- it must release the lock captured by this abandoned MLX switch.
+			if reason == "backend" then unlock_predictions() end
 		end)
+	end
+
+	--- Commits the explicit "No Model" state to runtime and preferences.
+	--- This is a model-identity change, so it also invalidates any pending
+	--- requirements callback before clearing the prediction engine model.
+	--- @return boolean True only when runtime and persistence both commit.
+	local function disable_model()
+		req_token = req_token + 1
+		local previous_model = state.llm_model
+		local previous_power = state.llm_model_power
+		local previous_actual = models_mgr.get_actual_model_name(previous_model)
+
+		if not keymap or type(keymap.set_llm_model) ~= "function"
+			or type(keymap.set_llm_display_model_name) ~= "function" then
+			Logger.error(LOG, "Cannot select No Model: keymap model setters are unavailable.")
+			return false
+		end
+		local runtime_ok, runtime_err = xpcall(function()
+			keymap.set_llm_model("")
+			keymap.set_llm_display_model_name("")
+		end, debug.traceback)
+		if not runtime_ok then
+			Logger.error(LOG, "Cannot select No Model: runtime update raised: %s", tostring(runtime_err))
+			pcall(keymap.set_llm_model, previous_actual)
+			pcall(keymap.set_llm_display_model_name, previous_model)
+			return false
+		end
+
+		state.llm_model = ""
+		state.llm_model_power = nil
+		if save_prefs() ~= true then
+			state.llm_model = previous_model
+			state.llm_model_power = previous_power
+			pcall(keymap.set_llm_model, previous_actual)
+			pcall(keymap.set_llm_display_model_name, previous_model)
+			return false
+		end
+		Logger.info(LOG, "Model disabled; runtime and preferences now have no active model.")
+		update_menu()
+		return true
 	end
 
 	return {
 		switch_model                      = switch_model,
+		disable_model                     = disable_model,
 		set_llm_profile                   = set_llm_profile,
 		apply_recommended_prompt_profile  = apply_recommended_prompt_profile,
 		get_display_model_name            = get_display_model_name,

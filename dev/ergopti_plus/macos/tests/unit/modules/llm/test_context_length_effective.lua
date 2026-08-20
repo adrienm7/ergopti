@@ -36,11 +36,11 @@ local LONG_BUFFER = ("x "):rep(1000)  -- 2000 chars, well over any heuristic cap
 
 
 
--- ================================================================================
+-- ===============================================================================
 -- ===============================================================================
 -- ======= 1/ Shared build_params: context_window_chars caps context (M-8) =======
 -- ===============================================================================
--- ================================================================================
+-- ===============================================================================
 
 helpers.describe("M-8: context_window_chars is honoured in build_params", function()
 
@@ -88,11 +88,11 @@ end)
 
 
 
--- ===================================================================================
+-- ==================================================================================
 -- ==================================================================================
 -- ======= 2/ HS shim M.build forwards context_window_chars from config (M-8) =======
 -- ==================================================================================
--- ===================================================================================
+-- ==================================================================================
 
 helpers.describe("M-8: HS prompt_builder shim threads context_window_chars", function()
 
@@ -101,9 +101,10 @@ helpers.describe("M-8: HS prompt_builder shim threads context_window_chars", fun
 		-- Load the HS shim with the real shared module (not a stub)
 		package.loaded["modules.llm.prompt_builder"] = nil
 		-- The shim requires "llm.prompt_builder" which is already in package.loaded from above
-		helpers.load_with_stubs("lib.logger")
+		helpers.load_with_stubs("infra.logger")
 		local ok_shim, ShimPB = pcall(require, "modules.llm.prompt_builder")
 		helpers.assert_true(ok_shim, "modules.llm.prompt_builder shim must be loadable")
+		helpers.assert_eq(type(ShimPB), "table", "and must be a table — the cases below index it")
 
 		local result, skip, _sig = ShimPB.build(LONG_BUFFER, {
 			max_words            = 0,
@@ -125,19 +126,20 @@ end)
 
 
 
--- ================================================================================================
+-- ===============================================================================================
 -- ===============================================================================================
 -- ======= 3/ Source: prediction_engine passes context_window_chars to PromptBuilder (M-8) =======
 -- ===============================================================================================
--- ================================================================================================
+-- ===============================================================================================
 
 helpers.describe("M-8: prediction_engine wires context_window_chars (source)", function()
 
 	helpers.it("prediction_engine.lua passes context_window_chars in PromptBuilder.build config", function()
-		local path = helpers.driver_root() .. "modules/llm/prediction_engine.lua"
-		local fh   = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "prediction_engine.lua must be readable")
-		local src  = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/prediction_engine.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function compute_adaptive_debounce")
+		helpers.assert_true(src ~= nil, "modules/llm/prediction_engine.lua source must be locatable")
 		helpers.assert_true(src:find("context_window_chars", 1, true) ~= nil,
 			"prediction_engine.lua must pass context_window_chars into PromptBuilder.build so the user setting takes effect (M-8)")
 	end)

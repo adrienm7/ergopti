@@ -29,8 +29,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- lib.logger must be resolved first so downstream requires can find it.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- export is required by aggregator.flush(); stub it so we never touch SQLite.
 package.loaded["modules.keylogger.export"] = {
@@ -49,7 +49,7 @@ package.loaded["modules.keylogger.sqlite_writer"] = {
 -- crash when aggregator.lua initialises its module-level timing constants.
 -- Inject a complete stub before the load so the real TOML path is never hit
 -- and the module loads cleanly in CI regardless of test ordering.
-package.loaded["lib.timings"] = {
+package.loaded["infra.timings"] = {
 	ms  = function(_section, _key) return 1000 end,
 	sec = function(_section, _key) return 1.0  end,
 }
@@ -96,70 +96,122 @@ helpers.describe("aggregator — pre-init guard", function()
 	-- Each walker must be a safe no-op when called before M.init().
 	local fresh = helpers.load_with_stubs("modules.keylogger.aggregator")
 
-	helpers.it("walk_typing before init does not crash", function()
-		local ok = pcall(function()
-			fresh.walk_typing({ app = "A", timestamp = "2024-01-01 10:00:00.000", events = {} })
-		end)
-		helpers.assert_true(ok)
+	-- "does not crash" is the weak half. A walker that ran before init would
+	-- accumulate rows against a nil device id and a batch that does not exist —
+	-- the point of the guard is that NOTHING is recorded, not that nothing
+	-- throws. has_pending_batch() is the observable, and no case looked at it.
+	helpers.it("walk_typing before init records nothing", function()
+		fresh.walk_typing({ app = "A", timestamp = "2024-01-01 10:00:00.000", events = {} })
+		helpers.assert_eq(fresh.has_pending_batch(), false,
+			"a pre-init walk must leave no batch behind — one flushed later would carry "
+				.. "rows with no device id attached")
 	end)
 
-	helpers.it("walk_app_switch before init does not crash", function()
-		local ok = pcall(function()
-			fresh.walk_app_switch({ prev_app = "A", next_app = "B",
-				timestamp = "2024-01-01 10:00:01.000", duration_ms = 1000 })
-		end)
-		helpers.assert_true(ok)
+	helpers.it("walk_app_switch before init records nothing", function()
+		fresh.walk_app_switch({ prev_app = "A", next_app = "B",
+			timestamp = "2024-01-01 10:00:01.000", duration_ms = 1000 })
+		helpers.assert_eq(fresh.has_pending_batch(), false,
+			"the same holds for an app switch — the guard is about the write, not the throw")
 	end)
 
-	helpers.it("flush before init does not crash", function()
-		local ok = pcall(function() fresh.flush() end)
-		helpers.assert_true(ok)
+	helpers.it("flush before init writes nothing", function()
+		fresh.flush()
+		helpers.assert_eq(fresh.has_pending_batch(), false,
+			"flushing before init must not create a batch on the way out")
 	end)
 
-	helpers.it("pause must not affect pure aggregation logic but real callers must gate (project_suspend_pause_invariant)", function()
-		-- Aggregator itself is pure; the hook/writer callers must early-return when paused.
-		-- This test documents the contract: flush/walk must produce zero side effects under pause.
-		helpers.assert_true(true, "keylogger aggregator walks must be suppressed by pause in kc_bridge / hook layer")
-	end)
-
-	helpers.it("high volume burst detection remains accurate under repeated walk_typing", function()
-		-- Stress: 100+ events must not corrupt ngram or burst counters.
-		helpers.assert_true(true)
-	end)
-
-	helpers.it("pause boundaries + privacy vectors + rollover simulation must produce zero output (project_suspend_pause_invariant)", function()
-		-- Aggregator pure; real kc_bridge/hook must gate. Pause mid-burst + day boundary must
-		-- not leak PII into any flush and must resume cleanly.
-		helpers.assert_true(true, "keylogger aggregator under pause + privacy + rollover must stay silent (callers gate)")
-	end)
-
-	helpers.it("FS/pcall resilience in flush path + 200+ events must never crash and still reach ring/errors", function()
-		-- Hard write failure in downstream must be caught; line stats must still be correct.
-		helpers.assert_true(true, "aggregator must survive FS/pcall errors (no crash, stats correct)")
-	end)
 end)
 
-helpers.describe("aggregator — diagnostic (healthcheck) integration + pause", function()
-	helpers.it("pause must keep aggregator pure; diagnostic must read safe counts + errors sink (project_suspend_pause_invariant)", function()
-		-- Aggregator is pure math; real hooks gate on pause. Healthcheck must still see
-		-- current session counts, privacy_hits, and the dedicated errors log path.
-		helpers.assert_true(true, "aggregator must be readable by diagnostic under pause; no side effects, privacy preserved")
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 3b/ Determinism, volume, bad input =======
+-- ==================================================
+-- ==================================================
+
+-- Eight assert_true(true) placeholders stood here. Seven of them restated the
+-- same sentence — "the aggregator is pure, the CALLERS gate on pause" — and
+-- verified none of it. That claim is not testable against this module at all:
+-- the aggregator has no knowledge of suspend, by design. Where it IS testable
+-- is at the caller, and that is where it is now asserted (the Windows twin
+-- pins the guard-before-mutation ordering in _OnPrefixChar / _OnPrefixKeyDown).
+--
+-- What IS a property of this module — determinism, behaviour at volume, and
+-- resilience to hostile app names — was named by those placeholders and checked
+-- by none of them. It is checked here.
+
+--- Builds a walk_typing entry from a plain string, one event per character.
+--- @param app string App name recorded on the entry.
+--- @param text string Characters to feed.
+--- @return table The entry shape walk_typing expects.
+local function typing_entry(app, text)
+	local events = {}
+	for i = 1, #text do
+		events[#events + 1] = { text:sub(i, i), 100, {} }
+	end
+	return { app = app, timestamp = "2024-01-01 10:00:00.000", events = events }
+end
+
+--- Characters the walker classified, summed across every app-day row.
+---
+--- chars_class is the walker's own per-character tally (letter / digit / punct
+--- / space / other), so it is the honest place to count what actually went in —
+--- the n-gram buckets are populated only on the paths that build grams.
+--- @param batch table|nil The aggregation batch.
+--- @return number Total classified characters.
+local function classified_chars(batch)
+	local n = 0
+	for _, row in pairs((batch or {}).chars_class or {}) do
+		n = n + (row.letter or 0) + (row.digit or 0) + (row.punct or 0) + (row.space or 0) + (row.other or 0)
+	end
+	return n
+end
+
+helpers.describe("aggregator — determinism, volume and hostile input", function()
+	local State = require("modules.keylogger.aggregator.state")
+
+	--- Walks `text` through a freshly-initialised aggregator and returns its batch.
+	local function walk_fresh(app, text)
+		State.initialized = false
+		State.agg_batch   = nil
+		State.ngram_ctx   = nil
+		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
+		a.init({ device_id = "determinism-probe" })
+		a.walk_typing(typing_entry(app, text))
+		return State.agg_batch
+	end
+
+	helpers.it("the same input produces the same character counts twice", function()
+		local first  = walk_fresh("Editor", "hello world")
+		local a_count = classified_chars(first)
+		local second = walk_fresh("Editor", "hello world")
+		local b_count = classified_chars(second)
+
+		helpers.assert_true(a_count > 0,
+			"the walker must record characters at all — a zero here would make the comparison below vacuous")
+		helpers.assert_eq(b_count, a_count,
+			"identical input must aggregate identically; a difference means state leaked across instances")
 	end)
 
-	helpers.it("high volume (200+) + pause mid-burst + rollover sim + unicode events must keep diagnostic summary correct", function()
-		-- Stress + pause + day boundary + bad chars: flush stats and ngram must be sane;
-		-- diagnostic keylogger section (events/wpm/privacy + errors sink) must not lie or leak.
-		helpers.assert_true(true, "aggregator volume + pause + rollover + unicode must not corrupt diagnostic keylogger summary (would have caught PII or wrong WPM in troubleshooting)")
+	helpers.it("200 characters are all counted", function()
+		local batch = walk_fresh("Editor", string.rep("ab", 100))
+		helpers.assert_eq(classified_chars(batch), 200,
+			"every fed character must reach the character bucket — the placeholder this replaces claimed to stress 200 events and fed none")
 	end)
 
-	helpers.it("privacy vectors + FS error in downstream + pause must still let diagnostic see errors sink and safe counts", function()
-		-- Even if flush/rollover hits protected FS, pcall must protect; diagnostic must surface
-		-- the clean ErgoptiPlus_errors_*.log for the user who is paused and debugging.
-		helpers.assert_true(true, "aggregator privacy + FS/pcall under pause must preserve diagnostic errors sink visibility")
-	end)
-
-	helpers.it("bad app names / empty / special unicode in events + pause must not crash walks and diagnostic must see only safe data", function()
-		helpers.assert_true(true, "aggregator bad/unicode app events under pause must be resilient; diagnostic summary remains privacy-safe")
+	helpers.it("an empty or non-ASCII app name neither crashes nor is dropped", function()
+		-- Deliberately NOT wrapped in pcall. A throw here fails the test on its
+		-- own, with the real stack; asserting on a pcall status instead would
+		-- prove only "it returned" and would pass on a walker that swallowed
+		-- every character.
+		for _, app in ipairs({ "", "Éditeur ✎", "app\tname" }) do
+			local batch = walk_fresh(app, "abc")
+			helpers.assert_eq(classified_chars(batch), 3,
+				"the characters must still be counted for app " .. string.format("%q", app))
+		end
 	end)
 end)
 
@@ -208,12 +260,42 @@ helpers.describe("aggregator — init", function()
 		helpers.assert_true(ctx == nil or type(ctx) == "table")
 	end)
 
-	helpers.it("ignores duplicate init calls", function()
+	helpers.it("ignores duplicate init calls and keeps the first device id", function()
+		-- The double-init guard lives in aggregator.state, which load_with_stubs
+		-- does NOT reload — so without dropping it here an earlier test's init is
+		-- still in effect and BOTH calls below are ignored, making the assertion
+		-- pass for the wrong reason.
+		--
+		-- The four submodules must be dropped and restored as one unit: they close
+		-- over the same state table, so reloading a subset leaves events.lua
+		-- pointing at the old table while core.lua uses the new one.
+		local FAMILY = {
+			"modules.keylogger.aggregator",
+			"modules.keylogger.aggregator.state",
+			"modules.keylogger.aggregator.core",
+			"modules.keylogger.aggregator.events",
+			"modules.keylogger.aggregator.sql",
+		}
+		local saved = {}
+		for _, name in ipairs(FAMILY) do
+			saved[name] = package.loaded[name]
+			package.loaded[name] = nil
+		end
+
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		a.init({ device_id = "uuid-a" })
-		-- Second call must not crash.
-		local ok = pcall(function() a.init({ device_id = "uuid-b" }) end)
-		helpers.assert_true(ok)
+		a.init({ device_id = "uuid-b" })
+		local seen = a.get_device_id()
+
+		-- Put the shared family back before asserting, so a failure here does not
+		-- cascade into every later test in the file.
+		for _, name in ipairs(FAMILY) do
+			package.loaded[name] = saved[name]
+		end
+		helpers.assert_eq(seen, "uuid-a",
+			"a second init must be ignored, not applied — the device id keys every row "
+				.. "written so far, and changing it mid-session splits one machine's "
+				.. "history across two identities")
 	end)
 end)
 
@@ -233,7 +315,18 @@ helpers.describe("aggregator — ngram context", function()
 	helpers.it("setup: init succeeds", function()
 		a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		a.init({ device_id = "ctx-test-uuid" })
-		helpers.assert_true(true)
+		-- "init succeeds" asserted as assert_true(true) meant the setup could fail
+		-- silently and every case below would run against a half-built module. The
+		-- post-condition is that the instance is usable, so check that.
+		helpers.assert_eq(type(a.get_ngram_ctx), "function",
+			"after init the aggregator must expose its context API")
+		-- The context is restored from disk after init, so it is nil until then. What
+		-- must hold is that the setter coerces: a non-table restore (a corrupt or
+		-- half-written JSON file) becomes an empty context, never a nil that every
+		-- later index would fault on.
+		a.set_ngram_ctx("not a table")
+		helpers.assert_eq(type(a.get_ngram_ctx()), "table",
+			"a non-table restore must be coerced to an empty context, not left nil")
 	end)
 
 	helpers.it("set_ngram_ctx stores a table and get_ngram_ctx retrieves it", function()
@@ -274,11 +367,12 @@ helpers.describe("aggregator — batch management", function()
 	helpers.it("reset_batch does not crash and can be called repeatedly", function()
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		a.init({ device_id = "batch-uuid" })
-		local ok = pcall(function()
-			a.reset_batch()
-			a.reset_batch()
-		end)
-		helpers.assert_true(ok)
+		a.reset_batch()
+		a.reset_batch()
+		helpers.assert_eq(a.has_pending_batch(), false,
+			"resetting twice must leave the batch empty, not half-rebuilt — the second "
+				.. "reset running against an already-cleared batch is the ordinary case on "
+				.. "a flush that found nothing to write")
 	end)
 end)
 
@@ -299,17 +393,27 @@ helpers.describe("aggregator — walk_typing char counts", function()
 		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "walk-uuid" })
-		helpers.assert_true(true)
+		helpers.assert_eq(type(a.walk_typing), "function",
+			"after init the aggregator must expose walk_typing — the cases below all call it, "
+			.. "and a silent setup failure would leave them running against nothing")
 	end)
 
-	helpers.it("empty events list does not crash", function()
-		local ok = pcall(function()
-			a.walk_typing({
-				app = "TestApp", timestamp = "2024-06-01 10:00:00.000",
-				events = {},
-			})
-		end)
-		helpers.assert_true(ok)
+	helpers.it("an empty events list adds no context for the app", function()
+		-- Called directly: a raise here fails with the real error, which is more
+		-- use than a boolean. And the claim is not survival — it is that a walk
+		-- over nothing creates nothing, because an ngram context invented from an
+		-- empty entry is a row the dashboards then attribute keystrokes to.
+		local before_ctx = a.get_ngram_ctx()
+		a.walk_typing({
+			app = "TestApp", timestamp = "2024-06-01 10:00:00.000",
+			events = {},
+		})
+		-- get_app_ctx creates on demand, so it cannot answer "was one made". What
+		-- CAN be read is the ngram context the walk would have advanced: an empty
+		-- entry must leave it exactly where it was, or the next real keystroke is
+		-- paired against a neighbour that was never typed.
+		helpers.assert_eq(a.get_ngram_ctx(), before_ctx,
+			"an empty entry must not advance the ngram context")
 	end)
 
 	helpers.it("three normal chars populate ngram_ctx for the app", function()
@@ -405,22 +509,26 @@ helpers.describe("aggregator — walk_app_switch", function()
 		a.walk_app_switch({ prev_app = "AppA", next_app = "AppC",
 			timestamp = "2024-06-01 12:00:05.000", duration_ms = 3000 })
 
-		-- flush() is a DB-level operation; just verify it does not crash with nil db.
-		local ok = pcall(function() a.flush() end)
-		helpers.assert_true(ok)
+		-- flush() is a DB-level operation. With no db it must report that it wrote
+		-- nothing rather than claim a flush that never reached SQLite: the caller
+		-- advances its watermark on the answer.
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"a flush with no database must not report rows written")
 	end)
 
-	helpers.it("missing prev_app does not crash", function()
+	helpers.it("an app switch with no prev_app records nothing for a nil app", function()
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "sw2-uuid" })
 
-		local ok = pcall(function()
-			a.walk_app_switch({ next_app = "AppB",
-				timestamp = "2024-06-01 12:00:00.000", duration_ms = 1000 })
-		end)
-		helpers.assert_true(ok)
+		a.walk_app_switch({ next_app = "AppB",
+			timestamp = "2024-06-01 12:00:00.000", duration_ms = 1000 })
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"a switch whose previous app is unknown must not manufacture a duration row "
+				.. "for it — the dashboards would attribute that time to nothing")
 	end)
 end)
 
@@ -444,24 +552,27 @@ helpers.describe("aggregator — walk_system_event", function()
 		a.walk_system_event({ action = "wifi_change", timestamp = "2024-06-01 08:00:00.000" })
 		a.walk_system_event({ action = "wifi_change", timestamp = "2024-06-01 08:01:00.000" })
 
-		-- walk_system_event is pure batch accumulation; flush with nil db is a no-op.
-		local ok = pcall(function() a.flush() end)
-		helpers.assert_true(ok)
+		-- walk_system_event is pure batch accumulation; flush with nil db writes
+		-- nothing and must say so.
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"a flush with no database must not report rows written")
 	end)
 
-	helpers.it("modifier_hold with valid keycode does not crash", function()
+	helpers.it("a modifier_hold accumulates without a database", function()
 		local a = helpers.load_with_stubs("modules.keylogger.aggregator")
 		package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return nil end }
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "hold-uuid" })
 
-		local ok = pcall(function()
-			a.walk_system_event({
-				action = "modifier_hold", keycode = 56, app = "TestApp",
-				hold_ms = 300, timestamp = "2024-06-01 09:00:00.000",
-			})
-		end)
-		helpers.assert_true(ok)
+		a.walk_system_event({
+			action = "modifier_hold", keycode = 56, app = "TestApp",
+			hold_ms = 300, timestamp = "2024-06-01 09:00:00.000",
+		})
+		local flushed = a.flush()
+		helpers.assert_true(flushed == nil or flushed == false or flushed == 0,
+			"accumulation is in-memory; without a database the flush must report nothing "
+				.. "written rather than a count the caller would trust")
 	end)
 end)
 
@@ -537,12 +648,13 @@ helpers.describe("aggregator — walk_system_event manifest_increment (F-HIGH-26
 		package.loaded["modules.keylogger.export"]        = { get_native_app_category = function() return "Dev" end }
 		a.init({ device_id = "manifest-bad-uuid" })
 
-		local ok = pcall(function()
+		local ok, walk_err = pcall(function()
 			a.walk_system_event({
 				action = "manifest_increment", stat = "not_a_real_column", amount = 1,
 				app = "TestApp", timestamp = "2024-06-01 12:00:00.000",
 			})
 		end)
+		helpers.assert_nil(walk_err, "and must report none: " .. tostring(walk_err))
 		helpers.assert_true(ok, "an unknown stat name must not crash walk_system_event")
 
 		local row = read_app_day_row("2024-06-01", "TestApp")
@@ -621,12 +733,13 @@ helpers.describe("aggregator — walk_system_event focus_first_key (F-MED-27)", 
 			events = { { "a", 100, {} } },
 		})
 
-		local ok = pcall(function()
+		local ok, focus_err = pcall(function()
 			a.walk_system_event({
 				action = "focus_first_key", app = "SharedApp", latency_ms = 300,
 				timestamp = "2024-07-02 09:00:01.000",
 			})
 		end)
+		helpers.assert_nil(focus_err, "and must report none: " .. tostring(focus_err))
 		helpers.assert_true(ok, "focus_first_key must not crash when the ergo row was created by walk_typing first")
 
 		local row = read_ergo_row("2024-07-02", "SharedApp")

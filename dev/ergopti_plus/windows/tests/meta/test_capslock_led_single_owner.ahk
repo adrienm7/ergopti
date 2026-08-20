@@ -86,7 +86,7 @@ Test("capsword: UpdateCapsLockLED ORs the hardware CapsLock toggle (capslock-led
 ; ToggleCapsLock must delegate the LED to the single owner instead of driving it
 ; directly, so it can never leave the LED disagreeing with CapsWord/layer state.
 _CLSO_ToggleRoutesThroughLed() {
-	Src := _CLSO_ReadSource("modules/tap_holds/one_shot_shift.ahk")
+	Src := _CLSO_ReadSource("platform/remap/one_shot_shift.ahk")
 	Seg := _DriverFuncBody("ToggleCapsLock")
 	Assert(Seg != "", "ToggleCapsLock() declaration must exist in one_shot_shift.ahk")
 	Assert(InStr(Seg, "UpdateCapsLockLED()") > 0,

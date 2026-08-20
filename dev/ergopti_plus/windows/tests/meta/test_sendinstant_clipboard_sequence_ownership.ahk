@@ -19,14 +19,15 @@ _SICSO_SendInstantRestoreOwnsSequence() {
         "SendInstant must use the clipboard adapter for its all-format transaction")
     Assert(InStr(SendBody, "OwnedSequence := CB_GetSequenceNumber()") > 0,
         "SendInstant must capture the sequence immediately after publishing its payload")
-    Assert(InStr(SendBody, "_SendInstant_RestoreClipboard.Bind(OldClipboard, OwnedSequence)") > 0,
-        "SendInstant must bind its owned sequence to the deferred restore")
+    Assert(InStr(SendBody, "_SendInstant_RestoreClipboard.Bind(OldClipboard, OwnedSequence, OwnerToken)") > 0,
+        "SendInstant must bind its owned sequence and shared transaction token to the deferred restore")
     Assert(InStr(Restore, "CB_GetSequenceNumber() = OwnedSequence") > 0
             && InStr(Restore, "CB_RestoreAll(OldClip)") > 0,
         "SendInstant restore must restore only while it still owns the clipboard sequence")
     Assert(InStr(Restore, "finally") > 0
-            && InStr(Restore, "_SEND_INSTANT_CLIP_BUSY := false") > 0,
-        "SendInstant restore must release the busy latch even when clipboard restoration fails")
+            && InStr(Restore, "_SEND_INSTANT_CLIP_BUSY := false") > 0
+            && InStr(Restore, "CB_EndOwnedTransaction(OwnerToken)") > 0,
+        "SendInstant restore must release both ownership and the busy latch even when clipboard restoration fails")
 }
 
 Test("hotstrings: SendInstant restores only its own clipboard sequence",

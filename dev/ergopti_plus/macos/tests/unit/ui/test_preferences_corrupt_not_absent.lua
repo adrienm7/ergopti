@@ -40,8 +40,48 @@ local function write_temp(contents)
 	return path
 end
 
+--- Reads one throwaway fixture after any filesystem override has been restored.
+--- @param path string Fixture path.
+--- @return string contents Exact fixture bytes.
+local function read_temp(path)
+	local fh = assert(io.open(path, "rb"))
+	local contents = assert(fh:read("*a"))
+	assert(fh:close())
+	return contents
+end
+
+--- Runs one callback with a temporary io.open implementation.
+--- @param replacement function Temporary open implementation.
+--- @param callback function Protected operation.
+--- @return any result First callback result.
+--- @return any extra Second callback result.
+local function with_open(replacement, callback)
+	local original = io.open
+	io.open = replacement
+	local ok, result, extra = xpcall(callback, debug.traceback)
+	io.open = original
+	if not ok then error(result, 0) end
+	return result, extra
+end
+
 local function preferences()
-	return helpers.load_with_stubs("ui.menu.preferences", {})
+	package.loaded["adapters.file_system"] = {
+		read_with_status = function(path)
+			local open_ok, fh, open_detail, open_code = pcall(io.open, path, "r")
+			if not open_ok or not fh then
+				if open_ok and open_code == 2 then return nil, "absent" end
+				return nil, "error", open_detail
+			end
+			local read_ok, content = pcall(fh.read, fh, "*a")
+			local close_ok, closed = pcall(fh.close, fh)
+			if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+				return nil, "error", "stream did not commit"
+			end
+			return content, "ok"
+		end,
+	}
+	package.loaded["infra.preferences"] = nil
+	return require("infra.preferences")
 end
 
 
@@ -62,6 +102,61 @@ helpers.describe("Preferences.load: corrupt is not absent", function()
 		helpers.assert_eq(status, "absent",
 			"a genuinely missing file must report absent — that is the fresh-install path, and it "
 				.. "is the ONLY case in which seeding factory defaults and saving them is correct")
+	end)
+
+	helpers.it("an existing file whose open is refused reports corrupt and preserves its bytes", function()
+		local prefs = preferences()
+		local sentinel = "PRIVATE-CONFIG-SENTINEL"
+		local private_failure = "PRIVATE-OPEN-FAILURE"
+		local path = write_temp(sentinel)
+		helpers.assert_true(path ~= nil, "the existing fixture file must be writable")
+		local original_open = io.open
+
+		local saved, status = with_open(function(candidate, mode)
+			if candidate == path and mode == "r" then return nil, private_failure, 13 end
+			return original_open(candidate, mode)
+		end, function()
+			return prefs.load(path)
+		end)
+
+		helpers.assert_true(type(saved) == "table", "an unreadable file must remain non-throwing")
+		helpers.assert_eq(status, "corrupt",
+			"a permission or transient-lock failure must never authorize the fresh-install writer")
+		helpers.assert_eq(read_temp(path), sentinel,
+			"classification of an unreadable existing config must preserve its exact bytes")
+		os.remove(path)
+	end)
+
+	helpers.it("read and close failures report corrupt without escaping", function()
+		local prefs = preferences()
+		local cases = {
+			{
+				label = "read throw",
+				handle = {
+					read = function() error("PRIVATE-READ-FAILURE", 0) end,
+					close = function() return true end,
+				},
+			},
+			{
+				label = "close refusal",
+				handle = {
+					read = function() return "[script]\nlocale = \"fr\"\n" end,
+					close = function() return false end,
+				},
+			},
+		}
+
+		for _, case in ipairs(cases) do
+			local call_ok, saved, status = pcall(function()
+				return with_open(function() return case.handle end, function()
+					return prefs.load("/controlled/config.toml")
+				end)
+			end)
+			helpers.assert_true(call_ok, case.label .. " must not escape Preferences.load")
+			helpers.assert_true(type(saved) == "table", case.label .. " must return a safe table")
+			helpers.assert_eq(status, "corrupt",
+				case.label .. " must never be indistinguishable from a genuinely missing file")
+		end
 	end)
 
 	helpers.it("an unparseable file reports corrupt, not absent", function()
@@ -118,6 +213,9 @@ helpers.describe("Preferences.load: corrupt is not absent", function()
 	end)
 end)
 
+package.loaded["adapters.file_system"] = nil
+package.loaded["infra.preferences"] = nil
+
 
 
 
@@ -152,7 +250,7 @@ helpers.describe("menu boot: a corrupt config never triggers the factory save", 
 
 	helpers.it("the save is still reached for a genuine fresh install", function()
 		local src = helpers.read_driver_source("config_absent")
-		helpers.assert_true(src:find("if config_absent then save_prefs() end", 1, true) ~= nil,
+		helpers.assert_true(src:find("if config_absent and save_prefs() ~= true then", 1, true) ~= nil,
 			"a real fresh install must still persist its seeded defaults — narrowing the flag must "
 				.. "not disable the path it exists for")
 	end)

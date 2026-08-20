@@ -25,8 +25,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Returns a unique writable temp path for each test case.
 --- @param name string Short discriminator so concurrent tests never collide.
@@ -41,6 +41,7 @@ end
 --- @param path string Override file path.
 --- @return table Freshly-initialised module.
 local function fresh_module(path)
+	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = path, toml_resolver = function() return nil end })
@@ -51,11 +52,11 @@ end
 
 
 
--- ==============================================================
+-- =============================================================
 -- =============================================================
 -- ======= 1/ show_tooltip false round-trip through disk =======
 -- =============================================================
--- ==============================================================
+-- =============================================================
 
 helpers.describe("hotstrings_config: show_tooltip override round-trip", function()
 	helpers.it("show_tooltip=false survives serialize → disk → reload", function()

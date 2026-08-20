@@ -9,7 +9,8 @@
 ---
 --- HOT PATH NOTE:
 --- M.append_log() is called on every keystroke. It must never block on SQLite.
---- All it does is open today.log in append mode, write one JSON line, and close.
+--- It reuses one unbuffered append handle and accepts a line only after write
+--- reports its documented success value.
 ---
 --- DAY ROLLOVER:
 --- M.day_rollover() is called at midnight by the keylogger init watchdog. It
@@ -18,30 +19,38 @@
 ---
 --- DEPENDENCIES:
 --- - lib.logger (project-wide logger).
---- - hs.json, hs.fs, hs.timer.
+--- - hs.json.
 --- ==============================================================================
 
 local M = {}
 
-local hs   = hs
-local fs   = require("hs.fs")
 local json = require("hs.json")
 
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG    = "keylogger.rotation"
 
 
 
 
 
--- ================================
+-- ===============================
 -- ===============================
 -- ======= 1/ Module State =======
 -- ===============================
--- ================================
+-- ===============================
 
 --- Maximum JSONL lines consumed per ingest tick.
 local INGEST_BATCH_LINES = 5000
+
+--- Tail-read outcomes. Only READ_STATUS_EOF authorizes destructive rollover;
+--- an empty entry list alone is never proof that the journal was fully read.
+M.READ_STATUS_BATCH  = "batch"
+M.READ_STATUS_EOF    = "eof"
+M.READ_STATUS_FAILED = "failed"
+
+--- POSIX errno returned by io.open() when today.log does not exist. In the
+--- single-threaded Hammerspoon callback this is a committed empty-journal state.
+local ENOENT_ERROR_CODE = 2
 
 --- Shared state injected by M.init().
 local _state = nil
@@ -63,15 +72,20 @@ local _initialized = false
 --- across every M.append_log() call so the hot path never pays open()/close().
 local _log_handle = nil
 
+--- A failed unbuffered write may have left a partial unterminated record. The
+--- next retry starts on a fresh line so that its complete JSON object remains
+--- independently ingestible after storage recovers.
+local _append_boundary_required = false
 
 
 
 
--- ==================================
+
+-- ===================================
 -- ===================================
 -- ======= 2/ Guards and Utils =======
 -- ===================================
--- ==================================
+-- ===================================
 
 --- Guards public functions against being called before M.init().
 local function _require_init(func_name)
@@ -106,11 +120,11 @@ local _now_ts = require("modules.keylogger.timestamp").now_ts
 
 
 
--- ==================================================
+-- =====================================================
 -- =====================================================
 -- ======= 3/ Offset accessors (for log_manager) =======
 -- =====================================================
--- ==================================================
+-- =====================================================
 
 --- Return the current tail-read watermark.
 --- @return integer Byte offset.
@@ -142,14 +156,63 @@ end
 -- ==================================================================
 -- ==================================================================
 
+--- Invalidates an append handle after an ambiguous unbuffered write result.
+--- The exact handle is closed best-effort and never reused: stdio buffer state
+--- after ENOSPC is undefined, so a retry must acquire a fresh stream.
+--- @param stage string Failed operation name for diagnostics.
+--- @param detail any Non-sensitive failure detail returned by the file API.
+--- @return boolean Always false so callers propagate the refused transaction.
+local function _reject_append_handle(stage, detail)
+	local failed_handle = _log_handle
+	_log_handle = nil
+	if failed_handle then
+		local close_ok, close_result = pcall(failed_handle.close, failed_handle)
+		if not close_ok or close_result ~= true then
+			Logger.warn(LOG, "today.log handle close after %s failure was not confirmed.", stage)
+		end
+	end
+	Logger.error(LOG, "Cannot append to today.log: %s failed (%s).",
+		stage, tostring(detail))
+	return false
+end
+
+--- Opens today.log in unbuffered append mode. With stdio buffering disabled,
+--- file:write() is the only ambiguous persistence boundary: a successful return
+--- means the complete line reached the OS, while nil/throw means a possibly
+--- partial line must be isolated before retry. A later flush cannot add a second
+--- uncertainty window because there is no userspace buffer left to flush.
+--- @return boolean opened True only when a configured handle is published.
+local function _open_append_handle()
+	local open_ok, handle_or_err, open_detail = pcall(io.open,
+		_paths.today_log_path, "a")
+	if not open_ok or handle_or_err == nil then
+		Logger.error(LOG, "Cannot open today.log for append (%s).",
+			tostring(open_detail or handle_or_err))
+		return false
+	end
+
+	local setvbuf_ok, configured_or_err, config_detail = pcall(
+		handle_or_err.setvbuf, handle_or_err, "no")
+	if not setvbuf_ok or configured_or_err ~= true then
+		pcall(handle_or_err.close, handle_or_err)
+		Logger.error(LOG, "Cannot configure unbuffered today.log append (%s).",
+			tostring(config_detail or configured_or_err))
+		return false
+	end
+
+	_log_handle = handle_or_err
+	return true
+end
+
 --- Append a single event entry to today.log as a JSONL line.
 --- Hot path: every keystroke ends up here. Never touches SQLite.
 --- @param entry table The event entry. Must contain a `type` field.
+--- @return boolean True only after one unbuffered write accepted the complete line.
 function M.append_log(entry)
-	if not _require_init("append_log") then return end
+	if not _require_init("append_log") then return false end
 	if type(entry) ~= "table" or type(entry.type) ~= "string" then
 		Logger.warn(LOG, "append_log: invalid entry — skipping")
-		return
+		return false
 	end
 	entry.timestamp = entry.timestamp or _now_ts()
 
@@ -157,40 +220,47 @@ function M.append_log(entry)
 	if not ok then
 		Logger.error(LOG, "JSON encode failed for type '%s': %s.",
 			tostring(entry.type), tostring(str))
-		return
+		return false
 	end
 	-- Collapse any embedded newlines so the file stays valid JSONL
 	str = str:gsub("\n", "")
 
 	-- Reopen if the handle was lost (e.g. external rotation deleted the file).
-	if not _log_handle then
-		_log_handle = io.open(_paths.today_log_path, "a")
+	if not _log_handle and not _open_append_handle() then return false end
+
+	local prefix = _append_boundary_required and "\n" or ""
+	local write_ok, write_result, write_detail = pcall(_log_handle.write,
+		_log_handle, prefix .. str .. "\n")
+	if not write_ok or write_result == nil or write_result == false then
+		_append_boundary_required = true
+		return _reject_append_handle("write", write_detail or write_result)
 	end
-	if not _log_handle then
-		Logger.error(LOG, "Cannot append to today.log at %s.",
-			_paths.today_log_path)
-		return
-	end
-	_log_handle:write(str .. "\n")
-	_log_handle:flush()
+
+	_append_boundary_required = false
+	return true
 end
 
 
 
 
 
--- ============================================
+-- ==============================================
 -- ==============================================
 -- ======= 5/ Tail Read (for ingest tick) =======
 -- ==============================================
--- ============================================
+-- ==============================================
 
---- Read newly appended bytes of today.log past the stored watermark and
---- return them as a list of {entry, raw} items plus the post-read offset.
---- Stops after INGEST_BATCH_LINES entries to keep each tick short.
---- @return table, integer List of parsed entries, new byte offset.
+--- Read newly appended bytes of today.log past the stored watermark. The third
+--- result distinguishes a capped batch, committed EOF, and any I/O failure;
+--- callers must never infer EOF from an empty list. Stops after
+--- INGEST_BATCH_LINES entries to keep each tick short.
+--- @return table entries List of parsed {entry, raw} items.
+--- @return integer offset New byte offset, or the previous committed offset on failure.
+--- @return string status One of READ_STATUS_BATCH, READ_STATUS_EOF, READ_STATUS_FAILED.
 function M.read_new_entries()
-	if not _require_init("read_new_entries") then return {}, _today_log_offset end
+	if not _require_init("read_new_entries") then
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
+	end
 
 	-- The offset is only reset by M.rollover(); resetting it here would cause
 	-- double-aggregation when day_rollover() calls ingest_once() at midnight
@@ -198,22 +268,51 @@ function M.read_new_entries()
 	local today = _today()
 	if not _today_log_date then _today_log_date = today end
 
-	local attrs = fs.attributes(_paths.today_log_path)
-	if not attrs then return {}, _today_log_offset end
-	local size = attrs.size or 0
-	if size <= _today_log_offset then return {}, _today_log_offset end
-
-	local fh, err = io.open(_paths.today_log_path, "r")
-	if not fh then
-		Logger.warn(LOG, "Cannot open today.log %s: %s.",
-			_paths.today_log_path, tostring(err))
-		return {}, _today_log_offset
+	local open_ok, fh, open_detail, open_code = pcall(io.open, _paths.today_log_path, "r")
+	if not open_ok or not fh then
+		if open_ok and open_code == ENOENT_ERROR_CODE then
+			return {}, _today_log_offset, M.READ_STATUS_EOF
+		end
+		Logger.warn(LOG, "Cannot open today.log; committed offset %d preserved "
+			.. "(failure content withheld; terminal type: %s).",
+			_today_log_offset, type(open_detail))
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
 	end
-	fh:seek("set", _today_log_offset)
+
+	local function fail_read(stage)
+		pcall(fh.close, fh)
+		Logger.warn(LOG, "today.log tail read failed at %s; committed offset %d preserved.",
+			stage, _today_log_offset)
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
+	end
+
+	local size_ok, size = pcall(fh.seek, fh, "end")
+	if not size_ok or type(size) ~= "number" then return fail_read("size query") end
+	if size < _today_log_offset then return fail_read("offset validation") end
+	if size == _today_log_offset then
+		local close_ok, closed = pcall(fh.close, fh)
+		if not close_ok or closed ~= true then
+			Logger.warn(LOG, "today.log EOF close failed; committed offset %d preserved.",
+				_today_log_offset)
+			return {}, _today_log_offset, M.READ_STATUS_FAILED
+		end
+		return {}, _today_log_offset, M.READ_STATUS_EOF
+	end
+
+	local seek_ok, start_offset = pcall(fh.seek, fh, "set", _today_log_offset)
+	if not seek_ok or start_offset ~= _today_log_offset then return fail_read("initial seek") end
+
 	local out, lines = {}, 0
+	local reached_eof = false
 	while lines < INGEST_BATCH_LINES do
-		local line = fh:read("*l")
-		if not line then break end
+		local read_ok, line, read_detail, read_code = pcall(fh.read, fh, "*l")
+		if not read_ok then return fail_read("line read") end
+		if line == nil then
+			if read_detail ~= nil or read_code ~= nil then return fail_read("line read") end
+			reached_eof = true
+			break
+		end
+		if type(line) ~= "string" then return fail_read("line type validation") end
 		local ok, entry = pcall(json.decode, line)
 		if ok and type(entry) == "table" and type(entry.type) == "string"
 		   and type(entry.timestamp) == "string" then
@@ -221,27 +320,44 @@ function M.read_new_entries()
 		end
 		lines = lines + 1
 	end
-	local new_offset = fh:seek("cur")
-	fh:close()
-	return out, new_offset
+
+	local offset_ok, new_offset = pcall(fh.seek, fh, "cur")
+	if not offset_ok or type(new_offset) ~= "number" then return fail_read("final seek") end
+	if new_offset > size then return fail_read("snapshot validation") end
+	if reached_eof and new_offset ~= size then return fail_read("EOF validation") end
+
+	local close_ok, closed = pcall(fh.close, fh)
+	if not close_ok or closed ~= true then
+		Logger.warn(LOG, "today.log tail-read close failed; committed offset %d preserved.",
+			_today_log_offset)
+		return {}, _today_log_offset, M.READ_STATUS_FAILED
+	end
+	return out, new_offset, reached_eof and M.READ_STATUS_EOF or M.READ_STATUS_BATCH
 end
 
 
 
 
 
--- ========================================
+-- =======================================
 -- =======================================
 -- ======= 6/ Day Rollover Handler =======
 -- =======================================
--- ========================================
+-- =======================================
 
 --- Perform a daily log rollover: delete today.log and reset the offset
 --- so tomorrow starts fresh. The caller (log_manager) must drain the
 --- remaining today.log into the ingest pipeline before calling this.
 --- @param data_sql_path string Path to the append-only data.sql file.
-function M.rollover(data_sql_path)
-	if not _require_init("rollover") then return end
+--- @param read_status string Must be READ_STATUS_EOF from the immediately
+--- preceding drain check.
+--- @return boolean True when rollover ran, false when the EOF proof was absent.
+function M.rollover(data_sql_path, read_status)
+	if not _require_init("rollover") then return false end
+	if read_status ~= M.READ_STATUS_EOF then
+		Logger.warn(LOG, "rollover refused without a committed EOF status; today.log preserved.")
+		return false
+	end
 
 	-- Append a human-readable boundary marker to data.sql
 	local prev_date = _today_log_date or ""
@@ -263,6 +379,7 @@ function M.rollover(data_sql_path)
 	end
 	_today_log_offset = 0
 	_today_log_date   = new_date
+	return true
 end
 
 
@@ -294,11 +411,11 @@ function M.init(deps)
 	_state = deps.state
 	_today_log_offset = deps.today_log_offset or 0
 	_today_log_date   = deps.today_log_date   or nil
+	_append_boundary_required = false
 
 	-- Open a persistent append handle for today.log so the hot path never
 	-- pays the cost of open()/close() on every keystroke.
-	_log_handle = io.open(_paths.today_log_path, "a")
-	if not _log_handle then
+	if not _open_append_handle() then
 		Logger.error(LOG, "Cannot open today.log at %s for append — log writes will fail.",
 			_paths.today_log_path)
 	end

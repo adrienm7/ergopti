@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 -- calls at module level. Clear it so the real implementation is loaded fresh.
 --
 -- The server-lifecycle sibling (models_manager_mlx_server) must ALSO be cleared:
--- start_server lives there since the P6 split, and that module captures
+-- start_server lives there since the models-manager split, and that module captures
 -- `local hs = hs` at load time. A prior load_with_stubs test swaps the _G.hs
 -- TABLE, so a stale server module would call the old hs.execute/hs.task (whose
 -- defaults return ""), and the `hs.execute`/`hs.task.new` stubs this test sets on

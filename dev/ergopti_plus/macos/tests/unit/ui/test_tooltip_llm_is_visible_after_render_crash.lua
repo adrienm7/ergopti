@@ -16,8 +16,8 @@
 --- focused application. A stuck-true flag silently misroutes every subsequent
 --- keypress until the next successful show_predictions() or an explicit hide().
 ---
---- Fix: move the `_is_visible = true` assignment to after Renderer.render()
---- returns without raising, inside the same internal pcall.
+--- Fix: commit visibility only after the renderer invokes its post-show callback
+--- and the complete dismissal-watcher set is verified active.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -25,24 +25,36 @@ local helpers = require("tests.helpers")
 helpers.describe("tooltip_llm: is_visible() stays false after a show_predictions render crash (F-MED-24)", function()
 	--- Loads tooltip_llm with a stubbed lib.logger so ERROR-level calls are
 	--- observable, and returns the module plus the captured error messages.
-	--- The stock hs.canvas stub used by tests/stubs/hs.lua returns a callable
-	--- from any :method() call on the mock canvas — `minimumTextSize(...)`.w
-	--- therefore yields a function value, and comparing it against a number in
-	--- show_predictions' width-calc loop raises. That is a genuine crash deep
-	--- inside the pcall-wrapped body, which is exactly the failure mode this
-	--- regression covers — no additional stubbing is needed to trigger it.
+	--- Installs an explicit failing renderer. The shared hs.canvas double must
+	--- remain contract-faithful so E2E renders can detect real native-state bugs;
+	--- using a deliberately broken global canvas stub as this test's fault
+	--- injector made unrelated tooltip renders log errors while the suite passed.
 	local function load_tooltip_llm_with_logger_spy()
 		local logged_errors = {}
-		package.loaded["lib.logger"] = nil
+		package.loaded["ui.tooltip.renderer"] = {
+			canvas = {
+				minimumTextSize = function()
+					error("simulated tooltip measurement failure")
+				end,
+			},
+			ELEM_INFO = 6,
+			hide = function() return true end,
+			set_element_text = function() return true end,
+			render = function() return false end,
+		}
+		package.loaded["infra.logger"] = nil
 		local Tooltip = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
-		package.loaded["lib.logger"].error = function(_log, fmt, ...)
+		-- Tooltip captured the fault injector; release the cache slot so it cannot
+		-- become another order-dependent fixture for later modules.
+		package.loaded["ui.tooltip.renderer"] = nil
+		package.loaded["infra.logger"].error = function(_log, fmt, ...)
 			table.insert(logged_errors, string.format(tostring(fmt), ...))
 		end
 		-- tooltip_llm already bound its own upvalue to the real (mutated)
 		-- module above — release the cache entry now so the monkey-patched
-		-- .error doesn't leak into every later require("lib.logger") for the
+		-- .error doesn't leak into every later require("infra.logger") for the
 		-- rest of the full-suite process.
-		package.loaded["lib.logger"] = nil
+		package.loaded["infra.logger"] = nil
 		return Tooltip, logged_errors
 	end
 
@@ -66,24 +78,14 @@ helpers.describe("tooltip_llm: is_visible() stays false after a show_predictions
 			"is_visible() must not get stuck true after show_predictions failed to render — " ..
 			"llm_bridge.lua would otherwise keep routing keystrokes to a tooltip that was never shown")
 	end)
-end)
 
-helpers.describe("tooltip_llm: _is_visible is set after Renderer.render(), not before (F-MED-24)", function()
-	local function read_src()
-		local path = helpers.driver_root() .. "ui/tooltip/tooltip_llm.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open tooltip_llm.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
-		return src
-	end
+	helpers.it("show_predictions reports a failed transaction when rendering crashes", function()
+		local Tooltip = load_tooltip_llm_with_logger_spy()
+		local preds = { { chunks = {}, nw = "hello" } }
 
-	helpers.it("the _is_visible = true assignment appears after the Renderer.render call", function()
-		local src = read_src()
-		local render_call_pos = src:find("Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)", 1, true)
-		local visible_flag_pos = src:find("_is_visible = true", 1, true)
-		helpers.assert_true(render_call_pos ~= nil, "show_predictions must call Renderer.render(...)")
-		helpers.assert_true(visible_flag_pos ~= nil, "show_predictions must set _is_visible = true")
-		helpers.assert_true(visible_flag_pos > render_call_pos,
-			"_is_visible = true must come AFTER the Renderer.render() call so a render crash cannot leave it stuck true")
+		local shown = Tooltip.show_predictions(preds, 1, true, "Model", "alt", 0, {}, nil, nil, 0)
+
+		helpers.assert_eq(shown, false,
+			"a swallowed render exception must not be reported as a committed tooltip")
 	end)
 end)

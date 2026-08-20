@@ -39,10 +39,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("keylogger: pause guard precedes the mouse/keyUp/flagsChanged branches (C1)", function()
 	helpers.it("the is_paused() guard appears before the event-type branches in handle_key", function()
-		local path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 
 		local hk = src:find("local function handle_key", 1, true)
 		helpers.assert_true(hk ~= nil, "handle_key must be locatable")
@@ -50,10 +51,13 @@ helpers.describe("keylogger: pause guard precedes the mouse/keyUp/flagsChanged b
 		-- First is_paused() AFTER handle_key starts = the pause guard.
 		local guard = src:find("is_paused()", hk, true)
 		local mouse = src:find("leftMouseDown", hk, true)
-		local flags = src:find("flagsChanged", hk, true)
+		-- The provenance prelude names the flagsChanged ENUM before the pause guard
+		-- but performs no write. Anchor on the first modifier writer, which is the
+		-- side effect the pause invariant actually protects.
+		local flags = src:find("LogManager.log_modifier_press", hk, true)
 
 		helpers.assert_true(guard ~= nil, "handle_key must contain an is_paused() guard")
-		helpers.assert_true(mouse ~= nil and flags ~= nil, "handle_key must branch on mouse + flagsChanged events")
+		helpers.assert_true(mouse ~= nil and flags ~= nil, "handle_key must retain mouse + modifier writers")
 		helpers.assert_true(guard < mouse, "the pause guard must precede the mouse branch (else clicks log while paused)")
 		helpers.assert_true(guard < flags, "the pause guard must precede the flagsChanged branch (else modifiers log while paused)")
 	end)
@@ -72,11 +76,11 @@ end)
 --- Reads a driver source file.
 --- @param rel string Path relative to the driver root.
 --- @return string File contents.
-local function read_source(rel)
-	local path = helpers.driver_root() .. rel
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. tostring(path))
-	local src = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -180,7 +184,7 @@ local GATED_FUNCTIONS = {
 
 helpers.describe("keylogger: no context_tracker writer escapes the pause classification", function()
 	helpers.it("every _log_manager.* call site sits in a gated or explicitly exempt function", function()
-		local src = read_source("modules/keylogger/context_tracker.lua")
+		local src = read_source("local function update_secure_field_state") -- modules/keylogger/context_tracker.lua
 
 		-- Walk the file once, tracking the most recent function declaration so
 		-- each writer call can be attributed to its enclosing function.

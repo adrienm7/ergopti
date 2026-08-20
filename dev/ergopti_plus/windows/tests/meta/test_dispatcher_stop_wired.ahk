@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the finding dispatcher-stop-not-wired-and-leaks.
 ;
-; The module docstring of lib/hook_dispatcher.ahk claimed Stop() was "Called by
+; The module docstring of infra/hook_dispatcher.ahk claimed Stop() was "Called by
 ; the script's OnExit handler", but no such handler was ever wired. On a plain
 ; ExitApp (non-Reload, e.g. the tray Quit item) the InputHook was only reclaimed
 ; by the OS, never explicitly Stopped. Additionally Stop() never cleared the
@@ -71,7 +71,7 @@ _DSW_OnExitWiresStop() {
 Test("ErgoptiPlus: OnExit wires HookDispatcher.Stop (dispatcher-stop-not-wired-and-leaks)", _DSW_OnExitWiresStop)
 
 _DSW_StopClearsSubscribers() {
-	Src := _DSW_ReadSource("lib/hook_dispatcher.ahk")
+	Src := _DSW_ReadSource("infra/hook_dispatcher.ahk")
 	Seg := _DSW_FuncBody(Src, "static Stop() {")
 	Assert(Seg != "", "HookDispatcher.Stop() must exist in hook_dispatcher.ahk")
 	Assert(InStr(Seg, "_subscribers := Map()") > 0,

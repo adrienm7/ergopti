@@ -4,14 +4,14 @@
 --- MODULE: GitHub Release JSON Parser (Shared)
 --- DESCRIPTION:
 --- Pure functions for parsing GitHub Releases API JSON payloads without a
---- full JSON decoder. Extracted from macos/lib/updater.lua (parse_tag,
+--- full JSON decoder. Extracted from macos/infra/updater.lua (parse_tag,
 --- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
---- and windows/lib/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
+--- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
 --- _Updater_SplitReleasesArray, _Updater_ParsePrerelease) so both drivers
 --- share a single implementation.
 ---
 --- The AHK driver cannot require Lua modules, so its copy in
---- lib/updater/core.ahk is hand-maintained and pinned by the shared corpus
+--- infra/updater/core.ahk is hand-maintained and pinned by the shared corpus
 --- test (see _shared/tests/corpus/updater/).
 ---
 --- This module is PURE Lua — no driver imports, no io/network, no OS calls.
@@ -49,7 +49,7 @@ function M.parse_notes(body)
 	if body:match('"body"%s*:%s*null') then return "" end
 	local raw = body:match('"body"%s*:%s*"(.-[^\\])"')
 	if not raw then return "" end
-	return raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\")
+	return (raw:gsub("\\n", "\n"):gsub("\\r", ""):gsub('\\"', '"'):gsub("\\\\", "\\"))
 end
 
 
