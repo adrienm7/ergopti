@@ -961,47 +961,13 @@ function M.try_repeat_feature(chars, is_ignored)
 		return false
 	end
 
-	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
-	TerminatorReplay.flush_now("superseded by repeat-key replacement")
-	local transaction = SyntheticInput.begin("repeat_key", "replacement")
-	local emitted, emit_err = pcall(SyntheticInput.with_transaction, transaction, function()
-		-- In ignored windows, the magic key is already on screen and must be deleted.
-		if is_ignored then
-			assert(TextSender.eraseChars(char_len, 0) ~= false,
-				"repeat-key deletion could not be constructed")
-		end
-
-		if keylogger and type(keylogger.notify_synthetic) == "function" then
-			local notify_ok, notify_err = pcall(keylogger.notify_synthetic,
-				last_char, "hotstring", is_ignored and char_len or 0, "repeat_key")
-			if not notify_ok then
-				Logger.error(LOG, "repeat-key notify_synthetic failed: %s.", tostring(notify_err))
-			end
-		end
-		assert(TextSender.send(last_char, { mode = "direct" }) ~= false,
-			"repeat-key output could not be constructed")
-	end)
-	if not emitted then
-		pcall(SyntheticInput.cancel, transaction)
-		Logger.error(LOG, "Repeat feature emission failed: %s.", tostring(emit_err))
-		return false
-	end
-	local sealed, seal_err = pcall(SyntheticInput.seal, transaction)
-	if not sealed then
-		pcall(SyntheticInput.cancel, transaction)
-		Logger.error(LOG, "Repeat feature transaction could not be sealed: %s.", tostring(seal_err))
-		return false
-	end
-
-	-- Update the buffer: strip the magic key and append the repeated character.
-	-- magic_offset is already the byte start of the magic key — reuse it.
-	_state.buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
-
-	if not is_ignored
-		and (type(_llm.is_runtime_available) ~= "function" or _llm.is_runtime_available())
-		and _llm.get_llm_enabled() then
-		_llm.start_timer()
-	end
+	local next_buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
+	local replaced = M.perform_text_replacement(
+		is_ignored and char_len or 0,
+		function() return km_utils.emit_text(last_char) end,
+		function() _state.buffer = next_buffer end,
+		false, is_ignored, "hotstring", "repeat_key", false)
+	if replaced ~= true then return false end
 
 	Logger.debug(LOG, "Repeat feature: repeated '%s'.", last_char)
 	return true
