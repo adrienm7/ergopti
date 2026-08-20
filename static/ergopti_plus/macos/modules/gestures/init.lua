@@ -106,6 +106,9 @@ M.DEFAULT_MODES = {
 -- Default sensitivity (step) for incremental mode
 M.DEFAULT_SENSITIVITY = 3.5
 
+-- Raw touch frames are high-frequency, so diagnostics sample about every 2 s
+local FRAME_HEARTBEAT_EVERY = 120
+
 -- space_wrap is the one cross-driver gesture default in the shared manifest, so
 -- it is sourced from there; the `gestures` enabled flag has no manifest path, and
 -- modes/sensitivities are computed per swipe slot below (not simple defaults).
@@ -180,8 +183,10 @@ Engine.init(CoreState, Actions)
 -- Prevent garbage collection by storing both device objects and watchers globally.
 _G.ERGOPTI_TOUCH_DEVICES = _G.ERGOPTI_TOUCH_DEVICES or {}
 _G.ERGOPTI_TOUCH_WATCHERS = _G.ERGOPTI_TOUCH_WATCHERS or {}
+_G.ERGOPTI_TOUCH_WATCHER_TOKENS = _G.ERGOPTI_TOUCH_WATCHER_TOKENS or {}
 local touch_devices  = _G.ERGOPTI_TOUCH_DEVICES
 local touch_watchers = _G.ERGOPTI_TOUCH_WATCHERS
+local touch_watcher_tokens = _G.ERGOPTI_TOUCH_WATCHER_TOKENS
 
 -- Global discovery timer and event loop primer
 local discovery_timer = nil
@@ -294,32 +299,101 @@ local function enumerate_devices()
 	return devices
 end
 
---- Safely creates a touch frame watcher for a specific device ID.
+--- Reads one method from a native Lua table/userdata without letting a hostile
+--- `__index` metamethod escape the lifecycle boundary.
+--- @param object table|userdata Native capability.
+--- @param method_name string Method key.
+--- @return function|nil method
+local function native_method(object, method_name)
+	local object_type = type(object)
+	if object_type ~= "table" and object_type ~= "userdata" then return nil end
+	local readable, method = pcall(function() return object[method_name] end)
+	if not readable or type(method) ~= "function" then return nil end
+	return method
+end
+
+--- Reads the native running state without confusing an exception with false.
+--- @param watcher table|userdata Native touchdevice watcher candidate.
+--- @return boolean observed Whether running state was readable.
+--- @return boolean|nil running Exact running state when observed.
+local function watcher_running(watcher)
+	local running_method = native_method(watcher, "running")
+	if not running_method then return false, nil end
+	local observed, running = pcall(running_method, watcher)
+	if not observed or type(running) ~= "boolean" then return false, nil end
+	return true, running
+end
+
+--- Fences and releases one exact watcher only after native state proves stopped.
+--- @param deviceID number|string Touchdevice identifier.
+--- @param watcher table|userdata Exact owned watcher.
+--- @return boolean settled True only when the native watcher is no longer running.
+local function stop_owned_watcher(deviceID, watcher)
+	local token = touch_watcher_tokens[deviceID]
+	if token then token.committed = false end
+
+	local stopped, stop_result = false, "missing stop method"
+	local stop_method = native_method(watcher, "stop")
+	if stop_method then
+		stopped, stop_result = xpcall(function() return stop_method(watcher) end,
+			debug.traceback)
+	end
+	local observed, running = watcher_running(watcher)
+	if observed and running == false then
+		if touch_watchers[deviceID] == watcher then
+			touch_watchers[deviceID] = nil
+			touch_devices[deviceID] = nil
+			frame_counters[deviceID] = nil
+			if touch_watcher_tokens[deviceID] == token then
+				touch_watcher_tokens[deviceID] = nil
+			end
+		end
+		if not stopped or stop_result == false then
+			Logger.warn(LOG,
+				"Watcher device=%s reported a stop error after native state settled: %s.",
+				tostring(deviceID), tostring(stop_result))
+		end
+		return true
+	end
+
+	Logger.error(LOG,
+		"Watcher device=%s stop remains unsettled; exact owner retained (call_ok=%s, result=%s, state_observed=%s, running=%s).",
+		tostring(deviceID), tostring(stopped), tostring(stop_result),
+		tostring(observed), tostring(running))
+	return false
+end
+
+--- Safely creates and commits a touch frame watcher for a specific device ID.
+--- @param deviceID number|string Touchdevice identifier.
+--- @return boolean committed True only when the exact watcher is running.
 local function create_watcher(deviceID)
 	Logger.info(LOG, "create_watcher: ENTRY deviceID=%s", tostring(deviceID))
 	if not touchdevice then
 		Logger.warn(LOG, "create_watcher: touchdevice unavailable, aborting")
-		return
+		return false
 	end
 
-	if touch_watchers[deviceID] then
-		local ok, r = pcall(function() return touch_watchers[deviceID]:running() end)
-		Logger.info(LOG, "create_watcher: existing watcher present (running=%s, pcall=%s)", tostring(r), tostring(ok))
-		if ok and r then
+	local existing = touch_watchers[deviceID]
+	if existing then
+		local observed, running = watcher_running(existing)
+		local token = touch_watcher_tokens[deviceID]
+		Logger.info(LOG,
+			"create_watcher: existing watcher present (running=%s, observed=%s, committed=%s)",
+			tostring(running), tostring(observed), tostring(token and token.committed == true))
+		if observed and running == true and token and token.committed == true then
 			Logger.info(LOG, "create_watcher: existing watcher already running — keeping it")
-			return
+			return true
 		end
-		pcall(function() touch_watchers[deviceID]:stop() end)
-		touch_watchers[deviceID] = nil
+		if stop_owned_watcher(deviceID, existing) ~= true then return false end
 	end
 
 	local ok_dev, dev = pcall(touchdevice.forDeviceID, deviceID)
 	if not ok_dev or not dev then
 		Logger.error(LOG, "create_watcher: touchdevice.forDeviceID FAILED (ok=%s, dev=%s)", tostring(ok_dev), tostring(dev))
-		return
+		return false
 	end
 
-	-- Dump device introspection: helps diagnose why frames don't flow.
+	-- Dump device introspection: helps diagnose why frames do not flow
 	Logger.info(LOG, "create_watcher: device introspection — id=%s, builtin=%s, alive=%s, running=%s, MTHID=%s, driverReady=%s, productName=%s",
 		safe_dev_call(dev, "deviceID"),
 		safe_dev_call(dev, "builtin"),
@@ -329,70 +403,103 @@ local function create_watcher(deviceID)
 		safe_dev_call(dev, "driverReady"),
 		safe_dev_call(dev, "productName"))
 
-	-- Vital: Keep the device object alive to prevent GC!
-	touch_devices[deviceID] = dev
-	frame_counters[deviceID] = 0
+	local candidate
+	local token = { committed = false }
+	local callback_ok, callback_result = xpcall(function()
+		candidate = dev:frameCallback(function(_, touches, _, _)
+			if touch_watchers[deviceID] ~= candidate
+				or touch_watcher_tokens[deviceID] ~= token
+				or token.committed ~= true
+				or not CoreState.enabled
+				or CoreState.suspended then
+				return
+			end
 
-	local FRAME_HEARTBEAT_EVERY = 120  -- Log every 120 frames (~2s at 60Hz)
-
-	local w = dev:frameCallback(function(_, touches, _, _)
-		frame_counters[deviceID] = (frame_counters[deviceID] or 0) + 1
-		local fc = frame_counters[deviceID]
-		-- Mark as active on very first frame received
-		if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME and type(touches) == "table" and #touches > 0 then
-			_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = true
-			local first = touches[1] or {}
-			local pos = (first.absoluteVector or {}).position or {}
-			Logger.success(LOG, "FIRST RAW TOUCH FRAME received! device=%s, frame#=%d, touches=%d, first_pos=(%.1f,%.1f).",
-				tostring(deviceID), fc, #touches,
-				tonumber(pos.x) or -1, tonumber(pos.y) or -1)
-		end
-		-- Heartbeat: confirms frames are still flowing
-		if fc == 1 or fc % FRAME_HEARTBEAT_EVERY == 0 then
-			Logger.debug(LOG, "frame#%d device=%s touches=%d", fc, tostring(deviceID),
-				type(touches) == "table" and #touches or 0)
-		end
-		if not Logger.pcall(LOG, Engine.process_frame, touches) then
-				-- process_frame threw after startScrollBlock() may have engaged.
-				-- Force a full state reset so the user can still scroll.
+			frame_counters[deviceID] = (frame_counters[deviceID] or 0) + 1
+			local fc = frame_counters[deviceID]
+			if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME
+				and type(touches) == "table" and #touches > 0 then
+				_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = true
+				local first = touches[1] or {}
+				local pos = (first.absoluteVector or {}).position or {}
+				Logger.success(LOG, "FIRST RAW TOUCH FRAME received! device=%s, frame#=%d, touches=%d, first_pos=(%.1f,%.1f).",
+					tostring(deviceID), fc, #touches,
+					tonumber(pos.x) or -1, tonumber(pos.y) or -1)
+			end
+			if fc == 1 or fc % FRAME_HEARTBEAT_EVERY == 0 then
+				Logger.debug(LOG, "frame#%d device=%s touches=%d", fc, tostring(deviceID),
+					type(touches) == "table" and #touches or 0)
+			end
+			if not Logger.pcall(LOG, Engine.process_frame, touches) then
+				-- A failed frame may leave the native scroll blocker engaged
 				pcall(Engine.emergency_reset)
 			end
-	end)
-
-	if not w then
-		Logger.error(LOG, "create_watcher: frameCallback returned nil for device=%s", tostring(deviceID))
-		return
+		end)
+		return candidate
+	end, debug.traceback)
+	if not callback_ok or callback_result == nil then
+		Logger.error(LOG, "create_watcher: frameCallback failed for device=%s: %s",
+			tostring(deviceID), tostring(callback_result))
+		return false
+	end
+	local start_method = native_method(candidate, "start")
+	if not start_method or not native_method(candidate, "stop")
+		or not native_method(candidate, "running") then
+		Logger.error(LOG, "create_watcher: watcher contract incomplete for device=%s (w=%s)",
+			tostring(deviceID), tostring(candidate))
+		return false
 	end
 
-	if type(w.start) ~= "function" then
-		Logger.error(LOG, "create_watcher: w:start is not a function for device=%s (w=%s)", tostring(deviceID), tostring(w))
-		return
+	-- Publish uncommitted ownership before start because native activation can
+	-- succeed and then raise, which still requires exact rollback capability
+	touch_devices[deviceID] = dev
+	touch_watchers[deviceID] = candidate
+	touch_watcher_tokens[deviceID] = token
+	frame_counters[deviceID] = 0
+
+	local start_ok, start_result = xpcall(function() return start_method(candidate) end,
+		debug.traceback)
+	local running_observed, running = watcher_running(candidate)
+	local alive_ok, alive = pcall(function() return candidate:alive() end)
+	if start_ok and start_result ~= false and running_observed and running == true then
+		token.committed = true
+		Logger.info(LOG,
+			"create_watcher: ATTACHED device=%s, running=true, alive=%s",
+			tostring(deviceID), alive_ok and tostring(alive) or "err")
+		return true
 	end
 
-	touch_watchers[deviceID] = w
-	local ok_start, err_start = pcall(function() w:start() end)
-	local ok_run, running = pcall(function() return w:running() end)
-	local ok_alive, alive = pcall(function() return w:alive() end)
-	Logger.info(LOG, "create_watcher: ATTACHED device=%s, start_pcall=%s, start_err=%s, running=%s, alive=%s",
-		tostring(deviceID), tostring(ok_start), tostring(err_start),
-		ok_run and tostring(running) or "err", ok_alive and tostring(alive) or "err")
+	Logger.error(LOG,
+		"create_watcher: start failed for device=%s (call_ok=%s, result=%s, state_observed=%s, running=%s).",
+		tostring(deviceID), tostring(start_ok), tostring(start_result),
+		tostring(running_observed), tostring(running))
+	if stop_owned_watcher(deviceID, candidate) ~= true then
+		Logger.error(LOG, "create_watcher: partial acquisition cleanup retained for device=%s.",
+			tostring(deviceID))
+	end
+	return false
 end
 
---- Force-kills all watchers and optionally re-attaches new ones.
---- @param reattach boolean When true (default) re-attaches after stopping; when false only detaches.
+--- Stops all watchers and optionally re-attaches new ones.
+--- @param reattach boolean When true re-attaches after stopping.
+--- @return boolean settled True when every stop and requested attach committed.
 local function recycle_watchers(reattach)
 	if reattach == nil then reattach = true end
 	local before = count_watchers()
 	Logger.info(LOG, "recycle_watchers: BEGIN (watchers_before=%d, first_frame=%s, reattach=%s)",
 		before, tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), tostring(reattach))
 	local stopped = 0
-	for id, w in pairs(touch_watchers) do
-		local ok = pcall(function() w:stop() end)
-		Logger.debug(LOG, "  stopping watcher device=%s (pcall=%s)", tostring(id), tostring(ok))
-		touch_watchers[id] = nil
-		touch_devices[id] = nil
-		frame_counters[id] = nil
-		stopped = stopped + 1
+	local settled = true
+	local owned = {}
+	for id, watcher in pairs(touch_watchers) do
+		owned[#owned + 1] = { id = id, watcher = watcher }
+	end
+	for _, entry in ipairs(owned) do
+		if stop_owned_watcher(entry.id, entry.watcher) == true then
+			stopped = stopped + 1
+		else
+			settled = false
+		end
 	end
 
 	if reattach then
@@ -403,11 +510,20 @@ local function recycle_watchers(reattach)
 			Logger.info(LOG, "  recycle_watchers: found %d device(s) to attach", #devices)
 			for i, id in ipairs(devices) do
 				Logger.debug(LOG, "    device #%d: id=%s", i, tostring(id))
-				pcall(create_watcher, id)
+				if touch_watchers[id] then
+					Logger.error(LOG,
+						"  recycle_watchers: device=%s still owns cleanup debt; successor refused.",
+						tostring(id))
+					settled = false
+				elseif create_watcher(id) ~= true then
+					settled = false
+				end
 			end
 		end
 	end
-	Logger.info(LOG, "recycle_watchers: END (watchers_after=%d, stopped=%d)", count_watchers(), stopped)
+	Logger.info(LOG, "recycle_watchers: END (watchers_after=%d, stopped=%d, settled=%s)",
+		count_watchers(), stopped, tostring(settled))
+	return settled
 end
 
 --- Ensures all connected touch devices have active watchers.
@@ -423,7 +539,10 @@ local function ensure_watchers()
 		if not exists or not running then
 			Logger.info(LOG, "ensure_watchers: (re)creating watcher for device=%s (existed=%s, running=%s)",
 				tostring(id), tostring(exists ~= nil), tostring(running))
-			pcall(create_watcher, id)
+			if create_watcher(id) ~= true then
+				Logger.error(LOG, "ensure_watchers: watcher acquisition failed for device=%s.",
+					tostring(id))
+			end
 		end
 	end
 end
@@ -704,7 +823,9 @@ start_startup_probe_loop = function()
 		Logger.info(LOG, "Safety-net recycle at +%.1fs (no frame yet) — one-shot, will not retry further",
 			STARTUP_SAFETY_PROBE_SEC)
 		kickstart_hid()
-		recycle_watchers()
+		if recycle_watchers() ~= true then
+			Logger.error(LOG, "Safety-net watcher recycle left cleanup or acquisition debt.")
+		end
 	end)
 	return true
 end
@@ -729,8 +850,10 @@ start_health_check_loop = function()
 			local ok, r = pcall(function() return w:running() end)
 			if not ok or not r then
 				Logger.warn(LOG, "Health-check: restoring dead listener for device %s.", tostring(id))
-				touch_watchers[id] = nil
-				pcall(create_watcher, id)
+				if create_watcher(id) ~= true then
+					Logger.error(LOG, "Health-check: watcher recovery failed for device %s.",
+						tostring(id))
+				end
 			end
 		end
 		ensure_watchers()
@@ -766,7 +889,9 @@ local function schedule_emergency_recycle()
 		end
 		Logger.debug(LOG, "EMERGENCY RECYCLE executing now (primer caught gesture event before any frame)")
 		kickstart_hid()
-		recycle_watchers()
+		if recycle_watchers() ~= true then
+			Logger.error(LOG, "Emergency watcher recycle left cleanup or acquisition debt.")
+		end
 	end)
 	return true
 end
@@ -840,7 +965,7 @@ function M.start()
 	-- A reload, duplicate start, or earlier failed rollback can leave exact native
 	-- owners published. Settle them before creating any successor capability.
 	if gesture_primer or sleep_watcher or discovery_timer
-		or next(discovery_cleanup_debt) ~= nil then
+		or next(discovery_cleanup_debt) ~= nil or next(touch_watchers) ~= nil then
 		if M.stop() ~= true then
 			Logger.error(LOG, "Gesture startup refused while prior cleanup remains pending.")
 			return false
@@ -952,7 +1077,9 @@ function M.start()
 	-- 3. Immediate first attachment attempt.
 	Logger.info(LOG, "STEP 3/4: kickstart HID + first watcher recycle…")
 	kickstart_hid()
-	recycle_watchers()
+	if recycle_watchers() ~= true then
+		return reject_gesture_start("touch watcher acquisition failed")
+	end
 
 	-- 4. Startup phase: a single safety-net recycle + first-frame detection.
 	-- The previous burst/loop approach was futile — empirical logs show the
@@ -982,7 +1109,9 @@ function M.start()
 				if not CoreState.enabled or CoreState.suspended then return end
 				Logger.info(LOG, "Wake-from-sleep detected (event=%d) — recycling watchers", event)
 				kickstart_hid()
-				recycle_watchers()
+				if recycle_watchers() ~= true then
+					Logger.error(LOG, "Wake watcher recycle left cleanup or acquisition debt.")
+				end
 			end
 		end)
 		return wake_candidate
@@ -1018,7 +1147,7 @@ function M.stop()
 	CoreState.enabled = false
 
 	-- 1. Stop watchers — detach only, no re-attachment on teardown
-	recycle_watchers(false)
+	local watchers_stopped = recycle_watchers(false)
 	
 	-- 2. Stop eventtap primer
 	local primer_stopped = stop_gesture_primer()
@@ -1038,7 +1167,8 @@ function M.stop()
 		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
 	end
 
-	if timer_stopped ~= true or primer_stopped ~= true or wake_watcher_stopped ~= true
+	if watchers_stopped ~= true or timer_stopped ~= true
+		or primer_stopped ~= true or wake_watcher_stopped ~= true
 		or not engine_stopped or engine_stop_result == false then
 		Logger.error(LOG, "Gestures module stop incomplete; native cleanup is retryable.")
 		return false
