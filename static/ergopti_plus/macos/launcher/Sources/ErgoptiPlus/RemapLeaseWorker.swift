@@ -540,16 +540,7 @@ func writeLeaseLine(_ line: String, to descriptor: Int32) -> Bool {
 func duplicateLeaseArguments(
 	_ arguments: [String]
 ) -> [UnsafeMutablePointer<CChar>?]? {
-	var duplicated: [UnsafeMutablePointer<CChar>?] = []
-	for argument in arguments {
-		guard let pointer = strdup(argument) else {
-			for case let existing? in duplicated { free(existing) }
-			return nil
-		}
-		duplicated.append(pointer)
-	}
-	duplicated.append(nil)
-	return duplicated
+	duplicateCStringVector(arguments)
 }
 
 /// Restores zombie-producing child semantics required by exact waitpid ownership.
@@ -1184,17 +1175,23 @@ final class PosixLeaseCLIExecutor:
 		defer {
 			for case let pointer? in rawArguments { free(pointer) }
 		}
+		guard let rawEnvironment = duplicateProcessEnvironment()
+		else { return .spawnFailed(ENOMEM) }
+		defer { for case let pointer? in rawEnvironment { free(pointer) } }
 		var mutableArguments = rawArguments
+		var mutableEnvironment = rawEnvironment
 		var childPID: pid_t = 0
-		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { buffer in
-			posix_spawn(
-				&childPID,
-				cliPath,
-				&fileActions,
-				&spawnAttributes,
-				buffer.baseAddress,
-				_NSGetEnviron().pointee
-			)
+		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { arguments in
+			mutableEnvironment.withUnsafeMutableBufferPointer { environment in
+				posix_spawn(
+					&childPID,
+					cliPath,
+					&fileActions,
+					&spawnAttributes,
+					arguments.baseAddress,
+					environment.baseAddress
+				)
+			}
 		}
 		guard spawnStatus == 0 else { return .spawnFailed(spawnStatus) }
 		let parentCloseStatus = Darwin.close(diagnosticWriteDescriptor)
@@ -2057,17 +2054,26 @@ final class PosixLeaseInnerSpawner:
 		defer {
 			for case let pointer? in rawArguments { free(pointer) }
 		}
+		guard let rawEnvironment = duplicateProcessEnvironment() else {
+			_ = Darwin.close(outerDescriptor)
+			_ = Darwin.close(innerDescriptor)
+			return nil
+		}
+		defer { for case let pointer? in rawEnvironment { free(pointer) } }
 		var mutableArguments = rawArguments
+		var mutableEnvironment = rawEnvironment
 		var childPID: pid_t = 0
-		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { buffer in
-			posix_spawn(
-				&childPID,
-				executablePath,
-				&fileActions,
-				&spawnAttributes,
-				buffer.baseAddress,
-				_NSGetEnviron().pointee
-			)
+		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { arguments in
+			mutableEnvironment.withUnsafeMutableBufferPointer { environment in
+				posix_spawn(
+					&childPID,
+					executablePath,
+					&fileActions,
+					&spawnAttributes,
+					arguments.baseAddress,
+					environment.baseAddress
+				)
+			}
 		}
 		_ = Darwin.close(innerDescriptor)
 		guard spawnStatus == 0 else {

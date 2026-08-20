@@ -832,7 +832,7 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 				let writer = Darwin.open(topical.path, O_WRONLY | O_APPEND | O_CLOEXEC)
 				XCTAssertGreaterThanOrEqual(writer, 0)
 				guard writer >= 0 else { return }
-				XCTAssertEqual(Darwin.flock(writer, LOCK_EX), 0)
+				XCTAssertEqual(ergoptiFlock(writer, LOCK_EX), 0)
 				XCTAssertEqual(Darwin.ftruncate(writer, 0), 0)
 				XCTAssertTrue(writeLauncherLogData(
 					Data("same-day-writer\n".utf8),
@@ -842,7 +842,7 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 					[.modificationDate: today],
 					ofItemAtPath: topical.path
 				)
-				XCTAssertEqual(Darwin.flock(writer, LOCK_UN), 0)
+				XCTAssertEqual(ergoptiFlock(writer, LOCK_UN), 0)
 				Darwin.close(writer)
 			}
 		)

@@ -41,11 +41,23 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const DATA = path.join(SP, '_shared', 'data');
+const SITE_LOADER = fs.readFileSync(
+	path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'),
+	'utf8'
+);
 
 const errors = [];
 
 const order = JSON.parse(fs.readFileSync(path.join(DATA, 'locale_order.json'), 'utf8')).order;
 const names = JSON.parse(fs.readFileSync(path.join(DATA, 'locale_names.json'), 'utf8')).locales;
+
+if (!/LOCALE_NAMES_PATH[\s\S]*?locale_names\.json/.test(SITE_LOADER)
+	|| !/readJson\(LOCALE_NAMES_PATH\)\.locales/.test(SITE_LOADER)) {
+	errors.push('the Ergopti+ site must read locale names from canonical locale_names.json');
+}
+if (/macos[/\\]lib[/\\]i18n\.lua/.test(SITE_LOADER)) {
+	errors.push('the Ergopti+ site still reads the retired macOS lib/i18n.lua path');
+}
 
 // ── 1. Order and names describe the same set ────────────────────────────────
 

@@ -115,7 +115,7 @@ final class LoggerRecordSink {
 
 	deinit {
 		if let rollback = pendingWriteRollback {
-			_ = Darwin.flock(rollback.descriptor, LOCK_UN)
+			_ = ergoptiFlock(rollback.descriptor, LOCK_UN)
 			Darwin.close(rollback.descriptor)
 		}
 		if directoryDescriptor >= 0 { Darwin.close(directoryDescriptor) }
@@ -355,7 +355,7 @@ final class LoggerRecordSink {
 		var locked = false
 		defer {
 			if releaseDescriptor {
-				if locked { _ = Darwin.flock(descriptor, LOCK_UN) }
+				if locked { _ = ergoptiFlock(descriptor, LOCK_UN) }
 				Darwin.close(descriptor)
 			}
 		}
@@ -434,7 +434,7 @@ final class LoggerRecordSink {
 		guard let rollback = pendingWriteRollback else { return true }
 		guard rollbackWrite(rollback.descriptor, originalSize: rollback.originalSize)
 		else { return false }
-		guard Darwin.flock(rollback.descriptor, LOCK_UN) == 0 else { return false }
+		guard ergoptiFlock(rollback.descriptor, LOCK_UN) == 0 else { return false }
 		Darwin.close(rollback.descriptor)
 		pendingWriteRollback = nil
 		return true
@@ -444,7 +444,7 @@ final class LoggerRecordSink {
 	private func acquireLock(_ descriptor: Int32) -> Bool {
 		let deadline = ProcessInfo.processInfo.systemUptime + Self.lockTimeoutSeconds
 		while true {
-			if Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == 0 { return true }
+			if ergoptiFlock(descriptor, LOCK_EX | LOCK_NB) == 0 { return true }
 			let lockError = errno
 			guard lockError == EINTR || lockError == EAGAIN || lockError == EWOULDBLOCK,
 				ProcessInfo.processInfo.systemUptime < deadline

@@ -264,13 +264,13 @@ final class LauncherLogTests: XCTestCase {
 		guard owner >= 0 else {
 			return XCTFail("the test must open its isolated launcher.log")
 		}
-		guard Darwin.flock(owner, LOCK_EX | LOCK_NB) == 0 else {
+		guard ergoptiFlock(owner, LOCK_EX | LOCK_NB) == 0 else {
 			Darwin.close(owner)
 			return XCTFail("the test must own launcher.log before the child starts")
 		}
 		var lockHeld = true
 		defer {
-			if lockHeld { _ = Darwin.flock(owner, LOCK_UN) }
+			if lockHeld { _ = ergoptiFlock(owner, LOCK_UN) }
 			Darwin.close(owner)
 		}
 
@@ -332,7 +332,7 @@ final class LauncherLogTests: XCTestCase {
 			"a writer that cannot acquire LOCK_EX must leave no partial record"
 		)
 
-		XCTAssertEqual(Darwin.flock(owner, LOCK_UN), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_UN), 0)
 		lockHeld = false
 
 		let releasedStartPipe = Pipe()

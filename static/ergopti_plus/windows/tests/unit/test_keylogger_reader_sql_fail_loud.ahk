@@ -156,6 +156,9 @@ Test("Keylogger reader: candidate publication swaps one complete tuple (reader-s
 _KLRSQL_WriteFixture(path, sql) {
 	try FileDelete(path)
 	FileAppend(sql, path, "UTF-8")
+	loop files, path, "F"
+		return A_LoopFileFullPath
+	throw Error("SQL fixture was not enumerable after creation: " . path)
 }
 
 _KLRSQL_CorruptColdLoadPublishesNothingAndRetries() {
@@ -169,7 +172,7 @@ _KLRSQL_CorruptColdLoadPublishesNothingAndRetries() {
 	KLR_ResetCache()
 	try {
 		DirCreate(deviceDir)
-		_KLRSQL_WriteFixture(path,
+		path := _KLRSQL_WriteFixture(path,
 			"CREATE TABLE audit_ingest (id INTEGER PRIMARY KEY); "
 			. "INSERT INTO audit_ingest VALUES (1); "
 			. "BROKEN SQL; "
@@ -219,7 +222,7 @@ _KLRSQL_BadDeltaPreservesLastGoodAndRetries() {
 		DirCreate(deviceDir)
 		InitialSql := "CREATE TABLE audit_invalid_delta (id INTEGER PRIMARY KEY); "
 			. "INSERT INTO audit_invalid_delta VALUES (1);"
-		_KLRSQL_WriteFixture(path, InitialSql)
+		path := _KLRSQL_WriteFixture(path, InitialSql)
 		db := KLR_BuildDatabase(root)
 		AssertTrue(db != 0, "the initial invalid-delta fixture must build")
 		PublishedDb := db
@@ -270,7 +273,7 @@ _KLRSQL_BrokenDeltaPreservesLastGoodAndRetries() {
 	KLR_ResetCache()
 	try {
 		DirCreate(deviceDir)
-		_KLRSQL_WriteFixture(path,
+		path := _KLRSQL_WriteFixture(path,
 			"CREATE TABLE audit_delta (id INTEGER PRIMARY KEY); "
 			. "INSERT INTO audit_delta VALUES (1);")
 		db := KLR_BuildDatabase(root)
@@ -350,10 +353,10 @@ _KLRSQL_MultiLedgerCarryReplaysEveryDiscardedTail() {
 	try {
 		DirCreate(deviceADir)
 		DirCreate(deviceBDir)
-		_KLRSQL_WriteFixture(pathA,
+		pathA := _KLRSQL_WriteFixture(pathA,
 			"CREATE TABLE audit_multi_a (id INTEGER PRIMARY KEY); "
 			. "INSERT INTO audit_multi_a VALUES (1);")
-		_KLRSQL_WriteFixture(pathB,
+		pathB := _KLRSQL_WriteFixture(pathB,
 			"CREATE TABLE audit_multi_b (id INTEGER PRIMARY KEY); "
 			. "INSERT INTO audit_multi_b VALUES (10);")
 		PublishedDb := KLR_BuildDatabase(root)
@@ -430,7 +433,7 @@ _KLRSQL_SameLengthRepairInvalidatesPendingSnapshot() {
 		DirCreate(deviceDir)
 		InitialSql := "CREATE TABLE audit_same_length (id INTEGER PRIMARY KEY); "
 			. "INSERT INTO audit_same_length VALUES (1);"
-		_KLRSQL_WriteFixture(path, InitialSql)
+		path := _KLRSQL_WriteFixture(path, InitialSql)
 		PublishedDb := KLR_BuildDatabase(root)
 		AssertTrue(PublishedDb != 0, "the same-length repair fixture must build")
 		LoadedSize := KLRCache.last_sizes[path]

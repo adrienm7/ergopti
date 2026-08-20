@@ -300,7 +300,7 @@ enum LauncherLog {
 	private static func acquireLogLock(_ descriptor: Int32) -> Bool {
 		let deadline = ProcessInfo.processInfo.systemUptime + lockTimeoutSeconds
 		while true {
-			if Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == 0 { return true }
+			if ergoptiFlock(descriptor, LOCK_EX | LOCK_NB) == 0 { return true }
 			let lockError = errno
 			guard lockError == EINTR || lockError == EAGAIN || lockError == EWOULDBLOCK,
 				ProcessInfo.processInfo.systemUptime < deadline
@@ -327,7 +327,7 @@ enum LauncherLog {
 		defer { Darwin.close(logDescriptor) }
 		beforeLock?()
 		guard acquireLogLock(logDescriptor) else { return false }
-		defer { _ = Darwin.flock(logDescriptor, LOCK_UN) }
+		defer { _ = ergoptiFlock(logDescriptor, LOCK_UN) }
 		return writeLauncherLogData(data, descriptor: logDescriptor)
 	}
 }

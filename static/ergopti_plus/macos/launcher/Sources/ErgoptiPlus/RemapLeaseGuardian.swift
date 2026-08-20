@@ -77,7 +77,7 @@ typealias LeaseGuardianAcknowledgementWriting = (Data, String, String) -> Bool
 
 /// Takes the exact activation gate, preserving errno for fail-closed retries.
 func lockGuardianActivationGate(_ descriptor: Int32) -> LeaseGuardianGateLockResult {
-	if Darwin.flock(descriptor, LOCK_EX) == 0 { return .acquired }
+	if ergoptiFlock(descriptor, LOCK_EX) == 0 { return .acquired }
 	return .failed(errno)
 }
 
@@ -367,8 +367,8 @@ private func prepareGuardianDirectories(_ paths: LeaseGuardianPaths) -> Bool {
 /// shared probes impersonate that owner after it dies.
 func guardianSingletonIsExclusivelyHeld(descriptor: Int32) -> Bool {
 	guard descriptor >= 0 else { return false }
-	if Darwin.flock(descriptor, LOCK_SH | LOCK_NB) == 0 {
-		_ = Darwin.flock(descriptor, LOCK_UN)
+	if ergoptiFlock(descriptor, LOCK_SH | LOCK_NB) == 0 {
+		_ = ergoptiFlock(descriptor, LOCK_UN)
 		return false
 	}
 	return errno == EWOULDBLOCK
@@ -531,7 +531,7 @@ func writeGuardianFileAtomically(
 		Darwin.close(descriptor)
 		_ = Darwin.unlink(temporary)
 	}
-	guard Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == 0,
+	guard ergoptiFlock(descriptor, LOCK_EX | LOCK_NB) == 0,
 		writeGuardianData(data, descriptor: descriptor),
 		let publishedIdentity = guardianFileIdentity(descriptor: descriptor),
 		Darwin.rename(temporary, path) == 0
@@ -573,7 +573,7 @@ private func readGuardianAcknowledgement(
 	)
 	guard descriptor >= 0 else { return nil }
 	defer { Darwin.close(descriptor) }
-	guard Darwin.flock(descriptor, LOCK_SH | LOCK_NB) == 0,
+	guard ergoptiFlock(descriptor, LOCK_SH | LOCK_NB) == 0,
 		let identity = guardianFileIdentity(descriptor: descriptor),
 		let acknowledgement = readGuardianData(descriptor: descriptor)
 			.flatMap(LeaseGuardianAcknowledgement.parse),
@@ -705,7 +705,7 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 		)
 		guard descriptor >= 0 else { return false }
 		recordDescriptor = descriptor
-		guard Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == 0,
+		guard ergoptiFlock(descriptor, LOCK_EX | LOCK_NB) == 0,
 			writeGuardianData(encoded, descriptor: descriptor),
 			let identity = guardianFileIdentity(descriptor: descriptor)
 		else {
@@ -750,7 +750,7 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 				continue
 			}
 			if acknowledgementMatches(guardianGeneration: generation) {
-				let gateResult = Darwin.flock(
+				let gateResult = ergoptiFlock(
 					activationGateDescriptor,
 					LOCK_SH | LOCK_NB
 				)
@@ -801,7 +801,7 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 			let guardianGeneration
 		else { return false }
 		if !activationGateLocked {
-			guard Darwin.flock(
+			guard ergoptiFlock(
 				activationGateDescriptor,
 				LOCK_SH | LOCK_NB
 			) == 0 else { return false }
@@ -863,7 +863,7 @@ final class LeaseGuardianRegistration: LeaseGuardianRegistering {
 	/// Releases only the shared ordering lock while preserving inode validation.
 	private func unlockActivationGate() {
 		guard activationGateDescriptor >= 0, activationGateLocked else { return }
-		_ = Darwin.flock(activationGateDescriptor, LOCK_UN)
+		_ = ergoptiFlock(activationGateDescriptor, LOCK_UN)
 		activationGateLocked = false
 	}
 
@@ -1090,11 +1090,11 @@ final class RemapLeaseGuardianRuntime {
 		// generation while an old shared-gate live write is awaiting its ACK.
 		activationGateDescriptor = openGuardianRegularFile(paths.activationGate)
 		guard activationGateDescriptor >= 0 else { return false }
-		while Darwin.flock(activationGateDescriptor, LOCK_EX) != 0 {
+		while ergoptiFlock(activationGateDescriptor, LOCK_EX) != 0 {
 			if errno == EINTR { continue }
 			return false
 		}
-		defer { _ = Darwin.flock(activationGateDescriptor, LOCK_UN) }
+		defer { _ = ergoptiFlock(activationGateDescriptor, LOCK_UN) }
 		guard acquireSingletonExclusive() else { return false }
 		guard let activationIdentity = guardianFileIdentity(
 				descriptor: activationGateDescriptor
@@ -1114,7 +1114,7 @@ final class RemapLeaseGuardianRuntime {
 			).encoded,
 			replaceGuardianData(activeState, descriptor: singletonDescriptor)
 		else {
-			_ = Darwin.flock(singletonDescriptor, LOCK_UN)
+			_ = ergoptiFlock(singletonDescriptor, LOCK_UN)
 			return false
 		}
 		return true
@@ -1122,25 +1122,25 @@ final class RemapLeaseGuardianRuntime {
 
 	/// Checks for an existing guardian while holding only a compatible shared probe.
 	private func probeSingletonWithoutOwnership() -> Bool {
-		guard Darwin.flock(singletonDescriptor, LOCK_SH | LOCK_NB) == 0 else {
+		guard ergoptiFlock(singletonDescriptor, LOCK_SH | LOCK_NB) == 0 else {
 			return false
 		}
 		singletonProbeObserved()
-		_ = Darwin.flock(singletonDescriptor, LOCK_UN)
+		_ = ergoptiFlock(singletonDescriptor, LOCK_UN)
 		return true
 	}
 
 	/// Takes the singleton after activation-gate drain, tolerating shared probes.
 	private func acquireSingletonExclusive() -> Bool {
-		while Darwin.flock(singletonDescriptor, LOCK_EX | LOCK_NB) != 0 {
+		while ergoptiFlock(singletonDescriptor, LOCK_EX | LOCK_NB) != 0 {
 			guard errno == EWOULDBLOCK else { return false }
 			// A transient shared presence probe is compatible with another shared
 			// probe, while a real guardian's exclusive lock is not. Do not let the
 			// former make launchd discard its only replacement generation.
-			guard Darwin.flock(singletonDescriptor, LOCK_SH | LOCK_NB) == 0 else {
+			guard ergoptiFlock(singletonDescriptor, LOCK_SH | LOCK_NB) == 0 else {
 				return false
 			}
-			_ = Darwin.flock(singletonDescriptor, LOCK_UN)
+			_ = ergoptiFlock(singletonDescriptor, LOCK_UN)
 			singletonContentionObserved()
 			usleep(kGuardianSingletonRetryMicroseconds)
 		}
@@ -1177,7 +1177,7 @@ final class RemapLeaseGuardianRuntime {
 					if singletonOwned {
 						// A broken ordering primitive must not leave stale ACTIVE bytes
 						// looking live merely because this process still owns the lock.
-						_ = Darwin.flock(singletonDescriptor, LOCK_UN)
+						_ = ergoptiFlock(singletonDescriptor, LOCK_UN)
 						singletonOwned = false
 					}
 					RemapGuardianLog.write(
@@ -1221,7 +1221,7 @@ final class RemapLeaseGuardianRuntime {
 		} ?? false)
 		if !drainingPublished, singletonOwned {
 			// An unchanged ACTIVE payload must never survive a failed transition.
-			_ = Darwin.flock(singletonDescriptor, LOCK_UN)
+			_ = ergoptiFlock(singletonDescriptor, LOCK_UN)
 			singletonOwned = false
 		}
 		RemapGuardianLog.write(
@@ -1560,7 +1560,7 @@ final class RemapLeaseGuardianRuntime {
 		)
 		watches[token] = watch
 
-		if Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == 0 {
+		if ergoptiFlock(descriptor, LOCK_EX | LOCK_NB) == 0 {
 			watch.queue.async { [weak self] in self?.fenceIfAbandoned(watch) }
 			return
 		}
@@ -1570,7 +1570,7 @@ final class RemapLeaseGuardianRuntime {
 		}
 
 		watch.queue.async { [weak self] in
-			while Darwin.flock(descriptor, LOCK_EX) != 0 {
+			while ergoptiFlock(descriptor, LOCK_EX) != 0 {
 				if errno == EINTR { continue }
 				let waitError = errno
 				self?.stateQueue.async { [weak self] in
@@ -1849,17 +1849,22 @@ final class PosixGuardianLaunchctlRunner: GuardianLaunchctlRunning {
 		guard let rawArguments = duplicateLeaseArguments([launchctlPath] + arguments)
 		else { return false }
 		defer { for case let pointer? in rawArguments { free(pointer) } }
+		guard let rawEnvironment = duplicateProcessEnvironment() else { return false }
+		defer { for case let pointer? in rawEnvironment { free(pointer) } }
 		var mutableArguments = rawArguments
+		var mutableEnvironment = rawEnvironment
 		var childPID: pid_t = 0
-		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { buffer in
-			posix_spawn(
-				&childPID,
-				launchctlPath,
-				&fileActions,
-				nil,
-				buffer.baseAddress,
-				_NSGetEnviron().pointee
-			)
+		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { arguments in
+			mutableEnvironment.withUnsafeMutableBufferPointer { environment in
+				posix_spawn(
+					&childPID,
+					launchctlPath,
+					&fileActions,
+					nil,
+					arguments.baseAddress,
+					environment.baseAddress
+				)
+			}
 		}
 		guard spawnStatus == 0 else { return false }
 

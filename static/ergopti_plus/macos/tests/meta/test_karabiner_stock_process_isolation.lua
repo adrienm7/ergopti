@@ -802,7 +802,6 @@ local function uses_exact_cli_argument_buffer(statement, arguments, arrays)
 	local lower = statement:lower()
 	local posix_at = lower:find("%f[%w_]posix_spawnp?%s*%(")
 	if not posix_at then return false end
-	local array_name, buffer_name = nil, nil
 	local cursor = 1
 	while true do
 		local start_at, end_at, candidate_array, candidate_buffer = lower:find(
@@ -810,19 +809,21 @@ local function uses_exact_cli_argument_buffer(statement, arguments, arrays)
 			cursor
 		)
 		if not start_at or start_at >= posix_at then break end
-		array_name, buffer_name = candidate_array, candidate_buffer
+		local exact_array = arrays[candidate_array]
+		if not exact_array then
+			local source_name = lower:match(
+				"%f[%w_]var%s+" .. candidate_array .. "%s*=%s*([%a_][%w_]*)"
+			)
+			exact_array = source_name and arrays[source_name] or false
+		end
+		if exact_array and arguments:lower():find(
+			"%f[%w_]" .. candidate_buffer .. "%s*%.%s*baseaddress%f[^%w_]"
+		) then
+			return true
+		end
 		cursor = end_at + 1
 	end
-	if not array_name then return false end
-	if not arrays[array_name] then
-		local source_name = lower:match(
-			"%f[%w_]var%s+" .. array_name .. "%s*=%s*([%a_][%w_]*)"
-		)
-		if not source_name or not arrays[source_name] then return false end
-	end
-	return arguments:lower():find(
-		"%f[%w_]" .. buffer_name .. "%s*%.%s*baseaddress%f[^%w_]"
-	) ~= nil
+	return false
 end
 
 --- Detects an exact executable literal inside URL/path wrapper expressions.
