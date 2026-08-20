@@ -3,6 +3,12 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; The real-process startup smoke runs this exact entry point under a uniquely
+; named wrapper and an isolated config tree. It exists because parsing the full
+; include graph cannot detect an auto-execute read of a global whose owning
+; include has not executed yet. Production launches leave the variable empty.
+global _DriverStartupSmokeDir := EnvGet("ERGOPTI_STARTUP_SMOKE_DIR")
+
 ; A rollback recovery executable is a byte-for-byte copy of the last known-good
 ; compiled driver named ``Current.exe.<guid>.recovery.exe``. Detect it before the
 ; mutex and before any hook can be registered. The helper is defined in the
@@ -73,7 +79,8 @@ if A_IsCompiled {
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
 global _DriverMutexHandle := 0
-if !(KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation())
+if !(KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
+		|| _DriverStartupSmokeDir != "")
 	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
 if (_DriverMutexHandle) {
 	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
@@ -482,6 +489,7 @@ BootProfile_Stamp("Module includes initialised")
 ; ======= 1.1) Variables initialization =======
 ; =============================================
 
+#Include infra/suspend_handoff.ahk
 #Include infra/boot.ahk
 
 ; A pending trigger transaction belongs to the stable paths.toml locator, not
@@ -498,7 +506,16 @@ if !LLM_TriggerJournalRecoverAtBoot()
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
 A_TrayMenu.Delete()
-Onboarding_Run()
+if (_DriverStartupSmokeDir != "") {
+		; The real onboarding WebView pumps messages while startup is incomplete.
+		; Reproduce that hazard without an interactive window: at least one suspend
+		; watchdog tick must execute here, before the later lifecycle include.
+		_StartupSmokePumpUntil := A_TickCount + 650
+		while (A_TickCount < _StartupSmokePumpUntil)
+				Sleep(20)
+} else {
+		Onboarding_Run()
+}
 ; Blocking on a first run, a no-op otherwise — which is exactly why it needs its
 ; own stamp: a first-run boot and a normal boot are otherwise indistinguishable
 ; in the timings.
@@ -838,17 +855,30 @@ _PersonalShortcutsPublishFile(Path, Content, WriterFn := 0, ReplaceFn := 0,
 						. A_TickCount . "." . StageSequence . ".stage"
 				Written := HasMethod(WriterFn, "Call")
 						? WriterFn.Call(StagePath, Content) : FSWriteDurable(StagePath, Content)
-				if !((Written is Integer) && Written == 1)
+				if !((Written is Integer) && Written == 1) {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts stage write was not durable at '{1}' (status={2}).",
+								StagePath, String(Written))
 						return false
-				Observed := HasMethod(ReadFn, "Call")
-						? ReadFn.Call(StagePath) : FSRead(StagePath)
-				if !(Observed is String) or Observed != Content {
+				}
+				Observed := HasMethod(ReadFn, "Call") ? ReadFn.Call(StagePath) : false
+				StageMatches := HasMethod(ReadFn, "Call")
+						? ((Observed is String) and Observed == Content)
+						: FSUtf8ExactMatches(StagePath, Content)
+				if !StageMatches {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts stage verification failed at '{1}' (expected={2} chars/U+{3}, observed={4} chars/U+{5}).",
+								StagePath, StrLen(Content), Ord(SubStr(Content, 1, 1)),
+								(Observed is String) ? StrLen(Observed) : -1,
+								(Observed is String) && Observed != "" ? Ord(SubStr(Observed, 1, 1)) : -1)
 						try FSDelete(StagePath)
 						return false
 				}
 				; The writer/read seam can yield to a path relocation or another
 				; user action. Only the exact still-live owner may publish its stage.
 				if !_ConfigWriteLeaseOwns(OwnerToken, Path) {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts publication lost its config lease for '{1}'.", Path)
 						try FSDelete(StagePath)
 						return false
 				}
@@ -857,6 +887,9 @@ _PersonalShortcutsPublishFile(Path, Content, WriterFn := 0, ReplaceFn := 0,
 						: (CreateOnly ? FSAtomicMoveCreate(StagePath, Path)
 								: FSAtomicMoveReplace(StagePath, Path))
 				if !((Replaced is Integer) && Replaced == 1) {
+						try LoggerError("ErgoptiPlus",
+								"Generated personal-shortcuts atomic publication failed from '{1}' to '{2}' (status={3}).",
+								StagePath, Path, String(Replaced))
 						try FSDelete(StagePath)
 						; Another process may have won creation after our initial absence
 						; probe. Its user-owned file is success, never something to replace.
@@ -871,7 +904,8 @@ _PersonalShortcutsPublishFile(Path, Content, WriterFn := 0, ReplaceFn := 0,
 }
 
 try {
-		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+		if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],
+				_DriverStartupSmokeDir == "")
 				throw Error("personal shortcuts bootstrap was not durable")
 } catch as _epsErr {
 		try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
@@ -921,6 +955,8 @@ for _KbSlot, _KbAction in KeyboardShortcutAssignments {
 		_KbBoundCount++
 }
 LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", _KbBoundCount)
+
+#Include infra/config_io.ahk
 
 CS_Load()
 global _SaveFullConfigReady := true
@@ -1022,8 +1058,6 @@ global _FmtCountCache := Map()
 
 
 
-#Include infra/config_io.ahk
-
 #Include ui/action_picker/init.ahk
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
@@ -1074,6 +1108,10 @@ BootProfile_Mark("Prefix watcher index complete")
 _DriverReady := true
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+if (_DriverStartupSmokeDir != "") {
+		try _LoggerFlush(true)
+		ExitApp(0)
+}
 
 ; A last-known-good rollback copy first becomes a fully functional driver. Only
 ; after the ready contract exists may it republish itself atomically to the

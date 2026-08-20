@@ -98,12 +98,6 @@ _SuspendHeldPrefixKeys() {
 		return Held == "" ? "(none)" : Held
 }
 
-; File name of the one-shot marker that carries a pause across a Reload. It sits
-; beside the stable paths.toml locator, so changing ConfigurationFile cannot
-; strand intent in the old config directory. Only terminal OnExit publication
-; creates the live marker; preparation uses inert .pending state.
-global SUSPEND_MARKER_FILENAME := "suspend_restore.marker"
-
 ; Absolute path of the suspend hand-off marker, derived from the locator whose
 ; own location stays stable while config.toml is redirected.
 _SuspendMarkerPath() {

@@ -295,6 +295,17 @@ FSReadUtf8Exact(Path) {
 	return _FSReadUtf8ExactImpl(Path, 0, false)
 }
 
+; Byte-faithful verification for staged UTF-8 control/source artifacts. The
+; ordinary FSRead/FileRead path consumes a physical EF BB BF prefix, so comparing
+; its String to a BOM-bearing expected payload produces a deterministic false
+; mismatch even though the bytes on disk are correct.
+FSUtf8ExactMatches(Path, Expected) {
+	if !(Expected is String)
+		return false
+	Observed := FSReadUtf8Exact(Path)
+	return (Observed is String) and Observed == Expected
+}
+
 FSReadUtf8ExactBounded(Path, MaxBytes) {
 	if !(MaxBytes is Integer) || MaxBytes <= 0
 		return false

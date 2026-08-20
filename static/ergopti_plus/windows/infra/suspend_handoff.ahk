@@ -13,6 +13,11 @@
 
 #Requires AutoHotkey v2.0
 
+; File name of the one-shot marker that carries a pause across a Reload. This
+; module is included before boot arms _SuspendStateWatchdog: onboarding pumps
+; messages, so the callback can run long before lifecycle.ahk's later include.
+global SUSPEND_MARKER_FILENAME := "suspend_restore.marker"
+
 
 
 

@@ -46,9 +46,11 @@ global OneShotShiftEnabled := False
 ; ConfigDirPath overrides to be lost on every update, which triggered the
 ; onboarding wizard again even for existing users. The dev-mode fallback keeps
 ; using A_ScriptDir\_generated\paths.toml.
-global _PathsFile := A_IsCompiled
-		? (A_AppData . "\Ergopti\paths.toml")
-		: (A_ScriptDir . "\_generated\paths.toml")
+global _PathsFile := (_DriverStartupSmokeDir != "")
+		? (_DriverStartupSmokeDir . "\paths.toml")
+		: (A_IsCompiled
+				? (A_AppData . "\Ergopti\paths.toml")
+				: (A_ScriptDir . "\_generated\paths.toml"))
 ; A valid transition chooses one complete old/new image before the locator is
 ; read. Quarantine is visible and fatal: continuing would let a mixed image
 ; select the wrong config directory and later be persisted as coherent state.
@@ -58,7 +60,9 @@ global _PathsOverrides := ReadPathsToml(_PathsFile)
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
 ; Defaults to %USERPROFILE%\.config\ergopti_plus\ (mirrors XDG-style on Unix);
 ; must end with a backslash.
-global _DefaultConfigDir := EnvGet("USERPROFILE") . "\.config\ergopti_plus\"
+global _DefaultConfigDir := (_DriverStartupSmokeDir != "")
+		? (_DriverStartupSmokeDir . "\config\")
+		: (EnvGet("USERPROFILE") . "\.config\ergopti_plus\")
 global _ConfigDir := (_PathsOverrides.Has("ConfigDirPath") and _PathsOverrides["ConfigDirPath"] != "")
 		? _PathsOverrides["ConfigDirPath"]
 		: _DefaultConfigDir
