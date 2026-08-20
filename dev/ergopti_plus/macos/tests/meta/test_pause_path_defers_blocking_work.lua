@@ -3,48 +3,22 @@
 --- ==============================================================================
 --- MODULE: Pause/Resume Blocking-Work Guard Meta Test
 --- DESCRIPTION:
---- pause_all() and resume_all() run SYNCHRONOUSLY inside the script-control
---- eventtap callback: handle_key -> dispatch_action -> pause_all/resume_all. Any
---- blocking work there stalls the tap, and macOS answers a slow tap by disabling
---- it (kCGEventTapDisabledByTimeout) — which kills AltGr+Enter itself, so the user
---- can no longer un-pause and must reload Hammerspoon by hand.
+--- The script-control shortcut originates in an eventtap. Native pause/resume
+--- work must be scheduled after that callback returns; a stalled tap is disabled
+--- by macOS and strands the only keyboard path that can leave pause.
 ---
 --- ROOT CAUSE ENCODED:
---- karabiner.pause() encodes and writes a 100 kB+ karabiner.json through
---- Generator.deploy_string (plus a /bin/mkdir subprocess on its fallback path), and
---- karabiner.resume() calls regenerate(), which rebuilds the FULL Ergopti config —
---- heavier still. Both were invoked inline from these two functions.
----
---- The project already knew the hazard AT THIS EXACT CALL SITE: ui/menu/init.lua's
---- on_pause_change listener defers its layout switch with the comment "this
---- callback runs synchronously inside the script-control eventtap callback, and the
---- switch spawns blocking osascript subprocesses that would otherwise stall the tap
---- long enough for macOS to disable it (killing AltGr+Enter)". The karabiner
---- redeploy — larger than the layout switch — was the forgotten sibling.
----
---- WHY A SOURCE GUARD:
---- The stall itself cannot be reproduced in the harness — there is no real event
---- tap and no real subprocess, so nothing can actually time out. The harness CAN
---- observe the deferral (tests/stubs/hs.lua records timers and fires them on
---- __fire_all, which is why the quiescence test in test_script_control.lua now
---- flushes), but observing that a call happened eventually does not distinguish
---- deferred from inline. What distinguishes them, and what the bug actually was, is
---- whether the call is lexically wrapped in a deferral. This test asserts that for
---- every known blocking-capable subsystem call in both functions, so a future
---- inline call fails CI rather than shipping a tap that dies on the next pause.
+--- The ACK-transaction refactor moved Karabiner calls out of pause_all/resume_all.
+--- This guard forbids them from moving back and pins the deferred handoff in
+--- request_pause_transition. Behavioral ordering is covered separately by
+--- test_pause_transaction.lua, so this source guard cannot pass merely because a
+--- scheduler token exists somewhere unrelated.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Subsystem calls made from pause_all/resume_all that reach file I/O, a subprocess
--- or a full config regeneration, and must therefore never run inline in the tap.
-local MUST_BE_DEFERRED = {
-	"_karabiner.pause()",
-	"_karabiner.resume()",
-}
-
--- The deferral wrapper the driver uses everywhere for this purpose.
-local DEFER_TOKEN = "hs.timer.doAfter(0,"
+local NATIVE_MODULE_TOKEN = "_karabiner"
+local DEFER_TOKEN = "pcall(hs.timer.doAfter, 0,"
 
 
 
@@ -72,7 +46,7 @@ local function function_slice(src, decl)
 end
 
 helpers.describe("pause/resume never do blocking work inline in the eventtap callback", function()
-	helpers.it("every blocking subsystem call in pause_all/resume_all is deferred", function()
+	helpers.it("native transition is absent from submodule commit and explicitly deferred", function()
 		-- Selected by a declaration unique to script_control.lua rather than by
 		-- path: the invariant is about that function pair, not about where the
 		-- file currently lives.
@@ -80,32 +54,23 @@ helpers.describe("pause/resume never do blocking work inline in the eventtap cal
 		helpers.assert_true(src ~= nil, "the pause_all/resume_all source must be locatable")
 		if not src then return end
 
-		-- The premise: these really are reached from the tap callback.
+		-- The premise: the shortcut callback reaches the transaction request.
 		helpers.assert_true(src:find("local function handle_key", 1, true) ~= nil,
 			"handle_key must exist — it is the eventtap callback this guard is about")
-		helpers.assert_true(src:find("pause_all()", 1, true) ~= nil,
-			"dispatch_action must call pause_all — if it stops doing so this guard needs rewriting")
+		helpers.assert_true(src:find("request_pause_transition(target_paused)", 1, true) ~= nil,
+			"the shortcut dispatcher must route through the ACK transaction")
 
 		for _, decl in ipairs({ "local function pause_all()", "local function resume_all()" }) do
 			local slice = function_slice(src, decl)
 			helpers.assert_true(slice ~= nil, decl .. " must be locatable")
-
-			for _, call in ipairs(MUST_BE_DEFERRED) do
-				local at = slice:find(call, 1, true)
-				if at then
-					-- Look backwards a short way for the deferral wrapper: the call must
-					-- sit inside an hs.timer.doAfter(0, ...) rather than run inline.
-					local window_start = math.max(1, at - 200)
-					local window = slice:sub(window_start, at)
-					helpers.assert_true(window:find(DEFER_TOKEN, 1, true) ~= nil, string.format(
-						"%s calls %s inline. pause_all/resume_all run synchronously inside the "
-						.. "script-control eventtap callback, and this call writes a 100 kB+ "
-						.. "karabiner.json (resume additionally regenerates the full config). "
-						.. "Blocking the tap lets macOS disable it, killing AltGr+Enter so the "
-						.. "user cannot un-pause. Wrap it in %s ... ) like the layout switch is.",
-						decl, call, DEFER_TOKEN))
-				end
-			end
+			helpers.assert_true(slice:find(NATIVE_MODULE_TOKEN, 1, true) == nil,
+				decl .. " must commit Hammerspoon state only, never call Karabiner inline")
 		end
+
+		local schedule_at = src:find(DEFER_TOKEN, 1, true)
+		local dispatch_at = schedule_at and src:find(
+			"dispatch_native_pause_transition(transaction)", schedule_at + #DEFER_TOKEN, true) or nil
+		helpers.assert_true(schedule_at ~= nil and dispatch_at ~= nil and schedule_at < dispatch_at,
+			"the native controller handoff must remain inside the zero-delay timer")
 	end)
 end)

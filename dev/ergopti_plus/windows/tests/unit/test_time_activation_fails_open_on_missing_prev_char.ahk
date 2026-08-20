@@ -17,7 +17,7 @@
 ;
 ; The fix makes the gate fail CLOSED: a missing timestamp with a positive
 ; activation window is reported as expired (True). IsTimeActivationExpired is
-; defined in lib/hotstrings/hotstring_engine.ahk, which the headless runner
+; defined in infra/hotstrings/hotstring_engine.ahk, which the headless runner
 ; #Includes, and it is a pure function (reads LastSentCharacterKeyTime, calls
 ; A_TickCount) with no OS/COM/hotkey side effects -- so this is a direct
 ; behavioral test, not a meta-static scan.

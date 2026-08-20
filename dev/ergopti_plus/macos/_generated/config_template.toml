@@ -10,6 +10,12 @@ log_level = "INFO"
 
 [hotstrings]
 trigger_char = "★"
+repeat_key_enabled = true
+expansion_delay = 0.75
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
 
 [hotstrings.autocorrection.accents]
 enabled = true
@@ -302,24 +308,24 @@ encrypt = false
 enabled = true
 chatgpt_url = "https://chat.openai.com"
 
-[hs.gestures]
+[gestures]
 enabled = true
-space_wrap = true
-swipe_2_left = "arrow_up"
+swipe_3_down = "tab_next"
 swipe_3_left = "word_prev"
 swipe_3_right = "word_next"
 swipe_3_up = "tab_prev"
-swipe_3_down = "tab_next"
-swipe_4_up = "none"
 swipe_4_down = "none"
 swipe_4_left = "none"
 swipe_4_right = "none"
+swipe_4_up = "none"
+tap_3 = "left_click_toggle"
+tap_4 = "app_window_previous"
+space_wrap = true
+swipe_2_left = "arrow_up"
 swipe_5_up = "none"
 swipe_5_down = "none"
 swipe_5_left = "none"
 swipe_5_right = "none"
-tap_3 = "left_click_toggle"
-tap_4 = "app_window_previous"
 swipe_2_right = "none"
 swipe_2_up = "none"
 swipe_2_down = "none"
@@ -349,7 +355,7 @@ swipe_5_horiz = "windows"
 tap_2 = "none"
 tap_5 = "none"
 
-[hs.gestures.modes]
+[gestures.modes]
 swipe_2_left = "x1"
 swipe_2_right = "x1"
 swipe_2_up = "x1"
@@ -383,7 +389,7 @@ swipe_5_left_up = "incremental"
 swipe_5_right_down = "incremental"
 swipe_5_right_up = "incremental"
 
-[hs.gestures.sensitivities]
+[gestures.sensitivities]
 swipe_2_left = 3.5
 swipe_2_right = 3.5
 swipe_2_up = 3.5
@@ -416,10 +422,3 @@ swipe_5_left_down = 3.5
 swipe_5_left_up = 3.5
 swipe_5_right_down = 3.5
 swipe_5_right_up = 3.5
-
-[hs.hotstrings]
-expansion_delay = 0.75
-preview_ai_enabled = true
-preview_autocorrect_enabled = true
-preview_colored_tooltips = true
-preview_star_enabled = true

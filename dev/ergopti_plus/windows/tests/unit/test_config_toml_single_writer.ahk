@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Regression — config.toml must have exactly ONE writer
 ; DESCRIPTION:
-; lib/config_shortcuts.ahk used to carry a second, section-splicing writer for
+; infra/config_shortcuts.ahk used to carry a second, section-splicing writer for
 ; config.toml (CS_WriteShortcutsSection + its CS_ReplaceSection /
 ; CS_RenderSection / CS_RenderValue / CS_Join helpers), reached from CS_Save
 ; whenever the canonical writer was not yet armed.
@@ -11,7 +11,7 @@
 ; ROOT CAUSE ENCODED:
 ; That writer seeded its rewrite from a BARE `try FileRead(path)`. A read that
 ; failed left the body empty, the section merge short-circuited to the rendered
-; [ahk.metrics] block alone, and the atomic FileMove then replaced the user's
+; [metrics] block alone, and the atomic FileMove then replaced the user's
 ; ENTIRE configuration with that single section. Nothing was logged: the only
 ; catch in the function covered the write, so a failed read followed by a
 ; successful write was completely signal-free. The shipped guard for the
@@ -27,7 +27,7 @@
 ; were removed is a load-time "call to nonexistent function", i.e. a driver
 ; that does not start at all).
 ;
-; SCOPE: source introspection. lib/config_shortcuts.ahk registers no hotkeys but
+; SCOPE: source introspection. infra/config_shortcuts.ahk registers no hotkeys but
 ; its writer path is only reachable pre-boot, which the headless harness cannot
 ; reproduce, so the guarantee is asserted against the driver source.
 ; ==============================================================================
@@ -67,7 +67,7 @@ _CTSW_NoSecondSectionSplicingWriter() {
 		"the scanned driver source must actually contain the config-shortcuts module")
 
 	for Name in ["CS_WriteShortcutsSection", "CS_ReplaceSection", "CS_RenderSection", "CS_RenderValue", "CS_Join"] {
-		Assert(_DriverFuncBody(Name) == "",
+		Assert(_DriverFuncBodyOrEmpty(Name) == "",
 			Name . " must not be reintroduced — config.toml has exactly one writer, and a section splicer seeded from a bare-try FileRead cannot tell an unreadable file from an empty one")
 		Assert(InStr(Src, Name) == 0,
 			Name . " must not appear anywhere in the driver source: a call left behind after the helper was deleted is a load-time 'call to nonexistent function' and the driver never starts")

@@ -9,8 +9,9 @@
 ; window its producer saw: app_switch / window_switch carry the outgoing
 ; prev_app / prev_title by design, and every OTHER type carries
 ; Keylogger.session_app / session_title, whose only writer is
-; KL_Hook_RefreshContext under its own CONTEXT_TTL_MS (1000 ms) on a 250 ms
-; timer. So for up to ~1.25 s after Alt-Tabbing away from an Incognito window or
+; KL_Hook_RefreshContext. It projects that same canonical snapshot under its own
+; CONTEXT_TTL_MS (1000 ms) on a 250 ms timer. So for up to ~1.25 s after
+; Alt-Tabbing away from an Incognito window or
 ; an excluded password manager, the live check passed while the row still
 ; stamped that window's process name and verbatim title into events_typing --
 ; precisely the identifiers the filter exists to suppress.
@@ -99,9 +100,9 @@ _KPPF_PayloadStillCarriesTheLaggingContext() {
 		. "lag the focus cache MF_ShouldFilter reads")
 
 	Filter := _DriverFuncBody("MF_ShouldFilter")
-	Assert(InStr(Filter, "MetricsFocusCache.state") > 0,
-		"prerequisite: the live privacy verdict is still read from MetricsFocusCache, a "
-		. "different snapshot on a different cadence from the payload's")
+	Assert(InStr(Filter, "MF_GetFocusSnapshot()") > 0,
+		"prerequisite: the live privacy verdict reads the canonical snapshot directly, "
+		. "while the payload carries the keylogger's slower session projection")
 }
 
 Test("keylogger: the payload context that the re-check guards still lags the focus cache (kl-payload-privacy-filter-scoped)",

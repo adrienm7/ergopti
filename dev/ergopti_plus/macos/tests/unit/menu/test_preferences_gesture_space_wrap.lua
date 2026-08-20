@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Preferences gesture_space_wrap regression tests
 --- DESCRIPTION:
---- Regressions for two related bugs in ui/menu/preferences.lua:
+--- Regressions for two related bugs in infra/preferences.lua:
 ---
 --- ui-menu-core-1: flatten_from_disk() classified ALL non-enabled scalars in
 --- [gestures] as gesture_actions slots. Keys like space_wrap that have a KEY_MAP
@@ -28,11 +28,11 @@ local helpers = require("tests.helpers")
 
 
 
--- =======================================================================================
+-- ======================================================================================
 -- ======================================================================================
 -- ======= 1/ space_wrap routes to flat key, not gesture_actions (ui-menu-core-1) =======
 -- ======================================================================================
--- =======================================================================================
+-- ======================================================================================
 
 helpers.describe("preferences.flatten_from_disk — space_wrap routing (ui-menu-core-1 regression)", function()
 
@@ -45,7 +45,7 @@ helpers.describe("preferences.flatten_from_disk — space_wrap routing (ui-menu-
 		fh:write("[gestures]\nspace_wrap = false\ntap_2 = \"copy\"\n")
 		fh:close()
 
-		local Prefs = helpers.load_with_stubs("ui.menu.preferences")
+		local Prefs = helpers.load_with_stubs("infra.preferences")
 		local flat  = Prefs.load(tmp)
 		pcall(os.remove, tmp)
 
@@ -83,7 +83,7 @@ helpers.describe("preferences — parameterized gesture action TOML round-trip",
 		fh:write("tap_3__open_url = \"https://saved.example/path\"\n")
 		fh:close()
 
-		local Prefs = helpers.load_with_stubs("ui.menu.preferences")
+		local Prefs = helpers.load_with_stubs("infra.preferences")
 		local flat = Prefs.load(tmp)
 		pcall(os.remove, tmp)
 
@@ -91,6 +91,9 @@ helpers.describe("preferences — parameterized gesture action TOML round-trip",
 		helpers.assert_eq(flat.gesture_action_parameters.tap_3__open_url, "https://saved.example/path")
 		helpers.assert_true(flat.gesture_actions.action_parameters == nil,
 			"the parameter table must never be treated as a gesture action slot")
+		local _, absent_status = Prefs.load(tmp)
+		helpers.assert_eq(absent_status, "absent",
+			"the intentional deletion must be acknowledged before a create-only save")
 
 		local fake_gestures = {
 			get_all_actions = function() return { tap_3 = "open_url" } end,
@@ -116,16 +119,20 @@ end)
 
 
 
+-- ===================================================================================
+-- ===================================================================================
 -- ======= 3/ save() uses explicit if/else for get_space_wrap (ui-menu-core-2) =======
+-- ===================================================================================
 -- ===================================================================================
 
 helpers.describe("preferences.save — gesture_space_wrap nil-vs-false guard (ui-menu-core-2 regression)", function()
 
 	helpers.it("source: no 'get_space_wrap() or true' short-circuit (Lua nil-vs-false trap)", function()
-		local src_path = helpers.driver_root() .. "ui/menu/preferences.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "preferences.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to infra/preferences.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function flatten_from_disk")
+		helpers.assert_true(src ~= nil, "infra/preferences.lua source must be locatable")
 
 		-- The buggy expression: `fn() or true` returns true when fn() returns false.
 		-- Even restricted to the get_space_wrap context the pattern is unambiguous.
@@ -137,10 +144,11 @@ helpers.describe("preferences.save — gesture_space_wrap nil-vs-false guard (ui
 	end)
 
 	helpers.it("source: explicit if/else guards get_space_wrap call", function()
-		local src_path = helpers.driver_root() .. "ui/menu/preferences.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to infra/preferences.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function flatten_from_disk")
+		helpers.assert_true(src ~= nil, "infra/preferences.lua source must be locatable")
 
 		-- The fix uses an explicit guard so false is not confused with nil.
 		local has_guard = src:find('type(gestures.get_space_wrap) == "function" then', 1, true) ~= nil

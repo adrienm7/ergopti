@@ -6,7 +6,7 @@
 ; Static source guard for the "Critical held across callback starves keyboard
 ; hook" finding (bypass-dispatch-critical-starves-keyboard-hook).
 ;
-; lib/menu_dispatcher.ahk _DispatchIfMissed() previously opened Critical
+; infra/menu_dispatcher.ahk _DispatchIfMissed() previously opened Critical
 ; at the top of the function and never released it before Callback.Call().
 ; AHK's Critical mode prevents the current thread from being interrupted — it
 ; also prevents the low-level keyboard hook thread from delivering keystrokes
@@ -44,7 +44,7 @@ _MDC_ReadSource(RelPath) {
 ; ===================================================
 
 _MDC_CriticalReleasedBeforeCallback() {
-	Src := _MDC_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDC_ReadSource("infra/menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Seg != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 	; Verify Critical Off appears in the function body (released before Call).

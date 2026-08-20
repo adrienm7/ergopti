@@ -14,7 +14,7 @@
 ; 1. Regression guard: prevents the specific crash that was triggered by
 ;    `global Keylogger` in crash_reporter.ahk conflicting with the
 ;    `class Keylogger` definition in keylogger.ahk.
-; 2. Codebase-wide: scans both lib/ and modules/ so new modules are covered
+; 2. Codebase-wide: scans both infra/ and modules/ so new modules are covered
 ;    automatically without updating this file.
 ; ==============================================================================
 
@@ -24,11 +24,11 @@
 
 
 
-; ========================================
+; ======================================
 ; ======================================
 ; ======= 1/ File listing helper =======
 ; ======================================
-; ========================================
+; ======================================
 
 _MetaListAhkFilesCC(Dir) {
 	Files := []
@@ -61,21 +61,21 @@ _MetaListAhkFilesCC(Dir) {
 
 
 
-; =============================================
+; =====================================
 ; =====================================
 ; ======= 2/ Test registrations =======
 ; =====================================
-; =============================================
+; =====================================
 
 _MetaRunClassGlobalConflictTests() {
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
 	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 
-	; Pass 1 — collect all class names defined anywhere in lib/ and modules/
+	; Pass 1 — collect all class names defined anywhere in infra/ and modules/
 	ClassNames := Map()
 	GlobalDecls := []   ; array of {name, file} objects
 
-	for Sub in ["lib", "modules"] {
+	for Sub in ["infra", "modules", "platform"] {
 		for AbsPath in _MetaListAhkFilesCC(StrReplace(DriverRoot . Sub, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -132,9 +132,18 @@ _MetaRunClassGlobalConflictTests() {
 	; AssertEqual("", actual) is the canonical failure pattern in this suite —
 	; a non-empty actual string means a violation was detected.
 	if Conflicts.Length = 0 {
+		; The clean case used to register an EMPTY body. It could not fail whether the
+		; scan had examined every class in the driver or none at all — and "none at
+		; all" is what a renamed token or a moved tree produces, which is exactly when
+		; this guard is needed. Assert the scan saw the classes instead.
 		_MetaNoConflict() {
+			Assert(ClassNames.Count > 20,
+				"the class scan found only " . ClassNames.Count . " class definition(s) across the "
+				. "driver — it is looking for something that is no longer there, so finding no "
+				. "conflicts proves nothing")
 		}
-		Test("meta class/global conflict: no conflicting `global ClassName` declarations found", _MetaNoConflict)
+		Test("meta class/global conflict: no conflicting `global ClassName` declarations found ("
+			. ClassNames.Count . " classes scanned)", _MetaNoConflict)
 	} else {
 		for Conflict in Conflicts {
 			; Capture loop variables for the closure

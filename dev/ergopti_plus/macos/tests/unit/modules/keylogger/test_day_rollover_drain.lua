@@ -6,7 +6,7 @@
 --- day_rollover() must fully drain today.log before delegating to
 --- Rotation.rollover() for file deletion. read_new_entries() caps at
 --- INGEST_BATCH_LINES per call, so a single ingest_once() may leave data
---- behind. The drain loop must iterate until read_new_entries returns empty;
+--- behind. The drain loop must iterate until read_new_entries commits EOF;
 --- if the offset stalls (persistent SQL error), rollover must be skipped
 --- and today.log preserved to avoid data loss.
 ---
@@ -27,16 +27,17 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local saved_file_system = package.loaded["adapters.file_system"]
 
 
 
 
 
--- =========================================
+-- ========================================
 -- ========================================
 -- ======= 1/ Drain-loop Simulation =======
 -- ========================================
--- =========================================
+-- ========================================
 
 --- Builds a minimal harness that replicates the day_rollover drain loop using
 --- injectable stubs for Rotation and ingest_once, then returns observable state.
@@ -53,8 +54,8 @@ local function run_drain_simulation(batches_until_empty, stall_on_iter)
 	local stub_rotation = {
 		get_offset = function() return offset end,
 		read_new_entries = function()
-			if iter >= batches_until_empty then return {} end
-			return { { raw = "line" } }
+			if iter >= batches_until_empty then return {}, offset, "eof" end
+			return { { raw = "line" } }, offset, "batch"
 		end,
 		rollover = function(_path) rollover_called = true end,
 		get_date = function() return "2099-07-01" end,
@@ -79,9 +80,13 @@ local function run_drain_simulation(batches_until_empty, stall_on_iter)
 	local drained = false
 	local prev_offset = stub_rotation.get_offset()
 	for _ = 1, MAX_ROLLOVER_DRAIN_ITERS do
-		local pending = stub_rotation.read_new_entries()
-		if #pending == 0 then
+		local pending, _, read_status = stub_rotation.read_new_entries()
+		if read_status == "failed" then
+			break
+		elseif #pending == 0 and read_status == "eof" then
 			drained = true
+			break
+		elseif #pending == 0 then
 			break
 		end
 		stub_ingest_once()
@@ -99,7 +104,7 @@ local function run_drain_simulation(batches_until_empty, stall_on_iter)
 		stub_logger.warn("LOG",
 			"day_rollover: today.log not fully drained — file preserved, rotation skipped.")
 	else
-		stub_rotation.rollover("/fake/data.sql")
+		stub_rotation.rollover("/fake/data.sql", "eof")
 	end
 
 	return {
@@ -192,9 +197,9 @@ local function load_real_day_rollover(stall)
 			if stall then
 				-- Always reports pending data without ever advancing the offset —
 				-- the exact "persistent SQL error" shape day_rollover must detect.
-				return { { entry = { type = "typing" } } }, offset
+				return { { entry = { type = "typing" } } }, offset, "batch"
 			end
-			return {}, offset
+			return {}, offset, "eof"
 		end,
 		get_offset = function() return offset end,
 		get_date   = function() return "2099-07-01" end,
@@ -235,9 +240,14 @@ local function load_real_day_rollover(stall)
 		get_db_rev              = function() return 0 end,
 		sync_foreign_data_sql   = function() end,
 	}
+package.loaded["adapters.file_system"] = {
+	write = function() return true end,
+	create_if_absent = function() return true, "created" end,
+	read = function() return nil end,
+}
 
-	package.loaded["lib.i18n"] = { t = function(key) return key end }
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.i18n"] = { t = function(key) return key end }
+	package.loaded["infra.timings"] = {
 		ms  = function() return 1000 end,
 		sec = function() return 1.0 end,
 	}
@@ -373,17 +383,18 @@ end)
 
 
 
--- ================================================
+-- ===============================================
 -- ===============================================
 -- ======= 4/ Source-level Structure Guard =======
 -- ===============================================
--- ================================================
+-- ===============================================
 
 local function read_source()
-	local path = helpers.driver_root() .. "modules/keylogger/log_manager.lua"
-	local fh = io.open(path, "r")
-	if not fh then error("Cannot read log_manager.lua for source scan") end
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to modules/keylogger/log_manager.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function _mark_aggregate_cache_rebuilt")
+	helpers.assert_true(src ~= nil, "modules/keylogger/log_manager.lua source must be locatable")
 	return src
 end
 
@@ -413,3 +424,4 @@ helpers.describe("day_rollover source: loop + conditional rollover", function()
 end)
 
 print("[PASS] test_day_rollover_drain")
+package.loaded["adapters.file_system"] = saved_file_system

@@ -56,9 +56,9 @@ _PCTW_CommitHelperWritesHwndLast() {
 	Src := _PCTW_ReadSource("modules/keylogger/keylogger.ahk")
 	Seg := _DriverFuncBody("KL_CommitPwCache")
 	Assert(Seg != "", "KL_CommitPwCache(hwnd, at, val) must exist - the single source of truth for password-cache write ordering")
-	PosVal  := InStr(Seg, "last_val")
-	PosAt   := InStr(Seg, "last_at")
-	PosHwnd := InStr(Seg, "last_hwnd")
+	PosVal  := InStr(Seg, "last_val  :=")
+	PosAt   := InStr(Seg, "last_at   :=")
+	PosHwnd := InStr(Seg, "last_hwnd :=")
 	Assert(PosVal > 0 && PosAt > 0 && PosHwnd > 0,
 		"KL_CommitPwCache must assign last_val, last_at and last_hwnd")
 	; last_hwnd is the commit flag - it MUST be assigned after both other fields

@@ -30,10 +30,11 @@ local helpers = require("tests.helpers")
 helpers.describe("personal_info.lua TOML unescape — single-pass pattern (dynhotstrings-2 regression)", function()
 
 	helpers.it("does NOT use the chained gsub that corrupts \\\\n sequences", function()
-		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "personal_info.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function parse_toml_section")
+		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 
 		-- The buggy pattern: \\n replacement runs before \\\\ replacement.
 		-- If this pattern is present it will corrupt any TOML value containing \\n
@@ -47,10 +48,11 @@ helpers.describe("personal_info.lua TOML unescape — single-pass pattern (dynho
 	end)
 
 	helpers.it("uses the single-pass \\\\(.) replacement-function pattern", function()
-		local src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function parse_toml_section")
+		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 
 		-- The correct pattern processes all escape sequences in one left-to-right pass
 		-- so \\n is seen as (\\)(n) → backslash + n, not as the two-char sequence matched
@@ -76,10 +78,11 @@ end)
 helpers.describe("hotstrings_config.lua word_delimiters unescape — single-pass (dynhotstrings-2 regression)", function()
 
 	helpers.it("does NOT use the chained gsub that corrupts \\\\n in word_delimiters", function()
-		local src_path = helpers.driver_root() .. "modules/hotstrings/hotstrings_config.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "hotstrings_config.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/hotstrings/hotstrings_config.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.get_global_default_delay_ms")
+		helpers.assert_true(src ~= nil, "modules/hotstrings/hotstrings_config.lua source must be locatable")
 
 		-- Find the word_delimiters unescape context (inside parse_overrides).
 		-- The buggy code had:  wd:gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\\\", "\\")
@@ -92,10 +95,11 @@ helpers.describe("hotstrings_config.lua word_delimiters unescape — single-pass
 	end)
 
 	helpers.it("uses the single-pass \\\\(.) replacement-function for word_delimiters", function()
-		local src_path = helpers.driver_root() .. "modules/hotstrings/hotstrings_config.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil)
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/hotstrings/hotstrings_config.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.get_global_default_delay_ms")
+		helpers.assert_true(src ~= nil, "modules/hotstrings/hotstrings_config.lua source must be locatable")
 
 		local has_single_pass = src:find("gsub('\\\\(.)'", 1, true) ~= nil
 		helpers.assert_true(

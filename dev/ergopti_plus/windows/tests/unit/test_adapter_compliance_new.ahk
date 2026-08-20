@@ -50,26 +50,39 @@ _SFD_SecureApps_HasEntries() {
 }
 Test("SFD_SECURE_APPS: Count > 0", _SFD_SecureApps_HasEntries)
 
-_SFD_Refresh_NoCrash() {
+; SFD_Refresh is a documented no-op on Windows — the detector queries live, so
+; there is nothing to pre-fetch. "Does not crash" was therefore the whole of the
+; old AssertTrue(1); what is worth pinning is that it stays a no-op, because a
+; future implementation that caches would make every consumer read stale state.
+_SFD_RefreshIsANoOp() {
+	Before := SFD_IsSecureApp("notepad.exe")
 	SFD_Refresh()
-	AssertTrue(1)
+	AssertEqual(Before, SFD_IsSecureApp("notepad.exe"),
+		"SFD_Refresh must not change what the detector reports — it is a no-op on Windows because the queries are live")
 }
-Test("SFD_Refresh: does not crash", _SFD_Refresh_NoCrash)
+Test("SFD_Refresh: is a no-op, not a cache primer", _SFD_RefreshIsANoOp)
 
-; Encore plus: pause invariant for adapters — SecureFieldDetector (and Clipboard/Storage/PLC) must support early no-op or be skipped when A_IsSuspended.
-; Privacy: never detect or act on secure fields while paused.
-_SFD_PauseNoDetection() {
-	; Real usage in keylogger must gate before calling SFD when paused.
-	AssertTrue(true, "adapter SecureFieldDetector must be pause-safe (no side effects under suspend)")
+; The privacy invariant this replaces was asserted as AssertTrue(true).
+;
+; "Pause silences the detector" is not a property of the ADAPTER — the adapter
+; knows nothing about suspend. It is a property of its caller. The port has
+; exactly one production consumer, the LLM prediction path, and the guarantee is
+; that its A_IsSuspended bail comes before the SFD_IsSecureField() call. If the
+; call ever moved above the guard, a paused driver would probe the focused field
+; and log about it.
+_SFD_PauseSilencesTheOnlyConsumer() {
+	Body := _DriverFuncBody("LLM_Engine_FirePrediction")
+	GuardPos := InStr(Body, "if A_IsSuspended")
+	CallPos  := InStr(Body, "SFD_IsSecureField()")
+	Assert(GuardPos > 0,
+		"LLM_Engine_FirePrediction must bail on A_IsSuspended — it is the only production consumer of the SecureFieldDetector port")
+	Assert(CallPos > 0,
+		"LLM_Engine_FirePrediction must still consult SFD_IsSecureField — without it the disable_password_fields preference does nothing")
+	Assert(GuardPos < CallPos,
+		"the A_IsSuspended bail must precede the SFD_IsSecureField() call, or a paused driver probes the focused field anyway")
 }
-Test("AdapterCompliance: pause must silence SecureFieldDetector usage (privacy)", _SFD_PauseNoDetection)
-
-; More compliance: ProcessLifecycle idempotency under pause simulation
-_PLC_PauseSafeStartStop() {
-	; PLC_Start/Stop must be safe even if called during paused state (no timers/hooks activated).
-	AssertTrue(1)
-}
-Test("AdapterCompliance: ProcessLifecycle Start/Stop must be pause-resilient", _PLC_PauseSafeStartStop)
+Test("AdapterCompliance: pause silences the SecureFieldDetector consumer (privacy)",
+	_SFD_PauseSilencesTheOnlyConsumer)
 
 
 
@@ -226,31 +239,50 @@ _PLC_GetForegroundApp_WindowTitleIsString() {
 }
 Test("PLC_GetForegroundApp: windowTitle is a String", _PLC_GetForegroundApp_WindowTitleIsString)
 
+; These four asserted AssertTrue(1) — "it did not throw". Each one NAMES
+; idempotency, and PLC exposes the state that makes idempotency checkable, so
+; each now asserts the post-condition its own title promises. A second Start
+; that re-armed the timer, or a Stop that left PLC_Running true, passed before.
 _PLC_Start_Idempotent() {
+	global PLC_Running
+	PLC_Stop()
 	PLC_Start()
+	AssertTrue(PLC_Running, "PLC_Start must mark the adapter running")
 	PLC_Start()
-	AssertTrue(1)
+	AssertTrue(PLC_Running, "a second PLC_Start must leave it running, not toggle or re-arm")
+	PLC_Stop()
 }
-Test("PLC_Start: callable twice without crash", _PLC_Start_Idempotent)
+Test("PLC_Start: a second call leaves the adapter running", _PLC_Start_Idempotent)
 
 _PLC_Stop_Idempotent() {
+	global PLC_Running, PLC_FocusCallbacks
+	PLC_Start()
 	PLC_Stop()
+	AssertFalse(PLC_Running, "PLC_Stop must clear the running flag")
+	AssertEqual(0, PLC_FocusCallbacks.Length, "PLC_Stop must clear the focus callbacks")
 	PLC_Stop()
-	AssertTrue(1)
+	AssertFalse(PLC_Running, "a second PLC_Stop must leave it stopped")
 }
-Test("PLC_Stop: callable twice without crash", _PLC_Stop_Idempotent)
+Test("PLC_Stop: a second call leaves the adapter stopped and its callbacks cleared", _PLC_Stop_Idempotent)
 
-_PLC_Stop_BeforeStart_NoCrash() {
+_PLC_Stop_BeforeStart_IsANoOp() {
+	global PLC_Running
 	PLC_Stop()
-	AssertTrue(1)
+	PLC_Stop()
+	AssertFalse(PLC_Running, "PLC_Stop before any PLC_Start must leave the adapter stopped")
 }
-Test("PLC_Stop: callable before PLC_Start without crash", _PLC_Stop_BeforeStart_NoCrash)
+Test("PLC_Stop: calling it before PLC_Start is a no-op", _PLC_Stop_BeforeStart_IsANoOp)
 
-_PLC_OnFocusChange_WithFunc_NoCrash() {
+_PLC_OnFocusChange_RegistersTheCallback() {
+	global PLC_FocusCallbacks
+	PLC_Stop()   ; clears the callback arrays, so the count below is this test's own
+	Before := PLC_FocusCallbacks.Length
 	PLC_OnFocusChange(PLC_GetForegroundApp)
-	AssertTrue(1)
+	AssertEqual(Before + 1, PLC_FocusCallbacks.Length,
+		"PLC_OnFocusChange must append the callback — accepting it and dropping it on the floor is the failure this covers")
+	PLC_Stop()
 }
-Test("PLC_OnFocusChange: accepts a Func without crash", _PLC_OnFocusChange_WithFunc_NoCrash)
+Test("PLC_OnFocusChange: the callback is actually registered", _PLC_OnFocusChange_RegistersTheCallback)
 
 
 
@@ -380,10 +412,16 @@ _SR_Spawn_ReturnsHandle() {
 Test("ShellRunner_Spawn: returns handle with start() and terminate()", _SR_Spawn_ReturnsHandle)
 
 _SR_Spawn_TerminateBeforeStart_NoCrash() {
-	; terminate() called before start() must not crash (idempotent).
+	; terminate() called before start() must not crash (idempotent) — and must
+	; leave the handle usable. AssertTrue(1) was the whole assertion, so a
+	; terminate() that nulled the handle's own methods on the way out would have
+	; passed here and failed at the caller, which is a spawn that never starts.
 	local h := ShellRunner_Spawn("cmd.exe", ["/c", "echo test"])
 	h.terminate()
-	AssertTrue(1, "terminate() before start() must not throw")
+	AssertTrue(HasMethod(h, "start"), "terminate() before start() must leave start() callable")
+	AssertTrue(HasMethod(h, "terminate"), "and terminate() itself callable, so it is idempotent")
+	h.terminate()
+	AssertTrue(HasMethod(h, "start"), "a second terminate() must not damage the handle either")
 }
 Test("ShellRunner_Spawn: terminate() before start() is safe", _SR_Spawn_TerminateBeforeStart_NoCrash)
 

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Window Utilities Tests
 ; DESCRIPTION:
-; Tests for the pure geometry helpers in lib/window_utils.ahk.
+; Tests for the pure geometry helpers in infra/window_utils.ahk.
 ; GetMonitorFromPoint is tested by stubbing MonitorGetCount and MonitorGet
 ; via a wrapper seam; AltTabMonitor is not testable without a live desktop.
 ; ==============================================================================
@@ -13,11 +13,11 @@
 
 
 
-; =========================================
+; ======================================
 ; ======================================
 ; ======= 1/ GetMonitorFromPoint =======
 ; ======================================
-; =========================================
+; ======================================
 
 ; GetMonitorFromPoint delegates entirely to MonitorGetCount() and MonitorGet()
 ; which call the Windows API directly — we cannot stub those in AHK v2 without

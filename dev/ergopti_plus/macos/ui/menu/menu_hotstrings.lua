@@ -8,11 +8,13 @@
 
 local M = {}
 local hs            = hs
-local Logger        = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local dialog        = require("lib.dialog_util")
-local notifications = require("lib.notifications")
-local i18n          = require("lib.i18n")
+local Logger        = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local dialog        = require("infra.dialog_util")
+local notifications = require("infra.notifications")
+local i18n          = require("infra.i18n")
+local Labels        = require("menu.labels")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG           = "menu_hotstrings"
 
 --- Resolves a description value that may be a plain string or a multilingual table.
@@ -94,27 +96,21 @@ end
 -- ====================================
 -- ====================================
 
---- Formats a number with spaces as thousands separators.
---- @param n number|string The number to format.
---- @return string The formatted number.
-local function fmt_count(n)
-	local num = tonumber(n) or 0
-	local s = tostring(math.floor(num + 0.5))
-	local r = ""
-	for i = 1, #s do
-		if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
-		r = r .. s:sub(i, i)
-	end
-	return r
-end
+-- Thousands separator formatting lives in _shared/lua/menu/labels.lua, so the
+-- three drivers render the same count the same way. This file used to carry its
+-- own byte-identical copy.
+local fmt_count = Labels.fmt_count
 
 --- Checks if a hotstring group is enabled.
 --- @param ctx table Context.
 --- @param name string Group name.
 --- @return boolean
 local function groupEnabled(ctx, name)
-	return (ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" and ctx.keymap.is_group_enabled(name))
-		or (ctx.state.hotstrings[name] ~= false)
+	if ctx.keymap and type(ctx.keymap.is_group_enabled) == "function" then
+		local live = ctx.keymap.is_group_enabled(name)
+		if live ~= nil then return live == true end
+	end
+	return ctx.state.hotstrings[name] ~= false
 end
 
 --- Gets the display label for a group.
@@ -127,25 +123,43 @@ local function groupLabel(ctx, name)
 	return ctx.applyTriggerChar(lbl)
 end
 
+--- Returns only actionable section names for one registry group.
+--- @param keymap_api table|nil
+--- @param group_name string
+--- @return table
+local function section_names_for(keymap_api, group_name)
+	local sections = keymap_api and type(keymap_api.get_sections) == "function"
+		and keymap_api.get_sections(group_name) or nil
+	local names = {}
+	for _, section in ipairs(type(sections) == "table" and sections or {}) do
+		if type(section) == "table" and section.name ~= "-" and not section.is_module_placeholder then
+			names[#names + 1] = section.name
+		end
+	end
+	return names
+end
+
 --- Generates a function to toggle a hotstring group.
 --- @param ctx table Context.
 --- @param name string Group name.
 --- @return function
 local function toggleGroupFn(ctx, name)
 	return function()
-		ctx.state.hotstrings[name] = not groupEnabled(ctx, name)
-		if ctx.state.hotstrings[name] then
-			if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, name) end
-			if not ctx.state.keymap then 
-				ctx.state.keymap = true
-				if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
-			end
-		else
-			if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, name) end
+		local will_enable = not groupEnabled(ctx, name)
+		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable hotstring group") then return end
+		local mutator
+		if ctx.keymap then
+			if will_enable then mutator = ctx.keymap.enable_group else mutator = ctx.keymap.disable_group end
 		end
-		ctx.save_prefs()
-		ctx.notify_feature(groupLabel(ctx, name), ctx.state.hotstrings[name])
-		ctx.updateMenu()
+		KeymapLifecycle.commit_mutation(ctx, "toggle hotstring group", function()
+			if type(mutator) ~= "function" then return false end
+			return mutator(name)
+		end, function()
+			ctx.state.hotstrings[name] = will_enable
+			if ctx.save_prefs() ~= true then return false end
+			ctx.notify_feature(groupLabel(ctx, name), will_enable)
+			ctx.updateMenu()
+		end)
 	end
 end
 
@@ -158,18 +172,19 @@ end
 local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	return function()
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
-		if will_enable then
-			if ctx.keymap and type(ctx.keymap.enable_section) == "function" then pcall(ctx.keymap.enable_section, group_name, sec_name) end
-			if not ctx.state.keymap then 
-				ctx.state.keymap = true
-				if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
-			end
-		else
-			if ctx.keymap and type(ctx.keymap.disable_section) == "function" then pcall(ctx.keymap.disable_section, group_name, sec_name) end
+		if will_enable and not KeymapLifecycle.ensure_started(ctx, "enable hotstring section") then return end
+		local mutator
+		if ctx.keymap then
+			if will_enable then mutator = ctx.keymap.enable_section else mutator = ctx.keymap.disable_section end
 		end
-		ctx.save_prefs()
-		ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
-		ctx.updateMenu()
+		KeymapLifecycle.commit_mutation(ctx, "toggle hotstring section", function()
+			if type(mutator) ~= "function" then return false end
+			return mutator(group_name, sec_name)
+		end, function()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.notify_feature(ctx.applyTriggerChar(sec_label or sec_name), will_enable)
+			ctx.updateMenu()
+		end)
 	end
 end
 
@@ -183,28 +198,20 @@ end
 local function setGroupSectionsFn(ctx, group_name, enable)
 	return function()
 		local km = ctx.keymap
-		local secs = (km and type(km.get_sections) == "function") and km.get_sections(group_name) or nil
-		if type(secs) == "table" then
-			for _, sec in ipairs(secs) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-					if enable and type(km.enable_section) == "function" then
-						pcall(km.enable_section, group_name, sec.name)
-					elseif not enable and type(km.disable_section) == "function" then
-						pcall(km.disable_section, group_name, sec.name)
-					end
-				end
-			end
-		end
-		if enable then
-			ctx.state.hotstrings[group_name] = true
-			if type(km.enable_group) == "function" then pcall(km.enable_group, group_name) end
-			if not ctx.state.keymap then
-				ctx.state.keymap = true
-				if type(km.start) == "function" then pcall(km.start) end
-			end
-		end
-		ctx.save_prefs()
-		ctx.updateMenu()
+		if enable and not KeymapLifecycle.ensure_started(ctx, "enable group sections") then return end
+		local changes = { {
+			name = group_name,
+			sections = section_names_for(km, group_name),
+			enable_group = enable,
+		} }
+		KeymapLifecycle.commit_mutation(ctx, "set hotstring group sections", function()
+			if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
+			return km.set_groups_sections_enabled(changes, enable)
+		end, function()
+			if enable then ctx.state.hotstrings[group_name] = true end
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
+		end)
 	end
 end
 
@@ -217,31 +224,29 @@ end
 local function setAllSectionsFn(ctx, enable)
 	return function()
 		local km = ctx.keymap
+		if enable and not KeymapLifecycle.ensure_started(ctx, "enable all hotstring sections") then return end
+		local changes = {}
 		for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 			local name = ctx.get_group_name and ctx.get_group_name(f) or f
-			local secs = (km and type(km.get_sections) == "function") and km.get_sections(name) or nil
-			if type(secs) == "table" then
-				for _, sec in ipairs(secs) do
-					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-						if enable and type(km.enable_section) == "function" then
-							pcall(km.enable_section, name, sec.name)
-						elseif not enable and type(km.disable_section) == "function" then
-							pcall(km.disable_section, name, sec.name)
-						end
-					end
-				end
+			local section_names = section_names_for(km, name)
+			if enable or #section_names > 0 then
+				changes[#changes + 1] = {
+					name = name,
+					sections = section_names,
+					enable_group = enable,
+				}
 			end
+		end
+		KeymapLifecycle.commit_mutation(ctx, "set all hotstring sections", function()
+			if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
+			return km.set_groups_sections_enabled(changes, enable)
+		end, function()
 			if enable then
-				ctx.state.hotstrings[name] = true
-				if type(km.enable_group) == "function" then pcall(km.enable_group, name) end
+				for _, change in ipairs(changes) do ctx.state.hotstrings[change.name] = true end
 			end
-		end
-		if enable and not ctx.state.keymap then
-			ctx.state.keymap = true
-			if type(km.start) == "function" then pcall(km.start) end
-		end
-		ctx.save_prefs()
-		ctx.updateMenu()
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
+		end)
 	end
 end
 
@@ -254,23 +259,23 @@ local function buildPersonalInfoItems(ctx, description)
 	description = ctx.applyTriggerChar(description)
 	return {
 		{
-			title   = description,
+			label   = description,
 			checked = ctx.state.personal_info or nil,
-			fn      = function()
+			action      = function()
 				ctx.state.personal_info = not ctx.state.personal_info
 				if ctx.state.personal_info then 
 					if type(ctx.personal_info.enable) == "function" then pcall(ctx.personal_info.enable) end
 				else 
 					if type(ctx.personal_info.disable) == "function" then pcall(ctx.personal_info.disable) end 
 				end
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.notify_feature(description or i18n.get("notify.personal_info"), ctx.state.personal_info)
 				ctx.updateMenu()
 			end,
 		},
 		{
-			title = i18n.get("menu.shortcuts.edit_personal_info"),
-			fn    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
+			label = i18n.get("menu.shortcuts.edit_personal_info"),
+			action    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
 		},
 	}
 end
@@ -300,9 +305,9 @@ function M.build_groups(ctx, only, counts)
 		local base_label = groupLabel(ctx, name)
 		local item = {
 			-- Always show count (even 0) — only enabled sections contribute
-			title   = base_label .. " (" .. fmt_count(total) .. ")",
+			label   = base_label .. " (" .. fmt_count(total) .. ")",
 			checked = enabled or nil,
-			fn      = toggleGroupFn(ctx, name),
+			action      = toggleGroupFn(ctx, name),
 		}
 
 		if has_secs then
@@ -329,34 +334,55 @@ function M.build_groups(ctx, only, counts)
 				ordered_secs = sections
 			end
 
+			-- THE ORDER BELOW IS THE SHARED ONE, and the three drivers had three of
+			-- them until 2026-08-07:
+			--
+			--   1. the category gate — everything under it is inert while it is off
+			--   2. « ouvrir le fichier », when the category has one
+			--   3. ─────────
+			--   4. « tout activer »
+			--   5. « tout désactiver »
+			--   6. ─────────
+			--   7. the sections
+			--
+			-- The gate row is NEW here. Windows and Linux have shown it since they
+			-- were written; this driver relied on the parent row toggling the group
+			-- when clicked, which works and which nobody discovers — the parent of a
+			-- submenu reads as something you open, not something you switch off. The
+			-- parent keeps its behaviour; this row makes it visible.
 			local sec_menu = {}
+			sec_menu[#sec_menu + 1] = {
+				label  = i18n.get(enabled and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+				action = not ctx.paused and toggleGroupFn(ctx, name) or nil,
+				disabled = ctx.paused or nil,
+			}
 			local toml_path = toml_path_for_group(ctx, name)
 			if toml_path then
 				sec_menu[#sec_menu + 1] = {
-					title = i18n.get("menu.hotstrings.open_file"),
-					fn    = function() open_toml_path(toml_path) end,
+					label = i18n.get("menu.hotstrings.open_file"),
+					action    = function() open_toml_path(toml_path) end,
 				}
-				sec_menu[#sec_menu + 1] = { title = "-" }
 			end
+			sec_menu[#sec_menu + 1] = { separator = true }
 			-- Section-level bulk actions for this category.
 			sec_menu[#sec_menu + 1] = {
-				title    = i18n.get("menu.hotstrings.enable_all"),
+				label    = i18n.get("menu.hotstrings.enable_all"),
 				disabled = ctx.paused or nil,
-				fn       = not ctx.paused and setGroupSectionsFn(ctx, name, true) or nil,
+				action       = not ctx.paused and setGroupSectionsFn(ctx, name, true) or nil,
 			}
 			sec_menu[#sec_menu + 1] = {
-				title    = i18n.get("menu.hotstrings.disable_all"),
+				label    = i18n.get("menu.hotstrings.disable_all"),
 				disabled = ctx.paused or nil,
-				fn       = not ctx.paused and setGroupSectionsFn(ctx, name, false) or nil,
+				action       = not ctx.paused and setGroupSectionsFn(ctx, name, false) or nil,
 			}
-			sec_menu[#sec_menu + 1] = { title = "-" }
+			sec_menu[#sec_menu + 1] = { separator = true }
 			-- "replace" (J→★ key remapping) is shown in Disposition Ergopti instead.
 			local prev_was_sep = true -- Suppress a potential leading separator
 			for _, sec in ipairs(ordered_secs) do
 				if type(sec) == "table" then
 					if sec.name == "-" then
 						if not prev_was_sep then
-							sec_menu[#sec_menu + 1] = { title = "-" }
+							sec_menu[#sec_menu + 1] = { separator = true }
 							prev_was_sep = true
 						end
 					elseif name == "magic_key" and sec.name == "replace" then
@@ -381,9 +407,9 @@ function M.build_groups(ctx, only, counts)
 									   or tostring(sec.name):gsub("_", " ")
 						lbl = ctx.applyTriggerChar(lbl)
 						sec_menu[#sec_menu + 1] = {
-							title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
+							label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 							checked  = sec_on or nil,
-							fn       = (enabled and not ctx.paused)
+							action       = (enabled and not ctx.paused)
 									   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
 							disabled = not enabled or ctx.paused or nil,
 						}
@@ -391,7 +417,13 @@ function M.build_groups(ctx, only, counts)
 					end
 				end
 			end
-			item.menu = sec_menu
+			-- `items`, not `menu`: this row is DATA handed to a `list` provider, and
+			-- the renderer reads `items` for nested rows. Written as `menu` — the
+			-- hs.menubar field — the sections were attached to a field nothing reads,
+			-- so every standard and Ergopti category rendered as a bare clickable row
+			-- with its whole submenu gone: no « ouvrir le fichier », no bulk actions,
+			-- no section toggles, and not one warning to say so.
+			item.items = sec_menu
 		end
 		items[#items + 1] = item
 		::continue_group::
@@ -407,14 +439,14 @@ end
 function M.build_bulk_actions(ctx)
 	return {
 		{
-			title    = i18n.get("menu.hotstrings.enable_all"),
+			label    = i18n.get("menu.hotstrings.enable_all"),
 			disabled = ctx.paused or nil,
-			fn       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
+			action       = not ctx.paused and setAllSectionsFn(ctx, true) or nil,
 		},
 		{
-			title    = i18n.get("menu.hotstrings.disable_all"),
+			label    = i18n.get("menu.hotstrings.disable_all"),
 			disabled = ctx.paused or nil,
-			fn       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
+			action       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
 		},
 	}
 end

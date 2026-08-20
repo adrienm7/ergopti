@@ -12,9 +12,9 @@ local M = {}
 
 local hs      = hs
 local llm_mod = require("modules.llm")
-local Logger  = require("lib.logger")
-local i18n    = require("lib.i18n")
-local dialog  = require("lib.dialog_util")
+local Logger  = require("infra.logger")
+local i18n    = require("infra.i18n")
+local dialog  = require("infra.dialog_util")
 
 local LOG = "menu_llm.settings"
 
@@ -78,7 +78,7 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
 				pcall(deps.keymap[hs_fn], final_val)
 			end
 
-			pcall(deps.save_prefs)
+			if deps.save_prefs() ~= true then return false end
 			pcall(deps.update_menu)
 			Logger.info(LOG, string.format("Value for %s updated successfully.", key))
 		else
@@ -99,7 +99,7 @@ local function reset_to_default(deps, key, default_val, hs_fn)
 	if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
 		pcall(deps.keymap[hs_fn], default_val)
 	end
-	pcall(deps.save_prefs)
+	if deps.save_prefs() ~= true then return false end
 	pcall(deps.update_menu)
 	Logger.info(LOG, string.format("Key %s reset successfully.", key))
 end
@@ -150,7 +150,7 @@ function M.new(deps)
 				if deps.keymap and type(deps.keymap.set_llm_debounce) == "function" then
 					pcall(deps.keymap.set_llm_debounce, new_val)
 				end
-				pcall(deps.save_prefs)
+				if deps.save_prefs() ~= true then return false end
 				pcall(deps.update_menu)
 				Logger.info(LOG, "Debounce delay updated successfully.")
 			end
@@ -182,7 +182,7 @@ function M.new(deps)
 			if deps.keymap and type(deps.keymap.set_llm_max_words) == "function" then
 				pcall(deps.keymap.set_llm_max_words, new_val)
 			end
-			pcall(deps.save_prefs)
+			if deps.save_prefs() ~= true then return false end
 			pcall(deps.update_menu)
 			Logger.info(LOG, "Max words updated successfully.")
 		end
@@ -213,7 +213,7 @@ function M.new(deps)
 			if deps.keymap and type(deps.keymap.set_llm_min_words) == "function" then
 				pcall(deps.keymap.set_llm_min_words, new_val)
 			end
-			pcall(deps.save_prefs)
+			if deps.save_prefs() ~= true then return false end
 			pcall(deps.update_menu)
 			Logger.info(LOG, "Min words updated successfully.")
 		end
@@ -286,7 +286,6 @@ function M.new(deps)
 		if not ApiMlx.set_port(new_port) then return end
 		Logger.info(LOG, "MLX server port set to %d via menu.", new_port)
 		if type(on_applied) == "function" then pcall(on_applied) end
-		pcall(deps.save_prefs)
 		pcall(deps.update_menu)
 	end
 
@@ -298,7 +297,6 @@ function M.new(deps)
 		if ApiMlx.set_port(ApiMlx.get_default_port()) then
 			Logger.info(LOG, "MLX server port reset to default %d.", ApiMlx.get_default_port())
 			if type(on_applied) == "function" then pcall(on_applied) end
-			pcall(deps.save_prefs)
 			pcall(deps.update_menu)
 		end
 	end
@@ -324,7 +322,7 @@ function M.new(deps)
 					if deps.keymap and type(deps.keymap.set_llm_pred_indent) == "function" then
 						pcall(deps.keymap.set_llm_pred_indent, i)
 					end
-					pcall(deps.save_prefs)
+					if deps.save_prefs() ~= true then return false end
 					pcall(deps.update_menu)
 				end or nil,
 			})
@@ -359,10 +357,11 @@ function M.new(deps)
                 checked = (table.concat(opt.mods, "+") == current_str) or nil,
                 fn = not paused and function()
                     hs.settings.set(key, opt.mods)
+					deps.state[key] = opt.mods
                     if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
                         pcall(deps.keymap[hs_fn], opt.mods)
                     end
-                    pcall(deps.save_prefs)
+                    if deps.save_prefs() ~= true then return false end
                     pcall(deps.update_menu)
                 end or nil
             })

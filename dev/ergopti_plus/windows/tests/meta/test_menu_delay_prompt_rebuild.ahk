@@ -18,15 +18,21 @@
 _MDPR_OverrideWriteRebuildsLive(FuncName) {
 	Body := _DriverFuncBody(FuncName)
 	Assert(Body != "", FuncName . " must exist in ui/menu/menu_hotstrings.ahk")
-	SetPos := InStr(Body, "HotstringsSetOverride(")
-	RebuildPos := InStr(Body, "RebuildHotstringsLive()")
-	Assert(SetPos > 0, FuncName . " must persist the delay via HotstringsSetOverride")
-	Assert(RebuildPos > SetPos,
-		FuncName . " must call RebuildHotstringsLive() AFTER HotstringsSetOverride so the new delay takes effect live, not only after a Reload")
+	Assert(InStr(Body, "_HS_CommitDelayOverride(") > 0,
+		FuncName . " must route persistence and live rebuilding through the shared strict-result helper")
 }
 _MDPR_BothDelayPromptsRebuild() {
 	_MDPR_OverrideWriteRebuildsLive("_HS_PromptDefaultDelay")
 	_MDPR_OverrideWriteRebuildsLive("_HS_PromptCategoryDelay")
+
+	Commit := _DriverFuncBody("_HS_CommitDelayOverride")
+	Assert(Commit != "", "_HS_CommitDelayOverride must exist in ui/menu/menu_hotstrings.ahk")
+	SetPos := InStr(Commit, "HotstringsSetOverride(")
+	StrictPos := InStr(Commit, "Committed is Integer")
+	RebuildPos := InStr(Commit, "RebuildHotstringsLive()")
+	Assert(SetPos > 0, "the shared helper must persist through HotstringsSetOverride")
+	Assert(StrictPos > SetPos and RebuildPos > StrictPos,
+		"the helper must accept only a strict successful persist BEFORE rebuilding live hotstrings; a refused write must never rebuild from stale state")
 }
-Test("menu: hotstring delay prompts re-register live after writing the override",
+Test("menu: hotstring delay prompts rebuild only after strict durable success",
 	_MDPR_BothDelayPromptsRebuild)

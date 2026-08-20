@@ -67,9 +67,15 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		}
 
 		-- dialog_util is stubbed by the harness; drive it to return a valid value.
-		local dialog = package.loaded["lib.dialog_util"]
+		-- The stub echoes back the CONFIRM label the caller passed rather than a
+		-- literal: hardcoding "Enregistrer" pinned the test to a French spelling
+		-- that only held while the button itself was hardcoded, so routing it
+		-- through i18n turned this green test red for no behavioural reason.
+		local dialog = package.loaded["infra.dialog_util"]
 		if type(dialog) == "table" then
-			dialog.text_prompt = function() return "Enregistrer", "https://example.com" end
+			dialog.text_prompt = function(_title, _prompt, _prior, confirm)
+				return confirm, "https://example.com"
+			end
 		end
 
 		local ok = SU.prompt_action_parameter(gestures, "return_key", "open_url", "url")
@@ -93,9 +99,12 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 			validate_action_parameter = function() return true end,
 			set_action_parameter = function() stored = stored + 1 end,
 		}
-		local dialog = package.loaded["lib.dialog_util"]
+		-- Echo the CANCEL label the caller passed, for the same reason as above.
+		local dialog = package.loaded["infra.dialog_util"]
 		if type(dialog) == "table" then
-			dialog.text_prompt = function() return "Annuler", nil end
+			dialog.text_prompt = function(_title, _prompt, _prior, _confirm, cancel)
+				return cancel, nil
+			end
 		end
 
 		local ok = SU.prompt_action_parameter(gestures, "return_key", "open_url", "url")
@@ -155,11 +164,17 @@ helpers.describe("the script-control picker configures before it binds", functio
 				.. "precisely the drift that made the configured link unreadable")
 
 		local sc_src = helpers.read_driver_source("BINDING_PREFIX")
-		local dispatches = 0
-		for _ in sc_src:gmatch("dispatch_action%([^\n]-BINDING_PREFIX") do dispatches = dispatches + 1 end
-		helpers.assert_true(dispatches >= 6,
-			"every dispatch must build its binding from that same constant (found " .. dispatches
-				.. ") — a literal on either side of the store re-opens the drift")
+		local routed = 0
+		for _ in sc_src:gmatch("return finish%(defer_dispatch%(") do routed = routed + 1 end
+		helpers.assert_true(routed >= 6,
+			"every sentinel/fallback branch must route through the shared deferred dispatcher (found "
+				.. routed .. ")")
+		local prefixed = 0
+		for _ in sc_src:gmatch("dispatch_action%(action, M%.BINDING_PREFIX %.%. binding%)") do
+			prefixed = prefixed + 1
+		end
+		helpers.assert_eq(prefixed, 1,
+			"the one shared dispatcher must derive its storage key from exported BINDING_PREFIX")
 
 		local menu_src = helpers.read_driver_source("local function dyn_script_control")
 		helpers.assert_true(menu_src ~= nil, "menu_shortcuts source must be locatable")

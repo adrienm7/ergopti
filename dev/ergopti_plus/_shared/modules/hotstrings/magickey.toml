@@ -1,3 +1,4 @@
+# _shared/modules/hotstrings/magickey.toml
 # ====================
 # ====================
 # ======= Meta =======
@@ -902,8 +903,8 @@ text_expansion_symbols_typst = { fr = "Expansion de texte Symboles Typst : $eq.n
 # ======================================
 
 [[text_expansion_symbols]]
-" -> ★" = { output = " ➜ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-" = /=>★" = { output = "⇏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+" -> ★" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+" = /=>★" = { output = "⇏", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "( = )★" = { output = "≡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(0)★" = { output = "🄋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(0n)★" = { output = "🄌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1041,7 +1042,7 @@ text_expansion_symbols_typst = { fr = "Expansion de texte Symboles Typst : $eq.n
 "ième★" = { output = "ᵉ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "|->★" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "|^★" = { output = "↓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"°C★" = { output = "℃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"°C★" = { output = "℃", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 
 
 

@@ -13,7 +13,7 @@
 ; This test verifies that _DispatchIfMissed uses `throw Err` after logging, or
 ; doesn't suppress the error entirely, so it propagates to the global OnError handler.
 ;
-; SCOPE: source introspection of lib/menu_dispatcher.ahk.
+; SCOPE: source introspection of infra/menu_dispatcher.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -43,7 +43,7 @@ _MDEP_ReadSource(RelPath) {
 ; ==================================================
 
 _MDEP_CheckErrorPropagation() {
-	Src := _MDEP_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDEP_ReadSource("infra/menu_dispatcher.ahk")
 	Body := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Body != "", "_DispatchIfMissed must exist in menu_dispatcher.ahk")
 

@@ -19,8 +19,8 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
-local text_utils = require("lib.text_utils")
+local Logger = require("infra.logger")
+local text_utils = require("infra.text_utils")
 
 local LOG = "adapters.app_launcher"
 

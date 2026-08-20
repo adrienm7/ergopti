@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Builds the Metrics category submenu: typing/app tracking entries, privacy filters, app exclusion and the WPM widget options.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -20,8 +20,16 @@
 ; (which item greys out on which toggle) lives once in menu_manifest.json
 ; instead of being re-derived per handler.
 global _MET_STATE_GETTERS := Map(
-	"keylogger_enabled",  () => MetricsShortcuts.enabled,
-	"wpm_widget_visible", () => WPMWidget.visible,
+	"keylogger_enabled",       () => MetricsShortcuts.enabled,
+	"wpm_widget_visible",      () => WPMWidget.visible,
+	; Read by the manifest's checked_when predicates, so the checkmark state is
+	; declared beside the row rather than restated in each handler.
+	"metrics_filter_private",  () => MetricsFilters.private_browsing,
+	"metrics_filter_secure",   () => MetricsFilters.secure_field,
+	"metrics_filter_sysauth",  () => MetricsFilters.system_auth,
+	; The encryption row became `check` on 2026-08-07, so its tick is read here
+	; instead of being set by a handler.
+	"metrics_encrypt_enabled", () => KL_Enc_IsEnabled(),
 )
 
 ; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
@@ -41,21 +49,40 @@ BuildMetricsMenu() {
 	; its own grey-out state from the manifest's disabled_when predicate.
 
 	DynHandlers := Map(
-		"show_typing",        (M, C) => _MET_ShowTyping(M, C, _MET_STATE_GETTERS),
-		"shortcut_typing",    (M, C) => _MET_ShortcutTyping(M, C, _MET_STATE_GETTERS),
-		"show_apps",          (M, C) => _MET_ShowApps(M, C, _MET_STATE_GETTERS),
-		"shortcut_apps",      (M, C) => _MET_ShortcutApps(M, C, _MET_STATE_GETTERS),
-		"filter_private",     (M, C) => _MET_FilterPrivate(M, C, _MET_STATE_GETTERS),
-		"filter_secure",      (M, C) => _MET_FilterSecure(M, C, _MET_STATE_GETTERS),
-		"filter_sysauth",     (M, C) => _MET_FilterSysauth(M, C, _MET_STATE_GETTERS),
-		"exclude_apps",       (M, C) => _MET_ExcludeApps(M, C, _MET_STATE_GETTERS),
 		"wpm_widget",         (M, C) => _MET_WpmWidget(M, C, _MET_STATE_GETTERS),
 		"widget_colors",      (M, C) => _MET_WpmWidgetColors(M, C, _MET_STATE_GETTERS),
 		"include_realtime",   (M, C) => _MET_WpmWidgetGraph(M, C, _MET_STATE_GETTERS),
-		"reset_wpm_position", (M, C) => _MET_WpmWidgetReset(M, C, _MET_STATE_GETTERS),
 	)
 
-	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers)
+	; The three privacy filters left DynHandlers on 2026-08-06: their manifest
+	; rows are `type = "check"`, so the renderer builds them from the
+	; declaration and this file supplies only the behaviour. One row shape for
+	; three drivers, which is what the manifest was for.
+	; show_typing and show_apps left DynHandlers on 2026-08-07: their manifest
+	; rows are `command` now, so the renderer builds the label and applies the
+	; greying from the declaration and this driver supplies only the click.
+	Commands := Map(
+		"filter_private",  ToggleFilterPrivate,
+		"filter_secure",   ToggleFilterSecureField,
+		"filter_sysauth",  ToggleFilterSystemAuth,
+		"encryption",         ToggleAtRestEncryption,
+		"reset_wpm_position", (*) => WPMWidget_ResetPosition(),
+		"show_typing",     KLUI_ToggleTyping,
+		"show_apps",       KLUI_ToggleApps,
+	)
+
+	; The two shortcut pickers and the app-exclusion row left DynHandlers on
+	; 2026-08-07: their labels are computed, so no static declaration can carry
+	; them, but a provider that returns one row is still the renderer drawing it.
+	; The three WPM widget rows stay handlers — their callbacks repaint the OPEN
+	; menu rather than rebuilding the tray, which a declarative row cannot do.
+	ListProviders := Map(
+		"shortcut_typing", (*) => _MET_ShortcutTypingRows(_MET_STATE_GETTERS),
+		"shortcut_apps",   (*) => _MET_ShortcutAppsRows(_MET_STATE_GETTERS),
+		"exclude_apps",    (*) => _MET_ExcludeAppsRows(_MET_STATE_GETTERS)
+	)
+
+	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", ListProviders, Commands, _MET_STATE_GETTERS)
 	; Metrics toggle uses a dedicated fn (confirm/security-warning dialogs +
 	; MetricsShortcuts.enabled + MS_SaveToIni) rather than the generic
 	; ToggleCategoryAllFeatures used by manifest-only menus — same pattern
@@ -68,77 +95,52 @@ BuildMetricsMenu() {
 	return MetricsMenu
 }
 
-; Dynamic handler: Show Typing button.
-_MET_ShowTyping(M, _Cat, Getters) {
-	Label := t("menu.metrics.show_typing")
-	RegisterMenuItem(M, Label, (*) => KLUI_ToggleTyping())
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "show_typing", Getters)
-		M.Disable(Label)
+; List provider: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
+_MET_PromptShortcutAndRefresh(which, ToggleFn, PromptFn := 0, RefreshFn := 0) {
+	Before := MS_GetDisplayLabel(which)
+	Result := HasMethod(PromptFn, "Call")
+		? PromptFn.Call(which, ToggleFn)
+		: MS_PromptShortcut(which, ToggleFn)
+	After := MS_GetDisplayLabel(which)
+	CommitOk := (Result is Integer) && Result == 1
+	; A partial commit deliberately returns false, but may have published a new
+	; durable binding plus cleanup warning. Refresh that changed projection too.
+	if !CommitOk && After == Before
+		return false
+	RefreshResult := HasMethod(RefreshFn, "Call")
+		? RefreshFn.Call()
+		: RebuildTrayMenu()
+	RefreshOk := (RefreshResult is Integer) && RefreshResult == 1
+	return CommitOk && RefreshOk
 }
 
-; Dynamic handler: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
-_MET_ShortcutTyping(M, _Cat, Getters) {
-	Label := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("typing")
-	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters)
-		M.Disable(Label)
+_MET_ShortcutTypingRows(Getters) {
+	return [Map(
+		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_typing")) . MS_GetDisplayLabel("typing"),
+		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_typing", Getters),
+		"action",   (*) => _MET_PromptShortcutAndRefresh("typing", KLUI_ToggleTyping))]
 }
 
-; Dynamic handler: Show Apps button.
-_MET_ShowApps(M, _Cat, Getters) {
-	Label := t("menu.metrics.show_apps")
-	RegisterMenuItem(M, Label, (*) => KLUI_ToggleApps())
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "show_apps", Getters)
-		M.Disable(Label)
+; List provider: Apps shortcut picker (ZWS differentiates from typing sc label).
+_MET_ShortcutAppsRows(Getters) {
+	return [Map(
+		"label",    t(MenuRenderer_I18nDynamic("metrics_menu", "shortcut_apps")) . MS_GetDisplayLabel("apps") . Chr(0x200B),
+		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_apps", Getters),
+		"action",   (*) => _MET_PromptShortcutAndRefresh("apps", KLUI_ToggleApps))]
 }
 
-; Dynamic handler: Apps shortcut picker (ZWS differentiates from typing sc label).
-_MET_ShortcutApps(M, _Cat, Getters) {
-	Label := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("apps") . Chr(0x200B)
-	RegisterMenuItem(M, Label, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "shortcut_apps", Getters)
-		M.Disable(Label)
-}
 
-; Dynamic handler: Filter private browsing toggle.
-_MET_FilterPrivate(M, _Cat, Getters) {
-	Label := t("menu.metrics.filter_private")
-	RegisterMenuItem(M, Label, ToggleFilterPrivate)
-	if MetricsFilters.private_browsing
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_private", Getters)
-		M.Disable(Label)
-}
 
-; Dynamic handler: Filter secure field toggle.
-_MET_FilterSecure(M, _Cat, Getters) {
-	Label := t("menu.metrics.filter_secure")
-	RegisterMenuItem(M, Label, ToggleFilterSecureField)
-	if MetricsFilters.secure_field
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_secure", Getters)
-		M.Disable(Label)
-}
 
-; Dynamic handler: Filter system auth toggle.
-_MET_FilterSysauth(M, _Cat, Getters) {
-	Label := t("menu.metrics.filter_sysauth")
-	RegisterMenuItem(M, Label, ToggleFilterSystemAuth)
-	if MetricsFilters.system_auth
-		M.Check(Label)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "filter_sysauth", Getters)
-		M.Disable(Label)
-}
-
-; Dynamic handler: App exclusion — label reflects current count.
-_MET_ExcludeApps(M, _Cat, Getters) {
+; List provider: App exclusion — label reflects current count.
+_MET_ExcludeAppsRows(Getters) {
 	n := MF_DisabledCount()
-	Label := (n > 0)
-		? StrReplace(StrReplace(t("menu.metrics.disabled_in_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
-		: t("menu.metrics.exclude_apps")
-	RegisterMenuItem(M, Label, OpenMetricsAppPicker)
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "exclude_apps", Getters)
-		M.Disable(Label)
+	return [Map(
+		"label", (n > 0)
+			? StrReplace(StrReplace(t("menu.metrics.disabled_in_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
+			: t("menu.metrics.exclude_apps"),
+		"disabled", MenuRenderer_ResolveDisabledWhen("metrics_menu", "exclude_apps", Getters),
+		"action",   OpenMetricsAppPicker)]
 }
 
 ; Dynamic handler: WPM floating widget toggle.
@@ -170,14 +172,6 @@ _MET_WpmWidgetGraph(M, _Cat, Getters) {
 	if WPMWidget.visible && WPMWidget.show_graph
 		M.Check(Label)
 	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "include_realtime", Getters)
-		M.Disable(Label)
-}
-
-; Dynamic handler: Reset WPM widget position.
-_MET_WpmWidgetReset(M, _Cat, Getters) {
-	Label := t("menu.metrics.reset_wpm_position")
-	RegisterMenuItem(M, Label, (*) => WPMWidget_ResetPosition())
-	if MenuRenderer_ResolveDisabledWhen("metrics_menu", "reset_wpm_position", Getters)
 		M.Disable(Label)
 }
 

@@ -17,11 +17,11 @@ local helpers = require("tests.helpers")
 
 
 
--- ==========================================================================
+-- =========================================================================
 -- =========================================================================
 -- ======= 1/ Malformed JSON does not abort require (llm-api-net-07) =======
 -- =========================================================================
--- ==========================================================================
+-- =========================================================================
 
 helpers.describe("api_remote — malformed api_providers.json does not crash require", function()
 
@@ -33,7 +33,7 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 			fh:write(json_content)
 			fh:close()
 		end
-		package.loaded["lib.paths"] = {
+		package.loaded["infra.paths"] = {
 			shared = function(rel) return helpers.shared(rel) end,
 			shared_root = function() return helpers.shared() end,
 			shared_llm_path = function(name)
@@ -99,7 +99,7 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 
 	helpers.it("still loads normally when JSON is valid", function()
 		-- Reset to the real shared path (test helpers default)
-		package.loaded["lib.paths"] = {
+		package.loaded["infra.paths"] = {
 			shared = function(rel) return helpers.shared(rel) end,
 			shared_root = function() return helpers.shared() end,
 			shared_llm_path = function(name)

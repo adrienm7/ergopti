@@ -8,15 +8,16 @@
 
 #Requires AutoHotkey v2.0
 
-_TNV_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+; Scans the whole ui/menu/menu_llm/ directory instead of one hardcoded file. All
+; three assertions are PRESENCE checks, so widening the scope cannot weaken one —
+; and _DriverDirConcat throws when the directory moves, instead of dying with an
+; unreadable-path error that says nothing about the invariant at stake.
+_TNV_ReadSource() {
+	return _DriverDirConcat("ui/menu/menu_llm")
 }
 
 _TNV_Check() {
-	Src := _TNV_ReadSource("ui/menu/menu_llm/tab_accept.ahk")
-	Assert(Src != "", "Source file tab_accept.ahk must exist")
+	Src := _TNV_ReadSource()
 	Assert(InStr(Src, "LLM_Menu_BindNavHotkeys") > 0, "tab_accept.ahk must bind nav hotkeys dynamically")
 	Assert(InStr(Src, "nav_modifiers") > 0, "tab_accept.ahk must read nav_modifiers")
 	Assert(InStr(Src, "val_modifiers") > 0, "tab_accept.ahk must read val_modifiers")

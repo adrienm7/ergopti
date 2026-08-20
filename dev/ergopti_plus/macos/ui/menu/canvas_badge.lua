@@ -13,8 +13,8 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("lib.logger")
-local i18n   = require("lib.i18n")
+local Logger = require("infra.logger")
+local i18n   = require("infra.i18n")
 local LOG    = "canvas_badge"
 
 

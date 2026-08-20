@@ -19,6 +19,11 @@
 
 local helpers = require("tests.helpers")
 
+package.loaded["platform.remap.lease_controller"] = {
+	status = function() return "active", { phase = "active" } end,
+	stop = function() return true end,
+}
+
 -- Menu titles are produced by string.format(i18n.get(key), delay); the test i18n
 -- stub echoes the key back and neither key carries a format specifier, so the
 -- rendered title is the bare key — that is how the two items are located below.
@@ -98,11 +103,29 @@ end
 --- @param item table The built Karabiner menu item.
 --- @param title string Title to match exactly.
 --- @return table|nil The matching submenu entry.
-local function find_item(item, title)
-	for _, entry in ipairs(item.menu or {}) do
-		if entry.title == title then return entry end
+--- Finds a row by its label, in either dialect.
+---
+--- This menu's rows became provider DATA on 2026-08-07 — `label` / `action`
+--- instead of `title` / `fn` — so the renderer materialises them rather than
+--- receiving a finished tree. What this test pins is unchanged: the delay rows
+--- exist and committing one regenerates karabiner.json. Reading both spellings
+--- keeps it pinned through the conversion instead of pinning the spelling.
+--- @param item table The built menu entry.
+--- @param label string The row label to find.
+--- @return table|nil
+local function find_item(item, label)
+	for _, entry in ipairs(item.menu or item.items or {}) do
+		if entry.title == label or entry.label == label then return entry end
 	end
 	return nil
+end
+
+--- The callback a row carries, in either dialect.
+--- @param row table
+--- @return function|nil
+local function row_action(row)
+	if type(row) ~= "table" then return nil end
+	return row.fn or row.action
 end
 
 --- Builds the Karabiner menu with a fresh double and an AppleScript stub that
@@ -110,7 +133,7 @@ end
 --- @return table menu_item, table karabiner_double
 local function build_menu()
 	local karabiner = make_karabiner()
-	local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_karabiner", {
+	local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
 		osascript = {
 			applescript = function(_script)
 				return true, { ["text returned"] = TYPED_DELAY_MS }
@@ -136,9 +159,9 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		local item, karabiner = build_menu()
 		local delay_item = find_item(item, TAP_HOLD_ITEM_TITLE)
 		helpers.assert_not_nil(delay_item, "the tap/hold delay item must exist in the submenu")
-		helpers.assert_type(delay_item.fn, "function")
+		helpers.assert_type(row_action(delay_item), "function")
 
-		delay_item.fn()
+		row_action(delay_item)()
 
 		helpers.assert_eq(karabiner._calls.set_tap_hold, 1, "the setter must run")
 		helpers.assert_true(karabiner._calls.regenerate >= 1,
@@ -156,9 +179,9 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		local item, karabiner = build_menu()
 		local sticky_item = find_item(item, STICKY_ITEM_TITLE)
 		helpers.assert_not_nil(sticky_item, "the sticky delay item must exist in the submenu")
-		helpers.assert_type(sticky_item.fn, "function")
+		helpers.assert_type(row_action(sticky_item), "function")
 
-		sticky_item.fn()
+		row_action(sticky_item)()
 
 		helpers.assert_eq(karabiner._calls.set_sticky, 1, "the setter must run")
 		helpers.assert_true(karabiner._calls.regenerate >= 1,
@@ -170,7 +193,7 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 	-- a no-op write would rewrite the file on every dismissed prompt.
 	helpers.it("does not regenerate when the user cancels the dialog", function()
 		local karabiner = make_karabiner()
-		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_karabiner", {
+		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
 			osascript = { applescript = function(_script) return false, nil end },
 		})
 		local item = menu_karabiner.build({ karabiner = karabiner, updateMenu = function() end })

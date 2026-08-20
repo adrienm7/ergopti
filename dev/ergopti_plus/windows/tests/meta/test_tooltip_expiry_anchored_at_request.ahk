@@ -19,8 +19,8 @@
 ; the user saw the suggestion, pressed the magic key inside the dead interval,
 ; and nothing at all was emitted. No exception, no log line, nothing to see.
 ;
-; ROOT CAUSE ENCODED: an absolute deadline must be anchored on the event the
-; other side of the contract anchors on, never on "now, once the work is done".
+; ROOT CAUSE ENCODED: the wrap-safe origin/duration pair must be anchored on the
+; event the other side of the contract anchors on, never on "now, once the work is done".
 ; Raising the decrement is NOT a fix — it is a shared cross-driver constant, and
 ; a fixed number cannot cover a variable render cost.
 ;
@@ -45,14 +45,16 @@
 _TEAR_TheRequestIsStamped() {
 	Show := _DriverFuncBody("TooltipShow")
 	Assert(Show != "", "TooltipShow() must exist in the driver source")
-	Assert(InStr(Show, "_TooltipPendingOriginMs := A_TickCount") > 0,
+	Assert(InStr(Show, "OriginMs: A_TickCount") > 0
+		and InStr(Show, "_TooltipPendingRequest := Request") > 0,
 		"TooltipShow must stamp the tick at which the render was REQUESTED. Everything after that line — the render debounce, the Gui build, the UIA resolve — is latency the row deadline must not be pushed back by, because the engine's time-activation window keeps running throughout")
 
 	Deferred := _DriverFuncBody("_TooltipDeferredShowFn")
 	Assert(Deferred != "", "_TooltipDeferredShowFn() must exist in the driver source")
-	Assert(InStr(Deferred, "_TooltipPendingOriginMs") > 0,
-		"_TooltipDeferredShowFn must read the stamped origin back — the render is deferred, so the value has to survive the debounce boundary")
-	Assert(RegExMatch(Deferred, "_TooltipShowNow\([^\r\n]*OriginMs") > 0,
+	Assert(InStr(Deferred, "Request.OriginMs") > 0,
+		"_TooltipDeferredShowFn must read the stamped origin from the exact tuple it atomically detached")
+	Assert(RegExMatch(Deferred,
+		"s)_TooltipShowNow\(.*?Request\.OriginMs") > 0,
 		"_TooltipDeferredShowFn must forward the origin to _TooltipShowNow, or the stamp is dead state")
 }
 
@@ -71,22 +73,39 @@ _TEAR_TheRequestIsStamped() {
 ; present time. Both are asserted, in both directions.
 _TEAR_BothBranchesAnchorOnTheOrigin() {
 	Body := _DriverFuncBody("_TooltipShowNow")
+	Plan := _DriverFuncBody("_TooltipCreateLifecyclePlan")
+	Bounds := _DriverFuncBody("_TooltipLifecycleDeadlineBounds")
+	Present := _DriverFuncBody("_TooltipPresentStack")
 	Assert(Body != "", "_TooltipShowNow() must exist in the driver source")
+	Assert(Plan != "" and Bounds != "" and Present != "",
+		"the lifecycle plan, deadline resolver and common presenter must exist")
 	Assert(InStr(Body, "OriginMs") > 0,
 		"_TooltipShowNow must accept and use the request origin")
+	Assert(InStr(Body, "if !IsSet(OriginMs)") > 0
+		and InStr(Body, "OriginMs > 0") == 0,
+		"tick zero is a valid request origin at rollover and must not be mistaken for an omitted origin")
 
-	; Dequeue path: the per-row absolute deadline.
-	Assert(InStr(Body, "ExpMs := OriginMs + Round(") > 0,
-		"the per-row dequeue deadline must be computed from the request origin the engine's time gate also reads")
-	Assert(InStr(Body, "ExpMs := Now + Round(") == 0,
+	; Both the per-row and single-timer branches produce immutable wrap-safe
+	; origin/duration pairs before GUI/UIA work.
+	Assert(InStr(Body, "_TooltipCreateLifecyclePlan(") > 0
+		and InStr(Plan, "ExpOriginTick := OriginMs") > 0
+		and InStr(Plan, "ExpireOriginTick: OriginMs") > 0,
+		"the per-row dequeue interval must preserve the request origin the engine's time gate also reads")
+	Assert(InStr(Plan, "ExpOriginTick := Now") == 0,
 		"the per-row dequeue deadline must not be recomputed from present time — present time is the request plus both debounces plus the render, so the row outlives the expansion window it is previewing")
 
-	; Single-timer path: the period must be what is LEFT of the deadline, not the
-	; whole duration measured again from the moment the render happened to finish.
-	Assert(RegExMatch(Body, "SetTimer\(_TooltipTimerFn, -Round\(Effective \* 1000\)\)") == 0,
-		"the single-timer path must not arm the full duration from present time — that restarts the clock after the debounce and the render, which is exactly the drift this fix removes")
-	Assert(RegExMatch(Body, "SetTimer\(_TooltipTimerFn, -Max\([^\r\n]*ExpMs - A_TickCount\)") > 0,
-		"the single-timer path must arm the REMAINDER of an absolute deadline, with a positive floor — a non-positive SetTimer period is read as -disable-, which would leave the surface with no auto-hide at all")
+	; No remainder is allowed to cross an interruptible call. The common presenter
+	; resolves it under the same Critical fence that publishes the timer + pixels.
+	Assert(InStr(Bounds, "TickRemaining(") > 0,
+		"the timer period must be the current wrap-safe remainder of the original interval")
+	CriticalOn := InStr(Present, 'Critical("On")')
+	Resolve := InStr(Present, "_TooltipLifecycleDeadlineBounds(", true,
+		CriticalOn)
+	Timer := InStr(Present, "SetTimer(_TooltipTimerFn", true, Resolve)
+	Reveal := InStr(Present, "_TooltipRevealPreparedSurfaces(", true, Timer)
+	Assert(CriticalOn > 0 and Resolve > CriticalOn and Timer > Resolve
+		and Reveal > Timer,
+		"the deadline remainder must be recomputed and armed atomically before its pixels become visible")
 }
 
 

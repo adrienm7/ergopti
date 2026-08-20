@@ -22,7 +22,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "keymap.registry"
 
@@ -55,13 +55,128 @@ local REQUIRED_CALLBACKS = {
 	"rebuild_lookup", "rebuild_tail_indexes", "drop_classify_cache",
 }
 
+--- Copies one array without cloning the mapping objects it owns.
+--- Reloads replace a group's mapping objects; mappings owned by other groups are
+--- immutable during the transaction and must retain their identity on rollback.
+--- @param source table
+--- @return table
+local function copy_array(source)
+	local out = {}
+	for i, value in ipairs(source or {}) do out[i] = value end
+	return out
+end
+
+--- Copies a map one level deep.
+--- @param source table
+--- @return table
+local function copy_map(source)
+	local out = {}
+	for key, value in pairs(source or {}) do out[key] = value end
+	return out
+end
+
+--- Copies group records while retaining their immutable section descriptors.
+--- @param source table
+--- @return table
+local function copy_groups(source)
+	local out = {}
+	for name, group in pairs(source or {}) do
+		out[name] = copy_map(group)
+	end
+	return out
+end
+
+--- Captures every registry field a loader or lifecycle hook may mutate.
+--- @return table
+local function snapshot_registry()
+	local mapping_values = {}
+	for _, mapping in ipairs(_state.mappings or {}) do
+		mapping_values[mapping] = copy_map(mapping)
+	end
+	return {
+		mappings                   = copy_array(_state.mappings),
+		mapping_values             = mapping_values,
+		groups                     = copy_groups(_state.groups),
+		group_post_load_hooks      = copy_map(_state.group_post_load_hooks),
+		section_delays             = copy_map(_state.SECTION_DELAYS),
+		seq_counter                = _state.seq_counter,
+		group_order_counter        = _state.group_order_counter,
+		current_group              = _state.current_group,
+		word_timeout               = _state.WORD_TIMEOUT_SEC,
+	}
+end
+
+--- Restores a registry snapshot after a failed transaction.
+--- @param snapshot table
+local function restore_registry(snapshot)
+	-- A direct loader can refresh an existing entry in place before a later
+	-- entry throws. Restore those table values before reattaching the old indexes,
+	-- because every index intentionally points at the same mapping objects.
+	for mapping, values in pairs(snapshot.mapping_values) do
+		for key in pairs(mapping) do mapping[key] = nil end
+		for key, value in pairs(values) do mapping[key] = value end
+	end
+	_state.mappings                   = snapshot.mappings
+	_state.groups                     = snapshot.groups
+	_state.group_post_load_hooks      = snapshot.group_post_load_hooks
+	_state.SECTION_DELAYS             = snapshot.section_delays
+	_state.seq_counter                = snapshot.seq_counter
+	_state.group_order_counter        = snapshot.group_order_counter
+	_state.current_group              = snapshot.current_group
+	_state.WORD_TIMEOUT_SEC           = snapshot.word_timeout
+	-- Failed helpers may replace any index table before failing. Rebuild every
+	-- derived structure from the restored corpus instead of retaining aliases to
+	-- tables that the attempted mutation could have modified in place.
+	local lookup_ok, lookup_err = pcall(_callbacks.rebuild_lookup)
+	local tail_ok, tail_err = pcall(_callbacks.rebuild_tail_indexes)
+	if not lookup_ok or not tail_ok then
+		Logger.error(LOG, "Registry rollback could not rebuild indexes: %s / %s.",
+			tostring(lookup_err), tostring(tail_err))
+	end
+	-- A cache cleared by the failed mutation is harmless; a cache populated for
+	-- its temporary corpus is not. Always discard it after restoring the corpus.
+	local ok, err = pcall(_callbacks.drop_classify_cache)
+	if not ok then
+		Logger.error(LOG, "Registry rollback could not clear the classification cache: %s.", tostring(err))
+	end
+end
+
+--- Executes one all-or-nothing registry mutation.
+--- The callback must return exact true; nil is a refusal, never implicit success.
+--- @param label string
+--- @param mutation function
+--- @return boolean committed
+local function run_transaction(label, mutation)
+	local snapshot = snapshot_registry()
+	local ok, committed = xpcall(mutation, debug.traceback)
+	if ok and committed == true then return true end
+	restore_registry(snapshot)
+	Logger.error(LOG, "Registry mutation '%s' rolled back "
+		.. "(details withheld; terminal type: %s).", tostring(label), type(committed))
+	return false
+end
+
 --- Injects the shared state and the registry's callback table.
 --- @param state table The shared CoreState.
 --- @param callbacks table Must provide every name in REQUIRED_CALLBACKS.
+--- @return boolean committed True only when the requested dependencies are active.
 function M.init(state, callbacks)
-	_state     = state
-	_callbacks = callbacks
-
+	if _state then
+		local same_dependencies = state == _state and type(callbacks) == "table"
+		for _, name in ipairs(REQUIRED_CALLBACKS) do
+			same_dependencies = same_dependencies and callbacks[name] == _callbacks[name]
+		end
+		if same_dependencies then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
+	end
+	if type(state) ~= "table" then
+		Logger.error(LOG, "M.init(): state must be a table — initialization refused.")
+		return false
+	end
 	local missing = {}
 	for _, name in ipairs(REQUIRED_CALLBACKS) do
 		if type(callbacks) ~= "table" or type(callbacks[name]) ~= "function" then
@@ -69,10 +184,27 @@ function M.init(state, callbacks)
 		end
 	end
 	if #missing > 0 then
-		Logger.error(LOG, "M.init(): missing callback(s) %s — group operations will be "
-			.. "incomplete and their callers pcall the throw away.",
+		Logger.error(LOG, "M.init(): missing callback(s) %s — initialization refused.",
 			table.concat(missing, ", "))
+		return false
 	end
+	_state     = state
+	_callbacks = callbacks
+	return true
+end
+
+--- Runs a multi-step mutation against one shared registry snapshot.
+--- Used by section batches so settings and every affected group commit together.
+--- @param label string
+--- @param mutation function
+--- @return boolean committed
+function M.transaction(label, mutation)
+	if not require_state("transaction") then return false end
+	if type(mutation) ~= "function" then
+		Logger.error(LOG, "transaction: mutation must be a function.")
+		return false
+	end
+	return run_transaction(label, mutation)
 end
 
 
@@ -135,30 +267,31 @@ end
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the Lua hotstring file.
 function M.load_file(name, path)
-	if not require_state("load_file") then return end
+	if not require_state("load_file") then return false end
 	if type(name) ~= "string" or name == "" then
-		Logger.error(LOG, "load_file: name must be a non-empty string."); return
+		Logger.error(LOG, "load_file: name must be a non-empty string."); return false
 	end
 	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "load_file: path must be a non-empty string."); return
+		Logger.error(LOG, "load_file: path must be a non-empty string."); return false
 	end
 
-	Logger.start(LOG, "Loading Lua mapping file '%s'…", name)
-	ensure_group_order(name)
-	_state.current_group = name
+	return run_transaction("load_file:" .. name, function()
+		Logger.start(LOG, "Loading Lua mapping file '%s'…", name)
+		ensure_group_order(name)
+		_state.current_group = name
 
-	local ok, err = pcall(dofile, path)
-	if not ok then
-		Logger.error(LOG, "Error loading '%s': %s.", path, tostring(err))
-	end
+		local ok, err = pcall(dofile, path)
+		if not ok then
+			Logger.error(LOG, "Error loading '%s': %s.", path, tostring(err))
+			return false
+		end
 
-	_state.current_group = nil
-	record_group(name, path, "lua")
-	_callbacks.sort_mappings()
-
-	if ok then
+		_state.current_group = nil
+		record_group(name, path, "lua")
+		_callbacks.sort_mappings()
 		Logger.success(LOG, "Lua mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
-	end
+		return true
+	end)
 end
 
 --- Loads and parses mappings from a TOML configuration file.
@@ -167,22 +300,23 @@ end
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
 function M.load_toml(name, path)
-	if not require_state("load_toml") then return end
+	if not require_state("load_toml") then return false end
 	if type(name) ~= "string" or name == "" then
-		Logger.error(LOG, "load_toml: name must be a non-empty string."); return
+		Logger.error(LOG, "load_toml: name must be a non-empty string."); return false
 	end
 	if type(path) ~= "string" or path == "" then
-		Logger.error(LOG, "load_toml: path must be a non-empty string."); return
+		Logger.error(LOG, "load_toml: path must be a non-empty string."); return false
 	end
 
-	Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
+	return run_transaction("load_toml:" .. name, function()
+		Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
 
-	local toml_reader  = require("lib.toml.reader")
-	local ok, data     = pcall(toml_reader.parse, path)
-	if not ok or type(data) ~= "table" then
-		Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))
-		return
-	end
+		local toml_reader       = require("infra.toml.reader")
+		local ok, data, committed = pcall(toml_reader.parse, path)
+		if not ok or type(data) ~= "table" or committed ~= true then
+			Logger.error(LOG, "Failed to parse TOML '%s': %s.", path, tostring(data))
+			return false
+		end
 
 	ensure_group_order(name)
 	-- Snapshot before registering so the success line can report what THIS file
@@ -254,6 +388,10 @@ function M.load_toml(name, path)
 							is_word           = v.is_word,
 							auto_expand       = v.auto_expand,
 							is_case_sensitive = v.is_case_sensitive,
+							-- Selects EXACT matching, where is_case_sensitive above only
+							-- selects literal registration. Omitting it here left the
+							-- registry unable to tell the two apart.
+							is_case_sensitive_strict = v.is_case_sensitive_strict,
 							final_result      = v.final_result,
 							priority          = v.priority,
 						})
@@ -282,6 +420,7 @@ function M.load_toml(name, path)
 					is_word           = entry.is_word,
 					auto_expand       = entry.auto_expand,
 					is_case_sensitive = entry.is_case_sensitive,
+					is_case_sensitive_strict = entry.is_case_sensitive_strict,
 					final_result      = entry.final_result,
 					section           = sec_name,
 					priority          = _callbacks.resolve_priority(entry.priority, override_priority, nil, name),
@@ -343,17 +482,53 @@ function M.load_toml(name, path)
 		Logger.success(LOG, "TOML mapping file '%s' loaded (%d mapping(s); %d total).",
 			name, added, #_state.mappings)
 	end
+	return true
+	end)
+end
+
+--- Replaces one enabled TOML group against a single registry snapshot.
+--- A failed parser/loader restores the exact previously-live corpus and every
+--- derived index. A group the user deliberately disabled stays disabled; its
+--- on-disk file will be loaded only if the user enables it later.
+--- @param name string Existing group identifier.
+--- @param path string Absolute TOML path.
+--- @return boolean committed
+function M.reload_toml(name, path)
+	if not require_state("reload_toml") then return false end
+	if type(name) ~= "string" or name == "" then
+		Logger.error(LOG, "reload_toml: name must be a non-empty string.")
+		return false
+	end
+	if type(path) ~= "string" or path == "" then
+		Logger.error(LOG, "reload_toml: path must be a non-empty string.")
+		return false
+	end
+
+	return run_transaction("reload_toml:" .. name, function()
+		local group = _state.groups[name]
+		if not group then
+			Logger.error(LOG, "reload_toml: unknown group '%s'.", name)
+			return false
+		end
+		if group.enabled ~= true then
+			group.path = path
+			group.kind = "toml"
+			return true
+		end
+		if M.disable_group(name) ~= true then return false end
+		return M.load_toml(name, path) == true
+	end)
 end
 
 
 
 
 
--- ==============================================
+-- =============================================
 -- =============================================
 -- ======= 2/ Group Lifecycle Management =======
 -- =============================================
--- ==============================================
+-- =============================================
 
 --- Manually sets the current group context used by M.add() to tag new entries.
 --- Must be reset to nil after the relevant block of M.add() calls. When a
@@ -382,34 +557,41 @@ end
 --- No-op when the group is already disabled or unknown.
 --- @param name string Group identifier.
 function M.disable_group(name)
-	if not require_state("disable_group") then return end
+	if not require_state("disable_group") then return false end
 	local g = _state.groups[name]
-	if not g or not g.enabled then return end
-
-	g.enabled = false
-
-	-- Purge all mappings belonging to this group from the live list.
-	-- Programmatic groups (g.path == nil, e.g. "dynamichotstrings") must be
-	-- purged too — their mappings are re-created by enable_group's post-load
-	-- hook, so leaving them here would fire disabled hotstrings indefinitely.
-	-- rebuild_tail_indexes() is required after the purge so the O(1) buckets
-	-- used by the hot-path (mappings_by_tail_char) no longer point at the
-	-- removed entries; previously only rebuild_lookup() was called, leaving
-	-- stale bucket pointers that caused disabled hotstrings to still trigger.
-	local kept = {}
-	for _, m in ipairs(_state.mappings) do
-		if m.group ~= name then table.insert(kept, m) end
+	if not g then
+		Logger.warn(LOG, "disable_group: unknown group '%s'.", tostring(name))
+		return false
 	end
-	_state.mappings = kept
-	_callbacks.rebuild_lookup()
-	_callbacks.rebuild_tail_indexes()
-	-- The third structure this purge invalidates. The classify_trigger memo is a
-	-- pure function of (string, corpus), and the corpus just shrank; sort_mappings
-	-- is the only other place it is dropped and this path deliberately does not
-	-- sort. Without this the disabled group's triggers keep classifying as present.
-	_callbacks.drop_classify_cache()
+	if not g.enabled then return true end
 
-	Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
+	return run_transaction("disable_group:" .. tostring(name), function()
+		g.enabled = false
+
+		-- Purge all mappings belonging to this group from the live list.
+		-- Programmatic groups (g.path == nil, e.g. "dynamichotstrings") must be
+		-- purged too — their mappings are re-created by enable_group's post-load
+		-- hook, so leaving them here would fire disabled hotstrings indefinitely.
+		-- rebuild_tail_indexes() is required after the purge so the O(1) buckets
+		-- used by the hot-path (mappings_by_tail_char) no longer point at the
+		-- removed entries; previously only rebuild_lookup() was called, leaving
+		-- stale bucket pointers that caused disabled hotstrings to still trigger.
+		local kept = {}
+		for _, mapping in ipairs(_state.mappings) do
+			if mapping.group ~= name then table.insert(kept, mapping) end
+		end
+		_state.mappings = kept
+		_callbacks.rebuild_lookup()
+		_callbacks.rebuild_tail_indexes()
+		-- The third structure this purge invalidates. The classify_trigger memo is a
+		-- pure function of (string, corpus), and the corpus just shrank; sort_mappings
+		-- is the only other place it is dropped and this path deliberately does not
+		-- sort. Without this the disabled group's triggers keep classifying as present.
+		_callbacks.drop_classify_cache()
+
+		Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
+		return true
+	end)
 end
 
 --- Returns true when the named group exists and is currently enabled.
@@ -452,34 +634,39 @@ end
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.
 function M.enable_group(name)
-	if not require_state("enable_group") then return end
+	if not require_state("enable_group") then return false end
 	local g = _state.groups[name]
 	if not g then
 		Logger.warn(LOG, "enable_group: unknown group '%s'.", tostring(name))
-		return
+		return false
 	end
-	if g.enabled then return end
+	if g.enabled then return true end
 
-	Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", name, g.kind or "?")
+	return run_transaction("enable_group:" .. tostring(name), function()
+		Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", name, g.kind or "?")
 
-	if g.path == nil then
-		-- Programmatic group: mark enabled and run the post-load hook if any.
-		g.enabled = true
+		if g.path == nil then
+			-- Programmatic group: mark enabled and run the post-load hook if any.
+			g.enabled = true
+			local hook = _state.group_post_load_hooks[name]
+			if type(hook) == "function" then hook() end
+			_callbacks.sort_mappings()
+			return true
+		end
+
+		local loaded
+		if g.kind == "toml" then
+			loaded = M.load_toml(name, g.path)
+		else
+			loaded = M.load_file(name, g.path)
+		end
+		if loaded ~= true then return false end
+
 		local hook = _state.group_post_load_hooks[name]
 		if type(hook) == "function" then hook() end
 		_callbacks.sort_mappings()
-		return
-	end
-
-	if g.kind == "toml" then
-		M.load_toml(name, g.path)
-	else
-		M.load_file(name, g.path)
-	end
-
-	local hook = _state.group_post_load_hooks[name]
-	if type(hook) == "function" then hook() end
-	_callbacks.sort_mappings()
+		return true
+	end)
 end
 
 return M

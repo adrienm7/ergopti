@@ -1,0 +1,109 @@
+# _shared/modules/personal_info/fields.toml
+#
+# Which personal_info.toml fields are secrets, and how much of one may appear on
+# screen before it is typed. Read at runtime by every driver; see README.md for
+# the reasoning and for what this file is NOT.
+#
+# EVERY field of personal_info.toml is listed, including the ones that are not
+# masked. Absence must never mean "not a secret": a field missing here and a
+# field misspelled in one driver's list look identical, and the second silently
+# reveals the value. So `masked` is written out both ways.
+
+[policy]
+# The character a hidden position is drawn as. U+2022 BULLET, the same glyph the
+# metrics store already substitutes for a private keystroke, so a user who sees
+# both recognises one convention rather than two.
+mask_char = "•"
+
+# How many characters stay visible at each end of a masked value.
+#
+# The tail is what a user checks: the last four digits are how a bank, a card
+# issuer and a phone company all ask you to identify an account, and the point of
+# the bubble is to confirm WHICH of your values is about to be typed. The head is
+# smaller and exists so the value is still recognisable as an IBAN rather than a
+# row of dots — "FR" tells you the country, and two characters cannot identify an
+# account.
+reveal_head = 2
+reveal_tail = 4
+
+# Below this length nothing is revealed at all. A value of eight characters
+# masked with head 2 and tail 4 shows six of them, which is not a mask. BIC codes
+# are exactly eight, which is why this bound is not theoretical.
+min_length_to_reveal = 12
+
+# Spaces are decoration in an IBAN, a card number and a French SSN, and they are
+# preserved rather than masked: they carry no information, and masking them turns
+# a recognisable grouping into an unreadable run of dots.
+preserve_separators = true
+
+
+
+
+# ==============================================================================
+# The fields
+# ==============================================================================
+#
+# `masked = true`  — a financial or identity secret. Partially hidden in the
+#                    preview bubble; typed in full, always.
+# `masked = false` — shown in the bubble as it will be typed.
+#
+# The distinction is NOT "is this personal data". Every field here is personal.
+# It is "does seeing this on screen, over a shoulder or in a screen share, hand
+# someone something they can use". A first name does not; an IBAN does.
+
+[fields.iban]
+masked = true
+
+[fields.bic]
+# Eight or eleven characters, so min_length_to_reveal usually hides it entirely.
+# That is the right outcome: a BIC is short enough that a partial reveal is most
+# of it.
+masked = true
+
+[fields.credit_card]
+masked = true
+
+[fields.social_security_number]
+masked = true
+
+[fields.phone_number]
+# NOT masked, by the maintainer's decision on 2026-08-05. A phone number is
+# routinely read aloud, printed on cards and given to strangers; hiding it in the
+# user's own preview costs confirmation and buys nothing.
+masked = false
+
+[fields.phone_number_clean]
+# The same number with grouping spaces. It follows its sibling, and the two are
+# listed separately rather than pattern-matched because a rule keyed on a name
+# prefix would silently capture a future `phone_number_work` nobody classified.
+masked = false
+
+[fields.date_of_birth]
+# Not masked. It is an identity element, but the bubble shows it because a date
+# is not a credential on its own and the user is about to type it into the very
+# form that asked for it.
+masked = false
+
+[fields.first_name]
+masked = false
+
+[fields.last_name]
+masked = false
+
+[fields.email_address]
+masked = false
+
+[fields.work_email_address]
+masked = false
+
+[fields.street_address]
+masked = false
+
+[fields.postal_code]
+masked = false
+
+[fields.city]
+masked = false
+
+[fields.country]
+masked = false

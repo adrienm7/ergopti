@@ -19,24 +19,6 @@
 ; The full expansion pipeline (emit dispatch, LLM bridge) is exercised by
 ; test_hotstrings_full.ahk. This file focuses on pure matching and arithmetic
 
-; ULTIMATE encore plus: pause + delay precedence + volume vectors in corpus.
-; These would have caught silent hotstring activation under pause or wrong delay timing.
-
-TestCorpusHotstrings_PauseMustNotActivateAnyVector() {
-	; All corpus vectors (triggers, backspace counts, terminators) must be safe to load/eval
-	; under pause; actual matching + expansion is gated in the engine/prefix watcher.
-	; project_suspend_pause_invariant + project-hotstring-delay-architecture.
-	AssertTrue(true, "hotstring corpus must be pause-resilient (no activation, correct arithmetic even under pause)")
-}
-Test("Corpus hotstrings: pause must not activate any vector (dispatchers gate)", TestCorpusHotstrings_PauseMustNotActivateAnyVector)
-
-TestCorpusHotstrings_DelayPrecedenceInVectors() {
-	; Corpus + engine must respect section > group > default for any time_activation.
-	; This documents the regression guard for the DYN_* early-load and per-section override bugs.
-	AssertTrue(true, "corpus hotstrings must preserve delay precedence invariants")
-}
-Test("Corpus hotstrings: delay precedence regression guard (section>group>default)", TestCorpusHotstrings_DelayPrecedenceInVectors)
-
 ; invariants shared with the Hammerspoon driver.
 ; ==============================================================================
 
@@ -58,20 +40,23 @@ _CorpusHS_Root() {
 	return A_ScriptDir . "\..\..\_shared\tests\corpus\hotstrings\vectors.json"
 }
 
+; THROWS when the corpus is missing or malformed. It used to return "", and
+; every consumer below opened with `if Corpus = "" { return }` — so moving or
+; breaking the corpus produced ONE red (the readability test) and EIGHT silent
+; greens. A cross-driver contract that can be deleted without the suite noticing
+; is not a contract.
 _CorpusHS_Load() {
 	Path := _CorpusHS_Root()
-	if not FileExist(Path) {
-		return ""
-	}
+	if not FileExist(Path)
+		throw Error("hotstring corpus not found at '" . Path . "' — the shared vectors are a cross-driver contract; a missing corpus must fail this suite, never skip it")
 	return FileRead(Path, "UTF-8")
 }
 
 _CorpusHS_Parse() {
-	Raw := _CorpusHS_Load()
-	if Raw = "" {
-		return ""
-	}
-	return JsonParse(Raw)
+	Corpus := JsonParse(_CorpusHS_Load())
+	if (Corpus = "")
+		throw Error("hotstring corpus at '" . _CorpusHS_Root() . "' did not parse into an object — a malformed corpus must fail this suite, never skip it")
+	return Corpus
 }
 
 
@@ -84,10 +69,10 @@ _CorpusHS_Parse() {
 ; ============================================
 
 _CorpusHS_FileIsReadableAndParseable() {
-	Raw := _CorpusHS_Load()
-	AssertTrue(Raw != "", "corpus JSON file must be readable")
+	; Readability and parseability are now enforced by the loader itself, which
+	; throws with the resolved path — asserting them again here would only
+	; restate what already cannot be false.
 	Corpus := _CorpusHS_Parse()
-	AssertTrue(Corpus != "", "corpus JSON must parse without error")
 	AssertTrue(Corpus.Has("vectors"), "corpus must have a vectors key")
 	AssertTrue(Corpus["vectors"].Length > 0, "corpus must contain at least one vector")
 }
@@ -95,9 +80,6 @@ Test("hotstring corpus  --  corpus file is readable and parseable", _CorpusHS_Fi
 
 _CorpusHS_EveryVectorHasRequiredFields() {
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		AssertTrue(Vec.Has("id") and Vec["id"] != "",
 			"vector missing id")
@@ -111,9 +93,6 @@ Test("hotstring corpus  --  every vector has required fields: id, trigger, expec
 
 _CorpusHS_BackspaceCountFormula() {
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = true) {
@@ -144,9 +123,6 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 	; Validates that every matched vector has a buffer that ends with the trigger  -- 
 	; this is required for a real hotstring match to fire in AHK.
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = true) {
@@ -156,8 +132,19 @@ _CorpusHS_TriggerLengthMatchesBuffer() {
 		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
 		BufTail := SubStr(Buf, -TLen)
-		AssertEqual(Trigger, BufTail,
-			"vector '" . Vec["id"] . "': buffer must end with trigger for matched=true")
+		; Compare the way the vector says the trigger is matched. A
+		; case-SENSITIVE vector must end with the trigger exactly; the default
+		; mode folds case, so its buffer legitimately differs — "BTW" matching
+		; "btw" is the fold working, not a malformed vector. Asserting the
+		; sensitive form for both held only while no vector exercised the fold.
+		if (Vec.Has("is_case_sensitive_strict") and Vec["is_case_sensitive_strict"] = true) {
+			AssertEqual(Trigger, BufTail,
+				"vector '" . Vec["id"] . "': strict vector's buffer must end with the trigger exactly")
+		} else {
+			; "=" is AHK's case-insensitive comparison.
+			AssertTrue(BufTail = Trigger,
+				"vector '" . Vec["id"] . "': buffer must end with trigger (case-folded) for matched=true")
+		}
 	}
 }
 Test("hotstring corpus  --  matched vectors: buffer ends with trigger", _CorpusHS_TriggerLengthMatchesBuffer)
@@ -166,9 +153,6 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 	; Validates that unmatched non-word vectors have buffers that do not end
 	; with the trigger (word-boundary blocking is tested elsewhere).
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = false) {
@@ -182,7 +166,34 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 		Buf     := Vec.Has("buffer") ? Vec["buffer"] : ""
 		Trigger := Vec["trigger"]
 		TLen    := StrLen(Trigger)
+		; Skip triggers longer than the rolling window  --  second legitimate
+		; reason a non-matched buffer ends with its trigger, and the one this
+		; enumeration was missing. The buffer holds only the last
+		; HSE_MAX_BUFFER_LEN codepoints, so a longer trigger is never present in
+		; full no matter what the vector's buffer text says. Read from the engine
+		; constant rather than a literal, so raising the cap moves both together.
+		if (TLen > HSE_MAX_BUFFER_LEN) {
+			continue
+		}
 		if Buf = "" {
+			continue
+		}
+		; A non-star trigger legitimately fails to match a buffer that DOES end
+		; with it: without the "*" flag it waits for a terminator, so "ya" must not
+		; fire inside "yaourt". The rule below assumed otherwise, and the
+		; assumption held only because every vector in the corpus was a star
+		; trigger — all 29 of them, until 2026-08-04. That is the same blind spot
+		; that let macOS ship with no gate on the flag at all; the corpus harness
+		; had it too, one layer up.
+		if (Vec.Has("auto_expand") && !Vec["auto_expand"]) {
+			continue
+		}
+		; A no-op mapping — replacement identical to the trigger — is the other
+		; legitimate non-match whose buffer DOES end with its trigger. It must not
+		; fire because firing consumes the triggering keystroke to inject the very
+		; characters it just erased; macOS shipped without that guard once and the
+		; character vanished from the screen.
+		if (Vec.Has("replacement") && Vec["replacement"] == Trigger) {
 			continue
 		}
 		BufTail := SubStr(Buf, -TLen)
@@ -193,6 +204,65 @@ _CorpusHS_NonMatchedBuffersDontEndWithTrigger() {
 }
 Test("hotstring corpus  --  non-matched vectors: buffer does not end with trigger", _CorpusHS_NonMatchedBuffersDontEndWithTrigger)
 
+; These two used to sit at the top of the file as AssertTrue(true, "…") with the
+; invariant written only in the message — and above the corpus load, so they
+; could not have read a vector even if they had wanted to. They are here now,
+; where the corpus exists, and they assert instead of assert nothing.
+
+_CorpusHS_ArithmeticIsIndependentOfSuspendState() {
+	; The corpus is a pure data contract: backspace_count is derived from the
+	; trigger and the terminator, never from runtime state. If any of that
+	; arithmetic ever consulted A_IsSuspended, a hotstring would delete a
+	; different number of characters after a pause than before one — the worst
+	; possible failure, because it silently eats the user's text.
+	for Fn in ["IsTimeActivationExpired", "GenerateUppercaseVariants"] {
+		Body := _DriverFuncBody(Fn)
+		Assert(InStr(Body, "A_IsSuspended") == 0,
+			Fn . "() must not read A_IsSuspended — corpus arithmetic has to hold identically "
+			. "whether or not the driver is paused")
+	}
+
+	; And the vectors themselves must be self-consistent: every matched vector's
+	; backspace_count equals the trigger length, plus one when the terminator is
+	; consumed. Recomputed here rather than trusted.
+	Checked := 0
+	Corpus := _CorpusHS_Parse()
+	for Vec in Corpus["vectors"] {
+		Expected := Vec["expected"]
+		if not (Expected.Has("matched") and Expected["matched"] = true)
+			continue
+		if !Expected.Has("backspace_count")
+			continue
+		Want := StrLen(Vec["trigger"])
+		if (Vec.Has("terminator_consumed") and Vec["terminator_consumed"] = true)
+			Want += 1
+		AssertEqual(Want, Expected["backspace_count"],
+			"vector '" . Vec["id"] . "': backspace_count must be trigger length"
+			. " (+1 when the terminator is consumed)")
+		Checked += 1
+	}
+	Assert(Checked > 0, "no matched vector carried a backspace_count — the corpus shape changed")
+}
+Test("hotstring corpus  --  backspace arithmetic holds, and reads no suspend state",
+	_CorpusHS_ArithmeticIsIndependentOfSuspendState)
+
+_CorpusHS_EveryVectorResolvesADelay() {
+	; Every corpus trigger belongs to a category, and every category must resolve
+	; a delay through the section > file > global cascade. A vector whose category
+	; resolved to an empty delay would expand with no activation window at all.
+	Checked := 0
+	Corpus := _CorpusHS_Parse()
+	for Vec in Corpus["vectors"] {
+		R := HotstringsResolve("rolls", Vec["id"])
+		Assert(R.Delay != "", "vector '" . Vec["id"] . "': resolution must yield a delay, never an empty one")
+		Assert(R.Delay >= 0, "vector '" . Vec["id"] . "': a negative activation delay is not a window")
+		Checked += 1
+	}
+	Assert(Checked > 0, "the corpus produced no vectors — the shared contract file is empty or unreadable")
+}
+Test("hotstring corpus  --  every vector's category resolves a usable delay",
+	_CorpusHS_EveryVectorResolvesADelay)
+
 _CorpusHS_Utf8BackspaceCountUsesCodepoints() {
 	; For UTF-8 triggers the corpus records backspace_count as the codepoint count,
 	; not the byte count. AHK v2 StrLen() counts UTF-16 code units (which collapses
@@ -200,9 +270,6 @@ _CorpusHS_Utf8BackspaceCountUsesCodepoints() {
 	; that StrLen equals the corpus backspace_count for all matched vectors --
 	; catching any future drift if AHK changes its string model.
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	for Vec in Corpus["vectors"] {
 		Expected := Vec["expected"]
 		if not (Expected.Has("matched") and Expected["matched"] = true) {
@@ -222,14 +289,31 @@ _CorpusHS_Utf8BackspaceCountUsesCodepoints() {
 Test("hotstring corpus  --  UTF-8 triggers: StrLen-based backspace_count matches corpus", _CorpusHS_Utf8BackspaceCountUsesCodepoints)
 
 _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
-	; Validates that case_sensitive=true vectors correctly reflect whether the
-	; buffer casing matches the trigger casing.
+	; Validates that strict vectors correctly reflect whether the buffer casing
+	; matches the trigger casing.
+	;
+	; WHAT THIS USED TO ASSERT, AND WHY IT WAS TOO STRONG.
+	; It required `matched == (buffer tail equals trigger, case-sensitively)` in
+	; BOTH directions. The forward direction is sound: a tail that differs in case
+	; can never fire a strict trigger. The reverse is not — casing being satisfied
+	; is one condition among several, and a vector can match on casing and still be
+	; refused by the word boundary or the no-op guard. The check held only because
+	; no strict vector had ever been blocked for a non-casing reason, and the first
+	; one that was made a correct vector look like a corpus error.
+	;
+	; So the reverse direction now demands an EXPLANATION rather than a match: a
+	; strict vector whose casing is satisfied but which expects no match must carry
+	; the rule that refuses it. That is stricter than deleting the direction and
+	; catches the thing the original check was really guarding — a `matched: false`
+	; written by mistake.
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
+	Checked := 0
 	for Vec in Corpus["vectors"] {
-		if not (Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true) {
+		; STRICT is the flag that makes the comparison exact. is_case_sensitive on its
+		; own selects literal registration and still folds, so gating this check on it
+		; asserted an exact match for a vector that legitimately matches "Adn"
+		; against "adn".
+		if not (Vec.Has("is_case_sensitive_strict") and Vec["is_case_sensitive_strict"] = true) {
 			continue
 		}
 		Expected := Vec["expected"]
@@ -238,11 +322,32 @@ _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag() {
 		TLen    := StrLen(Trigger)
 		BufTail := SubStr(Buf, -TLen)
 		; Exact (case-sensitive) match — use == for case-sensitive comparison
-		ActualMatch := (BufTail == Trigger)
-		ExpMatch    := Expected.Has("matched") and Expected["matched"] = true
-		AssertEqual(ExpMatch, ActualMatch,
-			"vector '" . Vec["id"] . "': case-sensitive match flag inconsistency")
+		CasingSatisfied := (BufTail == Trigger)
+		ExpMatch        := Expected.Has("matched") and Expected["matched"] = true
+		Checked++
+
+		if (not CasingSatisfied) {
+			AssertEqual(false, ExpMatch,
+				"vector '" . Vec["id"] . "': the buffer tail does not equal the trigger "
+				. "case-sensitively, so a strict trigger cannot fire whatever else is true")
+			continue
+		}
+
+		if (ExpMatch) {
+			continue
+		}
+
+		IsWord := Vec.Has("is_word") and Vec["is_word"] = true
+		IsNoop := Vec.Has("replacement") and Vec["replacement"] == Trigger
+		AssertTrue(IsWord or IsNoop,
+			"vector '" . Vec["id"] . "': casing is satisfied and it still expects no match, "
+			. "but it declares neither is_word nor a no-op replacement. Nothing else in the "
+			. "matcher can refuse it, so the expectation is unexplained")
 	}
+	; Floor: a filter that selects nothing passes for free.
+	AssertTrue(Checked >= 4,
+		"only " . Checked . " strict vector(s) were inspected — the is_case_sensitive_strict "
+		. "filter is no longer selecting anything and this check means nothing")
 }
 Test("hotstring corpus  --  case-sensitive vectors: exact match flag is consistent", _CorpusHS_CaseSensitiveVectorsHaveCorrectMatchFlag)
 
@@ -267,7 +372,6 @@ Test("hotstring corpus  --  case-sensitive vectors: exact match flag is consiste
 
 _CorpusHS_CollisionVectorsArePresent() {
 	Corpus := _CorpusHS_Parse()
-	AssertTrue(Corpus != "", "corpus must parse")
 	AssertTrue(Corpus.Has("collision_vectors"), "corpus must expose a collision_vectors array")
 	AssertTrue(Corpus["collision_vectors"].Length > 0, "collision_vectors must be non-empty")
 }
@@ -276,17 +380,21 @@ Test("hotstring corpus  --  collision_vectors array is present and non-empty", _
 _CorpusHS_EveryCollisionVectorResolvesToExpectedWinner() {
 	global HSE_PRIORITY_COMMON
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
-	if not Corpus.Has("collision_vectors") {
-		return
-	}
+	AssertTrue(Corpus.Has("collision_vectors"),
+		"corpus must expose collision_vectors — skipping the replay when the key is absent is how the whole tie-break contract stopped being exercised without a single red")
 	for Vec in Corpus["collision_vectors"] {
 		Id := Vec.Has("id") ? Vec["id"] : "?"
 		HSE_TestReset()
 		for Mapping in Vec["mappings"] {
-			Flags := "*?" . ((Mapping.Has("is_case_sensitive") and Mapping["is_case_sensitive"] = true) ? "C" : "")
+			; Flags are derived from the mapping, not hardcoded. This read "*?" for
+			; every mapping, and "?" means NO word boundary — so a collision
+			; vector's is_word was silently discarded here and every mapping was
+			; registered unbounded. The first vector to use is_word as a
+			; discriminator resolved to the wrong winner on Windows alone, which
+			; looked like an engine divergence and was this line.
+			IsWordM := Mapping.Has("is_word") and Mapping["is_word"] = true
+			Flags := "*" . (IsWordM ? "" : "?")
+				. ((Mapping.Has("is_case_sensitive") and Mapping["is_case_sensitive"] = true) ? "C" : "")
 			Grp   := Mapping.Has("group")       ? Mapping["group"]       : "g"
 			Prio  := Mapping.Has("priority")    ? Mapping["priority"]    : HSE_PRIORITY_COMMON
 			Repl  := Mapping.Has("replacement") ? Mapping["replacement"] : ""
@@ -337,9 +445,6 @@ Test("hotstring corpus  --  every collision vector resolves to the expected winn
 
 _CorpusHS_EveryVectorReplayedThroughEngine() {
 	Corpus := _CorpusHS_Parse()
-	if Corpus = "" {
-		return
-	}
 	Failures := 0
 	Total    := 0
 	for Vec in Corpus["vectors"] {
@@ -347,18 +452,28 @@ _CorpusHS_EveryVectorReplayedThroughEngine() {
 		Id := Vec.Has("id") ? Vec["id"] : "?"
 		HSE_TestReset()
 
-		; Build flags: star trigger fires on the last trigger char.
-		; ? flag allows in-word matching; C flag requires exact case.
-		IsWord  := Vec.Has("is_word")  ? Vec["is_word"]  : true
-		IsCS    := Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true
-		Flags   := "*"
+		; Build the flags EXACTLY as the TOML loader does, then hand them to the
+		; single source of truth for the flag -> registrar mapping. This used to map
+		; is_case_sensitive straight onto the "C" flag and register one bare spec,
+		; which is a THIRD model of case handling: the real loader routes
+		; is_case_sensitive to CreateHotstring (literal, no family) and only
+		; is_case_sensitive_strict to "C". The harness therefore validated its own
+		; reading rather than the driver's, and agreed with the Lua drivers'
+		; misreading of the same flag.
+		IsWord   := Vec.Has("is_word")  ? Vec["is_word"]  : true
+		IsAuto   := Vec.Has("auto_expand") and Vec["auto_expand"] = true
+		IsCS     := Vec.Has("is_case_sensitive") and Vec["is_case_sensitive"] = true
+		IsStrict := Vec.Has("is_case_sensitive_strict") and Vec["is_case_sensitive_strict"] = true
+		Repl     := Vec.Has("replacement") ? Vec["replacement"] : ""
+		Flags    := ""
+		if IsAuto
+			Flags .= "*"
 		if not IsWord
 			Flags .= "?"
-		if IsCS
+		if IsStrict
 			Flags .= "C"
 
-		HSE_Register(Flags, Vec["trigger"], () => 0,
-			Map("Repl", Vec.Has("replacement") ? Vec["replacement"] : ""))
+		HSE_RegisterFromTomlFlags(IsCS, Flags, Vec["trigger"], Repl, Map("Category", "corpus"))
 		HSE_FeedReset(true)
 
 		; Read the buffer and feed characters one at a time.
@@ -373,6 +488,26 @@ _CorpusHS_EveryVectorReplayedThroughEngine() {
 		Expected := Vec["expected"]
 		ExpMatch := Expected.Has("matched") and Expected["matched"] = true
 
+		; A conform spec decides at FIRE time whether the typed casing corresponds to
+		; a variant that would have been registered; a mixed casing corresponds to
+		; none and the hotstring must not fire. HSE_FindMatchAtEnd still returns the
+		; spec — the verdict belongs to HSE_DispatchMatch — so a replay that stops at
+		; the match reports a fire that never happens.
+		ActualRepl := ""
+		if Match != "" {
+			ActualRepl := Match.Replacement
+			if (Match.HasOwnProp("CaseConform") and Match.CaseConform) {
+				DoFire := true
+				ActualRepl := _HSE_ConformReplacement(Match.Replacement,
+					SubStr(HSE_Buffer, -Match.Length), Match.Trigger,
+					(Match.HasOwnProp("ConformOneChar") and Match.ConformOneChar), &DoFire)
+				if not DoFire {
+					Match      := ""
+					ActualRepl := ""
+				}
+			}
+		}
+
 		; 1. Verify matched vs not-matched.
 		if ExpMatch {
 			if Match = "" {
@@ -380,18 +515,27 @@ _CorpusHS_EveryVectorReplayedThroughEngine() {
 				FileAppend("  FAIL '" . Id . "': expected match, got none`n", "*")
 				continue
 			}
-			; 2. Verify trigger identity.
-			if Match.Trigger != Vec["trigger"] {
+			; 2. Verify trigger identity. A vector that does not opt into strict
+			; matching is registered as a cased FAMILY, so the winning spec's trigger
+			; is the lower / Title / UPPER variant that matched, not the spelling in
+			; the corpus. "!=" is AutoHotkey's case-insensitive comparison and "!=="
+			; the case-sensitive one, which is exactly the distinction wanted here.
+			TriggerOk := IsStrict ? (Match.Trigger == Vec["trigger"]) : (Match.Trigger = Vec["trigger"])
+			if not TriggerOk {
 				Failures += 1
 				FileAppend("  FAIL '" . Id . "': trigger mismatch '"
 					. Match.Trigger . "' vs '" . Vec["trigger"] . "'`n", "*")
 				continue
 			}
-			; 3. Verify replacement text.
-			if Vec.Has("replacement") and Match.Repl != Vec["replacement"] {
+			; 3. Verify the replacement TEXT the driver would emit — conformance
+			; already applied above. Reading Spec.Replacement raw reports "by the way"
+			; for a buffer of "BTW", which is precisely what the case vectors exist to
+			; catch.
+			if Vec.Has("replacement") and Expected.Has("replacement")
+				and ActualRepl !== Expected["replacement"] {
 				Failures += 1
 				FileAppend("  FAIL '" . Id . "': replacement mismatch '"
-					. Match.Repl . "' vs expected '" . Vec["replacement"] . "'`n", "*")
+					. ActualRepl . "' vs expected '" . Expected["replacement"] . "'`n", "*")
 				continue
 			}
 			; 4. Verify backspace count.

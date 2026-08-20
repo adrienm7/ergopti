@@ -6,18 +6,17 @@
 --- Serializes a hotstrings data structure back to the TOML format used by
 --- the application. Canonical source shared by all Lua-based drivers
 --- (Hammerspoon, future Linux driver). Previously lived at
---- hammerspoon/lib/toml_writer.lua; moved here so both drivers share one
+--- hammerspoon/infra/toml_writer.lua; moved here so both drivers share one
 --- implementation without duplication.
 ---
 --- FEATURES & RATIONALE:
---- 1. Python formatter integration: after writing, automatically calls the
----    centralized format_toml.py script to ensure consistent styling and
----    organization across all TOML files (sorts sections/keys, adds headers).
---- 2. Token alias normalization: {Esc} → {Escape}, {return} → {Enter}, etc.,
+--- 1. Token alias normalization: {Esc} → {Escape}, {return} → {Enter}, etc.,
 ---    so the on-disk format never mixes raw \n / \t with {Enter} / {Tab}.
---- 3. Batch write: a separate batch_write() method updates key/value pairs
+--- 2. Batch write: a separate batch_write() method updates key/value pairs
 ---    in INI-style TOML files (driver config.toml) without rewriting the whole
 ---    file — existing lines are updated in-place, new entries are appended.
+--- 3. Transactional publication: both writers require exact read/write/close/
+---    rename acknowledgement before they report success or replace live data.
 --- ==============================================================================
 
 local M = {}
@@ -27,61 +26,120 @@ local M = {}
 -- descriptions; elsewhere a print shim + key-passthrough i18n take over. Hard
 -- requires on lib.logger / lib.i18n here were the impurity that forced the Linux
 -- driver to fork its own TOML parser (audit SS-2).
-local _ok_log, Logger = pcall(require, "lib.logger")
+local _ok_log, Logger = pcall(require, "infra.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
-local _ok_i18n, i18n = pcall(require, "lib.i18n")
+local _ok_i18n, i18n = pcall(require, "infra.i18n")
 if not _ok_i18n or type(i18n) ~= "table" then
 	i18n = { get = function(k) return k end, get_locale = function() return "fr" end }
 end
 local LOG    = "toml_writer"
+local ENOENT_ERROR_CODE = 2
 
 
 
 
--- ===================================
+
 -- ====================================
--- ======= 0/ Python Formatter =======
 -- ====================================
--- ===================================
+-- ======= 0/ File Transactions =======
+-- ====================================
+-- ====================================
 
--- Locate the format_toml.py script at repo root/tools/
-local function get_format_script_path()
-	local _src = debug.getinfo(1, "S").source:sub(2)
-	local _script_dir = _src:match("^(.*[/\\])")
-	-- Walk up from static/ergopti_plus/_shared/lua/toml_codec/ to repo root
-	local _repo_root = _script_dir
-		:gsub("static[/\\].*$", "")
-		:gsub("[/\\]$", "")
-	return _repo_root .. "/tools/format_toml.py"
-end
+local read_batch_source
 
---- Reformat a TOML file using the centralized Python formatter.
---- Ensures consistent headers, sorted sections/keys across all TOML files.
---- Called automatically after M.write() to guarantee consistent formatting.
-local function format_toml_via_python(path)
-	if type(path) ~= "string" or path == "" then return end
-
-	local script_path = get_format_script_path()
-	local cmd = string.format("python3 '%s' '%s' 2>&1", script_path, path)
-
-	local ok, output = pcall(os.execute, cmd)
-	if not ok then
-		Logger.warn(LOG, "Python formatter call failed: %s", tostring(output))
-		return
+--- Publishes complete content through a same-directory staging file.
+--- A protected call only proves that Lua did not raise; file methods also
+--- return nil/false for ordinary I/O failures, so every terminal result is
+--- checked before the live path can be replaced.
+--- @param path string Destination path.
+--- @param content string Complete serialized content.
+--- @param expected_source table|nil Optional `{ status, content }` precondition.
+--- @return boolean committed
+--- @return string|nil error_message
+local function publish(path, content, expected_source)
+	local tmp_path = path .. ".tmp"
+	local open_ok, fh, open_err = pcall(io.open, tmp_path, "w")
+	if not open_ok or not fh then
+		return false, "cannot open staging file: " .. tostring(open_ok and open_err or fh)
 	end
 
-	Logger.trace(LOG, "Reformatted TOML: %s", path)
+	local write_ok, wrote, write_err = pcall(fh.write, fh, content)
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if not write_ok or wrote == nil or wrote == false then
+		pcall(os.remove, tmp_path)
+		return false, "write failed: " .. tostring(write_ok and write_err or wrote)
+	end
+	if not close_ok or closed == nil or closed == false then
+		pcall(os.remove, tmp_path)
+		return false, "close failed: " .. tostring(close_ok and close_err or closed)
+	end
+	if type(expected_source) == "table" then
+		local current, current_err, current_status = read_batch_source(path)
+		if current_status ~= expected_source.status
+			or (current_status == "ok" and current ~= expected_source.content) then
+			pcall(os.remove, tmp_path)
+			return false, "source changed before publication: " .. tostring(current_err or current_status)
+		end
+	end
+
+	local rename_ok, renamed, rename_err = pcall(os.rename, tmp_path, path)
+	-- POSIX replaces an existing destination atomically. Windows' C runtime does
+	-- not, so keep the old file recoverable while replacing it on test/Linux
+	-- hosts running under Windows.
+	if (not rename_ok or renamed ~= true) and package.config:sub(1, 1) == "\\" then
+		local backup = path .. ".bak"
+		pcall(os.remove, backup)
+		local backup_ok, backed_up = pcall(os.rename, path, backup)
+		if backup_ok and backed_up == true then
+			rename_ok, renamed, rename_err = pcall(os.rename, tmp_path, path)
+			if rename_ok and renamed == true then
+				pcall(os.remove, backup)
+			else
+				pcall(os.rename, backup, path)
+			end
+		end
+	end
+	if not rename_ok or renamed ~= true then
+		pcall(os.remove, tmp_path)
+		return false, "rename failed: " .. tostring(rename_ok and rename_err or renamed)
+	end
+	return true
+end
+
+--- Reads an existing batch-write source without confusing an I/O failure with
+--- a fresh file. The caller may create only after an exact ENOENT result.
+--- @param path string Source path.
+--- @return string|nil content Empty string for a proven absent source.
+--- @return string|nil error_message
+--- @return string status "ok" | "absent" | "error"
+read_batch_source = function(path)
+	local open_ok, fh, open_err, open_code = pcall(io.open, path, "r")
+	if not open_ok then return nil, "source open raised: " .. tostring(fh), "error" end
+	if not fh then
+		if open_code == ENOENT_ERROR_CODE then return "", nil, "absent" end
+		return nil, "source open failed: " .. tostring(open_err), "error"
+	end
+	local read_ok, content, read_err = pcall(fh.read, fh, "*a")
+	local close_ok, closed, close_err = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" then
+		return nil, "source read failed: " .. tostring(read_ok and read_err or content), "error"
+	end
+	if not close_ok or closed ~= true then
+		return nil, "source close failed: " .. tostring(close_ok and close_err or closed), "error"
+	end
+	return content, nil, "ok"
 end
 
 
 
 
+
 -- ====================================
--- =====================================
+-- ====================================
 -- ======= 1/ Constants & State =======
--- =====================================
+-- ====================================
 -- ====================================
 
 -- Token alias normalization map.
@@ -97,10 +155,11 @@ local TOKEN_CANONICAL = {
 
 
 
+
 -- ===================================
--- ====================================
+-- ===================================
 -- ======= 2/ String Utilities =======
--- ====================================
+-- ===================================
 -- ===================================
 
 --- Escapes a value for TOML double-quoted strings.
@@ -130,20 +189,86 @@ local function esc(s)
 	return s
 end
 
+-- Forward declaration: publish_content() revalidates through this helper.
+-- Declaring it first is required for Lua to capture the local rather than bind
+-- an unrelated `_G.read_existing`.
+local read_existing
+
+--- Publishes complete content through a platform adapter when one is supplied.
+--- The shared fallback remains for drivers that have not injected an adapter.
+--- When a caller edited an existing snapshot, it is re-read immediately before
+--- publication so a sibling writer cannot silently replace changes observed
+--- during serialization.
+--- @param path string Destination path.
+--- @param content string Complete TOML payload.
+--- @param file_adapter table|nil Platform file adapter.
+--- @param expected_source table|nil Optional `{ status, content }` precondition.
+--- @return boolean written
+--- @return string|nil error_message
+local function publish_content(path, content, file_adapter, expected_source)
+	if type(file_adapter) == "table" and type(file_adapter.write) == "function" then
+		if type(expected_source) == "table" then
+			local current, current_status, current_detail = read_existing(path, file_adapter)
+			if current_status ~= expected_source.status
+				or (current_status == "ok" and current ~= expected_source.content) then
+				return false, "source changed before publication: "
+					.. tostring(current_detail or current_status)
+			end
+		end
+		-- A classified source precondition is useful only if it crosses the same
+		-- serialization boundary as publication. macOS exposes that stronger
+		-- optional capability because its ordinary FileSystem.write contract is
+		-- deliberately two-argument; passing a third Lua argument to write() merely
+		-- discards it and leaves a race between this precheck and lock acquisition.
+		local publisher = type(expected_source) == "table"
+			and type(file_adapter.write_if_unchanged) == "function"
+			and file_adapter.write_if_unchanged
+			or file_adapter.write
+		local call_ok, written, write_detail = pcall(publisher, path, content, expected_source)
+		if call_ok and written == true then return true end
+		return false, tostring((call_ok and write_detail) or written or "adapter write failed")
+	end
+
+	return publish(path, content, expected_source)
+end
+
+--- Reads existing content through a classified platform adapter when supplied.
+--- @param path string Source path.
+--- @param file_adapter table|nil Platform file adapter.
+--- @return string|nil content
+--- @return string status `ok`, `absent`, or `error`.
+--- @return string|nil detail
+read_existing = function(path, file_adapter)
+	if type(file_adapter) == "table" and type(file_adapter.read_with_status) == "function" then
+		local call_ok, content, status, detail = pcall(file_adapter.read_with_status, path)
+		if not call_ok then return nil, "error", tostring(content) end
+		if status == "ok" and type(content) == "string" then return content, "ok" end
+		if status == "absent" then return nil, "absent", detail end
+		return nil, "error", detail or "classified read failed"
+	end
+
+	local content, detail, status = read_batch_source(path)
+	if status == "absent" then return nil, "absent", detail end
+	if status ~= "ok" then return nil, "error", detail end
+	return content, "ok"
+end
+
+
 
 
 
 -- =============================
--- ==============================
+-- =============================
 -- ======= 3/ Public API =======
--- ==============================
+-- =============================
 -- =============================
 
 --- Writes a TOML file from a hotstrings data structure.
 --- @param path string Destination file path.
 --- @param data table  The configuration dictionary.
---- @return boolean, string|nil True on success, or false and error string.
-function M.write(path, data)
+--- @param expected_source table|nil Optional exact source precondition.
+--- @return boolean, string|nil, string|nil Commit, error, and committed payload.
+function M.write(path, data, file_adapter, create_only, expected_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "Invalid path provided for TOML write.")
 		return false, "Invalid path provided."
@@ -235,47 +360,37 @@ function M.write(path, data)
 		end
 	end
 
-	-- Write to a temp file first so a crash or HS reload mid-write cannot
-	-- truncate the live config (toml-non-atomic-write fix).
-	local tmp_path = path .. ".tmp"
-	local ok, fh = pcall(io.open, tmp_path, "w")
-	if not ok or not fh then
-		Logger.error(LOG, "Failed to open temp file for writing.")
-		-- UI error message kept in French
-		return false, "Impossible d'ouvrir le fichier en écriture : " .. tostring(tmp_path)
+	local payload = table.concat(L, "\n")
+	local published, publish_err
+	local committed_payload = nil
+	if create_only == true and type(file_adapter) == "table"
+			and type(file_adapter.create_if_absent) == "function" then
+		local call_ok, created, create_status, create_detail = pcall(
+			file_adapter.create_if_absent,
+			path,
+			payload
+		)
+		published = call_ok and (created == true or create_status == "exists")
+		publish_err = create_detail or create_status
+		if call_ok and created == true then committed_payload = payload end
+	else
+		published, publish_err = publish_content(path, payload, file_adapter, expected_source)
+		if published then committed_payload = payload end
 	end
-
-	local write_ok, write_err = pcall(function()
-		fh:write(table.concat(L, "\n"))
-	end)
-
-	pcall(function() fh:close() end)
-
-	if not write_ok then
-		Logger.error(LOG, string.format("Error during TOML write: %s.", tostring(write_err)))
-		pcall(os.remove, tmp_path)
-		return false, "Erreur lors de l'écriture : " .. tostring(write_err)
-	end
-
-	-- Atomic rename: on POSIX this is a single syscall — the config either
-	-- has its old content or its new content, never a half-written state.
-	local rename_ok, rename_err = os.rename(tmp_path, path)
-	if not rename_ok then
-		Logger.error(LOG, "Failed to rename temp TOML file: %s.", tostring(rename_err))
-		pcall(os.remove, tmp_path)
-		return false, "Erreur lors du déplacement du fichier temporaire."
+	if not published then
+		Logger.error(LOG, "Failed to publish TOML file: %s.", tostring(publish_err))
+		return false, "Erreur lors de la publication : " .. tostring(publish_err)
 	end
 
 	Logger.info(LOG, "TOML configuration saved successfully.")
-	-- Reformat using centralized Python script for consistent styling
-	format_toml_via_python(path)
-	return true
+	return true, nil, committed_payload
 end
 
 
---- ===================================
+
+-- ===================================
 -- ===== 3.2) Batch Write Method =====
---- ===================================
+-- ===================================
 
 --- Writes or updates a set of key/value pairs in a simple INI-style TOML file
 --- (the driver config.toml used by config_overrides and the onboarding wizard).
@@ -289,7 +404,7 @@ end
 --- @param path    string Absolute path to the config.toml to write.
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
 --- @return boolean, string|nil True on success, or false and an error string.
-function M.batch_write(path, updates)
+function M.batch_write(path, updates, file_adapter)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "batch_write: invalid path.")
 		return false, "Invalid path."
@@ -317,13 +432,16 @@ function M.batch_write(path, updates)
 		return "\"" .. tostring(v):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
 	end
 
-	-- Read existing lines (empty table if file absent)
+	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
-	local fh_r = io.open(path, "r")
-	if fh_r then
-		for line in fh_r:lines() do lines[#lines + 1] = line end
-		fh_r:close()
+	local source, read_status, read_detail = read_existing(path, file_adapter)
+	if read_status == "error" then
+		Logger.error(LOG, "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
+		return false, tostring(read_detail)
 	end
+	if read_status == "absent" then source = "" end
+	for line in (source .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
+	if #lines == 1 and lines[1] == "" then lines = {} end
 
 	-- Walk existing lines, replacing matching key lines in-place
 	local current_section = ""
@@ -378,43 +496,14 @@ function M.batch_write(path, updates)
 		end
 	end
 
-	local tmp_w = path .. ".tmp"
-	local fh_w, err_w = io.open(tmp_w, "w")
-	if not fh_w then
-		Logger.error(LOG, "batch_write: cannot open '%s' for writing — %s.", tmp_w, tostring(err_w))
-		return false, tostring(err_w)
-	end
 	local content = table.concat(lines, "\n")
-	local ok_w, err2 = pcall(function() fh_w:write(content) end)
-	pcall(function() fh_w:close() end)
-	if not ok_w then
-		Logger.error(LOG, "batch_write: write failed — %s.", tostring(err2))
-		pcall(os.remove, tmp_w)
-		return false, tostring(err2)
-	end
-	local ok_mv = os.rename(tmp_w, path)
-	-- POSIX replaces an existing destination atomically. Windows' C runtime does
-	-- not, which made a perfectly valid existing user config silently refuse all
-	-- updates when the Linux driver test/runtime was hosted there. Keep the old
-	-- file as a recoverable sibling while replacing it, then restore it if the
-	-- second move fails.
-	if not ok_mv and package.config:sub(1, 1) == "\\" then
-		local backup = path .. ".bak"
-		pcall(os.remove, backup)
-		local backed_up = os.rename(path, backup)
-		if backed_up then
-			ok_mv = os.rename(tmp_w, path)
-			if ok_mv then
-				pcall(os.remove, backup)
-			else
-				pcall(os.rename, backup, path)
-			end
-		end
-	end
-	if not ok_mv then
-		Logger.error(LOG, "batch_write: rename '%s' → '%s' failed.", tmp_w, path)
-		pcall(os.remove, tmp_w)
-		return false, "rename failed"
+	local published, publish_err = publish_content(path, content, file_adapter, {
+		status = read_status,
+		content = source,
+	})
+	if not published then
+		Logger.error(LOG, "batch_write: publication to '%s' failed — %s.", path, tostring(publish_err))
+		return false, tostring(publish_err)
 	end
 	Logger.info(LOG, "batch_write: wrote %d line(s) to '%s'.", #lines, path)
 	return true

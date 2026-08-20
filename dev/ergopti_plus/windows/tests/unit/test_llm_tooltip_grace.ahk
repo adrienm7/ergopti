@@ -19,7 +19,7 @@
 ; surface, untouched by the hotstring lifecycle.
 ;
 ; THE FIX (encoded here):
-; A minimum-display window. LLM_TooltipShow stamps _LLM_Tooltip_ShownAt; for
+; A minimum-display window. The committed surface record owns ShownAt; for
 ; _LLM_TOOLTIP_MIN_DISPLAY_MS the prediction is immune to incidental hides.
 ; TooltipHide ignores non-deliberate hides during the window (deliberate "LLM"
 ; accept/dismiss and "Suspend" bypass it); the bridge's keystroke + pointer
@@ -48,8 +48,8 @@
 ; ================================================================
 ; ================================================================
 
-; Mirror of LLM_TooltipInGracePeriod() in lib/tooltip.ahk. The production
-; predicate reads four globals; this pure form takes them as parameters so the
+; Mirror of LLM_TooltipInGracePeriod() in infra/tooltip.ahk. The production
+; predicate reads one surface record; this pure form takes its fields as parameters so the
 ; branch logic is testable without loading the Gui engine.
 _SimulateInGracePeriod(visible, loading, shownAt, nowTick, windowMs) {
 	if (!visible)
@@ -64,7 +64,9 @@ _SimulateInGracePeriod(visible, loading, shownAt, nowTick, windowMs) {
 
 
 
+; ==================================================================
 ; ===== 1.1) A fresh prediction inside the window is protected =====
+; ==================================================================
 
 _TestGrace_FreshPredictionIsProtected() {
 	; Shown at tick 1000, now 1300, window 600 -> 300 ms elapsed -> protected.
@@ -77,7 +79,9 @@ Test("grace predicate: fresh prediction within the window is protected",
 
 
 
+; =========================================================
 ; ===== 1.2) Once the window elapses, protection ends =====
+; =========================================================
 
 _TestGrace_WindowElapses() {
 	; Shown at 1000, now 1700, window 600 -> 700 ms elapsed -> no longer protected.
@@ -90,7 +94,9 @@ Test("grace predicate: protection ends once the window elapses",
 
 
 
+; ===================================================
 ; ===== 1.3) Loading spinner is never protected =====
+; ===================================================
 
 _TestGrace_LoadingNotProtected() {
 	Assert(!_SimulateInGracePeriod(true, true, 1000, 1100, 600),
@@ -102,7 +108,9 @@ Test("grace predicate: loading spinner is never inside the window",
 
 
 
+; =============================================
 ; ===== 1.4) No stamp (0) means no window =====
+; =============================================
 
 _TestGrace_NoStampNoWindow() {
 	Assert(!_SimulateInGracePeriod(true, false, 0, 1100, 600),
@@ -114,7 +122,9 @@ Test("grace predicate: a zero show-time stamp opens no window",
 
 
 
+; ================================================
 ; ===== 1.5) Nothing visible means no window =====
+; ================================================
 
 _TestGrace_HiddenNoWindow() {
 	Assert(!_SimulateInGracePeriod(false, false, 1000, 1100, 600),
@@ -126,7 +136,9 @@ Test("grace predicate: a hidden tooltip opens no window",
 
 
 
+; ======================================================================
 ; ===== 1.6) Surface ownership is time-independent (whole display) =====
+; ======================================================================
 
 ; Mirror of LLM_TooltipOwnsSurface(): a real prediction owns the shared surface
 ; for its WHOLE display - no time component, unlike the grace window. This is what
@@ -166,11 +178,13 @@ _TestGrace_TooltipCentralGuard() {
 	; While a real prediction owns the surface, the hotstring lifecycle cannot tear
 	; it down - for the WHOLE display. Only authoritative hides pass: LLM (user
 	; dismiss/accept), TimerFn (auto-hide), Suspend.
-	Assert(InStr(Body, 'DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and LLM_TooltipOwnsSurface()') > 0,
+	Assert(InStr(RegExReplace(Body, "\s+", " "),
+		'DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and _llm_was_visible') > 0,
 		"TooltipHide must ignore hotstring-lifecycle hides while a real prediction owns the surface")
 	; The window opens the instant a real prediction renders.
-	Assert(InStr(Body, "_LLM_Tooltip_ShownAt := A_TickCount") > 0,
-		"LLM_TooltipShow must stamp the show time so the grace window can start")
+	Assert(InStr(Body, "ShownAt: Lifecycle.TimeoutOrigin") > 0
+		and InStr(Body, "SurfaceToken.LlmPresented := Record") > 0,
+		"the committed presentation record must own the show time that starts its grace window")
 	; Both predicates must exist: ownership (whole display) + grace (min display).
 	Assert(InStr(Body, "LLM_TooltipOwnsSurface() {") > 0,
 		"the LLM_TooltipOwnsSurface predicate must be defined")
@@ -179,7 +193,8 @@ _TestGrace_TooltipCentralGuard() {
 	; TooltipShow must ALSO bail while the prediction owns the surface. Blocking the
 	; NewShow hide is not enough: TooltipShow rebuilds the shared Gui regardless,
 	; clobbering the prediction with a hotstring preview lookup.
-	Assert(InStr(Body, "if LLM_TooltipOwnsSurface()") > 0,
+	Assert(InStr(Body,
+		"if (LLM_TooltipOwnsSurface() and !OwnedPresentation)") > 0,
 		"TooltipShow must refuse to rebuild the shared surface while a prediction owns it")
 }
 Test("grace contract: TooltipHide + TooltipShow guards + ownership/grace predicates present",
@@ -188,12 +203,15 @@ Test("grace contract: TooltipHide + TooltipShow guards + ownership/grace predica
 
 _TestGrace_HideResetsStamp() {
 	Body := _DriverDirConcat("ui/tooltip")
-	; Hiding the prediction must clear the stamp so a later show starts a fresh
-	; window and a stale stamp can never keep a vanished prediction "protected".
-	Assert(InStr(Body, "_LLM_Tooltip_ShownAt := 0") > 0,
-		"LLM_TooltipHide / LLM_TooltipShowLoading must reset the show-time stamp")
+	; Hiding detaches the entire owner; loading installs a distinct zero-stamped
+	; record. No stale timestamp survives in a parallel global.
+	Assert(InStr(Body, "_TooltipActiveSurface := 0") > 0
+		and InStr(Body,
+			'Kind: "loading", Slots: [], ActiveIdx: 0') > 0
+		and InStr(Body, "ShownAt: 0") > 0,
+		"hide/loading must replace the whole presentation owner instead of retaining a stale stamp")
 }
-Test("grace contract: the show-time stamp is reset on hide / loading",
+Test("grace contract: hide/loading retire the stamped presentation record",
 	_TestGrace_HideResetsStamp)
 
 

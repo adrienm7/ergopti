@@ -35,8 +35,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 -- =====================================
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Builds a fresh temp directory path for this test run's KC_LOG_PATH so
 --- concurrent test runs (or repeated `--only` reruns) never collide on the
@@ -68,11 +68,20 @@ local hs_overrides = {
 	pathwatcher = {
 		new = function(_path, cb)
 			captured_watcher_cb = cb
-			return { start = function() end, stop = function() end }
+			local watcher = {}
+			watcher.start = function() return watcher end
+			watcher.stop = function() end
+			return watcher
 		end,
 	},
 	timer = {
-		new = function(_interval, _cb) return { start = function() end, stop = function() end } end,
+		new = function(_interval, _cb)
+			local timer = { active = false }
+			timer.start = function() timer.active = true; return timer end
+			timer.stop = function() timer.active = false; return timer end
+			timer.running = function() return timer.active end
+			return timer
+		end,
 		absoluteTime = function() return 0 end,
 	},
 }
@@ -89,10 +98,11 @@ local function load_kc_bridge_with_tmp_path()
 	-- Piggyback on load_with_stubs for the hs stub reset, targeting a throwaway
 	-- module so its "ui.menu.*" wipe runs, then reinstall our stub and require
 	-- the real target ourselves.
-	helpers.load_with_stubs("lib.logger", hs_overrides)
-	package.loaded["ui.menu.menu_paths"] = {
+	helpers.load_with_stubs("infra.logger", hs_overrides)
+	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return tmp_dir end,
 	}
+	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["modules.keylogger.kc_bridge"] = nil
 	return require("modules.keylogger.kc_bridge")
 end
@@ -130,7 +140,7 @@ helpers.describe("kc_bridge — _file_offset advances while the keylogger is dis
 
 		-- Feature disabled: init() is always called with log_manager=nil at
 		-- keylogger module load, mirroring modules/keylogger/init.lua line 287.
-		kc.init({ ok = true }, nil, {}, {})
+		kc.init({ ok = true }, nil, {}, {}, function() return true end)
 		local offset_before = kc.get_stats().offset
 
 		append_ke_line("a")
@@ -151,7 +161,7 @@ helpers.describe("kc_bridge — _file_offset advances while the keylogger is dis
 	helpers.it("no backlog burst-replay: enabling later logs only lines written AFTER enable", function()
 		ensure_metrics_dir()
 		local kc = load_kc_bridge_with_tmp_path()
-		kc.init({ ok = true }, nil, {}, {})
+		kc.init({ ok = true }, nil, {}, {}, function() return true end)
 
 		-- Backlog accumulates while the feature is off.
 		append_ke_line("a")
@@ -185,7 +195,7 @@ helpers.describe("kc_bridge — _file_offset advances while the keylogger is dis
 	helpers.it("pending_down hold-duration tracking stays consistent across the disabled→enabled transition", function()
 		ensure_metrics_dir()
 		local kc = load_kc_bridge_with_tmp_path()
-		kc.init({ ok = true }, nil, {}, {})
+		kc.init({ ok = true }, nil, {}, {}, function() return true end)
 
 		-- Press while disabled, release while disabled too — both consumed
 		-- without a log call, and the pending_down bookkeeping must not leak
@@ -210,6 +220,78 @@ helpers.describe("kc_bridge — _file_offset advances while the keylogger is dis
 			"exactly the post-enable press+release pair must be logged")
 		helpers.assert_eq(logged[1].type, "press")
 		helpers.assert_eq(logged[2].type, "release")
+	end)
+
+	helpers.it("keeps draining without persisting after feature OFF when secure filtering is disabled", function()
+		tmp_dir = fresh_tmp_dir()
+		ensure_metrics_dir()
+		local feature_enabled = true
+		local kc = load_kc_bridge_with_tmp_path()
+		package.loaded["modules.keylogger"] = {
+			context_allows_logging = function() return true end,
+		}
+		helpers.assert_eq(kc.init({ ok = true }, nil, {}, {},
+			function() return feature_enabled end), true)
+
+		local logged = {}
+		kc.set_log_manager({
+			log_karabiner_press = function(kc_num)
+				logged[#logged + 1] = kc_num
+			end,
+		})
+		append_ke_line("a")
+		captured_watcher_cb()
+		helpers.assert_eq(#logged, 1,
+			"the positive control must persist while the complete gate allows it")
+
+		feature_enabled = false
+		append_ke_line("b")
+		local before = kc.get_stats().offset
+		captured_watcher_cb()
+		helpers.assert_eq(#logged, 1,
+			"the retained always-on drain must not bypass feature OFF")
+		helpers.assert_true(kc.get_stats().offset > before,
+			"denied rows must still advance the ledger cursor instead of replaying later")
+	end)
+
+	helpers.it("resynchronises a cold-start cursor before an already-active bridge can persist", function()
+		tmp_dir = fresh_tmp_dir()
+		ensure_metrics_dir()
+		append_ke_line("a")
+
+		local saved_open = io.open
+		local fail_initial_read = true
+		local ledger_path = tmp_dir .. "/metrics/karabiner_kc.log"
+		io.open = function(path, mode)
+			if fail_initial_read and path == ledger_path and mode == "r" then
+				fail_initial_read = false
+				return nil, "transient read refusal"
+			end
+			return saved_open(path, mode)
+		end
+
+		local ok, err = pcall(function()
+			local kc = load_kc_bridge_with_tmp_path()
+			helpers.assert_eq(kc.init({ active_app_name = "TextEdit" }, nil, {}, {},
+				function() return true end), true)
+
+			local logged = {}
+			kc.set_log_manager({
+				log_karabiner_press = function(kc_num)
+					logged[#logged + 1] = kc_num
+				end,
+			})
+			helpers.assert_eq(kc.start(), true,
+				"activation must retry the untrusted cold-start EOF even while watchers are active")
+			append_ke_line("b")
+			captured_watcher_cb()
+			helpers.assert_eq(#logged, 1,
+				"only the post-activation row may persist; the pre-session row must be discarded")
+			helpers.assert_eq(logged[1], 1,
+				"the one persisted row must be the post-activation physical key")
+		end)
+		io.open = saved_open
+		helpers.assert_true(ok, "cold-start EOF refusal scenario must complete: " .. tostring(err))
 	end)
 
 end)

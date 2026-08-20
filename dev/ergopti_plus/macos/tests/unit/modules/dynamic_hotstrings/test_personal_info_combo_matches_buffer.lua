@@ -42,6 +42,7 @@ local function make_fake_keymap()
 		register_interceptor      = function(fn) rec.interceptors[#rec.interceptors + 1] = fn end,
 		inject_dynamic            = function(deletes, text)
 			rec.injects[#rec.injects + 1] = { deletes = deletes, text = text }
+			return true
 		end,
 	}
 	return rec

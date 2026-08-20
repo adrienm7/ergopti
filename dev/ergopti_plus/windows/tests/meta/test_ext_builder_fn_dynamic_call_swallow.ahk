@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for finding ext-builder-fn-dynamic-call-swallow.
 ;
-; _SC_Extensions() invokes each extension's BuildExtMenu_<id> via dynamic
+; _SC_ExtensionRows() invokes each extension's BuildExtMenu_<id> via dynamic
 ; %BuilderFn% during menu build. The old code caught a thrown builder with a
 ; LoggerWarn only, so a broken extension produced a present-but-empty submenu
 ; indistinguishable from an absent one -- the only trace was a WARNING line the
@@ -43,34 +43,34 @@
 ; ==================================================
 
 _EBFD_CatchFailsLoud() {
-	Seg := _DriverFuncBody("_SC_Extensions")
-	Assert(Seg != "", "_SC_Extensions declaration must exist in the driver source")
+	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Assert(Seg != "", "_SC_ExtensionRows declaration must exist in the driver source")
 	; The thrown-builder branch must log an ERROR, not merely a Warn the user
 	; never reads.
 	Assert(InStr(Seg, "LoggerError(" . Chr(34) . "Extensions") > 0,
-		"_SC_Extensions must LoggerError (not just Warn) when a BuildExtMenu_<id> throws -- a broken extension is user-actionable")
+		"_SC_ExtensionRows must LoggerError (not just Warn) when a BuildExtMenu_<id> throws -- a broken extension is user-actionable")
 }
 Test("tray_menu: extension builder failure logs an ERROR (ext-builder-fn-dynamic-call-swallow)", _EBFD_CatchFailsLoud)
 
 _EBFD_RendersVisibleErrorRow() {
-	Seg := _DriverFuncBody("_SC_Extensions")
-	Assert(Seg != "", "_SC_Extensions declaration must exist in the driver source")
+	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Assert(Seg != "", "_SC_ExtensionRows declaration must exist in the driver source")
 	; A failed/empty builder must produce a visible disabled marker built from a
 	; localised error prefix plus the ExtId, so it is not mistaken for an absent
 	; extension.
 	Assert(InStr(Seg, "common.error_prefix") > 0,
-		"_SC_Extensions must add a visible disabled error row (localised common.error_prefix + ExtId) when an extension builder fails or adds nothing")
+		"_SC_ExtensionRows must add a visible disabled error row (localised common.error_prefix + ExtId) when an extension builder fails or adds nothing")
 }
 Test("tray_menu: extension builder failure shows a visible disabled row (ext-builder-fn-dynamic-call-swallow)", _EBFD_RendersVisibleErrorRow)
 
 _EBFD_ValidatesItemsPopulated() {
 	Src := _DriverSourceConcat()
-	Seg := _DriverFuncBody("_SC_Extensions")
-	Assert(Seg != "", "_SC_Extensions declaration must exist in the driver source")
+	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Assert(Seg != "", "_SC_ExtensionRows declaration must exist in the driver source")
 	; A builder may return without throwing yet populate nothing; the fix counts
 	; the items added and treats zero as a failure.
 	Assert(InStr(Seg, "_ExtMenuItemCount(") > 0,
-		"_SC_Extensions must validate the builder populated at least one item (via _ExtMenuItemCount) so a silently-empty submenu also surfaces the error marker")
+		"_SC_ExtensionRows must validate the builder populated at least one item (via _ExtMenuItemCount) so a silently-empty submenu also surfaces the error marker")
 	; And the counting helper itself must exist.
 	Assert(InStr(Src, "_ExtMenuItemCount(MenuObj) {") > 0,
 		"the driver source must define the _ExtMenuItemCount helper used to detect an empty extension submenu")

@@ -1,136 +1,141 @@
 --- tests/unit/modules/keylogger/test_midnight_rotation_invariants.lua
 
---- ==============================================================================
---- MODULE: Regression — midnight rotation does not reset in-flight state (C3)
---- DESCRIPTION:
---- perform_maintenance() in keylogger/init.lua fires once per second via the
---- maintenance timer. When it detects a date change it runs the midnight rotation:
----
----   LogManager.flush_buffer()
----   LogManager.day_rollover()
----   CoreState.today_idx     = {}
----   CoreState.ngram_context = nil
----   _current_day = today
----
---- Two invariants must hold:
----
---- INVARIANT 1 — ORDER: flush_buffer() MUST precede day_rollover(). Reversing the
---- order drains today.log before the in-memory buffer is written, losing the last
---- batch of keystrokes from the just-ended day (data loss, unrecoverable).
----
---- INVARIANT 2 — SCOPE: the rotation must NOT reset synth_queue, is_enabled,
---- is_paused, or the tap / watchdog references. Wiping synth_queue mid-rotation
---- desynchronises the two synthetic-event trackers (keymap + keylogger) and can
---- produce phantom or missing text. Touching enabled/paused state during a
---- background maintenance tick violates G1 (no unhandled state transitions).
----
---- These pins are structural (source-text); loading the full 1500-line module is
---- not feasible in the unit harness, and the patterns encode the root cause.
---- ==============================================================================
+--- Behavioural midnight-rotation coverage. The real watcher must flush before
+--- rollover, reset only day-local aggregates after an accepted drain, retry a
+--- rejected drain, and leave event-local input provenance untouched.
 
 local helpers = require("tests.helpers")
+local provenance_fixture = require("tests.support.keylogger_provenance_fixture")
 
-helpers.describe("keylogger: midnight rotation invariants (C3)", function()
-	local function read_src()
-		-- perform_maintenance() was extracted from keylogger/init.lua into the
-		-- self-contained keylogger/watchers.lua. Concatenate both so the body
-		-- introspection survives that move (move-resilient). The shared state is
-		-- the injected CoreState, named _state inside watchers.lua.
-		local function read_one(rel)
-			local path = helpers.driver_root() .. rel
-			local fh = io.open(path, "r")
-			helpers.assert_true(fh ~= nil, "cannot open " .. rel .. " at " .. tostring(path))
-			local s = fh:read("*a"); fh:close()
-			return s
-		end
-		return read_one("modules/keylogger/init.lua")
-			.. "\n" .. read_one("modules/keylogger/watchers.lua")
+local OLD_DAY = "2026-08-07"
+local NEW_DAY = "2026-08-08"
+
+local function with_date(day, fn)
+	local original_date = os.date
+	os.date = function(format, time)
+		if format == "%Y-%m-%d" then return day end
+		return original_date(format, time)
 	end
+	local ok, result = xpcall(fn, debug.traceback)
+	os.date = original_date
+	if not ok then error(result, 0) end
+	return result
+end
 
-	local function extract_maintenance(src)
-		-- Extract the body of perform_maintenance() by finding its definition
-		-- and taking the next ~3000 chars (the function grew past ~15 lines
-		-- once the drain-success gate was added — see F-HIGH-2). After the
-		-- watchers extraction it is exposed as M.perform_maintenance; accept
-		-- both the old local form and the public form (move-resilient).
-		local fn_start = src:find("local function perform_maintenance()", 1, true)
-			or src:find("function M.perform_maintenance()", 1, true)
-		helpers.assert_true(fn_start ~= nil, "perform_maintenance() must exist in keylogger init/watchers")
-		return src:sub(fn_start, fn_start + 3000)
-	end
+local function drive_rotation(rollover_results, paused, ticks)
+	local calls = {}
+	local rollover_count = 0
+	local previous_index = { sentinel = "index" }
+	local previous_ngram = { sentinel = "ngram" }
 
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["modules.keylogger.log_manager"] = {
+		flush_buffer = function()
+			calls[#calls + 1] = "flush"
+			return true
+		end,
+		day_rollover = function()
+			rollover_count = rollover_count + 1
+			calls[#calls + 1] = "rollover"
+			return rollover_results[rollover_count]
+		end,
+	}
+	package.loaded["modules.keylogger.context_tracker"] = {
+		split_active_app_at_midnight = function(day)
+			calls[#calls + 1] = "split:" .. tostring(day)
+		end,
+	}
 
-	-- ===== Invariant 1: flush_buffer precedes day_rollover =====
+	local watchers = with_date(OLD_DAY, function()
+		return helpers.load_with_stubs("modules.keylogger.watchers")
+	end)
+	local state = {
+		today_idx = previous_index,
+		ngram_context = previous_ngram,
+		is_enabled = true,
+		buffer_events = {},
+		mouse_distance_px = 0,
+		last_mouse_pos = nil,
+	}
+	watchers.init(state, function() return paused end)
 
-	helpers.it("flush_buffer() is called BEFORE day_rollover() during rotation", function()
-		local src = read_src()
-		local body = extract_maintenance(src)
-		local flush_pos    = body:find("flush_buffer()", 1, true)
-		local rollover_pos = body:find("day_rollover()", 1, true)
-		helpers.assert_true(flush_pos ~= nil,
-			"perform_maintenance() must call LogManager.flush_buffer()")
-		helpers.assert_true(rollover_pos ~= nil,
-			"perform_maintenance() must call LogManager.day_rollover()")
-		helpers.assert_true(flush_pos < rollover_pos,
-			"flush_buffer() must precede day_rollover(): reversing the order "
-			.. "drains today.log before the in-memory buffer is written — permanent data loss")
+	local synthetic_input = require("adapters.synthetic_input")
+	local provenance = require("adapters.event_provenance")
+	local tagged = provenance_fixture.tagged_key(
+		synthetic_input, "test.midnight", "replacement", "m")
+	local stats_before = synthetic_input.stats()
+	local tap_count_before = #_G.hs.eventtap.__taps
+
+	with_date(NEW_DAY, function()
+		for _ = 1, ticks or 1 do watchers.perform_maintenance() end
 	end)
 
+	local stats_after = synthetic_input.stats()
+	return {
+		calls = calls,
+		state = state,
+		previous_index = previous_index,
+		previous_ngram = previous_ngram,
+		rollover_count = rollover_count,
+		provenance = provenance,
+		tagged = tagged,
+		stats_before = stats_before,
+		stats_after = stats_after,
+		tap_count_before = tap_count_before,
+		tap_count_after = #_G.hs.eventtap.__taps,
+	}
+end
 
-	-- ===== Invariant 2: only today_idx + ngram_context are reset =====
+local function assert_provenance_unchanged(run, consumer)
+	helpers.assert_eq(run.stats_after.records, run.stats_before.records,
+		"calendar rotation must not mutate the centralized ownership ledger")
+	helpers.assert_eq(run.stats_after.generation, run.stats_before.generation)
+	helpers.assert_eq(run.stats_after.action_handoffs, run.stats_before.action_handoffs)
+	local metadata = run.provenance.classify(run.tagged, consumer)
+	helpers.assert_not_nil(metadata, "the event's exact ownership tag must survive rotation")
+	helpers.assert_eq(metadata.owner, "test.midnight")
+	helpers.assert_eq(metadata.effect, "replacement")
+	helpers.assert_eq(run.tap_count_after, run.tap_count_before,
+		"maintenance must not stop or rebuild an input tap")
+end
 
-	helpers.it("rotation resets the shared today_idx to {}", function()
-		local src = read_src()
-		local body = extract_maintenance(src)
-		-- The shared state is CoreState in init.lua; it is the injected _state
-		-- inside watchers.lua. Accept either name (same table, move-resilient).
-		helpers.assert_true(
-			body:find("CoreState%.today_idx%s*=%s*{}", 1, false) ~= nil
-			or body:find("_state%.today_idx%s*=%s*{}", 1, false) ~= nil,
-			"perform_maintenance() must reset <state>.today_idx = {} on date change")
+helpers.describe("keylogger: behavioural midnight rotation invariants", function()
+	helpers.it("flushes before rollover and resets only day-local aggregates on success", function()
+		local run = drive_rotation({ true }, false, 1)
+
+		helpers.assert_eq(table.concat(run.calls, ","),
+			"split:" .. OLD_DAY .. ",flush,rollover")
+		helpers.assert_true(run.state.today_idx ~= run.previous_index,
+			"an accepted rollover must start a fresh daily index")
+		helpers.assert_eq(next(run.state.today_idx), nil)
+		helpers.assert_nil(run.state.ngram_context)
+		helpers.assert_true(run.state.is_enabled,
+			"background maintenance must not change enablement")
+		assert_provenance_unchanged(run, "test.midnight.success")
 	end)
 
-	helpers.it("rotation resets the shared ngram_context to nil", function()
-		local src = read_src()
-		local body = extract_maintenance(src)
-		helpers.assert_true(
-			body:find("CoreState%.ngram_context%s*=%s*nil", 1, false) ~= nil
-			or body:find("_state%.ngram_context%s*=%s*nil", 1, false) ~= nil,
-			"perform_maintenance() must reset <state>.ngram_context = nil on date change")
+	helpers.it("retains bookmarks and retries a rejected rollover", function()
+		local run = drive_rotation({ false, false }, false, 2)
+
+		helpers.assert_eq(run.rollover_count, 2,
+			"a rejected drain must be retried on the next maintenance tick")
+		helpers.assert_eq(table.concat(run.calls, ","),
+			"split:" .. OLD_DAY .. ",flush,rollover,split:" .. OLD_DAY .. ",flush,rollover")
+		helpers.assert_true(run.state.today_idx == run.previous_index,
+			"the old index is a rollover bookmark until persistence accepts the drain")
+		helpers.assert_true(run.state.ngram_context == run.previous_ngram)
+		helpers.assert_true(run.state.is_enabled)
+		assert_provenance_unchanged(run, "test.midnight.retry")
 	end)
 
-	helpers.it("rotation does NOT wipe CoreState.synth_queue", function()
-		local src = read_src()
-		local body = extract_maintenance(src)
-		-- Any assignment to synth_queue inside perform_maintenance would desync the
-		-- dual synthetic-event trackers (keymap expected_synthetic_* + keylogger synth_queue)
-		helpers.assert_true(
-			body:find("synth_queue", 1, true) == nil,
-			"perform_maintenance() must not touch CoreState.synth_queue — wiping it mid-rotation "
-			.. "desynchronises the two synthetic-event trackers and can corrupt injected text")
-	end)
+	helpers.it("does no rotation or input-state work while paused", function()
+		local run = drive_rotation({ true }, true, 1)
 
-	helpers.it("rotation does NOT modify CoreState.is_enabled or is_paused", function()
-		local src = read_src()
-		local body = extract_maintenance(src)
-		helpers.assert_true(
-			body:find("is_enabled", 1, true) == nil,
-			"perform_maintenance() must not assign CoreState.is_enabled — "
-			.. "changing enabled state from a background maintenance tick violates G1")
-		-- Note: is_paused is READ at the top via _is_paused() to early-return;
-		-- that read is correct. The test here bans ASSIGNMENT inside the function body.
-		local assign_paused = body:find("is_paused%s*=", 1, false)
-		helpers.assert_true(assign_paused == nil,
-			"perform_maintenance() must not assign is_paused — "
-			.. "changing pause state from a maintenance tick violates G1")
-	end)
-
-	helpers.it("rotation does NOT stop or restart _event_tap", function()
-		local src = read_src()
-		local body = extract_maintenance(src)
-		helpers.assert_true(
-			body:find("_event_tap", 1, true) == nil,
-			"perform_maintenance() must not touch _event_tap — "
-			.. "stopping or restarting the tap from a maintenance timer loses keystrokes (G2)")
+		helpers.assert_eq(#run.calls, 0)
+		helpers.assert_true(run.state.today_idx == run.previous_index)
+		helpers.assert_true(run.state.ngram_context == run.previous_ngram)
+		helpers.assert_true(run.state.last_mouse_pos == nil,
+			"the pause gate must precede the hardware poll too")
+		assert_provenance_unchanged(run, "test.midnight.paused")
 	end)
 end)

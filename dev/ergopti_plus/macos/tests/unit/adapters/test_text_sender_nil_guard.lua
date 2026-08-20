@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "adapters/text_sender.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("adapters/text_sender.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to adapters/text_sender.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("function M.eraseChars")
+helpers.assert_true(src ~= nil, "adapters/text_sender.lua source must be locatable")
 
 -- Test 1: type-check on `text` exists near the top of M.send().
 local guard = src:find('type(text) ~= "string"', 1, true)
@@ -35,3 +36,11 @@ helpers.assert_true(
 )
 
 print("[PASS] test_text_sender_nil_guard")
+
+local TextSender = helpers.load_with_stubs("adapters.text_sender")
+helpers.assert_true(TextSender.isTerminalInputHost("com.apple.Terminal", ""))
+helpers.assert_true(TextSender.isTerminalInputHost("COM.GOOGLECODE.ITERM2", ""),
+	"terminal bundle matching must be case-insensitive")
+helpers.assert_true(TextSender.isTerminalInputHost("", "Ghostty"))
+helpers.assert_true(not TextSender.isTerminalInputHost("com.apple.TextEdit", "TextEdit"),
+	"ordinary GUI editors must retain the zero-latency callback-return path")

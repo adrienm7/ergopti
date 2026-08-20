@@ -36,15 +36,16 @@ local M = {}
 
 local hs      = hs
 local fs      = require("hs.fs")
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 local timer   = require("hs.timer")
 
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
-local i18n    = require("lib.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
+local Logger  = require("infra.logger")
+local Timings = require("infra.timings")
+local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "keylogger.log_manager"
 
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
@@ -57,11 +58,11 @@ local Metrics      = require("keylogger.metrics")
 
 
 
--- ==============================
+-- ============================
 -- ============================
 -- ======= 1/ Constants =======
 -- ============================
--- ==============================
+-- ============================
 
 --- Background ingest tick period (KEYLOGGER_SPEC §4). Shared cross-driver value
 --- ([keylogger] ingest_tick_ms).
@@ -97,6 +98,11 @@ local _paths = {}
 
 --- Background ingest timer.
 local _ingest_timer = nil
+local _ingest_timer_committed = false
+
+--- A failed initialization retains this flag until every partially acquired
+--- timer/database has been released. No later init may publish over that debt.
+local _init_cleanup_pending = false
 
 --- Registered post-ingest listeners — called after every successful ingest cycle.
 --- Each entry is a function(); errors are swallowed so one broken listener cannot
@@ -106,15 +112,27 @@ local _ingest_listeners = {}
 --- Whether `_uuid_v4` has seeded math.randomseed.
 local _uuid_seeded = false
 
+--- Ordered outbox used when an eventtap must detach a typing run without doing
+--- any serialization or file I/O. Once this queue is non-empty, later
+--- append_log() calls join it so they cannot overtake the detached run.
+local _deferred_log_queue = {}
+local _deferred_log_head  = 1
+local _deferred_log_tail  = 0
+local _deferred_log_timer = nil
+
+--- Retry delay after a timer-allocation or sink failure. The ingest timer also
+--- retries the queue, so a one-shot scheduling failure cannot strand it.
+local DEFERRED_LOG_RETRY_SEC = 0.1
 
 
 
 
--- ============================================
+
+-- ==================================
 -- ==================================
 -- ======= 3/ Private Helpers =======
 -- ==================================
--- ============================================
+-- ==================================
 
 --- Guards every public function against being called before M.init().
 local function _require_state(func_name)
@@ -177,11 +195,11 @@ end
 
 
 
--- =====================================
+-- ==================================
 -- ==================================
 -- ======= 4/ Path Resolution =======
 -- ==================================
--- =====================================
+-- ==================================
 
 --- Resolve <tmpdir>/ — macOS sets TMPDIR per-user; fall back to /tmp/.
 local function _resolve_tmpdir()
@@ -196,6 +214,8 @@ end
 --- Compute every path the log manager touches once `device_id` is known.
 --- @param metrics_dir string The metrics root (CoreState.LOG_DIR).
 --- @param device_id   string The current device's UUID.
+--- @return table Resolved path bundle. The caller publishes it only after the
+--- device identity transaction commits.
 local function _resolve_paths(metrics_dir, device_id)
 	local md = metrics_dir
 	if not md:match("[/\\]$") then md = md .. "/" end
@@ -203,7 +223,7 @@ local function _resolve_paths(metrics_dir, device_id)
 	local by_dev  = md .. "by_device/" .. device_id .. "/"
 	local tmp_dir = _resolve_tmpdir() .. "ergopti_metrics/" .. device_id .. "/"
 
-	_paths = {
+	return {
 		metrics_dir      = md,
 		by_device_dir    = by_dev,
 		device_json_path = by_dev .. "device.json",
@@ -218,16 +238,19 @@ end
 
 
 
--- ============================================
+-- ==================================
 -- ==================================
 -- ======= 5/ Device Identity =======
 -- ==================================
--- ============================================
+-- ==================================
 
 --- Loads `device.json` for the current host. Reuses an existing UUID if the
---- host_signature matches; otherwise generates a new UUID. KEYLOGGER_SPEC §16.1.
+--- host_signature matches; otherwise generates a new UUID only after every
+--- existing candidate was read and decoded successfully. KEYLOGGER_SPEC §16.1.
 --- @param metrics_dir string The metrics root.
---- @return table The fully populated device object.
+--- @return table|nil device The fully populated device object, or nil when the
+--- identity scan did not commit.
+--- @return boolean needs_publication True only for a newly generated identity.
 local function _resolve_device(metrics_dir)
 	local md = metrics_dir
 	if not md:match("[/\\]$") then md = md .. "/" end
@@ -235,20 +258,47 @@ local function _resolve_device(metrics_dir)
 	_mkdir_p(by_root)
 
 	local current_host = _host_signature()
-	for entry in fs.dir(by_root) do
-		if entry ~= "." and entry ~= ".." then
-			local djpath = by_root .. entry .. "/device.json"
-			local fh = io.open(djpath, "r")
-			if fh then
-				local raw = fh:read("*a"); fh:close()
-				local ok, obj = pcall(json.decode, raw)
-				if ok and type(obj) == "table"
-					and type(obj.device_id) == "string"
-					and obj.host_signature == current_host then
-					return obj
+	local dir_ok, iterator, dir_state = pcall(fs.dir, by_root)
+	if not dir_ok or type(iterator) ~= "function" then
+		Logger.error(LOG, "Cannot enumerate existing device identities; initialization refused.")
+		return nil
+	end
+
+	local scan_ok, matching_device, unresolved_candidate = pcall(function()
+		local unresolved = false
+		for entry in iterator, dir_state do
+			if entry ~= "." and entry ~= ".." then
+				local candidate_dir = by_root .. entry
+				local djpath = candidate_dir .. "/device.json"
+				local raw, read_status = FileSystem.read_with_status(djpath)
+				if read_status ~= "absent" then
+					if read_status ~= "ok" or type(raw) ~= "string" then
+						unresolved = true
+					else
+						local decode_ok, obj = pcall(json.decode, raw)
+						local valid = decode_ok and type(obj) == "table"
+							and type(obj.device_id) == "string" and obj.device_id ~= ""
+							and type(obj.host_signature) == "string" and obj.host_signature ~= ""
+						if not valid then
+							unresolved = true
+						elseif obj.host_signature == current_host then
+							return obj, false
+						end
+					end
 				end
 			end
 		end
+		return nil, unresolved
+	end)
+
+	if not scan_ok then
+		Logger.error(LOG, "Existing device identity scan failed; initialization refused.")
+		return nil
+	end
+	if matching_device then return matching_device, false end
+	if unresolved_candidate then
+		Logger.error(LOG, "An existing device identity could not be owned; initialization refused.")
+		return nil
 	end
 
 	return {
@@ -259,20 +309,55 @@ local function _resolve_device(metrics_dir)
 		host_signature = current_host,
 		created_at     = _now_ts(),
 		schema_version = 1,
-	}
+	}, true
 end
 
---- Atomically write the device object back to disk.
-local function _write_device_json(obj)
-	local tmp = _paths.device_json_path .. ".tmp"
-	local f, err = io.open(tmp, "w")
-	if not f then
-		Logger.error(LOG, "Cannot write %s: %s.", tmp, tostring(err))
+--- Publishes a new device identity without replacing a concurrent winner.
+--- @return boolean committed
+--- @return table|nil published_device Exact created/adopted device object.
+local function _write_device_json(obj, device_json_path)
+	local encode_ok, encoded = pcall(json.encode, obj)
+	if not encode_ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "Cannot encode device identity; initialization refused.")
 		return false
 	end
-	f:write(json.encode(obj)); f:close()
-	os.rename(tmp, _paths.device_json_path)
-	return true
+
+	-- A generated identity is derived from proven absence. Replacing an entry
+	-- that appeared after the scan would steal another process's identity.
+	local write_ok, created, create_status = pcall(
+		FileSystem.create_if_absent,
+		device_json_path,
+		encoded
+	)
+	if not write_ok then
+		Logger.error(LOG, "Device identity publication did not commit; initialization refused.")
+		return false, nil
+	end
+	if created == true and create_status == "created" then return true, obj end
+	if create_status ~= "exists" then
+		Logger.error(LOG, "Device identity publication did not commit; initialization refused.")
+		return false, nil
+	end
+
+	-- Another initializer won the same create-only target. Adopt only an exact,
+	-- internally consistent identity for this host and directory; every other
+	-- outcome is ambiguous and therefore fails closed.
+	local read_ok, raw, read_status = pcall(FileSystem.read_with_status, device_json_path)
+	if not read_ok or read_status ~= "ok" or type(raw) ~= "string" then
+		Logger.error(LOG, "Concurrent device identity could not be owned; initialization refused.")
+		return false, nil
+	end
+	local decode_ok, winner = pcall(json.decode, raw)
+	local valid = decode_ok and type(winner) == "table"
+		and type(winner.device_id) == "string" and winner.device_id == obj.device_id
+		and type(winner.host_signature) == "string"
+		and winner.host_signature == obj.host_signature
+	if not valid then
+		Logger.error(LOG, "Concurrent device identity was inconsistent; initialization refused.")
+		return false, nil
+	end
+	Logger.info(LOG, "Adopted the concurrently published device identity.")
+	return true, winner
 end
 
 
@@ -285,77 +370,105 @@ end
 -- ==============================================================
 -- ==============================================================
 
---- Append a single event entry to today.log as a JSONL line.
---- Delegates to Rotation.append_log (hot path — no SQLite).
---- @param entry table The event entry. Must contain a `type` field.
-function M.append_log(entry)
-	Rotation.append_log(entry)
+local _drain_deferred_logs
+
+
+--- Returns whether the ordered deferred outbox contains any work.
+--- @return boolean
+local function _has_deferred_logs()
+	return _deferred_log_head <= _deferred_log_tail
 end
 
---- Serialize the keystroke buffer accumulated in CoreState into a
---- typing event and append it to today.log. Resets per-flush buffers.
-function M.flush_buffer()
-	if not _require_state("flush_buffer") then return end
+
+--- Appends one operation to the in-memory ordered outbox.
+--- @param operation table `{ kind = "typing_snapshot"|"entry", value = table }`.
+local function _queue_deferred_log(operation)
+	_deferred_log_tail = _deferred_log_tail + 1
+	_deferred_log_queue[_deferred_log_tail] = operation
+end
+
+
+--- Schedules the outbox drain on the next run-loop turn.
+--- The shared scheduler publishes the exact unstarted native candidate before
+--- activation. If start raises after activation and rollback refuses, that
+--- candidate remains the only owner and blocks every sibling drain timer until
+--- teardown can retry its cleanup.
+--- @param delay number|nil Delay in seconds (zero for the initial drain).
+--- @return boolean scheduled
+local function _schedule_deferred_log_drain(delay)
+	if not _has_deferred_logs() then return true end
+	if _deferred_log_timer ~= nil then
+		return _deferred_log_timer.committed == true
+	end
+
+	-- Forward-declare before the closure: declaring this local below the closure
+	-- would bind the callback to a nil global instead of the scheduler handle.
+	local scheduled_handle
+	local committed
+	scheduled_handle, committed = TimerScheduler.after(delay or 0, function()
+		-- TimerScheduler fences repeat delivery before invoking us. Clear the
+		-- scheduling gate only when its exact native cleanup actually settled.
+		if _deferred_log_timer == scheduled_handle
+			and scheduled_handle.timer == nil then
+			_deferred_log_timer = nil
+		end
+		local drained_ok, drain_err = xpcall(_drain_deferred_logs, debug.traceback)
+		if not drained_ok then
+			Logger.error(LOG, "Deferred keylogger drain failed: %s.", tostring(drain_err))
+		end
+		if _has_deferred_logs() then
+			_schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC)
+		end
+	end)
+
+	-- A failed acquisition can still own a live candidate when native start
+	-- activated and then raised while rollback refused. Retain that exact debt;
+	-- otherwise discard the settled wrapper so a later ingest/action may retry.
+	if scheduled_handle and scheduled_handle.timer ~= nil then
+		_deferred_log_timer = scheduled_handle
+	end
+	if committed ~= true then
+		if not scheduled_handle or scheduled_handle.timer == nil then
+			_deferred_log_timer = nil
+		end
+		Logger.error(LOG, "Cannot schedule deferred keylogger drain transactionally.")
+		return false
+	end
+	_deferred_log_timer = scheduled_handle
+	return true
+end
+
+
+--- Detaches the current mutable typing run in O(1).
+--- No loop, JSON encoding, SQLite access, or file append is allowed here: this
+--- function is the action-epoch backstop reached from the keyboard eventtap.
+--- @return table|nil snapshot
+local function _detach_buffer_snapshot()
 	if #_state.buffer_events == 0
 		and _state.session_mouse_clicks == 0
 		and _state.session_mouse_scrolls == 0 then
-		return
+		return nil
 	end
 
-	local total_time_ms, total_chars = 0, 0
-	for _, ev in ipairs(_state.buffer_events) do
-		local meta = ev[3] or {}
-		if not meta.s then
-			local d = math.min(ev[2] or 0, WPM_MAX_EVENT_DELAY_MS)
-			total_time_ms = total_time_ms + d
-			total_chars   = total_chars + 1
-		end
-	end
-	local wpm = Metrics.compute_wpm_from_events(total_chars, total_time_ms)
-
-	-- Build a rich-text representation from rich_chunks.
-	local rich_str, cur_type, cur_text = "", nil, ""
-	local function flush_chunk()
-		if not cur_type then return end
-		if cur_type == "text" then
-			rich_str = rich_str .. cur_text
-		elseif cur_type == "correction" then
-			rich_str = rich_str .. "<correction><del>" .. cur_text .. "</del></correction>"
-		else
-			rich_str = rich_str .. "<autocomplete type=\"" .. cur_type .. "\">" .. cur_text .. "</autocomplete>"
-		end
-	end
-	for _, chunk in ipairs(_state.rich_chunks or {}) do
-		if chunk.type == cur_type then
-			cur_text = cur_text .. chunk.text
-		else
-			flush_chunk()
-			cur_type = chunk.type; cur_text = chunk.text
-		end
-	end
-	flush_chunk()
-
-	M.append_log({
-		type              = "typing",
-		text              = _state.buffer_text,
-		rich_text         = rich_str,
-		app               = _state.session_app_name,
-		title             = _state.session_win_title,
-		url               = _state.session_url,
-		field_role        = _state.session_field_role,
-		layout            = _state.session_layout,
-		document_path     = _state.session_document_path,
-		is_fullscreen     = _state.is_fullscreen,
-		in_meeting        = _state.in_meeting,
-		mouse_clicks      = _state.session_mouse_clicks,
-		mouse_scrolls     = _state.session_mouse_scrolls,
-		mouse_distance_px = math.floor(_state.mouse_distance_px or 0),
-		pause_before_ms   = _state.current_session_pause,
-		battery_level     = _state.current_battery_level,
-		audio_volume      = _state.current_audio_volume,
-		wpm               = tonumber(string.format("%.1f", wpm)),
-		events            = _state.buffer_events,
-	})
+	local snapshot = {
+		buffer_events         = _state.buffer_events,
+		buffer_text           = _state.buffer_text,
+		rich_chunks           = _state.rich_chunks or {},
+		session_app_name      = _state.session_app_name,
+		session_win_title     = _state.session_win_title,
+		session_url           = _state.session_url,
+		session_field_role    = _state.session_field_role,
+		session_layout        = _state.session_layout,
+		session_document_path = _state.session_document_path,
+		is_fullscreen         = _state.is_fullscreen,
+		in_meeting            = _state.in_meeting,
+		session_mouse_clicks  = _state.session_mouse_clicks,
+		session_mouse_scrolls = _state.session_mouse_scrolls,
+		mouse_distance_px     = _state.mouse_distance_px,
+		current_session_pause = _state.current_session_pause,
+		current_battery_level = _state.current_battery_level,
+		current_audio_volume  = _state.current_audio_volume,
+	}
 
 	_state.buffer_events         = {}
 	_state.buffer_text           = ""
@@ -366,6 +479,146 @@ function M.flush_buffer()
 	_state.session_mouse_scrolls = 0
 	_state.mouse_distance_px     = 0
 	_state.last_flush_time       = hs.timer.absoluteTime() / 1000000
+	return snapshot
+end
+
+
+--- Converts an immutable detached snapshot into its persisted typing entry.
+--- @param snapshot table Snapshot returned by _detach_buffer_snapshot().
+--- @return table entry
+local function _typing_entry_from_snapshot(snapshot)
+	local total_time_ms, total_chars = 0, 0
+	for _, ev in ipairs(snapshot.buffer_events) do
+		local meta = ev[3] or {}
+		if not meta.s then
+			local d = math.min(ev[2] or 0, WPM_MAX_EVENT_DELAY_MS)
+			total_time_ms = total_time_ms + d
+			total_chars   = total_chars + 1
+		end
+	end
+	local wpm = Metrics.compute_wpm_from_events(total_chars, total_time_ms)
+
+	local rich_str, cur_type, cur_text = "", nil, ""
+	local function flush_chunk()
+		if not cur_type then return end
+		if cur_type == "text" then
+			rich_str = rich_str .. cur_text
+		elseif cur_type == "correction" then
+			rich_str = rich_str .. "<correction><del>" .. cur_text .. "</del></correction>"
+		else
+			rich_str = rich_str .. "<autocomplete type=\"" .. cur_type .. "\">"
+				.. cur_text .. "</autocomplete>"
+		end
+	end
+	for _, chunk in ipairs(snapshot.rich_chunks) do
+		if chunk.type == cur_type then
+			cur_text = cur_text .. chunk.text
+		else
+			flush_chunk()
+			cur_type = chunk.type
+			cur_text = chunk.text
+		end
+	end
+	flush_chunk()
+
+	return {
+		type              = "typing",
+		text              = snapshot.buffer_text,
+		rich_text         = rich_str,
+		app               = snapshot.session_app_name,
+		title             = snapshot.session_win_title,
+		url               = snapshot.session_url,
+		field_role        = snapshot.session_field_role,
+		layout            = snapshot.session_layout,
+		document_path     = snapshot.session_document_path,
+		is_fullscreen     = snapshot.is_fullscreen,
+		in_meeting        = snapshot.in_meeting,
+		mouse_clicks      = snapshot.session_mouse_clicks,
+		mouse_scrolls     = snapshot.session_mouse_scrolls,
+		mouse_distance_px = math.floor(snapshot.mouse_distance_px or 0),
+		pause_before_ms   = snapshot.current_session_pause,
+		battery_level     = snapshot.current_battery_level,
+		audio_volume      = snapshot.current_audio_volume,
+		wpm               = tonumber(string.format("%.1f", wpm)),
+		events            = snapshot.buffer_events,
+	}
+end
+
+
+--- Drains queued operations in strict insertion order.
+--- The head advances only after Rotation returns exact true, so either a thrown
+--- or non-throwing filesystem refusal leaves the exact item available for retry.
+--- @return boolean drained Whether the queue is now empty.
+_drain_deferred_logs = function()
+	while _has_deferred_logs() do
+		local operation = assert(_deferred_log_queue[_deferred_log_head],
+			"keylogger deferred-log queue is sparse")
+		local entry = operation.kind == "typing_snapshot"
+			and _typing_entry_from_snapshot(operation.value)
+			or operation.value
+		local ok, accepted_or_err = xpcall(function()
+			return Rotation.append_log(entry)
+		end, debug.traceback)
+		if not ok or accepted_or_err ~= true then
+			Logger.error(LOG, "Cannot append deferred keylogger entry: %s.",
+				tostring(accepted_or_err))
+			return false
+		end
+		_deferred_log_queue[_deferred_log_head] = nil
+		_deferred_log_head = _deferred_log_head + 1
+	end
+	_deferred_log_head = 1
+	_deferred_log_tail = 0
+	return true
+end
+
+
+--- Append a single event entry to today.log as a JSONL line.
+--- The FIFO owns the entry before the sink is called, so a non-throwing storage
+--- refusal cannot destroy the caller's only copy.
+--- @param entry table The event entry. Must contain a `type` field.
+--- @return boolean persisted True when this call drained through exact commit;
+--- false when its owned FIFO item remains pending for a scheduled retry.
+function M.append_log(entry)
+	local had_deferred_work = _has_deferred_logs()
+	_queue_deferred_log({ kind = "entry", value = entry })
+	if had_deferred_work then
+		-- Queue insertion is the acceptance boundary; timer allocation only controls
+		-- when accepted work drains; the ingest tick and stop path independently retry it
+		_schedule_deferred_log_drain(0)
+		return true
+	end
+
+	local drained = _drain_deferred_logs()
+	if not drained then _schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC) end
+	return drained
+end
+
+--- Serialize the keystroke buffer accumulated in CoreState into a
+--- typing event and append it to today.log. Resets per-flush buffers.
+function M.flush_buffer()
+	if not _require_state("flush_buffer") then return end
+	local snapshot = _detach_buffer_snapshot()
+	if not snapshot then return end
+	return M.append_log(_typing_entry_from_snapshot(snapshot))
+end
+
+--- Detaches the current typing buffer and queues it for a post-eventtap drain.
+--- This is the only flush primitive allowed in an eventtap action-epoch
+--- backstop. It performs O(1) table swaps and never calls the persistence sink.
+--- @return boolean accepted False only when no initialized outbox can accept work.
+function M.defer_flush_buffer()
+	if not _require_state("defer_flush_buffer") then return false end
+	local snapshot = _detach_buffer_snapshot()
+	if snapshot then
+		_queue_deferred_log({ kind = "typing_snapshot", value = snapshot })
+	end
+	if not _has_deferred_logs() then return true end
+	-- The snapshot is already owned by the FIFO; reporting the scheduling result
+	-- as acceptance made the epoch listener retry the completed detach and abort
+	-- every later physical key when timer allocation stayed unavailable
+	_schedule_deferred_log_drain(0)
+	return true
 end
 
 ---@param prev_app string
@@ -442,11 +695,11 @@ end
 
 
 
--- =============================================================
+-- ============================================================
 -- ============================================================
 -- ======= 7/ Export delegate accessors (thin wrappers) =======
 -- ============================================================
--- =============================================================
+-- ============================================================
 
 --- Delegates to Export.get_native_app_category.
 function M.get_native_app_category(app_name)
@@ -472,8 +725,11 @@ end
 --- The callback receives no arguments; use M.get_db_rev() to read the new rev.
 --- Errors inside the callback are swallowed.
 ---@param fn function The listener to register.
+---@return boolean registered True only after the listener is owned.
 function M.on_ingest_done(fn)
+	assert(type(fn) == "function", "on_ingest_done requires a callback")
 	table.insert(_ingest_listeners, fn)
+	return true
 end
 
 local function _notify_ingest_listeners()
@@ -486,11 +742,11 @@ end
 
 
 
--- ========================================
+-- ===========================================
 -- ===========================================
 -- ======= 8/ Ingest Tick Orchestrator =======
 -- ===========================================
--- ========================================
+-- ===========================================
 
 --- Helper to safely SQL-escape a string.
 local function _sq(s)
@@ -874,6 +1130,10 @@ end
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
+	-- A failed timer allocation still leaves the ordered outbox intact. The
+	-- recurring ingest tick is the independent retry path that guarantees an
+	-- action with no following key cannot strand its detached typing run.
+	if _has_deferred_logs() then _drain_deferred_logs() end
 	local db = SqliteWriter.get_db()
 	if not db then return end
 
@@ -891,7 +1151,11 @@ function M.ingest_once()
 		return
 	end
 
-	local entries, new_offset = Rotation.read_new_entries()
+	local entries, new_offset, read_status = Rotation.read_new_entries()
+	if read_status == "failed" then
+		Logger.warn(LOG, "Ingest skipped because today.log tail read did not commit.")
+		return false
+	end
 	if #entries == 0 then
 		if #foreign_devices > 0 then _notify_ingest_listeners() end
 		return
@@ -1023,6 +1287,101 @@ function M.ingest_once()
 	_notify_ingest_listeners()
 end
 
+
+--- Verifies one native ingest timer's observable running state. Real
+--- Hammerspoon timers expose running(); the boolean branch keeps the narrow
+--- pure-Lua timer doubles faithful without accepting an unreadable userdata.
+--- @param timer_handle table|userdata Native timer candidate.
+--- @param expected boolean Required running state.
+--- @return boolean matches True only when the observable state matches.
+--- @return string|nil detail Probe failure detail.
+local function _ingest_timer_running_matches(timer_handle, expected)
+	local member_ok, member_or_err = pcall(function() return timer_handle.running end)
+	if not member_ok then return false, tostring(member_or_err) end
+	if type(member_or_err) == "boolean" and type(timer_handle) == "table" then
+		if member_or_err == expected then return true end
+		return false, string.format("running state was %s", tostring(member_or_err))
+	end
+	if type(member_or_err) ~= "function" then return false, "running() unavailable" end
+	local probe_ok, running_or_err = xpcall(function()
+		return member_or_err(timer_handle)
+	end, debug.traceback)
+	if not probe_ok or type(running_or_err) ~= "boolean" then
+		return false, tostring(running_or_err)
+	end
+	if running_or_err ~= expected then
+		return false, string.format("running() returned %s", tostring(running_or_err))
+	end
+	return true
+end
+
+--- Fences and releases the exact recurring ingest timer. A truthy chainable
+--- stop result is not a native-state verdict; retain the handle until
+--- running() proves that it is stopped.
+--- @param timer_handle table|userdata Exact timer owned by this module.
+--- @param label string Cleanup context for the file logger.
+--- @return boolean stopped True only when native state is observably stopped.
+local function _stop_ingest_timer(timer_handle, label)
+	if not timer_handle then return true end
+	if _ingest_timer == timer_handle then _ingest_timer_committed = false end
+	local stop_ok, stopped_or_err = xpcall(function()
+		return timer_handle:stop()
+	end, debug.traceback)
+	local state_stopped, state_detail = _ingest_timer_running_matches(timer_handle, false)
+	if not stop_ok or stopped_or_err == false or not state_stopped then
+		pcall(Logger.error, LOG, "%s cleanup remains pending: %s.", label,
+			tostring(not stop_ok and stopped_or_err
+				or (stopped_or_err == false and "stop returned false")
+				or state_detail))
+		return false
+	end
+	if _ingest_timer == timer_handle then _ingest_timer = nil end
+	return true
+end
+
+--- Acquires and starts the one recurring ingest timer. Construction and start
+--- are one transaction: a handle whose start raises or explicitly refuses stays
+--- retained so M.stop() can retry its exact cleanup.
+--- @return boolean started True when one owned timer is committed.
+local function _start_ingest_timer()
+	if _ingest_timer then return _ingest_timer_committed end
+
+	local timer_candidate = nil
+	local create_ok, timer_or_err = xpcall(function()
+		timer_candidate = timer.new(INGEST_TICK_SEC, function()
+			-- Native timers can invoke a queued callback after stop() refused or
+			-- after start() raised despite activating the candidate. Publication is
+			-- therefore both identity- and commit-scoped, never handle-presence-only.
+			if _ingest_timer ~= timer_candidate or _ingest_timer_committed ~= true then
+				return
+			end
+			Logger.pcall(LOG, M.ingest_once)
+		end)
+		return timer_candidate
+	end, debug.traceback)
+	if not create_ok or timer_or_err == nil then
+		pcall(Logger.error, LOG, "Cannot create ingest timer: %s.",
+			tostring(timer_or_err or "hs.timer.new returned nil"))
+		return false
+	end
+
+	_ingest_timer = timer_or_err
+	local start_ok, started_or_err = xpcall(function()
+		return timer_or_err:start()
+	end, debug.traceback)
+	local state_started, state_detail = _ingest_timer_running_matches(timer_or_err, true)
+	if not start_ok or started_or_err == false or not state_started then
+		pcall(Logger.error, LOG,
+			"Cannot start ingest timer; exact cleanup remains owned: %s.",
+			tostring(not start_ok and started_or_err
+				or (started_or_err == false and "start returned false")
+				or state_detail))
+		return false
+	end
+	_ingest_timer_committed = true
+	return true
+end
+
 --- Day rollover handler. Drains remaining today.log then delegates to
 --- Rotation.rollover to reset the file and offset.
 --- @return boolean True when the drain fully completed and rollover ran; false
@@ -1035,11 +1394,22 @@ function M.day_rollover()
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
 	-- Rotation.rollover from deleting un-ingested lines.
 	local drained = false
+	local committed_eof = nil
 	local prev_offset = Rotation.get_offset()
 	for _ = 1, MAX_ROLLOVER_DRAIN_ITERS do
-		local pending = Rotation.read_new_entries()
-		if #pending == 0 then
-			drained = true
+		local pending, _, read_status = Rotation.read_new_entries()
+		if read_status == "failed" then
+			Logger.warn(LOG,
+				"day_rollover: tail read failed — preserving today.log.")
+			break
+		elseif #pending == 0 then
+			if read_status == "eof" then
+				drained = true
+				committed_eof = read_status
+			else
+				Logger.warn(LOG,
+					"day_rollover: tail read did not commit EOF — preserving today.log.")
+			end
 			break
 		end
 		pcall(M.ingest_once)
@@ -1073,7 +1443,10 @@ function M.day_rollover()
 		return false
 	end
 
-	Rotation.rollover(_paths.data_sql_path)
+	if Rotation.rollover(_paths.data_sql_path, committed_eof) == false then
+		Logger.warn(LOG, "day_rollover: rotation rejected the EOF proof — today.log preserved.")
+		return false
+	end
 	Aggregator.reset_ngram_ctx()
 	if db then
 		db:exec("UPDATE meta SET value='0' WHERE key='today_log_offset';")
@@ -1088,37 +1461,112 @@ end
 
 
 
--- ===============================
+-- ============================
 -- ============================
 -- ======= 9/ Lifecycle =======
 -- ============================
--- ===============================
+-- ============================
+
+--- Releases resources acquired by an initialization attempt. Timer handles are
+--- cleared only after their exact stop call completes, so a failed teardown can
+--- be retried without constructing a sibling owner.
+--- @return boolean complete True only when no initialization cleanup debt remains.
+local function _release_failed_init_resources()
+	local complete = true
+
+	local ingest_timer = _ingest_timer
+	if ingest_timer then
+		if not _stop_ingest_timer(ingest_timer, "Failed-init ingest timer") then
+			complete = false
+		end
+	end
+
+	local deferred_timer = _deferred_log_timer
+	if deferred_timer then
+		local ok, result_or_err = xpcall(function()
+			return TimerScheduler.cancel(deferred_timer)
+		end,
+			debug.traceback)
+		if ok and result_or_err == true then
+			if _deferred_log_timer == deferred_timer then _deferred_log_timer = nil end
+		else
+			complete = false
+			pcall(Logger.error, LOG,
+				"Failed-init deferred timer cleanup remains pending: %s.",
+				tostring(result_or_err))
+		end
+	end
+
+	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
+		debug.traceback)
+	if not db_ok or db_result_or_err == false then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Failed-init database cleanup remains pending: %s.",
+			tostring(db_result_or_err))
+	end
+	return complete
+end
+
+--- Revokes all log-manager publication from a failed initialization and starts
+--- cleanup of any native resources that attempt acquired.
+--- @return boolean complete True only when every cleanup completed.
+local function _rollback_failed_init()
+	_state = nil
+	_device_obj = nil
+	_device_id = nil
+	_paths = {}
+	_init_cleanup_pending = true
+	local complete = _release_failed_init_resources()
+	_init_cleanup_pending = not complete
+	return complete
+end
 
 --- Initialize the log manager. Resolves the device, opens the SQLite cache,
 --- creates the filesystem layout. Idempotent; calling twice is a warning.
 --- @param core_state table The shared CoreState from modules/keylogger/init.lua.
-function M.init(core_state)
+local function _init(core_state)
 	if _state then
 		Logger.warn(LOG, "M.init() called twice — ignoring duplicate.")
-		return
+		return true
 	end
 	if type(core_state) ~= "table" or type(core_state.LOG_DIR) ~= "string" then
 		Logger.error(LOG, "M.init(): invalid core_state — log manager non-functional.")
-		return
+		return false
 	end
-	_state = core_state
 
 	Logger.start(LOG, "Initializing log manager…")
 
-	_device_obj = _resolve_device(_state.LOG_DIR)
-	_device_id  = _device_obj.device_id
-	_resolve_paths(_state.LOG_DIR, _device_id)
+	local device_obj, needs_publication = _resolve_device(core_state.LOG_DIR)
+	if not device_obj then
+		Logger.error(LOG, "M.init(): device identity could not be resolved — log manager disabled.")
+		return false
+	end
+	local device_id = device_obj.device_id
+	local paths = _resolve_paths(core_state.LOG_DIR, device_id)
 
-	_mkdir_p(_paths.metrics_dir)
-	_mkdir_p(_paths.by_device_dir)
-	_mkdir_p(_paths.tmpdir_dir)
+	_mkdir_p(paths.metrics_dir)
+	_mkdir_p(paths.by_device_dir)
+	_mkdir_p(paths.tmpdir_dir)
 
-	_write_device_json(_device_obj)
+	if needs_publication then
+		local identity_committed, published_device = _write_device_json(
+			device_obj,
+			paths.device_json_path
+		)
+		if not identity_committed then return false end
+		device_obj = published_device
+		device_id = device_obj.device_id
+		paths = _resolve_paths(core_state.LOG_DIR, device_id)
+	end
+
+	-- Publish the shared state only after a new identity is durable (or an
+	-- existing identity was read and owned). Every public method remains behind
+	-- _require_state until this transaction commits.
+	_state = core_state
+	_device_obj = device_obj
+	_device_id = device_id
+	_paths = paths
 	local cache_was_fresh = fs.attributes(_paths.sqlite_path) == nil
 
 	-- Initialise submodules.
@@ -1210,24 +1658,54 @@ function M.init(core_state)
 	_state.manifest  = _state.manifest  or {}
 
 	if not _ingest_timer then
-		pcall(M.ingest_once)
-		_ingest_timer = timer.new(INGEST_TICK_SEC, function()
-			pcall(M.ingest_once)
-		end)
-		_ingest_timer:start()
+		Logger.pcall(LOG, M.ingest_once)
+		if not _start_ingest_timer() then error("ingest timer acquisition failed") end
 	end
 
 	Logger.success(LOG, "Log manager initialized (device %s, name %s).",
 		_device_id:sub(1, 8) .. "…", _device_obj.name)
+	return true
+end
+
+--- Runs initialization as a transaction. A dependency may raise after a native
+--- timer or database has already become live; contain that exception, revoke the
+--- prematurely published state, and retain any failed cleanup for exact retry.
+--- @param core_state table The shared CoreState from modules/keylogger/init.lua.
+--- @return boolean initialized True only when the complete initialization commits.
+function M.init(core_state)
+	if not _state and _init_cleanup_pending then
+		local cleanup_complete = _release_failed_init_resources()
+		_init_cleanup_pending = not cleanup_complete
+		if not cleanup_complete then
+			pcall(Logger.error, LOG,
+				"M.init() refused while prior initialization cleanup remains pending.")
+			return false
+		end
+	end
+
+	local state_was_committed = _state ~= nil
+	local ok, initialized_or_err = xpcall(_init, debug.traceback, core_state)
+	if ok then return initialized_or_err end
+
+	local cleanup_complete = true
+	if not state_was_committed then cleanup_complete = _rollback_failed_init() end
+	pcall(Logger.error, LOG,
+		"M.init() raised; initialization was rejected%s: %s.",
+		cleanup_complete and "" or " with cleanup still pending",
+		tostring(initialized_or_err))
+	return false
 end
 
 --- Re-creates the ingest timer if it was stopped by M.stop() without a
---- full re-init. Safe to call when already running (_ingest_timer exists)
---- or before init (_state is nil): both cases are no-ops. Called
---- unconditionally from keylogger M.start() so the ingest loop survives
---- toggle OFF/ON without requiring a full re-initialization.
+--- full re-init. Idempotent when already running; before init it reports false
+--- and acquires nothing. Called unconditionally from keylogger M.start() so the
+--- ingest loop survives toggle OFF/ON without a full re-initialization.
+--- @return boolean running True only when one timer owner is committed.
 function M.ensure_ingest_running()
-	if not _state then return end
+	if not _state then return false end
+	-- A candidate may have become native-live before start() raised/refused. It is
+	-- cleanup debt, not an ingest owner; never reopen the database underneath it.
+	if _ingest_timer and not _ingest_timer_committed then return false end
 
 	-- Re-arm must be symmetric with M.stop(), which tears down BOTH the timer and
 	-- the SQLite cache. Restoring only the timer left the ingest tick running
@@ -1244,20 +1722,60 @@ function M.ensure_ingest_running()
 		end
 	end
 
-	if _ingest_timer then return end
-	_ingest_timer = timer.new(INGEST_TICK_SEC, function()
-		pcall(M.ingest_once)
-	end)
-	_ingest_timer:start()
+	if _ingest_timer then return true end
+	if not _start_ingest_timer() then return false end
 	Logger.done(LOG, "Ingest timer re-armed after stop/start cycle.")
+	return true
 end
 
---- Stop the ingest timer and close the SQLite cache cleanly.
+--- Stop every retained timer and close the SQLite cache cleanly.
+--- Native stop/close methods may explicitly refuse or raise after leaving their
+--- resource live. Retain the exact handle in that case so the lifecycle owner can
+--- retry instead of publishing a successor beside an orphan.
+--- @return boolean complete True only when every owned resource was released.
 function M.stop()
-	if _ingest_timer then _ingest_timer:stop(); _ingest_timer = nil end
+	local complete = true
+	local ingest_timer = _ingest_timer
+	if ingest_timer then
+		if not _stop_ingest_timer(ingest_timer, "Ingest timer") then
+			complete = false
+		end
+	end
+
+	local deferred_timer = _deferred_log_timer
+	if deferred_timer then
+		local ok, result_or_err = xpcall(function()
+			return TimerScheduler.cancel(deferred_timer)
+		end,
+			debug.traceback)
+		if ok and result_or_err == true then
+			if _deferred_log_timer == deferred_timer then _deferred_log_timer = nil end
+		else
+			complete = false
+			pcall(Logger.error, LOG,
+				"Deferred timer cleanup remains pending: %s.", tostring(result_or_err))
+		end
+	end
+
+	if _has_deferred_logs() then
+		local drain_ok, drained_or_err = xpcall(_drain_deferred_logs, debug.traceback)
+		if not drain_ok or drained_or_err == false then
+			complete = false
+			pcall(Logger.error, LOG,
+				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
+		end
+	end
 	pcall(M.ingest_once)
-	SqliteWriter.close_db()
-	Logger.debug(LOG, "Log manager stopped")
+	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
+		debug.traceback)
+	if not db_ok or db_result_or_err == false then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Database cleanup remains pending: %s.", tostring(db_result_or_err))
+	end
+	pcall(Logger.debug, LOG, complete and "Log manager stopped"
+		or "Log manager cleanup remains pending")
+	return complete
 end
 
 
@@ -1288,9 +1806,5 @@ function M.rebuild_index_if_needed_async(on_done)
 	if type(on_done) == "function" then pcall(on_done, false) end
 end
 function M.get_mac_serial() return "" end
-function M.process_files_async(_files, _is_encrypt, _password, _on_progress, on_complete)
-	if type(on_complete) == "function" then pcall(on_complete, false) end
-end
-function M.register_encryptor_app() end
 
 return M

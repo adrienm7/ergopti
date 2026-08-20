@@ -1,302 +1,314 @@
 --- tests/unit/modules/keymap/test_terminator_retype_ordering.lua
 
 --- ==============================================================================
---- MODULE: Regression — the re-typed terminator must not overtake a deferred
----         paste (terminator-retype-ordering)
+--- MODULE: Terminator replay ordering across tagged replacement batches
 --- DESCRIPTION:
---- A multi-segment expansion fired by a terminator landed with the terminator in
---- the MIDDLE of the replacement instead of at its end.
----
---- ROOT CAUSE ENCODED: emit_tokens defers the second and later paste-worthy
---- segments behind a settle gap, and chains every following token behind that
---- deferral so order survives. But the fence was local to emit_tokens and
---- covered only its own tokens. The terminator re-type happens in the expander,
---- AFTER emit_dispatch returns, and reaches the OS synchronously — so it
---- overtook the very segment it was supposed to follow. From the outside
---- emit_tokens looks finished while a paste is still queued on a timer, which is
---- exactly why the caller cannot get this right by itself.
----
---- The fence is now returned and the re-type chained behind it.
----
---- WHY IT WAS SILENT: nothing failed. Every character was emitted, the buffer
---- and the telemetry were correct, and only the on-screen order was wrong — and
---- only for replacements with multiple paste-worthy segments fired by a
---- non-consumed terminator.
+--- A non-consumed terminator is held until every replacement batch has been
+--- handed to Quartz and any clipboard settle fence has opened. The proof uses
+--- real SyntheticInput generations and batches, including deferred token output.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Longer than PASTE_THRESHOLD (50) so should_paste() routes each to the clipboard.
 local LONG_A = string.rep("a", 80)
 local LONG_B = string.rep("b", 80)
 
 
-
-
--- =============================================
--- =============================================
--- ======= 1/ Harness ==========================
--- =============================================
--- =============================================
-
---- Minimal CoreState stub, mirroring the sibling expander tests.
---- @param buffer string
---- @return table
 local function make_state(buffer)
-	local s = {
-		buffer                    = buffer or "",
-		expected_synthetic_chars  = "",
-		expected_synthetic_deletes = 0,
-		expected_synthetic_pastes = 0,
-		start_is_word_boundary    = function() return true end,
+	local state = {
+		buffer = buffer or "",
+		start_is_word_boundary = true,
+		magic_key = "*",
 	}
-	function s.suppress_rescan(_) end
-	return s
+	function state.suppress_rescan() end
+	function state.is_repeat_feature_enabled() return false end
+	return state
 end
 
---- Registry stub whose terminator is a space that is NOT consumed, so the
---- expander re-types it — the emission this regression is about.
---- @param entries table
---- @return table
-local function make_registry(entries)
-	local R = { _entries = entries or {} }
-	function R.is_terminator(c) return c == " " end
-	function R.terminator_is_consumed(_c) return false end
-	function R.mappings_for_tail(tail) return R._entries[tail] or {} end
-	return R
+
+local function make_registry()
+	return {
+		is_terminator = function(value) return value == " " end,
+		terminator_is_consumed = function() return false end,
+		mappings_for_tail = function() return {} end,
+	}
 end
+
 
 local function make_llm()
-	local L = {}
-	function L.update_preview(_) end
-	function L.get_llm_enabled() return false end
-	function L.start_timer() end
-	return L
-end
-
---- Loads the expander with every emission recorded in one ordered log and with
---- doAfter captured so deferrals can be fired deliberately.
---- @return table expander, table emissions, function fire_pending
-local function load_expander()
-	local emissions = {}
-	local pending   = {}
-
-	package.loaded["modules.keymap.utils"] = nil
-	package.loaded["modules.keymap.expander"] = nil
-	-- The terminator is emitted by the replay gate, not by the expander, and the
-	-- gate binds its TextSender at load time. Leaving it cached would keep the
-	-- reference taken before the recording stub below was installed, so every
-	-- terminator would go somewhere this test cannot see and the ordering
-	-- assertions would pass on an empty log.
-	package.loaded["modules.keymap.terminator_replay"] = nil
-	-- Same reasoning one level down: the scheduler captures `hs` at load time, and
-	-- load_with_stubs builds a FRESH hs per call. A cached scheduler would keep
-	-- posting into the previous test case's timer list, so this case's
-	-- fire_pending() would find nothing to fire and conclude the terminator was
-	-- never queued.
-	package.loaded["adapters.timer_scheduler"] = nil
-
-	local E = helpers.load_with_stubs("modules.keymap.expander", {
-		eventtap = {
-			keyStroke  = function(_mods, key) emissions[#emissions + 1] = "key:" .. tostring(key) end,
-			keyStrokes = function(s) emissions[#emissions + 1] = "type:" .. tostring(s):sub(1, 6) end,
-			event      = { types = { keyDown = 10 } },
-			new        = function() return { start = function() end, stop = function() end } end,
-		},
-		pasteboard = {
-			getContents  = function() return "" end,
-			readAllData  = function() return {} end,
-			writeAllData = function(_) return true end,
-			setContents  = function(s)
-				emissions[#emissions + 1] = "paste:" .. tostring(s):sub(1, 6)
-				return true
-			end,
-		},
-		timer = {
-			doAfter = function(delay, fn)
-				pending[#pending + 1] = { delay = delay, fn = fn }
-				return { stop = function() end }
-			end,
-			doEvery           = function() return { stop = function() end } end,
-			secondsSinceEpoch = function() return 1000 end,
-			absoluteTime      = function() return 0 end,
-			usleep            = function() end,
-		},
-	})
-
-	-- The terminator re-type goes through TextSender, not through hs.eventtap, so
-	-- it must be recorded on the SAME log to be comparable with the pastes.
-	package.loaded["adapters.text_sender"] = {
-		send     = function(s, _o) emissions[#emissions + 1] = "term:" .. tostring(s) end,
-		pressKey = function(k, _m, _d) emissions[#emissions + 1] = "term:" .. tostring(k) end,
-		sendKeys = function() end,
-		-- perform_text_replacement erases the trigger before emitting; recorded
-		-- rather than ignored so the log shows the full sequence.
-		eraseChars = function(n, _d) emissions[#emissions + 1] = "erase:" .. tostring(n) end,
+	return {
+		update_preview = function() end,
+		get_llm_enabled = function() return false end,
+		start_timer = function() end,
 	}
-	package.loaded["modules.keymap.expander"] = nil
-	package.loaded["modules.keymap.terminator_replay"] = nil
-	E = require("modules.keymap.expander")
-
-	local function fire_pending()
-		table.sort(pending, function(x, y) return x.delay < y.delay end)
-		for _, p in ipairs(pending) do pcall(p.fn) end
-		pending = {}
-	end
-
-	return E, emissions, fire_pending
-end
-
---- 1-based position of the first emission containing needle.
---- @param log table
---- @param needle string
---- @return integer|nil
-local function index_of(log, needle)
-	for i, e in ipairs(log) do
-		if e:find(needle, 1, true) then return i end
-	end
-	return nil
 end
 
 
+local function mapping(replacement, plain)
+	return {
+		trigger = "btw",
+		trigger_bytes = 3,
+		tlen = 3,
+		repl = replacement,
+		plain_repl = plain or replacement,
+		is_word = false,
+		match_mode = "exact",
+		final_result = false,
+	}
+end
 
 
+local function load_fixture()
+	for name in pairs(package.loaded) do
+		if type(name) == "string" and (
+			name:match("^modules%.keymap")
+			or name == "modules.keylogger"
+			or name:match("^adapters%.")
+			or name == "infra.logger"
+			or name == "infra.timings"
+		) then
+			package.loaded[name] = nil
+		end
+	end
 
--- =============================================
--- ==============================================
--- ======= 2/ Order Survives The Deferral =======
--- ==============================================
--- =============================================
+	package.loaded["tests.stubs.hs"] = nil
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	_G.hs = hs_stub
+	package.loaded["hs"] = hs_stub
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.timings"] = {
+		sec = function(_, key)
+			return key == "clipboard_restore_ms" and 0.15 or 0.08
+		end,
+	}
+	package.loaded["modules.keylogger"] = {
+		notify_synthetic = function() end,
+		set_buffer = function() end,
+		log_hotstring = function() end,
+	}
 
-helpers.describe("try_terminator_expand: the re-typed terminator lands last", function()
-	helpers.it("is emitted after a deferred second paste segment", function()
-		local E, log, fire_pending = load_expander()
+	local synthetic = require("adapters.synthetic_input")
+	local scheduled = {}
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(delay, callback)
+			local handle = {
+				delay = delay,
+				callback = callback,
+				cancelled = false,
+				timer = {},
+			}
+			scheduled[#scheduled + 1] = handle
+			return handle, true
+		end,
+		cancel = function(handle)
+			if type(handle) == "table" then
+				handle.cancelled = true
+				handle.timer = nil
+			end
+			return true
+		end,
+	}
+	package.loaded["adapters.text_sender"] = {
+		eraseChars = function(count, delay)
+			for _ = 1, count do
+				if not synthetic.emit_key_stroke({}, "delete", delay or 0) then return false end
+			end
+			return true
+		end,
+		pressKey = function(key, modifiers, delay)
+			return synthetic.emit_key_stroke(modifiers or {}, key, delay or 0)
+		end,
+		send = function(value)
+			return synthetic.emit_key_strokes(value)
+		end,
+	}
+	package.loaded["adapters.tooltip_renderer"] = {
+		hide = function() end,
+	}
 
-		local s = make_state("btw ")
-		-- repl carries a {Left} directive so plain_repl ~= repl and emit_dispatch
-		-- routes through emit_tokens — two paste-worthy segments, so the second
-		-- one is deferred.
-		local m = {
-			trigger       = "btw",
-			trigger_bytes = 3,
-			tlen          = 3,
-			repl          = LONG_A .. "{Left}" .. LONG_B,
-			plain_repl    = LONG_A .. LONG_B,
-			is_word       = false,
-			final_result  = false,
-		}
-		local reg = make_registry({ ["w"] = { m } })
-		E.init(s, reg, make_llm())
+	local clipboard_writes = {}
+	hs_stub.pasteboard.readAllData = function() return { original = "snapshot" } end
+	hs_stub.pasteboard.writeAllData = function() return true end
+	hs_stub.pasteboard.setContents = function(value)
+		if value ~= "" then clipboard_writes[#clipboard_writes + 1] = value end
+		return true
+	end
 
-		local fired = E.try_terminator_expand(m, " ", 1, false)
-		helpers.assert_true(fired, "the expansion must fire, or nothing below is exercised")
-		fire_pending()
+	local expander = require("modules.keymap.expander")
+	local replay = require("modules.keymap.terminator_replay")
+	return {
+		hs = hs_stub,
+		synthetic = synthetic,
+		expander = expander,
+		replay = replay,
+		scheduled = scheduled,
+		clipboard_writes = clipboard_writes,
+	}
+end
 
-		local b_at    = index_of(log, "bbbbbb")
-		local term_at = index_of(log, "term:")
 
-		helpers.assert_true(b_at ~= nil,
-			"the second paste segment must be emitted — without it there is no deferral and "
-				.. "this test would pass vacuously. Order was: " .. table.concat(log, " | "))
-		helpers.assert_true(term_at ~= nil,
-			"the terminator must be re-typed: it is not consumed, so it has to stay on screen. "
-				.. "Order was: " .. table.concat(log, " | "))
-		helpers.assert_true(term_at > b_at,
-			"the terminator must land AFTER the segment it follows. emit_tokens defers that "
-				.. "paste onto a timer while the re-type reaches the OS synchronously, so an "
-				.. "unfenced re-type arrives in the MIDDLE of the replacement. Order was: "
-				.. table.concat(log, " | "))
+local function expand(fixture, entry)
+	local state = make_state("btw ")
+	fixture.expander.init(state, make_registry(), make_llm())
+	fixture.synthetic.enter_callback()
+	local fired = fixture.expander.try_terminator_expand(entry, " ", 1, false)
+	local consume, events = fixture.synthetic.leave_callback(fired)
+	helpers.assert_true(fired, "the integration path must actually expand")
+	helpers.assert_true(consume)
+	helpers.assert_not_nil(events)
+	return events
+end
+
+
+local function fire_hs_zero(fixture)
+	local initial_count = #fixture.hs.timer.__timers
+	local fired = 0
+	for index = 1, initial_count do
+		local timer = fixture.hs.timer.__timers[index]
+		if timer.running and timer.delay == 0 then
+			timer:fire()
+			fired = fired + 1
+		end
+	end
+	return fired
+end
+
+
+--- Advances a callback handoff through confirmation and the retained lifecycle
+--- dispatcher without firing broker work allocated by that lifecycle callback.
+local function fire_hs_lifecycle(fixture)
+	fire_hs_zero(fixture)
+	fire_hs_zero(fixture)
+end
+
+
+local function fire_scheduled_delay(fixture, delay)
+	local initial_count = #fixture.scheduled
+	local fired = 0
+	for index = 1, initial_count do
+		local handle = fixture.scheduled[index]
+		if not handle.cancelled and handle.delay == delay then
+			handle.cancelled = true
+			handle.timer = nil
+			handle.callback()
+			fired = fired + 1
+		end
+	end
+	return fired
+end
+
+
+local function metadata(fixture, event)
+	local property = fixture.hs.eventtap.event.properties.eventSourceUserData
+	return fixture.synthetic.lookup_tag(event:getProperty(property))
+end
+
+
+local function claim_pending(fixture)
+	local fence = fixture.synthetic.claim_physical_fence()
+	helpers.assert_not_nil(fence, "tagged output must be waiting at the physical fence")
+	return fence.events
+end
+
+
+helpers.describe("terminator replay lands after its tagged replacement", function()
+	helpers.it("waits for every deferred replacement batch and the final settle fence", function()
+		local fixture = load_fixture()
+		local inline = expand(fixture, mapping(
+			LONG_A .. "{Left}" .. LONG_B,
+			LONG_A .. LONG_B
+		))
+		local inline_first = metadata(fixture, inline[1])
+		local inline_paste = metadata(fixture, inline[7])
+		helpers.assert_eq(inline_first.owner, "hotstring")
+		helpers.assert_eq(inline_first.effect, "replacement")
+		helpers.assert_eq(inline_first.generation, inline_paste.generation)
+		helpers.assert_eq(inline_paste.ordinal, 4)
+		helpers.assert_eq(inline[7].key, "v")
+		helpers.assert_eq(#fixture.clipboard_writes, 1)
+
+		fire_hs_lifecycle(fixture)
+		helpers.assert_true(fixture.replay.is_pending())
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0,
+			"deferred token timers have not fired yet")
+
+		local token_delay = fixture.scheduled[1].delay
+		helpers.assert_eq(fire_scheduled_delay(fixture, token_delay), 2,
+			"the deferred key and second paste must both run at the first deadline")
+		helpers.assert_eq(#fixture.clipboard_writes, 2)
+		helpers.assert_eq(fixture.clipboard_writes[2], LONG_B)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 2)
+
+		local deferred = claim_pending(fixture)
+		helpers.assert_eq(#deferred, 4)
+		local deferred_key = metadata(fixture, deferred[1])
+		local deferred_paste = metadata(fixture, deferred[3])
+		helpers.assert_eq(deferred_key.generation, inline_first.generation)
+		helpers.assert_eq(deferred_paste.generation, inline_first.generation)
+		helpers.assert_eq(deferred_key.ordinal, 5)
+		helpers.assert_eq(deferred_paste.ordinal, 6)
+		helpers.assert_eq(deferred[1].key, "left")
+		helpers.assert_eq(deferred[3].key, "v")
+		fire_hs_lifecycle(fixture)
+
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0)
+		helpers.assert_true(fixture.replay.is_pending(),
+			"handoff alone cannot prove that the target consumed the second paste")
+		-- Two paste-worthy segments advance the target-settle cursor twice.  A
+		-- clipboard-restore timer is appended when the second paste runs, so "last
+		-- scheduled" is no longer the ordering fence and would exercise the wrong
+		-- capability.
+		local settle_delay = token_delay * 2
+		helpers.assert_true(settle_delay > token_delay)
+		helpers.assert_eq(fire_scheduled_delay(fixture, settle_delay), 1)
+
+		local terminator = claim_pending(fixture)
+		helpers.assert_eq(#terminator, 2)
+		local term_tag = metadata(fixture, terminator[1])
+		helpers.assert_eq(term_tag.owner, "terminator_replay")
+		helpers.assert_eq(term_tag.effect, "replacement")
+		helpers.assert_true(term_tag.generation > inline_first.generation)
+		helpers.assert_eq(term_tag.ordinal, 1)
+		helpers.assert_eq(terminator[1].unicode, " ")
 	end)
 
-	helpers.it("waits for the settle window when the replacement was pasted", function()
-		local E, log, fire_pending = load_expander()
+	helpers.it("holds a single-paste terminator until the target-settle deadline", function()
+		local fixture = load_fixture()
+		local inline = expand(fixture, mapping(LONG_A))
+		local replacement = metadata(fixture, inline[1])
+		helpers.assert_eq(#fixture.clipboard_writes, 1)
+		fire_hs_lifecycle(fixture)
 
-		local s = make_state("btw ")
-		-- One paste-worthy segment: nothing is deferred on OUR side, and this case
-		-- used to assert the re-type therefore fired immediately. It must not. The
-		-- pasted text is produced by the target after it reads the pasteboard, so a
-		-- terminator posted straight after Cmd+V overtakes it.
-		local m = {
-			trigger       = "btw",
-			trigger_bytes = 3,
-			tlen          = 3,
-			repl          = LONG_A .. "{Left}",
-			plain_repl    = LONG_A,
-			is_word       = false,
-			final_result  = false,
-		}
-		local reg = make_registry({ ["w"] = { m } })
-		E.init(s, reg, make_llm())
+		helpers.assert_true(fixture.replay.is_pending())
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0,
+			"transaction completion must not bypass the clipboard settle fence")
+		local settle_delay = fixture.scheduled[#fixture.scheduled].delay
+		helpers.assert_eq(fire_scheduled_delay(fixture, settle_delay), 1)
 
-		E.try_terminator_expand(m, " ", 1, false)
-
-		helpers.assert_true(index_of(log, "term:") == nil,
-			"the terminator must NOT be emitted before the paste has settled. "
-				.. "Order was: " .. table.concat(log, " | "))
-
-		fire_pending()
-
-		local a_at    = index_of(log, "aaaaaa")
-		local term_at = index_of(log, "term:")
-		helpers.assert_true(a_at ~= nil and term_at ~= nil,
-			"both the paste and the terminator must be emitted once the fence elapses. "
-				.. "Order was: " .. table.concat(log, " | "))
-		helpers.assert_true(term_at > a_at,
-			"the terminator must land after the replacement it terminates. "
-				.. "Order was: " .. table.concat(log, " | "))
+		local terminator = claim_pending(fixture)
+		local term_tag = metadata(fixture, terminator[1])
+		helpers.assert_true(term_tag.generation > replacement.generation)
+		helpers.assert_eq(term_tag.owner, "terminator_replay")
 	end)
 
-	helpers.it("a typed replacement releases its terminator on the echo, not on a timer", function()
-		-- The non-regression the paste cases must not cost us: an ordinary
-		-- keystroke-emitted autocorrection must not sit behind a settle gap. Its
-		-- terminator is released by the echo of what we injected, which arrives
-		-- through the keyboard tap within a keystroke or two — so here we drain the
-		-- counters the tap would drain and assert the terminator follows at once,
-		-- with no timer fired.
-		local E, log, fire_pending = load_expander()
-		local Replay = require("modules.keymap.terminator_replay")
+	helpers.it("releases a typed replacement on callback handoff without a settle timer", function()
+		local fixture = load_fixture()
+		local inline = expand(fixture, mapping("by the way"))
+		local replacement = metadata(fixture, inline[1])
+		helpers.assert_true(fixture.replay.is_pending())
+		helpers.assert_eq(#fixture.scheduled, 1,
+			"only the lost-completion watchdog may exist for direct text")
+		helpers.assert_eq(fixture.synthetic.stats().pending, 0)
 
-		local s = make_state("btw ")
-		local m = {
-			trigger       = "btw",
-			trigger_bytes = 3,
-			tlen          = 3,
-			repl          = "by the way",
-			plain_repl    = "by the way",
-			is_word       = false,
-			final_result  = false,
-		}
-		local reg = make_registry({ ["w"] = { m } })
-		E.init(s, reg, make_llm())
-
-		E.try_terminator_expand(m, " ", 1, false)
-
-		helpers.assert_true(index_of(log, "type:") ~= nil,
-			"the replacement must be typed, or this case proves nothing. "
-				.. "Order was: " .. table.concat(log, " | "))
-		helpers.assert_true(index_of(log, "term:") == nil,
-			"the terminator must NOT go out while the replacement's own echoes are still "
-				.. "outstanding — that ordering is the whole point. "
-				.. "Order was: " .. table.concat(log, " | "))
-
-		-- What the keyboard tap does as our injected events come back.
-		s.expected_synthetic_deletes = 0
-		s.expected_synthetic_chars   = " "   -- only the terminator's own echo remains
-		Replay.flush_if_delivered()
-
-		local text_at = index_of(log, "type:")
-		local term_at = index_of(log, "term:")
-		helpers.assert_true(term_at ~= nil,
-			"once the echoes have drained the terminator must be released immediately, with "
-				.. "no timer in the way. Order was: " .. table.concat(log, " | "))
-		helpers.assert_true(term_at > text_at,
-			"and it must land last. Order was: " .. table.concat(log, " | "))
-
-		fire_pending()
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(fixture.replay.is_pending(), false)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 1,
+			"the replay is now an independently tagged deferred batch")
+		local terminator = claim_pending(fixture)
+		local term_tag = metadata(fixture, terminator[1])
+		helpers.assert_true(term_tag.generation > replacement.generation)
+		helpers.assert_eq(term_tag.owner, "terminator_replay")
+		helpers.assert_eq(terminator[1].unicode, " ")
 	end)
 end)
-
--- Restore the real adapter for later test files.
-package.loaded["adapters.text_sender"] = nil
-package.loaded["modules.keymap.expander"] = nil
-package.loaded["modules.keymap.utils"] = nil

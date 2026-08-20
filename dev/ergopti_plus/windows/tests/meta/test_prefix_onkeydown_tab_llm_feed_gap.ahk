@@ -12,9 +12,9 @@
 ; because the live Tab/Enter clause above it matched first and returned. The
 ; net effect: Enter never flushed the LLM bridge through this watcher.
 ;
-; The fix calls LLM_Bridge_FeedKeyDownIfActive(VK) inside the live Tab/Enter
-; clause (which maps 0x0D -> OnFlush) and removes the dead clause. This test
-; verifies the live Tab/Enter clause performs the bridge feed AND that
+; The current fix routes Tab/Enter through the shared ResetVKs branch and calls
+; LLM_Bridge_FeedKeyDownIfActive(VK, true) there. This test verifies that live
+; branch performs the bridge feed AND that
 ; LLM_Bridge_FeedKeyDownIfActive still routes 0x0D to a flush, so the Enter
 ; flush is wired end-to-end through the watcher.
 ;
@@ -30,43 +30,25 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-_PTLFG_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Flush-on-nav wiring assertions ========
+; ======= 1/ Flush-on-nav wiring assertions ========
 ; ==================================================
 ; ==================================================
 
 _PTLFG_EnterFlushReachesBridgeFromWatcher() {
-	Src := _PTLFG_ReadSource("lib/hotstrings/hotstring_prefix_watcher.ahk")
 	Seg := _DriverFuncBody("_OnPrefixKeyDown")
-	Assert(Seg != "", "_OnPrefixKeyDown must exist in hotstring_prefix_watcher.ahk")
-	; Locate the live Tab/Enter clause and confirm it feeds the bridge  -  the
-	; only place Enter (0x0D) can reach the LLM flush on this hook path.
-	Idx := InStr(Seg, "else if (VK == 0x09 or VK == 0x0D)")
-	Assert(Idx > 0, "the live Tab/Enter clause must be present")
-	Tail := SubStr(Seg, Idx)
-	NextClause := InStr(Tail, "} else if")
-	Branch := NextClause ? SubStr(Tail, 1, NextClause) : Tail
-	Assert(InStr(Branch, "LLM_Bridge_FeedKeyDownIfActive(VK)") > 0,
-		"Enter flush must be wired through the live Tab/Enter clause via LLM_Bridge_FeedKeyDownIfActive(VK); the dead trailing else-if can never run")
+	ResetBranch := InStr(Seg, "else if ResetVKs.Has(VK)")
+	EnterEntry := InStr(Seg, "0x0D, true")
+	BridgeFeed := InStr(Seg,
+		"LLM_Bridge_FeedKeyDownIfActive(VK, true)", true, ResetBranch)
+	CatchPos := InStr(Seg, "} catch", true, ResetBranch)
+	Assert(ResetBranch > 0 and EnterEntry > 0 and EnterEntry < ResetBranch,
+		"Enter must remain enrolled in the live ResetVKs branch")
+	Assert(BridgeFeed > ResetBranch and CatchPos > BridgeFeed,
+		"Enter flush must preserve the I1-filtered physical provenance through the live ResetVKs branch; the dead trailing else-if can never run")
 }
 Test("PrefixWatcher: Enter flush reaches the LLM bridge via the watcher (prefix-onkeydown-tab-llm-feed-gap)", _PTLFG_EnterFlushReachesBridgeFromWatcher)
 
 _PTLFG_BridgeMapsEnterToFlush() {
-	Src := _PTLFG_ReadSource("modules/keymap/llm_bridge.ahk")
 	Seg := _DriverFuncBody("LLM_Bridge_FeedKeyDownIfActive")
 	Assert(Seg != "", "LLM_Bridge_FeedKeyDownIfActive must exist in llm_bridge.ahk")
 	; The bridge entry point must still route Enter (0x0D) to a flush, otherwise

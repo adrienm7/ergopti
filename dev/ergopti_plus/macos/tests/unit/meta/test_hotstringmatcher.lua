@@ -35,8 +35,8 @@ local helpers = require("tests.helpers")
 --- @param specs table Array of {trigger, repl, group, is_word, is_case_sensitive}.
 --- @return table Registry module with mappings loaded.
 local function make_registry(specs)
-	package.loaded["lib.logger"] = nil
-	helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	helpers.load_with_stubs("infra.logger")
 	local R = helpers.load_with_stubs("modules.keymap.registry")
 	R.init({
 		magic_key               = "\xe2\x98\x85",  -- UTF-8 for ★

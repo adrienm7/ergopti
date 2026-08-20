@@ -30,15 +30,23 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
-local Logger           = require("lib.logger")
-local Timings          = require("lib.timings")
-local i18n             = require("lib.i18n")
-local Keycodes         = require("lib.keycodes")
+local Logger           = require("infra.logger")
+local Timings          = require("infra.timings")
+local TimerScheduler   = require("adapters.timer_scheduler")
+local i18n             = require("infra.i18n")
+local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
 local keylogger        = require("modules.keylogger")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
+local _runtime_guard = function() return true end
+
+
+local function runtime_available()
+	local ok, available = pcall(_runtime_guard)
+	return ok and available == true
+end
 
 
 
@@ -46,7 +54,9 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 
 
 --- ===================================
+--- ===================================
 --- ======= 1/ Module Constants =======
+--- ===================================
 --- ===================================
 
 -- ── macOS key code ────────────────────────────────────────────────────────────
@@ -90,7 +100,9 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
 
 --- ================================
+--- ================================
 --- ======= 2/ Mutable State =======
+--- ================================
 --- ================================
 
 -- ── Prediction pipeline ───────────────────────────────────────────────────────
@@ -120,6 +132,8 @@ local _last_request_buffer_len = 0
 
 -- Fires perform_check() after inactivity_debounce_sec of silence
 local _inactivity_timer = nil
+local timer_running
+local stop_inactivity_timer
 
 -- Holds the profile name to forward when the rate-limit deferral re-arms the
 -- inactivity timer; cleared by the timer callback after each deferred fire
@@ -127,6 +141,10 @@ local _deferred_profile_name = nil
 
 -- Fallback: fires perform_check() if the F16 chain signal is somehow missed
 local _chain_trigger_timer = nil
+-- Next-runloop dispatch created after the owned F16 signal arrives.
+local _chain_dispatch_timer = nil
+-- Fences fallback and dispatch callbacks across reset/re-arm transitions.
+local _chain_generation = 0
 
 -- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
@@ -158,12 +176,25 @@ local sequential_mode         = LLM_DEFAULTS.llm_sequential_mode
 local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
 local excluded_apps              = {}
 local is_ai_preview_enabled      = true
-local url_bar_filter_enabled     = true  -- When false, predictions are allowed inside browser URL bars
-local secure_field_filter_enabled = true  -- When false, predictions are allowed inside password/secure fields
+-- Privacy gates, sourced from defaults.json like every other shared scalar. These
+-- were hardcoded to true here while the shared value said false and Windows read
+-- the shared value, so the same setting shipped with opposite defaults on the two
+-- drivers. Canonical posture: password/secure fields blocked, URL bars allowed —
+-- a credential is not a URL.
+local url_bar_filter_enabled      = LLM_DEFAULTS.llm_disable_url_bars
+local secure_field_filter_enabled = LLM_DEFAULTS.llm_disable_password_fields
 local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
 local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypass debounce at word boundaries
+
+--- Stable dependency identity for WarmupController. A retry after a later child
+--- refuses must present the same function object, not a fresh closure that the
+--- controller correctly treats as an ownership replacement attempt.
+--- @return boolean enabled
+local function get_runtime_llm_enabled()
+	return is_llm_enabled
+end
 
 
 
@@ -261,6 +292,13 @@ end
 function M.get_llm_enabled() return is_llm_enabled end
 
 function M.set_llm_model(model_name)
+	local changed = active_model ~= model_name
+	if changed then
+		-- Model identity owns every pending debounce, watchdog and backend request.
+		-- Tear those down before publishing the new identity so a completion from
+		-- the old model cannot appear under the new menu selection.
+		M.reset()
+	end
 	local backend = core_llm.get_backend()
 	if backend == "mlx" then core_llm.set_llm_model_mlx(model_name)
 	else core_llm.set_llm_model_ollama(model_name) end
@@ -268,7 +306,7 @@ function M.set_llm_model(model_name)
 	Logger.info(LOG, "Model set: '%s' (backend: %s).", tostring(model_name), tostring(backend))
 	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
 	-- during startup when set_llm_model fires before set_llm_enabled(true))
-	if is_llm_enabled then
+	if is_llm_enabled and type(model_name) == "string" and model_name ~= "" then
 		WarmupController.schedule_warmup_with_retry("set_llm_model")
 	end
 end
@@ -400,10 +438,20 @@ function M.set_llm_debounce(seconds)
 	-- from config.toml would blow up inside the timer callback where nothing logs
 	inactivity_debounce_sec = tonumber(seconds) or LLM_DEFAULTS.llm_debounce
 	if _inactivity_timer then
-		_inactivity_timer:stop()
-		_inactivity_timer:setDelay(inactivity_debounce_sec)
+		if stop_inactivity_timer() ~= true then
+			Logger.error(LOG, "Debounce update rejected because the active timer could not be stopped.")
+			return false
+		end
+		local delay_ok, delay_err = xpcall(function()
+			_inactivity_timer:setDelay(inactivity_debounce_sec)
+		end, debug.traceback)
+		if not delay_ok then
+			Logger.error(LOG, "Debounce update failed: %s", tostring(delay_err))
+			return false
+		end
 	end
 	Logger.debug(LOG, "Inactivity timer delay updated: %.3fs.", inactivity_debounce_sec)
+	return true
 end
 
 
@@ -412,7 +460,9 @@ end
 
 
 --- ==================================
+--- ==================================
 --- ======= 4/ Private Helpers =======
+--- ==================================
 --- ==================================
 
 --- Guards functions that require _state. Logs an error and returns false if it is nil.
@@ -496,10 +546,24 @@ end
 --- Called after the final prediction batch arrives so the timer starts with the correct duration.
 --- A delay of 0 keeps the tooltip on screen indefinitely.
 local function reset_llm_dismiss_timer()
+	if not runtime_available() then return false end
 	local delay = (_state and _state.DELAYS and _state.DELAYS.llm_prediction) or 0
-	tooltip.set_llm_timeout(delay)
-	tooltip.reset_llm_timer()
+	local timeout_ok, timeout_err = pcall(tooltip.set_llm_timeout, delay)
+	if not timeout_ok then
+		Logger.error(LOG, "LLM dismiss timeout update raised — timer not committed: %s", tostring(timeout_err))
+		return false
+	end
+	local reset_ok, reset_result = pcall(tooltip.reset_llm_timer)
+	if not reset_ok then
+		Logger.error(LOG, "LLM dismiss timer reset raised — timer not committed: %s", tostring(reset_result))
+		return false
+	end
+	if reset_result ~= true then
+		Logger.error(LOG, "LLM dismiss timer reset did not commit (result: %s).", tostring(reset_result))
+		return false
+	end
 	Logger.debug(LOG, "LLM dismiss timer reset (delay: %gs).", delay)
+	return true
 end
 
 --- Computes an adaptive debounce delay based on the user's current typing speed.
@@ -529,22 +593,134 @@ end
 --- Arms the inactivity debounce timer to fire perform_check() after silence.
 --- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
 local function start_inactivity_timer(delay_override)
-	if not is_llm_enabled or inactivity_debounce_sec < 0 or not _inactivity_timer then return end
-	if delay_override then
-		_inactivity_timer:start(delay_override)
-		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay_override)
-	else
-		local delay = compute_adaptive_debounce()
+	if not runtime_available() then return false end
+	if not is_llm_enabled or inactivity_debounce_sec < 0 or not _inactivity_timer then return false end
+	local delay = delay_override
+	if delay == nil then delay = compute_adaptive_debounce() end
+	local start_ok, start_err = xpcall(function()
 		_inactivity_timer:start(delay)
+	end, debug.traceback)
+	if not start_ok then
+		Logger.error(LOG, "Cannot start inactivity timer: %s", tostring(start_err))
+		return false
+	end
+	local status_ok, running_or_err = timer_running(_inactivity_timer)
+	if not status_ok then
+		Logger.error(LOG, "Cannot verify started inactivity timer: %s", tostring(running_or_err))
+		return false
+	end
+	if not running_or_err then
+		Logger.error(LOG, "Inactivity timer remained stopped after start().")
+		return false
+	end
+	if delay_override ~= nil then
+		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
+	else
 		Logger.trace(LOG, "Inactivity timer started (adaptive: %.3fs).", delay)
 	end
+	return true
 end
---- Cancels the inactivity timer without firing the LLM check.
-local function stop_inactivity_timer()
-	if _inactivity_timer then
-		_inactivity_timer:stop()
-		Logger.done(LOG, "Inactivity timer stopped.")
+--- Reads a timer's native running state.
+--- @param timer table|userdata Timer candidate.
+--- @return boolean readable True when the probe completed.
+--- @return boolean|string running_or_error Running state, or a diagnostic.
+timer_running = function(timer)
+	local timer_type = type(timer)
+	if timer_type ~= "table" and timer_type ~= "userdata" then
+		return false, "invalid timer"
 	end
+	local probe = timer.running
+	if type(probe) == "function" then
+		local ok, running_or_err = pcall(probe, timer)
+		if not ok then return false, tostring(running_or_err) end
+		return true, running_or_err == true
+	end
+	if type(probe) == "boolean" then return true, probe end
+	return false, "running-state probe unavailable"
+end
+
+
+--- Cancels the inactivity timer without firing the LLM check.
+--- The canonical handle is retained permanently; a failed verification is
+--- retryable and must never be reported as a completed reset.
+--- @return boolean stopped True only when native state reports not running.
+stop_inactivity_timer = function()
+	local timer = _inactivity_timer
+	if not timer then return true end
+	if type(timer.stop) ~= "function" then
+		Logger.error(LOG, "Cannot stop inactivity timer: stop() is unavailable.")
+		return false
+	end
+	local stop_ok, stop_err = xpcall(function()
+		timer:stop()
+	end, debug.traceback)
+	if not stop_ok then
+		Logger.error(LOG, "Cannot stop inactivity timer: %s", tostring(stop_err))
+		return false
+	end
+	local status_ok, running_or_err = timer_running(timer)
+	if not status_ok then
+		Logger.error(LOG, "Cannot verify stopped inactivity timer: %s", tostring(running_or_err))
+		return false
+	end
+	if running_or_err then
+		Logger.error(LOG, "Inactivity timer remained running after stop().")
+		return false
+	end
+	Logger.done(LOG, "Inactivity timer stopped.")
+	return true
+end
+
+
+--- Verifies ownership of a newly created one-shot timer.
+--- @param timer table|userdata Timer candidate.
+--- @param label string Diagnostic label.
+--- @return boolean committed True only when the timer is running.
+local function verify_started_timer(timer, label)
+	local timer_type = type(timer)
+	if timer_type ~= "table" and timer_type ~= "userdata" then
+		Logger.error(LOG, "%s timer creation returned %s.", tostring(label), timer_type)
+		return false
+	end
+	local status_ok, running_or_err = timer_running(timer)
+	if not status_ok then
+		Logger.error(LOG, "Cannot verify started %s timer: %s", tostring(label), tostring(running_or_err))
+		return false
+	end
+	if not running_or_err then
+		Logger.error(LOG, "%s timer was created stopped.", tostring(label))
+		return false
+	end
+	return true
+end
+
+
+--- Stops one owned timer and preserves its handle until native state commits.
+--- @param timer table|userdata|nil Timer handle.
+--- @param label string Diagnostic label.
+--- @return boolean stopped True only when no live callback remains.
+local function stop_timer_handle(timer, label)
+	if timer == nil then return true end
+	local timer_type = type(timer)
+	if (timer_type ~= "table" and timer_type ~= "userdata") or type(timer.stop) ~= "function" then
+		Logger.error(LOG, "Cannot stop %s timer: stop() is unavailable.", tostring(label))
+		return false
+	end
+	local stop_ok, stop_err = xpcall(function() timer:stop() end, debug.traceback)
+	if not stop_ok then
+		Logger.error(LOG, "Cannot stop %s timer: %s", tostring(label), tostring(stop_err))
+		return false
+	end
+	local status_ok, running_or_err = timer_running(timer)
+	if not status_ok then
+		Logger.error(LOG, "Cannot verify stopped %s timer: %s", tostring(label), tostring(running_or_err))
+		return false
+	end
+	if running_or_err then
+		Logger.error(LOG, "%s timer remained running after stop().", tostring(label))
+		return false
+	end
+	return true
 end
 
 
@@ -571,6 +747,7 @@ end
 --- @param force_trigger boolean If true, bypasses the freshness and word-count guards.
 --- @param profile_name string|nil Optional profile label override shown in the info bar.
 function M.perform_check(force_trigger, profile_name)
+	if not runtime_available() then return end
 	if not require_state("perform_check") then return end
 
 	-- Defence-in-depth: a debounce/chain timer armed in the moment before the
@@ -590,6 +767,23 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "LLM disabled — request skipped.")
 		return
 	end
+	-- Preview-off is an intentional no-surface state, not a failed render. Do not
+	-- spend prompt/backend work on a result that cannot be published or accepted.
+	if not is_ai_preview_enabled then
+		Logger.debug(LOG, "AI preview disabled — request skipped.")
+		return
+	end
+	local model_ok, model_to_use = xpcall(function()
+		return core_llm.get_current_model()
+	end, debug.traceback)
+	if not model_ok then
+		Logger.error(LOG, "Current model lookup raised — request aborted: %s", tostring(model_to_use))
+		return
+	end
+	if type(model_to_use) ~= "string" or model_to_use == "" then
+		Logger.debug(LOG, "No active model — request skipped.")
+		return
+	end
 	-- Backend readiness gate: until the warmup has confirmed the model is loaded
 	-- and serving inference, dispatching a request would show the loading tooltip
 	-- against a server that simply cannot answer in time. Skip silently so the
@@ -605,14 +799,19 @@ function M.perform_check(force_trigger, profile_name)
 
 	-- Sync dismiss delay before the first show call so the timer is created with the correct duration
 	local dismiss_delay = (_state.DELAYS and _state.DELAYS.llm_prediction) or 0
-	tooltip.set_llm_timeout(dismiss_delay)
+	local timeout_ok, timeout_err = pcall(tooltip.set_llm_timeout, dismiss_delay)
+	if not timeout_ok then
+		Logger.error(LOG, "LLM dismiss timeout update raised — request aborted: %s", tostring(timeout_err))
+		M.reset()
+		return
+	end
 
 	local buffer = _state.buffer
 
 	-- Delegate prompt parameter building to PromptBuilder.
 	-- Guarded: perform_check is the body of the module-level debounce timer, and
 	-- hs.timer callbacks are pcall'd by Hammerspoon — a throw here would be routed
-	-- to the Hammerspoon Console and never reach lib/logger. The failure mode is
+	-- to the Hammerspoon Console and never reach infra/logger. The failure mode is
 	-- invisible and permanent: the health dot stays green, the backend stays
 	-- ready, and no prediction ever appears again for the session. Surfacing the
 	-- error through Logger.error makes it diagnosable from the unified log.
@@ -652,15 +851,13 @@ function M.perform_check(force_trigger, profile_name)
 			-- Reuse the single canonical timer instead of creating an orphan;
 			-- store profile_name so the callback can forward it when it fires
 			_deferred_profile_name = profile_name
-			_inactivity_timer:stop()
-			_inactivity_timer:start(remaining)
+			if stop_inactivity_timer() ~= true or start_inactivity_timer(remaining) ~= true then
+				_deferred_profile_name = nil
+				Logger.error(LOG, "Rate-limit deferral timer did not commit; request abandoned.")
+			end
 			return
 		end
 	end
-
-	last_buffer_signature    = signature
-	_last_request_buffer_len = #buffer
-	_last_request_at_s       = hs.timer.secondsSinceEpoch()
 
 	-- Pre-build the info bar for streaming frames; on_success replaces it with the latency-aware version
 	local active_profile_now   = core_llm.get_active_profile()
@@ -669,26 +866,70 @@ function M.perform_check(force_trigger, profile_name)
 		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
 		or nil
 
-	local model_to_use    = core_llm.get_current_model()
 	local num_preds       = params.num_preds
-
-	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
-		tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
-
-	-- The tooltip ignores duplicate set_chain_start calls — the first in a chain wins
-	pcall(tooltip.set_chain_start, hs.timer.secondsSinceEpoch())
-
-	-- Only show the spinner when the screen is empty; otherwise mark existing predictions as
-	-- placeholders so on_partial_cb evicts them cleanly when new tokens arrive
-	if not predictions_visible then
-		tooltip.show_loading(i18n.get("llm.generating"), is_ai_preview_enabled, tooltip.tint("ai_loading"))
-	else
-		for _, p in ipairs(pending_predictions) do p._is_stream_placeholder = true end
-	end
 
 	llm_request_counter   = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
+
+	--- Reports whether this exact request still owns the pipeline.
+	--- @return boolean current True while no reset or newer dispatch superseded it.
+	local function is_current_fetch()
+		return runtime_available() and fetch_request_counter == my_fetch_id
+	end
+
+	--- Fails closed only while this request still owns the surface.
+	--- @param stage string UI stage that failed to commit.
+	--- @param detail any Returned value or raised error.
+	--- @return boolean reset True when this request performed the reset.
+	local function close_current_request(stage, detail)
+		if not is_current_fetch() then return false end
+		Logger.error(LOG, "LLM request stage '%s' did not commit — request abandoned (result: %s).",
+			tostring(stage), tostring(detail))
+		local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
+		if not reset_ok or reset_result ~= true then
+			Logger.error(LOG, "LLM request cleanup did not commit after '%s' (result: %s).",
+				tostring(stage), tostring(reset_result))
+			return false
+		end
+		return true
+	end
+
+	-- An empty surface needs an explicit loading commit before any backend work.
+	-- Existing predictions were themselves committed by StreamingHandler, so they
+	-- may remain visible while the replacement request is dispatched.
+	if not predictions_visible then
+		-- Keep argument construction inside the protected boundary: tint() and the
+		-- locale lookup are native/dependency calls too, and a throw before pcall's
+		-- function argument otherwise bypasses the file logger and leaves no surface.
+		local loading_ok, loading_result = xpcall(function()
+			return tooltip.show_loading(
+				i18n.get("llm.generating"),
+				is_ai_preview_enabled,
+				tooltip.tint("ai_loading")
+			)
+		end, debug.traceback)
+		if not loading_ok or loading_result ~= true then
+			close_current_request("loading render", loading_result)
+			return
+		end
+		if not is_current_fetch() then return end
+	end
+
+	local chain_ok, chain_result = xpcall(function()
+		return tooltip.set_chain_start(hs.timer.secondsSinceEpoch())
+	end, debug.traceback)
+	if not chain_ok or chain_result ~= true then
+		close_current_request("chain timing", chain_result)
+		return
+	end
+	if not is_current_fetch() then return end
+
+	-- Only after the current surface is proven usable may prior rows become
+	-- placeholders and the backend lifecycle become externally observable.
+	if predictions_visible then
+		for _, p in ipairs(pending_predictions) do p._is_stream_placeholder = true end
+	end
 
 	-- Shared noise gate — must be consistent between partial and final paths
 	local function is_noise_pred(to_type)
@@ -721,31 +962,43 @@ function M.perform_check(force_trigger, profile_name)
 		predictions_visible = visible_ref.value
 	end
 
-	-- Build the streaming callbacks via StreamingHandler
-	local on_partial_cb, on_success_cb, on_fail_cb = StreamingHandler.build_callbacks({
-		buffer                  = buffer,
-		tail                    = params.tail,
-		my_fetch_id             = my_fetch_id,
-		get_fetch_id            = function() return fetch_request_counter end,
-		is_streaming_enabled    = is_streaming_enabled,
-		is_streaming_multi_enabled = is_streaming_multi_enabled,
-		num_predictions         = num_preds,
-		show_info_bar           = show_info_bar,
-		streaming_info_bar      = streaming_info_bar,
-		prediction_indent       = prediction_indent,
-		validation_mods         = normalize_mods(validation_mods),
-		navigation_mods         = normalize_mods(navigation_mods),
-		model_to_use            = model_to_use,
-		llm_display_name        = llm_display_name,
-		profile_name            = profile_name,
-		build_info_bar_text     = build_info_bar_text,
-		resolve_backend_label   = resolve_backend_label,
-		is_noise_pred           = is_noise_pred,
-		reset_llm_dismiss_timer = reset_llm_dismiss_timer,
-		is_ai_preview_enabled   = is_ai_preview_enabled,
-		pending_predictions_ref = pending_ref,
-		predictions_visible_ref = visible_ref,
-	})
+	-- Callback construction happens after the loading surface is live. Keep both
+	-- the context builders and the factory inside the same boundary: a throw here
+	-- otherwise strands a spinner with no watchdog and no backend callback able to
+	-- dismiss it.
+	local callbacks_ok, on_partial_cb, on_success_cb, on_fail_cb = xpcall(function()
+		return StreamingHandler.build_callbacks({
+			buffer                  = buffer,
+			tail                    = params.tail,
+			my_fetch_id             = my_fetch_id,
+			get_fetch_id            = function() return fetch_request_counter end,
+			is_streaming_enabled    = is_streaming_enabled,
+			is_streaming_multi_enabled = is_streaming_multi_enabled,
+			num_predictions         = num_preds,
+			show_info_bar           = show_info_bar,
+			streaming_info_bar      = streaming_info_bar,
+			prediction_indent       = prediction_indent,
+			validation_mods         = normalize_mods(validation_mods),
+			navigation_mods         = normalize_mods(navigation_mods),
+			model_to_use            = model_to_use,
+			llm_display_name        = llm_display_name,
+			profile_name            = profile_name,
+			build_info_bar_text     = build_info_bar_text,
+			resolve_backend_label   = resolve_backend_label,
+			is_noise_pred           = is_noise_pred,
+			reset_llm_dismiss_timer = reset_llm_dismiss_timer,
+			is_ai_preview_enabled   = is_ai_preview_enabled,
+			pending_predictions_ref = pending_ref,
+			predictions_visible_ref = visible_ref,
+			runtime_available       = runtime_available,
+			on_ui_unavailable       = close_current_request,
+		})
+	end, debug.traceback)
+	if not callbacks_ok or type(on_success_cb) ~= "function" or type(on_fail_cb) ~= "function" then
+		close_current_request("callback construction", callbacks_ok and "invalid callback set" or on_partial_cb)
+		return
+	end
+	if not is_current_fetch() then return end
 
 	-- Wrap callbacks to keep local state in sync after each call.
 	--
@@ -761,46 +1014,80 @@ function M.perform_check(force_trigger, profile_name)
 	--
 	-- The handler-level guard cannot cover this: the clobber happens one level
 	-- above it, in these two-line wrappers.
-	local function is_current_fetch()
-		return fetch_request_counter == my_fetch_id
-	end
-	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
-		on_success_cb(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+	local function run_async_callback(stage, callback, ...)
+		if not is_current_fetch() then return end
+		local args = table.pack(...)
+		local callback_ok, callback_err = xpcall(function()
+			return callback(table.unpack(args, 1, args.n))
+		end, debug.traceback)
+		if not callback_ok then
+			close_current_request(stage, callback_err)
+			return
+		end
 		if is_current_fetch() then sync_refs() end
+	end
+
+	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+		run_async_callback("success callback", on_success_cb,
+			raw_predictions, elapsed_ms, is_final, is_batch_progressive)
 	end
 	local function on_fail()
-		on_fail_cb()
-		if is_current_fetch() then sync_refs() end
+		run_async_callback("failure callback", on_fail_cb)
 	end
 	local on_partial = on_partial_cb and function(partial_raw)
-		on_partial_cb(partial_raw)
-		if is_current_fetch() then sync_refs() end
+		run_async_callback("partial callback", on_partial_cb, partial_raw)
 	end or nil
 
-	-- Arm the watchdog via StreamingHandler
-	StreamingHandler.arm_watchdog({
-		my_fetch_id             = my_fetch_id,
-		get_fetch_id            = function() return fetch_request_counter end,
-		pending_predictions_ref = pending_ref,
-		predictions_visible_ref = visible_ref,
-		validation_mods         = normalize_mods(validation_mods),
-		navigation_mods         = normalize_mods(navigation_mods),
-		show_info_bar           = show_info_bar,
-		llm_display_name        = llm_display_name,
-		prediction_indent       = prediction_indent,
-		is_ai_preview_enabled   = is_ai_preview_enabled,
-		build_info_bar_text     = build_info_bar_text,
-		resolve_backend_label   = resolve_backend_label,
-	})
+	-- A request without a live watchdog can strand the loading surface forever.
+	-- Treat timer construction and start verification as part of dispatch commit.
+	local watchdog_ok, watchdog_result = xpcall(function()
+		return StreamingHandler.arm_watchdog({
+			my_fetch_id             = my_fetch_id,
+			get_fetch_id            = function() return fetch_request_counter end,
+			pending_predictions_ref = pending_ref,
+			predictions_visible_ref = visible_ref,
+			validation_mods         = normalize_mods(validation_mods),
+			navigation_mods         = normalize_mods(navigation_mods),
+			show_info_bar           = show_info_bar,
+			llm_display_name        = llm_display_name,
+			prediction_indent       = prediction_indent,
+			is_ai_preview_enabled   = is_ai_preview_enabled,
+			build_info_bar_text     = build_info_bar_text,
+			resolve_backend_label   = resolve_backend_label,
+			runtime_available       = runtime_available,
+			on_ui_unavailable       = close_current_request,
+		})
+	end, debug.traceback)
+	if not watchdog_ok or watchdog_result ~= true then
+		close_current_request("watchdog arm", watchdog_result)
+		return
+	end
+	if not is_current_fetch() then return end
 
-	core_llm.fetch_llm_prediction(
-		params.context_buffer, params.tail, model_to_use, params.req_temperature,
-		params.max_tokens, num_preds,
-		on_success,
-		on_fail,
-		sequential_mode, force_trigger, function() return fetch_request_counter end,
-		on_partial
-	)
+	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
+		tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
+
+	local fetch_ok, fetch_err = xpcall(function()
+		core_llm.fetch_llm_prediction(
+			params.context_buffer, params.tail, model_to_use, params.req_temperature,
+			params.max_tokens, num_preds,
+			on_success,
+			on_fail,
+			sequential_mode, force_trigger, function() return fetch_request_counter end,
+			on_partial
+		)
+	end, debug.traceback)
+	if not fetch_ok then
+		close_current_request("backend dispatch", fetch_err)
+		return
+	end
+	if not is_current_fetch() then return end
+
+	-- Rate-limit and duplicate-suppression state describes real backend calls,
+	-- never a loading paint or failed watchdog construction.
+	last_buffer_signature    = signature
+	_last_request_buffer_len = #buffer
+	_last_request_at_s       = hs.timer.secondsSinceEpoch()
 end
 
 --- Clears all active predictions and fully resets the prediction pipeline state.
@@ -808,16 +1095,30 @@ end
 --- The keymap bridge wraps this to also handle hotstring dismissal telemetry.
 function M.reset()
 	local was_visible = predictions_visible and #pending_predictions > 0
+	local dismissed_predictions = was_visible and pending_predictions or nil
+	local cleanup_committed = true
 
-	if was_visible then
-		keylogger.log_llm_dismissed(nil, pending_predictions)
+	--- Runs one cleanup stage without preventing its siblings from executing.
+	--- @param stage string Diagnostic stage label.
+	--- @param fn function Cleanup operation.
+	--- @param require_true boolean Whether the operation has a strict commit result.
+	--- @return boolean committed True when this stage completed as required.
+	local function cleanup_stage(stage, fn, require_true)
+		local ok, result = xpcall(fn, debug.traceback)
+		if not ok or (require_true and result ~= true) then
+			cleanup_committed = false
+			Logger.error(LOG, "Prediction reset stage '%s' did not commit (result: %s).",
+				tostring(stage), tostring(result))
+			return false
+		end
+		return true
 	end
 
 	-- Finalise chain timing before tearing down state so the tooltip can
 	-- compute TTLT against the last update and render the full line one last
 	-- time. Safe to call unconditionally — tooltip ignores it if no chain
 	-- was armed (e.g. reset fired before any backend dispatch).
-	pcall(tooltip.mark_chain_complete)
+	cleanup_stage("chain timing", tooltip.mark_chain_complete, false)
 
 	pending_predictions        = {}
 	predictions_visible        = false
@@ -834,40 +1135,99 @@ function M.reset()
 	-- timer callback that fires between now and its cancellation sees
 	-- chain_pending = false and refuses to launch a fetch (D3 audit fix).
 	chain_pending = false
-	if _chain_trigger_timer then _chain_trigger_timer:stop(); _chain_trigger_timer = nil end
+	_chain_generation = _chain_generation + 1
+	if _chain_trigger_timer then
+		local timer = _chain_trigger_timer
+		cleanup_stage("chain fallback timer stop", function()
+			local stopped = stop_timer_handle(timer, "chain fallback")
+			if stopped and _chain_trigger_timer == timer then _chain_trigger_timer = nil end
+			return stopped
+		end, true)
+	end
+	if _chain_dispatch_timer then
+		local timer = _chain_dispatch_timer
+		cleanup_stage("chain dispatch timer stop", function()
+			local stopped = stop_timer_handle(timer, "chain dispatch")
+			if stopped and _chain_dispatch_timer == timer then _chain_dispatch_timer = nil end
+			return stopped
+		end, true)
+	end
 
-	StreamingHandler.reset_failure_count()
-	if tooltip.hide_forced then tooltip.hide_forced() else tooltip.hide() end
-	stop_inactivity_timer()
-	StreamingHandler.stop_watchdog()
+	cleanup_stage("failure counter reset", StreamingHandler.reset_failure_count, false)
+
+	-- A false/throwing silent hide must not abort the remaining cancellation
+	-- stages. Try each stronger public fallback before admitting that pixels could
+	-- not be revoked, while avoiding duplicate calls to the same function value.
+	local hidden = false
+	local attempted_hides = {}
+	local hide_candidates = {}
+	for _, candidate_name in ipairs({ "hide_forced_silent", "hide_forced", "hide" }) do
+		local candidate = tooltip[candidate_name]
+		if type(candidate) == "function" then hide_candidates[#hide_candidates + 1] = candidate end
+	end
+	for _, hide_fn in ipairs(hide_candidates) do
+		if not attempted_hides[hide_fn] then
+			attempted_hides[hide_fn] = true
+			local hide_ok, hide_result = xpcall(hide_fn, debug.traceback)
+			if hide_ok and hide_result == true then
+				hidden = true
+				break
+			end
+			Logger.error(LOG, "Prediction reset hide attempt did not commit (result: %s).", tostring(hide_result))
+		end
+	end
+	if not hidden then cleanup_committed = false end
+
+	cleanup_stage("inactivity timer stop", stop_inactivity_timer, true)
+	cleanup_stage("stream watchdog stop", StreamingHandler.stop_watchdog, true)
 	-- Cancel any in-flight streaming curl UNCONDITIONALLY — not gated on the current
 	-- is_streaming_enabled. A stream dispatched while streaming was ON can still be in
 	-- flight after the user toggles streaming OFF; gating on the live flag would skip
 	-- the cancel and leak the curl task (and on MLX, the single-request connection it
 	-- holds blocks the next prediction). cancel_streaming is a null-safe idempotent
 	-- no-op when nothing is streaming, mirroring stop_timer()'s unconditional cancel (F-L11).
-	pcall(core_llm.cancel_streaming)
+	cleanup_stage("backend stream cancel", core_llm.cancel_streaming, true)
 
-	if was_visible then
-		Logger.debug(LOG, "Predictions cleared (were visible).")
+	if dismissed_predictions then
+		-- Persistence performs an open/write/flush in the keylogger. reset() is
+		-- reached from the keyDown eventtap, so telemetry must run only after that
+		-- callback returns. Capture the immutable pool before clearing module state.
+		local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
+			return TimerScheduler.after(0, function()
+				pcall(keylogger.log_llm_dismissed, nil, dismissed_predictions)
+				Logger.debug(LOG, "Predictions cleared (were visible).")
+			end)
+		end, debug.traceback)
+		if not schedule_ok or telemetry_committed ~= true then
+			Logger.error(LOG, "Prediction dismissal telemetry could not be scheduled (result: %s).",
+				tostring(handle_or_err))
+		end
 	end
+	return cleanup_committed
 end
 
---- Captures the prediction at the given index for an apply operation.
---- Sets predictions_visible to false so subsequent reset() does not emit a dismissal event —
---- the bridge will log the acceptance event instead.
+--- Captures the prediction at the given index for an apply operation and
+--- atomically fences every older async callback before external cleanup begins.
+--- The bridge logs acceptance, so the following reset must not emit dismissal.
 --- @param idx number The 1-based prediction index to consume.
 --- @return table|nil pred The prediction entry, or nil if the index is invalid.
 --- @return table|nil all_preds The full prediction pool at the time of consumption, or nil.
 function M.consume(idx)
+	if not runtime_available() then return nil, nil end
 	local pred = pending_predictions[idx]
 	if not pred then
 		Logger.warn(LOG, "consume(%d): invalid index (pool of %d prediction(s)).", idx, #pending_predictions)
 		return nil, nil
 	end
 	local all_preds = pending_predictions
-	-- Prevent reset() from emitting a dismissal event; the bridge logs acceptance instead
+	-- Commit the logical half of acceptance before any timer/task/canvas teardown.
+	-- Even if native cleanup later fails, an old stream can no longer repaint over
+	-- the text the user accepted.
 	predictions_visible = false
+	pending_predictions = {}
+	last_buffer_signature = nil
+	llm_request_counter = llm_request_counter + 1
+	fetch_request_counter = fetch_request_counter + 1
 	return pred, all_preds
 end
 
@@ -875,20 +1235,66 @@ end
 --- Sets chain_pending and starts a fallback timer in case the F16 signal is missed.
 --- Must be called BEFORE hs.eventtap.keyStroke({}, "f16", 0) is sent by the bridge.
 function M.arm_chain()
-	if not require_state("arm_chain") then return end
-	if _inactivity_timer    then _inactivity_timer:stop() end
-	if _chain_trigger_timer then _chain_trigger_timer:stop() end
+	if not runtime_available() then return false end
+	if not require_state("arm_chain") then return false end
+	if stop_inactivity_timer() ~= true then return false end
+	if _chain_trigger_timer then
+		local old_timer = _chain_trigger_timer
+		if stop_timer_handle(old_timer, "prior chain fallback") ~= true then return false end
+		if _chain_trigger_timer == old_timer then _chain_trigger_timer = nil end
+	end
+	if _chain_dispatch_timer then
+		local old_timer = _chain_dispatch_timer
+		if stop_timer_handle(old_timer, "prior chain dispatch") ~= true then return false end
+		if _chain_dispatch_timer == old_timer then _chain_dispatch_timer = nil end
+	end
 
-	chain_pending = true
-	_state.suppress_rescan_keep_buffer(CHAIN_FALLBACK_SEC)
-
-	_chain_trigger_timer = hs.timer.doAfter(CHAIN_FALLBACK_SEC, function()
-		if chain_pending then
-			chain_pending = false
-			Logger.warn(LOG, "Fallback chain triggered — F16 signal was missed.")
-			M.perform_check(true)
+	local next_generation = _chain_generation + 1
+	local candidate
+	local create_ok, created_or_err = xpcall(function()
+		candidate = hs.timer.doAfter(CHAIN_FALLBACK_SEC, function()
+			local callback_ok, callback_err = xpcall(function()
+				if next_generation ~= _chain_generation or _chain_trigger_timer ~= candidate then return end
+				_chain_trigger_timer = nil
+				if not chain_pending or not runtime_available() then
+					chain_pending = false
+					return
+				end
+				chain_pending = false
+				Logger.warn(LOG, "Fallback chain triggered — F16 signal was missed.")
+				M.perform_check(true)
+			end, debug.traceback)
+			if not callback_ok then
+				Logger.error(LOG, "Chain fallback callback raised: %s", tostring(callback_err))
+			end
+		end)
+		return candidate
+	end, debug.traceback)
+	if not create_ok or not verify_started_timer(created_or_err, "chain fallback") then
+		if type(created_or_err) == "table" or type(created_or_err) == "userdata" then
+			if stop_timer_handle(created_or_err, "invalid chain fallback") ~= true then
+				_chain_trigger_timer = created_or_err
+			end
 		end
-	end)
+		Logger.error(LOG, "Chain fallback timer did not commit (result: %s).", tostring(created_or_err))
+		return false
+	end
+
+	local suppress_ok, suppress_err = xpcall(function()
+		_state.suppress_rescan_keep_buffer(CHAIN_FALLBACK_SEC)
+	end, debug.traceback)
+	if not suppress_ok then
+		if stop_timer_handle(candidate, "uncommitted chain fallback") ~= true then
+			_chain_trigger_timer = candidate
+		end
+		Logger.error(LOG, "Chain rescan suppression did not commit: %s", tostring(suppress_err))
+		return false
+	end
+
+	_chain_generation = next_generation
+	_chain_trigger_timer = candidate
+	chain_pending = true
+	return true
 end
 
 
@@ -897,31 +1303,58 @@ end
 
 
 --- =============================
+--- =============================
 --- ======= 6/ Public API =======
 --- =============================
+--- =============================
+
+--- Installs the live action-epoch predicate used by timers, fetches and actions.
+--- @param fn function|nil Zero-arity predicate.
+function M.set_runtime_guard(fn)
+	_runtime_guard = type(fn) == "function" and fn or function() return true end
+end
+
 
 --- Initializes the engine by injecting the shared keymap core state.
---- Must be called exactly once before any other engine function.
+--- Must be called exactly once before any other engine function in this module.
 --- @param core_state table The shared state object from modules/keymap/init.lua.
+--- @return boolean committed True only when every dependency is ready.
 function M.init(core_state)
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): invalid core_state (expected table, got %s).", type(core_state))
-		return
+		return false
 	end
-	_state = core_state
+	if _state then
+		if _state == core_state then
+			Logger.warn(LOG, "M.init() called more than once with the active state — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
+		return false
+	end
 
-	-- Initialize submodules with their required dependencies
-	WarmupController.init({
+	-- A parent may only publish this engine after every child reports an exact
+	-- commitment. Children treat a duplicate with the same retained binding as
+	-- success, so a retry can converge after a later child refused.
+	if WarmupController.init({
 		core_llm        = core_llm,
-		get_llm_enabled = function() return is_llm_enabled end,
-	})
-	StreamingHandler.init({
+		get_llm_enabled = get_runtime_llm_enabled,
+	}) ~= true then
+		Logger.error(LOG, "M.init(): warmup-controller dependency initialization refused.")
+		return false
+	end
+	if StreamingHandler.init({
 		core_llm  = core_llm,
 		tooltip   = tooltip,
 		keylogger = keylogger,
-	})
+	}) ~= true then
+		Logger.error(LOG, "M.init(): streaming-handler dependency initialization refused.")
+		return false
+	end
 
+	_state = core_state
 	Logger.debug(LOG, "Prediction engine state injected (%d mapping(s)).", #(core_state.mappings or {}))
+	return true
 end
 
 --- Public alias so the expander can re-arm the LLM timer after a text replacement.
@@ -930,17 +1363,19 @@ end
 --- through to the app — resulting in one extra character on screen before the expansion.
 --- @param delay_override number|nil Optional timer override in seconds.
 function M.start_timer(delay_override)
-	start_inactivity_timer(delay_override)
+	if not runtime_available() then return false end
+	return start_inactivity_timer(delay_override) == true
 end
 
 --- Arms the inactivity timer after a completed word (buffer ends with whitespace).
 --- When instant_on_word_end is enabled, bypasses the debounce entirely (delay = 0)
 --- so the prediction fires as soon as the word boundary is detected.
 function M.start_timer_word_end()
+	if not runtime_available() then return false end
 	if instant_on_word_end then
-		start_inactivity_timer(0)
+		return start_inactivity_timer(0) == true
 	else
-		start_inactivity_timer()
+		return start_inactivity_timer() == true
 	end
 end
 
@@ -949,8 +1384,19 @@ end
 --- tokens for a request that is now stale. Without this, a new request queues behind
 --- the old curl process and the perceived TTFT is (old generation remaining) + (new TTFT).
 function M.stop_timer()
-	stop_inactivity_timer()
-	core_llm.cancel_streaming()
+	local committed = true
+	local timer_ok, timer_result = xpcall(stop_inactivity_timer, debug.traceback)
+	if not timer_ok or timer_result ~= true then
+		committed = false
+		Logger.error(LOG, "Inactivity timer cancellation did not commit (result: %s).",
+			tostring(timer_result))
+	end
+	local stream_ok, stream_result = xpcall(core_llm.cancel_streaming, debug.traceback)
+	if not stream_ok or stream_result ~= true then
+		committed = false
+		Logger.error(LOG, "Active stream cancellation did not commit (result: %s).", tostring(stream_result))
+	end
+	return committed
 end
 
 --- Consumes the F16 chain signal if a chain is pending.
@@ -958,10 +1404,8 @@ end
 --- @param keyCode number The macOS key code of the pressed key.
 --- @return boolean True if the F16 event was consumed and the chain was triggered.
 function M.handle_chain_signal(keyCode)
+	if not runtime_available() then return false end
 	if keyCode ~= KEYCODE_LLM_CHAIN or not chain_pending then return false end
-	chain_pending = false
-	if _chain_trigger_timer then _chain_trigger_timer:stop() end
-	Logger.debug(LOG, "F16 received — scheduling chained LLM…")
 	-- Never run perform_check inline: this function is reached from the keymap
 	-- CGEventTap callback (llm_bridge.handle_llm_keys), and perform_check calls
 	-- AppFilter.is_blocked, which issues uncached cross-process Accessibility
@@ -969,25 +1413,68 @@ function M.handle_chain_signal(keyCode)
 	-- the keyboard until the tap is re-armed. Deferring by one run-loop tick makes
 	-- this path structurally identical to the CHAIN_FALLBACK_SEC timer that calls
 	-- the same function.
-	hs.timer.doAfter(0, function() M.perform_check(true) end)
+	local generation = _chain_generation
+	local candidate
+	local create_ok, created_or_err = xpcall(function()
+		candidate = hs.timer.doAfter(0, function()
+			local callback_ok, callback_err = xpcall(function()
+				if generation ~= _chain_generation or _chain_dispatch_timer ~= candidate then return end
+				_chain_dispatch_timer = nil
+				if runtime_available() then M.perform_check(true) end
+			end, debug.traceback)
+			if not callback_ok then
+				Logger.error(LOG, "Chain dispatch callback raised: %s", tostring(callback_err))
+			end
+		end)
+		return candidate
+	end, debug.traceback)
+	if not create_ok or not verify_started_timer(created_or_err, "chain dispatch") then
+		if type(created_or_err) == "table" or type(created_or_err) == "userdata" then
+			stop_timer_handle(created_or_err, "invalid chain dispatch")
+		end
+		Logger.error(LOG, "F16 dispatch deferral did not commit; fallback retained (result: %s).",
+			tostring(created_or_err))
+		-- F16 is an internal owned signal. Consume it while the already-armed
+		-- fallback remains the sole path to the chained request.
+		return true
+	end
+
+	_chain_dispatch_timer = candidate
+	chain_pending = false
+	if _chain_trigger_timer then
+		local fallback = _chain_trigger_timer
+		if stop_timer_handle(fallback, "superseded chain fallback") then
+			if _chain_trigger_timer == fallback then _chain_trigger_timer = nil end
+		end
+	end
+	Logger.debug(LOG, "F16 received — chained LLM dispatch committed.")
 	return true
 end
 
 --- @return boolean True while predictions are displayed and awaiting user interaction.
-function M.is_visible() return predictions_visible end
+function M.is_visible() return runtime_available() and predictions_visible end
 
 --- @return boolean True between an accepted prediction and the incoming F16 chain signal.
-function M.is_chain_pending() return chain_pending end
+function M.is_chain_pending() return runtime_available() and chain_pending end
 
 --- @return table The current pending predictions array.
-function M.get_predictions() return pending_predictions end
+function M.get_predictions()
+	if not runtime_available() then return {} end
+	return pending_predictions
+end
 
 --- @return number|nil The currently selected prediction index, or nil.
-function M.get_current_index() return tooltip.get_current_index() end
+function M.get_current_index()
+	if not runtime_available() then return nil end
+	return tooltip.get_current_index()
+end
 
 --- Navigates the prediction selection by the given delta.
 --- @param delta number Positive moves down the list, negative moves up.
-function M.navigate(delta) tooltip.navigate(delta) end
+function M.navigate(delta)
+	if not runtime_available() then return false end
+	return tooltip.navigate(delta)
+end
 
 --- Normalizes a modifier input (string or table) to a plain array of strings.
 --- Exported so the keymap bridge can use it when routing modifier+key combos.
@@ -1030,6 +1517,7 @@ end)
 -- without this guard, pressing Enter on the very first shown prediction would type a newline.
 tooltip.set_navigate_callback(function()
 	tooltip.set_enter_validates(true)
+	return true
 end)
 
 return M

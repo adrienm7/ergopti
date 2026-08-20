@@ -33,14 +33,16 @@ local DELAY    = 0.75
 helpers.describe("preferences: a per-category expansion delay round-trips through disk", function()
 
 	helpers.it("survives save, load and merge", function()
-		package.loaded["ui.menu.preferences"] = nil
-		local Prefs = helpers.load_with_stubs("ui.menu.preferences")
+		package.loaded["infra.preferences"] = nil
+		local Prefs = helpers.load_with_stubs("infra.preferences")
 
 		local path = os.tmpname()
 		local state = { delays = { [CATEGORY] = DELAY } }
 
-		local ok_save = pcall(Prefs.save, path, state, {}, {})
+		local ok_save, save_err = pcall(Prefs.save, path, state, {}, {})
 		helpers.assert_true(ok_save, "save must not throw on a minimal state")
+		helpers.assert_true(save_err == nil or type(save_err) == "boolean",
+			"and must answer whether it wrote — the caller has no other way to know")
 
 		local saved = select(2, pcall(Prefs.load, path))
 		helpers.assert_type(saved, "table", "load must return the parsed preferences table")
@@ -56,8 +58,8 @@ helpers.describe("preferences: a per-category expansion delay round-trips throug
 	end)
 
 	helpers.it("does not invent a delay that was never set", function()
-		package.loaded["ui.menu.preferences"] = nil
-		local Prefs = helpers.load_with_stubs("ui.menu.preferences")
+		package.loaded["infra.preferences"] = nil
+		local Prefs = helpers.load_with_stubs("infra.preferences")
 
 		local path = os.tmpname()
 		pcall(Prefs.save, path, { delays = {} }, {}, {})

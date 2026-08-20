@@ -19,8 +19,8 @@
 _CSIC_InlineCommentStrippedQuoteAware() {
 	Helper := _DriverFuncBody("CS_StripInlineComment")
 	Coerce := _DriverFuncBody("CS_CoerceValue")
-	Assert(Helper != "", "CS_StripInlineComment must exist in lib/config_shortcuts.ahk")
-	Assert(Coerce != "", "CS_CoerceValue must exist in lib/config_shortcuts.ahk")
+	Assert(Helper != "", "CS_StripInlineComment must exist in infra/config_shortcuts.ahk")
+	Assert(Coerce != "", "CS_CoerceValue must exist in infra/config_shortcuts.ahk")
 
 	; Quote-aware: the strip must track quoted-string state from the raw stream and
 	; only cut a '#' when NOT inside a quoted string, so a '#' in a quoted value stays.

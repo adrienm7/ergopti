@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/ports/TrayMenu.spec.js
+// _shared/core/ports/TrayMenu.spec.js
 
 /**
  * ==============================================================================
@@ -73,14 +73,29 @@ const portContract = {
 	/**
 	 * MenuNode shape (informative — not validated at runtime):
 	 * {
-	 *   id:       string,          // Unique stable identifier for this item
-	 *   label:    string,          // Display label (localised)
-	 *   enabled:  boolean,         // false = greyed out, onClick never fires
+	 *   title:    string,          // Display label (localised)
+	 *   disabled: boolean,         // true = greyed out, fn never fires
 	 *   checked:  boolean,         // true = checkmark shown next to label
-	 *   onClick:  Function | null, // Callback when item is clicked
-	 *   children: MenuNode[],      // Sub-menu items (empty = leaf item)
-	 *   separator:boolean,         // true = render as a separator line (ignores other fields)
+	 *   fn:       Function | null, // Callback when the item is clicked
+	 *   menu:     MenuNode[],      // Sub-menu items (absent = leaf item)
 	 * }
+	 * A separator is a node whose `title` is "-", with no other fields.
+	 *
+	 * CORRECTED 2026-08-04, and "informative" is exactly how it went wrong.
+	 * This block used to describe a node as { id, label, enabled, onClick,
+	 * children, separator }. No adapter has ever produced or consumed that shape.
+	 * Both Lua drivers build hs.menubar-shaped nodes — the ones above — and the
+	 * shared dbusmenu serialiser had invented a THIRD spelling of its own
+	 * ({ items, enabled, separator }), which meant the Linux tray silently
+	 * dropped every submenu, rendered disabled rows clickable and drew separators
+	 * as items labelled "-". Three vocabularies for one tree, none of them
+	 * enforced, and the only one written down was the one nobody implemented.
+	 *
+	 * A spec nobody validates is still the document a new driver is written from,
+	 * so it is the one place a wrong shape costs the most. The runtime validator
+	 * below checks method arity only; the node shape is held by
+	 * linux/tests/unit/meta/test_tray_protocol.lua, which now also pins the
+	 * abandoned spellings as dead so a half-revert is visible.
 	 */
 };
 
@@ -120,33 +135,27 @@ function validateAdapter(adapter) {
 /**
  * Minimal MenuNode tree fixture for testing.
  */
+// `id` is NOT part of the node contract — no adapter reads it. It is the handle
+// test-port-vector-traceability.cjs matches against the macOS mirror, so removing
+// it silently drops a vector out of that ratchet. Kept, and labelled, because the
+// first attempt at this correction did exactly that.
 const FIXTURE_MENU = [
 	{
 		id: 'feature_hotstrings',
-		label: 'Hotstrings',
-		enabled: true,
+		title: 'Hotstrings',
 		checked: true,
-		onClick: null,
-		children: [],
-		separator: false
+		fn: null,
+		menu: [{ id: 'group_autocorrection', title: 'Autocorrection', checked: true, fn: null }]
 	},
-	{
-		separator: true,
-		id: 'sep_1',
-		label: '',
-		enabled: true,
-		checked: false,
-		onClick: null,
-		children: []
-	},
+	// A separator is a row titled "-". Written out here because the fixture is
+	// what a new adapter is tested against, and the previous one used a
+	// `separator: true` flag no implementation reads.
+	{ id: 'sep_1', title: '-' },
 	{
 		id: 'reload',
-		label: 'Recharger',
-		enabled: true,
-		checked: false,
-		onClick: null,
-		children: [],
-		separator: false
+		title: 'Recharger',
+		disabled: true,
+		fn: null
 	}
 ];
 

@@ -16,7 +16,7 @@
 
 _WSLF_DisabledBranchFlushesPendingCustom() {
 	Body := _DriverFuncBody("_WS_Load")
-	Assert(Body != "", "_WS_Load must exist in lib/wrap_symbols_config.ahk")
+	Assert(Body != "", "_WS_Load must exist in infra/wrap_symbols_config.ahk")
 
 	DisPos := InStr(Body, '"[disabled]"')
 	Assert(DisPos > 0, "_WS_Load must handle the [disabled] section header")

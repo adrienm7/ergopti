@@ -56,7 +56,12 @@ end
 --- @param n number The integer to format (rounded before formatting).
 --- @return string Formatted string.
 function M.fmt_count(n)
-	local s = tostring(math.floor((n or 0) + 0.5))
+	-- tonumber() coercion, not just `or 0`: the two macOS menu copies this
+	-- function replaced accepted a numeric string, and several call sites read
+	-- their count out of a table whose value may have come back as text. Without
+	-- it, folding those copies in here would turn a working label into an
+	-- arithmetic error on a string.
+	local s = tostring(math.floor((tonumber(n) or 0) + 0.5))
 	local r = ""
 	for i = 1, #s do
 		if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end

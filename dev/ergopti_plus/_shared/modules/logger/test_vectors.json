@@ -1,7 +1,7 @@
 {
-	"_comment": "Logger test vectors — shared by AHK and Hammerspoon test suites.",
+	"_comment": "Logger test vectors — replayed by all three driver suites: Windows (tests/unit/test_logger_contract.ahk), macOS and Linux (tests/unit/lib/test_logger_contract.lua).",
 	"_sentinel": "TIMESTAMP replaces the real timestamp so vectors are time-independent.",
-	"_format": "Each vector: variant, module, message (format string), args (array), expected (rendered line with TIMESTAMP sentinel).",
+	"_format": "Each vector: variant, module, message (format string), args (array), expected (rendered line with TIMESTAMP sentinel). message_lua/expected_lua and message_ahk/expected_ahk override the pair for a LANGUAGE, not a driver: Lua takes %s, AutoHotkey takes {1}. Linux and macOS both read the _lua pair.",
 
 	"vectors": [
 		{
@@ -90,7 +90,7 @@
 			"variant": "info",
 			"module": "TapHoldLoader",
 			"message_ahk": "Loaded {1} key(s).",
-			"message_hs": "Loaded %d key(s).",
+			"message_lua": "Loaded %d key(s).",
 			"args": [8],
 			"expected": "TIMESTAMP [INFO] [TapHoldLoader] Loaded 8 key(s)."
 		},
@@ -101,7 +101,7 @@
 			"variant": "success",
 			"module": "TapHoldLoader",
 			"message_ahk": "Tap-hold config loaded ({1} key(s), {2} layer(s)).",
-			"message_hs": "Tap-hold config loaded (%d key(s), %d layer(s)).",
+			"message_lua": "Tap-hold config loaded (%d key(s), %d layer(s)).",
 			"args": [8, 2],
 			"expected": "TIMESTAMP [SUCCESS] [TapHoldLoader] Tap-hold config loaded (8 key(s), 2 layer(s))."
 		},
@@ -112,7 +112,7 @@
 			"variant": "debug",
 			"module": "ModelSwitcher",
 			"message_ahk": "Backend resolved to '{1}'.",
-			"message_hs": "Backend resolved to '%s'.",
+			"message_lua": "Backend resolved to '%s'.",
 			"args": ["mlx"],
 			"expected": "TIMESTAMP [DEBUG] [ModelSwitcher] Backend resolved to 'mlx'."
 		},
@@ -123,7 +123,7 @@
 			"variant": "info",
 			"module": "menu_llm",
 			"message_ahk": "Profile '{1}' selected (power level {2}).",
-			"message_hs": "Profile '%s' selected (power level %d).",
+			"message_lua": "Profile '%s' selected (power level %d).",
 			"args": ["advanced", 2],
 			"expected": "TIMESTAMP [INFO] [menu_llm] Profile 'advanced' selected (power level 2)."
 		},
@@ -174,10 +174,10 @@
 			"variant": "debug",
 			"module": "TapHoldLoader",
 			"message_ahk": "Threshold set to {1:.2f}s.",
-			"message_hs": "Threshold set to %.2fs.",
+			"message_lua": "Threshold set to %.2fs.",
 			"args": [0.35],
 			"expected_ahk": "TIMESTAMP [DEBUG] [TapHoldLoader] Threshold set to 0.35s.",
-			"expected_hs": "TIMESTAMP [DEBUG] [TapHoldLoader] Threshold set to 0.35s."
+			"expected_lua": "TIMESTAMP [DEBUG] [TapHoldLoader] Threshold set to 0.35s."
 		}
 	]
 }

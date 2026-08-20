@@ -19,9 +19,9 @@ local helpers = require("tests.helpers")
 -- through it during this test never crashes on a missing method.
 local captured = {}
 local function reset_capture() captured = {} end
-local _real_logger = package.loaded["lib.logger"]
+local _real_logger = package.loaded["infra.logger"]
 local function noop() end
-package.loaded["lib.logger"] = {
+package.loaded["infra.logger"] = {
 	info    = function(tag, fmt, ...) captured[#captured + 1] = { lvl = "info", tag = tag, fmt = fmt, args = { ... } } end,
 	warn    = function(tag, fmt, ...) captured[#captured + 1] = { lvl = "warn", tag = tag, fmt = fmt, args = { ... } } end,
 	debug   = noop, trace = noop, done = noop, start = noop, success = noop, error = noop,
@@ -32,8 +32,8 @@ package.loaded["lib.logger"] = {
 -- Force a fresh module so its module-level _start/_last reset for this file.
 -- Also drop the adapter so it re-captures the fake logger for this run.
 package.loaded["adapters.timer_scheduler"] = nil
-package.loaded["lib.boot_profiler"] = nil
-local boot = require("lib.boot_profiler")
+package.loaded["infra.boot_profiler"] = nil
+local boot = require("infra.boot_profiler")
 
 -- Drive a controllable wall-clock so deltas are deterministic. Saved and
 -- restored at file end so later test files keep the real stub clock.
@@ -41,7 +41,7 @@ local CLOCK_SEC      = 0
 local orig_sse       = hs.timer.secondsSinceEpoch
 hs.timer.secondsSinceEpoch = function() return CLOCK_SEC end
 
-helpers.describe("lib.boot_profiler.mark", function()
+helpers.describe("infra.boot_profiler.mark", function()
 	helpers.it("emits one INFO line per phase with delta and total in ms", function()
 		reset_capture()
 		CLOCK_SEC = 100.0
@@ -85,8 +85,8 @@ helpers.describe("lib.boot_profiler.mark", function()
 
 	helpers.it("a mark before begin() anchors the origin (no huge/negative total)", function()
 		-- Fresh module instance to guarantee _start == 0 (never began).
-		package.loaded["lib.boot_profiler"] = nil
-		local fresh = require("lib.boot_profiler")
+		package.loaded["infra.boot_profiler"] = nil
+		local fresh = require("infra.boot_profiler")
 		reset_capture()
 		CLOCK_SEC = 999.0
 		fresh.mark("Orphan mark")
@@ -99,5 +99,5 @@ end)
 -- Restore the real stub clock and the real logger so later test files are
 -- unaffected; drop the adapter so it re-captures the real logger on next load.
 hs.timer.secondsSinceEpoch = orig_sse
-package.loaded["lib.logger"] = _real_logger
+package.loaded["infra.logger"] = _real_logger
 package.loaded["adapters.timer_scheduler"] = nil

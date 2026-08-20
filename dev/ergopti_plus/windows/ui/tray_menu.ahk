@@ -83,10 +83,10 @@ global _V1CatToV2CatMap := Map(
 ; config/manifest section path. The menu layer still keys categories by these
 ; PascalCase ids (CategoryEnabled, _FLAT_HOTSTRING_V1_CATS, …); this map is how
 ; the bulk/count/collect helpers reach the v2 section. Relocated here from the
-; retired lib/path_translator.ahk — it is plain menu data, not path translation.
+; retired infra/path_translator.ahk — it is plain menu data, not path translation.
 global _LegacyTopCategoryMap := Map(
-	"Layout",             "ahk.layout",
-	"Gestures",           "ahk.gestures",
+	"Layout",             "layout",
+	"Gestures",           "gestures",
 	"Shortcuts",          "shortcuts",
 	"Autocorrection",     "hotstrings.autocorrection",
 	"DistancesReduction", "hotstrings.distances_reduction",

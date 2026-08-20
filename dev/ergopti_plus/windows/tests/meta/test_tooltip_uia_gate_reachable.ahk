@@ -7,7 +7,7 @@
 ; Three constants owned by two modules encode one timing contract, and nothing
 ; checked their sum:
 ;
-;   _PREFIX_RENDER_DEBOUNCE_MS   150   (lib/hotstrings/hotstring_inputhook.ahk)
+;   _PREFIX_RENDER_DEBOUNCE_MS   150   (infra/hotstrings/hotstring_inputhook.ahk)
 ; + TOOLTIP_RENDER_DEBOUNCE_MS    75   (ui/tooltip/core.ahk)
 ; = 225 ms of guaranteed physical idle before a preview can ever be rendered
 ;   TOOLTIP_UIA_IDLE_REQUIRED_MS 250   (ui/tooltip/core.ahk)

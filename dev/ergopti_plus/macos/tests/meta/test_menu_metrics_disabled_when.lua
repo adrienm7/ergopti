@@ -15,7 +15,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
 -- id -> canonical disabled_when key array (order matches the manifest).
 local CANON = {
@@ -46,12 +45,26 @@ local function all_true_getters()
 	return g
 end
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
+end
+
+--- The shared menu manifest, parsed.
+---
+--- Read through the renderer's own loader rather than by opening the JSON here:
+--- the path differs between a checkout and an installed bundle, and a second
+--- resolver would be a second thing to get wrong.
+--- @return table
+local function load_manifest()
+	local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
+	local root = type(ManifestMenu.get_root) == "function" and ManifestMenu.get_root() or nil
+	helpers.assert_true(type(root) == "table",
+		"the shared manifest must load — a test that cannot read it would agree with any driver")
+	return root
 end
 
 
@@ -101,8 +114,17 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 			if type(e) == "table" and e.id == "menubar_colors" then entry = e end
 		end
 		helpers.assert_true(entry ~= nil, "metrics_menu must declare a menubar_colors item")
-		helpers.assert_eq(entry.type, "dynamic",
-			"menubar_colors must be type=dynamic — type=feature is silently skipped by M.build (MG-2)")
+		-- The failure this guards is a type the renderer SKIPS: `feature` rows are
+		-- left to the caller, so declaring one here made the row vanish with
+		-- nothing to say so (MG-2). It was `dynamic` until 2026-08-07 and is
+		-- `check` now — the renderer builds the checkbox from the declaration
+		-- instead of the driver building one it already knows how to draw. Both
+		-- are rendered; `feature` and `toggle` are not.
+		local RENDERED_TYPES = { dynamic = true, check = true, command = true, list = true, action = true }
+		helpers.assert_true(RENDERED_TYPES[entry.type] == true,
+			"menubar_colors is type=" .. tostring(entry.type) .. ", which the renderer does not " ..
+			"materialise — `feature` and `toggle` are left to the caller, so the row disappears " ..
+			"with nothing reporting it (MG-2)")
 		helpers.assert_true(entry.depends_on == nil,
 			"menubar_colors must no longer carry the dead depends_on key — superseded by disabled_when")
 	end)
@@ -115,7 +137,7 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	--- =================================================
 
 	helpers.it("ManifestMenu.resolve_disabled_when enforces AND semantics against the real manifest", function()
-		local ManifestMenu = helpers.load_with_stubs("lib.manifest_menu")
+		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
 		for _, c in ipairs(CANON) do
 			-- Every required key true -> enabled.
 			helpers.assert_true(
@@ -140,17 +162,54 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 	--- ===== 3/ macOS driver delegates (MG-1) =====
 	--- ============================================
 
-	helpers.it("menu_metrics.lua resolves every canonical item's greying via the shared resolver", function()
-		local src = read_source("ui/menu/menu_metrics.lua")
+	helpers.it("every canonical item's greying is resolved by the shared resolver", function()
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
+		local manifest = load_manifest()
 		for _, c in ipairs(CANON) do
+			-- TWO ways to satisfy the invariant, and the invariant is what matters:
+			-- the greying must come from the shared resolver reading the manifest,
+			-- never from a condition re-derived in this driver.
+			--
+			--   1. the driver calls the resolver itself, for a row it still builds;
+			--   2. the row is declared `type = "check"`, and the SHARED renderer
+			--      calls the same resolver while materialising it.
+			--
+			-- The second is the direction this menu is moving in: the three privacy
+			-- filters left this file entirely on 2026-08-06 and the row is now built
+			-- once for all three drivers. Asserting only on (1) would have made that
+			-- migration look like a regression while the resolver was in fact being
+			-- called by more shared code than before.
 			local needle = 'ManifestMenu.resolve_disabled_when("metrics_menu", "' .. c.id .. '", STATE_GETTERS)'
-			helpers.assert_true(src:find(needle, 1, true) ~= nil,
-				"menu_metrics.lua must resolve '" .. c.id .. "' greying via ManifestMenu.resolve_disabled_when — not a hardcoded condition")
+			local resolved_here = src:find(needle, 1, true) ~= nil
+
+			-- `check` AND `command`: the shared renderer resolves disabled_when for
+			-- both, so either declaration hands the greying to the resolver. The two
+			-- window buttons became `command` on 2026-08-07 and this list had named
+			-- only `check` — which would have read the migration as a regression.
+			local declared_check = false
+			for _, entry in ipairs(manifest.metrics_menu or {}) do
+				if type(entry) == "table" and entry.id == c.id
+					and (entry.type == "check" or entry.type == "command") then
+					declared_check = true
+				end
+			end
+
+			helpers.assert_true(resolved_here or declared_check,
+				"'" .. c.id .. "' greying must come from the shared resolver: either this "
+					.. "file calls ManifestMenu.resolve_disabled_when for it, or the manifest "
+					.. "declares it type=check or type=command so the shared renderer does. A hardcoded "
+					.. "condition here is what neither allows")
+
+			-- And the two must not BOTH be true: a row the renderer builds and the
+			-- driver also builds appears twice.
+			helpers.assert_true(not (resolved_here and declared_check),
+				"'" .. c.id .. "' is declared type=check AND still resolved in this file — "
+					.. "the renderer builds that row now, so a handler here draws it a second time")
 		end
 	end)
 
 	helpers.it("the shared STATE_GETTERS table reads the correct Lua state", function()
-		local src = read_source("ui/menu/menu_metrics.lua")
+		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
 		helpers.assert_true(src:find("keylogger_enabled%s*=%s*function%(%) return state%.keylogger_enabled end") ~= nil,
 			"STATE_GETTERS must map keylogger_enabled to state.keylogger_enabled")
 		helpers.assert_true(src:find("wpm_widget_visible%s*=%s*function%(%) return state%.keylogger_float_wpm end") ~= nil,

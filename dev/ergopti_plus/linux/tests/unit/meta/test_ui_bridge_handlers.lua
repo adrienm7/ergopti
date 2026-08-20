@@ -46,8 +46,14 @@ helpers.describe("ui.bridge_handlers", function()
         export_json       = function() return '{"keystrokes":42}' end,
       },
       config = {
+        -- Flat functions, matching how hotstrings_config actually defines them.
+        -- This mock used to take a leading `self` because the bridge called
+        -- through `:` — so `is_group_enabled` received the module as its group
+        -- name and answered "enabled" for everything, and `toggle_group`
+        -- silently no-opped on its own string guard. The mock was shaped to the
+        -- bug, which is why the bridge's own test could never see it.
         get_groups     = function() return { "accents", "math", "code" } end,
-        is_group_enabled = function(_, g) return g ~= "code" end,
+        is_group_enabled = function(g) return g ~= "code" end,
         toggle_group   = function(g) end,
         reload         = function() return 10 end,
         mapping_count  = function() return 50 end,
@@ -126,7 +132,7 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("webview_manager", function()
     -- Use require (not load_module) so windows persist across tests.
     -- webview_manager auto-inits on load, and load_module would wipe state.
-    local wm = require("modules.ui.webview_manager")
+    local wm = require("ui.webview_manager")
 
     helpers.it("exports init", function()
       helpers.assert_true(type(wm.init) == "function")
@@ -167,12 +173,22 @@ helpers.describe("ui.bridge_handlers", function()
       local result = wm.route_message("nonexistent_bridge", "hello")
       helpers.assert_eq(result, nil)
     end)
-    helpers.it("route_message routes to action_picker handler", function()
+    -- The picker's protocol is confirm/cancel/ready and none of them returns a
+    -- value — the page is told things by an init(...) push, not by a reply. This
+    -- case used to post {action="search"} and assert a result table, a protocol
+    -- the page has never spoken; it passed because the handler had been written
+    -- to the same invention.
+    helpers.it("route_message reaches the action_picker handler", function()
       wm.show("action_picker", "fr")
       wm.set_daemon_state(build_mock_state())
-      local result = wm.route_message("action_picker_bridge", { action = "search", query = "test" })
-      helpers.assert_true(type(result) == "table", "route_message should return a table")
-      helpers.assert_true(type(result.results) == "table", "result.results should be a table")
+      local confirmed = nil
+      local handler = require("ui.action_picker.bridge")
+      handler.on_confirm = function(id) confirmed = id end
+      wm.route_message("action_picker_bridge", { action = "confirm", id = "tab_new" })
+      handler.on_confirm = nil
+      helpers.assert_eq(confirmed, "tab_new",
+        "a confirm must reach the handler with the id the user picked — routing that "
+          .. "silently dropped it is exactly what made the Linux picker inert")
     end)
     -- Regression: the handler file was named personal_toml_editor.lua without
     -- the "_bridge" suffix that _load_handler() requires, so route_message()
@@ -198,27 +214,29 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(wm._focus_gtk_window) == "function")
     end)
     helpers.it("_create_gtk_window no-ops safely without GTK", function()
-      local ok = pcall(function()
-        wm._create_gtk_window("test", "<html></html>", nil)
-      end)
-      helpers.assert_true(ok, "_create_gtk_window should not crash when lgi absent")
+      -- Called directly: a raise fails with the real error. The claim is the
+      -- no-op — with no GTK the window must not be registered, or every later
+      -- show/focus call addresses a window that does not exist.
+      wm._create_gtk_window("test", "<html></html>", nil)
+      helpers.assert_true(wm.is_open == nil or wm.is_open("test") ~= true,
+        "no GTK means no window, and no window means nothing registered")
     end)
     helpers.it("_destroy_gtk_window no-ops safely without GTK", function()
-      local ok = pcall(function()
-        wm._destroy_gtk_window("nonexistent")
-      end)
-      helpers.assert_true(ok, "_destroy_gtk_window should not crash when lgi absent")
+      wm._destroy_gtk_window("nonexistent")
+      helpers.assert_true(wm.is_open == nil or wm.is_open("nonexistent") ~= true,
+        "destroying a window that was never created must leave nothing behind")
     end)
     helpers.it("_focus_gtk_window no-ops safely without GTK", function()
-      local ok = pcall(function()
-        wm._focus_gtk_window("nonexistent")
-      end)
-      helpers.assert_true(ok, "_focus_gtk_window should not crash when lgi absent")
+      wm._focus_gtk_window("nonexistent")
+      helpers.assert_true(wm.is_open == nil or wm.is_open("nonexistent") ~= true,
+        "focusing a window that does not exist must not conjure one")
     end)
     helpers.it("bring_to_front calls _focus_gtk_window", function()
       wm.show("action_picker", "fr")
-      local ok = pcall(function() wm.bring_to_front("action_picker") end)
-      helpers.assert_true(ok, "bring_to_front should not crash")
+      wm.bring_to_front("action_picker")
+      helpers.assert_eq(type(wm.bring_to_front), "function",
+        "bring_to_front must survive being called with no GTK — it is bound to a menu "
+          .. "row the user can click on any desktop")
       wm.hide("action_picker")
     end)
   end)
@@ -228,7 +246,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("action_picker_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.action_picker_bridge")
+    local handler = helpers.load_module("ui.action_picker.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -241,19 +259,106 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message("ready", state)
       helpers.assert_eq(result, nil)
     end)
-    helpers.it("handles 'search' action", function()
-      local result = handler.on_message({ action = "search", query = "hotstrings" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.results) == "table")
-      helpers.assert_true(#result.results > 0)
+    helpers.it("handles 'confirm' and passes the picked id on", function()
+      local seen = nil
+      handler.on_confirm = function(id) seen = id end
+      handler.on_message({ action = "confirm", id = "app_switcher" }, state)
+      handler.on_confirm = nil
+      helpers.assert_eq(seen, "app_switcher", "the id the user picked must reach the caller")
     end)
-    helpers.it("handles 'execute' action", function()
-      local result = handler.on_message({ action = "execute", command = "reload" }, state)
-      helpers.assert_eq(result, nil)
+    helpers.it("passes the two specials through unchanged", function()
+      local seen = {}
+      handler.on_confirm = function(id) seen[#seen + 1] = id end
+      handler.on_message({ action = "confirm", id = "none" }, state)
+      handler.on_message({ action = "confirm", id = "__native__" }, state)
+      handler.on_confirm = nil
+      helpers.assert_eq(seen[1], "none", "\"none\" is a real choice, not an absence")
+      helpers.assert_eq(seen[2], "__native__",
+        "and __native__ means \"leave the OS binding alone\" — the handler must not "
+          .. "decide what either means")
+    end)
+    helpers.it("handles 'cancel'", function()
+      local cancelled = false
+      handler.on_cancel = function() cancelled = true end
+      handler.on_message({ action = "cancel" }, state)
+      handler.on_cancel = nil
+      helpers.assert_true(cancelled, "dismissing the picker must reach the caller")
+    end)
+    helpers.it("build_init_payload matches the shape init(data) reads", function()
+      local p = handler.build_init_payload({ current = "tab_new", allow_native = true })
+      for _, key in ipairs({ "title", "label", "current", "allowNative", "nativeLabel",
+                             "noneLabel", "searchPlaceholder", "noResults", "cancelLabel", "items" }) do
+        helpers.assert_true(p[key] ~= nil, "init(data) reads data." .. key .. " — it must be present")
+      end
+      helpers.assert_eq(p.current, "tab_new", "the already-bound id must be carried through")
+      helpers.assert_eq(p.allowNative, true, "and the native flag")
+      helpers.assert_eq(type(p.items), "table", "items must be a list, even when empty")
     end)
     helpers.it("handles unknown action gracefully", function()
       local result = handler.on_message({ action = "invalid" }, state)
       helpers.assert_eq(result, nil)
+    end)
+
+    -- The picker is told what to render by an init(...) push after it reports
+    -- ready — there is no reply channel it could learn it from. For a long time
+    -- "ready" was only logged, so the page opened, said ready, and rendered an
+    -- empty list forever. Nothing failed: build_init_payload was correct and
+    -- tested, the handler answered every message, and both halves looked done.
+    --
+    -- Asserting on the emitted JAVASCRIPT, not on the payload function, is the
+    -- point. A test that calls build_init_payload() and checks its keys is the
+    -- test that already existed while the channel did not.
+    local function capture_push(opts, body)
+      local wm_mod = helpers.load_module("ui.webview_manager")
+      local original = wm_mod.eval_js
+      local seen = {}
+      wm_mod.eval_js = function(app, js)
+        seen[#seen + 1] = { app = app, js = js }
+        return true
+      end
+      handler.pending_opts = opts
+      local ok, err = pcall(body, seen)
+      wm_mod.eval_js = original
+      handler.pending_opts = nil
+      if not ok then error(err, 0) end
+      return seen
+    end
+
+    helpers.it("a 'ready' table pushes init(...) into the picker's own window", function()
+      capture_push({ current = "tab_new", allow_native = true }, function(seen)
+        handler.on_message({ action = "ready" }, state)
+        helpers.assert_eq(#seen, 1, "exactly one push per ready — no push, or two, is a bug")
+        helpers.assert_eq(seen[1].app, "action_picker",
+          "the push must be addressed to the picker's window, not broadcast")
+        helpers.assert_true(seen[1].js:sub(1, 5) == "init(",
+          "the page defines init(data); anything else evaluates to nothing and says so nowhere")
+        helpers.assert_true(seen[1].js:find("tab_new", 1, true) ~= nil,
+          "pending_opts must reach the payload — a push carrying defaults renders the "
+            .. "wrong current selection and looks like the user's binding was lost")
+        helpers.assert_true(seen[1].js:find("searchPlaceholder", 1, true) ~= nil,
+          "the i18n strings must be in the pushed JSON, not left for the page to invent")
+      end)
+    end)
+
+    helpers.it("a bare 'ready' string pushes init(...) too", function()
+      -- Two code paths reach "ready": the JSON table and the host_bridge
+      -- fallback that delivers the bare word. Wiring one and not the other is a
+      -- picker that works or not depending on how the page happened to post.
+      capture_push(nil, function(seen)
+        handler.on_message("ready", state)
+        helpers.assert_eq(#seen, 1, "the bare-string path must push as well")
+        helpers.assert_true(seen[1].js:sub(1, 5) == "init(")
+      end)
+    end)
+
+    helpers.it("confirm and cancel push nothing", function()
+      capture_push(nil, function(seen)
+        handler.on_message({ action = "confirm", id = "tab_new" }, state)
+        handler.on_message({ action = "cancel" }, state)
+        helpers.assert_eq(#seen, 0,
+          "init() is a first-render push; re-pushing it on every message would reset "
+            .. "the search box under the user's fingers")
+      end)
     end)
   end)
 
@@ -262,7 +367,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("prompt_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.prompt_editor_bridge")
+    local handler = helpers.load_module("ui.prompt_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -298,7 +403,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("metrics_apps_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.metrics_apps_bridge")
+    local handler = helpers.load_module("ui.metrics_apps.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -343,7 +448,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ===========================================================================
 
   helpers.describe("metrics_typing_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.metrics_typing_bridge")
+    local handler = helpers.load_module("ui.metrics_typing.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -357,15 +462,18 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("returns nil for unknown actions", function()
       helpers.assert_eq(handler.on_message("unknown", state), nil)
     end)
-    helpers.it("returns a selected n-gram range over the native Linux bridge", function()
-      local result = handler.on_message({
-        action = "range", start_date = "2026-07-01", end_date = "2026-07-18", apps = { "firefox" },
-      }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result._prefetch_data.historical.c.a.c, 2)
-      helpers.assert_eq(result._prefetch_data.today.firefox.c.b.c, 3)
-      helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
-    end)
+		helpers.it("returns a selected n-gram range over the native Linux bridge", function()
+			local result = handler.on_message({
+				action = "range", request_id = 41,
+				start_date = "2026-07-01", end_date = "2026-07-18", apps = { "firefox" },
+			}, state)
+			helpers.assert_true(type(result) == "table")
+			helpers.assert_eq(result._prefetch_data.historical.c.a.c, 2)
+			helpers.assert_eq(result._prefetch_data.today.firefox.c.b.c, 3)
+			helpers.assert_eq(result.metrics_manifest["2026-07-18"].firefox.chars, 20)
+			helpers.assert_eq(result.range_request_id, 41,
+				"range replies must preserve the UI request owner across the native bridge")
+		end)
   end)
 
   -- ===========================================================================
@@ -373,42 +481,68 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("healthcheck_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+    local handler = helpers.load_module("ui.healthcheck.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "healthcheck")
     end)
-    helpers.it("'ready' returns full health status", function()
+    -- These cases used to assert a `modules` table of this bridge's own
+    -- invention. The shared page reads `version, sys, uptime_sec, warn_count,
+    -- err_count, ports_validated, failed_adapters, last_error, recent_issues,
+    -- pause_state, keylogger, llm, layout, hotstrings, logs, config` and found
+    -- none of them, so the window rendered empty while both sides reported
+    -- success. The assertion is now the shared contract itself, which is
+    -- strictly more than the old shape checked: sixteen named fields instead of
+    -- five invented ones.
+    local Snapshot = helpers.load_module("healthcheck.snapshot")
+
+    helpers.it("'ready' answers in the shape the shared page reads", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.modules) == "table")
-      helpers.assert_eq(result.modules.engine.status, "ok")
-      helpers.assert_eq(result.modules.keylogger.status, "ok")
-      helpers.assert_eq(result.modules.keylogger.keystrokes, 42)
-      helpers.assert_eq(result.modules.config.status, "ok")
-      helpers.assert_eq(result.modules.config.mapping_count, 50)
-      helpers.assert_eq(result.modules.config.parse_errors, 2)
-      helpers.assert_eq(result.modules.llm.status, "ok")
-      helpers.assert_eq(result.modules.llm.model, "codellama")
-      helpers.assert_eq(result.modules.layout.layout, "qwerty")
+      local ok, missing = Snapshot.validate_snapshot(result)
+      helpers.assert_true(ok,
+        "the snapshot is missing " .. table.concat(missing or {}, ", ")
+          .. " — the page reads these by name and renders nothing for the ones "
+          .. "it cannot find, which looks like a daemon with no diagnostics "
+          .. "rather than two halves speaking different languages")
     end)
-    helpers.it("'refresh' returns same data", function()
+
+    helpers.it("carries the live figures it was given", function()
+      local result = handler.on_message("ready", state)
+      helpers.assert_eq(result.keylogger.events_session, 42,
+        "the keystroke count must survive the reshape")
+      helpers.assert_eq(result.llm.model, "codellama")
+      helpers.assert_eq(result.hotstrings.personal_count, 50,
+        "the mapping count moved from modules.config to hotstrings, which is "
+          .. "where the page looks for it")
+      helpers.assert_eq(result.layout.ergopti_base, "qwerty")
+    end)
+
+    helpers.it("'refresh' answers in the same shape", function()
       local result = handler.on_message("refresh", state)
-      helpers.assert_eq(result.modules.engine.status, "ok")
+      helpers.assert_true((Snapshot.validate_snapshot(result)),
+        "a refresh that answers a different shape is a window that empties "
+          .. "itself the first time the user asks it to update")
     end)
-    helpers.it("reports missing modules correctly", function()
-      local empty = {}
-      local result = handler.on_message("ready", empty)
-      helpers.assert_eq(result.modules.engine.status, "missing")
-      helpers.assert_eq(result.modules.keylogger.status, "missing")
-      helpers.assert_eq(result.modules.llm.status, "missing")
+
+    helpers.it("still answers the contract with nothing wired at all", function()
+      local result = handler.on_message("ready", {})
+      local ok, missing = Snapshot.validate_snapshot(result)
+      helpers.assert_true(ok,
+        "an unwired daemon is exactly when this window is read, so it must not "
+          .. "be the case that answers only arrive when nothing is wrong: "
+          .. table.concat(missing or {}, ", "))
+      helpers.assert_true(#result.failed_adapters > 0,
+        "and it must SAY that nothing is wired, rather than reporting an empty "
+          .. "failure list that reads as a clean bill of health")
     end)
-    helpers.it("reports disabled LLM correctly", function()
-      local st = build_mock_state()
-      st.llm.is_enabled = function() return false end
-      local result = handler.on_message("ready", st)
-      helpers.assert_eq(result.modules.llm.status, "disabled")
+
+    helpers.it("names the parts that are wired and the parts that are not", function()
+      local result = handler.on_message("ready", state)
+      helpers.assert_true(#result.loaded_adapters > 0,
+        "a report listing no loaded parts on a fully wired daemon is the empty "
+          .. "window in a different disguise")
     end)
   end)
 
@@ -417,7 +551,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("onboarding_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.onboarding_bridge")
+    local handler = helpers.load_module("ui.onboarding.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -458,15 +592,15 @@ helpers.describe("ui.bridge_handlers", function()
     -- Stubs lib.i18n.get_locale, runs fn, then restores package.loaded so the
     -- stub never leaks into later test files.
     local function with_locale_module(mod, fn)
-      local prev = package.loaded["lib.i18n"]
-      package.loaded["lib.i18n"] = mod
+      local prev = package.loaded["infra.i18n"]
+      package.loaded["infra.i18n"] = mod
       local ok, err = pcall(fn)
-      package.loaded["lib.i18n"] = prev
+      package.loaded["infra.i18n"] = prev
       if not ok then error(err, 0) end
     end
 
     helpers.it("healthcheck payload uses the persisted locale, not a hardcoded 'fr'", function()
-      local hc = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+      local hc = helpers.load_module("ui.healthcheck.bridge")
       with_locale_module({ get_locale = function() return "de" end }, function()
         local result = hc.on_message("ready", build_mock_state())
         helpers.assert_eq(result.locale, "de",
@@ -475,7 +609,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
 
     helpers.it("onboarding init uses the persisted locale, not a hardcoded 'fr'", function()
-      local ob = helpers.load_module("modules.ui.bridge_handlers.onboarding_bridge")
+      local ob = helpers.load_module("ui.onboarding.bridge")
       with_locale_module({ get_locale = function() return "de" end }, function()
         local result = ob.on_message({ step = "init" }, build_mock_state())
         helpers.assert_eq(result.current_locale, "de",
@@ -484,7 +618,7 @@ helpers.describe("ui.bridge_handlers", function()
     end)
 
     helpers.it("falls back to 'fr' when lib.i18n resolves no locale", function()
-      local hc = helpers.load_module("modules.ui.bridge_handlers.healthcheck_bridge")
+      local hc = helpers.load_module("ui.healthcheck.bridge")
       with_locale_module({ get_locale = function() return nil end }, function()
         local result = hc.on_message("ready", build_mock_state())
         helpers.assert_eq(result.locale, "fr",
@@ -498,67 +632,145 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("hotstrings_config_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.hotstrings_config_bridge")
+    local handler = helpers.load_module("ui.hotstrings_config_window.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hotstrings_config_bridge")
     end)
-    helpers.it("'ready' returns groups + stats", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.groups) == "table")
-      helpers.assert_eq(#result.groups, 3)
-      helpers.assert_eq(result.groups[1].name, "accents")
-      helpers.assert_true(result.groups[1].enabled)
-      -- "code" should be disabled per mock.
-      helpers.assert_eq(result.groups[3].name, "code")
-      helpers.assert_eq(result.groups[3].enabled, false)
-      helpers.assert_eq(result.mapping_count, 50)
-      helpers.assert_eq(result.parse_errors, 2)
-      helpers.assert_eq(result.config_dir, "/home/user/.config/ergopti/hotstrings")
+    helpers.it("'ready' pushes the keys the settings page renders from", function()
+      -- This asserted `{groups = {{name, enabled}}, mapping_count, parse_errors,
+      -- config_dir}` — four keys, and the page destructures none of them. It
+      -- walks state.categories and state.presets, and its group selector wants
+      -- {key, label}. So the suite was green while the window drew an empty page
+      -- with a selector full of blank entries.
+      local pushed = {}
+      local manager = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = {
+        eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
+      }
+      handler.on_message("ready", state)
+      package.loaded["ui.webview_manager"] = manager
+
+      helpers.assert_eq(#pushed, 1, "exactly one push into the page")
+      helpers.assert_eq(pushed[1].app, "hotstrings_config_window",
+        "into the page's own directory name")
+      for _, key in ipairs({ "categories", "groups", "presets", "global_default_delay_ms" }) do
+        helpers.assert_true(pushed[1].js:find('"' .. key .. '"', 1, true) ~= nil,
+          "carrying " .. key .. ", which script.js reads")
+      end
+      helpers.assert_true(pushed[1].js:find('"mapping_count"', 1, true) == nil,
+        "and not the four keys it never read")
     end)
-    helpers.it("'toggle_group' returns refreshed data", function()
-      local result = handler.on_message({ action = "toggle_group", group = "accents" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(#result.groups > 0)
+    -- Rewritten on 2026-08-05. The cases that stood here exercised toggle_group,
+    -- reload, add_hotstring and delete_hotstring — none of which the shared
+    -- settings window has ever sent. They tested this bridge against a protocol
+    -- that does not exist, which is exactly why the four actions the window DOES
+    -- send and this bridge did not answer (set_priority, clear_priority,
+    -- set_all_grey, close) went unnoticed: the suite was green and comparing
+    -- nothing.
+    helpers.it("'set_color' records the override for the category the user clicked", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, sec = sec, field = field, value = value }
+      end
+      handler.on_message({ action = "set_color", category = "accents", hex = "#ff0000" }, s2)
+      helpers.assert_eq(#seen, 1, "a colour change must reach the config module exactly once")
+      helpers.assert_eq(seen[1].cat, "accents", "and name the category")
+      helpers.assert_eq(seen[1].field, "color", "under the colour field")
+      helpers.assert_eq(seen[1].value, "#ff0000", "with the colour the user picked")
     end)
-    helpers.it("'reload' returns refreshed data", function()
-      local result = handler.on_message({ action = "reload" }, state)
-      helpers.assert_true(type(result) == "table")
+    helpers.it("'set_color' with an empty section means the category itself", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, sec = sec, field = field, value = value }
+      end
+      -- The window sends section: '' for a category-level edit. Passing it
+      -- through writes an override under a section nothing has, so it never
+      -- resolves and the colour silently does not apply.
+      handler.on_message({ action = "set_color", category = "accents", section = "", hex = "#00ff00" }, s2)
+      helpers.assert_eq(seen[1].sec, nil, "the empty string must become nil, not a section key")
     end)
-    helpers.it("'add_hotstring' merges into the existing group and reports the write result", function()
-      local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
-        helpers.assert_true(result.added, "a successful write must report added = true")
-        -- Root cause: a single-entry payload used to overwrite the whole group,
-        -- destroying the two seeded siblings. Merge must preserve them.
-        local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 3, "merge must preserve the pre-existing siblings")
-        local triggers = {}
-        for _, e in ipairs(entries) do triggers[e.trigger] = true end
-        helpers.assert_true(triggers.omw and triggers.ty, "seeded 'omw'/'ty' must survive the add")
-        helpers.assert_true(triggers.btw, "the new 'btw' must be persisted")
-      end)
+    helpers.it("'set_priority' accepts a value in range and refuses one outside it", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, field = field, value = value }
+      end
+      handler.on_message({ action = "set_priority", category = "accents", priority = 42 }, s2)
+      helpers.assert_eq(#seen, 1, "an in-range priority must be recorded")
+      helpers.assert_eq(seen[1].value, 42, "with the value the user typed")
+
+      -- Re-validated rather than trusted: a priority outside the tier range
+      -- silently reorders every hotstring source against every other, with
+      -- nothing on screen to say so.
+      handler.on_message({ action = "set_priority", category = "accents", priority = 500 }, s2)
+      helpers.assert_eq(#seen, 1, "an out-of-range priority must be refused, not clamped")
     end)
-    helpers.it("'add_hotstring' reports failure when the write fails", function()
-      local reader, writer = make_spies(false, "disk full")
-      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "add_hotstring", trigger = "btw", replacement = "by the way", group = "english" }, state)
-        helpers.assert_eq(result.added, false, "a failed write must not report success")
-      end)
+    helpers.it("'clear_priority' removes the override rather than writing a default", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { field = field, value = value }
+      end
+      handler.on_message({ action = "clear_priority", category = "accents" }, s2)
+      helpers.assert_eq(#seen, 1, "clearing must reach the config module")
+      helpers.assert_eq(seen[1].value, nil,
+        "and pass nil — writing a number would pin the entry to whatever that default was")
     end)
-    helpers.it("'delete_hotstring' removes only the target and keeps siblings", function()
-      local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstrings_config_bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "delete_hotstring", trigger = "omw", group = "english" }, state)
-        helpers.assert_true(result.deleted)
-        -- Root cause: delete used to write an empty entry list, wiping the group.
-        local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 1, "only the target entry may be removed")
-        helpers.assert_eq(entries[1].trigger, "ty", "the sibling 'ty' must survive the delete")
-      end)
+    helpers.it("'set_all_grey' repaints every category AND clears the section colours", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.get_neutral_color = function() return "#6e6e73" end
+      s2.config.get_categories = function()
+        return { accents = { sections_order = { "acute", "grave" } } }
+      end
+      s2.config.set_override = function(cat, sec, field, value)
+        seen[#seen + 1] = { cat = cat, sec = sec, value = value }
+      end
+      handler.on_message({ action = "set_all_grey" }, s2)
+
+      local category_painted, sections_cleared = false, 0
+      for _, call in ipairs(seen) do
+        if call.sec == nil and call.value == "#6e6e73" then category_painted = true end
+        if call.sec ~= nil and call.value == nil then sections_cleared = sections_cleared + 1 end
+      end
+      helpers.assert_true(category_painted, "the category's own colour must become the neutral shade")
+      -- The half that matters: leaving the per-section overrides repaints the
+      -- headings and leaves the rows beneath in their old colours, which reads to
+      -- the user as a button that half-worked.
+      helpers.assert_eq(sections_cleared, 2, "and every per-section colour override must be wiped")
+    end)
+    helpers.it("'set_all_grey' changes nothing when the neutral colour cannot be read", function()
+      local seen = {}
+      local s2 = build_mock_state()
+      s2.config.get_categories = function() return { accents = {} } end
+      s2.config.get_neutral_color = nil
+      s2.config.set_override = function() seen[#seen + 1] = true end
+      handler.on_message({ action = "set_all_grey" }, s2)
+      -- No hardcoded fallback: substituting a literal would repaint every category
+      -- a shade nothing else in the product uses.
+      helpers.assert_eq(#seen, 0, "a missing neutral colour must stop the repaint, not invent one")
+    end)
+    helpers.it("'reset_all' clears every category's overrides", function()
+      local cleared = {}
+      local s2 = build_mock_state()
+      s2.config.reset_defaults = function() end
+      s2.config.get_categories = function() return { accents = {}, code = {} } end
+      s2.config.clear_override = function(id) cleared[#cleared + 1] = id end
+      handler.on_message({ action = "reset_all" }, s2)
+      helpers.assert_eq(#cleared, 2, "every category must be reset, not the first one found")
+    end)
+    helpers.it("'close' is answered so the host can tear the webview down", function()
+      local closed = {}
+      local s2 = build_mock_state()
+      s2.close_webview = function(name) closed[#closed + 1] = name end
+      handler.on_message({ action = "close" }, s2)
+      -- A window whose X does nothing is one the user force-quits, and on a
+      -- webview host that can leave the process running with no visible window.
+      helpers.assert_eq(#closed, 1, "the close request must reach the host")
     end)
   end)
 
@@ -567,7 +779,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("changelog_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.changelog_bridge")
+    local handler = helpers.load_module("ui.changelog.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -598,7 +810,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("dl_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.dl_bridge")
+    local handler = helpers.load_module("ui.download_window.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -626,52 +838,137 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("hotstring_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.hotstring_editor_bridge")
+    local handler = helpers.load_module("ui.hotstring_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsEditor")
     end)
-    helpers.it("'ready' returns initial payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.groups) == "table")
-      helpers.assert_true(type(result.hotstrings) == "table")
+    -- Rewritten on 2026-08-05. These asserted a payload of {groups, hotstrings}
+    -- and a save of {trigger, replacement, group} — a protocol the shared editor
+    -- has never spoken. window.initData reads {sections, trigger_char,
+    -- default_priority, open_mode}, and persist() sends the WHOLE model as
+    -- {sections_order, sections}. The suite was green while the editor opened
+    -- EMPTY on this driver, every time.
+    helpers.it("'ready' PUSHES window.initData rather than returning the payload", function()
+      -- The second half of the same bug. The keys were right; the delivery was
+      -- not. This bridge returned the payload as a bridge response, and the
+      -- shared editor page has no reader for one — it reveals #app (display:none
+      -- in the markup) only from inside window.initData, at script.js:1376. So
+      -- the editor stayed on "Chargement…" for ever, with a perfectly correct
+      -- payload sitting in a return value nothing collected.
+      local pushed = {}
+      local manager = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = {
+        eval_js = function(app, js) pushed[#pushed + 1] = { app = app, js = js }; return true end,
+      }
+      local ok, err = pcall(handler.on_message, "ready", state)
+      package.loaded["ui.webview_manager"] = manager
+      helpers.assert_true(ok, "the ready branch must not throw: " .. tostring(err))
+
+      helpers.assert_eq(#pushed, 1, "exactly one push into the page")
+      helpers.assert_eq(pushed[1].app, "hotstring_editor",
+        "into the page's own directory name — the key eval_js looks a live webview up by")
+      helpers.assert_true(pushed[1].js:find("window.initData(", 1, true) ~= nil,
+        "calling the entry point the page defines, not some other function")
+      helpers.assert_true(pushed[1].js:find("if(window.initData)", 1, true) ~= nil,
+        "guarded, because a push landing before the page defines it throws inside "
+          .. "the webview where nothing on this side would see it")
+      for _, key in ipairs({ "sections", "trigger_char", "open_mode" }) do
+        helpers.assert_true(pushed[1].js:find('"' .. key .. '"', 1, true) ~= nil,
+          "and carrying " .. key .. ", which the page destructures")
+      end
     end)
-    helpers.it("'save' merges into the existing group and reports the write result", function()
+    helpers.it("'save' writes the whole model the editor sent", function()
       local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        local result = h.on_message({
+          action = "save",
+          data = {
+            sections_order = { "work" },
+            sections = { work = { description = "Work", entries = {
+              { trigger = "btw", output = "by the way", is_word = true },
+              { trigger = "omw", output = "on my way" },
+            } } },
+          },
+        }, state)
         helpers.assert_true(result.saved, "a successful write must report saved = true")
+        local entries = captured.data.sections.work.entries
+        helpers.assert_eq(#entries, 2, "every entry the editor sent must be written")
+        helpers.assert_eq(entries[1].trigger, "btw", "in the order it sent them")
+        helpers.assert_eq(entries[1].is_word, true, "with its flags preserved")
+      end)
+    end)
+    helpers.it("'save' replaces rather than merges, so a deletion sticks", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        -- The shared script sends its ENTIRE state on every save, so an entry the
+        -- user deleted is simply absent from the payload. Merging into what is on
+        -- disk would bring it back, and the deletion would appear to work until
+        -- the next restart.
+        h.on_message({
+          action = "save",
+          data = {
+            sections_order = { "english" },
+            sections = { english = { description = "English", entries = {
+              { trigger = "ty", output = "thank you" },
+            } } },
+          },
+        }, state)
         local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 3, "merge must preserve the pre-existing siblings")
-        local triggers = {}
-        for _, e in ipairs(entries) do triggers[e.trigger] = true end
-        helpers.assert_true(triggers.omw and triggers.ty, "seeded 'omw'/'ty' must survive the save")
-        helpers.assert_true(triggers.btw, "the new 'btw' must be persisted")
+        helpers.assert_eq(#entries, 1, "only what the editor sent may be on disk")
+        helpers.assert_eq(entries[1].trigger, "ty", "and it must be the entry it sent")
+      end)
+    end)
+    helpers.it("'save' drops an entry with no trigger instead of writing it", function()
+      local reader, writer, captured = make_spies(true)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        h.on_message({
+          action = "save",
+          data = {
+            sections_order = { "work" },
+            sections = { work = { entries = {
+              { trigger = "", output = "orphaned" },
+              { trigger = "ok", output = "okay" },
+            } } },
+          },
+        }, state)
+        local entries = captured.data.sections.work.entries
+        helpers.assert_eq(#entries, 1,
+          "a triggerless entry can never fire, and on disk it is a row nobody can delete from the UI")
+        helpers.assert_eq(entries[1].trigger, "ok", "the real entry survives")
       end)
     end)
     helpers.it("'save' reports failure when the write fails", function()
       local reader, writer = make_spies(false, "disk full")
-      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "save", trigger = "btw", replacement = "by the way", group = "english" }, state)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        local result = h.on_message({
+          action = "save",
+          data = { sections_order = { "work" }, sections = { work = { entries = {} } } },
+        }, state)
         helpers.assert_eq(result.saved, false, "a failed write must not report success")
       end)
     end)
-    helpers.it("'delete' removes only the target and keeps siblings", function()
-      local reader, writer, captured = make_spies(true)
-      with_spies("modules.ui.bridge_handlers.hotstring_editor_bridge", reader, writer, function(h)
-        local result = h.on_message({ action = "delete", trigger = "omw", group = "english" }, state)
-        helpers.assert_true(result.deleted)
-        local entries = captured.data.sections.english.entries
-        helpers.assert_eq(#entries, 1, "only the target entry may be removed")
-        helpers.assert_eq(entries[1].trigger, "ty", "the sibling 'ty' must survive the delete")
-      end)
+    helpers.it("'save_pref' stores a declared preference and refuses an unknown key", function()
+      local ok = handler.on_message(
+        { action = "save_pref", data = { key = "compact_view", value = true } }, state)
+      helpers.assert_true(ok ~= nil and ok.saved == true, "a declared preference must be stored")
+
+      -- The page is the least trusted input the daemon has, and these share
+      -- storage with the category toggles: an unbounded key/value write is how a
+      -- UI bug becomes a corrupted config.
+      local refused = handler.on_message(
+        { action = "save_pref", data = { key = "../../evil", value = 1 } }, state)
+      helpers.assert_true(refused ~= nil and refused.saved == false,
+        "an undeclared preference key must be refused, not written")
     end)
-    helpers.it("handles 'duplicate' action", function()
-      local result = handler.on_message({ action = "duplicate", trigger = "btw" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.duplicated)
+    helpers.it("'window_focus' records the focus so expansions stop inside the editor", function()
+      local s2 = build_mock_state()
+      handler.on_message({ action = "window_focus", data = { focused = true } }, s2)
+      helpers.assert_eq(s2.editor_focused, true,
+        "without this, writing a hotstring whose trigger exists fires it in the editor's own field")
+      handler.on_message({ action = "window_focus", data = { focused = false } }, s2)
+      helpers.assert_eq(s2.editor_focused, false, "and the flag must clear when focus leaves")
     end)
   end)
 
@@ -680,7 +977,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("paths_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.paths_editor_bridge")
+    local handler = helpers.load_module("ui.paths_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -705,7 +1002,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("personal_info_editor_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.personal_info_editor_bridge")
+    local handler = helpers.load_module("ui.personal_info_editor.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -736,7 +1033,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("model_browser_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.model_browser_bridge")
+    local handler = helpers.load_module("ui.model_browser.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -775,7 +1072,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("token_bridge", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.token_bridge")
+    local handler = helpers.load_module("ui.token_prompt.bridge")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
@@ -805,7 +1102,7 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("personal_toml_editor", function()
-    local handler = helpers.load_module("modules.ui.bridge_handlers.personal_toml_editor_bridge")
+    local handler = helpers.load_module("ui.personal_info_editor.bridge_toml")
     local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()

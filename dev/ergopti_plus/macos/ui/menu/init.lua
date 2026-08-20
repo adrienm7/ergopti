@@ -14,21 +14,26 @@
 local M = {}
 
 local hs               = hs
-local notifications    = require("lib.notifications")
+local notifications    = require("infra.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
-local Logger           = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n             = require("lib.i18n")
-local ui_restore       = require("lib.ui_restore")
+local Logger           = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n             = require("infra.i18n")
+local ui_restore       = require("infra.ui_restore")
 
-local Preferences   = require("ui.menu.preferences")
+local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local MenuWatchers  = require("ui.menu.menu_watchers")
-local Updater       = require("lib.updater")
+local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
+local Chord         = require("chord")
+local Hotkeys       = require("adapters.hotkey_registrar")
+local TerminationCoordinator = require("infra.termination_coordinator")
+local PreferencesTransaction = require("ui.menu.preferences_transaction")
 
 local LOG = "menu"
 local load_errors = {}
@@ -76,7 +81,7 @@ local menu_mods = {
 	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ui.menu.menu_llm",             "AI menu"),
 	keylogger       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
-	karabiner       = safe_require("ui.menu.menu_karabiner",       "Karabiner menu"),
+	karabiner       = safe_require("ui.menu.menu_remap",       "Karabiner menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
 }
@@ -90,6 +95,33 @@ local core_mods = {
 }
 
 M._active_tasks = {}
+
+--- Creates a native-compatible facade over an opaque registrar handle.
+--- MenuState still owns the delayed :enable() warm-up, while all creation,
+--- delivery fencing, and teardown remain centralized in the adapter.
+--- @param mods table Modifier array.
+--- @param key string Key name.
+--- @param callback function Press callback.
+--- @return table|nil Managed hotkey facade.
+local function bind_managed_hotkey(mods, key, callback)
+	local chord, chord_err = Chord.format(mods, key)
+	if not chord then
+		Logger.error(LOG, "Cannot bind menu hotkey: %s.", tostring(chord_err))
+		return nil
+	end
+	local handle = Hotkeys.bind(chord, callback)
+	if not handle then return nil end
+	return {
+		enable = function() return Hotkeys.setEnabled(handle, true) end,
+		disable = function() return Hotkeys.setEnabled(handle, false) end,
+		delete = function()
+			if not handle then return true end
+			if Hotkeys.unbind(handle) ~= true then return false end
+			handle = nil
+			return true
+		end,
+	}
+end
 
 
 
@@ -118,21 +150,32 @@ M._active_tasks = {}
 --- the hazard that loop's own comment cites. This module holds the handles, so
 --- it is the only place that can stop them.
 function M.stop_watchers()
-	if M._watcher then
-		pcall(function() M._watcher:stop() end)
-		M._watcher = nil
+	local function stop_owned(field, label)
+		local watcher = M[field]
+		if watcher == nil then return true end
+		local ok, result = pcall(function() return watcher:stop() end)
+		if not ok or result == false then
+			Logger.error(LOG, "%s stop failed; exact capability retained for retry: %s",
+				label, tostring(result))
+			return false
+		end
+		M[field] = nil
+		return true
 	end
-	if M._theme_watcher then
-		pcall(function() M._theme_watcher:stop() end)
-		M._theme_watcher = nil
+
+	local config_stopped = stop_owned("_watcher", "Menubar config watcher")
+	local theme_stopped = stop_owned("_theme_watcher", "Menubar theme watcher")
+	if config_stopped and theme_stopped then
+		Logger.debug(LOG, "Menubar watchers stopped.")
+		return true
 	end
-	Logger.debug(LOG, "Menubar watchers stopped.")
+	return false
 end
 
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner, hotfile_paths)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
-	-- MenuPaths was already initialized by init.lua before menu.start() is called;
-	-- call init() again only as a no-op safety net in case of standalone testing.
+	-- init.lua initializes only the resolver. The editor owns its reload callback
+	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
 		MenuPaths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
 	end
@@ -185,7 +228,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- Single source of truth for the escape (lib.text_utils) rather than a fourth
 		-- private copy of the same "%" doubling. Inlined at the use site so the
 		-- class guard can see the escape without having to trace a local.
-		return text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char))
+		return (text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char)))
 	end
 
 	-- Inputs the menubar icon was last rendered for. Declared above update_icon:
@@ -299,13 +342,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		pcall(notifications.notify, tostring(label), nil, is_enabled and "success" or "error")
 	end
 
+	-- Preference callbacks mutate shared tables and runtime engines before they
+	-- publish config.toml. Keep the last acknowledged state so a returned or
+	-- raised writer failure can reverse the whole user action in place.
+	local sync_state_to_modules
+	local transactional_save_prefs = nil
+	local llm_handler = nil
+
 	local function save_prefs()
-		Preferences.save(MenuPaths.get("ConfigTomlPath"), state, hotfiles, core_mods)
-		if type(Builder.invalidate_cache) == "function" then Builder.invalidate_cache() end
-		if type(HotCounter.invalidate_cache) == "function" then HotCounter.invalidate_cache() end
-		-- A persisted preference change (group/section toggle, trigger char, …)
-		-- alters the menu tree → force a rebuild on the next open.
-		_menu_dirty = true
+		if type(transactional_save_prefs) ~= "function" then
+			Logger.error(LOG, "Preference transaction used before its boot snapshot was seeded.")
+			return false
+		end
+		return transactional_save_prefs()
 	end
 
 
@@ -320,11 +369,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _apps_time_hk_box = {}
 
 	local _metrics_hk = nil
-	local function apply_metrics_shortcut(mods, key)
+	local function apply_metrics_shortcut(mods, key, persist)
 		if _metrics_hk then pcall(function() _metrics_hk:delete() end); _metrics_hk = nil end
 		if mods and key then
 			state.metrics_shortcut = { mods = mods, key = key }
-			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+			local hk = bind_managed_hotkey(mods, key, function()
 				-- Toggle: close the dashboard if already open, otherwise open it.
 				-- Using package.loaded so we don't accidentally trigger require() on close.
 				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
@@ -336,22 +385,25 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local kl = core_mods.keylogger
 				if kl and type(kl.show_metrics) == "function" then pcall(kl.show_metrics) end
 			end)
-			if ok and hk then _metrics_hk = hk; hk:enable() end
+			if hk then _metrics_hk = hk; hk:enable() end
 		else
 			state.metrics_shortcut = false
 		end
 		-- Keep box in sync so MenuState.sync_state_to_modules can re-enable the hotkey
 		if _metrics_hk_box then _metrics_hk_box[1] = _metrics_hk end
-		save_prefs()
-		if type(updateMenu) == "function" then updateMenu() end
+		if persist ~= false then
+			if save_prefs() ~= true then return false end
+			if type(updateMenu) == "function" then updateMenu() end
+		end
+		return true
 	end
 
 	local _apps_time_hk = nil
-	local function apply_apps_time_shortcut(mods, key)
+	local function apply_apps_time_shortcut(mods, key, persist)
 		if _apps_time_hk then pcall(function() _apps_time_hk:delete() end); _apps_time_hk = nil end
 		if mods and key then
 			state.apps_time_shortcut = { mods = mods, key = key }
-			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+			local hk = bind_managed_hotkey(mods, key, function()
 				-- Toggle behaviour: close if open, else open
 				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
 				if at_loaded and at_loaded._wv then
@@ -362,14 +414,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local ok_mod, at = pcall(require, "ui.metrics_apps")
 				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end)
-			if ok and hk then _apps_time_hk = hk; hk:enable() end
+			if hk then _apps_time_hk = hk; hk:enable() end
 		else
 			state.apps_time_shortcut = false
 		end
 		-- Keep box in sync so MenuState.sync_state_to_modules can re-enable the hotkey
 		if _apps_time_hk_box then _apps_time_hk_box[1] = _apps_time_hk end
-		save_prefs()
-		if type(updateMenu) == "function" then updateMenu() end
+		if persist ~= false then
+			if save_prefs() ~= true then return false end
+			if type(updateMenu) == "function" then updateMenu() end
+		end
+		return true
 	end
 
 	-- Build the dependency bag for MenuState.sync_state_to_modules
@@ -379,8 +434,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- (Boxes forward-declared above so apply_metrics/apps_time_shortcut can
 	-- capture them as upvalues at definition time.)
 
-	local function sync_state_to_modules(saved, config_absent)
-		MenuState.sync_state_to_modules(state, saved, config_absent, {
+	sync_state_to_modules = function(saved, config_absent, restoring)
+		return MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
@@ -390,6 +445,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			apply_apps_time_shortcut = apply_apps_time_shortcut,
 			_metrics_hk              = _metrics_hk_box,
 			_apps_time_hk            = _apps_time_hk_box,
+			restoring                 = restoring == true,
 		})
 	end
 
@@ -411,13 +467,24 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 
-	local function clear_all_bindings()
+	local function clear_config_backed_bindings()
 		local disabled_action = "none"
 		if gestures and gestures_core_mod and type(gestures_core_mod.SINGLE_SLOTS) == "table" then
 			for _, slot in ipairs(gestures_core_mod.SINGLE_SLOTS) do
 				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, disabled_action) end
 			end
 		end
+		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
+			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
+			for _, keyname in ipairs({ "return_key", "backspace", "escape" }) do
+				state.script_control_shortcuts[keyname] = disabled_action
+				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, disabled_action)
+			end
+		end
+	end
+
+	local function clear_external_bindings()
+		local disabled_action = "none"
 		if karabiner then
 			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
 				pcall(karabiner.set_tap_action,  key_def.id, disabled_action)
@@ -431,13 +498,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(karabiner.regenerate) == "function" then pcall(karabiner.regenerate) end
 		end
 		clear_keyboard_shortcut_settings()
-		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
-			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
-			for _, keyname in ipairs({ "return_key", "backspace", "escape" }) do
-				state.script_control_shortcuts[keyname] = disabled_action
-				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, disabled_action)
-			end
-		end
 	end
 
 	local function restore_factory_bindings()
@@ -470,6 +530,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function set_all_enabled(enabled)
+		if enabled and not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
+			"enable all features") then
+			return false
+		end
 		-- 1. Set global states
 		state.keymap                 = enabled
 		state.gestures               = enabled
@@ -536,17 +600,24 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 		
-		-- 5. « Tout désactiver » also empties gesture / shortcut / tap-hold slots.
-		if not enabled then
-			clear_all_bindings()
-		end
+		-- Config-backed bindings must be in the candidate snapshot; rollback can
+		-- restore them because their runtimes are represented in Preferences.snapshot.
+		if not enabled then clear_config_backed_bindings() end
 
-		-- 6. Sync engines and Save
+		-- Publish the candidate state before destructive external effects. In
+		-- particular, clearing Karabiner bindings and hs.settings cannot be made
+		-- atomic by rolling back the config.toml snapshot alone.
+		if save_prefs() ~= true then return false end
+
+		-- 5. « Tout désactiver » also empties external tap-hold / keyboard slots.
+		if not enabled then clear_external_bindings() end
+
+		-- 6. Sync engines only after the candidate was acknowledged.
 		sync_state_to_modules(state, false)
-		save_prefs()
 		
 		notify_feature(enabled and i18n.get("notify.all_features_enabled") or i18n.get("notify.all_features_disabled"), enabled)
 		if type(updateMenu) == "function" then updateMenu() end
+		return true
 	end
 
 	local function reset_all_defaults()
@@ -610,6 +681,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 
+	-- Preserve the known-live pre-load posture. A persisted preference can cross
+	-- several runtime owners (notably Bindings + KeyboardShortcuts); if one child
+	-- refuses, continuing with the merged table would let the menu advertise OFF
+	-- while a retained native hotkey remains ON.
+	local pre_load_state = PreferencesTransaction.clone(state)
 	Preferences.merge_saved_data(state, saved)
 	-- Sync the core LLM backend from the just-merged persisted state BEFORE
 	-- sync_state_to_modules pushes the model into the engine. sync_state_to_modules
@@ -624,9 +700,68 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_llm.set_backend, state.llm_backend)
 		end
 	end
-	sync_state_to_modules(saved, config_absent)
+	-- Do not ask MenuState to seed config.toml yet: the transaction must first be
+	-- initialized from the fully hydrated runtime. This is crucial for the first
+	-- user click after boot, before any successful save has occurred.
+	local initial_sync_ok = sync_state_to_modules(saved, false)
+	if initial_sync_ok ~= true then
+		Logger.error(LOG,
+			"Initial preference synchronization did not complete; restoring pre-load runtime state.")
+		local state_restored = PreferencesTransaction.restore_table(state, pre_load_state)
+		local rollback_ok = false
+		local rollback_result
+		if state_restored == true then
+			local rollback_call_ok
+			rollback_call_ok, rollback_result = xpcall(function()
+				return sync_state_to_modules(pre_load_state, false, true)
+			end, debug.traceback)
+			rollback_ok = rollback_call_ok and rollback_result == true
+		end
+		if not rollback_ok then
+			Logger.error(LOG,
+				"Initial preference rollback did not settle; menubar startup aborted: %s.",
+				tostring(rollback_result))
+			pcall(TrayMenu.destroy)
+			return nil, nil
+		end
+		Logger.warn(LOG,
+			"Persisted preferences were rejected; the pre-load runtime state was restored.")
+	end
+	local snapshot_ok, initial_preferences = pcall(Preferences.snapshot, state, hotfiles, core_mods)
+	if not snapshot_ok or type(initial_preferences) ~= "table" then
+		initial_preferences = PreferencesTransaction.clone(state)
+		Logger.error(LOG, "Could not capture the initial runtime preference snapshot: %s.",
+			tostring(initial_preferences))
+	end
+	transactional_save_prefs = PreferencesTransaction.bind(Preferences, {
+		path                = MenuPaths.get("ConfigTomlPath"),
+		state               = state,
+		hotfiles            = hotfiles,
+		core_modules        = core_mods,
+		builder             = Builder,
+		hot_counter         = HotCounter,
+		initial_state       = state,
+		initial_preferences = initial_preferences,
+		restore_runtime     = function(snapshot)
+			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
+			if type(llm_handler) == "table"
+				and type(llm_handler.restore_preference_runtime) == "function" then
+				return llm_handler.restore_preference_runtime(snapshot) == true
+			end
+			return true
+		end,
+		on_commit           = function()
+			_menu_dirty = true
+		end,
+		on_rollback         = function()
+			_menu_dirty = true
+			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
+		end,
+	})
+	if config_absent and save_prefs() ~= true then
+		Logger.error(LOG, "Could not seed the initial preference file.")
+	end
 
-	local llm_handler = nil
 	if menu_mods.llm and type(menu_mods.llm.create) == "function" then
 		local ok_h, res = pcall(menu_mods.llm.create, {
 			state          = state,
@@ -654,16 +789,28 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	if type(llm_handler) == "table" and type(llm_handler.check_startup) == "function" then pcall(llm_handler.check_startup) end
 	if type(hotstring_editor.set_update_menu) == "function" then pcall(hotstring_editor.set_update_menu, function() if type(updateMenu) == "function" then updateMenu() end end) end
 
-	-- At startup / reload the script is in the active (non-paused) state, so honour
-	-- the user's chosen "resume" layout the same way a resume would: if the
-	-- pause-layout feature is on and a resume layout is configured, make it the
-	-- active layout. Deferred so it never blocks boot and runs after KE's first
-	-- deploy/prime. schedule_pause_layout_switch(false, …) is a no-op when the
-	-- feature is off or no resume layout is set.
+	-- Honour the live pause state once KE's first deploy/prime has settled. The
+	-- callback runs four seconds after this code, so capturing the boot-time
+	-- `false` would let a pause in that window get overwritten by the resume layout.
 	hs.timer.doAfter(STARTUP_LAYOUT_SWITCH_DELAY_SEC, function()
 		local kbd_layout_mod = menu_mods.keyboard_layout
 		if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
-			pcall(kbd_layout_mod.schedule_pause_layout_switch, false, state)
+			local live_paused = false
+			local shortcuts_mod = core_mods.shortcuts_mod
+			if shortcuts_mod and type(shortcuts_mod.is_paused) == "function" then
+				local ok_pause, paused_or_err = pcall(shortcuts_mod.is_paused)
+				if not ok_pause then
+					Logger.error(LOG, "Startup layout callback could not read live pause state: %s.",
+						tostring(paused_or_err))
+					return
+				end
+				live_paused = paused_or_err == true
+			end
+			local ok_switch, switch_err = pcall(
+				kbd_layout_mod.schedule_pause_layout_switch, live_paused, state)
+			if not ok_switch then
+				Logger.error(LOG, "Startup layout callback raised: %s.", tostring(switch_err))
+			end
 		end
 	end)
 
@@ -680,7 +827,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
 					pcall(kbd_layout_mod.schedule_pause_layout_switch, is_paused, state)
 				end
-				update_icon()
+				-- updateMenu's first statement is pcall(update_icon), so a bare call
+				-- here rendered the icon twice per toggle — off disk, through an
+				-- off-screen canvas — from inside the script-control eventtap callback
+				-- that carries the key needed to un-pause. Going through updateMenu
+				-- also puts the refresh under its pcall, so a throw in the render can
+				-- no longer escape this listener.
 				updateMenu()
 			end)
 		end
@@ -780,43 +932,31 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		enable_all                = function() set_all_enabled(true) end,
 		disable_all               = function() set_all_enabled(false) end,
 		reset_defaults            = function() reset_all_defaults() end,
-		open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+		open_paths                = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
 		reload                    = function() do_reload("menu") end,
 		quit                      = function()
-			hs.timer.doAfter(0.05, function()
-				-- Tear down Karabiner-Elements via karabiner.kill() — the SAME
-				-- ownership-respecting path script_quit (modules/gestures/actions.lua)
-				-- and hs.shutdownCallback (init.lua) already use. The previous
-				-- run_total_reset_async() call bypassed kill()'s is_hs_owned_bridge()
-				-- guard entirely, so it could tear down a user-managed KE install that
-				-- Hammerspoon never started (F-MED-13).
-				pcall(function()
-					local ok_kb, karabiner = pcall(require, "modules.karabiner")
-					if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
-						karabiner.kill()
-					end
-				end)
-				pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
-				-- Full orphan teardown before os.exit — os.exit() bypasses
-				-- hs.shutdownCallback so terminate_helper_processes and
-				-- terminate_orphan_mlx_server (called there) must be replicated here.
-				-- Without this the detached mlx_lm.server + helper daemons survive
-				-- indefinitely after a menubar-Quit (M-11 / F-MED-7 missed sibling).
-				pcall(function()
-					local mlm = require("ui.menu.menu_llm")
-					if type(mlm.terminate_helper_processes) == "function" then mlm.terminate_helper_processes() end
-					if type(mlm.terminate_orphan_mlx_server) == "function" then mlm.terminate_orphan_mlx_server() end
-				end)
-				-- Flush keylogger before os.exit() — it bypasses hs.shutdownCallback
-				-- where the normal flush lives.
-				pcall(function()
-					local ok_kl, kl = pcall(require, "modules.keylogger")
-					if ok_kl and type(kl) == "table" and type(kl.stop) == "function" then
-						kl.stop()
-					end
-				end)
-				os.exit(0)
+			local exit_requested = false
+			local function request_controlled_exit()
+				if exit_requested then return end
+				exit_requested = true
+				local request_ok, accepted_or_err = xpcall(function()
+					return TerminationCoordinator.request_exit("menu_quit", 0)
+				end, debug.traceback)
+				if not request_ok or accepted_or_err ~= true then
+					Logger.error(LOG, "Menubar controlled exit was rejected: %s",
+						tostring(accepted_or_err))
+				end
+			end
+			local scheduled, timer_or_err = pcall(function()
+				return hs.timer.doAfter(0.05, request_controlled_exit)
 			end)
+			if not scheduled or timer_or_err == nil or timer_or_err == false then
+				Logger.error(LOG, "Menubar controlled exit scheduling failed: %s",
+					tostring(timer_or_err))
+				-- The asynchronous coordinator remains the sole owner of the exact
+				-- lease fence, sibling teardown and eventual process exit.
+				request_controlled_exit()
+			end
 		end,
 		open_logs                 = function()
 			local dir = logs_dir()
@@ -824,7 +964,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_console              = function() pcall(hs.openConsole) end,
-		open_paths_editor         = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+		open_paths_editor         = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
 			if ok and type(ed.open) == "function" then pcall(ed.open) end
@@ -841,7 +981,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		open_script_source        = function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end,
 		open_personal_shortcuts   = function()
-			local ok, ps = pcall(require, "lib.personal_shortcuts")
+			local ok, ps = pcall(require, "infra.personal_shortcuts")
 			if ok and type(ps.open) == "function" then pcall(ps.open) end
 		end,
 		open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
@@ -853,14 +993,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_today_log            = function()
-			local path = require("lib.logger").UNIFIED_LOG_FILE
+			local path = require("infra.logger").UNIFIED_LOG_FILE
 			if type(path) ~= "string" or path == "" then
 				path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
 			end
 			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
 		end,
 		open_error_log            = function()
-			local path = require("lib.logger").ERRORS_LOG_FILE
+			local path = require("infra.logger").ERRORS_LOG_FILE
 			if type(path) ~= "string" or path == "" then
 				path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 			end
@@ -873,7 +1013,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end,
 		set_log_level             = function(level)
-			local L = require("lib.logger")
+			local L = require("infra.logger")
 			L.set_level(level)
 			pcall(function() hs.settings.set("ergopti.log_level", level) end)
 			L.info("menu", "Log level set to %s.", level)
@@ -1047,7 +1187,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- driver fully wired. Errors are caught inside the module so a broken
 	-- user file logs to the console without preventing boot.
 	pcall(function()
-		local ok, ps = pcall(require, "lib.personal_shortcuts")
+		local ok, ps = pcall(require, "infra.personal_shortcuts")
 		if ok and type(ps.load) == "function" then ps.load() end
 	end)
 
@@ -1060,18 +1200,38 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	_suppress_watcher_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
 	Logger.debug(LOG, "Pathwatcher boot suppression active for %.0f s.", BOOT_SUPPRESS_SEC)
 
+	-- The same exclusion list infra/file_watchers already receives. Two recursive
+	-- watchers cover this tree and only that one was using it.
 	local configWatcher = MenuWatchers.start_config_watcher(
 		base_dir,
 		function() do_reload("watcher") end,
 		function() return _suppress_watcher_until end,
-		ui_restore
+		ui_restore,
+		{ (hs.configdir or ".") .. "/cache" },
+		-- Resolved from MenuPaths, exactly as infra/file_watchers resolves the same
+		-- two, so the watcher and the writers cannot disagree about where they are.
+		-- Both files are rewritten by the driver itself — config.toml on every
+		-- persisted preference change, the Karabiner config on every regenerate —
+		-- and this is the second recursive watcher on the same tree. The other one
+		-- has always been given this list; this one was not, so under a layout where
+		-- the config directory sits inside base_dir a menu toggle read as a source
+		-- edit and armed a reload.
+		{
+			MenuPaths.get("ConfigTomlPath"),
+			MenuPaths.get("KarabinerConfigPath"),
+		}
 	)
 
 	M._menu    = myMenu
 	M._watcher = configWatcher
 
 	M._theme_watcher = MenuWatchers.start_theme_watcher(function()
-		if type(update_icon) == "function" then update_icon() end
+		-- updateMenu refreshes the icon itself, so the bare call was the same double
+		-- render as the pause listener's. And the icon does not depend on the system
+		-- theme in the first place: the variant is chosen from `paused` alone and it
+		-- is pushed with setIcon(icon, false) — the non-template form, so macOS never
+		-- re-tints it for light or dark either. What a theme change actually needs is
+		-- the menu rebuild below.
 		if type(updateMenu) == "function" then updateMenu() end
 	end)
 

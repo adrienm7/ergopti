@@ -4,7 +4,7 @@
 ; MODULE: Menu-Dispatch Deep Liveness Guard Meta Test
 ; DESCRIPTION:
 ; Static source guard for the F07 deep-liveness regression in
-; lib/menu_dispatcher.ahk.
+; infra/menu_dispatcher.ahk.
 ;
 ; BACKGROUND:
 ; MenuDispatcher_PruneMenu must decide whether each tracked item is still present
@@ -57,7 +57,7 @@ _MDDL_ReadSource(RelPath) {
 ; ==================================================================
 
 _MDDL_NoOneLevelCap() {
-	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDDL_ReadSource("infra/menu_dispatcher.ahk")
 	Body := _DriverFuncBody("_MenuDispatchCollectLiveIds")
 	Assert(Body != "", "_MenuDispatchCollectLiveIds must be defined in menu_dispatcher.ahk")
 	; The old one-level cap called the walker with a trailing ', false)'. That literal
@@ -68,7 +68,7 @@ _MDDL_NoOneLevelCap() {
 Test("menu_dispatcher: _MenuDispatchCollectLiveIds has no one-level-cap call (F07 deep-liveness)", _MDDL_NoOneLevelCap)
 
 _MDDL_CycleGuardPresent() {
-	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDDL_ReadSource("infra/menu_dispatcher.ahk")
 	Body := _DriverFuncBody("_MenuDispatchCollectLiveIds")
 	Assert(Body != "", "_MenuDispatchCollectLiveIds must be defined in menu_dispatcher.ahk")
 	Assert(InStr(Body, "Seen.Has(") > 0,
@@ -77,7 +77,7 @@ _MDDL_CycleGuardPresent() {
 Test("menu_dispatcher: _MenuDispatchCollectLiveIds has cycle guard via Seen.Has() (F07 deep-liveness)", _MDDL_CycleGuardPresent)
 
 _MDDL_RecursiveCall() {
-	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDDL_ReadSource("infra/menu_dispatcher.ahk")
 	Body := _DriverFuncBody("_MenuDispatchCollectLiveIds")
 	Assert(Body != "", "_MenuDispatchCollectLiveIds must be defined in menu_dispatcher.ahk")
 	Assert(InStr(Body, "_MenuDispatchCollectLiveIds(Sub") > 0,
@@ -86,7 +86,7 @@ _MDDL_RecursiveCall() {
 Test("menu_dispatcher: _MenuDispatchCollectLiveIds calls itself recursively (F07 deep-liveness)", _MDDL_RecursiveCall)
 
 _MDDL_CallerPassesMap() {
-	Src := _MDDL_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _MDDL_ReadSource("infra/menu_dispatcher.ahk")
 	Body := _DriverFuncBody("MenuDispatcher_PruneMenu")
 	Assert(Body != "", "MenuDispatcher_PruneMenu must be defined in menu_dispatcher.ahk")
 	Assert(InStr(Body, "_MenuDispatchCollectLiveIds(TrayHandle, LiveIds, Map())") > 0,

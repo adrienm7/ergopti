@@ -126,11 +126,11 @@ Test("i18n/json: unicode escape then plain run decodes correctly", TestI18n_Json
 
 
 
-; ==========================================
+; ===========================================
 ; ===========================================
 ; ======= 2/ _I18nLoadFile test cases =======
 ; ===========================================
-; ==========================================
+; ===========================================
 
 _I18nLoadFileMissingLeavesEmpty() {
 	_I18nTestReset()
@@ -299,11 +299,11 @@ Test("i18n cache: a fresh .tsv is served without re-parsing the .json", _I18nLaz
 
 
 
-; ================================
+; ===============================
 ; ===============================
 ; ======= 3/ t() fallback =======
 ; ===============================
-; ================================
+; ===============================
 
 _I18nTFallbackWhenEmpty() {
 	_I18nTestReset()
@@ -366,11 +366,11 @@ Test("i18n t(): primary cache takes priority over fallbacks", _I18nTPrimaryTakes
 
 
 
-; ================================================
+; =============================================
 ; =============================================
 ; ======= 4/ I18nInit locale validation =======
 ; =============================================
-; ================================================
+; =============================================
 
 _I18nInitAcceptsKnownLocale() {
 	_I18nTestReset()
@@ -424,11 +424,11 @@ Test("i18n I18nInit: resets cache loaded flag", _I18nInitResetsCacheLoadedFlag)
 
 
 
-; ====================================================
+; ==============================================
 ; ==============================================
 ; ======= 5/ _I18nSortedLocales ordering =======
 ; ==============================================
-; ====================================================
+; ==============================================
 
 _I18nSortedReturnsAll() {
 	global I18N_LOCALES
@@ -480,7 +480,7 @@ Test("i18n _I18nSortedLocales: does not mutate original I18N_LOCALES", _I18nSort
 
 _I18nSLP_SetLocaleOmitsStart() {
 	Body := _DriverFuncBody("I18nSetLocale")
-	AssertTrue(Body != "", "I18nSetLocale must be defined in lib/i18n.ahk")
+	AssertTrue(Body != "", "I18nSetLocale must be defined in infra/i18n.ahk")
 	AssertTrue(InStr(Body, "LoggerStart") == 0,
 		"I18nSetLocale must not call LoggerStart directly - it used to fire once per call regardless of debounce coalescing, leaving intermediate switches with an unpaired START")
 }
@@ -488,11 +488,15 @@ Test("i18n I18nSetLocale: no longer logs LoggerStart at the call site (F51)", _I
 
 _I18nSLP_DoReloadLogsPair() {
 	Body := _DriverFuncBody("_I18nDoReload")
-	AssertTrue(Body != "", "_I18nDoReload must be defined in lib/i18n.ahk")
+	Ready := _DriverFuncBody("_I18nReloadReady")
+	AssertTrue(Body != "", "_I18nDoReload must be defined in infra/i18n.ahk")
+	AssertTrue(Ready != "", "_I18nReloadReady must be defined in infra/i18n.ahk")
 	AssertTrue(InStr(Body, "LoggerStart") > 0,
 		"_I18nDoReload must log LoggerStart right before the real reload work happens (F51)")
-	AssertTrue(InStr(Body, "LoggerSuccess") > 0,
-		"_I18nDoReload must still log LoggerSuccess - the Start/Success pair now lives together where the reload actually happens")
+	AssertTrue(InStr(Body, "_I18nReloadReady.Bind") > 0,
+		"_I18nDoReload must hand its terminal log to ReloadPreservingSuspend so marker publication failure cannot be reported as SUCCESS")
+	AssertTrue(InStr(Ready, "LoggerSuccess") > 0,
+		"the successful reload callback must complete the Start/Success pair immediately before Reload")
 }
 Test("i18n _I18nDoReload: logs a matched Start/Success pair (F51)", _I18nSLP_DoReloadLogsPair)
 

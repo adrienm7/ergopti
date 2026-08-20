@@ -1,7 +1,7 @@
 --- tests/unit/lib/test_git_status.lua
 
 --- ==============================================================================
---- MODULE: lib/git_status predicate contract
+--- MODULE: infra/git_status predicate contract
 --- DESCRIPTION:
 --- git_status.operation_in_progress() is what stops the auto-reload watchers from
 --- firing hs.reload() in the middle of a `git pull` (macos-reload-during-git-pull).
@@ -29,8 +29,8 @@ package.loaded["adapters.file_system"] = {
 	read   = function(p) return contents[p] end,
 }
 
-package.loaded["lib.git_status"] = nil
-local git_status = require("lib.git_status")
+package.loaded["infra.git_status"] = nil
+local git_status = require("infra.git_status")
 
 local function reset()
 	for k in pairs(existing) do existing[k] = nil end
@@ -41,7 +41,7 @@ end
 -- real base_dir passed by init.lua.
 local DRIVER_DIR = "/repo/static/ergopti_plus/macos"
 
-helpers.describe("lib/git_status — operation_in_progress()", function()
+helpers.describe("infra/git_status — operation_in_progress()", function()
 	helpers.it("reports NOT in progress for an idle checkout", function()
 		reset()
 		existing["/repo/.git/HEAD"] = true

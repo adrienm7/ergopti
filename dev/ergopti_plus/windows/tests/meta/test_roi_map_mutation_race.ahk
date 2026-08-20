@@ -18,16 +18,26 @@ _RMMR_AssertHalflifeTickAtomic() {
 }
 
 _RMMR_AssertProcessWordAtomic() {
-	; The prune now lives in the dedicated KL_Roi_PruneWordCounts helper (extracted
-	; for the bounded/guaranteed-shrinking fix), which KL_Roi_ProcessWord invokes
-	; once the cap is exceeded. The atomicity guarantee moved with it, so assert
-	; the helper holds the Critical section.
-	Body := _DriverFuncBody("KL_Roi_PruneWordCounts")
-	Assert(Body != "", "KL_Roi_PruneWordCounts must exist in keylogger_trigger_roi.ahk")
-
-	CritOnIdx := InStr(Body, 'Critical("On")')
-	Assert(CritOnIdx > 0, "KL_Roi_PruneWordCounts must use Critical('On') for prune logic (roi-map-mutation-during-enumeration-race)")
+	; Only the map mutation, snapshot clone, and generation-checked swap are
+	; atomic. Survivor selection must remain interruptible so a rare prune cannot
+	; freeze the keyboard for hundreds of milliseconds.
+	Increment := _DriverFuncBody("KL_Roi_IncrementWordCount")
+	Snapshot := _DriverFuncBody("KL_Roi_SnapshotWordCounts")
+	Publish := _DriverFuncBody("KL_Roi_TryPublishPrunedCounts")
+	Assert(Increment != "" && Snapshot != "" && Publish != "",
+		"ROI word-count mutation, snapshot, and publication helpers must all exist")
+	for Txn in [
+		{Body: Increment, Fragment: "word_counts_generation += 1", Name: "increment"},
+		{Body: Snapshot, Fragment: "word_counts.Clone()", Name: "snapshot"},
+		{Body: Publish, Fragment: "State.word_counts := NextCounts", Name: "publish"}
+	] {
+		CritOnIdx := InStr(Txn.Body, 'Critical("On")')
+		WorkIdx := InStr(Txn.Body, Txn.Fragment, , CritOnIdx)
+		RestoreIdx := InStr(Txn.Body, "Critical(previous_critical)", , WorkIdx)
+		Assert(CritOnIdx > 0 && WorkIdx > CritOnIdx && RestoreIdx > WorkIdx,
+			"ROI " . Txn.Name . " transaction must mutate under a caller-state-preserving Critical span")
+	}
 }
 
 Test("keylogger_trigger_roi: KL_Roi_HalflifeTick enumerates map atomically (roi-map-mutation-during-enumeration-race)", _RMMR_AssertHalflifeTickAtomic)
-Test("keylogger_trigger_roi: KL_Roi_PruneWordCounts prunes map atomically (roi-map-mutation-during-enumeration-race)", _RMMR_AssertProcessWordAtomic)
+Test("keylogger_trigger_roi: ROI prune boundaries are atomic (roi-map-mutation-during-enumeration-race)", _RMMR_AssertProcessWordAtomic)

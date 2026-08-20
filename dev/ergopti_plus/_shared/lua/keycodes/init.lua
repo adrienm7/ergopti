@@ -21,7 +21,7 @@
 ---    without any init pattern.
 --- 4. Platform-neutral: depends only on numeric literals — no hs.* API here.
 ---    The HS-specific to_name() helper (which needs hs.keycodes.map) lives in
----    the Hammerspoon-local lib/keycodes.lua shim instead.
+---    the Hammerspoon-local infra/keycodes.lua shim instead.
 --- ==============================================================================
 
 local M = {}
@@ -29,10 +29,11 @@ local M = {}
 
 
 
+
 -- =====================================
---- =====================================
+-- =====================================
 -- ======= 1/ Function Key Codes =======
---- =====================================
+-- =====================================
 -- =====================================
 
 --- F13 (keycode 105) — Karabiner sentinel for the "right-command + Return"
@@ -59,7 +60,7 @@ M.F15_KARABINER_ESCAPE = 113
 M.F16_LLM_CHAIN_SIGNAL = 106
 
 --- F17 (keycode 64) — Karabiner-emitted "cycle windows in app" hotkey.
---- Bound by modules/karabiner/watchers.lua so the shortcut is layout-independent.
+--- Bound by platform/remap/watchers.lua so the shortcut is layout-independent.
 M.F17_CYCLE_WINDOWS = 64
 
 --- F18 (keycode 79) — currently used by modules/shortcuts/actions/system.lua as
@@ -80,15 +81,16 @@ M.F19_VOLUME_SCROLL_MODIFIER = 80
 M.F20_LAYER_NAV_ENTERED = 90
 
 -- NOTE: M.to_name() is Hammerspoon-specific (requires hs.keycodes.map) and
--- lives in the HS-local lib/keycodes.lua shim, not here.
+-- lives in the HS-local infra/keycodes.lua shim, not here.
+
 
 
 
 
 -- =================================================
---- =================================================
+-- =================================================
 -- ======= 2/ Other Hardcoded Physical Codes =======
---- =================================================
+-- =================================================
 -- =================================================
 
 --- Backspace (keycode 51) — used as the KE-paused fallback path in

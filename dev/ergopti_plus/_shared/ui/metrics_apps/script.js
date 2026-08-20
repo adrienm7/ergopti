@@ -62,6 +62,15 @@ function $id(id) {
 // ===================================
 // ===================================
 
+// Localised spellings of the default ("General") category, injected by the host
+// from _shared/data/metrics_general_category_aliases.json. Falls back to the two
+// spellings that predate the generated file so the dashboard still resolves the
+// common cases if the host has not supplied it.
+const GENERAL_CATEGORY_ALIASES = (typeof window !== 'undefined' && window.GeneralCategoryAliases) || [
+	'General',
+	'Général'
+];
+
 const MAC_CATEGORIES_FR = {
 	Productivity: 'Productivité',
 	'Social networking': 'Réseaux sociaux',
@@ -108,27 +117,75 @@ const CHART_PALETTE = [
 	'#5AC8FA' // Light Blue
 ];
 
-// Fixed aesthetic mappings for standard categories — each hue is deliberately distant
+// Fixed aesthetic mappings for standard categories — each hue is deliberately
+// distant. Keyed by the STABLE ENGLISH ID, not by the displayed label.
+//
+// It used to be keyed by the French label, which made the colour a property of
+// the translation rather than of the category. Two consequences, one of them
+// already live: 'Graphics design' displays as "Design graphique" but the table
+// held "Design", so that category silently lost its lavender and fell through to
+// the hash palette — a mismatch impossible to see, because both spellings look
+// correct. And translating the UI would have dropped EVERY fixed colour at once.
 const FIXED_CAT_COLORS = {
-	Productivité: '#0A84FF', // Blue
-	Développement: '#5E5CE6', // Indigo
-	'Réseaux sociaux': '#FF375F', // Pink-Red
-	Jeux: '#FF453A', // Deep Red
-	Divertissement: '#BF5AF2', // Purple
-	Utilitaires: '#64D2FF', // Sky Blue
-	Éducation: '#FF9F0A', // Orange
+	Productivity: '#0A84FF', // Blue
+	'Developer tools': '#5E5CE6', // Indigo
+	'Social networking': '#FF375F', // Pink-Red
+	Games: '#FF453A', // Deep Red
+	Entertainment: '#BF5AF2', // Purple
+	Utilities: '#64D2FF', // Sky Blue
+	Education: '#FF9F0A', // Orange
 	Business: '#FFD60A', // Yellow
 	Finance: '#30B0C7', // Teal
-	Design: '#E588F8', // Lavender
-	Photographie: '#FF6B35', // Burnt Orange
-	Vidéo: '#FF375F', // Coral
-	Musique: '#32D74B', // Green
-	'Santé & Forme': '#34C759', // Leaf Green
-	Actualités: '#F4A460', // Sandy
-	Météo: '#5AC8FA', // Light Blue
-	Voyage: '#00C7BE', // Cyan-Teal
-	Général: '#8E8E93' // Neutral Gray for uncategorized pieces
+	'Graphics design': '#E588F8', // Lavender
+	Photography: '#FF6B35', // Burnt Orange
+	Video: '#FF375F', // Coral
+	Music: '#32D74B', // Green
+	'Health fitness': '#34C759', // Leaf Green
+	News: '#F4A460', // Sandy
+	Weather: '#5AC8FA', // Light Blue
+	Travel: '#00C7BE', // Cyan-Teal
+	Unknown: '#8E8E93' // Neutral Gray for uncategorized pieces
 };
+
+// Every localised spelling a category has ever been STORED as, mapped back to its
+// id. The category is persisted into app_categories.json as a user override, and
+// the default written there is itself localised — so the file on disk already
+// depends on which language was active when it was written. Without this map, a
+// user who switches language finds their overrides orphaned and their charts
+// recoloured. Built from MAC_CATEGORIES_FR so the French spellings cannot drift
+// out of sync, plus the two historical spellings that were never in it.
+const LABEL_TO_CATEGORY_ID = (() => {
+	const map = {};
+	for (const [id, fr] of Object.entries(MAC_CATEGORIES_FR)) {
+		map[id] = id; // an id resolves to itself
+		map[fr] = id;
+	}
+	// "Design" was the FIXED_CAT_COLORS key for 'Graphics design' while the
+	// displayed label was "Design graphique"; either may be on disk.
+	map['Design'] = 'Graphics design';
+
+	// Every localised spelling of the DEFAULT category. This one is not a macOS
+	// App Store name — it is what the picker writes for an app the user has not
+	// classified, in whatever language was active at the time. A user who
+	// switches from French to German gets "Allgemein" while their file still
+	// holds "Général", and without this the picker shows two general categories
+	// where there should be one. The list is generated from the locale files
+	// (tools/build/gen-metrics-category-aliases.cjs) so it cannot go stale when a
+	// locale is added or a translation corrected.
+	for (const alias of GENERAL_CATEGORY_ALIASES) map[alias] = 'Unknown';
+	return map;
+})();
+
+/**
+ * Resolves any category spelling — an id, a French label, or a historical one —
+ * to its stable id. Unknown values pass through unchanged so a user-invented
+ * category keeps working and keeps its hashed colour.
+ * @param {string} value Stored or displayed category name.
+ * @returns {string} The category id, or `value` when it is not a known category.
+ */
+function categoryId(value) {
+	return LABEL_TO_CATEGORY_ID[value] || value;
+}
 
 function translateCategory(catName) {
 	return MAC_CATEGORIES_FR[catName] || catName;
@@ -149,11 +206,21 @@ function paletteIndex(str) {
 	return h % CHART_PALETTE.length;
 }
 
+/**
+ * Colour for a category, accepting an id OR any label it has been stored as.
+ * The hash fallback is deliberately applied to the resolved ID, so a category
+ * keeps the same colour across languages instead of jumping when the UI is
+ * translated.
+ * @param {string} catName Category id or displayed label.
+ * @param {number} score User productivity score (positive green, negative red).
+ * @returns {string} Hex colour.
+ */
 function getCategoryColor(catName, score) {
 	if (score > 0) return '#30D158';
 	if (score < 0) return '#FF453A';
-	if (FIXED_CAT_COLORS[catName]) return FIXED_CAT_COLORS[catName];
-	return CHART_PALETTE[paletteIndex(catName)];
+	const id = categoryId(catName);
+	if (FIXED_CAT_COLORS[id]) return FIXED_CAT_COLORS[id];
+	return CHART_PALETTE[paletteIndex(id)];
 }
 
 const postBridge = makeHostBridge('metrics_apps_bridge');
@@ -1055,7 +1122,7 @@ function updateCharts(appsArray, aggregatedData) {
 				labels: topApps.map((a) => a.name),
 				datasets: [
 					{
-						label: 'Temps',
+						label: _t('metrics_apps.chart_time_series'),
 						data: topApps.map((a) => formatDurationDecimal(a.timeMs)),
 						backgroundColor: topApps.map((a) => getAppColor(a.name, a.score)),
 						borderRadius: 4
@@ -1903,7 +1970,7 @@ function renderDashboard() {
 
 			const tdCat = document.createElement('td');
 			tdCat.className = 'app-cat-cell';
-			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="Modifier la catégorie">${escapeHtml(app.category)} ✎</span>`;
+			tdCat.innerHTML = `<span style="font-size: 0.85em; color: var(--text-muted); cursor: pointer;" title="${escapeHtml(_t('metrics_apps.edit_category_hint'))}">${escapeHtml(app.category)} ✎</span>`;
 			tdCat.addEventListener('click', (ev) => {
 				ev.stopPropagation();
 				postBridge({ action: 'edit', app: app.name, cat: app.category, score: app.score });
@@ -2986,20 +3053,24 @@ window.setHourWeekdayMode = function (mode) {
 
 let _calendarMode = 'chars';
 
-const MONTHS_FR_SHORT = [
-	'Jan',
-	'Fév',
-	'Mar',
-	'Avr',
-	'Mai',
-	'Juin',
-	'Juil',
-	'Août',
-	'Sep',
-	'Oct',
-	'Nov',
-	'Déc'
-];
+// Month abbreviations for the calendar axis, from Intl rather than a translated
+// array: the browser already knows every locale's short month names, including
+// the ones where they are not simply the first three letters, and a hand-written
+// list would need 21 translations that can drift. Built once — Intl formatter
+// construction is the expensive part, not the formatting.
+const MONTHS_SHORT = (() => {
+	const locale = (typeof window !== 'undefined' && window._i18n_locale) || 'fr';
+	let fmt;
+	try {
+		fmt = new Intl.DateTimeFormat(locale, { month: 'short' });
+	} catch (_) {
+		// An unknown or malformed locale tag must not take the calendar down with
+		// it; the axis is decoration, the grid below it is the data.
+		fmt = new Intl.DateTimeFormat('fr', { month: 'short' });
+	}
+	// Day 15 avoids any timezone rollover into a neighbouring month.
+	return Array.from({ length: 12 }, (_, m) => fmt.format(new Date(2024, m, 15)));
+})();
 
 /**
  * Renders a GitHub-style 53-week × 7-day calendar covering the last 365
@@ -3087,7 +3158,7 @@ function renderActivityCalendar() {
 		if (c.date.getDate() <= 7 && c.date.getMonth() !== last_label_month) {
 			last_label_month = c.date.getMonth();
 			const cx = LABEL_W + col * (CELL + GAP);
-			month_labels += `<text x="${cx}" y="12" fill="#888" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getMonth()]}</text>`;
+			month_labels += `<text x="${cx}" y="12" fill="#888" font-size="10" font-family="system-ui">${MONTHS_SHORT[c.date.getMonth()]}</text>`;
 		}
 	});
 

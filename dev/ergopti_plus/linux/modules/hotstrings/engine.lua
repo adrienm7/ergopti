@@ -20,8 +20,17 @@
 -- in both LuaJIT and Lua 5.4 (which both support debug.getinfo).
 local _this_file = debug.getinfo(1, "S").source:gsub("^@", "")
 -- Navigate: …/linux/modules/hotstrings/ → …/linux/ → …/_shared/lua/
+--
+-- _linux_root already IS the driver root — the pattern above strips
+-- modules/hotstrings/ — so _shared is ONE level up, not two. This read "../../"
+-- and resolved outside the tree entirely, so the shared engine was never added
+-- to package.path from here; whatever else had already put it there was
+-- carrying this module. It runs before package.path is set, which is why it
+-- resolves by hand rather than through lib.paths: requiring the resolver here
+-- would need the very path it is computing. tools/test/
+-- test-linux-shared-path-resolver.cjs asserts this depth instead.
 local _linux_root = _this_file:match("^(.*[/\\])modules[/\\]hotstrings[/\\]")
-local _shared_lua = _linux_root and (_linux_root .. "../../_shared/lua") or nil
+local _shared_lua = _linux_root and (_linux_root .. "../_shared/lua") or nil
 
 if _shared_lua then
 	-- Prepend to package.path only when the entry is not already present.

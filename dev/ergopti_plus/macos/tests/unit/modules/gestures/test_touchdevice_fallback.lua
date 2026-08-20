@@ -14,22 +14,18 @@ local helpers = require("tests.helpers")
 
 
 
--- =========================================
+--- ==========================================
 --- ==========================================
 --- ======= 1/ Source-level invariants =======
 --- ==========================================
--- =========================================
+--- ==========================================
 
-local function read_source()
-	local path = helpers.driver_root() .. "modules/gestures/init.lua"
-	local fh = io.open(path, "r")
-	if not fh then return "" end
-	local body = fh:read("*a") or ""
-	fh:close()
-	return body
-end
-
-local SOURCE = read_source()
+-- Selected by a declaration unique to modules/gestures/init.lua rather than by
+-- path, so moving or splitting the module cannot turn these invariants into a
+-- path error. The old form returned "" on a missing file, which made every
+-- assertion below pass against an empty string.
+local SOURCE = helpers.read_driver_source("local function schedule_emergency_recycle")
+helpers.assert_true(SOURCE ~= nil, "modules/gestures/init.lua source must be locatable")
 
 helpers.describe("gestures touchdevice loader source invariants", function()
 	helpers.it("defines load_touchdevice_module helper", function()
@@ -65,15 +61,15 @@ end)
 
 
 
--- =======================================
+--- ========================================
 --- ========================================
 --- ======= 2/ Runtime degraded mode =======
 --- ========================================
--- =======================================
+--- ========================================
 
 helpers.describe("gestures startup degraded mode", function()
-	local original_logger = package.loaded["lib.logger"]
-	local original_notifications = package.loaded["lib.notifications"]
+	local original_logger = package.loaded["infra.logger"]
+	local original_notifications = package.loaded["infra.notifications"]
 	local original_actions = package.loaded["modules.gestures.actions"]
 	local original_engine = package.loaded["modules.gestures.engine"]
 	local original_conflicts = package.loaded["modules.gestures.conflicts"]
@@ -102,8 +98,8 @@ helpers.describe("gestures startup degraded mode", function()
 		end,
 	}
 
-	package.loaded["lib.logger"] = logger_stub
-	package.loaded["lib.notifications"] = { notify = function() end }
+	package.loaded["infra.logger"] = logger_stub
+	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["modules.gestures.actions"] = {
 		AX_NAMES = {},
 		SG_NAMES = {},
@@ -118,6 +114,7 @@ helpers.describe("gestures startup degraded mode", function()
 	package.loaded["modules.gestures.engine"] = {
 		init = function() end,
 		process_frame = function() end,
+		stop = function() return true end,
 	}
 	package.loaded["modules.gestures.conflicts"] = {
 		on_action_changed = function() end,
@@ -128,9 +125,19 @@ helpers.describe("gestures startup degraded mode", function()
 	package.loaded["modules.gestures"] = nil
 	local gestures = helpers.load_with_stubs("modules.gestures")
 
-	helpers.it("M.start does not throw when touchdevice cannot be loaded", function()
-		local ok = pcall(gestures.start)
-		helpers.assert_true(ok)
+	helpers.it("M.start degrades without losing the module, when touchdevice cannot load", function()
+		-- Called directly: a raise fails with the real error. And note what is NOT
+		-- asserted — is_enabled(). It reflects the USER's feature flag, not whether a
+		-- device was found, and a start with no hardware must leave that flag alone:
+		-- the user still wants gestures, the trackpad just is not there. What must
+		-- hold is that the module survives usable, so plugging a device in and
+		-- calling start() again works.
+		gestures.start()
+		gestures.stop()
+		gestures.start()
+		helpers.assert_eq(type(gestures.get_all_actions()), "table",
+			"a failed start must leave the slot table readable — the menu renders from it "
+				.. "whether or not a device was found")
 	end)
 
 	helpers.it("M.start logs a warning and no error on missing touchdevice", function()
@@ -138,8 +145,8 @@ helpers.describe("gestures startup degraded mode", function()
 		helpers.assert_eq(logs.error, 0)
 	end)
 
-	package.loaded["lib.logger"] = original_logger
-	package.loaded["lib.notifications"] = original_notifications
+	package.loaded["infra.logger"] = original_logger
+	package.loaded["infra.notifications"] = original_notifications
 	package.loaded["modules.gestures.actions"] = original_actions
 	package.loaded["modules.gestures.engine"] = original_engine
 	package.loaded["modules.gestures.conflicts"] = original_conflicts

@@ -1,22 +1,13 @@
 ﻿; tests/meta/test_strict_canon_does_not_drop_stale_keys.ahk
 
 ; ==============================================================================
-; MODULE: Strict-Canonicalization Docstring Truth Meta Test
+; MODULE: Canonical Batch Writer Ownership Meta Test
 ; DESCRIPTION:
-; Static source guard for finding strict-canon-does-not-drop-stale-keys.
-;
-; TOML_RunStrictCanonicalization re-serializes the unified config via
-; SaveFullConfig. Its docstring used to claim it "rebuilds the file from the
-; in-memory state so stale sections/keys are dropped". That is false:
-; TOML_BatchWrite is a read-modify-MERGE and ParseTomlFile's cache feeds the
-; previous on-disk values back in, so untouched sections/keys are PRESERVED,
-; not dropped. The documented stale-key pruning never happens.
-;
-; The fix corrects the docstring to state the real merge/preserve semantics
-; and removes the false "dropped" claim (rule 5.7 - docs must match behaviour).
-; This meta-static test pins the documented behaviour: the docstring must not
-; claim stale keys are dropped, and must state that untouched sections are
-; preserved (merge semantics).
+; TOML_BatchWrite already renders the complete merged document in canonical
+; section/key order. Calling SaveFullConfig afterward was both redundant and
+; unsafe: candidate-first callers had not published their globals yet, so the
+; nested full save serialized stale state over the successful targeted commit.
+; This guard pins the one-writer contract and the merge/canonical primitives.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -24,50 +15,26 @@
 
 
 
-; ==================================================
-; ==================================================
-; ======= 1/ Source scan helper ====================
-; ==================================================
-; ==================================================
-
-; Returns the comment block immediately preceding a function declaration -
-; from the last blank line before the declaration up to the declaration line.
-; Good enough to scope the assertions to the function's own docstring.
-_SCDD_DocBlock(Src, FuncDef) {
-	Idx := InStr(Src, FuncDef)
-	if !Idx
-		return ""
-	Head := SubStr(Src, 1, Idx - 1)
-	; Walk back to the most recent run of two consecutive newlines (blank line)
-	; so we capture only this function's leading comment, not earlier ones.
-	Sep := InStr(Head, "`n`n", , -1)
-	if Sep
-		return SubStr(Head, Sep)
-	return Head
+_SCDD_BatchWriterIsCanonicalAndNonReentrant() {
+	Wrapper := _DriverFuncBody("TOML_BatchWrite")
+	Body := _DriverFuncBody("_TOML_BatchWriteImpl")
+	Assert(Wrapper != "" && Body != "",
+		"TOML_BatchWrite and its shared renderer must exist in toml_helpers.ahk")
+	Assert(InStr(Wrapper,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
+		"the public writer must route through the canonical implementation in write mode")
+	Assert(InStr(Body, "Cached := ParseTomlFile(Path)") > 0
+		or InStr(Body,
+			'(BuildOnly ? TOML_ParseFreshFile(Path) : ParseTomlFile(Path))') > 0,
+		"write mode must still obtain the complete on-disk document")
+	Assert(InStr(Body, "Sections := Cached.Clone()") > 0,
+		"the writer must merge updates into a detached copy of the complete on-disk document")
+	Assert(InStr(Body, "SortedSections := SortArray(SortedSections)") > 0
+		and InStr(Body, "SortedKeys := SortArray(SortedKeys)") > 0,
+		"the one atomic write must itself render canonical section and key order")
+	Assert(InStr(Body, "SaveFullConfig") = 0
+		and InStr(Body, "TOML_RunStrictCanonicalization") = 0,
+		"a low-level targeted write must never re-enter stale live globals through a second full save")
 }
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Docstring truth assertions ============
-; ==================================================
-; ==================================================
-
-_SCDD_DocstringMatchesMergeBehaviour() {
-	; Move-resilient: scan the toml module dir via the framework helper (comments
-	; preserved) instead of a pinned lib/toml/toml_helpers.ahk read. The DocBlock
-	; extractor still scopes the assertion to TOML_RunStrictCanonicalization's own
-	; leading comment, which is unique across the dir.
-	Src := _DriverDirConcat("lib/toml")
-	Doc := _SCDD_DocBlock(Src, "TOML_RunStrictCanonicalization(Path) {")
-	Assert(Doc != "", "TOML_RunStrictCanonicalization docstring must exist in toml_helpers.ahk")
-	; The false claim must be gone - the step does not drop stale sections/keys.
-	Assert(InStr(Doc, "dropped") = 0,
-		"TOML_RunStrictCanonicalization docstring must not claim stale sections/keys are 'dropped' - BatchWrite merges, so the pruning never happens (rule 5.7)")
-	; The docstring must now state the real merge/preserve semantics.
-	Assert(InStr(Doc, "PRESERVED") > 0,
-		"TOML_RunStrictCanonicalization docstring must state that untouched sections/keys are PRESERVED (merge semantics)")
-}
-Test("toml_helpers: strict-canon docstring documents merge/preserve, not stale-key dropping (strict-canon-does-not-drop-stale-keys)", _SCDD_DocstringMatchesMergeBehaviour)
+Test("toml_helpers: canonical batch writer never re-enters stale full state",
+	_SCDD_BatchWriterIsCanonicalAndNonReentrant)

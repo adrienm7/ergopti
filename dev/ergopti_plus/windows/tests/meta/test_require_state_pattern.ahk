@@ -12,7 +12,7 @@
 ; state. Three scope collapses compounded:
 ;
 ;   1. The scan root was hardcoded to modules/. The tree has since been
-;      reorganised and most stateful code moved out — lib/, ui/ and adapters/
+;      reorganised and most stateful code moved out — infra/, ui/ and adapters/
 ;      hold the majority, and this gate had never looked at any of them.
 ;   2. The statefulness predicate matched only `global _x := false` and
 ;      `global _x := unset`, so a module holding a Map, an array, 0 or "" was
@@ -67,7 +67,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/llm/models.ahk", true,
 	"modules/llm/profiles.ahk", true,
 	"modules/keylogger/keylogger_hook.ahk", true,
-	"lib/tap_hold/tap_hold_loader.ahk", true,
+	"platform/remap/tap_hold_loader.ahk", true,
 	"modules/keymap/llm_bridge.ahk", true,
 	"ui/tray_menu.ahk", true,
 	"modules/gestures/actions.ahk", true,
@@ -122,7 +122,7 @@ _MetaRunRequireStateTestsV2() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "lib", "adapters", "ui"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))

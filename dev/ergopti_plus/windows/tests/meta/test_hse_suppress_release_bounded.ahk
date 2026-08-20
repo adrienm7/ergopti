@@ -28,7 +28,7 @@ _HSE_SRL_ReadSource(RelPath) {
 }
 
 _HSE_SuppressReleaseBounded() {
-	Src := _HSE_SRL_ReadSource("lib\hotstrings\hotstring_dispatch.ahk")
+	Src := _HSE_SRL_ReadSource("infra\hotstrings\hotstring_dispatch.ahk")
 	Assert(Src != "", "hotstring_dispatch.ahk must be readable")
 
 	; 1. Constant exists and is bounded to <= 100 ms.
@@ -61,10 +61,15 @@ _HSE_SuppressReleaseBounded() {
 	;    Scan for SetTimer lines containing a bare negative literal (e.g. -60)
 	;    that is NOT the named constant. The constant-referencing lines like
 	;    "-HSE_SUPPRESS_RELEASE_DELAY_MS" contain letters and are fine.
+	; Counted, because this whole section only ever asserts on a VIOLATION: with no
+	; SetTimer line reaching the scan — a rename, a move out of the read source —
+	; the loop body never runs and the check reports a pass over nothing.
+	SetTimerLines := 0
 	Loop Parse, Src, "`n", "`r" {
 		Line := A_LoopField
 		if !InStr(Line, "SetTimer")
 			continue
+		SetTimerLines += 1
 		; Skip lines that use the named constant — they are correct.
 		if InStr(Line, "HSE_SUPPRESS_RELEASE_DELAY_MS")
 			continue
@@ -85,6 +90,9 @@ _HSE_SuppressReleaseBounded() {
 			Pos := AfterMatch
 		}
 	}
+	Assert(SetTimerLines > 0,
+		"no SetTimer line was examined at all — the scanned source no longer contains the "
+		. "suppress-release timers, so this bound was being asserted over nothing")
 }
 
 Test("meta hse: suppress-release delay bounded to <=100 ms and gated by named constant",

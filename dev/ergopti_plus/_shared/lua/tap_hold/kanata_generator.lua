@@ -17,12 +17,19 @@
 --- (e.g. "caps_lock", "left_shift") with at least:
 ---   { time_activation_seconds = number, tap_action = string, hold_modifier = string|nil, hold_layer = string|nil }
 ---
---- NOTE: ``ralt`` (alt_gr) and other keys with OS-specific multi-key tap/hold
---- expressions may need hand-post-processing by the caller. The shared data
---- model does not encode per-OS modifier-release sequences (e.g.
---- ``(multi (release-key lctl) (release-key lalt) tab)``). The generator
---- emits the plain action from defaults.toml; the caller should merge or
---- override such entries with their hand-tuned equivalents.
+--- The generated block REPLACES the last ``(defalias)`` block of
+--- ``linux/platform/remap/data/kanata.kbd`` wholesale, so it must be
+--- self-sufficient in two ways:
+---
+--- 1. Multi-key tap/hold expressions the shared data model cannot encode (such
+---    as ``alt_gr``'s modifier-release sequence) come from EXPRESSION_OVERRIDES
+---    below. They used to be left to "hand-post-processing by the caller",
+---    which no caller ever did — the hand-tuned expression was simply lost.
+--- 2. Aliases the emitted directives REFERENCE (``@copy``, ``@paste``) must be
+---    defined somewhere the generator does not overwrite. They live in the
+---    hand-maintained composites block that precedes the generated one, because
+---    kanata resolves every ``@name`` at load time: a single dangling reference
+---    makes the WHOLE configuration unloadable, not just that one key.
 
 local M = {}
 
@@ -68,6 +75,21 @@ local KEY_ALIAS_MAP = {
 	alt_gr     = "ralt",
 	tab        = "alttab",
 	right_ctrl = "ossft",   -- right_ctrl in defaults.toml maps to one_shot_shift
+}
+
+--- Tap/hold expressions the shared data model cannot encode, keyed by
+--- defaults.toml key id.
+---
+--- defaults.toml has no vocabulary for a modifier-release sequence, so without
+--- this table alt_gr was generated as `(tap-hold-press 200 200 tab ralt)` — the
+--- release-key steps of the hand-tuned config were silently dropped and
+--- window-switching left ctrl and alt stuck down. The timeout still comes from
+--- the TOML; only the expression is overridden here.
+local EXPRESSION_OVERRIDES = {
+	alt_gr = {
+		tap  = "(multi (release-key lctl) (release-key lalt) tab)",
+		hold = "(multi ralt (release-key lctl))",
+	},
 }
 
 --- Default one-shot shift timeout in ms (kanata uses integer ms).
@@ -167,8 +189,11 @@ function M.generate(keys_config, opts)
 			)
 		else
 			local ms = to_ms(kc.time_activation_seconds)
-			local tap = resolve_tap(kc.tap_action)
-			local hold = resolve_hold(kc)
+			-- The timeout stays TOML-driven; only expressions the shared model
+			-- cannot represent are taken from the override table.
+			local override = EXPRESSION_OVERRIDES[key_id]
+			local tap  = (override and override.tap)  or resolve_tap(kc.tap_action)
+			local hold = (override and override.hold) or resolve_hold(kc)
 
 			if tap and hold then
 				lines[#lines + 1] = string.format(

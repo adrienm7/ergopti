@@ -88,11 +88,23 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 				windowLevels = { overlay = 0, floating = 0 },
 			},
 			timer = {
-				new = function(_interval, fn) return { start = function() end, stop = function() end, _fn = fn } end,
+				new = function(_interval, fn)
+					local timer = { active = false, _fn = fn }
+					timer.start = function() timer.active = true; return timer end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
+				end,
 				absoluteTime = function() return 0 end,
 			},
 			eventtap = {
-				new = function(_types, _cb) return { start = function() end, stop = function() end } end,
+				new = function(_types, _cb)
+					local tap = { enabled = false }
+					tap.start = function(self) self.enabled = true; return self end
+					tap.stop = function(self) self.enabled = false; return self end
+					tap.isEnabled = function(self) return self.enabled end
+					return tap
+				end,
 				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
 			},
 		})
@@ -152,10 +164,11 @@ end)
 
 helpers.describe("wpm_widget: mouseCallback closure sources geometry from _canvas_geom (F-LOW-9)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/wpm/wpm_widget.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open wpm_widget.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/wpm/wpm_widget.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_shared_constants_path")
+		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 		return src
 	end
 

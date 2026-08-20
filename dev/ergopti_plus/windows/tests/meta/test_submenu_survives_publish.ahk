@@ -12,7 +12,7 @@
 ; The registration-time epoch check in _TrackedDispatch contradicted all of that.
 ; Submenu items are registered BEFORE the bump — RebuildTrayMenu calls
 ; InitSubMenus, then initMenu reaches Publish — and initMenu is also called ALONE
-; from the updater's tray refresh (lib/updater/core.ahk) and from lifecycle. So
+; from the updater's tray refresh (modules/updater/core.ahk) and from lifecycle. So
 ; every submenu item sat at the previous epoch and had its native dispatch
 ; rejected.
 ;
@@ -29,7 +29,7 @@
 ;    path, where it is captured at click time and correctly voids a retry that
 ;    spans a rebuild. Removing it there would be a different regression.
 ;
-; SCOPE: source introspection of lib/menu_dispatcher.ahk and ui/menu/menu_rebuild.ahk.
+; SCOPE: source introspection of infra/menu_dispatcher.ahk and ui/menu/menu_rebuild.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -21,9 +21,10 @@
 --- ==============================================================================
 
 local hs      = hs
-local Logger  = require("lib.logger")
-local text_utils = require("lib.text_utils")
+local Logger  = require("infra.logger")
+local text_utils = require("infra.text_utils")
 local install = require("modules.keymap.layout_install")
+local TaskLifecycle = require("adapters.task_lifecycle")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -285,7 +286,7 @@ end
 --- @param on_done function|nil Callback invoked after the cache is updated.
 local function refresh_active_layouts_async(on_done)
 	if _active_layouts_refreshing then
-		if on_done then pcall(on_done) end
+		if on_done then Logger.pcall(LOG, on_done) end
 		return
 	end
 	_active_layouts_refreshing = true
@@ -302,7 +303,7 @@ local function refresh_active_layouts_async(on_done)
 		else
 			Logger.warn(LOG, "Async active-layout probe returned unparseable output — keeping previous cache.")
 		end
-		if on_done then pcall(on_done) end
+		if on_done then Logger.pcall(LOG, on_done) end
 	end
 
 	if hs.task and type(hs.task.new) == "function" then
@@ -314,22 +315,18 @@ local function refresh_active_layouts_async(on_done)
 		-- fires, dropping the callback so finish() never runs and the refresh flag
 		-- stays wedged true for the session.
 		local probe_task
-		local ok = pcall(function()
-			probe_task = hs.task.new("/usr/bin/python3", function(_code, stdout, _stderr)
+		probe_task = TaskLifecycle.native("Active keyboard-layout probe", "/usr/bin/python3", function(_code, stdout, _stderr)
 				if probe_task then _active_probe_tasks[probe_task] = nil end
-				finish(stdout)
+				Logger.pcall(LOG, finish, stdout)
 			end, { "-c", ACTIVE_LAYOUTS_PY })
+		if probe_task then
 			_active_probe_tasks[probe_task] = true
-			-- :start() returns false (it does not raise) on a launch failure, so we
-			-- must check it: otherwise finish() never runs and the flag wedges.
-			if not probe_task:start() then
+			if not TaskLifecycle.start(probe_task, "Active keyboard-layout probe") then
 				_active_probe_tasks[probe_task] = nil
 				probe_task = nil
 				finish(nil)
 			end
-		end)
-		if not ok then
-			if probe_task then _active_probe_tasks[probe_task] = nil end
+		else
 			finish(nil)
 		end
 	else

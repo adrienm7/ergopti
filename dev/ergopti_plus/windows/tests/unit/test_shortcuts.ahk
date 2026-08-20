@@ -21,9 +21,9 @@
 ;    to its default state after each assertion group.
 ; ==============================================================================
 
-; ── Stubs for symbols that live outside the included lib/ tree ──────────────
+; ── Stubs for symbols that live outside the included infra/ tree ──────────────
 
-; SpotlightMouseAt is in lib/spotlight.ahk, which is not included by run_all.ahk.
+; SpotlightMouseAt is in infra/spotlight.ahk, which is not included by run_all.ahk.
 ; Record calls so the spotlight shortcut test can verify the stub is reachable.
 global _Stub_SpotlightCalls := []
 SpotlightMouseAt(X, Y, DurationMs) {
@@ -31,7 +31,7 @@ SpotlightMouseAt(X, Y, DurationMs) {
 	_Stub_SpotlightCalls.Push({ x: X, y: Y, duration: DurationMs })
 }
 
-; OneShotShiftFix is in modules/tap_holds/one_shot_shift.ahk (not included).
+; OneShotShiftFix is in platform/remap/one_shot_shift.ahk (not included).
 ; The AltGr dispatcher calls it before some Send* actions to cancel a
 ; pending one-shot-shift state; the stub is a no-op.
 global _Stub_OneShotShiftFixCalls := 0
@@ -119,11 +119,11 @@ _AltGrCapsLockReset() {
 
 
 
-; ===================================================
+; =======================================================
 ; =======================================================
 ; ======= 1/ RetrieveScancode / AddShortcut Tests =======
 ; =======================================================
-; ===================================================
+; =======================================================
 
 TestShortcuts_RetrieveScancodeUnmapped() {
 	; An unmapped letter returns a sc<hex> string computed from GetKeySC.
@@ -148,11 +148,11 @@ Test("Shortcuts/utils: RetrieveScancode honours RemappedList overrides", TestSho
 
 
 
-; ==============================================
+; ============================================
 ; ============================================
 ; ======= 2/ _AnyShortcutEnabled Tests =======
 ; ============================================
-; ==============================================
+; ============================================
 
 TestShortcuts_AnyEnabledAllFalse() {
 	; All entries false -> should return false.
@@ -190,11 +190,11 @@ Test("Shortcuts/altgr: _AnyShortcutEnabled handles all-false group", TestShortcu
 
 
 
-; ==============================================================
+; ========================================================
 ; ========================================================
 ; ======= 3/ LAltCapsLockShortcut Dispatcher Tests =======
 ; ========================================================
-; ==============================================================
+; ========================================================
 
 TestShortcuts_LaltCapsLock_CapsLock() {
 	global _Stub_SentText
@@ -293,11 +293,11 @@ Test("Shortcuts/base_modifier: LAltCapsLockShortcut degrades gracefully when its
 
 
 
-; ========================================================
+; =========================================================
 ; =========================================================
 ; ======= 4/ AltGrCapsLockShortcut Dispatcher Tests =======
 ; =========================================================
-; ========================================================
+; =========================================================
 
 TestShortcuts_AltGrCapsLock_CapsLock() {
 	global _Stub_SentText
@@ -435,11 +435,11 @@ Test("Shortcuts/altgr: AltGr+LAlt with all actions off is a no-op", TestShortcut
 
 
 
-; =====================================================
+; =================================================
 ; =================================================
 ; ======= 6/ Win-shortcuts Pure-Logic Tests =======
 ; =================================================
-; =====================================================
+; =================================================
 
 TestShortcuts_SearchPath_FileDetection() {
 	; Every branch inside SearchPath() ends in a real Run() (open the file,
@@ -490,11 +490,11 @@ Test("Shortcuts/win: GetKnownFolderDownloads returns a string value", TestShortc
 
 
 
-; =====================================================
+; =======================================================================================
 ; =======================================================================================
 ; ======= 7/ Pause + Volume + Resilience (encore plus, 100% regression certainty) =======
 ; =======================================================================================
-; =====================================================
+; =======================================================================================
 ; Every public dispatcher / gate / menu path in shortcuts must be provably
 ; pause-safe. The six tests below used to be bare AssertTrue(true, "...")
 ; placeholders that exercised zero production code -- they would have passed
@@ -523,11 +523,11 @@ TestShortcuts_ToggleSuspendDrainsAltGrPrefixFirst() {
 	; Historical gotcha [[feedback-ahk-suspend-prefix-latch]]: SC138 (AltGr) prefix
 	; can latch across Suspend(1)/Suspend(0) if the physical release happens while
 	; the custom-combination prefix layer is disarmed. The fix drains the prefix
-	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (lib/lifecycle.ahk).
-	Src := _DriverDirConcat("lib")
+	; BEFORE Suspend(-1) toggles state, in ToggleSuspend (infra/lifecycle.ahk).
+	Src := _DriverDirConcat("infra")
 	Assert(Src != "", "lib must be readable")
 	Body := _DriverFuncBody("ToggleSuspend")
-	Assert(Body != "", "ToggleSuspend must exist in lib/lifecycle.ahk")
+	Assert(Body != "", "ToggleSuspend must exist in infra/lifecycle.ahk")
 
 	ClearPos := InStr(Body, "_SuspendPrefixesAreClear()")
 	Assert(ClearPos > 0 and InStr(Body, "SetTimer(_SuspendPendingPoll, 25)") > ClearPos,
@@ -544,8 +544,18 @@ TestShortcuts_MenuItemsUseRegisterMenuItem() {
 	Src := _DriverDirConcat("ui/menu")
 	Assert(Src != "", "ui/menu must be readable")
 	MenuShortcutsSrc := FileRead(A_ScriptDir . "\..\ui\menu\menu_shortcuts.ahk", "UTF-8")
-	Assert(InStr(MenuShortcutsSrc, "RegisterMenuItem(") > 0,
-		"ui/menu/menu_shortcuts.ahk must register actionable items via RegisterMenuItem so they join the WM_COMMAND retry path (project-ahk-menu-dispatcher-drop)")
+	; TWO ways to be on the retry path, and the file must be on one of them. It
+	; used to call RegisterMenuItem directly; since 2026-08-08 its last actionable
+	; row is a `command` declaration and the renderer builds it — and _MR_RenderRows
+	; registers through the very same helper. Pinning the first spelling would have
+	; failed the change that made the rule harder to break.
+	ViaHelper   := InStr(MenuShortcutsSrc, "RegisterMenuItem(") > 0
+	ViaRenderer := InStr(MenuShortcutsSrc, "MenuRenderer_") > 0
+	Assert(ViaHelper or ViaRenderer,
+		"ui/menu/menu_shortcuts.ahk must put actionable items on the WM_COMMAND retry path — either "
+		. "through RegisterMenuItem directly or by handing its rows to MenuRenderer_*, which registers "
+		. "through the same helper. A raw Menu.Add(Title, Callback) silently drops about one click in "
+		. "three under AHK 2.0 (project-ahk-menu-dispatcher-drop)")
 }
 Test("Shortcuts/menu: shortcut menu items are registered via RegisterMenuItem, not raw Menu.Add (project-ahk-menu-dispatcher-drop)",
 	TestShortcuts_MenuItemsUseRegisterMenuItem)

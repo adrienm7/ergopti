@@ -60,7 +60,7 @@ Test("ErgoptiPlus: Ergopti_OnShutdown flushes keylogger via KL_Stop (no-onexit-k
 
 _OEKF_OnExitRegistered() {
 	Src := _DriverSourceConcat()
-	Assert(InStr(Src, "OnExit(Ergopti_OnShutdown)") > 0,
+	Assert(InStr(Src, "OnExit(Ergopti_OnShutdown, -1)") > 0,
 		"ErgoptiPlus.ahk must register OnExit(Ergopti_OnShutdown) — Reload/ExitApp run ONLY OnExit callbacks, so this is the single seam that flushes buffered metrics; removing it silently loses typing data on every restart")
 }
 Test("ErgoptiPlus: OnExit(Ergopti_OnShutdown) is registered (no-onexit-keylogger-flush)", _OEKF_OnExitRegistered)

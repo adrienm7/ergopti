@@ -5,6 +5,22 @@
 
 local helpers = require("tests.helpers")
 
+local REGISTRY_OWNERSHIP = {
+	"modules.keymap.registry",
+	"modules.keymap.registry_groups",
+	"modules.keymap.registry_index",
+	"modules.keymap.terminators",
+}
+
+local PRIORITY_OWNERSHIP = {
+	"modules.keymap.registry",
+	"modules.keymap.registry_groups",
+	"modules.keymap.registry_index",
+	"modules.keymap.terminators",
+	"infra.toml.reader",
+	"modules.hotstrings.hotstrings_config",
+}
+
 helpers.describe("Registry — hotstring counting regressions", function()
 	local Registry = helpers.load_with_stubs("modules.keymap.registry")
 	
@@ -48,9 +64,9 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		}
 		
 		-- Mock lib.toml_reader parse to return our data table directly
-		local old_toml_reader = package.loaded["lib.toml.reader"]
-		package.loaded["lib.toml.reader"] = {
-			parse = function(path) return data end
+		local old_toml_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function(path) return data, true end
 		}
 
 		Registry.init(state)
@@ -67,7 +83,41 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		for _ in pairs(state.mappings) do count = count + 1 end
 		helpers.assert_eq(count, 12, "total mappings should be 12")
 		
-		package.loaded["lib.toml.reader"] = old_toml_reader
+		package.loaded["infra.toml.reader"] = old_toml_reader
+	end)
+end)
+
+helpers.describe("Registry — TOML read commitment", function()
+	helpers.it("registers nothing when the reader returns a table without exact commitment", function()
+		for key in pairs(package.loaded) do
+			if type(key) == "string" and key:match("^modules%.keymap%.registry") then
+				package.loaded[key] = nil
+			end
+		end
+		local old_toml_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function()
+				return {
+					sections_order = { "ghost" },
+					sections = { ghost = { trigger = "must-not-register" } },
+				}
+			end,
+		}
+
+		local Registry = require("modules.keymap.registry")
+		local state = {
+			groups = { existing = { enabled = true } },
+			mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
+			mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+		}
+		Registry.init(state)
+		local loaded = Registry.load_toml("unreadable", "/controlled/unreadable.toml")
+
+		package.loaded["infra.toml.reader"] = old_toml_reader
+		helpers.assert_eq(loaded, false, "nil commitment must be a terminal load failure")
+		helpers.assert_eq(#state.mappings, 0, "the unreadable group must register no mappings")
+		helpers.assert_true(state.groups.existing ~= nil, "the previous registry must survive intact")
+		helpers.assert_nil(state.groups.unreadable, "an unreadable group must not be published")
 	end)
 end)
 
@@ -94,23 +144,23 @@ end)
 --- ==============================================================================
 
 helpers.describe("Registry -- shifted-comma case variants (':D' emoji safety)", function()
-	package.loaded["lib.logger"] = nil
-	local _ = helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	local _ = helpers.load_with_stubs("infra.logger")
 	local State = helpers.load_with_stubs("modules.keymap.state")
 
 	--- Reloads the registry so its module-level _state resets, inits a fresh
 	--- shared state, and registers the production ",d -> ds" SFB-reduction entry.
 	--- @return table state The shared state populated with the comma mappings.
 	local function registry_with_comma_ds()
-		package.loaded["modules.keymap.registry"] = nil
-		package.loaded["modules.keymap.terminators"] = nil
-		local R = require("modules.keymap.registry")
-		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { sfbsreduction = 0.3 })
-		R.init(state)
-		-- Same flags as static/ergopti_plus/_shared/modules/hotstrings/sfbsreduction.toml:
-		-- auto_expand=true (star), is_word=false (in-word), is_case_sensitive=false.
-		R.add(",d", "ds", { auto_expand = true, is_word = false, is_case_sensitive = false })
-		return state
+		return helpers.with_fresh_modules(REGISTRY_OWNERSHIP, function()
+			local R = require("modules.keymap.registry")
+			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { sfbsreduction = 0.3 })
+			helpers.assert_eq(R.init(state), true)
+			-- Same flags as static/ergopti_plus/_shared/modules/hotstrings/sfbsreduction.toml:
+			-- auto_expand=true (star), is_word=false (in-word), is_case_sensitive=false.
+			R.add(",d", "ds", { auto_expand = true, is_word = false, is_case_sensitive = false })
+			return state
+		end)
 	end
 
 	--- Returns the replacement registered for the exact trigger string, or nil.
@@ -168,8 +218,8 @@ end)
 --- ==============================================================================
 
 helpers.describe("Registry — section priority from the shared override file", function()
-	package.loaded["lib.logger"] = nil
-	local _ = helpers.load_with_stubs("lib.logger")
+	package.loaded["infra.logger"] = nil
+	local _ = helpers.load_with_stubs("infra.logger")
 
 	--- Reload the registry fresh (resets module _state), mock the TOML reader and
 	--- the hotstrings_config override layer, load one single-entry group, and return
@@ -178,31 +228,25 @@ helpers.describe("Registry — section priority from the shared override file", 
 	--- @param override_fn function get_user_override(name, section) -> table|nil.
 	--- @return number|nil priority, table Registry The mapping priority and module.
 	local function priority_after_load(toml_data, override_fn)
-		package.loaded["modules.keymap.registry"] = nil
-		package.loaded["modules.keymap.terminators"] = nil
-		local Registry = require("modules.keymap.registry")
+		return helpers.with_fresh_modules(PRIORITY_OWNERSHIP, function()
+			package.loaded["infra.toml.reader"] = { parse = function() return toml_data, true end }
+			package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = override_fn }
+			local Registry = require("modules.keymap.registry")
 
-		local old_toml = package.loaded["lib.toml.reader"]
-		local old_hcfg = package.loaded["modules.hotstrings.hotstrings_config"]
-		package.loaded["lib.toml.reader"]          = { parse = function() return toml_data end }
-		package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = override_fn }
+			local state = {
+				groups = { rolls = { enabled = true, sections = { sec1 = { enabled = true } } } },
+				mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
+				mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+			}
+			helpers.assert_eq(Registry.init(state), true)
+			Registry.load_toml("rolls", "dummy.toml")
 
-		local state = {
-			groups = { rolls = { enabled = true, sections = { sec1 = { enabled = true } } } },
-			mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
-			mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
-		}
-		Registry.init(state)
-		Registry.load_toml("rolls", "dummy.toml")
-
-		package.loaded["lib.toml.reader"]          = old_toml
-		package.loaded["modules.hotstrings.hotstrings_config"] = old_hcfg
-
-		local prio
-		for _, m in ipairs(state.mappings) do
-			if m.trigger == "trg" then prio = m.priority end
-		end
-		return prio, Registry
+			local prio
+			for _, m in ipairs(state.mappings) do
+				if m.trigger == "trg" then prio = m.priority end
+			end
+			return prio, Registry
+		end)
 	end
 
 	-- One enabled section with one entry that carries no per-entry priority.

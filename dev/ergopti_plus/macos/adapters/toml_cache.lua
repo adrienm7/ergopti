@@ -31,7 +31,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG    = "adapters.toml_cache"
 
 
@@ -48,12 +48,19 @@ local LOG    = "adapters.toml_cache"
 --- an older parser are rejected (treated as a miss) instead of fed back with a
 --- now-incompatible structure.
 --- Bumped from 1→2 when the content fingerprint field `fp` was added.
-local CACHE_VERSION = 2
+--- Bumped from 2→3 when parse_entry_line started carrying
+--- `is_case_sensitive_strict`: a snapshot written by the older parser has the
+--- field absent, and an absent flag reads as false — the exact silent
+--- mis-registration the version stamp exists to prevent.
+local CACHE_VERSION = 3
 
---- Number of bytes read from the source file to build the content fingerprint.
---- 512 bytes is enough to catch any realistic same-second edit while keeping the
---- overhead to a single small read that occurs only when mtime+size already match.
-local FINGERPRINT_READ_BYTES = 512
+--- Chunk size used to stream the source file while building the content
+--- fingerprint. The WHOLE file is hashed, one chunk at a time; this constant is
+--- only the read granularity, not a prefix window. It used to be a 512-byte
+--- prefix, which on a manifest-shaped file covered the `[_meta]` header and not
+--- one entry — so a same-second edit to any actual value was invisible and the
+--- stale cache was served. The read happens only when mtime+size already match.
+local FINGERPRINT_CHUNK_BYTES = 64 * 1024
 
 --- djb2 hash seed and modulus (32-bit) used to derive a collision-resistant
 --- snapshot filename from the full source path.
@@ -155,15 +162,31 @@ local function content_fingerprint(path)
 	local ok, result = pcall(function()
 		local f = io.open(path, "rb")
 		if not f then return nil end
-		-- Inner pcall ensures f:close() always runs on unexpected read errors
-		local read_ok, chunk = pcall(function() return f:read(FINGERPRINT_READ_BYTES) end)
-		f:close()
-		if not read_ok or not chunk then return nil end
-		-- FNV-1a-like: XOR then multiply, kept in 32-bit range
+		-- The WHOLE file, read in chunks. A prefix window is not evidence about the
+		-- part of the file it does not cover: at 512 bytes it stopped inside the
+		-- [_meta] preamble of every hotstring TOML in this repo, so an equal-length
+		-- same-second edit to any actual entry hashed identically and stale data was
+		-- served for the rest of the session.
+		--
+		-- Reading it all is affordable because this function is now only reached on
+		-- the AMBIGUOUS branch — a snapshot written in the same integer second as the
+		-- source mtime. Every other hit skips it entirely, which makes this a net
+		-- saving rather than a cost.
+		--
+		-- Inner pcall ensures f:close() always runs on unexpected read errors.
 		local h = 2166136261
-		for i = 1, #chunk do
-			h = ((h ~ chunk:byte(i)) * 16777619) & 0xFFFFFFFF
-		end
+		local read_ok = pcall(function()
+			while true do
+				local chunk = f:read(FINGERPRINT_CHUNK_BYTES)
+				if not chunk or #chunk == 0 then break end
+				-- FNV-1a-like: XOR then multiply, kept in 32-bit range
+				for i = 1, #chunk do
+					h = ((h ~ chunk:byte(i)) * 16777619) & 0xFFFFFFFF
+				end
+			end
+		end)
+		f:close()
+		if not read_ok then return nil end
 		return h
 	end)
 	if not ok then return nil end
@@ -260,9 +283,21 @@ function M.load(path)
 		return nil
 	end
 
-	-- mtime and size match, but on HFS+ the mtime resolution is 1 second, so a
-	-- same-second edit with an unchanged file size would pass the checks above and
-	-- serve stale data — guard with the stored content fingerprint
+	-- mtime and size match. On HFS+ the mtime resolution is 1 second, so a
+	-- same-second edit at an unchanged size would pass the checks above and serve
+	-- stale data. But that window only exists when the snapshot was written IN that
+	-- same second: if it was written strictly later, any subsequent edit necessarily
+	-- moves mtime past `snap.mtime`, and the check above has already caught it.
+	--
+	-- So the common case needs no content read at all — this takes an io.open plus a
+	-- full read off every cache hit. A snapshot with no `wrote_at` predates the field
+	-- and is treated as ambiguous, which is the safe direction.
+	if type(snap.wrote_at) == "number" and snap.wrote_at > math.floor(snap.mtime) then
+		_hits = _hits + 1
+		Logger.debug(LOG, "Snapshot hit for '%s' (unambiguous write, no content read).", path)
+		return snap.data
+	end
+
 	local fp = content_fingerprint(path)
 	if fp ~= snap.fp then
 		Logger.debug(LOG, "Fingerprint mismatch for '%s' — invalidating stale snapshot.", path)
@@ -296,8 +331,8 @@ function M.store(path, parsed)
 	local parts = {}
 	serialize(parsed, parts)
 	local body = string.format(
-		"return {ver=%d,mtime=%.17g,size=%.17g,fp=%d,data=%s}\n",
-		CACHE_VERSION, attr.mtime, attr.size, fp, table.concat(parts))
+		"return {ver=%d,mtime=%.17g,size=%.17g,fp=%d,wrote_at=%d,data=%s}\n",
+		CACHE_VERSION, attr.mtime, attr.size, fp, os.time(), table.concat(parts))
 
 	local ok = pcall(function()
 		local fh = io.open(snapshot_path(path), "w")

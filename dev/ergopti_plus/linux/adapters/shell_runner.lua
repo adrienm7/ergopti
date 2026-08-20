@@ -33,6 +33,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Heredoc = require("shell.heredoc")
 
 local LOG = "adapters.shell_runner"
 
@@ -45,10 +46,15 @@ local QUOTE_ESCAPE = "'\\''"
 -- the boolean true from Lua 5.2 onwards. Both spellings must be accepted.
 local EXIT_SUCCESS = 0
 
+-- Default opening token of a stdin heredoc for this driver. The framing itself
+-- lives in _shared/lua/shell/heredoc.lua.
+local HEREDOC_BASE_TOKEN = "ERGOPTI_STDIN"
+
 -- Set by M._set_runner(). Declared above every closure that reads it so it can
 -- never be captured as a nil global: in Lua the scope of a local starts AFTER
 -- the statement that declares it.
 local _test_runner = nil
+
 
 
 
@@ -153,7 +159,7 @@ end
 -- ========================================
 
 --- Reports whether an executable is resolvable on PATH.
---- @param binary string Executable name, e.g. "yad".
+--- @param binary string Executable name, e.g. "xclip".
 --- @return boolean True when the binary exists and is executable.
 function M.has_command(binary)
 	if type(binary) ~= "string" or binary == "" then return false end
@@ -163,9 +169,64 @@ end
 
 
 
+-- ===================================
+-- ===================================
+-- ======= 4/ Standard Input =========
+-- ===================================
+-- ===================================
+
+--- Returns a heredoc terminator that cannot appear as a line of `text`.
+--- Delegates to the shared framing: macOS shells out with the same user text,
+--- and a second copy of the collision rule is a second place for it to be wrong.
+--- @param text string Payload the terminator will delimit.
+--- @param base string|nil Starting token.
+--- @return string
+function M.heredoc_token(text, base)
+	return Heredoc.token(text, base or HEREDOC_BASE_TOKEN)
+end
+
+--- Appends a quoted heredoc carrying `input` to a composed command.
+--- @param cmd        string Fully composed command.
+--- @param input      string Payload for the command's standard input.
+--- @param token_base string|nil Starting terminator token.
+--- @return string The command with its heredoc attached.
+function M.with_stdin(cmd, input, token_base)
+	return Heredoc.with_stdin(cmd, input, token_base or HEREDOC_BASE_TOKEN)
+end
+
+--- Runs a command with `input` on its standard input and captures stdout.
+--- @param cmd   string Fully composed command (quote every interpolation).
+--- @param input string Payload for standard input.
+--- @return string Captured stdout, or "" on any failure.
+function M.exec_stdin(cmd, input)
+	return M.exec(M.with_stdin(cmd, input))
+end
+
+--- Appends a heredoc delivering EXACTLY the bytes of `input`.
+--- @param cmd        string Fully composed command.
+--- @param input      string Payload for the command's standard input.
+--- @param token_base string|nil Starting terminator token.
+--- @return string The command with its byte-exact heredoc attached.
+function M.with_exact_stdin(cmd, input, token_base)
+	return Heredoc.with_exact_stdin(cmd, input, token_base or HEREDOC_BASE_TOKEN)
+end
+
+--- Runs a command with EXACTLY the bytes of `input` on its standard input.
+--- The plain exec_stdin() normalises the payload's trailing newlines away, which
+--- is fine for a SQL script and silent corruption for a value being encrypted.
+--- @param cmd   string Fully composed command (quote every interpolation).
+--- @param input string Payload for standard input, delivered byte for byte.
+--- @return string Captured stdout, or "" on any failure.
+function M.exec_exact_stdin(cmd, input)
+	return M.exec(M.with_exact_stdin(cmd, input))
+end
+
+
+
+
 -- ==============================
 -- ==============================
--- ======= 4/ Test Seam =========
+-- ======= 5/ Test Seam =========
 -- ==============================
 -- ==============================
 

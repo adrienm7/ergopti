@@ -12,14 +12,14 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Stub lib.keycodes: actions/system.lua calls Keycodes.to_name(F18_WAKE_OS)
 -- at module level. The real implementation iterates hs.keycodes.map, which
 -- is not populated in the unit-test stub, so to_name would error. We provide
 -- the two fields that system.lua actually needs.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	F18_WAKE_OS             = 79,
 	F19_VOLUME_SCROLL_MODIFIER = 80,
 	to_name = function(code)
@@ -31,7 +31,7 @@ package.loaded["lib.keycodes"] = {
 -- Stub lib.i18n: bindings.lua calls i18n.get() at module level for
 -- shortcut labels. The real module depends on locale JSON files unavailable
 -- in unit tests.
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	get = function(key) return key end,
 }
 
@@ -49,10 +49,11 @@ local Bindings = helpers.load_with_stubs("modules.shortcuts.bindings")
 helpers.describe("bindings — disable persists across stop/start (shortcuts-bindings-reenable-on-resume)", function()
 
 	local function read_source()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/bindings.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "bindings.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/bindings.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_frontmost_app_name")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
 		return src
 	end
 
@@ -94,21 +95,64 @@ end)
 
 
 
-helpers.describe("bindings: pause invariant + volume (project_suspend_pause_invariant)", function()
-	helpers.it("pause must leave list/enable/disable safe but real hotkey effects gated higher", function()
-		-- list_shortcuts etc. are pure; the hs.hotkey.bind side and action execution are gated.
-		helpers.assert_true(true, "shortcuts bindings must be callable under pause (no side effects from registry)")
+-- The pause invariant for this module is that it has none: bindings is a
+-- declarative registry, and the decision not to run an action while paused
+-- belongs to the dispatcher. All three cases here used to state that with
+-- assert_true(true) and a sentence — including one that looped 150 times over a
+-- body reading `-- simulate`, so it asserted nothing about nothing. What is
+-- checkable is the claim itself.
+helpers.describe("bindings: the pause gate is not here (project_suspend_pause_invariant)", function()
+	helpers.it("the registry names no pause or suspend state", function()
+		-- A pause check HERE would mean two modules decide whether a shortcut
+		-- fires, and they will disagree: the registry is consulted at bind time,
+		-- the dispatcher at press time, and a shortcut disabled by one and bound
+		-- by the other is a key that does nothing with no error anywhere.
+		local src = helpers.read_driver_source("local function get_frontmost_app_name")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
+		helpers.assert_true(src:find("paus") == nil,
+			"bindings must stay a declarative registry — the pause gate belongs to the dispatcher")
+		helpers.assert_true(src:find("suspend") == nil,
+			"same for suspend: this table describes what exists, not when it runs")
 	end)
 
-	helpers.it("high volume (150+) enable/disable + list under pause transitions must be stable", function()
-		for i=1,150 do
-			-- simulate
+	helpers.it("enable/disable is idempotent however many times it is repeated", function()
+		-- The old version ran a 150-iteration loop whose body was a comment. The
+		-- volume is worth keeping — repeated toggling is what a paused/resumed
+		-- session actually does to this registry — but only if the state is read
+		-- back afterwards.
+		local names = {}
+		for _, s in ipairs(Bindings.list_shortcuts()) do names[#names + 1] = s.name or s.id end
+		helpers.assert_true(#names > 0, "the registry must list something, or this proves nothing")
+
+		local first = names[1]
+		local was_enabled = Bindings.list_shortcuts()[1].enabled
+		for _ = 1, 150 do
+			Bindings.disable(first)
+			Bindings.enable(first)
 		end
-		helpers.assert_true(true, "volume + pause on bindings must not corrupt registry or leak activations")
+		-- list_shortcuts hands back live state, so leaving `first` enabled here
+		-- made a later case in this same file fail. Restore what was found.
+		if not was_enabled then Bindings.disable(first) end
+
+		local after = Bindings.list_shortcuts()
+		helpers.assert_eq(#after, #names,
+			"150 disable/enable cycles must leave the registry the same size — a leak here is a "
+				.. "shortcut that silently stops being listed in the menu")
+		helpers.assert_eq(after[1].name or after[1].id, first, "and in the same order")
+		helpers.assert_eq(after[1].enabled, was_enabled,
+			"and in the state it started in — 150 round trips must cancel out exactly")
 	end)
 
-	helpers.it("bad/unicode shortcut ids must not crash registry (resilience)", function()
-		helpers.assert_true(true, "bad shortcut ids must degrade gracefully under pause")
+	helpers.it("an unknown or non-string id is refused rather than registered", function()
+		local before = #Bindings.list_shortcuts()
+		-- Each of these used to be covered by "bad shortcut ids must degrade
+		-- gracefully" asserted with true.
+		Bindings.disable("no_such_shortcut_id")
+		Bindings.disable("clé_accentuée_🚀")
+		Bindings.enable("no_such_shortcut_id")
+		helpers.assert_eq(#Bindings.list_shortcuts(), before,
+			"an unknown id must not grow the registry — inventing an entry from a typo is how a "
+				.. "shortcut appears in the menu bound to nothing")
 	end)
 end)
 
@@ -141,7 +185,7 @@ helpers.describe("shortcuts.bindings: public API", function()
 		-- Drift guard: the macOS default MUST equal the
 		-- cross-driver manifest default so a change to shortcuts.chatgpt_url cannot
 		-- silently diverge from the AHK driver, which reads the same default.
-		local Manifest = require("lib.manifest_reader")
+		local Manifest = require("infra.manifest_reader")
 		helpers.assert_eq(Bindings.DEFAULT_CHATGPT_URL, Manifest.default_for("shortcuts.chatgpt_url"))
 	end)
 end)
@@ -317,7 +361,7 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 	-- Builds a fresh Bindings instance with hs.hotkey.bind stubbed to capture the
 	-- ctrl_g callback, and hs.urlevent.openURL stubbed to record the URL it opened.
 	local function make_bindings_with_ctrl_g_spy()
-		package.loaded["lib.keycodes"] = {
+		package.loaded["infra.keycodes"] = {
 			F18_WAKE_OS                = 79,
 			F19_VOLUME_SCROLL_MODIFIER = 80,
 			to_name = function(code)
@@ -325,7 +369,7 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 				return MAP[code] or ("keycode_" .. tostring(code))
 			end,
 		}
-		package.loaded["lib.i18n"] = { get = function(key) return key end }
+		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["modules.shortcuts.bindings"] = nil
 		-- apps.lua captures `local urlevent = hs.urlevent` at module load time, so a
 		-- cached instance from an earlier test would still call the OLD hs stub's

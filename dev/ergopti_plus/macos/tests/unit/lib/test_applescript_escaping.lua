@@ -27,7 +27,7 @@
 
 local helpers = require("tests.helpers")
 
-local text_utils = require("lib.text_utils")
+local text_utils = require("infra.text_utils")
 
 
 
@@ -116,6 +116,12 @@ helpers.describe("the AppleScript call sites escape through the shared helper", 
 				end
 			end
 
+			-- This check passes on an empty result, so an unreadable or renamed source
+			-- would retire it rather than fail it.
+			helpers.assert_true(lineno > 0,
+				entry.what .. ": the scan walked no lines at all — the source is empty or was "
+					.. "not found, so finding no offenders proves nothing")
+
 			helpers.assert_eq(#offenders, 0,
 				entry.what .. " escapes the double quote without touching the backslash. "
 					.. "AppleScript treats the backslash as an escape character, so the value the "
@@ -151,18 +157,25 @@ helpers.describe("the AppleScript call sites escape through the shared helper", 
 	end)
 
 	helpers.it("the Ollama launch path is shell-quoted, not %q-quoted", function()
-		local src = helpers.read_driver_source("OLLAMA_KILL_SETTLE_SEC")
-		helpers.assert_true(src ~= nil and src ~= "", "api_ollama must be locatable")
+		local api_src = helpers.read_driver_source("OLLAMA_KILL_SETTLE_SEC")
+		local builder_src = helpers.read_driver_source('local DAILY_LOG_PREFIX = "ErgoptiPlus_"')
+		helpers.assert_true(api_src ~= nil and api_src ~= "", "api_ollama must be locatable")
+		helpers.assert_true(builder_src ~= nil and builder_src ~= "",
+			"the delegated Ollama server-command owner must be locatable")
 
-		local code = src:gsub("%-%-[^\n]*", "")
+		local api_code = api_src:gsub("%-%-[^\n]*", "")
+		local builder_code = builder_src:gsub("%-%-[^\n]*", "")
 
-		helpers.assert_true(code:find('string.format%("%%q"') == nil,
+		helpers.assert_true(api_code:find('string.format%("%%q"') == nil
+				and builder_code:find('string.format%("%%q"') == nil,
 			"the log path is interpolated into /bin/sh, so it must not be quoted with %q. That "
 				.. "escapes for a LUA literal and leaves $, backticks and ! for the shell to "
 				.. "expand — and the path derives from the configurable config directory")
-		helpers.assert_true(code:find("shell_quote", 1, true) ~= nil,
-			"it must go through shell_quote, which is also the spelling the shell-quoting guard "
-				.. "can see — a %q call is invisible to the check that exists for exactly this")
+		helpers.assert_true(api_code:find("OllamaServerCommand.build", 1, true) ~= nil,
+			"the API launch path must delegate command construction to the shared owner")
+		helpers.assert_true(builder_code:find("text_utils.shell_quote", 1, true) ~= nil,
+			"the delegated owner must use the canonical POSIX quoter; the behavioral rollover "
+				.. "test supplies spaces, $, and apostrophes to prove the resulting command")
 	end)
 end)
 

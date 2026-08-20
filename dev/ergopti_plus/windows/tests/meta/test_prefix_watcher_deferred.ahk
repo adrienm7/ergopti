@@ -36,7 +36,7 @@
 _MetaCheckPrefixWatcherDeferred() {
 	; The InputHook init must NOT build the index inline anymore — its success log
 	; line proves the build was deferred off the boot path.
-	WBody := _DriverDirConcat("lib/hotstrings")
+	WBody := _DriverDirConcat("infra/hotstrings")
 	Assert(InStr(WBody, "index build deferred off the boot path"),
 		"HotstringPrefixWatcherInit must defer the trigger-index build off the boot critical path")
 

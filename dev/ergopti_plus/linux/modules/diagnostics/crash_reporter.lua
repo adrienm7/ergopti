@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Basic crash diagnostics for the Linux daemon. Writes crash dumps to
 --- ~/.local/share/ergopti/crashes/ when a pcall-wrapped operation fails with
---- a non-trivial error. Mirrors macOS lib/crash_reporter.lua in intent but
+--- a non-trivial error. Mirrors macOS infra/crash_reporter.lua in intent but
 --- uses filesystem dumps instead of hs.crash.crashReporter.
 ---
 --- FEATURES & RATIONALE:
@@ -28,7 +28,7 @@ local LOG = "diagnostics.crash_reporter"
 -- =========================================
 
 local MAX_CRASH_FILES = 20
-local CRASH_DIR = (os.getenv("HOME") or "/tmp") .. "/.local/share/ergopti/crashes"
+local CRASH_DIR = require("infra.config_paths").data("crashes")
 
 
 -- =========================================
@@ -132,10 +132,21 @@ end
 --- @return boolean ok, any result
 function M.protect(module_name, fn, context)
 	if type(fn) ~= "function" then return false, "fn is not a function" end
-	local ok, result = pcall(fn)
+
+	-- xpcall, not pcall. A traceback taken AFTER pcall returns describes the
+	-- caller: the stack that threw has already been unwound, so every crash
+	-- report said "crash" and then listed this function and whatever called it —
+	-- the same three frames for every failure in the driver. The message handler
+	-- runs BEFORE the unwind, which is the only place the real stack still exists.
+	local captured = nil
+	local ok, result = xpcall(fn, function(err)
+		captured = debug.traceback(tostring(err), 2)
+		return err
+	end)
+
 	if not ok then
 		local ctx = type(context) == "table" and context or {}
-		ctx.stack_trace = ctx.stack_trace or debug.traceback("crash", 2)
+		ctx.stack_trace = ctx.stack_trace or captured or debug.traceback("crash", 2)
 		M.dump(module_name, tostring(result), ctx)
 	end
 	return ok, result

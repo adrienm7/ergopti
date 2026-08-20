@@ -57,6 +57,7 @@ global _TEXT_CLIPBOARD_GENERATION := 0
 ; FIFO head, so an intervening user copy is never restored to an older value.
 global _TEXT_CLIPBOARD_QUEUE := []
 global _TEXT_CLIPBOARD_BUSY := false
+global _TEXT_CLIPBOARD_OWNER_TOKEN := 0
 global TEXT_CLIPBOARD_NEXT_DELAY_MS := TEXT_CLIPBOARD_RESTORE_DELAY_MS + 20
 
 ; Injectable send primitives — point at the real AHK built-ins by default.
@@ -178,12 +179,173 @@ _TextSenderInvokeCallback(Callback, Ok := true, ErrorMessage := "") {
 	}
 }
 
+; Whether this request carries the private two-phase hooks used by an owner
+; whose in-memory ledger must change atomically with the OS output. The public
+; TextSender port deliberately stays three-arity; these hooks live inside Opts
+; so clipboard FIFO requests can carry them without widening that contract.
+_TextSenderHasAtomicHooks(Opts) {
+	if !(Opts is Map)
+		return false
+	for Name in ["admission", "atomic_prepare", "atomic_journal",
+			"atomic_commit", "commit_failure"] {
+		if Opts.Has(Name) and HasMethod(Opts[Name], "Call")
+			return true
+	}
+	return false
+}
+
+; Evaluate an optional admission predicate without logging or throwing. This
+; helper is safe inside a short Critical region; the LLM predicate uses only
+; in-memory generations and bounded User32 focus probes. A malformed predicate
+; fails closed instead of letting old output reach an unverifiable target.
+_TextSenderAdmissionCurrent(Opts, &Failure := "") {
+	Failure := ""
+	if !(Opts is Map) or !Opts.Has("admission")
+		return true
+	Admission := Opts["admission"]
+	if !HasMethod(Admission, "Call") {
+		Failure := "output admission is not callable"
+		return false
+	}
+	try {
+		Admitted := Admission.Call()
+		; Do not use loose equality here: AHK v2 considers the string "0"
+		; equal to false. Admission is a strictly typed Boolean contract.
+		if !(Admitted is Integer) or Admitted != true {
+			Failure := "output admission rejected"
+			return false
+		}
+		return true
+	} catch as Err {
+		Failure := "output admission failed: " . Err.Message
+		return false
+	}
+}
+
+; Emit one direct or clipboard operation together with its owner-provided RAM
+; journal and state commit. Potentially yielding privacy/flush preparation runs
+; first on the open thread. Admission is still checked at the last possible
+; instant; sender, canonical RAM journal and mirrors then share one Critical
+; boundary so visible output cannot race Suspend or physical input. GUI/file
+; work returned by atomic_commit remains outside the transaction.
+; @return {Object} { Ok, ErrorMessage, Rejected }.
+_TextSenderRunAtomicOutput(SenderFn, Opts, Operation) {
+	AtomicPrepare := (Opts is Map) ? Opts.Get("atomic_prepare", 0) : 0
+	AtomicJournal := (Opts is Map) ? Opts.Get("atomic_journal", 0) : 0
+	AtomicCommit := (Opts is Map) ? Opts.Get("atomic_commit", 0) : 0
+	CommitFailure := (Opts is Map) ? Opts.Get("commit_failure", 0) : 0
+	PreparedJournal := 0
+	Finalizer := 0
+	RecoveryFinalizer := 0
+	ErrorMessage := ""
+	PrepareError := ""
+	JournalError := ""
+	JournalRejected := false
+	CommitError := ""
+	RecoveryError := ""
+	Rejected := false
+	Emitted := false
+	if HasMethod(AtomicPrepare, "Call") {
+		try
+			PreparedJournal := AtomicPrepare.Call()
+		catch as Err
+			PrepareError := Err.Message
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if !_TextSenderAdmissionCurrent(Opts, &ErrorMessage)
+			Rejected := true
+		if !Rejected {
+			SenderFn.Call()
+			Emitted := true
+			if (PrepareError = "" and HasMethod(AtomicJournal, "Call")) {
+				try {
+					JournalResult := AtomicJournal.Call(PreparedJournal)
+					if !(JournalResult is Integer) or JournalResult != true
+						JournalRejected := true
+				} catch as Err {
+					JournalError := Err.Message
+				}
+			}
+			if HasMethod(AtomicCommit, "Call") {
+				try
+					Finalizer := AtomicCommit.Call()
+				catch as Err
+					CommitError := Err.Message
+			}
+		}
+	} catch as Err {
+		if Emitted
+			CommitError := Err.Message
+		else
+			ErrorMessage := Err.Message
+	} finally {
+		; A failed RAM commit has already left visible OS output behind. Repair its
+		; mirrors before physical input can resume; otherwise a character arriving
+		; between Critical("Off") and the reset would be erased by that reset. The
+		; recovery hook is therefore RAM-only and may return presentation work for
+		; the open-thread phase, exactly like atomic_commit.
+		if (CommitError != "" and HasMethod(CommitFailure, "Call")) {
+			try
+				RecoveryFinalizer := CommitFailure.Call(CommitError)
+			catch as Err
+				RecoveryError := Err.Message
+		}
+		Critical(PreviousCritical)
+	}
+
+	; Once SenderFn returned, output is visible. A later commit fault is terminal
+	; state damage, not "output absent": report it and invoke a fail-safe reset,
+	; but keep Ok=true so no caller can retry and duplicate the user's text.
+	if (CommitError != "") {
+		LoggerError("TextSender", "{1} state commit failed after output was emitted: {2}", Operation, CommitError)
+		if (RecoveryError != "")
+			LoggerError("TextSender", "{1} fail-safe reset failed: {2}", Operation, RecoveryError)
+		if HasMethod(RecoveryFinalizer, "Call") {
+			try
+				RecoveryFinalizer.Call()
+			catch as Err
+				LoggerError("TextSender", "{1} fail-safe finalizer failed: {2}", Operation, Err.Message)
+		}
+	} else if (Emitted and HasMethod(Finalizer, "Call")) {
+		try
+			Finalizer.Call()
+		catch as Err
+			LoggerError("TextSender", "{1} finalizer failed: {2}", Operation, Err.Message)
+	}
+	if (PrepareError != "")
+		LoggerError("TextSender", "{1} output journal preparation failed: {2}", Operation, PrepareError)
+	if (JournalError != "")
+		LoggerError("TextSender", "{1} output journal commit failed after output was emitted: {2}", Operation, JournalError)
+	else if JournalRejected
+		LoggerWarn("TextSender", "{1} output journal was invalidated at commit.", Operation)
+	if (!Emitted and ErrorMessage != "" and !Rejected)
+		LoggerError("TextSender", "{1} failed: {2}", Operation, ErrorMessage)
+	CallbackError := ErrorMessage
+	if (Emitted and CommitError != "")
+		CallbackError := "output emitted but state commit failed: " . CommitError
+	else if (Emitted and JournalError != "")
+		CallbackError := "output emitted but journal commit failed: " . JournalError
+	else if (Emitted and PrepareError != "")
+		CallbackError := "output emitted but journal preparation failed: " . PrepareError
+	else if (Emitted and JournalRejected)
+		CallbackError := "output emitted but journal was invalidated"
+	return {
+		Ok: Emitted,
+		ErrorMessage: CallbackError,
+		Rejected: Rejected,
+		CommitOk: Emitted and CommitError == "",
+		JournalOk: Emitted and PrepareError == "" and JournalError == ""
+			and !JournalRejected
+	}
+}
+
 ; Calls the injectable SendInput primitive without allowing an OS/injection
 ; failure to escape from a keyboard-facing adapter method.  A thrown SendInput
 ; in a timer callback otherwise skips the completion callback and leaves the
 ; process-wide clipboard FIFO permanently busy; in a hold path it can also
 ; strand a partially applied modifier transaction.
-_TextSenderSendInput(Keys, Operation := "SendInput") {
+_TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 	global _AHK_SendInput
 
 	; Every TextPressKey emission funnels through here at SendLevel 0, and the
@@ -203,18 +365,26 @@ _TextSenderSendInput(Keys, Operation := "SendInput") {
 	;     replacement, likewise already accounted for.
 	;   - the modifier Down/Up and rollback operations change modifier state
 	;     only; they touch neither the caret nor the document.
-	; IsSet-guarded because the headless runner loads these trees selectively and
-	; an adapter must stay usable without the hotstring layer present.
-	if (Operation == "key press" or Operation == "modified key press") {
-		if IsSet(HS_DeclareSyntheticEffect)
-			try HS_DeclareSyntheticEffect(Keys)
-	}
-
 	try {
-		_AHK_SendInput.Call(Keys)
+		; Declaration and OS output are one transaction. HS_DeclareSyntheticEffect
+		; used to restore Critical and run tooltip effects before this call, which
+		; let a physical OnChar enter the future buffer state before the caret move
+		; reached Windows. The canonical owner keeps only RAM mutation + SendInput
+		; under Critical and finishes GUI/analytics work after restoring it.
+		; IsSet-guarded because headless adapter runners may omit the hotstring layer.
+		if ((Operation == "key press" or Operation == "modified key press")
+			and IsSet(HS_RunSyntheticInputTransaction)) {
+			HS_RunSyntheticInputTransaction(Keys, _AHK_SendInput.Bind(Keys))
+		} else {
+			_AHK_SendInput.Call(Keys)
+		}
 		return true
 	} catch as Err {
-		LoggerError("TextSender", "{1} failed for '{2}': {3}", Operation, Keys, Err.Message)
+		; Synthetic ownership calls defer this ERROR until after their short
+		; Critical ledger/send commit. LoggerError flushes synchronously to disk,
+		; so logging it here would put file I/O under Critical and starve input.
+		if LogFailure
+			LoggerError("TextSender", "{1} failed for '{2}': {3}", Operation, Keys, Err.Message)
 		return false
 	}
 }
@@ -234,8 +404,9 @@ _TextSenderSendInput(Keys, Operation := "SendInput") {
 ; @param Text     {String}             The Unicode text to inject via clipboard paste.
 ; @param Saved    {ClipboardAll|String} Snapshot already captured by the caller.
 ; @param Callback {Func|0}             Optional zero-arity completion callback.
-_TextSendClipboard(Text, Saved, Callback := 0) {
+_TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	global TEXT_CLIPBOARD_RESTORE_DELAY_MS, TEXT_CLIPBOARD_WAIT_TIMEOUT_SEC, _TEXT_CLIPBOARD_GENERATION
+	global _AHK_SendInput
 
 	; This whole round-trip runs on a SetTimer callback, which native Suspend()
 	; never disarms — a pause toggled between TextSend's scheduling and this
@@ -305,8 +476,25 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 		_TextSenderInvokeCallback(Callback, false, "clipboard ownership changed before paste")
 		return
 	}
+	; ClipWait yields. A pause requested while it was blocked must win before the
+	; observable Ctrl+V, even though the earlier entry guard already passed.
+	if A_IsSuspended {
+		_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
+		_TextSenderInvokeCallback(Callback, false, "driver suspended before clipboard paste")
+		return
+	}
 
-	if !_TextSenderSendInput("^v", "clipboard paste") {
+	CompletionError := ""
+	if _TextSenderHasAtomicHooks(Opts) {
+		Result := _TextSenderRunAtomicOutput(
+			_AHK_SendInput.Bind("^v"), Opts, "clipboard paste")
+		if !Result.Ok {
+			_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
+			_TextSenderInvokeCallback(Callback, false, Result.ErrorMessage)
+			return
+		}
+		CompletionError := Result.ErrorMessage
+	} else if !_TextSenderSendInput("^v", "clipboard paste") {
 		_TextSendRestoreClipboard(Saved, Generation, OwnedSequence)
 		_TextSenderInvokeCallback(Callback, false, "clipboard paste failed")
 		return
@@ -315,7 +503,7 @@ _TextSendClipboard(Text, Saved, Callback := 0) {
 	; Fire the completion callback now that the paste keystroke has been emitted.
 	; Placed before the restore timer so callers can inspect A_Clipboard while it
 	; still holds the injected text, but after ^v so the paste is guaranteed to land.
-	_TextSenderInvokeCallback(Callback, true)
+	_TextSenderInvokeCallback(Callback, true, CompletionError)
 
 	; Restore after a short delay so the paste completes before we overwrite.
 	; The closure no-ops if a newer injection advanced the generation counter,
@@ -365,11 +553,22 @@ _TextSendForceRestoreClipboard(Saved, Generation) {
 ; started until the preceding restore window has elapsed, so its write cannot
 ; replace a payload that has not yet been pasted by the foreground application.
 _TextSenderStartClipboard() {
-	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_OWNER_TOKEN
 	if _TEXT_CLIPBOARD_BUSY or (_TEXT_CLIPBOARD_QUEUE.Length = 0)
 		return
 	_TEXT_CLIPBOARD_BUSY := true
 	Request := _TEXT_CLIPBOARD_QUEUE.RemoveAt(1)
+	RequestOpts := Request.HasOwnProp("Opts") ? Request.Opts : 0
+	AdmissionCritical := Critical("On")
+	try {
+		Admitted := _TextSenderAdmissionCurrent(RequestOpts, &AdmissionFailure)
+	} finally {
+		Critical(AdmissionCritical)
+	}
+	if !Admitted {
+		_TextSenderClipboardCompleted(Request.Callback, false, AdmissionFailure)
+		return
+	}
 	; Snapshot at FIFO ownership, not when the caller queued. A user copy made
 	; between queued requests is then the value restored after this request.
 	Saved := CB_SaveAll()
@@ -378,8 +577,12 @@ _TextSenderStartClipboard() {
 		_TextSenderClipboardCompleted(Request.Callback, false, "clipboard snapshot failed")
 		return
 	}
+	; Clipboard notifications and the synthetic Ctrl+V outlive the function
+	; which writes the payload. Keep one shared owner through the restore window;
+	; _TextSenderFinishClipboard releases it on every terminal path.
+	_TEXT_CLIPBOARD_OWNER_TOKEN := CB_BeginOwnedTransaction("text_sender", true)
 	_TextSendClipboard(Request.Text, Saved,
-		_TextSenderClipboardCompleted.Bind(Request.Callback))
+		_TextSenderClipboardCompleted.Bind(Request.Callback), RequestOpts)
 }
 
 ; Called by _TextSendClipboard on every terminal path. It preserves the public
@@ -392,7 +595,11 @@ _TextSenderClipboardCompleted(Callback, Ok := true, ErrorMessage := "") {
 }
 
 _TextSenderFinishClipboard() {
-	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_OWNER_TOKEN
+	OwnerToken := _TEXT_CLIPBOARD_OWNER_TOKEN
+	_TEXT_CLIPBOARD_OWNER_TOKEN := 0
+	if OwnerToken
+		CB_EndOwnedTransaction(OwnerToken)
 	_TEXT_CLIPBOARD_BUSY := false
 	if (_TEXT_CLIPBOARD_QUEUE.Length = 0) {
 		return
@@ -428,7 +635,8 @@ TextSend(Text, Opts, Callback) {
 		; Callback is passed into _TextSendClipboard and fired there after Ctrl+V, so
 		; callers that depend on the callback being synchronised with injection completion
 		; are never notified before the paste actually lands.
-		_TEXT_CLIPBOARD_QUEUE.Push({ Text: Text, Callback: Callback })
+		RequestOpts := (Opts is Map) ? Opts.Clone() : Opts
+		_TEXT_CLIPBOARD_QUEUE.Push({ Text: Text, Callback: Callback, Opts: RequestOpts })
 		SetTimer(_TextSenderStartClipboard, -1)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
@@ -437,16 +645,28 @@ TextSend(Text, Opts, Callback) {
 		; other OS-level call in this file is defensively guarded) — currently
 		; masked by both production callers' own outer guards, but a contested
 		; low-level hook can still throw here.
-		Ok := true
-		ErrorMessage := ""
-		try
-			_AHK_SendText.Call(Text)
-		catch as Err {
-			LoggerError("TextSender", "TextSend: direct-mode SendText failed: {1}", Err.Message)
-			Ok := false
-			ErrorMessage := Err.Message
+		if _TextSenderHasAtomicHooks(Opts) {
+			AtomicInput := (Opts is Map) ? Opts.Get("atomic_input", false) : false
+			if !(AtomicInput is Integer) or AtomicInput != true {
+				_TextSenderInvokeCallback(Callback, false,
+					"atomic direct output requires SendInput text mode")
+				return
+			}
+			Result := _TextSenderRunAtomicOutput(
+				_AHK_SendInput.Bind("{Text}" . Text), Opts, "direct-mode SendInput text")
+			_TextSenderInvokeCallback(Callback, Result.Ok, Result.ErrorMessage)
+		} else {
+			Ok := true
+			ErrorMessage := ""
+			try
+				_AHK_SendText.Call(Text)
+			catch as Err {
+				LoggerError("TextSender", "TextSend: direct-mode SendText failed: {1}", Err.Message)
+				Ok := false
+				ErrorMessage := Err.Message
+			}
+			_TextSenderInvokeCallback(Callback, Ok, ErrorMessage)
 		}
-		_TextSenderInvokeCallback(Callback, Ok, ErrorMessage)
 	}
 }
 
@@ -469,27 +689,37 @@ TextEraseChars(Count) {
 ; @param Modifiers {Array|String} Array of modifier name strings for a full
 ;                  keystroke, OR the string "Down"/"Up" to emit a sustained
 ;                  press/release event (e.g. hold a modifier across a KeyWait).
-TextPressKey(Key, Modifiers) {
+; @param LogFailure {Boolean} True to log sender failures synchronously. The
+;                   synthetic owner passes false while its ledger is Critical
+;                   and emits one terminal ERROR after restoring Critical.
+; @param Transaction {Object|unset} Optional mutable result for a sustained
+;                   Array transaction. SentKeys records proven Downs,
+;                   FailedKey identifies the rejected transition, and
+;                   RollbackFailedKeys retains every earlier Down whose
+;                   compensating Up was not proven. The tap-hold owner uses
+;                   that last field to keep release ownership after failure.
+TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 	; "Down" / "Up" — sustained press or release for hold-modifier patterns.
 	if (Modifiers == "Down" or Modifiers == "Up") {
 		; An empty Key here means an upstream hold_modifier resolver already
 		; logged a WARNING and bailed to "" (see ResolveHoldModifierKey in
-		; lib/tap_hold/tap_hold_loader.ahk). Sending "{ Down}" / "{ Up}" would
+		; platform/remap/tap_hold_loader.ahk). Sending "{ Down}" / "{ Up}" would
 		; silently arm nothing while still consuming the keystroke — refuse it
 		; here too as a second line of defense instead of a blind SendInput
 		; with a blank key name.
 		if (Key == "") {
 			LoggerError("TextSender", "TextPressKey: refusing to send '{1}' with an empty Key — caller must resolve the key name before calling.", Modifiers)
-			return
+			return false
 		}
 		; Hold modifiers can now be a combo represented as an Array (e.g.
 		; ["LCtrl", "LShift"]) or a scalar key name for legacy paths.
 		if (IsObject(Key) and Type(Key) == "Array") {
 			SentKeys := []
+			RollbackFailedKeys := []
 			for _, ModKey in Key {
 				if (ModKey == "")
 					continue
-				if !_TextSenderSendInput("{" . ModKey . " " . Modifiers . "}", "modifier " . Modifiers) {
+				if !_TextSenderSendInput("{" . ModKey . " " . Modifiers . "}", "modifier " . Modifiers, LogFailure) {
 					; A failed multi-key Down must not leave the keys already sent
 					; logically held by the driver.  Release them in reverse order;
 					; each release is guarded/logged independently because the
@@ -497,16 +727,27 @@ TextPressKey(Key, Modifiers) {
 					if (Modifiers == "Down") {
 						loop SentKeys.Length {
 							SentKey := SentKeys[SentKeys.Length - A_Index + 1]
-							_TextSenderSendInput("{" . SentKey . " Up}", "modifier rollback")
+							if !_TextSenderSendInput("{" . SentKey . " Up}", "modifier rollback", LogFailure)
+								RollbackFailedKeys.Push(SentKey)
 						}
+					}
+					if IsSet(Transaction) {
+						Transaction.SentKeys := SentKeys.Clone()
+						Transaction.FailedKey := ModKey
+						Transaction.RollbackFailedKeys := RollbackFailedKeys
 					}
 					return false
 				}
 				SentKeys.Push(ModKey)
 			}
+			if IsSet(Transaction) {
+				Transaction.SentKeys := SentKeys.Clone()
+				Transaction.FailedKey := ""
+				Transaction.RollbackFailedKeys := RollbackFailedKeys
+			}
 			return true
 		}
-		return _TextSenderSendInput("{" . Key . " " . Modifiers . "}", "sustained key " . Modifiers)
+		return _TextSenderSendInput("{" . Key . " " . Modifiers . "}", "sustained key " . Modifiers, LogFailure)
 	}
 	if (Modifiers is Array) {
 		Mods := []

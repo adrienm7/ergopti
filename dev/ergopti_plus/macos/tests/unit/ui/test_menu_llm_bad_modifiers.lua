@@ -18,17 +18,17 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel)
-	local path = helpers.driver_root() .. rel
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "cannot open " .. tostring(path))
-	local s = fh:read("*a"); fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local s = helpers.read_driver_source(selector)
 	return s
 end
 
 helpers.describe("menu_llm: wrong-typed modifier settings fail closed (F-HIGH-6)", function()
 	helpers.it("format_shortcut_title type-guards mods BEFORE table.concat", function()
-		local src = read_src("ui/menu/menu_llm/init.lua")
+		local src = read_src("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		local fn = src:match("local function format_shortcut_title.-\nend")
 		helpers.assert_true(fn ~= nil, "format_shortcut_title must be locatable")
 		local guard_pos  = fn:find('type(mods) ~= "table"', 1, true)
@@ -39,7 +39,7 @@ helpers.describe("menu_llm: wrong-typed modifier settings fail closed (F-HIGH-6)
 	end)
 
 	helpers.it("nav/val modifier reads fail closed to the default on a non-table", function()
-		local src = read_src("ui/menu/menu_llm/init.lua")
+		local src = read_src("local function format_shortcut_title") -- ui/menu/menu_llm/init.lua
 		helpers.assert_true(src:find('type(nav_mods) ~= "table"', 1, true) ~= nil,
 			"nav_mods read must guard against a non-table value, not only nil")
 		helpers.assert_true(src:find('type(val_mods) ~= "table"', 1, true) ~= nil,
@@ -47,7 +47,7 @@ helpers.describe("menu_llm: wrong-typed modifier settings fail closed (F-HIGH-6)
 	end)
 
 	helpers.it("build_modifier_menu type-guards current_mods BEFORE table.concat", function()
-		local src = read_src("ui/menu/menu_llm/settings_manager.lua")
+		local src = read_src("local function generic_numeric_prompt") -- ui/menu/menu_llm/settings_manager.lua
 		local guard_pos  = src:find('type(current_mods) ~= "table"', 1, true)
 		local concat_pos = src:find("table.concat(current_mods", 1, true)
 		helpers.assert_true(guard_pos ~= nil, "build_modifier_menu must type-guard current_mods")

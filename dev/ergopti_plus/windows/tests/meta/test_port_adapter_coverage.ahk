@@ -102,8 +102,7 @@ _MetaRunAdapterPresenceTests() {
 			MissingHs++
 			OutputDebug("WARN: HS adapter missing for port '" . RawName . "': " . HsFile)
 		}
-		; Linux must keep up with every port too, so a new port without a Linux
-		; adapter fails CI rather than letting the Linux driver silently lag.
+		; Counted for the report below, not to gate on. See _ResultAdapterLinux.
 		if not FileExist(StrReplace(LinuxFile, "/", "\")) {
 			MissingLinux++
 			OutputDebug("WARN: Linux adapter missing for port '" . RawName . "': " . LinuxFile)
@@ -121,10 +120,25 @@ _MetaRunAdapterPresenceTests() {
 	}
 	Test("meta port coverage: every port spec has a HS adapter (" . SpecCount . " specs)", _ResultAdapterHs)
 
+	; Deliberately NOT asserted for Linux, and this is the fourth place the same
+	; sentence had to be undone. ADR-008 supersedes ADR-001's "adding a new driver
+	; requires only implementing the twenty port adapters": a port is a contract
+	; for the drivers that need the capability, not a checklist. Requiring a file
+	; per spec here is what produced nine Linux adapters with no production caller
+	; -- every one of them satisfying this very assertion while nothing reached it.
+	;
+	; The count is still computed and reported, because "which ports does Linux
+	; not implement?" is a useful thing to be able to read. What IS enforced is
+	; the other direction, by tools/test/test-adapter-reachability.cjs: an adapter
+	; that exists must be required by something, held at zero on all three drivers.
 	_ResultAdapterLinux() {
-		Assert(MissingLinux = 0, "meta: " . MissingLinux . " Linux adapter(s) missing  --  see OutputDebug")
+		Assert(SpecCount > 0, "no *.spec.js files found  --  the scan is broken and this reports nothing")
+		Assert(MissingLinux >= 0,
+			"the Linux coverage count must be computed even though it is not enforced  --  "
+			. "an unread number stops being maintained")
+		OutputDebug("INFO: Linux implements " . (SpecCount - MissingLinux) . "/" . SpecCount . " port(s).")
 	}
-	Test("meta port coverage: every port spec has a Linux adapter (" . SpecCount . " specs)", _ResultAdapterLinux)
+	Test("meta port coverage: Linux port coverage is reported, not mandated (" . SpecCount . " specs)", _ResultAdapterLinux)
 }
 _MetaRunAdapterPresenceTests()
 

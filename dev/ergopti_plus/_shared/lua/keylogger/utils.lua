@@ -7,6 +7,14 @@
 --- This module has ZERO driver dependencies — no hs, no Logger, no Paths,
 --- no Timings, no io. It can be require()d by any Lua runtime (LuaJIT, etc.).
 
+
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table,
+-- and a shared module cannot depend on its caller having installed the compat
+-- shim — it does not know its callers. terminators.lua crashed from the E2E
+-- runner for exactly that reason while working from the daemon and the unit
+-- runner, both of which install one.
+local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+
 local M = {}
 
 -- ============================================================================
@@ -60,7 +68,7 @@ end
 --- Pop the last UTF-8 codepoint off a string. Used by the backspace handler to
 --- truncate the in-progress word buffer one logical character at a time.
 ---
---- Relies on `utf8.offset` (Lua 5.3+ built-in, or the compat shim on LuaJIT).
+--- Relies on `utf8_lib.offset` (Lua 5.3+ built-in, or the compat shim on LuaJIT).
 --- Falls back to raw byte truncation (`s:sub(1, -2)`) on malformed input so a
 --- corrupt string never crashes the aggregator.
 ---
@@ -68,7 +76,7 @@ end
 --- @return string   String with the last codepoint removed.
 function M.pop_utf8(s)
 	if not s or #s == 0 then return s or "" end
-	local ok, off = pcall(utf8.offset, s, -1)
+	local ok, off = pcall(utf8_lib.offset, s, -1)
 	if not ok or not off then return s:sub(1, -2) end
 	return s:sub(1, off - 1)
 end

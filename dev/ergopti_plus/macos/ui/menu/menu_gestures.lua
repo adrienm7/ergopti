@@ -7,7 +7,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Manifest-Driven: Structure (slot groups, separators, action buttons) is
----    read from ``_shared/menu_manifest.json`` via ``lib/manifest_menu``.
+---    read from ``_shared/menu_manifest.json`` via ``infra/manifest_menu``.
 ---    Dynamic blocks (slot items, disable_all, restore_defaults) are supplied
 ---    as handlers so runtime state stays in Lua.
 --- ==============================================================================
@@ -16,10 +16,12 @@ local M = {}
 local hs = hs
 
 local gestures_mod  = require("modules.gestures")
-local dialog        = require("lib.dialog_util")
-local i18n          = require("lib.i18n")
-local ManifestMenu  = require("lib.manifest_menu")
+local MenuUtils = require("ui.menu.menu_utils")
+local dialog        = require("infra.dialog_util")
+local i18n          = require("infra.i18n")
+local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
+local shortcut_utils = require("ui.menu.shortcut_utils")
 
 
 
@@ -66,7 +68,7 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = i18n.get("menu.gestures.title"),
+		label   = i18n.get("menu.gestures.title"),
 		checked = state.gestures or nil,
 		-- Disabled while the script is paused. The gesture engine's only gate is the
 		-- shared CoreState.enabled flag, which pause_all() drives via disable_all().
@@ -76,7 +78,7 @@ function M.build(ctx)
 		-- Pause owns the gesture state until resume restores it — mirror the
 		-- hotstrings master toggle, which is likewise pause-gated.
 		disabled = paused or nil,
-		fn      = (not paused) and function()
+		action  = (not paused) and function()
 			local new_state = not state.gestures
 			if new_state then
 				-- Show warning when activating gestures
@@ -92,7 +94,7 @@ function M.build(ctx)
 					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
 				end
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
 			ctx.updateMenu()
 		end or nil,
@@ -146,7 +148,7 @@ function M.build(ctx)
 			local function apply_action()
 				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
 				local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 				return conflict
 			end
@@ -154,12 +156,18 @@ function M.build(ctx)
 			if spec then
 				hs.timer.doAfter(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
-					local prompt = spec == "search_url"
-						and "URL de recherche, avec exactement un %s pour la requête :"
-						or "Lien à ouvrir :"
+					-- The %s inside the search-URL prompt is LITERAL — it is the
+					-- placeholder the user has to type — so this string is never run
+					-- through string.format. The title uses {1} so the two cannot be
+					-- confused.
+					local prompt = i18n.get(spec == "search_url"
+						and "dialog.gestures.param_search_url"
+						or  "dialog.gestures.param_link")
+					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
+					local save_btn = i18n.get("button.save")
 					while true do
-						local button, value = dialog.text_prompt("Configurer " .. (gestures.get_action_label(a) or a), prompt, prior, "Enregistrer", "Annuler")
-						if button ~= "Enregistrer" then return end
+						local button, value = dialog.text_prompt(title, prompt, prior, save_btn, i18n.get("button.cancel"))
+						if button ~= save_btn then return end
 						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
 							pcall(gestures.set_action_parameter, slot, a, value)
 							local conflict = apply_action()
@@ -170,7 +178,10 @@ function M.build(ctx)
 							end
 							return
 						end
-						pcall(dialog.block_alert, "Valeur invalide", "Saisissez une URL http:// ou https:// valide." .. (spec == "search_url" and " L’URL doit contenir un seul %s." or ""), "OK", nil, "warning")
+						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+							i18n.get("dialog.gestures.param_err_url")
+							.. (spec == "search_url" and (" " .. i18n.get("dialog.gestures.param_err_many_placeholders")) or ""),
+							"OK", nil, "warning")
 						prior = value or prior
 					end
 				end)
@@ -206,31 +217,35 @@ function M.build(ctx)
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 
+		-- Provider data from here down: `label` / `action` / `items`, which the
+		-- renderer materialises. These rows used to be built in this driver's own
+		-- dialect and translated one by one on the way out, so the tree was still
+		-- assembled here and every row of it counted as built outside the renderer.
 		local modeSubmenu = {
 			{
-				title = i18n.get("menu.gestures.mode_single"),
+				label = i18n.get("menu.gestures.mode_single"),
 				checked = (currentMode == "x1") or nil,
-				fn = function()
+				action = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "x1") end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end
 			},
 			{
-				title = i18n.get("menu.gestures.mode_incremental"),
+				label = i18n.get("menu.gestures.mode_incremental"),
 				checked = (currentMode == "incremental") or nil,
-				fn = function()
+				action = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "incremental") end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end
 			}
 		}
 
 		local sensSubmenu = {
-			{ title = i18n.section("menu.gestures.sensitivity_label"), disabled = true },
-			{ title = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
-			{ title = "-" },
+			{ label = i18n.section("menu.gestures.sensitivity_label"), disabled = true },
+			{ label = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
+			{ separator = true },
 		}
 		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0 }
 		for _, s in ipairs(sensitivities) do
@@ -238,10 +253,11 @@ function M.build(ctx)
 			if s == 3.5 then label = label .. " " .. i18n.get("menu.gestures.default_sensitivity") end
 
 			table.insert(sensSubmenu, {
-				title = label,
-				checked = (currentSens == s) or nil,				fn = function()
+				label = label,
+				checked = (currentSens == s) or nil,
+				action = function()
 					if type(gestures.set_sensitivity) == "function" then pcall(gestures.set_sensitivity, slot, s) end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end
 			})
@@ -252,8 +268,8 @@ function M.build(ctx)
 			or  i18n.get("menu.gestures.mode_single")
 
 		local change_action_item = {
-			title = i18n.get("menu.gestures.change_action"),
-			fn    = (state.gestures and not paused) and function()
+			label  = i18n.get("menu.gestures.change_action"),
+			action = (state.gestures and not paused) and function()
 				hs.timer.doAfter(0.05, function() open_action_chooser(slot, names, current) end)
 			end or nil,
 			disabled = not state.gestures or paused or nil,
@@ -263,111 +279,113 @@ function M.build(ctx)
 		if slot:match("swipe") then
 			local swipeSubmenu = {
 				change_action_item,
-				{ title = "-" },
-				{ title = i18n.get("menu.gestures.mode_prefix") .. mode_display, menu = modeSubmenu },
-				{ title = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), menu = sensSubmenu, disabled = (currentMode ~= "incremental") or nil },
+				{ separator = true },
+				{ label = i18n.get("menu.gestures.mode_prefix") .. mode_display, items = modeSubmenu },
+				{ label = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), items = sensSubmenu, disabled = (currentMode ~= "incremental") or nil },
 			}
 			return {
-				title    = slotLbl .. " : " .. actionLbl,
+				label    = slotLbl .. " : " .. actionLbl,
 				disabled = not state.gestures or paused or nil,
-				menu     = swipeSubmenu,
+				items    = swipeSubmenu,
 			}
 		end
 
 		-- Tap slots: only the action matters, open the chooser directly.
 		return {
-			title    = slotLbl .. " : " .. actionLbl,
+			label    = slotLbl .. " : " .. actionLbl,
 			disabled = not state.gestures or paused or nil,
-			menu     = { change_action_item },
+			items    = { change_action_item },
 		}
-	end
-
-	--- Generates a section of gesture items.
-	--- @param slots table List of slot identifiers.
-	--- @return table The section menu items.
-	local function section(slots)
-		local its = {}
-		for _, slot in ipairs(slots) do table.insert(its, slotItem(slot)) end
-		return its
 	end
 
 	-- Dynamic handlers — each appends its items to the list it receives.
 
-	local function dyn_disable_all(items, _ctx)
-		table.insert(items, {
-			title = i18n.get("menu.gestures.disable_all"),
-			fn    = function()
-				local gestures_enabled = state.gestures == true
-				local all_slots = gestures_mod.SINGLE_SLOTS or {}
-				for _, slot in ipairs(all_slots) do
-					if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
-				end
-				state.gestures = gestures_enabled
-				if gestures_enabled then
-					if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
-				else
-					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
-				end
-				ctx.save_prefs()
-				ctx.updateMenu()
-			end,
-		})
+	-- `command` since 2026-08-07: the renderer builds the row and its label from
+	-- the declaration, so this supplies only what the click does.
+	local function cmd_disable_all()
+		local gestures_enabled = state.gestures == true
+		local all_slots = gestures_mod.SINGLE_SLOTS or {}
+		for _, slot in ipairs(all_slots) do
+			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
+		end
+		state.gestures = gestures_enabled
+		if gestures_enabled then
+			if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
+		else
+			if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
+		end
+		if ctx.save_prefs() ~= true then return false end
+		ctx.updateMenu()
 	end
 
-	local function dyn_restore_defaults(items, _ctx)
-		table.insert(items, {
-			title = i18n.get("menu.gestures.restore_defaults"),
-			fn    = function()
-				local defaults = gestures_mod.DEFAULT_GESTURES or {}
-				for slot, action in pairs(defaults) do
-					if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
-				end
-				ctx.save_prefs()
-				ctx.updateMenu()
-			end,
-		})
+	local function cmd_restore_defaults()
+		local defaults = gestures_mod.DEFAULT_GESTURES or {}
+		for slot, action in pairs(defaults) do
+			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
+		end
+		if ctx.save_prefs() ~= true then return false end
+		ctx.updateMenu()
 	end
 
-	local function dyn_circular_spaces(items, _ctx)
-		table.insert(items, {
-			title    = i18n.get("menu.gestures.circular_spaces"),
-			checked  = (type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap()) or nil,
-			disabled = not state.gestures or paused or nil,
-			fn       = function()
-				if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
-					pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
-					ctx.save_prefs()
-					ctx.updateMenu()
-				end
-			end,
-		})
+	-- The row itself is `type = "check"` in the manifest now: the label, the tick
+	-- predicate and the greying predicate are declared, and this is only what the
+	-- row DOES.
+	local function cmd_circular_spaces()
+		if type(gestures.get_space_wrap) == "function" and type(gestures.set_space_wrap) == "function" then
+			pcall(gestures.set_space_wrap, not gestures.get_space_wrap())
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
+		end
 	end
 
 	-- Build a slot group from the manifest gesture_slots table.
-	local function dyn_slots_group(finger_count)
-		return function(items, _ctx)
+	-- One provider per finger count. The slot ids come from the manifest's own
+	-- `gesture_slots` table, so these rows were already manifest DATA appended by
+	-- hand — the shared renderer materialises them now.
+	local function slots_provider(finger_count)
+		return function()
 			local root = ManifestMenu.get_root()
 			local slots = (type(root) == "table"
 				and type(root.gesture_slots) == "table"
 				and root.gesture_slots[tostring(finger_count)]) or {}
+			local rows = {}
 			for _, slot_id in ipairs(slots) do
-				table.insert(items, slotItem(slot_id))
+				rows[#rows + 1] = slotItem(slot_id)
 			end
+			return rows
 		end
 	end
 
 	local dyn_handlers = {
-		disable_all      = dyn_disable_all,
-		restore_defaults = dyn_restore_defaults,
-		circular_spaces  = dyn_circular_spaces,
-		gesture_slots_2  = dyn_slots_group(2),
-		gesture_slots_3  = dyn_slots_group(3),
-		gesture_slots_4  = dyn_slots_group(4),
-		gesture_slots_5  = dyn_slots_group(5),
 	}
 
-	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, ctx)
-	item.menu = gm
+	local providers = {
+		["gesture_slots_2"] = slots_provider(2),
+		["gesture_slots_3"] = slots_provider(3),
+		["gesture_slots_4"] = slots_provider(4),
+		["gesture_slots_5"] = slots_provider(5),
+	}
+
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = { ["circular_spaces"] = cmd_circular_spaces }
+	render_ctx.state_getters = {
+		gesture_space_wrap = function()
+			return type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap() or false
+		end,
+		-- disabled_when is an AND of things that must be TRUE for the row to be
+		-- live, so this answers "are gestures usable", not "are they off".
+		gestures_enabled = function() return (state.gestures and not paused) and true or false end,
+	}
+
+	-- The two whole-tree actions are `command` rows: the renderer builds them from
+	-- the declaration and this driver registers only the behaviour.
+	render_ctx.commands = render_ctx.commands or {}
+	render_ctx.commands["disable_all"] = cmd_disable_all
+	render_ctx.commands["restore_defaults"] = cmd_restore_defaults
+
+	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
+	item.submenu = gm
 	return item
 end
 

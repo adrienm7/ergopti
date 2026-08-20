@@ -22,13 +22,13 @@
 ; segments must report how much of its time belonged to them.
 ;
 ; SCOPE: behavioural. The profiler is pure timing plus one log call, so it is
-; driven directly here through the logger test sink. lib/hotpath_profiler.ahk is
+; driven directly here through the logger test sink. infra/hotpath_profiler.ahk is
 ; not part of the headless runner's include graph, so it is pulled in explicitly.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-#Include ../../lib/hotpath_profiler.ahk
+#Include ../../infra/hotpath_profiler.ahk
 
 
 

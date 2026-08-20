@@ -77,7 +77,7 @@ _MetaCheckInstallerDoesNotProbeWingetSynchronously() {
 		"LLM_Deps_RunInstaller must not RunWait for 'where winget' on the menu thread; direct Run plus catch selects the browser fallback without freezing input")
 	Assert(InStr(Body, "winget install") > 0 and InStr(Body, "Run(") > 0,
 		"LLM_Deps_RunInstaller must launch winget asynchronously and preserve the automated installer path")
-	Assert(_DriverFuncBody("_LLM_Deps_HasWinget") = "",
+	Assert(_DriverFuncBodyOrEmpty("_LLM_Deps_HasWinget") = "",
 		"the synchronous _LLM_Deps_HasWinget helper must not be reintroduced")
 }
 Test("meta llm: installer launches winget without a synchronous availability probe (ollama-winget-menu-block)",

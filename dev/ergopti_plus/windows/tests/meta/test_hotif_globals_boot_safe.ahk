@@ -41,11 +41,11 @@ global _HGBS_PRE_PUMP_SEEDED := ["CapsWordEnabled", "LayerEnabled", "TapHold",
 
 
 
-; =====================================================================
+; ==================================================================
 ; ==================================================================
 ; ======= 1/ The pre-pump block still seeds what it promises =======
 ; ==================================================================
-; =====================================================================
+; ==================================================================
 
 ; The entry source above Bundle_Init(). Everything a parse-time #HotIf can
 ; reach during the first pump must be established in here.
@@ -75,11 +75,11 @@ _HGBS_SeedsSurviveInThePrePumpBlock() {
 
 
 
-; =====================================================================
+; ==============================================================
 ; ==============================================================
 ; ======= 2/ Every parse-time #HotIf helper is boot-safe =======
 ; ==============================================================
-; =====================================================================
+; ==============================================================
 
 ; Names of the driver functions called from a parse-time #HotIf directive.
 ; Multi-line directives are covered: `#HotIf (` continues until the closing
@@ -122,7 +122,10 @@ _HGBS_HotIfFunctions() {
 		Pending.Push(Fn)
 	while (Pending.Length > 0) {
 		Fn := Pending.Pop()
-		Body := _DriverFuncBody(Fn)
+		; A callee harvested from source can be a built-in or a method (Has, Map…),
+		; so absence is expected here and must not throw — this is one of the rare
+		; legitimate uses of the tolerant variant.
+		Body := _DriverFuncBodyOrEmpty(Fn)
 		if (Body == "")
 			continue
 		for Callee in _HGBS_CalleesIn(Body) {
@@ -188,9 +191,10 @@ _HGBS_EveryHotIfHelperIsBootSafe() {
 		"the scan must reach the real parse-time #HotIf directives (found only " . Count . " helper(s)) — a scan that matches nothing cannot fail")
 
 	for Fn, _ in Fns {
-		Body := _DriverFuncBody(Fn)
 		; Not a driver function (a built-in, or defined in a file outside the
-		; scanned tree) — nothing to assert.
+		; scanned tree) — nothing to assert, so the tolerant variant is required
+		; here rather than the throwing one.
+		Body := _DriverFuncBodyOrEmpty(Fn)
 		if (Body == "")
 			continue
 		for Name in _HGBS_UnguardedGlobalsOf(Body) {

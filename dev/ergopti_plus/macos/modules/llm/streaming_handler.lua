@@ -26,9 +26,9 @@ local M = {}
 
 local hs      = hs
 local Parser  = require("modules.llm.parser")
-local Logger  = require("lib.logger")
-local Timings = require("lib.timings")
-local i18n    = require("lib.i18n")
+local Logger  = require("infra.logger")
+local Timings = require("infra.timings")
+local i18n    = require("infra.i18n")
 
 local LOG = "llm.streaming_handler"
 
@@ -116,7 +116,7 @@ local function build_dedup_key(pred)
 		table.insert(parts, next_words)
 	end
 
-	return table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+	return (table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
 --- Formats the validation modifier shortcut for tooltip display.
@@ -128,6 +128,47 @@ local function format_validation_shortcut(mods)
 	-- Zero-width space: renders as invisible but keeps the slot present in the layout
 	if #mods == 0 then return "\226\128\139" end
 	return table.concat(mods, "+")
+end
+
+--- Reads a timer's running state from either the native Hammerspoon method or
+--- the behavioral-test boolean field.
+--- @param timer any Timer candidate.
+--- @return boolean readable True when the state probe was available.
+--- @return boolean|string running_or_error Running state, or a diagnostic.
+local function timer_running(timer)
+	local probe = timer and timer.running
+	if type(probe) == "function" then
+		local ok, running = pcall(probe, timer)
+		if not ok then return false, tostring(running) end
+		return true, running == true
+	end
+	if type(probe) == "boolean" then return true, probe end
+	return false, "running-state probe unavailable"
+end
+
+--- Stops and releases the current watchdog only after native state confirms it.
+--- @param reason string Diagnostic reason for the stop.
+--- @return boolean stopped True when no live watchdog remains owned here.
+local function stop_watchdog_timer(reason)
+	local timer = _stream_watchdog_timer
+	if not timer then return true end
+	if type(timer.stop) ~= "function" then
+		Logger.error(LOG, "Cannot stop LLM watchdog for %s: timer has no stop method.", tostring(reason))
+		return false
+	end
+	local stop_ok, stop_err = pcall(timer.stop, timer)
+	if not stop_ok then
+		Logger.error(LOG, "Cannot stop LLM watchdog for %s: %s", tostring(reason), tostring(stop_err))
+		return false
+	end
+	local status_ok, running = timer_running(timer)
+	if not status_ok or running then
+		Logger.error(LOG, "Cannot verify stopped LLM watchdog for %s: %s",
+			tostring(reason), tostring(status_ok and "timer remained running" or running))
+		return false
+	end
+	_stream_watchdog_timer = nil
+	return true
 end
 
 
@@ -146,9 +187,9 @@ end
 --- @return function on_fail Failure callback.
 function M.build_callbacks(ctx)
 	if not require_state("build_callbacks") then
-		-- Return no-op stubs so the caller does not crash
-		local noop = function() end
-		return nil, noop, noop
+		-- An inert callback set would let the backend dispatch and leave the loading
+		-- surface waiting for callbacks that can never publish or dismiss it.
+		return nil, nil, nil
 	end
 
 	local buffer                  = ctx.buffer
@@ -170,13 +211,83 @@ function M.build_callbacks(ctx)
 	local reset_llm_dismiss_timer = ctx.reset_llm_dismiss_timer
 	local pending_ref             = ctx.pending_predictions_ref
 	local visible_ref             = ctx.predictions_visible_ref
+	local runtime_guard           = type(ctx.runtime_available) == "function"
+		and ctx.runtime_available
+		or function() return true end
+
+	-- Action-epoch invalidation can race every backend callback independently of
+	-- the request generation. Treat a missing/throwing answer as closed before
+	-- touching logs, telemetry, prediction pools, or UI.
+	local function runtime_available()
+		local ok, available = pcall(runtime_guard)
+		return ok and available == true
+	end
+
+	--- Reports whether this callback still belongs to the live request.
+	--- @return boolean current True while both runtime and fetch generation match.
+	local function request_is_current()
+		if not runtime_available() then return false end
+		local ok, current_id = pcall(get_fetch_id)
+		return ok and current_id == my_fetch_id
+	end
+
+	--- Propagates one failed UI commit without tearing down a newer request.
+	--- @param stage string UI operation that failed.
+	--- @param detail any Returned value or raised error.
+	--- @return boolean handled True when the current request accepted cleanup.
+	local function reject_ui_commit(stage, detail)
+		Logger.error(LOG, "Tooltip %s did not commit (result: %s).", tostring(stage), tostring(detail))
+		if not request_is_current() then return false end
+		if type(ctx.on_ui_unavailable) ~= "function" then
+			Logger.error(LOG, "Tooltip failure handler is unavailable — request state remains closed locally.")
+			return false
+		end
+		local ok, handled = pcall(ctx.on_ui_unavailable, stage, detail)
+		if not ok then
+			Logger.error(LOG, "Tooltip failure handler raised for '%s': %s", tostring(stage), tostring(handled))
+			return false
+		end
+		return handled == true
+	end
+
+	--- Renders a prediction frame and accepts only a strict successful commit.
+	--- @param stage string Diagnostic stage label.
+	--- @param render_fn function Builds arguments and calls tooltip.show_predictions.
+	--- @return boolean committed True while this request still owns the painted frame.
+	local function render_predictions(stage, render_fn)
+		if not request_is_current() then return false end
+		local ok, result = xpcall(render_fn, debug.traceback)
+		if not ok or result ~= true then
+			reject_ui_commit(stage, result)
+			return false
+		end
+		return request_is_current()
+	end
+
+	--- Commits final-timer and timing-line updates before business state publishes.
+	--- @return boolean committed True when both UI updates committed for this request.
+	local function commit_final_ui()
+		local reset_ok, reset_result = pcall(reset_llm_dismiss_timer)
+		if not reset_ok or reset_result ~= true then
+			reject_ui_commit("dismiss timer reset", reset_result)
+			return false
+		end
+		if not request_is_current() then return false end
+		local timing_ok, timing_result = pcall(_tooltip.mark_chain_complete)
+		if not timing_ok or timing_result ~= true then
+			reject_ui_commit("timing update", timing_result)
+			return false
+		end
+		return request_is_current()
+	end
 
 
 	-- ── Streaming partial callback ────────────────────────────────────────────
 
 	-- on_partial_cb: nil when streaming multi is off (all-at-once mode suppresses interim tokens)
 	local on_partial_cb = (ctx.is_streaming_enabled and is_streaming_multi) and function(partial_raw)
-		if get_fetch_id() ~= my_fetch_id then return end
+		if not runtime_available() then return end
+		if not request_is_current() then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
 
 		local stripped = Parser.strip_thinking(partial_raw)
@@ -232,27 +343,32 @@ function M.build_callbacks(ctx)
 			end
 		end
 
-		pending_ref.value  = new_preds
-		visible_ref.value  = true
-
 		-- Reserve num_predictions slots with "…" so tooltip height stays constant during streaming
-		local current     = _tooltip.get_current_index()
-		local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
-		_tooltip.show_predictions(
-			new_preds, display_idx, ctx.is_ai_preview_enabled, streaming_info_bar,
-			nil, prediction_indent, navigation_mods,
-			_tooltip.tint("ai_prediction"), "…", num_predictions
-		)
+		if not render_predictions("partial render", function()
+			local current     = _tooltip.get_current_index()
+			local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
+			return _tooltip.show_predictions(
+				new_preds, display_idx, ctx.is_ai_preview_enabled, streaming_info_bar,
+				nil, prediction_indent, navigation_mods,
+				_tooltip.tint("ai_prediction"), "…", num_predictions, my_fetch_id
+			)
+		end) then return end
+
+		pending_ref.value = new_preds
+		visible_ref.value = true
 	end or nil
 
 
 	-- ── Success callback ──────────────────────────────────────────────────────
 
 	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+		if not runtime_available() then return end
 		-- Suppress intermediate batches in all-at-once mode (batch_progressive = fetch_batch reveal)
 		if not is_final and not is_streaming_multi and not is_batch_progressive then return end
-		if get_fetch_id() ~= my_fetch_id then
-			Logger.debug(LOG, "Stale LLM callback ignored (expected %d, current %d).", my_fetch_id, get_fetch_id())
+		if not request_is_current() then
+			local _, current_id = pcall(get_fetch_id)
+			Logger.debug(LOG, "Stale LLM callback ignored (expected %d, current %s).",
+				my_fetch_id, tostring(current_id))
 			return
 		end
 		-- Reset the consecutive-failure counter only for non-stale responses; a
@@ -260,9 +376,9 @@ function M.build_callbacks(ctx)
 		-- was dispatched (D4 audit fix — reset moved after the stale guard).
 		_consecutive_llm_failures = 0
 
-		if is_final and _stream_watchdog_timer then
-			_stream_watchdog_timer:stop()
-			_stream_watchdog_timer = nil
+		if is_final and not stop_watchdog_timer("final response") then
+			reject_ui_commit("watchdog cancellation", "timer did not stop")
+			return
 		end
 
 		local front    = hs.application.frontmostApplication()
@@ -289,15 +405,17 @@ function M.build_callbacks(ctx)
 			end
 		end
 
-		-- Evict streaming placeholders — finalized results always supersede them
-		for i = #pending_ref.value, 1, -1 do
-			if pending_ref.value[i] and pending_ref.value[i]._is_stream_placeholder then
-				table.remove(pending_ref.value, i)
+		-- Build a local retained pool. Mutating the live array before paint made a
+		-- failed canvas update delete the only still-visible predictions.
+		local retained_preds = {}
+		for _, existing in ipairs(pending_ref.value) do
+			if existing and not existing._is_stream_placeholder then
+				retained_preds[#retained_preds + 1] = existing
 			end
 		end
 
 		-- Merge: valid_preds leads; pending fills slots the new batch hasn't yet superseded
-		if not is_final and visible_ref.value and #pending_ref.value > 0 then
+		if not is_final and visible_ref.value and #retained_preds > 0 then
 			local merged, merged_keys = {}, {}
 			for _, new_pred in ipairs(valid_preds) do
 				local k = build_dedup_key(new_pred)
@@ -306,7 +424,7 @@ function M.build_callbacks(ctx)
 					table.insert(merged, new_pred)
 				end
 			end
-			for _, existing in ipairs(pending_ref.value) do
+			for _, existing in ipairs(retained_preds) do
 				local k = build_dedup_key(existing)
 				if k == "" or not merged_keys[k] then
 					if k ~= "" then merged_keys[k] = true end
@@ -319,22 +437,15 @@ function M.build_callbacks(ctx)
 		if #valid_preds == 0 then
 			if is_final then
 				Logger.warn(LOG, "No valid predictions after filtering (final batch).")
-				if not visible_ref.value then _tooltip.hide() end
+				if not visible_ref.value then
+					local hide_ok, hide_result = pcall(_tooltip.hide)
+					if not hide_ok or hide_result ~= true then
+						reject_ui_commit("empty-result hide", hide_result)
+					end
+				end
 			end
 			return
 		end
-
-		if is_final then
-			Logger.success(LOG, "%d prediction(s) received in %dms from '%s'.",
-				#valid_preds, elapsed_ms or 0, tostring(model_to_use))
-		else
-			Logger.debug(LOG, "Streaming — %d prediction(s) received (partial batch).", #valid_preds)
-		end
-
-		_keylogger.log_llm_suggested(app_name, #valid_preds)
-
-		pending_ref.value = valid_preds
-		visible_ref.value = true
 
 		local active_profile  = _core_llm.get_active_profile()
 		local display_profile = profile_name or (active_profile and active_profile.label)
@@ -353,17 +464,33 @@ function M.build_callbacks(ctx)
 			loading_text = string.format("%s Enrichissement… %d/%d", frame, #valid_preds, num_predictions)
 		end
 
-		local val_shortcut  = format_validation_shortcut(validation_mods)
-		local selected_idx  = math.min(math.max(1, math.floor(_tooltip.get_current_index() or 1)), #valid_preds)
-		local slot_count    = is_final and #valid_preds or num_predictions
+		local val_shortcut = format_validation_shortcut(validation_mods)
+		local slot_count   = is_final and #valid_preds or num_predictions
 
-		_tooltip.show_predictions(valid_preds, selected_idx, ctx.is_ai_preview_enabled, info_bar_text,
-			val_shortcut, prediction_indent, navigation_mods, _tooltip.tint("ai_prediction"),
-			loading_text, slot_count)
+		if not render_predictions(is_final and "final render" or "stream render", function()
+			local selected_idx = math.min(
+				math.max(1, math.floor(_tooltip.get_current_index() or 1)),
+				#valid_preds
+			)
+			return _tooltip.show_predictions(
+				valid_preds, selected_idx, ctx.is_ai_preview_enabled, info_bar_text,
+				val_shortcut, prediction_indent, navigation_mods, _tooltip.tint("ai_prediction"),
+				loading_text, slot_count, my_fetch_id
+			)
+		end) then return end
+
+		if is_final and not commit_final_ui() then return end
+		if not request_is_current() then return end
+
+		pending_ref.value = valid_preds
+		visible_ref.value = true
+		_keylogger.log_llm_suggested(app_name, #valid_preds)
 
 		if is_final then
-			reset_llm_dismiss_timer()
-			pcall(_tooltip.mark_chain_complete)
+			Logger.success(LOG, "%d prediction(s) received in %dms from '%s'.",
+				#valid_preds, elapsed_ms or 0, tostring(model_to_use))
+		else
+			Logger.debug(LOG, "Streaming — %d prediction(s) received (partial batch).", #valid_preds)
 		end
 	end
 
@@ -371,13 +498,14 @@ function M.build_callbacks(ctx)
 	-- ── Failure callback ──────────────────────────────────────────────────────
 
 	local function on_fail()
-		if get_fetch_id() ~= my_fetch_id then return end
+		if not runtime_available() then return end
+		if not request_is_current() then return end
 
 		-- Cancel the watchdog so a stale timer cannot fire show_predictions
 		-- with empty/partial data after the request has already failed
-		if _stream_watchdog_timer then
-			_stream_watchdog_timer:stop()
-			_stream_watchdog_timer = nil
+		if not stop_watchdog_timer("request failure") then
+			reject_ui_commit("watchdog cancellation", "timer did not stop")
+			return
 		end
 
 		-- Track consecutive failures to detect persistent issues (e.g. server
@@ -403,16 +531,22 @@ function M.build_callbacks(ctx)
 
 		if not visible_ref.value then
 			Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
-			_tooltip.hide()
+			local hide_ok, hide_result = pcall(_tooltip.hide)
+			if not hide_ok or hide_result ~= true then
+				reject_ui_commit("failure hide", hide_result)
+			end
 		else
 			Logger.warn(LOG, "LLM request failed — n-gram placeholder retained, loading text cleared.")
 			local val_shortcut = format_validation_shortcut(validation_mods)
-			local selected_idx = math.max(1, _tooltip.get_current_index() or 1)
-			_tooltip.show_predictions(pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
-				val_shortcut, prediction_indent, navigation_mods,
-				_tooltip.tint("ai_prediction"), nil, #pending_ref.value)
-			reset_llm_dismiss_timer()
-			pcall(_tooltip.mark_chain_complete)
+			if not render_predictions("failure fallback render", function()
+				local selected_idx = math.max(1, _tooltip.get_current_index() or 1)
+				return _tooltip.show_predictions(
+					pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
+					val_shortcut, prediction_indent, navigation_mods,
+					_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id
+				)
+			end) then return end
+			commit_final_ui()
 		end
 	end
 
@@ -432,36 +566,93 @@ end
 ---
 --- @param ctx table Context table (see source for full field list).
 function M.arm_watchdog(ctx)
-	if not require_state("arm_watchdog") then return end
+	if not require_state("arm_watchdog") then return false end
 
-	if _stream_watchdog_timer then _stream_watchdog_timer:stop() end
+	if not stop_watchdog_timer("replacement") then return false end
 
 	local my_fetch_id   = ctx.my_fetch_id
 	local get_fetch_id  = ctx.get_fetch_id
 	local pending_ref   = ctx.pending_predictions_ref
 	local visible_ref   = ctx.predictions_visible_ref
+	local runtime_guard = type(ctx.runtime_available) == "function"
+		and ctx.runtime_available
+		or function() return true end
 
-	_stream_watchdog_timer = hs.timer.doAfter(STREAM_WATCHDOG_SEC, function()
-		if get_fetch_id() ~= my_fetch_id or not visible_ref.value then return end
-		Logger.warn(LOG, "Watchdog triggered: stream stalled for %gs — surfacing partial results.", STREAM_WATCHDOG_SEC)
-		local val_shortcut = format_validation_shortcut(ctx.validation_mods)
-		local info = ctx.show_info_bar
-			and ctx.build_info_bar_text(ctx.llm_display_name, nil, ctx.resolve_backend_label(), "Timeout partiel")
-			or nil
-		_tooltip.show_predictions(
-			pending_ref.value, 1, ctx.is_ai_preview_enabled, info,
-			val_shortcut, ctx.prediction_indent, ctx.navigation_mods,
-			_tooltip.tint("ai_prediction"), nil, #pending_ref.value
-		)
+	local function runtime_available()
+		local ok, available = pcall(runtime_guard)
+		return ok and available == true
+	end
+
+	--- Reports whether this watchdog still belongs to the live request.
+	--- @return boolean current True while runtime and fetch generation match.
+	local function request_is_current()
+		if not runtime_available() then return false end
+		local ok, current_id = pcall(get_fetch_id)
+		return ok and current_id == my_fetch_id
+	end
+
+	--- Propagates a watchdog repaint failure only to its current owner.
+	--- @param detail any Returned value or raised error.
+	local function reject_watchdog_ui(detail)
+		Logger.error(LOG, "Tooltip watchdog render did not commit (result: %s).", tostring(detail))
+		if not request_is_current() or type(ctx.on_ui_unavailable) ~= "function" then return end
+		local ok, err = pcall(ctx.on_ui_unavailable, "watchdog render", detail)
+		if not ok then
+			Logger.error(LOG, "Tooltip failure handler raised for watchdog render: %s", tostring(err))
+		end
+	end
+
+	-- Declare before the closure so it captures the local timer rather than a nil
+	-- global if the callback later needs to release its own one-shot handle.
+	local watchdog_timer
+	local create_ok, created_or_err = pcall(hs.timer.doAfter, STREAM_WATCHDOG_SEC, function()
+		local callback_ok, callback_err = xpcall(function()
+			if not request_is_current() then return end
+			if not visible_ref.value or #pending_ref.value == 0 then
+				Logger.warn(LOG, "Watchdog triggered: stream produced no visible result for %gs.",
+					STREAM_WATCHDOG_SEC)
+				reject_watchdog_ui("no committed partial prediction")
+				return
+			end
+			Logger.warn(LOG, "Watchdog triggered: stream stalled for %gs — surfacing partial results.", STREAM_WATCHDOG_SEC)
+			local val_shortcut = format_validation_shortcut(ctx.validation_mods)
+			local info = ctx.show_info_bar
+				and ctx.build_info_bar_text(ctx.llm_display_name, nil, ctx.resolve_backend_label(), "Timeout partiel")
+				or nil
+			local render_result = _tooltip.show_predictions(
+				pending_ref.value, 1, ctx.is_ai_preview_enabled, info,
+				val_shortcut, ctx.prediction_indent, ctx.navigation_mods,
+				_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id
+			)
+			if render_result ~= true then reject_watchdog_ui(render_result) end
+		end, debug.traceback)
+		if not callback_ok then reject_watchdog_ui(callback_err) end
+		if _stream_watchdog_timer == watchdog_timer then _stream_watchdog_timer = nil end
 	end)
+	if not create_ok then
+		Logger.error(LOG, "Cannot create LLM stream watchdog: %s", tostring(created_or_err))
+		return false
+	end
+	watchdog_timer = created_or_err
+	if not watchdog_timer or type(watchdog_timer.stop) ~= "function" then
+		Logger.error(LOG, "Cannot create LLM stream watchdog: invalid timer object.")
+		return false
+	end
+	local status_ok, running = timer_running(watchdog_timer)
+	if not status_ok or not running then
+		pcall(watchdog_timer.stop, watchdog_timer)
+		Logger.error(LOG, "Cannot verify started LLM stream watchdog: %s",
+			tostring(status_ok and "timer did not start" or running))
+		return false
+	end
+	_stream_watchdog_timer = watchdog_timer
+	return true
 end
 
 --- Stops the active watchdog timer if one is armed.
 function M.stop_watchdog()
-	if _stream_watchdog_timer then
-		_stream_watchdog_timer:stop()
-		_stream_watchdog_timer = nil
-	end
+	if not require_state("stop_watchdog") then return false end
+	return stop_watchdog_timer("explicit stop")
 end
 
 --- Resets the consecutive failure counter (called when LLM is re-enabled or model changes).
@@ -481,32 +672,38 @@ end
 --- Initializes the streaming handler with its required dependencies.
 --- Must be called exactly once before any other function.
 --- @param deps table Must contain: core_llm (table), tooltip (table), keylogger (table).
+--- @return boolean committed True only when every dependency is ready.
 function M.init(deps)
 	Logger.start(LOG, "Initializing…")
 	if type(deps) ~= "table" then
 		Logger.error(LOG, "M.init(): deps must be a table — module non-functional.")
-		return
+		return false
 	end
 	if _core_llm then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _core_llm == deps.core_llm and _tooltip == deps.tooltip and _keylogger == deps.keylogger then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
 	end
 	if type(deps.core_llm) ~= "table" then
 		Logger.error(LOG, "M.init(): deps.core_llm must be a table — module non-functional.")
-		return
+		return false
 	end
 	if type(deps.tooltip) ~= "table" then
 		Logger.error(LOG, "M.init(): deps.tooltip must be a table — module non-functional.")
-		return
+		return false
 	end
 	if type(deps.keylogger) ~= "table" then
 		Logger.error(LOG, "M.init(): deps.keylogger must be a table — module non-functional.")
-		return
+		return false
 	end
 	_core_llm  = deps.core_llm
 	_tooltip   = deps.tooltip
 	_keylogger = deps.keylogger
 	Logger.success(LOG, "Initialized.")
+	return true
 end
 
 return M

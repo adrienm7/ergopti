@@ -1,6 +1,13 @@
 --- _shared/lua/compat/utf8.lua
 
+
 --- ==============================================================================
+
+-- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
+-- unless the build enabled 5.2 compatibility, which the one CI and the Linux
+-- daemon run does not. Resolved once here rather than at each call site, and
+-- table-first so a 5.4 interpreter keeps using the modern spelling.
+local table_unpack = table.unpack or unpack
 --- MODULE: UTF-8 Compatibility Shim (for LuaJIT)
 --- DESCRIPTION:
 --- Pure-Lua reimplementation of Lua 5.3's built-in `utf8` library for runtimes
@@ -176,7 +183,7 @@ local function utf8_codepoint(s, i, j)
 		end
 		if cp_idx >= j then break end
 	end
-	return table.unpack(results)
+	return table_unpack(results)
 end
 
 --- Installs the shim as the global `utf8` table. Safe to call multiple times

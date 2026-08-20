@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Wizard constants and shared state, the public entry points that launch / resume the first-run wizard, the AltGr-neutralisation guard used by other modules #HotIf criteria, and the i18n live-preview helpers.
 ;
-; Split out of the former lib/onboarding.ahk (P5 refactor); see
+; Split out of the former infra/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the onboarding/*.ahk files is irrelevant.
 ; ==============================================================================
@@ -14,11 +14,11 @@
 
 
 
-; ================================================
+; =============================================
 ; =============================================
 ; ======= 1/ Constants and wizard state =======
 ; =============================================
-; ================================================
+; =============================================
 
 ; Default locale index within I18N_LOCALES (1-based; English is index 4 — see
 ; the table in i18n.ahk: ar, cs, da, de, en, …). Pre-selecting English mirrors
@@ -112,7 +112,7 @@ global _ob_s1_debounce_ms := 120   ; delay after last ItemSelect before re-rende
 global _OB_ALTGR_PASSTHROUGH := false
 
 ; Public check used by other modules' #HotIf criteria to neutralise any
-; AltGr-capturing hotkey (e.g. the RAlt tap-hold in modules/tap_holds.ahk)
+; AltGr-capturing hotkey (e.g. the RAlt tap-hold in platform/remap.ahk)
 ; while the wizard is on screen. Standalone hotkeys disappear cleanly when
 ; their #HotIf returns false, restoring the OS-native AltGr typing path.
 IsOnboardingActive() {
@@ -124,11 +124,11 @@ IsOnboardingActive() {
 
 
 
-; =========================================
+; ======================================
 ; ======================================
 ; ======= 2/ Public entry points =======
 ; ======================================
-; =========================================
+; ======================================
 
 ; Run the wizard only when config.toml does not yet exist.
 ; Called at startup before features are loaded.
@@ -187,11 +187,11 @@ Onboarding_ShowFromMenu(*) {
 
 
 
-; ===============================================
+; =======================================
 ; =======================================
 ; ======= 3/ i18n preview helpers =======
 ; =======================================
-; ===============================================
+; =======================================
 
 ; Resolve a translation key in a target locale WITHOUT touching the active
 ; locale cache. Used by step 1 so the heading/title/button can be re-rendered

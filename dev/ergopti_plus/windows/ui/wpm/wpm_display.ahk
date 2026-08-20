@@ -17,11 +17,11 @@
 
 
 
-; ===================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ===================================
+; ============================
 
 class WPMWidgetConst {
     ; ── Values loaded at runtime from _shared/modules/wpm_widget/constants.toml ──────────
@@ -197,11 +197,11 @@ class WPMWidget {
 
 
 
-; ============================================
+; ======================================
 ; ======================================
 ; ======= 3/ Ring buffer helpers =======
 ; ======================================
-; ============================================
+; ======================================
 
 ; Categories whose expansions must not color the widget (no visible tooltip,
 ; or ergonomic substitutions that should stay at the default blue color).
@@ -214,48 +214,56 @@ _WPMWidget_NeutralCategory(category) {
 ;   Pass "" for manual keystrokes or when the category is unknown.
 ;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.
 WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
-    if !WPMWidget.visible
-        return
-    ; Neutral categories count as keystrokes but must not trigger HS color.
-    if (is_hs and _WPMWidget_NeutralCategory(category))
-        is_hs := false
-    cap  := WPMWidgetConst.RING_CAP
-    head := WPMWidget._ring_head
-    entry := Map("t", A_TickCount, "hs", is_hs, "ai", is_ai, "ac", is_ac)
-    ; Guard the ring mutation so the WPMWidget_Calc enumeration (running on the
-    ; tick timer) can never observe a half-grown array or a slot written mid-walk.
-    ; The region has no Send/Sleep/blocking call, so Critical cannot starve the hook.
-    RingCritical := Critical("On")
-    try {
-        if (WPMWidget._ring.Length < cap)
-            WPMWidget._ring.Push(entry)
-        else
-            WPMWidget._ring[head + 1] := entry
-        WPMWidget._ring_head := Mod(head + 1, cap)
-    } finally {
-        ; Preserve an outer injection transaction. Unconditionally switching
-        ; Critical off here would let the next hook callback interleave with it.
-        Critical(RingCritical)
-    }
-    now_t := A_TickCount
-    WPMWidget._last_tick     := now_t
-    WPMWidget._last_input_ms := now_t
-    WPMWidget._last_hs   := is_hs
-    WPMWidget._last_ai   := is_ai
-    WPMWidget._last_ac   := is_ac
-    if is_hs {
-        WPMWidget._last_hs_tick     := now_t
-        WPMWidget._last_hs_category := (category != "") ? category : "magickey"
-        WPMWidget._last_hs_section  := section
-        ; Per-keystroke hot path — gate the arg-array build behind the cached flag
-        ; so nothing is interpolated when DEBUG is off (logger.ahk convention).
-        if LoggerIsDebugEnabled()
-            LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, WPMWidget._last_hs_category)
-    }
-    if is_ai
-        WPMWidget._last_ai_tick := now_t
-    if is_ac
-        WPMWidget._last_ac_tick := now_t
+	; WPM pushes can originate from the deferred fire-log timer, which native
+	; Suspend does not disarm. Guard before the ring/timestamp mutations so a
+	; stale callback cannot repaint pre-pause activity after resume.
+	if A_IsSuspended
+		return
+	if !WPMWidget.visible
+		return
+	; Neutral categories count as keystrokes but must not trigger HS color.
+	if (is_hs and _WPMWidget_NeutralCategory(category))
+		is_hs := false
+	cap := WPMWidgetConst.RING_CAP
+	now_t := A_TickCount
+	entry := Map("t", now_t, "hs", is_hs, "ai", is_ai, "ac", is_ac)
+	; Pair the second pause check with every ring/timestamp mutation. Helpers above
+	; may yield, while this region contains no Send/Sleep/I/O/logger call and stays
+	; bounded regardless of replacement length.
+	RingCritical := Critical("On")
+	try {
+		if A_IsSuspended or !WPMWidget.visible
+			return
+		head := WPMWidget._ring_head
+		if (WPMWidget._ring.Length < cap)
+			WPMWidget._ring.Push(entry)
+		else
+			WPMWidget._ring[head + 1] := entry
+		WPMWidget._ring_head := Mod(head + 1, cap)
+		WPMWidget._last_tick := now_t
+		WPMWidget._last_input_ms := now_t
+		WPMWidget._last_hs := is_hs
+		WPMWidget._last_ai := is_ai
+		WPMWidget._last_ac := is_ac
+		if is_hs {
+			WPMWidget._last_hs_tick := now_t
+			WPMWidget._last_hs_category := (category != "") ? category : "magickey"
+			WPMWidget._last_hs_section := section
+			StoredCategory := WPMWidget._last_hs_category
+		}
+		if is_ai
+			WPMWidget._last_ai_tick := now_t
+		if is_ac
+			WPMWidget._last_ac_tick := now_t
+	} finally {
+		; Preserve an outer injection transaction. Unconditionally switching
+		; Critical off here would let the next hook callback interleave with it.
+		Critical(RingCritical)
+	}
+	; Per-keystroke hot path — gate the arg-array build behind the cached flag so
+	; nothing is interpolated when DEBUG is off (logger.ahk convention).
+	if is_hs and LoggerIsDebugEnabled()
+		LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, StoredCategory)
 }
 
 
@@ -587,11 +595,11 @@ WPMWidget_ShowPos(&out_x, &out_y) {
 
 
 
-; ============================================
+; ==============================
 ; ==============================
 ; ======= 6/ Show / Hide =======
 ; ==============================
-; ============================================
+; ==============================
 
 ; Applies the widget's geometry to a surface Gui: seeds the saved anchor on first
 ; use, derives the current mode's top-left from it and sizes + positions the
@@ -736,26 +744,15 @@ WPMWidget_Hide() {
     try LoggerDone("WPMWidget", "Widget hidden.")
 }
 
-WPMWidget_Toggle() {
-    TargetVisible := !WPMWidget.visible
-    if !WPMWidget_SaveVisible(TargetVisible)
-        return false
-    if WPMWidget.visible
-        WPMWidget_Hide()
-    else
-        WPMWidget_Show()
-    return true
-}
 
 
 
 
-
-; ============================================
+; =========================================
 ; =========================================
 ; ======= 7/ Tick — refresh display =======
 ; =========================================
-; ============================================
+; =========================================
 
 WPMWidget_Tick() {
     if !WPMWidget.visible

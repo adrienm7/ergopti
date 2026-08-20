@@ -43,7 +43,10 @@ local helpers = require("tests.helpers")
 
 --- Loads the onboarding module.
 --- @return table The onboarding module.
-local function load_onboarding()
+local function load_onboarding(file_system)
+	package.loaded["adapters.file_system"] = file_system or {
+		read_with_status = function() return nil, "absent" end,
+	}
 	package.loaded["ui.onboarding"] = nil
 	return helpers.load_with_stubs("ui.onboarding")
 end
@@ -113,5 +116,22 @@ helpers.describe("onboarding surfaces a write that failed without raising", func
 
 		helpers.assert_true(ok == true,
 			"a writer returning true must be reported as success, otherwise no first run can complete")
+	end)
+
+	helpers.it("refuses a dangling destination before invoking batch_write", function()
+		local writes = 0
+		local Onb = load_onboarding({
+			read_with_status = function()
+				return nil, "error", "dangling final symlink"
+			end,
+		})
+		local ok, err = Onb._commit_write({
+			batch_write = function() writes = writes + 1; return true end,
+		}, "/tmp/dangling-config.toml", {})
+
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(writes, 0,
+			"onboarding must not let a lower writer replace a dangling symlink")
+		helpers.assert_true(type(err) == "string" and err:find("dangling", 1, true) ~= nil)
 	end)
 end)

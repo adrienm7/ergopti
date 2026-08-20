@@ -18,11 +18,11 @@ local M = {}
 
 local hs         = hs
 local keylogger  = require("modules.keylogger")
-local EventTapGuard = require("adapters.event_tap_guard")
 local WPMShared  = require("ui.wpm.shared")
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
 local GraphicsRenderer = require("adapters.graphics_renderer")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "wpm_widget"
 
@@ -194,6 +194,7 @@ local _canvas            = nil
 local _timer             = nil
 local _mouse_tap         = nil   -- hs.eventtap watching mouse/touchpad events
 local _running           = false -- true between start() and stop(); guards redundant restarts
+local _generation        = 0
 local _wpm_history       = {}
 local _show_graph        = false
 local _use_source_colors = true
@@ -533,7 +534,7 @@ update_widget_body = function()
 				frame = { x = 0, y = strip_y, w = canvas_width, h = h_unit },
 			})
 
-			local ok_i18n, i18n = pcall(require, "lib.i18n")
+			local ok_i18n, i18n = pcall(require, "infra.i18n")
 			local unit_label = (ok_i18n and type(i18n.get) == "function") and i18n.get("menu.metrics.wpm_unit") or "MPM"
 
 			-- WPM number — vertically centred in the upper zone.
@@ -561,6 +562,51 @@ update_widget_body = function()
 	end
 end
 
+--- Releases the exact recurring timer while retaining refused cleanup debt.
+--- @return boolean settled True only when no native timer remains owned.
+local function release_timer()
+	if not _timer then return true end
+	local handle = _timer
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "WPM widget timer cleanup failed; exact handle retained: %s.",
+			tostring(ok and settled or settled))
+		return false
+	end
+	if _timer == handle then _timer = nil end
+	return true
+end
+
+--- Releases the exact mouse eventtap while retaining refused cleanup debt.
+--- @return boolean settled True only when no native eventtap remains owned.
+local function release_mouse_tap()
+	if not _mouse_tap then return true end
+	local tap = _mouse_tap
+	local ok, stopped = xpcall(function()
+		if type(tap.stop) ~= "function" then error("mouse eventtap has no stop method") end
+		tap:stop()
+		if type(tap.isEnabled) ~= "function" then error("mouse eventtap has no state probe") end
+		return tap:isEnabled()
+	end, debug.traceback)
+	if not ok or stopped ~= false then
+		Logger.error(LOG, "WPM widget mouse eventtap cleanup failed; exact handle retained: %s.",
+			tostring(ok and stopped or stopped))
+		return false
+	end
+	if _mouse_tap == tap then _mouse_tap = nil end
+	return true
+end
+
+--- Releases both runtime capabilities without hiding a sibling cleanup failure.
+--- @return boolean settled True only when both exact capabilities were released.
+local function release_runtime()
+	local timer_stopped = release_timer()
+	local tap_stopped = release_mouse_tap()
+	return timer_stopped and tap_stopped
+end
+
 
 
 
@@ -573,26 +619,51 @@ end
 
 --- Starts the floating widget loop.
 --- @param show_graph boolean Whether to draw the history curve.
+--- @return boolean committed True only when both polling capabilities are active.
 function M.start(show_graph)
 	local want_graph = show_graph or false
 	-- Idempotent: the menu tree rebuild re-invokes start() on every refresh. Skip the
 	-- redundant timer restart and full canvas re-render when already running with the
 	-- same graph mode — the 0.2 s timer already keeps the display fresh. Only a real
 	-- graph-mode change falls through to redraw immediately.
-	if _running and _show_graph == want_graph then return end
+	if _running and _show_graph == want_graph then return true end
+	if _running then
+		_show_graph = want_graph
+		update_widget()
+		return true
+	end
 	Logger.debug(LOG, "Starting floating WPM widget…")
+	if not release_runtime() then
+		Logger.error(LOG, "WPM widget start refused: prior cleanup remains pending.")
+		return false
+	end
 	_show_graph = want_graph
-	if not _timer then _timer = hs.timer.new(0.2, update_widget) end
-	_timer:start()
+	_generation = _generation + 1
+	local generation = _generation
+	local timer_ok, timer_candidate, timer_committed = xpcall(function()
+		return TimerScheduler.every(0.2, function()
+			if not _running or generation ~= _generation then return end
+			update_widget()
+		end)
+	end, debug.traceback)
+	if type(timer_candidate) == "table" then _timer = timer_candidate end
+	if not timer_ok or type(timer_candidate) ~= "table" or timer_committed ~= true then
+		_generation = _generation + 1
+		release_timer()
+		Logger.error(LOG, "WPM widget timer acquisition failed: %s.",
+			tostring(timer_ok and timer_committed or timer_candidate))
+		return false
+	end
+
 	-- Watch all mouse/touchpad events to know when to hide the widget.
-	if not _mouse_tap then
-		_mouse_tap = hs.eventtap.new({
+	local tap_ok, tap_candidate = xpcall(function()
+		return hs.eventtap.new({
 			hs.eventtap.event.types.mouseMoved,
 			hs.eventtap.event.types.leftMouseDown,
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,
 		}, function(e)
-			if EventTapGuard.handle_disabled(e, _mouse_tap, "wpm.mouse") then return false end
+			if not _running or generation ~= _generation then return false end
 			local now = hs.timer.absoluteTime() / 1000000000
 			local is_move = e:getType() == hs.eventtap.event.types.mouseMoved
 			-- Throttle mouseMoved: only update at most every MOUSE_MOVE_THROTTLE_SEC.
@@ -602,24 +673,51 @@ function M.start(show_graph)
 			end
 			return false  -- do not consume the event
 		end)
-		_mouse_tap:start()
+	end, debug.traceback)
+	if not tap_ok or tap_candidate == nil or tap_candidate == false then
+		_generation = _generation + 1
+		release_timer()
+		Logger.error(LOG, "WPM widget mouse eventtap construction failed: %s.",
+			tostring(tap_candidate))
+		return false
+	end
+	_mouse_tap = tap_candidate
+	local start_ok, started = xpcall(function()
+		if type(tap_candidate.start) ~= "function" then error("mouse eventtap has no start method") end
+		tap_candidate:start()
+		if type(tap_candidate.isEnabled) ~= "function" then error("mouse eventtap has no state probe") end
+		return tap_candidate:isEnabled()
+	end, debug.traceback)
+	if not start_ok or started ~= true then
+		_generation = _generation + 1
+		release_runtime()
+		Logger.error(LOG, "WPM widget mouse eventtap start failed: %s.",
+			tostring(start_ok and started or started))
+		return false
 	end
 	_running = true
 	update_widget()
 	Logger.info(LOG, "Floating WPM widget started successfully.")
+	return true
 end
 
 --- Halts the widget and clears the screen.
+--- @return boolean settled True only when both polling capabilities were released.
 function M.stop()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
-	if not _running and not _timer and not _mouse_tap and not _canvas then return end
+	if not _running and not _timer and not _mouse_tap and not _canvas then return true end
 	Logger.debug(LOG, "Stopping floating WPM widget…")
 	_running = false
-	if _timer then _timer:stop(); _timer = nil end
-	if _mouse_tap then _mouse_tap:stop(); _mouse_tap = nil end
+	_generation = _generation + 1
+	local runtime_stopped = release_runtime()
 	if _canvas then _canvas:delete(); _canvas = nil end
+	if not runtime_stopped then
+		Logger.error(LOG, "WPM widget stop incomplete: runtime cleanup remains pending.")
+		return false
+	end
 	Logger.info(LOG, "Floating WPM widget stopped.")
+	return true
 end
 
 --- Resets the widget to its default bottom-right position.

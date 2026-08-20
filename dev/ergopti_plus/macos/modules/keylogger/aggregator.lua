@@ -23,7 +23,7 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local LOG    = "keylogger.aggregator"
 
 local S      = require("modules.keylogger.aggregator.state")
@@ -35,11 +35,11 @@ local Sql    = require("modules.keylogger.aggregator.sql")
 
 
 
--- ===============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ===============================
+-- =============================
 
 M.reset_batch    = C.reset_batch
 M.has_pending_batch = C.has_pending_batch
@@ -60,11 +60,11 @@ M.flush = Sql.flush
 
 
 
--- ==================================
+-- ==============================
 -- ==============================
 -- ======= 2/ Initializer =======
 -- ==============================
--- ==================================
+-- ==============================
 
 --- Initialize the aggregator with the device id.
 --- @param deps table Must contain: device_id (string).

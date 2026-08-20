@@ -10,10 +10,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "ui/menu/menu_paths.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("menu_paths.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/menu/menu_paths.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("function M.persist_config_dir_for_wizard")
+helpers.assert_true(src ~= nil, "ui/menu/menu_paths.lua source must be locatable")
 
 -- Test 1: No Logger call may contain a {N} placeholder.
 -- Search for the patterns '{1}' or '{2}' or '{3}' as literal strings.

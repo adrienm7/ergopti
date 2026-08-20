@@ -72,7 +72,7 @@ helpers.describe("profiles_manager: custom profile Edit/Delete rows are pause-ga
 	helpers.it("Edit and Delete rows are disabled=true when paused", function()
 		ensure_real_llm_module()
 		local ProfilesManager = helpers.load_with_stubs("ui.menu.menu_llm.profiles_manager")
-		local i18n = require("lib.i18n")
+		local i18n = require("infra.i18n")
 		-- The real i18n stub from load_with_stubs returns the key verbatim, so
 		-- we can match on the canonical key strings below.
 
@@ -102,7 +102,7 @@ helpers.describe("profiles_manager: custom profile Edit/Delete rows are pause-ga
 	helpers.it("Edit and Delete rows are enabled when not paused (positive control)", function()
 		ensure_real_llm_module()
 		local ProfilesManager = helpers.load_with_stubs("ui.menu.menu_llm.profiles_manager")
-		local i18n = require("lib.i18n")
+		local i18n = require("infra.i18n")
 
 		local deps = make_deps(false)
 		local mgr = ProfilesManager.new(deps, nil)

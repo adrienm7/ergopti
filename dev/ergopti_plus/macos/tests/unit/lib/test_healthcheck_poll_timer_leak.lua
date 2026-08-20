@@ -12,10 +12,11 @@
 local helpers = require("tests.helpers")
 
 -- After the F2 split, the poll-timer / window logic lives in core.lua.
-local src_path = helpers.driver_root() .. "ui/healthcheck/core.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("healthcheck core.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/healthcheck/core.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function _stop_poll")
+helpers.assert_true(src ~= nil, "ui/healthcheck/core.lua source must be locatable")
 
 -- Test 1: _poll_timer must be declared at module level (before any function).
 -- A module-level local appears before the first `function` or `local function`
@@ -39,11 +40,13 @@ helpers.assert_true(
 
 -- Test 3: _stop_poll() is called in the window-reopen cleanup path — i.e.,
 -- inside the `if _window then` block — so the OLD timer is stopped before the
--- old webview is deleted. The cleanup pattern: _stop_poll() then _window:delete().
-local window_cleanup = src:find("_stop_poll()\n\t\tpcall(function() _window:delete()", 1, true)
-	or src:find("_stop_poll()\r\n\t\tpcall(function() _window:delete()", 1, true)
+-- old webview is deleted. Compare semantic anchors so retained-cleanup logging
+-- between the two operations cannot turn this test into a spelling pin.
+local reopen_start = src:find("if _window then", 1, true)
+local stop_poll = reopen_start and src:find("_stop_poll()", reopen_start, true)
+local delete_previous = reopen_start and src:find("previous:delete()", reopen_start, true)
 helpers.assert_true(
-	window_cleanup ~= nil,
+	stop_poll ~= nil and delete_previous ~= nil and stop_poll < delete_previous,
 	"healthcheck.lua must call _stop_poll() before deleting the old window (lib-health-1 reopen cleanup)"
 )
 

@@ -6,7 +6,7 @@
 ; Covers the generated Terminators class (_generated/terminators.ahk) - the
 ; single source of truth for the word-expander catalogue, shared verbatim with
 ; the macOS driver through _shared/core/domain/Terminators.spec.js - and the pure
-; word-delimiter helpers in lib/hotstrings/hotstrings_config.ahk that the tray
+; word-delimiter helpers in infra/hotstrings/hotstrings_config.ahk that the tray
 ; submenu and the config window both build on.
 ;
 ; FEATURES & RATIONALE:

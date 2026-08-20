@@ -9,8 +9,8 @@
 ---
 --- This module is driver-agnostic — the caller injects a JSON decoder, a path
 --- resolver closure, and optional log functions via M.init(). The macOS driver
---- (macos/lib/locale.lua) injects hs.json.decode + Paths.shared; the Linux
---- driver (linux/lib/locale.lua) injects a vendored JSON decoder + a
+--- (macos/infra/locale.lua) injects hs.json.decode + Paths.shared; the Linux
+--- driver (linux/infra/locale.lua) injects a vendored JSON decoder + a
 --- debug.getinfo-based path walker. Both wrappers re-export the same public
 --- surface so callers do not change.
 ---
@@ -174,11 +174,12 @@ end
 
 
 
--- ============================
+
+-- =============================
 -- =============================
 -- ======= 3/ Public API =======
 -- =============================
--- ============================
+-- =============================
 
 --- Returns the translated string for the given dot-notation key,
 --- with ★ substituted for the current trigger character.

@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: AHK Brace Balance Validation Test
 ; DESCRIPTION:
-; Meta-test that verifies every AHK source file under lib/ and modules/ has
+; Meta-test that verifies every AHK source file under infra/ and modules/ has
 ; perfectly balanced curly braces after stripping string literals, line
 ; comments, and block comments.
 ;
@@ -163,7 +163,7 @@ _MetaRunBraceBalanceTests() {
 	NormRoot := StrReplace(DriverRoot, "\", "/")
 	Checked := 0
 
-	for Sub in ["lib", "modules", "ui"] {
+	for Sub in ["infra", "modules", "platform", "ui"] {
 		for AbsPath in _MetaBrace_ListFiles(StrReplace(DriverRoot . Sub, "/", "\")) {
 			Checked++
 			Test("brace balance: " . RegExReplace(AbsPath, ".*[/\\]"),

@@ -13,8 +13,8 @@
 local helpers = require("tests.helpers")
 
 -- hotstrings_config logs through lib.logger; load it first under the stub.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Build a unique writable temp path (the module itself creates the file).
 --- @param name string A short discriminator so concurrent cases never collide.
@@ -29,6 +29,7 @@ end
 --- @param path string The override file path.
 --- @return table The freshly-initialised module.
 local function fresh_module(path)
+	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = path, toml_resolver = function() return nil end })

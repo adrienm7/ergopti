@@ -62,8 +62,8 @@ local function load_keymap_capturing_taps()
 	-- diagnose. Running this file alone would pass; the suite would not.
 	local to_wipe = {
 		"ui.tooltip",
-		"lib.text_utils",
-		"lib.logger",
+		"infra.text_utils",
+		"infra.logger",
 		"modules.keylogger",
 		"modules.hotstrings.hotstrings_config",
 	}
@@ -122,9 +122,35 @@ helpers.describe("keymap lifecycle: a stop/start cycle preserves runtime hooks",
 		end)
 
 		-- The disable/enable round-trip the menu performs.
-		KM.start()
+		helpers.assert_true(KM.start())
+		local original_focused_window = hs.window.focusedWindow
+		hs.window.focusedWindow = function()
+			local function watcher()
+				return {
+					start = function(self) return self end,
+					stop = function(self) return self end,
+				}
+			end
+			local app = {
+				pid = function() return 9001 end,
+				name = function() return "Test App" end,
+				newWatcher = function() return watcher() end,
+			}
+			return {
+				id = function() return 17 end,
+				application = function() return app end,
+				newWatcher = function() return watcher() end,
+				title = function() return "Normal Editor" end,
+			}
+		end
+		local Utils = require("modules.keymap.utils")
+		helpers.assert_true(Utils.prewarm_ignored_win_watchers({}, {}),
+			"the fixture must establish a known-normal cache off the eventtap")
+		-- This fixture does not emulate native canvas commitment; stop() may report
+		-- that unrelated tooltip teardown as incomplete, but it must still preserve
+		-- the registered hook tables for the subsequent feature restart.
 		KM.stop()
-		KM.start()
+		helpers.assert_true(KM.start())
 
 		local key_tap = taps[1]
 		helpers.assert_not_nil(key_tap, "the keyDown tap must have been created")
@@ -132,6 +158,7 @@ helpers.describe("keymap lifecycle: a stop/start cycle preserves runtime hooks",
 
 		-- Drive a real keystroke through the tap callback.
 		key_tap.callback(fake_key_event("a"))
+		hs.window.focusedWindow = original_focused_window
 		helpers.assert_true(interceptor_calls > 0,
 			"the interceptor registered at boot must still run after a stop/start cycle — "
 			.. "wiping CoreState.interceptors in stop() kills @-tag expansion permanently")

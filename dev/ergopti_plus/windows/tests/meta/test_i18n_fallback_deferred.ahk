@@ -16,7 +16,7 @@
 ;   t(). If a future edit reverts I18nPreload to the all-locales path, boot
 ;   re-inflates: caught here.
 ;
-; SCOPE: source introspection of lib/i18n.ahk + ErgoptiPlus.ahk (not loaded by
+; SCOPE: source introspection of infra/i18n.ahk + ErgoptiPlus.ahk (not loaded by
 ;   the headless runner).
 ; ==============================================================================
 
@@ -35,8 +35,8 @@
 _MetaCheckI18nFallbackDeferred() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 
-	I18n := _DriverDirConcat("lib")
-	Assert(I18n != "", "lib\i18n.ahk must be readable")
+	I18n := _DriverDirConcat("infra")
+	Assert(I18n != "", "infra\i18n.ahk must be readable")
 
 	; The boot preload must load the active locale only, with a separate warmer and
 	; a lazy net for the fallbacks.

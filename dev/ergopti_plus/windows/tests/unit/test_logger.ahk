@@ -24,19 +24,70 @@ LOGGER_RING_CURSOR := 0
 LOGGER_MIN_LEVEL := "DEBUG"
 _LoggerRefreshFastFlags()
 
-; ULTIMATE encore plus: more pause + errors-sink + volume + FS + pcall for 100% certainty
-TestLogger_PauseMustNotAffectErrorsSink() {
-	; Even under A_IsSuspended, high-severity (WARNING/ERROR) must still reach the dedicated errors log (for diagnostics) but main features are silenced.
-	; (In practice the pause gate is in dispatchers; logger itself is always-on for errors.)
-	AssertTrue(true, "errors-only sink must remain usable for post-pause diagnostics")
+; Two placeholders stood here. The first claimed the errors sink survives pause;
+; the logger has no suspend gate at all (the pause gate is in the dispatchers, as
+; its own comment said), so there was nothing about pause to drive. What IS
+; this module's guarantee — that a high-severity line reaches the errors sink,
+; and that it reaches ALL of them at volume — was never checked.
+TestLogger_ErrorReachesEverySink() {
+	global LOGGER_ERRORS_LOG_PATH, LOGGER_RING_BUFFER, LOGGER_LOG_PATH
+	_ResetLogger()   ; also blanks LOGGER_LOG_PATH, so both sinks are set here
+	ErrorsTmp := A_Temp . "\ergopti_test_errors_every_" . A_Now . ".log"
+	MainTmp   := A_Temp . "\ergopti_test_main_every_" . A_Now . ".log"
+	LOGGER_ERRORS_LOG_PATH := ErrorsTmp
+	LOGGER_LOG_PATH := MainTmp
+	try FileDelete(ErrorsTmp)
+	try FileDelete(MainTmp)
+	try {
+		LoggerError("ErrSink", "reaches-every-sink")
+		_LoggerFlush(true)
+
+		Errors := FileExist(ErrorsTmp) ? FileRead(ErrorsTmp, "UTF-8") : ""
+		AssertContains(Errors, "reaches-every-sink",
+			"an ERROR must reach the dedicated errors file — that file is what a user is asked for when reporting a problem")
+
+		Main := FileExist(MainTmp) ? FileRead(MainTmp, "UTF-8") : ""
+		AssertContains(Main, "reaches-every-sink",
+			"and the main log as well — the errors file is IN ADDITION to it, not instead of it")
+
+		AssertTrue(LOGGER_RING_BUFFER.Length > 0, "and the in-memory ring must have it too")
+		AssertContains(LOGGER_RING_BUFFER[LOGGER_RING_BUFFER.Length], "reaches-every-sink",
+			"the ring is what the crash reporter dumps, so a line missing there is invisible in a crash report")
+	} finally {
+		try FileDelete(ErrorsTmp)
+		try FileDelete(MainTmp)
+	}
 }
-Test("Logger: errors sink must survive pause (for debugging user issues)", TestLogger_PauseMustNotAffectErrorsSink)
+Test("Logger: one ERROR reaches the errors file, the main log and the ring", TestLogger_ErrorReachesEverySink)
 
 TestLogger_VolumeErrorsOnly() {
-	; 300+ ERROR logs must all land in errors file, ring, main (no loss, correct format).
-	AssertTrue(true, "high volume ERROR must populate errors sink reliably")
+	global LOGGER_ERRORS_LOG_PATH
+	_ResetLogger()
+	ErrorsTmp := A_Temp . "\ergopti_test_errors_volume_" . A_Now . ".log"
+	LOGGER_ERRORS_LOG_PATH := ErrorsTmp
+	try FileDelete(ErrorsTmp)
+	try {
+		Loop 300
+			LoggerError("Vol", "volume-line-{1}", A_Index)
+		_LoggerFlush(true)
+
+		Content := FileExist(ErrorsTmp) ? FileRead(ErrorsTmp, "UTF-8") : ""
+		; Count the marker rather than the lines: a formatter that dropped the
+		; argument would still produce 300 lines.
+		Seen := 0
+		Pos := 1
+		while (Found := InStr(Content, "volume-line-", , Pos)) {
+			Seen += 1
+			Pos := Found + 12
+		}
+		AssertEqual(300, Seen,
+			"all 300 ERROR lines must land in the errors sink — a buffered writer that drops on overflow is exactly what the placeholder claimed to cover and did not")
+		AssertContains(Content, "volume-line-300", "including the last one, so nothing is lost at the tail")
+	} finally {
+		try FileDelete(ErrorsTmp)
+	}
 }
-Test("Logger: high volume (300+) ERROR must fill errors-only sink correctly", TestLogger_VolumeErrorsOnly)
+Test("Logger: 300 ERROR lines all reach the errors sink", TestLogger_VolumeErrorsOnly)
 
 
 
@@ -488,11 +539,11 @@ Test("Ring buffer: snapshot is correct after double wrap-around",
 
 
 
-; =====================================================
+; =======================================================================================
 ; =======================================================================================
 ; ======= 9/ Healthcheck / Diagnostic integration (encore plus — 100% regression) =======
 ; =======================================================================================
-; =====================================================
+; =======================================================================================
 ; The enriched Diagnostic système (healthcheck) must be fully usable by paused users
 ; for troubleshooting. It must correctly surface the dedicated errors sink, keylogger
 ; summary (privacy-safe), pause_state, llm/layout/hotstrings/logs/config collectors.
@@ -568,10 +619,14 @@ Test("LoggerPurgeOldLogs: leaves files that don't match the pattern alone",
 	TestLogger_PurgeIgnoresUnrelatedFiles)
 
 TestLogger_PurgeMissingDir() {
-	; A non-existent dir must not throw.
+	; A non-existent dir must not throw AND must not be created. The old
+	; assertion was AssertTrue(true) — a purge that helpfully mkdir'd its way to
+	; a clean run passed it, and would then start writing logs somewhere nobody
+	; is looking.
 	NoDir := A_Temp . "\definitely_missing_" . A_Now . "\"
 	_LoggerPurgeOldLogs(NoDir, 14)
-	AssertTrue(true, "purge with missing dir should not throw")
+	AssertTrue(!DirExist(NoDir),
+		"purging a missing directory must leave it missing — creating it would silently relocate the log tree")
 }
 Test("LoggerPurgeOldLogs: missing directory is silently ignored",
 	TestLogger_PurgeMissingDir)
@@ -580,11 +635,11 @@ Test("LoggerPurgeOldLogs: missing directory is silently ignored",
 
 
 
-; ==================================================
+; =================================================
 ; =================================================
 ; ======= 5/ Test sink (injectable capture) =======
 ; =================================================
-; ==================================================
+; =================================================
 
 TestLogger_SinkReceivesLine() {
 	_ResetLogger()
@@ -638,11 +693,11 @@ Test("Test sink: cleared sink does not receive subsequent lines",
 
 
 
-; ==================================================
+; ============================================================
 ; ============================================================
 ; ======= 6/ Errors-only log sink (WARNING/ERROR only) =======
 ; ============================================================
-; ==================================================
+; ============================================================
 ; The dedicated LOGGER_ERRORS_LOG_PATH receives only lines at WARNING level
 ; and above. This keeps a small, focused file for triage. Lower levels must
 ; never appear in it. The main ring buffer and unified log continue to receive
@@ -691,12 +746,23 @@ Test("Errors sink: WARNING and ERROR are written to the dedicated errors file; I
 TestLogger_ErrorsPathEmptyWhenNotSet() {
 	; If LOGGER_ERRORS_LOG_PATH remains "", the errors fan-out must be a no-op
 	; (guarded in _LoggerEmit) and must not throw.
+	global LOGGER_RING_BUFFER, LOGGER_ERRORS_LOG_PATH
 	_ResetLogger()
 	; LOGGER_ERRORS_LOG_PATH is "" after reset
 	LoggerWarn("ErrSink", "no-file-should-be-created")
 	LoggerError("ErrSink", "also no file")
-	; If we got here without crash, and no file was implicitly created next to script, good.
-	AssertTrue(true, "emitting high severity with empty ERRORS_LOG_PATH must be safe")
+	_LoggerFlush(true)
+
+	; The old assertion was AssertTrue(true) — it could not tell "the fan-out
+	; skipped cleanly" from "the fan-out swallowed the whole log". The
+	; distinction that matters is the second one: an unconfigured errors sink
+	; must not cost the main path its lines.
+	AssertEqual("", LOGGER_ERRORS_LOG_PATH,
+		"the errors path must still be unset — the fan-out must not invent one")
+	AssertTrue(LOGGER_RING_BUFFER.Length >= 2,
+		"and the lines must still reach the ring — an unconfigured errors sink must not swallow the log entirely")
+	AssertContains(LOGGER_RING_BUFFER[LOGGER_RING_BUFFER.Length], "also no file",
+		"the last emitted line must be the last one in the ring")
 }
 Test("Errors sink: safe no-op when ERRORS_LOG_PATH is not configured",
 	TestLogger_ErrorsPathEmptyWhenNotSet)
@@ -868,11 +934,11 @@ Test("LoggerPurgeOldLogs: also purges old ErgoptiPlus_errors_*.log files (14-day
 
 
 
-; ==================================================
+; =================================================================================
 ; =================================================================================
 ; ======= 8/ Maximum coverage: day rollover, pcall-style, FS failure, edges =======
 ; =================================================================================
-; ==================================================
+; =================================================================================
 
 ; Day-rollover simulation for errors filename (create "yesterday" and "today" error paths,
 ; emit on each, verify correct file gets the line and purge still works).

@@ -9,11 +9,6 @@
 
 local helpers = require("tests.helpers")
 
-helpers.describe("Terminators pause and suspend", function()
-	helpers.it("pause must not trigger terminator expansions", function()
-		helpers.assert_true(true)  -- dispatch guard
-	end)
-end)
 local term    = helpers.load_with_stubs("modules.keymap.terminators")
 
 helpers.describe("keymap.terminators: defaults", function()
@@ -109,16 +104,51 @@ helpers.describe("keymap.terminators: magic key sync", function()
 	end)
 end)
 
-helpers.describe("keymap.terminators: pause invariant (project_suspend_pause_invariant)", function()
-	helpers.it("pause must leave terminator tables readable but no trigger/dispatch under pause", function()
-		-- Pure data; the hotstring engine / Feed path must early-return when paused.
-		helpers.assert_true(true, "terminators must be pause-resilient (callers gate activation)")
+-- The pause invariant for this module is that it has none: terminators are pure
+-- data, and the decision not to expand while paused belongs to the caller (the
+-- Feed path early-returns). Three cases here used to say that with
+-- assert_true(true) and a message — a design claim written as a test, which is a
+-- comment that costs a test-suite line and deters anyone from writing the real
+-- one. What can actually be checked is the claim itself.
+helpers.describe("keymap.terminators: the pause gate is not here", function()
+	-- Both halves: the macOS file is a thin i18n shim over the shared catalogue,
+	-- so checking only one of them leaves the other free to grow the coupling.
+	helpers.it("neither the shim nor the shared core names pause or suspend state", function()
+		-- The driver half goes through read_driver_source (symbol-keyed, so a
+		-- git mv cannot break it); the shared half is not under the driver root,
+		-- so it is opened by its shared-relative path.
+		local sources = {}
+		sources["macos/modules/keymap/terminators.lua"] =
+			helpers.read_driver_source("local I18N_LABEL_KEYS")
+
+		local shared_fh = io.open(helpers.shared("lua/keymap/terminators.lua"), "r")
+		helpers.assert_true(shared_fh ~= nil, "_shared/lua/keymap/terminators.lua must be readable")
+		sources["_shared/lua/keymap/terminators.lua"] = shared_fh:read("*a")
+		shared_fh:close()
+
+		local checked = 0
+		for label, src in pairs(sources) do
+			helpers.assert_true(src ~= nil and src ~= "", label .. " must be locatable")
+			checked = checked + 1
+			helpers.assert_true(src:find("paus") == nil,
+				label .. ": terminators must stay pure data — a pause check HERE means two "
+					.. "modules decide whether an expansion fires, and they will disagree")
+			helpers.assert_true(src:find("suspend") == nil,
+				label .. ": same for suspend. The Feed path early-returns; this table does not")
+		end
+		helpers.assert_eq(checked, 2, "both files must have been read, or this proves nothing")
 	end)
 
-	helpers.it("high volume is_terminator + bad unicode + pause must not degrade", function()
-		for i=1,100 do
-			term.is_terminator("x" .. i .. "🚀")
+	helpers.it("is_terminator is referentially transparent under repetition", function()
+		-- The old version of this case ran the loop and asserted true. The loop is
+		-- worth keeping — it is the only place a long unicode key is fed in bulk —
+		-- but only if its answers are checked.
+		local first = term.is_terminator(" ")
+		for i = 1, 100 do
+			helpers.assert_eq(term.is_terminator("x" .. i .. "🚀"), false,
+				"a multi-character string is never a terminator, however it is built")
 		end
-		helpers.assert_true(true, "volume + unicode terminators under pause must stay correct")
+		helpers.assert_eq(term.is_terminator(" "), first,
+			"reading the table 100 times must not change what it answers")
 	end)
 end)

@@ -1,4 +1,4 @@
-# config_schema/examples/personal_info.example.toml
+# _shared/core/config_schema/examples/personal_info.example.toml
 # Example for ``config/ergopti_plus/personal_info.toml`` v2.
 # All keys are snake_case. Read identically by AHK and HS.
 

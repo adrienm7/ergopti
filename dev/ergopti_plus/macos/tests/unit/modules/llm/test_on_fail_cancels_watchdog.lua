@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 --- Returns a fixed STREAM_WATCHDOG_SEC so timer assertions are deterministic.
 local WATCHDOG_DELAY_SEC = 5.0
 
-package.loaded["lib.timings"] = {
+package.loaded["infra.timings"] = {
 	sec = function(_section, _key) return WATCHDOG_DELAY_SEC end,
 	ms  = function(_section, _key) return WATCHDOG_DELAY_SEC * 1000 end,
 }
@@ -37,8 +37,8 @@ package.loaded["modules.llm.parser"] = {
 }
 
 --- Load lib.logger first so the handler can require it.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Load the module under test with a clean hs stub.
 local Handler = helpers.load_with_stubs("modules.llm.streaming_handler")
@@ -53,12 +53,13 @@ local function make_tooltip_stub()
 	}
 	stub.show_predictions = function(_preds, _idx, _ai, _info, _val, _indent, _nav, _tint, _loading, _slots)
 		stub.show_predictions_calls = stub.show_predictions_calls + 1
+		return true
 	end
-	stub.hide               = function() stub.hidden = true end
+	stub.hide               = function() stub.hidden = true; return true end
 	stub.get_current_index  = function() return 1 end
 	stub.make_diff_styled   = function(_chunks, _nw) return true end
 	stub.tint               = function(_name) return {} end
-	stub.mark_chain_complete = function() end
+	stub.mark_chain_complete = function() return true end
 	return stub
 end
 
@@ -103,11 +104,12 @@ local function make_ctx(fetch_id, get_fetch_id_fn)
 		build_info_bar_text      = function() return nil end,
 		resolve_backend_label    = function() return "mlx" end,
 		is_noise_pred            = function(_) return false end,
-		reset_llm_dismiss_timer  = function() end,
+		reset_llm_dismiss_timer  = function() return true end,
 		pending_predictions_ref  = { value = {} },
 		predictions_visible_ref  = { value = false },
 		tail                     = "",
-		is_ai_preview_enabled    = false,
+		-- build_callbacks is reachable only after prediction_engine's preview gate.
+		is_ai_preview_enabled    = true,
 	}
 end
 
@@ -230,12 +232,17 @@ helpers.describe("streaming_handler: on_fail() cancels the stream watchdog", fun
 	end)
 
 
-	helpers.it("stop_watchdog() is a no-op and does not crash when called repeatedly", function()
+	helpers.it("stop_watchdog() is idempotent and cancels nothing the second time", function()
 		hs_stub.__reset()
-		-- Drain any leftover watchdog from previous tests, then call again to exercise the nil path
+		-- "Does not crash" was the whole assertion. What the second call must not
+		-- do is cancel a timer it does not own: this module is reused across
+		-- requests, and a stop that reached into the next request's watchdog would
+		-- leave a stream running with nothing left to time it out.
 		Handler.stop_watchdog()
+		local after_first = #hs_stub.timer.__timers
 		Handler.stop_watchdog()
-		helpers.assert_true(true, "stop_watchdog must not raise on repeated calls or when watchdog is nil")
+		helpers.assert_eq(#hs_stub.timer.__timers, after_first,
+			"a second stop must touch no timer — there is none left that belongs to it")
 	end)
 
 

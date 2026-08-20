@@ -79,8 +79,8 @@ end)
 
 helpers.describe("gestures.actions: sg() 3-arg form does not crash on load", function()
 	helpers.it("Actions module loads without error (sg() 3-arg form is exercised at load time)", function()
-		package.loaded["lib.logger"] = nil
-		local _ = helpers.load_with_stubs("lib.logger")
+		package.loaded["infra.logger"] = nil
+		local _ = helpers.load_with_stubs("infra.logger")
 		-- If sg() misbound a label string as fn, the module-level calls to sg()
 		-- with 3 args would store strings — no crash at load time, but this
 		-- confirms the module at least loads successfully.

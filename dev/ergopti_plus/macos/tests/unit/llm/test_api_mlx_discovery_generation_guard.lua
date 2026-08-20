@@ -21,10 +21,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/llm/api_mlx_discovery.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("api_mlx_discovery.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/llm/api_mlx_discovery.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function read_active_model_arg")
+helpers.assert_true(src ~= nil, "modules/llm/api_mlx_discovery.lua source must be locatable")
 
 
 
@@ -56,13 +57,32 @@ helpers.describe("api_mlx_discovery.lua: discovery cycles carry a generation gua
 	end)
 
 	helpers.it("M.discover() captures my_discovery_gen before dispatching probes", function()
+		-- Asserted as an ORDER, not as "within the first 1 500 characters". The byte
+		-- window was the original form and it broke the day an inter-cycle cooldown
+		-- was added ahead of the capture — a change that moved the capture further
+		-- down the function without moving it after anything it has to precede. A
+		-- window pins the LAYOUT; what matters is that the generation is read before
+		-- the first thing that can outlive the cycle.
 		local discover_pos = src:find("function M.discover(", 1, true)
 		helpers.assert_true(discover_pos ~= nil, "api_mlx_discovery.lua must define M.discover() (F-MED-8)")
-		local discover_body = src:sub(discover_pos, discover_pos + 1500)
-		helpers.assert_true(
-			discover_body:find("local my_discovery_gen = _discovery_gen", 1, true) ~= nil,
-			"M.discover() must capture local my_discovery_gen = _discovery_gen before the async probe chain (F-MED-8)"
-		)
+
+		local capture_pos = src:find("local my_discovery_gen = _discovery_gen", discover_pos, true)
+		helpers.assert_true(capture_pos ~= nil,
+			"M.discover() must capture local my_discovery_gen = _discovery_gen (F-MED-8)")
+
+		-- The first poll-chain dispatch in the function. The cooldown has its own
+		-- captured generation; this assertion protects the cycle-local probe chain.
+		local first_async = nil
+		for _, needle in ipairs({ 'schedule_poll(0, "initial")', "ShellRunner.spawn(", "_probe_client.post(" }) do
+			local at = src:find(needle, discover_pos, true)
+			if at and (not first_async or at < first_async) then first_async = at end
+		end
+		helpers.assert_true(first_async ~= nil,
+			"no async dispatch found in M.discover() — this check is measuring nothing")
+		helpers.assert_true(capture_pos < first_async, string.format(
+			"my_discovery_gen is captured at offset %d but the first async dispatch is at "
+				.. "%d — a probe that completes after a reset() would compare against a "
+				.. "generation it never read (F-MED-8)", capture_pos, first_async))
 	end)
 
 	helpers.it("the opportunistic background chat probe re-checks the generation before writing _chat_endpoint", function()

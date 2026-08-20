@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec   = helpers.load_with_stubs("lib.toml.codec")
+local codec   = helpers.load_with_stubs("infra.toml.codec")
 
 
 -- =====================================================================
@@ -178,4 +178,141 @@ helpers.describe("toml_codec: duplicate section detection (F-LOW-3)", function()
 		helpers.assert_true(got == nil, "[a] followed by [a] must still be rejected as a duplicate")
 	end)
 
+end)
+
+
+
+
+
+-- ==================================================================
+-- ==================================================================
+-- ======= 4/ Inline table containing a multi-element array =========
+-- ==================================================================
+-- ==================================================================
+
+--- The inline-table splitter tracked quoted regions but NOT bracket depth, so a
+--- comma inside a nested array split the pair list:
+---
+---     { key = "Left", mods = ["ctrl", "super"] }
+---
+--- became the three fragments `key = "Left"`, `mods = ["ctrl"` and `"super"]`.
+--- The last two have no `=`, split_kv rejected them, and decode returned nil for
+--- the WHOLE document — with no error, no line number and no clue.
+---
+--- A SINGLE-element nested array parsed correctly, which is what made the bug
+--- invisible: the obvious smoke test passes. It surfaced only when a two-modifier
+--- action (`ctrl + super`) was added to the shared action catalogue, and the
+--- symptom was 14 Linux gesture tests failing for what looked like an unrelated
+--- reason — the whole catalogue had stopped parsing.
+---
+--- Same shape as the logger sub-files bug: a scanner tracking quotes but not
+--- nesting. Quotes alone are never enough when the delimiter being searched for
+--- can also appear one level down.
+helpers.describe("TOML codec — inline table with a nested multi-element array", function()
+
+	helpers.it("keeps every element of a two-element nested array", function()
+		local got = codec.decode('[a]\nemit = { key = "Left", mods = ["ctrl", "super"] }\n')
+		helpers.assert_true(got ~= nil,
+			"an inline table with a multi-element nested array must decode — it used to return nil "
+			.. "for the entire document, with no error")
+		helpers.assert_eq(got.a.emit.key, "Left", "the key preceding the nested array must survive")
+		helpers.assert_eq(#got.a.emit.mods, 2, "both modifiers must survive the pair split")
+		helpers.assert_eq(got.a.emit.mods[1], "ctrl")
+		helpers.assert_eq(got.a.emit.mods[2], "super")
+	end)
+
+	helpers.it("keeps a three-element nested array", function()
+		local got = codec.decode('[a]\ne = { k = "x", m = ["a", "b", "c"] }\n')
+		helpers.assert_true(got ~= nil, "three elements must decode as readily as two")
+		helpers.assert_eq(#got.a.e.m, 3)
+		helpers.assert_eq(got.a.e.m[3], "c")
+	end)
+
+	helpers.it("keeps a nested inline table", function()
+		-- Braces nest for the same reason brackets do; splitting on their commas
+		-- would break the inner table in exactly the same way.
+		local got = codec.decode('[a]\ne = { k = "x", n = { p = 1, q = 2 } }\n')
+		helpers.assert_true(got ~= nil, "a nested inline table must decode")
+		helpers.assert_eq(got.a.e.n.p, 1)
+		helpers.assert_eq(got.a.e.n.q, 2)
+	end)
+
+	helpers.it("still does not split on a comma inside a string", function()
+		-- The quote tracking the fix builds on must keep working: this is the
+		-- case the original code got right.
+		local got = codec.decode('[a]\ne = { k = "a,b", m = ["x"] }\n')
+		helpers.assert_true(got ~= nil, "a comma inside a quoted value must not split the pair list")
+		helpers.assert_eq(got.a.e.k, "a,b")
+	end)
+
+	helpers.it("still rejects a trailing comma before the closing brace", function()
+		-- Depth tracking must not soften a rejection the codec already made.
+		local got = codec.decode('[a]\ne = { k = "x", }\n')
+		helpers.assert_true(got == nil, "a trailing comma in an inline table must still be rejected")
+	end)
+
+	helpers.it("decodes the shared action catalogue, which is what found this", function()
+		-- The real document. A unit case can be satisfied by a fix that still
+		-- fails on the file the bug was found in.
+		local path = helpers.shared("modules/actions/actions.toml")
+		local fh = io.open(path, "r")
+		helpers.assert_true(fh ~= nil, "the shared action catalogue must be readable at " .. tostring(path))
+		local raw = fh:read("*a")
+		fh:close()
+		local got = codec.decode(raw)
+		helpers.assert_true(got ~= nil, "the shared action catalogue must decode")
+		helpers.assert_true(type(got.sg_actions) == "table", "sg_actions must be present")
+	end)
+
+end)
+
+helpers.describe("toml_codec: multiline strings remain data, never table syntax", function()
+	helpers.it("decodes a multiline basic string without inventing sections", function()
+		local source = [==[[llm]
+app_profile_overrides = """
+[features]
+llm.enabled = false
+"""
+]==]
+		local decoded = codec.decode(source)
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.llm.app_profile_overrides,
+			"[features]\nllm.enabled = false\n")
+		helpers.assert_nil(decoded.features,
+			"a header-looking line inside a value must never become executable configuration")
+	end)
+
+	helpers.it("decodes a multiline literal string without inventing sections", function()
+		local source = [==[[info]
+note = '''
+[letters]
+p = "credit_card"
+'''
+]==]
+		local decoded = codec.decode(source)
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.info.note, "[letters]\np = \"credit_card\"\n")
+		helpers.assert_nil(decoded.letters)
+	end)
+end)
+
+helpers.describe("toml_codec: literal strings protect array delimiters", function()
+	helpers.it("keeps commas inside single-quoted array elements", function()
+		local decoded = codec.decode(
+			"[metrics.disabled_apps]\nlist = ['com.example,app', 'other']\n")
+		helpers.assert_eq(decoded.metrics.disabled_apps.list,
+			{ "com.example,app", "other" })
+	end)
+
+	helpers.it("keeps closing brackets inside multiline literal array elements", function()
+		local decoded = codec.decode([==[[metrics.disabled_apps]
+list = [
+  'com.example]app',
+  'other',
+]
+]==])
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.metrics.disabled_apps.list,
+			{ "com.example]app", "other" })
+	end)
 end)

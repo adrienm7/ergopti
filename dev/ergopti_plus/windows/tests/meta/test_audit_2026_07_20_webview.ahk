@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Guards for F-25, F-26, F-27, F-28 and F-29.
 ;
-; The whole cluster has ONE mechanism behind it: lib/webview_utils.ahk defines a
+; The whole cluster has ONE mechanism behind it: infra/webview_utils.ahk defines a
 ; WebViewHost factory that handles every documented gotcha correctly — and has
 ; zero consumers. All 14 windows are hand-rolled copies, so each cross-cutting
 ; guard was applied only to the sites its regression test happened to name.
@@ -15,12 +15,13 @@
 ; it makes the next hand-rolled window fail the suite instead of silently
 ; inheriting the omission.
 ;
-; F-25  Only 2 of 9 WebMessageReceived handlers guarded A_IsSuspended. COM
+; F-25  Only 2 of 9 WebMessageReceived handlers enforced suspend policy. COM
 ;       callbacks bypass native Suspend, so a paused driver still let a page
 ;       click write config, re-register hotstrings, or (onboarding) launch an
-;       elevated UAC driver install. The guard deliberately exempts `ready`:
-;       gating page-lifecycle signals is what strands the SafetyFlush and
-;       leaves a window permanently un-initialised.
+;       elevated UAC driver install. Most handlers use a direct guard; the
+;       changelog captures immutable AHK-14 provenance before its yielding COM
+;       read and revalidates actions afterward. Both deliberately exempt
+;       `ready`: gating page-lifecycle signals strands the safety fallback.
 ; F-26  _PromptEdWeb_TryOpen captured the open context BELOW its singleton
 ;       early-return, so re-opening for a different profile kept the previous
 ;       _PromptEdWeb_EditId and saving overwrote the WRONG profile.
@@ -52,7 +53,7 @@ _A0720WV_MessageHandlers() {
 	Pos := 1
 	while (Pos := RegExMatch(Src, "WebMessageReceived\(\s*([A-Za-z0-9_]+)", &m, Pos)) {
 		Name := m[1]
-		; lib/webview_utils.ahk's WebViewHost registers a BOUND METHOD
+		; infra/webview_utils.ahk's WebViewHost registers a BOUND METHOD
 		; (this._OnWebMessage.Bind(this)), which resolves to the token "this" and
 		; has no top-level function body to look up. That factory has zero
 		; consumers — every window is a hand-rolled copy, which is the whole
@@ -68,13 +69,36 @@ _A0720WV_MessageHandlers() {
 	return Out
 }
 
+_A0720WV_ChangelogHasSuspendPolicy(Body) {
+	ReadPos := InStr(Body, "_Updater_ReadManualBridgeMessage(")
+	BornPos := InStr(Body, "Request.BornSuspended")
+	PolicyPos := InStr(Body, "_Updater_RequestMayPublish(Request)")
+	FetchPos := InStr(Body, "_CLW_FetchAndInject(")
+	UrlPos := InStr(Body, "_Updater_OpenManualUrl(")
+	Assert(ReadPos > 0 and BornPos > ReadPos and PolicyPos > BornPos,
+		"_CLW_OnWebMessage must preserve entry-time suspend provenance across its yielding COM read and revalidate it before actions")
+	Assert(FetchPos > PolicyPos and UrlPos > PolicyPos,
+		"_CLW_OnWebMessage must apply the shared suspend policy before every mutating bridge action")
+
+	Reader := _DriverFuncBody("_Updater_ReadManualBridgeMessage")
+	Assert(Reader != "",
+		"_Updater_ReadManualBridgeMessage must exist — it is the changelog bridge's suspend-policy owner")
+	CapturePos := InStr(Reader, "_Updater_NewRequestContext(")
+	YieldPos := InStr(Reader, "ReadFn.Call()")
+	Assert(CapturePos > 0 and YieldPos > CapturePos,
+		"the changelog bridge must capture AHK-14 provenance before the COM message read can yield")
+}
+
 _A0720WV_EveryHandlerIsSuspendGuarded() {
 	Checked := 0
 	for _, Fn in _A0720WV_MessageHandlers() {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . " must exist — if a host was renamed, update this list rather than dropping the handler from the invariant")
-		Assert(InStr(Body, "A_IsSuspended") > 0,
-			Fn . " must gate on A_IsSuspended: WebMessageReceived is a COM callback and bypasses native Suspend, which only disarms hotkeys, so a paused driver would still let a page click write config, re-register hotstrings or launch an elevated install")
+		if (Fn == "_CLW_OnWebMessage")
+			_A0720WV_ChangelogHasSuspendPolicy(Body)
+		else
+			Assert(InStr(Body, "A_IsSuspended") > 0,
+				Fn . " must gate on A_IsSuspended: WebMessageReceived is a COM callback and bypasses native Suspend, which only disarms hotkeys, so a paused driver would still let a page click write config, re-register hotstrings or launch an elevated install")
 		Checked += 1
 	}
 	; A floor, not a tautology: the previous ">= 9" compared a hardcoded list
@@ -159,23 +183,23 @@ _A0720WV_PathsEditorSurfacesWriteFailure() {
 	Assert(GuardPos > 0,
 		"_PathsEdWeb_Save must branch on the shared writer's result — a write that failed must not fall through")
 
-	; Spelling-independent: the reload now routes through ReloadPreservingSuspend()
-	; so a paused user is not silently un-paused by saving. The INVARIANT here is
-	; unchanged — the failure branch must return before whatever performs the
-	; reload — and matching either spelling keeps it from becoming a false green
-	; the next time the reload path is renamed.
-	ReloadPos := RegExMatch(Body, "Reload(?:PreservingSuspend)?\(")
-	Assert(ReloadPos > 0, "prerequisite: the success path still reloads")
-	Assert(GuardPos < ReloadPos,
-		"the failure branch must return BEFORE Reload() — reloading after a failed write drops the user back into the OLD config directory with no error anywhere, so the change simply appears not to have happened")
-
 	; The original assertions, re-pointed at the code that now performs the write.
 	Writer := _DriverFuncBody("_PathsFile_Write")
 	Assert(Writer != "", "_PathsFile_Write must exist — it is the single writer both editors call")
-	Assert(InStr(Writer, "LoggerError") > 0,
-		"the paths.toml writer must log an ERROR when the write fails — it was unprotected with no else on `if f`, so a read-only or locked target silently discarded the user's chosen directory while the log asserted success")
-	Assert(InStr(Writer, "catch") > 0,
-		"the FileOpen/Write/Close sequence must be wrapped in try/catch (fail fast, copilot-instructions 5.3)")
+	CommitPos := InStr(Writer, "ConfigTransitionCommitOwned(")
+	StrictPos := InStr(Writer,
+		'ConfigTransitionResultIs(CommitResult, "committed_new")')
+	ReloadPos := InStr(Writer, "ReloadPreservingSuspend(0, OwnerBundle)")
+	RollbackPos := InStr(Writer, "ConfigTransitionRollbackOwned(")
+	Assert(ReloadPos > 0,
+		"the shared writer must own the success-path reload so its config lease cannot be released between paths.toml and Reload")
+	Assert(CommitPos > 0 && StrictPos > CommitPos && ReloadPos > StrictPos
+		&& RollbackPos > ReloadPos,
+		"the paths editor must strictly commit its WAL before Reload and roll all-old on a refused Reload")
+	Assert(InStr(Writer, "ConfigTransitionLogFailure") > 0,
+		"a refused transition must be logged with its typed evidence")
+	Assert(InStr(Writer, "FileOpen(") == 0,
+		"the paths.toml writer must not bypass the crash-recoverable transition with raw I/O")
 	Assert(InStr(Writer, "return false") > 0,
 		"the writer must report failure to its callers, or the branch above cannot work")
 }

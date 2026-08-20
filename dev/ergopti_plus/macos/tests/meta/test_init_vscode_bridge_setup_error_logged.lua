@@ -4,7 +4,7 @@
 --- MODULE: Regression — vscode_bridge.setup() failure surfaced at the boot call site (F-MED-7)
 --- DESCRIPTION:
 --- init.lua wired the VS Code caret bridge with a bare
---- `pcall(function() require("lib.vscode_bridge").setup() end)`, discarding
+--- `pcall(function() require("infra.vscode_bridge").setup() end)`, discarding
 --- BOTH pcall return values. A setup() throw (a failed extension install, a
 --- port bind failure, …) vanished with no trace anywhere in the boot log.
 ---
@@ -23,10 +23,11 @@
 local helpers = require("tests.helpers")
 
 local function read_init_src()
-	local path = helpers.driver_root() .. "init.lua"
-	local fh   = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "init.lua must be readable")
-	local src = fh:read("*a"); fh:close()
+	-- Selected by a declaration unique to init.lua rather than by
+	-- path, so moving or splitting the module cannot turn this invariant
+	-- into a path error.
+	local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+	helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 	return src
 end
 
@@ -35,7 +36,7 @@ helpers.describe("F-MED-7: vscode_bridge.setup() failure is logged at the boot c
 	helpers.it("the vscode_bridge.setup() call site no longer uses a bare, return-discarding pcall", function()
 		local src = read_init_src()
 
-		local setup_pos = src:find('require("lib.vscode_bridge").setup()', 1, true)
+		local setup_pos = src:find('require("infra.vscode_bridge").setup()', 1, true)
 		helpers.assert_true(setup_pos ~= nil, "init.lua must call lib.vscode_bridge's setup()")
 
 		-- The old bug pattern: pcall(function() ... setup() ... end) with no
@@ -50,7 +51,7 @@ helpers.describe("F-MED-7: vscode_bridge.setup() failure is logged at the boot c
 	helpers.it("Logger.error is called when vscode_bridge.setup() throws", function()
 		local src = read_init_src()
 
-		local setup_pos = src:find('require("lib.vscode_bridge").setup()', 1, true)
+		local setup_pos = src:find('require("infra.vscode_bridge").setup()', 1, true)
 		helpers.assert_true(setup_pos ~= nil, "init.lua must call lib.vscode_bridge's setup()")
 
 		-- Logger.error must appear shortly after the pcall, inside the same guard block.

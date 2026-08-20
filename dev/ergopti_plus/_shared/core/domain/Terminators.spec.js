@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/domain/Terminators.spec.js
+// _shared/core/domain/Terminators.spec.js
 
 /**
  * ==============================================================================

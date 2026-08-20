@@ -1,4 +1,4 @@
-// static/ergopti_plus/_shared/core/domain/Expander.spec.js
+// _shared/core/domain/Expander.spec.js
 
 /**
  * ==============================================================================

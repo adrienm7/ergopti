@@ -23,10 +23,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("models_manager_ollama: installed-models refresh task is forward-declared (closure-nil guard)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/menu/menu_llm/models_manager_ollama.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open models_manager_ollama.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_llm/models_manager_ollama.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_ollama_path")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/models_manager_ollama.lua source must be locatable")
 		return src
 	end
 
@@ -41,12 +42,12 @@ helpers.describe("models_manager_ollama: installed-models refresh task is forwar
 		-- Extract the source window before the guard and confirm a forward declaration exists
 		local window = src:sub(1, guard_pos)
 		local decl_pos = window:find("local task\n", 1, true)
-		local new_pos  = window:find("task = hs.task.new(", 1, true)
+		local new_pos  = window:find("task = TaskLifecycle.native", 1, true)
 
 		helpers.assert_true(decl_pos ~= nil,
 			"the installed-models task must be forward-declared as `local task` (own line)")
 		helpers.assert_true(new_pos ~= nil,
-			"the installed-models task must be assigned via `task = hs.task.new(`")
+			"the installed-models task must be assigned via `task = TaskLifecycle.native`")
 		helpers.assert_true(decl_pos < new_pos,
 			"forward declaration must precede the hs.task.new closure so the callback captures the upvalue")
 	end)

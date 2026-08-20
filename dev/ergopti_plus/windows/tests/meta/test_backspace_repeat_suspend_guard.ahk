@@ -16,7 +16,7 @@
 ; body and asserts the A_IsSuspended check is present, so a regression that drops
 ; the guard fails CI.
 ;
-; SCOPE: source introspection of modules/tap_holds/lalt.ahk and rctrl.ahk.
+; SCOPE: source introspection of platform/remap/lalt.ahk and rctrl.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -33,9 +33,12 @@ helpers.describe("keylogger: event-id counter is restorable + restored on rollba
 	end)
 
 	helpers.it("ingest snapshots the counter before build_inserts and restores it on rollback", function()
-		local path = helpers.driver_root() .. "modules/keylogger/log_manager.lua"
-		local fh = io.open(path, "r"); helpers.assert_true(fh ~= nil, "cannot open log_manager.lua")
-		local src = fh:read("*a"); fh:close()
+		-- The declaration uniquely selects log_manager.lua while remaining stable if
+		-- the module moves or is split into another driver-relative path
+		local src = helpers.read_driver_source(
+			"local saved_event_id = SqliteWriter.get_next_event_id()")
+		helpers.assert_true(src ~= nil and src ~= "",
+			"the ingest event-id snapshot owner must be locatable by its declaration")
 
 		local snap_pos    = src:find("local saved_event_id = SqliteWriter.get_next_event_id()", 1, true)
 		local build_pos   = src:find("SqliteWriter.build_inserts", 1, true)
@@ -50,9 +53,11 @@ helpers.describe("keylogger: event-id counter is restorable + restored on rollba
 	end)
 
 	helpers.it("a failed aggregate flush rolls back and restores the walker context", function()
-		local path = helpers.driver_root() .. "modules/keylogger/log_manager.lua"
-		local fh = assert(io.open(path, "r"), "cannot open log_manager.lua")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/log_manager.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function _mark_aggregate_cache_rebuilt")
+		helpers.assert_true(src ~= nil, "modules/keylogger/log_manager.lua source must be locatable")
 
 		local snapshot_pos = assert(src:find("local saved_ngram_ctx_json", 1, true),
 			"ingest must snapshot the mutable walker context before replaying JSONL")

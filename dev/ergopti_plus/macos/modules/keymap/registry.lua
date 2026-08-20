@@ -19,10 +19,14 @@
 local M = {}
 
 local hs          = hs
-local text_utils  = require("lib.text_utils")
+local text_utils  = require("infra.text_utils")
+-- The collision cascade is shared with the Linux driver rather than defined here:
+-- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
+-- none, so the same pair of colliding entries elected different winners per OS.
+local HotstringPriority = require("hotstring_priority")
 local km_utils    = require("modules.keymap.utils")
-local Logger      = require("lib.logger")
-local Paths       = require("lib.paths")
+local Logger      = require("infra.logger")
+local Paths       = require("infra.paths")
 local Terminators = require("modules.keymap.terminators")
 local Groups      = require("modules.keymap.registry_groups")
 local RI          = require("modules.keymap.registry_index")
@@ -44,6 +48,7 @@ local _classify_cache = {}
 
 local _sort_deferred = false
 local _sort_pending  = false
+local CANONICAL_MAGIC_KEY = utf8.char(0x2605)
 
 
 --- Guard: verifies that M.init() was called before any public function that
@@ -112,16 +117,11 @@ end
 --- @param category string|nil Category (e.g. "personal", "custom", "personal_ext_demo", "ext.demo", "rolls").
 --- @return integer The source-default priority (personal 50 / package 30 / common 10).
 local function source_priority(category)
-	local c = type(category) == "string" and category:lower() or ""
-	if c == "personal" then return PRIORITY_PERSONAL end
-	-- "custom" is the group the hotstring editor reloads personal_hotstrings.toml
-	-- into on a live save (init.lua loads the same file as "personal" at boot).
-	-- Scoring it at the personal tier keeps an edited personal hotstring at the
-	-- same priority it gets at startup instead of silently dropping to common.
-	if c == "custom" then return PRIORITY_PERSONAL end
-	if c:sub(1, 13) == "personal_ext_" then return PRIORITY_PACKAGE end
-	if c:sub(1, 4) == "ext." then return PRIORITY_PACKAGE end
-	return PRIORITY_COMMON
+	return HotstringPriority.source_priority(category, {
+		common   = PRIORITY_COMMON,
+		package  = PRIORITY_PACKAGE,
+		personal = PRIORITY_PERSONAL,
+	})
 end
 
 --- Resolve the effective collision priority through the cascade
@@ -132,10 +132,11 @@ end
 --- @param category string|nil Category name, for the source-default fallback.
 --- @return integer The resolved priority.
 local function resolve_priority(individual, section, file, category)
-	if type(individual) == "number" then return individual end
-	if type(section)    == "number" then return section end
-	if type(file)       == "number" then return file end
-	return source_priority(category)
+	return HotstringPriority.resolve(individual, section, file, category, {
+		common   = PRIORITY_COMMON,
+		package  = PRIORITY_PACKAGE,
+		personal = PRIORITY_PERSONAL,
+	})
 end
 
 -- Exposed for the loader cascade and unit tests.
@@ -158,15 +159,28 @@ local function tail_codepoint(s)
 	return s:sub(-1)
 end
 
---- True when the trigger ends with the configured magic key (★ by default).
---- Such triggers are previewed through the case-SENSITIVE star bucket, so they
---- are excluded from the case-conform fast path to leave that path untouched.
---- @param t string The (already magic-key-substituted) trigger.
+--- Returns the first UTF-8 codepoint of a string, the mirror of tail_codepoint
+--- and used to bucket mappings by first character. Written with utf8.offset
+--- rather than a byte-class pattern for the same reason its twin is: the pattern
+--- form carries four numeric escapes that any tool rewriting this file has to
+--- preserve byte for byte, and one that does not produces a pattern that still
+--- compiles and matches the wrong thing.
+--- @param s string The input string.
+--- @return string The first UTF-8 character, or "" when s is empty.
+local function first_codepoint(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local ok, off = pcall(utf8.offset, s, 2)
+	if ok and off then return s:sub(1, off - 1) end
+	return s:sub(1, 1)
+end
+
+--- True when the source trigger explicitly carries the canonical magic marker.
+--- This is ownership provenance captured before runtime-key substitution.
+--- @param t string The source trigger before substitution.
 --- @return boolean
-local function has_magic_trigger(t)
-	local mk = _state and _state.magic_key
-	if type(mk) ~= "string" or mk == "" then return false end
-	return #t >= #mk and t:sub(-#mk) == mk
+local function owns_canonical_magic(t)
+	return #t >= #CANONICAL_MAGIC_KEY
+		and t:sub(-#CANONICAL_MAGIC_KEY) == CANONICAL_MAGIC_KEY
 end
 
 --- True when any codepoint of the trigger is a "shift-symbol" — a char whose
@@ -197,7 +211,7 @@ end
 --- @field tlen                integer UTF-8 codepoint length of `trigger`.
 --- @field trigger_bytes       integer Byte length of `trigger`; replaces repeated `#trigger` calls in the hot path.
 --- @field tail_char           string  Last UTF-8 codepoint of `trigger`; keys into _state.mappings_by_tail_char.
---- @field case_conform        boolean|nil True when this single lowercase entry stands in for the lower/Title/UPPER trio; the expander conforms the replacement's case to the typed trigger at fire time (text_utils.conform_replacement). nil on explicit-variant and case-sensitive entries.
+--- @field match_mode          string  One of "conform" (single lowercase entry standing in for the lower/Title/UPPER trio, replacement re-cased at fire time), "fold" (folded compare, replacement emitted verbatim) or "exact" (only the casing written matches). Same three values, same spelling, as the shared matcher core — the shared firing predicate reads this field.
 --- @field final_result        boolean True when the replacement is a finalized string (skip further substitution passes).
 --- @field has_magic           boolean True when `trigger` ends with the magic key.
 --- @field star_base           string|nil When has_magic, `trigger` minus the trailing magic key; nil otherwise.
@@ -258,7 +272,10 @@ end
 --- Rebuilds the per-tail-char bucket indexes from the (already sorted)
 --- _state.mappings list. Each mapping appears in mappings_by_tail_char
 --- under its last UTF-8 codepoint; has_magic mappings additionally appear
---- in mappings_by_star_tail_char under their star_base's last codepoint.
+--- in mappings_by_star_tail_char under their star_base's last codepoint. A
+--- fourth narrow list retains ordinary auto mappings whose literal suffix became
+--- the magic key after a runtime key change; they keep their ordinary timing
+--- semantics without forcing the hot path to rescan the full magic-key bucket.
 ---
 --- Buckets preserve the insertion order, which matches the sort order of
 --- _state.mappings (longest trigger first). Callers iterate a single bucket
@@ -268,7 +285,21 @@ local function rebuild_tail_indexes()
 	if not _state then return end
 	local tail_idx = {}
 	local star_idx = {}
-	for _, m in ipairs(_state.mappings) do
+	local literal_magic_idx = {}
+	local magic = type(_state.magic_key) == "string" and _state.magic_key or ""
+	local magic_tail = magic ~= "" and text_utils.trig_lower(tail_codepoint(magic)) or nil
+	-- Mappings bucketed by the FIRST codepoint of their trigger. classify_trigger
+	-- answers "is `str` a prefix of some trigger?", which no existing index could
+	-- serve: the tail buckets answer the other two questions (a trigger that
+	-- EQUALS or ENDS WITH `str` shares its last codepoint) but say nothing about
+	-- what a trigger starts with. Built here rather than in a second pass so the
+	-- three indexes can never describe different corpora.
+	local first_idx = {}
+	for registry_rank, m in ipairs(_state.mappings) do
+		-- Rank is assigned by the canonical registry sort and lets the resolver
+		-- merge candidates coming from two independent O(1) indexes without
+		-- duplicating this module's collision comparator.
+		m.registry_rank = registry_rank
 		-- tail_char is already Unicode-lowercased (trig_lower) at add_raw() time, so
 		-- it is used directly as the bucket key. The expander's hot path queries the
 		-- same lowercase key via mappings_for_tail (also trig_lower), so an accented
@@ -280,7 +311,19 @@ local function rebuild_tail_indexes()
 			tail_idx[tc] = bucket
 		end
 		bucket[#bucket + 1] = m
-		if m.has_magic and m.star_base_tail_char then
+		-- Same fold as the tail key, for the same reason: the query side lowercases
+		-- what the user typed, so registration must too or an uppercase first letter
+		-- probes an empty bucket.
+		local fc = m.first_char
+		if fc then
+			local fbucket = first_idx[fc]
+			if not fbucket then
+				fbucket = {}
+				first_idx[fc] = fbucket
+			end
+			fbucket[#fbucket + 1] = m
+		end
+		if m.has_magic and m.star_base_tail_char ~= nil then
 			local sc = m.star_base_tail_char
 			local sbucket = star_idx[sc]
 			if not sbucket then
@@ -288,10 +331,27 @@ local function rebuild_tail_indexes()
 				star_idx[sc] = sbucket
 			end
 			sbucket[#sbucket + 1] = m
+		elseif m.auto and magic_tail ~= nil and tc == magic_tail
+		then
+			-- Mirror the star-base index: before the user presses magic, only
+			-- mappings whose body shares the current buffer's folded tail can match.
+			-- Removing the final codepoint (not #magic bytes) preserves fold-mode
+			-- literals such as stored `litA` with configured magic `a`.
+			local ok_base, base_offset = pcall(utf8.offset, m.trigger, -1)
+			local base = (ok_base and base_offset) and m.trigger:sub(1, base_offset - 1) or ""
+			local base_tail = base == "" and "" or text_utils.trig_lower(tail_codepoint(base))
+			local lbucket = literal_magic_idx[base_tail]
+			if not lbucket then
+				lbucket = {}
+				literal_magic_idx[base_tail] = lbucket
+			end
+			lbucket[#lbucket + 1] = m
 		end
 	end
 	_state.mappings_by_tail_char      = tail_idx
 	_state.mappings_by_star_tail_char = star_idx
+	_state.mappings_by_first_char     = first_idx
+	_state.mappings_by_literal_magic_tail = literal_magic_idx
 end
 
 
@@ -354,8 +414,22 @@ end
 --- @param tail_char string Single-codepoint UTF-8 string.
 --- @return table|nil Array of mapping entries, or nil.
 function M.mappings_for_star_tail(tail_char)
-	if not _state then return nil end
-	return _state.mappings_by_star_tail_char[tail_char]
+	if not _state or type(tail_char) ~= "string" then return nil end
+	-- star_base follows the same match-mode semantics as the full trigger. The
+	-- registration side stores a folded tail key, so the preview/resolver query
+	-- must fold too; otherwise a fold-mode `abc★` fires for `ABC★` while the
+	-- prospective lookup probes the raw `C` bucket and finds nothing.
+	return _state.mappings_by_star_tail_char[text_utils.trig_lower(tail_char)]
+end
+
+--- Returns ordinary auto mappings whose literal trigger currently ends with the
+--- configured magic key and whose body shares `tail_char`, in canonical order.
+--- @param tail_char string Folded at lookup like every other tail index.
+--- @return table|nil Array of mapping entries, or nil.
+function M.mappings_for_literal_magic_tail(tail_char)
+	if not _state or type(tail_char) ~= "string" then return nil end
+	local index = _state.mappings_by_literal_magic_tail
+	return index and index[text_utils.trig_lower(tail_char)] or nil
 end
 
 --- Returns all three trigger-membership flags in a single O(N) pass.
@@ -397,13 +471,46 @@ function M.classify_trigger(str)
 	local exact = false
 	local pref  = false
 	local suff  = false
-	for _, m in ipairs(_state.mappings) do
-		local t = m.trigger
-		if not exact and t == str              then exact = true end
-		if not pref  and t:sub(1,  n) == str  then pref  = true end
-		if not suff  and t:sub(-n)    == str  then suff  = true end
-		if exact and pref and suff then break end
+
+	-- Two buckets instead of the whole corpus. A trigger that EQUALS `str`, or
+	-- ENDS WITH it, necessarily shares its last codepoint; one that STARTS WITH it
+	-- shares its first. Both buckets are keyed by the FOLDED codepoint and hold a
+	-- superset of the candidates, so the byte-exact comparisons below still decide
+	-- — the index narrows the search, it does not answer the question.
+	--
+	-- On a corpus of ~10-15k mappings this replaced a full scan with two substring
+	-- allocations per entry, run inside the keyDown eventtap. It is memoised above,
+	-- so the scan only ever ran on a miss — but the query is the whole keymap
+	-- buffer plus "@", which is a different string almost every time.
+	--
+	-- The indexes are built by sort_mappings, so between an M.add and the next
+	-- sort there is nothing to read. Rebuilding here rather than falling back to a
+	-- scan keeps ONE implementation of the rule: a fallback loop would be a second
+	-- answer to the same question, free to drift from this one, and it would drift
+	-- silently because both would be right most of the time.
+	if not _state.mappings_by_first_char or not _state.mappings_by_tail_char then
+		rebuild_tail_indexes()
 	end
+
+	local tail_bucket  = _state.mappings_by_tail_char
+		and _state.mappings_by_tail_char[text_utils.trig_lower(tail_codepoint(str))]
+	local first_bucket = _state.mappings_by_first_char
+		and _state.mappings_by_first_char[text_utils.trig_lower(first_codepoint(str))]
+
+	if tail_bucket then
+		for _, m in ipairs(tail_bucket) do
+			local t = m.trigger
+			if not exact and t == str           then exact = true end
+			if not suff  and t:sub(-n) == str   then suff  = true end
+			if exact and suff then break end
+		end
+	end
+	if first_bucket then
+		for _, m in ipairs(first_bucket) do
+			if m.trigger:sub(1, n) == str then pref = true ; break end
+		end
+	end
+
 	_classify_cache[str] = { exact, pref, suff }
 	return exact, pref, suff
 end
@@ -466,7 +573,9 @@ end
 --- @param trigger string The sequence to monitor.
 --- @param replacement string The resulting expansion string.
 --- @param opts table Optional flags: is_word, auto_expand, is_case_sensitive,
----   final_result, is_private (trigger and replacement are secrets — never logged).
+---   final_result, is_private (trigger and replacement are secrets — never logged),
+---   field (the personal_info.toml field the replacement came from, so the preview
+---   can ask the shared declaration how much of it may be shown).
 function M.add(trigger, replacement, opts)
 	if not require_state("add") then return end
 	if type(trigger) ~= "string" or trigger == "" then
@@ -478,26 +587,53 @@ function M.add(trigger, replacement, opts)
 		return
 	end
 
+	opts = type(opts) == "table" and opts or {}
+	local owns_magic = owns_canonical_magic(trigger) or opts.is_magic_trigger == true
+
 	-- Substitute the canonical magic-key when a non-default trigger char is configured.
 	-- The key is user-configurable through the menu, which accepts any codepoint —
 	-- including "%", which Lua treats specially on the REPLACEMENT side of gsub and
 	-- which raises "invalid use of '%' in replacement string". Unescaped, choosing
 	-- "%" as the magic key made every add() throw during registration, so the driver
 	-- came back from the post-change reload with no hotstrings at all.
-	if _state.magic_key and _state.magic_key ~= "★" then
-		trigger = trigger:gsub("★", text_utils.escape_gsub_replacement(_state.magic_key))
+	if _state.magic_key and _state.magic_key ~= CANONICAL_MAGIC_KEY then
+		trigger = trigger:gsub(CANONICAL_MAGIC_KEY,
+			text_utils.escape_gsub_replacement(_state.magic_key))
 	end
 
-	opts = type(opts) == "table" and opts or {}
+	if owns_magic then
+		local active = _state.magic_key
+		if type(active) ~= "string" or active == ""
+			or #trigger < #active or trigger:sub(-#active) ~= active
+		then
+			Logger.error(LOG, "add: is_magic_trigger requires a trigger ending in the active magic key.")
+			return
+		end
+	end
 	local is_word           = opts.is_word           == true
 	local is_auto           = opts.auto_expand        == true
+	-- The two case flags are ORTHOGONAL, exactly as the AutoHotkey loader treats
+	-- them (hotstring_builder.ahk: is_case_sensitive picks the REGISTRAR, the "C"
+	-- flag picks the comparison). is_case_sensitive alone means "register the
+	-- trigger literally, generate no cased family" — matching still folds case and
+	-- the replacement is emitted verbatim. Only strict makes the comparison exact.
+	-- Reading the first flag as "compare exactly" is what stopped 592 shared
+	-- entries — the acronym autocorrections, `"adn" = { output = "ADN" }` — from
+	-- firing on any casing but the one written in the TOML.
 	local is_case_sensitive = opts.is_case_sensitive  == true
+	local is_strict         = opts.is_case_sensitive_strict == true
 	local is_final          = opts.final_result       == true
 	-- Marks a mapping whose trigger AND replacement are user secrets (the
 	-- personal_info.toml phone / SSN / IBAN prefixes). The expander reads this
 	-- to suppress the keylogger call and the plaintext DEBUG line that would
 	-- otherwise copy both into the 14-day log and the exported metrics store
 	local is_private        = opts.is_private         == true
+	-- The personal_info.toml field this replacement was built from, when it has
+	-- one. The preview asks the shared declaration BY NAME how much of a value may
+	-- appear on screen, so a mapping that arrives without it is masked whole —
+	-- safe, but wrong for the fields the declaration marks public. Generated
+	-- aliases inherit it, like the section above.
+	local field             = type(opts.field) == "string" and opts.field or nil
 	-- Owning section name (e.g. "comma_j"), threaded through so mapping_fires can
 	-- look up a per-section delay override. Generated aliases inherit it.
 	local section           = type(opts.section) == "string" and opts.section or nil
@@ -522,7 +658,7 @@ function M.add(trigger, replacement, opts)
 	---   caller computes this once per replacement variant and threads it
 	---   through all space-variant calls, so we never tokenize the same
 	---   replacement 3-4× at load time.
-	local function add_raw(t, r, a, plain_r, conform)
+	local function add_raw(t, r, a, plain_r, conform, fold)
 		-- The owning group is part of the dedup identity. Re-adding a trigger from
 		-- the SAME source (a file hot-reload) updates the entry in place for
 		-- idempotency, but the SAME trigger arriving from a DIFFERENT source — e.g.
@@ -547,7 +683,7 @@ function M.add(trigger, replacement, opts)
 		-- recompute it on every keystroke; invalidated by update_trigger_char()
 		local mk        = _state.magic_key
 		local mkl       = #mk
-		local has_magic = mkl > 0 and t:sub(-mkl) == mk
+		local has_magic = owns_magic
 		local star_base = has_magic and t:sub(1, #t - mkl) or nil
 		local entry = {
 			trigger      = t,
@@ -557,6 +693,7 @@ function M.add(trigger, replacement, opts)
 			plain_repl   = plain_r,
 			is_word      = is_word,
 			is_private   = is_private,
+			field        = field,
 			section      = section,
 			auto         = a,
 			priority     = priority,
@@ -574,17 +711,37 @@ function M.add(trigger, replacement, opts)
 			-- registration. This is what lets a case-conform entry (registered in
 			-- lowercase only) match an UPPERCASE-typed trigger whose tail is accented.
 			tail_char    = text_utils.trig_lower(tail_codepoint(t)),
-			-- True when this single entry stands in for the lower/Title/UPPER trio:
-			-- the expander conforms the replacement's case to the typed trigger at
-			-- fire time instead of the registry pre-generating three variants.
-			case_conform = conform or nil,
+			-- First codepoint, folded like tail_char. Buckets the "is this string a
+			-- PREFIX of some trigger?" question, which the tail index cannot answer.
+			first_char   = text_utils.trig_lower(first_codepoint(t)),
+			-- The three-way match mode, resolved once at registration. It used to be
+			-- two orthogonal booleans (case_conform, case_fold) — a second vocabulary
+			-- for the same three outcomes the shared matcher core already names, and
+			-- the shared firing predicate could read neither.
+			--   "conform" — this single entry stands in for the lower/Title/UPPER
+			--               trio: the expander conforms the replacement's case to the
+			--               typed trigger at fire time instead of the registry
+			--               pre-generating three variants.
+			--   "fold"    — match with case folding but emit the replacement
+			--               verbatim. An acronym entry must yield "ADN" whether the
+			--               user typed "adn" or "Adn", so conforming it would be
+			--               wrong in both directions.
+			--   "exact"   — only the casing written matches.
+			match_mode   = conform and "conform" or (fold and "fold" or "exact"),
+			-- Precomputed folded trigger, the canonical side of a "fold" compare.
+			-- Only the typed text is folded on the hot path.
+			trigger_folded = fold and text_utils.trig_lower(t) or nil,
 			final_result = is_final,
 			has_magic    = has_magic,
 			star_base    = star_base,
 			-- Matching metadata for the preview path, where matches are tested
 			-- against star_base rather than the full trigger
 			star_base_bytes     = star_base and #star_base or nil,
-			star_base_tail_char = star_base and tail_codepoint(star_base) or nil,
+			-- Empty string is a real bucket key: a bare magic-key mapping remains
+			-- the shortest fallback for every magic-key press.
+			star_base_tail_char = star_base ~= nil
+				and (star_base == "" and "" or text_utils.trig_lower(tail_codepoint(star_base)))
+				or nil,
 		}
 		if _state.current_group then
 			entry.group = _state.current_group
@@ -605,14 +762,14 @@ function M.add(trigger, replacement, opts)
 	--- @param t string The trigger.
 	--- @param r string The replacement.
 	--- @param plain_r string Precomputed plain_text of r.
-	local function add_with_space_variants(t, r, plain_r, conform)
-		add_raw(t, r, is_auto, plain_r, conform)
+	local function add_with_space_variants(t, r, plain_r, conform, fold)
+		add_raw(t, r, is_auto, plain_r, conform, fold)
 		-- Only generate space variants for triggers that contain spaces but do not
 		-- *start* with a space (starting-space triggers are word-boundary guards).
 		local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
 		if not starts_with_space and t:match(" ") then
-			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r, conform)  -- regular nbsp
-			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r, conform) -- narrow nbsp
+			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r, conform, fold)  -- regular nbsp
+			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r, conform, fold) -- narrow nbsp
 		end
 	end
 
@@ -620,7 +777,18 @@ function M.add(trigger, replacement, opts)
 	-- Title/UPPER replacement plain-text forms are computed lazily below, only on
 	-- the explicit-variant path (the case-conform path never needs them, which is
 	-- the bulk of the corpus at startup).
-	local lower_trig       = text_utils.trig_lower(trigger)
+	-- Case variants belong to the trigger BODY, never to the configured magic
+	-- action suffix. With an alphabetic key such as "a", uppercasing the whole
+	-- string registered "BTWA" while the physical action is still lowercase
+	-- "a", making the advertised uppercase expansion unreachable.
+	local case_suffix = ""
+	local case_body   = trigger
+	if owns_magic then
+		case_suffix = _state.magic_key
+		case_body = trigger:sub(1, #trigger - #case_suffix)
+	end
+	local lower_body       = text_utils.trig_lower(case_body)
+	local lower_trig       = lower_body .. case_suffix
 	local plain_repl_base  = km_utils.plain_text(km_utils.tokens_from_repl(replacement))
 
 	-- ── Case-conform fast path (mirrors AHK CreateCaseSensitiveHotstrings) ──────
@@ -634,7 +802,7 @@ function M.add(trigger, replacement, opts)
 	-- exclusion of has_magic keeps the case-sensitive star-preview path untouched.
 	local use_conform = (not is_case_sensitive)
 		and is_auto
-		and (not has_magic_trigger(lower_trig))
+		and (not owns_magic)
 		and (plain_repl_base == replacement)
 		and (not trigger_has_shift_symbol(lower_trig))
 
@@ -649,13 +817,27 @@ function M.add(trigger, replacement, opts)
 		plain_repl_upper = km_utils.plain_text(km_utils.tokens_from_repl(upper_repl))
 	end
 
-	if is_case_sensitive then
+	if is_strict then
+		-- Exact: the casing written in the TOML, and nothing else, fires.
 		add_with_space_variants(trigger, replacement, plain_repl_base, false)
+	elseif is_case_sensitive then
+		-- Literal registration with a folding comparison. The trigger is stored AS
+		-- WRITTEN — folding happens in the comparison, against a precomputed
+		-- trigger_folded — because every other consumer (has_exact_trigger, the
+		-- preview index, the dynamic-hotstring rules engine) looks the mapping up by
+		-- the trigger it registered.
+		add_with_space_variants(trigger, replacement, plain_repl_base, false, true)
 	elseif use_conform then
 		add_with_space_variants(lower_trig, replacement, plain_repl_base, true)
 	else
-		local title_trigs = text_utils.trig_title(lower_trig)
-		local upper_trigs = text_utils.trig_upper(lower_trig)
+		local title_trigs = {}
+		for _, body in ipairs(text_utils.trig_title(lower_body)) do
+			title_trigs[#title_trigs + 1] = body .. case_suffix
+		end
+		local upper_trigs = {}
+		for _, body in ipairs(text_utils.trig_upper(lower_body)) do
+			upper_trigs[#upper_trigs + 1] = body .. case_suffix
+		end
 
 		add_with_space_variants(lower_trig, replacement, plain_repl_base, false)
 
@@ -688,13 +870,18 @@ function M.add(trigger, replacement, opts)
 	-- whether nbsp/nnbsp are configured as word terminators.
 	local NBSP  = "\194\160"     -- U+00A0
 	local NNBSP = "\226\128\175" -- U+202F
-	local first_char_src = is_case_sensitive and trigger or lower_trig
+	-- Both literal modes keep the casing they were written with; only the cased
+	-- family works from the lowercase canonical.
+	local first_char_src = (is_strict or is_case_sensitive) and trigger or lower_trig
 	local first_char     = first_char_src:match("^[%z\1-\127\194-\244][\128-\191]*")
 	if first_char == "," then
-		local rest = lower_trig:sub(#first_char + 1)
-		if rest ~= "" then
-			local lower_rest = text_utils.trig_lower(rest)
-			local upper_rests = text_utils.trig_upper(rest)
+		local rest_body = lower_body:sub(#first_char + 1)
+		if rest_body ~= "" or case_suffix ~= "" then
+			local lower_rest = text_utils.trig_lower(rest_body) .. case_suffix
+			local upper_rests = {}
+			for _, body in ipairs(text_utils.trig_upper(rest_body)) do
+				upper_rests[#upper_rests + 1] = body .. case_suffix
+			end
 			-- Plain ";" alias (original behaviour)
 			add_with_space_variants(";" .. lower_rest, title_repl, plain_repl_title)
 			for _, ru in ipairs(upper_rests) do
@@ -737,18 +924,21 @@ end
 --- Injects the shared CoreState from keymap/init.lua.
 --- Must be called exactly once before any other function in this module.
 --- @param core_state table The shared state object.
+--- @return boolean committed True only when the registry is ready for callers.
 function M.init(core_state)
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table (got %s).", type(core_state))
-		return
+		return false
 	end
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state then
+			Logger.warn(LOG, "M.init() called more than once with the active state — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
+		return false
 	end
-	_state = core_state
-	RI.setup(core_state)
-	Groups.init(core_state, {
+	local groups_ready = Groups.init(core_state, {
 		add                  = M.add,
 		sort_mappings        = M.sort_mappings,
 		is_section_enabled   = M.is_section_enabled,
@@ -757,7 +947,17 @@ function M.init(core_state)
 		rebuild_tail_indexes = rebuild_tail_indexes,
 		drop_classify_cache  = M.drop_classify_cache,
 	})
+	if groups_ready ~= true then
+		Logger.error(LOG, "M.init(): group registry dependency initialization refused.")
+		return false
+	end
+	if RI.setup(core_state) ~= true then
+		Logger.error(LOG, "M.init(): registry index dependency initialization refused.")
+		return false
+	end
+	_state = core_state
 	Logger.debug(LOG, "Registry initialized.")
+	return true
 end
 
 --- Reassigns the magic-key character across the terminator definitions AND
@@ -798,7 +998,7 @@ function M.update_trigger_char(char)
 		-- A mapping carried the old magic key iff its trigger ended with it.
 		-- This check must use the OLD key (via m.trigger) before we rename, so
 		-- we never rely on the stale m.has_magic flag.
-		local had_magic = old_len > 0 and m.trigger:sub(-old_len) == old_char
+		local had_magic = m.has_magic == true
 		if had_magic then
 			local base   = m.trigger:sub(1, #m.trigger - old_len)
 			local new_tr = base .. char
@@ -812,7 +1012,8 @@ function M.update_trigger_char(char)
 			m.has_magic           = true
 			m.star_base           = base
 			m.star_base_bytes     = #base
-			m.star_base_tail_char = tail_codepoint(base)
+			m.star_base_tail_char = base == "" and ""
+				or text_utils.trig_lower(tail_codepoint(base))
 			renamed = renamed + 1
 		else
 			-- Previously non-magic mappings must not suddenly gain has_magic

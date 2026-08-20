@@ -16,7 +16,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "adapters.key_state"
 
@@ -172,6 +172,52 @@ function M.describe_held_modifiers()
 		return #held > 0 and table.concat(held, " ") or "(none)"
 	end)
 	return ok and result or "(error)"
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Lock-key State ===============
+-- =========================================
+-- =========================================
+
+--- Switches the CapsLock lock state (and its LED) on or off.
+---
+--- Not expressible as a keystroke: macOS delivers CapsLock as a `flagsChanged`
+--- event rather than a keyDown/keyUp pair, so `hs.eventtap.keyStroke("capslock")`
+--- fails silently — it posts an event nothing consumes and reports success. The
+--- HID call is the only path that works, which is why it is exposed here rather
+--- than left for each call site to rediscover.
+---
+--- @param enabled boolean True to lock CapsLock on, false to release it.
+--- @return boolean True when Hammerspoon accepted the change.
+function M.set_capslock(enabled)
+	local ok, err = pcall(hs.hid.capslock.set, enabled and true or false)
+	if not ok then
+		Logger.error(LOG, "set_capslock(%s) failed — %s", tostring(enabled), tostring(err))
+	end
+	return ok
+end
+
+
+--- Toggles CapsLock through the HID state API.
+--- A false state is a successful toggle-to-off result, so failures use nil.
+--- @return boolean|nil state New CapsLock state, or nil on failure.
+--- @return string|nil error_message Failure detail.
+function M.toggle_capslock()
+	local ok, state_or_err = pcall(function()
+		assert(hs.hid and hs.hid.capslock
+			and type(hs.hid.capslock.toggle) == "function",
+			"hs.hid.capslock.toggle is unavailable")
+		return hs.hid.capslock.toggle()
+	end)
+	if not ok then return nil, tostring(state_or_err) end
+	if type(state_or_err) ~= "boolean" then
+		return nil, "hs.hid.capslock.toggle returned no boolean state"
+	end
+	return state_or_err, nil
 end
 
 return M

@@ -32,10 +32,10 @@
 
 local M = {}
 
-local Logger         = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Timings        = require("lib.timings")
-local Paths          = require("lib.paths")
+local Logger         = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Timings        = require("infra.timings")
+local Paths          = require("infra.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
@@ -46,6 +46,7 @@ local _infer_client  = _http_adapter.new()   -- used for inference POST requests
 local _check_client  = _http_adapter.new()   -- used for health-check GET requests
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local LOG            = "llm.api_remote"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -181,12 +182,75 @@ local RETRY_FAILED_MAX_MULT      = _R_MAX_MULT
 local _entries = {}
 local _active_id = ""
 local _is_ready = false
+local _identity_generation = 0
+local _token_cache = {}
+local _token_inflight = {}
+
+--- Delivers one token-resolution result without exposing a callback throw to
+--- the task-completion boundary that called it.
+--- @param callback function|nil Resolver callback.
+--- @param ... any Callback arguments.
+local function invoke_token_callback(callback, ...)
+	if type(callback) ~= "function" then return end
+	local args = table.pack(...)
+	local ok, err = xpcall(function()
+		callback(table.unpack(args, 1, args.n))
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Token resolver callback raised: %s", tostring(err))
+	end
+end
+
+--- Completes every waiter owned by superseded identity state exactly once.
+--- Cleartext is cached outside persisted entry objects and is discarded here.
+--- @param reason string Stable failure reason.
+local function invalidate_token_resolutions(reason)
+	local pending = _token_inflight
+	_token_inflight = {}
+	_token_cache = {}
+	for _, record in pairs(pending) do
+		if record.done ~= true then
+			record.done = true
+			if type(record.operation) == "table" and type(record.operation.cancel) == "function" then
+				local cancel_ok, settled = xpcall(function()
+					return record.operation.cancel()
+				end, debug.traceback)
+				if not cancel_ok or settled ~= true then
+					Logger.error(LOG, "Superseded Keychain read could not be terminated: %s",
+						tostring(cancel_ok and settled or settled))
+				end
+			end
+			for _, callback in ipairs(record.waiters) do
+				invoke_token_callback(callback, false, nil, reason)
+			end
+		end
+	end
+end
+
+--- Invalidates every asynchronous operation owned by the prior remote entry.
+--- Entry identity is a request-generation boundary: a healthy response from A
+--- must never make B ready, and A's completion must never publish after B was
+--- selected. The adapter generation is the first fence; this module generation
+--- remains authoritative even when a native completion was already queued.
+local function invalidate_identity()
+	invalidate_token_resolutions("identity_changed")
+	_identity_generation = _identity_generation + 1
+	_is_ready = false
+	for label, client in pairs({ health = _check_client, inference = _infer_client }) do
+		local ok, err = xpcall(function() return client.cancel() end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Remote %s cancellation raised during identity change: %s",
+				tostring(label), tostring(err))
+		end
+	end
+end
 
 --- Replace the full list of configured API entries. Used at load time from
 --- the persisted JSON sidecar and whenever the tray menu adds / removes one.
 --- @param entries table Array of entry tables. Pass {} to clear.
 function M.set_entries(entries)
 	if type(entries) ~= "table" then return end
+	invalidate_identity()
 	_entries = {}
 	for _, e in ipairs(entries) do
 		if type(e) == "table" then table.insert(_entries, e) end
@@ -198,14 +262,15 @@ function M.get_entries()
 	return _entries
 end
 
---- Pick the active API entry by id. When the id is empty or unknown, the
---- first entry wins — same fallback as the AHK twin, so the engine never
---- silently produces no predictions when the user has at least one entry
---- configured but no explicit selection yet.
+--- Pick the active API entry by id. Empty and unknown ids deliberately select
+--- no entry: the menu's "No Model" choice must disable runtime inference rather
+--- than silently falling back to the first configured account.
 --- @param id string Active entry identifier (matches entry.id field).
 function M.set_active_entry_id(id)
 	if type(id) ~= "string" then return end
+	if id == _active_id then return end
 	_active_id = id
+	invalidate_identity()
 	Logger.debug(LOG, "Active API entry id: '%s'.", id)
 end
 
@@ -213,86 +278,126 @@ function M.get_active_entry_id()
 	return _active_id
 end
 
---- Finds the currently active entry object (by id, falling back to the
---- first configured entry) WITHOUT resolving its token. Shared by
---- get_active_entry() and prewarm_active_entry_decrypt() so both agree on
---- exactly which entry is "active".
+--- Finds the currently active entry object by exact id without resolving its
+--- token. An empty or unknown id intentionally means "No Model".
 --- @return table|nil entry
 local function find_active_entry()
-	if #_entries == 0 then return nil end
-	local entry
-	if _active_id ~= "" then
-		for _, e in ipairs(_entries) do
-			if e.id == _active_id then entry = e; break end
-		end
+	if #_entries == 0 or _active_id == "" then return nil end
+	for _, entry in ipairs(_entries) do
+		if entry.id == _active_id then return entry end
 	end
-	return entry or _entries[1]
+	return nil
 end
 
---- Resolve the currently active entry, falling back to the first configured
---- one when no id matches. Returns nil when no entry exists at all.
---- Tokens stored as ``keychain:<id>`` references are decrypted on first call
---- and the cleartext is cached back into the entry so the Keychain subprocess
---- fires at most once per entry across the session lifetime.
----
---- This is still a SYNCHRONOUS decrypt (TokenCrypto.decrypt uses hs.execute)
---- because every caller here (warmup/check_availability/post_and_parse) needs
---- the token immediately to build its request. A locked Keychain can freeze
---- the run loop on this call. Callers reachable from a timer callback (not
---- the hot keystroke eventtap) should call prewarm_active_entry_decrypt()
---- first, off the initial load tick, so this synchronous path almost always
---- hits the already-cached cleartext branch below instead of shelling out
---- (F-MED-9).
+--- Returns active entry metadata without decrypting or mutating its token.
+--- Menu construction calls this function, so it must remain deterministic and
+--- free of subprocess work even when the login Keychain is locked.
 --- @return table|nil entry
 function M.get_active_entry()
-	local entry = find_active_entry()
-	if not entry then return nil end
-	-- Lazy-resolve the Keychain reference on first use so the blocking
-	-- security(1) subprocess never fires on the boot or load tick.
-	if type(entry.token) == "string" and TokenCrypto.is_encrypted(entry.token) then
-		-- Cache ONLY a non-empty result. TokenCrypto.decrypt returns "" as its
-		-- failure sentinel, which is indistinguishable from a legitimately empty
-		-- value once stored -- and a locked or permission-denied Keychain
-		-- produces exactly that. Caching it replaced the encrypted REFERENCE in
-		-- the live entry, and the next persist_api_entries then wrote the empty
-		-- string back to disk, destroying the stored token permanently. Leaving
-		-- the reference in place means the next call simply retries.
-		local cleartext = TokenCrypto.decrypt(entry.token)
-		if type(cleartext) == "string" and cleartext ~= "" then
-			entry.token = cleartext
-		else
-			Logger.warn(LOG,
-				"Keychain decrypt returned nothing for entry '%s' - keeping the encrypted "
-					.. "reference so it is not persisted over.", tostring(entry.id))
-		end
-	end
-	return entry
+	return find_active_entry()
 end
 
---- Asynchronously pre-warms the active entry's decrypted token cache using
---- TokenCrypto.decrypt_async (a non-blocking ShellRunner.spawn) instead of
---- the synchronous security(1) shell-out. Call this once, off the boot tick,
---- right after entries load — every LATER call to get_active_entry() from a
---- warmup or first-prediction timer callback then hits the already-cached
---- cleartext and never blocks on the Keychain (F-MED-9).
---- Safe to call with no entries configured, or when the active entry's token
---- is already cleartext (is_encrypted() false) — both are no-ops.
-function M.prewarm_active_entry_decrypt()
+--- Returns a shallow copy whose token is cleartext, leaving the persisted entry
+--- object untouched. Concurrent callers for the same exact identity/reference
+--- share one Keychain task. Identity changes complete all waiters as stale and
+--- prevent the old task from publishing cache state.
+--- @param callback function Receives (ok, resolved_entry, reason).
+function M.resolve_active_entry(callback)
 	local entry = find_active_entry()
-	if not entry then return end
-	if type(entry.token) ~= "string" or not TokenCrypto.is_encrypted(entry.token) then return end
-	TokenCrypto.decrypt_async(entry.token, function(cleartext)
-		-- The entry list or active id may have changed while the async
-		-- Keychain read was in flight; only cache back if this entry is
-		-- STILL the active one and still holds the same encrypted reference
-		-- we resolved (otherwise we would clobber a fresher lazy decrypt).
-		local still_active = find_active_entry()
-		-- Same non-empty guard as the lazy path above: the async decrypt reports
-		-- failure the same way, and caching "" here is equally destructive.
-		if still_active == entry and TokenCrypto.is_encrypted(entry.token)
-			and type(cleartext) == "string" and cleartext ~= "" then
-			entry.token = cleartext
-			Logger.debug(LOG, "Pre-warmed Keychain decrypt for active API entry '%s'.", tostring(entry.id))
+	if not entry then
+		invoke_token_callback(callback, false, nil, "no_active_entry")
+		return
+	end
+	local stored = entry.token
+	if type(stored) ~= "string" or stored == "" then
+		invoke_token_callback(callback, false, nil, "missing_token")
+		return
+	end
+
+	local function resolved_copy(cleartext)
+		local copy = {}
+		for key, value in pairs(entry) do copy[key] = value end
+		copy.token = cleartext
+		return copy
+	end
+
+	if not TokenCrypto.is_encrypted(stored) then
+		invoke_token_callback(callback, true, resolved_copy(stored), nil)
+		return
+	end
+
+	local cache_key = tostring(entry.id) .. "\0" .. stored
+	local cached = _token_cache[cache_key]
+	if type(cached) == "string" and cached ~= "" then
+		invoke_token_callback(callback, true, resolved_copy(cached), nil)
+		return
+	end
+
+	local existing = _token_inflight[cache_key]
+	if existing and existing.done ~= true then
+		existing.waiters[#existing.waiters + 1] = callback
+		return
+	end
+
+	local record = {
+		done = false,
+		entry = entry,
+		stored = stored,
+		generation = _identity_generation,
+		waiters = { callback },
+	}
+	_token_inflight[cache_key] = record
+
+	local function finish(ok, cleartext, reason)
+		if record.done == true then return end
+		record.done = true
+		if _token_inflight[cache_key] == record then _token_inflight[cache_key] = nil end
+		local still_current = record.generation == _identity_generation
+			and find_active_entry() == record.entry
+			and record.entry.token == record.stored
+		if not still_current then
+			ok, cleartext, reason = false, nil, "stale_identity"
+		elseif ok == true and type(cleartext) == "string" and cleartext ~= "" then
+			_token_cache[cache_key] = cleartext
+		else
+			ok, cleartext, reason = false, nil, reason or "decrypt_failed"
+		end
+		for _, waiter in ipairs(record.waiters) do
+			invoke_token_callback(waiter, ok, ok and resolved_copy(cleartext) or nil, reason)
+		end
+	end
+
+	local launch_ok, operation_or_err = xpcall(function()
+		return TokenCrypto.decrypt_async(stored, finish)
+	end, debug.traceback)
+	if not launch_ok then
+		Logger.error(LOG, "Keychain resolver launch raised for entry '%s': %s",
+			tostring(entry.id), tostring(operation_or_err))
+		finish(false, nil, "launch_failed")
+	else
+		record.operation = operation_or_err
+		if record.done == true and type(operation_or_err) == "table"
+			and type(operation_or_err.cancel) == "function" then
+			local cancel_ok, cancel_err = xpcall(function()
+				return operation_or_err.cancel()
+			end, debug.traceback)
+			if not cancel_ok then
+				Logger.error(LOG, "Completed Keychain read cleanup raised: %s", tostring(cancel_err))
+			end
+		end
+	end
+end
+
+--- Starts a best-effort asynchronous token resolution after persisted state
+--- loads. Correctness never depends on this prewarm: every network path calls
+--- resolve_active_entry itself.
+function M.prewarm_active_entry_decrypt()
+	M.resolve_active_entry(function(ok, entry, reason)
+		if ok then
+			Logger.debug(LOG, "Pre-warmed Keychain token for active API entry '%s'.",
+				tostring(entry and entry.id))
+		elseif reason ~= "no_active_entry" and reason ~= "missing_token" then
+			Logger.warn(LOG, "Keychain token prewarm did not complete: %s.", tostring(reason))
 		end
 	end)
 end
@@ -509,60 +614,62 @@ end
 --- A successful ping flips ``_is_ready`` so the prediction engine starts
 --- dispatching real requests immediately.
 function M.warmup(_model_name, _profile)
-	local entry = M.get_active_entry()
-	if not entry then
-		_is_ready = false
-		Logger.debug(LOG, "warmup: no API entry configured.")
-		return
-	end
-	local provider = M.PROVIDERS[entry.provider]
-	if not provider then
-		_is_ready = false
-		Logger.debug(LOG, "warmup: unknown provider '%s'.", tostring(entry.provider))
-		return
-	end
-	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
-	if base == "" then
-		_is_ready = false
-		Logger.debug(LOG, "warmup: empty base_url for provider '%s'.", entry.provider)
-		return
-	end
-	local token = entry.token or ""
-	if token == "" then
-		_is_ready = false
-		Logger.debug(LOG, "warmup: no token configured for entry '%s'.", tostring(entry.id))
-		return
-	end
-
-	-- /models is the canonical cheap ping for OpenAI-shape and Anthropic; for
-	-- Gemini the same shape works (with ?key= in the URL). A 200 confirms
-	-- both reachability and auth.
-	local format = provider.format
-	local ping_url
-	if format == "gemini" then
-		local enc = _http_adapter.encodeForQuery(token)
-		ping_url = rtrim_slash(base) .. "/models?key=" .. enc
-	else
-		ping_url = rtrim_slash(base) .. "/models"
-	end
-
-	_check_client.get(ping_url, build_headers(format, token), function(r)
-		local was_ready = _is_ready
-		_is_ready = r.ok
-		if _is_ready and not was_ready then
-			Logger.info(LOG, "Remote API ready (provider=%s, model=%s).",
-				tostring(entry.provider), tostring(entry.model))
-		elseif not _is_ready then
-			Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
-				tostring(r.status), tostring(entry.provider))
+	_is_ready = false
+	M.resolve_active_entry(function(resolved, entry, reason)
+		if resolved ~= true or not entry then
+			Logger.debug(LOG, "warmup: active API token unavailable (%s).", tostring(reason))
+			return
 		end
+		local provider = M.PROVIDERS[entry.provider]
+		if not provider then
+			Logger.debug(LOG, "warmup: unknown provider '%s'.", tostring(entry.provider))
+			return
+		end
+		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
+		if base == "" then
+			Logger.debug(LOG, "warmup: empty base_url for provider '%s'.", entry.provider)
+			return
+		end
+		local token = entry.token or ""
+		if token == "" then
+			Logger.debug(LOG, "warmup: no token configured for entry '%s'.", tostring(entry.id))
+			return
+		end
+
+		local identity_entry = find_active_entry()
+		local format = provider.format
+		local my_identity = _identity_generation
+		local ping_url
+		if format == "gemini" then
+			local enc = _http_adapter.encodeForQuery(token)
+			ping_url = rtrim_slash(base) .. "/models?key=" .. enc
+		else
+			ping_url = rtrim_slash(base) .. "/models"
+		end
+
+		_check_client.get(ping_url, build_headers(format, token), function(r)
+			if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then return end
+			local was_ready = _is_ready
+			_is_ready = r.ok
+			if _is_ready and not was_ready then
+				Logger.info(LOG, "Remote API ready (provider=%s, model=%s).",
+					tostring(entry.provider), tostring(entry.model))
+			elseif not _is_ready then
+				Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
+					tostring(r.status), tostring(entry.provider))
+			end
+		end)
 	end)
 end
 
---- No active stream to terminate — the remote path is request/response.
---- Kept as a no-op so the engine's dispatch surface stays identical across
---- backends and there is no need for a "supports streaming?" capability flag.
+--- Cancels the active request/response inference, if any.
 function M.cancel_streaming()
+	local ok, err = xpcall(function() return _infer_client.cancel() end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Remote inference cancellation raised: %s", tostring(err))
+		return false
+	end
+	return true
 end
 
 --- Async availability check used by the menu / status indicator. Calls
@@ -571,37 +678,41 @@ end
 --- remote providers list models, not a single configured one — exhaustive
 --- model verification belongs in the picker, not the hot path.
 function M.check_availability(_model_name, on_available, on_missing)
-	local entry = M.get_active_entry()
-	if not entry then
-		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
-		return
-	end
-	local provider = M.PROVIDERS[entry.provider]
-	if not provider then
-		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
-		return
-	end
-	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
-	if base == "" or (entry.token or "") == "" then
-		if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
-		return
-	end
-
-	local format = provider.format
-	local url
-	if format == "gemini" then
-		local enc = _http_adapter.encodeForQuery(entry.token)
-		url = rtrim_slash(base) .. "/models?key=" .. enc
-	else
-		url = rtrim_slash(base) .. "/models"
-	end
-
-	_check_client.get(url, build_headers(format, entry.token), function(r)
-		if r.ok then
-			if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
-		else
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", r.status == 0) end
+	M.resolve_active_entry(function(resolved, entry)
+		if resolved ~= true or not entry then
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+			return
 		end
+		local provider = M.PROVIDERS[entry.provider]
+		if not provider then
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+			return
+		end
+		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
+		if base == "" or (entry.token or "") == "" then
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+			return
+		end
+
+		local identity_entry = find_active_entry()
+		local format = provider.format
+		local my_identity = _identity_generation
+		local url
+		if format == "gemini" then
+			local enc = _http_adapter.encodeForQuery(entry.token)
+			url = rtrim_slash(base) .. "/models?key=" .. enc
+		else
+			url = rtrim_slash(base) .. "/models"
+		end
+
+		_check_client.get(url, build_headers(format, entry.token), function(r)
+			if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then return end
+			if r.ok then
+				if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
+			else
+				if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", r.status == 0) end
+			end
+		end)
 	end)
 end
 
@@ -621,15 +732,12 @@ local _req_counter = 0
 --- ``Parser.split_blocks``. The signature mirrors api_ollama's
 --- ``post_and_parse`` so the higher-level fetch_* strategies can keep their
 --- structure unchanged.
-local function post_and_parse(model_name, system_prompt, full_text, tail_text,
-                               temperature, max_tokens, num_predictions, is_batch,
-                               on_success, on_fail, dedup_stats)
-	local entry = M.get_active_entry()
-	if not entry then
-		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
-		return
-	end
+local function post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
+                                        temperature, max_tokens, num_predictions, is_batch,
+                                        on_success, on_fail, dedup_stats)
 	local provider = M.PROVIDERS[entry.provider]
+	local my_identity = _identity_generation
+	local identity_entry = find_active_entry()
 	if not provider then
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
@@ -685,6 +793,11 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
 
 	_infer_client.post(url, headers, encoded, function(r)
+		if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then
+			Logger.debug(LOG, "[%s] #%d response discarded after remote identity changed.",
+				tostring(model), req_id)
+			return
+		end
 		local status, body = r.status, r.body
 		-- Logger.pcall, not a bare pcall. This closure IS the entire response
 		-- handler: parsing, dedup, telemetry and the on_success dispatch all live
@@ -786,6 +899,23 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 	end)
 end
 
+--- Resolves the credential asynchronously before constructing any request.
+--- Every fetch strategy enters through this wrapper, so a cold or locked
+--- Keychain can delay/fail one request without freezing keyboard processing.
+local function post_and_parse(model_name, system_prompt, full_text, tail_text,
+                               temperature, max_tokens, num_predictions, is_batch,
+                               on_success, on_fail, dedup_stats)
+	M.resolve_active_entry(function(resolved, entry)
+		if resolved ~= true or not entry then
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
+		end
+		post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
+			temperature, max_tokens, num_predictions, is_batch,
+			on_success, on_fail, dedup_stats)
+	end)
+end
+
 
 
 
@@ -812,10 +942,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 	-- Snapshot the request id so the callback can detect if the user typed more text
 	-- while the single HTTP round-trip was in flight and discard the stale response
 	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
+	local initial_identity = _identity_generation
 
 	post_and_parse(model_name, system_prompt, full_text, tail_text,
 		effective_temp, tokens, num_predictions, is_batch,
 		function(results)
+			if initial_identity ~= _identity_generation then return end
 			-- Discard if the user typed new text between dispatch and callback
 			if initial_request_id
 				and type(request_id_provider) == "function"
@@ -831,15 +963,12 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 			-- `not streaming`, which is a tautology for a backend that never streams —
 			-- the equivalent condition here is simply "more than one result".
 			if #results > 1 then
-				local function reveal_next(idx)
-					if idx > #results then return end
-					local subset = {}
-					for j = 1, idx do subset[j] = results[j] end
-					local is_final = (idx == #results)
-					if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", subset, ms, is_final, not is_final) end
-					if not is_final then TimerScheduler.after(0, function() reveal_next(idx + 1) end) end
-				end
-				reveal_next(1)
+				ProgressiveReveal.deliver(results, on_success, ms, function()
+					if initial_identity ~= _identity_generation then return false end
+					return not initial_request_id
+						or type(request_id_provider) ~= "function"
+						or request_id_provider() == initial_request_id
+				end)
 			else
 				if type(on_success) == "function" then ApiCommon.protected_call(on_success, "on_success", results, ms, true) end
 			end
@@ -864,8 +993,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local attempt_index          = 1
 	local dedup_stats            = ApiCommon.new_dedup_stats()
 	local initial_request_id     = type(request_id_provider) == "function" and request_id_provider() or nil
+	local initial_identity       = _identity_generation
 
 	local function do_next()
+		if initial_identity ~= _identity_generation then return end
 		if type(request_id_provider) == "function" then
 			local cur = request_id_provider()
 			if initial_request_id ~= nil and cur ~= initial_request_id then

@@ -23,9 +23,10 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local i18n          = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local i18n          = require("infra.i18n")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -39,11 +40,11 @@ local LOG = "menu_llm.mlx"
 
 
 
--- =============================================
+-- ============================================
 -- ============================================
 -- ======= 1/ Model Download & Reattach =======
 -- ============================================
--- =============================================
+-- ============================================
 
 --- Attaches obj.pull_model and obj.reattach_download onto the manager object.
 --- @param ctx table Shared context: {
@@ -351,9 +352,16 @@ function M.install(ctx)
 					local stall_seconds = os.difftime(os.time(), last_progress_time)
 					local stall_limit = (_current_pct >= 99) and 120 or 300
 					if stall_seconds >= stall_limit then
-						local reason = (_current_pct >= 99)
-							and "Aucun progrès détecté depuis 2 minutes à 99 %. Blocage probable."
-							or "Aucun progrès détecté depuis 5 minutes. Abandon."
+						-- The notification title already went through i18n; the body did not, so
+						-- twenty of the twenty-one locales showed a French sentence under a
+						-- translated heading. The minute count is the stall limit itself, so
+						-- the two variants differ only in the number and in whether the
+						-- download had already reached 99 %.
+						local reason = i18n.format(
+							(_current_pct >= 99) and "mlx.download_stalled_near_complete"
+								or "mlx.download_stalled_giving_up",
+							math.floor(stall_limit / 60)
+						)
 						pcall(notifications.notify, i18n.get("mlx.download_stalled"), reason, "warning")
 						if download_window then pcall(download_window.complete, false, target_model) end
 						-- Pass silent=true: notifications and window state already handled above
@@ -466,7 +474,7 @@ function M.install(ctx)
 					deps.state.llm_model = target_model
 						invalidate_installed_cache()
 					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
-					pcall(deps.save_prefs)
+					if deps.save_prefs() ~= true then return false end
 					obj.start_server(target_model, function()
 						if on_success then pcall(on_success) end
 					end)
@@ -479,7 +487,7 @@ function M.install(ctx)
 			-- Starts a tail -f task that streams the Python log file back to Lua in real time;
 			-- also polls the exit file every 3 s to catch completion reliably
 			local function start_tail_monitor()
-				_tail_task = hs.task.new("/usr/bin/tail", function()
+				_tail_task = TaskLifecycle.native("MLX download log tail", "/usr/bin/tail", function()
 					-- Tail exited (killed by do_cancel or process gone) — check exit file
 					hs.timer.doAfter(0.5, function()
 						local ef = io.open(_exit_path, "r")
@@ -492,7 +500,10 @@ function M.install(ctx)
 
 				if _tail_task then
 					if deps.active_tasks then deps.active_tasks["download_tail"] = _tail_task end
-					pcall(function() _tail_task:start() end)
+					if not TaskLifecycle.start(_tail_task, "MLX download log tail") then
+						if deps.active_tasks then deps.active_tasks["download_tail"] = nil end
+						_tail_task = nil
+					end
 				end
 
 				-- Periodic poll: tail can miss the very last flush before Python exits
@@ -508,7 +519,7 @@ function M.install(ctx)
 
 			-- Short-lived launcher: resolves Python, installs deps, cleans stale cache, then
 			-- exits after spawning the detached Python process and printing its PID
-			local launcher_task = hs.task.new(script_path, function(code, stdout, stderr)
+			local launcher_task = TaskLifecycle.native("MLX detached download launcher", script_path, function(code, stdout, stderr)
 				if deps.active_tasks then deps.active_tasks["download"] = nil end
 				-- stdout/stderr are empty when a streaming callback is active — _dl_pid was already
 				-- set by the streaming callback which received the __DLPID__ sentinel
@@ -551,7 +562,18 @@ function M.install(ctx)
 
 			if launcher_task then
 				if deps.active_tasks then deps.active_tasks["download"] = launcher_task end
-				pcall(function() launcher_task:start() end)
+				if not TaskLifecycle.start(launcher_task, "MLX detached download launcher") then
+					if deps.active_tasks then deps.active_tasks["download"] = nil end
+					pcall(deps.update_icon)
+					if download_window then pcall(download_window.complete, false, target_model) end
+					pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
+						string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
+				end
+			else
+				pcall(deps.update_icon)
+				if download_window then pcall(download_window.complete, false, target_model) end
+				pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
+					string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
 			end
 		end
 
@@ -602,6 +624,33 @@ function M.install(ctx)
 		if deps.active_tasks then deps.active_tasks["download_tail"] = true end
 		pcall(deps.update_icon, "📥 …")
 
+		-- Byte accounting, as UPVALUES. These used to be declared inside the
+		-- per-chunk handler below, so every chunk reset them: nothing accumulated and
+		-- the total stayed 0 for the whole download, which is why a reattached
+		-- download showed neither a total nor an ETA. Declared above the closure so it
+		-- captures them - a local below would bind the nil global.
+		local _bytes_done, _current_pct = 0, 0
+		local _python_file_count = nil
+
+		-- The denominator, from the same preset field the launcher path reads. Without
+		-- it there is nothing to compute a percentage or an ETA against.
+		local _bytes_total = 0
+		for _, provider in ipairs(presets) do
+			for _, family in ipairs(provider.families or {}) do
+				for _, m in ipairs(family.models or {}) do
+					if m.name == model then
+						local hw = m.hardware_requirements and m.hardware_requirements.mlx or {}
+						if type(hw.download_gb) == "number" then
+							_bytes_total = math.floor(hw.download_gb * 1e9)
+						elseif type(hw.ram_gb) == "number" then
+							_bytes_total = math.floor(hw.ram_gb * 0.14 * 1e9)
+						end
+						break
+					end
+				end
+			end
+		end
+
 		local _tail_task = nil
 
 		local function do_cancel_reattached(silent)
@@ -636,7 +685,7 @@ function M.install(ctx)
 			if exit_code == 0 then
 				pcall(notifications.notify, i18n.get("mlx.model_installed"), string.format(i18n.get("mlx.model_ready"), model), "success")
 				if download_window then pcall(download_window.complete, true, model) end
-				pcall(deps.save_prefs)
+				if deps.save_prefs() ~= true then return false end
 			else
 				if download_window then pcall(download_window.complete, false, model) end
 				pcall(notifications.notify, i18n.get("mlx.download_failed"), i18n.get("mlx.download_failed_body"), "error")
@@ -645,22 +694,35 @@ function M.install(ctx)
 
 		local function process_stream_reattached(out)
 			if not out or out == "" then return end
-			local _bytes_done, _bytes_total, _current_pct = 0, 0, 0
 			local max_bytes = 0
 			for b_str in out:gmatch("__BYTES__:(%d+)") do
 				local b = tonumber(b_str)
 				if b and b > max_bytes then max_bytes = b end
 			end
-			if max_bytes > 0 then _bytes_done = max_bytes end
-			local _python_file_count = nil
+			-- Monotonic: the size watcher reports the total written so far, and a chunk
+			-- that happens to carry an older figure must not walk the bar backwards.
+			if max_bytes > _bytes_done then _bytes_done = max_bytes end
 			for fc_str in out:gmatch("__FILECOUNT__:(%d+)") do
 				local fc = tonumber(fc_str)
 				if fc and fc > 0 then _python_file_count = fc end
 			end
-			local icon_pct = math.min(tonumber(out:match("(%d+)%%") or 0) or 0, 99)
-			if icon_pct > 0 then pcall(deps.update_icon, "📥 " .. icon_pct .. "%") end
+
+			-- From the accumulated bytes over the estimated total, exactly as the
+			-- launcher path does. It used to be scraped out of the tool's own output
+			-- with out:match("(%d+)%%"), which is the progress of the file currently
+			-- being fetched and not of the download: a model with eight shards showed
+			-- the bar climb to 99% and snap back to 0, eight times over.
+			if _bytes_total > 0 and _bytes_done > 0 then
+				_current_pct = math.floor((_bytes_done / _bytes_total) * 100 + 0.5)
+			end
+			-- Capped at 99: only the exit code may declare completion.
+			_current_pct = math.min(math.max(0, _current_pct), 99)
+
+			if _current_pct > 0 then
+				pcall(deps.update_icon, "📥 " .. _current_pct .. "%")
+			end
 			if download_window then
-				pcall(download_window.update, icon_pct, _bytes_done, _bytes_total, out, _python_file_count)
+				pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, out, _python_file_count)
 			end
 		end
 
@@ -682,7 +744,7 @@ function M.install(ctx)
 		end
 
 		-- Start a new tail -f on the existing log file
-		_tail_task = hs.task.new("/usr/bin/tail", function()
+		_tail_task = TaskLifecycle.native("MLX reattached download log tail", "/usr/bin/tail", function()
 			hs.timer.doAfter(0.5, function()
 				local ef3 = io.open(exit_path, "r")
 				if ef3 then ef3:close(); handle_done_reattached() end
@@ -694,7 +756,12 @@ function M.install(ctx)
 
 		if _tail_task then
 			deps.active_tasks["download_tail"] = _tail_task
-			pcall(function() _tail_task:start() end)
+			if not TaskLifecycle.start(_tail_task, "MLX reattached download log tail") then
+				_tail_task = nil
+				-- Keep the logical monitor sentinel: the exit-file poll remains the
+				-- reliable completion backstop even when streaming cannot start.
+				deps.active_tasks["download_tail"] = true
+			end
 		end
 
 		-- Poll for exit file in case tail misses the final flush

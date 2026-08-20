@@ -64,6 +64,13 @@
       "min_height": 460,
       "vhost": "ergopti.modelbrowser"
     },
+    "numeric_prompt": {
+      "width": 420,
+      "height": 300,
+      "min_width": 360,
+      "min_height": 260,
+      "vhost": "ergopti.numericprompt"
+    },
     "onboarding": {
       "width": 480,
       "height": 560,

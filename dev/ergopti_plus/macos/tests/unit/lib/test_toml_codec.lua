@@ -3,14 +3,14 @@
 --- ==============================================================================
 --- MODULE: TOML Codec Tests
 --- DESCRIPTION:
---- Round-trip checks for lib/toml/codec — the generic encoder/decoder
+--- Round-trip checks for infra/toml/codec — the generic encoder/decoder
 --- behind ui/menu/preferences. Covers the structural shapes the HS state
 --- actually uses: scalars, arrays, nested maps, special-character keys,
 --- and the empty-table edge case.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec   = helpers.load_with_stubs("lib.toml.codec")
+local codec   = helpers.load_with_stubs("infra.toml.codec")
 
 local function deep_equal(a, b)
 	if type(a) ~= type(b) then return false end

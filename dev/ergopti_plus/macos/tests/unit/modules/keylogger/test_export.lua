@@ -28,12 +28,12 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- lib.logger must load first.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- lib.i18n is required at module load time by export.lua. We provide a minimal
 -- stub that returns the key itself so tests are locale-independent.
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	get = function(key) return key end,
 }
 
@@ -94,35 +94,35 @@ end)
 helpers.describe("export — init validation", function()
 	helpers.it("rejects nil deps", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init(nil)
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("rejects deps without paths table", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({ device_id = "uuid-x", get_db = function() return nil end })
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("rejects deps without device_id string", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({ paths = {}, get_db = function() return nil end })
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("rejects deps without get_db function", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({ paths = {}, device_id = "uuid-y" })
 		helpers.assert_eq(e.get_device_short_id(), "")
 	end)
 
 	helpers.it("accepts valid deps", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/db.sqlite" },
 			device_id = "abcdef01-0000-0000-0000-000000000000",
@@ -133,7 +133,7 @@ helpers.describe("export — init validation", function()
 
 	helpers.it("ignores a duplicate init call", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/first.sqlite" },
 			device_id = "first-uuid-0000-0000-000000000001",
@@ -149,15 +149,36 @@ helpers.describe("export — init validation", function()
 		helpers.assert_eq(e.get_device_short_id(), "first-uu\xe2\x80\xa6")
 	end)
 
-	helpers.it("pause must gate all export init and path access (project_suspend_pause_invariant)", function()
-		-- Real export of logs must be skipped when paused; no file reads/writes, no privacy leaks.
-		helpers.assert_true(true, "keylogger export must early-return under pause (no side effects)")
+	-- The getters are pure reads of module state. Asserting that they never touch
+	-- the filesystem is what makes "the export is gated elsewhere" mean anything:
+	-- a getter that opened the database would export while paused regardless of
+	-- any gate upstream.
+	helpers.it("the path getters perform no file I/O", function()
+		local src = helpers.read_driver_source("function M.get_sqlite_path")
+		helpers.assert_not_nil(src, "the export source must be findable by symbol")
+		for _, fn in ipairs({ "get_sqlite_path", "get_device_short_id" }) do
+			local body = src:match("function M%." .. fn .. ".-" .. string.char(10) .. "end" .. string.char(10))
+			helpers.assert_not_nil(body, fn .. " must be present in the source")
+			for _, forbidden in ipairs({ "io%.open", "os%.execute", "hs%.task" }) do
+				helpers.assert_true(body:find(forbidden) == nil,
+					fn .. "() must not call " .. forbidden .. " — it is a read of module state")
+			end
+		end
 	end)
 
-	helpers.it("bad device_id or paths under pause must not crash (resilience)", function()
+	-- A malformed init must leave the getters answering with the right TYPE rather
+	-- than nil. Every caller concatenates these into a path or a SQL string, so a
+	-- nil here becomes an error far from its cause.
+	helpers.it("a malformed init still leaves the getters type-safe", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		local ok = pcall(function() e.init({ paths = nil, device_id = 123 }) end)
-		helpers.assert_true(ok)
+		e.init({ paths = nil, device_id = 123 })
+		helpers.assert_eq(type(e.get_device_short_id()), "string",
+			"a numeric device_id must still yield a string short id, not nil")
+		-- nil, deliberately: with no paths table there is no correct answer, and
+		-- inventing a plausible one would have the exporter open some other file.
+		-- The contract is fail-fast, so the nil is the assertion.
+		helpers.assert_nil(e.get_sqlite_path(),
+			"with no paths table the getter must return nil rather than invent a path")
 	end)
 end)
 
@@ -173,7 +194,7 @@ end)
 helpers.describe("export — get_device_short_id", function()
 	local function make_export(uuid)
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/db.sqlite" },
 			device_id = uuid,
@@ -206,7 +227,7 @@ end)
 helpers.describe("export — get_sqlite_path", function()
 	helpers.it("returns the sqlite_path from the injected paths table", function()
 		local e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		local expected_path = "/private/tmp/ergopti_metrics/test-uuid/db.sqlite"
 		e.init({
 			paths     = { sqlite_path = expected_path },
@@ -221,11 +242,11 @@ end)
 
 
 
--- ==================================================
+-- ===================================================
 -- ===================================================
 -- ======= 7/ get_native_app_category Fallback =======
 -- ===================================================
--- ==================================================
+-- ===================================================
 
 helpers.describe("export — get_native_app_category fallback", function()
 	-- This function makes live hs.application.get() calls on a real machine.
@@ -234,13 +255,17 @@ helpers.describe("export — get_native_app_category fallback", function()
 
 	helpers.it("setup: init export module", function()
 		e = helpers.load_with_stubs("modules.keylogger.export")
-		package.loaded["lib.i18n"] = { get = function(k) return k end }
+		package.loaded["infra.i18n"] = { get = function(k) return k end }
 		e.init({
 			paths     = { sqlite_path = "/tmp/db.sqlite" },
 			device_id = "cat-test-uuid-0000-0000-000000000000",
 			get_db    = function() return nil end,
 		})
-		helpers.assert_true(true)
+		-- The setup case earns its place by asserting init took: every case below
+		-- reads through the module's injected state, and each of them would read
+		-- as passing against a module that silently refused its dependencies.
+		helpers.assert_eq(type(e.get_native_app_category), "function",
+			"init must leave the public surface callable")
 	end)
 
 	helpers.it("nil app_name returns a non-empty string", function()

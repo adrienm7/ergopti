@@ -131,10 +131,13 @@ helpers.describe("SecureFieldDetector: isSecureApp", function()
 	end)
 
 	helpers.it("returns a boolean for every call", function()
-		local ok1 = pcall(function() return adapter.isSecureApp("AnyApp") end)
-		helpers.assert_true(ok1, "isSecureApp must not throw")
-		local ok2 = pcall(function() return adapter.isSecureApp(nil) end)
-		helpers.assert_true(ok2, "isSecureApp(nil) must not throw")
+		-- The title is the assertion. A detector answering nil satisfied "did not
+		-- throw" and reads as falsy at the caller, which is the fail-OPEN direction
+		-- for a privacy filter: the field is treated as non-secure and logged.
+		helpers.assert_eq(type(adapter.isSecureApp("AnyApp")), "boolean",
+			"isSecureApp must answer a boolean, not nil")
+		helpers.assert_eq(type(adapter.isSecureApp(nil)), "boolean",
+			"including for a nil appId — the caller does not check before asking")
 	end)
 end)
 
@@ -277,8 +280,10 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 			application = make_app_stub(),
 		})
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() with missing axuielement API must not throw")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"with no axuielement API there is nothing to inspect, so the answer must be "
+				.. "false — but it must BE an answer, not a mute detector")
 		helpers.assert_eq(false, adapter.isSecureField(),
 			"missing axuielement API must leave isSecureField false")
 	end)
@@ -289,8 +294,9 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 			application = make_app_stub(),
 		})
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() with nil axuielement must not throw")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"same for a nil axuielement")
 		helpers.assert_eq(false, adapter.isSecureField(),
 			"nil axuielement must leave isSecureField false")
 	end)
@@ -305,8 +311,10 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 			application = make_app_stub(),
 		})
 
-		local ok = pcall(function() adapter.refresh() end)
-		helpers.assert_true(ok, "refresh() must catch internal AX error and not rethrow")
+		adapter.refresh()
+		helpers.assert_eq(adapter.isSecureField(), false,
+			"an AX error must be absorbed into a definite answer, not left as whatever "
+				.. "the previous refresh happened to have decided")
 		helpers.assert_eq(false, adapter.isSecureField(),
 			"throwing AX API must leave isSecureField false")
 	end)

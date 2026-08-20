@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The top-level initMenu orchestrator plus the personal-shortcuts and language submenu builders it appends. Assembles the whole tray context menu from the category builders.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -29,17 +29,23 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 		return
 	}
 
-	PersonalMenu := Menu()
+	; One nested row per registered personal shortcut, drawn by the renderer.
+	PersonalRows := []
 	for _, Name in Names {
 		; Label comes straight from the registry (the description, or the name
 		; itself when none); the v2 path keys the lowercased name under
-		; [ahk.shortcuts.personal]. Names are already lowercased at registration.
+		; [shortcuts.personal]. Names are already lowercased at registration.
 		Desc  := _PersonalShortcutsRegistry.Has(Name) ? _PersonalShortcutsRegistry[Name] : ""
 		Label := (Desc != "") ? Desc : Name
-		MenuAddItemWithLabel(PersonalMenu, "ahk.shortcuts.personal." . Name, Label, "Shortcuts")
+		Row := MenuRowWithLabel("shortcuts.personal." . Name, Label, "Shortcuts")
+		if (Row != "") {
+			PersonalRows.Push(Row)
+		}
 	}
-	ShortcutsMenu.Add()
-	ShortcutsMenu.Add(t("menu.shortcuts.personal"), PersonalMenu)
+	MenuRenderer_AppendRows(ShortcutsMenu, "shortcuts_menu", "personal_shortcuts", [
+		Map("separator", true),
+		Map("label", t("menu.shortcuts.personal"), "items", PersonalRows)
+	])
 }
 
 
@@ -70,7 +76,7 @@ BuildLanguageMenuDeferred() {
 }
 
 
-initMenu() {
+initMenu(PublishAuthorizeFn := 0) {
 	global SubMenus, A_TrayMenu, HotstringCategories
 	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
 	global _DriverReady, _LangMenuRef, _LangMenuBuildPending
@@ -96,13 +102,14 @@ initMenu() {
 	ShortcutsGated := IsCategoryGated("Shortcuts")
 
 	; ── 🌐 Disposition clavier — built from manifest via MenuRenderer_Build.
-	; Dynamic handler ``layout_features`` iterates ``ahk.layout`` entries;
+	; The two feature blocks are `list` providers: they enumerate ``ahk.layout``
+	; entries and return one row per feature, which the renderer materialises.
 	; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
-	LayoutDynHandlers := Map(
-		"layout_features_base",   (M, C) => _LAY_LayoutFeaturesBase(M, C),
-		"layout_features_altgr",  (M, C) => _LAY_LayoutFeaturesAltGr(M, C),
+	LayoutListProviders := Map(
+		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
+		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
 	)
-	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", LayoutDynHandlers)
+	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders)
 	; Grey out accented-letter shortcuts when Ergopti keyboard emulation is off —
 	; the shortcuts depend on Ergopti key positions and are unusable without it.
 	if !Features["layout"]["ergopti_base"] {
@@ -122,24 +129,56 @@ initMenu() {
 	; type entry but uses the ToggleAllHostrings* pattern for hotstrings.
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 
-	_HotDynHandlers := Map(
-		"hotstring_categories_standard", (M, C) => _HS_CategoriesStandard(M, C),
-		"hotstring_categories_dynamic",  (M, C) => _HS_CategoriesDynamic(M, C),
-		"hotstring_categories_ergopti",  (M, C) => _HS_CategoriesErgopti(M, C),
-		"hotstring_personal",            (M, C) => _HS_Personal(M, C),
-		"hotstring_extensions",          (M, C) => _HS_Extensions(M, C),
-		"magic_key_config",              (M, C) => _HS_MagicKeyConfig(M, C),
-		"repeat_key",                    (M, C) => _HS_RepeatKey(M, C),
-		"hotstring_bulk_actions",        (M, C) => _HS_BulkActions(M, C),
-		"delays_colors",                 (M, C) => _HS_DelaysColors(M, C),
-		"word_expanders",                (M, C) => _HS_WordExpanders(M, C),
+	; Empty since 2026-08-07: every row of the hotstrings tree is declarative or a
+	; list provider now. Kept as a Map rather than removed so the renderer's
+	; handler argument stays a Map and a future `dynamic` row has somewhere to go.
+	_HotDynHandlers := Map()
+
+	; repeat_key left _HotDynHandlers: its manifest row is `type = "check"` now,
+	; so the renderer draws the row, its label and its tick from the declaration
+	; and this driver supplies only the toggle and the state behind the tick. It
+	; was three copies of one checkbox before that, one per driver.
+	_HotParamCommands := Map(
+		"repeat_key", ToggleRepeatKeyEnabled,
+	)
+	_HotParamGetters := Map(
+		"hotstrings_repeat_enabled", () => HSE_RepeatEnabled,
+	)
+
+	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`
+	; now, so the renderer materialises every row of the submenu from the data
+	; the provider returns instead of the driver building a Menu object.
+	_HotListProviders := Map(
+		"word_expanders",                (*) => _HS_WordExpanderRows(),
+		; magic_key_config left _HotDynHandlers on 2026-08-07 for the same reason
+		; word_expanders did: its manifest row is `type = "list"` now, so the
+		; renderer builds the item from the data this returns.
+		"magic_key_config",              (*) => _HS_MagicKeyRows(),
+		"delays_colors",                 (*) => _HS_DelaysColorsRows(),
+		; The five category blocks. Their ROW — label, count, checkmark and
+		; position — is the renderer's now; the submenu hanging off each one is
+		; still SubMenus[Category], assembled by a different subsystem, and is
+		; handed over as a native Menu until that tree becomes data too.
+		"hotstring_categories_standard", (*) => _HS_CategoryRowsStandard(),
+		"hotstring_categories_dynamic",  (*) => _HS_CategoryRowsDynamic(),
+		"hotstring_categories_ergopti",  (*) => _HS_CategoryRowsErgopti(),
+		"hotstring_personal",            (*) => _HS_PersonalRows(),
+		"hotstring_extensions",          (*) => _HS_ExtensionRows(),
+	)
+
+	; The two bulk rows were ONE `dynamic` row that expanded to two, so the
+	; manifest described neither. They are two `command` rows now — which is
+	; also how macOS got them: it had no handler for the old id at all.
+	_HotCommands := Map(
+		"hotstrings_enable_all",  ToggleAllHotstringsOn,
+		"hotstrings_disable_all", ToggleAllHotstringsOff,
 	)
 
 	_HotGroupBuilders := Map(
-		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers),
+		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders, _HotParamCommands, _HotParamGetters),
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
-	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders)
+	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands)
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
@@ -199,18 +238,80 @@ initMenu() {
 		TrayMenuStage_Check(GetCategoryTitle("Gestures"))
 	}
 
+	; The HEAD is staged in the fixed sequence above, and the manifest declares
+	; that sequence too — so the two can disagree, and nothing would say which is
+	; right. This names what was staged, in order, and compares it with what
+	; top_level declares for this platform: a reordered manifest that this file
+	; does not follow is reported instead of silently ignored.
+	_MI_AssertHeadOrder(["keyboard_layout", "hotstrings", "llm", "metrics",
+		"shortcuts", "tap_holds", "gestures"])
+
 	; ─── Tail (global_actions onwards): order driven by the shared manifest top_level.
 	; Each id dispatches to its builder/registrar — only action closures and OS glue
 	; live here; layout data comes from menu_manifest.json.
 	_MI_AppendTail()
 	BootProfile_Mark("MENU/initMenu: tail (global_actions…debug)")
-	TrayMenuStage_Publish()
+	Published := TrayMenuStage_Publish(PublishAuthorizeFn)
+	return Published
 	} catch as e {
 		TrayMenuStage_Abort()
 		throw e
 	}
 }
 
+
+; Reports a head order that no longer matches the shared declaration.
+;
+; The tail below reads menu_manifest.json and dispatches by id; the head is a
+; fixed sequence of calls, because each entry needs different state assembled in
+; a different way and a generic dispatch would gain nothing. What it must not do
+; is DIFFER from the declaration — the two Lua drivers place the same entries by
+; reading it, so a manifest edit that this file ignores puts the same menu in two
+; orders.
+;
+; Reported, not enforced: reordering the calls is a real change with real
+; sequencing (the IA menu is initialised where it is because the metrics build
+; below depends on nothing it does), and a build-time ERROR naming the drift is
+; what tells the next person to make it deliberately.
+_MI_AssertHeadOrder(StagedIds) {
+	Declared := []
+	for _, Entry in MenuManifest_LoadTopLevel() {
+		if !(Entry is Map) or !Entry.Has("id")
+			continue
+		Id := Entry["id"]
+		if (Id == "---")
+			break  ; the head ends at the first separator; the tail is read below
+		if _MR_IsForAhk(Entry)
+			Declared.Push(Id)
+	}
+	if (Declared.Length == 0) {
+		try LoggerWarn("Menu", "top_level declares no head row for this platform — the order check read nothing.")
+		return
+	}
+	Mismatch := (Declared.Length != StagedIds.Length)
+	if !Mismatch {
+		for Index, Id in Declared {
+			if (Id != StagedIds[Index]) {
+				Mismatch := true
+				break
+			}
+		}
+	}
+	if Mismatch {
+		try LoggerError("Menu",
+			"The tray head is staged as [{1}] and menu_manifest.json declares [{2}] — the same menu is in two orders across the drivers.",
+			_MI_JoinIds(StagedIds), _MI_JoinIds(Declared))
+	}
+}
+
+; Comma-joins ids for the message above.
+_MI_JoinIds(Ids) {
+	Out := ""
+	for _, Id in Ids {
+		Out .= (Out == "" ? "" : ", ") . Id
+	}
+	return Out
+}
 
 ; Appends the tail section of the tray menu (from global_actions to debug) in the
 ; order declared in menu_manifest.json top_level, filtered for AHK.  Behaviour
@@ -272,96 +373,126 @@ _MI_AppendTail() {
 }
 
 
-; Builds the "Actions globales" submenu from the manifest's global_actions array (MENU-2).
+; Builds the "Actions globales" submenu from the manifest's global_actions array.
+;
+; Every row there is a `command`, so the renderer builds each label and each
+; separator from the declaration and this driver supplies only what a click does.
+; It used to iterate the same array and then write the label for each id by hand,
+; in a chain of `else if` — the manifest decided the ORDER and this file decided
+; everything else. Linux has rendered this same array for weeks.
 _MI_BuildGlobalActionsMenu() {
-	M := Menu()
-	for _, Entry in MenuManifest_LoadGlobalActions() {
-		Id := Entry["id"]
-		if Id == "---" {
-			M.Add()
-		} else if Id == "enable_all" {
-			RegisterMenuItem(M, t("menu.global.enable_all"),    ToggleAllFeaturesOn)
-		} else if Id == "disable_all" {
-			RegisterMenuItem(M, t("menu.global.disable_all"),   ToggleAllFeaturesOff)
-		} else if Id == "reset_defaults" {
-			RegisterMenuItem(M, t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
-		}
-	}
-	return M
+	Commands := Map(
+		"enable_all",     ToggleAllFeaturesOn,
+		"disable_all",    ToggleAllFeaturesOff,
+		"reset_defaults", ReloadWithDefaultConfig
+	)
+	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands)
 }
 
 
 ; Builds the About submenu (version, channel, update frequency, changelog).
 _MI_BuildAboutMenu() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
-	AboutMenu := Menu()
-	Ver := Updater_CurrentVersion()
-	VerLabel := "ErgoptiPlus " . Ver
+
+	; The updater block is provider DATA since 2026-08-07: one row per entry,
+	; with the channel and frequency pickers handed over as the native Menus they
+	; already are. The changelog and releases rows are `command` declarations.
+	; Until then the whole submenu was assembled here and described nowhere — on
+	; all three drivers at once.
+	Providers := Map("about_updates", (*) => _MI_AboutUpdateRows())
+	Commands := Map(
+		"about_changelog",     Updater_ShowChangelog,
+		"about_releases_page", Updater_OpenReleasesPage
+	)
+	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
+}
+
+; List provider: the version row, the channel picker, and — unless this is a
+; local checkout — the update-frequency picker and the one-click update row.
+_MI_AboutUpdateRows() {
+	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
+	Rows := []
+
+	VerLabel := "ErgoptiPlus " . Updater_CurrentVersion()
 	if Updater_IsLocalSource() {
-		AboutMenu.Add(VerLabel, (*) => NoAction())
-		AboutMenu.Disable(VerLabel)
+		; A local checkout has no release to open, so the version reads as a label.
+		Rows.Push(Map("label", VerLabel, "disabled", true))
 	} else {
-		RegisterMenuItem(AboutMenu, VerLabel, Updater_OpenCurrentRelease)
+		Rows.Push(Map("label", VerLabel, "action", Updater_OpenCurrentRelease))
 	}
-	AboutMenu.Add()
-	ChannelMenu := Menu()
-	RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
-	RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
-	ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
+	Rows.Push(Map("separator", true))
+
+	; The two channels as nested row DATA. The parent's label carries the channel
+	; currently set, which is why the row stays a provider's rather than a
+	; declaration's — but what hangs off it is the renderer's to draw.
 	ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
-	AboutMenu.Add(t("menu.about.channel_menu") . ": " . ChannelDisplay, ChannelMenu)
-	if not Updater_IsLocalSource() {
-		FreqMenu := Menu()
-		CurrentLabel := ""
-		CurrentCode  := ""
-		for _, Preset in UPDATER_INTERVAL_PRESETS {
-			Label := t("menu.about.frequency." . Preset.Code)
-			RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
-			if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
-				CurrentLabel := Label
-				CurrentCode  := Preset.Code
-			}
-		}
-		if (CurrentLabel != "")
-			FreqMenu.Check(CurrentLabel)
-		FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
-		AboutMenu.Add(t("menu.about.frequency_menu") . ": " . FreqDisplay, FreqMenu)
-		UpdateLabel := Updater_GetUpdateMenuLabel()
-		RegisterMenuItem(AboutMenu, UpdateLabel, Updater_OneClickUpdate)
-		if (Updater_GetUpdateState() == "checking")
-			AboutMenu.Disable(UpdateLabel)
+	Rows.Push(Map(
+		"label", t("menu.about.channel_menu") . ": " . ChannelDisplay,
+		"items", [
+			Map("label",   t("menu.about.channel_main"),
+				"action",  (*) => Updater_SetChannel("main"),
+				"checked", (UPDATER_CHANNEL != "dev")),
+			Map("label",   t("menu.about.channel_dev"),
+				"action",  (*) => Updater_SetChannel("dev"),
+				"checked", (UPDATER_CHANNEL == "dev"))
+		]))
+
+	if Updater_IsLocalSource() {
+		return Rows
 	}
-	AboutMenu.Add()
-	RegisterMenuItem(AboutMenu, t("menu.about.changelog"), Updater_ShowChangelog)
-	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
-	return AboutMenu
+
+	; Same shape for the check-frequency presets: one nested row per preset, the
+	; tick on whichever matches the interval in force.
+	FreqRows := []
+	CurrentLabel := ""
+	CurrentCode  := ""
+	for _, Preset in UPDATER_INTERVAL_PRESETS {
+		Label := t("menu.about.frequency." . Preset.Code)
+		FreqRows.Push(Map(
+			"label",   Label,
+			"action",  _MakeFreqSetter(Preset.Seconds),
+			"checked", (Preset.Seconds == UPDATER_CHECK_INTERVAL)))
+		if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
+			CurrentLabel := Label
+			CurrentCode  := Preset.Code
+		}
+	}
+	FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
+	Rows.Push(Map(
+		"label", t("menu.about.frequency_menu") . ": " . FreqDisplay,
+		"items", FreqRows))
+
+	Rows.Push(Map(
+		"label",    Updater_GetUpdateMenuLabel(),
+		"action",   Updater_OneClickUpdate,
+		"disabled", (Updater_GetUpdateState() == "checking")))
+	return Rows
 }
 
 
+
 ; Builds the Debug submenu from the manifest's debug_menu array.
+;
+; Same move as the global actions above, and the same day: every row is a
+; `command` except the log-level picker, whose label carries the CURRENT level
+; and is therefore a `list` — exactly the shape Linux declared for it.
 _MI_BuildDebuggingMenu() {
-	DebuggingMenu := Menu()
-	for _, Entry in MenuManifest_LoadDebugMenu() {
-		Id := Entry["id"]
-		if Id == "---" {
-			DebuggingMenu.Add()
-		} else if Id == "window_spy" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.window_spy"),     WindowSpy)
-		} else if Id == "list_vars" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.list_vars"),      ActivateListVars)
-		} else if Id == "key_history" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),    ActivateKeyHistory)
-		} else if Id == "log_level" {
-			DebuggingMenu.Add(_LogLevelMenuLabel(), _BuildLogLevelMenu())
-		} else if Id == "open_logs" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),      OpenLogsFolder)
-		} else if Id == "open_today_log" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
-		} else if Id == "open_error_log" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.open_error_log"), OpenErrorLog)
-		} else if Id == "healthcheck" {
-			RegisterMenuItem(DebuggingMenu, t("menu.debug.healthcheck"),    ShowHealthCheck)
-		}
-	}
-	return DebuggingMenu
+	Commands := Map(
+		"window_spy",     WindowSpy,
+		"list_vars",      ActivateListVars,
+		"key_history",    ActivateKeyHistory,
+		"open_logs",      OpenLogsFolder,
+		"open_today_log", OpenTodayLog,
+		"open_error_log", OpenErrorLog,
+		"healthcheck",    ShowHealthCheck
+	)
+	ListProviders := Map("log_level", (*) => _MI_LogLevelRows())
+	return MenuRenderer_Build("debug_menu", "Debug", "", "", ListProviders, Commands)
+}
+
+; List provider: the log-level picker, whose parent row reads the current level.
+_MI_LogLevelRows() {
+	return [Map(
+		"label", _LogLevelMenuLabel(),
+		"items", _MI_LogLevelChoiceRows())]
 }

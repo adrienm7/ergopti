@@ -32,7 +32,7 @@
 ; make the impossible value impossible, and to say something when the input was
 ; not what the code assumed.
 ;
-; SCOPE: behavioural for the locale miss (lib/locale.ahk is in the headless
+; SCOPE: behavioural for the locale miss (infra/locale.ahk is in the headless
 ; include graph); source-level for the two metrics findings, whose modules are
 ; not — see the scope note in section 1.
 ; ==============================================================================

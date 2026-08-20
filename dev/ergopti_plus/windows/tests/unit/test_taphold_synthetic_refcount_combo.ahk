@@ -15,10 +15,10 @@
 ; prevent — the user keeps a key physically held while its modifier is gone,
 ; and every keystroke until release arrives unmodified.
 ;
-; ROOT CAUSE ENCODED: the count must be per individual KEY NAME, never per
-; caller-supplied value. Both shapes (scalar and combo) must share one counter
-; for the same key name, so the Down is emitted only on 0->1 and the Up only
-; on 1->0.
+; ROOT CAUSES ENCODED: the count must be per individual KEY NAME, never per
+; caller-supplied value; a 0->1 combination is one sender transaction whose
+; counts publish only after success; and a failed 1->0 transition remains in a
+; separate release-pending ledger until a bounded retry proves the Up.
 ;
 ; SCOPE: behavioural. TapHoldSyntheticKeyDown/Up live in the tap-hold constants
 ; module, which the headless runner includes; the send primitive is swapped for
@@ -48,18 +48,22 @@ _TSRC_Record(Keys) {
 }
 
 _TSRC_Begin() {
-	global _AHK_SendInput, _TSRC_Sent, _TH_SyntheticHeldKeys
+	global _AHK_SendInput, _TSRC_Sent
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
 	_TSRC_Sent := []
 	_TH_SyntheticHeldKeys := Map()
+	_TH_SyntheticReleasePendingKeys := Map()
 	_AHK_SendInput := _TSRC_Record
 }
 
 ; Restores the suite-wide no-op installed by InstallSendNoOps and leaves no
 ; synthetic key logically held for the next test.
 _TSRC_End() {
-	global _AHK_SendInput, _TH_SyntheticHeldKeys
+	global _AHK_SendInput
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
 	_AHK_SendInput := (Keys) => 0
 	_TH_SyntheticHeldKeys := Map()
+	_TH_SyntheticReleasePendingKeys := Map()
 }
 
 _TSRC_Count(Payload) {
@@ -70,6 +74,34 @@ _TSRC_Count(Payload) {
 			N++
 	}
 	return N
+}
+
+; Records every low-level attempt and throws on the second modifier Down. The
+; adapter catches the exception, then its Array transaction rolls LCtrl back.
+_TSRC_FailSecondDown(Keys) {
+	global _TSRC_Sent
+	_TSRC_Sent.Push(Keys)
+	if (Keys == "{LShift Down}")
+		throw Error("injected second modifier Down failure")
+}
+
+; The full AHK-03 repro: the second Down fails, then the compensating Up for
+; the first successful Down fails too. The first key may remain down at the OS
+; and must therefore survive as an explicit release-pending owner.
+_TSRC_FailSecondDownAndRollback(Keys) {
+	global _TSRC_Sent
+	_TSRC_Sent.Push(Keys)
+	if (Keys == "{LShift Down}" or Keys == "{LCtrl Up}")
+		throw Error("injected Down/rollback failure")
+}
+
+; Records every low-level attempt and rejects every synthetic Up so the test
+; can prove both the retry bound and ownership retention after exhaustion.
+_TSRC_FailEveryUp(Keys) {
+	global _TSRC_Sent
+	_TSRC_Sent.Push(Keys)
+	if InStr(Keys, " Up}")
+		throw Error("injected synthetic Up failure")
 }
 
 
@@ -189,6 +221,216 @@ _TSRC_UntrackedReleaseStillBalancesEveryKeyOfACombo() {
 }
 
 
+
+
+
+; ============================================================
+; ============================================================
+; ======= 3/ Send failures preserve truthful ownership =======
+; ============================================================
+; ============================================================
+
+; AHK-03: the old tap-hold loop incremented both counters before making two
+; scalar sends. A failure on LShift therefore returned true, skipped the
+; sender's Array rollback, and left two fictional owners over one OS Down.
+_TSRC_FailedComboDownRollsBackBeforePublishing() {
+	global _AHK_SendInput, _TSRC_Sent
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	_TSRC_Begin()
+	try {
+		_AHK_SendInput := _TSRC_FailSecondDown
+		Ok := TapHoldSyntheticKeyDown(["LCtrl", "LShift"])
+
+		AssertEqual(false, Ok,
+			"a failed 0->1 combination transaction must return false")
+		AssertEqual(3, _TSRC_Sent.Length,
+			"the sender must attempt two Downs and exactly one rollback")
+		AssertEqual("{LCtrl Down}", _TSRC_Sent[1],
+			"the first modifier Down must lead the transaction")
+		AssertEqual("{LShift Down}", _TSRC_Sent[2],
+			"the deterministic seam must fail on the second modifier Down")
+		AssertEqual("{LCtrl Up}", _TSRC_Sent[3],
+			"partial Downs must roll back in reverse order before failure returns")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count,
+			"no active count may publish for an OS transaction that failed")
+		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count,
+			"a proven rollback must not manufacture a release-pending owner")
+	}
+	finally {
+		_TSRC_End()
+	}
+}
+
+; AHK-03: returning false is not sufficient when rollback itself fails. The
+; adapter must identify the exact key whose compensating Up was not proven and
+; the tap-hold owner must retain it for lifecycle cleanup without publishing a
+; fictional active refcount.
+_TSRC_FailedComboRollbackRemainsReleasePending() {
+	global _AHK_SendInput, _TSRC_Sent
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	_TSRC_Begin()
+	try {
+		_AHK_SendInput := _TSRC_FailSecondDownAndRollback
+		Ok := TapHoldSyntheticKeyDown(["LCtrl", "LShift"])
+
+		AssertEqual(false, Ok,
+			"a combination whose Down and rollback both fail must return false")
+		AssertEqual(3, _TSRC_Sent.Length,
+			"the failed transaction must attempt two Downs and one compensating Up")
+		AssertEqual("{LCtrl Up}", _TSRC_Sent[3],
+			"the rollback failure seam must target the first proven Down")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count,
+			"a failed combination must never publish ordinary active counts")
+		AssertTrue(_TH_SyntheticReleasePendingKeys.Has("LCtrl"),
+			"a failed rollback Up must remain owned even though the Down transaction returned false")
+		AssertTrue(!_TH_SyntheticReleasePendingKeys.Has("LShift"),
+			"the modifier whose Down failed must not acquire fictional release ownership")
+
+		_AHK_SendInput := _TSRC_Record
+		AssertEqual(true, TapHoldReleaseSyntheticKeys(),
+			"a later lifecycle cleanup must retry and prove the retained rollback Up")
+		AssertEqual(4, _TSRC_Sent.Length,
+			"cleanup must emit exactly one later retry for the retained key")
+		AssertEqual("{LCtrl Up}", _TSRC_Sent[4],
+			"cleanup must retry the exact rollback key, not the failed Down key")
+		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count,
+			"only the later proven Up may retire rollback ownership")
+	}
+	finally {
+		_TSRC_End()
+	}
+}
+
+; AHK-03: a failed final Up used to delete the only ledger entry first. Both
+; the normal finalizer and Suspend cleanup then forgot which OS key still
+; needed release. Exhaust the bounded retry twice, then prove a later cleanup
+; retains and drains the same pending owner.
+_TSRC_FailedFinalUpStaysPendingUntilCleanupProvesRelease() {
+	global _AHK_SendInput
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS
+	_TSRC_Begin()
+	try {
+		AssertEqual(true, TapHoldSyntheticKeyDown("LCtrl"),
+			"the fixture must first prove the synthetic Down")
+		_AHK_SendInput := _TSRC_FailEveryUp
+
+		Ok := TapHoldSyntheticKeyUp("LCtrl")
+		AssertEqual(false, Ok,
+			"an exhausted final-Up retry must return false")
+		AssertEqual(TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS,
+			_TSRC_Count("{LCtrl Up}"),
+			"the normal release must stop at the named retry bound")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count,
+			"a zero-count key must leave the active refcount ledger")
+		AssertTrue(_TH_SyntheticReleasePendingKeys.Has("LCtrl"),
+			"the failed 1->0 OS transition must remain explicitly release-pending")
+
+		CleanupOk := TapHoldReleaseSyntheticKeys()
+		AssertEqual(false, CleanupOk,
+			"lifecycle cleanup must report an exhausted pending release")
+		AssertEqual(TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS * 2,
+			_TSRC_Count("{LCtrl Up}"),
+			"each cleanup invocation must be bounded independently")
+		AssertTrue(_TH_SyntheticReleasePendingKeys.Has("LCtrl"),
+			"failed lifecycle retries must retain ownership for the next cleanup")
+
+		_AHK_SendInput := _TSRC_Record
+		AssertEqual(true, TapHoldReleaseSyntheticKeys(),
+			"a later lifecycle retry must drain the retained owner once Up succeeds")
+		AssertEqual(TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS * 2 + 1,
+			_TSRC_Count("{LCtrl Up}"),
+			"successful cleanup must stop immediately after the first proven Up")
+		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count,
+			"a proven Up is the only event allowed to forget release ownership")
+	}
+	finally {
+		_TSRC_End()
+	}
+}
+
+; The pending ledger is per emitted key, not per caller value. A combination
+; release must retain every failed Up independently; stopping after the first
+; failure would recreate the original partial-combo leak for the later keys.
+_TSRC_FailedComboUpRetainsEveryKey() {
+	global _AHK_SendInput
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS
+	_TSRC_Begin()
+	try {
+		AssertEqual(true, TapHoldSyntheticKeyDown(["LCtrl", "LShift"]),
+			"the fixture must prove both synthetic Downs before failing release")
+		_AHK_SendInput := _TSRC_FailEveryUp
+
+		AssertEqual(false, TapHoldSyntheticKeyUp(["LCtrl", "LShift"]),
+			"a combination release must report failure when either Up is unproven")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count,
+			"both zero-count keys must leave the active refcount ledger")
+		for _, Name in ["LCtrl", "LShift"] {
+			AssertTrue(_TH_SyntheticReleasePendingKeys.Has(Name),
+				"every failed combination Up must retain its own release owner: " . Name)
+			AssertEqual(TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS,
+				_TSRC_Count("{" . Name . " Up}"),
+				"each key's immediate retry loop must have the same named bound: " . Name)
+		}
+
+		_AHK_SendInput := _TSRC_Record
+		AssertEqual(true, TapHoldReleaseSyntheticKeys(),
+			"later lifecycle cleanup must drain every retained combination key")
+		for _, Name in ["LCtrl", "LShift"]
+			AssertEqual(TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS + 1,
+				_TSRC_Count("{" . Name . " Up}"),
+				"cleanup must retry every pending combination key exactly once after recovery: " . Name)
+		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count,
+			"cleanup may report success only after every combination Up is proven")
+	}
+	finally {
+		_TSRC_End()
+	}
+}
+
+; The two pass-through tap paths release a PHYSICAL LAlt/RCtrl before their tap
+; action. They must not decrement or force-Up an unrelated synthetic owner of
+; the same OS key; doing either turns a valid refcount into a lie.
+_TSRC_PhysicalEarlyReleaseDoesNotConsumeSyntheticOwner() {
+	global _TH_SyntheticHeldKeys
+	_TSRC_Begin()
+	try {
+		AssertEqual(true, TapHoldSyntheticKeyDown("LAlt"),
+			"the fixture must establish an unrelated synthetic owner")
+		AssertEqual(false, TapHoldReleasePhysicalKey("LAlt"),
+			"a pass-through physical tap must be suppressed while a synthetic owner still requires LAlt")
+		AssertEqual(1, _TSRC_Count("{LAlt Down}"),
+			"the synthetic owner must remain the sole proven Down")
+		AssertEqual(0, _TSRC_Count("{LAlt Up}"),
+			"physical early release must not force-Up a key an unrelated synthetic owner still holds")
+		AssertEqual(1, _TH_SyntheticHeldKeys["LAlt"],
+			"physical early release must not consume the synthetic owner's reference")
+		AssertEqual(true, TapHoldSyntheticKeyUp("LAlt"),
+			"the real owner must remain able to release normally")
+		AssertEqual(1, _TSRC_Count("{LAlt Up}"),
+			"the real owner must emit the one balancing Up")
+	}
+	finally {
+		_TSRC_End()
+	}
+}
+
+_TSRC_RejectShutdownSyntheticRelease(*) {
+	return false
+}
+
+; A bounded release failure at OnExit must keep the process alive. Otherwise
+; the release-pending Map dies with the process and the OS modifier has no
+; remaining owner capable of sending the balancing Up.
+_TSRC_ShutdownRefusesToDestroyPendingReleaseOwner() {
+	global _TSRC_RejectShutdownSyntheticRelease
+	AssertEqual(1,
+		TapHoldShutdownReleaseGate(_TSRC_RejectShutdownSyntheticRelease) ? 0 : 1,
+		"the shutdown gate must reject an unproven synthetic release")
+}
+
+
 Test("taphold-synthetic-refcount: a combo hold keeps LCtrl down when an overlapping single hold releases",
 	_TSRC_ComboKeepsCtrlWhenOverlappingSingleHoldReleases)
 Test("taphold-synthetic-refcount: two resolutions of the same combination share their counts",
@@ -197,3 +439,15 @@ Test("taphold-synthetic-refcount: the scalar refcount still balances",
 	_TSRC_ScalarRefcountStillBalances)
 Test("taphold-synthetic-refcount: an untracked combo release balances every key of the combination",
 	_TSRC_UntrackedReleaseStillBalancesEveryKeyOfACombo)
+Test("taphold synthetic transaction AHK-03: failed combo Down rolls back before publishing counts",
+	_TSRC_FailedComboDownRollsBackBeforePublishing)
+Test("taphold synthetic transaction AHK-03: failed combo rollback remains release-pending",
+	_TSRC_FailedComboRollbackRemainsReleasePending)
+Test("taphold synthetic transaction AHK-03: failed final Up remains pending through bounded cleanup retries",
+	_TSRC_FailedFinalUpStaysPendingUntilCleanupProvesRelease)
+Test("taphold synthetic transaction AHK-03: failed combo Up retains every emitted key",
+	_TSRC_FailedComboUpRetainsEveryKey)
+Test("taphold synthetic transaction AHK-03: physical early release preserves an unrelated synthetic owner",
+	_TSRC_PhysicalEarlyReleaseDoesNotConsumeSyntheticOwner)
+Test("taphold synthetic transaction AHK-03: shutdown preserves a failed release owner",
+	_TSRC_ShutdownRefusesToDestroyPendingReleaseOwner)

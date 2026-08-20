@@ -14,10 +14,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/llm/api_mlx_discovery.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("api_mlx_discovery.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/llm/api_mlx_discovery.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function read_active_model_arg")
+helpers.assert_true(src ~= nil, "modules/llm/api_mlx_discovery.lua source must be locatable")
 
 
 

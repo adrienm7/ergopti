@@ -44,6 +44,7 @@
 ; not (F47).
 global LLM_BRIDGE_BUFFER_MAX_CHARS := 10000
 global _LLM_Bridge_Buffer := ""
+global _LLM_Bridge_ContentGeneration := 0
 global _LLM_Bridge_Active := false
 ; Fallback path when Ollama becomes ready before PrefixWatcher's InputHook exists.
 global _LLM_Bridge_DispatcherCharFn := 0
@@ -51,6 +52,11 @@ global _LLM_Bridge_DispatcherKeyFn := 0
 ; Throttle keystroke logs — one INFO line per ~2 s of typing is enough to
 ; confirm the pipeline is alive without flooding ErgoptiPlus_*.log.
 global _LLM_Bridge_LastLogTick := 0
+; Single acceptance transaction guard shared by the HotIf and InputHook paths.
+; Production keeps it raised through sender completion and one deferred turn,
+; so both callbacks observing one physical Tab consume one claim.
+global _LLM_AcceptInProgress := false
+global _LLM_ACCEPT_CLAIM_RELEASE_DELAY_MS := 25
 ; Pointer-dismiss watcher — mirrors macOS tooltip_llm.lua mouseMoved/click/scroll.
 global _LLM_PointerWatch_Armed     := false
 global _LLM_PointerWatch_LastX     := unset
@@ -74,13 +80,452 @@ global _LLM_HOTSTRING_CHAIN_OFFSET_SEC := 0.05
 global _LLM_INFINITE_TOOLTIP_SEC       := 86400
 global _LLM_MIN_TOOLTIP_DURATION_SEC   := 0.05
 
+; Canonical owner for every runtime mutation of the rolling LLM context. The
+; old cap lived only in OnChar, so accepted and inline predictions could grow
+; the same buffer forever without passing through it. Every edit now keeps the
+; newest tail and advances an ABA-safe generation even when the visible value
+; returns to the same text after an append/backspace pair.
+; @param DeleteFromEnd {Integer|unset} Characters removed from the current
+;        tail. Omitted means clear every character, including oversized legacy
+;        state created before this invariant existed.
+; @param InsertedText {String} Text appended after deletion.
+; @return {String} The newly published bounded buffer.
+_LLM_Bridge_ApplyBufferEdit(DeleteFromEnd := unset, InsertedText := "") {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_ContentGeneration
+	global LLM_BRIDGE_BUFFER_MAX_CHARS
+	DeleteAll := !IsSet(DeleteFromEnd)
+	DeleteCount := DeleteAll ? 0 : Max(0, DeleteFromEnd)
+	InsertedTail := InsertedText
+	if (StrLen(InsertedTail) > LLM_BRIDGE_BUFFER_MAX_CHARS)
+		InsertedTail := SubStr(InsertedTail, -LLM_BRIDGE_BUFFER_MAX_CHARS)
+	PreviousCritical := Critical("On")
+	try {
+		RemainingLen := DeleteAll ? 0
+			: Max(0, StrLen(_LLM_Bridge_Buffer) - DeleteCount)
+		Remaining := RemainingLen > 0
+			? SubStr(_LLM_Bridge_Buffer, 1, RemainingLen) : ""
+		Available := LLM_BRIDGE_BUFFER_MAX_CHARS - StrLen(InsertedTail)
+		if (Available <= 0) {
+			KeptTail := ""
+		} else if (StrLen(Remaining) > Available) {
+			KeptTail := SubStr(Remaining, -Available)
+		} else {
+			KeptTail := Remaining
+		}
+		_LLM_Bridge_Buffer := KeptTail . InsertedTail
+		_LLM_Bridge_ContentGeneration += 1
+		return _LLM_Bridge_Buffer
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LLM_Bridge_ClearBuffer() {
+	return _LLM_Bridge_ApplyBufferEdit()
+}
+
+; Pure admission policy for a deferred LLM output. Maps keep the test seam
+; readable while every production field remains mandatory and strictly typed.
+; The three epochs are complementary: physical input catches mouse/chords,
+; bridge content catches text ABA even inside one tick quantum, and prefix
+; context catches caret/navigation resets that do not change the LLM text.
+_LLM_Bridge_TextAdmissionMatches(Expected, Live) {
+	if !(Expected is Map) or !(Live is Map)
+		return false
+	static IdentityKeys := ["hwnd", "control", "physical_generation",
+		"content_generation", "context_generation", "request_id"]
+	for Key in IdentityKeys {
+		if !Expected.Has(Key) or !Live.Has(Key)
+			return false
+		if !(Expected[Key] is Integer) or !(Live[Key] is Integer)
+			return false
+		if Expected[Key] != Live[Key]
+			return false
+	}
+	if (Expected["hwnd"] <= 0 or Expected["control"] <= 0)
+		return false
+	if !Live.Has("suspended") or !(Live["suspended"] is Integer)
+		return false
+	return Live["suspended"] == false
+}
+
+_LLM_Bridge_CaptureAdmissionSeed(Source) {
+	global _LLM_Bridge_ContentGeneration, _PrefixInputContextGeneration
+	if !(Source is Map)
+		Source := Map()
+	return Map(
+		"hwnd", Source.Get("hwnd", 0),
+		"control", Source.Get("control", 0),
+		"physical_generation", KS_GetPhysicalInputGeneration(),
+		"content_generation", _LLM_Bridge_ContentGeneration,
+		"context_generation", IsSet(_PrefixInputContextGeneration)
+			? _PrefixInputContextGeneration : -1
+	)
+}
+
+_LLM_Bridge_TextAdmissionStillCurrent(Expected) {
+	global _LLM_Bridge_ContentGeneration, _PrefixInputContextGeneration, _LLM_Engine
+	LiveRequestId := (IsSet(_LLM_Engine) and _LLM_Engine is Map)
+		? _LLM_Engine.Get("request_id", -1) : -1
+	Live := Map(
+		"hwnd", WIGetForegroundHwnd(),
+		"control", WIGetFocusedControlToken(),
+		"physical_generation", KS_GetPhysicalInputGeneration(),
+		"content_generation", _LLM_Bridge_ContentGeneration,
+		"context_generation", IsSet(_PrefixInputContextGeneration)
+			? _PrefixInputContextGeneration : -1,
+		"request_id", LiveRequestId,
+		"suspended", A_IsSuspended ? true : false
+	)
+	return _LLM_Bridge_TextAdmissionMatches(Expected, Live)
+}
+
+_LLM_Bridge_MakeTextAdmission(Seed, RequestId) {
+	if !(Seed is Map)
+		throw TypeError("LLM text admission requires an immutable seed Map.")
+	Expected := Seed.Clone()
+	Expected["request_id"] := RequestId
+	return {
+		Expected: Expected,
+		Predicate: _LLM_Bridge_TextAdmissionStillCurrent.Bind(Expected)
+	}
+}
+
+_LLM_Bridge_NewInjectionTransaction(Text, Seed, RequestId,
+		Inline := false, Slots := unset, ActiveIdx := 1,
+		PresentedRecord := 0, PresentedLifecycle := 0) {
+	Admission := _LLM_Bridge_MakeTextAdmission(Seed, RequestId)
+	SlotSnapshot := (IsSet(Slots) and Slots is Array) ? Slots.Clone() : [Text]
+	return {
+		Text: Text,
+		SourceHwnd: Admission.Expected["hwnd"],
+		SourceControl: Admission.Expected["control"],
+		Inline: Inline ? true : false,
+		Slots: SlotSnapshot,
+		ActiveIdx: ActiveIdx,
+		PresentedRecord: PresentedRecord,
+		PresentedLifecycle: PresentedLifecycle,
+		Admission: Admission.Predicate
+	}
+}
+
+; RAM-only half of an injected-text commit. TextSender calls this after the OS
+; primitive returned, without leaving the same Critical transaction. It returns
+; only the presentation finalizer, which TextSender executes after restoring the
+; scheduler. Any exception is treated as post-output state damage and triggers
+; the fail-safe reset below; it must never turn into a retryable send failure.
+_LLM_Bridge_CommitInjectedText(Transaction) {
+	global _LLM_Engine
+	if !A_IsCritical
+		throw Error("LLM injected-text commit requires a Critical output transaction.")
+	_LLM_Bridge_ApplyBufferEdit(0, Transaction.Text)
+	if Transaction.Inline {
+		if !(_LLM_Engine is Map)
+			throw Error("LLM engine state is unavailable during inline commit.")
+		_LLM_Engine["inline_last_typed"] := Transaction.Text
+	}
+	if !IsSet(_PrefixCommitInputContext) or !IsSet(_PrefixFinishInputContext)
+		throw Error("Prefix/HSE paired commit owner is unavailable.")
+	PrefixCommit := _PrefixCommitInputContext(Transaction.SourceControl, false)
+	if IsSet(_LSCResetFrom) {
+		Tail := []
+		N := Min(StrLen(Transaction.Text), 5)
+		loop N
+			Tail.Push(SubStr(Transaction.Text,
+				StrLen(Transaction.Text) - N + A_Index, 1))
+		_LSCResetFrom(Tail)
+	}
+	return _PrefixFinishInputContext.Bind(PrefixCommit)
+}
+
+_LLM_Bridge_RecoverInjectedState(Transaction, CommitError := "") {
+	global _LLM_Engine
+	if !A_IsCritical
+		throw Error("LLM injected-text recovery requires a Critical output transaction.")
+	Failures := []
+	PrefixCommit := 0
+	try
+		_LLM_Bridge_ClearBuffer()
+	catch as Err
+		Failures.Push("bridge=" . Err.Message)
+	if Transaction.Inline {
+		if (_LLM_Engine is Map)
+			_LLM_Engine["inline_last_typed"] := ""
+		else
+			Failures.Push("inline=engine state unavailable")
+	}
+	if !IsSet(_PrefixCommitInputContext) or !IsSet(_PrefixFinishInputContext) {
+		Failures.Push("prefix=paired commit owner unavailable")
+	} else {
+		try
+			PrefixCommit := _PrefixCommitInputContext(0, false)
+		catch as Err
+			Failures.Push("prefix=" . Err.Message)
+	}
+	try
+		_LSCResetFrom([])
+	catch as Err
+		Failures.Push("lsc=" . Err.Message)
+	return _LLM_Bridge_FinishInjectedRecovery.Bind(PrefixCommit, Failures)
+}
+
+_LLM_Bridge_FinishInjectedRecovery(PrefixCommit, Failures) {
+	if IsObject(PrefixCommit) {
+		try
+			_PrefixFinishInputContext(PrefixCommit)
+		catch as Err
+			Failures.Push("prefix_finalizer=" . Err.Message)
+	}
+	if Failures.Length > 0 {
+		Message := ""
+		for Index, Failure in Failures
+			Message .= (Index == 1 ? "" : "; ") . Failure
+		throw Error(Message)
+	}
+}
+
+_LLM_Bridge_InjectionOptions(Transaction) {
+	return Map(
+		"mode", "auto",
+		"atomic_input", true,
+		"admission", Transaction.Admission,
+		"atomic_prepare", _LLM_Bridge_PrepareOutputJournal.Bind(Transaction),
+		"atomic_journal", _LLM_Bridge_CommitOutputJournal,
+		"atomic_commit", _LLM_Bridge_CommitInjectedText.Bind(Transaction),
+		"commit_failure", _LLM_Bridge_RecoverInjectedState.Bind(Transaction)
+	)
+}
+
+_LLM_Bridge_PrepareOutputJournal(Transaction) {
+	return KL_PrepareLlmOutputJournal(Map(
+		"source_hwnd", Transaction.SourceHwnd,
+		"prediction", Transaction.Text,
+		"all_predictions", Transaction.Slots,
+		"chosen_index", Transaction.ActiveIdx,
+		"deletes", 0,
+		"deleted_text", "",
+		; Inline output has no rendered tooltip, so its suggestion denominator
+		; must be committed with the accepted row. Tab acceptance already has a
+		; suggested row from the final tooltip render.
+		"include_suggested", (Transaction.Inline
+			or (IsObject(Transaction.PresentedLifecycle)
+				and !Transaction.PresentedLifecycle.Suggested))
+	), Transaction.Admission)
+}
+
+_LLM_Bridge_CommitOutputJournal(Token) {
+	return KL_CommitPreparedLlmOutputJournal(Token)
+}
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 2/ Canonical Tab Acceptance =======
+; ===========================================
+; ===========================================
+
+; Snapshot the physical event and current focus in one fail-closed probe. Raw
+; InputHook events, the Tab hotkey, gestures and tap-hold remaps all converge on
+; this same shape; a caller cannot accidentally substitute logical modifier
+; state for the physical state that decides whether Tab means "accept".
+_LLM_Accept_ReadInputSnapshot() {
+	Snapshot := Map(
+		"known", false,
+		"tab_down", false,
+		"ctrl_down", false,
+		"alt_down", false,
+		"shift_down", false,
+		"win_down", false,
+		"current_hwnd", 0,
+		"current_control", 0
+	)
+	try {
+		Snapshot["tab_down"] := GetKeyState("Tab", "P") ? true : false
+		Snapshot["ctrl_down"] := GetKeyState("Ctrl", "P") ? true : false
+		Snapshot["alt_down"] := GetKeyState("Alt", "P") ? true : false
+		Snapshot["shift_down"] := GetKeyState("Shift", "P") ? true : false
+		Snapshot["win_down"] := (GetKeyState("LWin", "P")
+			or GetKeyState("RWin", "P")) ? true : false
+		Snapshot["current_hwnd"] := WinGetID("A")
+		Snapshot["current_control"] := WIGetFocusedControlToken()
+		Snapshot["known"] := (Snapshot["current_hwnd"] is Integer
+			and Snapshot["current_hwnd"] > 0
+			and Snapshot["current_control"] is Integer
+			and Snapshot["current_control"] > 0)
+	} catch {
+		; Keep known=false. An unverifiable focus or key state must never inject.
+	}
+	return Snapshot
+}
+
+_LLM_Accept_HasDeclaredModifiers(Modifiers) {
+	if (Modifiers is Array)
+		return Modifiers.Length > 0
+	if (Modifiers is String)
+		return Modifiers != ""
+	return true
+}
+
+_LLM_Accept_ReleaseClaim() {
+	global _LLM_AcceptInProgress
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_AcceptInProgress := false
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Release on a later scheduler turn, after every HotIf/InputHook callback for the
+; physical Tab that created the claim has had a chance to observe it. A direct
+; release after TextSend would reopen the still-visible tooltip before its
+; generation-fenced hide timer runs and permit a second injection.
+_LLM_Accept_DeferClaimRelease() {
+	global _LLM_ACCEPT_CLAIM_RELEASE_DELAY_MS
+	SetTimer(_LLM_Accept_ReleaseClaim, -_LLM_ACCEPT_CLAIM_RELEASE_DELAY_MS)
+}
+
+_LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot) {
+	if !(IsPhysicalTabEvent is Integer) or IsPhysicalTabEvent != true
+		return false
+	if _LLM_Accept_HasDeclaredModifiers(Modifiers)
+		return false
+	if !(InputSnapshot is Map)
+		return false
+	static RequiredInputKeys := ["known", "tab_down", "ctrl_down", "alt_down",
+		"shift_down", "win_down", "current_hwnd", "current_control"]
+	for Key in RequiredInputKeys {
+		if !InputSnapshot.Has(Key)
+			return false
+	}
+	for Key in ["known", "tab_down", "ctrl_down", "alt_down", "shift_down", "win_down"] {
+		if !(InputSnapshot[Key] is Integer)
+			return false
+	}
+	if !InputSnapshot["known"] or !InputSnapshot["tab_down"]
+		return false
+	if (InputSnapshot["ctrl_down"] or InputSnapshot["alt_down"]
+			or InputSnapshot["shift_down"] or InputSnapshot["win_down"])
+		return false
+	return true
+}
+
+; Pure policy predicate used by the canonical acceptance primitive. The source
+; is the one published by the render, not the mutable source of the newest
+; pending keystroke: a visible tooltip from control A must stay owned by A even
+; after control B has armed another request.
+_LLM_Accept_IsAllowed(IsPhysicalTabEvent, Modifiers, InputSnapshot, RenderedSource) {
+	if !_LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot)
+		return false
+	if !(RenderedSource is Map)
+		return false
+	SourceHwnd := RenderedSource.Get("hwnd", 0)
+	SourceControl := RenderedSource.Get("control", 0)
+	CurrentHwnd := InputSnapshot["current_hwnd"]
+	CurrentControl := InputSnapshot["current_control"]
+	if !(SourceHwnd is Integer and SourceHwnd > 0
+			and SourceControl is Integer and SourceControl > 0
+			and CurrentHwnd is Integer and CurrentHwnd > 0
+			and CurrentControl is Integer and CurrentControl > 0)
+		return false
+	return (SourceHwnd == CurrentHwnd and SourceControl == CurrentControl)
+}
+
+/**
+ * Canonical LLM acceptance primitive. Only an unmodified PHYSICAL Tab in the
+ * exact HWND/control that owns the rendered prediction may inject it. Optional
+ * snapshots/callbacks are deterministic unit-test seams; production call sites
+ * and their physical-event provenance are exhaustively meta-guarded.
+ * @param {boolean} IsPhysicalTabEvent - True only at a real Tab event source.
+ * @param {Array|String} Modifiers - Declared TextPressKey modifiers.
+ * @param {Map} InputSnapshot - Optional current physical/focus snapshot.
+ * @param {Func} AcceptFn - Optional injection callback.
+ * @returns {boolean} True when this Tab owns, or joins, the one active claim.
+ */
+LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnapshot := unset, AcceptFn := unset) {
+	global _LLM_AcceptInProgress
+	; Snapshot one presented tuple before any OS/focus probe. The later claim
+	; revalidates this exact record, so navigation or a replacement render cannot
+	; splice B's text onto A's focus source while the probe yields.
+	Presented := LLM_Tooltip_GetAcceptSnapshot()
+	if !IsSet(InputSnapshot)
+		InputSnapshot := _LLM_Accept_ReadInputSnapshot()
+	PreviousCritical := Critical("On")
+	try {
+		; The HotIf and InputHook callbacks can observe the SAME physical Tab. The
+		; first callback owns injection; a sibling may join only when it proves the
+		; same bare physical-Tab profile. Chords and remaps keep their normal output.
+		if _LLM_AcceptInProgress {
+			return _LLM_Accept_IsBarePhysicalTabEvent(
+				IsPhysicalTabEvent, Modifiers, InputSnapshot)
+		}
+		if !IsObject(Presented)
+			return false
+		if !_LLM_Accept_IsAllowed(
+			IsPhysicalTabEvent, Modifiers, InputSnapshot,
+			Presented.AcceptSource)
+			return false
+		ClaimedLifecycle := LLM_Tooltip_ClaimAcceptance(Presented.Record)
+		if !IsObject(ClaimedLifecycle)
+			return false
+		_LLM_AcceptInProgress := true
+		if !IsSet(AcceptFn) {
+			AdmissionSeed := _LLM_Bridge_CaptureAdmissionSeed(
+				Presented.AcceptSource)
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	KeepClaimForProductionCompletion := !IsSet(AcceptFn)
+	DispatchCompleted := false
+	try {
+		if IsSet(AcceptFn)
+			AcceptFn.Call(Presented.Text)
+		else
+			LLM_Bridge_OnAccept(
+				Presented.Text, AdmissionSeed, Presented.Slots,
+				Presented.ActiveIdx, Presented.Record, ClaimedLifecycle)
+		DispatchCompleted := true
+	} finally {
+		; Deterministic test callbacks have no sender-owned completion lifecycle.
+		; Production releases one deferred turn after direct or clipboard sender
+		; completion. A thrown production dispatch owns no future callback, but it
+		; still defers release so the sibling callback for this physical Tab cannot
+		; retry the failed transaction.
+		if !KeepClaimForProductionCompletion {
+			LLM_Tooltip_FinalizeAcceptance(
+				ClaimedLifecycle, DispatchCompleted)
+			LLM_Tooltip_HideExact(Presented.Record, DispatchCompleted)
+			_LLM_Accept_ReleaseClaim()
+		} else if !DispatchCompleted {
+			LLM_Tooltip_FinalizeAcceptance(ClaimedLifecycle, false)
+			LLM_Tooltip_HideExact(Presented.Record)
+			_LLM_Accept_DeferClaimRelease()
+		}
+	}
+	return true
+}
+
+; Emit Tab normally whenever canonical acceptance rejects it. This is used by
+; tap-hold/gesture remaps too: they retain the default non-physical provenance,
+; so they navigate as configured and can never accept an LLM prediction.
+LLM_Tooltip_FireTabOrAccept(Modifiers := [], IsPhysicalTabEvent := false) {
+	if LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent, Modifiers)
+		return true
+	TextPressKey("Tab", Modifiers)
+	return false
+}
+
 
 
 
 
 ; =================================
 ; =================================
-; ======= 2/ Initialisation =======
+; ======= 3/ Initialisation =======
 ; =================================
 ; =================================
 
@@ -139,10 +584,16 @@ _LLM_Bridge_UnregisterDispatcherFallback() {
 	}
 }
 
+; One of the two consumers of every character event, and the one with no segment:
+; the profiler showed ~600 slow OnChar events with no matching slow HSE.FeedChar,
+; which left this path as the only unattributed candidate. Two QPC reads, and the
+; line is gated by the profiler floor so ordinary typing logs nothing.
 _LLM_Bridge_OnDispatcherChar(ih, ch) {
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
 		return
+	_hpLlmChar := HotPath_Now()
 	LLM_Bridge_OnChar(ch)
+	HotPath_LogIfSlow("LLM.OnChar", _hpLlmChar, "")
 }
 
 _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
@@ -155,13 +606,13 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
  * Stops the bridge and hides any visible tooltip.
  */
 LLM_Bridge_Stop() {
-	global _LLM_Bridge_Active, _LLM_Bridge_Buffer
+	global _LLM_Bridge_Active
 	_LLM_Bridge_UnregisterDispatcherFallback()
 	_LLM_PointerWatch_Stop()
 	if !_LLM_Bridge_Active
 		return
 	_LLM_Bridge_Active := false
-	_LLM_Bridge_Buffer := ""
+	_LLM_Bridge_ClearBuffer()
 	try LLM_Engine_StopGeneration()   ; Cancel in-flight HTTP before disabling the engine
 	LLM_Engine_SetEnabled(false)
 	try LLM_OllamaCancelWarmupRetry()
@@ -190,48 +641,18 @@ LLM_Bridge_FeedCharIfActive(ch) {
 }
 
 /**
- * Mirror a hotstring expansion into the LLM rolling context buffer.
- * Called from HSE_DispatchMatch right after HSE_ApplyExpansion so the LLM
- * buffer stays in sync with the on-screen text even though physical chars
- * typed inside the 60 ms post-fire suppression window are not fed via
- * LLM_Bridge_FeedCharIfActive (AHK-23).
- * Mirrors HSE_ApplyExpansion semantics: strip Spec.Length + EndChar off the
- * right end of _LLM_Bridge_Buffer, then append Replacement + EndChar.
- * @param {Object} Spec - Hotstring spec with a .Length property.
- * @param {string} Replacement - The expanded text.
- * @param {string} EndChar - The terminator char, empty for star triggers.
- */
-LLM_Bridge_ApplyExpansionIfActive(Spec, Replacement, EndChar := "") {
-	global _LLM_Bridge_Active, _LLM_Bridge_Buffer
-	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
-		return
-	StripLen := Spec.Length + (EndChar != "" ? 1 : 0)
-	BufLen := StrLen(_LLM_Bridge_Buffer)
-	if (BufLen >= StripLen) {
-		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, 1, BufLen - StripLen)
-	} else {
-		_LLM_Bridge_Buffer := ""
-	}
-	_LLM_Bridge_Buffer .= Replacement
-	if (EndChar != "")
-		_LLM_Bridge_Buffer .= EndChar
-}
-
-/**
- * Called from PrefixWatcher OnKeyDown for navigation / editing keys.
+ * Called from PrefixWatcher or the early HookDispatcher fallback for
+ * navigation / editing keys.
  * @param {Integer} vk - Virtual key code.
+ * @param {boolean} IsPhysicalEvent - True only for the I1-filtered prefix hook.
  */
-LLM_Bridge_FeedKeyDownIfActive(vk) {
+LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		return
 	if (vk = 0x08)
 		LLM_Bridge_OnBackspace()
 	else if (vk = 0x09) {
-		; Skip if an accept is already in progress from the Tab hotkey path to
-		; avoid double-injection when the InputHook and the hotkey fire together.
-		if (IsSet(_LLM_AcceptInProgress) and _LLM_AcceptInProgress)
-			return
-		if (IsSet(LLM_Tooltip_TryAcceptTab) and LLM_Tooltip_TryAcceptTab()) {
+		if LLM_Tooltip_TryAcceptTab(IsPhysicalEvent, []) {
 			; Cancel the debounce timer so a stale prediction does not flash
 			; the tooltip again immediately after the user accepted the suggestion
 			LLM_Engine_CancelTimer()
@@ -257,8 +678,9 @@ LLM_Bridge_FeedKeyDownIfActive(vk) {
  * Called from the prefix watcher after a hotstring preview is shown.
  * Parity with macOS llm_bridge.update_preview() chain branch.
  * @param {Array} items - Tooltip rows shown by TooltipShow (DurationSec per row).
+ * @param {Object} SurfaceToken - Optional immutable owner from the pixel commit.
  */
-LLM_Bridge_ScheduleAfterHotstring(items) {
+LLM_Bridge_ScheduleAfterHotstring(items, SurfaceToken := 0) {
 	global _LLM_Bridge_Active, _LLM_Bridge_Buffer, _LLM_Engine
 	global _LLM_HOTSTRING_CHAIN_OFFSET_SEC, _LLM_INFINITE_TOOLTIP_SEC
 	global _LLM_MIN_TOOLTIP_DURATION_SEC
@@ -268,9 +690,10 @@ LLM_Bridge_ScheduleAfterHotstring(items) {
 	if !(IsSet(_LLM_Engine) && _LLM_Engine["enabled"] && _LLM_Engine["after_hotstring"])
 		return
 	if !(IsObject(items) && items.Length > 0)
-		return
-
-	LLM_Engine_CancelTimer()
+		return false
+	if (IsObject(SurfaceToken)
+		and !TooltipSurfaceTokenIsCurrent(SurfaceToken))
+		return false
 
 	minDur := 0
 	hasDur := false
@@ -287,8 +710,17 @@ LLM_Bridge_ScheduleAfterHotstring(items) {
 		: _LLM_INFINITE_TOOLTIP_SEC
 	delaySec := tooltipTimeout + _LLM_HOTSTRING_CHAIN_OFFSET_SEC
     BridgeBuffer := _LLM_Bridge_Buffer
+	; StartTimer performs focus capture outside its short mutation span, then
+	; rechecks this surface token atomically with cancel + re-arm. A stale tooltip
+	; callback therefore cannot cancel a newer typing timer or install its own.
+	Scheduled := IsObject(SurfaceToken)
+		? LLM_Engine_StartTimer(delaySec, BridgeBuffer,
+			TooltipSurfaceTokenIsCurrent.Bind(SurfaceToken))
+		: LLM_Engine_StartTimer(delaySec, BridgeBuffer)
+	if !Scheduled
+		return false
 	try LoggerDebug("LLM", "Hotstring chain scheduled in {1:.3f}s.", delaySec)
-    LLM_Engine_StartTimer(delaySec, BridgeBuffer)
+	return true
 }
 
 ; Returns true when char ``c`` is a word boundary — whitespace or common sentence/
@@ -311,20 +743,20 @@ _LLM_Bridge_IsWordEndTrigger(ch) {
 	return (prev != "" and !_LLM_Bridge_IsBoundaryChar(prev))
 }
 
-; Queue expensive layered-Gui teardown off a keyboard hook while preserving the
-; surface generation observed by the triggering action. Without this fence an
-; old OnChar timer can run after a fresh prediction has rendered and hide it.
-LLM_Bridge_DeferTooltipHide(accepted := false) {
-	global _TooltipGeneration
-	Epoch := IsSet(_TooltipGeneration) ? _TooltipGeneration : 0
-	SetTimer(_LLM_Bridge_DeferredTooltipHide.Bind(Epoch, accepted), -1)
+; Queue layered-Gui teardown off a keyboard hook while preserving the exact
+; presented record. A generation-only snapshot allowed an A callback to hide B
+; after wrap/rebuild paths changed the active semantics between snapshot and run.
+LLM_Bridge_DeferTooltipHide(accepted := false, ExpectedRecord := 0) {
+	Record := IsObject(ExpectedRecord)
+		? ExpectedRecord : LLM_Tooltip_GetPresentedToken()
+	if !IsObject(Record)
+		return false
+	SetTimer(_LLM_Bridge_DeferredTooltipHide.Bind(Record, accepted), -1)
+	return true
 }
 
-_LLM_Bridge_DeferredTooltipHide(Epoch, accepted) {
-	global _TooltipGeneration
-	if (Epoch != 0 and (!IsSet(_TooltipGeneration) or Epoch != _TooltipGeneration))
-		return
-	LLM_Tooltip_Hide(accepted)
+_LLM_Bridge_DeferredTooltipHide(ExpectedRecord, accepted) {
+	LLM_Tooltip_HideExact(ExpectedRecord, accepted)
 }
 
 /**
@@ -333,23 +765,19 @@ _LLM_Bridge_DeferredTooltipHide(Epoch, accepted) {
  * @param {string} ch - The character that was just typed.
  */
 LLM_Bridge_OnChar(ch) {
-	global _LLM_Bridge_Buffer, _LLM_Bridge_Active, LLM_BRIDGE_BUFFER_MAX_CHARS
+	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
 	if !_LLM_Bridge_Active
 		return
 
-	_LLM_Bridge_Buffer .= ch
-	if (StrLen(_LLM_Bridge_Buffer) > LLM_BRIDGE_BUFFER_MAX_CHARS)
-		; Drop the oldest characters, keep the most recent typing — mirrors
-		; HSE_FeedChar's trim-to-tail pattern (F47).
-		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, -LLM_BRIDGE_BUFFER_MAX_CHARS)
+	_LLM_Bridge_ApplyBufferEdit(0, ch)
 	; Hotstring tooltip priority: if the PrefixWatcher's tooltip is visible,
 	; update the buffer but do NOT arm the LLM timer — LLM_Bridge_ScheduleAfterHotstring
 	; (fired from _LookupAndRender) owns the chain delay until
 	; the overlay closes, mirroring HS update_preview().
 	if TooltipIsVisible()
 		return
-	; Only hide OUR tooltip — never dismiss a hotstring overlay.
-	; Silent=true so no llm_dismissed event is emitted for a stale hide.
+	; Only hide OUR tooltip — never dismiss a hotstring overlay. The canonical
+	; lifecycle emits dismissal for the exact offer this keystroke supersedes.
 	if LLM_Tooltip_IsVisible() {
 		; Minimum-display window: a keystroke that was already in flight when the
 		; slow model finally answered must not kill the prediction before the user
@@ -365,9 +793,8 @@ LLM_Bridge_OnChar(ch) {
 			; LowLevelHooksTimeout, dropping the in-flight or next physical key. The
 			; hook stays fast — buffer + engine feed below are cheap — while the
 			; expensive GDI/DWM work runs on a fresh thread once the hook returns
-			; (mirrors the auto-hide TimerFn, which already runs off-thread). Silent=true
-			; so no llm_dismissed event is emitted for this stale hide.
-			LLM_Bridge_DeferTooltipHide(true)
+			; (mirrors the auto-hide TimerFn, which already runs off-thread).
+			LLM_Bridge_DeferTooltipHide()
 		}
 	}
 	global _LLM_Bridge_LastLogTick
@@ -396,14 +823,13 @@ LLM_Bridge_OnBackspace() {
 	if !_LLM_Bridge_Active
 		return
 
-	if (StrLen(_LLM_Bridge_Buffer) > 0)
-		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, 1, -1)
+	_LLM_Bridge_ApplyBufferEdit(1, "")
 
 	; Same hotstring-priority guard as OnChar.
 	if TooltipIsVisible()
 		return
 	if LLM_Tooltip_IsVisible()
-		LLM_Bridge_DeferTooltipHide(true)
+		LLM_Bridge_DeferTooltipHide()
 	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
 }
 
@@ -415,7 +841,7 @@ LLM_Bridge_OnFlush() {
 	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
 	if !_LLM_Bridge_Active
 		return
-	_LLM_Bridge_Buffer := ""
+	_LLM_Bridge_ClearBuffer()
 	LLM_Bridge_ResetPredictions()
 }
 
@@ -445,7 +871,7 @@ LLM_Bridge_ResetPredictions() {
 		return
 	try LoggerDebug("LLM.tt", "ResetPredictions: cancelling generation + hiding any tooltip.")
 	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
-		_LLM_Bridge_Buffer := ""
+		_LLM_Bridge_ClearBuffer()
 	; Timings only: the surface is about to be hidden, so the full re-render the
 	; old call performed here was painted and thrown away in the same breath.
 	try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)
@@ -595,97 +1021,50 @@ _LLM_PointerWatch_OnMoveTick(*) {
  * Appends the accepted text to the buffer and types it into the active window.
  * @param {string} text - The accepted prediction text.
  */
-LLM_Bridge_OnAccept(text) {
-	global _LLM_Bridge_Buffer
+LLM_Bridge_OnAccept(text, AdmissionSeed, Slots := unset, ActiveIdx := 1,
+		PresentedRecord := 0, PresentedLifecycle := 0) {
 	; AHK-09: invalidate every in-flight sequential/streaming variant callback so
 	; they cannot re-show the tooltip after the user has already accepted a
 	; suggestion. StopGeneration bumps request_id (all async callbacks bail on id
 	; mismatch), cancels curl+WinHTTP streams, cancels the debounce timer, and
 	; drops last_ctx/last_results so the dismissed context cannot replay from cache.
 	; Must run BEFORE the injection so the id is bumped while callbacks are live.
-	try LLM_Engine_StopGeneration()
-	; Mute the hotstring InputHook before injecting the prediction so the
-	; synthetic characters do not re-enter the engine and trigger false
-	; hotstring matches on the appended text.
-	if IsSet(PrefixWatcherSuppress)
-		try PrefixWatcherSuppress(true)
-	; Tag the auto-typed prediction as synthetic so the keylogger keeps it out
-	; of the manual `chars` count and attributes it to the LLM source (esrc).
-	try KL_MarkSynthetic("llm")
-	; Completion callback: runs after TextSend has finished emitting all
-	; keystrokes. Releasing the synthetic flag and the prefix-watcher
-	; suppression here (rather than on a fixed timer) ensures the guards are
-	; held for exactly as long as the injection is observable — even for
-	; multi-sentence predictions that take longer than 80 ms to drain.
-	; The callback also resyncs the LSC ring to the trailing chars of the
-	; injected text so dead-key and ellipsis decisions see the prediction's
-	; tail, not pre-prediction characters.
-	; AHK-10: PrefixWatcherSuppress and KL_MarkSynthetic are DEPTH COUNTERS that must
-	; be released exactly once per acquire. TextSend calls _InjectCallback on success
-	; (synchronously for direct mode, deferred via SetTimer for clipboard mode >1000 chars)
-	; and the callback owns the release. The finally must release ONLY when TextSend
-	; threw before invoking the callback. Use an exception-thrown gate so clipboard-
-	; mode defers never release synchronously ahead of the paste. A `released` flag
-	; is wrong for clipboard mode (TextSend returns before invoking the callback so
-	; `released` is still false when the finally runs — the correct gate is whether
-	; TextSend threw, not whether the callback ran synchronously).
-	_InjectCallback := _LLM_Bridge_OnInjectComplete.Bind(text)
-	_threw := false
-	try {
-		TextSend(text, 0, _InjectCallback)
-	} catch as AcceptError {
-		; TextSend threw before the callback could run — arm the finally release
-		_threw := true
-		throw AcceptError
-	} finally {
-		; Release guards only when TextSend threw and never invoked the callback.
-		; On the success path (direct or clipboard) the callback owns the release.
-		if _threw {
-			try KL_ClearSynthetic()
-			if IsSet(PrefixWatcherSuppress)
-				try PrefixWatcherSuppress(false)
-		}
-	}
+	RequestId := LLM_Engine_StopGeneration()
+	if !(RequestId is Integer) or RequestId < 0
+		throw Error("LLM acceptance requires initialized engine state.")
+	Transaction := _LLM_Bridge_NewInjectionTransaction(
+		text, AdmissionSeed, RequestId, false, Slots, ActiveIdx,
+		PresentedRecord, PresentedLifecycle)
+	TextSend(text, _LLM_Bridge_InjectionOptions(Transaction),
+		_LLM_Bridge_OnInjectComplete.Bind(Transaction))
 }
 
-; Invoked by TextSend after all keystrokes for an accepted/injected prediction
-; have been emitted. Releases the keylogger synthetic flag and the prefix-watcher
-; suppression that were armed in LLM_Bridge_OnAccept before injection, and
-; resyncs the LSC ring to the trailing characters of the injected text.
-; @param {string} InjectedText - The prediction text that was injected.
-_LLM_Bridge_OnInjectComplete(InjectedText, Ok := true, ErrorMessage := "") {
-	try KL_ClearSynthetic()
-	if IsSet(PrefixWatcherSuppress)
-		try PrefixWatcherSuppress(false)
-	if !Ok {
-		try LoggerWarn("LLM", "Prediction acceptance was not injected: {1}", ErrorMessage)
-		return
-	}
-	global _LLM_Bridge_Buffer
-	; Commit every visible/UI state transition only after the matching sender has
-	; confirmed the paste/SendText operation. A long clipboard send returns from
-	; TextSend before Ctrl+V, so committing in OnAccept used to hide a suggestion
-	; and advance context even when the output was later cancelled or failed.
-	_LLM_Bridge_Buffer .= InjectedText
-	if IsSet(HSE_HardReset)
-		try HSE_HardReset()
-	if IsSet(_ResetPrefixBuffer)
-		try _ResetPrefixBuffer()
-	; Resync the last-sent-character ring so dead-key and ellipsis consumers
-	; see the prediction's tail rather than pre-prediction characters.
-	if IsSet(_LSCResetFrom) {
-		Tail := []
-		N := Min(StrLen(InjectedText), 5)
-		loop N
-			Tail.Push(SubStr(InjectedText, StrLen(InjectedText) - N + A_Index, 1))
-		try _LSCResetFrom(Tail)
-	}
+; Invoked after TextSender atomically emitted the accepted prediction and
+; committed the canonical metrics row and every RAM mirror. This open-thread
+; phase owns only tooltip teardown and the acceptance-claim lifecycle.
+_LLM_Bridge_OnInjectComplete(Transaction, Ok := true, ErrorMessage := "") {
+	HideQueued := false
 	try {
-		app_name := ""
-		try app_name := WIGetFocused()["appId"]
-		slots := LLM_Tooltip_GetSlots()
-		idx := LLM_Tooltip_GetActiveIdx()
-		KL_LogLlmAccepted(InjectedText, app_name, slots, idx)
+		if !Ok {
+			try LoggerWarn("LLM", "Prediction acceptance was not injected: {1}", ErrorMessage)
+			LLM_Tooltip_FinalizeAcceptance(
+				Transaction.PresentedLifecycle, false)
+			LLM_Bridge_DeferTooltipHide(false,
+				Transaction.PresentedRecord)
+			return
+		}
+		if (ErrorMessage != "")
+			try LoggerWarn("LLM", "Prediction output completed with a non-retryable warning: {1}", ErrorMessage)
+		LLM_Tooltip_FinalizeAcceptance(
+			Transaction.PresentedLifecycle, true)
+		LLM_Bridge_DeferTooltipHide(true,
+			Transaction.PresentedRecord)
+		_LLM_Accept_DeferClaimRelease()
+		HideQueued := true
+	} finally {
+		; A failed sender callback (or a failure while committing its state) never
+		; reaches the success path that normally releases the acceptance claim.
+		if !HideQueued
+			_LLM_Accept_DeferClaimRelease()
 	}
-	LLM_Bridge_DeferTooltipHide(true)
 }

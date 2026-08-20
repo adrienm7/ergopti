@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for menu-manifest-decoded-three-times-per-rebuild.
 ;
-; lib/menu_manifest.ahk exposes several loaders that each derive one slice of
+; infra/menu_manifest.ahk exposes several loaders that each derive one slice of
 ; the shared menu_manifest.json. Three of them - the debug menu, the top-level
 ; tail and the global actions - are reached from _MI_AppendTail on every single
 ; initMenu(), and initMenu() calls MenuManifest_InvalidateCache() first, which
@@ -66,7 +66,7 @@ _MMSD_LoadersReuseTheParsedRoot() {
 
 	for Name in Names {
 		Body := _DriverFuncBody(Name)
-		Assert(Body != "", Name . " must be defined in lib/menu_manifest.ahk")
+		Assert(Body != "", Name . " must be defined in infra/menu_manifest.ahk")
 		Assert(InStr(Body, "_MM_GetManifestRoot(") > 0,
 			Name . " must derive from the shared parsed manifest root")
 		Assert(InStr(Body, "JsonParse(") == 0,
@@ -95,7 +95,7 @@ Test("menu_manifest: no per-rebuild loader re-reads the manifest (menu-manifest-
 ; costing exactly as much as before, so the cache itself is the guarantee.
 _MMSD_SharedRootIsCachedAcrossRebuilds() {
 	Body := _DriverFuncBody("_MM_GetManifestRoot")
-	Assert(Body != "", "_MM_GetManifestRoot must be defined in lib/menu_manifest.ahk")
+	Assert(Body != "", "_MM_GetManifestRoot must be defined in infra/menu_manifest.ahk")
 
 	CachePos := InStr(Body, "if (_MM_MANIFEST_ROOT_CACHE != false)")
 	ReadPos  := InStr(Body, "FileRead(")
@@ -105,7 +105,7 @@ _MMSD_SharedRootIsCachedAcrossRebuilds() {
 		"_MM_GetManifestRoot must store the parsed root so the next caller is free")
 
 	Invalidate := _DriverFuncBody("MenuManifest_InvalidateCache")
-	Assert(Invalidate != "", "MenuManifest_InvalidateCache must be defined in lib/menu_manifest.ahk")
+	Assert(Invalidate != "", "MenuManifest_InvalidateCache must be defined in infra/menu_manifest.ahk")
 	Assert(InStr(Invalidate, "_MM_MANIFEST_ROOT_CACHE") == 0,
 		"MenuManifest_InvalidateCache must NOT clear the parsed root. initMenu() calls it at the top "
 		. "of every tray rebuild, so clearing the root there puts the whole decode cost straight back "

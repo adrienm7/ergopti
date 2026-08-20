@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: TOML Helpers Round-Trip Tests
 ; DESCRIPTION:
-; Regression suite for TOML_Unescape in lib/toml/toml_helpers.ahk.
+; Regression suite for TOML_Unescape in infra/toml/toml_helpers.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original sequential-StrReplace implementation applied "\\" → "\" first,

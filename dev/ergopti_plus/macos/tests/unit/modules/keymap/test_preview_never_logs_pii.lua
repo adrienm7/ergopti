@@ -45,8 +45,8 @@ local SENTINEL_PII = "9SENTINEL9"
 -- A deliberately ordinary replacement that MUST still be logged.
 local PUBLIC_REPL = "public-replacement"
 
-package.loaded["lib.logger"] = nil
-local Logger = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = helpers.load_with_stubs("infra.logger")
 
 
 
@@ -61,24 +61,40 @@ local Logger = helpers.load_with_stubs("lib.logger")
 --- Builds a minimal CoreState and initialises the real llm_bridge over it.
 --- @param provider function|nil Preview provider to register, or nil for none.
 --- @return table bridge, table state
+local PREVIEW_OWNERSHIP = {
+	"modules.keymap.state",
+	"modules.keymap.registry",
+	"modules.keymap.registry_groups",
+	"modules.keymap.registry_index",
+	"modules.keymap.terminators",
+	"modules.keymap.expander",
+	"modules.keymap.terminator_replay",
+	"modules.keymap.llm_bridge",
+	"modules.llm.prediction_engine",
+	"modules.llm.warmup_controller",
+	"modules.llm.streaming_handler",
+}
+
 local function load_bridge(provider)
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+	return helpers.with_fresh_modules(PREVIEW_OWNERSHIP, function()
+		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 
-	local state = {
-		buffer                    = "",
-		mappings                  = {},
-		groups                    = {},
-		preview_providers         = provider and { provider } or {},
-		is_repeat_feature_enabled = function() return false end,
-		DELAYS                    = {},
-		SECTION_DELAYS            = {},
-	}
+		local state = {
+			buffer                    = "",
+			mappings                  = {},
+			groups                    = {},
+			preview_providers         = provider and { provider } or {},
+			is_repeat_feature_enabled = function() return false end,
+			DELAYS                    = {},
+			SECTION_DELAYS            = {},
+		}
 
-	Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
-	Bridge.set_preview_star_enabled(true)
-	Bridge.set_preview_autocorrect_enabled(true)
-	return Bridge, state
+		helpers.assert_eq(Bridge.init(state,
+			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
+		Bridge.set_preview_star_enabled(true)
+		Bridge.set_preview_autocorrect_enabled(true)
+		return Bridge, state
+	end)
 end
 
 --- Drives update_preview with the logger sink installed and returns every line.
@@ -99,13 +115,18 @@ end
 --- @param needle string Text that must be absent.
 --- @param message string Assertion message.
 local function assert_absent(lines, needle, message)
+	-- The floor matters more than the scan. An absence assertion over an EMPTY
+	-- log list is vacuous: if the capture stopped recording, every "must not
+	-- leak" case in this file goes green while nothing is being inspected — which
+	-- is the exact failure mode a PII test cannot afford.
+	helpers.assert_true(#lines > 0,
+		"no log lines were captured, so this absence assertion inspected nothing: " .. message)
 	for _, line in ipairs(lines) do
 		if line:find(needle, 1, true) then
 			helpers.assert_true(false, message .. " — leaked line: " .. line)
 			return
 		end
 	end
-	helpers.assert_true(true, message)
 end
 
 
@@ -155,27 +176,32 @@ helpers.describe("hotstring preview never logs personal-info content", function(
 		-- would satisfy every assertion above while destroying the diagnostic. Drive
 		-- a REAL public star mapping through the REAL registry and require its
 		-- replacement to still appear.
-		local State = helpers.load_with_stubs("modules.keymap.state")
+		local Bridge = helpers.with_fresh_modules(PREVIEW_OWNERSHIP, function()
+			local State = helpers.load_with_stubs("modules.keymap.state")
+			local fresh_bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 
-		package.loaded["modules.keymap.llm_bridge"] = nil
-		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+			-- Take the registry instance the BRIDGE resolved, not a separately loaded
+			-- one: the bridge captured its Registry upvalue at require time, and a
+			-- second instance would be initialised over a state the bridge never reads.
+			local Registry = package.loaded["modules.keymap.registry"]
+			helpers.assert_true(Registry ~= nil, "the bridge must have loaded the registry")
+			local Expander = package.loaded["modules.keymap.expander"]
+			helpers.assert_true(Expander ~= nil, "the bridge must have loaded the expander")
 
-		-- Take the registry instance the BRIDGE resolved, not a separately loaded
-		-- one: the bridge captured its Registry upvalue at require time, and a
-		-- second instance would be initialised over a state the bridge never reads.
-		local Registry = package.loaded["modules.keymap.registry"]
-		helpers.assert_true(Registry ~= nil, "the bridge must have loaded the registry")
+			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+			state.preview_providers         = {}
+			state.is_repeat_feature_enabled = function() return false end
+			helpers.assert_eq(Registry.init(state), true)
+			Registry.add("pub★", PUBLIC_REPL, { auto_expand = true })
+			Registry.sort_mappings()
 
-		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
-		state.preview_providers         = {}
-		state.is_repeat_feature_enabled = function() return false end
-		Registry.init(state)
-		Registry.add("pub★", PUBLIC_REPL, {})
-		Registry.sort_mappings()
-
-		Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
-		Bridge.set_preview_star_enabled(true)
-		Bridge.set_preview_autocorrect_enabled(true)
+			helpers.assert_eq(fresh_bridge.init(state,
+				{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
+			helpers.assert_eq(Expander.init(state, Registry, fresh_bridge), true)
+			fresh_bridge.set_preview_star_enabled(true)
+			fresh_bridge.set_preview_autocorrect_enabled(true)
+			return fresh_bridge
+		end)
 
 		-- The star preview fires on the star_base ("pub"), before the magic key is
 		-- typed — that is the whole point of previewing what ★ would produce.

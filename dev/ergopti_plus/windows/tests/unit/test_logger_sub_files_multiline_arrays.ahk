@@ -74,32 +74,29 @@ _LSFM_MultiLineArrayKeepsEveryPattern() {
 	Assert(FileExist(TomlPath) != "",
 		"prerequisite: the shipped sub_files.toml must be readable, otherwise the parser silently uses LOGGER_SUB_FILES_FALLBACK and this test proves nothing")
 
-	Save := LOGGER_SUB_FILES
-	try {
-		LOGGER_SUB_FILES := []
-		_LoggerLoadSubFilesToml("")
+	; The routing table is generated from the shipped TOML rather than parsed by
+	; the driver, so this reads exactly what the logger will fan out with.
+	Entries := LoggerSubFilesData()
+	Assert(Entries.Length > 0, "the generated routing table must not be empty")
 
-		Gestures := _LSFM_Entry(LOGGER_SUB_FILES, "ErgoptiPlus_gestures.log")
-		Assert(Gestures != "", "the parser must produce an ErgoptiPlus_gestures.log entry")
-		Assert(Gestures["tags"].Length == 2,
-			"prerequisite: the SHIPPED TOML was parsed, not the hardcoded fallback (the fallback declares a single gestures pattern, the TOML declares two)")
+	Gestures := _LSFM_Entry(Entries, "ErgoptiPlus_gestures.log")
+	Assert(Gestures != "", "the table must carry an ErgoptiPlus_gestures.log entry")
+	Assert(Gestures["tags"].Length == 2,
+		"gestures must carry BOTH declared patterns. The hardcoded fallback this replaced declared only one, and the macOS twin had already drifted to a single pattern — so a stripped build quietly stopped collecting every bare " . Chr(34) . "gesture" . Chr(34) . " line")
 
-		Layout := _LSFM_Entry(LOGGER_SUB_FILES, "ErgoptiPlus_layout.log")
-		Assert(Layout != "", "the parser must produce an ErgoptiPlus_layout.log entry")
-		Assert(Layout["tags"].Length >= 3,
-			"a multi-line TOML patterns array must yield EVERY pattern (got " . Layout["tags"].Length . "): a value that contains a closing bracket inside its own quotes must not terminate the array (logger-subfiles-multiline-array-truncated)")
-		Assert(_LSFM_HasTag(Layout, "[LayoutCaps]"),
-			"the SECOND value of the layout patterns array must survive the parse: it is the first casualty when the array terminator is tested on the raw line")
-		Assert(_LSFM_HasTag(Layout, "[LayoutAltGr]"),
-			"the LAST value of the layout patterns array must survive the parse")
+	Layout := _LSFM_Entry(Entries, "ErgoptiPlus_layout.log")
+	Assert(Layout != "", "the table must carry an ErgoptiPlus_layout.log entry")
+	Assert(Layout["tags"].Length >= 3,
+		"a multi-line TOML patterns array must yield EVERY pattern (got " . Layout["tags"].Length . "): a value that contains a closing bracket inside its own quotes must not terminate the array (logger-subfiles-multiline-array-truncated)")
+	Assert(_LSFM_HasTag(Layout, "[LayoutCaps]"),
+		"the SECOND value of the layout patterns array must survive: it is the first casualty when the array terminator is tested on the raw line")
+	Assert(_LSFM_HasTag(Layout, "[LayoutAltGr]"),
+		"the LAST value of the layout patterns array must survive")
 
-		Dispatch := _LSFM_Entry(LOGGER_SUB_FILES, "ErgoptiPlus_dispatch.log")
-		Assert(Dispatch != "", "the parser must produce an ErgoptiPlus_dispatch.log entry")
-		Assert(_LSFM_HasTag(Dispatch, "[TomlLoader]"),
-			"[TomlLoader] must survive the parse: it is the only dispatch pattern the driver actually emits, so losing it leaves ErgoptiPlus_dispatch.log permanently empty while looking like a topic with no traffic")
-	} finally {
-		LOGGER_SUB_FILES := Save
-	}
+	Dispatch := _LSFM_Entry(Entries, "ErgoptiPlus_dispatch.log")
+	Assert(Dispatch != "", "the table must carry an ErgoptiPlus_dispatch.log entry")
+	Assert(_LSFM_HasTag(Dispatch, "[TomlLoader]"),
+		"[TomlLoader] must survive: it is the only dispatch pattern the driver actually emits, so losing it leaves ErgoptiPlus_dispatch.log permanently empty while looking like a topic with no traffic")
 }
 Test("logger: a multi-line TOML patterns array keeps every pattern (logger-subfiles-multiline-array-truncated)", _LSFM_MultiLineArrayKeepsEveryPattern)
 
@@ -114,16 +111,27 @@ Test("logger: a multi-line TOML patterns array keeps every pattern (logger-subfi
 ; ======================================================
 
 ; The behavioural test above can only see the patterns branch. The platforms
-; branch carries the identical terminator test and is dormant purely because no
-; shipped platforms array spans two lines yet — so pin the root cause itself:
-; neither branch may test the RAW fragment for a closing bracket.
-_LSFM_NoRawBracketTerminatorTest() {
-	Body := _DriverFuncBody("_LoggerLoadSubFilesToml")
-	Assert(Body != "", "_LoggerLoadSubFilesToml() must exist in the driver source")
+; branch carried the identical terminator bug and was dormant purely because no
+; shipped platforms array spans two lines yet.
+;
+; The fix for that was structural rather than another careful quote-stripping
+; pass: the driver no longer parses the TOML at all. So the assertion is now that
+; there is no parser here to get it wrong — a hand-rolled array reader inside
+; infra/logger.ahk is the precondition for the whole bug class, and it was one of
+; TWO copies of the same grammar, which is why the same fix had to be written
+; twice in two languages.
+_LSFM_NoHandRolledParserRemains() {
+	; The whole driver, not one file: the absence assertions below are stronger
+	; that way (no module anywhere may reintroduce the grammar), and reading by a
+	; hardcoded path breaks the moment a file moves.
+	Src := _DriverSourceConcat()
+	Assert(Src != "", "the driver source must be readable or this asserts nothing")
 
-	Assert(RegExMatch(Body, 'InStr\(\s*(Line|Fragment)\s*,\s*"\]"\s*\)') == 0,
-		"no array-terminator test may run against the raw line or fragment: every tag-shaped pattern carries a closing bracket inside its own quoted string, so the quoted values must be stripped before the terminator is looked for (logger-subfiles-multiline-array-truncated)")
-	Assert(InStr(Body, "_ArrayIsClosed(") > 0,
-		"both the patterns and the platforms branch must decide array termination through the shared quote-stripping helper, so the dormant platforms branch cannot become the next casualty")
+	Assert(InStr(Src, "[[sub_files]]") == 0,
+		"the driver parses the sub_files TOML grammar again. That grammar belongs to the generator (tools/codegen/codegen-logger-sub-files.cjs), which uses a real TOML library; a hand-rolled reader brings back the bug where a " . Chr(34) . "]" . Chr(34) . " inside a quoted pattern closes the array early (logger-subfiles-multiline-array-truncated)")
+	Assert(InStr(Src, "LOGGER_SUB_FILES_FALLBACK") == 0,
+		"the hardcoded fallback routing list is back. It is a second copy of the data with nothing holding it to the source, and the macOS twin had already drifted from it")
+	Assert(InStr(Src, "LoggerSubFilesData()") > 0,
+		"the logger must take its routing table from the generated _generated/logger_sub_files.ahk")
 }
-Test("logger: array termination is decided outside quoted values, in both branches (logger-subfiles-multiline-array-truncated)", _LSFM_NoRawBracketTerminatorTest)
+Test("logger: the driver holds no hand-rolled sub_files parser (logger-subfiles-multiline-array-truncated)", _LSFM_NoHandRolledParserRemains)

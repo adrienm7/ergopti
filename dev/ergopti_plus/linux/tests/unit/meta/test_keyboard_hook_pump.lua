@@ -12,8 +12,9 @@
 --- zero keystrokes. The fix resolves the keycode (forward-declaring _resolve_char
 --- to avoid the same non-hoisted-local trap) before the modifier reset.
 ---
---- This drives one keydown event through the pump with a mocked pipe (no real
---- evtest/libinput subprocess) and asserts the resolved character reaches on_char.
+--- This drives one keydown through the REAL reader over a recorded syscall
+--- backend (no /dev/input node needed) and asserts the resolved character
+--- reaches on_char.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -33,13 +34,16 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local received = {}
 		local physical = {}
-		-- evtest keydown line: code 30 = KEY_A, value 1 = press.
-		local mock_pipe = { read = function() return "Event: code 30 (KEY_A), value 1" end }
-		kh._test_inject_and_pump(mock_pipe, function(ch, scancode)
-			received[#received + 1] = { char = ch, scancode = scancode }
-		end, true, function(scancode, key_name, char)
-			physical[#physical + 1] = { scancode = scancode, key_name = key_name, char = char }
-		end)
+		-- code 30 = KEY_A, value 1 = press.
+		kh._test_drive({ { type = 1, code = 30, value = 1 } }, {
+			onChar = function(ch, scancode)
+				received[#received + 1] = { char = ch, scancode = scancode }
+			end,
+			onPhysical = function(scancode, key_name, char)
+				physical[#physical + 1] = { scancode = scancode, key_name = key_name, char = char }
+			end,
+			onEmitRaw = function() end,
+		}, true)
 		helpers.assert_true(#received == 1, "on_char must be called exactly once for a printable keydown")
 		helpers.assert_eq(received[1].char, "a", "on_char must receive the resolved character (code 30 = 'a' in qwerty)")
 		helpers.assert_eq(received[1].scancode, 30, "on_char must preserve the physical evdev code")
@@ -51,18 +55,23 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 	helpers.it("does not dispatch on a key release (value 0)", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local received = {}
-		local mock_pipe = { read = function() return "Event: code 30 (KEY_A), value 0" end }
-		kh._test_inject_and_pump(mock_pipe, function(ch) received[#received + 1] = ch end, true)
+		kh._test_drive({ { type = 1, code = 30, value = 0 } }, {
+			onChar = function(ch) received[#received + 1] = ch end,
+			onEmitRaw = function() end,
+		}, true)
 		helpers.assert_true(#received == 0, "on_char must not fire on a key release")
 	end)
 
 	helpers.it("keeps non-printable physical keys for the heatmap", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local physical = {}
-		local mock_pipe = { read = function() return "Event: code 14 (KEY_BACKSPACE), value 1" end }
-		kh._test_inject_and_pump(mock_pipe, function() end, true, function(scancode, key_name, char)
-			physical[#physical + 1] = { scancode = scancode, key_name = key_name, char = char }
-		end)
+		kh._test_drive({ { type = 1, code = 14, value = 1 } }, {
+			onChar = function() end,
+			onPhysical = function(scancode, key_name, char)
+				physical[#physical + 1] = { scancode = scancode, key_name = key_name, char = char }
+			end,
+			onEmitRaw = function() end,
+		}, true)
 		helpers.assert_eq(#physical, 1, "Backspace must not disappear from physical capture")
 		helpers.assert_eq(physical[1].scancode, 14)
 		helpers.assert_eq(physical[1].key_name, "KEY_BACKSPACE")

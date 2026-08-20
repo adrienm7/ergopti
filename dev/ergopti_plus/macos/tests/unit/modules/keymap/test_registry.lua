@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local State = helpers.load_with_stubs("modules.keymap.state")
 local Registry = helpers.load_with_stubs("modules.keymap.registry")
@@ -22,6 +22,8 @@ local Registry = helpers.load_with_stubs("modules.keymap.registry")
 --- @return table state, table Registry The fresh state and module reference.
 local function fresh_registry()
 	package.loaded["modules.keymap.registry"] = nil
+	package.loaded["modules.keymap.registry_groups"] = nil
+	package.loaded["modules.keymap.registry_index"] = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	local R = require("modules.keymap.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })
@@ -215,11 +217,11 @@ end)
 
 
 
--- =====================================
+--- ========================================
 --- ========================================
 --- ======= 7/ Terminator re-exports =======
 --- ========================================
--- =====================================
+--- ========================================
 
 helpers.describe("Registry terminator re-exports", function()
 	helpers.it("exposes the terminators API surface", function()
@@ -233,11 +235,11 @@ end)
 
 
 
--- =====================================
+-- ======================================
 -- ======================================
 -- ======= 8/ update_trigger_char =======
 -- ======================================
--- =====================================
+-- ======================================
 
 helpers.describe("Registry.update_trigger_char", function()
 	helpers.it("rejects non-string char", function()
@@ -272,11 +274,11 @@ end)
 
 
 
--- =====================================
+--- =======================================
 --- =======================================
 --- ======= 9/ Group enable/disable =======
 --- =======================================
--- =====================================
+--- =======================================
 
 helpers.describe("Registry group enable/disable", function()
 	helpers.it("disable_group removes mappings from the live list", function()
@@ -318,11 +320,11 @@ end)
 
 
 
--- =====================================
+--- ========================================
 --- ========================================
 --- ======= 10/ get_meta_description =======
 --- ========================================
--- =====================================
+--- ========================================
 
 helpers.describe("Registry.get_meta_description", function()
 	helpers.it("returns nil for unknown group", function()

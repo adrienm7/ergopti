@@ -15,8 +15,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("MLX SSE line parser tolerates CRLF", function()
 	helpers.it("strips a trailing CR from the data payload before the structural guard", function()
-		local fh = assert(io.open(helpers.driver_root() .. "modules/llm/api_mlx_inference.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/api_mlx_inference.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.post_and_parse_streaming")
+		helpers.assert_true(src ~= nil, "modules/llm/api_mlx_inference.lua source must be locatable")
 		-- The data extraction must remove a trailing CR so a CRLF line is not rejected.
 		helpers.assert_true(src:find('line:sub(7):gsub("\\r$", "")', 1, true) ~= nil
 			or src:find(':gsub("\\r$", "")', 1, true) ~= nil,

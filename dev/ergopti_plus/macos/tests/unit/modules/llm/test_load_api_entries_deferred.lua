@@ -21,18 +21,20 @@ local helpers = require("tests.helpers")
 
 helpers.describe("llm: persisted API-entry load is deferred off the require path (F-HIGH-4)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/llm/init.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open modules/llm/init.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/llm/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.start_background_network_bootstrap")
+		helpers.assert_true(src ~= nil, "modules/llm/init.lua source must be locatable")
 		return src
 	end
 
 	helpers.it("defers the require-path load via TimerScheduler.after(0)", function()
 		local src = read_src()
-		helpers.assert_true(
-			src:find("TimerScheduler.after(0, function() pcall(M.load_api_entries) end)", 1, true) ~= nil,
-			"the persisted-entry load (blocking Keychain decrypt) must be deferred via TimerScheduler.after(0)")
+		helpers.assert_true(src:find("schedule_api_entries_load()", 1, true) ~= nil,
+			"the persisted-entry load must enter its owned deferred-load transaction")
+		helpers.assert_true(src:find("handle, committed = TimerScheduler.after(0", 1, true) ~= nil,
+			"the deferred load must require explicit TimerScheduler commit")
 	end)
 
 	helpers.it("does NOT call load_api_entries synchronously at top level on require", function()

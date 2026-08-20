@@ -42,12 +42,11 @@ _UEL_ReadSource(RelPath) {
 ; ==================================================
 
 _UEL_AssertPollTickLogsFailure() {
-	Src := _UEL_ReadSource("modules/keymap/layout.ahk")
-	Body := _DriverFuncBody("_UIA_SelectionPollTick")
-	Assert(Body != "", "_UIA_SelectionPollTick() declaration must exist in layout.ahk")
-	Assert(InStr(Body, "catch as e") > 0,
-		"_UIA_SelectionPollTick must bind the exception (catch as e) rather than swallow it with a bare catch (uia-error-swallowed-silently)")
+	Body := _DriverFuncBody("_UIA_OnSelectionWorkerTerminal")
+	Assert(Body != "", "_UIA_OnSelectionWorkerTerminal() declaration must exist in layout.ahk")
+	Assert(InStr(Body, 'Status = "failed"') > 0,
+		"the detached UIA worker's failed terminal must be handled explicitly")
 	Assert(InStr(Body, "LoggerWarn") > 0,
-		"_UIA_SelectionPollTick must log the UIA/COM failure via LoggerWarn instead of failing silently (uia-error-swallowed-silently)")
+		"the worker terminal must log UIA/COM failure via LoggerWarn instead of failing silently (uia-error-swallowed-silently)")
 }
-Test("layout: _UIA_SelectionPollTick logs UIA failures instead of swallowing them (uia-error-swallowed-silently)", _UEL_AssertPollTickLogsFailure)
+Test("layout: detached UIA failures reach the resident logger (uia-error-swallowed-silently)", _UEL_AssertPollTickLogsFailure)

@@ -35,9 +35,22 @@ Test("LLM_ParseProfileObject: extracts label field", _LLMP_ParseObjectExtractsLa
 
 
 ; Encore plus: pause guard for LLM profiles (project_suspend_pause_invariant)
+; A profile is data. Parsing one must never reach the network or the engine —
+; the gate that decides whether to predict lives in the engine, and a profile
+; module that fired a request on parse would bypass it entirely.
 TestLLMProfiles_PauseNoPredict() {
-	; Profiles must not trigger predictions or HTTP when paused.
-	AssertTrue(true, "LLM profiles must respect full pause silence (no predictions under suspend)")
+	Parse := _DriverFuncBody("LLM_ParseProfileObject")
+	for Forbidden in ["WinHttp", "ComObject", "SetTimer", "LLM_Engine_"] {
+		Assert(InStr(Parse, Forbidden) == 0,
+			"LLM_ParseProfileObject() must not reference " . Forbidden . " — parsing a profile is "
+			. "data handling, and any request fired here would bypass the engine's own gate")
+	}
+
+	Resolve := _DriverFuncBody("LLM_ResolveSystemPrompt")
+	for Forbidden in ["WinHttp", "ComObject", "SetTimer"] {
+		Assert(InStr(Resolve, Forbidden) == 0,
+			"LLM_ResolveSystemPrompt() must not reference " . Forbidden . " — it builds a string")
+	}
 }
 Test("LLM profiles: pause must block all profile-driven predictions", TestLLMProfiles_PauseNoPredict)
 
@@ -51,8 +64,39 @@ TestLLMProfiles_BadJSONGraceful() {
 Test("LLM profiles: bad JSON handled gracefully without crash", TestLLMProfiles_BadJSONGraceful)
 
 ; Resolve under pause: must fallback safely
+; The resolver must always return a usable prompt, whatever it is handed. An
+; empty prompt is not a safe degradation: the model receives no instructions at
+; all and completes freely into the user's document.
 TestLLMProfiles_PauseFallback() {
-	AssertTrue(true, "LLM_ResolveSystemPrompt must no-op or fallback under pause")
+	Basic := LLM_GetBasicPrompt()
+	Assert(Basic != "", "the basic prompt must not itself be empty — it is the floor for every fallback")
+	Head := SubStr(Basic, 1, 40)
+
+	; A non-object profile falls back to the basic prompt. Compared on its head
+	; rather than whole, because the resolver substitutes {min_words} / {max_words}
+	; / {language} on the way out — which is itself asserted just below.
+	Missing := LLM_ResolveSystemPrompt("", 1, 1, 15)
+	Assert(Missing != "", "a missing profile must never resolve to an empty prompt")
+	AssertTrue(InStr(Missing, Head) > 0,
+		"a missing profile must fall back to the basic prompt, not to something else")
+
+	; A profile with no usable field falls back the same way.
+	NoField := LLM_ResolveSystemPrompt(Map(), 1, 1, 15)
+	AssertTrue(InStr(NoField, Head) > 0,
+		"a profile carrying no prompt field must fall back to the basic prompt")
+
+	; The runtime placeholders must be substituted, or the model is handed the
+	; literal text "{max_words}" as an instruction.
+	WithVars := LLM_ResolveSystemPrompt(Map("system_single", "up to {max_words} words in {language}"), 1, 1, 7, "fr")
+	AssertTrue(InStr(WithVars, "7") > 0, "{max_words} must be substituted")
+	AssertTrue(InStr(WithVars, "fr") > 0, "{language} must be substituted")
+	Assert(InStr(WithVars, "{max_words}") == 0, "no placeholder may survive into the prompt")
+
+	; And a real one is used verbatim, so the fallbacks above are fallbacks and
+	; not the only path.
+	Real := Map("system_single", "SPECIFIC")
+	AssertTrue(InStr(LLM_ResolveSystemPrompt(Real, 1, 1, 15), "SPECIFIC") > 0,
+		"a profile that supplies a prompt must have it used")
 }
 Test("LLM profiles: system prompt resolve must be pause-safe", TestLLMProfiles_PauseFallback)
 

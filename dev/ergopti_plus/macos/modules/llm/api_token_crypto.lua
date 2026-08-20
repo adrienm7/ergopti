@@ -3,60 +3,235 @@
 --- ==============================================================================
 --- MODULE: API Token Crypto (macOS Keychain)
 --- DESCRIPTION:
---- At-rest encryption for API tokens stored in hs.settings. Persists each
---- token in the macOS user Keychain (via the system ``security`` CLI) and
---- stores only a Keychain reference in hs.settings. The reference is
---- meaningless without the user's login keychain, so a leaked plist
---- doesn't expose the secret.
----
---- FEATURES & RATIONALE:
---- 1. macOS Keychain = the OS-supplied secret store. Tokens already kept
----    out of plaintext by every well-behaved Mac app go through this API.
---- 2. The user account is the encryption boundary: a different macOS user
----    on the same machine cannot decrypt; the same user on a different
----    machine cannot decrypt (Keychain entries are local to ~/Library).
---- 3. Backwards-compat: any string that does NOT start with the
----    ``keychain:`` prefix is treated as cleartext (legacy config). The
----    loader returns it unchanged; the next save migrates it into the
----    Keychain transparently.
---- 4. AHK twin: ``static/ergopti_plus/windows/modules/llm/api_token_crypto.ahk``
----    uses Windows DPAPI for the same purpose. Both keep the same
----    ``<scheme>:<opaque>`` storage shape so the rest of the code never
----    has to know which platform it's running on.
+--- Stores remote-API tokens in the macOS user Keychain without ever blocking
+--- Hammerspoon's single run loop. Every Keychain subprocess is owned through
+--- ShellRunner, has a hard TimerScheduler deadline, and completes exactly once.
 --- ==============================================================================
 
 local M = {}
-local hs = hs
-local Logger = require("lib.logger")
--- Async Keychain read (F-MED-9): M.decrypt() below is a synchronous
--- hs.execute shell-out that can raise a modal Keychain-unlock prompt,
--- freezing the ENTIRE Hammerspoon run loop (all keystroke processing, every
--- timer) until the user responds. Optional require so this module still
--- loads if adapters/shell_runner.lua is ever unavailable in a stripped test
--- environment — M.decrypt_async falls back to the sync path in that case.
-local ok_sr, ShellRunner = pcall(require, "adapters.shell_runner")
-if not ok_sr then ShellRunner = nil end
+
+local Logger         = require("infra.logger")
+local ShellRunner    = require("adapters.shell_runner")
+local TimerScheduler = require("adapters.timer_scheduler")
+local Timings        = require("infra.timings")
+local LauncherHelper = require("platform.remap.lease_helper")
+
 local LOG = "llm.api_token_crypto"
 
--- Marker prefix on encrypted blobs. Anything starting with this string is
--- a Keychain reference; everything else is cleartext (legacy).
-local KEYCHAIN_PREFIX = "keychain:"
--- Keychain service identifier — common to every entry; the per-entry
--- account is what disambiguates them. Mirrors the convention that other
--- apps use (one service per app, one account per credential).
-local KEYCHAIN_SERVICE = "org.ergopti.llm-api-token"
+local KEYCHAIN_PREFIX  = "keychain:"
+local OPERATION_TIMEOUT_SEC = Timings.sec("llm", "keychain_operation_timeout_ms")
+local TOKEN_WRITE_FLAG  = "--keychain-token-write"
+local TOKEN_READ_FLAG   = "--keychain-token-read"
+local TOKEN_DELETE_FLAG = "--keychain-token-delete"
 
--- Wrap an argument in single quotes for the shell. ``security`` does not
--- care about whitespace in arguments but treats most shell metacharacters
--- as themselves; single-quoting is the safest way to ship arbitrary
--- token bytes (which include base64 ``/`` and ``+``). Defined here as
--- ``local`` (was an accidental global in an earlier revision, polluting
--- ``_G`` and racing with any other module defining the same name).
-local function quote_shell(s)
-	s = tostring(s or "")
-	-- Escape any embedded single quotes by closing + concatenating +
-	-- reopening: ' → '\''
-	return "'" .. s:gsub("'", "'\\''") .. "'"
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 1/ Async Process Owner =======
+-- ======================================
+-- ======================================
+
+--- Invokes a client callback without letting its throw disappear in an async
+--- task or timer boundary.
+--- @param label string Operation label for diagnostics.
+--- @param callback function|nil Callback to invoke.
+--- @param ... any Callback arguments.
+local function invoke_guarded(label, callback, ...)
+	if type(callback) ~= "function" then return end
+	local args = table.pack(...)
+	local ok, err = xpcall(function()
+		callback(table.unpack(args, 1, args.n))
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s callback raised: %s", tostring(label), tostring(err))
+	end
+end
+
+--- Runs one owned signed-launcher Keychain operation with a hard deadline.
+--- @param label string Safe diagnostic label (never includes a credential).
+--- @param args table Argument vector.
+--- @param input string|nil Optional stdin payload.
+--- @param callback function Receives (completed, exit_code, stdout, stderr, reason).
+--- @param mutates_keychain boolean Whether the helper may have dispatched a
+---   Security.framework mutation that must reach natural completion.
+--- @return table operation Handle exposing cancel().
+local function run_security(label, args, input, callback, mutates_keychain)
+	local completed = false
+	local task_handle = nil
+	local timeout_handle = nil
+	local discard_native_completion = false
+	local cancellation_reason = nil
+	local task_started = false
+	local deadline_triggered = false
+	local operation = {}
+
+	local function cancel_timeout()
+		if timeout_handle == nil then return true end
+		local handle = timeout_handle
+		timeout_handle = nil
+		local ok, settled = xpcall(function()
+			return TimerScheduler.cancel(handle)
+		end, debug.traceback)
+		if not ok or settled ~= true then
+			Logger.error(LOG, "%s timeout cleanup failed: %s",
+				tostring(label), tostring(ok and settled or settled))
+			return false
+		end
+		return true
+	end
+
+	local function terminate_task(reason)
+		if task_handle == nil then return true, "settled" end
+		local owned = task_handle
+		local ok, settled, state = xpcall(function()
+			return owned.terminate()
+		end, debug.traceback)
+		-- ShellRunner's first return preserves its public compatibility contract:
+		-- true means the stop request was accepted. Only the second return proves
+		-- whether native exit has already settled.
+		if ok and state == "settled" then return true, "settled" end
+		if ok and state == "pending" then return false, "pending" end
+		if ok and settled == true and state == nil then return true, "settled" end
+		if not ok or state ~= "pending" then
+			Logger.error(LOG, "%s task termination failed after %s: %s",
+				tostring(label), tostring(reason), tostring(ok and (state or settled) or settled))
+		end
+		return false, "refused"
+	end
+
+	local function complete(process_completed, exit_code, stdout, stderr, reason)
+		if completed then return false end
+		completed = true
+		cancel_timeout()
+		invoke_guarded(label, callback, process_completed, exit_code, stdout, stderr, reason)
+		return true
+	end
+
+	operation.cancel = function()
+		if completed then return true, "settled" end
+		cancellation_reason = cancellation_reason or "cancelled"
+		if task_started and mutates_keychain == true then
+			-- SecItem write/delete is synchronous only from the helper's point of
+			-- view. Once dispatched to securityd, killing the helper cannot prove
+			-- that the mutation will not commit afterward. Preserve the live task
+			-- and wait for its natural callback before cleanup or a successor.
+			return false, "pending"
+		end
+		local settled, state = terminate_task("cancellation")
+		-- An accepted SIGTERM is only a pending request. Keep the task and its
+		-- native completion observable so persistence cannot overlap a successor
+		-- with Security.framework side effects from this helper.
+		if settled then complete(false, nil, nil, nil, cancellation_reason) end
+		return settled, state
+	end
+
+	local resolve_ok, executable_or_err, resolution_error = xpcall(function()
+		return LauncherHelper.resolve()
+	end, debug.traceback)
+	if not resolve_ok or type(executable_or_err) ~= "string" or executable_or_err == "" then
+		Logger.error(LOG, "%s launcher helper resolution failed: %s",
+			tostring(label), tostring(resolve_ok and resolution_error or executable_or_err))
+		complete(false, nil, nil, nil, "helper_unavailable")
+		return operation
+	end
+
+	local spawn_ok, candidate_or_err = xpcall(function()
+		return ShellRunner.spawn(executable_or_err, args, function(exit_code, stdout, stderr)
+			task_handle = nil
+			if discard_native_completion then return end
+			if cancellation_reason ~= nil then
+				complete(false, nil, nil, nil, cancellation_reason)
+				return
+			end
+			complete(true, exit_code, stdout, stderr, nil)
+		end)
+	end, debug.traceback)
+	if not spawn_ok or type(candidate_or_err) ~= "table" then
+		Logger.error(LOG, "%s task construction failed: %s",
+			tostring(label), tostring(candidate_or_err))
+		complete(false, nil, nil, nil, "launch_failed")
+		return operation
+	end
+	task_handle = candidate_or_err
+
+	-- A hostile or broken constructor may call completion synchronously. Do not
+	-- launch a process after the operation has already reached a terminal state.
+	if completed then
+		terminate_task("completion during construction")
+		return operation
+	end
+
+	if input ~= nil then
+		local input_ok, accepted_or_err = xpcall(function()
+			return task_handle.set_input(input)
+		end, debug.traceback)
+		if not input_ok or accepted_or_err ~= true then
+			Logger.error(LOG, "%s stdin setup failed: %s",
+				tostring(label), tostring(input_ok and accepted_or_err or accepted_or_err))
+			discard_native_completion = true
+			terminate_task("stdin setup failure")
+			complete(false, nil, nil, nil, "input_failed")
+			return operation
+		end
+		-- This spawn deliberately has no streaming callback. hs.task:setInput()
+		-- queues the bytes before start and automatically closes stdin afterward;
+		-- closeInput() is valid only for the streaming-callback task form.
+	end
+
+	local timer_ok, timer_or_err, timer_committed = xpcall(function()
+		local handle, committed = TimerScheduler.after(OPERATION_TIMEOUT_SEC, function()
+			if completed then return end
+			deadline_triggered = true
+			Logger.error(LOG, "%s timed out after %.3f seconds.", label, OPERATION_TIMEOUT_SEC)
+			cancellation_reason = cancellation_reason or "timeout"
+			if task_started and mutates_keychain == true then
+				-- Logical timeout fences the caller, but native ownership remains
+				-- pending until the non-cancellable Keychain mutation returns.
+				return
+			end
+			local settled = terminate_task("deadline")
+			-- Before start there is no OS mutation to await, even if a hostile
+			-- prepared-task double refuses terminate(). Never launch it afterward.
+			if settled or not task_started then
+				complete(false, nil, nil, nil, cancellation_reason)
+			end
+		end)
+		return handle, committed
+	end, debug.traceback)
+	if timer_ok then timeout_handle = timer_or_err end
+	if not timer_ok or timer_committed ~= true then
+		Logger.error(LOG, "%s deadline could not be armed: %s",
+			tostring(label), tostring(timer_ok and timer_committed or timer_or_err))
+		discard_native_completion = true
+		terminate_task("deadline setup failure")
+		complete(false, nil, nil, nil, "deadline_failed")
+		return operation
+	end
+	if deadline_triggered or completed then
+		-- A hostile scheduler can deliver during acquisition and still return a
+		-- committed handle. The deadline callback already retired the task; the
+		-- newly returned timer handle still needs exact cancellation.
+		cancel_timeout()
+		return operation
+	end
+
+	local start_ok, started_or_err = xpcall(function()
+		return task_handle.start()
+	end, debug.traceback)
+	if not start_ok or started_or_err ~= true then
+		Logger.error(LOG, "%s task launch failed: %s",
+			tostring(label), tostring(start_ok and started_or_err or started_or_err))
+		discard_native_completion = true
+		terminate_task("launch failure")
+		complete(false, nil, nil, nil, "launch_failed")
+	else
+		if not completed then task_started = true end
+	end
+
+	return operation
 end
 
 
@@ -64,137 +239,106 @@ end
 
 -- ====================================
 -- ====================================
--- ======= 1/ Public API ==============
+-- ======= 2/ Public API ==============
 -- ====================================
 -- ====================================
 
---- True when the value looks like a Keychain reference rather than
---- cleartext. Cheap check used to decide whether to round-trip through
---- the ``security`` CLI.
---- @param stored string|nil The value as stored on disk.
---- @return boolean
+--- True when a persisted value is a Keychain reference.
+--- @param stored string|nil Persisted token field.
+--- @return boolean encrypted
 function M.is_encrypted(stored)
 	return type(stored) == "string"
+		and #stored > #KEYCHAIN_PREFIX
 		and stored:sub(1, #KEYCHAIN_PREFIX) == KEYCHAIN_PREFIX
 end
 
---- Stores a cleartext token in the Keychain and returns a reference
---- (``keychain:<entry_id>``) the caller can persist to hs.settings.
---- On any failure (locked Keychain, ``security`` missing, write denied)
---- returns the cleartext unchanged so the caller never loses the token.
---- @param entry_id string Unique per-entry identifier (account in Keychain terms).
---- @param cleartext string The raw API token.
---- @return string Reference string, or the cleartext on failure.
-function M.encrypt(entry_id, cleartext)
-	if type(entry_id) ~= "string" or entry_id == "" then return cleartext end
-	if type(cleartext) ~= "string" or cleartext == "" then return cleartext end
-	-- If the value is already a reference, never re-wrap.
-	if M.is_encrypted(cleartext) then return cleartext end
+--- Stores a token and returns only an opaque Keychain reference on success.
+--- Cleartext is never returned as a failure fallback.
+--- @param entry_id string Stable account identifier.
+--- @param cleartext string Secret token.
+--- @param callback function Receives (ok, reference, reason).
+--- @return table operation Cancellation handle.
+function M.encrypt_async(entry_id, cleartext, callback)
+	if type(entry_id) ~= "string" or entry_id == ""
+		or type(cleartext) ~= "string" or cleartext == "" then
+		invoke_guarded("Keychain token write", callback, false, nil, "invalid_input")
+		return { cancel = function() return true end }
+	end
+	if M.is_encrypted(cleartext) then
+		invoke_guarded("Keychain token write", callback, true, cleartext, nil)
+		return { cancel = function() return true end }
+	end
 
-	-- ``security add-generic-password`` writes the token; -U updates
-	-- when the entry already exists. The token is piped via stdin (NOT
-	-- placed in argv) so it doesn't show up in ``ps`` listings — the
-	-- security(1) man page documents that `-w` with no value reads the
-	-- password from stdin. hs.task with setInput is the cleanest way to
-	-- do that synchronously from Hammerspoon.
-	local task = hs.task.new("/usr/bin/security", nil, {
-		"add-generic-password", "-U",
-		"-a", entry_id,
-		"-s", KEYCHAIN_SERVICE,
-		"-w",
-	})
-	if not task then
-		Logger.warn(LOG, "hs.task.new failed — token kept in plaintext on disk.")
-		return cleartext
-	end
-	task:setInput(cleartext)
-	if not task:start() then
-		Logger.warn(LOG, "Keychain task start failed — token kept in plaintext on disk.")
-		return cleartext
-	end
-	task:waitUntilExit()
-	local rc = task:terminationStatus() or -1
-	if rc ~= 0 then
-		Logger.warn(LOG, "Keychain write failed (rc=%d) — token kept in plaintext on disk.", rc)
-		return cleartext
-	end
-	return KEYCHAIN_PREFIX .. entry_id
-end
-
---- Resolves a stored value to its cleartext form. Handles both the
---- reference form and the legacy cleartext form so the caller never
---- has to know which.
---- @param stored string The value as stored on disk.
---- @return string Cleartext, or "" when the Keychain lookup failed.
-function M.decrypt(stored)
-	if type(stored) ~= "string" or stored == "" then return "" end
-	if not M.is_encrypted(stored) then return stored end
-	local entry_id = stored:sub(#KEYCHAIN_PREFIX + 1)
-	-- ``security find-generic-password -w`` prints just the password to
-	-- stdout when the account+service match. Read-only path is fine via
-	-- argv since there's no secret material in the arguments themselves.
-	local cmd = string.format(
-		"/usr/bin/security find-generic-password -a %s -s %s -w",
-		quote_shell(entry_id), quote_shell(KEYCHAIN_SERVICE))
-	local out, ok = hs.execute(cmd)
-	if not ok or not out or out == "" then
-		Logger.warn(LOG, "Keychain read failed for entry '%s'.", tostring(entry_id))
-		return ""
-	end
-	return (out:gsub("\n+$", ""))
-end
-
---- Async twin of M.decrypt(): resolves a stored value to cleartext without
---- ever blocking the run loop. Use this whenever the caller can defer the
---- rest of its work to a callback — e.g. pre-warming the cache right after
---- entries load, off the boot/timer tick that would otherwise call the
---- synchronous M.decrypt() through get_active_entry() (F-MED-9). Falls back
---- to the synchronous path only if adapters/shell_runner is unavailable.
---- @param stored string The value as stored on disk.
---- @param callback function Called with (cleartext) — "" on any failure.
-function M.decrypt_async(stored, callback)
-	if type(callback) ~= "function" then return end
-	if type(stored) ~= "string" or stored == "" then
-		callback("")
-		return
-	end
-	if not M.is_encrypted(stored) then
-		callback(stored)
-		return
-	end
-	if not ShellRunner then
-		-- No async adapter available (e.g. a stripped test load) — fall back
-		-- to the synchronous path rather than silently never calling back.
-		callback(M.decrypt(stored))
-		return
-	end
-	local entry_id = stored:sub(#KEYCHAIN_PREFIX + 1)
-	local task = ShellRunner.spawn("/usr/bin/security", {
-		"find-generic-password", "-a", entry_id, "-s", KEYCHAIN_SERVICE, "-w",
-	}, function(exit_code, stdout, _stderr)
-		if exit_code ~= 0 or type(stdout) ~= "string" or stdout == "" then
-			Logger.warn(LOG, "Async Keychain read failed for entry '%s'.", tostring(entry_id))
-			callback("")
+	return run_security("Keychain token write", {
+		TOKEN_WRITE_FLAG, entry_id,
+	}, cleartext, function(completed, exit_code, _stdout, stderr, reason)
+		if completed == true and exit_code == 0 then
+			invoke_guarded("Keychain token write result", callback,
+				true, KEYCHAIN_PREFIX .. entry_id, nil)
 			return
 		end
-		callback((stdout:gsub("\n+$", "")))
-	end)
-	task.start()
+		Logger.error(LOG, "Keychain token write failed for entry '%s' (reason=%s, rc=%s): %s",
+			tostring(entry_id), tostring(reason), tostring(exit_code), tostring(stderr or ""))
+		invoke_guarded("Keychain token write result", callback,
+			false, nil, reason or "security_failed")
+	end, true)
 end
 
---- Removes a Keychain entry. Called by the tray delete flow so the
---- secret is purged from the OS store, not just from hs.settings.
---- @param entry_id string The per-entry id used as the Keychain account.
-function M.delete(entry_id)
-	if type(entry_id) ~= "string" or entry_id == "" then return end
-	local cmd = string.format(
-		"/usr/bin/security delete-generic-password -a %s -s %s",
-		quote_shell(entry_id), quote_shell(KEYCHAIN_SERVICE))
-	local _out, ok, _kind, rc = hs.execute(cmd)
-	if not ok then
-		Logger.warn(LOG, "Keychain delete failed for entry '%s' (rc=%s).",
-			tostring(entry_id), tostring(rc))
+--- Resolves a Keychain reference without blocking the run loop.
+--- Legacy cleartext is returned unchanged so the next durable save can migrate it.
+--- @param stored string Persisted token field.
+--- @param callback function Receives (ok, cleartext, reason).
+--- @return table operation Cancellation handle.
+function M.decrypt_async(stored, callback)
+	if type(stored) ~= "string" or stored == "" then
+		invoke_guarded("Keychain token read", callback, false, nil, "invalid_input")
+		return { cancel = function() return true end }
 	end
+	if not M.is_encrypted(stored) then
+		invoke_guarded("Keychain token read", callback, true, stored, nil)
+		return { cancel = function() return true end }
+	end
+
+	local entry_id = stored:sub(#KEYCHAIN_PREFIX + 1)
+	return run_security("Keychain token read", {
+		TOKEN_READ_FLAG, entry_id,
+	}, nil, function(completed, exit_code, stdout, stderr, reason)
+		local cleartext = type(stdout) == "string" and (stdout:gsub("\n+$", "")) or ""
+		if completed == true and exit_code == 0 and cleartext ~= "" then
+			invoke_guarded("Keychain token read result", callback, true, cleartext, nil)
+			return
+		end
+		Logger.error(LOG, "Keychain token read failed for entry '%s' (reason=%s, rc=%s): %s",
+			tostring(entry_id), tostring(reason), tostring(exit_code), tostring(stderr or ""))
+		invoke_guarded("Keychain token read result", callback,
+			false, nil, reason or "security_failed")
+	end, false)
+end
+
+--- Removes a Keychain entry with the same ownership and deadline guarantees.
+--- An already-absent entry counts as success so durable cleanup tombstones can
+--- be retried safely after a crash between deletion and tombstone removal.
+--- @param entry_id string Stable account identifier.
+--- @param callback function Receives (ok, reason).
+--- @return table operation Cancellation handle.
+function M.delete_async(entry_id, callback)
+	if type(entry_id) ~= "string" or entry_id == "" then
+		invoke_guarded("Keychain token delete", callback, false, "invalid_input")
+		return { cancel = function() return true end }
+	end
+
+	return run_security("Keychain token delete", {
+		TOKEN_DELETE_FLAG, entry_id,
+	}, nil, function(completed, exit_code, _stdout, stderr, reason)
+		if completed == true and exit_code == 0 then
+			invoke_guarded("Keychain token delete result", callback, true, nil)
+			return
+		end
+		Logger.error(LOG, "Keychain token delete failed for entry '%s' (reason=%s, rc=%s): %s",
+			tostring(entry_id), tostring(reason), tostring(exit_code), tostring(stderr or ""))
+		invoke_guarded("Keychain token delete result", callback,
+			false, reason or "security_failed")
+	end, true)
 end
 
 return M

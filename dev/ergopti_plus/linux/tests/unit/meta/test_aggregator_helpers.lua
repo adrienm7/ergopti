@@ -329,10 +329,22 @@ helpers.describe("aggregator_helpers", function()
     end)
 
     helpers.it("no-ops on non-existent ngram table", function()
+      -- "Should not crash" was the whole assertion. What no-op MEANS here is that
+      -- the batch is untouched: a metric filed under a table that does not exist
+      -- must not invent one, or the writer later emits an INSERT against a table
+      -- the schema has never heard of and the whole batch is rolled back.
       local b = AggHelper.new_batch()
-      -- Should not crash
+      local before = 0
+      for _ in pairs(b) do before = before + 1 end
+
       AggHelper.add_ngram_metric(b, "nonexistent_table", "k", 0, false, "none")
-      helpers.assert_true(true)  -- survived
+
+      local after = 0
+      for _ in pairs(b) do after = after + 1 end
+      helpers.assert_eq(after, before,
+        "an unknown ngram table must leave the batch exactly as it was, not create a partition for it")
+      helpers.assert_true(b.nonexistent_table == nil,
+        "and specifically must not have created the table it was handed")
     end)
   end)
 

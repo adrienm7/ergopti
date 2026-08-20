@@ -1,0 +1,117 @@
+{
+	"description": "Cross-driver corpus for personal-info preview masking. Every vector must produce the same `expected` in every driver's suite, unmodified. The policy below is a COPY of _shared/modules/personal_info/fields.toml [policy], carried here so a vector's expectation can be read without opening a second file; tools/test/test-personal-info-mask-corpus.cjs asserts the two agree, so a change to the TOML that is not reflected here fails rather than silently retargets every vector.",
+	"policy": {
+		"mask_char": "•",
+		"reveal_head": 2,
+		"reveal_tail": 4,
+		"min_length_to_reveal": 12,
+		"preserve_separators": true
+	},
+	"vectors": [
+		{
+			"id": "iban_spaced",
+			"field": "iban",
+			"value": "FR76 3000 4000 5000 6000 7000 123",
+			"expected": "FR•• •••• •••• •••• •••• •••0 123",
+			"why": "The grouping spaces survive and do not count toward head or tail — revealing 'FR' must mean two LETTERS, not a letter and a space. This is the vector a byte-slicing implementation gets wrong."
+		},
+		{
+			"id": "iban_compact",
+			"field": "iban",
+			"value": "FR7630004000500060007000123",
+			"expected": "FR•••••••••••••••••••••0123",
+			"why": "The same value without decoration. Head and tail land on the same characters as the spaced form, which is what makes the separator rule a display concern rather than an arithmetic one."
+		},
+		{
+			"id": "bic_too_short",
+			"field": "bic",
+			"value": "ABCDFRPP",
+			"expected": "••••••••",
+			"why": "Eight characters, below min_length_to_reveal. Head 2 plus tail 4 would show six of the eight, which is not a mask. An implementation that applies the reveal unconditionally passes every other vector and fails this one."
+		},
+		{
+			"id": "bic_eleven",
+			"field": "bic",
+			"value": "ABCDFRPPXXX",
+			"expected": "•••••••••••",
+			"why": "Eleven is still below the threshold. The bound is on the value, not on the field."
+		},
+		{
+			"id": "credit_card_spaced",
+			"field": "credit_card",
+			"value": "1234 5678 9012 3456",
+			"expected": "12•• •••• •••• 3456",
+			"why": "The last four digits are how a card issuer asks you to identify a card, which is the whole reason the tail is larger than the head."
+		},
+		{
+			"id": "ssn_french_spaced",
+			"field": "social_security_number",
+			"value": "1 99 99 99 999 999 99",
+			"expected": "1 9• •• •• ••• •99 99",
+			"why": "A French SSN's grouping is irregular, so the reveal cannot be computed from group boundaries — only from content position."
+		},
+		{
+			"id": "phone_not_masked",
+			"field": "phone_number",
+			"value": "0750399576",
+			"expected": "0750399576",
+			"why": "Explicitly exempt by the maintainer's decision. A vector whose expectation EQUALS its input is what proves the field table is being consulted at all rather than everything being masked."
+		},
+		{
+			"id": "phone_clean_not_masked",
+			"field": "phone_number_clean",
+			"value": "07 50 39 95 76",
+			"expected": "07 50 39 95 76",
+			"why": "Follows its sibling. Listed separately because a rule keyed on a name prefix would silently capture a future phone_number_work nobody classified."
+		},
+		{
+			"id": "first_name_not_masked",
+			"field": "first_name",
+			"value": "Adrien",
+			"expected": "Adrien",
+			"why": "Personal, but not a credential. Also short enough that a masking implementation ignoring the field table would return all bullets, which this catches."
+		},
+		{
+			"id": "unknown_field_is_masked",
+			"field": "some_future_field",
+			"value": "AB12345678901234",
+			"expected": "AB••••••••••1234",
+			"why": "A field nobody classified is hidden. The opposite default reveals whatever a future edit forgets to declare, which is the failure this whole file exists to prevent."
+		},
+		{
+			"id": "no_field_is_masked",
+			"field": null,
+			"value": "AB12345678901234",
+			"expected": "AB••••••••••1234",
+			"why": "No field name means the value's provenance was lost on the way to the row, which is exactly when it must not be assumed public."
+		},
+		{
+			"id": "empty_value",
+			"field": "iban",
+			"value": "",
+			"expected": "",
+			"why": "Nothing to mask and nothing to reveal. An implementation that pads to a minimum width would invent content."
+		},
+		{
+			"id": "non_ascii_masked",
+			"field": "iban",
+			"value": "ÉÀ76 3000 4000 5000 6000",
+			"expected": "ÉÀ•• •••• •••• •••• 6000",
+			"why": "Accented characters are two bytes in UTF-8. A byte-indexed implementation reveals half a character here and produces a string that is both wrong and unreadable — and the Lua drivers run on a LuaJIT with no utf8 library, so this is not hypothetical."
+		},
+		{
+			"id": "exactly_at_threshold",
+			"field": "iban",
+			"value": "AB1234567890",
+			"expected": "AB••••••7890",
+			"why": "Twelve content characters is the boundary: min_length_to_reveal is inclusive, so this reveals. An off-by-one implementation hides it entirely and still passes every other vector."
+		},
+		{
+			"id": "one_below_threshold",
+			"field": "iban",
+			"value": "AB123456789",
+			"expected": "•••••••••••",
+			"why": "Eleven hides. The pair with the vector above is what pins which side of the boundary is which."
+		}
+	]
+}

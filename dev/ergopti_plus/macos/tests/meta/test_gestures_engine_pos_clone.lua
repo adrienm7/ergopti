@@ -27,13 +27,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local DRIVER_ROOT = helpers.driver_root()
 
-local function read_source(rel)
-	local fh = io.open(DRIVER_ROOT .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -57,7 +56,7 @@ end
 helpers.describe("gestures/engine.lua: position table clone (gesture-engine-table-mutation)", function()
 
 	helpers.it("gs.startPos is assigned as a cloned table, not a direct reference", function()
-		local src = strip_comments(read_source("modules/gestures/engine.lua"))
+		local src = strip_comments(read_source("local function triggerLiveAxisIfNeeded"))
 
 		-- Every occurrence of gs.startPos = ... must use the clone form
 		-- {x = pos.x, y = pos.y}, not a bare `= pos`
@@ -73,7 +72,7 @@ helpers.describe("gestures/engine.lua: position table clone (gesture-engine-tabl
 	end)
 
 	helpers.it("gs.endPos is assigned as a cloned table at rebase sites", function()
-		local src = strip_comments(read_source("modules/gestures/engine.lua"))
+		local src = strip_comments(read_source("local function triggerLiveAxisIfNeeded"))
 
 		-- The simultaneous startPos+endPos rebase sites must both clone
 		helpers.assert_true(

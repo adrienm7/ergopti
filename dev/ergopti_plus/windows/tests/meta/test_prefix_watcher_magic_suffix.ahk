@@ -4,7 +4,7 @@
 ; MODULE: Prefix Watcher IsMagic Trailing-Suffix Guard
 ; DESCRIPTION:
 ; Static source guard for the HasMagic trailing-suffix check fix in
-; lib/hotstrings/hotstring_prefix_watcher.ahk.
+; infra/hotstrings/hotstring_prefix_watcher.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; The original check used InStr(Entry.Trigger, MK) > 0, which matched any
@@ -41,8 +41,8 @@ _TPWMS_TrailingSuffixCheck() {
 	; Move-resilient: scan the hotstrings lib dir via the framework helper instead
 	; of a pinned hotstring_prefix_watcher.ahk path. The trailing-suffix form
 	; SubStr(Trigger, -MkLen) == MagicKey is unique to the watcher within the dir.
-	Src := _TPWMS_StripLineComments(_DriverDirConcat("lib/hotstrings"))
-	Assert(Src != "", "lib/hotstrings/hotstring_prefix_watcher.ahk must be readable")
+	Src := _TPWMS_StripLineComments(_DriverDirConcat("infra/hotstrings"))
+	Assert(Src != "", "infra/hotstrings/hotstring_prefix_watcher.ahk must be readable")
 
 	; MkLen must be computed from StrLen(MagicKey) — needed by the suffix test
 	Assert(InStr(Src, "MkLen := StrLen(MagicKey)") > 0,

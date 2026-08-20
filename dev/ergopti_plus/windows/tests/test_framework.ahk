@@ -38,11 +38,11 @@
 
 
 
-; ============================================
+; =============================================
 ; =============================================
 ; ======= 1/ Constants and shared state =======
 ; =============================================
-; ============================================
+; =============================================
 
 ; Registry of all Test() calls. Each entry is { name, callback }.
 global TEST_REGISTRY := []
@@ -71,11 +71,11 @@ if !IsSet(_AHK_ONLY_FILTER)
 
 
 
-; ==================================
+; =============================
 ; =============================
 ; ======= 2/ Assertions =======
 ; =============================
-; ==================================
+; =============================
 
 ; Throw a TestFailure when ``Condition`` is falsy. The accompanying message
 ; describes the property being checked, for use in the CI failure log.
@@ -91,8 +91,15 @@ _TestAppendProgress(line) {
 	try FileAppend(line . "`r`n", "*")
 }
 
+; ``!==`` and not ``!=``: AHK v2's ``!=`` compares strings CASE-INSENSITIVELY, so
+; AssertEqual("BTW", "btw") passed — in a suite whose whole subject is case
+; propagation, hotstring triggers and layout keys, that is the one distinction it
+; most needed to make. ``!==`` narrows nothing else: numbers still compare
+; numerically (1 == "1", 1 == 1.0, 255 == "0xFF"), "" is still distinct from 0,
+; true is still 1, and object comparison is identity either way — the ONLY
+; behaviour that changes is string case, which is the behaviour we want back.
 AssertEqual(Expected, Actual, Message := "values differ") {
-	if (Expected != Actual) {
+	if (Expected !== Actual) {
 		throw Error(Message . " - expected: <" . _DescribeValue(Expected)
 			. ">, actual: <" . _DescribeValue(Actual) . ">")
 	}
@@ -108,8 +115,11 @@ AssertFalse(Value, Message := "expected false") {
 	}
 }
 
+; CaseSense := true for the same reason AssertEqual uses ``!==``: InStr defaults
+; to a case-INSENSITIVE search, so AssertContains(output, "BTW") was satisfied by
+; an output containing "btw".
 AssertContains(Haystack, Needle, Message := "substring not found") {
-	if !InStr(Haystack, Needle) {
+	if !InStr(Haystack, Needle, true) {
 		throw Error(Message . " — needle <" . Needle . "> not in <" . Haystack . ">")
 	}
 }
@@ -190,8 +200,8 @@ _Enumerate(arr, n) {
 
 ; Reads the ENTIRE driver source — every .ahk under the windows/ root except the
 ; tests/, vendor/ and _generated/ trees — concatenated into one string, so
-; source-introspection tests find a function regardless of which lib/ or ui/ file
-; the entrypoint decomposition (P4/P5) moved it into. Function names are unique in
+; source-introspection tests find a function regardless of which infra/ or ui/ file
+; the entrypoint decomposition (the entry-point decomposition) moved it into. Function names are unique in
 ; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
 ; resolves to the single definition. Cached after first use.
 _DriverSourceConcat() {
@@ -230,7 +240,7 @@ _StripFullLineComments(Src) {
 ; Returns the whole driver source (see _DriverSourceConcat) with every
 ; full-line comment stripped. Use for source-scan invariants that count or
 ; match a token across the ENTIRE driver tree (not just one function body) —
-; without this, an explanatory comment anywhere in lib/modules/adapters/ui
+; without this, an explanatory comment anywhere in infra/modules/adapters/ui
 ; can silently trip a naive substring count. Cached after first use.
 _DriverSourceNoComments() {
 	static cache := ""
@@ -242,18 +252,84 @@ _DriverSourceNoComments() {
 
 ; Returns the body (signature through the matching closing brace, full-line
 ; comments stripped) of a top-level driver function, found across the whole
-; driver source. Anchors on the column-0 DEFINITION, so a call site (always
-; indented) in an earlier-concatenated file is never mistaken for the body.
+; driver source. THROWS when no definition exists.
+;
+; Failing loudly is the whole point: the helper used to return "" for a missing
+; function, and `InStr("", Needle)` is 0, so every `Assert(InStr(Body, X) > 0)`
+; became `Assert(0 > 0)` — red — while every "must NOT contain" assertion passed
+; VACUOUSLY. A rename therefore disarmed hundreds of guarantees instead of
+; reporting them. Use _DriverFuncBodyOrEmpty when the absence itself is what the
+; test asserts.
 _DriverFuncBody(Name) {
+	Body := _DriverFuncBodyOrEmpty(Name)
+	if (Body == "")
+		throw Error("_DriverFuncBody: no definition of '" . Name . "()' anywhere in the driver source — it was renamed, deleted, or its file moved outside the scanned tree. Fix the test's symbol name, or use _DriverFuncBodyOrEmpty if the absence is the assertion.")
+	return Body
+}
+
+; Same scan as _DriverFuncBody but returns "" instead of throwing when the
+; function is absent. Reserved for the handful of tests whose assertion IS the
+; absence (e.g. "this dead helper must stay deleted").
+_DriverFindFunctionDefinition(Src, Name) {
+	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
+		throw ValueError("Invalid driver function name: " . Name)
+	Pattern := "m)^[ \t]*" . Name . "\("
+	SearchPos := 1
+	SourceLen := StrLen(Src)
+	while RegExMatch(Src, Pattern, &Match, SearchPos) {
+		SignatureOpen := InStr(Src, "(", , Match.Pos)
+		Depth := 0
+		Quote := ""
+		Cursor := SignatureOpen
+		while Cursor <= SourceLen {
+			Ch := SubStr(Src, Cursor, 1)
+			if (Quote != "") {
+				if (Ch == Chr(96)) {
+					Cursor += 2
+					continue
+				}
+				if (Ch == Quote)
+					Quote := ""
+			} else if (Ch == Chr(34) or Ch == Chr(39)) {
+				Quote := Ch
+			} else if (Ch == ";") {
+				LineEnd := InStr(Src, "`n", , Cursor)
+				Cursor := LineEnd > 0 ? LineEnd : SourceLen + 1
+				continue
+			} else if (Ch == "(") {
+				Depth += 1
+			} else if (Ch == ")") {
+				Depth -= 1
+				if (Depth == 0)
+					break
+			}
+			Cursor += 1
+		}
+		if (Depth == 0) {
+			OpenPos := Cursor + 1
+			while (OpenPos <= SourceLen
+				and InStr(" `t`r`n", SubStr(Src, OpenPos, 1)) > 0)
+				OpenPos += 1
+			if (SubStr(Src, OpenPos, 1) == "{")
+				return { Idx: Match.Pos, OpenPos: OpenPos }
+		}
+		; A column-zero call is not a definition. Continue after this exact name
+		; instead of letting a multiline regex consume through a later function.
+		SearchPos := Match.Pos + Max(1, StrLen(Match[0]))
+	}
+	return 0
+}
+
+_DriverFuncBodyOrEmpty(Name) {
 	Src := _DriverSourceConcat()
-	; Match a function DEFINITION line — the name, its (...) params and the opening
-	; brace — optionally indented (nested functions), never a bare call site (a
-	; call has no trailing ") {"). This distinguishes def from call without relying
-	; on column 0, so nested helpers like _OneShot/_Repeating resolve too.
-	if !RegExMatch(Src, "m)^[ \t]*" . Name . "\([^\r\n]*\)\s*\{", &m)
+	; Match a definition, not a same-named column-zero call. The scanner balances
+	; nested parameter expressions and quoted parentheses before requiring the
+	; opening brace immediately after the real outer close.
+	Definition := _DriverFindFunctionDefinition(Src, Name)
+	if !IsObject(Definition)
 		return ""
-	Idx := m.Pos
-	OpenPos := InStr(Src, "{", , Idx)
+	Idx := Definition.Idx
+	OpenPos := Definition.OpenPos
 	if (!OpenPos)
 		return ""
 	depth := 0
@@ -281,12 +357,20 @@ _DriverFuncBody(Name) {
 ; into one string. Use for source-introspection tests that scan a specific
 ; module's files (e.g. "ui/tooltip") regardless of how that module is internally
 ; split into sub-files. RelDir uses forward slashes.
+;
+; THROWS when the directory holds no .ahk file. The directory name is the one
+; thing this helper hardcodes, so a rename is exactly what it must catch: a
+; silent "" here turned every downstream "must NOT contain" assertion into a
+; vacuous pass, while test-no-pinned-source-reads.cjs certified the caller as
+; move-resilient precisely BECAUSE it used this helper.
 _DriverDirConcat(RelDir) {
 	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
 	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
 	Combined := ""
 	Loop Files, Dir . "\*.ahk", "FR"
 		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
+	if (Combined == "")
+		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
 	return Combined
 }
 
@@ -300,11 +384,11 @@ global _DriverDirConcatFn := _DriverDirConcat
 
 
 
-; ===============================
+; ==============================
 ; ==============================
 ; ======= 3/ Test runner =======
 ; ==============================
-; ===============================
+; ==============================
 
 ; Register a test. ``Callback`` must be a 0-arg callable; it receives no
 ; setup/teardown — tests should be self-contained.

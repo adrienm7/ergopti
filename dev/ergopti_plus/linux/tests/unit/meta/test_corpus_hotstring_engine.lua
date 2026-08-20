@@ -56,6 +56,42 @@ end
 
 local engine_mod = require("hotstring_engine")
 
+--- Every per-entry flag a vector may declare. Driven off a LIST because this
+--- harness used to name the fields one by one and dropped two of them:
+--- `is_case_sensitive_strict` and `final_result` never reached the engine, so a
+--- vector exercising either was replayed as a vector that declared neither and
+--- passed for the wrong reason. A vector whose flag the harness ignores is worse
+--- than an absent vector — it reports coverage it does not have.
+local VECTOR_FLAGS = {
+	"is_word",
+	-- Passed through explicitly: the engine defaults auto_expand to FALSE,
+	-- matching the AutoHotkey loader, so a harness that drops the field silently
+	-- converts every vector into one that waits for a terminator and matches
+	-- nothing.
+	"auto_expand",
+	"is_case_sensitive",
+	"is_case_sensitive_strict",
+	"final_result",
+}
+
+--- Builds the engine mapping a vector (or a collision vector's entry) describes.
+--- @param v table The vector or mapping table from the corpus.
+--- @return table The mapping table to hand to load_mappings.
+local function build_mapping(v)
+	local mapping = {
+		trigger     = v.trigger,
+		replacement = v.replacement or "",
+	}
+	for _, flag in ipairs(VECTOR_FLAGS) do
+		mapping[flag] = v[flag] == true
+	end
+	-- Not a boolean, and not defaulted here: the engine treats an absent priority
+	-- as "no opinion", while the driver's loader resolves the cascade before the
+	-- engine ever sees a mapping.
+	if type(v.priority) == "number" then mapping.priority = v.priority end
+	return mapping
+end
+
 --- Loads the cross-driver hotstrings corpus from disk.
 --- @return table|nil Parsed corpus table with .vectors and .collision_vectors.
 local function load_corpus()
@@ -153,12 +189,7 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 		local passed   = 0
 
 		for _, v in ipairs(vectors) do
-			local mapping = {
-				trigger           = v.trigger,
-				replacement       = v.replacement or "",
-				is_word           = v.is_word == true,
-				is_case_sensitive = v.is_case_sensitive == true,
-			}
+			local mapping = build_mapping(v)
 
 			local e = engine_mod.new()
 			e:load_mappings({ mapping })
@@ -179,7 +210,10 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 				-- Feed the final codepoint with the terminator_consumed flag.
 				-- Per the engine API: {terminator_consumed = true} adds 1 to
 				-- backspace_count so the injector erases the terminator too.
-				local opts = { terminator_consumed = v.terminator_consumed == true }
+				local opts = {
+					terminator_consumed = v.terminator_consumed == true,
+					is_terminator       = v.terminator_consumed == true,
+				}
 				result = e:on_char(cps[#cps], opts)
 			end
 
@@ -222,7 +256,14 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 				.. table.concat(failures, "\n")
 			assert_true(false, msg)
 		else
-			assert_true(true, "all " .. vector_count .. " vector(s) passed")
+			-- The success branch used to be assert_true(true) with the count in the
+			-- message, which reads identically whether the corpus held 300 vectors
+			-- or zero — and a corpus that fails to load yields zero, no failures,
+			-- and this green. Assert the count instead of printing it.
+			assert_eq(passed, vector_count,
+				"every loaded vector must have been replayed")
+			assert_true(vector_count > 0,
+				"the corpus must hold vectors — an empty replay is a broken loader, not a clean run")
 		end
 	end)
 
@@ -242,19 +283,39 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 			"collision_vectors must be present in the corpus")
 	end)
 
+	-- The shared engine sorts each bucket by trigger length only. It has no
+	-- priority field — but "collisions need priority" was too broad a reason to
+	--- Loads every mapping of a collision vector and types its buffer.
+	--- @return string The winning replacement, or "<none>".
+	local function play_collision(v, mappings)
+		local e = engine_mod.new()
+		-- Through build_mapping like the single-vector replay, so the two paths
+		-- cannot disagree about which flags a corpus entry carries.
+		local built = {}
+		for i, m in ipairs(mappings) do built[i] = build_mapping(m) end
+		e:load_mappings(built)
+		local result
+		for _, cp in ipairs(split_codepoints(v.buffer)) do
+			result = e:on_char(cp)
+		end
+		return result and result.replacement or "<none>"
+	end
+
+	-- All seven replay for real now. Three of them used to be skipped as
+	-- "priority-blind", and the skip was right: the engine sorted on trigger
+	-- length alone, so a collision was decided by whichever mapping Lua's
+	-- table.sort happened to leave first. Two of the three would have PASSED a
+	-- naive replay, because their expected winner is also the first registered —
+	-- which is exactly why the skip asserted its own premise rather than being
+	-- deleted. The engine now sorts on length, then priority, then registration
+	-- order, so the premise is gone and so is the skip.
 	if collisions then
-		it("SKIP — shared engine delegates priority-based resolution to the caller", function()
-			-- The shared engine sorts mappings by trigger length only (longest
-			-- first). It has no priority field and does not resolve same-length
-			-- collisions by priority. The Linux driver's engine.lua thin re-export
-			-- applies priority sorting BEFORE calling load_mappings(), which is
-			-- tested separately. Collision vectors are pinned by the macOS
-			-- registry consumer (test_corpus_hotstrings.lua) and the AHK consumer
-			-- (test_corpus_hotstrings.ahk). The shared engine corpus replay
-			-- correctly stops at the vectors array — this SKIP is explicit and
-			-- tracked, not a silent gap.
-			assert_true(true, "skip acknowledged — " .. #collisions
-				.. " collision vector(s) require priority-based resolution")
-		end)
+		for _, v in ipairs(collisions) do
+			it("collision replay: " .. v.id, function()
+				local want = (v.expected.matched == false) and "<none>" or v.expected.winner
+				assert_eq(want, play_collision(v, v.mappings),
+					"collision vector '" .. v.id .. "': the shared engine elected the wrong winner")
+			end)
+		end
 	end
 end)

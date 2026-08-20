@@ -47,20 +47,20 @@
 _OTB_CacheReturnsRealBooleans() {
 	Path := A_Temp . "\ergopti_test_onb_bool.toml"
 	try FileDelete(Path)
-	FileAppend("[ahk.layout]`nergopti_base = true`nergopti_plus = false`n", Path, "UTF-8")
+	FileAppend("[layout]`nergopti_base = true`nergopti_plus = false`n", Path, "UTF-8")
 
 	Cache := ParseTomlFile(Path)
-	OnValue := IniCacheGet(Cache, "ahk.layout", "ergopti_base")
-	OffValue := IniCacheGet(Cache, "ahk.layout", "ergopti_plus")
+	OnValue := IniCacheGet(Cache, "layout", "ergopti_base")
+	OffValue := IniCacheGet(Cache, "layout", "ergopti_plus")
 	try FileDelete(Path)
 
 	Assert(StrLower(OnValue) != "true",
 		"a TOML `true` must NOT be readable as the string 'true' through IniCacheGet — if this ever starts passing the parser changed, and the wizard's old comparison would look correct again")
-	Assert(TomlCacheBool(Cache, "ahk.layout", "ergopti_base"),
+	Assert(TomlCacheBool(Cache, "layout", "ergopti_base"),
 		"TomlCacheBool must read a TOML `true` as true — this is the comparison the wizard needs")
-	Assert(!TomlCacheBool(Cache, "ahk.layout", "ergopti_plus"),
+	Assert(!TomlCacheBool(Cache, "layout", "ergopti_plus"),
 		"TomlCacheBool must read a TOML `false` as false")
-	Assert(!TomlCacheBool(Cache, "ahk.layout", "absent_key"),
+	Assert(!TomlCacheBool(Cache, "layout", "absent_key"),
 		"a missing key must read as false, not as the '_' sentinel leaking through")
 }
 

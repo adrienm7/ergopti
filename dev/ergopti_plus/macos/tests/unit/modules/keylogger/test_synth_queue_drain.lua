@@ -1,166 +1,162 @@
 --- tests/unit/modules/keylogger/test_synth_queue_drain.lua
 
 --- ==============================================================================
---- MODULE: keylogger synth_queue idle-drain Unit Tests
+--- MODULE: Keylogger Synthetic Provenance Regression Tests
 --- DESCRIPTION:
---- Regression tests for the C5 audit finding: CoreState.synth_queue must be
---- drained after a long inter-keystroke idle so that a stale unmatched entry
---- (from a suppressed expansion or a dropped keyDown) does not permanently tag
---- the next real keystroke as synthetic.
----
---- These tests exercise the drain logic in isolation via a lightweight simulation
---- that mirrors the post-fix handle_key() guard verbatim.
+--- Exercises EventProvenance against tags allocated by the real SyntheticInput
+--- adapter. Ownership is immutable user-data membership; process information is
+--- diagnostic only, consumer dedupe is independent, and a failed native read
+--- cannot consume another consumer's claim.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
+local CURRENT_PID = 7001
+local FOREIGN_PID = 8002
 
 
-
-
--- ===================================================
--- ===============================================
--- ======= 1/ synth_queue drain simulation =======
--- ===============================================
--- ===================================================
-
--- Threshold constant mirrored from keylogger/init.lua (C5 fix)
-local SYNTH_IDLE_DRAIN_MS = 500
-
---- Simulates the synth_queue drain logic from handle_key() post-fix.
---- @param delay number Inter-keystroke delay in milliseconds.
---- @param synth_queue table The current synth_queue (mutated in-place on drain).
---- @return boolean True when the queue was drained.
-local function simulate_drain(delay, synth_queue)
-	if delay > SYNTH_IDLE_DRAIN_MS and #synth_queue > 0 then
-		while #synth_queue > 0 do table.remove(synth_queue) end
-		return true
-	end
-	return false
+--- Loads fresh production provenance and transaction adapters.
+--- @return table fixture
+local function load_fixture()
+	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["adapters.event_provenance"] = nil
+	local provenance = helpers.load_with_stubs("adapters.event_provenance", {
+		processInfo = { processID = CURRENT_PID },
+	})
+	return {
+		provenance = provenance,
+		synthetic = require("adapters.synthetic_input"),
+		hs = require("hs"),
+	}
 end
 
-helpers.describe("keylogger: synth_queue idle drain (C5)", function()
-	helpers.it("drains queue when delay > 500 ms and queue is non-empty", function()
-		local q = { { char = "a", type = "hotstring" }, { char = "b", type = "hotstring" } }
-		local drained = simulate_drain(600, q)
-		helpers.assert_eq(drained, true)
-		helpers.assert_eq(#q, 0)
+
+--- Allocates one real tagged keyDown/keyUp pair.
+--- @param fixture table
+--- @return table down_event
+local function tagged_event(fixture)
+	local tx = fixture.synthetic.begin("test.keylogger", "replacement")
+	local batch = fixture.synthetic.begin_callback(tx)
+	fixture.synthetic.keyStroke(batch, { "cmd" }, "v")
+	local _, events = fixture.synthetic.finish_callback(batch, true)
+	fixture.synthetic.seal(tx)
+	return events[1]
+end
+
+
+--- Overrides only the optional PID diagnostic on an adapter event.
+--- @param fixture table
+--- @param event table
+--- @param pid integer
+local function set_diagnostic_pid(fixture, event, pid)
+	local property = fixture.hs.eventtap.event.properties.eventSourceUnixProcessID
+	local original = event.getProperty
+	event.getProperty = function(self, requested)
+		if requested == property then return pid end
+		return original(self, requested)
+	end
+end
+
+
+helpers.describe("event provenance: explicit tags are the only ownership authority", function()
+	helpers.it("classifies a real adapter tag and deduplicates per consumer", function()
+		local fixture = load_fixture()
+		local event = tagged_event(fixture)
+		local keylogger, status = fixture.provenance.classify(event, "keylogger")
+		helpers.assert_true(keylogger and keylogger.owned)
+		helpers.assert_eq(keylogger.owner, "test.keylogger")
+		helpers.assert_eq(status, fixture.provenance.STATUS_OWNED)
+		helpers.assert_eq(keylogger.duplicate, false)
+
+		local again = fixture.provenance.classify(event, "keylogger")
+		helpers.assert_true(again.duplicate)
+		local keymap = fixture.provenance.classify(event, "keymap")
+		helpers.assert_eq(keymap.duplicate, false,
+			"keymap and keylogger must own independent dedupe slots")
 	end)
 
-	helpers.it("does NOT drain when delay <= 500 ms even with entries", function()
-		local q = { { char = "a", type = "hotstring" } }
-		local drained = simulate_drain(400, q)
-		helpers.assert_eq(drained, false)
-		helpers.assert_eq(#q, 1)
+	helpers.it("keeps an untagged same-process event physical", function()
+		local fixture = load_fixture()
+		local properties = fixture.hs.eventtap.event.properties
+		local pid_reads = 0
+		local event = {
+			getProperty = function(_self, property)
+				if property == properties.eventSourceUserData then return 0 end
+				pid_reads = pid_reads + 1
+				return CURRENT_PID
+			end,
+		}
+		local metadata, status = fixture.provenance.classify(event, "keylogger")
+		helpers.assert_nil(metadata)
+		helpers.assert_eq(status, fixture.provenance.STATUS_FOREIGN)
+		helpers.assert_eq(pid_reads, 0,
+			"missing tag membership must stop classification before diagnostics")
 	end)
 
-	helpers.it("does NOT drain when queue is empty (nothing to drain)", function()
-		local q = {}
-		local drained = simulate_drain(1000, q)
-		helpers.assert_eq(drained, false)
-		helpers.assert_eq(#q, 0)
+	helpers.it("keeps a tagged event owned when PID diagnostics disagree", function()
+		local fixture = load_fixture()
+		local event = tagged_event(fixture)
+		set_diagnostic_pid(fixture, event, FOREIGN_PID)
+		local metadata, status = fixture.provenance.classify(event, "keylogger")
+		helpers.assert_true(metadata and metadata.owned)
+		helpers.assert_eq(status, fixture.provenance.STATUS_OWNED)
+		helpers.assert_eq(metadata.pid_matches, false)
 	end)
 
-	helpers.it("real keystroke after drain is NOT tagged synthetic", function()
-		-- Arm 2 synthetic entries, simulate long idle, then simulate a real keystroke.
-		-- The match logic checks synth_queue[1].char == keystroke char.
-		local q = { { char = "a", type = "hotstring" }, { char = "b", type = "hotstring" } }
-		local delay = 700
+	helpers.it("contains a native getter failure without consuming the live tag", function()
+		local fixture = load_fixture()
+		local event = tagged_event(fixture)
+		local unreadable = { getProperty = function() error("Quartz read failed") end }
+		local ok, metadata, status = pcall(
+			fixture.provenance.classify, unreadable, "keylogger")
+		helpers.assert_true(ok, "native property failures must stay inside the adapter")
+		helpers.assert_nil(metadata)
+		helpers.assert_eq(status, fixture.provenance.STATUS_UNREADABLE)
+		local claimed = fixture.provenance.classify(event, "keylogger")
+		helpers.assert_true(claimed and not claimed.duplicate,
+			"the failed read must not consume any live tag claim")
+	end)
 
-		-- Apply drain (post-fix logic)
-		if delay > SYNTH_IDLE_DRAIN_MS and #q > 0 then
-			q = {}
+	helpers.it("fails fast on invalid fenced-consumer IDs before touching Quartz", function()
+		local fixture = load_fixture()
+		local reads = 0
+		local event = {
+			getProperty = function()
+				reads = reads + 1
+				return 0
+			end,
+		}
+		for _, invalid in ipairs({ false, 1, {}, "" }) do
+			helpers.assert_throws(function()
+				fixture.provenance.classify_with_fence(event, invalid)
+			end)
 		end
+		helpers.assert_throws(function()
+			fixture.provenance.classify_with_fence(event, nil)
+		end)
+		helpers.assert_eq(reads, 0,
+			"programmer-contract failures must precede native reads and fence claims")
+	end)
 
-		-- Now simulate the match logic for a real "x" keystroke
-		local is_synthetic = false
-		local chars = "x"
-		if #q > 0 then
-			local next_synth = q[1]
-			if chars == next_synth.char then
-				is_synthetic = true
-				table.remove(q, 1)
+	helpers.it("fails fast when Quartz user-data tags are unavailable", function()
+		package.loaded["tests.stubs.hs"] = nil
+		local base = require("tests.stubs.hs")
+		local eventtap = {}
+		for key, value in pairs(base.eventtap) do eventtap[key] = value end
+		eventtap.event = {}
+		for key, value in pairs(base.eventtap.event) do eventtap.event[key] = value end
+		eventtap.event.properties = {}
+		for key, value in pairs(base.eventtap.event.properties) do
+			if key ~= "eventSourceUserData" then
+				eventtap.event.properties[key] = value
 			end
 		end
-
-		-- After drain, the queue is empty so the keystroke must NOT be synthetic
-		helpers.assert_eq(is_synthetic, false)
-	end)
-end)
-
-
-
-
-
--- ================================================================
--- ===============================================================
--- ======= 2/ fast-path synth_queue pop (keylogger-core-1) =======
--- ===============================================================
--- ================================================================
-
--- Threshold constant mirrored from keylogger/init.lua
-local SYNTH_MATCH_DELAY_MS = 80
-
---- Simulates the synth_queue fast-path match logic from handle_key() post-fix.
---- @param chars string The keystroke character(s).
---- @param delay number Inter-keystroke delay in milliseconds.
---- @param synth_queue table The current synth_queue (mutated in-place on match/pop).
---- @return boolean, string Whether the keystroke is synthetic and its type.
-local function simulate_synth_match(chars, delay, synth_queue)
-	local is_synthetic = false
-	local synth_type   = "unknown"
-	if #synth_queue > 0 then
-		local next_synth = synth_queue[1]
-		if chars == next_synth.char then
-			is_synthetic = true
-			synth_type   = next_synth.type
-			table.remove(synth_queue, 1)
-		elseif delay < SYNTH_MATCH_DELAY_MS then
-			is_synthetic = true
-			synth_type   = next_synth.type
-			-- Post-fix: pop even on char-mismatch fast-path
-			table.remove(synth_queue, 1)
-		end
-	end
-	return is_synthetic, synth_type
-end
-
-helpers.describe("keylogger: fast-path synth_queue pop (keylogger-core-1)", function()
-
-	helpers.it("fast-path char-mismatch pops head entry (regression)", function()
-		-- Before fix: fast-path would NOT pop the queue — head would re-match every
-		-- subsequent fast keystroke until a 500 ms gap cleared the queue.
-		local q = { { char = "X", type = "hotstring" }, { char = "Y", type = "hotstring" } }
-		local is_syn, _ = simulate_synth_match("Z", 5, q)
-		helpers.assert_eq(is_syn, true,
-			"fast-path char-mismatch must still be marked synthetic")
-		helpers.assert_eq(#q, 1,
-			"fast-path must pop the head entry even on a char-mismatch")
-		helpers.assert_eq(q[1].char, "Y",
-			"remaining queue head must be the second entry after pop")
-	end)
-
-	helpers.it("exact-match still pops head entry (non-regression)", function()
-		local q = { { char = "A", type = "hotstring" }, { char = "B", type = "hotstring" } }
-		local is_syn, _ = simulate_synth_match("A", 5, q)
-		helpers.assert_eq(is_syn, true,  "exact-match must be synthetic")
-		helpers.assert_eq(#q, 1,         "exact-match must pop one entry")
-	end)
-
-	helpers.it("slow mismatch does NOT pop and is not synthetic", function()
-		local q = { { char = "X", type = "hotstring" } }
-		local is_syn, _ = simulate_synth_match("Z", 300, q)
-		helpers.assert_eq(is_syn, false, "slow mismatch must NOT be synthetic")
-		helpers.assert_eq(#q, 1,         "slow mismatch must NOT pop the queue")
-	end)
-
-	helpers.it("second fast keystroke uses the next entry after pop", function()
-		-- With the fix: keystroke 1 (fast, char-mismatch) pops entry 1.
-		-- Keystroke 2 (exact match for char Y) should find entry 2 at the head.
-		local q = { { char = "X", type = "hotstring" }, { char = "Y", type = "hotstring" } }
-		simulate_synth_match("Z", 5, q)    -- keystroke 1: fast mismatch → pops X
-		local is_syn2, _ = simulate_synth_match("Y", 5, q)  -- keystroke 2: exact match on Y
-		helpers.assert_eq(is_syn2, true, "keystroke 2 must be synthetic via exact-match")
-		helpers.assert_eq(#q, 0,         "both entries must have been popped")
+		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["adapters.event_provenance"] = nil
+		local ok, err = pcall(helpers.load_with_stubs,
+			"adapters.event_provenance", { eventtap = eventtap })
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("eventSourceUserData", 1, true) ~= nil,
+			"the fail-fast error must identify the missing immutable-tag contract")
 	end)
 end)

@@ -47,8 +47,8 @@ _APTV_ReadSource(RelPath) {
 ; ==================================================
 
 _APTV_NoSingleLetterTAssignment() {
-	Src := _APTV_ReadSource("lib/app_picker.ahk")
-	Assert(Src != "", "lib/app_picker.ahk must be readable")
+	Src := _APTV_ReadSource("infra/app_picker.ahk")
+	Assert(Src != "", "infra/app_picker.ahk must be readable")
 	; The single-letter i18n identifier must never appear as an lvalue.
 	; A match means the window-title shadow (or a new one) was reintroduced.
 	Found := RegExMatch(Src, "m)^\s*t\s*:=")

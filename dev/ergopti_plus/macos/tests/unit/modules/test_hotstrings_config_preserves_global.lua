@@ -18,38 +18,129 @@
 local helpers = require("tests.helpers")
 
 local DELIMS = " \t,;:!?"
+local CONSUMED_DELIMS = ".,?!"
+local FUTURE_GLOBAL_RECORD = table.concat({
+	"# Future cross-driver values may span physical lines.",
+	"future_cross_driver_list = [",
+	'  "alpha",',
+	'  "beta", # comments inside an array belong to the record',
+	"]",
+	"# This unowned comment must survive too.",
+}, "\n")
 
 helpers.describe("hotstrings_config: a save preserves the shared [__global__] block", function()
 
 	helpers.it("word_delimiters survive a category-only save", function()
 		local path = os.tmpname()
-		local fh = assert(io.open(path, "w"))
-		fh:write('[__global__]\nword_delimiters = "' .. DELIMS .. '"\n\n[rolls]\ndelay = 0.5\n')
-		fh:close()
+		local config_module = "modules.hotstrings.hotstrings_config"
+		local file_system_module = "adapters.file_system"
+		local saved_config = package.loaded[config_module]
+		local saved_file_system = package.loaded[file_system_module]
+		local ok, err = xpcall(function()
+			local fh = assert(io.open(path, "w"))
+			fh:write('[__global__]\nword_delimiters = "' .. DELIMS
+				.. '"\nconsumed_delimiters = "' .. CONSUMED_DELIMS
+				.. '"\nfuture_cross_driver_flag = true\n'
+				.. FUTURE_GLOBAL_RECORD .. '\n\n[rolls]\ndelay = 0.5\n')
+			fh:close()
 
-		package.loaded["modules.hotstrings.hotstrings_config"] = nil
-		local cfg = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
-		cfg.init({ override_path = path, toml_resolver = function() return nil end })
+			package.loaded[config_module] = nil
+			package.loaded[file_system_module] = require("tests.support.file_system_write_stub")
+			local cfg = helpers.load_with_stubs(config_module)
+			cfg.init({ override_path = path, toml_resolver = function() return nil end })
 
-		-- A category-level change is what the window writes on every edit.
-		cfg.set_override("rolls", nil, "delay", 0.75)
+			-- A category-level change is what the window writes on every edit.
+			helpers.assert_eq(cfg.set_override("rolls", nil, "delay", 0.75), true)
 
-		local reread = io.open(path, "r")
-		local content = reread and reread:read("*a") or ""
-		if reread then reread:close() end
+			local reread = io.open(path, "r")
+			local content = reread and reread:read("*a") or ""
+			if reread then reread:close() end
+
+			-- Prove the save actually ran. Without this the assertions below pass
+			-- against an init that failed and a setter that wrote nothing at all.
+			helpers.assert_true(content:find("0.75", 1, true) ~= nil,
+				"the category change must have been persisted, or this test asserts nothing "
+				.. "about what a save preserves")
+
+			helpers.assert_true(content:find("[__global__]", 1, true) ~= nil,
+				"the shared override file is written by BOTH drivers; a macOS save that drops "
+				.. "[__global__] silently discards settings the AutoHotkey side stored")
+			helpers.assert_true(content:find('word_delimiters = " \\t,;:!?"', 1, true) ~= nil,
+				"control bytes must be preserved as valid TOML escapes, not raw bytes")
+			helpers.assert_true(content:find(
+				'consumed_delimiters = "' .. CONSUMED_DELIMS .. '"', 1, true
+			) ~= nil,
+				"a macOS category save must preserve consumed_delimiters owned by the Windows driver")
+			helpers.assert_true(content:find('future_cross_driver_flag = true', 1, true) ~= nil,
+				"the round trip must retain future [__global__] assignments it does not own")
+			helpers.assert_true(content:find(FUTURE_GLOBAL_RECORD, 1, true) ~= nil,
+				"the round trip must preserve the complete raw multiline record and its comments, "
+				.. "not only the first key/value line")
+
+			local codec = require("infra.toml.codec")
+			local decode_ok, decoded = pcall(codec.decode, content)
+			helpers.assert_true(decode_ok and type(decoded) == "table",
+				"preserving raw continuations must still produce valid TOML")
+			helpers.assert_eq(decoded.__global__.future_cross_driver_list[1], "alpha",
+				"the first preserved multiline value must reparse")
+			helpers.assert_eq(decoded.__global__.future_cross_driver_list[2], "beta",
+				"the commented continuation must reparse")
+			helpers.assert_eq(cfg.reload(), true,
+				"the rewritten shared file must remain readable")
+			helpers.assert_eq(cfg.get_word_delimiters(), DELIMS,
+				"the delimiter value itself must survive the serialized round trip")
+		end, debug.traceback)
+		package.loaded[config_module] = saved_config
+		package.loaded[file_system_module] = saved_file_system
 		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
 
-		-- Prove the save actually ran. Without this the two assertions below pass
-		-- against an init that failed and a set_override that wrote nothing at all.
-		helpers.assert_true(content:find("0.75", 1, true) ~= nil,
-			"the category change must have been persisted, or this test asserts nothing "
-			.. "about what a save preserves")
+	helpers.it("delimiter patch ignores header-looking lines inside nested arrays", function()
+		local path = os.tmpname()
+		local config_module = "modules.hotstrings.hotstrings_config"
+		local file_system_module = "adapters.file_system"
+		local saved_config = package.loaded[config_module]
+		local saved_file_system = package.loaded[file_system_module]
+		local matrix_record = table.concat({
+			"future_matrix = [",
+			"  [1, 2],",
+			"]",
+		}, "\n")
+		local ok, err = xpcall(function()
+			local fh = assert(io.open(path, "w"))
+			assert(fh:write("[__global__]\n" .. matrix_record
+				.. '\nword_delimiters = " ,"\n\n[rolls]\ndelay = 0.5\n'))
+			assert(fh:close())
 
-		helpers.assert_true(content:find("[__global__]", 1, true) ~= nil,
-			"the shared override file is written by BOTH drivers; a macOS save that drops "
-			.. "[__global__] silently discards the word delimiters the AutoHotkey side stored")
-		helpers.assert_true(content:find(DELIMS, 1, true) ~= nil,
-			"and the value itself must survive, not just the header")
+			package.loaded[config_module] = nil
+			package.loaded[file_system_module] = require("tests.support.file_system_write_stub")
+			local cfg = helpers.load_with_stubs(config_module)
+			cfg.init({ override_path = path, toml_resolver = function() return nil end })
+			helpers.assert_eq(cfg.set_word_delimiters(" ;"), true,
+				"the real setter must commit across a nested global array")
+
+			local reread = assert(io.open(path, "r"))
+			local content = assert(reread:read("*a"))
+			assert(reread:close())
+			local _, delimiter_count = content:gsub("word_delimiters%s*=", "")
+			helpers.assert_eq(delimiter_count, 1,
+				"a header-looking array element must not hide the existing owned key")
+			helpers.assert_contains(content, matrix_record,
+				"the unowned nested record must survive byte-for-byte")
+
+			local codec = require("infra.toml.codec")
+			local decode_ok, decoded = pcall(codec.decode, content)
+			helpers.assert_true(decode_ok and type(decoded) == "table",
+				"the published bytes must remain strict TOML")
+			helpers.assert_eq(decoded.__global__.future_matrix[1][2], 2)
+			helpers.assert_eq(cfg.reload(), true)
+			helpers.assert_eq(cfg.get_word_delimiters(), " ;")
+		end, debug.traceback)
+		package.loaded[config_module] = saved_config
+		package.loaded[file_system_module] = saved_file_system
+		os.remove(path)
+		if not ok then error(err, 0) end
 	end)
 
 end)

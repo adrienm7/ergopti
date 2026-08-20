@@ -26,8 +26,8 @@ local helpers = require("tests.helpers")
 
 -- Isolate the hs stub before loading any production module so every
 -- require("hs.*") call shares the same stub instance.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 
 
@@ -135,24 +135,48 @@ local function is_word_boundary(buf)
 		or last == "\194\160" or last == "\226\128\175"
 end
 
---- Verbatim copy of the local `word_boundary_blocks` from expander.lua (§2).
---- Returns true when the character before the trigger's start is a letter or "@".
---- @param buffer string
---- @param trigger string
---- @param trigger_start_byte number
+--- Loads the real expander with a controllable core state, so the word-boundary
+--- probes below drive PRODUCTION code instead of a transcription of it.
+---
+--- WHY THIS REPLACED A COPY, AND WHY IT MATTERS MORE THAN THE UTF-8 GUARD ITSELF.
+--- This section used to hold a "verbatim copy" of expander.lua's local
+--- word_boundary_blocks. By 2026-08-04 it was not verbatim: production consulted
+--- text_utils.is_hotstring_word_char while the copy still asked `prev_char == "@"`
+--- — the rule from two refactors earlier. The copy passed, the production rule had
+--- moved, and nothing could notice. Then the function was removed outright and the
+--- copy STILL passed, which is a test that guards nothing while reporting that it
+--- does. Public entry points cost one loader and cannot drift.
 --- @param start_is_word_boundary boolean
---- @return boolean
-local function word_boundary_blocks(buffer, trigger, trigger_start_byte, start_is_word_boundary)
-	if trigger:match("^[ \194\160\226\128\175;]") then return false end
-	if trigger_start_byte <= 1 then
-		return not start_is_word_boundary
-	end
-	local before = buffer:sub(1, trigger_start_byte - 1)
-	local ok_utf8, prev_off = pcall(utf8.offset, before, -1)
-	-- Treat malformed UTF-8 the same as an absent left-hand char: no block
-	if not ok_utf8 then prev_off = nil end
-	local prev_char = prev_off and before:sub(prev_off) or ""
-	return prev_char == "@"
+--- @return table expander
+local function load_expander(start_is_word_boundary)
+	package.loaded["modules.keymap.expander"] = nil
+	local E = helpers.load_with_stubs("modules.keymap.expander")
+	E.init({
+		buffer                      = "",
+		start_is_word_boundary      = start_is_word_boundary,
+		suppress_rescan             = function() end,
+		suppress_rescan_keep_buffer = function() end,
+	}, { is_terminator = function() return false end }, {
+		get_llm_enabled = function() return false end,
+		update_preview  = function() end,
+		start_timer     = function() end,
+	})
+	return E
+end
+
+--- Builds the mapping shape would_fire reads, for an is_word trigger.
+--- @param trigger string
+--- @return table
+local function word_mapping(trigger)
+	return {
+		trigger       = trigger,
+		trigger_bytes = #trigger,
+		tlen          = utf8.len(trigger) or #trigger,
+		repl          = "EXPANDED",
+		plain_repl    = "EXPANDED",
+		is_word       = true,
+		match_mode    = "exact",
+	}
 end
 
 
@@ -287,72 +311,73 @@ end)
 
 
 
--- ==============================================================
--- ==============================================================
--- ======= 5/ word_boundary_blocks: Malformed UTF-8 Guard =======
--- ==============================================================
--- ==============================================================
+-- ===========================================================================
+-- ===========================================================================
+-- ======= 5/ The Word-Boundary Rule: Malformed UTF-8 Guard, In Situ =========
+-- ===========================================================================
+-- ===========================================================================
 
-helpers.describe("word_boundary_blocks: malformed UTF-8 in `before` segment", function()
+helpers.describe("would_fire: malformed UTF-8 in front of the trigger", function()
 
-	helpers.it("0xBF in before segment — no error, returns boolean", function()
-		-- buffer = BAD_UTF8 + "trigger", trigger starts at byte 2
-		local buffer  = BAD_UTF8 .. "trigger"
-		local trigger = "trigger"
-		local tstart  = #BAD_UTF8 + 1
-		local ok, result = pcall(word_boundary_blocks, buffer, trigger, tstart, false)
-		assert_no_error(ok, "word_boundary_blocks 0xBF before")
-		assert_safe_bool(result, "word_boundary_blocks 0xBF result")
+	-- WHAT THE OLD COPY GOT WRONG HERE, recorded because it is the point of the
+	-- rewrite. It asserted that malformed UTF-8 "must not block", and production has
+	-- never behaved that way. Measured: utf8.offset does not raise on any of these
+	-- three bytes in this runtime — it returns offset 1 — so the byte itself reaches
+	-- the word-character rule, which counts EVERY non-ASCII byte as part of a word.
+	-- The match is therefore refused, conservatively, which is the right answer and
+	-- the opposite of what the copy claimed. The pcall still matters: it is what
+	-- keeps a runtime that DOES raise from taking the HID callback down with it.
+
+	helpers.it("0xBF before the trigger — no error, and blocks", function()
+		local E = load_expander(false)
+		local ok, result = pcall(E.would_fire, word_mapping("trigger"), BAD_UTF8 .. "trigger")
+		assert_no_error(ok, "would_fire 0xBF before")
+		helpers.assert_nil(result,
+			"an undecodable byte is non-ASCII, and every non-ASCII codepoint counts as a "
+			.. "word character — so it opens a word and the is_word trigger is refused")
 	end)
 
-	helpers.it("0x80 in before segment — no error, returns boolean", function()
-		local buffer  = BAD_UTF8_80 .. "word"
-		local trigger = "word"
-		local tstart  = #BAD_UTF8_80 + 1
-		local ok, result = pcall(word_boundary_blocks, buffer, trigger, tstart, false)
-		assert_no_error(ok, "word_boundary_blocks 0x80 before")
-		assert_safe_bool(result, "word_boundary_blocks 0x80 result")
+	helpers.it("0x80 before the trigger — no error, and blocks", function()
+		local E = load_expander(false)
+		local ok, result = pcall(E.would_fire, word_mapping("word"), BAD_UTF8_80 .. "word")
+		assert_no_error(ok, "would_fire 0x80 before")
+		helpers.assert_nil(result, "same contract for the other illegal lead byte")
 	end)
 
-	helpers.it("truncated lead byte in before — no error, block treated as absent", function()
-		local buffer  = BAD_UTF8_TRUNCATED .. "abc"
-		local trigger = "abc"
-		local tstart  = #BAD_UTF8_TRUNCATED + 1
-		local ok, result = pcall(word_boundary_blocks, buffer, trigger, tstart, true)
-		assert_no_error(ok, "word_boundary_blocks truncated before")
-		assert_safe_bool(result, "word_boundary_blocks truncated before result")
-		-- Malformed = prev_char is "" → not "@" → false (no block)
-		helpers.assert_eq(result, false, "malformed UTF-8 before must not block (treated as absent)")
+	helpers.it("truncated lead byte before the trigger — no error, and blocks", function()
+		local E = load_expander(true)
+		local ok, result = pcall(E.would_fire, word_mapping("abc"), BAD_UTF8_TRUNCATED .. "abc")
+		assert_no_error(ok, "would_fire truncated before")
+		helpers.assert_nil(result,
+			"a 2-byte lead with no continuation is tolerated exactly like the others, and "
+			.. "must NOT fall through to start_is_word_boundary: something IS in front of "
+			.. "the trigger. start_is_word_boundary is true here precisely so that a "
+			.. "fall-through would return the wrong answer and be visible")
 	end)
 
-	helpers.it("trigger starts at position 1 — returns !start_is_word_boundary (no utf8 call)", function()
-		local ok, result = pcall(word_boundary_blocks, "abc", "abc", 1, true)
-		assert_no_error(ok, "word_boundary_blocks tstart=1 boundary")
-		helpers.assert_eq(result, false, "start_is_word_boundary=true => no block")
+	helpers.it("trigger fills the buffer — falls back to start_is_word_boundary", function()
+		local E_open = load_expander(true)
+		helpers.assert_eq(E_open.would_fire(word_mapping("abc"), "abc"), "EXPANDED",
+			"start_is_word_boundary = true means the buffer starts at a boundary, so an "
+			.. "is_word trigger occupying all of it may fire")
 
-		local ok2, result2 = pcall(word_boundary_blocks, "abc", "abc", 1, false)
-		assert_no_error(ok2, "word_boundary_blocks tstart=1 no-boundary")
-		helpers.assert_eq(result2, true, "start_is_word_boundary=false => block")
+		local E_shut = load_expander(false)
+		helpers.assert_nil(E_shut.would_fire(word_mapping("abc"), "abc"),
+			"start_is_word_boundary = false means the text to the left was never observed, "
+			.. "so the boundary is unknown and the match must be refused")
 	end)
 
-	helpers.it("trigger preceded by '@' — blocks correctly (valid UTF-8 happy path)", function()
-		-- buffer = "@trigger", trigger starts at byte 2
-		local buffer  = "@trigger"
-		local trigger = "trigger"
-		local tstart  = 2
-		local ok, result = pcall(word_boundary_blocks, buffer, trigger, tstart, true)
-		assert_no_error(ok, "word_boundary_blocks '@' prefix")
-		helpers.assert_eq(result, true, "'@' immediately before trigger must block")
+	helpers.it("trigger preceded by '@' — blocks (valid UTF-8 happy path)", function()
+		local E = load_expander(true)
+		helpers.assert_nil(E.would_fire(word_mapping("trigger"), "@trigger"),
+			"'@' opens no word — what follows it is the rest of an address or a handle — "
+			.. "so it must block an is_word trigger")
 	end)
 
-	helpers.it("trigger preceded by space (non-blocking valid UTF-8)", function()
-		local buffer  = "hello trigger"
-		local trigger = "trigger"
-		local tstart  = #buffer - #trigger + 1
-		local ok, result = pcall(word_boundary_blocks, buffer, trigger, tstart, true)
-		assert_no_error(ok, "word_boundary_blocks space prefix")
-		-- Space is not "@", so prev_char != "@" → false (no block)
-		helpers.assert_eq(result, false, "space before trigger must not block")
+	helpers.it("trigger preceded by a space — does not block", function()
+		local E = load_expander(true)
+		helpers.assert_eq(E.would_fire(word_mapping("trigger"), "hello trigger"), "EXPANDED",
+			"a space is the canonical boundary")
 	end)
 
 end)
@@ -387,23 +412,23 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"modules.llm.prediction_engine",
 			"modules.keylogger",
 			"modules.hotstrings.hotstrings_config",
-			"lib.text_utils",
-			"lib.keycodes",
-			"lib.perf",
-			"lib.hotpath_profiler",
+			"infra.text_utils",
+			"infra.keycodes",
+			"infra.perf",
+			"infra.hotpath_profiler",
 			"ui.tooltip",
 		}
 		for _, mod in ipairs(to_clear) do package.loaded[mod] = nil end
 
 		-- Stub every dependency that is not under test.
-		package.loaded["lib.keycodes"] = {
+		package.loaded["infra.keycodes"] = {
 			ESCAPE            = 53,
 			RETURN            = 36,
 			BACKSPACE         = 51,
 			F16_LLM_CHAIN_SIGNAL = 106,
 			to_name           = function(_) return "f16" end,
 		}
-		package.loaded["lib.text_utils"] = {
+		package.loaded["infra.text_utils"] = {
 			is_letter_char       = function(_) return false end,
 			trig_lower           = function(s) return s:lower() end,
 			conform_replacement  = function(repl, _, _) return repl end,
@@ -411,14 +436,14 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			utf8_sub             = function(s, i, j) return s:sub(i, j) end,
 			get_common_prefix_utf8 = function(_, _) return 0 end,
 		}
-		package.loaded["lib.perf"] = {
+		package.loaded["infra.perf"] = {
 			is_enabled = function() return false end,
 			now        = function() return 0 end,
 			elapsed_ms = function(_) return 0 end,
 			sample     = function() end,
 			set_enabled = function() end,
 		}
-		package.loaded["lib.hotpath_profiler"] = {
+		package.loaded["infra.hotpath_profiler"] = {
 			now        = function() return 0 end,
 			elapsed_ms = function(_) return 0 end,
 			log_if_slow = function() end,
@@ -460,12 +485,12 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 
 		-- Minimal prediction engine stub — all operations are no-ops.
 		local engine_stub = {
-			init                    = function() end,
+			init                    = function() return true end,
 			get_llm_enabled         = function() return false end,
-			stop_timer              = function() end,
+			stop_timer              = function() return true end,
 			start_timer             = function() end,
 			start_timer_word_end    = function() end,
-			reset                   = function() end,
+			reset                   = function() return true end,
 			is_visible              = function() return false end,
 			get_predictions         = function() return {} end,
 			navigate                = function() end,
@@ -525,9 +550,9 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			is_ignored_window = function() return false end,
 		}
 
-		-- Reload lib.logger with the fresh hs stub so require("lib.logger") works.
-		package.loaded["lib.logger"] = nil
-		helpers.load_with_stubs("lib.logger")
+		-- Reload lib.logger with the fresh hs stub so require("infra.logger") works.
+		package.loaded["infra.logger"] = nil
+		helpers.load_with_stubs("infra.logger")
 
 		local bridge = require("modules.keymap.llm_bridge")
 
@@ -551,37 +576,50 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 	helpers.it("0xBF in buffer does not propagate an error from update_preview", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = BAD_UTF8
-		local ok = pcall(bridge.update_preview, BAD_UTF8)
-		helpers.assert_true(ok, "update_preview must not raise on malformed UTF-8")
+		local ok, err = pcall(bridge.update_preview, BAD_UTF8)
+		helpers.assert_true(ok,
+			"update_preview must not raise on malformed UTF-8: " .. tostring(err))
+		helpers.assert_eq(state.buffer, BAD_UTF8,
+			"and it must not have rewritten the buffer while failing to read it")
 	end)
 
 	helpers.it("0x80 continuation byte as buffer does not raise", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = BAD_UTF8_80
-		local ok = pcall(bridge.update_preview, BAD_UTF8_80)
-		helpers.assert_true(ok, "update_preview must not raise on 0x80")
+		local ok, err = pcall(bridge.update_preview, BAD_UTF8_80)
+		helpers.assert_true(ok, "update_preview must not raise on 0x80: " .. tostring(err))
+		helpers.assert_eq(state.buffer, BAD_UTF8_80, "and must leave the buffer alone")
 	end)
 
 	helpers.it("truncated 2-byte lead byte as buffer does not raise", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = BAD_UTF8_TRUNCATED
-		local ok = pcall(bridge.update_preview, BAD_UTF8_TRUNCATED)
-		helpers.assert_true(ok, "update_preview must not raise on truncated lead byte")
+		local ok, err = pcall(bridge.update_preview, BAD_UTF8_TRUNCATED)
+		helpers.assert_nil(err, "update_preview must not raise on a truncated lead byte: " .. tostring(err))
+		helpers.assert_true(ok, "update_preview must not raise on a truncated lead byte")
+		helpers.assert_eq(state.buffer, BAD_UTF8_TRUNCATED, "and must leave the buffer alone")
 	end)
 
 	helpers.it("bad UTF-8 appended after valid text does not raise", function()
 		local bridge, state = build_llm_bridge()
 		local buf = "bonjour" .. BAD_UTF8
 		state.buffer = buf
-		local ok = pcall(bridge.update_preview, buf)
+		local ok, err = pcall(bridge.update_preview, buf)
+		helpers.assert_nil(err, "update_preview must not raise on valid + bad UTF-8: " .. tostring(err))
 		helpers.assert_true(ok, "update_preview must not raise on valid + bad UTF-8")
+		helpers.assert_eq(state.buffer, buf,
+			"and the valid prefix must not be truncated by the failed read")
 	end)
 
 	helpers.it("valid UTF-8 buffer still runs without error (no regression on happy path)", function()
 		local bridge, state = build_llm_bridge()
 		state.buffer = "hello world"
-		local ok = pcall(bridge.update_preview, "hello world")
-		helpers.assert_true(ok, "update_preview must not raise on valid UTF-8")
+		-- The happy-path control for the four malformed cases above. Called directly:
+		-- valid input raising is a plain bug, and it should fail with its own error.
+		bridge.update_preview("hello world")
+		helpers.assert_eq(state.buffer, "hello world",
+			"a valid buffer must survive the read untouched — the malformed cases assert "
+				.. "the same thing, and this is what proves they can tell the difference")
 	end)
 
 end)

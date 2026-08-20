@@ -20,18 +20,18 @@
 
 
 
-; ======================================
+; =======================================
 ; =======================================
 ; ======= 1/ Engine Configuration =======
 ; =======================================
-; ======================================
+; =======================================
 
 ; Runtime state — populated at first LLM_Engine_Init() call from LLM_Defaults
-; (loaded by lib/llm_defaults.ahk at boot) so all values come from the shared
+; (loaded by infra/llm_defaults.ahk at boot) so all values come from the shared
 ; defaults.json rather than being hardcoded here.
 ; Timer/cache keys are always initialised to their zero values regardless.
 ; String/numeric placeholder values — always overwritten by LLM_Engine_ApplySharedDefaults()
-; which reads from LLM_Defaults (lib/llm_defaults.ahk → _shared/modules/llm/defaults.json).
+; which reads from LLM_Defaults (infra/llm_defaults.ahk → _shared/modules/llm/defaults.json).
 global _LLM_Engine := Map(
 	"enabled",                    false,
 	"model",                      "",
@@ -48,7 +48,7 @@ global _LLM_Engine := Map(
 	"after_hotstring",            true,
 	"reset_on_nav",               true,
 	"disable_url_bars",           false,
-	"disable_password_fields",    false,
+	"disable_password_fields",    true,
 	"disabled_apps",              [],
 	"show_info_bar",              true,
 	"streaming",                  true,
@@ -58,9 +58,19 @@ global _LLM_Engine := Map(
 	"nav_modifiers",              "",
 	"val_modifiers",              "alt",
 	"timer_active",               false,
+	; Acceptance origin captured with the keystroke that arms a request. The
+	; detached presentation record receives its own immutable copy at pixel
+	; commit; no parallel rendered-source field exists in the engine.
+	"request_accept_source",      "",
 	"last_ctx",                   "",
 	"last_result",                "",
 	"last_results",               [],
+	; Cache and callback ownership include the generation configuration. The
+	; base signature is configuration-only; the request signature also carries
+	; the effective per-application profile selected at fire time.
+	"semantic_config_signature",  "",
+	"active_request_signature",   "",
+	"last_semantic_signature",    "",
 	"last_request_tick",          0,
 	; Monotonic id bumped on every LLM_Engine_FirePrediction call. Every
 	; async variant captures the id at dispatch time and bails when its
@@ -74,8 +84,50 @@ global _LLM_Engine := Map(
 	; per-user records; ``api_entry_id`` is the selected one. Both are
 	; persisted across reloads via the shared TOML config.
 	"api_entries",                [],
-	"api_entry_id",               ""
+	"api_entry_id",               "",
+	"app_profile_overrides",      Map()
 )
+
+; Every option emitted by LLM_Menu_BuildOpts belongs to exactly one class.
+; Generation-semantic values must invalidate cache and callbacks. Display-only
+; values deliberately retain them. Runtime-policy values control when or where
+; an otherwise identical result is requested/consumed, not what the model sees.
+global LLM_ENGINE_SEMANTIC_CONFIG_KEYS := [
+	"backend",
+	"model",
+	"profile_id",
+	"user_profiles",
+	"n_predictions",
+	"min_words",
+	"max_words",
+	"ctx_chars",
+	"language",
+	"temperature",
+	"auto_raise_temp",
+	"inline_autotype",
+	"api_entries",
+	"api_entry_id",
+	"app_profile_overrides"
+]
+
+global LLM_ENGINE_DISPLAY_ONLY_CONFIG_KEYS := [
+	"show_info_bar",
+	"show_all_at_once",
+	"pred_indent",
+	"nav_modifiers",
+	"val_modifiers"
+]
+
+global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
+	"debounce_ms",
+	"instant_on_word_end",
+	"after_hotstring",
+	"reset_on_nav",
+	"disable_url_bars",
+	"disable_password_fields",
+	"disabled_apps",
+	"streaming"
+]
 
 ; Per-backend minimum interval (ms) between two prediction requests is now
 ; defined in ``static/ergopti_plus/_shared/modules/llm/inference.json`` and read via
@@ -124,17 +176,206 @@ LLM_Engine_ApplySharedDefaults() {
 			_LLM_Engine[engine_key] := LLM_Defaults[shared_key]
 	}
 }
+
+/**
+ * Length-prefixes one signature component so embedded delimiters are harmless.
+ * @param {string} Value - Encoded component.
+ * @returns {string} Collision-free framed component.
+ */
+_LLM_Engine_FrameSignaturePart(Value) {
+	return StrLen(Value) . ":" . Value
+}
+
+/**
+ * Sorts encoded Map/Object entries by their encoded key, case-sensitively.
+ * @param {Array} Entries - Maps with `sort_key`, `key`, and `value` fields.
+ */
+_LLM_Engine_SortSignatureEntries(Entries) {
+	Index := 2
+	while (Index <= Entries.Length) {
+		Current := Entries[Index]
+		Previous := Index - 1
+		while (Previous >= 1
+				and StrCompare(Entries[Previous]["sort_key"], Current["sort_key"], true) > 0) {
+			Entries[Previous + 1] := Entries[Previous]
+			Previous -= 1
+		}
+		Entries[Previous + 1] := Current
+		Index += 1
+	}
+}
+
+/**
+ * Canonically encodes nested configuration values without relying on Map order.
+ * @param {*} Value - Scalar, Array, Map, or plain object to encode.
+ * @returns {string} Deterministic, type-preserving encoding.
+ */
+_LLM_Engine_EncodeSemanticValue(Value) {
+	if (Value is Array) {
+		Encoded := "A" . Value.Length . ":"
+		Index := 1
+		while (Index <= Value.Length) {
+			if Value.Has(Index) {
+				Part := _LLM_Engine_EncodeSemanticValue(Value[Index])
+				Encoded .= "P" . _LLM_Engine_FrameSignaturePart(Part)
+			} else {
+				Encoded .= "H"
+			}
+			Index += 1
+		}
+		return Encoded
+	}
+
+	if (Value is Map) {
+		Entries := []
+		for Key, Item in Value {
+			EncodedKey := _LLM_Engine_EncodeSemanticValue(Key)
+			Entries.Push(Map(
+				"sort_key", EncodedKey,
+				"key", EncodedKey,
+				"value", _LLM_Engine_EncodeSemanticValue(Item)
+			))
+		}
+		_LLM_Engine_SortSignatureEntries(Entries)
+		; CaseSense changes lookup semantics even when the visible entries match
+		; (notably for per-app overrides), so it is part of Map identity too.
+		Encoded := "M" . _LLM_Engine_FrameSignaturePart(Value.CaseSense)
+		Encoded .= Entries.Length . ":"
+		for Entry in Entries {
+			Encoded .= _LLM_Engine_FrameSignaturePart(Entry["key"])
+			Encoded .= _LLM_Engine_FrameSignaturePart(Entry["value"])
+		}
+		return Encoded
+	}
+
+	if IsObject(Value) {
+		Entries := []
+		for Key, Item in Value.OwnProps() {
+			EncodedKey := _LLM_Engine_EncodeSemanticValue(Key)
+			Entries.Push(Map(
+				"sort_key", EncodedKey,
+				"key", EncodedKey,
+				"value", _LLM_Engine_EncodeSemanticValue(Item)
+			))
+		}
+		_LLM_Engine_SortSignatureEntries(Entries)
+		Encoded := "O" . _LLM_Engine_FrameSignaturePart(Type(Value))
+		Encoded .= Entries.Length . ":"
+		for Entry in Entries {
+			Encoded .= _LLM_Engine_FrameSignaturePart(Entry["key"])
+			Encoded .= _LLM_Engine_FrameSignaturePart(Entry["value"])
+		}
+		return Encoded
+	}
+
+	ValueType := Type(Value)
+	if (ValueType == "String")
+		return "S" . _LLM_Engine_FrameSignaturePart(Value)
+	if (ValueType == "Integer")
+		return "I" . Value . ";"
+	if (ValueType == "Float")
+		return "F" . Format("{:.17g}", Value) . ";"
+	return "T" . _LLM_Engine_FrameSignaturePart(ValueType)
+		. _LLM_Engine_FrameSignaturePart(Value . "")
+}
+
+/**
+ * Builds the one canonical signature for every generation-affecting setting.
+ * @param {Map} State - Optional engine state; defaults to the live engine.
+ * @returns {string} Canonical semantic configuration signature.
+ */
+_LLM_Engine_BuildSemanticConfigSignature(State := unset) {
+	global _LLM_Engine, LLM_ENGINE_SEMANTIC_CONFIG_KEYS
+	Source := IsSet(State) ? State : _LLM_Engine
+	if !(Source is Map)
+		return ""
+
+	Semantic := Map()
+	for Key in LLM_ENGINE_SEMANTIC_CONFIG_KEYS {
+		if Source.Has(Key)
+			Semantic[Key] := Source[Key]
+		else
+			Semantic[Key] := Map("engine_key_missing", Key)
+	}
+	return _LLM_Engine_EncodeSemanticValue(Semantic)
+}
+
+/**
+ * Compares semantic signatures case-sensitively.
+ * @param {string} Left - First signature.
+ * @param {string} Right - Second signature.
+ * @returns {Integer} One when the signatures are byte-semantically equal.
+ */
+_LLM_Engine_SignaturesEqual(Left, Right) {
+	return (Type(Left) == "String" and Type(Right) == "String"
+		and StrCompare(Left, Right, true) == 0)
+}
+
+/**
+ * Invalidates cache, timers, transports, and callbacks after a semantic change.
+ * @returns {Integer} One when the configuration changed.
+ */
+_LLM_Engine_RefreshSemanticConfig() {
+	global _LLM_Engine
+	PreviousCritical := Critical("On")
+	try {
+		Current := _LLM_Engine_BuildSemanticConfigSignature(_LLM_Engine)
+		Previous := _LLM_Engine.Get("semantic_config_signature", "")
+		if _LLM_Engine_SignaturesEqual(Current, Previous)
+			return false
+
+		; Publish only after invalidation succeeds. If timer cancellation ever
+		; throws, the old signature forces a retry instead of authorizing stale state.
+		LLM_Engine_StopGeneration()
+		_LLM_Engine["semantic_config_signature"] := Current
+		_LLM_Engine["last_request_tick"] := 0
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+/**
+ * Binds the base configuration to the profile effective for the focused app.
+ * @param {string} EffectiveProfileId - Profile selected for this request.
+ * @param {Map|Object} EffectiveProfile - Optional already-resolved profile.
+ * @returns {string} Request/cache semantic signature.
+ */
+_LLM_Engine_RequestSemanticSignature(EffectiveProfileId, EffectiveProfile := unset) {
+	global _LLM_Engine
+	Base := _LLM_Engine.Get("semantic_config_signature", "")
+	Profile := IsSet(EffectiveProfile)
+		? EffectiveProfile
+		: LLM_GetActiveProfile(EffectiveProfileId,
+			_LLM_Engine.Get("user_profiles", []))
+	return _LLM_Engine_FrameSignaturePart(Base)
+		. _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(EffectiveProfileId))
+		. _LLM_Engine_FrameSignaturePart(_LLM_Engine_EncodeSemanticValue(Profile))
+}
+
+/**
+ * Reports whether the cached result belongs to the current semantic request.
+ * @param {string} RequestSignature - Signature for the request being fired.
+ * @returns {Integer} One when the cache may be reused.
+ */
+_LLM_Engine_CacheOwnsRequest(RequestSignature) {
+	global _LLM_Engine
+	return _LLM_Engine_SignaturesEqual(
+		_LLM_Engine.Get("last_semantic_signature", ""), RequestSignature)
+}
+
 LLM_Engine_ApplySharedDefaults()
+_LLM_Engine["semantic_config_signature"] := _LLM_Engine_BuildSemanticConfigSignature(_LLM_Engine)
 
 
 
 
 
-; ====================================
+; ============================
 ; ============================
 ; ======= 2/ Lifecycle =======
 ; ============================
-; ====================================
+; ============================
 
 /**
  * Initialises the prediction engine with user settings.
@@ -144,45 +385,45 @@ LLM_Engine_ApplySharedDefaults()
  */
 LLM_Engine_Init(opts) {
 	global _LLM_Engine, _I18nLocale
-	; Stop any in-flight generation when the backend changes so a WinHTTP
-	; response from the old provider cannot land into the new backend's context.
-	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("backend") and opts.Has("backend") and _LLM_Engine["backend"] != opts["backend"]) {
-		try LLM_Engine_StopGeneration()
-		if IsSet(_LLM_Engine)
-			_LLM_Engine["last_request_tick"] := 0
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_Engine["enabled"] := true
+
+		static _keys := ["model", "profile_id", "backend", "n_predictions", "min_words", "max_words",
+			"debounce_ms", "ctx_chars", "language", "temperature",
+			"instant_on_word_end", "after_hotstring", "reset_on_nav",
+			"disable_url_bars", "disable_password_fields",
+			"show_info_bar", "streaming", "show_all_at_once",
+			"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
+			"inline_autotype", "api_entry_id"]
+
+		for _, k in _keys
+			if opts.Has(k)
+				_LLM_Engine[k] := opts[k]
+
+		; The prediction language follows the active UI locale (the i18n single source
+		; of truth, infra/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
+		; own language gets predictions in it. An explicit opts["language"] still wins.
+		if (!opts.Has("language") and IsSet(_I18nLocale) and _I18nLocale != "")
+			_LLM_Engine["language"] := _I18nLocale
+
+		; Arrays require explicit type validation before replacing live state.
+		if opts.Has("user_profiles") && (opts["user_profiles"] is Array)
+			_LLM_Engine["user_profiles"] := opts["user_profiles"]
+		if opts.Has("disabled_apps") && (opts["disabled_apps"] is Array)
+			_LLM_Engine["disabled_apps"] := opts["disabled_apps"]
+		if opts.Has("api_entries") && (opts["api_entries"] is Array)
+			_LLM_Engine["api_entries"] := opts["api_entries"]
+		if opts.Has("app_profile_overrides") and (opts["app_profile_overrides"] is Map)
+			_LLM_Engine["app_profile_overrides"] := opts["app_profile_overrides"]
+
+		; A semantic change owns the same invalidation transaction regardless of
+		; which tray setter or editor produced it. Display-only updates compare
+		; equal and therefore retain both the cache and current callbacks.
+		_LLM_Engine_RefreshSemanticConfig()
+	} finally {
+		Critical(PreviousCritical)
 	}
-	_LLM_Engine["enabled"] := true
-
-	static _keys := ["model", "profile_id", "backend", "n_predictions", "min_words", "max_words",
-		"debounce_ms", "ctx_chars", "language", "temperature",
-		"instant_on_word_end", "after_hotstring", "reset_on_nav",
-		"disable_url_bars", "disable_password_fields",
-		"show_info_bar", "streaming", "show_all_at_once",
-		"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
-		"inline_autotype", "api_entry_id"]
-
-	for _, k in _keys
-		if opts.Has(k)
-			_LLM_Engine[k] := opts[k]
-
-	; The prediction language follows the active UI locale (the i18n single source
-	; of truth, lib/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
-	; own language gets predictions in it. An explicit opts["language"] still wins.
-	if (!opts.Has("language") and IsSet(_I18nLocale) and _I18nLocale != "")
-		_LLM_Engine["language"] := _I18nLocale
-
-	; Arrays require explicit copy to avoid shared references
-	if opts.Has("user_profiles") && (opts["user_profiles"] is Array)
-		_LLM_Engine["user_profiles"] := opts["user_profiles"]
-	if opts.Has("disabled_apps") && (opts["disabled_apps"] is Array)
-		_LLM_Engine["disabled_apps"] := opts["disabled_apps"]
-	if opts.Has("api_entries") && (opts["api_entries"] is Array)
-		_LLM_Engine["api_entries"] := opts["api_entries"]
-	; Per-app profile overrides Map(app_name -> profile_id). Copy by
-	; reference is fine — the tray owns the canonical Map and the engine
-	; only reads from it.
-	if opts.Has("app_profile_overrides") and (opts["app_profile_overrides"] is Map)
-		_LLM_Engine["app_profile_overrides"] := opts["app_profile_overrides"]
 }
 
 /**

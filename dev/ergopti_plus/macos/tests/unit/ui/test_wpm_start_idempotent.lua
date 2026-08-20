@@ -27,11 +27,20 @@ helpers.describe("wpm_menubar.start() is idempotent (no redundant timer restart)
 	-- touches hs.screen, so the menubar is safe to drive headless.
 	local function load_menubar()
 		package.loaded["modules.keylogger"] = { get_live_stats = function() return {} end }
+		package.loaded["adapters.timer_scheduler"] = nil
 		local starts = { n = 0 }
 		local Menubar = helpers.load_with_stubs("ui.wpm.wpm_menubar", {
 			timer = {
 				new = function(_interval, _fn)
-					return { start = function() starts.n = starts.n + 1 end, stop = function() end }
+					local timer = { active = false }
+					timer.start = function()
+						starts.n = starts.n + 1
+						timer.active = true
+						return timer
+					end
+					timer.stop = function() timer.active = false; return timer end
+					timer.running = function() return timer.active end
+					return timer
 				end,
 				absoluteTime = function() return 0 end,
 			},
@@ -58,8 +67,12 @@ helpers.describe("wpm_menubar.start() is idempotent (no redundant timer restart)
 	helpers.it("stop() is safe to call repeatedly when already stopped", function()
 		local Menubar = (load_menubar())
 		-- No start() yet: stop() must early-return without error.
-		local ok = pcall(function() Menubar.stop(); Menubar.stop() end)
-		helpers.assert_true(ok, "repeated stop() on an idle menubar must not raise")
+		-- Called directly. A second stop must leave the widget restartable: the menu
+		-- toggle stops before it starts.
+		Menubar.stop()
+		Menubar.stop()
+		helpers.assert_eq(type(Menubar.start), "function",
+			"a double stop must leave the menubar startable")
 	end)
 end)
 
@@ -69,10 +82,11 @@ end)
 -- and the lifecycle flag is set in start()/stop().
 helpers.describe("wpm_widget.start() guards redundant restarts at source", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/wpm/wpm_widget.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open wpm_widget.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/wpm/wpm_widget.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_shared_constants_path")
+		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 		return src
 	end
 
@@ -85,7 +99,7 @@ helpers.describe("wpm_widget.start() guards redundant restarts at source", funct
 		local src = read_src()
 		-- The guard must key off BOTH _running and the graph mode, so a genuine
 		-- graph-mode change still falls through to redraw.
-		helpers.assert_true(src:find("if _running and _show_graph == want_graph then return end", 1, true) ~= nil,
+		helpers.assert_true(src:find("if _running and _show_graph == want_graph then return true end", 1, true) ~= nil,
 			"start() must early-return on (already running AND same graph mode) — not on _running alone")
 	end)
 

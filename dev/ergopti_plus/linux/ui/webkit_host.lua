@@ -1,4 +1,4 @@
---- linux/ui/webkit_host.lua
+--- ui/webkit_host.lua
 ---
 --- Pure logic for the WebKit2GTK host bridge — path resolution, HTML asset
 --- inlining, i18n locale injection, and bridge handler registry.
@@ -15,6 +15,20 @@
 --- loading the webview. This module exports the canonical registry.
 
 local M = {}
+
+-- pcall, not a hard require: this module is read by tests and tooling that load
+-- it before the driver's own package.path is set, and a missing logger must cost
+-- a diagnostic rather than the whole webview layer.
+local Logger
+local ok_logger, logger_mod = pcall(require, "logger.shim")
+if ok_logger and type(logger_mod) == "table" then
+	Logger = logger_mod
+else
+	local function noop() end
+	Logger = { error = noop, warn = noop, info = noop, debug = noop }
+end
+
+local LOG = "ui.webkit_host"
 
 -- ============================================================================
 -- 1. Bridge handler registry (mirrors host_bridge.js contract)
@@ -74,7 +88,7 @@ function M.resolve_ui_root(driver_root)
 		if fh then
 			fh:close()
 			-- Normalize to forward slashes
-			return p:gsub("\\", "/")
+			return (p:gsub("\\", "/"))
 		end
 	end
 	return ""
@@ -93,7 +107,7 @@ function M.resolve_locales_dir(driver_root)
 		local fh = io.open(p .. "/fr.json", "r")
 		if fh then
 			fh:close()
-			return p:gsub("\\", "/")
+			return (p:gsub("\\", "/"))
 		end
 	end
 	return ""
@@ -120,6 +134,18 @@ end
 -- ============================================================================
 
 --- Reads a file from disk and returns its raw content.
+--- Drops the cache-busting query from an asset reference.
+---
+--- `script.js?v=3` names the file `script.js`. The query means something to a
+--- browser fetching over HTTP and nothing to `io.open`, so it has to come off
+--- before the path is built — otherwise the read misses, the tag is replaced with
+--- nothing, and the page loads with that asset silently absent.
+--- @param reference string As written in the HTML.
+--- @return string
+local function strip_asset_query(reference)
+	return (tostring(reference):gsub("[?#].*$", ""))
+end
+
 --- @param path string Full path to the file.
 --- @return string The file content, or empty string if unreadable.
 local function read_file(path)
@@ -153,8 +179,12 @@ function M.build_injected_html(assets_dir, html_name)
 		if href:match("^https?://") then
 			return '<link rel="stylesheet" href="' .. href .. '" />'
 		end
-		local css = read_file(assets_dir .. "/" .. href)
-		return css ~= "" and ("<style>" .. css .. "</style>") or ""
+		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
+		if css == "" then
+			Logger.error(LOG, "Stylesheet '%s' could not be read — the page loads unstyled.", href)
+			return ""
+		end
+		return "<style>" .. css .. "</style>"
 	end)
 
 	-- Inline local <script src="..."></script>; leave CDN URLs intact
@@ -162,8 +192,30 @@ function M.build_injected_html(assets_dir, html_name)
 		if src:match("^https?://") then
 			return '<script src="' .. src .. '"></script>'
 		end
-		local js = read_file(assets_dir .. "/" .. src)
-		return js ~= "" and ("<script>" .. js .. "</script>") or ""
+		-- The cache-busting query is stripped before the file is opened.
+		-- `script.js?v=3` is a perfectly ordinary thing for a page author to
+		-- write — it means something to a browser fetching over HTTP — and it is
+		-- not part of the FILENAME. Concatenated raw, it made read_file miss, the
+		-- tag was replaced with nothing, and the page loaded with its entire
+		-- script absent: window.initData undefined, so every push the host made
+		-- was silently discarded by its own `if(window.initData)` guard.
+		--
+		-- Found by tests/hardware/run_webview_push.lua, which is the only thing
+		-- that ever asked the page whether it had the function. Every unit test
+		-- asserted the shape of the string handed to eval_js and none of them
+		-- could see this.
+		local js = read_file(assets_dir .. "/" .. strip_asset_query(src))
+		if js == "" then
+			-- Said out loud rather than silently deleted. Stripping the query fixed
+			-- ONE reason the read can miss; a typo, a missing file or a permission
+			-- refusal all still land here, and each produced a page that looked
+			-- fine and did nothing. The five CI cycles this cost were spent because
+			-- nothing anywhere said the script was absent.
+			Logger.error(LOG, "Script '%s' could not be read — the page loads without it, "
+				.. "so every function it defines will be undefined.", src)
+			return ""
+		end
+		return "<script>" .. js .. "</script>"
 	end)
 
 	return html

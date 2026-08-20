@@ -27,16 +27,18 @@
 local M = {}
 
 local hs            = hs
-local timer         = hs.timer
 local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
-local notifications = require("lib.notifications")
-local EventTapGuard = require("adapters.event_tap_guard")
+local notifications = require("infra.notifications")
+local EventProvenance = require("adapters.event_provenance")
+local KeyState      = require("adapters.key_state")
 local ShellRunner   = require("adapters.shell_runner")
-local Logger        = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local Timings       = require("lib.timings")
-local i18n          = require("lib.i18n")
+local Logger        = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local Timings       = require("infra.timings")
+local i18n          = require("infra.i18n")
+local SyntheticInput = require("adapters.synthetic_input")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "shortcuts.actions.system"
 
@@ -69,7 +71,7 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- Physical key-code for the @ / # key (position-based, not character-based)
 local KEYCODE_AT_HASH        = 10
 
-local Keycodes               = require("lib.keycodes")
+local Keycodes               = require("infra.keycodes")
 
 -- Keep-awake jitter parameters. The tick interval bounds + return delay come
 -- from the shared cross-driver registry ([keep_awake]); the pixel offsets are
@@ -136,6 +138,14 @@ local awake_alert_shown = false
 -- Pending "return the cursor to where it was" timer. Declared above every closure
 -- that touches it: a local declared below one binds the nil global instead.
 local _awake_return_timer = nil
+local _awake_generation = 0
+
+-- Eventtap acquisition is implemented below with the factory helpers. These
+-- declarations must remain above keep-awake's closures or Lua would resolve the
+-- names as nil globals when the user first toggles the feature.
+local wrap_tap
+local acquire_tap
+local _failed_tap_cleanup = {}
 
 local function close_awake_alert()
 	local id    = awake_alert_id
@@ -151,13 +161,47 @@ local function close_awake_alert()
 	end
 end
 
+
+--- Cancels the exact pending cursor-return timer without dropping cleanup debt.
+--- The generation fence makes a refused native stop harmless until retry.
+--- @return boolean settled True only when the timer accepted cancellation.
+local function cancel_awake_return_timer()
+	if not _awake_return_timer then return true end
+	local stop_ok, stop_result = xpcall(TimerScheduler.cancel, debug.traceback,
+		_awake_return_timer)
+	if stop_ok and stop_result == true then
+		_awake_return_timer = nil
+		return true
+	end
+	Logger.error(LOG, "Keep-awake cursor-return timer cleanup remains pending: %s.",
+		tostring(stop_result))
+	return false
+end
+
+
+--- Cancels the exact pending jitter tick without dropping cleanup debt.
+--- @return boolean settled True only when the scheduler proves cleanup.
+local function cancel_awake_tick_timer()
+	if not awake_timer then return true end
+	local stop_ok, stop_result = xpcall(TimerScheduler.cancel, debug.traceback,
+		awake_timer)
+	if stop_ok and stop_result == true then
+		awake_timer = nil
+		return true
+	end
+	Logger.error(LOG, "Keep-awake jitter timer cleanup remains pending: %s.",
+		tostring(stop_result))
+	return false
+end
+
 -- Forward declaration required because schedule_awake_tick calls itself recursively
 local schedule_awake_tick
+local stop_awake_input_watcher
 
 -- AX selection cache for the wrap-text eventtap: read_ax_selection() is two
 -- synchronous cross-process Accessibility calls, and the eventtap fires on
 -- EVERY keystroke matching a wrap symbol with no caching at all — a slow AX
--- call here risks kCGEventTapDisabledByTimeout. Mirrors lib/vscode_bridge.lua's
+-- call here risks kCGEventTapDisabledByTimeout. Mirrors infra/vscode_bridge.lua's
 -- get_editor_ax_frame() TTL-cache pattern (shortcuts-wrap-ax-uncached).
 local _wrap_ax_selection_cache = nil
 local _wrap_ax_selection_ts    = 0
@@ -167,15 +211,56 @@ local _wrap_ax_selection_ts    = 0
 local _wrap_ax_selection_valid = false
 local WRAP_AX_SELECTION_TTL_SEC = 0.2
 
+
+--- Applies the exact-provenance gate shared by every input tap in this module.
+--- Owned output is never a user command. An unreadable tag is also non-authoritative,
+--- but still claims and returns the older-output fence so no queued action is lost.
+--- @param event userdata|table Quartz event.
+--- @param consumer_id string Stable provenance consumer identifier.
+--- @return boolean physical True only for an explicitly foreign event.
+--- @return table|nil fence_events Older callback-return events to hand downstream.
+local function classify_physical_event(event, consumer_id)
+	local metadata, status, fence = EventProvenance.classify_with_fence(event, consumer_id)
+	local fence_events = fence and fence.events or nil
+	if metadata or status == EventProvenance.STATUS_UNREADABLE then
+		return false, fence_events
+	end
+	return status == EventProvenance.STATUS_FOREIGN, fence_events
+end
+
+
+--- Normalises the two-value Hammerspoon eventtap return contract.
+--- @param consume boolean Whether the original event is suppressed.
+--- @param fence_events table|nil Older synthetic payload returned before it.
+--- @return boolean consume
+--- @return table|nil fence_events
+local function finish_tap(consume, fence_events)
+	return consume == true, fence_events
+end
+
 --- Posts a single no-op F18 key event (down + up) to register KEYBOARD activity
 --- with the OS and with presence-aware apps. Exposed as M._emit_activity_keystroke
 --- so the regression test can assert it fires. The auto-deactivation watcher
---- ignores this exact key code so our own jiggle never disables keep-awake.
+--- ignores only its exact provenance tag so a physical F18 remains user activity.
 local function emit_activity_keystroke()
-	pcall(function()
-		hs.eventtap.event.newKeyEvent({}, KEEP_AWAKE_WAKE_KEY, true):post()
-		hs.eventtap.event.newKeyEvent({}, KEEP_AWAKE_WAKE_KEY, false):post()
-	end)
+	-- This is an OS heartbeat, not a user-visible cursor/text action. Letting the
+	-- adapter create its default `action` transaction advanced the process-wide
+	-- action epoch on every tick, clearing the typing buffer and quarantining LLM
+	-- predictions while the user was idle. An explicit replacement transaction
+	-- keeps the pair tagged without publishing an observable action boundary.
+	local transaction = nil
+	local ok, err = xpcall(function()
+		transaction = SyntheticInput.begin("shortcuts.keep_awake", "replacement")
+		assert(SyntheticInput.emit_key_stroke(
+			{}, KEEP_AWAKE_WAKE_KEY, KEYSTROKE_NO_DELAY_US, transaction),
+			"F18 activity pair could not be queued")
+		assert(SyntheticInput.seal(transaction),
+			"F18 activity transaction could not be sealed")
+	end, debug.traceback)
+	if ok then return true end
+	if transaction then pcall(SyntheticInput.cancel, transaction) end
+	Logger.error(LOG, "Keep-awake F18 activity signal failed - %s.", tostring(err))
+	return false
 end
 M._emit_activity_keystroke = emit_activity_keystroke
 
@@ -191,20 +276,21 @@ M._emit_activity_keystroke = emit_activity_keystroke
 
 --- Schedules the next keep-awake tick at a random interval.
 --- Each tick moves the mouse slightly around the recorded origin, then returns.
-schedule_awake_tick = function()
-	if not awake_active then return end
-
-	if awake_timer and type(awake_timer.stop) == "function" then
-		pcall(function() awake_timer:stop() end)
-		awake_timer = nil
-	end
+schedule_awake_tick = function(generation)
+	generation = generation or _awake_generation
+	if awake_timer and cancel_awake_tick_timer() ~= true then return false end
 
 	-- math.random(m, n) requires integer bounds in Lua 5.4; the tick bounds come from
 	-- Timings.sec() which returns floats, so use the float-safe uniform form instead.
 	local span = AWAKE_TICK_MAX_SEC - AWAKE_TICK_MIN_SEC
 	local interval = AWAKE_TICK_MIN_SEC + math.random() * span
-	awake_timer = timer.doAfter(interval, function()
-		if not awake_active then return end
+	local scheduled_handle
+	local committed
+	scheduled_handle, committed = TimerScheduler.after(interval, function()
+		if awake_timer == scheduled_handle and scheduled_handle.timer == nil then
+			awake_timer = nil
+		end
+		if not awake_active or generation ~= _awake_generation then return end
 
 		local origin = awake_origin_pos
 		if not origin then
@@ -232,11 +318,31 @@ schedule_awake_tick = function()
 			-- that, the cursor was still teleported back to its remembered origin
 			-- up to AWAKE_RETURN_DELAY_SEC after the user turned the feature off —
 			-- a pointer that moves on its own once the feature is disabled.
-			if _awake_return_timer then pcall(function() _awake_return_timer:stop() end) end
-			_awake_return_timer = timer.doAfter(AWAKE_RETURN_DELAY_SEC, function()
-				_awake_return_timer = nil
+			if _awake_return_timer and cancel_awake_return_timer() ~= true then
+				_awake_generation = _awake_generation + 1
+				awake_active = false
+				stop_awake_input_watcher()
+				close_awake_alert()
+				Logger.error(LOG,
+					"Keep-awake auto-disabled because prior cursor-return cleanup did not settle.")
+				return
+			end
+			local return_generation = _awake_generation
+			local return_handle
+			local return_committed
+			return_handle, return_committed = TimerScheduler.after(AWAKE_RETURN_DELAY_SEC, function()
+				if _awake_return_timer == return_handle and return_handle.timer == nil then
+					_awake_return_timer = nil
+				end
+				if return_generation ~= _awake_generation or not awake_active then return end
 				if origin then pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y}) end
 			end)
+			_awake_return_timer = return_handle
+			if return_committed ~= true then
+				if return_handle.timer == nil then _awake_return_timer = nil end
+				Logger.error(LOG, "Keep-awake cursor-return timer did not commit; restoring immediately.")
+				pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y})
+			end
 
 			-- Declare user activity so the OS resets its display-idle / power assertion
 			pcall(hs.caffeinate.declareUserActivity)
@@ -248,40 +354,86 @@ schedule_awake_tick = function()
 		-- covers display sleep, not app-level presence.
 		emit_activity_keystroke()
 
-		schedule_awake_tick()
+		if schedule_awake_tick(generation) ~= true then
+			_awake_generation = _awake_generation + 1
+			awake_active = false
+			stop_awake_input_watcher()
+			cancel_awake_return_timer()
+			close_awake_alert()
+			Logger.error(LOG, "Keep-awake auto-disabled because its next jitter tick could not be armed.")
+		end
 	end)
+	awake_timer = scheduled_handle
+	if committed ~= true then
+		if scheduled_handle.timer == nil then awake_timer = nil end
+		Logger.error(LOG, "Keep-awake jitter timer did not commit.")
+		return false
+	end
+	return true
 end
 
 --- Stops the input-activity watcher without touching keep-awake state.
-local function stop_awake_input_watcher()
-	if awake_input_watcher then
-		pcall(function() awake_input_watcher:stop() end)
-		awake_input_watcher = nil
+stop_awake_input_watcher = function()
+	if not awake_input_watcher then return true end
+	local settled = awake_input_watcher:delete()
+	if settled == true then awake_input_watcher = nil end
+	return settled == true
+end
+
+
+--- Auto-disables keep-awake after the observing eventtap has returned.
+--- The activation token prevents an old queued callback from disabling a newer
+--- keep-awake session after a rapid OFF -> ON cycle.
+--- @param expected_started_at number|nil Activation timestamp captured by the tap.
+local function auto_disable_awake(expected_started_at)
+	if not awake_active or awake_started_at ~= expected_started_at then return end
+
+	_awake_generation = _awake_generation + 1
+	awake_active = false
+	stop_awake_input_watcher()
+	cancel_awake_return_timer()
+
+	cancel_awake_tick_timer()
+
+	close_awake_alert()
+
+	-- Log duration so the dashboard accounts for the keep-awake period.
+	if awake_started_at then
+		local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
+		if dur_ms > 0 then
+			local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
+			if ok_lm and log_manager then
+				if type(log_manager.log_passive_period) == "function" then
+					pcall(log_manager.log_passive_period, "awake", dur_ms)
+				end
+				if awake_focused_app and type(log_manager.tag_awake_focus) == "function" then
+					pcall(log_manager.tag_awake_focus, awake_focused_app, dur_ms)
+				end
+			end
+		end
+		awake_started_at  = nil
+		awake_focused_app = nil
 	end
+
+	Logger.info(LOG, "Keep-awake auto-disabled — user activity detected.")
 end
 
 --- Toggles keep-awake mode on or off.
 --- When active, jiggles the mouse periodically to prevent the display from sleeping.
 function M.toggle_awake()
 	if awake_active then
+		_awake_generation = _awake_generation + 1
 		awake_active = false
 
-		stop_awake_input_watcher()
+		local watcher_settled = stop_awake_input_watcher()
+		local return_timer_settled = cancel_awake_return_timer()
 
-		if awake_timer and type(awake_timer.stop) == "function" then
-			pcall(function() awake_timer:stop() end)
-			awake_timer = nil
-		end
+		local tick_timer_settled = cancel_awake_tick_timer()
 
 		-- Cancel the pending cursor return too. Stopping only the tick timer left
 		-- a scheduled "put the pointer back" firing up to AWAKE_RETURN_DELAY_SEC
 		-- after the user switched the feature off — a cursor that moves by itself
 		-- once nothing is supposed to be moving it.
-		if _awake_return_timer then
-			pcall(function() _awake_return_timer:stop() end)
-			_awake_return_timer = nil
-		end
-
 		-- Log the keep-awake duration as a special passive period AND tag the
 		-- focused app so the dashboard can subtract it from per-app stats
 		-- when the user opted out of counting keep-awake time.
@@ -308,7 +460,97 @@ function M.toggle_awake()
 		-- the no-handle path, which falls back to closeAll).
 		close_awake_alert()
 		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2.0)
+		return watcher_settled and return_timer_settled and tick_timer_settled
 	else
+		-- A prior activate-then-throw may have left an inert exact timer awaiting
+		-- native cleanup. Settle that debt before acquiring a new watcher or timer.
+		if stop_awake_input_watcher() ~= true
+			or cancel_awake_tick_timer() ~= true
+			or cancel_awake_return_timer() ~= true then
+			Logger.error(LOG, "Keep-awake activation blocked by retained native cleanup debt.")
+			return false
+		end
+		-- Watch for any real keyboard or touchpad activity (key press, scroll,
+		-- swipe, tap, pinch, rotate...). We cut silently (no alert) since the user
+		-- is clearly back — the visual noise would be worse than the keep-awake itself.
+		local ev = eventtap.event.types
+		local watch_types = {
+			ev.scrollWheel, ev.leftMouseDown, ev.rightMouseDown, ev.otherMouseDown,
+			ev.leftMouseUp, ev.rightMouseUp, ev.otherMouseUp,
+			ev.mouseMoved, ev.keyDown
+		}
+		-- Touchpad gesture event types — some may be absent on older macOS builds
+		for _, name in ipairs({ "gesture", "beginGesture", "endGesture", "swipe", "magnify", "rotate", "directTouch", "smartMagnify" }) do
+			if ev[name] then
+				table.insert(watch_types, ev[name])
+			end
+		end
+		local watcher = acquire_tap(watch_types, function(_ev)
+			local is_physical, fence_events = classify_physical_event(
+				_ev, "shortcuts.keep_awake")
+			if not is_physical or not awake_active then
+				return finish_tap(false, fence_events)
+			end
+
+			-- Ignore events within the activation grace window so the trigger
+			-- keystroke, the origin nudge, and a rapid second Ctrl+M (with the
+			-- touchpad brush it carries) never instantly deactivate keep-awake.
+			if awake_started_at and hs.timer.secondsSinceEpoch() - awake_started_at < AWAKE_ACTIVATION_GRACE_SEC then
+				return finish_tap(false, fence_events)
+			end
+
+			-- Local must NOT be named `type`: that would shadow the `type()` builtin
+			-- in the deferred teardown (type(awake_timer.stop)), turning it into a
+			-- number and crashing before the banner is ever closed.
+			local ok_type, ev_type = pcall(_ev.getType, _ev)
+			if not ok_type then return finish_tap(false, fence_events) end
+			-- Ignore key presses with modifiers to prevent the trigger shortcut
+			-- from instantly deactivating the keep-awake mode.
+			if ev_type == ev.keyDown then
+				-- Exact ownership above, never an F18 keycode heuristic, distinguishes
+				-- our heartbeat from a real extended-keyboard F18 press.
+				local ok_flags, flags = pcall(_ev.getFlags, _ev)
+				if not ok_flags or type(flags) ~= "table" then
+					return finish_tap(false, fence_events)
+				end
+				if flags.cmd or flags.alt or flags.ctrl then
+					return finish_tap(false, fence_events)
+				end
+			end
+			-- If it's a mouse movement, only deactivate if it moved beyond the jitter area
+			if ev_type == ev.mouseMoved and awake_origin_pos then
+				local ok_pos, pos = pcall(_ev.location, _ev)
+				if not ok_pos or type(pos) ~= "table"
+					or type(pos.x) ~= "number" or type(pos.y) ~= "number" then
+					return finish_tap(false, fence_events)
+				end
+				if math.abs(pos.x - awake_origin_pos.x) <= AWAKE_JITTER_X and
+				   math.abs(pos.y - awake_origin_pos.y) <= AWAKE_JITTER_Y then
+					return finish_tap(false, fence_events)
+				end
+			end
+
+			-- State teardown, keylogger I/O and logging all run after this callback has
+			-- handed Quartz every older fence event and the physical event itself.
+			SyntheticInput.defer_after_callback(
+				"keep-awake auto-deactivation", auto_disable_awake, awake_started_at)
+			return finish_tap(false, fence_events)
+		end, "keep-awake input watcher")
+		if not watcher then
+			Logger.error(LOG, "Keep-awake activation refused because its input watcher did not commit.")
+			return false
+		end
+		awake_input_watcher = watcher
+		local next_generation = _awake_generation + 1
+		if schedule_awake_tick(next_generation) ~= true then
+			if watcher:delete() ~= true then _failed_tap_cleanup[watcher] = true end
+			awake_input_watcher = nil
+			return false
+		end
+
+		-- Publish visible state only after the watcher has proved it is live. A tap
+		-- that activates and then returns false/throws is rolled back by acquire_tap.
+		_awake_generation = next_generation
 		awake_active = true
 		awake_started_at = hs.timer.secondsSinceEpoch()
 		-- Capture the focused app at toggle-on so we can credit the keep-awake
@@ -338,127 +580,37 @@ function M.toggle_awake()
 			pcall(hs.mouse.absolutePosition, {x = pos.x + dx, y = pos.y})
 		end
 
-		-- Watch for any real keyboard or touchpad activity (key press, scroll,
-		-- swipe, tap, pinch, rotate...). We cut silently (no alert) since the user
-		-- is clearly back — the visual noise would be worse than the keep-awake itself.
-		local ev = eventtap.event.types
-		local watch_types = {
-			ev.scrollWheel, ev.leftMouseDown, ev.rightMouseDown, ev.otherMouseDown,
-			ev.leftMouseUp, ev.rightMouseUp, ev.otherMouseUp,
-			ev.mouseMoved, ev.keyDown
-		}
-		-- Touchpad gesture event types — some may be absent on older macOS builds
-		for _, name in ipairs({ "gesture", "beginGesture", "endGesture", "swipe", "magnify", "rotate", "directTouch", "smartMagnify" }) do
-			if ev[name] then
-				table.insert(watch_types, ev[name])
-			end
-		end
-		awake_input_watcher = eventtap.new(watch_types, function(_ev)
-			if EventTapGuard.handle_disabled(_ev, awake_input_watcher, "shortcuts.keep_awake") then return false end
-			if not awake_active then return false end
-
-			-- Ignore events within the activation grace window so the trigger
-			-- keystroke, the origin nudge, and a rapid second Ctrl+M (with the
-			-- touchpad brush it carries) never instantly deactivate keep-awake.
-			if awake_started_at and hs.timer.secondsSinceEpoch() - awake_started_at < AWAKE_ACTIVATION_GRACE_SEC then
-				return false
-			end
-
-			-- Local must NOT be named `type`: that would shadow the `type()` builtin
-			-- used below (type(awake_timer.stop)), turning it into a number and
-			-- crashing the callback before the banner is ever closed.
-			local ev_type = _ev:getType()
-			-- Ignore key presses with modifiers to prevent the trigger shortcut
-			-- from instantly deactivating the keep-awake mode.
-			if ev_type == ev.keyDown then
-				-- Our own F18 jiggle keystroke must never count as "the user is back".
-				-- F18 is reserved for this purpose (no physical key emits it), so a
-				-- keycode match is unambiguous — no timing window needed.
-				if _ev:getKeyCode() == KEEP_AWAKE_WAKE_KEY then
-					return false
-				end
-				local flags = _ev:getFlags()
-				if flags.cmd or flags.alt or flags.ctrl then
-					return false
-				end
-			end
-			-- If it's a mouse movement, only deactivate if it moved beyond the jitter area
-			if ev_type == ev.mouseMoved and awake_origin_pos then
-				local pos = _ev:location()
-				if math.abs(pos.x - awake_origin_pos.x) <= AWAKE_JITTER_X and
-				   math.abs(pos.y - awake_origin_pos.y) <= AWAKE_JITTER_Y then
-					return false
-				end
-			end
-
-			awake_active = false
-			stop_awake_input_watcher()
-
-			if awake_timer and type(awake_timer.stop) == "function" then
-				pcall(function() awake_timer:stop() end)
-				awake_timer = nil
-			end
-
-			close_awake_alert()
-
-			-- Log duration so the dashboard accounts for the keep-awake period
-			if awake_started_at then
-				local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
-				if dur_ms > 0 then
-					local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
-					if ok_lm and log_manager then
-						if type(log_manager.log_passive_period) == "function" then
-							pcall(log_manager.log_passive_period, "awake", dur_ms)
-						end
-						if awake_focused_app and type(log_manager.tag_awake_focus) == "function" then
-							pcall(log_manager.tag_awake_focus, awake_focused_app, dur_ms)
-						end
-					end
-				end
-				awake_started_at  = nil
-				awake_focused_app = nil
-			end
-
-			Logger.info(LOG, "Keep-awake auto-disabled — user activity detected.")
-			return false
-		end)
-		-- keyDown is excluded from watch_types so no deferred start is needed;
-		-- start immediately so scroll/gesture/click detection is live at once.
-		if awake_active and awake_input_watcher then
-			pcall(function() awake_input_watcher:start() end)
-		end
-
-		schedule_awake_tick()
 		Logger.info(LOG, "Keep-awake enabled.")
+		return true
 	end
 end
 
 --- Stops keep-awake cleanly; called when the bindings module shuts down.
 function M.stop_awake()
+	_awake_generation = _awake_generation + 1
 	awake_active = false
 
-	stop_awake_input_watcher()
+	local watcher_settled = stop_awake_input_watcher()
+	local return_timer_settled = cancel_awake_return_timer()
 
-	if awake_timer and type(awake_timer.stop) == "function" then
-		pcall(function() awake_timer:stop() end)
-		awake_timer = nil
-	end
+	local tick_timer_settled = cancel_awake_tick_timer()
 
 	close_awake_alert()
+	return watcher_settled and return_timer_settled and tick_timer_settled
 end
 
---- Toggles the hardware CapsLock state by synthesising a raw CapsLock keystroke.
---- Useful for debugging CapsWord state or recovering a stuck CapsLock LED.
+--- Toggles the hardware CapsLock state through Hammerspoon's HID API.
+--- @return boolean|nil New CapsLock state, or nil when the HID call failed.
 function M.toggle_capslock()
-	local ok, cur = pcall(hs.eventtap.checkKeyboardModifiers)
-	if not ok then
-		Logger.warn(LOG, "toggle_capslock: could not read modifier state.")
-		return
+	-- CapsLock is delivered as flagsChanged on macOS. A newKeyEvent down/up pair
+	-- reports no construction error but does not change the lock state or LED.
+	local state, err = KeyState.toggle_capslock()
+	if state == nil then
+		Logger.error(LOG, "CapsLock toggle failed - %s.", tostring(err))
+		return nil
 	end
-	-- Synthesise a CapsLock key-down + key-up pair; macOS toggles the LED on the down event.
-	pcall(hs.eventtap.keyStroke, {}, "capslock", 0)
-	local new_state = not (cur and cur.capslock)
-	Logger.debug(LOG, "CapsLock toggled — now %s.", new_state and "ON" or "OFF")
+	Logger.debug(LOG, "CapsLock toggled — now %s.", state and "ON" or "OFF")
+	return state
 end
 
 
@@ -471,73 +623,168 @@ end
 -- =============================================
 -- =============================================
 
---- Wraps an already-started eventtap in a fake-hotkey object with a :delete() method.
+--- Wraps an eventtap in a fake-hotkey owner with an exact, retryable delete.
 --- This lets the bindings registry treat eventtaps and hs.hotkeys uniformly.
---- @param tap userdata The hs.eventtap to wrap (must already be started).
+--- @param tap userdata The exact hs.eventtap candidate.
+--- @param label string Diagnostic owner label.
 --- @return table Fake-hotkey compatible object.
-local function wrap_tap(tap)
-	return {
-		delete = function()
-			if tap and type(tap.stop) == "function" then
-				pcall(function() tap:stop() end)
-			end
-		end
+wrap_tap = function(tap, label)
+	local owner = {
+		tap = tap,
+		label = label,
+		delivering = false,
+		released = false,
 	}
+
+	--- Invalidates delivery before stopping and retains refusal for a retry.
+	--- @return boolean settled True only when the exact tap is proven disabled.
+	function owner:delete()
+		self.delivering = false
+		if self.released then return true end
+		if not self.tap or type(self.tap.stop) ~= "function"
+			or type(self.tap.isEnabled) ~= "function" then
+			Logger.error(LOG, "Eventtap '%s' has no complete teardown contract.", self.label)
+			return false
+		end
+
+		local stop_ok, stop_result = xpcall(function() return self.tap:stop() end,
+			debug.traceback)
+		local probe_ok, enabled = xpcall(function() return self.tap:isEnabled() end,
+			debug.traceback)
+		if stop_ok and stop_result ~= false and probe_ok and enabled == false then
+			self.released = true
+			self.tap = nil
+			_failed_tap_cleanup[self] = nil
+			return true
+		end
+
+		Logger.error(LOG,
+			"Eventtap '%s' teardown did not settle (stop=%s, enabled=%s).",
+			self.label, tostring(stop_result), tostring(enabled))
+		return false
+	end
+
+	return owner
+end
+
+
+--- Retries every failed acquisition rollback before a successor is constructed.
+--- @return boolean settled True when no native cleanup debt remains.
+local function settle_failed_tap_cleanup()
+	local owners = {}
+	for owner in pairs(_failed_tap_cleanup) do owners[#owners + 1] = owner end
+	local settled = true
+	for _, owner in ipairs(owners) do
+		if owner:delete() ~= true then settled = false end
+	end
+	return settled
+end
+
+
+--- Creates and starts one eventtap as an acquisition transaction.
+--- @param types table Native event types.
+--- @param callback function User callback.
+--- @param label string Diagnostic owner label.
+--- @return table|nil owner Committed fake-hotkey owner, or nil on refusal.
+acquire_tap = function(types, callback, label)
+	if settle_failed_tap_cleanup() ~= true then
+		Logger.error(LOG, "Eventtap '%s' cannot start while prior cleanup remains pending.", label)
+		return nil
+	end
+
+	local owner
+	local function guarded_callback(...)
+		if not owner or owner.delivering ~= true then return false end
+		local ok, first, second = xpcall(callback, debug.traceback, ...)
+		if not ok then
+			Logger.error(LOG, "Eventtap '%s' callback failed: %s.", label, tostring(first))
+			return false
+		end
+		return first, second
+	end
+
+	local create_ok, tap_or_err = xpcall(function()
+		return eventtap.new(types, guarded_callback)
+	end, debug.traceback)
+	if not create_ok or tap_or_err == nil or tap_or_err == false then
+		Logger.error(LOG, "Eventtap '%s' construction failed: %s.", label, tostring(tap_or_err))
+		return nil
+	end
+	owner = wrap_tap(tap_or_err, label)
+
+	local start_ok, start_result = xpcall(function() return owner.tap:start() end,
+		debug.traceback)
+	local probe_ok, enabled = xpcall(function() return owner.tap:isEnabled() end,
+		debug.traceback)
+	if start_ok and start_result ~= false and probe_ok and enabled == true then
+		owner.delivering = true
+		return owner
+	end
+
+	Logger.error(LOG,
+		"Eventtap '%s' activation did not commit (start=%s, enabled=%s).",
+		label, tostring(start_result), tostring(enabled))
+	if owner:delete() ~= true then _failed_tap_cleanup[owner] = true end
+	return nil
+end
+
+
+--- Captures the frontmost window outside the keyboard eventtap callback.
+--- The delayed lookup is intentional: any action-epoch fence returned by the tap
+--- must reach the application before the target window is resolved.
+local function capture_frontmost_window()
+	local ok, w = pcall(hs.window.frontmostWindow)
+	if not ok or not w then
+		notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
+		return
+	end
+
+	local ok_id, id = pcall(w.id, w)
+	if not ok_id or not id then
+		notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
+		return
+	end
+	local home = os.getenv("HOME") or "~"
+	local dir  = home .. "/Pictures/screenshots"
+	local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
+	-- mkdir then screencapture, chained through the completion callback: the
+	-- directory has to exist before the capture runs. Both are asynchronous.
+	ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function()
+		ShellRunner.spawn(SCREENCAPTURE_BIN, { "-l", tostring(id), filename }, function(exit_code)
+			if exit_code == 0 then
+				notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
+				return
+			end
+			Logger.warn(LOG, "screencapture -l exited with code %s — no file written.",
+				tostring(exit_code))
+			notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+		end).start()
+	end).start()
 end
 
 --- Captures the frontmost window on the physical @/# key (key-code 10).
 --- Uses a raw keyDown tap so the shortcut fires before macOS generates characters.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_instant_screenshot()
-	local tap
-	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-		if EventTapGuard.handle_disabled(e, tap, "shortcuts.at_hash") then return false end
-		if e:getKeyCode() ~= KEYCODE_AT_HASH then return false end
+	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
+		local is_physical, fence_events = classify_physical_event(
+			e, "shortcuts.at_hash")
+		if not is_physical then return finish_tap(false, fence_events) end
 
-		local flags = e:getFlags()
-		if flags.cmd or flags.alt or flags.ctrl or flags.shift then return false end
-
-		local ok, w = pcall(hs.window.frontmostWindow)
-		if not ok or not w then
-			notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
-			return true
+		local ok_key, keycode = pcall(e.getKeyCode, e)
+		if not ok_key or keycode ~= KEYCODE_AT_HASH then
+			return finish_tap(false, fence_events)
+		end
+		local ok_flags, flags = pcall(e.getFlags, e)
+		if not ok_flags or type(flags) ~= "table"
+			or flags.cmd or flags.alt or flags.ctrl or flags.shift then
+			return finish_tap(false, fence_events)
 		end
 
-		-- Capture the window ID synchronously before the eventtap returns; defer the
-		-- filesystem ops and screencapture to avoid blocking the CGEventTap callback
-		-- thread — blocking calls here exceed the dispatch deadline and disable the tap.
-		local id = w:id()
-		-- Borderless or system windows can return nil for :id(); screencapture -l
-		-- requires a valid CGWindowID so we must bail out rather than concat nil.
-		if not id then
-			notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
-			return true
-		end
-		local home = os.getenv("HOME") or "~"
-		local dir  = home .. "/Pictures/screenshots"
-		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
-		-- mkdir then screencapture, chained through the completion callback: the
-		-- directory has to exist before the capture runs. Both are asynchronous
-		-- because the deferral this used to rely on ran the blocking calls on the
-		-- same runloop the keyboard tap lives on — it moved the freeze off the tap
-		-- callback without removing it.
-		ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function()
-			ShellRunner.spawn(SCREENCAPTURE_BIN, { "-l", tostring(id), filename }, function(exit_code)
-				if exit_code == 0 then
-					notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
-					return
-				end
-				-- The old code notified success unconditionally, so a capture that
-				-- never wrote a file still told the user where to find it.
-				Logger.warn(LOG, "screencapture -l exited with code %s — no file written.",
-					tostring(exit_code))
-				notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-			end).start()
-		end).start()
-		return true
-	end)
-	tap:start()
-	return wrap_tap(tap)
+		local scheduled = SyntheticInput.defer_after_callback(
+			"instant screenshot", capture_frontmost_window)
+		return finish_tap(scheduled, fence_events)
+	end, "instant screenshot")
 end
 
 --- Maps F19 + scroll wheel to system volume up/down.
@@ -547,64 +794,93 @@ function M.bind_layer_scroll()
 	local layer_held  = false
 	local f19_keycode = Keycodes.F19_VOLUME_SCROLL_MODIFIER
 
-	local key_tap
-	key_tap = hs.eventtap.new(
+	local key_owner = acquire_tap(
 		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
 		function(event)
-			if EventTapGuard.handle_disabled(event, key_tap, "shortcuts.f19_layer") then return false end
-			if event:getKeyCode() ~= f19_keycode then return false end
+			local is_physical, fence_events = classify_physical_event(
+				event, "shortcuts.f19_layer")
+			if not is_physical then return finish_tap(false, fence_events) end
 
-			if event:getType() == hs.eventtap.event.types.keyDown then
-				-- Release any in-progress right-click hold gesture that would conflict
-				if gestures and type(gestures.isRightClickHeld) == "function" then
-					if gestures.isRightClickHeld() then
+			local ok_key, keycode = pcall(event.getKeyCode, event)
+			if not ok_key or keycode ~= f19_keycode then
+				return finish_tap(false, fence_events)
+			end
+			local ok_type, event_type = pcall(event.getType, event)
+			if not ok_type then return finish_tap(false, fence_events) end
+			local should_hold = event_type == hs.eventtap.event.types.keyDown
+			if not should_hold and event_type ~= hs.eventtap.event.types.keyUp then
+				return finish_tap(false, fence_events)
+			end
+
+			-- This O(1) state write must be visible before the first following scroll;
+			-- deferring it creates a down -> scroll race where the first notch leaks to
+			-- the application. Only gesture cleanup is deferred off the HID callback.
+			layer_held = should_hold
+			if should_hold then
+				SyntheticInput.defer_after_callback("F19 gesture cleanup", function()
+					if gestures and type(gestures.isRightClickHeld) == "function"
+						and gestures.isRightClickHeld() then
 						pcall(function() gestures.forceCleanup() end)
 					end
-				end
-				layer_held = true
-			else
-				layer_held = false
+				end)
 			end
-			return false
-		end
+			return finish_tap(false, fence_events)
+		end,
+		"F19 layer key"
 	)
+	if not key_owner then return nil end
 
-	local scroll_tap
-	scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
-		if EventTapGuard.handle_disabled(event, scroll_tap, "shortcuts.f19_scroll") then return false end
-		if not layer_held then return false end
-
-		if gestures and type(gestures.isRightClickHeld) == "function" then
-			if gestures.isRightClickHeld() then
-				pcall(function() gestures.forceCleanup() end)
-			end
+	local scroll_owner = acquire_tap({hs.eventtap.event.types.scrollWheel}, function(event)
+		local is_physical, fence_events = classify_physical_event(
+			event, "shortcuts.f19_scroll")
+		if not is_physical or not layer_held then
+			return finish_tap(false, fence_events)
 		end
 
-		local delta = event:getProperty(hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
+		local ok_delta, delta = pcall(event.getProperty, event,
+			hs.eventtap.event.properties.scrollWheelEventDeltaAxis1)
 		-- A zero delta is a scroll-PHASE event (phase began / phase ended / momentum
 		-- ended), which macOS brackets every gesture with — not actual movement.
 		-- Falling through would classify it as "down" (delta > 0 is false) while
 		-- math.max(1, …) manufactures a real repetition, so every upward scroll ended
 		-- one or more notches LOWER than it started (shortcuts-layer-scroll-zero-delta).
 		-- Returning false also lets the phase event pass through instead of consuming it.
-		if type(delta) ~= "number" or delta == 0 then return false end
+		if not ok_delta or type(delta) ~= "number" or delta == 0 then
+			return finish_tap(false, fence_events)
+		end
 
 		local key  = delta > 0 and "SOUND_UP" or "SOUND_DOWN"
 		local reps = math.max(1, math.floor(math.abs(delta)))
-		for _ = 1, reps do
-			pcall(function() hs.eventtap.event.newSystemKeyEvent(key, true):post() end)
-			pcall(function() hs.eventtap.event.newSystemKeyEvent(key, false):post() end)
-		end
-		return true
-	end)
-
-	pcall(function() key_tap:start() end)
-	pcall(function() scroll_tap:start() end)
+		local scheduled = SyntheticInput.defer_after_callback("F19 volume scroll", function()
+			if gestures and type(gestures.isRightClickHeld) == "function"
+				and gestures.isRightClickHeld() then
+				pcall(function() gestures.forceCleanup() end)
+			end
+			-- NX system-defined media events are not keyDown/keyUp events, so they do
+			-- not enter keymap/keylogger keyboard callbacks and stay native here.
+			for _ = 1, reps do
+				hs.eventtap.event.newSystemKeyEvent(key, true):post()
+				hs.eventtap.event.newSystemKeyEvent(key, false):post()
+			end
+		end)
+		return finish_tap(scheduled, fence_events)
+	end, "F19 layer scroll")
+	if not scroll_owner then
+		if key_owner:delete() ~= true then _failed_tap_cleanup[key_owner] = true end
+		return nil
+	end
 
 	return {
 		delete = function()
-			if key_tap    and type(key_tap.stop)    == "function" then pcall(function() key_tap:stop() end) end
-			if scroll_tap and type(scroll_tap.stop) == "function" then pcall(function() scroll_tap:stop() end) end
+			layer_held = false
+			local settled = true
+			if key_owner then
+				if key_owner:delete() == true then key_owner = nil else settled = false end
+			end
+			if scroll_owner then
+				if scroll_owner:delete() == true then scroll_owner = nil else settled = false end
+			end
+			return settled
 		end
 	}
 end
@@ -615,15 +891,21 @@ end
 --- @param on_trigger function|nil Called as on_trigger(label, app_name) for shortcut logging.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_cmd_star(on_trigger)
-	local tap
-	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-		if EventTapGuard.handle_disabled(e, tap, "shortcuts.cmd_star") then return false end
-		local flags = e:getFlags()
-		if not flags.cmd then return false end
+	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
+		local is_physical, fence_events = classify_physical_event(
+			e, "shortcuts.cmd_star")
+		if not is_physical then return finish_tap(false, fence_events) end
+
+		local ok_flags, flags = pcall(e.getFlags, e)
+		if not ok_flags or type(flags) ~= "table" or not flags.cmd then
+			return finish_tap(false, fence_events)
+		end
 
 		local ok, ch = pcall(function() return e:getCharacters() end)
-		if not ok or not ch then return false end
-		if ch ~= "\xe2\x98\x85" and ch ~= "*" and ch ~= "\xe2\x9c\xb1" then return false end
+		if not ok or not ch then return finish_tap(false, fence_events) end
+		if ch ~= "\xe2\x98\x85" and ch ~= "*" and ch ~= "\xe2\x9c\xb1" then
+			return finish_tap(false, fence_events)
+		end
 
 		-- Build the modifier list to re-fire the keystroke faithfully
 		local mods = {}
@@ -632,34 +914,56 @@ function M.bind_cmd_star(on_trigger)
 		if flags.alt   then table.insert(mods, "alt")   end
 		if flags.ctrl  then table.insert(mods, "ctrl")  end
 
-		if type(on_trigger) == "function" then
-			-- Construct the canonical label (e.g. "Cmd+Shift+S")
+		-- Preserve only scalar flag state across the callback boundary; Quartz's
+		-- event userdata is not retained or dereferenced by the deferred action.
+		local flag_snapshot = {
+			cmd = flags.cmd == true, ctrl = flags.ctrl == true,
+			alt = flags.alt == true, shift = flags.shift == true,
+		}
+		local scheduled = SyntheticInput.defer_after_callback("Cmd-star action", function()
+			-- Queue the user-visible output first. Application lookup and shortcut
+			-- telemetry must never delay the replacement keystroke.
+			SyntheticInput.emit_key_stroke(mods, "s", KEYSTROKE_NO_DELAY_US)
+			if type(on_trigger) ~= "function" then return end
+
 			local parts  = {}
 			local order  = {"cmd", "ctrl", "alt", "shift"}
 			local labels = {cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift"}
-			for _, m in ipairs(order) do if flags[m] then table.insert(parts, labels[m]) end end
+			for _, m in ipairs(order) do
+				if flag_snapshot[m] then table.insert(parts, labels[m]) end
+			end
 			table.insert(parts, "S")
 
-			-- Resolve the frontmost application name for the log entry
 			local ok_app, app = pcall(hs.application.frontmostApplication)
-			local app_name    = (ok_app and app) and app:title() or nil
-			if not app_name or app_name == "" then
-				local win  = hs.window.focusedWindow()
-				local wa   = win and win:application()
-				app_name   = (wa and wa:title()) or "Unknown"
+			local app_name = nil
+			if ok_app and app then
+				local title_method = type(app.title) == "function" and app.title
+					or (type(app.name) == "function" and app.name or nil)
+				if title_method then
+					local ok_title, title = pcall(title_method, app)
+					if ok_title then app_name = title end
+				end
 			end
-
+			if not app_name or app_name == "" then
+				local ok_win, win = pcall(hs.window.focusedWindow)
+				local ok_wa, wa = false, nil
+				if ok_win and win and type(win.application) == "function" then
+					ok_wa, wa = pcall(win.application, win)
+				end
+				if ok_wa and wa then
+					local title_method = type(wa.title) == "function" and wa.title
+						or (type(wa.name) == "function" and wa.name or nil)
+					if title_method then
+						local ok_title, title = pcall(title_method, wa)
+						if ok_title then app_name = title end
+					end
+				end
+				if not app_name or app_name == "" then app_name = "Unknown" end
+			end
 			pcall(on_trigger, table.concat(parts, "+"), app_name)
-		end
-
-		-- Explicit delay: this runs INSIDE an eventtap callback, where keyStroke's
-		-- 200 000 us default usleep would stall the tap long enough for macOS to
-		-- disable it (kCGEventTapDisabledByTimeout), killing the shortcut entirely.
-		if #mods > 0 then hs.eventtap.keyStroke(mods, "s", KEYSTROKE_NO_DELAY_US) end
-		return true
-	end)
-	tap:start()
-	return wrap_tap(tap)
+		end)
+		return finish_tap(scheduled, fence_events)
+	end, "Cmd+star")
 end
 
 
@@ -692,7 +996,7 @@ function M.wrap_event_decision(flags, ch, pairs_tbl, has_selection)
 end
 
 --- Reads the current AX selection with a short-lived cache, mirroring
---- lib/vscode_bridge.lua's get_editor_ax_frame(). read_ax_selection() performs
+--- infra/vscode_bridge.lua's get_editor_ax_frame(). read_ax_selection() performs
 --- two synchronous cross-process Accessibility calls; without caching, a run of
 --- rapid wrap-symbol keystrokes (e.g. a held key, or fast typing that repeats a
 --- wrap char) would each pay that cost inline on the CGEventTap thread, risking
@@ -706,7 +1010,7 @@ local function read_wrap_ax_selection_cached()
 	-- (VS Code / Electron, where it is nil every time). Every wrap-symbol keystroke
 	-- therefore paid both synchronous cross-process AX calls inline on the
 	-- CGEventTap thread — precisely the cost this cache exists to avoid. Same defect
-	-- and same fix as lib/vscode_bridge.lua's _ax_frame_valid (3e403b254).
+	-- and same fix as infra/vscode_bridge.lua's _ax_frame_valid (3e403b254).
 	if _wrap_ax_selection_valid and (now - _wrap_ax_selection_ts) < WRAP_AX_SELECTION_TTL_SEC then
 		return _wrap_ax_selection_cache
 	end
@@ -739,44 +1043,80 @@ end
 ---   When nil, falls back to text_acts.WRAP_PAIRS (the full built-in catalogue).
 --- @return table Fake-hotkey object with :delete().
 function M.bind_wrap_text_if_selected(get_wrap_pairs)
-	local tap
-	tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
-		if EventTapGuard.handle_disabled(e, tap, "shortcuts.wrap_text") then return false end
-		local flags = e:getFlags()
+	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
+		local is_physical, fence_events = classify_physical_event(
+			e, "shortcuts.wrap_text")
+		if not is_physical then return finish_tap(false, fence_events) end
+		-- AX still describes the pre-return application while older callback events
+		-- have not reached Quartz. Fail open for this rare ordering branch: the real
+		-- symbol reaches keymap/app after the fence instead of wrapping stale text.
+		if type(fence_events) == "table" and #fence_events > 0 then
+			return finish_tap(false, fence_events)
+		end
+
+		local ok_flags, flags = pcall(e.getFlags, e)
+		if not ok_flags or type(flags) ~= "table" then
+			return finish_tap(false, fence_events)
+		end
 		-- Fast path: Cmd/Ctrl are real shortcuts — bail before any AX probe. Alt is
 		-- intentionally allowed through (Ergopti wrap symbols are on the AltGr layer).
-		if flags.cmd or flags.ctrl then return false end
+		if flags.cmd or flags.ctrl then return finish_tap(false, fence_events) end
 
 		local ok_ch, ch = pcall(function() return e:getCharacters() end)
-		if not ok_ch or type(ch) ~= "string" or ch == "" then return false end
+		if not ok_ch or type(ch) ~= "string" or ch == "" then
+			return finish_tap(false, fence_events)
+		end
 
 		-- Resolve the live symbol table on every keystroke so menu changes take effect immediately
-		local pairs_tbl = type(get_wrap_pairs) == "function" and get_wrap_pairs() or text_acts.WRAP_PAIRS
+		local ok_pairs, pairs_tbl = pcall(function()
+			return type(get_wrap_pairs) == "function" and get_wrap_pairs() or text_acts.WRAP_PAIRS
+		end)
+		if not ok_pairs or type(pairs_tbl) ~= "table" then
+			if not ok_pairs then
+				SyntheticInput.defer_after_callback("wrap-pair lookup diagnostic", function()
+					Logger.error(LOG, "Could not resolve active wrap pairs: %s.", tostring(pairs_tbl))
+				end)
+			end
+			return finish_tap(false, fence_events)
+		end
 		local pair = pairs_tbl[ch]
+		if pair ~= nil and (type(pair) ~= "table" or type(pair.left) ~= "string"
+			or type(pair.right) ~= "string") then
+			SyntheticInput.defer_after_callback("wrap-pair validation diagnostic", function()
+				Logger.error(LOG, "Invalid active wrap pair for key %q.", ch)
+			end)
+			return finish_tap(false, fence_events)
+		end
 
 		-- Probe the selection ONLY for configured wrap symbols (avoids an AX call on
 		-- every other keystroke). nil = nothing selected OR the app hides
-		-- AXSelectedText (e.g. VS Code / Electron). Cached for WRAP_AX_SELECTION_TTL_SEC
-		-- so rapid repeated wrap-key presses pay the AX cost at most once per window.
+		-- AXSelectedText (e.g. VS Code / Electron). Cached for the short TTL above.
 		local sel = pair and read_wrap_ax_selection_cached() or nil
-
 		local decision = M.wrap_event_decision(flags, ch, pairs_tbl, sel ~= nil)
-		-- Per-keystroke, so DEBUG only (silent at the default WARNING level): traces
-		-- the decision for punctuation keys, which is what makes a "does not wrap
-		-- here" report diagnosable without code changes.
 		if ch:match("%w") == nil and ch:match("%s") == nil then
 			Logger.debug(LOG, "wrap key=%q alt=%s match=%s sel=%s => %s",
-				ch, tostring(flags.alt == true), tostring(pair ~= nil), tostring(sel ~= nil), decision)
+				ch, tostring(flags.alt == true), tostring(pair ~= nil),
+				tostring(sel ~= nil), decision)
 		end
 
-		if decision ~= "wrap" then return false end
-		text_acts.wrap_selection(sel, pair.left, pair.right)
-		-- The wrap just replaced that selection, so the cached copy is stale now.
+		if decision ~= "wrap" then return finish_tap(false, fence_events) end
+		local ok_wrap, wrapped_or_err = pcall(
+			text_acts.wrap_selection, sel, pair.left, pair.right)
+		if not ok_wrap then
+			SyntheticInput.defer_after_callback("wrap-selection diagnostic", function()
+				Logger.error(LOG, "Could not wrap the active selection: %s.",
+					tostring(wrapped_or_err))
+			end)
+			return finish_tap(false, fence_events)
+		end
+		-- A match is not an output. wrap_selection may deliberately decline while a
+		-- clipboard transaction is already in flight (or after an adapter failure).
+		-- Suppress the physical symbol and invalidate the AX cache only after the
+		-- callee confirms that it actually scheduled the replacement.
+		if wrapped_or_err ~= true then return finish_tap(false, fence_events) end
 		mark_wrap_selection_consumed()
-		return true
-	end)
-	tap:start()
-	return wrap_tap(tap)
+		return finish_tap(true, fence_events)
+	end, "selection wrapping")
 end
 
 

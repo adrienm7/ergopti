@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers    = require("tests.helpers")
-local toml_codec = helpers.load_with_stubs("lib.toml.codec")
+local toml_codec = helpers.load_with_stubs("infra.toml.codec")
 
 
 

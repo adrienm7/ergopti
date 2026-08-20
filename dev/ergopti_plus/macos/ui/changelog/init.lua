@@ -23,10 +23,10 @@
 
 local M = {}
 
-local Logger     = require("lib.logger")
-local Paths      = require("lib.paths")
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
-local i18n       = require("lib.i18n")
+local i18n       = require("infra.i18n")
 
 local LOG = "changelog_window"
 
@@ -88,11 +88,11 @@ end
 
 
 
--- ==========================================
+-- ===========================================
 -- ===========================================
 -- ======= 2/ GitHub API Fetch Helpers =======
 -- ===========================================
--- ==========================================
+-- ===========================================
 
 --- Fetches releases from the GitHub API and injects them into the webview.
 --- When channel == "main" and the /latest endpoint returns 404, falls back
@@ -200,11 +200,11 @@ end
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 4/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Opens (or brings to front) the changelog window.
 --- @param opts table|nil { channel?: string } — "main" or "dev" (default "main").

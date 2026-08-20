@@ -34,15 +34,15 @@ _TWTL_CheckSharedHost(Path, OldPrefix) {
 }
 
 ; The updater module's two shared-env hosts (changelog window, update prompt)
-; live across sibling files after the lib/updater split -- verify at MODULE scope.
+; live across sibling files after the modules/updater split -- verify at MODULE scope.
 _TWTL_CheckSharedUpdaterModule() {
-	Src := _DriverDirConcat("lib/updater")
+	Src := _DriverDirConcat("modules/updater")
 	Assert(InStr(Src, "WebView_SharedEnvironment(") > 0,
-		"lib/updater module must obtain WebView2 controllers from WebView_SharedEnvironment")
+		"modules/updater module must obtain WebView2 controllers from WebView_SharedEnvironment")
 	Assert(InStr(Src, "ergopti_changelog_wv_") = 0,
-		"lib/updater must NOT create a per-open ergopti_changelog_wv_<tick> folder (replaced by the shared env)")
+		"modules/updater must NOT create a per-open ergopti_changelog_wv_<tick> folder (replaced by the shared env)")
 	Assert(InStr(Src, "ergopti_update_wv_") = 0,
-		"lib/updater must NOT create a per-open ergopti_update_wv_<tick> folder (replaced by the shared env)")
+		"modules/updater must NOT create a per-open ergopti_update_wv_<tick> folder (replaced by the shared env)")
 }
 
 ; LEGACY host: still creates a per-launch folder, so it must sweep stale profiles
@@ -59,9 +59,9 @@ _TWTL_CheckLegacyHost(Path, CreatePrefix) {
 ; The single shared user-data folder must be a FIXED path (no A_TickCount), so it
 ; cannot accumulate -- exactly one folder, reused for the whole session.
 _TWTL_SharedFolderIsFixed() {
-	Src := _TWTL_ReadSource("lib/webview_utils.ahk")
+	Src := _TWTL_ReadSource("infra/webview_utils.ahk")
 	Assert(InStr(Src, "WebView_SharedEnvironment") > 0,
-		"lib/webview_utils.ahk must define the shared environment helper")
+		"infra/webview_utils.ahk must define the shared environment helper")
 	Assert(InStr(Src, 'WEBVIEW_SHARED_UDIR := A_Temp . "\ergopti_wv_shared"') > 0,
 		"WEBVIEW_SHARED_UDIR must be a single fixed path (leak-free by construction)")
 }

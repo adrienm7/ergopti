@@ -22,10 +22,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("llm_bridge: chain delay must not be the INFINITE tooltip sentinel when no preview is shown (F-MED-4)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "modules/keymap/llm_bridge.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open llm_bridge.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/llm_bridge.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.set_preview_autocorrect_enabled")
+		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 		return src
 	end
 
@@ -37,8 +38,9 @@ helpers.describe("llm_bridge: chain delay must not be the INFINITE tooltip senti
 			src:find("chain_delay = (any_enabled", 1, true) ~= nil
 				or src:find("chain_delay = any_enabled", 1, true) ~= nil,
 			"the chain delay must be gated on any_enabled (short offset when no tooltip is shown)")
-		helpers.assert_true(src:find("engine.start_timer(chain_delay)", 1, true) ~= nil,
-			"start_timer must use the gated chain_delay")
+		helpers.assert_true(
+			src:find('arm_llm_timer("Hotstring-chain LLM timer", engine.start_timer, chain_delay)', 1, true) ~= nil,
+			"the strict timer owner must pass the gated chain_delay to engine.start_timer")
 	end)
 
 	helpers.it("no longer arms the chain unconditionally with the (possibly INFINITE) tooltip_timeout", function()

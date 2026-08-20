@@ -23,7 +23,7 @@
 ;   3. DisableCapsWord calls HookDispatcher.Unregister for the mouse-down events.
 ;   4. DisableCapsWord calls UpdateCapsLockLED to sync the physical LED.
 ;
-; SCOPE: source introspection of lib/lifecycle.ahk and modules/shortcuts/capsword.ahk.
+; SCOPE: source introspection of infra/lifecycle.ahk and modules/shortcuts/capsword.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,7 +38,7 @@
 ; ====================================================
 
 _CWRS_ReadLifecycleSrc() {
-	return _DriverDirConcat("lib")
+	return _DriverDirConcat("infra")
 }
 
 _CWRS_ReadCapswordSrc() {
@@ -54,10 +54,10 @@ _CWRS_ReadCapswordSrc() {
 
 _CWRS_SuspendEnterCallsDisableCapsWord() {
 	Src := _CWRS_ReadLifecycleSrc()
-	Assert(Src != "", "lib/ source must be readable")
+	Assert(Src != "", "infra/ source must be readable")
 
 	Body := _DriverFuncBody("Ergopti_OnSuspendEnter")
-	Assert(Body != "", "Ergopti_OnSuspendEnter must be defined in lib/lifecycle.ahk")
+	Assert(Body != "", "Ergopti_OnSuspendEnter must be defined in infra/lifecycle.ahk")
 
 	Assert(InStr(Body, "DisableCapsWord()") > 0,
 		"Ergopti_OnSuspendEnter must call DisableCapsWord() — CapsWord must be deactivated on every suspend to correct the LED and unregister the mouse listeners that bypass native Suspend (AHK-16)")

@@ -25,6 +25,7 @@
 //   metrics_apps_bridge       — _shared/ui/metrics_apps
 //   metrics_typing_bridge     — _shared/ui/metrics_typing
 //   model_browser_bridge      — _shared/ui/model_browser
+//   numeric_prompt_bridge     — _shared/ui/numeric_prompt
 //   prompt_bridge             — _shared/ui/prompt_editor
 //   token_bridge              — _shared/ui/token_prompt
 //   healthcheck                — _shared/ui/healthcheck (future)

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for finding appstate-orphaned-parallel-state.
 ;
-; lib/app_state.ahk once declared an "AppState" Map plus typed accessors
+; infra/app_state.ahk once declared an "AppState" Map plus typed accessors
 ; (AppState_GetNumberOfRepetitions, AppState_TouchLastSentKey, AppState_Reset,
 ; AppState_PruneLastSentKeyTime, etc.) as a consolidation target for the
 ; driver's mutable cross-module state. The cut-over never happened: every
@@ -53,15 +53,15 @@ _AOPS_ReadSource(RelPath) {
 
 ; The dead Map must not exist: it is the parallel copy of the live globals.
 _AOPS_NoParallelMap() {
-	Src := _AOPS_ReadSource("lib/app_state.ahk")
+	Src := _AOPS_ReadSource("infra/app_state.ahk")
 	Assert(InStr(Src, "AppState := Map(") == 0,
-		"lib/app_state.ahk must not declare an AppState Map - it is a parallel unused copy of the live globals and a single-source-of-truth trap (appstate-orphaned-parallel-state)")
+		"infra/app_state.ahk must not declare an AppState Map - it is a parallel unused copy of the live globals and a single-source-of-truth trap (appstate-orphaned-parallel-state)")
 }
 Test("app_state: no parallel AppState Map declaration (appstate-orphaned-parallel-state)", _AOPS_NoParallelMap)
 
 ; The typed accessors fronting the dead Map must not exist either.
 _AOPS_NoDeadAccessors() {
-	Src := _AOPS_ReadSource("lib/app_state.ahk")
+	Src := _AOPS_ReadSource("infra/app_state.ahk")
 	Assert(InStr(Src, "AppState_GetNumberOfRepetitions(") == 0,
 		"AppState_GetNumberOfRepetitions must be removed - the live counter lives in NumberOfRepetitions via nav_layer_helpers.ahk (appstate-orphaned-parallel-state)")
 	Assert(InStr(Src, "AppState_TouchLastSentKey(") == 0,
@@ -74,7 +74,7 @@ Test("app_state: dead AppState_* accessors are removed (appstate-orphaned-parall
 ; The pruning thresholds must have a single declaration in the live entry
 ; script, not a duplicate copy in app_state.ahk.
 _AOPS_ThresholdsSingleSource() {
-	StateSrc := _AOPS_ReadSource("lib/app_state.ahk")
+	StateSrc := _AOPS_ReadSource("infra/app_state.ahk")
 	Assert(InStr(StateSrc, "global LAST_SENT_KEY_TIME_PRUNE_AT :=") == 0,
 		"LAST_SENT_KEY_TIME_PRUNE_AT must be declared once in ErgoptiPlus.ahk, not duplicated in app_state.ahk (appstate-orphaned-parallel-state)")
 	Assert(InStr(StateSrc, "global LAST_SENT_KEY_TIME_MAX_AGE_MS :=") == 0,

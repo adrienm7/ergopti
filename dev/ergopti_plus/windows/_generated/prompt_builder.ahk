@@ -162,10 +162,21 @@ class PromptBuilder {
 	; Truncates the context to a char limit proportional to max_words.
 	; Prevents oversized prefill tokens from driving up TTFT on short predictions.
 	;
-	; Param buffer   - The full context buffer.
-	; Param maxWords - Max predicted words (0 = unlimited, returns buffer unchanged).
-	; Returns string - The possibly truncated context.
-	_CapContext(buffer, maxWords) {
+	; Param buffer     - The full context buffer.
+	; Param maxWords   - Max predicted words (0 = unlimited).
+	; Param ctxChars   - User-configured hard char cap (0 = no override). When
+	;                    positive this is AUTHORITATIVE and wins over maxWords,
+	;                    mirroring the shared Lua cap_context(). Omitting it is why
+	;                    llm_context_length had no effect on the automatic path.
+	; Returns string   - The possibly truncated context.
+	_CapContext(buffer, maxWords, ctxChars := 0) {
+		if (ctxChars && ctxChars > 0) {
+			local bufLenOverride := StrLen(buffer)
+			if (bufLenOverride <= ctxChars) {
+				return buffer
+			}
+			return SubStr(buffer, bufLenOverride - ctxChars + 1)
+		}
 		if (!maxWords || maxWords <= 0) {
 			return buffer
 		}
@@ -206,7 +217,8 @@ class PromptBuilder {
 		local language       := config.Has("language")        ? config["language"]        : "fr"
 
 		local tail    := this._ExtractTail(buffer)
-		local context := this._CapContext(buffer, maxWords)
+		local ctxChars       := config.Has("context_window_chars") ? config["context_window_chars"] : 0
+		local context := this._CapContext(buffer, maxWords, ctxChars)
 
 		return Map(
 			"context",          context,

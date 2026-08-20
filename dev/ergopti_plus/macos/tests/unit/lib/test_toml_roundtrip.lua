@@ -10,10 +10,10 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
-local writer = helpers.load_with_stubs("lib.toml.writer")
-local reader = helpers.load_with_stubs("lib.toml.reader")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
+local writer = helpers.load_with_stubs("infra.toml.writer")
+local reader = helpers.load_with_stubs("infra.toml.reader")
 
 
 --- Writes the given data to a temp file, parses it back, and returns the parsed

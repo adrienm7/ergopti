@@ -121,8 +121,11 @@ helpers.describe("event_loop adapter", function()
 
     helpers.it("stop() when not running is safe (idempotent)", function()
       -- Ensure any previous test's loop is done.
-      local ok = pcall(function() el.stop() end)
-      helpers.assert_true(ok, "stop() when not running does not crash")
+      -- Called directly. A stop that never started must leave the loop runnable:
+      -- the shutdown path stops defensively, and a wedged loop takes the daemon
+      -- with it on the next start.
+      el.stop()
+      helpers.assert_eq(el.isRunning(), false, "and must report itself stopped")
 
       -- Double stop is also safe.
       ok = pcall(function() el.stop() end)
@@ -247,8 +250,11 @@ helpers.describe("event_loop adapter", function()
 
     helpers.it("rejects a non-function handler (fail-fast) without crashing", function()
       local elx = helpers.load_module("adapters.event_loop")
-      local ok = pcall(function() elx.add_idle_handler(42) end)
-      helpers.assert_true(ok, "add_idle_handler(non-function) is a safe no-op")
+      -- A no-op means the handler is not REGISTERED. One that stored 42 and called
+      -- it on the next tick would crash the loop a frame later, far from here.
+      elx.add_idle_handler(42)
+      helpers.assert_eq(elx.isRunning(), false,
+        "a refused handler must not have started anything")
     end)
   end)
 

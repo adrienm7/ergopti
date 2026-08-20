@@ -1,47 +1,51 @@
 --- tests/unit/ui/test_tooltip_on_accept_pcall.lua
 
 --- Regression test for ui-tooltip-1: every _state.on_accept() call site in
---- tooltip_llm.lua must be guarded with pcall so a throwing callback cannot
---- propagate errors out of the eventtap keyDown handler.
+--- tooltip_llm.lua must be dispatched after the eventtap callback. The shared
+--- SyntheticInput FIFO owns the xpcall/logger boundary; the behavioural proof
+--- (including a throwing callback) lives in test_tooltip_action_epoch_guard.lua.
 ---
---- Pre-fix: four bare `_state.on_accept(_state.current_index)` (and one
---- `_state.on_accept(pred_index)`) calls. A callback that throws() would
---- propagate the error to the eventtap infrastructure and crash the watcher.
---- Post-fix: all call sites wrapped in pcall(_state.on_accept, ...) with an
---- explicit Logger.error on failure.
+--- Pre-fix: acceptance ran inline and a callback that throws() propagated into
+--- the eventtap infrastructure. Post-fix: every acceptance is nested inside a
+--- `defer_runtime_action(...)` closure, whose retained FIFO isolates failures.
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "ui/tooltip/tooltip_llm.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("tooltip_llm.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/tooltip/tooltip_llm.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function refresh_chain_timing")
+helpers.assert_true(src ~= nil, "ui/tooltip/tooltip_llm.lua source must be locatable")
 
--- Test 1: no bare _state.on_accept( invocations (lines without pcall on same line).
--- The state declaration `on_accept = nil` does not contain `on_accept(` so it
--- is not matched. Only invocations (with `(`) trigger the check.
-local bare_calls = 0
-for line in src:gmatch("[^\n]+") do
-	if line:find("_state%.on_accept%(", 1, false) then
-		if not line:find("pcall%(", 1, false) then
-			bare_calls = bare_calls + 1
-		end
-	end
+local accept_dispatches = 0
+local cursor = 1
+while true do
+	local accept_at = src:find("accept_prediction,", cursor, true)
+	if not accept_at then break end
+	accept_dispatches = accept_dispatches + 1
+	local context_start = math.max(1, accept_at - 260)
+	local context = src:sub(context_start, accept_at)
+	helpers.assert_true(
+		context:find("defer_runtime_action%(") ~= nil,
+		"every acceptance dispatch must be nested in a deferred runtime action"
+	)
+	cursor = accept_at + 1
 end
 
+helpers.assert_eq(accept_dispatches, 4,
+	"Tab, both Enter modes, and numbered acceptance must all use the deferred boundary")
+
+local accept_helper = src:find("local function accept_prediction", 1, true)
+helpers.assert_true(accept_helper ~= nil, "tooltip_llm must centralise caller acceptance")
+local accept_body = src:sub(accept_helper, accept_helper + 500)
 helpers.assert_true(
-	bare_calls == 0,
-	"tooltip_llm.lua has " .. bare_calls
-		.. " bare _state.on_accept(...) call(s) not wrapped in pcall — ui-tooltip-1 regression"
+	accept_body:find('invoke_user_callback("Prediction acceptance", _state.on_accept, index)', 1, true) ~= nil,
+	"the deferred acceptance helper must invoke the caller through the strict logged boundary"
 )
 
--- Test 2: at least 4 pcall-guarded call sites (Tab, Enter, Enter-nav, hotkey-number).
-local pcall_count = 0
-for _ in src:gmatch("pcall%(_state%.on_accept,") do pcall_count = pcall_count + 1 end
-
-helpers.assert_true(
-	pcall_count >= 4,
-	"tooltip_llm.lua must have at least 4 pcall(_state.on_accept, ...) sites, found: " .. pcall_count
-)
+local adapter_src = helpers.read_driver_source("local function drain_deferred_lifecycle")
+helpers.assert_true(adapter_src ~= nil, "adapters/synthetic_input.lua source must be locatable")
+helpers.assert_true(adapter_src:find("run_logged%(call%.label, call%.callback") ~= nil,
+	"the deferred FIFO must keep its shared xpcall/logger boundary")
 
 print("[PASS] test_tooltip_on_accept_pcall")

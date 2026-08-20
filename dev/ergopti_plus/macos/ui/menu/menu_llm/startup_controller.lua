@@ -21,7 +21,7 @@ local M = {}
 
 local hs      = hs
 local llm_mod = require("modules.llm")
-local Logger  = require("lib.logger")
+local Logger  = require("infra.logger")
 
 local LOG = "startup_ctrl"
 
@@ -29,11 +29,11 @@ local LOG = "startup_ctrl"
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Public API =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Returns a check_startup closure bound to the given context.
 --- Call the returned function once after all hotkeys and profile shortcuts
@@ -198,7 +198,8 @@ function M.new(ctx)
 			if keymap and type(keymap.set_llm_enabled) == "function" then
 				pcall(keymap.set_llm_enabled, false)
 			end
-			save_prefs(); update_menu()
+			if save_prefs() ~= true then return false end
+			update_menu()
 		end
 
 		if not state.llm_model or state.llm_model == "" then

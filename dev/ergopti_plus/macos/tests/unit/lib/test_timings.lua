@@ -18,14 +18,16 @@
 local helpers = require("tests.helpers")
 
 -- lib.timings logs through lib.logger; load the stub first.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
-local Timings = require("lib.timings")
+local Timings = require("infra.timings")
 
 -- The exact (section, key) -> value pairs each wired module is now sourced from.
 -- Mirror these against constants.toml; a change there must be deliberate.
 local WIRED_MS = {
+	-- modules/keymap/expander.lua: safely above one 60 Hz render turn.
+	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
 	-- keylogger/init.lua
 	{ "keylogger", "micro_idle_timeout_ms",  30000 },
 	{ "keylogger", "session_timeout_ms",    300000 },
@@ -34,7 +36,6 @@ local WIRED_MS = {
 	{ "keylogger", "idle_check_interval_ms",  10000 },
 	{ "keylogger", "maintenance_interval_ms",  5000 },
 	{ "keylogger", "system_load_poll_ms",    300000 },
-	{ "keylogger", "synth_match_delay_ms",        3 },
 	{ "keylogger", "auto_flush_idle_ms",     120000 },
 	-- llm/prediction_engine.lua
 	{ "llm", "prediction_debounce_min_ms",       50 },
@@ -61,7 +62,8 @@ local WIRED_MS = {
 
 helpers.describe("timings: ms / sec accessors", function()
 	helpers.it("ms returns the raw millisecond value", function()
-		helpers.assert_eq(Timings.ms("keylogger", "synth_match_delay_ms"), 3, "synth_match_delay_ms")
+		helpers.assert_eq(Timings.ms("keylogger", "idle_check_interval_ms"), 10000,
+			"idle_check_interval_ms")
 		helpers.assert_eq(Timings.ms("gestures", "tap_max_ms"), 700, "tap_max_ms")
 	end)
 
@@ -71,13 +73,21 @@ helpers.describe("timings: ms / sec accessors", function()
 	end)
 
 	helpers.it("fails fast on an unknown section", function()
-		local ok = pcall(function() return Timings.ms("nope", "whatever_ms") end)
+		-- The raising IS the subject here, so the pcall stays. What it was missing is
+		-- the error TEXT: a fail-fast that raised for an unrelated reason — a nil
+		-- registry, a bad path — reads identically, and the caller debugging a typo
+		-- would be told nothing about which section it got wrong.
+		local ok, err = pcall(function() return Timings.ms("nope", "whatever_ms") end)
 		helpers.assert_eq(ok, false, "ms raises on an unknown section")
+		helpers.assert_true(tostring(err):find("nope", 1, true) ~= nil,
+			"and the error must name the section it refused: " .. tostring(err))
 	end)
 
 	helpers.it("fails fast on an unknown key", function()
-		local ok = pcall(function() return Timings.ms("keylogger", "does_not_exist_ms") end)
+		local ok, err = pcall(function() return Timings.ms("keylogger", "does_not_exist_ms") end)
 		helpers.assert_eq(ok, false, "ms raises on an unknown key")
+		helpers.assert_true(tostring(err):find("does_not_exist_ms", 1, true) ~= nil,
+			"and the error must name the key it refused: " .. tostring(err))
 	end)
 end)
 
@@ -124,22 +134,22 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- unreachable, and returns whatever the module raised.
 	--- @return boolean,string The pcall status and the raised message.
 	local function reload_timings_without_shared_tree()
-		local saved_paths   = package.loaded["lib.paths"]
-		local saved_timings = package.loaded["lib.timings"]
+		local saved_paths   = package.loaded["infra.paths"]
+		local saved_timings = package.loaded["infra.timings"]
 
-		package.loaded["lib.paths"] = {
+		package.loaded["infra.paths"] = {
 			shared          = function() return nil end,
 			shared_root     = function() return nil end,
 			shared_llm_path = function() return nil end,
 			find_from_configdir = function() return nil end,
 		}
-		package.loaded["lib.timings"] = nil
+		package.loaded["infra.timings"] = nil
 
-		local ok, err = pcall(require, "lib.timings")
+		local ok, err = pcall(require, "infra.timings")
 
 		-- Restore the real modules so later suites are unaffected by this probe.
-		package.loaded["lib.timings"] = saved_timings
-		package.loaded["lib.paths"]   = saved_paths
+		package.loaded["infra.timings"] = saved_timings
+		package.loaded["infra.paths"]   = saved_paths
 
 		return ok, tostring(err)
 	end
@@ -168,26 +178,26 @@ helpers.describe("timings: registry load fail-fast", function()
 	--- lib.paths real. The three cases above all trip the FIRST guard (the shared
 	--- tree is unreachable), so the second guard — a tree that resolves but whose
 	--- constants.toml is missing, unreadable or empty — was never exercised. That
-	--- is the guard the comment in lib/timings.lua says was added because
+	--- is the guard the comment in infra/timings.lua says was added because
 	--- TomlReader.parse returns a well-formed result with empty `sections` on BOTH
 	--- of its failure exits, so the earlier type-only test could never fire.
 	--- @return boolean ok, string err
 	local function reload_timings_with_empty_registry()
-		local saved_reader  = package.loaded["lib.toml.reader"]
-		local saved_timings = package.loaded["lib.timings"]
+		local saved_reader  = package.loaded["infra.toml.reader"]
+		local saved_timings = package.loaded["infra.timings"]
 
 		-- Exactly what the real reader returns when the file is absent or malformed:
 		-- a well-formed table whose sections map is empty. Returning nil instead
 		-- would test a shape the production reader never produces.
-		package.loaded["lib.toml.reader"] = {
+		package.loaded["infra.toml.reader"] = {
 			parse = function(_path) return { sections = {} } end,
 		}
-		package.loaded["lib.timings"] = nil
+		package.loaded["infra.timings"] = nil
 
-		local ok, err = pcall(require, "lib.timings")
+		local ok, err = pcall(require, "infra.timings")
 
-		package.loaded["lib.timings"]     = saved_timings
-		package.loaded["lib.toml.reader"] = saved_reader
+		package.loaded["infra.timings"]     = saved_timings
+		package.loaded["infra.toml.reader"] = saved_reader
 
 		return ok, tostring(err)
 	end

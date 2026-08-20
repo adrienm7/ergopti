@@ -4,7 +4,7 @@
 ; MODULE: I18nSetLocale Fallback Reset Guard
 ; DESCRIPTION:
 ; Static source guard for the I18nSetLocale fallback-warm reset fix in
-; lib/i18n.ahk.
+; infra/i18n.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; After a locale change via I18nSetLocale, the fallback lookup table
@@ -46,11 +46,11 @@ _TISLRF_StripLineComments(Src) {
 ; =============================================================================
 
 _TISLRF_FallbackWarmReset() {
-	Src := _TISLRF_StripLineComments(_TISLRF_ReadSource("lib/i18n.ahk"))
-	Assert(Src != "", "lib/i18n.ahk must be readable")
+	Src := _TISLRF_StripLineComments(_TISLRF_ReadSource("infra/i18n.ahk"))
+	Assert(Src != "", "infra/i18n.ahk must be readable")
 
 	Body := _DriverFuncBody("I18nSetLocale")
-	Assert(Body != "", "I18nSetLocale must be defined in lib/i18n.ahk")
+	Assert(Body != "", "I18nSetLocale must be defined in infra/i18n.ahk")
 
 	; _I18nFallbacksWarmed must be reset inside the function
 	Assert(InStr(Body, "_I18nFallbacksWarmed  := false") > 0

@@ -15,7 +15,7 @@ _TWD_ReadSource(RelPath) {
 }
 
 _TWD_Check() {
-	Src := _TWD_ReadSource("lib/wrap_symbols_config.ahk")
+	Src := _TWD_ReadSource("infra/wrap_symbols_config.ahk")
 	Assert(Src != "", "Source file wrap_symbols_config.ahk must exist")
 	Assert(InStr(Src, "[[disabled]]") > 0, "wrap_symbols_config.ahk must use [[disabled]] array format")
 	Assert(InStr(Src, "char = ") > 0, "wrap_symbols_config.ahk must save char individually")

@@ -93,15 +93,23 @@ helpers.describe("MLX download: the shared slots have exactly one owner", functi
 		local obj, deps = install_mixin()
 		helpers.assert_nil(deps.active_tasks["download"])
 
-		-- The real spawn needs a live hs.task and a filesystem; what matters here
-		-- is that the ENTRY guard does not reject when nothing owns the slots.
-		-- Reaching past the guard is observable as the call not returning at the
-		-- guard: it either claims the slot or fails deeper, but it does not no-op.
-		pcall(obj.pull_model, "FirstModel", "org/first", nil)
-
-		helpers.assert_true(true,
-			"without this case the two assertions above would pass against a pull_model that "
-			.. "never does anything at all")
+		-- This case exists because the two above would pass against a pull_model
+		-- that never does anything at all. Its own assertion used to be
+		-- assert_true(true) with that sentence — which is the same failure one
+		-- level down: it certified nothing either.
+		--
+		-- The real spawn needs a live hs.task and a filesystem, so the observable
+		-- is not success. It is that the call went PAST the entry guard: past it,
+		-- the launcher either claims the slot or raises on the missing task API.
+		-- Returning cleanly having claimed nothing is exactly the no-op this file
+		-- exists to catch.
+		local ok, err = pcall(obj.pull_model, "FirstModel", "org/first", nil)
+		local claimed = deps.active_tasks["download"] ~= nil
+		helpers.assert_true(claimed or not ok,
+			"an idle manager must get past the entry guard: pull_model either claims the "
+				.. "download slot or fails deeper on the stubbed task API. It returned cleanly "
+				.. "having claimed nothing, which is the no-op the two cases above cannot see "
+				.. "(err: " .. tostring(err) .. ")")
 	end)
 
 end)

@@ -24,10 +24,12 @@ _PSGE_UsesBomAndLf() {
 
     Assert(!RegExMatch(EnsureBody, "FileAppend\([^\r\n]*" . Q . "UTF-8-RAW" . Q . "\)"),
         "EnsurePersonalShortcutsFile must never write generated AHK with UTF-8-RAW (BOM-less)")
-    Assert(InStr(EnsureBody, 'FileAppend(Template, Path, "UTF-8")') > 0,
-        "Personal shortcuts template must be created with UTF-8 BOM encoding")
-    Assert(InStr(EnsureBody, 'FileAppend(DesiredStub, StubPath, "UTF-8")') > 0,
-        "Forwarding stub must be created with UTF-8 BOM encoding")
+	Assert(InStr(EnsureBody,
+		'_PersonalShortcutsPublishFile(Path, Chr(0xFEFF) . Template') > 0,
+		"Personal shortcuts template must be atomically published with an explicit UTF-8 BOM")
+	Assert(InStr(EnsureBody,
+		'Chr(0xFEFF) . DesiredStub, WriterFn, ReplaceFn, ReadFn') > 0,
+		"Forwarding stub must be atomically published with an explicit UTF-8 BOM")
     Assert(!InStr(EnsureBody, "`r`n"),
         "Forwarding stub text must use LF, never CRLF")
 

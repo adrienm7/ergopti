@@ -22,18 +22,22 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_gestures: master toggle is pause-gated (F-MED-5)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/menu/menu_gestures.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open menu_gestures.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_gestures.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local DISABLED_GESTURE_ACTION")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_gestures.lua source must be locatable")
 		return src
 	end
 
-	helpers.it("gates the master-toggle fn on `not paused`", function()
+	-- `action`, the provider field, since the tray root became row data on
+	-- 2026-08-07. The rule is unchanged: the CALLBACK must not exist while paused.
+	helpers.it("gates the master-toggle callback on `not paused`", function()
 		local src = read_src()
-		local gate_pos = src:find("fn      = (not paused) and function()", 1, true)
+		local gate_pos = src:find("action  = (not paused) and function()", 1, true)
 		local body_pos = src:find("local new_state = not state.gestures", 1, true)
-		helpers.assert_true(gate_pos ~= nil, "the gestures master toggle fn must be gated on `not paused`")
+		helpers.assert_true(gate_pos ~= nil,
+			"the gestures master toggle callback must be gated on `not paused`")
 		helpers.assert_true(body_pos ~= nil, "the master-toggle body (state.gestures flip) must still exist")
 		helpers.assert_true(gate_pos < body_pos, "the `not paused` gate must wrap the toggle body")
 	end)

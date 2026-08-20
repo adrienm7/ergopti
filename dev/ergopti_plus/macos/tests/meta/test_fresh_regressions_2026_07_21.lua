@@ -109,14 +109,14 @@ helpers.describe("models_manager_mlx: every hs.task is GC-pinned", function()
 		-- that would be measuring the whole-tree pin coverage — a separate
 		-- finding, with its own scope and its own allowlist.
 		for _, name in ipairs({ "check_task", "delete_task" }) do
-			local at = src:find(name .. " = hs.task.new", 1, true)
+			local at = src:find(name .. " = TaskLifecycle.native", 1, true)
 			helpers.assert_true(at ~= nil,
 				name .. " must be forward-declared and then assigned, so its own callback can "
 					.. "release the pin")
 
 			-- The pin must land between creation and start.
 			local window = src:sub(at, at + 4000)
-			local start_at = window:find(name .. ":start()", 1, true)
+			local start_at = window:find("TaskLifecycle.start(" .. name, 1, true)
 			helpers.assert_true(start_at ~= nil, name .. " must be started")
 			local before_start = window:sub(1, start_at)
 
@@ -134,7 +134,7 @@ helpers.describe("models_manager_mlx: every hs.task is GC-pinned", function()
 
 	helpers.it("the probe releases its pin so the root does not grow forever", function()
 		local src = helpers.read_driver_source("check_requirements")
-		local at = src:find("check_task = hs.task.new", 1, true)
+		local at = src:find("check_task = TaskLifecycle.native", 1, true)
 		helpers.assert_true(at ~= nil,
 			"check_task must be forward-declared and then assigned, so its own callback can "
 				.. "reference it to release the pin")

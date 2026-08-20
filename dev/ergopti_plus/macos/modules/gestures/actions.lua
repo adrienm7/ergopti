@@ -10,15 +10,19 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local Paths         = require("lib.paths")
-local Timings       = require("lib.timings")
-local i18n          = require("lib.i18n")
-local text_utils    = require("lib.text_utils")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local Paths         = require("infra.paths")
+local Timings       = require("infra.timings")
+local i18n          = require("infra.i18n")
+local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
+local KeyState      = require("adapters.key_state")
 local ShellRunner   = require("adapters.shell_runner")
+local SyntheticInput = require("adapters.synthetic_input")
+local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
+local Sticky        = require("modules.gestures.sticky_modifiers")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -27,6 +31,7 @@ local LOG           = "gestures.actions"
 -- tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout). Declared
 -- here, above every closure that captures it, so it is never bound as a nil global.
 local KEYSTROKE_NO_DELAY_US = 0
+local CLIPBOARD_COPY_SETTLE_SEC = Timings.sec("debounce", "clipboard_copy_settle_ms")
 
 local _state = nil
 
@@ -57,6 +62,8 @@ end
 -- =========================================
 
 --- Sends a system-level media or hardware key event.
+--- NX system-defined events are deliberately outside SyntheticInput: they are
+--- not keyDown/keyUp events and never enter keymap/keylogger keyboard callbacks.
 --- @param key string The hardware key name (e.g. "SOUND_UP").
 local function sysKey(key)
 	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, true):post() end)
@@ -70,7 +77,14 @@ end
 --- @param mods table List of modifiers (e.g. {"cmd", "shift"}).
 --- @param key string The key code or character.
 local function postKeyStroke(mods, key)
-	pcall(function() hs.eventtap.keyStroke(mods, key, KEYSTROKE_NO_DELAY_US) end)
+	local ok, result = xpcall(function()
+		return SyntheticInput.emit_key_stroke(mods, key, KEYSTROKE_NO_DELAY_US)
+	end, debug.traceback)
+	if not ok or result ~= true then
+		error(string.format("synthetic key stroke was refused for %s: %s",
+			tostring(key), tostring(result)), 0)
+	end
+	return true
 end
 
 local function url_encode_query(value)
@@ -267,10 +281,11 @@ local function spaceNav(goNext)
 	end
 
 	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
-	ShellRunner.applescript(string.format(
-		"tell application \"System Events\" to key code %d using {control down}",
-		key_code
-	))
+	-- AppleScript-generated key events carry no Ergopti provenance. Both taps then
+	-- treated this Space navigation as physical typing, so action-epoch consumers
+	-- could retain text/LLM state from the previous desktop. Numeric Quartz keycodes
+	-- are supported by the same exact-tag adapter used by named gesture keys.
+	postKeyStroke({ "ctrl" }, key_code)
 end
 
 -- Axis actions (prev / next)
@@ -350,23 +365,168 @@ sg("app_previous",      switch_to_previous_application)
 sg("app_window_previous",  switch_to_previous_window_precise)
 
 -- Keys
-sg("enter",                           function() postKeyStroke({}, "return") end)
-sg("tab",                                function() postKeyStroke({}, "tab") end)
-sg("escape",                           function() postKeyStroke({}, "escape") end)
-sg("backspace",               function() postKeyStroke({}, "delete") end)
-sg("delete",                    function() postKeyStroke({}, "forwarddelete") end)
+-- ── Actions the shared catalogue describes for macOS ────────────────────────
+--
+-- 27 registrations used to be written out here, each spelling a key and its
+-- modifiers into its own closure. They now come from
+-- _shared/modules/actions/actions.toml via _generated/gesture_emit_actions.lua.
+--
+-- These are macOS values, not shared ones: of the 24 actions both drivers
+-- implement as a bare keystroke, 15 differ. macOS moves by word with Option
+-- where Windows uses Control, closes a window with cmd+w against alt+F4, and
+-- spells several keys differently outright (return/Enter, delete/BackSpace).
+--
+-- The closure below captures `row` safely: a Lua generic `for` binds fresh
+-- locals each iteration, so every handler keeps its own values. The AHK twin
+-- cannot do this — an AHK loop closure captures the loop VARIABLE, so its
+-- emitters have to be built by helper functions taking the values as arguments.
+local ok_emit, emit_rows = pcall(require, "_generated.gesture_emit_actions")
+if not ok_emit or type(emit_rows) ~= "table" then
+	error("gestures/actions: _generated/gesture_emit_actions.lua is missing or invalid — "
+		.. "27 gesture actions would silently do nothing. Run `npm run gen`.")
+end
+for _, row in ipairs(emit_rows) do
+	sg(row.id, function() postKeyStroke(row.mods, row.key) end)
+end
+
+
+
+
+-- ── The Karabiner catalogue's non-keystroke actions ─────────────────────────
+--
+-- macos/platform/remap/data/actions.json describes 73 actions the REMAP layer can
+-- put on a key. 36 of them are tappable and had no row in the shared catalogue,
+-- so the gesture picker could not offer a single one — the same feature was
+-- reachable from a remapped key and unreachable from a swipe, with nothing
+-- saying why. The 18 that are plain keystrokes come through the generated table
+-- above; these 18 cannot, and each family fails differently:
+--
+--   layer_on / layer_off / capsword  — state that lives INSIDE Karabiner. The
+--       only IPC is `karabiner_cli --set-variable`, so they are writes, not
+--       keystrokes (platform/remap/ke_variables.lua).
+--   the 15 sticky_*                  — `sticky_modifier` is a manipulator
+--       construct with no IPC at all, so macOS implements the behaviour itself
+--       (modules/gestures/sticky_modifiers.lua).
+--
+-- The 19 hold-only actions of the catalogue are deliberately absent: a gesture
+-- has no duration, so "hold Shift" cannot be expressed as one.
+
+-- `layer_active` is the one navigation-layer authority read by manipulators.
+-- Mirror variables add asynchronous writers without adding observable state.
+local KE_LAYER_VARIABLE = "layer_active"
+local KE_LAYER_ON       = 1
+local KE_LAYER_OFF      = 0
+local KE_CAPSWORD_VARIABLE   = "capsword"
+local KE_CAPSWORD_ACTIVE     = 1
+
+-- The remap menu stores the sticky auto-cancel delay in milliseconds.
+local MILLISECONDS_PER_SECOND = 1000
+
+--- The Karabiner variable bridge, required lazily so a driver booted without the
+--- remap layer still loads this registry.
+--- @return table|nil
+local function ke_variables()
+	local ok, mod = pcall(require, "platform.remap.ke_variables")
+	if not ok or type(mod) ~= "table" then
+		Logger.error(LOG, "platform.remap.ke_variables could not be required — the gesture is a no-op.")
+		return nil
+	end
+	return mod
+end
+
+--- Reads the user's sticky auto-cancel delay, in seconds.
+--- Returns nil rather than a default: the value is the one set in the remap
+--- menu, and substituting one here would silently override that choice on the
+--- exact boot where the configuration failed to load.
+--- @return number|nil
+local function sticky_timeout_sec()
+	local ok, Remap = pcall(require, "platform.remap")
+	if not ok or type(Remap) ~= "table" or type(Remap.get_sticky_timeout) ~= "function" then
+		Logger.error(LOG, "platform.remap exposes no get_sticky_timeout — sticky gesture is a no-op.")
+		return nil
+	end
+	local ms = Remap.get_sticky_timeout()
+	if type(ms) ~= "number" or ms <= 0 then
+		Logger.error(LOG, "Sticky timeout is '%s' — refusing to arm on a guessed delay.", tostring(ms))
+		return nil
+	end
+	return ms / MILLISECONDS_PER_SECOND
+end
+
+--- Arms a set of one-shot modifiers for the next keystroke.
+--- @param modifiers table Array of hs modifier names.
+local function arm_sticky(modifiers)
+	local secs = sticky_timeout_sec()
+	if not secs then return end
+	Sticky.toggle(modifiers, secs)
+end
+
+sg("layer_on", function()
+	local ke = ke_variables()
+	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_ON) end
+end)
+sg("layer_off", function()
+	local ke = ke_variables()
+	if ke then ke.set(KE_LAYER_VARIABLE, KE_LAYER_OFF) end
+end)
+sg("capsword", function()
+	local ke = ke_variables()
+	if not ke then return end
+	local function finish_activation(ok, reason, revision)
+		if ok ~= true or reason ~= "written" then
+			Logger.debug(LOG, "CapsWord gesture activation did not settle: %s.", tostring(reason))
+			return
+		end
+		local controller_ok, controller = pcall(require, "platform.remap.lease_controller")
+		if not controller_ok or type(controller) ~= "table"
+			or type(controller.status) ~= "function" then
+			Logger.error(LOG, "CapsWord gesture cannot verify the live remap lease: %s.",
+				tostring(controller))
+			return
+		end
+		local status_ok, phase = pcall(controller.status)
+		if not status_ok or phase ~= "active" then
+			Logger.debug(LOG, "CapsWord gesture LED activation discarded in lease phase %s.",
+				tostring(phase))
+			return
+		end
+		local revision_ok, current_revision = pcall(ke.capsword_revision)
+		if not revision_ok or current_revision ~= revision then
+			Logger.debug(LOG, "CapsWord gesture LED activation was superseded.")
+			return
+		end
+		Logger.pcall(LOG, KeyState.set_capslock, true)
+	end
+	if not ke.set(KE_CAPSWORD_VARIABLE, KE_CAPSWORD_ACTIVE, finish_activation) then return end
+	-- A keystroke cannot toggle CapsLock: macOS delivers it as a flagsChanged
+	-- event rather than a keyDown/keyUp pair, so keyStroke fails silently. The
+	-- adapter owns the only path that works after the lease-gated write settles,
+	-- and it is the same one
+	-- platform/remap/watchers.lua uses to switch CapsWord back off.
+end)
+
+sg("sticky_shift",             function() arm_sticky({ "shift" }) end)
+sg("sticky_ctrl",              function() arm_sticky({ "ctrl" }) end)
+sg("sticky_cmd",               function() arm_sticky({ "cmd" }) end)
+sg("sticky_option",            function() arm_sticky({ "alt" }) end)
+sg("sticky_cmd_shift",         function() arm_sticky({ "cmd", "shift" }) end)
+sg("sticky_cmd_option",        function() arm_sticky({ "cmd", "alt" }) end)
+sg("sticky_cmd_ctrl",          function() arm_sticky({ "cmd", "ctrl" }) end)
+sg("sticky_option_shift",      function() arm_sticky({ "alt", "shift" }) end)
+sg("sticky_option_ctrl",       function() arm_sticky({ "alt", "ctrl" }) end)
+sg("sticky_ctrl_shift",        function() arm_sticky({ "ctrl", "shift" }) end)
+sg("sticky_cmd_option_shift",  function() arm_sticky({ "cmd", "alt", "shift" }) end)
+sg("sticky_cmd_option_ctrl",   function() arm_sticky({ "cmd", "alt", "ctrl" }) end)
+sg("sticky_cmd_shift_ctrl",    function() arm_sticky({ "cmd", "shift", "ctrl" }) end)
+sg("sticky_option_shift_ctrl", function() arm_sticky({ "alt", "shift", "ctrl" }) end)
+sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "ctrl" }) end)
+
 
 -- Tabs
-sg("tab_new",                  function() postKeyStroke({"cmd"}, "t") end)
-sg("tab_close",                function() postKeyStroke({"cmd"}, "w") end)
-sg("tab_prev",              function() postKeyStroke({"ctrl", "shift"}, "tab") end)
-sg("tab_next",                function() postKeyStroke({"ctrl"}, "tab") end)
 
 -- Windows & Spaces
 sg("win_prev",            function() winNav(false) end)
 sg("win_next",              function() winNav(true) end)
-sg("close_window",         function() postKeyStroke({"cmd"}, "w") end)
-sg("fullscreen",                 function() postKeyStroke({"cmd", "ctrl"}, "f") end)
 sg("snap_left",              function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
@@ -382,29 +542,17 @@ end)
 sg("space_prev",             function() spaceNav(false) end)
 sg("space_next",               function() spaceNav(true) end)
 sg("mission_control",        function()
-	-- Deferred so the AppleScript call never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function()
-		ShellRunner.applescript("tell application \"System Events\" to key code 160")
-	end)
+	postKeyStroke({}, 160)
 end)
 sg("app_expose",                  function()
-	-- Deferred so the AppleScript call never blocks the gesture frameCallback
-	hs.timer.doAfter(0, function()
-		ShellRunner.applescript("tell application \"System Events\" to key code 125 using {control down}")
-	end)
+	postKeyStroke({ "ctrl" }, 125)
 end)
 
 -- Cursor movement
-sg("word_prev",                function() postKeyStroke({"alt"}, "left") end)
-sg("word_next",                  function() postKeyStroke({"alt"}, "right") end)
 sg("line_up",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end)
 sg("line_down",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end)
 sg("line_start",              function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end)
 sg("line_end",                  function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
-sg("para_prev",         function() postKeyStroke({"alt"}, "up") end)
-sg("para_next",           function() postKeyStroke({"alt"}, "down") end)
-sg("doc_start",            function() postKeyStroke({"cmd"}, "up") end)
-sg("doc_end",                function() postKeyStroke({"cmd"}, "down") end)
 
 -- Media
 sg("vol_up",                        function() sysKey("SOUND_UP") end)
@@ -417,20 +565,10 @@ sg("track_next",              function() sysKey("NEXT") end)
 sg("track_prev",            function() sysKey("PREVIOUS") end)
 
 -- Single arrows
-sg("arrow_up",                   function() postKeyStroke({}, "up") end)
-sg("arrow_down",                  function() postKeyStroke({}, "down") end)
-sg("arrow_left",               function() postKeyStroke({}, "left") end)
-sg("arrow_right",              function() postKeyStroke({}, "right") end)
 
 -- Shift + Arrows
-sg("sel_up",                  function() postKeyStroke({"shift"}, "up") end)
-sg("sel_down",                 function() postKeyStroke({"shift"}, "down") end)
-sg("sel_left",              function() postKeyStroke({"shift"}, "left") end)
-sg("sel_right",             function() postKeyStroke({"shift"}, "right") end)
 
 -- Shift + Alt + Arrows (Word selection)
-sg("sel_word_prev",     function() postKeyStroke({"shift", "alt"}, "left") end)
-sg("sel_word_next",       function() postKeyStroke({"shift", "alt"}, "right") end)
 
 -- Absolute path: the interactive layer must not inherit its binaries from PATH,
 -- which differs between a login shell and the Hammerspoon process.
@@ -477,6 +615,34 @@ sg("screenshot_fullscreen_clipboard",   function()
 end)
 sg("screenshot_fullscreen_save",        function()
 	capture({ screenshot_path("full") })
+end)
+
+-- Four actions macOS has always implemented — in the keyboard-SHORTCUT layer —
+-- and never exposed as gestures. The shared catalogue declared them
+-- platform = "ahk", so the picker (which filters on that) hid them, and the
+-- cross-driver feature matrix read as "macOS does not have this" for four
+-- features it ships. Registering them here is what makes the declaration true;
+-- the TOML flip to "all" without this would have put four dead rows in the
+-- picker, since execute_single() refuses an action it has no handler for.
+--
+-- Required lazily, inside the closure: these modules pull in the whole shortcuts
+-- tree, and requiring it at gesture-registry load time would drag it into boot
+-- for users who never bind one of these.
+sg("select_line", function()
+	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	if ok and type(Text.select_line) == "function" then Text.select_line() end
+end)
+sg("teleport_mouse", function()
+	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	if ok and type(Mouse.teleport_mouse) == "function" then Mouse.teleport_mouse() end
+end)
+sg("spotlight_mouse", function()
+	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	if ok and type(Mouse.spotlight_mouse) == "function" then Mouse.spotlight_mouse() end
+end)
+sg("toggle_capslock", function()
+	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
+	if ok and type(Sys.toggle_capslock) == "function" then Sys.toggle_capslock() end
 end)
 
 sg("lock_screen",                    function() pcall(hs.caffeinate.lockScreen) end)
@@ -528,7 +694,7 @@ sg("open_today_log",                   function()
 end)
 sg("open_error_log",                   function()
 	local ok_p, path = pcall(function()
-		local ok_l, Logger = pcall(require, "lib.logger")
+		local ok_l, Logger = pcall(require, "infra.logger")
 		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
 			return Logger.ERRORS_LOG_FILE
 		end
@@ -548,28 +714,180 @@ end)
 -- it: a local declared below one binds a nil global instead, and the failure
 -- surfaces only inside a timer callback where the file logger never sees it.
 local _search_capture_in_flight = false
-local _search_saved_clipboard   = nil
+local _search_saved_clipboard = nil
+local _search_capture_generation = 0
+local _search_recovery_only = false
+local _search_capture_timer = nil
+local _search_restore_retry_timer = nil
+local _search_deferred_retry_armed = false
+
+local function stop_search_timer(handle)
+	if handle and type(handle.stop) == "function" then pcall(handle.stop, handle) end
+end
+
+local function release_search_clipboard(generation)
+	if generation ~= _search_capture_generation then return end
+	stop_search_timer(_search_capture_timer)
+	stop_search_timer(_search_restore_retry_timer)
+	_search_capture_timer = nil
+	_search_restore_retry_timer = nil
+	_search_capture_in_flight = false
+	_search_saved_clipboard = nil
+	_search_recovery_only = false
+	_search_deferred_retry_armed = false
+	_search_capture_generation = _search_capture_generation + 1
+end
+
+local function restore_search_clipboard(generation)
+	if generation ~= _search_capture_generation or not _search_capture_in_flight then
+		return false, "stale search generation"
+	end
+	local saved = _search_saved_clipboard
+	local ok_restore, restore_result
+	if type(saved) == "table" and next(saved) ~= nil then
+		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+		if not ok_restore or restore_result ~= true then
+			return false, ok_restore and "writeAllData returned " .. tostring(restore_result)
+				or restore_result
+		end
+	else
+		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+		if not ok_restore then return false, restore_result end
+	end
+	release_search_clipboard(generation)
+	return true
+end
+
+local function arm_search_timer(slot, delay, label, generation, callback)
+	local handle = nil
+	local installing = true
+	local callback_ran = false
+	local ok_timer, timer_or_error = pcall(hs.timer.doAfter, delay, function()
+		callback_ran = true
+		if installing then return end
+		if slot == "capture" and _search_capture_timer == handle then
+			_search_capture_timer = nil
+		elseif slot == "restore" and _search_restore_retry_timer == handle then
+			_search_restore_retry_timer = nil
+		end
+		if generation ~= _search_capture_generation then return end
+		local ok_callback, callback_error = xpcall(callback, debug.traceback)
+		if not ok_callback then
+			Logger.error(LOG, "search_web %s callback failed: %s.", label, tostring(callback_error))
+			_search_recovery_only = true
+		end
+	end)
+	installing = false
+	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
+		stop_search_timer(timer_or_error)
+		return false, ok_timer and (callback_ran and "timer fired during installation"
+			or "hs.timer.doAfter returned no handle") or timer_or_error
+	end
+	handle = timer_or_error
+	if slot == "capture" then
+		_search_capture_timer = handle
+	else
+		_search_restore_retry_timer = handle
+	end
+	return true
+end
+
+local queue_search_restore_retry
+queue_search_restore_retry = function(generation)
+	if _search_restore_retry_timer or _search_deferred_retry_armed then return true end
+	local function attempt_restore()
+			local restored, restore_error = restore_search_clipboard(generation)
+			if restored or generation ~= _search_capture_generation then return end
+			_search_recovery_only = true
+			Logger.error(LOG, "search_web clipboard restore retry refused: %s.",
+				tostring(restore_error))
+			queue_search_restore_retry(generation)
+	end
+	local timer_armed, timer_error = arm_search_timer(
+		"restore", CLIPBOARD_COPY_SETTLE_SEC, "restore retry", generation, attempt_restore)
+	if timer_armed then
+		return true
+	end
+	if type(SyntheticInput.defer_after_callback) == "function" then
+		local installing = true
+		local callback_ran = false
+		local ok_defer, deferred = pcall(SyntheticInput.defer_after_callback,
+			"search_web clipboard restore recovery", function()
+				callback_ran = true
+				if installing then return end
+				_search_deferred_retry_armed = false
+				local ok_callback, callback_error = xpcall(attempt_restore, debug.traceback)
+				if not ok_callback then
+					Logger.error(LOG, "search_web deferred restore callback failed: %s.",
+						tostring(callback_error))
+				end
+			end)
+		installing = false
+		if ok_defer and deferred == true and not callback_ran then
+			_search_deferred_retry_armed = true
+			return true
+		end
+	end
+	Logger.error(LOG, "search_web clipboard restore retry could not be armed: %s.",
+		tostring(timer_error))
+	return false
+end
 
 sg("search_web", function(binding)
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
+	if _search_capture_in_flight then
+		if _search_recovery_only then
+			local recovered, recovery_error = restore_search_clipboard(_search_capture_generation)
+			if not recovered then
+				queue_search_restore_retry(_search_capture_generation)
+				Logger.error(LOG, "search_web refused while clipboard recovery is pending: %s.",
+					tostring(recovery_error))
+				return
+			end
+		else
+			Logger.debug(LOG, "search_web ignored while another capture owns the clipboard.")
+			return
+		end
+	end
 	-- Capture the user's clipboard ONLY when no capture is already in flight.
 	-- Two search_web gestures in quick succession made the second snapshot what
 	-- the FIRST had just copied — the selection, not the user's clipboard — and
 	-- then dutifully "restored" it, so the real clipboard was gone for good. The
 	-- same stale-snapshot class the text-transform path was hardened against.
-	if not _search_capture_in_flight then
-		_search_saved_clipboard = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or nil
+	local ok_snapshot, snapshot_or_error = pcall(hs.pasteboard.readAllData)
+	if not ok_snapshot or type(snapshot_or_error) ~= "table" then
+		Logger.error(LOG, "search_web clipboard snapshot failed: %s.", tostring(snapshot_or_error))
+		return
 	end
+	_search_saved_clipboard = snapshot_or_error
 	_search_capture_in_flight = true
-	local old_clipboard = _search_saved_clipboard
-	postKeyStroke({"cmd"}, "c")
-	hs.timer.doAfter(0.08, function()
-		local selected = hs.pasteboard and hs.pasteboard.getContents and hs.pasteboard.getContents() or ""
-		_search_capture_in_flight = false
-		_search_saved_clipboard   = nil
-		if old_clipboard ~= nil and hs.pasteboard and hs.pasteboard.setContents then
-			pcall(hs.pasteboard.setContents, old_clipboard)
+	_search_capture_generation = _search_capture_generation + 1
+	local my_generation = _search_capture_generation
+	local ok_clear, clear_error = pcall(hs.pasteboard.clearContents)
+	if not ok_clear then
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			queue_search_restore_retry(my_generation)
+		end
+		Logger.error(LOG, "search_web clipboard clear failed: %s.", tostring(clear_error))
+		return
+	end
+	local timer_armed, timer_error = arm_search_timer(
+		"capture", CLIPBOARD_COPY_SETTLE_SEC, "capture", my_generation, function()
+		if my_generation ~= _search_capture_generation then return end
+		local ok_selected, selected = pcall(hs.pasteboard.getContents)
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			Logger.error(LOG, "search_web clipboard restore refused; ownership retained: %s.",
+				tostring(restore_error))
+			queue_search_restore_retry(my_generation)
+		end
+		if not ok_selected or type(selected) ~= "string" or selected == "" then
+			Logger.error(LOG, "search_web selection copy produced no text: %s.", tostring(selected))
+			return
 		end
 		-- url_encode_query returns percent-escapes, and this value lands on the
 		-- REPLACEMENT side of gsub where "%2" reads as capture reference #2. Any
@@ -578,6 +896,29 @@ sg("search_web", function(binding)
 		-- Console and never to the file logger, and the search silently never opened.
 		open_url((template:gsub("%%s", text_utils.escape_gsub_replacement(url_encode_query(selected)))))
 	end)
+	if not timer_armed then
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			queue_search_restore_retry(my_generation)
+		end
+		Logger.error(LOG, "search_web capture timer was refused: %s (restore=%s).",
+			tostring(timer_error), tostring(restore_error))
+		return
+	end
+	local ok_copy, copied = pcall(
+		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
+	if not ok_copy or copied ~= true then
+		stop_search_timer(_search_capture_timer)
+		_search_capture_timer = nil
+		local restored, restore_error = restore_search_clipboard(my_generation)
+		if not restored then
+			_search_recovery_only = true
+			queue_search_restore_retry(my_generation)
+		end
+		Logger.error(LOG, "search_web copy shortcut was refused: %s (restore=%s).",
+			tostring(copied), tostring(restore_error))
+	end
 end)
 
 -- Script management
@@ -592,48 +933,31 @@ sg("script_save_reload",      function()
 end)
 sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
-	-- Tear down Karabiner-Elements BEFORE exiting. os.exit() terminates the Lua
-	-- VM abruptly and BYPASSES the Hammerspoon shutdown callback (where the normal
-	-- KE kill lives), so on this quit path KE would otherwise keep running with the
-	-- Ergopti rules — leaving the physical keyboard remapped after HS is gone.
-	-- karabiner.kill() runs the robust launchctl-bootout teardown SYNCHRONOUSLY
-	-- (so launchd cannot respawn the remapper) and respects a user-managed KE
-	-- install (leaves it untouched when HS did not own the bridge). Because it
-	-- blocks until KE is down, the keyboard is guaranteed free before os.exit.
-	-- Lazy-required so this low-level action module carries no load-time
-	-- dependency on the Karabiner module.
-	pcall(function()
-		local ok_kb, karabiner = pcall(require, "modules.karabiner")
-		if ok_kb and type(karabiner) == "table" and type(karabiner.kill) == "function" then
-			karabiner.kill()
+	-- Leave the gesture/eventtap stack before starting the lifecycle transaction.
+	-- The coordinator keeps every F17 consumer and classifier live until the exact
+	-- token reports STOPPED, then the root teardown owns keylogger/MLX/helpers and
+	-- finally calls os.exit. Shared stock/personal Karabiner remains untouched.
+	local exit_requested = false
+	local function request_controlled_exit()
+		if exit_requested then return end
+		exit_requested = true
+		local request_ok, accepted_or_err = xpcall(function()
+			return TerminationCoordinator.request_exit("script_quit", 0)
+		end, debug.traceback)
+		if not request_ok or accepted_or_err ~= true then
+			Logger.error(LOG, "script_quit controlled exit was rejected: %s",
+				tostring(accepted_or_err))
 		end
+	end
+	local scheduled, schedule_result = pcall(function()
+		return hs.timer.doAfter(0, request_controlled_exit)
 	end)
-	-- Flush in-memory keystrokes before exiting — os.exit(0) bypasses
-	-- hs.shutdownCallback where the normal keylogger flush lives.
-	pcall(function()
-		local ok_kl, kl = pcall(require, "modules.keylogger")
-		if ok_kl and type(kl) == "table" and type(kl.stop) == "function" then
-			kl.stop()
-		end
-	end)
-	-- Terminate the MLX server + orphan helper processes — os.exit(0) likewise
-	-- bypasses the HS shutdown callback where these kills live, so without
-	-- duplicating them the mlx_lm.server keeps holding GPU memory + the MLX port and the
-	-- ergopti_plus_expander / ergopti_plus_http_server helpers survive as orphans.
-	-- Shared with that callback via menu_llm so the two quit paths cannot drift.
-	pcall(function()
-		local ok_llm, menu_llm = pcall(require, "ui.menu.menu_llm")
-		if ok_llm and type(menu_llm) == "table" then
-			if type(menu_llm.stop_mlx_server) == "function" then menu_llm.stop_mlx_server() end
-			if type(menu_llm.terminate_helper_processes) == "function" then menu_llm.terminate_helper_processes() end
-			-- stop_mlx_server only kills the in-process wrapper; the detached
-			-- mlx_lm.server (own process group) must be reaped via pgrep/lsof or it
-			-- keeps holding GPU memory + the MLX port after quit. Same sweep the
-			-- shutdown callback runs (script_quit is always a genuine quit) (F-M7).
-			if type(menu_llm.terminate_orphan_mlx_server) == "function" then menu_llm.terminate_orphan_mlx_server() end
-		end
-	end)
-	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
+	if not scheduled or schedule_result == nil or schedule_result == false then
+		Logger.error(LOG, "script_quit could not schedule controlled exit: %s", tostring(schedule_result))
+		-- request_exit starts the asynchronous root transaction; invoking it here
+		-- never bypasses the exact lease fence or performs a direct process exit.
+		request_controlled_exit()
+	end
 end)
 
 -- Debug
@@ -652,152 +976,24 @@ sg("open_console",                        function() pcall(hs.openConsole) end)
 -- Hard-coded action labels — same in every locale (symbols + universal terms).
 -- app_expose and mission_control are intentionally absent: they vary by language
 -- and are served from the locale JSON.
-local LABELS = {
-	-- SG actions
-	none                             = "∅ Disabled",
-	left_click_toggle                = "🖱 L Left click (hold)",
-	right_click_toggle               = "🖱 R Right click (hold)",
-	lookup                           = "🔍 Word definition",
-	app_switcher                     = "⇥ Alt+Tab — Previous app",
-	app_previous                     = "⇥ ← Alt+Tab — Prev. app",
-	app_window_previous              = "⇥ ◱ ← Alt+Tab — Prev. window",
-	copy                             = "⎘ Copy",
-	paste                            = "⎘ Paste",
-	cut                              = "⎘ Cut",
-	undo                             = "↩ Undo",
-	redo                             = "↪ Redo",
-	select_all                       = "⬚ Select all",
-	find                             = "🔍 Find",
-	enter                            = "↵ Enter",
-	tab                              = "⇥ Tab",
-	escape                           = "⎋ Escape",
-	backspace                        = "⌫ Backspace",
-	delete                           = "⌦ Delete",
-	tab_new                          = "⧉ + New tab",
-	tab_close                        = "⧉ × Close tab",
-	tab_prev                         = "⧉ ← Previous tab",
-	tab_next                         = "⧉ → Next tab",
-	nav_back                         = "← Back (navigation)",
-	nav_forward                      = "→ Forward (navigation)",
-	win_prev                         = "◱ ← Previous window",
-	win_next                         = "◱ → Next window",
-	win_app_prev                     = "◱ ← Prev. window (same app)",
-	win_app_next                     = "◱ → Next window (same app)",
-	close_window                     = "◱ × Close window",
-	fullscreen                       = "📺 Fullscreen",
-	snap_left                        = "◧ ← Snap left",
-	snap_right                       = "◨ → Snap right",
-	maximize                         = "🔲 Maximize",
-	space_prev                       = "▢ ← Previous Space",
-	space_next                       = "▢ → Next Space",
-	desktop_prev                     = "▢ ← Previous desktop",
-	desktop_next                     = "▢ → Next desktop",
-	desktop_new                      = "▢ + New desktop",
-	desktop_close                    = "▢ × Close desktop",
-	task_view                        = "▢ Task View",
-	minimize_all                     = "◱ Minimize all",
-	word_prev                        = "W ← Previous word",
-	word_next                        = "W → Next word",
-	line_up                          = "↕ ↑ Previous line",
-	line_down                        = "↕ ↓ Next line",
-	line_start                       = "⇤ Line start",
-	line_end                         = "⇥ Line end",
-	para_prev                        = "¶ ↑ Previous paragraph",
-	para_next                        = "¶ ↓ Next paragraph",
-	doc_start                        = "⤒ Document start",
-	doc_end                          = "⤓ Document end",
-	arrow_up                         = "↑ Arrow Up",
-	arrow_down                       = "↓ Arrow Down",
-	arrow_left                       = "← Arrow Left",
-	arrow_right                      = "→ Arrow Right",
-	sel_up                           = "✎ ↑ Select Up",
-	sel_down                         = "✎ ↓ Select Down",
-	sel_left                         = "✎ ← Select Left",
-	sel_right                        = "✎ → Select Right",
-	sel_word_prev                    = "✎ W ← Sel. prev. word",
-	sel_word_next                    = "✎ W → Sel. next word",
-	vol_up                           = "🔊 + Volume +",
-	vol_down                         = "🔊 - Volume -",
-	mute                             = "🔇 Mute/Unmute",
-	brightness_up                    = "☀ + Brightness +",
-	brightness_down                  = "☀ - Brightness -",
-	track_play                       = "⏯ Play/Pause",
-	track_next                       = "⏭ Next track",
-	track_prev                       = "⏮ Previous track",
-	screenshot_window_clipboard      = "📸 ⊞ Copy window",
-	screenshot_window_save           = "📸 ⊞ Save window",
-	screenshot_region_clipboard      = "📸 ⬚ Copy region",
-	screenshot_region_save           = "📸 ⬚ Save region",
-	screenshot_fullscreen_clipboard  = "📸 🖥 Copy screen",
-	screenshot_fullscreen_save       = "📸 🖥 Save screen",
-	screen_record                    = "⏺ Screen recording",
-	lock_screen                      = "🔒 Lock screen",
-	notification_center              = "🔔 Notifications",
-	open_metrics_typing              = "📊 Typing stats",
-	open_metrics_apps                = "📊 App stats",
-	open_hotstrings_editor           = "⌨ Hotstrings editor",
-	open_paths_editor                = "📂 Paths editor",
-	open_script_source               = "🛠 Source code",
-	open_personal_shortcuts          = "👤 Personal shortcuts",
-	open_personal_hotstrings         = "👤 Personal hotstrings",
-	open_personal_info               = "👤 Personal info",
-	open_config                      = "⚙ Configuration",
-	open_logs_folder                 = "📁 Logs folder",
-	open_today_log                   = "📄 Today's log",
-	open_error_log                   = "📄 Error log",
-	script_pause_toggle              = "⏸/▶ Suspend / Resume",
-	script_reload                    = "↻ Reload",
-	script_save_reload               = "↻ Save and reload",
-	script_quit                      = "✕ Quit",
-	select_line                      = "☰ Select line",
-	screen_capture                   = "📸 Selective capture (Win+Shift+S)",
-	screen_capture_instant           = "📸 Instant capture (window)",
-	open_url                         = "🌐 Open a link (configurable)",
-	pick_color                       = "🎨 HEX colour under cursor",
-	take_note                        = "📝 Take a note",
-	activity_simulation              = "🖱 Simulate activity (anti-sleep)",
-	surround_parens                  = "() Surround with parentheses",
-	search_web                       = "🔍 Web search (configurable)",
-	teleport_mouse                   = "🖱 Teleport mouse",
-	uppercase_selection              = "AA Uppercase / lowercase",
-	titlecase_selection              = "Aa Title case",
-	spotlight_mouse                  = "🔦 Mouse spotlight",
-	toggle_capslock                  = "⇪ Toggle CapsLock",
-	microsoft_bold                   = "𝐁 Ctrl+B Microsoft (→ Ctrl+G)",
-	paste_plain                      = "⎘ Paste without formatting",
-	open_console                     = "▤ Console",
-	open_window_spy                  = "Window Spy",
-	open_list_vars                   = "Variable state",
-	open_key_history                 = "Key history",
-	-- AX actions
-	["ax.tabs"]                      = "⧉ Tabs",
-	["ax.char"]                      = "A Characters",
-	["ax.char_sel"]                  = "✎ A Sel. Characters",
-	["ax.line_arrow"]                = "↕ Lines (Arrows)",
-	["ax.line_sel"]                  = "✎ ↕ Sel. Lines",
-	["ax.words"]                     = "W Words",
-	["ax.words_sel"]                 = "✎ W Sel. Words",
-	["ax.windows"]                   = "◱ Windows",
-	["ax.spaces"]                    = "▢ Spaces",
-	["ax.desktops"]                  = "▢ Desktops",
-	["ax.volume"]                    = "🔊 Volume",
-	["ax.brightness"]                = "☀ Brightness",
-	["ax.tracks"]                    = "♫ Tracks",
-	["ax.lines"]                     = "↕ Lines (Alt)",
-	["ax.line_bounds"]               = "↔ Line (start/end)",
-	["ax.paragraphs"]                = "¶ Paragraphs",
-	["ax.document"]                  = "📄 Document (start/end)",
-}
+-- The 132-entry hardcoded English LABELS table stood here, as a last-resort
+-- fallback "so new locales never show raw keys". Every one of its entries had
+-- a locale key, so it was unreachable — a second copy of the translations, free
+-- to drift from the real ones with no symptom, because unreachable code shows
+-- none. Deleted; the premise it rested on is now a gate:
+-- tools/test/test-action-labels-have-locale-keys.cjs fails if any registered
+-- action lacks a label key in any of the 21 locales.
 
 -- Path to the shared actions.toml, resolved through the single shared-tree
 -- resolver (Paths.shared) so the shared root lives in exactly one place.
-local _shared_toml = Paths.shared("modules/gestures/actions.toml")
-local _modifier_chords_json = Paths.shared("modules/gestures/modifier_chords.json")
+local _shared_toml = Paths.shared("modules/actions/actions.toml")
+local _modifier_chords_json = Paths.shared("modules/actions/modifier_chords.json")
 
 --- Parses the shared actions.toml using a lightweight line-by-line reader.
---- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}}, ax_actions = {name={platform=...}} }
+--- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}},
+--- ax_actions = {name={platform=...}}, karabiner_aliases = {karabiner_id = shared_id} }
 local function load_shared_actions(path)
-	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {} }
+	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {}, karabiner_aliases = {} }
 	local ok, f = pcall(io.open, path, "r")
 	if not ok or not f then
 		Logger.warn("gestures.actions", "Shared actions TOML not found: %s — using fallback.", tostring(path))
@@ -867,6 +1063,11 @@ local function load_shared_actions(path)
 				if kind and name then
 					result[kind][name][key] = str_val
 				end
+			elseif current_section == "karabiner_aliases" then
+				-- A flat id = "target" table, not an action block: without this
+				-- branch the reader silently drops it and the remap picker shows
+				-- the raw Karabiner identifier for every aliased action.
+				result.karabiner_aliases[key] = str_val
 			end
 		end
 
@@ -877,6 +1078,15 @@ local function load_shared_actions(path)
 end
 
 local _shared = load_shared_actions(_shared_toml)
+
+--- Karabiner ids that name an action the catalogue already carries under another
+--- name, as { karabiner_id = shared_id }. The remap picker is indexed on
+--- Karabiner ids, so it resolves a label through this rather than carrying a
+--- second copy of the same translated string in twenty-one locale files.
+--- @return table
+function M.karabiner_aliases()
+	return (_shared and _shared.karabiner_aliases) or {}
+end
 
 local function parameter_key(binding, action)
 	return tostring(binding or "") .. "__" .. tostring(action or "")
@@ -992,6 +1202,26 @@ end
 
 register_modifier_chords(load_modifier_chords(_modifier_chords_json))
 
+-- The driver key this build of the catalogue answers to.
+local THIS_PLATFORM = "hs"
+
+--- True when a catalogue `platform` field claims this driver.
+---
+--- The field is "all", one driver key, or a comma-separated list of them. The
+--- list form exists because the field could not previously say "two drivers out
+--- of three": the two window cyclers ship on macOS and Windows and not on
+--- Linux, and both single-value answers were false — "all" put dead rows in the
+--- Linux picker, "hs" or "ahk" hid half the feature.
+--- @param platform string|nil The declared field, or nil for the "all" default.
+--- @return boolean
+local function claims_this_platform(platform)
+	if type(platform) ~= "string" or platform == "" or platform == "all" then return true end
+	for key in platform:gmatch("[^,%s]+") do
+		if key == THIS_PLATFORM then return true end
+	end
+	return false
+end
+
 --- Builds a picker-order list from the shared TOML, keeping only entries
 --- matching the given platform ("hs") plus sentinels ("--", "#…").
 --- The modifier-chord placeholder is expanded from modifier_chords.json.
@@ -1028,8 +1258,7 @@ local function build_sg_names(shared)
 			-- Driver-specific placeholders are ignored deliberately.
 		else
 			local meta = shared.sg_actions[item]
-			local platform = meta and meta.platform or "all"
-			if platform == "all" or platform == "hs" then
+			if claims_this_platform(meta and meta.platform) then
 				out[#out + 1] = item
 			end
 		end
@@ -1043,8 +1272,7 @@ local function build_ax_names(shared)
 	local out = {"none"}
 	for _, item in ipairs(shared.ax_order) do
 		local meta = shared.ax_actions[item]
-		local platform = meta and meta.platform or "all"
-		if platform == "all" or platform == "hs" then
+		if claims_this_platform(meta and meta.platform) then
 			out[#out + 1] = item
 		end
 	end
@@ -1118,8 +1346,7 @@ end
 
 function M.get_label(name)
 	if not name or name == "none" then
-		local s = i18n.get("sg_actions.none")
-		return (s ~= "sg_actions.none") and s or LABELS.none
+		return i18n.get("sg_actions.none")
 	end
 	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
 	-- Prefer locale JSON so the label is translated for the active language
@@ -1129,9 +1356,10 @@ function M.get_label(name)
 	local key_ax = "ax_actions." .. name
 	local s_ax = i18n.get(key_ax)
 	if s_ax ~= key_ax then return s_ax end
-	-- Fall back to hardcoded English label so new locales never show raw keys
-	if LABELS[name] then return LABELS[name] end
-	if LABELS["ax." .. name] then return LABELS["ax." .. name] end
+	-- No hardcoded fallback: an action without a label key is a gate failure
+	-- (test-action-labels-have-locale-keys.cjs), not something to paper over with
+	-- a second copy of the English strings. Returning the id makes the omission
+	-- visible if one ever slips past.
 	return name
 end
 

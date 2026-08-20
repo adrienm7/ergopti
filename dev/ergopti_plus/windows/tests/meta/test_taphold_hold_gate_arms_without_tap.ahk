@@ -14,7 +14,7 @@
 ; on the hold alone. Eight keys (CapsLock, Space, Escape, Enter, Backspace,
 ; Delete, Win) always did; Left Alt, Right Ctrl and Tab carried the conjunct.
 ;
-; SCOPE: source introspection. modules/tap_holds/*.ahk register #HotIf hotkeys
+; SCOPE: source introspection. platform/remap/*.ahk register #HotIf hotkeys
 ; at load and cannot be #Included by the headless runner, so the gate text is
 ; scanned instead of being exercised.
 ; ==============================================================================
@@ -55,7 +55,7 @@ _THG_PickerKeyIds() {
 ; =====================================================================
 
 _THG_HoldGatesDoNotRequireATapAction() {
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Ids := _THG_PickerKeyIds()
 	Assert(Ids.Length > 0,
 		"prerequisite: the tap-hold picker key ids must be derivable from _TH_KeyDefs — with none found this guard would check nothing")
@@ -97,7 +97,7 @@ Test("tap-holds: a hold gate never requires a configured tap action (taphold-hol
 ; TapHoldIsConfigured). The picker still offers all 32 hold options for them,
 ; which is a real open defect — closing it means either honouring the choice
 ; (dropping the `~` and suppressing the physical modifier on three very hot
-; keys) or filtering the picker in lib/tap_hold + ui/menu. Until that is
+; keys) or filtering the picker in platform/remap + ui/menu. Until that is
 ; decided, this ratchet at least stops the class from GROWING: a new key added
 ; to the picker without a hold gate fails here.
 _THG_KnownKeysWithoutHoldGate() {
@@ -105,7 +105,7 @@ _THG_KnownKeysWithoutHoldGate() {
 }
 
 _THG_NoNewKeyWithoutAHoldGate() {
-	Src := _DriverDirConcat("modules/tap_holds")
+	Src := _DriverDirConcat("platform/remap")
 	Known := _THG_KnownKeysWithoutHoldGate()
 	Ids := _THG_PickerKeyIds()
 	Assert(Ids.Length > 0, "prerequisite: the picker key ids must be derivable from _TH_KeyDefs")
@@ -119,7 +119,7 @@ _THG_NoNewKeyWithoutAHoldGate() {
 			continue
 		}
 		Assert(Known.Has(Id),
-			"key '" . Id . "' is offered a hold picker in the tray menu but no #HotIf in modules/tap_holds reads TapHoldHoldModifier or TapHoldHoldLayer for it — the selection persists, gets a checkmark and does nothing (taphold-hold-option-unreachable)")
+			"key '" . Id . "' is offered a hold picker in the tray menu but no #HotIf in platform/remap reads TapHoldHoldModifier or TapHoldHoldLayer for it — the selection persists, gets a checkmark and does nothing (taphold-hold-option-unreachable)")
 	}
 	Assert(Covered > 0,
 		"prerequisite: at least one key must actually read its hold configuration")
@@ -142,7 +142,7 @@ Test("tap-holds: no new picker key ships without a hold gate (taphold-hold-optio
 ; Escape, Enter, Backspace, Delete and Space already resolve their tap this way.
 _THG_TabDispatchFallsBackToNative() {
 	Body := _DriverFuncBody("_TabDispatch")
-	Assert(Body != "", "_TabDispatch must exist in modules/tap_holds/tab.ahk")
+	Assert(Body != "", "_TabDispatch must exist in platform/remap/tab.ahk")
 	Assert(InStr(Body, "TextPressKey") > 0,
 		"_TabDispatch must emit the native Tab when no tap action is configured — its hold gates arm on the hold alone, so an unhandled empty action turns the tap into a silent no-op instead of a Tab (taphold-hold-option-unreachable)")
 	Assert(InStr(Body, "_TapHoldFireAction") > 0,

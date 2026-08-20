@@ -16,8 +16,21 @@ local hs = hs
 local Bindings          = require("modules.shortcuts.bindings")
 local ScriptControl     = require("modules.shortcuts.script_control")
 local KeyboardShortcuts = require("modules.shortcuts.keyboard_shortcuts")
+local HotkeyRegistrar   = require("adapters.hotkey_registrar")
+local StartupTransaction = require("infra.startup_transaction")
+local Logger             = require("infra.logger")
 
 local M = {}
+
+local LOG = "shortcuts"
+
+-- One live fence covers every adapter-owned native hotkey, including UI
+-- shortcuts that are intentionally kept registered while the bindings layer is
+-- stopped. The callback resolves ScriptControl at delivery time, so a pause or
+-- resume takes effect without a fragile rebind sweep.
+HotkeyRegistrar.set_delivery_guard(function()
+	return ScriptControl.is_paused() ~= true
+end)
 
 
 
@@ -73,6 +86,25 @@ M.set_keyboard_action      = KeyboardShortcuts.set_action
 M.get_keyboard_action      = KeyboardShortcuts.get_action
 M.get_keyboard_slot_label  = KeyboardShortcuts.get_slot_label
 M.get_keyboard_assignments = KeyboardShortcuts.get_assignments
+M.get_keyboard_slot_groups = function() return KeyboardShortcuts.SLOT_GROUPS end
+M.available_keyboard_slots = KeyboardShortcuts.available_slots
+M.assigned_keyboard_slots  = KeyboardShortcuts.assigned_slots
+
+--- Stops independent shortcut children without letting one refusal hide its sibling.
+--- @param steps table[] Ordered `{name, stop}` descriptors.
+--- @return boolean settled True only when every child returned exact true.
+local function stop_children(steps)
+	local settled = true
+	for _, step in ipairs(steps) do
+		local ok, result_or_err = xpcall(step.stop, debug.traceback)
+		if not ok or result_or_err ~= true then
+			settled = false
+			Logger.error(LOG, "Shortcut child '%s' stop did not settle: %s.",
+				step.name, tostring(result_or_err))
+		end
+	end
+	return settled
+end
 
 --- Starts the user-facing shortcut layer: the static Bindings AND the
 --- configurable keyboard shortcuts. Symmetric with stop() and resume_bindings()
@@ -80,30 +112,40 @@ M.get_keyboard_assignments = KeyboardShortcuts.get_assignments
 --- configurable Cmd/Ctrl/Option shortcuts stay dead until the first pause/resume).
 --- ScriptControl has its own dedicated start/stop (start_script_control) so its
 --- pause/quit/reload tap survives a bindings toggle.
+--- @return boolean committed True only when both child starts committed.
 function M.start()
-	Bindings.start()
-	KeyboardShortcuts.start()
+	return StartupTransaction.run({
+		{name = "bindings", start = Bindings.start, stop = Bindings.stop},
+		{name = "keyboard_shortcuts", start = KeyboardShortcuts.start, stop = KeyboardShortcuts.stop},
+	})
 end
 
+--- Stops every shortcut child, including the independent script-control tap.
+--- @return boolean settled True only when every child cleanup committed.
 function M.stop()
-	Bindings.stop()
-	ScriptControl.stop()
-	KeyboardShortcuts.stop()
+	return stop_children({
+		{name = "bindings", stop = Bindings.stop},
+		{name = "script_control", stop = ScriptControl.stop},
+		{name = "keyboard_shortcuts", stop = KeyboardShortcuts.stop},
+	})
 end
 
 --- Stops only the user-facing bindings and keyboard shortcuts, leaving the
 --- script-control eventtap alive so AltGr+Enter/Escape/Backspace can still
 --- un-pause the script. Called by pause_all() in script_control.lua instead
 --- of stop() which would also kill the script-control tap itself.
+--- @return boolean settled True only when both user-facing children stopped.
 function M.pause_bindings()
-	Bindings.stop()
-	KeyboardShortcuts.stop()
+	return stop_children({
+		{name = "bindings", stop = Bindings.stop},
+		{name = "keyboard_shortcuts", stop = KeyboardShortcuts.stop},
+	})
 end
 
 --- Restores user-facing bindings after a pause. Symmetric to pause_bindings().
+--- @return boolean committed True only when both child starts committed.
 function M.resume_bindings()
-	Bindings.start()
-	KeyboardShortcuts.start()
+	return M.start()
 end
 
 --- Re-arms the layout-dependent hotkeys after a keyboard-layout change, so they
@@ -120,9 +162,15 @@ end
 --- @return boolean True when the layer was running and was actually re-armed.
 function M.rebind_for_layout()
 	if not Bindings.is_started() then return false end
-	Bindings.rebind()
-	KeyboardShortcuts.stop()
-	KeyboardShortcuts.start()
+	if Bindings.rebind() ~= true then
+		error("bindings rebind did not commit")
+	end
+	if KeyboardShortcuts.stop() ~= true then
+		error("keyboard-shortcuts release did not commit")
+	end
+	if KeyboardShortcuts.start() ~= true then
+		error("keyboard-shortcuts rebind did not commit")
+	end
 	return true
 end
 

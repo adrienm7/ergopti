@@ -11,25 +11,26 @@
 local helpers = require("tests.helpers")
 
 -- After the F2 split, the navigationCallback / poll-timer logic lives in core.lua.
-local src_path = helpers.driver_root() .. "ui/healthcheck/core.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("healthcheck core.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/healthcheck/core.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function _stop_poll")
+helpers.assert_true(src ~= nil, "ui/healthcheck/core.lua source must be locatable")
 
 -- Locate the didFinishNavigation branch.
 local nav_pos = src:find('"didFinishNavigation"', 1, true)
 helpers.assert_true(nav_pos ~= nil, 'healthcheck.lua must handle "didFinishNavigation" (lib-health-2)')
 
--- The poll timer is armed with the FIRST hs.timer.new(...) at or after the
+-- The poll timer is armed with the FIRST TimerScheduler.every(...) at or after the
 -- branch marker. Anchor to that call rather than a fixed-size character window:
 -- the window heuristic is brittle (any code inserted between the branch marker
 -- and the timer — e.g. the copy-button JS injection — silently pushes the
 -- _stop_poll() call out of range), whereas anchoring to the actual timer-arming
 -- site checks the real ordering invariant regardless of how much code precedes it.
-local new_timer_pos = src:find("hs.timer.new(", nav_pos, true)
+local new_timer_pos = src:find("TimerScheduler.every(", nav_pos, true)
 helpers.assert_true(
 	new_timer_pos ~= nil,
-	"didFinishNavigation branch must create a new poll timer with hs.timer.new (lib-health-2)"
+	"didFinishNavigation branch must acquire a recurring timer through TimerScheduler (lib-health-2)"
 )
 
 -- _stop_poll() must appear between the branch marker and the timer arming, so a
@@ -41,7 +42,7 @@ helpers.assert_true(
 )
 helpers.assert_true(
 	stop_pos < new_timer_pos,
-	"_stop_poll() must be called before hs.timer.new() in didFinishNavigation (lib-health-2)"
+	"_stop_poll() must be called before TimerScheduler.every() in didFinishNavigation (lib-health-2)"
 )
 
 print("[PASS] test_healthcheck_poll_timer_nav")

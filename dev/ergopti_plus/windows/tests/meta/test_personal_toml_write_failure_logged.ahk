@@ -4,9 +4,10 @@
 ; MODULE: Personal TOML Write Failure Logging Guard
 ; DESCRIPTION:
 ; Guards that WritePersonalToml and WritePersonalInfoToml emit a LoggerError
-; when FileOpen fails (disk full, locked by AV, ACL-restricted path). Before
-; the fix, both functions returned False with no log at all, and three of the
-; four native editor call sites ignored the return — silently losing user edits.
+; when their write path fails (disk full, locked by AV, ACL-restricted path).
+; Personal-hotstring writes stage through FSWriteDurable before an atomic replace, so
+; this guard follows the production delegation instead of requiring the durable
+; target itself to be opened with truncation semantics.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -16,23 +17,29 @@ _MetaCheckPersonalTomlWriteFailureLogged() {
 	Body := _DriverFuncBody("WritePersonalToml")
 	Assert(Body != "", "WritePersonalToml(Data) must exist in personal_toml_io.ahk")
 
-	; The FileOpen failure branch must call LoggerError.
-	FileOpenPos := InStr(Body, "FileOpen(")
-	Assert(FileOpenPos > 0, "WritePersonalToml must call FileOpen")
-	; Search for LoggerError within 300 chars after the FileOpen.
-	After := SubStr(Body, FileOpenPos, 300)
-	Assert(InStr(After, "LoggerError") > 0,
-		"WritePersonalToml must call LoggerError when FileOpen fails")
+	AtomicBody := _DriverFuncBody("_PersonalTomlWriteAtomic")
+	Assert(AtomicBody != "", "the personal TOML atomic publisher must exist")
+	Assert(InStr(Body, "_PersonalTomlWriteAtomic(FilePath, Content") > 0,
+		"WritePersonalToml must delegate its terminal write to the guarded atomic publisher")
+	Assert(InStr(AtomicBody, "FSWriteDurable(StagePath, Content)") > 0,
+		"the atomic publisher must durably write only its same-directory stage")
+	Assert(InStr(AtomicBody, "FSAtomicMoveReplace(StagePath, FilePath)") > 0,
+		"the complete stage must replace the durable target atomically")
+	Assert(InStr(AtomicBody, "LoggerError") > 0,
+		"staging and replace failures must be logged instead of becoming silent false returns")
 
-	; WritePersonalInfoToml must also log.
+	; personal_info.toml must use the same stage+replace path. Requiring the old
+	; direct FileOpen("w") here pinned the truncation bug as a test invariant:
+	; a partial write could destroy the durable target before the catch logged it.
 	InfoBody := _DriverFuncBody("WritePersonalInfoToml")
 	Assert(InfoBody != "", "WritePersonalInfoToml(FilePath) must exist in personal_toml_io.ahk")
-	InfoFileOpenPos := InStr(InfoBody, "FileOpen(")
-	Assert(InfoFileOpenPos > 0, "WritePersonalInfoToml must call FileOpen")
-	AfterInfo := SubStr(InfoBody, InfoFileOpenPos, 300)
-	Assert(InStr(AfterInfo, "LoggerError") > 0,
-		"WritePersonalInfoToml must call LoggerError when FileOpen fails")
+	Assert(InStr(InfoBody, "_PersonalTomlWriteAtomic(FilePath, Content") > 0,
+		"WritePersonalInfoToml must stage complete bytes and atomically replace the durable target")
+	Assert(InStr(InfoBody, '_PersonalTomlAuthorizeOwnedWrite.Bind(') > 0,
+		"the personal-info replace must revalidate its exact logical owner after the yielded stage")
+	Assert(InStr(InfoBody, "FileOpen(") == 0,
+		"WritePersonalInfoToml must never open the durable target with truncation semantics")
 }
 
-Test("meta personal TOML: WritePersonalToml + WritePersonalInfoToml log on FileOpen failure",
+Test("personal-toml-write-failure: both writers log their terminal write failure",
 	_MetaCheckPersonalTomlWriteFailureLogged)

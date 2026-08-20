@@ -105,8 +105,18 @@ _MMDW_MenubarColorsLoadBearing() {
 	for Entry in _MMDW_LoadMetricsMenu() {
 		if !(Entry is Map) || !Entry.Has("id") || Entry["id"] != "menubar_colors"
 			continue
-		Assert(Entry["type"] == "dynamic",
-			"menubar_colors must be type=dynamic — type=feature is silently skipped by the macOS renderer (MG-2)")
+		; The failure this guards is a type the renderer SKIPS: a `feature` row is
+		; left to the caller, so declaring one made the item never render at all.
+		; It was `dynamic` until 2026-08-07 and is `check` now — the renderer
+		; builds the checkbox from the declaration rather than the driver building
+		; one it already knows how to draw. Both are rendered; `feature` and
+		; `toggle` are not, which is what this states instead of naming the single
+		; type that happened to satisfy it.
+		RenderedTypes := Map("dynamic", true, "check", true, "command", true, "list", true, "action", true)
+		Assert(RenderedTypes.Has(Entry["type"]),
+			"menubar_colors is type=" . Entry["type"] . ", which the renderer does not materialise — "
+			. "`feature` and `toggle` are left to the caller, so the row disappears with nothing "
+			. "reporting it (MG-2)")
 		Assert(!Entry.Has("depends_on"),
 			"menubar_colors must no longer carry the dead depends_on key — superseded by disabled_when")
 		Assert(Entry.Has("disabled_when"), "menubar_colors must declare disabled_when")
@@ -132,19 +142,30 @@ Test("menu-metrics-disabled-when: menubar_colors depends_on is now load-bearing 
 ; Every AHK dynamic handler must call the shared resolver with its own id
 ; instead of re-deriving the dependency graph inline — the drift MG-1 closes.
 _MMDW_HandlersCallResolver() {
+	; The handlers this driver still writes. The three privacy filters left this
+	; list on 2026-08-06: their manifest rows became `type = "check"`, so the
+	; SHARED renderer builds them and calls the same resolver while doing it.
+	;
+	; The invariant is unchanged — greying comes from the manifest through the
+	; shared resolver, never from a condition re-derived here — and section 4
+	; below asserts it for the migrated rows. Keeping them in this list would
+	; have made a row built by MORE shared code look like a regression.
+	; show_typing, show_apps and reset_wpm_position left this list on 2026-08-07: their manifest rows
+	; are `command`, so the RENDERER applies the greying from the declaration and
+	; there is no handler left to delegate. That is the case the paragraph above
+	; describes — a row built by more shared code, not less.
+	; The two shortcut pickers and the app-exclusion row became `list` providers on
+	; 2026-08-07 — the renderer draws the row, the provider only says what it says.
+	; They stay in this list under their new names: a provider resolves its own
+	; greying exactly as the handler did, because the label is computed and the
+	; renderer has nothing else to apply the declaration to.
 	Handlers := Map(
-		"_MET_ShowTyping",      "show_typing",
-		"_MET_ShortcutTyping",  "shortcut_typing",
-		"_MET_ShowApps",        "show_apps",
-		"_MET_ShortcutApps",    "shortcut_apps",
-		"_MET_FilterPrivate",   "filter_private",
-		"_MET_FilterSecure",    "filter_secure",
-		"_MET_FilterSysauth",   "filter_sysauth",
-		"_MET_ExcludeApps",     "exclude_apps",
-		"_MET_WpmWidget",       "wpm_widget",
-		"_MET_WpmWidgetColors", "widget_colors",
-		"_MET_WpmWidgetGraph",  "include_realtime",
-		"_MET_WpmWidgetReset",  "reset_wpm_position",
+		"_MET_ShortcutTypingRows", "shortcut_typing",
+		"_MET_ShortcutAppsRows",   "shortcut_apps",
+		"_MET_ExcludeAppsRows",    "exclude_apps",
+		"_MET_WpmWidget",          "wpm_widget",
+		"_MET_WpmWidgetColors",    "widget_colors",
+		"_MET_WpmWidgetGraph",     "include_realtime",
 	)
 	for FuncName, Id in Handlers {
 		Seg := _DriverFuncBody(FuncName)
@@ -159,11 +180,16 @@ Test("menu-metrics-disabled-when: AHK handlers delegate to the shared resolver (
 ; The shared getters map itself must map each canonical key to the correct
 ; state read — this is the only place MetricsShortcuts.enabled / WPMWidget.visible
 ; should still be referenced for disabling purposes.
+; Matched with a tolerant gap between the key and its arrow rather than the exact
+; two spaces the map happened to use. The mapping is the contract; the column the
+; arrow lands in is not, and pinning it made adding a LONGER key to the map fail
+; this test — the alignment shifts, the assertion breaks, and nothing about the
+; state read has changed.
 _MMDW_GettersMapCorrect() {
 	Src := _DriverSourceConcat()
-	Assert(InStr(Src, '"keylogger_enabled",  () => MetricsShortcuts.enabled,') > 0,
+	Assert(RegExMatch(Src, '"keylogger_enabled",\s+\(\) => MetricsShortcuts\.enabled,') > 0,
 		"_MET_STATE_GETTERS must map keylogger_enabled to MetricsShortcuts.enabled")
-	Assert(InStr(Src, '"wpm_widget_visible", () => WPMWidget.visible,') > 0,
+	Assert(RegExMatch(Src, '"wpm_widget_visible",\s+\(\) => WPMWidget\.visible,') > 0,
 		"_MET_STATE_GETTERS must map wpm_widget_visible to WPMWidget.visible")
 }
 Test("menu-metrics-disabled-when: shared getters map reads the correct AHK state", _MMDW_GettersMapCorrect)
@@ -195,7 +221,7 @@ Test("menu-metrics-disabled-when: ToggleMetricsEnabled has a real call site (F2)
 ; writes a dead ToggleCategoryAllFeatures("Metrics", ...) key. Mirrors the
 ; gestures_menu toggle entry, which already carries platforms:["hs"].
 _MMDW_ManifestToggleExcludesAhk() {
-	; NOTE: this file's tests are static-source-scan only — lib/manifest_menu.ahk
+	; NOTE: this file's tests are static-source-scan only — infra/manifest_menu.ahk
 	; (which defines _MR_Get/MenuRenderer_Build) is deliberately NOT #Included by
 	; run_all.ahk, so this reads the parsed JSON directly via Map access rather
 	; than calling into manifest_menu.ahk's helpers.
@@ -236,7 +262,86 @@ _MMDW_ManifestTomlSourceExcludesAhk() {
 	Body := (NextTablePos > 0) ? SubStr(Toml, HeaderPos, NextTablePos - HeaderPos) : SubStr(Toml, HeaderPos)
 	Assert(InStr(Body, 'type = "toggle"') > 0,
 		'the first [[menu.metrics_menu]] table must be the type="toggle" master entry')
-	Assert(InStr(Body, 'platforms = ["hs"]') > 0,
-		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must declare platforms = ["hs"] — without it, regenerating menu_manifest.json from source silently resurrects the dead duplicate toggle (F2)')
+	; The INVARIANT is that ahk is excluded, not that the list reads exactly
+	; ["hs"]: Linux joined it on 2026-08-08 when the shared renderer learned to
+	; build `toggle` rows, and pinning the spelling would have failed a change that
+	; respects the rule completely.
+	PlatPos := InStr(Body, "platforms = [")
+	Assert(PlatPos > 0,
+		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must declare a platforms filter — without one, regenerating menu_manifest.json from source silently resurrects the dead duplicate toggle (F2)')
+	PlatEnd := InStr(Body, "]", , PlatPos)
+	PlatList := SubStr(Body, PlatPos, PlatEnd - PlatPos + 1)
+	Assert(!RegExMatch(PlatList, 'i)"ahk"'),
+		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must NOT list "ahk" — that driver builds this row itself in BuildMetricsMenu, and an unrestricted declaration makes its renderer draw a second, dead one (F2). Found: ' . PlatList)
 }
 Test("menu-metrics-disabled-when: manifest.toml SOURCE excludes ahk from the metrics toggle, not just the generated JSON (F2)", _MMDW_ManifestTomlSourceExcludesAhk)
+
+
+
+
+; ==============================================================================
+; ==============================================================================
+; ======= 4/ The rows the shared renderer builds now ===========================
+; ==============================================================================
+; ==============================================================================
+
+; The three privacy filters are declared `type = "check"`, which means the row —
+; label, checkmark and greying — is materialised by MenuRenderer_Build from the
+; manifest, on all three drivers, from one declaration.
+;
+; WHAT THIS FORBIDS. Two things, and the second is the one that bites: a row that
+; loses its declaration silently returns to being hand-built and drifts again;
+; and a row that is declared AND still has a handler here is drawn TWICE, which
+; looks like a duplicate menu entry and nothing else reports it.
+_MMDW_MigratedRowsAreDeclarative() {
+	; id -> the handler this driver used to build it with. Spelled out rather
+	; than derived from the id, because a derivation that stops matching would
+	; assert the absence of a function that never existed under that name.
+	Migrated := Map(
+		"filter_private", "_MET_FilterPrivate",
+		"filter_secure",  "_MET_FilterSecure",
+		"filter_sysauth", "_MET_FilterSysauth",
+	)
+
+	Rows := _MMDW_LoadMetricsMenu()
+	for Id, OldHandler in Migrated {
+		Found := false
+		for Entry in Rows {
+			if (Entry is Map) and Entry.Has("id") and Entry["id"] == Id {
+				Found := true
+				Assert(Entry.Has("type") and Entry["type"] == "check",
+					"'" . Id . "' must be declared type=check so the shared renderer builds its row — a row that loses the declaration goes back to being hand-built on three drivers and drifts again")
+				Assert(Entry.Has("i18n") and Entry["i18n"] != "",
+					"'" . Id . "' must carry its i18n key: the renderer has no other source for the label")
+			}
+		}
+		Assert(Found, "metrics_menu must still declare '" . Id . "'")
+
+		; And no handler may remain: the renderer draws the row, so a second
+		; builder here draws it twice — which looks like a duplicate menu entry
+		; and nothing else reports it.
+		Assert(_DriverFuncBodyOrEmpty(OldHandler) == "",
+			OldHandler . "() still exists — the shared renderer builds '" . Id . "' now, so this handler would draw it a second time")
+	}
+}
+Test("menu-metrics-disabled-when: the migrated privacy rows are built by the shared renderer, not twice", _MMDW_MigratedRowsAreDeclarative)
+
+_MMDW_ShortcutRowsRefreshTheirSnapshottedLabels() {
+	for Name in ["_MET_ShortcutTypingRows", "_MET_ShortcutAppsRows"] {
+		Body := _DriverFuncBody(Name)
+		Assert(InStr(Body, "_MET_PromptShortcutAndRefresh(") > 0,
+			Name . " must route its click through the tray-refresh owner")
+		Assert(InStr(Body, "MS_PromptShortcut(") = 0,
+			Name . " must not leave a direct click path with a stale label snapshot")
+	}
+	Wrapper := _DriverFuncBody("_MET_PromptShortcutAndRefresh")
+	Assert(InStr(Wrapper, "RebuildTrayMenu()") > 0,
+		"the shortcut action must request the canonical tray generation owner")
+	Assert(InStr(Wrapper, "(Result is Integer) && Result == 1") > 0
+		and InStr(Wrapper, "(RefreshResult is Integer) && RefreshResult == 1") > 0,
+		"prompt and tray outcomes must both reject truthy String statuses")
+	Assert(InStr(Wrapper, "After == Before") > 0,
+		"a surfaced cleanup failure must still refresh when its warning label changed")
+}
+Test("menu-metrics-disabled-when: shortcut clicks strictly refresh committed projections",
+	_MMDW_ShortcutRowsRefreshTheirSnapshottedLabels)

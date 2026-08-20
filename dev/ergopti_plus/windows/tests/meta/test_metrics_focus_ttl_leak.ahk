@@ -25,10 +25,12 @@
 ; ===================================================
 ; ===================================================
 
-_MFTL_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
+; Scans the whole infra/metrics/ directory instead of one hardcoded file. The
+; assertion below is a PRESENCE check, so widening the scope cannot weaken it —
+; and _DriverDirConcat throws when the directory moves, instead of dying with an
+; unreadable-path error that says nothing about the invariant at stake.
+_MFTL_ReadSource() {
+	return _DriverDirConcat("infra/metrics")
 }
 
 
@@ -45,7 +47,7 @@ _MFTL_ReadSource(RelPath) {
 ; (50 ms) rather than the original 250 ms, which is wide enough for 2-3
 ; keystrokes to land inside it (metrics-focus-cache-ttl-leak).
 _MFTL_FocusCacheTtlIsBounded() {
-	Src := _MFTL_ReadSource("lib/metrics/metrics_filters.ahk")
+	Src := _MFTL_ReadSource()
 
 	if !RegExMatch(Src, "global MF_FOCUS_TTL_MS := (\d+)", &m)
 		Assert(false, "MF_FOCUS_TTL_MS must be declared as a global numeric constant in metrics_filters.ahk")

@@ -20,21 +20,21 @@
 local helpers = require("tests.helpers")
 
 -- lib.logger must load first so every subsequent require can resolve it.
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local TODAY   = "/tmp/ergopti_rotation_persistent_today.log"
 local DATASQL = "/tmp/ergopti_rotation_persistent_data.sql"
 
 --- A no-op file handle so the spy touches no real disk.
 local function fake_handle()
-	return {
-		write = function() end,
-		flush = function() end,
-		close = function() end,
-		read  = function() return nil end,
-		lines = function() return function() return nil end end,
-	}
+	local handle = {}
+	function handle:setvbuf(mode) return mode == "no" end
+	function handle:write() return self end
+	function handle:close() return true end
+	function handle:read() return nil end
+	function handle:lines() return function() return nil end end
+	return handle
 end
 
 helpers.describe("rotation — persistent today.log handle (no per-append open/close)", function()
@@ -60,7 +60,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 		local opens_after_appends = today_opens
 
 		-- Rollover closes the handle; the next append must reopen exactly once.
-		r.rollover(DATASQL)
+		r.rollover(DATASQL, r.READ_STATUS_EOF)
 		r.append_log({ type = "typing", timestamp = "2024-06-02 09:00:00.000", text = "y" })
 		local opens_after_rollover = today_opens
 

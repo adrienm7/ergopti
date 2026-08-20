@@ -15,9 +15,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_llm word display coerces before the > 0 comparison", function()
 	helpers.it("source: the generation menu uses tonumber before comparing llm_*_words", function()
-		local path = helpers.driver_root() .. "ui/menu/menu_llm/init.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_llm/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("function M.terminate_orphan_mlx_server")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/init.lua source must be locatable")
 
 		helpers.assert_true(src:find("tonumber(state.llm_max_words)", 1, true) ~= nil,
 			"max-words display must coerce via tonumber(state.llm_max_words)")

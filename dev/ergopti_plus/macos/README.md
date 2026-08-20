@@ -1,8 +1,17 @@
 # ErgoptiPlus — macOS driver (Hammerspoon / Lua)
 
-The macOS implementation of ErgoptiPlus. It mirrors the Windows driver
-(`../windows/`) directory-for-directory so the analogue of any file lives at the
-same relative path on both platforms.
+The macOS implementation of ErgoptiPlus.
+
+> **The three driver trees do not currently mirror each other** (18.9 % tree
+> identity, measured). Use the cross-driver path table in
+> [`docs/ERGOPTI_PLUS.md`](../../../docs/ERGOPTI_PLUS.md) §2.1 to locate the
+> counterpart of a file; making the trees identical is invariant I1, measured
+> and ratcheted by `tools/test/test-driver-tree-parity.cjs`.
+>
+> Name collision to know first: `modules/keymap/` is the **hotstring expansion
+> engine** here, while on Windows the same path is the **physical layout remap**.
+> The layout remap lives in `platform/remap/` plus
+> `modules/keymap/{layout_install,input_sources}.lua`.
 
 ## Entry point
 
@@ -10,7 +19,7 @@ same relative path on both platforms.
 runs the boot sequence. Like the Windows entry it holds orchestration only —
 feature logic lives in the modules it loads.
 
-## Layout (mirror of `../windows/`)
+## Layout
 
 | Path | Role |
 |---|---|
@@ -43,5 +52,6 @@ Code is English, UI is French; tabs for indentation; EmmyLua docstrings; section
 banners and logging conventions are defined in
 [`../../../.github/copilot-instructions.md`](../../../.github/copilot-instructions.md).
 Hard-won gotchas live in
-[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md); work that is
-known but not done is in [`../../../TODO.md`](../../../TODO.md).
+[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md). Work that is
+known but not done lives in the gate that measures it: each ratchet under
+`tools/test/` carries its own count and, in its header, what would move it.

@@ -29,20 +29,49 @@
 ; "bc"; "ab → abc" so typing "ab" yields "abc" — depend on AHK actually firing
 ; hotkeys, which a unit test cannot do. They are nonetheless reduced to
 
-; Pause invariant for full hotstring paths (project_suspend_pause_invariant)
-TestHotstringsFull_PauseGuard() {
-	; All Create* and handler paths must be gated by A_IsSuspended in caller (ErgoptiPlus.ahk, prefix watcher)
-	; This documents the regression guard.
-	AssertTrue(true, "hotstring full engine dispatch must early-return on pause")
-}
-Test("Hotstrings full: pause must silence all expansions (guard in dispatch)", TestHotstringsFull_PauseGuard)
+; Delay per-section regression (from hotstrings_config).
+;
+; This replaces an AssertTrue(true) placeholder that stated the precedence rule
+; in prose and verified none of it. The rule is section > category > TOML >
+; global, and the section leg is the one users hit: a per-section delay set from
+; the config window must beat the category default, and clearing it must fall
+; back rather than leave the section pinned.
+TestHotstringsFull_SectionDelayBeatsCategory() {
+	global _HotstringsOverrides, _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	Path := A_Temp . "\hotstrings_full_precedence_overrides.toml"
+	try FileDelete(Path)
+	_HotstringsOverrides := Map()
+	_HotstringsOverridesPath := Path
+	HotstringsResolveBumpGen()
+	Cat := "_hsfull_precedence_probe"
+	Sec := "probe_section"
+	try {
+		HotstringsSetOverride(Cat, "", "delay", 111)
+		AssertEqual(111, HotstringsResolve(Cat).Delay,
+			"a category-level delay must resolve for the category itself")
+		AssertEqual(111, HotstringsResolve(Cat, Sec).Delay,
+			"a section with no delay of its own must inherit the category's")
 
-; Delay per-section regression (from hotstrings_config)
-TestHotstringsFull_SectionDelay() {
-	; Time activation must respect per-section delay from toml (project-hotstring-delay-architecture)
-	AssertTrue(true, "section delays must override group in resolution")
+		HotstringsSetOverride(Cat, Sec, "delay", 222)
+		AssertEqual(222, HotstringsResolve(Cat, Sec).Delay,
+			"a per-section delay must override the category — this is the leg the config window writes")
+		AssertEqual(111, HotstringsResolve(Cat).Delay,
+			"setting a section delay must not leak upward into the category")
+
+		HotstringsClearOverride(Cat, Sec, "delay")
+		AssertEqual(111, HotstringsResolve(Cat, Sec).Delay,
+			"clearing the section delay must fall back to the category, not stay pinned to the cleared value")
+	} finally {
+		_HotstringsOverrides := SavedOverrides
+		_HotstringsOverridesPath := SavedPath
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
+	}
 }
-Test("Hotstrings full: per-section delay precedence", TestHotstringsFull_SectionDelay)
+Test("Hotstrings full: a per-section delay overrides the category and falls back when cleared",
+	TestHotstringsFull_SectionDelayBeatsCategory)
 ; HotstringHandler invocations with the same Abbr/Repl pair: if HotstringHandler
 ; correctly issues "BackSpace N + Repl + EndChar" for the right N, then a
 ; runtime fire of the same hotstring under AHK will, by construction, replace
@@ -63,11 +92,11 @@ _TestCallHotstring(Abbreviation, Replacement, EndChar, OnlyText := True, FinalRe
 
 
 
-; ============================================
+; ==================================================
 ; ==================================================
 ; ======= 1/ CreateHotstring — flag assembly =======
 ; ==================================================
-; ============================================
+; ==================================================
 
 TestCH_FlagsEmpty() {
     ResetHotstringRecorders()
@@ -135,11 +164,11 @@ Test("CreateHotstring: callback is a callable Func", TestCH_CallbackIsObject)
 
 
 
-; ============================================
+; ========================================================
 ; ========================================================
 ; ======= 2/ CreateHotstring — options propagation =======
 ; ========================================================
-; ============================================
+; ========================================================
 
 TestCH_OptionsDefaultOnlyTextTrue() {
     ResetHotstringRecorders()
@@ -224,11 +253,11 @@ Test("CreateHotstring: TimeActivationSeconds blocks expansion when expired",
 
 
 
-; ============================================
+; =================================================================
 ; =================================================================
 ; ======= 3/ CreateCaseSensitiveHotstrings — variant counts =======
 ; =================================================================
-; ============================================
+; =================================================================
 
 ; Helper: extract every recorded trigger spec into a flat Array.
 _CollectSpecs() {
@@ -394,56 +423,81 @@ TestCS_TwoCharApostropheFirst() {
 Test("CreateCaseSensitiveHotstrings: apostrophe-first 2-char abbr produces 6 variants",
     TestCS_TwoCharApostropheFirst)
 
-; Encore plus: pause guard for full hotstring engine (project_suspend_pause_invariant)
-TestHSFull_PauseNoExpansion() {
-    ; All Create* and _HotstringDispatch must be no-op if A_IsSuspended.
-    ; Prevents expansions during pause.
-    AssertTrue(true, "hotstring full must respect pause - no registration or dispatch")
+; Six AssertTrue(true) placeholders stood here. Three of them stated the SAME
+; pause invariant three times, and it is already asserted for real — with the
+; guard-before-mutation ordering that actually matters — by
+; tests/unit/test_domain_expander.ahk. Restating it here would be a fourth copy
+; of a claim, not a fourth check, so those three are gone rather than rewritten.
+;
+; The other three named real, checkable invariants and are written out below.
+
+; Synthetic re-trigger loop. The driver's own SendInput output must never be fed
+; back into the watcher, or an expansion whose replacement contains a trigger
+; expands again, forever. The mechanism is the InputHook's I1 input level, which
+; filters by PROVENANCE — the previous 60 ms time window also discarded real
+; typing that arrived just after an expansion.
+TestHSFull_SyntheticIsFilteredByProvenance() {
+	Body := _DriverFuncBody("_StartInputHook")
+	Assert(RegExMatch(Body, 'InputHook\("[^"]*I1[^"]*"\)') > 0,
+		"the prefix watcher's InputHook must be created with I1 — that input level is what excludes the driver's own synthetic output, and without it every expansion containing a trigger re-triggers itself")
 }
-Test("Hotstrings full: pause silences all Create and dispatch (regression)", TestHSFull_PauseNoExpansion)
+Test("Hotstrings full: synthetic input is filtered by provenance, not by a time window",
+	TestHSFull_SyntheticIsFilteredByProvenance)
 
-; Synthetic input must not cause re-trigger (engine internal)
-TestHSFull_NoSyntheticReTrigger() {
-    ; _HSE and prefix watcher must ignore synthetic; else loops.
-    AssertTrue(true, "synthetic keys must be filtered before engine feed")
+
+; A delay the user could not have meant must not reach the engine. The resolver
+; is the single place this can be enforced, and the fallback has to be the
+; global default rather than the bad value or zero.
+TestHSFull_BadDelayFallsBackToTheGlobalDefault() {
+	global GLOBAL_DEFAULT_DELAY, _HotstringsOverrides, _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	Path := A_Temp . "\hotstrings_full_bad_delay_overrides.toml"
+	try FileDelete(Path)
+	_HotstringsOverrides := Map()
+	_HotstringsOverridesPath := Path
+	HotstringsResolveBumpGen()
+	Cat := "_hsfull_baddelay_probe"
+	try {
+		; An override cleared back to "" is exactly what the config window writes
+		; when the user empties the field.
+		HotstringsSetOverride(Cat, "", "delay", 250)
+		AssertEqual(250, HotstringsResolve(Cat).Delay, "the probe override must take effect first")
+		HotstringsSetOverride(Cat, "", "delay", "")
+		AssertEqual(GLOBAL_DEFAULT_DELAY, HotstringsResolve(Cat).Delay,
+			"an empty delay must fall back to the global default, not resolve to 0 or to the previous value")
+	} finally {
+		_HotstringsOverrides := SavedOverrides
+		_HotstringsOverridesPath := SavedPath
+		HotstringsResolveBumpGen()
+		try FileDelete(Path)
+	}
 }
-Test("Hotstrings full: no re-trigger from synthetic input in engine", TestHSFull_NoSyntheticReTrigger)
+Test("Hotstrings full: an empty delay falls back to the global default",
+	TestHSFull_BadDelayFallsBackToTheGlobalDefault)
 
-; Delay error path: negative or zero delay must fallback gracefully
-TestHSFull_BadDelayFallback() {
-    ; If config gives bad delay (0 or negative), must use default not crash.
-    AssertTrue(true, "bad delay values must fallback without error in time activation")
+
+; The preview tooltip must not survive the expansion it was previewing. It is
+; hidden from _ResetPrefixBuffer, which every fire path goes through, and the
+; hide must be FORCED — the queued form would leave it on screen for the
+; dequeue interval, which is the bug this covers.
+TestHSFull_TooltipHiddenOnFire() {
+	Body := _DriverFuncBody("_ResetPrefixBuffer")
+	Assert(RegExMatch(Body, 'TooltipHide\("ResetBuf",\s*true\)') > 0,
+		"_ResetPrefixBuffer must force-hide the tooltip (second argument true) — a queued hide leaves the preview on screen after the hotstring has already fired")
 }
-Test("Hotstrings full: bad delay values fallback safely", TestHSFull_BadDelayFallback)
-
-; Encore plus continue: more prefix watcher + engine pause + synthetic + error edges
-TestHSFull_PrefixWatcherPause() {
-	; hotstring_prefix_watcher must early-return on A_IsSuspended (no registration, no dispatch).
-	AssertTrue(true, "prefix watcher must respect full pause silence")
-}
-Test("Hotstrings full: prefix watcher must be silenced by pause", TestHSFull_PrefixWatcherPause)
-
-TestHSFull_TooltipVanishOnFire() {
-    ; Ensures the tooltip does not stay on screen (bypassing dequeue) when a hotstring fires.
-    AssertTrue(true, "_ResetPrefixBuffer or _LookupAndRender must force hide the tooltip immediately when a hotstring is triggered")
-}
-Test("Hotstrings full: tooltip vanishes immediately on hotstring fire", TestHSFull_TooltipVanishOnFire)
-
-TestHSFull_SyntheticInPrefixNoTrigger() {
-	; Synthetic input (from Send*) must be filtered in prefix watcher before reaching Create*/HSE.
-	AssertTrue(true, "prefix watcher must suppress synthetic to prevent re-trigger loops")
-}
-Test("Hotstrings full: prefix watcher suppresses synthetic input", TestHSFull_SyntheticInPrefixNoTrigger)
+Test("Hotstrings full: the preview tooltip is force-hidden when a hotstring fires",
+	TestHSFull_TooltipHiddenOnFire)
 
 
 
 
 
-; ============================================
+; =======================================================
 ; =======================================================
 ; ======= 4bis/ HotstringHandler — boundary cases =======
 ; =======================================================
-; ============================================
+; =======================================================
 
 TestHH_PriorKeyMissingFailsClosed() {
     global LastSentCharacterKeyTime
@@ -509,11 +563,11 @@ Test("HotstringHandler: replacement preserves leading whitespace",
 
 
 
-; ============================================
+; =========================================================
 ; =========================================================
 ; ======= 5bis/ End-to-end — case-sensitive cascade =======
 ; =========================================================
-; ============================================
+; =========================================================
 
 TestE2E_CaseSensSingleCharLowercase() {
     ResetHotstringRecorders()
@@ -563,11 +617,11 @@ Test("Hook integration: installed hook captures CreateHotstring instead of AHK b
 
 
 
-; ============================================
+; ==============================================
 ; ==============================================
 ; ======= 4/ HotstringHandler — branches =======
 ; ==============================================
-; ============================================
+; ==============================================
 
 TestHH_BackspaceCountSingleChar() {
     ResetHotstringRecorders()
@@ -770,11 +824,11 @@ Test("HotstringHandler: empty replacement is still emitted as the second send",
 
 
 
-; ============================================
+; ==================================================================
 ; ==================================================================
 ; ======= 5/ End-to-end CreateHotstring → callback → Handler =======
 ; ==================================================================
-; ============================================
+; ==================================================================
 
 ; Verifies that the callback closure built by CreateHotstring captures Abbr
 ; and Repl correctly. This is what the AHK runtime fires when a user actually
@@ -889,11 +943,11 @@ Test("End-to-end: CreateCaseSensitive conform emits Title replacement for Title 
 
 
 
-; ============================================
+; =====================================
 ; =====================================
 ; ======= 6/ ActivateHotstrings =======
 ; =====================================
-; ============================================
+; =====================================
 
 TestAH_SendsTwoCalls() {
     global HSE_Buffer
@@ -933,11 +987,11 @@ Test("ActivateHotstrings: second send is {BackSpace} with OnlyText=false",
 
 
 
-; ============================================
+; ===========================================
 ; ===========================================
 ; ======= 7/ Microsoft Office tagging =======
 ; ===========================================
-; ============================================
+; ===========================================
 
 TestMS_DetectsWord() {
     SimulateMicrosoftOffice()
@@ -964,11 +1018,11 @@ Test("MicrosoftApps: Notepad is not classified as an Office app",
 
 
 
-; ============================================
+; =========================================================
 ; =========================================================
 ; ======= 8/ HotstringHandler — more boundary cases =======
 ; =========================================================
-; ============================================
+; =========================================================
 
 TestHH_StarMagicKeyAbbr() {
     ResetHotstringRecorders()

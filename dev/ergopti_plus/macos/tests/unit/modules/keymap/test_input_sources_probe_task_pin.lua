@@ -63,20 +63,22 @@ end)
 
 helpers.describe("active-layout probe: handle is forward-declared and GC-pinned", function()
 	helpers.it("input_sources pins the probe task and checks start()", function()
-		local path = helpers.driver_root() .. "modules/keymap/input_sources.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keymap/input_sources.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function resolve_installed_ergopti_version")
+		helpers.assert_true(src ~= nil, "modules/keymap/input_sources.lua source must be locatable")
 
 		-- A module-level GC-root table must exist.
 		helpers.assert_true(src:find("_active_probe_tasks", 1, true) ~= nil,
 			"missing the _active_probe_tasks GC-root table")
 
 		-- The handle must be forward-declared ABOVE the hs.task.new call (closure-nil
-		-- rule) and assigned with `probe_task = hs.task.new`, NOT `local t = hs.task.new`.
+		-- rule) and assigned through the strict task adapter, never inline.
 		local decl_idx = src:find("local probe_task", 1, true)
-		local new_idx  = src:find("probe_task = hs.task.new", 1, true)
+		local new_idx  = src:find("probe_task = TaskLifecycle.native", 1, true)
 		helpers.assert_true(decl_idx ~= nil, "probe task handle must be forward-declared as `local probe_task`")
-		helpers.assert_true(new_idx ~= nil, "probe task must be assigned via `probe_task = hs.task.new`")
+		helpers.assert_true(new_idx ~= nil, "probe task must be assigned via strict TaskLifecycle.native")
 		helpers.assert_true(decl_idx < new_idx, "`local probe_task` must be declared BEFORE the hs.task.new closure")
 
 		-- The bare unpinned pattern must be gone.
@@ -84,7 +86,7 @@ helpers.describe("active-layout probe: handle is forward-declared and GC-pinned"
 			"a bare `local t = hs.task.new` re-introduces the un-pinned GC bug")
 
 		-- :start()'s return must be checked so a failed launch resets the flag.
-		helpers.assert_true(src:find("if not probe_task:start()", 1, true) ~= nil,
+		helpers.assert_true(src:find("if not TaskLifecycle.start(probe_task", 1, true) ~= nil,
 			"probe_task:start() return must be checked (false = launch failure)")
 	end)
 end)

@@ -14,8 +14,9 @@
 ; reading it — producing a crash or a corrupted/blank screenshot for the first
 ; capture. There was also no cleanup path for the temp file.
 ;
-; The fix inlines the capture code as a PowerShell -Command argument, eliminating
-; the shared temporary file entirely. Each Run() call is fully self-contained.
+; The fix passes capture code as a PowerShell -Command argument and gives every
+; worker a unique bitmap stage. The stage is output, never executable source,
+; and one generation owns its cleanup.
 ;
 ; This test verifies:
 ;   1. GestureScreenshotInstant does NOT reference "hs_screenshot.ps1".
@@ -70,13 +71,18 @@ _GSNF_InlineCommand() {
 		"GestureScreenshotInstant must delegate to the shared hardened capture path")
 
 	Capture := _DriverFuncBody("GestureCaptureRegion")
-	Assert(Capture != "", "GestureCaptureRegion must exist in modules/gestures/screenshots.ahk")
-	Assert(InStr(Capture, "-Command") > 0,
-		"the shared capture must inline PS code via -Command, never a temp .ps1 (gesture-screenshot-tempfile-race)")
+	ArgsBuilder := _DriverFuncBody("_GestureScreenshotPowerShellArgs")
+	Assert(Capture != "" && ArgsBuilder != "",
+		"GestureCaptureRegion and its PowerShell argument builder must exist")
+	Assert(InStr(ArgsBuilder, 'Args.Push("-WindowStyle", "Hidden", "-Command", Script)') > 0,
+		"the shared capture must pass PS code via -Command, never a temp .ps1 (gesture-screenshot-tempfile-race)")
 
-	; Run (not RunWait) so successive calls do not block each other
-	Assert(InStr(Capture, "Run(") > 0,
-		"the shared capture must use Run (not RunWait) to dispatch PS non-blocking")
+	; ShellRunner owns process launch, termination, and completion. A raw Run here
+	; would recreate the detached sibling fixed by AHK-13.
+	Assert(InStr(Capture, "_GestureScreenshotCreateWorker") > 0,
+		"the shared capture must register its process with the common worker owner")
+	Assert(InStr(Capture, "Run(") = 0,
+		"the shared capture must not launch an unowned PowerShell sibling")
 	Assert(InStr(Capture, "RunWait") = 0,
 		"the shared capture must never RunWait — that would block the keyboard hook thread")
 }

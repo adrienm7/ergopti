@@ -11,10 +11,11 @@ local helpers = require("tests.helpers")
 
 -- After the F2 split, the _last_error declaration + comment live in core.lua
 -- (the public-API half of ui/healthcheck/), not the former monolithic lib file.
-local src_path = helpers.driver_root() .. "ui/healthcheck/core.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("healthcheck core.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to ui/healthcheck/core.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function _stop_poll")
+helpers.assert_true(src ~= nil, "ui/healthcheck/core.lua source must be locatable")
 
 -- Test 1: the old incorrect claim must not appear in the source.
 local old_comment = src:find("reset to nil on each M.run() call", 1, true)

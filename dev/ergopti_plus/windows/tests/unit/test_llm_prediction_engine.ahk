@@ -59,6 +59,12 @@ _EngineInit_LanguageFollowsLocale() {
 	Saved := _I18nLocale
 	_I18nLocale := "en"
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	Lang := _LLM_Engine["language"]
 	_I18nLocale := Saved
 	AssertEqual("en", Lang)
@@ -117,6 +123,12 @@ Test("LLM_Engine_Init: copies disabled_apps array from opts", _EngineInit_Copies
 _EngineSetEnabled_DisablesEngine() {
 	global _LLM_Engine
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	LLM_Engine_SetEnabled(false)
 	AssertFalse(_LLM_Engine["enabled"])
 }
@@ -136,6 +148,12 @@ _EngineSetEnabled_CancelsTimerOnDisable() {
 	global _LLM_Engine
 	; Arm a fake timer marker, then disable — timer_active must be cleared
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["timer_active"] := true
 	_LLM_Engine["pending_timer"] := ""   ; no real timer object, just the flag
 	LLM_Engine_SetEnabled(false)
@@ -172,22 +190,63 @@ _EngineCancelTimer_ClearsPendingTimer() {
 Test("LLM_Engine_CancelTimer: clears pending_timer reference", _EngineCancelTimer_ClearsPendingTimer)
 
 ; ULTIMATE encore plus: pause on every engine path + diagnostic integration + volume + pcall/errors to sink (for 100% certainty on the enriched healthcheck).
+; Silence is implemented by the `enabled` flag, which the suspend handler clears
+; — not by an A_IsSuspended read inside the engine. Assert the mechanism that
+; actually exists: with enabled false, OnKeystroke arms nothing at all. A timer
+; armed here fires an HTTP request and types into the user's document, so
+; "returns early" has to mean "left no timer behind".
 _EnginePauseSilencesAndDiagnosticSeesState() {
 	global _LLM_Engine
 	LLM_Engine_Init(Map("model", "test"))
-	; Under A_IsSuspended / script pause: OnKeystroke, Fire, timers must early-return (no HTTP, no tooltip, no typing).
-	; Healthcheck (diagnostic) must still report llm section (backend/profile) + errors sink without side effects.
-	AssertTrue(true, "prediction engine must respect full pause silence (project_suspend_pause_invariant); diagnostic must see llm state + errors sink")
+
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["pending_timer"] := ""
+	_LLM_Engine["timer_active"] := false
+	_LLM_Engine["last_buffer"] := ""
+
+	LLM_Engine_OnKeystroke("bonjour")
+
+	AssertEqual("", _LLM_Engine["pending_timer"],
+		"a disabled engine must not arm a prediction timer — that timer fires an HTTP request "
+		. "and types into the user's document")
+	AssertFalse(_LLM_Engine["timer_active"], "and must not mark itself active")
+	AssertEqual("", _LLM_Engine["last_buffer"],
+		"nor record the keystroke buffer, which is what the prompt is built from")
+
+	; Re-enabled, the very same call does arm — so the assertion above is about the
+	; gate, not about a keystroke that never reached the engine.
+	_LLM_Engine["enabled"] := true
+	LLM_Engine_OnKeystroke("bonjour")
+	AssertEqual("bonjour", _LLM_Engine["last_buffer"],
+		"an enabled engine must record the buffer — otherwise the check above proves nothing")
+	LLM_Engine_CancelTimer()
 }
 Test("LLM Prediction Engine: pause must silence OnKeystroke/Fire/timers + diagnostic must still see llm state + errors sink", _EnginePauseSilencesAndDiagnosticSeesState)
 
+; Every keystroke cancels the in-flight request before re-arming. Two hundred of
+; them must therefore leave exactly ONE armed timer, not two hundred: a leak here
+; is what kept the "génération en cours" spinner alive and queued stale work
+; behind Ollama's single slot for seconds after the user stopped typing.
 _EngineHighVolumePcallBackendToErrorsSinkUnderPause() {
+	global _LLM_Engine
 	LLM_Engine_Init(Map("model", "test"))
+
 	Loop 200 {
-		LLM_Engine_OnKeystroke("a")
+		LLM_Engine_OnKeystroke("a" . A_Index)
 	}
-	; Internal pcall around backend must log ERROR to errors-only sink and continue; pause must not activate anything.
-	AssertTrue(true, "200+ volume + pcall backend errors must go to errors sink; pause must keep engine silent; diagnostic must surface the sink")
+
+	AssertTrue(_LLM_Engine["timer_active"],
+		"after a burst the engine must hold exactly one armed timer")
+	AssertEqual("a200", _LLM_Engine["last_buffer"],
+		"and it must be the LAST buffer — an earlier one would predict against text the user "
+		. "has already typed past")
+
+	; Cancelling once is enough, because there is only ever one.
+	LLM_Engine_CancelTimer()
+	AssertFalse(_LLM_Engine["timer_active"],
+		"a single cancel must clear the whole burst — 200 surviving timers would each fire an "
+		. "HTTP request")
+	AssertEqual("", _LLM_Engine["pending_timer"], "and drop the timer reference")
 }
 Test("LLM Prediction Engine: high volume (200+) + pcall backend ERROR to errors sink under pause; diagnostic visibility", _EngineHighVolumePcallBackendToErrorsSinkUnderPause)
 
@@ -516,9 +575,17 @@ _CacheHit_ExactMatchReturnsCachedResults() {
 	global _LLM_Engine, _LLM_Ollama_IsReady
 	_LLM_Ollama_IsReady := true
 	; Seed the cache with a known context and results
-	LLM_Engine_Init(Map())
+	LLM_Engine_Init(Map("app_profile_overrides", Map()))
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["last_ctx"]     := "intelligen"
 	_LLM_Engine["last_results"] := ["intelligence", "intelligent"]
+	_LLM_Engine["last_semantic_signature"] :=
+		_LLM_Engine_RequestSemanticSignature(_LLM_Engine["profile_id"])
 	id_before := _LLM_Engine["request_id"]
 	; Fire with the exact same context — should hit cache and bump request_id
 	LLM_Engine_FirePrediction("intelligen")
@@ -534,9 +601,17 @@ _CacheHit_PrefixMatchSlicesResults() {
 	; Cache: context "intelligen", predicted suffix "ce alone" (starts with "ce ").
 	; Firing with ctx="intelligence " gives typed_delta="ce " which matches the
 	; start of the cached slot — prefix-cache hits and slices to "alone".
-	LLM_Engine_Init(Map())
+	LLM_Engine_Init(Map("app_profile_overrides", Map()))
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	_LLM_Engine["last_ctx"]     := "intelligen"
 	_LLM_Engine["last_results"] := ["ce alone"]
+	_LLM_Engine["last_semantic_signature"] :=
+		_LLM_Engine_RequestSemanticSignature(_LLM_Engine["profile_id"])
 	; Now fire with a context that extends the cache by "ce " — prefix match
 	; should slice the cached prediction to the remaining suffix "alone"
 	id_before := _LLM_Engine["request_id"]
@@ -551,6 +626,12 @@ _CacheHit_EmptyContextSkipsRequest() {
 	global _LLM_Engine, _LLM_Ollama_IsReady
 	_LLM_Ollama_IsReady := true
 	LLM_Engine_Init(Map())
+	; These cases exercise the cache and debounce paths, not the privacy gate.
+	; State the posture explicitly: the shared default now BLOCKS secure fields,
+	; and the production gate fails closed when the detector cannot answer —
+	; which is always the case in a headless harness, so every prediction would
+	; be suppressed and these tests would assert nothing about their own subject.
+	_LLM_Engine["disable_password_fields"] := false
 	id_before := _LLM_Engine["request_id"]
 	; Empty context must return early without bumping request_id
 	LLM_Engine_FirePrediction("")
@@ -611,11 +692,12 @@ _FirePrediction_DoesNotCancelOllamaAsync() {
 Test("LLM_Engine_FirePrediction: does not cancel in-flight Ollama WinHTTP",
 	_FirePrediction_DoesNotCancelOllamaAsync)
 _OnVariantFail_FallsBackFromStreaming() {
-	state := Map("request_id", 1, "streaming", true, "attempt_index", 2,
+	state := Map("request_id", 1, "semantic_signature", "variant-test", "streaming", true, "attempt_index", 2,
 		"max_attempts", 4, "model", "qwen3.5:0.8b", "slots", [], "requested", 1,
 		"dispatch_fn", (*) => "", "base_temp", 0.1, "ctx", "some context")
 	global _LLM_Engine
 	_LLM_Engine["request_id"] := 1
+	_LLM_Engine["active_request_signature"] := "variant-test"
 	_LLM_Engine_OnVariantFail(state)
 	AssertFalse(state["streaming"], "streaming must be disabled after stream failure")
 }
@@ -689,6 +771,52 @@ _LLM_EngineIsBusy_Idle() {
 	AssertFalse(LLM_Engine_IsBusy(), "engine is not busy when idle")
 }
 Test("LLM_Engine_IsBusy: false when idle", _LLM_EngineIsBusy_Idle)
+
+; Regression: a debounce timer that outlives the engine map must be a no-op.
+;
+; The timer is armed with SetTimer and fires from AHK's timer thread, long after
+; the call site returned. Several cases in this very file replace _LLM_Engine
+; with a one-key Map, and a stray timer landing in that window read
+; _LLM_Engine["enabled"] on a map that no longer had the key -- "Item has no
+; value", raised from a timer thread where no caller can catch it, so it took the
+; whole process down rather than one prediction. It surfaced as an intermittent
+; FATAL STARTUP ERROR that moved around the suite depending on timing.
+;
+; The state a stale timer was armed for is gone; dropping the prediction is the
+; only correct outcome, and it must be a return, never a raise.
+_LLM_EngineFire_SurvivesTornDownEngine() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+
+	_LLM_Engine := Map("timer_active", true)   ; the shape a mid-test case leaves behind
+	Threw := false
+	try {
+		LLM_Engine_FirePrediction("bonjour le")
+	} catch {
+		Threw := true
+	}
+	_LLM_Engine := Saved
+	AssertFalse(Threw,
+		"a debounce timer firing against a torn-down engine must drop the prediction, not raise from "
+		. "a timer thread where nothing can catch it")
+}
+Test("LLM_Engine_FirePrediction: a stale timer against a torn-down engine is a no-op", _LLM_EngineFire_SurvivesTornDownEngine)
+
+_LLM_EngineFire_SurvivesNonMapEngine() {
+	global _LLM_Engine
+	Saved := _LLM_Engine
+
+	_LLM_Engine := ""                          ; the shape a teardown leaves behind
+	Threw := false
+	try {
+		LLM_Engine_FirePrediction("bonjour le")
+	} catch {
+		Threw := true
+	}
+	_LLM_Engine := Saved
+	AssertFalse(Threw, "an engine that is not a Map at all must also be survivable")
+}
+Test("LLM_Engine_FirePrediction: a stale timer against a non-Map engine is a no-op", _LLM_EngineFire_SurvivesNonMapEngine)
 
 
 ; Regression: the loading spinner must NOT replace a prediction already on screen.

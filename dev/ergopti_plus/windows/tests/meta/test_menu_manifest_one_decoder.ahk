@@ -8,9 +8,9 @@
 ; The shared menu_manifest.json is 12.5 KB and a single decode of it benches at
 ; ~44 ms with the driver's own JSON parser. The menu layer used to decode it
 ; three separate times on the boot path, each behind its own cache:
-;   1. _MM_GetManifestRoot        (lib/menu_manifest.ahk, the shared accessor)
+;   1. _MM_GetManifestRoot        (infra/menu_manifest.ahk, the shared accessor)
 ;   2. MenuManifest_LoadHotstringGroups, with a private FileRead + JsonParse
-;   3. _MR_GetManifestRoot        (lib/manifest_menu.ahk, a second full cache)
+;   3. _MR_GetManifestRoot        (infra/manifest_menu.ahk, a second full cache)
 ; Same bytes, same immutable result, ~88 ms of pure duplicate work per boot.
 ;
 ; ROOT CAUSE ENCODED: exactly one function in the menu layer may name and decode
@@ -18,7 +18,7 @@
 ; DERIVED by walking each occurrence of the manifest path back to its enclosing
 ; function, so a fourth private decode fails here instead of quietly reappearing.
 ;
-; _MG_LoadSubCategories (lib/master_gates.ahk) is the one documented exception:
+; _MG_LoadSubCategories (infra/master_gates.ahk) is the one documented exception:
 ; its non-memoized re-read is a deliberate fail-fast contract -- an invalid
 ; canonical manifest must throw on EVERY call -- pinned by
 ; tests/unit/test_master_gates.ahk, and it runs per live category toggle, never

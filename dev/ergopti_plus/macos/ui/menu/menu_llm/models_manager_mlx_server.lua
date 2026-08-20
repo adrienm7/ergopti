@@ -23,9 +23,11 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local i18n          = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local i18n          = require("infra.i18n")
+local ApiCommon     = require("modules.llm.api_common")
+local TaskLifecycle = require("adapters.task_lifecycle")
 
 -- Required to inform the discovery poller of the active server PID so it can
 -- exclude it from zombie kills; safe to require here because api_mlx holds no
@@ -42,11 +44,11 @@ local LOG = "menu_llm.mlx"
 
 
 
--- ====================================
+-- ===================================
 -- ===================================
 -- ======= 1/ Server Lifecycle =======
 -- ===================================
--- ====================================
+-- ===================================
 
 --- Attaches obj.start_server onto the manager object.
 --- @param ctx table Shared context: {
@@ -66,13 +68,42 @@ function M.install(ctx)
 	-- start_server in case the user changed it via the menu (M.set_port).
 	local MLX_PORT = ApiMlx.get_port()
 
+	local function take_server_waiters()
+		local waiters = obj._server_waiters or {}
+		obj._server_waiters = {}
+		return waiters
+	end
+
+	local function cancel_server_waiters()
+		for _, waiter in ipairs(take_server_waiters()) do
+			local callback = type(waiter) == "table" and waiter.on_cancel or nil
+			ApiCommon.protected_call(callback, "MLX server waiter on_cancel")
+		end
+	end
+
+	--- Runs a native Hammerspoon async callback behind a logged boundary.
+	--- Errors escaping an hs.task/hs.timer callback otherwise go only to the
+	--- Hammerspoon console, leaving the file log and the caller's lock silent.
+	--- @param name string Callback name used in the diagnostic.
+	--- @param callback function Callback body.
+	--- @return boolean ok
+	--- @return any result
+	local function run_async_callback(name, callback)
+		local ok, result = xpcall(callback, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Async callback '%s' raised: %s.", tostring(name), tostring(result))
+			return false, nil
+		end
+		return true, result
+	end
+
 	function obj.start_server(target_model, on_success, on_cancel, opts)
 		local repo = obj.get_mlx_repo(target_model)
 		if not repo then
 			Logger.warn(LOG, "Cannot start MLX server: no repository found for model %s.", tostring(target_model))
 			-- Fire on_cancel so the caller's prediction lock is released; otherwise
 			-- predictions stay silently disabled for the rest of the session
-			if type(on_cancel) == "function" then pcall(on_cancel) end
+			ApiCommon.protected_call(on_cancel, "MLX server on_cancel")
 			return
 		end
 		Logger.info(LOG, "Ensuring MLX server for model %s…", tostring(target_model))
@@ -113,12 +144,31 @@ function M.install(ctx)
 			Logger.debug(LOG, "Existing MLX task found — running=%s, server_target='%s', target_model='%s'.",
 				tostring(running), tostring(obj._server_target), tostring(target_model))
 			if running and obj._server_target == target_model then
-				Logger.info(LOG, "MLX server already running for model '%s' — reusing, calling on_success.", tostring(target_model))
-				if on_success then pcall(on_success) end
+				-- isRunning() means the PROCESS is alive, not that the model is loaded.
+				-- Resolving on it fired the second caller's on_success while the first
+				-- caller's readiness probe was still running, so a duplicate request was
+				-- told the server was ready 60-90 s before it was.
+				if obj._server_ready then
+					Logger.info(LOG, "MLX server already ready for '%s' — reusing.",
+						tostring(target_model))
+					ApiCommon.protected_call(on_success, "MLX server on_success")
+				elseif on_success or on_cancel then
+					-- Join the startup already in flight. The waiter is drained by
+					-- mark_server_ready below, so nobody is told "ready" early and nobody
+					-- has their callback dropped either.
+					obj._server_waiters = obj._server_waiters or {}
+					table.insert(obj._server_waiters, {
+						on_success = on_success,
+						on_cancel = on_cancel,
+					})
+					Logger.info(LOG, "MLX server for '%s' still starting — joined as waiter #%d.",
+						tostring(target_model), #obj._server_waiters)
+				end
 				return
 			end
 			if running then
 				Logger.info(LOG, "MLX server running for different model — terminating.")
+				cancel_server_waiters()
 				pcall(function() existing:terminate() end)
 			end
 			deps.active_tasks["mlx_server"] = nil
@@ -143,13 +193,18 @@ function M.install(ctx)
 				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :%d) — skipping cold restart.",
 					tostring(target_model), MLX_PORT)
 				obj._server_target = target_model
+				-- Adopted from a previous session with the weights already resident, so
+				-- this one really is ready — a later duplicate request must resolve
+				-- immediately rather than queue behind a startup that will never run.
+				obj._server_ready = true
+				cancel_server_waiters()
 				if type(ApiMlx) == "table" and type(ApiMlx.reset_endpoints) == "function" then
 					ApiMlx.reset_endpoints()
 				end
 				if type(ApiMlx) == "table" and type(ApiMlx.set_model_hf_path) == "function" then
 					ApiMlx.set_model_hf_path(repo)
 				end
-				if on_success then pcall(on_success) end
+				ApiCommon.protected_call(on_success, "MLX server on_success")
 				return
 			end
 		end
@@ -162,7 +217,7 @@ function M.install(ctx)
 		-- /tmp/mlx_server.pgid which can be stale; firing this sweep here closes that gap.
 		-- Fire-and-forget — the bash launcher's own sleep+lsof retry loop will catch any
 		-- survivor that this async kill doesn't reach in time.
-		do
+			do
 			local sweep_cmd =
 				"PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
 				"PORT_PIDS=$(lsof -ti TCP:" .. MLX_PORT .. " 2>/dev/null); " ..
@@ -171,13 +226,17 @@ function M.install(ctx)
 				"rm -f /tmp/mlx_server.pid /tmp/mlx_server.pgid; " ..
 				"echo done"
 			local sweep
-			sweep = hs.task.new("/bin/bash", function(_, stdout)
+			sweep = TaskLifecycle.native("MLX pre-launch port sweep", "/bin/bash", function(_, stdout)
 				if sweep then _active_tasks[sweep] = nil end  -- sweep captured by closure
-				Logger.debug(LOG, "Pre-launch port-%d sweep done: %s", MLX_PORT, tostring(stdout):gsub("\n", " "))
+				run_async_callback("MLX pre-launch port sweep completion", function()
+					Logger.debug(LOG, "Pre-launch port-%d sweep done: %s", MLX_PORT, tostring(stdout):gsub("\n", " "))
+				end)
 			end, {"-c", sweep_cmd})
 			if sweep then
 				_active_tasks[sweep] = true
-				pcall(function() sweep:start() end)
+				if not TaskLifecycle.start(sweep, "MLX pre-launch port sweep") then
+					_active_tasks[sweep] = nil
+				end
 			end
 		end
 
@@ -212,46 +271,131 @@ function M.install(ctx)
 				tostring(target_model), unified_log_file)
 			local startup_confirmed = false
 			local startup_closed = false
+			-- A fresh server is not ready, and any waiter queued against the PREVIOUS
+			-- one must not be resolved by this launch's probe: they asked about a
+			-- process that has since been terminated.
+			obj._server_ready = false
+			cancel_server_waiters()
 
 			local function mark_server_ready()
 				if startup_confirmed or startup_closed then return end
 				startup_confirmed = true
-				if on_success then pcall(on_success) on_success = nil end
+				-- Promoted to obj state: a start_server call arriving after this point
+				-- must be able to see that the server is ready, and one arriving BEFORE
+				-- it must be able to queue. A per-invocation local could do neither.
+				obj._server_ready = true
+				ApiCommon.protected_call(on_success, "MLX server on_success")
+				on_success = nil
+				local waiters = obj._server_waiters or {}
+				obj._server_waiters = {}
+				for _, waiter in ipairs(waiters) do
+					local callback = type(waiter) == "table" and waiter.on_success or waiter
+					ApiCommon.protected_call(callback, "MLX server waiter on_success")
+				end
 			end
 
-			local function probe_server_ready(retries)
+			local function fail_server_start()
+				if startup_confirmed or startup_closed then return false end
+				startup_closed = true
+				obj._server_ready = false
+				if obj._server_target == target_model then obj._server_target = nil end
+				ApiCommon.protected_call(on_cancel, "MLX server on_cancel")
+				on_cancel = nil
+				for _, waiter in ipairs(take_server_waiters()) do
+					local callback = type(waiter) == "table" and waiter.on_cancel or nil
+					ApiCommon.protected_call(callback, "MLX server waiter on_cancel")
+				end
+				return true
+			end
+
+			-- Declared before every retry/error closure. A declaration beside the
+			-- later constructor would bind those closures to a global `task` instead.
+			local task
+			local probe_server_ready
+
+			local function close_after_async_error()
+				if not fail_server_start() then
+					startup_closed = true
+					obj._server_ready = false
+					if obj._server_target == target_model then obj._server_target = nil end
+				end
+				-- A failed scheduler leaves no readiness owner. Stop the exact server
+				-- task rather than allowing an unobservable process to keep serving a
+				-- model whose callers were already released as failed.
+				if task then
+					local ok_terminate, terminated = xpcall(function()
+						return task:terminate()
+					end, debug.traceback)
+					if not ok_terminate or terminated == false then
+						Logger.error(LOG, "MLX server termination after async failure was refused: %s.",
+							tostring(terminated))
+					end
+				end
+			end
+
+			local function schedule_probe_retry(retries)
+				local installing = true
+				local callback_ran = false
+				local ok_timer, timer_or_error = xpcall(function()
+					return hs.timer.doAfter(0.5, function()
+						callback_ran = true
+						if installing then return end
+						local ok = run_async_callback("MLX readiness retry timer", function()
+							probe_server_ready(retries)
+						end)
+						if not ok then close_after_async_error() end
+					end)
+				end, debug.traceback)
+				installing = false
+				if not ok_timer or not timer_or_error or callback_ran then
+					Logger.error(LOG, "MLX readiness retry timer was not committed: %s.",
+						tostring(ok_timer and (callback_ran and "callback ran before handle publication"
+							or timer_or_error) or timer_or_error))
+					close_after_async_error()
+					return false
+				end
+				return true
+			end
+
+			probe_server_ready = function(retries)
 				if startup_closed or startup_confirmed then return end
 				if retries <= 0 then
 					-- 60 s elapsed without the server answering — release the prediction
 					-- lock so the user is not silently stuck; log for diagnosis
 					Logger.error(LOG, "MLX server for model '%s' did not become ready within 60s — releasing prediction lock.",
 						tostring(target_model))
-					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
+					fail_server_start()
 					return
 				end
 				-- Use curl --no-keepalive so each probe opens a fresh TCP connection.
 				-- hs.http pools connections and reuses a keep-alive socket to a zombie
 				-- server, making this probe see the zombie's stale model ID indefinitely.
 				local probe_task
-				probe_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout)
+				probe_task = TaskLifecycle.native("MLX readiness probe", "/usr/bin/curl", function(exit_code, stdout)
 					if probe_task then _active_tasks[probe_task] = nil end  -- probe_task captured by closure
-					if startup_closed or startup_confirmed then return end
-					if exit_code == 0 and probe_matches_target(stdout or "") then
-						mark_server_ready()
-					else
-						hs.timer.doAfter(0.5, function()
-							probe_server_ready(retries - 1)
-						end)
-					end
+					local ok = run_async_callback("MLX readiness probe completion", function()
+						if startup_closed or startup_confirmed then return end
+						if exit_code == 0 and probe_matches_target(stdout or "") then
+							mark_server_ready()
+						else
+							schedule_probe_retry(retries - 1)
+						end
+					end)
+					if not ok then close_after_async_error() end
 				end, {
 					"--silent", "--max-time", "5", "--no-keepalive",
 					"-H", "Connection: close",
 					"http://127.0.0.1:" .. MLX_PORT .. "/v1/models",
 				})
-			if probe_task then
-				_active_tasks[probe_task] = true
-				pcall(function() probe_task:start() end)
-			end
+				if probe_task then
+					_active_tasks[probe_task] = true
+					if not TaskLifecycle.start(probe_task, "MLX readiness probe") then
+						_active_tasks[probe_task] = nil
+						schedule_probe_retry(retries - 1)
+					end
+				else
+					schedule_probe_retry(retries - 1)
+				end
 			end
 
 			-- Every line of MLX stdout/stderr gets:
@@ -537,105 +681,118 @@ function M.install(ctx)
 				end
 				-- Release the caller’s prediction lock so the user can switch to a working
 				-- model without having to reload Hammerspoon
-				if on_cancel then pcall(on_cancel) end
+				fail_server_start()
 			end
 
-			local task
-			task = hs.task.new("/bin/bash", function(code)
-				startup_closed = true
+			task = TaskLifecycle.native("MLX server launch", "/bin/bash", function(code)
 				if deps.active_tasks and deps.active_tasks["mlx_server"] == task then
 					deps.active_tasks["mlx_server"] = nil
 				end
-				if obj._server_target == target_model then obj._server_target = nil end
+				local ok = run_async_callback("MLX server completion", function()
+					if startup_confirmed then
+						startup_closed = true
+						obj._server_ready = false
+						if obj._server_target == target_model then obj._server_target = nil end
+						Logger.info(LOG, "MLX server process exited with code %d.", code)
+						return
+					end
+					if code == 15 then
+						Logger.info(LOG, "MLX server process was terminated before readiness.")
+						fail_server_start()
+						return
+					end
 
-				if code == 15 then
-					print("MLX server exited with code " .. code)
-					return
-				end
+					if code == 0 and not startup_confirmed then
+						-- Process exited cleanly before signalling readiness — this is unexpected
+						Logger.error(LOG, "MLX server for model ‘%s’ exited before readiness (code 0).", tostring(target_model))
+						-- Release prediction lock so future predictions are not silently disabled
+						fail_server_start()
+						return
+					end
 
-				if code == 0 and not startup_confirmed then
-					-- Process exited cleanly before signalling readiness — this is unexpected
-					Logger.error(LOG, "MLX server for model ‘%s’ exited before readiness (code 0).", tostring(target_model))
-					-- Release prediction lock so future predictions are not silently disabled
-					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
-					return
-				end
+					if code ~= 0 then
+						-- Look for the most informative line in the in-memory ring buffer
+						-- (last ~15 lines captured live). The full server output is in
+						-- The unified rotating log behind the [MLX-SERVER] prefix if needed.
+						local error_msg = ""
+						for _, line in ipairs(server_log_buffer) do
+							if line:lower():match("error") or line:match("Traceback") or line:match("Exception") or
+							   line:match("CUDA") or line:match("RuntimeError") or line:match("ModuleNotFoundError") then
+								error_msg = line
+								break
+							end
+						end
+						if error_msg == "" and #server_log_buffer > 0 then
+							error_msg = server_log_buffer[#server_log_buffer]
+						end
 
-				if code ~= 0 then
-					-- Look for the most informative line in the in-memory ring buffer
-					-- (last ~15 lines captured live). The full server output is in
-					-- The unified rotating log behind the [MLX-SERVER] prefix if needed.
-					local error_msg = ""
-					for _, line in ipairs(server_log_buffer) do
-						if line:lower():match("error") or line:match("Traceback") or line:match("Exception") or
-						   line:match("CUDA") or line:match("RuntimeError") or line:match("ModuleNotFoundError") then
-							error_msg = line
-							break
+						if error_msg ~= "" then
+							Logger.error(LOG, "MLX server for model ‘%s’ crashed (code %d): %s", tostring(target_model), code, error_msg)
+						else
+							Logger.error(LOG, "MLX server for model ‘%s’ crashed (code %d).", tostring(target_model), code)
+						end
+						-- Release prediction lock so the session is not silently broken
+						-- after an architecture-mismatch crash or any other startup failure
+						fail_server_start()
+					end
+					Logger.info(LOG, "MLX server process exited with code %d.", code)
+				end)
+				if not ok then close_after_async_error() end
+			end, function(_, stdout, stderr)
+				local ok, continue_streaming = run_async_callback("MLX server stream", function()
+					local out = (stdout or "") .. (stderr or "")
+					if out ~= "" then
+						Logger.debug(LOG, "MLX server stream chunk (%d bytes).", #out)
+					end
+					for line in out:gmatch("([^\n\r]+)") do
+						server_last_line = line
+						table.insert(server_log_buffer, line)
+						while #server_log_buffer > 15 do table.remove(server_log_buffer, 1) end
+						Logger.debug(LOG, "MLX server: %s", line)
+						-- Inform api_mlx of the active server PGID as soon as bash reports it.
+						-- The zombie-kill logic excludes the entire process group (bash wrapper
+						-- + Python mlx_lm child) so it never terminates the server we just
+						-- launched. PGID is used instead of PID because SO_REUSEPORT makes
+						-- lsof only see the bash wrapper, not the Python child on the socket.
+						local pgid_str = line:match("%[MLX%] Server started with PID %d+ PGID (%d+)")
+						if pgid_str and type(ApiMlx) == "table" and type(ApiMlx.set_active_server_pgid) == "function" then
+							ApiMlx.set_active_server_pgid(tonumber(pgid_str))
 						end
 					end
-					if error_msg == "" and #server_log_buffer > 0 then
-						error_msg = server_log_buffer[#server_log_buffer]
+					if out:find("Starting httpd at") or out:find("Uvicorn running on") or out:find("Application startup complete") then
+						mark_server_ready()
 					end
-
-					if error_msg ~= "" then
-						Logger.error(LOG, "MLX server for model ‘%s’ crashed (code %d): %s", tostring(target_model), code, error_msg)
-					else
-						Logger.error(LOG, "MLX server for model ‘%s’ crashed (code %d).", tostring(target_model), code)
+					-- Lazy-loaded model crashes happen *after* the HTTP listener is up,
+					-- so this detection must run on every stream chunk — not only on
+					-- process exit (the process never exits when this happens)
+					if not crash_recovery_triggered and looks_like_arch_mismatch(out) then
+						trigger_auto_recovery(server_last_line)
 					end
-					-- Release prediction lock so the session is not silently broken
-					-- after an architecture-mismatch crash or any other startup failure
-					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
+					return true
+				end)
+				if not ok then
+					close_after_async_error()
+					return false
 				end
-
-				Logger.info(LOG, "MLX server process exited with code %d.", code)
-			end, function(_, stdout, stderr)
-				local out = (stdout or "") .. (stderr or "")
-				if out ~= "" then
-					Logger.debug(LOG, "MLX server stream chunk (%d bytes).", #out)
-				end
-				for line in out:gmatch("([^\n\r]+)") do
-					server_last_line = line
-					table.insert(server_log_buffer, line)
-					while #server_log_buffer > 15 do table.remove(server_log_buffer, 1) end
-					Logger.debug(LOG, "MLX server: %s", line)
-					-- Inform api_mlx of the active server PGID as soon as bash reports it.
-					-- The zombie-kill logic excludes the entire process group (bash wrapper
-					-- + Python mlx_lm child) so it never terminates the server we just
-					-- launched. PGID is used instead of PID because SO_REUSEPORT makes
-					-- lsof only see the bash wrapper, not the Python child on the socket.
-					local pgid_str = line:match("%[MLX%] Server started with PID %d+ PGID (%d+)")
-					if pgid_str and type(ApiMlx) == "table" and type(ApiMlx.set_active_server_pgid) == "function" then
-						ApiMlx.set_active_server_pgid(tonumber(pgid_str))
-					end
-				end
-				if out:find("Starting httpd at") or out:find("Uvicorn running on") or out:find("Application startup complete") then
-					mark_server_ready()
-				end
-				-- Lazy-loaded model crashes happen *after* the HTTP listener is up,
-				-- so this detection must run on every stream chunk — not only on
-				-- process exit (the process never exits when this happens)
-				if not crash_recovery_triggered and looks_like_arch_mismatch(out) then
-					trigger_auto_recovery(server_last_line)
-				end
-				return true
+				return continue_streaming
 			end, { "-c", bash_cmd })
 
 			Logger.debug(LOG, "MLX server bash_cmd: %s", bash_cmd)
 			if task then
 				deps.active_tasks["mlx_server"] = task
-				local ok, start_err = pcall(function() task:start() end)
-				if ok then
+				if TaskLifecycle.start(task, "MLX server launch") then
 					Logger.info(LOG, "MLX server task started for model ‘%s’.", tostring(target_model))
 				else
-					Logger.error(LOG, "MLX server task:start() failed for model ‘%s’: %s", tostring(target_model), tostring(start_err))
-					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
+					if deps.active_tasks["mlx_server"] == task then
+						deps.active_tasks["mlx_server"] = nil
+					end
+					fail_server_start()
 					return
 				end
 				-- 120 retries × 0.5 s = 60 s total; large models can take >30 s to load weights
 				probe_server_ready(120)
 			else
-				Logger.error(LOG, "Failed to create hs.task for MLX server — model ‘%s’ cannot start.", tostring(target_model))
-				if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
+				fail_server_start()
 			end
 		end
 	end

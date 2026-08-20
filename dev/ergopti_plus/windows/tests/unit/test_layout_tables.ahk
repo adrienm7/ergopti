@@ -483,11 +483,11 @@ Test("CAPSLOCK_SYMBOLS: every entry runs without crashing", TestLT_CapsLockSymbo
 
 
 
-; ========================================================================
+; ==========================================================================
 ; ==========================================================================
 ; ======= Regression: AltGr number-row must not require ergopti_base =======
 ; ==========================================================================
-; ========================================================================
+; ==========================================================================
 
 ; Source-scan the registration block in layout_altgr.ahk to ensure the HotIf
 ; condition for ALTGR_NUMBER_ROW does not require ergopti_base. When that
@@ -500,9 +500,16 @@ TestLT_AltGrNumberRowRegistrationNoErgoptiBase() {
 	Content := _DriverDirConcat("modules/keymap/layout")
 	; Locate the HotIf line that gates ALTGR_NUMBER_ROW registration.
 	; That line should contain "ergopti_alt_gr" but must NOT contain "ergopti_base".
-	Pattern := "HotIf\([^)]*ergopti_alt_gr[^)]*\)"
+	; NOT "HotIf\([^)]*…": the real registration is
+	;   HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
+	; and [^)] stops dead at the ")" in "(*)", so that pattern matched NOTHING and
+	; this guard scanned an empty result set while reporting a pass. Anchor on the
+	; whole line instead — the condition is written on one line.
+	Pattern := "m)^.*HotIf\(.*ergopti_alt_gr.*$"
 	Pos := 1
+	Seen := 0
 	while (Pos := RegExMatch(Content, Pattern, &M, Pos)) {
+		Seen += 1
 		if InStr(M[], "ergopti_base") {
 			AssertFalse(true,
 				"ALTGR_NUMBER_ROW HotIf condition must not require ergopti_base"
@@ -511,8 +518,13 @@ TestLT_AltGrNumberRowRegistrationNoErgoptiBase() {
 		}
 		Pos += StrLen(M[])
 	}
-	; No forbidden condition found.
-	AssertTrue(true)
+	; The loop finding nothing looks identical to the loop finding only good
+	; conditions, and AssertTrue(true) could not tell them apart: a renamed HotIf
+	; token would have reported this regression as fixed. The count is the
+	; difference.
+	Assert(Seen > 0,
+		"no AltGr HotIf registration was found at all — the ergopti_alt_gr token was renamed "
+		. "or the registration moved, so this guard was scanning nothing")
 }
 Test("ALTGR_NUMBER_ROW registration: HotIf does not require ergopti_base",
 	TestLT_AltGrNumberRowRegistrationNoErgoptiBase)

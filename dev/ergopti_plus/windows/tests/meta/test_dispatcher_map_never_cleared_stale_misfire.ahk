@@ -51,7 +51,7 @@ _DMNCSM_ReadSource(RelPath) {
 ; ==================================================
 
 _DMNCSM_ResetHelperClearsBothMaps() {
-	Src := _DMNCSM_ReadSource("lib/menu_dispatcher.ahk")
+	Src := _DMNCSM_ReadSource("infra/menu_dispatcher.ahk")
 	Seg := _DriverFuncBody("MenuDispatcher_Reset")
 	Assert(Seg != "", "MenuDispatcher_Reset() must be defined in menu_dispatcher.ahk")
 	; Whitespace-tolerant: the assignments are alignment-padded in the source
@@ -86,9 +86,14 @@ _DMNCSM_StagedPublicationRetiresOldIdsAfterAttach() {
 Test("tray_menu: staged publication retires old dispatcher IDs after attach (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_StagedPublicationRetiresOldIdsAfterAttach)
 
 _DMNCSM_RebuildUsesStagedInit() {
-	Seg := _DriverFuncBody("RebuildTrayMenu")
-	Assert(Seg != "", "RebuildTrayMenu() must exist in ui/tray_menu.ahk")
-	Assert(InStr(Seg, "A_TrayMenu.Delete()") = 0 and InStr(Seg, "initMenu()") > 0,
-		"RebuildTrayMenu must leave the live root intact until initMenu's staged publication succeeds")
+	Coordinator := _DriverFuncBody("RebuildTrayMenu")
+	Worker := _DriverFuncBody("_TrayRootBuildOnce")
+	Assert(Coordinator != "", "RebuildTrayMenu() must exist")
+	Assert(Worker != "", "_TrayRootBuildOnce() must exist")
+	Assert(InStr(Coordinator, "A_TrayMenu.Delete()") = 0
+		and InStr(Coordinator, "_TrayRootDrain()") > 0,
+		"RebuildTrayMenu must leave the live root intact and delegate to the single tray-root generation owner")
+	Assert(InStr(Worker, "initMenu(PublishAuthorizeFn)") > 0,
+		"the canonical root worker must carry terminal authorization into initMenu's staged publication")
 }
-Test("tray_menu: RebuildTrayMenu delegates root replacement to staged init (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_RebuildUsesStagedInit)
+Test("tray_menu: coordinated rebuild delegates root replacement to staged init (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_RebuildUsesStagedInit)

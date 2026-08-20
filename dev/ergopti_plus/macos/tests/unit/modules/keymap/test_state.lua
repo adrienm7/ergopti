@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local State = helpers.load_with_stubs("modules.keymap.state")
 
@@ -26,21 +26,23 @@ end
 
 
 
--- =====================================
+-- ======================================
 -- ======================================
 -- ======= 1/ Argument Validation =======
 -- ======================================
--- =====================================
+-- ======================================
 
 helpers.describe("State.new: argument validation", function()
 	helpers.it("errors when defaults is not a table", function()
-		local ok = pcall(State.new, "oops", {})
+		local ok, err = pcall(State.new, "oops", {})
 		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err) ~= "", "and must say why: " .. tostring(err))
 	end)
 
 	helpers.it("errors when delays_default is not a table", function()
-		local ok = pcall(State.new, make_defaults(), "oops")
+		local ok, err = pcall(State.new, make_defaults(), "oops")
 		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err) ~= "", "and must say why: " .. tostring(err))
 	end)
 end)
 
@@ -80,12 +82,12 @@ helpers.describe("State.new: seeded fields", function()
 		helpers.assert_eq(s.BASE_DELAY_SEC, 0.4)
 	end)
 
-	helpers.it("starts with empty buffer and zero counters", function()
+	helpers.it("starts with an empty buffer and fresh registry sequence", function()
 		local s = State.new(make_defaults(), { autocorrection = 0.3 })
 		helpers.assert_eq(s.buffer, "")
 		helpers.assert_eq(s.seq_counter, 0)
-		helpers.assert_eq(s.expected_synthetic_chars, "")
-		helpers.assert_eq(s.expected_synthetic_deletes, 0)
+		helpers.assert_eq(s.group_order_counter, 0)
+		helpers.assert_true(s.start_is_word_boundary)
 	end)
 
 	helpers.it("creates empty mapping containers", function()

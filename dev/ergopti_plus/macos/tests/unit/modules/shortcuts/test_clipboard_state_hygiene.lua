@@ -95,10 +95,12 @@ helpers.describe("the wrap-text cache is invalidated once the selection is consu
 			.. "longer selected: the keystroke is swallowed and the previous selection "
 			.. "duplicated")
 
-		local wrap_at = src:find("text_acts%.wrap_selection%(sel")
-		local mark_at = src:find("mark_wrap_selection_consumed%(%)", wrap_at or 1)
-		helpers.assert_true(wrap_at ~= nil and mark_at ~= nil and mark_at > wrap_at,
-			"the cache must be marked consumed AFTER the wrap that invalidates it")
+		local wrap_at = src:find("pcall%(%s*text_acts%.wrap_selection")
+		local success_at = src:find("wrapped_or_err%s*~=%s*true", wrap_at or 1)
+		local mark_at = src:find("mark_wrap_selection_consumed%(%)", success_at or 1)
+		helpers.assert_true(wrap_at ~= nil and success_at ~= nil and mark_at ~= nil
+			and wrap_at < success_at and success_at < mark_at,
+			"the cache must be marked consumed only AFTER wrap_selection confirms output")
 	end)
 
 	helpers.it("keeps the entry valid as a negative rather than clearing it", function()

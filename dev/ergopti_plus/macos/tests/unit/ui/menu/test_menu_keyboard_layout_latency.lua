@@ -24,10 +24,15 @@ local helpers = require("tests.helpers")
 local function task_stub_firing(stdout)
 	return {
 		new = function(_path, cb, _args)
-			return {
-				start     = function() if cb then cb(0, stdout, "") end end,
+			local task
+			task = {
+				start     = function()
+					if cb then cb(0, stdout, "") end
+					return task
+				end,
 				terminate = function() end,
 			}
+			return task
 		end,
 	}
 end
@@ -38,7 +43,9 @@ end
 
 
 --- ===================================================
+--- ===================================================
 --- ======= 1) Active-layout JSON parser (pure) =======
+--- ===================================================
 --- ===================================================
 
 helpers.describe("menu_keyboard_layout._parse_active_layouts", function()
@@ -101,6 +108,7 @@ end)
 
 helpers.describe("menu_keyboard_layout async refresh", function()
 	helpers.it("updates the cache from the probe stdout via hs.task", function()
+		package.loaded["adapters.task_lifecycle"] = nil
 		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
 			task = task_stub_firing('["French","Ergopti_v2_2_2_plus"]'),
 		})

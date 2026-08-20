@@ -157,6 +157,139 @@ PLC_Stop() {
 	}
 }
 
+; Signals an existing manual-reset event by its exact kernel-object name.
+; The caller validates any untrusted name before crossing this adapter seam.
+; @param Name {String} Exact event name.
+; @return {Boolean} True only when OpenEvent and SetEvent both succeed.
+PLC_SignalNamedEvent(Name) {
+	if !(Name is String) or Name = ""
+		return false
+	Handle := 0
+	try {
+		static EVENT_MODIFY_STATE := 0x0002
+		Handle := DllCall("OpenEventW", "UInt", EVENT_MODIFY_STATE, "Int", false,
+			"Str", Name, "Ptr")
+		return Handle and DllCall("SetEvent", "Ptr", Handle, "Int") != 0
+	} catch {
+		return false
+	} finally {
+		if Handle
+			try DllCall("CloseHandle", "Ptr", Handle)
+	}
+}
+
+; Creates a manual-reset, initially non-signaled event and rejects an existing
+; object with the same name. The collision check makes names capabilities rather
+; than attachable labels.
+PLC_CreateNamedManualResetEvent(Name) {
+	if !(Name is String) or Name = ""
+		throw TypeError("Named event requires a non-empty String")
+	Handle := DllCall("Kernel32\CreateEventW", "Ptr", 0, "Int", true,
+		"Int", false, "Str", Name, "Ptr")
+	ErrorCode := A_LastError
+	if !Handle
+		throw Error("CreateEventW failed for '" . Name . "' (Win32 "
+			. ErrorCode . ")")
+	static ERROR_ALREADY_EXISTS := 183
+	if (ErrorCode == ERROR_ALREADY_EXISTS) {
+		PLC_CloseNativeHandle(Handle)
+		throw Error("CreateEventW collided with existing event '" . Name . "'")
+	}
+	return Handle
+}
+
+PLC_CloseNativeHandle(Handle) {
+	if !Handle
+		return true
+	try return DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
+	catch
+		return false
+}
+
+PLC_CurrentProcessId() {
+	try return DllCall("Kernel32\GetCurrentProcessId", "UInt")
+	catch
+		return 0
+}
+
+; Opens an inheritable handle to this exact process. The updater passes that
+; capability to its child instead of relying on a reusable PID.
+PLC_OpenCurrentProcessHandle(DesiredAccess) {
+	ProcessId := PLC_CurrentProcessId()
+	if (!ProcessId or !IsNumber(DesiredAccess))
+		return 0
+	try return DllCall("Kernel32\OpenProcess", "UInt", DesiredAccess,
+		"Int", true, "UInt", ProcessId, "Ptr")
+	catch
+		return 0
+}
+
+PLC_TerminateProcessHandle(Handle, ExitCode := 1) {
+	if !Handle
+		return true
+	try return DllCall("Kernel32\TerminateProcess", "Ptr", Handle,
+		"UInt", ExitCode, "Int") != 0
+	catch
+		return false
+}
+
+; Creates a child with inherited handles into caller-owned native buffers. The
+; PROCESS_INFORMATION buffer remains caller-owned so an OnExit thread can claim
+; its handles atomically if creation and shutdown race.
+PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo) {
+	if !(ApplicationPath is String) or ApplicationPath = ""
+		throw TypeError("CreateProcessW requires an application path")
+	if !(CommandBuffer is Buffer) or !(StartupInfo is Buffer)
+		or !(ProcessInfo is Buffer)
+		throw TypeError("CreateProcessW requires native buffers")
+	Created := DllCall("Kernel32\CreateProcessW",
+		"Str", ApplicationPath,
+		"Ptr", CommandBuffer.Ptr,
+		"Ptr", 0,
+		"Ptr", 0,
+		"Int", true,
+		"UInt", CreationFlags,
+		"Ptr", 0,
+		"Ptr", 0,
+		"Ptr", StartupInfo.Ptr,
+		"Ptr", ProcessInfo.Ptr,
+		"Int")
+	if !Created
+		throw Error("CreateProcessW failed (Win32 " . A_LastError . ")")
+	return true
+}
+
+; Returns the native result, captured Win32 error and any thrown message without
+; losing diagnostics to cleanup calls that follow ResumeThread.
+PLC_ResumeThreadHandle(Handle) {
+	Result := Map("Value", 0xFFFFFFFF, "Error", 0, "Exception", "")
+	try {
+		Result["Value"] := DllCall("Kernel32\ResumeThread", "Ptr", Handle, "UInt")
+		Result["Error"] := A_LastError
+	} catch as Err {
+		Result["Error"] := A_LastError
+		Result["Exception"] := Err.Message
+	}
+	return Result
+}
+
+PLC_WaitHandle(Handle, TimeoutMs := 0) {
+	if !Handle
+		return -1
+	try return DllCall("Kernel32\WaitForSingleObject", "Ptr", Handle,
+		"UInt", TimeoutMs, "UInt")
+	catch
+		return -1
+}
+
+PLC_SetEventHandle(Handle) {
+	if !Handle
+		return false
+	try return DllCall("Kernel32\SetEvent", "Ptr", Handle, "Int") != 0
+	catch
+		return false
+}
+
 
 
 

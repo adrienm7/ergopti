@@ -56,6 +56,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 
 		local ok, err = pcall(Registry.add, "sig★", "Best regards", {})
 
+		helpers.assert_nil(err, "and must report no error: " .. tostring(err))
 		helpers.assert_true(ok,
 			"Registry.add must not raise when the magic key is '%' — the key is interpolated "
 			.. "into the REPLACEMENT side of gsub, where an unescaped '%' throws and aborts "
@@ -88,7 +89,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 		-- space becomes "%20", whose "%2" reads as capture reference #2. That raised
 		-- inside an hs.timer callback, where the error reaches only the HS Console,
 		-- so the search silently never opened for any multi-word selection.
-		local text_utils = helpers.load_with_stubs("lib.text_utils")
+		local text_utils = helpers.load_with_stubs("infra.text_utils")
 
 		local encoded  = "hello%20world%2Ffoo"
 		local template = "https://example.com/search?q=%s"
@@ -113,7 +114,8 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 			state.magic_key = key
 			Registry.init(state)
 
-			local ok = pcall(Registry.add, "sig★", "Best regards", {})
+			local ok, add_err = pcall(Registry.add, "sig★", "Best regards", {})
+			helpers.assert_nil(add_err, "and must report none: " .. tostring(add_err))
 			helpers.assert_true(ok,
 				"Registry.add must not raise for magic key '" .. key .. "'")
 		end

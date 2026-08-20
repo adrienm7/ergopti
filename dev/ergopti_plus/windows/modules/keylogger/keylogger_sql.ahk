@@ -52,6 +52,24 @@ KL_AllocEventId() {
 
 KL_BuildInsertTyping(e, id) {
     ts := e["timestamp"]
+
+    ; text and events_json are the only columns holding what the user literally
+    ; typed, so they are the only ones encrypted; the aggregates stay in clear.
+    ; A "" return with non-empty input means encryption is on but could not run —
+    ; the row is dropped rather than storing the plaintext the user asked to
+    ; protect. Empty input legitimately returns "" and must NOT be treated as a
+    ; failure.
+    rawText := KL_GetMap(e, "text", "")
+    rawJson := KL_JsonEncode(KL_GetMap(e, "events", ""))
+    if (rawJson = "")
+        rawJson := "{}"
+    encText := KL_Enc_Encrypt(Keylogger.device_id, id, rawText)
+    encJson := KL_Enc_Encrypt(Keylogger.device_id, id . "j", rawJson)
+    if (rawText != "" && encText = "") || (rawJson != "" && encJson = "") {
+        LoggerError("Keylogger", "At-rest encryption failed - typing event {1} dropped rather than stored in clear.", id)
+        return ""
+    }
+
     return Format(
         "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, {20}, {21}, {22});",
         Keylogger._device_id_lit, id,
@@ -71,9 +89,9 @@ KL_BuildInsertTyping(e, id) {
         KL_SqlNum(KL_GetMap(e, "battery_level", "")),
         KL_SqlNum(KL_GetMap(e, "audio_volume", "")),
         KL_SqlNum(KL_GetMap(e, "wpm", 0)),
-        KL_SqlStr(KL_GetMap(e, "text", "")),
+        KL_SqlStr(encText),
         KL_SqlNullable(KL_GetMap(e, "rich_text", "")),
-        KL_SqlJson(KL_GetMap(e, "events", ""))
+        KL_SqlStr(encJson)
     )
 }
 
@@ -186,11 +204,22 @@ KL_GetMap(m, key, default := "") {
     return default
 }
 
+; Wraps the typing builder's result: an empty string means at-rest encryption
+; failed, and the row is dropped (empty list) rather than stored in clear.
+KL_TypingRow(sql) {
+    return (sql = "") ? [] : [sql]
+}
+
 KL_BuildInserts(entry) {
     EventType := entry["type"]
-    id := KL_AllocEventId()
+	; Output transactions reserve ids at their real screen-order boundary. A
+	; detached typing flush can publish after the accepted completion that
+	; interrupted it, but its lower reserved id still replays first. Ordinary
+	; event producers keep the existing ingest-time allocation path.
+	id := (entry.Has("_event_id") && entry["_event_id"] is Integer
+		&& entry["_event_id"] > 0) ? entry["_event_id"] : KL_AllocEventId()
     switch EventType {
-        case "typing":              return [KL_BuildInsertTyping(entry, id)]
+        case "typing":              return KL_TypingRow(KL_BuildInsertTyping(entry, id))
         case "app_switch":          return [KL_BuildInsertAppSwitch(entry, id)]
         case "window_switch":       return [KL_BuildInsertWindowSwitch(entry, id)]
         case "shortcut":            return [KL_BuildInsertShortcut(entry, id)]

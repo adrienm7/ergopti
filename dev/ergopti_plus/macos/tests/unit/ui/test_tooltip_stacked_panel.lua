@@ -33,7 +33,7 @@ local helpers = require("tests.helpers")
 -- (e.g. missing the [typography] section that config.lua requires).
 package.loaded["ui.tooltip.config"] = nil
 package.loaded["toml_codec.reader"] = nil
-package.loaded["lib.toml.reader"]   = nil
+package.loaded["infra.toml.reader"]   = nil
 
 local Renderer = helpers.load_with_stubs("ui.tooltip.renderer")
 

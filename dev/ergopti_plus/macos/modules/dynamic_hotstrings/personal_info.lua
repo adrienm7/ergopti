@@ -14,9 +14,9 @@
 local M = {}
 
 local hs       = hs
-local eventtap = hs.eventtap
-local timer    = hs.timer
-local Logger   = require("lib.logger")
+local Logger   = require("infra.logger")
+local SyntheticInput = require("adapters.synthetic_input")
+local Terminators = require("keymap.terminators")
 local LOG      = "personal_info"
 
 -- Safely require the UI editor module to prevent crashes
@@ -25,6 +25,14 @@ if not ok_editor then ui_editor = nil end
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
+local FileSystem = require("adapters.file_system")
+
+-- The shared personal-info field classification, used ONLY by the preview
+-- provider below. Optional-require rather than a hard dependency so a driver
+-- shipped without the shared tree still expands correctly — the provider then
+-- withholds instead, which is the safe direction.
+local ok_fields, personal_info_fields = pcall(require, "infra.personal_info_fields")
+if not ok_fields then personal_info_fields = nil end
 
 
 
@@ -49,11 +57,64 @@ local _info            = {}
 local _letters         = {}
 local _base_dir        = ""
 local _info_toml_path  = ""
+local _source_snapshot = nil
 
 local _keymap    = nil
+local _active_start_token = nil
+local _starting_token = nil
+local ManifestReader = require("infra.manifest_reader")
+
+-- The magic key as declared in the shared feature manifest. Named once here so
+-- the three sites below cannot drift apart from each other or from the manifest.
+local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
+
+-- Same-directory staging keeps the final rename atomic on macOS
+local SAVE_TEMP_SUFFIX = ".ergopti-save.tmp"
+
+-- Width of the placeholder a preview part falls back to when the shared field
+-- classification cannot be reached. Fixed rather than the value's own length:
+-- how long a secret is, is itself a hint about which one it is.
+local UNCLASSIFIED_PREVIEW_BULLETS = 8
+
+--- Registers one append-only keymap callback as part of a prospective start.
+--- @param label string Stable diagnostic label.
+--- @param registrar function Keymap registration function.
+--- @param callback function Token-gated callback to publish.
+--- @return boolean committed
+local function register_start_callback(label, registrar, callback)
+	if type(registrar) ~= "function" then
+		Logger.error(LOG, "Personal-info start requires keymap.%s.", label)
+		return false
+	end
+	local ok, result = xpcall(function() return registrar(callback) end, debug.traceback)
+	if ok and result ~= false then return true end
+	Logger.error(LOG, "Personal-info %s failed (callback content withheld; terminal type: %s).",
+		label, type(result))
+	return false
+end
+
+--- Invalidates every callback published by an uncommitted start generation.
+--- @param token table Prospective generation token.
+--- @param reason string Failure context.
+--- @return boolean false
+local function rollback_start(token, reason)
+	if _starting_token == token or _active_start_token == token then
+		_starting_token = nil
+		_active_start_token = nil
+		_enabled = false
+		_replacing = false
+		_state = STATE_IDLE
+		_combo = ""
+		_keymap = nil
+	end
+	Logger.error(LOG, "Personal info tracker start rolled back after %s.", tostring(reason))
+	return false
+end
 
 local DEFAULT_CONFIG = {
-	trigger_char = "★",
+	-- Read from the shared manifest rather than restated: a second copy of the
+	-- magic key is a second thing to change when the user picks another one.
+	trigger_char = ManifestReader.default_for("hotstrings.trigger_char"),
 	info = {
 		first_name            = "Prénom",
 		last_name             = "Nom",
@@ -87,6 +148,28 @@ local DEFAULT_CONFIG = {
 		w = "work_email_address",
 	},
 }
+
+--- Copies one flat configuration map so runtime edits can never mutate the
+--- module-level defaults retained across stop/start cycles.
+--- @param source table
+--- @return table copy
+local function copy_config_map(source)
+	local copy = {}
+	for key, value in pairs(source or {}) do copy[key] = value end
+	return copy
+end
+
+--- Returns a fresh default configuration with no mutable table shared with
+--- DEFAULT_CONFIG. Personal data saved during one session must never become the
+--- fallback for a later missing or partially populated file.
+--- @return table config
+local function fresh_default_config()
+	return {
+		trigger_char = DEFAULT_CONFIG.trigger_char,
+		info = copy_config_map(DEFAULT_CONFIG.info),
+		letters = copy_config_map(DEFAULT_CONFIG.letters),
+	}
+end
 
 
 
@@ -140,19 +223,112 @@ local function escape_toml(s)
 	return s
 end
 
+--- Builds an isolated candidate without publishing partial edits to live consumers.
+--- @param new_info table Updated personal-information fields.
+--- @return table candidate Complete candidate table.
+local function build_info_candidate(new_info)
+	local candidate = {}
+	for key, value in pairs(_info) do candidate[key] = value end
+	for key, value in pairs(new_info) do candidate[key] = value end
+	return candidate
+end
+
+--- Serializes one complete personal-information candidate.
+--- @param candidate table Complete personal-information table.
+--- @return string content TOML payload.
+local function serialize_config(candidate)
+	local lines = {
+		"# personal_info.toml — Personal information",
+		"# Auto-managed by the personal information editor.",
+		"# Do not edit manually unless you know what you are doing.",
+		"",
+		"[info]",
+	}
+	for key, value in pairs(candidate) do
+		lines[#lines + 1] = key .. " = \"" .. escape_toml(tostring(value)) .. "\""
+	end
+	lines[#lines + 1] = ""
+	lines[#lines + 1] = "[letters]"
+	for key, value in pairs(_letters) do
+		lines[#lines + 1] = key .. " = \"" .. escape_toml(tostring(value)) .. "\""
+	end
+	lines[#lines + 1] = ""
+	return table.concat(lines, "\n")
+end
+
+--- Revokes any visible or prospective preview before its source data changes.
+--- @return boolean committed True only when mutation may proceed safely.
+local function invalidate_preview_before_save()
+	-- The nil case is bootstrap-only: start() materialises a missing file before
+	-- registering this module's preview provider, so no visible promise exists.
+	if not _keymap then return true end
+	if type(_keymap.invalidate_hotstring_preview) ~= "function" then
+		Logger.error(LOG, "Personal-info save refused because the keymap preview fence is unavailable.")
+		return false
+	end
+	local ok, committed = xpcall(_keymap.invalidate_hotstring_preview, debug.traceback)
+	if not ok or committed ~= true then
+		Logger.error(LOG, "Personal-info save refused because preview revocation did not commit "
+			.. "(failure content withheld).")
+		return false
+	end
+	return true
+end
+
+--- Removes an unpublished staging file and reports cleanup failure.
+--- @param staged_path string Staging file path.
+local function remove_staged_file(staged_path)
+	local ok, removed, remove_err = pcall(os.remove, staged_path)
+	if not ok or removed ~= true then
+		Logger.warn(LOG, "Could not remove the unpublished personal-info staging file "
+			.. "(failure content withheld).")
+	end
+end
+
+--- Writes and flushes a complete payload to its staging file.
+--- @param staged_path string Same-directory staging file path.
+--- @param content string Complete TOML payload.
+--- @return boolean committed True after write, flush, and close succeed.
+local function write_staged_config(staged_path, content)
+	local open_ok, file_or_err, open_err = pcall(io.open, staged_path, "wb")
+	if not open_ok or not file_or_err then
+		Logger.error(LOG, "Cannot open the personal-info staging file (failure content withheld).")
+		return false
+	end
+	local file = file_or_err
+	local write_ok, write_committed, write_err = xpcall(function()
+		local written, err = file:write(content)
+		if not written then return false, err end
+		local flushed, flush_err = file:flush()
+		if flushed ~= true then return false, flush_err end
+		return true
+	end, debug.traceback)
+	local close_ok, close_committed, close_err = pcall(file.close, file)
+	if not write_ok or write_committed ~= true or not close_ok or close_committed ~= true then
+		Logger.error(LOG, "Personal-info staging write did not commit (failure content withheld).")
+		remove_staged_file(staged_path)
+		return false
+	end
+	return true
+end
+
 --- Reads personal_info.toml and returns a config table compatible with DEFAULT_CONFIG.
 --- @param toml_path string Absolute path to personal_info.toml.
---- @return table config The loaded or default configuration.
+--- @return table|nil config The loaded/default configuration, or nil on read failure.
 --- @return boolean was_missing True if the file did not exist on disk and defaults were used.
+--- @return table|nil source_snapshot Exact classified bytes used to build the config.
 local function load_config(toml_path)
 	Logger.debug(LOG, "Loading personal info from '%s'…", toml_path)
-	local fh = io.open(toml_path, "r")
-	if not fh then
-		Logger.info(LOG, "personal_info.toml not found — using default values.")
-		return DEFAULT_CONFIG, true
+	local content, read_status = FileSystem.read_with_status(toml_path)
+	if read_status ~= "ok" then
+		if read_status == "absent" then
+			Logger.info(LOG, "personal_info.toml not found — using default values.")
+			return fresh_default_config(), true, { status = "absent" }
+		end
+		Logger.error(LOG, "personal_info.toml could not be read; startup refused "
+			.. "(failure content withheld).")
+		return nil, false
 	end
-	local content = fh:read("*a")
-	fh:close()
 
 	local info    = parse_toml_section(content, "info")
 	local letters = parse_toml_section(content, "letters")
@@ -176,46 +352,76 @@ local function load_config(toml_path)
 		trigger_char = DEFAULT_CONFIG.trigger_char,
 		info         = merged_info,
 		letters      = merged_letters,
-	}, false
+	}, false, { status = "ok", content = content }
 end
 
---- Persists updated info fields into personal_info.toml.
---- @param new_info table The updated fields to save.
-function M.save_info(new_info)
-	if type(new_info) ~= "table" then return end
-	Logger.debug(LOG, "Saving personal info to '%s'…", _info_toml_path)
+--- Replaces a published table without invalidating references held by consumers.
+--- @param target table Published table.
+--- @param source table Validated replacement.
+local function replace_table_contents(target, source)
+	for key in pairs(target) do target[key] = nil end
+	for key, value in pairs(source) do target[key] = value end
+end
 
-	-- Merge the new values into the current info
-	for k, v in pairs(new_info) do
-		_info[k] = v
-	end
-
-	local lines = {
-		"# personal_info.toml — Personal information",
-		"# Auto-managed by the personal information editor.",
-		"# Do not edit manually unless you know what you are doing.",
-		"",
-		"[info]",
-	}
-	for k, v in pairs(_info) do
-		lines[#lines + 1] = k .. ' = "' .. escape_toml(tostring(v)) .. '"'
-	end
-	lines[#lines + 1] = ""
-	lines[#lines + 1] = "[letters]"
-	for k, v in pairs(_letters) do
-		lines[#lines + 1] = k .. ' = "' .. escape_toml(tostring(v)) .. '"'
-	end
-	lines[#lines + 1] = ""
-
-	local fh = io.open(_info_toml_path, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot open personal_info.toml for writing.")
+--- Adopts a valid external winner only when it demonstrably differs from the
+--- snapshot that the rejected save attempted to replace. Ordinary I/O failures
+--- against unchanged bytes keep the current runtime state, preserving rollback.
+--- @param expected_source table Snapshot used by the rejected publication.
+local function adopt_changed_config(expected_source)
+	local config, was_missing, current_source = load_config(_info_toml_path)
+	if type(config) ~= "table" or was_missing or type(current_source) ~= "table"
+		or current_source.status ~= "ok"
+	then
 		return
 	end
-	fh:write(table.concat(lines, "\n"))
-	fh:close()
+	if type(expected_source) == "table"
+		and expected_source.status == current_source.status
+		and expected_source.content == current_source.content
+	then
+		return
+	end
+	if type(config.info) ~= "table" or type(config.letters) ~= "table" then return end
+	replace_table_contents(_info, config.info)
+	replace_table_contents(_letters, config.letters)
+	_source_snapshot = current_source
+	Logger.warn(LOG, "Personal-info save rejected a stale candidate and adopted the external winner.")
+end
+
+--- Persists updated info fields through a preview-fenced atomic transaction.
+--- @param new_info table The updated fields to save.
+--- @return boolean committed True only after disk and live memory commit.
+function M.save_info(new_info)
+	if type(new_info) ~= "table" then
+		Logger.error(LOG, "save_info(): expected a table, got %s — save refused.", type(new_info))
+		return false
+	end
+	if type(_info_toml_path) ~= "string" or _info_toml_path == "" then
+		Logger.error(LOG, "save_info() called before the personal-info path was initialized.")
+		return false
+	end
+	Logger.debug(LOG, "Saving personal info to '%s'…", _info_toml_path)
+
+	local candidate = build_info_candidate(new_info)
+	local content = serialize_config(candidate)
+	if not invalidate_preview_before_save() then return false end
+
+	if type(_source_snapshot) ~= "table" then
+		Logger.error(LOG, "Personal-info save refused because its source snapshot is unavailable.")
+		return false
+	end
+	local expected_source = _source_snapshot
+	if FileSystem.write_if_unchanged(_info_toml_path, content, expected_source) ~= true then
+		Logger.error(LOG, "Personal-info atomic publication did not commit.")
+		adopt_changed_config(expected_source)
+		return false
+	end
+
+	-- Preserve the shared table identity held by dependent engines
+	replace_table_contents(_info, candidate)
+	_source_snapshot = { status = "ok", content = content }
 
 	Logger.info(LOG, "Personal info configuration saved successfully.")
+	return true
 end
 
 
@@ -229,35 +435,78 @@ end
 -- ====================================
 
 --- Resolves accumulated letters into actual mapped strings.
+---
+--- Returns the field NAMES alongside the values, in the same order. The values
+--- alone are what gets typed, but the preview has to ask the shared declaration
+--- how much of each one may appear on screen — and only the letter that produced
+--- a part knows which personal_info.toml field it is. Losing that here is what
+--- would put an IBAN on screen in full.
+--- ALL OR NOTHING. A letter that aliases nothing, or that aliases a field the
+--- user left blank, declines the WHOLE combo rather than being skipped.
+---
+--- This used to skip. The failure it caused is silent and personal: typing "@npz"
+--- with a stray "z" expanded as "@np", so the values landed one form field short
+--- of where the user was aiming and every later box held the wrong thing — a
+--- surname in the address line, and no error anywhere. Nothing happening is
+--- merely visibly wrong, which the user corrects in a second.
+---
+--- Aligned deliberately with Linux (`manager.resolve_combo`) and Windows
+--- (`HSE_TryPersonalInfoCombo`), which both refuse. Three drivers answering the
+--- same question differently is the divergence the shared corpus exists to end,
+--- and this one changes what gets TYPED, not only what is shown.
 --- @param combo string Sequence of typed letters.
---- @return table List of strings resolved from the letters.
+--- @return table values List of strings resolved from the letters; empty when
+---   any letter of the combo cannot be resolved.
+--- @return table fields Matching personal_info.toml field names, same indices.
 local function resolve_combo(combo)
-	local parts = {}
-	if type(combo) ~= "string" then return parts end
-	
+	local parts  = {}
+	local fields = {}
+	if type(combo) ~= "string" then return parts, fields end
+
 	for i = 1, #combo do
 		local letter = combo:sub(i, i)
 		local key    = _letters[letter]
-		if key and _info[key] then
-			table.insert(parts, _info[key])
-		end
+		local value  = key and _info[key] or nil
+		if type(value) ~= "string" or value == "" then return {}, {} end
+		table.insert(parts, value)
+		table.insert(fields, key)
 	end
-	return parts
+	return parts, fields
+end
+
+--- What the preview bubble may show for one resolved part.
+---
+--- DISPLAY ONLY: do_expand() calls resolve_combo() and injects the values it
+--- returns, never this. A mask that reached the injector would type bullets into
+--- whatever form the user was filling in.
+--- @param value string The resolved value.
+--- @param field string|nil The personal_info.toml field it came from.
+--- @return string
+local function masked_for_preview(value, field)
+	if type(value) ~= "string" then return value end
+	if not personal_info_fields or type(personal_info_fields.for_preview) ~= "function" then
+		-- Fail closed. Every value this provider resolves comes straight out of
+		-- personal_info.toml, so an unreachable classifier is precisely the case
+		-- where showing the value is the wrong guess.
+		Logger.error(LOG, "Field classification unavailable — withholding a personal-info preview.")
+		return ("•"):rep(UNCLASSIFIED_PREVIEW_BULLETS)
+	end
+	return personal_info_fields.for_preview(value, field)
 end
 
 --- Performs the actual injection of the requested data.
 --- @param combo string Sequence of typed letters corresponding to the data.
+--- @return boolean injected True only when the keymap accepted the transaction.
 local function do_expand(combo)
 	Logger.debug(LOG, "Injecting personal data…")
 	local n_back = 1 + #combo
 	local parts  = resolve_combo(combo)
 	_replacing = true
-	-- Two DIFFERENT strings for two different trackers — see the emit callback's
-	-- return below.
-	-- `emitted` enumerates every keydown the OS will deliver back to us: the
-	-- field values PLUS the inter-field Tab, which is fired as a real keyStroke
-	-- and echoes as a "\t" character event exactly like the Tab terminator the
-	-- expander already tracks in try_terminator_expand.
+	-- Two strings serve the historical emitter return contract; neither identifies
+	-- an OS event. Immutable transaction tags now provide that provenance.
+	-- `emitted` describes the character-producing key sequence: field values plus
+	-- each inter-field Tab. It remains compatibility metadata for callers that
+	-- inspect physical_echo.
 	-- `echoed` is the LOGICAL text: values only, no tab. A Tab moves focus to the
 	-- next field, it inserts nothing on screen, so this is what CoreState.buffer
 	-- and the keylogger's logical record must hold.
@@ -266,35 +515,29 @@ local function do_expand(combo)
 
 	local ok, err = pcall(function()
 		if _keymap and type(_keymap.inject_dynamic) == "function" then
-			_keymap.inject_dynamic(n_back, echoed, function()
+			local injected = _keymap.inject_dynamic(n_back, echoed, function()
 				local c = 0
-				local ok_tu, text_utils = pcall(require, "lib.text_utils")
+				local ok_tu, text_utils = pcall(require, "infra.text_utils")
 				for i, value in ipairs(parts) do
-					eventtap.keyStrokes(value)
+					assert(SyntheticInput.emit_key_strokes(value),
+						"personal-info field could not be dispatched")
 					if ok_tu and type(text_utils.utf8_len) == "function" then
 						c = c + text_utils.utf8_len(value)
 					else
 						c = c + #value
 					end
 					if i < #parts then
-						eventtap.keyStroke({}, "tab", 0)
+						assert(SyntheticInput.emit_key_stroke({}, "tab", 0),
+							"personal-info Tab could not be dispatched")
 						c = c + 1
 					end
 				end
-				-- (count, physical_echo, logical_text) per perform_text_replacement's
-				-- contract. physical_echo MUST enumerate every keydown the OS
-				-- delivers, tabs included: the keylogger's synth_queue pops one
-				-- entry per echo, and on a char mismatch inside its fast window it
-				-- pops ANYWAY (no non-destructive tolerance, unlike the keymap
-				-- tracker's 20 ms path, which declines without consuming). Omitting
-				-- the tabs left the queue N-1 entries short for N fields, so the
-				-- trailing characters of the payload found an empty queue and were
-				-- recorded as HUMAN keystrokes — buffer_text, rich_chunks, physical
-				-- WPM and the n-gram index. For an IBAN+SSN combo that is the tail
-				-- of the SSN. Nothing warned: the stale-queue self-heal only reports
-				-- LEFTOVER entries, and this queue was UNDER-filled.
-				-- logical_text stays tab-free so the buffer and the logged record
-				-- hold only what the fields actually inserted.
+				-- Historical (count, physical_echo, logical_text) contract.
+				-- physical_echo describes field keydowns and inter-field Tabs for
+				-- compatibility only; immutable tags on the emitted events provide
+				-- exact ownership and prevent them from being classified as human.
+				-- logical_text stays tab-free so the buffer and logical telemetry hold
+				-- only text inserted into fields, not focus-navigation keys.
 				return c, emitted, echoed
 			-- is_private = true: every value this module emits comes from
 			-- personal_info.toml, which rules_engine already treats as PII in its
@@ -303,31 +546,48 @@ local function do_expand(combo)
 			-- the prefix-triggered one, and only this argument tells the keylogger
 			-- to redact what it persists.
 			end, "personal", true)
+			assert(injected == true,
+				"keymap rejected the personal-info replacement transaction")
 		else
-			-- Fallback: emit raw keystrokes without inject_dynamic.
-			-- Only arm the synthetic delete count — not the replacement text. The
-			-- replacement contains inter-field tabs fired as real keyStroke events,
-			-- which the keymap buffer does not see as literal \t chars, so passing
-			-- emitted to arm_synthetic would leave expected_synthetic_chars with an
-			-- unmatched \t that permanently desyncs the buffer counter.
-			if _keymap then
-				if type(_keymap.arm_synthetic) == "function" then _keymap.arm_synthetic(n_back, "") end
-				if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
+			-- The fallback still needs one keymap-owned replacement transaction.
+			-- Independent implicit actions would expose its tabs/deletes as user input.
+			if not _keymap or type(_keymap.arm_synthetic) ~= "function"
+					or type(_keymap.with_synthetic_transaction) ~= "function"
+					or type(_keymap.finish_synthetic) ~= "function"
+					or type(_keymap.cancel_synthetic) ~= "function" then
+				error("personal-info fallback requires the keymap synthetic-transaction API", 0)
 			end
+			local transaction = _keymap.arm_synthetic(n_back, "")
+			if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
 			if keylogger and type(keylogger.notify_synthetic) == "function" then
 				-- Same privacy contract as the primary path: this branch reaches
 				-- the identical sink and must carry the identical flag.
 				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
 			end
-			for _ = 1, n_back do
-				eventtap.keyStroke({}, "delete", 0)
-			end
-			for i, value in ipairs(parts) do
-				eventtap.keyStrokes(value)
-				if i < #parts then
-					eventtap.keyStroke({}, "tab", 0)
+			local ok_emit, emit_err = pcall(_keymap.with_synthetic_transaction, transaction, function()
+				for _ = 1, n_back do
+					assert(SyntheticInput.emit_key_stroke({}, "delete", 0),
+						"personal-info fallback Backspace could not be dispatched")
 				end
+				for i, value in ipairs(parts) do
+					assert(SyntheticInput.emit_key_strokes(value),
+						"personal-info fallback field could not be dispatched")
+					if i < #parts then
+						assert(SyntheticInput.emit_key_stroke({}, "tab", 0),
+							"personal-info fallback Tab could not be dispatched")
+					end
+				end
+			end)
+			-- Failed multi-field construction may already own deletes, field text and
+			-- Tabs. Cancel that whole prefix; sealing it while passing the physical
+			-- trigger through would produce a private, partial replacement.
+			local close = ok_emit and _keymap.finish_synthetic or _keymap.cancel_synthetic
+			local ok_close, close_err = pcall(close, transaction)
+			if not ok_close then
+				error(string.format("personal-info fallback transaction close failed: %s (emission: %s)",
+					tostring(close_err), ok_emit and "ok" or tostring(emit_err)), 0)
 			end
+			if not ok_emit then error(emit_err, 0) end
 		end
 	end)
 
@@ -335,13 +595,21 @@ local function do_expand(combo)
 		Logger.error(LOG, "Personal data injection failed: %s.", tostring(err))
 	end
 
-	-- Always release the flag, even on error, so future expansions are not blocked.
-	timer.doAfter(0.15, function()
-		_replacing = false
-		if ok then
-			Logger.info(LOG, "Personal data injection completed.")
-		end
-	end)
+	-- Tagged synthetic events are filtered before interceptors, so ownership can
+	-- end with the transaction. A delay here would only hide real physical input.
+	_replacing = false
+	if ok then Logger.info(LOG, "Personal data injection completed.") end
+	return ok
+end
+
+--- Returns whether the static registry owns a complete personal-info trigger.
+--- Both the interceptor and preview provider use this exact gate so a static
+--- `@x<magic>` collision cannot be declined by one and advertised by the other.
+--- @param full_trigger string Complete `@` combo including the magic key.
+--- @return boolean
+local function static_claims_full_trigger(full_trigger)
+	if not _keymap or type(_keymap.classify_trigger) ~= "function" then return false end
+	return (_keymap.classify_trigger(full_trigger)) == true
 end
 
 
@@ -404,22 +672,36 @@ local function interceptor(event, _km_buffer, ctx)
 		return nil
 	end
 
-	local char = event:getCharacters(false) or ""
+	local char = (ctx and ctx.chars) or event:getCharacters(false) or ""
 	if char == "" then return nil end
 
 	if _state == STATE_IDLE then
 		if char == "@" then
 			local full_trigger = (_km_buffer or "") .. "@"
 			if _keymap then
-				-- Single-pass scan: classify_trigger returns all three flags in
-				-- one O(N) loop instead of the former three separate N-scans.
+				-- Single-pass and memoised: classify_trigger returns all three flags
+				-- from one walk of the corpus, and its answer is cached until the
+				-- corpus changes.
+				--
+				-- There is no fallback. The else branch here used to run
+				-- has_exact_trigger, has_trigger_prefix and has_trigger_suffix as three
+				-- separate, uncached full scans — and it was unreachable in production,
+				-- because keymap always exports classify_trigger. Its only real effect
+				-- would have been to hide a partial keymap injection behind a slower
+				-- path with different caching, which is the hardcoded behavioural
+				-- fallback convention 5.4 forbids.
 				local exact, pref, suff = false, false, false
-				if _keymap.classify_trigger then
+				if type(_keymap.classify_trigger) == "function" then
 					exact, pref, suff = _keymap.classify_trigger(full_trigger)
 				else
-					exact = (_keymap.has_exact_trigger  and _keymap.has_exact_trigger(full_trigger))  or false
-					pref  = (_keymap.has_trigger_prefix and _keymap.has_trigger_prefix(full_trigger)) or false
-					suff  = (_keymap.has_trigger_suffix and _keymap.has_trigger_suffix(full_trigger)) or false
+					-- Loud, not silent. Absent means the keymap module was injected
+					-- partially, which is a wiring mistake and used to be absorbed by
+					-- three slower scans that reported nothing. Collection still proceeds
+					-- on the all-false answer, exactly as before, so the diagnostic is
+					-- added without changing what the user sees.
+					Logger.error(LOG, "keymap.classify_trigger is missing — cannot tell whether "
+						.. "'%s' is already claimed by a static hotstring; proceeding as "
+						.. "unclaimed.", full_trigger)
 				end
 				if exact or pref or suff then
 					return nil
@@ -434,7 +716,7 @@ local function interceptor(event, _km_buffer, ctx)
 	end
 
 	if _state == STATE_COLLECTING then
-		if char == _trigger then
+		if Terminators.matches_magic_event(char, _trigger) then
 			-- The keymap buffer is the authority on what is actually on screen.
 			--
 			-- This state machine is fed exclusively from keyDown, so it resets on
@@ -457,9 +739,14 @@ local function interceptor(event, _km_buffer, ctx)
 				local combo = _combo
 				
 				local full_trigger = "@" .. combo .. _trigger
-				if _keymap and _keymap.has_exact_trigger
-						and _keymap.has_exact_trigger(full_trigger)
-						and full_trigger:sub(1, 1) == "@" then
+				-- Through the memoised classifier, like the @-entry check above.
+				-- has_exact_trigger walks the whole mapping corpus and caches nothing,
+				-- and this runs on the keystroke that completes a combo - so the same
+				-- question was answered by a full scan here and from cache there.
+				-- classify_trigger returns all three flags; only `exact` matters at this
+				-- point, because a prefix or suffix match does not claim the trigger.
+				local claimed = static_claims_full_trigger(full_trigger)
+				if claimed and full_trigger:sub(1, 1) == "@" then
 					_state = STATE_IDLE
 					_combo = ""
 					return nil
@@ -468,8 +755,8 @@ local function interceptor(event, _km_buffer, ctx)
 				_state = STATE_IDLE
 				_combo = ""
 				
-				do_expand(combo)
-				return "consume"
+				if do_expand(combo) then return "consume" end
+				return nil
 			end
 			
 			_state = STATE_IDLE
@@ -505,6 +792,25 @@ end
 --- @return table The info table.
 function M.get_info()         return _info    end
 
+--- Seeds the two lookup tables and resolves a combo. TESTS ONLY.
+---
+--- `resolve_combo` is a local, and the all-or-nothing rule it enforces decides
+--- what gets TYPED into a user's form — so it needs a behavioural test rather
+--- than a source-grep pinning its current spelling. Linux exposes `_reset` for
+--- the same reason and the same audience.
+--- @param info table The [info] table to resolve against.
+--- @param letters table The [letters] alias map.
+--- @param combo string The letters typed after "@".
+--- @return table values, table fields
+function M._resolve_combo_for_test(info, letters, combo)
+	local prev_info, prev_letters = _info, _letters
+	_info, _letters = info or {}, letters or {}
+	local ok, values, fields = pcall(resolve_combo, combo)
+	_info, _letters = prev_info, prev_letters
+	if not ok then error(values, 0) end
+	return values, fields
+end
+
 --- Retrieves the configured trigger character.
 --- @return string The trigger character.
 function M.get_trigger_char() return _trigger end
@@ -520,7 +826,7 @@ function M.get_trigger_char() return _trigger end
 function M.set_trigger_char(char)
 	if type(char) ~= "string" or char == "" then
 		Logger.error(LOG, "set_trigger_char(): expected a non-empty string, got %s — trigger unchanged.", type(char))
-		return
+		return false
 	end
 	_trigger = char
 	-- A pending combo was accumulated against the OLD trigger; keeping it would
@@ -528,6 +834,7 @@ function M.set_trigger_char(char)
 	_state = STATE_IDLE
 	_combo = ""
 	Logger.debug(LOG, "Trigger char: %s.", char)
+	return true
 end
 
 --- Opens the browser-based HTML form using the extracted UI module.
@@ -546,6 +853,18 @@ end
 --- @param info_toml_path string|nil Absolute path to personal_info.toml (optional override).
 function M.start(base_dir, keymap_module, info_toml_path)
 	Logger.debug(LOG, "Starting personal info tracker…")
+	if _active_start_token then
+		if _keymap == keymap_module then return true end
+		Logger.error(LOG, "Personal info tracker already owns a different keymap.")
+		return false
+	end
+	if _starting_token then
+		Logger.error(LOG, "Personal info tracker start refused because another start is in progress.")
+		return false
+	end
+
+	local token = {}
+	_starting_token = token
 	if type(base_dir) == "string" then _base_dir = base_dir end
 
 	-- Resolve the TOML path: explicit override > default relative to base_dir
@@ -555,14 +874,15 @@ function M.start(base_dir, keymap_module, info_toml_path)
 		_info_toml_path = _base_dir .. "../hotstrings/personal_info.toml"
 	end
 
-	local config, was_missing = load_config(_info_toml_path)
+	local config, was_missing, source_snapshot = load_config(_info_toml_path)
 	if type(config) ~= "table" then
 		Logger.warn(LOG, "Module disabled because configuration is missing or invalid.")
-		return
+		return rollback_start(token, "configuration load")
 	end
 
 	_info    = type(config.info) == "table" and config.info or {}
 	_letters = type(config.letters) == "table" and config.letters or {}
+	_source_snapshot = source_snapshot
 
 	-- Source the trigger from the real, user-configurable magic key, exactly as
 	-- the sibling RulesEngine already does. personal_info.toml's trigger_char is
@@ -571,9 +891,9 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	-- user had stopped typing — while the preview, which has no trigger of its
 	-- own, kept promising the expansion.
 	if type(keymap_module) == "table" and type(keymap_module.get_trigger_char) == "function" then
-		_trigger = tostring(keymap_module.get_trigger_char() or config.trigger_char or "★")
+		_trigger = tostring(keymap_module.get_trigger_char() or config.trigger_char or DEFAULT_TRIGGER)
 	else
-		_trigger = tostring(config.trigger_char or "★")
+		_trigger = tostring(config.trigger_char or DEFAULT_TRIGGER)
 	end
 
 	-- Materialise defaults to disk if the file did not exist, so the user can
@@ -581,7 +901,27 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	-- re-creation on the next launch (mirrors the AHK side's behaviour).
 	if was_missing then
 		Logger.info(LOG, "Writing default personal_info.toml at '%s'…", _info_toml_path)
-		M.save_info({})
+		-- serialize_config receives the flat [info] map. Passing the surrounding
+		-- runtime configuration would stringify its nested tables and publish an
+		-- invalid first-launch schema (`info = "table: ..."`).
+		local serialized = serialize_config(_info)
+		local _, create_status = FileSystem.create_if_absent(
+			_info_toml_path,
+			serialized
+		)
+		if create_status == "exists" then
+			local concurrent, _, concurrent_snapshot = load_config(_info_toml_path)
+			if type(concurrent) ~= "table" then
+				return rollback_start(token, "concurrent default configuration load")
+			end
+			_info = concurrent.info
+			_letters = concurrent.letters
+			_source_snapshot = concurrent_snapshot
+		elseif create_status ~= "created" then
+			return rollback_start(token, "default configuration publication")
+		else
+			_source_snapshot = { status = "ok", content = serialized }
+		end
 	end
 
 	_state     = STATE_IDLE
@@ -589,31 +929,53 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	_replacing = false
 	_enabled   = true
 	
-	if type(keymap_module) == "table" then
-		_keymap = keymap_module
-	end
+	_keymap = type(keymap_module) == "table" and keymap_module or nil
+	local callback_keymap = _keymap
 
 	-- Register the keystroke interceptor
-	if _keymap and type(_keymap.register_interceptor) == "function" then
-		_keymap.register_interceptor(interceptor)
+	if _keymap and not register_start_callback("register_interceptor", _keymap.register_interceptor,
+		function(...)
+			if _active_start_token ~= token or _keymap ~= callback_keymap then return nil end
+			return interceptor(...)
+		end)
+	then
+		return rollback_start(token, "interceptor registration")
 	end
 
 	-- Register the preview provider for UI feedback
-	if _keymap and type(_keymap.register_preview_provider) == "function" then
-		_keymap.register_preview_provider(function(buf)
+	if _keymap and not register_start_callback("register_preview_provider", _keymap.register_preview_provider,
+		function(buf)
+			if _active_start_token ~= token or _keymap ~= callback_keymap then return nil end
 			if not _enabled or type(buf) ~= "string" then return nil end
 			
 			local match = buf:match("@([a-z]+)$")
 			if match then
-				local parts = resolve_combo(match)
+				-- The interceptor owns collection entry. It may deliberately remain
+				-- IDLE because a static mapping already claims this `@` sequence.
+				if _state ~= STATE_COLLECTING or _combo ~= match then return nil end
+				if static_claims_full_trigger("@" .. match .. _trigger) then return nil end
+				local parts, fields = resolve_combo(match)
 				if #parts > 0 then
-					return table.concat(parts, " ⇥ ")
+					-- Masked part by part, not row by row: one @-combo can resolve to
+					-- several fields at once (`@ip★` is an IBAN AND a first name), and
+					-- they are not classified alike. Masking the joined string would
+					-- have no field to ask about and would have to hide all of it.
+					local shown = {}
+					for index, value in ipairs(parts) do
+						shown[index] = masked_for_preview(value, fields[index])
+					end
+					return table.concat(shown, " ⇥ ")
 				end
 			end
 			return nil
 		end)
+	then
+		return rollback_start(token, "preview-provider registration")
 	end
+	_active_start_token = token
+	_starting_token = nil
 	Logger.info(LOG, "Personal info tracker started successfully.")
+	return true
 end
 
 --- Enables the engine tracking.
@@ -632,7 +994,10 @@ end
 
 --- Stops the engine tracking.
 function M.stop()
+	_active_start_token = nil
+	_starting_token = nil
 	M.disable()
+	_keymap = nil
 end
 
 return M

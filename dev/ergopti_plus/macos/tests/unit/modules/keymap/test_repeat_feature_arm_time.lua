@@ -1,78 +1,130 @@
 --- tests/unit/modules/keymap/test_repeat_feature_arm_time.lua
 
 --- ==============================================================================
---- MODULE: try_repeat_feature arm time regression test
+--- MODULE: Repeat Feature Synthetic Transaction Regression Tests
 --- DESCRIPTION:
---- Guards against the regression where try_repeat_feature() set
---- expected_synthetic_chars but did not update last_synthetic_arm_time.
----
---- The stuck-counter reset guard in onKeyDownRaw wipes expected_synthetic_chars
---- when more than 0.5 s have elapsed since last_synthetic_arm_time. If
---- try_repeat_feature arms the counter but leaves last_synthetic_arm_time stale
---- (e.g. it was set by a previous expansion 2 s ago), the next key event fires
---- the reset guard and wipes the counter before the repeated char echo arrives —
---- corrupting the keymap buffer.
----
---- Fix: try_repeat_feature now updates last_synthetic_arm_time immediately after
---- setting expected_synthetic_chars, matching the pattern in perform_text_replacement.
+--- Exercises try_repeat_feature through the production expander, TextSender, and
+--- SyntheticInput adapter. Deleting the magic key and emitting the repeated
+--- character must form one tagged replacement transaction, and consecutive
+--- repeats must receive distinct immutable generations even in the same tick.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-local function read_source(rel)
-	local fh = io.open(helpers.driver_root() .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
-	return src
+
+--- Loads a fresh expander wired to the real synthetic-input adapter.
+
+--- @param opts table|nil Optional buffer and magic-key overrides.
+--- @return table fixture
+local function load_fixture(opts)
+	opts = opts or {}
+	local notifications = {}
+	package.loaded["modules.keylogger"] = {
+		notify_synthetic = function(text, source, deletes, variant)
+			notifications[#notifications + 1] = {
+				text = text, source = source, deletes = deletes, variant = variant,
+			}
+		end,
+	}
+	package.loaded["modules.keymap.expander"] = nil
+	package.loaded["modules.keymap.terminator_replay"] = nil
+
+	local expander = helpers.load_with_stubs("modules.keymap.expander")
+	local synthetic = require("adapters.synthetic_input")
+	local state = {
+		buffer = opts.buffer or "ab★",
+		magic_key = opts.magic_key or "★",
+		is_repeat_feature_enabled = function() return true end,
+		suppress_rescan = function() end,
+	}
+	expander.init(state, {}, {
+		get_llm_enabled = function() return false end,
+		is_runtime_available = function() return true end,
+		start_timer = function() end,
+	})
+	return {
+		expander = expander,
+		synthetic = synthetic,
+		state = state,
+		notifications = notifications,
+		hs = require("hs"),
+		cleanup = function()
+			package.loaded["modules.keylogger"] = nil
+			package.loaded["modules.keymap.expander"] = nil
+			package.loaded["modules.keymap.terminator_replay"] = nil
+		end,
+	}
 end
 
-local function strip_comments(src)
-	local out = {}
-	for line in src:gmatch("[^\n]*") do
-		if not line:match("^%s*%-%-") then out[#out + 1] = line end
-	end
-	return table.concat(out, "\n")
+
+--- Fires one ignored-window repeat inside a real callback collector.
+--- @param fixture table
+--- @return table events
+local function fire_repeat(fixture, chars)
+	fixture.synthetic.enter_callback()
+	local fired = fixture.expander.try_repeat_feature(chars or "★", true)
+	local consume, events = fixture.synthetic.leave_callback(fired)
+	helpers.assert_true(fired, "the repeat feature must fire for a valid magic event")
+	helpers.assert_true(consume)
+	helpers.assert_not_nil(events)
+	return events
 end
 
 
+helpers.describe("keymap expander: repeat uses an explicit replacement transaction", function()
+	helpers.it("tags the delete and repeated character with one generation", function()
+		local fixture = load_fixture()
+		local events = fire_repeat(fixture)
+		helpers.assert_eq(#events, 4,
+			"ignored-window repeat must return Backspace down/up and text down/up")
+		helpers.assert_eq(fixture.state.buffer, "abb")
 
-
-
--- ======================================================================
--- =====================================================================
--- ======= 1/ try_repeat_feature updates last_synthetic_arm_time =======
--- =====================================================================
--- ======================================================================
-
-helpers.describe("keymap/expander.lua: try_repeat_feature arm time", function()
-
-	helpers.it("try_repeat_feature updates last_synthetic_arm_time after arming", function()
-		local src = strip_comments(read_source("modules/keymap/expander.lua"))
-
-		-- Locate try_repeat_feature function body
-		local fn_start = src:find("function M%.try_repeat_feature")
-		helpers.assert_true(fn_start ~= nil, "try_repeat_feature must exist in expander.lua")
-
-		-- After the function definition, last_synthetic_arm_time must be set
-		local after_fn = src:sub(fn_start)
-		helpers.assert_true(
-			after_fn:find("last_synthetic_arm_time%s*=%s*hs%.timer%.secondsSinceEpoch") ~= nil,
-			"try_repeat_feature must update last_synthetic_arm_time after arming expected_synthetic_chars")
+		local property = fixture.hs.eventtap.event.properties.eventSourceUserData
+		local first = fixture.synthetic.lookup_tag(events[1]:getProperty(property))
+		local last = fixture.synthetic.lookup_tag(events[4]:getProperty(property))
+		helpers.assert_true(first and first.owned and last and last.owned)
+		helpers.assert_eq(first.owner, "repeat_key")
+		helpers.assert_eq(first.effect, "replacement")
+		helpers.assert_eq(first.generation, last.generation,
+			"delete and insertion must be indivisible members of one replacement")
+		helpers.assert_eq(first.ordinal, 1)
+		helpers.assert_eq(last.ordinal, 2)
+		fixture.cleanup()
 	end)
 
-	helpers.it("last_synthetic_arm_time is set AFTER expected_synthetic_chars in try_repeat_feature", function()
-		local src = strip_comments(read_source("modules/keymap/expander.lua"))
-		local fn_start = src:find("function M%.try_repeat_feature")
-		helpers.assert_true(fn_start ~= nil)
-		local after_fn = src:sub(fn_start)
+	helpers.it("allocates a new generation for an immediate consecutive repeat", function()
+		local fixture = load_fixture()
+		local first_events = fire_repeat(fixture)
+		fixture.state.buffer = fixture.state.buffer .. "★"
+		local second_events = fire_repeat(fixture)
 
-		local chars_pos = after_fn:find("expected_synthetic_chars")
-		local arm_pos   = after_fn:find("last_synthetic_arm_time")
-		helpers.assert_true(chars_pos ~= nil and arm_pos ~= nil,
-			"both expected_synthetic_chars and last_synthetic_arm_time must be set")
-		helpers.assert_true(chars_pos < arm_pos,
-			"last_synthetic_arm_time must be set after expected_synthetic_chars")
+		local property = fixture.hs.eventtap.event.properties.eventSourceUserData
+		local first = fixture.synthetic.lookup_tag(first_events[1]:getProperty(property))
+		local second = fixture.synthetic.lookup_tag(second_events[1]:getProperty(property))
+		helpers.assert_true(first and second)
+		helpers.assert_true(first.generation ~= second.generation,
+			"transaction identity must not collapse two producers that run in the same tick")
+		helpers.assert_eq(fixture.state.buffer, "abbb")
+		fixture.cleanup()
 	end)
 
+	helpers.it("deletes both codepoints of a French composite magic event", function()
+		local NBSP = string.char(0xC2, 0xA0)
+		local physical_magic = NBSP .. ":"
+		local fixture = load_fixture({
+			buffer = "ab" .. physical_magic,
+			magic_key = ":",
+		})
+		local events = fire_repeat(fixture, physical_magic)
+
+		helpers.assert_eq(#events, 6,
+			"two physical carrier/key codepoints need two Backspace pairs plus one text pair")
+		helpers.assert_eq(fixture.state.buffer, "abb",
+			"the raw carrier and punctuation must both leave the logical buffer")
+		helpers.assert_eq(#fixture.notifications, 1)
+		helpers.assert_eq(fixture.notifications[1].deletes, 2,
+			"keylogger reconciliation must delete the same two codepoints as the screen")
+		helpers.assert_eq(fixture.notifications[1].variant, "repeat_key")
+		fixture.cleanup()
+	end)
 end)

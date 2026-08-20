@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Builds the Gestures category submenu, its per-slot action pickers and the master gestures enable/disable toggle.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -19,17 +19,26 @@ BuildGesturesMenu() {
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
 	DynHandlers := Map(
-		"auto_configure",     (M, C) => _GES_AutoConfigure(M, C),
-		"manual_tutorial",    (M, C) => _GES_ManualTutorial(M, C),
-		"disable_all",        (M, C) => _GES_DisableAll(M, C),
-		"restore_defaults",   (M, C) => _GES_RestoreDefaults(M, C),
-		"gesture_slots_ahk",  (M, C) => _GES_SlotsAhk(M, C),
 		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
 		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
 		"gesture_slots_4",    (M, C) => _GES_Slots4(M, C),
 		"gesture_slots_5",    (M, C) => _GES_Slots5(M, C),
 	)
-	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers)
+	; The two whole-tree actions are `command` rows since 2026-08-07: the renderer
+	; builds each row and its label from the declaration, and this driver
+	; registers only what the click does. All three drivers had been writing the
+	; same two rows with the same two labels.
+	; The two whole-tree actions joined them on the same day, and the two buttons
+	; below on 2026-08-07: each handler's whole body was one row with a static
+	; label, which the declaration already expresses.
+	Commands := Map(
+		"disable_all",      (*) => _GES_SetEverySlot("none"),
+		"restore_defaults", (*) => _GES_RestoreFactoryDefaults(),
+		"auto_configure",   (*) => GestureAutoConfigureAction(),
+		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
+	)
+	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows())
+	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands)
 	; Gestures toggle uses a dedicated fn (writes Features.Enabled + Reload)
 	; rather than the generic ToggleCategoryAllFeatures used by other menus.
 	AddCategoryToggleItem(GMenu,
@@ -38,33 +47,17 @@ BuildGesturesMenu() {
 	return GMenu
 }
 
-; Dynamic handler: auto-configure button.
-_GES_AutoConfigure(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.auto_configure"), (*) => GestureAutoConfigureAction())
-}
-
-; Dynamic handler: manual tutorial button.
-_GES_ManualTutorial(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
-}
 
 ; These actions alter bindings only. They deliberately keep the master gesture
 ; toggle intact, so an existing user choice to keep gestures off is respected.
-_GES_DisableAll(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.disable_all"), (*) => _GES_SetEverySlot("none"))
-}
-
-_GES_RestoreDefaults(M, _Cat) {
-	RegisterMenuItem(M, t("menu.gestures.restore_defaults"), (*) => _GES_RestoreFactoryDefaults())
-}
-
 _GES_SetEverySlot(ActionName) {
 	global GESTURE_SLOTS
 	Assignments := Map()
 	for _, Slot in GESTURE_SLOTS
 		Assignments[Slot] := ActionName
-	GestureSaveAllAssignments(Assignments)
-	ReloadPreservingSuspend()
+	if !GestureSaveAllAssignments(Assignments)
+		return false
+	return ReloadPreservingSuspend()
 }
 
 _GES_RestoreFactoryDefaults() {
@@ -72,31 +65,36 @@ _GES_RestoreFactoryDefaults() {
 	Assignments := Map()
 	for _, Slot in GESTURE_SLOTS
 		Assignments[Slot] := GESTURE_FACTORY_DEFAULTS.Has(Slot) ? GESTURE_FACTORY_DEFAULTS[Slot] : "none"
-	GestureSaveAllAssignments(Assignments)
-	ReloadPreservingSuspend()
+	if !GestureSaveAllAssignments(Assignments)
+		return false
+	return ReloadPreservingSuspend()
 }
 
-; Dynamic handler: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
+; List provider: flat slot list for AHK (mirrors pre-refactor BuildGesturesMenu).
 ; Iterates GESTURE_SLOTS in order, inserting a separator before tap_4 as before.
-_GES_SlotsAhk(M, _Cat) {
+; Row DATA since 2026-08-07, as on Linux: each label is the slot plus the action
+; currently bound to it, which no static declaration can carry.
+_GES_SlotRows() {
 	global GestureAssignments, GESTURE_ACTIONS, GESTURE_SLOTS, Features
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
+	Rows := []
 	for _, Slot in GESTURE_SLOTS {
 		if (Slot == "tap_4")
-			M.Add()
+			Rows.Push(Map("separator", true))
 		SlotLabel     := t("gesture.slots." . Slot)
 		CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)
 			? GestureActionDisplayLabel(CurrentAction, GestureBindingId("gesture", Slot))
 			: t("dialog.action_picker.disabled")
-		EntryLabel := SlotLabel . " : " . CurrentLabel
-		RegisterMenuItem(M, EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l,
-			GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
-			(Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
-		if !GestEnabled
-			M.Disable(EntryLabel)
+		Rows.Push(Map(
+			"label",    SlotLabel . " : " . CurrentLabel,
+			"disabled", !GestEnabled,
+			"action",   ((_s, _l) => (*) => ShowActionPicker(_l,
+				GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
+				(Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel)))
 	}
+	return Rows
 }
 
 ; Dynamic handlers for HS finger groups (unused on AHK — manifest filters them out).
@@ -115,10 +113,11 @@ _GES_Slots5(M, _Cat) {
 
 ; Applies a new action to a gesture slot and reloads.
 SetGestureSlotAction(Slot, ActionName) {
-	if !GestureEnsureActionParameter(GestureBindingId("gesture", Slot), ActionName)
-		return
-	GestureSaveAssignment(Slot, ActionName)
-	ReloadPreservingSuspend()
+	global GestureAssignments
+	if !GestureAssignConfiguredAction(&GestureAssignments,
+			"gesture", "gestures", Slot, ActionName)
+		return false
+	return ReloadPreservingSuspend()
 }
 
 ; Toggles the Gestures enabled state and reloads.
@@ -127,21 +126,22 @@ ToggleGesturesEnabled() {
 	NewVal := !(Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true)
 	; v2-native write via the canonical manifest path — no v1->v2 translation.
-	; WriteFeatureV2 derives the [ahk.gestures] section + the Features node from
-	; the path and persists in lock-step (see lib/feature_io.ahk).
-	WriteFeatureV2(Features, "ahk.gestures.enabled", NewVal)
-	ReloadPreservingSuspend()
+	; WriteFeatureV2 derives the [gestures] section + the Features node from
+	; the path and persists in lock-step (see infra/feature_io.ahk).
+	if !WriteFeatureV2(Features, "gestures.enabled", NewVal)
+		return ConfigReportPersistenceFailure("the gestures enable toggle")
+	return ReloadPreservingSuspend()
 }
 
 
 
 
 
-; ====================================
+; =====================================
 ; =====================================
 ; ======= 1.X / Category toggle =======
 ; =====================================
-; ====================================
+; =====================================
 
 ; Insert the canonical « ✅ X activé(s) (cliquer pour désactiver) » /
 ; « ❌ X désactivé(s) (cliquer pour activer) » synthetic top item into a
@@ -169,9 +169,8 @@ AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
 
 
 
-; ====================================
+; ==================================
 ; ==================================
 ; ======= 1.X / Metrics menu =======
 ; ==================================
-; ====================================
-
+; ==================================

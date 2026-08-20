@@ -11,8 +11,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 local function decode_for_locale_probe(raw)
 	if type(raw) ~= "string" then return {} end
@@ -25,7 +25,7 @@ local function decode_for_locale_probe(raw)
 	return {}
 end
 
-local Locale = helpers.load_with_stubs("lib.locale", {
+local Locale = helpers.load_with_stubs("infra.locale", {
 	json = {
 		decode = decode_for_locale_probe,
 	},

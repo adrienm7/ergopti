@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: HookDispatcher Regression Tests
 ; DESCRIPTION:
-; Locks the subscriber-registration contract of lib/hook_dispatcher.ahk.
+; Locks the subscriber-registration contract of infra/hook_dispatcher.ahk.
 ;
 ; Regression guard for the critical BoundFunc ".Ptr" bug: Register() and
 ; Unregister() compared callbacks via `existing.Ptr = callback_fn.Ptr`, but a
@@ -26,11 +26,11 @@
 
 
 
-; ==========================================
+; ========================================
 ; ========================================
 ; ======= 1/ Register / Unregister =======
 ; ========================================
-; ==========================================
+; ========================================
 
 _HD_RegisterKeepsMultipleSubscribers() {
 	Evt := "test_evt_multi_" . A_TickCount
@@ -83,11 +83,11 @@ Test("HookDispatcher.Dispatch fans out to every registered subscriber", _HD_Disp
 
 
 
-; ==================================================
+; ===================================================
 ; ===================================================
 ; ======= 2/ keyboard_hook bind-once contract =======
 ; ===================================================
-; ==================================================
+; ===================================================
 
 _HD_KeyboardHookStartStopDetaches() {
 	CharEvt := HookDispatcherConst.EVT_KB_CHAR

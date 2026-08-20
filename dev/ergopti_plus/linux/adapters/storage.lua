@@ -39,10 +39,12 @@ local LOG = "adapters.storage"
 -- ========================================
 
 local function _config_dir()
-	local xdg = os.getenv("XDG_CONFIG_HOME")
-	if xdg and xdg ~= "" then return xdg .. "/ergopti_plus/" end
-	local home = os.getenv("HOME") or "/tmp"
-	return home .. "/.config/ergopti_plus/"
+	-- NOTE the directory is "ergopti_plus", not "ergopti" as everywhere else.
+	-- Preserved deliberately: this is where existing installs keep their
+	-- storage.json, and unifying the name would orphan every stored setting
+	-- with no migration. The HOME fallback is the shared one.
+	local ConfigPaths = require("infra.config_paths")
+	return ConfigPaths.config_home() .. "/ergopti_plus/"
 end
 
 local _STORE_PATH = _config_dir() .. "storage.json"

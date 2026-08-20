@@ -15,7 +15,7 @@
 ; for every modifier, including AltGr's RAlt mapping. This test scans that
 ; single implementation so the redundant second Down can never return.
 ;
-; This is a meta-static test (scans source text): modules/tap_holds/space.ahk
+; This is a meta-static test (scans source text): platform/remap/space.ahk
 ; registers SC039:: hotkeys at top level and is deliberately NOT #Included by
 ; the headless runner (run_all.ahk excludes modules/ for that reason), so the
 ; function cannot be called directly without hanging the suite.
@@ -64,7 +64,7 @@ _SADRD_Count(Haystack, Needle) {
 
 _SADRD_AltGrModifierBalanced() {
 	Body := _DriverFuncBody("_SpaceHoldWithModifier")
-	Assert(Body != "", "_SpaceHoldWithModifier(captured) must exist in modules/tap_holds/space.ahk")
+	Assert(Body != "", "_SpaceHoldWithModifier(captured) must exist in platform/remap/space.ahk")
 
 	Downs := _SADRD_Count(Body, "TapHoldSyntheticKeyDown(ModKey)")
 	Ups := _SADRD_Count(Body, "TapHoldSyntheticKeyUp(ModKey)")

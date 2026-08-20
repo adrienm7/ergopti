@@ -1,0 +1,196 @@
+{
+	"schema_version": 1,
+	"_comment": "Cross-driver logger BEHAVIOUR corpus, replayed by all three driver suites. The sibling corpus _shared/modules/logger/test_vectors.json pins the LINE FORMAT (spec § 3); this one pins the parts that decide whether a line exists at all — severity filtering (§ 4) and the ring buffer (§ 5). Those are the parts the drivers had actually drifted on, and the parts that must be proved equivalent before any driver is re-pointed at the shared core.",
+	"_why_variants_not_numbers": "The filtering cases name VARIANTS and a threshold by name, never a raw integer, because that is the behaviour the spec defines and the only thing all three drivers can answer identically. The numbering below is asserted separately, by the drivers that expose it.",
+
+	"numbering": {
+		"_comment": "Spec § 4 numbering. AutoHotkey (LOGGER_SEVERITY) and the shared Lua core have always used it; the macOS driver used 1/2/3/4 until 2026-08-03, which meant a level number meant two different things depending on which driver read it.",
+		"debug": 10,
+		"trace": 10,
+		"done": 10,
+		"info": 20,
+		"start": 20,
+		"success": 20,
+		"warn": 30,
+		"error": 40
+	},
+
+	"aliases": {
+		"_comment": "Strings set_level() must accept, per spec § 4. Matching is case-insensitive: the macOS menu persists \"WARNING\" while the AHK ini writes \"warning\".",
+		"debug": 10,
+		"info": 20,
+		"warning": 30,
+		"error": 40
+	},
+
+	"filtering": [
+		{
+			"id": "at_debug_everything_passes",
+			"description": "The lowest threshold emits all eight variants — a logger that dropped anything here would lose the debug axis silently.",
+			"min_level": "debug",
+			"emitted": ["debug", "trace", "done", "info", "start", "success", "warn", "error"],
+			"dropped": []
+		},
+		{
+			"id": "at_info_debug_axis_dropped",
+			"description": "INFO drops the whole debug axis and keeps both lifecycle pairs at INFO. Dropping start but keeping success would leave unmatched halves in the log, which is the one thing the pairing rule exists to make visible.",
+			"min_level": "info",
+			"emitted": ["info", "start", "success", "warn", "error"],
+			"dropped": ["debug", "trace", "done"]
+		},
+		{
+			"id": "at_warning_only_warn_and_error",
+			"description": "WARNING keeps only the two variants that report a problem.",
+			"min_level": "warning",
+			"emitted": ["warn", "error"],
+			"dropped": ["debug", "trace", "done", "info", "start", "success"]
+		},
+		{
+			"id": "at_error_only_error",
+			"description": "ERROR is the last threshold; warn must be dropped here or the level means nothing.",
+			"min_level": "error",
+			"emitted": ["error"],
+			"dropped": ["debug", "trace", "done", "info", "start", "success", "warn"]
+		}
+	],
+
+	"lifecycle_pairs": [
+		{
+			"id": "trace_done_share_a_threshold",
+			"description": "trace and done must always be emitted or dropped together: a TRACE with no DONE reads as a silent failure, so a threshold that split them would manufacture one on every run.",
+			"a": "trace",
+			"b": "done"
+		},
+		{
+			"id": "start_success_share_a_threshold",
+			"description": "Same rule at INFO level for start and success.",
+			"a": "start",
+			"b": "success"
+		}
+	],
+
+	"ring_buffer": {
+		"capacity": 200,
+		"_comment": "Spec § 5. Entries hold the complete formatted line, post-substitution, and a snapshot is chronological oldest-first.",
+		"cases": [
+			{
+				"id": "empty_at_start",
+				"description": "A cleared buffer holds nothing.",
+				"emit": 0,
+				"expect_size": 0
+			},
+			{
+				"id": "one_entry",
+				"description": "A single emission is retrievable.",
+				"emit": 1,
+				"expect_size": 1,
+				"expect_first": 1,
+				"expect_last": 1
+			},
+			{
+				"id": "below_capacity_keeps_order",
+				"description": "Well below capacity, the snapshot is every line in the order it was emitted.",
+				"emit": 50,
+				"expect_size": 50,
+				"expect_first": 1,
+				"expect_last": 50
+			},
+			{
+				"id": "exactly_at_capacity",
+				"description": "The boundary case: 200 entries fit with nothing dropped. An off-by-one here silently loses the oldest line at the exact moment the buffer becomes useful.",
+				"emit": 200,
+				"expect_size": 200,
+				"expect_first": 1,
+				"expect_last": 200
+			},
+			{
+				"id": "one_past_capacity_drops_oldest",
+				"description": "The first overflow drops entry 1 and keeps 2..201, still in order.",
+				"emit": 201,
+				"expect_size": 200,
+				"expect_first": 2,
+				"expect_last": 201
+			},
+			{
+				"id": "far_past_capacity_stays_ordered",
+				"description": "After more than a full wrap the snapshot must still read oldest-first — a circular buffer that returns its raw array reads as two shuffled halves exactly here, and nowhere below capacity.",
+				"emit": 500,
+				"expect_size": 200,
+				"expect_first": 301,
+				"expect_last": 500
+			},
+			{
+				"id": "clear_empties_after_overflow",
+				"description": "Clearing after a wrap must reset the head as well as the contents, or the next snapshot reads stale slots.",
+				"emit": 250,
+				"clear": true,
+				"expect_size": 0
+			}
+		]
+	},
+
+	"dedup": {
+		"window_seconds": 5,
+		"_comment": "Both driver loggers suppress a line identical to the previous one inside a 5 s window, then close the streak with a \"N identical lines suppressed\" summary. The shared core did NOT — which meant adopting it would have removed flood suppression from a driver that had it, quietly, and the first anyone would know is a log file full of one line. Keyed on everything AFTER the timestamp: two emissions a second apart differ only there, so keying on the whole line would suppress nothing.",
+		"cases": [
+			{
+				"id": "identical_consecutive_is_suppressed",
+				"description": "The second of two identical lines does not reach the sink.",
+				"emit": ["a", "a"],
+				"expect_delivered": 1,
+				"expect_suppressed": 1
+			},
+			{
+				"id": "different_lines_both_pass",
+				"description": "Suppression is consecutive-only: two different messages are both kept.",
+				"emit": ["a", "b"],
+				"expect_delivered": 2,
+				"expect_suppressed": 0
+			},
+			{
+				"id": "streak_of_five",
+				"description": "One line plus four suppressed. A counter that reset per line would report 1.",
+				"emit": ["a", "a", "a", "a", "a"],
+				"expect_delivered": 1,
+				"expect_suppressed": 4
+			},
+			{
+				"id": "alternating_is_not_a_streak",
+				"description": "a,b,a is three distinct consecutive lines — suppression must not match against anything but the immediately preceding line.",
+				"emit": ["a", "b", "a"],
+				"expect_delivered": 3,
+				"expect_suppressed": 0
+			},
+			{
+				"id": "streak_closes_with_a_summary",
+				"description": "A new line after a streak emits the summary first, so the count is never lost. Delivered: a, the summary, then b.",
+				"emit": ["a", "a", "a", "b"],
+				"expect_delivered": 3,
+				"expect_summary": true,
+				"expect_summary_count": 2
+			},
+			{
+				"id": "summary_carries_the_suppressed_variant",
+				"description": "A swallowed error storm must still be reported at ERROR level, or the errors-only log misses it entirely.",
+				"emit": ["a", "a"],
+				"variant": "error",
+				"then_emit": ["b"],
+				"expect_summary_variant": "error"
+			},
+			{
+				"id": "ring_excludes_suppressed_lines",
+				"description": "The ring buffer feeds crash reports; a thousand copies of one line would push out everything that explains it.",
+				"emit": ["a", "a", "a"],
+				"expect_ring_entries": 1
+			}
+		]
+	},
+
+	"driver_defaults": {
+		"_comment": "The starting threshold is a POLICY, not a behaviour of the filter, so it is recorded per driver rather than asserted to be one value. Each driver's suite asserts its own row; a change to any of them is then a deliberate edit here and not a surprise in production. Spec § 4 states 10, which the shared core follows; the AutoHotkey driver deliberately starts at INFO to keep the log file quiet during normal use, and the macOS driver overrides its module default to DEBUG during boot.",
+		"shared_core": "debug",
+		"ahk": "info",
+		"macos_module_default": "warning",
+		"macos_after_boot": "debug"
+	}
+}

@@ -18,7 +18,7 @@
 
 local M = {}
 
--- Value formatting and stack-trace helpers shared with Linux (P0 SSoT).
+-- Value formatting and stack-trace helpers shared with Linux (single source of truth).
 local fmt = require("test.format")
 M.inspect = fmt.inspect
 M.deep_equal = fmt.deep_equal
@@ -83,13 +83,65 @@ end
 -- =====================================
 -- =====================================
 
+--- Runs a fixture against freshly required modules, then restores the exact
+--- package cache entries even if setup or an assertion raises. Stateful parent
+--- modules and their exact-owned children must be listed together; otherwise a
+--- reload creates an impossible hybrid that production correctly refuses.
+--- @param module_names string[] Unique dotted Lua module names.
+--- @param callback function Fixture callback.
+--- @return ... Callback results.
+function M.with_fresh_modules(module_names, callback)
+	assert(type(module_names) == "table", "module_names must be a table")
+	assert(type(callback) == "function", "callback must be a function")
+	local saved = {}
+	local seen = {}
+	for index, module_name in ipairs(module_names) do
+		assert(type(module_name) == "string" and module_name ~= "",
+			"module_names entries must be non-empty strings")
+		assert(not seen[module_name], "duplicate module name: " .. module_name)
+		seen[module_name] = true
+		saved[index] = package.loaded[module_name]
+		package.loaded[module_name] = nil
+	end
+
+	local outcome = { n = 0 }
+	local function capture(...)
+		outcome.n = select("#", ...)
+		for index = 1, outcome.n do outcome[index] = select(index, ...) end
+	end
+	capture(xpcall(callback, debug.traceback))
+	for index, module_name in ipairs(module_names) do
+		package.loaded[module_name] = saved[index]
+	end
+	if not outcome[1] then error(outcome[2], 0) end
+	return (table.unpack or unpack)(outcome, 2, outcome.n)
+end
+
 --- Reloads a module after wiping the package cache and stubbing `hs`.
 --- @param module_name string Dotted Lua module name to require.
 --- @param hs_overrides table|nil Optional table merged onto the default `hs` stub.
 --- @return any The module's return value.
 function M.load_with_stubs(module_name, hs_overrides)
 	-- Drop any previous instance so module-level state resets between tests.
+	--
+	-- Only the NAMED module, deliberately. Clearing the subtree as well looks
+	-- like the more thorough choice and breaks twenty-one tests: many place a
+	-- stub submodule in package.loaded and then load the parent to assert it
+	-- calls into that stub, and wiping the subtree throws the stub away. The
+	-- caller decides what its module tree contains; this helper does not.
+	--
+	-- The cost is a real one and worth naming: a submodule that captures `hs`
+	-- with `local hs = hs` at load time keeps whatever stub was global when IT
+	-- was first required, and no later call here can reach it. A test that needs
+	-- such a submodule re-read must clear it itself.
 	package.loaded[module_name] = nil
+	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
+	-- consumes the replay module's exact commitment, and replay correctly refuses
+	-- rebinding to a different CoreState. Reloading only the parent would therefore
+	-- create an impossible hybrid fixture (fresh parent, stale child).
+	if module_name == "modules.keymap.expander" then
+		package.loaded["modules.keymap.terminator_replay"] = nil
+	end
 	package.loaded["hs"] = nil
 	-- Force a fresh stub table each call so overrides from one test never leak
 	-- into the next. Modules that override hs.execute or hs.timer with a partial
@@ -120,14 +172,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- require-time get the stub instead of the full shared module, causing
 	-- "attempt to call a nil value (field 'utf8_len')" crashes in subsequent tests.
 	-- text_utils/init.lua is pure Lua with no hs deps, so reloading it is safe.
-	package.loaded["lib.text_utils"] = nil
+	package.loaded["infra.text_utils"] = nil
 
 	-- Clear any toml_codec stub installed at module level by test files that
 	-- treat it as a native C library (e.g. test_config.lua). The real codec is
 	-- pure Lua and loads fine in CI; the stub's encode() returns "" which
 	-- causes preferences.save() to write an empty TOML file and all persistence
 	-- tests to see flat = {}.
-	package.loaded["lib.toml.codec"]   = nil
+	package.loaded["infra.toml.codec"]   = nil
 	package.loaded["toml_codec"]       = nil
 	package.loaded["toml_codec.codec"] = nil
 
@@ -139,7 +191,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- modules.keylogger (which calls Timings.ms(...) at module load time, e.g.
 	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
 	-- (field 'ms')" the moment modules.keylogger is not already cached.
-	package.loaded["lib.timings"] = nil
+	package.loaded["infra.timings"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
@@ -182,13 +234,13 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends
 	-- on hs.settings and locale JSON files unavailable in headless unit tests.
-	-- Tests that need a richer stub should override package.loaded["lib.i18n"]
+	-- Tests that need a richer stub should override package.loaded["infra.i18n"]
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
 	-- canonical "— … —" decoration, so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
-	package.loaded["lib.i18n"] = {
+	package.loaded["infra.i18n"] = {
 		get             = function(key) return key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
@@ -212,7 +264,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- can find _shared/modules/llm/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
-	package.loaded["lib.paths"] = {
+	package.loaded["infra.paths"] = {
 		-- Single shared-tree resolver: all three helpers delegate to M.shared so
 		-- the folder name lives in exactly one place (SHARED_REL). Mirrors the
 		-- production Paths.shared contract (nil/"" → the shared root dir).
@@ -270,15 +322,22 @@ function M.read_fixture(relative_path)
 	return body
 end
 
---- Returns the concatenated production source containing an optional symbol.
+--- Production sources, read once per process.
 ---
---- Source-invariant tests must not name a production file: the implementation
---- can be split or moved without turning a useful invariant into a path error.
---- The scan deliberately excludes tests/ and works with the plain Lua runner on
---- macOS, Linux CI, and Windows.
---- @param symbol string|nil Optional literal to select relevant source files.
---- @return string|nil Matching production Lua source, or nil when not found.
-function M.read_driver_source(symbol)
+--- The scan used to re-run its `find`/`dir` and re-read all 201 production files
+--- on EVERY call, and there are several hundred call sites: ~3.3 MB of file I/O
+--- per read, ~1.2 GB per suite run, for a tree that no test is allowed to
+--- mutate. Caching it is what makes the symbol-keyed scan affordable enough to
+--- be the DEFAULT way a source invariant is written rather than a reluctant
+--- alternative to naming a path.
+--- @type table|nil
+local _production_sources = nil
+
+--- Loads (once) every production Lua file under the driver root.
+--- @return table Array of file bodies, tests/ excluded.
+local function production_sources()
+	if _production_sources then return _production_sources end
+
 	local root = M.driver_root()
 	local is_windows = package.config:sub(1, 1) == "\\"
 	local command
@@ -288,25 +347,99 @@ function M.read_driver_source(symbol)
 		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
 	end
 
+	-- Collect the PATHS first and sort them, because neither `find` nor `dir /b /s`
+	-- promises an order: it follows the filesystem, so a fresh CI runner returns a
+	-- different one from the last. Every source invariant built on this list was
+	-- therefore non-deterministic, and one of them — the boot-ordering guard — went
+	-- red or green depending on which file the scan happened to reach first.
+	local paths = {}
 	local pipe = io.popen(command, "r")
-	if not pipe then return nil end
-	local parts = {}
+	if not pipe then return {} end
 	for path in pipe:lines() do
 		local normalized = path:gsub("\\", "/")
 		if not normalized:find("/tests/", 1, true) then
-			local fh = io.open(path, "r")
-			if fh then
-				local body = fh:read("*a")
-				fh:close()
-				if not symbol or body:find(symbol, 1, true) then
-					parts[#parts + 1] = body
-				end
-			end
+			paths[#paths + 1] = path
 		end
 	end
 	pipe:close()
+	table.sort(paths)
+
+	local bodies = {}
+	for _, path in ipairs(paths) do
+		local fh = io.open(path, "r")
+		if fh then
+			bodies[#bodies + 1] = fh:read("*a")
+			fh:close()
+		end
+	end
+
+	-- An empty result means the scan itself failed (no popen, wrong root). Do not
+	-- cache that: a cached emptiness would make every later call return nil and
+	-- every source invariant in the run pass vacuously.
+	if #bodies > 0 then _production_sources = bodies end
+	return bodies
+end
+
+--- Returns the concatenated production source containing an optional symbol.
+---
+--- Source-invariant tests must not name a production file: the implementation
+--- can be split or moved without turning a useful invariant into a path error.
+--- The scan deliberately excludes tests/ and works with the plain Lua runner on
+--- macOS, Linux CI, and Windows.
+---
+--- The returned string is the concatenation of every production file containing
+--- `symbol`, so a selector matching two files changes what the caller asserts —
+--- pick one unique to the module under test, and prefer a declaration over a
+--- path-like literal.
+--- @param symbol string|nil Optional literal to select relevant source files.
+--- @return string|nil Matching production Lua source, or nil when not found.
+function M.read_driver_source(symbol)
+	local parts = {}
+	for _, body in ipairs(production_sources()) do
+		if not symbol or body:find(symbol, 1, true) then
+			parts[#parts + 1] = body
+		end
+	end
 	if #parts == 0 then return nil end
 	return table.concat(parts, "\n")
+end
+
+--- The ONE production file containing `symbol`, for invariants about ORDER.
+---
+--- read_driver_source concatenates every matching file, which is right for
+--- "does this appear anywhere" and wrong for "does A appear before B": byte
+--- offsets across unrelated files answer a question nobody asked. The boot
+--- guard compared `hs.shutdownCallback = function` against `"platform.remap"`
+--- that way; both live in init.lua, but two OTHER files carry the second marker
+--- alone, so whichever the scan reached first decided the verdict.
+---
+--- Sorting the scan made that deterministic. It did not make it meaningful —
+--- init.lua happens to sort first, so the guard would have passed for a reason
+--- unrelated to what it asserts. Ordering is a property of one translation
+--- unit, and this returns one or fails.
+---
+--- Still no path is named: the caller gives a symbol, not a file, so the
+--- implementation can move.
+--- @param symbol string A string unique to the file being asked for.
+--- @return string|nil body, string|nil err Body, or nil plus why.
+function M.read_driver_unit(symbol)
+	if type(symbol) ~= "string" or symbol == "" then
+		return nil, "read_driver_unit() needs a symbol to look for"
+	end
+	local matches = {}
+	for _, body in ipairs(production_sources()) do
+		if body:find(symbol, 1, true) then matches[#matches + 1] = body end
+	end
+	if #matches == 0 then
+		return nil, string.format("no production file contains %q", symbol)
+	end
+	if #matches > 1 then
+		return nil, string.format(
+			"%d production files contain %q — an ordering invariant needs a symbol "
+				.. "unique to one file, or it compares offsets across unrelated sources",
+			#matches, symbol)
+	end
+	return matches[1]
 end
 
 
@@ -318,97 +451,43 @@ end
 -- ==================================
 -- ==================================
 
---- Convenience aliases to the shared format module (P0 SSoT).
+--- Convenience aliases to the shared format module (single source of truth).
 --- deep_equal is used by assert_eq and is also available to test files.
 local deep_equal = fmt.deep_equal
 
---- Asserts strict equality. Tables are pretty-printed in the error message
---- so you see WHICH field differs, not an opaque `table: 0x...`.
---- @param actual   any        Observed value.
---- @param expected any        Expected value.
---- @param msg      string|nil Optional context tag.
-function M.assert_eq(actual, expected, msg)
-	if not deep_equal(actual, expected) then
-		local label = msg or "assert_eq"
-		error(_fail_msg(string.format(
-			"%s:\n  expected: %s\n    actual: %s",
-			label, M.inspect(expected), M.inspect(actual))), 0)
-	end
-end
-
---- Asserts a boolean condition. Shows the actual value on failure.
---- @param cond any        Condition to test.
---- @param msg  string|nil Optional context tag.
-function M.assert_true(cond, msg)
-	if not cond then
-		error(_fail_msg(string.format("%s — actual: %s",
-			tostring(msg or "expected truthy"), M.inspect(cond))), 0)
-	end
-end
-
---- Asserts a value is nil. Shows the actual value on failure.
---- @param v   any        Value to test.
---- @param msg string|nil Optional context tag.
-function M.assert_nil(v, msg)
-	if v ~= nil then
-		error(_fail_msg(string.format("%s: expected nil, got %s",
-			tostring(msg or "assert_nil"), M.inspect(v))), 0)
-	end
-end
-
---- Asserts a value is NOT nil.
---- @param v   any        Value to test.
---- @param msg string|nil Optional context tag.
-function M.assert_not_nil(v, msg)
-	if v == nil then
-		error(_fail_msg(tostring(msg or "expected non-nil")), 0)
-	end
-end
-
---- Asserts `haystack` contains substring `needle`.
---- @param haystack string    String to search in.
---- @param needle   string    Substring to find.
---- @param msg      string|nil Optional context tag.
-function M.assert_contains(haystack, needle, msg)
-	if not haystack:find(needle, 1, true) then
-		error(_fail_msg(string.format("%s: %q not found in %s",
-			tostring(msg or "assert_contains"), needle, M.inspect(haystack))), 0)
-	end
-end
-
---- Asserts a function throws an error when called.
---- @param fn  function  0-arg callable expected to throw.
---- @param msg string|nil Optional context tag.
---- @return string The error message thrown (for further assertions).
-function M.assert_throws(fn, msg)
-	local ok, err = pcall(fn)
-	if ok then
-		error(_fail_msg(tostring(msg or "expected exception but none was thrown")), 0)
-	end
-	return err
-end
-
---- Asserts `v` has type `expected_type` (e.g. "string", "table", "function").
---- @param v             any    Value to check.
---- @param expected_type string Lua type name.
---- @param msg           string|nil Optional context tag.
-function M.assert_type(v, expected_type, msg)
-	local actual_type = type(v)
-	if actual_type ~= expected_type then
-		error(_fail_msg(string.format("%s: expected %s, got %s (%s)",
-			tostring(msg or "assert_type"), expected_type, actual_type, M.inspect(v))), 0)
-	end
-end
+-- The seven assertions come from _shared/lua/test/assertions.lua. Both drivers
+-- carried their own copy: six of the seven bodies were byte-identical once
+-- whitespace was normalised, and the seventh differed by a single COMMENT line.
+-- Two copies of an assertion library is two places for a fix to land in one of,
+-- and every other test's credibility rests on these.
+--
+-- fail_msg is injected because it is the one genuinely per-driver part: it skips
+-- the stack frames belonging to THIS file so a failure reports the caller's line.
+local _assertions = require("test.assertions").build("helpers[/\\\\]init%.lua$", fmt)
+M.assert_eq        = _assertions.assert_eq
+M.assert_true      = _assertions.assert_true
+M.assert_nil       = _assertions.assert_nil
+M.assert_not_nil   = _assertions.assert_not_nil
+M.assert_type      = _assertions.assert_type
+M.assert_contains  = _assertions.assert_contains
+M.assert_throws    = _assertions.assert_throws
 
 
 
 
 
--- =================================
+
+
+
+
+
+
+
+--- ===================================
 --- ===================================
 --- ======= 4/ Mini Test Runner =======
 --- ===================================
--- =================================
+--- ===================================
 
 local _suite_results = { passed = 0, failed = 0, failures = {} }
 local _before_each_fn = nil
@@ -461,7 +540,7 @@ end
 
 --- Builds a minimal lib.logger stub suitable for injection via package.loaded.
 --- All log methods are no-ops so modules can log without crashing in headless tests.
---- @return table Logger stub with the same public API as lib/logger.lua.
+--- @return table Logger stub with the same public API as infra/logger.lua.
 function M.make_logger_stub()
 	local noop = function() end
 	return {
@@ -474,6 +553,12 @@ function M.make_logger_stub()
 		build   = function() return noop end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
+		start_async_sink = function() return true end,
+		classify_async_sink_boot_environment = function() return "standalone" end,
+		set_async_sink_failure_handler = function() return true end,
+		begin_async_sink_shutdown = function(callback) callback(true); return true end,
+		stop_async_sink = function() return true end,
+		async_sink_status = function() return { active = true } end,
 	}
 end
 

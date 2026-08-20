@@ -98,10 +98,10 @@ _TIC_EscapedQuoteDoesNotEndTheString() {
 ; ===================================================
 
 _TIC_SectionHeaderDropsItsComment() {
-	Cache := _TIC_Parse("header", "[ahk.layout] # mes reglages`nergopti_plus = 0`n")
-	Assert(Cache.Has("ahk.layout"),
+	Cache := _TIC_Parse("header", "[layout] # mes reglages`nergopti_plus = 0`n")
+	Assert(Cache.Has("layout"),
 		"a section header with a trailing comment must still be named by its path alone — the trailing-bracket anchor cannot match once a comment follows, so the whole comment used to become part of the section name and every later read of that section missed")
-	Assert(IniCacheGet(Cache, "ahk.layout", "ergopti_plus") == 0,
+	Assert(IniCacheGet(Cache, "layout", "ergopti_plus") == 0,
 		"the keys under a commented header must land in that section")
 }
 

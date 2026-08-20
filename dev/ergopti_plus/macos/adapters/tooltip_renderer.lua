@@ -23,7 +23,7 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 
 local LOG = "adapters.tooltip_renderer"
 
@@ -33,10 +33,13 @@ local _renderer = nil
 local _tooltip  = nil
 
 
+
+
+
 -- =========================================
--- ==========================================
+-- =========================================
 -- ======= 1/ Lazy Dependency Loader =======
--- ==========================================
+-- =========================================
 -- =========================================
 
 local function _ensure_deps()

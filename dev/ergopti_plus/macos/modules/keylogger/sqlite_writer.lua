@@ -26,19 +26,25 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("lib.logger")
-local Paths  = require("lib.paths")
+local Logger = require("infra.logger")
+local Paths  = require("infra.paths")
+-- At-rest encryption of the typed-text columns. Hard require: the setting must
+-- never silently degrade into "stored in clear".
+local TextCipher = require("modules.keylogger.text_cipher")
+-- Statement shapes for the at-rest migration (section 8). Shared with Linux so
+-- the two drivers cannot drift on which columns a conversion may rewrite.
+local Migration  = require("keylogger.text_migration")
 local LOG    = "keylogger.sqlite_writer"
 
 
 
 
 
--- ==============================
+-- ===============================
 -- ===============================
 -- ======= 1/ Module State =======
 -- ===============================
--- ==============================
+-- ===============================
 
 --- Resolved path bundle (set by M.init).
 local _paths = nil
@@ -75,11 +81,11 @@ local ACTION_SYS_AUTOCORRECT = "sys_autocorrect"
 
 
 
--- ======================================================
+-- =======================================================
 -- =======================================================
 -- ======= 2/ Guards and Internal Timestamp Helper =======
 -- =======================================================
--- ======================================================
+-- =======================================================
 
 --- Guards public functions against being called before M.init().
 local function _require_init(func_name)
@@ -99,11 +105,11 @@ local _now_ts = require("modules.keylogger.timestamp").now_ts
 
 
 
--- ======================================
+-- ===================================
 -- ===================================
 -- ======= 3/ Schema Bootstrap =======
 -- ===================================
--- ======================================
+-- ===================================
 
 --- Resolve the canonical schema.sql path through the single shared-tree
 --- resolver (Paths.shared) so the shared root lives in exactly one place.
@@ -272,15 +278,24 @@ local function _sql_num(n)
 	return tostring(n)
 end
 
---- JSON-encode a Lua value compactly. nil → '{}'.
-local function _sql_json(v)
-	if v == nil then return "'{}'" end
+--- JSON-encode a Lua value compactly, WITHOUT quoting it for SQL. Split out from
+--- _sql_json because the typing builder must encrypt the payload before it is
+--- turned into a SQL literal.
+--- @param v any
+--- @return string The encoded JSON, or "{}" when encoding fails.
+local function _json_text(v)
+	if v == nil then return "{}" end
 	local ok, encoded = pcall(json.encode, v)
 	if not ok then
-		Logger.warn(LOG, "_sql_json: json.encode failed (%s) — storing empty object.", tostring(encoded))
-		return "'{}'"
+		Logger.warn(LOG, "_json_text: json.encode failed (%s) — storing empty object.", tostring(encoded))
+		return "{}"
 	end
-	return _sql_str(encoded)
+	return encoded
+end
+
+--- JSON-encode a Lua value compactly as a SQL literal. nil → '{}'.
+local function _sql_json(v)
+	return _sql_str(_json_text(v))
 end
 
 --- Allocate the next event id (per-device autoincrement).
@@ -294,15 +309,27 @@ end
 
 
 
--- ===================================
+-- ==================================
 -- ==================================
 -- ======= 6/ INSERT Builders =======
 -- ==================================
--- ===================================
+-- ==================================
 
 local _builders = {}
 
 function _builders.typing(e, id)
+	-- `text` and `events_json` are the only columns holding what the user
+	-- literally typed, so they are the only ones encrypted. The aggregates the
+	-- dashboard computes over stay in clear, which is what keeps reads fast.
+	local enc_text = TextCipher.encrypt(_device_id, id, e.text or "")
+	local enc_json = TextCipher.encrypt(_device_id, tostring(id) .. "j", _json_text(e.events))
+	if enc_text == nil or enc_json == nil then
+		-- Encryption is on but could not run. Storing the plaintext would defeat
+		-- the setting the user turned on, so this row is not written at all.
+		Logger.error(LOG, "At-rest encryption failed — typing event %d dropped rather than stored in clear.", id)
+		return nil
+	end
+
 	return string.format(
 		"INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
 		_sql_str(_device_id), id,
@@ -319,7 +346,7 @@ function _builders.typing(e, id)
 		_sql_num(e.mouse_clicks or 0), _sql_num(e.mouse_scrolls or 0),
 		_sql_num(e.mouse_distance_px or 0), _sql_num(e.pause_before_ms),
 		_sql_num(e.battery_level), _sql_num(e.audio_volume), _sql_num(e.wpm),
-		_sql_str(e.text or ""), _sql_str(e.rich_text), _sql_json(e.events))
+		_sql_str(enc_text), _sql_str(e.rich_text), _sql_str(enc_json))
 end
 
 function _builders.app_switch(e, id)
@@ -428,7 +455,11 @@ function M.build_inserts(entry)
 	end
 	local t = entry.type
 	if t == "typing" then
-		return { _builders.typing(entry, _alloc_event_id()) }
+		-- The typing builder returns nil when at-rest encryption is enabled but
+		-- cannot run. An empty list drops the row, which is the intended
+		-- outcome: storing the text the user asked to protect would be worse.
+		local sql = _builders.typing(entry, _alloc_event_id())
+		return sql and { sql } or {}
 	elseif t == "app_switch" then
 		return { _builders.app_switch(entry, _alloc_event_id()) }
 	elseif t == "window_switch" then
@@ -504,6 +535,121 @@ function M.init(deps)
 	_device_id  = deps.device_id
 	_initialized = true
 	Logger.success(LOG, "Initialized (device %s).", _device_id:sub(1, 8) .. "…")
+end
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 8/ At-Rest Migration =========
+-- ======================================
+-- ======================================
+
+--- Row access for modules/keylogger/text_migration.lua, which converts rows that
+--- were already stored when the at-rest setting changed.
+--- It lives HERE rather than in that module because this file already owns the
+--- SQLite handle: keeping the OS-facing calls in one place is what stops the
+--- driver's direct-API count from creeping up one module at a time.
+
+--- Returns the device this writer stores rows for.
+--- The migration must scope every statement to it: the key derives from the
+--- machine id, so a row imported from another device could not be decrypted here
+--- and must not be encrypted here either.
+--- @return string|nil
+function M.get_device_id()
+	return _device_id
+end
+
+--- Counts the rows a migration may touch, for the progress fraction.
+--- @param device_id string
+--- @return number
+function M.count_typing_rows(device_id)
+	if not _db then return 0 end
+	local total = 0
+	for row in _db:nrows(Migration.count_sql(device_id)) do
+		total = tonumber(row.row_count) or 0
+	end
+	return total
+end
+
+--- Reads one bounded batch of migratable rows.
+--- @param device_id string
+--- @param after_id  number Exclusive cursor over the primary key.
+--- @param limit     number Maximum rows to return.
+--- @return table|nil Array of { id, values }, or nil when no database is open.
+function M.fetch_typing_batch(device_id, after_id, limit)
+	if not _db then return nil end
+	local rows = {}
+	for row in _db:nrows(Migration.select_batch_sql(device_id, after_id, limit)) do
+		local values = {}
+		for _, spec in ipairs(Migration.COLUMNS) do
+			values[spec.name] = row[spec.name] or ""
+		end
+		rows[#rows + 1] = { id = tonumber(row.id) or 0, values = values }
+	end
+	return rows
+end
+
+--- Rewrites a batch of rows as ONE transaction: either every row of it is
+--- converted or none is, so an interruption can never leave a row with one
+--- column converted and the other still in its old state.
+--- @param device_id string
+--- @param updates   table Array of { id, assignments }.
+--- @return boolean True on success.
+function M.apply_typing_updates(device_id, updates)
+	if not _db then return false end
+	if type(updates) ~= "table" or #updates == 0 then return true end
+
+	local statements = {}
+	for _, update in ipairs(updates) do
+		local sql = Migration.update_row_sql(device_id, update.id, update.assignments)
+		if not sql then
+			Logger.error(LOG, "Migration produced no statement for row %s — batch refused.",
+				tostring(update.id))
+			return false
+		end
+		statements[#statements + 1] = sql
+	end
+
+	if _db:exec("BEGIN TRANSACTION;") ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot open the migration transaction: %s.", tostring(_db:errmsg()))
+		return false
+	end
+	if _db:exec(table.concat(statements, "\n")) ~= sqlite3.OK then
+		Logger.error(LOG, "Migration batch failed: %s.", tostring(_db:errmsg()))
+		pcall(function() _db:exec("ROLLBACK;") end)
+		return false
+	end
+	if _db:exec("COMMIT;") ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot commit the migration batch: %s.", tostring(_db:errmsg()))
+		pcall(function() _db:exec("ROLLBACK;") end)
+		return false
+	end
+	return true
+end
+
+--- Reads one meta key. The migration stores its resume cursor there so a restart
+--- does not re-read every row of a year-long history.
+--- @param key string
+--- @return string|nil
+function M.get_meta(key)
+	if not _db or type(key) ~= "string" or key == "" then return nil end
+	local value = nil
+	for row in _db:nrows(string.format("SELECT value FROM meta WHERE key=%s;", _sql_str(key))) do
+		value = row.value
+	end
+	return value
+end
+
+--- Writes one meta key.
+--- @param key   string
+--- @param value string
+--- @return boolean True on success.
+function M.set_meta(key, value)
+	if not _db or type(key) ~= "string" or key == "" then return false end
+	return _db:exec(string.format("INSERT OR REPLACE INTO meta (key, value) VALUES (%s, %s);",
+		_sql_str(key), _sql_str(tostring(value)))) == sqlite3.OK
 end
 
 return M

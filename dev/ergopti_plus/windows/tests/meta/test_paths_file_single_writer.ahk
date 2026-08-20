@@ -39,9 +39,9 @@ _PFSW_OnlyOneWriter() {
 	Src := _DriverDirConcat("ui")
 	Assert(Src != "", "the ui/ source must be readable")
 
-	; Count the sites that open paths.toml for writing. Anything above one means
-	; the block was copied again and the two copies can drift apart, which is the
-	; defect this guard exists to prevent.
+	; No UI site may publish locator bytes directly. The crash-recoverable
+	; transition owns the only durable publication path and captures old bytes
+	; before either config or locator authority can change.
 	Needle := 'FileOpen(_PathsFile, "w"'
 	Count := 0
 	Pos := 1
@@ -49,8 +49,8 @@ _PFSW_OnlyOneWriter() {
 		Count += 1
 		Pos += StrLen(Needle)
 	}
-	Assert(Count == 1,
-		"paths.toml must have exactly ONE writer (found " . Count . "). Two copies of this block already drifted once: the hardened one reported failures, its twin discarded the user's chosen directory in silence and reloaded them into the old one.")
+	Assert(Count == 0,
+		"UI code must have zero raw paths.toml writers (found " . Count . "). Direct publication bypasses the multi-file WAL and can split config authority from its locator after a crash.")
 
 	Assert(InStr(Src, "_PathsFile_Write(") > 0,
 		"the shared writer _PathsFile_Write must exist and be the site both editors call")
@@ -62,14 +62,26 @@ _PFSW_WriterFailsLoudly() {
 	Body := _DriverFuncBody("_PathsFile_Write")
 	Assert(Body != "", "_PathsFile_Write() must exist")
 
-	Assert(InStr(Body, "catch as") > 0,
-		"_PathsFile_Write must catch explicitly — an unprotected FileOpen throws in v2 and would abort the caller mid-save")
-	Assert(InStr(Body, "LoggerError") > 0,
-		"a failed paths.toml write must reach the log")
+	Assert(InStr(Body, "ConfigTransitionAcquireLifecycleBundle(") > 0,
+		"_PathsFile_Write must acquire the process-wide transition owner before capturing old locator bytes")
+	Assert(InStr(Body, "ConfigTransitionCommitOwned(") > 0,
+		"_PathsFile_Write must publish paths.toml through the crash-recoverable transition")
+	Assert(InStr(Body,
+		'ConfigTransitionResultIs(CommitResult, "committed_new")') > 0,
+		"the journal commit result must be checked with the strict typed predicate")
+	Assert(InStr(Body, "ConfigTransitionLogFailure") > 0,
+		"a failed paths.toml transition must reach the log")
 	Assert(InStr(Body, "MsgBox") > 0,
 		"a failed paths.toml write must be shown to the user — they are standing in front of the dialog, and the following Reload() erases the evidence")
 	Assert(InStr(Body, "return false") > 0,
 		"_PathsFile_Write must report failure to its caller so the Reload() is skipped")
+	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle)")
+	RollbackPos := InStr(Body, "ConfigTransitionRollbackOwned(")
+	ReleasePos := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)")
+	Assert(ReloadPos > 0 && RollbackPos > ReloadPos && ReleasePos > RollbackPos,
+		"a refused Reload must restore all-old while the same terminal owner is still held")
+	Assert(InStr(Body, "FileOpen(") == 0,
+		"the shared writer must not bypass its WAL with a raw FileOpen")
 }
 
 ; Both callers must honour that contract: reloading after a failed write is what

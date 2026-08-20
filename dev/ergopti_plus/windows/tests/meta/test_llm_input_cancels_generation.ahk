@@ -83,7 +83,7 @@ _MetaCheckInputCancelsGeneration() {
 		. "so a freshly-rendered prediction is not killed the instant it appears")
 
 	; (5) The retired predicate must be fully removed (no dead code, §5.6).
-	Assert(_DriverFuncBody("_LLM_Bridge_PredictionShown") == "",
+	Assert(_DriverFuncBodyOrEmpty("_LLM_Bridge_PredictionShown") == "",
 		"_LLM_Bridge_PredictionShown must be removed — both gates now use HasActivePredictionWork")
 }
 

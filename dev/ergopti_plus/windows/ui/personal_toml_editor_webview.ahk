@@ -12,7 +12,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Shared UX: one editor frontend for both drivers — fixing a wording or a
 ;    behaviour there updates Windows and macOS at once. The bridge mirrors the
-;    proven onboarding WebView2 host (lib/webview_utils + vendor/WebView2), and
+;    proven onboarding WebView2 host (infra/webview_utils + vendor/WebView2), and
 ;    carries the same four hard-won gotcha fixes (see PROJECT_MEMORY
 ;    project-webview2-bridge-gotchas): show-before-create, virtual-host origin,
 ;    stored WebMessageReceived subscription, and fire-and-forget ExecuteScript.
@@ -164,11 +164,11 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 
 
 
-; ==============================================================
+; ====================================
 ; ====================================
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
-; ==============================================================
+; ====================================
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 channel, so each message is an object {action, data}. Handled
@@ -187,8 +187,18 @@ _HsEdWeb_OnWebMessage(Handler, Args) {
 	; config, re-register hotstrings or launch an elevated install.
 	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
 	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready")
+	if (A_IsSuspended && Action != "ready") {
+		if (Action == "save") {
+			try SetTimer(_HsEdWeb_ShowSaveFailure, -1)
+			catch as Err {
+				try LoggerError("HsEditor",
+					"Could not defer the suspended save refusal: {1}.",
+					Err.Message)
+				_HsEdWeb_ShowSaveFailure()
+			}
+		}
 		return
+	}
 	Data   := Payload.Has("data") ? Payload["data"] : Map()
 	; Defer out of the COM callback, like every sibling editor host already does
 	; (paths_editor, personal_info_editor, prompt_editor). `save` does file I/O
@@ -247,7 +257,42 @@ _HsEdWeb_Eval(Js) {
 ; {description, entries: [...]}}}. That shape already matches WritePersonalToml's
 ; input (a keyed sections Map + an order Array), so we forward it directly after
 ; attaching the meta description.
+_HsEdWeb_ShowSaveFailure() {
+	Message := _HsEdWeb_JsStr(t("editor.hotstrings.err_write"))
+	_HsEdWeb_Eval('(function(){const e=document.getElementById("save-toast");'
+		. 'if(e){e.textContent="' . Message
+		. '";e.classList.add("show");}})();')
+}
+
+_HsEdWeb_ReportSaveFailure() {
+	try LoggerError("HsEditor",
+		"Personal-hotstring durable/live publication failed — the save did not complete.")
+	try _HsEdWeb_ShowSaveFailure()
+	try NotifierSend(t("editor.hotstrings.err_write"),
+		Map("title", t("editor.hotstrings.save_error"), "level", "error"))
+}
+
+_HsEdWeb_DeferredSaveCompleted(CommitResult) {
+	global PERSONAL_TOML_COMMIT_FAILED
+	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
+		if A_IsSuspended {
+			try LoggerError("HsEditor",
+				"The deferred personal-hotstring save was refused after Suspend became active.")
+			_HsEdWeb_ShowSaveFailure()
+		} else {
+			_HsEdWeb_ReportSaveFailure()
+		}
+		return
+	}
+	try LoggerSuccess("HsEditor",
+		"Deferred personal hotstrings saved and reloaded.")
+}
+
 _HsEdWeb_Save(Data) {
+	if A_IsSuspended {
+		_HsEdWeb_ShowSaveFailure()
+		return
+	}
 	if (!(Data is Map) || !Data.Has("sections_order") || !Data.Has("sections"))
 		return
 	order := Data["sections_order"]
@@ -262,29 +307,26 @@ _HsEdWeb_Save(Data) {
 	)
 
 	try LoggerStart("HsEditor", "Saving personal hotstrings ({1} section(s))…", order.Length)
-	if !WritePersonalToml(WriteData) {
-		try LoggerError("HsEditor", "WritePersonalToml failed — personal hotstrings NOT saved.")
+	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
+	CommitResult := PersonalTomlCommitAndReload(WriteData,
+		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind())
+	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
+		if A_IsSuspended
+			_HsEdWeb_ShowSaveFailure()
+		else
+			_HsEdWeb_ReportSaveFailure()
 		return
 	}
-
-	; Live re-registration, per section — same FeatureConfig resolution as the
-	; native _SaveData path.
-	FeatureConfig := { TimeActivationSeconds: 0 }
-	if (IsSet(Features) && Features.Has("hotstrings") && Features["hotstrings"].Has("personal")
-		&& Features["hotstrings"]["personal"].Has("autocorrection")) {
-		FeatureConfig := Features["hotstrings"]["personal"]["autocorrection"]
-	}
-	for _, name in order {
-		if (name == "-" || name == "")
-			continue
-		try ReloadPersonalSection(WriteData, name, FeatureConfig)
+	if (CommitResult == PERSONAL_TOML_COMMIT_DEFERRED) {
+		try LoggerInfo("HsEditor", "Personal-hotstring publication was deferred behind an active writer; the newest full snapshot will be committed next.")
+		return
 	}
 	try LoggerSuccess("HsEditor", "Personal hotstrings saved and reloaded.")
 }
 
 ; Persists a single UI preference. The frontend uses its own key names
 ; (compact_view / auto_close / default_section); map them onto the native
-; [ahk.personal_editor] keys so the native editor and the webview agree.
+; [personal_editor] keys so the native editor and the webview agree.
 _HsEdWeb_SavePref(Data) {
 	if (!(Data is Map) || !Data.Has("key"))
 		return

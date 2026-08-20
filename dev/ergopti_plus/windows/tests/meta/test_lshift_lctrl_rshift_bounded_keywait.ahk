@@ -16,8 +16,8 @@
 ; bounds the wait to the configured tap duration and gates the tap decision
 ; on the wait having actually observed a release (not a timeout).
 ;
-; SCOPE: source introspection of modules/tap_holds/lshift_lctrl.ahk and
-; modules/tap_holds/rshift.ahk.
+; SCOPE: source introspection of platform/remap/lshift_lctrl.ahk and
+; platform/remap/rshift.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -57,12 +57,12 @@ _LLRBK_WindowAround(Src, Needle, WindowChars := 300) {
 ; =========================================================
 
 _LLRBK_NoBareKeyWait() {
-	Src := _DriverDirConcat("modules/tap_holds")
-	Assert(Src != "", "modules/tap_holds must be readable")
+	Src := _DriverDirConcat("platform/remap")
+	Assert(Src != "", "platform/remap must be readable")
 
 	for _, Sc in ["SC02A", "SC01D", "SC036"] {
 		Assert(InStr(Src, 'KeyWait("' . Sc . '")') = 0,
-			"modules/tap_holds/ must not contain a bare KeyWait(" . Chr(34) . Sc . Chr(34) . ") with no timeout -- a lost key-up would wedge this hotkey's tap/hold discrimination forever")
+			"platform/remap/ must not contain a bare KeyWait(" . Chr(34) . Sc . Chr(34) . ") with no timeout -- a lost key-up would wedge this hotkey's tap/hold discrimination forever")
 	}
 }
 Test("tap_holds: lshift_lctrl/rshift no longer use a bare unbounded KeyWait (hold-keywait-tap-only-shape)", _LLRBK_NoBareKeyWait)
@@ -90,10 +90,10 @@ _LLRBK_CheckBoundedAndReleaseGated(RelPath, Scancode) {
 }
 
 Test("tap_holds: lshift_lctrl.ahk SC02A (LShift) uses a bounded, release-gated KeyWait (hold-keywait-tap-only-shape)",
-	() => _LLRBK_CheckBoundedAndReleaseGated("modules/tap_holds/lshift_lctrl.ahk", "SC02A"))
+	() => _LLRBK_CheckBoundedAndReleaseGated("platform/remap/lshift_lctrl.ahk", "SC02A"))
 
 Test("tap_holds: lshift_lctrl.ahk SC01D (LCtrl) uses a bounded, release-gated KeyWait (hold-keywait-tap-only-shape)",
-	() => _LLRBK_CheckBoundedAndReleaseGated("modules/tap_holds/lshift_lctrl.ahk", "SC01D"))
+	() => _LLRBK_CheckBoundedAndReleaseGated("platform/remap/lshift_lctrl.ahk", "SC01D"))
 
 Test("tap_holds: rshift.ahk SC036 uses a bounded, release-gated KeyWait (hold-keywait-tap-only-shape)",
-	() => _LLRBK_CheckBoundedAndReleaseGated("modules/tap_holds/rshift.ahk", "SC036"))
+	() => _LLRBK_CheckBoundedAndReleaseGated("platform/remap/rshift.ahk", "SC036"))

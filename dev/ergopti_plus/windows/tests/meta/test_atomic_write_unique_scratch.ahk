@@ -38,11 +38,11 @@
 
 
 
-; ===============================================
+; ================================================
 ; ================================================
 ; ======= 1/ Class-wide scratch uniqueness =======
 ; ================================================
-; ===============================================
+; ================================================
 
 ; Every writer that stages to a sibling scratch file before publishing it over
 ; the target. They are checked together so the invariant is pinned to the
@@ -58,9 +58,23 @@ _AWU_SleepRetryWriters() {
 	return ["KL_WriteAtomic", "KLPF_WriteAtomic", "TOML_BatchWrite"]
 }
 
+; TOML_BatchWrite is intentionally a thin mode-selecting wrapper shared with
+; TOML_BuildUpdatedContent. Follow that wrapper to the implementation so this
+; class guard cannot become vacuous after a factoring-only refactor.
+_AWU_WriterBody(Name) {
+	if (Name != "TOML_BatchWrite")
+		return _DriverFuncBody(Name)
+	Wrapper := _DriverFuncBody(Name)
+	Assert(Wrapper != ""
+		&& InStr(Wrapper,
+			'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
+		"TOML_BatchWrite must still route to the checked implementation in write mode")
+	return _DriverFuncBody("_TOML_BatchWriteImpl")
+}
+
 _AWU_ScratchNamesAreUnique() {
 	for Name in _AWU_SleepRetryWriters() {
-		Body := _DriverFuncBody(Name)
+		Body := _AWU_WriterBody(Name)
 		Assert(Body != "", Name . "() must exist in the driver source")
 
 		; The exact defect: a scratch name built only from the destination. The
@@ -91,7 +105,7 @@ _AWU_StaleScratchIsReaped() {
 		"KLPF_WriteAtomic", "_KLPF_ReapStaleTemps",
 		"TOML_BatchWrite", "_TOML_ReapStaleTemps")
 	for Writer, Reaper in Reapers {
-		Body := _DriverFuncBody(Writer)
+		Body := _AWU_WriterBody(Writer)
 		Assert(Body != "", Writer . "() must exist in the driver source")
 		Assert(InStr(Body, Reaper . "(") > 0,
 			Writer . " must reap stale scratch files via " . Reaper . " — per-invocation names do not self-clean after a hard kill")

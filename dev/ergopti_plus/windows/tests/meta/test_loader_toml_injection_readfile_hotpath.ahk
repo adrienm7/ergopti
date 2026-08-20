@@ -12,10 +12,10 @@
 ; user tap-hold (CapsLock=Enter, etc.) with no warning.
 ;
 ; The fix has two halves:
-;   1. Writers (_TH_WriteTapHoldToml, _TH_WriteTapHoldDisabled) stage the
-;      content in a sibling .tmp file and rename it over the target with
-;      FileMove(Tmp, Path, true). The rename is atomic on NTFS, so the loader
-;      never observes a half-written file.
+;   1. Writers (_TH_WriteTapHoldToml, _TH_WriteTapHoldDisabled) durably stage
+;      the content in a unique sibling file and publish it through
+;      FSAtomicMoveReplace. The write-through rename is atomic on NTFS, so the
+;      loader never observes a half-written file.
 ;   2. The loader (LoadTapHoldToml) raises a WARNING when an existing user file
 ;      parses to 0 keys without an explicit inherit_defaults=false, so a
 ;      truncated write is no longer silently indistinguishable from the
@@ -68,26 +68,31 @@ _LTI_FuncBody(Src, FuncDef) {
 ; ==================================================
 
 _LTI_WriteTapHoldTomlIsAtomic() {
-	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
+	Src := _LTI_ReadSource("platform/remap/tap_hold_writer.ahk")
 	Seg := _DriverFuncBody("_TH_WriteTapHoldToml")
 	Assert(Seg != "", "_TH_WriteTapHoldToml declaration must exist in tap_hold_writer.ahk")
 	Assert(InStr(Seg, "FileDelete(Path)") == 0,
 		"_TH_WriteTapHoldToml must NOT delete the live tap_hold.toml first — a crash before FileAppend truncates it (loader-toml-injection-readfile-hotpath)")
-	Assert(InStr(Seg, "FileMove(Tmp, Path, true)") > 0,
-		"_TH_WriteTapHoldToml must rename a staged temp file over the target with atomic FileMove(Tmp, Path, true)")
+	Assert(InStr(Seg, "FSWriteDurable(StagePath, Content)") > 0,
+		"_TH_WriteTapHoldToml must flush the complete private stage before publication")
+	Assert(InStr(Seg, "FSAtomicMoveReplace(StagePath, BoundPath)") > 0,
+		"_TH_WriteTapHoldToml must publish the complete stage with a write-through atomic replacement")
 }
-Test("tap_hold_writer: _TH_WriteTapHoldToml uses atomic FileMove (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldTomlIsAtomic)
+Test("tap_hold_writer: _TH_WriteTapHoldToml uses durable atomic replacement (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldTomlIsAtomic)
 
 _LTI_WriteTapHoldDisabledIsAtomic() {
-	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_writer.ahk")
+	Src := _LTI_ReadSource("platform/remap/tap_hold_writer.ahk")
 	Seg := _DriverFuncBody("_TH_WriteTapHoldDisabled")
+	CommitSeg := _DriverFuncBody("_TH_CommitTapHoldMutation")
 	Assert(Seg != "", "_TH_WriteTapHoldDisabled declaration must exist in tap_hold_writer.ahk")
-	Assert(InStr(Seg, "FileDelete(Path)") == 0,
+	Assert(CommitSeg != "", "_TH_CommitTapHoldMutation declaration must exist in tap_hold_writer.ahk")
+	Assert(InStr(Seg, "FileDelete(Path)") == 0 and InStr(CommitSeg, "FileDelete(Path)") == 0,
 		"_TH_WriteTapHoldDisabled must NOT delete the live tap_hold.toml first (loader-toml-injection-readfile-hotpath)")
-	Assert(InStr(Seg, "_TH_WriteTapHoldToml(Candidate)") > 0,
-		"_TH_WriteTapHoldDisabled must delegate its immutable candidate to the single atomic FileMove writer")
+	Assert(InStr(Seg, "_TH_CommitTapHoldMutation(") > 0
+		and InStr(CommitSeg, "_TH_WriteTapHoldToml(Candidate") > 0,
+		"_TH_WriteTapHoldDisabled must reach the single durable atomic writer through its detached-candidate transaction")
 }
-Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses atomic FileMove (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldDisabledIsAtomic)
+Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses durable atomic replacement (loader-toml-injection-readfile-hotpath)", _LTI_WriteTapHoldDisabledIsAtomic)
 
 
 
@@ -99,7 +104,7 @@ Test("tap_hold_writer: _TH_WriteTapHoldDisabled uses atomic FileMove (loader-tom
 ; ==================================================
 
 _LTI_LoaderWarnsOnTruncatedConfig() {
-	Src := _LTI_ReadSource("lib/tap_hold/tap_hold_loader.ahk")
+	Src := _LTI_ReadSource("platform/remap/tap_hold_loader.ahk")
 	Seg := _LTI_FuncBody(Src, "LoadTapHoldToml(FilePath, DefaultsFilePath := " . Chr(34) . Chr(34) . ") {")
 	Assert(Seg != "", "LoadTapHoldToml declaration must exist in tap_hold_loader.ahk")
 	; The sentinel fires only when the parsed config has 0 keys and the user did

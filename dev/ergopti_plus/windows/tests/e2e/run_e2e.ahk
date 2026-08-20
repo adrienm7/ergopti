@@ -26,6 +26,16 @@
 ; here (as constants) so the harness is self-contained and does not require
 ; a JSON parser at E2E time.
 ;
+; FIVE OF THIRTY-FOUR, and the ratio matters more than the five. The macOS and
+; Linux e2e runners replay the WHOLE corpus by reading the file; this one
+; replays a hand-copied subset. So the cross-driver contract on this driver is
+; carried by the UNIT meta-test (tests/meta/test_corpus_hotstrings.ahk), which
+; does parse the real file and walks every vector — this harness is a smoke test
+; of the injection path, not the contract. Two consequences worth knowing before
+; trusting a green run here: a vector added to the corpus is not exercised end to
+; end on Windows, and the inline copies can drift from the file they were taken
+; from without anything noticing.
+;
 ; USAGE (headless CI):
 ;   AutoHotkey64.exe run_e2e.ahk
 ; USAGE (real GUI):
@@ -43,17 +53,20 @@ global _AHK_DRY_RUN := false
 ; Override the default A_Temp path so CI finds the results file next to this
 ; script (the workflow step looks for test_results.txt in tests/e2e/).
 global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
+; The shared app-context simulators publish into KLHook, just as the main
+; runner does. Load the definition here so E2E never depends on ambient state.
+#Include ../../modules/keylogger/keylogger_hook.ahk
 #Include ../test_stubs.ahk
 
 ; Production engine dependencies (same order as run_all.ahk).
-#Include ../../lib/app_state.ahk
-#Include ../../lib/ui_style.ahk
-#Include ../../lib/logger.ahk
+#Include ../../infra/app_state.ahk
+#Include ../../infra/ui_style.ahk
+#Include ../../infra/logger.ahk
 
-#Include ../../lib/window_utils.ahk
-#Include ../../lib/text_utils.ahk
-#Include ../../lib/hotstrings/hotstring_engine.ahk
-#Include ../../lib/hotstrings/hotstring_engine_main.ahk
+#Include ../../infra/window_utils.ahk
+#Include ../../infra/text_utils.ahk
+#Include ../../infra/hotstrings/hotstring_engine.ahk
+#Include ../../infra/hotstrings/hotstring_engine_main.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.
 InstallHotstringHooks()
@@ -62,11 +75,11 @@ InstallHotstringHooks()
 
 
 
-; ============================================
+; ============================
 ; ============================
 ; ======= 1/ Constants =======
 ; ============================
-; ============================================
+; ============================
 
 ; Whether Strategy B (real Gui window injection) is requested.
 ; Set to 1 by passing any truthy first argument on the command line.
@@ -147,11 +160,11 @@ global E2E_SCENARIOS := [
 
 
 
-; =====================================================================
+; =====================================================
 ; =====================================================
 ; ======= 2/ Strategy A — Pure engine injection =======
 ; =====================================================
-; =====================================================================
+; =====================================================
 
 ; Resets the engine and stubs, registers a single trigger, feeds the buffer
 ; char-by-char then the terminator, and returns a result Map with keys:
@@ -255,11 +268,11 @@ E2E_RunScenarioPure(Scenario) {
 
 
 
-; =====================================================================
+; ==================================================
 ; ==================================================
 ; ======= 3/ Strategy B — Real GUI injection =======
 ; ==================================================
-; =====================================================================
+; ==================================================
 
 ; Creates a hidden Gui with an Edit control, sends the trigger string and
 ; terminator via SendInput, and reads back the control text. Returns the
@@ -298,11 +311,11 @@ E2E_RunScenarioGui(Trigger, Terminator) {
 
 
 
-; =====================================================================
+; ====================================
 ; ====================================
 ; ======= 4/ Test registration =======
 ; ====================================
-; =====================================================================
+; ====================================
 
 ; Named helper used by the loop below — receives the scenario Map directly
 ; so each Test() callback is bound to a specific scenario via .Bind().
@@ -343,11 +356,11 @@ _E2E_RunGuiTest() {
 
 
 
-; ==============================================
+; ==============================
 ; ==============================
 ; ======= 5/ Entry point =======
 ; ==============================
-; ==============================================
+; ==============================
 
 ; Safety watchdog: kill the process if RunTests does not exit within 30 s.
 ; This prevents the CI job from hanging indefinitely if AHK's message loop

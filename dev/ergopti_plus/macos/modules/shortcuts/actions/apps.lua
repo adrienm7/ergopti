@@ -20,18 +20,18 @@ local M = {}
 
 local hs            = hs
 local timer         = hs.timer
-local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local urlevent      = hs.urlevent
 local http          = hs.http
-local notifications = require("lib.notifications")
-local Logger        = require("lib.logger")
-local text_utils = require("lib.text_utils")
-local i18n          = require("lib.i18n")
+local notifications = require("infra.notifications")
+local Logger        = require("infra.logger")
+local text_utils = require("infra.text_utils")
+local i18n          = require("infra.i18n")
 local AppLauncher   = require("adapters.app_launcher")
 local WindowInfo    = require("adapters.window_info")
 local WindowManager = require("adapters.window_manager")
 local ShellRunner   = require("adapters.shell_runner")
+local SyntheticInput = require("adapters.synthetic_input")
 
 local LOG = "shortcuts.actions.apps"
 
@@ -72,15 +72,25 @@ local CENTER_DELAY_SEC       = 0.3
 -- Additional delay for navigating to a sub-folder after the app focuses
 local FOLDER_OPEN_DELAY_SEC  = 0.12
 
+-- Clipboard ownership for copy_or_open_path. Overlapping actions keep the first
+-- user snapshot, and a native false/nil restore retains ownership for retry.
+local _copy_capture_in_flight = false
+local _copy_saved_prior = nil
+local _copy_capture_generation = 0
+local _copy_recovery_only = false
+local _copy_capture_timer = nil
+local _copy_restore_retry_timer = nil
+local _copy_deferred_retry_armed = false
 
 
 
 
--- ==================================
+
+-- ===================================
 -- ===================================
 -- ======= 2/ Internal Helpers =======
 -- ===================================
--- ==================================
+-- ===================================
 
 --- Trims leading and trailing whitespace from a string.
 --- @param s string The input string.
@@ -88,6 +98,145 @@ local FOLDER_OPEN_DELAY_SEC  = 0.12
 local function trim(s)
 	if type(s) ~= "string" then return "" end
 	return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
+local function begin_copy_capture()
+	if _copy_capture_in_flight then
+		Logger.debug(LOG, "copy_or_open_path ignored while another capture owns the clipboard.")
+		return nil, nil
+	end
+	local ok_read, prior_or_error = pcall(pasteboard.readAllData)
+	if not ok_read or type(prior_or_error) ~= "table" then
+		Logger.error(LOG, "copy_or_open_path: clipboard snapshot failed — %s.",
+			tostring(prior_or_error))
+		return nil, nil
+	end
+	_copy_saved_prior = prior_or_error
+	_copy_capture_in_flight = true
+	_copy_capture_generation = _copy_capture_generation + 1
+	return _copy_saved_prior, _copy_capture_generation
+end
+
+local function stop_copy_timer(handle)
+	if handle and type(handle.stop) == "function" then pcall(handle.stop, handle) end
+end
+
+local function release_copy_capture(generation)
+	if generation ~= _copy_capture_generation then return end
+	stop_copy_timer(_copy_capture_timer)
+	stop_copy_timer(_copy_restore_retry_timer)
+	_copy_capture_timer = nil
+	_copy_restore_retry_timer = nil
+	_copy_capture_in_flight = false
+	_copy_saved_prior = nil
+	_copy_recovery_only = false
+	_copy_deferred_retry_armed = false
+	_copy_capture_generation = _copy_capture_generation + 1
+end
+
+local function restore_copy_capture(prior, generation)
+	if generation ~= _copy_capture_generation or not _copy_capture_in_flight then
+		return false, "stale copy generation"
+	end
+	local ok_restore, restore_result
+	if type(prior) == "table" and next(prior) ~= nil then
+		ok_restore, restore_result = pcall(pasteboard.writeAllData, prior)
+		ok_restore = ok_restore and restore_result == true
+	else
+		ok_restore, restore_result = pcall(pasteboard.clearContents)
+	end
+	if ok_restore then
+		release_copy_capture(generation)
+		return true, nil
+	end
+	_copy_recovery_only = true
+	return false, restore_result
+end
+
+local queue_copy_restore_retry
+local abort_copy_capture
+
+local function arm_copy_timer(slot, delay, label, generation, callback)
+	local handle = nil
+	local installing = true
+	local callback_ran = false
+	local ok_timer, timer_or_error = pcall(timer.doAfter, delay, function()
+		callback_ran = true
+		if installing then return end
+		if slot == "capture" and _copy_capture_timer == handle then
+			_copy_capture_timer = nil
+		elseif slot == "restore" and _copy_restore_retry_timer == handle then
+			_copy_restore_retry_timer = nil
+		end
+		if generation ~= _copy_capture_generation then return end
+		local ok_callback, callback_error = xpcall(callback, debug.traceback)
+		if not ok_callback then
+			Logger.error(LOG, "copy_or_open_path %s callback failed — %s.",
+				label, tostring(callback_error))
+			if abort_copy_capture then
+				abort_copy_capture(_copy_saved_prior, generation,
+					label .. " callback failed", callback_error)
+			end
+		end
+	end)
+	installing = false
+	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
+		stop_copy_timer(timer_or_error)
+		return false, ok_timer and (callback_ran and "timer fired during installation"
+			or "hs.timer.doAfter returned no handle") or timer_or_error
+	end
+	handle = timer_or_error
+	if slot == "capture" then _copy_capture_timer = handle
+	else _copy_restore_retry_timer = handle end
+	return true, nil
+end
+
+queue_copy_restore_retry = function(prior, generation)
+	if _copy_restore_retry_timer or _copy_deferred_retry_armed then return true end
+	local function attempt_restore()
+		local restored, restore_error = restore_copy_capture(prior, generation)
+		if restored or generation ~= _copy_capture_generation then return end
+		Logger.error(LOG, "copy_or_open_path clipboard restore retry refused — %s.",
+			tostring(restore_error))
+		queue_copy_restore_retry(prior, generation)
+	end
+	local armed, timer_error = arm_copy_timer(
+		"restore", COPY_SETTLE_SEC, "restore retry", generation, attempt_restore)
+	if armed then return true end
+	if type(SyntheticInput.defer_after_callback) == "function" then
+		local installing = true
+		local callback_ran = false
+		local ok_defer, deferred = pcall(SyntheticInput.defer_after_callback,
+			"copy_or_open_path clipboard restore recovery", function()
+				callback_ran = true
+				if installing then return end
+				_copy_deferred_retry_armed = false
+				local ok_callback, callback_error = xpcall(attempt_restore, debug.traceback)
+				if not ok_callback then
+					Logger.error(LOG, "copy_or_open_path deferred restore callback failed — %s.",
+						tostring(callback_error))
+				end
+			end)
+		installing = false
+		if ok_defer and deferred == true and not callback_ran then
+			_copy_deferred_retry_armed = true
+			return true
+		end
+	end
+	Logger.error(LOG, "copy_or_open_path clipboard restore retry could not be armed — %s.",
+		tostring(timer_error))
+	return false
+end
+
+abort_copy_capture = function(prior, generation, reason, detail)
+	stop_copy_timer(_copy_capture_timer)
+	_copy_capture_timer = nil
+	local restored, restore_error = restore_copy_capture(prior, generation)
+	if not restored and generation == _copy_capture_generation then
+		queue_copy_restore_retry(prior, generation)
+	end
+	Logger.error(LOG, "copy_or_open_path %s — %s (restore=%s).",
+		reason, tostring(detail), tostring(restore_error))
 end
 
 --- Heuristically checks whether a string looks like a URL and normalises it.
@@ -130,8 +279,8 @@ local function launch_first_available(apps)
 		for _, a in ipairs(running) do
 			local ok_n, an = pcall(function() return a:name() end)
 			if ok_n and an and an:lower():find(lname, 1, true) then
-				pcall(function() a:activate() end)
-				return true
+				local ok_activate, activated = pcall(function() return a:activate() end)
+				if ok_activate and activated == true then return true end
 			end
 		end
 
@@ -302,46 +451,102 @@ function M.copy_or_open_path()
 		-- path", reported in the success notification, and the selection fallback
 		-- below became unreachable. The sibling branch already clears for exactly
 		-- this reason; this one did not.
-		local prior = nil
-		pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
-		eventtap.keyStroke({"cmd", "alt"}, "c", KEYSTROKE_NO_DELAY_US)
-
-		timer.doAfter(FINDER_PATH_SETTLE_SEC, function()
+		local prior, capture_generation = begin_copy_capture()
+		if capture_generation == nil then return end
+		local ok_clear, clear_error = pcall(pasteboard.clearContents)
+		if not ok_clear then
+			abort_copy_capture(prior, capture_generation, "clipboard clear failed", clear_error)
+			return
+		end
+		local function read_finder_path()
+			if capture_generation ~= _copy_capture_generation then return end
 			local ok_p, p = pcall(pasteboard.getContents)
 			if ok_p and p and p ~= "" then
+				release_copy_capture(capture_generation)
 				notifications.notify(string.format(i18n.get("shortcuts.copy_path_notif"), p), nil, "success")
+				return
+			end
+			if not ok_p then
+				abort_copy_capture(prior, capture_generation, "Finder path read failed", p)
 				return
 			end
 
 			-- Finder did not populate the clipboard — copy the selection instead
 			Logger.debug(LOG, "Finder did not write a path — falling back to copying the selection.")
-			eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
-
-			timer.doAfter(COPY_SETTLE_SEC, function()
-				local sel = nil
-				pcall(function() sel = pasteboard.getContents() end)
-				pcall(function()
-					if prior then pasteboard.setContents(prior) else pasteboard.clearContents() end
-				end)
+			local function read_fallback_selection()
+				if capture_generation ~= _copy_capture_generation then return end
+				local ok_sel, sel = pcall(pasteboard.getContents)
+				local restored, restore_error = restore_copy_capture(prior, capture_generation)
+				if not restored and capture_generation == _copy_capture_generation then
+					queue_copy_restore_retry(prior, capture_generation)
+				end
+				if not ok_sel then
+					Logger.error(LOG, "copy_or_open_path selection read failed — %s.", tostring(sel))
+					return
+				end
 				if sel and sel ~= "" then open_or_search(sel) end
-			end)
-		end)
+			end
+			local armed, timer_error = arm_copy_timer(
+				"capture", COPY_SETTLE_SEC, "fallback selection", capture_generation,
+				read_fallback_selection)
+			if not armed then
+				abort_copy_capture(prior, capture_generation, "fallback timer refused", timer_error)
+				return
+			end
+			local ok_copy, copied = pcall(
+				SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
+			if not ok_copy or copied ~= true then
+				abort_copy_capture(prior, capture_generation,
+					"fallback copy shortcut refused", copied)
+			end
+		end
+		local armed, timer_error = arm_copy_timer(
+			"capture", FINDER_PATH_SETTLE_SEC, "Finder path", capture_generation,
+			read_finder_path)
+		if not armed then
+			abort_copy_capture(prior, capture_generation, "Finder timer refused", timer_error)
+			return
+		end
+		local ok_copy, copied = pcall(
+			SyntheticInput.emit_key_stroke, { "cmd", "alt" }, "c", KEYSTROKE_NO_DELAY_US)
+		if not ok_copy or copied ~= true then
+			abort_copy_capture(prior, capture_generation, "Finder copy shortcut refused", copied)
+		end
 		return
 	end
 
 	-- Outside a file manager: copy selection and open or search
-	local prior = nil
-	pcall(function() prior = pasteboard.getContents(); pasteboard.clearContents() end)
-	eventtap.keyStroke({"cmd"}, "c", KEYSTROKE_NO_DELAY_US)
-
-	timer.doAfter(COPY_SETTLE_SEC, function()
-		local sel = nil
-		pcall(function() sel = pasteboard.getContents() end)
-		pcall(function()
-			if prior then pasteboard.setContents(prior) else pasteboard.clearContents() end
-		end)
+	local prior, capture_generation = begin_copy_capture()
+	if capture_generation == nil then return end
+	local ok_clear, clear_error = pcall(pasteboard.clearContents)
+	if not ok_clear then
+		abort_copy_capture(prior, capture_generation, "clipboard clear failed", clear_error)
+		return
+	end
+	local function read_selection()
+		if capture_generation ~= _copy_capture_generation then return end
+		local ok_sel, sel = pcall(pasteboard.getContents)
+		local restored, restore_error = restore_copy_capture(prior, capture_generation)
+		if not restored and capture_generation == _copy_capture_generation then
+			queue_copy_restore_retry(prior, capture_generation)
+		end
+		if not ok_sel then
+			Logger.error(LOG, "copy_or_open_path selection read failed — %s.", tostring(sel))
+			return
+		end
 		if sel and sel ~= "" then open_or_search(sel) end
-	end)
+	end
+	local armed, timer_error = arm_copy_timer(
+		"capture", COPY_SETTLE_SEC, "selection", capture_generation, read_selection)
+	if not armed then
+		abort_copy_capture(prior, capture_generation, "selection timer refused", timer_error)
+		return
+	end
+	local ok_copy, copied = pcall(
+		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
+	if not ok_copy or copied ~= true then
+		abort_copy_capture(prior, capture_generation, "copy shortcut refused", copied)
+	end
 end
 
 return M

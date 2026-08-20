@@ -27,7 +27,32 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Paths  = require("infra.paths")
 local LOG = "modules.shortcuts.manager"
+
+--- Records that the user fired a shortcut.
+---
+--- At ENTRY, not on success, and deliberately: the table stores what the user
+--- asked for, not whether it worked. macOS's events_shortcut carries a key name
+--- and nothing else for the same reason — "I pressed the uppercase shortcut and
+--- had nothing selected" is still a use of that shortcut, and a recorder that
+--- only fires on the happy path under-reports exactly the actions a user is
+--- struggling with.
+---
+--- pcall'd and lazily required: metrics are optional and must never be the
+--- reason a shortcut does not run.
+--- @param key string Stable action name; the dashboard groups by it.
+local function record(key)
+	local ok, keylogger = pcall(require, "modules.keylogger.keylogger")
+	if not ok or type(keylogger.record_shortcut) ~= "function" then return end
+	local app = "unknown"
+	local ok_win, WindowInfo = pcall(require, "adapters.window_info")
+	if ok_win and type(WindowInfo.focused_app_id) == "function" then
+		local ok_id, id = pcall(WindowInfo.focused_app_id)
+		if ok_id and type(id) == "string" and id ~= "" then app = id end
+	end
+	pcall(keylogger.record_shortcut, app, key)
+end
 
 -- =========================================
 -- =========================================
@@ -38,29 +63,20 @@ local LOG = "modules.shortcuts.manager"
 -- Relative path (from static/ergopti_plus) to the shared wrap-symbol catalogue,
 -- the single source of truth shared with the AHK and macOS drivers — never
 -- hardcode the pair list here; edit the JSON so all 3 drivers stay in sync
-local WRAP_SYMBOLS_REL_PATH = "/_shared/modules/wrap_symbols/wrap_symbols.json"
+local WRAP_SYMBOLS_REL_PATH = "modules/wrap_symbols/wrap_symbols.json"
 
 -- Leading UTF-8 BOM bytes; the pure-Lua JSON decoder rejects a byte-order mark
 local UTF8_BOM = "\239\187\191"
 
---- Resolves the absolute path to the shared wrap-symbols catalogue by walking up
---- from this file's location. manager.lua lives at
---- linux/modules/shortcuts/manager.lua, so the 4 trailing path segments are
---- stripped to reach static/ergopti_plus before descending into the shared tree.
---- Mirrors the debug.getinfo path walk in lib/locale.lua.
+--- Resolves the absolute path to the shared wrap-symbols catalogue.
+---
+--- Through infra.paths. Stripping four path segments off this file's own
+--- location described one layout only: an installed package stages the driver
+--- flat under /usr/lib/ergopti, where four up leaves the install entirely and
+--- every wrap pair is silently lost.
 --- @return string Absolute catalogue path, or "" when the location is unresolvable.
 local function resolve_wrap_symbols_path()
-	local src = debug and debug.getinfo and debug.getinfo(1, "S")
-	if src and src.source then
-		local s = src.source
-		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-		s = s:gsub("\\", "/")
-		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+/[^/]+$")
-		if root then
-			return root .. WRAP_SYMBOLS_REL_PATH
-		end
-	end
-	return ""
+	return Paths.shared(WRAP_SYMBOLS_REL_PATH) or ""
 end
 
 --- Reads the shared wrap-symbols JSON and flattens its ordered groups into the
@@ -146,6 +162,7 @@ end
 --- @param left string Opening symbol.
 --- @param right string Closing symbol.
 function M.wrap_selection(left, right)
+	record("wrap_selection")
 	if type(left) ~= "string" or type(right) ~= "string" then return end
 
 	-- Read current selection via xclip (clipboard, not primary, so
@@ -198,6 +215,7 @@ end
 
 --- Toggles CapsWord on/off via the menu.
 function M.toggle_caps_word()
+	record("caps_word")
 	_caps_word_active = not _caps_word_active
 	_caps_word_triggered = false
 	Logger.info(LOG, "CapsWord: %s", _caps_word_active and "ON" or "OFF")
@@ -270,6 +288,7 @@ end
 
 --- Transforms the current selection to UPPERCASE.
 function M.transform_uppercase()
+	record("to_uppercase")
 	local sel = _read_selection()
 	if not sel or sel == "" then
 		Logger.warn(LOG, "transform_uppercase: no selection.")
@@ -281,6 +300,7 @@ end
 
 --- Transforms the current selection to lowercase.
 function M.transform_lowercase()
+	record("to_lowercase")
 	local sel = _read_selection()
 	if not sel or sel == "" then
 		Logger.warn(LOG, "transform_lowercase: no selection.")
@@ -292,6 +312,7 @@ end
 
 --- Transforms the current selection to Title Case.
 function M.transform_titlecase()
+	record("to_titlecase")
 	local sel = _read_selection()
 	if not sel or sel == "" then
 		Logger.warn(LOG, "transform_titlecase: no selection.")
@@ -306,11 +327,13 @@ end
 
 --- Selects the current word under cursor (Ctrl+Shift+Left, Ctrl+Shift+Right).
 function M.select_word()
+	record("select_word")
 	os.execute("xdotool key ctrl+shift+Left 2>/dev/null &")
 end
 
 --- Selects the entire current line (Home, Shift+End).
 function M.select_line()
+	record("select_line")
 	os.execute("xdotool key Home 2>/dev/null &")
 	-- Small delay then extend selection.
 	os.execute("(sleep 0.05 && xdotool key shift+End) 2>/dev/null &")
@@ -318,6 +341,7 @@ end
 
 --- Pastes clipboard content as plain text (strips formatting).
 function M.paste_plain()
+	record("paste_plain")
 	-- Read clipboard, then type it via xdotool (bypasses rich-text paste).
 	local pipe = io.popen("xclip -o -selection clipboard 2>/dev/null")
 	if not pipe then return end

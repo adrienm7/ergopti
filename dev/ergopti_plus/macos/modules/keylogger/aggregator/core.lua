@@ -15,9 +15,9 @@ local M = {}
 
 local hs      = hs
 local utf8    = utf8
-local Logger  = require("lib.logger")
-local Paths   = require("lib.paths")
-local Timings = require("lib.timings")
+local Logger  = require("infra.logger")
+local Paths   = require("infra.paths")
+local Timings = require("infra.timings")
 local KUtils    = require("keylogger.utils")
 local AggHelper = require("keylogger.aggregator_helpers")
 local LOG       = "keylogger.aggregator"
@@ -28,11 +28,11 @@ local S = require("modules.keylogger.aggregator.state")
 
 
 
--- ==============================
+-- ============================
 -- ============================
 -- ======= 1/ Constants =======
 -- ============================
--- ==============================
+-- ============================
 
 -- The keystroke-timing thresholds below come from the shared cross-driver
 -- registry ([keylogger]) so the AHK and macOS keyloggers classify identically.
@@ -155,11 +155,11 @@ M.KC_TO_FINGER             = KC_TO_FINGER
 
 
 
--- ===========================
+-- =========================
 -- =========================
 -- ======= 2/ Guards =======
 -- =========================
--- ===========================
+-- =========================
 
 --- Guards public functions against being called before M.init().
 --- @param func_name string Name of the calling function for the error log.
@@ -182,11 +182,11 @@ end
 
 
 
--- ====================================
+-- ===================================
 -- ===================================
 -- ======= 3/ Batch Management =======
 -- ===================================
--- ====================================
+-- ===================================
 
 --- Ensure S.agg_batch is ready; called lazily from walk functions.
 function M.ensure_batch()
@@ -250,11 +250,11 @@ end
 
 
 
--- ================================
+-- ===============================
 -- ===============================
 -- ======= 4/ Walk Helpers =======
 -- ===============================
--- ================================
+-- ===============================
 
 --- Delegates to the shared keylogger/utils module.
 function M.gc(tbl, k, default)
@@ -306,11 +306,11 @@ end
 
 
 
--- ========================================
+-- ==========================================
 -- ==========================================
 -- ======= 5/ Burst / Session Helpers =======
 -- ==========================================
--- ========================================
+-- ==========================================
 
 --- Delegates to the shared keylogger/aggregator_helpers module.
 function M.finalize_burst(date_str, app, b)

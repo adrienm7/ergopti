@@ -15,13 +15,13 @@
 ---   set_llm_temperature      -> `t <= GREEDY_TEMP_THRESHOLD`   (prompt_builder:127)
 ---   set_llm_debounce         -> `inactivity_debounce_sec < 0`  (start_inactivity_timer)
 ---
---- Neither ui/menu/preferences.lua nor ui/menu/menu_state.lua coerces, and the
+--- Neither infra/preferences.lua nor ui/menu/menu_state.lua coerces, and the
 --- shared TOML codec falls back to a bare string for anything its two numeric
 --- patterns miss — so an untrusted string genuinely reaches these setters.
 ---
 --- WHY IT WAS FATAL: PromptBuilder.build runs inside perform_check, which is the
 --- body of the module-level hs.timer debounce. Hammerspoon pcalls timer
---- callbacks, so the throw went to the Console and never reached lib/logger —
+--- callbacks, so the throw went to the Console and never reached infra/logger —
 --- not even "Request signature accepted." was emitted. The health dot stayed
 --- green, the backend stayed ready, and no prediction ever appeared again for
 --- the session.
@@ -38,8 +38,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 
 
@@ -80,7 +80,7 @@ package.loaded["modules.llm"] = {
 	set_llm_model_ollama    = function(_) end,
 	set_runtime_llm_enabled = function(_) end,
 	set_llm_streaming       = function(_) end,
-	cancel_streaming        = function() end,
+	cancel_streaming        = function() return true end,
 	is_backend_ready        = function() return true end,
 	get_active_profile      = function() return { label = "Test profile" } end,
 	fetch_llm_prediction    = function(...) end,
@@ -88,7 +88,7 @@ package.loaded["modules.llm"] = {
 
 package.loaded["modules.llm.warmup_controller"] = {
 	schedule_warmup_with_retry = function(_reason) end,
-	init                       = function(_cfg) end,
+	init                       = function(_cfg) return true end,
 	start                      = function() end,
 	stop                       = function() end,
 }
@@ -101,12 +101,12 @@ package.loaded["modules.llm.api_mlx"] = {
 }
 
 package.loaded["modules.llm.streaming_handler"] = {
-	init                = function(_cfg) end,
+	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) end,
-	stop_watchdog       = function() end,
+	arm_watchdog        = function(_cfg) return true end,
+	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
-	cancel_streaming    = function() end,
+	cancel_streaming    = function() return true end,
 }
 
 package.loaded["modules.llm.app_filter"] = {
@@ -119,26 +119,26 @@ package.loaded["modules.llm.api_common"] = {
 	get_rate_limit_min_interval_s = function(_backend) return 0 end,
 }
 
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
-package.loaded["lib.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
-	set_chain_start       = function(_) end,
-	mark_chain_complete   = function() end,
+	set_chain_start       = function(_) return true end,
+	mark_chain_complete   = function() return true end,
 	get_current_index     = function() return nil end,
 	navigate              = function(_) end,
 	show                  = function() end,
-	hide                  = function() end,
+	hide                  = function() return true end,
 	set_llm_timeout       = function(_) end,
-	reset_llm_timer       = function() end,
-	show_loading          = function(...) end,
-	show_predictions      = function(...) end,
+	reset_llm_timer       = function() return true end,
+	show_loading          = function(...) return true end,
+	show_predictions      = function(...) return true end,
 	tint                  = function(_) return nil end,
 }
 
@@ -291,8 +291,8 @@ helpers.describe("prediction_engine — numeric settings survive a string from c
 		PE.stop_timer()
 		PE.set_llm_enabled(false)
 
-		helpers.assert_true(ok,
-			"a string llm_debounce must be coerced by the setter — start_inactivity_timer compares it against 0: " .. tostring(err))
+		helpers.assert_nil(err, "start_inactivity_timer compares the debounce against 0: " .. tostring(err))
+		helpers.assert_true(ok, "a string llm_debounce must be coerced by the setter")
 	end)
 
 	helpers.it("set_llm_num_predictions floors and clamps to at least one prediction", function()
@@ -366,7 +366,7 @@ helpers.describe("prediction_engine — a throwing PromptBuilder is contained an
 			"perform_check must actually reach PromptBuilder.build — otherwise this case proves nothing")
 		helpers.assert_true(ok,
 			"perform_check must pcall PromptBuilder.build — an unguarded throw is invisible (hs.timer routes it to the " ..
-			"Console, never to lib/logger) and permanently kills predictions for the session: " .. tostring(err))
+			"Console, never to infra/logger) and permanently kills predictions for the session: " .. tostring(err))
 		helpers.assert_true(dispatched == false,
 			"a failed build must abort the request, not fall through to the dispatcher")
 	end)

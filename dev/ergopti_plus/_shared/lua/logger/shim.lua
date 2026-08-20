@@ -25,6 +25,7 @@ local M = {}
 
 
 
+
 -- ===========================================
 -- ===========================================
 -- ======= 1/ Attempt real logger load =======
@@ -35,7 +36,7 @@ local M = {}
 local ok, real = pcall(require, "logger")
 if not ok or not real then
 	-- Try the macOS driver logger as a secondary fallback.
-	ok, real = pcall(require, "lib.logger")
+	ok, real = pcall(require, "infra.logger")
 end
 
 if ok and real then
@@ -45,11 +46,12 @@ end
 
 
 
--- ======================================
--- ======================================
--- ======= 2/ Print-fallback logger =====
--- ======================================
--- ======================================
+
+-- ========================================
+-- ========================================
+-- ======= 2/ Print-fallback logger =======
+-- ========================================
+-- ========================================
 
 local function _log(level, tag, fmt, ...)
 	local msg = select("#", ...) > 0 and string.format(fmt, ...) or tostring(fmt)

@@ -1,228 +1,421 @@
 --- tests/unit/modules/llm/test_api_token_decrypt_async_behaviour.lua
 
 --- ==============================================================================
---- MODULE: Regression — async Keychain decrypt never blocks (F-MED-9)
+--- MODULE: Regression — bounded Keychain tasks and single-flight resolution
 --- DESCRIPTION:
---- ApiRemote.get_active_entry()'s lazy Keychain decrypt (TokenCrypto.decrypt)
---- is a synchronous hs.execute shell-out, reachable from a run-loop timer
---- callback (warmup / first prediction). A locked Keychain there can freeze
---- the whole run loop on a modal unlock prompt.
----
---- Fix: TokenCrypto.decrypt_async() drives the Keychain read through
---- adapters/shell_runner's async hs.task.new instead of a blocking
---- hs.execute, and ApiRemote.prewarm_active_entry_decrypt() calls it right
---- after entries load so the LATER synchronous get_active_entry() call
---- almost always hits an already-cached cleartext token.
----
---- These tests stub hs.task.new to capture (rather than immediately fire)
---- its completion callback, proving decrypt_async() returns control to the
---- caller before the "Keychain" responds, and that the callback correctly
---- delivers the cleartext once the async task completes.
+--- Drives hung/failed subprocesses and stale resolver completions through the
+--- real production modules. Assertions cover observable completion, ownership,
+--- cache placement, and menu/network side effects rather than source spelling.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
+local function with_crypto_fixture(options, body)
+	options = options or {}
+	local names = {
+		"modules.llm.api_token_crypto", "adapters.shell_runner",
+		"adapters.timer_scheduler", "infra.timings", "infra.logger",
+		"platform.remap.lease_helper",
+	}
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 
-
-
-
--- =========================================================
--- =========================================================
--- ======= 1/ TokenCrypto.decrypt_async never blocks =======
--- =========================================================
--- =========================================================
-
-helpers.describe("TokenCrypto.decrypt_async: never blocks on the Keychain (F-MED-9)", function()
-
-	helpers.it("returns control to the caller before the async task completes", function()
-		local captured_cb = nil
-		local started = false
-		local hs_overrides = {
-			task = {
-				new = function(_exe, cb, _args)
-					captured_cb = cb
-					-- start() returns TRUE, as the real hs.task does. Returning nil
-					-- made a probe that was never started indistinguishable from one
-					-- that ran, so a regression that stopped starting it stayed green.
-					local t = { terminate = function() end }
-					t.start = function() started = true; return true end
-					return t
+	local fixture = {
+		done = nil,
+		timeout = nil,
+		terminate_calls = 0,
+		cancel_calls = 0,
+		start_calls = 0,
+		input = nil,
+		process_order = {},
+		streaming = nil,
+		executable = nil,
+		args = nil,
+		errors = {},
+	}
+	package.loaded["infra.logger"] = {
+		debug = function() end,
+		info = function() end,
+		warn = function() end,
+		error = function(_, fmt, ...)
+			fixture.errors[#fixture.errors + 1] = string.format(tostring(fmt), ...)
+		end,
+	}
+	package.loaded["infra.timings"] = {
+		sec = function(section, key)
+			helpers.assert_eq(section, "llm")
+			helpers.assert_eq(key, "keychain_operation_timeout_ms")
+			return 10
+		end,
+	}
+	package.loaded["platform.remap.lease_helper"] = {
+		resolve = function()
+			if options.helper_throws then error("helper resolution exploded") end
+			if options.helper_unavailable then return nil, "helper missing" end
+			return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+		end,
+	}
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(delay, callback)
+			helpers.assert_eq(delay, 10)
+			fixture.timeout = callback
+			if options.timer_fires_synchronously then callback() end
+			return { timer = true }, options.timer_commits ~= false
+		end,
+		cancel = function()
+			fixture.cancel_calls = fixture.cancel_calls + 1
+			return true
+		end,
+	}
+	package.loaded["adapters.shell_runner"] = {
+		spawn = function(executable, args, on_done, on_chunk)
+			if options.spawn_throws then error("spawn exploded") end
+			fixture.executable = executable
+			fixture.args = args
+			fixture.streaming = type(on_chunk) == "function"
+			fixture.done = on_done
+			return {
+				set_input = function(value)
+					fixture.input = value
+					fixture.process_order[#fixture.process_order + 1] = "input"
+					return options.input_accepts ~= false
 				end,
-			},
-		}
-		-- adapters.shell_runner captures `local hs = hs` at require-time; it
-		-- must be reloaded under THIS test's stub, not a previous test's, or
-		-- its wrapped_on_done still calls into the OLD hs.task.new.
-		package.loaded["modules.llm.api_token_crypto"] = nil
-		package.loaded["adapters.shell_runner"]        = nil
-		local TokenCrypto = helpers.load_with_stubs("modules.llm.api_token_crypto", hs_overrides)
+				start = function()
+					fixture.start_calls = fixture.start_calls + 1
+					fixture.process_order[#fixture.process_order + 1] = "start"
+					return options.start_succeeds ~= false
+				end,
+				terminate = function()
+					fixture.terminate_calls = fixture.terminate_calls + 1
+					if options.done_on_terminate and fixture.done then
+						fixture.done(15, "", "terminated")
+						return true, "settled"
+					end
+					if options.terminate_succeeds == false then return false, "refused" end
+					return true, "pending"
+				end,
+			}
+		end,
+	}
+	package.loaded["modules.llm.api_token_crypto"] = nil
 
-		local delivered = nil
-		TokenCrypto.decrypt_async("keychain:my-entry", function(cleartext) delivered = cleartext end)
+	local ok, err = xpcall(function()
+		body(require("modules.llm.api_token_crypto"), fixture)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	-- Keep the shared-slot restore explicit so the cross-file hygiene scanner can
+	-- prove this fixture cannot leak an exec-less shell runner into its successor.
+	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	if not ok then error(err) end
+end
 
-		-- The callback must NOT have fired synchronously — decrypt_async must
-		-- return immediately, before the "Keychain" subprocess responds.
-		helpers.assert_true(delivered == nil,
-			"decrypt_async must not deliver its result synchronously — the caller must not block")
-		helpers.assert_true(captured_cb ~= nil, "decrypt_async must spawn an hs.task for the Keychain read")
-		helpers.assert_true(started,
-			"the task must actually have been STARTED; hand-delivering its callback without "
-			.. "checking this hides a probe that is spawned and never launched")
+helpers.describe("TokenCrypto async task ownership", function()
+	helpers.it("times out a hung read, terminates its exact task, and completes once", function()
+		with_crypto_fixture({ done_on_terminate = true }, function(TokenCrypto, fixture)
+			local results = {}
+			TokenCrypto.decrypt_async("keychain:entry-a", function(...)
+				results[#results + 1] = table.pack(...)
+			end)
+			helpers.assert_eq(#results, 0, "a hung subprocess must not complete synchronously")
+			helpers.assert_type(fixture.timeout, "function", "the hard deadline must be armed")
+			fixture.timeout()
+			helpers.assert_eq(fixture.terminate_calls, 1,
+				"deadline must terminate the exact ShellRunner handle")
+			helpers.assert_eq(#results, 1, "timeout must complete the caller exactly once")
+			helpers.assert_eq(results[1][1], false)
+			helpers.assert_eq(results[1][3], "timeout")
 
-		-- Simulate the async subprocess completing.
-		captured_cb(0, "super-secret-token", "")
-
-		helpers.assert_eq(delivered, "super-secret-token",
-			"decrypt_async's callback must deliver the cleartext once the async task completes")
+			fixture.done(0, "late-secret", "")
+			fixture.done(0, "duplicate-secret", "")
+			helpers.assert_eq(#results, 1,
+				"late and duplicate native completions must be fenced after timeout")
+		end)
 	end)
 
-	helpers.it("delivers empty string when the async Keychain read fails", function()
-		local captured_cb = nil
-		local started = false
-		local hs_overrides = {
-			task = {
-				new = function(_exe, cb, _args)
-					captured_cb = cb
-					-- start() returns TRUE, as the real hs.task does. Returning nil
-					-- made a probe that was never started indistinguishable from one
-					-- that ran, so a regression that stopped starting it stayed green.
-					local t = { terminate = function() end }
-					t.start = function() started = true; return true end
-					return t
-				end,
-			},
-		}
-		package.loaded["modules.llm.api_token_crypto"] = nil
-		package.loaded["adapters.shell_runner"]        = nil
-		local TokenCrypto = helpers.load_with_stubs("modules.llm.api_token_crypto", hs_overrides)
-
-		local delivered = "not called"
-		TokenCrypto.decrypt_async("keychain:my-entry", function(cleartext) delivered = cleartext end)
-		captured_cb(44, "", "security: entry not found")
-
-		helpers.assert_eq(delivered, "", "a failed async Keychain read must deliver empty string, not throw")
+	helpers.it("reports start refusal exactly once and never waits for a callback", function()
+		with_crypto_fixture({ start_succeeds = false }, function(TokenCrypto, fixture)
+			local calls, reason = 0, nil
+			TokenCrypto.decrypt_async("keychain:entry-a", function(ok, _value, why)
+				calls = calls + 1
+				helpers.assert_eq(ok, false)
+				reason = why
+			end)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(reason, "launch_failed")
+			helpers.assert_eq(fixture.terminate_calls, 1)
+			helpers.assert_eq(fixture.cancel_calls, 1,
+				"launch failure must cancel the already-armed deadline")
+		end)
 	end)
 
-	helpers.it("calls back immediately (still async-shaped) for a non-encrypted (cleartext legacy) value", function()
-		package.loaded["modules.llm.api_token_crypto"] = nil
-		package.loaded["adapters.shell_runner"]        = nil
-		local TokenCrypto = helpers.load_with_stubs("modules.llm.api_token_crypto")
+	helpers.it("does not launch after a deadline fires synchronously during acquisition", function()
+		with_crypto_fixture({ timer_fires_synchronously = true, terminate_succeeds = false }, function(TokenCrypto, fixture)
+			local results = {}
+			TokenCrypto.decrypt_async("keychain:entry-a", function(...)
+				results[#results + 1] = table.pack(...)
+			end)
+			helpers.assert_eq(fixture.start_calls, 0,
+				"a terminal timeout must fence the later task start")
+			helpers.assert_eq(fixture.terminate_calls, 1,
+				"the synchronous deadline must terminate its exact prepared task")
+			helpers.assert_eq(fixture.cancel_calls, 1,
+				"the timer handle returned after delivery must still be retired")
+			helpers.assert_eq(#results, 1)
+			helpers.assert_eq(results[1][1], false)
+			helpers.assert_eq(results[1][3], "timeout")
+		end)
+	end)
 
-		local delivered = nil
-		TokenCrypto.decrypt_async("plain-legacy-token", function(cleartext) delivered = cleartext end)
+	helpers.it("converts a constructor throw into one explicit launch failure", function()
+		with_crypto_fixture({ spawn_throws = true }, function(TokenCrypto)
+			local calls, reason = 0, nil
+			TokenCrypto.decrypt_async("keychain:entry-a", function(ok, _value, why)
+				calls = calls + 1
+				helpers.assert_eq(ok, false)
+				reason = why
+			end)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(reason, "launch_failed")
+		end)
+	end)
 
-		helpers.assert_eq(delivered, "plain-legacy-token",
-			"a non-keychain-prefixed value must be delivered unchanged, no Keychain round-trip needed")
+	helpers.it("never returns cleartext as the encryption failure value", function()
+		with_crypto_fixture({}, function(TokenCrypto, fixture)
+			local delivered = nil
+			TokenCrypto.encrypt_async("entry-a", "plain-secret", function(...)
+				delivered = table.pack(...)
+			end)
+			helpers.assert_eq(fixture.input, "plain-secret",
+				"the token belongs on stdin, not in the argument vector")
+			helpers.assert_eq(table.concat(fixture.process_order, ","), "input,start",
+				"the non-streaming task must receive its one-shot stdin before launch")
+			helpers.assert_eq(fixture.streaming, false,
+				"hs.task setInput closes stdin automatically only in the non-streaming form")
+			helpers.assert_eq(fixture.executable,
+				"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus")
+			helpers.assert_eq(fixture.args[1], "--keychain-token-write")
+			helpers.assert_eq(fixture.args[2], "entry-a")
+			helpers.assert_eq(#fixture.args, 2,
+				"the secret must never be appended to launcher argv")
+			for _, argument in ipairs(fixture.args) do
+				helpers.assert_true(argument ~= "plain-secret", "secret material leaked into argv")
+			end
+			fixture.done(51, "", "denied")
+			helpers.assert_eq(delivered[1], false)
+			helpers.assert_eq(delivered[2], nil,
+				"encryption failure must never hand plaintext back for persistence")
+		end)
+	end)
+
+	helpers.it("does not signal or settle a timed-out Keychain mutation before natural completion", function()
+		with_crypto_fixture({}, function(TokenCrypto, fixture)
+			local results = {}
+			TokenCrypto.encrypt_async("entry-a", "plain-secret", function(...)
+				results[#results + 1] = table.pack(...)
+			end)
+
+			fixture.timeout()
+			helpers.assert_eq(fixture.terminate_calls, 0,
+				"a dispatched SecItem mutation cannot be cancelled safely with SIGTERM")
+			helpers.assert_eq(#results, 0,
+				"logical timeout must not release native mutation ownership")
+
+			fixture.done(0, "", "")
+			helpers.assert_eq(#results, 1)
+			helpers.assert_eq(results[1][1], false,
+				"a late native success remains logically timed out")
+			helpers.assert_eq(results[1][2], nil)
+			helpers.assert_eq(results[1][3], "timeout")
+		end)
+	end)
+
+	helpers.it("keeps explicit Keychain-mutation cancellation pending until native completion", function()
+		with_crypto_fixture({}, function(TokenCrypto, fixture)
+			local results = {}
+			local operation = TokenCrypto.encrypt_async("entry-a", "plain-secret", function(...)
+				results[#results + 1] = table.pack(...)
+			end)
+
+			local settled, state = operation.cancel()
+			helpers.assert_eq(settled, false)
+			helpers.assert_eq(state, "pending")
+			helpers.assert_eq(fixture.terminate_calls, 0)
+			helpers.assert_eq(#results, 0)
+
+			fixture.done(0, "", "")
+			helpers.assert_eq(#results, 1)
+			helpers.assert_eq(results[1][1], false)
+			helpers.assert_eq(results[1][3], "cancelled")
+		end)
+	end)
+
+	helpers.it("logs a client callback throw instead of swallowing it", function()
+		with_crypto_fixture({}, function(TokenCrypto, fixture)
+			TokenCrypto.decrypt_async("keychain:entry-a", function()
+				error("consumer exploded")
+			end)
+			fixture.done(0, "secret", "")
+			local joined = table.concat(fixture.errors, "\n")
+			helpers.assert_true(joined:find("consumer exploded", 1, true) ~= nil,
+				"a throw across the task boundary must reach the file logger")
+		end)
 	end)
 end)
 
-
-
-
--- ======================================================================
--- ======================================================================
--- ======= 2/ ApiRemote.prewarm_active_entry_decrypt caches the token ==
--- ======================================================================
--- ======================================================================
-
-helpers.describe("ApiRemote.prewarm_active_entry_decrypt: caches the active entry's token asynchronously (F-MED-9)", function()
-
-	--- Loads a fresh ApiRemote with hs.task.new stubbed to capture (not fire)
-	--- its completion callback, so the test controls exactly when the
-	--- "Keychain" responds.
-	--- @return table ApiRemote, function fire_pending (fires the captured callback with the given cleartext)
-	local function load_fresh_api_remote()
-		local captured_cb = nil
-		local started = false
-		local hs_overrides = {
-			task = {
-				new = function(_exe, cb, _args)
-					captured_cb = cb
-					-- start() returns TRUE, as the real hs.task does. Returning nil
-					-- made a probe that was never started indistinguishable from one
-					-- that ran, so a regression that stopped starting it stayed green.
-					local t = { terminate = function() end }
-					t.start = function() started = true; return true end
-					return t
+local function with_remote_fixture(body)
+	local names = {
+		"modules.llm.api_remote", "modules.llm.api_token_crypto",
+		"adapters.http_client",
+	}
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local fixture = { decrypt_calls = 0, callbacks = {}, cancels = 0, http_gets = 0 }
+	package.loaded["modules.llm.api_token_crypto"] = {
+		is_encrypted = function(value)
+			return type(value) == "string" and value:sub(1, 9) == "keychain:"
+		end,
+		decrypt_async = function(_stored, callback)
+			fixture.decrypt_calls = fixture.decrypt_calls + 1
+			fixture.callbacks[#fixture.callbacks + 1] = callback
+			return {
+				cancel = function()
+					fixture.cancels = fixture.cancels + 1
+					return true
 				end,
+			}
+		end,
+	}
+	package.loaded["adapters.http_client"] = {
+		new = function()
+			return {
+				cancel = function() return true end,
+				get = function(_url, _headers, _callback)
+					fixture.http_gets = fixture.http_gets + 1
+				end,
+				post = function() end,
+			}
+		end,
+		encodeForQuery = function(value) return value end,
+	}
+	package.loaded["modules.llm.api_remote"] = nil
+	local ok, err = xpcall(function()
+		body(helpers.load_with_stubs("modules.llm.api_remote"), fixture)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err) end
+end
+
+helpers.describe("ApiRemote asynchronous token resolver", function()
+	helpers.it("single-flights waiters, caches outside the entry, and ignores duplicates", function()
+		with_remote_fixture(function(ApiRemote, fixture)
+			ApiRemote.set_entries({
+				{ id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" },
+			})
+			ApiRemote.set_active_entry_id("entry-a")
+			local results = {}
+			ApiRemote.resolve_active_entry(function(...) results[#results + 1] = table.pack(...) end)
+			ApiRemote.resolve_active_entry(function(...) results[#results + 1] = table.pack(...) end)
+			helpers.assert_eq(fixture.decrypt_calls, 1,
+				"concurrent callers for one reference must share one Keychain task")
+			helpers.assert_eq(ApiRemote.get_active_entry().token, "keychain:entry-a",
+				"menu metadata must retain the persisted reference while resolution is pending")
+
+			fixture.callbacks[1](true, "secret-a", nil)
+			helpers.assert_eq(#results, 2, "every single-flight waiter must complete")
+			helpers.assert_eq(results[1][1], true)
+			helpers.assert_eq(results[1][2].token, "secret-a")
+			helpers.assert_eq(ApiRemote.get_active_entry().token, "keychain:entry-a",
+				"cleartext cache must never replace the persisted entry field")
+
+			fixture.callbacks[1](true, "duplicate", nil)
+			helpers.assert_eq(#results, 2, "duplicate crypto callbacks must not redeliver waiters")
+			local cached = nil
+			ApiRemote.resolve_active_entry(function(ok, entry) cached = ok and entry.token or nil end)
+			helpers.assert_eq(cached, "secret-a")
+			helpers.assert_eq(fixture.decrypt_calls, 1, "a valid external cache hit needs no second task")
+		end)
+	end)
+
+	helpers.it("terminates and fails waiters when identity changes, then discards the late result", function()
+		with_remote_fixture(function(ApiRemote, fixture)
+			ApiRemote.set_entries({
+				{ id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "a" },
+				{ id = "entry-b", provider = "openai", token = "keychain:entry-b", model = "b" },
+			})
+			ApiRemote.set_active_entry_id("entry-a")
+			local calls, reason = 0, nil
+			ApiRemote.resolve_active_entry(function(ok, _entry, why)
+				calls = calls + 1
+				helpers.assert_eq(ok, false)
+				reason = why
+			end)
+			ApiRemote.set_active_entry_id("entry-b")
+			helpers.assert_eq(fixture.cancels, 1, "identity change must terminate the exact read task")
+			helpers.assert_eq(calls, 1, "superseded waiter must receive one explicit failure")
+			helpers.assert_eq(reason, "identity_changed")
+
+			fixture.callbacks[1](true, "late-a", nil)
+			helpers.assert_eq(calls, 1, "late stale completion must not redeliver")
+			helpers.assert_eq(ApiRemote.get_entries()[1].token, "keychain:entry-a")
+		end)
+	end)
+
+	helpers.it("does zero HTTP work until a cold token resolves", function()
+		with_remote_fixture(function(ApiRemote, fixture)
+			ApiRemote.PROVIDERS.openai = {
+				label = "OpenAI", base_url = "https://example.invalid", default_model = "gpt", format = "openai",
+			}
+			ApiRemote.set_entries({
+				{ id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" },
+			})
+			ApiRemote.set_active_entry_id("entry-a")
+			ApiRemote.warmup()
+			helpers.assert_eq(fixture.http_gets, 0,
+				"warmup must return before the Keychain and must not send an unresolved reference")
+			fixture.callbacks[1](true, "secret-a", nil)
+			helpers.assert_eq(fixture.http_gets, 1,
+				"the network request may start only after async credential resolution")
+		end)
+	end)
+end)
+
+helpers.describe("API menu metadata path", function()
+	helpers.it("builds before token resolution without starting any shell work", function()
+		local names = {
+			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+		}
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local resolver_calls = 0
+		local entry = { id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" }
+		package.loaded["modules.llm"] = {
+			api_remote = {
+				PROVIDERS = { openai = { label = "OpenAI" } },
+				PROVIDER_ORDER = { "openai" },
+				get_entries = function() return { entry } end,
+				get_active_entry_id = function() return "entry-a" end,
+				get_active_entry = function() return entry end,
+				resolve_active_entry = function() resolver_calls = resolver_calls + 1 end,
 			},
 		}
-		package.loaded["modules.llm.api_remote"]       = nil
-		package.loaded["modules.llm.api_token_crypto"] = nil
-		package.loaded["adapters.shell_runner"]        = nil
-		local ApiRemote = helpers.load_with_stubs("modules.llm.api_remote", hs_overrides)
-
-		local function fire_pending(cleartext)
-			if captured_cb then captured_cb(0, cleartext, "") end
-		end
-		return ApiRemote, fire_pending
-	end
-
-	helpers.it("pre-warms the cache so a later get_active_entry() does not need to decrypt again", function()
-		local ApiRemote, fire_pending = load_fresh_api_remote()
-
-		ApiRemote.set_entries({
-			{ id = "e1", provider = "openai", token = "keychain:e1", model = "gpt-4" },
-		})
-		ApiRemote.set_active_entry_id("e1")
-
-		ApiRemote.prewarm_active_entry_decrypt()
-		-- Simulate the Keychain responding with the cleartext.
-		fire_pending("sk-prewarmed-token")
-
-		local entry = ApiRemote.get_active_entry()
-		helpers.assert_true(entry ~= nil, "get_active_entry must still resolve an entry")
-		helpers.assert_eq(entry.token, "sk-prewarmed-token",
-			"prewarm_active_entry_decrypt must cache the decrypted token back into the entry")
-	end)
-
-	helpers.it("is a no-op when there are no entries configured", function()
-		local ApiRemote, _fire_pending = load_fresh_api_remote()
-		local ok = pcall(ApiRemote.prewarm_active_entry_decrypt)
-		helpers.assert_true(ok, "prewarm_active_entry_decrypt must not throw with zero entries configured")
-	end)
-
-	helpers.it("is a no-op when the active entry's token is already cleartext", function()
-		local ApiRemote, fire_pending = load_fresh_api_remote()
-
-		ApiRemote.set_entries({
-			{ id = "e1", provider = "openai", token = "already-cleartext", model = "gpt-4" },
-		})
-		ApiRemote.set_active_entry_id("e1")
-
-		ApiRemote.prewarm_active_entry_decrypt()
-		-- No hs.task should have been spawned; firing a phantom callback must
-		-- be a safe no-op regardless (nothing captured it).
-		fire_pending("should-not-be-used")
-
-		local entry = ApiRemote.get_active_entry()
-		helpers.assert_eq(entry.token, "already-cleartext",
-			"a cleartext (non-keychain-prefixed) token must be left untouched")
-	end)
-
-	helpers.it("discards a stale pre-warm result if the active entry changed while the read was in flight", function()
-		local ApiRemote, fire_pending = load_fresh_api_remote()
-
-		ApiRemote.set_entries({
-			{ id = "e1", provider = "openai", token = "keychain:e1", model = "gpt-4" },
-			{ id = "e2", provider = "openai", token = "keychain:e2", model = "gpt-4o" },
-		})
-		ApiRemote.set_active_entry_id("e1")
-
-		ApiRemote.prewarm_active_entry_decrypt()
-
-		-- The user switches the active entry BEFORE the async Keychain read
-		-- for e1 completes.
-		ApiRemote.set_active_entry_id("e2")
-
-		-- Now the stale e1 read resolves.
-		fire_pending("sk-e1-cleartext")
-
-		local entries = ApiRemote.get_entries()
-		local e1 = nil
-		for _, e in ipairs(entries) do if e.id == "e1" then e1 = e end end
-		helpers.assert_true(e1 ~= nil, "entry e1 must still exist")
-		helpers.assert_eq(e1.token, "keychain:e1",
-			"a stale pre-warm result must not overwrite an entry that is no longer active")
+		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["infra.logger"] = { error = function() end }
+		package.loaded["infra.dialog_util"] = {}
+		package.loaded["infra.notifications"] = {}
+		package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
+		package.loaded["ui.menu.menu_llm.api_panel"] = nil
+		local ok, err = xpcall(function()
+			local panel = require("ui.menu.menu_llm.api_panel")
+			local title, rows = panel.build({
+				state = { llm_backend = "api" }, paused = true,
+				keymap = {}, update_menu = function() end, WarmupCtrl = {},
+			})
+			helpers.assert_true(type(title) == "string" and type(rows) == "table")
+			helpers.assert_eq(resolver_calls, 0,
+				"menu build must consume metadata only, even when the token is a Keychain reference")
+		end, debug.traceback)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err) end
 	end)
 end)

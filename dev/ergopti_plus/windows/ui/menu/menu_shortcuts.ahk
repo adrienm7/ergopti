@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Builds the Shortcuts category: personal shortcuts, script-control entries, extension shortcuts, the edit action and the surrounding-symbols (wrap) editor with its custom-pair CRUD.
 ;
-; Split out of ui/tray_menu.ahk (P5 refactor). tray_menu.ahk remains the module
+; Split out of ui/tray_menu.ahk (the module split). tray_menu.ahk remains the module
 ; index: it declares the shared menu globals and #Include-s this file. Every
 ; function here is hoisted into the global namespace, so load order across the
 ; menu/*.ahk files is irrelevant.
@@ -14,17 +14,14 @@
 
 
 
-; v1 group id -> v2 manifest section path for the three Shortcuts sub-Maps
-; (AltGrLAlt / AltGrCapsLock / LAltCapsLock). Each sub-Map renders as a
-; sub-submenu of 10 plain-bool toggles. The label of each sub-submenu in
-; the legacy render was the raw v1 key (e.g. "AltGrLAlt") because the
-; sub-Maps carried no ``__Label`` metadata — preserved verbatim here so
-; the manifest path is visually identical.
-global _SHORTCUTS_SUBMAP_V1V2 := Map(
-	"AltGrLAlt",     "ahk.shortcuts.alt_gr_lalt",
-	"AltGrCapsLock", "ahk.shortcuts.alt_gr_caps_lock",
-	"LAltCapsLock",  "ahk.shortcuts.lalt_caps_lock",
-)
+; The three Shortcuts sub-Maps (AltGrLAlt / AltGrCapsLock / LAltCapsLock) now
+; live in the manifest's ``modifier_combos_group`` section, one entry per
+; sub-submenu carrying its section path and its ``group_label``. They used to be
+; a Map here as well, which made the manifest section decorative: nothing read
+; it, so adding a fourth combo there changed nothing until someone also edited
+; this file. The sub-submenu label is still the raw v1 key, as the legacy render
+; had it — those are key names (AltGr, LAlt, CapsLock), identical in every
+; locale, so they carry no i18n key.
 
 ; Build the Shortcuts submenu from the manifest-driven renderer.
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
@@ -32,13 +29,29 @@ global _SHORTCUTS_SUBMAP_V1V2 := Map(
 _BuildShortcutsSubmenu() {
 	DynHandlers := Map(
 		"personal_shortcuts",         (M, C) => _SC_Personal(M, C),
-		"script_control_shortcuts",   (M, C) => _SC_ScriptControl(M, C),
-		"extensions_shortcuts",       (M, C) => _SC_Extensions(M, C),
-		"edit_shortcuts",             (M, C) => _SC_EditAction(M, C),
-		"wrap_symbols_menu",          (M, C) => _SC_WrapSymbols(M, C),
 	)
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers)
+	; The keyboard slots are a list, not a group: their rows are the user's own
+	; assignments, so the manifest can name the section but not enumerate it. The
+	; provider returns row DATA and the renderer draws it — which is also what
+	; ended the Menu.Insert splice that used to duplicate the groups on every
+	; updater-driven tray refresh
+	ListProviders := Map(
+		"script_control_shortcuts",   () => _SC_ScriptControlRows(),
+		"keyboard_slots",             () => KeyboardSlotRows(),
+		"wrap_symbols_menu",          () => _SC_WrapSymbolRows(),
+		; extensions_shortcuts left DynHandlers on 2026-08-07: its manifest row is
+		; `type = "list"` now, so the renderer draws the separator, the header and
+		; one row per extension from this data.
+		"extensions_shortcuts",       () => _SC_ExtensionRows(),
+	)
+
+	; `command` rows: a static label, a click, and the renderer builds the row.
+	Commands := Map(
+		"edit_shortcuts", OpenPersonalShortcuts
+	)
+
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands)
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).
@@ -47,15 +60,25 @@ _SC_Personal(SubMenu, _Cat) {
 	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 }
 
-; Dynamic handler: script control shortcuts submenu.
-_SC_ScriptControl(SubMenu, _Cat) {
-	SubMenu.Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
+; List provider: the script-control shortcuts submenu, as one row.
+;
+; A `list` of one rather than a `dynamic` handler: the label is static and the
+; tree below it is built by another subsystem, which is precisely what `submenu`
+; is for. The renderer draws the row.
+_SC_ScriptControlRows() {
+	return [Map(
+		"label",   t("menu.shortcuts.script_shortcuts"),
+		"submenu", BuildScriptShortcutsMenu())]
 }
 
 ; Dynamic handler: extensions shortcuts submenus.
-_SC_Extensions(SubMenu, _Cat) {
-	global _StaticDir
-	ExtShortcutsBaseDir := _StaticDir . "\extensions\"
+; List provider: one row per installed extension that ships shortcuts/menu.ahk,
+; behind its own separator and section header. `list` since 2026-08-07 — the row
+; SHAPE is the renderer's now; the submenu hanging off each extension is still
+; the native Menu its builder populates, handed over as `submenu`.
+_SC_ExtensionRows() {
+	global _ExtensionsDir
+	ExtShortcutsBaseDir := _ExtensionsDir . "\"
 	HasExtShortcuts := false
 	if DirExist(ExtShortcutsBaseDir) {
 		Loop Files ExtShortcutsBaseDir . "*", "D" {
@@ -66,13 +89,12 @@ _SC_Extensions(SubMenu, _Cat) {
 			}
 		}
 	}
+	Rows := []
 	if !HasExtShortcuts {
-		return false
+		return Rows
 	}
-	SubMenu.Add()
-	ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
-	SubMenu.Add(ExtShortcutsHeader, (*) => NoAction())
-	SubMenu.Disable(ExtShortcutsHeader)
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map("label", MenuSectionTitle(t("menu.extensions.header")), "disabled", true))
 	Loop Files ExtShortcutsBaseDir . "*", "D" {
 		ExtId       := A_LoopFileName
 		ExtDir      := A_LoopFileFullPath
@@ -108,18 +130,19 @@ _SC_Extensions(SubMenu, _Cat) {
 			if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
 				if !BuildFailed
 					LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
-				ErrLabel := t("common.error_prefix") . ExtId
-				ExtMenu.Add(ErrLabel, (*) => NoAction())
-				ExtMenu.Disable(ErrLabel)
+				; A label and nothing else: the renderer draws it inert and greyed,
+				; which is exactly what a marker is.
+				MenuRenderer_AppendRows(ExtMenu, "shortcuts_menu", "extensions_shortcuts",
+					[Map("label", t("common.error_prefix") . ExtId)])
 			}
 		} else {
 			LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
-			NaLabel := t("menu.extensions.empty")
-			ExtMenu.Add(NaLabel, (*) => NoAction())
-			ExtMenu.Disable(NaLabel)
+			MenuRenderer_AppendRows(ExtMenu, "shortcuts_menu", "extensions_shortcuts",
+				[Map("label", t("menu.extensions.empty"))])
 		}
-		SubMenu.Add(ExtName, ExtMenu)
+		Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
 	}
+	return Rows
 }
 
 ; Returns how many items a Menu currently holds, via its native HMENU. Used to
@@ -135,48 +158,57 @@ _ExtMenuItemCount(MenuObj) {
 	return 0
 }
 
-; Dynamic handler: edit personal shortcuts action button.
-_SC_EditAction(SubMenu, _Cat) {
-	RegisterMenuItem(SubMenu, t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
-}
-
 ; Dynamic handler: wrap-symbols submenu (toggles per built-in symbol + custom pairs).
 ; Attached as an indented sub-item directly below the wrap_text_if_selected feature row.
-_SC_WrapSymbols(SubMenu, _Cat) {
-	Sub := _WS_BuildSymbolsMenu()
-	SubMenu.Add(t("menu.shortcuts.wrap_symbols_title"), Sub)
+; List provider: the wrap-symbol picker, as a ROW.
+;
+; The manifest called this row Windows-only until 2026-08-06 — and macOS and
+; Linux had both been drawing it all along, in a different place each. It is one
+; shared `list` row now; the tree behind it is still this driver's native Menu,
+; handed over through the renderer's `submenu` field.
+_SC_WrapSymbolRows() {
+	return [Map(
+		"label", t("menu.shortcuts.wrap_symbols_title"),
+		"items", _WS_BuildSymbolRows())]
 }
 
-; Build the full wrap-symbols menu (called by _SC_WrapSymbols and on every initMenu refresh).
-_WS_BuildSymbolsMenu() {
+; The wrap-symbols tree, as row DATA.
+;
+; The manifest called this row Windows-only until 2026-08-06 — and macOS and
+; Linux had both been drawing it all along, in a different place each. It became
+; one shared `list` row then, but the tree behind it was still a native Menu
+; handed over through the renderer's `submenu` field, so every level of it was
+; assembled here. Since 2026-08-07 the renderer builds all of it: nested groups
+; are `items`, and the driver supplies labels, ticks and callbacks.
+_WS_BuildSymbolRows() {
 	global _WS_BUILTIN_GROUPS, _WS_Custom
-	Sub := Menu()
+	Rows := []
 
 	; ── Global bulk actions ──────────────────────────────────────────────────
-	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_check_all"), (*) => _WS_MenuSetAll(true))
-	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_uncheck_all"), (*) => _WS_MenuSetAll(false))
-	RegisterMenuItem(Sub, t("menu.global.reset_defaults"), (*) => _WS_MenuReset())
-	Sub.Add()
+	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_check_all"),
+		"action", (*) => _WS_MenuSetAll(true)))
+	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
+		"action", (*) => _WS_MenuSetAll(false)))
+	Rows.Push(Map("label", t("menu.global.reset_defaults"),
+		"action", (*) => _WS_MenuReset()))
+	Rows.Push(Map("separator", true))
 
-	; ── Built-in symbols, one named nested sub-submenu per group ──────────────
-	; Each group from the shared catalogue becomes its own sub-submenu (titled by
-	; its i18n label) so the top-level list stays short. Every group sub-submenu
-	; carries its own « check all / uncheck all » so the user can flip a whole
-	; family at once. Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
+	; ── Built-in symbols, one named nested group per family ──────────────────
+	; Order and grouping come from _shared/modules/wrap_symbols/wrap_symbols.json.
+	; Each group carries its own « check all / uncheck all » so a whole family can
+	; be flipped at once, and the parent row ticks when every symbol in it is on.
 	for _, Group in _WS_BUILTIN_GROUPS {
-		GroupMenu := Menu()
-		; Collect this group's opening chars for the per-group bulk actions.
+		GroupRows := []
 		GroupLefts := []
 		for _, Pair in Group["pairs"] {
 			GroupLefts.Push(Pair["left"])
 		}
-		RegisterMenuItem(GroupMenu, t("menu.shortcuts.wrap_symbols_check_all"),
-			((Chars) => (*) => _WS_MenuSetGroup(Chars, true))(GroupLefts))
-		RegisterMenuItem(GroupMenu, t("menu.shortcuts.wrap_symbols_uncheck_all"),
-			((Chars) => (*) => _WS_MenuSetGroup(Chars, false))(GroupLefts))
-		GroupMenu.Add()
-		; Track whether every symbol in the group is enabled so the parent item
-		; can show a checkmark when the whole family is on.
+		GroupRows.Push(Map("label", t("menu.shortcuts.wrap_symbols_check_all"),
+			"action", ((Chars) => (*) => _WS_MenuSetGroup(Chars, true))(GroupLefts)))
+		GroupRows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
+			"action", ((Chars) => (*) => _WS_MenuSetGroup(Chars, false))(GroupLefts)))
+		GroupRows.Push(Map("separator", true))
+
 		GroupAllOn := true
 		for _, Pair in Group["pairs"] {
 			L := Pair["left"]
@@ -184,75 +216,107 @@ _WS_BuildSymbolsMenu() {
 			; Display label: "( … )" for asymmetric, "@" for symmetric
 			Lbl := (L != R) ? (L . " … " . R) : L
 			Enabled := WrapSymbols_IsEnabled(L)
-			; Capture L in closure so the lambda references the right char
-			RegisterMenuItem(GroupMenu, Lbl, ((Ch) => (*) => _WS_MenuToggle(Ch))(L))
-			if Enabled {
-				GroupMenu.Check(Lbl)
-			} else {
+			; Capture L in the closure so the lambda references the right char
+			GroupRows.Push(Map("label", Lbl, "checked", Enabled,
+				"action", ((Ch) => (*) => _WS_MenuToggle(Ch))(L)))
+			if !Enabled {
 				GroupAllOn := false
 			}
 		}
 		GroupLabel := (Group["i18n"] != "") ? t(Group["i18n"]) : t("menu.shortcuts.wrap_symbols_title")
-		Sub.Add(GroupLabel, GroupMenu)
-		; Check the parent group item when all of its symbols are enabled.
-		if GroupAllOn {
-			Sub.Check(GroupLabel)
-		}
+		Rows.Push(Map("label", GroupLabel, "checked", GroupAllOn, "items", GroupRows))
 	}
 
 	; ── Custom symbols ───────────────────────────────────────────────────────
 	if (_WS_Custom.Length > 0) {
-		Sub.Add()
+		Rows.Push(Map("separator", true))
 		for Idx, Pair in _WS_Custom {
 			L := Pair["left"]
 			R := Pair["right"]
 			Lbl := ((L != R) ? (L . " … " . R) : L) . " — " . t("menu.shortcuts.wrap_symbols_custom_label")
-			DelSub := Menu()
-			RegisterMenuItem(DelSub, t("button.delete"), ((I) => (*) => _WS_MenuRemoveCustom(I))(Idx))
-			Sub.Add(Lbl, DelSub)
-			Sub.Check(Lbl)
+			Rows.Push(Map("label", Lbl, "checked", true, "items", [
+				Map("label", t("button.delete"), "action", ((I) => (*) => _WS_MenuRemoveCustom(I))(Idx))
+			]))
 		}
 	}
 
 	; ── Add custom ───────────────────────────────────────────────────────────
-	Sub.Add()
-	RegisterMenuItem(Sub, t("menu.shortcuts.wrap_symbols_add_custom"), (*) => _WS_MenuAddCustom())
+	Rows.Push(Map("separator", true))
+	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_add_custom"),
+		"action", (*) => _WS_MenuAddCustom()))
 
-	return Sub
+	return Rows
 }
 
-; Toggle a built-in symbol and refresh the tray.
-_WS_MenuToggle(OpenChar) {
-	WrapSymbols_Toggle(OpenChar)
-	RebuildTrayMenu()
+; Rebuild only after a strictly acknowledged durable wrap-symbol commit. A
+; refused writer, replace or final authorization must leave the visible tray
+; projection unchanged instead of advertising a state that never committed.
+_WS_MenuRebuildAfterCommit(Committed, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		; A caller may wrap the menu callback itself. Tray construction can be
+		; expensive and must remain interruptible even after persistence returns.
+		Critical("Off")
+		try return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+	try Rebuilt := HasMethod(RebuildFn, "Call")
+		? RebuildFn.Call() : RebuildTrayMenu()
+	catch as Err {
+		try LoggerError("WrapSymbols",
+			"Could not rebuild the tray after the durable wrap-symbol commit: {1}.",
+			Err.Message)
+		return false
+	}
+	if !(Rebuilt is Integer) || Rebuilt != 1 {
+		try LoggerError("WrapSymbols",
+			"The tray rebuild refused the durable wrap-symbol projection.")
+		return false
+	}
+	return 1
+}
+
+; Toggle a built-in symbol and refresh the tray after durable publication.
+_WS_MenuToggle(OpenChar, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
+	Committed := WrapSymbols_Toggle(OpenChar, WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Enable or disable all built-in symbols, then refresh.
-_WS_MenuSetAll(Enable) {
+_WS_MenuSetAll(Enable, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
 	if Enable {
-		WrapSymbols_EnableAll()
+		Committed := WrapSymbols_EnableAll(WriterFn, ReplaceFn, DeleteFn)
 	} else {
-		WrapSymbols_DisableAll()
+		Committed := WrapSymbols_DisableAll(WriterFn, ReplaceFn, DeleteFn)
 	}
-	RebuildTrayMenu()
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Enable or disable every symbol in one group at once, then refresh.
-_WS_MenuSetGroup(OpenChars, Enable) {
-	WrapSymbols_SetMany(OpenChars, Enable)
-	RebuildTrayMenu()
+_WS_MenuSetGroup(OpenChars, Enable, WriterFn := 0, ReplaceFn := 0,
+		DeleteFn := 0, RebuildFn := 0) {
+	Committed := WrapSymbols_SetMany(OpenChars, Enable,
+		WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Reset to factory defaults, then refresh.
-_WS_MenuReset() {
-	WrapSymbols_Reset()
-	RebuildTrayMenu()
+_WS_MenuReset(WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
+	Committed := WrapSymbols_Reset(WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Remove a custom symbol pair (1-based index), then refresh.
-_WS_MenuRemoveCustom(Idx) {
-	WrapSymbols_RemoveCustom(Idx)
-	RebuildTrayMenu()
+_WS_MenuRemoveCustom(Idx, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		RebuildFn := 0) {
+	Committed := WrapSymbols_RemoveCustom(Idx,
+		WriterFn, ReplaceFn, DeleteFn)
+	return _WS_MenuRebuildAfterCommit(Committed, RebuildFn)
 }
 
 ; Open a two-step GUI dialog to add a custom wrap-symbol pair.
@@ -282,7 +346,6 @@ _WS_MenuAddCustom() {
 		RightChar := LeftChar
 	}
 
-	WrapSymbols_AddCustom(LeftChar, RightChar)
-	RebuildTrayMenu()
+	Committed := WrapSymbols_AddCustom(LeftChar, RightChar)
+	return _WS_MenuRebuildAfterCommit(Committed)
 }
-

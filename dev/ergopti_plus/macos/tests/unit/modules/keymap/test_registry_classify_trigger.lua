@@ -16,18 +16,17 @@ local helpers = require("tests.helpers")
 -- -----------------------------------------------------------------------
 -- Load the module under test headlessly (hs.* unavailable).
 -- -----------------------------------------------------------------------
-local src_path = helpers.driver_root() .. "modules/keymap/registry.lua"
-
 -- Minimal stub: registry reads _state.mappings; we inject _state via the
 -- module's own _state variable after load by using the test-facing init.
 -- We cannot call M.init() (it expects CoreState), so we replicate the
 -- minimal dependency by reading the source and verifying the contract
 -- both structurally and logically with a direct require shim.
-
--- Source-invariant checks
-local fh = io.open(src_path, "r")
-if not fh then error("registry.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+--
+-- Selected by a declaration unique to modules/keymap/registry.lua rather than
+-- by path, so moving or splitting the module cannot turn this invariant into a
+-- path error.
+local src = helpers.read_driver_source("local function trigger_has_shift_symbol")
+helpers.assert_true(src ~= nil, "modules/keymap/registry.lua source must be locatable")
 
 -- Test 1: classify_trigger must be defined in the source.
 local has_fn = src:find("function M.classify_trigger", 1, true) ~= nil
@@ -67,20 +66,22 @@ helpers.assert_true(suff_body:find("classify_trigger", 1, true) ~= nil,
 	"has_trigger_suffix must delegate to classify_trigger (keymap-core-2)")
 
 -- Test 5: personal_info.lua must call classify_trigger at the hot call site.
-local pi_src_path = helpers.driver_root() .. "modules/dynamic_hotstrings/personal_info.lua"
-local pi_fh = io.open(pi_src_path, "r")
-if not pi_fh then error("personal_info.lua not readable at: " .. pi_src_path) end
-local pi_src = pi_fh:read("*a") ; pi_fh:close()
+-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local pi_src = helpers.read_driver_source("local function parse_toml_section")
+helpers.assert_true(pi_src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
 
 local has_classify_call = pi_src:find("classify_trigger", 1, true) ~= nil
 helpers.assert_true(has_classify_call,
 	"personal_info.lua interceptor must call classify_trigger (keymap-core-2)")
 
 -- Test 6: the init.lua module facade must expose classify_trigger.
-local init_src_path = helpers.driver_root() .. "modules/keymap/init.lua"
-local init_fh = io.open(init_src_path, "r")
-if not init_fh then error("keymap/init.lua not readable at: " .. init_src_path) end
-local init_src = init_fh:read("*a") ; init_fh:close()
+-- Selected by a declaration unique to modules/keymap/init.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local init_src = helpers.read_driver_source("local function invalidate_observed_context")
+helpers.assert_true(init_src ~= nil, "modules/keymap/init.lua source must be locatable")
 
 local init_exposes = init_src:find("M.classify_trigger", 1, true) ~= nil
 helpers.assert_true(init_exposes,

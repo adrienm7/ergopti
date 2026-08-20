@@ -41,7 +41,7 @@ local SECRET_TITLE = "ZZSECRETWINDOWTITLEZZ"
 
 local error_calls = {}
 
-package.loaded["lib.logger"] = {
+package.loaded["infra.logger"] = {
 	debug   = function() end,
 	info    = function() end,
 	warn    = function() end,

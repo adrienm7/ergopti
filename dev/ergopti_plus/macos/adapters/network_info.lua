@@ -21,14 +21,14 @@
 ---    every other Hammerspoon callback for up to the ping timeout (F-LOW-8).
 ---    Both methods instead return the last cached probe result immediately and
 ---    kick off an async refresh via adapters.shell_runner (mirrors the
----    read_layout_async() cached-async pattern in modules/karabiner/watchers.lua)
+---    read_layout_async() cached-async pattern in platform/remap/watchers.lua)
 ---    so the NEXT call reflects reality without ever blocking the caller.
 --- ==============================================================================
 
 local M = {}
 
 local hs          = hs
-local Logger      = require("lib.logger")
+local Logger      = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local Crypto      = require("adapters.crypto")
 

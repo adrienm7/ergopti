@@ -6,7 +6,7 @@
 --- DESCRIPTION:
 --- modules/llm/prediction_engine.lua calls `core_llm.get_current_model()`
 --- (core_llm = require("modules.llm")) UNCONDITIONALLY at module-load time
---- (not inside a function). Five test files install a partial
+--- (not inside a function). Four test files install a partial
 --- `package.loaded["modules.llm"] = { ... }` stub and never restore it
 --- afterward; when the stub was missing get_current_model, the next test in
 --- the same process whose require chain reached prediction_engine while that
@@ -31,7 +31,6 @@ local FILES_WITH_STUB = {
 	"unit/modules/keymap/test_utf8_offset_pcall.lua",
 	"unit/modules/keymap/test_llm_bridge_no_duplicate_init.lua",
 	"unit/menu/test_profile_label.lua",
-	"unit/modules/keymap/test_apply_prediction_paste_ops.lua",
 }
 
 --- Reads a tests/-relative source file.

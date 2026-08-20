@@ -21,11 +21,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_src(rel_path)
-	local src_path = helpers.driver_root() .. rel_path
-	local fh = io.open(src_path, "r")
-	if not fh then error(rel_path .. " not readable at: " .. src_path) end
-	local src = fh:read("*a") ; fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_src(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -40,7 +40,7 @@ end
 -- ====================================================================
 
 do
-	local src = read_src("modules/llm/api_ollama.lua")
+	local src = read_src("local function read_ollama_port_override") -- modules/llm/api_ollama.lua
 
 	-- Test 1: STREAM_MAX_TIME_SEC constant must be defined.
 	local max_time_def = src:match("local STREAM_MAX_TIME_SEC%s*=%s*(%d+)")
@@ -91,14 +91,20 @@ do
 		"api_ollama.lua safety-net timer must use STREAM_TMPFILE_CLEANUP_SEC (llm-api-net-03)"
 	)
 
-	-- Test 6: on_done must call os.remove(tmp_path) for immediate cleanup.
+	-- Test 6: on_done must relinquish task ownership and then remove tmp_path
+	-- before any parser or user callback can fail. Assert ordering instead of a
+	-- fixed source window so a transactional ownership preamble stays covered.
 	local on_done_pos = src:find("local function on_done(", 1, true)
 	helpers.assert_true(on_done_pos ~= nil, "api_ollama.lua must define on_done (llm-api-net-03)")
-	local on_done_body = src:sub(on_done_pos, on_done_pos + 200)
-	local has_remove_in_done = on_done_body:find("os.remove(tmp_path)", 1, true) ~= nil
+	local next_section = src:find("\n\t-- Build", on_done_pos, true) or #src
+	local on_done_body = src:sub(on_done_pos, next_section)
+	local ownership_pos = on_done_body:find("_active_stream_task = nil", 1, true)
+	local remove_pos = on_done_body:find("os.remove(tmp_path)", 1, true)
+	local parser_pos = on_done_body:find("flush_lines()", 1, true)
 	helpers.assert_true(
-		has_remove_in_done,
-		"api_ollama.lua on_done must call os.remove(tmp_path) for immediate cleanup (llm-api-net-03)"
+		ownership_pos ~= nil and remove_pos ~= nil and parser_pos ~= nil
+			and ownership_pos < remove_pos and remove_pos < parser_pos,
+		"api_ollama.lua on_done must release task ownership, remove tmp_path, then parse output (llm-api-net-03)"
 	)
 end
 
@@ -113,7 +119,7 @@ end
 -- =======================================================================
 
 do
-	local src = read_src("modules/llm/api_mlx_inference.lua")
+	local src = read_src("function M.post_and_parse_streaming") -- modules/llm/api_mlx_inference.lua
 
 	-- Test 1: STREAM_TMPFILE_CLEANUP_SEC constant must be defined, derived from
 	-- (not a bare literal duplicating) STREAM_HARD_TIMEOUT_SEC.
@@ -152,13 +158,18 @@ do
 		"api_mlx_inference.lua: tmp_path must be declared BEFORE on_done so the closure captures the real upvalue (F-MED-3)"
 	)
 
-	-- Test 4: on_done must call os.remove(tmp_path) for immediate cleanup, as
-	-- its FIRST statement (matching the Ollama twin's fix shape exactly).
-	local on_done_body = src:sub(on_done_pos, on_done_pos + 300)
-	local has_remove_in_done = on_done_body:find("os.remove(tmp_path)", 1, true) ~= nil
+	-- Test 4: release the completed task first, then remove tmp_path before any
+	-- fallible parsing/logging/caller callback. This is the same transaction as
+	-- the Ollama twin and survives harmless changes to comment length.
+	local next_section = src:find("\n\t-- Build", on_done_pos, true) or #src
+	local on_done_body = src:sub(on_done_pos, next_section)
+	local ownership_pos = on_done_body:find("_ctx.stream.task = nil", 1, true)
+	local remove_pos = on_done_body:find("os.remove(tmp_path)", 1, true)
+	local parser_pos = on_done_body:find("flush_lines()", 1, true)
 	helpers.assert_true(
-		has_remove_in_done,
-		"api_mlx_inference.lua on_done must call os.remove(tmp_path) for immediate cleanup (F-MED-3)"
+		ownership_pos ~= nil and remove_pos ~= nil and parser_pos ~= nil
+			and ownership_pos < remove_pos and remove_pos < parser_pos,
+		"api_mlx_inference.lua on_done must release task ownership, remove tmp_path, then parse output (F-MED-3)"
 	)
 end
 

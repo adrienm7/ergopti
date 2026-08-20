@@ -5,6 +5,13 @@ every Ergopti+ driver must implement. A "port" is a pure, platform-agnostic
 interface description. A "driver adapter" is the OS-specific implementation that
 satisfies it.
 
+> **A port is a contract for the drivers that need the capability, not a
+> checklist every driver must complete** — see
+> [ADR-008](../../docs/adr/008-ports-are-contracts-not-a-checklist.md). An
+> absent adapter is a legitimate statement that the driver does not do that
+> thing; an adapter that exists must be reachable, which
+> `test-adapter-reachability.cjs` holds at zero for all three drivers.
+
 ---
 
 ## 1. Motivation

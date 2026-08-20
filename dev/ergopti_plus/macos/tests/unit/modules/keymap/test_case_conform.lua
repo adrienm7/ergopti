@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Locks in the case-conform fast path ported from the AHK driver: an auto,
 --- case-insensitive, plain-text trigger WITHOUT a shift-symbol char is registered
---- as ONE lowercase entry (case_conform = true) instead of the lower/Title/UPPER
+--- as ONE lowercase entry (match_mode = "conform") instead of the lower/Title/UPPER
 --- trio, and the expander conforms the replacement's case to the typed trigger at
 --- fire time. Triggers that must keep the explicit-variant path (comma/shift-symbol,
 --- non-auto, case-sensitive, token replacements) are guarded too.
@@ -18,10 +18,34 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.logger"] = nil
-local _      = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _      = helpers.load_with_stubs("infra.logger")
 local State  = helpers.load_with_stubs("modules.keymap.state")
-local txt    = helpers.load_with_stubs("lib.text_utils")
+local txt    = helpers.load_with_stubs("infra.text_utils")
+
+local REGISTRY_OWNERSHIP = {
+	"modules.keymap.registry",
+	"modules.keymap.registry_groups",
+	"modules.keymap.registry_index",
+	"modules.keymap.terminators",
+	"modules.keymap.utils",
+	"infra.text_utils",
+	"text_utils",
+}
+
+local ENGINE_OWNERSHIP = {
+	"modules.keymap.registry",
+	"modules.keymap.registry_groups",
+	"modules.keymap.registry_index",
+	"modules.keymap.terminators",
+	"modules.keymap.expander",
+	"modules.keymap.terminator_replay",
+	"modules.keymap.utils",
+	"infra.text_utils",
+	"text_utils",
+	"ui.tooltip",
+	"modules.keylogger",
+}
 
 
 
@@ -73,15 +97,12 @@ end)
 -- =========================================
 
 local function fresh_registry()
-	package.loaded["modules.keymap.registry"]    = nil
-	package.loaded["modules.keymap.terminators"] = nil
-	package.loaded["modules.keymap.utils"]       = nil
-	package.loaded["lib.text_utils"]             = nil
-	package.loaded["text_utils"]                 = nil
-	local R = require("modules.keymap.registry")
-	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
-	R.init(state)
-	return state, R
+	return helpers.with_fresh_modules(REGISTRY_OWNERSHIP, function()
+		local R = require("modules.keymap.registry")
+		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+		helpers.assert_eq(R.init(state), true)
+		return state, R
+	end)
 end
 
 helpers.describe("Registry — case-conform registration shape", function()
@@ -90,7 +111,7 @@ helpers.describe("Registry — case-conform registration shape", function()
 		R.add("ccê", "ccu", { auto_expand = true, is_case_sensitive = false })
 		helpers.assert_eq(#state.mappings, 1, "one conform entry, not lower+Title+UPPER")
 		helpers.assert_eq(state.mappings[1].trigger, "ccê")
-		helpers.assert_eq(state.mappings[1].case_conform, true)
+		helpers.assert_eq(state.mappings[1].match_mode, "conform")
 	end)
 
 	helpers.it("buckets the entry under the Unicode-lowered tail (accented capital matches)", function()
@@ -108,7 +129,7 @@ helpers.describe("Registry — case-conform registration shape", function()
 		R.add(",e", "je", { auto_expand = true, is_case_sensitive = false })
 		helpers.assert_true(#state.mappings > 1, "comma trigger keeps explicit variants + aliases")
 		for _, m in ipairs(state.mappings) do
-			helpers.assert_true(not m.case_conform, "no comma entry may be case_conform")
+			helpers.assert_true(m.match_mode ~= "conform", "no comma entry may be in conform mode")
 		end
 	end)
 
@@ -117,7 +138,7 @@ helpers.describe("Registry — case-conform registration shape", function()
 		R.add("teh", "the", { auto_expand = false, is_case_sensitive = false })
 		helpers.assert_true(#state.mappings > 1, "non-auto trigger keeps lower/Title/UPPER")
 		for _, m in ipairs(state.mappings) do
-			helpers.assert_true(not m.case_conform, "non-auto entries are never case_conform")
+			helpers.assert_true(m.match_mode ~= "conform", "non-auto entries are never in conform mode")
 		end
 	end)
 
@@ -125,14 +146,14 @@ helpers.describe("Registry — case-conform registration shape", function()
 		local state, R = fresh_registry()
 		R.add("API", "api", { auto_expand = true, is_case_sensitive = true })
 		helpers.assert_eq(#state.mappings, 1)
-		helpers.assert_true(not state.mappings[1].case_conform)
+		helpers.assert_true(state.mappings[1].match_mode ~= "conform")
 	end)
 
 	helpers.it("does not conform a token (non-plain) replacement", function()
 		local state, R = fresh_registry()
 		R.add("sig", "Hi{Enter}Me", { auto_expand = true, is_case_sensitive = false })
 		for _, m in ipairs(state.mappings) do
-			helpers.assert_true(not m.case_conform, "token replacements keep the explicit path")
+			helpers.assert_true(m.match_mode ~= "conform", "token replacements keep the explicit path")
 		end
 	end)
 end)
@@ -150,31 +171,25 @@ end)
 -- can be driven through the real auto-expansion path. tooltip/keylogger are stubbed
 -- so perform_text_replacement's side-effects never touch real UI/OS code.
 local function fresh_engine()
-	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
-	package.loaded["modules.keylogger"] = {
-		notify_synthetic = function() end,
-		set_buffer       = function() end,
-		log_hotstring    = function() end,
-	}
-	-- Reset all keymap sub-modules so no stale stub (e.g. a utils stub from another
-	-- test that lacks emit_tokens/emit_text) poisons the registry or expander.
-	package.loaded["modules.keymap.registry"]   = nil
-	package.loaded["modules.keymap.terminators"] = nil
-	package.loaded["modules.keymap.expander"]   = nil
-	package.loaded["modules.keymap.utils"]      = nil
-	package.loaded["lib.text_utils"]            = nil
-	package.loaded["text_utils"]                = nil
-	local R = require("modules.keymap.registry")
-	local E = require("modules.keymap.expander")
-	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
-	R.init(state)
-	local llm = {
-		update_preview  = function() end,
-		get_llm_enabled = function() return false end,
-		start_timer     = function() end,
-	}
-	E.init(state, R, llm)
-	return state, R, E
+	return helpers.with_fresh_modules(ENGINE_OWNERSHIP, function()
+		package.loaded["ui.tooltip"] = { hide = function() end, hide_forced = function() end }
+		package.loaded["modules.keylogger"] = {
+			notify_synthetic = function() end,
+			set_buffer       = function() end,
+			log_hotstring    = function() end,
+		}
+		local R = require("modules.keymap.registry")
+		local E = require("modules.keymap.expander")
+		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+		helpers.assert_eq(R.init(state), true)
+		local llm = {
+			update_preview  = function() end,
+			get_llm_enabled = function() return false end,
+			start_timer     = function() end,
+		}
+		helpers.assert_eq(E.init(state, R, llm), true)
+		return state, R, E
+	end)
 end
 
 --- Registers one conform entry, sets the buffer to `typed`, and fires the

@@ -41,12 +41,12 @@ local helpers = require("tests.helpers")
 -- ==================================================
 
 helpers.describe("menu_karabiner: left-hand catalog loads without a nil-global crash", function()
-	helpers.it("require of ui.menu.menu_karabiner does not throw at module load", function()
+	helpers.it("require of ui.menu.menu_remap does not throw at module load", function()
 		-- Pre-fix this throws "attempt to call a nil value (global
 		-- '_load_left_hand_from_catalog')" while executing the module body, because
 		-- LEFT_HAND_IDS was seeded by a call placed ABOVE the local function's
 		-- definition (a `local function` is not hoisted).
-		local ok, mod = pcall(helpers.load_with_stubs, "ui.menu.menu_karabiner")
+		local ok, mod = pcall(helpers.load_with_stubs, "ui.menu.menu_remap")
 		helpers.assert_true(ok, "menu_karabiner must load without error; got: " .. tostring(mod))
 		helpers.assert_true(type(mod) == "table", "menu_karabiner must return its module table")
 	end)

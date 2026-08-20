@@ -4,8 +4,8 @@
 --- windows/tests/test_llm_menu_regressions.ahk where the platform shares the bug class.
 
 local helpers = require("tests.helpers")
-local prefs   = helpers.load_with_stubs("ui.menu.preferences")
-local codec   = helpers.load_with_stubs("lib.toml.codec")
+local prefs   = helpers.load_with_stubs("infra.preferences")
+local codec   = helpers.load_with_stubs("infra.toml.codec")
 
 local function contract_path()
 	return helpers.shared("modules/llm/menu_persistence_contract.json")
@@ -25,7 +25,7 @@ local function load_contract_entry(id)
 end
 
 local function preferences_source()
-	return helpers.driver_root() .. "ui/menu/preferences.lua"
+	return helpers.driver_root() .. "infra/preferences.lua"
 end
 
 local function init_llm_source()
@@ -122,6 +122,8 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		fh:close()
 		local ok, grouped = pcall(codec.decode, content)
 		helpers.assert_true(ok, "TOML decode failed")
+		helpers.assert_eq(type(grouped), "table",
+			"a decode that answered nothing would make every key check below pass\n\t\t\tagainst an empty table")
 		local nav = grouped.llm and grouped.llm.navigation
 		helpers.assert_true(type(nav) == "table", "llm.navigation missing")
 		helpers.assert_true(

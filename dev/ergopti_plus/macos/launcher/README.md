@@ -6,12 +6,64 @@ sees only "Ergopti" in the menubar — Hammerspoon is fully hidden inside
 
 The launcher's job is to:
 
-1. Set the embedded Hammerspoon's `MJConfigDir` so it loads our bundled Lua
-   tree from `Contents/Resources/config/` instead of `~/.hammerspoon`.
+1. Set the embedded Hammerspoon's `MJConfigFile` so it loads our bundled Lua
+   tree instead of `~/.hammerspoon/init.lua`.
 2. Spawn the embedded Hammerspoon as a child `Process`, forwarding lifecycle
    events so quitting the launcher cleanly terminates Hammerspoon.
 3. Host [Sparkle](https://sparkle-project.org/) so the in-app updater can
    ship new releases via the configured appcast.
+
+## Abrupt launcher termination
+
+`applicationWillTerminate` covers a normal launcher quit, but macOS cannot run
+that callback after Activity Monitor sends `SIGKILL`. The launcher therefore
+exports its exact process identity to its Hammerspoon child as
+`ERGOPTI_LAUNCHER_PID` and, when available,
+`ERGOPTI_LAUNCHER_BUNDLE_ID`.
+
+`infra/launcher_guard.lua` starts a strongly retained native application watcher
+before immediately resolving that PID. A matching termination event invokes an
+injected emergency-quit callback once. A native `applicationForPID` lookup every
+two seconds is only a backstop for a missed event; it does not shell out or run
+from an eventtap. Direct developer Hammerspoon sessions remain supported: when
+the launcher environment is absent, the guard deliberately stays inactive.
+
+The emergency callback revokes only ErgoptiPlus-owned resources, including its
+exact Karabiner lease. It must never terminate Karabiner's shared UI, Core
+Service (called `karabiner_grabber` before v15.7), console server,
+version-dependent session agents, `Karabiner-VirtualHIDDevice-Daemon`, or the
+DriverKit VirtualHID process.
+
+The Lua suite simulates the missing-parent and native-termination paths. A
+physical Activity Monitor Force Quit and observable keyboard-release check still
+requires a built application on macOS.
+
+## Karabiner lease guardian
+
+The same signed launcher executable provides retained outer and private-inner
+roles, a detached one-shot revoker, and an independent per-user LaunchAgent.
+The outer role owns Hammerspoon's standard-stream protocol and wait-supervises
+one exact inner child over a private socket. The inner role is the only process
+allowed to create, signal and reap transient lease-authority
+`karabiner_cli --set-variables` children. The launchd-owned guardian holds no
+Karabiner process authority: it watches a durable, locked exact-token record and
+publishes only that token's OFF+tombstone variables if every private process is
+Force Quit. Pipe EOF, outer loss, inner loss, guardian restart and bounded CLI
+timeouts therefore converge on the same token-scoped fence.
+
+This is deliberately not a Karabiner process watchdog. Karabiner's UI, menubar,
+root Core Service, console user server, user/session agents, observers,
+extensions, watchers, `Karabiner-VirtualHIDDevice-Daemon` and its DriverKit
+process are shared with the user's own configuration and remain entirely
+user-managed. Disabling ErgoptiPlus revokes
+only `ergopti_mode_<token>` / `ergopti_revoked_<token>`; it neither quits nor
+restarts stock Karabiner.
+
+Non-authority engine state is isolated independently. Generated rules and
+Hammerspoon writers use `ergopti_<logical-name>_<token>` for `layer_active`,
+`capsword`, and every `ke_held_*` value. A delayed runtime writer may outlive
+Hammerspoon, but its already-captured token cannot mutate a replacement
+generation or an untagged personal Karabiner variable.
 
 ## Build
 

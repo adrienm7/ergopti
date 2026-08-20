@@ -97,9 +97,11 @@ helpers.describe("gestures disable_all releases scroll-block and click-lock (F-M
 	end)
 
 	helpers.it("source: M.disable_all reaches Engine.unblock_scroll and Actions.force_cleanup", function()
-		local path = helpers.driver_root() .. "modules/gestures/init.lua"
-		local fh = assert(io.open(path, "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/gestures/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function schedule_emergency_recycle")
+		helpers.assert_true(src ~= nil, "modules/gestures/init.lua source must be locatable")
 		local s = src:find("function M%.disable_all")
 		local e = src:find("function M%.enable%(name%)")
 		helpers.assert_true(s ~= nil and e ~= nil and e > s, "could not isolate M.disable_all body")

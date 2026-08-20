@@ -17,7 +17,7 @@
 ; finally { DisableLayer() } so the layer is ALWAYS deactivated and the wait
 ; is bounded.
 ;
-; Meta-static (scans source text) because modules/tap_holds/*.ahk register
+; Meta-static (scans source text) because platform/remap/*.ahk register
 ; top-level #HotIf hotkeys and cannot be #Included by the headless runner.
 ; If a hold-layer branch regresses to a bare unbounded KeyWait or drops the
 ; finally, this test fails.
@@ -38,7 +38,7 @@
 ; unique across these files, so a whole-dir scan resolves each block regardless of
 ; how the module is split — move-resilient. RelPath is kept for call-site clarity.
 _HLRB_ReadSource(RelPath) {
-	return _DriverDirConcat("modules/tap_holds")
+	return _DriverDirConcat("platform/remap")
 }
 
 ; Extracts the body of a single hotkey block: from the Anchor (a substring on
@@ -90,7 +90,7 @@ _HLRB_RCtrlHoldLayer() {
 	; dropped so a hold arms on the hold alone (taphold-hold-option-unreachable);
 	; the `not _RCtrlIsSpecialTap()` prefix is the stable half and is what
 	; test_hold_modifier_release_bounded already anchors on for block 7.4.
-	_HLRB_AssertBounded("modules/tap_holds/rctrl.ahk",
+	_HLRB_AssertBounded("platform/remap/rctrl.ahk",
 		"not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, " . Q . "right_ctrl" . Q . ") != " . Q . Q,
 		"rctrl.ahk 7.5")
 }
@@ -98,7 +98,7 @@ Test("tap-holds: RCtrl hold-layer release is bounded + in finally (hold-layer-un
 
 _HLRB_EscapeHoldLayer() {
 	Q := Chr(34)
-	_HLRB_AssertBounded("modules/tap_holds/escape.ahk",
+	_HLRB_AssertBounded("platform/remap/escape.ahk",
 		"TapHoldHoldLayer(TapHold, " . Q . "escape" . Q . ") != " . Q . Q . " and TapHoldHoldModifier(TapHold, " . Q . "escape" . Q . ") == " . Q . Q,
 		"escape.ahk 11.2")
 }
@@ -106,7 +106,7 @@ Test("tap-holds: Escape hold-layer release is bounded + in finally (hold-layer-u
 
 _HLRB_EnterHoldLayer() {
 	Q := Chr(34)
-	_HLRB_AssertBounded("modules/tap_holds/enter.ahk",
+	_HLRB_AssertBounded("platform/remap/enter.ahk",
 		"TapHoldHoldLayer(TapHold, " . Q . "enter" . Q . ") != " . Q . Q . " and TapHoldHoldModifier(TapHold, " . Q . "enter" . Q . ") == " . Q . Q,
 		"enter.ahk 9.2")
 }
@@ -115,7 +115,7 @@ Test("tap-holds: Enter hold-layer release is bounded + in finally (hold-layer-un
 _HLRB_LAltTabLayer() {
 	Q := Chr(34)
 	; Section 4.2: tab tap + hold-layer — bare KeyWait("SC038") with no flags.
-	_HLRB_AssertBounded("modules/tap_holds/lalt.ahk",
+	_HLRB_AssertBounded("platform/remap/lalt.ahk",
 		"TapHoldTapAction(TapHold, " . Q . "left_alt" . Q . ") == " . Q . "tab" . Q . " and not LayerEnabled",
 		"lalt.ahk 4.2")
 }
@@ -124,7 +124,7 @@ Test("tap-holds: LAlt tab+layer hold-layer release is bounded + in finally (hold
 _HLRB_LAltBackspaceLayer() {
 	Q := Chr(34)
 	; Section 4.5: backspace tap + hold-layer.
-	_HLRB_AssertBounded("modules/tap_holds/lalt.ahk",
+	_HLRB_AssertBounded("platform/remap/lalt.ahk",
 		"_LAltIsBackspaceLayer() and not LayerEnabled",
 		"lalt.ahk 4.5")
 }
@@ -136,7 +136,7 @@ _HLRB_LAltGenericLayer() {
 	; `and TapHoldTapAction` was only a locator suffix; the gate no longer
 	; requires a tap action so a hold arms on the hold alone
 	; (taphold-hold-option-unreachable). The assertions are unchanged.
-	_HLRB_AssertBounded("modules/tap_holds/lalt.ahk",
+	_HLRB_AssertBounded("platform/remap/lalt.ahk",
 		"not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, " . Q . "left_alt" . Q . ") != " . Q . Q,
 		"lalt.ahk 4.8")
 }

@@ -1,6 +1,21 @@
 --- _shared/lua/text_utils/init.lua
 
+
 --- ==============================================================================
+
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table,
+-- and a shared module cannot depend on its caller having installed the compat
+-- shim — it does not know its callers. terminators.lua crashed from the E2E
+-- runner for exactly that reason while working from the daemon and the unit
+-- runner, both of which install one.
+local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+
+
+-- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
+-- unless the build enabled 5.2 compatibility, which the one CI and the Linux
+-- daemon run does not. Resolved once here rather than at each call site, and
+-- table-first so a 5.4 interpreter keeps using the modern spelling.
+local table_unpack = table.unpack or unpack
 --- MODULE: Text Utilities (Shared)
 --- DESCRIPTION:
 --- Platform-neutral UTF-8 string manipulation, advanced surgical diffing
@@ -25,10 +40,11 @@ local M = {}
 
 
 
+
 -- =======================================
---- =======================================
+-- =======================================
 -- ======= 1/ UTF-8 Core Utilities =======
---- =======================================
+-- =======================================
 -- =======================================
 
 --- Safely splits a UTF-8 string into a table of individual characters.
@@ -39,8 +55,8 @@ function M.utf8_chars(s)
 	if type(s) ~= "string" then return chars end
 
 	pcall(function()
-		for _, c in utf8.codes(s) do
-			table.insert(chars, utf8.char(c))
+		for _, c in utf8_lib.codes(s) do
+			table.insert(chars, utf8_lib.char(c))
 		end
 	end)
 
@@ -48,7 +64,7 @@ function M.utf8_chars(s)
 end
 
 --- Calculates the length of a common prefix between two UTF-8 strings.
---- Walks both `utf8.codes` iterators in lockstep, so no intermediate character
+--- Walks both `utf8_lib.codes` iterators in lockstep, so no intermediate character
 --- arrays are materialised — critical because this is called per expansion.
 --- @param s1 string First string.
 --- @param s2 string Second string.
@@ -60,8 +76,8 @@ function M.get_common_prefix_utf8(s1, s2)
 	-- pcall the whole walk so malformed UTF-8 cannot surface as an error;
 	-- worst case we stop early and report whatever prefix was already agreed.
 	local ok, count = pcall(function()
-		local iter1, inv1, ctrl1 = utf8.codes(s1)
-		local iter2, inv2, ctrl2 = utf8.codes(s2)
+		local iter1, inv1, ctrl1 = utf8_lib.codes(s1)
+		local iter2, inv2, ctrl2 = utf8_lib.codes(s2)
 		local matched = 0
 		while true do
 			local p1, c1 = iter1(inv1, ctrl1)
@@ -76,7 +92,7 @@ function M.get_common_prefix_utf8(s1, s2)
 end
 
 --- Safely extracts a substring using UTF-8 character indexing.
---- Uses `utf8.offset` for O(|i|+|j|) byte-position lookup instead of building
+--- Uses `utf8_lib.offset` for O(|i|+|j|) byte-position lookup instead of building
 --- a character array, so long buffers don't pay an allocation per slice.
 --- @param s string The input string.
 --- @param i number The starting index.
@@ -103,14 +119,14 @@ function M.utf8_sub(s, i, j)
 	-- Translate codepoint indices to byte offsets. start_byte is the first
 	-- byte of codepoint #start_idx; end_byte is the last byte of codepoint
 	-- #end_idx, i.e. one byte before the start of codepoint #(end_idx+1).
-	local ok_s, start_byte = pcall(utf8.offset, s, start_idx)
+	local ok_s, start_byte = pcall(utf8_lib.offset, s, start_idx)
 	if not ok_s or not start_byte then return "" end
 
 	local end_byte
 	if end_idx == n then
 		end_byte = #s
 	else
-		local ok_e, next_byte = pcall(utf8.offset, s, end_idx + 1)
+		local ok_e, next_byte = pcall(utf8_lib.offset, s, end_idx + 1)
 		if not ok_e or not next_byte then return "" end
 		end_byte = next_byte - 1
 	end
@@ -124,8 +140,8 @@ end
 function M.utf8_len(s)
 	if type(s) ~= "string" then return 0 end
 
-	-- utf8.len returns nil on invalid UTF-8 sequences, fallback to raw length
-	local ok, len = pcall(utf8.len, s)
+	-- utf8_lib.len returns nil on invalid UTF-8 sequences, fallback to raw length
+	local ok, len = pcall(utf8_lib.len, s)
 	return (ok and len) and len or #s
 end
 
@@ -138,7 +154,7 @@ function M.utf8_ends_with(s, suffix)
 	if s == "" or suffix == "" then return false end
 
 	local n = M.utf8_len(suffix)
-	local ok, start_idx = pcall(utf8.offset, s, -n)
+	local ok, start_idx = pcall(utf8_lib.offset, s, -n)
 
 	return (ok and start_idx) and (s:sub(start_idx) == suffix) or false
 end
@@ -151,7 +167,7 @@ function M.contains_high_unicode(s)
 
 	local found = false
 	pcall(function()
-		for _, c in utf8.codes(s) do
+		for _, c in utf8_lib.codes(s) do
 			if c > 0xFFFF then
 				found = true
 				break
@@ -172,7 +188,7 @@ function M.unescape_text(s)
 	s = s:gsub("\\u(%x%x%x%x)", function(hex)
 		local code = tonumber(hex, 16)
 		if code then
-			local ok, char = pcall(utf8.char, code)
+			local ok, char = pcall(utf8_lib.char, code)
 			if ok then return char end
 		end
 		return "\\u" .. hex
@@ -212,10 +228,11 @@ end
 
 
 
+
 -- =======================================
---- =======================================
+-- =======================================
 -- ======= 2/ Surgical Diff Engine =======
---- =======================================
+-- =======================================
 -- =======================================
 
 --- Computes a Wagner-Fischer edit distance diff to display UI text prediction overlays.
@@ -358,10 +375,11 @@ end
 
 
 
+
 -- =========================================
---- =========================================
+-- =========================================
 -- ======= 3/ Case Mapping Constants =======
---- =========================================
+-- =========================================
 -- =========================================
 
 M.UPPER_LETTERS = {
@@ -401,10 +419,11 @@ M.UPPER_TRIGGERS["."] = { _NNBSP .. ":", _NBSP .. ":" }
 
 
 
+
 -- ===========================================
---- ===========================================
+-- ===========================================
 -- ======= 4/ Case Conversion Routines =======
---- ===========================================
+-- ===========================================
 -- ===========================================
 
 --- Checks if a character is considered a valid letter.
@@ -415,6 +434,31 @@ function M.is_letter_char(c)
 	if c:match("[%w]") then return true end
 	if M.UPPER_LETTERS[c] or M.LOWER_LETTERS[c] then return true end
 	return string.upper(c) ~= string.lower(c)
+end
+
+--- Word character, for the hotstring word-boundary rule ONLY.
+---
+--- An `is_word` trigger fires only when the character in front of it is not one
+--- of these. Shared because the three drivers had three different answers and
+--- nothing compared them: this engine treated every non-ASCII codepoint as a word
+--- character, macOS asked is_letter_char (so "★" and "_" opened a word there but
+--- nowhere else), and AutoHotkey tests membership of the word-terminator set.
+--- Only the macOS/Linux pair can share an implementation; the AHK side is pinned
+--- by the shared corpus instead.
+---
+--- @param ch string A single UTF-8 character.
+--- @return boolean True when `ch` is part of a word.
+function M.is_hotstring_word_char(ch)
+	if type(ch) ~= "string" or ch == "" then return false end
+	-- Every non-ASCII codepoint counts, deliberately: accented letters must behave
+	-- like letters and there is no Unicode category table here. The magic key
+	-- inherits it, which is why a word-boundary trigger typed straight after ★ does
+	-- not fire — surprising, but the alternative treats "é" as punctuation.
+	if ch:byte(1) > 127 then return true end
+	-- "@" is not a letter and opens no word either: what follows it is the rest of
+	-- an address or a handle, never a new word.
+	if ch == "@" then return true end
+	return ch:match("^[%w_]$") ~= nil
 end
 
 --- Safely converts a trigger string to lowercase.
@@ -561,7 +605,7 @@ function M.applescript_format(fmt, ...)
 			args[i] = M.applescript_escape(args[i])
 		end
 	end
-	return string.format(fmt, table.unpack(args, 1, args.n))
+	return string.format(fmt, table_unpack(args, 1, args.n))
 end
 
 --- Escapes a string so it is safe to use as the REPLACEMENT argument of gsub.

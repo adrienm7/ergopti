@@ -8,6 +8,21 @@
 --- dispatch loop in builder.lua's load_top_level_tail() handles.  Prevents
 --- silent drift between the shared manifest and the driver.
 ---
+---
+--- WHEN THIS CAN BE RETIRED, and it is not yet — measured 2026-08-04.
+--- The stated precondition is that the tail becomes typed manifest rows with
+--- registry-validated ids, and that a Linux twin exists first. Neither holds:
+--- the tail rows carry only { id, platforms } and no type field, so BOTH drivers
+--- dispatch them through a hardcoded if/elseif chain, and the only id-validating
+--- gate skips every row whose type is not action/dynamic.
+---
+--- What DID land is the better half of the same idea, and it is what will make
+--- this file redundant: tools/test/test-menu-top-level-parity.cjs now reads both
+--- dispatch chains and compares them to the manifest projection in both
+--- directions. This gate pins the manifest against a HAND-TYPED list, so it
+--- alarms on a manifest edit and says nothing about the driver; that one reads
+--- the driver. Retire this once the parity gate also covers what this pins,
+--- rather than on a date.
 --- The AHK half lives in windows/tests/meta/test_menu_top_level_drift_gate.ahk.
 --- ==============================================================================
 
@@ -85,10 +100,11 @@ helpers.describe("menu drift gate (macOS): top_level tail matches canonical orde
 	end)
 
 	helpers.it("macOS loader keeps the separator immediately before global_actions", function()
-		local fh = io.open(DRIVER_ROOT .. "ui/menu/builder.lua", "r")
-		helpers.assert_true(fh ~= nil, "Cannot open builder.lua")
-		local source = fh:read("*a")
-		fh:close()
+		-- Selected by a declaration unique to ui/menu/builder.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local source = helpers.read_driver_source("local function load_ergopti_groups")
+		helpers.assert_true(source ~= nil, "ui/menu/builder.lua source must be locatable")
 		helpers.assert_true(source:find("previous.id == \"---\"", 1, true) ~= nil,
 			"load_top_level_tail must inspect the manifest entry before global_actions")
 		helpers.assert_true(source:find("tail_start = tail_start - 1", 1, true) ~= nil,

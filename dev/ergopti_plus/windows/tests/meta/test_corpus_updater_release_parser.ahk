@@ -10,7 +10,7 @@
 ; then asserts the output matches the expected golden values.
 ;
 ; The AHK driver cannot require Lua modules, so its parser functions in
-; lib/updater/core.ahk are hand-maintained. This test pins them against the
+; modules/updater/core.ahk are hand-maintained. This test pins them against the
 ; same golden vectors as the macOS Lua test so any divergence is caught.
 ;
 ; parse_asset_url is NOT tested here because the AHK _Updater_FindAssetUrl

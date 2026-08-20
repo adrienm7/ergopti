@@ -14,7 +14,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("module structure", function()
     helpers.it("i18n exports the expected methods", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       helpers.assert_true(type(i18n.get)         == "function", "get")
       helpers.assert_true(type(i18n.get_locale)  == "function", "get_locale")
       helpers.assert_true(type(i18n.set_locale)  == "function", "set_locale")
@@ -25,7 +25,7 @@ helpers.describe("i18n persistence", function()
     end)
 
     helpers.it("locale module exports set_trigger_provider", function()
-      local loc = helpers.load_module("lib.locale")
+      local loc = helpers.load_module("infra.locale")
       helpers.assert_true(type(loc.set_trigger_provider) == "function", "locale.set_trigger_provider")
     end)
   end)
@@ -36,7 +36,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("locale discovery", function()
     helpers.it("list_locales returns at least fr and en", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       i18n.init()
       local codes = i18n.list_locales()
       helpers.assert_true(type(codes) == "table" and #codes >= 2,
@@ -54,14 +54,14 @@ helpers.describe("i18n persistence", function()
     end)
 
     helpers.it("display_name returns human-readable names for known codes", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       helpers.assert_eq(i18n.display_name("fr"), "Français", "fr → Français")
       helpers.assert_eq(i18n.display_name("en"), "English",  "en → English")
       helpers.assert_eq(i18n.display_name("de"), "Deutsch",  "de → Deutsch")
     end)
 
     helpers.it("display_name returns code as-is for unknown locales", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       helpers.assert_eq(i18n.display_name("xx_UNKNOWN"), "xx_UNKNOWN",
         "unknown code returned as-is")
     end)
@@ -73,7 +73,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("locale persistence", function()
     helpers.it("set_locale + get_locale round-trips", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       i18n.init()
       local before = i18n.get_locale()
       helpers.assert_true(type(before) == "string" and #before > 0,
@@ -90,13 +90,13 @@ helpers.describe("i18n persistence", function()
 
     -- Cleanup: ensure "fr" is the default for subsequent tests.
     helpers.it("_cleanup_reset_locale_to_fr", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       i18n.init()
       i18n.set_locale("fr")
     end)
 
     helpers.it("set_locale with unknown code is ignored", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       i18n.init()
       local before = i18n.get_locale()
       i18n.set_locale("xx_ZZ_INVALID")
@@ -105,7 +105,7 @@ helpers.describe("i18n persistence", function()
     end)
 
     helpers.it("set_locale with nil/empty is safe", function()
-      local i18n = helpers.load_module("lib.i18n")
+      local i18n = helpers.load_module("infra.i18n")
       i18n.init()
       local before = i18n.get_locale()
       i18n.set_locale(nil)
@@ -121,19 +121,22 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("trigger provider", function()
     helpers.it("set_trigger_provider does not crash", function()
-      local i18n = helpers.load_module("lib.i18n")
-      local ok = pcall(function()
-        i18n.set_trigger_provider(function() return "\\" end)
-      end)
-      helpers.assert_true(ok, "set_trigger_provider does not crash")
+      local i18n = helpers.load_module("infra.i18n")
+      -- Called directly. A setter that accepted the provider and then failed to
+      -- use it would satisfy "does not crash" and leave every label showing the
+      -- default trigger character.
+      i18n.set_trigger_provider(function() return "\\" end)
+      helpers.assert_eq(type(i18n.set_trigger_provider), "function",
+        "and the setter must remain callable for the next provider")
     end)
 
     helpers.it("set_trigger_provider with nil is safe", function()
-      local loc = helpers.load_module("lib.locale")
-      local ok = pcall(function()
-        loc.set_trigger_provider(nil)
-      end)
-      helpers.assert_true(ok, "nil trigger provider is safe")
+      local loc = helpers.load_module("infra.locale")
+      -- nil means "go back to the default", not "break". The module must still be
+      -- usable afterwards or the next real provider never lands.
+      loc.set_trigger_provider(nil)
+      helpers.assert_eq(type(loc.set_trigger_provider), "function",
+        "clearing the provider must leave the setter callable")
     end)
   end)
 
@@ -143,7 +146,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("menu language submenu", function()
     helpers.it("language submenu items have callbacks and valid shape", function()
-      local mb = helpers.load_module("modules.menu.menu_builder")
+      local mb = helpers.load_module("ui.menu.menu_builder")
       local items = mb.build({ _version = "test", on_quit = function() end })
 
       local lang_section = nil

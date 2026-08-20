@@ -15,10 +15,11 @@
 
 local helpers = require("tests.helpers")
 
-local src_path = helpers.driver_root() .. "modules/keylogger/context_tracker.lua"
-local fh = io.open(src_path, "r")
-if not fh then error("context_tracker.lua not readable at: " .. src_path) end
-local src = fh:read("*a") ; fh:close()
+-- Selected by a declaration unique to modules/keylogger/context_tracker.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function update_secure_field_state")
+helpers.assert_true(src ~= nil, "modules/keylogger/context_tracker.lua source must be locatable")
 
 -- Test 1 (keylogger-support-3): + must not be decoded as space in the path decode.
 local has_plus_decode = src:find('gsub("+", " ")', 1, true) ~= nil

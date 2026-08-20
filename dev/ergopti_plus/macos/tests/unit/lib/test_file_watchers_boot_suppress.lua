@@ -1,7 +1,7 @@
 --- tests/unit/lib/test_file_watchers_boot_suppress.lua
 
 --- ==============================================================================
---- MODULE: lib/file_watchers post-boot FSEvents-replay suppression
+--- MODULE: infra/file_watchers post-boot FSEvents-replay suppression
 --- DESCRIPTION:
 --- Second regression for macos-reload-during-git-pull. The git guard stops a
 --- reload from firing WHILE git writes the tree, but macOS FSEvents replays the
@@ -19,18 +19,18 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["lib.ui_restore"] = {
+package.loaded["infra.ui_restore"] = {
 	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
 	snapshot     = function() end,
 	restore      = function() end,
 }
 -- git idle throughout: isolate the boot-suppress behaviour from the git gate.
-package.loaded["lib.git_status"] = { operation_in_progress = function() return false end }
+package.loaded["infra.git_status"] = { operation_in_progress = function() return false end }
 
-package.loaded["lib.file_watchers"] = nil
-local FW = require("lib.file_watchers")
+package.loaded["infra.file_watchers"] = nil
+local FW = require("infra.file_watchers")
 
-helpers.describe("lib/file_watchers — post-boot FSEvents-replay suppression (macos-reload-during-git-pull)", function()
+helpers.describe("infra/file_watchers — post-boot FSEvents-replay suppression (macos-reload-during-git-pull)", function()
 	helpers.it("drops a change inside the boot window, then reloads once the window passes", function()
 		local prev_pw, prev_timer, prev_attr, prev_reload =
 			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload

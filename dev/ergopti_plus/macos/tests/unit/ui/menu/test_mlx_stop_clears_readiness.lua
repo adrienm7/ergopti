@@ -17,8 +17,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("stop_mlx_server_if_needed resets readiness intrinsically", function()
 	helpers.it("clears _server_target and calls api_mlx.reset_endpoints", function()
-		local fh = assert(io.open(helpers.driver_root() .. "ui/menu/menu_llm/models_manager.lua", "r"))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_llm/models_manager.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_actual_model_name")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/models_manager.lua source must be locatable")
 		local idx = src:find("function obj.stop_mlx_server_if_needed", 1, true)
 		helpers.assert_true(idx ~= nil, "models_manager must define stop_mlx_server_if_needed")
 		local body = src:sub(idx, idx + 700)

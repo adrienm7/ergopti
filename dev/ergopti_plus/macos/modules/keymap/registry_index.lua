@@ -13,9 +13,9 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("lib.logger")
+local Logger = require("infra.logger")
 local Groups = require("modules.keymap.registry_groups")
-local i18n   = require("lib.i18n")
+local i18n   = require("infra.i18n")
 local LOG    = "keymap.registry"
 
 local _state = nil
@@ -35,19 +35,33 @@ end
 --- Injects the shared CoreState so state-dependent functions become live.
 --- Called once from registry.lua's M.init() after the main state is wired up.
 --- @param core_state table The shared CoreState from keymap/init.lua.
+--- @return boolean committed True only when the requested binding is active.
 function M.setup(core_state)
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.setup(): core_state must be a table — initialization refused.")
+		return false
+	end
+	if _state then
+		if _state == core_state then
+			Logger.warn(LOG, "M.setup() called more than once with the active state — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.setup(): a different state is already active — replacement refused.")
+		return false
+	end
 	_state = core_state
+	return true
 end
 
 
 
 
 
--- ==========================================
+-- ===========================================
 -- ===========================================
 -- ======= 1/ Group Loaders (forwards) =======
 -- ===========================================
--- ==========================================
+-- ===========================================
 
 -- All group-loading and group-lifecycle logic lives in registry_groups.lua.
 -- The public surface below is a thin forward layer so callers of registry.lua
@@ -57,7 +71,7 @@ end
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the Lua hotstring file.
 function M.load_file(name, path)
-	Groups.load_file(name, path)
+	return Groups.load_file(name, path)
 end
 
 --- Loads and parses mappings from a TOML configuration file.
@@ -65,7 +79,16 @@ end
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the TOML file.
 function M.load_toml(name, path)
-	Groups.load_toml(name, path)
+	return Groups.load_toml(name, path)
+end
+
+--- Atomically replaces one enabled TOML group while preserving a deliberately
+--- disabled group and rolling the live corpus back on loader failure.
+--- @param name string Existing group identifier.
+--- @param path string Absolute TOML path.
+--- @return boolean committed
+function M.reload_toml(name, path)
+	return Groups.reload_toml(name, path)
 end
 
 --- Manually sets the current group context used by M.add() to tag new entries.
@@ -86,7 +109,7 @@ end
 --- No-op when the group is already disabled or unknown.
 --- @param name string Group identifier.
 function M.disable_group(name)
-	Groups.disable_group(name)
+	return Groups.disable_group(name)
 end
 
 --- Returns true when the named group exists and is currently enabled.
@@ -111,22 +134,30 @@ function M.register_lua_group(name, meta_description, sections)
 	Groups.register_lua_group(name, meta_description, sections)
 end
 
+--- Runs a caller-owned multi-step registry mutation against one snapshot.
+--- @param label string Stable diagnostic label.
+--- @param mutation function Callback that must return exact true to commit.
+--- @return boolean committed
+function M.registry_transaction(label, mutation)
+	return Groups.transaction(label, mutation)
+end
+
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.
 function M.enable_group(name)
-	Groups.enable_group(name)
+	return Groups.enable_group(name)
 end
 
 
 
 
 
--- =======================================
+-- =====================================
 -- =====================================
 -- ======= 2/ Section Management =======
 -- =====================================
--- =======================================
+-- =====================================
 
 --- Returns true when the section is not explicitly disabled.
 --- hs.settings stores `false` when the user disables it; nil means enabled.
@@ -160,6 +191,123 @@ function M.set_repeat_feature_enabled(enabled)
 	Logger.debug(LOG, "Magic-key repeat engine: %s.", enabled and "on" or "off")
 end
 
+--- Builds the persistent settings key for one section.
+--- @param group_name string
+--- @param section_name string
+--- @return string
+local function section_setting_key(group_name, section_name)
+	return "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name)
+end
+
+--- Writes one setting and verifies the stored postcondition.
+--- `set` normally returns nil and `clear` may return false for an absent key,
+--- so neither return value is a commitment; exact read-back is authoritative.
+--- @param key string
+--- @param value boolean|nil
+--- @return boolean committed
+local function write_section_setting(key, value)
+	local ok, result = xpcall(function()
+		if value == nil then
+			hs.settings.clear(key)
+		else
+			hs.settings.set(key, value)
+		end
+		return hs.settings.get(key) == value
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Could not write section setting '%s': %s.", key, tostring(result))
+		return false
+	end
+	return result == true
+end
+
+--- Restores settings captured before a failed mutation.
+--- Values live inside records so an absent setting (`nil`) remains enumerable.
+--- @param previous table Map of settings key to `{ value = boolean|nil }`.
+local function restore_section_settings(previous)
+	for key, record in pairs(previous) do
+		if write_section_setting(key, record.value) ~= true then
+			Logger.error(LOG, "Could not roll back section setting '%s'.", key)
+		end
+	end
+end
+
+--- Persists and applies section changes for one or more groups atomically.
+--- Each change is `{ name = string, sections = string[], enable_group = bool }`.
+--- Exact true means all settings and live groups reached their postcondition;
+--- every other outcome restores the previous settings and registry snapshot.
+--- @param changes table
+--- @param enabled boolean
+--- @return boolean committed
+function M.set_groups_sections_enabled(changes, enabled)
+	if not require_state("set_groups_sections_enabled") then return false end
+	if type(changes) ~= "table" or type(enabled) ~= "boolean" then
+		Logger.error(LOG, "set_groups_sections_enabled: changes table and boolean enabled are required.")
+		return false
+	end
+	if #changes == 0 then return true end
+
+	local known_groups = Groups.list_groups()
+	local keys = {}
+	local seen_keys = {}
+	for _, change in ipairs(changes) do
+		if type(change) ~= "table" or type(change.name) ~= "string" or change.name == ""
+			or type(change.sections) ~= "table" or known_groups[change.name] == nil then
+			Logger.error(LOG, "set_groups_sections_enabled: invalid or unknown group change.")
+			return false
+		end
+		for _, section_name in ipairs(change.sections) do
+			if type(section_name) ~= "string" or section_name == "" then
+				Logger.error(LOG, "set_groups_sections_enabled: section names must be non-empty strings.")
+				return false
+			end
+			local key = section_setting_key(change.name, section_name)
+			if not seen_keys[key] then
+				seen_keys[key] = true
+				keys[#keys + 1] = key
+			end
+		end
+	end
+
+	local previous = {}
+	local read_ok, read_err = xpcall(function()
+		for _, key in ipairs(keys) do previous[key] = { value = hs.settings.get(key) } end
+	end, debug.traceback)
+	if not read_ok then
+		Logger.error(LOG, "Could not snapshot section settings: %s.", tostring(read_err))
+		return false
+	end
+
+	Logger.debug(LOG, "%s %d section setting(s) across %d group(s).",
+		enabled and "Enabling" or "Disabling", #keys, #changes)
+	local ok, committed = xpcall(function()
+		for _, key in ipairs(keys) do
+			local desired
+			if enabled then desired = nil else desired = false end
+			if write_section_setting(key, desired) ~= true then return false end
+		end
+
+		return Groups.transaction("set_groups_sections_enabled", function()
+			for _, change in ipairs(changes) do
+				if M.is_group_enabled(change.name) then
+					if M.disable_group(change.name) ~= true then return false end
+					if M.enable_group(change.name) ~= true then return false end
+				elseif change.enable_group == true then
+					if M.enable_group(change.name) ~= true then return false end
+				end
+			end
+			return true
+		end)
+	end, debug.traceback)
+
+	if not ok or committed ~= true then
+		restore_section_settings(previous)
+		Logger.error(LOG, "Section batch rolled back: %s.", tostring(committed))
+		return false
+	end
+	return true
+end
+
 --- Persists the enabled state of ONE OR MORE sections and rebuilds their group
 --- exactly once.
 ---
@@ -174,28 +322,20 @@ end
 --- @param section_names table Array of section names.
 --- @param enabled boolean True to enable (clears the explicit false), false to disable.
 function M.set_sections_enabled(gn, section_names, enabled)
-	if type(section_names) ~= "table" or #section_names == 0 then return end
-	Logger.debug(LOG, "%s %d section(s) of '%s'.",
-		enabled and "Enabling" or "Disabling", #section_names, tostring(gn))
-
-	-- Every setting first: the rebuild below reads them all, so a rebuild
-	-- interleaved between writes would register a half-applied state.
-	for _, sn in ipairs(section_names) do
-		hs.settings.set("hotstrings_section_" .. tostring(gn) .. "_" .. tostring(sn),
-			enabled and nil or false)
-	end
-
-	if M.is_group_enabled(gn) then
-		M.disable_group(gn)
-		M.enable_group(gn)
-	end
+	if type(section_names) ~= "table" then return false end
+	if #section_names == 0 then return true end
+	return M.set_groups_sections_enabled({ {
+		name = gn,
+		sections = section_names,
+		enable_group = false,
+	} }, enabled)
 end
 
 --- Disables a section and reloads its group so the mapping database reflects the change.
 --- @param gn string Group name.
 --- @param sn string Section name.
 function M.disable_section(gn, sn)
-	M.set_sections_enabled(gn, { sn }, false)
+	return M.set_sections_enabled(gn, { sn }, false)
 end
 
 --- Enables a section (removes the explicit false, restoring the default-enabled state)
@@ -203,7 +343,7 @@ end
 --- @param gn string Group name.
 --- @param sn string Section name.
 function M.enable_section(gn, sn)
-	M.set_sections_enabled(gn, { sn }, true)
+	return M.set_sections_enabled(gn, { sn }, true)
 end
 
 --- Returns the sections table for a group, or nil if the group is unknown.

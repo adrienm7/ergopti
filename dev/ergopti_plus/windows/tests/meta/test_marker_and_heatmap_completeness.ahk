@@ -35,7 +35,7 @@
 ; Registration must substitute the marker in the replacement as well as the
 ; trigger, or the emitted text differs from the previewed text.
 _MHC_RegistrationSubstitutesBothSides() {
-	Src := _StripFullLineComments(_DriverDirConcat("lib/hotstrings"))
+	Src := _StripFullLineComments(_DriverDirConcat("infra/hotstrings"))
 	Assert(Src != "", "the hotstring layer must be locatable")
 
 	At := InStr(Src, "HSE_RegisterFromTomlFlags(Row[6], Row[1],")
@@ -53,7 +53,7 @@ _MHC_RegistrationSubstitutesBothSides() {
 
 ; The preview side must keep substituting both, since agreement is the point.
 _MHC_PreviewSubstitutesBothSides() {
-	Src := _StripFullLineComments(_DriverDirConcat("lib/hotstrings"))
+	Src := _StripFullLineComments(_DriverDirConcat("infra/hotstrings"))
 	Assert(InStr(Src, "Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)") > 0,
 		"the preview index must substitute the trigger")
 	Assert(InStr(Src, "Output := StrReplace(Row[3], HS_CACHE_MARKER, MagicKey)") > 0,

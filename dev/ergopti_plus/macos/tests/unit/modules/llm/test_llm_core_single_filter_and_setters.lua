@@ -48,7 +48,7 @@ helpers.describe("llm core: the gate and the backend setter record what they app
 
 	helpers.it("set_runtime_llm_enabled logs both transitions", function()
 		local logged = {}
-		package.loaded["lib.logger"] = {
+		package.loaded["infra.logger"] = {
 			debug = function(_l, fmt, ...) table.insert(logged, string.format(fmt, ...)) end,
 			info = function() end, warn = function() end, error = function() end,
 			trace = function() end, done = function() end, start = function() end,

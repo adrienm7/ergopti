@@ -42,7 +42,7 @@ end
 helpers.describe("meta: duplicate default values", function()
 	-- Map of "varname=value" -> list of files declaring it
 	local seen = {}
-	for _, sub in ipairs({ "lib", "modules" }) do
+	for _, sub in ipairs({ "infra", "modules", "platform" }) do
 		for _, abs in ipairs(list_lua_files(DRIVER_ROOT .. sub)) do
 			local fh = io.open(abs, "r") ; if fh then
 				local body = fh:read("*a") ; fh:close()

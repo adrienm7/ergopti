@@ -16,8 +16,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_metrics WPM toggle handlers gate start() on pause", function()
 	local function read_src()
-		local fh = assert(io.open(helpers.driver_root() .. "ui/menu/menu_metrics.lua", "r"))
-		local s = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_metrics.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local s = helpers.read_driver_source("\"dialog.metrics.security_warning_title\"")
+		helpers.assert_true(s ~= nil, "ui/menu/menu_metrics.lua source must be locatable")
 		return s
 	end
 
@@ -34,10 +37,13 @@ helpers.describe("menu_metrics WPM toggle handlers gate start() on pause", funct
 			"a WPM widget start is not pause-gated")
 		helpers.assert_true(src:find("keylogger_menubar_wpm then WpmMenubar.start", 1, true) == nil,
 			"a WPM menubar start is not pause-gated")
-		-- And the gated form must be present for the interactive handlers.
-		helpers.assert_true(src:find("not paused_now() then WpmWidget.start", 1, true) ~= nil,
-			"interactive widget handlers must gate start on paused_now()")
-		helpers.assert_true(src:find("not paused_now() then WpmMenubar.start", 1, true) ~= nil,
-			"interactive menubar handlers must gate start on paused_now()")
+		-- The shared transactional toggle now owns the actual start call. Pin both
+		-- the click-time pause fence and delegation of each visibility key to it.
+		helpers.assert_true(src:find("if desired and not paused_now() then", 1, true) ~= nil,
+			"the lifecycle transaction must gate activation on the live pause state")
+		helpers.assert_true(src:find('toggle_wpm_visibility("keylogger_float_wpm"', 1, true) ~= nil,
+			"the interactive widget row must delegate to the pause-gated transaction")
+		helpers.assert_true(src:find('toggle_wpm_visibility("keylogger_menubar_wpm"', 1, true) ~= nil,
+			"the interactive menubar row must delegate to the pause-gated transaction")
 	end)
 end)

@@ -31,16 +31,16 @@ local helpers = require("tests.helpers")
 -- load_with_stubs() call below gets a truly fresh module graph.
 local STUB_MODULES = {
 	"modules.keymap.utils",
-	"lib.text_utils",
+	"infra.text_utils",
 	"modules.llm",
-	"lib.keycodes",
+	"infra.keycodes",
 	"modules.keylogger",
 	"ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.llm_bridge",
-	"lib.logger",
+	"infra.logger",
 }
 for _, mod in ipairs(STUB_MODULES) do
 	package.loaded[mod] = nil
@@ -48,11 +48,11 @@ end
 
 -- Install hs stub first so that modules which reference `hs` at load time
 -- find a valid global. load_with_stubs() sets _G.hs internally.
-local _ = helpers.load_with_stubs("lib.logger")
+local _ = helpers.load_with_stubs("infra.logger")
 
 -- Load a fresh Logger instance that we can attach a capture sink to.
-package.loaded["lib.logger"] = nil
-local Logger = require("lib.logger")
+package.loaded["infra.logger"] = nil
+local Logger = require("infra.logger")
 Logger.set_level(Logger.LEVELS.DEBUG)
 
 -- Minimal stub for modules.keymap.utils — only the functions referenced at
@@ -65,7 +65,7 @@ package.loaded["modules.keymap.utils"] = {
 }
 
 -- Minimal stub for lib.text_utils.
-package.loaded["lib.text_utils"] = {
+package.loaded["infra.text_utils"] = {
 	is_letter_char  = function(_) return false end,
 	trig_lower      = function(s) return s end,
 	conform_replacement = function(r, _, _) return r end,
@@ -86,7 +86,7 @@ package.loaded["modules.llm"] = {
 }
 
 -- lib.keycodes: only the constants accessed at load time matter.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	ESCAPE             = 53,
 	RETURN             = 36,
 	F16_LLM_CHAIN_SIGNAL = 106,
@@ -119,8 +119,8 @@ package.loaded["ui.tooltip"] = {
 -- modules.llm.prediction_engine: minimal stub for all setters + lifecycle calls.
 local ENGINE_ENABLED = false
 package.loaded["modules.llm.prediction_engine"] = {
-	init                          = function() end,
-	reset                         = function() end,
+	init                          = function() return true end,
+	reset                         = function() return true end,
 	set_preview_ai_enabled        = function() end,
 	set_preview_ai_color          = function() end,
 	set_llm_enabled               = function(v) ENGINE_ENABLED = v end,
@@ -155,7 +155,7 @@ package.loaded["modules.llm.prediction_engine"] = {
 	consume                       = function() return nil, {} end,
 	handle_chain_signal           = function() return false end,
 	arm_chain                     = function() end,
-	stop_timer                    = function() end,
+	stop_timer                    = function() return true end,
 	start_timer                   = function() end,
 	start_timer_word_end          = function() end,
 	perform_check                 = function() end,
@@ -199,9 +199,6 @@ local function make_state(sentinel)
 		preview_providers = {},
 		groups           = {},
 		DELAYS           = {},
-		expected_synthetic_chars   = "",
-		expected_synthetic_deletes = 0,
-		last_synthetic_arm_time    = 0,
 		is_repeat_feature_enabled  = function() return false end,
 	}
 	local defaults = {
@@ -226,12 +223,18 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 		-- The bridge was loaded fresh above with _state == nil; the first init
 		-- must not throw and must leave the module operational.
 		local state1, defaults1 = make_state("state1")
-		local ok = pcall(function() bridge.init(state1, defaults1) end)
-		helpers.assert_true(ok, "first M.init() must not throw")
+		-- Called directly: a raise fails with the real error. The claim is that the
+		-- first init leaves the bridge OPERATIONAL, which is what the duplicate-init
+		-- case below is measuring a change against.
+		helpers.assert_eq(bridge.init(state1, defaults1), true)
+		helpers.assert_eq(bridge.init(state1, defaults1), true,
+			"the exact active dependencies must be an idempotent success")
+		helpers.assert_eq(type(bridge.check_nav_reset), "function",
+			"a successful first init must leave the public surface callable")
 	end)
 
 
-	helpers.it("second M.init() with a different state is ignored and emits a WARN", function()
+	helpers.it("second M.init() with different dependencies is refused", function()
 		-- state1 was installed by the previous test case (same module instance).
 		-- Install a capture sink on the shared Logger so we can inspect the WARN.
 		local captured_lines = {}
@@ -239,23 +242,26 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 		Logger.set_sink(function(line) captured_lines[#captured_lines + 1] = line end)
 
 		local state2, defaults2 = make_state("state2")
-		local ok = pcall(function() bridge.init(state2, defaults2) end)
+		local init_result = nil
+		local ok, init_err = pcall(function() init_result = bridge.init(state2, defaults2) end)
 
 		-- Restore sink immediately so subsequent tests are unaffected.
 		Logger.set_sink(nil)
 
+		helpers.assert_nil(init_err, "and must report none: " .. tostring(init_err))
 		helpers.assert_true(ok, "second M.init() must not throw")
+		helpers.assert_eq(init_result, false,
+			"a different dependency set must not inherit the active binding's success")
 
-		-- Verify that at least one captured line mentions the duplicate-call warning.
-		local found_warn = false
+		local found_refusal = false
 		for _, line in ipairs(captured_lines) do
-			if line:find("more than once", 1, true) or line:find("duplicate", 1, true) then
-				found_warn = true
+			if line:find("replacement refused", 1, true) then
+				found_refusal = true
 				break
 			end
 		end
-		helpers.assert_true(found_warn,
-			"second M.init() must emit a WARN containing 'more than once' or 'duplicate'")
+		helpers.assert_true(found_refusal,
+			"a conflicting M.init() must log that dependency replacement was refused")
 	end)
 
 
@@ -285,11 +291,9 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 
 		-- check_nav_reset uses require_state + reads _state.buffer.
 		-- A nil _state would produce an ERROR; state1's buffer is "" so no crash.
-		local ok = pcall(function() bridge.check_nav_reset() end)
+		bridge.check_nav_reset()
 
 		Logger.set_sink(nil)
-
-		helpers.assert_true(ok, "check_nav_reset() must not throw after duplicate init")
 		helpers.assert_eq(#error_lines, 0,
 			"require_state guard must not fire — _state must still be the first state table")
 

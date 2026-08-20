@@ -48,8 +48,11 @@ _A0720B3_ShutdownFlagPrecedesEveryDrain() {
 	Body := _DriverFuncBody("KL_Stop")
 	Assert(Body != "", "KL_Stop must exist in modules/keylogger/keylogger.ahk")
 
-	FlagIdx := InStr(Body, "_shutting_down := true")
-	Assert(FlagIdx > 0, "KL_Stop must set Keylogger._shutting_down := true")
+	FlagIdx := InStr(Body, "KL_BeginShutdown()")
+	Assert(FlagIdx > 0, "KL_Stop must publish its shutdown lease through KL_BeginShutdown")
+	BeginBody := _DriverFuncBody("KL_BeginShutdown")
+	Assert(InStr(BeginBody, "_shutting_down := true") > 0,
+		"KL_BeginShutdown must publish Keylogger._shutting_down := true")
 
 	for _, Drain in ["KL_Hook_Stop()", "KL_Watchers_Stop()", "KL_Mouse_Stop()"
 	               , "KL_AV_Stop()", "KL_Net_Stop()", "KL_Roi_Stop()"] {
@@ -57,7 +60,7 @@ _A0720B3_ShutdownFlagPrecedesEveryDrain() {
 		if (Idx == 0)
 			continue
 		Assert(FlagIdx < Idx,
-			"KL_Stop must set _shutting_down BEFORE " . Drain . " — that drain emits a closing lifecycle event through KL_AppendLog, whose pause guard drops it while the flag is still false, leaving a dangling session_start after a quit or reload issued while paused")
+			"KL_Stop must publish _shutting_down BEFORE " . Drain . " — that drain emits a closing lifecycle event through KL_AppendLog, whose pause guard drops it while the flag is still false, leaving a dangling session_start after a quit or reload issued while paused")
 	}
 }
 Test("keylogger: KL_Stop raises the shutdown bypass before every drain (F-07)",
@@ -142,9 +145,7 @@ Test("llm-ollama: the warmup retry chain survives a transient skip (F-21)",
 
 
 _A0720B3_TailCorrectedIsWordCapped() {
-	Body := _DriverFuncBody("_LLM_Parser_ParseAdvancedBlock")
-	if (Body == "")
-		Body := _DriverSourceNoComments()
+	Body := _DriverFuncBody("_LLM_Parser_ProcessPredictionImpl")
 	Assert(RegExMatch(Body, "tc\s*:=\s*_LLM_Parser_EnforceWordLimits\(tc,\s*max_words\)") > 0,
 		"TAIL_CORRECTED must be word-capped like NEXT_WORDS before it reaches _LLM_Parser_TokenDiffOps — that diff is an O(n^2) dynamic program allocating per cell, len2 is unclamped, and it runs on the thread that serves the keyboard hook, so an unbounded correction from a model in a repetition loop stalls typing with nothing logged")
 }

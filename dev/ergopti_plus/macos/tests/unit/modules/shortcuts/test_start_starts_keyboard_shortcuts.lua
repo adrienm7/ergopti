@@ -28,19 +28,19 @@ helpers.describe("shortcuts.start() starts both bindings and keyboard shortcuts"
 		-- be nil without crashing.
 		package.loaded["modules.shortcuts.bindings"] = {
 			DEFAULT_CHATGPT_URL = "",
-			start       = function() calls.bindings = calls.bindings + 1 end,
-			stop        = function() end,
+			start       = function() calls.bindings = calls.bindings + 1; return true end,
+			stop        = function() return true end,
 			is_started  = function() return true end,
 		}
 		package.loaded["modules.shortcuts.script_control"] = {
 			ACTIONS = {}, ACTION_LABELS = {},
-			start = function() calls.script_control = calls.script_control + 1 end,
-			stop  = function() end,
+			start = function() calls.script_control = calls.script_control + 1; return true end,
+			stop  = function() return true end,
 			is_paused = function() return false end,
 		}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-			start = function() calls.keyboard = calls.keyboard + 1 end,
-			stop  = function() end,
+			start = function() calls.keyboard = calls.keyboard + 1; return true end,
+			stop  = function() return true end,
 		}
 
 		local Shortcuts = helpers.load_with_stubs("modules.shortcuts")

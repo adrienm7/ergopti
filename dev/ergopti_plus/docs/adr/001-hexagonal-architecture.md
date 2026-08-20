@@ -3,7 +3,7 @@
 | Field        | Value      |
 | ------------ | ---------- |
 | **Date**     | 2025-09-01 |
-| **Status**   | Accepted   |
+| **Status**   | Accepted; the "twenty adapters" clause below is superseded by [ADR-008](008-ports-are-contracts-not-a-checklist.md) |
 | **Deciders** | Core team  |
 
 ---
@@ -53,7 +53,12 @@ The twenty port contracts are: `FileSystem`, `HttpClient`, `KeyboardHook`,
 ### Positive
 
 - Domain logic can be unit-tested without any OS runtime.
-- Adding a new driver requires only implementing the twenty port adapters.
+- ~~Adding a new driver requires only implementing the twenty port adapters.~~
+  **Superseded by [ADR-008](008-ports-are-contracts-not-a-checklist.md).** Read as a
+  requirement rather than an upper bound, this produced nine Linux adapters with
+  no production caller — 1 549 lines that passed both the presence and the
+  compliance checks while nothing reached them. A driver implements the ports its
+  features use.
 - Port compliance is enforced by `npm run test:port-compliance`.
 - Cross-driver divergence is caught at the spec level, not discovered at runtime.
 

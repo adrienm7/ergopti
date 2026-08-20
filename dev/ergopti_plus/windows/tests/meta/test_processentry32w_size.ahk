@@ -44,10 +44,20 @@ _PE32_SizeIsCorrectForX64() {
 	; th32DefaultHeapID(16-24)+th32ModuleID(24-28)+cntThreads(28-32)+
 	; th32ParentProcessID(32-36)+pcPriClassBase(36-40)+dwFlags(40-44)+
 	; szExeFile[260]*2=520(44-564) rounded up to 568 for 8-byte alignment.
-	AssertEqual(568, 568, "PROCESSENTRY32W size on x64 must be 568")
-	; On x86 the correct size is 556 — the constant 568 is correct for 64-bit.
-	if (A_PtrSize == 8)
-		AssertTrue(true, "Running on x64 — 568 is the correct dwSize")
+	; AssertEqual(568, 568) compared a literal to itself. The value that matters is
+	; the CONSTANT the driver actually passes to Process32FirstW — if that drifts,
+	; the call fails with ERROR_BAD_LENGTH and process enumeration returns nothing,
+	; which the keylogger reports as "no AV running".
+	; PE32_SIZE is function-local, so its VALUE has to be read from the source.
+	Body := _DriverFuncBody("_KL_AV_FindCaptureExeSnapshot")
+	AssertTrue(RegExMatch(Body, "PE32_SIZE[ 	]*:=[ 	]*568"),
+		"PROCESSENTRY32W size on x64 must be 568 — a wrong dwSize makes Process32FirstW "
+		. "fail with ERROR_BAD_LENGTH, enumeration returns nothing, and the keylogger "
+		. "reports that as no AV running")
+	; On x86 the correct size is 556, so the constant is only right for 64-bit.
+	; Assert the assumption rather than restate it: the whole suite runs 64-bit.
+	AssertEqual(8, A_PtrSize,
+		"this constant is the x64 layout — on a 32-bit host PE32_SIZE would have to be 556")
 }
 
 Test("keylogger_av_state: PROCESSENTRY32W dwSize must use PE32_SIZE=568 constant (not hardcoded 560)", _PE32_SourceScanCheck)

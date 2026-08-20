@@ -8,7 +8,7 @@
 ; restore it in the finally block, rather than unconditionally calling Critical("Off")
 ; which would clobber a caller already inside a Critical section.
 ;
-; SCOPE: source introspection of lib/hook_dispatcher.ahk.
+; SCOPE: source introspection of infra/hook_dispatcher.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -51,7 +51,7 @@ _HDCS_FuncBody(Src, FnDecl) {
 ; ===================================================
 
 _HDCS_CheckRegisterSaveRestore() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 
 	RegBody := _HDCS_FuncBody(Src, "static Register(")
 	Assert(RegBody != "", "HookDispatcher.Register must be present")
@@ -63,7 +63,7 @@ _HDCS_CheckRegisterSaveRestore() {
 }
 
 _HDCS_CheckUnregisterSaveRestore() {
-	Src := _DriverDirConcat("lib")
+	Src := _DriverDirConcat("infra")
 
 	UnregBody := _HDCS_FuncBody(Src, "static Unregister(")
 	Assert(UnregBody != "", "HookDispatcher.Unregister must be present")

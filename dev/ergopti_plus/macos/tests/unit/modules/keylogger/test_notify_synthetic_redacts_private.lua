@@ -46,8 +46,22 @@ local SECRET = "FR7630006000011234567890189"
 --- unrelated vscode_bridge test, which reads os.getenv("HOME") at module scope.
 ---
 --- So the redaction decision is exported as a pure function and asserted
---- directly, the same way the URL redactor is, and package.loaded is left alone.
+--- directly, the same way the URL redactor is. The unrelated always-on KC file
+--- drain is replaced with an exact in-memory lifecycle owner before each reload;
+--- otherwise a second pure-function case would collide with the first case's
+--- process-lifetime KC singleton and fail before reaching the redaction decision.
 local function keylogger()
+	local running = false
+	package.loaded["modules.keylogger.kc_bridge"] = {
+		init = function(core_state, _pathwatcher, _timer, _log_manager, may_persist)
+			return type(core_state) == "table" and type(may_persist) == "function"
+		end,
+		set_log_manager = function(log_manager) return type(log_manager) == "table" end,
+		start = function() running = true; return true end,
+		stop = function() running = false; return true end,
+		is_running = function() return running end,
+		is_ke_managed_output_kc = function() return false end,
+	}
 	return helpers.load_with_stubs("modules.keylogger", {})
 end
 

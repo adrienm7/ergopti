@@ -36,11 +36,11 @@
 
 
 
-; ==============================================
+; ===============================================
 ; ===============================================
 ; ======= 1/ The timeout clamp must exist =======
 ; ===============================================
-; ==============================================
+; ===============================================
 
 _UPB_TimeoutsAreClamped() {
 	Body := _DriverFuncBody("_TooltipClampUiaTimeouts")
@@ -158,7 +158,7 @@ _UPB_SkippedProbeDoesNotPinCoarseAnchor() {
 ; Enumerated rather than asserted per-site: the recurring defect in this repo is
 ; the missed sibling, so the guard has to cover the class.
 _UPB_ProbeSites() {
-	return ["_TooltipResolvePosition", "_UIA_SelectionPollTick", "SFD_ProbeFocusedUia"]
+	return ["_TooltipResolvePosition", "UIASW_WorkerHandleRequest", "SFD_ProbeFocusedUia"]
 }
 
 _UPB_NoProbeSwallowsFailures() {

@@ -1,215 +1,231 @@
 --- tests/unit/meta/test_injector_race.lua
----
---- Deterministic reproduction of the hotstring injector race: when a physical
---- keystroke arrives during an in-flight ydotool injection, the character can
---- interleave with the synthetic backspaces and replacement text, corrupting
---- the output (the "abcd"→"acd" class of bug).
----
---- Uses the injector._set_runner() test seam to model ydotool commands as
---- mutations on a virtual document string, with no shell or hardware needed.
 
-local helpers  = require("tests.helpers")
-local injector = helpers.load_module("modules.hotstrings.injector")
-
-
--- ==========================================================================
--- Virtual-document runner for the injector test seam
--- ==========================================================================
-
---- Builds a runner function that models ydotool backspace+type commands as
---- mutations on a virtual document table (wrapped so callers share state).
+--- ==============================================================================
+--- MODULE: Injector — the erase-then-type window
+--- DESCRIPTION:
+--- An injection replayed against a virtual document, so the ORDER of what
+--- reaches the application is asserted rather than the shape of a command.
 ---
---- The runner recognises two command patterns:
----   ydotool key 14:1 14:0 ...   → one backspace per down/up pair
----   ydotool type ... -- 'text'  → append the text to the document
+--- ROOT CAUSE ENCODED:
+--- On a match the injector erases the trigger and then types the replacement.
+--- That window is tens of milliseconds, and until the daemon grabbed the device
+--- every key the user kept typing during it went straight to the application and
+--- interleaved with the synthetic stream: "abcd" came out as "acd",
+--- non-deterministically.
 ---
---- @param doc_t   table  Wrapper { value = "initial document string" }
---- @param on_bs   function|nil  Called after each backspace pair with
----                              (bs_index, doc_t) so the test can inject
----                              interleaving characters.
---- @return function  A runner suitable for injector._set_runner().
-local function make_virtual_runner(doc_t, on_bs)
-	return function(cmd)
-		if cmd:match("^ydotool key ") then
-			-- Count backspace down/up pairs in the command.
-			local bs_count = 0
-			for _ in cmd:gmatch("14:1 14:0") do
-				bs_count = bs_count + 1
-			end
-			for i = 1, bs_count do
-				-- Remove one UTF-8 codepoint from the end of the document.
-				if #doc_t.value > 0 then
-					-- Pop the last UTF-8 codepoint.
-					local len = #doc_t.value
-					while len > 0 and doc_t.value:byte(len) >= 0x80 and doc_t.value:byte(len) < 0xC0 do
-						len = len - 1
-					end
-					if len > 0 then
-						doc_t.value = doc_t.value:sub(1, len - 1)
-					end
-				end
-				if on_bs then on_bs(i, doc_t) end
-			end
-			return true
-		elseif cmd:match("^ydotool type ") then
-			-- Extract the replacement text (between the last -- ' and the final ').
-			local text = cmd:match("%-%-%s+'([^']*)'$")
-			if text then
-				doc_t.value = doc_t.value .. text
-			end
-			return true
-		end
-		return false
+--- WHAT CHANGED, AND WHY THE MODEL IS DIFFERENT NOW:
+--- The old version of this file modelled ydotool: it parsed `ydotool key 14:1`
+--- and `ydotool type -- 'text'` out of shell command strings. That model had a
+--- defect of its own — its text pattern could not span the shell escape for an
+--- apostrophe, so a French replacement silently appended NOTHING and the
+--- corruption assertion passed because the document had never been written to.
+---
+--- There are no commands to parse now. The injector writes evdev events to its
+--- own uinput device, so the document is rebuilt from the events themselves, and
+--- an apostrophe is a keystroke like any other.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+-- A layout for the characters these cases type. Keycodes are arbitrary but
+-- distinct: the point is that the injector resolves through the layout table
+-- rather than assuming anything, so any consistent set proves it.
+local LETTERS = "abcdehilorstuwy '"
+local LAYOUT = {}
+local CHAR_OF = {}
+do
+	local next_code = 100
+	for i = 1, #LETTERS do
+		local char = LETTERS:sub(i, i)
+		LAYOUT[char] = { keycode = next_code, level = 1, mods = {} }
+		CHAR_OF[next_code] = char
+		next_code = next_code + 1
 	end
 end
 
+local KEY_BACKSPACE = 14
+local VALUE_DOWN = 1
 
-helpers.describe("injector race (virtual document)", function()
+--- A uinput channel that replays what it is asked to emit into a document.
+--- @param doc table { value = string }
+--- @param on_backspace function|nil Called as (index, doc) after each erase.
+--- @return table channel
+local function virtual_device(doc, on_backspace)
+	local erased = 0
+	return {
+		is_open = function() return true end,
+		emit = function(code, value)
+			-- Only presses change a document; a release is not a character.
+			if value ~= VALUE_DOWN then return true end
 
-	-- ======================================================================
-	-- 1. Basic virtual runner contract
-	-- ======================================================================
-
-	helpers.describe("virtual runner basics", function()
-		helpers.it("applies backspaces by removing chars from the document end", function()
-			local doc = { value = "hello" }
-			local runner = make_virtual_runner(doc)
-			injector._set_runner(runner)
-			injector.inject(2, "")
-			injector._reset_runner()
-			helpers.assert_eq(doc.value, "hel",
-				"2 backspaces on 'hello'")
-		end)
-
-		helpers.it("appends replacement text to the document", function()
-			local doc = { value = "hel" }
-			local runner = make_virtual_runner(doc)
-			injector._set_runner(runner)
-			injector.inject(0, "lo world")
-			injector._reset_runner()
-			helpers.assert_eq(doc.value, "hello world",
-				"type appends replacement")
-		end)
-
-		helpers.it("erases trigger then types replacement (full inject)", function()
-			local doc = { value = "btw" }
-			local runner = make_virtual_runner(doc)
-			injector._set_runner(runner)
-			injector.inject(3, "by the way")
-			injector._reset_runner()
-			helpers.assert_eq(doc.value, "by the way",
-				"full erase-then-type injection")
-		end)
-	end)
-
-	-- ======================================================================
-	-- 2. Race reproduction — interleaving corrupts output
-	-- ======================================================================
-
-	helpers.describe("interleaving race", function()
-		helpers.it("corrupts output when a physical char arrives mid-backspace", function()
-			-- Model: user typed "btw" (trigger). During the 3 backspaces,
-			-- the physical character 'c' arrives after the 2nd backspace.
-			-- Without input queuing, the 'c' is appended between the
-			-- backspaces and the replacement, producing wrong output.
-			local doc = { value = "btw" }
-			local interleaved = false
-			local runner = make_virtual_runner(doc, function(bs_i, d)
-				if bs_i == 2 and not interleaved then
-					interleaved = true
-					d.value = d.value .. "c"  -- physical 'c' lands mid-erase
+			if code == KEY_BACKSPACE then
+				erased = erased + 1
+				-- Pop one UTF-8 codepoint, not one byte.
+				local len = #doc.value
+				while len > 0 and doc.value:byte(len) >= 0x80 and doc.value:byte(len) < 0xC0 do
+					len = len - 1
 				end
-			end)
-
-			injector._set_runner(runner)
-			-- Reset queue state from any prior test.
-			injector._end_injection()
-			injector.inject(3, "by the way")
-			injector._reset_runner()
-
-			-- Without queuing, the result is corrupted:
-			-- "btw" → BS1="bt" → BS2="b" + 'c'="bc" → BS3="b"
-			-- → type "by the way" → "bby the way"
-			-- The correct output after the fix would be "by the wayc".
-			helpers.assert_true(doc.value ~= "by the wayc",
-				"race CORRUPTS output — got '" .. doc.value .. "' instead of 'by the wayc'")
-			helpers.assert_true(interleaved,
-				"interleaving was triggered")
-		end)
-	end)
-
-	-- ======================================================================
-	-- 3. Queuing fix — input queue prevents corruption
-	-- ======================================================================
-
-	helpers.describe("input queuing fix", function()
-		helpers.it("preserves correct output by queuing mid-injection chars", function()
-			-- Same scenario as the race test, but the daemon queues
-			-- characters that arrive during injection and replays them
-			-- after the injection completes.
-			local doc = { value = "btw" }
-			local queued = {}
-			local runner = make_virtual_runner(doc, function(bs_i, d)
-				if bs_i == 2 and #queued == 0 then
-					-- Simulate a physical 'c' arriving mid-injection.
-					-- With queuing, it is NOT appended to doc now.
-					-- Instead it is queued for replay after injection.
-					queued[#queued + 1] = "c"
-				end
-			end)
-
-			-- Begin injection — this arms the queue.
-			injector._begin_injection()
-			injector._set_runner(runner)
-			injector.inject(3, "by the way")
-			injector._reset_runner()
-			-- End injection and drain queued characters.
-			local drained = injector._end_injection()
-
-			-- Merge any queued chars from both the explicit queue
-			-- (simulated physical input) and the drained injector queue.
-			for _, ch in ipairs(drained) do
-				queued[#queued + 1] = ch
-			end
-			for _, ch in ipairs(queued) do
-				doc.value = doc.value .. ch
+				if len > 0 then doc.value = doc.value:sub(1, len - 1) end
+				if on_backspace then on_backspace(erased, doc) end
+				return true
 			end
 
-			-- After the fix, the output is correct:
-			-- "btw" → BS×3=""" → type "by the way" → drain "c" → "by the wayc"
-			helpers.assert_eq(doc.value, "by the wayc",
-				"queuing prevents corruption — 'c' replayed after injection")
+			local char = CHAR_OF[code]
+			if char then doc.value = doc.value .. char end
+			return true
+		end,
+	}
+end
+
+--- Loads the injector with the stub layout and a virtual device installed.
+--- @param doc table
+--- @param on_backspace function|nil
+--- @return table injector
+local function with_document(doc, on_backspace)
+	local layout = helpers.load_module("adapters.keyboard_layout")
+	layout._set_table_for_test(LAYOUT)
+	package.loaded["adapters.keyboard_layout"] = layout
+
+	local injector = helpers.load_module("modules.hotstrings.injector")
+	injector._set_uinput(virtual_device(doc, on_backspace))
+	return injector
+end
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 1/ The two phases reach the document ====================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("injector: erase then type, against a virtual document", function()
+
+	helpers.it("removes exactly as many characters as it was asked to", function()
+		local doc = { value = "hello" }
+		with_document(doc).inject(2, "")
+		helpers.assert_eq(doc.value, "hel", "two backspaces on 'hello'")
+	end)
+
+	helpers.it("appends the replacement", function()
+		local doc = { value = "hel" }
+		with_document(doc).inject(0, "lo world")
+		helpers.assert_eq(doc.value, "hello world", "the replacement is typed, character by character")
+	end)
+
+	helpers.it("erases before it types", function()
+		local doc = { value = "btw" }
+		with_document(doc).inject(3, "by the way")
+		-- Typing first would delete the replacement's own tail instead of the
+		-- trigger, which reads as a truncated expansion rather than as an ordering
+		-- bug.
+		helpers.assert_eq(doc.value, "by the way", "the whole expansion, and nothing of the trigger")
+	end)
+
+	helpers.it("types an apostrophe like any other character", function()
+		local doc = { value = "" }
+		with_document(doc).inject(0, "it's")
+		-- The old model could not express this: its command-parsing pattern could
+		-- not span the shell escape for a quote, so a French replacement appended
+		-- nothing at all and every assertion about the result passed vacuously.
+		helpers.assert_eq(doc.value, "it's",
+			"an apostrophe is a keystroke now, not a shell-quoting problem")
+	end)
+
+	helpers.it("does nothing at all for a non-string replacement", function()
+		local doc = { value = "keep" }
+		with_document(doc).inject(2, nil)
+		helpers.assert_eq(doc.value, "keep",
+			"a malformed call must not erase — the guard runs before the first backspace")
+	end)
+
+	helpers.it("erases nothing for a zero or negative count", function()
+		local doc = { value = "keep" }
+		local injector = with_document(doc)
+		injector.inject(0, "")
+		injector.inject(-3, "")
+		helpers.assert_eq(doc.value, "keep", "there is nothing to erase")
+	end)
+
+end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 2/ A keystroke arriving mid-injection ===================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("injector: input arriving during the erase window", function()
+
+	helpers.it("corrupts the document when the keystroke is applied directly", function()
+		-- The defect, modelled. The user typed "btw" and keeps typing: a physical
+		-- "c" lands after the second backspace. Applied directly it sits between
+		-- the erase and the replacement:
+		--   "btw" → "bt" → "b" + "c" = "bc" → "b" → "by the way" = "bby the way"
+		local doc = { value = "btw" }
+		local landed = false
+		local injector = with_document(doc, function(index, d)
+			if index == 2 and not landed then
+				landed = true
+				d.value = d.value .. "c"
+			end
+		end)
+		injector._end_injection()
+		injector.inject(3, "by the way")
+
+		helpers.assert_true(landed, "the interleaving must actually have been simulated")
+		helpers.assert_eq(doc.value, "bby the way",
+			"named exactly, not merely asserted to differ from the correct answer: a "
+				.. "~= check passes when the document was never written at all, which "
+				.. "is how the previous version of this test passed for years")
+	end)
+
+	helpers.it("preserves the document when the keystroke is queued instead", function()
+		local doc = { value = "btw" }
+		local queued = {}
+		local injector = with_document(doc, function(index)
+			if index == 2 and #queued == 0 then
+				-- With the queue armed the daemon holds the character instead of
+				-- letting it reach the engine mid-injection.
+				queued[#queued + 1] = "c"
+			end
 		end)
 
-		helpers.it("_is_injecting flag reflects injection state", function()
-			injector._end_injection()  -- reset
-			helpers.assert_true(not injector._is_injecting(),
-				"not injecting before begin")
-			injector._begin_injection()
-			helpers.assert_true(injector._is_injecting(),
-				"injecting after begin")
-			injector._end_injection()
-			helpers.assert_true(not injector._is_injecting(),
-				"not injecting after end")
-		end)
+		injector._begin_injection()
+		injector.inject(3, "by the way")
+		for _, ch in ipairs(injector._end_injection()) do queued[#queued + 1] = ch end
+		for _, ch in ipairs(queued) do doc.value = doc.value .. ch end
 
-		helpers.it("_queue_char is a no-op when not injecting", function()
-			injector._end_injection()  -- reset
-			injector._queue_char("x")
-			local drained = injector._end_injection()
-			helpers.assert_eq(#drained, 0,
-				"queue is empty when not injecting")
-		end)
+		helpers.assert_eq(doc.value, "by the wayc",
+			"the replacement, then what the user typed during it, in that order")
+	end)
 
-		helpers.it("_queue_char stores chars when injecting", function()
-			injector._end_injection()  -- reset
-			injector._begin_injection()
-			injector._queue_char("a")
-			injector._queue_char("b")
-			local drained = injector._end_injection()
-			helpers.assert_eq(drained, {"a", "b"},
-				"queued chars returned in arrival order")
-		end)
+	helpers.it("reports whether an injection is in flight", function()
+		local doc = { value = "" }
+		local injector = with_document(doc)
+		injector._end_injection()
+		helpers.assert_eq(injector._is_injecting(), false, "nothing in flight to start with")
+		injector._begin_injection()
+		helpers.assert_eq(injector._is_injecting(), true, "armed")
+		injector._end_injection()
+		helpers.assert_eq(injector._is_injecting(), false, "and disarmed")
+	end)
+
+	helpers.it("drops characters queued by a previous injection", function()
+		local doc = { value = "" }
+		local injector = with_document(doc)
+		injector._begin_injection()
+		injector._queue_char("x")
+		injector._begin_injection()
+		helpers.assert_eq(#injector._end_injection(), 0,
+			"a stale character replayed into the next expansion appears from nowhere, "
+				.. "long after the keystroke that produced it")
 	end)
 
 end)

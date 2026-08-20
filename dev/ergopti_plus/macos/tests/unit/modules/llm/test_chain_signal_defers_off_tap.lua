@@ -28,8 +28,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["lib.logger"] = nil
-helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+helpers.load_with_stubs("infra.logger")
 
 -- Minimal core_llm surface: prediction_engine reads DEFAULT_STATE at load time
 -- and queries the backend during perform_check, which this test never reaches.
@@ -44,7 +44,7 @@ package.loaded["modules.llm"] = {
 	},
 	get_current_model = function() return "llama3" end,
 	get_backend       = function() return "ollama" end,
-	cancel_streaming  = function() end,
+	cancel_streaming  = function() return true end,
 	fetch_llm_prediction = function() end,
 }
 -- The real export is is_blocked(state, apps, url_filter, secure_filter): the very
@@ -54,33 +54,33 @@ package.loaded["modules.llm.app_filter"] = {
 	is_blocked = function(_state, _apps, _url, _secure) return false end,
 }
 package.loaded["modules.llm.streaming_handler"] = {
-	init                = function(_cfg) end,
+	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) end,
-	stop_watchdog       = function() end,
+	arm_watchdog        = function(_cfg) return true end,
+	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
-	cancel_streaming    = function() end,
+	cancel_streaming    = function() return true end,
 }
 package.loaded["modules.llm.api_common"] = {
 	MIN_CALL_INTERVAL_SEC         = 0.5,
 	get_retry_policy              = function() return 2, 0.18, 5 end,
 	get_rate_limit_min_interval_s = function(_backend) return 0 end,
 }
-package.loaded["lib.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
-package.loaded["lib.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+package.loaded["infra.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
+package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 -- set_navigate_callback and set_enter_validates are called at module load time.
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
-	set_chain_start       = function(_) end,
+	set_chain_start       = function(_) return true end,
 	mark_chain_complete   = function() end,
 	get_current_index     = function() return nil end,
 	navigate              = function(_) end,
 	show                  = function() end,
-	hide                  = function() end,
+	hide                  = function() return true end,
 	set_llm_timeout       = function(_) end,
 	reset_llm_timer       = function() end,
-	show_loading          = function(...) end,
+	show_loading          = function(...) return true end,
 	show_predictions      = function(...) end,
 	tint                  = function(_) return nil end,
 }
@@ -150,4 +150,48 @@ helpers.describe("F16 chain signal defers the LLM check off the event tap", func
 			"handle_chain_signal must keep returning true so the synthetic F16 is swallowed "
 			.. "and never reaches the buffer as a real keystroke")
 	end)
+
+	for _, case in ipairs({
+		{ name = "throw", build = function() error("CHAIN_DEFER_THROW") end },
+		{ name = "nil", build = function() return nil end },
+		{
+			name = "stopped handle",
+			build = function(original, delay, callback)
+				local timer = original(delay, callback)
+				timer.running = false
+				return timer
+			end,
+		},
+	}) do
+		helpers.it("retains the fallback when F16 deferral returns " .. case.name, function()
+			PE.reset()
+			PE.init({
+				buffer = "hello wor",
+				mappings = {},
+				DELAYS = { llm_prediction = 0 },
+				suppress_rescan_keep_buffer = function() end,
+			})
+			helpers.assert_eq(PE.arm_chain(), true)
+			local fallback = hs.timer.__timers[#hs.timer.__timers]
+			local calls = 0
+			local real_perform = PE.perform_check
+			PE.perform_check = function() calls = calls + 1 end
+			local original = hs.timer.doAfter
+			hs.timer.doAfter = function(delay, callback)
+				return case.build(original, delay, callback)
+			end
+
+			local ok, consumed = pcall(PE.handle_chain_signal, PE.KEYCODE_LLM_CHAIN)
+			hs.timer.doAfter = original
+			helpers.assert_true(ok, "F16 constructor failure must not escape the eventtap")
+			helpers.assert_eq(consumed, true,
+				"the internal F16 signal must never leak to the application")
+			helpers.assert_eq(PE.is_chain_pending(), true,
+				"the already-owned fallback remains authoritative")
+			fallback:fire()
+			helpers.assert_eq(calls, 1,
+				"exactly one chained check must survive through the retained fallback")
+			PE.perform_check = real_perform
+		end)
+	end
 end)

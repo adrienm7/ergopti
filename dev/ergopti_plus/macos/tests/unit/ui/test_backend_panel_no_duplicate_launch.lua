@@ -23,10 +23,11 @@ local helpers = require("tests.helpers")
 helpers.describe("backend_panel: no duplicate MLX server launch on backend switch", function()
 
 	helpers.it("source does not call force_mlx_check after switch_model", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_llm/backend_panel.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "backend_panel.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_llm/backend_panel.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("\"menu.llm.backend_ollama_suffix\"")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/backend_panel.lua source must be locatable")
 
 		-- The fix removes the redundant force_mlx_check call that launched a second
 		-- server immediately after switch_model already started one.
@@ -36,10 +37,11 @@ helpers.describe("backend_panel: no duplicate MLX server launch on backend switc
 	end)
 
 	helpers.it("source still calls switch_model for the MLX target model", function()
-		local src_path = helpers.driver_root() .. "ui/menu/menu_llm/backend_panel.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "backend_panel.lua must be readable")
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_llm/backend_panel.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("\"menu.llm.backend_ollama_suffix\"")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/backend_panel.lua source must be locatable")
 
 		helpers.assert_true(
 			src:find("switch_model(target_model)", 1, true) ~= nil,

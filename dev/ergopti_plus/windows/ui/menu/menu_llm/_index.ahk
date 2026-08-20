@@ -111,14 +111,14 @@ global LLM_HEALTH_PROBE_THROTTLE_MS := 3000
 
 
 
-; ============================
+; =============================
 ; =============================
 ; ======= 2/ Tray State =======
 ; =============================
-; ============================
+; =============================
 
 ; Initial values are replaced at startup by LLM_Menu_ApplySharedDefaults()
-; which reads from the shared defaults.json via LLM_Defaults (lib/llm_defaults.ahk).
+; which reads from the shared defaults.json via LLM_Defaults (infra/llm_defaults.ahk).
 ; String fields use "" as placeholder — ApplySharedDefaults() overwrites them.
 global _LLM_Menu := Map(
 	"enabled",                    false,
@@ -272,18 +272,15 @@ global _LLM_Menu_Loaded  := false
 ; short so the dropdown is ready almost immediately for a user who opens it.
 global LLM_MENU_BUILD_DEFER_MS := 200
 
-; Active trigger hotkey object — deleted and recreated on every shortcut change
-global _LLM_Menu_TriggerHk := unset
 
 
 
 
-
-; ===================================
+; ====================================
 ; ====================================
 ; ======= 3/ Sub-module Wiring =======
 ; ====================================
-; ===================================
+; ====================================
 
 ; Order is non-binding for AHK v2 — functions and globals from #Include files
 ; are merged into the main script before any user code runs, so any sub-module
@@ -291,11 +288,14 @@ global _LLM_Menu_TriggerHk := unset
 ; (init → build → action handlers) purely for human readability.
 
 #Include persist.ahk
+#Include transactions.ahk
 #Include init.ahk
 #Include menu_main.ahk
 #Include menu_models.ahk
 #Include menu_api_entries.ahk
 #Include menu_profiles.ahk
+#Include trigger_journal.ahk
+#Include trigger_shortcut.ahk
 #Include menu_settings.ahk
 #Include actions.ahk
 #Include tab_accept.ahk

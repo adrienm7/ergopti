@@ -55,28 +55,32 @@ LuaJIT instead of Rust.
 
 ```
 linux/
-  adapters/              9 port adapters (one per _shared/core/ports/*.spec.js)
-  modules/
-    hotstrings/
-      engine.lua         Pure-Lua trigger matching (HotstringMatcher spec)
-      loader.lua         TOML hotstring definition loader
-      injector.lua       Backspace + text injection via ydotool
-      input_reader.lua   Raw evdev binary reader (/dev/input/eventN)
-      device_finder.lua  Auto-detect keyboard from /proc/bus/input/devices
-    keylogger/
-      metrics_collector.lua  WPM, n-grams, session stats (pure Lua)
-  ergopti_hotstrings.lua Daemon entry point (CLI: --config --device --layout)
-  install.sh             Standalone installer (apt/dnf/pacman)
+  ergopti_hotstrings.lua      Daemon entry point (CLI: --config --device --layout --tray)
+  adapters/                   22 files: the 20 port implementations + shell_runner + event_loop
+  lib/                        6 files: file_watchers, i18n, locale, monotonic, timings, version
+  modules/                    11 feature folders — see modules/README.md for the measured table
+  ui/                         webkit_host.lua (WebKitGTK page builder)
+  install.sh                  Standalone installer (apt/dnf/pacman)
   ergopti-hotstrings.service  systemd user unit
   bin/
-    ergopti-hotstrings   Shell wrapper (sets LUA_PATH, checks deps)
+    ergopti-hotstrings        Shell wrapper (sets LUA_PATH, checks deps)
+  _generated/                 Codegen output
   tests/
-    helpers.lua          Assertion + describe/it harness
-    run.lua              Auto-discovers test_*.lua recursively
-    unit/meta/
-      test_port_adapter_presence.lua
-  vendor/                Bundled third-party Lua libs (not in git)
+    helpers.lua               Assertion + describe/it harness
+    run.lua                   Auto-discovers test_*.lua under tests/unit
+    unit/                     unit + meta tests
+    e2e/run_e2e.lua           corpus-driven end-to-end harness
+  vendor/                     Bundled third-party Lua libs (not in git)
 ```
+
+> ⚠ **Eleven of the 22 adapters have no production consumer** (≈ 1 750 lines):
+> `tooltip_renderer`, `graphics_renderer`, `window_manager`, `clipboard`,
+> `secure_field_detector`, `network_info`, `mouse_control`, `notifier`, `key_state`,
+> `app_launcher`, `crypto`. They are implemented and unit-tested but no Linux feature
+> calls them, so there is currently no tooltip surface, no notification, no clipboard
+> action and no window management on Linux. The `secure_field_detector` case is
+> **deliberate** — see the comment at `modules/keylogger/keylogger.lua:90-98`:
+> delegating to it would *narrow* password-app coverage and leak keystrokes.
 
 ## Running the daemon
 
@@ -120,10 +124,10 @@ a systemd user service.
 | Hotstrings + metrics     | ✅                   | ✅                     | evdev read works on both; injection via ydotool     |
 | Text injection           | ✅ ydotool           | ✅ ydotool             | Requires `ydotoold` daemon + uinput permissions     |
 | Window info (active app) | ✅ xdotool           | ⚠️ compositor-specific | No universal Wayland protocol                       |
-| Tray icon                | ✅ SNI               | ⚠️ partial             | GNOME Wayland needs AppIndicator extension          |
-| Tooltip overlay          | ✅ cairo window      | ❌ protocol blocks it  | Use notify-send as fallback on Wayland              |
-| Secure field detection   | ⚠️ AT-SPI2           | ❌ not standardised    | Keylogger disabled by default; opt-in only          |
-| Config UI                | ➡️ ergopti.com WebUI | ➡️ same                | No native GUI planned                               |
+| Tray icon                | ✅ SNI               | ⚠️ partial             | Every packaged systemd unit passes `--tray` (pinned by `test:linux-package-layout`); a manual launch without it runs headless and says so in the log. GNOME Wayland also needs the AppIndicator extension |
+| Tooltip overlay          | ❌ not implemented   | ❌ not implemented     | no hotstring preview, no LLM prediction preview. The `yad`/`zenity` adapter that existed for it was deleted under ADR-008: it had zero callers, so it was a claim rather than an implementation |
+| Secure field detection   | ❌ not wired         | ❌ not standardised    | The AT-SPI adapter has no consumer; the only protection is a substring match on eight hardcoded app names, and the keylogger **cannot be turned off** |
+| Config UI                | ⚠️ WebKitGTK, 3 of 14 windows | ⚠️ same       | `modules/ui/` hosts the shared webviews, but only `healthcheck`, `onboarding` and `hotstrings_config_window` are ever opened |
 
 ## Distribution support
 

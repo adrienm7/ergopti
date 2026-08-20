@@ -16,7 +16,7 @@
 #    Homebrew is already there. Either path lands a usable `ollama` binary.
 # 2. Server lifecycle: after the binary is installed, queries
 #    http://localhost:11434/api/tags. If the server is not running, launches
-#    `ollama serve` in the background (detached, redirected to /tmp/ergopti.log)
+#    the canonical Lua-built `ollama serve` logging pipeline in the background
 #    and waits up to OLLAMA_READY_TIMEOUT_SEC seconds for it to come online.
 # 3. Streaming markers: emits identifiable lines on stdout (OLLAMA_INSTALLING,
 #    OLLAMA_STARTING, OLLAMA_READY) so the Lua side can map each to a precise
@@ -47,10 +47,10 @@ OLLAMA_READY_TIMEOUT_SEC=20
 # liveness signal that does not depend on any model already being present.
 OLLAMA_HEALTH_URL="http://localhost:11434/api/tags"
 
-# Path to the unified log file used by Hammerspoon. Spawning `ollama serve`
-# with stdout/stderr appended here means `tail -f /tmp/ergopti.log` shows
-# the server output alongside the rest of the stack.
-UNIFIED_LOG="/tmp/ergopti.log"
+# The Lua caller passes the same server/logging pipeline used by the normal API
+# and model-manager launch paths. It is one argv item, not reassembled here.
+OLLAMA_SERVER_COMMAND="${1:-}"
+OLLAMA_RESOLVED_BIN="${2:-}"
 
 
 # ------------------------------------------------------------------------------
@@ -99,7 +99,12 @@ wait_for_server() {
 # ====================================
 # ====================================
 
-if ! command -v ollama >/dev/null 2>&1; then
+if [ -n "$OLLAMA_RESOLVED_BIN" ]; then
+	if [ ! -x "$OLLAMA_RESOLVED_BIN" ]; then
+		log_error "The driver-resolved Ollama executable is no longer executable."
+		exit 1
+	fi
+elif ! command -v ollama >/dev/null 2>&1; then
 	emit_marker "OLLAMA_INSTALLING"
 	log_info "Installation automatique d’Ollama…"
 
@@ -148,14 +153,17 @@ fi
 emit_marker "OLLAMA_STARTING"
 log_info "Démarrage du serveur Ollama en arrière-plan…"
 
-# Spawn the server fully detached so it survives this script's exit.
-# Output is appended to the unified log so `tail -f /tmp/ergopti.log` shows
-# the server's startup banner and any subsequent runtime errors.
-nohup ollama serve >>"$UNIFIED_LOG" 2>&1 &
+# Spawn the server fully detached so it survives this script's exit. The
+# supplied pipeline derives the dated unified-log filename per output line.
+if [ -z "$OLLAMA_SERVER_COMMAND" ]; then
+	log_error "Ollama server command was not supplied by the driver."
+	exit 1
+fi
+nohup /bin/bash -c "$OLLAMA_SERVER_COMMAND" </dev/null >/dev/null 2>&1 &
 disown 2>/dev/null || true
 
 if ! wait_for_server; then
-	log_error "Le serveur Ollama n'a pas répondu dans les ${OLLAMA_READY_TIMEOUT_SEC}s — voir $UNIFIED_LOG."
+	log_error "Ollama did not respond within ${OLLAMA_READY_TIMEOUT_SEC}s; inspect the ErgoptiPlus unified log."
 	exit 1
 fi
 

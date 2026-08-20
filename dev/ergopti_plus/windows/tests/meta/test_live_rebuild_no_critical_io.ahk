@@ -20,21 +20,27 @@
 #Requires AutoHotkey v2.0
 
 _LRNC_NoCriticalAcrossRegistration() {
-	Body := _DriverFuncBody("RebuildHotstringsLive")
-	Assert(Body != "", "RebuildHotstringsLive must exist in ui/menu/menu_rebuild.ahk")
+	Body := _DriverFuncBody("_RebuildHotstringsLiveOnce")
+	Assert(Body != "", "the serialized live-rebuild pass must exist in ui/menu/menu_rebuild.ahk")
+	DrainBody := _DriverFuncBody("_HSLR_DrainOwner")
+	Assert(DrainBody != "", "the live-rebuild owner drain must exist")
+	AcquireBody := _DriverFuncBody("_HSLR_RequestAndTryAcquire")
+	Assert(AcquireBody != "",
+		"the live-rebuild owner acquisition helper must exist")
 
-	FencePos := InStr(Body, "HSE_RebuildInProgress := true")
 	RegPos := InStr(Body, "RegisterAllHotstrings()")
-	Assert(FencePos > 0 && RegPos > FencePos,
-		"RebuildHotstringsLive must raise the HSE_RebuildInProgress fence before re-registering")
+	Assert(InStr(AcquireBody, "HSE_RebuildInProgress := true") > 0 && RegPos > 0,
+		"the coordinator must raise HSE_RebuildInProgress before entering the registration pass")
 	Assert(InStr(Body, "Critical(") = 0,
 		"RebuildHotstringsLive must NOT hold Critical across RegisterAllHotstrings — that span includes directory enumeration and TOML reads, and it froze the keyboard on every tray toggle")
+	Assert(InStr(DrainBody, "Critical(") = 0,
+		"the coordinator drain must not re-wrap the injected or production rebuild body in Critical")
 
 	; The fence is what makes dropping Critical safe: the matcher must bail while set.
 	Match := _DriverFuncBody("HSE_FindMatchAtEnd")
-	Assert(Match != "", "HSE_FindMatchAtEnd must exist in lib/hotstrings/hotstring_match.ahk")
+	Assert(Match != "", "HSE_FindMatchAtEnd must exist in infra/hotstrings/hotstring_match.ahk")
 	Assert(InStr(Match, "HSE_RebuildInProgress") > 0,
 		"HSE_FindMatchAtEnd must return no match while HSE_RebuildInProgress is set — that fence replaces the removed Critical, so an OnChar never sees a half-built registry")
 }
-Test("menu: live hotstring rebuild does not hold Critical across registration I/O",
+Test("menu: live hotstring rebuild does not hold Critical across registration I/O (live-rebuild-no-critical-io)",
 	_LRNC_NoCriticalAcrossRegistration)

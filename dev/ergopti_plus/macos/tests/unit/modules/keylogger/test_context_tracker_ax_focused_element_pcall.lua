@@ -24,8 +24,8 @@ local helpers = require("tests.helpers")
 --- while the script is paused. These scenarios exercise the RUNNING state.
 local function NOT_PAUSED() return false end
 
-package.loaded["lib.logger"] = nil
-local _ = helpers.load_with_stubs("lib.logger")
+package.loaded["infra.logger"] = nil
+local _ = helpers.load_with_stubs("infra.logger")
 
 --- Builds an hs override that stubs hs.axuielement with an application element
 --- whose AXFocusedUIElement attributeValue() read throws.
@@ -74,9 +74,11 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 		local core_state = {}
 		CT.init(core_state, {}, NOT_PAUSED)
 
-		local ok = pcall(CT.update_ax_observer, 12345)
+		local ok, err = pcall(CT.update_ax_observer, 12345)
 
 		helpers.assert_true(ok, "update_ax_observer must not propagate an error from a throwing AX read")
+		helpers.assert_nil(err, "and must report no error — this runs on the focus watcher, "
+			.. "so one escaping error takes the whole context tracker down")
 		helpers.assert_true(core_state.ax_observer ~= nil,
 			"_state.ax_observer must still be set to a valid observer despite the AX read failing")
 	end)
@@ -112,9 +114,10 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 		local core_state = {}
 		CT.init(core_state, {}, NOT_PAUSED)
 
-		local ok = pcall(CT.update_ax_observer, 6789)
+		local ok, err = pcall(CT.update_ax_observer, 6789)
 
 		helpers.assert_true(ok, "update_ax_observer must succeed when the AX read succeeds")
+		helpers.assert_nil(err, "the happy-path control for the throwing case above")
 		helpers.assert_true(core_state.ax_observer ~= nil, "_state.ax_observer must be set on the success path")
 	end)
 end)
@@ -132,10 +135,11 @@ end)
 helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guard (F-HIGH-27)", function()
 
 	helpers.it("the AXFocusedUIElement read inside update_ax_observer is wrapped in pcall", function()
-		local path = helpers.driver_root() .. "modules/keylogger/context_tracker.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open context_tracker.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/context_tracker.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function update_secure_field_state")
+		helpers.assert_true(src ~= nil, "modules/keylogger/context_tracker.lua source must be locatable")
 
 		local fn_start = src:find("function M.update_ax_observer", 1, true)
 		helpers.assert_true(fn_start ~= nil, "update_ax_observer must still exist")
@@ -149,10 +153,11 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 	end)
 
 	helpers.it("keylogger uses the guarded ProcessLifecycle application watcher", function()
-		local init_path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local init_fh = io.open(init_path, "r")
-		helpers.assert_true(init_fh ~= nil, "cannot open keylogger/init.lua at " .. tostring(init_path))
-		local init_src = init_fh:read("*a"); init_fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local init_src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(init_src ~= nil, "modules/keylogger/init.lua source must be locatable")
 
 		helpers.assert_true(
 			init_src:find("ProcessLifecycle.onAppActivate", 1, true) ~= nil
@@ -160,14 +165,14 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 			"keylogger must register application activation through ProcessLifecycle"
 		)
 
-		local adapter_path = helpers.driver_root() .. "adapters/process_lifecycle.lua"
-		local adapter_fh = io.open(adapter_path, "r")
-		helpers.assert_true(adapter_fh ~= nil, "cannot open process_lifecycle.lua at " .. tostring(adapter_path))
-		local adapter_src = adapter_fh:read("*a"); adapter_fh:close()
-		local guard_pos = adapter_src:find("pcall(function()", 1, true)
-		local watcher_pos = adapter_src:find("_app_watcher = hs.application.watcher.new", 1, true)
+		-- Selected by a declaration unique to adapters/process_lifecycle.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local adapter_src = helpers.read_driver_source("function M.getForegroundApp")
+		helpers.assert_true(adapter_src ~= nil, "adapters/process_lifecycle.lua source must be locatable")
 		helpers.assert_true(
-			guard_pos ~= nil and watcher_pos ~= nil and guard_pos < watcher_pos,
+			adapter_src:find(
+				"xpcall%(function%(%)%s*return%s+hs%.application%.watcher%.new", 1, false) ~= nil,
 			"ProcessLifecycle must create hs.application.watcher inside a pcall guard"
 		)
 	end)

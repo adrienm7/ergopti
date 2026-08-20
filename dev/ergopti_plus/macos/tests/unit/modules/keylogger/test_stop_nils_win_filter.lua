@@ -14,11 +14,11 @@
 
 local helpers = require("tests.helpers")
 
-local function read_source(rel)
-	local fh = io.open(helpers.driver_root() .. rel, "r")
-	assert(fh, "cannot open " .. rel)
-	local src = fh:read("*a")
-	fh:close()
+-- Takes a selector unique to one production file rather than that file's
+-- path, so moving or splitting a module cannot turn these invariants into
+-- path errors.
+local function read_source(selector)
+	local src = helpers.read_driver_source(selector)
 	return src
 end
 
@@ -40,7 +40,7 @@ end
 helpers.describe("keylogger/init.lua: M.stop() nils watcher locals", function()
 
 	helpers.it("_win_filter is nilled after unsubscribeAll in M.stop()", function()
-		local src = strip_comments(read_source("modules/keylogger/init.lua"))
+		local src = strip_comments(read_source("local function ensure_browser_window_filter"))
 		-- The pattern must show: unsubscribeAll() followed by _win_filter = nil
 		-- on the same line or in the same block
 		helpers.assert_true(
@@ -50,14 +50,14 @@ helpers.describe("keylogger/init.lua: M.stop() nils watcher locals", function()
 	end)
 
 	helpers.it("_event_tap is nilled after stop() in M.stop()", function()
-		local src = strip_comments(read_source("modules/keylogger/init.lua"))
+		local src = strip_comments(read_source("local function ensure_browser_window_filter"))
 		helpers.assert_true(
 			src:find("_event_tap%s*=%s*nil") ~= nil,
 			"M.stop() must nil _event_tap after stopping it")
 	end)
 
 	helpers.it("stops the app-activation lifecycle in M.stop()", function()
-		local src = strip_comments(read_source("modules/keylogger/init.lua"))
+		local src = strip_comments(read_source("local function ensure_browser_window_filter"))
 		helpers.assert_true(
 			src:find("ProcessLifecycle:stop%(%s*%)") ~= nil
 				or src:find("ProcessLifecycle%.stop%(%s*%)") ~= nil,

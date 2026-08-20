@@ -18,6 +18,7 @@
 
 global _HCWGui      := 0
 global _HCWWidgets  := 0
+global _HCW_LastSelection := 0
 
 ; Debounce window for the numeric Edit fields (delay / priority). Their "Change"
 ; event fires on every keystroke, but persisting on every digit rewrites the
@@ -25,12 +26,13 @@ global _HCWWidgets  := 0
 ; TOML) per character. We coalesce a burst of edits into a single write fired
 ; once the user pauses typing. Negative value = one-shot SetTimer.
 global _HCW_NUMERIC_DEBOUNCE_MS := 250
-; Pending debounced numeric write captured at arm time:
-; { Field, Entry, Sec, Value }. Each keystroke re-arms it with the latest
-; widget value AND the still-current selection, so the final value lands on the
-; entry the user was actually editing even if they switch selection or close the
-; window before the timer fires. 0 when no write is pending.
-global _HCW_PendingNumericWrite := 0
+; Pending debounced numeric writes captured at arm time:
+; [{ Field, Entry, Sec, Value }, ...]. Repeated edits replace only the matching
+; entry/section/field item; distinct fields remain queued for the shared flush.
+; The captured selection ensures each value lands on the entry the user was
+; actually editing even if selection changes before the timer fires.
+global _HCW_PendingNumericWrites := []
+global _HCW_NumericDrainActive := false
 
 ; Unified entry list — rebuilt each time the window opens.
 ; Shape: { Key, Label, Path, IsPersonal, IsExtension, ExtId, ExtName, Group }
@@ -160,10 +162,11 @@ _HCW_BuildCategoryList() {
 	}
 
 	; --- Extension TOML files ---
-	; Resolve extensions root relative to the driver's static/ ancestor
-	SplitPath(A_ScriptDir, , &DriversDir)
-	SplitPath(DriversDir, , &StaticDir)
-	ExtRoot := StaticDir . "\extensions\"
+	; One resolver, set by the entry point. This site used to walk two levels up
+	; from A_ScriptDir and land on static/, which has held no extensions/ since the
+	; reorg; DirExist() then turned the miss into a silent no-op.
+	global _ExtensionsDir
+	ExtRoot := _ExtensionsDir . "\"
 	if DirExist(ExtRoot) {
 		ExtDirNames := []
 		Loop Files, ExtRoot . "*", "D" {
@@ -283,6 +286,124 @@ _HCW_FmtMs(Ms) {
 ; ============================================================
 ; ============================================================
 
+_HCW_FindItemIndexByProperty(Items, Property, Value, FallbackIndex := 1) {
+	for Index, Item in Items {
+		if (Item.%Property% == Value)
+			return Index
+	}
+	if (Items.Length == 0 || FallbackIndex == 0)
+		return 0
+	return Min(Max(FallbackIndex, 1), Items.Length)
+}
+
+_HCW_CaptureSelection() {
+	Entry := _HCW_SelectedEntry()
+	return {
+		GroupKey: _HCW_SelectedGroupKey(),
+		EntryKey: Entry.Key,
+		SectionName: _HCW_SelectedSection(Entry)
+	}
+}
+
+; Gate a user-visible transition on its pending-draft drain. A false result is
+; an expected persistence refusal already reported by the drain; an exception
+; is contained here because GUI callbacks otherwise escape into the driver.
+_HCW_DrainBeforeTransition(DrainFn, RestoreFn := 0) {
+	DrainOk := false
+	try {
+		Result := HasMethod(DrainFn, "Call") ? DrainFn.Call() : false
+		DrainOk := (Result is Integer) && Result == 1
+	} catch as Err {
+		try LoggerError("HotstringsConfigWindow",
+			"Draft drain raised before a UI transition: {1}.", Err.Message)
+		try ConfigReportPersistenceFailure("the hotstrings configuration draft")
+	}
+	if DrainOk
+		return true
+	if HasMethod(RestoreFn, "Call") {
+		try RestoreFn.Call()
+		catch as Err {
+			try LoggerError("HotstringsConfigWindow",
+				"Selection restore failed after a refused draft drain: {1}.", Err.Message)
+		}
+	}
+	return false
+}
+
+_HCW_RestoreSelectionControl(Level, Selection) {
+	global _HCWWidgets, _HCW_GROUP_LIST
+	if !IsObject(Selection)
+		return false
+	if (Level == "group") {
+		Index := _HCW_FindItemIndexByProperty(
+			_HCW_GROUP_LIST, "Key", Selection.GroupKey)
+		_HCWWidgets.GroupDD.Choose(Index)
+		return true
+	}
+	Files := _HCW_FilesForGroup(Selection.GroupKey)
+	if (Level == "file") {
+		Index := _HCW_FindItemIndexByProperty(
+			Files, "Key", Selection.EntryKey)
+		_HCWWidgets.FileDD.Choose(Index)
+		return true
+	}
+	EntryIndex := _HCW_FindItemIndexByProperty(
+		Files, "Key", Selection.EntryKey)
+	Sections := _HCW_GetSections(Files[EntryIndex])
+	SectionIndex := _HCW_FindItemIndexByProperty(
+		Sections, "Name", Selection.SectionName, 0)
+	_HCWWidgets.SecDD.Choose(SectionIndex > 0 ? SectionIndex + 1 : 1)
+	return true
+}
+
+; Rebuild every selector from the fresh catalogue, restoring the user's place
+; by stable keys rather than by stale dropdown indexes. If the selected source
+; disappeared, fall back to the always-populated common group.
+_HCW_RefreshExistingControls(Selection) {
+	global _HCWWidgets, _HCW_GROUP_LIST, _HCW_FILE_LEVEL_LABEL
+	GroupIndex := _HCW_FindItemIndexByProperty(
+		_HCW_GROUP_LIST, "Key", Selection.GroupKey)
+	GroupKey := _HCW_GROUP_LIST[GroupIndex].Key
+	Files := _HCW_FilesForGroup(GroupKey)
+	if (Files.Length == 0) {
+		GroupIndex := _HCW_FindItemIndexByProperty(
+			_HCW_GROUP_LIST, "Key", "common")
+		GroupKey := _HCW_GROUP_LIST[GroupIndex].Key
+		Files := _HCW_FilesForGroup(GroupKey)
+	}
+
+	_HCWWidgets.GroupDD.Delete()
+	_HCWWidgets.GroupDD.Add(_HCW_GroupItems())
+	_HCWWidgets.GroupDD.Choose(GroupIndex)
+
+	FileItems := []
+	for _, Entry in Files
+		FileItems.Push(Entry.Label)
+	_HCWWidgets.FileDD.Delete()
+	_HCWWidgets.FileDD.Add(FileItems)
+	FileIndex := _HCW_FindItemIndexByProperty(
+		Files, "Key", Selection.EntryKey)
+	_HCWWidgets.FileDD.Choose(FileIndex)
+
+	Entry := Files[FileIndex]
+	Sections := _HCW_GetSections(Entry)
+	SectionItems := [_HCW_FILE_LEVEL_LABEL]
+	for _, Sec in Sections
+		SectionItems.Push(Sec.Title . "  —  " . Sec.Name)
+	_HCWWidgets.SecDD.Delete()
+	_HCWWidgets.SecDD.Add(SectionItems)
+	SectionIndex := 1
+	if (Selection.SectionName != "") {
+		FoundSection := _HCW_FindItemIndexByProperty(
+			Sections, "Name", Selection.SectionName, 0)
+		if (FoundSection > 0)
+			SectionIndex := FoundSection + 1
+	}
+	_HCWWidgets.SecDD.Choose(SectionIndex)
+	_HCW_LoadCurrent()
+	return true
+}
+
 OpenHotstringsConfigWindow() {
 	global _HCWGui, _HCWWidgets
 	; Prefer the shared WebView2 frontend (identical UI to macOS). It falls back
@@ -290,12 +411,16 @@ OpenHotstringsConfigWindow() {
 	if _HCWWeb_TryOpen()
 		return
 	_HCW_InitLocaleStrings()
-	_HCW_BuildCategoryList()
-	_HCW_BuildGroupList()
 	if _HCWGui {
+		Selection := _HCW_CaptureSelection()
+		_HCW_BuildCategoryList()
+		_HCW_BuildGroupList()
+		_HCW_RefreshExistingControls(Selection)
 		try _HCWGui.Show()
 		return
 	}
+	_HCW_BuildCategoryList()
+	_HCW_BuildGroupList()
 
 	G := Gui_Create("+Resize +MinSize580x320", t("hs_config.window_title"))
 	G.SetFont("s10", "Segoe UI")
@@ -379,7 +504,7 @@ OpenHotstringsConfigWindow() {
 	Gui_HarmoniseButtonWidths([BtnClose])
 	BtnClose.GetPos(, , &_closeW, )
 	BtnClose.Move(14 + (526 - _closeW) // 2)
-	BtnClose.OnEvent("Click", (*) => _HCWGui.Hide())
+	BtnClose.OnEvent("Click", (*) => _HCW_RequestHide())
 
 	_HCWWidgets := {
 		Gui:          G,
@@ -423,6 +548,15 @@ OpenHotstringsConfigWindow() {
 }
 
 
+_HCW_RequestHide() {
+	global _HCWGui
+	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false))
+		return false
+	_HCWGui.Hide()
+	return true
+}
+
+
 
 
 ; ============================================================
@@ -433,10 +567,13 @@ OpenHotstringsConfigWindow() {
 
 ; Rebuild the file dropdown whenever the group selection changes.
 _HCW_OnGroupChanged() {
-	global _HCWWidgets
+	global _HCWWidgets, _HCW_LastSelection
 	; Persist any pending numeric edit before the selection moves, otherwise the
 	; debounced write would target the previous entry or be silently dropped.
-	_HCW_FlushNumericWrite()
+	Selection := _HCW_LastSelection
+	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false),
+		_HCW_RestoreSelectionControl.Bind("group", Selection))
+		return false
 	GroupKey := _HCW_SelectedGroupKey()
 	Files := _HCW_FilesForGroup(GroupKey)
 	Items := []
@@ -448,14 +585,17 @@ _HCW_OnGroupChanged() {
 	if Items.Length > 0 {
 		_HCWWidgets.FileDD.Choose(1)
 	}
-	_HCW_OnFileChanged()
+	return _HCW_OnFileChanged()
 }
 
 ; Rebuild the section dropdown whenever the file selection changes.
 _HCW_OnFileChanged() {
-	global _HCWWidgets, _HCW_FILE_LEVEL_LABEL
+	global _HCWWidgets, _HCW_FILE_LEVEL_LABEL, _HCW_LastSelection
 	; Commit any pending numeric edit to its captured entry before re-selecting.
-	_HCW_FlushNumericWrite()
+	Selection := _HCW_LastSelection
+	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false),
+		_HCW_RestoreSelectionControl.Bind("file", Selection))
+		return false
 	Entry := _HCW_SelectedEntry()
 	Items := [_HCW_FILE_LEVEL_LABEL]
 	Sections := _HCW_GetSections(Entry)
@@ -466,19 +606,25 @@ _HCW_OnFileChanged() {
 	_HCWWidgets.SecDD.Add(Items)
 	_HCWWidgets.SecDD.Choose(1)
 	_HCW_LoadCurrent()
+	return true
 }
 
 ; Refresh the controls when the section selection changes. Commits any pending
 ; numeric edit to its captured entry first so a debounced write is never lost
 ; when the user jumps to another section before the timer fires.
 _HCW_OnSectionChanged() {
-	_HCW_FlushNumericWrite()
+	global _HCW_LastSelection
+	Selection := _HCW_LastSelection
+	if !_HCW_DrainBeforeTransition(_HCW_FlushNumericWrite.Bind(false),
+		_HCW_RestoreSelectionControl.Bind("section", Selection))
+		return false
 	_HCW_LoadCurrent()
+	return true
 }
 
 ; Pull the current selection and refresh the delay/color controls.
 _HCW_LoadCurrent() {
-	global _HCWWidgets
+	global _HCWWidgets, _HCW_LastSelection
 	Entry := _HCW_SelectedEntry()
 	Sec := _HCW_SelectedSection(Entry)
 	Resolved := _HCW_Resolve(Entry, Sec)
@@ -563,6 +709,11 @@ _HCW_LoadCurrent() {
 	_HCWWidgets.TooltipReset.Enabled := TooltipOverridden
 
 	_HCWWidgets.Status.Value := _HCW_StatusPath(Entry, Sec)
+	_HCW_LastSelection := {
+		GroupKey: _HCW_SelectedGroupKey(),
+		EntryKey: Entry.Key,
+		SectionName: Sec
+	}
 }
 
 

@@ -25,10 +25,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_about: install task must be forward-declared (F-CRIT-2)", function()
 	local function read_src()
-		local path = helpers.driver_root() .. "ui/menu/menu_about.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "cannot open menu_about.lua at " .. tostring(path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to ui/menu/menu_about.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function get_update_menu_label")
+		helpers.assert_true(src ~= nil, "ui/menu/menu_about.lua source must be locatable")
 		return src
 	end
 
@@ -56,9 +57,9 @@ helpers.describe("menu_about: install task must be forward-declared (F-CRIT-2)",
 	helpers.it("forward-declares the install task before the hs.task.new closure", function()
 		local src = read_src()
 		local decl_pos = src:find("local unzip_task", 1, true)
-		local new_pos  = src:find("unzip_task = hs.task.new", 1, true)
+		local new_pos  = src:find("unzip_task = TaskLifecycle.native", 1, true)
 		helpers.assert_true(decl_pos ~= nil, "install task must be forward-declared as `local unzip_task`")
-		helpers.assert_true(new_pos ~= nil, "install task must be assigned via `unzip_task = hs.task.new`")
+		helpers.assert_true(new_pos ~= nil, "install task must be assigned via `unzip_task = TaskLifecycle.native`")
 		helpers.assert_true(decl_pos < new_pos,
 			"the local declaration must come BEFORE the hs.task.new closure so the callback captures the upvalue")
 	end)

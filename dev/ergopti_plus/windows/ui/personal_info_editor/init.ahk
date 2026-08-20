@@ -25,11 +25,11 @@
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 1/ Lifecycle / open =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Singleton window + WebView2 plumbing. Subscription handles live in globals so
 ; the binding does not GC them (which would silently drop the JS->AHK channel);
@@ -126,11 +126,11 @@ _PiEdWeb_TryOpen() {
 
 
 
-; ==============================================================
+; ====================================
 ; ====================================
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
-; ==============================================================
+; ====================================
 
 ; Receives messages from the page (each is a JSON-encoded {action, …} object).
 _PiEdWeb_OnWebMessage(Handler, Args) {
@@ -169,21 +169,31 @@ _PiEdWeb_PushInitData() {
 
 ; Persists the edited values to personal_info.toml and reloads (the engine
 ; rebuilds its personal-info expansions on load), mirroring the native dialog.
-_PiEdWeb_Save(Values) {
-	global PersonalInformation, ScriptInformation
-	for Key, Val in Values
-		PersonalInformation[Key] := Val
-	; Branch on the writer's result and keep the editor open on failure — the
-	; window is the only place the typed values still exist. Discarding the
-	; boolean logged "Saved…" and then Reload()ed, which re-read the unchanged
-	; file: the edits vanished while every user-visible signal reported success.
-	; Same shape and same reason as _PathsEdWeb_Save.
-	if !WritePersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"]) {
+_PiEdWeb_Save(Values, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
+		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0) {
+	global ScriptInformation
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		; The deferred bridge normally starts non-Critical, but keep injected or
+		; future callers from re-wrapping persistence and reload in a long span.
+		Critical("Off")
+		try return _PiEdWeb_Save(Values, WriterFn, ReplaceFn, DeleteFn,
+			AuthorizeFn, NotifyFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	; The bridge already checked Suspend before scheduling this callback, but
+	; SetTimer yields. PersonalInfoCommitValues re-checks both on entry and in
+	; the atomic publish span, so a pause between the message and rename refuses
+	; without changing disk or RAM.
+	if !PersonalInfoCommitValues(ScriptInformation["PersonalInfoTomlPath"],
+			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn) {
 		try LoggerError("PersonalInfo", "Personal information NOT saved — keeping the editor open so the values are not lost.")
-		return
+		return _PersonalInfoReportSaveFailure(NotifyFn)
 	}
 	try LoggerInfo("PersonalInfo", "Saved personal information — reloading…")
-	ReloadPreservingSuspend()
+	if !_EditorReloadAfterCommit(ReloadFn)
+		return false
+	return true
 }
 
 
@@ -235,11 +245,11 @@ _PiEdWeb_HtmlUrl() {
 
 
 
-; ==============================================================
+; =====================================
 ; =====================================
 ; ======= 4/ Helpers / teardown =======
 ; =====================================
-; ==============================================================
+; =====================================
 
 ; Fire-and-forget script eval (never await inside a WebView2 callback).
 _PiEdWeb_Eval(Js) {

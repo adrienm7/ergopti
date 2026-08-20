@@ -12,7 +12,7 @@
 ; the same function (the WARNING gate at line ~530 only pushes onto
 ; _LOGGER_PENDING_ERRORS, it does not flush).
 ;
-; SCOPE: source introspection of lib/logger.ahk, scoped to _LoggerEmit's body.
+; SCOPE: source introspection of infra/logger.ahk, scoped to _LoggerEmit's body.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,7 +28,7 @@
 
 _LFOE_CheckErrorThreshold() {
 	Body := _DriverFuncBody("_LoggerEmit")
-	Assert(Body != "", "_LoggerEmit must exist in lib/logger.ahk")
+	Assert(Body != "", "_LoggerEmit must exist in infra/logger.ahk")
 
 	; [^}]* between the guard's "{" and "_LoggerFlush(true)" requires the flush
 	; call to be inside THIS specific if-block with no intervening "}" — so the

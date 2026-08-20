@@ -26,16 +26,16 @@ local helpers = require("tests.helpers")
 
 
 
--- =====================================================
+-- ====================================================
 -- ====================================================
 -- ======= 1/ Dependency stubs pre-registration =======
 -- ====================================================
--- =====================================================
+-- ====================================================
 
 -- Reset the hs stub and package cache for a clean load.
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["lib.logger"] = nil
-local hs_stub = helpers.load_with_stubs("lib.logger") and _G.hs
+package.loaded["infra.logger"] = nil
+local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
 
 -- Stub modules.llm (core_llm) — only the surface prediction_engine uses at
 -- module-load time and in setters is needed. fetch_llm_prediction is
@@ -65,7 +65,7 @@ package.loaded["modules.llm"] = {
 	set_llm_model_ollama    = function(_) end,
 	set_runtime_llm_enabled = function(_) end,
 	set_llm_streaming       = function(_) end,
-	cancel_streaming        = function() end,
+	cancel_streaming        = function() return true end,
 	is_backend_ready        = function() return true end,
 	get_active_profile      = function() return { label = "Test profile" } end,
 	fetch_llm_prediction    = function(...) end,
@@ -74,7 +74,7 @@ package.loaded["modules.llm"] = {
 -- Stub WarmupController — used as a module singleton, not instantiated.
 package.loaded["modules.llm.warmup_controller"] = {
 	schedule_warmup_with_retry = function(_reason) end,
-	init                       = function(_cfg) end,
+	init                       = function(_cfg) return true end,
 	start                      = function() end,
 	stop                       = function() end,
 }
@@ -96,12 +96,12 @@ package.loaded["modules.llm.prompt_builder"] = {
 
 -- Stub StreamingHandler — mirrors the real production surface (no ngram_predict).
 package.loaded["modules.llm.streaming_handler"] = {
-	init                = function(_cfg) end,
+	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) end,
-	stop_watchdog       = function() end,
+	arm_watchdog        = function(_cfg) return true end,
+	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
-	cancel_streaming    = function() end,
+	cancel_streaming    = function() return true end,
 }
 
 -- Stub AppFilter.
@@ -117,13 +117,13 @@ package.loaded["modules.llm.api_common"] = {
 }
 
 -- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
-package.loaded["lib.i18n"] = {
+package.loaded["infra.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
 -- Stub lib.keycodes.
-package.loaded["lib.keycodes"] = {
+package.loaded["infra.keycodes"] = {
 	F16_LLM_CHAIN_SIGNAL = 106,
 }
 
@@ -132,16 +132,16 @@ package.loaded["lib.keycodes"] = {
 package.loaded["ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
-	set_chain_start       = function(_) end,
+	set_chain_start       = function(_) return true end,
 	mark_chain_complete   = function() end,
 	get_current_index     = function() return nil end,
 	navigate              = function(_) end,
 	show                  = function() end,
-	hide                  = function() end,
-	hide_forced           = function() end,
+	hide                  = function() return true end,
+	hide_forced           = function() return true end,
 	set_llm_timeout       = function(_) end,
 	reset_llm_timer       = function() end,
-	show_loading          = function(...) end,
+	show_loading          = function(...) return true end,
 	show_predictions      = function(...) end,
 	tint                  = function(_) return nil end,
 }
@@ -240,8 +240,12 @@ helpers.describe("prediction_engine.reset(): chain state cleanup (D3, real modul
 
 	helpers.it("reset() is safe to call when chain was never armed", function()
 		PE.init(core_state)
-		local ok = pcall(function() PE.reset() end)
-		helpers.assert_true(ok, "reset() must not throw when no chain was ever armed")
+		-- Called directly: a raise fails with the real error. What the guard has to
+		-- leave behind is a USABLE module — the boot path calls this defensively, so a
+		-- guard that survived by wedging itself would break the call that follows.
+		PE.reset()
+		helpers.assert_eq(type(PE.reset), "function",
+			"and must leave the module callable")
 		helpers.assert_eq(PE.is_chain_pending(), false)
 	end)
 
@@ -253,4 +257,57 @@ helpers.describe("prediction_engine.reset(): chain state cleanup (D3, real modul
 			"arm_chain() must call core_state.suppress_rescan_keep_buffer")
 		PE.reset()
 	end)
+
+	helpers.it("(no-model-runtime) clearing the model cancels old identity without scheduling an empty warmup", function()
+		local core = package.loaded["modules.llm"]
+		local warmup = package.loaded["modules.llm.warmup_controller"]
+		local previous_cancel = core.cancel_streaming
+		local previous_schedule = warmup.schedule_warmup_with_retry
+		local cancellations, warmups = 0, 0
+		core.cancel_streaming = function() cancellations = cancellations + 1; return true end
+		warmup.schedule_warmup_with_retry = function() warmups = warmups + 1 end
+
+		local ok, err = pcall(function()
+			PE.init(core_state)
+			PE.set_llm_enabled(true)
+			cancellations, warmups = 0, 0
+			PE.set_llm_model("")
+			helpers.assert_true(cancellations > 0,
+				"No Model must revoke the prior backend request generation")
+			helpers.assert_eq(warmups, 0,
+				"an empty model is a disabled identity, not a model to warm")
+		end)
+		core.cancel_streaming = previous_cancel
+		warmup.schedule_warmup_with_retry = previous_schedule
+		if not ok then error(err) end
+	end)
+
+	for _, case in ipairs({
+		{ name = "throw", build = function() error("FALLBACK_CREATE_THROW") end },
+		{ name = "nil", build = function() return nil end },
+		{
+			name = "stopped handle",
+			build = function(original, delay, callback)
+				local timer = original(delay, callback)
+				timer.running = false
+				return timer
+			end,
+		},
+	}) do
+		helpers.it("arm_chain rejects a " .. case.name .. " fallback constructor", function()
+			PE.reset()
+			PE.init(core_state)
+			local original = hs_stub.timer.doAfter
+			hs_stub.timer.doAfter = function(delay, callback)
+				return case.build(original, delay, callback)
+			end
+			local ok, result = pcall(PE.arm_chain)
+			hs_stub.timer.doAfter = original
+
+			helpers.assert_true(ok, "fallback construction failure must be contained")
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(PE.is_chain_pending(), false,
+				"chain state cannot publish before the fallback timer is running")
+		end)
+	end
 end)

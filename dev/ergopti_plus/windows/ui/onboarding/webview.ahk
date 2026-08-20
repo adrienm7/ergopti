@@ -13,7 +13,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Shared UX: one onboarding frontend for both drivers — fixing a wording or
 ;    a step there updates Windows and macOS at once. The bridge mirrors the
-;    proven model_browser WebView2 host (lib/webview_utils + vendor/WebView2).
+;    proven model_browser WebView2 host (infra/webview_utils + vendor/WebView2).
 ; 2. Reuses the existing commit: the frontend collects exactly the six answers
 ;    the native wizard collects (locale, config_dir, use_ergopti, magic_key,
 ;    use_metrics, use_gestures). The "finish" handler funnels them into the
@@ -217,11 +217,11 @@ _OnbWeb_UnavailableReason() {
 
 
 
-; ==============================================================
+; ====================================
 ; ====================================
 ; ======= 2/ JS <-> AHK bridge =======
 ; ====================================
-; ==============================================================
+; ====================================
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 (chrome.webview) channel, so each message is an object with an
@@ -406,9 +406,9 @@ _OnbWeb_LoadExistingConfig(Dir) {
 	c := ParseTomlFile(path)
 	if !c.Count
 		return
-	saved := "{use_ergopti:" . (TomlCacheBool(c, "ahk.layout", "ergopti_base") ? "true" : "false")
-		. ",use_metrics:" . (TomlCacheBool(c, "ahk.metrics", "metrics_enabled") ? "true" : "false")
-		. ",use_gestures:" . (TomlCacheBool(c, "ahk.gestures", "enabled") ? "true" : "false")
+	saved := "{use_ergopti:" . (TomlCacheBool(c, "layout", "ergopti_base") ? "true" : "false")
+		. ",use_metrics:" . (TomlCacheBool(c, "metrics", "metrics_enabled") ? "true" : "false")
+		. ",use_gestures:" . (TomlCacheBool(c, "gestures", "enabled") ? "true" : "false")
 	mk := IniCacheGet(c, "hotstrings", "trigger_char")
 	if (mk != "_" && mk != "")
 		saved .= ",magic_key:" . _OnbWeb_JsStr(mk)
@@ -446,12 +446,10 @@ _OnbWeb_Finish(answers) {
 
 	; Do not tear the wizard down until persistence succeeds. Otherwise a failed
 	; path/config write would discard the user's answers and leave no retry UI.
-	if _Onboarding_Commit() {
-		; Close the WebView2 controller before the host window is torn down by
-		; Reload (the WebView2 spec requires Controller.Close first).
-		_OnbWeb_Reset()
-		ReloadPreservingSuspend()
-	}
+	; Close the WebView2 controller only from the accepted reload hand-off. The
+	; config/path owners remain held until that callback, and a refused reload
+	; leaves this retry surface intact.
+	_Onboarding_Commit(_OnbWeb_Reset)
 }
 
 ; Runs the synchronous, elevated touchpad-gesture configuration (same registry
@@ -492,11 +490,11 @@ _OnbWeb_RegisterGesturesManual() {
 
 
 
-; ==============================================================
+; ===================================
 ; ===================================
 ; ======= 4/ initData sources =======
 ; ===================================
-; ==============================================================
+; ===================================
 
 ; Returns the JSON array of supported locales [{code,name,flag}], in the same
 ; order as the tray language menu (_I18nSortedLocales). The flag emoji is read

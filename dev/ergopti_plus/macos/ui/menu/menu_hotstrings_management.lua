@@ -13,22 +13,24 @@
 
 local M = {}
 local hs                = hs
-local Logger            = require("lib.logger")
-local dialog            = require("lib.dialog_util")
-local notifications     = require("lib.notifications")
-local i18n              = require("lib.i18n")
+local Logger            = require("infra.logger")
+local dialog            = require("infra.dialog_util")
+local notifications     = require("infra.notifications")
+local i18n              = require("infra.i18n")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+local ManifestReader = require("infra.manifest_reader")
+local ManifestMenu   = require("infra.manifest_menu")
 local LOG               = "menu_hotstrings"
 
 
 
 
 
--- ==============================
+-- =============================
 -- =============================
 -- ======= 1/ Management =======
 -- =============================
--- ==============================
+-- =============================
 
 --- Builds a toggle item for one preview bubble type.
 --- @param ctx table Context.
@@ -42,15 +44,15 @@ local function buildBubbleItem(ctx, label, enabled_key, set_enabled_fn, notify_l
 	local paused = ctx.paused
 
 	return {
-		title    = label,
+		label    = label,
 		checked  = state[enabled_key] or nil,
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			state[enabled_key] = not state[enabled_key]
 			if ctx.keymap and type(ctx.keymap[set_enabled_fn]) == "function" then
 				pcall(ctx.keymap[set_enabled_fn], state[enabled_key])
 			end
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(notify_label, state[enabled_key])
 			ctx.updateMenu()
 		end or nil,
@@ -63,7 +65,6 @@ end
 function M.build_management(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
-	local menu   = {}
 	local bubble_item = nil
 	local exp_item = nil
 	local delays_item = nil
@@ -88,7 +89,7 @@ function M.build_management(ctx)
 		"set_preview_ai_enabled",
 		i18n.get("menu.hotstrings.notify_bubble_ai")))
 
-	table.insert(bubble_sub, { title = "-" })
+	table.insert(bubble_sub, { separator = true })
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_colored"),
@@ -96,7 +97,7 @@ function M.build_management(ctx)
 		"set_preview_colored_tooltips",
 		i18n.get("menu.hotstrings.notify_bubble_colored")))
 
-	bubble_item = { title = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, menu = bubble_sub }
+	bubble_item = { label = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, items = bubble_sub }
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
@@ -114,7 +115,7 @@ function M.build_management(ctx)
 				state.terminator_states[d.key] = enabled
 			end
 		end
-		ctx.save_prefs()
+		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
 	end
 	local function reset_terminators()
@@ -128,13 +129,13 @@ function M.build_management(ctx)
 				state.terminator_states[d.key] = def_on
 			end
 		end
-		ctx.save_prefs()
+		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
 	end
-	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, fn = not paused and function() bulk_set_terminators(true)  end or nil }
-	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, fn = not paused and function() bulk_set_terminators(false) end or nil }
-	exp_sub[#exp_sub + 1] = { title = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, fn = not paused and reset_terminators or nil }
-	exp_sub[#exp_sub + 1] = { title = "-" }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() bulk_set_terminators(true)  end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() bulk_set_terminators(false) end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, action = not paused and reset_terminators or nil }
+	exp_sub[#exp_sub + 1] = { separator = true }
 
 	-- Built-in terminators (non-custom), with consume indicator. The shared
 	-- catalogue order IS the menu order; { type = "separator" } entries become
@@ -143,7 +144,7 @@ function M.build_management(ctx)
 	for _, def in ipairs(defs) do
 		if type(def) == "table" and not def.custom then
 			if def.type == "separator" then
-				exp_sub[#exp_sub + 1] = { title = "-" }
+				exp_sub[#exp_sub + 1] = { separator = true }
 			elseif def.key then
 				local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
 
@@ -154,10 +155,10 @@ function M.build_management(ctx)
 				if def.consume then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
 
 				exp_sub[#exp_sub + 1] = {
-					title    = ctx.applyTriggerChar(lbl),
+					label    = ctx.applyTriggerChar(lbl),
 					checked  = enabled_t or nil,
 					disabled = paused or nil,
-					fn       = not paused and (function(k, l) return function()
+					action       = not paused and (function(k, l) return function()
 						local nv = true
 						if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
 							nv = not ctx.keymap.is_terminator_enabled(k)
@@ -166,7 +167,7 @@ function M.build_management(ctx)
 							end
 						end
 						state.terminator_states[k] = nv
-						ctx.save_prefs()
+						if ctx.save_prefs() ~= true then return false end
 						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
 					end end)(def.key, lbl) or nil,
@@ -176,7 +177,7 @@ function M.build_management(ctx)
 	end
 
 	-- Custom terminators + add button, grouped together at the bottom
-	exp_sub[#exp_sub + 1] = { title = "-" }
+	exp_sub[#exp_sub + 1] = { separator = true }
 
 	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 		if type(ct) ~= "table" or type(ct.char) ~= "string" or ct.char == "" then goto continue_ct end
@@ -186,9 +187,9 @@ function M.build_management(ctx)
 
 		local ct_sub = {
 			{
-				title    = i18n.get("menu.hotstrings.delete_expander"),
+				label    = i18n.get("menu.hotstrings.delete_expander"),
 				disabled = paused or nil,
-				fn       = not paused and (function(k) return function()
+				action       = not paused and (function(k) return function()
 					local res = dialog.block_alert(
 						i18n.get("dialog.hotstrings.delete_title"),
 						i18n.get("dialog.hotstrings.delete_body"),
@@ -204,25 +205,25 @@ function M.build_management(ctx)
 						end
 					end
 					if type(state.terminator_states) == "table" then state.terminator_states[k] = nil end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.updateMenu()
 				end end)(ct.key) or nil,
 			},
 		}
 
 		exp_sub[#exp_sub + 1] = {
-			title    = ct_lbl,
+			label    = ct_lbl,
 			checked  = enabled_t or nil,
-			menu     = ct_sub,
+			items     = ct_sub,
 			disabled = paused or nil,
 		}
 		::continue_ct::
 	end
 
 	exp_sub[#exp_sub + 1] = {
-		title    = i18n.get("menu.hotstrings.add_custom"),
+		label    = i18n.get("menu.hotstrings.add_custom"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
@@ -275,18 +276,18 @@ function M.build_management(ctx)
 			if type(state.custom_terminators) ~= "table" then state.custom_terminators = {} end
 			table.insert(state.custom_terminators, { key = key, char = char, label = label, consume = consume })
 			state.terminator_states[key] = true
-			ctx.save_prefs()
+			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
 		end or nil,
 	}
 
-	exp_item = { title = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil, menu = exp_sub }
+	exp_item = { label = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil, items = exp_sub }
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
 		if type(default_val) ~= "number" then
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
-			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
+			return { label = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
 		end
 		-- Coerce + fail closed to default_val: state.expansion_delay (and per-key
 		-- delays) come straight from config.toml and can be a string (hand edit /
@@ -301,9 +302,9 @@ function M.build_management(ctx)
 		return {
 			-- menu.settings.default_indicator (" (default)") is the surviving shared
 			-- key — its value already carries the leading space, so we don't add one.
-			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
+			label    = title .. " : " .. display_ms .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					i18n.get("menu.hotstrings.delay_prompt"),
@@ -325,7 +326,7 @@ function M.build_management(ctx)
 					state.delays[key] = new_sec
 					if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
 				end
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 			end or nil,
 		}
@@ -342,7 +343,7 @@ function M.build_management(ctx)
 		local cur_val  = (type(resolved) == "table" and type(resolved.delay) == "number") and resolved.delay or nil
 		if type(cur_val) ~= "number" then
 			Logger.error(LOG, "make_category_delay_item(): no resolvable delay for category '%s'.", category)
-			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
+			return { label = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
 		end
 		local cur_ms     = math.floor(cur_val * 1000 + 0.5)
 		local has_over   = (type(resolved) == "table" and resolved.has_override) or false
@@ -351,9 +352,9 @@ function M.build_management(ctx)
 		return {
 			-- menu.settings.default_indicator (" (default)") carries its own leading
 			-- space; show it while the user has set no override for this category.
-			title    = title .. " : " .. display_ms .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
+			label    = title .. " : " .. display_ms .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
-			fn       = not paused and function()
+			action       = not paused and function()
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					i18n.get("menu.hotstrings.delay_prompt"),
@@ -371,9 +372,10 @@ function M.build_management(ctx)
 				-- window writes to, so the two UIs never desync) then apply to the
 				-- running engine so the new delay takes effect without a restart.
 				local new_sec = val / 1000
-				pcall(hotstrings_config.set_override, category, nil, "delay", new_sec)
+				if hotstrings_config.set_override(category, nil, "delay", new_sec) ~= true then
+					return false
+				end
 				if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
-				ctx.save_prefs()
 				ctx.updateMenu()
 			end or nil,
 		}
@@ -398,9 +400,9 @@ function M.build_management(ctx)
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
 	table.insert(delay_menu, {
-		title    = i18n.get("menu.hotstrings.config_item"),
+		label    = i18n.get("menu.hotstrings.config_item"),
 		disabled = paused or nil,
-		fn       = not paused and function()
+		action       = not paused and function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
 			if not ok or not win or type(win.open) ~= "function" then return end
 			-- make_category_delay_item bakes the resolved delay and the
@@ -409,13 +411,13 @@ function M.build_management(ctx)
 			-- false default tag until something else rebuilds the menu. Hand the
 			-- window an explicit refresh channel so the two UIs cannot desync.
 			win._on_config_changed = function()
-				ctx.save_prefs()
+				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 			end
 			pcall(win.open)
 		end or nil,
 	})
-	table.insert(delay_menu, { title = "-" })
+	table.insert(delay_menu, { separator = true })
 	if def_delays then
 		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_ai_acceptance"), "llm_prediction", def_delays.llm_prediction, false))
 		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_autocompletion"), "dynamichotstrings", def_delays.dynamichotstrings, false))
@@ -428,24 +430,19 @@ function M.build_management(ctx)
 	-- (also tunable in the config window). Surface them here too, mirroring the
 	-- AHK tray, so the most-used per-category delays are one click away.
 	if def_delays then
-		table.insert(delay_menu, { title = "-" })
+		table.insert(delay_menu, { separator = true })
 		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_magic_key"), "STAR_TRIGGER", "magickey"))
 		table.insert(delay_menu, make_category_delay_item(i18n.get("menu.hotstrings.delay_autocorrection"), "autocorrection", "autocorrection"))
 	end
 
-	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
+	delays_item = { label = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, items = delay_menu }
 
-	if exp_item then table.insert(menu, exp_item) end
-	if delays_item then table.insert(menu, delays_item) end
-	table.insert(menu, { title = "-" })
-	if bubble_item then table.insert(menu, bubble_item) end
-	table.insert(menu, { title = "-" })
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
-	table.insert(menu, {
-		title    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or "★"),
+	local magic_key_item = ({
+		label    = i18n.get("menu.hotstrings.magic_key_prefix") .. (hs_state and hs_state.trigger_char or ManifestReader.default_for("hotstrings.trigger_char")),
 		disabled = hs_paused or nil,
-		fn       = not hs_paused and function()
+		action       = not hs_paused and function()
 			if not hs_state then return end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.hotstrings.magic_key_title"),
@@ -462,7 +459,7 @@ function M.build_management(ctx)
 					if ctx.hotstring_editor and type(ctx.hotstring_editor.set_trigger_char) == "function" then
 						pcall(ctx.hotstring_editor.set_trigger_char, new_char)
 					end
-					ctx.save_prefs()
+					if ctx.save_prefs() ~= true then return false end
 					ctx.do_reload("menu")
 				end
 			end
@@ -471,19 +468,71 @@ function M.build_management(ctx)
 	local repeat_enabled = ctx and ctx.keymap
 		and type(ctx.keymap.is_repeat_feature_enabled) == "function"
 		and ctx.keymap.is_repeat_feature_enabled()
-	table.insert(menu, {
-		title    = i18n.get("menu.hotstrings.repeat_key_toggle"),
-		checked  = repeat_enabled,
-		disabled = hs_paused or nil,
-		fn       = not hs_paused and function()
-			if ctx and ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
-				pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
-			end
-			ctx.do_reload("menu")
-		end or nil,
+	-- `repeat_key` is a `check` row since 2026-08-07: the renderer draws it from
+	-- the declaration, and this driver supplies only the toggle and the state
+	-- behind the tick. It was three copies of one checkbox before that, one per
+	-- driver, from a declaration that named only the slot.
+	local params_ctx = {}
+	for key, value in pairs(ctx) do params_ctx[key] = value end
+	params_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do params_ctx.commands[key] = value end
+	params_ctx.commands["repeat_key"] = function()
+		if ctx and ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
+			pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
+		end
+		ctx.do_reload("menu")
+	end
+	params_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
+	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
+
+	-- The manifest's rows for this group, dispatched by id, and then the two rows
+	-- it does not describe.
+	--
+	-- The three ids below were declared for this driver and handled nowhere — not
+	-- because the rows were missing, but because they were assembled by hand right
+	-- here and the ids were never written down. That is the state the handler
+	-- bijection ratchet counts, and it is worth being precise about how it misled:
+	-- a first pass read "no driver names magic_key_config" as "no Lua driver can
+	-- edit the magic key" and nearly restricted this very row out of the menu it
+	-- has always been in.
+	-- Named rows, not menu: a local called `menu` puts a bare `menu =` three lines
+	-- above the separator below, which is the context token the rows-outside-the-
+	-- renderer scan keys on — so the assignment alone made a separator read as a
+	-- hand-built row. The name is better this way regardless.
+	local rows = ManifestMenu.build("hotstrings_params_group", "HotstringsParams", {
+
+	}, nil, params_ctx, {
+		-- word_expanders is `type = "list"` in the manifest now, so the shared
+		-- renderer materialises every row of the submenu from this data instead of
+		-- this driver assembling the hs.menubar shape itself. Same provider shape
+		-- as the other two drivers answer with.
+		["word_expanders"] = function()
+			if not exp_item then return {} end
+			return { exp_item }
+		end,
+		-- `list` since 2026-08-07, for the same reason word_expanders became one:
+		-- both Lua drivers built this identical tree of four switches themselves
+		-- because `dynamic` handed the id straight back. The renderer materialises
+		-- it from the data now.
+		["preview_bubbles"] = function()
+			if not bubble_item then return {} end
+			return { bubble_item }
+		end,
+		-- `list` since 2026-08-07, with the same reasoning: the magic-key row and
+		-- its reset were built three times from a declaration that named the slot.
+		["magic_key_config"] = function()
+			if not magic_key_item then return {} end
+			return { magic_key_item }
+		end,
+		-- `list` since 2026-08-07, the last row of this group to move.
+		["delays_colors"] = function()
+			if not delays_item then return {} end
+			return { delays_item }
+		end,
 	})
 
-	return { title = i18n.get("menu.hotstrings.params"), menu = menu }
+	return { title = i18n.get("menu.hotstrings.params"), menu = rows }
 end
 
 return M

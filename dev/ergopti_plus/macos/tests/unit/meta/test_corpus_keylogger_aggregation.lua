@@ -297,7 +297,7 @@ local function setup_and_replay(vec)
 		get_native_app_category = function() return "Development" end,
 		init = function() end,
 	}
-	package.loaded["lib.timings"] = {
+	package.loaded["infra.timings"] = {
 		ms  = function(_section, key)
 			if key == "think_pause_ms" then return 2000 end
 			if key == "max_keystroke_delay_ms" then return 5000 end
@@ -599,5 +599,36 @@ helpers.describe("keylogger aggregation corpus — cleanup", function()
 		S.agg_batch   = nil
 		S.ngram_ctx   = nil
 		S.device_id   = nil
+	end)
+end)
+
+
+local KUtils = require("keylogger.utils")
+
+helpers.describe("keylogger corpus - pure text primitives", function()
+	helpers.it("classifies every char_class vector as the corpus says", function()
+		local cases = corpus_root and corpus_root.primitives and corpus_root.primitives.char_class
+		helpers.assert_true(type(cases) == "table" and #cases > 0,
+			"the corpus must carry char_class vectors - an empty section asserts nothing")
+		for _, case in ipairs(cases) do
+			helpers.assert_eq(KUtils.char_class(case.input), case.expect, string.format(
+				"char_class(%q) must be %q. This is the classifier every typing metric is bucketed "
+				.. "by, and the AutoHotkey walker re-implements it by hand: a drift here changes "
+				.. "every downstream aggregate and breaks nothing that reports itself.",
+				case.input, case.expect))
+		end
+	end)
+
+	helpers.it("pops one whole codepoint for every pop_utf8 vector", function()
+		local cases = corpus_root and corpus_root.primitives and corpus_root.primitives.pop_utf8
+		helpers.assert_true(type(cases) == "table" and #cases > 0,
+			"the corpus must carry pop_utf8 vectors")
+		for _, case in ipairs(cases) do
+			helpers.assert_eq(KUtils.pop_utf8(case.input), case.expect, string.format(
+				"pop_utf8(%q) must be %q. The AutoHotkey twin counts UTF-16 code units, so the "
+				.. "astral case is the one that already diverged: dropping a single unit leaves "
+				.. "half a surrogate pair in the word buffer.",
+				case.input, case.expect))
+		end
 	end)
 end)

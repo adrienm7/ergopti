@@ -21,19 +21,20 @@ local helpers = require("tests.helpers")
 
 
 
--- ===================================================================================
+-- ==================================================================================
 -- ==================================================================================
 -- ======= 1/ Source-level invariant — no dead push branch, real poll present =======
 -- ==================================================================================
--- ===================================================================================
+-- ==================================================================================
 
 helpers.describe("keylogger pause wiring — source-level invariant (e2e-pause-suspend-2 regression)", function()
 
 	helpers.it("script_control.lua does NOT reference _keylogger.pause or _keylogger.resume", function()
-		local src_path = helpers.driver_root() .. "modules/shortcuts/script_control.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "script_control.lua must be readable at " .. tostring(src_path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/shortcuts/script_control.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function log_shortcut_if_available")
+		helpers.assert_true(src ~= nil, "modules/shortcuts/script_control.lua source must be locatable")
 		-- The dead push branch (_keylogger.pause / _keylogger.resume) was never
 		-- reachable in production because the 5th arg was never passed. Removing it
 		-- avoids false confidence that the keylogger is silenced via push.
@@ -44,10 +45,11 @@ helpers.describe("keylogger pause wiring — source-level invariant (e2e-pause-s
 	end)
 
 	helpers.it("keylogger/init.lua handle_key checks _script_control.is_paused (real mechanism)", function()
-		local src_path = helpers.driver_root() .. "modules/keylogger/init.lua"
-		local fh = io.open(src_path, "r")
-		helpers.assert_true(fh ~= nil, "keylogger/init.lua must be readable at " .. tostring(src_path))
-		local src = fh:read("*a"); fh:close()
+		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
+		-- path, so moving or splitting the module cannot turn this invariant
+		-- into a path error.
+		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 		helpers.assert_true(src:find("_script_control.is_paused", 1, true) ~= nil,
 			"keylogger/init.lua must poll _script_control.is_paused — the real silence mechanism")
 	end)
@@ -58,40 +60,53 @@ end)
 
 
 
--- =====================================================================================
+-- ====================================================================================
 -- ====================================================================================
 -- ======= 2/ Timer/watcher callbacks respect pause guard (e2e-pause-suspend-1) =======
 -- ====================================================================================
--- =====================================================================================
+-- ====================================================================================
 
 helpers.describe("keylogger pause wiring — timer/watcher callbacks guarded (e2e-pause-suspend-1 regression)", function()
 
-	helpers.it("keylogger/init.lua timer/watcher callbacks all call _is_paused()", function()
+	helpers.it("each keylogger timer/watcher gate checks the injected pause predicate", function()
 		-- The sensor callbacks (check_idle, perform_maintenance, caffeinate_cb,
 		-- wifi/battery/spaces/audio watcher lambdas) were extracted into the
 		-- self-contained watchers.lua, which receives _is_paused as an injected
 		-- predicate and keeps the exact _is_paused() guard at every call site.
 		-- Read both files so the guard count survives that move (move-resilient).
-		local function read_src(rel)
-			local fh = io.open(helpers.driver_root() .. rel, "r")
-			if not fh then return nil end
-			local s = fh:read("*a"); fh:close()
+		-- Takes a selector unique to one production file rather than that file's
+		-- path, so moving or splitting a module cannot turn these invariants into
+		-- path errors.
+		local function read_src(selector)
+			local s = helpers.read_driver_source(selector)
 			return s
 		end
-		local init_src = read_src("modules/keylogger/init.lua")
+		local init_src = read_src("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
 		helpers.assert_true(init_src ~= nil, "keylogger/init.lua must be readable")
-		local src = init_src .. "\n" .. (read_src("modules/keylogger/watchers.lua") or "")
-		-- Every top-level callback must start with _is_paused(). We assert the
-		-- helper exists and is used more than once (once per callback).
-		local count = 0
-		for _ in src:gmatch("_is_paused%(%)") do count = count + 1 end
-		-- 1 definition + at least 7 usage sites = at minimum 8 occurrences
-		helpers.assert_true(count >= 8,
-			string.format(
-				"_is_paused() must appear at least 8 times across keylogger init/watchers (definition + 7 callbacks) — got %d",
-				count
-			)
-		)
+		local watchers_src = read_src("local function poll_mouse_distance")
+		helpers.assert_true(watchers_src ~= nil, "keylogger/watchers.lua must be readable")
+
+		-- Count floors silently became stale when callbacks were consolidated behind
+		-- hardware_callback_allowed(). Name every persistence-capable boundary and
+		-- require its own direct or shared pause gate instead.
+		local boundaries = {
+			{ start = "function M.check_idle()", finish = "function M.perform_maintenance()" },
+			{ start = "function M.perform_maintenance()", finish = "local function hardware_callback_allowed" },
+			{ start = "local function hardware_callback_allowed", finish = "local function run_hardware_callback" },
+			{ start = "local function schedule_context_refresh", finish = "local function stop_object_watcher" },
+			{ start = "function M.caffeinate_cb(event)", finish = "function M.init_hardware_watchers()" },
+		}
+		for _, boundary in ipairs(boundaries) do
+			local start_at = watchers_src:find(boundary.start, 1, true)
+			local finish_at = start_at and watchers_src:find(boundary.finish,
+				start_at + #boundary.start, true)
+			helpers.assert_true(start_at ~= nil and finish_at ~= nil,
+				"pause-guard boundary must remain locatable: " .. boundary.start)
+			local body = watchers_src:sub(start_at, finish_at - 1)
+			helpers.assert_true(body:find("_is_paused()", 1, true) ~= nil,
+				"persistence-capable boundary must consult pause directly or through its gate: "
+					.. boundary.start)
+		end
 	end)
 
 end)

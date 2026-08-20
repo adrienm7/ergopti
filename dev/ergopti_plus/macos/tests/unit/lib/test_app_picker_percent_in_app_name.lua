@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: app_picker "%" in app name regression test
 --- DESCRIPTION:
---- Guards the gsub replacement-string hazard in lib/app_picker.lua's build_menu().
+--- Guards the gsub replacement-string hazard in infra/app_picker.lua's build_menu().
 ---
 --- ROOT CAUSE ENCODED:
 --- The "Exclude {app}" entry was rendered with
@@ -39,7 +39,7 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 	--- @param app_name string The name the frontmost application reports.
 	--- @return table The freshly loaded AppPicker module.
 	local function load_picker_with_front_app(app_name)
-		local AppPicker = helpers.load_with_stubs("lib.app_picker", {
+		local AppPicker = helpers.load_with_stubs("infra.app_picker", {
 			application = {
 				frontmostApplication = function()
 					return {
@@ -54,7 +54,7 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 
 		-- load_with_stubs installs an identity i18n stub; override it so the
 		-- exclude entry actually exercises the "{app}" interpolation.
-		package.loaded["lib.i18n"] = {
+		package.loaded["infra.i18n"] = {
 			get = function(key)
 				if key == "app_picker.exclude_current" then return "Exclude {app}" end
 				return key
@@ -67,17 +67,21 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 
 		-- app_picker captures lib.i18n at require-time, so reload it now that the
 		-- richer stub is in place.
-		package.loaded["lib.app_picker"] = nil
-		return require("lib.app_picker")
+		package.loaded["infra.app_picker"] = nil
+		return require("infra.app_picker")
 	end
 
 	--- Finds a menu entry whose plain-string title matches exactly.
 	--- @param menu table The built menu structure.
 	--- @param title string The exact title to look for.
 	--- @return boolean True when an entry with that title exists.
+	-- `label`, the PROVIDER field: build_menu returns row data since 2026-08-08
+	-- and the shared renderer materialises it. `title` is still accepted so the
+	-- check reads the row whichever field carries it — what is asserted here is
+	-- the escaping of the app NAME, not which of the two shapes holds it.
 	local function has_title(menu, title)
 		for _, entry in ipairs(menu) do
-			if type(entry) == "table" and entry.title == title then return true end
+			if type(entry) == "table" and (entry.label == title or entry.title == title) then return true end
 		end
 		return false
 	end
@@ -90,8 +94,8 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 			menu = AppPicker.build_menu({}, function() end, "search")
 		end)
 
-		helpers.assert_true(ok,
-			"build_menu must not raise on an app name containing '%': " .. tostring(err))
+		helpers.assert_true(ok, "build_menu must not raise on '%': " .. tostring(err))
+		helpers.assert_nil(err, "and must report no error")
 		helpers.assert_true(type(menu) == "table", "build_menu must return a menu table")
 	end)
 
@@ -114,8 +118,8 @@ helpers.describe("app_picker — a '%' in the frontmost app name", function()
 			menu = AppPicker.build_menu({}, function() end, "search")
 		end)
 
-		helpers.assert_true(ok,
-			"build_menu must not raise on an app name containing '%1': " .. tostring(err))
+		helpers.assert_nil(err, "build_menu must report no error: " .. tostring(err))
+		helpers.assert_true(ok, "build_menu must not raise on an app name containing '%1'")
 		helpers.assert_true(has_title(menu, "Exclude Save %1 Now"),
 			"a capture-like sequence in the app name must survive as literal text")
 	end)

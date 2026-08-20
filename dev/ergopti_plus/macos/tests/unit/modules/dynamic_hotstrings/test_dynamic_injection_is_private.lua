@@ -72,11 +72,11 @@ end
 
 
 
--- ===============================================================
+-- ==============================================================
 -- ==============================================================
 -- ======= 1/ personal_info marks its @-expansion private =======
 -- ==============================================================
--- ===============================================================
+-- ==============================================================
 
 helpers.describe("personal_info: the @-tag expansion reaches inject_dynamic marked private", function()
 
@@ -123,11 +123,11 @@ end)
 
 
 
--- =========================================================
+-- ===========================================================
 -- ===========================================================
 -- ======= 2/ rules_engine marks its injection private =======
 -- ===========================================================
--- =========================================================
+-- ===========================================================
 
 helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic marked private", function()
 
@@ -147,6 +147,7 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 			set_post_load_hook        = function() end,
 			register_interceptor      = function(fn) interceptor = fn end,
 			register_preview_provider = function() end,
+			registry_transaction      = function(_, mutation) return mutation() == true end,
 			inject_dynamic = function(...)
 				captured.n          = select("#", ...)
 				captured.is_private = select(INJECT_DYNAMIC_PRIVATE_ARG, ...)
@@ -198,9 +199,6 @@ helpers.describe("expander: is_private is forwarded to the keylogger, not droppe
 		Expander.init({
 			buffer                     = "abc",
 			magic_key                  = "\xe2\x98\x85",
-			expected_synthetic_deletes = 0,
-			expected_synthetic_chars   = "",
-			expected_synthetic_pastes  = 0,
 			groups                     = {},
 			current_group              = "t",
 			start_is_word_boundary     = true,
