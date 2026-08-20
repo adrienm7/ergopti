@@ -13,7 +13,8 @@ must remain local until that explicit approval is received.
 ## Shared Project Rules
 
 Read and follow [.github/copilot-instructions.md](.github/copilot-instructions.md)
-and [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) before non-trivial work.
+and use [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) to select only the
+relevant project-memory topics before non-trivial work.
 
 ## Skills
 
