@@ -195,8 +195,9 @@ and build owned `posix_spawn` environments from `ProcessInfo.environment`.
 Cross-process descriptor tests use a debug-only role of the real launcher,
 started through `Process`/`posix_spawn`; Swift 6.3 marks imported `fork`
 unavailable, and binding that symbol in XCTest can interpose the test runner.
-Keep XCTest-visible debug constants out of executable `main.swift`: its globals
-are not initialized when Swift 6.3 loads the executable module into XCTest.
+Keep every XCTest-visible shared constant out of executable `main.swift`: its
+globals are not initialized when Swift 6.3 loads the executable module into
+XCTest. Put them in a normal source file even when bootstrap is their main user.
 
 ### project-macos-llm-runtime-enable-gate
 

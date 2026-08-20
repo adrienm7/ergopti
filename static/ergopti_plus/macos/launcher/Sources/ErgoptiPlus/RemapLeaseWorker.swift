@@ -2454,6 +2454,9 @@ final class KarabinerLeaseOuterRuntime {
 						return finishAfterRecovery(machine.innerLost())
 					}
 					beforeLiveAcknowledgementPublish()
+					guard liveInnerTransportStillPresent() else {
+						return finishAfterRecovery(machine.innerLost())
+					}
 				}
 				if !writeLeaseLine(line, to: parentOutputDescriptor) {
 					if let terminal = perform(machine.receiveParentEOF()) { return terminal }
@@ -2479,6 +2482,19 @@ final class KarabinerLeaseOuterRuntime {
 			}
 		}
 		return nil
+	}
+
+	/// Revalidates the private socket at the final live-ACK publication boundary.
+	private func liveInnerTransportStillPresent() -> Bool {
+		guard let current = inner, current.descriptor >= 0 else { return false }
+		var descriptor = pollfd(
+			fd: current.descriptor,
+			events: Int16(POLLIN | POLLHUP | POLLERR),
+			revents: 0
+		)
+		let result = pollLeaseBoundary(&descriptor, poller: boundaryPoller)
+		return result >= 0
+			&& !(result > 0 && leasePollReportsTerminal(descriptor.revents))
 	}
 
 	/// Recognizes public ACKs that prove one live Karabiner CLI transport completed.

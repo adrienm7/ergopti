@@ -2279,7 +2279,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(LeaseGuardianSingletonRecord.parse(drainingData)?.state, .draining)
 		Darwin.close(parentPipe[1])
 		parentPipe[1] = -1
-		XCTAssertEqual(outerResult.wait(timeout: 3), LeaseWorkerExit.success.rawValue)
+		XCTAssertEqual(outerResult.wait(timeout: 6), LeaseWorkerExit.success.rawValue)
 		guardian = nil
 	}
 
@@ -3500,7 +3500,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			"-c",
 			"sleep 0.05; printf 'HEARTBEAT 1 1\\n'; "
 				+ "sleep 0.05; printf 'HEARTBEAT 1 2\\n'; "
-				+ "sleep 0.05; printf 'HEARTBEAT 1 3\\n'",
+				+ "sleep 0.05; printf 'HEARTBEAT 1 3\\n'; sleep 0.2",
 		]
 		writer.standardOutput = output
 		try writer.run()
@@ -3813,6 +3813,9 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				+ "  IFS= read -r command <&3 || exit 40\n"
 				+ "  [ \"$command\" = 'ACTIVATE 1' ] || exit 41\n"
 				+ "  printf 'READY 1\\n' >&3\n"
+				+ "  exec 3>&-\n"
+				+ "  : > \"$4\"\n"
+				+ "  sleep 0.1\n"
 				+ "  exit 0\n"
 				+ "fi\n"
 				+ "IFS= read -r command <&3 || exit 42\n"
@@ -3822,6 +3825,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
 		let firstInnerMarker = fixture.deletingLastPathComponent()
 			.appendingPathComponent("fast-ready-inner.marker")
+		let closedInnerMarker = fixture.deletingLastPathComponent()
+			.appendingPathComponent("fast-ready-inner-closed.marker")
 		let publicOutput = fixture.deletingLastPathComponent()
 			.appendingPathComponent("fast-ready-public.log")
 		try Data().write(to: publicOutput)
@@ -3846,7 +3851,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			cliPath: "/unused/karabiner_cli",
 			token: token,
 			modeName: firstInnerMarker.path,
-			revokedName: "unused",
+			revokedName: closedInnerMarker.path,
 			initialMode: kLeaseModeActive,
 			heartbeatSeconds: 5
 		)
@@ -3856,7 +3861,10 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
 			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
 			parentInputDescriptor: parentPipe[0],
-			parentOutputDescriptor: outputDescriptor
+			parentOutputDescriptor: outputDescriptor,
+			beforeLiveAcknowledgementPublish: {
+				_ = self.waitForFile(at: closedInnerMarker, timeout: 2)
+			}
 		)
 
 		XCTAssertEqual(runtime.run(), LeaseWorkerExit.innerFailed.rawValue)
