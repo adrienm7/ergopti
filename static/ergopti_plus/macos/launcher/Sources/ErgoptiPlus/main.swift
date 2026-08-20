@@ -136,10 +136,6 @@ func launcherExecutableFileIdentity(
 // just doesn't start" gave us nothing to go on. LauncherLog appends a
 // timestamped line to a small on-disk file next to every NSAlert/failure path
 // (and a few success milestones) so a post-mortem is always possible.
-#if ERGOPTI_GUARDIAN_TEST_SUPPORT
-let kLauncherLogAppendTestFlag = "--launcher-log-append-test"
-#endif
-
 /// Writes every byte through one injectable POSIX operation. Retrying EINTR and
 /// advancing after a short write prevents a diagnostic from becoming a torn
 /// record merely because the kernel accepted only a prefix.
