@@ -1109,8 +1109,19 @@ _DriverReady := true
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 if (_DriverStartupSmokeDir != "") {
+		; Ready precedes the deferred tray build in production, so process-alive at
+		; this point used to miss deterministic post-ready boot failures. Exercise
+		; that first deferred owner synchronously and consume its status before the
+		; isolated smoke exits; this caught Func("...") -> Invalid base in LLM replay.
+		if !BuildTrayMenuDeferred()
+				throw Error("deferred tray-menu construction failed after ready")
 		try _LoggerFlush(true)
-		ExitApp(0)
+		; This isolated probe has just materialised a deep native Menu tree and must
+		; not run the production OnExit teardown against test-only paths/owners. AHK's
+		; immediate destruction of that fresh tree can itself raise STATUS_HEAP_CORRUPTION
+		; while the OS is already ending the disposable process. ExitProcess preserves
+		; the startup verdict without turning teardown into an unrelated smoke target.
+		DllCall("ExitProcess", "UInt", 0)
 }
 
 ; A last-known-good rollback copy first becomes a fully functional driver. Only

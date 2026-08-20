@@ -11,6 +11,14 @@
 
 #Requires AutoHotkey v2.0
 
+_LTST_DefaultTriggerCallbackResolvesAtBoot() {
+	Callback := _LLM_Menu_TriggerCallback()
+	AssertTrue(HasMethod(Callback, "Call"),
+		"the default LLM shortcut callback must resolve without Func(name), which raises Invalid base in AHK v2")
+}
+Test("LLM trigger shortcut: default callback resolves at boot (llm-trigger-invalid-base)",
+	_LTST_DefaultTriggerCallbackResolvesAtBoot)
+
 
 
 
