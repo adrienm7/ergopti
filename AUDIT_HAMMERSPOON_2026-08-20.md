@@ -57,7 +57,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [ ] `HS-010` — exact Ollama pull owner and cancel terminal
 - [ ] `HS-011` — onboarding installer lifecycle owner
 - [ ] `HS-012` — transactional pause-owner registry
-- [ ] `HS-013` — configurable shortcut edit transaction
+- [x] `HS-013` — this fix commit; exact handles are reused and six focused edit/menu repros pass
 - [x] `HS-014` — present in starting `dev` via `c6d081890`; independently replayed bind lifecycle tests
 - [ ] `HS-015` — shared screenshot-save transaction
 - [x] `HS-016` — present in starting `dev` via `c6d081890`; independently replayed callback-observability tests
@@ -305,22 +305,22 @@ The public stop sibling has the same ownership loss: call `stop_mlx_server_if_ne
 
 **Regression test.** Add `tests/unit/modules/shortcuts/test_pause_owner_inventory.lua`. The class-wide state×owner test must inject WPM stop refusal, a live search timer, Remote warmup, both startup timers, and `Actions.force_cleanup=false`. Also dispatch requirements, pause, then complete the dependency probe. Assert pause returns false or leaves every callback inert before publication; after a successful retry, no URL, readiness, model start, WPM timer, tap, canvas update, or gesture cleanup owner occurs until resume.
 
-### `HS-013` — Configurable shortcut edits persist and unbind before replacement acquisition commits
+### `HS-013` — Configurable shortcut edits release ownership before replacement and persistence commit
 
 - **Severity:** Medium
 - **Confidence:** High
 - **Guarantee:** `G2`; state-machine integrity
-- **Source:** `modules/shortcuts/keyboard_shortcuts.lua:192-231`, `modules/shortcuts/keyboard_shortcuts.lua:304-322`, `ui/menu/menu_keyboard_slots.lua:107-120`
+- **Source:** `modules/shortcuts/keyboard_shortcuts.lua:196-290`, `modules/shortcuts/keyboard_shortcuts.lua:378-426`, `ui/menu/menu_keyboard_slots.lua:110-124`
 
-**Reproduction.** Bind an action to `Cmd+Space` or inject a faithful registrar refusal. `set_action()` writes `_actions` and `hs.settings`, then unbinds the old hotkey and attempts the new one. On fresh bind refusal the UI/settings claim an action with no hotkey. On edit, the old owner is already gone; on unbind refusal, memory/settings already claim the new action while the old callback can remain live. The menu discards `false` and refreshes as if successful.
+**Reproduction.** Start with a live configurable chord, then choose another action while the successor bind refuses: `set_action()` first releases the old handle, cannot acquire the replacement, and its unchecked best-effort rebind can also refuse. Alternatively let `hs.settings.set` raise after mutating its store: the new handle is already live, the persisted value changed, and both rollback operations are unchecked. In either case the menu discards `false` and refreshes as if the edit committed. A fresh assignment has the same false-success UI path when native bind refuses.
 
-**Root cause and silence.** Configuration publication precedes native capability commitment. [Hammerspoon documents `hs.hotkey.bind()`](https://www.hammerspoon.org/docs/hs.hotkey.html#bind) as returning `nil` when the hotkey cannot be enabled; the lower adapter reports this, but the edit transaction is ordered backwards.
+**Root cause and silence.** The edit pipeline unnecessarily destroys and recreates the same native chord, while its callback captures the old action. That forces release-before-acquire ordering and makes exact rollback impossible on a same-chord bind refusal. Persistence and compensation results are not one transaction. [Hammerspoon documents `hs.hotkey.bind()`](https://www.hammerspoon.org/docs/hs.hotkey.html#bind) as returning `nil` when the hotkey cannot be enabled; the lower adapter reports this, but the menu erases that refusal.
 
 **Existing test/backstop checked.** `test_keyboard_shortcuts_start_transaction.lua` covers boot acquisition/teardown only. `test_menu_keyboard_slots.lua` uses the friendly default registrar and checks only that assignment/UI changed.
 
-**Fix.** Acquire a replacement before publishing when possible. Otherwise preserve enough exact old state to roll back binding, memory, settings, and menu atomically; do not refresh success on false.
+**Fix implemented.** Bound callbacks now resolve the committed `_actions[slot_id]` at delivery, so action-to-action edits reuse the exact live handle with zero native churn. Transitions to or from `none` use the registrar's reversible `setEnabled()` boundary and retain the exact handle on refusal. The settings value is snapshotted and restored on a throwing write before in-memory publication; failed native/persistence transitions never refresh the menu.
 
-**Regression test.** Add `tests/unit/modules/shortcuts/test_keyboard_shortcuts_edit_transaction.lua`. With a live old binding, table-drive new-bind refusal, unbind refusal, and settings-write throw. Assert the exact old handle/action/setting remain and still fire; successful replacement publishes only after new ownership commits and old release settles.
+**Regression test implemented.** `tests/unit/modules/shortcuts/test_keyboard_shortcuts_edit_transaction.lua` proves action-to-action edits make zero bind/unbind/enable calls, callbacks resolve the new action only after commit, a write that throws after mutation restores the exact old setting/action/handle, disable refusal retains and retries the same handle, failed fresh publication leaves an inert retained candidate, and fresh bind refusal changes nothing. `test_menu_keyboard_slots.lua` asserts a refused transaction causes zero menu refreshes. Both pre-existing startup acquisition/teardown refusal tests also pass.
 
 ### `HS-014` — VS Code caret bridge reports a failed TCP bind as successful
 
