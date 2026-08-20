@@ -29,6 +29,8 @@ end
 --- @return table fixture
 function M.load_keylogger()
 	local flushes = {}
+	local deferred_typing_builders = {}
+	local deferred_entry_builders = {}
 	local state
 	local foreground_captures = 0
 	-- These adapters capture the active hs table and Quartz property constants at
@@ -51,6 +53,14 @@ function M.load_keylogger()
 		init = function(core_state) state = core_state; return true end,
 		ensure_ingest_running = function() return true end,
 		defer_flush_buffer = function() return true end,
+		defer_typing_builder = function(builder)
+			deferred_typing_builders[#deferred_typing_builders + 1] = builder
+			return true
+		end,
+		defer_entry_builder = function(builder)
+			deferred_entry_builders[#deferred_entry_builders + 1] = builder
+			return true
+		end,
 		flush_buffer = function()
 			if not state then return true end
 			flushes[#flushes + 1] = {
@@ -135,6 +145,19 @@ function M.load_keylogger()
 		synthetic_input = require("adapters.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 	}
+	--- Runs deferred keylogger builders after the simulated eventtap returns.
+	function fixture.drain()
+		for _, builder in ipairs(deferred_typing_builders) do
+			local snapshot = builder()
+			flushes[#flushes + 1] = {
+				events = shallow_copy_array(snapshot.buffer_events),
+				rich_chunks = shallow_copy_array(snapshot.rich_chunks),
+			}
+		end
+		for _, builder in ipairs(deferred_entry_builders) do builder() end
+		deferred_typing_builders = {}
+		deferred_entry_builders = {}
+	end
 	function fixture.start(script_control)
 		local timers = fixture.hs.timer.__timers
 		local prior_count = #timers

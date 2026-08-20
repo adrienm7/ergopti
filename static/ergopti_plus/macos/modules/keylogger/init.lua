@@ -486,6 +486,18 @@ local function build_shortcut_key(event_obj, flags, keycode)
 	return table.concat(parts, "+")
 end
 
+--- Returns the foreground application name already maintained by ContextTracker.
+--- Native application queries can cross process boundaries and therefore cannot
+--- run in the eventtap callback.
+--- @return string app_name
+local function current_cached_app_name()
+	local active_name = CoreState.active_app_name
+	if type(active_name) == "string" and active_name ~= "" then return active_name end
+	local session_name = CoreState.session_app_name
+	if type(session_name) == "string" and session_name ~= "" then return session_name end
+	return "Unknown"
+end
+
 --- Returns true when the script-control module signals that the script is paused.
 --- Used as a fast guard in all timer/watcher callbacks so no data is written
 --- to the log while the user has explicitly suspended the keylogger.
@@ -691,16 +703,12 @@ local function handle_key(event_obj)
 				if not down_at then
 					-- Press — record timestamp and credit the kc dict
 					CoreState.modifier_down_at[keycode] = now
-					local front_app = hs.application.frontmostApplication()
-					local app_name  = front_app and front_app:title() or "Unknown"
-					LogManager.log_modifier_press(keycode, app_name)
+					LogManager.log_modifier_press(keycode, current_cached_app_name())
 				else
 					-- Release — compute hold duration and feed the manifest
 					local hold_ms = math.floor(now - down_at)
 					CoreState.modifier_down_at[keycode] = nil
-					local front_app = hs.application.frontmostApplication()
-					local app_name  = front_app and front_app:title() or "Unknown"
-					LogManager.log_modifier_hold(keycode, app_name, hold_ms)
+					LogManager.log_modifier_hold(keycode, current_cached_app_name(), hold_ms)
 				end
 			end
 			-- Keep the flag snapshot up to date for any code path that reads it
@@ -721,10 +729,9 @@ local function handle_key(event_obj)
 			-- Same re-seed as the mouse branches: this one returns below without
 			-- ever reaching the keystroke path's assignment.
 			CoreState.last_time = now
-			local front_app = hs.application.frontmostApplication()
 			LogManager.log_shortcut(
 				build_shortcut_key(event_obj, flags, keycode),
-				front_app and front_app:title() or "Unknown"
+				current_cached_app_name()
 			)
 			return
 		end
@@ -1104,6 +1111,96 @@ function M.recorded_char(char, is_private)
 	return char
 end
 
+--- Removes one effective-typing timestamp that existed at an action boundary.
+--- A physical key may overtake the timer-zero drain, so timestamps newer than
+--- the synthetic action must not be deleted by that older action's backspaces.
+--- @param timestamp_ms number Synthetic action timestamp.
+local function remove_effective_timestamp_at_or_before(timestamp_ms)
+	for index = #CoreState.recent_typing_eff, 1, -1 do
+		if CoreState.recent_typing_eff[index] <= timestamp_ms then
+			table.remove(CoreState.recent_typing_eff, index)
+			return
+		end
+	end
+end
+
+--- Inserts synthetic timestamps without moving them after overtaking keys.
+--- @param timestamp_ms number Synthetic action timestamp.
+--- @param count number Number of logical characters inserted.
+local function insert_effective_timestamps(timestamp_ms, count)
+	local insert_at = #CoreState.recent_typing_eff + 1
+	for index, recorded_at in ipairs(CoreState.recent_typing_eff) do
+		if recorded_at > timestamp_ms then
+			insert_at = index
+			break
+		end
+	end
+	for _ = 1, count do
+		table.insert(CoreState.recent_typing_eff, insert_at, timestamp_ms)
+		insert_at = insert_at + 1
+	end
+end
+
+--- Builds one immutable synthetic typing snapshot after the eventtap returns.
+--- @param operation table Captured synthetic action fields.
+--- @return table snapshot Deferred typing payload.
+local function build_deferred_synthetic_snapshot(operation)
+	local buffer_events = {}
+	local rich_chunks = {}
+	local char_count = 0
+
+	--- Appends one logical synthetic event to the detached snapshot.
+	--- @param char string Logical character or backspace marker.
+	local function append_virtual(char)
+		local recorded = M.recorded_char(char, operation.is_private)
+		table.insert(buffer_events, {
+			recorded, 0,
+			{ s = true, st = operation.source_type, c = false, ss = "none", r = recorded,
+				m = "", h = 0, d = 0, dk = false, cp = false, kc = nil },
+		})
+		if char ~= "[BS]" then
+			table.insert(rich_chunks, { type = operation.source_type, text = recorded })
+		end
+	end
+
+	Logger.debug(LOG, "Recording synthetic text from '%s' (%d delete(s), %d byte(s))…",
+		operation.source_type, operation.deletes, #operation.text)
+
+	for _ = 1, operation.deletes do append_virtual("[BS]") end
+	if operation.text ~= "" then
+		local ok_len, validated_count = pcall(utf8.len, operation.text)
+		if ok_len and validated_count then
+			for _, code in utf8.codes(operation.text) do
+				append_virtual(utf8.char(code))
+			end
+			char_count = validated_count
+		else
+			Logger.warn(LOG, "notify_synthetic: malformed UTF-8 in synthetic text — queuing an opaque fallback entry.")
+			append_virtual(operation.text)
+			char_count = 1
+		end
+	end
+
+	for _ = 1, operation.deletes do
+		remove_effective_timestamp_at_or_before(operation.timestamp_ms)
+	end
+	insert_effective_timestamps(operation.timestamp_ms, char_count)
+	if char_count > 0 then
+		CoreState.session_last_active = math.max(
+			CoreState.session_last_active or 0, operation.timestamp_ms)
+		if CoreState.session_start_time == 0
+			or CoreState.session_start_time > operation.timestamp_ms then
+			CoreState.session_start_time = operation.timestamp_ms
+		end
+	end
+
+	return {
+		buffer_events = buffer_events,
+		buffer_text = "",
+		rich_chunks = rich_chunks,
+	}
+end
+
 --- @param is_private boolean|nil When true, the content is replaced by a
 ---        redacted placeholder in every persisted field. Physical echoes are
 ---        excluded independently by immutable event provenance; this function
@@ -1112,83 +1209,44 @@ function M.notify_synthetic(text, source_type, deletes, source_variant, physical
 	-- Expander notifies unconditionally, but an opt-in keylogger that is currently
 	-- disabled or paused must not accumulate logical events or WPM samples for later.
 	if not M.may_persist() then return end
-
-	-- A clipboard paste does not emit one keyDown per inserted character. Record
-	-- the logical replacement immediately, then discard only the later physical
-	-- echoes of direct key injection. This keeps clipboard hotstrings and LLM
-	-- completions in the same raw event format as typed synthetic output.
-	-- What gets PERSISTED for one synthetic character. For a private expansion
-	-- the SHAPE is preserved (one entry per character, so counts, WPM and
-	-- timings stay correct) while the character itself is replaced. The
-	-- .text-based privacy tests never caught this because buffer_text stays
-	-- clean either way: the secret travelled in the per-character `r` field of
-	-- buffer_events and in rich_chunks, which become events_json and rich_text
-	-- in the database and are replicated by cross-device export.
-	local function append_virtual(char)
-		local recorded = M.recorded_char(char, is_private)
-		table.insert(CoreState.buffer_events, {
-			recorded, 0,
-			{ s = true, st = source_type, c = false, ss = "none", r = recorded,
-				m = "", h = 0, d = 0, dk = false, cp = false, kc = nil },
-		})
-		if char ~= "[BS]" then
-			table.insert(CoreState.rich_chunks, { type = source_type, text = recorded })
-		end
+	if text ~= nil and type(text) ~= "string" then
+		Logger.error(LOG, "notify_synthetic(): text must be a string or nil.")
+		return false
+	end
+	if deletes ~= nil and type(deletes) ~= "number" then
+		Logger.error(LOG, "notify_synthetic(): deletes must be a number or nil.")
+		return false
 	end
 
-	Logger.debug(LOG, "Recording synthetic text from '%s' (%d delete(s), %d char(s))…",
-		source_type, deletes or 0, text and (utf8.len(text) or #text) or 0)
-
-	if deletes and deletes > 0 then
-		for _ = 1, deletes do
-			append_virtual("[BS]")
-		end
-		-- Mirror the backspaces in the effective WPM window
-		for _ = 1, deletes do
-			if #CoreState.recent_typing_eff > 0 then table.remove(CoreState.recent_typing_eff) end
-		end
-	end
-
-	if text and text ~= "" then
-		-- Validate BEFORE iterating: utf8.codes raises immediately on a malformed
-		-- sequence (e.g. a truncated LLM completion cut mid-codepoint — French
-		-- accents, curly quotes, em-dashes are all multi-byte), whereas utf8.len
-		-- fails closed with nil instead of throwing. Mirrors the same
-		-- validate-then-iterate pattern used for the physical-keystroke split at
-		-- handle_key's normal-character branch (F-HIGH-16 fix).
-		local ok_len, char_count = pcall(utf8.len, text)
-		if ok_len and char_count then
-			for _, code in utf8.codes(text) do
-				append_virtual(utf8.char(code))
-			end
-		else
-			-- Malformed UTF-8 — queue one opaque, non-validated entry rather than
-			-- raising and aborting the expansion mid-flight (which would leave the
-			-- logical synthetic-action accounting incomplete).
-			Logger.warn(LOG, "notify_synthetic: malformed UTF-8 in synthetic text — queuing an opaque fallback entry.")
-			append_virtual(text)
-			char_count = 1
-		end
-		-- Add timestamps for all synthetic chars so the WPM window reflects them
-		local now_ms = hs.timer.absoluteTime() / 1000000
-		for _ = 1, char_count do
-			table.insert(CoreState.recent_typing_eff, now_ms)
-		end
-		CoreState.session_last_active = now_ms
-		if CoreState.session_start_time == 0 then CoreState.session_start_time = now_ms end
-	end
+	local timestamp_ms = hs.timer.absoluteTime() / 1000000
+	local operation = {
+		text = text or "",
+		source_type = source_type,
+		deletes = deletes and math.max(0, math.floor(deletes)) or 0,
+		is_private = is_private == true,
+		timestamp_ms = timestamp_ms,
+	}
 
 	-- `physical_echo` remains in the public signature for compatibility; immutable
 	-- provenance tags, not that payload, identify the later OS echoes.
-
-	-- A pure Cmd+V insertion would otherwise remain buffered indefinitely: the
-	-- Cmd+V event is a shortcut, not a typing event, and its pasted characters
-	-- never reach handle_key. Flush before the expander re-seeds buffer_text.
-	if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
+	if not LogManager.defer_flush_buffer() then
+		Logger.error(LOG, "notify_synthetic(): prior typing was not accepted by the outbox.")
+		return false
+	end
+	if operation.deletes > 0 or operation.text ~= "" then
+		local accepted = LogManager.defer_typing_builder(function()
+			return build_deferred_synthetic_snapshot(operation)
+		end)
+		if not accepted then
+			Logger.error(LOG, "notify_synthetic(): synthetic typing was not accepted by the outbox.")
+			return false
+		end
+	end
 
 	CoreState.last_source_type    = source_type
 	CoreState.last_source_variant = type(source_variant) == "string" and source_variant or source_type
-	CoreState.last_source_time    = hs.timer.absoluteTime() / 1000000000
+	CoreState.last_source_time    = timestamp_ms / 1000
+	return true
 end
 
 --- Computes the current live WPM from the rolling timestamp buffers.
@@ -1245,18 +1303,29 @@ end
 --- @param h_type string Hotstring category ("star", "autocorrect", "personal", …).
 function M.log_hotstring(trigger, replacement, h_type)
 	if not M.may_persist() then return end
-	LogManager.flush_buffer()
-	local net_saved = (utf8.len(replacement) or 0) - (utf8.len(trigger) or 0)
-	LogManager.append_log({
-		type           = "hotstring",
-		app            = CoreState.session_app_name,
-		trigger        = trigger,
-		replacement    = replacement,
-		h_type         = h_type or "unknown",
-		net_saved_chars = net_saved,
-		tag            = "<hotstring>" .. replacement .. "</hotstring>",
-	})
+	if not LogManager.defer_flush_buffer() then
+		Logger.error(LOG, "log_hotstring(): prior typing was not accepted by the outbox.")
+		return false
+	end
+	local app_name = CoreState.session_app_name
+	local accepted = LogManager.defer_entry_builder(function()
+		local net_saved = (utf8.len(replacement) or 0) - (utf8.len(trigger) or 0)
+		return {
+			type            = "hotstring",
+			app             = app_name,
+			trigger         = trigger,
+			replacement     = replacement,
+			h_type          = h_type or "unknown",
+			net_saved_chars = net_saved,
+			tag             = "<hotstring>" .. replacement .. "</hotstring>",
+		}
+	end)
+	if not accepted then
+		Logger.error(LOG, "log_hotstring(): event was not accepted by the outbox.")
+		return false
+	end
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+	return true
 end
 
 --- Logs an LLM prediction generation event with optional provenance metadata.
@@ -1416,18 +1485,25 @@ function M.log_llm_accepted(prediction_text, app_name, all_predictions, chosen_i
 	-- The synthetic typing burst is the canonical trigger counter. A manifest
 	-- increment here used to be ignored by the whitelist and would double-count
 	-- now that clipboard output is represented in the synthetic raw event stream.
-	local net_saved = (utf8.len(prediction_text or "") or 0) - (deletes or 0)
-	LogManager.append_log({
-		type            = "llm_accepted",
-		app             = target_app,
-		prediction      = prediction_text or "",
-		all_predictions = all_predictions or {},
-		chosen_index    = chosen_index or 1,
-		deletes         = deletes or 0,
-		deleted_text    = deleted_text or "",
-		net_saved_chars = net_saved,
-	})
+	local accepted = LogManager.defer_entry_builder(function()
+		local net_saved = (utf8.len(prediction_text or "") or 0) - (deletes or 0)
+		return {
+			type            = "llm_accepted",
+			app             = target_app,
+			prediction      = prediction_text or "",
+			all_predictions = all_predictions or {},
+			chosen_index    = chosen_index or 1,
+			deletes         = deletes or 0,
+			deleted_text    = deleted_text or "",
+			net_saved_chars = net_saved,
+		}
+	end)
+	if not accepted then
+		Logger.error(LOG, "log_llm_accepted(): event was not accepted by the outbox.")
+		return false
+	end
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+	return true
 end
 
 --- Opens the typing metrics UI.
