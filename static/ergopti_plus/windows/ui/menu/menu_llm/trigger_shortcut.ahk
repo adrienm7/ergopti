@@ -58,7 +58,15 @@ LLM_Menu_ShortcutToAhk(raw) {
 _LLM_Menu_TriggerCallback(CallbackFn := 0) {
 	if HasMethod(CallbackFn, "Call")
 		return CallbackFn
-	return Func("LLM_Menu_TriggerPrediction")
+	; In AHK v2 Func is the native class, not a name-lookup helper. Calling
+	; Func("name") raises ValueError "Invalid base" during boot replay and makes
+	; the tray-root coordinator retry forever. The declaration is available
+	; across the complete include graph, so return its function object directly.
+	return _LLM_Menu_InvokeTriggerPrediction.Bind()
+}
+
+_LLM_Menu_InvokeTriggerPrediction(Args*) {
+	return LLM_Menu_TriggerPrediction(Args*)
 }
 
 _LLM_Menu_ReportTriggerFailure(raw, Stage, Detail) {

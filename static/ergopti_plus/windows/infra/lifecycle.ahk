@@ -739,14 +739,18 @@ BuildTrayMenuDeferred() {
 	_HS_PreScanPersonal()
 	try {
 		BuildAccepted := RebuildTrayMenu(0, _TrayRootBuildBoot, false)
-		if !((BuildAccepted is Integer) and BuildAccepted == 1)
+		if !((BuildAccepted is Integer) and BuildAccepted == 1) {
 			try LoggerError("TrayMenu", "Deferred tray-menu build was retained for retry.")
+			return false
+		}
+		return true
 	} catch as e {
 		try LoggerError("TrayMenu", "Deferred tray-menu build failed: {1} [{2} at {3}:{4}]",
 			e.Message,
 			(e.HasProp("What") ? e.What : "?"),
 			(e.HasProp("File") ? e.File : "?"),
 			(e.HasProp("Line") ? e.Line : "?"))
+		return false
 	}
 }
 
