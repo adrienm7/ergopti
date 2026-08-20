@@ -20,6 +20,7 @@ helpers.describe("keylogger: malformed UTF-8 synthetic telemetry", function()
 		-- additionally prove that the malformed sequence is handled atomically.
 		fixture.keylogger.notify_synthetic(
 			MALFORMED, "llm", 0, "stream", MALFORMED, false)
+		fixture.drain()
 		helpers.assert_eq(#fixture.flushes, 1)
 		helpers.assert_eq(#fixture.flushes[1].events, 1,
 			"invalid input is one opaque logical event, not a partial character prefix")
@@ -39,6 +40,7 @@ helpers.describe("keylogger: malformed UTF-8 synthetic telemetry", function()
 		local text = "caf" .. utf8.char(0xE9)
 
 		fixture.keylogger.notify_synthetic(text, "hotstring", 0, "case", text, false)
+		fixture.drain()
 
 		local events = fixture.flushes[1].events
 		helpers.assert_eq(#events, 4)

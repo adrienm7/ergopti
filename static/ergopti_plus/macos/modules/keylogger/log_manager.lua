@@ -381,7 +381,7 @@ end
 
 
 --- Appends one operation to the in-memory ordered outbox.
---- @param operation table `{ kind = "typing_snapshot"|"entry", value = table }`.
+--- @param operation table Ordered entry, typing snapshot, or deferred builder.
 local function _queue_deferred_log(operation)
 	_deferred_log_tail = _deferred_log_tail + 1
 	_deferred_log_queue[_deferred_log_tail] = operation
@@ -439,21 +439,10 @@ local function _schedule_deferred_log_drain(delay)
 end
 
 
---- Detaches the current mutable typing run in O(1).
---- No loop, JSON encoding, SQLite access, or file append is allowed here: this
---- function is the action-epoch backstop reached from the keyboard eventtap.
---- @return table|nil snapshot
-local function _detach_buffer_snapshot()
-	if #_state.buffer_events == 0
-		and _state.session_mouse_clicks == 0
-		and _state.session_mouse_scrolls == 0 then
-		return nil
-	end
-
-	local snapshot = {
-		buffer_events         = _state.buffer_events,
-		buffer_text           = _state.buffer_text,
-		rich_chunks           = _state.rich_chunks or {},
+--- Captures the scalar context shared by physical and synthetic typing records.
+--- @return table snapshot
+local function _capture_typing_context()
+	return {
 		session_app_name      = _state.session_app_name,
 		session_win_title     = _state.session_win_title,
 		session_url           = _state.session_url,
@@ -469,6 +458,24 @@ local function _detach_buffer_snapshot()
 		current_battery_level = _state.current_battery_level,
 		current_audio_volume  = _state.current_audio_volume,
 	}
+end
+
+
+--- Detaches the current mutable typing run in O(1).
+--- No loop, JSON encoding, SQLite access, or file append is allowed here: this
+--- function is the action-epoch backstop reached from the keyboard eventtap.
+--- @return table|nil snapshot
+local function _detach_buffer_snapshot()
+	if #_state.buffer_events == 0
+		and _state.session_mouse_clicks == 0
+		and _state.session_mouse_scrolls == 0 then
+		return nil
+	end
+
+	local snapshot = _capture_typing_context()
+	snapshot.buffer_events = _state.buffer_events
+	snapshot.buffer_text = _state.buffer_text
+	snapshot.rich_chunks = _state.rich_chunks or {}
 
 	_state.buffer_events         = {}
 	_state.buffer_text           = ""
@@ -553,9 +560,33 @@ _drain_deferred_logs = function()
 	while _has_deferred_logs() do
 		local operation = assert(_deferred_log_queue[_deferred_log_head],
 			"keylogger deferred-log queue is sparse")
-		local entry = operation.kind == "typing_snapshot"
-			and _typing_entry_from_snapshot(operation.value)
-			or operation.value
+		local is_builder = operation.kind == "typing_builder"
+			or operation.kind == "entry_builder"
+		if is_builder and operation.prepared ~= true then
+			local build_ok, built_or_err = xpcall(operation.build, debug.traceback)
+			local valid_typing = operation.kind ~= "typing_builder"
+				or (type(built_or_err) == "table"
+					and type(built_or_err.buffer_events) == "table"
+					and type(built_or_err.rich_chunks) == "table")
+			if not build_ok or type(built_or_err) ~= "table" or not valid_typing then
+				Logger.error(LOG, "Cannot prepare deferred keylogger entry: %s.",
+					tostring(build_ok and "builder returned an invalid snapshot" or built_or_err))
+				return false
+			end
+			if operation.kind == "typing_builder" then
+				operation.value.buffer_events = built_or_err.buffer_events
+				operation.value.buffer_text = type(built_or_err.buffer_text) == "string"
+					and built_or_err.buffer_text or ""
+				operation.value.rich_chunks = built_or_err.rich_chunks
+			else
+				operation.value = built_or_err
+			end
+			operation.prepared = true
+			operation.build = nil
+		end
+		local entry = (operation.kind == "entry" or operation.kind == "entry_builder")
+			and operation.value
+			or _typing_entry_from_snapshot(operation.value)
 		local ok, accepted_or_err = xpcall(function()
 			return Rotation.append_log(entry)
 		end, debug.traceback)
@@ -574,33 +605,70 @@ end
 
 
 --- Append a single event entry to today.log as a JSONL line.
---- The FIFO owns the entry before the sink is called, so a non-throwing storage
---- refusal cannot destroy the caller's only copy.
+--- The FIFO owns the entry before this function returns; persistence occurs only
+--- from the retained drain after an eventtap callback has returned.
 --- @param entry table The event entry. Must contain a `type` field.
---- @return boolean persisted True when this call drained through exact commit;
---- false when its owned FIFO item remains pending for a scheduled retry.
+--- @return boolean accepted True once the ordered outbox owns the entry.
 function M.append_log(entry)
-	local had_deferred_work = _has_deferred_logs()
 	_queue_deferred_log({ kind = "entry", value = entry })
-	if had_deferred_work then
-		-- Queue insertion is the acceptance boundary; timer allocation only controls
-		-- when accepted work drains; the ingest tick and stop path independently retry it
-		_schedule_deferred_log_drain(0)
-		return true
-	end
-
-	local drained = _drain_deferred_logs()
-	if not drained then _schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC) end
-	return drained
+	-- Queue insertion is the acceptance boundary. Persistence never runs in the
+	-- caller because append_log is reached from keyboard and mouse eventtaps.
+	-- The ingest tick and stop path independently retry accepted work if timer
+	-- allocation is temporarily unavailable.
+	_schedule_deferred_log_drain(0)
+	return true
 end
 
---- Serialize the keystroke buffer accumulated in CoreState into a
---- typing event and append it to today.log. Resets per-flush buffers.
+--- Defers construction and persistence of one non-typing entry.
+--- @param builder function Zero-argument function returning an entry table.
+--- @return boolean accepted True once the ordered outbox owns the builder.
+function M.defer_entry_builder(builder)
+	if not _require_state("defer_entry_builder") then return false end
+	if type(builder) ~= "function" then
+		Logger.error(LOG, "defer_entry_builder(): builder must be a function.")
+		return false
+	end
+	_queue_deferred_log({
+		kind = "entry_builder",
+		build = builder,
+		prepared = false,
+	})
+	_schedule_deferred_log_drain(0)
+	return true
+end
+
+--- Detaches the keystroke buffer accumulated in CoreState and queues it for
+--- serialization and persistence after the caller returns.
+--- @return boolean|nil accepted True after detachment, nil when empty or uninitialized.
 function M.flush_buffer()
 	if not _require_state("flush_buffer") then return end
 	local snapshot = _detach_buffer_snapshot()
 	if not snapshot then return end
-	return M.append_log(_typing_entry_from_snapshot(snapshot))
+	_queue_deferred_log({ kind = "typing_snapshot", value = snapshot })
+	_schedule_deferred_log_drain(0)
+	return true
+end
+
+--- Captures typing context now and defers an expensive snapshot builder.
+--- The builder runs at most once after the originating eventtap has returned;
+--- an append refusal retries the already-prepared immutable snapshot.
+--- @param builder function Zero-argument function returning buffer_events,
+--- rich_chunks, and optional buffer_text fields.
+--- @return boolean accepted True once the ordered outbox owns the builder.
+function M.defer_typing_builder(builder)
+	if not _require_state("defer_typing_builder") then return false end
+	if type(builder) ~= "function" then
+		Logger.error(LOG, "defer_typing_builder(): builder must be a function.")
+		return false
+	end
+	_queue_deferred_log({
+		kind = "typing_builder",
+		value = _capture_typing_context(),
+		build = builder,
+		prepared = false,
+	})
+	_schedule_deferred_log_drain(0)
+	return true
 end
 
 --- Detaches the current typing buffer and queues it for a post-eventtap drain.

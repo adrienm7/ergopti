@@ -357,13 +357,16 @@ end)
 
 helpers.describe("log_manager append transaction ownership", function()
 	helpers.it("retains an OFF flush snapshot across refusal until exact commit", function()
-		-- flush_buffer() attempts once; stop() retries once directly and once via
-		-- its final ingest pass. Refuse all three so lifecycle debt remains visible.
+		-- flush_buffer() only transfers ownership to the outbox. stop() retries once
+		-- directly and once via its final ingest pass; refuse both attempts so the
+		-- lifecycle boundary still reports its exact cleanup debt.
 		with_fixture(function()
-			return load_log_manager_fixture(3)
+			return load_log_manager_fixture(2)
 		end, function(fixture)
-			helpers.assert_eq(fixture.manager.flush_buffer(), false,
-				"the first storage refusal must propagate to the lifecycle owner")
+			helpers.assert_true(fixture.manager.flush_buffer(),
+				"the detached snapshot must be accepted without touching storage")
+			helpers.assert_eq(#fixture.appended, 0,
+				"flush acceptance must not be confused with durable append")
 			helpers.assert_eq(fixture.state.buffer_text, "",
 				"the live buffer is detached once; ownership moves to the FIFO")
 			fixture.state.buffer_text = "new"
