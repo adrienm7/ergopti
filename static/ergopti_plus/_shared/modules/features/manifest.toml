@@ -829,6 +829,13 @@ type = "string"
 description_key = "menu.llm.app_profile_overrides"
 platforms = ["ahk"]
 
+[[features.llm]]
+id = "user_profiles"
+default = ""
+type = "string"
+description_key = "menu.llm.profiles"
+platforms = ["ahk"]
+
 
 
 # =============================

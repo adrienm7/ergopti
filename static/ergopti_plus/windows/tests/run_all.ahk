@@ -243,6 +243,9 @@ InstallSendNoOps()
 #Include unit/test_live_rebuild_serialization.ahk
 #Include unit/test_tray_root_coordinator.ahk
 #Include unit/test_terminal_hotstring_pacing.ahk
+#Include unit/test_terminal_hotstring_transaction_owner.ahk
+#Include unit/test_output_host_resolver_independent_of_metrics.ahk
+#Include unit/test_gesture_modifier_release_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
@@ -341,6 +344,7 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_api_remote.ahk
+#Include unit/test_llm_curl_terminal_classification.ahk
 ; Remote catalogue load must fall back gracefully when api_providers.json is missing/malformed.
 #Include meta/test_remote_catalog_load_graceful.ahk
 #Include ../modules/llm/prediction_engine.ahk
@@ -389,10 +393,12 @@ global _LLM_Menu_Loaded := false
 ; owns every native transition; this include registers no real hotkey.
 #Include ../ui/menu/menu_llm/trigger_journal.ahk
 #Include ../ui/menu/menu_llm/trigger_shortcut.ahk
+#Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
 ; harness; the regression suite calls only its one-shot saved-options seam.
 #Include ../ui/menu/menu_llm/init.ahk
 _LogBootProgress("loading menu_llm/persist")
+#Include ../ui/menu/menu_llm/menu_profiles.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include ../ui/menu/menu_llm/transactions.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
@@ -840,6 +846,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_gesturepickcolor_clipboard_clobber.ahk
 #Include meta/test_getselection_blocks_and_eats_keys.ahk
 #Include meta/test_global_error_handler_sendevent_storm.ahk
+#Include meta/test_output_host_resolver_single_owner.ahk
+#Include meta/test_gesture_modifier_release_class.ahk
 #Include meta/test_health_probe_timer_suspend_guard.ahk
 #Include meta/test_healthcheck_init_dead_reference.ahk
 #Include meta/test_healthcheck_onwebmsg_dead_code.ahk

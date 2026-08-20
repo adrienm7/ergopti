@@ -26,7 +26,7 @@ _LMSB_ResumeReplaysPendingBootstrap() {
 	Assert(Body != "", "LLM_Menu_OnResume must exist in ui/menu/menu_llm/actions.ahk")
 	Assert(InStr(Body, '"bootstrap_pending"') > 0,
 		"LLM_Menu_OnResume must consume the pending suspended lifecycle marker")
-	Assert(InStr(Body, "SetTimer(() => LLM_Menu_BootstrapOllama(false), -1)") > 0,
+	Assert(InStr(Body, "SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)") > 0,
 		"LLM_Menu_OnResume must replay bootstrap asynchronously after resume")
 	Lifecycle := _DriverFuncBody("Ergopti_OnSuspendResume")
 	Assert(Lifecycle != "", "Ergopti_OnSuspendResume must exist")

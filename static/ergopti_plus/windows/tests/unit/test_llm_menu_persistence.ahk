@@ -84,7 +84,8 @@ _LLM_Persist_MakeDefaultTray() {
 		"trigger_shortcut",           "Ctrl+Space",
 		"api_entry_id",               "api_primary",
 		"ollama_port",                11434,
-		"inline_autotype",            false
+		"inline_autotype",            false,
+		"user_profiles",              []
 	)
 }
 
@@ -376,3 +377,41 @@ Test_LLM_Persist_ApiEntryIdRoundTrips() {
 Test("LLM persist: active API entry survives config round-trip "
 	. "(llm-api-entry-id-roundtrip)",
 	Test_LLM_Persist_ApiEntryIdRoundTrips)
+
+Test_LLM_Persist_LosslessCustomProfiles() {
+	Profiles := [Map(
+		"id", "custom;=é",
+		"label", 'French "profile"',
+		"system_single", "line 1`nline 2;=é",
+		"system_multi", "multi",
+		"system_multi_template", "{text}",
+		"batch", true
+	)]
+	Payload := _LLM_Menu_SerializeUserProfiles(Profiles)
+	Assert(SubStr(Payload, 1, 3) == "v1:", "custom profile payload must be versioned")
+	Decoded := _LLM_Menu_DeserializeUserProfiles(Payload)
+	Assert(Decoded is Array, "custom profile payload must decode")
+	AssertEqual(1, Decoded.Length)
+	AssertEqual(Profiles[1]["id"], Decoded[1]["id"])
+	AssertEqual(Profiles[1]["system_single"], Decoded[1]["system_single"])
+	AssertEqual(true, Decoded[1]["batch"])
+	AssertEqual(false, _LLM_Menu_DeserializeUserProfiles("v1:not-base64"))
+}
+Test("LLM persist: custom profiles use a lossless versioned codec",
+	Test_LLM_Persist_LosslessCustomProfiles)
+
+Test_LLM_Persist_LosslessAppOverrides() {
+	Overrides := Map("semi;tool", "advanced", "eq=tool", "basic", "éditeur", "raw")
+	Payload := _LLM_Menu_SerializeAppProfileOverrides(Overrides)
+	Assert(SubStr(Payload, 1, 3) == "v1:", "override payload must be versioned")
+	Decoded := _LLM_Menu_DeserializeAppProfileOverrides(Payload)
+	Assert(Decoded is Map, "override payload must decode")
+	AssertEqual(3, Decoded.Count)
+	AssertEqual("advanced", Decoded["semi;tool"])
+	AssertEqual("basic", Decoded["eq=tool"])
+	AssertEqual("raw", Decoded["éditeur"])
+	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("dup=raw;dup=basic"))
+	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("broken"))
+}
+Test("LLM persist: app overrides round-trip delimiter and Unicode basenames",
+	Test_LLM_Persist_LosslessAppOverrides)

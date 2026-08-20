@@ -114,3 +114,27 @@ _RPFCM_MalformedBodyReturnsEmpty() {
 		"a non-JSON error body must parse to empty string, not throw")
 }
 Test("_LLMRemoteParseResponse: malformed body returns empty (remote-parse-first-content-match)", _RPFCM_MalformedBodyReturnsEmpty)
+
+_RPFCM_RecognizedEmptyNeverPromotesDecoy() {
+	Vectors := [
+		["openai", '{"reasoning":{"content":"secret"},"choices":[{"message":{"content":""}}]}'],
+		["anthropic", '{"content":[{"type":"thinking","text":"secret"},{"type":"text","text":""}]}'],
+		["gemini", '{"metadata":{"text":"secret"},"candidates":[{"content":{"parts":[{"text":""}]}}]}']
+	]
+	for Vector in Vectors
+		AssertEqual("", _LLMRemoteParseResponse(Vector[1], Vector[2]),
+			Vector[1] . " recognized-empty canonical output must not promote a decoy")
+}
+Test("_LLMRemoteParseResponse: recognized empty output suppresses compatibility fallback", _RPFCM_RecognizedEmptyNeverPromotesDecoy)
+
+_RPFCM_CompleteFieldInsideMalformedEnvelopeIsRejected() {
+	Vectors := [
+		["openai", '{"choices":[{"message":{"content":"wrong partial output"}}]'],
+		["anthropic", '{"content":[{"type":"text","text":"wrong partial output"}]'],
+		["gemini", '{"candidates":[{"content":{"parts":[{"text":"wrong partial output"}]}}]']
+	]
+	for Vector in Vectors
+		AssertEqual("", _LLMRemoteParseResponse(Vector[1], Vector[2]),
+			Vector[1] . " malformed envelope must never regex-recover a complete field")
+}
+Test("_LLMRemoteParseResponse: malformed complete-field envelopes are terminal failures", _RPFCM_CompleteFieldInsideMalformedEnvelopeIsRejected)

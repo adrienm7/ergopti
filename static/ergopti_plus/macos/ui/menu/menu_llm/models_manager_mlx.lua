@@ -203,32 +203,48 @@ function M.new(deps, presets)
 	-- =====================================
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local function still_current()
+			local ok, current = Logger.callback(LOG,
+				"MLX requirement freshness check", is_current)
+			return ok and current == true
+		end
+		if not still_current() then return end
 		if not target_model or target_model == "" then 
-			if type(on_success) == "function" then on_success() end
+			if still_current() and type(on_success) == "function" then
+				Logger.callback(LOG, "Empty MLX requirement success", on_success)
+			end
 			return 
 		end
 		Logger.debug(LOG, "Checking MLX requirements for model %s…", tostring(target_model))
 
 		local function do_check()
+			if not still_current() then return end
 			local installed = obj.get_installed_models()
 			if installed[target_model] then
 				Logger.info(LOG, "MLX model %s is installed. Starting server…", tostring(target_model))
-				obj.start_server(target_model, on_success, on_cancel, opts)
+				if still_current() then obj.start_server(target_model, on_success, on_cancel, opts) end
 			else
 				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)
 				if not repo then 
 					pcall(notifications.notify, i18n.get("mlx.model_unavailable"), string.format(i18n.get("mlx.model_unavailable_body"), target_model), "error")
-					if on_cancel then on_cancel() end 
+					if type(on_cancel) == "function" then
+						Logger.callback(LOG, "Unavailable MLX model", on_cancel)
+					end
 					return 
 				end
 				
 				if type(deps.shared_system_check) == "function" then
-					deps.shared_system_check(target_model, "Apple MLX", repo, function()
-						obj.pull_model(target_model, repo, on_success)
+					local check_ok, accepted = Logger.callback(LOG, "MLX shared system check",
+						deps.shared_system_check, target_model, "Apple MLX", repo, function()
+						if still_current() then obj.pull_model(target_model, repo, on_success) end
 					end, on_cancel)
+					if (not check_ok or accepted == false) and type(on_cancel) == "function" then
+						Logger.callback(LOG, "MLX system-check failure", on_cancel)
+					end
 				else
-					obj.pull_model(target_model, repo, on_success)
+					if still_current() then obj.pull_model(target_model, repo, on_success) end
 				end
 			end
 		end
@@ -250,6 +266,7 @@ function M.new(deps, presets)
 		local check_task
 		check_task = TaskLifecycle.native("MLX requirement check", "/bin/bash", function(code)
 			if check_task then M._active_tasks[check_task] = nil end
+			if not still_current() then return end
 			if code == 0 then
 				do_check()
 			else
@@ -333,7 +350,9 @@ function M.new(deps, presets)
 				Logger.error(LOG, "MLX model delete failed for %s: %s", tostring(model_name), tostring(stderr))
 				pcall(notifications.notify, i18n.get("mlx.model_deleted"), model_name, "error")
 			end
-			pcall(deps.update_menu)
+			if type(deps.update_menu) == "function" then
+				Logger.callback(LOG, "MLX model deletion menu refresh", deps.update_menu)
+			end
 		end, {"-rf", path})
 
 		if delete_task then

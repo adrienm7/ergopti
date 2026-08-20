@@ -1276,6 +1276,13 @@ _OnPrefixChar(IH, Char) {
 		_HseFeedTick := HotPath_Now()
                 HSEMatch := HSE_FeedChar(Char, true)
 		HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick, Char)
+		; A deferred terminal edit owns the already-matched prefix. Preserve any
+		; newly typed physical suffix in both buffers, but do not start a second
+		; expansion that would compete for the same visible text.
+		if HSE_TerminalTransactionPending() {
+			_PrefixAppendTypedChar(Char)
+			return
+		}
 		; When no registered hotstring matched, try the engine-level repeat
 		; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
 		; letter of the current word. This replaces the now-removed [[repeat]]
@@ -1315,6 +1322,12 @@ _OnPrefixChar(IH, Char) {
 			; part that actually correlates with dispatch cost.
 			HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick,
 				HotstringIsPrivate ? PersonalInfoRedactForLog(HSEMatch.Trigger) : HSEMatch.Trigger)
+			if (_HseFired is Map) && _HseFired.Has("Pending") {
+				; Scheduling is not a fire verdict. The owner will commit buffers,
+				; preview, metrics, and ring state after successful output.
+				_PrefixAppendTypedChar(Char)
+				return
+			}
 			; Log the fired hotstring. ``h_type`` is taken from the
 			; preceding suggestion when available (richest categorisation —
 			; "autocorrection", "personal", …) and falls back to a basic

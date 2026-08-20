@@ -192,7 +192,7 @@ ConfigTransitionRetainBarrier(Bundle) {
 ConfigTransitionRetainedBarrier() {
 	global _ConfigTransitionRetainedBarrier
 	PreviousCritical := Critical("On")
-	try return (_ConfigTransitionRetainedBarrier is Object)
+	try return (IsSet(_ConfigTransitionRetainedBarrier) && _ConfigTransitionRetainedBarrier is Object)
 		? _ConfigTransitionRetainedBarrier : false
 	finally Critical(PreviousCritical)
 }

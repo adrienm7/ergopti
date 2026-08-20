@@ -550,6 +550,7 @@ function M.make_logger_stub()
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
 		ring_buffer_snapshot = function() return {} end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
+		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 		build   = function() return noop end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,

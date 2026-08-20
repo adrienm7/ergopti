@@ -188,16 +188,84 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		return true
 }
 
-; Builds the crash report and shows the opt-in prompt. Always invoked off the input
-; thread via a one-shot SetTimer from ErgoptiGlobalErrorHandler, so its blocking
-; WMI/RegRead/git/healthcheck work cannot starve the keyboard hook (crash-build-offthread).
+global _CrashReportWorkerOwners := Map()
+global _CrashReportWorkerSerial := 0
+
+_CrashReport_EncodePowerShellCommand(Command) {
+	Bytes := Buffer(StrLen(Command) * 2, 0)
+	if Bytes.Size
+		DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", StrPtr(Command), "UPtr", Bytes.Size)
+	return CryptoBase64Encode(Bytes)
+}
+
+_CrashReport_WorkerSource() {
+	return '$ErrorActionPreference="Stop";'
+		. '$snapshot=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($args[0]))|ConvertFrom-Json;'
+		. '$snapshot|Add-Member os_name ([Environment]::OSVersion.VersionString) -Force;'
+		. '$snapshot|Add-Member os_arch $env:PROCESSOR_ARCHITECTURE -Force;'
+		. '$snapshot|Add-Member locale ([Globalization.CultureInfo]::CurrentCulture.Name) -Force;'
+		. '$os=Get-CimInstance Win32_OperatingSystem;'
+		. '$cpu=Get-CimInstance Win32_Processor|Select-Object -First 1;'
+		. '$snapshot|Add-Member os_build ([string]$os.BuildNumber) -Force;'
+		. '$snapshot|Add-Member cpu_name ([string]$cpu.Name) -Force;'
+		. '$snapshot|Add-Member cpu_cores ([string]$cpu.NumberOfLogicalProcessors) -Force;'
+		. '$snapshot|Add-Member ram_total_gb ([math]::Round($os.TotalVisibleMemorySize/1MB,2)) -Force;'
+		. '$snapshot|Add-Member ram_free_gb ([math]::Round($os.FreePhysicalMemory/1MB,2)) -Force;'
+		. '$dir=Join-Path $snapshot.config_dir "autohotkey\crash_reports";'
+		. '[IO.Directory]::CreateDirectory($dir)|Out-Null;'
+		. '$name="{0}_{1}.json" -f (Get-Date -Format "yyyy-MM-ddTHH-mm-ss"),[guid]::NewGuid().ToString("N");'
+		. '$path=Join-Path $dir $name;'
+		. '[IO.File]::WriteAllText($path,($snapshot|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false));'
+		. 'Write-Output ("OK:"+$path)'
+}
+
+_CrashReport_WorkerDone(OwnerId, ReleaseDedup, ExitCode, Stdout, Stderr) {
+	global _CrashReportWorkerOwners
+	if !_CrashReportWorkerOwners.Has(OwnerId)
+		return
+	Owner := _CrashReportWorkerOwners[OwnerId]
+	_CrashReportWorkerOwners.Delete(OwnerId)
+	Text := Trim(Stdout . "`n" . Stderr)
+	if (ExitCode = 0 and RegExMatch(Text, "m)^OK:(.+)$", &Match)) {
+		try LoggerSuccess("CrashReporter", "Crash report saved by worker: {1}.", Match[1])
+		try NotifierSend(Match[1], Map("title", t("crash.report.saved_title"), "level", "info"))
+		return
+	}
+	if ReleaseDedup
+		try ReleaseDedup()
+	try LoggerError("CrashReporter", "Crash-report worker failed (exit={1}): {2}.", ExitCode, Text)
+}
+
+; The timer only snapshots cheap in-memory state and starts a retained child.
+; WMI, JSON serialization and filesystem work execute in PowerShell, outside
+; AHK's cooperative scheduler and therefore outside the keyboard-hook thread.
 _ErgoptiDeferredCrashReport(Exc, ReleaseDedup := 0) {
+	global _CrashReportWorkerOwners, _CrashReportWorkerSerial, _ConfigDir
 	try {
-		Report := CrashReport_Build(Exc)
-		; Release the throttle when nothing was actually written, so the next
-		; occurrence of this fault is reported instead of silently suppressed.
-		if (!CrashReport_PromptUser(Report) and ReleaseDedup)
-			try ReleaseDedup()
+		Snapshot := Map(
+			"version", Updater_CurrentVersion(), "driver", "autohotkey",
+			"timestamp", _CrashReport_IsoTimestamp(), "config_dir", _ConfigDir,
+			"error_type", Type(Exc),
+			"error_msg", Exc.HasProp("Message") ? Exc.Message : "",
+			"error_extra", Exc.HasProp("Extra") ? String(Exc.Extra) : "",
+			"error_what", Exc.HasProp("What") ? String(Exc.What) : "",
+			"error_file", Exc.HasProp("File") ? String(Exc.File) : "",
+			"error_line", Exc.HasProp("Line") ? String(Exc.Line) : "",
+			"stack_trace", Exc.HasProp("Stack") ? Exc.Stack : "",
+			"log_tail", _CrashReport_JoinNewlines(LoggerRingBufferSnapshot()))
+		Payload := CryptoBase64EncodeUtf8(_CrashReport_ToJson(Snapshot))
+		WorkerId := ++_CrashReportWorkerSerial
+		Done := _CrashReport_WorkerDone.Bind(WorkerId, ReleaseDedup)
+		Task := ShellRunner_Spawn(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+			 "-EncodedCommand", _CrashReport_EncodePowerShellCommand(_CrashReport_WorkerSource()), Payload], Done)
+		_CrashReportWorkerOwners[WorkerId] := Task
+		if !Task.start() {
+			_CrashReportWorkerOwners.Delete(WorkerId)
+			if ReleaseDedup
+				try ReleaseDedup()
+			try LoggerError("CrashReporter", "Crash-report worker could not start.")
+		}
 	} catch as Err {
 		if ReleaseDedup
 			try ReleaseDedup()

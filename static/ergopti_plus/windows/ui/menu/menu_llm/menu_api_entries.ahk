@@ -107,13 +107,16 @@ _LLM_Menu_SelectApiEntry(Entry) {
 _LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId) {
 	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
 		return false
+	Matches := 0
 	for Entry in Candidate["api_entries"] {
 		if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId {
-			Candidate["api_entry_id"] := EntryId
-			return true
+			Matches += 1
 		}
 	}
-	return false
+	if (Matches != 1)
+		return false
+	Candidate["api_entry_id"] := EntryId
+	return true
 }
 
 
@@ -319,15 +322,15 @@ _LLM_Menu_RemoveApiEntryCandidate(Candidate, EntryId) {
 	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
 		return false
 	Kept := []
-	Removed := false
+	Removed := 0
 	for Entry in Candidate["api_entries"] {
 		if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId {
-			Removed := true
+			Removed += 1
 			continue
 		}
 		Kept.Push(Entry)
 	}
-	if !Removed
+	if (Removed != 1)
 		return false
 	Candidate["api_entries"] := Kept
 	Candidate["api_entry_id"] := (Kept.Length > 0)
@@ -353,7 +356,9 @@ _LLM_Menu_NewApiId() {
 	; Tick-based id keeps it monotonic without pulling a UUID lib. Collisions
 	; would only happen on two adds within the same millisecond — vanishingly
 	; unlikely from a user-driven dialog flow.
-	return "api_" . A_TickCount
+	static Sequence := 0
+	Sequence += 1
+	return "api_" . A_TickCount . "_" . Sequence
 }
 
 
@@ -394,6 +399,7 @@ _LLM_Menu_LoadApiEntries() {
 		return
 	}
 	entries := []
+	seen_ids := Map()
 	; Split the array into top-level object blocks via a state-aware scanner
 	; (NOT a regex like ``{[^{}]*}``). A token that happens to contain a
 	; literal ``{`` or ``}`` would silently truncate one entry and shift the
@@ -414,8 +420,16 @@ _LLM_Menu_LoadApiEntries() {
 		; keep working unchanged until the next persist re-encrypts.
 		if (obj["Token"] != "")
 			obj["Token"] := LLM_ApiToken_Decrypt(obj["Token"])
-		if (obj["Id"] != "")
+		if (obj["Id"] != "") {
+			if seen_ids.Has(obj["Id"]) {
+				OldId := obj["Id"]
+				obj["Id"] := _LLM_Menu_NewApiId()
+				LoggerError("LLM", "Duplicate API entry id '{1}' was quarantined as '{2}'.",
+					OldId, obj["Id"])
+			}
+			seen_ids[obj["Id"]] := true
 			entries.Push(obj)
+		}
 	}
 	_LLM_Menu["api_entries"] := entries
 	; Re-anchor the active id only if it still exists; otherwise pick the

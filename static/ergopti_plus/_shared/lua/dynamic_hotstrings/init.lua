@@ -27,6 +27,8 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local utf8_lib = (type(utf8) == "table" and utf8.len)
+	and utf8 or require("compat.utf8")
 
 local LOG = "dynamic_hotstrings.shared"
 
@@ -122,7 +124,7 @@ function M.add_rule(suffix, section, resolver)
 		Logger.warn(LOG, "add_rule: invalid arguments — skipped.")
 		return false
 	end
-	local valid_utf8, suffix_len = pcall(utf8.len, suffix)
+	local valid_utf8, suffix_len = pcall(utf8_lib.len, suffix)
 	if not valid_utf8 or type(suffix_len) ~= "number" or suffix_len < 1 then
 		Logger.warn(LOG, "add_rule: suffix must be non-empty valid UTF-8 — skipped.")
 		return false

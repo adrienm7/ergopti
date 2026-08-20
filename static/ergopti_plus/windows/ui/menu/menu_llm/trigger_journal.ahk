@@ -90,6 +90,8 @@ _LLM_TriggerJournalClearReadOnly() {
 
 LLM_TriggerJournalIsReadOnly() {
 	global _LLM_TriggerJournalReadOnly
+	if !IsSet(_LLM_TriggerJournalReadOnly)
+		return true
 	PreviousCritical := Critical("On")
 	try return _LLM_TriggerJournalReadOnly
 	finally Critical(PreviousCritical)
@@ -97,6 +99,8 @@ LLM_TriggerJournalIsReadOnly() {
 
 LLM_TriggerJournalReadOnlyKind() {
 	global _LLM_TriggerJournalReadOnlyKind
+	if !IsSet(_LLM_TriggerJournalReadOnlyKind)
+		return "startup"
 	PreviousCritical := Critical("On")
 	try return _LLM_TriggerJournalReadOnlyKind
 	finally Critical(PreviousCritical)

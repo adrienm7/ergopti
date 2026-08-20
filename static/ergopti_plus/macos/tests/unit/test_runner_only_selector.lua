@@ -29,18 +29,18 @@ local MODULES = {
 
 local SOURCES = {
 	["tests.unit.test_target"] = [[
-		helpers.it("focused target case", function() end)
+		helpers.it("focused target case", function() return "target" end)
 	]],
 	["tests.unit.test_dynamic"] = [[
 		for _, suffix in ipairs(vectors) do
-			helpers.it("dynamic " .. suffix, function() end)
+			helpers.it("dynamic " .. suffix, function() return suffix end)
 		end
 	]],
 	["tests.unit.test_unrelated"] = [[
 		-- focused target case is documentation, not a registered test.
-		local fixture = 'helpers.it("focused target case", function() end)'
+		local fixture = 'helpers.it("focused target case", function() return "doc" end)'
 		if os.getenv("SENTINEL") then error("unrelated module loaded") end
-		helpers.it("unrelated case", function() end)
+		helpers.it("unrelated case", function() return "unrelated" end)
 	]],
 }
 

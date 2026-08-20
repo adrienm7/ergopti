@@ -630,9 +630,14 @@ function M.enable_all()  CoreState.enabled = true  end
 --- mouseUp, but until then the OS is left with a button stuck down or
 --- native scroll still swallowed (gestures-disable-all-stuck-click, F-MED-22).
 function M.disable_all()
-	pcall(Engine.unblock_scroll)
-	pcall(Actions.force_cleanup)
+	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
+	local ok_cleanup, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
+	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result ~= true then
+		Logger.error(LOG, "Gesture disable cleanup refused; feature state preserved.")
+		return false
+	end
 	CoreState.enabled = false
+	return true
 end
 function M.enable(name)  if name == "all" then CoreState.enabled = true  end end
 -- Delegates to M.disable_all() (single source of truth) so this legacy
@@ -646,19 +651,25 @@ function M.is_enabled()  return CoreState.enabled end
 -- ON/OFF via the menu during pause has the correct effect at resume — we never
 -- clobber the user's intent with a stale snapshot.
 function M.suspend()
-	CoreState.suspended = true
 	-- "Pause = everything off": also quiesce state armed mid-gesture. The suspended
 	-- flag only gates NEW activity; a scroll-block armed by a 3+finger gesture keeps
 	-- swallowing native scroll until finger-lift, and a held synthetic click-lock
 	-- (left/right_click_toggle) keeps its drag + key-watcher eventtaps live. Release
 	-- both here, exactly as M.stop() does (force_cleanup is idempotent).
-	pcall(Engine.unblock_scroll)
-	pcall(Actions.force_cleanup)
+	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
+	local ok_cleanup, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
+	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result ~= true then
+		Logger.error(LOG, "Gesture suspend cleanup refused; suspend not published.")
+		return false
+	end
+	CoreState.suspended = true
 	Logger.debug(LOG, "Gestures suspended (feature flag preserved).")
+	return true
 end
 function M.resume()
 	CoreState.suspended = false
 	Logger.debug(LOG, "Gestures resumed.")
+	return true
 end
 function M.is_suspended() return CoreState.suspended end
 
@@ -1142,7 +1153,7 @@ function M.stop()
 	--    events are still dispatched while the module is logically running.
 	--    Skipping this leaves the OS stuck with a button held down
 	--    (gesture-stuck-click-on-stop).
-	pcall(Actions.force_cleanup)
+	local cleanup_ok, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
 
 	CoreState.enabled = false
 
@@ -1167,7 +1178,8 @@ function M.stop()
 		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
 	end
 
-	if watchers_stopped ~= true or timer_stopped ~= true
+	if not cleanup_ok or cleanup_result ~= true
+		or watchers_stopped ~= true or timer_stopped ~= true
 		or primer_stopped ~= true or wake_watcher_stopped ~= true
 		or not engine_stopped or engine_stop_result == false then
 		Logger.error(LOG, "Gestures module stop incomplete; native cleanup is retryable.")

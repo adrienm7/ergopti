@@ -170,7 +170,7 @@ KL_BuildInsertHotstring(e, id, kind) {
 KL_BuildInsertLlm(e, id, kind) {
     ts := e["timestamp"]
     return Format(
-        "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15});",
+        "INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
@@ -183,7 +183,11 @@ KL_BuildInsertLlm(e, id, kind) {
         KL_SqlNum(KL_GetMap(e, "deletes", "")),
         KL_SqlNullable(KL_GetMap(e, "deleted_text", "")),
         KL_SqlNum(KL_GetMap(e, "net_saved_chars", "")),
-        KL_SqlNum(KL_GetMap(e, "count", ""))
+        KL_SqlNum(KL_GetMap(e, "count", "")),
+        KL_SqlNum(KL_GetMap(e, "prompt_tokens", "")),
+        KL_SqlNum(KL_GetMap(e, "completion_tokens", "")),
+        KL_SqlNum(KL_GetMap(e, "total_tokens", "")),
+        KL_SqlNum(KL_GetMap(e, "est_cost_usd", ""))
     )
 }
 

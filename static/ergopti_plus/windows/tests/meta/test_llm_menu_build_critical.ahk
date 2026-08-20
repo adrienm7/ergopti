@@ -31,8 +31,10 @@ _LMBC_BuildIsStaged() {
 		"LLM_Menu_Build must construct a detached staged Menu while retaining the old published handle")
 	Assert(InStr(Body, "_LLM_Menu_Handle.Delete()") == 0,
 		"LLM_Menu_Build must not delete the live submenu before the staged replacement is complete")
-	Assert(InStr(Body, "_PublishCritical := Critical") > 0 and InStr(Body, 'A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)') > 0,
-		"LLM_Menu_Build must publish the staged submenu in its short Critical commit")
+	Assert(InStr(Body, "RebuildTrayMenu()") > 0,
+		"LLM_Menu_Build must submit the detached submenu to the root coordinator")
+	Assert(InStr(Body, "A_TrayMenu.Add") == 0,
+		"LLM_Menu_Build must not mutate the live root independently")
 	Assert(InStr(Body, "if !Published") > 0 and InStr(Body, "_LLM_Menu_Handle := OldHandle") > 0,
 		"a failed staged build must restore the old live submenu instead of publishing a partial tree")
 }

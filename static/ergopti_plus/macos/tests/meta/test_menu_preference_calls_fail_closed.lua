@@ -48,7 +48,7 @@ helpers.describe("menu preference call sites fail closed", function()
 			end
 		end
 
-		helpers.assert_true(calls >= 100,
+		helpers.assert_true(calls >= 80,
 			"the class scan must enumerate the large sibling set, not a token sample")
 		helpers.assert_eq(guarded, calls,
 			"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "

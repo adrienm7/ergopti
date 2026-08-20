@@ -135,6 +135,13 @@ M.DEFAULT_STATE = {
 -- Cached result of the last async server health check.
 -- nil = not yet checked, true = server responded, false = server unreachable.
 local _llm_health_status = nil
+local _llm_health_generation = 0
+
+--- Revokes every pending health writer and clears the shared display value.
+local function invalidate_llm_health()
+	_llm_health_generation = _llm_health_generation + 1
+	_llm_health_status = nil
+end
 
 --- Resets the cached health-status flag to nil (not-yet-checked).
 --- probe_llm_health() intentionally skips the "api" backend entirely (no
@@ -144,18 +151,27 @@ local _llm_health_status = nil
 --- back again (F-LOW-6). Call this whenever the active backend changes to
 --- "api" so the indicator starts from a clean, honest "not applicable" state.
 function M.reset_llm_health_status()
-	_llm_health_status = nil
+	invalidate_llm_health()
+	Logger.debug(LOG, "Invalidated LLM health status.")
 end
 
 --- Fires an async health probe against the active backend.
 --- Updates _llm_health_status and calls refresh_fn() when the result arrives.
---- @param backend string "mlx" or "ollama".
+--- @param state table The authoritative live LLM state.
 --- @param refresh_fn function Called with no args after the result is stored.
-local function probe_llm_health(backend, refresh_fn)
+local function probe_llm_health(state, refresh_fn)
+	local backend = type(state) == "table" and state.llm_backend or nil
 	-- In API backend mode there is no local server to probe. Skip the health
 	-- check entirely to avoid lighting the orange "warming" indicator based on
 	-- a residual MLX server that happens to be listening on the same port.
 	if backend == "api" then return end
+	if backend ~= "mlx" and backend ~= "ollama" then
+		Logger.error(LOG, "Cannot probe LLM health for invalid backend '%s'.", tostring(backend))
+		return
+	end
+	_llm_health_generation = _llm_health_generation + 1
+	local generation = _llm_health_generation
+	local backend_at_dispatch = backend
 	local url
 	if backend == "ollama" then
 		url = "http://127.0.0.1:11434/api/version"
@@ -166,6 +182,8 @@ local function probe_llm_health(backend, refresh_fn)
 	end
 
 	hs.http.asyncGet(url, {}, function(status)
+		if generation ~= _llm_health_generation then return end
+		if state.llm_backend ~= backend_at_dispatch or state.llm_enabled ~= true then return end
 		-- Any HTTP response (even 4xx) means the server is reachable
 		_llm_health_status = (type(status) == "number" and status > 0)
 		if type(refresh_fn) == "function" then pcall(refresh_fn) end
@@ -177,6 +195,7 @@ end
 --- Safe to call even when no server is active or before M.create() has been called.
 --- Intended for the Hammerspoon shutdown callback to prevent orphaned Python processes.
 function M.stop_mlx_server()
+	M.reset_llm_health_status()
 	if _active_models_mgr and type(_active_models_mgr.stop_mlx_server_if_needed) == "function" then
 		pcall(_active_models_mgr.stop_mlx_server_if_needed)
 	end
@@ -190,6 +209,7 @@ end
 --- revoked the exact remap lease + flushed the keylogger but left the MLX server
 --- + helpers alive). Stock Karabiner processes are never owned by Ergopti.
 function M.terminate_helper_processes()
+	M.reset_llm_health_status()
 	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
 	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
 	-- The `ollama serve` wrapper this driver launches is a third helper and was
@@ -209,6 +229,7 @@ end
 --- this, script_quit left the GPU-resident server holding the port (F-M7). The port
 --- is read from the single source api_mlx.get_port().
 function M.terminate_orphan_mlx_server()
+	M.reset_llm_health_status()
 	pcall(function()
 		local ok_m, am = pcall(require, "modules.llm.api_mlx")
 		local raw_port = (ok_m and type(am.get_port) == "function" and am.get_port())
@@ -287,6 +308,7 @@ function M.create(deps)
 		
 		deps.active_tasks = deps.active_tasks or {}
 		local state       = deps.state
+		M.reset_llm_health_status()
 		
 		-- Migration logic for older configs
 		if state.llm_use_mlx ~= nil then
@@ -324,6 +346,12 @@ function M.create(deps)
 								return false
 						end
 						return paused ~= true
+				end,
+				pause_epoch = function()
+						local script_control = deps.script_control
+						if not script_control or type(script_control.get_pause_epoch) ~= "function" then return 0 end
+						local ok, epoch = xpcall(script_control.get_pause_epoch, debug.traceback)
+						return ok and tonumber(epoch) or -1
 				end,
 		})
 		local switch_model                     = switcher.switch_model
@@ -562,7 +590,7 @@ function M.create(deps)
 				-- update_menu → build loop at ~10-20 rebuilds/second with live HTTP requests.
 				if state.llm_enabled and not paused then
 						local probe_snapshot = _llm_health_status
-						probe_llm_health(state.llm_backend or "mlx", function()
+						probe_llm_health(state, function()
 								if _llm_health_status ~= probe_snapshot then
 										pcall(update_menu)
 								end
@@ -889,6 +917,7 @@ function M.create(deps)
 												Logger.warn(LOG, "keymap.set_llm_enabled is unavailable.")
 										end
 										if save_prefs() ~= true then return false end
+										if enabled ~= true then M.reset_llm_health_status() end
 										return true
 								end
 

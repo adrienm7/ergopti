@@ -81,6 +81,7 @@ local TAP_WATCHDOG_INTERVAL_SEC = 2
 
 -- Module-level state
 local _is_paused       = false
+local _pause_epoch     = 0
 local _pause_transition = nil
 local _queued_pause_target = nil
 local _pause_transition_serial = 0
@@ -431,6 +432,46 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
+	local remote, remote_reason = require_pause_module("modules.llm.api_remote")
+	if remote_reason then return false, remote_reason end
+	if remote then
+		ok_step, step_reason = add_required_step(
+			"api_remote.stop_warmup",
+			remote.stop_warmup,
+			nil,
+			"invalidates one in-flight remote readiness probe"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	for _, owner in ipairs({
+		{ module = "ui.wpm.wpm_menubar", label = "wpm_menubar" },
+		{ module = "ui.wpm.wpm_widget", label = "wpm_widget" },
+	}) do
+		local surface, surface_reason = require_pause_module(owner.module)
+		if surface_reason then return false, surface_reason end
+		if surface then
+			local was_running = type(surface.is_running) == "function" and surface.is_running() == true
+			if was_running then
+				ok_step, step_reason = add_required_step(
+					owner.label .. ".stop", surface.stop, surface.start)
+				if not ok_step then return false, step_reason end
+			end
+		end
+	end
+
+	local onboarding, onboarding_reason = require_pause_module("platform.remap.onboarding")
+	if onboarding_reason then return false, onboarding_reason end
+	if onboarding then
+		ok_step, step_reason = add_required_step(
+			"remap_onboarding.stop",
+			onboarding.stop,
+			nil,
+			"a cancelled privileged installation must be restarted explicitly"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
 	-- reset_predictions is required and intentionally one-way: re-arming a stale
 	-- streaming generation after rollback would let an obsolete response paint.
 	ok_step, step_reason = add_required_step(
@@ -643,10 +684,7 @@ end
 --- @param target_paused boolean Settled pause state.
 local function publish_pause_state(target_paused)
 	if type(_on_pause_change) == "function" then
-		local ok_listener, listener_err = pcall(_on_pause_change, target_paused)
-		if not ok_listener then
-			Logger.error(LOG, "Pause-change listener failed after commit: %s.", tostring(listener_err))
-		end
+		Logger.callback(LOG, "Pause-change listener", _on_pause_change, target_paused)
 	end
 	if target_paused then
 		notifications.notify(i18n.get("script_control.paused"), nil, "warning")
@@ -870,6 +908,9 @@ request_pause_transition = function(target_paused)
 		return true
 	end
 	if _is_paused == target_paused then return true end
+	-- Every requested edge invalidates asynchronous work latched in the preceding
+	-- runtime epoch, even when native publication later refuses and is retried.
+	_pause_epoch = _pause_epoch + 1
 
 	local integration_enabled = false
 	if _karabiner and type(_karabiner.get_enabled) ~= "function" then
@@ -922,11 +963,13 @@ end
 --- @return boolean true if the handler ran (or returned without error).
 local function call_extra(name)
 	if type(_extras[name]) == "function" then
-		pcall(_extras[name])
+		local ok, handled = Logger.callback(LOG,
+			"Script-control extra '" .. tostring(name) .. "'", _extras[name])
+		return ok == true and handled ~= false
 	else
 		Logger.debug(LOG, "Action '%s' has no registered handler in extras.", name)
 	end
-	return true
+	return false
 end
 
 local function dispatch_action(action, binding)
@@ -946,14 +989,16 @@ local function dispatch_action(action, binding)
 
 	-- Use centralized action dispatcher for everything else
 	Logger.debug(LOG, "Dispatching centralized action: %s…", action)
-	local ok_exec, handled = pcall(GestActions.execute_single, action, binding)
+	local ok_exec, handled = Logger.callback(LOG,
+		"Central script-control action '" .. tostring(action) .. "'",
+		GestActions.execute_single, action, binding)
 	-- …and fall back to the extras table when the central registry does not know
 	-- the action. call_extra had NO caller, so M.set_extras stored handlers that
 	-- nothing could ever reach: a public API documenting a dispatch path that did
 	-- not exist. Registering a handler and watching it never fire is worse than
 	-- having no extension point at all.
 	if not ok_exec or handled ~= true then
-		call_extra(action)
+		return call_extra(action)
 	end
 	return true
 end
@@ -964,7 +1009,8 @@ local function log_shortcut_if_available(label)
 	local ok_kl, kl = pcall(require, "modules.keylogger")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		local app = hs.application.frontmostApplication()
-		pcall(kl.log_shortcut, label, app and app:title() or "Unknown")
+		Logger.callback(LOG, "Shortcut telemetry", kl.log_shortcut,
+			label, app and app:title() or "Unknown")
 	end
 end
 
@@ -997,7 +1043,7 @@ local function handle_key(e)
 			function()
 				Logger.info(LOG, log_format, tostring(action))
 				log_shortcut_if_available(label)
-				dispatch_action(action, M.BINDING_PREFIX .. binding)
+				return dispatch_action(action, M.BINDING_PREFIX .. binding)
 			end)
 	end
 
@@ -1167,7 +1213,8 @@ function M.start(keymap, shortcuts, gestures, karabiner)
 		if generation ~= _tap_generation or _tap ~= tap_candidate or not _tap_committed then
 			return false
 		end
-		local ok_handler, consume, replacement_events = Logger.pcall(LOG, handle_key, event)
+		local ok_handler, consume, replacement_events = Logger.callback(
+			LOG, "Script-control eventtap", handle_key, event)
 		if not ok_handler then return false end
 		return consume, replacement_events
 	end)
@@ -1275,6 +1322,10 @@ function M.is_paused()
 	return _is_paused
 end
 
+function M.get_pause_epoch()
+	return _pause_epoch
+end
+
 --- Configures the action triggered by a specific key slot.
 --- @param keyname string "return_key", "backspace", or "escape".
 --- @param action string One of the recognised action ids.
@@ -1323,7 +1374,9 @@ end
 --- Programmatically toggles the paused state (same as pressing the configured key).
 function M.toggle()
 	Logger.debug(LOG, "Programmatic pause toggle requested.")
-	pcall(dispatch_action, "script_pause_toggle")
+	local ok, handled = Logger.callback(LOG, "Programmatic pause toggle",
+		dispatch_action, "script_pause_toggle")
+	return ok == true and handled == true
 end
 
 --- Requests the same transactional pause as the pause key. State, listeners,

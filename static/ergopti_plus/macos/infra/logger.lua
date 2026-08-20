@@ -1349,6 +1349,29 @@ function M.pcall(module_name, fn, ...)
 	return table.unpack(results, 1, results.n)
 end
 
+--- Invokes an externally supplied callback with contextual traceback logging.
+--- Unlike a discarded pcall, the exact success flag and return tuple are
+--- forwarded so the owner cannot publish success after the callback failed.
+--- @param module_name string Short module identifier used in the error log.
+--- @param label string Operation-specific callback label.
+--- @param fn function Callback to invoke.
+--- @param ... any Arguments forwarded to fn.
+--- @return boolean ok True only when the callback completed without raising.
+--- @return any result_or_error Exact callback result, or traceback on failure.
+function M.callback(module_name, label, fn, ...)
+	if type(fn) ~= "function" then
+		local reason = string.format("Callback '%s' is not callable", tostring(label))
+		_log("ERROR", module_name, "%s.", reason)
+		return false, reason
+	end
+	local results = table.pack(xpcall(fn, debug.traceback, ...))
+	if not results[1] then
+		_log("ERROR", module_name, "Callback '%s' raised: %s.",
+			tostring(label), tostring(results[2]))
+	end
+	return table.unpack(results, 1, results.n)
+end
+
 --- Wraps a builder function in a pcall and logs any failure at ERROR level.
 --- Returns nil on failure so callers can use the result as a truthiness guard.
 --- @param module_name string Short module identifier.

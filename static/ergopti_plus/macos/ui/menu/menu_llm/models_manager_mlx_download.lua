@@ -58,6 +58,15 @@ function M.install(ctx)
 	local project_venv_python_escaped = ctx.project_venv_python_escaped
 	local invalidate_installed_cache  = ctx.invalidate_installed_cache
 
+	local function update_icon(label, ...)
+		return Logger.callback(LOG, label, deps.update_icon, ...)
+	end
+
+	local function save_prefs(label)
+		local ok, saved = Logger.callback(LOG, label, deps.save_prefs)
+		return ok == true and saved == true
+	end
+
 	function obj.pull_model(target_model, repo, on_success)
 		-- Refuse re-entry while a download owns the shared slots.
 		--
@@ -107,7 +116,7 @@ function M.install(ctx)
 					deps.active_tasks["download_tail"] = nil
 				end
 				-- Always reset the menubar % — the poll/handle_done path won't run after a cancel
-				pcall(deps.update_icon)
+				update_icon("MLX download cancellation icon reset")
 				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 				if not silent then
 					pcall(notifications.notify, i18n.get("mlx.download_cancelled"), string.format(i18n.get("mlx.download_cancelled_body"), target_model), "warning")
@@ -332,7 +341,7 @@ function M.install(ctx)
 					on_retry = do_retry,
 				})
 			end
-			pcall(deps.update_icon, "📥 0%")
+			update_icon("MLX download initial icon", "📥 0%")
 			
 			local _bytes_done, _bytes_total = 0, estimated_bytes_total
 			local _current_pct = 0
@@ -435,7 +444,9 @@ function M.install(ctx)
 					end
 				end
 				local _icon_pct = math.min(_current_pct, 99)
-				if _icon_pct > 0 then pcall(deps.update_icon, "📥 " .. _icon_pct .. "%") end
+				if _icon_pct > 0 then
+					update_icon("MLX download progress icon", "📥 " .. _icon_pct .. "%")
+				end
 			end
 
 			-- Called once the Python exit file appears — reads exit code and finalises UI
@@ -449,7 +460,7 @@ function M.install(ctx)
 					deps.active_tasks["download"]      = nil
 					deps.active_tasks["download_tail"] = nil
 				end
-				pcall(deps.update_icon)
+				update_icon("MLX download completion icon reset")
 				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 
 				-- Flush any remaining buffered output before showing final status
@@ -473,10 +484,15 @@ function M.install(ctx)
 					if download_window then pcall(download_window.complete, true, target_model) end
 					deps.state.llm_model = target_model
 						invalidate_installed_cache()
-					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
-					if deps.save_prefs() ~= true then return false end
+					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then
+						Logger.callback(LOG, "MLX downloaded-model runtime sync",
+							deps.keymap.set_llm_model, target_model)
+					end
+					if not save_prefs("MLX downloaded-model preference save") then return false end
 					obj.start_server(target_model, function()
-						if on_success then pcall(on_success) end
+						if type(on_success) == "function" then
+							Logger.callback(LOG, "MLX download success", on_success)
+						end
 					end)
 				else
 					if download_window then pcall(download_window.complete, false, target_model, _saw_gated_error and "gated" or nil) end
@@ -525,7 +541,7 @@ function M.install(ctx)
 				-- set by the streaming callback which received the __DLPID__ sentinel
 				if not _dl_pid or code ~= 0 then
 					-- Reset icon here: handle_download_done will not run after a launcher failure
-					pcall(deps.update_icon)
+					update_icon("MLX launcher-failure icon reset")
 					if download_window then pcall(download_window.complete, false, target_model) end
 					pcall(notifications.notify, i18n.get("mlx.launcher_failed"), string.format(i18n.get("mlx.launcher_failed_body"), code), "error")
 					return
@@ -564,13 +580,13 @@ function M.install(ctx)
 				if deps.active_tasks then deps.active_tasks["download"] = launcher_task end
 				if not TaskLifecycle.start(launcher_task, "MLX detached download launcher") then
 					if deps.active_tasks then deps.active_tasks["download"] = nil end
-					pcall(deps.update_icon)
+					update_icon("MLX launcher-refusal icon reset")
 					if download_window then pcall(download_window.complete, false, target_model) end
 					pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
 						string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
 				end
 			else
-				pcall(deps.update_icon)
+				update_icon("MLX launcher-construction icon reset")
 				if download_window then pcall(download_window.complete, false, target_model) end
 				pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
 					string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
@@ -622,7 +638,7 @@ function M.install(ctx)
 
 		-- Re-register in active_tasks so the menu item and icon stay active
 		if deps.active_tasks then deps.active_tasks["download_tail"] = true end
-		pcall(deps.update_icon, "📥 …")
+		update_icon("MLX reattach initial icon", "📥 …")
 
 		-- Byte accounting, as UPVALUES. These used to be declared inside the
 		-- per-chunk handler below, so every chunk reset them: nothing accumulated and
@@ -660,7 +676,7 @@ function M.install(ctx)
 				deps.active_tasks["download"]      = nil
 				deps.active_tasks["download_tail"] = nil
 			end
-			pcall(deps.update_icon)
+			update_icon("MLX reattach cancellation icon reset")
 			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 			if not silent then
 				pcall(notifications.notify, i18n.get("mlx.download_cancelled"), string.format(i18n.get("mlx.download_cancelled_body"), model), "warning")
@@ -673,7 +689,7 @@ function M.install(ctx)
 				deps.active_tasks["download"]      = nil
 				deps.active_tasks["download_tail"] = nil
 			end
-			pcall(deps.update_icon)
+			update_icon("MLX reattach completion icon reset")
 			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 			local ef2 = io.open(exit_path, "r")
 			local exit_code = 1
@@ -685,7 +701,7 @@ function M.install(ctx)
 			if exit_code == 0 then
 				pcall(notifications.notify, i18n.get("mlx.model_installed"), string.format(i18n.get("mlx.model_ready"), model), "success")
 				if download_window then pcall(download_window.complete, true, model) end
-				if deps.save_prefs() ~= true then return false end
+				if not save_prefs("MLX reattached-model preference save") then return false end
 			else
 				if download_window then pcall(download_window.complete, false, model) end
 				pcall(notifications.notify, i18n.get("mlx.download_failed"), i18n.get("mlx.download_failed_body"), "error")
@@ -719,7 +735,7 @@ function M.install(ctx)
 			_current_pct = math.min(math.max(0, _current_pct), 99)
 
 			if _current_pct > 0 then
-				pcall(deps.update_icon, "📥 " .. _current_pct .. "%")
+				update_icon("MLX reattach progress icon", "📥 " .. _current_pct .. "%")
 			end
 			if download_window then
 				pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, out, _python_file_count)

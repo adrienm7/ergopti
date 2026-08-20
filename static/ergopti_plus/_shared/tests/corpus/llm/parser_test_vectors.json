@@ -288,9 +288,9 @@
 			"description": "Anthropic text block containing JSON-escaped characters.",
 			"parser": "remote",
 			"format": "anthropic",
-			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"c\\'est \\\"top\\\"\"}]}",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"c'est \\\"top\\\"\"}]}",
 			"expected": {
-				"text": "c\\'est \"top\"",
+				"text": "c'est \"top\"",
 				"ok": true
 			}
 		},

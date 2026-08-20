@@ -108,6 +108,7 @@
 				"enabled": { "type": "boolean" },
 				"onboarding_seen": { "type": "boolean" },
 				"app_profile_overrides": { "type": ["string", "object"] },
+				"user_profiles": { "type": "string" },
 				"display": {
 					"type": "object",
 					"additionalProperties": false,
