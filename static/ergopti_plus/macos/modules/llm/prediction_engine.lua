@@ -574,7 +574,7 @@ end
 --- @return number The debounce delay in seconds to use for this timer start.
 local function compute_adaptive_debounce()
 	-- Correction guard: never reduce delay while the user is still deleting
-	local cur_len = (_state and type(_state.buffer) == "string") and #_state.buffer or 0
+	local cur_len = (_state and type(_state.llm_buffer) == "string") and #_state.llm_buffer or 0
 	if cur_len < _last_request_buffer_len then
 		return inactivity_debounce_sec
 	end
@@ -806,7 +806,7 @@ function M.perform_check(force_trigger, profile_name)
 		return
 	end
 
-	local buffer = _state.buffer
+	local buffer = _state.llm_buffer
 
 	-- Delegate prompt parameter building to PromptBuilder.
 	-- Guarded: perform_check is the body of the module-level debounce timer, and
