@@ -190,7 +190,7 @@ asynchronous worker and completion protocol.
 ### project-swift-sdk-posix-imports
 
 Swift SDK imports can shadow libc functions with same-named structures and can
-remove private Foundation accessors. Keep BSD `flock` behind the symbol wrapper
+remove private Foundation accessors. Keep BSD `flock` behind the explicit C shim
 and build owned `posix_spawn` environments from `ProcessInfo.environment`.
 Cross-process descriptor tests use a debug-only role of the real launcher,
 started through `Process`/`posix_spawn`; Swift 6.3 marks imported `fork`

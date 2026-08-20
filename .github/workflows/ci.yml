@@ -286,6 +286,8 @@ jobs:
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
       - name: Run Swift launcher tests
+        env:
+          SWIFT_BACKTRACE: enable=yes
         run: swift test --package-path static/ergopti_plus/macos/launcher
         timeout-minutes: 10
 

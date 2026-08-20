@@ -8,22 +8,20 @@
  importer changes.
 
  FEATURES & RATIONALE:
- 1. Binds BSD flock by symbol name because Swift 6.3 resolves the Darwin member
-    as the record-lock structure rather than the libc function.
+ 1. Calls BSD flock through a C shim because Swift 6.3 resolves the Darwin
+    member as the record-lock structure rather than the libc function.
  2. Builds an owned, nil-terminated environment for posix_spawn instead of
     relying on the SDK-private `_NSGetEnviron` accessor.
  ==============================================================================
  */
 
+import CPOSIXCompatibility
 import Darwin
 import Foundation
 
-@_silgen_name("flock")
-private func c_flock(_ descriptor: Int32, _ operation: Int32) -> Int32
-
-/// Applies a BSD advisory lock without depending on the SDK import spelling.
+/// Applies a BSD advisory lock through a normal C ABI compatibility shim.
 func ergoptiFlock(_ descriptor: Int32, _ operation: Int32) -> Int32 {
-	c_flock(descriptor, operation)
+	ergopti_flock_compat(descriptor, operation)
 }
 
 /// Duplicates strings into one owned, nil-terminated C vector.
