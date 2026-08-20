@@ -597,7 +597,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			Darwin.close(inheritedDescriptor)
 			return
 		}
-		let holderPID = Darwin.fork()
+		let holderPID = ergoptiForkForTesting()
 		if holderPID == 0 {
 			Darwin.close(ready[0])
 			_ = Darwin.signal(SIGTERM, SIG_DFL)
@@ -672,7 +672,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let readyWriteDescriptor = ready[1]
 		let releaseReadDescriptor = release[0]
 		let releaseWriteDescriptor = release[1]
-		let holderPID = Darwin.fork()
+		let holderPID = ergoptiForkForTesting()
 		if holderPID == 0 {
 			Darwin.close(readyReadDescriptor)
 			Darwin.close(releaseWriteDescriptor)
@@ -1700,7 +1700,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			Darwin.close(recordDescriptor)
 			return
 		}
-		let ownerPID = Darwin.fork()
+		let ownerPID = ergoptiForkForTesting()
 		if ownerPID == 0 {
 			Darwin.close(ready[0])
 			var armed: UInt8 = ergoptiFlock(recordDescriptor, LOCK_EX | LOCK_NB) == 0
@@ -2988,7 +2988,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			return
 		}
 
-		let harnessPID = Darwin.fork()
+		let harnessPID = ergoptiForkForTesting()
 		guard harnessPID >= 0 else {
 			XCTFail("the closed-descriptor harness must fork")
 			_ = Darwin.close(reportRead)

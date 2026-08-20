@@ -192,6 +192,8 @@ asynchronous worker and completion protocol.
 Swift SDK imports can shadow libc functions with same-named structures and can
 remove private Foundation accessors. Keep BSD `flock` behind the symbol wrapper
 and build owned `posix_spawn` environments from `ProcessInfo.environment`.
+Descriptor-inheritance tests that require pre-exec child code use a test-only
+symbol binding because Swift 6.3 marks its imported `fork` unavailable.
 
 ### project-macos-llm-runtime-enable-gate
 

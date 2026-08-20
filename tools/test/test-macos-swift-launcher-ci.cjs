@@ -115,10 +115,14 @@ check(!/\bDarwin\.flock\s*\(/.test(SWIFT_SOURCES),
 	'Swift 6.3 resolves `Darwin.flock(...)` as the struct; use ergoptiFlock instead');
 check(!/\b_NSGetEnviron\s*\(/.test(SWIFT_SOURCES),
 	'the current macOS SDK does not expose `_NSGetEnviron`; use duplicateProcessEnvironment');
+check(!/\bDarwin\.fork\s*\(/.test(SWIFT_SOURCES),
+	'Swift 6.3 marks `Darwin.fork()` unavailable; use the test-only symbol wrapper');
 check(/@_silgen_name\("flock"\)[\s\S]*?func c_flock\s*\(/.test(SWIFT_SOURCES),
 	'the Swift launcher must retain its libc flock symbol binding');
 check(/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),
 	'the Swift launcher must retain its owned posix_spawn environment builder');
+check(/@_silgen_name\("fork"\)[\s\S]*?func c_testFork\s*\(/.test(SWIFT_SOURCES),
+	'the descriptor-inheritance tests must retain their test-only fork symbol binding');
 
 const macosGate = withoutFullLineComments(jobBody('macos-ok'));
 check(macosGate.length > 100, '`macos-ok` is absent or empty');
