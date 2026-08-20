@@ -54,6 +54,83 @@ _HSE_IsTerminalInputHost(Exe, Title := "") {
 				|| InStr(NormalizedTitle, "codebuff") > 0
 }
 
+; Build explicit key tokens because AHK does not apply SetKeyDelay between the
+; internal repetitions of compact ``{BackSpace N}`` syntax.
+_HSE_BuildTerminalBurst(BSCount, Tail) {
+		BSCount := Max(0, Floor(BSCount))
+		Burst := ""
+		loop BSCount
+				Burst .= "{BackSpace}"
+		return Burst . Tail
+}
+
+_HSE_SetTerminalSendBlock(State, BlockFn := 0) {
+		if HasMethod(BlockFn, "Call")
+				return BlockFn.Call(State)
+		BlockInput(State)
+		return true
+}
+
+_HSE_SetTerminalKeyDelay(DelayMs, DurationMs, DelayFn := 0) {
+		if HasMethod(DelayFn, "Call")
+				return DelayFn.Call(DelayMs, DurationMs)
+		SetKeyDelay(DelayMs, DurationMs)
+		return true
+}
+
+; One SendEvent call is essential: BlockInput("Send") protects exactly that
+; command and buffers physical typing until it completes. Separate SendEvent
+; calls left the waits unprotected, allowing letters to splice between deletes.
+; Explicit Backspace tokens retain real SetKeyDelay pacing inside the one command.
+_HSE_SendTerminalPaced(BSCount, Tail, DelayMs, EmitFn := 0,
+		DelayFn := 0, BlockFn := 0) {
+		Burst := _HSE_BuildTerminalBurst(BSCount, Tail)
+		PreviousKeyDelay := A_KeyDelay
+		PreviousKeyDuration := A_KeyDuration
+		_HSE_SetTerminalSendBlock("Send", BlockFn)
+		try {
+				_HSE_SetTerminalKeyDelay(Max(1, Floor(DelayMs)), 0, DelayFn)
+				if HasMethod(EmitFn, "Call")
+						return _SendVerdictSucceeded(EmitFn.Call(Burst))
+				SendEvent(Burst)
+				return true
+		} finally {
+				_HSE_SetTerminalKeyDelay(PreviousKeyDelay, PreviousKeyDuration, DelayFn)
+				_HSE_SetTerminalSendBlock("Default", BlockFn)
+		}
+}
+
+; Run only after the visible InputHook callback has returned. Its completing
+; physical character then exists in the terminal and belongs to the full erase
+; count. Async errors must be logged here because timer exceptions are not
+; observable by HSE_DispatchMatch's caller.
+_HSE_RunTerminalTransaction(BSCount, Tail, DelayMs, EmitFn := 0,
+		DelayFn := 0, BlockFn := 0) {
+		Succeeded := false
+		try {
+				Succeeded := _HSE_SendTerminalPaced(
+						BSCount, Tail, DelayMs, EmitFn, DelayFn, BlockFn)
+				if !Succeeded
+						try LoggerError("HSE", "Terminal expansion sender refused an event.")
+		} catch as Err {
+				try LoggerError("HSE", "Terminal expansion injection failed: {1}.", Err.Message)
+		}
+		return Succeeded
+}
+
+; Hand the complete edit to a later timer turn. SetTimer cannot interrupt the
+; Critical OnChar thread; DelayMs additionally gives the completing physical key
+; one render turn before the protected SendEvent begins.
+_HSE_BeginTerminalTransaction(BSCount, Tail, DelayMs, EmitFn := 0,
+		DelayFn := 0, SchedulerFn := 0, BlockFn := 0) {
+		Runner := _HSE_RunTerminalTransaction.Bind(
+				Max(0, Floor(BSCount)), Tail, DelayMs, EmitFn, DelayFn, BlockFn)
+		if HasMethod(SchedulerFn, "Call")
+				return _SendVerdictSucceeded(SchedulerFn.Call(Runner, DelayMs))
+		SetTimer(Runner, -Max(1, Floor(DelayMs)))
+		return true
+}
+
 
 
 
@@ -456,36 +533,31 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						; OpenTUI/React-style prompts commit deletion state once per render
 						; turn. SendInput's zero-delay Backspace array makes every handler see
 						; the same pre-deletion value; the following text then appends to the
-						; trigger (``xgboostXGBoost``). One paced SendEvent call yields between
-						; key pairs while BlockInput keeps physical input outside the slower
-						; transaction. The complete erase/replacement/end-char payload remains
-						; a single call, preserving the ordering contract of the normal branch.
-						SendError := ""
+						; trigger (``xgboostXGBoost``). AHK does not apply SetKeyDelay between
+						; repetitions in ``{BackSpace N}``, so emit explicit keys and yield after
+						; each one. The timer hand-off lets the completing physical key reach the
+						; terminal before the full deletion count starts, while BlockInput keeps
+						; later physical input outside the slower transaction.
+						TerminalDelayMs := TimingsGet("debounce", "terminal_hotstring_key_delay_ms")
 						_AtCrit := Critical("On")
-						PreviousKeyDelay := A_KeyDelay
-						PreviousKeyDuration := A_KeyDuration
 						try {
-								BlockInput("Send")
-								SetKeyDelay(TimingsGet("debounce", "terminal_hotstring_key_delay_ms"), 0)
 								if _SendHook {
 										Hook := _SendHook
-										Fired := _SendVerdictSucceeded(Hook("SendTerminalResult", Burst, false))
+										EmitFn := (Payload) => Hook("SendTerminalResult", Payload, false)
 								} else {
-										SendEvent(Burst)
-										Fired := true
+										EmitFn := 0
 								}
+								Fired := _HSE_BeginTerminalTransaction(
+										BSCount,
+										ReplacementPart . EndCharPart,
+										TerminalDelayMs, EmitFn)
 						} catch as Err {
-								SendError := Err.Message
+								try LoggerError("HSE", "Terminal expansion scheduling failed: {1}", Err.Message)
 						} finally {
-								SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
-								BlockInput("Default")
 								Critical(_AtCrit)
 						}
-						if !Fired {
-								if SendError != ""
-										try LoggerError("HSE", "Terminal expansion injection failed: {1}", SendError)
+						if !Fired
 								return false
-						}
 						if OnlyText
 								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
 						else

@@ -26,6 +26,8 @@ local Timings = require("infra.timings")
 -- The exact (section, key) -> value pairs each wired module is now sourced from.
 -- Mirror these against constants.toml; a change there must be deliberate.
 local WIRED_MS = {
+	-- modules/keymap/expander.lua: safely above one 60 Hz render turn.
+	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
 	-- keylogger/init.lua
 	{ "keylogger", "micro_idle_timeout_ms",  30000 },
 	{ "keylogger", "session_timeout_ms",    300000 },
