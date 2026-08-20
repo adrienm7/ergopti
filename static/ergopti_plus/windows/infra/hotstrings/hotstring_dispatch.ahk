@@ -26,6 +26,34 @@
 ; replayed characters.
 global HSE_SUPPRESS_RELEASE_DELAY_MS := 60
 
+; Terminal/TUI inputs commonly update their edit state once per render turn.
+; A zero-delay run of Backspaces can therefore collapse onto one stale snapshot,
+; after which the replacement is appended to the untouched trigger. Keep the
+; host list narrow: ordinary GUI controls retain the faster SendInput path.
+global HSE_TERMINAL_INPUT_EXES := Map(
+		"windowsterminal.exe", true,
+		"openconsole.exe", true,
+		"conhost.exe", true,
+		"wezterm-gui.exe", true,
+		"alacritty.exe", true,
+		"kitty.exe", true,
+		"mintty.exe", true,
+		"tabby.exe", true,
+		"hyper.exe", true
+)
+
+_HSE_IsTerminalInputHost(Exe, Title := "") {
+		global HSE_TERMINAL_INPUT_EXES
+		NormalizedExe := StrLower(Trim(Exe))
+		if HSE_TERMINAL_INPUT_EXES.Has(NormalizedExe)
+				return true
+		; Covers an embedded terminal hosting the two known OpenTUI products without
+		; slowing every editor field in the parent IDE process.
+		NormalizedTitle := StrLower(Title)
+		return InStr(NormalizedTitle, "freebuff") > 0
+				|| InStr(NormalizedTitle, "codebuff") > 0
+}
+
 
 
 
@@ -382,9 +410,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; supplied the visible decision, this exact value is what it promised.
 				; (KLHook global removed)
 				IsNotepadApp := false
+				IsTerminalApp := false
 					try {
 							exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
-							IsNotepadApp := (exe = "notepad.exe")
+							WindowTitle := WinGetTitle("A")
+							IsNotepadApp := (StrLower(exe) = "notepad.exe")
+							IsTerminalApp := _HSE_IsTerminalInputHost(exe, WindowTitle)
 					}
 					; The clipboard route can only paste literal text. A Send-key payload such
 					; as '""{Left}' must keep its interpreted cursor movement in Notepad;
@@ -392,6 +423,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					; Reuse the normal atomic SendInput branch for those entries.
 					IsNotepadApp := IsNotepadApp and OnlyText
 					SentBurst := ""   ; exactly what we injected — captured for the fire-trace
+					ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
+					; Consume the end-char when it is explicitly listed as consumed —
+					; otherwise always re-inject it so the user sees what they typed.
+					EndCharPart := (EndChar != "" and !ForceConsumeEndChar
+							and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+					Burst := BackSpaceSeq . ReplacementPart . EndCharPart
 
 				if IsNotepadApp {
 						; Windows-11 Notepad mis-handles SendInput-injected hotstrings, so the
@@ -415,6 +452,45 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								return false
 						UpdateLastSentCharacter(SubStr(EndCharEmitted != "" ? EndCharEmitted : Replacement, -1))
 						SentBurst := BackSpaceSeq . "[clip]" . Replacement . EndCharEmitted
+				} else if IsTerminalApp {
+						; OpenTUI/React-style prompts commit deletion state once per render
+						; turn. SendInput's zero-delay Backspace array makes every handler see
+						; the same pre-deletion value; the following text then appends to the
+						; trigger (``xgboostXGBoost``). One paced SendEvent call yields between
+						; key pairs while BlockInput keeps physical input outside the slower
+						; transaction. The complete erase/replacement/end-char payload remains
+						; a single call, preserving the ordering contract of the normal branch.
+						SendError := ""
+						_AtCrit := Critical("On")
+						PreviousKeyDelay := A_KeyDelay
+						PreviousKeyDuration := A_KeyDuration
+						try {
+								BlockInput("Send")
+								SetKeyDelay(TimingsGet("debounce", "terminal_hotstring_key_delay_ms"), 0)
+								if _SendHook {
+										Hook := _SendHook
+										Fired := _SendVerdictSucceeded(Hook("SendTerminalResult", Burst, false))
+								} else {
+										SendEvent(Burst)
+										Fired := true
+								}
+						} catch as Err {
+								SendError := Err.Message
+						} finally {
+								SetKeyDelay(PreviousKeyDelay, PreviousKeyDuration)
+								BlockInput("Default")
+								Critical(_AtCrit)
+						}
+						if !Fired {
+								if SendError != ""
+										try LoggerError("HSE", "Terminal expansion injection failed: {1}", SendError)
+								return false
+						}
+						if OnlyText
+								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
+						else
+								_LSCResetFrom([])
+						SentBurst := Burst
 				} else {
 						; SendInput is atomic: the ENTIRE backspace+replacement+endchar burst is
 						; injected as one unit, so any physical keystroke the user types during
@@ -428,12 +504,6 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						; source — folded into this one atomic send, which additionally grants
 						; those triggers the {Text} wrapping, consumed-delimiter handling and
 						; UpdateLastSentCharacter the split branch silently skipped.
-						ReplacementPart := OnlyText ? ("{Text}" . Replacement) : Replacement
-						; Consume the end-char when it is explicitly listed as consumed —
-						; otherwise always re-inject it so the user sees what they typed.
-						EndCharPart := (EndChar != "" and !ForceConsumeEndChar
-								and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
-						Burst := BackSpaceSeq . ReplacementPart . EndCharPart
 						; Critical so AHK cannot start the next physical key's layout-remap
 						; SendEvent thread between issuing this burst and it draining — keeping
 						; the expansion atomic even when dispatched from a caller that is NOT
@@ -484,12 +554,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						if (Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate) {
 								try LoggerDebug("HSEFire",
 										"FIRE private mapping bs={1} branch={2} conform={3} burst={4} char(s) (trigger and content withheld).",
-										BSCount, IsNotepadApp ? "notepad-clip" : "atomic",
+										BSCount, IsNotepadApp ? "notepad-clip" : (IsTerminalApp ? "terminal-paced" : "atomic"),
 										IsConform ? 1 : 0, StrLen(SentBurst))
 						} else {
 								try LoggerDebug("HSEFire",
 										"FIRE trig='{1}' end='{2}' bs={3} branch={4} conform={5} burst='{6}'.",
-										Spec.Trigger, EndChar, BSCount, IsNotepadApp ? "notepad-clip" : "atomic",
+										Spec.Trigger, EndChar, BSCount, IsNotepadApp ? "notepad-clip" : (IsTerminalApp ? "terminal-paced" : "atomic"),
 										IsConform ? 1 : 0, SentBurst)
 						}
 				}

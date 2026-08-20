@@ -133,3 +133,33 @@ _EBA_AssertProvenanceFilterNotATimeWindow() {
 		. "replaced also threw away real typing that arrived just after an expansion")
 }
 Test("hotstrings: synthetic input is filtered by provenance, not by a time window (swallowed-keystrokes)", _EBA_AssertProvenanceFilterNotATimeWindow)
+
+
+
+
+; =============================================================
+; =============================================================
+; ======= 3/ Terminal TUIs receive paced deletion =============
+; =============================================================
+; =============================================================
+
+_EBA_AssertTerminalTuiDeletionIsPaced() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "driver source must be readable for the terminal-TUI regression test")
+
+	; React/OpenTUI-style prompt controls can batch a zero-delay Backspace run
+	; against one stale render. The replacement then appends to the untouched
+	; trigger (for example xgboostXGBoost). Terminal hosts therefore need one
+	; deliberately paced SendEvent transaction while ordinary controls retain the
+	; zero-latency SendInput path above.
+	Assert(InStr(Src, "_HSE_IsTerminalInputHost") > 0,
+		"the hotstring dispatcher must classify terminal input hosts before choosing its sender")
+	Assert(InStr(Src, "SetKeyDelay(TimingsGet(") > 0,
+		"terminal deletion must use the shared inter-key delay so TUI state can commit each Backspace")
+	Assert(InStr(Src, "SendEvent(Burst)") > 0,
+		"the complete terminal erase/replacement/end-char transaction must stay in one paced send")
+	Assert(InStr(Src, 'BlockInput("Send")') > 0,
+		"physical input must not splice into the slower terminal transaction")
+}
+Test("hotstrings: terminal TUI deletion is paced without splitting the transaction (terminal-stale-render)",
+	_EBA_AssertTerminalTuiDeletionIsPaced)

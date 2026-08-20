@@ -60,6 +60,33 @@ local PASTE_MODIFIER = { "cmd" }
 -- stalling the run loop that services the typing event tap mid-injection.
 local PASTE_KEY_DELAY_US = 0
 
+-- Terminal hosts whose prompt controls may batch a zero-delay Backspace run
+-- against one stale render. Bundle IDs are normalized before lookup; app-name
+-- fallbacks cover unsigned/custom builds that expose no stable bundle ID.
+local TERMINAL_BUNDLE_IDS = {
+	["com.apple.terminal"] = true,
+	["com.googlecode.iterm2"] = true,
+	["com.github.wez.wezterm"] = true,
+	["org.alacritty"] = true,
+	["net.kovidgoyal.kitty"] = true,
+	["com.mitchellh.ghostty"] = true,
+	["co.zeit.hyper"] = true,
+	["org.tabby"] = true,
+	["dev.warp.warp-stable"] = true,
+}
+
+local TERMINAL_APP_NAMES = {
+	["terminal"] = true,
+	["iterm2"] = true,
+	["wezterm"] = true,
+	["alacritty"] = true,
+	["kitty"] = true,
+	["ghostty"] = true,
+	["hyper"] = true,
+	["tabby"] = true,
+	["warp"] = true,
+}
+
 -- Serialised clipboard save/restore state. Two clipboard sends within
 -- CLIPBOARD_RESTORE_DELAY_S of each other must NOT each save() — the second would
 -- capture the first's still-injected payload as "the user's clipboard" and both
@@ -73,6 +100,45 @@ local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
 local _paste_recovery_only = false
 local _paste_generation = 0
+
+--- Reports whether one application identity is a terminal input host.
+--- @param bundle_id string|nil macOS bundle identifier.
+--- @param app_name string|nil Application display name.
+--- @return boolean is_terminal
+function M.isTerminalInputHost(bundle_id, app_name)
+	local bundle = type(bundle_id) == "string" and bundle_id:lower() or ""
+	local name = type(app_name) == "string" and app_name:lower() or ""
+	return TERMINAL_BUNDLE_IDS[bundle] == true or TERMINAL_APP_NAMES[name] == true
+end
+
+--- Returns the focused terminal application to use for targeted paced output.
+--- A nil result keeps the ordinary callback-return batch path.
+--- @return userdata|table|nil app
+function M.terminalInputTarget()
+	local app = nil
+	local ok_window, window = pcall(function()
+		return hs.window and hs.window.focusedWindow and hs.window.focusedWindow()
+	end)
+	if ok_window and window then
+		local ok_app, focused_app = pcall(function() return window:application() end)
+		if ok_app then app = focused_app end
+	end
+	if app == nil then
+		local ok_front, front = pcall(function()
+			return hs.application and hs.application.frontmostApplication
+				and hs.application.frontmostApplication()
+		end)
+		if ok_front then app = front end
+	end
+	if app == nil then return nil end
+
+	local ok_bundle, bundle = pcall(function() return app:bundleID() end)
+	local ok_name, name = pcall(function() return app:name() end)
+	if M.isTerminalInputHost(ok_bundle and bundle or "", ok_name and name or "") then
+		return app
+	end
+	return nil
+end
 
 local function cancel_restore_timer(timer)
 	if type(timer) ~= "table" or timer.timer == nil then return true end

@@ -40,6 +40,8 @@ local function make_fixture(options)
 		deliver_trigger = options.deliver_trigger ~= false,
 		tap_should_enable = options.tap_should_enable ~= false,
 		pump_deliveries = {},
+		paced_sleeps = {},
+		posted_targets = {},
 	}
 
 	local logger = helpers.make_logger_stub()
@@ -57,6 +59,7 @@ local function make_fixture(options)
 		return options.absolute_time or 987654321000
 	end
 	function timer.secondsSinceEpoch() return options.epoch or 1900000000.125 end
+	function timer.usleep(delay) fixture.paced_sleeps[#fixture.paced_sleeps + 1] = delay end
 	function timer.doAfter(delay, callback)
 		do_after_calls = do_after_calls + 1
 		if fixture.fail_next_do_after then
@@ -190,8 +193,9 @@ local function make_fixture(options)
 			end
 			return self.properties[property] or 0
 		end
-		function event:post()
+		function event:post(app)
 			fixture.post_count = fixture.post_count + 1
+			fixture.posted_targets[#fixture.posted_targets + 1] = app
 			if self.kind == "trigger" then
 				fixture.watchdog_armed_at_post = false
 				for _, handle in ipairs(fixture.delayed_handles) do
@@ -1621,6 +1625,32 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		helpers.assert_throws(function()
 			synthetic.emit_key_stroke({}, "x", 1)
 		end, "delay >= 1 microsecond must fail fast")
+	end)
+
+	helpers.it("target-posts terminal deletion pairs with render turns between them (terminal-stale-render)", function()
+		local fixture = make_fixture()
+		local synthetic = fixture.load()
+		local target = { id = "terminal-app" }
+		synthetic.enter_callback()
+		local tx = synthetic.begin("unit.terminal", "replacement")
+		synthetic.with_transaction(tx, function()
+			synthetic.emit_key_stroke({}, "delete", 0)
+			synthetic.emit_key_stroke({}, "delete", 0)
+			synthetic.emit_key_strokes("X")
+		end)
+
+		helpers.assert_true(synthetic.deliver_collected_paced(tx, 2, 12000, target))
+		synthetic.seal(tx)
+		local consume, returned = synthetic.leave_callback(true)
+		helpers.assert_true(consume)
+		helpers.assert_nil(returned,
+			"target-posted events must not be returned to Quartz a second time")
+		helpers.assert_eq(fixture.key_posts, 6)
+		helpers.assert_eq(#fixture.paced_sleeps, 2,
+			"each Backspace pair, including the last one before text, needs a render turn")
+		for _, delay in ipairs(fixture.paced_sleeps) do helpers.assert_eq(delay, 12000) end
+		for _, app in ipairs(fixture.posted_targets) do helpers.assert_true(app == target) end
+		fixture.fire_next_timer()
 	end)
 
 	helpers.it("globally posts loopback after the origin callback so keymap receives it", function()

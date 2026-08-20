@@ -27,6 +27,7 @@ local text_utils = require("infra.text_utils")
 local HotstringCore = require("infra.hotstring_engine")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
+local Timings    = require("infra.timings")
 local CoreStateM = require("modules.keymap.state")
 local TextSender = require("adapters.text_sender")
 local SyntheticInput = require("adapters.synthetic_input")
@@ -42,7 +43,6 @@ if not ok_kl then keylogger = nil end
 local _state    = nil  -- Shared CoreState injected via M.init().
 local _registry = nil  -- Registry module injected via M.init().
 local _llm      = nil  -- LLMBridge module injected via M.init().
-
 
 --- Guard: verifies that M.init() was called before any public function that
 --- depends on the injected dependencies. Logs an error and returns false on failure.
@@ -89,6 +89,10 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- start within the old timing window.
 	TerminatorReplay.flush_now("superseded by a new replacement")
 	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")
+	local terminal_target = nil
+	if deletes > 0 and type(TextSender.terminalInputTarget) == "function" then
+		terminal_target = TextSender.terminalInputTarget()
+	end
 	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 
 	-- The preview refresh belongs to the same replacement transaction as its
@@ -130,6 +134,18 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		pcall(SyntheticInput.cancel, transaction)
 		Logger.error(LOG, "emit_action failed: %s.", tostring(emit_count))
 		return false, transaction
+	end
+	if terminal_target then
+		local terminal_key_delay_us = Timings.ms(
+			"debounce", "terminal_hotstring_key_delay_ms") * 1000
+		local paced_ok, paced_or_error = pcall(SyntheticInput.deliver_collected_paced,
+			transaction, deletes, terminal_key_delay_us, terminal_target)
+		if not paced_ok then
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Terminal replacement delivery failed: %s.",
+				tostring(paced_or_error))
+			return false, transaction
+		end
 	end
 	emitted_str = emitted_str or ""
 	-- Keep extensions that still return the historical two values working. The

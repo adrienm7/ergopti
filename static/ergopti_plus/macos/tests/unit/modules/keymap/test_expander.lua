@@ -320,6 +320,47 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		helpers.assert_eq(llm.previews[#llm.previews], "hewrld")
 	end)
 
+	helpers.it("paces the collected delete prefix for terminal TUI inputs (terminal-stale-render)", function()
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
+		local TextSender = require("adapters.text_sender")
+		local target = { bundle = "com.apple.Terminal" }
+		local paced = nil
+		local previous_target = TextSender.terminalInputTarget
+		local previous_delivery = SyntheticInput.deliver_collected_paced
+		TextSender.terminalInputTarget = function() return target end
+		SyntheticInput.deliver_collected_paced = function(tx, deletes, delay_us, app)
+			paced = { tx = tx, deletes = deletes, delay_us = delay_us, app = app }
+			return true
+		end
+
+		local ok_body, body_err = pcall(function()
+			local s = make_state("xgboost")
+			E.init(s, make_registry({}, {}), make_llm())
+			SyntheticInput.enter_callback()
+			local replaced, tx = E.perform_text_replacement(
+				8,
+				function()
+					SyntheticInput.emit_key_strokes("XGBoost")
+					return 7, "XGBoost"
+				end,
+				function() s.buffer = "XGBoost" end,
+				false, false, "terminal-regression"
+			)
+			local consume = SyntheticInput.leave_callback(replaced)
+			helpers.assert_true(consume)
+			helpers.assert_not_nil(paced,
+				"terminal replacement must not return a zero-delay Backspace burst")
+			helpers.assert_true(paced.tx == tx)
+			helpers.assert_eq(paced.deletes, 8)
+			helpers.assert_true(type(paced.delay_us) == "number" and paced.delay_us >= 1000)
+			helpers.assert_true(paced.app == target)
+		end)
+
+		TextSender.terminalInputTarget = previous_target
+		SyntheticInput.deliver_collected_paced = previous_delivery
+		if not ok_body then error(body_err, 0) end
+	end)
+
 	helpers.it("refreshes chained preview only from committed replacement completion", function()
 		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 		local s = make_state("old")
