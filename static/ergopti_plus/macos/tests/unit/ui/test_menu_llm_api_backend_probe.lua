@@ -45,7 +45,8 @@ helpers.assert_true(
 )
 
 -- Test 3 (F-LOW-6): the public reset must delegate to the shared generation
--- invalidator so stale callbacks are revoked as well as the display value.
+-- invalidator used by lifecycle transitions, revoking stale callbacks as well
+-- as the display value.
 helpers.assert_true(
 	src:find("function M.reset_llm_health_status()", 1, true) ~= nil,
 	"menu_llm/init.lua must define M.reset_llm_health_status (F-LOW-6)"
@@ -74,7 +75,7 @@ helpers.assert_true(
 )
 
 -- Test 5 (F-LOW-6): backend_panel.lua's API-backend switch handler must call
--- the reset hook when activating the API backend.
+-- the shared invalidator when activating the API backend.
 -- Selected by a declaration rather than by path, so moving or splitting the
 -- module cannot turn this invariant into a path error. The selector is not
 -- unique to backend_panel.lua — menu_llm/init.lua declares it too — so the
@@ -91,8 +92,8 @@ helpers.assert_true(api_switch_pos ~= nil, "backend_panel.lua must set state.llm
 -- characters keeps the check inside the one function it is about.
 local api_switch_body = panel_src:sub(api_switch_pos, (panel_src:find("\n\t\t\tend\n", api_switch_pos, true) or #panel_src))
 helpers.assert_true(
-	api_switch_body:find("reset_llm_health_status", 1, true) ~= nil,
-	"backend_panel.lua's API-backend switch handler must call reset_llm_health_status (F-LOW-6)"
+	api_switch_body:find("invalidate_llm_health()", 1, true) ~= nil,
+	"backend_panel.lua's API-backend switch handler must invalidate health ownership (F-LOW-6)"
 )
 
 print("[PASS] test_menu_llm_api_backend_probe")
