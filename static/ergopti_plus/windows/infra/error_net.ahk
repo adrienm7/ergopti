@@ -76,7 +76,8 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; those modules are loaded; ExitApp is the only publication boundary here.
 		if (_DriverBootPhase != "ready") {
 				try LoggerError("ErgoptiPlus", "Fatal startup error during phase '{1}': {2}",
-						_DriverBootPhase, Exc.Message)
+						_DriverBootPhase, Exc.Message
+								. (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
 				; The ERROR line above only reaches disk once LOGGER_LOG_PATH is resolved (in
 				; LoggerInit) and the pending queue is flushed. Many fail-fast loaders run
 				; BEFORE LoggerInit, so a fault there would ExitApp with the line still in RAM:
@@ -96,9 +97,10 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				; Tell the user WHY the driver is exiting. A modal is safe here: no input
 				; pipeline is owned yet and we are about to ExitApp. i18n may not be loaded
 				; this early, so the message is a hardcoded French string (last-resort path).
-				try MsgBox("ErgoptiPlus n'a pas pu démarrer (phase « " . _DriverBootPhase . " ») :`n`n"
-						. Exc.Message . "`n`nLe driver va se fermer. Le journal des erreurs contient le détail.",
-						"ErgoptiPlus — erreur de démarrage", "Iconx")
+				if !(IsSet(_DriverStartupSmokeDir) && _DriverStartupSmokeDir != "")
+						try MsgBox("ErgoptiPlus n'a pas pu démarrer (phase « " . _DriverBootPhase . " ») :`n`n"
+								. Exc.Message . "`n`nLe driver va se fermer. Le journal des erreurs contient le détail.",
+								"ErgoptiPlus — erreur de démarrage", "Iconx")
 				try KL_Stop()
 				try HookDispatcher.Stop()
 				ExitApp(1)

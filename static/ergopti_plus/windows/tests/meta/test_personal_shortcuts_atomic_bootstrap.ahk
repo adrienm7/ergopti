@@ -31,8 +31,8 @@ _PSAB_GeneratorPublishesVerifiedStages() {
 		"the generator must never delete/truncate a live AHK source before replacement")
 
 	Write := InStr(Publish, "FSWriteDurable(StagePath, Content)")
-	Read := InStr(Publish, "FSRead(StagePath)", true, Write)
-	Verify := InStr(Publish, "Observed != Content", true, Read)
+	Read := InStr(Publish, "FSUtf8ExactMatches(StagePath, Content)", true, Write)
+	Verify := InStr(Publish, "if !StageMatches", true, Read)
 	Create := InStr(Publish, "FSAtomicMoveCreate(StagePath, Path)", true, Verify)
 	Replace := InStr(Publish, "FSAtomicMoveReplace(StagePath, Path)", true, Verify)
 	Assert(Write > 0 and Read > Write and Verify > Read
@@ -53,7 +53,7 @@ _PSAB_PublicationOwnsTheConfigBoundary() {
 		"the personal-shortcuts publication helper must remain source-visible")
 	Acquire := InStr(Publish, "_ConfigWriteLeaseTryAcquire(")
 	Write := InStr(Publish, "FSWriteDurable(StagePath, Content)", true, Acquire)
-	Verify := InStr(Publish, "Observed != Content", true, Write)
+	Verify := InStr(Publish, "if !StageMatches", true, Write)
 	Authorize := InStr(Publish,
 		"_ConfigWriteLeaseOwns(OwnerToken, Path)", true, Verify)
 	Replace := InStr(Publish,
@@ -89,7 +89,7 @@ _PSAB_EveryCallerConsumesFailure() {
 
 	Src := _DriverSourceNoComments()
 	BootGate := InStr(Src,
-		'if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])', true)
+		'if !EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],', true)
 	BootAbort := InStr(Src, "ExitApp(1)", true, BootGate)
 	PersonalInclude := InStr(Src,
 		"#Include *i _generated/personal_shortcuts.ahk", true, BootGate)
@@ -100,3 +100,66 @@ _PSAB_EveryCallerConsumesFailure() {
 Test("personal shortcuts: boot/menu/gesture consume generator failure "
 	. "(personal-shortcuts-delete-append-and-silent-failure)",
 	_PSAB_EveryCallerConsumesFailure)
+
+_PSAB_TempPath(Suffix) {
+	return A_Temp . "\ergopti_personal_shortcuts_" . DllCall("GetCurrentProcessId")
+		. "_" . A_TickCount . "_" . Suffix . ".ahk"
+}
+
+_PSAB_ExactBomPublicationRoundTrips() {
+	Path := _PSAB_TempPath("bom")
+	Content := Chr(0xFEFF) . '; generated`nSendText("é")`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, Content))
+		AssertTrue(FSUtf8ExactMatches(Path, Content))
+	} finally {
+		try FSDelete(Path)
+	}
+}
+Test("personal shortcuts: durable publication verifies physical BOM bytes "
+	. "(personal-shortcuts-exact-bom-roundtrip)",
+	_PSAB_ExactBomPublicationRoundTrips)
+
+_PSAB_NoBomPublicationRoundTrips() {
+	Path := _PSAB_TempPath("raw")
+	Content := "; raw utf8`n"
+	try {
+		AssertTrue(FSWriteDurable(Path, Content))
+		AssertTrue(FSUtf8ExactMatches(Path, Content))
+	} finally {
+		try FSDelete(Path)
+	}
+}
+Test("personal shortcuts: exact verification accepts intentional no-BOM payloads "
+	. "(personal-shortcuts-exact-raw-roundtrip)",
+	_PSAB_NoBomPublicationRoundTrips)
+
+_PSAB_MismatchedStageNeverPublishes() {
+	Path := _PSAB_TempPath("mismatch")
+	try {
+		AssertTrue(FSWriteDurable(Path, "corrupted"))
+		AssertFalse(FSUtf8ExactMatches(Path, "expected"))
+	} finally {
+		try FSDelete(Path)
+	}
+}
+Test("personal shortcuts: a mismatched stage cannot reach the destination "
+	. "(personal-shortcuts-stage-mismatch-refused)",
+	_PSAB_MismatchedStageNeverPublishes)
+
+_PSAB_CreateOnlyPreservesExistingBytes() {
+	Path := _PSAB_TempPath("create_only")
+	Stage := Path . ".stage"
+	try {
+		AssertTrue(FSWriteDurable(Path, "user-owned"))
+		AssertTrue(FSWriteDurable(Stage, "replacement"))
+		AssertFalse(FSAtomicMoveCreate(Stage, Path))
+		AssertEqual("user-owned", FSReadUtf8Exact(Path))
+	} finally {
+		try FSDelete(Stage)
+		try FSDelete(Path)
+	}
+}
+Test("personal shortcuts: create-only collision preserves the user-owned file "
+	. "(personal-shortcuts-create-only-preserves-existing)",
+	_PSAB_CreateOnlyPreservesExistingBytes)

@@ -39,6 +39,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-ahk-loop-capture-copy-freezes-nothing](#project-ahk-loop-capture-copy-freezes-nothing) — Copying a loop variable into another outer local does not freeze it for a closure; use .Bind()
 - [project-source-scan-loops-need-a-floor](#project-source-scan-loops-need-a-floor) — A scan loop that finds nothing looks exactly like a scan loop that finds only good results; assert the match count
 - [project-ahk-settimer-reenters-during-file-io](#project-ahk-settimer-reenters-during-file-io) — AHK pumps messages during blocking file I/O, so a routine that schedules its own next tick can be re-entered mid-flight
+- [project-ahk-entry-smoke-is-the-startup-proof](#project-ahk-entry-smoke-is-the-startup-proof) — Parsing and unit includes do not execute the real auto-execute thread; a fresh-config entry smoke is required to catch initializer order, early timers, and exact BOM publication
 - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs
 - [project-ahk-updater-async-ownership-2026-08-09](#project-ahk-updater-async-ownership-2026-08-09) — Updater/changelog async ownership spans the in-flight call, terminal, timer and epoch; entry-only generation checks are insufficient
 - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
@@ -5225,3 +5226,21 @@ A handler that computes a label and then adds exactly one row is a provider that
 - Writing a meta test about this on Windows: `InStr` is case-INSENSITIVE, so `_BuildTapHoldsSubmenu()` contains « menu() ». Use `RegExMatch`.
 
 Related: [[project-dynamic-places-list-materialises]], [[project-a-depth-cap-is-right-for-a-provider-and-wrong-for-a-filesystem]].
+
+
+### project-ahk-entry-smoke-is-the-startup-proof
+
+_Compiling the include graph proves syntax; it does not execute the auto-execute thread or its early timers_
+
+<sub>slug: `project_ahk_entry_smoke_is_the_startup_proof`</sub>
+
+The 2026-08-20 startup crash survived both `Ahk2Exe` coverage and 4,500+ unit/meta tests. The real entry called the config queue before `infra/config_io.ahk` had initialized its delay globals. Once that order was fixed, pumping the onboarding WebView exposed the same class in an early suspend watchdog: `SUSPEND_MARKER_FILENAME` still belonged to a later include. A fresh install then failed exact verification because `FSWriteDurable` wrote a BOM while ordinary `FSRead` consumed it.
+
+The durable rule is broader than those three symbols:
+
+- Before the auto-execute thread calls a module function or arms a callback, the entire owning module — including its globals and lease state — must already have executed. Moving one constant is not proof.
+- `run_all.ahk` deliberately cannot include and execute the resident production entry, while `Ahk2Exe` only parses it. Keep a separate process smoke that runs the real entry with an isolated config, pumps messages long enough for early timers, requires the driver's ready signal, and repeats both fresh and existing-config boots.
+- Exact UTF-8 source verification must use `FSReadUtf8Exact`/`FSUtf8ExactMatches`. Normal text reads may consume the BOM and therefore cannot prove byte-equivalent publication.
+- A fatal startup log must include the AHK stack. A message without the first source line turns a deterministic boot failure into guesswork.
+
+Related: [[feedback-ahk-source-encoding]], [[project-ahk-settimer-reenters-during-file-io]], [[project-ahk-invariant-incomplete-application]].

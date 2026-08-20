@@ -21,11 +21,12 @@ _GESR_AllRuntimeEditorsSuppressReload() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the personal-shortcuts callsite guard")
 
-	Pattern := "EnsurePersonalShortcutsFile\(([^)\r\n]*)\)"
+	Pattern := "s)EnsurePersonalShortcutsFile\((.*?)\)"
 	Pos := 1
 	CallCount := 0
 	BootCount := 0
 	RuntimeSafeCount := 0
+	RetryCount := 0
 	while (Pos := RegExMatch(Src, Pattern, &Match, Pos)) {
 		Args := Trim(Match[1])
 		Pos += Match.Len
@@ -36,14 +37,21 @@ _GESR_AllRuntimeEditorsSuppressReload() {
 			BootCount += 1
 		else if RegExMatch(Args, "^Path\s*,\s*false$")
 			RuntimeSafeCount += 1
+		else if RegExMatch(Args,
+				"^Path\s*,\s*AllowReload\s*,\s*WriterFn\s*,\s*ReplaceFn\s*,\s*ReadFn$")
+			RetryCount += 1
 	}
 
-	AssertEqual(CallCount, 3,
-		"every EnsurePersonalShortcutsFile production caller must be inventoried")
+	AssertEqual(CallCount, 4,
+		"every external and internal EnsurePersonalShortcutsFile caller must be inventoried")
 	AssertEqual(BootCount, 1,
-		"only the boot call may use the reload-enabled default")
+		"the entry point must expose exactly one boot-time reload policy")
 	AssertEqual(RuntimeSafeCount, 2,
 		"both runtime editor callers must pass false and suppress reload")
+	AssertEqual(RetryCount, 1,
+		"the only remaining call must be the parameter-preserving internal retry")
+	AssertEqual(BootCount + RuntimeSafeCount + RetryCount, CallCount,
+		"no unknown caller may bypass the boot/runtime reload policy")
 
 	for Name in ["GestureEditPersonalShortcuts", "OpenPersonalShortcuts"] {
 		Body := _DriverFuncBody(Name)
