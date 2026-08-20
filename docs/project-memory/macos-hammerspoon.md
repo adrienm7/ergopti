@@ -35,6 +35,12 @@ A permissive stub can make teardown, iterator, and ownership tests false-green.
 `hs.fs.dir` returns iterator and state. Production and doubles must preserve both
 values or directory scans can silently stop.
 
+### project-lua-zero-byte-file-probe
+
+On POSIX Lua, `file:read(0)` returns nil without an error at EOF for an empty
+regular file; a directory returns nil with an error. Test doubles must inspect
+both returns instead of treating nil as proof of a directory.
+
 ### project-macos-split-module-stub-reload
 
 When extracting a stateful module, add it to every `load_with_stubs` reload list.
@@ -180,6 +186,12 @@ preview, logging, and expansion.
 Event-tap callbacks perform only bounded in-memory work. `doAfter(0)` leaves the
 callback but is not a thread hop; shell, filesystem, and log sinks need an owned
 asynchronous worker and completion protocol.
+
+### project-swift-sdk-posix-imports
+
+Swift SDK imports can shadow libc functions with same-named structures and can
+remove private Foundation accessors. Keep BSD `flock` behind the symbol wrapper
+and build owned `posix_spawn` environments from `ProcessInfo.environment`.
 
 ### project-macos-llm-runtime-enable-gate
 

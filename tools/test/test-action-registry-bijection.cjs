@@ -39,6 +39,10 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const REGISTRY = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
+const SITE_LOADER = fs.readFileSync(
+	path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'),
+	'utf8'
+);
 
 // Frozen on 2026-08-01. Windows and macOS at zero: a new action declared for
 // either without a handler must fail on the first one.
@@ -85,6 +89,14 @@ const PLATFORM_FIELD = /^platform\s*=\s*"([^"]+)"/m;
 
 const errors = [];
 const summary = [];
+
+if (!/ACTIONS_ROOT[\s\S]*?modules[/\\]actions/.test(SITE_LOADER)
+	|| !/resolve\(ACTIONS_ROOT,\s*'actions\.toml'\)/.test(SITE_LOADER)) {
+	errors.push('the Ergopti+ site must read the canonical modules/actions/actions.toml registry');
+}
+if (/modules[/\\]gestures/.test(SITE_LOADER)) {
+	errors.push('the Ergopti+ site still reads the retired shared modules/gestures path');
+}
 
 /**
  * True when a `platform` field claims a driver.

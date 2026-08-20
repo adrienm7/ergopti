@@ -345,9 +345,11 @@ local function probe_fs_without_lfs(path)
 			fh:close()
 			return { mode = "file" }
 		end
-		local zero = fh:read(0)
+		local zero, read_error = fh:read(0)
 		fh:close()
-		if zero then return { mode = "file" } end
+		-- POSIX Lua returns nil without an error for an empty regular file, while
+		-- reading a directory returns nil plus EISDIR. Keep those cases distinct.
+		if zero ~= nil or read_error == nil then return { mode = "file" } end
 		return { mode = "directory" }
 	end
 	local ok, _, code = os.rename(path, path)

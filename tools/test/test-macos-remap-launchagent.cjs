@@ -248,7 +248,7 @@ const sharedProbe = indexAfter(SWIFT, 'probeSingletonWithoutOwnership()', single
 	'guardian startup must first perform a non-owning singleton probe');
 const activationDrain = indexAfter(
 	SWIFT,
-	'Darwin.flock(activationGateDescriptor, LOCK_EX)',
+	'ergoptiFlock(activationGateDescriptor, LOCK_EX)',
 	sharedProbe,
 	'guardian startup must drain the activation gate'
 );
@@ -269,14 +269,14 @@ check(probeDefinition >= 0 && probeSharedLock > probeDefinition && probeSharedLo
 const atomicGuardianWrite = SWIFT.indexOf('func writeGuardianFileAtomically(');
 const acknowledgementWriterLock = indexAfter(
 	SWIFT,
-	'Darwin.flock(descriptor, LOCK_EX | LOCK_NB)',
+	'ergoptiFlock(descriptor, LOCK_EX | LOCK_NB)',
 	atomicGuardianWrite,
 	'atomic ACK publication must exclusively lock its inode'
 );
 const acknowledgementReader = SWIFT.indexOf('private func readGuardianAcknowledgement(');
 const acknowledgementReaderLock = indexAfter(
 	SWIFT,
-	'Darwin.flock(descriptor, LOCK_SH | LOCK_NB)',
+	'ergoptiFlock(descriptor, LOCK_SH | LOCK_NB)',
 	acknowledgementReader,
 	'ACK readers must reject a publication whose inode is still locked'
 );

@@ -452,9 +452,9 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				O_RDWR | O_CLOEXEC | O_NOFOLLOW
 			)
 			if descriptor >= 0 {
-				let result = Darwin.flock(descriptor, LOCK_EX | LOCK_NB)
+				let result = ergoptiFlock(descriptor, LOCK_EX | LOCK_NB)
 				observedExclusiveLock = result == -1 && errno == EWOULDBLOCK
-				if result == 0 { _ = Darwin.flock(descriptor, LOCK_UN) }
+				if result == 0 { _ = ergoptiFlock(descriptor, LOCK_UN) }
 				Darwin.close(descriptor)
 				if observedExclusiveLock { break }
 			}
@@ -515,7 +515,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0)
 
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		let termination = GuardianTerminationRecorder()
@@ -601,7 +601,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		if holderPID == 0 {
 			Darwin.close(ready[0])
 			_ = Darwin.signal(SIGTERM, SIG_DFL)
-			var result: UInt8 = Darwin.flock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
+			var result: UInt8 = ergoptiFlock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
 			_ = Darwin.write(ready[1], &result, 1)
 			while true { _ = Darwin.pause() }
 		}
@@ -677,7 +677,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			Darwin.close(readyReadDescriptor)
 			Darwin.close(releaseWriteDescriptor)
 			_ = Darwin.signal(SIGTERM, SIG_DFL)
-			var locked: UInt8 = Darwin.flock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
+			var locked: UInt8 = ergoptiFlock(inheritedDescriptor, LOCK_SH) == 0 ? 1 : 0
 			_ = Darwin.write(readyWriteDescriptor, &locked, 1)
 			if locked == 1 {
 				var released: UInt8 = 0
@@ -791,7 +791,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
 		defer { Darwin.close(owner) }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX), 0)
 		let runtime = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
@@ -1238,7 +1238,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertGreaterThanOrEqual(singleton, 0)
 		guard singleton >= 0 else { return }
 		defer { Darwin.close(singleton) }
-		XCTAssertEqual(Darwin.flock(singleton, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(singleton, LOCK_EX | LOCK_NB), 0)
 		let activationGate = Darwin.open(
 			fixture.paths.activationGate,
 			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
@@ -1287,7 +1287,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				let descriptor = Darwin.open(recordURL.path, O_RDWR | O_CLOEXEC | O_NOFOLLOW)
 				guard descriptor >= 0 else { return }
 				defer { Darwin.close(descriptor) }
-				guard Darwin.flock(descriptor, LOCK_EX | LOCK_NB) == -1,
+				guard ergoptiFlock(descriptor, LOCK_EX | LOCK_NB) == -1,
 					errno == EWOULDBLOCK,
 					let acknowledgement = observed.acknowledgement(
 						guardianGeneration: self.guardianGeneration
@@ -1543,7 +1543,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0)
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
@@ -1617,7 +1617,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			)
 			XCTAssertGreaterThanOrEqual(descriptor, 0)
 			guard descriptor >= 0 else { return }
-			XCTAssertEqual(Darwin.flock(descriptor, LOCK_EX | LOCK_NB), 0)
+			XCTAssertEqual(ergoptiFlock(descriptor, LOCK_EX | LOCK_NB), 0)
 			owners[record.token] = descriptor
 		}
 
@@ -1703,7 +1703,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let ownerPID = Darwin.fork()
 		if ownerPID == 0 {
 			Darwin.close(ready[0])
-			var armed: UInt8 = Darwin.flock(recordDescriptor, LOCK_EX | LOCK_NB) == 0
+			var armed: UInt8 = ergoptiFlock(recordDescriptor, LOCK_EX | LOCK_NB) == 0
 				? 1
 				: 0
 			_ = Darwin.write(ready[1], &armed, 1)
@@ -1761,7 +1761,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0)
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
@@ -1841,7 +1841,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0)
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
@@ -1884,7 +1884,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0)
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
@@ -1920,7 +1920,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0)
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		let termination = GuardianTerminationRecorder()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
@@ -1938,7 +1938,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		let exactFence = "{\"ergopti_mode_\(token)\":0,\"ergopti_revoked_\(token)\":1}"
 		XCTAssertEqual(executor.snapshot().payloads, [exactFence, exactFence])
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0,
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0,
 			"termination fencing must not wait for or take the active owner's lock")
 
 		let retired = LeaseGuardianRecord(
@@ -1966,7 +1966,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertGreaterThanOrEqual(owner, 0)
 		guard owner >= 0 else { return }
-		XCTAssertEqual(Darwin.flock(owner, LOCK_EX | LOCK_NB), 0)
+		XCTAssertEqual(ergoptiFlock(owner, LOCK_EX | LOCK_NB), 0)
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		let termination = GuardianTerminationRecorder()
 		var gateCalls = 0
@@ -3104,17 +3104,25 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		defer {
 			for case let pointer? in rawArguments { free(pointer) }
 		}
+		guard let rawEnvironment = duplicateProcessEnvironment() else {
+			XCTFail("the child-reaping harness must allocate envp")
+			return
+		}
+		defer { for case let pointer? in rawEnvironment { free(pointer) } }
 		var mutableArguments = rawArguments
+		var mutableEnvironment = rawEnvironment
 		var processID: pid_t = 0
-		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { buffer in
-			posix_spawn(
-				&processID,
-				"/usr/bin/true",
-				nil,
-				nil,
-				buffer.baseAddress,
-				_NSGetEnviron().pointee
-			)
+		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { arguments in
+			mutableEnvironment.withUnsafeMutableBufferPointer { environment in
+				posix_spawn(
+					&processID,
+					"/usr/bin/true",
+					nil,
+					nil,
+					arguments.baseAddress,
+					environment.baseAddress
+				)
+			}
 		}
 		guard spawnStatus == 0 else {
 			XCTFail("the child-reaping harness failed to spawn: \(spawnStatus)")
@@ -5305,17 +5313,24 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		defer {
 			for case let pointer? in rawArguments { free(pointer) }
 		}
+		guard let rawEnvironment = duplicateProcessEnvironment() else {
+			throw NSError(domain: "ErgoptiLeaseHarness", code: Int(ENOMEM), userInfo: nil)
+		}
+		defer { for case let pointer? in rawEnvironment { free(pointer) } }
 		var mutableArguments = rawArguments
+		var mutableEnvironment = rawEnvironment
 		var processID: pid_t = 0
-		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { buffer in
-			posix_spawn(
-				&processID,
-				"/bin/sh",
-				&fileActions,
-				nil,
-				buffer.baseAddress,
-				_NSGetEnviron().pointee
-			)
+		let spawnStatus = mutableArguments.withUnsafeMutableBufferPointer { arguments in
+			mutableEnvironment.withUnsafeMutableBufferPointer { environment in
+				posix_spawn(
+					&processID,
+					"/bin/sh",
+					&fileActions,
+					nil,
+					arguments.baseAddress,
+					environment.baseAddress
+				)
+			}
 		}
 		guard spawnStatus == 0 else {
 			throw NSError(

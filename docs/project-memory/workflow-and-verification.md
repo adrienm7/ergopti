@@ -100,6 +100,12 @@ The AHK runner writes process-specific results under `%TEMP%`. Low free space ca
 produce misleading assertion failures; check the newest result file and disk
 space before debugging the test body.
 
+### project-ahk-temp-path-spelling
+
+Windows may enumerate `%TEMP%` through a different long/short path spelling than
+the caller used. Tests that inspect path-keyed caches must use the exact spelling
+returned by file enumeration.
+
 ### project-ahk-suite-runnable-here-plus-os-purity-ratchet-nondeterminism
 
 The Windows AHK suite runs on this machine even when the launcher returns before

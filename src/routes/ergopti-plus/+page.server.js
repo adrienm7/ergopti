@@ -31,6 +31,7 @@ const UI_ROOT = resolve(SHARED_ROOT, 'ui');
 const LOCALES_ROOT = resolve(SHARED_ROOT, 'data/locales');
 // Canonical language display order — single source shared with the drivers.
 const LOCALE_ORDER_PATH = resolve(SHARED_ROOT, 'data/locale_order.json');
+const LOCALE_NAMES_PATH = resolve(SHARED_ROOT, 'data/locale_names.json');
 
 /**
  * Read and parse a JSON file, failing the build loudly on malformed input.
@@ -227,11 +228,9 @@ function loadHotstringCategories() {
 // ==============================================
 // ==============================================
 
-const I18N_LUA_PATH = resolve(process.cwd(), 'static/ergopti_plus/macos/lib/i18n.lua');
-
 /**
  * List the UI locales shipped with the drivers — flags and native names come
- * from the driver's own canonical table (macos/lib/i18n.lua), cross-checked
+ * from the shared canonical locale_names.json table, cross-checked
  * against the locale JSON files actually present. Sorted the way the driver
  * menus present them: Latin-script names alphabetically first, non-Latin
  * scripts at the bottom. Fully automated: a locale added to the driver
@@ -245,14 +244,8 @@ function loadLocales() {
 			.map((f) => f.replace(/\.json$/, ''))
 	);
 
-	// Parse the driver's canonical table: { code = "fr", flag = "🇫🇷", name = "…" }
-	const lua = readFileSync(I18N_LUA_PATH, 'utf-8');
-	const entryRe =
-		/\{\s*code\s*=\s*"([a-z]+)",\s*flag\s*=\s*"([^"]*)",\s*name\s*=\s*"([^"]*)"\s*\}/g;
-	const known = new Map();
-	for (const m of lua.matchAll(entryRe)) {
-		known.set(m[1], { flag: m[2], name: m[3].trim() });
-	}
+	// Read the same native names and flags used to generate every driver table.
+	const known = new Map(Object.entries(readJson(LOCALE_NAMES_PATH).locales));
 
 	const locales = [...available].map((code) => {
 		const entry = known.get(code);
@@ -287,7 +280,7 @@ function loadLocales() {
 // ==================================================
 // ==================================================
 
-const GESTURES_ROOT = resolve(SHARED_ROOT, 'modules/gestures');
+const ACTIONS_ROOT = resolve(SHARED_ROOT, 'modules/actions');
 
 /**
  * Load the shared action catalog (single source of truth consumed by all
@@ -299,7 +292,7 @@ const GESTURES_ROOT = resolve(SHARED_ROOT, 'modules/gestures');
  */
 function loadActionGroups() {
 	// The file carries a (doubled) UTF-8 BOM that smol-toml rejects.
-	const raw = readFileSync(resolve(GESTURES_ROOT, 'actions.toml'), 'utf-8').replace(/^﻿+/, '');
+	const raw = readFileSync(resolve(ACTIONS_ROOT, 'actions.toml'), 'utf-8').replace(/^﻿+/, '');
 	const doc = parseToml(raw);
 	const fr = readJson(resolve(LOCALES_ROOT, 'fr.json'));
 	// Locale values keep the picker's leading "#" formatting marker — strip it.

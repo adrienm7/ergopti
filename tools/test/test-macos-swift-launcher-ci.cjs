@@ -36,6 +36,19 @@ const PACKAGE = fs.readFileSync(
 	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher', 'Package.swift'),
 	'utf8'
 );
+const SWIFT_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher');
+
+function readSwiftTree(directory) {
+	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+		const entryPath = path.join(directory, entry.name);
+		if (entry.isDirectory()) return readSwiftTree(entryPath);
+		return entry.isFile() && entry.name.endsWith('.swift')
+			? [fs.readFileSync(entryPath, 'utf8')]
+			: [];
+	}).join('\n');
+}
+
+const SWIFT_SOURCES = readSwiftTree(SWIFT_ROOT);
 
 const failures = [];
 
@@ -98,6 +111,14 @@ check(
 	/\.testTarget\s*\(\s*name:\s*"ErgoptiPlusTests"/s.test(PACKAGE),
 	'Package.swift must register the ErgoptiPlusTests target that CI claims to run'
 );
+check(!/\bDarwin\.flock\s*\(/.test(SWIFT_SOURCES),
+	'Swift 6.3 resolves `Darwin.flock(...)` as the struct; use ergoptiFlock instead');
+check(!/\b_NSGetEnviron\s*\(/.test(SWIFT_SOURCES),
+	'the current macOS SDK does not expose `_NSGetEnviron`; use duplicateProcessEnvironment');
+check(/@_silgen_name\("flock"\)[\s\S]*?func c_flock\s*\(/.test(SWIFT_SOURCES),
+	'the Swift launcher must retain its libc flock symbol binding');
+check(/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),
+	'the Swift launcher must retain its owned posix_spawn environment builder');
 
 const macosGate = withoutFullLineComments(jobBody('macos-ok'));
 check(macosGate.length > 100, '`macos-ok` is absent or empty');
