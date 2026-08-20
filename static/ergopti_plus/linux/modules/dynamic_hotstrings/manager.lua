@@ -370,7 +370,13 @@ function M.on_trigger(buffer, trigger)
 
 	-- Inject: erase the suffix + trigger, type the result.
 	-- e.g. buffer "@p★" → backspace 3 chars → type "Adrien"
-	local backspace_count = #(match.rule.suffix) + 1  -- suffix + trigger
+	local suffix_length = strict_codepoint_length(match.rule.suffix)
+	if not suffix_length then
+		Logger.error(LOG, "Dynamic rule suffix is invalid UTF-8 (%d-byte suffix); expansion refused.",
+			#match.rule.suffix)
+		return false
+	end
+	local backspace_count = suffix_length + 1  -- suffix + trigger
 	-- Injector is loaded once at require-time; the hotstrings injector module
 	-- wraps ydotool and is always available on Linux.
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
