@@ -223,6 +223,50 @@ Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 Logger.init_log_path(config_paths.get_config_dir(), 14)
 Boot.mark("Path: log file open (retention purge deferred)")
 
+-- The launcher exports one indivisible identity+logger authority. Complete
+-- absence and every partial/stale subset fail closed: the full driver may never
+-- arm an input owner while its logger can still perform synchronous I/O on the
+-- Hammerspoon callback loop. Developer runs must therefore use the launcher too.
+local function abort_logger_boot(detail)
+	Logger.error(LOG, "Native asynchronous logger transport unavailable — startup aborted before input: %s.",
+		tostring(detail))
+	Logger.stop_async_sink()
+	-- i18n is initialized above, but menu/notifications are deliberately not: a
+	-- bounded native alert is the only visible fail-fast surface that cannot arm
+	-- input or leave an inert embedded Hammerspoon process behind.
+	local BOOT_FAILURE_ALERT_SECONDS = 5
+	pcall(function()
+		local alert = hs.alert
+		if type(alert) == "table" and type(alert.show) == "function" then
+			alert.show(
+				i18n.get("startup.native_logger_unavailable"),
+				BOOT_FAILURE_ALERT_SECONDS)
+		end
+	end)
+	os.exit(1)
+	return false
+end
+
+local logger_boot_mode, logger_boot_policy_err = Logger.classify_async_sink_boot_environment()
+if logger_boot_mode ~= "managed" then
+	local refusal_detail = logger_boot_policy_err
+	if logger_boot_mode == "standalone" then
+		refusal_detail = "native logger authority absent; launch the full driver through the ErgoptiPlus launcher"
+	end
+	abort_logger_boot(refusal_detail)
+	return
+end
+
+-- The native launcher binds its authenticated loopback worker before spawning
+-- Hammerspoon. Commit the socket and pump while boot can still fail closed
+-- without exposing an eventtap. Runtime producers then only enqueue memory.
+local async_log_ready, async_log_err = Logger.start_async_sink(TimerScheduler)
+if async_log_ready ~= true then
+	abort_logger_boot(async_log_err)
+	return
+end
+Boot.mark("Path: native asynchronous logger transport committed")
+
 -- Make the file log self-sufficient: capture errors that Hammerspoon would
 -- otherwise only print to its (unexportable, far-too-noisy) Console. Wraps
 -- hs.timer callbacks so a throw inside one is logged with a traceback instead of
@@ -267,6 +311,12 @@ local karabiner
 local LauncherGuard
 local _termination_coordinator_ready = false
 local _local_teardown_state = TeardownTransaction.new_state()
+local _local_teardown_started = false
+-- Set only after the controlled path has drained and released the logger. The
+-- native shutdown callback still fires for hs.reload(); without this fence it
+-- would reopen the synchronous fallback sink and request the already-STOPPED
+-- lease a second time after the coordinator's final ACK boundary.
+local _controlled_terminal_finalized = false
 
 --- Delivers a lifecycle completion without letting an async callback exception
 --- disappear into the Hammerspoon Console.
@@ -373,7 +423,10 @@ end
 --- @param termination_kind string|nil `reload` or `exit` for diagnostics.
 --- @return boolean completed
 local function teardown_all_resources(termination_kind)
-	Logger.info(LOG, "Hammerspoon local teardown started (%s).", tostring(termination_kind or "shutdown"))
+	if not _local_teardown_started then
+		_local_teardown_started = true
+		Logger.info(LOG, "Hammerspoon local teardown started (%s).", tostring(termination_kind or "shutdown"))
+	end
 	local steps = {
 		{
 			name = "boot-ready-setting",
@@ -507,25 +560,37 @@ local function teardown_all_resources(termination_kind)
 			return module.stop_watchers()
 		end,
 	}
-	local timer_finalizer = {
-		name = "timer-scheduler",
-		run = function() return TimerScheduler.cancelAll() end,
+	steps[#steps + 1] = {
+		name = "logger-drain-announcement",
+		run = function()
+			-- This is intentionally the final Lua-produced completion line. The
+			-- asynchronous finalizer below cannot stop its socket until the native
+			-- worker has acknowledged this record and every earlier teardown line.
+			Logger.info(LOG, "Hammerspoon local owners stopped; draining acknowledged diagnostics.")
+			return true
+		end,
 	}
-
-	-- Scheduler handles belong to the modules above until every owner has
-	-- settled. A broad drain before then would invalidate their retained retry
-	-- capabilities while a failed teardown keeps this Lua process alive.
-	local completed = TeardownTransaction.run_with_finalizer(
-		_local_teardown_state,
-		steps,
-		timer_finalizer
-	)
-	if completed then
-		Logger.info(LOG, "Hammerspoon local teardown completed.")
-	else
+	-- The logger pump is intentionally NOT finalized here. The coordinator first
+	-- asks its native worker to ACK this final announcement and every earlier
+	-- teardown record; only that asynchronous completion may call
+	-- finalize_teardown_resources() below.
+	local completed = TeardownTransaction.run(_local_teardown_state, steps)
+	if completed == false then
 		Logger.error(LOG, "Hammerspoon local teardown remains incomplete and retryable.")
 	end
 	return completed
+end
+
+--- Settles scheduler capabilities after the native drain callback, then closes
+--- the logger socket. The logger remains logically active during cancelAll so a
+--- refusing timer cannot resurrect the synchronous legacy sink; the coordinator
+--- exits non-zero on either refusal because no local-owner rollback remains.
+--- @return boolean completed
+local function finalize_teardown_resources()
+	if TimerScheduler.cancelAll() ~= true then return false end
+	if Logger.stop_async_sink() ~= true then return false end
+	_controlled_terminal_finalized = true
+	return true
 end
 
 -- Armed HERE, not at the end of boot. This callback is an unawaitable native
@@ -534,6 +599,10 @@ end
 -- the retryable local teardown only after STOPPED. Native SIGTERM instead closes
 -- the process promptly; the worker's stdin EOF is then the authoritative fence.
 local function shutdown_all_resources()
+	-- A controlled reload has already fenced the lease, stopped every local owner,
+	-- drained the exact native log queue and closed its socket. This callback must
+	-- be strictly inert: any Logger call here would reopen the synchronous sink.
+	if _controlled_terminal_finalized then return end
 	Logger.info(LOG, "Hammerspoon is shutting down — requesting exact lease revocation first.")
 	-- Revoke this Lua generation's exact lease on EVERY shutdown, including a
 	-- reload. Each reload receives a distinct token, so leaving the old token live
@@ -565,20 +634,25 @@ hs.shutdownCallback = shutdown_all_resources
 -- alive. Arm the exact-PID launcher guard only AFTER the complete shutdown
 -- callback exists. Its bounded emergency path either completes the controlled
 -- fence/teardown or exits to hand revocation to native stdin EOF. Direct
--- developer launches do not export a launcher PID and remain supported.
-local _launcher_emergency_exit_requested = false
-local LAUNCHER_LOSS_EXIT_DEADLINE_SEC = 0.25
+-- module tests may omit the launcher PID, but root boot already required the
+-- complete native authority above and cannot reach this point without it.
+local _runtime_emergency_exit_requested = false
+local RUNTIME_FAILURE_EXIT_DEADLINE_SEC = 0.25
+local RUNTIME_FAILURE_EXIT_CODE = 70
 
 local function managed_launcher_expected()
 	local ok, raw_pid = pcall(os.getenv, "ERGOPTI_LAUNCHER_PID")
 	return ok and type(raw_pid) == "string" and raw_pid ~= ""
 end
 
-local function emergency_exit_after_launcher_loss(reason)
-	if _launcher_emergency_exit_requested then return end
-	_launcher_emergency_exit_requested = true
-	Logger.error(LOG, "ErgoptiPlus launcher disappeared (%s) — shutting down embedded Hammerspoon.",
-		tostring(reason))
+local function emergency_exit_after_runtime_failure(owner, reason)
+	if _runtime_emergency_exit_requested then return end
+	_runtime_emergency_exit_requested = true
+	local exact_owner = tostring(owner or "runtime_dependency")
+	local exact_reason = tostring(reason or "unknown_failure")
+	Logger.error(LOG,
+		"ErgoptiPlus runtime dependency failed (%s: %s) — shutting down embedded Hammerspoon.",
+		exact_owner, exact_reason)
 
 	-- Arm the deadline BEFORE starting a request that may never settle. If exact
 	-- STOPPED arrives in time, the normal coordinator fences, tears down, and exits.
@@ -586,8 +660,9 @@ local function emergency_exit_after_launcher_loss(reason)
 	-- guardian revokes this exact token. Never stop F17 consumers before either
 	-- fence: doing so would create missing Enter/Backspace/Escape output.
 	local accepted = EmergencyExit.request({
-		reason = "launcher_loss_" .. tostring(reason),
-		deadline_seconds = LAUNCHER_LOSS_EXIT_DEADLINE_SEC,
+		reason = "runtime_failure_" .. exact_owner .. "_" .. exact_reason,
+		deadline_seconds = RUNTIME_FAILURE_EXIT_DEADLINE_SEC,
+		exit_code = RUNTIME_FAILURE_EXIT_CODE,
 		schedule = function(delay, callback)
 			return hs.timer.doAfter(delay, callback)
 		end,
@@ -598,8 +673,13 @@ local function emergency_exit_after_launcher_loss(reason)
 		exit = function(code) return os.exit(code) end,
 	})
 	if not accepted then
-		Logger.error(LOG, "Launcher-loss controlled exit was not accepted; native EOF fallback was requested.")
+		Logger.error(LOG,
+			"Runtime-failure controlled exit was not accepted; native EOF fallback was requested.")
 	end
+end
+
+local function emergency_exit_after_launcher_loss(reason)
+	return emergency_exit_after_runtime_failure("launcher_liveness", reason)
 end
 
 do
@@ -653,14 +733,18 @@ do
 		return TerminationCoordinator.init({
 			request_lease = request_exact_lease_revoke,
 			teardown = teardown_all_resources,
+			begin_drain = Logger.begin_async_sink_shutdown,
+			finalize_teardown = finalize_teardown_resources,
 			reload = function(...) return _native_hs_reload(...) end,
 			exit = function(code) return os.exit(code) end,
+			fatal_exit = function(code) return os.exit(code) end,
+			fatal_exit_code = RUNTIME_FAILURE_EXIT_CODE,
 			mark_reload = function()
 				reload_guard.mark_reload()
 				return reload_guard.is_reloading() == true
 			end,
 			clear_reload = function()
-				reload_guard.clear()
+				reload_guard.clear_silent()
 				return reload_guard.is_reloading() == false
 			end,
 		})
@@ -674,11 +758,30 @@ do
 	end
 end
 
+-- The transport may discover queue exhaustion, repeated ACK loss, or a native
+-- NACK only after boot. Route every such failure through the same bounded exact
+-- lease fence used for launcher loss; an unresponsive coordinator still reaches
+-- os.exit(), whose stdin EOF lets the independent lease guardian revoke only
+-- the exact ErgoptiPlus token-scoped variables and rules. No stock Karabiner
+-- process belongs to ErgoptiPlus or may be signalled by this path.
+do
+	local handler_ok, handler_err = Logger.set_async_sink_failure_handler(function(detail)
+		emergency_exit_after_runtime_failure("native_logger", detail)
+	end)
+	if handler_ok ~= true then
+		emergency_exit_after_runtime_failure("native_logger_handler", handler_err)
+	end
+end
+
 -- Wire Logger.error → system notification so every ERROR surfaces to the user
 -- without any module needing to call notifications.notify() directly.
 -- Registered here (after notifications is loaded) to keep logger dependency-free.
 Logger.set_error_notification_handler(function(module_name, message)
-	pcall(notifications.notify, i18n.get("common.error_prefix") .. tostring(module_name), message, "error")
+	return notifications.notify(
+		i18n.get("common.error_prefix") .. tostring(module_name),
+		message,
+		"error"
+	)
 end)
 Boot.mark("Config-dependent module requires")
 

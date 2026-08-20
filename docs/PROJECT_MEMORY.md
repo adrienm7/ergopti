@@ -2997,6 +2997,18 @@ and purge. Fail closed before input activation if that ownership cannot be
 established. A timer-only drain was prototyped and rejected: it exits the
 eventtap stack but still performs disk I/O on Hammerspoon's main loop.
 
+**Native logger boot boundary (2026-08-14).** The launcher exports one indivisible
+four-field authority: `ERGOPTI_LAUNCHER_PID`, `ERGOPTI_LAUNCHER_BUNDLE_ID`,
+`ERGOPTI_LOG_PORT`, and `ERGOPTI_LOG_TOKEN`.
+`infra.logger.classify_async_sink_boot_environment()` distinguishes all four
+(native ACKed worker mandatory), all absent (diagnostic `standalone`), and every
+partial set. Root boot accepts only the complete authority. Both complete absence
+and all 14 partial combinations fail visibly before input activation; the full
+driver has no synchronous logging compatibility path because that would forfeit
+the eventtap G4 guarantee. Direct development of the complete driver must also use
+the launcher. `infra.launcher_guard` can still be disabled and tested in isolation;
+that module-level option does not authorize root boot without the logger worker.
+
 **How to apply:** inventory the complete transitive call graph of every
 `hs.eventtap` callback. Producers may classify, mutate bounded memory and enqueue;
 they must not shell out, touch filesystem sinks, render UI, notify, or call a

@@ -265,3 +265,54 @@ helpers.describe("TOML codec — inline table with a nested multi-element array"
 	end)
 
 end)
+
+helpers.describe("toml_codec: multiline strings remain data, never table syntax", function()
+	helpers.it("decodes a multiline basic string without inventing sections", function()
+		local source = [==[[llm]
+app_profile_overrides = """
+[features]
+llm.enabled = false
+"""
+]==]
+		local decoded = codec.decode(source)
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.llm.app_profile_overrides,
+			"[features]\nllm.enabled = false\n")
+		helpers.assert_nil(decoded.features,
+			"a header-looking line inside a value must never become executable configuration")
+	end)
+
+	helpers.it("decodes a multiline literal string without inventing sections", function()
+		local source = [==[[info]
+note = '''
+[letters]
+p = "credit_card"
+'''
+]==]
+		local decoded = codec.decode(source)
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.info.note, "[letters]\np = \"credit_card\"\n")
+		helpers.assert_nil(decoded.letters)
+	end)
+end)
+
+helpers.describe("toml_codec: literal strings protect array delimiters", function()
+	helpers.it("keeps commas inside single-quoted array elements", function()
+		local decoded = codec.decode(
+			"[metrics.disabled_apps]\nlist = ['com.example,app', 'other']\n")
+		helpers.assert_eq(decoded.metrics.disabled_apps.list,
+			{ "com.example,app", "other" })
+	end)
+
+	helpers.it("keeps closing brackets inside multiline literal array elements", function()
+		local decoded = codec.decode([==[[metrics.disabled_apps]
+list = [
+  'com.example]app',
+  'other',
+]
+]==])
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded.metrics.disabled_apps.list,
+			{ "com.example]app", "other" })
+	end)
+end)

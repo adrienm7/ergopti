@@ -895,11 +895,12 @@ M.console = { printStyledtext = function(_) end }
 M.notify = {
 	new = function(arg1, arg2)
 		local opts = type(arg1) == "function" and arg2 or arg1
-		return {
-			send = function() end,
+		local notification = {
 			release = function() end,
 			opts = opts,
 		}
+		notification.send = function() return notification end
+		return notification
 	end,
 	show = function(_) end,
 }

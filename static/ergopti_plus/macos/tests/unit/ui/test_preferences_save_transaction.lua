@@ -11,12 +11,20 @@
 local helpers = require("tests.helpers")
 
 local function load_preferences(file_system)
+	file_system.read_with_status = file_system.read_with_status or function()
+		return "", "ok"
+	end
+	file_system.write_if_unchanged = file_system.write_if_unchanged or
+		function(path, content, _expected_source)
+			return file_system.write(path, content)
+		end
 	package.loaded["adapters.file_system"] = file_system
 	package.loaded["infra.preferences"] = nil
 	return require("infra.preferences")
 end
 
 local function minimal_save(preferences)
+	preferences.load("/virtual/config.toml")
 	return preferences.save("/virtual/config.toml", {}, {}, {})
 end
 
@@ -48,6 +56,71 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 	helpers.it("returns true only after the writer confirms publication", function()
 		local preferences = load_preferences({ write = function() return true end })
 		helpers.assert_eq(minimal_save(preferences), true)
+	end)
+
+	helpers.it("preserves an external winner and lets the menu roll its live state back", function()
+		local path = "/virtual/config.toml"
+		local initial = "[features]\npreview_star_enabled = false\n"
+		local external = "[features]\npreview_star_enabled = true\n"
+		local disk = initial
+		local publications = 0
+		local preferences = load_preferences({
+			read_with_status = function(read_path)
+				helpers.assert_eq(read_path, path)
+				return disk, "ok"
+			end,
+			-- Causal old-code seam: the unconditional writer loses B and reports a
+			-- false success. The fixed code must never call it.
+			write = function(_write_path, content)
+				publications = publications + 1
+				disk = external
+				disk = content
+				return true
+			end,
+			write_if_unchanged = function(write_path, _content, expected_source)
+				publications = publications + 1
+				helpers.assert_eq(write_path, path)
+				helpers.assert_eq(expected_source,
+					{ status = "ok", content = initial },
+					"the exact boot bytes must cross the menu publication boundary")
+				disk = external
+				if expected_source.status ~= "ok" or disk ~= expected_source.content then
+					return false, "source changed"
+				end
+				return true
+			end,
+		})
+		local loaded, load_status = preferences.load(path)
+		helpers.assert_eq(load_status, "ok")
+		helpers.assert_type(loaded, "table")
+
+		local transaction = require("ui.menu.preferences_transaction")
+		local state = { preview_star_enabled = false }
+		local restores = 0
+		local save = transaction.bind(preferences, {
+			path = path,
+			state = state,
+			hotfiles = {},
+			core_modules = {},
+			initial_state = state,
+			initial_preferences = state,
+			restore_runtime = function(snapshot)
+				restores = restores + 1
+				helpers.assert_eq(snapshot.preview_star_enabled, false)
+				return true
+			end,
+		})
+		state.preview_star_enabled = true
+
+		helpers.assert_eq(save(), false,
+			"a stale full-document menu save must be rejected")
+		helpers.assert_eq(publications, 1)
+		helpers.assert_eq(disk, external,
+			"the external winner must survive byte-for-byte")
+		helpers.assert_eq(state.preview_star_enabled, false,
+			"the menu must roll the rejected runtime mutation back")
+		helpers.assert_eq(restores, 1,
+			"runtime restoration must run exactly once after the conflict")
 	end)
 
 end)

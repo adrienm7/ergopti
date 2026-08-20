@@ -260,19 +260,25 @@ end
 
 --- Initializes the module with the shared CoreState.
 --- @param core_state table The shared state object from keymap/init.lua.
+--- @return boolean committed True only when replay state is ready.
 function M.init(core_state)
 	Logger.start(LOG, "Initializing terminator replay…")
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table (got %s) — module non-functional.",
 			type(core_state))
-		return
+		return false
 	end
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state then
+			Logger.warn(LOG, "M.init() called more than once with the active state — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
+		return false
 	end
 	_state = core_state
 	Logger.success(LOG, "Terminator replay initialized.")
+	return true
 end
 
 

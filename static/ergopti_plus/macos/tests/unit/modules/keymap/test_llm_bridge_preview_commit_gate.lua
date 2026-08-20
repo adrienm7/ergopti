@@ -91,7 +91,7 @@ local function load_fixture(render_result, previews_enabled, options)
 	}
 	package.loaded["modules.llm.prediction_engine"] = {
 		set_runtime_guard = function() end,
-		init = function() end,
+		init = function() return true end,
 		get_llm_enabled = function() return true end,
 		stop_timer = function()
 			fixture.stops = fixture.stops + 1

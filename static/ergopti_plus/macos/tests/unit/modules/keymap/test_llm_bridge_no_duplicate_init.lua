@@ -119,7 +119,7 @@ package.loaded["ui.tooltip"] = {
 -- modules.llm.prediction_engine: minimal stub for all setters + lifecycle calls.
 local ENGINE_ENABLED = false
 package.loaded["modules.llm.prediction_engine"] = {
-	init                          = function() end,
+	init                          = function() return true end,
 	reset                         = function() return true end,
 	set_preview_ai_enabled        = function() end,
 	set_preview_ai_color          = function() end,
@@ -226,13 +226,15 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 		-- Called directly: a raise fails with the real error. The claim is that the
 		-- first init leaves the bridge OPERATIONAL, which is what the duplicate-init
 		-- case below is measuring a change against.
-		bridge.init(state1, defaults1)
+		helpers.assert_eq(bridge.init(state1, defaults1), true)
+		helpers.assert_eq(bridge.init(state1, defaults1), true,
+			"the exact active dependencies must be an idempotent success")
 		helpers.assert_eq(type(bridge.check_nav_reset), "function",
 			"a successful first init must leave the public surface callable")
 	end)
 
 
-	helpers.it("second M.init() with a different state is ignored and emits a WARN", function()
+	helpers.it("second M.init() with different dependencies is refused", function()
 		-- state1 was installed by the previous test case (same module instance).
 		-- Install a capture sink on the shared Logger so we can inspect the WARN.
 		local captured_lines = {}
@@ -240,24 +242,26 @@ helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
 		Logger.set_sink(function(line) captured_lines[#captured_lines + 1] = line end)
 
 		local state2, defaults2 = make_state("state2")
-		local ok, init_err = pcall(function() bridge.init(state2, defaults2) end)
+		local init_result = nil
+		local ok, init_err = pcall(function() init_result = bridge.init(state2, defaults2) end)
 
 		-- Restore sink immediately so subsequent tests are unaffected.
 		Logger.set_sink(nil)
 
 		helpers.assert_nil(init_err, "and must report none: " .. tostring(init_err))
 		helpers.assert_true(ok, "second M.init() must not throw")
+		helpers.assert_eq(init_result, false,
+			"a different dependency set must not inherit the active binding's success")
 
-		-- Verify that at least one captured line mentions the duplicate-call warning.
-		local found_warn = false
+		local found_refusal = false
 		for _, line in ipairs(captured_lines) do
-			if line:find("more than once", 1, true) or line:find("duplicate", 1, true) then
-				found_warn = true
+			if line:find("replacement refused", 1, true) then
+				found_refusal = true
 				break
 			end
 		end
-		helpers.assert_true(found_warn,
-			"second M.init() must emit a WARN containing 'more than once' or 'duplicate'")
+		helpers.assert_true(found_refusal,
+			"a conflicting M.init() must log that dependency replacement was refused")
 	end)
 
 

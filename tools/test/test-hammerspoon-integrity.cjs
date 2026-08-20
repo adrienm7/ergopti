@@ -117,9 +117,9 @@ check(
 );
 
 check(
-    'Controlled teardown: drains owners before the dependent timer finalizer',
+    'Controlled teardown: drains owners before scheduler/logger finalization',
     'static/ergopti_plus/macos/init.lua',
-    /name\s*=\s*["']timer-scheduler["'][\s\S]*TeardownTransaction\.run_with_finalizer\([\s\S]*_local_teardown_state,[\s\S]*steps,[\s\S]*timer_finalizer/
+    /local function teardown_all_resources\([^)]*\)[\s\S]*TeardownTransaction\.run\(_local_teardown_state, steps\)[\s\S]*local function finalize_teardown_resources\([^)]*\)[\s\S]*TimerScheduler\.cancelAll\(\)[\s\S]*Logger\.stop_async_sink\(\)[\s\S]*begin_drain\s*=\s*Logger\.begin_async_sink_shutdown[\s\S]*finalize_teardown\s*=\s*finalize_teardown_resources/
 );
 
 check(

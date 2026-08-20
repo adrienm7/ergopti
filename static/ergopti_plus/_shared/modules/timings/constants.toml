@@ -41,6 +41,11 @@ chain_fallback_ms = 500
 # HS:  api_remote.lua REQUEST_TIMEOUT_S.
 request_timeout_ms = 30000
 
+# Hard deadline for one macOS Keychain security(1) subprocess. This does not
+# block input, but it bounds every credential CRUD callback and owned task.
+# HS: api_token_crypto.lua OPERATION_TIMEOUT_SEC.
+keychain_operation_timeout_ms = 10000
+
 # HTTP polling interval when the remote driver polls a streaming response.
 # AHK: api_remote.ahk LLM_REMOTE_POLL_MS / api_ollama.ahk LLM_OLLAMA_POLL_MS.
 poll_interval_ms = 50

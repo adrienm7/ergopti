@@ -924,18 +924,21 @@ end
 --- Injects the shared CoreState from keymap/init.lua.
 --- Must be called exactly once before any other function in this module.
 --- @param core_state table The shared state object.
+--- @return boolean committed True only when the registry is ready for callers.
 function M.init(core_state)
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table (got %s).", type(core_state))
-		return
+		return false
 	end
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state then
+			Logger.warn(LOG, "M.init() called more than once with the active state — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
+		return false
 	end
-	_state = core_state
-	RI.setup(core_state)
-	Groups.init(core_state, {
+	local groups_ready = Groups.init(core_state, {
 		add                  = M.add,
 		sort_mappings        = M.sort_mappings,
 		is_section_enabled   = M.is_section_enabled,
@@ -944,7 +947,17 @@ function M.init(core_state)
 		rebuild_tail_indexes = rebuild_tail_indexes,
 		drop_classify_cache  = M.drop_classify_cache,
 	})
+	if groups_ready ~= true then
+		Logger.error(LOG, "M.init(): group registry dependency initialization refused.")
+		return false
+	end
+	if RI.setup(core_state) ~= true then
+		Logger.error(LOG, "M.init(): registry index dependency initialization refused.")
+		return false
+	end
+	_state = core_state
 	Logger.debug(LOG, "Registry initialized.")
+	return true
 end
 
 --- Reassigns the magic-key character across the terminator definitions AND

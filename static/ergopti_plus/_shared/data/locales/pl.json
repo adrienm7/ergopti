@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "Błąd uruchomienia: plik _generated/features_manifest.ahk jest nieobecny lub uszkodzony.\n\nUruchom `npm run build:manifest` z katalogu projektu i zrestartuj skrypt.",
 	"startup.manifest_title": "ErgoptiPlus — brak manifestu",
+	"startup.native_logger_unavailable": "Nie można uruchomić ErgoptiPlus, ponieważ natywna usługa rejestrowania jest niedostępna. Uruchom ErgoptiPlus za pomocą jego programu uruchamiającego.",
 	"tap_hold.action.disable": "Natywny klawisz",
 	"tap_hold.disable_all": "Wyłącz wszystko",
 	"tap_hold.group.alt_gr": "AltGr",

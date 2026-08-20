@@ -85,6 +85,7 @@ local function fresh_expander()
 	-- load_with_stubs() forces a full re-execution of the module body.
 	local to_wipe = {
 		"modules.keymap.expander",
+		"modules.keymap.terminator_replay",
 		"infra.text_utils",
 		"modules.keymap.utils",
 		"infra.logger",
@@ -128,10 +129,13 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		local llm2      = make_llm()
 
 		-- First legitimate initialisation.
-		expander.init(state1, registry1, llm1)
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true)
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true,
+			"the exact active dependencies must be an idempotent success")
 
 		-- Second call with entirely different objects — must be ignored.
-		expander.init(state2, registry2, llm2)
+		helpers.assert_eq(expander.init(state2, registry2, llm2), false,
+			"different dependency objects must be refused")
 
 		-- The expander must still be bound to state1. We probe this by verifying
 		-- that try_expand() operates on state1.buffer: we write a sentinel string
@@ -152,7 +156,7 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 	end)
 
 
-	helpers.it("second init() emits exactly one WARN log line", function()
+	helpers.it("a conflicting init() emits exactly one ERROR log line", function()
 		local expander = fresh_expander()
 		local L = require("infra.logger")
 		L.set_level(L.LEVELS.DEBUG)
@@ -175,29 +179,27 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		-- instance funnels through the one shared core and they all do. Counting
 		-- "any WARNING from anywhere" would make this test fail whenever an
 		-- unrelated module warns, which is not the invariant it is guarding.
-		local warn_lines = {}
+		local error_lines = {}
 		L.set_sink(function(line, variant)
-			if variant == "warn" and line:find("[" .. EXPANDER_LOG_TAG .. "]", 1, true) then
-				warn_lines[#warn_lines + 1] = line
+			if variant == "error" and line:find("[" .. EXPANDER_LOG_TAG .. "]", 1, true) then
+				error_lines[#error_lines + 1] = line
 			end
 		end)
-		local function warn_dump() return table.concat(warn_lines, " || ") end
+		local function error_dump() return table.concat(error_lines, " || ") end
 
-		expander.init(state1, registry1, llm1)   -- legitimate — no WARN expected
-		expander.init(state2, registry2, llm2)   -- duplicate — must emit one WARN
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true)
+		helpers.assert_eq(expander.init(state2, registry2, llm2), false)
 
 		L.set_sink(nil)
 
-		helpers.assert_eq(#warn_lines, 1,
-			"expected exactly one WARN from the duplicate init() call, got "
-			.. tostring(#warn_lines) .. ": " .. warn_dump())
+		helpers.assert_eq(#error_lines, 1,
+			"expected exactly one ERROR from the conflicting init() call, got "
+			.. tostring(#error_lines) .. ": " .. error_dump())
 
 		-- Confirm the message text matches the guard wording in the source.
-		local line = warn_lines[1] or ""
-		helpers.assert_true(
-			line:find("more than once", 1, true) ~= nil or line:find("duplicate", 1, true) ~= nil,
-			"WARN message should mention 'more than once' or 'duplicate', got: " .. line
-		)
+		local line = error_lines[1] or ""
+		helpers.assert_true(line:find("replacement refused", 1, true) ~= nil,
+			"ERROR message should identify the refused dependency replacement, got: " .. line)
 	end)
 
 
@@ -227,7 +229,7 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 		end)
 		local function warn_dump() return table.concat(warn_lines, " || ") end
 
-		expander.init(state1, registry1, llm1)
+		helpers.assert_eq(expander.init(state1, registry1, llm1), true)
 
 		L.set_sink(nil)
 

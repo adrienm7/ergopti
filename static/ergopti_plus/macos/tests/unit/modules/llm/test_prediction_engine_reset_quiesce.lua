@@ -55,13 +55,13 @@ local function load_fixture(cancel_result)
 	}
 	package.loaded["modules.llm"] = core
 	package.loaded["modules.llm.warmup_controller"] = {
-		init = function() end,
+		init = function() return true end,
 		stop = function() end,
 		schedule_warmup_with_retry = function() end,
 	}
 	package.loaded["modules.llm.prompt_builder"] = { build = function() return nil end }
 	package.loaded["modules.llm.streaming_handler"] = {
-		init = function() end,
+		init = function() return true end,
 		stop_watchdog = function() return true end,
 		reset_failure_count = function() end,
 	}

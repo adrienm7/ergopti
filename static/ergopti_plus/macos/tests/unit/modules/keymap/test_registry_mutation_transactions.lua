@@ -160,6 +160,57 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 			"rollback must restore the exact previously-live mapping object")
 	end)
 
+	helpers.it("rolls an editor-style TOML reload back to the exact live corpus", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("personal", "Personal", {})
+		state.groups.personal.path = "/virtual/personal_hotstrings.toml"
+		state.groups.personal.kind = "toml"
+		add_group_mapping(registry, "personal", "stable")
+		local mapping_before = state.mappings[1]
+		local previous_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function() error("injected editor reload failure", 0) end,
+		}
+
+		local ok, committed = pcall(
+			registry.reload_toml,
+			"personal",
+			"/virtual/personal_hotstrings.toml"
+		)
+		package.loaded["infra.toml.reader"] = previous_reader
+
+		helpers.assert_true(ok, "the public reload must contain parser failures")
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(registry.is_group_enabled("personal"), true,
+			"a failed editor reload must not leave the group disabled")
+		helpers.assert_eq(#state.mappings, 1)
+		helpers.assert_eq(state.mappings[1], mapping_before,
+			"rollback must restore the exact mapping object visible before Save")
+		helpers.assert_eq(registry.mappings_for_tail("e")[1], mapping_before,
+			"the hot-path tail index must point back to the restored corpus")
+	end)
+
+	helpers.it("does not activate a TOML group that the user disabled before Save", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("personal", "Personal", {})
+		add_group_mapping(registry, "personal", "stable")
+		helpers.assert_eq(registry.disable_group("personal"), true)
+		local previous_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function() error("disabled groups must not be loaded by Save", 0) end,
+		}
+
+		local committed = registry.reload_toml("personal", "/virtual/new-personal.toml")
+		package.loaded["infra.toml.reader"] = previous_reader
+
+		helpers.assert_eq(committed, true)
+		helpers.assert_eq(registry.is_group_enabled("personal"), false)
+		helpers.assert_eq(#state.mappings, 0,
+			"saving an intentionally disabled group must not activate its mappings")
+		helpers.assert_eq(state.groups.personal.path, "/virtual/new-personal.toml")
+		helpers.assert_eq(state.groups.personal.kind, "toml")
+	end)
+
 	helpers.it("rolls back a throwing or ineffective settings write by read-back", function()
 		for _, operation in ipairs({ "set", "clear" }) do
 			for _, mode in ipairs({ "throw_after_write", "nil_noop", "false_noop" }) do

@@ -65,11 +65,21 @@ function M.mark_reload()
 	Logger.debug(LOG, "Reload sentinel set.")
 end
 
+local function clear_sentinel(log_completion)
+	Storage.delete(SENTINEL_KEY)
+	if log_completion then Logger.debug(LOG, "Reload sentinel cleared.") end
+end
+
 --- Clears the sentinel. Called once at boot so the sentinel can only ever read
 --- true because a reload was initiated within the live session.
 function M.clear()
-	Storage.delete(SENTINEL_KEY)
-	Logger.debug(LOG, "Reload sentinel cleared.")
+	clear_sentinel(true)
+end
+
+--- Clears the sentinel without producing a record. Terminal rollback calls this
+--- after the native log drain may already have closed the asynchronous sink.
+function M.clear_silent()
+	clear_sentinel(false)
 end
 
 --- Reports whether a controlled reload was marked and is still fresh.

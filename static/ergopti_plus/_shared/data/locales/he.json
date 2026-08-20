@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "שגיאת הפעלה: הקובץ _generated/features_manifest.ahk חסר או פגום.\n\nהפעל `npm run build:manifest` מתיקיית הפרויקט ולאחר מכן הפעל מחדש את הסקריפט.",
 	"startup.manifest_title": "ErgoptiPlus — manifest חסר",
+	"startup.native_logger_unavailable": "לא ניתן להפעיל את ErgoptiPlus מכיוון ששירות הרישום המקורי שלו אינו זמין. יש להפעיל את ErgoptiPlus דרך המשגר שלו.",
 	"tap_hold.action.disable": "מקשים מקוריים",
 	"tap_hold.disable_all": "השבת הכל",
 	"tap_hold.group.alt_gr": "AltGr",

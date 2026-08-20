@@ -210,55 +210,71 @@ end)
 --- @param register function Called with the Registry to add the mappings under test.
 --- @param buf string The buffer to preview.
 --- @return table rows, table state
+local PREVIEW_OWNERSHIP = {
+	"modules.keymap.state",
+	"modules.keymap.registry",
+	"modules.keymap.registry_groups",
+	"modules.keymap.registry_index",
+	"modules.keymap.terminators",
+	"modules.keymap.expander",
+	"modules.keymap.terminator_replay",
+	"modules.keymap.llm_bridge",
+	"modules.llm.prediction_engine",
+	"modules.llm.warmup_controller",
+	"modules.llm.streaming_handler",
+	"adapters.timer_scheduler",
+}
+
 local function capture_rows(register, buf)
-	-- Everything the bridge pulls in is loaded FIRST, then the bridge: it captures
-	-- its dependencies as upvalues at require time.
-	local State = helpers.load_with_stubs("modules.keymap.state")
+	return helpers.with_fresh_modules(PREVIEW_OWNERSHIP, function()
+		-- Everything the bridge pulls in is loaded FIRST, then the bridge: it captures
+		-- its dependencies as upvalues at require time.
+		local State = helpers.load_with_stubs("modules.keymap.state")
 
-	-- Dropped so it is re-required under the fresh stub the bridge load installs;
-	-- see trap 2 above. Registry and Expander are stateful singletons too: leaving
-	-- either cached makes the resolver answer for a previous test's CoreState.
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["modules.keymap.registry"] = nil
-	package.loaded["modules.keymap.terminators"] = nil
-	package.loaded["modules.keymap.expander"] = nil
-	package.loaded["modules.keymap.llm_bridge"] = nil
-	local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+		-- Dropped so it is re-required under the fresh stub the bridge load installs;
+		-- see trap 2 above. Registry and Expander are stateful singletons too: leaving
+		-- either cached makes the resolver answer for a previous test's CoreState.
+		local Bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 
-	-- The registry instance the BRIDGE resolved, not a separately loaded one: the
-	-- bridge captured its Registry upvalue at require time, and a second instance
-	-- would be initialised over a state the bridge never reads.
-	local Registry = package.loaded["modules.keymap.registry"]
-	helpers.assert_not_nil(Registry, "the bridge must have loaded the registry")
-	local Expander = package.loaded["modules.keymap.expander"]
-	helpers.assert_not_nil(Expander, "the bridge must have loaded the expander")
+		-- The registry instance the BRIDGE resolved, not a separately loaded one: the
+		-- bridge captured its Registry upvalue at require time, and a second instance
+		-- would be initialised over a state the bridge never reads.
+		local Registry = package.loaded["modules.keymap.registry"]
+		helpers.assert_not_nil(Registry, "the bridge must have loaded the registry")
+		local Expander = package.loaded["modules.keymap.expander"]
+		helpers.assert_not_nil(Expander, "the bridge must have loaded the expander")
 
-	-- The REAL tooltip with exactly one method neutralised (trap 3). Patched
-	-- rather than replaced: a hand-written stub has to guess the whole surface.
-	local tooltip = require("ui.tooltip")
-	local real_show_stacked = tooltip.show_stacked
-	local captured = nil
-	tooltip.show_stacked = function(rows) captured = rows; return true end
+		-- The REAL tooltip with exactly one method neutralised (trap 3). Patched
+		-- rather than replaced: a hand-written stub has to guess the whole surface.
+		local tooltip = require("ui.tooltip")
+		local real_show_stacked = tooltip.show_stacked
+		local captured = nil
+		tooltip.show_stacked = function(rows) captured = rows; return true end
 
-	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
-	state.preview_providers         = {}
-	state.is_repeat_feature_enabled = function() return false end
-	Registry.init(state)
-	register(Registry)
-	Registry.sort_mappings()
+		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
+		state.preview_providers         = {}
+		state.is_repeat_feature_enabled = function() return false end
+		helpers.assert_eq(Registry.init(state), true)
+		register(Registry)
+		Registry.sort_mappings()
 
-	Bridge.init(state, { preview_star_enabled = true, preview_autocorrect_enabled = true })
-	Expander.init(state, Registry, Bridge)
-	Bridge.set_preview_star_enabled(true)
-	Bridge.set_preview_autocorrect_enabled(true)
+		helpers.assert_eq(Bridge.init(state,
+			{ preview_star_enabled = true, preview_autocorrect_enabled = true }), true)
+		helpers.assert_eq(Expander.init(state, Registry, Bridge), true)
+		Bridge.set_preview_star_enabled(true)
+		Bridge.set_preview_autocorrect_enabled(true)
 
-	-- NOT pcall'd. A throw means the function never reached the row builder, and
-	-- every assertion below would then be measuring the throw.
-	Bridge.update_preview(buf)
-	hs.timer.__fire_all()
-	tooltip.show_stacked = real_show_stacked
+		-- Restore the patched renderer even when the preview throws; the exception is
+		-- re-raised afterward so the row assertions cannot become vacuous.
+		local render_ok, render_err = xpcall(function()
+			Bridge.update_preview(buf)
+			hs.timer.__fire_all()
+		end, debug.traceback)
+		tooltip.show_stacked = real_show_stacked
+		if not render_ok then error(render_err, 0) end
 
-	return captured or {}, state
+		return captured or {}, state
+	end)
 end
 
 --- Concatenates every row's text, for absence assertions.

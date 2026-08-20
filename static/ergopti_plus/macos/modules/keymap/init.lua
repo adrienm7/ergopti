@@ -145,9 +145,15 @@ CoreState.is_repeat_feature_enabled  = Registry.is_repeat_feature_enabled
 CoreState.set_repeat_feature_enabled = Registry.set_repeat_feature_enabled
 
 -- Mount dependencies (order matters: Registry before Expander/LLMBridge).
-Registry.init(CoreState)
-LLMBridge.init(CoreState, M.DEFAULT_STATE)
-Expander.init(CoreState, Registry, LLMBridge)
+if Registry.init(CoreState) ~= true then
+	error("Keymap registry initialization did not commit.", 0)
+end
+if LLMBridge.init(CoreState, M.DEFAULT_STATE) ~= true then
+	error("Keymap LLM bridge initialization did not commit.", 0)
+end
+if Expander.init(CoreState, Registry, LLMBridge) ~= true then
+	error("Keymap expander initialization did not commit.", 0)
+end
 
 local tap       = nil
 local shift_tap = nil

@@ -91,7 +91,7 @@ local function load_fixture(streaming)
 	}
 	package.loaded["modules.llm"] = core
 	package.loaded["modules.llm.warmup_controller"] = {
-		init = function() end,
+		init = function() return true end,
 		start = function() end,
 		stop = function() end,
 		schedule_warmup_with_retry = function() end,

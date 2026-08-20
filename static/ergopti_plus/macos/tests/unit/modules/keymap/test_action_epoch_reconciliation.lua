@@ -119,10 +119,13 @@ local function load_fixture()
 		new = function() return state end,
 	}
 	package.loaded["modules.keymap.registry"] = api({
+		init = function() return true end,
 		is_repeat_feature_enabled = function() return false end,
 		set_repeat_feature_enabled = noop,
 	})
-	package.loaded["modules.keymap.expander"] = api()
+	package.loaded["modules.keymap.expander"] = api({
+		init = function() return true end,
+	})
 
 	local calls = {}
 	local callback_errors = {}
@@ -131,6 +134,7 @@ local function load_fixture()
 	local llm_quarantined = false
 	local safe_epoch = epoch
 	package.loaded["modules.keymap.llm_bridge"] = api({
+		init = function() return true end,
 		reset_predictions = function()
 			calls[#calls + 1] = "ordinary-reset"
 			return not llm_quarantined

@@ -23,6 +23,10 @@ function M.write(path, data)
 	return SharedWriter.write(path, data, FileSystem)
 end
 
+function M.write_if_unchanged(path, data, expected_source)
+	return SharedWriter.write(path, data, FileSystem, false, expected_source)
+end
+
 function M.create_if_absent(path, data)
 	return SharedWriter.write(path, data, FileSystem, true)
 end

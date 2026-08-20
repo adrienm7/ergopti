@@ -52,7 +52,30 @@ local function with_category_store(spec, callback)
 		write = function(path, payload)
 			helpers.assert_eq(path, TARGET_PATH)
 			state.writes = state.writes + 1
+			if spec.external_before_publish then
+				state.target = spec.external_before_publish
+				state.exists = true
+			end
 			if spec.write_result == false then return false end
+			state.target = payload
+			state.exists = true
+			return true
+		end,
+		write_if_unchanged = function(path, payload, expected_source)
+			helpers.assert_eq(path, TARGET_PATH)
+			state.writes = state.writes + 1
+			if spec.external_before_publish then
+				state.target = spec.external_before_publish
+				state.exists = true
+			end
+			if spec.write_result == false then return false end
+			local current_status = state.exists and "ok" or "absent"
+			if type(expected_source) ~= "table" or expected_source.status ~= current_status then
+				return false
+			end
+			if current_status == "ok" and expected_source.content ~= state.target then
+				return false
+			end
 			state.target = payload
 			state.exists = true
 			return true
@@ -226,6 +249,21 @@ helpers.describe("metrics_apps categories: failed publication exposes no candida
 			helpers.assert_eq(state.target, before)
 			helpers.assert_eq(state.ui_pushes, 0)
 		end)
+	end)
+
+	helpers.it("an external edit after the mutation read wins byte-for-byte", function()
+		local external = '{"Example":{"score":2,"type":"External"}}'
+		with_category_store({ external_before_publish = external },
+			function(metrics, state, callbacks, _logs)
+				attempt_edit(metrics, callbacks)
+				helpers.assert_eq(state.read_calls, 2,
+					"the chosen edit must derive from one fresh classified snapshot")
+				helpers.assert_eq(state.writes, 1)
+				helpers.assert_eq(state.target, external,
+					"the external winner must survive byte-for-byte")
+				helpers.assert_eq(state.ui_pushes, 0,
+					"a rejected stale edit must publish no dashboard success")
+			end)
 	end)
 
 	helpers.it("success commits bytes before one UI refresh", function()

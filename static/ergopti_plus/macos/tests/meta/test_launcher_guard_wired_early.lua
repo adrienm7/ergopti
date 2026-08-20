@@ -33,23 +33,47 @@ helpers.describe("init: Swift launcher loss is wired fail-closed", function()
 			"launcher liveness must be armed before config-dependent remap boot can throw")
 	end)
 
-	helpers.it("arms a hard deadline before requesting the exact fence", function()
+	helpers.it("shares one runtime-failure deadline and exact fence with launcher loss", function()
 		local source = init_source()
-		local function_at = source:find("local function emergency_exit_after_launcher_loss", 1, true)
+		local function_at = source:find("local function emergency_exit_after_runtime_failure", 1, true)
 		local guard_at = source:find('require, "infra.launcher_guard"', 1, true)
 		helpers.assert_true(function_at ~= nil and guard_at ~= nil,
 			"emergency callback and guard wiring must both be locatable")
 		local body = source:sub(function_at, guard_at - 1)
 		local emergency_at = body:find("EmergencyExit.request", 1, true)
-		local deadline_at = body:find("deadline_seconds = LAUNCHER_LOSS_EXIT_DEADLINE_SEC", 1, true)
+		local deadline_at = body:find("deadline_seconds = RUNTIME_FAILURE_EXIT_DEADLINE_SEC", 1, true)
+		local exit_code_at = body:find("exit_code = RUNTIME_FAILURE_EXIT_CODE", 1, true)
 		local request_at = body:find("TerminationCoordinator.request_exit", 1, true)
-		helpers.assert_true(emergency_at ~= nil and deadline_at ~= nil and request_at ~= nil)
-		helpers.assert_true(emergency_at < deadline_at and deadline_at < request_at,
+		helpers.assert_true(emergency_at ~= nil and deadline_at ~= nil
+			and exit_code_at ~= nil and request_at ~= nil)
+		helpers.assert_true(emergency_at < deadline_at and deadline_at < exit_code_at
+			and exit_code_at < request_at,
 			"the retained deadline capability must exist before the async fence request")
+		helpers.assert_true(source:find("local RUNTIME_FAILURE_EXIT_CODE = 70", 1, true) ~= nil,
+			"internal failures must stay distinguishable from normal user exit status zero")
 		helpers.assert_true(body:find("teardown_all_resources", 1, true) == nil,
 			"EOF fallback must not dismantle F17 consumers before the exact fence")
 		helpers.assert_true(body:find("os.exit", 1, true) ~= nil,
 			"the bounded fallback must close native stdin by exiting Hammerspoon")
+		helpers.assert_true(body:find('emergency_exit_after_runtime_failure("launcher_liveness", reason)',
+			1, true) ~= nil,
+			"launcher loss must be one caller of the owner-neutral runtime fail-safe")
+	end)
+
+	helpers.it("routes asynchronous logger failure through the initialized bounded fail-safe", function()
+		local source = init_source()
+		local coordinator_at = source:find("TerminationCoordinator.init", 1, true)
+		local handler_at = source:find("Logger.set_async_sink_failure_handler", 1, true)
+		local input_at = source:find("local prestart_committed = StartupTransaction.run", 1, true)
+		helpers.assert_true(coordinator_at ~= nil and handler_at ~= nil and input_at ~= nil)
+		helpers.assert_true(coordinator_at < handler_at,
+			"logger fail-safe must not request a controlled exit before its coordinator exists")
+		helpers.assert_true(handler_at < input_at,
+			"native logger failure must be armed before any input/eventtap transaction")
+		local handler_body = source:sub(handler_at, handler_at + 700)
+		helpers.assert_true(handler_body:find(
+			'emergency_exit_after_runtime_failure("native_logger", detail)', 1, true) ~= nil,
+			"queue-full, NACK, and ACK-loss failures must share the exact bounded exit path")
 	end)
 
 	helpers.it("keeps managed launch fail-closed if the guard cannot load or initialize", function()

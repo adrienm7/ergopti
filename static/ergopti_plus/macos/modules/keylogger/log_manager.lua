@@ -312,7 +312,9 @@ local function _resolve_device(metrics_dir)
 	}, true
 end
 
---- Atomically write the device object back to disk.
+--- Publishes a new device identity without replacing a concurrent winner.
+--- @return boolean committed
+--- @return table|nil published_device Exact created/adopted device object.
 local function _write_device_json(obj, device_json_path)
 	local encode_ok, encoded = pcall(json.encode, obj)
 	if not encode_ok or type(encoded) ~= "string" then
@@ -320,15 +322,42 @@ local function _write_device_json(obj, device_json_path)
 		return false
 	end
 
-	-- The shared adapter owns symlink-safe staging, write/flush/close checks,
-	-- path revalidation, and atomic rename. LogManager owns the higher-level
-	-- rule that no generated identity becomes session state before it returns true.
-	local write_ok, written = pcall(FileSystem.write, device_json_path, encoded)
-	if not write_ok or written ~= true then
+	-- A generated identity is derived from proven absence. Replacing an entry
+	-- that appeared after the scan would steal another process's identity.
+	local write_ok, created, create_status = pcall(
+		FileSystem.create_if_absent,
+		device_json_path,
+		encoded
+	)
+	if not write_ok then
 		Logger.error(LOG, "Device identity publication did not commit; initialization refused.")
-		return false
+		return false, nil
 	end
-	return true
+	if created == true and create_status == "created" then return true, obj end
+	if create_status ~= "exists" then
+		Logger.error(LOG, "Device identity publication did not commit; initialization refused.")
+		return false, nil
+	end
+
+	-- Another initializer won the same create-only target. Adopt only an exact,
+	-- internally consistent identity for this host and directory; every other
+	-- outcome is ambiguous and therefore fails closed.
+	local read_ok, raw, read_status = pcall(FileSystem.read_with_status, device_json_path)
+	if not read_ok or read_status ~= "ok" or type(raw) ~= "string" then
+		Logger.error(LOG, "Concurrent device identity could not be owned; initialization refused.")
+		return false, nil
+	end
+	local decode_ok, winner = pcall(json.decode, raw)
+	local valid = decode_ok and type(winner) == "table"
+		and type(winner.device_id) == "string" and winner.device_id == obj.device_id
+		and type(winner.host_signature) == "string"
+		and winner.host_signature == obj.host_signature
+	if not valid then
+		Logger.error(LOG, "Concurrent device identity was inconsistent; initialization refused.")
+		return false, nil
+	end
+	Logger.info(LOG, "Adopted the concurrently published device identity.")
+	return true, winner
 end
 
 
@@ -1520,8 +1549,15 @@ local function _init(core_state)
 	_mkdir_p(paths.by_device_dir)
 	_mkdir_p(paths.tmpdir_dir)
 
-	if needs_publication and not _write_device_json(device_obj, paths.device_json_path) then
-		return false
+	if needs_publication then
+		local identity_committed, published_device = _write_device_json(
+			device_obj,
+			paths.device_json_path
+		)
+		if not identity_committed then return false end
+		device_obj = published_device
+		device_id = device_obj.device_id
+		paths = _resolve_paths(core_state.LOG_DIR, device_id)
 	end
 
 	-- Publish the shared state only after a new identity is durable (or an

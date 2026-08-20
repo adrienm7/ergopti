@@ -16,6 +16,9 @@
 ---    return false. No exceptions propagate to the caller.
 --- 3. Defensive pcall: every io.open / hs.fs call is wrapped in pcall because
 ---    permission errors and locked files can panic the Lua runtime.
+--- 4. Classified creation: prepare_parent_for_create() creates only missing
+---    directory components on a previously resolved route, then revalidates
+---    every observed symlink before a caller may classify the final file.
 --- ==============================================================================
 
 local M = {}
@@ -497,6 +500,99 @@ function M.read(path)
 		Logger.debug(LOG, "read(): '%s' failed — %s", tostring(path), tostring(detail))
 	end
 	return content
+end
+
+--- Creates every missing component of one already-resolved directory route.
+--- Existing symlinks are rejected here: resolve_write_path() must have replaced
+--- them with their observed targets before this helper receives the route.
+--- @param dir string Symlink-resolved directory path.
+--- @return boolean prepared
+--- @return string|nil error_message
+local function create_directory_chain(dir)
+	if not hs or not hs.fs or type(hs.fs.mkdir) ~= "function" then
+		return false, "hs.fs.mkdir is unavailable"
+	end
+
+	local root, components = split_path(dir)
+	local prefix = root
+	if #components == 0 then
+		local attributes, inspect_err = inspect_path(dir)
+		if inspect_err ~= nil then return false, inspect_err end
+		if type(attributes) ~= "table" or attributes.mode ~= "directory" then
+			return false, "parent route is not a directory: " .. tostring(dir)
+		end
+		return true
+	end
+
+	for _, component in ipairs(components) do
+		local component_parent = prefix == "" and "." or prefix
+		prefix = append_component(prefix, component)
+		local attributes, inspect_err = inspect_path(prefix, component_parent, component)
+		if inspect_err ~= nil then return false, inspect_err end
+		if attributes == nil then
+			local mkdir_ok, created, mkdir_err = pcall(hs.fs.mkdir, prefix)
+			local mkdir_detail = tostring(mkdir_ok and (mkdir_err or created) or created)
+			attributes, inspect_err = inspect_path(prefix, component_parent, component)
+			if inspect_err ~= nil then return false, inspect_err end
+			if (not mkdir_ok or created ~= true or mkdir_err ~= nil) and attributes == nil then
+				return false, string.format(
+					"cannot create parent directory '%s': %s",
+					prefix,
+					mkdir_detail
+				)
+			end
+			if attributes == nil then
+				return false, "mkdir reported success but the directory is absent: " .. prefix
+			end
+		end
+		if attributes.mode ~= "directory" then
+			return false, "parent route component is not a directory: " .. prefix
+		end
+	end
+
+	return true
+end
+
+--- Prepares the parent of a destination before a classified read/create flow.
+--- The requested route is resolved first, every observed symlink is revalidated
+--- before and after directory creation, and permission or lookup ambiguity fails
+--- closed. This method never shells out and always returns a literal boolean.
+--- @param path string Absolute destination path.
+--- @return boolean prepared
+--- @return string|nil error_message
+function M.prepare_parent_for_create(path)
+	if type(path) ~= "string" or path == "" then
+		return false, "path must be a non-empty string"
+	end
+
+	local call_ok, prepared, detail = pcall(function()
+		local resolved_path, chain, resolve_err = resolve_write_path(path)
+		if not resolved_path then return false, resolve_err or "path resolution failed" end
+
+		local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, chain)
+		if not unchanged then return false, revalidate_err end
+
+		local dir = parent_dir(resolved_path)
+		if dir == nil then dir = resolved_path:sub(1, 1) == "/" and "/" or "." end
+		local created, create_err = create_directory_chain(dir)
+		if created ~= true then return false, create_err end
+
+		unchanged, revalidate_err = revalidate_write_path(path, resolved_path, chain)
+		if not unchanged then return false, revalidate_err end
+		return true
+	end)
+
+	if not call_ok then
+		detail = tostring(prepared)
+		Logger.error(LOG, "prepare_parent_for_create(): unexpected error for '%s' — %s", path, detail)
+		return false, detail
+	end
+	if prepared ~= true then
+		detail = tostring(detail or "parent preparation failed")
+		Logger.error(LOG, "prepare_parent_for_create(): refused '%s' — %s", path, detail)
+		return false, detail
+	end
+	return true
 end
 
 --- Builds a staging candidate beside the destination for POSIX rename.

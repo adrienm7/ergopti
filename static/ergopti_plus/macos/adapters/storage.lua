@@ -65,6 +65,23 @@ function M.get(key, default_value)
 	return result
 end
 
+--- Reads a key while preserving the distinction between an absent value and an
+--- adapter failure. Transactional callers need this for exact readback proof;
+--- get() deliberately collapses both cases to its default value.
+--- @param key string The settings key to read.
+--- @return boolean ok True when the native read completed.
+--- @return any value Stored value, including nil when the key is absent.
+function M.read_exact(key)
+	local ok, result = pcall(function()
+		return hs.settings.get(key)
+	end)
+	if not ok then
+		Logger.error(LOG, "read_exact(): failed to read key '%s' — %s", tostring(key), tostring(result))
+		return false, nil
+	end
+	return true, result
+end
+
 --- Deletes the entry for the given key from the persistent store.
 --- @param key string The settings key to remove.
 --- @return boolean Always true; a missing key is not treated as an error.
@@ -76,6 +93,34 @@ function M.delete(key)
 		Logger.error(LOG, "delete(): failed to clear key '%s' — %s", tostring(key), tostring(err))
 	end
 	-- Missing key is a non-error; callers only care that the key is gone
+	return true
+end
+
+--- Deletes one key and proves by readback that it is absent. A native clear
+--- can return without raising yet leave the value behind, which transactional
+--- callers must observe rather than treating as a durable commit.
+--- @param key string The settings key to remove.
+--- @return boolean deleted True only when exact readback confirms absence.
+function M.delete_exact(key)
+	local ok, err = pcall(function()
+		hs.settings.clear(key)
+	end)
+	if not ok then
+		Logger.error(LOG, "delete_exact(): failed to clear key '%s' — %s", tostring(key), tostring(err))
+		return false
+	end
+	local read_ok, remaining = pcall(function()
+		return hs.settings.get(key)
+	end)
+	if not read_ok then
+		Logger.error(LOG, "delete_exact(): failed to verify key '%s' — %s",
+			tostring(key), tostring(remaining))
+		return false
+	end
+	if remaining ~= nil then
+		Logger.error(LOG, "delete_exact(): key '%s' remained after clear.", tostring(key))
+		return false
+	end
 	return true
 end
 

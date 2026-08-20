@@ -34,7 +34,7 @@ local function install_collaborators(effects)
 		check_modifiers = function() effects.llm_calls = effects.llm_calls + 1; return false end,
 	}
 	package.loaded["modules.llm.prediction_engine"] = {
-		init = function() end,
+		init = function() return true end,
 		set_runtime_guard = function() end,
 		get_llm_enabled = function() return false end,
 		reset = function()

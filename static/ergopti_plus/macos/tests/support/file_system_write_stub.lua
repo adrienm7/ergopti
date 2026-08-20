@@ -46,4 +46,17 @@ function M.write(path, content)
 	return written ~= nil and written ~= false and closed == true
 end
 
+--- Writes only when the fixture still matches the caller's classified source.
+--- @param path string Destination path.
+--- @param content string Candidate bytes.
+--- @param expected_source table Classified source snapshot.
+--- @return boolean committed
+function M.write_if_unchanged(path, content, expected_source)
+	if type(expected_source) ~= "table" then return false end
+	local current, status = M.read_with_status(path)
+	if status ~= expected_source.status then return false end
+	if status == "ok" and current ~= expected_source.content then return false end
+	return M.write(path, content)
+end
+
 return M

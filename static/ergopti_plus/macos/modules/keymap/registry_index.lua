@@ -35,8 +35,22 @@ end
 --- Injects the shared CoreState so state-dependent functions become live.
 --- Called once from registry.lua's M.init() after the main state is wired up.
 --- @param core_state table The shared CoreState from keymap/init.lua.
+--- @return boolean committed True only when the requested binding is active.
 function M.setup(core_state)
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.setup(): core_state must be a table — initialization refused.")
+		return false
+	end
+	if _state then
+		if _state == core_state then
+			Logger.warn(LOG, "M.setup() called more than once with the active state — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.setup(): a different state is already active — replacement refused.")
+		return false
+	end
 	_state = core_state
+	return true
 end
 
 
@@ -66,6 +80,15 @@ end
 --- @param path string Absolute path to the TOML file.
 function M.load_toml(name, path)
 	return Groups.load_toml(name, path)
+end
+
+--- Atomically replaces one enabled TOML group while preserving a deliberately
+--- disabled group and rolling the live corpus back on loader failure.
+--- @param name string Existing group identifier.
+--- @param path string Absolute TOML path.
+--- @return boolean committed
+function M.reload_toml(name, path)
+	return Groups.reload_toml(name, path)
 end
 
 --- Manually sets the current group context used by M.add() to tag new entries.

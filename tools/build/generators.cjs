@@ -103,7 +103,8 @@ const GENERATORS = [
 		script: 'codegen/codegen-logger-sub-files.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/_generated/logger_sub_files.lua',
-			'static/ergopti_plus/windows/_generated/logger_sub_files.ahk'
+			'static/ergopti_plus/windows/_generated/logger_sub_files.ahk',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift'
 		]
 	},
 	{

@@ -140,7 +140,7 @@ helpers.describe("config_overrides source: no {N} log placeholders", function()
 		-- Selected by a declaration unique to infra/config_overrides.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function match_quoted_prefix")
+		local src = helpers.read_driver_source("local function read_committed")
 		helpers.assert_true(src ~= nil, "infra/config_overrides.lua source must be locatable")
 		helpers.assert_true(
 			src:find("{1}", 1, true) == nil and src:find("{2}", 1, true) == nil,

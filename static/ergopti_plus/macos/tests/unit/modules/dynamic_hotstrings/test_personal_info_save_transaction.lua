@@ -201,12 +201,14 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			fence.allow = true
 			local writes = 0
 			local rename_result = with_adapter_overrides(file_system, {
-				write = function(path, content)
+				write_if_unchanged = function(path, content, expected_source)
 					writes = writes + 1
 					helpers.assert_eq(path, config_path,
 						"the rejected publication must target the configured TOML")
 					helpers.assert_true(content:find('first_name = "Bob"', 1, true) ~= nil,
 						"the rejected publication must receive the complete candidate")
+					helpers.assert_eq(expected_source.content, initial,
+						"the rejected publication must compare against the exact loaded bytes")
 					return false, private_sentinel
 				end,
 			},
@@ -224,7 +226,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 
 			local successful_writes = 0
 			local committed = with_adapter_overrides(file_system, {
-				write = function(path, content)
+				write_if_unchanged = function(path, content, expected_source)
 					successful_writes = successful_writes + 1
 					helpers.assert_eq(path, config_path,
 						"the accepted publication must target the configured TOML")
@@ -232,6 +234,8 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 						"the filesystem port must receive the complete candidate")
 					helpers.assert_eq(read_file(path), initial,
 						"the old committed TOML must remain intact until the port accepts publication")
+					helpers.assert_eq(expected_source.content, initial,
+						"the accepted publication must compare against the exact loaded bytes")
 					local target = assert(io.open(path, "wb"))
 					assert(target:write(content))
 					assert(target:close())
@@ -249,6 +253,68 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			helpers.assert_true(read_file(config_path):find('first_name = "Bob"', 1, true) ~= nil,
 				"the committed TOML must contain the accepted candidate")
 			helpers.assert_eq(fence.calls, 5, "every valid save attempt must cross the preview fence")
+		end, function()
+			os.remove(config_path)
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		end)
+	end)
+
+	helpers.it("preserves and adopts an external edit that wins after the loaded snapshot", function()
+		local config_path = os.tmpname()
+		with_cleanup(function()
+			local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
+			local external = "[info]\nfirst_name = \"Carol\"\n\n[letters]\np = \"first_name\"\n"
+			local file = assert(io.open(config_path, "wb"))
+			assert(file:write(initial))
+			assert(file:close())
+
+			local personal_info, fence = load_personal_info(config_path, {})
+			local file_system = require("adapters.file_system")
+			local live_info = personal_info.get_info()
+			local publications = 0
+			fence.allow = true
+
+			local committed = with_adapter_overrides(file_system, {
+				-- The old implementation crossed this unconditional boundary and
+				-- overwrote the just-landed external version. Keeping this seam makes
+				-- the regression test fail causally on that implementation.
+				write = function(path, content)
+					publications = publications + 1
+					local competitor = assert(io.open(path, "wb"))
+					assert(competitor:write(external))
+					assert(competitor:close())
+					local stale = assert(io.open(path, "wb"))
+					assert(stale:write(content))
+					assert(stale:close())
+					return true
+				end,
+				write_if_unchanged = function(path, _content, expected_source)
+					publications = publications + 1
+					helpers.assert_eq(path, config_path,
+						"conditional publication must target the loaded personal-info file")
+					helpers.assert_eq(expected_source.status, "ok",
+						"the save must carry an exact existing-source classification")
+					helpers.assert_eq(expected_source.content, initial,
+						"the exact loaded bytes must cross the publication boundary")
+					local competitor = assert(io.open(path, "wb"))
+					assert(competitor:write(external))
+					assert(competitor:close())
+					return false, "source changed"
+				end,
+			}, function()
+				return personal_info.save_info({ first_name = "Bob" })
+			end)
+
+			helpers.assert_eq(committed, false,
+				"a stale editor candidate must be rejected after an external edit")
+			helpers.assert_eq(publications, 1,
+				"one save attempt must cross exactly one publication boundary")
+			helpers.assert_eq(read_file(config_path), external,
+				"the external winner must survive byte-for-byte")
+			helpers.assert_true(personal_info.get_info() == live_info,
+				"adopting the winner must preserve the shared live-table identity")
+			helpers.assert_eq(live_info.first_name, "Carol",
+				"the live expansion source must adopt the validated external winner")
 		end, function()
 			os.remove(config_path)
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil

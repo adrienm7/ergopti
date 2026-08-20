@@ -23,16 +23,67 @@ local REVOKED_NAME = "ergopti_revoked_" .. TOKEN
 local file_data = {}
 local unreadable_paths = {}
 local file_writes = {}
+local file_reads = {}
+local missing_parent_paths = {}
+local parent_prepare_failures = {}
+local parent_prepare_calls = {}
 local write_succeeds = true
+local before_publication = nil
+
+local function run_before_publication(path, content)
+	local hook = before_publication
+	before_publication = nil
+	if hook then hook(path, content) end
+end
 
 package.loaded["infra.logger"] = nil
 helpers.load_with_stubs("infra.logger")
 package.loaded["adapters.file_system"] = {
 	read = function(path) return file_data[path] end,
-	exists = function(path) return file_data[path] ~= nil or unreadable_paths[path] == true end,
+	read_with_status = function(path)
+		file_reads[#file_reads + 1] = path
+		if missing_parent_paths[path] == true then
+			return nil, "error", "missing path prefix"
+		end
+		if unreadable_paths[path] == true then
+			return nil, "error", "injected read failure"
+		end
+		if file_data[path] == nil then return nil, "absent" end
+		return file_data[path], "ok"
+	end,
+	prepare_parent_for_create = function(path)
+		parent_prepare_calls[#parent_prepare_calls + 1] = path
+		local failure = parent_prepare_failures[path]
+		if failure ~= nil then return false, failure end
+		missing_parent_paths[path] = nil
+		return true
+	end,
+	-- An old read()+exists() fallback would misclassify the injected read error
+	-- as absence, so this legacy helper intentionally does not expose it.
+	exists = function(path) return file_data[path] ~= nil end,
 	write = function(path, content)
-		file_writes[#file_writes + 1] = { path = path, content = content }
-		return write_succeeds
+		run_before_publication(path, content)
+		file_writes[#file_writes + 1] = { path = path, content = content, method = "write" }
+		if write_succeeds then file_data[path] = content end
+		return write_succeeds, write_succeeds and nil or "stub write failure"
+	end,
+	write_if_unchanged = function(path, content, expected_source)
+		run_before_publication(path, content)
+		file_writes[#file_writes + 1] = {
+			path = path,
+			content = content,
+			method = "write_if_unchanged",
+			expected_source = expected_source,
+		}
+		if not write_succeeds then return false, "stub write failure" end
+		local current = file_data[path]
+		local current_status = current == nil and "absent" or "ok"
+		local unchanged = type(expected_source) == "table"
+			and expected_source.status == current_status
+			and (current_status ~= "ok" or expected_source.content == current)
+		if not unchanged then return false, "source changed before publication" end
+		file_data[path] = content
+		return true
 	end,
 }
 package.loaded["infra.config_paths"] = {
@@ -1624,24 +1675,135 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 			},
 		})
 		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
 		write_succeeds = true
+		before_publication = nil
 
 		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
 		helpers.assert_true(ok, tostring(detail))
 		helpers.assert_eq(attempts, 1)
+		helpers.assert_eq(#parent_prepare_calls, 1)
+		helpers.assert_eq(parent_prepare_calls[1], path)
+		helpers.assert_eq(#file_reads, 1, "publication must merge from one exact post-preparation read")
 		helpers.assert_eq(#file_writes, 1)
 		helpers.assert_eq(file_writes[1].path, path)
+		helpers.assert_eq(file_writes[1].method, "write_if_unchanged")
 		local rules = selected_rules(file_writes[1].content)
 		helpers.assert_eq(#rules, 2)
 		helpers.assert_eq(rules[1].description, "keep me")
 		helpers.assert_true(rules[2].description:find("[ErgoptiPlus managed:", 1, true) == 1)
 	end)
 
+	helpers.it("prepares a missing parent before the exact absent read and publishes once", function()
+		local path = "/merge/fresh-parent/karabiner.json"
+		file_data[path] = nil
+		missing_parent_paths[path] = true
+		parent_prepare_failures[path] = nil
+		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
+		write_succeeds = true
+		before_publication = nil
+
+		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
+
+		helpers.assert_true(ok, tostring(detail))
+		helpers.assert_eq(attempts, 1)
+		helpers.assert_eq(#parent_prepare_calls, 1,
+			"the parent must be prepared exactly once before source classification")
+		helpers.assert_eq(parent_prepare_calls[1], path)
+		helpers.assert_eq(#file_reads, 1, "the prepared path must be classified exactly once for the merge")
+		helpers.assert_eq(file_reads[1], path)
+		helpers.assert_eq(#file_writes, 1, "fresh publication must use one conditional write")
+		helpers.assert_eq(file_writes[1].method, "write_if_unchanged")
+		helpers.assert_eq(file_writes[1].expected_source.status, "absent")
+	end)
+
+	helpers.it("fails closed when safe parent preparation reports permission or symlink failure", function()
+		local cases = {
+			{ suffix = "permission", detail = "mkdir refused: Permission denied" },
+			{ suffix = "symlink", detail = "symlink target changed before preparation" },
+		}
+		for _, case in ipairs(cases) do
+			local path = "/merge/unsafe-" .. case.suffix .. "/karabiner.json"
+			file_data[path] = nil
+			missing_parent_paths[path] = true
+			parent_prepare_failures[path] = case.detail
+			file_writes = {}
+			file_reads = {}
+			parent_prepare_calls = {}
+			write_succeeds = true
+			before_publication = nil
+
+			local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
+
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(attempts, 1)
+			helpers.assert_true(type(detail) == "string" and detail:find(case.detail, 1, true) ~= nil,
+				"the concrete parent-preparation failure must be surfaced")
+			helpers.assert_eq(#parent_prepare_calls, 1)
+			helpers.assert_eq(#file_reads, 0,
+				"an unsafe parent must abort before absence can be inferred")
+			helpers.assert_eq(#file_writes, 0,
+				"an unsafe parent must never reach publication")
+		parent_prepare_failures[path] = nil
+		missing_parent_paths[path] = nil
+		end
+	end)
+
+	helpers.it("refuses a foreign edit after merge instead of overwriting its exact bytes", function()
+		local path = "/merge/publish-concurrent.json"
+		local source_a = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("source A") } },
+				},
+			},
+		})
+		local foreign_b = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("foreign B") } },
+				},
+			},
+		})
+		file_data[path] = source_a
+		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
+		write_succeeds = true
+		before_publication = function(write_path)
+			helpers.assert_eq(write_path, path)
+			file_data[path] = foreign_b
+		end
+
+		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
+
+		helpers.assert_eq(ok, false, "a stale merge must never report publication success")
+		helpers.assert_true(type(detail) == "string" and detail:find("source changed", 1, true) ~= nil)
+		helpers.assert_eq(attempts, 1, "a source conflict must never enter mkdir/retry")
+		helpers.assert_eq(#parent_prepare_calls, 1,
+			"a source conflict must never re-prepare the parent as a retry strategy")
+		helpers.assert_eq(#file_writes, 1, "the stale candidate must be offered exactly once")
+		helpers.assert_eq(file_writes[1].method, "write_if_unchanged")
+		helpers.assert_eq(file_writes[1].expected_source.status, "ok")
+		helpers.assert_eq(file_writes[1].expected_source.content, source_a)
+		helpers.assert_eq(file_data[path], foreign_b, "the foreign writer's exact bytes must survive")
+	end)
+
 	helpers.it("fails closed without publishing when the live config is malformed", function()
 		local path = "/merge/publish-malformed.json"
 		file_data[path] = "{ invalid"
 		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
 		write_succeeds = true
+		before_publication = nil
 
 		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
 		helpers.assert_true(ok == false)
@@ -1662,7 +1824,10 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 			},
 		})
 		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
 		write_succeeds = false
+		before_publication = nil
 
 		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
 		helpers.assert_true(ok == false)

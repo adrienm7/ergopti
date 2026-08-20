@@ -159,10 +159,24 @@ end
 --- Injects the shared state and the registry's callback table.
 --- @param state table The shared CoreState.
 --- @param callbacks table Must provide every name in REQUIRED_CALLBACKS.
+--- @return boolean committed True only when the requested dependencies are active.
 function M.init(state, callbacks)
-	_state     = state
-	_callbacks = callbacks
-
+	if _state then
+		local same_dependencies = state == _state and type(callbacks) == "table"
+		for _, name in ipairs(REQUIRED_CALLBACKS) do
+			same_dependencies = same_dependencies and callbacks[name] == _callbacks[name]
+		end
+		if same_dependencies then
+			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
+			return true
+		end
+		Logger.error(LOG, "M.init(): different dependencies are already active — replacement refused.")
+		return false
+	end
+	if type(state) ~= "table" then
+		Logger.error(LOG, "M.init(): state must be a table — initialization refused.")
+		return false
+	end
 	local missing = {}
 	for _, name in ipairs(REQUIRED_CALLBACKS) do
 		if type(callbacks) ~= "table" or type(callbacks[name]) ~= "function" then
@@ -170,10 +184,13 @@ function M.init(state, callbacks)
 		end
 	end
 	if #missing > 0 then
-		Logger.error(LOG, "M.init(): missing callback(s) %s — group operations will be "
-			.. "incomplete and their callers pcall the throw away.",
+		Logger.error(LOG, "M.init(): missing callback(s) %s — initialization refused.",
 			table.concat(missing, ", "))
+		return false
 	end
+	_state     = state
+	_callbacks = callbacks
+	return true
 end
 
 --- Runs a multi-step mutation against one shared registry snapshot.
@@ -466,6 +483,40 @@ function M.load_toml(name, path)
 			name, added, #_state.mappings)
 	end
 	return true
+	end)
+end
+
+--- Replaces one enabled TOML group against a single registry snapshot.
+--- A failed parser/loader restores the exact previously-live corpus and every
+--- derived index. A group the user deliberately disabled stays disabled; its
+--- on-disk file will be loaded only if the user enables it later.
+--- @param name string Existing group identifier.
+--- @param path string Absolute TOML path.
+--- @return boolean committed
+function M.reload_toml(name, path)
+	if not require_state("reload_toml") then return false end
+	if type(name) ~= "string" or name == "" then
+		Logger.error(LOG, "reload_toml: name must be a non-empty string.")
+		return false
+	end
+	if type(path) ~= "string" or path == "" then
+		Logger.error(LOG, "reload_toml: path must be a non-empty string.")
+		return false
+	end
+
+	return run_transaction("reload_toml:" .. name, function()
+		local group = _state.groups[name]
+		if not group then
+			Logger.error(LOG, "reload_toml: unknown group '%s'.", name)
+			return false
+		end
+		if group.enabled ~= true then
+			group.path = path
+			group.kind = "toml"
+			return true
+		end
+		if M.disable_group(name) ~= true then return false end
+		return M.load_toml(name, path) == true
 	end)
 end
 

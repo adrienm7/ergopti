@@ -65,6 +65,8 @@ end
 --- The handle exposes start() and terminate() — both are safe to call multiple
 --- times and on a nil/dead task. start() returns a boolean the caller must check
 --- when it latches an "in flight" flag, since a launch failure is only logged.
+--- terminate() distinguishes an accepted SIGTERM that is still pending from
+--- native exit settlement; only the completion callback proves the latter.
 ---
 --- @param executable string Absolute path to the binary (e.g. "/usr/bin/curl").
 --- @param args        table  Array of string arguments (no shell expansion).
@@ -79,23 +81,35 @@ function M.spawn(executable, args, on_done, on_chunk)
 	local _lifecycle = "constructing"
 
 	local function _safe_terminate()
-		if not _task then return true end
+		if not _task then return true, "settled" end
 		local task = _task
-		local stopped, stop_err = pcall(function() task:terminate() end)
-		if not stopped then
+		if _lifecycle == "prepared" or _lifecycle == "start_failed" then
+			-- No process was launched, so releasing the prepared object is exact
+			-- settlement and requires no signal or completion callback.
+			_task = nil
+			_input_closed = true
+			_lifecycle = "terminated"
+			M._active_tasks[task] = nil
+			return true, "settled"
+		end
+		if _lifecycle == "terminating" then return true, "pending" end
+
+		local stopped, stop_result = pcall(function() return task:terminate() end)
+		if not stopped or stop_result == false or stop_result == nil then
 			-- Keep both the native task and its GC pin: this handle is the only exact
 			-- capability that can retry termination without process discovery.
 			Logger.error(LOG, "spawn.terminate(): native task stop failed; retained for retry — %s",
-				tostring(stop_err))
-			return false
+				tostring(stop_result))
+			return false, "refused"
 		end
-		if _task == task then _task = nil end
 		_input_closed = true
-		if _lifecycle ~= "completed" then _lifecycle = "terminated" end
-		-- A successful terminate request may never receive on_done, so release its
-		-- pin here as well as in the completion callback.
-		M._active_tasks[task] = nil
-		return true
+		-- hs.task:terminate() only sends SIGTERM. The callback may run
+		-- synchronously in a hostile double, but the real task normally exits
+		-- later. Retain the exact handle and GC pin until wrapped_on_done observes
+		-- that exit; otherwise a successor can overlap native side effects.
+		if _task ~= task or _lifecycle == "completed" then return true, "settled" end
+		_lifecycle = "terminating"
+		return true, "pending"
 	end
 
 	--- Starts the underlying task, reporting the outcome to the caller.
@@ -213,9 +227,8 @@ function M.spawn(executable, args, on_done, on_chunk)
 	-- hs.task completion callback signature is (exitCode, stdOut, stdErr) — no
 	-- task object is passed. Use the closure upvalue `_task` for the GC-pin release,
 	-- not the first argument (which would be the exit code integer).
-	-- The nil guard is essential: terminate() nils `_task` before the OS delivers
-	-- the SIGTERM completion callback, so without it this fires `M._active_tasks[nil]`
-	-- — a "table index is nil" error on every superseded/cancelled stream.
+	-- The nil guard contains a duplicate or hostile completion after another
+	-- terminal path has already released the task.
 	local function wrapped_on_done(exit_code, stdout, stderr)
 		if _lifecycle == "completed" then
 			Logger.warn(LOG, "Ignoring duplicate completion callback for '%s'.", tostring(executable))
@@ -289,8 +302,9 @@ function M.spawn(executable, args, on_done, on_chunk)
 	--- Closes the subprocess input so a supervised helper observes EOF.
 	handle.close_input = _safe_close_input
 
-	--- Terminates the subprocess if it is still running. Idempotent and retryable.
-	--- @return boolean settled True when no native task remains live.
+	--- Requests subprocess termination. Idempotent and retryable.
+	--- @return boolean accepted True when SIGTERM was accepted or no task remains.
+	--- @return string state `settled`, `pending`, or `refused`.
 	handle.terminate = _safe_terminate
 
 	return handle

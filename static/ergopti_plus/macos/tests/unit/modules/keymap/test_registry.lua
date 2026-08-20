@@ -22,6 +22,8 @@ local Registry = helpers.load_with_stubs("modules.keymap.registry")
 --- @return table state, table Registry The fresh state and module reference.
 local function fresh_registry()
 	package.loaded["modules.keymap.registry"] = nil
+	package.loaded["modules.keymap.registry_groups"] = nil
+	package.loaded["modules.keymap.registry_index"] = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	local R = require("modules.keymap.registry")
 	local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, { autocorrection = 0.3 })

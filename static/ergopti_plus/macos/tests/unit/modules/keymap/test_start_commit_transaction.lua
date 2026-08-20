@@ -143,12 +143,16 @@ local function load_fixture()
 	}
 	package.loaded["modules.keymap.state"] = { new = function() return state end }
 	package.loaded["modules.keymap.registry"] = api({
+		init = function() return true end,
 		is_repeat_feature_enabled = function() return false end,
 		set_repeat_feature_enabled = noop,
 		registry_transaction = function(_, mutation) return mutation() end,
 	})
-	package.loaded["modules.keymap.expander"] = api()
+	package.loaded["modules.keymap.expander"] = api({
+		init = function() return true end,
+	})
 	package.loaded["modules.keymap.llm_bridge"] = api({
+		init = function() return true end,
 		invalidate_hotstring_preview = function() return true end,
 		reset_for_teardown = function() return true end,
 		stop = function() return true end,

@@ -81,6 +81,7 @@ helpers.describe("Logger: error notification handler", function()
 		local captured = {}
 		Logger.set_error_notification_handler(function(mod, msg)
 			captured.module = mod ; captured.msg = msg
+			return true
 		end)
 		Logger.set_level("ERROR")
 		Logger.error("test_mod", "boom %d", 42)

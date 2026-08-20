@@ -92,7 +92,7 @@ local function load_fixture(reset_result)
 
 	local engine = setmetatable({
 		set_runtime_guard = function(guard) engine_guard = guard end,
-		init = function() end,
+		init = function() return true end,
 		get_llm_enabled = function() return true end,
 		stop_timer = function() effects.engine_stop = effects.engine_stop + 1; return true end,
 		start_timer = function() effects.engine_start = effects.engine_start + 1 end,

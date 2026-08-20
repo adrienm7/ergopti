@@ -1775,6 +1775,7 @@
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.manifest_missing": "स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।",
 	"startup.manifest_title": "ErgoptiPlus — manifest अनुपस्थित",
+	"startup.native_logger_unavailable": "ErgoptiPlus शुरू नहीं हो सकता क्योंकि उसकी मूल लॉगिंग सेवा उपलब्ध नहीं है। ErgoptiPlus को उसके लॉन्चर से शुरू करें।",
 	"tap_hold.action.disable": "मूल कुंजी",
 	"tap_hold.disable_all": "सब अक्षम करें",
 	"tap_hold.group.alt_gr": "AltGr",

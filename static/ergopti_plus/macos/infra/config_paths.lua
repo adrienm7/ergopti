@@ -94,6 +94,7 @@ end)()
 -- In-memory cache: { ConfigDirPath = "..." } or {}; nil = not yet loaded.
 local _bootstrap = nil
 local _bootstrap_status = nil
+local _bootstrap_snapshot = nil
 
 -- Module-load path discovery lets early consumers resolve read-only paths, but
 -- it is not lifecycle initialization. Only M.init() may publish this sentinel.
@@ -154,29 +155,37 @@ end
 --- @return table|nil bootstrap Parsed table.
 --- @return string status `ok`, `absent`, or `error`.
 --- @return string|nil detail
+--- @return string|nil raw Exact source bytes when status is `ok`.
 local function read_bootstrap(path)
 	local raw, status, detail = FileSystem.read_with_status(path)
 	if status ~= "ok" then return nil, status, detail end
-	return parse_toml(raw), "ok"
+	return parse_toml(raw), "ok", nil, raw
 end
 
 --- Loads the primary bootstrap, falling back to the adjacent legacy file only
 --- when a packaged launcher selected a different stable path.
 --- @return table|nil bootstrap
 --- @return string|nil source_path
+--- @return string status
+--- @return string|nil detail
+--- @return table|nil target_snapshot Exact state of the primary write target.
 local function load_bootstrap()
 	local primary = paths_file()
-	local parsed, status, detail = read_bootstrap(primary)
-	if status == "ok" then return parsed, primary, "ok" end
+	local parsed, status, detail, raw = read_bootstrap(primary)
+	if status == "ok" then
+		return parsed, primary, "ok", nil, { status = "ok", content = raw }
+	end
 	if status == "error" then return nil, primary, "error", detail end
 
 	local legacy = legacy_paths_file()
 	if _managed_paths_file and legacy ~= primary then
 		parsed, status, detail = read_bootstrap(legacy)
-		if status == "ok" then return parsed, legacy, "ok" end
+		if status == "ok" then
+			return parsed, legacy, "ok", nil, { status = "absent" }
+		end
 		if status == "error" then return nil, legacy, "error", detail end
 	end
-	return nil, nil, "absent"
+	return nil, nil, "absent", nil, { status = "absent" }
 end
 
 --- Returns the resolved config directory (with trailing slash).
@@ -186,9 +195,10 @@ end
 --- @return string
 local function config_dir()
 	if _bootstrap == nil then
-		local loaded, _, status = load_bootstrap()
+		local loaded, _, status, _, snapshot = load_bootstrap()
 		_bootstrap = loaded or {}
 		_bootstrap_status = status
+		_bootstrap_snapshot = snapshot
 	end
 	local v = _bootstrap[CONFIG_DIR_KEY]
 	if type(v) == "string" and v ~= "" then return v end
@@ -309,7 +319,10 @@ local function save_bootstrap()
 	local target = paths_file()
 	local replaced = false
 	local write_error = nil
-	if _bootstrap_status == "absent" then
+	if type(_bootstrap_snapshot) ~= "table" then
+		return false, "paths.toml source snapshot is unavailable"
+	end
+	if _bootstrap_snapshot.status == "absent" then
 		local created, create_status, create_detail = FileSystem.create_if_absent(target, content)
 		replaced = created == true
 		if create_status == "exists" then
@@ -317,7 +330,11 @@ local function save_bootstrap()
 		end
 		write_error = create_detail or "create-only publication failed"
 	else
-		replaced, write_error = FileSystem.write(target, content)
+		replaced, write_error = FileSystem.write_if_unchanged(
+			target,
+			content,
+			_bootstrap_snapshot
+		)
 	end
 	if not replaced then
 		Logger.error(LOG, "Cannot publish paths file '%s'.", target)
@@ -325,7 +342,32 @@ local function save_bootstrap()
 	end
 
 	_bootstrap_status = "ok"
+	_bootstrap_snapshot = { status = "ok", content = content }
 	Logger.info(LOG, "Paths saved to '%s'.", target)
+	return true
+end
+
+--- Adopts a target that demonstrably diverged from the snapshot used by the
+--- refused transaction. An ordinary I/O failure against unchanged bytes keeps
+--- the caller's in-memory rollback instead of fabricating a concurrent edit.
+--- @return boolean adopted
+local function adopt_changed_bootstrap_target()
+	local expected = _bootstrap_snapshot
+	if type(expected) ~= "table" then return false end
+	local parsed, status, _, raw = read_bootstrap(paths_file())
+	if status ~= "ok" and status ~= "absent" then return false end
+	local changed = status ~= expected.status
+		or (status == "ok" and raw ~= expected.content)
+	if not changed then return false end
+	if status == "ok" then
+		_bootstrap = parsed
+		_bootstrap_status = "ok"
+		_bootstrap_snapshot = { status = "ok", content = raw }
+	else
+		_bootstrap = {}
+		_bootstrap_status = "absent"
+		_bootstrap_snapshot = { status = "absent" }
+	end
 	return true
 end
 
@@ -425,47 +467,61 @@ function M.init(base_dir)
 
 	-- Read paths.toml, migrating an adjacent legacy override when present, or
 	-- creating a commented template when neither location exists.
-	local loaded, source_path, load_status, load_detail = load_bootstrap()
+	local loaded, source_path, load_status, load_detail, source_snapshot = load_bootstrap()
 	if load_status == "error" then
 		_bootstrap = {}
 		_bootstrap_status = "error"
+		_bootstrap_snapshot = nil
 		Logger.error(LOG, "paths.toml is unreadable or malformed; default publication refused (%s).",
 			tostring(load_detail))
 		return false
 	elseif load_status == "absent" then
 		Logger.info(LOG, "paths.toml not found — generating with defaults at '%s'.", paths_file())
 		_bootstrap = {}
-		local _, create_status, create_detail = FileSystem.create_if_absent(paths_file(), serialize_toml())
+		local initial_content = serialize_toml()
+		local _, create_status, create_detail = FileSystem.create_if_absent(paths_file(), initial_content)
 		if create_status == "exists" then
-			loaded, _, load_status, load_detail = load_bootstrap()
+			loaded, _, load_status, load_detail, source_snapshot = load_bootstrap()
 			if load_status ~= "ok" then
 				Logger.error(LOG, "Concurrent paths.toml publication could not be loaded (%s).",
 					tostring(load_detail))
 				return false
 			end
 			_bootstrap = loaded
+			_bootstrap_snapshot = source_snapshot
 		elseif create_status ~= "created" then
 			Logger.error(LOG, "paths.toml default publication failed (%s).", tostring(create_detail))
 			return false
+		else
+			_bootstrap_snapshot = { status = "ok", content = initial_content }
 		end
 		_bootstrap_status = "ok"
 	else
 		_bootstrap = loaded
 		_bootstrap_status = "ok"
+		_bootstrap_snapshot = source_snapshot
 		if source_path ~= paths_file() then
 			Logger.info(LOG, "Migrating paths from '%s' to '%s'.", source_path, paths_file())
-			local _, create_status, create_detail = FileSystem.create_if_absent(paths_file(), serialize_toml())
+			local migrated_content = serialize_toml()
+			local _, create_status, create_detail = FileSystem.create_if_absent(
+				paths_file(),
+				migrated_content
+			)
 			if create_status == "exists" then
-				local concurrent, concurrent_source, concurrent_status, concurrent_detail = load_bootstrap()
+				local concurrent, concurrent_source, concurrent_status, concurrent_detail,
+					concurrent_snapshot = load_bootstrap()
 				if concurrent_status ~= "ok" then
 					Logger.error(LOG, "Concurrent paths.toml migration target could not be loaded (%s).",
 						tostring(concurrent_detail))
 					return false
 				end
 				_bootstrap = concurrent
+				_bootstrap_snapshot = concurrent_snapshot
 			elseif create_status ~= "created" then
 				Logger.error(LOG, "paths.toml migration failed (%s).", tostring(create_detail))
 				return false
+			else
+				_bootstrap_snapshot = { status = "ok", content = migrated_content }
 			end
 		else
 			Logger.debug(LOG, "Paths loaded from '%s'.", source_path)
@@ -553,6 +609,7 @@ function M.set_config_dir(new_dir)
 	local saved, save_err = save_bootstrap()
 	if not saved then
 		_bootstrap[CONFIG_DIR_KEY] = old_override
+		adopt_changed_bootstrap_target()
 		return false, save_err
 	end
 	return config_dir() ~= old_dir
