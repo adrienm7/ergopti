@@ -372,8 +372,8 @@ function M.on_trigger(buffer, trigger)
 	-- e.g. buffer "@p★" → backspace 3 chars → type "Adrien"
 	local suffix_length = strict_codepoint_length(match.rule.suffix)
 	if not suffix_length then
-		Logger.error(LOG, "Dynamic rule suffix is invalid UTF-8 (%d-byte suffix); expansion refused.",
-			#match.rule.suffix)
+		Logger.error(LOG, "Dynamic rule output is invalid UTF-8 (%d-byte resolved content withheld); expansion refused.",
+			#match.result)
 		return false
 	end
 	local backspace_count = suffix_length + 1  -- suffix + trigger
