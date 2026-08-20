@@ -81,8 +81,9 @@ local function postKeyStroke(mods, key)
 		return SyntheticInput.emit_key_stroke(mods, key, KEYSTROKE_NO_DELAY_US)
 	end, debug.traceback)
 	if not ok or result ~= true then
-		error(string.format("synthetic key stroke was refused for %s: %s",
-			tostring(key), tostring(result)), 0)
+		Logger.error(LOG, "synthetic key stroke was refused for %s: %s",
+			tostring(key), tostring(result))
+		return false
 	end
 	return true
 end
@@ -1437,9 +1438,8 @@ function M.execute_single(name, binding)
 	-- Logger.callback (not a bare pcall) so a throwing action leaves a trace: with
 	-- ~150+ registered closures dispatched here, a caught-then-dropped exception
 	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
-	local ok, result = Logger.callback(LOG,
-		"Gesture action '" .. tostring(name) .. "'", s.fn, binding)
-	return ok == true and result ~= false
+	local ok = Logger.callback(LOG, "Gesture action '" .. tostring(name) .. "'", s.fn, binding)
+	return ok == true
 end
 
 function M.execute_axis(name, goNext)

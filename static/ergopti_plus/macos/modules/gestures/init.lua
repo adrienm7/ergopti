@@ -632,7 +632,7 @@ function M.enable_all()  CoreState.enabled = true  end
 function M.disable_all()
 	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
 	local ok_cleanup, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
-	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result ~= true then
+	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result == false then
 		Logger.error(LOG, "Gesture disable cleanup refused; feature state preserved.")
 		return false
 	end
@@ -658,7 +658,7 @@ function M.suspend()
 	-- both here, exactly as M.stop() does (force_cleanup is idempotent).
 	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
 	local ok_cleanup, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
-	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result ~= true then
+	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result == false then
 		Logger.error(LOG, "Gesture suspend cleanup refused; suspend not published.")
 		return false
 	end
@@ -1178,7 +1178,7 @@ function M.stop()
 		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
 	end
 
-	if not cleanup_ok or cleanup_result ~= true
+	if not cleanup_ok or cleanup_result == false
 		or watchers_stopped ~= true or timer_stopped ~= true
 		or primer_stopped ~= true or wake_watcher_stopped ~= true
 		or not engine_stopped or engine_stop_result == false then
