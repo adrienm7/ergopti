@@ -40,6 +40,7 @@ Accumulated engineering knowledge for this repository — gotchas, architecture 
 - [project-source-scan-loops-need-a-floor](#project-source-scan-loops-need-a-floor) — A scan loop that finds nothing looks exactly like a scan loop that finds only good results; assert the match count
 - [project-ahk-settimer-reenters-during-file-io](#project-ahk-settimer-reenters-during-file-io) — AHK pumps messages during blocking file I/O, so a routine that schedules its own next tick can be re-entered mid-flight
 - [project-audit-2026-07-21-open-items](#project-audit-2026-07-21-open-items) — Troisieme et quatrieme passes d'audit AHK : les pistes refutees a ne pas re-soulever, et deux decisions qui ne sont pas des correctifs
+- [project-ahk-updater-async-ownership-2026-08-09](#project-ahk-updater-async-ownership-2026-08-09) — Updater/changelog async ownership spans the in-flight call, terminal, timer and epoch; entry-only generation checks are insufficient
 - [project-typing-latency-tooltip-coldstart](#project-typing-latency-tooltip-coldstart) — Latence de frappe : pourquoi la reutilisation de fenetre tooltip est rejetee, pourquoi le chunking de l'enregistrement differe a ete reverte, et pourquoi WebView2 a quitte le chemin de frappe
 - [project-ahk-menu-dispatcher-drop](#project-ahk-menu-dispatcher-drop) — AHK 2.0 perd silencieusement ~30-50 % des clics du menu tray. Contourne par lib/menu_dispatcher.ahk — tout item actionnable doit passer par RegisterMenuItem, jamais par Menu.Add brut.
 - [project-audit-2026-07-21-toml-onboarding](#project-audit-2026-07-21-toml-onboarding) — Regles durables sorties de l'audit de `lib/toml/` et `ui/onboarding/` : ou parse-t-on, comment signale-t-on un echec de lecture, et le piege de la sentinelle
@@ -1740,6 +1741,74 @@ Related: [[project_ahk_guard_tests_must_loop_the_class]],
 [[project_ahk_invariant_incomplete_application]],
 [[project_audit_findings_are_hypotheses]],
 [[project_audit_evidence_must_be_reproducible]].
+
+### project-ahk-updater-async-ownership-2026-08-09
+
+_Updater/changelog : une frontiere asynchrone doit posseder l'appel en cours,
+son terminal, son timer et son epoch — pas seulement verifier une generation a
+l'entree_
+
+<sub>slug: `project_ahk_updater_async_ownership_2026_08_09`</sub>
+
+Quatre interleavings distincts ont impose le meme modele d'ownership :
+
+- `_Updater_SendOwnedAsyncRequest` lease l'intervalle claim -> `Http.Send()` ->
+  retour COM. Une annulation marque son terminal sur l'owner ; le dernier frame
+  le livre. Le passage au `Suspend(1)` attend la fin de tout send lease, sinon un
+  frame repris pourrait demarrer un transport deja terminal.
+- Les appels COM d'un changelog **deja committe** (`TryGetWebMessageAsString`,
+  `ExecuteScriptAsync`, `Controller.Fill`) prennent un lease du build. Un Close
+  pompe pendant COM, cache le host et doit appeler le take perdant pour armer
+  `CleanupPending`; le dernier release gagne ensuite l'unique teardown
+  controller -> HWND. Cacher sans armer ce take fuit silencieusement toute la
+  session.
+- Le safety timer du changelog stocke le callable exact
+  `_CLW_SafetyFlush.Bind(WindowEpoch)`. Le teardown desarme ce handle exact et
+  le callback revalide son epoch apres `LoggerWarn`, car un sink de log peut
+  pomper Close/reopen pendant l'emission.
+- Un lifecycle `LoggerStart` doit etre emis **avant** de publier l'owner que les
+  callbacks de suspend savent annuler. Le sink de test est appele avant la mise
+  en queue du log : s'il declenche Pause, l'absence d'owner garantit qu'aucun
+  ERROR terminal ne peut preceder le START. Le frame repris refuse ensuite la
+  reservation perimee et ferme le START par WARNING.
+
+Tests causaux :
+`Updater AHK-14: send lease closes cancel-before-COM orphan window`,
+`changelog: committed COM Close cleans up after lease return (AHK-30)`,
+`changelog: newer ingress and window epoch reject old actions (AHK-30)`,
+`Updater AHK-14: download START precedes cancellable owner
+(updater-download-logger-order)` et l'inventaire derive
+`meta webview-reset-guard-class: every committed changelog COM call owns a
+lease`. La mutation « reservation avant START » rend bien le dernier test rouge
+sur `OwnedAtStart = 1`.
+
+Piege de harnais rencontre dans la meme passe : `_DriverFuncBody` ne peut pas
+parser une signature avec un regex plat. Les signatures multilignes et les
+defaults imbriques (`Map()`) exigent un scan de parentheses equilibrees ; le
+scanner doit aussi ignorer un appel colonne zero du meme nom avant la vraie
+definition. Les controles positifs sont
+`driver-source-helper-multiline-signature` et
+`driver-source-helper-nested-default`.
+
+Le pre-check Node de `verify-change.cjs` avait reproduit le meme regex
+mono-ligne. Son premier correctif equilibre etait encore aveugle au contexte
+AVANT le candidat : `Ghost() {}` ecrit dans un commentaire bloc etait accepte
+comme definition. Une seconde passe a aussi montre que les chaines AHK peuvent
+etre delimitees par `"` **ou** par `'` ; ignorer le second delimiteur laisse les
+guillemets d'une regex single-quoted desynchroniser tout le reste du fichier.
+Le scanner JS final part du debut de la source pour chaque candidat, suit les
+deux formes de chaine, les commentaires ligne/bloc et les backticks, puis
+equilibre la signature et exige l'accolade. Le test
+`test-verify-change-ahk-function-definitions.cjs` couvre definition multiligne,
+default imbrique, appel colonne zero, pseudo-definition en commentaire bloc et
+pseudo-definition en chaine single-quoted. `verify-change --plan` doit rester
+un controle utile : un faux rouge de son propre scanner bloque tous les vrais
+gates, un faux vert blanchit un test source mort.
+
+Provenance : races confirmees par lecture + interleavings deterministes. Les
+vrais logs correctement resolus via `paths.toml` contenaient zero ligne
+`Downloading update`; l'ordre logger n'est donc pas presente comme observe en
+production.
 
 ### project-typing-latency-tooltip-coldstart
 
