@@ -2124,7 +2124,7 @@ jobs:
           $owner   = "${{ github.repository_owner }}"
           $repo    = "${{ github.event.repository.name }}"
           $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
-          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\lib\bundle.ahk"
+          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\infra\bundle.ahk"
           $text = Get-Content -Raw -Path $bundlePath
           $text = $text.Replace("__BUNDLE_VERSION__",     $version)
           $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
@@ -2287,7 +2287,7 @@ jobs:
           set -euo pipefail
           tar -czf build/linux/ergopti-plus-linux.tar.gz               -C build/linux linux _shared bin install.sh kanata.kbd
           echo "Bundle contents:"
-          tar -tzf build/linux/ergopti-plus-linux.tar.gz | head -20
+          tar -tzf build/linux/ergopti-plus-linux.tar.gz | sed -n '1,20p'
           echo "... $(tar -tzf build/linux/ergopti-plus-linux.tar.gz | wc -l) entries"
 
       - name: Install the packaging toolchains
