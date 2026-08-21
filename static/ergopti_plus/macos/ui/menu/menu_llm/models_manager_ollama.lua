@@ -90,12 +90,29 @@ function M.new(deps, presets, ram_getter)
 
 	local function cancel_task(task_key)
 		local t = deps.active_tasks and deps.active_tasks[task_key]
-		if t and type(t.terminate) == "function" then pcall(function() t:terminate() end) end
+		if not t then return true end
+		if type(t.terminate) ~= "function" then
+			Logger.error(LOG, "Cannot cancel task '%s': terminate() is unavailable.", tostring(task_key))
+			return false
+		end
+		local ok, result = Logger.callback(LOG, "Cancel task " .. tostring(task_key), function()
+			return t:terminate()
+		end)
+		if not ok or result == false or result == nil then
+			Logger.error(LOG, "Cancellation of task '%s' was refused: %s.",
+				tostring(task_key), tostring(result))
+			return false
+		end
+		-- Native hs.task:terminate() returns the task userdata when SIGTERM was
+		-- accepted. That is a signal request, not process settlement; the exact slot
+		-- stays owned until its completion callback clears it.
+		return true
 	end
 
 	local function cancel_pull_and_upgrade()
-		cancel_task("ollama_pull")
-		cancel_task("ollama_upgrade")
+		local pull_ok = cancel_task("ollama_pull")
+		local upgrade_ok = cancel_task("ollama_upgrade")
+		return pull_ok == true and upgrade_ok == true
 	end
 
 	local function show_progress_ui(title, terminal_cmd, initial_message, cancel_cb, retry_cb)
@@ -595,7 +612,10 @@ function M.new(deps, presets, ram_getter)
 	function obj.pull_model(target_model, repo, on_success, on_cancel, opts)
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
 		local terminal_sent = false
-		local user_cancelled = false
+		local owner = {
+			cancel_requested = false,
+			completion_seen = false,
+		}
 		local task
 		local function settle(callback, label, ...)
 			if terminal_sent then return false end
@@ -613,7 +633,7 @@ function M.new(deps, presets, ram_getter)
 			return ok == true and current == true
 		end
 		local function current_or_cancel()
-			if user_cancelled then return false end
+			if owner.cancel_requested then return false end
 			if still_current() then return true end
 			settle_cancel("stale")
 			return false
@@ -628,27 +648,42 @@ function M.new(deps, presets, ram_getter)
 		if deps.active_tasks["ollama_pull"] then
 			Logger.warn(LOG, "Ollama pull for %s refused while another pull owns the slot.",
 				tostring(target_model))
+			settle_cancel("busy")
 			return false
 		end
 		local bin = require_ollama_path("pull a model")
 		if not bin then
 			pcall(notifications.notify, i18n.get("ollama.fail_title"),
 				string.format(i18n.get("ollama.download_error"), tostring(target_model)), "error")
+			settle_cancel("binary_unavailable")
 			return false
 		end
 		local pull_output = ""
 		local function cancel_current_pull()
-			if user_cancelled then return false end
-			user_cancelled = true
-			if task and type(task.terminate) == "function" then
-				pcall(function() task:terminate() end)
+			if owner.completion_seen then return false end
+			if not task or deps.active_tasks["ollama_pull"] ~= task then return false end
+			owner.cancel_requested = true
+			if type(task.terminate) ~= "function" then
+				Logger.error(LOG, "Ollama pull cancellation refused: terminate() is unavailable.")
+				settle_cancel("termination_refused")
+				complete_progress_ui(false, target_model)
+				return false
+			end
+			local ok, result = Logger.callback(LOG, "Ollama pull termination", function()
+				return task:terminate()
+			end)
+			if not ok or result == false or result == nil then
+				Logger.error(LOG, "Ollama pull cancellation was refused: %s.", tostring(result))
+				settle_cancel("termination_refused")
+				complete_progress_ui(false, target_model)
+				return false
 			end
 			return true
 		end
 		
 		local function do_retry()
 			if not current_or_cancel() then return false end
-			if deps.active_tasks and deps.active_tasks["ollama_pull"] then return end
+			if deps.active_tasks and deps.active_tasks["ollama_pull"] then return false end
 			hs.timer.doAfter(0.05, function()
 				if not current_or_cancel() then return end
 				obj.pull_model(target_model, repo, on_success, on_cancel, opts)
@@ -659,10 +694,21 @@ function M.new(deps, presets, ram_getter)
 		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_current_pull, do_retry)
 		
 		if not current_or_cancel() then return false end
-		task = TaskLifecycle.native("Ollama model pull", bin, function(code)
-			if deps.active_tasks["ollama_pull"] ~= task then return end
+		local start_in_progress = true
+		local pending_completion = nil
+		local function finish_pull(code)
+			if owner.completion_seen then return false end
+			if deps.active_tasks["ollama_pull"] ~= task then return false end
+			owner.completion_seen = true
 			deps.active_tasks["ollama_pull"] = nil
-			if not current_or_cancel() then return end
+			if owner.cancel_requested then
+				pcall(notifications.notify, i18n.get("ollama.cancelled_title"),
+					i18n.get("ollama.download_cancelled"), "warning")
+				complete_progress_ui(false, target_model)
+				settle_cancel("user_cancelled")
+				return false
+			end
+			if not current_or_cancel() then return false end
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(true, target_model)
@@ -699,7 +745,10 @@ function M.new(deps, presets, ram_getter)
 							deps.keymap.set_llm_display_model_name, display_model)
 					end
 				end
-				if not save_prefs("Ollama model preference save") then return false end
+				if not save_prefs("Ollama model preference save") then
+					settle_cancel("preference_save_failed")
+					return false
+				end
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
@@ -710,6 +759,8 @@ function M.new(deps, presets, ram_getter)
 			elseif code == 15 then
 				pcall(notifications.notify, i18n.get("ollama.cancelled_title"), i18n.get("ollama.download_cancelled"), "warning")
 				complete_progress_ui(false, target_model)
+				settle_cancel("terminated")
+				return false
 			else
 				local requires_upgrade = needs_ollama_upgrade(pull_output)
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
@@ -724,7 +775,21 @@ function M.new(deps, presets, ram_getter)
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), string.format(i18n.get("ollama.download_error"), target_model), "error")
 					complete_progress_ui(false, target_model)
 				end
+				settle_cancel("process_failed")
+				return false
 			end
+			return true
+		end
+
+		task = TaskLifecycle.native("Ollama model pull", bin, function(code)
+			-- A native-faithful double can invoke completion from inside :start()
+			-- before :start() reports whether launch committed. Buffer that result so
+			-- a refused launch cannot publish model state from an unowned callback.
+			if start_in_progress then
+				if pending_completion == nil then pending_completion = table.pack(code) end
+				return true
+			end
+			return finish_pull(code)
 		end, function(_, stdout, stderr)
 			if not current_or_cancel() then return false end
 			local out = sanitize_terminal_stream((stdout or "") .. (stderr or ""))
@@ -744,24 +809,27 @@ function M.new(deps, presets, ram_getter)
 		if task then
 			if not current_or_cancel() then return false end
 			deps.active_tasks["ollama_pull"] = task
-			if not TaskLifecycle.start(task, "Ollama model pull") then
+			local started = TaskLifecycle.start(task, "Ollama model pull")
+			start_in_progress = false
+			if not started then
 				if deps.active_tasks["ollama_pull"] == task then
 					deps.active_tasks["ollama_pull"] = nil
 				end
+				owner.completion_seen = true
 				complete_progress_ui(false, target_model)
+				settle_cancel("task_start_refused")
 				return false
 			end
+			if pending_completion ~= nil then
+				return finish_pull(table.unpack(pending_completion, 1, pending_completion.n))
+			end
 			if not current_or_cancel() then
-				if deps.active_tasks["ollama_pull"] == task then
-					deps.active_tasks["ollama_pull"] = nil
-					if type(task.terminate) == "function" then
-						pcall(function() task:terminate() end)
-					end
-				end
+				cancel_current_pull()
 				return false
 			end
 		else
 			complete_progress_ui(false, target_model)
+			settle_cancel("task_construction_failed")
 			return false
 		end
 		return true
