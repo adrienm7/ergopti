@@ -78,6 +78,7 @@ end
 
 local Logger             = require("infra.logger")
 local TimerScheduler     = require("adapters.timer_scheduler")
+local SyntheticInput     = require("adapters.synthetic_input")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -732,6 +733,9 @@ do
 	local init_ok, initialized_or_err = xpcall(function()
 		return TerminationCoordinator.init({
 			request_lease = request_exact_lease_revoke,
+			drain_input = function(callback)
+				return SyntheticInput.when_idle(callback)
+			end,
 			teardown = teardown_all_resources,
 			begin_drain = Logger.begin_async_sink_shutdown,
 			finalize_teardown = finalize_teardown_resources,

@@ -1016,6 +1016,13 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- every replacement/action echo exits before the native getKeyCode call.
 	if provenance and not internal_loopback then return false end
 
+	-- The pause transaction closes new synthetic admission immediately after the
+	-- global drain reaches idle and keeps it closed through PAUSED/rollback. Raw
+	-- physical keys remain pass-through in that acknowledgement window; letting
+	-- the engine start an expansion would either cross the drain or trip the
+	-- adapter's fail-fast admission assertion.
+	if not SyntheticInput.admission_open() then return internal_loopback == true end
+
 	if CoreState.processing_paused then return internal_loopback == true end
 
 	-- Single getKeyCode() call — reused for every subsequent keyCode check
@@ -1318,22 +1325,31 @@ local function onKeyDown(e)
 	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil = pcall(
 		EventProvenance.classify_with_fence, e, "keymap")
 	local fence_events = nil
+	local fence_consumes_original = false
 	if classify_ok then
 		provenance = provenance_or_err
 		provenance_status = status_or_nil or EventProvenance.STATUS_UNREADABLE
-		if fence_or_nil then fence_events = fence_or_nil.events end
+		if fence_or_nil then
+			fence_events = fence_or_nil.events
+			fence_consumes_original = fence_or_nil.consume_original == true
+		end
 	else
 		pcall(Logger.error, LOG, "Synthetic event provenance classification failed: %s.",
 			tostring(provenance_or_err))
 		-- Preserve output ordering even if adapter bookkeeping itself failed. The
 		-- event remains unreadable and therefore cannot mutate keymap state.
-		local fence_ok, fence_or_err = pcall(SyntheticInput.claim_physical_fence)
+		local fence_ok, fence_or_err = pcall(SyntheticInput.claim_physical_fence, e)
 		if fence_ok and fence_or_err then
 			fence_events = fence_or_err.events
+			fence_consumes_original = fence_or_err.consume_original == true
 		elseif not fence_ok then
 			pcall(Logger.error, LOG, "Synthetic physical-input fence failed: %s.",
 				tostring(fence_or_err))
 		end
+	end
+	if fence_consumes_original then
+		HotPath.log_if_slow("keydown", t0_hot, _tc_chars)
+		return true, fence_events
 	end
 
 	-- Synthetic injectors reached below build tagged Quartz events instead of
@@ -1350,6 +1366,7 @@ local function onKeyDown(e)
 
 	local ok, result = pcall(onKeyDownRaw, e, provenance, provenance_status)
 	local returned_events = nil
+	local abort_requires_consumption = false
 	if ok then
 		local left, consume_or_err, events = pcall(SyntheticInput.leave_callback, result)
 		if left then
@@ -1360,12 +1377,14 @@ local function onKeyDown(e)
 			result = consume_or_err
 			-- leave_callback is designed to unwind atomically. Keep this backstop
 			-- idempotent so a future implementation cannot strand ambient state.
-			pcall(SyntheticInput.abort_callback)
+			local abort_ok, _, consume_original = pcall(SyntheticInput.abort_callback)
+			abort_requires_consumption = abort_ok and consume_original == true
 		end
 	else
 		-- Discard every event created before the exception. Returning a partial
 		-- replacement would be worse than passing through the user's original key.
-		pcall(SyntheticInput.abort_callback)
+		local abort_ok, _, consume_original = pcall(SyntheticInput.abort_callback)
+		abort_requires_consumption = abort_ok and consume_original == true
 	end
 	if t0 then Perf.sample("keymap_keydown", t0) end
 	-- Enrich the slow-keystroke detail with the per-stage breakdown when measured.
@@ -1376,7 +1395,12 @@ local function onKeyDown(e)
 	end
 	HotPath.log_if_slow("keydown", t0_hot, hot_detail)
 	if not ok then
-		Logger.error(LOG, "Keyboard interception failure: %s.", tostring(result))
+		pcall(Logger.error, LOG, "Keyboard interception failure: %s.", tostring(result))
+		if abort_requires_consumption then
+			-- The serializer already owns the completing key. Passing it through here
+			-- would append the physical terminator after the delayed replacement
+			return true, fence_events
+		end
 		-- An uncaught error inside the callback can cause macOS to disable the
 		-- tap on the next run-loop cycle; proactively re-arm it here
 		if tap and type(tap.isEnabled) == "function" and not tap:isEnabled() then
@@ -1413,6 +1437,7 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 	local provenance, _, fence = EventProvenance.classify_with_fence(
 		e, "keymap.loopback_keyup")
 	local fence_events = fence and fence.events or nil
+	if fence and fence.consume_original == true then return true, fence_events end
 	if provenance and (provenance.loopback or provenance.stale_loopback) then
 		return true, fence_events
 	end
@@ -1450,6 +1475,7 @@ shift_tap = eventtap.new(
 		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
 			e, "keymap.shift")
 		local fence_events = fence and fence.events or nil
+		if fence and fence.consume_original == true then return true, fence_events end
 		if provenance then return false end
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			_shift_left_down = false
@@ -1517,6 +1543,7 @@ mouse_tap = eventtap.new(
 		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
 			e, "keymap.mouse")
 		local fence_events = fence and fence.events or nil
+		if fence and fence.consume_original == true then return true, fence_events end
 		if provenance then return false end
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			invalidate_observed_context()
@@ -1830,6 +1857,7 @@ end
 --- @param teardown boolean|nil Also destroy ignored-window watchers on reload/quit.
 function M.stop(teardown)
 	Logger.start(LOG, "Stopping keymap engine…")
+	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
 	local listener_stopped = true
 	if _action_listener_registered then

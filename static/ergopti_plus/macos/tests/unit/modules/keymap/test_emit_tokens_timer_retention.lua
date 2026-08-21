@@ -42,17 +42,74 @@ local function load_fixture()
 		return handle
 	end
 
-	local tx = {}
+	local tx = {
+		kind = "emission",
+		sealed = false,
+		completed = false,
+		active_retains = 0,
+		completion_callbacks = {},
+	}
+	local debt_tx = nil
 	local retain_count = 0
 	local release_count = 0
+	local debt_retain_count = 0
+	local debt_release_count = 0
+	local function complete_emission_if_idle()
+		if tx.completed or not tx.sealed or tx.active_retains ~= 0 then return end
+		tx.completed = true
+		for _, callback in ipairs(tx.completion_callbacks) do
+			callback(tx, "complete")
+		end
+	end
 	package.loaded["adapters.synthetic_input"] = {
 		current_transaction = function() return tx end,
-		retain = function()
-			retain_count = retain_count + 1
-			return {}
+		begin = function()
+			assert(debt_tx == nil, "one clipboard owner must create one drain debt")
+			debt_tx = { kind = "clipboard_debt", sealed = false, cancelled = false }
+			return debt_tx
 		end,
-		release = function()
-			release_count = release_count + 1
+		retain = function(owner)
+			if owner == tx then
+				retain_count = retain_count + 1
+				tx.active_retains = tx.active_retains + 1
+			elseif owner == debt_tx then
+				debt_retain_count = debt_retain_count + 1
+			else
+				error("retained an unknown synthetic transaction")
+			end
+			return { owner = owner, active = true }
+		end,
+		seal = function(owner)
+			assert(owner == debt_tx and owner.cancelled ~= true,
+				"only the clipboard debt is sealed through the production adapter")
+			owner.sealed = true
+			return true
+		end,
+		release = function(owner, token)
+			assert(token ~= nil and token.owner == owner and token.active == true,
+				"a retain must release its exact active token")
+			token.active = false
+			if owner == tx then
+				release_count = release_count + 1
+				tx.active_retains = tx.active_retains - 1
+				complete_emission_if_idle()
+			elseif owner == debt_tx then
+				debt_release_count = debt_release_count + 1
+			else
+				error("released an unknown synthetic transaction")
+			end
+			return true
+		end,
+		cancel = function(owner)
+			assert(owner == debt_tx, "only clipboard debt can be cancelled here")
+			owner.cancelled = true
+			return true
+		end,
+		on_complete = function(owner, callback)
+			assert(owner == tx and type(callback) == "function",
+				"paste restore must observe the ambient emission transaction")
+			owner.completion_callbacks[#owner.completion_callbacks + 1] = callback
+			complete_emission_if_idle()
 			return true
 		end,
 		with_transaction = function(_, callback) return callback() end,
@@ -94,8 +151,14 @@ local function load_fixture()
 		utils = require("modules.keymap.utils"),
 		pasted = pasted,
 		fire_all = fire_all,
+		seal_emission = function()
+			tx.sealed = true
+			complete_emission_if_idle()
+		end,
 		retain_count = function() return retain_count end,
 		release_count = function() return release_count end,
+		debt_retain_count = function() return debt_retain_count end,
+		debt_release_count = function() return debt_release_count end,
 	}
 end
 
@@ -108,6 +171,7 @@ helpers.describe("emit_tokens deferred timer lifetime", function()
 			{ kind = "text", value = ("B"):rep(60) },
 		})
 		helpers.assert_eq(fixture.retain_count(), 1)
+		fixture.seal_emission()
 		collectgarbage("collect")
 		collectgarbage("collect")
 		fixture.fire_all()
@@ -117,5 +181,9 @@ helpers.describe("emit_tokens deferred timer lifetime", function()
 		helpers.assert_eq(fixture.pasted[2], ("B"):rep(60))
 		helpers.assert_eq(fixture.release_count(), 1,
 			"the transaction retain must close after deferred output runs")
+		helpers.assert_eq(fixture.debt_retain_count(), 1,
+			"clipboard mutation must retain one independent drain-visible restore debt")
+		helpers.assert_eq(fixture.debt_release_count(), 1,
+			"the exact clipboard debt must close after the original snapshot is restored")
 	end)
 end)

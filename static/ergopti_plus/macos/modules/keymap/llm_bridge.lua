@@ -1223,6 +1223,7 @@ local function arm_escape_trap()
 				event, "llm.escape_trap")
 			fence_events = fence and fence.events or nil
 			local function finish(consume) return consume == true, fence_events end
+			if fence and fence.consume_original == true then return finish(true) end
 			if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
 				return finish(false)
 			end
@@ -1515,7 +1516,7 @@ function M.apply_prediction(idx)
 	-- is_ignored=true: reset_predictions() already hid the tooltip; the F16 chain
 	--   signal (injected below) handles the next prediction — do not arm the LLM
 	--   inactivity timer or trigger update_preview here.
-	local replaced = expander.perform_text_replacement(
+	local replaced, replacement_transaction = expander.perform_text_replacement(
 		delete_count,
 		function() return km_utils.emit_text(text_to_type) end,
 		function()
@@ -1550,10 +1551,10 @@ function M.apply_prediction(idx)
 
 	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
 
-	-- Chain trigger: F16 is injected after all deletions and text keystrokes.
-	-- The HID event queue is ordered, so by the time handle_llm_keys() sees F16,
-	-- all previous keystrokes have been delivered to the target application.
-	-- engine.arm_chain() sets a fallback timer in case F16 is somehow missed.
+	-- Chain trigger: register against the exact replacement transaction before it
+	-- can complete. F16 is constructed only from status=complete, after every
+	-- paced deletion and suffix post has settled. engine.arm_chain() owns the
+	-- fallback timer in case the later loopback signal is missed.
 	-- F16 (not F15) so the script-control kill-switch keycode stays exclusive.
 	if not cleanup_committed then
 		local retry_ok, retry_handle, retry_committed = xpcall(function()
@@ -1574,22 +1575,36 @@ function M.apply_prediction(idx)
 		return true
 	end
 
-	local arm_ok, arm_result = xpcall(engine.arm_chain, debug.traceback)
-	if not arm_ok or arm_result ~= true then
-		Logger.error(LOG, "Prediction applied, but LLM chain ownership did not commit (result: %s).",
-			tostring(arm_result))
-		return true
+	local completion_state = _state
+	local completion_generation = completion_state.lifecycle_generation
+	local registered, registration_error = pcall(SyntheticInput.on_complete,
+		replacement_transaction, function(_transaction, status)
+			if status ~= "complete" or _state ~= completion_state
+				or completion_state.lifecycle_generation ~= completion_generation
+				or not M.is_runtime_available() then return end
+			local arm_ok, arm_result = xpcall(engine.arm_chain, debug.traceback)
+			if not arm_ok or arm_result ~= true then
+				Logger.error(LOG,
+					"Prediction applied, but LLM chain ownership did not commit (result: %s).",
+					tostring(arm_result))
+				return
+			end
+			local signal_ok, signal_result = xpcall(function()
+				return SyntheticInput.emit_loopback_key_stroke(
+					{}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
+			end, debug.traceback)
+			if not signal_ok or signal_result ~= true then
+				Logger.error(LOG,
+					"Prediction applied; F16 signal failed, so the owned fallback remains active (result: %s).",
+					tostring(signal_result))
+				return
+			end
+			Logger.debug(LOG, "F16 signal sent after replacement completion — LLM chain pending.")
+		end)
+	if not registered then
+		Logger.error(LOG, "Prediction applied, but completion-gated F16 registration failed: %s.",
+			tostring(registration_error))
 	end
-	local signal_ok, signal_result = xpcall(function()
-		return SyntheticInput.emit_loopback_key_stroke(
-			{}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
-	end, debug.traceback)
-	if not signal_ok or signal_result ~= true then
-		Logger.error(LOG, "Prediction applied; F16 signal failed, so the owned fallback remains active (result: %s).",
-			tostring(signal_result))
-		return true
-	end
-	Logger.debug(LOG, "F16 signal sent — LLM chain pending.")
 	return true
 end
 

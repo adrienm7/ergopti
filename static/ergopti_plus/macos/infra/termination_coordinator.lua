@@ -181,27 +181,94 @@ local function begin_drain(transaction)
 	return true
 end
 
+
+--- Executes the primary local teardown at most once for this exact transaction.
+--- A post-fence failure cannot safely republish the driver, but it must still
+--- give every local owner one cleanup attempt before the fatal backstop.
+--- @param transaction table Active terminal transaction.
+--- @return boolean settled
+--- @return any detail
+local function teardown_once(transaction)
+	if transaction.teardown_attempted == true then
+		return transaction.teardown_completed == true, transaction.teardown_result
+	end
+	transaction.teardown_attempted = true
+	local teardown_ok, teardown_result = xpcall(function()
+		return _deps.teardown(transaction.kind)
+	end, debug.traceback)
+	transaction.teardown_result = teardown_result
+	transaction.teardown_completed = teardown_ok and teardown_result == true
+	return transaction.teardown_completed, teardown_result
+end
+
+
+--- Runs the once-only local teardown after an exact fence, then exits fatally.
+--- @param transaction table Active terminal transaction.
+--- @param detail any Causal failure detail.
+--- @return boolean Always false if fatal_exit unexpectedly returns.
+local function teardown_then_fail_after_fence(transaction, detail)
+	local teardown_completed, teardown_detail = teardown_once(transaction)
+	local failure = tostring(detail)
+	if not teardown_completed then
+		failure = failure .. "; local teardown also failed: " .. tostring(teardown_detail)
+	end
+	return fail_after_teardown(transaction, failure)
+end
+
+
 local function begin_terminal_sequence(transaction)
 	if _transaction ~= transaction or transaction.settled then return false end
 	if transaction.kind == "reload" and not transaction.reload_marked then
 		local marked_ok, marked_or_err = xpcall(_deps.mark_reload, debug.traceback)
 		if not marked_ok or marked_or_err ~= true then
-			return fail_after_teardown(transaction,
+			return teardown_then_fail_after_fence(transaction,
 				"reload sentinel could not be committed: " .. tostring(marked_or_err))
 		end
 		transaction.reload_marked = true
 	end
 
-	local teardown_ok, teardown_result = xpcall(
-		function() return _deps.teardown(transaction.kind) end,
-		debug.traceback
-	)
-	if not teardown_ok or teardown_result ~= true then
+	local teardown_completed, teardown_result = teardown_once(transaction)
+	if not teardown_completed then
 		return fail_after_teardown(transaction,
 			"local teardown failed: " .. tostring(teardown_result))
 	end
-	transaction.teardown_completed = true
 	return begin_drain(transaction)
+end
+
+
+--- Waits for every synthetic transaction (including paced replacement and its
+--- fenced physical replay) before stopping any tap or finalizing timers.
+--- @param transaction table Active terminal transaction.
+--- @return boolean accepted
+local function begin_input_drain(transaction)
+	if transaction.input_drain_started then return true end
+	transaction.input_drain_started = true
+	local callback_fired = false
+	local function on_input_drained()
+		if callback_fired then return end
+		callback_fired = true
+		if _transaction ~= transaction or transaction.settled then return end
+		local ok, result = xpcall(function()
+			transaction.input_drained = true
+			return begin_terminal_sequence(transaction)
+		end, debug.traceback)
+		if not ok or result ~= true then
+			fail_after_teardown(transaction,
+				"synthetic input drain callback failed: " .. tostring(result))
+		end
+	end
+	local begin_ok, accepted_or_err = xpcall(function()
+		return _deps.drain_input(on_input_drained)
+	end, debug.traceback)
+	if not begin_ok or accepted_or_err ~= true then
+		if not callback_fired then
+			return teardown_then_fail_after_fence(transaction,
+				"synthetic input drain was not committed: " .. tostring(accepted_or_err))
+		end
+		return transaction.completion_ok == true
+	end
+	if callback_fired then return transaction.completion_ok == true end
+	return true
 end
 
 local function finish_transaction(transaction, fenced, detail)
@@ -212,8 +279,15 @@ local function finish_transaction(transaction, fenced, detail)
 		return
 	end
 	transaction.fenced = true
-	Logger.info(LOG, "Exact Karabiner lease fenced; completing controlled %s.", transaction.kind)
-	transaction.completion_ok = begin_terminal_sequence(transaction)
+	local logged_ok, logged_or_error = xpcall(function()
+		Logger.info(LOG, "Exact Karabiner lease fenced; completing controlled %s.",
+			transaction.kind)
+	end, debug.traceback)
+	if not logged_ok then
+		return teardown_then_fail_after_fence(transaction,
+			"post-fence logger failed: " .. tostring(logged_or_error))
+	end
+	transaction.completion_ok = begin_input_drain(transaction)
 end
 
 local function request(kind, reason, arguments, exit_code, on_aborted)
@@ -293,7 +367,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted)
 				-- so returning this Lua environment as live would violate the same
 				-- post-fence rule as a partially completed teardown. Do not depend on
 				-- the logger here: it may be the callback component that raised.
-				fail_after_teardown(transaction,
+				teardown_then_fail_after_fence(transaction,
 					"post-fence lease callback raised: " .. tostring(callback_err))
 				return
 			end
@@ -311,7 +385,7 @@ local function request(kind, reason, arguments, exit_code, on_aborted)
 	if not call_ok then
 		if callback_fired then
 			if transaction.fenced == true and not transaction.settled then
-				return fail_after_teardown(transaction,
+				return teardown_then_fail_after_fence(transaction,
 					"lease request raised after exact fence: " .. tostring(accepted_or_err))
 			end
 			-- A synchronous callback may already have completed a reload, invoked the
@@ -345,7 +419,7 @@ function M.init(deps)
 		return false
 	end
 	for _, name in ipairs({
-		"request_lease", "teardown", "begin_drain", "finalize_teardown",
+		"request_lease", "drain_input", "teardown", "begin_drain", "finalize_teardown",
 		"reload", "exit", "fatal_exit", "mark_reload", "clear_reload",
 	}) do
 		if type(deps[name]) ~= "function" then

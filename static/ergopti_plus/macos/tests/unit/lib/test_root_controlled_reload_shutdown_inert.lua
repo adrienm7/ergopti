@@ -18,6 +18,7 @@ local MODULE_NAMES = {
 	"tests.stubs.hs",
 	"infra.logger",
 	"adapters.timer_scheduler",
+	"adapters.synthetic_input",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
 	"infra.boot_profiler",
@@ -171,6 +172,12 @@ local function run_isolated(assertions)
 			["adapters.timer_scheduler"] = {
 				cancelAll = function()
 					state.cancel_all_calls = state.cancel_all_calls + 1
+					return true
+				end,
+			},
+			["adapters.synthetic_input"] = {
+				when_idle = function(callback)
+					callback()
 					return true
 				end,
 			},

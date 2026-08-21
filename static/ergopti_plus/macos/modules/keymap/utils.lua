@@ -104,6 +104,54 @@ local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
 local _paste_recovery_only = false
 local _paste_generation = 0
+-- A sealed retained synthetic transaction makes clipboard restoration part of
+-- the same process-wide drain used by pause/reload/quit. It owns no Quartz
+-- events; its sole terminal condition is restoration of the exact all-type
+-- snapshot (or an explicit lifecycle refusal while that debt remains visible).
+local _paste_debt_transaction = nil
+local _paste_debt_token = nil
+
+
+--- Acquires drain-visible ownership before the first clipboard mutation.
+--- @return boolean acquired
+--- @return any error_detail
+local function acquire_paste_debt()
+	if _paste_debt_transaction and _paste_debt_token
+		and _paste_debt_token.active == true then return true, nil end
+	local tx = nil
+	local token = nil
+	local ok, err = xpcall(function()
+		tx = SyntheticInput.begin("clipboard_restore", "replacement")
+		token = SyntheticInput.retain(tx)
+		assert(SyntheticInput.seal(tx) == true,
+			"clipboard debt transaction could not be sealed")
+	end, debug.traceback)
+	if not ok then
+		if tx then pcall(SyntheticInput.cancel, tx) end
+		return false, err
+	end
+	_paste_debt_transaction = tx
+	_paste_debt_token = token
+	return true, nil
+end
+
+
+--- Releases the exact drain debt only after the user's snapshot is restored.
+--- @return boolean released
+local function release_paste_debt()
+	local tx = _paste_debt_transaction
+	local token = _paste_debt_token
+	if tx == nil or token == nil then return true end
+	local ok, released_or_error = pcall(SyntheticInput.release, tx, token)
+	if not ok or released_or_error ~= true then
+		Logger.error(LOG, "Clipboard drain debt release failed: %s.",
+			tostring(released_or_error))
+		return false
+	end
+	_paste_debt_transaction = nil
+	_paste_debt_token = nil
+	return true
+end
 
 --- Cancels one exact scheduler handle without discarding stop-failure debt.
 --- @param timer table TimerScheduler handle.
@@ -144,6 +192,7 @@ local function release_paste_ownership()
 	_paste_owns_clipboard = false
 	_paste_recovery_only = false
 	_paste_generation = _paste_generation + 1
+	release_paste_debt()
 end
 
 --- Restores the retained all-type snapshot without releasing it on refusal.
@@ -263,13 +312,14 @@ function M.should_paste(text)
 	return false
 end
 
---- Mutates the clipboard with `value` and issues the Cmd+V keystroke, then
---- arms the async restore-to-original timer. Extracted so both emit_text and
+--- Mutates the clipboard with `value` and issues the Cmd+V keystroke, then arms
+--- restoration from the exact synthetic transaction completion. Extracted so both
 --- emit_tokens (which may need to defer this call — see the serialisation
 --- comment in emit_tokens) share the exact same paste + restore contract.
 --- @param value string The text to paste.
 --- @return boolean True only after the payload and Cmd+V were both accepted.
 local function perform_paste(value)
+	local transaction = SyntheticInput.current_transaction()
 	-- A previous failed restore owns the clipboard but has no valid user output
 	-- to extend. Recover it first; if the native pasteboard still refuses, fail
 	-- closed and preserve the original snapshot for the autonomous retry.
@@ -305,6 +355,13 @@ local function perform_paste(value)
 			return false
 		end
 		_paste_saved_original = snapshot_or_error
+		local debt_acquired, debt_error = acquire_paste_debt()
+		if not debt_acquired then
+			_paste_saved_original = nil
+			Logger.error(LOG, "Clipboard paste drain ownership was refused: %s.",
+				tostring(debt_error))
+			return false
+		end
 	end
 
 	_paste_generation = _paste_generation + 1
@@ -321,22 +378,58 @@ local function perform_paste(value)
 		return false
 	end
 
-	-- Arm restoration BEFORE Cmd+V. If allocation is refused there is still no
-	-- target output to preserve, so rollback can be exact and the trigger passes.
-	local restore_armed, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
-	if not restore_armed then
-		local restored, restore_error = restore_owned_clipboard()
-		if not restored then queue_paste_restore_retry("restore timer refusal") end
-		Logger.error(LOG, "Clipboard paste restore timer was refused — %s (restore=%s).",
-			tostring(timer_error), tostring(restore_error))
-		return false
+	local ownership_generation = _paste_generation
+	local restore_armed = false
+	if transaction then
+		-- Cmd+V may sit behind many Terminal delete turns. Starting a wall-clock
+		-- restore now lets 8 × 20 ms restore the old clipboard before Cmd+V posts.
+		-- Completion is the exact handoff boundary for both callback and paced FIFO.
+		local registered, registration_error = pcall(SyntheticInput.on_complete,
+			transaction, function(_transaction, status)
+				if ownership_generation ~= _paste_generation or not _paste_owns_clipboard then return end
+				if status ~= "complete" then
+					local restored, restore_error = restore_owned_clipboard()
+					if not restored then queue_paste_restore_retry("cancelled paste transaction") end
+					if not restored then
+						Logger.error(LOG, "Clipboard rollback after %s transaction failed: %s.",
+							tostring(status), tostring(restore_error))
+					end
+					return
+				end
+				local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
+				if not scheduled then
+					_paste_recovery_only = true
+					queue_paste_restore_retry("post-handoff restore timer refusal")
+					Logger.error(LOG, "Clipboard restore could not be armed after Cmd+V handoff: %s.",
+						tostring(timer_error))
+				end
+			end)
+		if not registered then
+			local restored, restore_error = restore_owned_clipboard()
+			if not restored then queue_paste_restore_retry("completion registration refusal") end
+			Logger.error(LOG, "Clipboard completion ownership was refused — %s (restore=%s).",
+				tostring(registration_error), tostring(restore_error))
+			return false
+		end
+	else
+		-- Standalone adapter callers have no enclosing transaction; retain the
+		-- historical pre-armed timer contract for that explicit boundary.
+		local timer_error
+		restore_armed, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
+		if not restore_armed then
+			local restored, restore_error = restore_owned_clipboard()
+			if not restored then queue_paste_restore_retry("restore timer refusal") end
+			Logger.error(LOG, "Clipboard paste restore timer was refused — %s (restore=%s).",
+				tostring(timer_error), tostring(restore_error))
+			return false
+		end
 	end
 
 	local ok_emit, emitted_or_error = pcall(function()
 		return SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0)
 	end)
 	if not ok_emit or emitted_or_error ~= true then
-		stop_paste_restore_timer()
+		if restore_armed then stop_paste_restore_timer() end
 		local restored, restore_error = restore_owned_clipboard()
 		if not restored then queue_paste_restore_retry("paste dispatch refusal") end
 		Logger.error(LOG, "Clipboard paste shortcut was refused — %s (restore=%s).",
@@ -355,9 +448,9 @@ end
 --- clipboard again before the OS has delivered the previous Cmd+V would
 --- overwrite it mid-flight and corrupt the earlier segment
 --- (multi-segment-paste-race). Only the FIRST paste in the loop fires
---- synchronously; every subsequent one is chained onto TimerScheduler.after so
---- each paste's Cmd+V has CLIPBOARD_PASTE_GAP_SEC to be consumed before the
---- next setContents() call runs.
+--- synchronously; every later token is owned by one pre-acquired recurring
+--- cursor, so equal deadlines cannot race and each Cmd+V has
+--- CLIPBOARD_PASTE_GAP_SEC before the next setContents() call.
 --- @param tokens table The token list produced by tokens_from_repl().
 --- @return number, string, string Total characters, the legacy physical_echo
 ---   metadata, and the logical text inserted. Clipboard text is absent from the
@@ -382,67 +475,6 @@ function M.emit_tokens(tokens)
 	-- this cursor: Cmd+V is only our last posted event; the target produces the
 	-- pasted text later, so a following key must wait for that settle boundary.
 	local order_delay = 0
-
-	--- Schedules an emission while retaining the ambient synthetic-input
-	--- transaction. A replacement transaction is sealed as soon as its synchronous
-	--- emitter returns; without the retain, a later token would either be rejected
-	--- as an append-after-completion or escape into an unrelated implicit action.
-	--- The release runs even when the deferred emitter throws, and every failure is
-	--- sent to the file logger because timer callback errors otherwise surface only
-	--- in the Hammerspoon Console.
-	--- @param delay number Seconds to wait before running fn.
-	--- @param fn function Deferred emission closure.
-	local function defer_in_transaction(delay, fn)
-		local tx = SyntheticInput.current_transaction()
-		local retain_token = tx and SyntheticInput.retain(tx) or nil
-		local deferred = {
-			tx = tx,
-			retain_token = retain_token,
-			released = false,
-		}
-
-		local function release_retain()
-			if deferred.released then return true end
-			deferred.released = true
-			if not tx then return true end
-			local ok_release, release_err = pcall(SyntheticInput.release, tx, retain_token)
-			if not ok_release then
-				Logger.error(LOG, "Deferred synthetic transaction release failed: %s.",
-					tostring(release_err))
-				return false
-			end
-			return true
-		end
-
-		local ok_timer, timer_or_err, timer_committed = pcall(TimerScheduler.after, delay, function()
-			local ok_run, run_err = pcall(function()
-				if tx then
-					SyntheticInput.with_transaction(tx, fn)
-				else
-					fn()
-				end
-			end)
-
-			release_retain()
-
-			if not ok_run then
-				Logger.error(LOG, "Deferred synthetic emission failed: %s.", tostring(run_err))
-			end
-		end)
-
-		if not ok_timer or timer_committed ~= true
-			or type(timer_or_err) ~= "table" or timer_or_err.timer == nil then
-			if type(timer_or_err) == "table" then
-				pcall(TimerScheduler.cancel, timer_or_err)
-			end
-			release_retain()
-			error(ok_timer and "timer scheduler returned no live deferred synthetic timer"
-				or timer_or_err, 0)
-		end
-		deferred.handle = timer_or_err
-		deferred.release = release_retain
-		return deferred
-	end
 
 	--- Emits inline when nothing is queued ahead, otherwise chains behind it.
 	--- Declared above the loop so the closures below capture it rather than a nil
@@ -521,29 +553,111 @@ function M.emit_tokens(tokens)
 		::continue::
 	end
 
-	-- Acquire every delayed capability before the first visible mutation. If one
-	-- timer is refused, previously acquired timers are fenced and every synthetic
-	-- retain is released while the user's screen is still untouched. The earlier
-	-- inline-first implementation could paste the first segment and only then
-	-- discover that the timer for the trailing Return did not exist, leaving a
-	-- silently truncated expansion.
-	local deferred_emissions = {}
-	local function rollback_deferred()
-		for _, deferred in ipairs(deferred_emissions) do
-			if deferred.handle then pcall(TimerScheduler.cancel, deferred.handle) end
-			if deferred.release then deferred.release() end
-		end
+	-- One pre-acquired recurring owner serializes every delayed token. Independent
+	-- absolute timers at the same deadline have no ordering contract in
+	-- Hammerspoon; a single cursor makes insertion order the runtime authority and
+	-- gives the whole continuation one retain/failure boundary.
+	local first_delayed = nil
+	for index, emission in ipairs(planned_emissions) do
+		if emission.delay > 0 then first_delayed = index; break end
 	end
-	for _, emission in ipairs(planned_emissions) do
-		if emission.delay > 0 then
-			local ok_defer, deferred_or_error = pcall(defer_in_transaction,
-				emission.delay, emission.run)
-			if not ok_defer then
-				rollback_deferred()
-				error(deferred_or_error, 0)
+	local ordered_owner = nil
+	if first_delayed then
+		local tx = SyntheticInput.current_transaction()
+		local retain_token = tx and SyntheticInput.retain(tx) or nil
+		local owner = {
+			tx = tx,
+			retain_token = retain_token,
+			cursor = first_delayed,
+			tick = 0,
+			released = false,
+			finished = false,
+			handle = nil,
+		}
+
+		local function release_retain()
+			if owner.released then return true end
+			owner.released = true
+			if not tx then return true end
+			local ok_release, released_or_error = pcall(
+				SyntheticInput.release, tx, retain_token)
+			if not ok_release or released_or_error ~= true then
+				Logger.error(LOG, "Ordered synthetic transaction release failed: %s.",
+					tostring(released_or_error))
+				return false
 			end
-			deferred_emissions[#deferred_emissions + 1] = deferred_or_error
+			return true
 		end
+
+		local function stop_owner()
+			owner.finished = true
+			local handle = owner.handle
+			owner.handle = nil
+			if handle then
+				local ok_cancel, settled_or_error = pcall(TimerScheduler.cancel, handle)
+				if not ok_cancel or settled_or_error ~= true then
+					Logger.error(LOG, "Ordered emission timer cleanup remains pending: %s.",
+						tostring(settled_or_error))
+				end
+			end
+			release_retain()
+		end
+
+		local function fail_owner(detail)
+			if tx then
+				local ok_fail, failed_or_error = pcall(SyntheticInput.fail, tx, detail)
+				if not ok_fail or failed_or_error ~= true then
+					Logger.error(LOG, "Deferred transaction failure publication failed: %s.",
+						tostring(failed_or_error))
+				end
+			end
+			stop_owner()
+			Logger.error(LOG, "Deferred synthetic emission failed: %s.", tostring(detail))
+		end
+
+		local installing = true
+		local callback_ran = false
+		local ok_timer, timer_or_error, timer_committed = pcall(
+			TimerScheduler.every, CLIPBOARD_PASTE_GAP_SEC, function()
+				callback_ran = true
+				if installing or owner.finished then return end
+				owner.tick = owner.tick + 1
+				local deadline = owner.tick * CLIPBOARD_PASTE_GAP_SEC
+				while owner.cursor <= #planned_emissions do
+					local emission = planned_emissions[owner.cursor]
+					if emission.delay > deadline + 0.0000001 then break end
+					local run_ok, run_error = xpcall(function()
+						if tx then
+							SyntheticInput.with_transaction(tx, emission.run)
+						else
+							emission.run()
+						end
+					end, debug.traceback)
+					if not run_ok then
+						fail_owner(run_error)
+						return
+					end
+					owner.cursor = owner.cursor + 1
+				end
+				if owner.cursor > #planned_emissions then
+					Logger.done(LOG, "%d token(s) emitted (%d char(s)).", #tokens, count)
+					stop_owner()
+				end
+			end)
+		installing = false
+		if not ok_timer or timer_committed ~= true
+			or type(timer_or_error) ~= "table" or timer_or_error.timer == nil
+			or callback_ran then
+			if type(timer_or_error) == "table" then
+				pcall(TimerScheduler.cancel, timer_or_error)
+			end
+			release_retain()
+			error(ok_timer and (callback_ran and "ordered timer fired before commit"
+				or "timer scheduler returned no live ordered synthetic timer")
+				or timer_or_error, 0)
+		end
+		owner.handle = timer_or_error
+		ordered_owner = owner
 	end
 
 	local ok_inline, inline_error = xpcall(function()
@@ -552,11 +666,20 @@ function M.emit_tokens(tokens)
 		end
 	end, debug.traceback)
 	if not ok_inline then
-		rollback_deferred()
+		if ordered_owner and not ordered_owner.finished then
+			ordered_owner.finished = true
+			if ordered_owner.handle then pcall(TimerScheduler.cancel, ordered_owner.handle) end
+			if ordered_owner.tx and not ordered_owner.released then
+				ordered_owner.released = true
+				pcall(SyntheticInput.release, ordered_owner.tx, ordered_owner.retain_token)
+			end
+		end
 		error(inline_error, 0)
 	end
 
-	Logger.done(LOG, "%d token(s) emitted (%d char(s)).", #tokens, count)
+	if ordered_owner == nil then
+		Logger.done(LOG, "%d token(s) emitted (%d char(s)).", #tokens, count)
+	end
 	-- The fence is returned, not just applied internally. A caller that emits
 	-- anything MORE after this call — the terminator re-type does — has the same
 	-- ordering hazard as the tokens themselves, and no way to know about it

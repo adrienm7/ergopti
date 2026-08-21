@@ -51,6 +51,17 @@ package.loaded["modules.llm.warmup_controller"] = {
 }
 package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
 
+package.loaded["adapters.synthetic_input"] = nil
+local SyntheticInput = helpers.load_with_stubs("adapters.synthetic_input")
+SyntheticInput.when_idle = function(callback)
+	callback()
+	return true
+end
+SyntheticInput.defer_after_callback = function(_, callback)
+	hs.timer.doAfter(0, callback)
+	return true
+end
+
 local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
 local hs_stub = _G.hs
 

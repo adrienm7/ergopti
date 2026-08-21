@@ -22,7 +22,7 @@
 --- The fix keeps every emission on one cursor: only paste-worthy tokens advance
 --- it, but all three kinds are chained behind it.
 ---
---- The test drives the real emit_tokens with a captured hs.timer.doAfter and
+--- The test drives the real emit_tokens with a captured native timer owner and
 --- asserts the RELATIVE ORDER of the emissions, which is the property that broke —
 --- not merely that a deferral happened.
 --- ==============================================================================
@@ -50,11 +50,37 @@ local function load_utils()
 	local emissions = {}
 	local pending   = {}
 	local clipboard = { clears = 0 }
+	local debt_sequence = 0
 
 	package.loaded["modules.keymap.utils"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = {
 		current_transaction = function() return nil end,
+		begin = function()
+			debt_sequence = debt_sequence + 1
+			return { id = debt_sequence, sealed = false, cancelled = false }
+		end,
+		retain = function(tx)
+			assert(tx ~= nil and tx.sealed ~= true and tx.cancelled ~= true,
+				"clipboard debt must be retained before sealing")
+			return { owner = tx, active = true }
+		end,
+		seal = function(tx)
+			assert(tx ~= nil and tx.cancelled ~= true,
+				"a cancelled clipboard debt cannot be sealed")
+			tx.sealed = true
+			return true
+		end,
+		release = function(tx, token)
+			assert(token ~= nil and token.owner == tx and token.active == true,
+				"clipboard restore must release its exact retained debt")
+			token.active = false
+			return true
+		end,
+		cancel = function(tx)
+			tx.cancelled = true
+			return true
+		end,
 		emit_key_stroke = function(_mods, key)
 			emissions[#emissions + 1] = "key:" .. tostring(key)
 			return true
@@ -117,7 +143,15 @@ local function load_utils()
 		pending = {}
 		table.sort(scheduled, function(x, y) return x.delay < y.delay end)
 		for _, p in ipairs(scheduled) do
-			if p.running ~= false and p.stopped ~= true then pcall(p.fn) end
+			if p.running ~= false and p.stopped ~= true then
+				pcall(p.fn)
+				-- hs.timer.new is recurring. TimerScheduler.after() stops its native
+				-- owner from inside the wrapper, while TimerScheduler.every() remains
+				-- live and must be delivered again on the next simulated run-loop turn.
+				if p.running ~= false and p.stopped ~= true then
+					pending[#pending + 1] = p
+				end
+			end
 		end
 		return #scheduled
 	end
@@ -156,6 +190,7 @@ helpers.describe("emit_tokens preserves token order across a deferred paste", fu
 			{ kind = "key",  value = "return" },
 		})
 		fire_pending()
+		fire_pending()
 
 		local b_at   = index_of(log, "bbbbbb")
 		local key_at = index_of(log, "key:return")
@@ -177,6 +212,7 @@ helpers.describe("emit_tokens preserves token order across a deferred paste", fu
 			{ kind = "text", value = LONG_B },
 			{ kind = "text", value = "zzz" },   -- below PASTE_THRESHOLD -> keystrokes
 		})
+		fire_pending()
 		fire_pending()
 
 		local b_at = index_of(log, "bbbbbb")

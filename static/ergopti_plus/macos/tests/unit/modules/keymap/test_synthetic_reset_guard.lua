@@ -55,6 +55,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		'SyntheticInput.begin("terminator_replay", "replacement")',
 		'SyntheticInput.begin("external_replacement", "replacement")',
 		'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")',
+		'SyntheticInput.begin("clipboard_restore", "replacement")',
 		'SyntheticInput.begin("shortcuts.text.reselect", "action")',
 		'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
 	}
@@ -127,6 +128,18 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		helpers.assert_true(begin_pos and scope_pos and seal_pos and cancel_pos)
 		helpers.assert_true(begin_pos < scope_pos and scope_pos < seal_pos,
 			"the replay must build before it can commit")
+	end)
+
+	helpers.it("clipboard restore is a sealed retained drain owner", function()
+		local source = read_unit("local function acquire_paste_debt")
+		local begin_pos = source:find(calls[4], 1, true)
+		local retain_pos = source:find("SyntheticInput.retain(tx)", begin_pos, true)
+		local seal_pos = source:find("SyntheticInput.seal(tx)", begin_pos, true)
+		local release_pos = source:find("SyntheticInput.release, tx, token", begin_pos, true)
+		helpers.assert_true(begin_pos and retain_pos and seal_pos and release_pos,
+			"clipboard mutation needs explicit begin/retain/seal/exact-release ownership")
+		helpers.assert_true(begin_pos < retain_pos and retain_pos < seal_pos
+			and seal_pos < release_pos)
 	end)
 
 	helpers.it("deferred text reselection owns dispatch through terminal cleanup", function()

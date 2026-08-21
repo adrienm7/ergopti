@@ -33,9 +33,14 @@ local function make_state(buffer)
 		buffer         = buffer or "",
 		magic_key      = "★",
 		repeat_enabled = true,
+		lifecycle_generation = 0,
 	}
 	function s.is_repeat_feature_enabled() return s.repeat_enabled end
-	function s.suppress_rescan(_) end
+	function s.prepare_suppress_rescan(_) return 1 end
+	function s.commit_suppress_rescan(deadline) s.no_rescan_until = deadline end
+	function s.suppress_rescan(duration)
+		s.commit_suppress_rescan(s.prepare_suppress_rescan(duration))
+	end
 	return s
 end
 
@@ -324,12 +329,35 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
 		local TextSender = require("adapters.text_sender")
 		local target = { bundle = "com.apple.Terminal" }
+		local target_calls = 0
 		local paced = nil
 		local previous_target = TextSender.terminalInputTarget
-		local previous_delivery = SyntheticInput.deliver_collected_paced
-		TextSender.terminalInputTarget = function() return target end
-		SyntheticInput.deliver_collected_paced = function(tx, deletes, delay_us, app)
+		local previous_prepare = SyntheticInput.prepare_collected_paced
+		local previous_budget = SyntheticInput.paced_settlement_budget
+		local previous_authorize = SyntheticInput.authorize_collected_paced
+		local previous_commit = SyntheticInput.commit_collected_paced
+		TextSender.terminalInputTarget = function()
+			target_calls = target_calls + 1
+			return target
+		end
+		SyntheticInput.prepare_collected_paced = function(tx, deletes, delay_us, app)
 			paced = { tx = tx, deletes = deletes, delay_us = delay_us, app = app }
+			return paced
+		end
+		SyntheticInput.paced_settlement_budget = function(owner)
+			helpers.assert_true(owner == paced)
+			return (owner.deletes + SyntheticInput.PACED_TRAILING_TICKS)
+				* (owner.delay_us / 1000000)
+		end
+		SyntheticInput.authorize_collected_paced = function(owner)
+			helpers.assert_true(owner == paced)
+			paced.authorized = true
+			return true
+		end
+		SyntheticInput.commit_collected_paced = function(owner)
+			helpers.assert_true(owner == paced)
+			helpers.assert_true(paced.authorized)
+			paced.committed = true
 			return true
 		end
 
@@ -354,10 +382,16 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 			helpers.assert_eq(paced.deletes, 8)
 			helpers.assert_true(type(paced.delay_us) == "number" and paced.delay_us >= 1000)
 			helpers.assert_true(paced.app == target)
+			helpers.assert_eq(target_calls, 1,
+				"the exact terminal target must be snapshotted once before serialization")
+			helpers.assert_true(paced.committed)
 		end)
 
 		TextSender.terminalInputTarget = previous_target
-		SyntheticInput.deliver_collected_paced = previous_delivery
+		SyntheticInput.prepare_collected_paced = previous_prepare
+		SyntheticInput.paced_settlement_budget = previous_budget
+		SyntheticInput.authorize_collected_paced = previous_authorize
+		SyntheticInput.commit_collected_paced = previous_commit
 		if not ok_body then error(body_err, 0) end
 	end)
 
@@ -396,6 +430,38 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		end
 		helpers.assert_eq(#llm.previews, 1)
 		helpers.assert_eq(llm.previews[1], "new")
+	end)
+
+	helpers.it("does not re-arm preview when stop invalidates a mid-batch transaction", function()
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
+		local s = make_state("old")
+		local llm = make_llm()
+		E.init(s, make_registry({}, {}), llm)
+
+		SyntheticInput.enter_callback()
+		local replaced = E.perform_text_replacement(
+			0,
+			function()
+				SyntheticInput.emit_key_strokes("new")
+				return 3, "new"
+			end,
+			function() s.buffer = "new" end,
+			false, false, "stop-mid-batch"
+		)
+		helpers.assert_true(replaced)
+		local consume = SyntheticInput.leave_callback(replaced)
+		helpers.assert_true(consume)
+
+		-- keymap.stop() advances this exact shared generation before tearing down
+		-- taps/UI. The already-owned Quartz batch may finish, but its completion
+		-- callback must become inert rather than rebuilding a stopped tooltip.
+		s.lifecycle_generation = s.lifecycle_generation + 1
+		if hs and hs.timer and hs.timer.__fire_all then
+			hs.timer.__fire_all()
+			hs.timer.__fire_all()
+		end
+		helpers.assert_eq(#llm.previews, 0,
+			"a transaction settled after keymap stop must not re-arm preview UI")
 	end)
 
 	helpers.it("does not arm the LLM timer when LLM is disabled", function()
@@ -470,6 +536,43 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 			"no prefix event may escape a cancelled callback transaction")
 		helpers.assert_true(not buffer_committed)
 		helpers.assert_eq(s.buffer, "trigger")
+		helpers.assert_eq(SyntheticInput.stats().active_transactions, 0)
+	end)
+
+	helpers.it("prepares the final-result clock before mutating the engine buffer", function()
+		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
+		local s = make_state("trigger")
+		local buffer_committed = false
+		local clock_reads = 1 -- the ordinary key hot path already read the clock
+		s.prepare_suppress_rescan = function()
+			clock_reads = clock_reads + 1
+			error("second clock read refused")
+		end
+		E.init(s, make_registry({}, {}), make_llm())
+
+		SyntheticInput.enter_callback()
+		local replaced = E.perform_text_replacement(
+			1,
+			function()
+				SyntheticInput.emit_key_strokes("final")
+				return 5, "final"
+			end,
+			function()
+				buffer_committed = true
+				s.buffer = "final"
+			end,
+			true, false, "clock-refusal"
+		)
+		local consume, events = SyntheticInput.leave_callback(replaced)
+
+		helpers.assert_true(not replaced)
+		helpers.assert_eq(clock_reads, 2)
+		helpers.assert_true(not buffer_committed,
+			"a fallible final-result clock read must happen before buffer publication")
+		helpers.assert_eq(s.buffer, "trigger")
+		helpers.assert_true(not consume)
+		helpers.assert_nil(events,
+			"clock refusal must roll back the complete synthetic batch")
 		helpers.assert_eq(SyntheticInput.stats().active_transactions, 0)
 	end)
 
