@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: LLM Navigation Hotkey Transaction Tests
 ; DESCRIPTION:
-; Root-cause regression coverage for AHK-017. Invalid modifier text must be
-; refused before persistence, and a fallible native rebind must either publish
-; the complete new keyboard surface or restore the complete previous one.
+; Root-cause regression coverage for AHK-017 and AHK-025. Invalid modifier text
+; must be refused before persistence, a fallible native rebind must publish one
+; complete surface, and an out-of-range digit must remain native pass-through.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -56,8 +56,40 @@ LLM_Tooltip_GetActiveIdx() {
 }
 
 LLM_Tooltip_SetActiveIdx(Index) {
-	global _LNHT_TooltipActiveIdx
+	global _LNHT_TooltipActiveIdx, _LNHT_TooltipSlots
+	if Index < 1 || Index > _LNHT_TooltipSlots.Length
+		return false
 	_LNHT_TooltipActiveIdx := Index
+	return true
+}
+
+_LNHT_ShowTooltip(Slots, ActiveIdx := 1) {
+	global _LNHT_TooltipSlots, _LNHT_TooltipActiveIdx
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+	_LNHT_TooltipSlots := Slots is Array ? Slots.Clone() : []
+	if _LNHT_TooltipSlots.Length == 0 {
+		_LNHT_TooltipActiveIdx := 1
+		_Stub_LlmTooltipText := ""
+		_Stub_LlmPresentedRecord := 0
+		return
+	}
+	_LNHT_TooltipActiveIdx := Max(1, Min(ActiveIdx,
+		_LNHT_TooltipSlots.Length))
+	Lifecycle := {
+		Outcome: "", AcceptSource: Map(), AppName: ""
+	}
+	_Stub_LlmPresentedRecord := {
+		Kind: "prediction", Slots: _LNHT_TooltipSlots.Clone(),
+		ActiveIdx: _LNHT_TooltipActiveIdx, Lifecycle: Lifecycle
+	}
+	_Stub_LlmTooltipText := _LNHT_TooltipSlots[
+		_LNHT_TooltipActiveIdx]
+}
+
+_LNHT_HideTooltip() {
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+	_Stub_LlmTooltipText := ""
+	_Stub_LlmPresentedRecord := 0
 }
 
 _LNHT_PredicateSlot(Predicate) {
@@ -156,12 +188,13 @@ _LNHT_ActiveHas(Spec) {
 	return _LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|" . Spec)
 }
 
-_LNHT_FirePhysical(Spec) {
+_LNHT_FirePhysical(Spec, PermanentSpec := "") {
 	global _LNHT_Hotkeys, _LNHT_AppOutput, _LLM_Menu_NavActiveSlot
 	OwnedSpec := _LLM_Menu_NavActiveSlot . "|" . Spec
 	Predicate := _LLM_Menu_NavSlotPredicate(_LLM_Menu_NavActiveSlot)
-	if Predicate.Call(Spec) && _LNHT_Hotkeys.Has(OwnedSpec) {
-		_LNHT_Hotkeys[OwnedSpec].Call()
+	HotIfSpec := PermanentSpec == "" ? Spec : PermanentSpec
+	if Predicate.Call(HotIfSpec) && _LNHT_Hotkeys.Has(OwnedSpec) {
+		_LNHT_Hotkeys[OwnedSpec].Call(HotIfSpec)
 		return "hotkey"
 	}
 	_LNHT_AppOutput.Push(Spec)
@@ -285,9 +318,12 @@ _LNHT_WithPersistenceFixture(TestFn) {
 _LNHT_WithFixture(TestFn) {
 	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavSlotPlans
 	global _LLM_Menu_NavActiveSlot
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
 	SavedBound := _LLM_Menu_NavHotkeysBound
 	SavedPlans := _LLM_Menu_NavSlotPlans
 	SavedSlot := _LLM_Menu_NavActiveSlot
+	SavedText := _Stub_LlmTooltipText
+	SavedRecord := _Stub_LlmPresentedRecord
 	try {
 		_LNHT_Reset()
 		_LLM_Menu_NavHotkeysBound := []
@@ -299,6 +335,8 @@ _LNHT_WithFixture(TestFn) {
 		_LLM_Menu_NavSlotPlans := SavedPlans
 		_LLM_Menu_NavActiveSlot := SavedSlot
 		_LNHT_Reset()
+		_Stub_LlmTooltipText := SavedText
+		_Stub_LlmPresentedRecord := SavedRecord
 	}
 }
 
@@ -338,9 +376,7 @@ _LNHT_InvalidTextCore() {
 		AssertEqual(3, _LNHT_RejectCalls,
 			"each invalid spelling must produce one user-visible refusal")
 
-		_LNHT_TooltipSlots := ["one", "two", "three", "four", "five", "six"]
-		_LNHT_TooltipActiveIdx := 1
-		_Stub_LlmTooltipText := "visible prediction"
+		_LNHT_ShowTooltip(["one", "two", "three", "four", "five", "six"])
 		AssertEqual("app", _LNHT_FirePhysical("7"))
 		AssertEqual(1, _LNHT_AppOutput.Length)
 		AssertEqual("7", _LNHT_AppOutput[1],
@@ -691,6 +727,7 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 	global _LLM_Menu, _Stub_LlmTooltipText
 	global _LLM_PROFILE_HOTKEY_PRED, _LLM_Menu_NavActiveSlot
 	global LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	global _LNHT_TooltipSlots, _LNHT_AppOutput
 	SavedMenu := _LLM_Menu
 	SavedText := _Stub_LlmTooltipText
 	HadBuiltinOrder := IsSet(LLM_PROFILE_BUILTIN_ORDER)
@@ -706,10 +743,10 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 		_LLM_Menu := _LLMST_Menu()
 		_LLM_Menu["enabled"] := true
 		_LLM_Menu["user_profiles"] := []
+		_LNHT_ShowTooltip(["one"])
 		AssertTrue(LLM_Menu_BindNavHotkeys(_LNHT_Menu("alt", "alt"),
 			_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
 			_LNHT_ForceHotIfReset))
-		_Stub_LlmTooltipText := "visible prediction"
 		AssertTrue(LLM_Menu_GetHotkeyProfileOrder().Length > 0)
 		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call("^1"),
 			"default Alt navigation must not swallow the Ctrl profile surface")
@@ -723,6 +760,17 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 		AssertTrue(LLM_Menu_NavOwnsSpec("^1"))
 		AssertFalse(_LLM_PROFILE_HOTKEY_PRED.Call("^1"),
 			"an exact Ctrl+digit collision must belong to visible navigation")
+		_LNHT_ShowTooltip(["one", "two", "three", "four", "five", "six"])
+		_LNHT_AppOutput := []
+		AssertFalse(_LLM_Menu_NavSlotPredicate(
+			_LLM_Menu_NavActiveSlot).Call("^7"),
+			"an out-of-range Ctrl+digit variant must let Windows pass it through")
+		AssertTrue(LLM_Menu_NavOwnsSpec("^7"),
+			"the reserved navigation chord must still outrank the profile variant")
+		AssertFalse(_LLM_PROFILE_HOTKEY_PRED.Call("^7"),
+			"an out-of-range navigation chord must not fall through to profiles")
+		AssertEqual("app", _LNHT_FirePhysical("^7"))
+		AssertEqual(1, _LNHT_AppOutput.Length)
 
 		AssertTrue(LLM_Menu_BindNavHotkeys(
 			_LNHT_Menu("alt", "control+shift"), _LNHT_Hotkey,
@@ -731,7 +779,7 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call("^1"),
 			"a different navigation chord must leave Ctrl profiles enabled")
 
-		_Stub_LlmTooltipText := ""
+		_LNHT_HideTooltip()
 		AssertFalse(_LLM_Menu_NavSlotPredicate(
 			_LLM_Menu_NavActiveSlot).Call("^1"),
 			"the active navigation surface must pass through while hidden")
@@ -761,10 +809,8 @@ _LNHT_EmptyModifiersCore() {
 	AssertTrue(_LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|7"),
 		"a genuinely empty validation modifier deliberately owns bare digits")
 	try {
-		_LNHT_TooltipSlots := ["one", "two", "three", "four", "five",
-			"six", "seven"]
-		_LNHT_TooltipActiveIdx := 1
-		_Stub_LlmTooltipText := "visible prediction"
+		_LNHT_ShowTooltip(["one", "two", "three", "four", "five",
+			"six", "seven"])
 		AssertTrue(_LLM_Menu_NavSlotPredicate(
 			_LLM_Menu_NavActiveSlot).Call("7"))
 		AssertTrue(LLM_Menu_NavOwnsSpec("7"))
@@ -773,7 +819,7 @@ _LNHT_EmptyModifiersCore() {
 			"a valid empty-modifier digit must select its in-range slot")
 		AssertEqual(0, _LNHT_AppOutput.Length,
 			"an owned in-range digit must not also reach the application")
-		_Stub_LlmTooltipText := ""
+		_LNHT_HideTooltip()
 		AssertFalse(_LLM_Menu_NavSlotPredicate(
 			_LLM_Menu_NavActiveSlot).Call("7"),
 			"bare digits must pass through exactly when the tooltip is hidden")
@@ -788,3 +834,98 @@ _LNHT_EmptyModifiers() {
 
 Test("[llm-nav-transaction] genuinely empty modifiers retain bare-key support",
 	_LNHT_EmptyModifiers)
+
+_LNHT_DigitRangeMatchesVisibleSlotsCore() {
+	global _Stub_LlmTooltipText, _LNHT_TooltipSlots
+	global _LNHT_TooltipActiveIdx, _LNHT_AppOutput
+	SavedText := _Stub_LlmTooltipText
+	try {
+		for Modifier in ["", "alt"] {
+			Prefix := Modifier == "" ? "" : "!"
+			AssertTrue(LLM_Menu_BindNavHotkeys(_LNHT_Menu("", Modifier),
+				_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
+				_LNHT_ForceHotIfReset))
+			for SlotCount in [0, 1, 6, 10] {
+				Slots := []
+				Loop SlotCount
+					Slots.Push("slot " . A_Index)
+				_LNHT_ShowTooltip(Slots)
+				Loop 10 {
+					Index := A_Index
+					Digit := Index == 10 ? "0" : String(Index)
+					Spec := Prefix . Digit
+					_LNHT_TooltipActiveIdx := -1
+					_LNHT_AppOutput := []
+					Outcome := _LNHT_FirePhysical(Spec)
+					if Index <= SlotCount {
+						AssertEqual("hotkey", Outcome)
+						AssertEqual(Index, _LNHT_TooltipActiveIdx)
+						AssertEqual(0, _LNHT_AppOutput.Length)
+					} else {
+						AssertEqual("app", Outcome,
+							"an out-of-range digit must use native pass-through")
+						AssertEqual(-1, _LNHT_TooltipActiveIdx)
+						AssertEqual(1, _LNHT_AppOutput.Length)
+						AssertEqual(Spec, _LNHT_AppOutput[1])
+					}
+				}
+			}
+			_LNHT_HideTooltip()
+			Loop 10 {
+				Digit := A_Index == 10 ? "0" : String(A_Index)
+				Spec := Prefix . Digit
+				_LNHT_AppOutput := []
+				AssertEqual("app", _LNHT_FirePhysical(Spec),
+					"every hidden digit variant must use native pass-through")
+				AssertEqual(1, _LNHT_AppOutput.Length)
+				AssertEqual(Spec, _LNHT_AppOutput[1])
+			}
+		}
+	} finally _Stub_LlmTooltipText := SavedText
+}
+
+_LNHT_DigitRangeMatchesVisibleSlots() {
+	return _LNHT_WithFixture(_LNHT_DigitRangeMatchesVisibleSlotsCore)
+}
+
+Test("[llm-nav-transaction] digit variants match the visible slot range",
+	_LNHT_DigitRangeMatchesVisibleSlots)
+
+_LNHT_PermanentHotkeyAliasCore() {
+	global _Stub_LlmTooltipText, _LNHT_TooltipSlots
+	global _LNHT_TooltipActiveIdx
+	SavedText := _Stub_LlmTooltipText
+	try {
+		_LNHT_ShowTooltip(["one", "two"])
+		AssertTrue(LLM_Menu_BindNavHotkeys(_LNHT_Menu("alt", "alt"),
+			_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
+			_LNHT_ForceHotIfReset))
+		AssertEqual("!up", _LLM_Menu_NavNativeIdentity("~!Up"))
+		AssertEqual("!up", _LLM_Menu_NavNativeIdentity("$!up"))
+		AssertEqual("^!7", _LLM_Menu_NavNativeIdentity("~!^7"))
+		AssertEqual("^!7", _LLM_Menu_NavNativeIdentity("$^!7"))
+		AssertFalse(_LLM_Menu_NavNativeIdentity("*^!7")
+			== _LLM_Menu_NavNativeIdentity("^!7"),
+			"wildcard hotkeys must retain their distinct physical identity")
+		AssertEqual("hotkey", _LNHT_FirePhysical("~!Up", "!up"),
+			"the first variant's permanent name must resolve the tilde nav variant")
+		AssertEqual(2, _LNHT_TooltipActiveIdx,
+			"the permanent-name alias must execute the intended navigation callback")
+
+		_LNHT_ShowTooltip(["one", "two", "three", "four", "five", "six",
+			"seven"])
+		AssertTrue(LLM_Menu_BindNavHotkeys(
+			_LNHT_Menu("alt", "control+alt"), _LNHT_Hotkey,
+			_LNHT_HotIf, _LNHT_Log, _LNHT_ForceHotIfReset))
+		AssertEqual("hotkey", _LNHT_FirePhysical("^!7", "!^7"),
+			"modifier order in the permanent name must not disable the variant")
+		AssertEqual(7, _LNHT_TooltipActiveIdx)
+	} finally _Stub_LlmTooltipText := SavedText
+}
+
+_LNHT_PermanentHotkeyAlias() {
+	return _LNHT_WithFixture(_LNHT_PermanentHotkeyAliasCore)
+}
+
+Test("[llm-nav-transaction] permanent hotkey names resolve tilde variants",
+	_LNHT_PermanentHotkeyAlias)
