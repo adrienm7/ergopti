@@ -37,6 +37,7 @@ local function with_fixture(spec, body)
 	local ok, err = xpcall(function()
 		local errors = {}
 		local dialog_call_count = 0
+		local notification_call_count = 0
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...)
 			errors[#errors + 1] = string.format(message, ...)
@@ -60,7 +61,13 @@ local function with_fixture(spec, body)
 				return choice or "button.cancel"
 			end,
 		}
-		package.loaded["infra.notifications"] = {notify = function() return true end}
+		package.loaded["infra.notifications"] = {notify = function()
+			notification_call_count = notification_call_count + 1
+			if spec.notification_mode == "throw" then
+				error("notification injected failure")
+			end
+			return true
+		end}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}
@@ -185,6 +192,7 @@ local function with_fixture(spec, body)
 			errors = errors,
 			pending = pending,
 			dialog_calls = function() return dialog_call_count end,
+			notification_calls = function() return notification_call_count end,
 		})
 	end, debug.traceback)
 
@@ -457,6 +465,29 @@ helpers.describe("HS-031 recommended profiles share the profile transaction owne
 			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), true)
 			helpers.assert_eq(fixture.dialog_calls(), 2)
 			assert_old_profile(fixture)
+		end)
+	end)
+end)
+
+helpers.describe("HS-016 profile warning callback observability", function()
+	helpers.it("HS-016 logs a throwing warning sink after the profile commits", function()
+		with_fixture({notification_mode = "throw"}, function(fixture)
+			helpers.assert_eq(fixture.switcher.set_llm_profile("batch_advanced"), true)
+			helpers.assert_eq(fixture.state.llm_active_profile, "batch_advanced")
+			helpers.assert_eq(fixture.runtime.profile, "batch_advanced")
+			helpers.assert_eq(fixture.persisted().llm_active_profile, "batch_advanced")
+			helpers.assert_eq(fixture.rendered().llm_active_profile, "batch_advanced")
+			helpers.assert_eq(fixture.notification_calls(), 1)
+			local found_context = false
+			for _, message in ipairs(fixture.errors) do
+				if message:find("Profile power warning notification", 1, true)
+					and message:find("notification injected failure", 1, true) then
+					found_context = true
+					break
+				end
+			end
+			helpers.assert_true(found_context,
+				"the warning callback traceback must reach the file logger")
 		end)
 	end)
 end)
