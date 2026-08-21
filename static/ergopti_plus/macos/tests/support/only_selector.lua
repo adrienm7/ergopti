@@ -3,12 +3,33 @@
 --- ==============================================================================
 --- MODULE: Hammerspoon Focused-Test Module Selector
 --- DESCRIPTION:
---- Selects the test modules that can register a requested plain-text test name
---- before the runner requires them. This keeps focused replays isolated from
---- unrelated module-level setup while retaining a full-load fallback.
+--- Resolves exact module targets or selects modules that can register a requested
+--- plain-text test name before the runner requires them. This keeps focused
+--- replays isolated while retaining a fail-closed full-load fallback.
 --- ==============================================================================
 
 local M = {}
+
+--- Resolves a user-provided exact path or dotted name to one discovered module.
+--- @param module_names string[] Discovered dotted module names.
+--- @param only_filter string User-provided `--only` value.
+--- @return string|nil module_name
+local function find_exact_module(module_names, only_filter)
+	local normalized_filter = only_filter:gsub("\\", "/")
+	local is_lua_path = normalized_filter:sub(-4) == ".lua"
+
+	for _, module_name in ipairs(module_names) do
+		if only_filter == module_name then return module_name end
+		if is_lua_path then
+			local relative_path = module_name:gsub("%.", "/") .. ".lua"
+			if normalized_filter == relative_path
+				or normalized_filter:sub(-#relative_path - 1) == "/" .. relative_path then
+				return module_name
+			end
+		end
+	end
+	return nil
+end
 
 --- Returns the final byte of a Lua long-bracket token at `at`.
 --- @param source string Lua source.
@@ -170,12 +191,17 @@ end
 --- @param source_loader function Function returning source text for a module.
 --- @return string[] selected Candidate module names.
 --- @return boolean narrowed Whether discovery was safely narrowed.
+--- @return string|nil case_filter Filter passed to helpers.it, or nil for an exact module.
 function M.select_modules(module_names, only_filter, source_loader)
 	if type(only_filter) ~= "string" or only_filter == "" then
-		return module_names, false
+		return module_names, false, nil
 	end
+
+	local exact_module = find_exact_module(module_names, only_filter)
+	if exact_module then return { exact_module }, true, nil end
+
 	if type(source_loader) ~= "function" then
-		return module_names, false
+		return module_names, false, only_filter
 	end
 
 	local records = {}
@@ -201,7 +227,7 @@ function M.select_modules(module_names, only_filter, source_loader)
 
 	-- A dynamic target cannot be proven from source. Without one literal owner,
 	-- fall back to every module and let helpers.it() decide at registration time.
-	if not literal_hit then return module_names, false end
+	if not literal_hit then return module_names, false, only_filter end
 
 	local selected = {}
 	for _, record in ipairs(records) do
@@ -209,7 +235,7 @@ function M.select_modules(module_names, only_filter, source_loader)
 			selected[#selected + 1] = record.name
 		end
 	end
-	return selected, #selected < #module_names
+	return selected, #selected < #module_names, only_filter
 end
 
 --- Converts a zero-test focused replay into a visible failure.
