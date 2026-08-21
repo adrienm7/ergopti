@@ -10,11 +10,15 @@
 
 local helpers = require("tests.helpers")
 
+local REAL_ONBOARDING_CACHE_PATH = "/__ergopti_hs011_integration__/Karabiner-Elements.dmg"
+
 --- Loads platform.remap over pure doubles and returns observable side effects.
 --- @return table remap
 --- @return table calls
 local function load_enabled_remap(options)
 	options = options or {}
+	local onboarding_stop_succeeds = options.onboarding_stop_succeeds
+	if onboarding_stop_succeeds == nil then onboarding_stop_succeeds = true end
 	local calls = {
 		stop = 0,
 		stop_reasons = {},
@@ -41,9 +45,15 @@ local function load_enabled_remap(options)
 		gesture_stop_attempts = 0,
 		lifecycle_stop_attempts = 0,
 		lifecycle_stop_failures_remaining = 0,
+		onboarding_stop_attempts = 0,
+		onboarding_stop_succeeds = onboarding_stop_succeeds,
 		lease_phase = options.initially_enabled == false and "prepared"
 			or (options.paused == true and "paused" or "active"),
 		timers = {},
+		first_run_timers = {},
+		timer_after_attempts = 0,
+		timer_cancel_attempts = 0,
+		wizard_runs = 0,
 	}
 	local paused_now = options.paused == true
 	local lease_token = "ffeeddccbbaa99887766554433221100"
@@ -235,6 +245,44 @@ local function load_enabled_remap(options)
 		end,
 	}
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	local timer_scheduler = {}
+	function timer_scheduler.after(delay, callback)
+		calls.timer_after_attempts = calls.timer_after_attempts + 1
+		local configured = nil
+		if type(options.first_run_timer_after_results) == "table" then
+			configured = options.first_run_timer_after_results[calls.timer_after_attempts]
+		end
+		if configured == "throw" then error("synthetic first-run timer acquisition failure") end
+		local native_timer = {}
+		if configured == "nil" then native_timer = nil end
+		local timer = {
+			callback = callback,
+			committed = configured ~= false and configured ~= "nil",
+			delay = delay,
+			fired = false,
+			timer = native_timer,
+		}
+		calls.first_run_timers[#calls.first_run_timers + 1] = timer
+		if configured == false then return timer, false end
+		if configured == "nil" then return timer, nil end
+		return timer, true
+	end
+	function timer_scheduler.cancel(timer)
+		if type(timer) ~= "table" or timer.timer == nil then return true end
+		calls.timer_cancel_attempts = calls.timer_cancel_attempts + 1
+		timer.committed = false
+		local configured = nil
+		if type(options.first_run_timer_cancel_results) == "table" then
+			configured = options.first_run_timer_cancel_results[calls.timer_cancel_attempts]
+		end
+		if configured == "throw" then error("synthetic first-run timer cancellation failure") end
+		if configured == false then return false end
+		if configured == "nil" then return nil end
+		timer.timer = nil
+		return true
+	end
+	function timer_scheduler.every() return { committed = false, fired = true }, false end
+	package.loaded["adapters.timer_scheduler"] = timer_scheduler
 	package.loaded["infra.config_paths"] = { get = function() return "missing-config.toml" end }
 	package.loaded["modules.keylogger.kc_bridge"] = {
 		refresh_managed_set = function()
@@ -251,6 +299,25 @@ local function load_enabled_remap(options)
 	package.loaded["modules.shortcuts"] = {
 		is_paused = function() return paused_now end,
 	}
+	if options.onboarding_module then
+		package.loaded["platform.remap.onboarding"] = options.onboarding_module
+	else
+		package.loaded["platform.remap.onboarding"] = {
+			run_first_run_wizard = function()
+				calls.wizard_runs = calls.wizard_runs + 1
+				return true
+			end,
+			stop = function(on_done)
+				calls.onboarding_stop_attempts = calls.onboarding_stop_attempts + 1
+				if type(on_done) == "function" then
+					local detail = "installer-stop-refused"
+					if calls.onboarding_stop_succeeds then detail = "installer-stopped" end
+					on_done(calls.onboarding_stop_succeeds, detail)
+				end
+				return calls.onboarding_stop_succeeds
+			end,
+		}
+	end
 	package.loaded["platform.remap"] = nil
 
 	local remap = helpers.load_with_stubs("platform.remap", {
@@ -284,6 +351,7 @@ local function load_enabled_remap(options)
 	calls.hotkey_attempts = 0
 	calls.lifecycle_stop_attempts = 0
 	calls.lifecycle_stop_failures_remaining = options.lifecycle_stop_failures or 0
+	calls.onboarding_stop_attempts = 0
 	function calls.deliver_ready(ok, reason)
 		publish_phase(ok == false and "failed" or "paused")
 		local callback = calls.start_paused_callback
@@ -308,7 +376,148 @@ local function load_enabled_remap(options)
 	end
 	function calls.set_paused(value) paused_now = value == true end
 	function calls.set_save_succeeds(value) calls.save_succeeds = value == true end
+	function calls.force_first_run_callback(index)
+		local timer = calls.first_run_timers[index or #calls.first_run_timers]
+		if timer then timer.callback() end
+	end
+	function calls.fire_first_run_timer(index)
+		local timer = calls.first_run_timers[index or #calls.first_run_timers]
+		if not timer or timer.timer == nil or timer.committed ~= true then return false end
+		timer.fired = true
+		timer.committed = false
+		timer_scheduler.cancel(timer)
+		timer.callback()
+		return true
+	end
 	return remap, calls
+end
+
+--- Loads the real onboarding lifecycle with one controlled download task, then
+--- injects that exact module into the real remap transaction.
+--- @return table remap Initialized remap module.
+--- @return table calls Remap-side observations.
+--- @return table installer Real onboarding task and terminal observations.
+local function load_remap_with_real_onboarding(remap_options)
+	local saved_hs = _G.hs
+	local absent_module = {}
+	local isolated_module_names = {
+		"infra.logger",
+		"infra.i18n",
+		"infra.notifications",
+		"infra.text_utils",
+		"platform.remap.ke_paths",
+		"adapters.timer_scheduler",
+		"adapters.task_lifecycle",
+		"platform.remap.onboarding",
+	}
+	local saved_modules = {}
+	for _, module_name in ipairs(isolated_module_names) do
+		local loaded_module = package.loaded[module_name]
+		if loaded_module == nil then
+			saved_modules[module_name] = absent_module
+		else
+			saved_modules[module_name] = loaded_module
+		end
+	end
+	local installer = {
+		order = {},
+		outcomes = {},
+		tasks = {},
+		timers = {},
+	}
+	local uuid_counter = 0
+	local hs_stub = {
+		execute = function() return "", true, "exit", 0 end,
+		host = {
+			uuid = function()
+				uuid_counter = uuid_counter + 1
+				return string.format("00000000-0000-4000-8000-%012x", uuid_counter)
+			end,
+		},
+		task = {},
+	}
+	hs_stub.task.new = function(executable, callback, args)
+		local task = {
+			args = args,
+			callback = callback,
+			executable = executable,
+			terminate_calls = 0,
+		}
+		function task:start() return self end
+		function task:terminate()
+			self.terminate_calls = self.terminate_calls + 1
+			return self
+		end
+		function task:complete(rc, stdout, stderr)
+			return self.callback(rc or 1, stdout or "", stderr or "cancelled")
+		end
+		installer.tasks[#installer.tasks + 1] = task
+		return task
+	end
+
+	local function noop() end
+	_G.hs = hs_stub
+	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["infra.text_utils"] = {
+		applescript_format = function(format, value) return string.format(format, value) end,
+		escape_gsub_replacement = function(value) return value end,
+		shell_quote = function(value) return value end,
+	}
+	package.loaded["platform.remap.ke_paths"] = {
+		CLI = "/test/karabiner_cli",
+		CORE_SERVICE = "/test/Karabiner-Core-Service",
+		GRABBER = "/test/karabiner_grabber",
+	}
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(delay, callback)
+			local timer = { callback = callback, cancelled = false, delay = delay }
+			installer.timers[#installer.timers + 1] = timer
+			return timer, true
+		end,
+		cancel = function(timer)
+			if timer then timer.cancelled = true end
+			return true
+		end,
+		every = function() return nil, false end,
+	}
+	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["platform.remap.onboarding"] = nil
+	local onboarding = require("platform.remap.onboarding")
+	onboarding.load_manifest = function()
+		return {
+			file_name = "Karabiner-Elements.dmg",
+			sha256 = string.rep("a", 64),
+			source_url = "https://example.invalid/Karabiner-Elements.dmg",
+			version = "99.0.0",
+		}
+	end
+	onboarding.get_cache_dmg_path = function() return REAL_ONBOARDING_CACHE_PATH end
+	local install_started = onboarding.install_karabiner_elements(function(ok, detail)
+		installer.order[#installer.order + 1] = "installer"
+		installer.outcomes[#installer.outcomes + 1] = { ok = ok, detail = detail }
+	end)
+	_G.hs = saved_hs
+	for _, module_name in ipairs(isolated_module_names) do
+		local saved_module = saved_modules[module_name]
+		if saved_module == absent_module then
+			package.loaded[module_name] = nil
+		else
+			package.loaded[module_name] = saved_module
+		end
+	end
+	helpers.assert_true(install_started)
+	helpers.assert_eq(#installer.tasks, 1,
+		"the integration fixture must own one real onboarding download task")
+	installer.task = installer.tasks[1]
+	installer.onboarding = onboarding
+
+	local options = {}
+	for key, value in pairs(remap_options or {}) do options[key] = value end
+	options.onboarding_module = onboarding
+	local remap, calls = load_enabled_remap(options)
+	return remap, calls, installer
 end
 
 --- Wires the real script-control state machine to a prepared remap module.
@@ -734,7 +943,194 @@ end)
 -- =================================================
 -- =================================================
 
+helpers.describe("HS-011 first-run timer is part of every remap lifecycle fence", function()
+	helpers.it("retries a refused first-run timer constructor before publishing its successor", function()
+		local _, calls = load_enabled_remap({
+			first_run_timer_after_results = { false, true },
+		})
+		helpers.assert_eq(calls.timer_after_attempts, 2)
+		helpers.assert_eq(#calls.first_run_timers, 2)
+		helpers.assert_nil(calls.first_run_timers[1].timer,
+			"the refused exact wrapper must settle before replacement")
+		helpers.assert_not_nil(calls.first_run_timers[2].timer)
+		helpers.assert_eq(calls.timer_cancel_attempts, 1)
+		helpers.assert_true(calls.fire_first_run_timer(2))
+		helpers.assert_eq(calls.wizard_runs, 1,
+			"the committed successor must deliver the wizard exactly once")
+	end)
+
+	helpers.it("preserves a nil native timer candidate without inventing cleanup debt", function()
+		local _, calls = load_enabled_remap({
+			first_run_timer_after_results = { "nil", true },
+			first_run_timer_cancel_results = { false, false, false },
+		})
+		helpers.assert_eq(calls.timer_after_attempts, 2,
+			"a nil native candidate must not block the bounded successor")
+		helpers.assert_nil(calls.first_run_timers[1].timer)
+		helpers.assert_eq(calls.timer_cancel_attempts, 0,
+			"the fixture must not fabricate a cancellable native timer for nil")
+		helpers.assert_not_nil(calls.first_run_timers[2].timer)
+	end)
+
+	helpers.it("retries exact first-run cancellation without another lifecycle action", function()
+		local remap, calls = load_enabled_remap({
+			first_run_timer_cancel_results = { false, true },
+		})
+		local result = nil
+		helpers.assert_true(remap.pause(function(ok) result = ok end))
+		helpers.assert_eq(calls.timer_cancel_attempts, 2)
+		helpers.assert_nil(calls.first_run_timers[1].timer)
+		helpers.assert_eq(#calls.pause_callbacks, 1)
+		calls.force_first_run_callback(1)
+		helpers.assert_eq(calls.wizard_runs, 0)
+		calls.pause_callbacks[1](true, "paused")
+		helpers.assert_true(result == true)
+	end)
+
+	for _, entry_point in ipairs({ "pause", "disable", "revoke", "shutdown" }) do
+		helpers.it("fences the real first-run timer before " .. entry_point .. " completion", function()
+			local remap, calls = load_enabled_remap()
+			local result = nil
+			local accepted
+			if entry_point == "pause" then
+				accepted = remap.pause(function(ok) result = ok end)
+			elseif entry_point == "disable" then
+				accepted = remap.set_enabled(false, function(ok) result = ok end)
+			elseif entry_point == "revoke" then
+				accepted = remap.revoke("HS-011-first-run", function(ok) result = ok end)
+			else
+				accepted = remap.shutdown("HS-011-first-run", function(ok) result = ok end)
+			end
+			helpers.assert_true(accepted)
+			helpers.assert_nil(calls.first_run_timers[1].timer,
+				entry_point .. " must settle the exact first-run capability first")
+			calls.force_first_run_callback(1)
+			helpers.assert_eq(calls.wizard_runs, 0,
+				"a queued first-run callback must remain inert after " .. entry_point)
+			helpers.assert_nil(result)
+			if entry_point == "pause" then
+				helpers.assert_eq(#calls.pause_callbacks, 1)
+				calls.pause_callbacks[1](true, "paused")
+			else
+				calls.finish_stop(true, "stopped")
+			end
+			helpers.assert_true(result == true)
+		end)
+	end
+
+	for _, refusal in ipairs({ false, "throw" }) do
+		for _, entry_point in ipairs({ "pause", "disable", "revoke", "shutdown" }) do
+			helpers.it("contains first-run cancel " .. tostring(refusal)
+				.. " during " .. entry_point, function()
+				local remap, calls = load_enabled_remap({
+					first_run_timer_cancel_results = { refusal, refusal, refusal },
+				})
+				local result, detail = nil, nil
+				local accepted
+				local function on_done(ok, reason)
+					result, detail = ok, reason
+				end
+				if entry_point == "pause" then
+					accepted = remap.pause(on_done)
+				elseif entry_point == "disable" then
+					accepted = remap.set_enabled(false, on_done)
+				elseif entry_point == "revoke" then
+					accepted = remap.revoke("HS-011-first-run-refusal", on_done)
+				else
+					accepted = remap.shutdown("HS-011-first-run-refusal", on_done)
+				end
+				helpers.assert_eq(calls.timer_cancel_attempts, 3,
+					"first-run cancellation must stop at its named retry budget")
+				helpers.assert_not_nil(calls.first_run_timers[1].timer,
+					"terminal failure must retain the exact cancellation debt")
+				calls.force_first_run_callback(1)
+				helpers.assert_eq(calls.wizard_runs, 0)
+				helpers.assert_eq(calls.onboarding_stop_attempts, 1,
+					"timer refusal must not skip independent installer revocation")
+				if entry_point == "pause" or entry_point == "disable" then
+					helpers.assert_true(accepted == false)
+					helpers.assert_true(result == false)
+					helpers.assert_eq(calls.stop, 0)
+				else
+					helpers.assert_true(accepted)
+					helpers.assert_nil(result,
+						"revoke still has to join the independently accepted lease fence")
+					calls.finish_stop(true, "stopped")
+					helpers.assert_true(result == false)
+					helpers.assert_eq(detail, "first-run-wizard-stop-incomplete")
+				end
+			end)
+		end
+	end
+
+	helpers.it("orders real installer terminal before first-run cancellation failure", function()
+		local remap, calls, installer = load_remap_with_real_onboarding({
+			first_run_timer_cancel_results = { false, false, false },
+		})
+		local result = nil
+		helpers.assert_true(remap.pause(function(ok)
+			installer.order[#installer.order + 1] = "pause"
+			result = ok
+		end), "the accepted task termination must keep the composed stop joined")
+		helpers.assert_nil(result)
+		helpers.assert_eq(installer.task.terminate_calls, 1)
+		helpers.assert_eq(#calls.pause_callbacks, 0)
+
+		installer.task:complete(1, "", "cancelled")
+		helpers.assert_eq(#installer.order, 2)
+		helpers.assert_eq(installer.order[1], "installer")
+		helpers.assert_eq(installer.order[2], "pause")
+		helpers.assert_true(result == false)
+		helpers.assert_eq(#calls.pause_callbacks, 0,
+			"PAUSED cannot publish after either composed owner failed")
+	end)
+end)
+
 helpers.describe("karabiner pause/resume API exposes the complete transaction boundary", function()
+	helpers.it("HS-011 withholds PAUSED while onboarding installer settlement refuses", function()
+		local remap, calls = load_enabled_remap({ onboarding_stop_succeeds = false })
+		local result, reason = nil, nil
+
+		helpers.assert_true(remap.pause(function(ok, detail)
+			result, reason = ok, detail
+		end) == false)
+		helpers.assert_true(result == false)
+		helpers.assert_eq(reason, "onboarding-stop-incomplete")
+		helpers.assert_eq(calls.onboarding_stop_attempts, 1)
+		helpers.assert_eq(#calls.pause_callbacks, 0,
+			"PAUSE must not reach the lease while installer cleanup is unsettled")
+		helpers.assert_eq(calls.lease_phase, "active")
+
+		calls.onboarding_stop_succeeds = true
+		helpers.assert_true(remap.pause(function(ok) result = ok end))
+		helpers.assert_eq(calls.onboarding_stop_attempts, 2)
+		helpers.assert_eq(#calls.pause_callbacks, 1)
+		calls.pause_callbacks[1](true, "paused")
+		helpers.assert_true(result == true)
+	end)
+
+	helpers.it("HS-011 resumes the same PAUSE automatically after installer settlement", function()
+		local remap, calls, installer = load_remap_with_real_onboarding()
+		local result = nil
+
+		helpers.assert_true(remap.pause(function(ok) result = ok end),
+			"the real installer termination signal must be joined, not treated as exit")
+		helpers.assert_nil(result)
+		helpers.assert_eq(#calls.pause_callbacks, 0,
+			"native PAUSE must wait below installer settlement")
+		helpers.assert_eq(installer.task.terminate_calls, 1)
+		helpers.assert_eq(#installer.outcomes, 0)
+
+		installer.task:complete(1, "", "cancelled")
+		helpers.assert_eq(#installer.outcomes, 1)
+		helpers.assert_true(installer.outcomes[1].ok == false)
+		helpers.assert_eq(#calls.pause_callbacks, 1,
+			"the retained continuation must request PAUSE without a second user action")
+		helpers.assert_nil(result)
+		calls.pause_callbacks[1](true, "paused")
+		helpers.assert_true(result == true)
+	end)
+
 	for _, mode in ipairs({ "throw", "false" }) do
 		helpers.it("contains a PAUSE request returning " .. mode, function()
 			local remap, calls = load_enabled_remap({ pause_mode = mode })
@@ -915,6 +1311,105 @@ end)
 -- ===============================================
 
 helpers.describe("karabiner disable state is committed only after STOPPED", function()
+	helpers.it("HS-011 withholds disabled state while onboarding installer settlement refuses", function()
+		local remap, calls = load_enabled_remap({ onboarding_stop_succeeds = false })
+		local result, reason = nil, nil
+
+		helpers.assert_true(remap.set_enabled(false, function(ok, detail)
+			result, reason = ok, detail
+		end) == false)
+		helpers.assert_true(result == false)
+		helpers.assert_eq(reason, "onboarding-stop-incomplete")
+		helpers.assert_true(remap.get_enabled())
+		helpers.assert_eq(calls.save, 0)
+		helpers.assert_eq(calls.stop, 0,
+			"disable must not enter its STOPPED transaction before installer settlement")
+
+		calls.onboarding_stop_succeeds = true
+		helpers.assert_true(remap.set_enabled(false))
+		helpers.assert_eq(calls.onboarding_stop_attempts, 2)
+		helpers.assert_eq(calls.stop, 1)
+	end)
+
+	helpers.it("HS-011 resumes the same disable automatically after installer settlement", function()
+		local remap, calls, installer = load_remap_with_real_onboarding()
+		local result = nil
+
+		helpers.assert_true(remap.set_enabled(false, function(ok) result = ok end))
+		helpers.assert_nil(result)
+		helpers.assert_eq(calls.stop, 0,
+			"lease revocation must wait below installer settlement")
+
+		installer.task:complete(1, "", "cancelled")
+		helpers.assert_eq(#installer.outcomes, 1)
+		helpers.assert_true(installer.outcomes[1].ok == false)
+		helpers.assert_eq(calls.stop, 1,
+			"the retained disable continuation must run without a second user action")
+		helpers.assert_nil(result)
+		calls.finish_stop(true, "stopped")
+		helpers.assert_true(result == true)
+		helpers.assert_true(not remap.get_enabled())
+	end)
+
+	helpers.it("HS-011 joins lease and installer settlement in either shutdown order", function()
+		for _, entry_point in ipairs({ "revoke", "shutdown" }) do
+			for _, first in ipairs({ "lease", "installer" }) do
+				local remap, calls, installer = load_remap_with_real_onboarding()
+				local result, teardown_result = nil, nil
+				local label = entry_point .. " with " .. first .. " first"
+				local accepted
+				if entry_point == "revoke" then
+					accepted = remap.revoke("HS-011-order", function(ok)
+						result = ok
+						if ok == true then teardown_result = remap.teardown_local() end
+					end)
+				else
+					accepted = remap.shutdown("HS-011-order", function(ok) result = ok end)
+				end
+				helpers.assert_true(accepted, label .. " must be accepted")
+
+				if first == "lease" then
+					calls.finish_stop(true, "stopped")
+				else
+					installer.task:complete(1, "", "cancelled")
+				end
+				helpers.assert_nil(result,
+					label .. " must not publish after only one half settles")
+
+				if first == "lease" then
+					installer.task:complete(1, "", "cancelled")
+				else
+					calls.finish_stop(true, "stopped")
+				end
+				helpers.assert_true(result == true,
+					label .. " must resume automatically after the second half")
+				if entry_point == "revoke" then
+					helpers.assert_true(teardown_result == true,
+						"the root revoke+teardown path must observe settled onboarding")
+				end
+				helpers.assert_eq(#installer.outcomes, 1)
+				helpers.assert_eq(#installer.tasks, 1,
+					"joined shutdown must not construct a replacement installer")
+			end
+		end
+	end)
+
+	helpers.it("HS-011 revoke publishes failure after onboarding refusal and lease settlement", function()
+		local remap, calls = load_enabled_remap({ onboarding_stop_succeeds = false })
+		local outcomes = {}
+
+		helpers.assert_true(remap.revoke("HS-011-refusal", function(ok, detail)
+			outcomes[#outcomes + 1] = { ok = ok, detail = detail }
+		end), "revoke must retain ownership until its lease half settles")
+		helpers.assert_eq(#outcomes, 0,
+			"revoke must still join the independently accepted lease revocation")
+		calls.finish_stop(true, "stopped")
+		helpers.assert_eq(#outcomes, 1,
+			"onboarding refusal must not leave revoke pending after the lease settles")
+		helpers.assert_true(outcomes[1].ok == false)
+		helpers.assert_contains(tostring(outcomes[1].detail), "installer-stop-refused")
+	end)
+
 	helpers.it("keeps exact fence success distinct from a failed local hotkey delete", function()
 		local remap, calls = load_enabled_remap({
 			initially_enabled = false,

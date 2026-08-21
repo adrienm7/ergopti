@@ -51,11 +51,36 @@ helpers.describe("karabiner/onboarding: all four hs.task closures forward-declar
 
 	helpers.it("all four async task sites use the split forward-declaration pattern", function()
 		local src = read_src()
-		-- Each site must keep the declaration above TaskLifecycle.native so the
-		-- callback captures the local while construction remains protected.
-		local _, fwd_count = src:gsub("local task%s*\n%s*task = TaskLifecycle%.native", "")
-		helpers.assert_true(fwd_count >= 4,
-			"expected at least 4 forward-declared `local task` sites in onboarding.lua; got " .. tostring(fwd_count))
+		-- A completion gate now sits between declaration and construction. Pair the
+		-- four sites in source order instead of requiring adjacency: declaration
+		-- order is the root cause, while adjacency was only an old implementation.
+		local declarations, constructions = {}, {}
+		local cursor = 1
+		while true do
+			local position = src:find("local task\n", cursor, true)
+			if not position then break end
+			declarations[#declarations + 1] = position
+			cursor = position + 1
+		end
+		cursor = 1
+		while true do
+			local position = src:find("task = TaskLifecycle.native", cursor, true)
+			if not position then break end
+			constructions[#constructions + 1] = position
+			cursor = position + 1
+		end
+		helpers.assert_eq(#constructions, 4,
+			"the guard must enumerate every installer task construction")
+		helpers.assert_eq(#declarations, #constructions,
+			"every installer task must have one forward declaration")
+		for index, construction in ipairs(constructions) do
+			helpers.assert_true(declarations[index] < construction,
+				"installer task " .. tostring(index)
+					.. " must be declared before its completion closure and constructor")
+			local between = src:sub(declarations[index], construction)
+			helpers.assert_contains(between, "latch_install_task_completion",
+				"the forward declaration must enclose the callback that captures it")
+		end
 	end)
 
 	helpers.it("all four GC-pin releases are guarded against nil task", function()

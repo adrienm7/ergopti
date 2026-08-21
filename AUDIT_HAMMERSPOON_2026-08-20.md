@@ -55,7 +55,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [ ] `HS-008` — exact MLX predecessor/replacement ownership
 - [x] `HS-009` — `2cdf06f89` (`fix(macos): isolate semantic LLM HTTP owners`)
 - [x] `HS-010` — exact Ollama pull owner and cancel terminal — fixed and behaviorally replayed in this commit
-- [ ] `HS-011` — onboarding installer lifecycle owner
+- [x] `HS-011` — exact installer owner, bounded cleanup retries, and pause/disable/teardown joins
 - [ ] `HS-012` — transactional pause-owner registry
 - [x] `HS-013` — this fix commit; exact handles are reused and six focused edit/menu repros pass
 - [x] `HS-014` — present in starting `dev` via `c6d081890`; independently replayed bind lifecycle tests
@@ -305,6 +305,8 @@ The callers defeat a local stop fix unless they join the same transaction. Switc
 **Fix.** Give the install pipeline its own lifecycle epoch, own every exact task/mount, terminate on pause/disable/stop, retain refusal debt, and check authority before every successor and privileged action.
 
 **Regression test.** Add `tests/unit/platform/remap/test_onboarding_install_lifecycle.lua`. Start the real pipeline with captured task objects, stop/pause after download dispatch, then complete download. Assert zero checksum, mount, or `osascript` constructions; assert exact termination retry and safe unmount/temporary-file cleanup.
+
+**Implemented and behaviorally replayed.** The installer now owns an exact epoch/stage/task/mount/partial record, pins every native task before start, latches synchronous start/terminate completions until the native result is known, and treats a truthy task userdata as a pending signal rather than settlement. Every successor is generation- and completion-fenced; duplicate callbacks are inert. Pause, disable, revoke, and shutdown join the same owner, including the first-run wizard timer. Task, mount, partial-file, and timer cleanup refusals are retained and retried with a bounded, observable policy, while verified cache publication uses a unique partial and atomic promotion. The adversarial lifecycle matrix passes `82/82`, pause/disable/revoke/shutdown passes `51/51`, guardian recovery passes `66/66`, and the direct timer/task/stock-process neighbors are green. Conventions, false-green, Lua compatibility, integrity, encoding, compilation, and scoped diff checks are also green; an independent second-lens review returned GO.
 
 ### `HS-012` — Pause commits before several runtime and deferred owners are quiescent
 

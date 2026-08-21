@@ -31,6 +31,8 @@
 ---    the friction to ~3 clicks total but never pretends to skip them.
 --- 6. Exact timer ownership: polls and delayed continuations share one
 ---    generation-scoped slot so stop cannot leave a callback that reopens UI.
+--- 7. Exact installer ownership: one epoch-scoped owner retains every task,
+---    unique partial, and mounted volume until native cleanup settles.
 --- ==============================================================================
 
 local M = {}
@@ -53,13 +55,18 @@ local LOG = "karabiner.onboarding"
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
 M._active_tasks = {}
+M._install_owner = nil
 
 -- One lifecycle epoch owns every poll, delayed continuation, and installer
 -- completion spawned by the current wizard chain
 local _wizard_epoch = 0
 local _install_epoch = 0
 local _timer_owner = nil
+local _stop_waiters = {}
+local _stop_failure_detail = nil
 local run_wizard_step
+local cancel_install_cleanup_retry
+local schedule_install_cleanup_retry
 
 -- Resolve our own directory at load time so the manifest lookup works whether
 -- this file is symlinked, run from the project tree, or deployed elsewhere.
@@ -99,6 +106,9 @@ local POLL_INTERVAL_SEC = 3
 local POLL_TIMEOUT_SEC  = 300
 local INSTALL_SETTLE_DELAY_SEC = 2
 local NEXT_STEP_DELAY_SEC = 1
+local INSTALL_CLEANUP_RETRY_DELAY_SEC = 0.25
+local INSTALL_CLEANUP_MAX_RETRIES = 3
+local WIZARD_TIMER_MAX_ATTEMPTS = 3
 
 
 --- File-existence test that does not pull in lfs (not available in HS by default).
@@ -254,128 +264,648 @@ end
 -- ==============================================
 -- ==============================================
 
+--- True only while one installer owner still holds current execution authority.
+--- @param owner table Installer lifecycle owner.
+--- @return boolean current
+local function install_owner_is_current(owner)
+	return type(owner) == "table"
+		and M._install_owner == owner
+		and owner.epoch == _install_epoch
+		and owner.terminal ~= true
+end
+
+--- Updates cleanup debt and releases a terminal owner only after exact settlement.
+--- @param owner table Installer lifecycle owner.
+--- @return boolean settled
+local function refresh_install_owner(owner)
+	if type(owner) ~= "table" then return true end
+	local pending = next(owner.tasks) ~= nil
+		or owner.mount_point ~= nil
+		or owner.unique_partial ~= nil
+		or next(owner.cleanup_debt.tasks) ~= nil
+		or owner.cleanup_debt.mount_point ~= nil
+		or owner.cleanup_debt.partial ~= nil
+		or next(owner.cleanup_debt.retry_timer_owners) ~= nil
+	owner.cleanup_debt.pending = pending
+	if not pending and owner.terminal == true and M._install_owner == owner then
+		M._install_owner = nil
+	end
+	return not pending
+end
+
+--- Releases one exact task from both the lifecycle owner and the GC root.
+--- @param owner table Installer lifecycle owner.
+--- @param task any Native task handle.
+local function release_install_task(owner, task)
+	if not task then return end
+	owner.tasks[task] = nil
+	owner.cleanup_debt.tasks[task] = nil
+	owner.cleanup_debt.termination_accepted[task] = nil
+	owner.cleanup_debt.termination_decisions[task] = nil
+end
+
+--- Invokes the public installer callback at most once with traceback logging.
+--- @param owner table Installer lifecycle owner.
+--- @param callback function Installer completion callback.
+--- @param ok_result boolean Terminal result.
+--- @param detail string|nil Terminal detail.
+local function finish_install_owner(owner, callback, ok_result, detail)
+	if owner.terminal == true then return end
+	owner.terminal = true
+	owner.stage = ok_result == true and "complete" or "failed"
+	local callback_ok, callback_err = xpcall(function()
+		callback(ok_result == true, detail)
+	end, debug.traceback)
+	if not callback_ok then
+		Logger.error(LOG, "Karabiner installer terminal callback failed: %s.", tostring(callback_err))
+	end
+	if refresh_install_owner(owner) ~= true
+		and owner.cleanup_debt.cancel_requested ~= true then
+		schedule_install_cleanup_retry(owner, "installer terminal cleanup")
+	end
+end
+
+--- Delivers every joined stop continuation exactly once.
+--- Waiters are detached before invocation so re-entrant lifecycle calls cannot
+--- redeliver an older transaction, including when native cleanup refuses and its
+--- exact debt must outlive the public lifecycle terminal.
+--- @param ok_result boolean Terminal stop result.
+--- @param detail string Stable settlement detail.
+local function complete_stop_waiters(ok_result, detail)
+	local waiters = _stop_waiters
+	_stop_waiters = {}
+	_stop_failure_detail = nil
+	for _, callback in ipairs(waiters) do
+		local ok, err = xpcall(function()
+			callback(ok_result == true, detail)
+		end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Onboarding stop continuation failed: %s.", tostring(err))
+		end
+	end
+end
+
+--- Delivers successful stop continuations only after every owner settles.
+--- @return boolean settled True only when no exact owner remains.
+local function complete_stop_waiters_if_settled()
+	if M._install_owner ~= nil then return false end
+	if _stop_failure_detail then
+		complete_stop_waiters(false, _stop_failure_detail)
+		return false
+	end
+	if _timer_owner ~= nil then return false end
+	complete_stop_waiters(true, "onboarding-stopped")
+	return true
+end
+
+--- Builds an attempt-unique staging path beside the published cache file.
+--- @param cache_path string Published cache path.
+--- @return string|nil partial_path
+local function make_unique_partial_path(cache_path)
+	if not hs or type(hs.host) ~= "table" or type(hs.host.uuid) ~= "function" then
+		Logger.error(LOG, "Cannot allocate a unique installer partial because the UUID provider is unavailable.")
+		return nil
+	end
+	local ok, uuid_or_err = xpcall(hs.host.uuid, debug.traceback)
+	if not ok or type(uuid_or_err) ~= "string" or uuid_or_err == "" then
+		Logger.error(LOG, "Cannot allocate a unique installer partial: %s.", tostring(uuid_or_err))
+		return nil
+	end
+	local token = uuid_or_err:gsub("[^%w%-]", "")
+	if token == "" then
+		Logger.error(LOG, "Cannot allocate a unique installer partial from an invalid UUID.")
+		return nil
+	end
+	return cache_path .. "." .. token .. ".part"
+end
+
+--- Removes one exact partial path without sweeping sibling installer attempts.
+--- @param owner table Installer lifecycle owner.
+--- @param path string|nil Exact staging path.
+--- @param context string Cleanup reason.
+--- @return boolean settled
+local function remove_owned_partial(owner, path, context)
+	path = path or owner.unique_partial
+	if not path then return true end
+	local call_ok, removed_or_err, remove_err, error_code = xpcall(function()
+		return os.remove(path)
+	end, debug.traceback)
+	local absent = call_ok and removed_or_err ~= true and error_code == 2
+	if not call_ok or (removed_or_err ~= true and not absent) then
+		owner.unique_partial = path
+		owner.cleanup_debt.partial = path
+		Logger.error(LOG, "%s: exact installer partial cleanup failed for '%s': %s.",
+			context, path, tostring(call_ok and remove_err or removed_or_err))
+		return false
+	end
+	if owner.unique_partial == path then owner.unique_partial = nil end
+	if owner.cleanup_debt.partial == path then owner.cleanup_debt.partial = nil end
+	Logger.debug(LOG, "%s: exact installer partial settled for '%s'.", context, path)
+	return true
+end
+
+--- Detaches one exact mounted volume at most once for an installer owner.
+--- @param owner table Installer lifecycle owner.
+--- @param mount_point string Exact volume mount point.
+--- @param context string Cleanup reason.
+--- @return boolean settled
+local function detach_owned_mount(owner, mount_point, context)
+	if type(mount_point) ~= "string" or mount_point == "" then return true end
+	if owner.cleanup_debt.detached_mounts[mount_point] == true then
+		if owner.mount_point == mount_point then owner.mount_point = nil end
+		if owner.cleanup_debt.mount_point == mount_point then owner.cleanup_debt.mount_point = nil end
+		return true
+	end
+	owner.mount_point = mount_point
+	local call_ok, output_or_err, succeeded = xpcall(function()
+		return hs.execute("/usr/bin/hdiutil detach "
+			.. text_utils.shell_quote(mount_point) .. " 2>/dev/null")
+	end, debug.traceback)
+	if not call_ok or succeeded ~= true then
+		owner.cleanup_debt.mount_point = mount_point
+		Logger.error(LOG, "%s: exact installer mount detach failed for '%s': %s.",
+			context, mount_point, tostring(output_or_err))
+		return false
+	end
+	owner.cleanup_debt.detached_mounts[mount_point] = true
+	owner.mount_point = nil
+	if owner.cleanup_debt.mount_point == mount_point then owner.cleanup_debt.mount_point = nil end
+	Logger.debug(LOG, "%s: exact installer mount detached from '%s'.", context, mount_point)
+	return true
+end
+
+--- Settles artifacts only after no subprocess can still recreate or consume them.
+--- @param owner table Installer lifecycle owner.
+--- @param context string Cleanup reason.
+--- @return boolean settled
+local function settle_install_artifacts(owner, context)
+	if next(owner.tasks) ~= nil then
+		if owner.mount_point then owner.cleanup_debt.mount_point = owner.mount_point end
+		if owner.unique_partial then owner.cleanup_debt.partial = owner.unique_partial end
+		refresh_install_owner(owner)
+		return false
+	end
+	local settled = true
+	if owner.mount_point then
+		settled = detach_owned_mount(owner, owner.mount_point, context) and settled
+	end
+	if owner.unique_partial then
+		settled = remove_owned_partial(owner, owner.unique_partial, context) and settled
+	end
+	refresh_install_owner(owner)
+	return settled
+		and owner.mount_point == nil
+		and owner.unique_partial == nil
+		and owner.cleanup_debt.mount_point == nil
+		and owner.cleanup_debt.partial == nil
+end
+
+--- Publishes one failed cancellation terminal while retaining exact cleanup debt.
+--- @param owner table Installer lifecycle owner.
+--- @param detail string Stable failure detail.
+local function fail_install_cleanup(owner, detail)
+	if owner.cleanup_debt.cancel_requested == true and owner.terminal ~= true then
+		finish_install_owner(owner, owner.cleanup_debt.callback, false,
+			owner.cleanup_debt.cancel_detail or "Installer cancelled.")
+	end
+	complete_stop_waiters(false, detail)
+end
+
+--- Cancels every exact retry timer while retaining native cancellation debt.
+--- A refused handle stays in retry_timer_owners and counts as installer debt;
+--- retry_timer_owner tracks only the currently committed user callback so a
+--- fenced predecessor cannot block an autonomous cleanup successor.
+--- @param owner table Installer lifecycle owner.
+--- @param context string Cleanup reason.
+--- @return boolean cancelled
+cancel_install_cleanup_retry = function(owner, context)
+	local retry_owners = owner.cleanup_debt.retry_timer_owners
+	local snapshot = {}
+	for retry_owner in pairs(retry_owners) do snapshot[#snapshot + 1] = retry_owner end
+	local settled = true
+	for _, retry_owner in ipairs(snapshot) do
+		retry_owner.committed = false
+		if owner.cleanup_debt.retry_timer_owner == retry_owner then
+			owner.cleanup_debt.retry_timer_owner = nil
+		end
+		if retry_owner.handle == nil then
+			retry_owners[retry_owner] = nil
+		else
+			local ok, result = xpcall(function()
+				return TimerScheduler.cancel(retry_owner.handle)
+			end, debug.traceback)
+			if ok and result == true then
+				retry_owner.handle = nil
+				retry_owners[retry_owner] = nil
+			else
+				settled = false
+				Logger.error(LOG,
+					"%s: exact installer cleanup retry timer remains scheduler-owned: %s.",
+					context, tostring(result))
+			end
+		end
+	end
+	refresh_install_owner(owner)
+	return settled and next(retry_owners) == nil
+end
+
+--- Finishes a revoked installer only after its task and artifacts are settled.
+--- The public installer terminal is delivered exactly once before joined pause,
+--- disable, or shutdown continuations resume. Unsettled debt arms one bounded,
+--- identity-checked retry owner rather than waiting for another user gesture.
+--- @param owner table Installer lifecycle owner.
+--- @param context string Cleanup reason.
+--- @return boolean settled
+local function settle_stopped_install_owner(owner, context)
+	if settle_install_artifacts(owner, context) ~= true then
+		schedule_install_cleanup_retry(owner, context)
+		return false
+	end
+	if cancel_install_cleanup_retry(owner, context) ~= true then
+		schedule_install_cleanup_retry(owner, context)
+		return false
+	end
+	if owner.cleanup_debt.cancel_requested == true and owner.terminal ~= true then
+		finish_install_owner(owner, owner.cleanup_debt.callback, false,
+			owner.cleanup_debt.cancel_detail or "Installer cancelled.")
+	end
+	complete_stop_waiters_if_settled()
+	return refresh_install_owner(owner)
+end
+
+--- Sends one termination signal without mistaking acceptance for process exit.
+--- Only the exact native completion callback releases the task and its GC pin.
+--- @param owner table Installer lifecycle owner.
+--- @param task any Exact native task handle.
+--- @param context string Cleanup reason.
+--- @return boolean accepted True for any truthy native signal result.
+local function request_install_task_termination(owner, task, context)
+	local stage = owner.tasks[task]
+	if stage == nil then return true end
+	owner.cleanup_debt.tasks[task] = stage
+	if owner.cleanup_debt.termination_accepted[task] == true then
+		Logger.debug(LOG,
+			"%s: installer stage '%s' already accepted its termination signal; awaiting exact exit.",
+			context, tostring(stage))
+		return true
+	end
+	local decision = {
+		delivery = nil,
+		in_progress = true,
+	}
+	owner.cleanup_debt.termination_decisions[task] = decision
+	local ok, result = xpcall(function()
+		return task:terminate()
+	end, debug.traceback)
+	decision.in_progress = false
+	owner.cleanup_debt.termination_decisions[task] = nil
+	local accepted = ok and result ~= false and result ~= nil
+	if accepted then
+		owner.cleanup_debt.termination_accepted[task] = true
+	else
+		-- A native callback may run synchronously inside terminate(). Do not let
+		-- that exact exit publish a successful joined stop before the enclosing
+		-- native call reveals that it refused or raised.
+		_stop_failure_detail = "onboarding-task-termination-refused"
+	end
+	local pending_delivery = decision.delivery
+	decision.delivery = nil
+	if pending_delivery then pending_delivery() end
+	if accepted then
+		Logger.debug(LOG, "%s: termination signal accepted for installer stage '%s'; awaiting exact exit.",
+			context, tostring(stage))
+		return true
+	end
+	Logger.error(LOG, "%s: termination signal refused for installer stage '%s': %s.",
+		context, tostring(stage), tostring(result))
+	return false
+end
+
+--- Retries exact installer cleanup after one owned delay.
+--- @param owner table Installer lifecycle owner.
+--- @param context string Cleanup reason.
+local function run_install_cleanup_retry(owner, context)
+	if M._install_owner ~= owner then return end
+	local termination_refused = false
+	local tasks = {}
+	for task in pairs(owner.tasks) do tasks[#tasks + 1] = task end
+	for _, task in ipairs(tasks) do
+		if owner.tasks[task] ~= nil
+			and request_install_task_termination(owner, task, context) ~= true then
+			termination_refused = true
+		end
+	end
+	if termination_refused then
+		fail_install_cleanup(owner, "onboarding-task-termination-refused")
+	end
+	settle_stopped_install_owner(owner, context)
+end
+
+--- Arms one bounded retry/deadline owner for task and artifact cleanup debt.
+--- @param owner table Installer lifecycle owner.
+--- @param context string Cleanup reason.
+--- @return boolean committed
+schedule_install_cleanup_retry = function(owner, context)
+	if M._install_owner ~= owner then return false end
+	if owner.cleanup_debt.retry_timer_owner then return true end
+	if owner.cleanup_debt.retry_attempts >= INSTALL_CLEANUP_MAX_RETRIES then
+		Logger.error(LOG, "%s: installer cleanup deadline reached after %d retry attempt(s).",
+			context, owner.cleanup_debt.retry_attempts)
+		fail_install_cleanup(owner, "onboarding-cleanup-timeout")
+		return false
+	end
+	owner.cleanup_debt.retry_attempts = owner.cleanup_debt.retry_attempts + 1
+
+	local retry_owner = {
+		committed = false,
+		handle = nil,
+	}
+	owner.cleanup_debt.retry_timer_owner = retry_owner
+	owner.cleanup_debt.retry_timer_owners[retry_owner] = true
+	local timer_ok, handle_or_err, committed = xpcall(function()
+		return TimerScheduler.after(INSTALL_CLEANUP_RETRY_DELAY_SEC, function()
+			if owner.cleanup_debt.retry_timer_owner ~= retry_owner
+				or retry_owner.committed ~= true then return end
+			owner.cleanup_debt.retry_timer_owner = nil
+			retry_owner.committed = false
+			cancel_install_cleanup_retry(owner, context .. " retry delivery")
+			complete_stop_waiters_if_settled()
+			run_install_cleanup_retry(owner, context)
+		end)
+	end, debug.traceback)
+	if timer_ok then retry_owner.handle = handle_or_err end
+	if not timer_ok or committed ~= true then
+		if owner.cleanup_debt.retry_timer_owner == retry_owner then
+			owner.cleanup_debt.retry_timer_owner = nil
+		end
+		cancel_install_cleanup_retry(owner, context .. " acquisition rollback")
+		local detail = handle_or_err
+		if timer_ok then detail = committed end
+		Logger.error(LOG, "%s: installer cleanup retry timer was not committed: %s.",
+			context, tostring(detail))
+		if owner.cleanup_debt.retry_attempts < INSTALL_CLEANUP_MAX_RETRIES then
+			return schedule_install_cleanup_retry(owner, context)
+		end
+		fail_install_cleanup(owner, "onboarding-cleanup-timer-refused")
+		return false
+	end
+	retry_owner.committed = true
+	Logger.debug(LOG, "%s: installer cleanup retry %d/%d armed in %.2fs.",
+		context, owner.cleanup_debt.retry_attempts,
+		INSTALL_CLEANUP_MAX_RETRIES, INSTALL_CLEANUP_RETRY_DELAY_SEC)
+	return true
+end
+
+--- Pins one exact task before start and treats only literal true as commitment.
+--- @param owner table Installer lifecycle owner.
+--- @param task any Native task candidate.
+--- @param stage string Stable installer stage.
+--- @param label string Native task label.
+--- @param callback function Failure callback.
+--- @param start_gate table Completion publication gate.
+--- @return boolean committed
+local function start_owned_task(owner, task, stage, label, callback, start_gate)
+	if not task then
+		if start_gate then start_gate.refuse() end
+		callback(false, "Failed to create " .. stage .. " task.")
+		return false
+	end
+	if not install_owner_is_current(owner) then
+		if start_gate then start_gate.refuse() end
+		return false
+	end
+	owner.stage = stage
+	owner.tasks[task] = stage
+	M._active_tasks[task] = true
+	if start_gate then start_gate.task = task end
+	if TaskLifecycle.start(task, label) ~= true then
+		if start_gate then start_gate.refuse() end
+		M._active_tasks[task] = nil
+		release_install_task(owner, task)
+		callback(false, "Failed to start " .. stage .. " task.")
+		return false
+	end
+	if start_gate then start_gate.commit() end
+	return true
+end
+
+--- Latches one exact native task completion before it may advance the pipeline.
+--- Native callbacks are not assumed to be single-shot because a duplicate from
+--- the current task would otherwise construct a second successor while the owner
+--- generation still has valid authority.
+--- @param owner table Installer lifecycle owner.
+--- @param stage string Stable installer stage.
+--- @param callback function Native task completion body.
+--- @return table start_gate Buffers completion until native start commits.
+--- @return function guarded_callback Single-shot completion callback.
+local function latch_install_task_completion(owner, stage, callback)
+	local gate = {
+		committed = false,
+		completed = false,
+		pending = nil,
+	}
+	local function deliver(rc, stdout, stderr)
+		if gate.completed then
+			Logger.warn(LOG, "Duplicate %s completion ignored for installer epoch %s.",
+				tostring(stage), tostring(owner.epoch))
+			return
+		end
+		gate.completed = true
+		local callback_ok, callback_result = xpcall(function()
+			return callback(rc, stdout, stderr)
+		end, debug.traceback)
+		if not callback_ok then
+			Logger.error(LOG, "%s completion failed for installer epoch %s: %s.",
+				tostring(stage), tostring(owner.epoch), tostring(callback_result))
+			return nil
+		end
+		return callback_result
+	end
+	function gate.commit()
+		if gate.completed then return end
+		gate.committed = true
+		local pending = gate.pending
+		gate.pending = nil
+		if pending then return deliver(pending.rc, pending.stdout, pending.stderr) end
+	end
+	function gate.refuse()
+		gate.committed = false
+		gate.completed = true
+		gate.pending = nil
+	end
+	local function guarded_callback(rc, stdout, stderr)
+		if gate.completed then
+			Logger.warn(LOG, "Duplicate %s completion ignored for installer epoch %s.",
+				tostring(stage), tostring(owner.epoch))
+			return
+		end
+		if gate.committed ~= true then
+			if gate.pending == nil then
+				gate.pending = { rc = rc, stdout = stdout, stderr = stderr }
+			else
+				Logger.warn(LOG, "Duplicate pre-commit %s completion ignored for installer epoch %s.",
+					tostring(stage), tostring(owner.epoch))
+			end
+			return
+		end
+		local task = gate.task
+		local decision = task and owner.cleanup_debt.termination_decisions[task] or nil
+		if decision and decision.in_progress == true then
+			if decision.delivery == nil then
+				decision.delivery = function() return deliver(rc, stdout, stderr) end
+			else
+				Logger.warn(LOG,
+					"Duplicate synchronous %s termination completion ignored for installer epoch %s.",
+					tostring(stage), tostring(owner.epoch))
+			end
+			return
+		end
+		return deliver(rc, stdout, stderr)
+	end
+	return gate, guarded_callback
+end
+
 --- Verifies the SHA-256 of a local file against an expected hex digest. Async
 --- so a slow shasum call cannot block Hammerspoon's main loop.
+--- @param owner table Installer lifecycle owner.
 --- @param path string Absolute path of the file to hash.
 --- @param expected_sha string Expected SHA-256, lowercase hex.
 --- @param callback function fun(ok: boolean, err: string|nil)
-local function verify_sha256_async(path, expected_sha, callback)
-	local epoch = _install_epoch
+local function verify_sha256_async(owner, path, expected_sha, callback)
 	local task
-	task = TaskLifecycle.native("Karabiner installer checksum", "/usr/bin/shasum", function(rc, stdout)
-		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
-		if epoch ~= _install_epoch then return end
-		if rc ~= 0 or type(stdout) ~= "string" then
-			callback(false, "shasum exit code " .. tostring(rc))
-			return
-		end
-		local actual = stdout:match("^([%x]+)")
-		if not actual then
-			callback(false, "Could not parse shasum output: " .. stdout)
-			return
-		end
-		if actual:lower() ~= expected_sha:lower() then
-			callback(false, string.format("expected=%s actual=%s", expected_sha, actual))
-			return
-		end
-		callback(true, nil)
-	end, { "-a", "256", path })
-	if not task or not TaskLifecycle.start(task, "Karabiner installer checksum") then
-		callback(false, "Failed to start shasum task.")
-	else
-		M._active_tasks[task] = true
-	end
+	local start_gate, on_completion = latch_install_task_completion(owner, "checksum",
+		function(rc, stdout)
+			if task then M._active_tasks[task] = nil end
+			release_install_task(owner, task)
+			if not install_owner_is_current(owner) then
+				settle_stopped_install_owner(owner, "stale checksum completion")
+				return
+			end
+			if rc ~= 0 or type(stdout) ~= "string" then
+				callback(false, "shasum exit code " .. tostring(rc))
+				return
+			end
+			local actual = stdout:match("^([%x]+)")
+			if not actual then
+				callback(false, "Could not parse shasum output: " .. stdout)
+				return
+			end
+			if actual:lower() ~= expected_sha:lower() then
+				callback(false, string.format("expected=%s actual=%s", expected_sha, actual))
+				return
+			end
+			callback(true, nil)
+		end)
+	task = TaskLifecycle.native("Karabiner installer checksum", "/usr/bin/shasum",
+		on_completion, { "-a", "256", path })
+	start_owned_task(owner, task, "checksum", "Karabiner installer checksum", callback, start_gate)
 end
 
 --- Downloads a URL to a destination file via curl, async. Creates the parent
 --- directory beforehand if needed. Uses --fail so HTTP 4xx/5xx errors do not
 --- silently produce a 0-byte file.
+--- @param owner table Installer lifecycle owner.
 --- @param url string Source URL.
 --- @param dest string Absolute destination path.
 --- @param callback function fun(ok: boolean, err: string|nil)
-local function download_async(url, dest, callback)
-	local epoch = _install_epoch
+local function download_async(owner, url, dest, callback)
 	local parent = dest:match("^(.*/)") or ""
 	if parent ~= "" then
-		hs.execute("/bin/mkdir -p " .. text_utils.shell_quote(parent))
-	end
-	local task
-	task = TaskLifecycle.native("Karabiner installer download", "/usr/bin/curl", function(rc, _, stderr)
-		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
-		if epoch ~= _install_epoch then return end
-		if rc ~= 0 then
-			callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
+		local mkdir_ok, mkdir_output, mkdir_succeeded = xpcall(function()
+			return hs.execute("/bin/mkdir -p " .. text_utils.shell_quote(parent))
+		end, debug.traceback)
+		if not mkdir_ok or mkdir_succeeded ~= true then
+			callback(false, "Failed to prepare cache directory: " .. tostring(mkdir_output))
 			return
 		end
-		callback(true, nil)
-	end, { "-L", "--fail", "--silent", "--show-error", "--output", dest, url })
-	if not task or not TaskLifecycle.start(task, "Karabiner installer download") then
-		callback(false, "Failed to start curl task.")
-	else
-		M._active_tasks[task] = true
 	end
+	local task
+	local start_gate, on_completion = latch_install_task_completion(owner, "download",
+		function(rc, _, stderr)
+			if task then M._active_tasks[task] = nil end
+			release_install_task(owner, task)
+			if not install_owner_is_current(owner) then
+				if owner.unique_partial == nil then owner.unique_partial = dest end
+				settle_stopped_install_owner(owner, "stale download completion")
+				return
+			end
+			if rc ~= 0 then
+				callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
+				return
+			end
+			callback(true, nil)
+		end)
+	task = TaskLifecycle.native("Karabiner installer download", "/usr/bin/curl",
+		on_completion, { "-L", "--fail", "--silent", "--show-error", "--output", dest, url })
+	start_owned_task(owner, task, "download", "Karabiner installer download", callback, start_gate)
 end
 
 --- Mounts a DMG via hdiutil, async. Returns the mount point on success.
+--- @param owner table Installer lifecycle owner.
 --- @param dmg_path string Absolute path to the .dmg.
 --- @param callback function fun(ok: boolean, mount_point_or_err: string)
-local function mount_dmg_async(dmg_path, callback)
-	local epoch = _install_epoch
+local function mount_dmg_async(owner, dmg_path, callback)
 	local task
-	task = TaskLifecycle.native("Karabiner installer DMG mount", "/usr/bin/hdiutil", function(rc, stdout, stderr)
-		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
-		if epoch ~= _install_epoch then return end
-		if rc ~= 0 or type(stdout) ~= "string" then
-			callback(false, "hdiutil rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
-			return
-		end
-		local mount_point
-		for line in stdout:gmatch("[^\n]+") do
-			local mp = line:match("(/Volumes/[^\t]+)")
-			if mp then mount_point = mp end
-		end
-		if not mount_point then
-			callback(false, "Could not parse hdiutil output: " .. stdout)
-			return
-		end
-		callback(true, mount_point)
-	end, { "attach", "-nobrowse", dmg_path })
-	if not task or not TaskLifecycle.start(task, "Karabiner installer DMG mount") then
-		callback(false, "Failed to start hdiutil task.")
-	else
-		M._active_tasks[task] = true
-	end
-end
-
---- Detaches a mounted DMG. Fire-and-forget — unmount is fast and any error
---- is non-fatal (the volume can be lazily released on reboot).
---- @param mount_point string
-local function unmount_dmg(mount_point)
-	hs.execute("/usr/bin/hdiutil detach " .. text_utils.shell_quote(mount_point) .. " 2>/dev/null")
+	local start_gate, on_completion = latch_install_task_completion(owner, "mount",
+		function(rc, stdout, stderr)
+			if task then M._active_tasks[task] = nil end
+			release_install_task(owner, task)
+			local mount_point
+			if rc == 0 and type(stdout) == "string" then
+				for line in stdout:gmatch("[^\n]+") do
+					local parsed = line:match("(/Volumes/[^\t]+)")
+					if parsed then mount_point = parsed end
+				end
+			end
+			if not install_owner_is_current(owner) then
+				if mount_point then owner.mount_point = mount_point end
+				settle_stopped_install_owner(owner, "stale mount completion")
+				return
+			end
+			if rc ~= 0 or type(stdout) ~= "string" then
+				callback(false, "hdiutil rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
+				return
+			end
+			if not mount_point then
+				callback(false, "Could not parse hdiutil output: " .. stdout)
+				return
+			end
+			owner.mount_point = mount_point
+			callback(true, mount_point)
+		end)
+	task = TaskLifecycle.native("Karabiner installer DMG mount", "/usr/bin/hdiutil",
+		on_completion, { "attach", "-nobrowse", dmg_path })
+	start_owned_task(owner, task, "mount", "Karabiner installer DMG mount", callback, start_gate)
 end
 
 --- Locates the .pkg sitting at the root of a mounted DMG. KE ships exactly
 --- one .pkg per release.
 --- @param mount_point string
 --- @return string|nil pkg_path
+--- @return string|nil err
 local function find_pkg_in_volume(mount_point)
-	local out = hs.execute("/bin/ls " .. text_utils.shell_quote(mount_point) .. " 2>&1")
-	if type(out) ~= "string" then return nil end
+	local call_ok, out_or_err, succeeded = xpcall(function()
+		return hs.execute("/bin/ls " .. text_utils.shell_quote(mount_point) .. " 2>&1")
+	end, debug.traceback)
+	if not call_ok or succeeded ~= true or type(out_or_err) ~= "string" then
+		return nil, tostring(out_or_err)
+	end
+	local out = out_or_err
 	for line in out:gmatch("[^\n]+") do
 		if line:match("%.pkg$") then
-			return mount_point .. "/" .. line
+			return mount_point .. "/" .. line, nil
 		end
 	end
-	return nil
+	return nil, "no package found"
 end
 
 --- Runs `installer -pkg PATH -target /` with sudo, via osascript so macOS shows
 --- its native admin password prompt. This is the only user-friendly way to
 --- escalate from a Hammerspoon script.
+--- @param owner table Installer lifecycle owner.
 --- @param pkg_path string Absolute path to the .pkg.
 --- @param callback function fun(ok: boolean, err: string|nil)
-local function run_pkg_with_sudo_async(pkg_path, callback)
-	local epoch = _install_epoch
+local function run_pkg_with_sudo_async(owner, pkg_path, callback)
 	-- `quoted form of` operates on the AppleScript VALUE, and that value is
 	-- produced by PARSING the literal below — so anything the literal itself
 	-- mis-parses is already lost before `quoted form of` ever runs. The escape must
@@ -387,20 +917,23 @@ local function run_pkg_with_sudo_async(pkg_path, callback)
 		pkg_path
 	)
 	local task
-	task = TaskLifecycle.native("Karabiner package install", "/usr/bin/osascript", function(rc, _, stderr)
-		if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
-		if epoch ~= _install_epoch then return end
-		if rc ~= 0 then
-			callback(false, "osascript rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
-			return
-		end
-		callback(true, nil)
-	end, { "-e", script })
-	if not task or not TaskLifecycle.start(task, "Karabiner package install") then
-		callback(false, "Failed to start osascript task.")
-	else
-		M._active_tasks[task] = true
-	end
+	local start_gate, on_completion = latch_install_task_completion(owner, "install",
+		function(rc, _, stderr)
+			if task then M._active_tasks[task] = nil end
+			release_install_task(owner, task)
+			if not install_owner_is_current(owner) then
+				settle_stopped_install_owner(owner, "stale package completion")
+				return
+			end
+			if rc ~= 0 then
+				callback(false, "osascript rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
+				return
+			end
+			callback(true, nil)
+		end)
+	task = TaskLifecycle.native("Karabiner package install", "/usr/bin/osascript",
+		on_completion, { "-e", script })
+	start_owned_task(owner, task, "install", "Karabiner package install", callback, start_gate)
 end
 
 --- Ensures the DMG is present in the cache and matches the manifest SHA-256.
@@ -409,50 +942,85 @@ end
 --- @param manifest table
 --- @param cache_path string
 --- @param callback function fun(ok: boolean, err: string|nil)
-function M.ensure_dmg_cached(manifest, cache_path, callback)
+--- @param owner table|nil Exact owner supplied by install_karabiner_elements().
+function M.ensure_dmg_cached(manifest, cache_path, callback, owner)
+	owner = owner or M._install_owner
+	if not install_owner_is_current(owner) then
+		callback(false, "Installer authority is unavailable.")
+		return false
+	end
+
 	local function fresh_download()
+		if not install_owner_is_current(owner) then return false end
+		local partial_path = make_unique_partial_path(cache_path)
+		if not partial_path then
+			callback(false, "Failed to allocate a unique download path.")
+			return false
+		end
+		owner.unique_partial = partial_path
 		Logger.start(LOG, "Downloading KE DMG (~46 MB) from %s…", manifest.source_url)
 		notify(i18n.get("karabiner.downloading"), "info")
-		download_async(manifest.source_url, cache_path, function(ok_dl, err_dl)
+		download_async(owner, manifest.source_url, partial_path, function(ok_dl, err_dl)
 			if not ok_dl then
 				Logger.error(LOG, "Download failed: %s.", err_dl)
+				settle_install_artifacts(owner, "download failure")
 				callback(false, string.format(i18n.get("karabiner.download_failed"), tostring(err_dl)))
+				return
+			end
+			if not install_owner_is_current(owner) then
+				settle_stopped_install_owner(owner, "download successor fence")
 				return
 			end
 			Logger.success(LOG, "Download complete.")
 			Logger.start(LOG, "Verifying SHA-256…")
-			verify_sha256_async(cache_path, manifest.sha256, function(ok_sha, err_sha)
+			verify_sha256_async(owner, partial_path, manifest.sha256, function(ok_sha, err_sha)
 				if not ok_sha then
 					Logger.error(LOG, "Hash verification failed: %s.", err_sha)
-					os.remove(cache_path)
+					settle_install_artifacts(owner, "checksum failure")
 					callback(false, string.format(i18n.get("karabiner.sha_failed"), tostring(err_sha)))
 					return
 				end
+				if not install_owner_is_current(owner) then
+					settle_stopped_install_owner(owner, "checksum successor fence")
+					return
+				end
+				local rename_ok, renamed_or_err, rename_err = xpcall(function()
+					return os.rename(partial_path, cache_path)
+				end, debug.traceback)
+				if not rename_ok or renamed_or_err ~= true then
+					Logger.error(LOG, "Verified DMG atomic cache promotion failed: %s.",
+						tostring(rename_ok and rename_err or renamed_or_err))
+					settle_install_artifacts(owner, "cache promotion failure")
+					callback(false, "Verified DMG could not be published atomically.")
+					return
+				end
+				owner.unique_partial = nil
+				owner.cleanup_debt.partial = nil
 				Logger.success(LOG, "SHA-256 verified.")
 				callback(true, nil)
 			end)
 		end)
+		return true
 	end
 
 	if not file_exists(cache_path) then
 		Logger.debug(LOG, "Cache miss: '%s'.", cache_path)
-		fresh_download()
-		return
+		return fresh_download()
 	end
 
 	-- Cache hit — re-verify before trusting it. A previous partial download
 	-- or bit rot would be invisible without this check.
-	Logger.trace(LOG, "Cache hit, verifying SHA-256…")
-	verify_sha256_async(cache_path, manifest.sha256, function(ok_sha, err_sha)
+	Logger.debug(LOG, "Cache hit, verifying SHA-256 before installer use.")
+	verify_sha256_async(owner, cache_path, manifest.sha256, function(ok_sha, err_sha)
 		if ok_sha then
-			Logger.done(LOG, "Cached DMG SHA-256 verified — skipping download.")
+			Logger.info(LOG, "Cached DMG SHA-256 verified; download skipped.")
 			callback(true, nil)
 			return
 		end
 		Logger.warn(LOG, "Cached DMG hash mismatch (%s) — redownloading.", tostring(err_sha))
-		os.remove(cache_path)
 		fresh_download()
 	end)
+	return true
 end
 
 --- High-level installer pipeline: ensures the DMG is cached + verified,
@@ -461,69 +1029,117 @@ end
 --- @param callback function fun(ok: boolean, err: string|nil) optional.
 function M.install_karabiner_elements(callback)
 	callback = callback or function() end
-	for _ in pairs(M._active_tasks) do
+	if M._install_owner or #_stop_waiters > 0 then
 		callback(false, "An installer operation is already active.")
 		return false
 	end
 	_install_epoch = _install_epoch + 1
+	local owner = {
+		epoch = _install_epoch,
+		stage = "preparing",
+		tasks = {},
+		mount_point = nil,
+		unique_partial = nil,
+		cleanup_debt = {
+			callback = callback,
+			cancel_detail = nil,
+			cancel_requested = false,
+			detached_mounts = {},
+			mount_point = nil,
+			partial = nil,
+			pending = false,
+			retry_attempts = 0,
+			retry_timer_owner = nil,
+			retry_timer_owners = {},
+			tasks = {},
+			termination_accepted = {},
+			termination_decisions = {},
+		},
+		terminal = false,
+	}
+	M._install_owner = owner
 
 	local manifest = M.load_manifest()
 	if not manifest then
-		callback(false, "Manifest illisible.")
-		return
+		finish_install_owner(owner, callback, false, "Manifest is unreadable.")
+		return false
 	end
 	if M.manifest_is_unpinned(manifest) then
 		Logger.warn(LOG, "Manifest unpinned (TODO placeholders) — auto-install disabled.")
-		callback(false, i18n.get("karabiner.onboarding.error.manifest_unconfigured"))
-		return
+		finish_install_owner(owner, callback, false,
+			i18n.get("karabiner.onboarding.error.manifest_unconfigured"))
+		return false
 	end
 
 	local cache_path = M.get_cache_dmg_path(manifest)
 	Logger.start(LOG, "Installing Karabiner-Elements (cache='%s')…", cache_path)
 
 	M.ensure_dmg_cached(manifest, cache_path, function(ok_cache, err_cache)
+		if not install_owner_is_current(owner) then
+			settle_stopped_install_owner(owner, "cache completion fence")
+			return
+		end
 		if not ok_cache then
-			callback(false, err_cache)
+			finish_install_owner(owner, callback, false, err_cache)
 			return
 		end
 
 		Logger.trace(LOG, "Mounting DMG…")
-		mount_dmg_async(cache_path, function(ok_mount, mount_or_err)
+		mount_dmg_async(owner, cache_path, function(ok_mount, mount_or_err)
 			if not ok_mount then
 				Logger.error(LOG, "Mount failed: %s.", mount_or_err)
 				-- Parenthesised so gsub's second return (the match count) does not leak in
 				-- as callback's third argument, and escaped because the payload is raw
 				-- hdiutil stderr — a "%" in it would raise inside this async callback,
 				-- where the error reaches only the HS Console.
-				callback(false, (i18n.get("karabiner.onboarding.error.mount_failed")
-					:gsub("{error}", text_utils.escape_gsub_replacement(tostring(mount_or_err)))))
+				finish_install_owner(owner, callback, false,
+					(i18n.get("karabiner.onboarding.error.mount_failed")
+						:gsub("{error}", text_utils.escape_gsub_replacement(tostring(mount_or_err)))))
 				return
 			end
 			local mount_point = mount_or_err
 			Logger.done(LOG, "Mounted at '%s'.", mount_point)
-
-			local pkg_path = find_pkg_in_volume(mount_point)
-			if not pkg_path then
-				unmount_dmg(mount_point)
-				Logger.error(LOG, "No .pkg found in mounted volume.")
-				callback(false, i18n.get("karabiner.pkg_not_found"))
+			if not install_owner_is_current(owner) then
+				settle_stopped_install_owner(owner, "mount successor fence")
 				return
 			end
 
-			Logger.start(LOG, "Running pkg installer (admin prompt expected)…")
+			local pkg_path, pkg_err = find_pkg_in_volume(mount_point)
+			if not pkg_path then
+				settle_install_artifacts(owner, "package discovery failure")
+				Logger.error(LOG, "No .pkg found in mounted volume.")
+				finish_install_owner(owner, callback, false,
+					i18n.get("karabiner.pkg_not_found") .. ": " .. tostring(pkg_err))
+				return
+			end
+			if not install_owner_is_current(owner) then
+				settle_stopped_install_owner(owner, "privileged installer fence")
+				return
+			end
+
+			Logger.info(LOG, "Running pkg installer; admin prompt expected.")
 			notify(i18n.get("karabiner.installing"), "info")
-			run_pkg_with_sudo_async(pkg_path, function(ok_install, err_install)
-				unmount_dmg(mount_point)
+			run_pkg_with_sudo_async(owner, pkg_path, function(ok_install, err_install)
+				local artifacts_settled = settle_install_artifacts(owner,
+					"package installer completion")
 				if not ok_install then
 					Logger.error(LOG, "Installer failed: %s.", err_install)
-					callback(false, string.format(i18n.get("karabiner.install_failed"), tostring(err_install)))
+					finish_install_owner(owner, callback, false,
+						string.format(i18n.get("karabiner.install_failed"), tostring(err_install)))
+					return
+				end
+				if not artifacts_settled then
+					Logger.error(LOG, "Installer succeeded but exact artifact cleanup remains pending.")
+					finish_install_owner(owner, callback, false,
+						"Installer cleanup remains pending.")
 					return
 				end
 				Logger.success(LOG, "Karabiner-Elements installed.")
-				callback(true, nil)
+				finish_install_owner(owner, callback, true, nil)
 			end)
 		end)
-	end)
+	end, owner)
+	return true
 end
 
 
@@ -579,6 +1195,7 @@ local function cancel_timer_owner(owner, context)
 	if not owner.handle then
 		if owner.acquiring then return false end
 		if _timer_owner == owner then _timer_owner = nil end
+		complete_stop_waiters_if_settled()
 		return true
 	end
 	local ok, result = xpcall(function()
@@ -587,10 +1204,24 @@ local function cancel_timer_owner(owner, context)
 	if ok and result == true then
 		owner.handle = nil
 		if _timer_owner == owner then _timer_owner = nil end
+		complete_stop_waiters_if_settled()
 		return true
 	end
 	Logger.error(LOG, "%s: exact onboarding timer cleanup remains pending — %s.",
 		context, tostring(result))
+	return false
+end
+
+--- Retries settlement of one exact wizard timer without acquiring a sibling.
+--- @param owner table Timer transaction owner.
+--- @param context string Operation requesting cancellation.
+--- @return boolean settled True only after literal cancellation success.
+local function cancel_timer_owner_bounded(owner, context)
+	for attempt = 1, WIZARD_TIMER_MAX_ATTEMPTS do
+		if cancel_timer_owner(owner, context) == true then return true end
+		Logger.error(LOG, "%s: onboarding timer cleanup attempt %d/%d refused.",
+			context, attempt, WIZARD_TIMER_MAX_ATTEMPTS)
+	end
 	return false
 end
 
@@ -603,7 +1234,7 @@ local function settle_timer_slot(context)
 		Logger.error(LOG, "%s: onboarding timer sibling rejected while an active owner exists.", context)
 		return false
 	end
-	return cancel_timer_owner(_timer_owner, context)
+	return cancel_timer_owner_bounded(_timer_owner, context)
 end
 
 --- Invokes one wizard callback with a traceback in the Ergopti file logger.
@@ -626,7 +1257,7 @@ end
 --- @param label string Stable operation label.
 --- @param callback function fun(owner: table)
 --- @return boolean committed True only when the native timer was armed.
-local function arm_owned_timer(method, delay, epoch, label, callback)
+local function arm_owned_timer_once(method, delay, epoch, label, callback)
 	if epoch ~= _wizard_epoch then return false end
 	if settle_timer_slot(label) ~= true then return false end
 	local scheduler = TimerScheduler[method]
@@ -649,17 +1280,18 @@ local function arm_owned_timer(method, delay, epoch, label, callback)
 			if _timer_owner ~= owner then return end
 			if owner.committed ~= true then
 				if owner.acquiring ~= true then
-					cancel_timer_owner(owner, label .. " stale callback")
+					cancel_timer_owner_bounded(owner, label .. " stale callback")
 				end
 				return
 			end
 			if owner.epoch ~= _wizard_epoch then
-				cancel_timer_owner(owner, label .. " stale epoch")
+				owner.committed = false
+				cancel_timer_owner_bounded(owner, label .. " stale epoch")
 				return
 			end
 			if method == "after" then
 				owner.committed = false
-				if cancel_timer_owner(owner, label .. " completion") ~= true then return end
+				cancel_timer_owner_bounded(owner, label .. " completion")
 			end
 			invoke_wizard_callback(label, function() callback(owner) end)
 		end)
@@ -670,13 +1302,31 @@ local function arm_owned_timer(method, delay, epoch, label, callback)
 
 	if not schedule_ok or committed ~= true or type(candidate) ~= "table" then
 		owner.committed = false
-		cancel_timer_owner(owner, label .. " acquisition rollback")
+		cancel_timer_owner_bounded(owner, label .. " acquisition rollback")
 		Logger.error(LOG, "%s: onboarding timer acquisition failed — %s.",
 			label, tostring(handle_or_err))
 		return false
 	end
 	owner.committed = true
 	return true
+end
+
+--- Acquires a wizard timer through one bounded constructor retry series.
+--- Every refused candidate is settled exactly before a successor is attempted.
+--- @param method string TimerScheduler method name.
+--- @param delay number Delay or interval in seconds.
+--- @param epoch number Wizard lifecycle epoch.
+--- @param label string Stable operation label.
+--- @param callback function fun(owner: table)
+--- @return boolean committed True only when the native timer was armed.
+local function arm_owned_timer(method, delay, epoch, label, callback)
+	for _ = 1, WIZARD_TIMER_MAX_ATTEMPTS do
+		if arm_owned_timer_once(method, delay, epoch, label, callback) == true then
+			return true
+		end
+		if epoch ~= _wizard_epoch or _timer_owner ~= nil then return false end
+	end
+	return false
 end
 
 --- Schedules the next wizard step under the current lifecycle epoch.
@@ -710,7 +1360,7 @@ local function poll_until(predicate, on_done, on_timeout, epoch)
 		end
 		terminal = true
 		owner.committed = false
-		if cancel_timer_owner(owner, "poll_until terminal") ~= true then return end
+		cancel_timer_owner_bounded(owner, "poll_until terminal")
 		if epoch == _wizard_epoch then invoke_wizard_callback("poll_until terminal", callback) end
 	end
 
@@ -741,30 +1391,66 @@ local function poll_until(predicate, on_done, on_timeout, epoch)
 	return committed
 end
 
---- Cancels every wizard continuation and invalidates queued async completions.
---- @return boolean settled True only when no native onboarding timer can remain.
-function M.stop()
+--- Revokes installer authority before terminating every exact native task.
+--- Truthy native results only accept the termination signal; the exact callback
+--- remains the process-exit proof. Refusal fails immediately, while accepted
+--- signals and artifact debt receive bounded autonomous retries before timeout.
+--- @param on_done function|nil Joined callback fn(ok, detail).
+--- @return boolean accepted_or_settled Callback form reports acceptance; synchronous
+--- form reports whether every onboarding owner is already settled.
+function M.stop(on_done)
+	local joins_settlement = type(on_done) == "function"
+	if joins_settlement then _stop_waiters[#_stop_waiters + 1] = on_done end
 	_wizard_epoch = _wizard_epoch + 1
 	_install_epoch = _install_epoch + 1
-	local settled = true
-	for task in pairs(M._active_tasks) do
-		local ok, result = xpcall(function() return task:terminate() end, debug.traceback)
-		if ok and result == true then
-			M._active_tasks[task] = nil
-		else
-			settled = false
-			Logger.error(LOG, "Onboarding task termination refused; owner retained: %s", tostring(result))
+	local installer_settled = true
+	local termination_refused = false
+	local install_owner = M._install_owner
+	if install_owner then
+		install_owner.cleanup_debt.cancel_requested = true
+		install_owner.cleanup_debt.cancel_detail = "Installer cancelled."
+		if install_owner.terminal ~= true then install_owner.stage = "stopping" end
+		local tasks = {}
+		for task in pairs(install_owner.tasks) do tasks[#tasks + 1] = task end
+		for _, task in ipairs(tasks) do
+			if install_owner.tasks[task] ~= nil
+				and request_install_task_termination(install_owner, task, "M.stop") ~= true then
+				termination_refused = true
+			end
 		end
+		if termination_refused then
+			fail_install_cleanup(install_owner, "onboarding-task-termination-refused")
+		end
+		installer_settled = settle_stopped_install_owner(install_owner, "M.stop")
 	end
+	local timer_settled = true
 	if _timer_owner then
 		local owner = _timer_owner
 		owner.committed = false
-		settled = cancel_timer_owner(owner, "M.stop") and settled
+		timer_settled = cancel_timer_owner_bounded(owner, "M.stop")
 	end
-	if not settled then
-		Logger.error(LOG, "Onboarding stop incomplete; exact timer cleanup retained for retry.")
+	local settled = installer_settled and timer_settled
+	if joins_settlement and timer_settled ~= true then
+		_stop_failure_detail = "onboarding-stop-incomplete"
 	end
-	return settled
+	if settled then
+		complete_stop_waiters_if_settled()
+	elseif termination_refused or (install_owner and install_owner.terminal == true) then
+		Logger.error(LOG, "Onboarding stop incomplete; exact cleanup debt retained for retry.")
+		complete_stop_waiters(false, "onboarding-stop-incomplete")
+	elseif timer_settled ~= true then
+		Logger.error(LOG, "Onboarding timer stop incomplete; exact cleanup debt retained for retry.")
+		if M._install_owner == nil then
+			complete_stop_waiters(false, "onboarding-stop-incomplete")
+		else
+			Logger.debug(LOG,
+				"Onboarding stop is awaiting installer terminal before reporting timer failure.")
+		end
+	else
+		Logger.debug(LOG, "Onboarding stop is awaiting exact installer cleanup settlement.")
+	end
+	if joins_settlement then return true end
+	return settled and not termination_refused
 end
 
 --- Builds a French-language summary of the missing pieces from a health report.
@@ -893,7 +1579,7 @@ function M.run_first_run_wizard()
 	if _timer_owner then
 		local owner = _timer_owner
 		owner.committed = false
-		if cancel_timer_owner(owner, "run_first_run_wizard replacement") ~= true then
+		if cancel_timer_owner_bounded(owner, "run_first_run_wizard replacement") ~= true then
 			return false
 		end
 	end

@@ -64,6 +64,7 @@ local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
 local FIRST_RUN_WIZARD_DELAY_SEC = 2.0
+local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
 -- replacement must not resolve keycodes until TIS has settled.  Transient
 -- failures inside that barrier therefore get their own bounded retry budget;
@@ -2806,6 +2807,136 @@ end
 -- ===============================================
 -- ===============================================
 
+--- Fences and settles the exact deferred first-run timer with bounded retries.
+--- Literal true is the only cancellation proof. Refusal leaves the original
+--- wrapper retained and callback-inert so no sibling capability can replace it.
+--- @param context string Lifecycle boundary requesting cancellation.
+--- @return boolean settled True only when no native timer remains owned.
+local function cancel_first_run_wizard_timer(context)
+	_wizard_timer_committed = false
+	local timer = _wizard_timer
+	if not timer then return true end
+	for attempt = 1, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS do
+		local cancel_ok, result = xpcall(function()
+			return TimerScheduler.cancel(timer)
+		end, debug.traceback)
+		if cancel_ok and result == true then
+			if _wizard_timer == timer then _wizard_timer = nil end
+			return true
+		end
+		Logger.error(LOG,
+			"%s: first-run wizard timer cancellation attempt %d/%d failed: %s.",
+			context, attempt, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS, tostring(result))
+	end
+	return false
+end
+
+--- Acquires the delayed first-run wizard without replacing unresolved debt.
+--- A scheduler refusal is rolled back exactly before the bounded successor
+--- attempt; a queued predecessor callback remains fenced by identity and epoch.
+--- @param wizard_epoch number Lifecycle epoch owning the deferred wizard.
+--- @return boolean committed True only when one exact timer was armed.
+local function schedule_first_run_wizard(wizard_epoch)
+	if cancel_first_run_wizard_timer("First-run wizard replacement") ~= true then
+		return false
+	end
+	for attempt = 1, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS do
+		local candidate = nil
+		local schedule_ok, handle_or_err, committed = xpcall(function()
+			return TimerScheduler.after(FIRST_RUN_WIZARD_DELAY_SEC, function()
+				if _wizard_timer ~= candidate or _wizard_timer_committed ~= true then return end
+				_wizard_timer_committed = false
+				cancel_first_run_wizard_timer("First-run wizard delivery")
+				if not is_current_lifecycle(wizard_epoch)
+					or not _state or _state.enabled ~= true then return end
+				local callback_ok, callback_err = xpcall(function()
+					local Onboarding = require("platform.remap.onboarding")
+					Onboarding.run_first_run_wizard()
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "First-run wizard callback failed: %s.", tostring(callback_err))
+				end
+			end)
+		end, debug.traceback)
+		candidate = type(handle_or_err) == "table" and handle_or_err or nil
+		if candidate then _wizard_timer = candidate end
+		if schedule_ok and committed == true and candidate then
+			_wizard_timer_committed = true
+			return true
+		end
+		_wizard_timer_committed = false
+		Logger.error(LOG,
+			"First-run wizard timer acquisition attempt %d/%d failed: %s.",
+			attempt, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS, tostring(handle_or_err))
+		if candidate
+			and cancel_first_run_wizard_timer("First-run wizard acquisition rollback") ~= true then
+			return false
+		end
+	end
+	return false
+end
+
+--- Stops the loaded onboarding subsystem without constructing it during teardown.
+--- @param context string Lifecycle boundary requesting installer revocation.
+--- @param on_done function|nil Joined callback fn(ok, detail) after exact settlement.
+--- @return boolean accepted_or_settled Callback form reports acceptance; synchronous
+--- form reports whether every exact onboarding owner settled.
+local function stop_loaded_onboarding(context, on_done)
+	local first_run_settled = cancel_first_run_wizard_timer(context) == true
+	if not first_run_settled then
+		Logger.error(LOG, "%s: first-run wizard timer settlement failed.", context)
+	end
+	local onboarding = package.loaded["platform.remap.onboarding"]
+	if not onboarding then
+		local detail = first_run_settled and "onboarding-not-loaded"
+			or "first-run-wizard-stop-incomplete"
+		invoke_public_callback("onboarding stop", on_done, first_run_settled, detail)
+		return first_run_settled
+	end
+	if type(onboarding) ~= "table" or type(onboarding.stop) ~= "function" then
+		Logger.error(LOG, "%s: loaded onboarding module has no stop contract.", context)
+		invoke_public_callback("onboarding stop", on_done, false, "stop-unavailable")
+		return false
+	end
+	if type(on_done) ~= "function" then
+		local stop_ok, stop_result = xpcall(onboarding.stop, debug.traceback)
+		if not stop_ok or stop_result ~= true then
+			Logger.error(LOG, "%s: onboarding installer settlement failed: %s.",
+				context, tostring(stop_result))
+			return false
+		end
+		return first_run_settled
+	end
+
+	local callback_fired = false
+	local callback_succeeded = false
+	local function finish(onboarding_ok, detail)
+		if callback_fired then
+			Logger.warn(LOG, "%s: duplicate onboarding stop completion ignored.", context)
+			return
+		end
+		callback_fired = true
+		callback_succeeded = onboarding_ok == true and first_run_settled
+		if not first_run_settled then detail = "first-run-wizard-stop-incomplete" end
+		invoke_public_callback("onboarding stop", on_done, callback_succeeded, detail)
+	end
+	local stop_ok, stop_result = xpcall(function()
+		return onboarding.stop(finish)
+	end, debug.traceback)
+	if not stop_ok or stop_result ~= true then
+		Logger.error(LOG, "%s: onboarding installer settlement failed: %s.",
+			context, tostring(stop_result))
+		if not callback_fired then finish(false, "stop-rejected") end
+		return false
+	end
+	if callback_fired then return callback_succeeded end
+	return true
+end
+
+-- Unforgeable recursion token: only a completion from stop_loaded_onboarding()
+-- may enter the continuation below the installer settlement fence.
+local ONBOARDING_STOP_JOINED = {}
+
 --- Returns true when the Karabiner integration is enabled.
 --- @return boolean
 function M.get_enabled()
@@ -2818,8 +2949,9 @@ end
 --- When disabling: revokes only that lease; stock Karabiner remains user-managed.
 --- @param value boolean
 --- @param on_done function|nil Callback fn(ok, reason) after READY or STOPPED.
+--- @param onboarding_gate table|nil Private exact-settlement continuation token.
 --- @return boolean True when accepted or already settled.
-function M.set_enabled(value, on_done)
+function M.set_enabled(value, on_done, onboarding_gate)
 	if not require_state("set_enabled") then
 		invoke_public_callback("set_enabled", on_done, false, "not-initialized")
 		return false
@@ -2839,6 +2971,22 @@ function M.set_enabled(value, on_done)
 		Logger.warn(LOG, "Karabiner state request rejected while the opposite transition is in flight.")
 		invoke_public_callback("set_enabled", on_done, false, "transition-in-progress")
 		return false
+	end
+	if not target_enabled and onboarding_gate ~= ONBOARDING_STOP_JOINED then
+		local callback_fired = false
+		local continuation_result = false
+		local accepted = stop_loaded_onboarding("Karabiner integration disable",
+			function(stopped)
+				callback_fired = true
+				if stopped == true then
+					continuation_result = M.set_enabled(value, on_done, ONBOARDING_STOP_JOINED)
+				else
+					invoke_public_callback("set_enabled", on_done, false,
+						"onboarding-stop-incomplete")
+				end
+			end)
+		if callback_fired then return continuation_result end
+		return accepted == true
 	end
 
 	local was_enabled = _state.enabled == true
@@ -3886,10 +4034,25 @@ end
 --- No config file or stock Karabiner process is touched.
 --- Does nothing when the integration is disabled.
 --- @param on_done function|nil Callback fn(ok, reason) after PAUSED or failure.
-function M.pause(on_done)
+--- @param onboarding_gate table|nil Private exact-settlement continuation token.
+function M.pause(on_done, onboarding_gate)
 	if not _state or not _state.enabled then
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
+	end
+	if onboarding_gate ~= ONBOARDING_STOP_JOINED then
+		local callback_fired = false
+		local continuation_result = false
+		local accepted = stop_loaded_onboarding("Karabiner pause", function(stopped)
+			callback_fired = true
+			if stopped == true then
+				continuation_result = M.pause(on_done, ONBOARDING_STOP_JOINED)
+			else
+				invoke_public_callback("pause", on_done, false, "onboarding-stop-incomplete")
+			end
+		end)
+		if callback_fired then return continuation_result end
+		return accepted == true
 	end
 	cancel_guardian_regeneration_wait("script-pause-requested")
 	cancel_deferred_layout_regeneration("script-pause-requested")
@@ -4344,33 +4507,8 @@ function M.init(file_system)
 	if _state.enabled and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true
 		local wizard_epoch = _lifecycle_epoch
-		local candidate = nil
-		local schedule_ok, handle_or_err, committed = xpcall(function()
-			return TimerScheduler.after(FIRST_RUN_WIZARD_DELAY_SEC, function()
-				if _wizard_timer ~= candidate or _wizard_timer_committed ~= true then return end
-				_wizard_timer_committed = false
-				if candidate.timer == nil then _wizard_timer = nil end
-				if not is_current_lifecycle(wizard_epoch)
-					or not _state or _state.enabled ~= true then return end
-				local callback_ok, callback_err = xpcall(function()
-					local Onboarding = require("platform.remap.onboarding")
-					Onboarding.run_first_run_wizard()
-				end, debug.traceback)
-				if not callback_ok then
-					Logger.error(LOG, "First-run wizard callback failed: %s.", tostring(callback_err))
-				end
-			end)
-		end, debug.traceback)
-		candidate = handle_or_err
-		if type(candidate) == "table" and candidate.timer ~= nil then
-			_wizard_timer = candidate
-		end
-		if schedule_ok and committed == true and type(candidate) == "table" then
-			_wizard_timer = candidate
-			_wizard_timer_committed = true
-		else
-			Logger.error(LOG, "First-run wizard timer could not be scheduled: %s.",
-				tostring(handle_or_err))
+		if schedule_first_run_wizard(wizard_epoch) ~= true then
+			Logger.error(LOG, "First-run wizard timer could not be scheduled or settled.")
 		end
 	end
 
@@ -4390,31 +4528,8 @@ local function stop_local_resources()
 	cancel_deferred_layout_regeneration("local-teardown")
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
-	_wizard_timer_committed = false
-	if _wizard_timer then
-		local timer_ok, timer_result = xpcall(function()
-			return TimerScheduler.cancel(_wizard_timer)
-		end, debug.traceback)
-		if not timer_ok or timer_result ~= true then
-			Logger.error(LOG, "First-run wizard timer teardown failed: %s.",
-				tostring(timer_result))
-			all_stopped = false
-		else
-			_wizard_timer = nil
-		end
-	end
-	-- The onboarding poll is owned by its module rather than the shared
-	-- scheduler registry.  Consult package.loaded so teardown never starts the
-	-- onboarding subsystem merely to stop it, while still retrying an exact
-	-- timer handle retained after a failed native cancellation.
-	local onboarding = package.loaded["platform.remap.onboarding"]
-	if onboarding and type(onboarding.stop) == "function" then
-		local onboarding_ok, onboarding_result = xpcall(onboarding.stop, debug.traceback)
-		if not onboarding_ok or onboarding_result ~= true then
-			Logger.error(LOG, "Onboarding poll teardown failed: %s.", tostring(onboarding_result))
-			all_stopped = false
-		end
-	end
+	-- The module-level contract owns timers, installer tasks, partials, and mounts
+	if stop_loaded_onboarding("Karabiner local teardown") ~= true then all_stopped = false end
 	if _wake_watcher then
 		local stopped, stop_result = pcall(function() return _wake_watcher:stop() end)
 		if not stopped or stop_result == false then
@@ -4479,9 +4594,10 @@ function M.teardown_local()
 	return true
 end
 
---- Revokes only Ergopti's exact lease. Local F17 consumers stay mounted until
---- the STOPPED/fallback callback, and are deliberately owned by a later local
---- teardown transaction. Stock Karabiner processes remain user-managed.
+--- Revokes Ergopti's exact lease and joins onboarding installer settlement.
+--- Local F17 consumers stay mounted until both fences complete, and are
+--- deliberately owned by a later local teardown transaction. Stock Karabiner
+--- processes remain user-managed.
 --- @param reason string|nil Stable teardown reason for diagnostics.
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
@@ -4500,6 +4616,12 @@ function M.revoke(reason, on_done)
 	_pending_layout_refresh = nil
 	local callback_fired = false
 	local callback_succeeded = false
+	local onboarding_done = false
+	local onboarding_succeeded = false
+	local onboarding_detail = nil
+	local lease_done = false
+	local lease_succeeded = false
+	local lease_detail = nil
 	local function settle_revoke(ok, detail)
 		if callback_fired then
 			Logger.warn(LOG, "Duplicate Ergopti Karabiner revocation completion ignored.")
@@ -4509,29 +4631,63 @@ function M.revoke(reason, on_done)
 		callback_succeeded = ok == true
 		invoke_public_callback("revoke", on_done, ok == true, detail)
 	end
-	local call_ok, accepted_or_err = xpcall(function()
-		return LeaseController.stop(reason or "hammerspoon_shutdown", function(stopped, stop_reason)
-			if stopped ~= true then
-				Logger.error(LOG, "Ergopti Karabiner lease revocation failed: %s.",
-					tostring(stop_reason))
-				settle_revoke(false, stop_reason or "revocation-failed")
+	local function settle_join_if_ready()
+		if not onboarding_done or not lease_done then return end
+		if onboarding_succeeded ~= true then
+			Logger.error(LOG, "Ergopti onboarding revocation failed: %s.",
+				tostring(onboarding_detail))
+			settle_revoke(false, onboarding_detail or "onboarding-stop-incomplete")
+			return
+		end
+		if lease_succeeded ~= true then
+			Logger.error(LOG, "Ergopti Karabiner lease revocation failed: %s.",
+				tostring(lease_detail))
+			settle_revoke(false, lease_detail or "revocation-failed")
+			return
+		end
+		settle_revoke(true, lease_detail or "stopped")
+	end
+
+	local onboarding_accepted = stop_loaded_onboarding("Karabiner lease revocation",
+		function(stopped, detail)
+			if onboarding_done then
+				Logger.warn(LOG, "Duplicate onboarding half of Karabiner revocation ignored.")
 				return
 			end
-			settle_revoke(true, stop_reason or "stopped")
+			onboarding_done = true
+			onboarding_succeeded = stopped == true
+			onboarding_detail = detail
+			settle_join_if_ready()
+		end)
+	if onboarding_accepted ~= true and not onboarding_done then
+		onboarding_done = true
+		onboarding_detail = "onboarding-stop-rejected"
+	end
+	local call_ok, accepted_or_err = xpcall(function()
+		return LeaseController.stop(reason or "hammerspoon_shutdown", function(stopped, stop_reason)
+			if lease_done then
+				Logger.warn(LOG, "Duplicate lease half of Karabiner revocation ignored.")
+				return
+			end
+			lease_done = true
+			lease_succeeded = stopped == true
+			lease_detail = stop_reason
+			settle_join_if_ready()
 		end)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "Ergopti Karabiner lease revocation raised: %s.",
 			tostring(accepted_or_err))
-		if not callback_fired then settle_revoke(false, "revocation-raised") end
-		return false
-	end
-	if accepted_or_err ~= true then
+		lease_done = true
+		lease_detail = "revocation-raised"
+	elseif accepted_or_err ~= true then
 		Logger.error(LOG, "Ergopti Karabiner lease revocation was not accepted.")
-		if not callback_fired then settle_revoke(false, "revocation-rejected") end
-		return false
+		lease_done = true
+		lease_detail = "revocation-rejected"
+	else
+		Logger.success(LOG, "Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.")
 	end
-	Logger.success(LOG, "Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.")
+	settle_join_if_ready()
 	if callback_fired then return callback_succeeded end
 	return true
 end

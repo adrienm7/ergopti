@@ -1182,10 +1182,12 @@ helpers.describe("Karabiner stock processes remain entirely user-managed", funct
 		local exact_owned_task_terminations = 0
 		for _, unit in ipairs(units) do
 			local guarded_body = unit.body
-			-- Onboarding owns the hs.task objects in its private registry. Cancelling
-			-- those exact download/installer handles is required lifecycle cleanup,
-			-- not control of a shared Karabiner process.
-			if guarded_body:find("for task in pairs(M._active_tasks) do", 1, true) then
+			-- The whole onboarding module is the private native-task owner class.
+			-- Mask every exact handle termination in that class without pinning the
+			-- implementation's loop/helper spelling; the behavioral lifecycle suite
+			-- separately proves membership, retention, and retry of those handles.
+			local normalized_path = unit.path:gsub("\\", "/")
+			if normalized_path:match("platform/remap/onboarding%.lua$") then
 				local masked
 				guarded_body, masked = guarded_body:gsub(
 					"task:%s*terminate%s*%(%s*%)", "task:cancel_exact_owned_task()")
