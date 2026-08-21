@@ -73,9 +73,11 @@ SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
 GH_OWNER="${GH_OWNER:-Ergopti}"
 GH_REPO="${GH_REPO:-Ergopti}"
 
-# Bundle identifier for the embedded Hammerspoon. Picked so preferences land
-# in ~/Library/Preferences/com.ergoptiplus.app.plist, isolated from stock HS.
+# Give the embedded runtime an Ergopti-owned but distinct identity. Reusing the
+# outer launcher's ID makes macOS terminate Hammerspoon as a duplicate app;
+# using a dedicated ID still isolates its preferences from stock Hammerspoon.
 BUNDLE_ID="com.ergoptiplus.app"
+HAMMERSPOON_BUNDLE_ID="com.ergoptiplus.app.hammerspoon"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build/macos"
@@ -282,13 +284,14 @@ assemble_app() {
 	mv "$BUILD_DIR/Hammerspoon.app" "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
 
 	# Rewrite the embedded Hammerspoon's bundle id so its NSUserDefaults land
-	# under com.ergoptiplus.app — the launcher reads/writes MJConfigDir there.
+	# under the dedicated child identity used by the launcher's CFPreferences
+	# writes. It must not equal the already-running outer application's ID.
 	# Without this rewrite a stock Hammerspoon install on the same machine
 	# would share its preferences with our embedded instance and overwrite
 	# the config-dir override on every launch.
 	local hs_plist="$APP_PATH/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist"
 	[ -f "$hs_plist" ] || fail "embedded Hammerspoon Info.plist missing."
-	plutil -replace CFBundleIdentifier -string "$BUNDLE_ID" "$hs_plist"
+	plutil -replace CFBundleIdentifier -string "$HAMMERSPOON_BUNDLE_ID" "$hs_plist"
 
 	# Disarm the embedded Hammerspoon's own Sparkle so it never tries to
 	# update itself behind our back. Updates are owned exclusively by the

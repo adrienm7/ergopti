@@ -513,12 +513,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// This writes into ~/Library/Preferences/<bundleId>.plist synchronously,
 	// bypassing the cfprefsd async pipeline that `defaults write` goes through.
 	// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
-	// its own bundle ID (rewritten to kErgoptiBundleId at build time); the plist
+	// its own bundle ID (rewritten to kEmbeddedHammerspoonBundleId at build time).
+	// Keeping that identity distinct from the running launcher prevents macOS
+	// from treating the child as a duplicate instance of the outer application.
+	// The plist
 	// is flushed before launchHammerspoon() so HS sees the correct path on the
 	// very first read, even on first-ever launch.
 	// Done at every startup so a user who moved the .app sees the new path.
 	private func seedConfigDirDefault() {
-		let appId = kErgoptiBundleId as CFString
+		let appId = kEmbeddedHammerspoonBundleId as CFString
 		let user  = kCFPreferencesCurrentUser
 		let host  = kCFPreferencesAnyHost
 
@@ -688,11 +691,11 @@ let _earlyInitLua = Bundle.main.bundlePath + "/Contents/Resources/static/ergopti
 CFPreferencesSetValue(
     kHammerspoonConfigKey as CFString,
     _earlyInitLua as CFString,
-    kErgoptiBundleId as CFString,
+    kEmbeddedHammerspoonBundleId as CFString,
     kCFPreferencesCurrentUser,
     kCFPreferencesAnyHost)
 CFPreferencesSynchronize(
-    kErgoptiBundleId as CFString,
+    kEmbeddedHammerspoonBundleId as CFString,
     kCFPreferencesCurrentUser,
     kCFPreferencesAnyHost)
 
