@@ -333,10 +333,21 @@ function M.create(deps)
 				save_prefs  = save_prefs,
 				update_menu = update_menu,
 				profile_mutation_gate = function()
-						local gate = deps.settle_profile_delete_recovery
-						if gate == nil then return true end
-						if type(gate) ~= "function" then return false end
-						return gate()
+						local delete_gate = deps.settle_profile_delete_recovery
+						if delete_gate ~= nil then
+								if type(delete_gate) ~= "function"
+										or delete_gate() ~= true then
+										return false
+								end
+						end
+						local candidate_gate = deps.settle_profile_candidate_recovery
+						if candidate_gate ~= nil then
+								if type(candidate_gate) ~= "function"
+										or candidate_gate() ~= true then
+										return false
+								end
+						end
+						return true
 				end,
 				runtime_gate = function()
 						local script_control = deps.script_control

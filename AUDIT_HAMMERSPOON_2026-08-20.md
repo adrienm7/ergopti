@@ -78,7 +78,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-031` — recommended-profile actions now use the same transactional profile owner; independently reviewed GO
 - [x] `HS-032` — Ollama pull owns download/loadability only; parent model transaction is the sole publisher
 - [x] `HS-033` — this fix commit; profile deletion, shortcut replacement, and profile-intent recovery share exact retryable owners
-- [ ] `HS-034` — failed profile creation removes its uncommitted registry candidate
+- [x] `HS-034` — clone/create candidates share an exact registry owner and retryable rollback debt
 - [x] `HS-035` — Ollama pull failure reaches the parent requirements terminal; independently reviewed GO
 - [x] `PARITY-001` — `4f22a1efc` (Linux suffix codepoint count)
 - [x] `PARITY-002` — `22ca14d81` (Linux canonical multibyte trigger)
@@ -765,6 +765,8 @@ With production sources temporarily removed while retaining the new tests, the e
 **Fix.** Give clone/create one candidate-registry owner around activation. On a clean activation refusal, remove the exact newly inserted table before returning failure and emit no editor/success notification. If the profile transition retains compensation debt that still references the candidate, retain an explicit candidate cleanup debt and remove it exactly once only after the transition settles. Coordinate runtime registry publication with `HS-033` rather than assigning a second public field.
 
 **Regression test.** Drive real `ProfilesManager` plus real `ModelSwitcher` from an empty user registry. Inject a runtime setter that mutates then throws, with successful compensation, and assert Clone and Create leave zero profiles, `basic` at every boundary, and zero editor/notification. Add a refused-compensation case proving the exact candidate remains owned while live and is removed after recovery, never by a later unrelated profile.
+
+**Implemented and independently replayed.** Clone and Create now publish their exact candidate table only through a shared registry owner. A refused activation restores the previous table in place through `set_user_profiles()`, retains runtime/persistence/menu compensation debt when any strict boundary refuses, and gates every sibling selection, CRUD action, recommendation, pending-model continuation, and `No Model` transition until recovery settles. The Create timer/editor callback is latched, so synchronous or duplicate delivery cannot publish a second candidate. The real `MenuLLM.create` wiring dynamically forwards the candidate gate into `ModelSwitcher`; removing either factory edge makes the integration proof fail. The focused matrix passes `49/49`, including literal `false`, `nil`, and throw at strict registry/save/recovery boundaries plus positive nil controls for documented void runtime/menu callbacks. Nine direct model/profile neighbours pass `217/217`, and an independent second-lens review returned GO.
 
 ### `HS-035` — Ollama pull failures disappear below the parent requirements terminal
 
