@@ -148,6 +148,18 @@ local LM = helpers.load_with_stubs("modules.keylogger.log_manager", {
 hs.fs.__set_entries(SCRATCH_DIR .. "by_device/", { ".", "..", DEVICE_ID })
 local Rotation = require("modules.keylogger.rotation")
 
+local function ensure_initialized()
+	if Rotation.is_initialized() then return end
+	helpers.assert_true(LM.init({
+		LOG_DIR = SCRATCH_DIR,
+		buffer_events = {}, buffer_text = "", rich_chunks = {},
+		session_mouse_clicks = 0, session_mouse_scrolls = 0,
+		mouse_distance_px = 0, last_flush_time = 0,
+		last_time = 0, pending_keyup = {},
+		today_idx = {}, manifest = {},
+	}) ~= false, "the JSONL fallback fixture must initialize independently")
+end
+
 
 
 
@@ -161,14 +173,7 @@ local Rotation = require("modules.keylogger.rotation")
 helpers.describe("keylogger/log_manager: a db.sqlite open failure must not silence JSONL logging", function()
 
 	helpers.it("initialises rotation through the fallback branch when SQLite is unavailable", function()
-		LM.init({
-			LOG_DIR = SCRATCH_DIR,
-			buffer_events = {}, buffer_text = "", rich_chunks = {},
-			session_mouse_clicks = 0, session_mouse_scrolls = 0,
-			mouse_distance_px = 0, last_flush_time = 0,
-			last_time = 0, pending_keyup = {},
-			today_idx = {}, manifest = {},
-		})
+		ensure_initialized()
 
 		-- ROOT CAUSE pin: the old probe tested an accessor's existence, so this
 		-- flag stayed false and every later append_log was rejected by the guard.
@@ -177,8 +182,13 @@ helpers.describe("keylogger/log_manager: a db.sqlite open failure must not silen
 	end)
 
 	helpers.it("writes the appended event to today.log as exactly one JSONL line", function()
+		ensure_initialized()
+		local timer_count = #hs.timer.__timers
 		helpers.assert_true(LM.append_log({ type = "typing", text = "x" }),
 			"the JSONL-only append must cross the exact write+flush commit boundary")
+		helpers.assert_true(#hs.timer.__timers > timer_count,
+			"accepted eventtap work must schedule a retained outbox drain")
+		hs.timer.__timers[#hs.timer.__timers]:fire()
 
 		local lines = read_lines(TODAY_LOG)
 		helpers.assert_eq(#lines, 1,
