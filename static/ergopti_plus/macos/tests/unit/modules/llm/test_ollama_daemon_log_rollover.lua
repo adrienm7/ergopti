@@ -140,12 +140,28 @@ helpers.describe("Ollama daemon log rollover", function()
 	helpers.it("routes the menu-owned daemon through the same runtime daily sink", function()
 		local Logger = require("infra.logger")
 		local original_log = Logger.UNIFIED_LOG_FILE
+		local previous_shell_runner = package.loaded["adapters.shell_runner"]
+		local previous_timer_scheduler = package.loaded["adapters.timer_scheduler"]
 		local commands = {}
 		Logger.UNIFIED_LOG_FILE = SENTINEL_LOG
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return "/fixture/ollama", nil, true end,
 		}
 		package.loaded["adapters.task_lifecycle"] = nil
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function(program, args, on_done)
+				local command = {program = program, args = args, on_done = on_done}
+				commands[#commands + 1] = command
+				return {
+					start = function() return true end,
+					terminate = function() return true, "pending" end,
+				}
+			end,
+		}
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function() error("restart rollover test must not reach readiness retry") end,
+			cancel = function() return true end,
+		}
 
 		local Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama", {
 			fs = { attributes = function(path)
@@ -154,26 +170,25 @@ helpers.describe("Ollama daemon log rollover", function()
 				end
 				return nil
 			end },
-			execute = function(command)
-				commands[#commands + 1] = command
-				return "", true
-			end,
+			execute = function() error("menu daemon startup must not use hs.execute") end,
 			timer = { doAfter = function() return { stop = function() end } end },
 		})
 
 		local ok, err = pcall(function()
 			local manager = Manager.new({}, {}, function() return 0 end)
 			manager.check_requirements("test-model", function() end, function() end)
-			local daemon_command
-			for _, command in ipairs(commands) do
-				if command:find("nohup", 1, true) then daemon_command = command; break end
-			end
-			helpers.assert_not_nil(daemon_command, "menu flow must reach the real daemon restart")
-			assert_runtime_daily_sink(daemon_command, "models_manager_ollama")
+			helpers.assert_eq(commands[1].program, "/usr/bin/curl",
+				"menu flow must probe readiness asynchronously before restarting")
+			commands[1].on_done(28, "", "timeout")
+			helpers.assert_not_nil(commands[2], "menu flow must reach the real daemon restart")
+			helpers.assert_eq(commands[2].program, "/bin/bash")
+			assert_runtime_daily_sink(commands[2].args[2], "models_manager_ollama")
 		end)
 
 		Logger.UNIFIED_LOG_FILE = original_log
 		package.loaded["modules.llm.ollama_binary"] = nil
+		package.loaded["adapters.shell_runner"] = previous_shell_runner
+		package.loaded["adapters.timer_scheduler"] = previous_timer_scheduler
 		if not ok then error(err) end
 	end)
 

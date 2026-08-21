@@ -19,12 +19,20 @@ local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 -- GC-root table: hs.task objects pinned here survive until their callback fires.
 local _active_tasks = {}
 
 local LOG = "menu_llm.ollama"
+local BASH_BIN = "/bin/bash"                         -- Shell used only as an async daemon-launch worker.
+local CURL_BIN = "/usr/bin/curl"                    -- Absolute path: Hammerspoon does not inherit login PATH reliably.
+local OLLAMA_VERSION_URL = "http://localhost:11434/api/version"
+local OLLAMA_READINESS_PROBE_TIMEOUT_SEC = 5         -- Bound each worker without blocking the Lua runloop.
+local OLLAMA_READINESS_RETRY_DELAY_SEC = 0.5         -- Preserve the established daemon-start polling cadence.
+local OLLAMA_READINESS_MAX_RETRIES = 30              -- Allow thirty bounded probes before terminal failure.
 
 local ok_dw, download_window = pcall(require, "ui.download_window")
 if not ok_dw then download_window = nil end
@@ -150,9 +158,9 @@ function M.new(deps, presets, ram_getter)
 		return clean
 	end
 
-	local function restart_ollama_daemon()
+	local function build_ollama_restart_command()
 		local ollama_bin = require_ollama_path("restart the daemon")
-		if not ollama_bin then return false end
+		if not ollama_bin then return nil end
 		
 		-- Launch daemon via bash nohup to ensure it survives subprocess termination.
 		-- The shared foreground pipeline uses a `while read` loop because macOS'
@@ -161,77 +169,280 @@ function M.new(deps, presets, ram_getter)
 			ollama_bin, Logger.UNIFIED_LOG_FILE)
 		if not launch_cmd then
 			Logger.error(LOG, "Could not build Ollama daemon command: %s", tostring(command_err))
-			return false
+			return nil
 		end
-		local detached_cmd = "nohup /bin/bash -c " .. text_utils.shell_quote(launch_cmd)
+		return "nohup /bin/bash -c " .. text_utils.shell_quote(launch_cmd)
 			.. " </dev/null >/dev/null 2>&1 &"
-		local call_ok, _, command_ok = pcall(hs.execute, detached_cmd)
-		return call_ok == true and command_ok ~= false
 	end
+
+	-- One manager instance owns one readiness transaction. Callers join this
+	-- single-flight operation with independent freshness predicates and terminal
+	-- callbacks; a rapid A -> B switch therefore cannot launch two Ollama daemons.
+	local readiness_operation = nil
 
 	--- Ensures the Ollama daemon is running, starts it otherwise.
 	--- @param on_ready function Callback executed when ready.
 	--- @param on_fail function Callback executed when failed.
 	--- @param opts table|nil Operation options, including the live generation predicate.
+	--- @return boolean accepted True when the waiter joined or owned the readiness operation.
 	local function ensure_ollama_running(on_ready, on_fail, opts)
-		local is_current = type(opts) == "table" and opts.is_current or function() return true end
-		local terminal_sent = false
-		local function settle(callback, label, ...)
-			if terminal_sent then return false end
-			terminal_sent = true
-			if type(callback) ~= "function" then return true end
-			local ok, result = Logger.callback(LOG, label, callback, ...)
-			return ok and result ~= false
-		end
-		local function settle_failure(...)
-			return settle(on_fail, "Ollama daemon failure", ...)
-		end
-		local function still_current()
+		local waiter = {
+			is_current = type(opts) == "table" and opts.is_current or function() return true end,
+			on_ready = on_ready,
+			on_fail = on_fail,
+			terminal_sent = false,
+		}
+
+		local function waiter_is_current(candidate)
 			local ok, current = Logger.callback(LOG,
-				"Ollama daemon freshness check", is_current)
+				"Ollama readiness waiter freshness check", candidate.is_current)
 			return ok == true and current == true
 		end
-		local function current_or_cancel()
-			if still_current() then return true end
-			settle_failure("stale")
+
+		local function settle_waiter(candidate, ready, reason)
+			if candidate.terminal_sent then return false end
+			candidate.terminal_sent = true
+			local callback = ready and candidate.on_ready or candidate.on_fail
+			if type(callback) ~= "function" then return true end
+			local label = ready and "Ollama daemon ready" or "Ollama daemon failure"
+			local ok, result
+			if ready then
+				ok, result = Logger.callback(LOG, label, callback)
+			else
+				ok, result = Logger.callback(LOG, label, callback, reason)
+			end
+			return ok == true and result ~= false
+		end
+
+		if not waiter_is_current(waiter) then
+			settle_waiter(waiter, false, "stale")
 			return false
 		end
-		local function settle_ready(...)
-			if not current_or_cancel() then return false end
-			return settle(on_ready, "Ollama daemon ready", ...)
+
+		local existing = readiness_operation
+		if existing ~= nil and existing.terminal_sent ~= true then
+			existing.waiters[#existing.waiters + 1] = waiter
+			return true
 		end
 
-		if not current_or_cancel() then return false end
-		local ok, result = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
-		if not current_or_cancel() then return false end
-		if ok and result and result:find('"version"') then
-			return settle_ready()
+		local operation = {
+			command = nil,
+			retry_timer = nil,
+			retries = 0,
+			restart_requested = false,
+			terminal_sent = false,
+			waiters = {waiter},
+		}
+		readiness_operation = operation
+
+		local function owns_operation()
+			return readiness_operation == operation and operation.terminal_sent ~= true
 		end
 
-		pcall(notifications.notify, i18n.get("ollama.starting_title"), i18n.get("ollama.service_stopped"), "info")
-		if not current_or_cancel() then return false end
-		if restart_ollama_daemon() then
-			local retries = 0
-			local function check_ready()
-				if not current_or_cancel() then return end
-				retries = retries + 1
-				local ok2, result2 = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
-				if not current_or_cancel() then return end
-				if ok2 and result2 and result2:find('"version"') then
-					settle_ready()
-				elseif retries < 30 then
-					hs.timer.doAfter(0.5, check_ready)
-				else
-					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.start_fail"), "error")
-					settle_failure("readiness_timeout")
+		local function cancel_retry_timer()
+			local handle = operation.retry_timer
+			if not handle then return true end
+			local ok, cancelled = Logger.callback(LOG,
+				"Ollama readiness retry timer cancellation", TimerScheduler.cancel, handle)
+			if ok == true and cancelled == true then
+				if operation.retry_timer == handle then operation.retry_timer = nil end
+				return true
+			end
+			Logger.error(LOG, "Ollama readiness retry timer refused cancellation; exact handle retained.")
+			return false
+		end
+
+		local function release_operation()
+			if operation.terminal_sent then return false end
+			operation.terminal_sent = true
+			if operation.retry_timer ~= nil then cancel_retry_timer() end
+			if readiness_operation == operation then readiness_operation = nil end
+			return true
+		end
+
+		local function settle_operation(ready, reason)
+			if not release_operation() then return false end
+			local delivered = false
+			local all_accepted = true
+			local waiters = operation.waiters
+			operation.waiters = {}
+			for _, candidate in ipairs(waiters) do
+				if not candidate.terminal_sent then
+					local candidate_ready = ready and waiter_is_current(candidate)
+					local candidate_reason = reason
+					if ready and not candidate_ready then candidate_reason = "stale" end
+					if not ready and not waiter_is_current(candidate) then candidate_reason = "stale" end
+					delivered = true
+					if settle_waiter(candidate, candidate_ready, candidate_reason) ~= true then
+						all_accepted = false
+					end
 				end
 			end
-			hs.timer.doAfter(0.5, check_ready)
-		else
-			pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.daemon_fail"), "error")
-			settle_failure("restart_failed")
+			return delivered and all_accepted
 		end
-		return true
+
+		local function retain_current_waiters()
+			if not owns_operation() then return false end
+			local limit = #operation.waiters
+			for index = 1, limit do
+				local candidate = operation.waiters[index]
+				if not candidate.terminal_sent and not waiter_is_current(candidate) then
+					settle_waiter(candidate, false, "stale")
+				end
+			end
+			for _, candidate in ipairs(operation.waiters) do
+				if not candidate.terminal_sent then return true end
+			end
+			release_operation()
+			return false
+		end
+
+		local start_probe
+		local start_restart
+		local schedule_retry
+
+		local function start_owned_command(label, executable, args, on_done, refusal_reason)
+			if not retain_current_waiters() then return false end
+			if operation.command ~= nil then
+				Logger.error(LOG, "%s refused because another readiness command is still owned.", label)
+				settle_operation(false, "readiness_command_overlap")
+				return false
+			end
+
+			local command
+			local start_in_progress = true
+			local pending_completion = nil
+			local function finish_command(exit_code, stdout, stderr)
+				if operation.command ~= command then return false end
+				operation.command = nil
+				if not retain_current_waiters() then return false end
+				local done_ok, done_result = Logger.callback(LOG,
+					label .. " completion", on_done, exit_code, stdout, stderr)
+				if not done_ok then
+					settle_operation(false, label .. "_callback_failed")
+					return false
+				end
+				if done_result == false and owns_operation() then
+					settle_operation(false, label .. "_completion_refused")
+				end
+				return done_result ~= false
+			end
+			local built_ok, candidate = Logger.callback(LOG, label .. " construction",
+				ShellRunner.spawn, executable, args, function(exit_code, stdout, stderr)
+					-- A hostile/native-faithful task double may deliver completion from
+					-- inside :start() before :start() reports whether acquisition
+					-- committed.  Buffer that completion until the exact true result;
+					-- otherwise downstream model work can start and then be contradicted
+					-- by a start-refusal terminal from this same command.
+					if start_in_progress then
+						if pending_completion == nil then
+							pending_completion = table.pack(exit_code, stdout, stderr)
+						end
+						return true
+					end
+					return finish_command(exit_code, stdout, stderr)
+				end)
+			if not built_ok or type(candidate) ~= "table" or type(candidate.start) ~= "function" then
+				settle_operation(false, refusal_reason)
+				return false
+			end
+
+			command = candidate
+			operation.command = command
+			local start_ok, started = Logger.callback(LOG, label .. " start", command.start)
+			start_in_progress = false
+			if not start_ok or started ~= true then
+				if operation.command == command then operation.command = nil end
+				settle_operation(false, refusal_reason)
+				return false
+			end
+			if pending_completion ~= nil then
+				return finish_command(table.unpack(pending_completion, 1, pending_completion.n))
+			end
+			return true
+		end
+
+		schedule_retry = function()
+			if not retain_current_waiters() then return false end
+			if operation.retry_timer ~= nil then
+				Logger.error(LOG, "Ollama readiness retry refused because a timer is already owned.")
+				settle_operation(false, "retry_timer_overlap")
+				return false
+			end
+
+			local retry_handle
+			local timer_ok, candidate, committed = Logger.callback(LOG,
+				"Ollama readiness retry timer", TimerScheduler.after,
+				OLLAMA_READINESS_RETRY_DELAY_SEC, function()
+					if operation.retry_timer ~= retry_handle then return false end
+					operation.retry_timer = nil
+					if not retain_current_waiters() then return false end
+					operation.retries = operation.retries + 1
+					return start_probe(true)
+				end)
+			if not timer_ok or type(candidate) ~= "table" or committed ~= true then
+				if type(candidate) == "table" then
+					Logger.callback(LOG, "Ollama refused retry timer cleanup",
+						TimerScheduler.cancel, candidate)
+				end
+				settle_operation(false, "retry_timer_refused")
+				return false
+			end
+			retry_handle = candidate
+			operation.retry_timer = retry_handle
+			return true
+		end
+
+		start_restart = function()
+			local command = build_ollama_restart_command()
+			if not command then
+				pcall(notifications.notify, i18n.get("ollama.fail_title"),
+					i18n.get("ollama.daemon_fail"), "error")
+				settle_operation(false, "restart_command_unavailable")
+				return false
+			end
+			-- Do not use a login shell: user profile startup is unrelated to this
+			-- fixed launch command and can otherwise stall the shared readiness owner.
+			return start_owned_command("Ollama daemon restart", BASH_BIN, {"-c", command},
+				function(exit_code)
+					if exit_code ~= 0 then
+						Logger.error(LOG, "Ollama daemon restart worker exited with code %s.",
+							tostring(exit_code))
+						pcall(notifications.notify, i18n.get("ollama.fail_title"),
+							i18n.get("ollama.daemon_fail"), "error")
+						settle_operation(false, "restart_failed")
+						return false
+					end
+					return schedule_retry()
+				end, "restart_task_start_refused")
+		end
+
+		start_probe = function(is_retry)
+			return start_owned_command("Ollama readiness probe", CURL_BIN,
+				{"-s", "--max-time", tostring(OLLAMA_READINESS_PROBE_TIMEOUT_SEC),
+					OLLAMA_VERSION_URL},
+				function(exit_code, stdout)
+					if exit_code == 0 and type(stdout) == "string"
+						and stdout:find('"version"', 1, true) then
+						return settle_operation(true)
+					end
+					if not is_retry and not operation.restart_requested then
+						operation.restart_requested = true
+						pcall(notifications.notify, i18n.get("ollama.starting_title"),
+							i18n.get("ollama.service_stopped"), "info")
+						return start_restart()
+					end
+					if operation.retries < OLLAMA_READINESS_MAX_RETRIES then return schedule_retry() end
+					Logger.error(LOG, "Ollama daemon stayed unavailable after %d readiness probes.",
+						OLLAMA_READINESS_MAX_RETRIES)
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						i18n.get("ollama.start_fail"), "error")
+					settle_operation(false, "readiness_timeout")
+					return false
+				end, "readiness_probe_start_refused")
+		end
+
+		return start_probe(false)
 	end
 
 	local function get_ollama_repo(model_name)
@@ -612,7 +823,7 @@ function M.new(deps, presets, ram_getter)
 		local silent = type(opts) == "table" and opts.silent_notifications == true
 		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
 		
-		ensure_ollama_running(function()
+		local readiness_accepted = ensure_ollama_running(function()
 			if not current_or_cancel() then return false end
 			local bin = require_ollama_path("check model requirements")
 			if not bin then
@@ -695,23 +906,32 @@ function M.new(deps, presets, ram_getter)
 			end
 			return true
 		end, settle_cancel, opts)
+		if readiness_accepted ~= true then
+			if not terminal_sent then settle_cancel("readiness_dispatch_refused") end
+			return false
+		end
 		return true
 	end
 
 	function obj.delete_model(model_name)
-		if not model_name or model_name == "" then return end
+		if not model_name or model_name == "" then return false end
 		Logger.debug(LOG, string.format("Deleting Ollama model %s…", model_name))
 		
-		ensure_ollama_running(function()
+		local readiness_accepted = ensure_ollama_running(function()
 			local bin = require_ollama_path("delete a model")
 			if not bin then
 				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 					string.format(i18n.get("ollama.delete_error"), model_name,
 						"Ollama executable unavailable"), "error")
-				return
+				return false
 			end
 			local task
-				task = TaskLifecycle.native("Ollama model delete", bin, function(code, stdout)
+			local start_in_progress = true
+			local pending_completion = nil
+			local terminal_sent = false
+			local function finish_delete(code, stdout)
+				if terminal_sent then return false end
+				terminal_sent = true
 				if task then _active_tasks[task] = nil end
 				if code == 0 then
 					pcall(notifications.notify, i18n.get("ollama.deleted_title"), string.format(i18n.get("ollama.model_deleted"), model_name), "success")
@@ -719,24 +939,51 @@ function M.new(deps, presets, ram_getter)
 						Logger.callback(LOG, "Ollama deletion menu refresh", deps.update_menu)
 					end
 					Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
-				else
-					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(stdout)), "error")
+					return true
 				end
-				end, {"rm", model_name})
-				if task then
-					_active_tasks[task] = true
-					if not TaskLifecycle.start(task, "Ollama model delete") then
-						_active_tasks[task] = nil
-						pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
-							string.format(i18n.get("ollama.delete_error"), model_name,
-								"task start failed"), "error")
+				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(stdout)), "error")
+				return false
+			end
+			task = TaskLifecycle.native("Ollama model delete", bin, function(code, stdout)
+				if start_in_progress then
+					if pending_completion == nil then
+						pending_completion = table.pack(code, stdout)
 					end
-				else
+					return true
+				end
+				return finish_delete(code, stdout)
+			end, {"rm", model_name})
+			if task then
+				_active_tasks[task] = true
+				local started = TaskLifecycle.start(task, "Ollama model delete")
+				start_in_progress = false
+				if started ~= true then
+					_active_tasks[task] = nil
+					terminal_sent = true
 					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 						string.format(i18n.get("ollama.delete_error"), model_name,
-							"task creation failed"), "error")
+							"task start failed"), "error")
+					return false
 				end
+				if pending_completion ~= nil then
+					return finish_delete(table.unpack(pending_completion, 1,
+						pending_completion.n))
+				end
+				return true
+			end
+			start_in_progress = false
+			terminal_sent = true
+			pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+				string.format(i18n.get("ollama.delete_error"), model_name,
+					"task creation failed"), "error")
+			return false
+		end, function(reason)
+			pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
+				string.format(i18n.get("ollama.delete_error"), model_name,
+					tostring(reason or "readiness failed")), "error")
+			return true
 		end)
+		return readiness_accepted == true
 	end
 
 	return obj

@@ -14,9 +14,10 @@
 --- longer than macOS's watchdog threshold permanently disables the input tap,
 --- breaking the keylogger until the next full Hammerspoon reload.
 ---
---- The fix: the blocking function (wait_for_ollama_api) was dead code and has
---- been removed. The production polling path (ensure_ollama_running) already
---- uses hs.timer.doAfter for fully async polling with no usleep.
+--- The fix: no readiness shell operation runs on the Lua thread. ShellRunner
+--- owns curl/restart processes and TimerScheduler owns every retry boundary;
+--- merely moving a blocking call into hs.timer.doAfter would still freeze the
+--- same Hammerspoon runloop.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -45,11 +46,15 @@ helpers.describe("ui/menu/menu_llm/models_manager_ollama.lua: no usleep (ollama-
 			"models_manager_ollama.lua must NOT call hs.timer.usleep — it blocks the main thread and can kill eventtap hooks (ollama-usleep-main-thread-freeze)")
 	end)
 
-	helpers.it("async polling uses hs.timer.doAfter, not a blocking loop", function()
+	helpers.it("readiness polling owns async tasks and retained timers", function()
 		local src = read_source("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
 		helpers.assert_true(
-			src:find("hs%.timer%.doAfter") ~= nil,
-			"models_manager_ollama.lua must use hs.timer.doAfter for async Ollama readiness polling (ollama-usleep-main-thread-freeze)")
+			src:find("ShellRunner%.spawn") ~= nil
+				and src:find("TimerScheduler%.after") ~= nil,
+			"Ollama readiness must own subprocess and retry capabilities through async adapters")
+		helpers.assert_true(
+			src:find("pcall%(hs%.execute") == nil and src:find("hs%.execute%(") == nil,
+			"bounded hs.execute still blocks the Hammerspoon runloop and is forbidden")
 	end)
 
 end)
