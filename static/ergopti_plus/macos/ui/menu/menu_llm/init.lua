@@ -189,11 +189,62 @@ end
 --- Stops the MLX server process if one is currently running.
 --- Safe to call even when no server is active or before M.create() has been called.
 --- Intended for the Hammerspoon shutdown callback to prevent orphaned Python processes.
-function M.stop_mlx_server()
-	M.reset_llm_health_status()
-	if _active_models_mgr and type(_active_models_mgr.stop_mlx_server_if_needed) == "function" then
-		pcall(_active_models_mgr.stop_mlx_server_if_needed)
+--- @param on_settled function|nil Called exactly once with the shutdown terminal.
+--- @return boolean accepted True when synchronous settlement or callback ownership commits.
+function M.stop_mlx_server(on_settled)
+	if on_settled ~= nil and type(on_settled) ~= "function" then
+		Logger.error(LOG, "MLX shutdown refused: settlement callback is not callable.")
+		return false
 	end
+	local callback_claimed = false
+	local callback_result = false
+	local function settle_shutdown(settled, detail)
+		if callback_claimed then return callback_result end
+		callback_claimed = true
+		callback_result = settled == true
+		if callback_result then M.reset_llm_health_status() end
+		if type(on_settled) == "function" then
+			local callback_ok, callback_error = xpcall(function()
+				on_settled(callback_result,
+					detail or (callback_result and "mlx-listener-absent" or "mlx-listener-cleanup-refused"))
+			end, debug.traceback)
+			if not callback_ok then
+				callback_result = false
+				Logger.error(LOG, "MLX shutdown settlement callback failed: %s.",
+					tostring(callback_error))
+			end
+		end
+		return callback_result
+	end
+
+	if not _active_models_mgr then
+		return settle_shutdown(true, "mlx-manager-inactive")
+	end
+	if type(_active_models_mgr.stop_mlx_server_if_needed) ~= "function" then
+		Logger.error(LOG, "MLX shutdown refused: exact stop primitive is unavailable.")
+		return false
+	end
+	local ok, accepted = xpcall(function()
+		return _active_models_mgr.stop_mlx_server_if_needed(function(detail)
+			return settle_shutdown(true, detail)
+		end, {
+			kind = "shutdown",
+			on_cancel = function(reason)
+				return settle_shutdown(false, reason)
+			end,
+		})
+	end, debug.traceback)
+	-- A faithful or test-native task may complete from inside terminate(); exact
+	-- completion then outranks any contradictory return from the signal request
+	if callback_claimed then return callback_result end
+	if not ok or accepted ~= true then
+		Logger.error(LOG, "MLX shutdown stop was refused: %s.",
+			tostring(ok and accepted or accepted))
+		return false
+	end
+	-- Callback callers own an awaitable terminal. Legacy synchronous callers still
+	-- receive false until exact settlement rather than confusing signal with stop
+	return type(on_settled) == "function"
 end
 
 --- Kills the orphan helper processes spawned for the local LLM backends (the
@@ -216,10 +267,10 @@ function M.terminate_helper_processes()
 	pcall(hs.execute, "pkill -f '[o]llama serve'", true)
 end
 
---- Kills any orphan mlx_lm.server and frees its listening port. stop_mlx_server()
---- only terminates the in-process hs.task WRAPPER; the Python server runs in its
---- OWN process group (set +m) and survives that, so it must be reaped explicitly
---- via pgrep/lsof. Shared by BOTH the hs.shutdownCallback genuine-quit branch and
+--- Kills any orphan mlx_lm.server and frees its listening port when no current
+--- lifecycle owner can be reached. The exact stop primitive already proves its
+--- captured port absent; this remains the previous-session/crash fallback shared
+--- by BOTH the hs.shutdownCallback genuine-quit branch and
 --- the script_quit (os.exit) action so the two quit paths can never drift — without
 --- this, script_quit left the GPU-resident server holding the port (F-M7). The port
 --- is read from the single source api_mlx.get_port().
@@ -325,6 +376,54 @@ function M.create(deps)
 		local keymap       = deps.keymap
 		local save_prefs   = deps.save_prefs
 		local update_menu  = deps.update_menu
+		local mlx_port_transition_generation = 0
+
+		local function restart_mlx_for_current_port(new_port, commit_port)
+				if type(commit_port) ~= "function" then
+						Logger.error(LOG, "MLX port transition refused: commit callback is unavailable.")
+						return false
+				end
+				mlx_port_transition_generation = mlx_port_transition_generation + 1
+				local generation = mlx_port_transition_generation
+				if state.llm_backend ~= "mlx" then return commit_port() == true end
+				if type(models_mgr.stop_mlx_server_if_needed) ~= "function" then
+						Logger.error(LOG, "MLX port transition refused: exact stop primitive is unavailable.")
+						return false
+				end
+				local ok_stop, accepted = xpcall(function()
+						return models_mgr.stop_mlx_server_if_needed(function()
+								if generation ~= mlx_port_transition_generation then return false end
+								if not commit_port() then return false end
+								if state.llm_backend == "mlx"
+										and state.llm_enabled
+										and state.llm_model
+										and state.llm_model ~= "" then
+										-- Silent: a port change is not a model change, so don't pop the
+										-- recommended-profile dialog. Pin the committed port into this
+										-- successor identity so a later preference edit cannot retarget it.
+										local ok_start, started = xpcall(function()
+												return models_mgr.check_requirements(
+														state.llm_model, nil, nil, {
+															silent_notifications = true,
+															_mlx_port = new_port,
+														})
+										end, debug.traceback)
+										if not ok_start or started == false then
+												Logger.error(LOG, "MLX server relaunch on port %s was refused: %s.",
+														tostring(new_port), tostring(started))
+												return false
+										end
+								end
+								return true
+						end, { kind = "port" })
+				end, debug.traceback)
+				if not ok_stop or accepted ~= true then
+						Logger.error(LOG, "MLX port transition stop was refused: %s.",
+								tostring(ok_stop and accepted or accepted))
+						return false
+				end
+				return true
+		end
 
 		local switcher = ModelSwitcher.new({
 				state       = state,
@@ -683,16 +782,6 @@ function M.create(deps)
 						-- new port for the current model so the change takes effect immediately.
 						local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
 						if ok_api and type(ApiMlx.get_port) == "function" then
-								local function restart_mlx_for_current_port()
-										if state.llm_backend ~= "mlx" then return end
-										pcall(models_mgr.stop_mlx_server_if_needed)
-										if state.llm_enabled and state.llm_model and state.llm_model ~= "" then
-												-- Silent: a port change is not a model change, so don't pop the
-												-- recommended-profile dialog — just bring the server back up.
-												pcall(models_mgr.check_requirements, state.llm_model, nil, nil,
-														{ silent_notifications = true })
-										end
-								end
 								-- Row DATA appended to the selector's finished tree: the rows
 								-- above it are ModelsSelector's, these three are this file's,
 								-- and the renderer materialises this file's.
@@ -700,19 +789,19 @@ function M.create(deps)
 										{ separator = true },
 										{
 												label    = string.format(i18n.get("menu.llm.mlx_port_label"), tostring(ApiMlx.get_port())),
-												disabled = paused or nil,
-												action   = not paused and function()
-														settings_mgr.set_mlx_port(restart_mlx_for_current_port)
-												end or nil,
-										},
+										disabled = paused or nil,
+										action   = not paused and function()
+												return settings_mgr.set_mlx_port(restart_mlx_for_current_port)
+										end or nil,
+								},
 								}
 								if type(ApiMlx.get_default_port) == "function" and ApiMlx.get_port() ~= ApiMlx.get_default_port() then
 										port_rows[#port_rows + 1] = {
 												label    = string.format(i18n.get("menu.llm.reset_label"), tostring(ApiMlx.get_default_port())),
-												disabled = paused or nil,
-												action   = not paused and function()
-														settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
-												end or nil,
+											disabled = paused or nil,
+											action   = not paused and function()
+													return settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
+											end or nil,
 										}
 								end
 								for _, row in ipairs(ManifestMenu.render_rows(port_rows, "llm_model")) do

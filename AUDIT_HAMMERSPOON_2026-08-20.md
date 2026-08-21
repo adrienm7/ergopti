@@ -52,7 +52,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-005` — `5ca12305c` (`fix(macos): route repeat through replacement transaction`)
 - [x] `HS-006` — `477cec849` (`fix(macos): count dynamic suffixes as codepoints`)
 - [x] `HS-007` — manager-side generation fence and exactly-once stale terminal — fixed and behaviorally replayed in this commit
-- [ ] `HS-008` — exact MLX predecessor/replacement ownership
+- [x] `HS-008` — exact MLX predecessor/replacement ownership; native/adopted/cleanup owners and async root teardown independently replayed
 - [x] `HS-009` — `2cdf06f89` (`fix(macos): isolate semantic LLM HTTP owners`)
 - [x] `HS-010` — exact Ollama pull owner and cancel terminal — fixed and behaviorally replayed in this commit
 - [x] `HS-011` — exact installer owner, bounded cleanup retries, and pause/disable/teardown joins
@@ -258,6 +258,8 @@ The callers defeat a local stop fix unless they join the same transaction. Switc
 **Fix.** Make replacement, public stop, backend switch, port restart, and shutdown share one exact settlement primitive: retain A until confirmed stopped, accept native task userdata as a termination signal but not as settlement, and launch/publish the successor only from A's exact completion. Include port in the server identity and propagate stop refusal to callers.
 
 **Regression test.** Add `tests/unit/ui/menu/menu_llm/test_mlx_server_replacement_transaction.lua`. For throw/false/native-self terminate through replacement, public stop, backend switch, port edit, and shutdown, assert no successor/publication, no false success log, and unchanged exact owner. Accepted termination must retain A until its callback, then launch the latest model/port successor exactly once. Preserve the `HS-007` negative invariant that no independent pre-launch sweep exists.
+
+**Implemented and independently replayed.** Replacement, explicit stop, backend publication, port restart, and controlled shutdown now share one latest-intent owner keyed by backend, model, and port. A native `hs.task:terminate()` self-return is treated only as an accepted signal; the exact task, adopted-listener cleanup, and successor remain owned until callback and port-absence proof. Stop supersedes pending successors, cleanup refusal produces one negative waiter terminal while retaining retryable debt, and startup supervises the background Python process so a wrapper stopped before bind cannot publish a late listener. Stock Apple `lsof` 4.91 is supported without `-Q`, while no-match and operational failure remain distinct. Root teardown is explicitly awaitable through `TerminationCoordinator`, so reload/quit resumes only from the exact MLX callback. The focused `HS-008` replay passes `29/29`; nine affected neighbour modules pass `57/57`; Lua compilation, strict conventions, pinned-read, false-green, and diff checks are green. These are deterministic harnesses; no native macOS process smoke result is claimed, and download ownership remains tracked separately by `HS-024`.
 
 ### `HS-009` — Single-slot HTTP clients silently cancel independent semantic operations
 

@@ -313,6 +313,8 @@ local LauncherGuard
 local _termination_coordinator_ready = false
 local _local_teardown_state = TeardownTransaction.new_state()
 local _local_teardown_started = false
+local _mlx_teardown_pending = false
+local _mlx_teardown_settled = false
 -- Set only after the controlled path has drained and released the logger. The
 -- native shutdown callback still fires for hs.reload(); without this fence it
 -- would reopen the synchronous fallback sink and request the already-STOPPED
@@ -422,12 +424,64 @@ end
 --- fence. The native shutdown callback intentionally does not call it because
 --- its asynchronous fence cannot be awaited safely.
 --- @param termination_kind string|nil `reload` or `exit` for diagnostics.
---- @return boolean completed
-local function teardown_all_resources(termination_kind)
+--- @param on_teardown_ready function|nil Retained by an asynchronous owner.
+--- @return boolean accepted
+--- @return string|nil state `pending` while an exact callback is retained.
+local function teardown_all_resources(termination_kind, on_teardown_ready)
 	if not _local_teardown_started then
 		_local_teardown_started = true
 		Logger.info(LOG, "Hammerspoon local teardown started (%s).", tostring(termination_kind or "shutdown"))
 	end
+
+	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM
+	-- Keep every remaining local owner alive until its exact callback proves the
+	-- captured listener absent, then let the coordinator retry this stateful pass
+	if not _mlx_teardown_settled then
+		if _mlx_teardown_pending then return true, "pending" end
+		local module = package.loaded["ui.menu.menu_llm"]
+		if module == nil then
+			_mlx_teardown_settled = true
+		elseif type(module.stop_mlx_server) ~= "function" then
+			Logger.error(LOG, "MLX teardown refused: stop_mlx_server is unavailable.")
+			return false
+		elseif type(on_teardown_ready) ~= "function" then
+			Logger.error(LOG, "MLX teardown refused: readiness callback is unavailable.")
+			return false
+		else
+			local callback_claimed = false
+			_mlx_teardown_pending = true
+			local function on_mlx_settled(settled, detail)
+				if callback_claimed then return false end
+				callback_claimed = true
+				_mlx_teardown_pending = false
+				_mlx_teardown_settled = settled == true
+				local callback_ok, callback_error = xpcall(function()
+					return on_teardown_ready(settled == true, detail)
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "MLX teardown readiness callback failed: %s.",
+						tostring(callback_error))
+				end
+				return callback_ok and settled == true
+			end
+
+			local stop_ok, accepted_or_error = xpcall(function()
+				return module.stop_mlx_server(on_mlx_settled)
+			end, debug.traceback)
+			-- Exact synchronous completion outranks a later native return or throw;
+			-- the coordinator observed the callback and owns the authorized retry
+			if callback_claimed then return true, "pending" end
+			if not stop_ok or accepted_or_error ~= true then
+				_mlx_teardown_pending = false
+				Logger.error(LOG, "MLX teardown stop was refused: %s.",
+					tostring(stop_ok and accepted_or_error or accepted_or_error))
+				return false
+			end
+			Logger.debug(LOG, "MLX teardown is awaiting exact task completion.")
+			return true, "pending"
+		end
+	end
+
 	local steps = {
 		{
 			name = "boot-ready-setting",
@@ -505,15 +559,6 @@ local function teardown_all_resources(termination_kind)
 					error("infra.vscode_bridge.stop_server is unavailable")
 				end
 				return module.stop_server()
-			end,
-		},
-		{
-			name = "mlx-server",
-			run = function()
-				local module = package.loaded["ui.menu.menu_llm"]
-				if module == nil then return true end
-				if type(module.stop_mlx_server) ~= "function" then error("stop_mlx_server is unavailable") end
-				return module.stop_mlx_server()
 			end,
 		},
 		{

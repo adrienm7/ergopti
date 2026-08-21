@@ -538,9 +538,10 @@ function M.new(deps)
 	--- api_mlx (persisted to hs.settings), NOT in the LLM state table, because it is
 	--- a property of Ergopti's own MLX server — the one we launch with `--port` — and
 	--- is read by the launcher, the health probe, and the boot cleanup. On a valid
-	--- change we persist + rebuild the server URL via api_mlx.set_port, then invoke
-	--- on_applied so the caller can relaunch the server on the new port.
-	--- @param on_applied function|nil Called after a successful change (e.g. restart).
+	--- change the caller first joins the exact server-stop transaction. It receives
+	--- a one-shot commit callback and may return true to defer persistence until the
+	--- predecessor's native completion. A false/throw leaves the old port published.
+	--- @param on_applied function|nil Called as (new_port, commit_port).
 	function obj.set_mlx_port(on_applied)
 		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
 		if not ok_api or type(ApiMlx.set_port) ~= "function" then
@@ -568,25 +569,48 @@ function M.new(deps)
 				tostring(raw), lo, hi)
 			return
 		end
-		if not ApiMlx.set_port(new_port) then return end
-		Logger.info(LOG, "MLX server port set to %d via menu.", new_port)
-		local applied = invoke_optional("MLX port apply", on_applied)
-		local refreshed = refresh_menu(deps, "MLX port menu refresh")
-		return applied and refreshed
+		local committed = false
+		local commit_result = false
+		local function commit_port()
+			if committed then return commit_result end
+			committed = true
+			if not ApiMlx.set_port(new_port) then return false end
+			Logger.info(LOG, "MLX server port set to %d via menu.", new_port)
+			commit_result = refresh_menu(deps, "MLX port menu refresh")
+			return commit_result
+		end
+		if type(on_applied) ~= "function" then return commit_port() end
+		local ok_apply, apply_result = Logger.callback(
+			LOG, "MLX port apply", on_applied, new_port, commit_port)
+		if not ok_apply or apply_result == false then return false end
+		-- Literal true transfers commit ownership to an asynchronous stop callback.
+		-- Nil preserves the synchronous optional-hook contract used by other callers.
+		if apply_result == true then return true end
+		return commit_port()
 	end
 
 	--- Resets the MLX server port to its dedicated default and applies it.
-	--- @param on_applied function|nil Called after the reset (e.g. restart).
+	--- @param on_applied function|nil Called as (default_port, commit_port).
 	function obj.reset_mlx_port(on_applied)
 		local ok_api, ApiMlx = pcall(require, "modules.llm.api_mlx")
 		if not ok_api or type(ApiMlx.set_port) ~= "function" then return end
-		if ApiMlx.set_port(ApiMlx.get_default_port()) then
-			Logger.info(LOG, "MLX server port reset to default %d.", ApiMlx.get_default_port())
-			local applied = invoke_optional("MLX port reset apply", on_applied)
-			local refreshed = refresh_menu(deps, "MLX port reset menu refresh")
-			return applied and refreshed
+		local default_port = ApiMlx.get_default_port()
+		local committed = false
+		local commit_result = false
+		local function commit_port()
+			if committed then return commit_result end
+			committed = true
+			if not ApiMlx.set_port(default_port) then return false end
+			Logger.info(LOG, "MLX server port reset to default %d.", default_port)
+			commit_result = refresh_menu(deps, "MLX port reset menu refresh")
+			return commit_result
 		end
-		return false
+		if type(on_applied) ~= "function" then return commit_port() end
+		local ok_apply, apply_result = Logger.callback(
+			LOG, "MLX port reset apply", on_applied, default_port, commit_port)
+		if not ok_apply or apply_result == false then return false end
+		if apply_result == true then return true end
+		return commit_port()
 	end
 
 	--- Builds the indentation selection submenu.
