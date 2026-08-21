@@ -54,7 +54,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-007` — manager-side generation fence and exactly-once stale terminal — fixed and behaviorally replayed in this commit
 - [ ] `HS-008` — exact MLX predecessor/replacement ownership
 - [x] `HS-009` — `2cdf06f89` (`fix(macos): isolate semantic LLM HTTP owners`)
-- [ ] `HS-010` — exact Ollama pull owner and cancel terminal
+- [x] `HS-010` — exact Ollama pull owner and cancel terminal — fixed and behaviorally replayed in this commit
 - [ ] `HS-011` — onboarding installer lifecycle owner
 - [ ] `HS-012` — transactional pause-owner registry
 - [x] `HS-013` — this fix commit; exact handles are reused and six focused edit/menu repros pass
@@ -284,6 +284,8 @@ The callers defeat a local stop fix unless they join the same transaction. Switc
 **Fix.** Use a pull owner `{task, generation, cancel_requested, terminal}`. Refuse or join re-entry while it owns the slot, mark cancellation before signaling the native task, accept a truthy task userdata only as signal acceptance, retain ownership until the exact callback, and compare owner/token before every clear or publication.
 
 **Regression test.** Add `tests/unit/ui/menu/menu_llm/test_ollama_download_single_slot.lua`. Preserve the existing A-then-B rejection and exact-owner assertion. Table-drive `terminate()` throw, false, and native-shaped `return self`; accepted cancellation retains A until its callback and delivers one terminal. Deliver late exit `0` after cancel and assert zero model/runtime/persistence publication. A stale completion must not clear or mutate a successor; include the idle positive control.
+
+**Implemented and behaviorally replayed.** The pull now owns `{cancel_requested, completion_seen, terminal}` beside the exact task slot. A user cancel is latched before native termination, native task userdata means signal accepted rather than settled, and false/nil/throw retain the same task for cleanup retry. Construction/start refusal, synchronous completion from `start()` or `terminate()`, duplicate completion, process failure, busy re-entry, and late exit `0` after cancel all deliver at most one terminal and never publish canceled output. The pre-fix behavioral module exposed seven ownership/terminal failures; the final exact module passes `12/12`, and four direct manager/generation neighbors pass `24/24`. Syntax, conventions, false-green ratchet, and scoped diff checks are green. The shared Hammerspoon E2E snapshot remains `60/64` because the concurrently open `HS-003` serializer WIP rejects four synthetic provenance cases; no E2E-green claim is made for this commit, and `HS-010` touches neither the input serializer nor that harness.
 
 ### `HS-011` — Onboarding installer tasks survive pause, disable, and stop
 
