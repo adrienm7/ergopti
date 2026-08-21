@@ -759,7 +759,7 @@ global _LLM_PROFILE_HOTKEY_RETRY_LIMIT := 3
  * happens only after the complete pass and a proven HotIf reset.
  */
 LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
-		ResetFn := 0) {
+		ResetFn := 0, SelectFn := 0) {
 	global _LLM_PROFILE_HOTKEY_PRED, _LLM_Menu_ProfileHotkeyOwner
 	global _LLM_Menu_ProfileHotkeyFailureCount
 	global _LLM_PROFILE_HOTKEY_STATUS_READY
@@ -769,7 +769,7 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 	if InheritedCritical {
 		Critical("Off")
 		try return LLM_Menu_BindProfileHotkeys(HotkeyFn, HotIfFn, LogFn,
-			ResetFn)
+			ResetFn, SelectFn)
 		finally Critical(InheritedCritical)
 	}
 	if (_LLM_Menu_ProfileHotkeyOwner is Map) {
@@ -783,7 +783,9 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 		HotIfFn := _LLM_Menu_ProfileNativeHotIf
 	if !HasMethod(ResetFn, "Call")
 		ResetFn := _LLM_Menu_ProfileNativeHotIf
-	CandidatePlan := _LLM_Menu_BuildProfileHotkeyPlan()
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
+	CandidatePlan := _LLM_Menu_BuildProfileHotkeyPlan(SelectFn)
 
 	PreviousCritical := Critical("On")
 	OpenAttempted := false
@@ -848,13 +850,19 @@ _LLM_Menu_ProfileNativeHotIf(Args*) {
 	HotIf(Args*)
 }
 
-_LLM_Menu_BuildProfileHotkeyPlan() {
+_LLM_Menu_ProfileNativeSelect(ProfileId) {
+	return LLM_Menu_SetProfile(ProfileId)
+}
+
+_LLM_Menu_BuildProfileHotkeyPlan(SelectFn := 0) {
 	global LLM_PROFILE_HOTKEY_LIMIT
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
 	Plan := []
 	loop LLM_PROFILE_HOTKEY_LIMIT {
 		Index := A_Index
 		Plan.Push(Map("spec", "^" . Index,
-			"callback", _LLM_Menu_MakeProfileHotkey(Index)))
+			"callback", _LLM_Menu_MakeProfileHotkey(Index, SelectFn)))
 	}
 	return Plan
 }
@@ -918,23 +926,36 @@ _LLM_Menu_ProfileHotkeyRetryPending() {
 
 /**
  * Predicate used by ``HotIf`` to decide whether the Ctrl+<n> bindings are
- * active. True only when the LLM tray reports enabled AND there is at
- * least one configured profile to map onto — otherwise the keystroke
- * falls through to the active app unchanged.
+ * active. True only when the LLM tray reports enabled AND the concrete
+ * Ctrl+digit index maps to a configured profile. An ineligible variant lets
+ * Windows deliver the original physical event to the next eligible owner (or
+ * the app) unchanged. Cross-surface collisions are tracked separately.
  */
+_LLM_Menu_ProfileHotkeyIndex(ThisHotkey) {
+	Identity := _LLM_Menu_NavNativeIdentity(ThisHotkey)
+	if !RegExMatch(Identity, "^\^([1-9])$", &Match)
+		return 0
+	return Integer(Match[1])
+}
+
 _LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {
 	global _LLM_Menu, _LLM_Menu_Loaded
 	if !_LLM_Menu_Loaded || !_LLM_Menu_ProfileHotkeyOwnerReady()
 		return false
 	if !IsSet(_LLM_Menu) or !_LLM_Menu["enabled"]
 		return false
+	Index := _LLM_Menu_ProfileHotkeyIndex(ThisHotkey)
+	if !Index
+		return false
+	Order := LLM_Menu_GetHotkeyProfileOrder()
+	if (Index > Order.Length)
+		return false
 	; Yield only when the published navigation owner has the exact same variant.
 	; A broad tooltip-visible gate would swallow Ctrl+digits while navigation uses
 	; Alt or Shift; AHK passes the concrete hotkey name to this predicate.
 	if LLM_Menu_NavOwnsSpec(ThisHotkey)
 		return false
-	order := LLM_Menu_GetHotkeyProfileOrder()
-	return order.Length > 0
+	return true
 }
 
 /**
@@ -942,19 +963,22 @@ _LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {
  * the active profile order each time it fires (not at registration time)
  * so new user profiles created after boot are reachable without a reload.
  */
-_LLM_Menu_MakeProfileHotkey(idx) {
-	return (*) => _LLM_Menu_OnProfileHotkey(idx)
+_LLM_Menu_MakeProfileHotkey(idx, SelectFn := 0) {
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
+	return (*) => _LLM_Menu_OnProfileHotkey(idx, SelectFn)
 }
 
-_LLM_Menu_OnProfileHotkey(idx) {
-	; The HotIf predicate already guarantees the LLM is enabled and at
-	; least one profile is configured. We still guard against an out-of-
-	; range idx (user has fewer profiles than the bound 1..9) by sending
-	; the bare keystroke through so the app's own Ctrl+<n> handler runs.
-	order := LLM_Menu_GetHotkeyProfileOrder()
-	if (idx < 1 or idx > order.Length) {
-		Send "^" . idx
-		return
-	}
-	LLM_Menu_SetProfile(order[idx])
+_LLM_Menu_OnProfileHotkey(idx, SelectFn := 0) {
+	; The predicate owns only in-range digits. Recheck because the separate
+	; HotIf callback thread can observe a newer profile order; never synthesize a
+	; replacement chord here because that would not be native pass-through.
+	if !(idx is Integer) || idx < 1
+		return false
+	Order := LLM_Menu_GetHotkeyProfileOrder()
+	if (idx > Order.Length)
+		return false
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
+	return SelectFn.Call(Order[idx])
 }
