@@ -26,7 +26,9 @@
 #Requires AutoHotkey v2.0
 
 LLM_Menu_IsValidModifierString(Raw) {
-	Value := Trim(String(Raw))
+	if !(Raw is String)
+		return false
+	Value := Trim(Raw)
 	return (Value == "") || (LLM_Menu_ShortcutToAhk(Value . "+a") != "")
 }
 

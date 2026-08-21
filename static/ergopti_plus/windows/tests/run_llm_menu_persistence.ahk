@@ -3,11 +3,20 @@
 SetWorkingDir(A_ScriptDir)
 #Warn VarUnset, Off
 global _AHK_DRY_RUN := false
+global _ConfigBootReadFailed := false
 #Include test_framework.ahk
 #Include test_stubs.ahk
+#Include ../adapters/crypto.ahk
+#Include ../adapters/file_system.ahk
 #Include ../infra/json.ahk
+#Include ../infra/locale.ahk
+#Include ../infra/chord.ahk
+#Include ../adapters/hotkey_registrar.ahk
+#Include ../infra/hotpath_profiler.ahk
 #Include ../infra/toml/toml_helpers.ahk
+#Include ../infra/toml/toml_loader.ahk
 #Include ../infra/toml/toml_config_loader.ahk
+#Include ../modules/llm/option_validation.ahk
 global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
@@ -18,8 +27,11 @@ global _LLM_Menu := Map(
 	"streaming", true, "show_all_at_once", true, "pred_indent", 0,
 	"auto_raise_temp", true, "nav_modifiers", "", "val_modifiers", "alt",
 	"trigger_shortcut", "Ctrl+Space", "api_entry_id", "api_primary",
-	"ollama_port", 11434, "inline_autotype", false
+	"ollama_port", 11434, "inline_autotype", false, "user_profiles", []
 )
+#Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/menu_profiles.ahk
+#Include ../ui/menu/menu_llm/trigger_shortcut.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_menu_regressions.ahk

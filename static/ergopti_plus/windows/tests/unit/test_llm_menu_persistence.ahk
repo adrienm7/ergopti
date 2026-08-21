@@ -108,12 +108,14 @@ _LLM_Persist_CollectFeatureUpdates(Updates, SectionPath, Node) {
 _LLM_Persist_CollectUpdates() {
 	global Features, _LLM_Menu
 	Updates := []
-	_LLM_Menu_SyncToFeatures()
+	AssertTrue(_LLM_Menu_SyncToFeatures(),
+		"the persistence fixture must not continue after feature reconciliation fails")
 	; Scope to [llm] only - same keys the tray persists; avoids walking the full
 	; Features stub (hotstrings, layout, ...) on every contract round-trip.
 	if Features.Has("llm")
 		_LLM_Persist_CollectFeatureUpdates(Updates, "llm", Features["llm"])
-	_LLM_Menu_AppendPersistedUpdates(Updates)
+	AssertTrue(_LLM_Menu_AppendPersistedUpdates(Updates),
+		"the persistence fixture must not continue after menu serialization fails")
 	return Updates
 }
 
@@ -220,18 +222,24 @@ Test("LLM persist: every contract tray_key is synced before save",
 	Test_LLM_Persist_AllTrayKeysAreSynced)
 
 Test_LLM_Persist_BuildSavedOptsCoversFeatures() {
-	body := FileRead(_LLM_Persist_PersistSource(), "UTF-8")
-	for entry in _LLM_Persist_LoadContract() {
-		if !entry.Has("ahk") or !(entry["ahk"] is Map)
-			continue
-		ahk := entry["ahk"]
-		if ahk.Has("persist") and ahk["persist"] = "extra"
-			continue
-		if !ahk.Has("tray_key")
-			continue
-		needle := 'opts["' . ahk["tray_key"] . '"]'
-		Assert(InStr(body, needle) > 0,
-			"LLM_Menu_BuildSavedOpts must load " . needle . " (" . entry["id"] . ")")
+	global Features
+	SavedFeatures := Features
+	try {
+		Features := _LLM_Persist_CloneFeatures(SavedFeatures)
+		Opts := LLM_Menu_BuildSavedOpts()
+		for Entry in _LLM_Persist_LoadContract() {
+			if !Entry.Has("ahk") or !(Entry["ahk"] is Map)
+				continue
+			Ahk := Entry["ahk"]
+			if !Ahk.Has("features") or !Ahk.Has("tray_key")
+				continue
+			TrayKey := Ahk["tray_key"]
+			AssertTrue(Opts.Has(TrayKey),
+				"LLM_Menu_BuildSavedOpts must publish the typed Features value for "
+				. TrayKey . " (" . Entry["id"] . ")")
+		}
+	} finally {
+		Features := SavedFeatures
 	}
 }
 Test("LLM persist: BuildSavedOpts loads every Features-backed tray key",
@@ -415,3 +423,225 @@ Test_LLM_Persist_LosslessAppOverrides() {
 }
 Test("LLM persist: app overrides round-trip delimiter and Unicode basenames",
 	Test_LLM_Persist_LosslessAppOverrides)
+
+_LLM_Persist_AssertCompositeScalarRejected(Key, Literal, Slug) {
+	Path := A_Temp . "\ergopti_llm_scalar_" . Slug . ".toml"
+	try {
+		Toml := "[llm]`n" . Key . " = " . Literal . "`n"
+		try FileDelete(Path)
+		FileAppend(Toml, Path, "UTF-8")
+		Cache := ParseTomlFile(Path)
+		Assert(IniCacheGet(Cache, "llm", Key) is Array,
+			Slug . " fixture must reach its scalar boundary as an Array")
+
+		Thrown := false
+		Failure := ""
+		try Opts := LLM_Menu_BuildSavedOpts(Cache)
+		catch as Err {
+			Thrown := true
+			Failure := Err.Message
+		}
+		AssertFalse(Thrown,
+			Slug . " must be rejected before String()/deserialization; got: " . Failure)
+		AssertFalse(Opts.Has(Key),
+			Slug . " must not publish a composite value into scalar state")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+
+Test_LLM_Persist_CompositeTriggerShortcutRejected() {
+	_LLM_Persist_AssertCompositeScalarRejected(
+		"trigger_shortcut", '["Ctrl+Space"]', "trigger-shortcut")
+}
+Test("LLM persist: composite trigger shortcut fails closed "
+	. "(llm-persisted-option-type-boundary-trigger-shortcut)",
+	Test_LLM_Persist_CompositeTriggerShortcutRejected)
+
+Test_LLM_Persist_CompositeApiEntryIdRejected() {
+	_LLM_Persist_AssertCompositeScalarRejected(
+		"api_entry_id", '["api_primary"]', "api-entry-id")
+}
+Test("LLM persist: composite API entry identity fails closed "
+	. "(llm-persisted-option-type-boundary-api-entry-id)",
+	Test_LLM_Persist_CompositeApiEntryIdRejected)
+
+Test_LLM_Persist_CompositeUserProfilesPayloadRejected() {
+	_LLM_Persist_AssertCompositeScalarRejected(
+		"user_profiles", '[["encoded-profile"]]', "user-profiles")
+}
+Test("LLM persist: composite custom-profile payload fails closed "
+	. "(llm-persisted-option-type-boundary-user-profiles)",
+	Test_LLM_Persist_CompositeUserProfilesPayloadRejected)
+
+_LLM_Persist_AssertNestedArrayRejected(Section, Key, Slug) {
+	global Features
+	Path := A_Temp . "\ergopti_llm_nested_" . Slug . ".toml"
+	Toml := "[" . Section . "]`n" . Key . ' = [["sentinel"]]`n'
+	try {
+		try FileDelete(Path)
+		FileAppend(Toml, Path, "UTF-8")
+		Cache := ParseTomlFile(Path)
+		Raw := IniCacheGet(Cache, Section, Key)
+		Assert(Raw is Array && Raw.Length = 1 && (Raw[1] is Array),
+			Slug . " fixture must reach production as Array -> Array")
+		ApplyConfigToml(Features, Path)
+		if (Key == "val_modifiers") {
+			Applied := Features["llm"]["navigation"]["val_modifiers"]
+			Assert(Applied is Array && Applied.Length = 1 && (Applied[1] is Array),
+				"ApplyConfigToml must prove the Features contamination is reachable")
+		}
+
+		Thrown := false
+		Failure := ""
+		try Opts := LLM_Menu_BuildSavedOpts(Cache)
+		catch as Err {
+			Thrown := true
+			Failure := Err.Message
+		}
+		AssertFalse(Thrown,
+			Slug . " must fail closed before String()/RegExReplace; got: " . Failure)
+		AssertFalse(Opts.Has(Key),
+			Slug . " must not publish a nested element to menu/engine state")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+
+Test_LLM_Persist_NestedValModifiersRejected() {
+	global Features
+	SavedFeatures := Features
+	try {
+		Features := _LLM_Persist_CloneFeatures(Features)
+		_LLM_Persist_AssertNestedArrayRejected(
+			"llm.navigation", "val_modifiers", "val")
+	} finally {
+		Features := SavedFeatures
+	}
+}
+Test("LLM persist: nested val modifiers fail closed "
+	. "(llm-persisted-option-type-boundary-val)",
+	Test_LLM_Persist_NestedValModifiersRejected)
+
+Test_LLM_Persist_NestedNavModifiersRejected() {
+	global Features
+	SavedFeatures := Features
+	try {
+		Features := _LLM_Persist_CloneFeatures(Features)
+		_LLM_Persist_AssertNestedArrayRejected(
+			"llm.navigation", "nav_modifiers", "nav")
+	} finally {
+		Features := SavedFeatures
+	}
+}
+Test("LLM persist: nested navigation modifiers fail closed "
+	. "(llm-persisted-option-type-boundary-nav)",
+	Test_LLM_Persist_NestedNavModifiersRejected)
+
+Test_LLM_Persist_NestedDisabledAppsRejected() {
+	global Features
+	SavedFeatures := Features
+	try {
+		Features := _LLM_Persist_CloneFeatures(Features)
+		_LLM_Persist_AssertNestedArrayRejected(
+			"llm.trigger", "disabled_apps", "disabled-apps")
+	} finally {
+		Features := SavedFeatures
+	}
+}
+Test("LLM persist: nested disabled applications fail closed "
+	. "(llm-persisted-option-type-boundary-disabled-apps)",
+	Test_LLM_Persist_NestedDisabledAppsRejected)
+
+_LLM_Persist_AssertFeatureCompositeRejected(Section, Key, OptionKey,
+		FeaturePath, Slug) {
+	global Features
+	SavedFeatures := Features
+	Path := A_Temp . "\ergopti_llm_feature_scalar_" . Slug . ".toml"
+	try {
+		Features := _LLM_Persist_CloneFeatures(Features)
+		try FileDelete(Path)
+		FileAppend("[" . Section . "]`n" . Key . ' = [["sentinel"]]`n',
+			Path, "UTF-8")
+		AssertEqual(1, ApplyConfigToml(Features, Path),
+			Slug . " fixture must be accepted by the generic TOML loader")
+		Applied := _LLM_Persist_FeaturesGet(FeaturePath)
+		Assert(Applied is Array,
+			Slug . " fixture must reach the LLM boundary as a composite value")
+
+		Thrown := false
+		Failure := ""
+		try Opts := LLM_Menu_BuildSavedOpts(ParseTomlFile(Path))
+		catch as Err {
+			Thrown := true
+			Failure := Err.Message
+		}
+		AssertFalse(Thrown,
+			Slug . " must be rejected before conversion/publication; got: " . Failure)
+		AssertFalse(Opts.Has(OptionKey),
+			Slug . " must keep the validated menu default")
+	} finally {
+		Features := SavedFeatures
+		try FileDelete(Path)
+	}
+}
+
+Test_LLM_Persist_CompositeFeatureModelRejected() {
+	_LLM_Persist_AssertFeatureCompositeRejected(
+		"llm.models", "ollama", "model", ["models", "ollama"], "model")
+}
+Test("LLM persist: composite Features string fails closed "
+	. "(llm-persisted-option-type-boundary-feature-string)",
+	Test_LLM_Persist_CompositeFeatureModelRejected)
+
+Test_LLM_Persist_CompositeFeatureEnabledRejected() {
+	_LLM_Persist_AssertFeatureCompositeRejected(
+		"llm", "enabled", "enabled", ["enabled"], "enabled")
+}
+Test("LLM persist: composite Features boolean fails closed "
+	. "(llm-persisted-option-type-boundary-feature-boolean)",
+	Test_LLM_Persist_CompositeFeatureEnabledRejected)
+
+Test_LLM_Persist_CompositeFeatureCountRejected() {
+	_LLM_Persist_AssertFeatureCompositeRejected(
+		"llm.profiles", "num_predictions", "n_predictions",
+		["profiles", "num_predictions"], "n-predictions")
+}
+Test("LLM persist: composite Features integer fails closed "
+	. "(llm-persisted-option-type-boundary-feature-integer)",
+	Test_LLM_Persist_CompositeFeatureCountRejected)
+
+Test_LLM_Persist_CompositeFeatureTemperatureRejected() {
+	_LLM_Persist_AssertFeatureCompositeRejected(
+		"llm.generation", "temperature", "temperature",
+		["generation", "temperature"], "temperature")
+}
+Test("LLM persist: composite Features temperature fails before Float "
+	. "(llm-persisted-option-type-boundary-feature-temperature)",
+	Test_LLM_Persist_CompositeFeatureTemperatureRejected)
+
+Test_LLM_Persist_OnboardingBooleanIsTyped() {
+	BadPath := A_Temp . "\ergopti_llm_onboarding_bad.toml"
+	GoodPath := A_Temp . "\ergopti_llm_onboarding_good.toml"
+	try {
+		try FileDelete(BadPath)
+		try FileDelete(GoodPath)
+		FileAppend("[llm]`nonboarding_seen = [[true]]`n", BadPath, "UTF-8")
+		BadOpts := LLM_Menu_BuildSavedOpts(ParseTomlFile(BadPath))
+		AssertFalse(BadOpts.Has("onboarding_seen"),
+			"a composite onboarding value must retain the default")
+
+		FileAppend("[llm]`nonboarding_seen = true`n", GoodPath, "UTF-8")
+		GoodOpts := LLM_Menu_BuildSavedOpts(ParseTomlFile(GoodPath))
+		AssertTrue(GoodOpts.Has("onboarding_seen"),
+			"the production saved-options loader must own the onboarding field")
+		AssertTrue(GoodOpts["onboarding_seen"],
+			"a valid persisted boolean must survive the typed boundary")
+	} finally {
+		try FileDelete(BadPath)
+		try FileDelete(GoodPath)
+	}
+}
+Test("LLM persist: onboarding boolean uses the typed saved-options path "
+	. "(llm-persisted-option-type-boundary-onboarding)",
+	Test_LLM_Persist_OnboardingBooleanIsTyped)

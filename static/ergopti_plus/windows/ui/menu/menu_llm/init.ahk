@@ -35,6 +35,8 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	global _LLM_Menu, _LLM_Menu_Loaded
 	if _LLM_Menu_Loaded
 		return false
+	if !(saved_opts is Map)
+		throw TypeError("LLM saved options must be a Map.")
 	static _str_keys := ["model", "profile_id", "language", "temperature",
 		"nav_modifiers", "val_modifiers", "trigger_shortcut", "backend",
 		"api_entry_id"]
@@ -45,26 +47,58 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 		"show_info_bar", "streaming", "show_all_at_once", "auto_raise_temp",
 		"auto_profile_for_model", "onboarding_seen", "inline_autotype"]
 	static _arr_keys := ["user_profiles", "disabled_apps"]
-	for key in _str_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
+	for key in _str_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because its scalar type is invalid.", key)
+	}
 	for key in ["nav_modifiers", "val_modifiers"] {
 		if !LLM_Menu_IsValidModifierString(_LLM_Menu[key]) {
 			LoggerError("LLM", "Ignoring invalid persisted {1} value: '{2}'.", key, _LLM_Menu[key])
 			_LLM_Menu[key] := (key == "val_modifiers") ? "alt" : ""
 		}
 	}
-	for key in _num_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
-	for key in _bool_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
+	for key in _num_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because it is not an integer.", key)
+	}
+	for key in _bool_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because it is not a Boolean.", key)
+	}
 	if !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"]
 		_LLM_Menu["streaming"] := false
-	for key in _arr_keys
-		if saved_opts.Has(key) && (saved_opts[key] is Array)
-			_LLM_Menu[key] := saved_opts[key]
+	for key in _arr_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because its array shape is invalid.", key)
+	}
+	if saved_opts.Has("app_profile_overrides") {
+		if LLM_Option_TryNormalize("app_profile_overrides",
+				saved_opts["app_profile_overrides"], &NormalizedOverrides)
+			_LLM_Menu["app_profile_overrides"] := NormalizedOverrides
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted app-profile overrides because their shape is invalid.")
+	}
 	return true
 }
 
@@ -93,13 +127,9 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; would roll every LLM setting back in memory while disk keeps the new value.
 	; Restore persisted values exactly once; later builds use the published map.
 	FirstRestore := _LLM_Menu_RestoreSavedOptsOnce(saved_opts)
-	; Map-valued overrides are outside the scalar/array restore table. Install
-	; them before any model correction can persist a full detached candidate;
-	; otherwise an early correction would durably serialize the default empty Map
-	; over the user's application-specific profiles.
-	if FirstRestore && saved_opts.Has("app_profile_overrides")
-			&& (saved_opts["app_profile_overrides"] is Map)
-		_LLM_Menu["app_profile_overrides"] := saved_opts["app_profile_overrides"]
+	; _LLM_Menu_RestoreSavedOptsOnce installs Map-valued overrides before any
+	; model correction can persist a full detached candidate; otherwise an early
+	; correction could durably replace the user's overrides with the empty default.
 	if FirstRestore && _LLM_Menu_PruneOrphanProfileOverrides(_LLM_Menu)
 		LoggerWarn("LLM", "Removed orphan per-application profile override(s) during startup.")
 

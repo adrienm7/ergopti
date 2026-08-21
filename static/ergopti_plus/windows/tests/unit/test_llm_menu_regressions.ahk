@@ -98,29 +98,41 @@ Test("LLM regression: isolated LLM runner predeclares _AHK_DRY_RUN",
 
 
 ; ============================================
-; 2/ persist.ahk — val_modifiers comma-separated round-trip
+; 2/ persist.ahk — val_modifiers canonical chord round-trip
 ; ============================================
 
 Test_LLM_Regression_ValModifiersAltCtrlRoundTrip() {
 	global _LLM_Menu, Features
 	Features := _LLM_Persist_CloneFeatures(Features)
 	_LLM_Menu := _LLM_Persist_MakeDefaultTray()
-	_LLM_Menu["val_modifiers"] := "alt,ctrl"
+	_LLM_Menu["val_modifiers"] := "alt+ctrl"
 
 	_LLM_Menu_SyncToFeatures()
 	got := Features["llm"]["navigation"]["val_modifiers"]
-	Assert(_LLM_Persist_ValuesEqual(["alt", "ctrl"], got, Map("toml_array", true)),
-		"Sync must split alt,ctrl into a two-element array")
+	Assert(_LLM_Persist_ValuesEqual(["ctrl", "alt"], got, Map("toml_array", true)),
+		"Sync must canonicalize alt+ctrl through the shared modifier order")
+	legacy := _LLM_Menu_ModifiersStringToArray("alt,ctrl")
+	Assert(_LLM_Persist_ValuesEqual(["ctrl", "alt"], legacy, Map("toml_array", true)),
+		"The legacy comma spelling must remain readable during migration")
 
 	updates := _LLM_Persist_CollectUpdates()
 	path := A_Temp . "\ergopti_llm_regress_val_mods.toml"
 	TOML_BatchWrite(path, updates)
 	cache := ParseTomlFile(path)
+	Persisted := IniCacheGet(cache, "llm.navigation", "val_modifiers")
+	Assert(_LLM_Persist_ValuesEqual(["ctrl", "alt"], Persisted,
+		Map("toml_array", true)),
+		"Persistence must keep two modifier elements, never one comma-bearing token")
 	opts := LLM_Menu_BuildSavedOpts(cache)
-	Assert(_LLM_Persist_ValuesEqual("alt,ctrl", opts["val_modifiers"], Map("toml_array", true)),
-		"BuildSavedOpts must reload alt,ctrl from TOML cache, not a single token")
+	AssertEqual("ctrl+alt", opts["val_modifiers"],
+		"BuildSavedOpts must reload the canonical '+' chord spelling")
+	Parsed := ChordParse(opts["val_modifiers"] . "+a")
+	AssertTrue(Parsed["ok"],
+		"The persisted modifier spelling must be accepted by the production chord parser")
+	AssertEqual("^!1", LLM_Menu_ShortcutToAhk(opts["val_modifiers"] . "+1"),
+		"The restored modifiers must reach the real Windows digit binding")
 }
-Test("LLM regression: val_modifiers alt,ctrl round-trips via cache",
+Test("LLM regression: val_modifiers uses the canonical chord separator",
 	Test_LLM_Regression_ValModifiersAltCtrlRoundTrip)
 
 
