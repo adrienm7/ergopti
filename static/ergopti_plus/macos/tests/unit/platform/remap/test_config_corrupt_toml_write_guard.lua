@@ -380,8 +380,8 @@ helpers.describe("karabiner setters — only the reset bypasses the corruption g
 		local reset_at = src:find("function M.reset_to_defaults", 1, true)
 		local reset_end = reset_at and src:find("\nend", reset_at, true)
 		local reset_body = reset_at and src:sub(reset_at, reset_end) or ""
-		helpers.assert_true(reset_body:find("end, true", 1, true) ~= nil,
-			"only reset_to_defaults may pass overwrite_corrupt=true into commit_state_mutation")
+		helpers.assert_true(reset_body:find("end, on_done, true", 1, true) ~= nil,
+			"only reset_to_defaults may pass overwrite_corrupt=true into the bulk transaction")
 	end)
 
 end)

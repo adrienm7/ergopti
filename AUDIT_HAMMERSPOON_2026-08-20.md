@@ -63,7 +63,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-016` — callback inventory plus profile-warning sibling are observable and truthful
 - [x] `HS-017` — `ea924a686` (`fix(macos): order updater responses monotonically`)
 - [x] `HS-018` — this fix commit; local health generations now invalidate on every committed backend switch
-- [ ] `HS-019` — root Karabiner fail-fast and bulk clear transaction
+- [x] `HS-019` — root Karabiner fail-fast and bulk clear transaction
 - [x] `HS-020` — `468a3646d` plus fail-safe follow-up `063b8d8ba`
 - [x] `HS-021` — `e02233b4b` (`fix(macos): invalidate hotstring context on Escape`)
 - [ ] `HS-022` — global Disable All / factory reset transaction
@@ -474,6 +474,10 @@ A faithful server harness produced `start_result=nil`, `native_port=0`, `getPort
 **Fix.** Normalize `karabiner.init()` to literal boolean, require exact true before operational UI/boot-ready publication, and make every menu mutation honor returned commit state. Provide a disabled diagnostic menu if desired, never active-looking controls.
 
 **Regression test.** Add `tests/unit/test_init_karabiner_fail_fast.lua`. The root harness injects `karabiner.init=false/nil` and asserts no operational remap menu, no boot success/ready flag, and a visible boot failure. An integration case loads malformed TOML and invokes Clear All, asserting zero success claim and unchanged state.
+
+**Implemented and behaviorally replayed.** Root now requires literal `true` from Karabiner initialization before operational menu or boot-ready publication, and the platform initializer returns a literal boolean on every terminal. All setting and grouped-picker callbacks propagate their exact result. Clear All, Restore Defaults, Copy Tap→Combo and the two per-row clears share one candidate/persist/publish/regenerate owner; a failed terminal compensates the complete detached payload (including `enabled`) and retains persistence or regeneration debt across setters, enable transitions, revoke, stop and local teardown. Disable onboarding preflight is itself owned across asynchronous settlement and fenced by lifecycle epoch, so a late installer callback cannot resume work after shutdown.
+
+The focused HS-019 filter passes `33/33`; the complete platform transaction module passes `73/73`, the real manifest/menu module `7/7`, the root fail-fast meta module `5/5`, and the corruption/timeout neighbours `9/9` and `3/3`. The missing composition identified by second-lens review now writes genuinely malformed TOML, drives the real parser and `platform.remap` initialization into refusal, invokes the real `karabiner_clear_all` manifest action, and proves byte-identical input, fail-closed state, zero success and visible failure. Mutating the uninitialized Clear All branch to return/callback success makes that exact case red (`0/1`); the restored source is green (`1/1`). These are deterministic Lua harnesses; no native macOS Karabiner smoke result is claimed.
 
 ### `HS-020` — The Hammerspoon `--only` runner still loads every test module
 
