@@ -8,8 +8,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Isolated panel: keeps init.lua focused on wiring rather than individual
 ---    setting UIs — temperature items live next to their i18n keys and flags.
---- 2. Delegates setters to settings_manager: this panel only builds menu items
----    and never owns the set/reset callbacks, which already live in the manager.
+--- 2. Delegates every setting transition to settings_manager: this panel only
+---    builds menu items and never owns partial state or persistence updates.
 --- ==============================================================================
 
 local M = {}
@@ -30,14 +30,11 @@ local i18n    = require("infra.i18n")
 --- Appends the temperature rows to the generation submenu's row array.
 --- Row DATA since 2026-08-07: the caller renders the whole array through the
 --- shared renderer, so this panel says what its rows are and nothing more.
---- @param ctx table Context: { state, keymap, is_disabled, save_prefs, update_menu, settings_mgr, llm_mod }.
+--- @param ctx table Context: { state, is_disabled, settings_mgr }.
 --- @param out table The destination ROW array to append to.
 function M.build(ctx, out)
 	local state        = ctx.state
-	local keymap       = ctx.keymap
 	local is_disabled  = ctx.is_disabled
-	local save_prefs   = ctx.save_prefs
-	local update_menu  = ctx.update_menu
 	local settings_mgr = ctx.settings_mgr
 
 	-- Temperature input with reset if changed from default
@@ -62,12 +59,12 @@ function M.build(ctx, out)
 		checked  = state.llm_auto_raise_temp,
 		disabled = (is_disabled or (tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions) < 2) or nil,
 		action   = function()
-			state.llm_auto_raise_temp = not state.llm_auto_raise_temp
-			if keymap and type(keymap.set_llm_auto_raise_temp) == "function" then
-				pcall(keymap.set_llm_auto_raise_temp, state.llm_auto_raise_temp)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+			return settings_mgr.apply_setting_transaction({
+				key = "llm_auto_raise_temp",
+				value = not state.llm_auto_raise_temp,
+				runtime_fn = "set_llm_auto_raise_temp",
+				publish_setting = false,
+			})
 		end,
 	})
 end

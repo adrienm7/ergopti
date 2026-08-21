@@ -118,7 +118,7 @@ package.loaded["ui.tooltip"] = {
 
 -- modules.llm.prediction_engine: minimal stub for all setters + lifecycle calls.
 local ENGINE_ENABLED = false
-package.loaded["modules.llm.prediction_engine"] = {
+local engine_stub = {
 	init                          = function() return true end,
 	reset                         = function() return true end,
 	set_preview_ai_enabled        = function() end,
@@ -146,6 +146,7 @@ package.loaded["modules.llm.prediction_engine"] = {
 	set_llm_debounce              = function() end,
 	set_llm_streaming             = function() end,
 	set_llm_streaming_multi       = function() end,
+	get_llm_runtime_setting       = function() return false, nil end,
 	get_predictions               = function() return {} end,
 	get_current_index             = function() return 1 end,
 	get_navigation_mods           = function() return {} end,
@@ -160,6 +161,7 @@ package.loaded["modules.llm.prediction_engine"] = {
 	start_timer_word_end          = function() end,
 	perform_check                 = function() end,
 }
+package.loaded["modules.llm.prediction_engine"] = engine_stub
 
 -- modules.keymap.registry: no-op stub.
 package.loaded["modules.keymap.registry"] = {
@@ -177,6 +179,33 @@ package.loaded["modules.hotstrings.hotstrings_config"] = {
 -- bridge entry from package.loaded before requiring it, so we get a pristine
 -- module instance with _state == nil.
 local bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
+
+local FORWARDED_ENGINE_SETTERS = {
+	"set_preview_ai_enabled",
+	"set_preview_ai_color",
+	"set_llm_enabled",
+	"set_llm_model",
+	"set_llm_display_model_name",
+	"set_llm_backend_name",
+	"set_llm_context_length",
+	"set_llm_temperature",
+	"set_llm_num_predictions",
+	"set_llm_pred_indent",
+	"set_llm_show_info_bar",
+	"set_llm_sequential_mode",
+	"set_llm_auto_raise_temp",
+	"set_llm_disabled_apps",
+	"set_llm_url_bar_filter_enabled",
+	"set_llm_secure_field_filter_enabled",
+	"set_llm_instant_on_word_end",
+	"set_llm_val_modifiers",
+	"set_llm_nav_modifiers",
+	"set_llm_min_words",
+	"set_llm_max_words",
+	"set_llm_debounce",
+	"set_llm_streaming",
+	"set_llm_streaming_multi",
+}
 
 
 
@@ -218,6 +247,51 @@ end
 -- ==========================================================
 
 helpers.describe("keymap.llm_bridge — duplicate M.init() guard", function()
+	helpers.it("all engine setting wrappers propagate an exact false refusal", function()
+		for _, name in ipairs(FORWARDED_ENGINE_SETTERS) do
+			local original = engine_stub[name]
+			engine_stub[name] = function() return false end
+			local ok, result = pcall(bridge[name], "candidate")
+			engine_stub[name] = original
+			helpers.assert_true(ok, name .. " must remain callable")
+			helpers.assert_eq(result, false,
+				name .. " must not translate an engine refusal into nil success")
+		end
+	end)
+
+	helpers.it("an engine setter throw crosses the real bridge unchanged", function()
+		local original = engine_stub.set_llm_temperature
+		engine_stub.set_llm_temperature = function() error("engine temperature exploded") end
+		local ok, err = pcall(bridge.set_llm_temperature, 0.75)
+		engine_stub.set_llm_temperature = original
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("engine temperature exploded", 1, true) ~= nil)
+	end)
+
+	helpers.it("runtime getter spans bridge-owned and engine-owned settings", function()
+		bridge.set_llm_after_hotstring(true)
+		bridge.set_llm_reset_on_nav(true)
+		local after_found, after_value = bridge.get_llm_runtime_setting("llm_after_hotstring")
+		local nav_found, nav_value = bridge.get_llm_runtime_setting("llm_reset_on_nav")
+		helpers.assert_eq(after_found, true)
+		helpers.assert_eq(after_value, true)
+		helpers.assert_eq(nav_found, true)
+		helpers.assert_eq(nav_value, true)
+
+		local sentinel = {temperature = 0.4}
+		local original = engine_stub.get_llm_runtime_setting
+		engine_stub.get_llm_runtime_setting = function(key)
+			helpers.assert_eq(key, "llm_temperature")
+			return true, sentinel
+		end
+		local found, value = bridge.get_llm_runtime_setting("llm_temperature")
+		engine_stub.get_llm_runtime_setting = original
+		bridge.set_llm_after_hotstring(false)
+		bridge.set_llm_reset_on_nav(false)
+		helpers.assert_eq(found, true)
+		helpers.assert_true(value == sentinel,
+			"the bridge must propagate the engine getter value without substitution")
+	end)
 
 	helpers.it("first M.init() call succeeds with a valid state table", function()
 		-- The bridge was loaded fresh above with _state == nil; the first init

@@ -413,16 +413,44 @@ end
 function M.set_llm_min_words(w)
 	-- Coerce + fail closed: a value from config.toml / a half-written plist can be a
 	-- string, which later reaches `<=`/`>` comparisons in the shared prompt_builder
-	-- and `> 0` in the menu — both crash on a non-number. Persist the coerced number.
+	-- and `> 0` in the menu — both crash on a non-number. SettingsManager remains
+	-- the sole native plist publisher; this setter owns runtime state only.
 	min_words = tonumber(w) or LLM_DEFAULTS.llm_min_words
-	hs.settings.set("llm_min_words", min_words)
 	Logger.debug(LOG, "Min words: %s.", tostring(min_words))
 end
 
 function M.set_llm_max_words(w)
 	max_words = tonumber(w) or LLM_DEFAULTS.llm_max_words
-	hs.settings.set("llm_max_words", max_words)
 	Logger.debug(LOG, "Max words: %s (0 = unlimited).", tostring(max_words))
+end
+
+--- Reads the actual engine-owned runtime value for one transactional menu key.
+--- The boolean discriminator keeps a valid false value distinct from an unknown key.
+--- @param key string Canonical preference key.
+--- @return boolean found True when this engine owns the requested runtime value.
+--- @return any value Current runtime value.
+function M.get_llm_runtime_setting(key)
+	if key == "llm_debounce" then return true, inactivity_debounce_sec end
+	if key == "llm_max_words" then return true, max_words end
+	if key == "llm_min_words" then return true, min_words end
+	if key == "llm_temperature" then return true, temperature end
+	if key == "llm_context_length" then return true, context_window_chars end
+	if key == "llm_num_predictions" then return true, num_predictions end
+	if key == "llm_show_info_bar" then return true, show_info_bar end
+	if key == "llm_sequential_mode" then return true, sequential_mode end
+	if key == "llm_auto_raise_temp" then return true, auto_raise_temperature end
+	if key == "llm_streaming" then return true, is_streaming_enabled end
+	if key == "llm_streaming_multi" then return true, is_streaming_multi_enabled end
+	if key == "llm_pred_indent" then return true, prediction_indent end
+	if key == "llm_nav_modifiers" then return true, navigation_mods end
+	if key == "llm_val_modifiers" then return true, validation_mods end
+	if key == "llm_instant_on_word_end" then return true, instant_on_word_end end
+	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
+	if key == "llm_secure_field_filter_enabled" then
+		return true, secure_field_filter_enabled
+	end
+	if key == "llm_disabled_apps" then return true, excluded_apps end
+	return false, nil
 end
 
 

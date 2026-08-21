@@ -431,7 +431,7 @@ end
 --- Delegates to the prediction engine which owns this flag.
 --- @param v boolean
 function M.set_preview_ai_enabled(v)
-	engine.set_preview_ai_enabled(v)
+	return engine.set_preview_ai_enabled(v)
 end
 
 --- Enables or disables all non-LLM preview tooltips simultaneously.
@@ -476,7 +476,7 @@ end
 --- Overrides the accent tint for AI prediction tooltips.
 --- @param color table|nil RGBA table, or nil to restore the default.
 function M.set_preview_ai_color(color)
-	engine.set_preview_ai_color(color)
+	return engine.set_preview_ai_color(color)
 end
 
 
@@ -486,29 +486,29 @@ end
 -- All LLM configuration is owned by the prediction engine; the bridge
 -- forwards these calls so the menu's public API surface does not change.
 
-function M.set_llm_enabled(v)               engine.set_llm_enabled(v)               end
+function M.set_llm_enabled(v)               return engine.set_llm_enabled(v)               end
 function M.get_llm_enabled()                return engine.get_llm_enabled()          end
-function M.set_llm_model(name)              engine.set_llm_model(name)              end
-function M.set_llm_display_model_name(name) engine.set_llm_display_model_name(name) end
-function M.set_llm_backend_name(label)      engine.set_llm_backend_name(label)      end
-function M.set_llm_context_length(l)        engine.set_llm_context_length(l)        end
-function M.set_llm_temperature(t)           engine.set_llm_temperature(t)           end
-function M.set_llm_num_predictions(n)       engine.set_llm_num_predictions(n)       end
-function M.set_llm_pred_indent(v)           engine.set_llm_pred_indent(v)           end
-function M.set_llm_show_info_bar(v)         engine.set_llm_show_info_bar(v)         end
-function M.set_llm_sequential_mode(v)       engine.set_llm_sequential_mode(v)       end
-function M.set_llm_auto_raise_temp(v)       engine.set_llm_auto_raise_temp(v)       end
-function M.set_llm_disabled_apps(apps)           engine.set_llm_disabled_apps(apps)           end
-function M.set_llm_url_bar_filter_enabled(v)      engine.set_llm_url_bar_filter_enabled(v)      end
-function M.set_llm_secure_field_filter_enabled(v) engine.set_llm_secure_field_filter_enabled(v) end
-function M.set_llm_instant_on_word_end(v)         engine.set_llm_instant_on_word_end(v)         end
-function M.set_llm_val_modifiers(mods)      engine.set_llm_val_modifiers(mods)      end
-function M.set_llm_nav_modifiers(mods)      engine.set_llm_nav_modifiers(mods)      end
-function M.set_llm_min_words(w)             engine.set_llm_min_words(w)             end
-function M.set_llm_max_words(w)             engine.set_llm_max_words(w)             end
-function M.set_llm_debounce(seconds)        engine.set_llm_debounce(seconds)        end
-function M.set_llm_streaming(v)             engine.set_llm_streaming(v)             end
-function M.set_llm_streaming_multi(v)       engine.set_llm_streaming_multi(v)       end
+function M.set_llm_model(name)              return engine.set_llm_model(name)              end
+function M.set_llm_display_model_name(name) return engine.set_llm_display_model_name(name) end
+function M.set_llm_backend_name(label)      return engine.set_llm_backend_name(label)      end
+function M.set_llm_context_length(l)        return engine.set_llm_context_length(l)        end
+function M.set_llm_temperature(t)           return engine.set_llm_temperature(t)           end
+function M.set_llm_num_predictions(n)       return engine.set_llm_num_predictions(n)       end
+function M.set_llm_pred_indent(v)           return engine.set_llm_pred_indent(v)           end
+function M.set_llm_show_info_bar(v)         return engine.set_llm_show_info_bar(v)         end
+function M.set_llm_sequential_mode(v)       return engine.set_llm_sequential_mode(v)       end
+function M.set_llm_auto_raise_temp(v)       return engine.set_llm_auto_raise_temp(v)       end
+function M.set_llm_disabled_apps(apps)           return engine.set_llm_disabled_apps(apps)           end
+function M.set_llm_url_bar_filter_enabled(v)      return engine.set_llm_url_bar_filter_enabled(v)      end
+function M.set_llm_secure_field_filter_enabled(v) return engine.set_llm_secure_field_filter_enabled(v) end
+function M.set_llm_instant_on_word_end(v)         return engine.set_llm_instant_on_word_end(v)         end
+function M.set_llm_val_modifiers(mods)      return engine.set_llm_val_modifiers(mods)      end
+function M.set_llm_nav_modifiers(mods)      return engine.set_llm_nav_modifiers(mods)      end
+function M.set_llm_min_words(w)             return engine.set_llm_min_words(w)             end
+function M.set_llm_max_words(w)             return engine.set_llm_max_words(w)             end
+function M.set_llm_debounce(seconds)        return engine.set_llm_debounce(seconds)        end
+function M.set_llm_streaming(v)             return engine.set_llm_streaming(v)             end
+function M.set_llm_streaming_multi(v)       return engine.set_llm_streaming_multi(v)       end
 
 --- Sets the "chain LLM after hotstring" flag, owned here because
 --- update_preview() consumes it directly.
@@ -524,6 +524,16 @@ end
 function M.set_llm_reset_on_nav(v)
 	reset_buffer_on_navigation = (v == true)
 	Logger.debug(LOG, "LLM context reset on nav: %s.", reset_buffer_on_navigation and "yes" or "no")
+end
+
+--- Reads the actual bridge/engine runtime value for a transactional menu key.
+--- @param key string Canonical preference key.
+--- @return boolean found True when the runtime owner recognizes the key.
+--- @return any value Current runtime value.
+function M.get_llm_runtime_setting(key)
+	if key == "llm_after_hotstring" then return true, fire_llm_after_hotstring end
+	if key == "llm_reset_on_nav" then return true, reset_buffer_on_navigation end
+	return engine.get_llm_runtime_setting(key)
 end
 
 

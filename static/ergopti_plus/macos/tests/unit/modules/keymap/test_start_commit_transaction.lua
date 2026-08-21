@@ -48,6 +48,7 @@ local function load_fixture()
 		listener_result = true,
 		mailbox_start_mode = "ok",
 		mailbox_stop_mode = "ok",
+		llm_setter_mode = "ok",
 	}
 	local taps = {}
 	hs_stub.eventtap.new = function(_types, callback)
@@ -151,12 +152,24 @@ local function load_fixture()
 	package.loaded["modules.keymap.expander"] = api({
 		init = function() return true end,
 	})
+	local llm_setter_values = {}
+	local runtime_sentinel = {source = "prediction-engine-runtime"}
 	package.loaded["modules.keymap.llm_bridge"] = api({
 		init = function() return true end,
 		invalidate_hotstring_preview = function() return true end,
 		reset_for_teardown = function() return true end,
 		stop = function() return true end,
 		is_runtime_available = function() return true end,
+		get_llm_runtime_setting = function(key)
+			if key ~= "llm_debounce" then return false, nil end
+			return true, runtime_sentinel
+		end,
+		set_llm_debounce = function(value)
+			llm_setter_values[#llm_setter_values + 1] = value
+			if controls.llm_setter_mode == "throw" then error("LLM_SETTER_FAILURE") end
+			if controls.llm_setter_mode == "false" then return false end
+			return true
+		end,
 	})
 	package.loaded["modules.keymap.terminator_replay"] = api({
 		flush_now = function() return true end,
@@ -218,6 +231,8 @@ local function load_fixture()
 		mailbox_start_calls = function() return mailbox_start_calls end,
 		mailbox_stop_calls = function() return mailbox_stop_calls end,
 		mailbox_running = function() return mailbox_running end,
+		llm_setter_values = llm_setter_values,
+		runtime_sentinel = runtime_sentinel,
 	}
 end
 
@@ -229,6 +244,27 @@ local function assert_all_taps_disabled(fixture, message)
 end
 
 helpers.describe("keymap start: exact native commitment", function()
+	helpers.it("exports the exact LLM runtime getter and setter result through the real facade", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(type(fixture.keymap.get_llm_runtime_setting), "function",
+			"modules.keymap.init must publish the bridge runtime snapshot boundary")
+		local found, value = fixture.keymap.get_llm_runtime_setting("llm_debounce")
+		helpers.assert_eq(found, true)
+		helpers.assert_true(value == fixture.runtime_sentinel,
+			"the facade must not copy or substitute the bridge runtime snapshot")
+
+		fixture.controls.llm_setter_mode = "false"
+		helpers.assert_eq(fixture.keymap.set_llm_debounce(0.71), false,
+			"the facade must expose a literal bridge refusal to SettingsManager")
+
+		fixture.controls.llm_setter_mode = "throw"
+		local ok, err = pcall(fixture.keymap.set_llm_debounce, 0.92)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("LLM_SETTER_FAILURE", 1, true) ~= nil,
+			"the caller must observe the exact bridge exception")
+		helpers.assert_eq(fixture.llm_setter_values, {0.71, 0.92})
+	end)
+
 	helpers.it("forwards exact registry transactions to feature starters", function()
 		local fixture = load_fixture()
 		local calls = 0
