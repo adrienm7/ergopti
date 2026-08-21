@@ -78,7 +78,10 @@ local function build_fixture(backend, save_results, options)
 	}
 	package.loaded["ui.menu.menu_llm.models_manager"] = { new = function() return models end }
 	package.loaded["ui.menu.menu_llm.profiles_manager"] = {
-		new = function() return { get_menu_item = function() return {} end } end,
+		new = function(deps)
+			calls.profile_deps = deps
+			return { get_menu_item = function() return {} end }
+		end,
 	}
 	package.loaded["ui.menu.menu_llm.settings_manager"] = {
 		new = function()
@@ -107,7 +110,9 @@ local function build_fixture(backend, save_results, options)
 				switch_model = noop,
 				disable_model = noop,
 				set_llm_profile = noop,
-				apply_recommended_prompt_profile = noop,
+				apply_recommended_prompt_profile = function()
+					return options.recommendation_result
+				end,
 				get_display_model_name = function(name) return name end,
 				get_model_power_level = function() return 1 end,
 				guarded_check_requirements = noop,
@@ -210,6 +215,13 @@ local function assert_rejected_activation(backend)
 end
 
 helpers.describe("LLM activation: external work waits for preference commit", function()
+	helpers.it("HS-031 propagates the recommended-profile result through the menu adapter", function()
+		local _, _, calls = build_fixture("ollama", {}, {recommendation_result = false})
+		helpers.assert_type(calls.profile_deps, "table")
+		helpers.assert_type(calls.profile_deps.apply_recommended_prompt_profile, "function")
+		helpers.assert_eq(calls.profile_deps.apply_recommended_prompt_profile({force_dialog = true}), false)
+	end)
+
 	helpers.it("(no-model-runtime) reapplies a persisted No Model identity after reload", function()
 		local _, state, calls = build_fixture("ollama", {}, { model = "" })
 		helpers.assert_eq(state.llm_model, "")

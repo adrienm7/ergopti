@@ -361,6 +361,8 @@ function M.new(ctx)
 	-- =====================================================
 	-- ===== 1.5) Profile management =====
 	-- =====================================================
+	local set_llm_profile
+	local settle_recovery_debts
 
 	--- Warns when the selected profile demands significantly more than the model can give.
 	--- @param selected_profile_id string Profile the user just activated.
@@ -384,10 +386,24 @@ function M.new(ctx)
 	--- Offers to switch to the recommended profile when it differs from the current one.
 	--- Completion models are switched silently; chat models prompt the user.
 	--- @param model_name string The newly selected model name.
-	--- @param opts table|nil Optional { dialog_title, force_dialog }.
+	--- @param opts table|nil Optional { dialog_title, force_dialog, record_intent }.
+	--- @return boolean settled True only for a committed recommendation or voluntary no-op.
 	local function apply_recommended_prompt_profile(model_name, opts)
-		if type(model_name) ~= "string" or model_name == "" then return end
 		opts = type(opts) == "table" and opts or {}
+		if type(model_name) ~= "string" or model_name == "" then
+			Logger.warn(LOG, "Cannot recommend a profile because no model is active.")
+			Logger.callback(LOG, "Recommended-profile unavailable notification",
+				notifications.notify,
+				i18n.get("menu.profiles.recommended_unavailable_title"),
+				i18n.get("menu.profiles.recommended_unavailable_body"),
+				"warning")
+			return false
+		end
+		if type(settle_recovery_debts) ~= "function" then
+			Logger.error(LOG, "Cannot recommend a profile: recovery owner unavailable.")
+			return false
+		end
+		if not settle_recovery_debts() then return false end
 
 		local rec_profile, _   = get_recommended_profile_info(model_name)
 		local rec_label        = get_profile_label(rec_profile)
@@ -412,18 +428,36 @@ function M.new(ctx)
 		local cur_profile = get_normalized_active_profile_id()
 		local cur_label   = get_profile_label(cur_profile)
 		Logger.debug(LOG, string.format("Recommended profile: %s (currently: %s).", rec_profile, cur_profile))
+		local function commit_recommendation(profile_id)
+			if type(set_llm_profile) ~= "function" then
+				Logger.error(LOG, "Cannot apply the recommended profile: transaction owner unavailable.")
+				return false
+			end
+			return set_llm_profile(profile_id, {
+				record_intent = opts.record_intent ~= false,
+			})
+		end
+		local function ask_user(title, message)
+			local ok, choice = Logger.callback(LOG, "Recommended-profile dialog",
+				dialog.block_alert,
+				title, message,
+				i18n.get("button.confirm"), i18n.get("button.cancel"), "informational")
+			Logger.debug(LOG, string.format("Dialog response: ok=%s, choice=%s.",
+				tostring(ok), tostring(choice)))
+			if not ok then return false, false end
+			if choice == i18n.get("button.confirm") then return true, true end
+			if choice == i18n.get("button.cancel") then return true, false end
+			Logger.error(LOG, "Recommended-profile dialog returned an unexpected choice: %s.",
+				tostring(choice))
+			return false, false
+		end
 
 		if cur_profile ~= rec_profile then
 			if is_completion then
 				-- Completion models have exactly one correct profile — switch silently.
 				Logger.info(LOG, string.format(
 					"Completion model: silently switching profile %s → %s.", cur_profile, rec_profile))
-				state.llm_active_profile = rec_profile
-				if not call_model_boundary("Recommended completion-profile runtime sync",
-					llm_mod.set_active_profile, rec_profile) then return false end
-				if save_prefs() ~= true then return false end
-				if not call_model_boundary("Recommended completion-profile menu refresh",
-					update_menu) then return false end
+				return commit_recommendation(rec_profile)
 			else
 				local title = type(opts.dialog_title) == "string"
 					and opts.dialog_title
@@ -432,17 +466,11 @@ function M.new(ctx)
 				local msg = string.format(
 					i18n.get("menu.llm.profile_change_msg"),
 					display_name, power_desc, cur_label, rec_label)
-				local ok, choice = pcall(dialog.block_alert,
-					title, msg, i18n.get("button.confirm"), i18n.get("button.cancel"), "informational")
-				Logger.debug(LOG, string.format("Dialog response: ok=%s, choice=%s.", tostring(ok), tostring(choice)))
-				if ok and choice == i18n.get("button.confirm") then
+				local dialog_ok, accepted = ask_user(title, msg)
+				if not dialog_ok then return false end
+				if accepted then
 					Logger.info(LOG, string.format("Profile changed to %s (accepted).", rec_profile))
-					state.llm_active_profile = rec_profile
-					if not call_model_boundary("Recommended profile runtime sync",
-						llm_mod.set_active_profile, rec_profile) then return false end
-					if save_prefs() ~= true then return false end
-					if not call_model_boundary("Recommended profile menu refresh",
-						update_menu) then return false end
+					return commit_recommendation(rec_profile)
 				else
 					-- User refused — the profile is already cur_profile; no setter call
 					-- or save needed. Re-applying set_active_profile without persisting
@@ -457,7 +485,10 @@ function M.new(ctx)
 			local msg = string.format(
 				i18n.get("menu.llm.profile_already_ok_msg"),
 				display_name, power_desc, cur_label, rec_label)
-			pcall(dialog.block_alert, title, msg, i18n.get("button.confirm"), i18n.get("button.cancel"), "informational")
+			local dialog_ok, accepted = ask_user(title, msg)
+			if not dialog_ok then return false end
+			if accepted then return commit_recommendation(cur_profile) end
+			return true
 		else
 			Logger.debug(LOG, "Recommended profile already active — no action needed.")
 		end
@@ -613,7 +644,7 @@ function M.new(ctx)
 
 	--- Settles recovery ledgers in ownership order before a new menu action.
 	--- @return boolean settled True when both model and profile identities are stable.
-	local function settle_recovery_debts()
+	settle_recovery_debts = function()
 		if not settle_model_recovery_debt() then return false end
 		return settle_profile_recovery_debt()
 	end
@@ -621,8 +652,10 @@ function M.new(ctx)
 	--- Activates a profile and triggers a power-mismatch check.
 	--- A direct profile action cannot publish over an unsettled model rollback.
 	--- @param profile_id string Profile to activate.
+	--- @param opts table|nil Optional { record_intent = false } for model-owned recommendations.
 	--- @return boolean True only when runtime, persistence, and menu all commit.
-	local function set_llm_profile(profile_id)
+	set_llm_profile = function(profile_id, opts)
+		opts = type(opts) == "table" and opts or {}
 		if type(profile_id) ~= "string" then return false end
 		if not settle_recovery_debts() then return false end
 		local snapshot = snapshot_profile_transition()
@@ -661,7 +694,9 @@ function M.new(ctx)
 		end
 
 		profile_recovery_debt = nil
-		profile_intent_generation = profile_intent_generation + 1
+		if opts.record_intent ~= false then
+			profile_intent_generation = profile_intent_generation + 1
+		end
 		Logger.info(LOG, "Profile successfully switched to %s.", profile_id)
 		Logger.callback(LOG, "Profile power mismatch check",
 			check_profile_power_mismatch, profile_id, state.llm_model)
@@ -779,7 +814,10 @@ function M.new(ctx)
 						"Model-switch recommended-profile follow-up",
 						apply_recommended_prompt_profile,
 						new_model,
-						{dialog_title = i18n.get("menu.llm.model_change_title")})
+						{
+							dialog_title = i18n.get("menu.llm.model_change_title"),
+							record_intent = false,
+						})
 					if not profile_ok or profile_result == false then
 						return reject_transition("profile follow-up")
 					end

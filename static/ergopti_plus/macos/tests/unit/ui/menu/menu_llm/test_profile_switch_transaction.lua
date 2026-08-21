@@ -36,14 +36,29 @@ local function with_fixture(spec, body)
 
 	local ok, err = xpcall(function()
 		local errors = {}
+		local dialog_call_count = 0
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...)
 			errors[#errors + 1] = string.format(message, ...)
 		end
+		logger.callback = function(module_name, label, fn, ...)
+			local results = table.pack(xpcall(fn, debug.traceback, ...))
+			if not results[1] then
+				logger.error(module_name, "Callback '%s' raised: %s.", label, tostring(results[2]))
+			end
+			return table.unpack(results, 1, results.n)
+		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.dialog_util"] = {
-			block_alert = function() return "button.cancel" end,
+			block_alert = function()
+				dialog_call_count = dialog_call_count + 1
+				local choice = type(spec.dialog_choices) == "table"
+					and spec.dialog_choices[dialog_call_count]
+					or spec.dialog_choice
+				if choice == "throw" then error("dialog injected failure") end
+				return choice or "button.cancel"
+			end,
 		}
 		package.loaded["infra.notifications"] = {notify = function() return true end}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -123,7 +138,12 @@ local function with_fixture(spec, body)
 				return on_success()
 			end,
 			get_presets = function() return {} end,
-			get_model_info = function() return {params = 1} end,
+			get_model_info = function()
+				return {
+					params = spec.model_params or 1,
+					type = spec.model_type or "chat",
+				}
+			end,
 			get_actual_model_name = function(name) return "actual:" .. tostring(name) end,
 		}
 		local keymap = {
@@ -164,6 +184,7 @@ local function with_fixture(spec, body)
 			calls = calls,
 			errors = errors,
 			pending = pending,
+			dialog_calls = function() return dialog_call_count end,
 		})
 	end, debug.traceback)
 
@@ -196,6 +217,7 @@ end
 
 helpers.describe("HS-028 direct profile selection is one recoverable transaction", function()
 	local forward_failures = {
+		{name = "runtime", mode = "false"},
 		{name = "runtime", mode = "throw"},
 		{name = "save", mode = "false"},
 		{name = "save", mode = "throw"},
@@ -328,6 +350,113 @@ helpers.describe("HS-028 direct profile selection is one recoverable transaction
 			helpers.assert_eq(fixture.calls.profiles, {"advanced"})
 			helpers.assert_eq(fixture.calls.save_profiles, {"advanced"})
 			helpers.assert_eq(fixture.calls.menu_profiles, {"advanced"})
+		end)
+	end)
+end)
+
+helpers.describe("HS-031 recommended profiles share the profile transaction owner", function()
+	local forward_failures = {
+		{name = "runtime", mode = "false"},
+		{name = "runtime", mode = "throw"},
+		{name = "save", mode = "false"},
+		{name = "menu", mode = "false"},
+		{name = "menu", mode = "throw"},
+	}
+	for _, failure in ipairs(forward_failures) do
+		helpers.it(string.format(
+			"HS-031 rolls back recommended profile %s %s", failure.name, failure.mode), function()
+			with_fixture({
+				dialog_choice = "button.confirm",
+				model_params = 3,
+				failures = {{name = failure.name, occurrence = 1, mode = failure.mode}},
+			}, function(fixture)
+				helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+				assert_old_profile(fixture)
+				helpers.assert_true(#fixture.errors >= 1,
+					"a failed recommendation boundary must leave a contextual file-log diagnostic")
+			end)
+		end)
+	end
+
+	helpers.it("HS-031 commits an accepted recommendation through every boundary once", function()
+		with_fixture({dialog_choice = "button.confirm", model_params = 3}, function(fixture)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), true)
+			helpers.assert_eq(fixture.state.llm_active_profile, "advanced")
+			helpers.assert_eq(fixture.runtime.profile, "advanced")
+			helpers.assert_eq(fixture.persisted().llm_active_profile, "advanced")
+			helpers.assert_eq(fixture.rendered().llm_active_profile, "advanced")
+			helpers.assert_eq(fixture.calls.profiles, {"advanced"})
+			helpers.assert_eq(fixture.calls.save_profiles, {"advanced"})
+			helpers.assert_eq(fixture.calls.menu_profiles, {"advanced"})
+		end)
+	end)
+
+	helpers.it("HS-031 treats recommendation dialog refusal as a successful no-op", function()
+		with_fixture({dialog_choice = "button.cancel", model_params = 3}, function(fixture)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), true)
+			assert_old_profile(fixture)
+			helpers.assert_eq(fixture.calls.profiles, {})
+			helpers.assert_eq(fixture.calls.save_profiles, {})
+			helpers.assert_eq(fixture.calls.menu_profiles, {})
+		end)
+	end)
+
+	helpers.it("HS-031 reports a throwing recommendation dialog as failure", function()
+		with_fixture({dialog_choice = "throw", model_params = 3}, function(fixture)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			assert_old_profile(fixture)
+			helpers.assert_true(#fixture.errors >= 1)
+		end)
+	end)
+
+	helpers.it("HS-031 routes a silent completion recommendation through the same rollback", function()
+		with_fixture({
+			model_type = "completion",
+			failures = {{name = "save", occurrence = 1, mode = "false"}},
+		}, function(fixture)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("custom-completion"), false)
+			assert_old_profile(fixture)
+			helpers.assert_eq(fixture.calls.profiles, {"raw", "basic"})
+		end)
+	end)
+
+	helpers.it("HS-031 retains shared compensation debt after a recommendation fails", function()
+		with_fixture({
+			dialog_choice = "button.confirm",
+			model_params = 3,
+			failures = compensation_failures("runtime", "throw"),
+		}, function(fixture)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			helpers.assert_eq(fixture.runtime.profile, "advanced",
+				"the refused runtime compensation must remain represented as recovery debt")
+			helpers.assert_eq(fixture.switcher.set_llm_profile("raw"), false)
+			helpers.assert_eq(fixture.switcher.set_llm_profile("raw"), false)
+			helpers.assert_eq(fixture.switcher.set_llm_profile("raw"), true)
+			helpers.assert_eq(fixture.state.llm_active_profile, "raw")
+			helpers.assert_eq(fixture.runtime.profile, "raw")
+			helpers.assert_eq(fixture.persisted().llm_active_profile, "raw")
+			helpers.assert_eq(fixture.rendered().llm_active_profile, "raw")
+		end)
+	end)
+
+	helpers.it("HS-031 settles retained debt before a later dialog cancellation", function()
+		with_fixture({
+			dialog_choices = {"button.confirm", "button.cancel"},
+			model_params = 3,
+			failures = compensation_failures("runtime", "throw"),
+		}, function(fixture)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			helpers.assert_eq(fixture.runtime.profile, "advanced")
+			helpers.assert_eq(fixture.dialog_calls(), 1)
+
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), false)
+			helpers.assert_eq(fixture.dialog_calls(), 1,
+				"unsettled debt must refuse before presenting a new decision")
+
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-3b"), true)
+			helpers.assert_eq(fixture.dialog_calls(), 2)
+			assert_old_profile(fixture)
 		end)
 	end)
 end)

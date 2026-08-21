@@ -4,7 +4,8 @@
 -- MODULE: Profiles Manager Explicit-Intent Ownership
 -- DESCRIPTION:
 -- Proves that clone, create, and active-profile deletion route their resulting
--- profile selection through the transactional model-switcher owner.
+-- profile selection through the transactional model-switcher owner, and that
+-- Auto-detect propagates the same owner's exact terminal result.
 -- =============================================================================
 
 local helpers = require("tests.helpers")
@@ -17,6 +18,7 @@ local MODULES = {
 	"infra.notifications",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
+	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.profiles_manager",
 	"ui.menu.shortcut_utils",
 	"ui.prompt_editor",
@@ -37,6 +39,8 @@ local function with_profiles_fixture(options, body)
 
 	local ok, err = xpcall(function()
 		local runtime_profiles = {}
+		local runtime_profile = options.active_profile or "basic"
+		local notification_count = 0
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function() return "button.delete" end,
 		}
@@ -48,16 +52,22 @@ local function with_profiles_fixture(options, body)
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 		}
-		package.loaded["infra.notifications"] = {notify = function() return true end}
+		package.loaded["infra.notifications"] = {notify = function()
+			notification_count = notification_count + 1
+			return true
+		end}
 		package.loaded["modules.llm"] = {
+			DEFAULT_STATE = {llm_num_predictions = 1},
 			BUILTIN_PROFILES = {
 				{id = "basic", label = "Basic"},
 				{id = "advanced", label = "Advanced"},
 			},
 			set_active_profile = function(profile_id)
 				runtime_profiles[#runtime_profiles + 1] = profile_id
+				runtime_profile = profile_id
 				return true
 			end,
+			get_active_profile = function() return {id = runtime_profile} end,
 		}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
@@ -81,7 +91,12 @@ local function with_profiles_fixture(options, body)
 		}
 
 		local state = {
+			llm_backend = "ollama",
+			llm_enabled = true,
 			llm_active_profile = options.active_profile or "basic",
+			llm_model = options.model ~= nil and options.model or "A",
+			llm_model_power = 1,
+			llm_model_ollama = options.model ~= nil and options.model or "A",
 			llm_num_predictions = 1,
 			llm_profile_shortcuts = {},
 			llm_user_profiles = options.user_profiles or {},
@@ -90,6 +105,7 @@ local function with_profiles_fixture(options, body)
 		local direct_saves = 0
 		local direct_menus = 0
 		local shortcut_clears = 0
+		local recommendations = {}
 		local deps = {
 			state = state,
 			script_control = {is_paused = function() return false end},
@@ -106,6 +122,10 @@ local function with_profiles_fixture(options, body)
 				shortcut_clears = shortcut_clears + 1
 				return true
 			end,
+			apply_recommended_prompt_profile = function(opts)
+				recommendations[#recommendations + 1] = opts
+				return options.recommendation_result
+			end,
 			save_prefs = function()
 				direct_saves = direct_saves + 1
 				return true
@@ -115,11 +135,28 @@ local function with_profiles_fixture(options, body)
 				return true
 			end,
 		}
+		local models_mgr = {
+			get_presets = function() return {} end,
+			get_model_info = function() return {} end,
+			get_actual_model_name = function(name) return name end,
+			check_requirements = function() return false end,
+		}
+		if options.real_recommendation then
+			package.loaded["ui.menu.menu_llm.model_switcher"] = nil
+			local switcher = require("ui.menu.menu_llm.model_switcher").new({
+				state = state,
+				models_mgr = models_mgr,
+				keymap = {},
+				save_prefs = deps.save_prefs,
+				update_menu = deps.update_menu,
+			})
+			deps.apply_recommended_prompt_profile = function(opts)
+				return switcher.apply_recommended_prompt_profile(state.llm_model, opts)
+			end
+		end
 
 		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, {
-			get_model_info = function() return {} end,
-		})
+		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
 		body({
 			manager = manager,
 			state = state,
@@ -127,6 +164,8 @@ local function with_profiles_fixture(options, body)
 			direct_saves = function() return direct_saves end,
 			direct_menus = function() return direct_menus end,
 			shortcut_clears = function() return shortcut_clears end,
+			recommendations = recommendations,
+			notifications = function() return notification_count end,
 		})
 	end, debug.traceback)
 
@@ -200,6 +239,54 @@ helpers.describe("HS-029 profiles manager activation ownership", function()
 			helpers.assert_eq(fixture.state.llm_active_profile, "user_custom")
 			helpers.assert_eq(fixture.state.llm_user_profiles, {profile})
 			helpers.assert_eq(fixture.shortcut_clears(), 0)
+			helpers.assert_eq(fixture.direct_saves(), 0)
+			helpers.assert_eq(fixture.direct_menus(), 0)
+		end)
+	end)
+
+	helpers.it("HS-031 propagates an Auto-detect refusal from the transaction owner", function()
+		with_profiles_fixture({recommendation_result = false}, function(fixture)
+			local rows = fixture.manager.get_menu_item().menu
+			local auto_detect = find_row(rows, "menu.profiles.auto_detect")
+			helpers.assert_type(auto_detect.action, "function")
+			helpers.assert_eq(auto_detect.action(), false)
+			helpers.assert_eq(#fixture.recommendations, 1)
+			helpers.assert_eq(fixture.recommendations[1].force_dialog, true)
+			helpers.assert_eq(fixture.recommendations[1].dialog_title,
+				"menu.profiles.recommended_profile")
+		end)
+	end)
+
+	helpers.it("HS-031 propagates a built-in profile refusal from the transaction owner", function()
+		with_profiles_fixture({selection_result = false}, function(fixture)
+			local rows = fixture.manager.get_menu_item().menu
+			local basic = find_row(rows, "Basic")
+			helpers.assert_type(basic.action, "function")
+			helpers.assert_eq(basic.action(), false)
+			helpers.assert_eq(fixture.selections, {{id = "basic", registry_size = 0}})
+		end)
+	end)
+
+	helpers.it("HS-031 propagates a cloned-profile activation refusal", function()
+		with_profiles_fixture({selection_result = false}, function(fixture)
+			local rows = fixture.manager.get_menu_item().menu
+			local clone = find_row(rows, "menu.profiles.clone_builtin")
+			helpers.assert_type(clone.action, "function")
+			helpers.assert_eq(clone.action(), false)
+			helpers.assert_eq(#fixture.selections, 1)
+			helpers.assert_eq(fixture.selections[1].registry_size, 1)
+			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
+		end)
+	end)
+
+	helpers.it("HS-031 makes No Model Auto-detect visibly fail through the real owners", function()
+		with_profiles_fixture({model = "", real_recommendation = true}, function(fixture)
+			local rows = fixture.manager.get_menu_item().menu
+			local auto_detect = find_row(rows, "menu.profiles.auto_detect")
+			helpers.assert_type(auto_detect.action, "function")
+			helpers.assert_eq(auto_detect.action(), false)
+			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
+			helpers.assert_eq(fixture.notifications(), 1)
 			helpers.assert_eq(fixture.direct_saves(), 0)
 			helpers.assert_eq(fixture.direct_menus(), 0)
 		end)

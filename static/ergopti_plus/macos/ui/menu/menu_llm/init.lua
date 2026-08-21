@@ -358,7 +358,7 @@ function M.create(deps)
 
 		deps.set_llm_profile = switcher.set_llm_profile
 		deps.apply_recommended_prompt_profile = function(opts)
-				apply_recommended_prompt_profile(state.llm_model, opts)
+				return apply_recommended_prompt_profile(state.llm_model, opts)
 		end
 
 		-- Resolve display model name to actual backend names on startup —

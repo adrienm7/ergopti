@@ -161,14 +161,18 @@ local function build_profile_menu(deps, models_mgr)
 		disabled = paused or nil,
 		action       = not paused and function()
 			if type(deps.apply_recommended_prompt_profile) == "function" then
-				deps.apply_recommended_prompt_profile({ dialog_title = i18n.get("menu.profiles.recommended_profile"), force_dialog = true })
-				return
+				return deps.apply_recommended_prompt_profile({
+					dialog_title = i18n.get("menu.profiles.recommended_profile"),
+					force_dialog = true,
+				})
 			end
 
-			local model_name = state.llm_model
-			if type(model_name) ~= "string" or model_name == "" or not models_mgr then return end
-
-			pcall(notifications.notify, i18n.get("menu.profiles.recommended_unavailable_title"), i18n.get("menu.profiles.recommended_unavailable_body"), "warning")
+			Logger.callback(LOG, "Recommended-profile unavailable notification",
+				notifications.notify,
+				i18n.get("menu.profiles.recommended_unavailable_title"),
+				i18n.get("menu.profiles.recommended_unavailable_body"),
+				"warning")
+			return false
 		end or nil,
 	})
 	table.insert(rows, { separator = true })
@@ -196,7 +200,7 @@ local function build_profile_menu(deps, models_mgr)
 			label    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
 			checked  = (state.llm_active_profile == pid) or nil,
 			disabled = paused or nil,
-			action       = not paused and function() select_profile(deps, state, pid) end or nil,
+			action       = not paused and function() return select_profile(deps, state, pid) end or nil,
 		})
 	end
 
@@ -221,7 +225,7 @@ local function build_profile_menu(deps, models_mgr)
 					label    = i18n.get("menu.profiles.use_profile"),
 					checked  = (state.llm_active_profile == pid) or nil,
 					disabled = paused or nil,
-					action       = not paused and function() select_profile(deps, state, pid) end or nil,
+					action       = not paused and function() return select_profile(deps, state, pid) end or nil,
 				},
 				{
 					label    = i18n.get("menu.profiles.shortcut_prefix"),
@@ -316,7 +320,7 @@ local function build_profile_menu(deps, models_mgr)
 		table.insert(rows, { separator = true })
 		table.insert(rows, {
 			label = i18n.get("menu.profiles.clone_builtin"),
-			action    = function() clone_builtin_profile(deps, state, active_builtin) end,
+			action    = function() return clone_builtin_profile(deps, state, active_builtin) end,
 		})
 	end
 
