@@ -41,10 +41,84 @@ local _profile_seq = 0
 
 --- Synchronizes the internal state of the LLM module with current preferences.
 --- @param state table Shared menu state.
+--- @return boolean settled
 local function sync_profiles(state)
-	if type(state) ~= "table" then return end
-	llm_mod.set_active_profile(state.llm_active_profile or "basic")
-	llm_mod.user_profiles = type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}
+	if type(state) ~= "table" then return false end
+	local profiles = type(state.llm_user_profiles) == "table" and state.llm_user_profiles or {}
+	local profiles_ok, profiles_result = xpcall(
+		llm_mod.set_user_profiles,
+		debug.traceback,
+		profiles
+	)
+	if not profiles_ok or profiles_result ~= true then
+		Logger.error(LOG, "User-profile runtime synchronization refused: %s.",
+			tostring(profiles_result))
+		return false
+	end
+	state.llm_user_profiles = profiles
+	local active_ok, active_result = xpcall(
+		llm_mod.set_active_profile,
+		debug.traceback,
+		state.llm_active_profile or "basic"
+	)
+	if not active_ok or active_result == false then
+		Logger.error(LOG, "Active-profile runtime synchronization refused: %s.",
+			tostring(active_result))
+		return false
+	end
+	return true
+end
+
+--- Settles a retained Delete rollback before a sibling profile mutation.
+--- @param deps table Global dependencies.
+--- @return boolean settled
+local function settle_profile_delete_recovery(deps)
+	local callback = type(deps) == "table" and deps.settle_profile_delete_recovery or nil
+	if callback == nil then return true end
+	if type(callback) ~= "function" then
+		Logger.error(LOG, "Profile mutation refused because its Delete recovery gate is invalid.")
+		return false
+	end
+	local ok, result = xpcall(callback, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Profile mutation refused while Delete rollback remains unsettled: %s.",
+			tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Settles retained ModelSwitcher compensation before direct profile CRUD that
+--- bypasses its setter. This callback must not point back through ProfilesManager.
+--- @param deps table Global dependencies.
+--- @return boolean settled
+local function settle_profile_switcher_recovery(deps)
+	local callback = type(deps) == "table" and deps.settle_llm_switcher_recovery or nil
+	if callback == nil then return true end
+	if type(callback) ~= "function" then
+		Logger.error(LOG, "Profile mutation refused because its switcher recovery gate is invalid.")
+		return false
+	end
+	local ok, result = xpcall(callback, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Profile mutation refused while switcher rollback remains unsettled: %s.",
+			tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Settles every owner that may still reference the profile registry.
+--- @param deps table Global dependencies.
+--- @param opts table|nil Optional internal skip controls.
+--- @return boolean settled
+local function settle_profile_mutation_recovery(deps, opts)
+	opts = type(opts) == "table" and opts or {}
+	if opts.skip_delete_recovery ~= true
+		and not settle_profile_delete_recovery(deps) then
+		return false
+	end
+	return settle_profile_switcher_recovery(deps)
 end
 
 --- Activates a profile by id: prefers the injected deps.set_llm_profile path,
@@ -54,16 +128,36 @@ end
 --- @param deps table Global dependencies.
 --- @param state table Shared menu state.
 --- @param pid string Profile id to activate.
-local function select_profile(deps, state, pid)
+--- @param opts table|nil Optional parent-transaction controls.
+--- @return boolean committed
+--- @return table|nil intent_lease Deferred intent lease from the real owner.
+local function select_profile(deps, state, pid, opts)
+	opts = type(opts) == "table" and opts or {}
+	if not settle_profile_mutation_recovery(deps, opts) then
+		return false
+	end
 	if type(deps.set_llm_profile) == "function" then
-		return deps.set_llm_profile(pid)
+		local ok, result, intent_lease = xpcall(
+			deps.set_llm_profile,
+			debug.traceback,
+			pid,
+			opts
+		)
+		if not ok or result ~= true then
+			Logger.error(LOG, "Profile selection refused for '%s': %s.", pid, tostring(result))
+			return false
+		end
+		return true, intent_lease
 	end
 	state.llm_active_profile = pid
-	llm_mod.set_active_profile(pid)
-	sync_profiles(state)
-	if deps.save_prefs() ~= true then return false end
-	local menu_ok, menu_result = pcall(deps.update_menu)
-	return menu_ok and menu_result ~= false
+	if sync_profiles(state) ~= true then return false end
+	if opts.persist ~= false then
+		local save_ok, save_result = xpcall(deps.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then return false end
+	end
+	if opts.update_menu == false then return true, nil end
+	local menu_ok, menu_result = xpcall(deps.update_menu, debug.traceback)
+	return menu_ok and menu_result ~= false, nil
 end
 
 --- Clones a built-in profile into an editable user profile and opens the editor.
@@ -76,6 +170,7 @@ end
 --- @param src table The built-in profile to clone.
 local function clone_builtin_profile(deps, state, src)
 	if type(src) ~= "table" then return end
+	if not settle_profile_mutation_recovery(deps) then return false end
 	-- Unique id: seq suffix prevents collision when two profiles are cloned
 	-- within the same second (os.time() resolution = 1s).
 	_profile_seq = _profile_seq + 1
@@ -96,6 +191,7 @@ local function clone_builtin_profile(deps, state, src)
 		hs.timer.doAfter(0.1, function()
 			pcall(prompt_editor.open, copy, function(updated)
 				if type(updated) == "table" then
+					if not settle_profile_mutation_recovery(deps) then return false end
 					for j, p in ipairs(state.llm_user_profiles) do
 						if type(p) == "table" and p.id == updated.id then
 							state.llm_user_profiles[j] = updated
@@ -136,6 +232,245 @@ local function active_profile_label(state)
 	return tostring(id)
 end
 
+--- Invokes one required profile-deletion boundary with exact settlement.
+--- @param label string Boundary label.
+--- @param callback function|nil Boundary callback.
+--- @param ... any Arguments forwarded to callback.
+--- @return boolean settled
+local function invoke_delete_boundary(label, callback, ...)
+	if type(callback) ~= "function" then
+		Logger.error(LOG, "%s refused because its callback is unavailable.", label)
+		return false
+	end
+	local ok, result = xpcall(callback, debug.traceback, ...)
+	if not ok or result ~= true then
+		Logger.error(LOG, "%s refused: %s.", label, tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Creates the exact multi-owner transaction used by confirmed profile Delete.
+--- @param deps table Global dependencies.
+--- @return function delete_profile Transaction callback.
+local function make_profile_deleter(deps)
+	local state = deps.state
+	local recovery_debt = nil
+
+	--- Restores a rejected deletion while the shortcut lease fences re-entrant
+	--- preference rollback callbacks.
+	--- @param debt table Mutable deletion ledger.
+	--- @return boolean settled
+	local function restore_deletion(debt)
+		local failures = {}
+		if debt.intent_pending then
+			if invoke_delete_boundary("Profile deletion intent cancellation",
+				debt.intent_lease and debt.intent_lease.cancel) then
+				debt.intent_pending = false
+			else
+				failures[#failures + 1] = "profile intent"
+			end
+		end
+		state.llm_user_profiles = debt.old_profiles
+		if debt.registry_touched then
+			if not invoke_delete_boundary("Profile registry runtime rollback",
+				llm_mod.set_user_profiles, debt.old_profiles) then
+				failures[#failures + 1] = "runtime registry"
+			end
+		end
+
+		if not invoke_delete_boundary("Profile shortcut native rollback",
+			debt.shortcut_lease.restore) then
+			failures[#failures + 1] = "shortcut owner"
+		end
+
+		if debt.active_published and not select_profile(deps, state, debt.old_active, {
+			persist = false,
+			update_menu = false,
+			record_intent = false,
+			skip_delete_recovery = true,
+		}) then
+			failures[#failures + 1] = "active profile"
+		end
+		state.llm_active_profile = debt.old_active
+
+		if debt.persistence_touched
+			and not invoke_delete_boundary("Profile deletion preference rollback", deps.save_prefs) then
+			failures[#failures + 1] = "preferences"
+		end
+
+		-- A failed outer preference rollback may restore the last committed deletion
+		-- snapshot. Reassert every live boundary while the shortcut fence is held
+		state.llm_user_profiles = debt.old_profiles
+		if debt.registry_touched then
+			if not invoke_delete_boundary("Profile registry rollback reassertion",
+				llm_mod.set_user_profiles, debt.old_profiles) then
+				failures[#failures + 1] = "runtime registry reassertion"
+			end
+		end
+		if not invoke_delete_boundary("Profile shortcut rollback reassertion",
+			debt.shortcut_lease.restore) then
+			failures[#failures + 1] = "shortcut reassertion"
+		end
+		if debt.active_published and not select_profile(deps, state, debt.old_active, {
+			persist = false,
+			update_menu = false,
+			record_intent = false,
+			skip_delete_recovery = true,
+		}) then
+			failures[#failures + 1] = "active profile reassertion"
+		end
+		state.llm_active_profile = debt.old_active
+
+		if debt.menu_touched then
+			local menu_ok, menu_result = xpcall(deps.update_menu, debug.traceback)
+			if not menu_ok or menu_result == false then
+				failures[#failures + 1] = "menu"
+			end
+		end
+
+		if #failures == 0 and invoke_delete_boundary(
+			"Profile shortcut rollback fence release",
+			debt.shortcut_lease.finish_rollback) then
+			recovery_debt = nil
+			return true
+		end
+		if #failures == 0 then failures[#failures + 1] = "shortcut fence" end
+		recovery_debt = debt
+		Logger.error(LOG, "Profile deletion rollback remains pending at: %s.",
+			table.concat(failures, ", "))
+		return false
+	end
+
+	--- Retries retained deletion compensation before another destructive action.
+	--- @return boolean settled
+	local function settle_recovery()
+		if not recovery_debt then return true end
+		Logger.warn(LOG, "Retrying retained profile deletion rollback.")
+		return restore_deletion(recovery_debt)
+	end
+
+	--- Deletes one user profile only after every parent boundary commits.
+	--- @param profile_id string User profile id.
+	--- @return boolean committed
+	local function delete_profile(profile_id)
+		if not settle_recovery() then return false end
+		if not settle_profile_switcher_recovery(deps) then return false end
+		if type(profile_id) ~= "string" or profile_id == "" then return false end
+		if type(state.llm_user_profiles) ~= "table" then return false end
+
+		local old_profiles = state.llm_user_profiles
+		local kept = {}
+		local found = false
+		for _, profile in ipairs(old_profiles) do
+			if type(profile) == "table" and profile.id == profile_id then
+				found = true
+			else
+				kept[#kept + 1] = profile
+			end
+		end
+		if not found then return false end
+
+		local lease_ok, shortcut_lease = xpcall(
+			deps.apply_llm_profile_shortcut,
+			debug.traceback,
+			profile_id,
+			nil,
+			nil,
+			{defer = true}
+		)
+		if not lease_ok or type(shortcut_lease) ~= "table"
+			or type(shortcut_lease.publish) ~= "function"
+			or type(shortcut_lease.commit) ~= "function"
+			or type(shortcut_lease.restore) ~= "function"
+			or type(shortcut_lease.finish_rollback) ~= "function" then
+			Logger.error(LOG, "Profile deletion could not acquire the exact shortcut lease: %s.",
+				tostring(shortcut_lease))
+			return false
+		end
+
+		local debt = {
+			active_changed = state.llm_active_profile == profile_id,
+			active_published = false,
+			intent_lease = nil,
+			intent_pending = false,
+			menu_touched = false,
+			old_active = state.llm_active_profile,
+			old_profiles = old_profiles,
+			persistence_touched = false,
+			registry_touched = false,
+			shortcut_lease = shortcut_lease,
+		}
+		--- Rejects the candidate deletion and runs every acquired compensation.
+		--- @param boundary string Boundary that refused.
+		--- @return boolean committed Always false.
+		local function reject_deletion(boundary)
+			Logger.error(LOG, "Profile deletion failed at '%s'; restoring exact prior owners.",
+				boundary)
+			recovery_debt = debt
+			restore_deletion(debt)
+			return false
+		end
+
+		if debt.active_changed then
+			local fallback_ok, intent_lease = select_profile(deps, state, "basic", {
+				persist = false,
+				update_menu = false,
+				defer_intent = true,
+				skip_delete_recovery = true,
+			})
+			debt.active_published = fallback_ok == true
+			if fallback_ok ~= true then
+				return reject_deletion("active-profile fallback")
+			end
+			if type(intent_lease) ~= "table"
+				or type(intent_lease.commit) ~= "function"
+				or type(intent_lease.cancel) ~= "function" then
+				return reject_deletion("active-profile intent lease")
+			end
+			debt.intent_lease = intent_lease
+			debt.intent_pending = true
+		end
+		debt.registry_touched = true
+		if not invoke_delete_boundary("Profile registry runtime publication",
+			llm_mod.set_user_profiles, kept) then
+			return reject_deletion("runtime registry")
+		end
+		state.llm_user_profiles = kept
+		if not invoke_delete_boundary("Profile shortcut preference publication",
+			shortcut_lease.publish) then
+			return reject_deletion("shortcut preference")
+		end
+		debt.persistence_touched = true
+		if not invoke_delete_boundary("Profile deletion preference commit", deps.save_prefs) then
+			return reject_deletion("preferences")
+		end
+		debt.menu_touched = true
+		local menu_ok, menu_result = xpcall(deps.update_menu, debug.traceback)
+		if not menu_ok or menu_result == false then
+			Logger.error(LOG, "Profile deletion menu publication refused: %s.",
+				tostring(menu_result))
+			return reject_deletion("menu")
+		end
+		if not invoke_delete_boundary("Profile shortcut native release",
+			shortcut_lease.commit) then
+			return reject_deletion("shortcut release")
+		end
+		if debt.intent_pending then
+			-- The real model-switch owner issues a pure local lease: after the native
+			-- release above there is no remaining operational boundary that can refuse.
+			debt.intent_lease.commit()
+			debt.intent_pending = false
+		end
+
+		recovery_debt = nil
+		Logger.info(LOG, "User profile '%s' deleted transactionally.", profile_id)
+		return true
+	end
+
+	return delete_profile, settle_recovery
+end
+
 
 
 
@@ -149,8 +484,9 @@ end
 --- Builds the strategy selection submenu with support for custom profiles.
 --- @param deps table Global dependencies.
 --- @param models_mgr table Manager reference to handle auto-detection heuristics.
+--- @param delete_profile function Exact profile-deletion transaction.
 --- @return table The Hammerspoon menu structure.
-local function build_profile_menu(deps, models_mgr)
+local function build_profile_menu(deps, models_mgr, delete_profile)
 	local state  = deps.state
 	local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 	local rows   = {}
@@ -160,6 +496,7 @@ local function build_profile_menu(deps, models_mgr)
 		label    = i18n.get("menu.profiles.auto_detect"),
 		disabled = paused or nil,
 		action       = not paused and function()
+			if not settle_profile_mutation_recovery(deps) then return false end
 			if type(deps.apply_recommended_prompt_profile) == "function" then
 				return deps.apply_recommended_prompt_profile({
 					dialog_title = i18n.get("menu.profiles.recommended_profile"),
@@ -231,15 +568,16 @@ local function build_profile_menu(deps, models_mgr)
 					label    = i18n.get("menu.profiles.shortcut_prefix"),
 					disabled = paused or nil,
 					action       = not paused and function()
-						shortcut_ui.prompt_shortcut({
+						return shortcut_ui.prompt_shortcut({
 							title = i18n.get("menu.profiles.shortcut_title"),
 							message = i18n.get("menu.profiles.shortcut_prompt"),
 							current_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil,
 							default_mods = {"ctrl"},
 							on_apply = function(mods, key)
 								if type(deps.apply_llm_profile_shortcut) == "function" then
-									deps.apply_llm_profile_shortcut(pid, mods, key)
+									return deps.apply_llm_profile_shortcut(pid, mods, key)
 								end
+								return false
 							end,
 						})
 					end or nil,
@@ -251,9 +589,10 @@ local function build_profile_menu(deps, models_mgr)
 					action       = not paused and function()
 						if prompt_editor and type(prompt_editor.open) == "function" then
 							hs.timer.doAfter(0.1, function()
-								pcall(prompt_editor.open, profile, function(updated)
-									if type(updated) == "table" then
-										for j, p in ipairs(state.llm_user_profiles) do
+							pcall(prompt_editor.open, profile, function(updated)
+								if type(updated) == "table" then
+									if not settle_profile_mutation_recovery(deps) then return false end
+									for j, p in ipairs(state.llm_user_profiles) do
 											if type(p) == "table" and p.id == updated.id then
 												state.llm_user_profiles[j] = updated
 												break
@@ -279,23 +618,9 @@ local function build_profile_menu(deps, models_mgr)
 							i18n.get("button.delete"), i18n.get("common.cancel"), "critical")
 
 						if ok_c and choice == i18n.get("button.delete") then
-							if state.llm_active_profile == pid
-								and select_profile(deps, state, "basic") ~= true then
-								return false
-							end
-							if type(deps.apply_llm_profile_shortcut) == "function" then
-								deps.apply_llm_profile_shortcut(pid, nil, nil, { silent = true })
-							end
-							local kept = {}
-							for _, p in ipairs(state.llm_user_profiles) do
-								if type(p) == "table" and p.id ~= pid then table.insert(kept, p) end
-							end
-							state.llm_user_profiles = kept
-							sync_profiles(state)
-							if deps.save_prefs() ~= true then return false end
-							local menu_ok, menu_result = pcall(deps.update_menu)
-							if not menu_ok or menu_result == false then return false end
+							return delete_profile(pid)
 						end
+						return false
 					end or nil,
 				},
 			}
@@ -332,6 +657,7 @@ local function build_profile_menu(deps, models_mgr)
 				hs.timer.doAfter(0.1, function()
 					pcall(prompt_editor.open, nil, function(new_profile)
 						if type(new_profile) == "table" then
+							if not settle_profile_mutation_recovery(deps) then return false end
 							if type(state.llm_user_profiles) ~= "table" then state.llm_user_profiles = {} end
 							table.insert(state.llm_user_profiles, new_profile)
 							if select_profile(deps, state, new_profile.id) ~= true then return false end
@@ -363,7 +689,11 @@ end
 --- @return table The profiles manager instance.
 function M.new(deps, models_mgr)
 	local obj = { deps = deps }
-	sync_profiles(deps.state)
+	if sync_profiles(deps.state) ~= true then
+		Logger.error(LOG, "Initial user-profile runtime synchronization did not commit.")
+	end
+	local delete_profile, settle_delete_recovery = make_profile_deleter(deps)
+	deps.settle_profile_delete_recovery = settle_delete_recovery
 
 	--- Returns the main menu entry for Strategy selection.
 	function obj.get_menu_item()
@@ -375,7 +705,7 @@ function M.new(deps, models_mgr)
 
 		return {
 			label = string.format(i18n.get("menu.profiles.profile_label_prefix"), label) .. warning,
-			menu  = build_profile_menu(deps, models_mgr)
+			menu  = build_profile_menu(deps, models_mgr, delete_profile)
 		}
 	end
 

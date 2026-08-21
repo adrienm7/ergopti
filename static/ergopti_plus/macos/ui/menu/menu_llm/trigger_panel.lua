@@ -77,7 +77,7 @@ function M.build(ctx)
 		label    = string.format(i18n.get("menu.llm.trigger_shortcut_label"), sc_label),
 		disabled = is_disabled or nil,
 		action   = function()
-			shortcut_ui.prompt_shortcut({
+			return shortcut_ui.prompt_shortcut({
 				title            = i18n.get("menu.llm.trigger_shortcut_title"),
 				message          = i18n.get("menu.llm.shortcut_prompt"),
 				current_shortcut = state.llm_trigger_shortcut,

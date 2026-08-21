@@ -457,17 +457,37 @@ helpers.describe("Core profile accessors", function()
 	end)
 
 	helpers.it("set_user_profiles merges user list with built-ins", function()
-		Core.set_user_profiles({ { id = "myuser", label = "Mine", system_single = "X" } })
+		local user_profiles = {
+			{ id = "myuser", label = "Mine", system_single = "X" },
+		}
+		helpers.assert_eq(Core.set_user_profiles(user_profiles), true)
+		table.insert(user_profiles, {
+			id = "second_user", label = "Second", system_single = "Y",
+		})
 		local all = Core.get_all_profiles()
 		local has_user = false
-		for _, p in ipairs(all) do if p.id == "myuser" then has_user = true end end
+		local has_second = false
+		for _, p in ipairs(all) do
+			if p.id == "myuser" then has_user = true end
+			if p.id == "second_user" then has_second = true end
+		end
 		helpers.assert_true(has_user)
+		helpers.assert_true(has_second,
+			"the runtime must retain the exact replacement table, not a detached clone")
+		helpers.assert_eq(Core.set_user_profiles({}), true)
 	end)
 
-	helpers.it("set_user_profiles ignores non-table input", function()
-		Core.set_user_profiles({})
-		Core.set_user_profiles("garbage")
-		-- Should not crash
+	helpers.it("set_user_profiles rejects non-table input without replacing the registry", function()
+		helpers.assert_eq(Core.set_user_profiles({
+			{ id = "kept", label = "Kept", system_single = "X" },
+		}), true)
+		helpers.assert_eq(Core.set_user_profiles("garbage"), false)
+		local kept = false
+		for _, profile in ipairs(Core.get_all_profiles()) do
+			if profile.id == "kept" then kept = true end
+		end
+		helpers.assert_true(kept, "a refused replacement must preserve the exact registry")
+		helpers.assert_eq(Core.set_user_profiles({}), true)
 	end)
 end)
 

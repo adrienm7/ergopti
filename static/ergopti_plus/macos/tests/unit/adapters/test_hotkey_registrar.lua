@@ -221,6 +221,36 @@ end)
 -- ===================================
 
 helpers.describe("hotkey_registrar: setEnabled", function()
+	helpers.it("retains and fences the exact handle when native enable returns nil", function()
+		local adapter, hs_stub = fresh()
+		local fired = 0
+		local handle = adapter.bind("Ctrl+T", function() fired = fired + 1 end)
+		local hotkey = hs_stub.hotkey._bound[1]
+		helpers.assert_eq(adapter.setEnabled(handle, false), true)
+
+		local attempts = 0
+		function hotkey:enable()
+			attempts = attempts + 1
+			-- Exercise the adapter's logical gate even against an adversarial native
+			-- object that mutates before returning Hammerspoon's refusal sentinel.
+			self.enabled = true
+			if attempts == 1 then return nil end
+			return self
+		end
+
+		helpers.assert_eq(adapter.setEnabled(handle, true), false)
+		helpers.assert_eq(adapter.chord_of(handle), "Ctrl+T",
+			"a refused activation must retain the same retry capability")
+		hotkey.pressed_fn()
+		helpers.assert_eq(fired, 0,
+			"native mutation before a nil return must remain fenced at the adapter")
+
+		helpers.assert_eq(adapter.setEnabled(handle, true), true)
+		helpers.assert_eq(attempts, 2)
+		hotkey.pressed_fn()
+		helpers.assert_eq(fired, 1)
+	end)
+
 	helpers.it("suspends without releasing", function()
 		local adapter, hs_stub = fresh()
 		local handle = adapter.bind("Ctrl+T", function() end)

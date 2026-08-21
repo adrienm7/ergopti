@@ -1461,10 +1461,15 @@ end
 
 --- Overrides user profiles globally.
 --- @param profiles_table table The new user profile map.
+--- @return boolean committed
 function M.set_user_profiles(profiles_table)
-	if type(profiles_table) == "table" then
-		CoreState.user_profiles = profiles_table
+	if type(profiles_table) ~= "table" then
+		Logger.error(LOG, "set_user_profiles(): profiles_table must be a table.")
+		return false
 	end
+	CoreState.user_profiles = profiles_table
+	Logger.debug(LOG, "User profiles: %d custom profile(s).", #profiles_table)
+	return true
 end
 
 --- Initiates a new LLM prediction request, selecting the optimal fetch strategy based on profile state.

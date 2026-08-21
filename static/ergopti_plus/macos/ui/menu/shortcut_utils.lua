@@ -11,6 +11,9 @@ local M = {}
 local hs     = hs
 local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
+local Logger = require("infra.logger")
+
+local LOG = "menu.shortcut_utils"
 
 
 
@@ -160,9 +163,22 @@ end
 -- ==================================
 -- ==================================
 
+--- Invokes a shortcut mutation and reports only literal committed success.
+--- @param callback function Shortcut transaction callback.
+--- @param ... any Callback arguments.
+--- @return boolean committed
+local function apply_prompt_update(callback, ...)
+	local ok, result = xpcall(callback, debug.traceback, ...)
+	if not ok then
+		Logger.error(LOG, "Shortcut prompt update raised: %s.", tostring(result))
+		return false
+	end
+	return result == true
+end
+
 --- Opens a standard shortcut prompt and returns parsed output via callback.
 --- @param opts table Prompt options.
---- @return boolean True when an update callback was executed.
+--- @return boolean True only when the update callback committed.
 function M.prompt_shortcut(opts)
 	if type(opts) ~= "table" or type(opts.on_apply) ~= "function" then return false end
 
@@ -177,14 +193,12 @@ function M.prompt_shortcut(opts)
 
 	local cleaned = raw:match("^%s*(.-)%s*$")
 	if cleaned == "" then
-		opts.on_apply(nil, nil)
-		return true
+		return apply_prompt_update(opts.on_apply, nil, nil)
 	end
 
 	local parsed = M.parse_shortcut_input(cleaned, opts.default_mods)
 	if parsed then
-		opts.on_apply(parsed.mods, parsed.key)
-		return true
+		return apply_prompt_update(opts.on_apply, parsed.mods, parsed.key)
 	end
 
 	pcall(dialog.alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"))

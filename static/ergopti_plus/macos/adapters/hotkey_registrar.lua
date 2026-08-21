@@ -209,12 +209,16 @@ function M.setEnabled(handle, enabled)
 	-- keeps a later call retryable.
 	if not want then entry.enabled = false end
 
-	local ok, err = pcall(function()
-		if want then entry.hotkey:enable() else entry.hotkey:disable() end
+	local ok, native_result = pcall(function()
+		if want then return entry.hotkey:enable() end
+		return entry.hotkey:disable()
 	end)
-	if not ok then
+	-- Hammerspoon returns the hotkey object on enable/disable. In particular,
+	-- enable() returns nil when activation was refused; pcall success alone is
+	-- therefore not evidence that the global shortcut became live.
+	if not ok or native_result == nil or native_result == false then
 		entry.native_settled = false
-		Logger.error(LOG, "setEnabled(): %s failed to reach %s — %s.", entry.chord, tostring(want), tostring(err))
+		Logger.error(LOG, "setEnabled(): %s failed to reach %s — %s.", entry.chord, tostring(want), tostring(native_result))
 		return false
 	end
 

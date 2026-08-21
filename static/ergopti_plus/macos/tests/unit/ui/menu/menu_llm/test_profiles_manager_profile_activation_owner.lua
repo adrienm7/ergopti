@@ -67,6 +67,7 @@ local function with_profiles_fixture(options, body)
 				runtime_profile = profile_id
 				return true
 			end,
+			set_user_profiles = function() return true end,
 			get_active_profile = function() return {id = runtime_profile} end,
 		}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -109,17 +110,42 @@ local function with_profiles_fixture(options, body)
 		local deps = {
 			state = state,
 			script_control = {is_paused = function() return false end},
-			set_llm_profile = function(profile_id)
+			set_llm_profile = function(profile_id, opts)
 				selections[#selections + 1] = {
 					id = profile_id,
 					registry_size = #state.llm_user_profiles,
 				}
 				if options.selection_result == false then return false end
 				state.llm_active_profile = profile_id
+				if type(opts) == "table" and opts.defer_intent == true then
+					local pending = true
+					return true, {
+						commit = function()
+							if not pending then return false end
+							pending = false
+							return true
+						end,
+						cancel = function()
+							if not pending then return false end
+							pending = false
+							return true
+						end,
+					}
+				end
 				return true
 			end,
-			apply_llm_profile_shortcut = function()
-				shortcut_clears = shortcut_clears + 1
+			apply_llm_profile_shortcut = function(_, _, _, opts)
+				if type(opts) == "table" and opts.defer == true then
+					return {
+						publish = function() return true end,
+						commit = function()
+							shortcut_clears = shortcut_clears + 1
+							return true
+						end,
+						restore = function() return true end,
+						finish_rollback = function() return true end,
+					}
+				end
 				return true
 			end,
 			apply_recommended_prompt_profile = function(opts)

@@ -80,6 +80,9 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["ui.menu.menu_llm.profiles_manager"] = {
 		new = function(deps)
 			calls.profile_deps = deps
+			if type(options.delete_recovery_gate) == "function" then
+				deps.settle_profile_delete_recovery = options.delete_recovery_gate
+			end
 			return { get_menu_item = function() return {} end }
 		end,
 	}
@@ -105,11 +108,15 @@ local function build_fixture(backend, save_results, options)
 	}
 	package.loaded["ui.menu.menu_llm.models_selector"] = { build = function() return {} end }
 	package.loaded["ui.menu.menu_llm.model_switcher"] = {
-		new = function()
+		new = function(ctx)
+			calls.switcher_ctx = ctx
+			local settle_recovery_debts = function() return true end
+			calls.switcher_settlement = settle_recovery_debts
 			return {
 				switch_model = noop,
 				disable_model = noop,
 				set_llm_profile = noop,
+				settle_recovery_debts = settle_recovery_debts,
 				apply_recommended_prompt_profile = function()
 					return options.recommendation_result
 				end,
@@ -165,7 +172,7 @@ local function build_fixture(backend, save_results, options)
 
 	package.loaded["ui.menu.menu_llm"] = nil
 	local MenuLLM = require("ui.menu.menu_llm")
-	local handler = MenuLLM.create({
+	local deps = {
 		state = state,
 		keymap = {
 			set_llm_enabled = function(value)
@@ -192,7 +199,9 @@ local function build_fixture(backend, save_results, options)
 		end,
 		update_menu = function() calls.updates = calls.updates + 1 end,
 		active_tasks = {},
-	})
+	}
+	calls.root_deps = deps
+	local handler = MenuLLM.create(deps)
 	local item = handler.build_item()
 	helpers.assert_type(item.action, "function")
 	calls.last_attempted_enabled = function() return last_attempted_enabled end
@@ -215,6 +224,40 @@ local function assert_rejected_activation(backend)
 end
 
 helpers.describe("LLM activation: external work waits for preference commit", function()
+	helpers.it("HS-033 wires both recovery owners through the real MenuLLM factory", function()
+		local false_calls = 0
+		local _, _, calls = build_fixture("ollama", {}, {
+			delete_recovery_gate = function()
+				false_calls = false_calls + 1
+				return false
+			end,
+		})
+		helpers.assert_true(calls.profile_deps == calls.root_deps,
+			"ProfilesManager must receive the exact shared dependency table")
+		helpers.assert_type(calls.switcher_ctx.profile_mutation_gate, "function")
+		helpers.assert_eq(calls.switcher_ctx.profile_mutation_gate(), false)
+		helpers.assert_eq(false_calls, 1)
+
+		local throwing_gate = function() error("dynamic Delete gate", 0) end
+		calls.profile_deps.settle_profile_delete_recovery = throwing_gate
+		local throw_ok, throw_error = pcall(calls.switcher_ctx.profile_mutation_gate)
+		helpers.assert_eq(throw_ok, false)
+		helpers.assert_true(tostring(throw_error):find("dynamic Delete gate", 1, true) ~= nil)
+
+		local true_calls = 0
+		local true_gate = function()
+			true_calls = true_calls + 1
+			return true
+		end
+		calls.profile_deps.settle_profile_delete_recovery = true_gate
+		helpers.assert_eq(calls.switcher_ctx.profile_mutation_gate(), true)
+		helpers.assert_eq(true_calls, 1,
+			"the forwarding closure must read the live callback after construction")
+		helpers.assert_true(calls.profile_deps.settle_llm_switcher_recovery
+			== calls.switcher_settlement,
+			"ProfilesManager must receive the exact ModelSwitcher settlement owner")
+	end)
+
 	helpers.it("HS-031 propagates the recommended-profile result through the menu adapter", function()
 		local _, _, calls = build_fixture("ollama", {}, {recommendation_result = false})
 		helpers.assert_type(calls.profile_deps, "table")
