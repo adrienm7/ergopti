@@ -96,19 +96,24 @@ _LLM_Menu_ApplyStandardCommitted(*) {
 ; trigger quiescence, full collector and strict TOML writer.
 LLM_Menu_CommitMutation(Context, MutateFn, ApplyFn := 0, WriterFn := 0,
 		NotifyFn := 0, AcquireFn := 0, SettleFn := 0, QuiesceFn := 0,
-		CollectFn := 0) {
+		CollectFn := 0, PrepareFn := 0, PublishFn := 0) {
 	PreviousCritical := Critical("Off")
 	try return _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn,
-		WriterFn, NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn)
+		WriterFn, NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn,
+		PrepareFn, PublishFn)
 	finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
-		NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn) {
+		NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn, PrepareFn,
+		PublishFn) {
 	global ConfigurationFile, Features, _LLM_Menu
 	if !(Context is String) || Context == "" || !HasMethod(MutateFn, "Call")
 		return ConfigReportPersistenceFailure("the LLM menu mutation", NotifyFn,
 			"the candidate mutation contract is invalid")
+	if HasMethod(PrepareFn, "Call") != HasMethod(PublishFn, "Call")
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			"candidate preparation requires a matching publication owner")
 	if !IsSet(ConfigurationFile) || !(ConfigurationFile is String)
 			|| ConfigurationFile == "" || !IsSet(Features) || !(Features is Map)
 			|| !IsSet(_LLM_Menu) || !(_LLM_Menu is Map) {
@@ -126,6 +131,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			"another configuration transaction owns the global barrier")
 	}
+	PreparedOwner := 0
 	try {
 		try Settled := HasMethod(SettleFn, "Call")
 			? SettleFn.Call(Bundle) : _ConfigFullSaveSettleTerminal(Bundle)
@@ -175,6 +181,17 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"candidate serialization returned no update batch")
 		}
+		if HasMethod(PrepareFn, "Call") {
+			; A false result is an ordinary native refusal. An exception means the
+			; preparation owner could not restore a process-wide invariant (for
+			; example the current HotIf criterion), so it must escape fail-fast.
+			; The surrounding finally still releases terminal admission.
+			PreparedOwner := PrepareFn.Call(CandidateMenu)
+			if !(PreparedOwner is Object) {
+				return ConfigReportPersistenceFailure(Context, NotifyFn,
+					"candidate preparation was refused")
+			}
+		}
 		OwnerToken := _ConfigWriteLeaseSelectOwner(Bundle, ConfigurationFile)
 		if !(OwnerToken is Object) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
@@ -183,7 +200,15 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		if !ConfigCommitBorrowedUpdates(OwnerToken, ConfigurationFile, Updates,
 				Context, WriterFn, NotifyFn)
 			return false
-		if !_LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
+		try Published := HasMethod(PublishFn, "Call")
+			? PublishFn.Call(CandidateFeatures, CandidateMenu, PreparedOwner)
+			: _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu)
+		catch as Err {
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"config.toml is durable but live publication raised: "
+				. Err.Message, false)
+		}
+		if !((Published is Integer) && Published == 1) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml is durable but live publication was refused", false)
 		}

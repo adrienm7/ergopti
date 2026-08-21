@@ -102,6 +102,19 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	return true
 }
 
+_LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
+		NavFn := 0) {
+	if !FirstRestore
+		return true
+	if !HasMethod(ProfileFn, "Call")
+		ProfileFn := LLM_Menu_BindProfileHotkeys
+	if !HasMethod(NavFn, "Call")
+		NavFn := LLM_Menu_BindNavHotkeys
+	ProfileFn.Call()
+	NavReady := NavFn.Call()
+	return (NavReady is Integer) && NavReady == 1
+}
+
 /**
  * Bootstraps the tray menu and starts the LLM bridge if auto-start is enabled.
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
@@ -169,8 +182,11 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; would be wasteful and noisy in the AHK Hotkey log; doing it here
 	; covers both fresh boots and post-Reload paths since LLM_Menu_Init is
 	; the only entry into the tray module.
-	LLM_Menu_BindProfileHotkeys()
-	LLM_Menu_BindNavHotkeys()
+	if !_LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore) {
+		LoggerError("LLM",
+			"Initial navigation hotkey activation remained incomplete; retaining the tray build for retry.")
+		throw Error("initial LLM navigation hotkeys are incomplete")
+	}
 
 	; (Removed) First-run LLM onboarding TrayTip — the unsolicited
 	; "Text predictions available" balloon was perceived as noise by users

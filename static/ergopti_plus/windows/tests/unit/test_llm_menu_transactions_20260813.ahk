@@ -20,6 +20,10 @@ global _LMT_LiveAtWrite := ""
 global _LMT_ConfigPath := ""
 global _LMT_ApiPath := ""
 global _LMT_ApiRefused := false
+global _LMT_PrepareResult := 1
+global _LMT_PrepareCalls := 0
+global _LMT_PublishCalls := 0
+global _LMT_Events := []
 
 _LMT_Features() {
 	return _LLMST_Features(false, "live-model", "ollama")
@@ -69,18 +73,36 @@ _LMT_MutateNested(Candidate) {
 
 _LMT_Writer(Path, Updates) {
 	global _LMT_WriterResult, _LMT_WriterCalls, _LMT_WriterCritical
-	global _LMT_LiveAtWrite, _LLM_Menu
+	global _LMT_LiveAtWrite, _LLM_Menu, _LMT_Events
 	_LMT_WriterCalls += 1
+	_LMT_Events.Push("writer")
 	_LMT_WriterCritical := A_IsCritical
 	_LMT_LiveAtWrite := _LLM_Menu["user_profiles"][1]["label"]
 	return _LMT_WriterResult
 }
 
 _LMT_Apply(Candidate) {
-	global _LMT_ApplyCalls, _LMT_ApplyCritical
+	global _LMT_ApplyCalls, _LMT_ApplyCritical, _LMT_Events
 	_LMT_ApplyCalls += 1
+	_LMT_Events.Push("apply")
 	_LMT_ApplyCritical := A_IsCritical
 	return true
+}
+
+_LMT_Prepare(Candidate) {
+	global _LMT_PrepareResult, _LMT_PrepareCalls, _LMT_Events
+	_LMT_PrepareCalls += 1
+	_LMT_Events.Push("prepare")
+	return _LMT_PrepareResult ? Map("candidate", Candidate) : false
+}
+
+_LMT_Publish(CandidateFeatures, CandidateMenu, Owner) {
+	global _LMT_PublishCalls, _LMT_Events
+	_LMT_PublishCalls += 1
+	_LMT_Events.Push("publish")
+	if !(Owner is Map)
+		return false
+	return _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu)
 }
 
 _LMT_Notify(Message, Options) {
@@ -91,7 +113,8 @@ _LMT_InstallFixture() {
 	global Features, _LLM_Menu, ConfigurationFile
 	global _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
 	global _LMT_WriterCritical, _LMT_ApplyCritical, _LMT_LiveAtWrite
-	global _LMT_ConfigPath
+	global _LMT_ConfigPath, _LMT_PrepareResult, _LMT_PrepareCalls
+	global _LMT_PublishCalls, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
 		"path", ConfigurationFile)
 	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction.toml"
@@ -104,6 +127,10 @@ _LMT_InstallFixture() {
 	_LMT_WriterCritical := -1
 	_LMT_ApplyCritical := -1
 	_LMT_LiveAtWrite := ""
+	_LMT_PrepareResult := 1
+	_LMT_PrepareCalls := 0
+	_LMT_PublishCalls := 0
+	_LMT_Events := []
 	return Previous
 }
 
@@ -173,6 +200,77 @@ _LMT_DurabilityPrecedesPublicationAndDefusesCritical() {
 Test("LLM menu: durable write precedes publication outside inherited Critical "
 	. "(llm-menu-durable-before-publish)",
 	_LMT_DurabilityPrecedesPublicationAndDefusesCritical)
+
+_LMT_PrepareRefusalPrecedesDurability() {
+	global _LMT_PrepareResult, _LMT_PrepareCalls, _LMT_PublishCalls
+	global _LMT_WriterCalls, _LMT_ApplyCalls, _LMT_Events
+	Previous := _LMT_InstallFixture()
+	try {
+		_LMT_PrepareResult := 0
+		AssertFalse(LLM_Menu_CommitMutation("the prepared LLM setting",
+			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
+			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+			_LMT_Prepare, _LMT_Publish))
+		AssertEqual(1, _LMT_PrepareCalls)
+		AssertEqual(0, _LMT_WriterCalls,
+			"native preparation refusal must happen before durable I/O")
+		AssertEqual(0, _LMT_ApplyCalls)
+		AssertEqual(0, _LMT_PublishCalls)
+		AssertEqual(1, _LMT_Events.Length)
+		AssertEqual("prepare", _LMT_Events[1])
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM menu: native preparation refusal precedes durable write "
+	. "(llm-menu-prepare-before-durability)",
+	_LMT_PrepareRefusalPrecedesDurability)
+
+_LMT_FailedWriterKeepsPreparedSurfaceInert() {
+	global _LMT_WriterResult, _LMT_PrepareCalls, _LMT_PublishCalls
+	global _LMT_WriterCalls, _LMT_ApplyCalls, _LMT_Events
+	Previous := _LMT_InstallFixture()
+	try {
+		_LMT_WriterResult := 0
+		AssertFalse(LLM_Menu_CommitMutation("the prepared LLM setting",
+			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
+			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+			_LMT_Prepare, _LMT_Publish))
+		AssertEqual(1, _LMT_PrepareCalls)
+		AssertEqual(1, _LMT_WriterCalls)
+		AssertEqual(0, _LMT_PublishCalls,
+			"a failed writer must never activate the prepared native surface")
+		AssertEqual(0, _LMT_ApplyCalls)
+		AssertEqual(2, _LMT_Events.Length)
+		AssertEqual("prepare", _LMT_Events[1])
+		AssertEqual("writer", _LMT_Events[2])
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM menu: failed writer never activates the prepared native surface "
+	. "(llm-menu-prepared-surface-inert)",
+	_LMT_FailedWriterKeepsPreparedSurfaceInert)
+
+_LMT_SuccessPublishesPreparedSurfaceOnce() {
+	global _LMT_PrepareCalls, _LMT_PublishCalls, _LMT_WriterCalls
+	global _LMT_ApplyCalls, _LMT_Events
+	Previous := _LMT_InstallFixture()
+	try {
+		AssertTrue(LLM_Menu_CommitMutation("the prepared LLM setting",
+			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
+			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+			_LMT_Prepare, _LMT_Publish))
+		AssertEqual(1, _LMT_PrepareCalls)
+		AssertEqual(1, _LMT_WriterCalls)
+		AssertEqual(1, _LMT_PublishCalls)
+		AssertEqual(1, _LMT_ApplyCalls)
+		AssertEqual(4, _LMT_Events.Length)
+		AssertEqual("prepare", _LMT_Events[1])
+		AssertEqual("writer", _LMT_Events[2])
+		AssertEqual("publish", _LMT_Events[3])
+		AssertEqual("apply", _LMT_Events[4])
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM menu: publication atomically activates the prepared native surface "
+	. "(llm-menu-prepared-surface-publish)",
+	_LMT_SuccessPublishesPreparedSurfaceOnce)
 
 _LMT_GlobalAdmissionRefusalDoesNotBuildCandidate() {
 	global _LMT_ConfigPath, _LMT_WriterCalls, _LMT_ApplyCalls

@@ -771,9 +771,14 @@ LLM_Menu_BindProfileHotkeys() {
  * least one configured profile to map onto — otherwise the keystroke
  * falls through to the active app unchanged.
  */
-_LLM_Menu_IsProfileHotkeyActive() {
+_LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {
 	global _LLM_Menu
 	if !IsSet(_LLM_Menu) or !_LLM_Menu["enabled"]
+		return false
+	; Yield only when the published navigation owner has the exact same variant.
+	; A broad tooltip-visible gate would swallow Ctrl+digits while navigation uses
+	; Alt or Shift; AHK passes the concrete hotkey name to this predicate.
+	if LLM_Menu_NavOwnsSpec(ThisHotkey)
 		return false
 	order := LLM_Menu_GetHotkeyProfileOrder()
 	return order.Length > 0
