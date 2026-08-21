@@ -68,7 +68,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-021` — `e02233b4b` (`fix(macos): invalidate hotstring context on Escape`)
 - [ ] `HS-022` — global Disable All / factory reset transaction
 - [x] `HS-023` — this fix commit (`fix(macos): publish VS Code extension transactionally`); `--only "HS-023"` passes 9/9
-- [ ] `HS-024` — MLX download exactly-once terminal contract
+- [x] `HS-024` — MLX download exactly-once terminal contract; cross-stage owner, retry/cancel cleanup, and reattach settlement replayed
 - [x] `HS-025` — asynchronous Ollama readiness probes
 - [x] `HS-026` — LLM settings transaction; independently reviewed GO
 - [x] `HS-027` — this fix commit; model and `No Model` share one recoverable transition, with 26 focused refusal/retry cases
@@ -565,6 +565,8 @@ The focused HS-019 filter passes `33/33`; the complete platform transaction modu
 **Fix.** Give the download one terminal owner `{active, generation, tasks, partial, on_success, on_cancel, guard}`. Every terminal failure settles `on_cancel` exactly once; cancellation revokes authority before signaling native work; retry transfers the same owner; every continuation and server start rechecks authority.
 
 **Regression test.** Add `tests/unit/ui/menu/menu_llm/test_mlx_download_terminal_contract.lua`. Drive busy slot, user cancel, temp-file refusal, launcher/tail constructor and start refusal, task exit failure, save refusal, and server-start refusal through the real switcher; assert the keymap gate transitions `false -> true` exactly once with no state commit. After a tail-acquisition refusal, assert a second pull is rejected while the same logical owner remains. Deliver exit `0` after cancel and assert zero publication/server start/second terminal.
+
+**Implemented and independently replayed.** One logical owner now spans launcher creation, detached PID discovery, tail monitoring, critical timers, server handoff, Retry, Cancel, and post-reload reattachment. Native signal acceptance never clears a task slot; exact callbacks, PID-death proof, and retryable cleanup debt control release. File writes, close/rename, session publication, chmod, task construction/start, timer acquisition/reschedule, and server dispatch fail closed on false, nil, or throw. Retry transfers the same latch, late PID and task callbacks can only contribute cleanup evidence, and reattached success remains owned until its exact tail callback. The real ModelSwitcher receives one success or cancellation terminal, including busy/refusal paths, and PID-missing reattachment preserves the specific interrupted-download notification. The focused replay passes `100/100`; affected single-slot, generation, reattach, callback, download-window, and GC modules pass `46/46`. Lua compilation, strict conventions, false-green, and diff checks are green. These are deterministic Lua/native-shape harnesses; no native macOS detached-process smoke result is claimed.
 
 ### `HS-025` — Ollama readiness blocks the Hammerspoon runloop for up to five seconds per attempt
 
