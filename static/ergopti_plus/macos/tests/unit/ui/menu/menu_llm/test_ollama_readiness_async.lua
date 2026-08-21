@@ -5,6 +5,8 @@
 -- DESCRIPTION:
 -- Proves that readiness and daemon restart shell work is owned asynchronously,
 -- generation-fenced, and terminal exactly once without blocking the Lua runloop.
+-- Also proves that a requirement request receives every terminal from the real
+-- pull continuation that it dispatches.
 -- =============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,6 +39,7 @@ local function with_fixture(spec, body)
 		local http_callbacks = {}
 		local shared_system_checks = {}
 		local notifications = {}
+		local download_options = nil
 		local starts = spec.start_results or {}
 		local synchronous_completions = spec.synchronous_completions or {}
 		local native_synchronous_completions = spec.native_synchronous_completions or {}
@@ -63,7 +66,10 @@ local function with_fixture(spec, body)
 			build = function() return "exec /opt/homebrew/bin/ollama serve" end,
 		}
 		package.loaded["ui.download_window"] = {
-			show = function() return true end,
+			show = function(options)
+				download_options = options
+				return true
+			end,
 			update = function() return true end,
 			complete = function() return true end,
 		}
@@ -118,20 +124,29 @@ local function with_fixture(spec, body)
 
 		local manager
 		package.loaded["adapters.task_lifecycle"] = {
-			native = function(label, executable, on_done, args)
+			native = function(label, executable, on_done, on_chunk_or_args, args)
 				local index = #native_tasks + 1
 				if native_task_results[index] == false then return nil end
 				if type(spec.on_native_construct) == "function" then
 					spec.on_native_construct(manager, label)
 				end
+				local on_stream = type(on_chunk_or_args) == "function"
+					and on_chunk_or_args or nil
+				local argv = on_stream and (args or {}) or on_chunk_or_args
 				local task = {
 					index = index,
 					label = label,
 					executable = executable,
-					args = args,
+					args = argv,
 					on_done = on_done,
+					on_stream = on_stream,
 					starts = 0,
+					terminate_calls = 0,
 				}
+				function task:terminate()
+					self.terminate_calls = self.terminate_calls + 1
+					return self
+				end
 				native_tasks[#native_tasks + 1] = task
 				return task
 			end,
@@ -160,7 +175,7 @@ local function with_fixture(spec, body)
 				http_callbacks[#http_callbacks + 1] = {
 					url = url, body = body, headers = headers, callback = callback,
 				}
-				return true
+				return nil
 			end},
 			urlevent = {openURL = function() return true end},
 		}
@@ -190,6 +205,7 @@ local function with_fixture(spec, body)
 			timers = timers,
 			native_tasks = native_tasks,
 			http_callbacks = http_callbacks,
+			download_options = function() return download_options end,
 			shared_system_checks = shared_system_checks,
 			notifications = notifications,
 			menu_updates = function() return menu_updates end,
@@ -200,6 +216,40 @@ local function with_fixture(spec, body)
 	_G.hs = saved_hs
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved_modules[name] end
 	if not ok then error(err, 0) end
+end
+
+--- Accepts the real manager's download continuation without replacing it.
+--- @param _target_model string The requested display model.
+--- @param _backend string The backend label.
+--- @param _repo string The resolved Ollama repository.
+--- @param start_download function The manager-owned pull continuation.
+--- @return boolean accepted Whether the pull accepted native ownership.
+local function accept_model_download(_target_model, _backend, _repo, start_download)
+	return start_download()
+end
+
+--- Drives a missing model through readiness, inventory, and pull dispatch.
+--- @param fixture table The real-manager fixture.
+--- @param freshness table Mutable generation state.
+--- @return boolean accepted Whether the outer requirement request was accepted.
+--- @return table terminal External terminal counters and failure reasons.
+local function start_missing_model_pull(fixture, freshness)
+	local terminal = {successes = 0, failures = 0, reasons = {}}
+	local accepted = fixture.manager.check_requirements("missing-model", function()
+		terminal.successes = terminal.successes + 1
+		return true
+	end, function(reason)
+		terminal.failures = terminal.failures + 1
+		terminal.reasons[#terminal.reasons + 1] = reason
+		return true
+	end, {is_current = function() return freshness.current end})
+
+	fixture.spawns[1].complete(0, '{"version":"ready"}', "")
+	helpers.assert_eq(fixture.native_tasks[1].args, {"list"},
+		"the inventory task must receive the native four-argument argv form")
+	helpers.assert_nil(fixture.native_tasks[1].on_stream)
+	fixture.native_tasks[1].on_done(0, "NAME ID SIZE\n", "")
+	return accepted, terminal
 end
 
 helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned", function()
@@ -529,8 +579,17 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				complete = function() return true end,
 			}
 			package.loaded["adapters.task_lifecycle"] = {
-				native = function(label, executable, on_done, args)
-					local task = {label = label, executable = executable, on_done = on_done, args = args}
+				native = function(label, executable, on_done, on_chunk_or_args, args)
+					local on_stream = type(on_chunk_or_args) == "function"
+						and on_chunk_or_args or nil
+					local argv = on_stream and (args or {}) or on_chunk_or_args
+					local task = {
+						label = label,
+						executable = executable,
+						on_done = on_done,
+						on_stream = on_stream,
+						args = argv,
+					}
 					model_tasks[#model_tasks + 1] = task
 					return task
 				end,
@@ -576,7 +635,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 					secondsSinceEpoch = function() return 100 end,
 				},
 				json = {encode = function() return "{}" end},
-				http = {asyncPost = function() return true end},
+				http = {asyncPost = function() return nil end},
 				urlevent = {openURL = function() return true end},
 			}
 
@@ -610,6 +669,122 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 		_G.hs = saved_hs
 		for _, name in ipairs(MODULES) do package.loaded[name] = saved_modules[name] end
 		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("HS-035 Ollama requirement pull terminal delivery", function()
+	helpers.it("(HS-035-process-failure) forwards a pull process failure exactly once", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(#fixture.native_tasks, 2)
+			helpers.assert_eq(fixture.native_tasks[2].args, {"pull", "missing-model"})
+			helpers.assert_type(fixture.native_tasks[2].on_stream, "function")
+			fixture.native_tasks[2].on_stream(nil, "", "pull failed")
+			fixture.native_tasks[2].on_done(2, "", "pull failed")
+			fixture.native_tasks[2].on_done(2, "", "duplicate")
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"process_failed"})
+		end)
+	end)
+
+	helpers.it("(HS-035-user-cancel) forwards user cancellation after native settlement", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_eq(accepted, true)
+			local progress = fixture.download_options()
+			helpers.assert_type(progress, "table")
+			helpers.assert_type(progress.on_cancel, "function")
+			helpers.assert_eq(progress.on_cancel(), true)
+			helpers.assert_eq(terminal.failures, 0,
+				"termination request is not process settlement")
+			fixture.native_tasks[2].on_done(15, "", "")
+			fixture.native_tasks[2].on_done(15, "", "duplicate")
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"user_cancelled"})
+		end)
+	end)
+
+	helpers.it("(HS-035-construction-refusal) preserves the child construction reason", function()
+		with_fixture({
+			shared_system_check = accept_model_download,
+			native_task_results = {[2] = false},
+		}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(#fixture.native_tasks, 1)
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"task_construction_failed"})
+		end)
+	end)
+
+	helpers.it("(HS-035-start-refusal) preserves the child start reason", function()
+		with_fixture({
+			shared_system_check = accept_model_download,
+			task_start_results = {[2] = false},
+		}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(#fixture.native_tasks, 2)
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"task_start_refused"})
+		end)
+	end)
+
+	helpers.it("(HS-035-stale-duplicate) forwards one stale terminal from late pull completion", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local freshness = {current = true}
+			local accepted, terminal = start_missing_model_pull(fixture, freshness)
+			helpers.assert_eq(accepted, true)
+			freshness.current = false
+			fixture.native_tasks[2].on_done(0, "", "")
+			fixture.native_tasks[2].on_done(0, "", "duplicate")
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"stale"})
+			helpers.assert_eq(#fixture.http_callbacks, 0)
+		end)
+	end)
+
+	helpers.it("(HS-035-loadability-stale-duplicate) rejects a late loadability success", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local freshness = {current = true}
+			local accepted, terminal = start_missing_model_pull(fixture, freshness)
+			helpers.assert_eq(accepted, true)
+			fixture.native_tasks[2].on_done(0, "", "")
+			helpers.assert_eq(#fixture.http_callbacks, 1)
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 0)
+
+			freshness.current = false
+			fixture.http_callbacks[1].callback(200, "{}", {})
+			fixture.http_callbacks[1].callback(200, "duplicate", {})
+			fixture.native_tasks[2].on_done(0, "", "duplicate")
+			helpers.assert_eq(terminal.successes, 0)
+			helpers.assert_eq(terminal.failures, 1)
+			helpers.assert_eq(terminal.reasons, {"stale"})
+		end)
+	end)
+
+	helpers.it("(HS-035-success-duplicate) forwards one success after loadability", function()
+		with_fixture({shared_system_check = accept_model_download}, function(fixture)
+			local accepted, terminal = start_missing_model_pull(fixture, {current = true})
+			helpers.assert_eq(accepted, true)
+			fixture.native_tasks[2].on_done(0, "", "")
+			helpers.assert_eq(terminal.successes, 0,
+				"pull completion alone cannot bypass the loadability boundary")
+			helpers.assert_eq(#fixture.http_callbacks, 1)
+			fixture.http_callbacks[1].callback(200, "{}", {})
+			fixture.http_callbacks[1].callback(200, "duplicate", {})
+			fixture.native_tasks[2].on_done(0, "", "duplicate")
+			helpers.assert_eq(terminal.successes, 1)
+			helpers.assert_eq(terminal.failures, 0)
+			helpers.assert_eq(terminal.reasons, {})
+		end)
 	end)
 end)
 

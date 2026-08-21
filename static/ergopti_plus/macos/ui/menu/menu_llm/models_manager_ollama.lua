@@ -826,10 +826,6 @@ function M.new(deps, presets, ram_getter)
 		local function settle_cancel(...)
 			return settle(on_cancel, "Ollama requirement cancellation", ...)
 		end
-		local function settle_stale(reason)
-			if reason ~= "stale" then return false end
-			return settle_cancel(reason)
-		end
 		local function still_current()
 			local ok, current = Logger.callback(LOG,
 				"Ollama requirement freshness check", is_current)
@@ -839,6 +835,11 @@ function M.new(deps, presets, ram_getter)
 			if still_current() then return true end
 			settle_cancel("stale")
 			return false
+		end
+		local function settle_child_failure(reason, ...)
+			if reason == "stale" then return settle_cancel(reason, ...) end
+			if not current_or_cancel() then return false end
+			return settle_cancel(reason, ...)
 		end
 		local function settle_success(...)
 			if not current_or_cancel() then return false end
@@ -883,7 +884,7 @@ function M.new(deps, presets, ram_getter)
 							end
 							if not current_or_cancel() then return end
 							local accepted = obj.pull_model(target_model, repo,
-								settle_success, settle_stale, opts)
+								settle_success, settle_child_failure, opts)
 							if accepted == false then settle_cancel("repair_pull_refused") end
 							return
 						end
@@ -896,10 +897,10 @@ function M.new(deps, presets, ram_getter)
 							if not current_or_cancel() then return false end
 							if get_ollama_path() then
 								return obj.pull_model(target_model, repo,
-									settle_success, settle_stale, opts)
+									settle_success, settle_child_failure, opts)
 							end
 							return obj.install_ollama_then_pull(target_model, repo,
-								settle_success, settle_stale, opts)
+								settle_success, settle_child_failure, opts)
 						end, settle_cancel, opts)
 						if not check_ok or accepted == false then
 							settle_cancel("system_check_refused")
@@ -909,10 +910,10 @@ function M.new(deps, presets, ram_getter)
 						local accepted
 						if get_ollama_path() then
 							accepted = obj.pull_model(target_model, repo,
-								settle_success, settle_stale, opts)
+								settle_success, settle_child_failure, opts)
 						else
 							accepted = obj.install_ollama_then_pull(target_model, repo,
-								settle_success, settle_stale, opts)
+								settle_success, settle_child_failure, opts)
 						end
 						if accepted == false then settle_cancel("download_dispatch_refused") end
 					end
