@@ -249,7 +249,8 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 	end)
 
 	helpers.it("execute_single('none') runs the empty action without error", function()
-		Actions.execute_single("none")
+		helpers.assert_eq(Actions.execute_single("none"), true,
+			"a registered successful action must report handled to its caller")
 	end)
 
 	helpers.it("is_right_click_held returns a boolean", function()

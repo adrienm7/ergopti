@@ -60,7 +60,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-013` — this fix commit; exact handles are reused and six focused edit/menu repros pass
 - [x] `HS-014` — present in starting `dev` via `c6d081890`; independently replayed bind lifecycle tests
 - [x] `HS-015` — this fix commit; both entry-point families share one exact screenshot-save transaction and 15 focused repros pass
-- [ ] `HS-016` — starting `dev` fixes the enumerated callbacks; one profile-warning sibling found during `HS-031` remains
+- [x] `HS-016` — callback inventory plus profile-warning sibling are observable and truthful
 - [x] `HS-017` — `ea924a686` (`fix(macos): order updater responses monotonically`)
 - [x] `HS-018` — this fix commit; local health generations now invalidate on every committed backend switch
 - [ ] `HS-019` — root Karabiner fail-fast and bulk clear transaction
@@ -409,7 +409,9 @@ A faithful server harness produced `start_result=nil`, `native_port=0`, `getPort
 
 **Regression test.** Add `tests/unit/modules/shortcuts/test_script_control_extra_callback_errors.lua` and extend `tests/unit/llm/test_callbacks_never_swallowed.lua`. Execute the real deferred script-control path with success then throw; assert success once, one contextual ERROR on throw, and no silent success result. For each LLM callback-bearing module, inject throw and assert containment, traceback log, and terminal cleanup. Make the meta inventory enumerate modules rather than selected spellings.
 
-**Implementation rescan collateral (open).** `ui/menu/menu_llm/model_switcher.lua:381` still invokes the profile-power warning through a bare `pcall(notifications.notify, ...)` and discards both status and error. Repro: commit a profile whose power exceeds the active model by more than one level, inject a throwing notification sink, and observe a successful action with no warning and no file `ERROR`. The prior callback inventory did not include this helper. A follow-up regression must drive the real committed profile path, make the warning sink throw, and assert that the profile remains committed while one contextual traceback is file-logged.
+**Implementation rescan collateral.** `ui/menu/menu_llm/model_switcher.lua:381` still invoked the profile-power warning through a bare `pcall(notifications.notify, ...)` and discarded both status and error. Repro: commit a profile whose power exceeds the active model by more than one level, inject a throwing notification sink, and observe a successful action with no warning and no file `ERROR`. The prior callback inventory did not include this helper. A follow-up regression must drive the real committed profile path, make the warning sink throw, and assert that the profile remains committed while one contextual traceback is file-logged.
+
+**Follow-up implemented and behaviorally replayed.** The profile-power warning now crosses `Logger.callback`: a throwing notification remains non-transactional after the profile commit, but its label and traceback reach the central file logger. The real profile transaction test was red before the change and passes `28/28` after it, the gesture callback module passes `30/30`, and the move-resilient callback inventory now accepts both tested visible boundaries (`ApiCommon.protected_call` and `Logger.callback`) while still rejecting every bare callback `pcall` (`9/9`).
 
 ### `HS-017` — Same-generation updater responses can regress release state
 

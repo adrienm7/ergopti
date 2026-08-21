@@ -291,9 +291,21 @@ end)
 helpers.describe("LLM orchestration: queued waiters use the visible callback contract", function()
 	helpers.it("covers dependency and model-manager callback aliases", function()
 		local targets = {
-			{ symbol = "local function fire_pending_callbacks", label = "MLX dependency callbacks" },
-			{ symbol = "function M.new(deps, presets)", label = "MLX model-manager callbacks" },
-			{ symbol = "function obj.start_server", label = "MLX server waiters" },
+			{
+				symbol = "local function fire_pending_callbacks",
+				label = "MLX dependency callbacks",
+				boundary = "ApiCommon.protected_call",
+			},
+			{
+				symbol = "function M.new(deps, presets)",
+				label = "MLX model-manager callbacks",
+				boundary = "Logger.callback",
+			},
+			{
+				symbol = "function obj.start_server",
+				label = "MLX server waiters",
+				boundary = "ApiCommon.protected_call",
+			},
 		}
 		local offenders = {}
 		for _, target in ipairs(targets) do
@@ -307,9 +319,9 @@ helpers.describe("LLM orchestration: queued waiters use the visible callback con
 					break
 				end
 			end
-			helpers.assert_true(code:find("ApiCommon.protected_call", 1, true) ~= nil,
+			helpers.assert_true(code:find(target.boundary, 1, true) ~= nil,
 				target.label .. " must route every caller callback through the tested "
-					.. "traceback-and-ERROR wrapper")
+					.. "traceback-and-ERROR wrapper " .. target.boundary)
 		end
 		helpers.assert_eq(0, #offenders,
 			"bare callback pcall still deletes errors in: " .. table.concat(offenders, ", "))

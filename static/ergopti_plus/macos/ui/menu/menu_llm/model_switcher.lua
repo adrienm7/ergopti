@@ -379,7 +379,8 @@ function M.new(ctx)
 				i18n.get("menu.llm.profile_power_warning"),
 				get_profile_label(rec_profile),
 				get_profile_label(selected_profile_id))
-			pcall(notifications.notify, msg, nil, "warning")
+			Logger.callback(LOG, "Profile power warning notification",
+				notifications.notify, msg, nil, "warning")
 		end
 	end
 
