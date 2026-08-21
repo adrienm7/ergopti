@@ -251,7 +251,11 @@ local function interceptor(event, km_buffer, ctx)
 
 	local rule   = match.rule
 	local result = match.result
-	local n_back = #rule.suffix
+	local len_ok, n_back = pcall(utf8.len, rule.suffix)
+	if not len_ok or type(n_back) ~= "number" or n_back < 1 then
+		Logger.error(LOG, "Dynamic rule suffix is not valid UTF-8; output refused.")
+		return nil
+	end
 
 	Logger.debug(LOG, "Injecting dynamic rule for suffix '%s'…", rule.suffix)
 
@@ -549,8 +553,7 @@ end
 --- @param resolver function A callback function that returns the string to insert.
 function M.add_rule(suffix, section, resolver)
 	if not invalidate_preview_snapshot("Rule registration") then return false end
-	SharedEngine.add_rule(suffix, section, resolver)
-	return true
+	return SharedEngine.add_rule(suffix, section, resolver) == true
 end
 
 --- Internal method used by init.lua to inject personal data into the engine.

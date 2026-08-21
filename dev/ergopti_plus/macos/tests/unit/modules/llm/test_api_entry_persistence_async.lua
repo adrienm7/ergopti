@@ -109,6 +109,7 @@ local function with_persistence_fixture(options, body)
 			fixture.errors[#fixture.errors + 1] = string.format(tostring(fmt), ...)
 		end,
 		pcall = function(_, fn, ...) return pcall(fn, ...) end,
+		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 	}
 	package.loaded["infra.paths"] = {
 		shared = function(relative)

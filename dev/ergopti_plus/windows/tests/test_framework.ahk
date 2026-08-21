@@ -336,9 +336,27 @@ _DriverFuncBodyOrEmpty(Name) {
 	i := OpenPos
 	Len := StrLen(Src)
 	BodyEnd := Len
+	Quote := ""
 	while (i <= Len) {
 		ch := SubStr(Src, i, 1)
-		if (ch == "{")
+		if (Quote != "") {
+			; AHK uses the backtick escape inside both quote styles. The escaped
+			; byte cannot close the string or alter brace depth.
+			if (ch == Chr(96)) {
+				i += 2
+				continue
+			}
+			if (ch == Quote)
+				Quote := ""
+		} else if (ch == Chr(34) or ch == Chr(39)) {
+			Quote := ch
+		} else if (ch == ";") {
+			; Inline comments may document literal `{` / `}` examples. They are
+			; not syntax and must not make the extracted body absorb siblings.
+			LineEnd := InStr(Src, "`n", , i)
+			i := LineEnd > 0 ? LineEnd : Len + 1
+			continue
+		} else if (ch == "{")
 			depth++
 		else if (ch == "}") {
 			depth--

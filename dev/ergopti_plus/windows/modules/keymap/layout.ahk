@@ -761,7 +761,7 @@ _UIA_SelectionPollTick() {
 		and !IsObject(_UIA_SelectionCache))
 		return
 	ProcName := ""
-	try ProcName := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+	try ProcName := OutputHostResolve()["Exe"]
 	if (ProcName == "" or ProcName == "Code.exe") {
 		_UIA_SelectionCache := 0
 		return

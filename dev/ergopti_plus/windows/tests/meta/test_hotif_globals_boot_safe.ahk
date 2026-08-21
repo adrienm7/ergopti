@@ -36,6 +36,7 @@
 ; helper reads must be here, or IsSet-guarded where it is read.
 global _HGBS_PRE_PUMP_SEEDED := ["CapsWordEnabled", "LayerEnabled", "TapHold",
 	"_ALTGR_KANA_FIXUP", "_DriverBootPhase", "_PersonalShortcutsRegistry", "DriverPid"]
+global _HGBS_HOTIF_PARENTS := Map()
 
 
 
@@ -86,8 +87,10 @@ _HGBS_SeedsSurviveInThePrePumpBlock() {
 ; paren, and a scanner that only reads the directive's first line is blind to
 ; everything after it — that blindness is itself a recorded finding.
 _HGBS_HotIfFunctions() {
+	global _HGBS_HOTIF_PARENTS
 	Src := _DriverSourceNoComments()
 	Names := Map()
+	Parents := Map()
 	Lines := StrSplit(Src, "`n", "`r")
 	InDirective := false
 	Depth := 0
@@ -108,8 +111,11 @@ _HGBS_HotIfFunctions() {
 		if (Depth <= 0)
 			InDirective := false
 
-		for Fn in _HGBS_CalleesIn(Text)
+		for Fn in _HGBS_CalleesIn(Text) {
 			Names[Fn] := true
+			if !Parents.Has(Fn)
+				Parents[Fn] := "#HotIf"
+		}
 	}
 	; TRANSITIVE. The reported crash went through a one-line wrapper:
 	; `#HotIf LLM_Tooltip_GetText()` calls LLM_TooltipGetText(), and it is the
@@ -132,22 +138,79 @@ _HGBS_HotIfFunctions() {
 			if Names.Has(Callee)
 				continue
 			Names[Callee] := true
+			Parents[Callee] := Fn
 			Pending.Push(Callee)
 		}
 	}
+	_HGBS_HOTIF_PARENTS := Parents
 	return Names
+}
+
+_HGBS_PathTo(Fn) {
+	global _HGBS_HOTIF_PARENTS
+	Path := Fn
+	Seen := Map(Fn, true)
+	while _HGBS_HOTIF_PARENTS.Has(Fn) {
+		Fn := _HGBS_HOTIF_PARENTS[Fn]
+		Path := Fn . " -> " . Path
+		if (Fn == "#HotIf" || Seen.Has(Fn))
+			break
+		Seen[Fn] := true
+	}
+	return Path
 }
 
 ; Function names called in a snippet, minus the language constructs and the
 ; control-flow keywords AHK spells with parentheses.
+_HGBS_CodeOnly(Text) {
+	Out := ""
+	Quote := ""
+	i := 1
+	while (i <= StrLen(Text)) {
+		Ch := SubStr(Text, i, 1)
+		if (Quote != "") {
+			if (Ch == Chr(96)) {
+				Out .= "  "
+				i += 2
+				continue
+			}
+			if (Ch == Quote)
+				Quote := ""
+			Out .= (Ch == "`n") ? "`n" : " "
+		} else if (Ch == Chr(34) or Ch == Chr(39)) {
+			Quote := Ch
+			Out .= " "
+		} else if (Ch == ";") {
+			LineEnd := InStr(Text, "`n", , i)
+			if !LineEnd
+				break
+			Out .= "`n"
+			i := LineEnd + 1
+			continue
+		} else {
+			Out .= Ch
+		}
+		i++
+	}
+	return Out
+}
+
 _HGBS_CalleesIn(Text) {
 	static Skip := Map("IsSet", true, "not", true, "and", true, "or", true,
 		"if", true, "while", true, "for", true, "return", true, "loop", true,
 		"catch", true, "switch", true, "case", true, "Critical", true)
+	Text := _HGBS_CodeOnly(Text)
 	Found := []
 	Pos := 1
-	while (FoundPos := RegExMatch(Text, "([A-Za-z_]\w*)\s*\(", &C, Pos)) {
+	; A method call such as Object.Has() is not a call to a same-named driver
+	; function. Treating it as one makes the graph jump between unrelated APIs.
+	while (FoundPos := RegExMatch(Text, "(?<![.\w])([A-Za-z_]\w*)\s*\(", &C, Pos)) {
 		Pos := FoundPos + C.Len
+		; A one-line `try Callee()` contains an early-boot UnsetError by language
+		; contract; descending into it reports a crash that cannot escape #HotIf.
+		Prefix := SubStr(Text, Max(1, FoundPos - 12), Min(12, FoundPos - 1))
+		if RegExMatch(Prefix, "i)\btry\s*$")
+			continue
 		if Skip.Has(C[1])
 			continue
 		Found.Push(C[1])
@@ -203,9 +266,27 @@ _HGBS_EveryHotIfHelperIsBootSafe() {
 				if (S == Name)
 					Seeded := true
 			Assert(Seeded,
-				"'" . Fn . "' is reachable from a parse-time #HotIf and reads the global '" . Name . "' without an IsSet guard, while that global is not seeded in the pre-pump block. A key pressed during Bundle_Init's extraction evaluates that #HotIf before the assignment runs, raises UnsetError inside the evaluator, and kills the boot. Either IsSet-guard the read or seed the global above Bundle_Init()")
+				"'" . Fn . "' is reachable from a parse-time #HotIf via " . _HGBS_PathTo(Fn)
+				. " and reads the global '" . Name . "' without an IsSet guard, while that global is not seeded in the pre-pump block. A key pressed during Bundle_Init's extraction evaluates that #HotIf before the assignment runs, raises UnsetError inside the evaluator, and kills the boot. Either IsSet-guard the read or seed the global above Bundle_Init()")
 		}
 	}
+}
+
+_HGBS_FunctionScannerIgnoresLiteralBraces() {
+	Body := _DriverFuncBody("LLM_TooltipGetText")
+	AssertContains(Body, "_LLM_TooltipGetCurrentRecord()",
+		"the positive-control tooltip body must be extracted")
+	Assert(InStr(Body, "LLM_TriggerJournalReconcile") = 0,
+		"a brace in a string or comment must not make function extraction absorb unrelated sibling files")
+}
+
+_HGBS_CalleeScannerIgnoresNonCodeAndMethods() {
+	Snippet := 'RealCall()`nobj.MethodCall()`n"StringCall()" ' . Chr(59)
+		. ' CommentCall()`ntry ContainedCall()'
+	Calls := _HGBS_CalleesIn(Snippet)
+	AssertEqual(1, Calls.Length,
+		"the call graph must ignore method-name collisions, strings, and comments")
+	AssertEqual("RealCall", Calls[1])
 }
 
 
@@ -213,3 +294,7 @@ Test("meta hotif-globals-boot-safe: the pre-pump block still seeds what it promi
 	_HGBS_SeedsSurviveInThePrePumpBlock)
 Test("meta hotif-globals-boot-safe: every parse-time #HotIf helper is boot-safe",
 	_HGBS_EveryHotIfHelperIsBootSafe)
+Test("meta hotif-globals-boot-safe: function scan stops at the real closing brace",
+	_HGBS_FunctionScannerIgnoresLiteralBraces)
+Test("meta hotif-globals-boot-safe: call scan follows executable free functions only",
+	_HGBS_CalleeScannerIgnoresNonCodeAndMethods)

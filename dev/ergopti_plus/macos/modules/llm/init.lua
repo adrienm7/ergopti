@@ -191,7 +191,9 @@ function M.auto_detect_backend(callback)
 	-- Return cached result immediately if checked recently (within 10s)
 	if now - CoreState.last_backend_check < CoreState.backend_check_interval then
 		local result = CoreState.backend
-		if type(callback) == "function" then pcall(callback, result) end
+		if type(callback) == "function" then
+			Logger.callback(LOG, "Cached backend auto-detect result", callback, result)
+		end
 		return result
 	end
 
@@ -231,7 +233,9 @@ function M.auto_detect_backend(callback)
 			CoreState.backend = "inconnu"
 		end
 
-		if type(callback) == "function" then pcall(callback, CoreState.backend) end
+		if type(callback) == "function" then
+			Logger.callback(LOG, "Backend auto-detect completion", callback, CoreState.backend)
+		end
 	end
 
 	-- pcall's boolean result must be checked: if hs.http.asyncGet throws
@@ -436,13 +440,7 @@ end
 
 local function invoke_persist_callback(callback, ...)
 	if type(callback) ~= "function" then return end
-	local args = table.pack(...)
-	local ok, err = xpcall(function()
-		callback(table.unpack(args, 1, args.n))
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "API persistence callback raised: %s", tostring(err))
-	end
+	return Logger.callback(LOG, "API persistence callback", callback, ...)
 end
 
 local function read_setting(key)

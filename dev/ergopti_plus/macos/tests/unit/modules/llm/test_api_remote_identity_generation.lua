@@ -38,10 +38,12 @@ ApiRemote.PROVIDERS.fixture = {
 
 helpers.describe("api_remote entry identity generation", function()
 	helpers.it("(remote-identity-generation) treats an empty active id as No Model instead of selecting the first entry", function()
-		local check_client = get_upvalue(ApiRemote.warmup, "_check_client")
-		local original_get = check_client.get
+		local warmup_client = get_upvalue(ApiRemote.warmup, "_warmup_client")
+		helpers.assert_true(warmup_client ~= nil,
+			"warmup must retain its dedicated semantic HTTP owner")
+		local original_get = warmup_client.get
 		local requests = 0
-		check_client.get = function() requests = requests + 1 end
+		warmup_client.get = function() requests = requests + 1 end
 
 		local ok, err = pcall(function()
 			ApiRemote.set_entries({ entry_a, entry_b })
@@ -52,15 +54,17 @@ helpers.describe("api_remote entry identity generation", function()
 			helpers.assert_eq(requests, 0,
 				"No Model must not silently warm or infer with the first configured entry")
 		end)
-		check_client.get = original_get
+		warmup_client.get = original_get
 		if not ok then error(err) end
 	end)
 
 	helpers.it("(remote-identity-generation) discards an old health callback after the active entry changes", function()
-		local check_client = get_upvalue(ApiRemote.warmup, "_check_client")
-		local original_get = check_client.get
+		local warmup_client = get_upvalue(ApiRemote.warmup, "_warmup_client")
+		helpers.assert_true(warmup_client ~= nil,
+			"warmup must retain its dedicated semantic HTTP owner")
+		local original_get = warmup_client.get
 		local callback
-		check_client.get = function(_, _, on_done) callback = on_done end
+		warmup_client.get = function(_, _, on_done) callback = on_done end
 
 		local ok, err = pcall(function()
 			ApiRemote.set_entries({ entry_a, entry_b })
@@ -73,7 +77,7 @@ helpers.describe("api_remote entry identity generation", function()
 			helpers.assert_eq(ApiRemote.is_ready(), false,
 				"entry A cannot mark entry B ready")
 		end)
-		check_client.get = original_get
+		warmup_client.get = original_get
 		if not ok then error(err) end
 	end)
 

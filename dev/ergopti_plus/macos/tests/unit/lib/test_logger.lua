@@ -111,6 +111,44 @@ helpers.describe("Logger: pcall wrapper", function()
 	end)
 end)
 
+helpers.describe("Logger: contextual callback wrapper (HS-016)", function()
+	helpers.it("forwards exact callback results on success", function()
+		local FreshLogger = fresh_logger()
+		local ok, first, second, third = FreshLogger.callback(
+			"callback_test", "Model-ready", function(a, b)
+				return a, nil, b
+			end, false, "tail")
+
+		helpers.assert_true(ok, "a callback that returned false did not throw")
+		helpers.assert_eq(first, false, "false is an exact callback result, not failure")
+		helpers.assert_nil(second, "nil result slots must be preserved")
+		helpers.assert_eq(third, "tail", "later callback results must survive a nil slot")
+	end)
+
+	helpers.it("returns false and logs context plus traceback when a callback throws", function()
+		local FreshLogger = fresh_logger()
+		local ok, err = FreshLogger.callback("callback_test", "Model-ready", function()
+			error("callback exploded")
+		end)
+
+		helpers.assert_eq(ok, false, "a thrown callback cannot be reported as successful")
+		helpers.assert_contains(tostring(err), "callback exploded")
+		helpers.assert_contains(tostring(err), "stack traceback",
+			"the async owner needs the original callback stack after the runloop unwinds")
+
+		local matching_errors = 0
+		for _, line in ipairs(FreshLogger.ring_buffer_snapshot()) do
+			if line:find("[ERROR]", 1, true)
+				and line:find("Model-ready", 1, true)
+				and line:find("callback exploded", 1, true) then
+				matching_errors = matching_errors + 1
+			end
+		end
+		helpers.assert_eq(matching_errors, 1,
+			"one callback failure must produce one contextual file-log error")
+	end)
+end)
+
 helpers.describe("Logger: build wrapper", function()
 	helpers.it("returns the value on success", function()
 		local v = Logger.build("test", "thing", function() return { ok = true } end, {})

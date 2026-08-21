@@ -174,6 +174,30 @@ function M.open_db()
 
 	_db = db
 
+	-- schema.sql applies only to fresh caches. Keep older caches writable when
+	-- optional LLM accounting columns are introduced; duplicate-column errors are
+	-- avoided by inspecting the published table shape first.
+	local llm_columns = {}
+	for row in _db:nrows("PRAGMA table_info(events_llm)") do
+		llm_columns[row.name] = true
+	end
+	for _, column in ipairs({
+		{ "prompt_tokens", "INTEGER" },
+		{ "completion_tokens", "INTEGER" },
+		{ "total_tokens", "INTEGER" },
+		{ "est_cost_usd", "REAL" },
+	}) do
+		if not llm_columns[column[1]] then
+			local rc = _db:exec("ALTER TABLE events_llm ADD COLUMN " .. column[1] .. " " .. column[2])
+			if rc ~= sqlite3.OK then
+				Logger.error(LOG, "Cannot migrate events_llm.%s: %s.", column[1], _db:errmsg())
+				_db:close()
+				_db = nil
+				return false
+			end
+		end
+	end
+
 	-- Ensure meta keys exist (INSERT OR IGNORE is idempotent on replay). This set MUST
 	-- stay in lockstep with the meta seeds in _shared/data/db/schema.sql: the schema
 	-- block runs only on a fresh DB, so any key missing here is never back-filled into
@@ -416,7 +440,7 @@ end
 
 function _builders.llm(e, id, kind)
 	return string.format(
-		"INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
+		"INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
 		_sql_str(_device_id), id,
 		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
 		_sql_str(e.app or "Unknown"), _sql_str(kind),
@@ -425,7 +449,9 @@ function _builders.llm(e, id, kind)
 		_sql_str(e.prediction),
 		(e.all_predictions and _sql_json(e.all_predictions) or "NULL"),
 		_sql_num(e.chosen_index), _sql_num(e.deletes),
-		_sql_str(e.deleted_text), _sql_num(e.net_saved_chars), _sql_num(e.count))
+		_sql_str(e.deleted_text), _sql_num(e.net_saved_chars), _sql_num(e.count),
+		_sql_num(e.prompt_tokens), _sql_num(e.completion_tokens),
+		_sql_num(e.total_tokens), _sql_num(e.est_cost_usd))
 end
 
 function _builders.session(e, id, kind)

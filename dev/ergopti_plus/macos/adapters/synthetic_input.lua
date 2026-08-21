@@ -59,7 +59,6 @@ local absolute_time = assert(timer_api.absoluteTime,
 	"adapters.synthetic_input: hs.timer.absoluteTime is unavailable")
 local seconds_since_epoch = assert(timer_api.secondsSinceEpoch,
 	"adapters.synthetic_input: hs.timer.secondsSinceEpoch is unavailable")
-local usleep = timer_api.usleep
 local CURRENT_PROCESS_ID = assert(hs.processInfo and tonumber(hs.processInfo.processID),
 	"adapters.synthetic_input: hs.processInfo.processID is unavailable")
 local mouse_position = assert(hs.mouse and hs.mouse.absolutePosition,
@@ -1998,10 +1997,10 @@ function M.emit_key_strokes(value, explicit_tx)
 end
 
 
---- Target-posts one callback transaction, pausing after each leading deletion
---- pair. The originating eventtap callback stays open for the entire operation,
---- so later physical keys remain queued behind it while terminal/TUI render loops
---- get a turn between Backspaces. Every event retains its immutable Ergopti tag.
+--- Transfers one callback transaction to a retained timer serializer. No native
+--- post or sleep occurs while the originating eventtap callback is active. The
+--- owner advances its ordinal only after a successful post, so a failed post
+--- retries the exact undispatched suffix without duplicating its prefix.
 --- @param tx table Active transaction represented in the ambient collector.
 --- @param delete_pairs number Number of leading Backspace pairs to pace.
 --- @param delay_us number Inter-pair delay in microseconds.
@@ -2014,8 +2013,6 @@ function M.deliver_collected_paced(tx, delete_pairs, delay_us, app)
 		"adapters.synthetic_input.deliver_collected_paced: delete_pairs must be a positive integer")
 	assert(type(delay_us) == "number" and delay_us >= 1000,
 		"adapters.synthetic_input.deliver_collected_paced: delay must be at least 1000 us")
-	assert(type(usleep) == "function",
-		"adapters.synthetic_input.deliver_collected_paced: hs.timer.usleep is unavailable")
 	assert(app ~= nil,
 		"adapters.synthetic_input.deliver_collected_paced: target application is required")
 
@@ -2034,16 +2031,57 @@ function M.deliver_collected_paced(tx, delete_pairs, delay_us, app)
 			"adapters.synthetic_input.deliver_collected_paced: event cannot be posted")
 	end
 
-	for index, event in ipairs(events) do
-		event:post(app)
-		if index % 2 == 0 and index <= delete_event_count and index < #events then
-			usleep(delay_us)
+	local retain_token = M.retain(tx)
+	local owner = {
+		tx = tx,
+		token = retain_token,
+		events = events,
+		ordinal = 1,
+		delete_event_count = delete_event_count,
+		delay_sec = delay_us / 1000000,
+		app = app,
+	}
+	local function pump()
+		if tx.cancelled or tx.completed then return end
+		local event = owner.events[owner.ordinal]
+		if event == nil then
+			M.release(tx, retain_token)
+			return
+		end
+		local posted, post_error = xpcall(function() event:post(owner.app) end, debug.traceback)
+		if not posted then
+			Logger.error(LOG,
+				"Paced terminal post refused at ordinal %d; retaining suffix for retry: %s",
+				owner.ordinal, tostring(post_error))
+			local retry = schedule_after(owner.delay_sec,
+				"paced terminal retry", pump)
+			if not retry then
+				Logger.error(LOG,
+					"Paced terminal retry timer refused; transaction remains retained at ordinal %d.",
+					owner.ordinal)
+			end
+			return
+		end
+		owner.ordinal = owner.ordinal + 1
+		local completed_delete_pair = (owner.ordinal - 1) % 2 == 0
+			and (owner.ordinal - 1) <= owner.delete_event_count
+		local delay = completed_delete_pair and owner.ordinal <= #owner.events
+			and owner.delay_sec or 0
+		local scheduled = schedule_after(delay, "paced terminal serializer", pump)
+		if not scheduled then
+			Logger.error(LOG,
+				"Paced terminal serializer timer refused; transaction remains retained at ordinal %d.",
+				owner.ordinal)
 		end
 	end
+	local scheduled = M.defer_after_callback("paced terminal serializer", pump)
+	if not scheduled then
+		M.release(tx, retain_token)
+		return false
+	end
 
-	-- These exact objects have already crossed the application boundary. Remove
-	-- them from the callback return table without discarding their tags: normal
-	-- handoff confirmation still owns record retirement and transaction completion.
+	-- Ownership has committed before the exact objects leave the callback-return
+	-- batch. Their immutable tags remain attached to the retained serializer.
 	local delivered = {}
 	for _, event in ipairs(events) do delivered[event] = true end
 	local remaining = {}

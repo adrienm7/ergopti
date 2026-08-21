@@ -202,7 +202,16 @@ local function bind_slot(slot_id, action_id)
 	end
 	local ok_bind, handle = xpcall(Registrar.bind, debug.traceback, chord, function()
 		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, action_id)
-		pcall(GestActions.execute_single, action_id, "keyboard__" .. slot_id)
+		local ok_action, handled = Logger.callback(LOG,
+			"Configurable shortcut '" .. tostring(slot_id) .. "'",
+			GestActions.execute_single, action_id, "keyboard__" .. slot_id)
+		if not ok_action then return false end
+		if handled ~= true then
+			Logger.error(LOG, "Configurable shortcut '%s' was not handled by action '%s'.",
+				tostring(slot_id), tostring(action_id))
+			return false
+		end
+		return true
 	end)
 	if ok_bind and handle then
 		_hotkeys[slot_id] = handle
@@ -310,15 +319,29 @@ function M.set_action(slot_id, action_id)
 		Logger.error(LOG, "set_action(): both arguments must be strings.")
 		return false
 	end
+	local old_action = _actions[slot_id] or "none"
+	if old_action == action_id then return true end
+	if _started then
+		if unbind_slot(slot_id) ~= true then return false end
+		if action_id ~= "none" and bind_slot(slot_id, action_id) ~= true then
+			if old_action ~= "none" then bind_slot(slot_id, old_action) end
+			return false
+		end
+	end
+	local persisted, persist_err = pcall(hs.settings.set,
+		_settings_prefix .. slot_id, action_id)
+	if not persisted then
+		if _started then
+			unbind_slot(slot_id)
+			if old_action ~= "none" then bind_slot(slot_id, old_action) end
+		end
+		Logger.error(LOG, "Shortcut setting write failed for slot '%s': %s.",
+			slot_id, tostring(persist_err))
+		return false
+	end
 	_actions[slot_id] = action_id
-	hs.settings.set(_settings_prefix .. slot_id, action_id)
 	Logger.debug(LOG, "Slot '%s' → '%s' persisted.", slot_id, action_id)
 
-	-- Hot-rebind: release old hotkey, create new one if not "none"
-	if unbind_slot(slot_id) ~= true then return false end
-	if _started and action_id ~= "none" then
-		if bind_slot(slot_id, action_id) ~= true then return false end
-	end
 	return true
 end
 

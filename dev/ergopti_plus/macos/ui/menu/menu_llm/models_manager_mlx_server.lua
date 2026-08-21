@@ -98,6 +98,13 @@ function M.install(ctx)
 	end
 
 	function obj.start_server(target_model, on_success, on_cancel, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local function still_current()
+			local ok, current = ApiCommon.protected_call(
+				is_current, "MLX server freshness check")
+			return ok and current == true
+		end
+		if not still_current() then return false end
 		local repo = obj.get_mlx_repo(target_model)
 		if not repo then
 			Logger.warn(LOG, "Cannot start MLX server: no repository found for model %s.", tostring(target_model))
@@ -169,10 +176,19 @@ function M.install(ctx)
 			if running then
 				Logger.info(LOG, "MLX server running for different model — terminating.")
 				cancel_server_waiters()
-				pcall(function() existing:terminate() end)
+				local ok_terminate, terminated = xpcall(function()
+					return existing:terminate()
+				end, debug.traceback)
+				if not ok_terminate or terminated ~= true then
+					Logger.error(LOG, "MLX server replacement refused: predecessor termination did not commit (%s).",
+						tostring(ok_terminate and terminated or terminated))
+					ApiCommon.protected_call(on_cancel, "MLX server replacement on_cancel")
+					return false
+				end
 			end
 			deps.active_tasks["mlx_server"] = nil
 		end
+		if not still_current() then return false end
 
 		-- Cross-session adoption — after a Hammerspoon reload the in-memory hs.task
 		-- handle checked above is gone, but the detached Python server launched in
@@ -189,7 +205,7 @@ function M.install(ctx)
 			local ok_probe, body = pcall(hs.execute,
 				"/usr/bin/curl --silent --max-time 1 --no-keepalive " ..
 				"-H 'Connection: close' http://127.0.0.1:" .. MLX_PORT .. "/v1/models")
-			if ok_probe and probe_matches_target(body) then
+			if ok_probe and probe_matches_target(body) and still_current() then
 				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :%d) — skipping cold restart.",
 					tostring(target_model), MLX_PORT)
 				obj._server_target = target_model
@@ -217,6 +233,7 @@ function M.install(ctx)
 		-- /tmp/mlx_server.pgid which can be stale; firing this sweep here closes that gap.
 		-- Fire-and-forget — the bash launcher's own sleep+lsof retry loop will catch any
 		-- survivor that this async kill doesn't reach in time.
+		if not still_current() then return false end
 			do
 			local sweep_cmd =
 				"PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..

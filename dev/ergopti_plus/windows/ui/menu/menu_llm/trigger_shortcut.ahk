@@ -527,6 +527,8 @@ LLM_Menu_QuiesceTriggerForLifecycle(ExistingOwners := 0, Port := 0,
 		finally Critical(InheritedCritical)
 	}
 	global ConfigurationFile
+	if !IsSet(ConfigurationFile)
+		return false
 	OwnBundle := false
 	OwnerBundle := ExistingOwners
 	if !(OwnerBundle is Object) {
@@ -599,6 +601,10 @@ LLM_Menu_AcquireLifecycleBundle(AdditionalPaths := 0, Port := 0,
 		finally Critical(InheritedCritical)
 	}
 	global ConfigurationFile, _LLM_Menu_TriggerRecovery
+	; Lifecycle persistence is unavailable during Bundle_Init's parse-time
+	; #HotIf message pump; fail closed before touching either late global.
+	if !IsSet(ConfigurationFile) || !IsSet(_LLM_Menu_TriggerRecovery)
+		return false
 	Paths := [ConfigurationFile]
 	JournalOwner := LLM_TriggerJournalOwnerHint(Port, ExplicitPath)
 	if (JournalOwner is String) && JournalOwner != ""

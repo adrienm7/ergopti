@@ -85,6 +85,7 @@ helpers.describe("State.new: seeded fields", function()
 	helpers.it("starts with an empty buffer and fresh registry sequence", function()
 		local s = State.new(make_defaults(), { autocorrection = 0.3 })
 		helpers.assert_eq(s.buffer, "")
+		helpers.assert_eq(s.llm_buffer, "")
 		helpers.assert_eq(s.seq_counter, 0)
 		helpers.assert_eq(s.group_order_counter, 0)
 		helpers.assert_true(s.start_is_word_boundary)
@@ -139,16 +140,20 @@ helpers.describe("State.new: suppress_rescan", function()
 	helpers.it("clears the buffer when called", function()
 		local s = State.new(make_defaults(), { a = 0.3 })
 		s.buffer = "abc"
+		s.llm_buffer = "prompt"
 		s.suppress_rescan(0.5)
 		helpers.assert_eq(s.buffer, "")
+		helpers.assert_eq(s.llm_buffer, "")
 		helpers.assert_true(s.no_rescan_until > 0)
 	end)
 
 	helpers.it("keeps the buffer when called via _keep_buffer variant", function()
 		local s = State.new(make_defaults(), { a = 0.3 })
 		s.buffer = "abc"
+		s.llm_buffer = "prompt"
 		s.suppress_rescan_keep_buffer(0.5)
 		helpers.assert_eq(s.buffer, "abc")
+		helpers.assert_eq(s.llm_buffer, "prompt")
 	end)
 
 	helpers.it("uses the default when duration is omitted", function()

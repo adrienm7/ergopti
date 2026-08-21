@@ -65,7 +65,7 @@ _AHK16_ConfigClassPartitionIsExhaustive() {
 	global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS
 
 	ExpectedSemantic := [
-		"backend", "model", "profile_id", "user_profiles", "n_predictions",
+		"backend", "ollama_port", "model", "profile_id", "user_profiles", "n_predictions",
 		"min_words", "max_words", "ctx_chars", "language", "temperature",
 		"auto_raise_temp", "inline_autotype", "api_entries", "api_entry_id",
 		"app_profile_overrides"

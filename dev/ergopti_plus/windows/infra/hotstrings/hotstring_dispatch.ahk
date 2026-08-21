@@ -41,6 +41,8 @@ global HSE_TERMINAL_INPUT_EXES := Map(
 		"tabby.exe", true,
 		"hyper.exe", true
 )
+global _HSE_TerminalOwner := 0
+global _HSE_TerminalOwnerSerial := 0
 
 _HSE_IsTerminalInputHost(Exe, Title := "") {
 		global HSE_TERMINAL_INPUT_EXES
@@ -129,6 +131,135 @@ _HSE_BeginTerminalTransaction(BSCount, Tail, DelayMs, EmitFn := 0,
 				return _SendVerdictSucceeded(SchedulerFn.Call(Runner, DelayMs))
 		SetTimer(Runner, -Max(1, Floor(DelayMs)))
 		return true
+}
+
+HSE_TerminalTransactionPending() {
+	global _HSE_TerminalOwner
+	return (_HSE_TerminalOwner is Map) && _HSE_TerminalOwner["Pending"]
+}
+
+_HSE_TerminalOwnerIsCurrent(Owner) {
+	global _HSE_TerminalOwner, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, HSE_Buffer
+	if !(_HSE_TerminalOwner is Map) || _HSE_TerminalOwner != Owner || !Owner["Pending"]
+		return false
+	if A_IsSuspended
+		return false
+	if (HSE_RegistryGeneration != Owner["RegistryGeneration"]
+			|| HSE_RuntimeDecisionGeneration != Owner["DecisionGeneration"]
+			|| _PrefixInputContextGeneration != Owner["InputGeneration"]
+			|| _PrefixDeferredGeneration != Owner["LifecycleGeneration"])
+		return false
+	Host := OutputHostResolve()
+	if (Host["Hwnd"] != Owner["Hwnd"] || Host["Pid"] != Owner["Pid"])
+		return false
+	Snapshot := Owner["BufferSnapshot"]
+	return StrLen(HSE_Buffer) >= StrLen(Snapshot)
+			&& SubStr(HSE_Buffer, 1, StrLen(Snapshot)) == Snapshot
+}
+
+_HSE_CommitTerminalOwner(Owner, TrailingText) {
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN
+	global _PrefixPrivateResidue
+	DeleteCount := Owner["Backspaces"] + StrLen(TrailingText)
+	InsertedText := Owner["OnlyText"]
+		? Owner["PlainInsertedText"] . TrailingText : ""
+	ClearAll := !Owner["OnlyText"]
+	Effect := {
+		ClearAll: ClearAll,
+		DeleteFromEnd: DeleteCount,
+		InsertedText: InsertedText,
+		EndCharEmitted: Owner["EndCharPart"] != "",
+		KnownBoundaryAfter: !ClearAll && InsertedText != ""
+			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -1)) > 0
+	}
+	BufferCritical := Critical("On")
+	try {
+		if ClearAll {
+			HSE_Buffer := ""
+			HSE_StartIsWordBoundary := false
+		} else {
+			CurrentLength := StrLen(HSE_Buffer)
+			HSE_Buffer := CurrentLength >= DeleteCount
+				? SubStr(HSE_Buffer, 1, CurrentLength - DeleteCount) : ""
+			HSE_Buffer .= InsertedText
+			if StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN {
+				HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
+				HSE_StartIsWordBoundary := false
+			}
+		}
+		_HSE_MirrorCanonicalEffectToLlm(Effect)
+	} finally {
+		Critical(BufferCritical)
+	}
+	if Owner["OnlyText"]
+		UpdateLastSentCharacter(SubStr(InsertedText, -1))
+	else
+		_LSCResetFrom([])
+	if IsSet(_PrefixCommitPostFireEffect)
+		_PrefixCommitPostFireEffect(Effect)
+	if Owner["IsPrivate"] && IsSet(_PrefixPrivateResidue)
+		_PrefixPrivateResidue := true
+	if IsSet(_HSE_QueueFireLog)
+		_HSE_QueueFireLog(Owner["Trigger"], Owner["ReplacementForLog"],
+			Owner["HType"], Owner["Category"], Owner["Section"], Owner["IsPrivate"])
+	return Effect
+}
+
+_HSE_FinishTerminalOwner(Owner, Succeeded, TrailingText := "") {
+	global _HSE_TerminalOwner, HSE_SUPPRESS_RELEASE_DELAY_MS
+	if Succeeded
+		_HSE_CommitTerminalOwner(Owner, TrailingText)
+	Owner["Pending"] := false
+	if (_HSE_TerminalOwner == Owner)
+		_HSE_TerminalOwner := 0
+	if Succeeded {
+		SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+		SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+	} else {
+		PrefixWatcherSuppress(false)
+		KL_ClearSynthetic()
+	}
+}
+
+_HSE_RunOwnedTerminalTransaction(Owner) {
+	global HSE_Buffer
+	Succeeded := false
+	TrailingText := ""
+	try {
+		if !_HSE_TerminalOwnerIsCurrent(Owner)
+			return false
+		TrailingText := SubStr(HSE_Buffer, StrLen(Owner["BufferSnapshot"]) + 1)
+		Tail := Owner["OnlyText"]
+			? "{Text}" . Owner["PlainInsertedText"] . TrailingText
+			: Owner["SendPayload"] . (TrailingText != "" ? "{Text}" . TrailingText : "")
+		Succeeded := _HSE_SendTerminalPaced(
+			Owner["Backspaces"] + StrLen(TrailingText), Tail, Owner["DelayMs"],
+			Owner["EmitFn"], Owner["DelayFn"], Owner["BlockFn"])
+		if !Succeeded
+			try LoggerError("HSE", "Terminal expansion sender refused an event.")
+		return Succeeded
+	} catch as Err {
+		try LoggerError("HSE", "Terminal expansion transaction failed: {1}.", Err.Message)
+		return false
+	} finally {
+		_HSE_FinishTerminalOwner(Owner, Succeeded, TrailingText)
+	}
+}
+
+_HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
+	global _HSE_TerminalOwner
+	if HSE_TerminalTransactionPending()
+		return false
+	Runner := _HSE_RunOwnedTerminalTransaction.Bind(Owner)
+	Scheduled := HasMethod(SchedulerFn, "Call")
+		? _SendVerdictSucceeded(SchedulerFn.Call(Runner, Owner["DelayMs"])) : true
+	if !Scheduled
+		return false
+	_HSE_TerminalOwner := Owner
+	if !HasMethod(SchedulerFn, "Call")
+		SetTimer(Runner, -Max(1, Floor(Owner["DelayMs"])))
+	return true
 }
 
 
@@ -388,6 +519,8 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		ForceConsumeEndChar := false) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
+		global _HSE_TerminalOwnerSerial, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
+		global _PrefixInputContextGeneration, _PrefixDeferredGeneration
 		CommittedEffect := 0
 		if (Spec == "") {
 				return false
@@ -426,6 +559,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		OnlyText := Prepared.OnlyText
 
 		Fired := false
+		DeferredOwner := 0
 		; Route through PrefixWatcherSuppress when available — it delegates to
 		; HSE_Suppress internally, so a SINGLE matched pair (true/false) keeps
 		; HSE_Suppressed balanced at depth 1. The direct HSE_Suppress(true) path is
@@ -489,8 +623,9 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				IsNotepadApp := false
 				IsTerminalApp := false
 					try {
-							exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
-							WindowTitle := WinGetTitle("A")
+							OutputHost := OutputHostResolve()
+							exe := OutputHost["Exe"]
+							WindowTitle := OutputHost["Title"]
 							IsNotepadApp := (StrLower(exe) = "notepad.exe")
 							IsTerminalApp := _HSE_IsTerminalInputHost(exe, WindowTitle)
 					}
@@ -547,10 +682,34 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								} else {
 										EmitFn := 0
 								}
-								Fired := _HSE_BeginTerminalTransaction(
-										BSCount,
-										ReplacementPart . EndCharPart,
-										TerminalDelayMs, EmitFn)
+								HostSnapshot := OutputHostResolve()
+								DeferredOwner := Map(
+									"Id", ++_HSE_TerminalOwnerSerial,
+									"Pending", true,
+									"Backspaces", BSCount,
+									"PlainInsertedText", Replacement . EndCharPart,
+									"SendPayload", ReplacementPart . EndCharPart,
+									"EndCharPart", EndCharPart,
+									"OnlyText", OnlyText,
+									"DelayMs", TerminalDelayMs,
+									"EmitFn", EmitFn,
+									"DelayFn", 0,
+									"BlockFn", 0,
+									"BufferSnapshot", HSE_Buffer,
+									"Hwnd", HostSnapshot["Hwnd"],
+									"Pid", HostSnapshot["Pid"],
+									"RegistryGeneration", HSE_RegistryGeneration,
+									"DecisionGeneration", HSE_RuntimeDecisionGeneration,
+									"InputGeneration", _PrefixInputContextGeneration,
+									"LifecycleGeneration", _PrefixDeferredGeneration,
+									"Trigger", Spec.Trigger,
+									"ReplacementForLog", Spec.Replacement,
+									"HType", IsSet(_ResolveFireHType) ? _ResolveFireHType(Spec) : (EndChar != "" ? "endchar" : "star"),
+									"Category", Spec.HasOwnProp("Category") ? Spec.Category : "",
+									"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
+									"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate
+								)
+								Fired := _HSE_BeginOwnedTerminalTransaction(DeferredOwner)
 						} catch as Err {
 								try LoggerError("HSE", "Terminal expansion scheduling failed: {1}", Err.Message)
 						} finally {
@@ -558,11 +717,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						}
 						if !Fired
 								return false
-						if OnlyText
-								UpdateLastSentCharacter(SubStr(EndCharPart != "" ? EndCharPart : Replacement, -1))
-						else
-								_LSCResetFrom([])
-						SentBurst := Burst
+						; Admission is not output success. The timer owner revalidates,
+						; emits, commits all canonical state, records metrics, and releases
+						; suppression only after its sender returns a true verdict.
+						return DeferredOwner
 				} else {
 						; SendInput is atomic: the ENTIRE backspace+replacement+endchar burst is
 						; injected as one unit, so any physical keystroke the user types during
@@ -656,13 +814,15 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; Suppress(false) fires so that PrefixWatcherSuppress(false) does not
 				; find a stale buffer and clear it 60 ms later — which would erase the
 				; first keystrokes of the next word if the user types quickly.
-				if (Fired and IsSet(_ResetPrefixBuffer)) {
+				if (!IsObject(DeferredOwner) and Fired and IsSet(_ResetPrefixBuffer)) {
 						try _ResetPrefixBuffer(true)
 				}
 				; Release via the same path used to suppress — a single matched pair keeps
 				; HSE_Suppressed balanced. The PrefixWatcherSuppress path handles both the
 				; prefix-watcher counter and HSE_Suppressed in one call.
-				if IsSet(PrefixWatcherSuppress) {
+				if IsObject(DeferredOwner) {
+						; The deferred transaction owns both releases.
+				} else if IsSet(PrefixWatcherSuppress) {
 						if Fired
 								SetTimer((*) => PrefixWatcherSuppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 						else
@@ -675,7 +835,9 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				}
 				; Release the synthetic flag on the same flush window as the suppression
 				; — clearing inline would let trailing replacement keystrokes look manual.
-				if Fired
+				if IsObject(DeferredOwner) {
+						; The deferred transaction owns the synthetic marker.
+				} else if Fired
 						SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
 				else
 						KL_ClearSynthetic()

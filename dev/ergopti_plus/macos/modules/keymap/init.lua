@@ -190,6 +190,7 @@ local function observe_context_epoch(epoch)
 	if epoch ~= SyntheticInput.current_action_epoch() then return false end
 	if epoch ~= _last_context_epoch then
 		CoreState.buffer = ""
+		CoreState.llm_buffer = ""
 		CoreState.start_is_word_boundary = false
 		_action_preview_refresh_pending = false
 		_last_context_epoch = epoch
@@ -335,6 +336,7 @@ end
 --- timer allocation fails without performing file/canvas work on the HID path.
 local function invalidate_observed_context()
 	CoreState.buffer = ""
+	CoreState.llm_buffer = ""
 	cancel_action_preview_recovery()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
 	-- word-anchored triggers must stay silent until a real terminator is seen.
@@ -351,6 +353,7 @@ end
 --- may reuse a buffer or word-start claim assembled in the other context.
 local function discard_paused_text_context()
 	CoreState.buffer = ""
+	CoreState.llm_buffer = ""
 	CoreState.start_is_word_boundary = false
 	cancel_action_preview_recovery()
 end
@@ -361,6 +364,7 @@ end
 --- destination is known-normal; ignored/unknown destinations never reopen LLM.
 local function invalidate_window_context()
 	CoreState.buffer = ""
+	CoreState.llm_buffer = ""
 	cancel_action_preview_recovery()
 	CoreState.start_is_word_boundary = false
 	TerminatorReplay.discard_pending("window context changed", true)
@@ -1071,6 +1075,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- boundary and word-boundary-required triggers are allowed to fire.
 	if CoreState.WORD_TIMEOUT_SEC > 0 and dt > CoreState.WORD_TIMEOUT_SEC then
 		CoreState.buffer = ""
+		CoreState.llm_buffer = ""
 		CoreState.start_is_word_boundary = true
 		LLMBridge.reset_predictions()
 	end
@@ -1178,7 +1183,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- fresh, so treat the new position as a word boundary.
 	if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
 		or (keyCode >= 123 and keyCode <= 126) then
-		CoreState.start_is_word_boundary = true
+		CoreState.buffer = ""
+		CoreState.start_is_word_boundary = false
 		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 		return false
@@ -1518,7 +1524,8 @@ mouse_tap = eventtap.new(
 		-- Close the runtime in O(1) before returning the focus-changing click.
 		-- Canvas, AX, task cancellation and logging run only after Quartz receives
 		-- the older fence payload and the original mouse event.
-		CoreState.start_is_word_boundary = true
+		CoreState.buffer = ""
+		CoreState.start_is_word_boundary = false
 		cancel_action_preview_recovery()
 		LLMBridge.set_runtime_quarantined(true)
 		local scheduled = SyntheticInput.defer_after_callback("keymap mouse reset",
@@ -1855,6 +1862,7 @@ function M.stop(teardown)
 		Logger.error(LOG, "Pending terminator teardown did not commit (result: %s).", tostring(replay_result))
 	end
 	CoreState.buffer = ""
+	CoreState.llm_buffer = ""
 	CoreState.start_is_word_boundary = false
 	cancel_action_preview_recovery()
 	local taps_stopped = stop_eventtap("keyDown", tap)

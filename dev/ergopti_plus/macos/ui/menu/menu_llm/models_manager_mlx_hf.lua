@@ -27,6 +27,9 @@ local ui_builder    = require("ui.ui_builder")
 local i18n          = require("infra.i18n")
 local Paths         = require("infra.paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local Logger        = require("infra.logger")
+
+local LOG = "menu_llm.models.mlx_hf"
 
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
@@ -128,7 +131,9 @@ function M.install(ctx)
 				elseif msg.body == "cancel" then
 					if _token_wv then pcall(function() _token_wv:delete() end) end
 					_token_wv = nil
-					if type(on_done) == "function" then pcall(on_done, false) end
+					if type(on_done) == "function" then
+						Logger.callback(LOG, "HuggingFace prompt cancellation", on_done, false)
+					end
 
 				elseif type(msg.body) == "table" and msg.body.type == "validate" then
 					local token = type(msg.body.token) == "string" and msg.body.token:match("^%s*(.-)%s*$") or ""
@@ -145,7 +150,9 @@ function M.install(ctx)
 
 					if token == "" then
 						pcall(notifications.notify, i18n.get("mlx.token_missing"), i18n.get("mlx.token_missing_body"), "error")
-						if type(on_done) == "function" then pcall(on_done, false) end
+						if type(on_done) == "function" then
+							Logger.callback(LOG, "HuggingFace empty-token result", on_done, false)
+						end
 						return
 					end
 
@@ -175,7 +182,9 @@ function M.install(ctx)
 				assets_dir        = TOKEN_ASSETS_DIR,
 				on_close          = function()
 					_token_wv = nil
-					if type(on_done) == "function" then pcall(on_done, false) end
+					if type(on_done) == "function" then
+						Logger.callback(LOG, "HuggingFace prompt close", on_done, false)
+					end
 				end
 			})
 		end)
@@ -263,10 +272,14 @@ PY
 
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("mlx.hf_connected"), i18n.get("mlx.hf_connected_body"), "success")
-				if type(on_done) == "function" then pcall(on_done, true) end
+				if type(on_done) == "function" then
+					Logger.callback(LOG, "HuggingFace login success", on_done, true)
+				end
 			else
 				pcall(notifications.notify, i18n.get("mlx.hf_login_title"), i18n.get("mlx.hf_connection_failed_body"), "error")
-				if type(on_done) == "function" then pcall(on_done, false) end
+				if type(on_done) == "function" then
+					Logger.callback(LOG, "HuggingFace login failure", on_done, false)
+				end
 			end
 		end, function(_, stdout, stderr)
 			local out = (stdout or "") .. (stderr or "")
@@ -281,11 +294,15 @@ PY
 			if not TaskLifecycle.start(task, "HuggingFace login") then
 				deps.active_tasks["hf_login"] = nil
 				pcall(notifications.notify, i18n.get("mlx.hf_connection_failed"), nil, "error")
-				if type(on_done) == "function" then pcall(on_done, false) end
+				if type(on_done) == "function" then
+					Logger.callback(LOG, "HuggingFace login start refusal", on_done, false)
+				end
 			end
 		else
 			pcall(notifications.notify, i18n.get("mlx.hf_connection_failed"), nil, "error")
-			if type(on_done) == "function" then pcall(on_done, false) end
+			if type(on_done) == "function" then
+				Logger.callback(LOG, "HuggingFace login construction failure", on_done, false)
+			end
 		end
 	end
 end

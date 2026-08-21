@@ -1296,8 +1296,8 @@ Boot.mark("Keymap engine started")
 -- Initialize the Karabiner bridge (starts trackpad watcher + loads feature flags)
 -- The FileSystem adapter is injected so KE config path resolution goes through
 -- the port boundary (hs.fs.pathToAbsolute) instead of raw os.getenv("HOME").
-if karabiner then
-	karabiner.init(file_system)
+if type(karabiner) ~= "table" or karabiner.init(file_system) ~= true then
+	error("karabiner.init did not commit")
 end
 Boot.mark("UI: karabiner.init")
 
@@ -1315,9 +1315,24 @@ Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 -- here previously discarded both return values, so a setup() throw (e.g. a
 -- failed extension install or a port bind failure) vanished with no trace.
 do
-	local ok_vscode, vscode_err = pcall(function() require("infra.vscode_bridge").setup() end)
-	if not ok_vscode then
-		Logger.error(LOG, "VS Code caret bridge setup() failed: %s.", tostring(vscode_err))
+	local ok_vscode, vscode_result = xpcall(function()
+		return require("infra.vscode_bridge").setup()
+	end, debug.traceback)
+	if not ok_vscode or vscode_result ~= true then
+		Logger.error(LOG, "VS Code caret bridge setup() failed: %s.", tostring(vscode_result))
+		local rollback_ok, rollback_result = xpcall(function()
+			local owned_bridge = package.loaded["infra.vscode_bridge"]
+			if owned_bridge == nil then return true end
+			if type(owned_bridge) ~= "table" or type(owned_bridge.stop_server) ~= "function" then
+				error("infra.vscode_bridge.stop_server is unavailable")
+			end
+			return owned_bridge.stop_server()
+		end, debug.traceback)
+		if not rollback_ok or rollback_result ~= true then
+			Logger.error(LOG, "VS Code caret bridge startup rollback failed: %s.",
+				tostring(rollback_result))
+		end
+		error("VS Code caret bridge setup did not commit")
 	end
 end
 

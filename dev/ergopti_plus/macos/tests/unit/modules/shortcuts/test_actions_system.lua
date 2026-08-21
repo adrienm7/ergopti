@@ -1103,16 +1103,19 @@ local SyntheticInputStack = require("tests.support.synthetic_input_stack")
 --- @return table fixture
 local function load_h01_system(options)
 	options = options or {}
+	local previous_logger = package.loaded["infra.logger"]
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	package.loaded["modules.gestures"] = options.gestures or {}
 	package.loaded["adapters.shell_runner"] = nil
+	if options.logger then package.loaded["infra.logger"] = options.logger end
 	if options.text_actions then
 		package.loaded["modules.shortcuts.actions.text"] = options.text_actions
 	end
 	local system, synthetic = SyntheticInputStack.load(
 		"modules.shortcuts.actions.system", options.hs_overrides)
+	if options.logger then package.loaded["infra.logger"] = previous_logger end
 	return { system = system, synthetic = synthetic, hs = _G.hs }
 end
 
@@ -1459,6 +1462,33 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		helpers.assert_eq(trigger_count, 1)
 		helpers.assert_eq(fixture.synthetic.stats().pending, 1,
 			"the Cmd+S replacement is queued only after the older batch was handed off")
+	end)
+
+	helpers.it("Cmd+star contains telemetry errors after queueing its replacement (HS-016)", function()
+		local failures = {}
+		local logger = helpers.make_logger_stub()
+		logger.callback = function(_, label, fn, ...)
+			local results = table.pack(xpcall(fn, debug.traceback, ...))
+			if not results[1] then
+				failures[#failures + 1] = tostring(label) .. ": " .. tostring(results[2])
+			end
+			return table.unpack(results, 1, results.n)
+		end
+		local fixture = load_h01_system({logger = logger})
+		fixture.system.bind_cmd_star(function() error("telemetry exploded") end)
+		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
+
+		local consumed = tap.fn(
+			physical_key_down(fixture, 28, "*", {cmd = true, shift = true}))
+		fire_post_callback_actions(fixture.hs)
+
+		helpers.assert_true(consumed)
+		helpers.assert_eq(fixture.synthetic.stats().pending, 1,
+			"the user-visible Cmd+S replacement must survive telemetry failure")
+		helpers.assert_eq(#failures, 1)
+		helpers.assert_contains(failures[1], "Cmd-star telemetry")
+		helpers.assert_contains(failures[1], "telemetry exploded")
+		helpers.assert_contains(failures[1], "stack traceback")
 	end)
 
 	helpers.it("the real tagged pump trigger cannot auto-disable keep-awake (HS-H-01)", function()

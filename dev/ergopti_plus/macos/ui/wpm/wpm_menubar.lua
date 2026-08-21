@@ -186,6 +186,10 @@ function M.stop()
 	return true
 end
 
+function M.is_running()
+	return _running == true
+end
+
 --- Enables or disables source-based menubar coloring.
 --- @param enabled boolean Whether source colors should be active.
 function M.set_use_source_colors(enabled)

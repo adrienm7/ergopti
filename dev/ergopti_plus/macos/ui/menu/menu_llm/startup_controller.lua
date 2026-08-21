@@ -71,6 +71,21 @@ function M.new(ctx)
 	local set_startup_silence        = ctx.set_startup_silence
 	local get_trigger_hk             = ctx.get_trigger_hk
 	local get_profile_hks            = ctx.get_profile_hks
+	local function pause_epoch()
+		local control = deps and deps.script_control
+		if not control or type(control.get_pause_epoch) ~= "function" then return 0 end
+		local ok, epoch = xpcall(control.get_pause_epoch, debug.traceback)
+		return ok and tonumber(epoch) or -1
+	end
+	local function runtime_current(epoch)
+		local control = deps and deps.script_control
+		if pause_epoch() ~= epoch then return false end
+		if control and type(control.is_paused) == "function" then
+			local ok, paused = xpcall(control.is_paused, debug.traceback)
+			return ok and paused ~= true
+		end
+		return true
+	end
 
 	local _check_startup_attempts = nil
 	-- Shared guard between the self-rescheduling primary requirements chain
@@ -229,10 +244,12 @@ function M.new(ctx)
 		-- check) so each can detect whether the OTHER already reached a
 		-- terminal outcome and discard its own stale success (F-MED-32).
 		local my_startup_gen = _startup_check_generation
+		local my_pause_epoch = pause_epoch()
 
 		-- Poll installed-models cache until populated — refresh_installed_async fires
 		-- at doAfter(0), so the first tick may return an empty table.
 		local function do_check_requirements()
+			if not runtime_current(my_pause_epoch) then return end
 			local installed = models_mgr.get_installed_models()
 			local count = 0; for _ in pairs(installed) do count = count + 1 end
 			Logger.debug(LOG, string.format("Startup installed-models cache count: %d.", count))
@@ -252,14 +269,20 @@ function M.new(ctx)
 			if state.llm_backend == "mlx" and type(models_mgr.force_mlx_check) == "function" then
 				Logger.debug(LOG, string.format("Startup MLX: forcing requirements check for %s.", state.llm_model))
 				check_fn = function(model_name, on_ok, on_fail)
-					models_mgr.force_mlx_check(model_name, on_ok, on_fail, { silent_notifications = false })
+					models_mgr.force_mlx_check(model_name, on_ok, on_fail, {
+						silent_notifications = false,
+						is_current = function()
+							return my_startup_gen == _startup_check_generation
+								and runtime_current(my_pause_epoch)
+						end,
+					})
 				end
 			end
 
 			check_fn(state.llm_model, function()
 				-- Discard if the OTHER (backup) check already reached a terminal
 				-- outcome (e.g. disable_llm ran) since this chain started (F-MED-32).
-				if my_startup_gen ~= _startup_check_generation then
+				if my_startup_gen ~= _startup_check_generation or not runtime_current(my_pause_epoch) then
 					Logger.debug(LOG, "Startup primary check: stale success discarded (gen %d != %d).",
 						my_startup_gen, _startup_check_generation)
 					return
@@ -288,7 +311,7 @@ function M.new(ctx)
 			-- The primary chain (or a prior disable_llm) may have already
 			-- reached a terminal outcome by now — skip entirely rather than
 			-- dispatching a redundant/racing force_mlx_check (F-MED-32).
-			if my_startup_gen ~= _startup_check_generation then
+			if my_startup_gen ~= _startup_check_generation or not runtime_current(my_pause_epoch) then
 				Logger.debug(LOG, "Startup MLX backup check: primary chain already resolved (gen %d != %d) — skipping.",
 					my_startup_gen, _startup_check_generation)
 				return
@@ -314,7 +337,13 @@ function M.new(ctx)
 					end
 				end, function()
 					Logger.warn(LOG, string.format("Startup MLX backup check failed for %s.", state.llm_model))
-				end, { silent_notifications = false })
+				end, {
+					silent_notifications = false,
+					is_current = function()
+						return my_startup_gen == _startup_check_generation
+							and runtime_current(my_pause_epoch)
+					end,
+				})
 			end
 		end)
 

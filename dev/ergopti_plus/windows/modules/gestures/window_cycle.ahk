@@ -257,7 +257,8 @@ GestureCycleWindows(Forward) {
 		Active := WinExist("A")
 		; Release modifiers still held by the touchpad gesture (Ctrl+Win+Shift)
 		; so WinActivate doesn't trigger the Start menu or other system shortcuts.
-		Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
+		if !GestureReleaseOwnedCarrierModifiers()
+				return
 		Windows := _GestureOrderedWindows()
 		N := Windows.Length
 		if (N < 2) {
@@ -306,7 +307,8 @@ GestureCycleAppWindows(Forward) {
 		global _GestureCycling
 		; Capture the active HWND before releasing modifiers — same race as CycleWindows.
 		Active := WinExist("A")
-		Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
+		if !GestureReleaseOwnedCarrierModifiers()
+				return
 		if (!Active) {
 				return
 		}

@@ -18,6 +18,54 @@ local dialog  = require("infra.dialog_util")
 
 local LOG = "menu_llm.settings"
 
+--- Invokes one optional injected dependency with visible, exact settlement.
+--- @param label string Operation-specific callback label.
+--- @param fn function|nil Injected dependency.
+--- @param ... any Arguments forwarded to fn.
+--- @return boolean settled True when absent or completed without refusal.
+local function invoke_optional(label, fn, ...)
+	if type(fn) ~= "function" then return true end
+	local ok, result = Logger.callback(LOG, label, fn, ...)
+	return ok == true and result ~= false
+end
+
+--- Rebuilds the menu through the required injected owner.
+--- @param deps table Global dependencies.
+--- @param label string Operation-specific callback label.
+--- @return boolean settled True only when the rebuild callback completed.
+local function refresh_menu(deps, label)
+	if type(deps.update_menu) ~= "function" then
+		Logger.error(LOG, "%s refused because update_menu is unavailable.", tostring(label))
+		return false
+	end
+	return invoke_optional(label, deps.update_menu)
+end
+
+--- Persists preferences through the required injected owner.
+--- @param deps table Global dependencies.
+--- @param label string Operation-specific callback label.
+--- @return boolean settled True only after an explicit persistence commit.
+local function save_prefs(deps, label)
+	if type(deps.save_prefs) ~= "function" then
+		Logger.error(LOG, "%s refused because save_prefs is unavailable.", tostring(label))
+		return false
+	end
+	local ok, saved = Logger.callback(LOG, label, deps.save_prefs)
+	return ok == true and saved == true
+end
+
+--- Reads pause state through the injected lifecycle owner and fails closed.
+--- @param deps table Global dependencies.
+--- @param label string Operation-specific callback label.
+--- @return boolean paused
+local function is_paused(deps, label)
+	local script_control = deps.script_control
+	if not script_control or type(script_control.is_paused) ~= "function" then return false end
+	local ok, paused = Logger.callback(LOG, label, script_control.is_paused)
+	if not ok then return true end
+	return paused == true
+end
+
 
 
 
@@ -73,14 +121,17 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
 			state[key] = final_val
 			hs.settings.set(key, final_val)
 
-            -- Sync with the keymap engine if a function is provided
+			-- Sync with the keymap engine if a function is provided
 			if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
-				pcall(deps.keymap[hs_fn], final_val)
+				if not invoke_optional("Numeric setting runtime sync", deps.keymap[hs_fn], final_val) then
+					return false
+				end
 			end
 
-			if deps.save_prefs() ~= true then return false end
-			pcall(deps.update_menu)
+			if not save_prefs(deps, "Numeric setting preference save") then return false end
+			if not refresh_menu(deps, "Numeric setting menu refresh") then return false end
 			Logger.info(LOG, string.format("Value for %s updated successfully.", key))
+			return true
 		else
 			Logger.warn(LOG, "Invalid numeric input provided.")
 		end
@@ -97,11 +148,14 @@ local function reset_to_default(deps, key, default_val, hs_fn)
 	deps.state[key] = default_val
 	hs.settings.set(key, default_val)
 	if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
-		pcall(deps.keymap[hs_fn], default_val)
+		if not invoke_optional("Default setting runtime sync", deps.keymap[hs_fn], default_val) then
+			return false
+		end
 	end
-	if deps.save_prefs() ~= true then return false end
-	pcall(deps.update_menu)
+	if not save_prefs(deps, "Default setting preference save") then return false end
+	if not refresh_menu(deps, "Default setting menu refresh") then return false end
 	Logger.info(LOG, string.format("Key %s reset successfully.", key))
+	return true
 end
 
 
@@ -148,11 +202,14 @@ function M.new(deps)
 				state.llm_debounce = new_val
 				hs.settings.set("llm_debounce", new_val)
 				if deps.keymap and type(deps.keymap.set_llm_debounce) == "function" then
-					pcall(deps.keymap.set_llm_debounce, new_val)
+					if not invoke_optional("Debounce runtime sync", deps.keymap.set_llm_debounce, new_val) then
+						return false
+					end
 				end
-				if deps.save_prefs() ~= true then return false end
-				pcall(deps.update_menu)
+				if not save_prefs(deps, "Debounce preference save") then return false end
+				if not refresh_menu(deps, "Debounce menu refresh") then return false end
 				Logger.info(LOG, "Debounce delay updated successfully.")
+				return true
 			end
 		end
 	end
@@ -180,11 +237,14 @@ function M.new(deps)
 			state.llm_max_words = new_val
 			hs.settings.set("llm_max_words", new_val)
 			if deps.keymap and type(deps.keymap.set_llm_max_words) == "function" then
-				pcall(deps.keymap.set_llm_max_words, new_val)
+				if not invoke_optional("Maximum-words runtime sync", deps.keymap.set_llm_max_words, new_val) then
+					return false
+				end
 			end
-			if deps.save_prefs() ~= true then return false end
-			pcall(deps.update_menu)
+			if not save_prefs(deps, "Maximum-words preference save") then return false end
+			if not refresh_menu(deps, "Maximum-words menu refresh") then return false end
 			Logger.info(LOG, "Max words updated successfully.")
+			return true
 		end
 	end
 	
@@ -211,11 +271,14 @@ function M.new(deps)
 			state.llm_min_words = new_val
 			hs.settings.set("llm_min_words", new_val)
 			if deps.keymap and type(deps.keymap.set_llm_min_words) == "function" then
-				pcall(deps.keymap.set_llm_min_words, new_val)
+				if not invoke_optional("Minimum-words runtime sync", deps.keymap.set_llm_min_words, new_val) then
+					return false
+				end
 			end
-			if deps.save_prefs() ~= true then return false end
-			pcall(deps.update_menu)
+			if not save_prefs(deps, "Minimum-words preference save") then return false end
+			if not refresh_menu(deps, "Minimum-words menu refresh") then return false end
 			Logger.info(LOG, "Min words updated successfully.")
+			return true
 		end
 	end
 	
@@ -285,8 +348,9 @@ function M.new(deps)
 		end
 		if not ApiMlx.set_port(new_port) then return end
 		Logger.info(LOG, "MLX server port set to %d via menu.", new_port)
-		if type(on_applied) == "function" then pcall(on_applied) end
-		pcall(deps.update_menu)
+		local applied = invoke_optional("MLX port apply", on_applied)
+		local refreshed = refresh_menu(deps, "MLX port menu refresh")
+		return applied and refreshed
 	end
 
 	--- Resets the MLX server port to its dedicated default and applies it.
@@ -296,9 +360,11 @@ function M.new(deps)
 		if not ok_api or type(ApiMlx.set_port) ~= "function" then return end
 		if ApiMlx.set_port(ApiMlx.get_default_port()) then
 			Logger.info(LOG, "MLX server port reset to default %d.", ApiMlx.get_default_port())
-			if type(on_applied) == "function" then pcall(on_applied) end
-			pcall(deps.update_menu)
+			local applied = invoke_optional("MLX port reset apply", on_applied)
+			local refreshed = refresh_menu(deps, "MLX port reset menu refresh")
+			return applied and refreshed
 		end
+		return false
 	end
 
 	--- Builds the indentation selection submenu.
@@ -307,7 +373,7 @@ function M.new(deps)
 		local menu = {}
 		local default_val = llm_mod.DEFAULT_STATE.llm_pred_indent
 		local current = math.floor(tonumber(deps.state.llm_pred_indent) or default_val)
-		local paused  = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
+		local paused = is_paused(deps, "Indentation menu pause-state read")
 
 		for i = -7, 7 do
 			local title_str = ((i == -1 or i == 0 or i == 1) and i18n.get("menu.settings.indent_space")) or (i .. i18n.get("menu.settings.indent_spaces"))
@@ -320,10 +386,11 @@ function M.new(deps)
 					deps.state.llm_pred_indent = i
 					hs.settings.set("llm_pred_indent", i)
 					if deps.keymap and type(deps.keymap.set_llm_pred_indent) == "function" then
-						pcall(deps.keymap.set_llm_pred_indent, i)
+						if not invoke_optional("Indentation runtime sync",
+							deps.keymap.set_llm_pred_indent, i) then return false end
 					end
-					if deps.save_prefs() ~= true then return false end
-					pcall(deps.update_menu)
+					if not save_prefs(deps, "Indentation preference save") then return false end
+					return refresh_menu(deps, "Indentation menu refresh")
 				end or nil,
 			})
 		end
@@ -337,7 +404,7 @@ function M.new(deps)
 		-- string would raise and blank the submenu (same class as format_shortcut_title).
 		if type(current_mods) ~= "table" then current_mods = default_mods end
 		local current_str = table.concat(current_mods, "+")
-		local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
+		local paused = is_paused(deps, "Modifier menu pause-state read")
 
         local opts = {
             {title = i18n.get("menu.settings.disabled"), mods = {"none"}},
@@ -358,11 +425,12 @@ function M.new(deps)
                 fn = not paused and function()
                     hs.settings.set(key, opt.mods)
 					deps.state[key] = opt.mods
-                    if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
-                        pcall(deps.keymap[hs_fn], opt.mods)
-                    end
-                    if deps.save_prefs() ~= true then return false end
-                    pcall(deps.update_menu)
+					if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
+						if not invoke_optional("Modifier runtime sync",
+							deps.keymap[hs_fn], opt.mods) then return false end
+					end
+					if not save_prefs(deps, "Modifier preference save") then return false end
+					return refresh_menu(deps, "Modifier menu refresh")
                 end or nil
             })
         end

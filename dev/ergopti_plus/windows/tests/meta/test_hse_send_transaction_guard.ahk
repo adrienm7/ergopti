@@ -81,7 +81,7 @@ _AHK04M_NormalDispatchCommitsAfterOutput() {
 		"HSE_ApplyExpansion must run only after the selected output branch succeeds")
 	Assert(_AHK04M_Count(Body, "if !Fired") >= 2,
 		"both Notepad and atomic branches must abort on failed output")
-	Assert(InStr(Body, "if (Fired and IsSet(_ResetPrefixBuffer))") > 0,
+	Assert(InStr(Body, "if (!IsObject(DeferredOwner) and Fired and IsSet(_ResetPrefixBuffer))") > 0,
 		"the preview reset must be gated on output success")
 	Assert(InStr(Body, "catch as Err", , AtomicSend) > AtomicSend,
 		"the direct atomic SendInput path must convert an OS exception into a failed transaction")

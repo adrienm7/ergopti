@@ -74,6 +74,20 @@ helpers.describe("gestures startup degraded mode", function()
 	local original_engine = package.loaded["modules.gestures.engine"]
 	local original_conflicts = package.loaded["modules.gestures.conflicts"]
 	local original_gestures = package.loaded["modules.gestures"]
+	local touchdevice_candidates = {
+		"hs._asm.undocumented.touchdevice",
+		"vendor.hs_asm.undocumented.touchdevice",
+	}
+	local original_touchdevice = {}
+	local original_touchdevice_preload = {}
+	for _, name in ipairs(touchdevice_candidates) do
+		original_touchdevice[name] = package.loaded[name]
+		original_touchdevice_preload[name] = package.preload[name]
+		package.loaded[name] = nil
+		package.preload[name] = function()
+			error("injected unavailable touchdevice module")
+		end
+	end
 
 	local logs = {
 		warn = 0,
@@ -123,7 +137,7 @@ helpers.describe("gestures startup degraded mode", function()
 	}
 
 	package.loaded["modules.gestures"] = nil
-	local gestures = helpers.load_with_stubs("modules.gestures")
+	local gestures = require("modules.gestures")
 
 	helpers.it("M.start degrades without losing the module, when touchdevice cannot load", function()
 		-- Called directly: a raise fails with the real error. And note what is NOT
@@ -141,6 +155,9 @@ helpers.describe("gestures startup degraded mode", function()
 	end)
 
 	helpers.it("M.start logs a warning and no error on missing touchdevice", function()
+		logs.warn = 0
+		logs.error = 0
+		gestures.start()
 		helpers.assert_true(logs.warn >= 1)
 		helpers.assert_eq(logs.error, 0)
 	end)
@@ -151,4 +168,8 @@ helpers.describe("gestures startup degraded mode", function()
 	package.loaded["modules.gestures.engine"] = original_engine
 	package.loaded["modules.gestures.conflicts"] = original_conflicts
 	package.loaded["modules.gestures"] = original_gestures
+	for _, name in ipairs(touchdevice_candidates) do
+		package.loaded[name] = original_touchdevice[name]
+		package.preload[name] = original_touchdevice_preload[name]
+	end
 end)

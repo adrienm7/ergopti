@@ -3,11 +3,12 @@
 --- ==============================================================================
 --- MODULE: Virtual synthetic telemetry source regression tests
 --- DESCRIPTION: Clipboard insertion has no per-character OS events. The
---- keylogger must therefore materialise logical synthetic events immediately,
---- then discard tagged physical echoes through exact event provenance.
+--- keylogger must therefore retain logical synthetic work for a post-eventtap
+--- drain, then discard tagged physical echoes through exact event provenance.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local fixture_module = require("tests.support.keylogger_provenance_fixture")
 
 
 --- @param selector string
@@ -89,12 +90,18 @@ helpers.describe("keylogger: virtual synthetic telemetry for clipboard output", 
 	end
 
 	helpers.it("records logical chars and rejects tagged OS echoes before aggregation", function()
-		local keylogger_source = source()
-		local notify = function_slice(keylogger_source, "function M.notify_synthetic(",
-			"\nfunction M.get_live_stats")
-		helpers.assert_true(notify:find("append_virtual(utf8.char(code))", 1, true) ~= nil,
-			"logical synthetic output must enter buffer_events even for Cmd+V")
+		local fixture = fixture_module.load_keylogger()
+		fixture.state.is_enabled = true
+		fixture.keylogger.notify_synthetic("xy", "hotstring", 0, "case", "xy", false)
+		helpers.assert_eq(#fixture.flushes, 0,
+			"logical expansion must not run before the originating eventtap returns")
+		fixture.drain()
+		helpers.assert_eq(#fixture.flushes, 1)
+		helpers.assert_eq(#fixture.flushes[1].events, 2)
+		helpers.assert_eq(fixture.flushes[1].events[1][1], "x")
+		helpers.assert_eq(fixture.flushes[1].events[2][1], "y")
 
+		local keylogger_source = source()
 		local handle_key = function_slice(keylogger_source, "local function handle_key(event_obj)",
 			"\nfunction M.set_options")
 		helpers.assert_true(keylogger_uses_fenced_tag_ownership(handle_key),
@@ -133,11 +140,15 @@ helpers.describe("keylogger: virtual synthetic telemetry for clipboard output", 
 			"the telemetry guard must fail if PID becomes synthetic authority")
 	end)
 
-	helpers.it("flushes a virtual paste so output cannot wait forever for a key event", function()
-		local notify = function_slice(source(), "function M.notify_synthetic(",
-			"\nfunction M.get_live_stats")
-		helpers.assert_true(notify:find("LogManager.flush_buffer()", 1, true) ~= nil,
-			"virtual clipboard output must be persisted without waiting for another key")
+	helpers.it("drains a virtual paste without waiting for another key event", function()
+		local fixture = fixture_module.load_keylogger()
+		fixture.state.is_enabled = true
+		fixture.keylogger.notify_synthetic("paste", "hotstring", 0, "case", "", false)
+		helpers.assert_eq(#fixture.flushes, 0)
+		fixture.drain()
+		helpers.assert_eq(#fixture.flushes, 1,
+			"the retained builder must make clipboard output independently drainable")
+		helpers.assert_eq(#fixture.flushes[1].events, 5)
 	end)
 
 	helpers.it("does not add a second LLM manifest trigger", function()

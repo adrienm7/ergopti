@@ -42,6 +42,7 @@ local function make_fixture(options)
 		pump_deliveries = {},
 		paced_sleeps = {},
 		posted_targets = {},
+		key_attempts = {},
 	}
 
 	local logger = helpers.make_logger_stub()
@@ -213,6 +214,10 @@ local function make_fixture(options)
 					}
 				end
 			else
+				fixture.key_attempts[#fixture.key_attempts + 1] = self
+				if options.key_post_throw_at == #fixture.key_attempts then
+					error("key post exploded")
+				end
 				fixture.key_posts = fixture.key_posts + 1
 				if fixture.key_observer then fixture.key_observer(self) end
 			end
@@ -1627,7 +1632,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		end, "delay >= 1 microsecond must fail fast")
 	end)
 
-	helpers.it("target-posts terminal deletion pairs with render turns between them (terminal-stale-render)", function()
+	helpers.it("serializes terminal deletion pairs after callback return with timed render turns", function()
 		local fixture = make_fixture()
 		local synthetic = fixture.load()
 		local target = { id = "terminal-app" }
@@ -1640,17 +1645,61 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		end)
 
 		helpers.assert_true(synthetic.deliver_collected_paced(tx, 2, 12000, target))
+		helpers.assert_eq(fixture.key_posts, 0,
+			"paced delivery must not post from the active eventtap callback")
 		synthetic.seal(tx)
 		local consume, returned = synthetic.leave_callback(true)
 		helpers.assert_true(consume)
 		helpers.assert_nil(returned,
 			"target-posted events must not be returned to Quartz a second time")
+		helpers.assert_eq(fixture.key_posts, 0)
+		local paced_delays = 0
+		local guard = 0
+		while fixture.key_posts < 6 and #fixture.timers > 0 do
+			local delay = fixture.fire_next_timer()
+			if delay == 0.012 then paced_delays = paced_delays + 1 end
+			guard = guard + 1
+			helpers.assert_true(guard < 40, "paced serializer must terminate")
+		end
 		helpers.assert_eq(fixture.key_posts, 6)
-		helpers.assert_eq(#fixture.paced_sleeps, 2,
+		helpers.assert_eq(paced_delays, 2,
 			"each Backspace pair, including the last one before text, needs a render turn")
-		for _, delay in ipairs(fixture.paced_sleeps) do helpers.assert_eq(delay, 12000) end
+		helpers.assert_eq(#fixture.paced_sleeps, 0,
+			"paced delivery must never block with hs.timer.usleep")
 		for _, app in ipairs(fixture.posted_targets) do helpers.assert_true(app == target) end
-		fixture.fire_next_timer()
+	end)
+
+	helpers.it("retries the exact terminal ordinal after a refused paced post", function()
+		local fixture = make_fixture({ key_post_throw_at = 3 })
+		local synthetic = fixture.load()
+		local target = { id = "terminal-app" }
+		local completion
+		synthetic.enter_callback()
+		local tx = synthetic.begin("unit.terminal.retry", "replacement")
+		synthetic.on_complete(tx, function(_, status) completion = status end)
+		synthetic.with_transaction(tx, function()
+			synthetic.emit_key_stroke({}, "delete", 0)
+			synthetic.emit_key_stroke({}, "delete", 0)
+			synthetic.emit_key_strokes("X")
+		end)
+		helpers.assert_true(synthetic.deliver_collected_paced(tx, 2, 12000, target))
+		synthetic.seal(tx)
+		local consume, returned = synthetic.leave_callback(true)
+		helpers.assert_true(consume)
+		helpers.assert_nil(returned)
+
+		local guard = 0
+		while (#fixture.timers > 0 or completion == nil) and guard < 60 do
+			if #fixture.timers > 0 then fixture.fire_next_timer() end
+			guard = guard + 1
+		end
+		helpers.assert_eq(fixture.key_posts, 6,
+			"all six unique events must eventually post exactly once")
+		helpers.assert_eq(#fixture.key_attempts, 7,
+			"one refused ordinal must add exactly one retry attempt")
+		helpers.assert_true(fixture.key_attempts[3] == fixture.key_attempts[4],
+			"retry must retain the exact event object and ordinal")
+		helpers.assert_eq(completion, "complete")
 	end)
 
 	helpers.it("globally posts loopback after the origin callback so keymap receives it", function()

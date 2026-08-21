@@ -72,8 +72,10 @@ _HealthCheck_AdapterSpecs() {
 ; @param Msg {String} Human-readable error description.
 HealthCheck_RecordError(Msg) {
 	global _HealthCheckLastError, _HealthCheckErrCount
+	if !IsSet(_HealthCheckLastError)
+		_HealthCheckLastError := ""
 	_HealthCheckLastError := Msg
-	_HealthCheckErrCount  += 1
+	_HealthCheckErrCount := (IsSet(_HealthCheckErrCount) ? _HealthCheckErrCount : 0) + 1
 	; Do NOT log here: this runs synchronously from inside _LoggerEmit() (via the
 	; ERROR/WARNING hook), so a recursive Logger* call re-enters _LoggerEmit mid-flight
 	; and clobbers the outer call's dedup key + ring cursor with this line instead
@@ -84,7 +86,7 @@ HealthCheck_RecordError(Msg) {
 ; Increments the session warning counter (called by logger when it emits a WARNING).
 HealthCheck_RecordWarn() {
 	global _HealthCheckWarnCount
-	_HealthCheckWarnCount += 1
+	_HealthCheckWarnCount := (IsSet(_HealthCheckWarnCount) ? _HealthCheckWarnCount : 0) + 1
 }
 
 ; Probes all registered adapters and returns a Map snapshot with:
@@ -627,6 +629,4 @@ HealthCheck_FormatPlain(Snapshot) {
 		Out .= (i > 1 ? "`r`n" : "") . L
 	return Out
 }
-
-
 

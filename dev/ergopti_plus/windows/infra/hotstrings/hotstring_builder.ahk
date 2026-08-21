@@ -227,7 +227,7 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		try {
 				isNotepad := false
 				try {
-						exe := (IsSet(KLHook) and KLHook.HasOwnProp("prev_app")) ? KLHook.prev_app : WinGetProcessName("A")
+						exe := OutputHostResolve()["Exe"]
 						isNotepad := (exe = "notepad.exe")
 				}
 				if isNotepad {

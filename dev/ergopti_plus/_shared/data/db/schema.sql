@@ -173,6 +173,10 @@ CREATE TABLE IF NOT EXISTS events_llm (
 	deleted_text         TEXT,
 	net_saved_chars      INTEGER,
 	count                INTEGER,
+	prompt_tokens        INTEGER,
+	completion_tokens    INTEGER,
+	total_tokens         INTEGER,
+	est_cost_usd         REAL,
 	PRIMARY KEY (device_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_events_llm_date_kind ON events_llm(date, kind);

@@ -436,3 +436,45 @@ helpers.describe("llm.init — auto_detect_backend survives a synchronous asyncG
 	end)
 
 end)
+
+
+
+
+-- ========================================================================
+-- ========================================================================
+-- ======= 3/ Completion callback failures stay visible (HS-016) =========
+-- ========================================================================
+-- ========================================================================
+
+helpers.describe("llm.init — auto-detect callback failures are visible (HS-016)", function()
+	helpers.it("contains one throwing completion callback with context and traceback", function()
+		local LLM, fire_probes = load_llm_init_with_deferred_probes(
+			200, '{"version":"0.5.0"}',
+			404, ""
+		)
+		local Logger = require("infra.logger")
+		Logger.ring_buffer_clear()
+		local calls = 0
+		LLM.auto_detect_backend(function()
+			calls = calls + 1
+			error("auto-detect callback exploded")
+		end)
+
+		local delivered = pcall(fire_probes)
+		local matching = 0
+		for _, line in ipairs(Logger.ring_buffer_snapshot()) do
+			if line:find("[ERROR]", 1, true)
+				and line:find("Backend auto-detect completion", 1, true)
+				and line:find("auto-detect callback exploded", 1, true)
+				and line:find("stack traceback", 1, true) then
+				matching = matching + 1
+			end
+		end
+
+		helpers.assert_true(delivered,
+			"a user callback must not escape the asynchronous HTTP completion")
+		helpers.assert_eq(calls, 1)
+		helpers.assert_eq(matching, 1,
+			"one callback throw must produce one contextual traceback ERROR")
+	end)
+end)

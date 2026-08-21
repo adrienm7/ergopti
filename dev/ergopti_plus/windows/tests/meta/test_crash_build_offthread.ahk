@@ -30,7 +30,10 @@ _CBOT_AssertDeferred() {
 		"ErgoptiGlobalErrorHandler must not call CrashReport_Build inline — defer it off the input thread (crash-build-offthread)")
 	Helper := _DriverFuncBody("_ErgoptiDeferredCrashReport")
 	Assert(Helper != "", "_ErgoptiDeferredCrashReport (the deferred worker) must exist")
-	Assert(InStr(Helper, "CrashReport_Build(") > 0,
-		"_ErgoptiDeferredCrashReport must perform the actual CrashReport_Build off-thread (crash-build-offthread)")
+	Assert(InStr(Helper, "ShellRunner_Spawn(") > 0,
+		"_ErgoptiDeferredCrashReport must launch a real child-process worker")
+	for Forbidden in ["CrashReport_Build(", "HealthCheck_Run(", "ComObject(", "RegRead(", "Sleep(", "FileOpen("]
+		Assert(InStr(Helper, Forbidden) = 0,
+			"the deferred AHK timer must not perform blocking diagnostic work: " . Forbidden)
 }
 Test("error-net: crash-report build is deferred off the input thread (crash-build-offthread)", _CBOT_AssertDeferred)

@@ -117,12 +117,16 @@ helpers.describe("vscode_bridge — a negative AX lookup is cached (behaviour)",
 			},
 			httpserver = {
 				new = function()
-					return {
-						setPort     = function() end,
-						setCallback = function(_, cb) captured_callback = cb end,
-						start       = function() end,
-						stop        = function() end,
+					local listening_port = 0
+					local server
+					server = {
+						setPort = function(self, port) listening_port = port; return self end,
+						setCallback = function(self, cb) captured_callback = cb; return self end,
+						start = function(self) return self end,
+						getPort = function() return listening_port end,
+						stop = function(self) listening_port = 0; return self end,
 					}
+					return server
 				end,
 			},
 		})

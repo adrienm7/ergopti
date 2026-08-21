@@ -147,7 +147,9 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["modules.llm.api_common"] = {
 			protected_call = function(callback, _, ...)
-				if type(callback) == "function" then return callback(...) end
+				if type(callback) ~= "function" then return false, nil end
+				local results = table.pack(pcall(callback, ...))
+				return table.unpack(results, 1, results.n)
 			end,
 		}
 		package.loaded["adapters.task_lifecycle"] = {
