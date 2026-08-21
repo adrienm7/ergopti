@@ -319,6 +319,9 @@ local function construct_click_key_watcher(generation)
 		for _, older in ipairs((fence and fence.events) or {}) do
 			ordered_events[#ordered_events + 1] = older
 		end
+		if fence and fence.consume_original == true then
+			return true, (#ordered_events > 0 and ordered_events or nil)
+		end
 		if provenance or status == EventProvenance.STATUS_UNREADABLE then
 			return false, (#ordered_events > 0 and ordered_events or nil)
 		end

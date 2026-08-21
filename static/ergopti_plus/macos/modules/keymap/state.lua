@@ -127,6 +127,7 @@ function M.new(defaults, delays_default)
 		last_key_time              = 0,
 		last_key_was_complex       = false,
 		no_rescan_until            = 0,
+		lifecycle_generation       = 0,
 		WORD_TIMEOUT_SEC           = 5.0,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
 		DELAYS                     = {},
@@ -145,9 +146,16 @@ function M.new(defaults, delays_default)
 	-- thread the state handle through. suppress_rescan always wipes the
 	-- buffer (used after an expansion) while suppress_rescan_keep_buffer
 	-- leaves it intact (used for sequential hotstring chains).
-	s.suppress_rescan = function(duration)
+	s.prepare_suppress_rescan = function(duration)
 		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
-		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
+		return epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
+	end
+
+	-- Memory-only commit half used after replacement buffer mutation. Keeping the
+	-- native clock read in prepare_suppress_rescan() prevents a second clock fault
+	-- from rolling Quartz back after the engine already describes new text.
+	s.commit_suppress_rescan = function(deadline)
+		s.no_rescan_until = deadline
 		s.buffer = ""
 		s.llm_buffer = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
@@ -155,6 +163,10 @@ function M.new(defaults, delays_default)
 		-- char can fire word-boundary-required triggers — that mirrors the
 		-- AHK HSEv2 contract (HSE_ApplyExpansion semantics).
 		s.start_is_word_boundary = true
+	end
+
+	s.suppress_rescan = function(duration)
+		s.commit_suppress_rescan(s.prepare_suppress_rescan(duration))
 	end
 
 	--- Resolves the expansion delay (seconds) that applies to one mapping.

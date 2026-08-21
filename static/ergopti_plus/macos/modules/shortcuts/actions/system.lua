@@ -217,6 +217,11 @@ local WRAP_AX_SELECTION_TTL_SEC = 0.2
 local function classify_physical_event(event, consumer_id)
 	local metadata, status, fence = EventProvenance.classify_with_fence(event, consumer_id)
 	local fence_events = fence and fence.events or nil
+	if fence and fence.consume_original == true then
+		fence_events = fence_events or {}
+		fence_events._consume_original = true
+		return false, fence_events
+	end
 	if metadata or status == EventProvenance.STATUS_UNREADABLE then
 		return false, fence_events
 	end
@@ -230,6 +235,10 @@ end
 --- @return boolean consume
 --- @return table|nil fence_events
 local function finish_tap(consume, fence_events)
+	if type(fence_events) == "table" and fence_events._consume_original == true then
+		fence_events._consume_original = nil
+		return true, (#fence_events > 0 and fence_events or nil)
+	end
 	return consume == true, fence_events
 end
 

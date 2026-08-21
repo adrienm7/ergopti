@@ -49,6 +49,12 @@ local function load_context(options)
 		resume_callback = nil,
 		resume_callbacks = {},
 		pause_listener = {},
+		input_idle_callbacks = {},
+		admission_fence = nil,
+		admission_serial = 0,
+		admission_release_tokens = {},
+		admission_release_failures = options.admission_release_failures or 0,
+		admission_release_throws = options.admission_release_throws or 0,
 		pause_failure = options.pause_failure,
 		resume_failure = options.resume_failure,
 		snapshot_failure = options.snapshot_failure,
@@ -153,6 +159,39 @@ local function load_context(options)
 		resync_context = record("keylogger_resync"),
 		log_shortcut = function() end,
 	}
+	package.loaded["adapters.synthetic_input"] = {
+		when_idle = function(callback)
+			ctx.calls.input_drain = (ctx.calls.input_drain or 0) + 1
+			ctx.input_idle_callbacks[#ctx.input_idle_callbacks + 1] = callback
+			if options.input_drain_deferred ~= true then callback() end
+			return options.input_drain_accepted ~= false
+		end,
+		acquire_admission_fence = function(owner)
+			ctx.calls.admission_acquire = (ctx.calls.admission_acquire or 0) + 1
+			if options.admission_refused == true or ctx.admission_fence ~= nil then return nil end
+			ctx.admission_serial = ctx.admission_serial + 1
+			local token = { id = ctx.admission_serial, owner = owner, active = true }
+			ctx.admission_fence = token
+			return token
+		end,
+		release_admission_fence = function(token)
+			ctx.calls.admission_release = (ctx.calls.admission_release or 0) + 1
+			ctx.admission_release_tokens[#ctx.admission_release_tokens + 1] = token
+			if ctx.admission_release_throws > 0 then
+				ctx.admission_release_throws = ctx.admission_release_throws - 1
+				error("admission release exploded")
+			end
+			if ctx.admission_release_failures > 0 then
+				ctx.admission_release_failures = ctx.admission_release_failures - 1
+				return false
+			end
+			if token ~= ctx.admission_fence or token.active ~= true then return false end
+			token.active = false
+			ctx.admission_fence = nil
+			return true
+		end,
+		admission_open = function() return ctx.admission_fence == nil end,
+	}
 
 	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
 	local keymap = {
@@ -170,8 +209,13 @@ local function load_context(options)
 		resume = inverse("gestures_resume"),
 		is_enabled = snapshot("gestures_snapshot"),
 	}
+	local get_enabled = function()
+			if options.get_enabled_throws then error("get_enabled exploded") end
+			return options.integration_enabled ~= false
+		end
+	if options.get_enabled_missing then get_enabled = nil end
 	local karabiner = {
-		get_enabled = function() return true end,
+		get_enabled = get_enabled,
 		pause = function(callback)
 			ctx.calls.karabiner_pause = (ctx.calls.karabiner_pause or 0) + 1
 			local callback_fired = false
@@ -202,6 +246,7 @@ local function load_context(options)
 		end,
 	}
 
+	if options.no_integration then karabiner = nil end
 	script_control.start(keymap, shortcuts, gestures, karabiner)
 	script_control.set_on_pause_change(function(value)
 		ctx.pause_listener[#ctx.pause_listener + 1] = value
@@ -259,10 +304,36 @@ end
 -- ===========================================
 
 helpers.describe("script-control pause transaction waits for exact lease ACK", function()
+	helpers.it("keeps every feature live until paced input is idle and cancels a queued reversal", function()
+		local script_control, ctx = load_context({ input_drain_deferred = true })
+
+		helpers.assert_true(script_control.pause_all())
+		helpers.assert_eq(ctx.calls.input_drain, 1)
+		ctx.fire_deferred()
+		helpers.assert_eq(ctx.calls.karabiner_pause, nil,
+			"native pause must not overtake an owned paced replacement")
+		helpers.assert_eq(ctx.calls.keymap_pause, nil)
+		helpers.assert_eq(script_control.is_paused(), false)
+
+		helpers.assert_true(script_control.resume_all(),
+			"a rapid reversal must be accepted while the input drain owns pause")
+		ctx.input_idle_callbacks[1]()
+		ctx.fire_deferred()
+		helpers.assert_eq(ctx.calls.karabiner_pause, nil,
+			"the queued resume must cancel pause before native publication")
+		helpers.assert_eq(ctx.calls.keymap_pause, nil)
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_nil(ctx.admission_fence,
+			"a queued resume cancels pause before taking the admission fence")
+		script_control.stop()
+	end)
+
 	helpers.it("does not publish or quiesce pause before PAUSED, then commits once", function()
 		local script_control, ctx = load_context()
 
 		script_control.pause_all()
+		helpers.assert_not_nil(ctx.admission_fence,
+			"the idle callback must close admission before native PAUSED is requested")
 		helpers.assert_eq(script_control.is_paused(), false,
 			"requesting pause must not publish a committed state")
 		helpers.assert_eq(ctx.calls.karabiner_pause, nil,
@@ -284,6 +355,8 @@ helpers.describe("script-control pause transaction waits for exact lease ACK", f
 		helpers.assert_eq(ctx.calls.gestures_pause, 1)
 		helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true }))
 		helpers.assert_eq(count_notifications(ctx, "script_control.paused", "warning"), 1)
+		helpers.assert_not_nil(ctx.admission_fence,
+			"committed pause retains the same admission owner until resume")
 
 		ctx.pause_callback(true, "duplicate-paused")
 		helpers.assert_eq(ctx.calls.keymap_pause, 1,
@@ -319,6 +392,70 @@ helpers.describe("script-control pause transaction is atomic", function()
 		{ step = "tooltip_hide", label = "tooltip.hide_forced" },
 	}
 
+	helpers.it("reopens admission only after a refused native pause settles", function()
+		local script_control, ctx = load_context()
+		helpers.assert_true(script_control.pause_all())
+		helpers.assert_not_nil(ctx.admission_fence)
+		ctx.fire_deferred()
+		ctx.pause_callback(false, "native pause refused")
+
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_nil(ctx.admission_fence,
+			"failed PAUSED acknowledgement must roll admission back exactly")
+		helpers.assert_eq(ctx.calls.admission_release, 1)
+		helpers.assert_eq(count_notifications(ctx, "script_control.pause_failed", "error"), 1)
+		script_control.stop()
+	end)
+
+	helpers.it("reuses a retained preflight fence on the next explicit pause", function()
+		local cases = {
+			{
+				name = "false",
+				options = { get_enabled_throws = true, admission_release_failures = 1 },
+			},
+			{
+				name = "throw",
+				options = { get_enabled_throws = true, admission_release_throws = 1 },
+			},
+		}
+		for _, case in ipairs(cases) do
+			local script_control, ctx = load_context(case.options)
+			helpers.assert_true(script_control.pause_all())
+			local exact_fence = ctx.admission_fence
+			helpers.assert_not_nil(exact_fence,
+				case.name .. " release refusal must retain the acquired fence")
+			helpers.assert_eq(ctx.calls.admission_release, 1,
+				"preflight failure must attempt exact rollback immediately")
+			helpers.assert_true(ctx.admission_release_tokens[1] == exact_fence)
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_true(helpers.deep_equal(ctx.pause_listener, {}))
+			helpers.assert_eq(count_notifications(ctx,
+				"script_control.pause_failed", "error"), 1)
+
+			case.options.get_enabled_throws = false
+			helpers.assert_true(script_control.pause_all(),
+				case.name .. " retained fence must keep explicit pause retry reachable")
+			helpers.assert_eq(ctx.calls.input_drain, 1,
+				"the exact retained fence already owns the idle-to-PAUSED boundary")
+			helpers.assert_eq(ctx.calls.admission_acquire, 1,
+				"retry must never request a second fence while the first remains active")
+			helpers.assert_true(ctx.admission_fence == exact_fence)
+			ctx.fire_deferred()
+			helpers.assert_eq(ctx.calls.karabiner_pause, 1)
+			ctx.pause_callback(true, "retry-paused")
+			helpers.assert_eq(script_control.is_paused(), true)
+			helpers.assert_true(ctx.admission_fence == exact_fence,
+				"successful PAUSED commit retains the same fence until resume")
+			helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true }))
+			helpers.assert_eq(count_notifications(ctx,
+				"script_control.paused", "warning"), 1)
+			helpers.assert_eq(count_notifications(ctx,
+				"script_control.pause_failed", "error"), 1,
+				"the successful retry must not republish the prior failure")
+			helpers.assert_true(script_control.stop())
+		end
+	end)
+
 	helpers.it("rolls every partial local pause back before publishing any PAUSED state", function()
 		for _, mode in ipairs({ "throw", "false" }) do
 			for failed_index, failed_step in ipairs(pause_steps) do
@@ -337,6 +474,8 @@ helpers.describe("script-control pause transaction is atomic", function()
 					"a partial local pause must immediately request native RESUMED rollback")
 				helpers.assert_eq(ctx.native_state, "paused",
 					"the rollback must remain pending until native RESUMED is acknowledged")
+				helpers.assert_not_nil(ctx.admission_fence,
+					"local pause failure must keep admission closed through native rollback")
 				helpers.assert_eq(count_notifications(ctx, "script_control.paused", "warning"), 0,
 					"partial local pause must never publish PAUSED")
 				helpers.assert_eq(count_notifications(ctx, "script_control.pause_failed", "error"), 0,
@@ -370,6 +509,8 @@ helpers.describe("script-control pause transaction is atomic", function()
 				ctx.resume_callbacks[1](true, "running-restored")
 				helpers.assert_eq(ctx.native_state, "running")
 				helpers.assert_eq(script_control.is_paused(), false)
+				helpers.assert_nil(ctx.admission_fence,
+					"only the settled RESUMED rollback may reopen admission")
 				helpers.assert_eq(count_notifications(ctx, "script_control.pause_failed", "error"), 1,
 					"pause failure may be published only after native RESUMED")
 				helpers.assert_true(has_error_containing(ctx, failed_step.label),
@@ -520,6 +661,7 @@ helpers.describe("script-control resume transaction is atomic", function()
 		script_control.pause_all()
 		ctx.fire_deferred()
 		ctx.pause_callback(true, "paused")
+		helpers.assert_not_nil(ctx.admission_fence)
 
 		script_control.resume_all()
 		ctx.fire_deferred()
@@ -527,12 +669,94 @@ helpers.describe("script-control resume transaction is atomic", function()
 		ctx.resume_callback(true, "duplicate-resumed")
 
 		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_nil(ctx.admission_fence,
+			"RESUMED plus local activation is the exact admission reopen point")
+		helpers.assert_eq(ctx.calls.admission_release, 1)
 		helpers.assert_eq(ctx.calls.keymap_resume, 1)
 		helpers.assert_eq(ctx.calls.shortcuts_resume, 1)
 		helpers.assert_eq(ctx.calls.gestures_resume, 1)
 		helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true, false }))
 		helpers.assert_eq(count_notifications(ctx, "script_control.resumed", "success"), 1)
 		script_control.stop()
+	end)
+
+	helpers.it("never publishes RESUMED before exact admission release settles", function()
+		for _, mode in ipairs({ "false", "throw" }) do
+			local options = mode == "false"
+				and { admission_release_failures = 1 }
+				or { admission_release_throws = 1 }
+			local script_control, ctx = load_context(options)
+			script_control.pause_all()
+			ctx.fire_deferred()
+			ctx.pause_callback(true, "paused")
+			local exact_fence = ctx.admission_fence
+
+			script_control.resume_all()
+			ctx.fire_deferred()
+			ctx.resume_callback(true, "resumed")
+			helpers.assert_eq(script_control.is_paused(), true,
+				mode .. " admission release must roll local activation back to PAUSED")
+			helpers.assert_true(ctx.admission_fence == exact_fence,
+				"the exact refused fence remains owned for retry")
+			helpers.assert_eq(count_notifications(ctx, "script_control.resumed", "success"), 0)
+			helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true }),
+				"listeners may not observe RESUMED before admission reopens")
+			helpers.assert_eq(ctx.calls.karabiner_pause, 2,
+				"native RESUMED must be rolled back when admission cannot reopen")
+
+			ctx.pause_callbacks[2](true, "re-paused")
+			helpers.assert_true(ctx.admission_fence == exact_fence)
+			script_control.resume_all()
+			ctx.fire_deferred()
+			ctx.resume_callbacks[2](true, "retry-resumed")
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_nil(ctx.admission_fence)
+			helpers.assert_eq(count_notifications(ctx, "script_control.resumed", "success"), 1)
+			script_control.stop()
+		end
+	end)
+
+	helpers.it("keeps no-integration resume private until the exact fence releases", function()
+		local script_control, ctx = load_context({
+			integration_enabled = false,
+			admission_release_failures = 1,
+		})
+		script_control.pause_all()
+		local exact_fence = ctx.admission_fence
+		helpers.assert_eq(script_control.is_paused(), true)
+		helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true }))
+
+		script_control.resume_all()
+		helpers.assert_eq(script_control.is_paused(), true,
+			"local-only resume must roll back when admission release returns false")
+		helpers.assert_true(ctx.admission_fence == exact_fence)
+		helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true }))
+		helpers.assert_eq(count_notifications(ctx, "script_control.resumed", "success"), 0)
+
+		script_control.resume_all()
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_nil(ctx.admission_fence)
+		helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true, false }))
+		script_control.stop()
+	end)
+
+	helpers.it("stop retains and retries an exact admission release refusal", function()
+		local script_control, ctx = load_context()
+		script_control.pause_all()
+		ctx.fire_deferred()
+		ctx.pause_callback(true, "paused")
+		local exact_fence = ctx.admission_fence
+		ctx.admission_release_throws = 1
+
+		helpers.assert_true(not script_control.stop(),
+			"stop cannot report settlement while admission remains fenced")
+		helpers.assert_true(ctx.admission_fence == exact_fence)
+		helpers.assert_true(exact_fence.active)
+		helpers.assert_true(script_control.stop(),
+			"a later stop must retry the same retained fence")
+		helpers.assert_nil(ctx.admission_fence)
+		helpers.assert_true(ctx.admission_release_tokens[1] == exact_fence)
+		helpers.assert_true(ctx.admission_release_tokens[2] == exact_fence)
 	end)
 
 	helpers.it("rolls every partial local resume back before publishing any failure", function()

@@ -546,6 +546,7 @@ local function start_watchers()
 			local provenance, status, fence = EventProvenance.classify_with_fence(
 				event, "tooltip.llm_mouse")
 			local fence_events = fence and fence.events or nil
+			if fence and fence.consume_original == true then return true, fence_events end
 			if provenance ~= nil then return false, fence_events end
 			if status == EventProvenance.STATUS_UNREADABLE then
 				defer_dismiss("unreadable mouse provenance")
@@ -572,6 +573,7 @@ local function start_watchers()
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "tooltip.llm_flags")
 		local fence_events = fence and fence.events or nil
+		if fence and fence.consume_original == true then return true, fence_events end
 		if provenance ~= nil then return false, fence_events end
 		if status == EventProvenance.STATUS_UNREADABLE then
 			_shift_side = nil
@@ -609,6 +611,7 @@ local function start_watchers()
 			event, "tooltip.llm_key")
 		local fence_events = fence and fence.events or nil
 		local function finish(consume) return consume == true, fence_events end
+		if fence and fence.consume_original == true then return finish(true) end
 		if provenance ~= nil then return finish(false) end
 		if status == EventProvenance.STATUS_UNREADABLE then
 			defer_dismiss("unreadable keyboard provenance")

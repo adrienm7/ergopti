@@ -47,6 +47,20 @@ package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
 -- sentinel guard delegates the live right-AltGr query to that adapter).
 package.loaded["adapters.key_state"] = nil
 
+-- These broad API tests are not serializer timing tests. Complete the newly
+-- required input-idle fence synchronously while retaining the real adapter's
+-- classification/defer paths used by the sentinel cases below.
+package.loaded["adapters.synthetic_input"] = nil
+local SyntheticInput = helpers.load_with_stubs("adapters.synthetic_input")
+SyntheticInput.when_idle = function(callback)
+	callback()
+	return true
+end
+SyntheticInput.defer_after_callback = function(_, callback)
+	hs.timer.doAfter(0, callback)
+	return true
+end
+
 local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
 
 
@@ -758,8 +772,8 @@ helpers.describe("ScriptControl: the extras table is actually reachable", functi
 		local src = helpers.read_driver_source("function M.execute_single")
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the actions source must be readable or this invariant asserts nothing")
-		-- Bounded to execute_single's own body: "return false" appears elsewhere in
-		-- the same file, so an unbounded search would pass against the unfixed code.
+		-- Bound to execute_single's exact body: fixed byte windows became false-red
+		-- when lifecycle comments grew even though the return contract was unchanged.
 		local at = src:find("function M.execute_single", 1, true)
 		helpers.assert_true(at ~= nil, "execute_single must exist")
 		local next_function = src:find("function M.execute_axis", at, true)

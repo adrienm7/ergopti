@@ -85,6 +85,10 @@ local _pause_epoch     = 0
 local _pause_transition = nil
 local _queued_pause_target = nil
 local _pause_transition_serial = 0
+-- Exact SyntheticInput admission owner. A successful pause keeps it until the
+-- symmetric resume commits; an uncommitted pause keeps it through every native
+-- rollback callback, closing the idle-to-PAUSED race without inventing PAUSED.
+local _pause_admission_fence = nil
 local _tap             = nil
 local _tap_committed   = false
 local _tap_watchdog    = nil
@@ -699,6 +703,8 @@ end
 --- @param target_paused boolean Settled pause state.
 --- @return boolean committed
 --- @return string|nil reason
+local release_pause_admission
+
 local function commit_pause_state(target_paused)
 	if _is_paused == target_paused then return true, nil end
 	if target_paused then
@@ -710,6 +716,18 @@ local function commit_pause_state(target_paused)
 		Logger.info(LOG, "Resuming all script operations after Karabiner regeneration committed.")
 		local ok_resume, resume_reason = resume_all()
 		if not ok_resume then return false, resume_reason end
+		-- Admission is the final local commit point. Publishing RESUMED before this
+		-- exact token releases lets callbacks open new output while the adapter is
+		-- still fenced. On refusal, restore the local paused state and retain the
+		-- same token for the native rollback/next explicit retry.
+		if not release_pause_admission(_pause_admission_fence) then
+			local rollback_ok, rollback_reason = pause_all()
+			local reason = "synthetic-input admission fence release was refused"
+			if not rollback_ok then
+				reason = reason .. "; local pause rollback failed: " .. tostring(rollback_reason)
+			end
+			return false, reason
+		end
 		_is_paused = false
 	end
 	publish_pause_state(target_paused)
@@ -729,6 +747,22 @@ end
 
 local request_pause_transition
 
+
+--- Releases one exact pause admission owner without silently clearing debt.
+--- @param token table|nil SyntheticInput admission token.
+--- @return boolean settled
+release_pause_admission = function(token)
+	if token == nil then return true end
+	local ok, released_or_error = pcall(SyntheticInput.release_admission_fence, token)
+	if not ok or released_or_error ~= true then
+		Logger.error(LOG, "Synthetic-input admission fence release failed: %s.",
+			tostring(released_or_error))
+		return false
+	end
+	if _pause_admission_fence == token then _pause_admission_fence = nil end
+	return true
+end
+
 --- Completes one request once and then applies the latest queued user intent.
 --- @param transaction table Captured transition descriptor.
 --- @param ok boolean Whether the complete transaction committed.
@@ -736,6 +770,13 @@ local request_pause_transition
 local function complete_pause_transition(transaction, ok, reason)
 	if _pause_transition ~= transaction then return end
 	_pause_transition = nil
+	if transaction.target == true then
+		if ok == true then
+			_pause_admission_fence = transaction.admission_fence
+		else
+			release_pause_admission(transaction.admission_fence)
+		end
+	end
 	if ok ~= true then
 		report_pause_transition_failure(transaction.target, reason)
 	end
@@ -897,7 +938,7 @@ end
 --- and a second toggle is coalesced as latest intent.
 --- @param target_paused boolean Desired state.
 --- @return boolean True when accepted or already satisfied.
-request_pause_transition = function(target_paused)
+request_pause_transition = function(target_paused, input_drained, admission_fence)
 	target_paused = target_paused == true
 	if _pause_transition then
 		local desired = desired_pause_state()
@@ -908,19 +949,94 @@ request_pause_transition = function(target_paused)
 		return true
 	end
 	if _is_paused == target_paused then return true end
+	if target_paused and input_drained ~= true and _pause_admission_fence ~= nil then
+		-- A failed preflight rollback keeps this exact token active and admission
+		-- closed. A later explicit pause therefore already owns the original
+		-- idle-to-PAUSED boundary: asking when_idle() to acquire a second fence can
+		-- only refuse forever while our first token remains live.
+		admission_fence = _pause_admission_fence
+		input_drained = true
+	end
+	if target_paused and input_drained ~= true then
+		_pause_transition_serial = _pause_transition_serial + 1
+		local transaction = {
+			id = _pause_transition_serial,
+			target = true,
+			stage = "synthetic-input-drain",
+		}
+		_pause_transition = transaction
+		local drain_ok, accepted_or_error = pcall(SyntheticInput.when_idle, function()
+			if _pause_transition ~= transaction then return end
+			local queued = _queued_pause_target
+			_queued_pause_target = nil
+			if queued == false then
+				_pause_transition = nil
+				return
+			end
+			local acquired_ok, fence_or_error = pcall(
+				SyntheticInput.acquire_admission_fence, "script_pause")
+			if not acquired_ok or fence_or_error == nil then
+				_pause_transition = nil
+				report_pause_transition_failure(true,
+					"synthetic input admission fence was not committed: "
+						.. tostring(fence_or_error))
+				return
+			end
+			_pause_transition = nil
+			request_pause_transition(true, true, fence_or_error)
+		end)
+		if not drain_ok or accepted_or_error ~= true then
+			_pause_transition = nil
+			report_pause_transition_failure(true,
+				"synthetic input drain was not committed: " .. tostring(accepted_or_error))
+			return false
+		end
+		return true
+	end
+	if target_paused and admission_fence == nil then
+		admission_fence = _pause_admission_fence
+		if admission_fence == nil then
+			local acquired_ok, fence_or_error = pcall(
+				SyntheticInput.acquire_admission_fence, "script_pause")
+			if not acquired_ok or fence_or_error == nil then
+				report_pause_transition_failure(true,
+					"synthetic input admission fence was not committed: "
+						.. tostring(fence_or_error))
+				return false
+			end
+			admission_fence = fence_or_error
+			-- Publish ownership immediately, before every fallible Karabiner probe.
+			-- A later rollback refusal must never orphan this exact token in a local.
+			_pause_admission_fence = admission_fence
+		end
+	end
+	if target_paused and admission_fence ~= nil then
+		if _pause_admission_fence ~= nil and _pause_admission_fence ~= admission_fence then
+			report_pause_transition_failure(true,
+				"synthetic input admission fence ownership changed before pause")
+			return false
+		end
+		_pause_admission_fence = admission_fence
+	end
 	-- Every requested edge invalidates asynchronous work latched in the preceding
 	-- runtime epoch, even when native publication later refuses and is retried.
 	_pause_epoch = _pause_epoch + 1
 
 	local integration_enabled = false
 	if _karabiner and type(_karabiner.get_enabled) ~= "function" then
-		report_pause_transition_failure(target_paused, "Karabiner enabled-state API unavailable")
+		local release_ok = not target_paused or release_pause_admission(admission_fence)
+		local reason = "Karabiner enabled-state API unavailable"
+		if not release_ok then reason = reason .. "; admission rollback remains pending" end
+		report_pause_transition_failure(target_paused, reason)
 		return false
 	end
 	if _karabiner then
 		local ok_enabled, enabled_or_err = pcall(_karabiner.get_enabled)
 		if not ok_enabled then
-			report_pause_transition_failure(target_paused, enabled_or_err)
+			local release_ok = not target_paused or release_pause_admission(admission_fence)
+			local reason = tostring(enabled_or_err)
+			if not release_ok then reason = reason .. "; admission rollback remains pending" end
+			report_pause_transition_failure(target_paused, reason)
 			return false
 		end
 		integration_enabled = enabled_or_err == true
@@ -928,8 +1044,12 @@ request_pause_transition = function(target_paused)
 	if not integration_enabled then
 		local committed, commit_reason = commit_pause_state(target_paused)
 		if not committed then
+			if target_paused then release_pause_admission(admission_fence) end
 			report_pause_transition_failure(target_paused, commit_reason)
 			return false
+		end
+		if target_paused then
+			_pause_admission_fence = admission_fence
 		end
 		return true
 	end
@@ -939,6 +1059,7 @@ request_pause_transition = function(target_paused)
 		id = _pause_transition_serial,
 		target = target_paused,
 		timer = nil,
+		admission_fence = target_paused and admission_fence or _pause_admission_fence,
 	}
 	_pause_transition = transaction
 	local ok_timer, timer_or_err = pcall(hs.timer.doAfter, 0, function()
@@ -1032,6 +1153,7 @@ local function handle_key(e)
 		e, "shortcuts.script_control")
 	local fence_events = fence and fence.events or nil
 	local function finish(consume) return consume == true, fence_events end
+	if fence and fence.consume_original == true then return finish(true) end
 	if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
 		return finish(false)
 	end
@@ -1280,6 +1402,10 @@ function M.stop()
 	_tap_generation = _tap_generation + 1
 	Logger.start(LOG, "Stopping script control…")
 	local settled = true
+	if _pause_admission_fence
+		and not release_pause_admission(_pause_admission_fence) then
+		settled = false
+	end
 	_tap_committed = false
 	_tap_watchdog_committed = false
 

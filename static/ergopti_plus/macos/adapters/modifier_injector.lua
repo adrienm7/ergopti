@@ -91,6 +91,7 @@ function M.arm(flags, on_applied)
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "modifier_injector")
 		local fence_events = fence and fence.events or nil
+		if fence and fence.consume_original == true then return true, fence_events end
 		-- A delayed Ergopti batch is not the user's "next key". Mutating it would
 		-- corrupt that output, disarm the sticky modifier, and leave the subsequent
 		-- physical key unmodified. Unreadable provenance is equally non-authoritative.
