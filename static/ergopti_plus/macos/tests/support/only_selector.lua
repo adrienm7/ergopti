@@ -240,10 +240,10 @@ end
 
 --- Converts a zero-test focused replay into a visible failure.
 --- @param results table Mutable helpers.get_results() record.
---- @param only_filter string|nil Focused filter.
+--- @param case_filter string|nil Focused case-name filter; nil for exact modules.
 --- @return boolean matched True unless a non-empty filter ran zero cases.
-function M.require_match(results, only_filter)
-	if type(only_filter) ~= "string" or only_filter == ""
+function M.require_match(results, case_filter)
+	if type(case_filter) ~= "string" or case_filter == ""
 		or type(results) ~= "table"
 		or (tonumber(results.passed) or 0) > 0
 		or (tonumber(results.failed) or 0) > 0 then
@@ -252,7 +252,7 @@ function M.require_match(results, only_filter)
 	results.failed = 1
 	results.failures = results.failures or {}
 	results.failures[#results.failures + 1] = {
-		name = "--only " .. only_filter,
+		name = "--only " .. case_filter,
 		err = "no test case matched the requested --only filter",
 	}
 	return false
