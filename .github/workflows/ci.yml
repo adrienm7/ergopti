@@ -1967,8 +1967,23 @@ jobs:
           rm -f "$LAUNCHER_LOG"
           rm -rf "$LUA_LOG_DIR"
 
-          "$APP/Contents/MacOS/ErgoptiPlus" &
-          PID=$!
+          # Exercise the bundle through Launch Services, matching Finder and
+          # normal CLI launches. Executing the inner Mach-O directly leaves
+          # AppKit without the bundle launch context and the embedded GUI child
+          # receives a clean termination request during bootstrap.
+          open -n -g "$APP"
+          PID=""
+          launch_deadline=$((SECONDS + 10))
+          while [ "$SECONDS" -lt "$launch_deadline" ]; do
+              PID="$(pgrep -f -x "$APP/Contents/MacOS/ErgoptiPlus" | sed -n '1p' || true)"
+              [ -n "$PID" ] && break
+              sleep 0.1
+          done
+          if [ -z "$PID" ]; then
+              echo "::error::Launch Services did not start ErgoptiPlus.app within 10s."
+              cat "$LAUNCHER_LOG" 2>/dev/null || true
+              exit 1
+          fi
 
           deadline=$((SECONDS + 20))
           lua_boot_seen=false
