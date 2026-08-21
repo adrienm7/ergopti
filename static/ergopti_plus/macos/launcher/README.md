@@ -105,4 +105,7 @@ in source.
 The embedded Hammerspoon's `CFBundleIdentifier` is rewritten to
 `com.ergoptiplus.app.hammerspoon` at bundle-assembly time. This isolates its
 preferences from stock Hammerspoon and gives it a Launch Services identity
-distinct from the single-instance outer `com.ergoptiplus.app` bundle.
+distinct from the single-instance outer `com.ergoptiplus.app` bundle. Before
+spawning that GUI child, the launcher removes inherited `__CFBundleIdentifier`
+and `XPC_SERVICE_NAME` markers so AppKit and `NSUserDefaults` resolve the
+embedded bundle rather than the outer Launch Services identity.

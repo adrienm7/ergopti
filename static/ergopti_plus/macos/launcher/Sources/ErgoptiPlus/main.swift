@@ -80,6 +80,14 @@ func launcherChildEnvironment(
 	loggerEndpoint: LoggerDatagramEndpoint? = nil
 ) -> [String: String] {
 	var environment = base
+	// Launch Services injects the outer app identity into its environment.
+	// Process inherits it verbatim, but the child is a second GUI bundle: keeping
+	// either marker makes AppKit/NSUserDefaults treat embedded Hammerspoon as the
+	// launcher, so it misses the MJConfigFile stored under its own bundle ID and
+	// can terminate cleanly before loading init.lua. Let the child derive its
+	// identity from its own executable and Info.plist.
+	environment.removeValue(forKey: "__CFBundleIdentifier")
+	environment.removeValue(forKey: "XPC_SERVICE_NAME")
 	environment["ERGOPTI_LAUNCHER_PID"] = String(launcherPid)
 	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
 	environment.removeValue(forKey: kLoggerDatagramPortEnvironment)

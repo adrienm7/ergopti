@@ -69,6 +69,14 @@ if (!embeddedId || swiftEmbeddedId !== embeddedId) {
 if ((launcher.match(/kEmbeddedHammerspoonBundleId as CFString/g) || []).length !== 3) {
 	errors.push('all three Hammerspoon preference-domain uses must target the embedded runtime ID.');
 }
+for (const inheritedKey of ['__CFBundleIdentifier', 'XPC_SERVICE_NAME']) {
+	const escapedKey = inheritedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	if (!new RegExp(`environment\\.removeValue\\(forKey: "${escapedKey}"\\)`).test(launcher)) {
+		errors.push(
+			`the embedded GUI child must not inherit the outer Launch Services identity ${inheritedKey}.`
+		);
+	}
+}
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] launcher Info.plist is missing the single-instance guard:\x1b[0m');
