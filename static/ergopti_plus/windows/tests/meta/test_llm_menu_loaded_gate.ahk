@@ -72,8 +72,23 @@ _LTLG_CheckInitSetsFlag() {
 	Body := _DriverFuncBody("LLM_Menu_Init")
 	Assert(Body != "", "LLM_Menu_Init must be present in ui/menu/menu_llm/init.ahk")
 
-	Assert(InStr(Body, "_LLM_Menu_Loaded := true"),
+	HotkeyBarrierPos := InStr(Body,
+		"_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore)")
+	LoadedPos := InStr(Body, "_LLM_Menu_Loaded := true")
+	Assert(LoadedPos > 0,
 		"LLM_Menu_Init() must set _LLM_Menu_Loaded := true before returning")
+	Assert(HotkeyBarrierPos > 0 && HotkeyBarrierPos < LoadedPos,
+		"profile and navigation hotkeys must be complete before loaded publication")
+	RequireBody := _DriverFuncBody("_LLM_Menu_RequireFirstRestoreHotkeys")
+	Assert(RequireBody != "",
+		"the typed first-restore terminal must remain reachable")
+	Assert(InStr(RequireBody,
+		"_LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore") > 0,
+		"the terminal helper must consume the canonical activation result")
+	Assert(InStr(RequireBody, "TrayRootRetryPendingError") > 0,
+		"retryable profile refusal must retain the tray root without publication")
+	Assert(InStr(RequireBody, 'throw Error("initial LLM hotkey surface') > 0,
+		"non-profile activation refusal must remain an ordinary failure")
 }
 
 _LTLG_CheckSaveConfigGated() {
@@ -102,6 +117,53 @@ _LTLG_CheckSaveConfigGated() {
 		. "explicit transaction candidate may bypass only that boot-order gate")
 }
 
+_LTLG_CheckTypedTrayRootErrorsStaySilent() {
+	DrainBody := _DriverFuncBody("_TrayRootDrain")
+	Assert(DrainBody != "", "_TrayRootDrain must remain source-visible")
+	PendingPos := InStr(DrainBody, "TrayRootRetryPendingError")
+	FatalPos := InStr(DrainBody, "TrayRootFatalContextError")
+	RetirePos := FatalPos > 0
+		? InStr(DrainBody, "_TrayRootRetireFatal", , FatalPos) : 0
+	FatalThrowPos := RetirePos > 0
+		? InStr(DrainBody, "throw Err", , RetirePos) : 0
+	PendingThrowPos := PendingPos > 0
+		? InStr(DrainBody, "throw Err", , PendingPos) : 0
+	DrainLogPos := InStr(DrainBody, "LoggerError")
+	Assert(PendingPos > 0 && FatalPos > 0 && DrainLogPos > 0,
+		"typed tray-root branches and the ordinary diagnostic must remain present")
+	Assert(FatalPos < RetirePos && RetirePos < FatalThrowPos
+		&& FatalThrowPos < DrainLogPos,
+		"fatal root control must retire and throw before ordinary logging")
+	Assert(PendingPos < PendingThrowPos && PendingThrowPos < DrainLogPos,
+		"pending root control must throw before ordinary logging")
+
+	ServiceBody := _DriverFuncBody("_TrayRootServiceRetainedWork")
+	Assert(ServiceBody != "",
+		"the watchdog retained-work boundary must remain source-visible")
+	ServiceFatalPos := InStr(ServiceBody, "TrayRootFatalContextError")
+	ServiceReturnPos := ServiceFatalPos > 0
+		? InStr(ServiceBody, "return false", , ServiceFatalPos) : 0
+	ServiceNextPos := InStr(ServiceBody, "NextFn.Call()")
+	ServiceLogPos := InStr(ServiceBody, "LoggerError")
+	Assert(ServiceFatalPos > 0 && ServiceReturnPos > ServiceFatalPos
+		&& ServiceNextPos > ServiceReturnPos
+		&& ServiceLogPos > ServiceReturnPos,
+		"a fatal retained root must end the watchdog pass before sibling work or logging")
+
+	DeferredBody := _DriverFuncBody("BuildTrayMenuDeferred")
+	Assert(DeferredBody != "",
+		"BuildTrayMenuDeferred must remain source-visible")
+	SilentPos := InStr(DeferredBody, "_TrayRootErrorIsSilent(e)")
+	DeferredLogPos := SilentPos > 0
+		? InStr(DeferredBody, "LoggerError", , SilentPos) : 0
+	ReturnPos := SilentPos > 0
+		? InStr(DeferredBody, "return false", , SilentPos) : 0
+	Assert(SilentPos > 0 && ReturnPos > SilentPos,
+		"the outer deferred owner must consume typed root control errors")
+	Assert(DeferredLogPos > ReturnPos,
+		"typed root control errors must return before outer error logging")
+}
+
 
 Test("meta llm-tray-loaded-gate: menu_llm.ahk declares _LLM_Menu_Loaded := false at module level",
 	_LTLG_CheckModuleLevelFlag)
@@ -111,3 +173,6 @@ Test("meta llm-tray-loaded-gate: LLM_Menu_Init() sets _LLM_Menu_Loaded := true b
 
 Test("meta llm-tray-loaded-gate: full-save collector gates detached LLM reconciliation",
 	_LTLG_CheckSaveConfigGated)
+
+Test("meta llm-tray-loaded-gate: typed tray-root control errors stay silent",
+	_LTLG_CheckTypedTrayRootErrorsStaySilent)

@@ -127,18 +127,29 @@ _LLMTG_RecoveryIsTerminableAndPostLease() {
 	Assert(RetryPos > 0 && RunClaimedPos > RetryPos && CommitPos > RunClaimedPos,
 		"a later edit must claim and finish recovery before claiming a new plan")
 	Lifecycle := _DriverFuncBody("_SuspendStateWatchdog")
+	WatchdogWork := _DriverFuncBody("_TrayRootServiceRetainedWork")
 	Resume := _DriverFuncBody("LLM_Menu_OnResume")
 	Assert(Lifecycle != "", "_SuspendStateWatchdog must remain source-visible")
+	Assert(WatchdogWork != "",
+		"the retained-work watchdog boundary must remain source-visible")
 	Assert(Resume != "", "LLM_Menu_OnResume must remain source-visible")
-	AssertContains(Lifecycle, "LLM_Menu_ServiceTriggerRecovery()",
+	AssertContains(Lifecycle, "TriggerService := LLM_Menu_ServiceTriggerRecovery",
 		"the active watchdog must recover a refused timer arm")
+	AssertContains(Lifecycle, "_TrayRootServiceRetainedWork(",
+		"the active watchdog must use the typed retained-work boundary")
+	FatalPos := InStr(WatchdogWork, "TrayRootFatalContextError")
+	ReturnPos := FatalPos > 0
+		? InStr(WatchdogWork, "return false", , FatalPos) : 0
+	TriggerPos := InStr(WatchdogWork, "NextFn.Call()")
+	Assert(FatalPos > 0 && ReturnPos > FatalPos && TriggerPos > ReturnPos,
+		"fatal root context must end the watchdog pass before trigger recovery")
 	AssertContains(Resume, "LLM_Menu_ServiceTriggerRecovery()",
 		"resume must transfer a timer callback consumed during pause")
 	for Spec in [
-		{ body: Lifecycle, label: "watchdog" },
-		{ body: Resume, label: "resume" }
+		{ body: WatchdogWork, call: "NextFn.Call()", label: "watchdog" },
+		{ body: Resume, call: "LLM_Menu_ServiceTriggerRecovery()", label: "resume" }
 	] {
-		CallPos := InStr(Spec.body, "LLM_Menu_ServiceTriggerRecovery()")
+		CallPos := InStr(Spec.body, Spec.call)
 		CatchPos := CallPos > 0
 			? InStr(Spec.body, "catch as Err", , CallPos) : 0
 		LogPos := CatchPos > 0

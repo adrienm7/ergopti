@@ -219,7 +219,7 @@ const JUDGED = [
 		why: 'KL_LogHotstringNearMiss; both call sites return early via _NearMissIsWithheld before reaching it.'
 	},
 	{
-		file: 'infra/lifecycle.ahk',
+		file: 'ui/menu/menu_rebuild.ahk',
 		match: 'LLM trigger recovery watchdog service failed: {1}.',
 		verdict: 'not-personal',
 		why: 'the interpolation is recovery-service error metadata; trigger means the LLM keyboard shortcut, never hotstring content.'

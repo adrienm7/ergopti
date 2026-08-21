@@ -27,6 +27,21 @@ global _TrayRootLifecycleEpoch := 0
 global _TrayRootLatestAuthorizeFn := 0
 global _TrayRootLatestWorkerFn := 0
 
+; Expected retained work must not look like a fresh crash on every watchdog
+; tick. A fatal dynamic-context error is different: retire that exact root
+; generation and end the current logical thread so no later registration can
+; inherit an unproven HotIf context.
+class TrayRootRetryPendingError extends Error {
+}
+
+class TrayRootFatalContextError extends Error {
+}
+
+_TrayRootErrorIsSilent(Err) {
+	return (Err is TrayRootRetryPendingError)
+		or (Err is TrayRootFatalContextError)
+}
+
 TrayMenuStage_Begin() {
 	global _TrayMenuStage
 	if IsObject(_TrayMenuStage)
@@ -218,6 +233,17 @@ _TrayRootTryReleaseFailed(TargetGeneration) {
 	} finally Critical(PreviousCritical)
 }
 
+_TrayRootRetireFatal(TargetGeneration) {
+	global _TrayRootPublishedGeneration, _TrayRootActive
+	PreviousCritical := Critical("On")
+	try {
+		_TrayRootPublishedGeneration := Max(
+			_TrayRootPublishedGeneration, TargetGeneration)
+		_TrayRootActive := false
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0) {
 	if HasMethod(WorkerFn, "Call")
 		return WorkerFn.Call(PublishAuthorizeFn)
@@ -234,8 +260,14 @@ _TrayRootDrain() {
 			TargetGeneration, LifecycleEpoch, UpstreamAuthorizeFn)
 		try Published := _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn)
 		catch as Err {
+			if (Err is TrayRootFatalContextError) {
+				_TrayRootRetireFatal(TargetGeneration)
+				throw Err
+			}
 			if !_TrayRootTryReleaseFailed(TargetGeneration)
 				continue
+			if (Err is TrayRootRetryPendingError)
+				throw Err
 			try LoggerError("Menu", "Tray-root reconstruction failed and remains pending: {1}", Err.Message)
 			return false
 		}
@@ -261,6 +293,32 @@ _TrayRootServiceRetained() {
 	if !_TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn)
 		return true
 	return _TrayRootDrain()
+}
+
+_TrayRootServiceRetainedWork(RootFn := 0, NextFn := 0, LogFn := 0) {
+	if HasMethod(RootFn, "Call") {
+		try RootFn.Call()
+		catch as Err {
+			; A failed HotIf reset can leave this logical thread's dynamic
+			; registration context selected. Retire the root and end this
+			; watchdog pass before any other native hotkey mutation runs.
+			if Err is TrayRootFatalContextError
+				return false
+		}
+	}
+	if HasMethod(NextFn, "Call") {
+		try NextFn.Call()
+		catch as Err {
+			if HasMethod(LogFn, "Call") {
+				try LogFn.Call(Err)
+			} else {
+				try LoggerError("Lifecycle",
+					"LLM trigger recovery watchdog service failed: {1}.",
+					Err.Message)
+			}
+		}
+	}
+	return true
 }
 
 _TrayRootOnSuspendEnter() {

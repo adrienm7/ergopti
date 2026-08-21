@@ -471,6 +471,7 @@ Ergopti_OnSuspendResume() {
 			try SetTimer(UIASW_Start, -1)
 		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 }
+
 _SuspendStateWatchdog() {
 		global _LastSuspendState
 		; Serialize the transition. This runs both from a 500 ms repeating timer and
@@ -492,16 +493,15 @@ _SuspendStateWatchdog() {
 				_SuspendRestoreFromMarker()
 		}
 		if (A_IsSuspended == _LastSuspendState) {
-				if !A_IsSuspended and IsSet(_TrayRootServiceRetained)
-						try _TrayRootServiceRetained()
-				; A trigger recovery SetTimer arm may fail or consume ownership while
-				; paused. The active watchdog is the final bounded wake-up backstop.
-				if !A_IsSuspended and IsSet(LLM_Menu_ServiceTriggerRecovery) {
-						try LLM_Menu_ServiceTriggerRecovery()
-						catch as Err
-								try LoggerError("Lifecycle",
-										"LLM trigger recovery watchdog service failed: {1}.",
-										Err.Message)
+				if !A_IsSuspended {
+						RootService := 0
+						TriggerService := 0
+						if IsSet(_TrayRootServiceRetained)
+								RootService := _TrayRootServiceRetained
+						if IsSet(LLM_Menu_ServiceTriggerRecovery)
+								TriggerService := LLM_Menu_ServiceTriggerRecovery
+						_TrayRootServiceRetainedWork(
+								RootService, TriggerService)
 				}
 				return
 		}
@@ -747,6 +747,8 @@ BuildTrayMenuDeferred() {
 		}
 		return true
 	} catch as e {
+		if _TrayRootErrorIsSilent(e)
+			return false
 		try LoggerError("TrayMenu", "Deferred tray-menu build failed: {1} [{2} at {3}:{4}]",
 			e.Message,
 			(e.HasProp("What") ? e.What : "?"),

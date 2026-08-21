@@ -680,11 +680,13 @@ Test("[llm-nav-transaction] post-apply registration failure is fully purged",
 
 global _LNHT_FirstRestoreProfileCalls := 0
 global _LNHT_FirstRestoreNavCalls := 0
+global _LNHT_FirstRestoreProfileResult := false
 global _LNHT_FirstRestoreNavResult := false
 
 _LNHT_FirstRestoreProfile() {
-	global _LNHT_FirstRestoreProfileCalls
+	global _LNHT_FirstRestoreProfileCalls, _LNHT_FirstRestoreProfileResult
 	_LNHT_FirstRestoreProfileCalls += 1
+	return _LNHT_FirstRestoreProfileResult
 }
 
 _LNHT_FirstRestoreNav() {
@@ -695,24 +697,45 @@ _LNHT_FirstRestoreNav() {
 
 _LNHT_FirstRestoreOwnsBootBindingCore() {
 	global _LNHT_FirstRestoreProfileCalls, _LNHT_FirstRestoreNavCalls
-	global _LNHT_FirstRestoreNavResult
+	global _LNHT_FirstRestoreProfileResult, _LNHT_FirstRestoreNavResult
+	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
 	_LNHT_FirstRestoreProfileCalls := 0
 	_LNHT_FirstRestoreNavCalls := 0
+	_LNHT_FirstRestoreProfileResult := false
 	_LNHT_FirstRestoreNavResult := false
 	AssertTrue(_LLM_Menu_ActivateFirstRestoreHotkeys(false,
 		_LNHT_FirstRestoreProfile, _LNHT_FirstRestoreNav))
 	AssertEqual(0, _LNHT_FirstRestoreProfileCalls)
 	AssertEqual(0, _LNHT_FirstRestoreNavCalls,
 		"ordinary tray rebuilds must never rebind the inactive transaction slot")
-	AssertFalse(_LLM_Menu_ActivateFirstRestoreHotkeys(true,
-		_LNHT_FirstRestoreProfile, _LNHT_FirstRestoreNav))
-	AssertEqual(1, _LNHT_FirstRestoreProfileCalls)
-	AssertEqual(1, _LNHT_FirstRestoreNavCalls)
+	for InvalidProfileResult in [false, "", "1", "-1", 1.0, -1.0,
+		2, Map()] {
+		_LNHT_FirstRestoreProfileResult := InvalidProfileResult
+		AssertFalse(_LLM_Menu_ActivateFirstRestoreHotkeys(true,
+			_LNHT_FirstRestoreProfile, _LNHT_FirstRestoreNav))
+	}
+	AssertEqual(8, _LNHT_FirstRestoreProfileCalls)
+	AssertEqual(0, _LNHT_FirstRestoreNavCalls,
+		"profile refusal must short-circuit navigation admission")
+	_LNHT_FirstRestoreProfileResult := _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	_LNHT_FirstRestoreNavResult := true
+	AssertTrue(_LLM_Menu_ActivateFirstRestoreHotkeys(true,
+		_LNHT_FirstRestoreProfile, _LNHT_FirstRestoreNav),
+		"an explicit degraded profile terminal must still admit navigation")
+	_LNHT_FirstRestoreProfileResult := true
+	_LNHT_FirstRestoreNavResult := false
+	for InvalidNavResult in [false, "", "1", 1.0, 2, Map()] {
+		_LNHT_FirstRestoreNavResult := InvalidNavResult
+		AssertFalse(_LLM_Menu_ActivateFirstRestoreHotkeys(true,
+			_LNHT_FirstRestoreProfile, _LNHT_FirstRestoreNav))
+	}
+	AssertEqual(15, _LNHT_FirstRestoreProfileCalls)
+	AssertEqual(7, _LNHT_FirstRestoreNavCalls)
 	_LNHT_FirstRestoreNavResult := true
 	AssertTrue(_LLM_Menu_ActivateFirstRestoreHotkeys(true,
 		_LNHT_FirstRestoreProfile, _LNHT_FirstRestoreNav))
-	AssertEqual(2, _LNHT_FirstRestoreProfileCalls)
-	AssertEqual(2, _LNHT_FirstRestoreNavCalls,
+	AssertEqual(16, _LNHT_FirstRestoreProfileCalls)
+	AssertEqual(8, _LNHT_FirstRestoreNavCalls,
 		"a retained first-restore build must retry the complete surface")
 }
 
@@ -726,10 +749,13 @@ Test("[llm-nav-transaction] only first restore owns boot-time nav binding",
 _LNHT_ProfilePredicateYieldsToPredictionCore() {
 	global _LLM_Menu, _Stub_LlmTooltipText
 	global _LLM_PROFILE_HOTKEY_PRED, _LLM_Menu_NavActiveSlot
+	global _LLM_Menu_ProfileHotkeyOwner, _LLM_Menu_Loaded
 	global LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
 	global _LNHT_TooltipSlots, _LNHT_AppOutput
 	SavedMenu := _LLM_Menu
 	SavedText := _Stub_LlmTooltipText
+	SavedOwner := _LLM_Menu_ProfileHotkeyOwner
+	SavedLoaded := _LLM_Menu_Loaded
 	HadBuiltinOrder := IsSet(LLM_PROFILE_BUILTIN_ORDER)
 	HadHotkeyLimit := IsSet(LLM_PROFILE_HOTKEY_LIMIT)
 	if HadBuiltinOrder
@@ -743,6 +769,10 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 		_LLM_Menu := _LLMST_Menu()
 		_LLM_Menu["enabled"] := true
 		_LLM_Menu["user_profiles"] := []
+		_LLM_Menu_ProfileHotkeyOwner := Map(
+			"ready", true, "degraded", false,
+			"plan", _LLM_Menu_BuildProfileHotkeyPlan())
+		_LLM_Menu_Loaded := true
 		_LNHT_ShowTooltip(["one"])
 		AssertTrue(LLM_Menu_BindNavHotkeys(_LNHT_Menu("alt", "alt"),
 			_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
@@ -787,6 +817,8 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 	} finally {
 		_LLM_Menu := SavedMenu
 		_Stub_LlmTooltipText := SavedText
+		_LLM_Menu_ProfileHotkeyOwner := SavedOwner
+		_LLM_Menu_Loaded := SavedLoaded
 		LLM_PROFILE_BUILTIN_ORDER := HadBuiltinOrder ? SavedBuiltinOrder : unset
 		LLM_PROFILE_HOTKEY_LIMIT := HadHotkeyLimit ? SavedHotkeyLimit : unset
 	}

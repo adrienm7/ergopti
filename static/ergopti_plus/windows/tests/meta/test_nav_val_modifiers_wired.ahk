@@ -44,8 +44,10 @@ _TNV_Check() {
 	Assert(InStr(ApplyBody, "LLM_Menu_BindNavHotkeys") == 0,
 		"post-durability application must not start a fallible native rebind")
 	InitBody := _DriverFuncBody("LLM_Menu_Init")
+	Assert(InitBody != "",
+		"LLM_Menu_Init must remain reachable to the first-restore guard")
 	Assert(InStr(InitBody,
-		"if !_LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore)") > 0,
+		"_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore)") > 0,
 		"boot must consume the first-restore binding owner and retain failures")
 	Assert(InStr(InitBody, "LLM_Menu_BindNavHotkeys") == 0,
 		"ordinary tray rebuilds must not bypass the first-restore owner")

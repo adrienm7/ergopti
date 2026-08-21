@@ -15,6 +15,7 @@ global _TRC_Builds := []
 global _TRC_ApplyCalls := 0
 global _TRC_FailureMode := ""
 global _TRC_ExpectedError := 0
+global _TRC_TriggerCalls := 0
 
 _TRC_SaveState() {
 	global _TrayMenuStage
@@ -28,7 +29,8 @@ _TRC_SaveState() {
 		Active: _TrayRootActive,
 		Lifecycle: _TrayRootLifecycleEpoch,
 		Authorize: _TrayRootLatestAuthorizeFn,
-		Worker: _TrayRootLatestWorkerFn
+		Worker: _TrayRootLatestWorkerFn,
+		CriticalLevel: A_IsCritical
 	}
 }
 
@@ -38,6 +40,7 @@ _TRC_ResetState() {
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
 	global _TRC_Builds, _TRC_ApplyCalls, _TRC_FailureMode
+	global _TRC_TriggerCalls
 	_TrayMenuStage := false
 	_TrayRootRequestedGeneration := 0
 	_TrayRootPublishedGeneration := 0
@@ -48,6 +51,7 @@ _TRC_ResetState() {
 	_TRC_Builds := []
 	_TRC_ApplyCalls := 0
 	_TRC_FailureMode := ""
+	_TRC_TriggerCalls := 0
 }
 
 _TRC_RestoreState(Saved) {
@@ -62,6 +66,7 @@ _TRC_RestoreState(Saved) {
 	_TrayRootLifecycleEpoch := Saved.Lifecycle
 	_TrayRootLatestAuthorizeFn := Saved.Authorize
 	_TrayRootLatestWorkerFn := Saved.Worker
+	Critical(Saved.CriticalLevel)
 }
 
 _TRC_RefusePublication() {
@@ -161,3 +166,160 @@ _TRC_FailedOwnerHandsOffSuccessor() {
 }
 Test("tray root: failed owner hands off accepted successor (tray-root-failure-handoff)",
 	_TRC_FailedOwnerHandsOffSuccessor)
+
+_TRC_PendingThenSuccessWorker(PublishAuthorizeFn) {
+	global _TRC_Builds
+	_TRC_Builds.Push(_TRC_Builds.Length + 1)
+	if _TRC_Builds.Length < 3
+		throw TrayRootRetryPendingError("injected retained root")
+	return PublishAuthorizeFn.Call()
+}
+
+_TRC_PendingRootRetainsExactGeneration() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TRC_Builds
+	Saved := _TRC_SaveState()
+	try {
+		_TRC_ResetState()
+		FirstPending := false
+		try RebuildTrayMenu(0, _TRC_PendingThenSuccessWorker, false)
+		catch as Err
+			FirstPending := Err is TrayRootRetryPendingError
+		AssertTrue(FirstPending,
+			"the first pending build must surface its typed retained status")
+		AssertEqual(1, _TrayRootRequestedGeneration)
+		AssertEqual(0, _TrayRootPublishedGeneration)
+		AssertFalse(_TrayRootActive)
+
+		SecondPending := false
+		try _TrayRootServiceRetained()
+		catch as Err
+			SecondPending := Err is TrayRootRetryPendingError
+		AssertTrue(SecondPending,
+			"the retained owner must preserve the same typed retry status")
+		AssertEqual(1, _TrayRootRequestedGeneration)
+		AssertEqual(0, _TrayRootPublishedGeneration)
+		AssertFalse(_TrayRootActive)
+
+		AssertTrue(_TrayRootServiceRetained(),
+			"the retained generation must publish when its worker recovers")
+		AssertEqual(3, _TRC_Builds.Length)
+		AssertEqual(1, _TrayRootRequestedGeneration)
+		AssertEqual(1, _TrayRootPublishedGeneration)
+		AssertFalse(_TrayRootActive)
+	} finally {
+		_TRC_RestoreState(Saved)
+	}
+}
+Test("tray root: pending status retains one exact generation (tray-root-retry-status)",
+	_TRC_PendingRootRetainsExactGeneration)
+
+_TRC_FatalWorker(PublishAuthorizeFn) {
+	global _TRC_Builds
+	_TRC_Builds.Push(_TRC_Builds.Length + 1)
+	if _TRC_Builds.Length == 1 {
+		AssertFalse(RebuildTrayMenu(0, _TRC_FatalWorker, false),
+			"a successor accepted during the fatal build must remain queued")
+		throw TrayRootFatalContextError("injected poisoned context")
+	}
+	return PublishAuthorizeFn.Call()
+}
+
+_TRC_FatalRootRetiresExactGeneration() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TRC_Builds
+	Saved := _TRC_SaveState()
+	try {
+		_TRC_ResetState()
+		FatalSurfaced := false
+		try RebuildTrayMenu(0, _TRC_FatalWorker, false)
+		catch as Err
+			FatalSurfaced := Err is TrayRootFatalContextError
+		AssertTrue(FatalSurfaced,
+			"a poisoned HotIf context must terminate its logical thread")
+		AssertEqual(2, _TrayRootRequestedGeneration)
+		AssertEqual(1, _TrayRootPublishedGeneration)
+		AssertFalse(_TrayRootActive)
+		AssertTrue(_TrayRootServiceRetained(),
+			"only the successor generation may remain queued after fatal retirement")
+		AssertEqual(2, _TRC_Builds.Length)
+		AssertEqual(2, _TrayRootPublishedGeneration)
+		AssertFalse(_TrayRootActive)
+	} finally {
+		_TRC_RestoreState(Saved)
+	}
+}
+Test("tray root: fatal context retires the exact generation (tray-root-fatal-status)",
+	_TRC_FatalRootRetiresExactGeneration)
+
+_TRC_OrdinaryFailureThenSuccessWorker(PublishAuthorizeFn) {
+	global _TRC_Builds
+	_TRC_Builds.Push(_TRC_Builds.Length + 1)
+	if _TRC_Builds.Length == 1
+		throw Error("injected ordinary root failure")
+	return PublishAuthorizeFn.Call()
+}
+
+_TRC_OrdinaryFailureRemainsRetryable() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TRC_Builds
+	Saved := _TRC_SaveState()
+	try {
+		_TRC_ResetState()
+		AssertFalse(RebuildTrayMenu(0,
+			_TRC_OrdinaryFailureThenSuccessWorker, false),
+			"an ordinary failure must preserve the existing false result")
+		AssertEqual(1, _TrayRootRequestedGeneration)
+		AssertEqual(0, _TrayRootPublishedGeneration)
+		AssertFalse(_TrayRootActive)
+		AssertTrue(_TrayRootServiceRetained(),
+			"an ordinary retained generation must remain serviceable")
+		AssertEqual(2, _TRC_Builds.Length)
+		AssertEqual(1, _TrayRootPublishedGeneration)
+	} finally {
+		_TRC_RestoreState(Saved)
+	}
+}
+Test("tray root: ordinary failure remains retryable (tray-root-error-control)",
+	_TRC_OrdinaryFailureRemainsRetryable)
+
+_TRC_TypedErrorsHaveNarrowSilentClassification() {
+	AssertTrue(_TrayRootErrorIsSilent(
+		TrayRootRetryPendingError("pending")))
+	AssertTrue(_TrayRootErrorIsSilent(
+		TrayRootFatalContextError("fatal")))
+	AssertFalse(_TrayRootErrorIsSilent(Error("ordinary")),
+		"ordinary reconstruction errors must remain reportable")
+}
+Test("tray root: only typed control errors are silent (tray-root-error-classification)",
+	_TRC_TypedErrorsHaveNarrowSilentClassification)
+
+_TRC_FatalRetainedService() {
+	throw TrayRootFatalContextError("injected poisoned watchdog context")
+}
+
+_TRC_PendingRetainedService() {
+	throw TrayRootRetryPendingError("injected safe retained retry")
+}
+
+_TRC_TriggerRecoverySpy() {
+	global _TRC_TriggerCalls
+	_TRC_TriggerCalls += 1
+	return true
+}
+
+_TRC_WatchdogStopsAfterFatalContext() {
+	global _TRC_TriggerCalls
+	_TRC_TriggerCalls := 0
+	AssertFalse(_TrayRootServiceRetainedWork(
+		_TRC_FatalRetainedService, _TRC_TriggerRecoverySpy),
+		"a fatal root context must terminate the current watchdog pass")
+	AssertEqual(0, _TRC_TriggerCalls,
+		"no later native hotkey recovery may run under a poisoned HotIf context")
+	AssertTrue(_TrayRootServiceRetainedWork(
+		_TRC_PendingRetainedService, _TRC_TriggerRecoverySpy),
+		"a proven-reset pending root may continue to sibling recovery")
+	AssertEqual(1, _TRC_TriggerCalls)
+}
+Test("tray root: watchdog stops after fatal dynamic context (tray-root-fatal-watchdog)",
+	_TRC_WatchdogStopsAfterFatalContext)
