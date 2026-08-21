@@ -449,6 +449,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationWillTerminate(_ notification: Notification) {
 		applicationIsTerminating = true
+		LauncherLog.write("applicationWillTerminate; stopping embedded Hammerspoon")
 		// Forward the quit to the child so Hammerspoon shuts down cleanly.
 		if let proc = hsProcess, proc.isRunning {
 			proc.terminate()
@@ -513,12 +514,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// This writes into ~/Library/Preferences/<bundleId>.plist synchronously,
 	// bypassing the cfprefsd async pipeline that `defaults write` goes through.
 	// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
-	// its own bundle ID (rewritten to kErgoptiBundleId at build time); the plist
+	// its own bundle ID (rewritten to kEmbeddedHammerspoonBundleId at build time);
+	// the outer bundle prohibits duplicate instances, so the GUI child must keep
+	// a distinct Launch Services identity. The plist
 	// is flushed before launchHammerspoon() so HS sees the correct path on the
 	// very first read, even on first-ever launch.
 	// Done at every startup so a user who moved the .app sees the new path.
 	private func seedConfigDirDefault() {
-		let appId = kErgoptiBundleId as CFString
+		let appId = kEmbeddedHammerspoonBundleId as CFString
 		let user  = kCFPreferencesCurrentUser
 		let host  = kCFPreferencesAnyHost
 
@@ -688,11 +691,11 @@ let _earlyInitLua = Bundle.main.bundlePath + "/Contents/Resources/static/ergopti
 CFPreferencesSetValue(
     kHammerspoonConfigKey as CFString,
     _earlyInitLua as CFString,
-    kErgoptiBundleId as CFString,
+    kEmbeddedHammerspoonBundleId as CFString,
     kCFPreferencesCurrentUser,
     kCFPreferencesAnyHost)
 CFPreferencesSynchronize(
-    kErgoptiBundleId as CFString,
+    kEmbeddedHammerspoonBundleId as CFString,
     kCFPreferencesCurrentUser,
     kCFPreferencesAnyHost)
 

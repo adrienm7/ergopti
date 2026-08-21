@@ -27,6 +27,12 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const build = read('tools/build/build_macos_app.sh');
+const constants = read(
+	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift'
+);
+const launcher = read(
+	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift'
+);
 
 const errors = [];
 
@@ -44,6 +50,24 @@ if (!keyMatch) {
 	errors.push(
 		'build_macos_app.sh: LSMultipleInstancesProhibited must be <true/>, found <' + keyMatch[1] + '/>.'
 	);
+}
+
+const outerId = build.match(/^BUNDLE_ID="([^"]+)"$/m)?.[1];
+const embeddedId = build.match(/^HAMMERSPOON_BUNDLE_ID="([^"]+)"$/m)?.[1];
+const swiftEmbeddedId = constants.match(
+	/^let kEmbeddedHammerspoonBundleId = "([^"]+)"$/m
+)?.[1];
+if (!outerId || !embeddedId || outerId === embeddedId) {
+	errors.push('the single-instance outer app and its embedded GUI runtime need distinct bundle IDs.');
+}
+if (!/plutil -replace CFBundleIdentifier -string "\$HAMMERSPOON_BUNDLE_ID" "\$hs_plist"/.test(build)) {
+	errors.push('the embedded Hammerspoon Info.plist must use HAMMERSPOON_BUNDLE_ID.');
+}
+if (!embeddedId || swiftEmbeddedId !== embeddedId) {
+	errors.push('Swift CFPreferences and the build script must share the embedded runtime bundle ID.');
+}
+if ((launcher.match(/kEmbeddedHammerspoonBundleId as CFString/g) || []).length !== 3) {
+	errors.push('all three Hammerspoon preference-domain uses must target the embedded runtime ID.');
 }
 
 if (errors.length > 0) {
