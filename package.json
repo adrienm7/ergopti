@@ -182,6 +182,7 @@
 		"test:llm-stop-sequences-single-source": "node ./tools/test/test-llm-stop-sequences-single-source.cjs",
 		"test:shared-toml-codec-purity": "node ./tools/test/test-shared-toml-codec-purity.cjs",
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",
+		"test:release-packaging-workflow": "node ./tools/test/test-release-packaging-workflow.cjs",
 		"test:linux-launcher-deps": "node ./tools/test/test-linux-launcher-deps.cjs",
 		"test:extensions-path-resolves": "node ./tools/test/test-extensions-path-resolves.cjs",
 		"test:llm-no-prompt-content-in-logs": "node ./tools/test/test-llm-no-prompt-content-in-logs.cjs",
