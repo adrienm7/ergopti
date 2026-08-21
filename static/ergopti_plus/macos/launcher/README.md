@@ -8,8 +8,9 @@ The launcher's job is to:
 
 1. Set the embedded Hammerspoon's `MJConfigFile` so it loads our bundled Lua
    tree instead of `~/.hammerspoon/init.lua`.
-2. Spawn the embedded Hammerspoon as a child `Process`, forwarding lifecycle
-   events so quitting the launcher cleanly terminates Hammerspoon.
+2. Launch embedded Hammerspoon with `NSWorkspace` so AppKit receives a real
+   application context, forwarding lifecycle events so quitting either side
+   shuts down the other cleanly.
 3. Host [Sparkle](https://sparkle-project.org/) so the in-app updater can
    ship new releases via the configured appcast.
 

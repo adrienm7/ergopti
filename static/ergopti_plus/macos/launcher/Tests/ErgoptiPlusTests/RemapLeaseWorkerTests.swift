@@ -2862,7 +2862,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			source.range(of: "env[\"ERGOPTI_LAUNCHER_INODE\"]")?.lowerBound
 		)
 		let childStart = try XCTUnwrap(
-			source.range(of: "try processRunner(proc)")?.lowerBound
+			source.range(of: "applicationLauncher(applicationURL, configuration)")?.lowerBound
 		)
 
 		XCTAssertLessThan(headless, preferences)

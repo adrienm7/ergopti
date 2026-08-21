@@ -10,9 +10,9 @@
 //   1. Point the embedded Hammerspoon at our bundled Lua config dir via the
 //      MJConfigDir user-defaults key, isolated by our rebranded bundle id so
 //      it never collides with a stock Hammerspoon install the user may run.
-//   2. Spawn the embedded Hammerspoon binary as a child process; forward its
+//   2. Launch the embedded Hammerspoon app through Launch Services; forward its
 //      lifecycle so quitting Ergopti cleanly terminates Hammerspoon, and a
-//      Hammerspoon crash terminates Ergopti.
+//      Hammerspoon shutdown terminates Ergopti.
 //   3. Host Sparkle (SPUStandardUpdaterController) so the in-app updater can
 //      ship new releases over the configured appcast.
 //   4. Install a private inherited umask before Hammerspoon or a native helper
@@ -100,6 +100,29 @@ func launcherChildEnvironment(
 		environment[kLoggerDatagramTokenEnvironment] = loggerEndpoint.token
 	}
 	return environment
+}
+
+/// Resolves the application bundle that owns an embedded GUI executable.
+func embeddedApplicationBundleURL(binaryPath: String) -> URL? {
+	let executableURL = URL(fileURLWithPath: binaryPath).standardizedFileURL
+	let appURL = executableURL
+		.deletingLastPathComponent()
+		.deletingLastPathComponent()
+		.deletingLastPathComponent()
+	guard appURL.pathExtension == "app" else { return nil }
+	return appURL
+}
+
+/// Creates the Launch Services request used for the embedded GUI runtime.
+func embeddedApplicationOpenConfiguration(
+	environment: [String: String]
+) -> NSWorkspace.OpenConfiguration {
+	let configuration = NSWorkspace.OpenConfiguration()
+	configuration.activates = false
+	configuration.addsToRecentItems = false
+	configuration.createsNewApplicationInstance = true
+	configuration.environment = environment
+	return configuration
 }
 
 /// Captures the exact on-disk identity of the running launcher executable.
@@ -334,11 +357,16 @@ enum LauncherLog {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
-	private var hsProcess: Process?
+	private var hsApplication: NSRunningApplication?
+	private var hsTerminationObserver: NSObjectProtocol?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updaterController: SPUStandardUpdaterController?
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
-	private let processRunner: (Process) throws -> Void
+	private let applicationLauncher: (
+		URL,
+		NSWorkspace.OpenConfiguration,
+		@escaping (NSRunningApplication?, Error?) -> Void
+	) -> Void
 	private let fatalReporter: ((String) -> Void)?
 	private let applicationTerminator: (Any?) -> Void
 	private let guardianRegistrar: (String) -> RemapGuardianRegistrationStatus
@@ -352,7 +380,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	/// Creates the production delegate or an injected launcher boundary for tests.
 	/// - Parameters:
 	///   - launcherIdentityReader: Captures the running launcher's exact file identity.
-	///   - processRunner: Performs the sole embedded-Hammerspoon child start.
+	///   - applicationLauncher: Starts embedded Hammerspoon through Launch Services.
 	///   - fatalReporter: Test-only observer replacing the modal fatal UI.
 	///   - applicationTerminator: Ends AppKit after a clean child shutdown.
 	///   - guardianRegistrar: Resolves the independent service off the AppKit thread.
@@ -360,7 +388,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
-		processRunner: @escaping (Process) throws -> Void = { try $0.run() },
+		applicationLauncher: @escaping (
+			URL,
+			NSWorkspace.OpenConfiguration,
+			@escaping (NSRunningApplication?, Error?) -> Void
+		) -> Void = { url, configuration, completion in
+			NSWorkspace.shared.openApplication(
+				at: url,
+				configuration: configuration,
+				completionHandler: completion
+			)
+		},
 		fatalReporter: ((String) -> Void)? = nil,
 		applicationTerminator: @escaping (Any?) -> Void = { NSApp.terminate($0) },
 		guardianRegistrar: @escaping (String) -> RemapGuardianRegistrationStatus =
@@ -370,7 +408,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
-		self.processRunner = processRunner
+		self.applicationLauncher = applicationLauncher
 		self.fatalReporter = fatalReporter
 		self.applicationTerminator = applicationTerminator
 		self.guardianRegistrar = guardianRegistrar
@@ -459,9 +497,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		applicationIsTerminating = true
 		LauncherLog.write("applicationWillTerminate; stopping embedded Hammerspoon")
 		// Forward the quit to the child so Hammerspoon shuts down cleanly.
-		if let proc = hsProcess, proc.isRunning {
-			proc.terminate()
+		if let application = hsApplication, !application.isTerminated {
+			application.terminate()
 		}
+		removeHammerspoonTerminationObserver()
 		// The DispatchSource cancel handler is asynchronous. Explicitly relinquish
 		// the logger socket while AppKit is still alive instead of assuming process
 		// teardown will eventually run the worker's deinitializer.
@@ -553,9 +592,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		CFPreferencesSynchronize(appId, user, host)
 	}
 
-	// Launch the embedded Hammerspoon as a child Process. We use Process
-	// rather than NSWorkspace.open so terminating the launcher also terminates
-	// Hammerspoon — keeping the two visually fused for the user.
+	// Launch the embedded Hammerspoon through Launch Services. A nested AppKit
+	// bundle cannot be bootstrapped reliably by executing its inner Mach-O: on
+	// headless and fresh sessions it may receive a clean termination request
+	// before setup.lua loads. NSWorkspace supplies the application launch context
+	// while the returned NSRunningApplication preserves the fused lifecycle.
 	func launchHammerspoon(
 		at binaryPath: String,
 		remapGuardianStatus: RemapGuardianRegistrationStatus = .ready
@@ -572,9 +613,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		loggerWorker = activeLoggerWorker
-
-		let proc = Process()
-		proc.executableURL = URL(fileURLWithPath: binaryPath)
 
 		// Inherit our environment and add a marker the bundled Lua config can
 		// optionally read to know it is running under the Ergopti launcher.
@@ -595,23 +633,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		env.removeValue(forKey: "ERGOPTI_LAUNCHER_INODE")
 		env["ERGOPTI_LAUNCHER_DEVICE"] = launcherIdentity.device
 		env["ERGOPTI_LAUNCHER_INODE"] = launcherIdentity.inode
-		proc.environment = env
-
-		proc.terminationHandler = { [weak self] terminated in
-			let code = terminated.terminationStatus
-			NSLog("[Ergopti] embedded Hammerspoon exited with code \(code)")
-			LauncherLog.write("embedded Hammerspoon exited with code \(code)")
-			DispatchQueue.main.async { self?.handleEmbeddedHammerspoonExit(status: code) }
-		}
-
-		do {
-			try processRunner(proc)
-			hsProcess = proc
-			LauncherLog.write("embedded Hammerspoon launched at \(binaryPath)")
-		} catch {
+		guard let applicationURL = embeddedApplicationBundleURL(binaryPath: binaryPath) else {
 			loggerWorker?.stop()
 			loggerWorker = nil
-			fail("Failed to launch embedded Hammerspoon: \(error.localizedDescription)")
+			fail("Embedded Hammerspoon application bundle path is invalid.")
+			return
+		}
+
+		let configuration = embeddedApplicationOpenConfiguration(environment: env)
+		applicationLauncher(applicationURL, configuration) { [weak self] application, error in
+			let finishLaunch = {
+				guard let self else { return }
+				guard let application else {
+					self.loggerWorker?.stop()
+					self.loggerWorker = nil
+					self.fail(
+						"Failed to launch embedded Hammerspoon: "
+							+ (error?.localizedDescription ?? "Launch Services returned no application.")
+					)
+					return
+				}
+				self.trackEmbeddedHammerspoon(application, applicationURL: applicationURL)
+			}
+			if Thread.isMainThread { finishLaunch() }
+			else { DispatchQueue.main.async(execute: finishLaunch) }
+		}
+	}
+
+	private func trackEmbeddedHammerspoon(
+		_ application: NSRunningApplication,
+		applicationURL: URL
+	) {
+		hsApplication = application
+		LauncherLog.write("embedded Hammerspoon launched at \(applicationURL.path)")
+		removeHammerspoonTerminationObserver()
+		hsTerminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+			forName: NSWorkspace.didTerminateApplicationNotification,
+			object: nil,
+			queue: .main
+		) { [weak self] notification in
+			guard let terminated = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+				as? NSRunningApplication,
+				terminated.processIdentifier == application.processIdentifier
+			else { return }
+			LauncherLog.write("embedded Hammerspoon terminated")
+			self?.handleEmbeddedHammerspoonExit(status: 0)
+		}
+		if application.isTerminated {
+			LauncherLog.write("embedded Hammerspoon terminated during launch")
+			handleEmbeddedHammerspoonExit(status: 0)
+		}
+	}
+
+	private func removeHammerspoonTerminationObserver() {
+		if let observer = hsTerminationObserver {
+			NSWorkspace.shared.notificationCenter.removeObserver(observer)
+			hsTerminationObserver = nil
 		}
 	}
 

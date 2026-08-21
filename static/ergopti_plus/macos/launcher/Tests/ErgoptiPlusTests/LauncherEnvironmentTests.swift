@@ -20,6 +20,7 @@
 //    receives only the endpoint that was successfully bound before its launch.
 // 7. Private inheritance: the launcher installs umask 0077 before child spawn.
 // 8. Launch Services isolation: parent GUI identity cannot leak into Hammerspoon.
+// 9. AppKit launch context: the embedded GUI starts through its .app bundle.
 //
 // NOTE: This target requires the macOS Swift toolchain. Verify with
 // `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
@@ -41,6 +42,9 @@ private final class TestLoggerDatagramServer: LoggerDatagramServing {
 
 	func stop() { stopCount += 1 }
 }
+
+private let testEmbeddedHammerspoonBinary =
+	"/tmp/Hammerspoon.app/Contents/MacOS/Hammerspoon"
 
 /// Verifies the pure child-environment boundary used before launching embedded
 /// Hammerspoon.
@@ -123,17 +127,35 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertEqual(environment["UNRELATED"], "preserved")
 	}
 
+	/// Executing the nested Mach-O directly does not establish an AppKit launch
+	/// context; Launch Services must receive the owning .app and exact environment.
+	func testEmbeddedGUIUsesApplicationBundleLaunchConfiguration() throws {
+		let bundleURL = try XCTUnwrap(embeddedApplicationBundleURL(
+			binaryPath: testEmbeddedHammerspoonBinary
+		))
+		XCTAssertEqual(bundleURL.path, "/tmp/Hammerspoon.app")
+		XCTAssertNil(embeddedApplicationBundleURL(binaryPath: "/tmp/Hammerspoon"))
+
+		let configuration = embeddedApplicationOpenConfiguration(
+			environment: ["ERGOPTI_CONFIG_DIR": "/tmp/config"]
+		)
+		XCTAssertFalse(configuration.activates)
+		XCTAssertFalse(configuration.addsToRecentItems)
+		XCTAssertTrue(configuration.createsNewApplicationInstance)
+		XCTAssertEqual(configuration.environment["ERGOPTI_CONFIG_DIR"], "/tmp/config")
+	}
+
 	/// Proves an unavailable launcher file identity cannot start a partial app.
 	func testMissingLauncherFileIdentityFailsBeforeChildStart() {
 		var childStartCount = 0
 		var fatalMessages: [String] = []
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in nil },
-			processRunner: { _ in childStartCount += 1 },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
 			fatalReporter: { fatalMessages.append($0) }
 		)
 
-		delegate.launchHammerspoon(at: "/tmp/embedded-hammerspoon")
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 
 		XCTAssertEqual(childStartCount, 0)
 		XCTAssertEqual(
@@ -145,15 +167,19 @@ final class LauncherEnvironmentTests: XCTestCase {
 	/// The Lua child receives the exact fail-closed reason for localized recovery UI.
 	func testGuardianRegistrationStatusIsExportedToHammerspoon() {
 		var childEnvironment: [String: String] = [:]
+		var launchedApplicationURL: URL?
 		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
-			processRunner: { process in childEnvironment = process.environment ?? [:] },
+			applicationLauncher: { applicationURL, configuration, _ in
+				launchedApplicationURL = applicationURL
+				childEnvironment = configuration.environment
+			},
 			loggerWorkerFactory: { loggerWorker }
 		)
 
 		delegate.launchHammerspoon(
-			at: "/tmp/embedded-hammerspoon",
+			at: testEmbeddedHammerspoonBinary,
 			remapGuardianStatus: .requiresApproval
 		)
 
@@ -161,6 +187,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 			childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"],
 			"requires_approval"
 		)
+		XCTAssertEqual(launchedApplicationURL?.path, "/tmp/Hammerspoon.app")
 	}
 
 	/// paths.toml must survive app replacement and remain writable in /Applications.
@@ -174,10 +201,12 @@ final class LauncherEnvironmentTests: XCTestCase {
 		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
-			processRunner: { process in childEnvironment = process.environment ?? [:] },
+			applicationLauncher: { _, configuration, _ in
+				childEnvironment = configuration.environment
+			},
 			loggerWorkerFactory: { loggerWorker }
 		)
-		delegate.launchHammerspoon(at: "/tmp/embedded-hammerspoon")
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 
 		let exported = childEnvironment["ERGOPTI_PATHS_FILE"]
 		XCTAssertEqual(exported, managedPathsFile())
@@ -196,10 +225,10 @@ final class LauncherEnvironmentTests: XCTestCase {
 		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
-			processRunner: { process in
+			applicationLauncher: { _, configuration, _ in
 				stateLock.lock()
 				childStartCount += 1
-				childEnvironment = process.environment ?? [:]
+				childEnvironment = configuration.environment
 				stateLock.unlock()
 				childStarted.fulfill()
 			},
@@ -214,7 +243,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 
 		withExtendedLifetime(delegate) {
 			delegate.startManagedHammerspoon(
-				at: "/tmp/embedded-hammerspoon",
+				at: testEmbeddedHammerspoonBinary,
 				launcherPath: "/tmp/ErgoptiPlus"
 			)
 			XCTAssertEqual(entered.wait(timeout: .now() + 1), .success)
@@ -240,9 +269,9 @@ final class LauncherEnvironmentTests: XCTestCase {
 		var childEnvironment: [String: String] = [:]
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
-			processRunner: { process in
+			applicationLauncher: { _, configuration, _ in
 				XCTAssertEqual(factoryCallCount, 1)
-				childEnvironment = process.environment ?? [:]
+				childEnvironment = configuration.environment
 			},
 			loggerWorkerFactory: {
 				factoryCallCount += 1
@@ -250,7 +279,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 			}
 		)
 
-		delegate.launchHammerspoon(at: "/tmp/embedded-hammerspoon")
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 
 		XCTAssertEqual(childEnvironment["ERGOPTI_LOG_PORT"], "42424")
 		XCTAssertEqual(childEnvironment["ERGOPTI_LOG_TOKEN"], "fresh-token")
@@ -262,12 +291,12 @@ final class LauncherEnvironmentTests: XCTestCase {
 		var fatalMessages: [String] = []
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
-			processRunner: { _ in childStartCount += 1 },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
 			fatalReporter: { fatalMessages.append($0) },
 			loggerWorkerFactory: { nil }
 		)
 
-		delegate.launchHammerspoon(at: "/tmp/embedded-hammerspoon")
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 
 		XCTAssertEqual(childStartCount, 0)
 		XCTAssertEqual(
@@ -281,10 +310,10 @@ final class LauncherEnvironmentTests: XCTestCase {
 		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
-			processRunner: { _ in },
+			applicationLauncher: { _, _, _ in },
 			loggerWorkerFactory: { loggerWorker }
 		)
-		delegate.launchHammerspoon(at: "/tmp/embedded-hammerspoon")
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 
 		delegate.applicationWillTerminate(Notification(name: Notification.Name(
 			"test-termination"
@@ -297,16 +326,21 @@ final class LauncherEnvironmentTests: XCTestCase {
 	func testChildLaunchFailureStopsThePreboundNativeLogger() {
 		let loggerWorker = TestLoggerDatagramServer()
 		var fatalMessages: [String] = []
+		let failureReported = expectation(description: "Launch Services failure reported")
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
-			processRunner: { _ in
-				throw NSError(domain: "test-launch", code: 17)
+			applicationLauncher: { _, _, completion in
+				completion(nil, NSError(domain: "test-launch", code: 17))
 			},
-			fatalReporter: { fatalMessages.append($0) },
+			fatalReporter: {
+				fatalMessages.append($0)
+				failureReported.fulfill()
+			},
 			loggerWorkerFactory: { loggerWorker }
 		)
 
-		delegate.launchHammerspoon(at: "/tmp/embedded-hammerspoon")
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		wait(for: [failureReported], timeout: 1)
 
 		XCTAssertEqual(loggerWorker.stopCount, 1)
 		XCTAssertEqual(fatalMessages.count, 1)
