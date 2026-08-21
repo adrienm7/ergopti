@@ -108,8 +108,306 @@ _EngineInit_CopiesDisabledAppsArray() {
 	LLM_Engine_Init(Map("disabled_apps", apps))
 	AssertEqual(2, _LLM_Engine["disabled_apps"].Length)
 	AssertEqual("slack.exe", _LLM_Engine["disabled_apps"][1])
+	apps[1] := "mutated.exe"
+	AssertEqual("slack.exe", _LLM_Engine["disabled_apps"][1],
+		"engine admission must detach the caller-owned disabled-app array")
 }
 Test("LLM_Engine_Init: copies disabled_apps array from opts", _EngineInit_CopiesDisabledAppsArray)
+
+_EngineInit_DetachesNestedOptions() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		StopSequences := ["END"]
+		Profile := Map(
+			"id", "custom",
+			"label", "Custom",
+			"stop_sequences", StopSequences)
+		Profiles := [Profile]
+		ApiEntry := { Id: "api-1", Name: "Production" }
+		ApiEntries := [ApiEntry]
+		Overrides := Map("notepad", "custom")
+		LLM_Engine_Init(Map(
+			"user_profiles", Profiles,
+			"api_entries", ApiEntries,
+			"app_profile_overrides", Overrides))
+
+		StopSequences[1] := "MUTATED"
+		Profile["label"] := "Mutated"
+		Profiles.Push(Map("id", "late"))
+		ApiEntry.Name := "Mutated"
+		ApiEntries.Push(Map("Id", "api-2"))
+		Overrides["notepad"] := "basic"
+
+		AssertEqual(1, _LLM_Engine["user_profiles"].Length,
+			"engine admission must detach the caller-owned profile array")
+		AssertEqual("Custom", _LLM_Engine["user_profiles"][1]["label"],
+			"engine admission must detach each profile record")
+		AssertEqual("END", _LLM_Engine["user_profiles"][1]["stop_sequences"][1],
+			"engine admission must detach nested profile arrays")
+		AssertEqual(1, _LLM_Engine["api_entries"].Length,
+			"engine admission must detach the caller-owned API-entry array")
+		AssertEqual("Production", _LLM_Engine["api_entries"][1]["Name"],
+			"engine admission must detach each API-entry record")
+		AssertEqual("custom", _LLM_Engine["app_profile_overrides"]["notepad"],
+			"engine admission must detach the caller-owned override map")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("LLM_Engine_Init: composite options are deeply detached at admission "
+	. "(llm-persisted-option-type-boundary-detached)",
+	_EngineInit_DetachesNestedOptions)
+
+_EngineInit_RejectsNestedDisabledApps() {
+	global _LLM_Engine
+	SavedEnabled := _LLM_Engine["enabled"]
+	SavedModel := _LLM_Engine["model"]
+	SavedApps := _LLM_Engine["disabled_apps"]
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["model"] := "safe-model"
+	_LLM_Engine["disabled_apps"] := ["safe-app"]
+	try {
+		Thrown := false
+		Failure := ""
+		try LLM_Engine_Init(Map(
+			"model", "must-not-publish",
+			"disabled_apps", [["notepad"]]))
+		catch as Err {
+			Thrown := true
+			Assert(Err is TypeError,
+				"nested disabled_apps must fail with the admission TypeError")
+			Failure := Err.Message
+		}
+		AssertTrue(Thrown,
+			"a nonvalidated caller must fail fast on a nested disabled_apps value")
+		AssertContains(Failure, "disabled_apps",
+			"the admission error must identify the rejected option")
+		AssertFalse(_LLM_Engine["enabled"],
+			"failed validation must not enable the engine")
+		AssertEqual("safe-model", _LLM_Engine["model"],
+			"failed validation must not publish scalar options before the bad array")
+		AssertEqual("safe-app", _LLM_Engine["disabled_apps"][1],
+			"failed validation must not publish partial engine state")
+	} finally {
+		_LLM_Engine["enabled"] := SavedEnabled
+		_LLM_Engine["model"] := SavedModel
+		_LLM_Engine["disabled_apps"] := SavedApps
+	}
+}
+Test("LLM_Engine_Init: nested disabled_apps fails before hot-path publication "
+	. "(llm-persisted-option-type-boundary)",
+	_EngineInit_RejectsNestedDisabledApps)
+
+_EngineInit_AssertCompositeScalarRejected(Key, BadValue, Baseline, Slug) {
+	global _LLM_Engine
+	SavedEnabled := _LLM_Engine["enabled"]
+	SavedLanguage := _LLM_Engine["language"]
+	SavedTarget := _LLM_Engine[Key]
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["language"] := "safe-language"
+	_LLM_Engine[Key] := Baseline
+	try {
+		Thrown := false
+		Failure := ""
+		try LLM_Engine_Init(Map(
+			"language", "must-not-publish",
+			Key, BadValue))
+		catch as Err {
+			Thrown := true
+			Assert(Err is TypeError,
+				Slug . " must fail with the engine admission TypeError")
+			Failure := Err.Message
+		}
+		AssertTrue(Thrown, Slug . " must fail fast at engine admission")
+		AssertContains(Failure, Key,
+			Slug . " admission error must identify the rejected option")
+		AssertFalse(_LLM_Engine["enabled"],
+			Slug . " must not enable the engine before validation completes")
+		AssertEqual("safe-language", _LLM_Engine["language"],
+			Slug . " must not partially publish an earlier valid option")
+		AssertEqual(Baseline, _LLM_Engine[Key],
+			Slug . " must retain its seeded value")
+	} finally {
+		_LLM_Engine["enabled"] := SavedEnabled
+		_LLM_Engine["language"] := SavedLanguage
+		_LLM_Engine[Key] := SavedTarget
+	}
+}
+
+_EngineInit_RejectsCompositeString() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"model", [["bad"]], "safe-model", "composite string")
+}
+Test("LLM_Engine_Init: composite string is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-string)",
+	_EngineInit_RejectsCompositeString)
+
+_EngineInit_RejectsCompositeInteger() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"n_predictions", [[9]], 3, "composite integer")
+}
+Test("LLM_Engine_Init: composite integer is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-integer)",
+	_EngineInit_RejectsCompositeInteger)
+
+_EngineInit_RejectsCompositeBoolean() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"show_info_bar", [[true]], true, "composite boolean")
+}
+Test("LLM_Engine_Init: composite boolean is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-boolean)",
+	_EngineInit_RejectsCompositeBoolean)
+
+_EngineInit_RejectsCompositeTemperature() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"temperature", [[0.25]], "0.10", "composite temperature")
+}
+Test("LLM_Engine_Init: composite temperature is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-temperature)",
+	_EngineInit_RejectsCompositeTemperature)
+
+_EngineInit_AssertCompositeContainerRejected(Key, BadValue, Baseline, Slug) {
+	global _LLM_Engine
+	SavedEnabled := _LLM_Engine["enabled"]
+	SavedLanguage := _LLM_Engine["language"]
+	SavedTarget := _LLM_Engine[Key]
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["language"] := "safe-language"
+	_LLM_Engine[Key] := Baseline
+	try {
+		Thrown := false
+		Failure := ""
+		try LLM_Engine_Init(Map(
+			"language", "must-not-publish",
+			Key, BadValue))
+		catch as Err {
+			Thrown := true
+			Assert(Err is TypeError,
+				Slug . " must fail with the engine admission TypeError")
+			Failure := Err.Message
+		}
+		AssertTrue(Thrown, Slug . " must fail fast at engine admission")
+		AssertContains(Failure, Key,
+			Slug . " admission error must identify the rejected option")
+		AssertFalse(_LLM_Engine["enabled"],
+			Slug . " must not enable the engine before validation completes")
+		AssertEqual("safe-language", _LLM_Engine["language"],
+			Slug . " must not partially publish an earlier valid option")
+		AssertEqual(Baseline, _LLM_Engine[Key],
+			Slug . " must retain the exact seeded container")
+	} finally {
+		_LLM_Engine["enabled"] := SavedEnabled
+		_LLM_Engine["language"] := SavedLanguage
+		_LLM_Engine[Key] := SavedTarget
+	}
+}
+
+_EngineInit_RejectsCompositeUserProfile() {
+	_EngineInit_AssertCompositeContainerRejected(
+		"user_profiles", [["bad"]], [], "composite user profile")
+}
+Test("LLM_Engine_Init: composite user profile is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-user-profiles)",
+	_EngineInit_RejectsCompositeUserProfile)
+
+_EngineInit_RejectsCompositeApiEntry() {
+	_EngineInit_AssertCompositeContainerRejected(
+		"api_entries", [["bad"]], [], "composite API entry")
+}
+Test("LLM_Engine_Init: composite API entry is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-api-entries)",
+	_EngineInit_RejectsCompositeApiEntry)
+
+_EngineInit_RejectsCompositeAppOverride() {
+	_EngineInit_AssertCompositeContainerRejected(
+		"app_profile_overrides", Map("notepad", []), Map(),
+		"composite app-profile override")
+}
+Test("LLM_Engine_Init: composite app override is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-app-overrides)",
+	_EngineInit_RejectsCompositeAppOverride)
+
+_EngineInit_AcceptsManifestNumericRepresentations() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	try {
+		_LLM_Engine := SavedEngine.Clone()
+		LLM_Engine_Init(Map("n_predictions", 3.0, "temperature", 0.25))
+		AssertEqual(3, _LLM_Engine["n_predictions"],
+			"an integral manifest number must normalize to the engine integer")
+		AssertEqual("0.25", _LLM_Engine["temperature"],
+			"a numeric manifest temperature must normalize to the engine string")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("LLM_Engine_Init: valid manifest numeric representations remain accepted "
+	. "(llm-persisted-option-type-boundary-engine-valid-number)",
+	_EngineInit_AcceptsManifestNumericRepresentations)
+
+_EngineTypedRestoreFeedsValidatedAppFilter() {
+	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Engine
+	SavedMenu := _LLM_Menu
+	SavedLoaded := _LLM_Menu_Loaded
+	SavedEngine := _LLM_Engine
+	try {
+		_LLM_Menu := _LLM_Menu.Clone()
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Menu["disabled_apps"] := []
+		_LLM_Menu["n_predictions"] := 3
+		_LLM_Menu["show_info_bar"] := true
+		_LLM_Menu["app_profile_overrides"] := Map("safe", "basic")
+		_LLM_Menu_Loaded := false
+		AssertTrue(_LLM_Menu_RestoreSavedOptsOnce(Map(
+			"disabled_apps", [" Notepad.EXE "],
+			"n_predictions", [[99]],
+			"show_info_bar", [[false]],
+			"app_profile_overrides", Map("notepad", []))))
+		AssertEqual(3, _LLM_Menu["n_predictions"],
+			"invalid numeric restore must retain the menu default")
+		AssertTrue(_LLM_Menu["show_info_bar"],
+			"invalid boolean restore must retain the menu default")
+		AssertEqual("notepad.exe", _LLM_Menu["disabled_apps"][1],
+			"valid app exclusions must be normalized during restore")
+		AssertEqual("basic", _LLM_Menu["app_profile_overrides"]["safe"],
+			"invalid override values must retain the validated menu default")
+
+		LLM_Engine_Init(Map("disabled_apps", _LLM_Menu["disabled_apps"]))
+		FocusCalls := 0
+		FocusFn := (*) => (FocusCalls += 1, Map("appId", "Notepad.EXE"))
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn),
+			"the production privacy decision must suppress the restored app")
+		AssertEqual(1, FocusCalls,
+			"a nonempty validated exclusion list must resolve focus exactly once")
+		AllowedCalls := 0
+		AllowedFocusFn := (*) => (AllowedCalls += 1, Map("appId", "wordpad.exe"))
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocusFn),
+			"a non-excluded focused app must remain eligible for predictions")
+		AssertEqual(1, AllowedCalls,
+			"a nonempty exclusion list must resolve an allowed focus exactly once")
+		_LLM_Engine["disabled_apps"] := []
+		EmptyCalls := 0
+		EmptyFocusFn := (*) => (EmptyCalls += 1, Map("appId", "notepad.exe"))
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(EmptyFocusFn),
+			"an empty exclusion list must not suppress predictions")
+		AssertEqual(0, EmptyCalls,
+			"an empty exclusion list must avoid the focus lookup entirely")
+		_LLM_Engine["disabled_apps"] := Map("corrupt", true)
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn),
+			"corrupt internal exclusion state must fail closed")
+		AssertEqual(1, FocusCalls,
+			"invalid internal state must be rejected before any focus query")
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Loaded := SavedLoaded
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("LLM options: typed restore reaches the production app filter "
+	. "(llm-persisted-option-type-boundary-restore-engine-filter)",
+	_EngineTypedRestoreFeedsValidatedAppFilter)
 
 
 

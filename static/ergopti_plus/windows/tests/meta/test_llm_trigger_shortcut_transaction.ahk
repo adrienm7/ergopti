@@ -154,11 +154,14 @@ _LLMTG_BootFailureIsVisibleAndStrictlyConsumed() {
 	ApplyBody := _DriverFuncBody("LLM_Menu_ApplyTriggerShortcut")
 	NotifyBody := _DriverFuncBody("_LLM_Menu_NotifyTriggerApplyFailure")
 	InitBody := _DriverFuncBody("LLM_Menu_Init")
+	RestoreBody := _DriverFuncBody("_LLM_Menu_RestoreSavedOptsOnce")
 	Assert(ApplyBody != "",
 		"LLM_Menu_ApplyTriggerShortcut must remain source-visible")
 	Assert(NotifyBody != "",
 		"_LLM_Menu_NotifyTriggerApplyFailure must remain source-visible")
 	Assert(InitBody != "", "LLM_Menu_Init must remain source-visible")
+	Assert(RestoreBody != "",
+		"_LLM_Menu_RestoreSavedOptsOnce must remain source-visible")
 	AssertContains(ApplyBody, "_LLM_Menu_NotifyTriggerApplyFailure(",
 		"boot replay refusal must have a user-visible terminal")
 	AssertContains(NotifyBody, "NotifierSend(",
@@ -171,12 +174,15 @@ _LLMTG_BootFailureIsVisibleAndStrictlyConsumed() {
 		"boot must reject malformed truthy activation statuses")
 	FirstRestorePos := InStr(InitBody, "if FirstRestore {")
 	ReplayPos := InStr(InitBody, "LLM_Menu_ApplyTriggerShortcut(")
-	OverridesGatePos := InStr(InitBody,
-		'if FirstRestore && saved_opts.Has("app_profile_overrides")')
 	Assert(FirstRestorePos > 0 && ReplayPos > FirstRestorePos,
 		"a root tray rebuild must not replay the stale boot trigger snapshot")
-	Assert(OverridesGatePos > 0,
-		"sibling app-profile state must carry the same one-shot restore condition")
+	AssertContains(RestoreBody, "if _LLM_Menu_Loaded",
+		"the restore owner must reject every post-boot replay")
+	AssertContains(RestoreBody, 'if saved_opts.Has("app_profile_overrides")',
+		"sibling app-profile state must remain inside the one-shot restore owner")
+	AssertContains(RestoreBody,
+		'LLM_Option_TryNormalize("app_profile_overrides"',
+		"the one-shot override restore must retain its typed admission boundary")
 }
 Test("[llm-trigger-tx-meta] boot failure is visible and strictly consumed",
 	_LLMTG_BootFailureIsVisibleAndStrictlyConsumed)

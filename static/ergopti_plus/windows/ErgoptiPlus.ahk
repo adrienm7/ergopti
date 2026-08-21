@@ -464,6 +464,7 @@ if KLPF_IsWorkerInvocation()
 LLM_Defaults_Load()
 #Include _generated/llm_profiles_data.ahk
 #Include modules/llm/profiles.ahk
+#Include modules/llm/option_validation.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk

@@ -95,6 +95,50 @@ _LLM_Engine_AppNameForAcceptSource(Source) {
 	return AppName
 }
 
+; Pure consumer for the production privacy gate. Engine admission guarantees a
+; flat string array; the defensive type check keeps the hot path fail-closed if
+; a future internal writer bypasses that boundary.
+_LLM_Engine_AppIsExcluded(AppId) {
+	global _LLM_Engine
+	if !(AppId is String) || AppId == ""
+		return false
+	Apps := _LLM_Engine.Get("disabled_apps", [])
+	if !(Apps is Array)
+		return true
+	Needle := RegExReplace(StrLower(AppId), "\.exe$", "")
+	for App in Apps {
+		if !(App is String)
+			return true
+		if (RegExReplace(StrLower(App), "\.exe$", "") == Needle)
+			return true
+	}
+	return false
+}
+
+; Owns the complete disabled-app privacy decision so the production caller and
+; tests cannot disagree about invalid state, focus lookup, or name matching.
+_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
+	global _LLM_Engine
+	Apps := _LLM_Engine.Get("disabled_apps", [])
+	if !(Apps is Array) {
+		try LoggerError("LLM",
+			"Prediction suppressed because disabled-app state is not a validated array.")
+		return true
+	}
+	if (Apps.Length == 0)
+		return false
+	Focused := Map("appId", "")
+	try Focused := HasMethod(FocusFn, "Call") ? FocusFn.Call() : WIGetFocused()
+	AppId := (Focused is Map) ? Focused.Get("appId", "") : ""
+	if !(AppId is String) || AppId == ""
+		return false
+	if !_LLM_Engine_AppIsExcluded(AppId)
+		return false
+	try LoggerInfo("LLM", "Prediction suppressed - '{1}' is on the disabled-apps list.",
+		RegExReplace(StrLower(AppId), "\.exe$", ""))
+	return true
+}
+
 /**
  * Fires the actual LLM call after the debounce period expires.
  * Skips the call if context is identical to the last result's context.
@@ -179,20 +223,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	; and shown in the menu but was previously never enforced. Resolve the focused process
 	; only when the list is non-empty, so no OS call runs on the per-fire path when the user
 	; has not excluded any app (llm-app-filter-enforced).
-	if (_LLM_Engine.Has("disabled_apps") && (_LLM_Engine["disabled_apps"] is Array)
-			&& _LLM_Engine["disabled_apps"].Length > 0) {
-		_focused_app := ""
-		try _focused_app := StrLower(WIGetFocused()["appId"])
-		if (_focused_app != "") {
-			_focused_app := RegExReplace(_focused_app, "\.exe$", "")
-			for _excluded_app in _LLM_Engine["disabled_apps"] {
-				if (StrLower(RegExReplace(_excluded_app, "\.exe$", "")) == _focused_app) {
-					try LoggerInfo("LLM", "Prediction suppressed - '{1}' is on the disabled-apps list.", _focused_app)
-					return
-				}
-			}
-		}
-	}
+	if _LLM_Engine_ShouldSuppressForDisabledApps()
+		return
 
 	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
 	if (backend_now = "ollama" and IsSet(LLM_OllamaAllowInference) and !LLM_OllamaAllowInference()) {
