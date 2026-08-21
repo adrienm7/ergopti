@@ -84,6 +84,9 @@ function M.new(ctx)
 	-- A failed compensation must remain owned across user retries. A later model
 	-- action is forbidden from publishing over an identity that has not settled.
 	local model_recovery_debt = nil
+	-- Profile selection crosses a different set of boundaries. Its compensation
+	-- remains independently retryable so model actions cannot bury profile drift.
+	local profile_recovery_debt = nil
 
 	local function call_model_boundary(label, callback, ...)
 		if type(callback) ~= "function" then
@@ -532,17 +535,131 @@ function M.new(ctx)
 		return restore_model_transition(model_recovery_debt)
 	end
 
+	--- Snapshots the independently observable state and runtime profile identities.
+	--- @return table|nil snapshot Exact rollback identities, or nil when unavailable.
+	local function snapshot_profile_transition()
+		if type(llm_mod.get_active_profile) ~= "function" then
+			Logger.error(LOG, "Cannot snapshot the active runtime profile for rollback.")
+			return nil
+		end
+		local ok, active_profile = Logger.callback(LOG,
+			"Previous runtime profile resolution", llm_mod.get_active_profile)
+		if not ok or type(active_profile) ~= "table"
+			or type(active_profile.id) ~= "string" then
+			Logger.error(LOG, "Cannot resolve the active runtime profile for rollback.")
+			return nil
+		end
+		return {
+			state_profile = state.llm_active_profile,
+			runtime_profile = active_profile.id,
+		}
+	end
+
+	--- Restores every profile boundary reached by a rejected transition.
+	--- @param debt table Mutable per-boundary compensation ledger.
+	--- @return boolean settled True only when every required compensation commits.
+	local function restore_profile_transition(debt)
+		local snapshot = debt.snapshot
+		state.llm_active_profile = snapshot.state_profile
+
+		local failures = {}
+		if debt.runtime then
+			if call_model_boundary("Profile-switch runtime rollback",
+				llm_mod.set_active_profile, snapshot.runtime_profile) then
+				debt.runtime = false
+			else
+				failures[#failures + 1] = "runtime rollback"
+			end
+		end
+		if debt.persist then
+			local ok, saved = Logger.callback(LOG,
+				"Profile-switch preference rollback", save_prefs)
+			if ok and saved == true then
+				debt.persist = false
+			else
+				failures[#failures + 1] = "preference rollback"
+			end
+		end
+		if debt.menu then
+			if call_model_boundary("Profile-switch menu rollback", update_menu) then
+				debt.menu = false
+			else
+				failures[#failures + 1] = "menu rollback"
+			end
+		end
+
+		if #failures > 0 then
+			profile_recovery_debt = debt
+			Logger.error(LOG,
+				"Profile-switch rollback remains unsettled at: %s.",
+				table.concat(failures, ", "))
+			return false
+		end
+		profile_recovery_debt = nil
+		return true
+	end
+
+	--- Retries retained profile compensation before any identity-changing action.
+	--- @return boolean settled True when no profile recovery remains.
+	local function settle_profile_recovery_debt()
+		if not profile_recovery_debt then return true end
+		Logger.warn(LOG, "Retrying retained profile-switch rollback before a new action.")
+		return restore_profile_transition(profile_recovery_debt)
+	end
+
+	--- Settles recovery ledgers in ownership order before a new menu action.
+	--- @return boolean settled True when both model and profile identities are stable.
+	local function settle_recovery_debts()
+		if not settle_model_recovery_debt() then return false end
+		return settle_profile_recovery_debt()
+	end
+
 	--- Activates a profile and triggers a power-mismatch check.
 	--- A direct profile action cannot publish over an unsettled model rollback.
 	--- @param profile_id string Profile to activate.
+	--- @return boolean True only when runtime, persistence, and menu all commit.
 	local function set_llm_profile(profile_id)
 		if type(profile_id) ~= "string" then return false end
-		if not settle_model_recovery_debt() then return false end
+		if not settle_recovery_debts() then return false end
+		local snapshot = snapshot_profile_transition()
+		if not snapshot then return false end
+
+		local debt = {
+			snapshot = snapshot,
+			runtime = false,
+			persist = false,
+			menu = false,
+		}
+		local function reject_transition(boundary)
+			Logger.error(LOG,
+				"Profile-switch transition failed at '%s'; restoring the previous profile.",
+				tostring(boundary))
+			profile_recovery_debt = debt
+			restore_profile_transition(debt)
+			return false
+		end
+
+		debt.runtime = true
+		if not call_model_boundary("Profile-switch runtime sync",
+			llm_mod.set_active_profile, profile_id) then
+			return reject_transition("runtime sync")
+		end
 		state.llm_active_profile = profile_id
-		llm_mod.set_active_profile(profile_id)
-		check_profile_power_mismatch(profile_id, state.llm_model)
-		if save_prefs() ~= true then return false end
-		update_menu()
+		debt.persist = true
+		local save_ok, saved = Logger.callback(LOG,
+			"Profile-switch preference save", save_prefs)
+		if not save_ok or saved ~= true then
+			return reject_transition("preference save")
+		end
+		debt.menu = true
+		if not call_model_boundary("Profile-switch menu refresh", update_menu) then
+			return reject_transition("menu refresh")
+		end
+
+		profile_recovery_debt = nil
+		Logger.info(LOG, "Profile successfully switched to %s.", profile_id)
+		Logger.callback(LOG, "Profile power mismatch check",
+			check_profile_power_mismatch, profile_id, state.llm_model)
 		return true
 	end
 
@@ -557,7 +674,7 @@ function M.new(ctx)
 	--- @param new_model string Display name of the model to activate.
 	local function switch_model(new_model)
 		Logger.debug(LOG, string.format("Executing switch_model('%s')…", new_model or "nil"))
-		if not settle_model_recovery_debt() then return false end
+		if not settle_recovery_debts() then return false end
 
 		-- Lock predictions during the MLX server restart — weights take 60–90 s to reload
 		local mlx_was_enabled = state.llm_backend == "mlx" and state.llm_enabled
@@ -587,6 +704,7 @@ function M.new(ctx)
 		return guarded_check_requirements(new_model, function()
 			local callback_ok, callback_result = Logger.callback(LOG,
 				"Model-switch success callback", function()
+				if not settle_recovery_debts() then return false end
 				local snapshot = snapshot_model_transition()
 				if not snapshot then return false end
 				if not keymap or type(keymap.set_llm_model) ~= "function"
@@ -690,7 +808,7 @@ function M.new(ctx)
 	--- requirements callback before clearing the prediction engine model.
 	--- @return boolean True only when runtime and persistence both commit.
 	local function disable_model()
-		if not settle_model_recovery_debt() then return false end
+		if not settle_recovery_debts() then return false end
 		req_token = req_token + 1
 		local snapshot = snapshot_model_transition()
 		if not snapshot then return false end
