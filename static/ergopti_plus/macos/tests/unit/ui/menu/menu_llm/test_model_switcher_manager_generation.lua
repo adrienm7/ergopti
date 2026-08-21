@@ -320,14 +320,16 @@ helpers.describe("model manager generation fences", function()
 		local modules = {
 			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.text_utils",
 			"modules.llm", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.task_lifecycle", "infra.dialog_util", "ui.download_window",
+			"adapters.shell_runner", "adapters.task_lifecycle", "adapters.timer_scheduler",
+			"infra.dialog_util", "ui.download_window",
 			"ui.menu.menu_llm.profile_label", "ui.menu.menu_llm.model_switcher",
 			"ui.menu.menu_llm.models_manager_ollama",
 		}
 		local list_tasks = {}
 		local load_callbacks = {}
+		local readiness_tasks = {}
 		local hs_fixture = {
-			execute = function() return '{"version":"fixture"}', true end,
+			execute = function() error("Ollama readiness must not use hs.execute") end,
 			http = {asyncPost = function(_, _, _, callback)
 				load_callbacks[#load_callbacks + 1] = callback
 			end},
@@ -349,6 +351,19 @@ helpers.describe("model manager generation fences", function()
 			}
 			package.loaded["ui.download_window"] = {
 				show = function() end, update = function() end, complete = function() end,
+			}
+			package.loaded["adapters.shell_runner"] = {
+				spawn = function(executable, args, on_done)
+					local task = {executable = executable, args = args, on_done = on_done}
+					function task.start() return true end
+					function task.terminate() return true, "pending" end
+					readiness_tasks[#readiness_tasks + 1] = task
+					return task
+				end,
+			}
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function() error("healthy readiness must not schedule a retry") end,
+				cancel = function() return true end,
 			}
 			package.loaded["adapters.task_lifecycle"] = {
 				native = function(label, _, on_done)
@@ -415,7 +430,12 @@ helpers.describe("model manager generation fences", function()
 			})
 
 			switcher.switch_model("A")
+			helpers.assert_eq(#readiness_tasks, 1)
+			readiness_tasks[1].on_done(0, '{"version":"fixture"}', "")
+			helpers.assert_eq(#list_tasks, 1)
 			switcher.switch_model("B")
+			helpers.assert_eq(#readiness_tasks, 2)
+			readiness_tasks[2].on_done(0, '{"version":"fixture"}', "")
 			helpers.assert_eq(#list_tasks, 2)
 			list_tasks[2].on_done(0, "NAME ID\nB fixture\n")
 			helpers.assert_eq(#load_callbacks, 1)

@@ -142,7 +142,9 @@ helpers.describe("bundled Ollama executable contract", function()
 
 	helpers.it("uses the exported path for both menu server and CLI tasks", function()
 		local restore_environment = override_environment()
-		local function hs_overrides(server_ready, commands, task_bins)
+		local previous_shell_runner = package.loaded["adapters.shell_runner"]
+		local previous_timer_scheduler = package.loaded["adapters.timer_scheduler"]
+		local function hs_overrides(task_bins)
 			return {
 				fs = { attributes = function(path)
 					if path == FIXTURE_BIN then
@@ -150,13 +152,7 @@ helpers.describe("bundled Ollama executable contract", function()
 					end
 					return nil
 				end },
-				execute = function(command)
-					commands[#commands + 1] = command
-					if command:find("curl", 1, true) then
-						return server_ready and '{"version":"fixture"}' or "", true
-					end
-					return "", true
-				end,
+				execute = function() error("menu Ollama work must not use hs.execute") end,
 				task = { new = function(bin, _done, _stream, _args)
 					task_bins[#task_bins + 1] = bin
 					local task = {}
@@ -166,23 +162,47 @@ helpers.describe("bundled Ollama executable contract", function()
 				timer = { doAfter = function() return { stop = function() end } end },
 			}
 		end
+		local function install_async_ports(server_ready, commands)
+			package.loaded["adapters.shell_runner"] = {
+				spawn = function(program, args, on_done)
+					local command = {program = program, args = args, on_done = on_done}
+					commands[#commands + 1] = command
+					return {
+						start = function()
+							if program == "/usr/bin/curl" then
+								on_done(server_ready and 0 or 28,
+									server_ready and '{"version":"fixture"}' or "", "")
+							end
+							return true
+						end,
+						terminate = function() return true, "pending" end,
+					}
+				end,
+			}
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function() error("this fixture must not advance past daemon launch") end,
+				cancel = function() return true end,
+			}
+		end
 
 		local commands, task_bins = {}, {}
 		package.loaded["modules.llm.ollama_binary"] = nil
 		package.loaded["adapters.task_lifecycle"] = nil
+		install_async_ports(false, commands)
 		local Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama",
-			hs_overrides(false, commands, task_bins))
+			hs_overrides(task_bins))
 		local manager = Manager.new({}, {}, function() return 0 end)
 		manager.check_requirements("test-model", function() end, function() end)
 		local daemon_command
 		for _, command in ipairs(commands) do
-			if command:find("nohup", 1, true) then daemon_command = command; break end
+			if command.program == "/bin/bash" then daemon_command = command.args[2]; break end
 		end
 
 		package.loaded["modules.llm.ollama_binary"] = nil
 		package.loaded["adapters.task_lifecycle"] = nil
+		install_async_ports(true, commands)
 		Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama",
-			hs_overrides(true, commands, task_bins))
+			hs_overrides(task_bins))
 		manager = Manager.new({}, {}, function() return 0 end)
 		manager.check_requirements("test-model", function() end, function() end)
 
@@ -195,6 +215,8 @@ helpers.describe("bundled Ollama executable contract", function()
 		end)
 
 		restore_environment()
+		package.loaded["adapters.shell_runner"] = previous_shell_runner
+		package.loaded["adapters.timer_scheduler"] = previous_timer_scheduler
 		if not ok then error(err) end
 	end)
 

@@ -69,7 +69,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [ ] `HS-022` — global Disable All / factory reset transaction
 - [x] `HS-023` — this fix commit (`fix(macos): publish VS Code extension transactionally`); `--only "HS-023"` passes 9/9
 - [ ] `HS-024` — MLX download exactly-once terminal contract
-- [ ] `HS-025` — asynchronous Ollama readiness probes
+- [x] `HS-025` — asynchronous Ollama readiness probes
 - [ ] `HS-026` — LLM settings transaction
 - [x] `HS-027` — this fix commit; model and `No Model` share one recoverable transition, with 26 focused refusal/retry cases
 - [x] `HS-028` — this fix commit; direct profile selection is transactional with retryable compensation debt
@@ -543,6 +543,8 @@ A faithful server harness produced `start_result=nil`, `native_port=0`, `getPort
 
 **Regression test.** Add `tests/unit/ui/menu/menu_llm/test_ollama_readiness_async.lua`. Install a tripwire on `hs.execute`, capture the real readiness task/timers, and assert menu and timer callbacks return before any completion. Deliver refusal, stale completion, retry, and success out of order; assert one exact owner and one terminal callback.
 
+**Implemented and independently replayed.** Readiness curl/restart work now runs through retained `ShellRunner` owners, retries use committed `TimerScheduler` handles, and one manager-local single-flight transaction lets a current waiter adopt an in-flight daemon restart without launching a duplicate. Every waiter has an independent freshness predicate and exactly-once terminal. The implementation pass also found a same-boundary delete sibling: an inline `ollama rm` completion could publish success before `start()` subsequently refused. Delete now buffers completion until exact start commitment and rejects late/duplicate completion. Loading the `HEAD` production module into the new behavioral suite produced `0/9`; the completed implementation passes `12/12`. Direct neighboring replays pass `1/1` nonblocking-policy, `10/10` manager-generation, `4/4` bundled-binary, `4/4` daemon-log-rollover, and `2/2` no-usleep tests. The configured worker timeout remains five seconds, but it no longer blocks the Hammerspoon Lua runloop; no production latency percentile is claimed.
+
 ### `HS-026` — LLM settings publish state and `hs.settings` before runtime and persistence commit
 
 - **Severity:** Medium
@@ -731,7 +733,7 @@ The available `D:/tmp/ErgoptiPlus_2026-08-20.log` and `D:/tmp/ErgoptiPlus_boot.l
 | -------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Terminal replacement | `D × 20 ms` configured sleep plus native posts inside eventtap                                            | Correctness finding `HS-003`; `140 ms` for bundled seven-delete `xgboost` is source-derived, not profiled |
 | Keylogger taps       | O(events/chunks) snapshot conversion + JSON encode + unbuffered write; native app lookup on some branches | Structural finding `HS-004`; latency unmeasured                                                           |
-| Ollama readiness     | synchronous `hs.execute(curl --max-time 5)` per attempt in `models_manager_ollama.lua:172-203`            | Correctness/performance finding `HS-025`; five-second ceiling is code-derived, not profiled                |
+| Ollama readiness     | retained async curl worker with a configured five-second per-attempt bound and `0.5 s` owned retry cadence | `HS-025` fixed; dispatch is bounded in-memory Lua work, runtime worker latency remains unprofiled           |
 | MLX adoption         | synchronous `curl --max-time 1` in `models_manager_mlx_server.lua:189-191`                                | **Performance hypothesis**, not promoted without target profile                                           |
 | Backend/menu helpers | several synchronous `os.execute`/`hs.execute` paths on the Hammerspoon runloop                            | Inventory item; measure on target before prioritizing                                                     |
 
