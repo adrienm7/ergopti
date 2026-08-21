@@ -23,6 +23,8 @@
 ---    rollback is impossible and an inert process is not a safe recovery state.
 --- 6. Logged Async Boundary: every lease/drain completion and injected terminal
 ---    action is protected so Hammerspoon cannot hide a callback exception.
+--- 7. Awaitable Teardown: a retained native completion pauses final drain and
+---    authorizes exactly one stateful retry with the latest reload/exit intent.
 --- ==============================================================================
 
 local M = {}
@@ -182,23 +184,153 @@ local function begin_drain(transaction)
 end
 
 
---- Executes the primary local teardown at most once for this exact transaction.
---- A post-fence failure cannot safely republish the driver, but it must still
---- give every local owner one cleanup attempt before the fatal backstop.
+local resume_after_teardown_boundary
+
+--- Commits the terminal result of the exact local-teardown owner.
 --- @param transaction table Active terminal transaction.
---- @return boolean settled
+--- @param completed boolean Whether every local owner settled.
+--- @param detail any Exact result or failure detail.
+local function settle_teardown(transaction, completed, detail)
+	transaction.teardown_pending = false
+	transaction.teardown_settled = true
+	transaction.teardown_completed = completed == true
+	transaction.teardown_result = detail
+end
+
+--- Advances to drain or the fatal backstop after teardown reaches a terminal.
+--- @param transaction table Active terminal transaction.
+--- @return boolean continued
+local function continue_after_teardown(transaction)
+	if transaction.teardown_failure_detail ~= nil then
+		local failure = tostring(transaction.teardown_failure_detail)
+		if transaction.teardown_completed ~= true then
+			failure = failure .. "; local teardown also failed: "
+				.. tostring(transaction.teardown_result)
+		end
+		return fail_after_teardown(transaction, failure)
+	end
+	if transaction.teardown_completed ~= true then
+		return fail_after_teardown(transaction,
+			"local teardown failed: " .. tostring(transaction.teardown_result))
+	end
+	return begin_drain(transaction)
+end
+
+--- Runs one local-teardown attempt. A dependency may return `true, "pending"`
+--- after retaining the supplied callback; only that exact callback authorizes
+--- the coordinator to retry the stateful teardown with the latest exit/reload kind.
+--- @param transaction table Active terminal transaction.
+--- @return boolean|nil completed Nil while an exact callback is pending.
 --- @return any detail
+--- @return boolean pending
+local function run_teardown_attempt(transaction)
+	while true do
+		local installing = true
+		local callback_claimed = false
+		local synchronous_settled = nil
+		local synchronous_detail = nil
+
+		local function on_teardown_ready(settled, detail)
+			if callback_claimed then
+				if not transaction.settled and not transaction.drain_started then
+					Logger.warn(LOG, "Duplicate local teardown readiness callback ignored.")
+				end
+				return false
+			end
+			callback_claimed = true
+			if installing then
+				synchronous_settled = settled == true
+				synchronous_detail = detail
+				return synchronous_settled
+			end
+			local resume_ok, resume_result = xpcall(function()
+				return resume_after_teardown_boundary(transaction, settled == true, detail)
+			end, debug.traceback)
+			if resume_ok then return resume_result end
+			if _transaction == transaction and not transaction.settled then
+				settle_teardown(transaction, false, resume_result)
+				Logger.error(LOG, "Local teardown readiness callback raised: %s.",
+					tostring(resume_result))
+				return fail_after_teardown(transaction,
+					"local teardown readiness callback raised: " .. tostring(resume_result))
+			end
+			return false
+		end
+
+		local results = table.pack(xpcall(function()
+			return _deps.teardown(transaction.kind, on_teardown_ready)
+		end, debug.traceback))
+		installing = false
+
+		-- An exact synchronous callback outranks a later return or throw from the
+		-- acquisition call, just like native task completion outranks its signal result
+		if callback_claimed then
+			if synchronous_settled ~= true then
+				return false, synchronous_detail, false
+			end
+			-- The callback settled the pending boundary, not the whole stateful pass;
+			-- retry immediately so the dependency can commit its remaining owners
+		else
+			local call_ok = results[1] == true
+			local result = results[2]
+			local state = results[3]
+			if not call_ok then return false, result, false end
+			if result == true and state == "pending" then
+				transaction.teardown_pending = true
+				transaction.teardown_result = "pending"
+				return nil, "pending", true
+			end
+			return result == true, result, false
+		end
+	end
+end
+
+--- Resumes the coordinator only from the callback retained by a pending teardown.
+--- @param transaction table Active terminal transaction.
+--- @param settled boolean Whether the pending boundary settled exactly.
+--- @param detail any Boundary detail.
+--- @return boolean continued
+resume_after_teardown_boundary = function(transaction, settled, detail)
+	if _transaction ~= transaction or transaction.settled then return false end
+	if transaction.teardown_pending ~= true then
+		if not transaction.drain_started then
+			Logger.warn(LOG, "Late local teardown readiness callback ignored.")
+		end
+		return false
+	end
+	transaction.teardown_pending = false
+	if settled ~= true then
+		settle_teardown(transaction, false, detail)
+	else
+		local completed, result, pending = run_teardown_attempt(transaction)
+		if pending then return true end
+		settle_teardown(transaction, completed == true, result)
+	end
+
+	return continue_after_teardown(transaction)
+end
+
+--- Executes the primary local teardown once, except for retries authorized by
+--- its retained readiness callback. Ordinary callers can observe a pending pass
+--- but cannot invoke the dependency a second time themselves.
+--- @param transaction table Active terminal transaction.
+--- @return boolean|nil settled Nil while an exact callback is pending.
+--- @return any detail
+--- @return boolean pending
 local function teardown_once(transaction)
+	if transaction.teardown_settled == true then
+		return transaction.teardown_completed == true,
+			transaction.teardown_result, false
+	end
+	if transaction.teardown_pending == true then return nil, "pending", true end
 	if transaction.teardown_attempted == true then
-		return transaction.teardown_completed == true, transaction.teardown_result
+		return false, "teardown attempt lost its terminal state", false
 	end
 	transaction.teardown_attempted = true
-	local teardown_ok, teardown_result = xpcall(function()
-		return _deps.teardown(transaction.kind)
-	end, debug.traceback)
-	transaction.teardown_result = teardown_result
-	transaction.teardown_completed = teardown_ok and teardown_result == true
-	return transaction.teardown_completed, teardown_result
+	local completed, result, pending = run_teardown_attempt(transaction)
+	if pending then return nil, result, true end
+	settle_teardown(transaction, completed == true, result)
+	return transaction.teardown_completed, transaction.teardown_result, false
 end
 
 
@@ -207,12 +339,10 @@ end
 --- @param detail any Causal failure detail.
 --- @return boolean Always false if fatal_exit unexpectedly returns.
 local function teardown_then_fail_after_fence(transaction, detail)
-	local teardown_completed, teardown_detail = teardown_once(transaction)
-	local failure = tostring(detail)
-	if not teardown_completed then
-		failure = failure .. "; local teardown also failed: " .. tostring(teardown_detail)
-	end
-	return fail_after_teardown(transaction, failure)
+	transaction.teardown_failure_detail = tostring(detail)
+	local _teardown_completed, _teardown_detail, pending = teardown_once(transaction)
+	if pending then return true end
+	return continue_after_teardown(transaction)
 end
 
 
@@ -227,7 +357,8 @@ local function begin_terminal_sequence(transaction)
 		transaction.reload_marked = true
 	end
 
-	local teardown_completed, teardown_result = teardown_once(transaction)
+	local teardown_completed, teardown_result, pending = teardown_once(transaction)
+	if pending then return true end
 	if not teardown_completed then
 		return fail_after_teardown(transaction,
 			"local teardown failed: " .. tostring(teardown_result))
@@ -267,7 +398,12 @@ local function begin_input_drain(transaction)
 		end
 		return transaction.completion_ok == true
 	end
-	if callback_fired then return transaction.completion_ok == true end
+	if callback_fired then
+		-- A synchronous input-drain callback may have committed an asynchronous
+		-- local teardown without completing the terminal action yet. That active
+		-- transaction is accepted; only an already-settled failure is a refusal.
+		return not transaction.settled or transaction.completion_ok == true
+	end
 	return true
 end
 

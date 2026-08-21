@@ -548,18 +548,28 @@ function M.new(deps)
 		return false
 	end
 	
-	function obj.stop_mlx_server_if_needed()
-		if deps.active_tasks and deps.active_tasks["mlx_server"] then
-			pcall(function() deps.active_tasks["mlx_server"]:terminate() end)
-			deps.active_tasks["mlx_server"] = nil
-			-- Make the readiness reset INTRINSIC to "MLX stops serving", not incidental
-			-- to the process dying: clear the server identity and force a fresh readiness
-			-- verdict so a stale-true _is_ready / _server_target can never describe a
-			-- killed server (the latent MLX twin of the Ollama stale-ready bug, F-L15).
-			obj._server_target = nil
-			pcall(function() require("modules.llm.api_mlx").reset_endpoints() end)
-			Logger.info(LOG, "MLX server stopped safely.")
+	function obj.stop_mlx_server_if_needed(on_stopped, opts)
+		if type(mlx.stop_server_if_needed) ~= "function" then
+			Logger.error(LOG, "MLX server stop refused: lifecycle primitive is unavailable.")
+			return false
 		end
+		local ok, accepted = xpcall(function()
+			return mlx.stop_server_if_needed(function()
+				Logger.info(LOG, "MLX server stopped safely.")
+				if type(on_stopped) == "function" then
+					local callback_ok, callback_result = Logger.callback(
+						LOG, "MLX public stop settlement", on_stopped)
+					return callback_ok == true and callback_result ~= false
+				end
+				return true
+			end, opts)
+		end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "MLX server stop raised before signal acceptance: %s.",
+				tostring(accepted))
+			return false
+		end
+		return accepted == true
 	end
 
 	return obj

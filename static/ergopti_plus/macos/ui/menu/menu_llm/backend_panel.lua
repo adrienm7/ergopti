@@ -23,9 +23,10 @@ local LOG = "backend_panel"
 
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
--- Single source of truth for the MLX server port — used to free the right socket
--- when switching away from MLX. Never hardcode the port here.
-local ApiMlx              = require("modules.llm.api_mlx")
+
+-- Survives menu rebuilds so a deferred settlement callback from an older row
+-- cannot publish a backend after a newer selection has taken ownership.
+local _backend_transition_generation = 0
 
 --- Returns whether the current machine has Apple Silicon.
 --- Lazily evaluated once so the shell call does not repeat on every menu open.
@@ -97,6 +98,52 @@ function M.build(ctx)
 		return true
 	end
 
+	local function publish_backend(target_backend)
+		local previous_backend = state.llm_backend
+		state.llm_backend = target_backend
+		if save_prefs() ~= true then
+			state.llm_backend = previous_backend
+			return false
+		end
+		if not invalidate_llm_health() then return false end
+		llm_mod.set_backend(target_backend)
+		return true
+	end
+
+	--- Keeps MLX published until its exact owner proves listener absence, then
+	--- commits the selected backend. The initial unchanged write is a fail-closed writer
+	--- preflight: a rejected preference transaction must not stop a live server.
+	local function leave_mlx(target_backend, on_committed)
+		if save_prefs() ~= true then return false end
+		if type(models_mgr.stop_mlx_server_if_needed) ~= "function" then
+			Logger.error(LOG, "Cannot switch MLX to %s: exact stop primitive is unavailable.",
+				tostring(target_backend))
+			return false
+		end
+		_backend_transition_generation = _backend_transition_generation + 1
+		local generation = _backend_transition_generation
+		local ok_stop, accepted = xpcall(function()
+			return models_mgr.stop_mlx_server_if_needed(function()
+				if generation ~= _backend_transition_generation then return false end
+				if state.llm_backend ~= "mlx" then return false end
+				Logger.debug(LOG, "MLX server cleanup proved before %s publication.",
+					tostring(target_backend))
+				if not publish_backend(target_backend) then
+					Logger.error(LOG, "Cannot publish backend %s after MLX settlement.",
+						tostring(target_backend))
+					return false
+				end
+				return on_committed()
+			end, { kind = "backend" })
+		end, debug.traceback)
+		if not ok_stop or accepted ~= true then
+			Logger.error(LOG, "Cannot switch MLX to %s: stop signal was refused (%s).",
+				tostring(target_backend), tostring(ok_stop and accepted or accepted))
+			return false
+		end
+		return true
+	end
+
 	-- Title reflects current active backend
 	local backend_title_str = i18n.get("menu.llm.backend_title")
 	if state.llm_backend == "mlx" then     backend_title_str = backend_title_str .. "MLX 🚀"
@@ -118,10 +165,7 @@ function M.build(ctx)
 		action       = not paused and function()
 			if state.llm_backend ~= "mlx" then
 				Logger.info(LOG, "Activating MLX backend…")
-				state.llm_backend = "mlx"
-				if save_prefs() ~= true then return false end
-				invalidate_llm_health()
-				llm_mod.set_backend("mlx")
+				if not publish_backend("mlx") then return false end
 				-- On-demand deps check: bootstrap the MLX venv if the user just
 				-- switched and the engine is not ready — silent on the fast path.
 				check_backend_deps("mlx")
@@ -131,7 +175,7 @@ function M.build(ctx)
 				end
 
 				-- Kill any stray ollama to free RAM
-				os.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
+				pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
 
 				local target_model = get_display_model_name(state.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_mlx or "")
 				if target_model and target_model ~= "" then
@@ -165,36 +209,33 @@ function M.build(ctx)
 		action       = not paused and function()
 			if state.llm_backend ~= "ollama" then
 				Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
-				state.llm_backend = "ollama"
-				if save_prefs() ~= true then return false end
-				invalidate_llm_health()
-				llm_mod.set_backend("ollama")
-				-- On-demand deps check — silent on the fast path.
-				check_backend_deps("ollama")
-				if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
-				-- Hard kill just in case — target the configured MLX port (via the
-				-- api_mlx getter, the single source of truth) so switching backends
-				-- frees the right socket.
-				os.execute("pids=$(lsof -tiTCP:" .. ApiMlx.get_port() .. " -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null")
-				Logger.debug(LOG, "MLX server stopped.")
-
-				if keymap and type(keymap.set_llm_backend_name) == "function" then
-					pcall(keymap.set_llm_backend_name, "Ollama 🦙")
-				end
-
-				local target_model = get_display_model_name(state.llm_model_ollama or llm_mod.DEFAULT_STATE.llm_model_ollama or "")
-				if target_model and target_model ~= "" then
-					switch_model(target_model)
-				else
-					state.llm_model = ""
-					if keymap and type(keymap.set_llm_model) == "function" then
-						pcall(keymap.set_llm_model, "")
+				local function finish_ollama_switch()
+					-- On-demand deps check — silent on the fast path.
+					check_backend_deps("ollama")
+					if keymap and type(keymap.set_llm_backend_name) == "function" then
+						pcall(keymap.set_llm_backend_name, "Ollama 🦙")
 					end
-					if keymap and type(keymap.set_llm_display_model_name) == "function" then
-						pcall(keymap.set_llm_display_model_name, "")
+
+					local target_model = get_display_model_name(state.llm_model_ollama or llm_mod.DEFAULT_STATE.llm_model_ollama or "")
+					if target_model and target_model ~= "" then
+						switch_model(target_model)
+					else
+						state.llm_model = ""
+						if keymap and type(keymap.set_llm_model) == "function" then
+							pcall(keymap.set_llm_model, "")
+						end
+						if keymap and type(keymap.set_llm_display_model_name) == "function" then
+							pcall(keymap.set_llm_display_model_name, "")
+						end
+						update_menu()
 					end
-					update_menu()
+					return true
 				end
+				if state.llm_backend == "mlx" then
+					return leave_mlx("ollama", finish_ollama_switch)
+				end
+				if not publish_backend("ollama") then return false end
+				return finish_ollama_switch()
 			end
 		end or nil
 	})
@@ -214,21 +255,24 @@ function M.build(ctx)
 		action       = not paused and function()
 			if state.llm_backend ~= "api" then
 				Logger.info(LOG, "Activating remote API backend…")
-				state.llm_backend = "api"
-				if save_prefs() ~= true then return false end
-				invalidate_llm_health()
-				llm_mod.set_backend("api")
-				-- Kill any local server that would burn RAM / GPU for nothing
-				if models_mgr.stop_mlx_server_if_needed then pcall(models_mgr.stop_mlx_server_if_needed) end
-				os.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
-				if keymap and type(keymap.set_llm_backend_name) == "function" then
-					pcall(keymap.set_llm_backend_name, "API 🌐")
+				local function finish_api_switch()
+					-- Kill any local Ollama server that would burn RAM for nothing.
+					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+					if keymap and type(keymap.set_llm_backend_name) == "function" then
+						pcall(keymap.set_llm_backend_name, "API 🌐")
+					end
+					-- Reload persisted entries (no-op when already in memory), then ping
+					-- the active one so the health indicator reflects reality.
+					if type(llm_mod.load_api_entries) == "function" then pcall(llm_mod.load_api_entries) end
+					WarmupCtrl.warmup("api_backend_switch")
+					update_menu()
+					return true
 				end
-				-- Reload persisted entries (no-op when already in memory), then ping
-				-- the active one so the health indicator reflects reality.
-				if type(llm_mod.load_api_entries) == "function" then pcall(llm_mod.load_api_entries) end
-				WarmupCtrl.warmup("api_backend_switch")
-				update_menu()
+				if state.llm_backend == "mlx" then
+					return leave_mlx("api", finish_api_switch)
+				end
+				if not publish_backend("api") then return false end
+				return finish_api_switch()
 			end
 		end or nil
 	})

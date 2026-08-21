@@ -42,6 +42,16 @@ local function with_fixture(callback)
 		local noop = function() end
 		local updates = 0
 		local probes = {}
+		local stop_mode = "sync"
+		local pending_stop
+		local last_stop
+		local pending_stop_cancel
+		local last_stop_cancel
+		local pending_stop_kind
+		local stop_kinds = {}
+		local current_port = 3460
+		local port_commits = 0
+		local mlx_restarts = {}
 		local state = {
 			llm_enabled = true,
 			llm_backend = "mlx",
@@ -99,8 +109,27 @@ local function with_fixture(callback)
 			get_actual_model_name = function(name) return name end,
 			get_model_info = function() return {} end,
 			get_model_ram = function() return 0 end,
-			check_requirements = noop,
-			stop_mlx_server_if_needed = noop,
+			check_requirements = function(model, _, _, opts)
+				mlx_restarts[#mlx_restarts + 1] = { model = model, opts = opts }
+				return true
+			end,
+			stop_mlx_server_if_needed = function(on_stopped, opts)
+				local kind = type(opts) == "table" and opts.kind or "stop"
+				local on_cancel = type(opts) == "table" and opts.on_cancel or nil
+				stop_kinds[#stop_kinds + 1] = kind
+				if stop_mode == "throw" then error("fixture stop failure") end
+				if stop_mode == "false" then return false end
+				if stop_mode == "deferred" then
+					pending_stop = on_stopped
+					last_stop = on_stopped
+					pending_stop_cancel = on_cancel
+					last_stop_cancel = on_cancel
+					pending_stop_kind = kind
+					return true
+				end
+				if type(on_stopped) == "function" then on_stopped() end
+				return true
+			end,
 		}
 		package.loaded["ui.menu.menu_llm.models_manager"] = {
 			new = function() return models end,
@@ -115,6 +144,18 @@ local function with_fixture(callback)
 				return {
 					build_nav_modifier_menu = function() return {} end,
 					build_val_modifier_menu = function() return {} end,
+					set_mlx_port = function(on_applied)
+						local committed = false
+						local function commit_port()
+							if committed then return true end
+							committed = true
+							current_port = 4567
+							port_commits = port_commits + 1
+							return true
+						end
+						return on_applied(4567, commit_port)
+					end,
+					reset_mlx_port = noop,
 				}
 			end,
 		}
@@ -148,7 +189,7 @@ local function with_fixture(callback)
 		}
 		package.loaded["modules.llm.api_mlx"] = {
 			get_base_url = function() return "http://127.0.0.1:3460" end,
-			get_port = function() return 3460 end,
+			get_port = function() return current_port end,
 			get_default_port = function() return 3460 end,
 		}
 		package.loaded["ui.menu.menu_llm.startup_controller"] = {
@@ -216,6 +257,34 @@ local function with_fixture(callback)
 				state = state,
 				probes = probes,
 				updates = function() return updates end,
+				set_stop_mode = function(mode) stop_mode = mode end,
+				settle_stop = function()
+					local callback = pending_stop
+					pending_stop = nil
+					pending_stop_cancel = nil
+					pending_stop_kind = nil
+					if type(callback) == "function" then return callback() end
+				end,
+				refuse_stop = function(reason)
+					local callback = pending_stop_cancel
+					pending_stop = nil
+					pending_stop_cancel = nil
+					pending_stop_kind = nil
+					if type(callback) == "function" then return callback(reason) end
+				end,
+				repeat_stop = function()
+					if type(last_stop) == "function" then return last_stop() end
+				end,
+				repeat_stop_cancel = function(reason)
+					if type(last_stop_cancel) == "function" then return last_stop_cancel(reason) end
+				end,
+				pending_stop = function() return pending_stop end,
+				pending_stop_cancel = function() return pending_stop_cancel end,
+				pending_stop_kind = function() return pending_stop_kind end,
+				stop_kinds = stop_kinds,
+				port = function() return current_port end,
+				port_commits = function() return port_commits end,
+				mlx_restarts = mlx_restarts,
 			})
 		end, debug.traceback)
 
@@ -283,6 +352,112 @@ helpers.describe("LLM health probe ownership", function()
 			local refreshed = fixture.handler.build_item()
 			helpers.assert_true(refreshed.submenu[2].title:find("🟡 ", 1, true) == 1,
 				"a committed current MLX response must render the reachable state")
+		end)
+	end)
+
+	helpers.it("reports shutdown settled only from the exact stop callback (HS-008)", function()
+		for _, mode in ipairs({ "false", "throw" }) do
+			with_fixture(function(fixture)
+				fixture.handler.build_item()
+				fixture.set_stop_mode(mode)
+				local settlements = 0
+				helpers.assert_eq(fixture.MenuLLM.stop_mlx_server(function()
+					settlements = settlements + 1
+				end), false)
+				helpers.assert_eq(fixture.pending_stop(), nil)
+				helpers.assert_eq(settlements, 0)
+			end)
+		end
+
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			local stale_probe = fixture.probes[1]
+			fixture.set_stop_mode("deferred")
+			local settlements = 0
+			helpers.assert_eq(fixture.MenuLLM.stop_mlx_server(function(settled)
+				helpers.assert_eq(settled, true)
+				settlements = settlements + 1
+			end), true,
+				"accepted SIGTERM must transfer exact callback ownership")
+			helpers.assert_eq(type(fixture.pending_stop()), "function")
+			helpers.assert_eq(fixture.pending_stop_kind(), "shutdown")
+			helpers.assert_eq(settlements, 0)
+			helpers.assert_eq(fixture.settle_stop(), true)
+			helpers.assert_eq(settlements, 1)
+			fixture.repeat_stop()
+			helpers.assert_eq(settlements, 1,
+				"a duplicate native completion cannot publish shutdown twice")
+			local updates_before_stale = fixture.updates()
+			stale_probe.completion(200)
+			helpers.assert_eq(fixture.updates(), updates_before_stale)
+		end)
+
+		with_fixture(function(fixture)
+			fixture.handler.build_item()
+			fixture.set_stop_mode("deferred")
+			local terminals = {}
+			helpers.assert_eq(fixture.MenuLLM.stop_mlx_server(function(settled, detail)
+				terminals[#terminals + 1] = { settled = settled, detail = detail }
+			end), true)
+			helpers.assert_eq(type(fixture.pending_stop_cancel()), "function",
+				"shutdown must own the exact cleanup-refusal terminal")
+			helpers.assert_eq(fixture.refuse_stop("cleanup_refused"), false)
+			helpers.assert_eq(#terminals, 1)
+			helpers.assert_eq(terminals[1].settled, false)
+			helpers.assert_eq(terminals[1].detail, "cleanup_refused")
+			helpers.assert_eq(fixture.repeat_stop_cancel("cleanup_refused"), false)
+			helpers.assert_eq(#terminals, 1,
+				"a duplicate cleanup refusal cannot publish shutdown twice")
+		end)
+	end)
+
+	helpers.it("routes real port and backend actions through one latest intent (HS-008)", function()
+		with_fixture(function(fixture)
+			fixture.state.llm_model = "A"
+			fixture.state.llm_model_mlx = "A"
+			fixture.set_stop_mode("deferred")
+			local item = fixture.handler.build_item()
+			local port_action = item.submenu[2].menu[2].action
+			local backend_action = item.submenu[1].menu[3].action
+			helpers.assert_eq(type(port_action), "function")
+			helpers.assert_eq(type(backend_action), "function")
+
+			helpers.assert_eq(port_action(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "port")
+			helpers.assert_eq(fixture.port(), 3460)
+			helpers.assert_eq(backend_action(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "backend")
+			helpers.assert_eq(fixture.state.llm_backend, "mlx")
+			helpers.assert_eq(fixture.settle_stop(), true)
+			helpers.assert_eq(fixture.state.llm_backend, "api")
+			helpers.assert_eq(fixture.port(), 3460,
+				"a superseded port callback cannot publish its candidate")
+			helpers.assert_eq(fixture.port_commits(), 0)
+			helpers.assert_eq(#fixture.mlx_restarts, 0)
+			helpers.assert_eq(fixture.stop_kinds, { "port", "backend" })
+		end)
+
+		with_fixture(function(fixture)
+			fixture.state.llm_model = "A"
+			fixture.state.llm_model_mlx = "A"
+			fixture.set_stop_mode("deferred")
+			local item = fixture.handler.build_item()
+			local port_action = item.submenu[2].menu[2].action
+			local backend_action = item.submenu[1].menu[3].action
+
+			helpers.assert_eq(backend_action(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "backend")
+			helpers.assert_eq(port_action(), true)
+			helpers.assert_eq(fixture.pending_stop_kind(), "port")
+			helpers.assert_eq(fixture.settle_stop(), true)
+			helpers.assert_eq(fixture.state.llm_backend, "mlx",
+				"a superseded backend callback cannot publish")
+			helpers.assert_eq(fixture.port(), 4567)
+			helpers.assert_eq(fixture.port_commits(), 1)
+			helpers.assert_eq(#fixture.mlx_restarts, 1)
+			helpers.assert_eq(fixture.mlx_restarts[1].model, "A")
+			helpers.assert_eq(fixture.mlx_restarts[1].opts._mlx_port, 4567)
+			helpers.assert_eq(fixture.stop_kinds, { "backend", "port" })
 		end)
 	end)
 end)
