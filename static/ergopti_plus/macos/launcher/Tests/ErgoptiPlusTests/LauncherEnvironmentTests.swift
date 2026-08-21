@@ -19,6 +19,7 @@
 // 6. Logger authority: stale inherited credentials are removed, and the child
 //    receives only the endpoint that was successfully bound before its launch.
 // 7. Private inheritance: the launcher installs umask 0077 before child spawn.
+// 8. Launch Services isolation: parent GUI identity cannot leak into Hammerspoon.
 //
 // NOTE: This target requires the macOS Swift toolchain. Verify with
 // `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
@@ -102,6 +103,24 @@ final class LauncherEnvironmentTests: XCTestCase {
 
 			XCTAssertNil(environment["ERGOPTI_LAUNCHER_BUNDLE_ID"])
 		}
+	}
+
+	/// A GUI child must discover its own bundle and preferences domain instead
+	/// of impersonating the Launch Services parent that spawned it.
+	func testOuterLaunchServicesIdentityCannotLeakIntoEmbeddedGUIChild() {
+		let environment = launcherChildEnvironment(
+			base: [
+				"__CFBundleIdentifier": "com.ergoptiplus.app",
+				"XPC_SERVICE_NAME": "application.com.ergoptiplus.app.123",
+				"UNRELATED": "preserved",
+			],
+			launcherPid: 4242,
+			launcherBundleId: "com.ergoptiplus.app"
+		)
+
+		XCTAssertNil(environment["__CFBundleIdentifier"])
+		XCTAssertNil(environment["XPC_SERVICE_NAME"])
+		XCTAssertEqual(environment["UNRELATED"], "preserved")
 	}
 
 	/// Proves an unavailable launcher file identity cannot start a partial app.
