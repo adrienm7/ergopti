@@ -271,6 +271,30 @@ helpers.describe("HS-029 model/profile intent ordering", function()
 			helpers.assert_eq(fixture.calls.prediction_states, {false, true})
 		end)
 	end)
+
+	helpers.it("HS-031 records a confirmed Auto-detect choice even when the profile id is unchanged", function()
+		with_fixture(function(fixture)
+			helpers.assert_eq(fixture.switcher.switch_model("starcoder2-3b"), true)
+			helpers.assert_eq(fixture.calls.prediction_states, {false})
+
+			helpers.assert_eq(fixture.switcher.apply_recommended_prompt_profile("chat-small", {
+				force_dialog = true,
+			}), true)
+			helpers.assert_eq(fixture.dialog_calls(), 1)
+			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
+			helpers.assert_eq(fixture.runtime.profile, "basic")
+
+			helpers.assert_eq(fixture.pending["starcoder2-3b"].success(), true)
+			helpers.assert_eq(fixture.state.llm_model, "starcoder2-3b")
+			helpers.assert_eq(fixture.runtime.model, "actual:starcoder2-3b")
+			helpers.assert_eq(fixture.state.llm_active_profile, "basic",
+				"the older model recommendation must not overwrite the confirmed Auto-detect intent")
+			helpers.assert_eq(fixture.runtime.profile, "basic")
+			helpers.assert_eq(fixture.calls.profiles, {"basic"},
+				"the model-owned raw recommendation must be skipped after the user confirms Auto-detect")
+			helpers.assert_eq(fixture.calls.prediction_states, {false, true})
+		end)
+	end)
 end)
 
 return true

@@ -95,6 +95,9 @@ local function with_fixture(spec, body)
 
 		local core_llm = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
+			get_active_profile = function()
+				return {id = runtime.profile}
+			end,
 			set_llm_model_mlx = function(value)
 				calls.core_models[#calls.core_models + 1] = value
 				return run_boundary("core_model", function() runtime.core_model = value end)
@@ -198,6 +201,12 @@ helpers.describe("HS-027 model switch is one recoverable transaction", function(
 				}, function(fixture)
 					helpers.assert_eq(fixture.switcher.switch_model("B"), false)
 					assert_old_identity(fixture)
+					if boundary == "profile" then
+						helpers.assert_eq(fixture.calls.profiles[1], "raw",
+							"the completion recommendation must reach the injected runtime refusal")
+						helpers.assert_eq(fixture.calls.profiles[#fixture.calls.profiles], "basic",
+							"the parent rollback must restore the prior profile identity")
+					end
 					helpers.assert_true(#fixture.errors >= 1,
 						"the failed boundary must leave a contextual file-log diagnostic")
 				end)
