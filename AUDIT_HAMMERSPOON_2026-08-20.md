@@ -6,12 +6,12 @@ Scope: `static/ergopti_plus/macos/`, its shared Lua/data dependencies, relevant 
 
 ## 1. Executive summary
 
-This pass and its implementation-phase rescan found **34 confirmed defects**: **16 High**, **16 Medium**, **2 Low**, and **0 Critical**. “Confirmed” means that the state is reachable, the exact source path was re-opened, a concrete reproduction sequence exists, and the existing tests were inspected for a contradiction. No candidate was promoted merely because a source pattern looked suspicious.
+This pass and its implementation-phase rescan found **35 confirmed defects**: **16 High**, **17 Medium**, **2 Low**, and **0 Critical**. “Confirmed” means that the state is reachable, the exact source path was re-opened, a concrete reproduction sequence exists, and the existing tests were inspected for a contradiction. No candidate was promoted merely because a source pattern looked suspicious.
 
 | Severity       | Count | IDs               |
 | -------------- | ----: | ----------------- |
 | High           |    16 | `HS-001`–`HS-011`, `HS-021`, `HS-022`, `HS-024`, `HS-025`, `HS-033` |
-| Medium         |    16 | `HS-012`–`HS-019`, `HS-023`, `HS-026`–`HS-029`, `HS-031`, `HS-032`, `HS-034` |
+| Medium         |    17 | `HS-012`–`HS-019`, `HS-023`, `HS-026`–`HS-029`, `HS-031`, `HS-032`, `HS-034`, `HS-035` |
 | Low            |     2 | `HS-020`, `HS-030` |
 | Critical       |     0 | —                 |
 
@@ -79,6 +79,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [ ] `HS-032` — Ollama pull publication waits for the parent model transaction
 - [ ] `HS-033` — profile deletion retains exact shortcut and runtime-profile ownership
 - [ ] `HS-034` — failed profile creation removes its uncommitted registry candidate
+- [ ] `HS-035` — Ollama pull failure reaches the parent requirements terminal
 - [x] `PARITY-001` — `4f22a1efc` (Linux suffix codepoint count)
 - [x] `PARITY-002` — `22ca14d81` (Linux canonical multibyte trigger)
 
@@ -741,6 +742,23 @@ The explicit `No Model` sibling is the same distributed transition. With model `
 
 **Regression test.** Drive real `ProfilesManager` plus real `ModelSwitcher` from an empty user registry. Inject a runtime setter that mutates then throws, with successful compensation, and assert Clone and Create leave zero profiles, `basic` at every boundary, and zero editor/notification. Add a refused-compensation case proving the exact candidate remains owned while live and is removed after recovery, never by a later unrelated profile.
 
+### `HS-035` — Ollama pull failures disappear below the parent requirements terminal
+
+- **Severity:** Medium
+- **Confidence:** High
+- **Guarantees:** `G2`, `G3`; exactly-once asynchronous terminal delivery
+- **Source:** `ui/menu/menu_llm/models_manager_ollama.lua:712-766`, `ui/menu/menu_llm/models_manager_ollama.lua:821-917`
+
+**Reproduction.** Select an absent Ollama model, let `check_requirements()` accept and dispatch the pull, then complete the native pull with a non-zero exit or cancel it. The pull settles its own `on_cancel("process_failed")`/cancellation terminal and closes its task/UI owner, but the callback supplied by `check_requirements()` is `settle_stale`. That callback ignores every reason except the literal string `"stale"`, so the outer request delivers neither success nor failure after it was accepted.
+
+**Root cause and silence.** A stale-only adapter is reused as the general failure terminal for an asynchronous child. The immediate return cannot repair this after dispatch, and the child's exactly-once latch prevents a second delivery. The download may show its own error toast, but the switch transaction and any caller-owned completion remain unresolved.
+
+**Existing test/backstop checked.** `test_ollama_download_single_slot.lua` proves direct pull terminals, including `process_failed`, without placing the pull under `check_requirements()`. Manager-generation tests cover stale cancellation, and the parent-publication regression covers success plus parent persistence refusal. None delivers a current-generation child process failure through the real parent callback.
+
+**Fix.** Pass a general child-failure adapter that settles the outer `on_cancel` for every terminal reason, while preserving the existing generation guard so stale work still settles once and cannot publish. Every accepted pull path under requirements must end in exactly one outer success or failure.
+
+**Regression test.** Extend the real-manager parent harness or add `test_ollama_requirements_terminal_contract.lua`. Dispatch an absent model through `check_requirements()`, then table-drive process failure, user cancellation, task-construction/start refusal, and a stale completion. Assert one exact outer failure reason, zero success/publication, and no duplicate on repeated callbacks; retain a successful pull control.
+
 ### Cross-driver parity findings discovered during implementation
 
 These two confirmed Linux defects are outside the Hammerspoon severity total above. They were re-derived while implementing `HS-006` and are retained here because they share its byte/codepoint class and otherwise risk disappearing between implementation commits.
@@ -884,7 +902,7 @@ Legend: `B` = audited and behaviorally/source-blanched; `F` = confirmed finding;
 | `modules/keylogger/**`                                                               | `B`            | `B`                    | `B`                | `F HS-004`             | n/a        | Input pass 3 dry for requested lens; persistence refusal correctness is blanched, tap cost is not.                                                                                                                                                                         |
 | `ui/tooltip/**`, renderer/watchers                                                   | `B`            | `B`                    | `B`                | `B/N profile`          | `B/R`      | Source behavior dry; canvas performance unmeasured on native macOS.                                                                                                                                                                                                        |
 | `modules/llm/**`, prompt/parser/profiles/streaming                                   | `B`            | `F HS-009`             | `F HS-009`         | `S`                    | `R`        | Two full post-candidate LLM passes were dry. Direct profile-setter claim was rejected for stock paths.                                                                                                                                                                     |
-| `ui/menu/menu_llm/**`, MLX/Ollama managers                                           | `F HS-008,024,026–029,031–034` | `F HS-007,009,010,018,024,026–029,031–034` | `F HS-007–010,018,024,029,032–034` | `F HS-025` | `F HS-018,026–029,031–034` | Two audit passes were dry before implementation-phase transaction/terminal rescans found `HS-024`–`HS-034`; this zone is reopened until a clean post-fix pass.                                                                                                   |
+| `ui/menu/menu_llm/**`, MLX/Ollama managers                                           | `F HS-008,024,026–029,031–035` | `F HS-007,009,010,018,024,026–029,031–035` | `F HS-007–010,018,024,029,032–035` | `F HS-025` | `F HS-018,026–029,031–035` | Two audit passes were dry before implementation-phase transaction/terminal rescans found `HS-024`–`HS-035`; this zone is reopened until a clean post-fix pass.                                                                                                   |
 | `modules/gestures/{init,engine,actions,conflicts}`                                   | `F HS-001`     | `F HS-001,012,015`     | `F HS-001,012`     | `S`                    | n/a        | Watcher domain had a clean recheck; late search/screenshot findings received one clean sibling recheck, not two-pass dry.                                                                                                                                                  |
 | `modules/shortcuts/**`, script control, keyboard slots                               | `F HS-016`     | `F HS-013,016`         | `F HS-012,013`     | `B`                    | n/a        | Late findings verified; one clean recheck only, therefore not claimed two-pass dry. Dedicated script-control tap lifecycle blanched.                                                                                                                                       |
 | `platform/remap/**`, generator, watchers, onboarding, KE lifecycle                   | `F HS-011,019` | `F HS-011,019`         | `F HS-011`         | `S`                    | n/a        | Generator, KE lease/reload lifecycle and input-source state dry; onboarding late finding has one clean recheck.                                                                                                                                                            |
@@ -934,7 +952,7 @@ Legend: `B` = audited and behaviorally/source-blanched; `F` = confirmed finding;
 2. `HS-001`, `HS-007`, `HS-008`, `HS-010`, `HS-011`, `HS-024`: restore exact native/task ownership, terminal completion, and generation fencing.
 3. `HS-002`, `HS-005`, `HS-006`, `HS-021`: repair text/tooltip correctness through shared transactions and codepoint units.
 4. `HS-009`, `HS-012`: make semantic clients and pause an explicit owner registry.
-5. `HS-013`–`HS-020`, `HS-022`, `HS-023`, `HS-026`–`HS-033`: make configuration/UI/file publication transactional, order profile/model intent, eliminate silent callback success, and keep every focused test-module shape replayable in isolation.
+5. `HS-013`–`HS-020`, `HS-022`, `HS-023`, `HS-026`–`HS-035`: make configuration/UI/file publication transactional, order profile/model intent, deliver every asynchronous terminal, eliminate silent callback success, and keep every focused test-module shape replayable in isolation.
 6. `PARITY-001`, `PARITY-002`: carry the strict UTF-8 fix through the Linux sibling and exercise the shipped default trigger end to end.
 
 Each fix should land with the behavioral test described in its finding, run alone, in the full Lua suite, and—where native contracts are involved—in a macOS integration harness with faithful refusal and reordered-completion cases.
