@@ -18,6 +18,31 @@ local shortcut_ui  = require("ui.menu.shortcut_utils")
 local AppPickerLib = require("infra.app_picker")
 local i18n         = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
+local Logger       = require("infra.logger")
+
+local LOG = "menu_llm.trigger_panel"
+
+--- Routes one trigger setting through the shared transactional owner.
+--- @param settings_mgr table Settings manager instance.
+--- @param key string Shared state key.
+--- @param value any Candidate value.
+--- @param runtime_fn string Keymap setter name.
+--- @return boolean committed True only when every boundary commits.
+local function apply_setting_transaction(settings_mgr, key, value, runtime_fn)
+	if type(settings_mgr) ~= "table"
+		or type(settings_mgr.apply_setting_transaction) ~= "function" then
+		Logger.error(LOG,
+			"Trigger setting '%s' refused because the transaction owner is unavailable.",
+			tostring(key))
+		return false
+	end
+	return settings_mgr.apply_setting_transaction({
+		key = key,
+		value = value,
+		runtime_fn = runtime_fn,
+		publish_setting = false,
+	})
+end
 
 
 
@@ -36,10 +61,7 @@ local ManifestMenu = require("infra.manifest_menu")
 --- @return table menu Populated trigger_menu table.
 function M.build(ctx)
 	local state               = ctx.state
-	local keymap              = ctx.keymap
 	local is_disabled         = ctx.is_disabled
-	local save_prefs          = ctx.save_prefs
-	local update_menu         = ctx.update_menu
 	local settings_mgr        = ctx.settings_mgr
 	local apply_llm_shortcut  = ctx.apply_llm_shortcut
 
@@ -96,12 +118,10 @@ function M.build(ctx)
 		checked  = state.llm_instant_on_word_end,
 		disabled = is_disabled or nil,
 		action   = not is_disabled and function()
-			state.llm_instant_on_word_end = not state.llm_instant_on_word_end
-			if keymap and type(keymap.set_llm_instant_on_word_end) == "function" then
-				pcall(keymap.set_llm_instant_on_word_end, state.llm_instant_on_word_end)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+			return apply_setting_transaction(settings_mgr,
+				"llm_instant_on_word_end",
+				not state.llm_instant_on_word_end,
+				"set_llm_instant_on_word_end")
 		end or nil,
 	}
 
@@ -110,12 +130,10 @@ function M.build(ctx)
 		checked  = state.llm_after_hotstring,
 		disabled = is_disabled or nil,
 		action   = not is_disabled and function()
-			state.llm_after_hotstring = not state.llm_after_hotstring
-			if keymap and type(keymap.set_llm_after_hotstring) == "function" then
-				pcall(keymap.set_llm_after_hotstring, state.llm_after_hotstring)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+			return apply_setting_transaction(settings_mgr,
+				"llm_after_hotstring",
+				not state.llm_after_hotstring,
+				"set_llm_after_hotstring")
 		end or nil,
 	}
 
@@ -131,12 +149,10 @@ function M.build(ctx)
 		checked  = state.llm_url_bar_filter_enabled,
 		disabled = is_disabled or nil,
 		action   = not is_disabled and function()
-			state.llm_url_bar_filter_enabled = not state.llm_url_bar_filter_enabled
-			if keymap and type(keymap.set_llm_url_bar_filter_enabled) == "function" then
-				pcall(keymap.set_llm_url_bar_filter_enabled, state.llm_url_bar_filter_enabled)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+			return apply_setting_transaction(settings_mgr,
+				"llm_url_bar_filter_enabled",
+				not state.llm_url_bar_filter_enabled,
+				"set_llm_url_bar_filter_enabled")
 		end or nil,
 	}
 
@@ -145,12 +161,10 @@ function M.build(ctx)
 		checked  = state.llm_secure_field_filter_enabled,
 		disabled = is_disabled or nil,
 		action   = not is_disabled and function()
-			state.llm_secure_field_filter_enabled = not state.llm_secure_field_filter_enabled
-			if keymap and type(keymap.set_llm_secure_field_filter_enabled) == "function" then
-				pcall(keymap.set_llm_secure_field_filter_enabled, state.llm_secure_field_filter_enabled)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+			return apply_setting_transaction(settings_mgr,
+				"llm_secure_field_filter_enabled",
+				not state.llm_secure_field_filter_enabled,
+				"set_llm_secure_field_filter_enabled")
 		end or nil,
 	}
 
@@ -167,10 +181,8 @@ function M.build(ctx)
 	local exclusion_menu = AppPickerLib.build_menu(
 		state.llm_disabled_apps,
 		function(new_list)
-			state.llm_disabled_apps = new_list
-			if keymap and type(keymap.set_llm_disabled_apps) == "function" then pcall(keymap.set_llm_disabled_apps, new_list) end
-			if save_prefs() ~= true then return false end
-			pcall(update_menu)
+			return apply_setting_transaction(settings_mgr,
+				"llm_disabled_apps", new_list, "set_llm_disabled_apps")
 		end,
 		i18n.get("menu.llm.exclude_from_ai")
 	)

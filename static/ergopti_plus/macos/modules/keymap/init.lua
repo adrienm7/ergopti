@@ -585,6 +585,7 @@ M.set_llm_sequential_mode    = LLMBridge.set_llm_sequential_mode
 M.set_llm_val_modifiers      = LLMBridge.set_llm_val_modifiers
 M.set_llm_nav_modifiers      = LLMBridge.set_llm_nav_modifiers
 M.get_llm_enabled            = LLMBridge.get_llm_enabled
+M.get_llm_runtime_setting    = LLMBridge.get_llm_runtime_setting
 M.set_llm_disabled_apps      = LLMBridge.set_llm_disabled_apps
 M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring

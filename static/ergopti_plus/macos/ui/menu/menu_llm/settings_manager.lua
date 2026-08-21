@@ -1,4 +1,4 @@
-﻿--- ui/menu/menu_llm/settings_manager.lua
+--- ui/menu/menu_llm/settings_manager.lua
 
 --- ==============================================================================
 --- MODULE: LLM Settings Manager
@@ -18,6 +18,16 @@ local dialog  = require("infra.dialog_util")
 
 local LOG = "menu_llm.settings"
 
+--- Creates a detached value snapshot for rollback.
+--- @param value any Value to clone.
+--- @return any clone
+local function clone_value(value)
+	if type(value) ~= "table" then return value end
+	local clone = {}
+	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
+	return clone
+end
+
 --- Invokes one optional injected dependency with visible, exact settlement.
 --- @param label string Operation-specific callback label.
 --- @param fn function|nil Injected dependency.
@@ -27,6 +37,61 @@ local function invoke_optional(label, fn, ...)
 	if type(fn) ~= "function" then return true end
 	local ok, result = Logger.callback(LOG, label, fn, ...)
 	return ok == true and result ~= false
+end
+
+--- Invokes one required dependency with visible, exact settlement.
+--- @param label string Operation-specific callback label.
+--- @param fn function|nil Required dependency.
+--- @param ... any Arguments forwarded to fn.
+--- @return boolean settled True when the callback completed without refusal.
+local function invoke_required(label, fn, ...)
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "%s refused because its callback is unavailable.", tostring(label))
+		return false
+	end
+	local ok, result = Logger.callback(LOG, label, fn, ...)
+	return ok == true and result ~= false
+end
+
+--- Reads one native setting through the logger-aware ownership boundary.
+--- @param key string Native settings key.
+--- @return boolean settled
+--- @return any value Detached current value when settled.
+local function read_native_setting(key)
+	if type(hs) ~= "table" or type(hs.settings) ~= "table"
+		or type(hs.settings.get) ~= "function" then
+		Logger.error(LOG, "Native setting '%s' cannot be read because hs.settings.get is unavailable.",
+			tostring(key))
+		return false, nil
+	end
+	local ok, value = Logger.callback(LOG, "LLM native-setting snapshot", hs.settings.get, key)
+	if not ok then return false, nil end
+	return true, clone_value(value)
+end
+
+--- Writes or clears one native setting through an exact boundary.
+--- @param key string Native settings key.
+--- @param value any Value to write; nil restores absence.
+--- @param label string Operation-specific callback label.
+--- @return boolean settled
+local function write_native_setting(key, value, label)
+	if type(hs) ~= "table" or type(hs.settings) ~= "table" then
+		Logger.error(LOG, "%s refused because hs.settings is unavailable.", tostring(label))
+		return false
+	end
+	local callback
+	if value == nil then
+		callback = hs.settings.clear
+	else
+		callback = hs.settings.set
+	end
+	if type(callback) ~= "function" then
+		Logger.error(LOG, "%s refused because the native settings writer is unavailable.",
+			tostring(label))
+		return false
+	end
+	if value == nil then return invoke_required(label, callback, key) end
+	return invoke_required(label, callback, key, clone_value(value))
 end
 
 --- Rebuilds the menu through the required injected owner.
@@ -78,6 +143,7 @@ end
 
 --- Opens a standardized numeric input prompt and updates the state.
 --- @param deps table Global dependencies.
+--- @param apply_setting_transaction function Transaction owner.
 --- @param title string Dialog title.
 --- @param msg string Dialog informative text.
 --- @param key string The state key to update.
@@ -86,7 +152,18 @@ end
 --- @param default_val number|string|nil The fallback default value.
 --- @param min_val number|nil Minimum allowed value.
 --- @param max_val number|nil Maximum allowed value.
-local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, default_val, min_val, max_val)
+local function generic_numeric_prompt(
+	deps,
+	apply_setting_transaction,
+	title,
+	msg,
+	key,
+	factor,
+	hs_fn,
+	default_val,
+	min_val,
+	max_val
+)
 	local state = deps.state
 
 	local current_val = tonumber(state[key])
@@ -116,22 +193,14 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
 			if min_val and new_val < min_val then new_val = min_val end
 			if max_val and new_val > max_val then new_val = max_val end
 
-            -- Reverse the factor if applied
+			-- Reverse the factor if applied
 			local final_val = factor and (new_val / factor) or new_val
-			state[key] = final_val
-			hs.settings.set(key, final_val)
-
-			-- Sync with the keymap engine if a function is provided
-			if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
-				if not invoke_optional("Numeric setting runtime sync", deps.keymap[hs_fn], final_val) then
-					return false
-				end
-			end
-
-			if not save_prefs(deps, "Numeric setting preference save") then return false end
-			if not refresh_menu(deps, "Numeric setting menu refresh") then return false end
-			Logger.info(LOG, string.format("Value for %s updated successfully.", key))
-			return true
+			return apply_setting_transaction({
+				key = key,
+				value = final_val,
+				runtime_fn = hs_fn,
+				publish_setting = true,
+			})
 		else
 			Logger.warn(LOG, "Invalid numeric input provided.")
 		end
@@ -139,23 +208,18 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
 end
 
 --- Resets a state key to its default value cleanly.
---- @param deps table Global dependencies.
+--- @param apply_setting_transaction function Transaction owner.
 --- @param key string The state key to reset.
 --- @param default_val number|string|nil The fallback default value.
 --- @param hs_fn string|nil The keymap function name to sync the value.
-local function reset_to_default(deps, key, default_val, hs_fn)
+local function reset_to_default(apply_setting_transaction, key, default_val, hs_fn)
 	Logger.debug(LOG, string.format("Resetting %s to default value…", key))
-	deps.state[key] = default_val
-	hs.settings.set(key, default_val)
-	if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
-		if not invoke_optional("Default setting runtime sync", deps.keymap[hs_fn], default_val) then
-			return false
-		end
-	end
-	if not save_prefs(deps, "Default setting preference save") then return false end
-	if not refresh_menu(deps, "Default setting menu refresh") then return false end
-	Logger.info(LOG, string.format("Key %s reset successfully.", key))
-	return true
+	return apply_setting_transaction({
+		key = key,
+		value = default_val,
+		runtime_fn = hs_fn,
+		publish_setting = true,
+	})
 end
 
 
@@ -173,6 +237,174 @@ end
 --- @return table The settings manager instance.
 function M.new(deps)
 	local obj = { deps = deps }
+	local setting_recovery_debt = nil
+
+	--- Restores every boundary reached by a rejected setting transition.
+	--- @param debt table Mutable per-boundary compensation ledger.
+	--- @return boolean settled True only when every compensation commits.
+	local function restore_setting_transaction(debt)
+		local snapshot = debt.snapshot
+		deps.state[snapshot.key] = clone_value(snapshot.state_value)
+
+		local failures = {}
+		if debt.menu then
+			if refresh_menu(deps, "LLM setting menu rollback") then
+				debt.menu = false
+			else
+				failures[#failures + 1] = "menu rollback"
+			end
+		end
+		if debt.persist then
+			local persisted = save_prefs(deps, "LLM setting preference rollback")
+			-- The outer preference owner may restore its last committed candidate
+			-- when this compensating write refuses, so reclaim this key immediately
+			deps.state[snapshot.key] = clone_value(snapshot.state_value)
+			if persisted then
+				debt.persist = false
+			else
+				failures[#failures + 1] = "preference rollback"
+			end
+		end
+		if debt.setting then
+			if write_native_setting(snapshot.key, snapshot.setting_value,
+				"LLM native-setting rollback") then
+				-- PreferencesTransaction may republish its last committed candidate
+				-- whenever rollback persistence refuses. Keep this reassertion as debt
+				-- until that owner settles, then perform it once more on the retry.
+				if not debt.persist then debt.setting = false end
+			else
+				failures[#failures + 1] = "native-setting rollback"
+			end
+		end
+		if debt.runtime then
+			if invoke_required("LLM setting runtime rollback", debt.runtime_callback,
+				clone_value(snapshot.runtime_value)) then
+				debt.runtime = false
+			else
+				failures[#failures + 1] = "runtime rollback"
+			end
+		end
+
+		if #failures > 0 then
+			setting_recovery_debt = debt
+			Logger.error(LOG,
+				"LLM setting '%s' rollback remains unsettled at: %s.",
+				tostring(snapshot.key), table.concat(failures, ", "))
+			return false
+		end
+		setting_recovery_debt = nil
+		return true
+	end
+
+	--- Retries retained compensation before accepting another setting action.
+	--- @return boolean settled True when no setting recovery remains.
+	local function settle_setting_recovery_debt()
+		if not setting_recovery_debt then return true end
+		Logger.warn(LOG, "Retrying retained LLM setting rollback before a new action.")
+		return restore_setting_transaction(setting_recovery_debt)
+	end
+
+	--- Applies one state/runtime/persistence/native-setting/menu transaction.
+	--- Void runtime and native setters commit on a non-throwing nil return; literal
+	--- false is an operational refusal. Preference persistence alone requires true.
+	--- @param options table Transaction fields: key, value, runtime_fn, publish_setting.
+	--- @return boolean committed True only when every boundary commits.
+	function obj.apply_setting_transaction(options)
+		if type(options) ~= "table" or type(options.key) ~= "string"
+			or options.key == "" or type(options.runtime_fn) ~= "string" then
+			Logger.error(LOG, "LLM setting transaction refused invalid options.")
+			return false
+		end
+		if type(deps.state) ~= "table" then
+			Logger.error(LOG, "LLM setting '%s' refused because state is unavailable.",
+				tostring(options.key))
+			return false
+		end
+		if not settle_setting_recovery_debt() then return false end
+
+		local runtime_callback = deps.keymap and deps.keymap[options.runtime_fn]
+		if type(runtime_callback) ~= "function" then
+			Logger.error(LOG,
+				"LLM setting '%s' refused because runtime setter '%s' is unavailable.",
+				tostring(options.key), tostring(options.runtime_fn))
+			return false
+		end
+		local runtime_getter = deps.keymap and deps.keymap.get_llm_runtime_setting
+		if type(runtime_getter) ~= "function" then
+			Logger.error(LOG,
+				"LLM setting '%s' refused because its runtime getter is unavailable.",
+				tostring(options.key))
+			return false
+		end
+		local runtime_ok, runtime_found, runtime_value = Logger.callback(LOG,
+			"LLM setting runtime snapshot", runtime_getter, options.key)
+		if not runtime_ok or runtime_found ~= true then
+			Logger.error(LOG, "LLM setting '%s' refused because runtime state is unavailable.",
+				tostring(options.key))
+			return false
+		end
+
+		local setting_value = nil
+		if options.publish_setting == true then
+			local setting_ok
+			setting_ok, setting_value = read_native_setting(options.key)
+			if not setting_ok then return false end
+		end
+
+		local snapshot = {
+			key = options.key,
+			state_value = clone_value(deps.state[options.key]),
+			runtime_value = clone_value(runtime_value),
+			setting_value = clone_value(setting_value),
+		}
+		local debt = {
+			snapshot = snapshot,
+			runtime_callback = runtime_callback,
+			runtime = false,
+			persist = false,
+			setting = false,
+			menu = false,
+		}
+
+		local function reject_transition(boundary)
+			Logger.error(LOG,
+				"LLM setting '%s' failed at '%s'; restoring the previous value.",
+				tostring(options.key), tostring(boundary))
+			setting_recovery_debt = debt
+			restore_setting_transaction(debt)
+			return false
+		end
+
+		local candidate = clone_value(options.value)
+		debt.runtime = true
+		if not invoke_required("LLM setting runtime sync", runtime_callback,
+			clone_value(candidate)) then
+			return reject_transition("runtime sync")
+		end
+
+		deps.state[options.key] = clone_value(candidate)
+		debt.persist = true
+		if not save_prefs(deps, "LLM setting preference save") then
+			return reject_transition("preference save")
+		end
+
+		if options.publish_setting == true then
+			debt.setting = true
+			if not write_native_setting(options.key, candidate,
+				"LLM native-setting publication") then
+				return reject_transition("native-setting publication")
+			end
+		end
+
+		debt.menu = true
+		if not refresh_menu(deps, "LLM setting menu refresh") then
+			return reject_transition("menu refresh")
+		end
+
+		setting_recovery_debt = nil
+		Logger.info(LOG, "LLM setting '%s' committed successfully.", tostring(options.key))
+		return true
+	end
 
 	--- Sets the idle delay before triggering the LLM.
 	function obj.set_debounce()
@@ -199,23 +431,19 @@ function M.new(deps)
 			end
 			
 			if new_val then
-				state.llm_debounce = new_val
-				hs.settings.set("llm_debounce", new_val)
-				if deps.keymap and type(deps.keymap.set_llm_debounce) == "function" then
-					if not invoke_optional("Debounce runtime sync", deps.keymap.set_llm_debounce, new_val) then
-						return false
-					end
-				end
-				if not save_prefs(deps, "Debounce preference save") then return false end
-				if not refresh_menu(deps, "Debounce menu refresh") then return false end
-				Logger.info(LOG, "Debounce delay updated successfully.")
-				return true
+				return obj.apply_setting_transaction({
+					key = "llm_debounce",
+					value = new_val,
+					runtime_fn = "set_llm_debounce",
+					publish_setting = true,
+				})
 			end
 		end
 	end
 	
-	function obj.reset_debounce() 
-		reset_to_default(deps, "llm_debounce", llm_mod.DEFAULT_STATE.llm_debounce, "set_llm_debounce") 
+	function obj.reset_debounce()
+		return reset_to_default(obj.apply_setting_transaction, "llm_debounce",
+			llm_mod.DEFAULT_STATE.llm_debounce, "set_llm_debounce")
 	end
 
 	--- Sets the maximum number of words kept per prediction.
@@ -233,23 +461,19 @@ function M.new(deps)
 			local digits = raw:match("^%s*(%d+)%s*$")
 			if not digits then return end
 			local new_val = tonumber(digits) or 0
-			
-			state.llm_max_words = new_val
-			hs.settings.set("llm_max_words", new_val)
-			if deps.keymap and type(deps.keymap.set_llm_max_words) == "function" then
-				if not invoke_optional("Maximum-words runtime sync", deps.keymap.set_llm_max_words, new_val) then
-					return false
-				end
-			end
-			if not save_prefs(deps, "Maximum-words preference save") then return false end
-			if not refresh_menu(deps, "Maximum-words menu refresh") then return false end
-			Logger.info(LOG, "Max words updated successfully.")
-			return true
+
+			return obj.apply_setting_transaction({
+				key = "llm_max_words",
+				value = new_val,
+				runtime_fn = "set_llm_max_words",
+				publish_setting = true,
+			})
 		end
 	end
 	
-	function obj.reset_max_words() 
-		reset_to_default(deps, "llm_max_words", llm_mod.DEFAULT_STATE.llm_max_words, "set_llm_max_words")
+	function obj.reset_max_words()
+		return reset_to_default(obj.apply_setting_transaction, "llm_max_words",
+			llm_mod.DEFAULT_STATE.llm_max_words, "set_llm_max_words")
 	end
 
 	--- Sets the minimum number of words generated per prediction.
@@ -267,49 +491,47 @@ function M.new(deps)
 			local digits = raw:match("^%s*(%d+)%s*$")
 			if not digits then return end
 			local new_val = tonumber(digits) or 1
-			
-			state.llm_min_words = new_val
-			hs.settings.set("llm_min_words", new_val)
-			if deps.keymap and type(deps.keymap.set_llm_min_words) == "function" then
-				if not invoke_optional("Minimum-words runtime sync", deps.keymap.set_llm_min_words, new_val) then
-					return false
-				end
-			end
-			if not save_prefs(deps, "Minimum-words preference save") then return false end
-			if not refresh_menu(deps, "Minimum-words menu refresh") then return false end
-			Logger.info(LOG, "Min words updated successfully.")
-			return true
+
+			return obj.apply_setting_transaction({
+				key = "llm_min_words",
+				value = new_val,
+				runtime_fn = "set_llm_min_words",
+				publish_setting = true,
+			})
 		end
 	end
 	
-	function obj.reset_min_words() 
-		reset_to_default(deps, "llm_min_words", llm_mod.DEFAULT_STATE.llm_min_words, "set_llm_min_words") 
+	function obj.reset_min_words()
+		return reset_to_default(obj.apply_setting_transaction, "llm_min_words",
+			llm_mod.DEFAULT_STATE.llm_min_words, "set_llm_min_words")
 	end
 
 	--- Sets the AI temperature (creativity vs stability).
 	function obj.set_temperature()
-		generic_numeric_prompt(deps, 
-			i18n.get("menu.settings.temperature_title"), 
-			i18n.get("menu.settings.temperature_prompt"), 
+		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
+			i18n.get("menu.settings.temperature_title"),
+			i18n.get("menu.settings.temperature_prompt"),
 			"llm_temperature", nil, "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, 0.0, 1.0
 		)
 	end
 	
-	function obj.reset_temperature() 
-		reset_to_default(deps, "llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, "set_llm_temperature") 
+	function obj.reset_temperature()
+		return reset_to_default(obj.apply_setting_transaction, "llm_temperature",
+			llm_mod.DEFAULT_STATE.llm_temperature, "set_llm_temperature")
 	end
 
 	--- Sets the size of the text buffer sent as context to the AI.
 	function obj.set_context_length()
-		generic_numeric_prompt(deps, 
-			i18n.get("menu.settings.context_length_title"), 
-			i18n.get("menu.llm.context_length_prompt"), 
+		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
+			i18n.get("menu.settings.context_length_title"),
+			i18n.get("menu.llm.context_length_prompt"),
 			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length
 		)
 	end
 	
 	function obj.reset_context_length()
-		reset_to_default(deps, "llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length, "set_llm_context_length")
+		return reset_to_default(obj.apply_setting_transaction, "llm_context_length",
+			llm_mod.DEFAULT_STATE.llm_context_length, "set_llm_context_length")
 	end
 
 	--- Prompts for the local MLX server port and applies it. The port lives in
@@ -383,14 +605,12 @@ function M.new(deps)
 				title   = title_str,
 				checked = (i == current) or nil,
 				fn      = not paused and function()
-					deps.state.llm_pred_indent = i
-					hs.settings.set("llm_pred_indent", i)
-					if deps.keymap and type(deps.keymap.set_llm_pred_indent) == "function" then
-						if not invoke_optional("Indentation runtime sync",
-							deps.keymap.set_llm_pred_indent, i) then return false end
-					end
-					if not save_prefs(deps, "Indentation preference save") then return false end
-					return refresh_menu(deps, "Indentation menu refresh")
+					return obj.apply_setting_transaction({
+						key = "llm_pred_indent",
+						value = i,
+						runtime_fn = "set_llm_pred_indent",
+						publish_setting = true,
+					})
 				end or nil,
 			})
 		end
@@ -406,36 +626,34 @@ function M.new(deps)
 		local current_str = table.concat(current_mods, "+")
 		local paused = is_paused(deps, "Modifier menu pause-state read")
 
-        local opts = {
-            {title = i18n.get("menu.settings.disabled"), mods = {"none"}},
-            {title = i18n.get("menu.settings.no_modifier"), mods = {}},
-            {title = "⇧ Shift", mods = {"shift"}}, 
-            {title = "⌘ Cmd", mods = {"cmd"}},
-            {title = "⌥ Option", mods = {"alt"}}, 
-            {title = "⌃ Ctrl", mods = {"ctrl"}},
-            {title = "⇧⌘ Shift + Cmd", mods = {"shift", "cmd"}},
-            {title = "⇧⌥ Shift + Option", mods = {"shift", "alt"}}
-        }
-        
-        local menu = {}
-        for _, opt in ipairs(opts) do
-            table.insert(menu, {
-                title = opt.title,
-                checked = (table.concat(opt.mods, "+") == current_str) or nil,
-                fn = not paused and function()
-                    hs.settings.set(key, opt.mods)
-					deps.state[key] = opt.mods
-					if deps.keymap and type(deps.keymap[hs_fn]) == "function" then
-						if not invoke_optional("Modifier runtime sync",
-							deps.keymap[hs_fn], opt.mods) then return false end
-					end
-					if not save_prefs(deps, "Modifier preference save") then return false end
-					return refresh_menu(deps, "Modifier menu refresh")
-                end or nil
-            })
-        end
-        return menu
-    end
+		local opts = {
+			{title = i18n.get("menu.settings.disabled"), mods = {"none"}},
+			{title = i18n.get("menu.settings.no_modifier"), mods = {}},
+			{title = "⇧ Shift", mods = {"shift"}},
+			{title = "⌘ Cmd", mods = {"cmd"}},
+			{title = "⌥ Option", mods = {"alt"}},
+			{title = "⌃ Ctrl", mods = {"ctrl"}},
+			{title = "⇧⌘ Shift + Cmd", mods = {"shift", "cmd"}},
+			{title = "⇧⌥ Shift + Option", mods = {"shift", "alt"}},
+		}
+
+		local menu = {}
+		for _, opt in ipairs(opts) do
+			table.insert(menu, {
+				title = opt.title,
+				checked = (table.concat(opt.mods, "+") == current_str) or nil,
+				fn = not paused and function()
+					return obj.apply_setting_transaction({
+						key = key,
+						value = opt.mods,
+						runtime_fn = hs_fn,
+						publish_setting = true,
+					})
+				end or nil,
+			})
+		end
+		return menu
+	end
 
 	function obj.build_nav_modifier_menu()
 		return build_modifier_menu("llm_nav_modifiers", llm_mod.DEFAULT_STATE.llm_nav_modifiers, "set_llm_nav_modifiers")

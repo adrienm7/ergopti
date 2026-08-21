@@ -170,6 +170,49 @@ package.loaded["modules.keylogger"] = {
 -- Now load the prediction engine with all stubs registered.
 local PE = require("modules.llm.prediction_engine")
 
+--- Loads the production bridge against this file's production prediction engine.
+--- Unrelated keymap dependencies are inert because this fixture invokes only the
+--- direct configuration-forwarding surface.
+--- @return table bridge Fresh production bridge instance.
+local function load_real_setting_bridge()
+	local noop = function() end
+	local replacements = {
+		["modules.keymap.utils"] = {},
+		["adapters.event_provenance"] = {STATUS_UNREADABLE = "unreadable"},
+		["adapters.synthetic_input"] = {current_action_epoch = function() return 0 end},
+		["infra.text_utils"] = {},
+		["infra.keycodes"] = {
+			ESCAPE = 53,
+			RETURN = 36,
+			F16_LLM_CHAIN_SIGNAL = 106,
+			to_name = function() return "f16" end,
+		},
+		["modules.keylogger"] = {},
+		["ui.tooltip"] = {},
+		["modules.keymap.registry"] = {},
+		["modules.hotstrings.hotstrings_config"] = {},
+		["modules.keymap.expander"] = {},
+		["adapters.timer_scheduler"] = {after = noop},
+		["infra.manifest_reader"] = {},
+		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
+		["modules.llm.prediction_engine"] = PE,
+	}
+	local saved = {}
+	for name, replacement in pairs(replacements) do
+		saved[name] = package.loaded[name]
+		package.loaded[name] = replacement
+	end
+	local saved_bridge = package.loaded["modules.keymap.llm_bridge"]
+	package.loaded["modules.keymap.llm_bridge"] = nil
+	local ok, bridge_or_error = xpcall(function()
+		return require("modules.keymap.llm_bridge")
+	end, debug.traceback)
+	for name in pairs(replacements) do package.loaded[name] = saved[name] end
+	package.loaded["modules.keymap.llm_bridge"] = saved_bridge
+	if not ok then error(bridge_or_error, 0) end
+	return bridge_or_error
+end
+
 
 
 
@@ -191,6 +234,7 @@ helpers.describe("prediction_engine — module surface", function()
 			"handle_chain_signal", "navigate",
 			"is_visible", "is_chain_pending", "get_predictions", "get_current_index",
 			"normalize_mods", "get_navigation_mods", "get_validation_mods",
+			"get_llm_runtime_setting",
 		}) do
 			helpers.assert_eq(type(PE[fn]), "function", "missing export: " .. fn)
 		end
@@ -314,21 +358,114 @@ helpers.describe("prediction_engine — configuration setters", function()
 	-- F-M10: a wrong-typed config.toml / plist value (e.g. max_words = "five")
 	-- reached `<=`/`>` in the prompt_builder and `> 0` in the menu, crashing both.
 	-- The setters now coerce + fail closed to the numeric default.
-	helpers.it("set_llm_max_words / set_llm_min_words coerce a wrong type to a number", function()
-		PE.set_llm_max_words("five")
-		local mx = hs.settings.get("llm_max_words")
+	helpers.it("min/max setters coerce runtime values without publishing hs.settings", function()
+		local original_set = hs.settings.set
+		local writes = {}
+		hs.settings.set = function(key, value)
+			writes[#writes + 1] = {key = key, value = value}
+			return original_set(key, value)
+		end
+		local ok, values_or_error = xpcall(function()
+			PE.set_llm_max_words("five")
+			local max_found, mx = PE.get_llm_runtime_setting("llm_max_words")
+
+			PE.set_llm_min_words("seven")
+			local min_found, mn = PE.get_llm_runtime_setting("llm_min_words")
+
+			-- A genuine numeric string is still accepted (coerced).
+			PE.set_llm_max_words("12")
+			local numeric_found, numeric_max = PE.get_llm_runtime_setting("llm_max_words")
+			return {
+				max_found = max_found,
+				max_value = mx,
+				min_found = min_found,
+				min_value = mn,
+				numeric_found = numeric_found,
+				numeric_max = numeric_max,
+			}
+		end, debug.traceback)
+		hs.settings.set = original_set
+		if not ok then error(values_or_error, 0) end
+
+		local values = values_or_error
+		helpers.assert_eq(values.max_found, true)
+		local mx = values.max_value
 		helpers.assert_eq(type(mx), "number")
 		-- Exactly the comparison that crashed on the raw string.
 		-- The comparison crashed pre-fix on a string. Asserting the TYPE is what the
 		-- fix guarantees, and it is stronger than "this one comparison did not raise".
 		helpers.assert_eq(type(mx), "number", "a coerced max must be a number, not a string")
+		helpers.assert_eq(values.min_found, true)
+		helpers.assert_eq(type(values.min_value), "number")
+		helpers.assert_eq(values.numeric_found, true)
+		helpers.assert_eq(values.numeric_max, 12)
+		helpers.assert_eq(writes, {},
+			"SettingsManager is the sole native plist publisher for min/max words")
+	end)
 
-		PE.set_llm_min_words("seven")
-		helpers.assert_eq(type(hs.settings.get("llm_min_words")), "number")
+	helpers.it("runtime getter observes every engine-owned transactional setting", function()
+		for _, case in ipairs({
+			{key = "llm_debounce", setter = "set_llm_debounce", value = 0.42},
+			{key = "llm_max_words", setter = "set_llm_max_words", value = 21},
+			{key = "llm_min_words", setter = "set_llm_min_words", value = 5},
+			{key = "llm_temperature", setter = "set_llm_temperature", value = 0.64},
+			{key = "llm_context_length", setter = "set_llm_context_length", value = 812},
+			{key = "llm_num_predictions", setter = "set_llm_num_predictions", value = 4},
+			{key = "llm_show_info_bar", setter = "set_llm_show_info_bar", value = false},
+			{key = "llm_sequential_mode", setter = "set_llm_sequential_mode", value = true},
+			{key = "llm_auto_raise_temp", setter = "set_llm_auto_raise_temp", value = true},
+			{key = "llm_streaming", setter = "set_llm_streaming", value = true},
+			{key = "llm_streaming_multi", setter = "set_llm_streaming_multi", value = true},
+			{key = "llm_pred_indent", setter = "set_llm_pred_indent", value = 2},
+			{key = "llm_nav_modifiers", setter = "set_llm_nav_modifiers", value = {"ctrl"}},
+			{key = "llm_val_modifiers", setter = "set_llm_val_modifiers", value = {"shift"}},
+			{key = "llm_instant_on_word_end", setter = "set_llm_instant_on_word_end", value = true},
+			{key = "llm_url_bar_filter_enabled", setter = "set_llm_url_bar_filter_enabled", value = false},
+			{key = "llm_secure_field_filter_enabled", setter = "set_llm_secure_field_filter_enabled", value = false},
+			{key = "llm_disabled_apps", setter = "set_llm_disabled_apps", value = {{name = "Terminal"}}},
+		}) do
+			PE[case.setter](case.value)
+			local found, value = PE.get_llm_runtime_setting(case.key)
+			helpers.assert_eq(found, true, "runtime owner missing " .. case.key)
+			helpers.assert_eq(value, case.value, "runtime owner returned stale " .. case.key)
+		end
+		local found, value = PE.get_llm_runtime_setting("not_a_setting")
+		helpers.assert_eq(found, false)
+		helpers.assert_nil(value)
+	end)
 
-		-- A genuine numeric string is still accepted (coerced).
-		PE.set_llm_max_words("12")
-		helpers.assert_eq(hs.settings.get("llm_max_words"), 12)
+	helpers.it("real bridge propagates the real engine debounce refusal and throw", function()
+		local bridge = load_real_setting_bridge()
+		local inactivity_timer = nil
+		for _, timer in ipairs(hs.timer.__timers) do
+			if type(timer.setDelay) == "function" then inactivity_timer = timer end
+		end
+		helpers.assert_true(inactivity_timer ~= nil,
+			"the production engine must own its canonical delayed timer")
+
+		local old_found, old_debounce = PE.get_llm_runtime_setting("llm_debounce")
+		helpers.assert_eq(old_found, true)
+		local original_stop = inactivity_timer.stop
+		local original_running = inactivity_timer.running
+		inactivity_timer.running = true
+		inactivity_timer.stop = function(self) return self end
+		local call_ok, refused = pcall(bridge.set_llm_debounce, 0.73)
+		inactivity_timer.stop = original_stop
+		inactivity_timer.running = false
+		local restored = PE.set_llm_debounce(old_debounce)
+		inactivity_timer.running = original_running
+		helpers.assert_true(call_ok)
+		helpers.assert_eq(refused, false,
+			"the bridge must expose the engine timer's exact false refusal")
+		helpers.assert_eq(restored, true)
+
+		local original_temperature = PE.set_llm_temperature
+		PE.set_llm_temperature = function() error("real engine boundary exploded") end
+		local throw_ok, throw_error = pcall(bridge.set_llm_temperature, 0.8)
+		PE.set_llm_temperature = original_temperature
+		helpers.assert_eq(throw_ok, false)
+		helpers.assert_true(tostring(throw_error):find(
+			"real engine boundary exploded", 1, true) ~= nil)
 	end)
 
 	helpers.it("set_llm_debounce recreates the timer without throwing", function()

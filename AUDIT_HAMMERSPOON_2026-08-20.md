@@ -70,7 +70,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-023` — this fix commit (`fix(macos): publish VS Code extension transactionally`); `--only "HS-023"` passes 9/9
 - [ ] `HS-024` — MLX download exactly-once terminal contract
 - [x] `HS-025` — asynchronous Ollama readiness probes
-- [ ] `HS-026` — LLM settings transaction
+- [x] `HS-026` — LLM settings transaction; independently reviewed GO
 - [x] `HS-027` — this fix commit; model and `No Model` share one recoverable transition, with 26 focused refusal/retry cases
 - [x] `HS-028` — this fix commit; direct profile selection is transactional with retryable compensation debt
 - [x] `HS-029` — pending model completion preserves newer explicit profile intent — fixed and independently reviewed in this commit
@@ -590,16 +590,17 @@ A faithful server harness produced `start_result=nil`, `native_port=0`, `getPort
 
 **Regression test.** Add `tests/unit/ui/menu/menu_llm/test_settings_transaction.lua`. Table-drive settings throw, runtime false/throw, persistence false, and menu callback throw across numeric/reset/toggle/modifier paths; assert exact old state/settings/runtime/menu on every pre-commit failure and exactly-once publication on success.
 
-**Implementation review collateral (open).** The first rescan routed six missed stock siblings through the shared owner—info-bar visibility, token streaming/multi-streaming, auto-raise temperature, prediction-count selection/reset, and reset-on-navigation—and their real callback matrix is now green. A second lens nevertheless found six material topology/native false-greens:
+**Implementation review collateral (closed).** The first rescan routed six missed stock siblings through the shared owner—info-bar visibility, token streaming/multi-streaming, auto-raise temperature, prediction-count selection/reset, and reset-on-navigation—and their real callback matrix is now green. A second lens nevertheless found six material topology/native false-greens:
 
 1. rollback calls `hs.settings.clear(key, nil)` through a generic two-argument writer even though the native API accepts only `clear(key)`; the permissive fixture ignores the extra argument, while production refuses and retains cleanup debt for a formerly absent setting;
 2. the outer `PreferencesTransaction` can republish its last candidate into `hs.settings` when a compensating save refuses, after the inner ledger already marked native-setting restoration settled, so a retry can finish with the candidate plist value;
 3. `llm_bridge` setter wrappers do not return their prediction-engine result, converting a real engine `false` (notably a debounce timer refusal) into accepted void `nil`;
 4. the prediction-engine min/max setters themselves write `hs.settings`, creating a second publisher before canonical persistence and overwriting a later exact plist rollback;
 5. menu rendering directly re-applies nav/validation modifiers through bare `pcall`, so a rebuild duplicates the committed runtime write and discards refusal; and
-6. the transaction copies `deps.state[key]` as its alleged runtime snapshot. The tests force state/runtime/plist equality, but boot/runtime refusal makes divergence reachable and rollback then restores the wrong engine value.
+6. the transaction copies `deps.state[key]` as its alleged runtime snapshot. The tests force state/runtime/plist equality, but boot/runtime refusal makes divergence reachable and rollback then restores the wrong engine value; and
+7. the first corrected fixture exercises the engine and bridge, then injects a fake keymap into the transaction. Removing the public `modules.keymap.init` getter export would therefore leave the focused suite green while every production transaction refuses before mutation. The native-shaped `hs.settings.clear` stub also returns void instead of its documented boolean.
 
-`HS-026` remains open until native arity, plist ownership/order, the complete bridge result chain, render-time writers, and a real runtime snapshot boundary are behaviorally pinned.
+All seven review gaps are now behaviorally pinned. `apply_setting_transaction` snapshots state, native plist and the actual runtime getter independently; exact runtime, persistence, optional native publication and menu boundaries compensate in reverse with retryable debt. `hs.settings.clear(key)` uses its one-argument native shape, min/max setters no longer publish a second plist value, render-only menu rebuilds perform no runtime writes, and every engine setter result crosses bridge plus public keymap facade unchanged. The real callback matrix passes `95/95`; exact facade, bridge and prediction-engine modules pass `24/24`, `6/6` and `37/37`. Mutation-sensitive facade and native-arity tests closed the final false-greens, and independent read-only review returned GO.
 
 ### `HS-027` — Model switching publishes state before runtime and persistence commit
 

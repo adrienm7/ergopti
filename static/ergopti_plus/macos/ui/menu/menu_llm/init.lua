@@ -445,15 +445,12 @@ function M.create(deps)
 								checked = (state.llm_num_predictions == i),
 								action  = function()
 										Logger.info(LOG, string.format("Changing number of predictions -> %d", i))
-										state.llm_num_predictions = i
-										if keymap and type(keymap.set_llm_num_predictions) == "function" then 
-												local ok = pcall(keymap.set_llm_num_predictions, i)
-												Logger.debug(LOG, string.format("keymap.set_llm_num_predictions(%d) execution -> %s", i, tostring(ok)))
-										else
-												Logger.warn(LOG, "keymap.set_llm_num_predictions is unavailable.")
-										end
-										if save_prefs() ~= true then return false end
-										update_menu()
+										return settings_mgr.apply_setting_transaction({
+												key = "llm_num_predictions",
+												value = i,
+												runtime_fn = "set_llm_num_predictions",
+												publish_setting = false,
+										})
 								end
 						})
 				end
@@ -730,10 +727,12 @@ function M.create(deps)
 								title    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
 								disabled = MenuLayout.row_disabled("llm_num_predictions", is_disabled, paused),
 								fn       = function()
-										state.llm_num_predictions = llm_mod.DEFAULT_STATE.llm_num_predictions
-										if keymap and type(keymap.set_llm_num_predictions) == "function" then pcall(keymap.set_llm_num_predictions, state.llm_num_predictions) end
-										if save_prefs() ~= true then return false end
-										update_menu()
+										return settings_mgr.apply_setting_transaction({
+												key = "llm_num_predictions",
+												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
+												runtime_fn = "set_llm_num_predictions",
+												publish_setting = false,
+										})
 								end
 						})
 				end
@@ -770,10 +769,12 @@ function M.create(deps)
 						checked  = state.llm_reset_on_nav,
 						disabled = is_disabled or nil,
 						action   = function()
-								state.llm_reset_on_nav = not state.llm_reset_on_nav
-								if keymap and type(keymap.set_llm_reset_on_nav) == "function" then pcall(keymap.set_llm_reset_on_nav, state.llm_reset_on_nav) end
-								if save_prefs() ~= true then return false end
-								update_menu()
+								return settings_mgr.apply_setting_transaction({
+										key = "llm_reset_on_nav",
+										value = not state.llm_reset_on_nav,
+										runtime_fn = "set_llm_reset_on_nav",
+										publish_setting = false,
+								})
 						end
 				})
 
@@ -826,15 +827,13 @@ function M.create(deps)
 
 				local nav_rows = {}
 
-				local nav_mods = hs.settings.get("llm_nav_modifiers")
-				-- Fail closed to the canonical default on any non-table (corrupt/AHK plist),
-				-- so both the engine setter and format_shortcut_title get a valid table.
+				local nav_mods = state.llm_nav_modifiers
+				-- Rendering observes canonical state only. Runtime synchronization belongs
+				-- to SettingsManager's transaction and must never be repeated by a rebuild.
 				if type(nav_mods) ~= "table" then nav_mods = llm_mod.DEFAULT_STATE.llm_nav_modifiers end
-				if keymap and type(keymap.set_llm_nav_modifiers) == "function" then pcall(keymap.set_llm_nav_modifiers, nav_mods) end
 
-				local val_mods = hs.settings.get("llm_val_modifiers")
+				local val_mods = state.llm_val_modifiers
 				if type(val_mods) ~= "table" then val_mods = llm_mod.DEFAULT_STATE.llm_val_modifiers end
-				if keymap and type(keymap.set_llm_val_modifiers) == "function" then pcall(keymap.set_llm_val_modifiers, val_mods) end
 
 				local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
 				local nav_title = format_shortcut_title(i18n.get("menu.llm.nav_label"), nav_mods, i18n.get("menu.llm.arrows_only"), i18n.get("menu.llm.arrows"))
