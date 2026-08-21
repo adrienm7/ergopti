@@ -274,7 +274,27 @@ function M.new(deps)
 	local presets = load_models_presets()
 
 	-- Injecting a cross-engine hardware check for dynamic scaling.
-	deps.shared_system_check = function(target_model, engine_name, repo_info, do_download, on_cancel)
+	deps.shared_system_check = function(target_model, engine_name, repo_info, do_download, on_cancel, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local cancellation_sent = false
+		local function cancel_once(label)
+			if cancellation_sent then return false end
+			cancellation_sent = true
+			if type(on_cancel) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, on_cancel)
+			return ok and result ~= false
+		end
+		local function still_current()
+			local ok, current = Logger.callback(LOG,
+				"Model system-check freshness check", is_current)
+			return ok == true and current == true
+		end
+		local function current_or_cancel()
+			if still_current() then return true end
+			cancel_once("Stale model system-check cancellation")
+			return false
+		end
+		if not current_or_cancel() then return false end
 		local is_mlx   = engine_name:lower():find("mlx") ~= nil
 		local ram_req  = get_model_ram_logic(target_model, presets, is_mlx)
 		local size     = get_model_size_logic(target_model, presets, is_mlx)
@@ -310,6 +330,7 @@ function M.new(deps)
 		local msg = string.format(i18n.get("menu.llm.model_label"), target_model) .. "\n\n" .. table.concat(warnings, "\n")
 		
 		hs.timer.doAfter(0.1, function()
+			if not current_or_cancel() then return end
 			local hs_app = hs.application and hs.application.get and hs.application.get("Hammerspoon") or nil
 			if not hs_app and hs.application and hs.application.find then
 				hs_app = hs.application.find("Hammerspoon")
@@ -321,9 +342,7 @@ function M.new(deps)
 			end
 			if is_critical then
 				pcall(dialog.block_alert, i18n.get("menu.llm.download_failed"), msg, i18n.get("common.close"), nil, "critical")
-				if type(on_cancel) == "function" then
-					Logger.callback(LOG, "System-check cancellation", on_cancel)
-				end
+				cancel_once("System-check cancellation")
 				return
 			end
 			
@@ -337,6 +356,7 @@ function M.new(deps)
 			local ok_c, choice = pcall(dialog.block_alert,
 				string.format(i18n.get("menu.llm.hw_header"), engine_name),
 				body, i18n.get("menu.llm.btn_download"), i18n.get("common.cancel"), msg:find("⚠️") and "warning" or "informational")
+			if not current_or_cancel() then return end
 				
 			if ok_c and choice == i18n.get("menu.llm.btn_download") then
 				-- Clear any stale abort flag from a previous cancelled download so
@@ -346,23 +366,21 @@ function M.new(deps)
 						"Download-abort reset", deps.clear_download_abort)
 					if not ok_clear or cleared == false then
 						Logger.error(LOG, "Download refused because its prior abort state could not be reset.")
-						if type(on_cancel) == "function" then
-							Logger.callback(LOG, "Download reset failure", on_cancel)
-						end
+						cancel_once("Download reset failure")
 						return
 					end
 				end
+				if not current_or_cancel() then return end
 				local download_ok, accepted = Logger.callback(LOG,
 					"Approved model download", do_download)
-				if (not download_ok or accepted == false) and type(on_cancel) == "function" then
-					Logger.callback(LOG, "Model download dispatch failure", on_cancel)
+				if not download_ok or accepted == false then
+					cancel_once("Model download dispatch failure")
 				end
 			else
-				if type(on_cancel) == "function" then
-					Logger.callback(LOG, "Download prompt cancellation", on_cancel)
-				end
+				cancel_once("Download prompt cancellation")
 			end
 		end)
+		return true
 	end
 
 	-- Inject minimal wrappers into deps to centralize download abort/reset

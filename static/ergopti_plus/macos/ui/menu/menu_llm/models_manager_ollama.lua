@@ -172,41 +172,66 @@ function M.new(deps, presets, ram_getter)
 	--- Ensures the Ollama daemon is running, starts it otherwise.
 	--- @param on_ready function Callback executed when ready.
 	--- @param on_fail function Callback executed when failed.
-	local function ensure_ollama_running(on_ready, on_fail)
+	--- @param opts table|nil Operation options, including the live generation predicate.
+	local function ensure_ollama_running(on_ready, on_fail, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local terminal_sent = false
+		local function settle(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, callback, ...)
+			return ok and result ~= false
+		end
+		local function settle_failure(...)
+			return settle(on_fail, "Ollama daemon failure", ...)
+		end
+		local function still_current()
+			local ok, current = Logger.callback(LOG,
+				"Ollama daemon freshness check", is_current)
+			return ok == true and current == true
+		end
+		local function current_or_cancel()
+			if still_current() then return true end
+			settle_failure("stale")
+			return false
+		end
+		local function settle_ready(...)
+			if not current_or_cancel() then return false end
+			return settle(on_ready, "Ollama daemon ready", ...)
+		end
+
+		if not current_or_cancel() then return false end
 		local ok, result = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
+		if not current_or_cancel() then return false end
 		if ok and result and result:find('"version"') then
-			if type(on_ready) == "function" then
-				return Logger.callback(LOG, "Ollama ready", on_ready)
-			end
-			return
+			return settle_ready()
 		end
 
 		pcall(notifications.notify, i18n.get("ollama.starting_title"), i18n.get("ollama.service_stopped"), "info")
+		if not current_or_cancel() then return false end
 		if restart_ollama_daemon() then
 			local retries = 0
 			local function check_ready()
+				if not current_or_cancel() then return end
 				retries = retries + 1
 				local ok2, result2 = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
+				if not current_or_cancel() then return end
 				if ok2 and result2 and result2:find('"version"') then
-					if type(on_ready) == "function" then
-						Logger.callback(LOG, "Ollama daemon ready", on_ready)
-					end
+					settle_ready()
 				elseif retries < 30 then
 					hs.timer.doAfter(0.5, check_ready)
 				else
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.start_fail"), "error")
-					if type(on_fail) == "function" then
-						Logger.callback(LOG, "Ollama daemon readiness failure", on_fail)
-					end
+					settle_failure("readiness_timeout")
 				end
 			end
 			hs.timer.doAfter(0.5, check_ready)
 		else
 			pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.daemon_fail"), "error")
-			if type(on_fail) == "function" then
-				Logger.callback(LOG, "Ollama daemon restart failure", on_fail)
-			end
+			settle_failure("restart_failed")
 		end
+		return true
 	end
 
 	local function get_ollama_repo(model_name)
@@ -291,13 +316,34 @@ function M.new(deps, presets, ram_getter)
 	--- Pre-warms the installed models cache in the background at startup.
 	hs.timer.doAfter(0, function() pcall(refresh_installed_async) end)
 
-	local function check_model_loadable(target_model, on_success, on_fail)
+	local function check_model_loadable(target_model, on_success, on_fail, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local terminal_sent = false
+		local function settle(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, callback, ...)
+			return ok and result ~= false
+		end
+		local function settle_failure(...)
+			return settle(on_fail, "Ollama model-load failure", ...)
+		end
+		local function still_current()
+			local ok, current = Logger.callback(LOG,
+				"Ollama model-load freshness check", is_current)
+			return ok == true and current == true
+		end
+		local function current_or_cancel()
+			if still_current() then return true end
+			settle_failure("stale", false)
+			return false
+		end
+
+		if not current_or_cancel() then return false end
 		if type(target_model) ~= "string" or target_model == "" then
-			if type(on_fail) == "function" then
-				Logger.callback(LOG, "Ollama model validation failure", on_fail,
-					"invalid_model", false)
-			end
-			return
+			settle_failure("invalid_model", false)
+			return false
 		end
 
 		local payload = {
@@ -314,36 +360,62 @@ function M.new(deps, presets, ram_getter)
 
 		local ok_enc, body = pcall(hs.json.encode, payload)
 		if not ok_enc or type(body) ~= "string" then
-			if type(on_fail) == "function" then
-				Logger.callback(LOG, "Ollama model-probe encoding failure", on_fail,
-					"encode_error", false)
-			end
-			return
+			settle_failure("encode_error", false)
+			return false
 		end
 
+		if not current_or_cancel() then return false end
 		hs.http.asyncPost("http://127.0.0.1:11434/api/chat", body, { ["Content-Type"] = "application/json" },
 			function(status, resp_body, _)
+				if not current_or_cancel() then return end
 				if status == 200 then
-					if type(on_success) == "function" then
-						Logger.callback(LOG, "Ollama model-load success", on_success)
-					end
+					settle(on_success, "Ollama model-load success")
 					return
 				end
 
 				local err_text = type(resp_body) == "string" and resp_body or ""
 				local load_error = err_text:find("unable to load model", 1, true) ~= nil
-				if type(on_fail) == "function" then
-					Logger.callback(LOG, "Ollama model-load failure", on_fail,
-						err_text, load_error)
-				end
+				settle_failure(err_text, load_error)
 			end
 		)
+		return true
 	end
 
-	function obj.pull_model(target_model, repo, on_success)
+	function obj.pull_model(target_model, repo, on_success, on_cancel, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local terminal_sent = false
+		local user_cancelled = false
+		local task
+		local function settle(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, callback, ...)
+			return ok and result ~= false
+		end
+		local function settle_cancel(...)
+			return settle(on_cancel, "Ollama pull cancellation", ...)
+		end
+		local function still_current()
+			local ok, current = Logger.callback(LOG,
+				"Ollama pull freshness check", is_current)
+			return ok == true and current == true
+		end
+		local function current_or_cancel()
+			if user_cancelled then return false end
+			if still_current() then return true end
+			settle_cancel("stale")
+			return false
+		end
+		local function settle_success(...)
+			if not current_or_cancel() then return false end
+			return settle(on_success, "Ollama pull success", ...)
+		end
+
+		if not current_or_cancel() then return false end
 		deps.active_tasks = deps.active_tasks or {}
 		if deps.active_tasks["ollama_pull"] then
-			Logger.warn(LOG, "Ollama pull for %s refused while another exact pull owns the slot.",
+			Logger.warn(LOG, "Ollama pull for %s refused while another pull owns the slot.",
 				tostring(target_model))
 			return false
 		end
@@ -354,20 +426,32 @@ function M.new(deps, presets, ram_getter)
 			return false
 		end
 		local pull_output = ""
-		
-		local function do_retry()
-			if deps.active_tasks and deps.active_tasks["ollama_pull"] then return end
-			hs.timer.doAfter(0.05, function()
-				obj.pull_model(target_model, repo, on_success)
-			end)
+		local function cancel_current_pull()
+			if user_cancelled then return false end
+			user_cancelled = true
+			if task and type(task.terminate) == "function" then
+				pcall(function() task:terminate() end)
+			end
+			return true
 		end
 		
-		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_pull_and_upgrade, do_retry)
+		local function do_retry()
+			if not current_or_cancel() then return false end
+			if deps.active_tasks and deps.active_tasks["ollama_pull"] then return end
+			hs.timer.doAfter(0.05, function()
+				if not current_or_cancel() then return end
+				obj.pull_model(target_model, repo, on_success, on_cancel, opts)
+			end)
+			return true
+		end
 		
-		local task
+		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_current_pull, do_retry)
+		
+		if not current_or_cancel() then return false end
 		task = TaskLifecycle.native("Ollama model pull", bin, function(code)
 			if deps.active_tasks["ollama_pull"] ~= task then return end
 			deps.active_tasks["ollama_pull"] = nil
+			if not current_or_cancel() then return end
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(true, target_model)
@@ -408,14 +492,10 @@ function M.new(deps, presets, ram_getter)
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
-					if type(on_success) == "function" then
-						Logger.callback(LOG, "Ollama pull load success", on_success)
-					end
+					settle_success()
 				end, function()
-					if type(on_success) == "function" then
-						Logger.callback(LOG, "Ollama pull load fallback", on_success)
-					end
-				end)
+					settle_success()
+				end, opts)
 			elseif code == 15 then
 				pcall(notifications.notify, i18n.get("ollama.cancelled_title"), i18n.get("ollama.download_cancelled"), "warning")
 				complete_progress_ui(false, target_model)
@@ -435,6 +515,7 @@ function M.new(deps, presets, ram_getter)
 				end
 			end
 		end, function(_, stdout, stderr)
+			if not current_or_cancel() then return false end
 			local out = sanitize_terminal_stream((stdout or "") .. (stderr or ""))
 			pull_output = pull_output .. out
 			if out ~= "" then
@@ -450,12 +531,22 @@ function M.new(deps, presets, ram_getter)
 		end, {"pull", repo})
 		
 		if task then
+			if not current_or_cancel() then return false end
 			deps.active_tasks["ollama_pull"] = task
 			if not TaskLifecycle.start(task, "Ollama model pull") then
 				if deps.active_tasks["ollama_pull"] == task then
 					deps.active_tasks["ollama_pull"] = nil
 				end
 				complete_progress_ui(false, target_model)
+				return false
+			end
+			if not current_or_cancel() then
+				if deps.active_tasks["ollama_pull"] == task then
+					deps.active_tasks["ollama_pull"] = nil
+					if type(task.terminate) == "function" then
+						pcall(function() task:terminate() end)
+					end
+				end
 				return false
 			end
 		else
@@ -465,9 +556,19 @@ function M.new(deps, presets, ram_getter)
 		return true
 	end
 
-	function obj.install_ollama_then_pull(target_model, repo, on_success)
+	function obj.install_ollama_then_pull(target_model, repo, on_success, on_cancel, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local ok_current, current = Logger.callback(LOG,
+			"Ollama install freshness check", is_current)
+		if not (ok_current == true and current == true) then
+			if type(on_cancel) == "function" then
+				Logger.callback(LOG, "Stale Ollama install cancellation", on_cancel, "stale")
+			end
+			return false
+		end
 		pcall(hs.urlevent.openURL, "https://ollama.com/download")
 		pcall(notifications.notify, i18n.get("ollama.not_detected_title"), i18n.get("ollama.not_detected_body"), "warning")
+		return false
 	end
 
 	--- Verifies if the target model is installed, triggering the download prompt otherwise.
@@ -477,29 +578,51 @@ function M.new(deps, presets, ram_getter)
 	--- @param opts table|nil Options: `silent_notifications` (boolean) suppresses repair toasts.
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local terminal_sent = false
+		local function settle(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, callback, ...)
+			return ok and result ~= false
+		end
+		local function settle_cancel(...)
+			return settle(on_cancel, "Ollama requirement cancellation", ...)
+		end
+		local function settle_stale(reason)
+			if reason ~= "stale" then return false end
+			return settle_cancel(reason)
+		end
 		local function still_current()
 			local ok, current = Logger.callback(LOG,
 				"Ollama requirement freshness check", is_current)
-			return ok and current == true
+			return ok == true and current == true
 		end
-		if not still_current() then return end
-		if not target_model or target_model == "" then return end
+		local function current_or_cancel()
+			if still_current() then return true end
+			settle_cancel("stale")
+			return false
+		end
+		local function settle_success(...)
+			if not current_or_cancel() then return false end
+			return settle(on_success, "Ollama requirement success", ...)
+		end
+		if not current_or_cancel() then return false end
+		if not target_model or target_model == "" then return settle_success() end
 		local silent = type(opts) == "table" and opts.silent_notifications == true
 		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
 		
 		ensure_ollama_running(function()
-			if not still_current() then return end
+			if not current_or_cancel() then return false end
 			local bin = require_ollama_path("check model requirements")
 			if not bin then
-				if type(on_cancel) == "function" then
-					Logger.callback(LOG, "Ollama requirement binary failure", on_cancel)
-				end
-				return
+				settle_cancel("binary_unavailable")
+				return false
 			end
 			local task
-				task = TaskLifecycle.native("Ollama model requirement check", bin, function(code, stdout)
+			task = TaskLifecycle.native("Ollama model requirement check", bin, function(code, stdout)
 				if task then _active_tasks[task] = nil end
-				if not still_current() then return end
+				if not current_or_cancel() then return end
 				local installed = {}
 				if code == 0 and type(stdout) == "string" then
 					for line in stdout:gmatch("[^\r\n]+") do
@@ -514,51 +637,65 @@ function M.new(deps, presets, ram_getter)
 
 				if installed[actual_model] or installed[actual_model .. ":latest"] or installed[repo] or installed[repo .. ":latest"] then
 					check_model_loadable(actual_model, function()
-						if still_current() and type(on_success) == "function" then
-							Logger.callback(LOG, "Ollama requirements success", on_success)
-						end
+						settle_success()
 					end, function(_, is_load_error)
-						if not still_current() then return end
+						if not current_or_cancel() then return end
 						if is_load_error and get_ollama_path() then
 							if not silent then
 								pcall(notifications.notify, i18n.get("ollama.model_repair_title"), string.format(i18n.get("ollama.model_repair"), target_model), "info")
 							end
-							if still_current() then obj.pull_model(target_model, repo, on_success) end
+							if not current_or_cancel() then return end
+							local accepted = obj.pull_model(target_model, repo,
+								settle_success, settle_stale, opts)
+							if accepted == false then settle_cancel("repair_pull_refused") end
 							return
 						end
-						if type(on_cancel) == "function" then
-							Logger.callback(LOG, "Ollama model-load cancellation", on_cancel)
-						end
-					end)
+						settle_cancel("model_load_failed")
+					end, opts)
 				else
 					if type(deps.shared_system_check) == "function" then
 						local check_ok, accepted = Logger.callback(LOG, "Ollama shared system check",
 							deps.shared_system_check, target_model, "Ollama", repo, function()
-							if not still_current() then return end
-							if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
-							else obj.install_ollama_then_pull(target_model, repo, on_success) end
-						end, on_cancel)
-						if (not check_ok or accepted == false) and type(on_cancel) == "function" then
-							Logger.callback(LOG, "Ollama system-check failure", on_cancel)
+							if not current_or_cancel() then return false end
+							if get_ollama_path() then
+								return obj.pull_model(target_model, repo,
+									settle_success, settle_stale, opts)
+							end
+							return obj.install_ollama_then_pull(target_model, repo,
+								settle_success, settle_stale, opts)
+						end, settle_cancel, opts)
+						if not check_ok or accepted == false then
+							settle_cancel("system_check_refused")
 						end
 					else
-						if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
-						else obj.install_ollama_then_pull(target_model, repo, on_success) end
-					end
-				end
-				end, {"list"})
-				if task then
-					_active_tasks[task] = true
-					if not TaskLifecycle.start(task, "Ollama model requirement check") then
-						_active_tasks[task] = nil
-						if type(on_cancel) == "function" then
-							Logger.callback(LOG, "Ollama requirement start refusal", on_cancel)
+						if not current_or_cancel() then return end
+						local accepted
+						if get_ollama_path() then
+							accepted = obj.pull_model(target_model, repo,
+								settle_success, settle_stale, opts)
+						else
+							accepted = obj.install_ollama_then_pull(target_model, repo,
+								settle_success, settle_stale, opts)
 						end
+						if accepted == false then settle_cancel("download_dispatch_refused") end
 					end
-				elseif type(on_cancel) == "function" then
-					Logger.callback(LOG, "Ollama requirement construction failure", on_cancel)
 				end
-		end, on_cancel)
+			end, {"list"})
+			if task then
+				if not current_or_cancel() then return false end
+				_active_tasks[task] = true
+				if not TaskLifecycle.start(task, "Ollama model requirement check") then
+					_active_tasks[task] = nil
+					settle_cancel("task_start_refused")
+					return false
+				end
+			else
+				settle_cancel("task_construction_failed")
+				return false
+			end
+			return true
+		end, settle_cancel, opts)
+		return true
 	end
 
 	function obj.delete_model(model_name)

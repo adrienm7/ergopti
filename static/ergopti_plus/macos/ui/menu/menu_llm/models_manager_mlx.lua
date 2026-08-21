@@ -204,47 +204,72 @@ function M.new(deps, presets)
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local terminal_sent = false
 		local function still_current()
 			local ok, current = Logger.callback(LOG,
 				"MLX requirement freshness check", is_current)
-			return ok and current == true
+			return ok == true and current == true
 		end
-		if not still_current() then return end
+		local function settle(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, callback, ...)
+			return ok and result ~= false
+		end
+		local function settle_cancel(...)
+			return settle(on_cancel, "MLX requirement cancellation", ...)
+		end
+		local function current_or_cancel()
+			if still_current() then return true end
+			settle_cancel("stale")
+			return false
+		end
+		local function settle_success(...)
+			if not current_or_cancel() then return false end
+			return settle(on_success, "MLX requirement success", ...)
+		end
+		if not current_or_cancel() then return false end
 		if not target_model or target_model == "" then 
-			if still_current() and type(on_success) == "function" then
-				Logger.callback(LOG, "Empty MLX requirement success", on_success)
-			end
-			return 
+			return settle_success()
 		end
 		Logger.debug(LOG, "Checking MLX requirements for model %s…", tostring(target_model))
 
 		local function do_check()
-			if not still_current() then return end
+			if not current_or_cancel() then return false end
 			local installed = obj.get_installed_models()
 			if installed[target_model] then
 				Logger.info(LOG, "MLX model %s is installed. Starting server…", tostring(target_model))
-				if still_current() then obj.start_server(target_model, on_success, on_cancel, opts) end
+				if not current_or_cancel() then return false end
+				local started = obj.start_server(target_model, settle_success, settle_cancel, opts)
+				if started == false then settle_cancel("start_refused") end
+				return started ~= false
 			else
+				if not current_or_cancel() then return false end
 				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)
 				if not repo then 
 					pcall(notifications.notify, i18n.get("mlx.model_unavailable"), string.format(i18n.get("mlx.model_unavailable_body"), target_model), "error")
-					if type(on_cancel) == "function" then
-						Logger.callback(LOG, "Unavailable MLX model", on_cancel)
-					end
-					return 
+					settle_cancel("unavailable")
+					return false
 				end
 				
 				if type(deps.shared_system_check) == "function" then
 					local check_ok, accepted = Logger.callback(LOG, "MLX shared system check",
 						deps.shared_system_check, target_model, "Apple MLX", repo, function()
-						if still_current() then obj.pull_model(target_model, repo, on_success) end
-					end, on_cancel)
-					if (not check_ok or accepted == false) and type(on_cancel) == "function" then
-						Logger.callback(LOG, "MLX system-check failure", on_cancel)
+							if not current_or_cancel() then return false end
+							return obj.pull_model(target_model, repo,
+								settle_success, settle_cancel, opts)
+						end, settle_cancel, opts)
+					if not check_ok or accepted == false then
+						settle_cancel("system_check_refused")
+						return false
 					end
+					return true
 				else
-					if still_current() then obj.pull_model(target_model, repo, on_success) end
+					if not current_or_cancel() then return false end
+					return obj.pull_model(target_model, repo,
+						settle_success, settle_cancel, opts) ~= false
 				end
 			end
 		end
@@ -266,7 +291,7 @@ function M.new(deps, presets)
 		local check_task
 		check_task = TaskLifecycle.native("MLX requirement check", "/bin/bash", function(code)
 			if check_task then M._active_tasks[check_task] = nil end
-			if not still_current() then return end
+			if not current_or_cancel() then return end
 			if code == 0 then
 				do_check()
 			else
@@ -310,7 +335,7 @@ function M.new(deps, presets)
 					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
 						i18n.get("mlx.deps_missing_body"), "error")
 				end
-				ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
+				settle_cancel("dependency_probe_failed")
 			end
 		end, {"-c", check_cmd})
 		
@@ -318,11 +343,14 @@ function M.new(deps, presets)
 			M._active_tasks[check_task] = true
 			if not TaskLifecycle.start(check_task, "MLX requirement check") then
 				M._active_tasks[check_task] = nil
-				ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
+				settle_cancel("task_start_refused")
+				return false
 			end
 		else
-			ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
+			settle_cancel("task_construction_failed")
+			return false
 		end
+		return true
 	end
 
 	function obj.delete_model(model_name)
