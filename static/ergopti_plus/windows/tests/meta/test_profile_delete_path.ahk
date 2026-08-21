@@ -23,8 +23,12 @@ _TPD_Check() {
 		"the detached candidate must remove the selected user profile")
 	Assert(InStr(Candidate, 'Candidate["profile_id"] := "basic"') > 0,
 		"deleting the active profile must select a valid built-in fallback")
-	Assert(InStr(Publisher, "LLM_Menu_BindProfileHotkeys") > 0,
-		"only the committed publisher may re-bind profile hotkeys")
+	Assert(InStr(Publisher, "LLM_Menu_BindProfileHotkeys") == 0,
+		"fixed profile variants resolve live order and must not rebind post-commit")
+	Callback := _DriverFuncBody("_LLM_Menu_OnProfileHotkey")
+	Assert(Callback != ""
+		&& InStr(Callback, "LLM_Menu_GetHotkeyProfileOrder()") > 0,
+		"profile callbacks must resolve the committed order when they fire")
 }
 
 Test("LLMTray: profiles can be deleted", _TPD_Check)

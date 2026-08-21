@@ -787,6 +787,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_llm_trigger_shortcut_transactions.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
+#Include unit/test_llm_profile_hotkey_transaction.ahk
 #Include unit/test_llm_trigger_journal.ahk
 #Include meta/test_llm_trigger_shortcut_transaction.ahk
 #Include meta/test_llm_trigger_journal_lifecycle.ahk

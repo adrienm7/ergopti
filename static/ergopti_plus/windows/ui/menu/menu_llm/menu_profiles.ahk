@@ -463,8 +463,6 @@ _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 
 _LLM_Menu_ApplyProfileCommitted(*) {
 	_LLM_Menu_ApplyStandardCommitted()
-	if IsSet(LLM_Menu_BindProfileHotkeys)
-		(LLM_Menu_BindProfileHotkeys)()
 	return true
 }
 
@@ -744,25 +742,178 @@ LLM_Menu_GetProfileHotkeyHint(id) {
 ; keyed HotIf contexts on the function reference: a fresh lambda on each call
 ; would create a new context, orphaning the previous bindings and leaking them.
 global _LLM_PROFILE_HOTKEY_PRED := _LLM_Menu_IsProfileHotkeyActive.Bind()
+; Published only after all fixed Ctrl+digit variants exist and the dynamic
+; HotIf context has been reset. Partially-created native variants remain inert
+; because their stable predicate refuses while this owner is absent.
+global _LLM_Menu_ProfileHotkeyOwner := 0
+global _LLM_Menu_ProfileHotkeyFailureCount := 0
+global _LLM_PROFILE_HOTKEY_STATUS_READY := 1
+global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED := -1
+global _LLM_PROFILE_HOTKEY_RETRY_LIMIT := 3
 
 /**
  * Registers Ctrl+1 … Ctrl+9 globally so the user can switch profiles from
- * any focused app. Idempotent — calling this on every menu rebuild is safe
- * because AHK's ``Hotkey`` API replaces an existing binding when the same
- * key triple is re-registered. The hotkey only fires when the LLM feature
- * is enabled (paused / disabled scripts still get the bare Ctrl+<n> their
- * apps expect).
+ * any focused app. The surface is immutable: every callback resolves the
+ * current profile order at fire time. Therefore one retained readiness owner
+ * is sufficient — retries overwrite the same nine variants and publication
+ * happens only after the complete pass and a proven HotIf reset.
  */
-LLM_Menu_BindProfileHotkeys() {
-	global LLM_PROFILE_HOTKEY_LIMIT, _LLM_PROFILE_HOTKEY_PRED
-	; Stable predicate — same BoundFunc every call so AHK reuses the context
-	HotIf(_LLM_PROFILE_HOTKEY_PRED)
-	loop LLM_PROFILE_HOTKEY_LIMIT {
-		idx := A_Index
-		key := "^" . idx
-		try Hotkey(key, _LLM_Menu_MakeProfileHotkey(idx), "On")
+LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
+		ResetFn := 0) {
+	global _LLM_PROFILE_HOTKEY_PRED, _LLM_Menu_ProfileHotkeyOwner
+	global _LLM_Menu_ProfileHotkeyFailureCount
+	global _LLM_PROFILE_HOTKEY_STATUS_READY
+	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	global _LLM_PROFILE_HOTKEY_RETRY_LIMIT
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_BindProfileHotkeys(HotkeyFn, HotIfFn, LogFn,
+			ResetFn)
+		finally Critical(InheritedCritical)
 	}
-	HotIf  ; reset
+	if (_LLM_Menu_ProfileHotkeyOwner is Map) {
+		return _LLM_Menu_ProfileHotkeyOwnerReady()
+			? _LLM_PROFILE_HOTKEY_STATUS_READY
+			: _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	}
+	if !HasMethod(HotkeyFn, "Call")
+		HotkeyFn := _LLM_Menu_ProfileNativeHotkey
+	if !HasMethod(HotIfFn, "Call")
+		HotIfFn := _LLM_Menu_ProfileNativeHotIf
+	if !HasMethod(ResetFn, "Call")
+		ResetFn := _LLM_Menu_ProfileNativeHotIf
+	CandidatePlan := _LLM_Menu_BuildProfileHotkeyPlan()
+
+	PreviousCritical := Critical("On")
+	OpenAttempted := false
+	Succeeded := false
+	FailureDetail := ""
+	ResetFailure := 0
+	TerminalStatus := 0
+	try {
+		try {
+			OpenAttempted := true
+			HotIfFn.Call(_LLM_PROFILE_HOTKEY_PRED)
+			for Entry in CandidatePlan
+				HotkeyFn.Call(Entry["spec"], Entry["callback"], "On")
+			Succeeded := true
+		} catch as e {
+			FailureDetail := "Profile hotkey transaction failed: " . e.Message
+		} finally {
+			if OpenAttempted {
+				try _LLM_Menu_ProfileCloseHotIf(HotIfFn, ResetFn)
+				catch as e {
+					ResetFailure := e
+					Succeeded := false
+					FailureDetail := e.Message
+				}
+			}
+			if Succeeded {
+				_LLM_Menu_ProfileHotkeyFailureCount := 0
+				_LLM_Menu_ProfileHotkeyOwner := Map(
+					"ready", true, "degraded", false,
+					"plan", CandidatePlan)
+				TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_READY
+			} else if !IsObject(ResetFailure) {
+				_LLM_Menu_ProfileHotkeyFailureCount := Min(
+					_LLM_Menu_ProfileHotkeyFailureCount + 1,
+					_LLM_PROFILE_HOTKEY_RETRY_LIMIT)
+				if (_LLM_Menu_ProfileHotkeyFailureCount
+						>= _LLM_PROFILE_HOTKEY_RETRY_LIMIT) {
+					_LLM_Menu_ProfileHotkeyOwner := Map(
+						"ready", false, "degraded", true, "plan", [])
+					TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+				}
+			}
+		}
+	} finally Critical(PreviousCritical)
+	if IsObject(ResetFailure) {
+		_LLM_Menu_LogProfileHotkeyFailure(FailureDetail, LogFn)
+		throw TrayRootFatalContextError(ResetFailure.Message, -1,
+			ResetFailure.Extra)
+	}
+	if (TerminalStatus == _LLM_PROFILE_HOTKEY_STATUS_DEGRADED) {
+		_LLM_Menu_LogProfileHotkeyFailure(FailureDetail, LogFn)
+		return _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	}
+	return TerminalStatus
+}
+
+_LLM_Menu_ProfileNativeHotkey(Args*) {
+	Hotkey(Args*)
+}
+
+_LLM_Menu_ProfileNativeHotIf(Args*) {
+	HotIf(Args*)
+}
+
+_LLM_Menu_BuildProfileHotkeyPlan() {
+	global LLM_PROFILE_HOTKEY_LIMIT
+	Plan := []
+	loop LLM_PROFILE_HOTKEY_LIMIT {
+		Index := A_Index
+		Plan.Push(Map("spec", "^" . Index,
+			"callback", _LLM_Menu_MakeProfileHotkey(Index)))
+	}
+	return Plan
+}
+
+_LLM_Menu_ProfileCloseHotIf(HotIfFn, ResetFn) {
+	Loop 2 {
+		try {
+			HotIfFn.Call()
+			return true
+		} catch {
+		}
+	}
+	try {
+		ResetFn.Call()
+		return true
+	} catch as e {
+		throw Error("Profile HotIf reset could not be proven", -1, e.Message)
+	}
+}
+
+_LLM_Menu_LogProfileHotkeyFailure(Message, LogFn := 0) {
+	if HasMethod(LogFn, "Call") {
+		try LogFn.Call(Message)
+		return
+	}
+	try LoggerError("LLM", "Profile hotkey registration failed: {1}.",
+		Message)
+}
+
+_LLM_Menu_ProfileHotkeyOwnerReady() {
+	global _LLM_Menu_ProfileHotkeyOwner, LLM_PROFILE_HOTKEY_LIMIT
+	Owner := _LLM_Menu_ProfileHotkeyOwner
+	if !(Owner is Map)
+		return false
+	Ready := Owner.Get("ready", false)
+	Degraded := Owner.Get("degraded", false)
+	Plan := Owner.Get("plan", 0)
+	if !((Ready is Integer) && Ready == 1
+			&& (Degraded is Integer) && Degraded == 0
+			&& (Plan is Array) && Plan.Length == LLM_PROFILE_HOTKEY_LIMIT)
+		return false
+	Loop Plan.Length {
+		Index := A_Index
+		if !Plan.Has(Index)
+			return false
+		Entry := Plan[Index]
+		if !(Entry is Map)
+			|| Entry.Get("spec", "") != "^" . Index
+			|| !HasMethod(Entry.Get("callback", 0), "Call")
+			return false
+	}
+	return true
+}
+
+_LLM_Menu_ProfileHotkeyRetryPending() {
+	global _LLM_Menu_ProfileHotkeyOwner
+	global _LLM_Menu_ProfileHotkeyFailureCount
+	return !(_LLM_Menu_ProfileHotkeyOwner is Map)
+		&& _LLM_Menu_ProfileHotkeyFailureCount > 0
 }
 
 /**
@@ -772,7 +923,9 @@ LLM_Menu_BindProfileHotkeys() {
  * falls through to the active app unchanged.
  */
 _LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {
-	global _LLM_Menu
+	global _LLM_Menu, _LLM_Menu_Loaded
+	if !_LLM_Menu_Loaded || !_LLM_Menu_ProfileHotkeyOwnerReady()
+		return false
 	if !IsSet(_LLM_Menu) or !_LLM_Menu["enabled"]
 		return false
 	; Yield only when the published navigation owner has the exact same variant.

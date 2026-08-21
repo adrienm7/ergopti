@@ -104,15 +104,33 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 
 _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 		NavFn := 0) {
+	global _LLM_PROFILE_HOTKEY_STATUS_READY
+	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
 	if !FirstRestore
 		return true
 	if !HasMethod(ProfileFn, "Call")
 		ProfileFn := LLM_Menu_BindProfileHotkeys
 	if !HasMethod(NavFn, "Call")
 		NavFn := LLM_Menu_BindNavHotkeys
-	ProfileFn.Call()
+	ProfileStatus := ProfileFn.Call()
+	if !((ProfileStatus is Integer)
+			&& (ProfileStatus == _LLM_PROFILE_HOTKEY_STATUS_READY
+				|| ProfileStatus == _LLM_PROFILE_HOTKEY_STATUS_DEGRADED))
+		return false
 	NavReady := NavFn.Call()
 	return (NavReady is Integer) && NavReady == 1
+}
+
+_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
+		NavFn := 0) {
+	if _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn, NavFn)
+		return true
+	if _LLM_Menu_ProfileHotkeyRetryPending()
+		throw TrayRootRetryPendingError(
+			"initial LLM profile hotkeys are pending a bounded retry")
+	LoggerError("LLM",
+		"Initial LLM hotkey activation remained incomplete; retaining the tray build for retry.")
+	throw Error("initial LLM hotkey surface is incomplete")
 }
 
 /**
@@ -182,11 +200,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; would be wasteful and noisy in the AHK Hotkey log; doing it here
 	; covers both fresh boots and post-Reload paths since LLM_Menu_Init is
 	; the only entry into the tray module.
-	if !_LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore) {
-		LoggerError("LLM",
-			"Initial navigation hotkey activation remained incomplete; retaining the tray build for retry.")
-		throw Error("initial LLM navigation hotkeys are incomplete")
-	}
+	_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore)
 
 	; (Removed) First-run LLM onboarding TrayTip — the unsolicited
 	; "Text predictions available" balloon was perceived as noise by users
