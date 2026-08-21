@@ -77,6 +77,15 @@ for (const inheritedKey of ['__CFBundleIdentifier', 'XPC_SERVICE_NAME']) {
 		);
 	}
 }
+if (!/NSWorkspace\.shared\.openApplication\(/.test(launcher)) {
+	errors.push('the embedded Hammerspoon GUI must be launched through NSWorkspace.');
+}
+if (!/embeddedApplicationBundleURL\(binaryPath: binaryPath\)/.test(launcher)) {
+	errors.push('Launch Services must receive the embedded .app, not its inner Mach-O.');
+}
+if (/proc\.executableURL\s*=/.test(launcher)) {
+	errors.push('the embedded AppKit GUI must not be executed directly as a Process.');
+}
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] launcher Info.plist is missing the single-instance guard:\x1b[0m');
