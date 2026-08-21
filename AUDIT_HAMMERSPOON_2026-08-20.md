@@ -79,7 +79,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-032` — Ollama pull owns download/loadability only; parent model transaction is the sole publisher
 - [ ] `HS-033` — profile deletion retains exact shortcut and runtime-profile ownership
 - [ ] `HS-034` — failed profile creation removes its uncommitted registry candidate
-- [ ] `HS-035` — Ollama pull failure reaches the parent requirements terminal
+- [x] `HS-035` — Ollama pull failure reaches the parent requirements terminal; independently reviewed GO
 - [x] `PARITY-001` — `4f22a1efc` (Linux suffix codepoint count)
 - [x] `PARITY-002` — `22ca14d81` (Linux canonical multibyte trigger)
 
@@ -771,6 +771,8 @@ The explicit `No Model` sibling is the same distributed transition. With model `
 **Fix.** Pass a general child-failure adapter that settles the outer `on_cancel` for every terminal reason, while preserving the existing generation guard so stale work still settles once and cannot publish. Every accepted pull path under requirements must end in exactly one outer success or failure.
 
 **Regression test.** Extend the real-manager parent harness or add `test_ollama_requirements_terminal_contract.lua`. Dispatch an absent model through `check_requirements()`, then table-drive process failure, user cancellation, task-construction/start refusal, and a stale completion. Assert one exact outer failure reason, zero success/publication, and no duplicate on repeated callbacks; retain a successful pull control.
+
+**Implemented and behaviorally replayed.** `check_requirements()` now routes every child pull failure through a generation-aware terminal adapter: a current failure preserves its exact reason, while a late child settles once as `stale`. The real readiness -> inventory -> pull -> loadability chain was red with `14` passes and `4` failures before the source fix, then green `19/19` after it. Its fixtures preserve the native `TaskLifecycle.native` four/five-argument forms, the void return of `hs.http.asyncPost`, task-shaped termination acceptance, reordered loadability callbacks, and duplicate delivery. Independent second-lens review returned GO; `HS-032` remains the sole-publication owner.
 
 ### Cross-driver parity findings discovered during implementation
 
