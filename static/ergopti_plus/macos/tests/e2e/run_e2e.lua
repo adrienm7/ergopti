@@ -20,10 +20,11 @@
 ---   1. Characters are fed into the shared CoreState buffer one by one via the
 ---      same `process_char` callback that the live eventtap calls.
 ---   2. The Expander module runs its full matching + replacement logic.
----   3. SyntheticInput returns the exact tagged Quartz events from the simulated
----      eventtap callback, as production does.
----   4. The harness replays those events against a virtual screen and verifies
----      their immutable transaction provenance.
+---   3. SyntheticInput returns the exact tagged replacement events from the
+---      simulated eventtap callback and posts reserved successors from its owned
+---      process FIFO, as production does.
+---   4. The harness captures both routes, replays the replacement against a
+---      virtual screen, and verifies their immutable transaction provenance.
 ---   5. Assertions compare emitted text and logical replacement counts against
 ---      the shared corpus.
 ---
@@ -185,10 +186,30 @@ local function make_vkb(trigger, replacement, opts)
 	-- transaction instance this scenario never created.
 	package.loaded["modules.keymap.terminator_replay"] = nil
 
+	-- Observe global FIFO posts before SyntheticInput captures newKeyEvent. A
+	-- reserved terminator is deliberately activated in the callback but posted on
+	-- a later timer turn, so callback-returned events alone are not the full output.
+	package.loaded["tests.stubs.hs"] = nil
+	local event_hs = require("tests.stubs.hs")
+	event_hs.__reset()
+	local posted_events = {}
+	local native_new_key_event = event_hs.eventtap.event.newKeyEvent
+	event_hs.eventtap.event.newKeyEvent = function(modifiers, key, is_down)
+		local event = native_new_key_event(modifiers, key, is_down)
+		local native_post = event.post
+		event.post = function(self, app)
+			posted_events[#posted_events + 1] = { event = self, app = app }
+			return native_post(self, app)
+		end
+		return event
+	end
+
 	-- One load_with_stubs call establishes the canonical hs stub for this
 	-- scenario; all dependencies cascade from the same require chain and share
 	-- the same SyntheticInput ledger.
-	local Expander, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
+	local Expander, SyntheticInput = SyntheticStack.load("modules.keymap.expander", {
+		eventtap = event_hs.eventtap,
+	})
 	local Registry = require("modules.keymap.registry")
 	local text_utils = require("infra.text_utils")
 	-- Required from the SAME load wave as Expander so the harness drives the very
@@ -256,6 +277,9 @@ local function make_vkb(trigger, replacement, opts)
 		logical_bs = 0,
 		terminator_held = false,
 		provenance_ok = true,
+		callback_replay_pairs = 0,
+		posted_replay_pairs = 0,
+		remaining_transactions = 0,
 	}
 
 	-- Drives one eventtap callback and replays only its returned, tagged events
@@ -271,6 +295,10 @@ local function make_vkb(trigger, replacement, opts)
 		_result.logical_bs      = 0
 		_result.terminator_held = false
 		_result.provenance_ok   = true
+		_result.callback_replay_pairs = 0
+		_result.posted_replay_pairs = 0
+		_result.remaining_transactions = 0
+		posted_events = {}
 
 		state.buffer = buffer_text
 		SyntheticInput.enter_callback()
@@ -281,9 +309,9 @@ local function make_vkb(trigger, replacement, opts)
 		end
 		local fired = fired_or_err == true
 
-		-- Record the hold before handing the replacement table off. The replay is
-		-- collected only afterwards, in a second simulated callback, so the harness
-		-- cannot accidentally certify an inline terminator ahead of the replacement.
+		-- Record the hold before handing the replacement table off. The replay stays
+		-- detached from this collector and must only post from the owned process FIFO
+		-- after the replacement transaction has settled.
 		local replay_pending = TerminatorReplay.is_pending()
 		_result.terminator_held = replay_pending
 		local ok_leave, consume, returned_events = pcall(
@@ -302,33 +330,42 @@ local function make_vkb(trigger, replacement, opts)
 			return
 		end
 
-		local replay_flushed = true
+		local replay_activated = true
 		if replay_pending then
-			SyntheticInput.enter_callback()
 			local ok_flush, flushed_or_err = pcall(TerminatorReplay.flush_now,
 				"e2e harness: emulate post-handoff replay")
 			if not ok_flush then
-				SyntheticInput.abort_callback()
 				error(flushed_or_err, 0)
 			end
-			replay_flushed = flushed_or_err == true
-			local ok_replay, replay_consume, replay_events = pcall(
-				SyntheticInput.leave_callback, replay_flushed)
-			if not ok_replay then
-				SyntheticInput.abort_callback()
-				error(replay_consume, 0)
-			end
-			replay_flushed = replay_flushed and replay_consume == true
-			for _, event in ipairs(replay_events or {}) do
-				events[#events + 1] = event
-			end
+			replay_activated = flushed_or_err == true
 		end
 		_result.expanded = true
-		_result.provenance_ok = consume == true and replay_flushed
+		_result.provenance_ok = consume == true and replay_activated
+
+		-- The recurring FIFO owner is the only authority allowed to post a reserved
+		-- successor. Drain bounded run-loop turns instead of assuming one fire_all()
+		-- settles every owner, and retain the active count as explicit evidence.
+		local drain_turns = 0
+		while SyntheticInput.stats().active_transactions ~= 0
+			or TerminatorReplay.is_pending() do
+			if not (hs and hs.timer and hs.timer.__fire_all) then
+				_result.provenance_ok = false
+				break
+			end
+			drain_turns = drain_turns + 1
+			if drain_turns > 128 then
+				_result.provenance_ok = false
+				break
+			end
+			hs.timer.__fire_all()
+		end
+		_result.remaining_transactions = SyntheticInput.stats().active_transactions
+		if TerminatorReplay.is_pending() then _result.provenance_ok = false end
 
 		-- Validate adjacent down/up phases and group them by immutable generation.
-		-- A terminator replay is intentionally a later transaction; every other
-		-- returned pair must belong to the registered `e2e` replacement.
+		-- Every callback-returned pair belongs to the registered `e2e` replacement.
+		-- A terminator replay in this table would prove the harness reintroduced the
+		-- old inline-handoff contract.
 		local property = hs.eventtap.event.properties.eventSourceUserData
 		local generations = {}
 		local metadata_by_event = {}
@@ -346,8 +383,7 @@ local function make_vkb(trigger, replacement, opts)
 				and down_meta.generation == up_meta.generation
 				and down_meta.owner == up_meta.owner
 				and down_meta.ordinal == up_meta.ordinal
-				and down_meta.owner ~= nil
-				and (down_meta.owner == "e2e" or down_meta.owner == "terminator_replay")
+				and down_meta.owner == "e2e"
 			if not pair_ok then
 				_result.provenance_ok = false
 			elseif generations[down_meta.owner]
@@ -358,16 +394,47 @@ local function make_vkb(trigger, replacement, opts)
 			end
 		end
 
-		-- Apply replacement keyDown events to the screen. TerminatorReplay owns its
-		-- own pair and is deliberately excluded so emitted() returns replacement
-		-- text only, matching the corpus contract.
-		local screen = buffer_text
+		-- Validate the globally posted successor independently. The exact one-pair
+		-- count is part of the contract: activation returns no callback event and the
+		-- FIFO later posts one tagged down/up pair.
 		local found_terminator_replay = false
+		if replay_pending then
+			if #posted_events ~= 2 then _result.provenance_ok = false end
+		elseif #posted_events ~= 0 then
+			_result.provenance_ok = false
+		end
+		if (#posted_events % 2) ~= 0 then _result.provenance_ok = false end
+		for index = 1, #posted_events, 2 do
+			local down_record, up_record = posted_events[index], posted_events[index + 1]
+			local down = down_record and down_record.event or nil
+			local up = up_record and up_record.event or nil
+			local down_meta = down and SyntheticInput.lookup_tag(down:getProperty(property)) or nil
+			local up_meta = up and SyntheticInput.lookup_tag(up:getProperty(property)) or nil
+			local pair_ok = down_meta and up_meta
+				and down_meta.owned and up_meta.owned
+				and down_meta.effect == "replacement" and up_meta.effect == "replacement"
+				and down_meta.phase == "down" and up_meta.phase == "up"
+				and down_meta.generation == up_meta.generation
+				and down_meta.owner == "terminator_replay"
+				and up_meta.owner == "terminator_replay"
+				and down_meta.ordinal == up_meta.ordinal
+			if not pair_ok then
+				_result.provenance_ok = false
+			else
+				found_terminator_replay = true
+				_result.posted_replay_pairs = _result.posted_replay_pairs + 1
+			end
+		end
+
+		-- Apply only callback-returned replacement keyDown events to the screen. The
+		-- globally posted terminator is deliberately excluded so emitted() matches
+		-- the corpus replacement contract.
+		local screen = buffer_text
 		for index, event in ipairs(events) do
 			if event.isDown then
 				local metadata = metadata_by_event[index]
 				if metadata and metadata.owner == "terminator_replay" then
-					found_terminator_replay = true
+					_result.callback_replay_pairs = _result.callback_replay_pairs + 1
 				elseif metadata and metadata.owner == "e2e" then
 					if event.key == "delete" then
 						local ok_off, off = pcall(utf8.offset, screen, -1)
@@ -410,8 +477,7 @@ local function make_vkb(trigger, replacement, opts)
 		end
 		_result.logical_bs = cp_count
 
-		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
-		if SyntheticInput.stats().active_transactions ~= 0 then
+		if _result.remaining_transactions ~= 0 then
 			_result.provenance_ok = false
 		end
 	end
@@ -444,12 +510,30 @@ local function make_vkb(trigger, replacement, opts)
 		return _result.provenance_ok
 	end
 
+	--- Returns how many terminator pairs incorrectly escaped through the callback.
+	local function callback_replay_pairs()
+		return _result.callback_replay_pairs
+	end
+
+	--- Returns how many exact terminator pairs the owned global FIFO posted.
+	local function posted_replay_pairs()
+		return _result.posted_replay_pairs
+	end
+
+	--- Returns the active synthetic transaction count after the bounded drain.
+	local function remaining_transactions()
+		return _result.remaining_transactions
+	end
+
 	return {
 		inject          = inject,
 		emitted         = emitted,
 		backspaces      = backspaces,
 		terminator_held = terminator_held,
 		provenance_ok   = provenance_ok,
+		callback_replay_pairs = callback_replay_pairs,
+		posted_replay_pairs = posted_replay_pairs,
+		remaining_transactions = remaining_transactions,
 	}
 end
 
@@ -553,6 +637,12 @@ local function run_hardcoded_scenarios()
 		assert_eq("scenario1 — terminator withheld by the replay gate", true, vkb1.terminator_held())
 		assert_eq("scenario1 — callback output carries exact transaction provenance",
 			true, vkb1.provenance_ok())
+		assert_eq("scenario1 — reserved terminator never returns from the callback",
+			0, vkb1.callback_replay_pairs())
+		assert_eq("scenario1 — reserved terminator posts once from the global FIFO",
+			1, vkb1.posted_replay_pairs())
+		assert_eq("scenario1 — all synthetic transactions settle after FIFO replay",
+			0, vkb1.remaining_transactions())
 	else
 		fail_count = fail_count + 1
 		print("  FAIL  scenario1 — setup: " .. tostring(vkb1))
