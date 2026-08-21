@@ -41,6 +41,10 @@ const MAIN_SWIFT = fs.readFileSync(
 	path.join(SWIFT_ROOT, 'Sources', 'ErgoptiPlus', 'main.swift'),
 	'utf8'
 );
+const BUNDLE_VALIDATION_TEST = fs.readFileSync(
+	path.join(SWIFT_ROOT, 'Tests', 'ErgoptiPlusTests', 'BundleValidationTests.swift'),
+	'utf8'
+);
 const POSIX_SHIM = fs.readFileSync(
 	path.join(SWIFT_ROOT, 'Sources', 'CPOSIXCompatibility', 'CPOSIXCompatibility.c'),
 	'utf8'
@@ -141,6 +145,11 @@ check(/func runPOSIXTestHelper\s*\(/.test(SWIFT_SOURCES),
 	'the real launcher must implement the cross-process POSIX test helper');
 check(!/^let k[A-Za-z0-9_]*\s*(?::[^=]+)?=/m.test(MAIN_SWIFT),
 	'shared constants must not live in executable main.swift globals');
+check(
+	!BUNDLE_VALIDATION_TEST.includes('kEmbeddedHammerspoonBundleId') ||
+		/^@testable import ErgoptiPlus\s*$/m.test(BUNDLE_VALIDATION_TEST),
+	'BundleValidationTests must import ErgoptiPlus before referencing launcher constants'
+);
 
 const macosGate = withoutFullLineComments(jobBody('macos-ok'));
 check(macosGate.length > 100, '`macos-ok` is absent or empty');

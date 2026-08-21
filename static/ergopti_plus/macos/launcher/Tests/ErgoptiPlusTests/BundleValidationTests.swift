@@ -34,6 +34,7 @@
 // ==============================================================================
 
 import XCTest
+@testable import ErgoptiPlus
 
 final class BundleValidationTests: XCTestCase {
 	func testEmbeddedRuntimeIdentityDiffersFromLauncherIdentity() {
