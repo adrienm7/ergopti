@@ -231,7 +231,7 @@ for _, mod_name in ipairs(modules_to_load) do
 end
 
 local r = helpers.get_results()
-OnlySelector.require_match(r, only_filter)
+OnlySelector.require_match(r, case_filter)
 print(string.format(
 	"\n========================================\nOVERALL RESULTS:\nTotal modules: %d\nPassed tests:  %d\nFailed tests:  %d\n========================================",
 	total_modules, r.passed, r.failed

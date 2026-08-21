@@ -74,12 +74,12 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-027` — this fix commit; model and `No Model` share one recoverable transition, with 26 focused refusal/retry cases
 - [x] `HS-028` — this fix commit; direct profile selection is transactional with retryable compensation debt
 - [ ] `HS-029` — direct profile choice invalidates an older pending model switch and releases its prediction lock
-- [ ] `HS-030` — exact `--only` targets accept source-only modules with no registered `helpers.it` cases
+- [x] `HS-030` — this fix commit; exact source-only modules bypass only the case-name no-match guard
 - [ ] `HS-031` — recommended-profile actions use the same transactional profile owner
 - [x] `PARITY-001` — `4f22a1efc` (Linux suffix codepoint count)
 - [x] `PARITY-002` — `22ca14d81` (Linux canonical multibyte trigger)
 
-Implementation verification is recorded per checkbox. For the current `HS-028` commit, the exact profile transaction module passes `15/15`; the model transaction, backend guard, manager-generation, and recommended-profile decision neighbors pass `26/26`, `5/5`, `10/10`, and `2/2`. Conventions, the false-green ratchet, and `git diff --check` are green. An independent source/test second lens verified the direct transaction and retained-debt topology; its sibling findings remain explicitly open as `HS-029` and `HS-031`. The full Hammerspoon gate returned non-zero in a shared WIP snapshot but its failure output was lost, so no global-green or global-failure attribution is made for this commit.
+Implementation verification is recorded per checkbox. For the current `HS-030` commit, the real exact source-only replay changes from exit `1` with a synthetic no-match failure to exit `0`; the selector/runner regression module passes `14/14`, including a child-process replay, unknown-filter fail-closed behavior, and preservation of load failures. Conventions, the false-green ratchet, targeted JS ratchets, `git diff --check`, and the Hammerspoon E2E gate are green. The full Hammerspoon gate returned non-zero in an earlier shared WIP snapshot but its failure output was lost, so no global-green or global-failure attribution is made for this commit.
 
 ## 2. Findings
 
@@ -624,7 +624,7 @@ The explicit `No Model` sibling is the same distributed transition. With model `
 - **Guarantee:** verification integrity and focused developer feedback
 - **Source:** `tests/run.lua:201-234`, `tests/support/only_selector.lua:194-201`, `tests/support/only_selector.lua:241-260`
 
-**Reproduction.** Run `lua tests/run.lua --only tests/unit/ui/menu/menu_llm/test_ollama_manager_nonblocking.lua`. The selector correctly loads exactly one module, the module executes its top-level assertions and prints `[PASS]`, then the runner changes the result to failure with `no test case matched the requested --only filter` because that source-only module deliberately registers no `helpers.it()` case.
+**Reproduction.** Run `lua tests/run.lua --only tests/unit/lib/test_config_overrides_comment_strip.lua`. The selector correctly loads exactly one module, the module executes its top-level assertions and prints `[PASS]`, then the unfixed runner changes the result to failure with `no test case matched the requested --only filter` because that source-only module deliberately registers no `helpers.it()` case.
 
 **Root cause and silence.** Exact-path selection correctly clears `case_filter`, but `tests/run.lua` passes the original non-empty `only_filter` to `OnlySelector.require_match()`. The zero-case guard cannot distinguish an unknown case-name filter from a successfully loaded exact module whose contract is expressed through load-time assertions. This makes the new focused-module feature reject a supported class of existing tests and can send developers back to broad/full-suite replays.
 
@@ -633,6 +633,8 @@ The explicit `No Model` sibling is the same distributed transition. With model `
 **Fix.** Apply the zero-case match guard only to a real case-name filter, not to an exact module target. Preserve load failures as failures and preserve unknown textual/path fallback as fail-closed. The selector should return an explicit target kind (or the runner should pass `case_filter`) rather than reinterpreting the original argument after classification.
 
 **Regression test.** Extend `tests/unit/test_runner_only_selector.lua` with a real runner fixture or subprocess that selects an exact source-only module whose top-level assertion succeeds and registers zero cases; assert exit `0`, one loaded module, and no synthetic no-match failure. Add a throwing source-only control and an unknown textual filter control so the change cannot hide load failures or zero-match typos.
+
+**Implemented and behaviorally replayed.** The runner now passes the selector's classified `case_filter` to the zero-case guard, so an exact module target with no registered cases is accepted only after its module loads successfully; unknown textual/path filters remain fail-closed, and an actual load failure remains counted. The exact pre-fix command loaded `1/834`, printed the source-only module's `[PASS]`, then exited `1` with the synthetic no-match error. The same command now exits `0`. The runner regression module executes a child runner against that real source-only target and passes `14/14`, including unknown-filter and throwing-load controls.
 
 ### `HS-031` — Recommended-profile actions bypass the transactional profile owner
 
