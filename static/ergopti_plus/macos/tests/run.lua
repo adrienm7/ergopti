@@ -68,8 +68,8 @@ local helpers = require("tests.helpers")
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
 
--- --only <substr> / --only=<substr>: run only test cases whose name contains the
--- substring, so a single behaviour can be re-run in isolation from a red message
+-- --only accepts an exact test module path/name or a historical case-name
+-- substring, so one file or behaviour can be re-run from a red message
 -- arg is the global Lua args table.
 local only_filter = nil
 if arg then
@@ -80,10 +80,6 @@ if arg then
 			only_filter = arg[i]:gsub("^%-%-only=", "")
 		end
 	end
-end
-if only_filter and only_filter ~= "" then
-	helpers.set_only_filter(only_filter)
-	print(string.format("Filtering to test cases matching: %q", only_filter))
 end
 
 -- Inject the hs stub as a global before any test loads source modules
@@ -202,12 +198,18 @@ for _, dir in ipairs(TEST_DIRS) do
 		discovered_modules[#discovered_modules + 1] = mod_name
 	end
 end
-local modules_to_load, narrowed = OnlySelector.select_modules(
+local modules_to_load, narrowed, case_filter = OnlySelector.select_modules(
 	discovered_modules,
 	only_filter,
 	read_test_module_source
 )
+helpers.set_only_filter(case_filter)
 if only_filter and only_filter ~= "" then
+	if case_filter then
+		print(string.format("Filtering to test cases matching: %q", case_filter))
+	else
+		print(string.format("Selecting exact test module: %q", only_filter))
+	end
 	print(string.format(
 		"Focused discovery: %d of %d module(s)%s",
 		#modules_to_load,
