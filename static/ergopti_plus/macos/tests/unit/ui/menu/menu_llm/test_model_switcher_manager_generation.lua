@@ -694,12 +694,13 @@ helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-mlx-download-publication-yield) drops stale detached-download continuations", function()
 		local modules = {
 			"hs", "infra.logger", "infra.i18n", "infra.notifications",
-			"adapters.task_lifecycle", "ui.download_window",
+			"adapters.task_lifecycle", "adapters.timer_scheduler", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_mlx_download",
 		}
 		local saved_io_open = io.open
 		local saved_os_execute = os.execute
 		local saved_os_remove = os.remove
+		local saved_os_rename = os.rename
 		local ok, err = xpcall(function()
 			local timers = {}
 			local tasks = {}
@@ -755,6 +756,22 @@ helpers.describe("model manager generation fences", function()
 					end,
 					start = function(task) return task:start() == true end,
 				}
+				package.loaded["adapters.timer_scheduler"] = {
+					after = function(delay, callback)
+						local handle = {timer = true}
+						local function fire()
+							if handle.timer == nil then return false end
+							handle.timer = nil
+							return callback()
+						end
+						timers[#timers + 1] = {delay = delay, callback = fire, handle = handle}
+						return handle, true
+					end,
+					cancel = function(handle)
+						handle.timer = nil
+						return true
+					end,
+				}
 
 				io.open = function(path, mode)
 					if mode == "w" then
@@ -766,19 +783,30 @@ helpers.describe("model manager generation fences", function()
 								end
 								return true
 							end,
-							close = function() fake_files[path] = table.concat(chunks) end,
+							close = function()
+								fake_files[path] = table.concat(chunks)
+								return true
+							end,
 						}
 					end
 					if path:match("%.exit$") and exit_available then
 						current = false
-						return {read = function() return "0" end, close = function() end}
+						return {read = function() return "0" end,
+							close = function() return true end}
 					end
 					local content = fake_files[path]
 					if content == nil then return nil end
-					return {read = function() return content end, close = function() end}
+					return {read = function() return content end,
+						close = function() return true end}
 				end
 				os.execute = function() return true end
 				os.remove = function(path) fake_files[path] = nil; return true end
+				os.rename = function(from_path, to_path)
+					if fake_files[from_path] == nil then return nil, "not found" end
+					fake_files[to_path] = fake_files[from_path]
+					fake_files[from_path] = nil
+					return true
+				end
 
 				local state = {llm_model = "B"}
 				local runtime_sets, saves, invalidations, starts, icon_updates = 0, 0, 0, 0, 0
@@ -834,7 +862,18 @@ helpers.describe("model manager generation fences", function()
 				helpers.assert_eq(successes, 0)
 				helpers.assert_eq(cancellations, 1,
 					"the stale detached completion must invoke its registered callback once")
+				local retained_tail = deps.active_tasks["download_tail"]
+				helpers.assert_type(retained_tail, "table",
+					"a termination signal cannot discard the exact tail before on_done")
+				helpers.assert_eq(retained_tail.label, "MLX download log tail")
+				retained_tail.on_done(15, "", "")
 				helpers.assert_nil(deps.active_tasks["download_tail"])
+				helpers.assert_eq(successes, 0)
+				helpers.assert_eq(cancellations, 1,
+					"retiring the exact tail cannot publish another terminal")
+				helpers.assert_eq(notifications, 0)
+				helpers.assert_eq(completions, 0)
+				helpers.assert_eq(icon_updates, 0)
 
 				-- Start another exact owner, then expire it in its launcher stream.
 				-- Its cleanup must not reset shared UI that a successor may already own.
@@ -849,6 +888,9 @@ helpers.describe("model manager generation fences", function()
 				current = false
 				helpers.assert_eq(stale_launcher.on_stream(nil, "progress", ""), false)
 				helpers.assert_eq(stale_launcher.terminate_calls, 1)
+				helpers.assert_eq(deps.active_tasks["download"], stale_launcher,
+					"a termination signal cannot discard the exact launcher before on_done")
+				stale_launcher.on_done(15, "", "")
 				helpers.assert_nil(deps.active_tasks["download"])
 				helpers.assert_eq(icon_updates, 0,
 					"stale A cleanup must not overwrite a successor's shared icon")
@@ -862,6 +904,7 @@ helpers.describe("model manager generation fences", function()
 		io.open = saved_io_open
 		os.execute = saved_os_execute
 		os.remove = saved_os_remove
+		os.rename = saved_os_rename
 		if not ok then error(err, 0) end
 	end)
 

@@ -18,35 +18,111 @@
 
 local helpers = require("tests.helpers")
 
+local MIXIN_MODULES = {
+	"adapters.task_lifecycle",
+	"adapters.timer_scheduler",
+	"infra.logger",
+	"ui.download_window",
+	"ui.menu.menu_llm.models_manager_mlx_download",
+}
+
+
+--- Runs one call without touching the host filesystem or shell.
+--- @param callback function Scenario receiving the in-memory files and commands.
+local function with_native_boundaries(callback)
+	local saved_open = io.open
+	local saved_execute = os.execute
+	local saved_remove = os.remove
+	local saved_rename = os.rename
+	local files = {}
+	local commands = {}
+	local outcome = table.pack(xpcall(function()
+		io.open = function(path, mode)
+			if mode == "r" and files[path] == nil then return nil, "not found" end
+			if mode == "w" then files[path] = "" end
+			local handle = {}
+			function handle:write(...)
+				local pieces = {}
+				for index = 1, select("#", ...) do
+					pieces[index] = tostring(select(index, ...))
+				end
+				files[path] = (files[path] or "") .. table.concat(pieces)
+				return self
+			end
+			function handle:read(kind)
+				local value = files[path]
+				if kind == "*l" and type(value) == "string" then
+					return value:match("[^\r\n]*")
+				end
+				return value
+			end
+			function handle:close() return true end
+			return handle
+		end
+		os.execute = function(command)
+			commands[#commands + 1] = command
+			if command:match("^chmod %+x /tmp/hs_mlx_dl_%d+%.sh$") then
+				return true, "exit", 0
+			end
+			return nil, "exit", 127
+		end
+		os.remove = function(path)
+			if files[path] == nil then return nil, "not found" end
+			files[path] = nil
+			return true
+		end
+		os.rename = function(from_path, to_path)
+			if files[from_path] == nil then return nil, "not found" end
+			files[to_path] = files[from_path]
+			files[from_path] = nil
+			return true
+		end
+		return callback(files, commands)
+	end, debug.traceback))
+	io.open = saved_open
+	os.execute = saved_execute
+	os.remove = saved_remove
+	os.rename = saved_rename
+	if not outcome[1] then error(outcome[2]) end
+	return table.unpack(outcome, 2, outcome.n)
+end
+
 
 --- Builds the ctx/deps shape the download mixin is installed with, with the two
 --- task slots observable.
 --- @return table obj, table deps
 local function install_mixin()
-	package.loaded["ui.menu.menu_llm.models_manager_mlx_download"] = nil
-	local mixin = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_mlx_download")
+	return helpers.with_fresh_modules(MIXIN_MODULES, function()
+		helpers.load_with_stubs("infra.logger")
+		package.loaded["ui.download_window"] = {
+			show = function() return true end,
+			update = function() return true end,
+			complete = function() return true end,
+		}
+		local mixin = require("ui.menu.menu_llm.models_manager_mlx_download")
 
-	local deps = {
-		active_tasks             = {},
-		state                    = {},
-		update_icon              = function() end,
-		save_prefs               = function() end,
-		keymap                   = {},
-		invalidate_installed_cache = function() end,
-	}
-	local obj = {}
-	local install = (type(mixin) == "function") and mixin
-		or (type(mixin) == "table" and (mixin.install or mixin.attach or mixin.mixin))
-	helpers.assert_type(install, "function",
-		"the download mixin must expose an installer this test can call")
-	install({
-		obj                        = obj,
-		deps                       = deps,
-		presets                    = {},
-		project_venv_python_escaped = "/usr/bin/python3",
-		invalidate_installed_cache = function() end,
-	})
-	return obj, deps
+		local deps = {
+			active_tasks             = {},
+			state                    = {},
+			update_icon              = function() return true end,
+			save_prefs               = function() return true end,
+			keymap                   = {},
+			invalidate_installed_cache = function() return true end,
+		}
+		local obj = {}
+		local install = (type(mixin) == "function") and mixin
+			or (type(mixin) == "table" and (mixin.install or mixin.attach or mixin.mixin))
+		helpers.assert_type(install, "function",
+			"the download mixin must expose an installer this test can call")
+		install({
+			obj                        = obj,
+			deps                       = deps,
+			presets                    = {},
+			project_venv_python_escaped = "/usr/bin/python3",
+			invalidate_installed_cache = function() return true end,
+		})
+		return obj, deps
+	end)
 end
 
 
@@ -98,18 +174,19 @@ helpers.describe("MLX download: the shared slots have exactly one owner", functi
 		-- assert_true(true) with that sentence — which is the same failure one
 		-- level down: it certified nothing either.
 		--
-		-- The real spawn needs a live hs.task and a filesystem, so the observable
-		-- is not success. It is that the call went PAST the entry guard: past it,
-		-- the launcher either claims the slot or raises on the missing task API.
-		-- Returning cleanly having claimed nothing is exactly the no-op this file
-		-- exists to catch.
-		local ok, err = pcall(obj.pull_model, "FirstModel", "org/first", nil)
-		local claimed = deps.active_tasks["download"] ~= nil
-		helpers.assert_true(claimed or not ok,
-			"an idle manager must get past the entry guard: pull_model either claims the "
-				.. "download slot or fails deeper on the stubbed task API. It returned cleanly "
-				.. "having claimed nothing, which is the no-op the two cases above cannot see "
-				.. "(err: " .. tostring(err) .. ")")
+		-- Every native boundary is in-memory, so acceptance itself is observable:
+		-- no host chmod/file error may masquerade as an entry-guard refusal.
+		with_native_boundaries(function(_files, commands)
+			local ok, accepted = pcall(obj.pull_model, "FirstModel", "org/first", nil)
+			helpers.assert_true(ok, "the isolated idle pull must not raise")
+			helpers.assert_eq(accepted, true,
+				"an idle manager must commit the launcher transaction")
+			helpers.assert_type(deps.active_tasks["download"], "table",
+				"the accepted launcher must own the shared download slot")
+			helpers.assert_eq(#commands, 1)
+			helpers.assert_true(commands[1]:match("^chmod %+x ") ~= nil,
+				"the only isolated shell boundary must be launcher chmod")
+		end)
 	end)
 
 end)
