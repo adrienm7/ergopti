@@ -56,7 +56,7 @@ end
 
 --- True when a window of source contains a recognizable GC-root pin.
 ---
---- Three spellings are accepted, all of which genuinely root the task:
+--- Four spellings are accepted, all of which genuinely root the task:
 ---   1. The canonical own-module root `_active_tasks` — and any `_active_*_tasks`
 ---      variant (e.g. `_active_probe_tasks` in keymap/input_sources.lua); the
 ---      pin is what matters, not its name.
@@ -66,6 +66,9 @@ end
 ---      valid, since deps is long-lived and held by the caller.
 ---   3. `waitUntilExit`, which references the task from its local for the whole
 ---      blocking lifetime, so the GC can never reach it mid-run.
+---   4. `start_owned_task`, the installer transaction helper whose behavioral
+---      suite proves it inserts the exact task into `M._active_tasks` before
+---      crossing native start, including synchronous completion.
 --- @param window string A slice of comment-free source.
 --- @return boolean
 local function window_has_pin(window)
@@ -73,6 +76,7 @@ local function window_has_pin(window)
 		or window:find("%.active_tasks") ~= nil
 		or window:find("active_tasks_gc_root", 1, true) ~= nil
 		or window:find("waitUntilExit", 1, true) ~= nil
+		or window:find("start_owned_task%s*%(") ~= nil
 end
 
 --- Reports every raw or TaskLifecycle.native task site with no pin near it.
@@ -186,6 +190,23 @@ helpers.describe("GC retention: the guard is per-site, not per-file", function()
 		far[#far + 1] = "t:start()"
 		helpers.assert_eq(#scan_unpinned_sites(table.concat(far, "\n")), 1,
 			"but a pin that far away belongs to a DIFFERENT task and must not vouch for this one")
+	end)
+
+	helpers.it("the onboarding owner helper must be called at the launch site", function()
+		local owned = table.concat({
+			"local task = TaskLifecycle.native(\"installer\", bin, cb, args)",
+			"start_owned_task(owner, task, \"download\", \"installer\", cb, gate)",
+		}, "\n")
+		helpers.assert_eq(#scan_unpinned_sites(owned), 0,
+			"the installer helper behaviorally pins the exact task before native start")
+
+		local mention_only = table.concat({
+			"local task = TaskLifecycle.native(\"installer\", bin, cb, args)",
+			"local start_owned_task = false",
+			"task:start()",
+		}, "\n")
+		helpers.assert_eq(#scan_unpinned_sites(mention_only), 1,
+			"a nearby identifier must not certify an unowned task without invoking the owner helper")
 	end)
 end)
 
