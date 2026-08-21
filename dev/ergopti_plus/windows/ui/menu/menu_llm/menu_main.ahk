@@ -37,11 +37,18 @@
  * an asynchronous dependency callback or a settings action requests a rebuild.
  */
 LLM_Menu_Build() {
-	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
-	static _Building := false
-	if _Building
-		return
-	_Building := true
+global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
+static _Building := false
+static _RequestedGeneration := 0
+static _PublishedGeneration := 0
+_RequestedGeneration += 1
+if A_IsSuspended
+	return false
+if _Building
+return true
+while (_PublishedGeneration < _RequestedGeneration) {
+	TargetGeneration := _RequestedGeneration
+_Building := true
 	; Never clear the published submenu before its replacement is complete. A menu
 	; build can be preempted by timers and callbacks; an in-place Delete() exposed
 	; an empty or partial LLM tree and silently dropped the user's next click.
@@ -127,20 +134,14 @@ LLM_Menu_Build() {
 		Map("label", t("menu.llm.about"), "action", LLM_Menu_OnAbout)
 	])
 
-	; Publish the completed subtree and retire obsolete dispatcher IDs in one
-	; short, non-preemptible commit. Building itself deliberately stays outside
-	; Critical so a slow menu cannot starve the keyboard hook.
-	_PublishCritical := Critical("On")
-	try {
-		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Menu_Handle)
-		_LLM_Menu_InTray := true
-		Published := true
-		; Prune only after the tray points at the staged subtree. The whole-tray
-		; walk then retains every new ID and removes the old generation's IDs.
-		MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
-	} finally {
-		Critical(_PublishCritical)
-	}
+	; The LLM builder owns only a detached child. The root coordinator attaches
+	; it while publishing a complete root, so an asynchronous LLM rebuild can
+	; never expose an IA-only tray or mutate a root currently being staged.
+	if !RebuildTrayMenu()
+		throw Error("tray root coordinator refused the LLM subtree")
+	MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
+	_LLM_Menu_InTray := true
+	Published := true
 
 	; Check the parent tray entry only when enabled AND Ollama is confirmed ready.
 	; Both branches are guarded with try: the item may not exist yet if the updater
@@ -162,6 +163,9 @@ LLM_Menu_Build() {
 	} finally {
 		_Building := false
 	}
+	_PublishedGeneration := TargetGeneration
+}
+return true
 }
 
 

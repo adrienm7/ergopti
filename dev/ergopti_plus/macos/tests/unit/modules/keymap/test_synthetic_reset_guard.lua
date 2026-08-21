@@ -55,7 +55,6 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		'SyntheticInput.begin("terminator_replay", "replacement")',
 		'SyntheticInput.begin("external_replacement", "replacement")',
 		'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")',
-		'SyntheticInput.begin("repeat_key", "replacement")',
 		'SyntheticInput.begin("shortcuts.text.reselect", "action")',
 		'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
 	}
@@ -101,15 +100,22 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		helpers.assert_true(begin_pos < scope_pos and scope_pos < seal_pos)
 	end)
 
-	helpers.it("expander replacement and repeat both retain rollback and commit paths", function()
+	helpers.it("expander has one replacement producer and repeat delegates to it", function()
 		local source = read_unit("function M.try_terminator_expand")
-		helpers.assert_eq(count_literal(source, "SyntheticInput.begin("), 2)
-		helpers.assert_true(count_literal(source, "SyntheticInput.with_transaction") >= 2,
-			"both expander producers must build inside their own transaction")
-		helpers.assert_true(count_literal(source, "SyntheticInput.seal") >= 2,
-			"both expander producers must commit explicitly")
-		helpers.assert_true(count_literal(source, "SyntheticInput.cancel") >= 2,
-			"every fallible construction needs rollback")
+		helpers.assert_eq(count_literal(source, "SyntheticInput.begin("), 1,
+			"all expander output must use one replacement producer")
+		helpers.assert_true(count_literal(source, "SyntheticInput.with_transaction") >= 1)
+		helpers.assert_true(count_literal(source, "SyntheticInput.seal") >= 1)
+		helpers.assert_true(count_literal(source, "SyntheticInput.cancel") >= 1)
+
+		local repeat_start = source:find("function M.try_repeat_feature", 1, true)
+		helpers.assert_not_nil(repeat_start)
+		local repeat_tail = source:sub(repeat_start)
+		helpers.assert_true(repeat_tail:find(
+			"local replaced = M.perform_text_replacement", 1, true) ~= nil,
+			"repeat must inherit the common output/telemetry/preview transaction")
+		helpers.assert_eq(count_literal(repeat_tail, "SyntheticInput.begin("), 0,
+			"repeat must never reopen a second synthetic producer")
 	end)
 
 	helpers.it("terminator replay commits only after scoped construction succeeds", function()
@@ -125,7 +131,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 
 	helpers.it("deferred text reselection owns dispatch through terminal cleanup", function()
 		local source = read_unit("local TRANSFORM_LOCK_TIMEOUT_SEC")
-		local begin_pos = source:find(calls[5], 1, true)
+		local begin_pos = source:find(calls[4], 1, true)
 		local batch_pos = source:find("SyntheticInput.begin_batch(tx)", begin_pos, true)
 		local dispatch_pos = source:find("SyntheticInput.dispatch(batch)", begin_pos, true)
 		local seal_pos = source:find("SyntheticInput.seal(tx)", begin_pos, true)
@@ -137,7 +143,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 
 	helpers.it("keep-awake heartbeat is an explicit non-observable transaction with rollback", function()
 		local source = read_unit("local function emit_activity_keystroke")
-		local begin_pos = source:find(calls[6], 1, true)
+		local begin_pos = source:find(calls[5], 1, true)
 		local emit_pos = source:find("SyntheticInput.emit_key_stroke", begin_pos, true)
 		local seal_pos = source:find("SyntheticInput.seal", begin_pos, true)
 		local cancel_pos = source:find("SyntheticInput.cancel, transaction", begin_pos, true)

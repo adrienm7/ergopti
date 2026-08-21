@@ -81,8 +81,9 @@ local function postKeyStroke(mods, key)
 		return SyntheticInput.emit_key_stroke(mods, key, KEYSTROKE_NO_DELAY_US)
 	end, debug.traceback)
 	if not ok or result ~= true then
-		error(string.format("synthetic key stroke was refused for %s: %s",
-			tostring(key), tostring(result)), 0)
+		Logger.error(LOG, "synthetic key stroke was refused for %s: %s",
+			tostring(key), tostring(result))
+		return false
 	end
 	return true
 end
@@ -573,6 +574,7 @@ sg("track_prev",            function() sysKey("PREVIOUS") end)
 -- Absolute path: the interactive layer must not inherit its binaries from PATH,
 -- which differs between a login shell and the Hammerspoon process.
 local SCREENCAPTURE_BIN    = "/usr/sbin/screencapture"
+local MKDIR_BIN           = "/bin/mkdir"
 local SCREENSHOT_DIR_REL   = "/Pictures/screenshots"
 local SCREENSHOT_STAMP_FMT = "%Y%m%d%H%M%S"
 
@@ -593,7 +595,41 @@ end
 --- Fires screencapture without blocking the runloop.
 --- @param args table Array of argv entries (flags, then an optional target path).
 local function capture(args)
-	ShellRunner.spawn(SCREENCAPTURE_BIN, args).start()
+	local task = ShellRunner.spawn(SCREENCAPTURE_BIN, args, function(exit_code)
+		if exit_code ~= 0 then
+			Logger.error(LOG, "Gesture screenshot capture failed with exit code %s.", tostring(exit_code))
+			notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+		end
+	end)
+	if not task or task.start() ~= true then
+		Logger.error(LOG, "Gesture screenshot task refused to start.")
+		notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+		return false
+	end
+	return true
+end
+
+local function capture_saved(flags, prefix)
+	local home = os.getenv("HOME") or ""
+	local dir = home .. SCREENSHOT_DIR_REL
+	local target = screenshot_path(prefix)
+	local mkdir_task = ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function(exit_code)
+		if exit_code ~= 0 then
+			Logger.error(LOG, "Gesture screenshot directory creation failed with exit code %s.", tostring(exit_code))
+			notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+			return
+		end
+		local args = {}
+		for _, flag in ipairs(flags) do args[#args + 1] = flag end
+		args[#args + 1] = target
+		capture(args)
+	end)
+	if not mkdir_task or mkdir_task.start() ~= true then
+		Logger.error(LOG, "Gesture screenshot directory task refused to start.")
+		notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+		return false
+	end
+	return true
 end
 
 
@@ -602,19 +638,19 @@ sg("screenshot_window_clipboard",     function()
 	capture({ "-cw" })
 end)
 sg("screenshot_window_save",          function()
-	capture({ "-w", screenshot_path("win") })
+	capture_saved({ "-w" }, "win")
 end)
 sg("screenshot_region_clipboard",      function()
 	capture({ "-ci" })
 end)
 sg("screenshot_region_save",           function()
-	capture({ "-i", screenshot_path("reg") })
+	capture_saved({ "-i" }, "reg")
 end)
 sg("screenshot_fullscreen_clipboard",   function()
 	capture({ "-c" })
 end)
 sg("screenshot_fullscreen_save",        function()
-	capture({ screenshot_path("full") })
+	capture_saved({}, "full")
 end)
 
 -- Four actions macOS has always implemented — in the keyboard-SHORTCUT layer —
@@ -833,6 +869,20 @@ queue_search_restore_retry = function(generation)
 	return false
 end
 
+local function cleanup_search_capture()
+	if not _search_capture_in_flight then return true end
+	stop_search_timer(_search_capture_timer)
+	_search_capture_timer = nil
+	local generation = _search_capture_generation
+	local restored, restore_error = restore_search_clipboard(generation)
+	if restored then return true end
+	_search_recovery_only = true
+	queue_search_restore_retry(generation)
+	Logger.error(LOG, "search_web cleanup refused; clipboard owner retained: %s.",
+		tostring(restore_error))
+	return false
+end
+
 sg("search_web", function(binding)
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
@@ -920,6 +970,14 @@ sg("search_web", function(binding)
 			tostring(copied), tostring(restore_error))
 	end
 end)
+
+M.force_cleanup = function()
+	local click_ok, click_result = xpcall(Click.force_cleanup, debug.traceback)
+	local search_ok, search_result = xpcall(cleanup_search_capture, debug.traceback)
+	if not click_ok then Logger.error(LOG, "Click cleanup raised: %s.", tostring(click_result)) end
+	if not search_ok then Logger.error(LOG, "Search cleanup raised: %s.", tostring(search_result)) end
+	return click_ok and click_result ~= false and search_ok and search_result == true
+end
 
 -- Script management
 sg("script_pause_toggle",     function()
@@ -1377,20 +1435,23 @@ function M.execute_single(name, binding)
 	if name ~= "left_click_toggle" and name ~= "right_click_toggle" then
 		Click.release_held_for_tap(name)
 	end
-	-- Logger.pcall (not a bare pcall) so a throwing action leaves a trace: with
+	-- Logger.callback (not a bare pcall) so a throwing action leaves a trace: with
 	-- ~150+ registered closures dispatched here, a caught-then-dropped exception
 	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
-	Logger.pcall(LOG, s.fn, binding)
-	return true
+	local ok = Logger.callback(LOG, "Gesture action '" .. tostring(name) .. "'", s.fn, binding)
+	return ok == true
 end
 
 function M.execute_axis(name, goNext)
 	local a = AX[name]
-	if not a then return end
+	if not a then return false end
 	local fn = goNext and a.next or a.prev
 	if type(fn) == "function" then
-		Logger.pcall(LOG, fn)
+		local ok, result = Logger.callback(LOG,
+			"Gesture axis action '" .. tostring(name) .. "'", fn)
+		return ok == true and result ~= false
 	end
+	return false
 end
 
 function M.is_scalable(name)

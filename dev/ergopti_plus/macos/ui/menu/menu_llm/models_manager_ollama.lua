@@ -75,6 +75,11 @@ end
 function M.new(deps, presets, ram_getter)
 	local obj = {}
 
+	local function save_prefs(label)
+		local ok, saved = Logger.callback(LOG, label, deps.save_prefs)
+		return ok == true and saved == true
+	end
+
 	local function cancel_task(task_key)
 		local t = deps.active_tasks and deps.active_tasks[task_key]
 		if t and type(t.terminate) == "function" then pcall(function() t:terminate() end) end
@@ -170,7 +175,9 @@ function M.new(deps, presets, ram_getter)
 	local function ensure_ollama_running(on_ready, on_fail)
 		local ok, result = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
 		if ok and result and result:find('"version"') then
-			if type(on_ready) == "function" then on_ready() end
+			if type(on_ready) == "function" then
+				return Logger.callback(LOG, "Ollama ready", on_ready)
+			end
 			return
 		end
 
@@ -181,18 +188,24 @@ function M.new(deps, presets, ram_getter)
 				retries = retries + 1
 				local ok2, result2 = pcall(hs.execute, "curl -s --max-time 5 http://localhost:11434/api/version 2>/dev/null")
 				if ok2 and result2 and result2:find('"version"') then
-					if type(on_ready) == "function" then on_ready() end
+					if type(on_ready) == "function" then
+						Logger.callback(LOG, "Ollama daemon ready", on_ready)
+					end
 				elseif retries < 30 then
 					hs.timer.doAfter(0.5, check_ready)
 				else
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.start_fail"), "error")
-					if type(on_fail) == "function" then on_fail() end
+					if type(on_fail) == "function" then
+						Logger.callback(LOG, "Ollama daemon readiness failure", on_fail)
+					end
 				end
 			end
 			hs.timer.doAfter(0.5, check_ready)
 		else
 			pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.daemon_fail"), "error")
-			if type(on_fail) == "function" then on_fail() end
+			if type(on_fail) == "function" then
+				Logger.callback(LOG, "Ollama daemon restart failure", on_fail)
+			end
 		end
 	end
 
@@ -280,7 +293,10 @@ function M.new(deps, presets, ram_getter)
 
 	local function check_model_loadable(target_model, on_success, on_fail)
 		if type(target_model) ~= "string" or target_model == "" then
-			if type(on_fail) == "function" then on_fail("invalid_model", false) end
+			if type(on_fail) == "function" then
+				Logger.callback(LOG, "Ollama model validation failure", on_fail,
+					"invalid_model", false)
+			end
 			return
 		end
 
@@ -298,30 +314,44 @@ function M.new(deps, presets, ram_getter)
 
 		local ok_enc, body = pcall(hs.json.encode, payload)
 		if not ok_enc or type(body) ~= "string" then
-			if type(on_fail) == "function" then on_fail("encode_error", false) end
+			if type(on_fail) == "function" then
+				Logger.callback(LOG, "Ollama model-probe encoding failure", on_fail,
+					"encode_error", false)
+			end
 			return
 		end
 
 		hs.http.asyncPost("http://127.0.0.1:11434/api/chat", body, { ["Content-Type"] = "application/json" },
 			function(status, resp_body, _)
 				if status == 200 then
-					if type(on_success) == "function" then on_success() end
+					if type(on_success) == "function" then
+						Logger.callback(LOG, "Ollama model-load success", on_success)
+					end
 					return
 				end
 
 				local err_text = type(resp_body) == "string" and resp_body or ""
 				local load_error = err_text:find("unable to load model", 1, true) ~= nil
-				if type(on_fail) == "function" then on_fail(err_text, load_error) end
+				if type(on_fail) == "function" then
+					Logger.callback(LOG, "Ollama model-load failure", on_fail,
+						err_text, load_error)
+				end
 			end
 		)
 	end
 
 	function obj.pull_model(target_model, repo, on_success)
+		deps.active_tasks = deps.active_tasks or {}
+		if deps.active_tasks["ollama_pull"] then
+			Logger.warn(LOG, "Ollama pull for %s refused while another exact pull owns the slot.",
+				tostring(target_model))
+			return false
+		end
 		local bin = require_ollama_path("pull a model")
 		if not bin then
 			pcall(notifications.notify, i18n.get("ollama.fail_title"),
 				string.format(i18n.get("ollama.download_error"), tostring(target_model)), "error")
-			return
+			return false
 		end
 		local pull_output = ""
 		
@@ -334,8 +364,10 @@ function M.new(deps, presets, ram_getter)
 		
 		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_pull_and_upgrade, do_retry)
 		
-		local task = TaskLifecycle.native("Ollama model pull", bin, function(code)
-			if deps.active_tasks then deps.active_tasks["ollama_pull"] = nil end
+		local task
+		task = TaskLifecycle.native("Ollama model pull", bin, function(code)
+			if deps.active_tasks["ollama_pull"] ~= task then return end
+			deps.active_tasks["ollama_pull"] = nil
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(true, target_model)
@@ -363,16 +395,26 @@ function M.new(deps, presets, ram_getter)
 				end
 				deps.state.llm_model = display_model
 				if deps.keymap then
-					if type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
-					if type(deps.keymap.set_llm_display_model_name) == "function" then pcall(deps.keymap.set_llm_display_model_name, display_model) end
+					if type(deps.keymap.set_llm_model) == "function" then
+						Logger.callback(LOG, "Ollama model runtime sync",
+							deps.keymap.set_llm_model, target_model)
+					end
+					if type(deps.keymap.set_llm_display_model_name) == "function" then
+						Logger.callback(LOG, "Ollama display-model runtime sync",
+							deps.keymap.set_llm_display_model_name, display_model)
+					end
 				end
-				if deps.save_prefs() ~= true then return false end
+				if not save_prefs("Ollama model preference save") then return false end
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
-					if on_success then pcall(on_success) end
+					if type(on_success) == "function" then
+						Logger.callback(LOG, "Ollama pull load success", on_success)
+					end
 				end, function()
-					if on_success then pcall(on_success) end
+					if type(on_success) == "function" then
+						Logger.callback(LOG, "Ollama pull load fallback", on_success)
+					end
 				end)
 			elseif code == 15 then
 				pcall(notifications.notify, i18n.get("ollama.cancelled_title"), i18n.get("ollama.download_cancelled"), "warning")
@@ -408,15 +450,19 @@ function M.new(deps, presets, ram_getter)
 		end, {"pull", repo})
 		
 		if task then
-			deps.active_tasks = deps.active_tasks or {}
 			deps.active_tasks["ollama_pull"] = task
 			if not TaskLifecycle.start(task, "Ollama model pull") then
-				deps.active_tasks["ollama_pull"] = nil
+				if deps.active_tasks["ollama_pull"] == task then
+					deps.active_tasks["ollama_pull"] = nil
+				end
 				complete_progress_ui(false, target_model)
+				return false
 			end
 		else
 			complete_progress_ui(false, target_model)
+			return false
 		end
+		return true
 	end
 
 	function obj.install_ollama_then_pull(target_model, repo, on_success)
@@ -430,19 +476,30 @@ function M.new(deps, presets, ram_getter)
 	--- @param on_cancel function Callback executed when cancelled.
 	--- @param opts table|nil Options: `silent_notifications` (boolean) suppresses repair toasts.
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local function still_current()
+			local ok, current = Logger.callback(LOG,
+				"Ollama requirement freshness check", is_current)
+			return ok and current == true
+		end
+		if not still_current() then return end
 		if not target_model or target_model == "" then return end
 		local silent = type(opts) == "table" and opts.silent_notifications == true
 		Logger.debug(LOG, string.format("Checking Ollama requirements for %s…", target_model))
 		
 		ensure_ollama_running(function()
+			if not still_current() then return end
 			local bin = require_ollama_path("check model requirements")
 			if not bin then
-				if type(on_cancel) == "function" then on_cancel() end
+				if type(on_cancel) == "function" then
+					Logger.callback(LOG, "Ollama requirement binary failure", on_cancel)
+				end
 				return
 			end
 			local task
 				task = TaskLifecycle.native("Ollama model requirement check", bin, function(code, stdout)
 				if task then _active_tasks[task] = nil end
+				if not still_current() then return end
 				local installed = {}
 				if code == 0 and type(stdout) == "string" then
 					for line in stdout:gmatch("[^\r\n]+") do
@@ -457,23 +514,33 @@ function M.new(deps, presets, ram_getter)
 
 				if installed[actual_model] or installed[actual_model .. ":latest"] or installed[repo] or installed[repo .. ":latest"] then
 					check_model_loadable(actual_model, function()
-						if type(on_success) == "function" then on_success() end
+						if still_current() and type(on_success) == "function" then
+							Logger.callback(LOG, "Ollama requirements success", on_success)
+						end
 					end, function(_, is_load_error)
+						if not still_current() then return end
 						if is_load_error and get_ollama_path() then
 							if not silent then
 								pcall(notifications.notify, i18n.get("ollama.model_repair_title"), string.format(i18n.get("ollama.model_repair"), target_model), "info")
 							end
-							obj.pull_model(target_model, repo, on_success)
+							if still_current() then obj.pull_model(target_model, repo, on_success) end
 							return
 						end
-						if type(on_cancel) == "function" then on_cancel() end
+						if type(on_cancel) == "function" then
+							Logger.callback(LOG, "Ollama model-load cancellation", on_cancel)
+						end
 					end)
 				else
 					if type(deps.shared_system_check) == "function" then
-						deps.shared_system_check(target_model, "Ollama", repo, function()
+						local check_ok, accepted = Logger.callback(LOG, "Ollama shared system check",
+							deps.shared_system_check, target_model, "Ollama", repo, function()
+							if not still_current() then return end
 							if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
 							else obj.install_ollama_then_pull(target_model, repo, on_success) end
 						end, on_cancel)
+						if (not check_ok or accepted == false) and type(on_cancel) == "function" then
+							Logger.callback(LOG, "Ollama system-check failure", on_cancel)
+						end
 					else
 						if get_ollama_path() then obj.pull_model(target_model, repo, on_success)
 						else obj.install_ollama_then_pull(target_model, repo, on_success) end
@@ -484,10 +551,12 @@ function M.new(deps, presets, ram_getter)
 					_active_tasks[task] = true
 					if not TaskLifecycle.start(task, "Ollama model requirement check") then
 						_active_tasks[task] = nil
-						if type(on_cancel) == "function" then on_cancel() end
+						if type(on_cancel) == "function" then
+							Logger.callback(LOG, "Ollama requirement start refusal", on_cancel)
+						end
 					end
 				elseif type(on_cancel) == "function" then
-					on_cancel()
+					Logger.callback(LOG, "Ollama requirement construction failure", on_cancel)
 				end
 		end, on_cancel)
 	end
@@ -509,7 +578,9 @@ function M.new(deps, presets, ram_getter)
 				if task then _active_tasks[task] = nil end
 				if code == 0 then
 					pcall(notifications.notify, i18n.get("ollama.deleted_title"), string.format(i18n.get("ollama.model_deleted"), model_name), "success")
-					if deps.update_menu then pcall(deps.update_menu) end
+					if type(deps.update_menu) == "function" then
+						Logger.callback(LOG, "Ollama deletion menu refresh", deps.update_menu)
+					end
 					Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
 				else
 					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(stdout)), "error")

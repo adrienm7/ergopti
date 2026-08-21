@@ -960,7 +960,8 @@ function M.bind_cmd_star(on_trigger)
 				end
 				if not app_name or app_name == "" then app_name = "Unknown" end
 			end
-			pcall(on_trigger, table.concat(parts, "+"), app_name)
+			Logger.callback(LOG, "Cmd-star telemetry", on_trigger,
+				table.concat(parts, "+"), app_name)
 		end)
 		return finish_tap(scheduled, fence_events)
 	end, "Cmd+star")

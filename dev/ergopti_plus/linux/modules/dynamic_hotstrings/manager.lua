@@ -75,6 +75,16 @@ local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
 
+local utf8_lib = (type(utf8) == "table" and utf8.len)
+	and utf8 or require("compat.utf8")
+
+local function strict_codepoint_length(value)
+	if type(value) ~= "string" then return nil end
+	local ok, length = pcall(utf8_lib.len, value)
+	if not ok or type(length) ~= "number" then return nil end
+	return length
+end
+
 
 -- =========================================
 -- =========================================
@@ -123,8 +133,18 @@ function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
 
 	-- Resolve trigger character (default "★").
-	if type(options.trigger_char) == "string" and options.trigger_char ~= "" then
+	if options.trigger_char ~= nil then
+		if strict_codepoint_length(options.trigger_char) ~= 1 then
+			Logger.error(LOG, "Dynamic hotstring trigger must be exactly one valid UTF-8 codepoint.")
+			_enabled = false
+			return false
+		end
 		_trigger_char = options.trigger_char
+	end
+	if strict_codepoint_length(_trigger_char) ~= 1 then
+		Logger.error(LOG, "Dynamic hotstring trigger must be exactly one valid UTF-8 codepoint.")
+		_enabled = false
+		return false
 	end
 
 	-- Resolve personal_info.toml path.
@@ -329,7 +349,7 @@ function M.on_trigger(buffer, trigger)
 	-- Only fire on the configured trigger character.
 	-- The shared engine matches the buffer suffix; we guard on the trigger.
 	local t = trigger or _trigger_char
-	if buffer:sub(-1) ~= t then return false end
+	if strict_codepoint_length(t) ~= 1 or buffer:sub(-#t) ~= t then return false end
 
 	-- Injector loaded once at init; stored via closure below.
 	local Engine = require("dynamic_hotstrings")
@@ -337,7 +357,7 @@ function M.on_trigger(buffer, trigger)
 
 	-- The shared engine matches the buffer SUFFIX (without the trigger char
 	-- itself). Pass the buffer MINUS the last char (the trigger).
-	local prefix = buffer:sub(1, -2)
+	local prefix = buffer:sub(1, -(#t + 1))
 	if prefix == "" then return false end
 
 	local match = Engine.match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled)
@@ -350,7 +370,13 @@ function M.on_trigger(buffer, trigger)
 
 	-- Inject: erase the suffix + trigger, type the result.
 	-- e.g. buffer "@p★" → backspace 3 chars → type "Adrien"
-	local backspace_count = #(match.rule.suffix) + 1  -- suffix + trigger
+	local suffix_length = strict_codepoint_length(match.rule.suffix)
+	if not suffix_length then
+		Logger.error(LOG, "Dynamic rule output is invalid UTF-8 (%d-byte resolved content withheld); expansion refused.",
+			#match.result)
+		return false
+	end
+	local backspace_count = suffix_length + 1  -- suffix + trigger
 	-- Injector is loaded once at require-time; the hotstrings injector module
 	-- wraps ydotool and is always available on Linux.
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
@@ -451,7 +477,10 @@ function M.preview(buffer)
 	-- The same guard as the match path. A preview that offers what the engine
 	-- will refuse is worse than no preview: the user sees a rule they switched
 	-- off and concludes the toggle does nothing.
-	return Engine.preview(buffer:sub(1, -2), DYNAMIC_GROUP, M.is_rule_enabled)
+	if strict_codepoint_length(_trigger_char) ~= 1 or buffer:sub(-#_trigger_char) ~= _trigger_char then
+		return nil
+	end
+	return Engine.preview(buffer:sub(1, -(#_trigger_char + 1)), DYNAMIC_GROUP, M.is_rule_enabled)
 end
 
 

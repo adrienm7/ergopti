@@ -26,11 +26,11 @@ _LSPE_AssertSetBackendCallsEngineInit() {
 	Body := _DriverFuncBody("LLM_Menu_SetBackend")
 	Assert(Body != "", "LLM_Menu_SetBackend must exist in ui/menu/menu_llm/actions.ahk")
 	Assert(InStr(Body, "LLM_Menu_CommitMutation(") > 0
-		and InStr(Body, "_LLM_Menu_ApplyStandardCommitted") > 0,
+		and InStr(Body, "_LLM_Menu_ApplyBackendCommitted") > 0,
 		"LLM_Menu_SetBackend must route its durable candidate through the shared "
 		. "post-commit engine initializer; direct live initialization before "
 		. "durability would revive F25 as a persistence lie")
-	ApplyBody := _DriverFuncBody("_LLM_Menu_ApplyStandardCommitted")
+	ApplyBody := _DriverFuncBody("_LLM_Menu_ApplyBackendCommitted")
 	Assert(InStr(ApplyBody, "LLM_Engine_Init(LLM_Menu_BuildOpts())") > 0,
 		"the shared committed callback must propagate the published backend to "
 		. "the prediction engine (F25)")
@@ -38,7 +38,7 @@ _LSPE_AssertSetBackendCallsEngineInit() {
 Test("menu_llm: LLM_Menu_SetBackend propagates to the prediction engine (F25)", _LSPE_AssertSetBackendCallsEngineInit)
 
 _LSPE_AssertInitCallPrecedesBuild() {
-	Body := _DriverFuncBody("_LLM_Menu_ApplyStandardCommitted")
+	Body := _DriverFuncBody("_LLM_Menu_ApplyBackendCommitted")
 	InitPos  := InStr(Body, "LLM_Engine_Init(LLM_Menu_BuildOpts())")
 	BuildPos := InStr(Body, "LLM_Menu_Build()")
 	Assert(InitPos > 0 and BuildPos > 0 and InitPos < BuildPos,

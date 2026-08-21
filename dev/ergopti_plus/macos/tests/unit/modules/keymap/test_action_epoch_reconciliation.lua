@@ -328,7 +328,8 @@ helpers.describe("keymap action epochs", function()
 		helpers.assert_eq(#returned_events, 1)
 		helpers.assert_true(returned_events[1] == older_events[1],
 			"the always-on keymap mouse tap must return queued output before the original click")
-		helpers.assert_true(fixture.state.start_is_word_boundary)
+		helpers.assert_true(not fixture.state.start_is_word_boundary,
+			"a focus-changing click must close the stale word-boundary state synchronously")
 		fixture.keymap.stop()
 	end)
 

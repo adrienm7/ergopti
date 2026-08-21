@@ -207,8 +207,31 @@ _GestureParseAndPressKey(Keys) {
 ; touchpad gesture itself is still holding down at callback time. Without this,
 ; e.g. Ctrl+Shift+Tab sent on top of held Ctrl+Win+Shift collapses to plain Tab.
 GestureSendShortcut(Keys) {
-		Send("{Blind}{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
+		if !GestureReleaseOwnedCarrierModifiers()
+				return
 		_GestureParseAndPressKey(Keys)
+}
+
+; Releases only logically stuck members of the Ctrl+Win+Shift carrier. A key
+; still physically held belongs to the user and must never receive synthetic Up.
+GestureReleaseOwnedCarrierModifiers(StateReader := GetKeyState, Emitter := SendEvent) {
+		Payload := "{Blind}"
+		ReleaseCount := 0
+		for _, ModKey in ["LControl", "RControl", "LShift", "RShift", "LWin", "RWin"] {
+				if StateReader(ModKey) && !StateReader(ModKey, "P") {
+						Payload .= "{" . ModKey . " Up}"
+						ReleaseCount += 1
+				}
+		}
+		if (ReleaseCount == 0)
+				return true
+		try {
+				Emitter(Payload)
+				return true
+		} catch as Err {
+				LoggerError("gestures", "Carrier modifier release failed: {1}.", Err.Message)
+				return false
+		}
 }
 
 
@@ -246,7 +269,8 @@ GestureDispatch(slot) {
 		; Release all modifiers held down by the touchpad shortcut (Ctrl+Win+Shift)
 		; before firing the action — otherwise SendEvent/Send calls inherit the
 		; still-down state and produce wrong combos on every swipe after the first.
-		Send("{LCtrl up}{RCtrl up}{LShift up}{RShift up}{LWin up}{RWin up}{LAlt up}{RAlt up}")
+		if !GestureReleaseOwnedCarrierModifiers()
+				return
 		LoggerDebug("gestures", "Dispatching gesture: {1} -> {2}.", slot, ActionName)
 
 		; Any tap action (other than the click-toggle itself) must deactivate a held click

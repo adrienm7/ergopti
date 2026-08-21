@@ -762,11 +762,14 @@ helpers.describe("ScriptControl: the extras table is actually reachable", functi
 		-- the same file, so an unbounded search would pass against the unfixed code.
 		local at = src:find("function M.execute_single", 1, true)
 		helpers.assert_true(at ~= nil, "execute_single must exist")
-		local body = src:sub(at, at + 700)
+		local next_function = src:find("function M.execute_axis", at, true)
+		helpers.assert_true(next_function ~= nil,
+			"execute_single must be bounded by the following execute_axis declaration")
+		local body = src:sub(at, next_function - 1)
 		helpers.assert_true(body:find("return false", 1, true) ~= nil,
 			"execute_single must report an unknown action instead of returning nil for both "
 			.. "outcomes; without that signal the caller cannot know when to try its fallback")
-		helpers.assert_true(body:find("return true", 1, true) ~= nil,
+		helpers.assert_true(body:find("return ok == true", 1, true) ~= nil,
 			"and it must report the handled case too, or the fallback fires after a success")
 	end)
 

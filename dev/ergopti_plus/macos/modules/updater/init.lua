@@ -78,6 +78,9 @@ local _check_interval_sec = DEFAULT_INTERVAL_SEC
 -- global has moved on, preventing a stale in-flight response from clobbering
 -- _cached_release / _update_state with data from the wrong channel.
 local _poll_generation    = 0
+-- Request and response order are distinct because timer-owned fetches overlap
+local _poll_request_seq   = 0
+local _poll_response_seq  = 0
 -- Per-channel ETag cache for conditional GET (304 does not count vs rate limit).
 local _fetch_cache        = {}
 
@@ -212,7 +215,7 @@ local function resolve_fetch_body(channel, status, body, response_headers)
 		local cached = _fetch_cache[channel]
 		if cached and cached.body then
 			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s.", channel)
-			return cached.body
+			return cached.body, nil
 		end
 		return nil
 	end
@@ -228,8 +231,7 @@ local function resolve_fetch_body(channel, status, body, response_headers)
 	if type(response_headers) == "table" then
 		etag = response_headers["ETag"] or response_headers["etag"] or ""
 	end
-	store_fetch_cache(channel, etag, body)
-	return body
+	return body, etag
 end
 
 function M.parse_tag(body)
@@ -350,18 +352,49 @@ local function background_tick(channel, update_menu_fn, generation)
 	end
 	local current = M.current_version()
 	local url = M.release_api_url(channel)
-	-- Capture generation before the async call so a channel switch mid-flight
-	-- can be detected and the stale response discarded.
+	_poll_request_seq = _poll_request_seq + 1
+	local request_seq = _poll_request_seq
+	-- Lifecycle generation and request order are independent stale dimensions
 	hs.http.asyncGet(url, fetch_headers(channel), function(status, body, response_headers)
 		if generation ~= _poll_generation then
-			Logger.debug(LOG, "Background check: stale response discarded (gen %d != %d).", generation, _poll_generation)
+			Logger.debug(LOG,
+				"Background check: stale response discarded (generation %d superseded by %d).",
+				generation, _poll_generation)
 			return
 		end
-		body = resolve_fetch_body(channel, status, body, response_headers)
+		if request_seq < _poll_response_seq then
+			Logger.debug(LOG,
+				"Background check: stale response discarded (request %d superseded by response %d in generation %d).",
+				request_seq, _poll_response_seq, generation)
+			return
+		end
+		if request_seq == _poll_response_seq then
+			Logger.debug(LOG,
+				"Background check: duplicate response discarded (request %d in generation %d).",
+				request_seq, generation)
+			return
+		end
+		local response_etag
+		body, response_etag = resolve_fetch_body(channel, status, body, response_headers)
 		if not body then return end
 		body = normalize_release_json(body, channel)
 		local latest = M.parse_tag(body)
-		if latest == "" or not M.is_newer_version(latest, current) then
+		if latest == "" then
+			Logger.debug(LOG, "Background check: response has no usable release tag.")
+			return
+		end
+		if _cached_release and _cached_release.tag
+			and M.is_newer_version(_cached_release.tag, latest) then
+			Logger.debug(LOG, "Background check: older release %s refused after %s.",
+				latest, _cached_release.tag)
+			return
+		end
+		-- Only a response that survived parsing and monotonicity may supersede an
+		-- older request or its ETag. A newer HTTP failure must not erase a valid
+		-- older completion that is still in flight.
+		_poll_response_seq = request_seq
+		if response_etag ~= nil then store_fetch_cache(channel, response_etag, body) end
+		if not M.is_newer_version(latest, current) then
 			Logger.debug(LOG, "Background check: up to date (%s).", current)
 			return
 		end

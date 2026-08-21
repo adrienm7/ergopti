@@ -103,6 +103,10 @@ HotPath_Now() {
 ; @returns {Float} Nested milliseconds (0 when nothing ran inside).
 _HotPathNestedMs(Closed, StartTicks, EndTicks) {
 	global _HOTPATH_QPC_FREQ
+	; A parse-time #HotIf can reach the profiler while Bundle_Init() is pumping
+	; messages, before this include's auto-execute assignments have run.
+	if !IsSet(_HOTPATH_QPC_FREQ)
+		return 0.0
 	Inside := []
 	for , Seg in Closed
 		if (Seg.S >= StartTicks and Seg.E <= EndTicks)
@@ -137,6 +141,13 @@ _HotPathNestedMs(Closed, StartTicks, EndTicks) {
 HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 	global _HOTPATH_QPC_FREQ, _HOTPATH_SLOW_MS
 	global _HOTPATH_NEST_MIN_MS, _HOTPATH_NEST_TRACK_CAP, _HOTPATH_SLOW_MS_BY_SEGMENT
+	; HotIf helpers are live at parse time. During the first message-pumping
+	; Bundle_Init() call the profiler globals below are not assigned yet, so the
+	; only safe behaviour is to skip this optional diagnostic sample.
+	if (!IsSet(_HOTPATH_QPC_FREQ) || !IsSet(_HOTPATH_SLOW_MS)
+			|| !IsSet(_HOTPATH_NEST_MIN_MS) || !IsSet(_HOTPATH_NEST_TRACK_CAP)
+			|| !IsSet(_HOTPATH_SLOW_MS_BY_SEGMENT))
+		return
 	; Ring of recently closed segments, oldest first. Deliberately a static local
 	; rather than a module global: this file otherwise holds no mutable state.
 	; A segment that closed before this one started can never be contained in it,

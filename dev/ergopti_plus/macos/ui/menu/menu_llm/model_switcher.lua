@@ -75,6 +75,8 @@ function M.new(ctx)
 	local update_menu = ctx.update_menu
 	local runtime_gate = type(ctx.runtime_gate) == "function"
 		and ctx.runtime_gate or function() return true end
+	local pause_epoch = type(ctx.pause_epoch) == "function"
+		and ctx.pause_epoch or function() return 0 end
 
 	-- Monotonically-increasing token so stale async callbacks from a previous
 	-- switch attempt are silently discarded when a new switch is initiated.
@@ -269,12 +271,23 @@ function M.new(ctx)
 		req_token = req_token + 1
 		local my_token = req_token
 		local request_backend = state.llm_backend
+		local request_pause_epoch = pause_epoch()
 		local function stale_reason()
 			if state.llm_backend ~= request_backend then return "backend" end
 			if my_token ~= req_token then return "request" end
+			if pause_epoch() ~= request_pause_epoch then return "pause_epoch" end
+			if runtime_gate() ~= true then return "paused" end
 			return nil
 		end
-		models_mgr.check_requirements(model_name,
+		local guarded_opts = {}
+		for key, value in pairs(type(opts) == "table" and opts or {}) do
+			guarded_opts[key] = value
+		end
+		guarded_opts.is_current = function()
+			return stale_reason() == nil
+		end
+		local check_ok, accepted = Logger.callback(LOG, "Model requirements dispatch",
+			models_mgr.check_requirements, model_name,
 			function(...)
 				local reason = stale_reason()
 				if reason then
@@ -282,10 +295,19 @@ function M.new(ctx)
 						"Stale ok-callback discarded (reason=%s, model=%s, backend=%s, current_backend=%s).",
 						tostring(reason), tostring(model_name), tostring(request_backend),
 						tostring(state.llm_backend)))
-					if type(on_stale) == "function" then on_stale(reason) end
-					return
+					if type(on_stale) == "function" then
+						local ok, result = Logger.callback(LOG,
+							"Stale model-success continuation", on_stale, reason)
+						return ok and result ~= false
+					end
+					return false
 				end
-				if type(on_ok) == "function" then on_ok(...) end
+				if type(on_ok) == "function" then
+					local ok, result = Logger.callback(LOG,
+						"Model requirements success continuation", on_ok, ...)
+					return ok and result ~= false
+				end
+				return true
 			end,
 			function(...)
 				local reason = stale_reason()
@@ -294,12 +316,28 @@ function M.new(ctx)
 						"Stale fail-callback discarded (reason=%s, model=%s, backend=%s, current_backend=%s).",
 						tostring(reason), tostring(model_name), tostring(request_backend),
 						tostring(state.llm_backend)))
-					if type(on_stale) == "function" then on_stale(reason) end
-					return
+					if type(on_stale) == "function" then
+						local ok, result = Logger.callback(LOG,
+							"Stale model-failure continuation", on_stale, reason)
+						return ok and result ~= false
+					end
+					return false
 				end
-				if type(on_fail) == "function" then on_fail(...) end
+				if type(on_fail) == "function" then
+					local ok, result = Logger.callback(LOG,
+						"Model requirements failure continuation", on_fail, ...)
+					return ok and result ~= false
+				end
+				return true
 			end,
-			opts)
+			guarded_opts)
+		if not check_ok or accepted == false then
+			if type(on_fail) == "function" then
+				Logger.callback(LOG, "Model requirements dispatch failure", on_fail)
+			end
+			return false
+		end
+		return true
 	end
 
 
@@ -431,25 +469,30 @@ function M.new(ctx)
 		local mlx_was_enabled = state.llm_backend == "mlx" and state.llm_enabled
 		if mlx_was_enabled and keymap and type(keymap.set_llm_enabled) == "function" then
 			Logger.debug(LOG, "MLX model switch: locking predictions during server restart.")
-			pcall(keymap.set_llm_enabled, false)
+			local lock_ok, locked = Logger.callback(LOG,
+				"MLX prediction lock", keymap.set_llm_enabled, false)
+			if not lock_ok or locked == false then return false end
 		end
 
 		local function unlock_predictions()
-			local gate_ok, runtime_available = xpcall(runtime_gate, debug.traceback)
-			if not gate_ok then
-				Logger.error(LOG, "MLX model switch runtime gate raised: %s", tostring(runtime_available))
-				runtime_available = false
-			end
+			local gate_ok, runtime_available = Logger.callback(LOG,
+				"MLX model-switch runtime gate", runtime_gate)
+			if not gate_ok then return false end
 			if mlx_was_enabled and state.llm_enabled == true and runtime_available == true
 				and keymap and type(keymap.set_llm_enabled) == "function" then
 				Logger.debug(LOG, "MLX model switch: predictions unlocked.")
-				pcall(keymap.set_llm_enabled, true)
+				local ok, result = Logger.callback(LOG,
+					"MLX prediction unlock", keymap.set_llm_enabled, true)
+				return ok and result ~= false
 			elseif mlx_was_enabled then
 				Logger.debug(LOG, "MLX model switch: unlock skipped because the live runtime gate is closed.")
 			end
+			return true
 		end
 
-		guarded_check_requirements(new_model, function()
+		return guarded_check_requirements(new_model, function()
+			local callback_ok, callback_result = Logger.callback(LOG,
+				"Model-switch success callback", function()
 			Logger.info(LOG, string.format("Model successfully switched to %s.", new_model))
 			state.llm_model       = new_model
 			state.llm_model_power = get_model_power_level(new_model)
@@ -467,31 +510,46 @@ function M.new(ctx)
 			end
 
 			if keymap and type(keymap.set_llm_model) == "function" then
-				local ok = pcall(keymap.set_llm_model, actual_name)
+				local ok, result = Logger.callback(LOG,
+					"Model-switch runtime model sync", keymap.set_llm_model, actual_name)
 				Logger.debug(LOG, string.format("keymap.set_llm_model() -> %s.", tostring(ok)))
+				if not ok or result == false then return false end
 			else
 				Logger.warn(LOG, "keymap.set_llm_model is unavailable.")
 			end
 			if keymap and type(keymap.set_llm_display_model_name) == "function" then
-				pcall(keymap.set_llm_display_model_name, new_model)
+				local ok, result = Logger.callback(LOG,
+					"Model-switch display-model sync",
+					keymap.set_llm_display_model_name, new_model)
+				if not ok or result == false then return false end
 			end
 
-			if save_prefs() ~= true then
-				unlock_predictions()
+			local save_ok, saved = Logger.callback(LOG,
+				"Model-switch preference save", save_prefs)
+			if not save_ok or saved ~= true then
 				return false
 			end
-			update_menu()
-			unlock_predictions()
+			local menu_ok, refreshed = Logger.callback(LOG,
+				"Model-switch menu refresh", update_menu)
+			if not menu_ok or refreshed == false then return false end
 			apply_recommended_prompt_profile(new_model, { dialog_title = i18n.get("menu.llm.model_change_title") })
+			return true
+			end)
+			local unlocked = unlock_predictions()
+			if not callback_ok or not unlocked then
+				return false
+			end
+			return callback_result ~= false
 		end, function()
 			-- Requirements failed — restore predictions so the user is not left stranded
 			Logger.warn(LOG, string.format("switch_model('%s') failed — restoring predictions.", tostring(new_model)))
-			unlock_predictions()
+			return unlock_predictions()
 		end, nil, function(reason)
 			-- A superseding model request owns the existing prediction lock. A
 			-- backend change does not necessarily launch another model request, so
 			-- it must release the lock captured by this abandoned MLX switch.
-			if reason == "backend" then unlock_predictions() end
+			if reason == "backend" then return unlock_predictions() end
+			return true
 		end)
 	end
 

@@ -327,6 +327,13 @@ _I18nEnsureLoaded() {
 I18nLookup(Key) {
 	global _I18nCache, _I18nCacheLoaded, _I18nFallbacksWarmed
 	global _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
+	; Translation is optional while parse-time #HotIf criteria are evaluated
+	; during Bundle_Init's first message pump. None of these caches exists yet.
+	if (!IsSet(_I18nCache) || !IsSet(_I18nCacheLoaded)
+			|| !IsSet(_I18nFallbacksWarmed) || !IsSet(_I18nCacheEn)
+			|| !IsSet(_I18nCacheEnLoaded) || !IsSet(_I18nCacheFr)
+			|| !IsSet(_I18nCacheFrLoaded))
+		return ""
 	if !_I18nCacheLoaded
 		_I18nEnsureActiveLoaded()
 	; An empty-string value is treated as MISSING at every cascade level, so it
@@ -368,6 +375,8 @@ t(Key) {
 	; Warned once per key: t() is called for every menu label on every rebuild,
 	; so an unthrottled line would flood the log and bury the first occurrence.
 	global _I18nMissWarned
+	if !IsSet(_I18nMissWarned)
+		return Key
 	if !_I18nMissWarned.Has(Key) {
 		_I18nMissWarned[Key] := true
 		try LoggerWarn("Locale", "No translation for '{1}' in the active locale, en or fr — the raw key is being displayed to the user.", Key)

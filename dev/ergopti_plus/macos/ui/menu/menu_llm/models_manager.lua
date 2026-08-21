@@ -321,7 +321,10 @@ function M.new(deps)
 			end
 			if is_critical then
 				pcall(dialog.block_alert, i18n.get("menu.llm.download_failed"), msg, i18n.get("common.close"), nil, "critical")
-				if type(on_cancel) == "function" then pcall(on_cancel) end return
+				if type(on_cancel) == "function" then
+					Logger.callback(LOG, "System-check cancellation", on_cancel)
+				end
+				return
 			end
 			
 			local sep  = string.rep("─", 25)
@@ -338,10 +341,26 @@ function M.new(deps)
 			if ok_c and choice == i18n.get("menu.llm.btn_download") then
 				-- Clear any stale abort flag from a previous cancelled download so
 				-- update_icon() calls in the new download are not silently no-oped.
-				if type(deps.clear_download_abort) == "function" then pcall(deps.clear_download_abort) end
-				do_download()
+				if type(deps.clear_download_abort) == "function" then
+					local ok_clear, cleared = Logger.callback(LOG,
+						"Download-abort reset", deps.clear_download_abort)
+					if not ok_clear or cleared == false then
+						Logger.error(LOG, "Download refused because its prior abort state could not be reset.")
+						if type(on_cancel) == "function" then
+							Logger.callback(LOG, "Download reset failure", on_cancel)
+						end
+						return
+					end
+				end
+				local download_ok, accepted = Logger.callback(LOG,
+					"Approved model download", do_download)
+				if (not download_ok or accepted == false) and type(on_cancel) == "function" then
+					Logger.callback(LOG, "Model download dispatch failure", on_cancel)
+				end
 			else
-				if type(on_cancel) == "function" then pcall(on_cancel) end
+				if type(on_cancel) == "function" then
+					Logger.callback(LOG, "Download prompt cancellation", on_cancel)
+				end
 			end
 		end)
 	end
@@ -354,31 +373,66 @@ function M.new(deps)
 
 		deps.mark_download_aborted = function()
 			download_aborted = true
-			if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) end
-			if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
+			local settled = true
+			if type(deps._orig_reset_menubar) == "function" then
+				local ok, result = Logger.callback(LOG,
+					"Download abort menubar reset", deps._orig_reset_menubar)
+				settled = ok and result ~= false and settled
+			end
+			if type(deps._orig_update_icon) == "function" then
+				local ok, result = Logger.callback(LOG,
+					"Download abort icon reset", deps._orig_update_icon)
+				settled = ok and result ~= false and settled
+			end
+			return settled
 		end
 
 		deps.clear_download_abort = function()
 			download_aborted = false
+			return true
 		end
 
 		deps.update_icon = function(text)
 			if download_aborted then return end
-			if type(deps._orig_update_icon) == "function" then return deps._orig_update_icon(text) end
+			if type(deps._orig_update_icon) == "function" then
+				local ok, result = Logger.callback(LOG,
+					"Download icon update", deps._orig_update_icon, text)
+				return ok and result ~= false
+			end
+			return true
 		end
 
 		deps.reset_menubar = function()
-			if type(deps._orig_reset_menubar) == "function" then pcall(deps._orig_reset_menubar) return end
-			if type(deps._orig_update_icon) == "function" then pcall(deps._orig_update_icon) end
+			if type(deps._orig_reset_menubar) == "function" then
+				local ok, result = Logger.callback(LOG,
+					"Menubar reset", deps._orig_reset_menubar)
+				if ok and result ~= false then return true end
+			end
+			if type(deps._orig_update_icon) == "function" then
+				local ok, result = Logger.callback(LOG,
+					"Menubar icon fallback reset", deps._orig_update_icon)
+				return ok and result ~= false
+			end
+			return false
 		end
 	end
 
 	-- Expose global hooks so the download_window can notify us on user cancel or retry.
 	package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"] = function()
-		if deps and type(deps.mark_download_aborted) == "function" then pcall(deps.mark_download_aborted) end
+		if deps and type(deps.mark_download_aborted) == "function" then
+			local ok, result = Logger.callback(LOG,
+				"Download-window abort hook", deps.mark_download_aborted)
+			return ok and result ~= false
+		end
+		return false
 	end
 	package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"] = function()
-		if deps and type(deps.clear_download_abort) == "function" then pcall(deps.clear_download_abort) end
+		if deps and type(deps.clear_download_abort) == "function" then
+			local ok, result = Logger.callback(LOG,
+				"Download-window retry hook", deps.clear_download_abort)
+			return ok and result ~= false
+		end
+		return false
 	end
 
 	local ollama = OllamaMgr.new(deps, presets, get_model_ram_logic)
@@ -470,7 +524,9 @@ function M.new(deps)
 		if type(mlx.prompt_hf_login) == "function" then
 			return mlx.prompt_hf_login(on_done)
 		end
-		if type(on_done) == "function" then pcall(on_done, false) end
+		if type(on_done) == "function" then
+			Logger.callback(LOG, "Unavailable HuggingFace prompt", on_done, false)
+		end
 		return false
 	end
 	

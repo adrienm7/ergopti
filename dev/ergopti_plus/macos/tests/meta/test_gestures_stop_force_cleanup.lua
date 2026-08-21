@@ -13,7 +13,7 @@
 --- never called Actions.force_cleanup(). The user was then unable to click
 --- normally until a physical button press released the stuck state.
 ---
---- The fix adds a `pcall(Actions.force_cleanup)` at the top of M.stop(), before
+--- The fix adds an `xpcall(Actions.force_cleanup, debug.traceback)` at the top of M.stop(), before
 --- CoreState.enabled is set to false, so any held synthetic clicks are released
 --- while the module is still logically running.
 --- ==============================================================================
@@ -50,20 +50,20 @@ end
 
 helpers.describe("gestures/init.lua: M.stop() releases held clicks (gesture-stuck-click-on-stop)", function()
 
-	helpers.it("M.stop() body contains a pcall(Actions.force_cleanup) call", function()
+	helpers.it("M.stop() body contains a traceback-preserving force_cleanup call", function()
 		local src  = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		local body = func_body(src, "function M.stop()")
 		helpers.assert_true(body ~= "",
 			"M.stop() must exist in modules/gestures/init.lua")
 		helpers.assert_true(
-			body:match("pcall%(Actions%.force_cleanup%)") ~= nil,
-			"M.stop() must call pcall(Actions.force_cleanup) to release held clicks (gesture-stuck-click-on-stop)")
+			body:match("xpcall%(Actions%.force_cleanup,%s*debug%.traceback%)") ~= nil,
+			"M.stop() must xpcall Actions.force_cleanup with a traceback to release held clicks visibly (gesture-stuck-click-on-stop)")
 	end)
 
 	helpers.it("force_cleanup call precedes CoreState.enabled = false", function()
 		local src  = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		local body = func_body(src, "function M.stop()")
-		local cleanup_pos = body:find("pcall%(Actions%.force_cleanup%)")
+		local cleanup_pos = body:find("xpcall%(Actions%.force_cleanup,%s*debug%.traceback%)")
 		local enabled_pos = body:find("CoreState%.enabled%s*=%s*false")
 		helpers.assert_true(
 			cleanup_pos ~= nil and enabled_pos ~= nil and cleanup_pos < enabled_pos,

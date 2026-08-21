@@ -108,7 +108,7 @@ _LLM_Menu_ApplyToggleCommitted(Candidate) {
 		; Model readiness is checked by the deferred bootstrap after this global
 		; barrier releases, so it cannot start a nested persistence transaction.
 		SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
-		SetTimer(() => LLM_Menu_BootstrapOllama(true), -1)
+		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(true), -1)
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
 		try LLM_Deps_Cancel()
@@ -196,9 +196,27 @@ LLM_Menu_OnInstantToggle(*) {
  * @param {string} key - The _LLM_Menu key to flip.
  */
 LLM_Menu_ToggleBool(key) {
+	global _LLM_Menu
+	if (key == "streaming" && !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"])
+		return false
 	return LLM_Menu_CommitMutation("the LLM '" . key . "' setting",
 		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, key),
 		_LLM_Menu_ApplyStandardCommitted)
+}
+
+LLM_Menu_BootstrapCurrentBackend(show_ui := true) {
+	global _LLM_Menu
+	if (_LLM_Menu["backend"] == "api") {
+		try LLM_Deps_Cancel()
+		try LLM_OllamaCancelWarmupRetry()
+		if A_IsSuspended {
+			_LLM_Menu["bootstrap_pending"] := true
+			return false
+		}
+		_LLM_Menu["bootstrap_pending"] := false
+		return LLM_Menu_TryStartBridge()
+	}
+	return LLM_Menu_BootstrapOllama(show_ui)
 }
 
 /**
@@ -241,7 +259,21 @@ LLM_Menu_BootstrapOllama(show_ui := true) {
 LLM_Menu_SetBackend(id) {
 	return LLM_Menu_CommitMutation("the LLM backend selection",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, "backend", id),
-		_LLM_Menu_ApplyStandardCommitted)
+		_LLM_Menu_ApplyBackendCommitted)
+}
+
+_LLM_Menu_ApplyBackendCommitted(Candidate) {
+	try LLM_AuxInvalidate("backend")
+	try LLM_Engine_StopGeneration()
+	try LLM_Deps_Cancel()
+	try LLM_OllamaCancelWarmupRetry()
+	if !LLM_BackendCapabilities(Candidate["backend"])["streaming"]
+		Candidate["streaming"] := false
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_Build()
+	if Candidate["enabled"]
+		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+	return true
 }
 
 LLM_Menu_SetModel(tag) {
@@ -489,7 +521,9 @@ LLM_Menu_TryStartBridge() {
 		_LLM_Menu["bootstrap_pending"] := true
 		return
 	}
-	if !_LLM_Menu["enabled"] or !LLM_Deps_IsReady()
+	if !_LLM_Menu["enabled"]
+		return false
+	if (_LLM_Menu["backend"] == "ollama" && !LLM_Deps_IsReady())
 		return
 	_LLM_Menu["bridge_pending"] := false
 	LLM_Menu_StartBridge()
@@ -595,6 +629,7 @@ LLM_Menu_BuildOpts() {
 		"nav_modifiers",           _LLM_Menu["nav_modifiers"],
 		"val_modifiers",           _LLM_Menu["val_modifiers"],
 		"backend",                 _LLM_Menu["backend"],
+		"ollama_port",             _LLM_Menu["ollama_port"],
 		"api_entries",             _LLM_Menu["api_entries"],
 		"api_entry_id",            _LLM_Menu["api_entry_id"],
 		"inline_autotype",         _LLM_Menu["inline_autotype"],
@@ -617,6 +652,8 @@ LLM_Menu_BuildOpts() {
  */
 LLM_Menu_OnDepsReady() {
 	global _LLM_Menu
+	if (_LLM_Menu["backend"] != "ollama")
+		return
 	if A_IsSuspended {
 		_LLM_Menu["bootstrap_pending"] := true
 		LoggerDebug("LLM", "Deps-ready callback deferred while suspended.")
@@ -646,6 +683,8 @@ LLM_Menu_OnDepsReady() {
  */
 LLM_Menu_OnDepsFailed(msg) {
 	global _LLM_Menu
+	if (_LLM_Menu["backend"] != "ollama")
+		return
 	if A_IsSuspended {
 		_LLM_Menu["bootstrap_pending"] := true
 		LoggerDebug("LLM", "Deps-failed callback deferred while suspended.")
@@ -671,10 +710,10 @@ LLM_Menu_OnResume() {
 			try LoggerError("LLM",
 				"Trigger shortcut recovery resume service failed: {1}.", Err.Message)
 	}
-	if !_LLM_Menu["bootstrap_pending"]
-		return
-	_LLM_Menu["bootstrap_pending"] := false
-	if !_LLM_Menu["enabled"]
-		return
-	SetTimer(() => LLM_Menu_BootstrapOllama(false), -1)
+	LLM_Menu_Build()
+	if _LLM_Menu["bootstrap_pending"] {
+		_LLM_Menu["bootstrap_pending"] := false
+		if _LLM_Menu["enabled"]
+			SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+	}
 }

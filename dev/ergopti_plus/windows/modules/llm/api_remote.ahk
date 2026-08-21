@@ -182,6 +182,10 @@ _LLMRemote_BuildCurlConfig(Format, Token, Url) {
 _LLMRemote_CurlCleanup(entry) {
     try FSDelete(entry["tmp_payload"])
     try FSDelete(entry["tmp_stdout"])
+    if entry.Has("tmp_status")
+        try FSDelete(entry["tmp_status"])
+    if entry.Has("tmp_exit")
+        try FSDelete(entry["tmp_exit"])
     ; The token lives in tmp_config; it has to be reaped on the cancelled, deadline,
     ; trim and completion paths alike, which all funnel through here.
     if entry.Has("tmp_config")
@@ -202,6 +206,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"
     tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
     tmp_config  := tmp_dir . "\ergopti_remote_" . uid . ".conf"
+    terminal    := _LLM_CurlTerminalPaths(tmp_stdout)
     if !FSWrite(tmp_payload, Payload) {
         try LoggerWarn("LLM.remote", "Failed to write curl payload file.")
         _LLM_InvokeCallback(on_fail, "on_fail")
@@ -215,10 +220,11 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     }
     ; URL and auth headers come from --config, never from argv (see
     ; _LLMRemote_BuildCurlConfig): argv has no ACL for a same-user reader.
-    cmdLine := '"' . curl_exe . '" -s -S -X POST '
+    curlCmd := '"' . curl_exe . '" -s -S -X POST '
         . '--config ' . _Q(tmp_config) . ' '
         . '--data-binary @' . _Q(tmp_payload) . ' '
         . '-o ' . _Q(tmp_stdout)
+    cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
     pid := 0
     try {
         Run(cmdLine, , "Hide", &pid)
@@ -236,6 +242,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     _LLM_Remote_Async[req_id] := Map(
         "transport", "curl", "pid", pid,
         "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout, "tmp_config", tmp_config,
+        "tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
         "format", resolved["Format"], "model_id_at_dispatch", resolved["Model"],
         "on_success", on_success, "on_fail", on_fail,
         "cancelled", false, "start_tick", A_TickCount, "timeout_ms", timeout_ms)
@@ -274,12 +281,14 @@ _LLMRemote_PollCurl(req_id) {
     on_fail    := entry["on_fail"]
     fmt        := entry["format"]
     model_id   := entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : ""
-    body := ""
-    try body := FileRead(entry["tmp_stdout"], "UTF-8")
-    _LLMRemote_CurlCleanup(entry)
-    _LLM_Remote_Async.Delete(req_id)
-    if (body == "") {
-        try LoggerWarn("LLM.remote", "curl produced an empty body for req_id={1} — the request never reached the provider (DNS, proxy, TLS).", req_id)
+    terminal := _LLM_CurlReadTerminal(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
+    body := terminal["body"]
+    if !_LLM_CurlTerminalOk(terminal) {
+        snip := StrLen(body) > 200 ? SubStr(body, 1, 200) . "…" : body
+        try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body=«{4}».",
+            req_id, terminal["exit"], terminal["status"], snip)
+        _LLMRemote_CurlCleanup(entry)
+        _LLM_Remote_Async.Delete(req_id)
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
@@ -291,6 +300,8 @@ _LLMRemote_PollCurl(req_id) {
         ; model that simply answered nothing.
         snip := StrLen(body) > 200 ? SubStr(body, 1, 200) . "…" : body
         try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion — body: «{2}».", req_id, snip)
+        _LLMRemote_CurlCleanup(entry)
+        _LLM_Remote_Async.Delete(req_id)
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
@@ -298,6 +309,8 @@ _LLMRemote_PollCurl(req_id) {
     ; cost from this block, and curl is the transport every shipping Windows host
     ; actually takes — dropping it here zeroed every metric on the API backend.
     meta := _LLMRemoteExtractUsage(fmt, body, model_id)
+    _LLMRemote_CurlCleanup(entry)
+    _LLM_Remote_Async.Delete(req_id)
     _LLM_InvokeCallback(on_success, "on_success", text, meta)
 }
 
@@ -434,33 +447,26 @@ _LLMRemoteExtractUsage(format, body, model) {
     out := Map("prompt_tokens", 0, "completion_tokens", 0, "total_tokens", 0, "est_cost_usd", 0.0)
     if (body == "")
         return out
-    ; Gemini uses ``promptTokenCount`` / ``candidatesTokenCount`` /
-    ; ``totalTokenCount`` inside ``usageMetadata``.
-    if (format == "gemini") {
-        if RegExMatch(body, '"promptTokenCount"\s*:\s*([0-9]+)', &m)
-            out["prompt_tokens"] := Integer(m[1])
-        if RegExMatch(body, '"candidatesTokenCount"\s*:\s*([0-9]+)', &m)
-            out["completion_tokens"] := Integer(m[1])
-        if RegExMatch(body, '"totalTokenCount"\s*:\s*([0-9]+)', &m)
-            out["total_tokens"] := Integer(m[1])
-    } else if (format == "anthropic") {
-        ; Anthropic: input_tokens / output_tokens at top level under ``usage``.
-        if RegExMatch(body, '"input_tokens"\s*:\s*([0-9]+)', &m)
-            out["prompt_tokens"] := Integer(m[1])
-        if RegExMatch(body, '"output_tokens"\s*:\s*([0-9]+)', &m)
-            out["completion_tokens"] := Integer(m[1])
-        out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
-    } else {
-        ; OpenAI shape (also used by Mistral / DeepSeek / Cohere / xAI /
-        ; Cerebras / openai_compat): prompt_tokens / completion_tokens /
-        ; total_tokens inside ``usage``.
-        if RegExMatch(body, '"prompt_tokens"\s*:\s*([0-9]+)', &m)
-            out["prompt_tokens"] := Integer(m[1])
-        if RegExMatch(body, '"completion_tokens"\s*:\s*([0-9]+)', &m)
-            out["completion_tokens"] := Integer(m[1])
-        if RegExMatch(body, '"total_tokens"\s*:\s*([0-9]+)', &m)
-            out["total_tokens"] := Integer(m[1])
-    }
+    try root := JsonParse(body)
+    catch
+        return out
+    if !(root is Map)
+        return out
+    usageKey := format == "gemini" ? "usageMetadata" : "usage"
+    if !root.Has(usageKey) or !(root[usageKey] is Map)
+        return out
+    usage := root[usageKey]
+    promptKey := format == "gemini" ? "promptTokenCount"
+        : (format == "anthropic" ? "input_tokens" : "prompt_tokens")
+    completionKey := format == "gemini" ? "candidatesTokenCount"
+        : (format == "anthropic" ? "output_tokens" : "completion_tokens")
+    totalKey := format == "gemini" ? "totalTokenCount" : "total_tokens"
+    if usage.Has(promptKey) and usage[promptKey] is Number and usage[promptKey] >= 0
+        out["prompt_tokens"] := Integer(usage[promptKey])
+    if usage.Has(completionKey) and usage[completionKey] is Number and usage[completionKey] >= 0
+        out["completion_tokens"] := Integer(usage[completionKey])
+    if usage.Has(totalKey) and usage[totalKey] is Number and usage[totalKey] >= 0
+        out["total_tokens"] := Integer(usage[totalKey])
     if (out["total_tokens"] == 0 and out["prompt_tokens"] > 0)
         out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
     out["est_cost_usd"] := _LLMRemoteEstimateCost(model, out["prompt_tokens"], out["completion_tokens"])
@@ -807,10 +813,47 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
 _LLMRemoteParseResponse(Format, Body) {
     if (Body == "")
         return ""
-    structured := _LLMRemoteParseStructured(Format, Body)
-    if (structured != "")
-        return structured
+    state := _LLMRemoteParseStructuredState(Format, Body)
+    if !state["valid"]
+        return ""
+    if state["recognized"]
+        return state["text"]
     return _LLMRemoteParseResponseRegex(Format, Body)
+}
+
+_LLMRemoteParseStructuredState(Format, Body) {
+	try root := JsonParse(Body)
+	catch
+		return Map("valid", false, "recognized", false, "text", "")
+	if !(root is Map)
+		return Map("valid", true, "recognized", false, "text", "")
+	if (Format == "anthropic") {
+		if root.Has("content") and (root["content"] is Array) {
+			for _, block in root["content"]
+				if (block is Map) and block.Has("type") and block["type"] == "text"
+						and block.Has("text") and Type(block["text"]) == "String"
+					return Map("valid", true, "recognized", true, "text", block["text"])
+		}
+	} else if (Format == "gemini") {
+		if root.Has("candidates") and (root["candidates"] is Array) and root["candidates"].Length {
+			candidate := root["candidates"][1]
+			if (candidate is Map) and candidate.Has("content") and (candidate["content"] is Map) {
+				content := candidate["content"]
+				if content.Has("parts") and (content["parts"] is Array)
+					for _, part in content["parts"]
+						if (part is Map) and part.Has("text") and Type(part["text"]) == "String"
+							return Map("valid", true, "recognized", true, "text", part["text"])
+			}
+		}
+	} else if root.Has("choices") and (root["choices"] is Array) and root["choices"].Length {
+		choice := root["choices"][1]
+		if (choice is Map) and choice.Has("message") and (choice["message"] is Map) {
+			message := choice["message"]
+			if message.Has("content") and Type(message["content"]) == "String"
+				return Map("valid", true, "recognized", true, "text", message["content"])
+		}
+	}
+	return Map("valid", true, "recognized", false, "text", "")
 }
 
 ; Structured-navigation parse: walks the documented response tree for the
@@ -818,18 +861,8 @@ _LLMRemoteParseResponse(Format, Body) {
 ; (so the caller can fall back to the regex). Wrapped in try because JsonParse
 ; throws on malformed bodies (HTTP error pages) — that just means "fall back".
 _LLMRemoteParseStructured(Format, Body) {
-    try {
-        root := JsonParse(Body)
-    } catch {
-        return ""
-    }
-    if !(root is Map)
-        return ""
-    if (Format == "anthropic")
-        return _LLMRemoteNavAnthropic(root)
-    if (Format == "gemini")
-        return _LLMRemoteNavGemini(root)
-    return _LLMRemoteNavOpenAI(root)
+	state := _LLMRemoteParseStructuredState(Format, Body)
+	return state["valid"] and state["recognized"] ? state["text"] : ""
 }
 
 ; Anthropic Messages: ``content`` is an ARRAY of blocks; the answer is the first
@@ -972,37 +1005,64 @@ _LLMRemote_LoadCatalog() {
     if !(prices is Map)
         throw Error("api_providers.json: model_prices must be an object")
 
-    LLM_API_PROVIDERS := Map()
-    LLM_API_PROVIDER_ORDER := []
+    candidateProviders := Map()
+    candidateOrder := []
     for _, pid in order {
         if (Type(pid) != "String" or pid = "")
-            throw Error("api_providers.json: invalid provider_order entry")
-        if !providers.Has(pid)
-            throw Error("api_providers.json: provider_order references unknown '" . pid . "'")
+            continue
+        if !providers.Has(pid) {
+            try LoggerWarn("LLM.remote", "api_providers.json: unknown provider '{1}' skipped.", pid)
+            continue
+        }
         desc := providers[pid]
-        if !(desc is Map)
-            throw Error("api_providers.json: providers." . pid . " must be an object")
+        if !(desc is Map) {
+            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' is not an object and was skipped.", pid)
+            continue
+        }
+        valid := true
         for req in ["label", "base_url", "default_model", "format"] {
-            if !desc.Has(req)
-                throw Error("api_providers.json: providers." . pid . " missing '" . req . "'")
+			if (!desc.Has(req) or Type(desc[req]) != "String"
+				or ((req = "label" or req = "format") and desc[req] = "")) {
+                valid := false
+                break
+            }
+        }
+        if !valid {
+            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has a non-string or empty descriptor and was skipped.", pid)
+            continue
         }
         fmt := desc["format"]
-        if (fmt != "openai" and fmt != "anthropic" and fmt != "gemini")
-            throw Error("api_providers.json: providers." . pid . " has invalid format '" . fmt . "'")
-        LLM_API_PROVIDERS[pid] := Map(
+        if (fmt != "openai" and fmt != "anthropic" and fmt != "gemini") {
+            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has an unsupported format and was skipped.", pid)
+            continue
+        }
+        candidateProviders[pid] := Map(
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],
             "DefaultModel", desc["default_model"],
             "Format", fmt)
-        LLM_API_PROVIDER_ORDER.Push(pid)
+        candidateOrder.Push(pid)
     }
 
-    LLM_REMOTE_MODEL_PRICES := Map()
+    candidatePrices := Map()
     for model, row in prices {
-        if !(row is Map) or !row.Has("in") or !row.Has("out")
-            throw Error("api_providers.json: model_prices." . model . " must have in/out")
-        LLM_REMOTE_MODEL_PRICES[model] := Map("in", row["in"], "out", row["out"])
+        validModel := Type(model) = "String" and model != ""
+        validRow := row is Map and row.Has("in") and row.Has("out")
+        if validRow
+            validRow := row["in"] is Number and row["out"] is Number
+                and row["in"] >= 0 and row["out"] >= 0
+        if (!validModel or !validRow) {
+            try LoggerWarn("LLM.remote", "api_providers.json: invalid price row '{1}' skipped.", model)
+            continue
+        }
+        candidatePrices[model] := Map("in", row["in"], "out", row["out"])
     }
+
+    ; Publish only the completely validated candidates. A failed/partial parse
+    ; can never leak raw catalogue scalars to the menu or inference path.
+    LLM_API_PROVIDERS := candidateProviders
+    LLM_API_PROVIDER_ORDER := candidateOrder
+    LLM_REMOTE_MODEL_PRICES := candidatePrices
 }
 
 ; AHK-05: a corrupt or user-edited api_providers.json must disable only the remote

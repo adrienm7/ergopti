@@ -61,8 +61,8 @@ _CRNS_ThrottleIsReleasedOnFailure() {
 
 	Deferred := _DriverFuncBody("_ErgoptiDeferredCrashReport")
 	Assert(Deferred != "", "_ErgoptiDeferredCrashReport() must exist")
-	Assert(InStr(Deferred, "!CrashReport_PromptUser(") > 0,
-		"the deferred report must branch on whether the report was saved")
+	Assert(InStr(Deferred, "if !Task.start()") > 0,
+		"the deferred report must release its throttle when the worker cannot start")
 	Assert(InStr(Deferred, "ReleaseDedup()") > 0,
 		"the throttle must be released when the report was not written — otherwise a single failed save silences every recurrence of that fault for the whole TTL")
 

@@ -2454,6 +2454,9 @@ final class KarabinerLeaseOuterRuntime {
 						return finishAfterRecovery(machine.innerLost())
 					}
 					beforeLiveAcknowledgementPublish()
+					guard liveInnerTransportStillPresent() else {
+						return finishAfterRecovery(machine.innerLost())
+					}
 				}
 				if !writeLeaseLine(line, to: parentOutputDescriptor) {
 					if let terminal = perform(machine.receiveParentEOF()) { return terminal }
@@ -2479,6 +2482,19 @@ final class KarabinerLeaseOuterRuntime {
 			}
 		}
 		return nil
+	}
+
+	/// Revalidates the private socket at the final live-ACK publication boundary.
+	private func liveInnerTransportStillPresent() -> Bool {
+		guard let current = inner, current.descriptor >= 0 else { return false }
+		var descriptor = pollfd(
+			fd: current.descriptor,
+			events: Int16(POLLIN | POLLHUP | POLLERR),
+			revents: 0
+		)
+		let result = pollLeaseBoundary(&descriptor, poller: boundaryPoller)
+		return result >= 0
+			&& !(result > 0 && leasePollReportsTerminal(descriptor.revents))
 	}
 
 	/// Recognizes public ACKs that prove one live Karabiner CLI transport completed.
@@ -2623,6 +2639,68 @@ final class KarabinerLeaseOuterRuntime {
 // ====================================
 // ====================================
 
+#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+/// Debug-only subprocess role for POSIX behavior that must cross an exec boundary.
+let kPOSIXTestHelperFlag = "--posix-test-helper"
+/// Debug-only subprocess role for launcher-log append concurrency tests.
+let kLauncherLogAppendTestFlag = "--launcher-log-append-test"
+
+/// Runs one bounded POSIX regression-test role in the real launcher executable.
+private func runPOSIXTestHelper(arguments: [String]) -> Int32 {
+	guard arguments.count >= 3 else { return LeaseWorkerExit.invalidArguments.rawValue }
+	switch arguments[2] {
+	case "hold-shared", "hold-exclusive":
+		guard arguments.count == 4 else { return LeaseWorkerExit.invalidArguments.rawValue }
+		let descriptor = Darwin.open(
+			arguments[3],
+			O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW,
+			S_IRUSR | S_IWUSR
+		)
+		guard descriptor >= 0 else { return LeaseWorkerExit.innerFailed.rawValue }
+		defer { _ = Darwin.close(descriptor) }
+		let operation = arguments[2] == "hold-shared" ? LOCK_SH : LOCK_EX | LOCK_NB
+		guard ergoptiFlock(descriptor, operation) == 0 else {
+			return LeaseWorkerExit.innerFailed.rawValue
+		}
+		var ready: UInt8 = 1
+		guard Darwin.write(STDOUT_FILENO, &ready, 1) == 1 else {
+			return LeaseWorkerExit.innerFailed.rawValue
+		}
+		if arguments[2] == "hold-exclusive" {
+			while true { _ = Darwin.pause() }
+		}
+		var release: UInt8 = 0
+		var readResult: Int
+		repeat {
+			readResult = Darwin.read(STDIN_FILENO, &release, 1)
+		} while readResult == -1 && errno == EINTR
+		return readResult >= 0
+			? LeaseWorkerExit.success.rawValue
+			: LeaseWorkerExit.innerFailed.rawValue
+	case "reserved-sockets":
+		guard arguments.count == 3 else { return LeaseWorkerExit.invalidArguments.rawValue }
+		for descriptor in STDIN_FILENO...kInnerControlDescriptor {
+			_ = Darwin.close(descriptor)
+		}
+		guard let sockets = makeReservedLeaseSocketEndpoints() else {
+			return LeaseWorkerExit.innerFailed.rawValue
+		}
+		defer {
+			_ = Darwin.close(sockets.outerDescriptor)
+			_ = Darwin.close(sockets.innerDescriptor)
+		}
+		let valid = sockets.outerDescriptor > kInnerControlDescriptor
+			&& sockets.innerDescriptor > kInnerControlDescriptor
+			&& sockets.outerDescriptor != sockets.innerDescriptor
+			&& fcntl(sockets.outerDescriptor, F_GETFD) & FD_CLOEXEC != 0
+			&& fcntl(sockets.innerDescriptor, F_GETFD) & FD_CLOEXEC != 0
+		return valid ? LeaseWorkerExit.success.rawValue : LeaseWorkerExit.innerFailed.rawValue
+	default:
+		return LeaseWorkerExit.invalidArguments.rawValue
+	}
+}
+#endif
+
 /// Dispatches validated headless roles from the signed launcher executable.
 enum KarabinerLeaseWorker {
 	/// Detects every headless role before any NSApplication side effect.
@@ -2632,7 +2710,8 @@ enum KarabinerLeaseWorker {
 		guard arguments.count > 1 else { return false }
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 		if arguments[1] == kKarabinerLeaseGuardianLifetimeTestFlag
-			|| arguments[1] == kLauncherLogAppendTestFlag {
+			|| arguments[1] == kLauncherLogAppendTestFlag
+			|| arguments[1] == kPOSIXTestHelperFlag {
 			return true
 		}
 		#endif
@@ -2654,6 +2733,9 @@ enum KarabinerLeaseWorker {
 		prepareLeaseChildReaping()
 		_ = Darwin.signal(SIGPIPE, SIG_IGN)
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		if arguments[1] == kPOSIXTestHelperFlag {
+			return runPOSIXTestHelper(arguments: arguments)
+		}
 		if arguments[1] == kLauncherLogAppendTestFlag {
 			return runLauncherLogAppendTest(arguments: arguments)
 		}

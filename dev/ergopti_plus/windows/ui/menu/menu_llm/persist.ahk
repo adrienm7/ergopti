@@ -100,6 +100,10 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 		Updates.Push({ Section: "llm", Key: "ollama_port", Value: MenuState["ollama_port"] })
 	if MenuState.Has("api_entry_id")
 		Updates.Push({ Section: "llm", Key: "api_entry_id", Value: MenuState["api_entry_id"] })
+	ProfilesPayload := _LLM_Menu_SerializeUserProfiles(MenuState["user_profiles"])
+	if !(ProfilesPayload is String)
+		return false
+	Updates.Push({ Section: "llm", Key: "user_profiles", Value: ProfilesPayload })
 	Updates.Push({ Section: "llm.navigation", Key: "nav_modifiers",
 		Value: _LLM_Menu_ModifiersStringToArray(MenuState["nav_modifiers"]) })
 	apps := MenuState.Has("disabled_apps") ? MenuState["disabled_apps"] : []
@@ -149,6 +153,14 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 		raw := IniCacheGet(Cache, "llm", "api_entry_id")
 		if (raw != "_")
 			opts["api_entry_id"] := String(raw)
+		raw := IniCacheGet(Cache, "llm", "user_profiles")
+		if (raw != "_") {
+			Profiles := _LLM_Menu_DeserializeUserProfiles(String(raw))
+			if (Profiles is Array)
+				opts["user_profiles"] := Profiles
+			else
+				LoggerError("LLM", "Persisted custom profiles are malformed; refusing to publish them.")
+		}
 		raw := IniCacheGet(Cache, "llm.navigation", "val_modifiers")
 		if (raw != "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)

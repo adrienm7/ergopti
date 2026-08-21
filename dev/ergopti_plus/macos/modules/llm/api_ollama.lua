@@ -14,11 +14,11 @@ local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
--- Two independent HTTP clients: one for long inference POST requests, one for
--- quick health-check GETs on /api/tags. A single shared client would cancel
--- an in-flight completion whenever a background availability ping arrived.
+-- Independent inference, availability, and warmup owners prevent one semantic
+-- operation from superseding another merely because both use HTTP
 local _infer_client  = require("adapters.http_client").new()
 local _check_client  = require("adapters.http_client").new()
+local _warmup_client = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
@@ -138,7 +138,13 @@ end
 --- pointless re-warm when the weights really are loaded.
 function M.stop_warmup()
 	_warmup_gen = _warmup_gen + 1
+	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
+	if not ok or result == false then
+		Logger.error(LOG, "stop_warmup() could not retire its HTTP owner: %s.", tostring(result))
+		return false
+	end
 	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, in-flight warmup invalidated.", _warmup_gen)
+	return true
 end
 
 -- Delay before launching Ollama after killing a stale instance (seconds)
@@ -343,7 +349,7 @@ function M.warmup(model_name)
 	-- in flight, the response describes a now-stale server/model and its callback
 	-- must not touch _is_ready (see reset_ready for the self-termination scenario).
 	local my_warmup_gen = _warmup_gen
-	_infer_client.post(
+	_warmup_client.post(
 		M.get_base_url() .. "/api/chat",
 		{ ["Content-Type"] = "application/json" },
 		encoded,

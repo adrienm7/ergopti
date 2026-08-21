@@ -60,13 +60,15 @@ local function load_bridge_with_throwing_notice()
 		httpserver = {
 			new = function()
 				started.count = started.count + 1
+				local listening_port = 0
 				local srv
 				srv = {
-					setPort     = function(self) return self end,
+					setPort     = function(self, port) listening_port = port; return self end,
 					setCallback = function(self) return self end,
 					setInterface = function(self) return self end,
 					start       = function(self) return self end,
-					stop        = function(self) return self end,
+					getPort     = function() return listening_port end,
+					stop        = function(self) listening_port = 0; return self end,
 				}
 				return srv
 			end,
@@ -124,13 +126,15 @@ helpers.describe("vscode_bridge: setup() isolates the cosmetic step from the ser
 			httpserver = {
 				new = function()
 					started.count = started.count + 1
+					local listening_port = 0
 					local srv
 					srv = {
-						setPort = function(self) return self end,
+						setPort = function(self, port) listening_port = port; return self end,
 						setCallback = function(self) return self end,
 						setInterface = function(self) return self end,
 						start = function(self) return self end,
-						stop = function(self) return self end,
+						getPort = function() return listening_port end,
+						stop = function(self) listening_port = 0; return self end,
 					}
 					return srv
 				end,

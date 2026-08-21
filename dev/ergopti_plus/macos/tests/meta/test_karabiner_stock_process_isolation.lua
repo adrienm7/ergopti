@@ -1179,8 +1179,18 @@ helpers.describe("Karabiner stock processes remain entirely user-managed", funct
 
 		local offenders = {}
 		local lifecycle_units = 0
+		local exact_owned_task_terminations = 0
 		for _, unit in ipairs(units) do
 			local guarded_body = unit.body
+			-- Onboarding owns the hs.task objects in its private registry. Cancelling
+			-- those exact download/installer handles is required lifecycle cleanup,
+			-- not control of a shared Karabiner process.
+			if guarded_body:find("for task in pairs(M._active_tasks) do", 1, true) then
+				local masked
+				guarded_body, masked = guarded_body:gsub(
+					"task:%s*terminate%s*%(%s*%)", "task:cancel_exact_owned_task()")
+				exact_owned_task_terminations = exact_owned_task_terminations + masked
+			end
 			if unit.body == lifecycle_source then
 				guarded_body = guarded_lifecycle
 				lifecycle_units = lifecycle_units + 1
@@ -1194,6 +1204,8 @@ helpers.describe("Karabiner stock processes remain entirely user-managed", funct
 		end
 		helpers.assert_eq(lifecycle_units, 1,
 			"the runtime unit scan must include ke_lifecycle exactly once")
+		helpers.assert_eq(exact_owned_task_terminations, 1,
+			"the onboarding lifecycle must cancel exactly one private active-task class")
 		local menu_source, menu_err = helpers.read_driver_unit('i18n.get("menu.karabiner.open_gui")')
 		helpers.assert_true(menu_source ~= nil,
 			"the explicit Karabiner menu action must be uniquely readable: " .. tostring(menu_err))

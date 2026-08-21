@@ -39,7 +39,7 @@ helpers.describe("menu_llm build_item: probe callback is guarded", function()
 
 		-- The old bug: probe_llm_health(backend, update_menu) directly
 		helpers.assert_true(
-			src:find("probe_llm_health(state.llm_backend", 1, true) ~= nil,
+			src:find("probe_llm_health(state,", 1, true) ~= nil,
 			"probe_llm_health call must still exist in build_item"
 		)
 		-- The bare pattern must NOT appear (it was the bug)

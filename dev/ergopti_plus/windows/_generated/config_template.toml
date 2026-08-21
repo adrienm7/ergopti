@@ -257,6 +257,7 @@ time_activation_seconds = 0.75
 enabled = false
 onboarding_seen = false
 app_profile_overrides = ""
+user_profiles = ""
 
 [llm.display]
 pred_indent = 0

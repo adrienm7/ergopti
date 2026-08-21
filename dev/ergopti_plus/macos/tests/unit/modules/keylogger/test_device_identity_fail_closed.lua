@@ -31,6 +31,7 @@ local STUBBED_MODULES = {
 	"modules.keylogger.export",
 	"keylogger.metrics",
 	"adapters.file_system",
+	"adapters.timer_scheduler",
 }
 
 local function make_state()
@@ -102,19 +103,24 @@ local function run_unowned_case(failure)
 		end,
 	}
 
-	local timer_handle = { active = false }
-	function timer_handle:start()
-		self.active = true
-		return self
+	local function make_timer_handle(callback)
+		local handle = { active = false, callback = callback }
+		function handle:start()
+			self.active = true
+			return self
+		end
+		function handle:stop()
+			self.active = false
+			return self
+		end
+		function handle:running()
+			return self.active
+		end
+		return handle
 	end
-	function timer_handle:stop()
-		self.active = false
-		return self
-	end
-	function timer_handle:running()
-		return self.active
-	end
+	local timer_handle = make_timer_handle(nil)
 
+	package.loaded["adapters.timer_scheduler"] = nil
 	local module = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end
@@ -138,8 +144,9 @@ local function run_unowned_case(failure)
 		},
 		timer = {
 			absoluteTime = function() return 1000000 end,
-			new = function()
+			new = function(_, callback)
 				calls.timer_new = calls.timer_new + 1
+				timer_handle.callback = callback
 				return timer_handle
 			end,
 		},
@@ -283,19 +290,24 @@ local function run_publication_case(failure)
 		end,
 	}
 
-	local timer_handle = { active = false }
-	function timer_handle:start()
-		self.active = true
-		return self
+	local function make_publication_timer_handle(callback)
+		local handle = { active = false, callback = callback }
+		function handle:start()
+			self.active = true
+			return self
+		end
+		function handle:stop()
+			self.active = false
+			return self
+		end
+		function handle:running()
+			return self.active
+		end
+		return handle
 	end
-	function timer_handle:stop()
-		self.active = false
-		return self
-	end
-	function timer_handle:running()
-		return self.active
-	end
+	local timer_handle = make_publication_timer_handle(nil)
 
+	package.loaded["adapters.timer_scheduler"] = nil
 	local module = helpers.load_with_stubs("modules.keylogger.log_manager", {
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end
@@ -314,16 +326,27 @@ local function run_publication_case(failure)
 		},
 		timer = {
 			absoluteTime = function() return 1000000 end,
-			new = function()
+			new = function(_, callback)
 				calls.timer_new = calls.timer_new + 1
-				return timer_handle
+				if calls.timer_new == 1 then
+					timer_handle.callback = callback
+					return timer_handle
+				end
+				calls.deferred_timer = make_publication_timer_handle(callback)
+				return calls.deferred_timer
 			end,
 		},
 	})
 
 	local ok, failure_detail = xpcall(function()
 		local initialized = module.init(make_state())
+		calls.timer_new_after_init = calls.timer_new
 		module.log_shortcut("cmd+c", "Finder")
+		if initialized == true then
+			helpers.assert_type(calls.deferred_timer and calls.deferred_timer.callback, "function",
+				"a published identity must schedule its accepted log entry")
+			calls.deferred_timer.callback()
+		end
 		local concurrent = failure == "concurrent_match" or failure == "concurrent_mismatch"
 		helpers.assert_eq(calls.classified_reads, concurrent and 2 or 1,
 			"only proven absence or an exact concurrent-winner read may authorize identity")
@@ -351,7 +374,7 @@ local function run_publication_case(failure)
 				"submodules may initialize after identity publication commits")
 			helpers.assert_eq(calls.rotation_appends, 1,
 				"public log actions must become reachable after the commit")
-			helpers.assert_eq(calls.timer_new, 1,
+			helpers.assert_eq(calls.timer_new_after_init, 1,
 				"the committed identity must own exactly one proven-running ingest timer")
 			helpers.assert_eq(timer_handle:running(), true,
 				"the successful fixture must model the native timer state required by init")

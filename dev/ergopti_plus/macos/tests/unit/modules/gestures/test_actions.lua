@@ -296,15 +296,15 @@ end)
 
 -- ===============================================================
 -- ===============================================================
--- ======= 7/ Throwing actions are traced via Logger.pcall =======
+-- ======= 7/ Throwing actions are traced via Logger.callback ====
 -- ===============================================================
 -- ===============================================================
 
 -- Regression: execute_single/execute_axis dispatched every registered action (~150+ closures)
 -- via a bare pcall(s.fn) with the (ok, err) tuple discarded — a thrown exception left NO trace
--- anywhere. The fix replaces both bare pcalls with Logger.pcall(LOG, ...) so a throwing action
--- is always logged at ERROR level.
-helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall (gestures-actions-silent-pcall regression)", function()
+-- anywhere and execute_single still reported true. The contextual boundary must
+-- log the traceback and return false to its caller.
+helpers.describe("gestures.actions: throwing actions are traced via Logger.callback (HS-016)", function()
 
 	-- Loads a fresh actions module with a REAL (not stubbed) lib.logger instance so the
 	-- ring buffer genuinely reflects what Logger.pcall wrote, plus hs.timer.doAfter
@@ -329,21 +329,23 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
 
 		-- 'lookup' -> M.trigger_lookup() calls hs.timer.doAfter(...) UNPROTECTED
-		-- (no internal pcall), so stubbing it to error() reaches Logger.pcall's guard.
+		-- (no internal pcall), so stubbing it to error() reaches Logger.callback's guard.
 		-- The containment IS the subject, so the pcall stays. What it was missing is
-		-- that the exception was CONTAINED rather than swallowed: Logger.pcall is
+		-- that the exception was CONTAINED rather than swallowed: Logger.callback is
 		-- meant to log it, and a guard that silently discarded every failure would
 		-- leave a dead gesture with nothing in the logs to explain it.
 		local ok, result = pcall(Actions2.execute_single, "lookup")
-		helpers.assert_true(ok, "execute_single itself must never raise — Logger.pcall must contain the exception")
-		helpers.assert_true(result ~= nil,
-			"and must still ANSWER its caller — a contained exception that returned nothing "
-				.. "is indistinguishable from an action that was never dispatched")
+		helpers.assert_true(ok, "execute_single itself must never raise — Logger.callback must contain the exception")
+		helpers.assert_eq(result, false,
+			"a contained exception must be returned as an explicit dispatch refusal")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false
 		for _, line in ipairs(snap) do
-			if line:find("[ERROR]", 1, true) and line:find("gestures.actions", 1, true) then
+			if line:find("[ERROR]", 1, true)
+				and line:find("Gesture action 'lookup'", 1, true)
+				and line:find("boom: injected", 1, true)
+				and line:find("stack traceback", 1, true) then
 				found_error = true
 			end
 		end
@@ -355,18 +357,18 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
 
 		-- 'lines' next/prev call hs.timer.doAfter(...) UNPROTECTED directly.
-		-- execute_axis answers nil where execute_single answers true, and both are
-		-- deliberate: the axis dispatcher has no single result to report. Asserted as
-		-- a TYPE so a future change to either is visible here rather than at a caller.
 		local ok, result = pcall(Actions2.execute_axis, "lines", true)
-		helpers.assert_true(ok, "execute_axis itself must never raise — Logger.pcall must contain the exception")
-		helpers.assert_true(result == nil or type(result) == "boolean",
-			"and must answer nil or a boolean, never a half-value")
+		helpers.assert_true(ok, "execute_axis itself must never raise — Logger.callback must contain the exception")
+		helpers.assert_eq(result, false,
+			"a throwing axis action must return an explicit dispatch refusal")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false
 		for _, line in ipairs(snap) do
-			if line:find("[ERROR]", 1, true) and line:find("gestures.actions", 1, true) then
+			if line:find("[ERROR]", 1, true)
+				and line:find("Gesture axis action 'lines'", 1, true)
+				and line:find("boom: injected", 1, true)
+				and line:find("stack traceback", 1, true) then
 				found_error = true
 			end
 		end
@@ -383,7 +385,7 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.pcall
 		local dispatched = Actions2.execute_single("mission_control")
 		SyntheticInput.emit_key_stroke = original_emit
 
-		helpers.assert_eq(true, dispatched,
+		helpers.assert_eq(dispatched, true,
 			"the registered action remains owned by the gesture dispatcher")
 		local found_refusal = false
 		for _, line in ipairs(FreshLogger.ring_buffer_snapshot()) do

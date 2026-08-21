@@ -27,6 +27,18 @@
 ; LLM_OLLAMA_BASE_URL is DERIVED from it; change both via LLM_Ollama_SetPort.
 global LLM_OLLAMA_PORT     := 0
 global LLM_OLLAMA_BASE_URL := "http://localhost:" . LLM_OLLAMA_PORT
+global _LLM_AuxGeneration := 1
+
+LLM_AuxGeneration() {
+	global _LLM_AuxGeneration
+	return _LLM_AuxGeneration
+}
+
+LLM_AuxInvalidate(*) {
+	global _LLM_AuxGeneration
+	_LLM_AuxGeneration += 1
+	return _LLM_AuxGeneration
+}
 ; Keep-alive duration sent in /api/chat payloads — canonical value lives in
 ; _shared/modules/llm/defaults.json (llm_ollama_keep_alive). Sentinel "" —
 ; sourced at boot from LLM_Defaults by LLM_Ollama_LoadDefaults().
@@ -151,6 +163,8 @@ LLM_Ollama_SetPort(port) {
 	port := Integer(port)
 	if (port < 1024 || port > 65535)
 		return false
+	if port != LLM_OLLAMA_PORT
+		LLM_AuxInvalidate("ollama_port")
 	LLM_OLLAMA_PORT     := port
 	LLM_OLLAMA_BASE_URL := "http://localhost:" . port
 	return true

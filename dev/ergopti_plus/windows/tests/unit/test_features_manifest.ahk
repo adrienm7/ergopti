@@ -459,21 +459,39 @@ TestFMv2_ApplyNestedSubSection() {
 Test("ApplyConfigToml: applies a nested sub-section (modelisation alpha)",
 	TestFMv2_ApplyNestedSubSection)
 
-TestFMv2_ApplyHsSectionIsSilentlySkipped() {
+TestFMv2_ApplyHsSectionIsLoudlyRejected() {
 	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
 	try {
 		Path := _FM_WriteFixture("hs_section",
-			"[hs.gestures]`r`nswipe_2_left = " . '"' . "arrow_down" . '"' . "`r`n")
+			"[hs.gestures]`r`nswipe_2_left = " . '"' . "arrow_down" . '"' . "`r`n"
+			. "[script]`r`nlocale = " . '"' . "es" . '"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
-		AssertEqual(0, Applied)
+		AssertEqual(1, Applied)
+		AssertEqual("es", Features["script"]["locale"],
+			"a foreign namespace error must not abort following valid configuration")
+		Errors := []
+		for Line in Captured
+			if InStr(Line, "[ERROR]", true)
+				Errors.Push(Line)
+		AssertEqual(1, Errors.Length, "[hs.*] must emit exactly one ERROR")
+		AssertTrue(InStr(Errors[1], "[hs.gestures]", true) > 0,
+			"the loud error must name the rejected foreign section")
 		FileDelete(Path)
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
-Test("ApplyConfigToml: [hs.*] sections are silently skipped", TestFMv2_ApplyHsSectionIsSilentlySkipped)
+Test("ApplyConfigToml: [hs.*] sections are loudly rejected", TestFMv2_ApplyHsSectionIsLoudlyRejected)
 
 TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
 	try {
 		Path := _FM_WriteFixture("unknown_section",
 			"[hotstrings.no_such_group]`r`n"
@@ -483,9 +501,20 @@ TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("es", Features["script"]["locale"])
+		Errors := []
+		for Line in Captured
+			if InStr(Line, "[ERROR]", true)
+				Errors.Push(Line)
+		AssertEqual(1, Errors.Length, "an unknown section must emit exactly one ERROR")
+		AssertTrue(InStr(Errors[1], "hotstrings.no_such_group", true) > 0,
+			"the error must name the unknown section")
 		FileDelete(Path)
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
 	}
-	_FM_EndIsolated(OldFeatures)
 }
 Test("ApplyConfigToml: unknown sections warn but do not abort other overrides",
 	TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash)

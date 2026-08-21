@@ -492,6 +492,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		"dispatch_fn",       dispatch_fn,
 		"dispatch_stream_fn",dispatch_stream_fn,
 		"streaming",         streaming_enabled,
+		"show_all_at_once",  _LLM_Engine.Has("show_all_at_once") and _LLM_Engine["show_all_at_once"],
 		; Wallclock at request start so the keylogger event can include the
 		; round-trip latency (matches the HS log_llm shape's ``elapsed_ms``
 		; field). Read at finalize time as ``A_TickCount - request_start``.
@@ -726,6 +727,8 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	global _LLM_Engine
 	if !_LLM_Engine_IsCurrent(state)
 		return
+	if state.Has("show_all_at_once") and state["show_all_at_once"]
+		return
 	preview := []
 	for _, s in state["slots"]
 		preview.Push(s)
@@ -788,8 +791,9 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	if (state["slots"].Length >= state["requested"]) {
 		active_idx := 1
 	}
-	LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false,
-		state["request_id"], state["semantic_signature"])
+	if !(state.Has("show_all_at_once") and state["show_all_at_once"])
+		LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false,
+			state["request_id"], state["semantic_signature"])
 	_LLM_Engine_DispatchVariant(state)
 }
 

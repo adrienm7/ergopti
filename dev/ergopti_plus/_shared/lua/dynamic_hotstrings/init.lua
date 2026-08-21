@@ -27,6 +27,8 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local utf8_lib = (type(utf8) == "table" and utf8.len)
+	and utf8 or require("compat.utf8")
 
 local LOG = "dynamic_hotstrings.shared"
 
@@ -116,13 +118,20 @@ end
 --- @param suffix string The string sequence that must immediately precede the trigger character.
 --- @param section string The UI section name linking this rule to a toggleable menu item.
 --- @param resolver function A callback function that returns the string to insert.
+--- @return boolean committed
 function M.add_rule(suffix, section, resolver)
 	if type(suffix) ~= "string" or type(section) ~= "string" or type(resolver) ~= "function" then
 		Logger.warn(LOG, "add_rule: invalid arguments — skipped.")
-		return
+		return false
+	end
+	local valid_utf8, suffix_len = pcall(utf8_lib.len, suffix)
+	if not valid_utf8 or type(suffix_len) ~= "number" or suffix_len < 1 then
+		Logger.warn(LOG, "add_rule: suffix must be non-empty valid UTF-8 — skipped.")
+		return false
 	end
 	table.insert(_rules, { suffix = suffix, section = section, resolver = resolver })
 	Logger.debug(LOG, "Rule registered: suffix='%s' section='%s'.", suffix, section)
+	return true
 end
 
 

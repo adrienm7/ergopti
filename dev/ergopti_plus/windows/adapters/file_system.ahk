@@ -60,15 +60,31 @@ FSWrite(Path, Content) {
 		return false
 	if !(Content is String)
 		Content := ""
+	FH := 0
+	Opened := false
+	Succeeded := false
 	try {
-		local FH := FileOpen(Path, "w", "UTF-8-RAW")
+		FH := FileOpen(Path, "w", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
-		FH.Write(Content)
+		Opened := true
+		Written := FH.Write(Content)
+		; File.Write reports encoded bytes in text mode. Comparing that value to
+		; UTF-16 code units rejects every valid non-ASCII write as "short".
+		ExpectedBytes := StrPut(Content, "UTF-8") - 1
+		if Written != ExpectedBytes
+			throw Error("short write")
 		FH.Close()
+		FH := 0
+		Succeeded := true
 		return true
 	} catch {
 		return false
+	} finally {
+		if IsObject(FH)
+			try FH.Close()
+		if Opened && !Succeeded
+			try FileDelete(Path)
 	}
 }
 

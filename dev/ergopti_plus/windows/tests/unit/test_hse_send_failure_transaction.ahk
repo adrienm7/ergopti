@@ -149,6 +149,7 @@ _AHK04_RunIsolated(Callback) {
 		; Keep the real drain timer disarmed while tests inspect exact queue counts.
 		_HSE_FireLogScheduled := true
 		KLHook.prev_app := "ahk04-test.exe"
+		OutputHostResolverPrimeForTest("ahk04-test.exe")
 		_Stub_LastChars := []
 		LastSentCharacterKeyTime := Map()
 		; Ring commits must not be masked by unrelated input hooks left active by a
@@ -284,6 +285,7 @@ _AHK04_NormalDispatchImpl() {
 		"a successful normal fire must remain one atomic send")
 
 	KLHook.prev_app := "notepad.exe"
+	OutputHostResolverPrimeForTest("notepad.exe")
 	_LSCResetFrom(["seed"])
 	HSE_Buffer := "ab"
 	_PrefixBuffer := "ab"
@@ -313,6 +315,7 @@ _AHK04_NotepadSendModeImpl() {
 	Spec.OnlyText := false
 	Spec.Replacement := '""{Left}'
 	KLHook.prev_app := "notepad.exe"
+	OutputHostResolverPrimeForTest("notepad.exe")
 	HSE_Buffer := "ab"
 	HSE_StartIsWordBoundary := true
 	_PrefixBuffer := "ab"
