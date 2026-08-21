@@ -366,15 +366,15 @@ function M.new(ctx)
 	local set_llm_profile
 	local settle_recovery_debts
 
-	--- Settles the ProfilesManager Delete ledger before any profile-facing result,
+	--- Settles every ProfilesManager registry owner before an identity-facing result,
 	--- including voluntary recommendation no-ops that never reach set_llm_profile.
 	--- @param action_label string Human-readable action for refusal logging.
 	--- @return boolean settled
 	local function settle_profile_mutation_gate(action_label)
 		local gate_ok, gate_result = Logger.callback(LOG,
-			"Profile Delete recovery gate", profile_mutation_gate)
+			"Profile mutation recovery gate", profile_mutation_gate)
 		if not gate_ok or gate_result ~= true then
-			Logger.error(LOG, "%s refused while Delete rollback remains unsettled.",
+			Logger.error(LOG, "%s refused while a profile registry rollback remains unsettled.",
 				action_label)
 			return false
 		end
@@ -619,21 +619,40 @@ function M.new(ctx)
 		state.llm_active_profile = snapshot.state_profile
 
 		local failures = {}
-		if debt.runtime then
-			if call_model_boundary("Profile-switch runtime rollback",
+		local runtime_failed = false
+		local function reassert_runtime(label, retain_for_preference_retry)
+			state.llm_active_profile = snapshot.state_profile
+			if debt.runtime_touched ~= true then return true end
+			if call_model_boundary(label,
 				llm_mod.set_active_profile, snapshot.runtime_profile) then
-				debt.runtime = false
-			else
-				failures[#failures + 1] = "runtime rollback"
+				debt.runtime = retain_for_preference_retry == true
+				return true
 			end
+			debt.runtime = true
+			runtime_failed = true
+			failures[#failures + 1] = "runtime rollback"
+			return false
+		end
+
+		if debt.runtime then
+			reassert_runtime("Profile-switch runtime rollback", debt.persist == true)
 		end
 		if debt.persist then
 			local ok, saved = Logger.callback(LOG,
 				"Profile-switch preference rollback", save_prefs)
 			if ok and saved == true then
 				debt.persist = false
+				-- A successful preference rollback cannot settle a runtime
+				-- compensation that was refused earlier in this attempt.
+				if debt.runtime_touched == true and not runtime_failed then
+					debt.runtime = false
+				end
 			else
 				failures[#failures + 1] = "preference rollback"
+				-- PreferencesTransaction can restore the rejected candidate in place.
+				-- Reassert both active identities immediately and retain the runtime bit
+				-- so the next persistence retry cannot outlive this compensation.
+				reassert_runtime("Profile-switch post-preference runtime reassertion", true)
 			end
 		end
 		if debt.menu then
@@ -641,9 +660,14 @@ function M.new(ctx)
 				debt.menu = false
 			else
 				failures[#failures + 1] = "menu rollback"
+				reassert_runtime("Profile-switch post-menu runtime reassertion",
+					debt.persist == true)
 			end
 		end
 
+		-- Later reassertions in the same rollback attempt must not absorb an
+		-- earlier runtime refusal; keep that exact boundary for the next retry.
+		if runtime_failed then debt.runtime = true end
 		if #failures > 0 then
 			profile_recovery_debt = debt
 			Logger.error(LOG,
@@ -680,6 +704,7 @@ function M.new(ctx)
 	---   `skip_delete_recovery = true` is reserved for Delete compensation itself.
 	--- @return boolean committed True only when every boundary owned by this call commits.
 	--- @return table|nil intent_lease Parent-owned commit/cancel lease when requested.
+	--- @return table|nil recovery_status Exact failed-transition ownership status.
 	set_llm_profile = function(profile_id, opts)
 		opts = type(opts) == "table" and opts or {}
 		if type(profile_id) ~= "string" then return false end
@@ -694,6 +719,7 @@ function M.new(ctx)
 		local debt = {
 			snapshot = snapshot,
 			runtime = false,
+			runtime_touched = false,
 			persist = false,
 			menu = false,
 		}
@@ -701,12 +727,19 @@ function M.new(ctx)
 			Logger.error(LOG,
 				"Profile-switch transition failed at '%s'; restoring the previous profile.",
 				tostring(boundary))
+			local persistence_touched = debt.persist == true
+			local menu_touched = debt.menu == true
 			profile_recovery_debt = debt
-			restore_profile_transition(debt)
-			return false
+			local settled = restore_profile_transition(debt)
+			return false, nil, {
+				recovery_pending = settled ~= true,
+				persistence_touched = persistence_touched,
+				menu_touched = menu_touched,
+			}
 		end
 
 		debt.runtime = true
+		debt.runtime_touched = true
 		if not call_model_boundary("Profile-switch runtime sync",
 			llm_mod.set_active_profile, profile_id) then
 			return reject_transition("runtime sync")
@@ -766,6 +799,7 @@ function M.new(ctx)
 	--- @param new_model string Display name of the model to activate.
 	local function switch_model(new_model)
 		Logger.debug(LOG, string.format("Executing switch_model('%s')…", new_model or "nil"))
+		if not settle_profile_mutation_gate("Model switch") then return false end
 		if not settle_recovery_debts() then return false end
 		local request_profile_generation = profile_intent_generation
 
@@ -797,6 +831,9 @@ function M.new(ctx)
 		return guarded_check_requirements(new_model, function()
 			local callback_ok, callback_result = Logger.callback(LOG,
 				"Model-switch success callback", function()
+				if not settle_profile_mutation_gate("Model switch continuation") then
+					return false
+				end
 				if not settle_recovery_debts() then return false end
 				local snapshot = snapshot_model_transition()
 				if not snapshot then return false end
@@ -911,6 +948,7 @@ function M.new(ctx)
 	--- requirements callback before clearing the prediction engine model.
 	--- @return boolean True only when runtime and persistence both commit.
 	local function disable_model()
+		if not settle_profile_mutation_gate("No Model transition") then return false end
 		if not settle_recovery_debts() then return false end
 		req_token = req_token + 1
 		local snapshot = snapshot_model_transition()

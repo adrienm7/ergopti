@@ -19,6 +19,7 @@ local i18n          = require("infra.i18n")
 local dialog        = require("infra.dialog_util")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local ManifestMenu  = require("infra.manifest_menu")
+local PreferencesTransaction = require("ui.menu.preferences_transaction")
 
 local LOG = "menu_llm.profiles"
 
@@ -108,6 +109,25 @@ local function settle_profile_switcher_recovery(deps)
 	return true
 end
 
+--- Settles an uncommitted Clone/Create registry candidate before a sibling mutation.
+--- @param deps table Global dependencies.
+--- @return boolean settled
+local function settle_profile_candidate_recovery(deps)
+	local callback = type(deps) == "table" and deps.settle_profile_candidate_recovery or nil
+	if callback == nil then return true end
+	if type(callback) ~= "function" then
+		Logger.error(LOG, "Profile mutation refused because its candidate recovery gate is invalid.")
+		return false
+	end
+	local ok, result = xpcall(callback, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Profile mutation refused while candidate rollback remains unsettled: %s.",
+			tostring(result))
+		return false
+	end
+	return true
+end
+
 --- Settles every owner that may still reference the profile registry.
 --- @param deps table Global dependencies.
 --- @param opts table|nil Optional internal skip controls.
@@ -116,6 +136,10 @@ local function settle_profile_mutation_recovery(deps, opts)
 	opts = type(opts) == "table" and opts or {}
 	if opts.skip_delete_recovery ~= true
 		and not settle_profile_delete_recovery(deps) then
+		return false
+	end
+	if opts.skip_candidate_recovery ~= true
+		and not settle_profile_candidate_recovery(deps) then
 		return false
 	end
 	return settle_profile_switcher_recovery(deps)
@@ -131,13 +155,14 @@ end
 --- @param opts table|nil Optional parent-transaction controls.
 --- @return boolean committed
 --- @return table|nil intent_lease Deferred intent lease from the real owner.
+--- @return table|nil recovery_status Exact failed-transition ownership status.
 local function select_profile(deps, state, pid, opts)
 	opts = type(opts) == "table" and opts or {}
 	if not settle_profile_mutation_recovery(deps, opts) then
 		return false
 	end
 	if type(deps.set_llm_profile) == "function" then
-		local ok, result, intent_lease = xpcall(
+		local ok, result, intent_lease, recovery_status = xpcall(
 			deps.set_llm_profile,
 			debug.traceback,
 			pid,
@@ -145,7 +170,7 @@ local function select_profile(deps, state, pid, opts)
 		)
 		if not ok or result ~= true then
 			Logger.error(LOG, "Profile selection refused for '%s': %s.", pid, tostring(result))
-			return false
+			return false, nil, recovery_status
 		end
 		return true, intent_lease
 	end
@@ -160,6 +185,219 @@ local function select_profile(deps, state, pid, opts)
 	return menu_ok and menu_result ~= false, nil
 end
 
+--- Creates the exact registry owner shared by Clone and Create.
+--- @param deps table Global dependencies.
+--- @return function activate_candidate Candidate activation transaction.
+--- @return function settle_recovery Retained candidate rollback gate.
+local function make_profile_candidate_owner(deps)
+	local state = deps.state
+	local recovery_debt = nil
+
+	--- Invokes one strict candidate boundary.
+	--- @param label string Boundary label.
+	--- @param callback function|nil Boundary callback.
+	--- @param ... any Arguments forwarded to callback.
+	--- @return boolean settled
+	local function invoke_candidate_boundary(label, callback, ...)
+		if type(callback) ~= "function" then
+			Logger.error(LOG, "%s refused because its callback is unavailable.", label)
+			return false
+		end
+		local ok, result = xpcall(callback, debug.traceback, ...)
+		if not ok or result ~= true then
+			Logger.error(LOG, "%s refused: %s.", label, tostring(result))
+			return false
+		end
+		return true
+	end
+
+	--- Reasserts the exact pre-candidate registry after an external boundary.
+	--- The global preference transaction restores state in place and may therefore
+	--- mutate the published candidate table during either a failed save or its own
+	--- runtime rollback. The detached pre-candidate table remains this owner's
+	--- identity and is restored in place before being republished.
+	--- @param debt table Mutable candidate rollback ledger.
+	--- @param label string Boundary-specific diagnostic label.
+	--- @return boolean settled
+	local function reassert_candidate_registry(debt, label)
+		local restored = PreferencesTransaction.restore_table(
+			debt.old_profiles,
+			debt.old_profiles_snapshot
+		)
+		if restored ~= true then
+			Logger.error(LOG, "%s refused because the prior registry could not be restored in place.",
+				tostring(label))
+			return false
+		end
+
+		state.llm_user_profiles = debt.old_profiles
+		local runtime_ok = invoke_candidate_boundary(
+			label,
+			llm_mod.set_user_profiles,
+			debt.old_profiles
+		)
+		local post_restore = PreferencesTransaction.restore_table(
+			debt.old_profiles,
+			debt.old_profiles_snapshot
+		)
+		state.llm_user_profiles = debt.old_profiles
+		if post_restore ~= true then
+			Logger.error(LOG, "%s mutated the prior registry beyond in-place recovery.",
+				tostring(label))
+			return false
+		end
+		return runtime_ok == true
+	end
+
+	--- Restores the exact registry that preceded one uncommitted candidate.
+	--- Runtime profile compensation settles first because it may still resolve the
+	--- candidate. Every later external boundary is followed by an exact registry
+	--- reassertion because PreferencesTransaction can mutate state and runtime in
+	--- place while reporting a failed rollback.
+	--- @param debt table Mutable candidate rollback ledger.
+	--- @return boolean settled
+	local function restore_candidate(debt)
+		recovery_debt = debt
+		if debt.switcher_pending then
+			if not settle_profile_switcher_recovery(deps) then
+				Logger.error(LOG,
+					"Profile candidate '%s' remains owned by pending runtime compensation.",
+					tostring(debt.candidate.id))
+				return false
+			end
+			debt.switcher_pending = false
+		end
+
+		local failures = {}
+		if not reassert_candidate_registry(debt,
+			"Profile candidate registry rollback") then
+			failures[#failures + 1] = "runtime registry"
+		end
+
+		if #failures == 0 and debt.persistence_pending then
+			local saved = invoke_candidate_boundary(
+				"Profile candidate preference rollback",
+				deps.save_prefs
+			)
+			if saved then debt.persistence_pending = false end
+			if not reassert_candidate_registry(debt,
+				"Profile candidate post-preference registry reassertion") then
+				failures[#failures + 1] = "post-preference runtime registry"
+			end
+			if not saved then failures[#failures + 1] = "preferences" end
+		end
+
+		if #failures == 0 and debt.menu_pending then
+			local menu_ok, menu_result = xpcall(deps.update_menu, debug.traceback)
+			if menu_ok and menu_result ~= false then
+				debt.menu_pending = false
+			else
+				Logger.error(LOG, "Profile candidate menu rollback refused: %s.",
+					tostring(menu_result))
+				failures[#failures + 1] = "menu"
+			end
+			if not reassert_candidate_registry(debt,
+				"Profile candidate post-menu registry reassertion") then
+				failures[#failures + 1] = "post-menu runtime registry"
+			end
+		end
+
+		if #failures == 0 and not reassert_candidate_registry(debt,
+			"Profile candidate final registry reassertion") then
+			failures[#failures + 1] = "final runtime registry"
+		end
+		if #failures > 0 then
+			Logger.error(LOG, "Profile candidate rollback remains pending at: %s.",
+				table.concat(failures, ", "))
+			return false
+		end
+
+		debt.registry_pending = false
+		recovery_debt = nil
+		Logger.info(LOG, "Uncommitted profile candidate '%s' rolled back.",
+			tostring(debt.candidate.id))
+		return true
+	end
+
+	--- Retries retained candidate cleanup before a sibling profile mutation.
+	--- @return boolean settled
+	local function settle_recovery()
+		if not recovery_debt then return true end
+		Logger.warn(LOG, "Retrying retained profile candidate rollback.")
+		return restore_candidate(recovery_debt)
+	end
+
+	--- Publishes and activates one candidate without losing rejected ownership.
+	--- @param candidate table Newly constructed profile table.
+	--- @return boolean committed
+	local function activate_candidate(candidate)
+		if type(candidate) ~= "table" or type(candidate.id) ~= "string"
+			or candidate.id == "" then
+			Logger.error(LOG, "Profile candidate activation refused because its identity is invalid.")
+			return false
+		end
+		if not settle_profile_mutation_recovery(deps) then return false end
+		if type(state) ~= "table" then
+			Logger.error(LOG, "Profile candidate activation refused because shared state is invalid.")
+			return false
+		end
+
+		local old_profiles = type(state.llm_user_profiles) == "table"
+			and state.llm_user_profiles or {}
+		local candidate_profiles = {}
+		for _, profile in ipairs(old_profiles) do
+			candidate_profiles[#candidate_profiles + 1] = profile
+		end
+		candidate_profiles[#candidate_profiles + 1] = candidate
+		local debt = {
+			candidate = candidate,
+			candidate_profiles = candidate_profiles,
+			menu_pending = false,
+			old_profiles = old_profiles,
+			old_profiles_snapshot = PreferencesTransaction.clone(old_profiles),
+			persistence_pending = false,
+			registry_pending = true,
+			switcher_pending = false,
+		}
+
+		state.llm_user_profiles = candidate_profiles
+		if not invoke_candidate_boundary("Profile candidate registry publication",
+			llm_mod.set_user_profiles, candidate_profiles) then
+			recovery_debt = debt
+			restore_candidate(debt)
+			return false
+		end
+
+		local committed, _, recovery_status = select_profile(
+			deps,
+			state,
+			candidate.id,
+			{skip_candidate_recovery = true}
+		)
+		if committed == true then
+			recovery_debt = nil
+			return true
+		end
+
+		if type(recovery_status) == "table" then
+			debt.switcher_pending = recovery_status.recovery_pending == true
+			debt.persistence_pending = recovery_status.persistence_touched == true
+			debt.menu_pending = recovery_status.menu_touched == true
+		end
+		recovery_debt = debt
+		if debt.switcher_pending then
+			Logger.error(LOG,
+				"Profile candidate '%s' retained until runtime compensation settles.",
+				tostring(candidate.id))
+			return false
+		end
+		restore_candidate(debt)
+		return false
+	end
+
+	return activate_candidate, settle_recovery
+end
+
 --- Clones a built-in profile into an editable user profile and opens the editor.
 --- The built-in profiles in profiles.json ship with the driver and are read-only
 --- by design (any local edit would be overwritten on the next update), so cloning
@@ -168,7 +406,8 @@ end
 --- @param deps table Global dependencies.
 --- @param state table Shared menu state.
 --- @param src table The built-in profile to clone.
-local function clone_builtin_profile(deps, state, src)
+--- @param activate_candidate function Exact candidate-registry transaction.
+local function clone_builtin_profile(deps, state, src, activate_candidate)
 	if type(src) ~= "table" then return end
 	if not settle_profile_mutation_recovery(deps) then return false end
 	-- Unique id: seq suffix prevents collision when two profiles are cloned
@@ -182,29 +421,47 @@ local function clone_builtin_profile(deps, state, src)
 		system_multi_template = src.system_multi_template or "",
 		batch                 = src.batch == true,
 	}
-	state.llm_user_profiles = state.llm_user_profiles or {}
-	table.insert(state.llm_user_profiles, copy)
-	if select_profile(deps, state, copy.id) ~= true then return false end
+	if type(activate_candidate) ~= "function" or activate_candidate(copy) ~= true then
+		return false
+	end
 	-- Open the edit dialog immediately so the user lands in the prompt they can
 	-- edit, not back in the menu.
 	if prompt_editor and type(prompt_editor.open) == "function" then
-		hs.timer.doAfter(0.1, function()
-			pcall(prompt_editor.open, copy, function(updated)
-				if type(updated) == "table" then
+		local timer_fired = false
+		local editor_settled = false
+		local function open_clone_editor()
+			if timer_fired then return false end
+			timer_fired = true
+			if not settle_profile_mutation_recovery(deps) then return false end
+			local editor_ok, editor_result = Logger.callback(LOG,
+				"Cloned-profile editor",
+				prompt_editor.open,
+				copy,
+				function(updated)
+					if editor_settled then return false end
+					editor_settled = true
+					if type(updated) ~= "table" then return false end
 					if not settle_profile_mutation_recovery(deps) then return false end
 					for j, p in ipairs(state.llm_user_profiles) do
-						if type(p) == "table" and p.id == updated.id then
+						if p == copy then
 							state.llm_user_profiles[j] = updated
 							break
 						end
 					end
-					sync_profiles(state)
-					if deps.save_prefs() ~= true then return false end
-					pcall(deps.update_menu)
-				end
-			end)
-		end)
+					if sync_profiles(state) ~= true then return false end
+					if invoke_candidate_boundary("Cloned-profile preference save",
+						deps.save_prefs) ~= true then return false end
+					local menu_ok, menu_result = Logger.callback(LOG,
+						"Cloned-profile menu refresh", deps.update_menu)
+					return menu_ok == true and menu_result ~= false
+				end)
+			return editor_ok == true and editor_result ~= false
+		end
+		local timer_ok, timer = Logger.callback(LOG,
+			"Cloned-profile editor timer", hs.timer.doAfter, 0.1, open_clone_editor)
+		if not timer_ok or timer == nil or timer == false then return false end
 	end
+	return true
 end
 
 --- Aggregates built-in and user-created profiles into a single list.
@@ -355,6 +612,7 @@ local function make_profile_deleter(deps)
 	--- @return boolean committed
 	local function delete_profile(profile_id)
 		if not settle_recovery() then return false end
+		if not settle_profile_candidate_recovery(deps) then return false end
 		if not settle_profile_switcher_recovery(deps) then return false end
 		if type(profile_id) ~= "string" or profile_id == "" then return false end
 		if type(state.llm_user_profiles) ~= "table" then return false end
@@ -485,8 +743,9 @@ end
 --- @param deps table Global dependencies.
 --- @param models_mgr table Manager reference to handle auto-detection heuristics.
 --- @param delete_profile function Exact profile-deletion transaction.
+--- @param activate_candidate function Exact profile-candidate transaction.
 --- @return table The Hammerspoon menu structure.
-local function build_profile_menu(deps, models_mgr, delete_profile)
+local function build_profile_menu(deps, models_mgr, delete_profile, activate_candidate)
 	local state  = deps.state
 	local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 	local rows   = {}
@@ -568,12 +827,14 @@ local function build_profile_menu(deps, models_mgr, delete_profile)
 					label    = i18n.get("menu.profiles.shortcut_prefix"),
 					disabled = paused or nil,
 					action       = not paused and function()
+						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
 							title = i18n.get("menu.profiles.shortcut_title"),
 							message = i18n.get("menu.profiles.shortcut_prompt"),
 							current_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil,
 							default_mods = {"ctrl"},
 							on_apply = function(mods, key)
+								if not settle_profile_mutation_recovery(deps) then return false end
 								if type(deps.apply_llm_profile_shortcut) == "function" then
 									return deps.apply_llm_profile_shortcut(pid, mods, key)
 								end
@@ -587,31 +848,51 @@ local function build_profile_menu(deps, models_mgr, delete_profile)
 					label    = i18n.get("menu.profiles.edit_profile"),
 					disabled = paused or nil,
 					action       = not paused and function()
-						if prompt_editor and type(prompt_editor.open) == "function" then
-							hs.timer.doAfter(0.1, function()
-							pcall(prompt_editor.open, profile, function(updated)
-								if type(updated) == "table" then
+						if not settle_profile_mutation_recovery(deps) then return false end
+						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
+						local timer_fired = false
+						local function open_profile_editor()
+							if timer_fired then return false end
+							timer_fired = true
+							if not settle_profile_mutation_recovery(deps) then return false end
+							local editor_ok, editor_result = Logger.callback(LOG,
+								"Custom-profile editor",
+								prompt_editor.open,
+								profile,
+								function(updated)
+									if type(updated) ~= "table" then return false end
 									if not settle_profile_mutation_recovery(deps) then return false end
-									for j, p in ipairs(state.llm_user_profiles) do
-											if type(p) == "table" and p.id == updated.id then
-												state.llm_user_profiles[j] = updated
-												break
-											end
+									for j, current in ipairs(state.llm_user_profiles) do
+										if current == profile then
+											state.llm_user_profiles[j] = updated
+											break
 										end
-										sync_profiles(state)
-										if deps.save_prefs() ~= true then return false end
-										pcall(deps.update_menu)
-										pcall(notifications.notify, i18n.get("profiles.updated_title"), ProfileLabel.format(updated.label, state.llm_num_predictions), "success")
 									end
+									if sync_profiles(state) ~= true then return false end
+									if invoke_candidate_boundary("Custom-profile preference save",
+										deps.save_prefs) ~= true then return false end
+									local menu_ok, menu_result = Logger.callback(LOG,
+										"Custom-profile menu refresh", deps.update_menu)
+									if not menu_ok or menu_result == false then return false end
+									Logger.callback(LOG, "Custom-profile update notification",
+										notifications.notify,
+										i18n.get("profiles.updated_title"),
+										ProfileLabel.format(updated.label, state.llm_num_predictions),
+										"success")
+									return true
 								end)
-							end)
+							return editor_ok == true and editor_result ~= false
 						end
+						local timer_ok, timer = Logger.callback(LOG,
+							"Custom-profile editor timer", hs.timer.doAfter, 0.1, open_profile_editor)
+						return timer_ok == true and timer ~= nil and timer ~= false
 					end or nil,
 				},
 				{
 					label    = i18n.get("menu.profiles.delete_profile"),
 					disabled = paused or nil,
 					action       = not paused and function()
+						if not settle_profile_mutation_recovery(deps) then return false end
 						local ok_c, choice = pcall(dialog.block_alert,
 							string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label),
 							i18n.get("menu.profiles.delete_confirm_body"),
@@ -645,7 +926,9 @@ local function build_profile_menu(deps, models_mgr, delete_profile)
 		table.insert(rows, { separator = true })
 		table.insert(rows, {
 			label = i18n.get("menu.profiles.clone_builtin"),
-			action    = function() return clone_builtin_profile(deps, state, active_builtin) end,
+			action    = function()
+				return clone_builtin_profile(deps, state, active_builtin, activate_candidate)
+			end,
 		})
 	end
 
@@ -653,20 +936,41 @@ local function build_profile_menu(deps, models_mgr, delete_profile)
 	table.insert(rows, {
 		label = i18n.get("menu.profiles.create_profile"),
 		action    = not paused and function()
-			if prompt_editor and type(prompt_editor.open) == "function" then
-				hs.timer.doAfter(0.1, function()
-					pcall(prompt_editor.open, nil, function(new_profile)
-						if type(new_profile) == "table" then
-							if not settle_profile_mutation_recovery(deps) then return false end
-							if type(state.llm_user_profiles) ~= "table" then state.llm_user_profiles = {} end
-							table.insert(state.llm_user_profiles, new_profile)
-							if select_profile(deps, state, new_profile.id) ~= true then return false end
-							pcall(notifications.notify, i18n.get("profiles.created_title"), ProfileLabel.format(new_profile.label, state.llm_num_predictions), "success")
-							Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
+			if not settle_profile_mutation_recovery(deps) then return false end
+			if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
+			local timer_fired = false
+			local editor_settled = false
+			local function open_create_editor()
+				if timer_fired then return false end
+				timer_fired = true
+				if not settle_profile_mutation_recovery(deps) then return false end
+				local editor_ok, editor_result = Logger.callback(LOG,
+					"Profile creation editor",
+					prompt_editor.open,
+					nil,
+					function(new_profile)
+						if editor_settled then return false end
+						editor_settled = true
+						if type(new_profile) ~= "table" then return false end
+						if not settle_profile_mutation_recovery(deps) then return false end
+						if type(activate_candidate) ~= "function"
+							or activate_candidate(new_profile) ~= true then
+							return false
 						end
+						Logger.callback(LOG, "Profile creation notification",
+							notifications.notify,
+							i18n.get("profiles.created_title"),
+							ProfileLabel.format(new_profile.label, state.llm_num_predictions),
+							"success")
+						Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
+						return true
 					end)
-				end)
+				return editor_ok == true and editor_result ~= false
 			end
+			local timer_ok, timer = Logger.callback(LOG,
+				"Profile creation editor timer", hs.timer.doAfter, 0.1, open_create_editor)
+			if not timer_ok or timer == nil or timer == false then return false end
+			return true
 		end or nil,
 	})
 	
@@ -692,7 +996,9 @@ function M.new(deps, models_mgr)
 	if sync_profiles(deps.state) ~= true then
 		Logger.error(LOG, "Initial user-profile runtime synchronization did not commit.")
 	end
+	local activate_candidate, settle_candidate_recovery = make_profile_candidate_owner(deps)
 	local delete_profile, settle_delete_recovery = make_profile_deleter(deps)
+	deps.settle_profile_candidate_recovery = settle_candidate_recovery
 	deps.settle_profile_delete_recovery = settle_delete_recovery
 
 	--- Returns the main menu entry for Strategy selection.
@@ -705,7 +1011,7 @@ function M.new(deps, models_mgr)
 
 		return {
 			label = string.format(i18n.get("menu.profiles.profile_label_prefix"), label) .. warning,
-			menu  = build_profile_menu(deps, models_mgr, delete_profile)
+			menu  = build_profile_menu(deps, models_mgr, delete_profile, activate_candidate)
 		}
 	end
 
