@@ -6,12 +6,12 @@ Scope: `static/ergopti_plus/macos/`, its shared Lua/data dependencies, relevant 
 
 ## 1. Executive summary
 
-This pass and its implementation-phase rescan found **27 confirmed defects**: **15 High**, **11 Medium**, **1 Low**, and **0 Critical**. “Confirmed” means that the state is reachable, the exact source path was re-opened, a concrete reproduction sequence exists, and the existing tests were inspected for a contradiction. No candidate was promoted merely because a source pattern looked suspicious.
+This pass and its implementation-phase rescan found **28 confirmed defects**: **15 High**, **12 Medium**, **1 Low**, and **0 Critical**. “Confirmed” means that the state is reachable, the exact source path was re-opened, a concrete reproduction sequence exists, and the existing tests were inspected for a contradiction. No candidate was promoted merely because a source pattern looked suspicious.
 
 | Severity       | Count | IDs               |
 | -------------- | ----: | ----------------- |
 | High           |    15 | `HS-001`–`HS-011`, `HS-021`, `HS-022`, `HS-024`, `HS-025` |
-| Medium         |    11 | `HS-012`–`HS-019`, `HS-023`, `HS-026`, `HS-027` |
+| Medium         |    12 | `HS-012`–`HS-019`, `HS-023`, `HS-026`–`HS-028` |
 | Low            |     1 | `HS-020`          |
 | Critical       |     0 | —                 |
 
@@ -71,11 +71,12 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [ ] `HS-024` — MLX download exactly-once terminal contract
 - [ ] `HS-025` — asynchronous Ollama readiness probes
 - [ ] `HS-026` — LLM settings transaction
-- [ ] `HS-027` — transactional model-switch publication and rollback
+- [x] `HS-027` — this fix commit; model and `No Model` share one recoverable transition, with 26 focused refusal/retry cases
+- [ ] `HS-028` — transactional direct profile selection and rollback
 - [x] `PARITY-001` — `4f22a1efc` (Linux suffix codepoint count)
 - [x] `PARITY-002` — `22ca14d81` (Linux canonical multibyte trigger)
 
-Implementation verification is recorded per checkbox. For the current `HS-018` commit, four focused behavioral/source replays and the direct source test pass; `HS-E2E` passes `64/64`. The full Hammerspoon gate currently reports 18 failures in unrelated gesture/keylogger/synthetic/script-control/MLX-owner tests on the starting `dev` tree, and the JavaScript gate lacks this fresh worktree's dependency/generated prerequisites. Those failures are disclosed, not attributed to `HS-018` and not presented as green.
+Implementation verification is recorded per checkbox. For the current `HS-027` commit, the exact transaction module passes `26/26`; the backend guard, manager-generation, accepted/refused-profile, and profile-manager neighbors pass `5/5`, `10/10`, `2/2`, and `2/2`. Conventions, the false-green ratchet, and `git diff --check` are green. A second agent independently reviewed the final source/test topology and returned GO after its two blockers were fixed. The full Hammerspoon gate was not run against the shared in-progress `HS-003`/`HS-011` worktree, so no global-green claim is made for this commit.
 
 ## 2. Findings
 
@@ -565,13 +566,34 @@ A faithful server harness produced `start_result=nil`, `native_port=0`, `getPort
 
 **Reproduction.** Keep an installed model `A` active, select installed model `B`, and let the requirements callback succeed. Make `keymap.set_llm_model(B)` or `keymap.set_llm_display_model_name(B)` return `false`/throw, or make `save_prefs()` return `false`. The callback has already assigned `state.llm_model = B`, cached its power/backend-specific identity, and called the core LLM model setter. It then returns failure without restoring the prior state/runtime values. The menu state and one or more runtime/persistent stores can therefore describe different active models.
 
+The explicit `No Model` sibling is the same distributed transition. With model `A` active, select `No Model`, then make the display setter, persistence save, or menu refresh refuse. The old implementation could clear one or both runtime identities and mutate shared state before returning failure, leaving the menu, persisted model, and prediction engine on different identities.
+
 **Root cause and silence.** The success continuation is a distributed publish sequence, not a transaction: candidate state is mutated before exact runtime and durable acknowledgements, and no snapshot or reverse compensation exists. `Logger.callback` makes throws visible after `HS-016`, but visibility does not restore the previous model.
 
 **Existing test/backstop checked.** `test_model_switcher_backend_guard.lua`, `test_model_switcher_manager_generation.lua`, and the MLX prediction-lock tests cover stale ordering and terminal unlock. No test injects refusal at each setter/save boundary or asserts rollback of the already-published model identity. The generation fence in `HS-007` prevents an obsolete operation from entering this block; it does not make a current operation atomic.
 
-**Fix.** Give one model switch an exact transition owner. Snapshot every state/core/keymap/persistence value, stage the candidate, require exact runtime setters and one canonical persistence commit, publish menu/profile effects only afterward, and compensate in reverse on any refusal. If compensation itself refuses, retain and file-log explicit recovery debt rather than reporting success.
+**Fix.** Give one model switch an exact transition owner. Snapshot every state/keymap/persistence value, stage the candidate, use `keymap.set_llm_model()` as the sole owner of its nested core-model update, require exact runtime setters and one canonical persistence commit, publish menu/profile effects only afterward, and compensate in reverse on any refusal. If compensation itself refuses, retain and file-log explicit recovery debt rather than reporting success.
 
-**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_model_switch_transaction.lua`. Table-drive `false` and throw at both runtime setters, the core backend setter, preference save, menu refresh, and profile follow-up; assert the exact old state/runtime/persistence/menu after every pre-commit failure, no success notification, and one exact commit on retry.
+**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_model_switch_transaction.lua`. Faithfully route the public keymap setter through its nested core setter; table-drive `false`/throw at both public runtime setters, a nested core throw, preference save, menu refresh, profile follow-up, and the corresponding `No Model` boundaries. Assert the exact old state/runtime/persistence/menu after every pre-commit failure, retained per-boundary recovery debt when compensation refuses, and one exact commit on retry.
+
+**Implemented and independently replayed.** Model selection and `No Model` now snapshot the prior identity, route the core mutation through the single public keymap owner, require durable save and menu publication, compensate only the boundaries that actually committed, and retain any refused compensation for exact retry. Direct profile selection is barred from publishing across unsettled model debt; its separate ordinary publication defect remains open as `HS-028`. The original model matrix produced 13 failures before the fix, and adding the untouched `No Model` sibling produced 6 more red cases. The final exact module passes `26/26`, including false/throw compensation debt for both entry points; the four direct neighbor modules pass `19/19`. An independent read-only second lens returned GO after verifying the faithful nested-core topology and the added `No Model` debt cases.
+
+### `HS-028` — Direct profile selection publishes before runtime and persistence commit
+
+- **Severity:** Medium
+- **Confidence:** High
+- **Guarantees:** `G1`, `G2`; menu/runtime truth
+- **Source:** `ui/menu/menu_llm/model_switcher.lua:538-549` in the implementation branch (`:379-386` in the audited tree)
+
+**Reproduction.** Keep profile `basic` active, use the LLM menu to select `advanced`, and make the canonical `save_prefs()` return `false` after its write path refuses. `set_llm_profile()` has already assigned `state.llm_active_profile = "advanced"` and called `llm_mod.set_active_profile("advanced")`; it returns false without restoring either value. The live prompt/warmup identity is `advanced`, the durable configuration remains `basic`, and the menu callback has no truthful committed result. A runtime-setter or menu-refresh throw is swallowed by Hammerspoon's callback boundary after the same partial publication.
+
+**Root cause and silence.** Direct profile selection is a second hand-written publication pipeline outside the settings/model transition owners. It mutates shared and runtime state first, treats persistence as a late gate, and owns no reverse compensation or retryable debt. Callback logging from `HS-016` can expose a throw but cannot restore the old profile.
+
+**Existing test/backstop checked.** `test_llm_activation_save_gate.lua` replaces the whole model switcher with a no-op fixture. `test_profiles_manager_edit_delete_pause_gate.lua` covers profile CRUD and pause gating, not activation through `set_llm_profile()`. `test_model_switch_transaction.lua` covers model identity and its recommended-profile follow-up only; it does not invoke the public direct-profile action. No behavioral refusal/rollback test contradicts this claim.
+
+**Fix.** Give direct profile selection one exact transition owner: snapshot the active profile, require the runtime setter, canonical preference save, and menu refresh to commit in order, then report success. On any refusal, restore runtime/state/persistence/menu in reverse and retain explicit recovery debt if compensation itself refuses.
+
+**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_profile_switch_transaction.lua`. Table-drive runtime throw/false, persistence throw/false, menu throw/false, and a refused compensation; assert the old state/runtime/persisted/menu identity after each failed attempt, that a new action is blocked until exact debt settles, and that the positive path commits each owner once.
 
 ### Cross-driver parity findings discovered during implementation
 
@@ -716,7 +738,7 @@ Legend: `B` = audited and behaviorally/source-blanched; `F` = confirmed finding;
 | `modules/keylogger/**`                                                               | `B`            | `B`                    | `B`                | `F HS-004`             | n/a        | Input pass 3 dry for requested lens; persistence refusal correctness is blanched, tap cost is not.                                                                                                                                                                         |
 | `ui/tooltip/**`, renderer/watchers                                                   | `B`            | `B`                    | `B`                | `B/N profile`          | `B/R`      | Source behavior dry; canvas performance unmeasured on native macOS.                                                                                                                                                                                                        |
 | `modules/llm/**`, prompt/parser/profiles/streaming                                   | `B`            | `F HS-009`             | `F HS-009`         | `S`                    | `R`        | Two full post-candidate LLM passes were dry. Direct profile-setter claim was rejected for stock paths.                                                                                                                                                                     |
-| `ui/menu/menu_llm/**`, MLX/Ollama managers                                           | `F HS-008,024,026,027` | `F HS-007,009,010,018,024,026,027` | `F HS-007–010,018,024` | `F HS-025` | `F HS-018,026` | Two audit passes were dry before implementation-phase transaction/terminal rescans found `HS-024`–`HS-027`; this zone is reopened until a clean post-fix pass.                                                                                                   |
+| `ui/menu/menu_llm/**`, MLX/Ollama managers                                           | `F HS-008,024,026–028` | `F HS-007,009,010,018,024,026–028` | `F HS-007–010,018,024` | `F HS-025` | `F HS-018,026–028` | Two audit passes were dry before implementation-phase transaction/terminal rescans found `HS-024`–`HS-028`; this zone is reopened until a clean post-fix pass.                                                                                                   |
 | `modules/gestures/{init,engine,actions,conflicts}`                                   | `F HS-001`     | `F HS-001,012,015`     | `F HS-001,012`     | `S`                    | n/a        | Watcher domain had a clean recheck; late search/screenshot findings received one clean sibling recheck, not two-pass dry.                                                                                                                                                  |
 | `modules/shortcuts/**`, script control, keyboard slots                               | `F HS-016`     | `F HS-013,016`         | `F HS-012,013`     | `B`                    | n/a        | Late findings verified; one clean recheck only, therefore not claimed two-pass dry. Dedicated script-control tap lifecycle blanched.                                                                                                                                       |
 | `platform/remap/**`, generator, watchers, onboarding, KE lifecycle                   | `F HS-011,019` | `F HS-011,019`         | `F HS-011`         | `S`                    | n/a        | Generator, KE lease/reload lifecycle and input-source state dry; onboarding late finding has one clean recheck.                                                                                                                                                            |
@@ -746,7 +768,7 @@ Legend: `B` = audited and behaviorally/source-blanched; `F` = confirmed finding;
 - `infra/file_watchers.lua` publishes a composite owner early and does not robustly consume every native pathwatcher start refusal. The Lua transaction is weak, and current success-only tests are not sufficient, but this pass could not establish a deterministic user-reachable refusal for a valid watched path. It remains suspected.
 - `LeaseOuterStateMachine.requestMode()` can immediately publish `PAUSED`/`RESUMED` when its transported mode already matches, without acquiring the live-transport gate used for a private send. A same-poll HUP could therefore race that direct wire-level ACK. The stock Lua controller at `platform/remap/lease_controller.lua:1177-1194` settles already-paused/active requests locally and never sends that idempotent command, so no user-reachable reproduction was established. Keep a native test that injects public idempotent mode plus private HUP in one poll batch; do not promote this unless a caller appears.
 - Synchronous `hs.execute`/`os.execute` calls in MLX adoption, input-source helpers, onboarding helpers, and backend menu actions remain performance hypotheses without a target profile. Ollama readiness is separately promoted as `HS-025` because a stalled local listener gives an exact bounded blocking reproduction.
-- The direct internal `set_active_profile()` API does not itself reset prediction identity. All stock user entry points found have a stronger quarantine/reset backstop, so no finding was promoted.
+- The direct internal `set_active_profile()` API does not itself reset prediction identity. All stock user entry points found have a stronger quarantine/reset backstop, so that prediction-generation claim was not promoted. This is distinct from `HS-028`, which concerns the user-reachable menu action publishing profile state/runtime before durable commit.
 - `modules/keymap/terminator_replay.lua:224-225` checks the protected-call status of `SyntheticInput.seal()` but not its exact `true` result. Re-derivation found that `emit_pending()` creates a fresh private transaction and no stock `with_transaction`/`TextSender` path can pre-seal or expose it, so `seal()==false` is not currently user-reachable. Keep an exact-return hardening test; do not promote it without a reachable producer.
 - [x] The focused selector formerly failed to recognize an exact test-file path or dotted module name: `lua tests/run.lua --only tests/unit/adapters/test_synthetic_input_provenance.lua` fell back to all modules while retaining the path as a case filter. The dedicated runner fix now resolves normalized POSIX, Windows, absolute, and dotted-module targets to exactly one module and clears only the case-name filter for that form; historical case filters and unknown-target fail-closed behavior remain intact. Direct replays of every exact form loaded `1/831` (or `1/832` while the new test was untracked), and the selector suite passed `12/12`.
 - Three older gesture lifecycle tests install `Actions.force_cleanup()` stubs that return `nil`, while the production exact contract now requires literal success. They can fail for fixture reasons and do not faithfully refute watcher lifecycle behavior; update those doubles rather than weakening the exact contract.
@@ -765,7 +787,7 @@ Legend: `B` = audited and behaviorally/source-blanched; `F` = confirmed finding;
 2. `HS-001`, `HS-007`, `HS-008`, `HS-010`, `HS-011`, `HS-024`: restore exact native/task ownership, terminal completion, and generation fencing.
 3. `HS-002`, `HS-005`, `HS-006`, `HS-021`: repair text/tooltip correctness through shared transactions and codepoint units.
 4. `HS-009`, `HS-012`: make semantic clients and pause an explicit owner registry.
-5. `HS-013`–`HS-020`, `HS-022`, `HS-023`, `HS-026`, `HS-027`: make configuration/UI/file publication transactional and eliminate silent callback success; keep the focused runner fast enough to replay each test in isolation.
+5. `HS-013`–`HS-020`, `HS-022`, `HS-023`, `HS-026`–`HS-028`: make configuration/UI/file publication transactional and eliminate silent callback success; keep the focused runner fast enough to replay each test in isolation.
 6. `PARITY-001`, `PARITY-002`: carry the strict UTF-8 fix through the Linux sibling and exercise the shipped default trigger end to end.
 
 Each fix should land with the behavioral test described in its finding, run alone, in the full Lua suite, and—where native contracts are involved—in a macOS integration harness with faithful refusal and reordered-completion cases.

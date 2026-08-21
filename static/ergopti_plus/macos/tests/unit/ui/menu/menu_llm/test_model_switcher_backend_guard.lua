@@ -314,10 +314,16 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			"a failed success continuation cannot publish a truthful success")
 		helpers.assert_eq(prediction_states, {false, true},
 			"prediction unlock is mandatory cleanup even after update_menu throws")
-		helpers.assert_eq(#errors, 1)
+		helpers.assert_eq(#errors, 4,
+			"the failed commit and its refused compensation must both remain visible")
 		helpers.assert_contains(errors[1], "Model-switch menu refresh")
 		helpers.assert_contains(errors[1], "menu refresh exploded")
 		helpers.assert_contains(errors[1], "stack traceback")
+		helpers.assert_contains(errors[2], "failed at 'menu refresh'")
+		helpers.assert_contains(errors[3], "Model-switch menu rollback")
+		helpers.assert_contains(errors[3], "menu refresh exploded")
+		helpers.assert_contains(errors[4], "rollback remains unsettled")
+		helpers.assert_contains(errors[4], "Model-switch menu rollback")
 	end)
 end)
 

@@ -81,6 +81,18 @@ function M.new(ctx)
 	-- Monotonically-increasing token so stale async callbacks from a previous
 	-- switch attempt are silently discarded when a new switch is initiated.
 	local req_token = 0
+	-- A failed compensation must remain owned across user retries. A later model
+	-- action is forbidden from publishing over an identity that has not settled.
+	local model_recovery_debt = nil
+
+	local function call_model_boundary(label, callback, ...)
+		if type(callback) ~= "function" then
+			Logger.error(LOG, "Model-switch boundary '%s' is unavailable.", tostring(label))
+			return false
+		end
+		local ok, result = Logger.callback(LOG, label, callback, ...)
+		return ok == true and result ~= false
+	end
 
 
 	-- =====================================================
@@ -362,17 +374,6 @@ function M.new(ctx)
 		end
 	end
 
-	--- Activates a profile and triggers a power-mismatch check.
-	--- @param profile_id string Profile to activate.
-	local function set_llm_profile(profile_id)
-		if type(profile_id) ~= "string" then return end
-		state.llm_active_profile = profile_id
-		llm_mod.set_active_profile(profile_id)
-		check_profile_power_mismatch(profile_id, state.llm_model)
-		if save_prefs() ~= true then return false end
-		update_menu()
-	end
-
 	--- Offers to switch to the recommended profile when it differs from the current one.
 	--- Completion models are switched silently; chat models prompt the user.
 	--- @param model_name string The newly selected model name.
@@ -411,9 +412,11 @@ function M.new(ctx)
 				Logger.info(LOG, string.format(
 					"Completion model: silently switching profile %s → %s.", cur_profile, rec_profile))
 				state.llm_active_profile = rec_profile
-				llm_mod.set_active_profile(rec_profile)
+				if not call_model_boundary("Recommended completion-profile runtime sync",
+					llm_mod.set_active_profile, rec_profile) then return false end
 				if save_prefs() ~= true then return false end
-				update_menu()
+				if not call_model_boundary("Recommended completion-profile menu refresh",
+					update_menu) then return false end
 			else
 				local title = type(opts.dialog_title) == "string"
 					and opts.dialog_title
@@ -428,9 +431,11 @@ function M.new(ctx)
 				if ok and choice == i18n.get("button.confirm") then
 					Logger.info(LOG, string.format("Profile changed to %s (accepted).", rec_profile))
 					state.llm_active_profile = rec_profile
-					llm_mod.set_active_profile(rec_profile)
+					if not call_model_boundary("Recommended profile runtime sync",
+						llm_mod.set_active_profile, rec_profile) then return false end
 					if save_prefs() ~= true then return false end
-					update_menu()
+					if not call_model_boundary("Recommended profile menu refresh",
+						update_menu) then return false end
 				else
 					-- User refused — the profile is already cur_profile; no setter call
 					-- or save needed. Re-applying set_active_profile without persisting
@@ -449,6 +454,96 @@ function M.new(ctx)
 		else
 			Logger.debug(LOG, "Recommended profile already active — no action needed.")
 		end
+		return true
+	end
+
+	local function snapshot_model_transition()
+		local ok, actual_name = Logger.callback(LOG,
+			"Previous model identity resolution",
+			models_mgr.get_actual_model_name,
+			state.llm_model)
+		if not ok or type(actual_name) ~= "string" then
+			Logger.error(LOG, "Cannot snapshot the current model identity for rollback.")
+			return nil
+		end
+		return {
+			backend = state.llm_backend,
+			model = state.llm_model,
+			model_power = state.llm_model_power,
+			model_mlx = state.llm_model_mlx,
+			model_ollama = state.llm_model_ollama,
+			active_profile = state.llm_active_profile,
+			actual_name = actual_name,
+		}
+	end
+
+	local function restore_model_transition(debt)
+		local snapshot = debt.snapshot
+		state.llm_model = snapshot.model
+		state.llm_model_power = snapshot.model_power
+		state.llm_model_mlx = snapshot.model_mlx
+		state.llm_model_ollama = snapshot.model_ollama
+		state.llm_active_profile = snapshot.active_profile
+
+		local failures = {}
+		local function restore_boundary(field, label, callback, ...)
+			if debt[field] ~= true then return end
+			if call_model_boundary(label, callback, ...) then
+				debt[field] = false
+			else
+				failures[#failures + 1] = label
+			end
+		end
+
+		restore_boundary("runtime_model", "Model-switch runtime rollback",
+			keymap and keymap.set_llm_model, snapshot.actual_name)
+		restore_boundary("display_model", "Model-switch display rollback",
+			keymap and keymap.set_llm_display_model_name, snapshot.model)
+		restore_boundary("profile", "Model-switch profile rollback",
+			llm_mod.set_active_profile, snapshot.active_profile)
+
+		if debt.persist then
+			local ok, saved = Logger.callback(LOG,
+				"Model-switch preference rollback", save_prefs)
+			if not ok or saved ~= true then
+				failures[#failures + 1] = "preference rollback"
+			else
+				debt.persist = false
+			end
+		end
+		if debt.menu then
+			restore_boundary("menu", "Model-switch menu rollback", update_menu)
+		end
+
+		if #failures > 0 then
+			model_recovery_debt = debt
+			Logger.error(LOG,
+				"Model-switch rollback remains unsettled at: %s.",
+				table.concat(failures, ", "))
+			return false
+		end
+		model_recovery_debt = nil
+		return true
+	end
+
+	local function settle_model_recovery_debt()
+		if not model_recovery_debt then return true end
+		Logger.warn(LOG, "Retrying retained model-switch rollback before a new action.")
+		return restore_model_transition(model_recovery_debt)
+	end
+
+	--- Activates a profile and triggers a power-mismatch check.
+	--- A direct profile action cannot publish over an unsettled model rollback.
+	--- @param profile_id string Profile to activate.
+	local function set_llm_profile(profile_id)
+		if type(profile_id) ~= "string" then return false end
+		if not settle_model_recovery_debt() then return false end
+		state.llm_active_profile = profile_id
+		llm_mod.set_active_profile(profile_id)
+		check_profile_power_mismatch(profile_id, state.llm_model)
+		if save_prefs() ~= true then return false end
+		update_menu()
+		return true
 	end
 
 
@@ -462,6 +557,7 @@ function M.new(ctx)
 	--- @param new_model string Display name of the model to activate.
 	local function switch_model(new_model)
 		Logger.debug(LOG, string.format("Executing switch_model('%s')…", new_model or "nil"))
+		if not settle_model_recovery_debt() then return false end
 
 		-- Lock predictions during the MLX server restart — weights take 60–90 s to reload
 		local mlx_was_enabled = state.llm_backend == "mlx" and state.llm_enabled
@@ -491,47 +587,85 @@ function M.new(ctx)
 		return guarded_check_requirements(new_model, function()
 			local callback_ok, callback_result = Logger.callback(LOG,
 				"Model-switch success callback", function()
-			Logger.info(LOG, string.format("Model successfully switched to %s.", new_model))
-			state.llm_model       = new_model
-			state.llm_model_power = get_model_power_level(new_model)
-			Logger.debug(LOG, string.format("Model power cached: %d.", state.llm_model_power))
+				local snapshot = snapshot_model_transition()
+				if not snapshot then return false end
+				if not keymap or type(keymap.set_llm_model) ~= "function"
+					or type(keymap.set_llm_display_model_name) ~= "function" then
+					Logger.error(LOG, "Cannot switch model: required keymap setters are unavailable.")
+					return false
+				end
 
-			local actual_name = models_mgr.get_actual_model_name(new_model)
-			if state.llm_backend == "mlx" then
-				state.llm_model_mlx = new_model
-				llm_mod.set_llm_model_mlx(actual_name)
-				Logger.debug(LOG, string.format("Actual MLX model: %s -> %s.", new_model, actual_name))
-			else
-				state.llm_model_ollama = new_model
-				llm_mod.set_llm_model_ollama(actual_name)
-				Logger.debug(LOG, string.format("Actual Ollama model: %s -> %s.", new_model, actual_name))
-			end
+				local actual_ok, actual_name = Logger.callback(LOG,
+					"Candidate model identity resolution",
+					models_mgr.get_actual_model_name,
+					new_model)
+				if not actual_ok or type(actual_name) ~= "string" then
+					Logger.error(LOG, "Cannot resolve the candidate model identity.")
+					return false
+				end
+				local candidate_power = get_model_power_level(new_model)
+				local debt = {
+					snapshot = snapshot,
+					runtime_model = false,
+					display_model = false,
+					profile = false,
+					persist = false,
+					menu = false,
+				}
+				local function reject_transition(boundary)
+					Logger.error(LOG,
+						"Model-switch transition failed at '%s'; restoring the previous identity.",
+						tostring(boundary))
+					model_recovery_debt = debt
+					restore_model_transition(debt)
+					return false
+				end
 
-			if keymap and type(keymap.set_llm_model) == "function" then
-				local ok, result = Logger.callback(LOG,
-					"Model-switch runtime model sync", keymap.set_llm_model, actual_name)
-				Logger.debug(LOG, string.format("keymap.set_llm_model() -> %s.", tostring(ok)))
-				if not ok or result == false then return false end
-			else
-				Logger.warn(LOG, "keymap.set_llm_model is unavailable.")
-			end
-			if keymap and type(keymap.set_llm_display_model_name) == "function" then
-				local ok, result = Logger.callback(LOG,
-					"Model-switch display-model sync",
-					keymap.set_llm_display_model_name, new_model)
-				if not ok or result == false then return false end
-			end
+				debt.runtime_model = true
+				if not call_model_boundary("Model-switch runtime model sync",
+					keymap.set_llm_model, actual_name) then
+					return reject_transition("runtime model")
+				end
+				debt.display_model = true
+				if not call_model_boundary("Model-switch display-model sync",
+					keymap.set_llm_display_model_name, new_model) then
+					return reject_transition("display model")
+				end
 
-			local save_ok, saved = Logger.callback(LOG,
-				"Model-switch preference save", save_prefs)
-			if not save_ok or saved ~= true then
-				return false
-			end
-			local menu_ok, refreshed = Logger.callback(LOG,
-				"Model-switch menu refresh", update_menu)
-			if not menu_ok or refreshed == false then return false end
-			apply_recommended_prompt_profile(new_model, { dialog_title = i18n.get("menu.llm.model_change_title") })
-			return true
+				state.llm_model = new_model
+				state.llm_model_power = candidate_power
+				if snapshot.backend == "mlx" then
+					state.llm_model_mlx = new_model
+				else
+					state.llm_model_ollama = new_model
+				end
+				debt.persist = true
+				local save_ok, saved = Logger.callback(LOG,
+					"Model-switch preference save", save_prefs)
+				if not save_ok or saved ~= true then
+					return reject_transition("preference save")
+				end
+
+				-- The recommendation helper can mutate profile runtime, persistence,
+				-- and menu state. Mark every compensation before entering it.
+				debt.profile = true
+				debt.menu = true
+				local profile_ok, profile_result = Logger.callback(LOG,
+					"Model-switch recommended-profile follow-up",
+					apply_recommended_prompt_profile,
+					new_model,
+					{dialog_title = i18n.get("menu.llm.model_change_title")})
+				if not profile_ok or profile_result == false then
+					return reject_transition("profile follow-up")
+				end
+				if not call_model_boundary("Model-switch menu refresh", update_menu) then
+					return reject_transition("menu refresh")
+				end
+
+				model_recovery_debt = nil
+				Logger.info(LOG, string.format("Model successfully switched to %s.", new_model))
+				Logger.debug(LOG, string.format("Model power cached: %d.", state.llm_model_power))
+				return true
 			end)
 			local unlocked = unlock_predictions()
 			if not callback_ok or not unlocked then
@@ -556,38 +690,60 @@ function M.new(ctx)
 	--- requirements callback before clearing the prediction engine model.
 	--- @return boolean True only when runtime and persistence both commit.
 	local function disable_model()
+		if not settle_model_recovery_debt() then return false end
 		req_token = req_token + 1
-		local previous_model = state.llm_model
-		local previous_power = state.llm_model_power
-		local previous_actual = models_mgr.get_actual_model_name(previous_model)
+		local snapshot = snapshot_model_transition()
+		if not snapshot then return false end
 
 		if not keymap or type(keymap.set_llm_model) ~= "function"
 			or type(keymap.set_llm_display_model_name) ~= "function" then
 			Logger.error(LOG, "Cannot select No Model: keymap model setters are unavailable.")
 			return false
 		end
-		local runtime_ok, runtime_err = xpcall(function()
-			keymap.set_llm_model("")
-			keymap.set_llm_display_model_name("")
-		end, debug.traceback)
-		if not runtime_ok then
-			Logger.error(LOG, "Cannot select No Model: runtime update raised: %s", tostring(runtime_err))
-			pcall(keymap.set_llm_model, previous_actual)
-			pcall(keymap.set_llm_display_model_name, previous_model)
+
+		local debt = {
+			snapshot = snapshot,
+			runtime_model = false,
+			display_model = false,
+			profile = false,
+			persist = false,
+			menu = false,
+		}
+		local function reject_transition(boundary)
+			Logger.error(LOG,
+				"No Model transition failed at '%s'; restoring the previous identity.",
+				tostring(boundary))
+			model_recovery_debt = debt
+			restore_model_transition(debt)
 			return false
+		end
+
+		debt.runtime_model = true
+		if not call_model_boundary("No Model runtime update", keymap.set_llm_model, "") then
+			return reject_transition("runtime model")
+		end
+		debt.display_model = true
+		if not call_model_boundary("No Model display update",
+			keymap.set_llm_display_model_name, "") then
+			return reject_transition("display model")
 		end
 
 		state.llm_model = ""
 		state.llm_model_power = nil
-		if save_prefs() ~= true then
-			state.llm_model = previous_model
-			state.llm_model_power = previous_power
-			pcall(keymap.set_llm_model, previous_actual)
-			pcall(keymap.set_llm_display_model_name, previous_model)
-			return false
+		debt.persist = true
+		local save_ok, saved = Logger.callback(LOG,
+			"No Model preference commit", save_prefs)
+		if not save_ok or saved ~= true then
+			return reject_transition("preference commit")
 		end
+
+		debt.menu = true
+		if not call_model_boundary("No Model menu refresh", update_menu) then
+			return reject_transition("menu refresh")
+		end
+
+		model_recovery_debt = nil
 		Logger.info(LOG, "Model disabled; runtime and preferences now have no active model.")
-		update_menu()
 		return true
 	end
 

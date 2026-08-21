@@ -22,12 +22,7 @@ local function build_fixture(dialog_choice)
 		llm_num_predictions = 1,
 	}
 
-	package.loaded["infra.logger"] = {
-		debug = noop,
-		info = noop,
-		warn = noop,
-		error = noop,
-	}
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return dialog_choice end,
