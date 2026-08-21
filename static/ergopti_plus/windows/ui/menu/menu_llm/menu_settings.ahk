@@ -602,13 +602,7 @@ LLM_Menu_PromptNavModifiers() {
 	ib := InputBox(t("menu.llm.nav_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["nav_modifiers"])
 	if (ib.Result != "OK")
 		return
-	if !LLM_Menu_IsValidModifierString(ib.Value) {
-		LoggerError("LLM", "Rejected invalid navigation modifier configuration: '{1}'.", ib.Value)
-		return false
-	}
-	return LLM_Menu_CommitMutation("the LLM navigation-modifier setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"nav_modifiers", Trim(ib.Value)), _LLM_Menu_ApplyNavCommitted)
+	return LLM_Menu_CommitNavModifier("nav_modifiers", ib.Value)
 }
 
 LLM_Menu_PromptValModifiers() {
@@ -622,18 +616,11 @@ LLM_Menu_PromptValModifiers() {
 	ib := InputBox(t("menu.llm.val_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["val_modifiers"])
 	if (ib.Result != "OK")
 		return
-	if !LLM_Menu_IsValidModifierString(ib.Value) {
-		LoggerError("LLM", "Rejected invalid validation modifier configuration: '{1}'.", ib.Value)
-		return false
-	}
-	return LLM_Menu_CommitMutation("the LLM validation-modifier setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"val_modifiers", Trim(ib.Value)), _LLM_Menu_ApplyNavCommitted)
+	return LLM_Menu_CommitNavModifier("val_modifiers", ib.Value)
 }
 
 _LLM_Menu_ApplyNavCommitted(*) {
-	_LLM_Menu_ApplyStandardCommitted()
-	return LLM_Menu_BindNavHotkeys() == true
+	return _LLM_Menu_ApplyStandardCommitted()
 }
 
 

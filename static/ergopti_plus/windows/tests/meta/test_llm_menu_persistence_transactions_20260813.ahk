@@ -31,12 +31,15 @@ _LMPT_EveryPersistentActionUsesDetachedTransaction() {
 		"LLM_Menu_CloneActiveBuiltinProfile", "LLM_Menu_PromptNumeric",
 		"_LLM_AssignAndRebuild", "LLM_Menu_PromptOllamaPort",
 		"LLM_Menu_ResetOllamaPort", "LLM_Menu_PromptMaxWords",
-		"LLM_Menu_PromptTemperature", "LLM_Menu_PromptNavModifiers",
-		"LLM_Menu_PromptValModifiers", "_LLM_Menu_SelectApiEntry",
+		"LLM_Menu_PromptTemperature", "_LLM_Menu_SelectApiEntry",
 		"_PromptEdWeb_PersistProfile", "LLM_Menu_EnsureModelReady"
 	]
 	for FuncName in Standard
 		_LMPT_AssertTransactionBody(FuncName, "LLM_Menu_CommitMutation(")
+	for FuncName in ["LLM_Menu_PromptNavModifiers",
+			"LLM_Menu_PromptValModifiers"]
+		_LMPT_AssertTransactionBody(FuncName,
+			"LLM_Menu_CommitNavModifier(")
 	for FuncName in ["_LLM_Menu_PromptApiEntry",
 			"_LLM_Menu_RemoveActiveApiEntry"]
 		_LMPT_AssertTransactionBody(FuncName,
@@ -96,4 +99,3 @@ _LMPT_ApiIdRoundTripsAndPromptEditorRechecksEpoch() {
 Test("meta LLM menu: API selection round-trips and prompt editor rechecks epoch "
 	. "(llm-api-id-prompt-epoch-guard)",
 	_LMPT_ApiIdRoundTripsAndPromptEditorRechecksEpoch)
-
