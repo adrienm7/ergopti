@@ -44,8 +44,8 @@ helpers.assert_true(
 	"api guard must precede URL construction in probe_llm_health (ui-menu-llm-core-1)"
 )
 
--- Test 3 (F-LOW-6): menu_llm/init.lua must expose a reset function for the
--- health-status flag.
+-- Test 3 (F-LOW-6): the public reset must delegate to the shared generation
+-- invalidator so stale callbacks are revoked as well as the display value.
 helpers.assert_true(
 	src:find("function M.reset_llm_health_status()", 1, true) ~= nil,
 	"menu_llm/init.lua must define M.reset_llm_health_status (F-LOW-6)"
@@ -53,8 +53,17 @@ helpers.assert_true(
 local reset_fn_pos = src:find("function M.reset_llm_health_status()", 1, true)
 local reset_fn_body = src:sub(reset_fn_pos, reset_fn_pos + 150)
 helpers.assert_true(
-	reset_fn_body:find("_llm_health_status = nil", 1, true) ~= nil,
-	"M.reset_llm_health_status must set _llm_health_status back to nil (F-LOW-6)"
+	reset_fn_body:find("invalidate_llm_health()", 1, true) ~= nil,
+	"M.reset_llm_health_status must revoke the current health generation (F-LOW-6)"
+)
+local invalidator_pos = src:find("local function invalidate_llm_health()", 1, true)
+helpers.assert_true(invalidator_pos ~= nil,
+	"menu_llm/init.lua must define the shared health invalidator")
+local invalidator_body = src:sub(invalidator_pos, invalidator_pos + 180)
+helpers.assert_true(
+	invalidator_body:find("_llm_health_generation = _llm_health_generation + 1", 1, true) ~= nil
+		and invalidator_body:find("_llm_health_status = nil", 1, true) ~= nil,
+	"health invalidation must revoke pending callbacks and clear the display value"
 )
 
 -- Test 4 (F-LOW-6): BackendPanel.build must be called with a
