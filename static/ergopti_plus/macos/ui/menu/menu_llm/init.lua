@@ -332,6 +332,12 @@ function M.create(deps)
 				keymap      = keymap,
 				save_prefs  = save_prefs,
 				update_menu = update_menu,
+				profile_mutation_gate = function()
+						local gate = deps.settle_profile_delete_recovery
+						if gate == nil then return true end
+						if type(gate) ~= "function" then return false end
+						return gate()
+				end,
 				runtime_gate = function()
 						local script_control = deps.script_control
 						if not script_control or type(script_control.is_paused) ~= "function" then return true end
@@ -357,6 +363,7 @@ function M.create(deps)
 		local guarded_check_requirements       = switcher.guarded_check_requirements
 
 		deps.set_llm_profile = switcher.set_llm_profile
+		deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts
 		deps.apply_recommended_prompt_profile = function(opts)
 				return apply_recommended_prompt_profile(state.llm_model, opts)
 		end

@@ -73,6 +73,8 @@ function M.new(ctx)
 	local keymap      = ctx.keymap
 	local save_prefs  = ctx.save_prefs
 	local update_menu = ctx.update_menu
+	local profile_mutation_gate = type(ctx.profile_mutation_gate) == "function"
+		and ctx.profile_mutation_gate or function() return true end
 	local runtime_gate = type(ctx.runtime_gate) == "function"
 		and ctx.runtime_gate or function() return true end
 	local pause_epoch = type(ctx.pause_epoch) == "function"
@@ -364,6 +366,21 @@ function M.new(ctx)
 	local set_llm_profile
 	local settle_recovery_debts
 
+	--- Settles the ProfilesManager Delete ledger before any profile-facing result,
+	--- including voluntary recommendation no-ops that never reach set_llm_profile.
+	--- @param action_label string Human-readable action for refusal logging.
+	--- @return boolean settled
+	local function settle_profile_mutation_gate(action_label)
+		local gate_ok, gate_result = Logger.callback(LOG,
+			"Profile Delete recovery gate", profile_mutation_gate)
+		if not gate_ok or gate_result ~= true then
+			Logger.error(LOG, "%s refused while Delete rollback remains unsettled.",
+				action_label)
+			return false
+		end
+		return true
+	end
+
 	--- Warns when the selected profile demands significantly more than the model can give.
 	--- @param selected_profile_id string Profile the user just activated.
 	--- @param model_name string Currently active model.
@@ -391,6 +408,9 @@ function M.new(ctx)
 	--- @return boolean settled True only for a committed recommendation or voluntary no-op.
 	local function apply_recommended_prompt_profile(model_name, opts)
 		opts = type(opts) == "table" and opts or {}
+		if not settle_profile_mutation_gate("Recommended profile follow-up") then
+			return false
+		end
 		if type(model_name) ~= "string" or model_name == "" then
 			Logger.warn(LOG, "Cannot recommend a profile because no model is active.")
 			Logger.callback(LOG, "Recommended-profile unavailable notification",
@@ -653,11 +673,20 @@ function M.new(ctx)
 	--- Activates a profile and triggers a power-mismatch check.
 	--- A direct profile action cannot publish over an unsettled model rollback.
 	--- @param profile_id string Profile to activate.
-	--- @param opts table|nil Optional { record_intent = false } for model-owned recommendations.
-	--- @return boolean True only when runtime, persistence, and menu all commit.
+	--- @param opts table|nil Optional transaction controls. `persist = false` and
+	---   `update_menu = false` let a parent transaction own those boundaries;
+	---   `record_intent = false` is reserved for model-owned recommendations;
+	---   `defer_intent = true` returns a parent-owned intent lease as a second value;
+	---   `skip_delete_recovery = true` is reserved for Delete compensation itself.
+	--- @return boolean committed True only when every boundary owned by this call commits.
+	--- @return table|nil intent_lease Parent-owned commit/cancel lease when requested.
 	set_llm_profile = function(profile_id, opts)
 		opts = type(opts) == "table" and opts or {}
 		if type(profile_id) ~= "string" then return false end
+		if opts.skip_delete_recovery ~= true
+			and not settle_profile_mutation_gate("Profile switch") then
+			return false
+		end
 		if not settle_recovery_debts() then return false end
 		local snapshot = snapshot_profile_transition()
 		if not snapshot then return false end
@@ -683,25 +712,47 @@ function M.new(ctx)
 			return reject_transition("runtime sync")
 		end
 		state.llm_active_profile = profile_id
-		debt.persist = true
-		local save_ok, saved = Logger.callback(LOG,
-			"Profile-switch preference save", save_prefs)
-		if not save_ok or saved ~= true then
-			return reject_transition("preference save")
+		if opts.persist ~= false then
+			debt.persist = true
+			local save_ok, saved = Logger.callback(LOG,
+				"Profile-switch preference save", save_prefs)
+			if not save_ok or saved ~= true then
+				return reject_transition("preference save")
+			end
 		end
-		debt.menu = true
-		if not call_model_boundary("Profile-switch menu refresh", update_menu) then
-			return reject_transition("menu refresh")
+		if opts.update_menu ~= false then
+			debt.menu = true
+			if not call_model_boundary("Profile-switch menu refresh", update_menu) then
+				return reject_transition("menu refresh")
+			end
 		end
 
 		profile_recovery_debt = nil
-		if opts.record_intent ~= false then
+		local intent_lease = nil
+		if opts.defer_intent == true then
+			local pending = true
+			intent_lease = {
+				commit = function()
+					if pending ~= true then return false end
+					pending = false
+					profile_intent_generation = profile_intent_generation + 1
+					Logger.debug(LOG, "Deferred profile intent committed by its parent transaction.")
+					return true
+				end,
+				cancel = function()
+					if pending ~= true then return false end
+					pending = false
+					Logger.debug(LOG, "Deferred profile intent cancelled by its parent transaction.")
+					return true
+				end,
+			}
+		elseif opts.record_intent ~= false then
 			profile_intent_generation = profile_intent_generation + 1
 		end
 		Logger.info(LOG, "Profile successfully switched to %s.", profile_id)
 		Logger.callback(LOG, "Profile power mismatch check",
 			check_profile_power_mismatch, profile_id, state.llm_model)
-		return true
+		return true, intent_lease
 	end
 
 
@@ -921,6 +972,7 @@ function M.new(ctx)
 		switch_model                      = switch_model,
 		disable_model                     = disable_model,
 		set_llm_profile                   = set_llm_profile,
+		settle_recovery_debts             = settle_recovery_debts,
 		apply_recommended_prompt_profile  = apply_recommended_prompt_profile,
 		get_display_model_name            = get_display_model_name,
 		get_model_power_level             = get_model_power_level,
