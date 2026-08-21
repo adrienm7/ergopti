@@ -73,7 +73,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [ ] `HS-026` — LLM settings transaction
 - [x] `HS-027` — this fix commit; model and `No Model` share one recoverable transition, with 26 focused refusal/retry cases
 - [x] `HS-028` — this fix commit; direct profile selection is transactional with retryable compensation debt
-- [ ] `HS-029` — pending model completion preserves newer explicit profile intent
+- [x] `HS-029` — pending model completion preserves newer explicit profile intent — fixed and independently reviewed in this commit
 - [x] `HS-030` — this fix commit; exact source-only modules bypass only the case-name no-match guard
 - [ ] `HS-031` — recommended-profile actions use the same transactional profile owner
 - [ ] `HS-032` — Ollama pull publication waits for the parent model transaction
@@ -634,7 +634,9 @@ The explicit `No Model` sibling is the same distributed transition. With model `
 
 **Fix.** Track a separate explicit-profile generation. A model request snapshots it at dispatch. When that model later commits, publish the requested model normally but skip only its recommended-profile follow-up if a newer explicit profile transaction committed. Do not bump `req_token` and do not release the MLX prediction lock early; the still-valid model request owns that lock until its normal terminal.
 
-**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_profile_intent_ordering.lua`. Capture a real pending switch to model `B`, commit `advanced`, then deliver the model completion. Assert `B` publishes exactly once, `advanced` remains current, and the recommendation performs zero profile setter/save/menu side effects beyond the model transaction's own boundaries. The MLX prediction states must be exactly `{false, true}` when `B` terminates. Add a control with no intervening profile choice where the recommendation still applies normally.
+**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_profile_intent_ordering.lua`. Capture a real pending switch to model `B`, commit `advanced`, then deliver the model completion. Assert `B` publishes exactly once, `advanced` remains current, and the recommendation performs zero profile setter/save/menu side effects beyond the model transaction's own boundaries. The MLX prediction states must be exactly `{false, true}` when `B` terminates. Add a control with no intervening profile choice where the recommendation still applies normally. Behaviorally prove that clone, create, and active-profile deletion route their resulting selection through the same owner; a refused fallback must leave the old profile and registry untouched.
+
+**Implemented and independently replayed.** `model_switcher` now snapshots a profile-intent generation before asynchronous model dispatch and increments it only after the explicit profile's runtime, persistence, and menu boundaries all commit. Model completion always publishes the requested model and releases the MLX lock at its normal terminal, but skips only an older automatic recommendation when that generation changed. Clone/create activation and active-profile deletion now delegate to the same exact owner; deletion commits the `basic` fallback while the old profile is still resolvable, before registry removal. The core ordering matrix passes `5/5`, the real ProfilesManager delegation matrix passes `4/4`, and six direct transaction/generation/menu neighbors pass `60/60` plus their source-only guard. Syntax, conventions, false-green ratchet, and scoped diff checks are green. A read-only second lens returned GO and kept Auto-detect (`HS-031`) plus shortcut/registry deletion ownership (`HS-033`) explicitly separate.
 
 ### `HS-030` — Exact `--only` targets falsely fail source-only test modules
 

@@ -81,6 +81,10 @@ function M.new(ctx)
 	-- Monotonically-increasing token so stale async callbacks from a previous
 	-- switch attempt are silently discarded when a new switch is initiated.
 	local req_token = 0
+	-- Model and profile selections are independent user intents. A pending model
+	-- may still commit, but its recommendation must not replace a newer explicit
+	-- profile transaction that committed while requirements were being checked.
+	local profile_intent_generation = 0
 	-- A failed compensation must remain owned across user retries. A later model
 	-- action is forbidden from publishing over an identity that has not settled.
 	local model_recovery_debt = nil
@@ -657,6 +661,7 @@ function M.new(ctx)
 		end
 
 		profile_recovery_debt = nil
+		profile_intent_generation = profile_intent_generation + 1
 		Logger.info(LOG, "Profile successfully switched to %s.", profile_id)
 		Logger.callback(LOG, "Profile power mismatch check",
 			check_profile_power_mismatch, profile_id, state.llm_model)
@@ -675,6 +680,7 @@ function M.new(ctx)
 	local function switch_model(new_model)
 		Logger.debug(LOG, string.format("Executing switch_model('%s')…", new_model or "nil"))
 		if not settle_recovery_debts() then return false end
+		local request_profile_generation = profile_intent_generation
 
 		-- Lock predictions during the MLX server restart — weights take 60–90 s to reload
 		local mlx_was_enabled = state.llm_backend == "mlx" and state.llm_enabled
@@ -764,18 +770,25 @@ function M.new(ctx)
 					return reject_transition("preference save")
 				end
 
-				-- The recommendation helper can mutate profile runtime, persistence,
-				-- and menu state. Mark every compensation before entering it.
-				debt.profile = true
-				debt.menu = true
-				local profile_ok, profile_result = Logger.callback(LOG,
-					"Model-switch recommended-profile follow-up",
-					apply_recommended_prompt_profile,
-					new_model,
-					{dialog_title = i18n.get("menu.llm.model_change_title")})
-				if not profile_ok or profile_result == false then
-					return reject_transition("profile follow-up")
+				if request_profile_generation == profile_intent_generation then
+					-- The recommendation helper can mutate profile runtime, persistence,
+					-- and menu state. Mark every compensation before entering it.
+					debt.profile = true
+					debt.menu = true
+					local profile_ok, profile_result = Logger.callback(LOG,
+						"Model-switch recommended-profile follow-up",
+						apply_recommended_prompt_profile,
+						new_model,
+						{dialog_title = i18n.get("menu.llm.model_change_title")})
+					if not profile_ok or profile_result == false then
+						return reject_transition("profile follow-up")
+					end
+				else
+					Logger.info(LOG,
+						"Skipping the automatic profile recommendation for %s because a newer explicit profile committed.",
+						new_model)
 				end
+				debt.menu = true
 				if not call_model_boundary("Model-switch menu refresh", update_menu) then
 					return reject_transition("menu refresh")
 				end
