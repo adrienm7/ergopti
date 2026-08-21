@@ -117,3 +117,42 @@ _PHSP_BindersExposeNativeTransactionPorts() {
 
 Test("Profile hotkeys: profile and nav binders expose native transaction ports",
 	_PHSP_BindersExposeNativeTransactionPorts)
+
+_PHSP_ProfileCallbackNeverSynthesizesPassThrough() {
+	Callback := _StripFullLineComments(
+		_DriverFuncBody("_LLM_Menu_OnProfileHotkey"))
+	NativeSelect := _StripFullLineComments(
+		_DriverFuncBody("_LLM_Menu_ProfileNativeSelect"))
+	Binder := _StripFullLineComments(
+		_DriverFuncBody("LLM_Menu_BindProfileHotkeys"))
+	Assert(Callback != "",
+		"the production profile callback must remain reachable")
+	Assert(NativeSelect != "" && Binder != "",
+		"the tested selection seam and its production binder must remain reachable")
+	Assert(InStr(Callback, "LLM_Menu_GetHotkeyProfileOrder()") > 0,
+		"the callback must recheck the current profile range before selection")
+	Assert(InStr(NativeSelect, "LLM_Menu_SetProfile(ProfileId)") > 0
+		&& InStr(Binder, "SelectFn := _LLM_Menu_ProfileNativeSelect") > 0
+		&& InStr(Binder, "_LLM_Menu_BuildProfileHotkeyPlan(SelectFn)") > 0,
+		"the behavioral selection seam must preserve the production profile publisher")
+	Assert(Trim(RegExReplace(NativeSelect, "\s+", " "))
+		== "_LLM_Menu_ProfileNativeSelect(ProfileId) { return LLM_Menu_SetProfile(ProfileId) }",
+		"the production selector must remain a transparent profile-publisher adapter")
+	; No LLM menu helper may hide the replay behind another function. The
+	; directory currently has no legitimate synthetic-key emitter, so scan the
+	; complete move-resilient production subtree rather than a hand-picked call
+	; chain that a helper extraction could escape.
+	MenuSource := _StripFullLineComments(
+		_DriverDirConcat("ui/menu/menu_llm"))
+	Assert(MenuSource != "", "the production LLM menu subtree must be scanned")
+	Normalized := RegExReplace(MenuSource, "\s+", " ")
+	for Name in ["Send", "SendInput", "SendEvent", "SendText", "SendPlay",
+			"ControlSend", "ControlSendText"] {
+		Pattern := "i)(?:^|[^A-Za-z0-9_])" . Name . "(?: |[(])"
+		Assert(!RegExMatch(Normalized, Pattern),
+			"an out-of-range profile variant must use native HotIf pass-through, never a synthetic Send fallback")
+	}
+}
+
+Test("Profile hotkeys: callback has no synthetic pass-through fallback (profile-hotkey-stable-pred)",
+	_PHSP_ProfileCallbackNeverSynthesizesPassThrough)

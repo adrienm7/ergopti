@@ -3,9 +3,10 @@
 ; ==============================================================================
 ; MODULE: LLM Profile Hotkey Transaction Tests
 ; DESCRIPTION:
-; Root-cause regression coverage for AHK-024. The fixed Ctrl+1..9 surface must
+; Root-cause regression coverage for AHK-024 and AHK-028. The fixed Ctrl+1..9 surface must
 ; remain inert until every native variant exists and the HotIf context is proven
-; reset; boot must consume profile and navigation readiness strictly.
+; reset; boot must consume profile and navigation readiness strictly; and only
+; digits backed by a current profile may suppress native application input.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,6 +37,8 @@ global _LPHT_LogCalls := 0
 global _LPHT_LogCritical := -1
 global _LPHT_NavCalls := 0
 global _LPHT_NativeCriticalSamples := []
+global _LPHT_AppOutput := []
+global _LPHT_SelectedProfiles := []
 
 _LPHT_ResetPorts() {
 	global _LPHT_Hotkeys, _LPHT_CurrentPredicate
@@ -44,6 +47,7 @@ _LPHT_ResetPorts() {
 	global _LPHT_HotkeyCalls, _LPHT_OpenCalls, _LPHT_CloseCalls
 	global _LPHT_ResetCalls, _LPHT_LogCalls, _LPHT_LogCritical
 	global _LPHT_NavCalls, _LPHT_NativeCriticalSamples
+	global _LPHT_AppOutput, _LPHT_SelectedProfiles
 	_LPHT_Hotkeys := Map()
 	_LPHT_CurrentPredicate := 0
 	_LPHT_FaultSpec := ""
@@ -60,6 +64,8 @@ _LPHT_ResetPorts() {
 	_LPHT_LogCritical := -1
 	_LPHT_NavCalls := 0
 	_LPHT_NativeCriticalSamples := []
+	_LPHT_AppOutput := []
+	_LPHT_SelectedProfiles := []
 }
 
 _LPHT_HotIf(Args*) {
@@ -125,6 +131,17 @@ _LPHT_ProfileBindPort() {
 		_LPHT_HotIf, _LPHT_Log, _LPHT_ForceReset)
 }
 
+_LPHT_ProfileBindSelectPort() {
+	return LLM_Menu_BindProfileHotkeys(_LPHT_Hotkey,
+		_LPHT_HotIf, _LPHT_Log, _LPHT_ForceReset, _LPHT_Select)
+}
+
+_LPHT_Select(ProfileId) {
+	global _LPHT_SelectedProfiles
+	_LPHT_SelectedProfiles.Push(ProfileId)
+	return true
+}
+
 _LPHT_NavReadyPort() {
 	global _LPHT_NavCalls
 	_LPHT_NavCalls += 1
@@ -150,6 +167,26 @@ _LPHT_EffectiveCount() {
 
 _LPHT_RoutePhysical(Spec) {
 	return _LPHT_IsEffective(Spec) ? "hotkey" : "app"
+}
+
+_LPHT_FirePhysical(Spec, PhysicalEvent, PermanentSpec := "<default>",
+		InvokeCallback := false) {
+	global _LPHT_Hotkeys, _LPHT_AppOutput
+	if PermanentSpec == "<default>"
+		PermanentSpec := Spec
+	if _LPHT_Hotkeys.Has(Spec) {
+		Record := _LPHT_Hotkeys[Spec]
+		if Record["predicate"].Call(PermanentSpec) {
+			; Never invoke a callback for a route the test expects to pass through.
+			; This keeps the regression harness safe even if the old synthetic Send
+			; fallback and its broad predicate are accidentally restored together.
+			if InvokeCallback
+				Record["callback"].Call()
+			return "hotkey"
+		}
+	}
+	_LPHT_AppOutput.Push(PhysicalEvent)
+	return "app"
 }
 
 _LPHT_WithFixture(TestFn) {
@@ -704,3 +741,118 @@ _LPHT_OwnerAndLoadedGate() {
 
 Test("[llm-profile-hotkeys] only a complete ready owner activates after loaded",
 	_LPHT_OwnerAndLoadedGate)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 8/ Per-index native pass-through gate =======
+; =====================================================
+; =====================================================
+
+_LPHT_SetExposedProfileCount(Count) {
+	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER
+	LLM_PROFILE_BUILTIN_ORDER := []
+	_LLM_Menu["user_profiles"] := []
+	Loop Count
+		_LLM_Menu["user_profiles"].Push(Map("id", "range_" . A_Index))
+}
+
+_LPHT_ProfileRangeAdmissionCore() {
+	Status := _LPHT_ProfileBindPort()
+	AssertTrue((Status is Integer) && Status == 1)
+	for Count in [0, 1, 4, 9] {
+		_LPHT_SetExposedProfileCount(Count)
+		Loop 9 {
+			Index := A_Index
+			AssertEqual(Index <= Count, _LPHT_IsEffective("^" . Index),
+				"only Ctrl+digits backed by a published profile may suppress input")
+		}
+	}
+}
+
+_LPHT_ProfileRangeAdmission() {
+	return _LPHT_WithFixture(_LPHT_ProfileRangeAdmissionCore)
+}
+
+Test("[llm-profile-hotkeys] profile range is decided before native suppression",
+	_LPHT_ProfileRangeAdmission)
+
+_LPHT_ProfileRangeRoutesExactlyOnceCore() {
+	global _LPHT_AppOutput, _LPHT_SelectedProfiles
+	Status := _LPHT_ProfileBindSelectPort()
+	AssertTrue((Status is Integer) && Status == 1)
+	for Count in [0, 1, 4, 9] {
+		_LPHT_SetExposedProfileCount(Count)
+		ExpectedOrder := LLM_Menu_GetHotkeyProfileOrder()
+		Loop 9 {
+			Index := A_Index
+			_LPHT_AppOutput := []
+			_LPHT_SelectedProfiles := []
+			PhysicalEvent := Map("spec", "^" . Index, "serial", Count * 10 + Index)
+			Route := _LPHT_FirePhysical("^" . Index, PhysicalEvent,
+				"<default>", Index <= Count)
+			if (Index <= Count) {
+				AssertEqual("hotkey", Route)
+				AssertEqual(1, _LPHT_SelectedProfiles.Length)
+				AssertEqual(ExpectedOrder[Index], _LPHT_SelectedProfiles[1],
+					"an in-range physical chord must select exactly its published profile")
+				AssertEqual(0, _LPHT_AppOutput.Length)
+			} else {
+				AssertEqual("app", Route)
+				AssertEqual(0, _LPHT_SelectedProfiles.Length)
+				AssertEqual(1, _LPHT_AppOutput.Length)
+				AssertTrue(ObjPtr(_LPHT_AppOutput[1]) == ObjPtr(PhysicalEvent),
+					"an out-of-range chord must preserve the exact physical app event")
+			}
+			AssertEqual(1, _LPHT_SelectedProfiles.Length + _LPHT_AppOutput.Length,
+				"each physical chord must have exactly one terminal effect")
+		}
+	}
+
+	_LPHT_SetExposedProfileCount(9)
+	for PermanentSpec in ["^7", "~^7", "$^7"] {
+		_LPHT_AppOutput := []
+		_LPHT_SelectedProfiles := []
+		PhysicalEvent := Map("spec", PermanentSpec)
+		AssertEqual("hotkey", _LPHT_FirePhysical("^7", PhysicalEvent,
+			PermanentSpec, true))
+		AssertEqual("range_7", _LPHT_SelectedProfiles[1],
+			"AHK permanent-name decorations must preserve the profile index")
+		AssertEqual(0, _LPHT_AppOutput.Length)
+	}
+	for PermanentSpec in ["*^7", "!^7", "^0", "^10", ""] {
+		_LPHT_AppOutput := []
+		_LPHT_SelectedProfiles := []
+		PhysicalEvent := Map("spec", PermanentSpec)
+		AssertEqual("app", _LPHT_FirePhysical("^7", PhysicalEvent,
+			PermanentSpec))
+		AssertEqual(0, _LPHT_SelectedProfiles.Length)
+		AssertEqual(1, _LPHT_AppOutput.Length)
+		AssertTrue(ObjPtr(_LPHT_AppOutput[1]) == ObjPtr(PhysicalEvent))
+	}
+
+	; The old callback rebuilt Ctrl+7 from the current keyboard layout. This seam
+	; models Windows' native ineligible-variant route by retaining the immutable
+	; US-bound VK/SC event after the focused app switches to a French layout; the
+	; audit still records that no live dual-layout physical probe was run.
+	_LPHT_SetExposedProfileCount(4)
+	_LPHT_AppOutput := []
+	_LPHT_SelectedProfiles := []
+	LayoutEvent := Map("vk", 0x37, "sc", 0x08, "ctrl", true,
+		"shift", false, "bound_hkl", 0x0409, "current_hkl", 0x040C)
+	AssertEqual("app", _LPHT_FirePhysical("^7", LayoutEvent, "$^7"))
+	AssertEqual(0, _LPHT_SelectedProfiles.Length)
+	AssertEqual(1, _LPHT_AppOutput.Length)
+	AssertTrue(ObjPtr(_LPHT_AppOutput[1]) == ObjPtr(LayoutEvent),
+		"layout changes must not reconstruct an out-of-range Ctrl+digit chord")
+}
+
+_LPHT_ProfileRangeRoutesExactlyOnce() {
+	return _LPHT_WithFixture(_LPHT_ProfileRangeRoutesExactlyOnceCore)
+}
+
+Test("[llm-profile-hotkeys] profile digits select or pass through exactly once",
+	_LPHT_ProfileRangeRoutesExactlyOnce)
