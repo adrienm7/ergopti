@@ -109,29 +109,113 @@ global _LLM_Menu_NavActiveSlot := 0
 ; A new lambda on each BindNavHotkeys() call would create a different function
 ; object, causing Hotkey(..., "Off") to target a different HotIf variant and
 ; never actually remove the old binding — duplicates would accumulate.
-global _LLM_Nav_HotIfPred1 := (*) => _LLM_Menu_NavActiveSlot == 1
-	&& LLM_Tooltip_GetText() != ""
-global _LLM_Nav_HotIfPred2 := (*) => _LLM_Menu_NavActiveSlot == 2
-	&& LLM_Tooltip_GetText() != ""
+global _LLM_Nav_HotIfPred1 := (ThisHotkey) =>
+	_LLM_Menu_NavVariantIsActive(1, ThisHotkey)
+global _LLM_Nav_HotIfPred2 := (ThisHotkey) =>
+	_LLM_Menu_NavVariantIsActive(2, ThisHotkey)
 
 _LLM_Menu_NavSlotPredicate(Slot) {
 	global _LLM_Nav_HotIfPred1, _LLM_Nav_HotIfPred2
 	return Slot == 1 ? _LLM_Nav_HotIfPred1 : _LLM_Nav_HotIfPred2
 }
 
+_LLM_Menu_NavNativeIdentity(Spec) {
+	if !(Spec is String)
+		return ""
+	Raw := StrLower(Trim(Spec))
+	if Raw == ""
+		return ""
+	; HotIf receives the permanent name established by the first variant. Tilde
+	; and hook-forcing dollar prefixes are variant properties, and modifier
+	; symbols may be written in any order. Canonicalize the physical identity so
+	; a later ``~!^7`` variant can legitimately be called ``^!7``.
+	Modifiers := Map()
+	Wildcard := false
+	KeyStart := 1
+	Loop StrLen(Raw) {
+		Ch := SubStr(Raw, A_Index, 1)
+		if Ch == "<" || Ch == ">"
+			return ""
+		if Ch == "~" || Ch == "$" {
+			KeyStart := A_Index + 1
+			continue
+		}
+		if Ch == "*" {
+			Wildcard := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		if Ch == "^" || Ch == "!" || Ch == "+" || Ch == "#" {
+			Modifiers[Ch] := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		break
+	}
+	Key := SubStr(Raw, KeyStart)
+	if Key == "" || InStr(Key, "&")
+		return ""
+	Identity := Wildcard ? "*" : ""
+	for Prefix in ["^", "!", "+", "#"] {
+		if Modifiers.Has(Prefix)
+			Identity .= Prefix
+	}
+	return Identity . Key
+}
+
+_LLM_Menu_NavVariantIsActive(Slot, Spec) {
+	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavActiveSlot
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_Menu_NavActiveSlot != Slot
+			return false
+		NativeIdentity := _LLM_Menu_NavNativeIdentity(Spec)
+		if NativeIdentity == "" || !(_LLM_Menu_NavHotkeysBound is Array)
+			return false
+		try Snapshot := LLM_Tooltip_GetAcceptSnapshot()
+		catch
+			return false
+		if !IsObject(Snapshot) || !(Snapshot.Slots is Array)
+			return false
+		for Entry in _LLM_Menu_NavHotkeysBound {
+			if !(Entry is Map) || Entry.Get("native_id", "") != NativeIdentity
+				continue
+			JumpIndex := Entry.Get("jump_idx", 0)
+			return JumpIndex == 0 || (JumpIndex is Integer
+				&& JumpIndex >= 1 && JumpIndex <= Snapshot.Slots.Length)
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
 LLM_Menu_NavOwnsSpec(Spec) {
 	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavActiveSlot
-	if !(Spec is String) || Spec == "" || LLM_Tooltip_GetText() == ""
+	PreviousCritical := Critical("On")
+	try {
+		NativeIdentity := _LLM_Menu_NavNativeIdentity(Spec)
+		if NativeIdentity == ""
+			return false
+		if !(_LLM_Menu_NavActiveSlot == 1 || _LLM_Menu_NavActiveSlot == 2)
+			return false
+		if !(_LLM_Menu_NavHotkeysBound is Array)
+			return false
+		try Snapshot := LLM_Tooltip_GetAcceptSnapshot()
+		catch
+			return false
+		if !IsObject(Snapshot)
+			return false
+		for Entry in _LLM_Menu_NavHotkeysBound {
+			if !(Entry is Map)
+				continue
+			EntryIdentity := Entry.Get("native_id", "")
+			if EntryIdentity == ""
+				EntryIdentity := _LLM_Menu_NavNativeIdentity(
+					Entry.Get("spec", ""))
+			if EntryIdentity == NativeIdentity
+				return true
+		}
 		return false
-	if !(_LLM_Menu_NavActiveSlot == 1 || _LLM_Menu_NavActiveSlot == 2)
-		return false
-	if !(_LLM_Menu_NavHotkeysBound is Array)
-		return false
-	for Entry in _LLM_Menu_NavHotkeysBound {
-		if (Entry is Map) && Entry.Get("spec", "") == Spec
-			return true
-	}
-	return false
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_NavNativeHotkey(Args*) {
@@ -142,8 +226,9 @@ _LLM_Menu_NavNativeHotIf(Args*) {
 	HotIf(Args*)
 }
 
-_LLM_Menu_NavBindingRecord(Spec, Callback) {
-	return Map("spec", Spec, "callback", Callback)
+_LLM_Menu_NavBindingRecord(Spec, Callback := 0, JumpIndex := 0) {
+	return Map("spec", Spec, "callback", Callback, "jump_idx", JumpIndex,
+		"native_id", _LLM_Menu_NavNativeIdentity(Spec))
 }
 
 _LLM_Menu_NavBindingIndex(Plan) {
@@ -217,7 +302,6 @@ _LLM_Menu_BuildNavBindingPlan(MenuState) {
 	if (nav_mod != "" && nav_prefix == "")
 			|| (val_mod != "" && val_prefix == "")
 		return false
-
 	Plan := [
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Up",
 			(*) => _LLM_Nav_Cycle(-1)),
@@ -227,7 +311,7 @@ _LLM_Menu_BuildNavBindingPlan(MenuState) {
 	Loop 10 {
 		Digit := (A_Index == 10) ? "0" : String(A_Index)
 		Plan.Push(_LLM_Menu_NavBindingRecord(val_prefix . Digit,
-			_LLM_Menu_MakeNavJump(A_Index)))
+			_LLM_Menu_MakeNavJump(A_Index), A_Index))
 	}
 	return Map("plan", Plan, "nav_prefix", nav_prefix,
 		"val_prefix", val_prefix)
