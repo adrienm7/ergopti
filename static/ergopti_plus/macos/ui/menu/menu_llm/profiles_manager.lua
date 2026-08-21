@@ -56,14 +56,14 @@ end
 --- @param pid string Profile id to activate.
 local function select_profile(deps, state, pid)
 	if type(deps.set_llm_profile) == "function" then
-		deps.set_llm_profile(pid)
-		return
+		return deps.set_llm_profile(pid)
 	end
 	state.llm_active_profile = pid
 	llm_mod.set_active_profile(pid)
 	sync_profiles(state)
 	if deps.save_prefs() ~= true then return false end
-	pcall(deps.update_menu)
+	local menu_ok, menu_result = pcall(deps.update_menu)
+	return menu_ok and menu_result ~= false
 end
 
 --- Clones a built-in profile into an editable user profile and opens the editor.
@@ -89,10 +89,7 @@ local function clone_builtin_profile(deps, state, src)
 	}
 	state.llm_user_profiles = state.llm_user_profiles or {}
 	table.insert(state.llm_user_profiles, copy)
-	state.llm_active_profile = copy.id
-	sync_profiles(state)
-	if deps.save_prefs() ~= true then return false end
-	pcall(deps.update_menu)
+	if select_profile(deps, state, copy.id) ~= true then return false end
 	-- Open the edit dialog immediately so the user lands in the prompt they can
 	-- edit, not back in the menu.
 	if prompt_editor and type(prompt_editor.open) == "function" then
@@ -278,6 +275,10 @@ local function build_profile_menu(deps, models_mgr)
 							i18n.get("button.delete"), i18n.get("common.cancel"), "critical")
 
 						if ok_c and choice == i18n.get("button.delete") then
+							if state.llm_active_profile == pid
+								and select_profile(deps, state, "basic") ~= true then
+								return false
+							end
 							if type(deps.apply_llm_profile_shortcut) == "function" then
 								deps.apply_llm_profile_shortcut(pid, nil, nil, { silent = true })
 							end
@@ -286,13 +287,10 @@ local function build_profile_menu(deps, models_mgr)
 								if type(p) == "table" and p.id ~= pid then table.insert(kept, p) end
 							end
 							state.llm_user_profiles = kept
-							if state.llm_active_profile == pid then
-								state.llm_active_profile = "basic"
-								llm_mod.set_active_profile("basic")
-							end
 							sync_profiles(state)
-						if deps.save_prefs() ~= true then return false end
-						pcall(deps.update_menu)
+							if deps.save_prefs() ~= true then return false end
+							local menu_ok, menu_result = pcall(deps.update_menu)
+							if not menu_ok or menu_result == false then return false end
 						end
 					end or nil,
 				},
@@ -332,11 +330,7 @@ local function build_profile_menu(deps, models_mgr)
 						if type(new_profile) == "table" then
 							if type(state.llm_user_profiles) ~= "table" then state.llm_user_profiles = {} end
 							table.insert(state.llm_user_profiles, new_profile)
-							state.llm_active_profile = new_profile.id
-							llm_mod.set_active_profile(new_profile.id)
-							sync_profiles(state)
-							if deps.save_prefs() ~= true then return false end
-							pcall(deps.update_menu)
+							if select_profile(deps, state, new_profile.id) ~= true then return false end
 							pcall(notifications.notify, i18n.get("profiles.created_title"), ProfileLabel.format(new_profile.label, state.llm_num_predictions), "success")
 							Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
 						end
