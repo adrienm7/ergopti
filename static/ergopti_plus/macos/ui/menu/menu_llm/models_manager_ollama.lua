@@ -83,11 +83,6 @@ end
 function M.new(deps, presets, ram_getter)
 	local obj = {}
 
-	local function save_prefs(label)
-		local ok, saved = Logger.callback(LOG, label, deps.save_prefs)
-		return ok == true and saved == true
-	end
-
 	local function cancel_task(task_key)
 		local t = deps.active_tasks and deps.active_tasks[task_key]
 		if not t then return true end
@@ -712,43 +707,6 @@ function M.new(deps, presets, ram_getter)
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(true, target_model)
-				-- Resolve the display name from the actual model name (e.g. "gemma3:4b" → "Gemma 3 4B")
-				local display_model = target_model
-				if type(presets) == "table" then
-					local found = false
-					for _, provider in ipairs(presets) do
-						if found then break end
-						for _, family in ipairs(provider.families or {}) do
-							if found then break end
-							for _, m in ipairs(family.models or {}) do
-								local ollama_url = m.urls and m.urls.ollama
-								if ollama_url then
-									local actual = ollama_url:match("/library/([^/]+)$") or ollama_url:match("([^/]+)$")
-									if actual == target_model and m.name then
-										display_model = m.name
-										found = true
-										break
-									end
-								end
-							end
-						end
-					end
-				end
-				deps.state.llm_model = display_model
-				if deps.keymap then
-					if type(deps.keymap.set_llm_model) == "function" then
-						Logger.callback(LOG, "Ollama model runtime sync",
-							deps.keymap.set_llm_model, target_model)
-					end
-					if type(deps.keymap.set_llm_display_model_name) == "function" then
-						Logger.callback(LOG, "Ollama display-model runtime sync",
-							deps.keymap.set_llm_display_model_name, display_model)
-					end
-				end
-				if not save_prefs("Ollama model preference save") then
-					settle_cancel("preference_save_failed")
-					return false
-				end
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()

@@ -76,7 +76,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-029` — pending model completion preserves newer explicit profile intent — fixed and independently reviewed in this commit
 - [x] `HS-030` — this fix commit; exact source-only modules bypass only the case-name no-match guard
 - [x] `HS-031` — recommended-profile actions now use the same transactional profile owner; independently reviewed GO
-- [ ] `HS-032` — Ollama pull publication waits for the parent model transaction
+- [x] `HS-032` — Ollama pull owns download/loadability only; parent model transaction is the sole publisher
 - [ ] `HS-033` — profile deletion retains exact shortcut and runtime-profile ownership
 - [ ] `HS-034` — failed profile creation removes its uncommitted registry candidate
 - [ ] `HS-035` — Ollama pull failure reaches the parent requirements terminal
@@ -705,6 +705,8 @@ The explicit `No Model` sibling is the same distributed transition. With model `
 **Fix.** Make `pull_model()` own only download/loadability and terminal delivery. The parent `model_switcher` transaction must remain the sole publisher of model state, runtime setters, persistence, recommendation, and menu identity. If a standalone manager caller still needs publication, give it an explicit transactional adapter rather than an implicit side effect.
 
 **Regression test.** Drive the real Ollama manager under the real switcher: complete the pull, then refuse the first persistence boundary. Assert exact old state/runtime/durable/menu identity, one failure terminal and restored prediction gate. On success, assert the parent transaction publishes each boundary once and the manager performs zero direct model publication.
+
+**Implemented and behaviorally replayed.** `pull_model()` now owns only the native process, progress/toast, loadability check, and child terminal. It no longer writes model state, runtime/display identities, or preferences; every model publication is deferred to the existing `ModelSwitcher` transaction. The new real-manager/real-switcher regression was red `0/2` before the source change and is green `2/2`: a refused parent save restores `A` at state/runtime/durable/menu boundaries with one failure, while success proves zero publication before loadability and one parent publication afterward. Direct manager-generation, model-transaction, pull-owner, readiness/nonblocking, compile, GC, conventions, false-green, and scoped diff neighbors are green. Independent second-lens review returned GO. `HS-035` remains open for the distinct current-generation child-failure terminal gap.
 
 ### `HS-033` — Profile deletion can lose a live global shortcut and keep the deleted prompt executable
 
