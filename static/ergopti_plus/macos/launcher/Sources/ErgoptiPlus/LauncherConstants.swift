@@ -16,9 +16,6 @@ import Darwin
 
 /// Signed application identity shared by bootstrap and guardian registration.
 let kErgoptiBundleId = "com.ergoptiplus.app"
-/// Distinct identity for the child runtime; sharing the launcher's identity
-/// makes Launch Services terminate Hammerspoon as a duplicate application.
-let kEmbeddedHammerspoonBundleId = "com.ergoptiplus.app.hammerspoon"
 /// Hammerspoon preference key installed before the embedded runtime starts.
 let kHammerspoonConfigKey = "MJConfigFile"
 /// Process-wide private mask inherited by every launcher and headless role.

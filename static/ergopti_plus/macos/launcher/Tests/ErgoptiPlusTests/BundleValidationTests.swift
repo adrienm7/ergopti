@@ -34,16 +34,8 @@
 // ==============================================================================
 
 import XCTest
-@testable import ErgoptiPlus
 
 final class BundleValidationTests: XCTestCase {
-	func testEmbeddedRuntimeIdentityDiffersFromLauncherIdentity() {
-		XCTAssertNotEqual(
-			kEmbeddedHammerspoonBundleId,
-			kErgoptiBundleId,
-			"the child runtime must not be terminated as a duplicate of the running launcher"
-		)
-	}
 
 	// ==================================================
 	// ======= 1/ Fixture bundle path construction =======
