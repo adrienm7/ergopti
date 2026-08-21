@@ -67,7 +67,39 @@ function M.install(ctx)
 		return ok == true and saved == true
 	end
 
-	function obj.pull_model(target_model, repo, on_success)
+	function obj.pull_model(target_model, repo, on_success, on_cancel, opts)
+		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local terminal_sent = false
+		local function settle(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, callback, ...)
+			return ok and result ~= false
+		end
+		local function settle_cancel(...)
+			return settle(on_cancel, "MLX download cancellation", ...)
+		end
+		local function settle_stale(reason)
+			if reason ~= "stale" then return false end
+			return settle_cancel(reason)
+		end
+		local function still_current()
+			local ok, current = Logger.callback(LOG,
+				"MLX download freshness check", is_current)
+			return ok == true and current == true
+		end
+		local function current_or_cancel()
+			if still_current() then return true end
+			settle_cancel("stale")
+			return false
+		end
+		local function settle_success(...)
+			if not current_or_cancel() then return false end
+			return settle(on_success, "MLX download success", ...)
+		end
+
+		if not current_or_cancel() then return false end
 		-- Refuse re-entry while a download owns the shared slots.
 		--
 		-- Every piece of download state is a SINGLE global slot: the two task
@@ -91,19 +123,47 @@ function M.install(ctx)
 		end
 
 		local function _internal_pull()
+			if not current_or_cancel() then return false end
 			-- Upvalues shared between closures so do_cancel/tail can coordinate
 			local _dl_pid    = nil
 			local _tail_task = nil
+			local launcher_task
+			local operation_closed = false
 			local _rand_id   = tostring(math.random(1000, 9999))
 			local _log_path  = "/tmp/hs_mlx_dl_" .. _rand_id .. ".log"
 			local _exit_path = _log_path .. ".exit"
 
+			local function remove_owned_session()
+				local session_file = "/tmp/hs_mlx_active_download.json"
+				local handle = io.open(session_file, "r")
+				if not handle then return end
+				local raw = handle:read("*a")
+				handle:close()
+				local ok, session = pcall(hs.json.decode, raw)
+				if ok and type(session) == "table" and session.log_path == _log_path then
+					os.remove(session_file)
+				end
+			end
+
 			-- silent=true suppresses the "Annulé" notification and complete() so callers that
 			-- already handle their own UI (do_retry, check_timeout) don't double-notify
-			local function do_cancel(silent)
+			local function do_cancel(silent, reason)
+				if operation_closed then
+					if reason == "stale" then settle_cancel(reason) end
+					return false
+				end
+				operation_closed = true
 				if _tail_task then
 					pcall(function() _tail_task:terminate() end)
+					if deps.active_tasks and deps.active_tasks["download_tail"] == _tail_task then
+						deps.active_tasks["download_tail"] = nil
+					end
 					_tail_task = nil
+				end
+				if launcher_task and deps.active_tasks
+					and deps.active_tasks["download"] == launcher_task then
+					pcall(function() launcher_task:terminate() end)
+					deps.active_tasks["download"] = nil
 				end
 				if _dl_pid then
 					-- Kill the detached Python process directly — hs.task:terminate() would not reach
@@ -111,37 +171,50 @@ function M.install(ctx)
 					os.execute("kill -TERM " .. tostring(_dl_pid) .. " 2>/dev/null")
 					_dl_pid = nil
 				end
-				if deps.active_tasks then
-					deps.active_tasks["download"]      = nil
-					deps.active_tasks["download_tail"] = nil
+				-- A stale owner may run after its successor has already published a new
+				-- percentage. Clean only the exact native/session owners in that case;
+				-- resetting shared UI here would let A overwrite B.
+				if reason ~= "stale" then
+					update_icon("MLX download cancellation icon reset")
 				end
-				-- Always reset the menubar % — the poll/handle_done path won't run after a cancel
-				update_icon("MLX download cancellation icon reset")
-				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
+				remove_owned_session()
 				if not silent then
 					pcall(notifications.notify, i18n.get("mlx.download_cancelled"), string.format(i18n.get("mlx.download_cancelled_body"), target_model), "warning")
 					if download_window then pcall(download_window.complete, false, target_model) end
 				end
+				if reason == "stale" then settle_cancel(reason) end
+				return true
+			end
+
+			local function cancel_from_ui()
+				return do_cancel(false)
 			end
 
 			local function do_retry()
+				if not current_or_cancel() then return false end
 				-- Pass silent=true: do_retry manages its own lifecycle, no cancel notification needed
 				do_cancel(true)
 				hs.timer.doAfter(0.05, function()
-					obj.pull_model(target_model, repo, on_success)
+					if not current_or_cancel() then return end
+					obj.pull_model(target_model, repo, on_success, on_cancel, opts)
 				end)
+				return true
 			end
 
 			local function do_resolve_gated()
+				if not current_or_cancel() then return false end
 				if type(obj.prompt_hf_login) == "function" then
 					hs.timer.doAfter(0.08, function()
+						if not current_or_cancel() then return end
 						obj.prompt_hf_login(function(ok)
+							if not current_or_cancel() then return end
 							if ok and type(do_retry) == "function" then
 								hs.timer.doAfter(0.3, do_retry)
 							end
 						end)
 					end)
 				end
+				return true
 			end
 
 			local estimated_bytes_total = 0
@@ -181,6 +254,7 @@ function M.install(ctx)
 
 			-- Write the Python downloader to a real file so it is fully independent of any pipe or
 			-- heredoc — a detached process cannot read from stdin after the shell exits anyway
+			if not current_or_cancel() then return false end
 			local py = io.open(py_path, "w")
 			if not py then
 				pcall(notifications.notify, i18n.get("mlx.write_py_failed"), nil, "error")
@@ -272,6 +346,7 @@ function M.install(ctx)
 
 			-- Write the launcher: resolves Python binary, installs deps, cleans stale cache,
 			-- then starts Python detached via nohup (shields SIGHUP) and reports its PID
+			if not current_or_cancel() then return false end
 			local f = io.open(script_path, "w")
 			if not f then
 				pcall(notifications.notify, i18n.get("mlx.write_sh_failed"), nil, "error")
@@ -321,6 +396,7 @@ function M.install(ctx)
 			f:close()
 
 			os.execute("chmod +x " .. script_path)
+			if not current_or_cancel() then return false end
 
 			-- Persist session so a future HS reload can reattach tail -f without restarting the download
 			local _session_json = string.format(
@@ -336,10 +412,14 @@ function M.install(ctx)
 					kind = "mlx_model",
 					model = target_model,
 					terminal_cmd = "tail -f " .. _log_path,
-					on_cancel = do_cancel,
+					on_cancel = cancel_from_ui,
 					on_resolve = do_resolve_gated,
 					on_retry = do_retry,
 				})
+			end
+			if not current_or_cancel() then
+				do_cancel(true, "stale")
+				return false
 			end
 			update_icon("MLX download initial icon", "📥 0%")
 			
@@ -355,6 +435,11 @@ function M.install(ctx)
 				last_progress_time = os.time()
 			end
 			local function check_timeout()
+				if operation_closed then return end
+				if not still_current() then
+					do_cancel(true, "stale")
+					return
+				end
 				-- Guard on _dl_pid rather than active_tasks: the task slot is transient for the
 				-- short-lived launcher, but _dl_pid persists for the entire Python process lifetime
 				if _dl_pid then
@@ -374,7 +459,7 @@ function M.install(ctx)
 						pcall(notifications.notify, i18n.get("mlx.download_stalled"), reason, "warning")
 						if download_window then pcall(download_window.complete, false, target_model) end
 						-- Pass silent=true: notifications and window state already handled above
-						do_cancel(true)
+						do_cancel(true, "timeout")
 					else
 						hs.timer.doAfter(30, check_timeout)
 					end
@@ -383,7 +468,12 @@ function M.install(ctx)
 
 			-- Shared stream processor used by both the launcher stdout and the tail task
 			local function process_stream(out)
-				if not out or out == "" then return end
+				if operation_closed then return false end
+				if not still_current() then
+					do_cancel(true, "stale")
+					return false
+				end
+				if not out or out == "" then return true end
 				local found_progress = false
 				local out_l = out:lower()
 				if out_l:find("gated", 1, true) or out_l:find("privé", 1, true) or out_l:find("401", 1, true) or out_l:find("403", 1, true) then
@@ -451,23 +541,20 @@ function M.install(ctx)
 
 			-- Called once the Python exit file appears — reads exit code and finalises UI
 			local function handle_download_done()
+				if operation_closed then return false end
+				operation_closed = true
 				if _tail_task then
 					pcall(function() _tail_task:terminate() end)
+					if deps.active_tasks and deps.active_tasks["download_tail"] == _tail_task then
+						deps.active_tasks["download_tail"] = nil
+					end
 					_tail_task = nil
 				end
 				_dl_pid = nil
-				if deps.active_tasks then
-					deps.active_tasks["download"]      = nil
-					deps.active_tasks["download_tail"] = nil
+				if deps.active_tasks and deps.active_tasks["download"] == launcher_task then
+					deps.active_tasks["download"] = nil
 				end
-				update_icon("MLX download completion icon reset")
-				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
-
-				-- Flush any remaining buffered output before showing final status
-				if _stream_tail ~= "" and download_window then
-					pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, _stream_tail, _python_file_count)
-					_stream_tail = ""
-				end
+				remove_owned_session()
 
 				-- Read exit code written by Python atexit handler
 				local exit_code = 1
@@ -477,6 +564,14 @@ function M.install(ctx)
 					ef:close()
 					exit_code = tonumber(raw) or 1
 					os.execute("rm -f " .. _exit_path .. " 2>/dev/null")
+				end
+				if not current_or_cancel() then return false end
+
+				update_icon("MLX download completion icon reset")
+				-- Flush any remaining buffered output before showing final status
+				if _stream_tail ~= "" and download_window then
+					pcall(download_window.update, _current_pct, _bytes_done, _bytes_total, _stream_tail, _python_file_count)
+					_stream_tail = ""
 				end
 
 				if exit_code == 0 then
@@ -489,32 +584,45 @@ function M.install(ctx)
 							deps.keymap.set_llm_model, target_model)
 					end
 					if not save_prefs("MLX downloaded-model preference save") then return false end
-					obj.start_server(target_model, function()
-						if type(on_success) == "function" then
-							Logger.callback(LOG, "MLX download success", on_success)
-						end
-					end)
+					if not current_or_cancel() then return false end
+					local accepted = obj.start_server(target_model,
+						settle_success, settle_stale, opts)
+					return accepted ~= false
 				else
 					if download_window then pcall(download_window.complete, false, target_model, _saw_gated_error and "gated" or nil) end
 					pcall(notifications.notify, i18n.get("mlx.download_failed"), i18n.get("mlx.download_failed_body"), "error")
+					return false
 				end
 			end
 
 			-- Starts a tail -f task that streams the Python log file back to Lua in real time;
 			-- also polls the exit file every 3 s to catch completion reliably
 			local function start_tail_monitor()
+				if operation_closed then return false end
+				if not still_current() then
+					do_cancel(true, "stale")
+					return false
+				end
 				_tail_task = TaskLifecycle.native("MLX download log tail", "/usr/bin/tail", function()
 					-- Tail exited (killed by do_cancel or process gone) — check exit file
 					hs.timer.doAfter(0.5, function()
+						if operation_closed then return end
+						if not still_current() then
+							do_cancel(true, "stale")
+							return
+						end
 						local ef = io.open(_exit_path, "r")
 						if ef then ef:close(); handle_download_done() end
 					end)
 				end, function(_, stdout, stderr)
-					process_stream((stdout or "") .. (stderr or ""))
-					return true
+					return process_stream((stdout or "") .. (stderr or "")) ~= false
 				end, {"-F", "-n", "+1", _log_path})
 
 				if _tail_task then
+					if not still_current() then
+						do_cancel(true, "stale")
+						return false
+					end
 					if deps.active_tasks then deps.active_tasks["download_tail"] = _tail_task end
 					if not TaskLifecycle.start(_tail_task, "MLX download log tail") then
 						if deps.active_tasks then deps.active_tasks["download_tail"] = nil end
@@ -524,6 +632,11 @@ function M.install(ctx)
 
 				-- Periodic poll: tail can miss the very last flush before Python exits
 				local function poll_exit()
+					if operation_closed then return end
+					if not still_current() then
+						do_cancel(true, "stale")
+						return
+					end
 					if not _dl_pid then return end
 					local ef = io.open(_exit_path, "r")
 					if ef then ef:close(); handle_download_done()
@@ -531,12 +644,21 @@ function M.install(ctx)
 				end
 				hs.timer.doAfter(3, poll_exit)
 				hs.timer.doAfter(30, check_timeout)
+				return true
 			end
 
 			-- Short-lived launcher: resolves Python, installs deps, cleans stale cache, then
 			-- exits after spawning the detached Python process and printing its PID
-			local launcher_task = TaskLifecycle.native("MLX detached download launcher", script_path, function(code, stdout, stderr)
-				if deps.active_tasks then deps.active_tasks["download"] = nil end
+			if not current_or_cancel() then return false end
+			launcher_task = TaskLifecycle.native("MLX detached download launcher", script_path, function(code, stdout, stderr)
+				if deps.active_tasks and deps.active_tasks["download"] == launcher_task then
+					deps.active_tasks["download"] = nil
+				end
+				if operation_closed then return end
+				if not still_current() then
+					do_cancel(true, "stale")
+					return
+				end
 				-- stdout/stderr are empty when a streaming callback is active — _dl_pid was already
 				-- set by the streaming callback which received the __DLPID__ sentinel
 				if not _dl_pid or code ~= 0 then
@@ -544,10 +666,16 @@ function M.install(ctx)
 					update_icon("MLX launcher-failure icon reset")
 					if download_window then pcall(download_window.complete, false, target_model) end
 					pcall(notifications.notify, i18n.get("mlx.launcher_failed"), string.format(i18n.get("mlx.launcher_failed_body"), code), "error")
+					do_cancel(true, "launcher_failed")
 					return
 				end
 				start_tail_monitor()
 			end, function(_, stdout, stderr)
+				if operation_closed then return false end
+				if not still_current() then
+					do_cancel(true, "stale")
+					return false
+				end
 				local out = (stdout or "") .. (stderr or "")
 				-- Parse __DLPID__ here — completion callback gets empty strings when streaming is active
 				if not _dl_pid then
@@ -572,30 +700,41 @@ function M.install(ctx)
 				end
 				-- Strip the sentinel line before forwarding to the download window log
 				local clean = out:gsub("__DLPID__:%d+\n?", "")
-				process_stream(clean)
-				return true
+				return process_stream(clean) ~= false
 			end)
 
 			if launcher_task then
+				if not current_or_cancel() then return false end
 				if deps.active_tasks then deps.active_tasks["download"] = launcher_task end
 				if not TaskLifecycle.start(launcher_task, "MLX detached download launcher") then
-					if deps.active_tasks then deps.active_tasks["download"] = nil end
+					if deps.active_tasks and deps.active_tasks["download"] == launcher_task then
+						deps.active_tasks["download"] = nil
+					end
 					update_icon("MLX launcher-refusal icon reset")
 					if download_window then pcall(download_window.complete, false, target_model) end
 					pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
 						string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
+					do_cancel(true)
+					return
+				end
+				if not still_current() then
+					do_cancel(true, "stale")
+					return false
 				end
 			else
 				update_icon("MLX launcher-construction icon reset")
 				if download_window then pcall(download_window.complete, false, target_model) end
 				pcall(notifications.notify, i18n.get("mlx.launcher_failed"),
 					string.format(i18n.get("mlx.launcher_failed_body"), -1), "error")
+				do_cancel(true)
+				return
 			end
+			return true
 		end
 
 		-- Dependencies are pinned in pyproject.toml and provisioned by
 		-- ensure-mlx-deps.sh on Hammerspoon startup; no runtime upgrade path.
-		_internal_pull()
+		return _internal_pull()
 	end
 
 	--- Reattaches the download UI and log tail to an already-running detached Python download.

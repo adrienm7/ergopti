@@ -4,28 +4,28 @@
 --- MODULE: Regression — models_manager_mlx_server closure-nil forward declarations
 --- DESCRIPTION:
 --- start_server (extracted to models_manager_mlx_server.lua in the models-manager
---- split) has three hs.task sites whose callbacks reference the task handle itself
+--- split) retains two hs.task sites whose callbacks reference the task handle itself
 --- (not a hardcoded string key):
 ---
----   1. sweep    — pre-launch port sweep; callback clears _active_tasks[sweep]
----   2. probe_task — HTTP probe loop; callback clears _active_tasks[probe_task]
----   3. task (mlx-server bash kill) — callback compares
+---   1. probe_task — HTTP probe loop; callback clears _active_tasks[probe_task]
+---   2. task (mlx-server bash kill) — callback compares
 ---      deps.active_tasks["mlx_server"] == task to guard the cleanup
 ---
 --- An inline `local X = <constructor>(...)` form binds _G.X (nil) inside the
---- callback closure. For sweep/probe_task: _active_tasks[nil] = nil → "table
---- index is nil" (swallowed to HS Console). For the bash-kill task: the comparison
+--- callback closure. For probe_task: _active_tasks[nil] = nil → "table index is
+--- nil" (swallowed to HS Console). For the bash-kill task: the comparison
 --- would always be `deps.active_tasks["mlx_server"] == nil`, unconditionally
 --- clearing the active-task slot even when a different MLX process is running.
 ---
---- Fix: forward-declare each handle before TaskLifecycle.native constructs the task.
---- This test pins the ROOT CAUSE for each dangerous site.
+--- The former detached pre-launch sweep was removed because its late broad kill
+--- could terminate the successor. This test pins both the absence of that race
+--- and the ROOT CAUSE at each retained closure site.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-declare their handle", function()
-	-- The three dangerous hs.task sites live inside start_server, which moved to
+helpers.describe("models_manager_mlx: retained task closures own exact handles", function()
+	-- The retained dangerous hs.task sites live inside start_server, which moved to
 	-- the server-lifecycle sibling module during the models-manager split.
 	--
 	-- Selected by a function declaration unique to that production module rather
@@ -37,29 +37,26 @@ helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-d
 	end
 
 
-	-- ===== Site 1: sweep =====
+	-- ===== Removed site: detached pre-launch sweep =====
 
-	helpers.it("sweep handle is forward-declared before the constructor closure", function()
+	helpers.it("(HS-007-no-detached-prelaunch-sweep) has no detached pre-launch sweep", function()
 		local src = read_src()
-		local decl_pos = src:find("local sweep\n", 1, true)
-		local new_pos  = src:find("sweep = TaskLifecycle.native", 1, true)
-		helpers.assert_true(decl_pos ~= nil, "sweep must be forward-declared as `local sweep`")
-		helpers.assert_true(new_pos  ~= nil,
-			"sweep must be assigned via `sweep = TaskLifecycle.native`")
-		helpers.assert_true(decl_pos < new_pos,
-			"forward declaration must precede the constructor closure so the callback captures the upvalue")
-	end)
-
-	helpers.it("sweep GC-pin release is guarded against nil sweep", function()
-		local src = read_src()
-		helpers.assert_true(
-			src:find("if sweep then _active_tasks[sweep] = nil end", 1, true) ~= nil,
-			"sweep callback must guard the GC-pin clear with `if sweep then` "
-			.. "(_active_tasks[nil] = nil raises 'table index is nil')")
+		local native_labels = {}
+		for label in src:gmatch('TaskLifecycle%.native%("([^"]+)"') do
+			native_labels[#native_labels + 1] = label
+		end
+		helpers.assert_eq(native_labels, {"MLX readiness probe", "MLX server launch"},
+			"start_server may own only its readiness probe and exact server launcher")
+		helpers.assert_nil(src:find('TaskLifecycle.native("MLX pre-launch port sweep"', 1, true),
+			"a pre-launch cleanup must not run as a detached task that can kill its successor")
+		helpers.assert_nil(src:find("sweep = TaskLifecycle.native", 1, true),
+			"the removed detached sweep constructor must not return under another comment")
+		helpers.assert_nil(src:find("_active_tasks[sweep]", 1, true),
+			"the removed sweep must not retain an independently scheduled GC owner")
 	end)
 
 
-	-- ===== Site 2: probe_task =====
+	-- ===== Site 1: probe_task =====
 
 	helpers.it("probe_task handle is forward-declared before the constructor closure", function()
 		local src = read_src()
@@ -80,9 +77,9 @@ helpers.describe("models_manager_mlx: three dangerous hs.task closures forward-d
 	end)
 
 
-	-- ===== Site 3: task (mlx-server bash kill) =====
+	-- ===== Site 2: task (mlx-server bash kill) =====
 
-	helpers.it("mlx-server bash-kill task handle is forward-declared before the hs.task.new closure", function()
+	helpers.it("mlx-server bash-kill task handle is forward-declared before the native constructor", function()
 		local src = read_src()
 		-- Anchor on the unique sentinel that only appears in this scope
 		local anchor = src:find('deps.active_tasks["mlx_server"] == task', 1, true)

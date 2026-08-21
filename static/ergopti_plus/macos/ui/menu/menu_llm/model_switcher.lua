@@ -272,6 +272,7 @@ function M.new(ctx)
 		local my_token = req_token
 		local request_backend = state.llm_backend
 		local request_pause_epoch = pause_epoch()
+		local terminal_sent = false
 		local function stale_reason()
 			if state.llm_backend ~= request_backend then return "backend" end
 			if my_token ~= req_token then return "request" end
@@ -286,6 +287,13 @@ function M.new(ctx)
 		guarded_opts.is_current = function()
 			return stale_reason() == nil
 		end
+		local function settle_requirements(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = Logger.callback(LOG, label, callback, ...)
+			return ok and result ~= false
+		end
 		local check_ok, accepted = Logger.callback(LOG, "Model requirements dispatch",
 			models_mgr.check_requirements, model_name,
 			function(...)
@@ -296,18 +304,14 @@ function M.new(ctx)
 						tostring(reason), tostring(model_name), tostring(request_backend),
 						tostring(state.llm_backend)))
 					if type(on_stale) == "function" then
-						local ok, result = Logger.callback(LOG,
-							"Stale model-success continuation", on_stale, reason)
-						return ok and result ~= false
+						return settle_requirements(on_stale,
+							"Stale model-success continuation", reason)
 					end
+					terminal_sent = true
 					return false
 				end
-				if type(on_ok) == "function" then
-					local ok, result = Logger.callback(LOG,
-						"Model requirements success continuation", on_ok, ...)
-					return ok and result ~= false
-				end
-				return true
+				return settle_requirements(on_ok,
+					"Model requirements success continuation", ...)
 			end,
 			function(...)
 				local reason = stale_reason()
@@ -317,24 +321,18 @@ function M.new(ctx)
 						tostring(reason), tostring(model_name), tostring(request_backend),
 						tostring(state.llm_backend)))
 					if type(on_stale) == "function" then
-						local ok, result = Logger.callback(LOG,
-							"Stale model-failure continuation", on_stale, reason)
-						return ok and result ~= false
+						return settle_requirements(on_stale,
+							"Stale model-failure continuation", reason)
 					end
+					terminal_sent = true
 					return false
 				end
-				if type(on_fail) == "function" then
-					local ok, result = Logger.callback(LOG,
-						"Model requirements failure continuation", on_fail, ...)
-					return ok and result ~= false
-				end
-				return true
+				return settle_requirements(on_fail,
+					"Model requirements failure continuation", ...)
 			end,
 			guarded_opts)
 		if not check_ok or accepted == false then
-			if type(on_fail) == "function" then
-				Logger.callback(LOG, "Model requirements dispatch failure", on_fail)
-			end
+			settle_requirements(on_fail, "Model requirements dispatch failure")
 			return false
 		end
 		return true

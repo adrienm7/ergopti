@@ -316,7 +316,7 @@ helpers.describe("LLM orchestration: queued waiters use the visible callback con
 	end)
 
 	helpers.it("recognises the MLX server's local xpcall as an owned logged boundary", function()
-		local src, err = helpers.read_driver_unit("MLX pre-launch port sweep completion")
+		local src, err = helpers.read_driver_unit("Async callback '%s' raised")
 		helpers.assert_true(src ~= nil,
 			"MLX async callback owner must be reachable: " .. tostring(err))
 		local owner_at = src:find("local function run_async_callback", 1, true)

@@ -51,7 +51,7 @@ This register is updated in the same commit as each completed fix. The worktree 
 - [x] `HS-004` — `5e12271b1` (`fix(macos): defer keylogger persistence off eventtaps`)
 - [x] `HS-005` — `5ca12305c` (`fix(macos): route repeat through replacement transaction`)
 - [x] `HS-006` — `477cec849` (`fix(macos): count dynamic suffixes as codepoints`)
-- [ ] `HS-007` — manager-side generation fence and exactly-once stale terminal
+- [x] `HS-007` — manager-side generation fence and exactly-once stale terminal — fixed and behaviorally replayed in this commit
 - [ ] `HS-008` — exact MLX predecessor/replacement ownership
 - [x] `HS-009` — `2cdf06f89` (`fix(macos): isolate semantic LLM HTTP owners`)
 - [ ] `HS-010` — exact Ollama pull owner and cancel terminal
@@ -206,26 +206,28 @@ The Ollama sibling has the same fence placement. Select absent A then installed 
 
 **Regression test.** Add `tests/unit/ui/menu/menu_llm/test_model_switcher_manager_generation.lua`. Defer real manager task completions; run MLX A→B, finish B then A, and assert no `start_server(A)`, no B termination, and B remains current. Repeat with Ollama absent A/installed B and assert zero A prompt, pull, runtime publication, or persistence.
 
-### `HS-008` — MLX replacement starts a successor before exact teardown and broad cleanup settle
+**Implemented and independently replayed.** The switcher-owned predicate and one-shot stale terminal now flow through the real MLX and Ollama task, timer, HTTP, prompt, download, server-adoption, readiness, and publication continuations. Every destructive commit rechecks exact authority. The detached MLX pre-launch sweep was removed; the serial launcher is now the sole cleanup/start owner. The existing Ollama pull-slot guard remains ahead of UI and native-task construction. With only the six production files reverted, `lua tests/run.lua --only HS-007` exited `1` on the stale prompt/readiness/download/Ollama publication reproductions; after restoration it passed `11/11`. This checkbox does **not** close the exact replacement/cancel/pause/download-terminal work tracked separately by `HS-008`, `HS-010`, `HS-012`, `HS-024`, `HS-025`, or `HS-027`.
+
+### `HS-008` — MLX replacement drops its predecessor before exact teardown settles
 
 - **Severity:** High
 - **Confidence:** High
 - **Guarantees:** `G1`, `G2`, `G3`
 - **Source:** `ui/menu/menu_llm/models_manager_mlx_server.lua:141-175`, `ui/menu/menu_llm/models_manager_mlx_server.lua:212-249`, `ui/menu/menu_llm/models_manager.lua:551-563`, `ui/menu/menu_llm/backend_panel.lua:165-223`, `ui/menu/menu_llm/init.lua:189-197`, `ui/menu/menu_llm/init.lua:665-680`
 
-**Reproduction.** With server A active, make its task’s `terminate()` throw or return false, then select B. The code clears the active slot and proceeds to B. Independently, delay the fire-and-forget `ps/lsof ... kill -9` sweep until B appears; the broad filter can select and kill the successor it was supposed to protect.
+**Reproduction.** With server A active, make its task’s `terminate()` throw or return false, then select B. The code clears the active slot and proceeds to B. A native-shaped successful `terminate()` returns the task userdata rather than literal `true`, so the current literal-boolean check can also reject a valid termination request while leaving the replacement transaction unsettled.
 
 The public stop sibling has the same ownership loss: call `stop_mlx_server_if_needed()` with an active task whose `terminate()` throws or returns false. The function unconditionally clears `active_tasks["mlx_server"]`, resets endpoint identity, and logs “stopped safely,” so the still-live exact server can no longer be retried through that owner.
 
 The callers defeat a local stop fix unless they join the same transaction. Switching MLX to API/Ollama publishes and persists the new backend before discarding the stop result; the API path has no MLX hard-kill backstop. Changing the MLX port similarly signals stop and immediately rechecks the same model. Because the server identity does not include the port and teardown is not settled, the old server can be reused on the old port while runtime settings point to the new one. `M.stop_mlx_server()` also discards the stop result and returns `nil`, allowing shutdown to report settlement without it.
 
-**Root cause and silence.** A signal request is treated as settlement, its result is discarded, the exact task handle is dropped, and the global sweep is not serialized with launch or scoped to an operation identity.
+**Root cause and silence.** A signal request is treated as settlement, its native return shape is misclassified, its result is discarded by sibling callers, and the exact task handle is dropped before completion.
 
-**Existing test/backstop checked.** `test_mlx_server_readiness_is_shared.lua` uses always-successful termination. `test_mlx_stop_clears_readiness.lua` is source-only. `test_models_manager_mlx_adopt.lua` counts relaunches but does not order sweep completion before launch. `test_backend_panel_save_gate.lua` replaces the public stop method with a counter and cannot represent refusal.
+**Existing test/backstop checked.** `test_mlx_server_readiness_is_shared.lua` uses always-successful termination. `test_mlx_stop_clears_readiness.lua` is source-only. `test_backend_panel_save_gate.lua` replaces the public stop method with a counter and cannot represent refusal. `HS-007` removed the independent fire-and-forget pre-launch sweep and added a negative inventory test, so that former sibling race is closed rather than carried by this finding.
 
-**Fix.** Make replacement, public stop, backend switch, port restart, and shutdown share one exact settlement primitive: retain A until confirmed stopped, accept native task userdata as a termination signal but not as settlement, and launch/publish the successor only from A's exact completion. Include port in the server identity, propagate stop refusal to callers, and prefer exact PID/process-group ownership over a broad post-hoc sweep.
+**Fix.** Make replacement, public stop, backend switch, port restart, and shutdown share one exact settlement primitive: retain A until confirmed stopped, accept native task userdata as a termination signal but not as settlement, and launch/publish the successor only from A's exact completion. Include port in the server identity and propagate stop refusal to callers.
 
-**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_mlx_server_replacement_transaction.lua`. For throw/false/native-self terminate through replacement, public stop, backend switch, port edit, and shutdown, assert no successor/publication, no false success log, and unchanged exact owner. Accepted termination must retain A until its callback, then launch the latest model/port successor exactly once. A delayed old sweep must be unable to enumerate or kill that successor.
+**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_mlx_server_replacement_transaction.lua`. For throw/false/native-self terminate through replacement, public stop, backend switch, port edit, and shutdown, assert no successor/publication, no false success log, and unchanged exact owner. Accepted termination must retain A until its callback, then launch the latest model/port successor exactly once. Preserve the `HS-007` negative invariant that no independent pre-launch sweep exists.
 
 ### `HS-009` — Single-slot HTTP clients silently cancel independent semantic operations
 
@@ -246,23 +248,23 @@ The callers defeat a local stop fix unless they join the same transaction. Switc
 
 **Regression test.** Add `tests/unit/modules/llm/test_semantic_http_owner_isolation.lua`. For Ollama, start non-stream inference then profile-restore warmup and assert inference terminates exactly once without being silently canceled. For Remote, start validation then warmup, deliver both out of order, and assert validation commits/rolls back and releases the mutation lease independently.
 
-### `HS-010` — Ollama pulls overwrite a single global owner slot
+### `HS-010` — Ollama pull cancellation has no exact owner settlement or terminal
 
 - **Severity:** High
 - **Confidence:** High
 - **Guarantees:** `G2`, `G3`
 - **Source:** `ui/menu/menu_llm/models_manager_ollama.lua:319-420`, `ui/menu/menu_llm/models_selector.lua:281-299`
-- **Recent-fix sibling omitted:** `ffd7ec2a2`
+- **Recent-fix blind spot:** the single-slot guard exists, but its tests do not exercise cancellation refusal, native return shape, or terminal completion
 
-**Reproduction.** Start pulling absent model A, reopen the tray, and start B. The selector disables rows only for pause, and `pull_model` has no entry guard. B overwrites `active_tasks["ollama_pull"]`; cancel reaches only B. A’s later callback unconditionally clears the slot and can publish A into runtime/preferences despite a newer outer selection. Independently, cancel A while its exact `terminate()` throws/returns false, or returns the native task userdata but has not completed. The current helper drops or prematurely settles the slot; if A later reports exit `0`, it can still publish the model after the UI and outer request already reported cancellation.
+**Reproduction.** Start pulling absent model A, then click Cancel while its exact `terminate()` throws/returns false, or returns the native task userdata but has not completed. The UI callback reports acceptance without checking the signal result and there is no durable exact cancellation owner. When A later completes, the callback clears the slot and the `user_cancelled` branch returns without delivering the required failure/cancel terminal. Before the `HS-007` generation checks, an exit `0` could also publish after cancellation; that late publication is now fenced, but ownership and terminal settlement remain open.
 
-**Root cause and silence.** Two native tasks are represented by one unguarded mutable slot; callbacks do not compare the exact task or an operation token before clearing/publishing. Cancellation has no durable `cancel_requested` owner state and confuses a truthy termination signal with process settlement.
+**Root cause and silence.** Cancellation has no durable `{task, cancel_requested, terminal}` owner, discards throw/false/native-self termination semantics, and treats the eventual exact callback as a silent early return instead of settlement. The slot itself is guarded against concurrent entry and callbacks compare the exact task; the earlier no-entry-guard subclaim is refuted below.
 
-**Existing test/backstop checked.** `test_mlx_download_single_slot.lua` encodes the same invariant for MLX only. The Ollama forward-declaration test checks lexical scope, not concurrent ownership.
+**Existing test/backstop checked.** The production guard at `models_manager_ollama.lua:415-421` rejects a second pull before UI/native construction, and the exact callback check at `:451-454` prevents a stale task from clearing a successor. No behavioral test covers terminate throw/false/native-self, retained cancellation ownership, or exactly-once terminal delivery.
 
 **Fix.** Use a pull owner `{task, generation, cancel_requested, terminal}`. Refuse or join re-entry while it owns the slot, mark cancellation before signaling the native task, accept a truthy task userdata only as signal acceptance, retain ownership until the exact callback, and compare owner/token before every clear or publication.
 
-**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_ollama_download_single_slot.lua`. Start A then B; assert B is rejected and A remains the exact owner. Table-drive `terminate()` throw, false, and native-shaped `return self`; accepted cancellation retains A until its callback. Deliver late exit `0` after cancel and assert zero model/runtime/persistence publication. A stale completion must not clear or mutate a successor; include the idle positive control.
+**Regression test.** Add `tests/unit/ui/menu/menu_llm/test_ollama_download_single_slot.lua`. Preserve the existing A-then-B rejection and exact-owner assertion. Table-drive `terminate()` throw, false, and native-shaped `return self`; accepted cancellation retains A until its callback and delivers one terminal. Deliver late exit `0` after cancel and assert zero model/runtime/persistence publication. A stale completion must not clear or mutate a successor; include the idle positive control.
 
 ### `HS-011` — Onboarding installer tasks survive pause, disable, and stop
 
@@ -621,6 +623,7 @@ The following claims were actively investigated and rejected:
 18. **“Reload and quit still indiscriminately kill Karabiner processes.”** Refuted. Current exact token/lease isolation owns Ergopti state only. Older sentinel wording in project memory is documentation drift.
 19. **“A native eventtap `stop()` refusal creates a separate demonstrated leak.”** Not promoted: no distinct valid native refusal contract or reproduction was established beyond already-owned watchdog paths.
 20. **“A buffered live launcher ACK can currently outrank inner HUP or parent STOP/EOF.”** Refuted for stock paths. `RemapLeaseWorker.swift:2186-2281` processes terminal parent state before inner progress, and `:2432-2500` rechecks both guardian and private transport immediately before publishing a live ACK. `testPublicTerminalBatchNeverForwardsBufferedPause`, `testInnerHUPOutranksBufferedReadyAcknowledgement`, and `testParentEOFAfterPublicPingOutranksItsLatePong` are behavioral counterexamples. The idempotent-wire-command seam listed under suspected claims is narrower and not reachable through the stock Lua controller.
+21. **“Ollama pull B can overwrite active pull A because there is no entry guard.”** Refuted on the implementation audited for this fix. `models_manager_ollama.lua` rejects a second pull while `active_tasks["ollama_pull"]` is owned and its completion compares the exact task before clearing the slot. `test_model_switcher_manager_generation.lua` now drives two dispatches and preserves the first native handle. `HS-010` remains confirmed for cancellation refusal/native-return/terminal settlement, not concurrent slot overwrite.
 
 ## 4. Performance
 
@@ -699,7 +702,7 @@ Recent-fix collateral checked:
 - `dafbcb591e` strengthened lifecycle/timer ownership tests but missed sibling native watcher acquisition and refusal shapes (`HS-001`).
 - `ba681d500f` connected the script-control extras path but retained silent `pcall` (`HS-016`).
 - `3e50bb392` / `37da444bd` fenced the outer MLX switch without passing identity below destructive manager effects (`HS-007`).
-- `ffd7ec2a2` added single-slot ownership for MLX downloads but omitted the Ollama sibling (`HS-010`).
+- `ffd7ec2a2` added MLX download slot ownership with manager-only coverage. The current Ollama path also has an entry guard; `HS-010` is the narrower cancellation/terminal blind spot, while `HS-024` is the MLX outer-lock/late-completion blind spot.
 
 ## 6. Coverage register and loop-until-dry
 
