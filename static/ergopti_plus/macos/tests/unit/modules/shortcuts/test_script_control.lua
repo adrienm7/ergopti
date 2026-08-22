@@ -851,22 +851,11 @@ helpers.describe("ScriptControl: the extras table is actually reachable", functi
 	end)
 
 	helpers.it("the central dispatcher reports whether it handled the action", function()
-		local src = helpers.read_driver_source("function M.execute_single")
-		helpers.assert_true(type(src) == "string" and src ~= "",
-			"the actions source must be readable or this invariant asserts nothing")
-		-- Bound to execute_single's exact body: fixed byte windows became false-red
-		-- when lifecycle comments grew even though the return contract was unchanged.
-		local at = src:find("function M.execute_single", 1, true)
-		helpers.assert_true(at ~= nil, "execute_single must exist")
-		local next_function = src:find("function M.execute_axis", at, true)
-		helpers.assert_true(next_function ~= nil,
-			"execute_single must be bounded by the following execute_axis declaration")
-		local body = src:sub(at, next_function - 1)
-		helpers.assert_true(body:find("return false", 1, true) ~= nil,
-			"execute_single must report an unknown action instead of returning nil for both "
-			.. "outcomes; without that signal the caller cannot know when to try its fallback")
-		helpers.assert_true(body:find("return ok == true", 1, true) ~= nil,
-			"and it must report the handled case too, or the fallback fires after a success")
+		local actions = helpers.load_with_stubs("modules.gestures.actions")
+		helpers.assert_eq(actions.execute_single("none"), true,
+			"a registered action must report that the central dispatcher owns it")
+		helpers.assert_eq(actions.execute_single("__script_control_unknown_action__"), false,
+			"an unknown action must let ScriptControl try its extras fallback")
 	end)
 
 end)

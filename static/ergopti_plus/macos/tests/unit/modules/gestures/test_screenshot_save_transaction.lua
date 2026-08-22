@@ -306,7 +306,7 @@ end)
 -- ==========================================
 
 helpers.describe("gesture screenshot entry point (HS-015)", function()
-	helpers.it("propagates the shared save transaction result (HS-015)", function()
+	helpers.it("owns the registered action when the shared save transaction refuses (HS-015)", function()
 		local saved_actions = package.loaded["modules.gestures.actions"]
 		local saved_screenshot = package.loaded["modules.shortcuts.actions.screenshot_save"]
 		local saved_hs = _G.hs
@@ -321,8 +321,8 @@ helpers.describe("gesture screenshot entry point (HS-015)", function()
 
 		local ok, err = xpcall(function()
 			local actions = helpers.load_with_stubs("modules.gestures.actions")
-			helpers.assert_eq(actions.execute_single("screenshot_fullscreen_save"), false,
-				"a shared transaction refusal must not be promoted to gesture success")
+			helpers.assert_eq(actions.execute_single("screenshot_fullscreen_save"), true,
+				"the registered gesture remains owned after its shared transaction refuses")
 			helpers.assert_eq(#calls, 1)
 			helpers.assert_eq(#calls[1].flags, 0)
 			helpers.assert_eq(calls[1].prefix, "full")

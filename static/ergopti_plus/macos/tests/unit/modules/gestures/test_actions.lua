@@ -344,12 +344,15 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
 
 		-- 'lookup' owns a local acquisition boundary because direct API callers use it
-		-- too. The outer Logger callback still has to receive a literal refusal while
-		-- the inner boundary leaves the original traceback in the shared file log.
+		-- too. That direct boundary reports the operational refusal, while the gesture
+		-- dispatcher still owns its registered action and must not fall through to a
+		-- second provider after the callback returns normally.
+		helpers.assert_eq(Actions2.trigger_lookup(), false,
+			"the direct lookup boundary must expose its acquisition refusal")
 		local ok, result = pcall(Actions2.execute_single, "lookup")
 		helpers.assert_true(ok, "execute_single itself must never raise across the lookup owner boundary")
-		helpers.assert_eq(result, false,
-			"a contained exception must be returned as an explicit dispatch refusal")
+		helpers.assert_eq(result, true,
+			"a registered action remains owned after its contained operation refuses")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false
@@ -363,6 +366,30 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 		end
 		helpers.assert_true(found_error,
 			"a throwing acquisition must leave an ERROR-level Logger trace")
+	end)
+
+	helpers.it("execute_single refuses a registered callback that raises", function()
+		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
+
+		-- Unlike lookup, line_up has no inner containment boundary. Its auxiliary
+		-- acquisition reaches Logger.callback as an exception, so the registered
+		-- dispatch itself did not complete and must be reported as refused.
+		local ok, result = pcall(Actions2.execute_single, "line_up")
+		helpers.assert_true(ok, "execute_single must contain a throwing registered callback")
+		helpers.assert_eq(result, false,
+			"a callback that raises through Logger.callback must refuse the dispatch")
+
+		local found_error = false
+		for _, line in ipairs(FreshLogger.ring_buffer_snapshot()) do
+			if line:find("[ERROR]", 1, true)
+				and line:find("Gesture action 'line_up'", 1, true)
+				and line:find("boom: injected", 1, true)
+				and line:find("stack traceback", 1, true) then
+				found_error = true
+			end
+		end
+		helpers.assert_true(found_error,
+			"the throwing single action must preserve its contextual traceback")
 	end)
 
 	helpers.it("execute_axis logs an ERROR when the dispatched axis action throws ('lines' via its auxiliary timer)", function()
