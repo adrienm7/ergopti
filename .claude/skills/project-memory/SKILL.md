@@ -1,6 +1,6 @@
 ---
 name: project-memory
-description: How to consult and extend the routed docs/project-memory catalog without loading unrelated context. Use before non-trivial work in an unfamiliar area, and after learning something non-obvious about this codebase.
+description: Consult or maintain routed project memory without loading unrelated topics. Use for unfamiliar work or durable repository discoveries.
 ---
 
 # Project memory

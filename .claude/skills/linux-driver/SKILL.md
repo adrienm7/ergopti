@@ -1,3 +1,8 @@
+---
+name: linux-driver
+description: Apply the Linux driver's LuaJIT, evdev, ydotool, and kanata invariants. Use when writing, editing, or reviewing the Linux driver.
+---
+
 # Linux driver foot-guns
 
 Style rules live in `.github/copilot-instructions.md`. This file covers what has

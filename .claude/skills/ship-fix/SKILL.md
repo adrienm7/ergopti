@@ -1,6 +1,6 @@
 ---
 name: ship-fix
-description: The end-to-end protocol for fixing a bug in this repo — consult PROJECT_MEMORY, fix the root cause rather than the symptom, ship a regression test that encodes that root cause, run the full local gate, and commit one fix per commit without pushing. Use whenever fixing a bug, acting on an error report, or implementing a correction the user asked for.
+description: Fix a bug from root cause through regression proof and local commit. Use for error reports and requested corrections.
 ---
 
 # Shipping a fix

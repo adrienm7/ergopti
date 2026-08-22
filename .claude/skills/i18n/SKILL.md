@@ -1,6 +1,6 @@
 ---
 name: i18n
-description: Adding or changing user-facing text — never hardcode a string, add the key to the canonical en.json then all 21 locales, and run the parity checks. Use when touching any UI label, dialog, menu entry, tooltip, onboarding step or message the user reads.
+description: Add or change localized user-facing text across every locale. Use for UI labels, dialogs, menus, tooltips, onboarding, or messages.
 ---
 
 # User-facing text

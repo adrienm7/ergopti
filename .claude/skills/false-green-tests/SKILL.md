@@ -1,10 +1,6 @@
 ---
 name: false-green-tests
-description: Finding tests that cannot fail — the six patterns (tautology, vacuous absence assertion, unregistered test, stub short-circuit, pcall-only, spelling-pinned grep), the measured scoreboard, and the ratchet that stops the count growing. Use when auditing the suite, or whenever a test passes and you are not sure it could ever fail.
----
----
-name: false-green-tests
-description: How to hunt tests that cannot fail — the six shapes they take in this repo, the ones a tool can find and the two only a human can. Use before trusting a green suite, when writing a regression test, and during any audit or review of test code.
+description: Find tests that cannot fail and apply the false-green ratchet. Use for test audits or doubtful passing tests.
 ---
 
 # Tests that cannot fail

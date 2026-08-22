@@ -1,6 +1,6 @@
 ---
 name: ahk-driver
-description: AutoHotkey v2 foot-guns and invariants for the Windows driver (static/ergopti_plus/windows) — file encoding, backtick escapes, Map access that throws, IsSet on pre-pump globals, #Include load-order semantics, load-time hotkey registration, and A_IsSuspended guards. Use when writing, editing or reviewing any .ahk file.
+description: Apply the Windows driver's AutoHotkey v2 invariants. Use when writing, editing, or reviewing any .ahk file.
 ---
 
 # AutoHotkey v2 foot-guns

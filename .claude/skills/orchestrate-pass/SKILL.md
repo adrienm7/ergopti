@@ -1,6 +1,6 @@
 ---
 name: orchestrate-pass
-description: Running a multi-agent pass on this repo — scout before you fan out, feed agents the already-rejected list or they re-propose it, verify findings with two independent lenses, and keep implementation sequential. Use when a task is too broad for one context.
+description: Orchestrate a bounded multi-agent pass with independent verification. Use when one context cannot cover the task safely.
 ---
 
 # Running a multi-agent pass
