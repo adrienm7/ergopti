@@ -161,7 +161,10 @@ local suppress_calls = {}
 local core_state = {
 	mappings = {},
 	DELAYS   = { llm_prediction = 0 },
-	suppress_rescan_keep_buffer = function(sec) suppress_calls[#suppress_calls + 1] = sec end,
+	suppress_rescan_keep_buffer = function(sec)
+		suppress_calls[#suppress_calls + 1] = sec
+		return true
+	end,
 }
 
 

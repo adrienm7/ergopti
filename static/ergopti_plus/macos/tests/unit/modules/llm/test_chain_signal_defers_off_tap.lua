@@ -115,7 +115,7 @@ helpers.describe("F16 chain signal defers the LLM check off the event tap", func
 			buffer   = "hello wor",
 			mappings = {},
 			DELAYS   = { llm_prediction = 0 },
-			suppress_rescan_keep_buffer = function() end,
+			suppress_rescan_keep_buffer = function() return true end,
 		})
 		PE.arm_chain()
 
@@ -199,7 +199,7 @@ helpers.describe("F16 chain signal defers the LLM check off the event tap", func
 				buffer = "hello wor",
 				mappings = {},
 				DELAYS = { llm_prediction = 0 },
-				suppress_rescan_keep_buffer = function() end,
+				suppress_rescan_keep_buffer = function() return true end,
 			})
 			helpers.assert_eq(PE.arm_chain(), true)
 			local fallback = hs.timer.__timers[#hs.timer.__timers]
