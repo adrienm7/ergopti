@@ -12,6 +12,7 @@ local helpers = require("tests.helpers")
 
 
 local function fresh_screenshot()
+	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.shortcuts.actions.screenshot_save",
 		"adapters.shell_runner",
@@ -123,6 +124,7 @@ local function fresh_screenshot()
 	}
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	fixture.subject = require("modules.shortcuts.actions.screenshot_save")
+	package.loaded["adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 

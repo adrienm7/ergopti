@@ -21,6 +21,7 @@ end
 
 
 local function fresh_apps()
+	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps",
 		"adapters.timer_scheduler",
@@ -263,6 +264,7 @@ local function fresh_apps()
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.apps"] = nil
 	fixture.subject = require("modules.shortcuts.actions.apps")
+	package.loaded["adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 

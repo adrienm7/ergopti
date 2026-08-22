@@ -45,6 +45,7 @@ end
 
 local function with_fixture(callback)
 	local saved_hs = _G.hs
+	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(OWNED_MODULES, function()
 			package.loaded["tests.stubs.hs"] = nil
@@ -477,6 +478,7 @@ local function with_fixture(callback)
 		end)
 	end, debug.traceback))
 	_G.hs = saved_hs
+	package.loaded["adapters.shell_runner"] = saved_shell_runner
 	if not outcome[1] then error(outcome[2], 0) end
 end
 

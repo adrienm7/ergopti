@@ -12,6 +12,7 @@ local helpers = require("tests.helpers")
 
 
 local function fresh_owner()
+	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.gestures.actions_aux_owner",
 		"adapters.timer_scheduler",
@@ -137,6 +138,7 @@ local function fresh_owner()
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["modules.gestures.actions_aux_owner"] = nil
 	fixture.subject = require("modules.gestures.actions_aux_owner")
+	package.loaded["adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 

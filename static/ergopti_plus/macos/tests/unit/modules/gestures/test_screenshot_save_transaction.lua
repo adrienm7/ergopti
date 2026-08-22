@@ -140,6 +140,7 @@ local function with_subject(options, scenario)
 
 	_G.hs = saved_hs
 	for _, name in ipairs(SUBJECT_MODULES) do package.loaded[name] = saved[name] end
+	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 
