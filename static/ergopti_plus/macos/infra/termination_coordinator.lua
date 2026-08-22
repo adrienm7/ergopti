@@ -426,7 +426,7 @@ local function finish_transaction(transaction, fenced, detail)
 	transaction.completion_ok = begin_input_drain(transaction)
 end
 
-local function request(kind, reason, arguments, exit_code, on_aborted)
+local function request(kind, reason, arguments, exit_code, on_aborted, require_fresh)
 	if not require_state("request_" .. kind) then return false end
 	if type(reason) ~= "string" or reason == "" then
 		Logger.error(LOG, "Controlled %s requires a non-empty reason.", kind)
@@ -434,6 +434,11 @@ local function request(kind, reason, arguments, exit_code, on_aborted)
 	end
 
 	if _transaction and not _transaction.settled then
+		-- An owned reload handoff must never silently join an older terminal
+		-- transition. Its caller has already published reversible state that only
+		-- this exact abort callback can compensate while the Lua environment is
+		-- still live.
+		if require_fresh == true then return false end
 		if kind == "exit" and _transaction.kind == "reload" then
 			if _transaction.reload_marked then
 				local clear_ok, cleared = xpcall(_deps.clear_reload, debug.traceback)
@@ -585,7 +590,23 @@ end
 --- @param ... any Native hs.reload arguments.
 --- @return boolean accepted
 function M.request_reload(reason, ...)
-	return request("reload", reason, table.pack(...), nil, nil)
+	return request("reload", reason, table.pack(...), nil, nil, false)
+end
+
+--- Requests an exclusive reload and transfers one reversible caller owner into
+--- the coordinator. The abort callback runs only while rollback is still safe;
+--- a successful handoff has deliberately no completion callback because
+--- hs.reload may return after the logger and local owners have been finalized.
+--- @param reason string Stable diagnostic reason.
+--- @param on_aborted function Exact pre-fence abort callback.
+--- @param ... any Native hs.reload arguments.
+--- @return boolean accepted
+function M.request_reload_owned(reason, on_aborted, ...)
+	if type(on_aborted) ~= "function" then
+		Logger.error(LOG, "Owned controlled reload requires an abort callback.")
+		return false
+	end
+	return request("reload", reason, table.pack(...), nil, on_aborted, true)
 end
 
 --- Requests process exit only after the exact lease fence settles.
@@ -604,7 +625,7 @@ function M.request_exit(reason, exit_code, on_aborted)
 		Logger.error(LOG, "Controlled exit abort callback must be a function when provided.")
 		return false
 	end
-	return request("exit", reason, table.pack(), exit_code, on_aborted)
+	return request("exit", reason, table.pack(), exit_code, on_aborted, false)
 end
 
 --- Reports whether one exact fence currently owns the terminal transition.
