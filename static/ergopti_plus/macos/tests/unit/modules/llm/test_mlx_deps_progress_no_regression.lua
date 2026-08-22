@@ -18,14 +18,21 @@ local helpers = require("tests.helpers")
 local src = helpers.read_driver_source("local function resolve_bootstrap_script_path")
 helpers.assert_true(src ~= nil, "modules/llm/mlx_deps_checker.lua source must be locatable")
 
--- Locate the MARKER_PROGRESS iteration block.
-local block_pos = src:find("max_pct", 1, true)
+-- Locate the complete MARKER_PROGRESS iteration block by stable statements.
+-- A fixed-width slice became a false negative as lifecycle guards were added.
+local block_pos = src:find("local max_pct = nil", 1, true)
 helpers.assert_true(
 	block_pos ~= nil,
 	"mlx_deps_checker.lua must use a max_pct accumulator in the MARKER_PROGRESS loop (lib-deps-2)"
 )
 
-local block = src:sub(block_pos, block_pos + 400)
+local block_end = block_pos and src:find("\n\t\treturn true", block_pos, true) or nil
+helpers.assert_true(
+	block_end ~= nil,
+	"mlx_deps_checker.lua progress handler must retain a terminal return after marker processing"
+)
+
+local block = src:sub(block_pos, block_end)
 
 -- Test 1: max_pct must be computed as the maximum across all matching markers.
 local has_max_compare = block:find("pct > max_pct", 1, true) ~= nil
@@ -41,16 +48,15 @@ helpers.assert_true(
 	"mlx_deps_checker.lua must call set_progress with max_pct (not inside the loop) (lib-deps-2)"
 )
 
--- Test 3: set_progress must NOT be called inside the pairs() loop.
+-- Test 3: set_progress must remain after the accumulation loop. Ordering the
+-- stable statements avoids guessing where a nested Lua `end` belongs.
 local loop_start = block:find("for marker, pct in pairs", 1, true)
-local loop_end   = block:find("end$", loop_start or 1) or (block:find("\n\t\tif max_pct", 1, true))
-if loop_start and loop_end then
-	local loop_body = block:sub(loop_start, loop_end)
-	local has_call_in_loop = loop_body:find("set_progress", 1, true) ~= nil
-	helpers.assert_true(
-		not has_call_in_loop,
-		"mlx_deps_checker.lua must not call set_progress inside the pairs() loop (lib-deps-2)"
-	)
-end
+local max_guard = block:find("if max_pct and owns_window() then", 1, true)
+local set_progress = block:find("set_progress, max_pct", 1, true)
+helpers.assert_true(
+	loop_start ~= nil and max_guard ~= nil and set_progress ~= nil
+		and loop_start < max_guard and max_guard < set_progress,
+	"mlx_deps_checker.lua must call set_progress only after the marker accumulation loop (lib-deps-2)"
+)
 
 print("[PASS] test_mlx_deps_progress_no_regression")
