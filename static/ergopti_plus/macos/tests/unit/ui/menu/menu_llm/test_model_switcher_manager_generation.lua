@@ -246,7 +246,7 @@ helpers.describe("model manager generation fences", function()
 						prediction_states[#prediction_states + 1] = enabled
 						return true
 					end,
-					set_llm_model = function() end,
+					set_llm_model = function() return true end,
 					set_llm_display_model_name = function() end,
 				},
 				save_prefs = function() return true end,
@@ -462,6 +462,7 @@ helpers.describe("model manager generation fences", function()
 					end,
 					set_llm_model = function(model)
 						runtime_models[#runtime_models + 1] = model
+						return true
 					end,
 					set_llm_display_model_name = function() end,
 				},
@@ -817,10 +818,15 @@ helpers.describe("model manager generation fences", function()
 				package.loaded["adapters.task_lifecycle"] = {
 					native = function(label, _, on_done, on_stream)
 						local task = {
-							label = label, on_done = on_done, on_stream = on_stream,
-							terminate_calls = 0,
+							label = label, on_stream = on_stream,
+							terminate_calls = 0, running = false,
 						}
-						function task:start() return true end
+						function task.on_done(...)
+							task.running = false
+							return on_done(...)
+						end
+						function task:start() self.running = true; return true end
+						function task:isRunning() return self.running end
 						function task:terminate()
 							self.terminate_calls = self.terminate_calls + 1
 							return true

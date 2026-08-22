@@ -1132,7 +1132,7 @@ helpers.describe("HS-033 profile deletion transaction", function()
 			end)
 	end)
 
-	for _, outcome in ipairs({"false", "throw"}) do
+	for _, outcome in ipairs({"false", "nil", "throw"}) do
 		helpers.it("HS-033 Delete restores every boundary after menu " .. outcome, function()
 			with_delete_fixture({active_profile = "basic"}, function(fixture, delete_action, old_handle)
 				local old_profiles = fixture.state.llm_user_profiles
@@ -1156,7 +1156,7 @@ helpers.describe("HS-033 profile deletion transaction", function()
 	helpers.it("HS-033 Delete commits fallback, registry, shortcut, and exact release once", function()
 		with_delete_fixture({active_profile = "user_p", real_switcher = true}, function(fixture, delete_action, old_handle)
 			fixture.plan_save({"ok"})
-			fixture.plan_menu({"nil"})
+			fixture.plan_menu({"ok"})
 
 			local result = delete_action()
 			helpers.assert_eq(fixture.state.llm_active_profile, "basic")
