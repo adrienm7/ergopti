@@ -490,6 +490,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 		body(require("modules.llm.api_remote"), fixture)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
 	if not ok then error(err) end
 end
 

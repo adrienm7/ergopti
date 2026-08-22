@@ -35,6 +35,7 @@ local helpers = require("tests.helpers")
 --- @param callback function Fixture body.
 local function with_fixture(module_names, hs_fixture, callback)
 	local saved_hs = _G.hs
+	local saved_shell_runner = package.loaded["adapters.shell_runner"]
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(module_names, function()
 			_G.hs = hs_fixture
@@ -43,6 +44,7 @@ local function with_fixture(module_names, hs_fixture, callback)
 		end)
 	end, debug.traceback))
 	_G.hs = saved_hs
+	package.loaded["adapters.shell_runner"] = saved_shell_runner
 	if not outcome[1] then error(outcome[2], 0) end
 end
 
@@ -489,6 +491,7 @@ helpers.describe("model manager generation fences", function()
 				"the stale absent model must not dispatch a pull")
 			helpers.assert_eq(prediction_states, {},
 				"this Ollama path must emit no MLX enable transition")
+			package.loaded["adapters.shell_runner"] = nil
 		end)
 	end)
 

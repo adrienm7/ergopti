@@ -196,6 +196,7 @@ local function with_fixture(options, callback)
 
 	_G.hs = saved_hs
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
+	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 
