@@ -2061,6 +2061,127 @@ helpers.describe("karabiner bulk settings use one exact reversible transaction",
 	end)
 end)
 
+helpers.describe("HS-022 Karabiner snapshots share the exact bulk owner", function()
+	helpers.it("captures only detached persisted settings", function()
+		local remap = load_enabled_remap()
+		helpers.assert_true(remap.set_tap_action("left_shift", "escape"))
+		helpers.assert_true(remap.set_combo_symmetric(true))
+
+		local snapshot = remap.snapshot_settings()
+		helpers.assert_type(snapshot, "table")
+		helpers.assert_eq(snapshot.tap_hold_config.left_shift.tap, "escape")
+		helpers.assert_true(snapshot.combo_symmetric == true)
+		helpers.assert_nil(snapshot.watcher)
+		helpers.assert_nil(snapshot.hotkey_cycle_windows)
+
+		snapshot.tap_hold_config.left_shift.tap = "none"
+		snapshot.combo_symmetric = false
+		helpers.assert_eq(remap.get_tap_action("left_shift"), "escape",
+			"mutating the parent snapshot must not mutate live state")
+		helpers.assert_true(remap.get_combo_symmetric() == true)
+	end)
+
+	helpers.it("restores a detached snapshot only after one exact terminal", function()
+		local remap = load_enabled_remap()
+		helpers.assert_true(remap.set_tap_action("left_shift", "escape"))
+		helpers.assert_true(remap.set_hold_action("left_shift", "layer"))
+		local snapshot = remap.snapshot_settings()
+		local original_snapshot = clone_payload(snapshot)
+		helpers.assert_true(remap.set_tap_action("left_shift", "none"))
+		helpers.assert_true(remap.set_hold_action("left_shift", "none"))
+
+		local terminals = {}
+		local callback_count = 0
+		local outcome = nil
+		remap.regenerate = function(on_done)
+			terminals[#terminals + 1] = on_done
+			return true
+		end
+		helpers.assert_true(remap.restore_settings(snapshot, function(ok)
+			callback_count = callback_count + 1
+			outcome = ok
+		end))
+		helpers.assert_nil(outcome)
+		helpers.assert_eq(remap.get_tap_action("left_shift"), "escape")
+		helpers.assert_eq(remap.get_hold_action("left_shift"), "layer")
+		helpers.assert_true(helpers.deep_equal(snapshot, original_snapshot),
+			"restore must never consume or rewrite its caller-owned snapshot")
+
+		terminals[1](true, "ready")
+		terminals[1](false, "late-duplicate")
+		helpers.assert_true(outcome == true)
+		helpers.assert_eq(callback_count, 1)
+	end)
+
+	helpers.it("rejects malformed snapshots and enabled-intent drift exactly once", function()
+		local remap = load_enabled_remap()
+		local callback_count = 0
+		local outcome, reason = nil, nil
+		helpers.assert_eq(remap.restore_settings({}, function(ok, detail)
+			callback_count = callback_count + 1
+			outcome, reason = ok, detail
+		end), false)
+		helpers.assert_eq(callback_count, 1)
+		helpers.assert_true(outcome == false)
+		helpers.assert_eq(reason, "invalid-settings-snapshot")
+
+		local snapshot = remap.snapshot_settings()
+		snapshot.enabled = false
+		helpers.assert_eq(remap.restore_settings(snapshot, function(ok, detail)
+			callback_count = callback_count + 1
+			outcome, reason = ok, detail
+		end), false)
+		helpers.assert_eq(callback_count, 2)
+		helpers.assert_true(outcome == false)
+		helpers.assert_eq(reason, "enabled-intent-changed")
+	end)
+
+	helpers.it("retains the same snapshot until older bulk recovery settles", function()
+		local remap, calls = load_enabled_remap()
+		helpers.assert_true(remap.set_tap_action("left_shift", "escape"))
+		local snapshot = remap.snapshot_settings()
+		local snapshot_before = clone_payload(snapshot)
+		calls.set_save_results({ "true", "false", "true", "true" })
+		local terminals = {}
+		local rejected_outcome = nil
+		remap.regenerate = function(on_done)
+			terminals[#terminals + 1] = on_done
+			return true
+		end
+
+		helpers.assert_true(remap.clear_all_bindings(function(ok)
+			rejected_outcome = ok
+		end))
+		terminals[1](false, "candidate-failed")
+		helpers.assert_true(rejected_outcome == false)
+
+		local blocked_count = 0
+		helpers.assert_eq(remap.restore_settings(snapshot, function(ok)
+			blocked_count = blocked_count + 1
+			helpers.assert_true(ok == false)
+		end), false,
+			"the retrying call must settle older debt without overlapping a new inverse")
+		helpers.assert_eq(blocked_count, 1)
+		helpers.assert_eq(#terminals, 2)
+		terminals[2](true, "older-inverse-ready")
+
+		local restored_count = 0
+		local restored_outcome = nil
+		helpers.assert_true(remap.restore_settings(snapshot, function(ok)
+			restored_count = restored_count + 1
+			restored_outcome = ok
+		end))
+		helpers.assert_eq(#terminals, 3)
+		helpers.assert_nil(restored_outcome)
+		terminals[3](true, "snapshot-ready")
+		helpers.assert_true(restored_outcome == true)
+		helpers.assert_eq(restored_count, 1)
+		helpers.assert_eq(remap.get_tap_action("left_shift"), "escape")
+		helpers.assert_true(helpers.deep_equal(snapshot, snapshot_before),
+			"every retry must use the same untouched detached snapshot")
+	end)
+end)
+
 helpers.describe("karabiner init fails closed on unsafe persisted config", function()
 	helpers.it("HS-019 returns literal booleans for every early refusal class", function()
 		local uninitialized = load_enabled_remap({ skip_init = true })

@@ -155,51 +155,37 @@ end)
 
 -- =========================================================================
 -- =========================================================================
--- ======= 3/ H8 — the factory reset leaves no config behind ===============
+-- ======= 3/ H8 — factory reset is recoverable and transactional ============
 -- =========================================================================
 -- =========================================================================
 
 helpers.describe("menu: reset_all_defaults really resets", function()
-	helpers.it("does not re-save the current state after deleting the config", function()
+	helpers.it("delegates to the exact global transaction owner", function()
 		local src = helpers.read_driver_source("reset_all_defaults")
 		helpers.assert_true(src ~= nil and src ~= "",
 			"the menu source must be locatable by its reset_all_defaults symbol")
 
 		local at = src:find("local function reset_all_defaults", 1, true)
 		helpers.assert_true(at ~= nil, "reset_all_defaults must exist")
-
-		-- Bound the body at the reload that ends it.
-		local reload_at = src:find("hs.reload", at, true)
-		helpers.assert_true(reload_at ~= nil, "reset_all_defaults must end in a reload")
-		local body = src:sub(at, reload_at)
-
-		-- Strip comments: the explanation of why save_prefs must NOT be here
-		-- mentions it by name, and matching that would flag the fix as the bug.
-		local code = body:gsub("%-%-[^\n]*", "")
-
+		local body = src:sub(at, at + 500)
 		helpers.assert_true(
-			code:find("save_prefs()", 1, true) == nil,
-			"reset_all_defaults must not call save_prefs(). It rewrites config.toml from the "
-				.. "still-current in-memory state — which restore_factory_bindings does not reset, "
-				.. "it only resets bindings — so the reload finds a NON-empty config, skips the "
-				.. "factory-seed branch, and re-hydrates every toggle the user asked to clear while "
-				.. "the notification reports success"
+			body:find("return global_actions_owner.reset_defaults()", 1, true) ~= nil,
+			"the menu action must not recreate a best-effort delete/reload sequence outside "
+				.. "the exact snapshot, journal, inverse-debt, and terminal owner"
 		)
 	end)
 
-	helpers.it("still removes both persisted config files", function()
+	helpers.it("wires both persisted config files through recoverable moves", function()
 		local src = helpers.read_driver_source("reset_all_defaults")
-		local at = src:find("local function reset_all_defaults", 1, true)
-		local reload_at = src:find("hs.reload", at, true)
-		local body = src:sub(at, reload_at)
-
-		helpers.assert_true(body:find("ConfigTomlPath", 1, true) ~= nil,
-			"the reset must still delete config.toml — that deletion is what makes the next boot "
-				.. "take the config_absent path and seed factory defaults")
-		helpers.assert_true(body:find("KarabinerConfigPath", 1, true) ~= nil,
-			"the reset must still delete the karabiner config, which holds the tap/hold bindings")
-		helpers.assert_true(body:find("restore_factory_bindings", 1, true) ~= nil,
-			"and it must still restore the bindings held in the other stores (hs.settings), which "
-				.. "no file deletion covers")
+		helpers.assert_true(src:find("RecoverableFileMoves.create()", 1, true) ~= nil,
+			"factory reset must retain exact inverse evidence instead of unlinking files")
+		helpers.assert_true(src:find('MenuPaths.get("ConfigTomlPath")', 1, true) ~= nil,
+			"config.toml must be one recoverable reset path")
+		helpers.assert_true(src:find('MenuPaths.get("KarabinerConfigPath")', 1, true) ~= nil,
+			"the Karabiner config must be one recoverable reset path")
+		helpers.assert_true(
+			src:find('TerminationCoordinator.request_reload_owned(', 1, true) ~= nil,
+			"factory reset must transfer its retained mutation fence to the owned reload handoff"
+		)
 	end)
 end)

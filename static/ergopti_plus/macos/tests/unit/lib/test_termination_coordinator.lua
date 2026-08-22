@@ -145,6 +145,26 @@ local function load_coordinator(options)
 end
 
 helpers.describe("controlled termination coordinator", function()
+	helpers.it("retains an exclusive reload caller until the exact lease aborts", function()
+		local coordinator, calls = load_coordinator()
+		local aborted = 0
+		local abort_detail = nil
+		helpers.assert_eq(coordinator.request_reload_owned("factory_reset", function(detail)
+			aborted = aborted + 1
+			abort_detail = detail
+		end), true)
+		helpers.assert_eq(coordinator.request_reload_owned("sibling_reset", function() end), false,
+			"an owned handoff cannot join an older terminal transition")
+		helpers.assert_true(coordinator.is_pending())
+
+		calls.lease_callback(false, "native fence refused")
+		helpers.assert_eq(aborted, 1)
+		helpers.assert_eq(abort_detail, "exact Karabiner revocation was not proven: native fence refused")
+		helpers.assert_eq(calls.teardowns, 0)
+		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_true(not coordinator.is_pending())
+	end)
+
 	helpers.it("accepts a returning hs.reload after the exact fence and drained teardown", function()
 		local coordinator, calls = load_coordinator()
 		helpers.assert_true(coordinator.request_reload("menu_reload", "arg-a", 7))

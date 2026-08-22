@@ -914,6 +914,167 @@ release_cooperative_write_lock = function(owner)
 	)
 end
 
+--- Classifies one final pathname without following a symbolic link.
+--- Unlike read_with_status(), this returns inode identity needed by an owned
+--- hard-link move and distinguishes proven absence from an unreadable path.
+--- @param path string Filesystem path.
+--- @return table|nil attributes lstat-style attributes for a present path.
+--- @return string status `ok`, `absent`, or `error`.
+--- @return string|nil detail Concrete classification failure.
+function M.classify_no_follow(path)
+	if type(path) ~= "string" or path == "" then
+		return nil, "error", "path must be a non-empty string"
+	end
+	local attributes, inspect_err = inspect_path(path)
+	if type(attributes) == "table" then return attributes, "ok" end
+	if inspect_err ~= nil then return nil, "error", tostring(inspect_err) end
+	return nil, "absent"
+end
+
+--- Acquires the stable adjacent writer locks for several paths in lexical
+--- resolved-path order. Ordering prevents two cooperating multi-path writers
+--- from deadlocking each other. The returned group is also returned on partial
+--- acquisition when cleanup itself remains unsettled, so callers never lose the
+--- only exact lock capability.
+--- @param paths table Array of requested paths.
+--- @return table|nil group Retained ordered lock capability.
+--- @return boolean committed True only when every path is locked and revalidated.
+--- @return string|nil detail Failure detail.
+function M.acquire_write_locks(paths)
+	if type(paths) ~= "table" or #paths == 0 then
+		return nil, false, "paths must be a non-empty array"
+	end
+
+	local routes = {}
+	local resolved_seen = {}
+	for index, requested_path in ipairs(paths) do
+		if type(requested_path) ~= "string" or requested_path == "" then
+			return nil, false, "path " .. tostring(index) .. " is invalid"
+		end
+		local resolved_path, chain, resolve_err = resolve_write_path(requested_path)
+		if type(resolved_path) ~= "string" or resolved_path == "" then
+			return nil, false, tostring(resolve_err or "path resolution failed")
+		end
+		if resolved_seen[resolved_path] then
+			return nil, false, "multiple requested paths resolve to '" .. resolved_path .. "'"
+		end
+		resolved_seen[resolved_path] = true
+		routes[#routes + 1] = {
+			requested = requested_path,
+			resolved = resolved_path,
+			chain = chain,
+		}
+	end
+	table.sort(routes, function(left, right) return left.resolved < right.resolved end)
+
+	local group = {
+		routes = routes,
+		locks = {},
+		resolved_paths = {},
+		committed = false,
+		released = false,
+	}
+	local acquisition_ok, acquired, acquisition_detail = xpcall(function()
+		for _, route in ipairs(routes) do
+			group.resolved_paths[route.requested] = route.resolved
+			local lock, lock_err = acquire_cooperative_write_lock(route.resolved)
+			if not lock then
+				return false, tostring(lock_err or "cooperative write lock failed")
+			end
+			group.locks[#group.locks + 1] = { route = route, owner = lock }
+		end
+
+		for _, route in ipairs(routes) do
+			local unchanged, revalidate_err = revalidate_write_path(
+				route.requested, route.resolved, route.chain)
+			if not unchanged then
+				return false, tostring(revalidate_err or "path changed while acquiring locks")
+			end
+		end
+		return true
+	end, debug.traceback)
+	if not acquisition_ok or acquired ~= true then
+		local released, release_err = M.release_write_locks(group)
+		local detail = tostring(acquisition_ok and acquisition_detail or acquired)
+		if released then return nil, false, detail end
+		return group, false, detail .. "; cleanup retained: " .. tostring(release_err)
+	end
+
+	group.committed = true
+	return group, true
+end
+
+--- Releases an ordered writer-lock group in reverse acquisition order.
+--- Successfully released members are cleared individually; a retry therefore
+--- targets only the exact unresolved lock owners.
+--- @param group table|nil Group returned by acquire_write_locks().
+--- @return boolean released True only when every retained lock settled.
+--- @return string|nil detail First unresolved release detail.
+function M.release_write_locks(group)
+	if group == nil then return true end
+	if type(group) ~= "table" or type(group.locks) ~= "table" then
+		return false, "invalid cooperative write-lock group"
+	end
+	if group.released == true then return true end
+
+	local first_error = nil
+	for index = #group.locks, 1, -1 do
+		local item = group.locks[index]
+		if type(item) == "table" and item.owner ~= nil then
+			local released, release_err = release_cooperative_write_lock(item.owner)
+			if released then
+				item.owner = nil
+			elseif first_error == nil then
+				first_error = tostring(release_err or "write-lock release refused")
+			end
+		end
+	end
+
+	for _, item in ipairs(group.locks) do
+		if type(item) == "table" and item.owner ~= nil then
+			return false, first_error or "write-lock release remains pending"
+		end
+	end
+	group.committed = false
+	group.released = true
+	return true
+end
+
+--- Creates one hard link at an absent exact pathname.
+--- The kernel link operation is create-only: an existing file, symlink, or
+--- directory at destination is never interpreted as a container or replaced.
+--- @param source string Existing regular-file pathname.
+--- @param destination string Exact absent pathname to create.
+--- @return boolean linked Literal native success.
+--- @return string|nil detail Failure detail.
+function M.hard_link_create_only(source, destination)
+	if type(source) ~= "string" or source == ""
+		or type(destination) ~= "string" or destination == "" then
+		return false, "source and destination must be non-empty strings"
+	end
+	if not hs or not hs.fs or type(hs.fs.link) ~= "function" then
+		return false, "hs.fs.link is unavailable"
+	end
+	local call_ok, linked, link_err = pcall(hs.fs.link, source, destination, false)
+	if not call_ok then return false, tostring(linked) end
+	if linked ~= true then return false, tostring(link_err or linked or "hard link refused") end
+	return true
+end
+
+--- Removes one exact pathname and preserves the native literal-true contract.
+--- @param path string Pathname to unlink.
+--- @return boolean removed Literal native success.
+--- @return string|nil detail Failure detail.
+function M.remove_exact(path)
+	if type(path) ~= "string" or path == "" then
+		return false, "path must be a non-empty string"
+	end
+	local call_ok, removed, remove_err = pcall(os.remove, path)
+	if not call_ok then return false, tostring(removed) end
+	if removed ~= true then return false, tostring(remove_err or removed or "remove refused") end
+	return true
+end
+
 --- Writes content to a file atomically (temp file + rename), overwriting any
 --- existing content. Creates parent directories when they do not exist.
 --- A crash or process kill mid-write can never leave a torn/truncated file at

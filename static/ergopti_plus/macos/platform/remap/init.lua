@@ -3884,6 +3884,87 @@ function M.set_combo_symmetric(value)
 	return committed
 end
 
+--- Copies exactly the settings persisted in config_karabiner.toml.
+--- Runtime handles and watcher capabilities from `_state` are deliberately
+--- excluded, so the snapshot can be retained by a parent transaction.
+--- @param source table Live or previously captured settings.
+--- @return table|nil snapshot Detached persisted settings.
+local function clone_persisted_settings(source)
+	if type(source) ~= "table"
+		or type(source.tap_hold_config) ~= "table"
+		or type(source.mod_combos_config) ~= "table"
+		or type(source.enabled) ~= "boolean"
+		or type(source.tap_hold_timeout_ms) ~= "number"
+		or type(source.sticky_timeout_ms) ~= "number"
+		or type(source.simultaneous_threshold_ms) ~= "number"
+		or type(source.combo_symmetric) ~= "boolean" then
+		return nil
+	end
+	local detached = clone_settings_state(source)
+	return {
+		enabled = detached.enabled == true,
+		tap_hold_config = detached.tap_hold_config,
+		mod_combos_config = detached.mod_combos_config,
+		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
+		sticky_timeout_ms = detached.sticky_timeout_ms,
+		simultaneous_threshold_ms = detached.simultaneous_threshold_ms,
+		combo_symmetric = detached.combo_symmetric == true,
+	}
+end
+
+--- Captures one detached, persistence-only settings snapshot.
+--- A parent transaction must never snapshot an enabled/bulk candidate in flight.
+--- @return table|nil snapshot
+function M.snapshot_settings()
+	if not require_state("snapshot_settings") then return nil end
+	if not _running or _shutdown_requested or _enabled_preflight
+		or _enabled_transition or _bulk_settings_transaction then
+		Logger.error(LOG, "Karabiner settings snapshot refused while another owner is active.")
+		return nil
+	end
+	return clone_persisted_settings(_state)
+end
+
+--- Restores one captured settings snapshot through the same exact bulk owner.
+--- The enabled flag belongs to the lease transition and must still match; this
+--- inverse owns only the remaining persisted settings and their regeneration.
+--- @param snapshot table Detached result of `snapshot_settings()`.
+--- @param on_done function|nil Callback fn(ok, reason).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.restore_settings(snapshot, on_done)
+	local desired = clone_persisted_settings(snapshot)
+	if not desired then
+		invoke_public_callback(
+			"Restore captured settings",
+			on_done,
+			false,
+			"invalid-settings-snapshot",
+			0
+		)
+		return false
+	end
+	if _state and desired.enabled ~= (_state.enabled == true) then
+		invoke_public_callback(
+			"Restore captured settings",
+			on_done,
+			false,
+			"enabled-intent-changed",
+			0
+		)
+		return false
+	end
+	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
+		local restored = clone_persisted_settings(desired)
+		candidate.tap_hold_config = restored.tap_hold_config
+		candidate.mod_combos_config = restored.mod_combos_config
+		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
+		candidate.sticky_timeout_ms = restored.sticky_timeout_ms
+		candidate.simultaneous_threshold_ms = restored.simultaneous_threshold_ms
+		candidate.combo_symmetric = restored.combo_symmetric
+		return 0
+	end, on_done)
+end
+
 --- Clears both slots for one tap/hold key as one exact transaction.
 --- @param key_id string Key id as defined in tap_hold_keys.json.
 --- @param on_done function|nil Callback fn(ok, reason, change_count).
