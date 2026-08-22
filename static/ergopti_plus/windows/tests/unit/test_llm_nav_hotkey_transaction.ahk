@@ -101,6 +101,55 @@ _LNHT_PredicateSlot(Predicate) {
 	return 0
 }
 
+_LNHT_NativeSpec(LogicalSpec, KeyResolverFn := 0) {
+	Descriptor := HotkeyRegistrarResolvedNativeDescriptor(LogicalSpec,
+		KeyResolverFn)
+	return Descriptor is Map ? Descriptor["native_spec"] : LogicalSpec
+}
+
+_LNHT_NameMatches(Name, LogicalSpec) {
+	return Name == LogicalSpec || Name == _LNHT_NativeSpec(LogicalSpec)
+}
+
+_LNHT_OwnedSpec(Slot, LogicalSpec) {
+	global _LNHT_Hotkeys
+	Exact := Slot . "|" . LogicalSpec
+	if _LNHT_Hotkeys.Has(Exact)
+		return Exact
+	return Slot . "|" . _LNHT_NativeSpec(LogicalSpec)
+}
+
+_LNHT_ActiveNavNativeSpec(LogicalSpec) {
+	global _LLM_Menu_NavHotkeysBound
+	if _LLM_Menu_NavHotkeysBound is Array {
+		for Entry in _LLM_Menu_NavHotkeysBound {
+			if Entry is Map && Entry.Get("spec", "") == LogicalSpec
+				return Entry.Get("native_spec", "")
+		}
+	}
+	return ""
+}
+
+_LNHT_ProfileNativeSpec(Index) {
+	global _LLM_Menu_ProfileHotkeyOwner
+	if !(_LLM_Menu_ProfileHotkeyOwner is Map)
+		return ""
+	Plan := _LLM_Menu_ProfileHotkeyOwner.Get("plan", 0)
+	if !(Plan is Array) || !Plan.Has(Index)
+		return ""
+	Entry := Plan[Index]
+	return Entry is Map ? Entry.Get("native_spec", "") : ""
+}
+
+_LNHT_CallbackAcceptsHotkeyName(Callback) {
+	if !HasMethod(Callback, "Call")
+		return false
+	try return Callback.MinParams <= 1
+		&& (Callback.IsVariadic || Callback.MaxParams >= 1)
+	catch
+		return false
+}
+
 _LNHT_Hotkey(Args*) {
 	global _LNHT_Hotkeys, _LNHT_Events, _LNHT_FailSpec, _LNHT_CurrentSlot
 	global _LNHT_FailOffSpec
@@ -109,16 +158,20 @@ _LNHT_Hotkey(Args*) {
 	Spec := Args[1]
 	Action := Args[2]
 	Mode := Args.Length >= 3 ? Args[3] : ""
+	if !(Action is String) && !_LNHT_CallbackAcceptsHotkeyName(Action)
+		throw ValueError("injected callback rejects the native HotkeyName")
 	OwnedSpec := _LNHT_CurrentSlot . "|" . Spec
 	_LNHT_Events.Push(OwnedSpec . " " . (Action is String ? Action : Mode))
-	ShouldFail := _LNHT_FailSpec != "" && Spec == _LNHT_FailSpec
+	ShouldFail := _LNHT_FailSpec != ""
+		&& _LNHT_NameMatches(Spec, _LNHT_FailSpec)
 		&& !(Action is String && Action == "Off")
 	if ShouldFail && !_LNHT_FailAfterApply {
 		_LNHT_FailSpec := ""
 		throw Error("injected native registration failure")
 	}
 	if (Action is String && Action == "Off") {
-		if (_LNHT_FailOffSpec != "" && Spec == _LNHT_FailOffSpec) {
+		if (_LNHT_FailOffSpec != ""
+				&& _LNHT_NameMatches(Spec, _LNHT_FailOffSpec)) {
 			_LNHT_FailOffSpec := ""
 			throw Error("injected native deregistration failure")
 		}
@@ -185,14 +238,14 @@ _LNHT_TransactionApply(*) {
 
 _LNHT_ActiveHas(Spec) {
 	global _LNHT_Hotkeys, _LLM_Menu_NavActiveSlot
-	return _LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|" . Spec)
+	return _LNHT_Hotkeys.Has(_LNHT_OwnedSpec(_LLM_Menu_NavActiveSlot, Spec))
 }
 
 _LNHT_FirePhysical(Spec, PermanentSpec := "") {
 	global _LNHT_Hotkeys, _LNHT_AppOutput, _LLM_Menu_NavActiveSlot
-	OwnedSpec := _LLM_Menu_NavActiveSlot . "|" . Spec
+	OwnedSpec := _LNHT_OwnedSpec(_LLM_Menu_NavActiveSlot, Spec)
 	Predicate := _LLM_Menu_NavSlotPredicate(_LLM_Menu_NavActiveSlot)
-	HotIfSpec := PermanentSpec == "" ? Spec : PermanentSpec
+	HotIfSpec := PermanentSpec == "" ? _LNHT_NativeSpec(Spec) : PermanentSpec
 	if Predicate.Call(HotIfSpec) && _LNHT_Hotkeys.Has(OwnedSpec) {
 		_LNHT_Hotkeys[OwnedSpec].Call(HotIfSpec)
 		return "hotkey"
@@ -295,11 +348,14 @@ _LNHT_AssertSurface(NavPrefix, ValPrefix) {
 	}
 	AssertEqual(12, Count,
 		"a complete navigation surface owns two arrows and ten digits")
-	AssertTrue(_LNHT_Hotkeys.Has(OwnedPrefix . "~" . NavPrefix . "Up"))
-	AssertTrue(_LNHT_Hotkeys.Has(OwnedPrefix . "~" . NavPrefix . "Down"))
+	AssertTrue(_LNHT_Hotkeys.Has(_LNHT_OwnedSpec(_LLM_Menu_NavActiveSlot,
+		"~" . NavPrefix . "Up")))
+	AssertTrue(_LNHT_Hotkeys.Has(_LNHT_OwnedSpec(_LLM_Menu_NavActiveSlot,
+		"~" . NavPrefix . "Down")))
 	Loop 10 {
 		Digit := A_Index == 10 ? "0" : String(A_Index)
-		AssertTrue(_LNHT_Hotkeys.Has(OwnedPrefix . ValPrefix . Digit),
+		AssertTrue(_LNHT_Hotkeys.Has(_LNHT_OwnedSpec(
+			_LLM_Menu_NavActiveSlot, ValPrefix . Digit)),
 			"the complete generation must retain " . ValPrefix . Digit)
 	}
 }
@@ -498,6 +554,43 @@ _LNHT_NativeFailure() {
 Test("[llm-nav-transaction] native failure restores the complete old generation",
 	_LNHT_NativeFailure)
 
+_LNHT_PoisonedPreparedPlanCannotPublishCore() {
+	global Features, _LLM_Menu, _LLM_Menu_NavHotkeysBound
+	global _LLM_Menu_NavActiveSlot
+	AssertTrue(LLM_Menu_BindNavHotkeys(_LLM_Menu,
+		_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log))
+	OldFeatures := Features
+	OldMenu := _LLM_Menu
+	OldPlan := _LLM_Menu_NavHotkeysBound
+	OldSlot := _LLM_Menu_NavActiveSlot
+	CandidateFeatures := Features.Clone()
+	CandidateMenu := _LLM_Menu.Clone()
+	CandidateMenu["val_modifiers"] := "ctrl"
+	Owner := _LLM_Menu_PrepareNavBindingCandidate(CandidateMenu,
+		_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
+		_LNHT_ForceHotIfReset)
+	AssertTrue(Owner is Map)
+	AssertTrue(_LLM_Menu_NavPlanIsValid(Owner["plan"], CandidateMenu))
+	Owner["plan"][9]["jump_idx"] := "7"
+	AssertFalse(_LLM_Menu_NavPlanIsValid(Owner["plan"], CandidateMenu),
+		"a numerically coercible jump index must poison the candidate owner")
+	AssertFalse(_LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures,
+		CandidateMenu, Owner))
+	AssertTrue(Features == OldFeatures)
+	AssertTrue(_LLM_Menu == OldMenu)
+	AssertTrue(_LLM_Menu_NavHotkeysBound == OldPlan)
+	AssertEqual(OldSlot, _LLM_Menu_NavActiveSlot,
+		"a poisoned inactive plan must never acquire the active slot")
+}
+
+_LNHT_PoisonedPreparedPlanCannotPublish() {
+	return _LNHT_WithPersistenceFixture(
+		_LNHT_PoisonedPreparedPlanCannotPublishCore)
+}
+
+Test("[llm-nav-transaction] poisoned prepared owner cannot publish",
+	_LNHT_PoisonedPreparedPlanCannotPublish)
+
 _LNHT_HotIfCloseRetryCore() {
 	global _LNHT_FailHotIfClose, _LNHT_HotIfDepth
 	_LNHT_FailHotIfClose := 1
@@ -661,13 +754,13 @@ _LNHT_PostApplyFailureIsPurgedCore() {
 		_LNHT_ForceHotIfReset))
 	AssertEqual(1, _LLM_Menu_NavActiveSlot,
 		"an unproven rollback must leave its entire candidate slot inactive")
-	AssertTrue(_LNHT_Hotkeys.Has("2|^7"),
+	AssertTrue(_LNHT_Hotkeys.Has(_LNHT_OwnedSpec(2, "^7")),
 		"the fault seam must retain the applied variant whose removal was refused")
 	AssertTrue(LLM_Menu_BindNavHotkeys(_LNHT_Menu("shift", "shift"),
 		_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
 		_LNHT_ForceHotIfReset))
 	_LNHT_AssertOnlyPrefix("+")
-	AssertFalse(_LNHT_Hotkeys.Has("2|^7"),
+	AssertFalse(_LNHT_Hotkeys.Has(_LNHT_OwnedSpec(2, "^7")),
 		"recycling the inactive slot must purge every conservative stale variant")
 }
 
@@ -778,26 +871,32 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 			_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
 			_LNHT_ForceHotIfReset))
 		AssertTrue(LLM_Menu_GetHotkeyProfileOrder().Length > 0)
-		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call("^1"),
+		Profile1 := _LNHT_ProfileNativeSpec(1)
+		Profile7 := _LNHT_ProfileNativeSpec(7)
+		AssertTrue(Profile1 != "" && Profile7 != "")
+		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call(Profile1),
 			"default Alt navigation must not swallow the Ctrl profile surface")
-		AssertFalse(LLM_Menu_NavOwnsSpec("^1"))
+		AssertFalse(LLM_Menu_NavOwnsSpec(Profile1))
 
 		AssertTrue(LLM_Menu_BindNavHotkeys(_LNHT_Menu("alt", "ctrl"),
 			_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log,
 			_LNHT_ForceHotIfReset))
+		Nav1 := _LNHT_ActiveNavNativeSpec("^1")
+		Nav7 := _LNHT_ActiveNavNativeSpec("^7")
+		AssertTrue(Nav1 != "" && Nav7 != "")
 		AssertTrue(_LLM_Menu_NavSlotPredicate(
-			_LLM_Menu_NavActiveSlot).Call("^1"))
-		AssertTrue(LLM_Menu_NavOwnsSpec("^1"))
-		AssertFalse(_LLM_PROFILE_HOTKEY_PRED.Call("^1"),
+			_LLM_Menu_NavActiveSlot).Call(Nav1))
+		AssertTrue(LLM_Menu_NavOwnsSpec(Nav1))
+		AssertFalse(_LLM_PROFILE_HOTKEY_PRED.Call(Profile1),
 			"an exact Ctrl+digit collision must belong to visible navigation")
 		_LNHT_ShowTooltip(["one", "two", "three", "four", "five", "six"])
 		_LNHT_AppOutput := []
 		AssertFalse(_LLM_Menu_NavSlotPredicate(
-			_LLM_Menu_NavActiveSlot).Call("^7"),
+			_LLM_Menu_NavActiveSlot).Call(Nav7),
 			"an out-of-range Ctrl+digit variant must let Windows pass it through")
-		AssertTrue(LLM_Menu_NavOwnsSpec("^7"),
+		AssertTrue(LLM_Menu_NavOwnsSpec(Nav7),
 			"the reserved navigation chord must still outrank the profile variant")
-		AssertFalse(_LLM_PROFILE_HOTKEY_PRED.Call("^7"),
+		AssertFalse(_LLM_PROFILE_HOTKEY_PRED.Call(Profile7),
 			"an out-of-range navigation chord must not fall through to profiles")
 		AssertEqual("app", _LNHT_FirePhysical("^7"))
 		AssertEqual(1, _LNHT_AppOutput.Length)
@@ -805,15 +904,17 @@ _LNHT_ProfilePredicateYieldsToPredictionCore() {
 		AssertTrue(LLM_Menu_BindNavHotkeys(
 			_LNHT_Menu("alt", "control+shift"), _LNHT_Hotkey,
 			_LNHT_HotIf, _LNHT_Log, _LNHT_ForceHotIfReset))
-		AssertFalse(LLM_Menu_NavOwnsSpec("^1"))
-		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call("^1"),
+		AssertFalse(LLM_Menu_NavOwnsSpec(Profile1))
+		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call(Profile1),
 			"a different navigation chord must leave Ctrl profiles enabled")
 
 		_LNHT_HideTooltip()
+		ShiftNav1 := _LNHT_ActiveNavNativeSpec("^+1")
+		AssertTrue(ShiftNav1 != "")
 		AssertFalse(_LLM_Menu_NavSlotPredicate(
-			_LLM_Menu_NavActiveSlot).Call("^1"),
+			_LLM_Menu_NavActiveSlot).Call(ShiftNav1),
 			"the active navigation surface must pass through while hidden")
-		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call("^1"))
+		AssertTrue(_LLM_PROFILE_HOTKEY_PRED.Call(Profile1))
 	} finally {
 		_LLM_Menu := SavedMenu
 		_Stub_LlmTooltipText := SavedText
@@ -838,14 +939,17 @@ _LNHT_EmptyModifiersCore() {
 	AssertTrue(LLM_Menu_BindNavHotkeys(_LNHT_Menu("", ""),
 		_LNHT_Hotkey, _LNHT_HotIf, _LNHT_Log))
 	_LNHT_AssertOnlyPrefix("")
-	AssertTrue(_LNHT_Hotkeys.Has(_LLM_Menu_NavActiveSlot . "|7"),
+	AssertTrue(_LNHT_Hotkeys.Has(_LNHT_OwnedSpec(
+		_LLM_Menu_NavActiveSlot, "7")),
 		"a genuinely empty validation modifier deliberately owns bare digits")
 	try {
 		_LNHT_ShowTooltip(["one", "two", "three", "four", "five",
 			"six", "seven"])
+		Native7 := _LNHT_ActiveNavNativeSpec("7")
+		AssertTrue(Native7 != "")
 		AssertTrue(_LLM_Menu_NavSlotPredicate(
-			_LLM_Menu_NavActiveSlot).Call("7"))
-		AssertTrue(LLM_Menu_NavOwnsSpec("7"))
+			_LLM_Menu_NavActiveSlot).Call(Native7))
+		AssertTrue(LLM_Menu_NavOwnsSpec(Native7))
 		AssertEqual("hotkey", _LNHT_FirePhysical("7"))
 		AssertEqual(7, _LNHT_TooltipActiveIdx,
 			"a valid empty-modifier digit must select its in-range slot")
@@ -853,7 +957,7 @@ _LNHT_EmptyModifiersCore() {
 			"an owned in-range digit must not also reach the application")
 		_LNHT_HideTooltip()
 		AssertFalse(_LLM_Menu_NavSlotPredicate(
-			_LLM_Menu_NavActiveSlot).Call("7"),
+			_LLM_Menu_NavActiveSlot).Call(Native7),
 			"bare digits must pass through exactly when the tooltip is hidden")
 		AssertEqual("app", _LNHT_FirePhysical("7"))
 		AssertEqual(1, _LNHT_AppOutput.Length)
@@ -943,13 +1047,18 @@ _LNHT_PermanentHotkeyAliasCore() {
 			"the first variant's permanent name must resolve the tilde nav variant")
 		AssertEqual(2, _LNHT_TooltipActiveIdx,
 			"the permanent-name alias must execute the intended navigation callback")
+		AssertEqual("hotkey", _LNHT_FirePhysical("~!Down", "!down"),
+			"both arrow callbacks must accept the permanent HotkeyName argument")
+		AssertEqual(1, _LNHT_TooltipActiveIdx,
+			"Down must wrap from the last visible slot to the first")
 
 		_LNHT_ShowTooltip(["one", "two", "three", "four", "five", "six",
 			"seven"])
 		AssertTrue(LLM_Menu_BindNavHotkeys(
 			_LNHT_Menu("alt", "control+alt"), _LNHT_Hotkey,
 			_LNHT_HotIf, _LNHT_Log, _LNHT_ForceHotIfReset))
-		AssertEqual("hotkey", _LNHT_FirePhysical("^!7", "!^7"),
+		PermanentDigit := StrReplace(_LNHT_NativeSpec("^!7"), "^!", "!^")
+		AssertEqual("hotkey", _LNHT_FirePhysical("^!7", PermanentDigit),
 			"modifier order in the permanent name must not disable the variant")
 		AssertEqual(7, _LNHT_TooltipActiveIdx)
 	} finally _Stub_LlmTooltipText := SavedText

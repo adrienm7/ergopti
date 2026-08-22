@@ -102,6 +102,32 @@ _LPHT_ForceReset() {
 	_LPHT_CurrentPredicate := 0
 }
 
+_LPHT_NativeSpec(LogicalSpec, KeyResolverFn := 0) {
+	Descriptor := HotkeyRegistrarResolvedNativeDescriptor(LogicalSpec,
+		KeyResolverFn)
+	return Descriptor is Map ? Descriptor["native_spec"] : LogicalSpec
+}
+
+_LPHT_NameMatches(Name, LogicalSpec) {
+	return Name == LogicalSpec || Name == _LPHT_NativeSpec(LogicalSpec)
+}
+
+_LPHT_RegisteredSpec(LogicalSpec) {
+	global _LPHT_Hotkeys
+	if _LPHT_Hotkeys.Has(LogicalSpec)
+		return LogicalSpec
+	return _LPHT_NativeSpec(LogicalSpec)
+}
+
+_LPHT_CallbackAcceptsHotkeyName(Callback) {
+	if !HasMethod(Callback, "Call")
+		return false
+	try return Callback.MinParams <= 1
+		&& (Callback.IsVariadic || Callback.MaxParams >= 1)
+	catch
+		return false
+}
+
 _LPHT_Hotkey(Spec, Callback, Options := "") {
 	global _LPHT_Hotkeys, _LPHT_CurrentPredicate
 	global _LPHT_FaultSpec, _LPHT_FaultMode, _LPHT_HotkeyCalls
@@ -112,11 +138,15 @@ _LPHT_Hotkey(Spec, Callback, Options := "") {
 		throw ValueError("profile fixture accepts only On registrations")
 	if !HasMethod(_LPHT_CurrentPredicate, "Call")
 		throw Error("profile fixture requires an owned HotIf predicate")
-	if Spec == _LPHT_FaultSpec && _LPHT_FaultMode == "before"
+	if !_LPHT_CallbackAcceptsHotkeyName(Callback)
+		throw ValueError("profile callback must accept AHK's HotkeyName argument")
+	if _LPHT_FaultSpec != "" && _LPHT_NameMatches(Spec, _LPHT_FaultSpec)
+			&& _LPHT_FaultMode == "before"
 		throw Error("injected pre-apply registration refusal")
 	_LPHT_Hotkeys[Spec] := Map("predicate", _LPHT_CurrentPredicate,
 		"callback", Callback)
-	if Spec == _LPHT_FaultSpec && _LPHT_FaultMode == "after"
+	if _LPHT_FaultSpec != "" && _LPHT_NameMatches(Spec, _LPHT_FaultSpec)
+			&& _LPHT_FaultMode == "after"
 		throw Error("injected post-apply registration refusal")
 }
 
@@ -150,10 +180,11 @@ _LPHT_NavReadyPort() {
 
 _LPHT_IsEffective(Spec) {
 	global _LPHT_Hotkeys
-	if !_LPHT_Hotkeys.Has(Spec)
+	RegisteredSpec := _LPHT_RegisteredSpec(Spec)
+	if !_LPHT_Hotkeys.Has(RegisteredSpec)
 		return false
-	Record := _LPHT_Hotkeys[Spec]
-	return Record["predicate"].Call(Spec)
+	Record := _LPHT_Hotkeys[RegisteredSpec]
+	return Record["predicate"].Call(RegisteredSpec)
 }
 
 _LPHT_EffectiveCount() {
@@ -173,15 +204,16 @@ _LPHT_FirePhysical(Spec, PhysicalEvent, PermanentSpec := "<default>",
 		InvokeCallback := false) {
 	global _LPHT_Hotkeys, _LPHT_AppOutput
 	if PermanentSpec == "<default>"
-		PermanentSpec := Spec
-	if _LPHT_Hotkeys.Has(Spec) {
-		Record := _LPHT_Hotkeys[Spec]
+		PermanentSpec := _LPHT_NativeSpec(Spec)
+	RegisteredSpec := _LPHT_RegisteredSpec(Spec)
+	if _LPHT_Hotkeys.Has(RegisteredSpec) {
+		Record := _LPHT_Hotkeys[RegisteredSpec]
 		if Record["predicate"].Call(PermanentSpec) {
 			; Never invoke a callback for a route the test expects to pass through.
 			; This keeps the regression harness safe even if the old synthetic Send
 			; fallback and its broad predicate are accidentally restored together.
 			if InvokeCallback
-				Record["callback"].Call()
+				Record["callback"].Call(PermanentSpec)
 			return "hotkey"
 		}
 	}
@@ -672,8 +704,15 @@ _LPHT_OwnerAndLoadedGateCore() {
 	for Index, Entry in ReadyOwner["plan"] {
 		AssertTrue(Entry is Map)
 		AssertEqual("^" . Index, Entry["spec"])
+		AssertEqual(Index, Entry["profile_idx"])
+		AssertTrue(_LLM_Menu_HotkeyPhysicalIdentityIsValid(
+			Entry["physical_id"]))
+		AssertTrue(Entry["native_spec"] is String
+			&& Entry["native_spec"] != "")
+		AssertEqual(_LLM_Menu_NavNativeIdentity(Entry["native_spec"]),
+			Entry["native_id"])
 		AssertTrue(HasMethod(Entry["callback"], "Call"))
-		AssertTrue(_LPHT_Hotkeys[Entry["spec"]]["predicate"]
+		AssertTrue(_LPHT_Hotkeys[Entry["native_spec"]]["predicate"]
 			== _LLM_PROFILE_HOTKEY_PRED,
 			"every retry must reuse the one stable profile HotIf predicate")
 	}
@@ -719,18 +758,34 @@ _LPHT_OwnerAndLoadedGateCore() {
 		"a sparse native plan must fail closed without reading an unset slot")
 	AssertEqual(0, _LPHT_EffectiveCount())
 	BadSpecPlan := ReadyOwner["plan"].Clone()
-	BadSpecPlan[1] := Map("spec", "^2",
-		"callback", ReadyOwner["plan"][1]["callback"])
+	BadSpecPlan[1] := ReadyOwner["plan"][1].Clone()
+	BadSpecPlan[1]["spec"] := "^2"
 	_LLM_Menu_ProfileHotkeyOwner := Map(
 		"ready", true, "degraded", false, "plan", BadSpecPlan)
 	AssertEqual(0, _LPHT_EffectiveCount(),
 		"a duplicated native spec must fail closed")
 	BadCallbackPlan := ReadyOwner["plan"].Clone()
-	BadCallbackPlan[1] := Map("spec", "^1", "callback", 0)
+	BadCallbackPlan[1] := ReadyOwner["plan"][1].Clone()
+	BadCallbackPlan[1]["callback"] := 0
 	_LLM_Menu_ProfileHotkeyOwner := Map(
 		"ready", true, "degraded", false, "plan", BadCallbackPlan)
 	AssertEqual(0, _LPHT_EffectiveCount(),
 		"an uncallable native callback must fail closed")
+	StringIndexPlan := ReadyOwner["plan"].Clone()
+	StringIndexPlan[2] := ReadyOwner["plan"][2].Clone()
+	StringIndexPlan[2]["profile_idx"] := "2"
+	_LLM_Menu_ProfileHotkeyOwner := Map(
+		"ready", true, "degraded", false, "plan", StringIndexPlan)
+	AssertFalse(_LLM_Menu_ProfileHotkeyOwnerReady(),
+		"a numerically coercible profile index must fail closed")
+	AssertEqual(0, _LPHT_EffectiveCount())
+	BadIdentityPlan := ReadyOwner["plan"].Clone()
+	BadIdentityPlan[1] := ReadyOwner["plan"][1].Clone()
+	BadIdentityPlan[1]["physical_id"] := "^1"
+	_LLM_Menu_ProfileHotkeyOwner := Map(
+		"ready", true, "degraded", false, "plan", BadIdentityPlan)
+	AssertEqual(0, _LPHT_EffectiveCount(),
+		"a malformed physical identity must fail closed")
 	_LLM_Menu_ProfileHotkeyOwner := ReadyOwner
 	AssertEqual(9, _LPHT_EffectiveCount())
 }
@@ -813,7 +868,8 @@ _LPHT_ProfileRangeRoutesExactlyOnceCore() {
 	}
 
 	_LPHT_SetExposedProfileCount(9)
-	for PermanentSpec in ["^7", "~^7", "$^7"] {
+	Native7 := _LPHT_NativeSpec("^7")
+	for PermanentSpec in [Native7, "~" . Native7, "$" . Native7] {
 		_LPHT_AppOutput := []
 		_LPHT_SelectedProfiles := []
 		PhysicalEvent := Map("spec", PermanentSpec)
@@ -823,7 +879,9 @@ _LPHT_ProfileRangeRoutesExactlyOnceCore() {
 			"AHK permanent-name decorations must preserve the profile index")
 		AssertEqual(0, _LPHT_AppOutput.Length)
 	}
-	for PermanentSpec in ["*^7", "!^7", "^0", "^10", ""] {
+	for PermanentSpec in ["*" . Native7,
+			"!" . Native7,
+			_LPHT_NativeSpec("^0"), "^10", ""] {
 		_LPHT_AppOutput := []
 		_LPHT_SelectedProfiles := []
 		PhysicalEvent := Map("spec", PermanentSpec)
@@ -843,7 +901,8 @@ _LPHT_ProfileRangeRoutesExactlyOnceCore() {
 	_LPHT_SelectedProfiles := []
 	LayoutEvent := Map("vk", 0x37, "sc", 0x08, "ctrl", true,
 		"shift", false, "bound_hkl", 0x0409, "current_hkl", 0x040C)
-	AssertEqual("app", _LPHT_FirePhysical("^7", LayoutEvent, "$^7"))
+	AssertEqual("app", _LPHT_FirePhysical("^7", LayoutEvent,
+		"$" . Native7))
 	AssertEqual(0, _LPHT_SelectedProfiles.Length)
 	AssertEqual(1, _LPHT_AppOutput.Length)
 	AssertTrue(ObjPtr(_LPHT_AppOutput[1]) == ObjPtr(LayoutEvent),

@@ -25,19 +25,6 @@
 
 #Requires AutoHotkey v2.0
 
-LLM_Menu_IsValidModifierString(Raw) {
-	if !(Raw is String)
-		return false
-	Value := Trim(Raw)
-	if Value == ""
-		return true
-	for Token in StrSplit(Value, "+") {
-		if Trim(Token) == ""
-			return false
-	}
-	return LLM_Menu_ShortcutToAhk(Value . "+a") != ""
-}
-
 LLM_Menu_CommitNavModifier(Key, Raw, CommitFn := 0, ApplyFn := 0,
 		RejectFn := 0, TransactionPort := 0) {
 	if !(Key == "nav_modifiers" || Key == "val_modifiers")
@@ -65,7 +52,8 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 	DefaultApply := (Args*) => _LLM_Menu_ApplyNavCommitted(Args*)
 	DefaultPrepare := (Candidate) => _LLM_Menu_PrepareNavBindingCandidate(Candidate,
 		ResolvedPort.Get("hotkey", 0), ResolvedPort.Get("hotif", 0),
-		ResolvedPort.Get("log", 0), ResolvedPort.Get("reset", 0))
+		ResolvedPort.Get("log", 0), ResolvedPort.Get("reset", 0),
+		ResolvedPort.Get("key_resolver", 0))
 	DefaultPublish := (CandidateFeatures, CandidateMenu, Owner) =>
 		_LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures,
 			CandidateMenu, Owner)
@@ -119,50 +107,6 @@ _LLM_Menu_NavSlotPredicate(Slot) {
 	return Slot == 1 ? _LLM_Nav_HotIfPred1 : _LLM_Nav_HotIfPred2
 }
 
-_LLM_Menu_NavNativeIdentity(Spec) {
-	if !(Spec is String)
-		return ""
-	Raw := StrLower(Trim(Spec))
-	if Raw == ""
-		return ""
-	; HotIf receives the permanent name established by the first variant. Tilde
-	; and hook-forcing dollar prefixes are variant properties, and modifier
-	; symbols may be written in any order. Canonicalize the physical identity so
-	; a later ``~!^7`` variant can legitimately be called ``^!7``.
-	Modifiers := Map()
-	Wildcard := false
-	KeyStart := 1
-	Loop StrLen(Raw) {
-		Ch := SubStr(Raw, A_Index, 1)
-		if Ch == "<" || Ch == ">"
-			return ""
-		if Ch == "~" || Ch == "$" {
-			KeyStart := A_Index + 1
-			continue
-		}
-		if Ch == "*" {
-			Wildcard := true
-			KeyStart := A_Index + 1
-			continue
-		}
-		if Ch == "^" || Ch == "!" || Ch == "+" || Ch == "#" {
-			Modifiers[Ch] := true
-			KeyStart := A_Index + 1
-			continue
-		}
-		break
-	}
-	Key := SubStr(Raw, KeyStart)
-	if Key == "" || InStr(Key, "&")
-		return ""
-	Identity := Wildcard ? "*" : ""
-	for Prefix in ["^", "!", "+", "#"] {
-		if Modifiers.Has(Prefix)
-			Identity .= Prefix
-	}
-	return Identity . Key
-}
-
 _LLM_Menu_NavVariantIsActive(Slot, Spec) {
 	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavActiveSlot
 	PreviousCritical := Critical("On")
@@ -208,9 +152,6 @@ LLM_Menu_NavOwnsSpec(Spec) {
 			if !(Entry is Map)
 				continue
 			EntryIdentity := Entry.Get("native_id", "")
-			if EntryIdentity == ""
-				EntryIdentity := _LLM_Menu_NavNativeIdentity(
-					Entry.Get("spec", ""))
 			if EntryIdentity == NativeIdentity
 				return true
 		}
@@ -228,13 +169,51 @@ _LLM_Menu_NavNativeHotIf(Args*) {
 
 _LLM_Menu_NavBindingRecord(Spec, Callback := 0, JumpIndex := 0) {
 	return Map("spec", Spec, "callback", Callback, "jump_idx", JumpIndex,
-		"native_id", _LLM_Menu_NavNativeIdentity(Spec))
+		"native_id", "")
+}
+
+_LLM_Menu_NavPlanIsValid(Plan, MenuState) {
+	Prefixes := _LLM_Menu_BuildNavModifierPrefixes(MenuState)
+	if !(Prefixes is Map) || !(Plan is Array) || Plan.Length != 12
+		return false
+	NavPrefix := Prefixes["nav_prefix"]
+	ValPrefix := Prefixes["val_prefix"]
+	SeenSpec := Map()
+	SeenNative := Map()
+	SeenPhysical := Map()
+	Loop Plan.Length {
+		Index := A_Index
+		if !Plan.Has(Index)
+			return false
+		Entry := Plan[Index]
+		ExpectedJump := Index <= 2 ? 0 : Index - 2
+		ExpectedSpec := Index == 1 ? "~" . NavPrefix . "Up"
+			: Index == 2 ? "~" . NavPrefix . "Down"
+			: ValPrefix . (Index == 12 ? "0" : String(Index - 2))
+		if !(Entry is Map)
+				|| Entry.Get("spec", "") !== ExpectedSpec
+				|| !(Entry.Get("jump_idx", -1) is Integer)
+				|| Entry.Get("jump_idx", -1) != ExpectedJump
+				|| !HasMethod(Entry.Get("callback", 0), "Call")
+				|| !_LLM_Menu_PlanEntryDescriptorIsValid(Entry)
+			return false
+		NativeId := Entry["native_id"]
+		PhysicalId := Entry["physical_id"]
+		if SeenSpec.Has(ExpectedSpec) || NativeId == ""
+				|| SeenNative.Has(NativeId)
+				|| SeenPhysical.Has(PhysicalId)
+			return false
+		SeenSpec[ExpectedSpec] := true
+		SeenNative[NativeId] := true
+		SeenPhysical[PhysicalId] := true
+	}
+	return true
 }
 
 _LLM_Menu_NavBindingIndex(Plan) {
 	Index := Map()
 	for Entry in Plan
-		Index[Entry["spec"]] := Entry
+		Index[Entry["native_id"]] := Entry
 	return Index
 }
 
@@ -242,7 +221,7 @@ _LLM_Menu_NavBindingUnion(Plans*) {
 	Index := Map()
 	for Plan in Plans {
 		for Entry in Plan
-			Index[Entry["spec"]] := Entry
+			Index[Entry["native_id"]] := Entry
 	}
 	Merged := []
 	for , Entry in Index
@@ -277,31 +256,11 @@ _LLM_Menu_NavCloseHotIf(HotIfFn, ResetFn) {
 }
 
 _LLM_Menu_BuildNavBindingPlan(MenuState) {
-	if !(MenuState is Map)
+	Prefixes := _LLM_Menu_BuildNavModifierPrefixes(MenuState)
+	if !(Prefixes is Map)
 		return false
-	if (MenuState.Has("nav_modifiers")
-			&& !(MenuState["nav_modifiers"] is String))
-		return false
-	if (MenuState.Has("val_modifiers")
-			&& !(MenuState["val_modifiers"] is String))
-		return false
-	nav_mod := MenuState.Has("nav_modifiers")
-		? Trim(MenuState["nav_modifiers"]) : ""
-	val_mod := MenuState.Has("val_modifiers")
-		? Trim(MenuState["val_modifiers"]) : "alt"
-	if (!LLM_Menu_IsValidModifierString(nav_mod)
-			|| !LLM_Menu_IsValidModifierString(val_mod))
-		return false
-
-	nav_prefix := LLM_Menu_ShortcutToAhk(nav_mod == "" ? "a" : nav_mod . "+a")
-	val_prefix := LLM_Menu_ShortcutToAhk(val_mod == "" ? "a" : val_mod . "+a")
-	if (nav_prefix != "")
-		nav_prefix := SubStr(nav_prefix, 1, -1)
-	if (val_prefix != "")
-		val_prefix := SubStr(val_prefix, 1, -1)
-	if (nav_mod != "" && nav_prefix == "")
-			|| (val_mod != "" && val_prefix == "")
-		return false
+	nav_prefix := Prefixes["nav_prefix"]
+	val_prefix := Prefixes["val_prefix"]
 	Plan := [
 		_LLM_Menu_NavBindingRecord("~" . nav_prefix . "Up",
 			(*) => _LLM_Nav_Cycle(-1)),
@@ -321,14 +280,13 @@ _LLM_Menu_RestoreNavBindingPlan(OldPlan, CandidatePlan, HotkeyFn) {
 	OldIndex := _LLM_Menu_NavBindingIndex(OldPlan)
 	Restored := true
 	for Entry in CandidatePlan {
-		Spec := Entry["spec"]
-		if OldIndex.Has(Spec)
+		if OldIndex.Has(Entry["native_id"])
 			continue
-		if !_LLM_Menu_NavDisableIfPresent(Spec, HotkeyFn)
+		if !_LLM_Menu_NavDisableIfPresent(Entry["native_spec"], HotkeyFn)
 			Restored := false
 	}
 	for Entry in OldPlan {
-		try HotkeyFn.Call(Entry["spec"], Entry["callback"], "On")
+		try HotkeyFn.Call(Entry["native_spec"], Entry["callback"], "On")
 		catch
 			Restored := false
 	}
@@ -344,13 +302,13 @@ _LLM_Menu_LogNavBindingFailure(Message, LogFn := 0) {
 }
 
 _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
-		LogFn := 0, ResetFn := 0) {
+		LogFn := 0, ResetFn := 0, KeyResolverFn := 0) {
 	global _LLM_Menu, _LLM_Menu_NavSlotPlans, _LLM_Menu_NavActiveSlot
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return _LLM_Menu_PrepareNavHotkeys(MenuState, HotkeyFn, HotIfFn,
-			LogFn, ResetFn)
+			LogFn, ResetFn, KeyResolverFn)
 		finally Critical(InheritedCritical)
 	}
 
@@ -363,6 +321,24 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 		return false
 	}
 	CandidatePlan := Built["plan"]
+	TriggerConflict := _LLM_Menu_RuntimeTriggerNavCollision(CandidatePlan,
+		KeyResolverFn)
+	if !TriggerConflict["ok"] {
+		_LLM_Menu_LogNavBindingFailure(
+			"Navigation hotkeys rejected: invalid collision state.", LogFn)
+		return false
+	}
+	if TriggerConflict["identity"] != "" {
+		_LLM_Menu_LogNavBindingFailure(
+			"Navigation hotkeys rejected: a chord is owned by the prediction trigger.",
+			LogFn)
+		return false
+	}
+	if !_LLM_Menu_NavPlanIsValid(CandidatePlan, ResolvedMenu) {
+		_LLM_Menu_LogNavBindingFailure(
+			"Navigation hotkeys rejected: invalid candidate owner.", LogFn)
+		return false
+	}
 	if !(_LLM_Menu_NavActiveSlot == 0 || _LLM_Menu_NavActiveSlot == 1
 			|| _LLM_Menu_NavActiveSlot == 2) {
 		_LLM_Menu_LogNavBindingFailure(
@@ -395,12 +371,13 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 				HotIfFn.Call(SlotPredicate)
 				for Entry in CandidatePlan {
 					AttemptedPlan.Push(Entry)
-					HotkeyFn.Call(Entry["spec"], Entry["callback"], "On")
+					HotkeyFn.Call(Entry["native_spec"], Entry["callback"], "On")
 				}
 				CandidateIndex := _LLM_Menu_NavBindingIndex(CandidatePlan)
 				for Entry in OldPlan {
-					if !CandidateIndex.Has(Entry["spec"])
-							&& !_LLM_Menu_NavDisableIfPresent(Entry["spec"],
+					if !CandidateIndex.Has(Entry["native_id"])
+							&& !_LLM_Menu_NavDisableIfPresent(
+								Entry["native_spec"],
 								HotkeyFn)
 						throw Error("retired navigation variant could not be disabled")
 				}
@@ -451,9 +428,9 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 }
 
 _LLM_Menu_PrepareNavBindingCandidate(CandidateMenu, HotkeyFn := 0,
-		HotIfFn := 0, LogFn := 0, ResetFn := 0) {
+		HotIfFn := 0, LogFn := 0, ResetFn := 0, KeyResolverFn := 0) {
 	return _LLM_Menu_PrepareNavHotkeys(CandidateMenu, HotkeyFn, HotIfFn,
-		LogFn, ResetFn)
+		LogFn, ResetFn, KeyResolverFn)
 }
 
 _LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures, CandidateMenu,
@@ -464,11 +441,13 @@ _LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures, CandidateMenu,
 			|| !(Owner is Map) || !Owner.Has("slot") || !Owner.Has("plan")
 		return false
 	Slot := Owner["slot"]
-	if !(Slot == 1 || Slot == 2) || !_LLM_Menu_NavSlotPlans.Has(Slot)
-			|| !(_LLM_Menu_NavSlotPlans[Slot] == Owner["plan"])
-		return false
 	PreviousCritical := Critical("On")
 	try {
+		if !(Slot == 1 || Slot == 2)
+				|| !_LLM_Menu_NavSlotPlans.Has(Slot)
+				|| !(_LLM_Menu_NavSlotPlans[Slot] == Owner["plan"])
+				|| !_LLM_Menu_NavPlanIsValid(Owner["plan"], CandidateMenu)
+			return false
 		Features := CandidateFeatures
 		_LLM_Menu := CandidateMenu
 		_LLM_Menu_NavHotkeysBound := Owner["plan"]
@@ -478,14 +457,18 @@ _LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures, CandidateMenu,
 }
 
 LLM_Menu_BindNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
-		LogFn := 0, ResetFn := 0) {
+		LogFn := 0, ResetFn := 0, KeyResolverFn := 0) {
 	Owner := _LLM_Menu_PrepareNavHotkeys(MenuState, HotkeyFn, HotIfFn,
-		LogFn, ResetFn)
+		LogFn, ResetFn, KeyResolverFn)
 	if !(Owner is Map)
 		return false
 	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavActiveSlot
+	global _LLM_Menu
+	ResolvedMenu := MenuState is Map ? MenuState : _LLM_Menu
 	PreviousCritical := Critical("On")
 	try {
+		if !_LLM_Menu_NavPlanIsValid(Owner["plan"], ResolvedMenu)
+			return false
 		_LLM_Menu_NavHotkeysBound := Owner["plan"]
 		_LLM_Menu_NavActiveSlot := Owner["slot"]
 		return true

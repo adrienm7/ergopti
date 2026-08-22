@@ -108,6 +108,12 @@ _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
 	if !FirstRestore
 		return true
+	; A rejected persisted trigger can still own its old native chord until the
+	; cleanup recovery proves Off. Do not publish any contextual variant while
+	; that global owner is still live, otherwise AHK precedence recreates the
+	; exact cross-owner ambiguity the collision policy rejected.
+	if _LLM_Menu_TriggerRecoveryPending()
+		return false
 	if !HasMethod(ProfileFn, "Call")
 		ProfileFn := LLM_Menu_BindProfileHotkeys
 	if !HasMethod(NavFn, "Call")
@@ -125,6 +131,9 @@ _LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 		NavFn := 0) {
 	if _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn, NavFn)
 		return true
+	if _LLM_Menu_TriggerRecoveryPending()
+		throw TrayRootRetryPendingError(
+			"initial LLM trigger cleanup is pending before contextual hotkeys")
 	if _LLM_Menu_ProfileHotkeyRetryPending()
 		throw TrayRootRetryPendingError(
 			"initial LLM profile hotkeys are pending a bounded retry")

@@ -39,6 +39,24 @@ global _LLM_Menu_TriggerRecovery := false
 global _LLM_Menu_TriggerRecoveryNextId := 0
 global _LLM_Menu_TriggerFailureNoticeKey := ""
 
+_LLM_Menu_TriggerKeyUsesNativeSyntax(Key) {
+	if !(Key is String) || Key == ""
+		return true
+	; The shared chord grammar deliberately accepts physical VK/SC names for
+	; low-level driver shortcuts. The LLM trigger cannot safely accept raw AHK
+	; syntax: VK/SC aliases overlap named contextual variants, wildcard variants
+	; cover additional modifiers, lateral modifier keys split one chord into two
+	; actions, and an " Up" suffix adds a release action to the same physical
+	; press. Keep that syntax out of this setting while leaving the shared
+	; registrar contract unchanged.
+	if RegExMatch(Key,
+			"i)^(?:vk[0-9a-f]+(?:sc[0-9a-f]+)?|sc[0-9a-f]+)$")
+		return true
+	if RegExMatch(Key, "i)^(?:l|r)(?:ctrl|control|alt|shift|win)$")
+		return true
+	return RegExMatch(Key, "[\s*~$<>^!#&]") != 0
+}
+
 LLM_Menu_ShortcutToAhk(raw) {
 	if (Type(raw) = "String" && Trim(raw) = "")
 		return ""
@@ -48,11 +66,461 @@ LLM_Menu_ShortcutToAhk(raw) {
 			Parsed["err"])
 		return ""
 	}
+	if _LLM_Menu_TriggerKeyUsesNativeSyntax(Parsed["key"]) {
+		try LoggerWarn("LLM",
+			"Rejected trigger shortcut '{1}': native AutoHotkey key syntax is not allowed.",
+			raw)
+		return ""
+	}
+	; Raw pointer observers own wildcard mouse-button and wheel variants, so every modified or
+	; unmodified spelling overlaps their physical surface. A trigger variant would
+	; eclipse activity tracking for that chord and must be rejected here.
+	if RegExMatch(Parsed["key"],
+			"i)^(?:[lrm]button|xbutton[12]|wheel(?:up|down|left|right))$") {
+		try LoggerWarn("LLM",
+			"Rejected trigger shortcut '{1}': the pointer key is reserved by the input dispatcher.",
+			raw)
+		return ""
+	}
 	Native := HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"])
 	if (Native = "")
 		try LoggerWarn("LLM",
 			"Rejected trigger shortcut '{1}': a modifier has no Windows equivalent.", raw)
 	return Native
+}
+
+LLM_Menu_IsValidModifierString(Raw) {
+	if !(Raw is String)
+		return false
+	Value := Trim(Raw)
+	if Value == ""
+		return true
+	for Token in StrSplit(Value, "+") {
+		if Trim(Token) == ""
+			return false
+	}
+	return LLM_Menu_ShortcutToAhk(Value . "+a") != ""
+}
+
+_LLM_Menu_ParseHotkeyNativeSpec(Spec) {
+	if !(Spec is String)
+		return false
+	Raw := StrLower(Trim(Spec))
+	if Raw == ""
+		return false
+	; HotIf receives the permanent name established by the first variant. Tilde
+	; and hook-forcing dollar prefixes are variant properties, and modifier
+	; symbols may be written in any order.
+	Modifiers := Map()
+	Wildcard := false
+	KeyStart := 1
+	Loop StrLen(Raw) {
+		Ch := SubStr(Raw, A_Index, 1)
+		if Ch == "<" || Ch == ">"
+			return false
+		if Ch == "~" || Ch == "$" {
+			KeyStart := A_Index + 1
+			continue
+		}
+		if Ch == "*" {
+			Wildcard := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		if Ch == "^" || Ch == "!" || Ch == "+" || Ch == "#" {
+			Modifiers[Ch] := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		break
+	}
+	Key := SubStr(Raw, KeyStart)
+	if Key == "" || InStr(Key, "&")
+		return false
+	return Map("modifiers", Modifiers, "wildcard", Wildcard, "key", Key)
+}
+
+_LLM_Menu_HotkeyIdentityPrefix(Parsed) {
+	if !(Parsed is Map) || !(Parsed.Get("modifiers", 0) is Map)
+		return false
+	Identity := Parsed.Get("wildcard", false) ? "*" : ""
+	Modifiers := Parsed["modifiers"]
+	for Prefix in ["^", "!", "+", "#"] {
+		if Modifiers.Has(Prefix)
+			Identity .= Prefix
+	}
+	return Identity
+}
+
+; Textual identity is intentionally retained for HotIf's permanent-name and
+; per-plan lookup contract. Cross-owner admission uses the physical identity
+; below because distinct character spellings can resolve to one native chord.
+_LLM_Menu_HotkeyNativeIdentity(Spec) {
+	Parsed := _LLM_Menu_ParseHotkeyNativeSpec(Spec)
+	Prefix := _LLM_Menu_HotkeyIdentityPrefix(Parsed)
+	if !(Prefix is String)
+		return ""
+	Key := Parsed["key"]
+	if RegExMatch(Key, "^(vk|sc)([0-9a-f]+)$", &Match) {
+		Code := Integer("0x" . Match[2])
+		if Code <= 0 || (Match[1] == "vk" && Code > 0xFF)
+				|| (Match[1] == "sc" && Code > 0x1FF)
+			return ""
+		Key := Match[1] == "vk" ? "vk" . Format("{:02x}", Code)
+			: "sc" . Format("{:03x}", Code)
+	}
+	return Prefix . Key
+}
+
+_LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn := 0) {
+	if HasMethod(KeyResolverFn, "Call")
+		return KeyResolverFn
+	return HotkeyRegistrarNativeKeyResolverSnapshot(
+		KeyResolverFn is Map ? KeyResolverFn : 0)
+}
+
+_LLM_Menu_HotkeyResolvedDescriptor(Spec, KeyResolverFn := 0) {
+	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	if !HasMethod(KeyResolverFn, "Call")
+		return false
+	Descriptor := HotkeyRegistrarResolvedNativeDescriptor(Spec, KeyResolverFn)
+	return HotkeyRegistrarResolvedDescriptorIsValid(Descriptor)
+		? Descriptor : false
+}
+
+_LLM_Menu_HotkeyPhysicalIdentity(Spec, KeyResolverFn := 0) {
+	Descriptor := _LLM_Menu_HotkeyResolvedDescriptor(Spec, KeyResolverFn)
+	return Descriptor is Map ? Descriptor["identity"] : ""
+}
+
+_LLM_Menu_HotkeyPhysicalIdentityIsValid(Identity) {
+	if !(Identity is String)
+		return false
+	if !RegExMatch(Identity,
+			"^\*?\^?!?\+?#?(vk|sc)([0-9A-F]{4})$", &Match)
+		return false
+	Code := Integer("0x" . Match[2])
+	return Code > 0 && ((Match[1] == "vk" && Code <= 0xFF)
+		|| (Match[1] == "sc" && Code <= 0x1FF))
+}
+
+; Compatibility name retained for the profile and navigation predicates.
+_LLM_Menu_NavNativeIdentity(Spec) {
+	return _LLM_Menu_HotkeyNativeIdentity(Spec)
+}
+
+_LLM_Menu_ContextualModifierSnapshot(MenuState := 0) {
+	global _LLM_Menu
+	if MenuState is Map
+		Source := MenuState
+	else if (MenuState is Integer) && MenuState == 0
+		Source := _LLM_Menu
+	else
+		return false
+	if !(Source is Map)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		NavModifiers := Source.Has("nav_modifiers")
+			? Source["nav_modifiers"] : ""
+		ValModifiers := Source.Has("val_modifiers")
+			? Source["val_modifiers"] : "alt"
+		return Map("nav_modifiers", NavModifiers,
+			"val_modifiers", ValModifiers)
+	} finally Critical(PreviousCritical)
+}
+
+_LLM_Menu_BuildNavModifierPrefixes(MenuState) {
+	if !(MenuState is Map)
+		return false
+	if (MenuState.Has("nav_modifiers")
+			&& !(MenuState["nav_modifiers"] is String))
+		return false
+	if (MenuState.Has("val_modifiers")
+			&& !(MenuState["val_modifiers"] is String))
+		return false
+	NavModifiers := MenuState.Has("nav_modifiers")
+		? Trim(MenuState["nav_modifiers"]) : ""
+	ValModifiers := MenuState.Has("val_modifiers")
+		? Trim(MenuState["val_modifiers"]) : "alt"
+	if (!LLM_Menu_IsValidModifierString(NavModifiers)
+			|| !LLM_Menu_IsValidModifierString(ValModifiers))
+		return false
+
+	NavPrefix := LLM_Menu_ShortcutToAhk(NavModifiers == ""
+		? "a" : NavModifiers . "+a")
+	ValPrefix := LLM_Menu_ShortcutToAhk(ValModifiers == ""
+		? "a" : ValModifiers . "+a")
+	if NavPrefix != ""
+		NavPrefix := SubStr(NavPrefix, 1, -1)
+	if ValPrefix != ""
+		ValPrefix := SubStr(ValPrefix, 1, -1)
+	if (NavModifiers != "" && NavPrefix == "")
+			|| (ValModifiers != "" && ValPrefix == "")
+		return false
+	return Map("nav_prefix", NavPrefix, "val_prefix", ValPrefix)
+}
+
+_LLM_Menu_AddContextualHotkeyOwner(Owners, Spec, OwnerName,
+		KeyResolverFn := 0) {
+	Identity := _LLM_Menu_HotkeyPhysicalIdentity(Spec, KeyResolverFn)
+	return _LLM_Menu_AddContextualPhysicalOwner(Owners, Identity, OwnerName)
+}
+
+_LLM_Menu_AddContextualPhysicalOwner(Owners, Identity, OwnerName) {
+	if !(Owners is Map) || !_LLM_Menu_HotkeyPhysicalIdentityIsValid(Identity)
+			|| !(OwnerName is String) || OwnerName == ""
+		return false
+	if Owners.Has(Identity) && Owners[Identity] != OwnerName
+		Owners[Identity] .= " and " . OwnerName
+	else
+		Owners[Identity] := OwnerName
+	return true
+}
+
+_LLM_Menu_AddPublishedPlanOwners(Owners, Plan, OwnerName, ExpectedLength) {
+	if !(Plan is Array) || !(ExpectedLength is Integer)
+			|| ExpectedLength < 1 || Plan.Length != ExpectedLength
+		return false
+	Loop Plan.Length {
+		if !Plan.Has(A_Index)
+			return false
+		Entry := Plan[A_Index]
+		if !_LLM_Menu_PlanEntryDescriptorIsValid(Entry)
+			return false
+		Identity := Entry.Get("physical_id", "")
+		if !_LLM_Menu_AddContextualPhysicalOwner(Owners, Identity, OwnerName)
+			return false
+	}
+	return true
+}
+
+_LLM_Menu_PlanEntryDescriptorIsValid(Entry) {
+	if !(Entry is Map)
+		return false
+	Descriptor := Entry.Get("descriptor", 0)
+	if !HotkeyRegistrarResolvedDescriptorIsValid(Descriptor)
+		return false
+	Spec := Entry.Get("spec", "")
+	NativeSpec := Entry.Get("native_spec", "")
+	NativeId := Entry.Get("native_id", "")
+	PhysicalId := Entry.Get("physical_id", "")
+	return Spec is String && Spec != ""
+		&& Descriptor["logical_spec"] == StrLower(Spec)
+		&& Descriptor["native_spec"] == NativeSpec
+		&& Descriptor["identity"] == PhysicalId
+		&& NativeId != ""
+		&& NativeId == _LLM_Menu_NavNativeIdentity(NativeSpec)
+}
+
+_LLM_Menu_ContextualPublishedOwnerSnapshot() {
+	global _LLM_Menu_ProfileHotkeyOwner
+	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavActiveSlot
+	PreviousCritical := Critical("On")
+	try {
+		ProfileOwner := _LLM_Menu_ProfileHotkeyOwner
+		NavPlan := _LLM_Menu_NavHotkeysBound
+		NavSlot := _LLM_Menu_NavActiveSlot
+	} finally Critical(PreviousCritical)
+
+	ProfilePublished := false
+	ProfilePlan := 0
+	if ProfileOwner is Map {
+		Ready := ProfileOwner.Get("ready", false)
+		Degraded := ProfileOwner.Get("degraded", false)
+		if ((Ready is Integer) && Ready == 1
+				&& (Degraded is Integer) && Degraded == 0) {
+			ProfilePublished := true
+			ProfilePlan := ProfileOwner.Get("plan", 0)
+		}
+	}
+	NavPublished := (NavSlot == 1 || NavSlot == 2)
+		&& (NavPlan is Array) && NavPlan.Length > 0
+	return Map(
+		"profile_published", ProfilePublished,
+		"profile_plan", ProfilePlan,
+		"nav_published", NavPublished,
+		"nav_plan", NavPlan)
+}
+
+_LLM_Menu_AttachPlanPhysicalIdentities(Plan, KeyResolverFn := 0) {
+	if !(Plan is Array)
+		return false
+	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	if !HasMethod(KeyResolverFn, "Call")
+		return false
+	Staged := []
+	SeenNative := Map()
+	SeenPhysical := Map()
+	Loop Plan.Length {
+		if !Plan.Has(A_Index)
+			return false
+		Entry := Plan[A_Index]
+		if !(Entry is Map)
+			return false
+		Descriptor := _LLM_Menu_HotkeyResolvedDescriptor(
+			Entry.Get("spec", ""), KeyResolverFn)
+		if !(Descriptor is Map)
+			return false
+		NativeId := _LLM_Menu_HotkeyNativeIdentity(
+			Descriptor["native_spec"])
+		PhysicalId := Descriptor["identity"]
+		if NativeId == "" || SeenNative.Has(NativeId)
+				|| SeenPhysical.Has(PhysicalId)
+			return false
+		SeenNative[NativeId] := true
+		SeenPhysical[PhysicalId] := true
+		Staged.Push(Map("entry", Entry, "physical_id", PhysicalId,
+			"native_spec", Descriptor["native_spec"],
+			"native_id", NativeId, "descriptor", Descriptor))
+	}
+	for Item in Staged {
+		Entry := Item["entry"]
+		Entry["physical_id"] := Item["physical_id"]
+		Entry["native_spec"] := Item["native_spec"]
+		Entry["native_id"] := Item["native_id"]
+		Entry["descriptor"] := Item["descriptor"]
+	}
+	return true
+}
+
+_LLM_Menu_BuildContextualHotkeyOwners(MenuState, KeyResolverFn := 0) {
+	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	if !HasMethod(KeyResolverFn, "Call")
+		return false
+	Published := _LLM_Menu_ContextualPublishedOwnerSnapshot()
+	Owners := Map()
+	if !_LLM_Menu_AddContextualHotkeyOwner(Owners, "Tab",
+			"tooltip acceptance", KeyResolverFn)
+		return false
+	; The contextual profile surface is a fixed Ctrl+1..9 contract. Deriving it
+	; from currently available profiles would let a later CRUD action introduce
+	; a collision that the global trigger had already claimed.
+	if Published["profile_published"] {
+		if !_LLM_Menu_AddPublishedPlanOwners(Owners,
+				Published["profile_plan"], "profile selection", 9)
+			return false
+	} else {
+		Loop 9 {
+			if !_LLM_Menu_AddContextualHotkeyOwner(Owners, "^" . A_Index,
+					"profile selection", KeyResolverFn)
+				return false
+		}
+	}
+	if Published["nav_published"] {
+		if !_LLM_Menu_AddPublishedPlanOwners(Owners,
+				Published["nav_plan"], "prediction navigation", 12)
+			return false
+	} else {
+		Prefixes := _LLM_Menu_BuildNavModifierPrefixes(MenuState)
+		if !(Prefixes is Map)
+			return false
+		NavPrefix := Prefixes["nav_prefix"]
+		ValPrefix := Prefixes["val_prefix"]
+		for Spec in ["~" . NavPrefix . "Up", "~" . NavPrefix . "Down"] {
+			if !_LLM_Menu_AddContextualHotkeyOwner(Owners, Spec,
+					"prediction navigation", KeyResolverFn)
+				return false
+		}
+		Loop 10 {
+			Digit := A_Index == 10 ? "0" : String(A_Index)
+			if !_LLM_Menu_AddContextualHotkeyOwner(Owners, ValPrefix . Digit,
+					"prediction navigation", KeyResolverFn)
+				return false
+		}
+	}
+	return Owners
+}
+
+_LLM_Menu_CheckTriggerContextCollision(TriggerAhk, MenuState,
+		KeyResolverFn := 0, CapturedIdentity := "") {
+	if !(TriggerAhk is String)
+		return Map("ok", false, "identity", "", "owner", "",
+			"descriptor", false)
+	if TriggerAhk == ""
+		return Map("ok", true, "identity", "", "owner", "",
+			"descriptor", false)
+	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	if !HasMethod(KeyResolverFn, "Call")
+		return Map("ok", false, "identity", "", "owner", "",
+			"descriptor", false)
+	if !(CapturedIdentity is String)
+		return Map("ok", false, "identity", "", "owner", "",
+			"descriptor", false)
+	Descriptor := false
+	if CapturedIdentity != ""
+		Identity := CapturedIdentity
+	else {
+		Descriptor := _LLM_Menu_HotkeyResolvedDescriptor(TriggerAhk,
+			KeyResolverFn)
+		Identity := Descriptor is Map ? Descriptor["identity"] : ""
+	}
+	Owners := _LLM_Menu_BuildContextualHotkeyOwners(MenuState, KeyResolverFn)
+	if !_LLM_Menu_HotkeyPhysicalIdentityIsValid(Identity) || !(Owners is Map)
+		return Map("ok", false, "identity", Identity, "owner", "",
+			"descriptor", Descriptor)
+	return Map("ok", true, "identity", Identity,
+		"owner", Owners.Get(Identity, ""), "descriptor", Descriptor)
+}
+
+_LLM_Menu_RuntimeTriggerNativeIdentities() {
+	global _LLM_Menu_TriggerHandle, _LLM_Menu_TriggerAhk
+	global _LLM_Menu_TriggerRecoveryHandles
+	PreviousCritical := Critical("On")
+	try {
+		PrimaryHandle := _LLM_Menu_TriggerHandle
+		PrimaryAhk := _LLM_Menu_TriggerAhk
+		if !(_LLM_Menu_TriggerRecoveryHandles is Array)
+			return false
+		RecoveryHandles := _LLM_Menu_TriggerRecoveryHandles.Clone()
+	} finally Critical(PreviousCritical)
+	Identities := Map()
+	if !(PrimaryAhk is String)
+		return false
+	if PrimaryAhk != "" {
+		if !(PrimaryHandle is String) || PrimaryHandle == ""
+			return false
+		PrimaryIdentity := HotkeyRegistrarPhysicalIdentityOf(PrimaryHandle)
+		if !_LLM_Menu_HotkeyPhysicalIdentityIsValid(PrimaryIdentity)
+			return false
+		Identities[PrimaryIdentity] := true
+	} else if PrimaryHandle != "" {
+		return false
+	}
+	for Handle in RecoveryHandles {
+		Identity := HotkeyRegistrarPhysicalIdentityOf(Handle)
+		if !_LLM_Menu_HotkeyPhysicalIdentityIsValid(Identity)
+			return false
+		Identities[Identity] := true
+	}
+	return Identities
+}
+
+_LLM_Menu_RuntimeTriggerPlanCollision(CandidatePlan, KeyResolverFn := 0) {
+	if !(CandidatePlan is Array)
+		return Map("ok", false, "identity", "")
+	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	if !HasMethod(KeyResolverFn, "Call")
+		return Map("ok", false, "identity", "")
+	if !_LLM_Menu_AttachPlanPhysicalIdentities(CandidatePlan, KeyResolverFn)
+		return Map("ok", false, "identity", "")
+	TriggerIdentities := _LLM_Menu_RuntimeTriggerNativeIdentities()
+	if !(TriggerIdentities is Map)
+		return Map("ok", false, "identity", "")
+	for Entry in CandidatePlan {
+		if !(Entry is Map)
+			return Map("ok", false, "identity", "")
+		Identity := Entry.Get("physical_id", "")
+		if !_LLM_Menu_HotkeyPhysicalIdentityIsValid(Identity)
+			return Map("ok", false, "identity", "")
+		if TriggerIdentities.Has(Identity)
+			return Map("ok", true, "identity", Identity)
+	}
+	return Map("ok", true, "identity", "")
+}
+
+_LLM_Menu_RuntimeTriggerNavCollision(CandidatePlan, KeyResolverFn := 0) {
+	return _LLM_Menu_RuntimeTriggerPlanCollision(CandidatePlan, KeyResolverFn)
 }
 
 _LLM_Menu_TriggerCallback(CallbackFn := 0) {
@@ -686,16 +1154,43 @@ _LLM_Menu_AcceptTriggerReplay(RawText) {
 	return true
 }
 
+_LLM_Menu_RejectTriggerReplay(RawText, Detail, OldHandle,
+		HotkeyFn, SchedulerFn, RefreshFn, NotifyFn, ReportFailure := true) {
+	global LLM_TRIGGER_STATUS_ERROR, LLM_TRIGGER_STATUS_CLEANUP_PENDING
+	RemainingHandles := []
+	if OldHandle != "" {
+		Retired := _HotkeyRegistrarRetire(OldHandle, HotkeyFn)
+		if !Retired && HotkeyRegistrarChordOf(OldHandle) != ""
+			RemainingHandles.Push(OldHandle)
+	}
+	if RemainingHandles.Length > 0 {
+		RecoveryState := Map(
+			"old_string", RawText,
+			"recovery_complete_status", LLM_TRIGGER_STATUS_ERROR,
+			"recovery_handles", RemainingHandles)
+		_LLM_Menu_PublishTriggerRuntime(RawText, "", "",
+			LLM_TRIGGER_STATUS_CLEANUP_PENDING, RemainingHandles)
+		_LLM_Menu_InstallTriggerRecovery("cleanup", RecoveryState, 0,
+			HotkeyFn, SchedulerFn, RefreshFn)
+	} else {
+		_LLM_Menu_PublishTriggerRuntime(RawText, "", "",
+			LLM_TRIGGER_STATUS_ERROR, [])
+	}
+	if ReportFailure
+		_LLM_Menu_ReportTriggerFailure(RawText, "apply", Detail)
+	return _LLM_Menu_NotifyTriggerApplyFailure(RawText, NotifyFn)
+}
+
 ; Boot/reload replay has no write to perform because the loader already made
 ; RawText authoritative. It still uses reserve-Off then Activate, and publishes
 ; both handles if exception-before-mutation Off leaves the previous one live
 LLM_Menu_ApplyTriggerShortcut(raw, HotkeyFn := 0, ProbeFn := 0, CallbackFn := 0,
-		SchedulerFn := 0, RefreshFn := 0, NotifyFn := 0) {
+		SchedulerFn := 0, RefreshFn := 0, NotifyFn := 0, KeyResolverFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return LLM_Menu_ApplyTriggerShortcut(raw, HotkeyFn, ProbeFn,
-			CallbackFn, SchedulerFn, RefreshFn, NotifyFn)
+			CallbackFn, SchedulerFn, RefreshFn, NotifyFn, KeyResolverFn)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu_TriggerHandle, _LLM_Menu_TriggerAhk
@@ -707,13 +1202,36 @@ LLM_Menu_ApplyTriggerShortcut(raw, HotkeyFn := 0, ProbeFn := 0, CallbackFn := 0,
 			"an earlier native or durable recovery is still pending")
 		return _LLM_Menu_NotifyTriggerApplyFailure(RawText, NotifyFn)
 	}
-	NewAhk := (RawText = "") ? "" : LLM_Menu_ShortcutToAhk(RawText)
-	if (RawText != "" && NewAhk = "") {
-		_LLM_Menu_PublishTriggerRecovery(LLM_TRIGGER_STATUS_ERROR, [])
-		return _LLM_Menu_NotifyTriggerApplyFailure(RawText, NotifyFn)
-	}
 	OldHandle := _LLM_Menu_TriggerHandle
 	OldAhk := _LLM_Menu_TriggerAhk
+	NewAhk := (RawText = "") ? "" : LLM_Menu_ShortcutToAhk(RawText)
+	if (RawText != "" && NewAhk = "") {
+		return _LLM_Menu_RejectTriggerReplay(RawText,
+			"the trigger shortcut is invalid", OldHandle,
+			HotkeyFn, SchedulerFn, RefreshFn, NotifyFn, false)
+	}
+	ContextState := _LLM_Menu_ContextualModifierSnapshot()
+	CapturedIdentity := ""
+	if (NewAhk != "" && NewAhk == OldAhk && OldHandle != "") {
+		CapturedIdentity := HotkeyRegistrarPhysicalIdentityOf(OldHandle)
+		if CapturedIdentity == "" {
+			return _LLM_Menu_RejectTriggerReplay(RawText,
+				"the active trigger owner has no native identity", OldHandle,
+				HotkeyFn, SchedulerFn, RefreshFn, NotifyFn)
+		}
+	}
+	Conflict := _LLM_Menu_CheckTriggerContextCollision(NewAhk, ContextState,
+		KeyResolverFn, CapturedIdentity)
+	if !Conflict["ok"] {
+		return _LLM_Menu_RejectTriggerReplay(RawText,
+			"the contextual hotkey surface is malformed", OldHandle,
+			HotkeyFn, SchedulerFn, RefreshFn, NotifyFn)
+	}
+	if Conflict["owner"] != "" {
+		return _LLM_Menu_RejectTriggerReplay(RawText,
+			"the chord is reserved by " . Conflict["owner"], OldHandle,
+			HotkeyFn, SchedulerFn, RefreshFn, NotifyFn)
+	}
 	if (NewAhk = OldAhk && (NewAhk = "" || OldHandle != "")) {
 		_LLM_Menu_PublishTriggerRuntime(RawText, OldAhk, OldHandle,
 			_LLM_Menu_TriggerStatusForAhk(OldAhk), [])
@@ -736,8 +1254,9 @@ LLM_Menu_ApplyTriggerShortcut(raw, HotkeyFn := 0, ProbeFn := 0, CallbackFn := 0,
 		return _LLM_Menu_AcceptTriggerReplay(RawText)
 	}
 
-	NewHandle := _HotkeyRegistrarReserveOwned(RawText,
-		_LLM_Menu_TriggerCallback(CallbackFn), "llm:trigger", HotkeyFn, ProbeFn)
+	NewHandle := _HotkeyRegistrarReserveResolvedOwned(RawText,
+		_LLM_Menu_TriggerCallback(CallbackFn), "llm:trigger",
+		Conflict["descriptor"], HotkeyFn, ProbeFn)
 	if (NewHandle = "") {
 		_LLM_Menu_PublishTriggerRecovery(LLM_TRIGGER_STATUS_ERROR, [])
 		_LLM_Menu_ReportTriggerFailure(RawText, "reserve",
@@ -927,7 +1446,7 @@ _LLM_Menu_RetainStableTriggerJournal(State, WriterFn, HotkeyFn,
 
 _LLM_Menu_BuildTriggerShortcutPlan(Outcome, RawText, CallbackFn, WriterFn,
 		HotkeyFn, ProbeFn, SchedulerFn, RefreshFn, JournalPort := 0,
-		ReadTriggerFn := 0, JournalPath := "") {
+		ReadTriggerFn := 0, JournalPath := "", KeyResolverFn := 0) {
 	global _LLM_Menu, _LLM_Menu_TriggerHandle, _LLM_Menu_TriggerAhk
 	global _LLM_Menu_TriggerStatus, _LLM_Menu_TriggerRecoveryHandles
 	global _LLM_Menu_TriggerRecovery
@@ -944,6 +1463,11 @@ _LLM_Menu_BuildTriggerShortcutPlan(Outcome, RawText, CallbackFn, WriterFn,
 		OldString := _LLM_Menu["trigger_shortcut"]
 		OldHandle := _LLM_Menu_TriggerHandle
 		OldAhk := _LLM_Menu_TriggerAhk
+		ContextState := Map(
+			"nav_modifiers", _LLM_Menu.Has("nav_modifiers")
+				? _LLM_Menu["nav_modifiers"] : "",
+			"val_modifiers", _LLM_Menu.Has("val_modifiers")
+				? _LLM_Menu["val_modifiers"] : "alt")
 	} finally Critical(PreviousCritical)
 	if RecoveryPending {
 		_LLM_Menu_ReportTriggerFailure(RawText, "edit",
@@ -951,8 +1475,7 @@ _LLM_Menu_BuildTriggerShortcutPlan(Outcome, RawText, CallbackFn, WriterFn,
 		return false
 	}
 	NewAhk := (RawText = "") ? "" : LLM_Menu_ShortcutToAhk(RawText)
-	if (RawText != "" && NewAhk = "")
-		return false
+	CandidateValid := (RawText == "") || NewAhk != ""
 
 	BindingChanged := (NewAhk != OldAhk) || (NewAhk != "" && OldHandle = "")
 	NewHandle := BindingChanged ? "" : OldHandle
@@ -1000,9 +1523,36 @@ _LLM_Menu_BuildTriggerShortcutPlan(Outcome, RawText, CallbackFn, WriterFn,
 			SchedulerFn, RefreshFn)
 		return false
 	}
+	; Candidate syntax has no authority over a prior durable transaction. Refuse
+	; it only after that transaction has reached its stable old state, but still
+	; before native reservation or a candidate WAL/config write.
+	if !CandidateValid
+		return false
+	CapturedIdentity := ""
+	if (!BindingChanged && NewAhk != "") {
+		CapturedIdentity := HotkeyRegistrarPhysicalIdentityOf(OldHandle)
+		if CapturedIdentity == "" {
+			_LLM_Menu_ReportTriggerFailure(RawText, "edit",
+				"the active trigger owner has no native identity")
+			return false
+		}
+	}
+	Conflict := _LLM_Menu_CheckTriggerContextCollision(NewAhk, ContextState,
+		KeyResolverFn, CapturedIdentity)
+	if !Conflict["ok"] {
+		_LLM_Menu_ReportTriggerFailure(RawText, "edit",
+			"the contextual hotkey surface is malformed")
+		return false
+	}
+	if Conflict["owner"] != "" {
+		_LLM_Menu_ReportTriggerFailure(RawText, "edit",
+			"the chord is reserved by " . Conflict["owner"])
+		return false
+	}
 	if (BindingChanged && NewAhk != "") {
-		NewHandle := _HotkeyRegistrarReserveOwned(RawText,
-			_LLM_Menu_TriggerCallback(CallbackFn), "llm:trigger", HotkeyFn, ProbeFn)
+		NewHandle := _HotkeyRegistrarReserveResolvedOwned(RawText,
+			_LLM_Menu_TriggerCallback(CallbackFn), "llm:trigger",
+			Conflict["descriptor"], HotkeyFn, ProbeFn)
 		if (NewHandle = "") {
 			_LLM_Menu_ReportTriggerFailure(RawText, "reserve",
 				"the shared registrar refused the candidate")
@@ -1039,13 +1589,13 @@ _LLM_Menu_BuildTriggerShortcutPlan(Outcome, RawText, CallbackFn, WriterFn,
 LLM_Menu_CommitTriggerShortcut(raw, WriterFn := 0, NotifyFn := 0,
 		HotkeyFn := 0, ProbeFn := 0, CallbackFn := 0, SchedulerFn := 0,
 		RefreshFn := 0, JournalPort := 0, ReadTriggerFn := 0,
-		JournalPath := "") {
+		JournalPath := "", KeyResolverFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return LLM_Menu_CommitTriggerShortcut(raw, WriterFn, NotifyFn,
 			HotkeyFn, ProbeFn, CallbackFn, SchedulerFn, RefreshFn,
-			JournalPort, ReadTriggerFn, JournalPath)
+			JournalPort, ReadTriggerFn, JournalPath, KeyResolverFn)
 		finally Critical(InheritedCritical)
 	}
 	RawText := Trim(String(raw))
@@ -1064,7 +1614,8 @@ LLM_Menu_CommitTriggerShortcut(raw, WriterFn := 0, NotifyFn := 0,
 	Committed := CS_SaveBuilt("the LLM trigger shortcut",
 		_LLM_Menu_BuildTriggerShortcutPlan.Bind(Outcome, RawText, CallbackFn,
 			WriterFn, HotkeyFn, ProbeFn, SchedulerFn, RefreshFn,
-			JournalPort, ReadTriggerFn, JournalPath), GatewayWriter, NotifyFn)
+			JournalPort, ReadTriggerFn, JournalPath, KeyResolverFn),
+		GatewayWriter, NotifyFn)
 	Succeeded := ((Committed is Integer) && Committed == 1)
 		&& Outcome.Get("accepted", false)
 	if Succeeded

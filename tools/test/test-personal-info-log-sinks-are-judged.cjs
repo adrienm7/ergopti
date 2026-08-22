@@ -298,6 +298,18 @@ const JUDGED = [
 	},
 	{
 		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Rejected trigger shortcut '{1}': native AutoHotkey key syntax is not allowed.",
+		verdict: 'not-personal',
+		why: '`raw` is the LLM keyboard chord rejected by the native-syntax admission policy, never a hotstring trigger or replacement.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
+		match: "Rejected trigger shortcut '{1}': the pointer key is reserved by the input dispatcher.",
+		verdict: 'not-personal',
+		why: '`raw` is the LLM keyboard chord rejected because the dispatcher owns that pointer variant, never a hotstring trigger or replacement.'
+	},
+	{
+		file: 'ui/menu/menu_llm/trigger_shortcut.ahk',
 		match: "Rejected trigger shortcut '{1}': a modifier has no Windows equivalent.",
 		verdict: 'not-personal',
 		why: '`raw` is the LLM keyboard chord whose platform modifier mapping failed, never hotstring content.'

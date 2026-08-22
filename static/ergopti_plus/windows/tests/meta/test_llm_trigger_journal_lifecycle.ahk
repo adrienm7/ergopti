@@ -72,7 +72,7 @@ _LLMJG_TransactionOrdersEveryDurableBoundary() {
 	}
 
 	ReconcilePos := InStr(Build, "LLM_TriggerJournalReconcile(", true)
-	ReservePos := InStr(Build, "_HotkeyRegistrarReserveOwned(", true)
+	ReservePos := InStr(Build, "_HotkeyRegistrarReserveResolvedOwned(", true)
 	PendingPos := InStr(Build,
 		"_LLM_TriggerJournalPrepareTransaction(", true)
 	Assert(ReconcilePos > 0 && ReservePos > ReconcilePos

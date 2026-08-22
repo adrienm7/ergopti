@@ -71,6 +71,26 @@ global HOTKEY_KEY_NATIVE := Map(
 	"delete", "delete"
 )
 
+; AutoHotkey v2 resolves these named suffixes by scan code so their number-pad
+; counterparts, which share a virtual key, remain distinct. Keep this list in
+; the native adapter beside the spelling table; ownership comparisons must use
+; the same primary axis as Hotkey::TextToKey rather than comparing both codes.
+global HOTKEY_NATIVE_SC_PRIMARY_KEYS := Map(
+	"numpadenter", true,
+	"delete", true,
+	"del", true,
+	"insert", true,
+	"ins", true,
+	"up", true,
+	"down", true,
+	"left", true,
+	"right", true,
+	"home", true,
+	"end", true,
+	"pgup", true,
+	"pgdn", true
+)
+
 ; Live bindings keyed by handle token, each holding the native spec and the
 ; enabled state. The spec never leaves this file, so exactly one code path can
 ; turn a hotkey off
@@ -141,6 +161,356 @@ HotkeyRegistrarNativeSpec(mods, key) {
 	return spec . NativeKey
 }
 
+_HotkeyRegistrarGetKeyboardLayout() {
+	return DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
+}
+
+_HotkeyRegistrarVkKeyScan(Key, Layout) {
+	return DllCall("VkKeyScanExW", "UShort", Ord(Key),
+		"Ptr", Layout, "Short")
+}
+
+_HotkeyRegistrarGetKeyVK(Key) {
+	return GetKeyVK(Key)
+}
+
+_HotkeyRegistrarGetKeySC(Key) {
+	return GetKeySC(Key)
+}
+
+; One collision decision must resolve every owner against one keyboard layout.
+; Returning a unary bound resolver prevents a layout switch between candidate
+; and contextual-owner probes from producing a torn ownership snapshot.
+HotkeyRegistrarNativeKeyResolverSnapshot(Port := 0) {
+	ResolvedPort := Port is Map ? Port : Map()
+	LayoutFn := ResolvedPort.Get("get_layout", _HotkeyRegistrarGetKeyboardLayout)
+	if !HasMethod(LayoutFn, "Call")
+		return false
+	try Layout := LayoutFn.Call()
+	catch
+		return false
+	if !(Layout is Integer) || Layout == 0
+		return false
+	return _HotkeyRegistrarResolveNativeKeyIdentityAtLayout.Bind(Layout,
+		ResolvedPort)
+}
+
+; Mirrors the supported AutoHotkey v2 Hotkey::TextToKey identity boundary.
+; Single-character suffixes resolve through one captured HKL and acquire any
+; implicit Shift/Ctrl/Alt bits returned by VkKeyScanExW. Named keys use the same
+; VK-vs-SC primary axis as AutoHotkey's public key table.
+HotkeyRegistrarResolveNativeKeyIdentity(Key, Port := 0) {
+	Resolver := HotkeyRegistrarNativeKeyResolverSnapshot(Port)
+	if !HasMethod(Resolver, "Call")
+		return false
+	return Resolver.Call(Key)
+}
+
+_HotkeyRegistrarResolveNativeKeyIdentityAtLayout(Layout, Port, Key) {
+	global HOTKEY_NATIVE_SC_PRIMARY_KEYS
+	if !(Key is String) || Key == "" || !(Port is Map)
+		return false
+	try {
+		if StrLen(Key) == 1 {
+			VkScanFn := Port.Get("vk_scan", _HotkeyRegistrarVkKeyScan)
+			if !HasMethod(VkScanFn, "Call")
+				return false
+			Packed := VkScanFn.Call(Key, Layout)
+			if !(Packed is Integer)
+				return false
+			if Packed == -1 {
+				if !RegExMatch(Key, "i)^[a-z]$")
+					return false
+				Code := Ord(StrUpper(Key))
+				Flags := 0
+			} else {
+				Code := Packed & 0xFF
+				Flags := (Packed >> 8) & 0xFF
+				if Code == 0 || (Flags & 0xF8)
+					return false
+			}
+			; AHK deliberately makes alphabetic hotkeys case-insensitive by removing
+			; the Shift bit which VkKeyScanExW reports for uppercase letters.
+			if Code >= 0x41 && Code <= 0x5A
+				Flags := Flags & 0xFE
+			; AltGr is a right-sided Ctrl+Alt owner while neutral modifiers expand
+			; across left/right slots. A scalar identity cannot model their overlap,
+			; so reject this LLM trigger key rather than authorize two owners.
+			if (Flags & 0x06) == 0x06
+				return false
+			Implicit := ""
+			if Flags & 0x02
+				Implicit .= "^"
+			if Flags & 0x04
+				Implicit .= "!"
+			if Flags & 0x01
+				Implicit .= "+"
+			return Map("axis", "vk", "code", Code,
+				"implicit_modifiers", Implicit)
+		}
+
+		LowerKey := StrLower(Key)
+		if RegExMatch(LowerKey, "^vk([0-9a-f]{2})$", &ExplicitMatch) {
+			Code := Integer("0x" . ExplicitMatch[1])
+			if Code <= 0 || Code > 0xFF
+				return false
+			return Map("axis", "vk", "code", Code,
+				"implicit_modifiers", "")
+		}
+		if RegExMatch(LowerKey, "^sc([0-9a-f]{3})$", &ExplicitMatch) {
+			Code := Integer("0x" . ExplicitMatch[1])
+			if Code <= 0 || Code > 0x1FF
+				return false
+			return Map("axis", "sc", "code", Code,
+				"implicit_modifiers", "")
+		}
+		if RegExMatch(LowerKey, "^(?:vk|sc)[0-9a-f]")
+			return false
+		if HOTKEY_NATIVE_SC_PRIMARY_KEYS.Has(LowerKey) {
+			ResolveFn := Port.Get("get_sc", _HotkeyRegistrarGetKeySC)
+			Axis := "sc"
+		} else {
+			ResolveFn := Port.Get("get_vk", _HotkeyRegistrarGetKeyVK)
+			Axis := "vk"
+		}
+		if !HasMethod(ResolveFn, "Call")
+			return false
+		Code := ResolveFn.Call(Key)
+		if !(Code is Integer) || Code <= 0
+				|| (Axis == "vk" && Code > 0xFF)
+				|| (Axis == "sc" && Code > 0x1FF)
+			return false
+		return Map("axis", Axis, "code", Code,
+			"implicit_modifiers", "")
+	} catch as e {
+		try LoggerError("HotkeyRegistrar",
+			"Could not resolve native hotkey key '{1}': {2}.", Key, e.Message)
+		return false
+	}
+}
+
+_HotkeyRegistrarParseNativeSpec(Spec) {
+	if !(Spec is String)
+		return false
+	Raw := StrLower(Trim(Spec))
+	if Raw == ""
+		return false
+	Modifiers := Map()
+	Tilde := false
+	Dollar := false
+	Wildcard := false
+	KeyStart := 1
+	Loop StrLen(Raw) {
+		Ch := SubStr(Raw, A_Index, 1)
+		if Ch == "<" || Ch == ">"
+			return false
+		if Ch == "~" {
+			Tilde := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		if Ch == "$" {
+			Dollar := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		if Ch == "*" {
+			Wildcard := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		if Ch == "^" || Ch == "!" || Ch == "+" || Ch == "#" {
+			Modifiers[Ch] := true
+			KeyStart := A_Index + 1
+			continue
+		}
+		break
+	}
+	Key := SubStr(Raw, KeyStart)
+	if Key == "" || InStr(Key, "&")
+		return false
+	return Map("modifiers", Modifiers, "tilde", Tilde, "dollar", Dollar,
+		"wildcard", Wildcard, "key", Key)
+}
+
+_HotkeyRegistrarDescriptorPrefix(Parsed) {
+	if !(Parsed is Map) || !(Parsed.Get("modifiers", 0) is Map)
+		return false
+	Prefix := Parsed.Get("wildcard", false) ? "*" : ""
+	for Symbol in ["^", "!", "+", "#"] {
+		if Parsed["modifiers"].Has(Symbol)
+			Prefix .= Symbol
+	}
+	return Prefix
+}
+
+; VkKeyScanEx can add only neutral Ctrl, Alt and Shift. Ctrl+Alt is rejected
+; earlier because it represents AltGr, whose sided ownership is not scalar.
+_HotkeyRegistrarImplicitModifiersAreCanonical(Value) {
+	return Value is String && (Value == "" || Value == "^" || Value == "!"
+		|| Value == "+" || Value == "^+" || Value == "!+")
+}
+
+/**
+ * Resolves one AHK hotkey spec into an immutable native descriptor. Character
+ * suffixes are converted to explicit VK specs, so a later keyboard-layout
+ * change cannot make Hotkey() register a different physical owner than the
+ * identity used by collision admission.
+ */
+HotkeyRegistrarResolvedNativeDescriptor(Spec, KeyResolverFn := 0) {
+	Parsed := _HotkeyRegistrarParseNativeSpec(Spec)
+	if !(Parsed is Map)
+		return false
+	Resolver := HasMethod(KeyResolverFn, "Call") ? KeyResolverFn
+		: HotkeyRegistrarNativeKeyResolverSnapshot(KeyResolverFn is Map
+			? KeyResolverFn : 0)
+	if !HasMethod(Resolver, "Call")
+		return false
+	try ResolvedKey := Resolver.Call(Parsed["key"])
+	catch
+		return false
+	if !(ResolvedKey is Map)
+		return false
+	Axis := ResolvedKey.Get("axis", "")
+	Code := ResolvedKey.Get("code", 0)
+	ImplicitModifiers := ResolvedKey.Get("implicit_modifiers", "")
+	CharacterKey := StrLen(Parsed["key"]) == 1
+	if !((Axis == "vk" || Axis == "sc") && (Code is Integer)
+			&& Code > 0 && (ImplicitModifiers is String))
+		return false
+	if CharacterKey && Axis != "vk"
+		return false
+	if !_HotkeyRegistrarImplicitModifiersAreCanonical(ImplicitModifiers)
+		return false
+	if !CharacterKey && ImplicitModifiers != ""
+		return false
+	if (Axis == "vk" && Code > 0xFF) || (Axis == "sc" && Code > 0x1FF)
+		return false
+	SourcePrefix := _HotkeyRegistrarDescriptorPrefix(Parsed)
+	if !(SourcePrefix is String)
+		return false
+	VariantPrefix := (Parsed["tilde"] ? "~" : "")
+		. (Parsed["dollar"] ? "$" : "")
+	LogicalSpec := VariantPrefix . SourcePrefix . Parsed["key"]
+	Loop StrLen(ImplicitModifiers) {
+		Symbol := SubStr(ImplicitModifiers, A_Index, 1)
+		Parsed["modifiers"][Symbol] := true
+	}
+	Prefix := _HotkeyRegistrarDescriptorPrefix(Parsed)
+	if !(Prefix is String)
+		return false
+	Identity := Prefix . Axis . Format("{:04X}", Code)
+	; AHK gives an explicitly numeric VK different semantics for named keys
+	; which share a virtual key (Enter/NumpadEnter and several numpad aliases).
+	; Freeze only layout-dependent character suffixes; named suffixes already
+	; have layout-independent parsing and must retain their AHK name.
+	NativeKey := CharacterKey
+		? "vk" . Format("{:02X}", Code)
+		: Parsed["key"]
+	return Map("identity", Identity,
+		"native_spec", VariantPrefix . Prefix . NativeKey,
+		"logical_spec", LogicalSpec,
+		"kind", CharacterKey ? "character" : "named",
+		"axis", Axis,
+		"code", Code,
+		"implicit_modifiers", ImplicitModifiers,
+		"resolver", Resolver)
+}
+
+HotkeyRegistrarResolvedDescriptorIsValid(Descriptor) {
+	if !(Descriptor is Map)
+		return false
+	Identity := Descriptor.Get("identity", "")
+	NativeSpec := Descriptor.Get("native_spec", "")
+	LogicalSpec := Descriptor.Get("logical_spec", "")
+	Kind := Descriptor.Get("kind", "")
+	Axis := Descriptor.Get("axis", "")
+	Code := Descriptor.Get("code", 0)
+	ImplicitModifiers := Descriptor.Get("implicit_modifiers", "")
+	Resolver := Descriptor.Get("resolver", 0)
+	if !(Identity is String) || !(NativeSpec is String)
+			|| !(LogicalSpec is String) || LogicalSpec == ""
+			|| !(Kind == "character" || Kind == "named")
+			|| !(Axis == "vk" || Axis == "sc")
+			|| !(Code is Integer) || Code <= 0
+			|| !_HotkeyRegistrarImplicitModifiersAreCanonical(ImplicitModifiers)
+			|| !HasMethod(Resolver, "Call")
+		return false
+	if !RegExMatch(Identity,
+			"^(\*?\^?!?\+?#?)(vk|sc)([0-9A-F]{4})$", &IdentityMatch)
+		return false
+	IdentityCode := Integer("0x" . IdentityMatch[3])
+	if IdentityMatch[2] != Axis || IdentityCode != Code
+		return false
+	if (Axis == "vk" && Code > 0xFF) || (Axis == "sc" && Code > 0x1FF)
+		return false
+	NativeParsed := _HotkeyRegistrarParseNativeSpec(NativeSpec)
+	LogicalParsed := _HotkeyRegistrarParseNativeSpec(LogicalSpec)
+	if !(NativeParsed is Map) || !(LogicalParsed is Map)
+		return false
+	try ResolvedKey := Resolver.Call(LogicalParsed["key"])
+	catch
+		return false
+	if !(ResolvedKey is Map)
+		return false
+	ResolvedAxis := ResolvedKey.Get("axis", "")
+	ResolvedCode := ResolvedKey.Get("code", 0)
+	ResolvedImplicit := ResolvedKey.Get("implicit_modifiers", "")
+	if ResolvedAxis != Axis || ResolvedCode != Code
+			|| !_HotkeyRegistrarImplicitModifiersAreCanonical(ResolvedImplicit)
+		return false
+	if ImplicitModifiers != ResolvedImplicit
+		return false
+	NativePrefix := _HotkeyRegistrarDescriptorPrefix(NativeParsed)
+	LogicalPrefix := _HotkeyRegistrarDescriptorPrefix(LogicalParsed)
+	NativeVariantPrefix := (NativeParsed["tilde"] ? "~" : "")
+		. (NativeParsed["dollar"] ? "$" : "")
+	LogicalVariantPrefix := (LogicalParsed["tilde"] ? "~" : "")
+		. (LogicalParsed["dollar"] ? "$" : "")
+	ExpectedNativeKey := Kind == "character"
+		? (Axis == "vk" ? "vk" . Format("{:02X}", Code)
+			: "sc" . Format("{:03X}", Code))
+		: LogicalParsed["key"]
+	ExpectedNativeSpec := NativeVariantPrefix . NativePrefix
+		. ExpectedNativeKey
+	ExpectedLogicalSpec := LogicalVariantPrefix . LogicalPrefix
+		. LogicalParsed["key"]
+	ExpectedParsed := Map("modifiers", LogicalParsed["modifiers"].Clone(),
+		"wildcard", LogicalParsed["wildcard"])
+	Loop StrLen(ImplicitModifiers) {
+		Symbol := SubStr(ImplicitModifiers, A_Index, 1)
+		if !(Symbol == "^" || Symbol == "!" || Symbol == "+")
+			return false
+		ExpectedParsed["modifiers"][Symbol] := true
+	}
+	ExpectedPrefix := _HotkeyRegistrarDescriptorPrefix(ExpectedParsed)
+	if !(NativePrefix is String) || !(LogicalPrefix is String)
+			|| !(ExpectedPrefix is String)
+			|| NativePrefix != IdentityMatch[1]
+			|| ExpectedPrefix != IdentityMatch[1]
+			|| NativeSpec !== ExpectedNativeSpec
+			|| LogicalSpec !== ExpectedLogicalSpec
+			|| NativeParsed["tilde"] != LogicalParsed["tilde"]
+			|| NativeParsed["dollar"] != LogicalParsed["dollar"]
+		return false
+	if Kind == "named" {
+		if StrLen(LogicalParsed["key"]) <= 1
+				|| ImplicitModifiers != "" || NativeSpec != LogicalSpec
+			return false
+		return true
+	}
+	if StrLen(LogicalParsed["key"]) != 1
+		return false
+	if Axis != "vk"
+		return false
+	if !RegExMatch(NativeParsed["key"],
+			"^(vk)([0-9a-f]{2})$", &NativeKeyMatch)
+		return false
+	NativeCode := Integer("0x" . NativeKeyMatch[2])
+	return NativeKeyMatch[1] == Axis && NativeCode == Code
+		&& StrLen(NativeKeyMatch[2]) == 2
+}
+
 
 
 
@@ -168,6 +538,19 @@ _HotkeyRegistrarState(Phase, Dispatch := 0, NativeState := "unknown") {
 	return Map("phase", Phase, "dispatch", Dispatch, "native", NativeState)
 }
 
+; A registrar Entry owns its exact AHK lifecycle spec. Call only inside an
+; existing Critical section so the lookup forms one non-yielding ownership
+; snapshot.
+_HotkeyRegistrarOwnsSpec(Entry) {
+	global HOTKEY_REGISTRAR_SPECS
+
+	Spec := Entry["spec"]
+	if !HOTKEY_REGISTRAR_SPECS.Has(Spec)
+			|| (HOTKEY_REGISTRAR_SPECS[Spec] != Entry)
+		return false
+	return true
+}
+
 ; Internal owner-aware seam. HotkeyFn and ProbeFn are injected only by the
 ; behavioural suite; public port arity remains exactly bind(chord, callback).
 _HotkeyRegistrarBindOwned(chordString, callback, Owner := "anonymous",
@@ -184,12 +567,13 @@ _HotkeyRegistrarBindOwned(chordString, callback, Owner := "anonymous",
 	return ""
 }
 
-; Internal staging primitive: claim one physical spec and install its wrapper in
+; Internal staging primitive: claim one exact native spec and install its wrapper in
 ; confirmed native Off state. The returned handle is not an active binding until
 ; _HotkeyRegistrarActivate succeeds, so a durable transaction can prepare it
 ; without publishing the candidate action early.
 _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
-		HotkeyFn := 0, ProbeFn := 0, HotIfFn := 0) {
+		HotkeyFn := 0, ProbeFn := 0, HotIfFn := 0,
+		ResolvedDescriptor := 0) {
 	global HOTKEY_REGISTRAR_BINDINGS, HOTKEY_REGISTRAR_SPECS
 	global HOTKEY_REGISTRAR_NEXT_TOKEN
 
@@ -197,7 +581,6 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 		LoggerError("adapters.hotkey_registrar", "bind(): callback must be a function.")
 		return ""
 	}
-
 	parsed := ChordParse(chordString)
 	if (!parsed["ok"]) {
 		LoggerError("adapters.hotkey_registrar", "bind(): refusing '" . chordString . "' — " . parsed["err"] . ".")
@@ -205,9 +588,20 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 	}
 
 	PhysicalKey := HotkeyRegistrarPhysicalKey(parsed["key"])
-	spec := HotkeyRegistrarNativeSpec(parsed["mods"], PhysicalKey)
-	if (spec = "") {
+	DisplaySpec := HotkeyRegistrarNativeSpec(parsed["mods"], PhysicalKey)
+	if (DisplaySpec = "") {
 		LoggerWarn("adapters.hotkey_registrar", "bind(): '" . chordString . "' names a modifier Windows does not expose.")
+		return ""
+	}
+	PhysicalIdentity := ""
+	spec := DisplaySpec
+	if ResolvedDescriptor is Map {
+		if !HotkeyRegistrarResolvedDescriptorIsValid(ResolvedDescriptor)
+				|| ResolvedDescriptor["logical_spec"] !== StrLower(DisplaySpec)
+			return ""
+		PhysicalIdentity := ResolvedDescriptor["identity"]
+		spec := ResolvedDescriptor["native_spec"]
+	} else if !((ResolvedDescriptor is Integer) && ResolvedDescriptor == 0) {
 		return ""
 	}
 	Formatted := ChordFormat(parsed["mods"], PhysicalKey)
@@ -217,6 +611,7 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 	}
 	canonical := Formatted["label"]
 	OwnerText := String(Owner)
+	HasConflict := false
 	ConflictOwner := ""
 	KnownTombstone := false
 	HadPreviousEntry := false
@@ -228,22 +623,45 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 		if HOTKEY_REGISTRAR_SPECS.Has(spec) {
 			Existing := HOTKEY_REGISTRAR_SPECS[spec]
 			ExistingState := Existing["state"]
-			if (ExistingState["phase"] != "retired")
+			if (ExistingState["phase"] != "retired") {
+				HasConflict := true
 				ConflictOwner := Existing["owner"]
-			else {
+			} else {
 				KnownTombstone := true
 				HadPreviousEntry := true
 				PreviousEntry := Existing
 			}
 		}
-		if (ConflictOwner = "") {
+		; Strict LLM reservations freeze character keys to VK/SC spellings while
+		; legacy consumers retain their established textual specs. Serialize both
+		; representations of the same logical chord before either can reach the
+		; interruptible native probe.
+		if !HasConflict {
+			for , Existing in HOTKEY_REGISTRAR_SPECS {
+				if Existing.Get("display_spec", Existing.Get("spec", ""))
+						!== DisplaySpec
+					continue
+				ExistingState := Existing["state"]
+				if ExistingState["phase"] != "retired" {
+					HasConflict := true
+					ConflictOwner := Existing["owner"]
+					break
+				}
+			}
+		}
+		if !HasConflict {
 			HOTKEY_REGISTRAR_NEXT_TOKEN += 1
 			handle := "hotkey#" . HOTKEY_REGISTRAR_NEXT_TOKEN
 			entry := Map(
 				"handle", handle,
 				"spec", spec,
+				"display_spec", DisplaySpec,
 				"chord", canonical,
 				"owner", OwnerText,
+				; Optional immutable native identity and explicit VK/SC spec supplied as
+				; one validated descriptor. The native call below uses ``spec`` itself,
+				; so metadata and the registered owner cannot diverge after an HKL switch.
+				"physical_identity", PhysicalIdentity,
 				"callback", callback,
 				"state", 0)
 			ReserveState := _HotkeyRegistrarState("reserving", 0, "off")
@@ -253,16 +671,25 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if (ConflictOwner != "") {
+	if HasConflict {
 		LoggerWarn("adapters.hotkey_registrar", "bind(): refusing '" . canonical
 			. "' — owner '" . ConflictOwner . "' already holds it.")
 		return ""
 	}
 
 	; Unknown native variants are probed after the in-memory claim. Sibling binds
-	; now see this reservation, while no Critical span covers the OS call.
-	if !KnownTombstone && _HotkeyRegistrarNativeExists(spec, HotkeyFn, ProbeFn,
-			HotIfFn) {
+	; now see this reservation, while no Critical span covers the OS call. A
+	; frozen character spec (for example ^vk56) can address the same AHK variant
+	; as a raw producer registered under its textual spelling (~^v). Probe that
+	; spelling as well: freezing the candidate must not make an older producer
+	; invisible. An exact tombstone only proves the frozen spec is ours; it says
+	; nothing about a later textual producer.
+	DisplayOccupied := spec != DisplaySpec
+		&& _HotkeyRegistrarNativeExists(DisplaySpec, HotkeyFn, ProbeFn,
+			HotIfFn)
+	SpecOccupied := !DisplayOccupied && !KnownTombstone
+		&& _HotkeyRegistrarNativeExists(spec, HotkeyFn, ProbeFn, HotIfFn)
+	if DisplayOccupied || SpecOccupied {
 		RolledBack := _HotkeyRegistrarRollbackClaim(entry, ReserveState,
 			PreviousEntry, HadPreviousEntry)
 		_HotkeyRegistrarRequireState(RolledBack,
@@ -292,8 +719,7 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 	Published := false
 	PreviousCritical := Critical("On")
 	try {
-		if HOTKEY_REGISTRAR_SPECS.Has(spec)
-				&& (HOTKEY_REGISTRAR_SPECS[spec] == entry)
+		if _HotkeyRegistrarOwnsSpec(entry)
 				&& (entry["state"] == ReserveState) {
 			entry["state"] := _HotkeyRegistrarState("reserved", 0, "off")
 			HOTKEY_REGISTRAR_BINDINGS[handle] := entry
@@ -309,12 +735,22 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 	return handle
 }
 
+; LLM collision admission must never fall back to a layout-dependent textual
+; reserve when the descriptor is absent or malformed.
+_HotkeyRegistrarReserveResolvedOwned(chordString, callback, Owner,
+		ResolvedDescriptor, HotkeyFn := 0, ProbeFn := 0, HotIfFn := 0) {
+	if !HotkeyRegistrarResolvedDescriptorIsValid(ResolvedDescriptor)
+		return ""
+	return _HotkeyRegistrarReserveOwned(chordString, callback, Owner,
+		HotkeyFn, ProbeFn, HotIfFn, ResolvedDescriptor)
+}
+
 ; Enables an inert reservation. Publish callback authority while native is still
 ; confirmed Off, then call On: this closes the interruptible line boundary after
 ; Hotkey() returns where the newly active wrapper could otherwise swallow its
 ; first press. A refusal leaves native Off and restores the inert snapshot.
 _HotkeyRegistrarActivate(handle, HotkeyFn := 0, HotIfFn := 0) {
-	global HOTKEY_REGISTRAR_BINDINGS, HOTKEY_REGISTRAR_SPECS
+	global HOTKEY_REGISTRAR_BINDINGS
 
 	if (!IsSet(handle) || Type(handle) != "String")
 		return false
@@ -326,8 +762,7 @@ _HotkeyRegistrarActivate(handle, HotkeyFn := 0, HotIfFn := 0) {
 		if !HOTKEY_REGISTRAR_BINDINGS.Has(handle)
 			return false
 		Entry := HOTKEY_REGISTRAR_BINDINGS[handle]
-		if !HOTKEY_REGISTRAR_SPECS.Has(Entry["spec"])
-				|| (HOTKEY_REGISTRAR_SPECS[Entry["spec"]] != Entry)
+		if !_HotkeyRegistrarOwnsSpec(Entry)
 			return false
 		PreviousState := Entry["state"]
 		if (PreviousState["phase"] != "reserved")
@@ -362,7 +797,7 @@ _HotkeyRegistrarActivate(handle, HotkeyFn := 0, HotIfFn := 0) {
 ; Discards an inert reservation without touching the OS: reserve state already
 ; proves that its native variant is Off.
 _HotkeyRegistrarAbort(handle) {
-	global HOTKEY_REGISTRAR_BINDINGS, HOTKEY_REGISTRAR_SPECS
+	global HOTKEY_REGISTRAR_BINDINGS
 
 	if (!IsSet(handle) || Type(handle) != "String")
 		return false
@@ -375,8 +810,7 @@ _HotkeyRegistrarAbort(handle) {
 			return false
 		} else {
 			Entry := HOTKEY_REGISTRAR_BINDINGS[handle]
-			if !HOTKEY_REGISTRAR_SPECS.Has(Entry["spec"])
-					|| (HOTKEY_REGISTRAR_SPECS[Entry["spec"]] != Entry)
+			if !_HotkeyRegistrarOwnsSpec(Entry)
 				return false
 			if (Entry["state"]["phase"] != "reserved")
 				return false
@@ -483,8 +917,7 @@ _HotkeyRegistrarRollbackClaim(Entry, ExpectedState, PreviousEntry,
 	PreviousCritical := Critical("On")
 	try {
 		Spec := Entry["spec"]
-		if HOTKEY_REGISTRAR_SPECS.Has(Spec)
-				&& (HOTKEY_REGISTRAR_SPECS[Spec] == Entry)
+		if _HotkeyRegistrarOwnsSpec(Entry)
 				&& (Entry["state"] == ExpectedState) {
 			Entry["state"] := _HotkeyRegistrarState("retired", 0, "off")
 			if HadPreviousEntry
@@ -501,17 +934,15 @@ _HotkeyRegistrarRollbackClaim(Entry, ExpectedState, PreviousEntry,
 
 _HotkeyRegistrarPublishLiveState(Entry, ExpectedState, NextState,
 		RetireHandle := false) {
-	global HOTKEY_REGISTRAR_BINDINGS, HOTKEY_REGISTRAR_SPECS
+	global HOTKEY_REGISTRAR_BINDINGS
 
 	Published := false
 	PreviousCritical := Critical("On")
 	try {
 		Handle := Entry["handle"]
-		Spec := Entry["spec"]
 		if HOTKEY_REGISTRAR_BINDINGS.Has(Handle)
 				&& (HOTKEY_REGISTRAR_BINDINGS[Handle] == Entry)
-				&& HOTKEY_REGISTRAR_SPECS.Has(Spec)
-				&& (HOTKEY_REGISTRAR_SPECS[Spec] == Entry)
+				&& _HotkeyRegistrarOwnsSpec(Entry)
 				&& (Entry["state"] == ExpectedState) {
 			Entry["state"] := NextState
 			if RetireHandle
@@ -534,7 +965,7 @@ HotkeyRegistrarUnbind(handle) {
 }
 
 _HotkeyRegistrarRetire(handle, HotkeyFn := 0, HotIfFn := 0) {
-	global HOTKEY_REGISTRAR_BINDINGS, HOTKEY_REGISTRAR_SPECS
+	global HOTKEY_REGISTRAR_BINDINGS
 
 	if (!IsSet(handle) || Type(handle) != "String") {
 		; Not an error: teardown paths unbind defensively and a second call must
@@ -551,6 +982,8 @@ _HotkeyRegistrarRetire(handle, HotkeyFn := 0, HotIfFn := 0) {
 		if !HOTKEY_REGISTRAR_BINDINGS.Has(handle)
 			return false
 		Entry := HOTKEY_REGISTRAR_BINDINGS[handle]
+		if !_HotkeyRegistrarOwnsSpec(Entry)
+			return false
 		Snapshot := Entry["state"]
 		PreviousState := Snapshot
 		Phase := Snapshot["phase"]
@@ -604,7 +1037,7 @@ HotkeyRegistrarSetEnabled(handle, enabled) {
 }
 
 _HotkeyRegistrarSetEnabled(handle, enabled, HotkeyFn := 0, HotIfFn := 0) {
-	global HOTKEY_REGISTRAR_BINDINGS, HOTKEY_REGISTRAR_SPECS
+	global HOTKEY_REGISTRAR_BINDINGS
 
 	if (!IsSet(handle) || Type(handle) != "String") {
 		return false
@@ -618,6 +1051,8 @@ _HotkeyRegistrarSetEnabled(handle, enabled, HotkeyFn := 0, HotIfFn := 0) {
 		if !HOTKEY_REGISTRAR_BINDINGS.Has(handle)
 			return false
 		Entry := HOTKEY_REGISTRAR_BINDINGS[handle]
+		if !_HotkeyRegistrarOwnsSpec(Entry)
+			return false
 		PreviousState := Entry["state"]
 		Phase := PreviousState["phase"]
 		if ((Phase = "active" && want) || (Phase = "disabled" && !want))
@@ -696,6 +1131,33 @@ HotkeyRegistrarChordOf(handle) {
 		Critical(PreviousCritical)
 	}
 	return Chord
+}
+
+/**
+ * Reports consumer-owned physical identity metadata captured with a handle.
+ * The registrar deliberately does not derive this value later: AHK freezes a
+ * hotkey's VK/SC interpretation when the native variant is created, while the
+ * thread keyboard layout may subsequently change.
+ * @param {String} handle
+ * @returns {String} The immutable identity, or "" when absent/unknown.
+ */
+HotkeyRegistrarPhysicalIdentityOf(handle) {
+	global HOTKEY_REGISTRAR_BINDINGS
+
+	if (!IsSet(HOTKEY_REGISTRAR_BINDINGS)
+			|| !IsSet(handle) || Type(handle) != "String")
+		return ""
+	Identity := ""
+	PreviousCritical := Critical("On")
+	try {
+		if HOTKEY_REGISTRAR_BINDINGS.Has(handle) {
+			Entry := HOTKEY_REGISTRAR_BINDINGS[handle]
+			Candidate := Entry.Get("physical_identity", "")
+			if Candidate is String
+				Identity := Candidate
+		}
+	} finally Critical(PreviousCritical)
+	return Identity
 }
 
 /**
