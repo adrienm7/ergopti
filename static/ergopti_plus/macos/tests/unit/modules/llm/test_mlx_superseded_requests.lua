@@ -96,14 +96,20 @@ helpers.describe("MLX warmup: an abandoned POST cannot speak for its retry", fun
 		local src = helpers.read_driver_source("WARMUP_POST_TIMEOUT_SEC")
 		local code = src:gsub("%-%-[^\n]*", "")
 
-		local at = code:find("_warmup_client.post", 1, true)
-		helpers.assert_true(at ~= nil, "the warmup POST must still be issued")
+		local handler_at = code:find("local function handle_warmup_response", 1, true)
+		helpers.assert_true(handler_at ~= nil, "the warmup response handler must still exist")
+		local post_at = code:find("_warmup_client.post", handler_at, true)
+		helpers.assert_true(post_at ~= nil, "the warmup POST must still follow its response handler")
 
-		local body = code:sub(at, at + 700)
-		helpers.assert_true(body:find("_warmup_timeout == _wt_handle", 1, true) ~= nil,
+		local body = code:sub(handler_at, post_at - 1)
+		local guard_at = body:find("_warmup_timeout == _wt_handle", 1, true)
+		local cancel_at = body:find('cancel_warmup_timer("timeout")', 1, true)
+		helpers.assert_true(guard_at ~= nil,
 			"the response must cancel only ITS OWN timer. After a timeout-triggered retry the "
 				.. "slot holds the NEW POST's timeout, so a late reply from the abandoned request "
 				.. "disarmed the live request's only bound — and warmup POSTs piled up with "
 				.. "nothing left to stop them")
+		helpers.assert_true(cancel_at ~= nil and guard_at < cancel_at,
+			"the exact-handle guard must precede timeout cancellation")
 	end)
 end)
