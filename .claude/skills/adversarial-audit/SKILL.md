@@ -1,6 +1,6 @@
 ---
 name: adversarial-audit
-description: Protocol for an adversarial robustness audit of a driver — the four guarantees, the module-then-flow method, loop-until-dry, and the proof discipline every finding must satisfy. Includes the evidence rule, learned the hard way: re-derive every artifact you cite before citing it. Use when asked to audit, harden, stress or hunt for latent bugs.
+description: Audit a driver adversarially with reproducible evidence. Use for robustness audits, hardening, stress analysis, or latent-bug searches.
 ---
 
 # Adversarial audit

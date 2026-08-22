@@ -1,6 +1,6 @@
 ---
 name: bulk-edit
-description: Rewriting a tracked file with a script — match by heading not line number, dry-run before writing, refuse to write on detected corruption, and prove nothing was lost by comparing structure before and after. Use whenever an edit is too large or too repetitive to do by hand.
+description: Rewrite tracked files safely with a script. Use for edits too large or repetitive to perform by hand.
 ---
 
 # Rewriting a tracked file with a script

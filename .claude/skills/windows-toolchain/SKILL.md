@@ -1,6 +1,6 @@
 ---
 name: windows-toolchain
-description: The shell, git and Node mechanics of this Windows checkout — PowerShell 5.1 traps that silently corrupt files, why commit messages go through a file, which POSIX tools are missing, and where the driver's real config and logs live. Use before scripting anything against the repo, and before any commit.
+description: Apply this Windows checkout's safe shell, Git, encoding, and Node practices. Use before scripting or committing.
 ---
 
 # Working the toolchain on this box

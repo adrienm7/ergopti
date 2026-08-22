@@ -1,6 +1,6 @@
 ---
 name: commit-and-push
-description: Commit and push discipline for this repo. Commit freely and locally — one commit per fix, Conventional Commits, no co-author trailers. NEVER push dev or main without the user's explicit authorization in the current conversation, because every push to those branches triggers CI and cuts a release. Use before any git commit or push, and when monitoring CI afterwards.
+description: Apply this repository's commit, push, and CI discipline. Use before every commit or push and while monitoring CI.
 ---
 
 # Commit and push discipline

@@ -1,6 +1,6 @@
 ---
 name: hammerspoon-driver
-description: Hammerspoon/Lua foot-guns and invariants for the macOS driver (static/ergopti_plus/macos) — hs.task GC pinning, the Lua local-after-closure trap, the hs.* purity ratchet that counts comments, swallowed async callback errors, hs.fs.dir's two return values, and os.exit bypassing the shutdown callback. Use when writing, editing or reviewing any .lua file under macos/.
+description: Apply the macOS driver's Hammerspoon and Lua invariants. Use when writing, editing, or reviewing Lua under macos/.
 ---
 
 # Hammerspoon driver foot-guns

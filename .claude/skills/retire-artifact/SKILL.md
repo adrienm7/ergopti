@@ -1,6 +1,6 @@
 ---
 name: retire-artifact
-description: Deleting a plan, report, archive or doc without losing what it still carried — verify every claim against the code rather than its own status labels, extract what survives into TODO.md, and only then delete. Use before removing any tracked document.
+description: Retire a tracked plan, report, archive, or document without losing durable information. Use before deleting any tracked document.
 ---
 
 # Retiring a document

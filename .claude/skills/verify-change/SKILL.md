@@ -1,6 +1,6 @@
 ---
 name: verify-change
-description: Prove a change is safe before committing it — run the gates that actually cover what you touched, not the ones that happen to be quick. Includes the file-to-gate map (a port map is checked by the JS gate, never by the AHK runner) and the two silent-failure pre-checks. Use after ANY edit, and always before a commit.
+description: Select and run the gates that actually cover a change. Use after every edit and before every commit.
 ---
 
 # Verifying a change

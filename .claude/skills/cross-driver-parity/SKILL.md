@@ -1,6 +1,6 @@
 ---
 name: cross-driver-parity
-description: Keeping the drivers in sync — Windows (AHK), macOS (Hammerspoon/Lua), Linux (Lua/kanata) and the JS site. Where the shared source of truth lives, the parity and single-source test families, and the rule that every shared constant needs a single-source test. Use when changing a feature, constant or default that exists on more than one driver.
+description: Preserve behavior and single sources across Windows, macOS, Linux, and web. Use when a change affects more than one driver.
 ---
 
 # Cross-driver parity

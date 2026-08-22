@@ -1,6 +1,6 @@
 ---
 name: perf-profiling
-description: Measuring this driver before optimising it — where the logs really are, how to aggregate the profiler, which segments nest inside which, why the numbers are censored at 5 ms, and how to bench a suspicion instead of arguing about it. Use before proposing any performance change.
+description: Measure driver performance with the repository's profiler and benchmarks. Use before proposing or implementing a performance change.
 ---
 
 # Measuring before touching

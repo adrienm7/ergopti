@@ -1,6 +1,6 @@
 ---
 name: meta-test
-description: How to write AHK meta-tests that assert things about the driver's source code — use the move-resilient source helpers instead of hardcoded file paths (a CI ratchet enforces this), avoid the comment-mention and string-escape traps, and register the test in run_all.ahk. Use when adding a test that scans driver source rather than calling a function.
+description: Write resilient AHK tests that inspect driver source. Use when a test scans source instead of calling behavior directly.
 ---
 
 # Writing source-scanning meta-tests

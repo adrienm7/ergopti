@@ -1,6 +1,6 @@
 ---
 name: logger
-description: Logging conventions and their enforcement — the eight variants, the mandatory start/success and trace/done pairing, message punctuation, and English-only text. Use when adding, changing or reviewing log statements in any driver.
+description: Apply the shared logging contract and lifecycle pairing. Use when adding, changing, or reviewing log statements in any driver.
 ---
 
 # Logging
