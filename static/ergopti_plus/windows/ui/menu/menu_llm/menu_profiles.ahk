@@ -759,7 +759,7 @@ global _LLM_PROFILE_HOTKEY_RETRY_LIMIT := 3
  * happens only after the complete pass and a proven HotIf reset.
  */
 LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
-		ResetFn := 0, SelectFn := 0) {
+		ResetFn := 0, SelectFn := 0, KeyResolverFn := 0) {
 	global _LLM_PROFILE_HOTKEY_PRED, _LLM_Menu_ProfileHotkeyOwner
 	global _LLM_Menu_ProfileHotkeyFailureCount
 	global _LLM_PROFILE_HOTKEY_STATUS_READY
@@ -769,7 +769,7 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 	if InheritedCritical {
 		Critical("Off")
 		try return LLM_Menu_BindProfileHotkeys(HotkeyFn, HotIfFn, LogFn,
-			ResetFn, SelectFn)
+			ResetFn, SelectFn, KeyResolverFn)
 		finally Critical(InheritedCritical)
 	}
 	if (_LLM_Menu_ProfileHotkeyOwner is Map) {
@@ -785,7 +785,12 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 		ResetFn := _LLM_Menu_ProfileNativeHotIf
 	if !HasMethod(SelectFn, "Call")
 		SelectFn := _LLM_Menu_ProfileNativeSelect
-	CandidatePlan := _LLM_Menu_BuildProfileHotkeyPlan(SelectFn)
+	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	CandidatePlan := HasMethod(KeyResolverFn, "Call")
+		? _LLM_Menu_BuildProfileHotkeyPlan(SelectFn, KeyResolverFn) : false
+	TriggerConflict := CandidatePlan is Array
+		? _LLM_Menu_RuntimeTriggerPlanCollision(CandidatePlan, KeyResolverFn)
+		: Map("ok", false, "identity", "")
 
 	PreviousCritical := Critical("On")
 	OpenAttempted := false
@@ -795,10 +800,16 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 	TerminalStatus := 0
 	try {
 		try {
+			if !(CandidatePlan is Array)
+				throw Error("Profile hotkey physical ownership could not be resolved")
+			if !TriggerConflict["ok"]
+				throw Error("Profile hotkey collision ownership is malformed")
+			if TriggerConflict["identity"] != ""
+				throw Error("Profile hotkey chord is owned by the prediction trigger")
 			OpenAttempted := true
 			HotIfFn.Call(_LLM_PROFILE_HOTKEY_PRED)
 			for Entry in CandidatePlan
-				HotkeyFn.Call(Entry["spec"], Entry["callback"], "On")
+				HotkeyFn.Call(Entry["native_spec"], Entry["callback"], "On")
 			Succeeded := true
 		} catch as e {
 			FailureDetail := "Profile hotkey transaction failed: " . e.Message
@@ -854,7 +865,7 @@ _LLM_Menu_ProfileNativeSelect(ProfileId) {
 	return LLM_Menu_SetProfile(ProfileId)
 }
 
-_LLM_Menu_BuildProfileHotkeyPlan(SelectFn := 0) {
+_LLM_Menu_BuildProfileHotkeyPlan(SelectFn := 0, KeyResolverFn := 0) {
 	global LLM_PROFILE_HOTKEY_LIMIT
 	if !HasMethod(SelectFn, "Call")
 		SelectFn := _LLM_Menu_ProfileNativeSelect
@@ -862,8 +873,11 @@ _LLM_Menu_BuildProfileHotkeyPlan(SelectFn := 0) {
 	loop LLM_PROFILE_HOTKEY_LIMIT {
 		Index := A_Index
 		Plan.Push(Map("spec", "^" . Index,
+			"profile_idx", Index,
 			"callback", _LLM_Menu_MakeProfileHotkey(Index, SelectFn)))
 	}
+	if !_LLM_Menu_AttachPlanPhysicalIdentities(Plan, KeyResolverFn)
+		return false
 	return Plan
 }
 
@@ -904,15 +918,26 @@ _LLM_Menu_ProfileHotkeyOwnerReady() {
 			&& (Degraded is Integer) && Degraded == 0
 			&& (Plan is Array) && Plan.Length == LLM_PROFILE_HOTKEY_LIMIT)
 		return false
+	SeenNative := Map()
+	SeenPhysical := Map()
 	Loop Plan.Length {
 		Index := A_Index
 		if !Plan.Has(Index)
 			return false
 		Entry := Plan[Index]
 		if !(Entry is Map)
-			|| Entry.Get("spec", "") != "^" . Index
-			|| !HasMethod(Entry.Get("callback", 0), "Call")
+				|| Entry.Get("spec", "") != "^" . Index
+				|| !(Entry.Get("profile_idx", 0) is Integer)
+				|| Entry.Get("profile_idx", 0) != Index
+				|| !_LLM_Menu_PlanEntryDescriptorIsValid(Entry)
+				|| !HasMethod(Entry.Get("callback", 0), "Call")
 			return false
+		NativeId := Entry["native_id"]
+		PhysicalId := Entry["physical_id"]
+		if SeenNative.Has(NativeId) || SeenPhysical.Has(PhysicalId)
+			return false
+		SeenNative[NativeId] := true
+		SeenPhysical[PhysicalId] := true
 	}
 	return true
 }
@@ -933,9 +958,25 @@ _LLM_Menu_ProfileHotkeyRetryPending() {
  */
 _LLM_Menu_ProfileHotkeyIndex(ThisHotkey) {
 	Identity := _LLM_Menu_NavNativeIdentity(ThisHotkey)
-	if !RegExMatch(Identity, "^\^([1-9])$", &Match)
+	if Identity == ""
 		return 0
-	return Integer(Match[1])
+	global _LLM_Menu_ProfileHotkeyOwner
+	PreviousCritical := Critical("On")
+	try {
+		if !(_LLM_Menu_ProfileHotkeyOwner is Map)
+			return 0
+		Plan := _LLM_Menu_ProfileHotkeyOwner.Get("plan", 0)
+		if !(Plan is Array)
+			return 0
+		for Entry in Plan {
+			if Entry is Map && Entry.Get("native_id", "") == Identity {
+				Index := Entry.Get("profile_idx", 0)
+				return (Index is Integer) && Index >= 1 && Index <= 9
+					? Index : 0
+			}
+		}
+		return 0
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {

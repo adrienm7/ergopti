@@ -30,10 +30,12 @@
 ; ===================================================
 
 _LNLT_CheckLoopIsTen() {
-	; Move-resilient: scan the whole driver source via the framework helper.
-	; "Loop 10" and "Loop 9" are unique enough that whole-tree scope preserves
-	; the present/absent semantics and strengthens the absent guard.
-	Src := _DriverSourceConcat()
+	; Scope the cardinality check to the production navigation plan. Profile
+	; selection intentionally owns Ctrl+1..9, so a whole-driver absence scan for
+	; "Loop 9" would reject that distinct fixed surface.
+	Src := _DriverFuncBody("_LLM_Menu_BuildNavBindingPlan")
+	Assert(Src != "",
+		"the production navigation plan must remain reachable to this guard")
 
 	Assert(!InStr(Src, "Loop 9"),
 		"nav-jump binding loop must not be Loop 9 — that misses slot 10 (digit 0)")
@@ -43,9 +45,9 @@ _LNLT_CheckLoopIsTen() {
 }
 
 _LNLT_CheckSlot10MapsToZero() {
-	; Move-resilient: "A_Index == 10" is unique to tab_accept.ahk in the driver
-	; source, so whole-tree scope cannot false-pass.
-	Src := _DriverSourceConcat()
+	Src := _DriverFuncBody("_LLM_Menu_BuildNavBindingPlan")
+	Assert(Src != "",
+		"the production navigation plan must remain reachable to this guard")
 
 	; The mapping of index 10 to digit "0" must be present
 	Assert(InStr(Src, "A_Index == 10") && InStr(Src, '"0"'),

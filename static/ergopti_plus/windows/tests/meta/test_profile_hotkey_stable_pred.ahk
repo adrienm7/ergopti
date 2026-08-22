@@ -133,7 +133,8 @@ _PHSP_ProfileCallbackNeverSynthesizesPassThrough() {
 		"the callback must recheck the current profile range before selection")
 	Assert(InStr(NativeSelect, "LLM_Menu_SetProfile(ProfileId)") > 0
 		&& InStr(Binder, "SelectFn := _LLM_Menu_ProfileNativeSelect") > 0
-		&& InStr(Binder, "_LLM_Menu_BuildProfileHotkeyPlan(SelectFn)") > 0,
+		&& InStr(Binder,
+			"_LLM_Menu_BuildProfileHotkeyPlan(SelectFn, KeyResolverFn)") > 0,
 		"the behavioral selection seam must preserve the production profile publisher")
 	Assert(Trim(RegExReplace(NativeSelect, "\s+", " "))
 		== "_LLM_Menu_ProfileNativeSelect(ProfileId) { return LLM_Menu_SetProfile(ProfileId) }",

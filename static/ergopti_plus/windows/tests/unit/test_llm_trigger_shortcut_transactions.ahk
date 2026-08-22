@@ -60,6 +60,7 @@ global _LTST_DurablePresent := 1
 global _LTST_DurableValue := ""
 global _LTST_JournalFiles := Map()
 global _LTST_JournalPath := "memory://llm-trigger.wal"
+global _LTST_JournalMoves := []
 global _LTST_MutateRefusedCalls := Map()
 global _LTST_CriticalStates := []
 
@@ -82,6 +83,7 @@ _LTST_Reset(WriteOk := true) {
 	global _LTST_RefreshCalls
 	global _LTST_RefreshLeaseReacquired
 	global _LTST_DurablePresent, _LTST_DurableValue, _LTST_JournalFiles
+	global _LTST_JournalMoves
 	global _LTST_MutateRefusedCalls
 	global _LTST_CriticalStates
 	global _LLM_Menu_TriggerRecovery, _LLM_Menu_TriggerRecoveryNextId
@@ -129,6 +131,7 @@ _LTST_Reset(WriteOk := true) {
 	_LTST_DurablePresent := 1
 	_LTST_DurableValue := ""
 	_LTST_JournalFiles := Map()
+	_LTST_JournalMoves := []
 	_LTST_MutateRefusedCalls := Map()
 	_LTST_CriticalStates := []
 }
@@ -162,16 +165,24 @@ _LTST_JournalWrite(Path, Content) {
 
 _LTST_JournalMove(Source, Destination) {
 	global _LTST_JournalFiles, _LTST_FireCandidateDuringJournalCommit
+	global _LTST_JournalMoves
 	_LTST_RecordCritical("journal_move")
 	if !_LTST_JournalFiles.Has(Source)
 		return 0
 	Candidate := _LLM_TriggerJournalParse(_LTST_JournalFiles[Source])
+	_LTST_RecordMovedJournal(Candidate)
 	if _LTST_FireCandidateDuringJournalCommit && Candidate is Map
 			&& Candidate["phase"] = "committed_new"
 		_LTST_Fire("^n")
 	_LTST_JournalFiles[Destination] := _LTST_JournalFiles[Source]
 	_LTST_JournalFiles.Delete(Source)
 	return 1
+}
+
+_LTST_RecordMovedJournal(Candidate) {
+	global _LTST_JournalMoves
+	MovedRecord := Candidate is Map ? Candidate.Clone() : Candidate
+	_LTST_JournalMoves.Push(MovedRecord)
 }
 
 _LTST_JournalDelete(Path) {
@@ -216,11 +227,58 @@ _LTST_ApplyDurableUpdates(Updates) {
 }
 
 _LTST_Commit(raw, WriterFn := 0, NotifyFn := 0, HotkeyFn := 0,
-		ProbeFn := 0, CallbackFn := 0, SchedulerFn := 0, RefreshFn := 0) {
+		ProbeFn := 0, CallbackFn := 0, SchedulerFn := 0, RefreshFn := 0,
+		KeyResolverFn := 0) {
 	global _LTST_JournalPath
 	return LLM_Menu_CommitTriggerShortcut(raw, WriterFn, NotifyFn,
 		HotkeyFn, ProbeFn, CallbackFn, SchedulerFn, RefreshFn,
-		_LTST_JournalPort(), _LTST_ReadTrigger, _LTST_JournalPath)
+		_LTST_JournalPort(), _LTST_ReadTrigger, _LTST_JournalPath,
+		KeyResolverFn)
+}
+
+_LTST_ResolvedNativeSpec(LogicalSpec, KeyResolverFn := 0) {
+	Descriptor := HotkeyRegistrarResolvedNativeDescriptor(LogicalSpec,
+		KeyResolverFn)
+	return Descriptor is Map ? Descriptor["native_spec"] : LogicalSpec
+}
+
+_LTST_NativeKey(LogicalSpec, KeyResolverFn := 0) {
+	global _LTST_Native
+	if _LTST_Native.Has(LogicalSpec)
+		return LogicalSpec
+	return _LTST_ResolvedNativeSpec(LogicalSpec, KeyResolverFn)
+}
+
+_LTST_NativeHas(LogicalSpec, KeyResolverFn := 0) {
+	global _LTST_Native
+	return _LTST_Native.Has(_LTST_NativeKey(LogicalSpec, KeyResolverFn))
+}
+
+_LTST_NativeEntry(LogicalSpec, KeyResolverFn := 0) {
+	global _LTST_Native
+	Key := _LTST_NativeKey(LogicalSpec, KeyResolverFn)
+	return _LTST_Native.Has(Key) ? _LTST_Native[Key] : false
+}
+
+_LTST_RegistrarEntry(LogicalSpec, KeyResolverFn := 0) {
+	global HOTKEY_REGISTRAR_SPECS
+	if HOTKEY_REGISTRAR_SPECS.Has(LogicalSpec)
+		return HOTKEY_REGISTRAR_SPECS[LogicalSpec]
+	NativeSpec := _LTST_ResolvedNativeSpec(LogicalSpec, KeyResolverFn)
+	return HOTKEY_REGISTRAR_SPECS.Has(NativeSpec)
+		? HOTKEY_REGISTRAR_SPECS[NativeSpec] : false
+}
+
+_LTST_RecordedNativeName(Name) {
+	for LogicalSpec in ["^l", "^n", "^p"] {
+		if Name == _LTST_ResolvedNativeSpec(LogicalSpec)
+			return LogicalSpec
+	}
+	return Name
+}
+
+_LTST_NameMatches(Name, LogicalSpec) {
+	return Name == LogicalSpec || Name == _LTST_ResolvedNativeSpec(LogicalSpec)
 }
 
 _LTST_Hotkey(Name, Action := unset, Options := unset) {
@@ -230,29 +288,30 @@ _LTST_Hotkey(Name, Action := unset, Options := unset) {
 	if !IsSet(Action)
 		return _LTST_Native.Has(Name)
 	if IsSet(Options) {
-		_LTST_Events.Push(Name . " " . Options)
+		_LTST_Events.Push(_LTST_RecordedNativeName(Name) . " " . Options)
 		if (Options != "Off" && Options != "On")
 			throw Error("unexpected fake Hotkey registration option")
 		; AHK Hotkey registration is exception-atomic. Injected failures occur
 		; before the fake mutates native callback or enabled state
-		if (_LTST_FailNewOn && Options = "On" && Name = "^n")
+		if (_LTST_FailNewOn && Options = "On"
+				&& _LTST_NameMatches(Name, "^n"))
 			throw Error("injected activation failure before native mutation")
 		_LTST_Native[Name] := { callback: Action, enabled: Options = "On" }
 		return true
 	}
 	if (Action = "Off") {
-		_LTST_Events.Push(Name . " Off")
-		if (_LTST_FailNewOff && Name = "^n")
+		_LTST_Events.Push(_LTST_RecordedNativeName(Name) . " Off")
+		if (_LTST_FailNewOff && _LTST_NameMatches(Name, "^n"))
 			throw Error("injected candidate-Off failure before native mutation")
-		if (_LTST_FailOldOff && Name = "^l")
+		if (_LTST_FailOldOff && _LTST_NameMatches(Name, "^l"))
 			throw Error("injected previous-Off failure before native mutation")
 		if _LTST_Native.Has(Name)
 			_LTST_Native[Name].enabled := false
 		return true
 	}
 	if (Action = "On") {
-		_LTST_Events.Push(Name . " On")
-		if (_LTST_FailNewOn && Name = "^n")
+		_LTST_Events.Push(_LTST_RecordedNativeName(Name) . " On")
+		if (_LTST_FailNewOn && _LTST_NameMatches(Name, "^n"))
 			throw Error("injected activation failure before native mutation")
 		if _LTST_Native.Has(Name)
 			_LTST_Native[Name].enabled := true
@@ -269,8 +328,9 @@ _LTST_Probe(Name) {
 
 _LTST_Fire(Name) {
 	global _LTST_Native, _LTST_AppDeliveries
-	if _LTST_Native.Has(Name) && _LTST_Native[Name].enabled {
-		_LTST_Native[Name].callback.Call("fake-hotkey")
+	NativeName := _LTST_NativeKey(Name)
+	if _LTST_Native.Has(NativeName) && _LTST_Native[NativeName].enabled {
+		_LTST_Native[NativeName].callback.Call("fake-hotkey")
 		return true
 	}
 	_LTST_AppDeliveries += 1
@@ -302,9 +362,9 @@ _LTST_Writer(Path, Updates) {
 	_LTST_Events.Push("write")
 	if (_LTST_WriteCalls = 1) {
 		_LTST_ObservedRaw := _LLM_Menu["trigger_shortcut"]
-		if _LTST_RetireCandidateDuringWrite && HOTKEY_REGISTRAR_SPECS.Has("^n") {
+		Candidate := _LTST_RegistrarEntry("^n")
+		if _LTST_RetireCandidateDuringWrite && Candidate is Map {
 			_LTST_RetireCandidateDuringWrite := false
-			Candidate := HOTKEY_REGISTRAR_SPECS["^n"]
 			_HotkeyRegistrarRetire(Candidate["handle"], _LTST_Hotkey)
 		}
 		if _LTST_FireOldDuringWrite
@@ -1291,8 +1351,7 @@ Test("[llm-trigger-wal] process restart repairs a mutating writer refusal",
 
 _LTST_CommittedNewPromotionFailureCore() {
 	global _LTW_JournalPath, _LTW_Files
-	global _LTST_DurableValue, _LTST_Native
-	global HOTKEY_REGISTRAR_BINDINGS, HOTKEY_REGISTRAR_SPECS
+	global _LTST_DurableValue
 	_LTST_SeedOld()
 	_LTW_Reset()
 	; pending succeeds, committed_new fails, committed_old compensation succeeds.
@@ -1303,14 +1362,16 @@ _LTST_CommittedNewPromotionFailureCore() {
 		_LTW_JournalPath))
 	AssertEqual("Ctrl+L", _LTST_DurableValue,
 		"failed commit-marker publication must restore durable old authority")
-	AssertTrue(HOTKEY_REGISTRAR_SPECS.Has("^n"),
+	Candidate := _LTST_RegistrarEntry("^n")
+	AssertTrue(Candidate is Map,
 		"the registrar retains a native-Off tombstone for safe spec reuse")
-	Candidate := HOTKEY_REGISTRAR_SPECS["^n"]
 	AssertEqual("retired", Candidate["state"]["phase"],
 		"a candidate whose commit marker failed must be aborted before activation")
 	AssertFalse(HOTKEY_REGISTRAR_BINDINGS.Has(Candidate["handle"]))
-	AssertTrue(_LTST_Native.Has("^n"))
-	AssertFalse(_LTST_Native["^n"].enabled)
+	NativeCandidate := _LTST_NativeEntry("^n")
+	AssertTrue(IsObject(NativeCandidate),
+		"the frozen native candidate must remain addressable after abort")
+	AssertFalse(NativeCandidate.enabled)
 	AssertTrue(_LTW_Files.Has(_LTW_JournalPath))
 	Terminal := _LLM_TriggerJournalParse(_LTW_Files[_LTW_JournalPath])
 	AssertTrue(Terminal is Map)

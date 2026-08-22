@@ -25,8 +25,10 @@ _LLMTG_StagedPlanOwnsEveryBoundary() {
 	Body := _DriverFuncBody("_LLM_Menu_BuildTriggerShortcutPlan")
 	Assert(Body != "",
 		"_LLM_Menu_BuildTriggerShortcutPlan must remain source-visible")
-	AssertContains(Body, "_HotkeyRegistrarReserveOwned(",
+	AssertContains(Body, "_HotkeyRegistrarReserveResolvedOwned(",
 		"the candidate must be installed native-Off before the writer")
+	Assert(InStr(Body, "_HotkeyRegistrarReserveOwned(") = 0,
+		"the trigger builder must never reopen textual layout resolution")
 	Assert(InStr(Body, "_HotkeyRegistrarBindOwned(") = 0,
 		"the builder must never activate a callback before durability")
 	AssertContains(Body, "rollback_updates:",
