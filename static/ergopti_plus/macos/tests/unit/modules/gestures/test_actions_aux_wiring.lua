@@ -958,7 +958,8 @@ helpers.describe("gesture Actions search acquisition epoch", function()
 
 		controls.search_restore_mode = nil
 		helpers.assert_eq(actions.execute_single(
-			"search_web", "keyboard__cmd_1"), false)
+			"search_web", "keyboard__cmd_1"), true,
+			"the registered sibling action remains owned when foreign debt refuses its work")
 		helpers.assert_eq(calls.clipboard_restore_calls, restore_calls,
 			"a sibling action may observe but never settle foreign recovery debt")
 		helpers.assert_eq(calls.clipboard_text(), "selected words")
@@ -1077,7 +1078,8 @@ helpers.describe("gesture Actions save/reload transaction", function()
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("posts no save when reload timer acquisition returns " .. mode, function()
 			local actions, calls = fresh_actions({ prepare_mode = mode })
-			helpers.assert_eq(actions.execute_single("script_save_reload"), false)
+			helpers.assert_eq(actions.execute_single("script_save_reload"), true,
+				"the registered save action remains owned after its continuation refuses")
 			helpers.assert_eq(#calls.keys, 0,
 				"save must not post unless its exact reload continuation is already owned")
 			helpers.assert_eq(calls.reload, 0)
@@ -1085,7 +1087,8 @@ helpers.describe("gesture Actions save/reload transaction", function()
 
 		helpers.it("rolls back reload when save dispatch returns " .. mode, function()
 			local actions, calls = fresh_actions({ key_post_mode = mode })
-			helpers.assert_eq(actions.execute_single("script_save_reload"), false)
+			helpers.assert_eq(actions.execute_single("script_save_reload"), true,
+				"the registered save action remains owned after its native dispatch refuses")
 			helpers.assert_eq(calls.rollback, 1)
 			helpers.assert_eq(#calls.keys, 0)
 			helpers.assert_eq(calls.fire(calls.after[1].token), false)
