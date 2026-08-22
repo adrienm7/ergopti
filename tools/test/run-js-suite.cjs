@@ -30,6 +30,12 @@ const FULL = process.argv.includes('--full');
 
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
+	{ name: 'Agent Skills canonical tree matches the generated Claude mirror', cmd: 'node', args: ['tools/test/test-agent-skills-sync.cjs'], repro: 'npm run test:agent-skills' },
+	{ name: 'audit manifests and dedicated worktrees obey the portable workflow contract', cmd: 'node', args: ['tools/test/test-audit-workflow.cjs'], repro: 'npm run test:audit-workflow' },
+	{ name: 'verify-change distinguishes current regressions, historical debt, and environment failures', cmd: 'node', args: ['tools/test/test-verify-change-red-classification.cjs'], repro: 'npm run test:verify-red-classification' },
+	{ name: 'repository text resolves to LF on every platform', cmd: 'node', args: ['tools/test/test-repository-eol-policy.cjs'], repro: 'npm run test:repository-eol-policy' },
+	{ name: 'project RTK bootstrap stays pinned and network-free in CI', cmd: 'node', args: ['tools/test/test-rtk-project-integration.cjs'], repro: 'npm run test:project-rtk' },
+	{ name: 'VS Code and Zed format on save with the repository Prettier only', cmd: 'node', args: ['tools/test/test-editor-format-on-save.cjs'], repro: 'npm run test:editor-format-on-save' },
 	{ name: 'domain pipeline (manifest, parity, ports, schema, read-sites, drift)', cmd: 'npm', args: ['run', '--silent', 'build:domain'], repro: 'npm run build:domain' },
 	{ name: 'hotstring priority parity (shared JSON ↔ AHK + Lua)', cmd: 'npm', args: ['run', '--silent', 'test:priority-parity'], repro: 'npm run test:priority-parity' },
 	{ name: 'translation key consistency audit', cmd: 'node', args: ['tools/lint/audit-translations.cjs'], repro: 'node tools/lint/audit-translations.cjs' },

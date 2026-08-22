@@ -1,4 +1,4 @@
-<!-- docs/project-memory/windows-ahk.md -->
+<!-- docs/memory/windows-ahk.md -->
 
 # Windows and AutoHotkey memory
 
@@ -153,4 +153,3 @@ path. Reuse only resources whose lifecycle and stale-state behavior are proven.
 
 Metrics UI snapshots must project the currently open foreground interval; disk
 state alone lags the user's live session.
-

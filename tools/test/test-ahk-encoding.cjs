@@ -18,8 +18,11 @@
 
 'use strict';
 
+const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('node:os');
 const path = require('path');
+const { spawnSync } = require('node:child_process');
 
 // ===================================
 // ===================================
@@ -28,6 +31,9 @@ const path = require('path');
 // ===================================
 
 const ROOT = path.resolve(__dirname, '..', '..', 'static', 'ergopti_plus', 'windows');
+const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..');
+const FIXER = path.join(REPOSITORY_ROOT, 'tools', 'deploy', 'fix-ahk-encoding.cjs');
+const HOOK = path.join(REPOSITORY_ROOT, '.husky', 'pre-commit');
 
 /**
  * Recursively collects all .ahk files under a directory, skipping vendor/.
@@ -94,6 +100,126 @@ function hasCr(buf) {
 	return false;
 }
 
+function git(cwd, args, encoding = 'utf8') {
+	const result = spawnSync('git', args, { cwd, encoding });
+	assert.equal(result.status, 0, result.stderr?.toString() || result.error?.message);
+	return result.stdout;
+}
+
+function testStagedFixerDoesNotMutateUnstagedAhk() {
+	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-encoding-'));
+	try {
+		git(temporary, ['init']);
+		git(temporary, ['config', 'user.email', 'encoding-test@example.invalid']);
+		git(temporary, ['config', 'user.name', 'Encoding Test']);
+		const staged = path.join(temporary, 'staged.ahk');
+		const unstaged = path.join(temporary, 'unstaged.ahk');
+		const valid = (body) => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(body)]);
+		fs.writeFileSync(staged, valid('; staged\n'));
+		fs.writeFileSync(unstaged, valid('; unstaged\n'));
+		git(temporary, ['add', '--', 'staged.ahk', 'unstaged.ahk']);
+		git(temporary, ['commit', '-m', 'chore: initialize fixture']);
+
+		fs.writeFileSync(staged, Buffer.from('; staged change\r\n'));
+		git(temporary, ['add', '--', 'staged.ahk']);
+		fs.writeFileSync(unstaged, Buffer.from('; preserve this unstaged file\r\n'));
+		const unstagedBefore = fs.readFileSync(unstaged);
+
+		const fixtureFixer = path.join(temporary, 'tools', 'deploy', 'fix-ahk-encoding.cjs');
+		fs.mkdirSync(path.dirname(fixtureFixer), { recursive: true });
+		fs.copyFileSync(FIXER, fixtureFixer);
+		const result = spawnSync(process.execPath, [fixtureFixer, '--staged'], {
+			cwd: temporary,
+			encoding: 'utf8'
+		});
+		assert.equal(result.status, 0, result.stderr);
+
+		const stagedWorking = fs.readFileSync(staged);
+		assert.ok(hasBom(stagedWorking), 'the staged AHK working file must gain a UTF-8 BOM');
+		assert.equal(hasCr(stagedWorking), false, 'the staged AHK working file must become LF-only');
+		assert.deepEqual(
+			fs.readFileSync(unstaged),
+			unstagedBefore,
+			'an unstaged AHK file must remain byte-for-byte untouched'
+		);
+		const stagedIndex = git(temporary, ['show', ':staged.ahk'], null);
+		assert.ok(hasBom(stagedIndex), 'the corrected staged AHK bytes must be re-staged');
+		assert.equal(hasCr(stagedIndex), false, 'the staged AHK index blob must become LF-only');
+	} finally {
+		fs.rmSync(temporary, { recursive: true, force: true });
+	}
+
+	const hook = fs.readFileSync(HOOK, 'utf8');
+	assert.match(
+		hook,
+		/node tools\/deploy\/fix-ahk-encoding\.cjs --staged/,
+		'the pre-commit hook must invoke the fixer in staged-only mode'
+	);
+}
+
+function testStagedFixerRefusesPartiallyStagedAhkAtomically() {
+	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ahk-partial-stage-'));
+	try {
+		git(temporary, ['init']);
+		git(temporary, ['config', 'user.email', 'encoding-test@example.invalid']);
+		git(temporary, ['config', 'user.name', 'Encoding Test']);
+		const partiallyStaged = path.join(temporary, 'partially-staged.ahk');
+		const fullyStaged = path.join(temporary, 'fully-staged.ahk');
+		const valid = (body) => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(body)]);
+		fs.writeFileSync(partiallyStaged, valid('; partial baseline\n'));
+		fs.writeFileSync(fullyStaged, valid('; full baseline\n'));
+		git(temporary, ['add', '--', 'partially-staged.ahk', 'fully-staged.ahk']);
+		git(temporary, ['commit', '-m', 'chore: initialize fixture']);
+
+		fs.writeFileSync(partiallyStaged, Buffer.from('; staged portion\r\n'));
+		fs.writeFileSync(fullyStaged, Buffer.from('; fully staged change\r\n'));
+		git(temporary, ['add', '--', 'partially-staged.ahk', 'fully-staged.ahk']);
+		fs.writeFileSync(
+			partiallyStaged,
+			Buffer.from('; staged portion\r\n; preserve this unstaged portion\r\n')
+		);
+
+		const before = {
+			partialWorking: fs.readFileSync(partiallyStaged),
+			partialIndex: git(temporary, ['show', ':partially-staged.ahk'], null),
+			fullWorking: fs.readFileSync(fullyStaged),
+			fullIndex: git(temporary, ['show', ':fully-staged.ahk'], null)
+		};
+		const fixtureFixer = path.join(temporary, 'tools', 'deploy', 'fix-ahk-encoding.cjs');
+		fs.mkdirSync(path.dirname(fixtureFixer), { recursive: true });
+		fs.copyFileSync(FIXER, fixtureFixer);
+		const result = spawnSync(process.execPath, [fixtureFixer, '--staged'], {
+			cwd: temporary,
+			encoding: 'utf8'
+		});
+
+		assert.notEqual(result.status, 0, 'a partially staged AHK file must stop the fixer');
+		assert.match(
+			result.stderr,
+			/partially staged AHK file.*partially-staged\.ahk/is,
+			'the refusal must identify the partially staged destination'
+		);
+		assert.deepEqual(fs.readFileSync(partiallyStaged), before.partialWorking);
+		assert.deepEqual(
+			git(temporary, ['show', ':partially-staged.ahk'], null),
+			before.partialIndex,
+			'the partially staged index blob must remain unchanged'
+		);
+		assert.deepEqual(
+			fs.readFileSync(fullyStaged),
+			before.fullWorking,
+			'an earlier fully staged destination must not be rewritten before refusal'
+		);
+		assert.deepEqual(
+			git(temporary, ['show', ':fully-staged.ahk'], null),
+			before.fullIndex,
+			'an earlier fully staged index blob must not be re-staged before refusal'
+		);
+	} finally {
+		fs.rmSync(temporary, { recursive: true, force: true });
+	}
+}
+
 // =====================================
 // =====================================
 // ======= 3/ Validation Runner =======
@@ -148,6 +274,9 @@ function run() {
 		console.error('line endings to LF, then save.\n');
 		process.exit(1);
 	}
+
+	testStagedFixerDoesNotMutateUnstagedAhk();
+	testStagedFixerRefusesPartiallyStagedAhkAtomically();
 
 	console.log(`\nEncoding check passed — ${total} .ahk file(s) verified (UTF-8 BOM + LF).\n`);
 	process.exit(0);

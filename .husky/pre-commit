@@ -21,17 +21,11 @@ fi
 # causes silent CI failures with no error message; the LF half keeps one
 # line-ending convention repo-wide so no mixed-ending parser edge case can hide a
 # test. Both halves are exactly what tools/test/test-ahk-encoding.cjs enforces.
-# The fixer runs on all .ahk files in the repo (fast — only reads/writes what
-# needs changing), then re-stages any file it touched so the corrected bytes land
-# in the commit automatically.
-STAGED_AHK=$(git diff --cached --name-only --diff-filter=ACM | grep -i '\.ahk$' || true)
-if [ -n "$STAGED_AHK" ]; then
-    echo "[pre-commit] Fixing AHK encoding (BOM + CRLF) on staged files…"
-    node tools/deploy/fix-ahk-encoding.cjs
-    echo "$STAGED_AHK" | while IFS= read -r f; do
-        [ -f "$f" ] && git add "$f"
-    done
-fi
+# The fixer reads Git's NUL-delimited staged destinations, validates that every
+# selected path is a regular in-repository AHK file, and re-stages only those
+# destinations. Unstaged AHK files are never scanned or rewritten; a partially
+# staged destination fails before any file or index entry is changed.
+node tools/deploy/fix-ahk-encoding.cjs --staged
 
 # Location-pinned source reads in macOS tests — block them at the source rather
 # than discovering them later via the JS ratchet. A test that reads a driver file

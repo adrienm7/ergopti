@@ -22,10 +22,10 @@ des décisions, y compris des pistes déjà écartées comme « net négatif » 
 re-propose pas ce qui a été rejeté à raison, mais signale si une décision mérite
 d'être rouverte) :
 
-- `.github/copilot-instructions.md` et `CLAUDE.md` — règles de style, langue
-  (code anglais / UI française), logging, **single source of truth pour les
-  défauts (§5.2)**, pas de code mort (§5.6), test de régression par fix (§5.9).
-- `docs/PROJECT_MEMORY.md` — gotchas et invariants accumulés.
+- `AGENTS.md` — contrat universel de sécurité, de livraison et de langue ; les
+  skills ciblés sous `.agents/skills/` et le `SPEC.md` du logger portent les
+  règles propres aux drivers et au logging.
+- `docs/memory/README.md` — routeur des gotchas et invariants accumulés.
 - `docs/REFACTOR_PLAN.md` — le plan de refacto P0→P7 + FEAT A/B/C, avec le
   raisonnement des items faits ET rejetés. **C'est la mémoire canonique** : ton
   audit doit s'y greffer, pas la contredire sans preuve.
@@ -90,7 +90,7 @@ Analyse exhaustivement, avec preuves :
    i18n, des divergences d'ordre/structure entre AHK et HS ? Le pont de
    résolution (labels, catégories dynamiques) est-il dupliqué ?
 
-3. **Valeurs par défaut.** Applique §5.2 (single source of truth) à GRANDE
+3. **Valeurs par défaut.** Applique le contrat SSoT d'`AGENTS.md` à GRANDE
    échelle : trouve **tout défaut dupliqué** entre drivers ou entre code et
    `manifest.toml` / `*.toml` / `DEFAULT_STATE` (délais, couleurs, priorités,
    timeouts, tailles de fenêtres, seuils, presets de couleur, etc.). Pour chaque
@@ -144,8 +144,8 @@ réduction, pas l'ajout.
 3. **God-files & indirection.** Repère les fichiers volumineux ou à
    responsabilités multiples (des deux côtés) qui gagneraient à être scindés —
    ou au contraire des micro-fichiers/indirections à fusionner. Signale les
-   patterns de complexité accidentelle (ponts de compat, alias, fallbacks
-   morts) interdits par §5.6.
+   patterns de complexité accidentelle (ponts de compat, alias et fallbacks
+   morts) interdits par `AGENTS.md`.
 
 4. **Tooling & tests.** `tools/` (codegen, lint, test) est-il cohérent et
    non redondant ? Des scripts `package.json` orphelins ? La suite de tests
@@ -178,4 +178,4 @@ Contraintes : ne modifie pas le code pendant l'audit ; cite des chemins réels ;
 quantifie quand tu peux (Ko, nb de fichiers, nb de doublons) ; respecte la règle
 « aucun changement de comportement » et « un test de régression par fix » dans
 toutes tes propositions ; et confronte systématiquement tes conclusions à
-`docs/REFACTOR_PLAN.md` et `docs/PROJECT_MEMORY.md`.
+`docs/REFACTOR_PLAN.md` et `docs/memory/README.md`.

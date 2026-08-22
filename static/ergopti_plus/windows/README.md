@@ -57,10 +57,11 @@ without launching the driver.
 
 ## Conventions
 
-Code is English, UI is French; tabs for indentation; section/subsection banners
-and logging conventions are defined in
-[`../../../.github/copilot-instructions.md`](../../../.github/copilot-instructions.md).
+Repository-wide delivery rules live in [`AGENTS.md`](../../../AGENTS.md),
+Windows semantics in the
+[`ahk-driver` skill](../../../.agents/skills/ahk-driver/SKILL.md), and logging
+in the shared [`logger contract`](../_shared/modules/logger/SPEC.md).
 Hard-won gotchas live in
-[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md). Work that is
+[`../../../docs/memory/README.md`](../../../docs/memory/README.md). Work that is
 known but not done lives in the gate that measures it: each ratchet under
 `tools/test/` carries its own count and, in its header, what would move it.

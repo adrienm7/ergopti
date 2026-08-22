@@ -12,8 +12,8 @@
 > beaucoup, c'est le sujet du plan, pas une fatalité.
 >
 > **Règles du projet** (obligatoires, non négociées ici) :
-> [.github/copilot-instructions.md](../.github/copilot-instructions.md).
-> **Gotchas accumulés** : [docs/PROJECT_MEMORY.md](PROJECT_MEMORY.md).
+> [AGENTS.md](../AGENTS.md).
+> **Gotchas accumulés** : [docs/memory/README.md](memory/README.md).
 
 ---
 
@@ -970,8 +970,9 @@ du plan — après quoi il devient la **définition exécutable** de l'arbre can
 
 La procédure du projet, condensée :
 
-1. Consulter `docs/PROJECT_MEMORY.md` — il y a de bonnes chances que le piège soit déjà
-   documenté, ou que votre idée ait déjà été tentée et revertée.
+1. Consulter `docs/memory/README.md`, puis le seul sujet concerné — il y a de bonnes
+   chances que le piège soit déjà documenté. Les idées mesurées puis écartées vivent
+   séparément dans `docs/memory/rejected_proposals.md`.
 2. Corriger la **cause racine**, pas le symptôme. Et auditer **toute la classe** : le bug
    récurrent de ce dépôt est le site frère oublié, ou une garantie défaite un niveau
    d'indirection plus bas.
@@ -990,7 +991,7 @@ La procédure du projet, condensée :
 
 Ce sont les seules différences qu'il est légitime de conserver. Toute autre différence est
 un bug ou une dette. **Cette liste doit vivre à un seul endroit** ; en attendant que le plan
-crée `_shared/remap/SPEC.md`, elle est ici et dans `docs/PROJECT_MEMORY.md`.
+crée `_shared/remap/SPEC.md`, elle est ici et dans `docs/memory/`.
 
 | # | Asymétrie | Niveau | Pourquoi |
 |---|---|---|---|
@@ -1015,7 +1016,7 @@ crée `_shared/remap/SPEC.md`, elle est ici et dans `docs/PROJECT_MEMORY.md`.
 ## 12. Pièges par langage
 
 Ce sont ceux qui ont réellement mordu, avec leur symptôme. Liste complète dans les skills
-`.claude/skills/{ahk,hammerspoon,linux}-driver/`.
+`.agents/skills/{ahk,hammerspoon,linux}-driver/`.
 
 ### AutoHotkey v2 (`windows/`)
 
@@ -1109,9 +1110,9 @@ renommage.**
 | Question | Document |
 |---|---|
 « Que faut-il changer, dans quel ordre, et pour quel gain ? » | [TODO.md](../TODO.md) — §0 porte le programme de simplification complet |
-« Quelles sont les règles de style, de log, de nommage ? » | [.github/copilot-instructions.md](../.github/copilot-instructions.md) |
-« Ce piège a-t-il déjà mordu quelqu'un ? » | [PROJECT_MEMORY.md](PROJECT_MEMORY.md) |
+« Quelles sont les règles de style, de log, de nommage ? » | [AGENTS.md](../AGENTS.md), les [skills des drivers](../.agents/skills/) et le [contrat du logger](../static/ergopti_plus/_shared/modules/logger/SPEC.md) |
+« Ce piège a-t-il déjà mordu quelqu'un ? » | [memory/README.md](memory/README.md) |
 « Comment lancer quoi ? » | [TESTING.md](TESTING.md) |
 « Que veut dire ce terme ? » | [glossary.md](glossary.md) (français) et [../static/ergopti_plus/docs/glossary.md](../static/ergopti_plus/docs/glossary.md) (anglais) — ⚠ **ce ne sont pas deux versions du même document** ; l'anglais annonce « neuf ports » puis en liste treize alors qu'il y en a 20, et nomme des répertoires `hammerspoon/` / `autohotkey/` qui n'existent pas |
 « Pourquoi cette décision d'architecture ? » | [../static/ergopti_plus/docs/adr/](../static/ergopti_plus/docs/adr/) — ⚠ plusieurs ADR contiennent des chemins périmés, voir §14 du plan |
-« Comment faire une tâche récurrente (fix, commit, audit) ? » | `.claude/skills/` — index dans [../AGENTS.md](../AGENTS.md) |
+« Comment faire une tâche récurrente (fix, commit, audit) ? » | `.agents/skills/` — index dans [../AGENTS.md](../AGENTS.md) |

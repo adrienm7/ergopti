@@ -4,7 +4,7 @@
 ; MODULE: Logger
 ; DESCRIPTION:
 ; Lightweight central logger for ErgoptiPlus, matching the 8-variant taxonomy
-; mandated by CLAUDE.md §4 (debug / trace / done / info / start / success /
+; in _shared/modules/logger/SPEC.md (debug / trace / done / info / start / success /
 ; warn / error). Writes structured lines to ``ErgoptiPlus.log`` next to the
 ; script and keeps a small in-memory ring buffer that the tray menu can dump
 ; for live debugging without re-reading the file.
@@ -16,7 +16,7 @@
 ; 2. All log lines are best-effort; FileAppend is wrapped in try/finally so a
 ;    locked log file (anti-virus, OneDrive sync) can never break the keyboard
 ;    driver. The driver MUST stay responsive even if logging fails.
-; 3. Format strings follow CLAUDE.md §4.3 punctuation conventions
+; 3. Format strings follow the shared logger contract's punctuation conventions
 ;    (in-progress ``…``, completed ``.``).
 ; 4. Minimum level is configurable via the ini under [Script] LogLevel so users
 ;    can crank it to DEBUG when troubleshooting and back to INFO afterwards.
@@ -711,7 +711,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 						; the raw template SILENTLY is the worst of both worlds: the line
 						; still looks like a log entry while carrying none of its
 						; information — every placeholder intact, every value gone — and
-						; nothing anywhere records that the substitution failed (§5.3).
+						; nothing anywhere records that the substitution failed (fail-fast contract).
 						; Recursing into the logger to report it risks a loop on the hot
 						; path, so the evidence rides on the emitted line itself.
 						Body := Msg . "  [!! log format failed: " . FormatErr.Message
