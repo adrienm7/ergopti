@@ -74,8 +74,8 @@ helpers.assert_true(
 	"menu_llm/init.lua must thread M.reset_llm_health_status into BackendPanel.build's ctx (F-LOW-6)"
 )
 
--- Test 5 (F-LOW-6): backend_panel.lua's API-backend switch handler must call
--- the shared invalidator when activating the API backend.
+-- Test 5 (F-LOW-6): API activation must enter the generic backend transaction,
+-- whose publication phase owns the state write and health invalidation.
 -- Selected by a declaration rather than by path, so moving or splitting the
 -- module cannot turn this invariant into a path error. The selector is not
 -- unique to backend_panel.lua — menu_llm/init.lua declares it too — so the
@@ -85,15 +85,27 @@ helpers.assert_true(
 local panel_src = helpers.read_driver_source("local function check_backend_deps")
 helpers.assert_true(panel_src ~= nil, "ui/menu/menu_llm/backend_panel.lua source must be locatable")
 
-local api_switch_pos = panel_src:find('state.llm_backend = "api"', 1, true)
-helpers.assert_true(api_switch_pos ~= nil, "backend_panel.lua must set state.llm_backend = \"api\" on API switch")
--- The handler runs from the backend flip to the `end` closing its `if`, at the
--- same indentation as the `if` itself. Bounding on that instead of on 500
--- characters keeps the check inside the one function it is about.
-local api_switch_body = panel_src:sub(api_switch_pos, (panel_src:find("\n\t\t\tend\n", api_switch_pos, true) or #panel_src))
+local transaction_pos = panel_src:find(
+	"local function finish_backend_transition(target_backend, token, debt, on_committed)",
+	1,
+	true
+)
+local transaction_end = transaction_pos
+	and panel_src:find("\n\tlocal function publish_backend(", transaction_pos, true)
 helpers.assert_true(
-	api_switch_body:find("invalidate_llm_health()", 1, true) ~= nil,
-	"backend_panel.lua's API-backend switch handler must invalidate health ownership (F-LOW-6)"
+	transaction_pos ~= nil and transaction_end ~= nil,
+	"backend_panel.lua must retain a bounded generic backend publication transaction"
+)
+local transaction_body = panel_src:sub(transaction_pos, transaction_end)
+helpers.assert_true(
+	transaction_body:find("state.llm_backend = target_backend", 1, true) ~= nil
+		and transaction_body:find("invalidate_llm_health()", 1, true) ~= nil,
+	"generic backend publication must commit the target then invalidate health ownership (F-LOW-6)"
+)
+helpers.assert_true(
+	panel_src:find('publish_backend("api", finish_api_switch)', 1, true) ~= nil
+		and panel_src:find('leave_mlx("api", finish_api_switch)', 1, true) ~= nil,
+	"API activation must route both local-backend postures through the generic publication transaction"
 )
 
 print("[PASS] test_menu_llm_api_backend_probe")
