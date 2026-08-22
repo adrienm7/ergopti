@@ -37,8 +37,19 @@ local function with_fixture(spec, body)
 	local ok, err = xpcall(function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
+		local base_callback = logger.callback
 		logger.error = function(_, message, ...)
 			errors[#errors + 1] = string.format(message, ...)
+		end
+		logger.callback = function(module_name, label, callback, ...)
+			if label == "Model-switch recommended-profile follow-up"
+				and spec.profile_followup_mode ~= nil then
+				if spec.profile_followup_mode == "throw" then
+					return false, "injected profile follow-up exception"
+				end
+				return true, nil
+			end
+			return base_callback(module_name, label, callback, ...)
 		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.i18n"] = {get = function(key) return key end}
@@ -66,6 +77,7 @@ local function with_fixture(spec, body)
 			if not (failure and failure.mutate == false) then mutate() end
 			if failure then
 				if failure.mode == "throw" then error(name .. " injected failure") end
+				if failure.mode == "nil" then return nil end
 				return false
 			end
 			return true
@@ -88,9 +100,19 @@ local function with_fixture(spec, body)
 		}
 		local persisted = copy_state(state)
 		local rendered = copy_state(state)
+		local switcher
+		local nested_result
+		local reentered = false
+		local function reenter_switcher()
+			if spec.reenter_action == "profile" then
+				nested_result = switcher.set_llm_profile("advanced")
+			else
+				nested_result = switcher.switch_model("C")
+			end
+		end
 		local calls = {
 			core_models = {}, keymap_models = {}, display_models = {},
-			profiles = {}, saves = 0, menus = 0,
+			profiles = {}, saves = 0, menus = 0, profile_gates = 0,
 		}
 
 		local core_llm = {
@@ -125,12 +147,21 @@ local function with_fixture(spec, body)
 			set_llm_enabled = function() return true end,
 			set_llm_model = function(value)
 				calls.keymap_models[#calls.keymap_models + 1] = value
+				local core_result
 				if state.llm_backend == "mlx" then
-					core_llm.set_llm_model_mlx(value)
+					core_result = core_llm.set_llm_model_mlx(value)
 				else
-					core_llm.set_llm_model_ollama(value)
+					core_result = core_llm.set_llm_model_ollama(value)
 				end
-				return run_boundary("runtime_model", function() runtime.keymap_model = value end)
+				if core_result ~= true then return core_result end
+				return run_boundary("runtime_model", function()
+					runtime.keymap_model = value
+					if spec.reenter_boundary == "runtime_model"
+						and value == "actual:B" and not reentered then
+						reentered = true
+						reenter_switcher()
+					end
+				end)
 			end,
 			set_llm_display_model_name = function(value)
 				calls.display_models[#calls.display_models + 1] = value
@@ -139,19 +170,37 @@ local function with_fixture(spec, body)
 		}
 		local function save_prefs()
 			calls.saves = calls.saves + 1
-			return run_boundary("save", function() persisted = copy_state(state) end)
+			return run_boundary("save", function()
+				persisted = copy_state(state)
+				if spec.reenter_boundary == "save"
+					and state.llm_model == "B" and not reentered then
+					reentered = true
+					reenter_switcher()
+					-- Simulate the opaque writer tail resuming after the nested call.
+					persisted = copy_state(state)
+				end
+			end)
 		end
 		local function update_menu()
 			calls.menus = calls.menus + 1
 			return run_boundary("menu", function() rendered = copy_state(state) end)
 		end
+		local function profile_mutation_gate()
+			calls.profile_gates = calls.profile_gates + 1
+			if spec.reenter_boundary == "profile_mutation_gate" and not reentered then
+				reentered = true
+				reenter_switcher()
+			end
+			return true
+		end
 
-		local switcher = require("ui.menu.menu_llm.model_switcher").new({
+		switcher = require("ui.menu.menu_llm.model_switcher").new({
 			state = state,
 			models_mgr = manager,
 			keymap = keymap,
 			save_prefs = save_prefs,
 			update_menu = update_menu,
+			profile_mutation_gate = profile_mutation_gate,
 		})
 		body({
 			switcher = switcher,
@@ -161,6 +210,7 @@ local function with_fixture(spec, body)
 			rendered = function() return rendered end,
 			calls = calls,
 			errors = errors,
+			nested_result = function() return nested_result end,
 		})
 	end, debug.traceback)
 
@@ -184,13 +234,69 @@ local function assert_old_identity(fixture)
 end
 
 helpers.describe("HS-027 model switch is one recoverable transaction", function()
+	helpers.it("HS-012 fences reentrant selection inside the profile recovery preflight", function()
+		with_fixture({reenter_boundary = "profile_mutation_gate"}, function(fixture)
+			helpers.assert_eq(fixture.switcher.switch_model("B"), true)
+			helpers.assert_eq(fixture.nested_result(), false,
+				"a recovery callback cannot publish a sibling while its predecessor is on-stack")
+			helpers.assert_eq(fixture.state.llm_model, "B")
+			helpers.assert_eq(fixture.runtime.core_model, "actual:B")
+			helpers.assert_eq(fixture.runtime.keymap_model, "actual:B")
+			helpers.assert_eq(fixture.persisted().llm_model, "B")
+			helpers.assert_eq(fixture.calls.keymap_models, {"actual:B"})
+		end)
+	end)
+
+	for _, mode in ipairs({ "nil", "throw" }) do
+		helpers.it("HS-012 rejects recommended-profile follow-up " .. mode, function()
+			with_fixture({profile_followup_mode = mode}, function(fixture)
+				helpers.assert_eq(fixture.switcher.switch_model("B"), false)
+				assert_old_identity(fixture)
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "runtime_model", "save" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("HS-012 refuses nested model selection during " .. boundary
+				.. " mutate-then-" .. mode, function()
+				with_fixture({
+					reenter_boundary = boundary,
+					failures = {{name = boundary, occurrence = 1, mode = mode}},
+				}, function(fixture)
+					helpers.assert_eq(fixture.switcher.switch_model("B"), false)
+					helpers.assert_eq(fixture.nested_result(), false,
+						"the nested successor cannot commit inside an opaque boundary")
+					assert_old_identity(fixture)
+				end)
+			end)
+		end
+	end
+
+	for _, boundary in ipairs({ "runtime_model", "save" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("HS-012 refuses nested profile selection during model "
+				.. boundary .. " mutate-then-" .. mode, function()
+				with_fixture({
+					reenter_boundary = boundary,
+					reenter_action = "profile",
+					failures = {{name = boundary, occurrence = 1, mode = mode}},
+				}, function(fixture)
+					helpers.assert_eq(fixture.switcher.switch_model("B"), false)
+					helpers.assert_eq(fixture.nested_result(), false)
+					assert_old_identity(fixture)
+				end)
+			end)
+		end
+	end
+
 	local boundary_modes = {
-		core_model = {"throw"},
-		runtime_model = {"false", "throw"},
+		core_model = {"false", "nil", "throw"},
+		runtime_model = {"false", "nil", "throw"},
 		display_model = {"false", "throw"},
 		save = {"false", "throw"},
 		menu = {"false", "throw"},
-		profile = {"false", "throw"},
+		profile = {"false", "nil", "throw"},
 	}
 	for boundary, modes in pairs(boundary_modes) do
 		for _, mode in ipairs(modes) do
@@ -283,8 +389,8 @@ helpers.describe("HS-027 model switch is one recoverable transaction", function(
 	end)
 
 	local no_model_boundary_modes = {
-		core_model = {"throw"},
-		runtime_model = {"false", "throw"},
+		core_model = {"false", "nil", "throw"},
+		runtime_model = {"false", "nil", "throw"},
 		display_model = {"false", "throw"},
 		save = {"false", "throw"},
 		menu = {"false", "throw"},
@@ -304,7 +410,7 @@ helpers.describe("HS-027 model switch is one recoverable transaction", function(
 		end
 	end
 
-	for _, mode in ipairs({"false", "throw"}) do
+	for _, mode in ipairs({"false", "nil", "throw"}) do
 		helpers.it(string.format(
 			"HS-027 retains No Model %s compensation debt until exact retry", mode), function()
 			with_fixture({
@@ -332,6 +438,35 @@ helpers.describe("HS-027 model switch is one recoverable transaction", function(
 			end)
 		end)
 	end
+
+	helpers.it("HS-027 keeps nil display permissive after an exact menu commit", function()
+		with_fixture({
+			failures = {{name = "display_model", occurrence = 1, mode = "nil"}},
+		}, function(fixture)
+			helpers.assert_eq(fixture.switcher.switch_model("B"), true)
+			helpers.assert_eq(fixture.state.llm_model, "B")
+			helpers.assert_eq(fixture.runtime.core_model, "actual:B")
+			helpers.assert_eq(fixture.runtime.display_model, "B")
+			helpers.assert_eq(fixture.persisted().llm_model, "B")
+			helpers.assert_eq(fixture.rendered().llm_model, "B")
+			helpers.assert_eq(fixture.calls.display_models, {"B"})
+			helpers.assert_eq(fixture.calls.menus, 1)
+		end)
+	end)
+
+	helpers.it("HS-027 treats nil menu result as refusal and rolls back exactly", function()
+		with_fixture({
+			failures = {{name = "menu", occurrence = 1, mode = "nil"}},
+		}, function(fixture)
+			helpers.assert_eq(fixture.switcher.switch_model("B"), false)
+			assert_old_identity(fixture)
+			helpers.assert_eq(fixture.calls.core_models, {"actual:B", "actual:A"})
+			helpers.assert_eq(fixture.calls.keymap_models, {"actual:B", "actual:A"})
+			helpers.assert_eq(fixture.calls.display_models, {"B", "A"})
+			helpers.assert_eq(fixture.calls.saves, 2)
+			helpers.assert_eq(fixture.calls.menus, 2)
+		end)
+	end)
 
 	helpers.it("HS-027 commits No Model exactly once on success", function()
 		with_fixture({}, function(fixture)

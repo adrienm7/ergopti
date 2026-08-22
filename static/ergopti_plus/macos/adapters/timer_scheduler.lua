@@ -52,15 +52,6 @@ local function _new_id()
 	return _next_id
 end
 
---- Marks a handle terminal only after no native timer remains owned.
---- @param handle table Scheduler handle.
-local function settle_handle(handle)
-	handle.committed = false
-	handle.fired = true
-	handle.timer = nil
-	if handle.id then _live_timers[handle.id] = nil end
-end
-
 --- Invokes one user callback without letting Hammerspoon swallow its failure.
 --- @param kind string Scheduler method owning the callback.
 --- @param fn function User callback.
@@ -68,6 +59,23 @@ local function invoke_callback(kind, fn)
 	local ok, err = xpcall(fn, debug.traceback)
 	if not ok then
 		Logger.error(LOG, "%s() callback raised: %s", kind, tostring(err))
+	end
+end
+
+--- Marks a handle terminal only after no native timer remains owned, then
+--- delivers in-memory settlement observers. Observers are not native work: they
+--- exist solely to let the exact owner retry a continuation after a previously
+--- refused stop is eventually proven settled.
+--- @param handle table Scheduler handle.
+local function settle_handle(handle)
+	local observers = handle.settlement_observers or {}
+	handle.settlement_observers = {}
+	handle.committed = false
+	handle.fired = true
+	handle.timer = nil
+	if handle.id then _live_timers[handle.id] = nil end
+	for _, observer in ipairs(observers) do
+		invoke_callback("onSettled", observer)
 	end
 end
 
@@ -111,7 +119,12 @@ end
 --- @return table Opaque cancellation handle.
 --- @return boolean committed True only when the native timer was armed.
 function M.after(delaySec, fn)
-	local handle = { fired = false, committed = false, id = _new_id() }
+	local handle = {
+		fired = false,
+		committed = false,
+		id = _new_id(),
+		settlement_observers = {},
+	}
 	local activation_in_progress = true
 	local delivered_before_commit = false
 	-- Opportunistically retry exact native cleanup debt before adding a new
@@ -128,7 +141,14 @@ function M.after(delaySec, fn)
 				return
 			end
 			if handle.committed ~= true then
-				if activation_in_progress then delivered_before_commit = true end
+				if activation_in_progress then
+					delivered_before_commit = true
+				elseif handle.timer ~= nil then
+					-- A start/rollback transaction may have activated before
+					-- refusing. Native delivery is then only a cleanup signal:
+					-- retry the exact handle without ever invoking user work.
+					M.cancel(handle)
+				end
 				return
 			end
 			-- The native primitive repeats, so fence delivery before crossing stop().
@@ -179,14 +199,23 @@ end
 --- @return table Opaque cancellation handle.
 --- @return boolean committed True only when the native timer was armed.
 function M.every(intervalSec, fn)
-	local handle = { fired = false, committed = false, id = _new_id() }
+	local handle = {
+		fired = false,
+		committed = false,
+		id = _new_id(),
+		settlement_observers = {},
+	}
 	local activation_in_progress = true
 	local delivered_before_commit = false
 	M.retryCleanup()
 	local construct_ok, candidate_or_err = xpcall(function()
 		return hs.timer.new(intervalSec, function()
 			if handle.committed ~= true or handle.fired == true then
-				if activation_in_progress then delivered_before_commit = true end
+				if activation_in_progress then
+					delivered_before_commit = true
+				elseif handle.timer ~= nil then
+					M.cancel(handle)
+				end
 				return
 			end
 			invoke_callback("every", fn)
@@ -226,6 +255,24 @@ function M.every(intervalSec, fn)
 	activation_in_progress = false
 	handle.committed = true
 	return handle, true
+end
+
+--- Registers one in-memory continuation that runs exactly once after the native
+--- timer is proven stopped. If settlement already committed, it runs now.
+--- @param handle table Scheduler handle returned by after()/every().
+--- @param observer function Zero-arity continuation.
+--- @return boolean registered
+function M.onSettled(handle, observer)
+	if type(handle) ~= "table" or type(observer) ~= "function" then return false end
+	if handle.timer == nil then
+		invoke_callback("onSettled", observer)
+		return true
+	end
+	if type(handle.settlement_observers) ~= "table" then
+		handle.settlement_observers = {}
+	end
+	handle.settlement_observers[#handle.settlement_observers + 1] = observer
+	return true
 end
 
 --- Cancels a previously scheduled timer. Safe to call on a nil or already-fired

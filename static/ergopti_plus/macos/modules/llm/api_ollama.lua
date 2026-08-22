@@ -82,6 +82,15 @@ local _ollama_kill_task = nil
 local _ollama_launch_timer = nil
 local _ollama_serve_task = nil
 local _ollama_ambiguous_task = nil
+local _ollama_start_resume_pending = false
+local _ollama_start_cleanup_pending = false
+local _ollama_start_pause_in_progress = false
+local _ollama_start_pause_fenced = false
+-- Native task/timer acquisition can synchronously re-enter ScriptControl.  The
+-- exact slots are not terminal until the outer start frame returns and is
+-- revalidated, so PAUSE/RESUME must refuse cleanup while this depth is non-zero.
+local _ollama_start_acquisition_depth = 0
+local _ollama_launch_cleanup_observers = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
 -- the same numbers. ``max_mult`` is the upper bound on attempts as a
@@ -104,10 +113,251 @@ local _is_ready           = false
 -- a server/model that is no longer current and must discard itself. Mirrors the
 -- api_mlx _warmup_gen invariant (F-L4).
 local _warmup_gen         = 0
+local _warmup_active      = false
+local _warmup_last_model  = nil
+local _warmup_resume_pending = false
+local _warmup_explicitly_stopped = false
+local _warmup_resume_timer = nil
+local _warmup_resume_observers = {}
+local _warmup_client_recovery_token = nil
+local WARMUP_RESUME_COMMIT_DELAY_SEC = 0.05
+
+--- Reads ScriptControl's exact public pause state and epoch without requiring it
+--- through the LLM dependency cycle.
+local function read_script_pause_state()
+	local control = package.loaded["modules.shortcuts.script_control"]
+	if type(control) ~= "table" then return false, 0, true end
+	local epoch = 0
+	if type(control.get_pause_epoch) == "function" then
+		local epoch_ok, value = xpcall(control.get_pause_epoch, debug.traceback)
+		if not epoch_ok or type(value) ~= "number" then return true, -1, false end
+		epoch = value
+	end
+	if type(control.is_paused) ~= "function" then return false, epoch, true end
+	local paused_ok, paused = xpcall(control.is_paused, debug.traceback)
+	if not paused_ok or type(paused) ~= "boolean" then return true, epoch, false end
+	return paused, epoch, true
+end
+
+--- Cancels the exact post-RESUMED staging timer without losing refusal debt.
+local stage_warmup_resume
+local recover_warmup_resume
+local recover_warmup_after_client
+local begin_warmup_resume_activation
+local recover_ollama_start_after_settlement
+local has_pending_ollama_start_owner
+
+--- Returns whether either Ollama owner owes post-pause restoration.
+--- @return boolean pending
+local function has_ollama_resume_intent()
+	return _warmup_resume_pending == true or _ollama_start_resume_pending == true
+end
+
+local function cancel_warmup_resume_timer()
+	local handle = _warmup_resume_timer
+	if type(handle) ~= "table" or handle.timer == nil then
+		_warmup_resume_timer = nil
+		return true
+	end
+	local ok, result = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or result ~= true then return false end
+	if _warmup_resume_timer == handle then _warmup_resume_timer = nil end
+	return true
+end
+
+local function observe_warmup_resume_settlement(handle, epoch, generation)
+	if type(handle) ~= "table" or _warmup_resume_observers[handle] == true then return true end
+	if type(TimerScheduler.onSettled) ~= "function" then return false end
+	_warmup_resume_observers[handle] = true
+	local ok, registered_or_err = xpcall(function()
+		return TimerScheduler.onSettled(handle, function()
+			_warmup_resume_observers[handle] = nil
+			if _warmup_resume_timer == handle then _warmup_resume_timer = nil end
+			if generation ~= _warmup_gen or not has_ollama_resume_intent() then return end
+			local paused, current_epoch, state_ok = read_script_pause_state()
+			if state_ok == true and paused ~= true and current_epoch == epoch then
+				recover_warmup_resume(epoch, true)
+			end
+		end)
+	end, debug.traceback)
+	if not ok or registered_or_err ~= true then
+		_warmup_resume_observers[handle] = nil
+		return false
+	end
+	return true
+end
+
+--- Stages one warmup activation until the same ScriptControl epoch publishes
+--- RESUMED. A later owner refusal rolls this exact timer back through pause_warmup.
+local function arm_warmup_resume(epoch)
+	if type(_warmup_resume_timer) == "table"
+		and _warmup_resume_timer.timer ~= nil
+		and _warmup_resume_timer.committed == true then
+		return true
+	end
+	if cancel_warmup_resume_timer() ~= true then return false end
+	if not has_ollama_resume_intent() then return true end
+	if type(_warmup_resume_timer) == "table"
+		and _warmup_resume_timer.timer ~= nil
+		and _warmup_resume_timer.committed == true then
+		return true
+	end
+	local generation = _warmup_gen
+	local handle
+	local committed
+	local arm_ok, arm_error = xpcall(function()
+		handle, committed = TimerScheduler.after(WARMUP_RESUME_COMMIT_DELAY_SEC, function()
+			if _warmup_resume_timer ~= handle then return end
+			if handle.timer ~= nil then
+				observe_warmup_resume_settlement(handle, epoch, generation)
+				return
+			end
+			_warmup_resume_timer = nil
+			if committed ~= true or generation ~= _warmup_gen
+				or not has_ollama_resume_intent() then return end
+			local paused, current_epoch, state_ok = read_script_pause_state()
+			if state_ok ~= true then
+				recover_warmup_resume(epoch, false)
+				return
+			end
+			if current_epoch ~= epoch then return end
+			if paused == true then
+				recover_warmup_resume(epoch, false)
+				return
+			end
+			begin_warmup_resume_activation(epoch, true)
+		end)
+	end, debug.traceback)
+	if type(handle) == "table" and handle.timer ~= nil then
+		_warmup_resume_timer = handle
+	end
+	if not arm_ok or committed ~= true or type(handle) ~= "table" or handle.timer == nil then
+		if type(handle) == "table" and handle.timer ~= nil then
+			observe_warmup_resume_settlement(handle, epoch, generation)
+		end
+		Logger.error(LOG, "Ollama warmup resume staging failed: %s.",
+			tostring(arm_ok and committed or arm_error))
+		return false
+	end
+	handle.committed = true
+	_warmup_resume_timer = handle
+	return true
+end
+
+stage_warmup_resume = arm_warmup_resume
+
+recover_warmup_resume = function(epoch, allow_direct)
+	if _warmup_client_recovery_token ~= nil then return true end
+	if stage_warmup_resume(epoch) == true then return true end
+	if type(_warmup_resume_timer) == "table" and _warmup_resume_timer.timer ~= nil then
+		return false
+	end
+	if stage_warmup_resume(epoch) == true then return true end
+	if type(_warmup_resume_timer) == "table" and _warmup_resume_timer.timer ~= nil then
+		return false
+	end
+	if allow_direct ~= true then return false end
+	local paused, current_epoch, state_ok = read_script_pause_state()
+	if state_ok ~= true or paused == true or current_epoch ~= epoch
+		or not has_ollama_resume_intent() then return false end
+	return begin_warmup_resume_activation(epoch, false)
+end
+
+--- Restages only the pre-pause daemon intent after exact cleanup settlement.
+recover_ollama_start_after_settlement = function()
+	if has_pending_ollama_start_owner() then return end
+	_ollama_start_cleanup_pending = false
+	if _ollama_start_pause_in_progress == true
+		or _ollama_start_resume_pending ~= true then return end
+	local paused, epoch, state_ok = read_script_pause_state()
+	if state_ok == true and paused ~= true then
+		recover_warmup_resume(epoch, true)
+	end
+end
+
+recover_warmup_after_client = function(epoch, allow_direct)
+	local recovery_generation = _warmup_gen
+	if type(_warmup_client.onSettled) ~= "function" then
+		return recover_warmup_resume(epoch, allow_direct)
+	end
+	local token = {}
+	_warmup_client_recovery_token = token
+	local ok, registered_or_err = xpcall(function()
+		return _warmup_client.onSettled(function()
+			if _warmup_client_recovery_token ~= token then return end
+			_warmup_client_recovery_token = nil
+			if recovery_generation ~= _warmup_gen or _warmup_resume_pending ~= true then return end
+			local paused, current_epoch, state_ok = read_script_pause_state()
+			if state_ok == true and paused ~= true and current_epoch == epoch then
+				recover_warmup_resume(epoch, allow_direct)
+			end
+		end)
+	end, debug.traceback)
+	if not ok or registered_or_err ~= true then
+		if _warmup_client_recovery_token == token then
+			_warmup_client_recovery_token = nil
+		end
+		return recover_warmup_resume(epoch, allow_direct)
+	end
+	return true
+end
+
+begin_warmup_resume_activation = function(epoch, allow_direct_recovery)
+	_ollama_start_pause_fenced = false
+	if _ollama_start_resume_pending == true then
+		if _ollama_start_cleanup_pending == true or has_pending_ollama_start_owner() then
+			return false
+		end
+		local start_ok, start_result = xpcall(M.ensure_running, debug.traceback)
+		if not start_ok or start_result ~= true then
+			Logger.error(LOG, "Ollama resumed daemon start did not commit: %s.",
+				tostring(start_result))
+			return recover_warmup_resume(epoch, allow_direct_recovery)
+		end
+		_ollama_start_resume_pending = false
+	end
+	if _warmup_resume_pending ~= true then return true end
+	local terminal = false
+	local outcome = false
+	local call_ok, accepted_or_err = xpcall(function()
+		return M.warmup(_warmup_last_model, function(committed)
+			if terminal then return end
+			terminal = true
+			if committed == true then
+				_warmup_resume_pending = false
+				outcome = true
+				return
+			end
+			outcome = recover_warmup_after_client(epoch, allow_direct_recovery)
+		end)
+	end, debug.traceback)
+	local accepted = call_ok == true and accepted_or_err or false
+	if not call_ok then
+		Logger.error(LOG, "Ollama resumed warmup raised: %s.", tostring(accepted_or_err))
+	end
+	if accepted ~= true and terminal ~= true then
+		terminal = true
+		return recover_warmup_after_client(epoch, allow_direct_recovery)
+	end
+	if terminal == true then return outcome == true end
+	return accepted == true
+end
 
 --- Returns true when the backend has confirmed it can answer inference requests.
 --- @return boolean
 function M.is_ready()
+	if has_ollama_resume_intent() and _warmup_client_recovery_token == nil then
+		local paused, epoch, state_ok = read_script_pause_state()
+		if state_ok == true and paused ~= true then
+			if _warmup_resume_pending == true then
+				recover_warmup_after_client(epoch, true)
+			else
+				recover_warmup_resume(epoch, true)
+			end
+		end
+	end
 	return _is_ready
 end
 
@@ -130,21 +380,181 @@ function M.reset_ready()
 	Logger.debug(LOG, "Ollama readiness flag reset — next warmup must re-confirm (gen %d).", _warmup_gen)
 end
 
+--- Returns whether a non-terminal daemon-start capability still exists.
+--- A published daemon deliberately remains outside pause ownership.
+--- @return boolean pending
+has_pending_ollama_start_owner = function()
+	return _ollama_kill_task ~= nil
+		or _ollama_launch_timer ~= nil
+		or _ollama_ambiguous_task ~= nil
+		or (_ollama_serve_task ~= nil and _ollama_started ~= true)
+end
+
+--- Joins one exact startup task without mistaking accepted termination for exit.
+--- @param label string Stable owner label.
+--- @param task table|nil ShellRunner task handle.
+--- @param owns function Returns whether the same slot still owns the task.
+--- @param release function Clears the exact task slot.
+--- @return boolean settled
+local function settle_ollama_start_task(label, task, owns, release)
+	if task == nil then return true end
+	local ok, accepted_or_err, state = xpcall(function()
+		return task.terminate()
+	end, debug.traceback)
+	-- A hostile synchronous completion is stronger evidence than the outer
+	-- terminate result, including mutate-then-false/nil/throw doubles
+	if not owns() then return true end
+	if ok == true and accepted_or_err == true and state == "settled" then
+		release()
+		return true
+	end
+	if not ok or accepted_or_err ~= true then
+		Logger.error(LOG, "%s termination did not settle: %s.", label,
+			tostring(accepted_or_err))
+	end
+	return false
+end
+
+--- Observes exact settlement of a launch timer retained after stop refusal.
+--- @param handle table TimerScheduler handle.
+--- @return boolean registered
+local function observe_ollama_launch_cleanup(handle)
+	if type(handle) ~= "table" then return false end
+	if _ollama_launch_cleanup_observers[handle] == true then return true end
+	if type(TimerScheduler.onSettled) ~= "function" then return false end
+	_ollama_launch_cleanup_observers[handle] = true
+	local ok, registered_or_err = xpcall(function()
+		return TimerScheduler.onSettled(handle, function()
+			if _ollama_launch_cleanup_observers[handle] ~= true then return end
+			_ollama_launch_cleanup_observers[handle] = nil
+			if _ollama_launch_timer ~= handle then return end
+			_ollama_launch_timer = nil
+			if type(recover_ollama_start_after_settlement) == "function" then
+				recover_ollama_start_after_settlement()
+			end
+		end)
+	end, debug.traceback)
+	if not ok or registered_or_err ~= true then
+		_ollama_launch_cleanup_observers[handle] = nil
+		return false
+	end
+	return true
+end
+
+--- Cancels the exact daemon launch timer while retaining refusal debt.
+--- @return boolean settled
+local function settle_ollama_launch_timer()
+	local handle = _ollama_launch_timer
+	if type(handle) ~= "table" or handle.timer == nil then
+		_ollama_launch_timer = nil
+		return true
+	end
+	observe_ollama_launch_cleanup(handle)
+	local ok, result = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if _ollama_launch_timer ~= handle then return true end
+	if ok ~= true or result ~= true then return false end
+	_ollama_launch_cleanup_observers[handle] = nil
+	_ollama_launch_timer = nil
+	return true
+end
+
+--- Retries every non-terminal daemon-start cleanup owner.
+--- @return boolean settled
+local function settle_ollama_start_cleanup()
+	if _ollama_start_acquisition_depth > 0 then return false end
+	local kill_task = _ollama_kill_task
+	local kill_settled = settle_ollama_start_task(
+		"Ollama stale-process task", kill_task,
+		function() return _ollama_kill_task == kill_task end,
+		function() if _ollama_kill_task == kill_task then _ollama_kill_task = nil end end)
+	local timer_settled = settle_ollama_launch_timer()
+	local serve_settled = true
+	if _ollama_started ~= true then
+		local serve_task = _ollama_serve_task
+		serve_settled = settle_ollama_start_task(
+			"Ollama unpublished serve task", serve_task,
+			function() return _ollama_serve_task == serve_task end,
+			function() if _ollama_serve_task == serve_task then _ollama_serve_task = nil end end)
+	end
+	local ambiguous_task = _ollama_ambiguous_task
+	local ambiguous_settled = settle_ollama_start_task(
+		"Ollama ambiguous startup task", ambiguous_task,
+		function() return _ollama_ambiguous_task == ambiguous_task end,
+		function() if _ollama_ambiguous_task == ambiguous_task then _ollama_ambiguous_task = nil end end)
+	local settled = kill_settled and timer_settled and serve_settled
+		and ambiguous_settled and not has_pending_ollama_start_owner()
+	if settled then _ollama_start_cleanup_pending = false end
+	return settled
+end
+
+--- Fences and joins only a daemon start that has not yet been published.
+--- @return boolean settled
+local function quiesce_ollama_start()
+	if _ollama_start_cleanup_pending ~= true
+		and not has_pending_ollama_start_owner()
+		and _ollama_starting ~= true
+		and _ollama_start_acquisition_depth == 0 then
+		return true
+	end
+	_ollama_start_generation = _ollama_start_generation + 1
+	_ollama_starting = false
+	_ollama_start_cleanup_pending = true
+	if _ollama_start_acquisition_depth > 0 then return false end
+	return settle_ollama_start_cleanup()
+end
+
 --- Invalidates any in-flight warmup POST so its response cannot flip _is_ready or
 --- fire the user-facing "server ready" notification after the LLM gate closed
 --- (pause, or set_llm_enabled(false)). Mirrors api_mlx.stop_warmup (M-3), but
 --- without a _warmup_stopped flag — Ollama has no self-rescheduling retry chain to
 --- short-circuit — and without clearing _is_ready, so a resume does not force a
 --- pointless re-warm when the weights really are loaded.
-function M.stop_warmup()
+local function quiesce_warmup()
 	_warmup_gen = _warmup_gen + 1
+	_warmup_active = false
+	local timer_settled = cancel_warmup_resume_timer() == true
 	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
-	if not ok or result == false then
+	local client_settled = ok == true and result == true
+	if client_settled then _warmup_client_recovery_token = nil end
+	if not client_settled then
 		Logger.error(LOG, "stop_warmup() could not retire its HTTP owner: %s.", tostring(result))
-		return false
 	end
+	if not timer_settled or not client_settled then return false end
 	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, in-flight warmup invalidated.", _warmup_gen)
 	return true
+end
+
+function M.stop_warmup()
+	_warmup_resume_pending = false
+	_warmup_explicitly_stopped = true
+	return quiesce_warmup()
+end
+
+--- Quiesces one in-flight warmup while retaining its exact pre-pause intent.
+--- @return boolean settled
+function M.pause_warmup()
+	if _warmup_explicitly_stopped == true then
+		_warmup_resume_pending = false
+	elseif _warmup_resume_pending ~= true then
+		local active = _warmup_active == true
+		if not active and type(_warmup_client.isActive) == "function" then
+			local ok, value = xpcall(_warmup_client.isActive, debug.traceback)
+			active = ok == true and value == true
+		end
+		_warmup_resume_pending = active
+	end
+	if _ollama_start_resume_pending ~= true then
+		_ollama_start_resume_pending = _ollama_starting == true
+			or has_pending_ollama_start_owner()
+	end
+	_ollama_start_pause_fenced = true
+	_ollama_start_pause_in_progress = true
+	local daemon_settled = quiesce_ollama_start()
+	local warmup_settled = quiesce_warmup()
+	_ollama_start_pause_in_progress = false
+	return daemon_settled and warmup_settled
 end
 
 -- Delay before launching Ollama after killing a stale instance (seconds)
@@ -163,43 +573,55 @@ local STREAM_TMPFILE_CLEANUP_SEC = 70
 -- @return boolean accepted True when a daemon is running or one launch attempt
 -- was committed to native async ownership.
 local function ensure_ollama_running()
-	-- A thrown start is outside ShellRunner's normal contract, but an injected or
-	-- future adapter can still leave native ownership ambiguous. Do not launch a
-	-- sibling until the exact retained capability has been terminated.
-	if _ollama_ambiguous_task then
-		local ambiguous = _ollama_ambiguous_task
-		local stop_ok, stop_result = xpcall(function() return ambiguous.terminate() end, debug.traceback)
-		if not stop_ok or stop_result ~= true then
-			Logger.error(LOG, "Ambiguous Ollama startup task could not be revoked; launch remains fenced: %s",
-				tostring(stop_result))
-			return false
-		end
-		if _ollama_ambiguous_task == ambiguous then _ollama_ambiguous_task = nil end
-		_ollama_start_generation = _ollama_start_generation + 1
-		_ollama_starting = false
+	if _ollama_ambiguous_task ~= nil then _ollama_start_cleanup_pending = true end
+	if _ollama_start_cleanup_pending == true
+		and settle_ollama_start_cleanup() ~= true then
+		Logger.error(LOG, "Ollama startup cleanup remains unsettled; sibling launch fenced.")
+		return false
 	end
-
-	if _ollama_started or _ollama_starting then return true end
+	if _ollama_started then return true end
+	if _ollama_start_pause_fenced == true then
+		_ollama_start_resume_pending = true
+		return true
+	end
+	local paused, _, pause_state_ok = read_script_pause_state()
+	if pause_state_ok == true and paused == true then
+		_ollama_start_resume_pending = true
+		return true
+	end
+	if _ollama_starting then return true end
 
 	_ollama_start_generation = _ollama_start_generation + 1
 	local my_generation = _ollama_start_generation
 	_ollama_starting = true
 
 	local function fail_start(stage, result, ambiguous_task)
-		if my_generation ~= _ollama_start_generation then return false end
-		_ollama_kill_task = nil
-		_ollama_launch_timer = nil
-		if ambiguous_task then
-			local stop_ok, stop_result = xpcall(function() return ambiguous_task.terminate() end, debug.traceback)
-			if not stop_ok or stop_result ~= true then
-				_ollama_ambiguous_task = ambiguous_task
-				_ollama_starting = true
-				Logger.error(LOG, "Ollama %s left ambiguous native ownership; retry fenced: %s",
-					tostring(stage), tostring(stop_result))
-				return false
+		if my_generation ~= _ollama_start_generation then
+			if ambiguous_task ~= nil
+				and (_ollama_kill_task == ambiguous_task
+					or _ollama_serve_task == ambiguous_task) then
+				_ollama_start_cleanup_pending = true
 			end
+			if _ollama_start_acquisition_depth == 0
+				and _ollama_start_cleanup_pending == true
+				and settle_ollama_start_cleanup() == true then
+				recover_ollama_start_after_settlement()
+			end
+			return false
+		end
+		if ambiguous_task then
+			if _ollama_kill_task == ambiguous_task then _ollama_kill_task = nil end
+			if _ollama_serve_task == ambiguous_task then _ollama_serve_task = nil end
+			_ollama_ambiguous_task = ambiguous_task
 		end
 		_ollama_starting = false
+		if has_pending_ollama_start_owner() then
+			_ollama_start_cleanup_pending = true
+			if settle_ollama_start_cleanup() ~= true then
+				Logger.error(LOG, "Ollama %s left unsettled native ownership; retry fenced.",
+					tostring(stage))
+			end
+		end
 		Logger.error(LOG, "Ollama %s did not commit (result: %s); launch remains retryable.",
 			tostring(stage), tostring(result))
 		return false
@@ -208,30 +630,44 @@ local function ensure_ollama_running()
 	-- Locals are declared above the callbacks that capture them. Moving either
 	-- declaration below its closure silently binds a nil global in Lua.
 	local kill_handle
+	local kill_completed = false
 	local function on_kill_done()
 		local callback_ok, callback_err = xpcall(function()
-			if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
-			if _ollama_kill_task ~= kill_handle then return end
-			_ollama_kill_task = nil
+			kill_completed = true
+			local claimed = false
+			if _ollama_kill_task == kill_handle then
+				_ollama_kill_task = nil
+				claimed = true
+			end
+			if _ollama_ambiguous_task == kill_handle then
+				_ollama_ambiguous_task = nil
+				claimed = true
+			end
+			if not claimed then return end
+			if my_generation ~= _ollama_start_generation or not _ollama_starting then
+				recover_ollama_start_after_settlement()
+				return
+			end
 
 			local launch_handle
 			local launch_callback_ran = false
-			local function launch_server()
-				launch_callback_ran = true
+			local launch_observer_registered = false
+			local function activate_server()
 				local launch_ok, launch_err = xpcall(function()
 					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
-					_ollama_launch_timer = nil
 
 					-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
 					-- [OLLAMA-SERVER] prefix. The shared builder captures only the stable
 					-- directory; its shell loop derives the dated filename for every line.
 					local ollama_bin, binary_err = OllamaBinary.resolve()
+					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
 					if not ollama_bin then
 						fail_start("server executable resolution", binary_err)
 						return
 					end
 					local launch_cmd, command_err = OllamaServerCommand.build(
 						ollama_bin, Logger.UNIFIED_LOG_FILE)
+					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
 					if not launch_cmd then
 						fail_start("server command creation", command_err)
 						return
@@ -242,9 +678,20 @@ local function ensure_ollama_running()
 					local function on_serve_done()
 						local done_ok, done_err = xpcall(function()
 							serve_completed = true
-							if my_generation ~= _ollama_start_generation then return end
-							if _ollama_serve_task ~= serve_handle then return end
-							_ollama_serve_task = nil
+							local claimed = false
+							if _ollama_serve_task == serve_handle then
+								_ollama_serve_task = nil
+								claimed = true
+							end
+							if _ollama_ambiguous_task == serve_handle then
+								_ollama_ambiguous_task = nil
+								claimed = true
+							end
+							if not claimed then return end
+							if my_generation ~= _ollama_start_generation then
+								recover_ollama_start_after_settlement()
+								return
+							end
 							_ollama_started = false
 							_ollama_starting = false
 							Logger.warn(LOG, "Ollama server task exited; the next demand will relaunch it.")
@@ -252,24 +699,33 @@ local function ensure_ollama_running()
 						if not done_ok then Logger.error(LOG, "Ollama server completion callback raised: %s", tostring(done_err)) end
 					end
 
+					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
 					local spawn_ok, spawned = xpcall(function()
 						return ShellRunner.spawn("/bin/sh", { "-c", launch_cmd }, on_serve_done)
 					end, debug.traceback)
+					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
 					if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
 						fail_start("server task creation", spawned)
 						return
 					end
 					serve_handle = spawned
 					_ollama_serve_task = serve_handle
-					local start_ok, start_result = xpcall(function() return serve_handle.start() end, debug.traceback)
-					if not start_ok then
-						_ollama_serve_task = nil
-						fail_start("server task start", start_result, serve_handle)
+					if my_generation ~= _ollama_start_generation or not _ollama_starting
+						or _ollama_start_pause_fenced == true then
+						fail_start("server task creation superseded", spawned, serve_handle)
 						return
 					end
-					if start_result ~= true then
-						_ollama_serve_task = nil
-						fail_start("server task start", start_result)
+					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
+					local start_ok, start_result = xpcall(function() return serve_handle.start() end, debug.traceback)
+					_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
+					if not start_ok or start_result ~= true then
+						local ambiguous = not serve_completed and serve_handle or nil
+						fail_start("server task start", start_result, ambiguous)
+						return
+					end
+					if not serve_completed and (my_generation ~= _ollama_start_generation
+						or not _ollama_starting or _ollama_start_pause_fenced == true) then
+						fail_start("server task start superseded", start_result, serve_handle)
 						return
 					end
 					if not serve_completed and my_generation == _ollama_start_generation then
@@ -281,35 +737,90 @@ local function ensure_ollama_running()
 				if not launch_ok then fail_start("server launch callback", launch_err) end
 			end
 
+			local function continue_after_launch_settlement()
+				if _ollama_launch_timer ~= launch_handle then return end
+				_ollama_launch_timer = nil
+				if my_generation ~= _ollama_start_generation or not _ollama_starting then
+					recover_ollama_start_after_settlement()
+					return
+				end
+				activate_server()
+			end
+
+			local function launch_server()
+				launch_callback_ran = true
+				if _ollama_launch_timer ~= launch_handle then return end
+				if type(launch_handle) == "table" and launch_handle.timer ~= nil then
+					if launch_observer_registered then return end
+					launch_observer_registered = true
+					local ok_observer, registered_or_err = xpcall(function()
+						return TimerScheduler.onSettled(launch_handle, function()
+							if not launch_observer_registered then return end
+							launch_observer_registered = false
+							continue_after_launch_settlement()
+						end)
+					end, debug.traceback)
+					if not ok_observer or registered_or_err ~= true then
+						launch_observer_registered = false
+						Logger.error(LOG, "Ollama launch timer settlement observer failed: %s.",
+							tostring(registered_or_err))
+					end
+					return
+				end
+				continue_after_launch_settlement()
+			end
+
+			_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
 			local schedule_ok, scheduled, settle_committed = xpcall(function()
 				return TimerScheduler.after(OLLAMA_KILL_SETTLE_SEC, launch_server)
 			end, debug.traceback)
-			if not schedule_ok or settle_committed ~= true then
+			_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
+			launch_handle = scheduled
+			if type(launch_handle) == "table" and launch_handle.timer ~= nil then
+				_ollama_launch_timer = launch_handle
+			end
+			local launch_current = my_generation == _ollama_start_generation
+				and _ollama_starting == true
+				and _ollama_start_pause_fenced ~= true
+			if not schedule_ok or settle_committed ~= true
+				or type(launch_handle) ~= "table" or launch_handle.timer == nil
+				or launch_callback_ran or launch_current ~= true then
+				if type(launch_handle) == "table" and launch_handle.timer ~= nil then
+					observe_ollama_launch_cleanup(launch_handle)
+				end
 				fail_start("settle timer", scheduled)
 				return
 			end
-			launch_handle = scheduled
-			if not launch_callback_ran then _ollama_launch_timer = launch_handle end
 		end, debug.traceback)
 		if not callback_ok then fail_start("kill completion callback", callback_err) end
 	end
 
+	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
 	local spawn_ok, spawned = xpcall(function()
 		return ShellRunner.spawn("/bin/sh", {
 			"-c", "pkill -f '[o]llama serve' 2>/dev/null || true"
 		}, on_kill_done)
 	end, debug.traceback)
+	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
 	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
 		return fail_start("stale-process task creation", spawned)
 	end
 	kill_handle = spawned
 	_ollama_kill_task = kill_handle
-	local start_ok, start_result = xpcall(function() return kill_handle.start() end, debug.traceback)
-	if not start_ok then
-		return fail_start("stale-process task start", start_result, kill_handle)
+	if my_generation ~= _ollama_start_generation or not _ollama_starting
+		or _ollama_start_pause_fenced == true then
+		return fail_start("stale-process task creation superseded", spawned, kill_handle)
 	end
-	if start_result ~= true then
-		return fail_start("stale-process task start", start_result)
+	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
+	local start_ok, start_result = xpcall(function() return kill_handle.start() end, debug.traceback)
+	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth - 1
+	if not start_ok or start_result ~= true then
+		local ambiguous = not kill_completed and kill_handle or nil
+		return fail_start("stale-process task start", start_result, ambiguous)
+	end
+	if not kill_completed and (my_generation ~= _ollama_start_generation
+		or not _ollama_starting or _ollama_start_pause_fenced == true) then
+		return fail_start("stale-process task start superseded", start_result, kill_handle)
 	end
 	return true
 end
@@ -331,8 +842,24 @@ end
 --- Called once after the model is configured; subsequent real requests then
 --- skip the cold-start penalty (typically 1–3 s for a 2B model on Apple Silicon).
 --- @param model_name string The Ollama model identifier to pre-load.
-function M.warmup(model_name)
-	if type(model_name) ~= "string" or model_name == "" then return end
+--- @param on_acquired function|nil Internal exact POST-acquisition callback.
+function M.warmup(model_name, on_acquired)
+	local acquisition_reported = false
+	local function report_acquisition(committed)
+		if acquisition_reported then return end
+		acquisition_reported = true
+		if type(on_acquired) ~= "function" then return end
+		local ok, err = xpcall(function() on_acquired(committed == true) end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Ollama warmup acquisition callback raised: %s.", tostring(err))
+		end
+	end
+	if type(model_name) ~= "string" or model_name == "" then
+		report_acquisition(false)
+		return false
+	end
+	_warmup_explicitly_stopped = false
+	_warmup_last_model = model_name
 	Logger.debug(LOG, "Warming up model '%s'…", model_name)
 	local encoded, enc_err = JsonCodec.encode({
 		model      = model_name,
@@ -342,23 +869,30 @@ function M.warmup(model_name)
 		options    = { num_predict = 1, temperature = 0 },
 	})
 	if not encoded then
+		report_acquisition(false)
 		Logger.error(LOG, "warmup: encode failed — %s", tostring(enc_err))
-		return
+		return false
 	end
 	-- Snapshot the warmup generation: if reset_ready() bumps it while this POST is
 	-- in flight, the response describes a now-stale server/model and its callback
 	-- must not touch _is_ready (see reset_ready for the self-termination scenario).
 	local my_warmup_gen = _warmup_gen
-	_warmup_client.post(
+	_warmup_active = true
+	local dispatch_committed = false
+	local pending_response = nil
+	local dispatch_ok, accepted_or_err = xpcall(function()
+		return _warmup_client.post(
 		M.get_base_url() .. "/api/chat",
 		{ ["Content-Type"] = "application/json" },
 		encoded,
 		function(r)
+			local function apply_response()
 			if my_warmup_gen ~= _warmup_gen then
 				Logger.debug(LOG, "Discarding stale Ollama warmup response (gen %d != %d) — it describes a server/model that is no longer current.",
 					my_warmup_gen, _warmup_gen)
 				return
 			end
+			_warmup_active = false
 			if r.status == 200 then
 				local became_ready = (_is_ready ~= true)
 				_is_ready = true
@@ -370,8 +904,56 @@ function M.warmup(model_name)
 				_is_ready = false
 				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(r.status))
 			end
-		end
-	)
+			end
+			if dispatch_committed ~= true then
+				pending_response = apply_response
+				return
+			end
+			apply_response()
+		end)
+	end, debug.traceback)
+	if not dispatch_ok or accepted_or_err ~= true then
+		pending_response = nil
+		_warmup_active = false
+		Logger.error(LOG, "Ollama warmup POST acquisition failed: %s.",
+			tostring(accepted_or_err))
+		report_acquisition(false)
+		return false
+	end
+	dispatch_committed = true
+	if pending_response ~= nil then
+		local apply_response = pending_response
+		pending_response = nil
+		apply_response()
+	end
+	report_acquisition(true)
+	return true
+end
+
+--- Restarts only the exact warmup that pause_warmup() invalidated.
+--- @return boolean committed
+function M.resume_warmup()
+	if _ollama_start_acquisition_depth > 0 then return false end
+	local timer_settled = cancel_warmup_resume_timer() == true
+	local ok_cancel, cancel_result = xpcall(function()
+		return _warmup_client.cancel()
+	end, debug.traceback)
+	local daemon_settled = settle_ollama_start_cleanup()
+	if not timer_settled or not ok_cancel or cancel_result ~= true
+		or daemon_settled ~= true then
+		Logger.error(LOG, "Ollama warmup resume is waiting for prior cancellation: %s.",
+			tostring(cancel_result))
+		return false
+	end
+	if not has_ollama_resume_intent() then
+		_warmup_resume_pending = false
+		_ollama_start_pause_fenced = false
+		return true
+	end
+	local paused, epoch, state_ok = read_script_pause_state()
+	if state_ok ~= true then return false end
+	if paused == true then return stage_warmup_resume(epoch) end
+	return begin_warmup_resume_activation(epoch, true)
 end
 
 --- Terminates the in-flight streaming task if one is active.

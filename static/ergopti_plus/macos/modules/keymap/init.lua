@@ -21,6 +21,7 @@ local eventtap   = hs.eventtap
 local text_utils = require("infra.text_utils")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
+local TimerScheduler = require("adapters.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
@@ -170,6 +171,7 @@ local _action_preview_refresh_pending = false
 local _context_reconcile_pending = false
 local _context_reconcile_timer = nil
 local _context_reconcile_quiet = false
+local _context_reconcile_generation = 0
 local _window_context_reconcile_pending = false
 local _last_window_context_generation = 0
 
@@ -273,7 +275,6 @@ end
 --- declaration, so a copy placed further down would bind the never-assigned
 --- GLOBAL in the error handler that needs it most.
 local function reconcile_observed_context_async()
-	_context_reconcile_timer = nil
 	if not _context_reconcile_pending then return end
 	_context_reconcile_pending = false
 	local quiet = _context_reconcile_quiet
@@ -319,15 +320,39 @@ local function arm_observed_context_reconcile(quiet)
 	else
 		_context_reconcile_quiet = false
 	end
-	if _context_reconcile_timer then return end
-	local callback_ran = false
-	local ok, timer_or_err = pcall(hs.timer.doAfter, 0, function()
-		callback_ran = true
+	if CoreState.processing_paused == true then return true end
+	if _context_reconcile_timer and _context_reconcile_timer.timer ~= nil then return true end
+	_context_reconcile_timer = nil
+	_context_reconcile_generation = _context_reconcile_generation + 1
+	local generation = _context_reconcile_generation
+	local handle, committed = TimerScheduler.after(0, function()
+		if generation ~= _context_reconcile_generation
+			or CoreState.processing_paused == true then return end
 		reconcile_observed_context_async()
 	end)
-	if ok and timer_or_err ~= nil and not callback_ran then
-		_context_reconcile_timer = timer_or_err
+	if handle and handle.timer ~= nil then
+		_context_reconcile_timer = handle
+		TimerScheduler.onSettled(handle, function()
+			if _context_reconcile_timer == handle then
+				_context_reconcile_timer = nil
+			end
+		end)
 	end
+	return committed == true
+end
+
+
+--- Fences and settles the exact reconciliation timer without consuming the
+--- pending context intent. A refused native stop remains retryable by the next
+--- PAUSE/RESUME attempt; TimerScheduler keeps its callback logically inert.
+--- @return boolean settled
+local function pause_observed_context_reconcile()
+	_context_reconcile_generation = _context_reconcile_generation + 1
+	local handle = _context_reconcile_timer
+	if not handle then return true end
+	if TimerScheduler.cancel(handle) ~= true then return false end
+	if _context_reconcile_timer == handle then _context_reconcile_timer = nil end
+	return true
 end
 
 
@@ -415,17 +440,36 @@ function M.get_trigger_char()
 end
 
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
+--- @return boolean committed
 function M.pause_processing()
 	CoreState.processing_paused = true
 	discard_paused_text_context()
+	if pause_observed_context_reconcile() ~= true then
+		Logger.error(LOG, "Processing pause retained an exact context-reconcile timer.")
+		return false
+	end
 	Logger.debug(LOG, "Processing paused.")
+	return true
 end
 
 --- Resumes eventtap processing after a pause.
+--- @return boolean committed
 function M.resume_processing()
 	discard_paused_text_context()
+	if pause_observed_context_reconcile() ~= true then
+		Logger.error(LOG, "Processing resume is blocked by context-reconcile cleanup debt.")
+		return false
+	end
 	CoreState.processing_paused = false
+	if _context_reconcile_pending and arm_observed_context_reconcile(
+		_context_reconcile_quiet) ~= true then
+		CoreState.processing_paused = true
+		pause_observed_context_reconcile()
+		Logger.error(LOG, "Processing resume could not re-arm pending context reconciliation.")
+		return false
+	end
 	Logger.debug(LOG, "Processing resumed.")
+	return true
 end
 
 --- Returns true when the eventtap is currently paused.
@@ -605,6 +649,7 @@ M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.reset_predictions  = LLMBridge.reset_predictions
+M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 
 M.classify_trigger   = Registry.classify_trigger
 M.has_exact_trigger  = Registry.has_exact_trigger
@@ -988,15 +1033,6 @@ local FAST_EXIT_KEYCODES = {
 local _interceptor_error_logged = {}
 
 local function onKeyDownRaw(e, provenance, provenance_status)
-	-- Tap order is not stable: an action can advance the shared epoch before this
-	-- keymap tap sees its tagged echo. The wrapper also claims older deferred
-	-- output before entering this function, so re-read the epoch before every
-	-- other gate and never route a physical key through stale predictions.
-	local action_epoch = SyntheticInput.current_action_epoch()
-	if action_epoch ~= _last_context_epoch then
-		observe_action_epoch(action_epoch)
-	end
-
 	-- A stale internal loopback has lost the live transaction identity required to
 	-- re-enter the LLM, but it is still an Ergopti-only control key. Consume it in
 	-- every state (including pause) instead of leaking F16 to the frontmost app.
@@ -1004,13 +1040,6 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		and (provenance.loopback == true or provenance.stale_loopback == true)
 	if provenance and provenance.stale_loopback then return true end
 
-	-- A failed native user-data read is neither proof of physical input nor proof
-	-- of ownership. Pass the event through, but discard every cursor/text belief so
-	-- an unreadable synthetic echo cannot be appended as human typing.
-	if provenance_status == EventProvenance.STATUS_UNREADABLE then
-		invalidate_observed_context()
-		return false
-	end
 	-- Ordinary owned output is already represented logically by its transaction.
 	-- Only the explicit live loopback control is allowed to reach key decoding;
 	-- every replacement/action echo exits before the native getKeyCode call.
@@ -1021,9 +1050,28 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- physical keys remain pass-through in that acknowledgement window; letting
 	-- the engine start an expansion would either cross the drain or trip the
 	-- adapter's fail-fast admission assertion.
-	if not SyntheticInput.admission_open() then return internal_loopback == true end
+	if not SyntheticInput.admission_open()
+		or CoreState.processing_paused == true then
+		return internal_loopback == true
+	end
 
-	if CoreState.processing_paused then return internal_loopback == true end
+	-- Tap order is not stable: an action can advance the shared epoch before this
+	-- keymap tap sees its tagged echo. The wrapper also claims older deferred
+	-- output before entering this function, so re-read the epoch only after the
+	-- pause/admission fence and never mutate context on a pass-through PAUSED key.
+	local action_epoch = SyntheticInput.current_action_epoch()
+	if action_epoch ~= _last_context_epoch then
+		observe_action_epoch(action_epoch)
+	end
+
+	-- A failed native user-data read is neither proof of physical input nor proof
+	-- of ownership. Pass the event through, but discard every cursor/text belief so
+	-- an unreadable synthetic echo cannot be appended as human typing. PAUSED and
+	-- admission-closed delivery returned above without touching this belief state.
+	if provenance_status == EventProvenance.STATUS_UNREADABLE then
+		invalidate_observed_context()
+		return false
+	end
 
 	-- Single getKeyCode() call — reused for every subsequent keyCode check
 	local keyCode = e:getKeyCode()
@@ -1516,9 +1564,11 @@ shift_tap = eventtap.new(
 			_shift_right_down = false
 			_shift_last_side = nil
 			update_shift_side()
-			SyntheticInput.defer_after_callback("shift-side diagnostic", function()
-				Logger.error(LOG, "Shift-side detection failure: %s.", tostring(result))
-			end)
+			if CoreState.processing_paused ~= true then
+				SyntheticInput.defer_after_callback("shift-side diagnostic", function()
+					Logger.error(LOG, "Shift-side detection failure: %s.", tostring(result))
+				end)
+			end
 			return false, fence_events
 		end
 		return result, fence_events
@@ -1545,6 +1595,10 @@ mouse_tap = eventtap.new(
 		local fence_events = fence and fence.events or nil
 		if fence and fence.consume_original == true then return true, fence_events end
 		if provenance then return false end
+		-- ScriptControl leaves the physical tap installed so the click itself still
+		-- passes through, but PAUSE owns every keymap mutation and deferred reset.
+		-- Claim any older synthetic fence above, then stop before touching context.
+		if CoreState.processing_paused == true then return false, fence_events end
 		if provenance_status == EventProvenance.STATUS_UNREADABLE then
 			invalidate_observed_context()
 			return false, fence_events
@@ -1734,7 +1788,8 @@ tap_watchdog = function(timer, generation)
 	-- Timer allocation in the HID callback is best-effort. This periodic path is
 	-- the independent retry that guarantees a closed observation-gap latch cannot
 	-- strand predictions forever.
-	if _context_reconcile_pending and _context_reconcile_timer == nil then
+	if CoreState.processing_paused ~= true
+		and _context_reconcile_pending and _context_reconcile_timer == nil then
 		reconcile_observed_context_async()
 	end
 	local function revive(name, t)
@@ -1752,7 +1807,9 @@ tap_watchdog = function(timer, generation)
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)
 	-- Only the keyDown tap feeds the buffer, so only its outage invalidates it.
-	if keydown_revived then invalidate_observed_context() end
+	if keydown_revived and CoreState.processing_paused ~= true then
+		invalidate_observed_context()
+	end
 end
 
 --- Starts the eventtap listeners and attaches them to the OS event queue.
@@ -1870,9 +1927,10 @@ function M.stop(teardown)
 		end
 	end
 	local watchdog_stopped = stop_watchdog()
-	if _context_reconcile_timer then
-		pcall(function() _context_reconcile_timer:stop() end)
-		_context_reconcile_timer = nil
+	local context_reconcile_stopped = pause_observed_context_reconcile()
+	if not context_reconcile_stopped then
+		Logger.error(LOG,
+			"Context-reconcile timer teardown remains incomplete and retryable.")
 	end
 	_context_reconcile_pending = false
 	_context_reconcile_quiet = false
@@ -1954,7 +2012,8 @@ function M.stop(teardown)
 	-- They are already inert while stopped: both are only consulted from
 	-- onKeyDownRaw, which cannot run once the tap is stopped.
 
-	local stopped = listener_stopped and watchdog_stopped and terminator_settled
+	local stopped = listener_stopped and watchdog_stopped
+		and context_reconcile_stopped and terminator_settled
 		and taps_stopped and predictions_reset and escape_trap_stopped
 		and window_filter_stopped and diagnostic_mailbox_stopped
 	if stopped then

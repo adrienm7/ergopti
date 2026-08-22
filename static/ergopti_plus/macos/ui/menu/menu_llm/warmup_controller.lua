@@ -41,20 +41,22 @@ function M.warmup(label)
 	-- while LLM is off cannot trigger paid remote POST requests (M-12).
 	if type(llm_mod.get_runtime_llm_enabled) == "function" and not llm_mod.get_runtime_llm_enabled() then
 		Logger.debug(LOG, "warmup('%s'): runtime LLM disabled — skipping.", tostring(label))
-		return
+		return true
 	end
 	local model = llm_mod.get_current_model and llm_mod.get_current_model()
 	if type(model) ~= "string" or model == "" then
 		Logger.debug(LOG, "warmup('%s'): no active model — skipping.", tostring(label))
-		return
+		return true
 	end
 
 	Logger.trace(LOG, "Warming up model '%s' (%s)…", model, tostring(label))
-	local ok, err = pcall(llm_mod.warmup_model, model)
-	if ok then
+	local ok, result = pcall(llm_mod.warmup_model, model)
+	if ok and result == true then
 		Logger.done(LOG, "Warmup complete for '%s' (%s).", model, tostring(label))
+		return true
 	else
-		Logger.error(LOG, "Warmup failed for '%s' (%s): %s", model, tostring(label), tostring(err))
+		Logger.error(LOG, "Warmup failed for '%s' (%s): %s", model, tostring(label), tostring(result))
+		return false
 	end
 end
 
@@ -66,19 +68,21 @@ function M.warmup_model(model, label)
 	-- Gate on the runtime enable flag (M-12); mirrors set_active_profile's guard.
 	if type(llm_mod.get_runtime_llm_enabled) == "function" and not llm_mod.get_runtime_llm_enabled() then
 		Logger.debug(LOG, "warmup_model('%s'): runtime LLM disabled — skipping.", tostring(label))
-		return
+		return true
 	end
 	if type(model) ~= "string" or model == "" then
 		Logger.debug(LOG, "warmup_model('%s'): empty model name — skipping.", tostring(label))
-		return
+		return true
 	end
 
 	Logger.trace(LOG, "Warming up model '%s' (%s)…", model, tostring(label))
-	local ok, err = pcall(llm_mod.warmup_model, model)
-	if ok then
+	local ok, result = pcall(llm_mod.warmup_model, model)
+	if ok and result == true then
 		Logger.done(LOG, "Warmup complete for '%s' (%s).", model, tostring(label))
+		return true
 	else
-		Logger.error(LOG, "Warmup failed for '%s' (%s): %s", model, tostring(label), tostring(err))
+		Logger.error(LOG, "Warmup failed for '%s' (%s): %s", model, tostring(label), tostring(result))
+		return false
 	end
 end
 

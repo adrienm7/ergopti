@@ -60,7 +60,7 @@ local function make_env()
 					break
 				end
 			end
-			return nil
+			return true
 		end,
 		activeCount = function() return #env.timers end,
 	}
@@ -77,6 +77,8 @@ local function make_env()
 					env.probes = env.probes + 1
 					if cb then cb({ status = 404, body = "" }) end
 				end,
+				cancel = function() return true end,
+				isActive = function() return false end,
 			}
 		end,
 	}

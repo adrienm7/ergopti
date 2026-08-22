@@ -30,7 +30,7 @@ package.loaded["modules.gestures.actions"] = {
 	init                 = function() end,
 	get_sg_names         = function() return {} end,
 	get_label            = function() return "" end,
-	force_cleanup        = function() force_cleanup_called = true end,
+	force_cleanup        = function() force_cleanup_called = true; return true end,
 	toggle_right_click   = function() end,
 	trigger_lookup       = function() end,
 	is_right_click_held  = function() return false end,
@@ -39,6 +39,7 @@ package.loaded["modules.gestures.actions"] = {
 package.loaded["modules.gestures.engine"] = {
 	init          = function() end,
 	process_frame = function() end,
+	stop          = function() return true end,
 }
 
 package.loaded["modules.gestures.conflicts"] = {
@@ -76,7 +77,8 @@ helpers.describe("gestures M.stop(): calls Actions.force_cleanup (gesture-stuck-
 		clear_live_tables()
 		force_cleanup_called = false
 
-		Gestures.stop()
+		helpers.assert_eq(Gestures.stop(), true,
+			"the cleanup observation must come from a fully settled stop transaction")
 
 		helpers.assert_true(force_cleanup_called,
 			"M.stop() must call Actions.force_cleanup() to release held synthetic clicks (gesture-stuck-click-on-stop)")
@@ -86,7 +88,8 @@ helpers.describe("gestures M.stop(): calls Actions.force_cleanup (gesture-stuck-
 		clear_live_tables()
 		force_cleanup_called = false
 
-		Gestures.stop()
+		helpers.assert_eq(Gestures.stop(), true,
+			"the no-watcher path must still settle every production endpoint")
 
 		helpers.assert_true(force_cleanup_called,
 			"M.stop() must call force_cleanup() regardless of watcher count (gesture-stuck-click-on-stop)")
@@ -94,10 +97,11 @@ helpers.describe("gestures M.stop(): calls Actions.force_cleanup (gesture-stuck-
 
 	helpers.it("force_cleanup is still called on a second stop() call", function()
 		clear_live_tables()
-		Gestures.stop()
+		helpers.assert_eq(Gestures.stop(), true)
 
 		force_cleanup_called = false
-		Gestures.stop()
+		helpers.assert_eq(Gestures.stop(), true,
+			"an idempotent retry must not hide an unrelated engine cleanup refusal")
 
 		helpers.assert_true(force_cleanup_called,
 			"M.stop() must call force_cleanup() on every invocation (idempotence + gesture-stuck-click-on-stop)")

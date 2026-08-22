@@ -41,6 +41,9 @@ local function load_subject()
 		if controls.refuse_special and counters.created > 0 then return nil end
 		return handle()
 	end
+	local mouse_paused = false
+	local pixel_paused = false
+	local screenshot_claims = {}
 
 	package.loaded["modules.shortcuts.actions.system"] = {
 		stop_awake = function() counters.stop_awake = counters.stop_awake + 1; return true end,
@@ -57,6 +60,32 @@ local function load_subject()
 		open_emoji_picker = function() end,
 		spotlight_mouse = function() end,
 		teleport_mouse = function() end,
+		pause_mouse_actions = function() mouse_paused = true; return true end,
+		resume_mouse_actions = function() mouse_paused = false; return true end,
+		stop_mouse_actions = function() mouse_paused = true; return true end,
+		is_mouse_actions_paused = function() return mouse_paused end,
+		has_pending_mouse_action = function() return false end,
+		pause_pixel_actions = function() pixel_paused = true; return true end,
+		resume_pixel_actions = function() pixel_paused = false; return true end,
+		stop_pixel_actions = function() pixel_paused = true; return true end,
+		is_pixel_actions_paused = function() return pixel_paused end,
+		has_pending_pixel_action = function() return false end,
+		pause_screenshot_actions = function(parent)
+			screenshot_claims[parent] = true
+			return true
+		end,
+		resume_screenshot_actions = function(parent)
+			screenshot_claims[parent] = nil
+			return true
+		end,
+		stop_screenshot_actions = function(parent)
+			screenshot_claims[parent] = true
+			return true
+		end,
+		has_screenshot_pause_claim = function(parent)
+			return screenshot_claims[parent] == true
+		end,
+		has_pending_screenshot_action = function() return false end,
 	}
 	package.loaded["infra.i18n"] = {get = function(key) return key end}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()

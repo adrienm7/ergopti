@@ -31,9 +31,12 @@ local LOG             = "gestures.click"
 
 -- Delay to ignore the spurious mouseUp from the gesture’s own finger-lift
 local CLICK_COOLDOWN_SEC = Timings.sec("gestures", "click_cooldown_ms")
+local DEFAULT_ACTION_PARENT = "gestures"
 
 local rightClickHeld = false
 local leftClickHeld  = false
+local rightClickParent = nil
+local leftClickParent  = nil
 
 local rightMouseTap           = nil
 local rightMouseTapCommitted  = false
@@ -45,9 +48,13 @@ local leftMouseTapGeneration  = 0
 local click_key_watcher            = nil
 local click_key_watcher_committed  = false
 local click_key_watcher_generation = 0
+local click_key_watcher_parent     = nil
 
 -- Exact native handles whose stop result was not positively committed
 local tap_cleanup_debt = {}
+local hold_acquisition_epochs = {}
+local hold_acquisitions = {}
+local active_hold_acquisition = nil
 
 
 
@@ -76,6 +83,22 @@ local function set_side_held(side, held)
 	else
 		rightClickHeld = held
 	end
+end
+
+--- Returns the feature parent that owns one held side.
+--- @param side string Either "left" or "right".
+--- @return string|nil parent
+local function side_parent(side)
+	if side == "left" then return leftClickParent end
+	return rightClickParent
+end
+
+--- Publishes the feature parent for one held side.
+--- @param side string Either "left" or "right".
+--- @param parent string|nil Stable action parent.
+local function set_side_parent(side, parent)
+	if side == "left" then leftClickParent = parent
+	else rightClickParent = parent end
 end
 
 --- Returns the currently published drag tap for one side.
@@ -135,6 +158,7 @@ end
 local function clear_released_handle(handle)
 	if click_key_watcher == handle and not click_key_watcher_committed then
 		click_key_watcher = nil
+		click_key_watcher_parent = nil
 	end
 	if leftMouseTap == handle and not leftMouseTapCommitted then
 		leftMouseTap = nil
@@ -177,7 +201,7 @@ end
 --- @param label string Diagnostic owner label.
 --- @return boolean settled True only when no native capability remains.
 --- @return string|nil detail Native refusal detail.
-local function release_tap_handle(handle, label)
+local function release_tap_handle(handle, label, parent)
 	if handle == nil or handle == false then return true end
 	local settled, detail = stop_native_tap(handle)
 	if settled then
@@ -185,20 +209,32 @@ local function release_tap_handle(handle, label)
 		clear_released_handle(handle)
 		return true
 	end
-	tap_cleanup_debt[handle] = label
+	tap_cleanup_debt[handle] = {
+		label = label,
+		parent = parent or DEFAULT_ACTION_PARENT,
+	}
 	return false, detail
 end
 
 --- Retries every exact tap retained after a refused rollback or stop.
 --- @return boolean settled True only when no cleanup debt remains.
-local function retry_tap_cleanup()
+local function retry_tap_cleanup(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
 	local snapshot = {}
-	for handle, label in pairs(tap_cleanup_debt) do
-		snapshot[#snapshot + 1] = { handle = handle, label = label }
+	for handle, debt in pairs(tap_cleanup_debt) do
+		if debt.parent == scope_id then
+			snapshot[#snapshot + 1] = {
+				handle = handle,
+				label = debt.label,
+				parent = debt.parent,
+			}
+		end
 	end
 	local settled = true
 	for _, item in ipairs(snapshot) do
-		local released, detail = release_tap_handle(item.handle, item.label)
+		local released, detail = release_tap_handle(
+			item.handle, item.label, item.parent)
 		if not released then
 			settled = false
 			Logger.error(LOG, "%s cleanup remains pending: %s.", item.label, tostring(detail))
@@ -260,13 +296,68 @@ local function rollback_candidates(candidates)
 	local settled = true
 	for index = #candidates, 1, -1 do
 		local item = candidates[index]
-		local released, detail = release_tap_handle(item.handle, item.label)
-		if not released then
-			settled = false
-			Logger.error(LOG, "%s rollback remains pending: %s.", item.label, tostring(detail))
+		if item.released ~= true then
+			local released, detail = release_tap_handle(
+				item.handle, item.label, item.parent)
+			if released then
+				item.released = true
+			else
+				settled = false
+				Logger.error(LOG, "%s rollback remains pending: %s.", item.label, tostring(detail))
+			end
 		end
 	end
 	return settled
+end
+
+--- Opens one parent-scoped acquisition marker before any native candidate can
+--- start. force_cleanup() can therefore invalidate and settle candidates that
+--- have not reached the committed public owner slots yet.
+local function begin_hold_acquisition(parent)
+	if active_hold_acquisition ~= nil or hold_acquisitions[parent] ~= nil then return nil end
+	local epoch = (hold_acquisition_epochs[parent] or 0) + 1
+	hold_acquisition_epochs[parent] = epoch
+	local attempt = { parent = parent, epoch = epoch, candidates = {} }
+	hold_acquisitions[parent] = attempt
+	active_hold_acquisition = attempt
+	return attempt
+end
+
+local function hold_acquisition_is_current(attempt)
+	return type(attempt) == "table"
+		and active_hold_acquisition == attempt
+		and hold_acquisitions[attempt.parent] == attempt
+		and hold_acquisition_epochs[attempt.parent] == attempt.epoch
+end
+
+local function invalidate_hold_acquisition(parent)
+	local attempt = hold_acquisitions[parent]
+	hold_acquisition_epochs[parent] = (hold_acquisition_epochs[parent] or 0) + 1
+	hold_acquisitions[parent] = nil
+	if not attempt then return true end
+	if active_hold_acquisition == attempt then active_hold_acquisition = nil end
+	local boundary_in_flight = attempt.mouse_down_boundary == true
+	-- A re-entrant cleanup may arrive after candidates were published but before
+	-- mouseDown committed. Fence those public slots before rollback so exact
+	-- release can unpublish them instead of leaving stopped handles marked live.
+	for _, item in ipairs(attempt.candidates) do
+		if click_key_watcher == item.handle then
+			click_key_watcher_committed = false
+			click_key_watcher_generation = click_key_watcher_generation + 1
+		end
+		if leftMouseTap == item.handle then fence_side_tap("left") end
+		if rightMouseTap == item.handle then fence_side_tap("right") end
+	end
+	local settled = rollback_candidates(attempt.candidates)
+	if leftMouseTap == nil and leftClickHeld ~= true
+		and leftClickParent == parent then leftClickParent = nil end
+	if rightMouseTap == nil and rightClickHeld ~= true
+		and rightClickParent == parent then rightClickParent = nil end
+	-- event:post() is an externally re-entrant boundary. Even after both tap
+	-- candidates were stopped, cleanup cannot claim settlement until that call
+	-- returns: it may still have handed Quartz a mouseDown which requires an
+	-- exact compensating mouseUp owned by this parent.
+	return settled and not boundary_in_flight
 end
 
 
@@ -281,12 +372,16 @@ end
 
 --- Stops the keyboard watcher after fencing every queued callback.
 --- @return boolean settled True only when its exact native handle was released.
-local function stop_click_key_watcher()
+local function stop_click_key_watcher(parent, release_shared)
 	local candidate = click_key_watcher
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or click_key_watcher_parent or DEFAULT_ACTION_PARENT
+	if release_shared ~= true and candidate and click_key_watcher_parent ~= nil
+		and click_key_watcher_parent ~= scope_id then return true end
 	click_key_watcher_committed = false
 	click_key_watcher_generation = click_key_watcher_generation + 1
 	if not candidate then return true end
-	return release_tap_handle(candidate, "Click-hold key watcher")
+	return release_tap_handle(candidate, "Click-hold key watcher", scope_id)
 end
 
 --- Fences and stops one side’s drag tap.
@@ -294,9 +389,10 @@ end
 --- @return boolean settled True only when its exact native handle was released.
 local function stop_side_tap(side)
 	local candidate = side_tap(side)
+	local parent = side_parent(side)
 	fence_side_tap(side)
 	if not candidate then return true end
-	return release_tap_handle(candidate, side .. " click-hold drag tap")
+	return release_tap_handle(candidate, side .. " click-hold drag tap", parent)
 end
 
 --- Constructs a generation-fenced keyboard auto-release watcher.
@@ -357,17 +453,21 @@ local function construct_click_key_watcher(generation)
 		-- Returned events commit before the original key; stale native callbacks
 		-- are fenced before any stop which may refuse or throw
 		local cleanup_failures = {}
+		local release_parent = release_left and side_parent("left")
+			or (release_right and side_parent("right"))
 		if release_left then
 			set_side_held("left", false)
 			local settled, detail = stop_side_tap("left")
+			set_side_parent("left", nil)
 			if not settled then cleanup_failures[#cleanup_failures + 1] = tostring(detail) end
 		end
 		if release_right then
 			set_side_held("right", false)
 			local settled, detail = stop_side_tap("right")
+			set_side_parent("right", nil)
 			if not settled then cleanup_failures[#cleanup_failures + 1] = tostring(detail) end
 		end
-		local key_settled, key_detail = stop_click_key_watcher()
+		local key_settled, key_detail = stop_click_key_watcher(release_parent, true)
 		if not key_settled then cleanup_failures[#cleanup_failures + 1] = tostring(key_detail) end
 
 		for _, mouse_up in ipairs(release_events) do
@@ -430,11 +530,13 @@ local function construct_side_tap(side, generation, started_at)
 			if hs.timer.secondsSinceEpoch() - started_at < CLICK_COOLDOWN_SEC then return true end
 			-- The physical mouseUp is the only crash-proof release capability: fence
 			-- internal ownership synchronously, then let that exact event reach Quartz
+			local owner_parent = side_parent(side)
 			set_side_held(side, false)
 			local tap_settled, tap_detail = stop_side_tap(side)
+			set_side_parent(side, nil)
 			local key_settled, key_detail = true, nil
 			if not leftClickHeld and not rightClickHeld then
-				key_settled, key_detail = stop_click_key_watcher()
+				key_settled, key_detail = stop_click_key_watcher(owner_parent, true)
 			end
 			pcall(SyntheticInput.defer_after_callback,
 				side .. " click-hold physical release log", function()
@@ -544,8 +646,14 @@ end
 --- @param reason string Exact failed lifecycle boundary.
 --- @param candidates table Exact candidates created by this attempt.
 --- @return boolean Always false.
-local function reject_hold_acquisition(side, reason, candidates)
-	rollback_candidates(candidates)
+local function reject_hold_acquisition(side, reason, attempt)
+	if hold_acquisitions[attempt.parent] == attempt then
+		hold_acquisitions[attempt.parent] = nil
+		if active_hold_acquisition == attempt then active_hold_acquisition = nil end
+		hold_acquisition_epochs[attempt.parent] =
+			(hold_acquisition_epochs[attempt.parent] or 0) + 1
+	end
+	rollback_candidates(attempt.candidates)
 	Logger.error(LOG, "Synthetic %s-click hold acquisition failed: %s.", side, tostring(reason))
 	return false
 end
@@ -553,31 +661,58 @@ end
 --- Acquires both eventtaps before publishing mouseDown or held state.
 --- @param side string Either "left" or "right".
 --- @return boolean committed True only after every native effect committed.
-local function acquire_hold(side)
-	if retry_tap_cleanup() ~= true then
-		Logger.error(LOG, "Synthetic %s-click hold refused while tap cleanup remains pending.", side)
+local function acquire_hold(side, parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
+	local attempt = begin_hold_acquisition(scope_id)
+	if not attempt then
+		Logger.error(LOG, "Synthetic %s-click hold refused during another acquisition.", side)
 		return false
+	end
+	local candidates = attempt.candidates
+	if retry_tap_cleanup(scope_id) ~= true then
+		return reject_hold_acquisition(side,
+			"tap cleanup remains pending", attempt)
+	end
+	if not hold_acquisition_is_current(attempt) then
+		return reject_hold_acquisition(side, "acquisition superseded during cleanup", attempt)
 	end
 
 	-- A stale uncommitted owner must be retired before any successor exists
 	if side_tap(side) and side_tap_is_committed(side) ~= true then
-		tap_cleanup_debt[side_tap(side)] = side .. " click-hold drag tap"
-		if retry_tap_cleanup() ~= true then return false end
+		tap_cleanup_debt[side_tap(side)] = {
+			label = side .. " click-hold drag tap",
+			parent = side_parent(side) or scope_id,
+		}
+		if retry_tap_cleanup(scope_id) ~= true then
+			return reject_hold_acquisition(side, "stale side tap cleanup refused", attempt)
+		end
+		if not hold_acquisition_is_current(attempt) then
+			return reject_hold_acquisition(side, "acquisition superseded by side cleanup", attempt)
+		end
 	end
 	if click_key_watcher and click_key_watcher_committed ~= true then
-		tap_cleanup_debt[click_key_watcher] = "Click-hold key watcher"
-		if retry_tap_cleanup() ~= true then return false end
+		tap_cleanup_debt[click_key_watcher] = {
+			label = "Click-hold key watcher",
+			parent = click_key_watcher_parent or scope_id,
+		}
+		if retry_tap_cleanup(scope_id) ~= true then
+			return reject_hold_acquisition(side, "stale key watcher cleanup refused", attempt)
+		end
+		if not hold_acquisition_is_current(attempt) then
+			return reject_hold_acquisition(side, "acquisition superseded by key cleanup", attempt)
+		end
 	end
 
 	local mouse_down_type, mouse_up_type, label = side_event_types(side)
 	local down_event, down_error = construct_mouse_event(mouse_down_type, true)
 	if not down_event then
-		Logger.error(LOG, "Synthetic %s-Click mouseDown construction failed: %s.",
-			label, tostring(down_error))
-		return false
+		return reject_hold_acquisition(side,
+			"mouseDown construction failed: " .. tostring(down_error), attempt)
 	end
-
-	local candidates = {}
+	if not hold_acquisition_is_current(attempt) then
+		return reject_hold_acquisition(side, "acquisition superseded during mouseDown construction", attempt)
+	end
 	local owns_new_key_watcher = click_key_watcher == nil
 	local key_candidate = click_key_watcher
 	local key_generation = click_key_watcher_generation
@@ -587,12 +722,16 @@ local function acquire_hold(side)
 		key_candidate, key_error = construct_click_key_watcher(key_generation)
 		if not key_candidate then
 			return reject_hold_acquisition(side,
-				"key watcher construction failed: " .. tostring(key_error), candidates)
+				"key watcher construction failed: " .. tostring(key_error), attempt)
 		end
 		candidates[#candidates + 1] = {
 			handle = key_candidate,
 			label = "Click-hold key watcher",
+			parent = scope_id,
 		}
+		if not hold_acquisition_is_current(attempt) then
+			return reject_hold_acquisition(side, "acquisition superseded during key construction", attempt)
+		end
 	end
 
 	local tap_generation = side_generation(side) + 1
@@ -600,25 +739,35 @@ local function acquire_hold(side)
 	local drag_candidate, drag_error = construct_side_tap(side, tap_generation, started_at)
 	if not drag_candidate then
 		return reject_hold_acquisition(side,
-			side .. " drag tap construction failed: " .. tostring(drag_error), candidates)
+			side .. " drag tap construction failed: " .. tostring(drag_error), attempt)
 	end
 	candidates[#candidates + 1] = {
 		handle = drag_candidate,
 		label = side .. " click-hold drag tap",
+		parent = scope_id,
 	}
+	if not hold_acquisition_is_current(attempt) then
+		return reject_hold_acquisition(side, "acquisition superseded during drag construction", attempt)
+	end
 
 	-- Both taps now exist; native activation is still callback-inert until publish
 	if owns_new_key_watcher then
 		local key_started, key_error = start_click_key_watcher(key_candidate)
 		if not key_started then
 			return reject_hold_acquisition(side,
-				"key watcher start failed: " .. tostring(key_error), candidates)
+				"key watcher start failed: " .. tostring(key_error), attempt)
+		end
+		if not hold_acquisition_is_current(attempt) then
+			return reject_hold_acquisition(side, "acquisition superseded during key start", attempt)
 		end
 	end
 	local drag_started, drag_start_error = start_native_tap(drag_candidate)
 	if not drag_started then
 		return reject_hold_acquisition(side,
-			side .. " drag tap start failed: " .. tostring(drag_start_error), candidates)
+			side .. " drag tap start failed: " .. tostring(drag_start_error), attempt)
+	end
+	if not hold_acquisition_is_current(attempt) then
+		return reject_hold_acquisition(side, "acquisition superseded during drag start", attempt)
 	end
 
 	-- Both required taps are proven active before either visible state is exposed
@@ -626,28 +775,42 @@ local function acquire_hold(side)
 		click_key_watcher = key_candidate
 		click_key_watcher_generation = key_generation
 		click_key_watcher_committed = true
+		click_key_watcher_parent = scope_id
 	end
+	set_side_parent(side, scope_id)
 	publish_side_tap(side, drag_candidate, tap_generation)
 
+	attempt.mouse_down_boundary = true
 	local down_posted, post_error = post_mouse_event(down_event)
-	if not down_posted then
+	attempt.mouse_down_boundary = false
+	if not down_posted or not hold_acquisition_is_current(attempt) then
 		-- post() may throw after handing the event to Quartz; a compensating mouseUp
 		-- makes that uncertainty safe before the taps are rolled back
 		local emergency_up = construct_mouse_event(mouse_up_type, false)
 		local emergency_released = emergency_up and post_mouse_event(emergency_up) == true
 		if emergency_released then
 			stop_side_tap(side)
-			if owns_new_key_watcher then stop_click_key_watcher() end
+			set_side_parent(side, nil)
+			if owns_new_key_watcher then stop_click_key_watcher(scope_id, true) end
 		else
 			-- The OS may own the down event, so retain explicit release ownership
+			set_side_parent(side, scope_id)
 			set_side_held(side, true)
 		end
 		Logger.error(LOG, "Synthetic %s-Click mouseDown post failed: %s.",
 			label, tostring(post_error))
+		if hold_acquisitions[scope_id] == attempt then
+			hold_acquisitions[scope_id] = nil
+			if active_hold_acquisition == attempt then active_hold_acquisition = nil end
+			hold_acquisition_epochs[scope_id] =
+				(hold_acquisition_epochs[scope_id] or 0) + 1
+		end
 		return false
 	end
 
 	set_side_held(side, true)
+	hold_acquisitions[scope_id] = nil
+	if active_hold_acquisition == attempt then active_hold_acquisition = nil end
 	Logger.info(LOG, "Synthetic %s-Click HELD.", label)
 	return true
 end
@@ -658,6 +821,7 @@ end
 --- @return boolean settled True only after mouseUp and exact tap cleanup commit.
 local function release_hold(side, reason)
 	if not side_is_held(side) then return true end
+	local owner_parent = side_parent(side)
 	local _, mouse_up_type, label = side_event_types(side)
 	local up_event, construction_error = construct_mouse_event(mouse_up_type, false)
 	if not up_event then
@@ -677,10 +841,12 @@ local function release_hold(side, reason)
 	end
 
 	set_side_held(side, false)
-	local tap_settled = release_tap_handle(side_tap(side), side .. " click-hold drag tap")
+	local tap_settled = release_tap_handle(
+		side_tap(side), side .. " click-hold drag tap", owner_parent)
+	set_side_parent(side, nil)
 	local key_settled = true
 	if not leftClickHeld and not rightClickHeld then
-		key_settled = stop_click_key_watcher()
+		key_settled = stop_click_key_watcher(owner_parent, true)
 	end
 	Logger.info(LOG, "Synthetic %s-Click RELEASED%s.", label, reason)
 	if not tap_settled or not key_settled then
@@ -702,44 +868,77 @@ end
 
 --- Forcefully releases every held synthetic click and retries all tap cleanup.
 --- @return boolean settled True only when no button or native tap remains owned.
-function M.force_cleanup()
+function M.force_cleanup(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
 	Logger.debug(LOG, "Forcefully releasing all held clicks…")
-	local settled = retry_tap_cleanup()
-	if leftClickHeld and release_hold("left", " forcefully") ~= true then settled = false end
-	if rightClickHeld and release_hold("right", " forcefully") ~= true then settled = false end
+	local settled = invalidate_hold_acquisition(scope_id)
+	if retry_tap_cleanup(scope_id) ~= true then settled = false end
+	if leftClickHeld and leftClickParent == scope_id
+		and release_hold("left", " forcefully") ~= true then settled = false end
+	if rightClickHeld and rightClickParent == scope_id
+		and release_hold("right", " forcefully") ~= true then settled = false end
 	if not leftClickHeld and not rightClickHeld then
-		if stop_click_key_watcher() ~= true then settled = false end
+		if stop_click_key_watcher(scope_id) ~= true then settled = false end
 	end
-	if retry_tap_cleanup() ~= true then settled = false end
-	return settled and not leftClickHeld and not rightClickHeld
+	if retry_tap_cleanup(scope_id) ~= true then settled = false end
+	local matching_hold = (leftClickHeld and leftClickParent == scope_id)
+		or (rightClickHeld and rightClickParent == scope_id)
+	for _, debt in pairs(tap_cleanup_debt) do
+		if debt.parent == scope_id then settled = false end
+	end
+	return settled and not matching_hold
 end
 
 --- Toggles a held synthetic right-click.
 --- @return boolean committed True only when the requested state transition commits.
-function M.toggle_right_click()
-	if rightClickHeld then return release_hold("right", "") end
+function M.toggle_right_click(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
+	if rightClickHeld then
+		if rightClickParent ~= scope_id then
+			Logger.debug(LOG,
+				"Right-click hold toggle refused while sibling parent '%s' owns it.",
+				tostring(rightClickParent))
+			return false
+		end
+		return release_hold("right", "")
+	end
 	Logger.debug(LOG, "Enabling right-click hold mode…")
-	return acquire_hold("right")
+	return acquire_hold("right", scope_id)
 end
 
 --- Toggles a held synthetic left-click.
 --- @return boolean committed True only when the requested state transition commits.
-function M.toggle_left_click()
-	if leftClickHeld then return release_hold("left", "") end
+function M.toggle_left_click(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
+	if leftClickHeld then
+		if leftClickParent ~= scope_id then
+			Logger.debug(LOG,
+				"Left-click hold toggle refused while sibling parent '%s' owns it.",
+				tostring(leftClickParent))
+			return false
+		end
+		return release_hold("left", "")
+	end
 	Logger.debug(LOG, "Enabling left-click hold mode…")
-	return acquire_hold("left")
+	return acquire_hold("left", scope_id)
 end
 
 --- Releases every held click before a non-toggle tap action fires.
 --- @param name string Tap action name used only for release attribution.
+--- @param parent string|nil Feature parent whose held clicks may be released.
 --- @return boolean settled True only when every required release commits.
-function M.release_held_for_tap(name)
+function M.release_held_for_tap(name, parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
 	local settled = true
-	if leftClickHeld
+	if leftClickHeld and leftClickParent == scope_id
 		and release_hold("left", string.format(" by tap action '%s'", name)) ~= true then
 		settled = false
 	end
-	if rightClickHeld
+	if rightClickHeld and rightClickParent == scope_id
 		and release_hold("right", string.format(" by tap action '%s'", name)) ~= true then
 		settled = false
 	end

@@ -85,7 +85,10 @@ helpers.describe("ShellRunner: ERROR logged when on_done throws (M-4 behaviour)"
 				new = function(_, cb, _args)
 					captured_completion_cb = cb
 					return {
-						start        = function() if captured_completion_cb then captured_completion_cb(0, "", "") end end,
+						start        = function()
+							if captured_completion_cb then captured_completion_cb(0, "", "") end
+							return true
+						end,
 						isRunning    = function() return false end,
 						terminate    = function() end,
 					}

@@ -25,6 +25,10 @@ local LOG = "wpm_menubar"
 local _menubar           = nil
 local _timer             = nil
 local _running           = false -- true between start() and stop(); guards redundant restarts
+-- A failed pause rollback can leave the runtime stopped while the pre-pause
+-- intent is still owed. Keep that ownership outside `_running` so a later
+-- pause transaction inventories this surface again and can finish restoring it.
+local _pause_restore_pending = false
 local _use_source_colors = true
 local _generation        = 0
 
@@ -138,7 +142,10 @@ function M.start()
 	-- Idempotent: the menu tree rebuild re-invokes start() on every refresh. Skip the
 	-- redundant timer restart and menubar re-render when already polling — the 0.5 s
 	-- timer already keeps the icon fresh.
-	if _running then return true end
+	if _running then
+		_pause_restore_pending = false
+		return true
+	end
 	Logger.debug(LOG, "Starting WPM menubar widget…")
 	if not release_timer() then
 		Logger.error(LOG, "WPM menubar start refused: prior timer cleanup remains pending.")
@@ -162,6 +169,7 @@ function M.start()
 		return false
 	end
 	_running = true
+	_pause_restore_pending = false
 	update_menubar()
 	Logger.info(LOG, "WPM menubar widget started successfully.")
 	return true
@@ -187,7 +195,14 @@ function M.stop()
 end
 
 function M.is_running()
-	return _running == true
+	return _running == true or _pause_restore_pending == true
+end
+
+--- Restores a menubar surface that the pause registry previously stopped.
+--- @return boolean committed
+function M.resume_after_pause()
+	_pause_restore_pending = true
+	return M.start()
 end
 
 --- Enables or disables source-based menubar coloring.

@@ -25,11 +25,99 @@ local _on_show_callback = nil
 -- tooltip -> keymap require cycle while making stale action epochs inert at the
 -- final rendering/interaction boundary.
 local _runtime_guard = function() return true end
+-- The standard canvas is shared by loading/hotstring and prediction owners.
+-- A native callback can synchronously paint a successor while its predecessor
+-- is still inside dismiss/render/hide. Keep the latest committed operation as
+-- a replay capability so the outer stale tail can repair, but never republish,
+-- the successor before control returns to its caller.
+local _surface_generation = 0
+local _surface_boundary_depth = 0
+local _latest_surface_operation = nil
+local _surface_repairing = false
+-- An authoritative hide requested from inside an opaque render/hide boundary
+-- cannot be reported as complete: that boundary can still repaint after the
+-- nested call returns. Invalidate the in-flight owner immediately and retain
+-- cleanup debt until a caller retries after the whole boundary unwinds.
+local _forced_hide_pending = false
+local _forced_hide_generation = 0
 
 
 local function runtime_available()
 	local ok, available = pcall(_runtime_guard)
 	return ok and available == true
+end
+
+local function surface_operation_current(operation)
+	if _latest_surface_operation ~= operation then return false end
+	if type(operation.commit_guard) ~= "function" then return true end
+	local guard_ok, current = pcall(operation.commit_guard)
+	return guard_ok and current == true and _latest_surface_operation == operation
+end
+
+local function repair_latest_surface()
+	if _surface_repairing or _forced_hide_pending then return false end
+	_surface_repairing = true
+	local repaired = false
+	for _ = 1, 16 do
+		local operation = _latest_surface_operation
+		if not operation or operation.committed ~= true
+			or type(operation.repair) ~= "function" then
+			break
+		end
+		_surface_boundary_depth = _surface_boundary_depth + 1
+		local repair_ok, repair_result = xpcall(function()
+			return operation.repair(function()
+				return surface_operation_current(operation)
+			end)
+		end, debug.traceback)
+		_surface_boundary_depth = math.max(0, _surface_boundary_depth - 1)
+		if _latest_surface_operation == operation
+			and surface_operation_current(operation) then
+			repaired = repair_ok and repair_result == true
+			break
+		end
+	end
+	_surface_repairing = false
+	if not repaired and not _forced_hide_pending then
+		Logger.error(LOG, "Latest tooltip surface could not be repaired after reentrant supersession.")
+	end
+	return repaired
+end
+
+local function run_surface_operation(commit_guard, apply, repair)
+	-- A forced-hide debt owns the shared canvas until its exact retry settles.
+	-- In particular, PredictionEngine.reset() must not fall through from its
+	-- forced hides to a normal hide and report PAUSE complete under a live paint.
+	if _forced_hide_pending then return false end
+	if type(commit_guard) == "function" then
+		local observed_generation = _surface_generation
+		local guard_ok, current = pcall(commit_guard)
+		if not guard_ok or current ~= true
+			or observed_generation ~= _surface_generation then return false end
+	end
+	_surface_generation = _surface_generation + 1
+	local operation = {
+		generation = _surface_generation,
+		commit_guard = commit_guard,
+		committed = false,
+		repair = repair,
+	}
+	_latest_surface_operation = operation
+	_surface_boundary_depth = _surface_boundary_depth + 1
+	local apply_ok, apply_result = xpcall(function()
+		return apply(function() return surface_operation_current(operation) end)
+	end, debug.traceback)
+	local current = surface_operation_current(operation)
+	operation.committed = apply_ok and apply_result == true and current
+	_surface_boundary_depth = math.max(0, _surface_boundary_depth - 1)
+	if not current and _surface_boundary_depth == 0
+		and not _forced_hide_pending then
+		repair_latest_surface()
+	end
+	if not apply_ok then
+		Logger.error(LOG, "Tooltip surface transaction raised: %s.", tostring(apply_result))
+	end
+	return operation.committed == true, operation
 end
 
 --- Publishes a completed show only after its external ownership callback runs.
@@ -79,15 +167,85 @@ function M.set_llm_timeout(seconds) Config.set_llm_timeout(seconds) end
 --- @param enabled boolean True to allow color, false to enforce gray.
 function M.set_colorization_enabled(enabled) Config.set_colorization_enabled(enabled) end
 
+local function hide_surface(expected_session, owns)
+	if not owns() then return false end
+	local llm_hidden
+	if expected_session ~= nil then
+		if type(TooltipLLM.hide_session) ~= "function" then return false end
+		llm_hidden = TooltipLLM.hide_session(expected_session, owns) == true
+	else
+		llm_hidden = TooltipLLM.hide() == true
+	end
+	if not owns() then return false end
+	local hotstring_hidden = TooltipHotstring.hide() == true
+	if not owns() then return false end
+	return llm_hidden and hotstring_hidden
+end
+
+local function hide_forced_surface(silent)
+	local llm_hidden
+	if silent and type(TooltipLLM.hide_silent) == "function" then
+		llm_hidden = TooltipLLM.hide_silent() == true
+	else
+		llm_hidden = TooltipLLM.hide() == true
+	end
+	local hotstring_hidden = TooltipHotstring.hide_forced() == true
+	return llm_hidden and hotstring_hidden
+end
+
+--- Invalidates every prior surface operation and attempts an authoritative
+--- physical hide only when no opaque surface mutation remains on stack.
+--- @param silent boolean Whether to use the log-free LLM hide path.
+--- @return boolean hidden True only when this exact request settled both owners.
+local function request_forced_hide(silent)
+	_surface_generation = _surface_generation + 1
+	_latest_surface_operation = nil
+	_forced_hide_pending = true
+	_forced_hide_generation = _forced_hide_generation + 1
+	local request_generation = _forced_hide_generation
+
+	if _surface_boundary_depth > 0 or _surface_repairing then return false end
+
+	-- Treat the physical hide itself as a boundary. A nested forced hide may
+	-- supersede it, but no surface operation can paint while cleanup is pending.
+	_surface_boundary_depth = _surface_boundary_depth + 1
+	local hide_ok, hide_result = xpcall(function()
+		return hide_forced_surface(silent)
+	end, debug.traceback)
+	_surface_boundary_depth = math.max(0, _surface_boundary_depth - 1)
+
+	if hide_ok and hide_result == true
+		and _forced_hide_generation == request_generation then
+		_forced_hide_pending = false
+		return true
+	end
+	if not hide_ok then
+		Logger.error(LOG, "Authoritative tooltip hide raised: %s.", tostring(hide_result))
+	end
+	return false
+end
+
 --- Safely hides any currently active tooltip.
 --- Respects the hotstring dequeue guard: if a stacked multi-row tooltip is
 --- currently cycling through its rows, mouse/scroll events are ignored so
 --- longer-lived rows survive past the first row's expiry deadline.
+--- @param expected_session any|nil Optional exact streaming request identity.
+--- @param commit_guard function|nil Optional live request predicate.
 --- @return boolean True when both owners are stopped or safely guarded.
-function M.hide()
-	local llm_hidden = TooltipLLM.hide() == true
-	local hotstring_hidden = TooltipHotstring.hide() == true
-	return llm_hidden and hotstring_hidden
+function M.hide(expected_session, commit_guard)
+	-- A capability-free hide cannot settle while an older surface callback can
+	-- still repaint. Exact session-scoped hides keep successor replay semantics.
+	if expected_session == nil
+		and (_surface_boundary_depth > 0 or _surface_repairing) then
+		return false
+	end
+	return run_surface_operation(commit_guard,
+		function(owns)
+			return hide_surface(expected_session, owns)
+		end,
+		function(owns)
+			return hide_surface(expected_session, owns)
+		end)
 end
 
 --- Bypasses all guards and hides both tooltip types immediately.
@@ -95,22 +253,13 @@ end
 --- authoritative hide regardless of any active dequeue cycle.
 --- @return boolean True when both owners are verified stopped.
 function M.hide_forced()
-	local llm_hidden = TooltipLLM.hide() == true
-	local hotstring_hidden = TooltipHotstring.hide_forced() == true
-	return llm_hidden and hotstring_hidden
+	return request_forced_hide(false)
 end
 
 --- Authoritative hide for the keyboard hot path without synchronous log I/O.
 --- @return boolean True when both owners are verified stopped.
 function M.hide_forced_silent()
-	local llm_hidden
-	if TooltipLLM.hide_silent then
-		llm_hidden = TooltipLLM.hide_silent() == true
-	else
-		llm_hidden = TooltipLLM.hide() == true
-	end
-	local hotstring_hidden = TooltipHotstring.hide_forced() == true
-	return llm_hidden and hotstring_hidden
+	return request_forced_hide(true)
 end
 
 --- Checks if any tooltip is currently rendered on screen.
@@ -148,6 +297,7 @@ end
 --- @param is_enabled boolean Guard clause to prevent rendering if disabled.
 --- @param background_color table|nil Optional background tint.
 function M.show(content, is_llm_origin, is_enabled, background_color)
+	if _forced_hide_pending then return false end
 	if TooltipLLM.hide() ~= true then return false end
 	local shown = TooltipHotstring.show(content, is_llm_origin, is_enabled, background_color) == true
 	return publish_show(shown)
@@ -158,6 +308,7 @@ end
 --- @param rows table Array of row descriptors.
 --- @param is_enabled boolean Guard clause.
 function M.show_stacked(rows, is_enabled)
+	if _forced_hide_pending then return false end
 	if TooltipLLM.hide() ~= true then return false end
 	local shown = TooltipHotstring.show_stacked(rows, is_enabled) == true
 	return publish_show(shown)
@@ -169,11 +320,25 @@ end
 --- @param content string|userdata The loading text to display.
 --- @param is_enabled boolean Guard clause to prevent rendering if disabled.
 --- @param background_color table|nil Optional background tint.
-function M.show_loading(content, is_enabled, background_color)
-	if not runtime_available() then return false end
+local function show_loading_surface(content, is_enabled, background_color, owns)
+	if not runtime_available() or not owns() then return false end
 	if TooltipLLM.hide() ~= true then return false end
+	if not owns() then return false end
 	local shown = TooltipHotstring.show_loading(content, is_enabled, background_color) == true
-	return publish_show(shown)
+	return shown == true and owns()
+end
+
+function M.show_loading(content, is_enabled, background_color)
+	local shown, operation = run_surface_operation(nil,
+		function(owns)
+			return show_loading_surface(content, is_enabled, background_color, owns)
+		end,
+		function(owns)
+			return show_loading_surface(content, is_enabled, background_color, owns)
+		end)
+	if shown ~= true then return false end
+	local published = publish_show(true)
+	return published == true and surface_operation_current(operation)
 end
 
 --- Displays AI predictions with interactive navigation (LLM mode).
@@ -188,16 +353,41 @@ end
 --- @param loading_text string Text to show if loading.
 --- @param max_reserved_count number Skeleton slots to render.
 --- @param session_id any|nil Stable request identity for same-stream repaints.
-function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count, session_id)
-	if not runtime_available() then return false end
+--- @param commit_guard function|nil Live request predicate.
+local function show_predictions_surface(predictions, current_index, is_enabled, info_bar,
+	shortcut_modifier, indent, navigation_modifiers, background_color, loading_text,
+	max_reserved_count, session_id, owns)
+	if not runtime_available() or not owns() then return false end
 	-- Reset hotstring state without hiding the shared canvas so the LLM render overwrites
 	-- the loading indicator in-place — no blank frame between the two tooltips.
 	if TooltipHotstring.dismiss_silent() ~= true then return false end
+	if not owns() then return false end
 	local shown = TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar,
 		shortcut_modifier, indent, navigation_modifiers, background_color, loading_text,
-		max_reserved_count, session_id) == true
-	if not shown then TooltipHotstring.hide_forced() end
-	return publish_show(shown)
+		max_reserved_count, session_id, owns) == true
+	if not owns() then return false end
+	if not shown then
+		TooltipHotstring.hide_forced()
+		return false
+	end
+	return true
+end
+
+function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count, session_id, commit_guard)
+	local shown, operation = run_surface_operation(commit_guard,
+		function(owns)
+			return show_predictions_surface(predictions, current_index, is_enabled, info_bar,
+				shortcut_modifier, indent, navigation_modifiers, background_color,
+				loading_text, max_reserved_count, session_id, owns)
+		end,
+		function(owns)
+			return show_predictions_surface(predictions, current_index, is_enabled, info_bar,
+				shortcut_modifier, indent, navigation_modifiers, background_color,
+				loading_text, max_reserved_count, session_id, owns)
+		end)
+	if shown ~= true then return false end
+	local published = publish_show(true)
+	return published == true and surface_operation_current(operation)
 end
 
 function M.navigate(delta)

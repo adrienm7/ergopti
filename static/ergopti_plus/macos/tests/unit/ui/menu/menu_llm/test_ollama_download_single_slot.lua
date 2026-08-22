@@ -20,7 +20,9 @@ local MODULES = {
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
+	"adapters.http_client",
 	"ui.download_window",
+	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
 }
 
@@ -60,8 +62,54 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["adapters.shell_runner"] = { spawn = function() return nil end }
 	package.loaded["adapters.timer_scheduler"] = {
-		after = function(_, fn) return { callback = fn }, true end,
-		cancel = function() return true end,
+		after = function(_, fn)
+			return { callback = fn, timer = {}, observers = {} }, true
+		end,
+		cancel = function(handle)
+			handle.timer = nil
+			local observers = handle.observers or {}
+			handle.observers = {}
+			for _, observer in ipairs(observers) do observer() end
+			return true
+		end,
+		onSettled = function(handle, observer)
+			if handle.timer == nil then observer() else
+				handle.observers[#handle.observers + 1] = observer
+			end
+			return true
+		end,
+	}
+	package.loaded["adapters.http_client"] = {
+		new = function()
+			local client = { settled = false, observers = {} }
+			function client.post(_, _, _, done)
+				http_callback = function(status, body, headers)
+					local result = done({ status = status, body = body, headers = headers })
+					if not client.settled then
+						client.settled = true
+						local observers = client.observers
+						client.observers = {}
+						for _, observer in ipairs(observers) do observer() end
+					end
+					return result
+				end
+				return true
+			end
+			function client.cancel()
+				client.settled = true
+				local observers = client.observers
+				client.observers = {}
+				for _, observer in ipairs(observers) do observer() end
+				return true
+			end
+			function client.onSettled(observer)
+				if client.settled then observer() else
+					client.observers[#client.observers + 1] = observer
+				end
+				return true
+			end
+			return client
+		end,
 	}
 	package.loaded["ui.download_window"] = {
 		show = function(opts)
@@ -83,8 +131,10 @@ local function with_fixture(options, callback)
 				on_done = on_done,
 				on_stream = on_stream,
 				terminate_calls = 0,
+				running = false,
 			}
 			function task:start()
+				self.running = options.start_result ~= false
 				if options.complete_during_start ~= nil then on_done(options.complete_during_start) end
 				return options.start_result ~= false
 			end
@@ -96,6 +146,7 @@ local function with_fixture(options, callback)
 				if mode == "nil" then return nil end
 				return self
 			end
+			function task:isRunning() return self.running end
 			if label == "Ollama model pull" then pulls[#pulls + 1] = task end
 			return task
 		end,

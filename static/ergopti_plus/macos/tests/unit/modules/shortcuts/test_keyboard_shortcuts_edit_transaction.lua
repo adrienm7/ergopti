@@ -32,11 +32,14 @@ local function with_subject(initial_action, scenario)
 	local store = {[key] = initial_action}
 	local controls = {
 		bind_refuses = false,
+		bind_hook = nil,
+		set_enabled_hook = nil,
 		set_enabled_refuses_once = false,
 		settings_throw_after_write_once = false,
 	}
 	local counters = {bind = 0, unbind = 0, set_enabled = 0, settings_set = 0}
 	local handles = {}
+	local unbound_handles = {}
 	local fired = {}
 
 	local registrar = {}
@@ -51,10 +54,14 @@ local function with_subject(initial_action, scenario)
 			native_settled = true,
 		}
 		handles[#handles + 1] = handle
+		if type(controls.bind_hook) == "function" then controls.bind_hook(handle) end
 		return handle
 	end
 	function registrar.setEnabled(handle, enabled)
 		counters.set_enabled = counters.set_enabled + 1
+		if type(controls.set_enabled_hook) == "function" then
+			controls.set_enabled_hook(handle, enabled)
+		end
 		if controls.set_enabled_refuses_once then
 			controls.set_enabled_refuses_once = false
 			if not enabled then handle.enabled = false end
@@ -67,6 +74,7 @@ local function with_subject(initial_action, scenario)
 	end
 	function registrar.unbind(handle)
 		counters.unbind = counters.unbind + 1
+		unbound_handles[#unbound_handles + 1] = handle
 		handle.enabled = false
 		return true
 	end
@@ -116,6 +124,7 @@ local function with_subject(initial_action, scenario)
 			controls = controls,
 			counters = counters,
 			handles = handles,
+			unbound_handles = unbound_handles,
 			fired = fired,
 			store = store,
 			setting_key = key,
@@ -216,6 +225,48 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 			helpers.assert_eq(subject.get_action("cmd_a"), "none")
 			helpers.assert_eq(ctx.store[ctx.setting_key], "none")
 			helpers.assert_eq(#ctx.handles, 0)
+		end)
+	end)
+
+	helpers.it("keeps a none-to-action factory visible to re-entrant PAUSE", function()
+		with_subject("none", function(subject, ctx)
+			local nested_pause = nil
+			ctx.controls.bind_hook = function()
+				ctx.controls.bind_hook = nil
+				nested_pause = subject.pause()
+			end
+			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+			helpers.assert_eq(nested_pause, false,
+				"PAUSE cannot certify settlement while Registrar.bind is in flight")
+			helpers.assert_eq(subject.get_action("cmd_a"), "none")
+			helpers.assert_eq(ctx.store[ctx.setting_key], "none")
+			helpers.assert_eq(ctx.counters.unbind, 1)
+			helpers.assert_eq(ctx.handles[1].enabled, false)
+			helpers.assert_eq(ctx.handles[1].callback(), false)
+			helpers.assert_eq(#ctx.fired, 0)
+			helpers.assert_eq(subject.pause(), true)
+		end)
+	end)
+
+	helpers.it("keeps retained-handle re-enable visible to re-entrant PAUSE", function()
+		with_subject("none", function(subject, ctx)
+			ctx.controls.settings_throw_after_write_once = true
+			ctx.controls.set_enabled_refuses_once = true
+			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+			local exact = ctx.handles[1]
+			local nested_pause = nil
+			ctx.controls.set_enabled_hook = function()
+				ctx.controls.set_enabled_hook = nil
+				nested_pause = subject.pause()
+			end
+			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+			helpers.assert_eq(nested_pause, false)
+			helpers.assert_eq(ctx.unbound_handles[1] == exact, true)
+			helpers.assert_eq(ctx.unbound_handles[2] == exact, true,
+				"the superseded native re-enable must compensate the same handle")
+			helpers.assert_eq(exact.enabled, false)
+			helpers.assert_eq(subject.get_action("cmd_a"), "none")
+			helpers.assert_eq(subject.pause(), true)
 		end)
 	end)
 end)

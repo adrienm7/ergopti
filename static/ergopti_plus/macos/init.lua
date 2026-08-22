@@ -930,6 +930,13 @@ end
 Logger.info(LOG, "Main modules initialized successfully.")
 Boot.mark("Script control engine started (panic-button eventtap)")
 
+-- Register both backend-local dependency owners before any menu or boot caller
+-- can admit bootstrap work. Each checker retains only its own timers/tasks.
+if mlx_deps_checker.configure_pause_owner(shortcuts) ~= true
+	or ollama_deps_checker.configure_pause_owner(shortcuts) ~= true then
+	error("dependency bootstrap pause-owner registration did not commit")
+end
+
 -- Fast-path LLM check: if LLM is explicitly disabled in hs.settings, skip the
 -- synchronous MLX cleanup (lsof + curl) — its sole consumer is the warmup retry
 -- loop which is also gated on LLM being enabled. When the setting is nil (user
@@ -1032,19 +1039,17 @@ end
 if boot_llm_enabled then
 	local active_backend = backend_detector.effective_backend()
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
-	-- Defer the dependency check off the critical boot path. Its synchronous setup
-	-- (resolving the script, writing the PTY wrapper, chmod via os.execute, and
-	-- hs.task creation) costs hundreds of ms, and nothing on the boot path needs the
-	-- venv to be ready synchronously — the backend server start is itself lazy. A
-	-- doAfter(0) tick runs it right after boot completes, the same pattern
-	-- start_background_network_bootstrap already uses.
-	hs.timer.doAfter(0, function()
-		if active_backend == backend_detector.BACKEND_MLX then
-			pcall(mlx_deps_checker.check_and_install_deps)
-		else
-			pcall(ollama_deps_checker.check_and_install_deps)
-		end
-	end)
+	-- Each checker owns its retained zero-delay timer, pause admission, exact
+	-- task settlement, and same-epoch replay. A PAUSED caller is rejected and
+	-- does not create a new resume intent.
+	local selected_checker = active_backend == backend_detector.BACKEND_MLX
+		and mlx_deps_checker or ollama_deps_checker
+	local schedule_ok, scheduled = xpcall(
+		selected_checker.schedule_initial_check, debug.traceback)
+	if not schedule_ok or scheduled ~= true then
+		Logger.warn(LOG, "Backend dependency bootstrap was not scheduled: %s",
+			tostring(scheduled))
+	end
 	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
 		core_llm.start_background_network_bootstrap()
 	end

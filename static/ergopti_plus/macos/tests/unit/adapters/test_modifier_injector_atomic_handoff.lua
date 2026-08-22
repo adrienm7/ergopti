@@ -25,6 +25,7 @@ local function make_fixture(schedule_ok)
 	local tap_callback = nil
 	local tap_stop_count = 0
 	local deferred = {}
+	local tap_enabled = false
 
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.event_provenance"] = {
@@ -46,11 +47,16 @@ local function make_fixture(schedule_ok)
 		new = function(_types, callback)
 			tap_callback = callback
 			return {
-				start = function(self) return self end,
-				stop = function(self)
-					tap_stop_count = tap_stop_count + 1
+				start = function(self)
+					tap_enabled = true
 					return self
 				end,
+				stop = function(self)
+					tap_stop_count = tap_stop_count + 1
+					tap_enabled = false
+					return self
+				end,
+				isEnabled = function() return tap_enabled end,
 			}
 		end,
 	}

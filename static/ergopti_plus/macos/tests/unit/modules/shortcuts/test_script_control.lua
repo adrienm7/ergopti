@@ -42,6 +42,29 @@ package.loaded["modules.gestures.actions"] = {
 -- tests independent from the real canvas-backed tooltip, which cannot own a
 -- surface under the headless hs stub.
 package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+-- The fixed HS-012 inventory lazy-loads every owner. These broad ScriptControl
+-- API tests must not depend on a real owner cached by an earlier test module.
+package.loaded["modules.llm.api_mlx"] = {
+	stop_warmup = function() return true end,
+	resume_warmup = function() return true end,
+}
+package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() return true end }
+package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
+package.loaded["modules.llm.warmup_controller"] = {
+	stop = function() return true end,
+	schedule_warmup_with_retry = function() return true end,
+}
+package.loaded["ui.wpm.wpm_menubar"] = {
+	is_running = function() return false end,
+	stop = function() return true end,
+	resume_after_pause = function() return true end,
+}
+package.loaded["ui.wpm.wpm_widget"] = {
+	is_running = function() return false end,
+	stop = function() return true end,
+	resume_after_pause = function() return true end,
+}
+package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
 
 -- Force a fresh adapters.key_state so it captures THIS file's hs stub (the F-CRIT-1
 -- sentinel guard delegates the live right-AltGr query to that adapter).
@@ -443,37 +466,90 @@ helpers.describe("resume_all must not re-enable user-disabled gestures or shortc
 	-- Regression: resume_all() was calling _gestures.enable_all() and
 	-- _shortcuts.resume_bindings() unconditionally. A user who had gestures or
 	-- shortcuts disabled before pausing would find them re-enabled after unpause.
-	-- The fix snapshots the pre-pause state in pause_all() and restores only what
-	-- was active.
-	helpers.it("script_control source snapshots pre-pause state before disabling", function()
-		-- Selected by a declaration unique to modules/shortcuts/script_control.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function log_shortcut_if_available")
-		helpers.assert_true(src ~= nil, "modules/shortcuts/script_control.lua source must be locatable")
-		if not src then return end
+	-- Exercise the real transaction instead of pinning a particular local-variable
+	-- spelling. The spies mutate live state, so deleting either snapshot gate or
+	-- committed-owner ledger makes the inactive case fail non-vacuously.
+	local function run_restore_case(initially_active)
+		local calls = {
+			pause_bindings = 0,
+			resume_bindings = 0,
+			release_bindings_claim = 0,
+			disable_gestures = 0,
+			enable_gestures = 0,
+		}
+		local shortcuts_active = initially_active
+		local gestures_active = initially_active
+		local keymap = {
+			pause_processing = function() return true end,
+			resume_processing = function() return true end,
+			reset_predictions = function() return true end,
+		}
+		local shortcuts = {
+			is_bindings_started = function() return shortcuts_active end,
+			pause_bindings = function()
+				calls.pause_bindings = calls.pause_bindings + 1
+				shortcuts_active = false
+				return true
+			end,
+			resume_bindings = function()
+				calls.resume_bindings = calls.resume_bindings + 1
+				shortcuts_active = true
+				return true
+			end,
+			release_bindings_pause_claim = function()
+				calls.release_bindings_claim = calls.release_bindings_claim + 1
+				return true
+			end,
+		}
+		local gestures = {
+			is_enabled = function() return gestures_active end,
+			disable_all = function()
+				calls.disable_gestures = calls.disable_gestures + 1
+				gestures_active = false
+				return true
+			end,
+			enable_all = function()
+				calls.enable_gestures = calls.enable_gestures + 1
+				gestures_active = true
+				return true
+			end,
+		}
 
-		helpers.assert_true(src:find("_gestures_were_enabled", 1, true) ~= nil,
-			"script_control must declare _gestures_were_enabled snapshot")
-		helpers.assert_true(src:find("_shortcuts_were_running", 1, true) ~= nil,
-			"script_control must declare _shortcuts_were_running snapshot")
+		helpers.assert_true(SC.start(keymap, shortcuts, gestures, nil))
+		helpers.assert_true(SC.pause_all())
+		helpers.assert_true(SC.is_paused())
+		helpers.assert_true(SC.resume_all())
+		helpers.assert_eq(SC.is_paused(), false)
+		helpers.assert_true(SC.stop())
+		return calls, shortcuts_active, gestures_active
+	end
+
+	helpers.it("leaves shortcuts and gestures disabled when they were inactive before PAUSE", function()
+		local calls, shortcuts_active, gestures_active = run_restore_case(false)
+		helpers.assert_eq(calls.pause_bindings, 1,
+			"global PAUSE must install its claim even on an already-OFF feature")
+		helpers.assert_eq(calls.resume_bindings, 0,
+			"RESUME may replay only a shortcut owner that committed during PAUSE")
+		helpers.assert_eq(calls.release_bindings_claim, 1,
+			"an OFF snapshot must release only the global claim")
+		helpers.assert_eq(calls.disable_gestures, 0)
+		helpers.assert_eq(calls.enable_gestures, 0,
+			"RESUME may replay only a gesture owner that committed during PAUSE")
+		helpers.assert_eq(shortcuts_active, false)
+		helpers.assert_eq(gestures_active, false)
 	end)
 
-	helpers.it("resume_all only calls enable_all when gestures were enabled before pause", function()
-		-- Selected by a declaration unique to modules/shortcuts/script_control.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function log_shortcut_if_available")
-		helpers.assert_true(src ~= nil, "modules/shortcuts/script_control.lua source must be locatable")
-		if not src then return end
-
-		-- The guard must appear before the enable_all call
-		local guard_pos = src:find("_gestures_were_enabled", 1, true)
-		local enable_pos = src:find("enable_all", 1, true)
-		helpers.assert_true(guard_pos ~= nil and enable_pos ~= nil,
-			"script_control must have both _gestures_were_enabled guard and enable_all call")
-		helpers.assert_true(guard_pos < enable_pos,
-			"_gestures_were_enabled check must appear before the enable_all call")
+	helpers.it("restores exactly the shortcuts and gestures active before PAUSE", function()
+		local calls, shortcuts_active, gestures_active = run_restore_case(true)
+		helpers.assert_eq(calls.pause_bindings, 1,
+			"positive control must prove the shortcut owner joined PAUSE")
+		helpers.assert_eq(calls.resume_bindings, 1)
+		helpers.assert_eq(calls.release_bindings_claim, 0)
+		helpers.assert_eq(calls.disable_gestures, 1,
+			"positive control must prove the gesture owner joined PAUSE")
+		helpers.assert_eq(calls.enable_gestures, 1)
+		helpers.assert_eq(shortcuts_active, true)
+		helpers.assert_eq(gestures_active, true)
 	end)
 
 	helpers.it("bindings.lua exposes is_started() to detect active state before pause", function()
@@ -657,15 +733,16 @@ helpers.describe("ScriptControl pause stops the LLM warmup retry chain (F-LOW-2)
 	-- violation). pause_all() must cancel it via warmup_controller.stop().
 	helpers.it("pause_all() invokes warmup_controller.stop()", function()
 		local stopped = 0
+		local previous_warmup = package.loaded["modules.llm.warmup_controller"]
 		package.loaded["modules.llm.warmup_controller"] = {
-			stop = function() stopped = stopped + 1 end,
-			schedule_warmup_with_retry = function() end,
+			stop = function() stopped = stopped + 1; return true end,
+			schedule_warmup_with_retry = function() return true end,
 		}
 
 		SC.pause_all()
 		SC.resume_all()  -- restore the un-paused state for any later test
 
-		package.loaded["modules.llm.warmup_controller"] = nil
+		package.loaded["modules.llm.warmup_controller"] = previous_warmup
 		helpers.assert_true(stopped >= 1,
 			"pause_all must call warmup_controller.stop() so backend warmup POSTs stop during pause")
 	end)
@@ -679,7 +756,12 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 	-- pause_all()/resume_all() with SPY modules and asserts the real quiescence calls.
 	helpers.it("pause_all invokes the real quiescence calls, resume_all the symmetric restores", function()
 		local calls = {}
-		local function rec(name) return function() calls[name] = (calls[name] or 0) + 1 end end
+		local function rec(name)
+			return function()
+				calls[name] = (calls[name] or 0) + 1
+				return true
+			end
+		end
 		-- pause now treats tooltip teardown as required. Keep this unit test
 		-- behavioral and deterministic instead of loading the real TOML-backed UI.
 		package.loaded["ui.tooltip"] = { hide_forced = rec("tt_hide") }

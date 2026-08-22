@@ -22,6 +22,10 @@ local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
+local Logger         = require("infra.logger")
+
+local LOG = "menu.gestures"
+local gesture_toggle_debt = nil
 
 
 
@@ -67,6 +71,42 @@ function M.build(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
 
+	--- Applies one exact gesture lifecycle edge and restores the previously
+	--- committed posture when the edge mutates native state before refusing.
+	--- @param enabled boolean Desired feature posture.
+	--- @param previous boolean Previously published posture.
+	--- @return boolean committed
+	local function apply_gesture_posture(enabled, label)
+		local lifecycle = enabled and gestures.enable_all or gestures.disable_all
+		if type(lifecycle) ~= "function" then
+			Logger.error(LOG, "Gesture toggle refused because its lifecycle contract is incomplete.")
+			return false
+		end
+		local apply_ok, result_or_err = xpcall(lifecycle, debug.traceback)
+		if apply_ok and result_or_err == true then return true end
+		Logger.error(LOG, "Gesture runtime %s did not commit: %s.",
+			tostring(label), tostring(result_or_err))
+		return false
+	end
+
+	local function commit_gestures_runtime(enabled, previous)
+		if apply_gesture_posture(enabled, "toggle") == true then return true end
+		if apply_gesture_posture(previous, "rollback") ~= true then
+			gesture_toggle_debt = { restore_enabled = previous }
+		end
+		return false
+	end
+
+	local function settle_gesture_toggle_debt()
+		local debt = gesture_toggle_debt
+		if not debt then return true end
+		if apply_gesture_posture(debt.restore_enabled, "rollback retry") ~= true then
+			return false
+		end
+		if gesture_toggle_debt == debt then gesture_toggle_debt = nil end
+		return true
+	end
+
 	local item = {
 		label   = i18n.get("menu.gestures.title"),
 		checked = state.gestures or nil,
@@ -79,24 +119,30 @@ function M.build(ctx)
 		-- hotstrings master toggle, which is likewise pause-gated.
 		disabled = paused or nil,
 		action  = (not paused) and function()
-			local new_state = not state.gestures
-			if new_state then
+			if settle_gesture_toggle_debt() ~= true then return false end
+			local previous = state.gestures == true
+			local desired = not previous
+			if desired then
 				-- Show warning when activating gestures
 				local warnMsg = i18n.get("dialog.gestures.warning_msg")
 				local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
 				if res ~= i18n.get("button.activate") then return end
 			end
-			state.gestures = new_state
-			if gestures then
-				if state.gestures then
-					if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
-				else
-					if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
+			if commit_gestures_runtime(desired, previous) ~= true then return false end
+			state.gestures = desired
+			local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+			if not save_ok or save_result ~= true then
+				state.gestures = previous
+				if apply_gesture_posture(previous, "preference rollback") ~= true then
+					gesture_toggle_debt = { restore_enabled = previous }
 				end
+				Logger.error(LOG, "Gesture preference publication did not commit: %s.",
+					tostring(save_result))
+				return false
 			end
-			if ctx.save_prefs() ~= true then return false end
 			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
 			ctx.updateMenu()
+			return true
 		end or nil,
 	}
 

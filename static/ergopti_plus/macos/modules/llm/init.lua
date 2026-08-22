@@ -146,6 +146,7 @@ local CoreState = {
 	runtime_llm_enabled    = false,
 	background_bootstrap_started = false,
 	background_bootstrap_timer = nil,
+	background_bootstrap_generation = 0,
 	api_entries_load_timer = nil,
 	api_entries_load_generation = 0,
 	api_entries_load_started = false,
@@ -169,8 +170,19 @@ local CoreState = {
 	-- model name (captured against the OLD backend) to the NEW backend's
 	-- warmup() (F-MED-6). Mirrors detection_generation's pattern.
 	backend_generation     = 0,
+	backend_transition_generation = 0,
+	ollama_model_transition_generation = 0,
+	mlx_model_transition_generation = 0,
 	profile_generation     = 0,
+	profile_warmup_generation = 0,
+	profile_warmup_timer   = nil,
 }
+
+-- Forward declaration: automatic backend detection and persisted remote-entry
+-- restore are defined before the exact deferred-warmup owner below, but both
+-- can supersede the model identity captured by that owner.
+local settle_deferred_profile_warmup
+local deferred_profile_warmup_cleanup_pending
 
 
 
@@ -189,7 +201,8 @@ function M.auto_detect_backend(callback)
 	local now = hs.timer.secondsSinceEpoch()
 
 	-- Return cached result immediately if checked recently (within 10s)
-	if now - CoreState.last_backend_check < CoreState.backend_check_interval then
+	if now - CoreState.last_backend_check < CoreState.backend_check_interval
+		and not deferred_profile_warmup_cleanup_pending() then
 		local result = CoreState.backend
 		if type(callback) == "function" then
 			Logger.callback(LOG, "Cached backend auto-detect result", callback, result)
@@ -220,17 +233,32 @@ function M.auto_detect_backend(callback)
 			Logger.debug(LOG, "auto_detect: user has set a manual backend override — skipping automatic write.")
 			return
 		end
-		-- Prefer Ollama if both available, otherwise use MLX if available
-		if ollama_ok then
-			CoreState.backend = "ollama"
+		-- Prefer Ollama if both are available, otherwise MLX, and only invalidate
+		-- deferred work when the resolved identity actually changes. A same-backend
+		-- health refresh must not cancel an otherwise valid profile warmup.
+		local next_backend = ollama_ok and "ollama" or (mlx_ok and "mlx" or "inconnu")
+		local identity_changed = CoreState.backend ~= next_backend
+		if identity_changed then
+			CoreState.backend_generation = CoreState.backend_generation + 1
+		end
+		if identity_changed or deferred_profile_warmup_cleanup_pending() then
+			if settle_deferred_profile_warmup("automatic backend replacement") ~= true then
+				Logger.error(LOG,
+					"auto_detect: prior deferred profile warmup remains owned after backend replacement.")
+				-- Keep the resolved backend and every successor unpublished until the
+				-- exact predecessor timer can be joined. Resetting the cache timestamp
+				-- makes the next explicit detection call retry that same debt instead
+				-- of returning a false cached success.
+				CoreState.last_backend_check = 0
+				return
+			end
+		end
+		CoreState.backend = next_backend
+		if next_backend == "ollama" then
 			-- Ensure the Ollama daemon is running now that we know it is the active
 			-- backend — doing this at api_ollama require-time would launch Ollama for
 			-- MLX/API users who never selected it.
 			pcall(function() ApiOllama.ensure_running() end)
-		elseif mlx_ok then
-			CoreState.backend = "mlx"
-		else
-			CoreState.backend = "inconnu"
 		end
 
 		if type(callback) == "function" then
@@ -778,6 +806,11 @@ function M.load_api_entries()
 	for _, entry_id in ipairs(journal) do pending[entry_id] = true end
 	state.pending_keychain_deletes = sorted_ids(pending)
 	CoreState.api_persisted_state = copy_settings_value(state)
+	if settle_deferred_profile_warmup("remote API identity restore") ~= true then
+		Logger.error(LOG,
+			"Remote API identity restore fenced a deferred profile warmup with cleanup debt.")
+		return false
+	end
 	ApiRemote.set_entries(copy_settings_value(state.entries))
 	ApiRemote.set_active_entry_id(state.active_id)
 
@@ -1085,9 +1118,21 @@ end
 local function schedule_api_entries_load()
 	local prior = CoreState.api_entries_load_timer
 	if type(prior) == "table" then
+		if prior.acquiring == true or prior.callback_running == true then
+			Logger.error(LOG, "Persisted API-entry load acquisition is still in flight.")
+			return false
+		end
 		if prior.committed == true then return true end
-		if prior.timer ~= nil and TimerScheduler.cancel(prior) ~= true then
+		local prior_handle = prior.handle
+		if type(prior_handle) == "table" and prior_handle.timer ~= nil
+			and TimerScheduler.cancel(prior_handle) ~= true then
 			Logger.error(LOG, "Persisted API-entry load cleanup remains pending.")
+			return false
+		end
+		if CoreState.api_entries_load_timer ~= nil
+			and CoreState.api_entries_load_timer ~= prior then
+			Logger.error(LOG,
+				"Persisted API-entry load cleanup was superseded during native settlement.")
 			return false
 		end
 		if CoreState.api_entries_load_timer == prior then CoreState.api_entries_load_timer = nil end
@@ -1096,29 +1141,60 @@ local function schedule_api_entries_load()
 
 	CoreState.api_entries_load_generation = CoreState.api_entries_load_generation + 1
 	local generation = CoreState.api_entries_load_generation
+	local owner = {
+		handle = nil,
+		committed = false,
+		acquiring = true,
+		callback_running = false,
+		delivery_attempted = false,
+		generation = generation,
+	}
+	CoreState.api_entries_load_timer = owner
 	local handle
 	local committed
 	local schedule_ok, schedule_err = xpcall(function()
 		handle, committed = TimerScheduler.after(0, function()
-			if CoreState.api_entries_load_timer == handle and handle.timer == nil then
-				CoreState.api_entries_load_timer = nil
-			end
-			if committed ~= true or generation ~= CoreState.api_entries_load_generation then return end
+			owner.delivery_attempted = true
+			if owner.committed ~= true
+				or owner.acquiring == true
+				or CoreState.api_entries_load_timer ~= owner
+				or generation ~= CoreState.api_entries_load_generation then return end
+			owner.callback_running = true
 			local call_ok, loaded = Logger.pcall(LOG, M.load_api_entries)
 			if call_ok == true and loaded == true then
 				CoreState.api_entries_load_started = true
 			else
 				Logger.error(LOG, "Persisted API-entry load did not complete.")
 			end
+			owner.callback_running = false
+			owner.committed = false
+			if CoreState.api_entries_load_timer == owner then
+				CoreState.api_entries_load_timer = nil
+			end
 		end)
 	end, debug.traceback)
-	if type(handle) == "table" and handle.timer ~= nil then CoreState.api_entries_load_timer = handle end
-	if not schedule_ok or committed ~= true then
+	owner.handle = handle
+	owner.acquiring = false
+	owner.committed = schedule_ok == true and committed == true
+	if CoreState.api_entries_load_timer ~= owner then
+		if type(handle) == "table" and handle.timer ~= nil then
+			TimerScheduler.cancel(handle)
+		end
+		Logger.error(LOG, "Persisted API-entry load acquisition was superseded.")
+		return false
+	end
+	if not schedule_ok or committed ~= true or owner.delivery_attempted == true then
+		owner.committed = false
+		if type(handle) ~= "table" or handle.timer == nil
+			or TimerScheduler.cancel(handle) == true then
+			if CoreState.api_entries_load_timer == owner then
+				CoreState.api_entries_load_timer = nil
+			end
+		end
 		Logger.error(LOG, "Persisted API-entry load timer did not commit: %s.",
 			tostring(schedule_ok and handle or schedule_err))
 		return false
 	end
-	CoreState.api_entries_load_timer = handle
 	return true
 end
 
@@ -1129,10 +1205,11 @@ schedule_api_entries_load()
 --- not block the caller.
 --- @param model_name string The backend-specific model identifier.
 --- @param profile table|nil The active profile object; omit to use a minimal ping.
+--- @return boolean accepted True when skipped by a live pause or the backend owns the warmup.
 function M.warmup_model(model_name, profile)
 	if type(model_name) ~= "string" or model_name == "" then
 		Logger.debug(LOG, "warmup_model: skipped — model_name is empty.")
-		return
+		return false
 	end
 	-- « pause = tout éteint » applies to warmups the USER starts too. Switching
 	-- profile or model from the menu during a pause funnels through here, and
@@ -1144,16 +1221,21 @@ function M.warmup_model(model_name, profile)
 	local sc = package.loaded["modules.shortcuts.script_control"]
 	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
 		Logger.debug(LOG, "warmup_model: paused — '%s' stays cold until resume.", tostring(model_name))
-		return
+		return true
 	end
 
 	local resolved_profile = profile or M.get_active_profile()
 	Logger.debug(LOG, "warmup_model: dispatching to backend '%s' for model '%s'.",
 		tostring(CoreState.backend), tostring(model_name))
-	local ok, err = pcall(function() get_api().warmup(model_name, resolved_profile) end)
-	if not ok then
-		Logger.warn(LOG, "warmup_model: backend warmup raised: %s", tostring(err))
+	local ok, accepted_or_err = pcall(function()
+		return get_api().warmup(model_name, resolved_profile)
+	end)
+	if not ok or accepted_or_err ~= true then
+		Logger.warn(LOG, "warmup_model: backend warmup did not commit: %s",
+			tostring(accepted_or_err))
+		return false
 	end
+	return true
 end
 
 --- Returns true when the active backend has confirmed it can answer inference
@@ -1186,32 +1268,193 @@ function M.get_active_profile()
 	return Profiles.get_active_profile(CoreState.active_profile_id, CoreState.user_profiles)
 end
 
+--- Reads the current global pause epoch without requiring ScriptControl during
+--- the core module's bootstrap cycle.
+--- @return number epoch Monotonic pause generation, or zero when unavailable.
+local function profile_warmup_pause_epoch()
+	local control = package.loaded["modules.shortcuts.script_control"]
+	if type(control) ~= "table" or type(control.get_pause_epoch) ~= "function" then
+		return 0
+	end
+	local ok, epoch = xpcall(control.get_pause_epoch, debug.traceback)
+	return ok and tonumber(epoch) or -1
+end
+
+--- Checks that a deferred profile warmup still belongs to the same unpaused
+--- runtime epoch. A PAUSE/RESUME cycle never replays work captured before PAUSE.
+--- @param epoch number Pause epoch captured before acquisition.
+--- @return boolean current
+local function profile_warmup_runtime_current(epoch)
+	local control = package.loaded["modules.shortcuts.script_control"]
+	if profile_warmup_pause_epoch() ~= epoch then return false end
+	if type(control) ~= "table" then return true end
+	if type(control.is_paused) == "function" then
+		local ok, paused = xpcall(control.is_paused, debug.traceback)
+		if not ok or paused == true then return false end
+	end
+	if type(control.is_pause_transition_pending) == "function" then
+		local ok, pending = xpcall(control.is_pause_transition_pending,
+			debug.traceback)
+		if not ok or pending == true then return false end
+	end
+	return true
+end
+
+--- Fences and joins the exact deferred profile-warmup timer. The generation is
+--- bumped before native cancellation, so false/nil/throw cleanup debt and every
+--- late delivery are already logically inert.
+--- @param reason string Diagnostic cancellation reason.
+--- @return boolean settled True only after exact native settlement.
+settle_deferred_profile_warmup = function(reason)
+	CoreState.profile_warmup_generation = CoreState.profile_warmup_generation + 1
+	local settlement_generation = CoreState.profile_warmup_generation
+	local owner = CoreState.profile_warmup_timer
+	if owner == nil then return true end
+	owner.authorized = false
+	owner.committed = false
+	if owner.callback_running == true then return false end
+	if owner.handle == nil then
+		if owner.installing == true then return false end
+		if CoreState.profile_warmup_timer == owner then
+			CoreState.profile_warmup_timer = nil
+		end
+		return true
+	end
+	local cancel_ok, settled_or_error = xpcall(function()
+		return TimerScheduler.cancel(owner.handle)
+	end, debug.traceback)
+	if cancel_ok ~= true or settled_or_error ~= true then
+		Logger.error(LOG,
+			"Deferred profile warmup cancellation for %s remains unsettled: %s.",
+			tostring(reason), tostring(settled_or_error))
+		return false
+	end
+	-- Native cancellation may synchronously re-enter a profile writer through
+	-- the timer's running() probe. That nested transaction is allowed to install
+	-- a successor, but the outer transaction must neither overwrite it nor
+	-- report that its own settlement remained authoritative.
+	if CoreState.profile_warmup_generation ~= settlement_generation
+		or (CoreState.profile_warmup_timer ~= nil
+			and CoreState.profile_warmup_timer ~= owner) then
+		return false
+	end
+	if CoreState.profile_warmup_timer == owner then
+		CoreState.profile_warmup_timer = nil
+	end
+	return true
+end
+
+--- Reports an exact fenced owner that still needs a physical settlement retry.
+--- A healthy authorized one-shot is not debt and must survive same-value writes.
+--- @return boolean pending
+deferred_profile_warmup_cleanup_pending = function()
+	local owner = CoreState.profile_warmup_timer
+	return owner ~= nil and owner.authorized ~= true
+end
+
+--- Joins deferred profile warmup at the prediction/global-PAUSE boundary.
+--- RESUME deliberately does not replay this one-shot; established warmup owners
+--- decide whether current runtime state warrants a fresh acquisition.
+--- @return boolean settled
+function M.pause_deferred_profile_warmup()
+	return settle_deferred_profile_warmup("prediction pause")
+end
+
 --- Updates the active profile ID and re-primes the KV cache for the new profile's
 --- system prompt so the first request after a profile switch benefits from the cache.
 --- @param id string The ID of the profile to activate.
+--- @return boolean committed
 function M.set_active_profile(id)
-	if type(id) ~= "string" then return end
+	if type(id) ~= "string" then return false end
+	if settle_deferred_profile_warmup("profile replacement") ~= true then
+		Logger.error(LOG,
+			"set_active_profile: prior deferred warmup remains owned; sibling refused.")
+		return false
+	end
+	local previous_profile_id = CoreState.active_profile_id
 	CoreState.active_profile_id = id
 	CoreState.profile_generation = CoreState.profile_generation + 1
+	local my_profile_generation = CoreState.profile_generation
+	local function rollback_profile_identity()
+		if CoreState.profile_generation == my_profile_generation
+			and CoreState.active_profile_id == id then
+			CoreState.active_profile_id = previous_profile_id
+			CoreState.profile_generation = CoreState.profile_generation + 1
+		end
+		return false
+	end
 	if not CoreState.runtime_llm_enabled then
 		Logger.debug(LOG, "set_active_profile: runtime LLM disabled — skipping warmup for '%s'.", tostring(id))
-		return
+		return true
 	end
 	-- Re-prime the KV cache: the new profile may have a different static prompt prefix
 	local model = M.get_current_model()
 	if type(model) == "string" and model ~= "" then
 		local new_profile = M.get_active_profile()
+		local my_remote_identity = CoreState.backend == "api"
+			and ApiRemote.get_identity_generation() or nil
 		-- Capture the backend generation now so the deferred warmup below can
 		-- detect a set_backend() call that lands within the same tick and
 		-- discard itself instead of dispatching `model` (resolved against the
 		-- OLD backend) to the NEW backend's warmup() (F-MED-6).
 		local my_backend_generation = CoreState.backend_generation
-		local my_profile_generation = CoreState.profile_generation
-		hs.timer.doAfter(0, function()
+		local my_warmup_generation = CoreState.profile_warmup_generation
+		local my_pause_epoch = profile_warmup_pause_epoch()
+		local runtime_current = profile_warmup_runtime_current(my_pause_epoch)
+		local model_ok, current_model = xpcall(M.get_current_model, debug.traceback)
+		local current_remote_identity = CoreState.backend == "api"
+			and ApiRemote.get_identity_generation() or nil
+		if runtime_current ~= true or model_ok ~= true
+			or CoreState.profile_generation ~= my_profile_generation
+			or CoreState.active_profile_id ~= id
+			or CoreState.profile_warmup_generation ~= my_warmup_generation
+			or CoreState.backend_generation ~= my_backend_generation
+			or current_model ~= model
+			or current_remote_identity ~= my_remote_identity
+			or CoreState.profile_warmup_timer ~= nil then
+			Logger.debug(LOG,
+				"set_active_profile: stale or paused runtime refused deferred warmup for '%s'.",
+				tostring(model))
+			return rollback_profile_identity()
+		end
+
+		local owner = {
+			handle = nil,
+			authorized = true,
+			committed = false,
+			installing = true,
+			native_settled = false,
+			callback_pending = false,
+			callback_running = false,
+			callback_consumed = false,
+		}
+		CoreState.profile_warmup_timer = owner
+
+		local function deliver_warmup()
+			if owner.callback_pending ~= true or owner.callback_consumed == true
+				or owner.native_settled ~= true or owner.committed ~= true then
+				return false
+			end
+			owner.callback_consumed = true
+			owner.callback_pending = false
+			owner.committed = false
+			if owner.authorized ~= true
+				or CoreState.profile_warmup_generation ~= my_warmup_generation
+				or not profile_warmup_runtime_current(my_pause_epoch) then
+				if owner.native_settled == true
+					and CoreState.profile_warmup_timer == owner then
+					CoreState.profile_warmup_timer = nil
+				end
+				return true
+			end
+			owner.callback_running = true
 			local ok, err = xpcall(function()
 				if CoreState.backend_generation ~= my_backend_generation
-					or CoreState.profile_generation ~= my_profile_generation then
-					Logger.debug(LOG, "set_active_profile: backend/profile changed before deferred warmup fired — discarding stale dispatch for '%s'.",
+					or CoreState.profile_generation ~= my_profile_generation
+					or M.get_current_model() ~= model
+					or (CoreState.backend == "api"
+						and ApiRemote.get_identity_generation() ~= my_remote_identity) then
+					Logger.debug(LOG, "set_active_profile: backend/model/profile identity changed before deferred warmup fired — discarding stale dispatch for '%s'.",
 						tostring(model))
 					return
 				end
@@ -1222,11 +1465,89 @@ function M.set_active_profile(id)
 				end
 				M.warmup_model(model, new_profile)
 			end, debug.traceback)
+			owner.callback_running = false
 			if not ok then
 				Logger.error(LOG, "Deferred profile warmup callback raised: %s", tostring(err))
 			end
-		end)
+			if owner.native_settled == true
+				and CoreState.profile_warmup_timer == owner then
+				CoreState.profile_warmup_timer = nil
+			end
+			return ok == true
+		end
+
+		local function timer_callback()
+			if owner.callback_consumed == true or owner.callback_pending == true then
+				return false
+			end
+			owner.callback_pending = true
+			if owner.installing == true then return true end
+			deliver_warmup()
+			return true
+		end
+
+		local schedule_ok, handle_or_error, timer_committed = xpcall(function()
+			return TimerScheduler.after(0, timer_callback)
+		end, debug.traceback)
+		owner.installing = false
+		if schedule_ok == true and type(handle_or_error) == "table" then
+			owner.handle = handle_or_error
+			local observed_ok, observed = xpcall(function()
+				return TimerScheduler.onSettled(handle_or_error, function()
+					owner.native_settled = true
+					deliver_warmup()
+					if owner.callback_consumed == true
+						and owner.callback_running ~= true
+						and CoreState.profile_warmup_timer == owner then
+						CoreState.profile_warmup_timer = nil
+					end
+				end)
+			end, debug.traceback)
+			if observed_ok ~= true or observed ~= true then
+				owner.authorized = false
+				owner.committed = false
+				local cancel_ok, settled = xpcall(function()
+					return TimerScheduler.cancel(handle_or_error)
+				end, debug.traceback)
+				if cancel_ok == true and settled == true
+					and CoreState.profile_warmup_timer == owner then
+					CoreState.profile_warmup_timer = nil
+				end
+				Logger.error(LOG,
+					"Deferred profile warmup settlement observation failed: %s.",
+					tostring(observed))
+				return rollback_profile_identity()
+			end
+		end
+		if schedule_ok ~= true or type(handle_or_error) ~= "table"
+			or timer_committed ~= true then
+			owner.authorized = false
+			owner.committed = false
+			if owner.handle ~= nil then
+				xpcall(function() return TimerScheduler.cancel(owner.handle) end,
+					debug.traceback)
+			elseif CoreState.profile_warmup_timer == owner then
+				CoreState.profile_warmup_timer = nil
+			end
+			Logger.error(LOG, "Deferred profile warmup timer could not be armed: %s.",
+				tostring(schedule_ok and timer_committed or handle_or_error))
+			return rollback_profile_identity()
+		end
+		if owner.authorized ~= true then
+			local cancel_ok, settled = xpcall(function()
+				return TimerScheduler.cancel(owner.handle)
+			end, debug.traceback)
+			if cancel_ok == true and settled == true
+				and CoreState.profile_warmup_timer == owner then
+				CoreState.profile_warmup_timer = nil
+			end
+			return rollback_profile_identity()
+		end
+		owner.committed = true
+		deliver_warmup()
+		return true
 	end
+	return true
 end
 
 --- Enables or disables token-by-token streaming.
@@ -1256,28 +1577,70 @@ end
 --- @param backend string The backend identifier (e.g., "mlx", "ollama").
 function M.set_backend(backend)
 	if type(backend) == "string" and backend ~= "" then
+		local identity_changed = CoreState.backend ~= backend
 		-- Invalidate in-flight auto-detect probes before writing the new value
 		CoreState.detection_generation = CoreState.detection_generation + 1
 		-- Invalidate any deferred set_active_profile() warmup scheduled against
 		-- the OLD backend (F-MED-6) — see backend_generation's declaration comment.
-		CoreState.backend_generation   = CoreState.backend_generation + 1
+		if identity_changed then
+			CoreState.backend_generation = CoreState.backend_generation + 1
+		end
+		if (identity_changed or deferred_profile_warmup_cleanup_pending())
+			and settle_deferred_profile_warmup("explicit backend replacement") ~= true then
+			Logger.error(LOG,
+				"set_backend: prior deferred profile warmup remains owned after replacement.")
+			return false
+		end
 		CoreState.backend = backend
 		-- Prevent any future auto-detection from overwriting this explicit choice
 		CoreState.user_override_backend = true
+		CoreState.backend_transition_generation =
+			CoreState.backend_transition_generation + 1
+		local my_transition_generation = CoreState.backend_transition_generation
 		-- Any backend transition forces a fresh Ollama readiness verdict: leaving MLX
 		-- kills `ollama serve`, and returning relaunches it async (not yet listening).
 		-- Without this, a stale-true _is_ready would make the warmup chain self-terminate
 		-- and predictions dispatch to a cold/dead server (F-M8). ensure_running launches
 		-- the daemon but must NEVER imply readiness.
-		pcall(function() ApiOllama.reset_ready() end)
+		local reset_ok, reset_error = xpcall(function()
+			return ApiOllama.reset_ready()
+		end, debug.traceback)
+		if not reset_ok then
+			Logger.error(LOG, "Ollama readiness reset raised during backend transition: %s",
+				tostring(reset_error))
+		end
+		if CoreState.backend_transition_generation ~= my_transition_generation
+			or CoreState.backend ~= backend then
+			Logger.debug(LOG,
+				"set_backend: superseded during readiness reset; stale '%s' result refused.",
+				tostring(backend))
+			return false
+		end
 		if backend == "ollama" then
-			pcall(function() ApiOllama.ensure_running() end)
+			local ensure_ok, ensure_result = xpcall(function()
+				return ApiOllama.ensure_running()
+			end, debug.traceback)
+			if CoreState.backend_transition_generation ~= my_transition_generation
+				or CoreState.backend ~= backend then
+				Logger.debug(LOG,
+					"set_backend: superseded during daemon startup; stale '%s' result refused.",
+					tostring(backend))
+				return false
+			end
+			if ensure_ok ~= true or ensure_result ~= true then
+				Logger.error(LOG,
+					"set_backend: Ollama daemon startup did not commit (result: %s).",
+					tostring(ensure_result))
+				return false
+			end
 		end
 		-- Convention 5.5: a public setter logs its new value, so the applied
 		-- backend can be read back from the logs like every other setting.
 		Logger.debug(LOG, "Backend: %s.", backend)
+		return true
 	else
 		Logger.warn(LOG, "set_backend(): ignoring invalid backend %s.", tostring(backend))
+		return false
 	end
 end
 
@@ -1292,11 +1655,22 @@ end
 --- restore profile/model state without triggering a backend warmup.
 --- @param enabled boolean True when runtime LLM activity is enabled.
 function M.set_runtime_llm_enabled(enabled)
-	CoreState.runtime_llm_enabled = (enabled == true)
+	local next_enabled = enabled == true
+	local identity_changed = CoreState.runtime_llm_enabled ~= next_enabled
+	CoreState.runtime_llm_enabled = next_enabled
+	local settled = true
+	if identity_changed or deferred_profile_warmup_cleanup_pending() then
+		settled = settle_deferred_profile_warmup("runtime LLM gate replacement")
+	end
+	if settled ~= true then
+		Logger.error(LOG,
+			"set_runtime_llm_enabled: deferred profile warmup cleanup remains owned.")
+	end
 	-- This flag is the ONE gate that authorises a model load or a warmup, so its
 	-- transitions are exactly what a "why did it warm up while disabled?" report
 	-- needs from the log. It was the only writer of it that said nothing.
 	Logger.debug(LOG, "Runtime LLM gate: %s.", CoreState.runtime_llm_enabled and "enabled" or "disabled")
+	return settled == true
 end
 
 --- Returns the current runtime LLM enabled state.
@@ -1319,47 +1693,90 @@ function M.start_background_network_bootstrap()
 
 	local prior = CoreState.background_bootstrap_timer
 	if prior then
+		if prior.acquiring == true or prior.callback_running == true then
+			Logger.error(LOG, "Background LLM bootstrap acquisition is still in flight.")
+			return false
+		end
 		if prior.committed == true then
 			Logger.debug(LOG, "start_background_network_bootstrap: already scheduled — skipping duplicate call.")
 			return true
 		end
 		-- A prior activation may have raised after making its native timer live.
 		-- Never publish a sibling until that exact cleanup capability settles.
-		if TimerScheduler.cancel(prior) ~= true then
+		local prior_handle = prior.handle
+		if type(prior_handle) == "table" and prior_handle.timer ~= nil
+			and TimerScheduler.cancel(prior_handle) ~= true then
 			Logger.error(LOG, "Background LLM bootstrap cleanup remains pending.")
+			return false
+		end
+		if CoreState.background_bootstrap_timer ~= nil
+			and CoreState.background_bootstrap_timer ~= prior then
+			Logger.error(LOG,
+				"Background LLM bootstrap cleanup was superseded during native settlement.")
 			return false
 		end
 		if CoreState.background_bootstrap_timer == prior then
 			CoreState.background_bootstrap_timer = nil
 		end
+		if CoreState.background_bootstrap_started then return true end
 	end
 
-	-- Forward-declare before the closure so Lua captures this local rather than
-	-- resolving a later declaration as the nil global `bootstrap_timer`.
+	CoreState.background_bootstrap_generation =
+		CoreState.background_bootstrap_generation + 1
+	local generation = CoreState.background_bootstrap_generation
+	local owner = {
+		handle = nil,
+		committed = false,
+		acquiring = true,
+		callback_running = false,
+		delivery_attempted = false,
+		generation = generation,
+	}
+	CoreState.background_bootstrap_timer = owner
 	local bootstrap_timer
 	local committed
-	bootstrap_timer, committed = TimerScheduler.after(0, function()
-		if CoreState.background_bootstrap_timer == bootstrap_timer
-			and bootstrap_timer.timer == nil then
-			CoreState.background_bootstrap_timer = nil
+	local schedule_ok, schedule_err = xpcall(function()
+		bootstrap_timer, committed = TimerScheduler.after(0, function()
+			owner.delivery_attempted = true
+			if owner.committed ~= true
+				or owner.acquiring == true
+				or CoreState.background_bootstrap_timer ~= owner
+				or generation ~= CoreState.background_bootstrap_generation then return end
+			owner.callback_running = true
+			if not CoreState.background_bootstrap_started then
+				CoreState.background_bootstrap_started = true
+				Logger.pcall(LOG, M.auto_detect_backend)
+				Logger.pcall(LOG, M.warm_up_connections)
+			end
+			owner.callback_running = false
+			owner.committed = false
+			if CoreState.background_bootstrap_timer == owner then
+				CoreState.background_bootstrap_timer = nil
+			end
+		end)
+	end, debug.traceback)
+	owner.handle = bootstrap_timer
+	owner.acquiring = false
+	owner.committed = schedule_ok == true and committed == true
+	if CoreState.background_bootstrap_timer ~= owner then
+		if type(bootstrap_timer) == "table" and bootstrap_timer.timer ~= nil then
+			TimerScheduler.cancel(bootstrap_timer)
 		end
-		if CoreState.background_bootstrap_started then return end
-		CoreState.background_bootstrap_started = true
-		Logger.pcall(LOG, M.auto_detect_backend)
-		Logger.pcall(LOG, M.warm_up_connections)
-	end)
-
-	if bootstrap_timer and bootstrap_timer.timer ~= nil then
-		CoreState.background_bootstrap_timer = bootstrap_timer
-	end
-	if committed ~= true then
-		if not bootstrap_timer or bootstrap_timer.timer == nil then
-			CoreState.background_bootstrap_timer = nil
-		end
-		Logger.error(LOG, "Background LLM network bootstrap scheduling was refused.")
+		Logger.error(LOG, "Background LLM bootstrap acquisition was superseded.")
 		return false
 	end
-	CoreState.background_bootstrap_timer = bootstrap_timer
+	if not schedule_ok or committed ~= true or owner.delivery_attempted == true then
+		owner.committed = false
+		if type(bootstrap_timer) ~= "table" or bootstrap_timer.timer == nil
+			or TimerScheduler.cancel(bootstrap_timer) == true then
+			if CoreState.background_bootstrap_timer == owner then
+				CoreState.background_bootstrap_timer = nil
+			end
+		end
+		Logger.error(LOG, "Background LLM network bootstrap scheduling was refused: %s.",
+			tostring(schedule_ok and bootstrap_timer or schedule_err))
+		return false
+	end
 	Logger.debug(LOG, "Background LLM network bootstrap scheduled.")
 	return true
 end
@@ -1436,21 +1853,58 @@ end
 --- Sets the model for Ollama backend.
 --- @param model_name string The model identifier for Ollama.
 function M.set_llm_model_ollama(model_name)
-	if type(model_name) == "string" then
-		CoreState.llm_model_ollama = model_name
-		-- A model switch is a fresh (server, model) identity: clear readiness so the
-		-- scheduled warmup actually re-primes model B instead of self-terminating on
-		-- model A's stale-true flag (F-M8).
-		pcall(function() ApiOllama.reset_ready() end)
+	if type(model_name) ~= "string" then return false end
+	local identity_changed = CoreState.llm_model_ollama ~= model_name
+	if (identity_changed or deferred_profile_warmup_cleanup_pending())
+		and settle_deferred_profile_warmup("Ollama model replacement") ~= true then
+		Logger.error(LOG,
+			"set_llm_model_ollama: deferred profile warmup cleanup remains owned.")
+		return false
 	end
+	CoreState.ollama_model_transition_generation =
+		CoreState.ollama_model_transition_generation + 1
+	local my_transition_generation = CoreState.ollama_model_transition_generation
+	CoreState.llm_model_ollama = model_name
+	-- A model switch is a fresh (server, model) identity: clear readiness so the
+	-- scheduled warmup actually re-primes model B instead of self-terminating on
+	-- model A's stale-true flag (F-M8).
+	local reset_ok, reset_error = xpcall(function()
+		return ApiOllama.reset_ready()
+	end, debug.traceback)
+	if not reset_ok then
+		Logger.error(LOG, "Ollama readiness reset raised during model transition: %s",
+			tostring(reset_error))
+	end
+	if CoreState.ollama_model_transition_generation ~= my_transition_generation
+		or CoreState.llm_model_ollama ~= model_name then
+		Logger.debug(LOG,
+			"set_llm_model_ollama: superseded during readiness reset; stale '%s' result refused.",
+			tostring(model_name))
+		return false
+	end
+	return true
 end
 
 --- Sets the model for MLX backend.
 --- @param model_name string The model identifier for MLX.
 function M.set_llm_model_mlx(model_name)
-	if type(model_name) == "string" then
-		CoreState.llm_model_mlx = model_name
+	if type(model_name) ~= "string" then return false end
+	local identity_changed = CoreState.llm_model_mlx ~= model_name
+	if (identity_changed or deferred_profile_warmup_cleanup_pending())
+		and settle_deferred_profile_warmup("MLX model replacement") ~= true then
+		Logger.error(LOG,
+			"set_llm_model_mlx: deferred profile warmup cleanup remains owned.")
+		return false
 	end
+	CoreState.mlx_model_transition_generation =
+		CoreState.mlx_model_transition_generation + 1
+	local my_transition_generation = CoreState.mlx_model_transition_generation
+	CoreState.llm_model_mlx = model_name
+	if CoreState.mlx_model_transition_generation ~= my_transition_generation
+		or CoreState.llm_model_mlx ~= model_name then
+		return false
+	end
+	return true
 end
 
 --- Exposes built-in profiles and user profiles.
@@ -1465,6 +1919,11 @@ end
 function M.set_user_profiles(profiles_table)
 	if type(profiles_table) ~= "table" then
 		Logger.error(LOG, "set_user_profiles(): profiles_table must be a table.")
+		return false
+	end
+	if settle_deferred_profile_warmup("profile registry replacement") ~= true then
+		Logger.error(LOG,
+			"set_user_profiles: deferred profile warmup cleanup remains owned.")
 		return false
 	end
 	CoreState.user_profiles = profiles_table

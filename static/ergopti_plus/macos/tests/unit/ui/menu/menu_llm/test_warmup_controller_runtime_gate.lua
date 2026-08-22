@@ -21,12 +21,18 @@
 local helpers = require("tests.helpers")
 
 -- Build a fake llm_mod with configurable gate and a spy on warmup_model
-local function make_llm_stub(runtime_enabled, active_model)
+local function make_llm_stub(runtime_enabled, active_model, mode)
 	local warmup_calls = {}
 	return {
 		get_runtime_llm_enabled = function() return runtime_enabled end,
 		get_current_model       = function() return active_model or "test-model" end,
-		warmup_model            = function(m) warmup_calls[#warmup_calls + 1] = m end,
+		warmup_model            = function(m)
+			warmup_calls[#warmup_calls + 1] = m
+			if mode == "throw" then error("injected warmup refusal") end
+			if mode == "nil" then return nil end
+			if mode == "false" then return false end
+			return true
+		end,
 		get_warmup_calls        = function() return warmup_calls end,
 	}
 end
@@ -66,6 +72,15 @@ helpers.describe("M-12: WarmupCtrl.warmup gated on runtime LLM enable", function
 		helpers.assert_true(#llm_stub.get_warmup_calls() >= 1,
 			"warmup_model must be called when get_runtime_llm_enabled returns true")
 	end)
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("warmup() propagates strict backend " .. mode, function()
+			local llm_stub = make_llm_stub(true, "mlx-community/model", mode)
+			local wc = load_wc(llm_stub)
+			helpers.assert_eq(wc.warmup("backend-switch"), false)
+			helpers.assert_eq(#llm_stub.get_warmup_calls(), 1)
+		end)
+	end
 end)
 
 

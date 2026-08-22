@@ -108,8 +108,13 @@ local function new()
 
 	-- Per-instance state
 	local _active_task     = nil
+	local _active_task_generation = nil
 	local _timeout_timer   = nil
 	local _timeout_cleanup = {}
+	local _observed_timeout_handles = {}
+	local _settlement_observers = {}
+	local _lifecycle_depth = 0
+	local _settlement_notification_pending = false
 	local _request_active  = false
 	local _cancelled       = false
 	-- Bumped on every post()/get()/cancel() so a callback captured by an
@@ -119,14 +124,63 @@ local function new()
 
 	-- ── Internal helpers ──────────────────────────────────────────────────
 
+	--- Returns whether every native capability owned by this instance settled.
+	--- @return boolean settled
+	local function _fully_settled()
+		return _request_active ~= true
+			and _active_task == nil
+			and _timeout_timer == nil
+			and #_timeout_cleanup == 0
+	end
+
+	--- Delivers settlement observers outside an active lifecycle mutation.
+	local function _notify_settlement_observers()
+		if not _fully_settled() then return end
+		if _lifecycle_depth > 0 then
+			_settlement_notification_pending = true
+			return
+		end
+		_settlement_notification_pending = false
+		local observers = _settlement_observers
+		_settlement_observers = {}
+		for _, observer in ipairs(observers) do
+			invoke_callback(observer, { settled = true })
+		end
+	end
+
+	--- Removes one exact timer debt without disturbing sibling capabilities.
+	--- @param handle table TimerScheduler handle.
+	local function _remove_timeout_cleanup(handle)
+		for index = #_timeout_cleanup, 1, -1 do
+			if _timeout_cleanup[index] == handle then
+				table.remove(_timeout_cleanup, index)
+			end
+		end
+	end
+
 	--- Retains one exact scheduler handle once native release is uncertain.
 	--- @param handle table|nil TimerScheduler handle.
 	local function _retain_timeout_cleanup(handle)
 		if type(handle) ~= "table" or handle.timer == nil then return end
 		for _, retained in ipairs(_timeout_cleanup) do
-			if retained == handle then return end
+			if retained == handle then
+				return
+			end
 		end
 		_timeout_cleanup[#_timeout_cleanup + 1] = handle
+		if type(TimerScheduler.onSettled) == "function"
+			and _observed_timeout_handles[handle] ~= true then
+			_observed_timeout_handles[handle] = true
+			local registered = TimerScheduler.onSettled(handle, function()
+				_observed_timeout_handles[handle] = nil
+				if _timeout_timer == handle then _timeout_timer = nil end
+				_remove_timeout_cleanup(handle)
+				_notify_settlement_observers()
+			end)
+			if registered ~= true then
+				_observed_timeout_handles[handle] = nil
+			end
+		end
 	end
 
 	--- Attempts to release one exact timeout capability.
@@ -152,7 +206,13 @@ local function new()
 		for index = #_timeout_cleanup, 1, -1 do
 			local handle = _timeout_cleanup[index]
 			if _cancel_timeout_handle(handle, "Timeout cleanup retry") then
-				table.remove(_timeout_cleanup, index)
+				-- TimerScheduler may synchronously notify settlement and remove
+				-- this exact handle while cancel() is still on the stack.
+				if _timeout_cleanup[index] == handle then
+					table.remove(_timeout_cleanup, index)
+				else
+					_remove_timeout_cleanup(handle)
+				end
 			else
 				settled = false
 			end
@@ -172,19 +232,28 @@ local function new()
 	end
 
 	--- Cancels the optional native HTTP task after the generation was fenced.
-	--- @return boolean settled True unless native cancellation explicitly failed.
+	--- The exact handle remains owned until its cancel method returns literal true.
+	--- @return boolean settled True only after exact native settlement.
 	local function _cancel_active_task()
 		local task = _active_task
-		_active_task = nil
 		if not task then return true end
 		local ok, result_or_err = xpcall(function()
 			if type(task.cancel) ~= "function" then return true end
 			return task:cancel()
 		end, debug.traceback)
-		if not ok or result_or_err == false then
+		-- Some cancellable transports report their terminal callback synchronously
+		-- from cancel(). That callback is stronger settlement proof than the method's
+		-- later false/nil/throw result; never keep a capability already retired by its
+		-- exact generation callback.
+		if _active_task ~= task then return true end
+		if not ok or result_or_err ~= true then
 			Logger.error(LOG, "HTTP task cancellation failed after logical revocation: %s.",
 				tostring(result_or_err))
 			return false
+		end
+		if _active_task == task then
+			_active_task = nil
+			_active_task_generation = nil
 		end
 		return true
 	end
@@ -218,6 +287,7 @@ local function new()
 					body = "",
 					error = TIMEOUT_ERROR,
 				})
+				_notify_settlement_observers()
 			end)
 		end, debug.traceback)
 		timeout_handle = schedule_ok and handle_or_err or nil
@@ -238,17 +308,29 @@ local function new()
 
 	local function _make_cb(callback, my_generation)
 		return function(status, response_body, _response_headers)
+			-- A native task callback is terminal proof for that exact task even
+			-- after logical revocation. Clear only the matching generation so a
+			-- stale completion cannot consume a successor's capability.
+			if _active_task_generation == my_generation then
+				_active_task = nil
+				_active_task_generation = nil
+			end
 			-- Discard a stale callback from a superseded request: cancel() cannot
 			-- guarantee the underlying OS request has not already queued its
 			-- completion, so the generation check is the only reliable guard.
 			if my_generation ~= _generation then
 				Logger.debug(LOG, "Stale response discarded (gen %d != %d).", my_generation, _generation)
+				_notify_settlement_observers()
 				return
 			end
-			if _cancelled or not _request_active then return end
+			if _cancelled or not _request_active then
+				_notify_settlement_observers()
+				return
+			end
 			_cancelled = true
 			_request_active = false
 			_active_task = nil
+			_active_task_generation = nil
 			_stop_timeout()
 			local is_ok  = type(status) == "number" and status >= 200 and status < 300
 			local err_msg = nil
@@ -259,6 +341,7 @@ local function new()
 				body   = type(response_body) == "string" and response_body or "",
 				error  = err_msg,
 			})
+			_notify_settlement_observers()
 		end
 	end
 
@@ -266,7 +349,18 @@ local function new()
 	--- @param callback function Completion callback.
 	--- @return integer|nil generation New request generation, or nil on refusal.
 	local function _prepare_request(callback)
-		if _request_active or _timeout_timer or _active_task then inst.cancel() end
+		if _request_active or _timeout_timer or _active_task then
+			if inst.cancel() ~= true then
+				Logger.error(LOG, "HTTP request refused while native cancellation remains pending.")
+				invoke_callback(callback, {
+					ok = false,
+					status = 0,
+					body = "",
+					error = TIMEOUT_CLEANUP_PENDING_ERROR,
+				})
+				return nil
+			end
+		end
 		if not _retry_timeout_cleanup() then
 			Logger.error(LOG, "HTTP request refused while timeout cleanup remains pending.")
 			invoke_callback(callback, {
@@ -303,7 +397,7 @@ local function new()
 	--- @param callback function Completion callback.
 	local function _dispatch(method, url, headers, body, callback)
 		local my_generation = _prepare_request(callback)
-		if not my_generation then return end
+		if not my_generation then return false end
 
 		local ok, task_or_err = pcall(function()
 			if method == "post" then
@@ -316,11 +410,12 @@ local function new()
 				Logger.error(LOG,
 					"%s(): native HTTP dispatch failed after terminal completion — %s. "
 						.. "Duplicate result suppressed.", method, tostring(task_or_err))
-				return
+				return false
 			end
 			_cancelled = true
 			_request_active = false
 			_active_task = nil
+			_active_task_generation = nil
 			_stop_timeout()
 			Logger.error(LOG, "%s(): native HTTP dispatch failed — %s.", method, tostring(task_or_err))
 			invoke_callback(callback, {
@@ -329,14 +424,17 @@ local function new()
 				body = "",
 				error = tostring(task_or_err),
 			})
-			return
+			_notify_settlement_observers()
+			return false
 		end
 
 		-- A faithful Hammerspoon call returns nil. Activity is therefore tracked
 		-- independently, and a synchronous test completion cannot resurrect it
 		if my_generation == _generation and _request_active then
 			_active_task = task_or_err
+			_active_task_generation = task_or_err ~= nil and my_generation or nil
 		end
+		return true
 	end
 
 	-- ── Public methods ────────────────────────────────────────────────────
@@ -347,7 +445,7 @@ local function new()
 	--- @param body     string   JSON-encoded request body.
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.post(url, headers, body, callback)
-		_dispatch("post", url, headers, body, callback)
+		return _dispatch("post", url, headers, body, callback)
 	end
 
 	--- Sends an HTTP GET request.
@@ -355,7 +453,7 @@ local function new()
 	--- @param headers  table    Key→value header map.
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.get(url, headers, callback)
-		_dispatch("get", url, headers, nil, callback)
+		return _dispatch("get", url, headers, nil, callback)
 	end
 
 	--- Aborts the in-flight request. The callback is NOT called after cancel().
@@ -366,11 +464,34 @@ local function new()
 	--- check. Native task cancellation remains opportunistic for an implementation
 	--- that does return a cancellable handle.
 	function inst.cancel()
+		_lifecycle_depth = _lifecycle_depth + 1
 		_cancelled  = true
 		_request_active = false
 		_generation = _generation + 1
-		_cancel_active_task()
+		local task_settled = _cancel_active_task() == true
 		_stop_timeout()
+		-- _stop_timeout retains an uncertain timer in the exact cleanup ledger.
+		-- Retry that ledger now and expose the final settlement to lifecycle owners;
+		-- legacy nil made pause publish success while native timeout debt survived.
+		local timers_settled = _retry_timeout_cleanup() == true
+		_lifecycle_depth = _lifecycle_depth - 1
+		_notify_settlement_observers()
+		return task_settled and timers_settled
+	end
+
+	--- Registers a continuation for exact native settlement of this instance.
+	--- It runs immediately when no request/task/timer capability remains, or once
+	--- after a previously refused cancellation later settles autonomously.
+	--- @param observer function Zero-arity settlement callback.
+	--- @return boolean registered
+	function inst.onSettled(observer)
+		if type(observer) ~= "function" then return false end
+		if _fully_settled() and _lifecycle_depth == 0 then
+			invoke_callback(observer, { settled = true })
+			return true
+		end
+		_settlement_observers[#_settlement_observers + 1] = observer
+		return true
 	end
 
 	--- Returns true when a request is currently in flight.

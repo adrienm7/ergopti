@@ -26,6 +26,23 @@ local function result_value(mode, fallback)
 	return mode
 end
 
+local function find_function_upvalue(fn, target, seen)
+	if type(fn) ~= "function" then return nil end
+	seen = seen or {}
+	if seen[fn] then return nil end
+	seen[fn] = true
+	for index = 1, 100 do
+		local name, value = debug.getupvalue(fn, index)
+		if name == nil then break end
+		if name == target and type(value) == "function" then return value end
+		if type(value) == "function" then
+			local nested = find_function_upvalue(value, target, seen)
+			if nested ~= nil then return nested end
+		end
+	end
+	return nil
+end
+
 local function with_fixture(plan, callback)
 	plan = plan or {}
 	local saved_hs = _G.hs
@@ -36,6 +53,7 @@ local function with_fixture(plan, callback)
 	local outcome = table.pack(xpcall(function()
 			helpers.with_fresh_modules(MODULES, function()
 			local records = {
+				callback_labels = {},
 				cancels = {},
 				completions = {},
 				gates = {},
@@ -47,12 +65,21 @@ local function with_fixture(plan, callback)
 				server_starts = 0,
 				successes = 0,
 				timers = {},
+				updates = {},
 			}
 			local controls = {
 				exit_code = nil,
 				files = {},
 				tasks = {launcher = {}, tail = {}},
 			}
+
+			local function reenter_pause(kind, record_key)
+				if kind == "requirement" then
+					records[record_key] = controls.requirement_pause_join()
+				elseif kind == "reattach" then
+					records[record_key] = controls.pause_reattached_download()
+				end
+			end
 
 			local function file_kind(path)
 				if path:match("%.py$") then return "python" end
@@ -105,6 +132,15 @@ local function with_fixture(plan, callback)
 			end
 
 			io.open = function(path, mode)
+				if mode == "r" and path:match("%.log%.exit$") then
+					records.reattach_exit_probes =
+						(records.reattach_exit_probes or 0) + 1
+					if plan.pause_reattach_on_exit_probe
+						== records.reattach_exit_probes then
+						records.reentrant_reattach_probe_pause =
+							controls.pause_reattached_download()
+					end
+				end
 				local open_refusal = boundary_mode("open", path)
 				if open_refusal then return result_value(open_refusal, file_handle(path, mode)) end
 				if plan.fail_open == "python" and mode == "w" and path:match("%.py$") then
@@ -127,6 +163,11 @@ local function with_fixture(plan, callback)
 					return result_value(plan.chmod_mode, true)
 				end
 				if command:find("kill %-0", 1, false) then
+					if plan.pause_reattach_on_pid_probe == true
+						and records.reentrant_reattach_pid_pause == nil then
+						records.reentrant_reattach_pid_pause =
+							controls.pause_reattached_download()
+					end
 					local alive = plan.pid_alive
 					if type(alive) == "table" then
 						local next_value = table.remove(alive, 1)
@@ -217,6 +258,14 @@ local function with_fixture(plan, callback)
 					end
 					local result = result_value(behavior.start, self)
 					if result ~= false and result ~= nil then record.live = true end
+					if behavior.pause_on_start == true then
+						records.reentrant_timer_pause =
+							controls.requirement_pause_join()
+					end
+					if behavior.pause_reattach_on_start == true then
+						records.reentrant_reattach_pause =
+							controls.pause_reattached_download()
+					end
 					if behavior.fire_on_start then timer_callback() end
 					return result
 				end
@@ -226,7 +275,14 @@ local function with_fixture(plan, callback)
 					if result ~= false and result ~= nil then record.live = false end
 					return result
 				end
-				function handle:running() return record.live end
+				function handle:running()
+					local reenter = behavior.reenter_on_running
+					if type(reenter) == "function" then
+						behavior.reenter_on_running = nil
+						records.timer_running_reentry_result = reenter()
+					end
+					return record.live
+				end
 				record.handle = handle
 				records.timers[#records.timers + 1] = record
 				return handle
@@ -246,21 +302,47 @@ local function with_fixture(plan, callback)
 				local task = {kind = kind, done = on_done, stream = on_stream,
 					behavior = behavior, running_state = false}
 				function task:start()
-					if self.behavior.start == "throw_after_start" then
-						self.running_state = true
-						error("injected native refusal after activation")
+					local start_mode = self.behavior.start
+					local start_throws = start_mode == "throw"
+						or start_mode == "throw_after_start"
+					local start_result
+					if start_throws ~= true then
+						start_result = result_value(start_mode, self)
 					end
-					local start_result = result_value(self.behavior.start, self)
-					if start_result ~= false and start_result ~= nil then
+					if self.behavior.running_after_start ~= nil then
+						self.running_state = self.behavior.running_after_start == true
+					elseif self.behavior.mutate_on_start == true
+						or start_mode == "throw_after_start"
+						or (start_result ~= false and start_result ~= nil) then
 						self.running_state = true
 					end
-					if self.behavior.stream_on_start then
+					if self.behavior.pause_on_start then
+						reenter_pause(self.behavior.pause_on_start,
+							"reentrant_" .. self.kind .. "_start_pause")
+					end
+					if self.behavior.stream_on_start
+						and self.behavior.stream_after_complete_on_start ~= true then
 						self.stream(self, self.behavior.stream_on_start, "")
 					end
 					if self.behavior.complete_on_start then
 						self.running_state = false
 						self.done(self.behavior.complete_code or 0, "", "")
 					end
+					if self.behavior.stream_on_start
+						and self.behavior.stream_after_complete_on_start == true then
+						self.stream(self, self.behavior.stream_on_start, "")
+					end
+					if self.kind == "tail"
+						and self.behavior.pause_after_complete_on_start == true then
+							records.reentrant_requirement_pause =
+								controls.requirement_pause_join()
+					end
+					if self.kind == "tail"
+						and self.behavior.pause_reattach_on_start == true then
+						records.reentrant_reattach_tail_pause =
+							controls.pause_reattached_download()
+					end
+					if start_throws then error("injected native refusal after activation") end
 					return start_result
 				end
 				function task:terminate()
@@ -268,15 +350,34 @@ local function with_fixture(plan, callback)
 						self.running_state = false
 						self.done(self.behavior.terminate_code or 15, "", "")
 					end
+					if self.behavior.terminate_stops == true then
+						self.running_state = false
+					end
+					if self.behavior.pause_after_terminate then
+						local pause_kind = self.behavior.pause_after_terminate
+						self.behavior.pause_after_terminate = nil
+						reenter_pause(pause_kind,
+							"reentrant_" .. self.kind .. "_termination_pause")
+					end
 					return result_value(self.behavior.terminate, self)
 				end
 				function task:complete(code)
 					self.running_state = false
 					return self.done(code or 0, "", "")
 				end
-				function task:isRunning() return self.running_state end
+				function task:isRunning()
+					local probe_mode = self.behavior.running_probe
+					if type(probe_mode) == "table" then
+						probe_mode = table.remove(probe_mode, 1)
+					end
+					return result_value(probe_mode, self.running_state)
+				end
 				function task:emit(text)
 					return self.stream(self, text, "")
+				end
+				if behavior.pause_on_construct then
+					reenter_pause(behavior.pause_on_construct,
+						"reentrant_" .. kind .. "_construction_pause")
 				end
 				controls.tasks[kind][#controls.tasks[kind] + 1] = task
 				return task
@@ -284,7 +385,29 @@ local function with_fixture(plan, callback)
 
 			_G.hs = hs_fixture
 			package.loaded["hs"] = hs_fixture
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local logger_stub = helpers.make_logger_stub()
+			local base_logger_callback = logger_stub.callback
+			logger_stub.callback = function(log_name, label, fn, ...)
+				records.callback_labels[#records.callback_labels + 1] = label
+				local pause_label = plan.pause_on_logger_callback
+					or plan.pause_on_update_icon
+				if pause_label == label then
+					local pause_kind = plan.logger_pause_kind
+						or plan.update_icon_pause_kind or "requirement"
+					local record_key = plan.logger_pause_record
+						or "reentrant_update_icon_pause"
+					plan.pause_on_logger_callback = nil
+					plan.pause_on_update_icon = nil
+					local args = table.pack(...)
+					return base_logger_callback(log_name, label, function()
+						local results = table.pack(fn(table.unpack(args, 1, args.n)))
+						reenter_pause(pause_kind, record_key)
+						return table.unpack(results, 1, results.n)
+					end)
+				end
+				return base_logger_callback(log_name, label, fn, ...)
+			end
+			package.loaded["infra.logger"] = logger_stub
 			package.loaded["infra.i18n"] = {
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,
@@ -303,7 +426,15 @@ local function with_fixture(plan, callback)
 					controls.window = options
 					return true
 				end,
-				update = function() return true end,
+				update = function(...)
+					records.updates[#records.updates + 1] = table.pack(...)
+					if plan.pause_on_window_update then
+						local kind = plan.pause_on_window_update
+						plan.pause_on_window_update = nil
+						reenter_pause(kind, "reentrant_window_update_pause")
+					end
+					return true
+				end,
 				complete = function(...)
 					records.completions[#records.completions + 1] = table.pack(...)
 					return true
@@ -409,13 +540,43 @@ local function with_fixture(plan, callback)
 				return false
 			end
 			function controls.pull(model)
+				local options = {is_current = function() return true end}
+				if plan.requirement_lifecycle == true then
+					options._requirement_lifecycle = {
+						adopt = function(child, pause_join)
+							controls.requirement_child = child
+							controls.requirement_pause_join = pause_join
+							return true
+						end,
+						settle = function(child)
+							helpers.assert_eq(child, controls.requirement_child)
+							records.requirement_settlements =
+								(records.requirement_settlements or 0) + 1
+							return true
+						end,
+					}
+				end
 				return obj.pull_model(model or "B", "org/model", function()
+					if plan.pause_in_terminal == "success" then
+						plan.pause_in_terminal = nil
+						records.reentrant_server_terminal_pause =
+							controls.requirement_pause_join()
+						records.server_terminal_mutations =
+							(records.server_terminal_mutations or 0) + 1
+					end
 					records.successes = records.successes + 1
 					return true
 				end, function(reason)
+					if plan.pause_in_terminal == "failure" then
+						plan.pause_in_terminal = nil
+						records.reentrant_server_terminal_pause =
+							controls.requirement_pause_join()
+						records.server_terminal_mutations =
+							(records.server_terminal_mutations or 0) + 1
+					end
 					records.cancels[#records.cancels + 1] = reason
 					return true
-				end, {is_current = function() return true end})
+				end, options)
 			end
 			function controls.reattach()
 				local session = {
@@ -430,6 +591,9 @@ local function with_fixture(plan, callback)
 					.. '"exit_path":"/tmp/hs_mlx_dl_reattach.log.exit",'
 					.. '"repo":"org/model","pid":4242}'
 				return obj.reattach_download(session)
+			end
+			function controls.pause_reattached_download()
+				return obj.pause_reattached_download()
 			end
 			function controls.finish_download(code)
 				controls.exit_code = code
@@ -484,6 +648,54 @@ local function launch_detached_download(fixture)
 	launcher:emit("__DLPID__:4242\n")
 	launcher:complete(0)
 	return launcher
+end
+
+helpers.describe("HS-012 MLX timer replacement ownership", function()
+	helpers.it("preserves a same-slot successor installed during native settlement", function()
+		local poll_behavior = {}
+		with_fixture({
+			requirement_lifecycle = true,
+			timer_by_delay = { [3] = poll_behavior },
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			launch_detached_download(fixture)
+			local owner = fixture.controls.requirement_child
+			helpers.assert_type(owner, "table")
+			local schedule_owner_timer = find_function_upvalue(
+				fixture.obj.pull_model, "schedule_owner_timer")
+			helpers.assert_type(schedule_owner_timer, "function")
+			local predecessor = owner.timers.poll
+			helpers.assert_type(predecessor, "table")
+			local before = #fixture.records.timers
+
+			poll_behavior.reenter_on_running = function()
+				return schedule_owner_timer(owner, "poll", 3, function() return true end)
+			end
+			helpers.assert_eq(
+				schedule_owner_timer(owner, "poll", 3, function() return true end), false,
+				"the stale outer replacement must refuse its nested successor")
+			helpers.assert_true(fixture.records.timer_running_reentry_result)
+			helpers.assert_eq(#fixture.records.timers, before + 1,
+				"the outer replacement must not publish a second successor")
+			helpers.assert_true(owner.timers.poll ~= predecessor)
+			helpers.assert_eq(fixture.records.timers[before + 1].live, true)
+		end)
+	end)
+end)
+
+local function assert_revoked_cleanup_timer_owned(fixture)
+	local cleanup
+	for _, timer in ipairs(fixture.records.timers) do
+		if timer.delay == 0.25 and timer.live == true then cleanup = timer end
+	end
+	helpers.assert_not_nil(cleanup,
+		"revocation must retain one live cleanup timer for the exact PID owner")
+	for _, timer in ipairs(fixture.records.timers) do
+		if timer.live == true then
+			helpers.assert_true(timer.delay ~= 3 and timer.delay ~= 30,
+				"revocation must not authorize poll/timeout business successors")
+		end
+	end
 end
 
 helpers.describe("HS-024 MLX download terminal owner", function()
@@ -547,7 +759,11 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 
 	for _, mode in ipairs({"false", "nil", "throw"}) do
 		helpers.it("HS-024 tail " .. mode .. " refusal retains the same cleanup owner", function()
-			local plan = {tail = {start = mode}, pid_alive = true}
+			local plan = {tail = {
+				start = mode,
+				stream_on_start = "__BYTES__:99\n",
+				mutate_on_start = true,
+			}, pid_alive = true}
 			with_fixture(plan, function(fixture)
 				helpers.assert_eq(fixture.controls.pull(), true)
 				local launcher = fixture.controls.latest("launcher")
@@ -555,6 +771,8 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 				launcher:complete(0)
 				local stale_tail = fixture.controls.latest("tail")
 				assert_cancelled(fixture, "tail_task_start_refused")
+				helpers.assert_eq(#fixture.records.updates, 0,
+					"a refused tail cannot publish its synchronous stream")
 				local session_path = "/tmp/hs_mlx_active_download.json"
 				local retained_session = fixture.controls.files[session_path]
 				helpers.assert_type(retained_session, "string")
@@ -572,8 +790,20 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 					"a busy successor cannot replace the live owner's session")
 
 				plan.pid_alive = false
+				assert_revoked_cleanup_timer_owned(fixture)
 				fixture.controls.fire(0.25)
 				helpers.assert_nil(fixture.controls.files[session_path])
+				local tail_count = #fixture.controls.tasks.tail
+				helpers.assert_eq(fixture.obj.pull_model("C", "org/other", nil, function(reason)
+					second_cancels = second_cancels + 1
+					helpers.assert_eq(reason, "busy")
+				end, {is_current = function() return true end}), false,
+					"a vanished PID cannot settle the still-live refused tail task")
+				helpers.assert_eq(second_cancels, 2)
+				helpers.assert_eq(#fixture.controls.tasks.tail, tail_count,
+					"the refused tail must block every sibling until its exact terminal")
+
+				stale_tail:complete(0)
 				helpers.assert_eq(fixture.obj.pull_model("C", "org/other", nil, nil,
 					{is_current = function() return true end}), true)
 				local successor_session = fixture.controls.files[session_path]
@@ -581,7 +811,9 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 				helpers.assert_eq(successor_session:find('"model":"C"', 1, true) ~= nil, true)
 				helpers.assert_eq(successor_session:find('"repo":"org/other"', 1, true) ~= nil, true)
 
-				stale_tail:complete(0)
+				stale_tail:emit("__BYTES__:100\n")
+				helpers.assert_eq(#fixture.records.updates, 0,
+					"late refused-tail chunks must remain inert")
 				helpers.assert_eq(fixture.controls.files[session_path], successor_session,
 					"a late callback cannot remove the successor's exact session")
 				helpers.assert_eq(#fixture.records.cancels, 1)
@@ -590,6 +822,56 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 			end)
 		end)
 	end
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("HS-024 launcher " .. mode
+			.. " refusal discards synchronous business stream", function()
+			with_fixture({launcher = {
+				start = mode,
+				stream_on_start = "launcher business\n",
+				mutate_on_start = true,
+			}}, function(fixture)
+				helpers.assert_eq(fixture.controls.pull(), false)
+				helpers.assert_eq(#fixture.records.updates, 0)
+				local launcher = fixture.controls.latest("launcher")
+				launcher:emit("late launcher business\n")
+				helpers.assert_eq(#fixture.records.updates, 0)
+			end)
+		end)
+	end
+
+	helpers.it("HS-024 replays committed launcher and tail streams once", function()
+		with_fixture({
+			launcher = {stream_on_start = "launcher business\n"},
+			tail = {stream_on_start = "__BYTES__:99\n"},
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			helpers.assert_eq(#fixture.records.updates, 1)
+			local launcher = fixture.controls.latest("launcher")
+			launcher:emit("__DLPID__:4242\n")
+			launcher:complete(0)
+			helpers.assert_eq(#fixture.records.updates, 2)
+			launcher:emit("late launcher business\n")
+			helpers.assert_eq(#fixture.records.updates, 2)
+			local tail = fixture.controls.latest("tail")
+			tail:complete(0)
+			tail:emit("__BYTES__:100\n")
+			helpers.assert_eq(#fixture.records.updates, 2)
+		end)
+	end)
+
+	helpers.it("HS-024 drops a synchronous stream delivered after terminal", function()
+		with_fixture({launcher = {
+			start = "success",
+			complete_on_start = true,
+			complete_code = 1,
+			stream_on_start = "post-terminal business\n",
+			stream_after_complete_on_start = true,
+		}}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), false)
+			helpers.assert_eq(#fixture.records.updates, 0)
+		end)
+	end)
 
 	helpers.it("HS-024 tail construction refusal retains the detached owner", function()
 		local plan = {tail = {construct = "nil"}, pid_alive = true}
@@ -615,6 +897,7 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 				"a busy successor cannot replace the live owner's session")
 
 			plan.pid_alive = false
+			assert_revoked_cleanup_timer_owned(fixture)
 			fixture.controls.fire(0.25)
 			helpers.assert_nil(fixture.controls.files[session_path])
 			helpers.assert_eq(fixture.obj.pull_model("C", "org/other", nil, nil,
@@ -966,6 +1249,569 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 		end)
 	end
 
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("HS-012 retains launcher construction debt after PAUSE " .. mode,
+			function()
+				with_fixture({
+					requirement_lifecycle = true,
+					launcher = {
+						pause_on_construct = "requirement",
+						terminate = mode,
+					},
+				}, function(fixture)
+					helpers.assert_eq(fixture.controls.pull(), false)
+					helpers.assert_eq(
+						fixture.records.reentrant_launcher_construction_pause, false,
+						"PAUSE cannot publish while launcher construction is on-stack")
+					assert_cancelled(fixture, "script_paused")
+					local exact_launcher = fixture.controls.latest("launcher")
+					helpers.assert_type(exact_launcher, "table")
+					helpers.assert_nil(fixture.deps.active_tasks.download,
+						"an exact stopped proof settles a candidate that never started")
+					helpers.assert_eq(fixture.records.requirement_settlements, 1)
+					helpers.assert_eq(exact_launcher:complete(0), false,
+						"late completion from the settled candidate must stay inert")
+					helpers.assert_eq(fixture.records.requirement_settlements, 1)
+				end)
+			end)
+	end
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("HS-012 revalidates launcher rollback after PAUSE " .. mode,
+			function()
+				with_fixture({
+					requirement_lifecycle = true,
+					launcher = {
+						start = "false",
+						mutate_on_start = true,
+						pause_after_terminate = "requirement",
+						terminate = mode,
+					},
+				}, function(fixture)
+					helpers.assert_eq(fixture.controls.pull(), false)
+					helpers.assert_eq(
+						fixture.records.reentrant_launcher_termination_pause, false,
+						"PAUSE cannot publish during exact launcher rollback")
+					local refusal_icons = 0
+					for _, label in ipairs(fixture.records.callback_labels) do
+						if label == "MLX launcher-refusal icon reset" then
+							refusal_icons = refusal_icons + 1
+						end
+					end
+					helpers.assert_eq(refusal_icons, 0,
+						"rollback PAUSE must fence failure UI")
+					local exact_launcher = fixture.controls.latest("launcher")
+					helpers.assert_eq(fixture.deps.active_tasks.download, exact_launcher)
+					helpers.assert_eq(fixture.records.requirement_settlements or 0, 0)
+					exact_launcher:complete(0)
+					helpers.assert_eq(fixture.records.requirement_settlements, 1)
+				end)
+			end)
+	end
+
+	helpers.it("HS-012 rejects a truthy launcher start already proven stopped", function()
+		with_fixture({launcher = {
+			{running_after_start = false},
+			{},
+		}}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), false)
+			assert_cancelled(fixture, "launcher_start_refused")
+			helpers.assert_nil(fixture.deps.active_tasks.download)
+			helpers.assert_true(fixture.obj.pull_model("C", "org/other", nil, nil,
+				{is_current = function() return true end}))
+		end)
+	end)
+
+	helpers.it("HS-012 rejects a truthy regular tail start already proven stopped", function()
+		with_fixture({
+			requirement_lifecycle = true,
+			tail = {running_after_start = false},
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			local launcher = fixture.controls.latest("launcher")
+			launcher:emit("__DLPID__:4242\n")
+			helpers.assert_eq(launcher:complete(0), false)
+			assert_cancelled(fixture, "tail_task_start_refused")
+			helpers.assert_nil(fixture.deps.active_tasks.download_tail)
+			fixture.controls.fire(0.25)
+			helpers.assert_true(fixture.obj.pull_model("C", "org/other", nil, nil,
+				{is_current = function() return true end}))
+		end)
+	end)
+
+	for _, probe_mode in ipairs({"nil", "throw", "non_boolean"}) do
+		helpers.it("HS-012 fails closed on launcher liveness probe " .. probe_mode,
+			function()
+				with_fixture({launcher = {
+					{
+						running_probe = probe_mode,
+						terminate = "false",
+					},
+					{},
+				}}, function(fixture)
+					helpers.assert_eq(fixture.controls.pull(), false)
+					assert_cancelled(fixture, "launcher_start_refused")
+					local exact_launcher = fixture.controls.latest("launcher")
+					helpers.assert_eq(fixture.deps.active_tasks.download, exact_launcher,
+						"an inconclusive liveness probe must retain the exact task")
+					helpers.assert_eq(fixture.obj.pull_model("C", "org/other", nil, nil,
+						{is_current = function() return true end}), false)
+					exact_launcher:complete(0)
+					helpers.assert_true(fixture.obj.pull_model("C", "org/other", nil, nil,
+						{is_current = function() return true end}))
+				end)
+			end)
+	end
+
+	helpers.it("HS-012 fails closed on regular tail non-boolean liveness", function()
+		with_fixture({
+			requirement_lifecycle = true,
+			tail = {running_probe = "non_boolean", terminate = "false"},
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			local launcher = fixture.controls.latest("launcher")
+			launcher:emit("__DLPID__:4242\n")
+			helpers.assert_eq(launcher:complete(0), false)
+			assert_cancelled(fixture, "tail_task_start_refused")
+			local exact_tail = fixture.controls.latest("tail")
+			helpers.assert_eq(fixture.deps.active_tasks.download_tail, exact_tail)
+			helpers.assert_eq(fixture.obj.pull_model("C", "org/other", nil, nil,
+				{is_current = function() return true end}), false)
+			exact_tail:complete(0)
+			fixture.controls.fire(0.25)
+			helpers.assert_true(fixture.obj.pull_model("C", "org/other", nil, nil,
+				{is_current = function() return true end}))
+		end)
+	end)
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("HS-012 consumes stopped proof after launcher terminate " .. mode,
+			function()
+				with_fixture({launcher = {
+					terminate = mode,
+					terminate_stops = true,
+				}}, function(fixture)
+					helpers.assert_true(fixture.controls.pull())
+					helpers.assert_true(fixture.controls.window.on_cancel())
+					helpers.assert_nil(fixture.deps.active_tasks.download)
+					helpers.assert_true(fixture.obj.pull_model("C", "org/other", nil, nil,
+						{is_current = function() return true end}))
+				end)
+			end)
+
+		helpers.it("HS-012 consumes stopped proof after tail terminate " .. mode,
+			function()
+				with_fixture({
+					requirement_lifecycle = true,
+					tail = {terminate = mode, terminate_stops = true},
+				}, function(fixture)
+					helpers.assert_true(fixture.controls.pull())
+					launch_detached_download(fixture)
+					fixture.controls.requirement_child.partial.pid = nil
+					helpers.assert_true(fixture.controls.window.on_cancel())
+					helpers.assert_nil(fixture.deps.active_tasks.download_tail)
+					helpers.assert_true(fixture.obj.pull_model("C", "org/other", nil, nil,
+						{is_current = function() return true end}))
+				end)
+			end)
+	end
+
+	helpers.it("HS-012 fences launcher terminal UI after nested PAUSE", function()
+		with_fixture({
+			requirement_lifecycle = true,
+			pause_on_update_icon = "MLX launcher-failure icon reset",
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			local launcher = fixture.controls.latest("launcher")
+			helpers.assert_eq(launcher:complete(1), false)
+			helpers.assert_eq(fixture.records.reentrant_update_icon_pause, false,
+				"PAUSE cannot publish from inside the launcher terminal callback")
+			assert_cancelled(fixture, "script_paused")
+			helpers.assert_eq(#fixture.records.completions, 0,
+				"a PAUSE-revoked terminal cannot update the download window")
+			helpers.assert_eq(#fixture.records.notifications, 0,
+				"a PAUSE-revoked terminal cannot notify after owner removal")
+			helpers.assert_nil(fixture.controls.latest("tail"))
+			helpers.assert_eq(fixture.records.requirement_settlements, 1)
+		end)
+	end)
+
+	helpers.it("HS-012 fences buffered launcher terminal UI after nested PAUSE", function()
+		with_fixture({
+			requirement_lifecycle = true,
+			pause_on_update_icon = "MLX launcher-failure icon reset",
+			launcher = {complete_on_start = true, complete_code = 1},
+		}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), false)
+			helpers.assert_eq(fixture.records.reentrant_update_icon_pause, false,
+				"PAUSE cannot publish while buffered terminal work is replayed")
+			assert_cancelled(fixture, "script_paused")
+			helpers.assert_eq(#fixture.records.completions, 0)
+			helpers.assert_eq(#fixture.records.notifications, 0)
+			helpers.assert_nil(fixture.controls.latest("tail"))
+			helpers.assert_eq(fixture.records.requirement_settlements, 1)
+		end)
+	end)
+
+	helpers.it("HS-012 fences launcher stdout UI after nested PAUSE", function()
+		with_fixture({
+			requirement_lifecycle = true,
+			pause_on_window_update = "requirement",
+			launcher = {complete_on_terminate = true},
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			local launcher = fixture.controls.latest("launcher")
+			helpers.assert_eq(launcher:emit("launcher business\n"), false)
+			helpers.assert_eq(fixture.records.reentrant_window_update_pause, false,
+				"PAUSE cannot publish while launcher stdout is on-stack")
+			assert_cancelled(fixture, "script_paused")
+			local progress_icons = 0
+			for _, label in ipairs(fixture.records.callback_labels) do
+				if label == "MLX download progress icon" then
+					progress_icons = progress_icons + 1
+				end
+			end
+			helpers.assert_eq(progress_icons, 0,
+				"the revoked stdout callback cannot publish its UI successor")
+			helpers.assert_eq(fixture.records.requirement_settlements, 1)
+		end)
+	end)
+
+	helpers.it("HS-012 fences buffered launcher stdout after nested PAUSE", function()
+		with_fixture({
+			requirement_lifecycle = true,
+			pause_on_window_update = "requirement",
+			launcher = {
+				stream_on_start = "launcher business\n",
+				complete_on_terminate = true,
+			},
+		}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), false)
+			helpers.assert_eq(fixture.records.reentrant_window_update_pause, false,
+				"PAUSE cannot publish while buffered stdout is replayed")
+			assert_cancelled(fixture, "script_paused")
+			local progress_icons = 0
+			for _, label in ipairs(fixture.records.callback_labels) do
+				if label == "MLX download progress icon" then
+					progress_icons = progress_icons + 1
+				end
+			end
+			helpers.assert_eq(progress_icons, 0)
+			helpers.assert_eq(fixture.records.requirement_settlements, 1)
+		end)
+	end)
+
+	helpers.it("HS-012 fences tail stdout UI after nested PAUSE", function()
+		with_fixture({
+			requirement_lifecycle = true,
+			pause_on_window_update = "requirement",
+			pid_alive = false,
+			tail = {complete_on_terminate = true},
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			launch_detached_download(fixture)
+			local tail = fixture.controls.latest("tail")
+			fixture.controls.requirement_child.partial.pid = nil
+			helpers.assert_eq(tail:emit("__BYTES__:99\n"), false)
+			helpers.assert_eq(fixture.records.reentrant_window_update_pause, false,
+				"PAUSE cannot publish while tail stdout is on-stack")
+			assert_cancelled(fixture, "script_paused")
+			local progress_icons = 0
+			for _, label in ipairs(fixture.records.callback_labels) do
+				if label == "MLX download progress icon" then
+					progress_icons = progress_icons + 1
+				end
+			end
+			helpers.assert_eq(progress_icons, 0,
+				"the revoked tail callback cannot publish its UI successor")
+		end)
+	end)
+
+	helpers.it("HS-012 fences tail terminal successor after nested PAUSE", function()
+		local plan = {
+			requirement_lifecycle = true,
+			pid_alive = false,
+		}
+		with_fixture(plan, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			launch_detached_download(fixture)
+			local tail = fixture.controls.latest("tail")
+			fixture.controls.requirement_child.partial.pid = nil
+			plan.pause_on_logger_callback = "MLX download freshness check"
+			plan.logger_pause_record = "reentrant_tail_terminal_pause"
+			helpers.assert_eq(tail:complete(0), false)
+			helpers.assert_eq(fixture.records.reentrant_tail_terminal_pause, false,
+				"PAUSE cannot publish while the tail terminal callback is on-stack")
+			assert_cancelled(fixture, "script_paused")
+			local live_tail_done = 0
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 0.5 and timer.live == true then
+					live_tail_done = live_tail_done + 1
+				end
+			end
+			helpers.assert_eq(live_tail_done, 0,
+				"the revoked terminal cannot retain a business successor")
+		end)
+	end)
+
+	for _, action in ipairs({"cancel", "retry"}) do
+		helpers.it("HS-012 keeps regular " .. action
+			.. " UI callback joined through nested PAUSE", function()
+			with_fixture({
+				requirement_lifecycle = true,
+				pause_on_update_icon = "MLX download cancellation icon reset",
+				launcher = {complete_on_terminate = true},
+			}, function(fixture)
+				helpers.assert_true(fixture.controls.pull())
+				local result
+				if action == "cancel" then
+					result = fixture.controls.window.on_cancel()
+				else
+					result = fixture.controls.window.on_retry()
+				end
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(
+					fixture.records.reentrant_update_icon_pause, false,
+					"nested PAUSE must wait for the complete UI callback")
+				assert_cancelled(fixture, "script_paused")
+				helpers.assert_eq(#fixture.records.notifications, 0)
+				helpers.assert_eq(#fixture.records.completions, 0)
+				local retry_timers = 0
+				for _, timer in ipairs(fixture.records.timers) do
+					if timer.delay == 0.05 then retry_timers = retry_timers + 1 end
+				end
+				helpers.assert_eq(retry_timers, 0,
+					"nested PAUSE must fence the retry successor")
+				helpers.assert_eq(fixture.records.requirement_settlements, 1)
+			end)
+		end)
+	end
+
+	for _, action in ipairs({"cancel", "retry"}) do
+		helpers.it("HS-012 keeps reattach " .. action
+			.. " UI callback joined through nested PAUSE", function()
+			local plan = {
+				pid_alive = true,
+				tail = {complete_on_terminate = true},
+			}
+			if action == "cancel" then
+				plan.pause_on_update_icon = "MLX reattach completion icon reset"
+				plan.update_icon_pause_kind = "reattach"
+			else
+				plan.tail.pause_after_terminate = "reattach"
+			end
+			with_fixture(plan, function(fixture)
+				helpers.assert_true(fixture.controls.reattach())
+				local result
+				if action == "cancel" then
+					result = fixture.controls.window.on_cancel()
+				else
+					result = fixture.controls.window.on_retry()
+				end
+				helpers.assert_eq(result, false)
+				local pause_result
+				if action == "cancel" then
+					pause_result = fixture.records.reentrant_update_icon_pause
+				else
+					pause_result = fixture.records.reentrant_tail_termination_pause
+				end
+				helpers.assert_eq(pause_result, false,
+					"reattach PAUSE must wait for the complete UI callback")
+				helpers.assert_eq(#fixture.records.notifications, 0,
+					"a paused callback cannot publish a terminal notification")
+				helpers.assert_eq(#fixture.records.completions, 0,
+					"a paused callback cannot publish terminal window state")
+				helpers.assert_nil(fixture.controls.latest("launcher"),
+					"a paused retry cannot start its regular download successor")
+			end)
+		end)
+	end
+
+	helpers.it("HS-012 rejects a truthy stopped reattach tail before retry", function()
+		local plan = {
+			pid_alive = true,
+			tail = {running_after_start = false},
+		}
+		with_fixture(plan, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			local stopped_tail = fixture.controls.latest("tail")
+			helpers.assert_true(fixture.deps.active_tasks.download_tail ~= stopped_tail,
+				"the stopped task cannot remain the monitor sentinel")
+			helpers.assert_true(fixture.controls.window.on_retry())
+			plan.pid_alive = false
+			fixture.controls.fire(0.25)
+			helpers.assert_not_nil(fixture.controls.latest("launcher"),
+				"retry must hand off after the stopped tail is cleared")
+		end)
+	end)
+
+	helpers.it("HS-012 retains reattach tail on non-boolean liveness", function()
+		local plan = {
+			pid_alive = true,
+			tail = {running_probe = "non_boolean", terminate = "false"},
+		}
+		with_fixture(plan, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			local exact_tail = fixture.controls.latest("tail")
+			helpers.assert_eq(fixture.deps.active_tasks.download_tail, exact_tail,
+				"inconclusive liveness must retain the exact tail debt")
+			helpers.assert_true(fixture.controls.window.on_retry())
+			plan.pid_alive = false
+			fixture.controls.exit_code = 1
+			exact_tail:complete(0)
+			fixture.controls.fire(0.25)
+			helpers.assert_not_nil(fixture.controls.latest("launcher"),
+				"the retry may hand off only after the exact tail settles")
+		end)
+	end)
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("HS-012 consumes stopped reattach tail after terminate " .. mode,
+			function()
+				local plan = {
+					pid_alive = true,
+					tail = {terminate = mode, terminate_stops = true},
+				}
+				with_fixture(plan, function(fixture)
+					helpers.assert_true(fixture.controls.reattach())
+					local exact_tail = fixture.controls.latest("tail")
+					helpers.assert_true(fixture.controls.window.on_retry())
+					helpers.assert_true(
+						fixture.deps.active_tasks.download_tail ~= exact_tail,
+						"exact stopped tail must yield to the monitor sentinel")
+					plan.pid_alive = false
+					fixture.controls.fire(0.25)
+					helpers.assert_not_nil(fixture.controls.latest("launcher"))
+				end)
+			end)
+	end
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("HS-012 releases a cancelled retry timer after late " .. mode
+			.. " stop debt settles", function()
+			with_fixture({
+				requirement_lifecycle = true,
+				launcher = {complete_on_terminate = true},
+				timer_by_delay = {
+					[0.05] = {stop = mode},
+				},
+			}, function(fixture)
+				helpers.assert_true(fixture.controls.pull())
+				helpers.assert_true(fixture.controls.window.on_retry())
+				local retry_timer
+				for _, timer in ipairs(fixture.records.timers) do
+					if timer.delay == 0.05 then retry_timer = timer break end
+				end
+				helpers.assert_not_nil(retry_timer)
+				helpers.assert_eq(fixture.controls.window.on_cancel(), false)
+				helpers.assert_eq(fixture.records.requirement_settlements or 0, 0,
+					"the exact refused timer must remain registered")
+				retry_timer.behavior.stop = "success"
+				fixture.controls.fire(0.05)
+				helpers.assert_eq(fixture.records.requirement_settlements, 1,
+					"late exact settlement must release the revoked owner")
+			end)
+		end)
+	end
+
+	for _, dispatch in ipairs({"sync", "async"}) do
+		for _, terminal in ipairs({"success", "failure"}) do
+			helpers.it("HS-012 keeps " .. dispatch .. " server " .. terminal
+				.. " terminal joined through callback return", function()
+				local plan = {
+					requirement_lifecycle = true,
+					pause_in_terminal = terminal,
+					pid_alive = false,
+				}
+				if dispatch == "sync" then plan.server_sync = terminal end
+				with_fixture(plan, function(fixture)
+					helpers.assert_true(fixture.controls.pull())
+					launch_detached_download(fixture)
+					fixture.controls.finish_download(0)
+					if dispatch == "async" then
+						if terminal == "success" then
+							helpers.assert_true(fixture.controls.server_success())
+						else
+							helpers.assert_true(
+								fixture.controls.server_cancel("server_failed"))
+						end
+					end
+					helpers.assert_eq(fixture.records.reentrant_server_terminal_pause,
+						false,
+						"terminal PAUSE must wait for the complete server callback")
+					helpers.assert_eq(fixture.records.server_terminal_mutations, 1)
+					helpers.assert_eq(fixture.records.requirement_settlements, 1)
+					helpers.assert_true(fixture.controls.requirement_pause_join(),
+						"PAUSE may publish only after the callback mutation returns")
+				end)
+			end)
+		end
+	end
+
+	helpers.it("HS-012 joins a requirement PAUSE re-entered by synchronous tail completion",
+		function()
+			local plan = {
+				requirement_lifecycle = true,
+				pid_alive = false,
+				tail = {
+					complete_on_start = true,
+					pause_after_complete_on_start = true,
+					terminate = "false",
+				},
+			}
+			with_fixture(plan, function(fixture)
+				helpers.assert_true(fixture.controls.pull())
+				local launcher = fixture.controls.latest("launcher")
+				launcher:emit("__DLPID__:4242\n")
+				launcher:complete(0)
+				helpers.assert_eq(fixture.records.reentrant_requirement_pause, false)
+				assert_cancelled(fixture, "script_paused")
+				local poll_or_timeout = 0
+				for _, timer in ipairs(fixture.records.timers) do
+					if timer.delay == 3 or timer.delay == 30 then
+						poll_or_timeout = poll_or_timeout + 1
+					end
+				end
+				helpers.assert_eq(poll_or_timeout, 0,
+					"a revoked synchronous tail cannot arm poll or timeout successors")
+				fixture.controls.fire(0.25)
+				helpers.assert_eq(fixture.records.requirement_settlements, 1)
+			end)
+		end)
+
+	helpers.it("HS-012 retains a poll timer published before reentrant PAUSE", function()
+		local plan = {
+			requirement_lifecycle = true,
+			pid_alive = false,
+			tail = { terminate = "false" },
+			timer_by_delay = {
+				[3] = { pause_on_start = true, stop = "false" },
+			},
+		}
+		with_fixture(plan, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			local launcher = fixture.controls.latest("launcher")
+			launcher:emit("__DLPID__:4242\n")
+			launcher:complete(0)
+			helpers.assert_eq(fixture.records.reentrant_timer_pause, false)
+			assert_cancelled(fixture, "script_paused")
+			local poll
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 3 then poll = timer break end
+			end
+			helpers.assert_not_nil(poll)
+			helpers.assert_true(poll.live,
+				"the refused exact stop must retain the poll candidate")
+
+			poll.behavior.stop = "success"
+			helpers.assert_eq(fixture.controls.requirement_pause_join(), false,
+				"the tail still owns physical settlement after the timer joins")
+			helpers.assert_eq(poll.live, false)
+			fixture.controls.latest("tail"):complete(0)
+			helpers.assert_eq(fixture.records.requirement_settlements, 1)
+		end)
+	end)
+
 	for _, mode in ipairs({"false", "throw"}) do
 		helpers.it("HS-024 handles tail construction " .. mode .. " refusal", function()
 			with_fixture({real_switcher = true, tail = {construct = mode}}, function(fixture)
@@ -1002,6 +1848,223 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 			helpers.assert_eq(#fixture.records.completions, 1)
 			helpers.assert_eq(fixture.records.completions[1][1], false)
 			helpers.assert_nil(fixture.deps.active_tasks.download_tail)
+		end)
+	end)
+
+	helpers.it("HS-012 keeps RESUME parked when freshness re-enters PAUSE", function()
+		with_fixture({pid_alive = true}, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			helpers.assert_true(fixture.controls.pause_reattached_download())
+			fixture.controls.fire(3)
+			local nested_pause
+			helpers.assert_eq(fixture.obj.resume_reattached_download({
+				resume_is_current = function()
+					nested_pause = fixture.controls.pause_reattached_download()
+					return true
+				end,
+			}), false)
+			helpers.assert_eq(nested_pause, false,
+				"nested PAUSE must wait for the RESUME freshness callback")
+			local live_poll_timers = 0
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 3 and timer.live == true then
+					live_poll_timers = live_poll_timers + 1
+				end
+			end
+			helpers.assert_eq(live_poll_timers, 0,
+				"a PAUSE-fenced RESUME cannot rearm parked work")
+			helpers.assert_true(fixture.obj.resume_reattached_download({
+				resume_is_current = function() return true end,
+			}))
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 3 and timer.live == true then
+					live_poll_timers = live_poll_timers + 1
+				end
+			end
+			helpers.assert_eq(live_poll_timers, 1,
+				"a later clean RESUME must rearm exactly one parked poll")
+		end)
+	end)
+
+	helpers.it("HS-012 revalidates reattachment after a timer start re-enters PAUSE", function()
+		with_fixture({
+			pid_alive = true,
+			timer_by_delay = {
+				[3] = {{pause_reattach_on_start = true}, {}},
+			},
+		}, function(fixture)
+			helpers.assert_eq(fixture.controls.reattach(), false)
+			helpers.assert_eq(fixture.records.reentrant_reattach_pause, false,
+				"PAUSE cannot publish inside the exact poll-timer acquisition")
+			helpers.assert_nil(fixture.controls.latest("tail"),
+				"a paused reattach acquisition cannot start its tail successor")
+			helpers.assert_nil(fixture.controls.window,
+				"a paused reattach acquisition cannot publish its download window")
+			local live_poll_timers = 0
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 3 and timer.live == true then
+					live_poll_timers = live_poll_timers + 1
+				end
+			end
+			helpers.assert_eq(live_poll_timers, 0,
+				"the rejected acquisition cannot leave a live business successor")
+			helpers.assert_true(fixture.obj.has_reattached_download(),
+				"the exact parked reattach owner must remain retryable")
+			helpers.assert_true(fixture.controls.pause_reattached_download(),
+				"the same PAUSE must settle after acquisition unwinds")
+			helpers.assert_true(fixture.obj.resume_reattached_download())
+			local retried_poll_timers = 0
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 3 and timer.live == true then
+					retried_poll_timers = retried_poll_timers + 1
+				end
+			end
+			helpers.assert_eq(retried_poll_timers, 1,
+				"RESUME must retry exactly one parked poll capability")
+		end)
+	end)
+
+	helpers.it("HS-012 publishes the reattach callback before its PID probe", function()
+		with_fixture({
+			pid_alive = true,
+			pause_reattach_on_pid_probe = true,
+		}, function(fixture)
+			helpers.assert_eq(fixture.controls.reattach(), false)
+			helpers.assert_eq(fixture.records.reentrant_reattach_pid_pause, false,
+				"PAUSE cannot publish while the exact PID probe remains on-stack")
+			helpers.assert_eq(#fixture.records.timers, 0,
+				"the paused probe must fence its poll-timer successor")
+			helpers.assert_nil(fixture.controls.latest("tail"))
+			helpers.assert_nil(fixture.controls.window)
+			helpers.assert_true(fixture.obj.has_reattached_download(),
+				"the probe must retain the exact parked reattach owner")
+			helpers.assert_true(fixture.controls.pause_reattached_download(),
+				"retrying PAUSE after the probe unwinds must settle that owner")
+		end)
+	end)
+
+	helpers.it("HS-012 parks a poll whose exit probe re-enters PAUSE", function()
+		with_fixture({
+			pid_alive = true,
+			pause_reattach_on_exit_probe = 2,
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			local exact_tail = fixture.controls.latest("tail")
+			helpers.assert_type(exact_tail, "table")
+			fixture.controls.fire(3)
+			helpers.assert_eq(fixture.records.reentrant_reattach_probe_pause, false,
+				"PAUSE cannot publish from inside the poll callback")
+			local poll_timers = 0
+			local live_poll_timers = 0
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 3 then
+					poll_timers = poll_timers + 1
+					if timer.live == true then
+						live_poll_timers = live_poll_timers + 1
+					end
+				end
+			end
+			helpers.assert_eq(poll_timers, 1,
+				"the fenced probe must not construct a poll successor")
+			helpers.assert_eq(live_poll_timers, 0)
+			helpers.assert_eq(fixture.controls.latest("tail"), exact_tail,
+				"the parked monitor must retain its exact tail identity")
+			helpers.assert_true(fixture.controls.pause_reattached_download(),
+				"retrying the same PAUSE after callback unwind must settle")
+			helpers.assert_true(fixture.obj.resume_reattached_download())
+			local retried_poll_timers = 0
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 3 and timer.live == true then
+					retried_poll_timers = retried_poll_timers + 1
+				end
+			end
+			helpers.assert_eq(retried_poll_timers, 1,
+				"RESUME must restore exactly the deferred poll successor")
+		end)
+	end)
+
+	helpers.it("HS-012 withholds PAUSED while the reattached tail starts", function()
+		with_fixture({
+			pid_alive = true,
+			tail = {pause_reattach_on_start = true},
+		}, function(fixture)
+			helpers.assert_eq(fixture.controls.reattach(), false)
+			helpers.assert_eq(fixture.records.reentrant_reattach_tail_pause, false,
+				"PAUSE cannot publish while the exact tail start remains on-stack")
+			local exact_tail = fixture.controls.latest("tail")
+			helpers.assert_type(exact_tail, "table")
+			helpers.assert_eq(fixture.deps.active_tasks.download_tail, exact_tail)
+			helpers.assert_true(fixture.controls.pause_reattached_download(),
+				"the same tail owner must settle after start unwinds")
+			helpers.assert_true(fixture.obj.resume_reattached_download())
+			helpers.assert_eq(fixture.controls.latest("tail"), exact_tail,
+				"RESUME must retain the exact already-started tail")
+		end)
+	end)
+
+	helpers.it("HS-012 retries the exact tail-completion timer after nested PAUSE", function()
+		with_fixture({
+			pid_alive = true,
+			timer_by_delay = {
+				[0.5] = {{pause_reattach_on_start = true}, {}},
+			},
+		}, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			local exact_tail = fixture.controls.latest("tail")
+			helpers.assert_type(exact_tail, "table")
+			helpers.assert_true(exact_tail:complete(0))
+			helpers.assert_eq(fixture.records.reentrant_reattach_pause, false,
+				"PAUSE cannot publish inside the tail-completion timer acquisition")
+			local live_tail_done = 0
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 0.5 and timer.live == true then
+					live_tail_done = live_tail_done + 1
+				end
+			end
+			helpers.assert_eq(live_tail_done, 0,
+				"the fenced acquisition cannot leave a live tail successor")
+			helpers.assert_true(fixture.controls.pause_reattached_download(),
+				"the same tail callback owner must settle after unwind")
+			helpers.assert_true(fixture.obj.resume_reattached_download())
+			for _, timer in ipairs(fixture.records.timers) do
+				if timer.delay == 0.5 and timer.live == true then
+					live_tail_done = live_tail_done + 1
+				end
+			end
+			helpers.assert_eq(live_tail_done, 1,
+				"RESUME must restore exactly the parked tail-completion capability")
+		end)
+	end)
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("HS-024 reattach tail " .. mode
+			.. " refusal discards synchronous stream", function()
+			with_fixture({pid_alive = true, tail = {
+				start = mode,
+				stream_on_start = "__BYTES__:99\n",
+				mutate_on_start = true,
+			}}, function(fixture)
+				helpers.assert_true(fixture.controls.reattach())
+				helpers.assert_eq(#fixture.records.updates, 0)
+				local tail = fixture.controls.latest("tail")
+				tail:emit("__BYTES__:100\n")
+				helpers.assert_eq(#fixture.records.updates, 0,
+					"late refused reattach stream must remain inert")
+			end)
+		end)
+	end
+
+	helpers.it("HS-024 replays a committed reattach stream once", function()
+		with_fixture({pid_alive = true, tail = {
+			stream_on_start = "__BYTES__:99\n",
+		}}, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			helpers.assert_eq(#fixture.records.updates, 1)
+			local tail = fixture.controls.latest("tail")
+			tail:complete(0)
+			tail:emit("__BYTES__:100\n")
+			helpers.assert_eq(#fixture.records.updates, 1,
+				"terminal reattach tail must fence late stream")
 		end)
 	end)
 

@@ -38,14 +38,14 @@ helpers.describe("gestures disable_all releases scroll-block and click-lock (F-M
 	helpers.it("M.disable_all() calls Engine.unblock_scroll AND Actions.force_cleanup", function()
 		local calls = { unblock = 0, cleanup = 0 }
 		package.loaded["modules.gestures.engine"] = permissive({
-			unblock_scroll = function() calls.unblock = calls.unblock + 1 end,
+			unblock_scroll = function() calls.unblock = calls.unblock + 1; return true end,
 		})
 		package.loaded["modules.gestures.actions"] = permissive({
-			force_cleanup = function() calls.cleanup = calls.cleanup + 1 end,
+			force_cleanup = function() calls.cleanup = calls.cleanup + 1; return true end,
 		})
 
 		local Gestures = helpers.load_with_stubs("modules.gestures")
-		Gestures.disable_all()
+		helpers.assert_eq(Gestures.disable_all(), true)
 		-- The regression: both were 0 because disable_all only flipped the boolean.
 		helpers.assert_eq(calls.unblock, 1)
 		helpers.assert_eq(calls.cleanup, 1)
@@ -56,19 +56,21 @@ helpers.describe("gestures disable_all releases scroll-block and click-lock (F-M
 		package.loaded["modules.gestures"]         = nil
 	end)
 
-	helpers.it("M.enable_all() does NOT trigger cleanup (only disable needs to release a held lock)", function()
-		local calls = { unblock = 0, cleanup = 0 }
+	helpers.it("M.enable_all() reopens action admission without repeating cleanup", function()
+		local calls = { unblock = 0, cleanup = 0, resume = 0 }
 		package.loaded["modules.gestures.engine"] = permissive({
-			unblock_scroll = function() calls.unblock = calls.unblock + 1 end,
+			unblock_scroll = function() calls.unblock = calls.unblock + 1; return true end,
 		})
 		package.loaded["modules.gestures.actions"] = permissive({
-			force_cleanup = function() calls.cleanup = calls.cleanup + 1 end,
+			force_cleanup = function() calls.cleanup = calls.cleanup + 1; return true end,
+			resume_after_cleanup = function() calls.resume = calls.resume + 1; return true end,
 		})
 
 		local Gestures = helpers.load_with_stubs("modules.gestures")
-		Gestures.enable_all()
+		helpers.assert_eq(Gestures.enable_all(), true)
 		helpers.assert_eq(calls.unblock, 0)
 		helpers.assert_eq(calls.cleanup, 0)
+		helpers.assert_eq(calls.resume, 1)
 		helpers.assert_eq(Gestures.is_enabled(), true)
 
 		package.loaded["modules.gestures.engine"]  = nil
@@ -79,14 +81,14 @@ helpers.describe("gestures disable_all releases scroll-block and click-lock (F-M
 	helpers.it("M.disable(\"all\") (the legacy name-based entry point) also releases the click-lock", function()
 		local calls = { unblock = 0, cleanup = 0 }
 		package.loaded["modules.gestures.engine"] = permissive({
-			unblock_scroll = function() calls.unblock = calls.unblock + 1 end,
+			unblock_scroll = function() calls.unblock = calls.unblock + 1; return true end,
 		})
 		package.loaded["modules.gestures.actions"] = permissive({
-			force_cleanup = function() calls.cleanup = calls.cleanup + 1 end,
+			force_cleanup = function() calls.cleanup = calls.cleanup + 1; return true end,
 		})
 
 		local Gestures = helpers.load_with_stubs("modules.gestures")
-		Gestures.disable("all")
+		helpers.assert_eq(Gestures.disable("all"), true)
 		helpers.assert_eq(calls.unblock, 1)
 		helpers.assert_eq(calls.cleanup, 1)
 		helpers.assert_eq(Gestures.is_enabled(), false)
@@ -94,6 +96,53 @@ helpers.describe("gestures disable_all releases scroll-block and click-lock (F-M
 		package.loaded["modules.gestures.engine"]  = nil
 		package.loaded["modules.gestures.actions"] = nil
 		package.loaded["modules.gestures"]         = nil
+	end)
+
+	helpers.it("M.enable(\"all\") propagates enable_all refusal and preserves disabled state", function()
+		local resume_allowed = true
+		package.loaded["modules.gestures.engine"] = permissive({
+			unblock_scroll = function() return true end,
+		})
+		package.loaded["modules.gestures.actions"] = permissive({
+			force_cleanup = function() return true end,
+			resume_after_cleanup = function() return resume_allowed end,
+		})
+
+		local Gestures = helpers.load_with_stubs("modules.gestures")
+		helpers.assert_eq(Gestures.disable_all(), true)
+		helpers.assert_eq(Gestures.is_enabled(), false)
+		resume_allowed = false
+		helpers.assert_eq(Gestures.enable("all"), false,
+			"the legacy wrapper must propagate the exact lifecycle refusal")
+		helpers.assert_eq(Gestures.is_enabled(), false,
+			"a refused enable must not bypass Actions resume ownership")
+
+		package.loaded["modules.gestures.engine"] = nil
+		package.loaded["modules.gestures.actions"] = nil
+		package.loaded["modules.gestures"] = nil
+	end)
+
+	helpers.it("M.disable(\"all\") propagates disable_all refusal and preserves enabled state", function()
+		package.loaded["modules.gestures.engine"] = permissive({
+			unblock_scroll = function() return false end,
+		})
+		package.loaded["modules.gestures.actions"] = permissive({
+			force_cleanup = function() return true end,
+			resume_after_cleanup = function() return true end,
+		})
+
+		local Gestures = helpers.load_with_stubs("modules.gestures")
+		helpers.assert_eq(Gestures.enable_all(), true)
+		helpers.assert_eq(Gestures.disable("all"), false,
+			"the legacy wrapper must return the exact cleanup refusal")
+		helpers.assert_eq(Gestures.is_enabled(), true,
+			"a refused disable must not publish the feature as disabled")
+		helpers.assert_eq(Gestures.enable("unknown"), false)
+		helpers.assert_eq(Gestures.disable("unknown"), false)
+
+		package.loaded["modules.gestures.engine"] = nil
+		package.loaded["modules.gestures.actions"] = nil
+		package.loaded["modules.gestures"] = nil
 	end)
 
 	helpers.it("source: M.disable_all reaches Engine.unblock_scroll and Actions.force_cleanup", function()

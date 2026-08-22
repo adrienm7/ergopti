@@ -1702,6 +1702,21 @@ function M.begin_batch(tx, token)
 end
 
 
+--- Discards one batch that could not be constructed before dispatch.
+--- This is deliberately narrower than cancel(tx): a retained transaction may
+--- already have published a prefix and still need to build an exact cleanup
+--- sibling. The building batch is terminalized without cancelling that sibling.
+--- @param batch table Building batch returned by begin_batch().
+--- @return boolean discarded True only for the first building-state discard.
+function M.discard_batch(batch)
+	batch = require_batch(batch)
+	if batch.status ~= "building" then return false end
+	discard_batch_records(batch)
+	finish_batch(batch, "cancelled")
+	return true
+end
+
+
 --- Appends one key-down/key-up pair.
 --- @param batch table Batch.
 --- @param modifiers table Modifier names.

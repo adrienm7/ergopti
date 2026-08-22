@@ -33,6 +33,7 @@ local function with_subject(options, scenario)
 		notifications = {},
 		errors = {},
 		role_counts = {directory = 0, capture = 0},
+		notify_hook = nil,
 	}
 	local modes = options or {}
 
@@ -60,6 +61,7 @@ local function with_subject(options, scenario)
 	}
 	package.loaded["infra.notifications"] = {
 		notify = function(message, body, kind)
+			if type(fixture.notify_hook) == "function" then fixture.notify_hook() end
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,
 				body = body,
@@ -82,12 +84,14 @@ local function with_subject(options, scenario)
 				role = role,
 				executable = executable,
 				args = args,
-				on_done = on_done,
 				started = false,
 			}
 			fixture.tasks[#fixture.tasks + 1] = record
-			return {
-				start = function()
+			local handle = {
+				settled = false,
+				observers = {},
+			}
+			function handle.start()
 					local start_mode = modes[role .. "_start"]
 					if type(start_mode) == "table" then start_mode = start_mode[ordinal] end
 					if start_mode == "throw" then error("injected " .. role .. " start failure") end
@@ -95,8 +99,32 @@ local function with_subject(options, scenario)
 					if start_mode == "nil" then return nil end
 					record.started = true
 					return true
-				end,
-			}
+			end
+			function handle.isSettled() return handle.settled end
+			function handle.onSettled(observer)
+				if handle.settled then observer()
+				else handle.observers[#handle.observers + 1] = observer end
+				return true
+			end
+			function handle.terminate()
+				if handle.settled then return true, "settled" end
+				handle.settled = true
+				local observers = handle.observers
+				handle.observers = {}
+				for _, observer in ipairs(observers) do observer() end
+				return true, "settled"
+			end
+			function record.on_done(...)
+				local first = handle.settled ~= true
+				handle.settled = true
+				on_done(...)
+				if first then
+					local observers = handle.observers
+					handle.observers = {}
+					for _, observer in ipairs(observers) do observer() end
+				end
+			end
+			return handle
 		end,
 	}
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
@@ -222,6 +250,30 @@ helpers.describe("shared screenshot save transaction (HS-015)", function()
 			tasks_for(fixture, "directory")[1].on_done(0, "", "")
 			tasks_for(fixture, "capture")[1].on_done(1, "", "capture refused")
 			assert_one_failure(fixture)
+		end)
+	end)
+
+	helpers.it("keeps success notification visible to re-entrant parent PAUSE", function()
+		with_subject({}, function(subject, fixture)
+			local nested_pause = nil
+			helpers.assert_eq(subject.save({}, "full", "gestures"), true)
+			tasks_for(fixture, "directory")[1].on_done(0, "", "")
+			fixture.notify_hook = function()
+				fixture.notify_hook = nil
+				nested_pause = subject.pause_screenshot_actions("gestures")
+			end
+			tasks_for(fixture, "capture")[1].on_done(0, "", "")
+			helpers.assert_eq(nested_pause, false,
+				"PAUSE cannot settle before the terminal business callback returns")
+			helpers.assert_eq(#fixture.notifications, 1)
+			helpers.assert_eq(fixture.notifications[1].kind, "success")
+			helpers.assert_eq(
+				subject.has_screenshot_pause_claim("gestures"), true)
+			helpers.assert_eq(
+				subject.has_pending_screenshot_action("gestures"), false)
+			helpers.assert_eq(
+				subject.pause_screenshot_actions("shortcut_bindings"), true)
+			helpers.assert_eq(subject.pause_screenshot_actions("gestures"), true)
 		end)
 	end)
 

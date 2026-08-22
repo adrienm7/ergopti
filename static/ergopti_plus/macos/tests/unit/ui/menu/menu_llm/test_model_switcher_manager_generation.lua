@@ -174,6 +174,7 @@ helpers.describe("model manager generation fences", function()
 				keymap = {
 					set_llm_enabled = function(enabled)
 						prediction_states[#prediction_states + 1] = enabled
+						return true
 					end,
 					set_llm_model = function() end,
 					set_llm_display_model_name = function() end,
@@ -241,6 +242,7 @@ helpers.describe("model manager generation fences", function()
 				keymap = {
 					set_llm_enabled = function(enabled)
 						prediction_states[#prediction_states + 1] = enabled
+						return true
 					end,
 					set_llm_model = function() end,
 					set_llm_display_model_name = function() end,
@@ -301,6 +303,7 @@ helpers.describe("model manager generation fences", function()
 				keymap = {
 					set_llm_enabled = function(enabled)
 						prediction_states[#prediction_states + 1] = enabled
+						return true
 					end,
 					set_llm_model = function() end,
 					set_llm_display_model_name = function() end,
@@ -321,6 +324,7 @@ helpers.describe("model manager generation fences", function()
 			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.text_utils",
 			"modules.llm", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"adapters.shell_runner", "adapters.task_lifecycle", "adapters.timer_scheduler",
+			"adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
 			"infra.dialog_util", "ui.download_window",
 			"ui.menu.menu_llm.profile_label", "ui.menu.menu_llm.model_switcher",
 			"ui.menu.menu_llm.models_manager_ollama",
@@ -364,6 +368,39 @@ helpers.describe("model manager generation fences", function()
 			package.loaded["adapters.timer_scheduler"] = {
 				after = function() error("healthy readiness must not schedule a retry") end,
 				cancel = function() return true end,
+			}
+			package.loaded["adapters.http_client"] = {
+				new = function()
+					local client = { settled = false, observers = {} }
+					function client.post(_, _, _, done)
+						load_callbacks[#load_callbacks + 1] = function(status, body, headers)
+							local result = done({ status = status, body = body, headers = headers })
+							if client.settled ~= true then
+								client.settled = true
+								local observers = client.observers
+								client.observers = {}
+								for _, observer in ipairs(observers) do observer() end
+							end
+							return result
+						end
+						return true
+					end
+					function client.cancel()
+						if client.settled ~= true then
+							client.settled = true
+							local observers = client.observers
+							client.observers = {}
+							for _, observer in ipairs(observers) do observer() end
+						end
+						return true
+					end
+					function client.onSettled(observer)
+						if client.settled then observer()
+						else client.observers[#client.observers + 1] = observer end
+						return true
+					end
+					return client
+				end,
 			}
 			package.loaded["adapters.task_lifecycle"] = {
 				native = function(label, _, on_done)
@@ -419,6 +456,7 @@ helpers.describe("model manager generation fences", function()
 				keymap = {
 					set_llm_enabled = function(enabled)
 						prediction_states[#prediction_states + 1] = enabled
+						return true
 					end,
 					set_llm_model = function(model)
 						runtime_models[#runtime_models + 1] = model
@@ -496,7 +534,8 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.dialog_util", "infra.paths",
+			"hs", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
+			"infra.dialog_util", "infra.paths",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -511,9 +550,24 @@ helpers.describe("model manager generation fences", function()
 			json = {decode = function()
 				return {{families = {{models = {{name = "A", urls = {ollama = "A"}}}}}}}
 			end},
-			timer = {doAfter = function(_, callback)
-				timers[#timers + 1] = callback
-				return {stop = function() end}
+			timer = {new = function(delay, callback)
+				local timer = {
+					delay = delay,
+					callback = callback,
+					_running = false,
+				}
+				function timer:start()
+					self._running = true
+					return self
+				end
+				function timer:stop()
+					self._running = false
+					return self
+				end
+				function timer:running() return self._running end
+				function timer:fire() self.callback() end
+				timers[#timers + 1] = timer
+				return timer
 			end},
 		}
 		with_fixture(modules, hs_fixture, function()
@@ -536,14 +590,29 @@ helpers.describe("model manager generation fences", function()
 			local deps = {update_icon = function() end, reset_menubar = function() end}
 			require("ui.menu.menu_llm.models_manager").new(deps)
 			local current = true
+			local children = {}
+			local lifecycle = {
+				adopt = function(child, pause_join)
+					children[child] = pause_join
+					return true
+				end,
+				settle = function(child)
+					if children[child] == nil then return false end
+					children[child] = nil
+					return true
+				end,
+			}
 			deps.shared_system_check("A", "Ollama", "A",
 				function() downloads = downloads + 1; return true end,
 				function() cancellations = cancellations + 1 end,
-				{is_current = function() return current end})
+				{
+					is_current = function() return current end,
+					_requirement_lifecycle = lifecycle,
+				})
 			helpers.assert_eq(#timers, 1)
 			current = false
-			timers[1]()
-			timers[1]()
+			timers[1]:fire()
+			timers[1]:fire()
 
 			helpers.assert_eq(prompts, 0,
 				"a stale delayed system check must not show a modal prompt")
@@ -553,6 +622,8 @@ helpers.describe("model manager generation fences", function()
 				"a stale delayed system check must not steal application focus")
 			helpers.assert_eq(cancellations, 1,
 				"the discarded prompt continuation must invoke its stale callback once")
+			helpers.assert_nil(next(children),
+				"the stale prompt timer must release its exact requirement owner")
 		end)
 	end)
 
@@ -572,7 +643,7 @@ helpers.describe("model manager generation fences", function()
 			install_common_stubs()
 			package.loaded["modules.llm.api_mlx"] = {
 				get_port = function() return 8080 end,
-				reset_endpoints = function() end,
+				reset_endpoints = function() return true end,
 				set_model_hf_path = function() end,
 				set_active_server_pgid = function() end,
 				mark_load_failed = function() end,
@@ -641,7 +712,7 @@ helpers.describe("model manager generation fences", function()
 			install_common_stubs()
 			package.loaded["modules.llm.api_mlx"] = {
 				get_port = function() return 8080 end,
-				reset_endpoints = function() end,
+				reset_endpoints = function() return true end,
 				set_model_hf_path = function() end,
 				set_active_server_pgid = function() end,
 				mark_load_failed = function() end,

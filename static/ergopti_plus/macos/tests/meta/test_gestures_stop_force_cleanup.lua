@@ -13,9 +13,10 @@
 --- never called Actions.force_cleanup(). The user was then unable to click
 --- normally until a physical button press released the stuck state.
 ---
---- The fix adds an `xpcall(Actions.force_cleanup, debug.traceback)` at the top of M.stop(), before
---- CoreState.enabled is set to false, so any held synthetic clicks are released
---- while the module is still logically running.
+--- M.stop() now delegates to the shared exact teardown transaction.  That
+--- transaction must call Actions.force_cleanup through xpcall before it lowers
+--- CoreState.enabled, so held synthetic clicks are released while the module is
+--- still logically running without duplicating the teardown sequence.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -38,6 +39,14 @@ local function func_body(src, func_def)
 	return rest
 end
 
+local function segment_between(src, start_marker, end_marker)
+	local start_idx = src:find(start_marker, 1, true)
+	if not start_idx then return "" end
+	local end_idx = src:find(end_marker, start_idx + #start_marker, true)
+	if not end_idx then return "" end
+	return src:sub(start_idx, end_idx - 1)
+end
+
 
 
 
@@ -50,24 +59,29 @@ end
 
 helpers.describe("gestures/init.lua: M.stop() releases held clicks (gesture-stuck-click-on-stop)", function()
 
-	helpers.it("M.stop() body contains a traceback-preserving force_cleanup call", function()
+	helpers.it("M.stop() delegates to the exact runtime teardown", function()
 		local src  = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
 		local body = func_body(src, "function M.stop()")
 		helpers.assert_true(body ~= "",
 			"M.stop() must exist in modules/gestures/init.lua")
 		helpers.assert_true(
-			body:match("xpcall%(Actions%.force_cleanup,%s*debug%.traceback%)") ~= nil,
-			"M.stop() must xpcall Actions.force_cleanup with a traceback to release held clicks visibly (gesture-stuck-click-on-stop)")
+			body:find("teardown_gesture_runtime(false)", 1, true) ~= nil,
+			"M.stop() must route through the shared exact teardown transaction")
 	end)
 
-	helpers.it("force_cleanup call precedes CoreState.enabled = false", function()
+	helpers.it("shared teardown releases held clicks before disabling gestures", function()
 		local src  = read_source("local function schedule_emergency_recycle") -- modules/gestures/init.lua
-		local body = func_body(src, "function M.stop()")
-		local cleanup_pos = body:find("xpcall%(Actions%.force_cleanup,%s*debug%.traceback%)")
+		local body = segment_between(src,
+			"teardown_gesture_runtime = function",
+			"local function reject_gesture_start")
+		helpers.assert_true(body ~= "",
+			"the shared gesture teardown transaction must remain discoverable")
+		local cleanup_pos = body:find(
+			"Actions%.force_cleanup,%s*debug%.traceback,%s*GESTURE_ACTION_PARENT")
 		local enabled_pos = body:find("CoreState%.enabled%s*=%s*false")
 		helpers.assert_true(
 			cleanup_pos ~= nil and enabled_pos ~= nil and cleanup_pos < enabled_pos,
-			"force_cleanup must appear BEFORE CoreState.enabled = false in M.stop() so clicks are released while the module is still running (gesture-stuck-click-on-stop)")
+			"the exact teardown must release held clicks before lowering CoreState.enabled")
 	end)
 
 end)

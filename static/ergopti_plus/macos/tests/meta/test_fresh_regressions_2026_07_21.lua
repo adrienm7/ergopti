@@ -134,15 +134,19 @@ helpers.describe("models_manager_mlx: every hs.task is GC-pinned", function()
 
 	helpers.it("the probe releases its pin so the root does not grow forever", function()
 		local src = helpers.read_driver_source("check_requirements")
-		local at = src:find("check_task = TaskLifecycle.native", 1, true)
-		helpers.assert_true(at ~= nil,
-			"check_task must be forward-declared and then assigned, so its own callback can "
-				.. "reference it to release the pin")
+		local helper_at = src:find("local function release_requirement_task", 1, true)
+		local callback_at = src:find("local function complete_requirement_task", 1, true)
+		helpers.assert_true(helper_at ~= nil and callback_at ~= nil,
+			"the exact task owner and its completion callback must both be explicit")
 
-		local body = src:sub(at, at + 600)
-		helpers.assert_true(body:find("_active_tasks%[check_task%] = nil") ~= nil,
-			"the callback must release the pin as its first act, exactly as the sibling delete_task "
-				.. "does — otherwise every probe leaks an entry into the GC root for the session")
+		local helper = src:sub(helper_at, helper_at + 500)
+		helpers.assert_true(helper:find("M._active_tasks%[task%] = nil") ~= nil,
+			"the shared terminal helper must release the exact GC pin")
+		local callback = src:sub(callback_at, callback_at + 900)
+		local release_at = callback:find("release_requirement_task(task_owner)", 1, true)
+		local business_at = callback:find("handle_requirement_completion", 1, true)
+		helpers.assert_true(release_at ~= nil and business_at ~= nil and release_at < business_at,
+			"the callback must release its exact pin before authorized business continuation")
 	end)
 end)
 

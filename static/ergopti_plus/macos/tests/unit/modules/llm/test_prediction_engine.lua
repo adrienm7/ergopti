@@ -58,9 +58,10 @@ package.loaded["modules.llm"] = {
 	},
 	get_current_model       = function() return "llama3" end,
 	get_backend             = function() return "ollama" end,
-	set_llm_model_mlx       = function(_) end,
-	set_llm_model_ollama    = function(_) end,
-	set_runtime_llm_enabled = function(_) end,
+	set_llm_model_mlx       = function(_) return true end,
+	set_llm_model_ollama    = function(_) return true end,
+	pause_deferred_profile_warmup = function() return true end,
+	set_runtime_llm_enabled = function(_) return true end,
 	set_llm_streaming       = function(_) end,
 	cancel_streaming        = function() return true end,
 	-- Dispatch-path surface (exercised by the perform_check regression in §8).
@@ -71,20 +72,45 @@ package.loaded["modules.llm"] = {
 
 -- Stub WarmupController — used as a module singleton, not instantiated.
 package.loaded["modules.llm.warmup_controller"] = {
-	schedule_warmup_with_retry = function(_reason) end,
+	schedule_warmup_with_retry = function(_reason) return true end,
 	init                       = function(_cfg) return true end,
 	start                      = function() end,
-	stop                       = function() end,
+	stop                       = function() return true end,
+}
+package.loaded["modules.llm.api_mlx"] = {
+	resume_warmup = function() return true end,
+	stop_warmup = function() return true end,
+}
+package.loaded["modules.llm.api_ollama"] = {
+	stop_warmup = function() return true end,
+}
+package.loaded["modules.llm.api_remote"] = {
+	stop_warmup = function() return true end,
 }
 
 local runtime_llm_enabled_calls = {}
 package.loaded["modules.llm"].set_runtime_llm_enabled = function(enabled)
 	runtime_llm_enabled_calls[#runtime_llm_enabled_calls + 1] = enabled
+	return true
 end
 
 local warmup_schedule_reasons = {}
 package.loaded["modules.llm.warmup_controller"].schedule_warmup_with_retry = function(reason)
 	warmup_schedule_reasons[#warmup_schedule_reasons + 1] = reason
+	return true
+end
+
+--- Reads one named production upvalue for identity assertions.
+--- @param fn function Closure carrying the state.
+--- @param target string Upvalue name.
+--- @return any value
+local function read_upvalue(fn, target)
+	for index = 1, 80 do
+		local name, value = debug.getupvalue(fn, index)
+		if name == nil then break end
+		if name == target then return value end
+	end
+	return nil
 end
 
 -- Stub PromptBuilder — build() (the real export shape) is called inside
@@ -338,11 +364,11 @@ helpers.describe("prediction_engine — configuration setters", function()
 	helpers.it("set_llm_enabled accepts boolean", function()
 		runtime_llm_enabled_calls = {}
 		warmup_schedule_reasons = {}
-		PE.set_llm_enabled(true)
+		helpers.assert_true(PE.set_llm_enabled(true))
 		helpers.assert_eq(PE.get_llm_enabled(), true)
 		helpers.assert_eq(runtime_llm_enabled_calls[#runtime_llm_enabled_calls], true)
 		helpers.assert_eq(warmup_schedule_reasons[#warmup_schedule_reasons], "set_llm_enabled")
-		PE.set_llm_enabled(false)
+		helpers.assert_true(PE.set_llm_enabled(false))
 		helpers.assert_eq(PE.get_llm_enabled(), false)
 		helpers.assert_eq(runtime_llm_enabled_calls[#runtime_llm_enabled_calls], false)
 	end)
@@ -354,6 +380,125 @@ helpers.describe("prediction_engine — configuration setters", function()
 	helpers.it("set_llm_num_predictions does not throw", function()
 		PE.set_llm_num_predictions(5)
 	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("does not publish or warm a model after core " .. mode,
+			function()
+				local core = package.loaded["modules.llm"]
+				local original_setter = core.set_llm_model_ollama
+				core.set_llm_model_ollama = function()
+					if mode == "throw" then error("core model refusal") end
+					if mode == "false" then return false end
+					return nil
+				end
+				helpers.assert_true(PE.set_llm_enabled(true))
+				warmup_schedule_reasons = {}
+				helpers.assert_eq(PE.set_llm_model("refused-model"), false)
+				helpers.assert_eq(warmup_schedule_reasons, {},
+					"a refused core identity must not acquire a warmup successor")
+
+				core.set_llm_model_ollama = function() return true end
+				helpers.assert_true(PE.set_llm_model("refused-model"))
+				helpers.assert_eq(warmup_schedule_reasons, { "set_llm_model" })
+				core.set_llm_model_ollama = original_setter
+				helpers.assert_true(PE.set_llm_enabled(false))
+		end)
+	end
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("propagates model warmup " .. mode .. " until an exact retry",
+			function()
+				local warmup = package.loaded["modules.llm.warmup_controller"]
+				local original_schedule = warmup.schedule_warmup_with_retry
+				helpers.assert_true(PE.set_llm_enabled(true))
+				local schedule_calls = 0
+				warmup.schedule_warmup_with_retry = function()
+					schedule_calls = schedule_calls + 1
+					if mode == "throw" then error("warmup scheduling refusal") end
+					if mode == "false" then return false end
+					return nil
+				end
+				local model = "warmup-refusal-" .. mode
+				local test_ok, test_error = xpcall(function()
+					helpers.assert_eq(PE.set_llm_model(model), false,
+						"a retained warmup owner cannot be acknowledged as committed")
+					helpers.assert_eq(schedule_calls, 1)
+
+					warmup.schedule_warmup_with_retry = function()
+						schedule_calls = schedule_calls + 1
+						return true
+					end
+					helpers.assert_true(PE.set_llm_model(model),
+						"reasserting the same model must retry its warmup acquisition")
+					helpers.assert_eq(schedule_calls, 2)
+				end, debug.traceback)
+
+				warmup.schedule_warmup_with_retry = original_schedule
+				PE.set_llm_enabled(false)
+				if not test_ok then error(test_error, 0) end
+			end)
+	end
+
+	for _, boundary in ipairs({ "reset", "backend", "core", "warmup" }) do
+		helpers.it("preserves a nested model successor across reentrant " .. boundary,
+			function()
+				local core = package.loaded["modules.llm"]
+				local warmup = package.loaded["modules.llm.warmup_controller"]
+				local original_reset = PE.reset
+				local original_backend = core.get_backend
+				local original_setter = core.set_llm_model_ollama
+				local original_schedule = warmup.schedule_warmup_with_retry
+				local reenter = true
+				local nested_result = nil
+				local nested_model = "nested-" .. boundary
+
+				local function run_nested_once()
+					if not reenter then return end
+					reenter = false
+					nested_result = PE.set_llm_model(nested_model)
+				end
+
+				helpers.assert_true(PE.set_llm_enabled(boundary == "warmup"))
+				if boundary == "reset" then
+					PE.reset = function(...)
+						run_nested_once()
+						if reenter then return true end
+						return original_reset(...)
+					end
+				elseif boundary == "backend" then
+					core.get_backend = function()
+						run_nested_once()
+						return "ollama"
+					end
+				elseif boundary == "core" then
+					core.set_llm_model_ollama = function()
+						run_nested_once()
+						return true
+					end
+				else
+					warmup.schedule_warmup_with_retry = function()
+						run_nested_once()
+						return true
+					end
+				end
+
+				local test_ok, test_error = xpcall(function()
+					helpers.assert_eq(PE.set_llm_model("outer-" .. boundary), false,
+						"a stale outer model transition cannot report committed")
+					helpers.assert_true(nested_result)
+					helpers.assert_eq(read_upvalue(PE.set_llm_model, "active_model"), nested_model,
+						"the nested model successor must remain authoritative")
+				end, debug.traceback)
+
+				PE.reset = original_reset
+				core.get_backend = original_backend
+				core.set_llm_model_ollama = original_setter
+				warmup.schedule_warmup_with_retry = original_schedule
+				PE.set_llm_enabled(false)
+				PE.set_llm_model("llama3")
+				if not test_ok then error(test_error, 0) end
+			end)
+	end
 
 	-- F-M10: a wrong-typed config.toml / plist value (e.g. max_words = "five")
 	-- reached `<=`/`>` in the prompt_builder and `> 0` in the menu, crashing both.
@@ -436,24 +581,19 @@ helpers.describe("prediction_engine — configuration setters", function()
 
 	helpers.it("real bridge propagates the real engine debounce refusal and throw", function()
 		local bridge = load_real_setting_bridge()
-		local inactivity_timer = nil
-		for _, timer in ipairs(hs.timer.__timers) do
-			if type(timer.setDelay) == "function" then inactivity_timer = timer end
-		end
-		helpers.assert_true(inactivity_timer ~= nil,
-			"the production engine must own its canonical delayed timer")
+		helpers.assert_true(PE.set_llm_enabled(true))
+		helpers.assert_true(PE.start_timer())
+		local inactivity_timer = hs.timer.__timers[#hs.timer.__timers]
+		helpers.assert_true(inactivity_timer ~= nil and inactivity_timer.running == true,
+			"the production engine must own one exact scheduled debounce timer")
 
 		local old_found, old_debounce = PE.get_llm_runtime_setting("llm_debounce")
 		helpers.assert_eq(old_found, true)
 		local original_stop = inactivity_timer.stop
-		local original_running = inactivity_timer.running
-		inactivity_timer.running = true
-		inactivity_timer.stop = function(self) return self end
+		inactivity_timer.stop = function() return false end
 		local call_ok, refused = pcall(bridge.set_llm_debounce, 0.73)
 		inactivity_timer.stop = original_stop
-		inactivity_timer.running = false
 		local restored = PE.set_llm_debounce(old_debounce)
-		inactivity_timer.running = original_running
 		helpers.assert_true(call_ok)
 		helpers.assert_eq(refused, false,
 			"the bridge must expose the engine timer's exact false refusal")
@@ -466,9 +606,10 @@ helpers.describe("prediction_engine — configuration setters", function()
 		helpers.assert_eq(throw_ok, false)
 		helpers.assert_true(tostring(throw_error):find(
 			"real engine boundary exploded", 1, true) ~= nil)
+		helpers.assert_true(PE.set_llm_enabled(false))
 	end)
 
-	helpers.it("set_llm_debounce recreates the timer without throwing", function()
+	helpers.it("set_llm_debounce updates the next one-shot without throwing", function()
 		PE.set_llm_debounce(0.5)
 	end)
 
@@ -670,12 +811,34 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 		local previous_build = streaming.build_callbacks
 		local previous_log = keylogger.log_llm_dismissed
 		local previous_after = scheduler.after
+		local previous_cancel = scheduler.cancel
+		local previous_on_settled = scheduler.onSettled
 		local scheduled = {}
 		local dismissal_calls = 0
 
 		scheduler.after = function(_, callback)
-			scheduled[#scheduled + 1] = callback
-			return { timer = {}, fired = false }
+			local handle = { timer = {}, fired = false, observers = {} }
+			scheduled[#scheduled + 1] = function()
+				if handle.fired then return end
+				handle.fired = true
+				handle.timer = nil
+				for _, observer in ipairs(handle.observers) do observer() end
+				handle.observers = {}
+				callback()
+			end
+			return handle, true
+		end
+		scheduler.cancel = function(handle)
+			if handle.timer == nil then return true end
+			handle.timer = nil
+			for _, observer in ipairs(handle.observers) do observer() end
+			handle.observers = {}
+			return true
+		end
+		scheduler.onSettled = function(handle, observer)
+			if handle.timer == nil then observer(); return true end
+			handle.observers[#handle.observers + 1] = observer
+			return true
 		end
 		keylogger.log_llm_dismissed = function()
 			dismissal_calls = dismissal_calls + 1
@@ -703,6 +866,15 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 			PE.perform_check(true)
 			helpers.assert_true(PE.is_visible())
 
+			PE.reset({ suppress_telemetry = true })
+			helpers.assert_true(not PE.is_visible())
+			helpers.assert_eq(#scheduled, 0,
+				"a global pause reset may not acquire a deferred telemetry capability")
+			helpers.assert_eq(dismissal_calls, 0)
+
+			PE.perform_check(true)
+			helpers.assert_true(PE.is_visible(),
+				"positive control must republish a prediction before ordinary reset")
 			PE.reset()
 			helpers.assert_true(not PE.is_visible(),
 				"stale predictions must be invalid immediately")
@@ -718,6 +890,8 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 		streaming.build_callbacks = previous_build
 		keylogger.log_llm_dismissed = previous_log
 		scheduler.after = previous_after
+		scheduler.cancel = previous_cancel
+		scheduler.onSettled = previous_on_settled
 		PE.set_llm_enabled(false)
 		if not ok then error(err, 0) end
 	end)

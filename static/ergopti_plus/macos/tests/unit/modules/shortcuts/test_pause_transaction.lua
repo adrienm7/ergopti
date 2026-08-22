@@ -30,6 +30,7 @@ local function load_context(options)
 	local ctx = {
 		calls = {},
 		call_order = {},
+		hooks = {},
 		states = {
 			keymap = true,
 			shortcuts = true,
@@ -81,12 +82,18 @@ local function load_context(options)
 			ctx.call_order[#ctx.call_order + 1] = name
 			local mutation = state_changes[name]
 			if mutation then ctx.states[mutation[1]] = mutation[2] end
+			local hook = ctx.hooks[name]
+			if type(hook) == "function" then hook() end
 			-- Failure is injected AFTER the mutation. A correct transaction must
 			-- therefore include the failing operation itself in reverse rollback.
-			local failure = ctx.pause_failure or ctx.resume_failure
+			local failure = ctx.pause_failure
+			if not (failure and failure.step == name) then
+				failure = ctx.resume_failure
+			end
 			if failure and failure.step == name then
 				if failure.mode == "throw" then error(name .. " exploded") end
 				if failure.mode == "false" then return false, name .. " refused" end
+				if failure.mode == "nil" then return nil, name .. " returned nil" end
 			end
 			return true
 		end
@@ -144,8 +151,8 @@ local function load_context(options)
 		describe_held_modifiers = function() return "(none)" end,
 	}
 	package.loaded["modules.llm.warmup_controller"] = {
-		stop = record("warmup_stop"),
-		schedule_warmup_with_retry = inverse("warmup_resume"),
+		pause_warmup = record("warmup_stop"),
+		resume_warmup = inverse("warmup_resume"),
 	}
 	package.loaded["modules.llm.api_mlx"] = {
 		stop_warmup = record("mlx_stop"),
@@ -153,6 +160,25 @@ local function load_context(options)
 	}
 	package.loaded["modules.llm.api_ollama"] = {
 		stop_warmup = record("ollama_stop"),
+	}
+	-- HS-012 added these fixed pause owners. Keep this older transaction harness
+	-- independent from whichever real/cache-backed instance a prior test loaded;
+	-- the class-wide owner matrix exercises their refusal paths separately.
+	package.loaded["modules.llm.api_remote"] = {
+		stop_warmup = function() return true end,
+	}
+	package.loaded["ui.wpm.wpm_menubar"] = {
+		is_running = function() return false end,
+		stop = function() return true end,
+		resume_after_pause = function() return true end,
+	}
+	package.loaded["ui.wpm.wpm_widget"] = {
+		is_running = function() return false end,
+		stop = function() return true end,
+		resume_after_pause = function() return true end,
+	}
+	package.loaded["platform.remap.onboarding"] = {
+		stop = function() return true end,
 	}
 	package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
 	package.loaded["modules.keylogger"] = {
@@ -202,8 +228,12 @@ local function load_context(options)
 	local shortcuts = {
 		pause_bindings = record("shortcuts_pause"),
 		resume_bindings = inverse("shortcuts_resume"),
+		release_bindings_pause_claim = record("shortcuts_release_claim"),
 		is_bindings_started = snapshot("shortcuts_snapshot"),
 	}
+	if type(options.shortcuts_factory) == "function" then
+		shortcuts = options.shortcuts_factory(ctx, record, inverse, snapshot)
+	end
 	local gestures = {
 		suspend = record("gestures_pause"),
 		resume = inverse("gestures_resume"),
@@ -211,6 +241,8 @@ local function load_context(options)
 	}
 	local get_enabled = function()
 			if options.get_enabled_throws then error("get_enabled exploded") end
+			if options.get_enabled_mode == "nil" then return nil end
+			if options.get_enabled_mode == "non_boolean" then return "enabled" end
 			return options.integration_enabled ~= false
 		end
 	if options.get_enabled_missing then get_enabled = nil end
@@ -366,6 +398,140 @@ helpers.describe("script-control pause transaction waits for exact lease ACK", f
 	end)
 end)
 
+helpers.describe("script-control: bindings child cleanup debt", function()
+	helpers.it("settles pixel debt while preserving an originally OFF bindings layer", function()
+		local calls = { pause = 0, resume = 0 }
+		local debt = true
+		local script_control, ctx = load_context({
+			shortcuts_factory = function()
+				return {
+					is_bindings_started = function() return false end,
+					has_bindings_pause_debt = function() return debt end,
+					pause_bindings = function()
+						calls.pause = calls.pause + 1
+						debt = false
+						return true
+					end,
+					resume_bindings = function()
+						calls.resume = calls.resume + 1
+						return true
+					end,
+					release_bindings_pause_claim = function() return true end,
+				}
+			end,
+		})
+
+		helpers.assert_eq(script_control.pause_all(), true)
+		ctx.fire_deferred()
+		ctx.pause_callback(true, "paused")
+		helpers.assert_eq(script_control.is_paused(), true)
+		helpers.assert_eq(calls.pause, 1)
+		helpers.assert_eq(debt, false)
+
+		helpers.assert_eq(script_control.resume_all(), true)
+		ctx.fire_deferred()
+		ctx.resume_callback(true, "resumed")
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_eq(calls.resume, 0,
+			"cleanup-only debt must not resurrect bindings that were OFF before pause")
+		script_control.stop()
+	end)
+
+	for _, mode in ipairs({ "nil", "throw" }) do
+		helpers.it("rejects an ambiguous bindings-debt snapshot after " .. mode, function()
+			local pause_calls = 0
+			local script_control, ctx = load_context({
+				shortcuts_factory = function()
+					return {
+						is_bindings_started = function() return false end,
+						has_bindings_pause_debt = function()
+							if mode == "throw" then error("synthetic debt query failure") end
+							return nil
+						end,
+						pause_bindings = function()
+							pause_calls = pause_calls + 1
+							return true
+						end,
+						resume_bindings = function() return true end,
+						release_bindings_pause_claim = function() return true end,
+					}
+				end,
+			})
+
+			helpers.assert_eq(script_control.pause_all(), true,
+				"the public request reports controller admission, not local settlement")
+			ctx.fire_deferred()
+			ctx.pause_callback(true, "native-paused")
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_eq(pause_calls, 0,
+				"an ambiguous ownership query must fail before cleanup mutation")
+			helpers.assert_eq(ctx.calls.karabiner_resume, 1,
+				"the already-paused native layer must be rolled back")
+			ctx.resume_callback(true, "native-running")
+			script_control.stop()
+		end)
+	end
+
+	helpers.it("does not duplicate a reversible shortcut debt with cleanup-only work", function()
+		local calls = { pause = 0, resume = 0 }
+		local started = true
+		local debt = false
+		local rollback_refusals = 1
+		local script_control, ctx = load_context({
+			pause_failure = { step = "mlx_stop", mode = "false" },
+			shortcuts_factory = function()
+				return {
+					is_bindings_started = function() return started end,
+					has_bindings_pause_debt = function() return debt end,
+					pause_bindings = function()
+						calls.pause = calls.pause + 1
+						started = false
+						debt = false
+						return true
+					end,
+					resume_bindings = function()
+						calls.resume = calls.resume + 1
+						if rollback_refusals > 0 then
+							rollback_refusals = rollback_refusals - 1
+							debt = true
+							return false
+						end
+						started = true
+						debt = false
+						return true
+					end,
+				}
+			end,
+		})
+
+		script_control.pause_all()
+		ctx.fire_deferred()
+		ctx.pause_callback(true, "first-native-paused")
+		helpers.assert_eq(calls.pause, 1)
+		helpers.assert_eq(calls.resume, 1)
+		helpers.assert_eq(debt, true)
+		helpers.assert_eq(ctx.calls.karabiner_resume, 1)
+		ctx.resume_callback(true, "first-native-rollback")
+
+		ctx.pause_failure = nil
+		helpers.assert_eq(script_control.pause_all(), true)
+		ctx.fire_deferred()
+		ctx.pause_callback(true, "retry-native-paused")
+		helpers.assert_eq(script_control.is_paused(), true)
+		helpers.assert_eq(calls.pause, 2,
+			"the retained reversible owner must be quiesced once, not once per debt label")
+
+		script_control.resume_all()
+		ctx.fire_deferred()
+		ctx.resume_callback(true, "final-native-resumed")
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_eq(calls.resume, 2)
+		helpers.assert_eq(started, true,
+			"the original ON intent must survive the retained reversible debt")
+		script_control.stop()
+	end)
+end)
+
 
 
 
@@ -376,12 +542,51 @@ end)
 -- ===========================================
 
 helpers.describe("script-control pause transaction is atomic", function()
+	helpers.it("rolls an originally-OFF shortcut claim back without starting children", function()
+		local calls = { pause = 0, release = 0, resume = 0 }
+		local script_control, ctx = load_context({
+			pause_failure = { step = "gestures_pause", mode = "false" },
+			shortcuts_factory = function()
+				return {
+					is_bindings_started = function() return false end,
+					pause_bindings = function(parent)
+						helpers.assert_eq(parent, "script_control")
+						calls.pause = calls.pause + 1
+						return true
+					end,
+					resume_bindings = function()
+						calls.resume = calls.resume + 1
+						return true
+					end,
+					release_bindings_pause_claim = function(parent)
+						helpers.assert_eq(parent, "script_control")
+						calls.release = calls.release + 1
+						return true
+					end,
+				}
+			end,
+		})
+
+		helpers.assert_eq(script_control.pause_all(), true)
+		ctx.fire_deferred()
+		ctx.pause_callback(true, "native-paused")
+		helpers.assert_eq(calls.pause, 1)
+		helpers.assert_eq(calls.release, 1,
+			"failed PAUSE must release only the OFF snapshot's global claim")
+		helpers.assert_eq(calls.resume, 0,
+			"rollback must not manufacture a shortcut ON transition")
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_eq(ctx.calls.karabiner_resume, 1)
+		ctx.resume_callback(true, "native-running")
+		script_control.stop()
+	end)
+
 	local pause_steps = {
 		{ step = "keymap_pause", label = "keymap.pause_processing", rollback = "keymap_resume" },
 		{ step = "shortcuts_pause", label = "shortcuts.pause_bindings", rollback = "shortcuts_resume" },
 		{ step = "gestures_pause", label = "gestures.suspend", rollback = "gestures_resume" },
 		{ step = "mlx_stop", label = "api_mlx.stop_warmup", rollback = "mlx_resume" },
-		{ step = "warmup_stop", label = "warmup_controller.stop", rollback = "warmup_resume" },
+		{ step = "warmup_stop", label = "warmup_controller.pause_warmup", rollback = "warmup_resume" },
 		-- These three operations deliberately have no inverse. Re-opening a stale
 		-- prediction/tooltip is unsafe, and Ollama stop_warmup only invalidates one
 		-- in-flight generation without disabling readiness or a retry chain. They
@@ -407,6 +612,25 @@ helpers.describe("script-control pause transaction is atomic", function()
 		script_control.stop()
 	end)
 
+	helpers.it("fails closed when the Karabiner enabled-state probe is not boolean", function()
+		for _, mode in ipairs({ "nil", "non_boolean" }) do
+			local script_control, ctx = load_context({ get_enabled_mode = mode })
+			helpers.assert_true(script_control.pause_all())
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_eq(#ctx.call_order, 0,
+				"an ambiguous native snapshot may not mutate local owners")
+			helpers.assert_eq(ctx.calls.karabiner_pause, nil,
+				"an ambiguous native snapshot may not dispatch a transition")
+			helpers.assert_eq(ctx.calls.admission_release, 1)
+			helpers.assert_nil(ctx.admission_fence,
+				"a clean preflight refusal must release the exact admission fence")
+			helpers.assert_true(helpers.deep_equal(ctx.pause_listener, {}))
+			helpers.assert_eq(count_notifications(ctx,
+				"script_control.pause_failed", "error"), 1)
+			helpers.assert_true(script_control.stop())
+		end
+	end)
+
 	helpers.it("reuses a retained preflight fence on the next explicit pause", function()
 		local cases = {
 			{
@@ -416,6 +640,14 @@ helpers.describe("script-control pause transaction is atomic", function()
 			{
 				name = "throw",
 				options = { get_enabled_throws = true, admission_release_throws = 1 },
+			},
+			{
+				name = "nil probe / false release",
+				options = { get_enabled_mode = "nil", admission_release_failures = 1 },
+			},
+			{
+				name = "non-boolean probe / throw release",
+				options = { get_enabled_mode = "non_boolean", admission_release_throws = 1 },
 			},
 		}
 		for _, case in ipairs(cases) do
@@ -433,6 +665,7 @@ helpers.describe("script-control pause transaction is atomic", function()
 				"script_control.pause_failed", "error"), 1)
 
 			case.options.get_enabled_throws = false
+			case.options.get_enabled_mode = nil
 			helpers.assert_true(script_control.pause_all(),
 				case.name .. " retained fence must keep explicit pause retry reachable")
 			helpers.assert_eq(ctx.calls.input_drain, 1,
@@ -536,7 +769,7 @@ helpers.describe("script-control pause transaction is atomic", function()
 			{ inverse = "shortcuts_resume", label = "shortcuts.pause_bindings" },
 			{ inverse = "gestures_resume", label = "gestures.suspend" },
 			{ inverse = "mlx_resume", label = "api_mlx.stop_warmup" },
-			{ inverse = "warmup_resume", label = "warmup_controller.stop" },
+			{ inverse = "warmup_resume", label = "warmup_controller.pause_warmup" },
 		}
 		for _, case in ipairs(cases) do
 			local script_control, ctx = load_context({ missing_inverse = case.inverse })
@@ -626,6 +859,37 @@ end)
 -- ============================================
 
 helpers.describe("script-control resume transaction is atomic", function()
+	helpers.it("keeps PAUSED ownership when the Karabiner resume snapshot is ambiguous", function()
+		for _, mode in ipairs({ "nil", "non_boolean" }) do
+			local options = {}
+			local script_control, ctx = load_context(options)
+			helpers.assert_true(script_control.pause_all())
+			ctx.fire_deferred()
+			ctx.pause_callback(true, "paused")
+			local exact_fence = ctx.admission_fence
+			local committed_calls = #ctx.call_order
+
+			options.get_enabled_mode = mode
+			helpers.assert_eq(script_control.resume_all(), false)
+			helpers.assert_eq(script_control.is_paused(), true)
+			helpers.assert_true(ctx.admission_fence == exact_fence,
+				"ambiguous native state must retain the exact PAUSED admission fence")
+			helpers.assert_eq(#ctx.call_order, committed_calls,
+				"ambiguous native state may not resume a local owner")
+			helpers.assert_eq(ctx.calls.karabiner_resume, nil,
+				"ambiguous native state may not dispatch native RESUME")
+			helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true }))
+
+			options.get_enabled_mode = nil
+			helpers.assert_true(script_control.resume_all())
+			ctx.fire_deferred()
+			ctx.resume_callback(true, "resumed")
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_nil(ctx.admission_fence)
+			helpers.assert_true(script_control.stop())
+		end
+	end)
+
 	helpers.it("keeps pause and resumes zero Hammerspoon modules when RESUMED fails", function()
 		local script_control, ctx = load_context()
 		script_control.pause_all()
@@ -759,13 +1023,114 @@ helpers.describe("script-control resume transaction is atomic", function()
 		helpers.assert_true(ctx.admission_release_tokens[2] == exact_fence)
 	end)
 
+	helpers.it("joins an already-dispatched native transition before stopping", function()
+		-- PAUSE direction: the exact admission fence and callback must survive stop.
+		do
+			local script_control, ctx = load_context()
+			helpers.assert_true(script_control.pause_all())
+			ctx.fire_deferred()
+			helpers.assert_eq(ctx.calls.karabiner_pause, 1)
+			local exact_fence = ctx.admission_fence
+			helpers.assert_eq(script_control.stop(), false,
+				"stop cannot discard a dispatched native PAUSE owner")
+			helpers.assert_true(script_control.is_pause_transition_pending())
+			helpers.assert_true(ctx.admission_fence == exact_fence)
+			helpers.assert_eq(ctx.calls.admission_release, nil)
+
+			ctx.pause_callbacks[1](true, "paused-after-stop-refusal")
+			helpers.assert_eq(script_control.is_paused(), true)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			helpers.assert_true(script_control.stop(),
+				"terminal native ownership must make the later stop reachable")
+			ctx.pause_callbacks[1](true, "duplicate-paused")
+			helpers.assert_eq(ctx.calls.keymap_pause, 1)
+		end
+
+		-- RESUME direction: stop may not release the fence ahead of native RESUMED.
+		do
+			local script_control, ctx = load_context()
+			helpers.assert_true(script_control.pause_all())
+			ctx.fire_deferred()
+			ctx.pause_callbacks[1](true, "paused")
+			local exact_fence = ctx.admission_fence
+			helpers.assert_true(script_control.resume_all())
+			ctx.fire_deferred()
+			helpers.assert_eq(ctx.calls.karabiner_resume, 1)
+			helpers.assert_eq(script_control.stop(), false,
+				"stop cannot discard a dispatched native RESUME owner")
+			helpers.assert_true(script_control.is_pause_transition_pending())
+			helpers.assert_true(ctx.admission_fence == exact_fence)
+			helpers.assert_eq(ctx.calls.admission_release, nil)
+
+			ctx.resume_callbacks[1](true, "resumed-after-stop-refusal")
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			helpers.assert_nil(ctx.admission_fence)
+			helpers.assert_true(script_control.stop())
+			ctx.resume_callbacks[1](true, "duplicate-resumed")
+			helpers.assert_eq(ctx.calls.keymap_resume, 1)
+		end
+	end)
+
+	helpers.it("queues the original target again while native rollback is pending", function()
+		-- A PAUSE whose local half fails is already destined back to ACTIVE. A new
+		-- PAUSE request during that native rollback must survive as a fresh attempt.
+		do
+			local script_control, ctx = load_context()
+			ctx.pause_failure = { step = "shortcuts_pause", mode = "false" }
+			helpers.assert_true(script_control.pause_all())
+			ctx.fire_deferred()
+			ctx.pause_callbacks[1](true, "native-paused")
+			helpers.assert_eq(ctx.calls.karabiner_resume, 1,
+				"local PAUSE refusal must own native ACTIVE rollback")
+			helpers.assert_true(script_control.pause_all(),
+				"same target during rollback must be queued, not mistaken for satisfaction")
+			ctx.pause_failure = nil
+			ctx.resume_callbacks[1](true, "native-running")
+			helpers.assert_true(script_control.is_pause_transition_pending(),
+				"terminal rollback must dispatch the queued PAUSE")
+			ctx.fire_deferred()
+			helpers.assert_eq(ctx.calls.karabiner_pause, 2)
+			ctx.pause_callbacks[2](true, "retry-paused")
+			helpers.assert_eq(script_control.is_paused(), true)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			helpers.assert_true(script_control.stop())
+		end
+
+		-- Symmetric RESUME retry while the failed activation is being re-paused.
+		do
+			local script_control, ctx = load_context()
+			helpers.assert_true(script_control.pause_all())
+			ctx.fire_deferred()
+			ctx.pause_callbacks[1](true, "paused")
+			ctx.resume_failure = { step = "shortcuts_resume", mode = "false" }
+			helpers.assert_true(script_control.resume_all())
+			ctx.fire_deferred()
+			ctx.resume_callbacks[1](true, "native-resumed")
+			helpers.assert_eq(ctx.calls.karabiner_pause, 2,
+				"local RESUME refusal must own native PAUSED rollback")
+			helpers.assert_true(script_control.resume_all(),
+				"same target during rollback must be retained as latest intent")
+			ctx.resume_failure = nil
+			ctx.pause_callbacks[2](true, "native-repaused")
+			helpers.assert_true(script_control.is_pause_transition_pending(),
+				"terminal rollback must dispatch the queued RESUME")
+			ctx.fire_deferred()
+			helpers.assert_eq(ctx.calls.karabiner_resume, 2)
+			ctx.resume_callbacks[2](true, "retry-resumed")
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			helpers.assert_true(script_control.stop())
+		end
+	end)
+
 	helpers.it("rolls every partial local resume back before publishing any failure", function()
 		local resume_steps = {
 			{ step = "keymap_resume", label = "keymap.resume_processing", rollback = "keymap_pause" },
 			{ step = "shortcuts_resume", label = "shortcuts.resume_bindings", rollback = "shortcuts_pause" },
 			{ step = "gestures_resume", label = "gestures.resume", rollback = "gestures_pause" },
 			{ step = "mlx_resume", label = "api_mlx.resume_warmup", rollback = "mlx_stop" },
-			{ step = "warmup_resume", label = "warmup_controller.schedule_warmup_with_retry", rollback = "warmup_stop" },
+			{ step = "warmup_resume", label = "warmup_controller.resume_warmup", rollback = "warmup_stop" },
 		}
 		local failure_modes = { "throw", "false" }
 
@@ -837,6 +1202,307 @@ helpers.describe("script-control resume transaction is atomic", function()
 					"a clean retry after rollback must remain reachable")
 				helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true, false }))
 				script_control.stop()
+			end
+		end
+	end)
+
+	helpers.it("retains local re-pause debt until the same-state PAUSE settles it", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			local script_control, ctx = load_context({ no_integration = true })
+			helpers.assert_true(script_control.pause_all())
+			helpers.assert_true(script_control.is_paused())
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+
+			ctx.resume_failure = { step = "shortcuts_resume", mode = "false" }
+			ctx.pause_failure = { step = "shortcuts_pause", mode = mode }
+			helpers.assert_eq(script_control.resume_all(), false,
+				mode .. " re-pause refusal must abort the local resume")
+			helpers.assert_true(script_control.is_paused())
+			helpers.assert_true(script_control.is_pause_transition_pending(),
+				"terminal request state must retain the exact local rollback debt")
+			helpers.assert_eq(ctx.calls.shortcuts_resume, 1)
+			helpers.assert_eq(ctx.calls.shortcuts_pause, 2,
+				"initial pause plus failed rollback must target the same owner")
+
+			helpers.assert_eq(script_control.pause_all(), false,
+				"PAUSE while already PAUSED must retry the retained local inverse")
+			helpers.assert_eq(ctx.calls.shortcuts_pause, 3)
+			helpers.assert_eq(ctx.calls.shortcuts_resume, 1,
+				"debt settlement may not acquire a resume successor")
+			helpers.assert_true(script_control.is_pause_transition_pending())
+
+			ctx.pause_failure = nil
+			helpers.assert_true(script_control.pause_all())
+			helpers.assert_eq(ctx.calls.shortcuts_pause, 4)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false,
+				"literal re-pause settlement must consume the debt")
+			ctx.resume_failure = nil
+			helpers.assert_true(script_control.resume_all())
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			helpers.assert_true(script_control.stop())
+		end
+	end)
+
+	helpers.it("keeps re-pause debt visible after the native rollback callback", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			local script_control, ctx = load_context()
+			helpers.assert_true(script_control.pause_all())
+			ctx.fire_deferred()
+			ctx.pause_callbacks[1](true, "paused")
+
+			ctx.resume_failure = { step = "shortcuts_resume", mode = "false" }
+			ctx.pause_failure = { step = "shortcuts_pause", mode = mode }
+			helpers.assert_true(script_control.resume_all())
+			ctx.fire_deferred()
+			ctx.resume_callbacks[1](true, "native-resumed")
+			helpers.assert_true(script_control.is_pause_transition_pending(),
+				"native re-pause callback must still own the transition")
+			helpers.assert_eq(ctx.calls.karabiner_pause, 2)
+
+			ctx.pause_callbacks[2](true, "native-repaused")
+			helpers.assert_true(script_control.is_paused())
+			helpers.assert_true(script_control.is_pause_transition_pending(),
+				"local inverse debt must outlive the now-terminal native transaction")
+			helpers.assert_eq(script_control.pause_all(), false)
+			helpers.assert_eq(ctx.calls.karabiner_pause, 2,
+				"same-state local recovery may not publish a redundant native pause")
+
+			ctx.pause_failure = nil
+			helpers.assert_true(script_control.pause_all())
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			ctx.resume_failure = nil
+			helpers.assert_true(script_control.resume_all())
+			ctx.fire_deferred()
+			ctx.resume_callbacks[2](true, "retry-resumed")
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			helpers.assert_true(script_control.stop())
+		end
+	end)
+
+	helpers.it("tracks a late pause-owner registration whose inverse also refuses", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			local script_control = load_context({ no_integration = true })
+			helpers.assert_true(script_control.pause_all())
+			local pause_mode = mode
+			local resume_mode = mode
+			local pause_calls = 0
+			local resume_calls = 0
+			local function result_for(current, label)
+				if current == "throw" then error(label .. " exploded") end
+				if current == "false" then return false end
+				if current == "nil" then return nil end
+				return true
+			end
+			local owner = {
+				pause = function()
+					pause_calls = pause_calls + 1
+					return result_for(pause_mode, "late owner pause")
+				end,
+				resume = function()
+					resume_calls = resume_calls + 1
+					return result_for(resume_mode, "late owner resume")
+				end,
+			}
+
+			helpers.assert_true(script_control.register_pause_owner("llm_activation", owner),
+				"failed registration rollback must remain globally owned")
+			helpers.assert_eq(pause_calls, 1)
+			helpers.assert_eq(resume_calls, 1)
+			helpers.assert_true(script_control.is_pause_transition_pending())
+			helpers.assert_eq(script_control.pause_all(), false)
+			helpers.assert_eq(pause_calls, 2)
+			helpers.assert_eq(resume_calls, 1,
+				"same-state debt retry may not activate the late owner")
+
+			pause_mode = "true"
+			helpers.assert_true(script_control.pause_all())
+			helpers.assert_eq(pause_calls, 3)
+			helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+			resume_mode = "true"
+			helpers.assert_true(script_control.resume_all())
+			helpers.assert_eq(resume_calls, 2)
+			helpers.assert_eq(script_control.is_paused(), false)
+			helpers.assert_true(script_control.stop())
+		end
+	end)
+
+	helpers.it("rejects a PAUSE snapshot when a callback registers a new owner", function()
+		local script_control, ctx = load_context({ no_integration = true })
+		local active = true
+		local pause_calls = 0
+		local resume_calls = 0
+		local owner = {
+			pause = function()
+				pause_calls = pause_calls + 1
+				active = false
+				return true
+			end,
+			resume = function()
+				resume_calls = resume_calls + 1
+				active = true
+				return true
+			end,
+		}
+		ctx.hooks.keymap_pause = function()
+			ctx.hooks.keymap_pause = nil
+			helpers.assert_true(script_control.register_pause_owner("llm_activation", owner))
+		end
+
+		helpers.assert_true(script_control.pause_all(),
+			"the public request reports accepted input-drain ownership")
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_eq(count_notifications(ctx, "script_control.pause_failed", "error"), 1,
+			"the synchronously refused local commit must still be reported")
+		helpers.assert_eq(pause_calls, 0,
+			"registration while still ACTIVE must not pretend the new owner was paused")
+		helpers.assert_eq(resume_calls, 0)
+		helpers.assert_eq(active, true)
+		helpers.assert_eq(ctx.calls.keymap_pause, 1)
+		helpers.assert_eq(ctx.calls.keymap_resume, 1,
+			"the stale PAUSE snapshot must roll its exact applied mutation back")
+
+		helpers.assert_true(script_control.pause_all(),
+			"the next PAUSE must inventory and quiesce the retained owner")
+		helpers.assert_eq(script_control.is_paused(), true)
+		helpers.assert_eq(pause_calls, 1)
+		helpers.assert_eq(active, false)
+		helpers.assert_true(script_control.resume_all())
+		helpers.assert_eq(resume_calls, 1)
+		helpers.assert_eq(active, true)
+		helpers.assert_true(script_control.stop())
+	end)
+
+	helpers.it("rejects a RESUME snapshot when a callback registers a paused owner", function()
+		local script_control, ctx = load_context({ no_integration = true })
+		helpers.assert_true(script_control.pause_all())
+		local active = true
+		local pause_calls = 0
+		local resume_calls = 0
+		local owner = {
+			pause = function()
+				pause_calls = pause_calls + 1
+				active = false
+				return true
+			end,
+			resume = function()
+				resume_calls = resume_calls + 1
+				active = true
+				return true
+			end,
+		}
+		ctx.hooks.keymap_resume = function()
+			ctx.hooks.keymap_resume = nil
+			helpers.assert_true(script_control.register_pause_owner("llm_activation", owner))
+		end
+
+		helpers.assert_eq(script_control.resume_all(), false,
+			"a RESUME may not clear a ledger that grew inside an owner callback")
+		helpers.assert_eq(script_control.is_paused(), true)
+		helpers.assert_eq(pause_calls, 1,
+			"registration under PAUSED must quiesce the new owner immediately")
+		helpers.assert_eq(resume_calls, 0,
+			"the omitted owner may not be activated by the stale snapshot")
+		helpers.assert_eq(active, false)
+		helpers.assert_eq(ctx.calls.keymap_resume, 1)
+		helpers.assert_eq(ctx.calls.keymap_pause, 2,
+			"the already applied resume step must be rolled back exactly")
+
+		helpers.assert_true(script_control.resume_all(),
+			"the next RESUME must include the newly appended owner")
+		helpers.assert_eq(resume_calls, 1)
+		helpers.assert_eq(active, true)
+		helpers.assert_eq(script_control.is_paused(), false)
+		helpers.assert_true(script_control.stop())
+	end)
+
+	helpers.it("retains every resumed owner when admission and exact re-pause refuse", function()
+		for _, release_mode in ipairs({ "false", "throw" }) do
+			for _, pause_mode in ipairs({ "false", "nil", "throw" }) do
+				local options = release_mode == "false"
+					and { admission_release_failures = 1 }
+					or { admission_release_throws = 1 }
+				local script_control, ctx = load_context(options)
+				helpers.assert_true(script_control.pause_all())
+				ctx.fire_deferred()
+				ctx.pause_callbacks[1](true, "paused")
+				local exact_fence = ctx.admission_fence
+
+				ctx.pause_failure = { step = "shortcuts_pause", mode = pause_mode }
+				helpers.assert_true(script_control.resume_all())
+				ctx.fire_deferred()
+				ctx.resume_callbacks[1](true, "native-resumed")
+				helpers.assert_eq(script_control.is_paused(), true)
+				helpers.assert_true(script_control.is_pause_transition_pending(),
+					"native rollback and local re-pause debt must remain observable")
+				helpers.assert_true(ctx.admission_fence == exact_fence)
+				helpers.assert_eq(ctx.calls.shortcuts_pause, 2,
+					"fallback must target the same owner that committed the original PAUSE")
+				helpers.assert_eq(ctx.calls.shortcuts_resume, 1,
+					"re-pause debt may not reacquire an activation successor")
+				helpers.assert_eq(ctx.calls.karabiner_pause, 2)
+
+				ctx.pause_callbacks[2](true, "native-repaused")
+				helpers.assert_true(script_control.is_pause_transition_pending(),
+					"terminal native re-pause may not consume unresolved local ownership")
+				helpers.assert_eq(script_control.pause_all(), false,
+					"same-state PAUSE must retry the retained owner without a successor")
+				helpers.assert_eq(ctx.calls.shortcuts_pause, 3)
+				helpers.assert_eq(ctx.calls.shortcuts_resume, 1)
+				helpers.assert_eq(ctx.calls.karabiner_pause, 2,
+					"local debt recovery must not publish a redundant native request")
+
+				ctx.pause_failure = nil
+				helpers.assert_true(script_control.pause_all())
+				helpers.assert_eq(ctx.calls.shortcuts_pause, 4)
+				helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+				helpers.assert_true(script_control.resume_all())
+				ctx.fire_deferred()
+				ctx.resume_callbacks[2](true, "retry-resumed")
+				helpers.assert_eq(script_control.is_paused(), false)
+				helpers.assert_nil(ctx.admission_fence)
+				helpers.assert_true(ctx.admission_release_tokens[1] == exact_fence)
+				helpers.assert_true(ctx.admission_release_tokens[2] == exact_fence)
+				helpers.assert_true(script_control.stop())
+			end
+		end
+	end)
+
+	helpers.it("does not replay one-way PAUSE cleanup after admission release refusal", function()
+		for _, owner in ipairs({
+			{ step = "keymap_reset", label = "prediction reset" },
+			{ step = "tooltip_hide", label = "tooltip dismissal" },
+		}) do
+			for _, mode in ipairs({ "false", "nil", "throw" }) do
+				local script_control, ctx = load_context({ admission_release_failures = 1 })
+				helpers.assert_true(script_control.pause_all())
+				ctx.fire_deferred()
+				ctx.pause_callbacks[1](true, "paused")
+				helpers.assert_eq(ctx.calls[owner.step], 1,
+					"positive control must commit the original " .. owner.label)
+
+				ctx.pause_failure = { step = owner.step, mode = mode }
+				helpers.assert_true(script_control.resume_all())
+				ctx.fire_deferred()
+				ctx.resume_callbacks[1](true, "native-resumed")
+				helpers.assert_eq(ctx.calls[owner.step], 1,
+					owner.label .. " was never resumed and must not be acquired again")
+				helpers.assert_eq(script_control.is_paused(), true)
+				helpers.assert_true(script_control.is_pause_transition_pending(),
+					"native re-pause must remain owned until its callback settles")
+
+				ctx.pause_callbacks[2](true, "native-repaused")
+				helpers.assert_eq(script_control.is_pause_transition_pending(), false)
+				helpers.assert_eq(ctx.calls[owner.step], 1,
+					"terminal native compensation may not replay one-way work")
+				ctx.pause_failure = nil
+				helpers.assert_true(script_control.resume_all())
+				ctx.fire_deferred()
+				ctx.resume_callbacks[2](true, "retry-resumed")
+				helpers.assert_eq(script_control.is_paused(), false)
+				helpers.assert_eq(ctx.calls[owner.step], 1)
+				helpers.assert_true(script_control.stop())
 			end
 		end
 	end)

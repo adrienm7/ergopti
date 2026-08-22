@@ -47,6 +47,10 @@ local function load_subject(controls)
 		start = start_child("keyboard"),
 		stop = stop_child("keyboard"),
 	}
+	package.loaded["modules.gestures.actions"] = {
+		resume_after_cleanup = start_child("actions"),
+		force_cleanup = stop_child("actions"),
+	}
 	package.loaded["modules.shortcuts.script_control"] = {
 		ACTIONS = {}, ACTION_LABELS = {},
 		start = start_child("script_control"),
@@ -75,11 +79,23 @@ end
 -- ============================================
 
 helpers.describe("shortcuts aggregate start transaction", function()
+	helpers.it("rolls back a refused shortcut action scope before exposing hotkeys", function()
+		local subject, events = load_subject({
+			actions_has_result = true,
+			actions_result = false,
+		})
+
+		helpers.assert_eq(subject.start(), false)
+		helpers.assert_eq(table.concat(events, ","),
+			"start:actions,stop:actions")
+	end)
+
 	helpers.it("returns exact true only after both child starts commit", function()
 		local subject, events = load_subject()
 
 		helpers.assert_eq(subject.start(), true)
-		helpers.assert_eq(table.concat(events, ","), "start:bindings,start:keyboard")
+		helpers.assert_eq(table.concat(events, ","),
+			"start:actions,start:bindings,start:keyboard")
 	end)
 
 	helpers.it("rejects a bindings false before starting the keyboard child", function()
@@ -89,14 +105,18 @@ helpers.describe("shortcuts aggregate start transaction", function()
 		})
 
 		helpers.assert_eq(subject.start(), false)
-		helpers.assert_eq(table.concat(events, ","), "start:bindings,stop:bindings")
+		helpers.assert_eq(table.concat(events, ","), table.concat({
+			"start:actions", "start:bindings", "stop:bindings", "stop:actions",
+		}, ","))
 	end)
 
 	helpers.it("contains a bindings throw and rolls its partial ownership back", function()
 		local subject, events = load_subject({bindings_mode = "throw"})
 
 		helpers.assert_eq(subject.start(), false)
-		helpers.assert_eq(table.concat(events, ","), "start:bindings,stop:bindings")
+		helpers.assert_eq(table.concat(events, ","), table.concat({
+			"start:actions", "start:bindings", "stop:bindings", "stop:actions",
+		}, ","))
 	end)
 
 	helpers.it("rolls keyboard refusal back before the committed bindings", function()
@@ -107,10 +127,12 @@ helpers.describe("shortcuts aggregate start transaction", function()
 
 		helpers.assert_eq(subject.start(), false)
 		helpers.assert_eq(table.concat(events, ","), table.concat({
+			"start:actions",
 			"start:bindings",
 			"start:keyboard",
 			"stop:keyboard",
 			"stop:bindings",
+			"stop:actions",
 		}, ","))
 	end)
 
@@ -121,8 +143,10 @@ helpers.describe("shortcuts aggregate start transaction", function()
 		})
 
 		helpers.assert_eq(subject.start(), false)
-		helpers.assert_eq(table.concat(events, ","),
-			"start:bindings,start:keyboard,stop:keyboard,stop:bindings")
+		helpers.assert_eq(table.concat(events, ","), table.concat({
+			"start:actions", "start:bindings", "start:keyboard",
+			"stop:keyboard", "stop:bindings", "stop:actions",
+		}, ","))
 	end)
 end)
 

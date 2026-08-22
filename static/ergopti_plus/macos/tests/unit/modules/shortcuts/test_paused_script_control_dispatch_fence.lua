@@ -41,14 +41,22 @@ package.loaded["modules.gestures.actions"] = {
 }
 package.loaded["modules.keylogger"] = { log_shortcut = function() end }
 package.loaded["modules.llm.api_mlx"] = {
-	stop_warmup = function() end,
-	resume_warmup = function() end,
+	stop_warmup = function() return true end,
+	resume_warmup = function() return true end,
 }
-package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() end }
+package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() return true end }
+package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
 package.loaded["modules.llm.warmup_controller"] = {
-	stop = function() end,
-	schedule_warmup_with_retry = function() end,
+	stop = function() return true end,
+	schedule_warmup_with_retry = function() return true end,
 }
+package.loaded["ui.wpm.wpm_menubar"] = {
+	is_running = function() return false end,
+}
+package.loaded["ui.wpm.wpm_widget"] = {
+	is_running = function() return false end,
+}
+package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
 package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
 
 package.loaded["adapters.synthetic_input"] = nil
@@ -71,17 +79,17 @@ end
 hs_stub.eventtap.checkKeyboardModifiers = function() return { _raw = 0 } end
 
 local keymap = {
-	pause_processing = function() end,
-	resume_processing = function() end,
-	reset_predictions = function() end,
+	pause_processing = function() return true end,
+	resume_processing = function() return true end,
+	reset_predictions = function() return true end,
 }
 local shortcuts = {
 	is_bindings_started = function() return false end,
 }
 local gestures = {
 	is_enabled = function() return true end,
-	suspend = function() end,
-	resume = function() end,
+	suspend = function() return true end,
+	resume = function() return true end,
 }
 
 --- Builds a genuine Karabiner-tagged F14 sentinel event.

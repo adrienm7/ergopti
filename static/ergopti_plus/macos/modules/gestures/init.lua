@@ -21,6 +21,7 @@ local Manifest      = require("infra.manifest_reader")
 local Timings       = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG           = "gestures"
+local GESTURE_ACTION_PARENT = "gestures"
 
 local function load_touchdevice_module()
 	local candidates = {
@@ -211,6 +212,10 @@ _G.ERGOPTI_GESTURE_PRIMER = _G.ERGOPTI_GESTURE_PRIMER or nil
 local gesture_primer = _G.ERGOPTI_GESTURE_PRIMER
 local gesture_primer_committed = false
 local engine_needs_init = false
+local gesture_lifecycle_epoch = 0
+local gesture_start_attempt = nil
+local gesture_resume_start_required = false
+local teardown_gesture_runtime
 
 -- Debounce for primer-triggered emergency recycles
 local last_emergency_recycle = 0
@@ -575,7 +580,20 @@ M.on_action_changed  = Conflicts.on_action_changed
 function M.apply_all_overrides()    Conflicts.apply_all_overrides(CoreState.ga) end
 function M.restore_all_overrides()  Conflicts.restore_all_overrides()           end
 function M.get_action(slot)         return CoreState.ga[slot]                   end
-function M.set_action(slot, action) CoreState.ga[slot] = action                 end
+
+--- Stores one gesture action through an exact project-level setter contract.
+--- @param slot string Gesture slot identifier.
+--- @param action string Action identifier.
+--- @return boolean committed
+function M.set_action(slot, action)
+	if type(slot) ~= "string" or type(action) ~= "string" then
+		Logger.error(LOG, "set_action(): slot and action must be strings.")
+		return false
+	end
+	CoreState.ga[slot] = action
+	Logger.debug(LOG, "Gesture action '%s' → '%s'.", slot, action)
+	return true
+end
 function M.get_mode(slot)           return CoreState.modes[slot] or "x1"        end
 function M.set_mode(slot, mode)     CoreState.modes[slot] = mode                end
 function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot]) or M.DEFAULT_SENSITIVITY end
@@ -619,7 +637,55 @@ function M.get_all_sensitivities()
 	return t
 end
 
-function M.enable_all()  CoreState.enabled = true  end
+--- Enables every gesture through an exact project-level lifecycle contract.
+--- @return boolean committed
+function M.enable_all()
+	if CoreState.suspended == true then
+		local ok_cleanup, cleanup_result = xpcall(
+			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+		if not ok_cleanup or cleanup_result ~= true then
+			Logger.error(LOG,
+				"Gesture enable refused and cleanup behind global pause remains pending: %s.",
+				tostring(cleanup_result))
+		else
+			Logger.warn(LOG,
+				"Gesture enable refused while ScriptControl suspension is active.")
+		end
+		return false
+	end
+	if gesture_resume_start_required == true then
+		if teardown_gesture_runtime(true) ~= true then
+			Logger.error(LOG,
+				"Gesture enable cannot rebuild while native rollback debt remains.")
+			return false
+		end
+		CoreState.enabled = true
+		local start_ok, start_result = xpcall(M.start, debug.traceback)
+		if not start_ok or start_result ~= true then
+			CoreState.enabled = false
+			gesture_resume_start_required = true
+			local cleanup_ok, cleanup_result = xpcall(
+				Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+			if not cleanup_ok or cleanup_result ~= true then
+				Logger.error(LOG, "Gesture enable restart cleanup remains pending: %s.",
+					tostring(cleanup_result))
+			end
+			return false
+		end
+		return true
+	end
+	local lifecycle = Actions.resume_after_cleanup
+	local ok_resume, resume_result = xpcall(
+		lifecycle, debug.traceback, GESTURE_ACTION_PARENT)
+	if not ok_resume or resume_result ~= true then
+		Logger.error(LOG, "Gesture enable refused while action cleanup remains pending: %s.",
+			tostring(resume_result))
+		return false
+	end
+	CoreState.enabled = true
+	Logger.debug(LOG, "All gestures enabled.")
+	return true
+end
 
 --- Disables gestures entirely (menu master toggle and the dedicated "disable
 --- all" action both route through this single function). Mirrors what
@@ -630,19 +696,35 @@ function M.enable_all()  CoreState.enabled = true  end
 --- mouseUp, but until then the OS is left with a button stuck down or
 --- native scroll still swallowed (gestures-disable-all-stuck-click, F-MED-22).
 function M.disable_all()
-	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
-	local ok_cleanup, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
-	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result == false then
+	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
+	gesture_start_attempt = nil
+	local cleanup_settled
+	if gesture_resume_start_required == true then
+		cleanup_settled = teardown_gesture_runtime(true)
+	else
+		local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
+		local ok_cleanup, cleanup_result = xpcall(
+			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+		cleanup_settled = ok_scroll and scroll_result == true
+			and ok_cleanup and cleanup_result == true
+	end
+	if cleanup_settled ~= true then
 		Logger.error(LOG, "Gesture disable cleanup refused; feature state preserved.")
 		return false
 	end
 	CoreState.enabled = false
 	return true
 end
-function M.enable(name)  if name == "all" then CoreState.enabled = true  end end
+function M.enable(name)
+	if name ~= "all" then return false end
+	return M.enable_all()
+end
 -- Delegates to M.disable_all() (single source of truth) so this legacy
 -- name-based entry point gets the same click-lock release (F-MED-22).
-function M.disable(name) if name == "all" then M.disable_all() end end
+function M.disable(name)
+	if name ~= "all" then return false end
+	return M.disable_all()
+end
 function M.is_enabled()  return CoreState.enabled end
 
 -- Suspend/resume keep the user feature flag (enabled) intact while enforcing
@@ -656,17 +738,76 @@ function M.suspend()
 	-- swallowing native scroll until finger-lift, and a held synthetic click-lock
 	-- (left/right_click_toggle) keeps its drag + key-watcher eventtaps live. Release
 	-- both here, exactly as M.stop() does (force_cleanup is idempotent).
+	-- Publish the logical fence before fallible native cleanup. During a failed
+	-- RESUME transaction ScriptControl may call suspend() as a rollback; even if a
+	-- native owner then refuses cleanup, newly arriving gestures must remain gated
+	-- for as long as the global state is still PAUSED.
+	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
+	gesture_start_attempt = nil
+	CoreState.suspended = true
 	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
-	local ok_cleanup, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
-	if not ok_scroll or scroll_result == false or not ok_cleanup or cleanup_result == false then
-		Logger.error(LOG, "Gesture suspend cleanup refused; suspend not published.")
+	local ok_cleanup, cleanup_result = xpcall(
+		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+	if not ok_scroll or scroll_result ~= true or not ok_cleanup or cleanup_result ~= true then
+		Logger.error(LOG, "Gesture suspend cleanup refused; logical fence retained.")
 		return false
 	end
-	CoreState.suspended = true
 	Logger.debug(LOG, "Gestures suspended (feature flag preserved).")
 	return true
 end
 function M.resume()
+	if CoreState.enabled ~= true then
+		if gesture_resume_start_required == true
+			and teardown_gesture_runtime(true) ~= true then
+			Logger.error(LOG,
+				"Gesture OFF resume cannot settle interrupted startup rollback debt.")
+			return false
+		end
+		local cleanup_ok, cleanup_result = xpcall(
+			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Gesture cleanup-only resume remains pending: %s.",
+				tostring(cleanup_result))
+			return false
+		end
+		CoreState.suspended = false
+		Logger.debug(LOG, "Gesture resume kept the disabled action scope fenced.")
+		return true
+	end
+	if gesture_resume_start_required == true then
+		-- A PAUSE that arrived inside start() forced exact rollback of partially
+		-- acquired native owners. Settle any refused inverse first, then rebuild
+		-- the complete previously-ON posture as one fresh guarded start attempt.
+		if teardown_gesture_runtime(true) ~= true then
+			Logger.error(LOG,
+				"Gesture resume cannot rebuild while startup rollback debt remains.")
+			return false
+		end
+		CoreState.suspended = false
+		local start_ok, start_result = xpcall(M.start, debug.traceback)
+		if not start_ok or start_result ~= true then
+			CoreState.enabled = true
+			CoreState.suspended = true
+			gesture_resume_start_required = true
+			local cleanup_ok, cleanup_result = xpcall(
+				Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+			if not cleanup_ok or cleanup_result ~= true then
+				Logger.error(LOG,
+					"Gesture resume restart refusal left action cleanup debt: %s.",
+					tostring(cleanup_result))
+			end
+			return false
+		end
+		Logger.debug(LOG, "Gestures resumed by rebuilding the interrupted native startup.")
+		return true
+	end
+	local ok_resume, resume_result = xpcall(
+		Actions.resume_after_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+	if not ok_resume or resume_result ~= true then
+		Logger.error(LOG, "Gesture resume refused while action cleanup remains pending: %s.",
+			tostring(resume_result))
+		return false
+	end
 	CoreState.suspended = false
 	Logger.debug(LOG, "Gestures resumed.")
 	return true
@@ -920,7 +1061,7 @@ local function stop_gesture_primer()
 	gesture_primer_committed = false
 	local stopped, result_or_err = xpcall(function() return candidate:stop() end,
 		debug.traceback)
-	if not stopped or result_or_err == false then
+	if not stopped or result_or_err == nil or result_or_err == false then
 		Logger.error(LOG, "Gesture primer stop failed; exact cleanup remains owned: %s.",
 			tostring(result_or_err))
 		return false
@@ -940,7 +1081,7 @@ local function stop_sleep_watcher()
 	sleep_watcher_committed = false
 	local stopped, result_or_err = xpcall(function() return candidate:stop() end,
 		debug.traceback)
-	if not stopped or result_or_err == false then
+	if not stopped or result_or_err == nil or result_or_err == false then
 		Logger.error(LOG, "Gesture wake watcher stop failed; exact cleanup remains owned: %s.",
 			tostring(result_or_err))
 		return false
@@ -948,6 +1089,37 @@ local function stop_sleep_watcher()
 	if sleep_watcher == candidate then
 		sleep_watcher = nil
 		_G.ERGOPTI_SLEEP_WATCHER = nil
+	end
+	return true
+end
+
+--- Settles every native gesture runtime owner without necessarily changing the
+--- user feature snapshot. Startup rollback under ScriptControl PAUSE uses the
+--- preserving form so RESUME can reconstruct the exact previously-ON posture.
+--- @param preserve_feature_state boolean
+--- @return boolean settled
+teardown_gesture_runtime = function(preserve_feature_state)
+	local cleanup_ok, cleanup_result = xpcall(
+		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+	if preserve_feature_state ~= true then CoreState.enabled = false end
+
+	local watchers_stopped = recycle_watchers(false)
+	local primer_stopped = stop_gesture_primer()
+	local timer_stopped = cancel_discovery_timer("module stop")
+	local wake_watcher_stopped = stop_sleep_watcher()
+	local engine_stopped, engine_stop_result = xpcall(Engine.stop, debug.traceback)
+	if engine_stopped and engine_stop_result == true then
+		engine_needs_init = true
+	else
+		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
+	end
+
+	if not cleanup_ok or cleanup_result ~= true
+		or watchers_stopped ~= true or timer_stopped ~= true
+		or primer_stopped ~= true or wake_watcher_stopped ~= true
+		or not engine_stopped or engine_stop_result ~= true then
+		Logger.error(LOG, "Gestures runtime teardown incomplete; native cleanup is retryable.")
+		return false
 	end
 	return true
 end
@@ -963,31 +1135,104 @@ local function reject_gesture_start(reason)
 	return false
 end
 
+local function gesture_start_is_current(attempt)
+	return gesture_start_attempt == attempt
+		and gesture_lifecycle_epoch == attempt.epoch
+		and CoreState.suspended ~= true
+end
+
 --- Initializes and binds multi-touch listeners.
 function M.start()
 	Logger.start(LOG, "Starting gestures module…")
 	Logger.info(LOG, "============== GESTURES STARTUP DIAGNOSTIC ==============")
 	Logger.info(LOG, "Hammerspoon timestamp: %.3f", hs.timer.secondsSinceEpoch())
 	Logger.info(LOG, "touchdevice module available: %s", tostring(touchdevice ~= nil))
+	-- ScriptControl suspension is an admission claim, not merely an engine hint.
+	-- A re-entrant/duplicate start while globally paused must perform action
+	-- cleanup only; it may not recycle or construct native gesture owners.
+	if CoreState.suspended == true then
+		local cleanup_ok, cleanup_result = xpcall(
+			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Gesture startup cleanup under suspension did not settle: %s.",
+				tostring(cleanup_result))
+		end
+		Logger.warn(LOG, "Gesture startup refused while ScriptControl suspension is active.")
+		return false
+	end
+	if gesture_start_attempt ~= nil then
+		Logger.warn(LOG, "Gesture startup refused while another start attempt is active.")
+		return false
+	end
 	if not touchdevice then
 		Logger.warn(LOG, "Touchdevice API is not available — gestures module disabled on this runtime.")
 		return
 	end
 	-- A reload, duplicate start, or earlier failed rollback can leave exact native
 	-- owners published. Settle them before creating any successor capability.
+	local entry_enabled = CoreState.enabled == true
 	if gesture_primer or sleep_watcher or discovery_timer
 		or next(discovery_cleanup_debt) ~= nil or next(touch_watchers) ~= nil then
-		if M.stop() ~= true then
+		if teardown_gesture_runtime(true) ~= true then
 			Logger.error(LOG, "Gesture startup refused while prior cleanup remains pending.")
 			return false
 		end
+	end
+	if CoreState.suspended == true then
+		local cleanup_ok, cleanup_result = xpcall(
+			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Gesture startup cleanup after owner settlement did not commit: %s.",
+				tostring(cleanup_result))
+		end
+		return false
+	end
+	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
+	local start_attempt = {
+		epoch = gesture_lifecycle_epoch,
+		previous_enabled = entry_enabled,
+	}
+	gesture_start_attempt = start_attempt
+	local function reject_attempt(reason)
+		local paused_during_start = CoreState.suspended == true
+		if paused_during_start then
+			Logger.error(LOG, "Gesture startup rejected: %s.", tostring(reason))
+			gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
+			gesture_start_attempt = nil
+			local rollback_settled = teardown_gesture_runtime(true)
+			CoreState.enabled = start_attempt.previous_enabled
+			CoreState.suspended = true
+			gesture_resume_start_required = start_attempt.previous_enabled == true
+			if rollback_settled ~= true then
+				Logger.error(LOG,
+					"Gesture PAUSE startup rollback remains incomplete and retryable.")
+			end
+		else
+			reject_gesture_start(reason)
+		end
+		return false
+	end
+	local action_lifecycle = CoreState.enabled == true
+		and Actions.resume_after_cleanup or Actions.force_cleanup
+	local actions_ok, actions_result = xpcall(
+		action_lifecycle, debug.traceback, GESTURE_ACTION_PARENT)
+	if not actions_ok or actions_result ~= true then
+		Logger.error(LOG, "Gesture startup refused while action cleanup remains pending: %s.",
+			tostring(actions_result))
+		return reject_attempt("action lifecycle did not commit: " .. tostring(actions_result))
+	end
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during action lifecycle")
 	end
 	if engine_needs_init then
 		local engine_ok, engine_err = xpcall(function()
 			return Engine.init(CoreState, Actions)
 		end, debug.traceback)
 		if not engine_ok or engine_err == false then
-			return reject_gesture_start("engine reinitialization failed: " .. tostring(engine_err))
+			return reject_attempt("engine reinitialization failed: " .. tostring(engine_err))
+		end
+		if not gesture_start_is_current(start_attempt) then
+			return reject_attempt("startup superseded during engine initialization")
 		end
 		engine_needs_init = false
 	end
@@ -1000,6 +1245,9 @@ function M.start()
 
 	-- Enumerate devices before doing anything.
 	local pre_devices = enumerate_devices()
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during device enumeration")
+	end
 	Logger.info(LOG, "touchdevice.devices() returned %d device(s) at startup", #pre_devices)
 	for i, id in ipairs(pre_devices) do
 		Logger.info(LOG, "  pre-init device #%d: id=%s", i, tostring(id))
@@ -1014,6 +1262,9 @@ function M.start()
 	-- 1. Pre-warm all lazy Hammerspoon modules so the first gesture fires fast.
 	Logger.info(LOG, "STEP 1/4: pre-warming Hammerspoon dependencies…")
 	prewarm_dependencies()
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during dependency prewarm")
+	end
 
 	-- 2. Prime the WindowServer HID routing tree by consuming gesture events.
 	-- Without this consumer, the OS never initialises the gesture dispatch
@@ -1065,7 +1316,10 @@ function M.start()
 		return primer_candidate
 	end, debug.traceback)
 	if not ok_tap or new_tap == nil or type(new_tap.start) ~= "function" then
-		return reject_gesture_start("primer construction failed: " .. tostring(new_tap))
+		return reject_attempt("primer construction failed: " .. tostring(new_tap))
+	end
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during primer construction")
 	end
 	gesture_primer = new_tap
 	_G.ERGOPTI_GESTURE_PRIMER = gesture_primer
@@ -1080,7 +1334,10 @@ function M.start()
 	end
 	if not primer_start_ok or primer_start_result == false
 		or not primer_enabled_ok or primer_enabled ~= true then
-		return reject_gesture_start("primer start failed: " .. tostring(primer_start_result))
+		return reject_attempt("primer start failed: " .. tostring(primer_start_result))
+	end
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during primer start")
 	end
 	gesture_primer_committed = true
 	Logger.info(LOG, "  primer eventtap committed")
@@ -1088,8 +1345,14 @@ function M.start()
 	-- 3. Immediate first attachment attempt.
 	Logger.info(LOG, "STEP 3/4: kickstart HID + first watcher recycle…")
 	kickstart_hid()
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during HID kickstart")
+	end
 	if recycle_watchers() ~= true then
-		return reject_gesture_start("touch watcher acquisition failed")
+		return reject_attempt("touch watcher acquisition failed")
+	end
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during touch watcher acquisition")
 	end
 
 	-- 4. Startup phase: a single safety-net recycle + first-frame detection.
@@ -1103,6 +1366,9 @@ function M.start()
 		M.stop()
 		return false
 	end
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during discovery timer acquisition")
+	end
 
 	-- 5. Wake-from-sleep watcher (BetterTouchTool pattern). Sleep can silently
 	-- tear down the multitouch subscription on some hardware; we re-create the
@@ -1110,7 +1376,7 @@ function M.start()
 	Logger.info(LOG, "STEP 5/5: arming wake-from-sleep watcher…")
 	local ok_cw, cw_module = pcall(require, "hs.caffeinate.watcher")
 	if not ok_cw or type(cw_module) ~= "table" or type(cw_module.new) ~= "function" then
-		return reject_gesture_start("wake watcher module unavailable: " .. tostring(cw_module))
+		return reject_attempt("wake watcher module unavailable: " .. tostring(cw_module))
 	end
 	local wake_candidate = nil
 	local wake_new_ok, wake_or_err = xpcall(function()
@@ -1128,7 +1394,10 @@ function M.start()
 		return wake_candidate
 	end, debug.traceback)
 	if not wake_new_ok or wake_or_err == nil or type(wake_or_err.start) ~= "function" then
-		return reject_gesture_start("wake watcher construction failed: " .. tostring(wake_or_err))
+		return reject_attempt("wake watcher construction failed: " .. tostring(wake_or_err))
+	end
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during wake watcher construction")
 	end
 	sleep_watcher = wake_or_err
 	_G.ERGOPTI_SLEEP_WATCHER = sleep_watcher
@@ -1136,11 +1405,19 @@ function M.start()
 		return sleep_watcher:start()
 	end, debug.traceback)
 	if not wake_start_ok or wake_start_result == false then
-		return reject_gesture_start("wake watcher start failed: " .. tostring(wake_start_result))
+		return reject_attempt("wake watcher start failed: " .. tostring(wake_start_result))
+	end
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded during wake watcher start")
 	end
 	sleep_watcher_committed = true
 	Logger.info(LOG, "  wake-from-sleep watcher committed")
 
+	if not gesture_start_is_current(start_attempt) then
+		return reject_attempt("startup superseded before final commit")
+	end
+	gesture_start_attempt = nil
+	gesture_resume_start_required = false
 	Logger.success(LOG, "============== gestures module startup COMPLETE — primer events so far: %d ==============", primer_event_count)
 	return true
 end
@@ -1148,43 +1425,10 @@ end
 --- Stops all multitouch listeners and background timers.
 function M.stop()
 	Logger.start(LOG, "Stopping gestures module…")
-
-	-- 0. Release any held synthetic clicks BEFORE disabling so the mouse-up
-	--    events are still dispatched while the module is logically running.
-	--    Skipping this leaves the OS stuck with a button held down
-	--    (gesture-stuck-click-on-stop).
-	local cleanup_ok, cleanup_result = xpcall(Actions.force_cleanup, debug.traceback)
-
-	CoreState.enabled = false
-
-	-- 1. Stop watchers — detach only, no re-attachment on teardown
-	local watchers_stopped = recycle_watchers(false)
-	
-	-- 2. Stop eventtap primer
-	local primer_stopped = stop_gesture_primer()
-
-	-- 3. Stop timers
-	local timer_stopped = cancel_discovery_timer("module stop")
-
-	-- 4. Stop sleep watcher
-	local wake_watcher_stopped = stop_sleep_watcher()
-
-	-- 5. Stop engine (releases scroll-blocker eventtap; must come after primer/watchers
-	--    so any in-flight frame processing sees CoreState.enabled=false first)
-	local engine_stopped, engine_stop_result = xpcall(Engine.stop, debug.traceback)
-	if engine_stopped and engine_stop_result ~= false then
-		engine_needs_init = true
-	else
-		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
-	end
-
-	if not cleanup_ok or cleanup_result == false
-		or watchers_stopped ~= true or timer_stopped ~= true
-		or primer_stopped ~= true or wake_watcher_stopped ~= true
-		or not engine_stopped or engine_stop_result == false then
-		Logger.error(LOG, "Gestures module stop incomplete; native cleanup is retryable.")
-		return false
-	end
+	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
+	gesture_start_attempt = nil
+	gesture_resume_start_required = false
+	if teardown_gesture_runtime(false) ~= true then return false end
 	Logger.success(LOG, "Gestures module stopped.")
 	return true
 end

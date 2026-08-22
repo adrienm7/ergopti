@@ -39,8 +39,13 @@ local function with_profiles_fixture(options, body)
 
 	local ok, err = xpcall(function()
 		local runtime_profiles = {}
+		local runtime_registry = {}
+		local registry_calls = 0
+		local active_calls = 0
 		local runtime_profile = options.active_profile or "basic"
 		local notification_count = 0
+		local error_count = 0
+		local editor_calls = 0
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function() return "button.delete" end,
 		}
@@ -48,7 +53,9 @@ local function with_profiles_fixture(options, body)
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		local logger = helpers.make_logger_stub()
+		logger.error = function() error_count = error_count + 1 end
+		package.loaded["infra.logger"] = logger
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 		}
@@ -63,11 +70,30 @@ local function with_profiles_fixture(options, body)
 				{id = "advanced", label = "Advanced"},
 			},
 			set_active_profile = function(profile_id)
+				active_calls = active_calls + 1
 				runtime_profiles[#runtime_profiles + 1] = profile_id
 				runtime_profile = profile_id
+				local refuse = options.active_setter_mode ~= nil
+					and active_calls == (options.active_setter_occurrence or 1)
+				if refuse and options.active_setter_mode == "throw" then
+					error("injected active-profile refusal")
+				end
+				if refuse and options.active_setter_mode == "nil" then return nil end
+				if refuse and options.active_setter_mode == "false" then return false end
 				return true
 			end,
-			set_user_profiles = function() return true end,
+			set_user_profiles = function(profiles)
+				registry_calls = registry_calls + 1
+				runtime_registry = profiles
+				local refuse = options.registry_setter_mode ~= nil
+					and registry_calls == (options.registry_setter_occurrence or 1)
+				if refuse and options.registry_setter_mode == "throw" then
+					error("injected user-profile refusal")
+				end
+				if refuse and options.registry_setter_mode == "nil" then return nil end
+				if refuse and options.registry_setter_mode == "false" then return false end
+				return true
+			end,
 			get_active_profile = function() return {id = runtime_profile} end,
 		}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
@@ -76,8 +102,13 @@ local function with_profiles_fixture(options, body)
 		package.loaded["ui.menu.shortcut_utils"] = {prompt_shortcut = function() end}
 		package.loaded["ui.prompt_editor"] = {
 			open = function(profile, callback)
+				editor_calls = editor_calls + 1
 				if profile == nil then
 					callback({id = "user_created", label = "Created"})
+				elseif options.edit_update_label ~= nil then
+					callback({id = profile.id, label = options.edit_update_label})
+				elseif type(options.edit_update) == "table" then
+					callback(options.edit_update)
 				end
 				return true
 			end,
@@ -107,6 +138,14 @@ local function with_profiles_fixture(options, body)
 		local direct_menus = 0
 		local shortcut_clears = 0
 		local recommendations = {}
+		local manager
+		local save_hook_fired = false
+		local function strict_result(mode, label)
+			if mode == "throw" then error("injected " .. label .. " refusal") end
+			if mode == "nil" then return nil end
+			if mode == "false" then return false end
+			return true
+		end
 		local deps = {
 			state = state,
 			script_control = {is_paused = function() return false end},
@@ -154,10 +193,22 @@ local function with_profiles_fixture(options, body)
 			end,
 			save_prefs = function()
 				direct_saves = direct_saves + 1
+				if not save_hook_fired and type(options.save_hook) == "function" then
+					save_hook_fired = true
+					options.save_hook(manager)
+				end
+				if options.save_mode ~= nil
+					and direct_saves == (options.save_occurrence or 1) then
+					return strict_result(options.save_mode, "profile save")
+				end
 				return true
 			end,
 			update_menu = function()
 				direct_menus = direct_menus + 1
+				if options.menu_mode ~= nil
+					and direct_menus == (options.menu_occurrence or 1) then
+					return strict_result(options.menu_mode, "profile menu")
+				end
 				return true
 			end,
 		}
@@ -182,7 +233,7 @@ local function with_profiles_fixture(options, body)
 		end
 
 		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
-		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
+		manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
 		body({
 			manager = manager,
 			state = state,
@@ -192,6 +243,12 @@ local function with_profiles_fixture(options, body)
 			shortcut_clears = function() return shortcut_clears end,
 			recommendations = recommendations,
 			notifications = function() return notification_count end,
+			runtime_profiles = runtime_profiles,
+			runtime_registry = function() return runtime_registry end,
+			registry_calls = function() return registry_calls end,
+			active_calls = function() return active_calls end,
+			errors = function() return error_count end,
+			editor_calls = function() return editor_calls end,
 		})
 	end, debug.traceback)
 
@@ -201,6 +258,168 @@ local function with_profiles_fixture(options, body)
 end
 
 helpers.describe("HS-029 profiles manager activation ownership", function()
+	for _, setter in ipairs({"registry", "active"}) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("HS-012 refuses a live manager after initial " .. setter
+				.. " setter " .. mode, function()
+				local options = {
+					active_profile = "user_custom",
+					user_profiles = {{id = "user_custom", label = "Custom"}},
+				}
+				options[setter .. "_setter_mode"] = mode
+				with_profiles_fixture(options, function(fixture)
+					helpers.assert_eq(fixture.manager, nil)
+					if setter == "registry" then
+						helpers.assert_eq(fixture.active_calls(), 0,
+							"active identity cannot follow a refused registry")
+					end
+					helpers.assert_true(fixture.errors() >= 2)
+				end)
+			end)
+		end
+	end
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("HS-012 stops edited-profile publication after active setter "
+			.. mode, function()
+			with_profiles_fixture({
+				active_profile = "user_custom",
+				active_setter_mode = mode,
+				active_setter_occurrence = 2,
+				user_profiles = {{id = "user_custom", label = "Custom"}},
+				edit_update = {id = "user_custom", label = "Updated"},
+			}, function(fixture)
+				local rows = fixture.manager.get_menu_item().menu
+				local custom = find_row(rows, "Custom")
+				local edit = find_row(custom.items, "menu.profiles.edit_profile")
+				helpers.assert_type(edit.action, "function")
+				edit.action()
+				helpers.assert_eq(#fixture.runtime_profiles, 3,
+					"the refused active identity must be reasserted exactly")
+				helpers.assert_eq(fixture.state.llm_user_profiles[1].label, "Custom")
+				helpers.assert_eq(fixture.runtime_registry()[1].label, "Custom")
+				helpers.assert_eq(fixture.direct_saves(), 0,
+					"a refused identity cannot publish edited preferences")
+				helpers.assert_eq(fixture.direct_menus(), 0)
+				helpers.assert_eq(fixture.notifications(), 0)
+				helpers.assert_true(fixture.errors() >= 1)
+			end)
+		end)
+	end
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("HS-012 rolls back edited registry setter " .. mode, function()
+			with_profiles_fixture({
+				active_profile = "user_custom",
+				registry_setter_mode = mode,
+				registry_setter_occurrence = 2,
+				user_profiles = {{id = "user_custom", label = "Custom"}},
+				edit_update = {id = "user_custom", label = "Updated"},
+			}, function(fixture)
+				local rows = fixture.manager.get_menu_item().menu
+				local custom = find_row(rows, "Custom")
+				local edit = find_row(custom.items, "menu.profiles.edit_profile")
+				helpers.assert_eq(edit.action(), true,
+					"the editor timer owns dispatch even when its callback rejects")
+				helpers.assert_eq(fixture.registry_calls(), 3)
+				helpers.assert_eq(fixture.active_calls(), 1,
+					"active publication cannot follow a refused candidate registry")
+				helpers.assert_eq(fixture.state.llm_user_profiles[1].label, "Custom")
+				helpers.assert_eq(fixture.runtime_registry()[1].label, "Custom")
+				helpers.assert_eq(fixture.direct_saves(), 0)
+				helpers.assert_eq(fixture.direct_menus(), 0)
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({"save", "menu"}) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("HS-012 rolls back edited profile after " .. boundary
+				.. " boundary " .. mode, function()
+			local options = {
+				active_profile = "user_custom",
+				user_profiles = {{id = "user_custom", label = "Custom"}},
+				edit_update = {id = "user_custom", label = "Updated"},
+			}
+			options[boundary .. "_mode"] = mode
+			with_profiles_fixture(options, function(fixture)
+				local rows = fixture.manager.get_menu_item().menu
+				local custom = find_row(rows, "Custom")
+				local edit = find_row(custom.items, "menu.profiles.edit_profile")
+				helpers.assert_eq(edit.action(), true)
+				helpers.assert_eq(fixture.state.llm_user_profiles[1].label, "Custom")
+				helpers.assert_eq(fixture.runtime_registry()[1].label, "Custom")
+				helpers.assert_eq(fixture.active_calls(),
+					boundary == "save" and 4 or 5,
+					"rollback must reassert the prior active identity after opaque callbacks")
+				helpers.assert_eq(fixture.notifications(), 0)
+				if boundary == "save" then
+					helpers.assert_eq(fixture.direct_saves(), 2)
+					helpers.assert_eq(fixture.direct_menus(), 0)
+				else
+					helpers.assert_eq(fixture.direct_saves(), 2)
+					helpers.assert_eq(fixture.direct_menus(), 2)
+				end
+			end)
+		end)
+		end
+	end
+
+	helpers.it("HS-012 fences a nested edit for the full opaque save boundary", function()
+		local nested_dispatched = false
+		with_profiles_fixture({
+			active_profile = "user_custom",
+			user_profiles = {{id = "user_custom", label = "Custom"}},
+			edit_update = {id = "user_custom", label = "Updated"},
+			save_hook = function(manager)
+				local rows = manager.get_menu_item().menu
+				local updated = find_row(rows, "Updated")
+				local edit = find_row(updated.items, "menu.profiles.edit_profile")
+				nested_dispatched = edit.action()
+			end,
+		}, function(fixture)
+			local rows = fixture.manager.get_menu_item().menu
+			local custom = find_row(rows, "Custom")
+			local edit = find_row(custom.items, "menu.profiles.edit_profile")
+			helpers.assert_eq(edit.action(), true)
+			helpers.assert_eq(nested_dispatched, false,
+				"the nested edit must be refused before it can acquire a timer")
+			helpers.assert_eq(fixture.editor_calls(), 1,
+				"the nested edit must stop before reopening its opaque editor callback")
+			helpers.assert_eq(fixture.state.llm_user_profiles[1].label, "Updated")
+			helpers.assert_eq(fixture.runtime_registry()[1].label, "Updated")
+			helpers.assert_eq(fixture.notifications(), 1)
+		end)
+	end)
+
+	for _, setter in ipairs({"registry", "active"}) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("HS-012 rolls back cloned-profile edit " .. setter
+				.. " setter " .. mode, function()
+				local options = {edit_update_label = "Updated clone"}
+				options[setter .. "_setter_mode"] = mode
+				options[setter .. "_setter_occurrence"] = setter == "registry" and 3 or 2
+				with_profiles_fixture(options, function(fixture)
+					local rows = fixture.manager.get_menu_item().menu
+					local clone = find_row(rows, "menu.profiles.clone_builtin")
+					helpers.assert_eq(clone.action(), true)
+					helpers.assert_eq(#fixture.state.llm_user_profiles, 1)
+					helpers.assert_true(
+						fixture.state.llm_user_profiles[1].label ~= "Updated clone")
+					helpers.assert_true(
+						fixture.runtime_registry()[1].label ~= "Updated clone")
+					helpers.assert_eq(fixture.direct_saves(), 0)
+					helpers.assert_eq(fixture.direct_menus(), 0)
+					if setter == "registry" then
+						helpers.assert_eq(fixture.registry_calls(), 4)
+					else
+						helpers.assert_eq(fixture.active_calls(), 3)
+					end
+				end)
+			end)
+		end
+	end
+
 	helpers.it("HS-029 routes cloned-profile activation through the intent owner", function()
 		with_profiles_fixture({}, function(fixture)
 			local rows = fixture.manager.get_menu_item().menu

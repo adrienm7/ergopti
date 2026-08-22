@@ -34,6 +34,11 @@ local LOG = "adapters.modifier_injector"
 -- The live tap while armed; nil otherwise.
 local _tap = nil
 
+-- Logical delivery authority is revoked before native cleanup.  A refused
+-- eventtap stop therefore leaves one retryable capability, never a callback
+-- that can still mutate a key while the gesture runtime is suspended.
+local _delivering = false
+
 -- Flags to add to the next key event, as a set { cmd = true, … }.
 local _flags = {}
 
@@ -51,13 +56,43 @@ local _on_applied = nil
 -- =========================================
 
 --- Stops and forgets the tap. Safe to call when not armed.
+--- The exact handle is retained when native cleanup refuses or cannot be
+--- observed, so a later pause/clear can retry the same capability.
+--- @return boolean settled True only after the tap is observably disabled.
 function M.disarm()
-	if _tap then
-		pcall(function() _tap:stop() end)
-		_tap = nil
-	end
+	local tap = _tap
+	_delivering = false
 	_flags      = {}
 	_on_applied = nil
+	if not tap then return true end
+
+	local method_ok, stop_method = pcall(function() return tap.stop end)
+	if not method_ok or type(stop_method) ~= "function" then
+		Logger.error(LOG, "disarm(): eventtap stop is unavailable; exact handle retained.")
+		return false
+	end
+	local stopped, stop_result = xpcall(function()
+		return stop_method(tap)
+	end, debug.traceback)
+	local probe_ok, enabled = xpcall(function()
+		if type(tap.isEnabled) ~= "function" then
+			error("eventtap isEnabled is unavailable")
+		end
+		return tap:isEnabled()
+	end, debug.traceback)
+	if not stopped or stop_result == nil or stop_result == false
+		or not probe_ok or enabled ~= false then
+		Logger.error(LOG,
+			"disarm(): eventtap stop did not settle; exact handle retained — %s.",
+			tostring(not stopped and stop_result
+				or (stop_result == nil and "returned nil")
+				or (stop_result == false and "returned false")
+				or (not probe_ok and enabled)
+				or "tap remained enabled"))
+		return false
+	end
+	if _tap == tap then _tap = nil end
+	return true
 end
 
 --- Arms a set of modifier flags for the next key event.
@@ -82,12 +117,37 @@ function M.arm(flags, on_applied)
 		return false
 	end
 
+	-- A prior refused disarm is logically fenced but still owns its exact tap.
+	-- Never acquire a successor until that same handle settles.
+	if _tap and _delivering ~= true and M.disarm() ~= true then
+		Logger.error(LOG, "arm(): prior eventtap cleanup is still pending — refusing a successor arm.")
+		return false
+	end
+
 	_flags      = copy
 	_on_applied = type(on_applied) == "function" and on_applied or nil
 
-	if _tap then return true end
+	if _tap then
+		local probe_ok, enabled = xpcall(function()
+			if type(_tap.isEnabled) ~= "function" then error("eventtap isEnabled is unavailable") end
+			return _tap:isEnabled()
+		end, debug.traceback)
+		if probe_ok and enabled == true then
+			_delivering = true
+			return true
+		end
+		_delivering = false
+		if M.disarm() ~= true then
+			Logger.error(LOG, "arm(): existing eventtap is not enabled and could not be released.")
+			return false
+		end
+		_flags      = copy
+		_on_applied = type(on_applied) == "function" and on_applied or nil
+	end
 
+	local tap_candidate = nil
 	local ok, tap_or_err = pcall(hs.eventtap.new, { hs.eventtap.event.types.keyDown }, function(event)
+		if _delivering ~= true or _tap ~= tap_candidate then return false end
 		local provenance, status, fence = EventProvenance.classify_with_fence(
 			event, "modifier_injector")
 		local fence_events = fence and fence.events or nil
@@ -133,15 +193,38 @@ function M.arm(flags, on_applied)
 
 	if not ok then
 		Logger.error(LOG, "arm(): hs.eventtap.new failed — %s", tostring(tap_or_err))
+		_delivering = false
+		_flags      = {}
+		_on_applied = nil
+		return false
+	end
+	if tap_or_err == nil or tap_or_err == false then
+		Logger.error(LOG, "arm(): hs.eventtap.new returned no handle.")
+		_delivering = false
 		_flags      = {}
 		_on_applied = nil
 		return false
 	end
 
-	_tap = tap_or_err
-	local ok_start, err = pcall(function() _tap:start() end)
-	if not ok_start then
-		Logger.error(LOG, "arm(): eventtap:start() failed — %s", tostring(err))
+	tap_candidate = tap_or_err
+	_tap = tap_candidate
+	_delivering = true
+	local ok_start, start_result = xpcall(function() return tap_candidate:start() end,
+		debug.traceback)
+	local probe_ok, enabled = xpcall(function()
+		if type(tap_candidate.isEnabled) ~= "function" then
+			error("eventtap isEnabled is unavailable")
+		end
+		return tap_candidate:isEnabled()
+	end, debug.traceback)
+	if not ok_start or start_result == nil or start_result == false
+		or not probe_ok or enabled ~= true then
+		Logger.error(LOG, "arm(): eventtap:start() did not commit — %s",
+			tostring(not ok_start and start_result
+				or (start_result == nil and "returned nil")
+				or (start_result == false and "returned false")
+				or (not probe_ok and enabled)
+				or "tap remained disabled"))
 		M.disarm()
 		return false
 	end
@@ -151,7 +234,7 @@ end
 --- True while a set of flags is waiting for the next key event.
 --- @return boolean
 function M.is_armed()
-	return _tap ~= nil
+	return _tap ~= nil and _delivering == true
 end
 
 return M

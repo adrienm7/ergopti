@@ -27,9 +27,11 @@ local MODULES = {
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
+	"adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
+	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
 }
 
@@ -89,17 +91,6 @@ local function with_fixture(save_results, callback)
 			local rendered = copy_identity(state)
 			local logger = helpers.make_logger_stub()
 			logger.UNIFIED_LOG_FILE = "/tmp/ergopti-hs032.log"
-			local base_callback = logger.callback
-			logger.callback = function(log_name, label, native_callback, ...)
-				local ok, result = base_callback(log_name, label, native_callback, ...)
-				if label == "Ollama requirement success" then
-					records.terminals[#records.terminals + 1] = ok and result ~= false
-						and "success" or "failure"
-				elseif label == "Ollama requirement cancellation" then
-					records.terminals[#records.terminals + 1] = "failure"
-				end
-				return ok, result
-			end
 
 			local hs_fixture = {
 				execute = function() return "", true end,
@@ -141,6 +132,38 @@ local function with_fixture(save_results, callback)
 				end,
 			}
 			package.loaded["adapters.timer_scheduler"] = {}
+			package.loaded["adapters.http_client"] = {
+				new = function()
+					local client = { settled = false, observers = {} }
+					function client.post(_, _, _, done)
+						loadability_callbacks[#loadability_callbacks + 1] = function(status, body, headers)
+							local result = done({ status = status, body = body, headers = headers })
+							if not client.settled then
+								client.settled = true
+								local observers = client.observers
+								client.observers = {}
+								for _, observer in ipairs(observers) do observer() end
+							end
+							return result
+						end
+						return true
+					end
+					function client.cancel()
+						client.settled = true
+						local observers = client.observers
+						client.observers = {}
+						for _, observer in ipairs(observers) do observer() end
+						return true
+					end
+					function client.onSettled(observer)
+						if client.settled then observer() else
+							client.observers[#client.observers + 1] = observer
+						end
+						return true
+					end
+					return client
+				end,
+			}
 			package.loaded["ui.download_window"] = {
 				show = function() return true end,
 				update = function() return true end,
@@ -211,6 +234,18 @@ local function with_fixture(save_results, callback)
 			manager.get_actual_model_name = function(name) return name end
 			manager.get_model_info = function() return {params = 1, type = "chat"} end
 			manager.get_presets = function() return presets end
+			local check_requirements = manager.check_requirements
+			manager.check_requirements = function(model, on_success, on_cancel, opts)
+				return check_requirements(model, function(...)
+					local accepted = on_success(...)
+					records.terminals[#records.terminals + 1] = accepted == true
+						and "success" or "failure"
+					return accepted
+				end, function(...)
+					records.terminals[#records.terminals + 1] = "failure"
+					return on_cancel(...)
+				end, opts)
+			end
 
 			local switcher = require("ui.menu.menu_llm.model_switcher").new({
 				state = state,

@@ -9,14 +9,14 @@
 --- invariant, "pause = absolutely nothing activates", forbids outright.
 ---
 --- ROOT CAUSE ENCODED:
---- A whole subsystem outside the pause reactor. The gate answers the caller
---- instead of returning silently: a warmup waiting on a callback that never
---- fires is how the prediction lock gets stuck for the rest of the session.
+--- A whole subsystem outside the pause reactor. A paused refusal must answer
+--- through its boolean return without re-entering the warmup callback: that
+--- callback calls warmup() again and used to recurse while PAUSED.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("api_mlx_discovery: paused means no probe and no dropped caller", function()
+helpers.describe("api_mlx_discovery: paused means a non-reentrant refusal", function()
 
 	local function load_gated(paused)
 		package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return paused end }
@@ -32,31 +32,30 @@ helpers.describe("api_mlx_discovery: paused means no probe and no dropped caller
 			return { post = function() end, get = function() end }
 		end }
 
-		D.discover(function() end)
+		helpers.assert_eq(D.discover(function() end), false)
 
 		helpers.assert_eq(posts, 0,
 			"a paused script must not POST inference probes at the MLX server")
 	end)
 
-	helpers.it("still answers the caller instead of dropping it", function()
+	helpers.it("does not re-enter the rejected caller synchronously", function()
 		local D = load_gated(true)
 		local answered = false
-		D.discover(function() answered = true end)
+		local accepted = D.discover(function() answered = true end)
 
-		helpers.assert_true(answered,
-			"the callback must fire even when the probe is refused; a warmup left waiting on a "
-			.. "callback that never comes holds the prediction lock for the rest of the session")
+		helpers.assert_eq(accepted, false,
+			"the return value must expose that paused discovery acquired no continuation")
+		helpers.assert_eq(answered, false,
+			"the rejected callback must remain inert instead of recursively re-entering warmup")
 	end)
 
 	helpers.it("is not a blanket mute — an unpaused script still starts discovery", function()
 		local D = load_gated(false)
 		-- This case exists so the two above cannot pass against a discover() that
-		-- never runs. Called directly, and asserting the ANSWER: a discovery that
-		-- returned nothing is indistinguishable from one that was gated off, which is
-		-- exactly the confusion this case is here to prevent.
+		-- never runs. Called directly, and asserting the exact acquisition answer.
 		local started = D.discover(function() end)
-		helpers.assert_true(started == nil or type(started) == "boolean",
-			"an unpaused discover() must answer whether it started")
+		helpers.assert_eq(started, true,
+			"an unpaused discover() must commit one discovery continuation")
 	end)
 
 end)

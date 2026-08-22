@@ -53,6 +53,7 @@ local LOG = "shortcuts.script_control"
 local KEYCODE_RETURN_SENTINEL    = Keycodes.F13_KARABINER_RETURN
 local KEYCODE_BACKSPACE_SENTINEL = Keycodes.F14_KARABINER_BACKSPACE
 local KEYCODE_ESCAPE_SENTINEL    = Keycodes.F15_KARABINER_ESCAPE
+local SCRIPT_CONTROL_SHORTCUT_CLAIM = "script_control"
 
 -- Physical keycodes used in the Karabiner-paused fallback path below. When KE is
 -- running the sentinels above are the sole dispatch mechanism; this fallback
@@ -98,6 +99,40 @@ local _key_actions     = {return_key = "script_pause_toggle", backspace = "scrip
 local _on_pause_change = nil
 local _extras          = {}
 
+-- Runtime owners created by the menu layer register under this fixed inventory.
+-- The order is deliberate: backend-local dependency processes are fenced and
+-- joined before menu activation/switch/startup continuations are unwound.
+local DYNAMIC_PAUSE_OWNER_ORDER = {
+	"mlx_dependency_bootstrap",
+	"ollama_dependency_bootstrap",
+	"mlx_model_maintenance",
+	"ollama_model_maintenance",
+	"llm_activation",
+	"llm_model_switcher",
+	"llm_startup",
+}
+local DYNAMIC_PAUSE_OWNER_SET = {}
+for _, owner_name in ipairs(DYNAMIC_PAUSE_OWNER_ORDER) do
+	DYNAMIC_PAUSE_OWNER_SET[owner_name] = true
+end
+local _dynamic_pause_owners = {}
+-- Monotonic identity for the runtime owner inventory. A registration can occur
+-- synchronously inside another owner's pause/resume callback; transactions must
+-- then reject the stale prebuilt inventory instead of publishing a state that
+-- omitted the newly registered owner.
+local _dynamic_pause_owner_version = 0
+local _paused_owner_steps = nil
+-- Reversible owners whose inverse refused during an uncommitted pause remain
+-- part of the next pause inventory even when their live snapshot now reports
+-- inactive. Without this ledger, a failed bindings/WPM restore could be skipped
+-- by the retry and then never receive the eventual committed resume.
+local _pause_rollback_debt_steps = nil
+-- A failed RESUME can activate an owner and then fail to re-pause it during
+-- rollback. Keep that opposite-direction debt separate from the normal paused
+-- owner ledger: before any later resume may acquire successors, the exact
+-- re-pause operation must first settle.
+local _resume_rollback_debt_steps = nil
+
 local _keymap     = nil
 local _shortcuts  = nil
 local _gestures   = nil
@@ -105,9 +140,6 @@ local _karabiner  = nil
 
 -- Pre-pause snapshots: only re-enable sub-systems that were active before the
 -- pause, so a user-disabled gesture or shortcut set stays off after unpause.
-local _gestures_were_enabled  = false
-local _shortcuts_were_running = false
-
 -- The dedicated script-control tap deliberately survives a pause so the user
 -- can recover or terminate the host. Only lifecycle actions keep that privilege;
 -- an arbitrary UI/gesture action assigned to the same three physical slots must
@@ -209,9 +241,9 @@ end
 -- ==============================
 -- ==============================
 
---- Calls one lifecycle operation without swallowing a thrown error or an
---- explicit false result. Legacy lifecycle functions return nil on success,
---- so only the explicit false sentinel is a rejected operation.
+--- Calls one pause-owner lifecycle operation through its exact settlement
+--- contract. A nil return is not evidence that an asynchronous or native owner
+--- is quiescent; every registered operation must explicitly return true.
 --- @param label string Stable operation name for diagnostics.
 --- @param action function Operation to call.
 --- @return boolean ok
@@ -221,8 +253,8 @@ local function call_lifecycle_operation(label, action)
 	if not ok_call then
 		return false, string.format("%s raised: %s", label, tostring(result))
 	end
-	if result == false then
-		return false, string.format("%s returned false: %s", label, tostring(detail))
+	if result ~= true then
+		return false, string.format("%s returned %s: %s", label, tostring(result), tostring(detail))
 	end
 	return true, nil
 end
@@ -233,8 +265,10 @@ end
 --- @param operation string Human-readable transaction name.
 --- @param applied table[] Applied descriptors in forward order.
 --- @return string|nil Joined rollback failures, if any.
+--- @return table[] Exact reversible descriptors still owing restoration.
 local function rollback_lifecycle_operations(operation, applied)
 	local failures = {}
+	local unsettled_reverse = {}
 	for index = #applied, 1, -1 do
 		local step = applied[index]
 		local ok_rollback, rollback_reason = call_lifecycle_operation(
@@ -243,11 +277,16 @@ local function rollback_lifecycle_operations(operation, applied)
 		)
 		if not ok_rollback then
 			failures[#failures + 1] = rollback_reason
+			unsettled_reverse[#unsettled_reverse + 1] = step
 			Logger.error(LOG, "%s rollback failed: %s.", operation, tostring(rollback_reason))
 		end
 	end
-	if #failures == 0 then return nil end
-	return table.concat(failures, "; ")
+	local unsettled = {}
+	for index = #unsettled_reverse, 1, -1 do
+		unsettled[#unsettled + 1] = unsettled_reverse[index]
+	end
+	if #failures == 0 then return nil, unsettled end
+	return table.concat(failures, "; "), unsettled
 end
 
 --- Reads one boolean lifecycle snapshot without letting a dependency throw out
@@ -283,9 +322,20 @@ local function pause_all()
 	-- test_script_control.lua). Once the eventtap exists, every injected driver
 	-- dependency is required; a partial pause would be a false PAUSED state.
 	local enforce_dependencies = _tap ~= nil
+	local prior_debt = _pause_rollback_debt_steps or {}
+	local owner_version = _dynamic_pause_owner_version
+	local prior_debt_by_label = {}
+	for _, debt_step in ipairs(prior_debt) do
+		prior_debt_by_label[debt_step.label] = debt_step
+	end
 	local steps = {}
+	local step_labels = {}
 	local shortcuts_were_running = false
+	local shortcuts_have_cleanup_debt = false
+	local shortcuts_have_reversible_debt = prior_debt_by_label["shortcuts.pause_bindings"] ~= nil
+		or prior_debt_by_label["shortcuts.stop"] ~= nil
 	local gestures_were_enabled = false
+	local ok_step, step_reason
 
 	local function dependency_failure(reason)
 		if enforce_dependencies then return false, reason end
@@ -293,7 +343,13 @@ local function pause_all()
 		return true, nil
 	end
 
-	local function add_required_step(label, action, rollback, one_way_contract)
+	local function add_required_step(label, action, rollback, one_way_contract, resume_label)
+		local retained = prior_debt_by_label[label]
+		if retained then
+			steps[#steps + 1] = retained
+			step_labels[label] = true
+			return true, nil
+		end
 		if type(action) ~= "function" then
 			return dependency_failure(label .. " API unavailable")
 		end
@@ -308,7 +364,9 @@ local function pause_all()
 			action = action,
 			rollback = rollback,
 			one_way_contract = one_way_contract,
+			resume_label = resume_label,
 		}
+		step_labels[label] = true
 		return true, nil
 	end
 
@@ -329,6 +387,20 @@ local function pause_all()
 	if enforce_dependencies and not _shortcuts then return false, "shortcuts dependency unavailable" end
 	if enforce_dependencies and not _gestures then return false, "gestures dependency unavailable" end
 
+	for _, owner_name in ipairs(DYNAMIC_PAUSE_OWNER_ORDER) do
+		local owner = _dynamic_pause_owners[owner_name]
+		if owner then
+			ok_step, step_reason = add_required_step(
+				owner_name .. ".pause",
+				owner.pause,
+				owner.resume,
+				nil,
+				owner_name .. ".resume"
+			)
+			if not ok_step then return false, step_reason end
+		end
+	end
+
 	if _shortcuts then
 		if type(_shortcuts.is_bindings_started) ~= "function" then
 			local ok_dependency, dependency_reason = dependency_failure(
@@ -339,6 +411,12 @@ local function pause_all()
 				"shortcuts.is_bindings_started", _shortcuts.is_bindings_started)
 			if not ok_snapshot then return false, snapshot_reason end
 			shortcuts_were_running = snapshot_value
+		end
+		if type(_shortcuts.has_bindings_pause_debt) == "function" then
+			local ok_debt, debt_value, debt_reason = read_lifecycle_snapshot(
+				"shortcuts.has_bindings_pause_debt", _shortcuts.has_bindings_pause_debt)
+			if not ok_debt then return false, debt_reason end
+			shortcuts_have_cleanup_debt = debt_value
 		end
 	end
 	if _gestures and type(_gestures.is_enabled) == "function" then
@@ -352,28 +430,64 @@ local function pause_all()
 		if not ok_dependency then return false, dependency_reason end
 	end
 
-	local ok_step, step_reason = add_required_step(
+	ok_step, step_reason = add_required_step(
 		"keymap.pause_processing",
 		_keymap and _keymap.pause_processing,
-		_keymap and _keymap.resume_processing
+		_keymap and _keymap.resume_processing,
+		nil,
+		"keymap.resume_processing"
 	)
 	if not ok_step then return false, step_reason end
 
-	if shortcuts_were_running then
-		local shortcut_action = _shortcuts and (
+	if _shortcuts and type(_shortcuts.pause_bindings) == "function" then
+		-- Always install the global claim, including when the feature snapshot is
+		-- already OFF. Otherwise a menu ON transition behind PAUSE can reopen the
+		-- shortcut action scope because no `script_control` sibling claim exists.
+		local shortcut_action = function()
+			return _shortcuts.pause_bindings(SCRIPT_CONTROL_SHORTCUT_CLAIM)
+		end
+		local shortcut_rollback
+		local shortcut_resume_label
+		if shortcuts_were_running then
+			shortcut_rollback = type(_shortcuts.resume_bindings) == "function" and function()
+				return _shortcuts.resume_bindings(SCRIPT_CONTROL_SHORTCUT_CLAIM)
+			end or nil
+			shortcut_resume_label = "shortcuts.resume_bindings"
+		else
+			shortcut_rollback = type(_shortcuts.release_bindings_pause_claim) == "function"
+				and function()
+					return _shortcuts.release_bindings_pause_claim(
+						SCRIPT_CONTROL_SHORTCUT_CLAIM)
+				end or nil
+			shortcut_resume_label = "shortcuts.release_bindings_pause_claim"
+		end
+		ok_step, step_reason = add_required_step(
+			"shortcuts.pause_bindings",
+			shortcut_action,
+			shortcut_rollback,
+			nil,
+			shortcut_resume_label
+		)
+		if not ok_step then return false, step_reason end
+	elseif shortcuts_were_running then
+		ok_step, step_reason = add_required_step(
+			"shortcuts.stop",
+			_shortcuts and _shortcuts.stop,
+			_shortcuts and _shortcuts.start,
+			nil,
+			"shortcuts.start"
+		)
+		if not ok_step then return false, step_reason end
+	elseif shortcuts_have_cleanup_debt and not shortcuts_have_reversible_debt then
+		local cleanup_action = _shortcuts and (
 			type(_shortcuts.pause_bindings) == "function" and _shortcuts.pause_bindings
 			or _shortcuts.stop
 		) or nil
-		local shortcut_label = _shortcuts and type(_shortcuts.pause_bindings) == "function"
-			and "shortcuts.pause_bindings" or "shortcuts.stop"
-		local shortcut_rollback = _shortcuts and (
-			type(_shortcuts.resume_bindings) == "function" and _shortcuts.resume_bindings
-			or _shortcuts.start
-		) or nil
 		ok_step, step_reason = add_required_step(
-			shortcut_label,
-			shortcut_action,
-			shortcut_rollback
+			"shortcuts.cleanup_bindings_debt",
+			cleanup_action,
+			nil,
+			"settle native shortcut child debt without restoring an OFF layer"
 		)
 		if not ok_step then return false, step_reason end
 	end
@@ -384,14 +498,18 @@ local function pause_all()
 		ok_step, step_reason = add_required_step(
 			"gestures.suspend",
 			_gestures.suspend,
-			_gestures.resume
+			_gestures.resume,
+			nil,
+			"gestures.resume"
 		)
 		if not ok_step then return false, step_reason end
 	elseif gestures_were_enabled then
 		ok_step, step_reason = add_required_step(
 			"gestures.disable_all",
 			_gestures and _gestures.disable_all,
-			_gestures and _gestures.enable_all
+			_gestures and _gestures.enable_all,
+			nil,
+			"gestures.enable_all"
 		)
 		if not ok_step then return false, step_reason end
 	end
@@ -399,10 +517,15 @@ local function pause_all()
 	local api, api_reason = require_pause_module("modules.llm.api_mlx")
 	if api_reason then return false, api_reason end
 	if api then
+		local pause_mlx = type(api.pause_warmup) == "function"
+			and api.pause_warmup or api.stop_warmup
 		ok_step, step_reason = add_required_step(
-			"api_mlx.stop_warmup",
-			api.stop_warmup,
-			api.resume_warmup
+			type(api.pause_warmup) == "function"
+				and "api_mlx.pause_warmup" or "api_mlx.stop_warmup",
+			pause_mlx,
+			api.resume_warmup,
+			nil,
+			"api_mlx.resume_warmup"
 		)
 		if not ok_step then return false, step_reason end
 	end
@@ -411,15 +534,22 @@ local function pause_all()
 	if wc_reason then return false, wc_reason end
 	if wc then
 		local warmup_rollback = nil
-		if type(wc.schedule_warmup_with_retry) == "function" then
+		if type(wc.resume_warmup) == "function" then
+			warmup_rollback = wc.resume_warmup
+		elseif type(wc.schedule_warmup_with_retry) == "function" then
 			warmup_rollback = function()
 				return wc.schedule_warmup_with_retry("script pause rollback")
 			end
 		end
+		local pause_warmup = type(wc.pause_warmup) == "function"
+			and wc.pause_warmup or wc.stop
 		ok_step, step_reason = add_required_step(
-			"warmup_controller.stop",
-			wc.stop,
-			warmup_rollback
+			type(wc.pause_warmup) == "function"
+				and "warmup_controller.pause_warmup" or "warmup_controller.stop",
+			pause_warmup,
+			warmup_rollback,
+			nil,
+			"warmup_controller.resume_warmup"
 		)
 		if not ok_step then return false, step_reason end
 	end
@@ -427,11 +557,18 @@ local function pause_all()
 	local oll, oll_reason = require_pause_module("modules.llm.api_ollama")
 	if oll_reason then return false, oll_reason end
 	if oll then
+		local pause_ollama = type(oll.pause_warmup) == "function"
+			and oll.pause_warmup or oll.stop_warmup
+		local resume_ollama = type(oll.pause_warmup) == "function"
+			and oll.resume_warmup or nil
 		ok_step, step_reason = add_required_step(
-			"api_ollama.stop_warmup",
-			oll.stop_warmup,
-			nil,
-			"invalidates one in-flight generation; readiness and retry policy stay enabled"
+			type(oll.pause_warmup) == "function"
+				and "api_ollama.pause_warmup" or "api_ollama.stop_warmup",
+			pause_ollama,
+			resume_ollama,
+			resume_ollama == nil
+				and "legacy generation invalidation has no restart contract" or nil,
+			"api_ollama.resume_warmup"
 		)
 		if not ok_step then return false, step_reason end
 	end
@@ -439,11 +576,18 @@ local function pause_all()
 	local remote, remote_reason = require_pause_module("modules.llm.api_remote")
 	if remote_reason then return false, remote_reason end
 	if remote then
+		local pause_remote = type(remote.pause_warmup) == "function"
+			and remote.pause_warmup or remote.stop_warmup
+		local resume_remote = type(remote.pause_warmup) == "function"
+			and remote.resume_warmup or nil
 		ok_step, step_reason = add_required_step(
-			"api_remote.stop_warmup",
-			remote.stop_warmup,
-			nil,
-			"invalidates one in-flight remote readiness probe"
+			type(remote.pause_warmup) == "function"
+				and "api_remote.pause_warmup" or "api_remote.stop_warmup",
+			pause_remote,
+			resume_remote,
+			resume_remote == nil
+				and "legacy generation invalidation has no restart contract" or nil,
+			"api_remote.resume_warmup"
 		)
 		if not ok_step then return false, step_reason end
 	end
@@ -455,10 +599,15 @@ local function pause_all()
 		local surface, surface_reason = require_pause_module(owner.module)
 		if surface_reason then return false, surface_reason end
 		if surface then
-			local was_running = type(surface.is_running) == "function" and surface.is_running() == true
+			local ok_running, was_running, running_reason = read_lifecycle_snapshot(
+				owner.label .. ".is_running", surface.is_running)
+			if not ok_running then return false, running_reason end
 			if was_running then
+				local resume_action = type(surface.resume_after_pause) == "function"
+					and surface.resume_after_pause or surface.start
 				ok_step, step_reason = add_required_step(
-					owner.label .. ".stop", surface.stop, surface.start)
+					owner.label .. ".stop", surface.stop, resume_action, nil,
+					owner.label .. ".resume_after_pause")
 				if not ok_step then return false, step_reason end
 			end
 		end
@@ -478,9 +627,16 @@ local function pause_all()
 
 	-- reset_predictions is required and intentionally one-way: re-arming a stale
 	-- streaming generation after rollback would let an obsolete response paint.
+	-- The pause-specific boundary performs the same authoritative teardown without
+	-- scheduling dismissal telemetry that could fire after PAUSED is published.
+	local reset_predictions = _keymap and (
+		type(_keymap.reset_predictions_for_pause) == "function"
+			and _keymap.reset_predictions_for_pause
+		or _keymap.reset_predictions
+	) or nil
 	ok_step, step_reason = add_required_step(
 		"keymap.reset_predictions",
-		_keymap and _keymap.reset_predictions,
+		reset_predictions,
 		nil,
 		"stale prediction generations must never be restored"
 	)
@@ -498,24 +654,119 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
+	-- A previous uncommitted pause may have failed to restore an owner. Its live
+	-- state can now look inactive, so snapshot-gated inventory alone is unsound.
+	-- Reuse the original closure and inverse exactly once when the normal fixed
+	-- inventory did not already include it.
+	for _, debt_step in ipairs(prior_debt) do
+		if step_labels[debt_step.label] ~= true then
+			steps[#steps + 1] = debt_step
+			step_labels[debt_step.label] = true
+		end
+	end
+
 	local applied = {}
+	local visited_labels = {}
+	local function rollback_applied(action_reason)
+		local rollback_reason, rollback_debt = rollback_lifecycle_operations("Pause", applied)
+		local unsettled_by_label = {}
+		for _, debt_step in ipairs(rollback_debt) do
+			unsettled_by_label[debt_step.label] = debt_step
+		end
+		local merged_debt = {}
+		local merged_labels = {}
+		for _, debt_step in ipairs(prior_debt) do
+			if visited_labels[debt_step.label] ~= true
+				or unsettled_by_label[debt_step.label] then
+				merged_debt[#merged_debt + 1] = debt_step
+				merged_labels[debt_step.label] = true
+			end
+		end
+		for _, debt_step in ipairs(rollback_debt) do
+			if merged_labels[debt_step.label] ~= true then
+				merged_debt[#merged_debt + 1] = debt_step
+				merged_labels[debt_step.label] = true
+			end
+		end
+		_pause_rollback_debt_steps = #merged_debt > 0 and merged_debt or nil
+		if rollback_reason then
+			action_reason = action_reason .. "; rollback failures: " .. rollback_reason
+		end
+		return false, action_reason
+	end
 	for _, step in ipairs(steps) do
+		visited_labels[step.label] = true
 		-- Register before invoking: the operation may mutate and then throw/false.
 		if step.rollback then applied[#applied + 1] = step end
 		local ok_action, action_reason = call_lifecycle_operation(step.label, step.action)
 		if not ok_action then
-			local rollback_reason = rollback_lifecycle_operations("Pause", applied)
-			if rollback_reason then
-				action_reason = action_reason .. "; rollback failures: " .. rollback_reason
-			end
-			return false, action_reason
+			return rollback_applied(action_reason)
+		end
+		if _dynamic_pause_owner_version ~= owner_version then
+			return rollback_applied(
+				"pause-owner registry changed during pause quiescence")
 		end
 	end
 
-	-- Publish snapshots only after the transaction itself committed. A failed
-	-- attempt must not poison the next clean retry's resume contract.
-	_shortcuts_were_running = shortcuts_were_running
-	_gestures_were_enabled = gestures_were_enabled
+	-- Preserve the exact set that committed. Resume replays only these inverses;
+	-- a surface that was disabled before pause can therefore never be resurrected.
+	_paused_owner_steps = {}
+	for _, step in ipairs(applied) do
+		_paused_owner_steps[#_paused_owner_steps + 1] = step
+	end
+	_pause_rollback_debt_steps = nil
+	return true, nil
+end
+
+--- Retains one exact RESUME rollback descriptor without duplicating its owner.
+--- @param step table Descriptor whose `rollback` re-pauses the owner.
+local function retain_resume_rollback_debt(step)
+	if type(step) ~= "table" or type(step.rollback) ~= "function" then return end
+	_resume_rollback_debt_steps = _resume_rollback_debt_steps or {}
+	for _, retained in ipairs(_resume_rollback_debt_steps) do
+		if retained == step or retained.label == step.label then return end
+	end
+	_resume_rollback_debt_steps[#_resume_rollback_debt_steps + 1] = step
+end
+
+--- Converts one committed PAUSE ledger into exact re-pause descriptors.
+--- The conversion is required before the final admission release: every owner
+--- in this ledger has just resumed, but the externally published state is still
+--- PAUSED until that release commits.
+--- @param paused_ledger table[] Exact reversible descriptors from pause_all().
+local function retain_paused_ledger_as_resume_debt(paused_ledger)
+	for _, paused_step in ipairs(paused_ledger or {}) do
+		retain_resume_rollback_debt({
+			label = paused_step.resume_label or (paused_step.label .. " inverse"),
+			action = paused_step.rollback,
+			rollback = paused_step.action,
+		})
+	end
+end
+
+--- Reasserts exact PAUSED ownership left ambiguous by a failed RESUME rollback.
+--- No forward/resume operation may run until every retained inverse settles.
+--- @return boolean settled
+--- @return string|nil reason
+local function settle_resume_rollback_debt()
+	local debt = _resume_rollback_debt_steps
+	if type(debt) ~= "table" or #debt == 0 then
+		_resume_rollback_debt_steps = nil
+		return true, nil
+	end
+
+	local unsettled = {}
+	local failures = {}
+	for _, step in ipairs(debt) do
+		local ok_step, step_reason = call_lifecycle_operation(
+			step.label .. " retained rollback", step.rollback)
+		if not ok_step then
+			unsettled[#unsettled + 1] = step
+			failures[#failures + 1] = step_reason
+		end
+	end
+	_resume_rollback_debt_steps = #unsettled > 0 and unsettled or nil
+	if #failures > 0 then return false, table.concat(failures, "; ") end
 	return true, nil
 end
 
@@ -524,109 +775,59 @@ end
 --- @return boolean True only when every required activation committed.
 --- @return string|nil Failure detail.
 local function resume_all()
-	-- The public API is deliberately safe before M.start() (covered by
-	-- test_script_control.lua). Optional lazy modules are still re-armed there,
-	-- but only an initialized driver has local activation state to roll back.
-	local enforce_transaction = _tap ~= nil
+	local debt_settled, debt_reason = settle_resume_rollback_debt()
+	if not debt_settled then
+		return false, "retained resume rollback debt: " .. tostring(debt_reason)
+	end
+
+	local paused_ledger = _paused_owner_steps or {}
+	local paused_ledger_count = #paused_ledger
+	local owner_version = _dynamic_pause_owner_version
 	local steps = {}
-
-	local function add_reversible_step(label, action, rollback)
-		if type(action) ~= "function" then return true, nil end
-		if type(rollback) ~= "function" then
-			return false, label .. " has no inverse rollback"
-		end
-		steps[#steps + 1] = { label = label, action = action, rollback = rollback }
-		return true, nil
+	for _, paused_step in ipairs(paused_ledger) do
+		steps[#steps + 1] = {
+			label = paused_step.resume_label or (paused_step.label .. " inverse"),
+			action = paused_step.rollback,
+			rollback = paused_step.action,
+		}
 	end
 
-	local ok_step, step_reason = add_reversible_step(
-		"keymap.resume_processing",
-		_keymap and _keymap.resume_processing,
-		_keymap and _keymap.pause_processing
-	)
-	if not ok_step then return false, step_reason end
+	local applied = {}
+	local function rollback_applied(reason)
+		local rollback_reason, rollback_debt = rollback_lifecycle_operations("Resume", applied)
+		for _, debt_step in ipairs(rollback_debt) do
+			retain_resume_rollback_debt(debt_step)
+		end
+		if rollback_reason then reason = reason .. "; rollback failures: " .. rollback_reason end
+		return false, reason
+	end
+	for _, step in ipairs(steps) do
+		-- Register before invoking: an activation may mutate and then throw/refuse.
+		applied[#applied + 1] = step
+		local ok_action, action_reason = call_lifecycle_operation(step.label, step.action)
+		if not ok_action then
+			return rollback_applied(action_reason)
+		end
+		-- register_pause_owner() may run synchronously inside an activation callback.
+		-- It sees the still-published PAUSED state and appends its newly quiesced
+		-- owner to this ledger. Refuse this snapshot rather than losing that owner at
+		-- the final clear; the next explicit RESUME will include its exact inverse.
+		if _paused_owner_steps ~= paused_ledger
+			or #paused_ledger ~= paused_ledger_count
+			or _dynamic_pause_owner_version ~= owner_version then
+			return rollback_applied(
+				"pause-owner ledger changed during resume activation")
+		end
+	end
+	-- A lifecycle callback can register another pause owner synchronously. If that
+	-- late registration retained ambiguous re-pause debt, the forward loop above
+	-- is not a complete RESUME even though every originally listed action settled.
+	if _resume_rollback_debt_steps ~= nil
+		and #_resume_rollback_debt_steps > 0 then
+		return rollback_applied(
+			"resume acquired while a late re-pause debt remained")
+	end
 
-	if _shortcuts_were_running then
-		local shortcut_action = _shortcuts and (
-			type(_shortcuts.resume_bindings) == "function" and _shortcuts.resume_bindings
-			or _shortcuts.start
-		) or nil
-		local shortcut_label = _shortcuts and type(_shortcuts.resume_bindings) == "function"
-			and "shortcuts.resume_bindings" or "shortcuts.start"
-		local shortcut_rollback = _shortcuts and (
-			type(_shortcuts.pause_bindings) == "function" and _shortcuts.pause_bindings
-			or _shortcuts.stop
-		) or nil
-		if type(shortcut_action) ~= "function" then
-			return false, "shortcuts resume API unavailable"
-		end
-		ok_step, step_reason = add_reversible_step(
-			shortcut_label,
-			shortcut_action,
-			shortcut_rollback
-		)
-		if not ok_step then return false, step_reason end
-	end
-	-- resume() clears CoreState.suspended so the engine gate re-uses
-	-- CoreState.enabled (the user feature flag). No snapshot needed: whatever
-	-- the user toggled during pause is already in enabled, and resume never
-	-- overrides it.
-	if _gestures and type(_gestures.resume) == "function" then
-		local gesture_rollback = type(_gestures.suspend) == "function"
-			and _gestures.suspend or _gestures.disable_all
-		ok_step, step_reason = add_reversible_step(
-			"gestures.resume",
-			_gestures.resume,
-			gesture_rollback
-		)
-		if not ok_step then return false, step_reason end
-	elseif _gestures_were_enabled then
-		if not _gestures or type(_gestures.enable_all) ~= "function" then
-			return false, "gestures enable API unavailable"
-		end
-		ok_step, step_reason = add_reversible_step(
-			"gestures.enable_all",
-			_gestures.enable_all,
-			_gestures.disable_all
-		)
-		if not ok_step then return false, step_reason end
-	end
-	-- Symmetric to the pause-side stop_warmup()/wc.stop() pair: re-arm both warmup
-	-- drivers. resume_warmup() clears the _warmup_stopped short-circuit so that
-	-- api_mlx's own retry chain can run again (M-3). schedule_warmup_with_retry is
-	-- fully self-guarding — it no-ops when LLM is disabled, model is unresolved, or
-	-- backend is already ready — so it never fires from anything but a genuinely cold,
-	-- enabled backend (never from profile restoration alone).
-	local ok_api, api = pcall(require, "modules.llm.api_mlx")
-	if not ok_api then
-		if enforce_transaction then
-			return false, "require(modules.llm.api_mlx) raised: " .. tostring(api)
-		end
-		api = nil
-	end
-	if api and type(api.resume_warmup) == "function" then
-		ok_step, step_reason = add_reversible_step(
-			"api_mlx.resume_warmup",
-			api.resume_warmup,
-			api.stop_warmup
-		)
-		if not ok_step then return false, step_reason end
-	end
-	local ok_wc, wc = pcall(require, "modules.llm.warmup_controller")
-	if not ok_wc then
-		if enforce_transaction then
-			return false, "require(modules.llm.warmup_controller) raised: " .. tostring(wc)
-		end
-		wc = nil
-	end
-	if wc and type(wc.schedule_warmup_with_retry) == "function" then
-		ok_step, step_reason = add_reversible_step(
-			"warmup_controller.schedule_warmup_with_retry",
-			function() return wc.schedule_warmup_with_retry("script resume") end,
-			wc.stop
-		)
-		if not ok_step then return false, step_reason end
-	end
 	-- The context tracker is pause-gated at its entry points, so an app switch made
 	-- DURING the pause never updated the cached context and nothing else re-syncs it:
 	-- resuming in a different app left active_app_* and — critically — is_secure_field
@@ -644,36 +845,23 @@ local function resume_all()
 		kl = nil
 	end
 	if kl and type(kl.resync_context) == "function" then
-		steps[#steps + 1] = {
-			label = "keylogger.resync_context",
-			action = kl.resync_context,
-			rollback = nil,
-			best_effort = true,
-		}
-	end
-
-	local applied = {}
-	for _, step in ipairs(steps) do
-		-- Register the inverse before calling the operation: a throwing function
-		-- can already have mutated its first field before raising.
-		if step.rollback then applied[#applied + 1] = step end
-		local ok_action, action_reason = call_lifecycle_operation(step.label, step.action)
-		if not ok_action then
-			if step.best_effort then
-				Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
-					tostring(action_reason))
-			elseif not enforce_transaction then
-				Logger.warn(LOG, "Pre-start resume operation ignored: %s.", tostring(action_reason))
-			else
-				local rollback_reason = rollback_lifecycle_operations("Resume", applied)
-				if rollback_reason then
-					action_reason = action_reason .. "; rollback failures: " .. rollback_reason
-				end
-				return false, action_reason
-			end
+		local ok_resync, resync_result = xpcall(kl.resync_context, debug.traceback)
+		if not ok_resync or resync_result == false then
+			Logger.warn(LOG,
+				"Optional resume operation keylogger.resync_context failed without blocking activation: %s.",
+				tostring(resync_result))
 		end
 	end
-	return true, nil
+	if _paused_owner_steps ~= paused_ledger
+		or #paused_ledger ~= paused_ledger_count
+		or _dynamic_pause_owner_version ~= owner_version then
+		return rollback_applied(
+			"pause-owner ledger changed during optional resume finalization")
+	end
+	-- Keep the committed PAUSE ledger owned until the outer transaction releases
+	-- its exact admission fence. If that final boundary refuses, these same
+	-- descriptors are the only sound source for re-pausing every activated owner.
+	return true, nil, paused_ledger
 end
 
 --- Returns the most recent requested pause state, including a queued reversal.
@@ -707,6 +895,10 @@ local release_pause_admission
 
 local function commit_pause_state(target_paused)
 	if _is_paused == target_paused then return true, nil end
+	-- The runtime epoch changes only once native publication reaches the local
+	-- commit boundary. A refused native request leaves the running owners valid;
+	-- a local refusal is instead compensated through the same owner registry.
+	_pause_epoch = _pause_epoch + 1
 	if target_paused then
 		Logger.info(LOG, "Pausing all script operations after PAUSED acknowledgement.")
 		local ok_pause, pause_reason = pause_all()
@@ -714,20 +906,31 @@ local function commit_pause_state(target_paused)
 		_is_paused = true
 	else
 		Logger.info(LOG, "Resuming all script operations after Karabiner regeneration committed.")
-		local ok_resume, resume_reason = resume_all()
+		local ok_resume, resume_reason, resumed_ledger = resume_all()
 		if not ok_resume then return false, resume_reason end
 		-- Admission is the final local commit point. Publishing RESUMED before this
 		-- exact token releases lets callbacks open new output while the adapter is
 		-- still fenced. On refusal, restore the local paused state and retain the
 		-- same token for the native rollback/next explicit retry.
 		if not release_pause_admission(_pause_admission_fence) then
-			local rollback_ok, rollback_reason = pause_all()
+			-- Convert before compensation: exact re-pause is fallible, and a
+			-- mutate-then-refuse owner must remain represented while the last
+			-- published state is still PAUSED.
+			retain_paused_ledger_as_resume_debt(resumed_ledger)
+			-- Replay only owners that this RESUME actually activated. One-way PAUSE
+			-- cleanups (prediction reset, tooltip dismissal, onboarding cancellation)
+			-- were never inverted and remain quiescent; re-running the full inventory
+			-- here would create a new unowned one-way failure class.
+			local rollback_ok, rollback_reason = settle_resume_rollback_debt()
 			local reason = "synthetic-input admission fence release was refused"
 			if not rollback_ok then
 				reason = reason .. "; local pause rollback failed: " .. tostring(rollback_reason)
 			end
 			return false, reason
 		end
+		-- The PAUSE ledger is consumed only at the true outer commit point. Until
+		-- admission reopens literally, it remains the rollback source of truth.
+		if _paused_owner_steps == resumed_ledger then _paused_owner_steps = nil end
 		_is_paused = false
 	end
 	publish_pause_state(target_paused)
@@ -783,7 +986,10 @@ local function complete_pause_transition(transaction, ok, reason)
 
 	local queued = _queued_pause_target
 	_queued_pause_target = nil
-	if queued ~= nil and queued ~= _is_paused then
+	local queued_repause_debt = queued == true and _is_paused == true
+		and _resume_rollback_debt_steps ~= nil
+		and #_resume_rollback_debt_steps > 0
+	if queued ~= nil and (queued ~= _is_paused or queued_repause_debt) then
 		request_pause_transition(queued)
 	end
 end
@@ -942,13 +1148,29 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 	target_paused = target_paused == true
 	if _pause_transition then
 		local desired = desired_pause_state()
-		if desired ~= target_paused then
+		local rollback_pending = _pause_transition.stage == "native-resume-rollback"
+			or _pause_transition.stage == "native-pause-rollback"
+		if (rollback_pending and _pause_transition.target == target_paused)
+			or desired ~= target_paused then
 			_queued_pause_target = target_paused
 			Logger.debug(LOG, "Queued script pause target: %s.", tostring(target_paused))
 		end
 		return true
 	end
-	if _is_paused == target_paused then return true end
+	if _is_paused == target_paused then
+		-- A failed RESUME rollback may leave one owner activation ambiguous while
+		-- the last published state correctly remains PAUSED. A same-state pause is
+		-- the recovery port: retry only those exact local re-pause operations, with
+		-- no new admission fence or native Karabiner transaction.
+		if target_paused and _resume_rollback_debt_steps ~= nil then
+			local settled, settle_reason = settle_resume_rollback_debt()
+			if not settled then
+				report_pause_transition_failure(true, settle_reason)
+				return false
+			end
+		end
+		return true
+	end
 	if target_paused and input_drained ~= true and _pause_admission_fence ~= nil then
 		-- A failed preflight rollback keeps this exact token active and admission
 		-- closed. A later explicit pause therefore already owns the original
@@ -1018,10 +1240,6 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 		end
 		_pause_admission_fence = admission_fence
 	end
-	-- Every requested edge invalidates asynchronous work latched in the preceding
-	-- runtime epoch, even when native publication later refuses and is retried.
-	_pause_epoch = _pause_epoch + 1
-
 	local integration_enabled = false
 	if _karabiner and type(_karabiner.get_enabled) ~= "function" then
 		local release_ok = not target_paused or release_pause_admission(admission_fence)
@@ -1032,9 +1250,11 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 	end
 	if _karabiner then
 		local ok_enabled, enabled_or_err = pcall(_karabiner.get_enabled)
-		if not ok_enabled then
+		if not ok_enabled or type(enabled_or_err) ~= "boolean" then
 			local release_ok = not target_paused or release_pause_admission(admission_fence)
-			local reason = tostring(enabled_or_err)
+			local reason = not ok_enabled and tostring(enabled_or_err)
+				or ("Karabiner enabled-state API returned "
+					.. type(enabled_or_err) .. ", expected boolean")
 			if not release_ok then reason = reason .. "; admission rollback remains pending" end
 			report_pause_transition_failure(target_paused, reason)
 			return false
@@ -1276,6 +1496,27 @@ end
 -- =============================
 
 M.ACTIONS = GestActions.SG_NAMES
+M.PAUSE_OWNER_IDS = {
+	"mlx_dependency_bootstrap",
+	"ollama_dependency_bootstrap",
+	"mlx_model_maintenance",
+	"ollama_model_maintenance",
+	"llm_activation",
+	"llm_model_switcher",
+	"llm_startup",
+	"keymap_processing",
+	"shortcut_bindings",
+	"gestures",
+	"mlx_warmup",
+	"warmup_controller",
+	"ollama_warmup",
+	"remote_warmup",
+	"wpm_menubar",
+	"wpm_widget",
+	"remap_onboarding",
+	"predictions",
+	"tooltip",
+}
 
 -- Build a flat id→label lookup from SG_NAMES, skipping separators and headers.
 do
@@ -1393,10 +1634,17 @@ end
 --- Stops the script-control eventtap.
 --- @return boolean settled True only when both native resources are released.
 function M.stop()
-	if _pause_transition and _pause_transition.timer then
-		pcall(function() _pause_transition.timer:stop() end)
+	if _pause_transition ~= nil then
+		-- Once a native pause/resume request (or its rollback) is owned, there is no
+		-- cancellation API that proves the exact controller lease settled. Clearing
+		-- the descriptor here would make its late terminal a no-op while the native
+		-- and local states diverge. Join it instead: the callback closes ownership,
+		-- and a later stop can then release the settled resources.
+		Logger.error(LOG,
+			"Script control stop deferred while pause transaction %s remains owned.",
+			tostring(_pause_transition.stage or _pause_transition.target))
+		return false
 	end
-	_pause_transition = nil
 	_queued_pause_target = nil
 	_pause_transition_serial = _pause_transition_serial + 1
 	_tap_generation = _tap_generation + 1
@@ -1448,6 +1696,87 @@ function M.is_paused()
 	return _is_paused
 end
 
+--- Returns whether an exact pause-state transaction or retained inverse debt
+--- still owns the boundary between ACTIVE and PAUSED. Unlike `is_paused()`,
+--- this query covers the synthetic-input drain, queued reversal, native
+--- transition/rollback, admission-fence debt, and any reversible owner whose
+--- inverse has not settled yet.
+--- @return boolean True while pause/resume publication is not transactionally safe.
+function M.is_pause_transition_pending()
+	return _pause_transition ~= nil
+		or _queued_pause_target ~= nil
+		or (_pause_rollback_debt_steps ~= nil and #_pause_rollback_debt_steps > 0)
+		or (_resume_rollback_debt_steps ~= nil and #_resume_rollback_debt_steps > 0)
+		or (_pause_admission_fence ~= nil and _is_paused ~= true)
+end
+
+--- Registers one runtime-created owner in the fixed pause inventory.
+--- Owners are never replaced in place: doing so could orphan the exact resource
+--- retained by the previous closure. Registration while paused immediately
+--- quiesces the candidate and adds only that committed owner to the resume ledger.
+--- @param owner_name string Fixed owner identifier.
+--- @param owner table Table exposing exact `pause()` and `resume()` methods.
+--- @return boolean committed
+function M.register_pause_owner(owner_name, owner)
+	if DYNAMIC_PAUSE_OWNER_SET[owner_name] ~= true or type(owner) ~= "table"
+		or type(owner.pause) ~= "function" or type(owner.resume) ~= "function" then
+		Logger.error(LOG, "Pause-owner registration rejected for '%s'.", tostring(owner_name))
+		return false
+	end
+	local existing = _dynamic_pause_owners[owner_name]
+	if existing then
+		if existing == owner then return true end
+		Logger.error(LOG, "Pause-owner '%s' is already registered; replacement refused.", owner_name)
+		return false
+	end
+
+	local pause_step = {
+		label = owner_name .. ".pause",
+		action = owner.pause,
+		rollback = owner.resume,
+		resume_label = owner_name .. ".resume",
+	}
+	_dynamic_pause_owners[owner_name] = owner
+	_dynamic_pause_owner_version = _dynamic_pause_owner_version + 1
+	if _is_paused then
+		local paused, reason = call_lifecycle_operation(pause_step.label, pause_step.action)
+		if not paused then
+			local owner_retained = false
+			local restored, restore_reason = call_lifecycle_operation(
+				pause_step.resume_label, pause_step.rollback)
+			if restored ~= true then
+				_paused_owner_steps = _paused_owner_steps or {}
+				_paused_owner_steps[#_paused_owner_steps + 1] = pause_step
+				retain_resume_rollback_debt({
+					label = pause_step.resume_label,
+					action = pause_step.rollback,
+					rollback = pause_step.action,
+				})
+				owner_retained = true
+				Logger.error(LOG,
+					"Pause-owner '%s' registration rollback remains owned: %s.",
+					owner_name, tostring(restore_reason))
+			else
+				if _dynamic_pause_owners[owner_name] == owner then
+					_dynamic_pause_owners[owner_name] = nil
+				end
+			end
+			Logger.error(LOG, "Pause-owner '%s' could not join the settled pause: %s.",
+				owner_name, tostring(reason))
+			-- Registration itself is committed when the exact inverse debt is
+			-- retained in the global resume ledger. Callers must stay pause-gated,
+			-- but they are no longer permanently orphaned after the later retry.
+			return owner_retained
+		end
+		_paused_owner_steps = _paused_owner_steps or {}
+		_paused_owner_steps[#_paused_owner_steps + 1] = pause_step
+	end
+	Logger.debug(LOG, "Pause owner registered: %s.", owner_name)
+	return true
+end
+
+--- Returns the current pause transaction epoch.
+--- @return integer Monotonic runtime generation.
 function M.get_pause_epoch()
 	return _pause_epoch
 end
@@ -1455,13 +1784,15 @@ end
 --- Configures the action triggered by a specific key slot.
 --- @param keyname string "return_key", "backspace", or "escape".
 --- @param action string One of the recognised action ids.
+--- @return boolean committed
 function M.set_shortcut_action(keyname, action)
 	if type(keyname) ~= "string" or type(action) ~= "string" then
 		Logger.error(LOG, "set_shortcut_action(): both keyname and action must be strings.")
-		return
+		return false
 	end
 	_key_actions[keyname] = action
 	Logger.debug(LOG, "Key slot '%s' → '%s'.", keyname, action)
+	return true
 end
 
 --- Registers a callback invoked whenever the pause state changes.

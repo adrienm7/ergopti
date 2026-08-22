@@ -79,22 +79,60 @@ function M.spawn(executable, args, on_done, on_chunk)
 	local _task  = nil
 	local _input_closed = false
 	local _lifecycle = "constructing"
+	local _start_dispatching = false
+	local _start_committed = false
+	local _pending_completion = nil
+	local _pending_chunks = {}
+	local _business_stream_closed = false
+	local _business_terminal_sent = false
+	local _settlement_observers = {}
+	local _deliver_business_completion
+	local _deliver_business_chunk
+
+	local function _notify_settled()
+		if _task ~= nil or _start_dispatching then return false end
+		local observers = _settlement_observers
+		_settlement_observers = {}
+		for _, observer in ipairs(observers) do
+			local ok, err = xpcall(observer, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+			end
+		end
+		return true
+	end
+
+	local function _task_proven_not_running(task)
+		local method_ok, method = pcall(function() return task and task.isRunning end)
+		if not method_ok or type(method) ~= "function" then return false end
+		local ok, running = xpcall(function() return method(task) end, debug.traceback)
+		return ok == true and running == false
+	end
 
 	local function _safe_terminate()
 		if not _task then return true, "settled" end
+		_business_stream_closed = true
 		local task = _task
-		if _lifecycle == "prepared" or _lifecycle == "start_failed" then
+		if _lifecycle == "prepared"
+			or (_lifecycle == "start_failed" and _task_proven_not_running(task)) then
 			-- No process was launched, so releasing the prepared object is exact
 			-- settlement and requires no signal or completion callback.
 			_task = nil
 			_input_closed = true
 			_lifecycle = "terminated"
 			M._active_tasks[task] = nil
+			_notify_settled()
 			return true, "settled"
 		end
 		if _lifecycle == "terminating" then return true, "pending" end
 
 		local stopped, stop_result = pcall(function() return task:terminate() end)
+		if _task ~= task or _lifecycle == "completed" then
+			-- Exact completion wins even when the native terminate frame later
+			-- returns false/nil or raises. There is no capability left to retain or
+			-- retry once wrapped_on_done has synchronously proved settlement.
+			return true, "settled"
+		end
 		if not stopped or stop_result == false or stop_result == nil then
 			-- Keep both the native task and its GC pin: this handle is the only exact
 			-- capability that can retry termination without process discovery.
@@ -119,45 +157,72 @@ function M.spawn(executable, args, on_done, on_chunk)
 	--- @return boolean True when the subprocess was started, false on any failure.
 	local function _safe_start()
 		if _lifecycle == "starting" or _lifecycle == "started" then return true end
+		if _lifecycle ~= "prepared" then
+			Logger.error(LOG,
+				"spawn.start(): exact task is not startable in lifecycle '%s' for %s",
+				tostring(_lifecycle), tostring(executable))
+			return false
+		end
 		if not _task then
 			Logger.error(LOG, "spawn.start(): task was not created for %s", tostring(executable))
 			return false
 		end
 		local task = _task
 		_lifecycle = "starting"
-		-- The closure MUST return the value: hs.task:start() reports a refused launch
-		-- by RETURNING false, not by raising, so a pcall that only captures the raise
-		-- reported success for the most common real failure (missing or non-executable
-		-- binary) — exactly the case this function's contract exists to surface.
+		_start_dispatching = true
 		local ok, started = pcall(function() return task:start() end)
-		-- Release the GC pin on BOTH failure paths. The pin is taken at
-		-- construction so the task cannot be collected mid-run, and is released by
-		-- the completion callback — which never fires for a task that never
-		-- launched. Without this, every refused launch left a dead hs.task and its
-		-- captured closures in the GC root for the life of the process, and the
-		-- root is the one table that is never pruned.
+		_start_dispatching = false
+		if ok and started then
+			_start_committed = true
+			if _lifecycle == "starting" then _lifecycle = "started" end
+			local pending_chunks = _pending_chunks
+			_pending_chunks = {}
+			for _, chunk in ipairs(pending_chunks) do
+				if _business_terminal_sent ~= true then
+					local keep_streaming = _deliver_business_chunk(
+						chunk[1], chunk[2], chunk[3], true)
+					if keep_streaming == false then
+						_business_stream_closed = true
+						_safe_terminate()
+						break
+					end
+				end
+			end
+			local pending = _pending_completion
+			_pending_completion = nil
+			if pending ~= nil and type(_deliver_business_completion) == "function" then
+				_deliver_business_completion(table.unpack(pending, 1, pending.n))
+			end
+			_notify_settled()
+			return true
+		end
+
+		_start_committed = false
+		_business_stream_closed = true
+		_pending_completion = nil
+		_pending_chunks = {}
+		if _lifecycle ~= "completed" then
+			_input_closed = true
+			_lifecycle = "start_failed"
+			if _task_proven_not_running(task) then
+				if _task == task then _task = nil end
+				M._active_tasks[task] = nil
+				_lifecycle = "terminated"
+				_notify_settled()
+			else
+				-- False/nil/throw may follow native mutation. Retain this exact task,
+				-- initiate rollback, and await its real completion callback.
+				_safe_terminate()
+			end
+		else
+			_notify_settled()
+		end
 		if not ok then
-			if _lifecycle ~= "completed" then
-				M._active_tasks[task] = nil
-				if _task == task then _task = nil end
-				_input_closed = true
-				_lifecycle = "start_failed"
-			end
 			Logger.error(LOG, "spawn.start(): hs.task:start() failed — %s", tostring(started))
-			return false
-		end
-		if not started then
-			if _lifecycle ~= "completed" then
-				M._active_tasks[task] = nil
-				if _task == task then _task = nil end
-				_input_closed = true
-				_lifecycle = "start_failed"
-			end
+		else
 			Logger.error(LOG, "spawn.start(): hs.task:start() refused to launch %s", tostring(executable))
-			return false
 		end
-		if _lifecycle == "starting" then _lifecycle = "started" end
-		return true
+		return false
 	end
 
 	--- Writes bytes to a live streaming task without exposing its native handle.
@@ -223,6 +288,21 @@ function M.spawn(executable, args, on_done, on_chunk)
 		end
 	end
 
+	_deliver_business_completion = function(exit_code, stdout, stderr)
+		if _start_committed ~= true or _business_terminal_sent == true then return false end
+		_business_stream_closed = true
+		_business_terminal_sent = true
+		if type(on_done) ~= "function" then return true end
+		local ok, err = xpcall(function()
+			return on_done(exit_code, stdout, stderr)
+		end, debug.traceback)
+		if not ok then
+			report_callback_throw("on_done", err)
+			return false
+		end
+		return true
+	end
+
 	-- Wrap on_done to release the GC-root reference once the subprocess exits.
 	-- hs.task completion callback signature is (exitCode, stdOut, stdErr) — no
 	-- task object is passed. Use the closure upvalue `_task` for the GC-pin release,
@@ -239,16 +319,15 @@ function M.spawn(executable, args, on_done, on_chunk)
 		_task = nil
 		_input_closed = true
 		_lifecycle = "completed"
-		if type(on_done) == "function" then
-			-- xpcall instead of pcall so a throw in on_done is surfaced (not swallowed).
-			-- A silently-swallowed throw here is the root cause of the "vert mais aucune
-			-- prédiction" class of bugs — the entire callback body aborts on its first
-			-- line with no log line anywhere.
-			local ok, err = xpcall(function() on_done(exit_code, stdout, stderr) end, debug.traceback)
-			if not ok then
-				report_callback_throw("on_done", err)
+		if _start_dispatching then
+			if _pending_completion == nil then
+				_pending_completion = table.pack(exit_code, stdout, stderr)
 			end
+			return true
 		end
+		_deliver_business_completion(exit_code, stdout, stderr)
+		_notify_settled()
+		return true
 	end
 
 	-- Wrap on_chunk the same way wrapped_on_done wraps on_done. Before this fix,
@@ -261,14 +340,41 @@ function M.spawn(executable, args, on_done, on_chunk)
 	-- caught throw so a single bad chunk does not also kill the whole stream
 	-- (the real production on_chunk closures already re-check their own
 	-- generation guards on the next chunk).
-	local function wrapped_on_chunk(task, stdout_chunk, stderr_chunk)
+	_deliver_business_chunk = function(task, stdout_chunk, stderr_chunk, start_replay)
 		if type(on_chunk) ~= "function" then return true end
-		local ok, result_or_err = xpcall(function() return on_chunk(task, stdout_chunk, stderr_chunk) end, debug.traceback)
+		if _start_committed ~= true or _business_stream_closed == true
+			or _business_terminal_sent == true
+			or (_lifecycle ~= "started" and start_replay ~= true) then
+			return true
+		end
+		local ok, result_or_err = xpcall(function()
+			return on_chunk(task, stdout_chunk, stderr_chunk)
+		end, debug.traceback)
 		if not ok then
 			report_callback_throw("on_chunk", result_or_err)
 			return true
 		end
 		return result_or_err
+	end
+
+	local function wrapped_on_chunk(task, stdout_chunk, stderr_chunk)
+		-- Native doubles can publish output from inside start() before the launch
+		-- decision crosses back into Lua. Retain the event until literal start
+		-- commitment; a refused start discards it with the acquisition rollback.
+		if _start_dispatching == true then
+			if _lifecycle ~= "completed" and _business_stream_closed ~= true
+				and _business_terminal_sent ~= true then
+				_pending_chunks[#_pending_chunks + 1] =
+					table.pack(task, stdout_chunk, stderr_chunk)
+			end
+			return true
+		end
+		-- Completion and termination close the business stream permanently. A late
+		-- native chunk may still arrive while the exact task drains, but it is not an
+		-- authorized application event.
+		local keep_streaming = _deliver_business_chunk(task, stdout_chunk, stderr_chunk)
+		if keep_streaming == false then _business_stream_closed = true end
+		return keep_streaming
 	end
 
 	-- Build the hs.task — choose 3-arg or 4-arg form depending on on_chunk.
@@ -306,6 +412,27 @@ function M.spawn(executable, args, on_done, on_chunk)
 	--- @return boolean accepted True when SIGTERM was accepted or no task remains.
 	--- @return string state `settled`, `pending`, or `refused`.
 	handle.terminate = _safe_terminate
+
+	--- Returns literal true only when no exact native task remains retained.
+	function handle.isSettled()
+		return _task == nil and _start_dispatching ~= true
+	end
+
+	--- Observes exact settlement once; already-settled handles notify synchronously.
+	--- @param observer function Zero-arity terminal observer.
+	--- @return boolean registered
+	function handle.onSettled(observer)
+		if type(observer) ~= "function" then return false end
+		if handle.isSettled() then
+			local ok, err = xpcall(observer, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+			end
+			return true
+		end
+		_settlement_observers[#_settlement_observers + 1] = observer
+		return true
+	end
 
 	return handle
 end
@@ -359,12 +486,13 @@ end
 --- @param target string Path or URL to open. Passed as an argv entry, so it needs
 ---        no shell quoting and cannot be re-interpreted by a shell.
 --- @param on_done function|nil Optional fn(ok) called with true on exit code 0.
---- @return boolean True when the subprocess was started.
+--- @return boolean started True when the subprocess was started.
+--- @return table|nil handle Exact lifecycle handle; nil only before construction.
 function M.open(target, on_done)
 	if type(target) ~= "string" or target == "" then
 		Logger.error(LOG, "open(): target must be a non-empty string — nothing opened.")
 		invoke_guarded("open.reject", on_done, false)
-		return false
+		return false, nil
 	end
 	Logger.trace(LOG, "Opening '%s' asynchronously…", target)
 	-- No shell is involved, so a target containing a space, a quote or a `$` is
@@ -379,6 +507,11 @@ function M.open(target, on_done)
 		end
 		invoke_guarded("open.done", on_done, ok)
 	end)
+	if handle.isSettled() then
+		Logger.error(LOG, "open(): could not construct %s for '%s'.", OPEN_BIN, target)
+		invoke_guarded("open.construct_failed", on_done, false)
+		return false, nil
+	end
 	local started = handle.start()
 	if not started then
 		Logger.error(LOG, "open(): could not start %s for '%s'.", OPEN_BIN, target)
@@ -386,7 +519,7 @@ function M.open(target, on_done)
 		-- callback would wait forever.
 		invoke_guarded("open.launch_failed", on_done, false)
 	end
-	return started
+	return started, handle
 end
 
 --- Runs an AppleScript without blocking, reporting its result to a callback.
@@ -396,12 +529,13 @@ end
 ---        output is stdout with the trailing newline `osascript` always appends
 ---        stripped — callers compare against bare tokens like "ok", and the raw
 ---        stdout never equals one.
---- @return boolean True when the subprocess was started.
+--- @return boolean started True when the subprocess was started.
+--- @return table|nil handle Exact lifecycle handle; nil only before construction.
 function M.applescript(script, on_done)
 	if type(script) ~= "string" or script == "" then
 		Logger.error(LOG, "applescript(): script must be a non-empty string — nothing run.")
 		invoke_guarded("applescript.reject", on_done, false, nil)
-		return false
+		return false, nil
 	end
 	Logger.trace(LOG, "Running AppleScript asynchronously (%d bytes)…", #script)
 	local handle = M.spawn(OSASCRIPT_BIN, { "-e", script }, function(exit_code, stdout, stderr)
@@ -415,6 +549,11 @@ function M.applescript(script, on_done)
 		end
 		invoke_guarded("applescript.done", on_done, ok, out)
 	end)
+	if handle.isSettled() then
+		Logger.error(LOG, "applescript(): could not construct %s.", OSASCRIPT_BIN)
+		invoke_guarded("applescript.construct_failed", on_done, false, nil)
+		return false, nil
+	end
 	local started = handle.start()
 	if not started then
 		Logger.error(LOG, "applescript(): could not start %s.", OSASCRIPT_BIN)
@@ -422,7 +561,7 @@ function M.applescript(script, on_done)
 		-- a caller waiting on it would hang forever on its "in flight" branch.
 		invoke_guarded("applescript.launch_failed", on_done, false, nil)
 	end
-	return started
+	return started, handle
 end
 
 return M

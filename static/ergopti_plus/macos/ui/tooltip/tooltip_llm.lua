@@ -1162,7 +1162,16 @@ function M.reset_timer()
 end
  
 
-local function hide_impl(log_callsite)
+local function hide_impl(log_callsite, expected_session, commit_guard)
+	local function still_owned()
+		if type(commit_guard) == "function" then
+			local guard_ok, current = pcall(commit_guard)
+			if not guard_ok or current ~= true then return false end
+		end
+		return expected_session == nil or _state.session_id == nil
+			or _state.session_id == expected_session
+	end
+	if not still_owned() then return false end
 	if log_callsite then
 		-- Debug lens for the "prediction vanished the instant it appeared" class of
 		-- bug: record WHO hid the tooltip. The action-epoch path uses hide_silent()
@@ -1178,6 +1187,9 @@ local function hide_impl(log_callsite)
 		Logger.error(LOG, "Crash while stopping prediction tooltip watchers: %s.",
 			tostring(stop_result))
 	end
+	-- Native watcher stop/probe callbacks may synchronously publish a replacement
+	-- request. The predecessor must not carry its hide into that new session.
+	if not still_owned() then return false end
 
 	local hide_ok, hide_result = xpcall(Renderer.hide, debug.traceback)
 	local canvas_hidden = hide_ok and hide_result == true
@@ -1185,6 +1197,9 @@ local function hide_impl(log_callsite)
 		Logger.error(LOG, "Crash while hiding prediction tooltip canvas: %s.",
 			tostring(hide_result))
 	end
+	-- Renderer.hide() is another opaque boundary. The facade repairs any pixels
+	-- touched before ownership changed; keep the successor's logical state intact.
+	if not still_owned() then return false end
 
 	-- Logical visibility describes native pixels, not watcher ownership.  If the
 	-- canvas is observably hidden, clear the visual state even when a separate
@@ -1214,6 +1229,17 @@ local function hide_impl(log_callsite)
 end
 
 function M.hide() return hide_impl(true) end
+
+--- Hides only the surface still owned by one streaming request.
+--- A nil current session is eligible because the request may still own the
+--- shared loading indicator before its first prediction frame.
+--- @param session_id any Stable request identity.
+--- @param commit_guard function Live request predicate.
+--- @return boolean hidden True only while this request retains ownership.
+function M.hide_session(session_id, commit_guard)
+	if session_id == nil or type(commit_guard) ~= "function" then return false end
+	return hide_impl(true, session_id, commit_guard)
+end
 
 --- Hides immediately without file-backed diagnostic logging.
 --- Used by keyDown reconciliation where stale UI must disappear synchronously
@@ -1278,21 +1304,27 @@ function M.navigate(delta)
 	return render_navigation()
 end
 
-function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count, session_id)
+function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count, session_id, commit_guard)
 	if not runtime_available() then return false end
+	local function still_owned()
+		if type(commit_guard) ~= "function" then return true end
+		local guard_ok, current = pcall(commit_guard)
+		return guard_ok and current == true
+	end
+	if not still_owned() then return false end
 	-- Latency tripwire: this runs on the streaming hot path (re-fired per token),
 	-- so a slow assemble/width-calc/render surfaces as one WARNING instead of an
 	-- invisible per-keystroke drag. Silent when the render is fast.
 	local _hot_t0 = HotPath.now()
 	local rendered = false
 	local ok, err = pcall(function()
-		if not is_enabled then return end
+		if not is_enabled or not still_owned() then return end
 		
 		local active_count = type(predictions) == "table" and #predictions or 0
 		local reserved_slots = tonumber(max_reserved_count) or 0
 		
 		if active_count == 0 and reserved_slots == 0 then
-			M.hide()
+			hide_impl(true, session_id, commit_guard)
 			return
 		end
 
@@ -1346,6 +1378,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		-- the real render that DOES include "— ⏱ X.XX s" gets clipped to
 		-- that narrower frame, hiding the timing zone off-screen.
 		refresh_chain_timing()
+		if not still_owned() then return end
 
 		local render_count = math.max(1, math.floor(reserved_slots > 0 and reserved_slots or active_count))
 		local calculated_max_width = 0
@@ -1360,6 +1393,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		local width_hint_memo, width_info_memo, width_combined_memo
 
 		for i = 1, render_count do
+			if not still_owned() then return end
 			local simulation_state = {}
 			for k, v in pairs(_state) do simulation_state[k] = v end
 			simulation_state.current_index = i
@@ -1397,6 +1431,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			if final_width > calculated_max_width then calculated_max_width = final_width end
 		end
 
+		if not still_owned() then return end
 		_state.fixed_width        = calculated_max_width
 		_state.reserved_count     = render_count
 		if not same_session then
@@ -1413,6 +1448,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			watcher_callback_ran = true
 			watcher_activation_ok, watcher_activation_crashed = activate_watchers_safely()
 		end)
+		if not still_owned() then return end
 		if render_committed ~= true then
 			dismiss("prediction render did not commit")
 			return
@@ -1439,14 +1475,16 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 
 	if not ok then
 		Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".")
-		if runtime_available() then dismiss("prediction render failure") else M.hide_silent() end
+		if still_owned() then
+			if runtime_available() then dismiss("prediction render failure") else M.hide_silent() end
+		end
 	elseif rendered then
 		Logger.debug(LOG, "SHOW predictions: %d active, %d reserved (idle timer armed in start_watchers).",
 			type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0,
 			tonumber(_state.reserved_count) or 0)
 	end
 	HotPath.log_if_slow("tooltip.show_predictions", _hot_t0, "LLM prediction render")
-	return ok and rendered
+	return ok and rendered and still_owned()
 end
 
 function M.make_diff_styled(diff_chunks, next_words, fallback_text)

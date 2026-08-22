@@ -75,6 +75,7 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		package.loaded["infra.paths"] = nil
 		package.loaded["infra.timings"] = nil
 		package.loaded["adapters.synthetic_input"] = synthetic
+		package.loaded["adapters.timer_scheduler"] = nil
 		package.loaded["modules.shortcuts.actions.text"] = nil
 		local actions = require("modules.shortcuts.actions.text")
 

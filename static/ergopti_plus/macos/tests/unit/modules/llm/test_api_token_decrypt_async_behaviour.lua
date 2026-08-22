@@ -25,6 +25,9 @@ local function with_crypto_fixture(options, body)
 		timeout = nil,
 		terminate_calls = 0,
 		cancel_calls = 0,
+		cancel_handles = {},
+		timer_observers = {},
+		timer_cancel_mode = options.timer_cancel_mode or "true",
 		start_calls = 0,
 		input = nil,
 		process_order = {},
@@ -60,10 +63,28 @@ local function with_crypto_fixture(options, body)
 			helpers.assert_eq(delay, 10)
 			fixture.timeout = callback
 			if options.timer_fires_synchronously then callback() end
-			return { timer = true }, options.timer_commits ~= false
+			fixture.timeout_handle = { timer = true }
+			return fixture.timeout_handle, options.timer_commits ~= false
 		end,
-		cancel = function()
+		cancel = function(handle)
 			fixture.cancel_calls = fixture.cancel_calls + 1
+			fixture.cancel_handles[#fixture.cancel_handles + 1] = handle
+			if fixture.timer_cancel_mode == "throw" then
+				error("timer cancellation exploded")
+			end
+			if fixture.timer_cancel_mode == "false" then return false end
+			if fixture.timer_cancel_mode == "nil" then return nil end
+			if type(handle) == "table" then handle.timer = nil end
+			local observers = fixture.timer_observers[handle] or {}
+			fixture.timer_observers[handle] = nil
+			for _, observer in ipairs(observers) do observer() end
+			return true
+		end,
+		onSettled = function(handle, observer)
+			if type(handle) ~= "table" or type(observer) ~= "function" then return false end
+			if handle.timer == nil then observer(); return true end
+			fixture.timer_observers[handle] = fixture.timer_observers[handle] or {}
+			fixture.timer_observers[handle][#fixture.timer_observers[handle] + 1] = observer
 			return true
 		end,
 	}
@@ -166,6 +187,40 @@ helpers.describe("TokenCrypto async task ownership", function()
 		end)
 	end)
 
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains a synchronously delivered deadline after " .. mode
+			.. " cleanup refusal", function()
+			with_crypto_fixture({
+				timer_fires_synchronously = true,
+				timer_cancel_mode = mode,
+				done_on_terminate = true,
+			}, function(TokenCrypto, fixture)
+				local results = {}
+				local operation = TokenCrypto.decrypt_async("keychain:entry-a", function(...)
+					results[#results + 1] = table.pack(...)
+				end)
+				helpers.assert_eq(fixture.start_calls, 0)
+				helpers.assert_eq(#results, 0,
+					mode .. " may not publish over the exact handle returned after delivery")
+				helpers.assert_eq(fixture.cancel_calls, 1)
+				helpers.assert_eq(fixture.cancel_handles[1], fixture.timeout_handle)
+
+				fixture.timer_cancel_mode = "true"
+				local settled, state = operation.cancel()
+				helpers.assert_true(settled,
+					mode .. " exact handle must remain retryable after synchronous acquisition")
+				helpers.assert_eq(state, "settled")
+				helpers.assert_eq(#results, 1)
+				helpers.assert_eq(results[1][1], false)
+				helpers.assert_eq(results[1][3], "timeout")
+				fixture.timeout()
+				fixture.done(0, "duplicate", "")
+				helpers.assert_eq(#results, 1,
+					"late and duplicate terminals must remain inert after exact settlement")
+			end)
+		end)
+	end
+
 	helpers.it("converts a constructor throw into one explicit launch failure", function()
 		with_crypto_fixture({ spawn_throws = true }, function(TokenCrypto)
 			local calls, reason = 0, nil
@@ -260,16 +315,62 @@ helpers.describe("TokenCrypto async task ownership", function()
 				"a throw across the task boundary must reach the file logger")
 		end)
 	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains the exact timeout handle after task completion and " .. mode,
+			function()
+				with_crypto_fixture({ timer_cancel_mode = mode }, function(TokenCrypto, fixture)
+					local results = {}
+					local operation = TokenCrypto.decrypt_async("keychain:entry-a", function(...)
+						results[#results + 1] = table.pack(...)
+					end)
+					fixture.done(0, "secret-a", "")
+					helpers.assert_eq(#results, 0,
+						"the terminal may not publish over a live deadline capability")
+					helpers.assert_eq(fixture.cancel_calls, 1)
+					helpers.assert_eq(fixture.cancel_handles[1], fixture.timeout_handle)
+
+					local settled, state = operation.cancel()
+					helpers.assert_eq(settled, false)
+					helpers.assert_eq(state, "pending")
+					helpers.assert_eq(fixture.cancel_handles[2], fixture.timeout_handle,
+						"retry must target the exact retained timer handle")
+					fixture.timer_cancel_mode = "true"
+					settled, state = operation.cancel()
+					helpers.assert_eq(settled, true)
+					helpers.assert_eq(state, "settled")
+					helpers.assert_eq(fixture.cancel_handles[3], fixture.timeout_handle)
+					helpers.assert_eq(#results, 1)
+					helpers.assert_eq(results[1][1], true)
+					helpers.assert_eq(results[1][2], "secret-a")
+
+					fixture.done(0, "duplicate", "")
+					fixture.timeout()
+					helpers.assert_eq(#results, 1,
+						"late and duplicate terminal delivery must remain one-shot")
+				end)
+			end)
+	end
 end)
 
 local function with_remote_fixture(body)
 	local names = {
 		"modules.llm.api_remote", "modules.llm.api_token_crypto",
-		"adapters.http_client",
+		"adapters.http_client", "modules.shortcuts.script_control",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	local fixture = { decrypt_calls = 0, callbacks = {}, cancels = 0, http_gets = 0 }
+	local fixture = {
+		decrypt_calls = 0,
+		callbacks = {},
+		cancels = 0,
+		http_gets = 0,
+		cancel_mode = "true",
+	}
+	package.loaded["modules.shortcuts.script_control"] = {
+		is_paused = function() return false end,
+		get_pause_epoch = function() return 0 end,
+	}
 	package.loaded["modules.llm.api_token_crypto"] = {
 		is_encrypted = function(value)
 			return type(value) == "string" and value:sub(1, 9) == "keychain:"
@@ -280,6 +381,9 @@ local function with_remote_fixture(body)
 			return {
 				cancel = function()
 					fixture.cancels = fixture.cancels + 1
+					if fixture.cancel_mode == "throw" then error("resolver cancel exploded") end
+					if fixture.cancel_mode == "false" then return false end
+					if fixture.cancel_mode == "nil" then return nil end
 					return true
 				end,
 			}
@@ -291,8 +395,9 @@ local function with_remote_fixture(body)
 				cancel = function() return true end,
 				get = function(_url, _headers, _callback)
 					fixture.http_gets = fixture.http_gets + 1
+					return true
 				end,
-				post = function() end,
+				post = function() return true end,
 			}
 		end,
 		encodeForQuery = function(value) return value end,
@@ -305,7 +410,126 @@ local function with_remote_fixture(body)
 	if not ok then error(err) end
 end
 
+--- Loads real TokenCrypto + TimerScheduler + ApiRemote over native task/timer
+--- doubles so a late scheduler settlement can complete a normal resolver without
+--- any explicit lifecycle retry.
+local function with_real_remote_crypto_settlement(stop_mode, body)
+	local names = {
+		"modules.llm.api_remote", "modules.llm.api_token_crypto",
+		"adapters.shell_runner", "adapters.timer_scheduler",
+		"adapters.http_client", "modules.shortcuts.script_control",
+		"platform.remap.lease_helper",
+	}
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local fixture = {
+		done = nil,
+		native_callback = nil,
+		running = false,
+		stop_mode = stop_mode,
+		stop_calls = 0,
+		http_gets = 0,
+	}
+	local timer_stub = {
+		secondsSinceEpoch = function() return 0 end,
+		new = function(_, callback)
+			fixture.native_callback = callback
+			local native = {}
+			function native:start()
+				fixture.running = true
+				return self
+			end
+			function native:running() return fixture.running end
+			function native:stop()
+				fixture.stop_calls = fixture.stop_calls + 1
+				if fixture.stop_mode == "throw" then error("timer stop refused") end
+				if fixture.stop_mode == "false" then return false end
+				if fixture.stop_mode == "nil" then return nil end
+				fixture.running = false
+				return self
+			end
+			return native
+		end,
+	}
+	local ok, err = xpcall(function()
+		helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+		package.loaded["platform.remap.lease_helper"] = {
+			resolve = function() return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end,
+		}
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function(_executable, _args, on_done)
+				fixture.done = on_done
+				return {
+					start = function() return true end,
+					terminate = function() return true, "pending" end,
+				}
+			end,
+		}
+		package.loaded["modules.shortcuts.script_control"] = {
+			is_paused = function() return false end,
+			get_pause_epoch = function() return 0 end,
+		}
+		package.loaded["adapters.http_client"] = {
+			new = function()
+				return {
+					cancel = function() return true end,
+					isActive = function() return false end,
+					onSettled = function(callback) callback(); return true end,
+					get = function(_url, _headers, _callback)
+						fixture.http_gets = fixture.http_gets + 1
+						return true
+					end,
+					post = function() return true end,
+				}
+			end,
+			encodeForQuery = function(value) return value end,
+		}
+		package.loaded["modules.llm.api_token_crypto"] = nil
+		require("modules.llm.api_token_crypto")
+		package.loaded["modules.llm.api_remote"] = nil
+		body(require("modules.llm.api_remote"), fixture)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(err) end
+end
+
 helpers.describe("ApiRemote asynchronous token resolver", function()
+	for _, stop_mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("finishes real Remote resolution after autonomous " .. stop_mode
+			.. " timeout settlement", function()
+			with_real_remote_crypto_settlement(stop_mode, function(ApiRemote, fixture)
+				ApiRemote.PROVIDERS.openai = {
+					label = "OpenAI", base_url = "https://example.invalid",
+					default_model = "gpt", format = "openai",
+				}
+				ApiRemote.set_entries({
+					{ id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" },
+				})
+				ApiRemote.set_active_entry_id("entry-a")
+				helpers.assert_eq(ApiRemote.warmup(), true, stop_mode)
+				helpers.assert_type(fixture.done, "function")
+				helpers.assert_eq(fixture.http_gets, 0)
+
+				fixture.done(0, "secret-a\n", "")
+				helpers.assert_eq(fixture.stop_calls, 1)
+				helpers.assert_eq(fixture.http_gets, 0,
+					stop_mode .. " must retain the resolved token until deadline settlement")
+				fixture.stop_mode = "success"
+				fixture.native_callback()
+				helpers.assert_eq(fixture.http_gets, 1,
+					stop_mode .. " native settlement must continue warmup exactly once")
+				fixture.native_callback()
+				helpers.assert_eq(fixture.http_gets, 1,
+					stop_mode .. " duplicate native delivery must stay inert")
+				local cached = nil
+				ApiRemote.resolve_active_entry(function(ok, entry)
+					cached = ok and entry.token or nil
+				end)
+				helpers.assert_eq(cached, "secret-a")
+			end)
+		end)
+	end
+
 	helpers.it("single-flights waiters, caches outside the entry, and ignores duplicates", function()
 		with_remote_fixture(function(ApiRemote, fixture)
 			ApiRemote.set_entries({
@@ -359,6 +583,62 @@ helpers.describe("ApiRemote asynchronous token resolver", function()
 			helpers.assert_eq(ApiRemote.get_entries()[1].token, "keychain:entry-a")
 		end)
 	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("fences reentrant identity resolution over " .. mode
+			.. " cancellation debt", function()
+			with_remote_fixture(function(ApiRemote, fixture)
+				ApiRemote.set_entries({
+					{ id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "a" },
+					{ id = "entry-b", provider = "openai", token = "keychain:entry-b", model = "b" },
+				})
+				ApiRemote.set_active_entry_id("entry-a")
+				local first_ok, first_reason = nil, nil
+				local reentrant_ok, reentrant_reason = nil, nil
+				ApiRemote.resolve_active_entry(function(ok, _entry, why)
+					first_ok = ok
+					first_reason = why
+					ApiRemote.resolve_active_entry(function(resolved_ok, _resolved, reentrant_why)
+						reentrant_ok = resolved_ok
+						reentrant_reason = reentrant_why
+					end)
+				end)
+				fixture.cancel_mode = mode
+				ApiRemote.set_active_entry_id("entry-b")
+				helpers.assert_eq(first_ok, false)
+				helpers.assert_eq(first_reason, "identity_changed")
+				helpers.assert_eq(reentrant_ok, false)
+				helpers.assert_eq(reentrant_reason, "resolver_quiesced")
+				helpers.assert_eq(fixture.decrypt_calls, 1,
+					"callback reentrance may not launch an identity successor")
+				helpers.assert_eq(fixture.cancels, 1)
+
+				local blocked_ok, blocked_reason = nil, nil
+				ApiRemote.resolve_active_entry(function(ok, _entry, why)
+					blocked_ok = ok
+					blocked_reason = why
+				end)
+				helpers.assert_eq(blocked_ok, false)
+				helpers.assert_eq(blocked_reason, "resolver_quiesced")
+				helpers.assert_eq(fixture.decrypt_calls, 1,
+					"a failed retry must retain the original native owner")
+				helpers.assert_eq(fixture.cancels, 2)
+
+				fixture.cancel_mode = "true"
+				local successor = nil
+				ApiRemote.resolve_active_entry(function(ok, entry)
+					successor = ok and entry or nil
+				end)
+				helpers.assert_eq(fixture.cancels, 3)
+				helpers.assert_eq(fixture.decrypt_calls, 2,
+					"successor may launch only after exact predecessor settlement")
+				fixture.callbacks[1](true, "late-a", nil)
+				helpers.assert_eq(successor, nil)
+				fixture.callbacks[2](true, "secret-b", nil)
+				helpers.assert_eq(successor.token, "secret-b")
+			end)
+		end)
+	end
 
 	helpers.it("does zero HTTP work until a cold token resolves", function()
 		with_remote_fixture(function(ApiRemote, fixture)

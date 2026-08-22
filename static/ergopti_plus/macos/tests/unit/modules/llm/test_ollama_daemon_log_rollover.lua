@@ -85,6 +85,7 @@ helpers.describe("Ollama daemon log rollover", function()
 		local original_log = logger.UNIFIED_LOG_FILE
 		local commands = {}
 		local kill_done
+		local launch_server
 
 		for name, value in pairs({
 			_ollama_started = false,
@@ -112,14 +113,20 @@ helpers.describe("Ollama daemon log rollover", function()
 			}
 		end
 		scheduler.after = function(_, callback)
-			callback()
-			return { timer = {} }, true
+			local handle = { timer = {} }
+			launch_server = function()
+				handle.timer = nil
+				callback()
+			end
+			return handle, true
 		end
 
 		local ok, err = pcall(function()
 			helpers.assert_eq(ApiOllama.ensure_running(), true)
 			helpers.assert_eq(type(kill_done), "function", "stale-process completion must be captured")
 			kill_done()
+			helpers.assert_eq(type(launch_server), "function")
+			launch_server()
 			helpers.assert_not_nil(commands[2], "server launch must follow stale-process cleanup")
 			assert_runtime_daily_sink(commands[2].args[2], "ApiOllama")
 		end)
@@ -192,12 +199,14 @@ helpers.describe("Ollama daemon log rollover", function()
 		if not ok then error(err) end
 	end)
 
-	helpers.it("passes the same runtime daily sink to the fresh-install bootstrap", function()
+	helpers.it("delegates fresh-install daemon launch to ApiOllama ownership", function()
 		local Logger = require("infra.logger")
 		local original_log = Logger.UNIFIED_LOG_FILE
 		local previous_progress = package.loaded["ui.download_window"]
+		local previous_api = package.loaded["modules.llm.api_ollama"]
 		local task_args
 		local task_done
+		local daemon_calls = 0
 
 		package.loaded["ui.download_window"] = {
 			is_active = function() return false end,
@@ -211,6 +220,12 @@ helpers.describe("Ollama daemon log rollover", function()
 		}
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return nil, "not installed", false end,
+		}
+		package.loaded["modules.llm.api_ollama"] = {
+			ensure_running = function()
+				daemon_calls = daemon_calls + 1
+				return true
+			end,
 		}
 		package.loaded["adapters.task_lifecycle"] = nil
 		Logger.UNIFIED_LOG_FILE = SENTINEL_LOG
@@ -236,12 +251,17 @@ helpers.describe("Ollama daemon log rollover", function()
 		local ok, err = pcall(function()
 			Checker.check_and_install_deps()
 			helpers.assert_true(type(task_args) == "table", "bootstrap task arguments must be captured")
-			assert_runtime_daily_sink(task_args[2], "ollama_deps_checker")
+			helpers.assert_eq(task_args[3], "/bin/bash")
+			helpers.assert_eq(task_args[5], "",
+				"the install script receives only the optional resolved executable")
+			task_done(0, "", "")
+			helpers.assert_eq(daemon_calls, 1,
+				"the checker must not detach its own unjoinable serve process")
 		end)
 
-		if type(task_done) == "function" then task_done(0, "", "") end
 		Logger.UNIFIED_LOG_FILE = original_log
 		package.loaded["ui.download_window"] = previous_progress
+		package.loaded["modules.llm.api_ollama"] = previous_api
 		package.loaded["modules.llm.ollama_binary"] = nil
 		if not ok then error(err) end
 	end)

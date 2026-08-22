@@ -86,6 +86,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	local hotstring_editor = deps.hotstring_editor
 	local core_mods        = deps.core_mods
 	local save_prefs       = deps.save_prefs
+	local apply_llm_enabled = deps.apply_llm_enabled
 	local apply_metrics_shortcut   = deps.apply_metrics_shortcut
 	local apply_apps_time_shortcut = deps.apply_apps_time_shortcut
 
@@ -198,37 +199,46 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- setters may schedule warmup work immediately, so reversing this order would
 	-- dispatch the acknowledged model through the just-rejected backend.
 	local llm = core_mods and core_mods.llm
+	local llm_identity_committed = true
 	if llm then
-		local llm_map = {
+		local identity_map = {
 			{ fn = "set_backend",        val = state.llm_backend },
-			{ fn = "set_active_profile", val = state.llm_active_profile },
-			{ fn = "set_llm_streaming",  val = state.llm_streaming },
 			{ fn = "set_user_profiles",  val = state.llm_user_profiles },
+			{ fn = "set_active_profile", val = state.llm_active_profile },
+			{ fn = "set_llm_model_ollama", val = state.llm_model_ollama },
+			{ fn = "set_llm_model_mlx",    val = state.llm_model_mlx },
 		}
-		for _, item in ipairs(llm_map) do
-			if type(llm[item.fn]) == "function" then try("llm." .. item.fn, llm[item.fn], item.val) end
+		for _, item in ipairs(identity_map) do
+			if not try_exact("llm." .. item.fn, llm[item.fn], item.val) then
+				llm_identity_committed = false
+				break
+			end
 		end
-		if type(llm.set_llm_model_ollama) == "function" then
-			try("llm.set_llm_model_ollama", llm.set_llm_model_ollama, state.llm_model_ollama)
-		end
-		if type(llm.set_llm_model_mlx) == "function" then
-			try("llm.set_llm_model_mlx", llm.set_llm_model_mlx, state.llm_model_mlx)
+		if llm_identity_committed and type(llm.set_llm_streaming) == "function" then
+			try("llm.set_llm_streaming", llm.set_llm_streaming, state.llm_streaming)
 		end
 	end
 
 	-- Sync keymap options
-	if keymap then
-		local backend_labels = { mlx = "MLX 🚀", ollama = "Ollama 🦙", api = "API 🌐" }
-		local map = {
+	if keymap and llm_identity_committed then
+		local keymap_identity_committed = try_exact(
+			"keymap.set_llm_model", keymap.set_llm_model, state.llm_model)
+		local llm_enabled_setter = type(apply_llm_enabled) == "function"
+			and apply_llm_enabled or keymap.set_llm_enabled
+		if keymap_identity_committed and type(llm_enabled_setter) == "function" then
+			keymap_identity_committed = try_exact(
+				"keymap.set_llm_enabled", llm_enabled_setter, state.llm_enabled)
+		end
+		if keymap_identity_committed then
+			local backend_labels = { mlx = "MLX 🚀", ollama = "Ollama 🦙", api = "API 🌐" }
+			local map = {
 			{ fn = "set_preview_star_enabled",        val = state.preview_star_enabled },
 			{ fn = "set_preview_autocorrect_enabled", val = state.preview_autocorrect_enabled },
 			{ fn = "set_preview_ai_enabled",          val = state.preview_ai_enabled },
 			{ fn = "set_preview_colored_tooltips",    val = state.preview_colored_tooltips },
 			{ fn = "set_llm_after_hotstring",         val = state.llm_after_hotstring },
 			{ fn = "set_llm_auto_raise_temp",         val = state.llm_auto_raise_temp },
-			{ fn = "set_llm_enabled",                 val = state.llm_enabled },
 			{ fn = "set_llm_debounce",                val = state.llm_debounce },
-			{ fn = "set_llm_model",                   val = state.llm_model },
 			{ fn = "set_llm_backend_name",            val = backend_labels[state.llm_backend] or state.llm_backend },
 			{ fn = "set_llm_display_model_name",      val = state.llm_model },
 			{ fn = "set_trigger_char",                val = state.trigger_char },
@@ -250,9 +260,12 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_llm_url_bar_filter_enabled",      val = state.llm_url_bar_filter_enabled },
 			{ fn = "set_llm_secure_field_filter_enabled", val = state.llm_secure_field_filter_enabled },
 			{ fn = "set_llm_instant_on_word_end",         val = state.llm_instant_on_word_end },
-		}
-		for _, item in ipairs(map) do
-			if type(keymap[item.fn]) == "function" then try("keymap." .. item.fn, keymap[item.fn], item.val) end
+			}
+			for _, item in ipairs(map) do
+				if type(keymap[item.fn]) == "function" then
+					try("keymap." .. item.fn, keymap[item.fn], item.val)
+				end
+			end
 		end
 	end
 	-- Several LLM editors also mirror these values in hs.settings. Restore that
@@ -397,10 +410,28 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 	end
 	if gestures then
-		if state.gestures then
-			if type(gestures.enable_all) == "function" then try("gestures.enable_all", gestures.enable_all) end
-		else
-			if type(gestures.disable_all) == "function" then try("gestures.disable_all", gestures.disable_all) end
+		local desired_gestures = state.gestures == true
+		local gesture_lifecycle = desired_gestures
+			and gestures.enable_all or gestures.disable_all
+		local gesture_committed = try_exact(
+			desired_gestures and "gestures.enable_all" or "gestures.disable_all",
+			gesture_lifecycle)
+		if gesture_committed ~= true then
+			-- Production enable_all()/disable_all() preserve their previous CoreState
+			-- on refusal. Publish that exact runtime posture back into the mutable
+			-- state and preferences so boot cannot report the rejected desired value.
+			local query_ok, runtime_enabled = pcall(gestures.is_enabled)
+			if query_ok and type(runtime_enabled) == "boolean" then
+				state.gestures = runtime_enabled
+				if type(save_prefs) == "function" then
+					try_exact("save_prefs gesture lifecycle rollback", save_prefs)
+				end
+			else
+				sync_failed = true
+				Logger.warn(LOG,
+					"sync_state_to_modules: gestures.is_enabled rollback query failed — %s",
+					tostring(runtime_enabled))
+			end
 		end
 
 		-- Sync granular settings

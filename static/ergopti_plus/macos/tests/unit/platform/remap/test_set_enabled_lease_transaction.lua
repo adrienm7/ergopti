@@ -574,7 +574,10 @@ local function load_resume_script_control(remap)
 		pause_listener = {},
 	}
 	local function record(name)
-		return function() effects.calls[name] = (effects.calls[name] or 0) + 1 end
+		return function()
+			effects.calls[name] = (effects.calls[name] or 0) + 1
+			return true
+		end
 	end
 
 	package.loaded["infra.notifications"] = {
@@ -614,12 +617,29 @@ local function load_resume_script_control(remap)
 		resume_warmup = record("mlx_resume"),
 	}
 	package.loaded["modules.llm.api_ollama"] = { stop_warmup = record("ollama_stop") }
+	package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
+	package.loaded["ui.wpm.wpm_menubar"] = {
+		is_running = function() return false end,
+	}
+	package.loaded["ui.wpm.wpm_widget"] = {
+		is_running = function() return false end,
+	}
+	package.loaded["platform.remap.onboarding"] = {
+		stop = function(on_done)
+			if type(on_done) == "function" then on_done(true, "stopped") end
+			return true
+		end,
+	}
 	package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
 	package.loaded["modules.keylogger"] = {
 		resync_context = record("keylogger_resync"),
 		log_shortcut = function() end,
 	}
 
+	-- Bind both native timer owners to the same fresh hs run loop as script_control;
+	-- cached adapters would retain prior timers or an obsolete commitment contract.
+	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
 	local script_hs = hs
 	package.loaded["modules.shortcuts"] = {
@@ -640,7 +660,8 @@ local function load_resume_script_control(remap)
 		resume = record("gestures_resume"),
 		is_enabled = function() return true end,
 	}
-	script_control.start(keymap, shortcuts, gestures, remap)
+	helpers.assert_true(script_control.start(keymap, shortcuts, gestures, remap),
+		"the integration fixture must commit script-control native ownership")
 	script_control.set_on_pause_change(function(value)
 		effects.pause_listener[#effects.pause_listener + 1] = value
 	end)
@@ -2438,7 +2459,8 @@ helpers.describe("karabiner pause/resume API exposes the complete transaction bo
 		local remap, calls = load_enabled_remap()
 		local script_control, effects = load_resume_script_control(remap)
 
-		script_control.pause_all()
+		helpers.assert_true(script_control.pause_all(),
+			"the integration fixture must accept the pause transaction")
 		effects.fire_deferred()
 		helpers.assert_eq(#calls.pause_callbacks, 1)
 		calls.lease_phase = "paused"
