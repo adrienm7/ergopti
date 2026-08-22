@@ -5,16 +5,17 @@ description: Consult or maintain routed project memory without loading unrelated
 
 # Project memory
 
-`docs/PROJECT_MEMORY.md` is a short routing index for hard-won knowledge. The
-actual entries live in focused files under `docs/project-memory/`. This catalog
-is shared by every developer, agent and reviewer and replaces agent-private
-memory stores.
+`docs/memory/README.md` is the routing index for hard-won knowledge. The actual
+entries live beside it in focused files under `docs/memory/`.
+`docs/PROJECT_MEMORY.md` is only a compatibility pointer for older clients.
+This catalog is shared by every developer, agent and reviewer and replaces
+agent-private memory stores.
 
 ## Consult it first
 
-Read the index, then only the topic files covering the area you will touch. Do
-not load every topic by default. A meaningful share of "new" bugs in this repo
-are documented recurrences.
+Read `docs/memory/README.md`, then only the topic files covering the area you
+will touch. Do not load every topic by default. A meaningful share of "new"
+bugs in this repo are documented recurrences.
 
 ## What belongs here
 
@@ -23,8 +24,8 @@ time, an invariant that is not visible from the code, a decision whose rationale
 would otherwise evaporate, an intentional asymmetry that looks like a bug.
 
 What does **not** belong: anything the repo already records — code structure, the
-content of a fix (that is the commit), git history, or rules already written in
-`.github/copilot-instructions.md`. Do not restate; link instead.
+content of a fix (that is the commit), git history, or universal rules already
+written in `AGENTS.md`. Do not restate; link instead.
 
 ## Entry format
 
@@ -58,5 +59,6 @@ directly to code/tests when that is more useful than restating them.
 ## Cadence
 
 Add or update entries proactively at the end of a task, without being asked.
-Prune obsolete material at the same time. Then commit without pushing, per the
-`commit-and-push` skill.
+Prune obsolete material at the same time. Put measured rejected ideas in
+`docs/memory/rejected_proposals.md`, not among implementation invariants. Then
+commit without pushing, per the `commit-and-push` skill.

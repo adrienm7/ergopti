@@ -31,10 +31,10 @@ Walk the document item by item and sort each one:
 
 - **Delivered** — cite the `file:line` that proves it. This is the bulk of an old
   plan, and it is what makes the deletion safe.
-- **Still open** — extract it, with enough context to act *without* the original:
+- **Still open** — extract it, with enough context to act _without_ the original:
   what, where (real paths), why it matters today, and how to verify it. If you
   cannot write that, you have not understood it well enough to move it.
-- **Decided against** — keep the *reason*, not the item, and put it under a
+- **Decided against** — keep the _reason_, not the item, and put it under a
   "do not re-raise" heading. This is the part everyone drops, and it is why the
   same rejected idea comes back every few months.
 - **Superseded** — a test now guards the invariant. Name the test. The test is
@@ -46,7 +46,7 @@ Walk the document item by item and sort each one:
 say plainly what each item costs if it stays undone. If everything looks equally
 important, nobody will start.
 
-Durable *lessons* go to `docs/PROJECT_MEMORY.md` instead; see the
+Durable _lessons_ go to the narrow topic under `docs/memory/` instead; see the
 `project-memory` skill. The distinction: a lesson stops someone breaking
 something, a TODO is work someone will do.
 
@@ -67,8 +67,8 @@ markdown links, so it catches the references you missed.
 
 ## When not to delete
 
-Keep the document if it is a **reference** (it describes what *is*) rather than a
-**plan** (it described what *was going to be*). A reference that has gone stale
+Keep the document if it is a **reference** (it describes what _is_) rather than a
+**plan** (it described what _was going to be_). A reference that has gone stale
 gets corrected, not deleted — and correcting it is urgent, because a wrong
 reference actively misleads. One in this repo instructed the reader to add
 `Critical` to a block where the live test asserts its absence; following it would

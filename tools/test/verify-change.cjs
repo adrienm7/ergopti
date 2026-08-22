@@ -437,6 +437,42 @@ function runGate(gate) {
 	return spawnSync(ahk, [spec.ahk], { cwd: WINDOWS_TESTS, stdio: 'inherit' });
 }
 
+/**
+ * Classifies a gate outcome without pretending a red proves causality. A gate
+ * selected by the current diff is a candidate regression; an extra full-audit
+ * gate is baseline/history until separately reproduced against the baseline.
+ * Failure to start is environmental, not a test assertion.
+ * @param {string} gate Gate name.
+ * @param {object} result spawnSync-like result.
+ * @param {boolean} selectedByChange Whether the current diff requires the gate.
+ * @returns {{kind: string, blockingInDiagnosis: boolean, detail: string}}
+ */
+function classifyGateResult(gate, result, selectedByChange) {
+	if (result.skipped) {
+		return { kind: 'environment-deferral', blockingInDiagnosis: false, detail: result.skipped };
+	}
+	if (result.error || result.status === null) {
+		return {
+			kind: 'environment-failure',
+			blockingInDiagnosis: selectedByChange,
+			detail: result.error ? result.error.message : `${gate} process did not start`,
+		};
+	}
+	if (result.status === 0) return { kind: 'pass', blockingInDiagnosis: false, detail: '' };
+	if (selectedByChange) {
+		return {
+			kind: 'candidate-regression',
+			blockingInDiagnosis: true,
+			detail: 'this gate covers the current diff; inspect the exact assertion before attributing causality',
+		};
+	}
+	return {
+		kind: 'baseline-or-history',
+		blockingInDiagnosis: false,
+		detail: 'this full-audit gate is not selected by the current diff; reproduce it against the baseline before blocking a scoped change',
+	};
+}
+
 // ==================================================
 // ==================================================
 // ======= 5/ Entry point ===========================
@@ -447,15 +483,20 @@ function main() {
 	const args = process.argv.slice(2);
 	const planOnly = args.includes('--plan');
 	const all = args.includes('--all');
+	const diagnose = args.includes('--diagnose');
 	const range = (args.find((a) => a.startsWith('--range=')) || '').replace('--range=', '') || null;
+	if (diagnose && !all) {
+		console.error('verify-change: --diagnose is a full-audit classifier and requires --all.');
+		return 2;
+	}
 
-	const files = all ? null : changedFiles(range);
-	if (files && files.length === 0) {
+	const files = changedFiles(range);
+	if (!all && files.length === 0) {
 		console.log('verify-change: nothing changed — nothing to verify.');
 		return 0;
 	}
 
-	if (files) {
+	if (files.length > 0) {
 		console.log(`verify-change: ${files.length} changed file(s).`);
 		const problems = [...checkTestsAreRegistered(files), ...checkScannedSymbolsExist(files)];
 		if (problems.length > 0) {
@@ -467,9 +508,10 @@ function main() {
 		console.log('verify-change: silent-failure pre-checks passed.');
 	}
 
+	const changeGates = selectGates(files);
 	const gates = all
 		? new Map([['ahk-encoding', {}], ['ahk-suite', {}], ['ahk-e2e', {}], ['js', {}]])
-		: selectGates(files);
+		: changeGates;
 
 	if (gates.size === 0) {
 		console.log('verify-change: no gate matches these files. Run with --all if in doubt.');
@@ -485,28 +527,36 @@ function main() {
 	if (planOnly) return 0;
 
 	let failed = 0;
+	let diagnosticBlockers = 0;
+	const classifications = [];
 	for (const [gate] of gates) {
 		console.log(`\n=== ${gate} ===`);
 		const res = runGate(gate);
-		if (res.skipped) {
-			console.log(`  skipped: ${res.skipped}`);
-			continue;
-		}
-		// A null status means the process never started (bad shim, missing
-		// interpreter). Report that as its own failure rather than letting it
-		// masquerade as a failed gate — the two need different fixes.
-		if (res.error || res.status === null) {
+		const classification = classifyGateResult(gate, res, changeGates.has(gate));
+		classifications.push({ gate, ...classification });
+		if (classification.kind === 'environment-deferral') console.log(`  skipped: ${classification.detail}`);
+		else if (classification.kind !== 'pass') {
 			failed += 1;
-			console.error(`  ${gate} COULD NOT RUN: ${res.error ? res.error.message : 'process did not start'}`);
-			continue;
-		}
-		if (res.status !== 0) {
-			failed += 1;
-			console.error(`  ${gate} FAILED`);
+			if (classification.blockingInDiagnosis) diagnosticBlockers += 1;
+			console.error(`  ${gate} ${classification.kind.toUpperCase()}: ${classification.detail}`);
 		}
 	}
 
 	console.log('');
+	if (diagnose) {
+		const nonPassing = classifications.filter((item) => item.kind !== 'pass');
+		console.log('verify-change diagnosis:');
+		if (nonPassing.length === 0) console.log('  every full-audit gate passed.');
+		for (const item of nonPassing) {
+			console.log(`  - ${item.gate}: ${item.kind}${item.blockingInDiagnosis ? ' (blocks this scoped change)' : ' (reported, non-blocking for this scoped change)'}`);
+		}
+		if (diagnosticBlockers === 0) {
+			console.log('verify-change: gates required by the current diff passed or were explicitly deferred; unrelated historical reds were not promoted to regressions.');
+			return 0;
+		}
+		console.error(`verify-change: ${diagnosticBlockers} current-diff gate(s) still require diagnosis.`);
+		return 1;
+	}
 	if (failed > 0) {
 		console.error(`verify-change: ${failed} gate(s) failed.`);
 		return 1;
@@ -519,7 +569,7 @@ function main() {
 // every selectable gate resolves to a real command, without spawning any suite.
 // The auto-run stays guarded on require.main so `node verify-change.cjs` behaves
 // exactly as before.
-module.exports = { RULES, GATE_COMMANDS, selectGates, hasAhkFunctionDefinition };
+module.exports = { RULES, GATE_COMMANDS, classifyGateResult, selectGates, hasAhkFunctionDefinition };
 
 if (require.main === module) {
 	process.exit(main());

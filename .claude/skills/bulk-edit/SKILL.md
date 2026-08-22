@@ -36,8 +36,8 @@ Put the check inside the script, not in your head:
 ```js
 const mojibake = (result.match(/â€/g) || []).length;
 if (mojibake > 0) {
-  console.error(`REFUSING TO WRITE: ${mojibake} mojibake sequence(s)`);
-  process.exit(1);
+	console.error(`REFUSING TO WRITE: ${mojibake} mojibake sequence(s)`);
+	process.exit(1);
 }
 ```
 
@@ -48,24 +48,20 @@ the replacement blocks had been extracted with `Get-Content` without
 copied it faithfully. **A rewrite is only as clean as the data you feed it: check
 the input, then check the output.**
 
-## Preserve the file's line endings
+## Enforce the repository's LF contract
 
-The working copy is CRLF; content you assemble in a script is LF. Normalise the
-source to `\n`, do the work, then restore the original ending on write:
+Normalize source text before matching and write LF, as declared by
+`.gitattributes`:
 
 ```js
-const WAS_CRLF = raw.includes('\r\n');
-const src = raw.replace(/\r\n/g, '\n');
+const src = raw.replace(/\r\n?/g, '\n');
 // … edit …
-fs.writeFileSync(p, WAS_CRLF ? out.replace(/\n/g, '\r\n') : out, 'utf8');
+if (out.includes('\r')) throw new Error('refusing to write non-LF text');
+fs.writeFileSync(p, out, 'utf8');
 ```
 
-Skipping this leaves mixed terminators, which `file` reports as
-`CRLF, CR, LF line terminators` and which makes every later diff noisy.
-
-Related trap, silent: **in a JS regex `.` does not cross `\r`**, so a pattern
-ending in `.*$` matches nothing on a CRLF line. In one run this made every
-bracketed heading look unmatched — 15 sections skipped with no error.
+Do not use a bulk rewrite to normalize unrelated files in an active dirty
+worktree. Line-ending migration is a separate, explicitly reviewed change.
 
 ## Prove you did not lose anything
 
@@ -73,7 +69,7 @@ Structure the check as a before/after comparison, not a glance at the diff:
 
 ```js
 const keys = (t) => [...t.matchAll(/^###\s+(.+)$/gm)].map(normalise);
-const lost  = keys(before).filter((k) => !keys(after).includes(k));
+const lost = keys(before).filter((k) => !keys(after).includes(k));
 const added = keys(after).filter((k) => !keys(before).includes(k));
 ```
 

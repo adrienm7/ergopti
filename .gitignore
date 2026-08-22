@@ -206,5 +206,6 @@ version.json
 
 .claude/settings.local.json
 .claude/worktrees/
+.rtk/
 .locale_work/
 .scratch/

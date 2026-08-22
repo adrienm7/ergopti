@@ -1,4 +1,4 @@
-<!-- docs/project-memory/macos-hammerspoon.md -->
+<!-- docs/memory/macos-hammerspoon.md -->
 
 # macOS and Hammerspoon memory
 

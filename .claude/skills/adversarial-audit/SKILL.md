@@ -1,6 +1,6 @@
 ---
 name: adversarial-audit
-description: Audit a driver adversarially with reproducible evidence. Use for robustness audits, hardening, stress analysis, or latent-bug searches.
+description: Audit one Ergopti driver adversarially with reproducible evidence, without implementing fixes. Use for robustness audits, latent-bug searches, "fais un audit AHK", or "fais un audit Hammerspoon"; use perf-profiling for performance-only audits.
 ---
 
 # Adversarial audit
@@ -8,11 +8,21 @@ description: Audit a driver adversarially with reproducible evidence. Use for ro
 Adopt an adversarial stance: the goal is not to confirm the code works, it is to
 find the input, state or timing that breaks it.
 
-## The four guarantees
+Read only the matching scope reference, plus the report contract before writing
+the deliverable:
+
+- AutoHotkey: [references/ahk.md](references/ahk.md)
+- Hammerspoon: [references/hammerspoon.md](references/hammerspoon.md)
+- Output: [references/report-contract.md](references/report-contract.md)
+
+This skill audits and reports. Do not edit production or test code unless the
+user separately asks to implement the findings.
+
+## The five guarantees
 
 Audit against these, and state which one each finding violates:
 
-- **G1 — Robustness.** No unhandled exception, crash or keyboard lock-up in *any*
+- **G1 — Robustness.** No unhandled exception, crash or keyboard lock-up in _any_
   state: normal, suspended, paused, mid-layout-switch, mid-config-reload,
   updater-poll, cold start, first boot.
 - **G2 — No missing output.** No silent no-op: every user action produces its
@@ -20,6 +30,8 @@ Audit against these, and state which one each finding violates:
 - **G3 — No races.** Every async boundary (timer, hook, InputHook, HTTP, watcher)
   is safe against reentrancy and out-of-order completion.
 - **G4 — No lag.** No perceptible latency on any hot path.
+- **G5 — Truthful preview.** A tooltip or preview predicts the exact behavior
+  the owning engine would produce in the same state.
 
 ## Method
 
@@ -34,7 +46,8 @@ Audit against these, and state which one each finding violates:
 
 Bug classes worth a dedicated sweep: unguarded map/table access, state read
 before init, load-time vs runtime registration, missing suspend guards, swallowed
-exceptions, non-reentrant handlers, sync I/O on a hot path.
+exceptions, non-reentrant handlers, sync I/O on a hot path. The scope references
+add platform-specific failure modes and current refutations.
 
 ## Proof discipline — every finding must carry
 
@@ -53,7 +66,7 @@ A finding without a repro path is a hypothesis. Label it as one.
 The cautionary tale here is a **refutation that was wrong**, which is worse than
 the finding it killed. The second 2026-07-20 audit declared the first audit's
 performance section fabricated — "zero `Slow` lines exist in any log". A third
-pass re-derived the disputed figures independently and got them *exactly*:
+pass re-derived the disputed figures independently and got them _exactly_:
 `Tooltip.ResolvePos` max 2560.3 ms, `OnChar` max 701.3 ms, 8 958 `Slow` lines
 across 10 days. The debunker had searched `<ConfigDir>/ahk/logs/` — a directory
 that never existed — instead of `<ConfigDir>/autohotkey/logs/`
@@ -70,7 +83,7 @@ Consequences to internalise:
   first, then the driver's subdirectory constant.
 - **Never present a sub-agent's or tool's output as measured evidence** without
   opening the artifact yourself. Aggregating an unverified claim launders it.
-- **Cheapest possible check first**, run at the *correct* path:
+- **Cheapest possible check first**, run at the _correct_ path:
   `awk 'index($0,"Slow")>0{c++} END{print c+0}' <log>`.
 - **Be fair when you suspect fabrication.** Prefer "I could not locate the artifact
   at X, Y, Z — where should I look?" over "this was invented".
@@ -92,10 +105,11 @@ Consequences to internalise:
 
 ## Deliverable
 
-Unless asked otherwise: `AUDIT_<SCOPE>_<YYYY-MM-DD>.md` at the repo root, with
-executive summary, findings by severity, performance (with provenance labelled),
-PROJECT_MEMORY watch-list status, and a coverage register of what was and was not
-examined. Be explicit about coverage gaps — silence reads as "covered".
+Follow `references/report-contract.md`: write a human report and validated
+`findings.json` under a dated `docs/audits/<scope>/` directory. Include an
+executive summary, confirmed findings by severity, performance evidence with
+provenance, memory watch-list status, rejected hypotheses, and a coverage
+register. Be explicit about gaps — silence reads as "covered".
 
 ## Constraint
 

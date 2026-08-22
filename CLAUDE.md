@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Claude Code
+# Claude Code adapter
 
-Use the common repository contract above. Load detailed procedures from
-`.claude/skills/` only when their descriptions match the current task.
+Use the common contract above. Claude skills live in the generated
+`.claude/skills/` mirror; their canonical sources are `.agents/skills/`.

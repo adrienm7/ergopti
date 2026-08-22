@@ -1,4 +1,4 @@
-<!-- docs/project-memory/linux-web-release.md -->
+<!-- docs/memory/linux-web-release.md -->
 
 # Linux, web, and release memory
 
@@ -55,4 +55,3 @@ tag, notes, and every expected asset explicitly.
 When a cross-platform drift tool fails on Windows path/process semantics, use
 the repository's supported wrapper and preserve the failure as a test fixture;
 do not silently skip the guard.
-

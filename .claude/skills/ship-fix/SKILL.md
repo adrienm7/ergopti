@@ -6,43 +6,42 @@ description: Fix a bug from root cause through regression proof and local commit
 # Shipping a fix
 
 No fix is complete until its regression test is written, runs, and is green.
-This is `.github/copilot-instructions.md` §5.9 — a hard project rule, not a
-preference.
+This is the repository delivery contract in `AGENTS.md`.
 
 ## 1. Before touching code
 
-Read `docs/PROJECT_MEMORY.md` for the area you are about to change. It is the
+Read `docs/memory/README.md`, then the one topic for the area you are about to
+change. It is the
 in-repo record of foot-guns and invariants that have already bitten this
 codebase; several "new" bugs are documented recurrences. See the
 `project-memory` skill.
 
 ## 2. Fix the root cause
 
-Find *why* the failure is possible, not just where it surfaces. A fix that makes
+Find _why_ the failure is possible, not just where it surfaces. A fix that makes
 the symptom disappear while leaving the mechanism intact will regress under a
 slightly different trigger.
 
 Ask explicitly: **why was this silent until now?** A bug that produced no log,
 no error, no visible failure usually means a swallowed exception or a missing
-guard — that silence is itself a second bug worth fixing (§5.3, fail fast).
+guard — that silence is itself a second bug worth fixing under the fail-fast
+contract in `AGENTS.md`.
 
 Check whether the same mistake exists at sibling call sites. Per
-`project-ahk-invariant-incomplete-application` in PROJECT_MEMORY, the recurring
-pattern here is the ONE missed sibling site — audit the whole class.
+`project-ahk-invariant-incomplete-application` in
+`docs/memory/windows-ahk.md`, the recurring pattern here is the ONE missed
+sibling site — audit the whole class.
 
 ## 3. Write the regression test
 
-It must **fail before the fix and pass after it**. A test that passes against the
-unfixed code proves nothing, so prove it rather than assume it:
+It must **fail before the fix and pass after it**. Write and run the targeted
+test before editing production code whenever possible. Never stash, reset, or
+rewrite an active worktree to manufacture pre-fix evidence. If production code
+was already edited, use a recorded pre-fix reproduction or baseline; otherwise
+state the evidence gap explicitly and make the regression assertion as direct
+as possible.
 
-```bash
-git stash push -- <the SOURCE files only, never the test>
-AutoHotkey64.exe tests/run_all.ahk --only "<slug from the test name>"   # expect exit 1
-git stash pop
-```
-
-Stash the source, never the test — stashing both proves nothing, and it is the
-easy mistake to make. Put a stable slug in the test name (`(perf-2026-07-21)`,
+Put a stable slug in the test name (`(perf-2026-07-21)`,
 `(llm-cancel-under-critical)`) so `--only` can replay exactly that case in
 seconds instead of the whole suite.
 
@@ -52,11 +51,11 @@ encoding the root cause.
 
 Put it in the suite covering the affected layer:
 
-| Layer | Location |
-|---|---|
-| Windows AHK driver | `static/ergopti_plus/windows/tests/` (`unit/`, `meta/`, `startup/`, `e2e/`) |
-| macOS Hammerspoon | `static/ergopti_plus/macos/tests/` |
-| Cross-platform / JS | `tools/test/` |
+| Layer               | Location                                                                    |
+| ------------------- | --------------------------------------------------------------------------- |
+| Windows AHK driver  | `static/ergopti_plus/windows/tests/` (`unit/`, `meta/`, `startup/`, `e2e/`) |
+| macOS Hammerspoon   | `static/ergopti_plus/macos/tests/`                                          |
+| Cross-platform / JS | `tools/test/`                                                               |
 
 **Encode the root cause, and exploit the harness so a regression actually
 fails.** Canonical example: the `DYN_HOTSTRINGS_DEFAULT_DELAY` startup crash came
@@ -72,25 +71,17 @@ site the bug was found at.
 For tests that scan driver source, see the `meta-test` skill — there are
 non-obvious traps and a CI ratchet.
 
-## 4. Run the full local gate
+## 4. Run proportional gates
 
-```bash
-npm run test:js            # 66 checks — the umbrella CI gates on
-npm run test:ahk-encoding  # every .ahk is UTF-8 BOM + LF
-AutoHotkey64.exe static/ergopti_plus/windows/tests/run_all.ahk
-AutoHotkey64.exe static/ergopti_plus/windows/tests/e2e/run_e2e.ahk
-```
+Use the `verify-change` skill after the edit. Its planner selects the checks
+that cover the touched paths, including driver tests and the AHK encoding gate
+when applicable. Run the selected commands through the project launcher and
+record every command, exit code, and intentional skip.
 
-Add `npm run test:hs` (macOS) or `npm run test:linux` when those drivers are touched.
-
-`npm run test:js` is the one that gets skipped and the one that matters: it wraps
-the pinned-source-read ratchet, `lint:conventions:strict`, port compliance,
-priority parity, the translations audit and the TOML format check — none of which
-the AHK runner knows about. A 3212/3212 green AHK suite can still ship a red CI.
-
-**If `test:js` reports fewer than 66 checks or any `MODULE_NOT_FOUND`, the gate
-did not run.** Install deps first — see `feedback-local-gate-mirrors-ci` in
-PROJECT_MEMORY for the `engine-strict` / Node-floor trap.
+A gate that cannot start is not green. Diagnose missing runtimes or dependencies
+separately from assertion failures. Use the full `--all` gate only for a release,
+a repository-wide audit, or when the user explicitly requests it; a focused fix
+does not automatically justify every platform suite.
 
 ## 5. Never weaken a test to make a change pass
 
@@ -108,4 +99,5 @@ authorization in the current conversation.
 ## 7. Record what was non-obvious
 
 If the bug taught you something that is not derivable from the code or git
-history, add an entry to `docs/PROJECT_MEMORY.md` (see `project-memory`).
+history, add an entry to the narrow topic under `docs/memory/` (see
+`project-memory`).

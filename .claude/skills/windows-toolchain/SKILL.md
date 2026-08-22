@@ -45,17 +45,17 @@ grep -c 'â€' <file>     # must be 0
 file <file>             # line terminators must be consistent, not "CRLF, CR, LF"
 ```
 
-## Line endings: the working copy is CRLF, git stores LF
+## Repository text uses LF, including on Windows
 
-Git converts on checkout, so `git` warning *"LF will be replaced by CRLF"* on add
-is normal and not a problem. What **is** a problem is producing a file with mixed
-terminators — an `awk`/`sed` pass over a CRLF file emits LF and leaves you with
-both. Normalise to `\n` while editing and restore the file's original ending on
-write.
+`.gitattributes` declares `* text=auto eol=lf`. New and rewritten repository
+text must therefore contain LF only; AutoHotkey keeps the additional UTF-8 BOM
+requirement. Do not restore a file to CRLF after editing it.
 
-A related regex trap, and it fails silently: **in a JS regex `.` does not cross
-`\r`**, so `^\[([^\]]+)\].*$` matches nothing on a CRLF line. Strip `\r` before
-matching or your script quietly skips every line it was written for.
+Normalize scripted input with `raw.replace(/\r\n?/g, "\n")`, then write LF.
+Refuse mixed terminators. Do not mass-renormalize a dirty worktree: that hides
+the user's real diff inside mechanical churn and can contaminate other active
+worktrees. A repository-wide normalization, if ever needed, is its own reviewed
+commit.
 
 ## Node cannot spawn `npm` without a shell
 
@@ -66,12 +66,12 @@ its own outcome — a false red costs as much trust as a false green.
 
 ## Missing POSIX tools, and what to use instead
 
-| Not available | Use |
-|---|---|
-| `grep -P` | `grep -E`, or the Grep tool |
-| `python3` / `python` | Node, or `tools/format_toml.py` via the `python` the CI uses |
-| `rg` | the Grep tool (the shell wrapper falls back noisily) |
-| `sleep` in the foreground | a background command with an `until` loop |
+| Not available             | Use                                                          |
+| ------------------------- | ------------------------------------------------------------ |
+| `grep -P`                 | `grep -E`, or the Grep tool                                  |
+| `python3` / `python`      | Node, or `tools/format_toml.py` via the `python` the CI uses |
+| `rg`                      | the Grep tool (the shell wrapper falls back noisily)         |
+| `sleep` in the foreground | a background command with an `until` loop                    |
 
 `awk` and `sed` are available (Git Bash). Prefer the Read/Edit/Grep tools over
 shell text-mangling on tracked files — they preserve encoding.
@@ -88,15 +88,12 @@ Check `git status --short` before amending.
 
 ## Proving a test fails before the fix
 
-The `ship-fix` rule "must fail before, pass after" in practice:
-
-```bash
-git stash push -- <only the source files, not the test>
-AutoHotkey64.exe tests/run_all.ahk --only "<slug from the test name>"   # expect exit 1
-git stash pop
-```
-
-Stash the **source**, never the test — stashing both proves nothing.
+Run the new targeted test before editing production code whenever possible.
+Never stash, reset, or rewrite an active checkout to manufacture pre-fix
+evidence: stashes are shared by every worktree and can capture someone else's
+state. If the implementation is already changed, use a recorded reproduction,
+an isolated fixture built from `git show HEAD:<path>`, or state the evidence gap
+explicitly. See `ship-fix` for the full regression-proof contract.
 
 ## Where the driver actually lives at runtime
 

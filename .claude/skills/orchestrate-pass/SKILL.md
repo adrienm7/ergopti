@@ -11,7 +11,7 @@ does not earn it on depth, and it never earns it on writing.
 ## Scout first, then fan out
 
 Discover the work list in your own context (list the files, find the sites, scope
-the diff), *then* parallelise over it. Fanning out before you know the shape
+the diff), _then_ parallelise over it. Fanning out before you know the shape
 produces agents that each rediscover the same landscape.
 
 ## Read-only fan-out, sequential writes
@@ -25,7 +25,8 @@ obvious one, since every new test must be registered there.
 The single highest-value thing you put in an agent prompt. Without it they will
 confidently re-propose ideas this repo already tried and reverted — tooltip window
 reuse, chunking the emoji registration, process-priority changes. Extract the
-rejected list from `docs/PROJECT_MEMORY.md` and paste it in with the *reasons*.
+rejected list from `docs/memory/rejected_proposals.md` and paste it in with the
+_reasons_.
 
 Also give them: the real paths (including the config redirect, see
 `perf-profiling`), the conventions that make a proposal undeliverable, and the
@@ -34,7 +35,7 @@ evidence standard — every claim carries `file:line`, and every number is label
 
 ## Verify with two independent lenses
 
-One refuter is a coin flip. Two agents looking from *different angles* is what
+One refuter is a coin flip. Two agents looking from _different angles_ is what
 catches a plausible-but-wrong finding:
 
 - **Code lens** — does the cited code actually do this? Recount the per-keystroke
@@ -71,7 +72,7 @@ A workflow persists its script and returns a `runId`. After a mid-run failure �
 an agent dying on a schema mismatch, a stop — relaunch with
 `{scriptPath, resumeFromRunId}`: the unchanged prefix replays from cache and only
 the failed and subsequent calls run live. Do not edit the script before resuming
-unless you *want* the tail re-run: the cache key is `(prompt, opts)`.
+unless you _want_ the tail re-run: the cache key is `(prompt, opts)`.
 
 ## When not to do this
 

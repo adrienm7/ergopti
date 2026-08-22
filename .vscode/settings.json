@@ -1,5 +1,74 @@
 {
 	"cSpell.words": ["ergopti", "kbdedit", "keylayout", "keylayouts", "keymap", "keymaps"],
+	"editor.formatOnSave": false,
+	"files.eol": "\n",
+	"prettier.prettierPath": "./node_modules/prettier",
+	"prettier.resolveGlobalModules": false,
+	"[javascript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[javascriptreact]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[typescript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[typescriptreact]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[json]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[css]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[scss]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[less]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[html]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[markdown]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[yaml]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
+	"[svelte]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true,
+		"editor.formatOnSaveMode": "modificationsIfAvailable"
+	},
 	"search.exclude": {
 		"**/static/corpus/**": true
 	},

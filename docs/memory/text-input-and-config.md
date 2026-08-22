@@ -1,4 +1,4 @@
-<!-- docs/project-memory/text-input-and-config.md -->
+<!-- docs/memory/text-input-and-config.md -->
 
 # Text input and configuration memory
 
@@ -116,4 +116,3 @@ it with repeated synthetic probes.
 
 Keymap defaults live in the owning keymap module and flow through explicit
 injection. Menus and bridges consume those defaults rather than redeclaring them.
-

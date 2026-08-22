@@ -5,9 +5,10 @@ description: Apply the macOS driver's Hammerspoon and Lua invariants. Use when w
 
 # Hammerspoon driver foot-guns
 
-Style rules live in `.github/copilot-instructions.md`. This skill covers only the
-Hammerspoon and Lua semantics that have actually broken this driver — every item
-below is a bug we shipped, and most of them shipped **green**.
+Universal code rules live in `AGENTS.md`; the strict convention lint is the
+formatting authority. This skill covers only the Hammerspoon and Lua semantics
+that have actually broken this driver — every item below is a bug we shipped,
+and most of them shipped **green**.
 
 The unit suite never loads `init.lua` (running it needs a live Hammerspoon), so
 boot-path logic is only reachable through static source tests — that is why so
@@ -29,19 +30,17 @@ release it inside the callback. The canonical root is `M._active_tasks`
 module may pin into a root injected by its parent (`active_tasks_gc_root`,
 `ui/menu/menu_llm/models_manager_mlx.lua:213`).
 
-**The guard is file-granular, not call-site-granular.**
-`tests/unit/meta/test_gc_retention.lua:46-59` walks every driver `.lua` and only
-asks: does this file contain `hs.task.new` *and* some `_active_tasks` /
-`.active_tasks` / `active_tasks_gc_root` / `waitUntilExit` spelling? One pinned
-task makes the whole file pass. A live example:
-`ui/menu/menu_llm/models_manager_mlx.lua:273` creates `check_task` and starts it
-at `:322` **without ever pinning it** — the file passes because `delete_task` at
-`:344-358` is pinned. Adding a task to a file that already has one is exactly
-how you ship an unpinned task with a green suite.
+**The broad guard is file-granular, not call-site-granular.**
+`tests/unit/meta/test_gc_retention.lua` walks every driver `.lua` and only asks
+whether a file that constructs a task contains an ownership spelling. One
+pinned task can therefore mask an unpinned sibling. The historical
+`models_manager_mlx.check_task` defect is fixed and now has a dedicated guard in
+`test_fresh_regressions_2026_07_21.lua`; do not report it as live. Still inspect
+every construction/start/callback/teardown chain individually.
 
 ## `local x` declared AFTER the closure that uses it binds the nil global
 
-In Lua a `local`'s scope starts *after* its declaration statement. A closure
+In Lua a `local`'s scope starts _after_ its declaration statement. A closure
 written above the `local` does not capture it as an upvalue — the name resolves
 to `_G.x`, i.e. `nil`. The code reads perfectly; at call time the value is nil.
 
@@ -60,7 +59,7 @@ end, args)
 ```
 
 Both halves matter. Without the split you get `nil`; without `if task then` you
-get `table index is nil` thrown *inside* an async callback, where it is
+get `table index is nil` thrown _inside_ an async callback, where it is
 invisible (next section). `platform/remap/watchers.lua:148-149` is the
 reference shape.
 
@@ -87,7 +86,7 @@ Two consequences:
   `LUA_IO_OS_BASELINE` at `:247-248`; they move on nearly every pass and a stale
   number sends people chasing a delta that does not exist.
 
-Prefer routing the call through an adapter and naming the *adapter* in the
+Prefer routing the call through an adapter and naming the _adapter_ in the
 comment. If a comment genuinely must name the `hs.` API, bump the baseline **with
 a note saying it is a comment, not a call**, and prove it with
 `git diff -- modules lib`. Never bump silently.
@@ -112,10 +111,11 @@ it.** Two limits worth knowing:
 - It is installed at `init.lua:198`, after the log path is resolved. Anything
   scheduled before that line is unguarded.
 - It covers `hs.timer` constructors and `print()` — nothing else. Eventtaps are
-  not covered. `adapters/shell_runner.lua` was fixed (xpcall + crash report), but
-  `adapters/http_client.lua` still invokes completion callbacks under a bare
-  `pcall` with no `Logger.error` (`:98`, `:126`, `:155`, `:178`) — throws in HTTP
-  callbacks are still silent today.
+  not covered. `adapters/shell_runner.lua` and `adapters/http_client.lua` now
+  contain visible `xpcall` boundaries; the latter is guarded by
+  `test_http_client_reports_callback_throws.lua`. Re-read the live adapter before
+  claiming a callback error is swallowed: this fact changed after the original
+  audit.
 
 Because of this, a regression test for anything async must encode the root cause
 **behaviourally**. A "the call chain exists" grep is a false green; two
@@ -125,7 +125,7 @@ regressions have already hidden behind one.
 
 `hs.fs.dir(path)` returns an iterator **and** a directory state object that the
 iterator requires as its first argument (real Hammerspoon checks a `<<directory>>`
-userdata metatable and aborts with *"directory metatable expected, got nil"* on
+userdata metatable and aborts with _"directory metatable expected, got nil"_ on
 the first step). It also **throws** on a missing or permission-denied directory.
 
 So `local ok, it = pcall(hs.fs.dir, dir)` followed by `for x in it do` drops the
@@ -142,7 +142,7 @@ That last assertion is the real lesson: the original `hs` stub returned a single
 stateless iterator, so the buggy pattern "worked" and CI stayed green over a
 guaranteed production crash. **A stub must model the real API's return arity and
 its state requirement.** A second trap compounded it — an earlier meta-test
-asserted the *buggy spelling* was present. Assert the invariant, never a
+asserted the _buggy spelling_ was present. Assert the invariant, never a
 particular phrasing of the code.
 
 ## `os.exit()` does NOT run `hs.shutdownCallback`
@@ -161,7 +161,7 @@ teardown by hand — Karabiner kill through the ownership-respecting
 
 The failure mode is invisible at quit time and shows up later: a detached
 `mlx_lm.server` and helper daemons surviving indefinitely, or the last minutes of
-keystrokes lost. Every one of those lines was added as a *missed sibling* of a
+keystrokes lost. Every one of those lines was added as a _missed sibling_ of a
 fix applied to only one of the two paths.
 
 **Whenever you add a teardown step, add it to all three sites** — the shutdown
@@ -171,12 +171,15 @@ callback and both `os.exit` paths. Guards:
 
 ## Other traps
 
-- **No blocking work inside an `hs.eventtap` callback.** macOS disables a tap
-  that overruns (`kCGEventTapDisabledByTimeout`) and the shortcut just dies.
-  Anything that shells out, touches TIS/Carbon or does heavy I/O — including code
-  called synchronously from the callback — must be deferred with
-  `hs.timer.doAfter(0, …)`. Guard: `tests/meta/test_pause_path_defers_blocking_work.lua`.
-- **`string.format("%q", path)` is not shell quoting.** `%q` escapes for a *Lua*
+- **No blocking work inside an `hs.eventtap` callback.** macOS disables an
+  overrun tap. `hs.timer.doAfter(0, …)` leaves the originating callback but runs
+  later on the same Hammerspoon main loop; it is suitable for a short ordered
+  handoff, not for shell, filesystem, Accessibility, or heavy work. Blocking
+  work needs an owned asynchronous task/native worker and a completion
+  protocol. Guards include
+  `tests/unit/meta/test_interactive_actions_do_not_block_runloop.lua` and
+  `tests/unit/modules/diagnostics/test_crash_report_deferred_off_hot_path.lua`.
+- **`string.format("%q", path)` is not shell quoting.** `%q` escapes for a _Lua_
   literal and leaves `$`, backticks and `!` live for `/bin/sh`. Every driver path
   is user-configurable. Use `text_utils.shell_quote`. Guard:
   `tests/meta/test_shell_quoting_not_lua_q.lua` (it found 41 sites in 15 files).

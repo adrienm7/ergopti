@@ -1,0 +1,50 @@
+{
+	"format_on_save": "off",
+	"line_ending": "prefer_lf",
+	"languages": {
+		"JavaScript": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"TypeScript": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"TSX": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"JSON": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"CSS": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"SCSS": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"LESS": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"HTML": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"Markdown": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"YAML": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		},
+		"Svelte": {
+			"format_on_save": "modifications_if_available",
+			"formatter": "prettier"
+		}
+	}
+}

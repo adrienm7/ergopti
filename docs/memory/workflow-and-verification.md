@@ -1,4 +1,4 @@
-<!-- docs/project-memory/workflow-and-verification.md -->
+<!-- docs/memory/workflow-and-verification.md -->
 
 # Workflow and verification memory
 
@@ -36,6 +36,22 @@ scan is appropriate only when behavior cannot be called directly.
 
 Use the repository verification planner and run every selected gate. A green
 subset is not a green change, and the supported Node engine floor matters.
+
+### project-red-gate-triage
+
+A red outcome is not automatic proof that the current diff caused it. The
+default `verify-change` run is the commit gate because it selects checks by
+changed surface. Use `--all --diagnose` to classify extra reds as a candidate
+regression, baseline/history, or environment; reproduce the exact failure
+against the baseline before declaring it unrelated. An unrelated full-audit red
+is reported but does not turn a passing scoped micro-change into a regression.
+
+### project-plans-are-proportional
+
+Small isolated edits do not need a persistent plan. Use a short checklist for a
+multi-file or risky change, and a durable artifact-backed plan for an audit,
+campaign, migration, or series of dependent commits. A red unrelated historical
+check does not by itself expand the work into a planned campaign.
 
 ### project-gate-scripts-must-be-wired
 
@@ -134,16 +150,6 @@ tracking artifact and retain only durable invariants here or in tests.
 Re-measure TODO and plan claims before acting. Code movement and prior fixes make
 old counts unreliable.
 
-### project-decided-do-not-re-raise
-
-Do not repeatedly reopen measured and rejected proposals unless the relevant
-implementation or evidence changed.
-
-### project-generated-trees-are-not-reducible
-
-The checked-in `_generated/` trees were measured and found to have consumers.
-Treat them as generated contracts; revisit only with new dependency evidence.
-
 ### project-menu-manifest-json-is-generated
 
 Edit the menu manifest's canonical source, not generated JSON. Run the owning
@@ -164,7 +170,57 @@ missing terminal newline are part of the contract.
 Do not perform broad scripted slice replacement without heading-based matching,
 a dry run, corruption checks, and before/after structure comparison.
 
-### project-crlf-in-worktree-is-not-a-repo-defect
+### project-repository-text-is-lf
 
-Distinguish checkout line-ending conversion from bytes stored in Git before
-reporting drift.
+`.gitattributes` makes LF the checkout and index contract for repository text,
+including Markdown and scripts. AutoHotkey files additionally keep their UTF-8
+BOM. Do not mass-renormalise an active dirty worktree: apply the attribute to
+newly written files and let an explicitly reviewed normalization commit handle
+pre-existing checkout drift.
+
+### project-editor-formatting-uses-local-prettier
+
+VS Code and Zed enable format-on-save only for the languages handled by the
+repository's local Prettier and Svelte plugin. Global format-on-save stays off,
+and tracked files prefer modified-range formatting. Both editors fall back to
+the full buffer when range information is unavailable, so new files still
+format without rewriting an ordinary tracked legacy file. Both editors prefer
+LF for new files. Lua and AutoHotkey remain outside automatic formatting.
+
+## Agent context
+
+### project-agent-startup-is-routing-only
+
+`AGENTS.md` contains the small cross-agent safety, routing, and universal
+delivery contract. Keep catalog tables, driver details, audit procedures, and
+examples in on-demand skills or memory; duplicating them in startup files
+spends context and creates stale authorities.
+
+### project-universal-code-authorities
+
+`AGENTS.md` owns rules that apply to every code change; the strict convention
+lint owns mechanical style, and
+`static/ergopti_plus/_shared/modules/logger/SPEC.md` owns the logger contract.
+Adapter files such as `.github/copilot-instructions.md` only route clients to
+those authorities. Skills must link to the owner rather than inventing numbered
+adapter sections.
+
+### project-agent-skills-have-one-source
+
+`.agents/skills/` is canonical and `.claude/skills/` is a deterministic mirror.
+Edit the canonical tree, run `tools/agents/sync-skills.cjs write`, then its
+`check` mode. Keep skill descriptions short, mutually distinct, and explicit
+about both positive and negative triggers.
+
+### project-rtk-is-local-integration
+
+Interactive agents use the launcher in `docs/tooling/rtk.md`. It may install
+only the pinned, checksum-verified user-local binary and never modifies persistent `PATH` or
+global hooks. CI must retain the raw-command fallback and never download RTK.
+
+### project-external-skills-are-reviewed-dependencies
+
+Do not bulk-install a skill pack or use an unreviewed skill-store auto-update.
+If a local gap is measured, vendor only the narrow skill needed at a pinned
+revision after reviewing its instructions, scripts, hooks, network use, license,
+and trigger collisions; keep the repository-specific skill authoritative.

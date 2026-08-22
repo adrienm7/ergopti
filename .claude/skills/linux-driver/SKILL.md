@@ -5,8 +5,9 @@ description: Apply the Linux driver's LuaJIT, evdev, ydotool, and kanata invaria
 
 # Linux driver foot-guns
 
-Style rules live in `.github/copilot-instructions.md`. This file covers what has
-actually gone wrong, or is provably wrong today, in the Linux driver.
+Universal code rules live in `AGENTS.md`; the strict convention lint is the
+formatting authority. This file covers what has actually gone wrong, or is
+provably wrong today, in the Linux driver.
 
 **Rewritten 2026-08-06.** Every technical section of the previous version
 described a defect that had since been fixed — the grab, the dead evdev decoder,
@@ -43,7 +44,7 @@ local, and the read silently does nothing: no error, no log, just a counter that
 stays at zero or a state that never applies.
 
 Declare module state in the state section at the top, above every reader. This
-has its own entry in `docs/PROJECT_MEMORY.md`
+has its own entry in `docs/memory/linux-web-release.md`
 (`project-lua-closure-before-local-nil-global`).
 
 ### A value must be named at EVERY boundary it crosses

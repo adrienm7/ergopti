@@ -79,7 +79,7 @@ la toolchain de test/codegen est en Node sous `tools/`.
   certaines faites, beaucoup REPORTÉES avec la raison). **Ton guide le prolonge et le
   raffine — il ne le contredit pas.** Lis-le en entier d'abord, et réutilise sa
   « Structure cible (miroir 1:1) » et son « Harnais de vérification ».
-- **Mémoire projet** : `docs/PROJECT_MEMORY.md` encode les foot-guns et les décisions
+- **Mémoire projet** : `docs/memory/README.md` route vers les foot-guns et les décisions
   arrêtées. **Lis-la** : plusieurs « refactors évidents » y sont déjà prouvés
   _non faisables_ (ex. déplacer les helpers OS hors de `adapters/` casse le ratchet
   de pureté ; `adapters/` = couche d'isolation OS, pas « exactement 20 ports »).
@@ -100,13 +100,14 @@ la toolchain de test/codegen est en Node sous `tools/`.
 1. **Comportement préservé.** Chaque étape proposée est un **pur refactor** : aucun
    changement de comportement observable. Si une étape changerait le comportement,
    marque-la `feat`/`fix` séparément et exige une preuve d'équivalence avant/après.
-2. **Conventions maison** (`.github/copilot-instructions.md`, `CLAUDE.md`) :
+2. **Conventions maison** (`AGENTS.md`, skills ciblés sous `.agents/skills/`,
+   contrat du logger) :
    bannières de section (5 lignes vides / `=` alignés), **tabs**, ligne 1 = chemin
    relatif, docstrings finissant par `.`, **code anglais / UI française**, i18n
    obligatoire pour tout texte utilisateur (21 langues), logger 8-variants avec
    paires lifecycle, **fail-fast** via `require_state`, **pas de magic numbers**,
    **SSoT des défauts**, pas de code mort / shim de compat.
-3. **Discipline de test de régression (§5.9).** _Chaque_ étape qui corrige ou
+3. **Discipline de test de régression (`AGENTS.md`).** _Chaque_ étape qui corrige ou
    déplace quelque chose **embarque son test** dans le même commit, encodant la
    _cause racine_, rouge avant / vert après. Le guide doit nommer ce test pour
    chaque étape.
@@ -205,7 +206,7 @@ opaque » en suite **où un rouge se corrige en minutes**. Exige :
   ex. chemins OS, choix de modèle par plateforme via `default_per_platform`).
 - **Un mécanisme unique** de consommation : les drivers **lisent** le défaut
   partagé (codegen ou lecture TOML), **ne le re-déclarent jamais**. Tout fallback
-  hardcodé `if x == nil then x = …` est une violation (§5.4) → fail-fast.
+  hardcodé `if x == nil then x = …` viole le contrat SSoT/fail-fast d'`AGENTS.md`.
 - **Drift test** : la duplication redevient impossible parce qu'un test compare le
   défaut consommé à la SSoT et casse sinon.
 - Étends `manifest.toml` (ou un `_shared/.../defaults.toml` cousin) **avec preuve
@@ -297,7 +298,7 @@ Génère **un seul** fichier markdown avec **exactement** ces sections, dans cet
 8. **`## Décisions maintainer requises`** — les arbitrages à fort blast radius
    (divergences structurelles, codegen vs hand-port…), chacun avec options + reco +
    risque. Ne tranche pas seul ce qui est irréversible.
-9. **`## Risques & foot-guns`** — repris/complétés depuis `PROJECT_MEMORY.md` et
+9. **`## Risques & foot-guns`** — repris/complétés depuis `docs/memory/README.md` et
    `REFACTOR_PLAN.md` (encodage AHK, ordre `#Include`/`#InputLevel`, ratchet de
    pureté, tap_hold possiblement déjà divergent, churn du généré…).
 10. **`## Definition of Done`** — la checklist vérifiable de §6.
@@ -320,7 +321,7 @@ Priorise : si tu dois couper, garde les étapes à fort gain / faible risque.
 - [ ] La **table de symétrie** `windows/`↔`macos/` est complète, divergences marquées
       avec sens de convergence.
 - [ ] Tous les **gros fichiers** (> seuil) ont un plan de split miroir.
-- [ ] Le guide **ne contredit pas** `REFACTOR_PLAN.md`, `PROJECT_MEMORY.md`, les ADRs ;
+- [ ] Le guide **ne contredit pas** `REFACTOR_PLAN.md`, `docs/memory/`, les ADRs ;
       il les prolonge et s'y réfère par lien.
 - [ ] **Aucune étape ne change le comportement** (sinon explicitement marquée
       `feat`/`fix` avec preuve d'équivalence exigée).
@@ -336,7 +337,7 @@ Priorise : si tu dois couper, garde les étapes à fort gain / faible risque.
 
 - ❌ Du conseil générique (« appliquez SOLID », « ajoutez des tests ») sans
   `path:line` ni action concrète propre à ce repo.
-- ❌ Re-proposer un refactor **déjà rejeté** dans `PROJECT_MEMORY.md` /
+- ❌ Re-proposer un refactor **déjà rejeté** dans `docs/memory/rejected_proposals.md` /
   `REFACTOR_PLAN.md` (ex. casser le ratchet de pureté `adapters/`).
 - ❌ Un big-bang non découpé, ou des étapes qui changent le comportement déguisées en
   refactor.

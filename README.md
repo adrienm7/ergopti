@@ -153,7 +153,7 @@ static/ergopti_plus/      The Ergopti+ driver suite
                           (hotstrings TOML, LLM catalogue, locales, menus, webview UIs…)
 static/drivers/           Ergopti layout artefacts (keylayout, XKB, …)
 tools/                    Build, codegen, lint and test tooling
-docs/                     Engineering docs — start with docs/PROJECT_MEMORY.md
+docs/                     Engineering docs — start with docs/memory/README.md
 ```
 
 ---
@@ -313,7 +313,7 @@ bash static/ergopti_plus/linux/tests/hardware/validate.sh
 
 House rules: every bug fix ships with a regression test, and the shared
 constants between drivers are pinned by single-source parity tests — see
-[docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) for the accumulated engineering
+[docs/memory/README.md](docs/memory/README.md) for the accumulated engineering
 knowledge.
 
 ---
@@ -363,7 +363,7 @@ Issues and PRs are welcome — in **English**, so everyone can collaborate.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/);
   `main` and `dev` keep a **linear history** (squash, no merge commits).
 - Non-obvious lessons about the codebase belong in
-  [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) so they never evaporate.
+  [docs/memory/README.md](docs/memory/README.md) so they never evaporate.
 
 ---
 

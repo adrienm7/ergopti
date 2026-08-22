@@ -19,7 +19,8 @@ static/ergopti_plus/
 ```
 
 `_shared/` is the source of truth. Each layer resolves the shared root in exactly
-one place — but per `project-shared-tree-layout` in PROJECT_MEMORY, several sites
+one place — but per `project-shared-tree-layout` in
+`docs/memory/shared-architecture.md`, several sites
 bypass that SSOT, so **only the test suites catch a rename**. Never assume a move
 is safe because the code compiles.
 
@@ -40,15 +41,15 @@ All of these run inside `npm run test:js` — you do not invoke them individuall
 in normal work, but knowing what they cover tells you which one your change will
 trip:
 
-| Family | What it pins |
-|---|---|
-| `test:port-compliance` | ported logic matches its source driver |
-| `test:priority-parity` | resolution priority identical across drivers |
-| `test:manifest-parity`, `test:manifest-equivalence` | feature/menu manifests agree |
-| `test:*-single-source` | one constant, one home (LLM defaults, temperature, max-tokens, Ollama port, versions, WPM, keycodes, buffer caps…) |
-| `test:kanata-defalias-parity` | kanata aliases match the layout |
-| `test:no-fallback-literals` | no hardcoded fallback shadowing a configured value |
-| `test:git-mv-resilience`, `test:doc-paths` | path references survive moves |
+| Family                                              | What it pins                                                                                                       |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `test:port-compliance`                              | ported logic matches its source driver                                                                             |
+| `test:priority-parity`                              | resolution priority identical across drivers                                                                       |
+| `test:manifest-parity`, `test:manifest-equivalence` | feature/menu manifests agree                                                                                       |
+| `test:*-single-source`                              | one constant, one home (LLM defaults, temperature, max-tokens, Ollama port, versions, WPM, keycodes, buffer caps…) |
+| `test:kanata-defalias-parity`                       | kanata aliases match the layout                                                                                    |
+| `test:no-fallback-literals`                         | no hardcoded fallback shadowing a configured value                                                                 |
+| `test:git-mv-resilience`, `test:doc-paths`          | path references survive moves                                                                                      |
 
 The `*-single-source` family is the template: when you introduce a new shared
 constant, **add its single-source test in the same commit**. Copy the closest
@@ -74,7 +75,8 @@ the cross-driver gates. See `ship-fix` for the full gate.
 
 ## Known intentional asymmetries
 
-Do not "fix" these — they are documented decisions in PROJECT_MEMORY:
+Do not "fix" these — they are documented decisions in the routed topics under
+`docs/memory/`:
 
 - macOS does not read `menu_manifest.json`'s `hotstrings_menu` / `layout_menu`
   keys (a drift gate exists; the migration does not).
@@ -82,4 +84,4 @@ Do not "fix" these — they are documented decisions in PROJECT_MEMORY:
 - The Windows VK-keyed finger map is a deliberate third copy left untouched by DC-1.
 - AHK vs Hammerspoon word-boundary framing diverges by design.
 
-Check PROJECT_MEMORY before assuming a difference is a bug.
+Check `docs/memory/README.md` before assuming a difference is a bug.

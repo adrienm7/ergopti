@@ -9,8 +9,9 @@ A false green is worse than no test. It occupies the slot a real guard would
 have taken, it is counted in the "3380/3380 green" figure everyone trusts, and
 when the bug it was written for comes back it actively certifies the bug.
 
-This is the most recurrent defect in this repo. PROJECT_MEMORY records it at
-least eight times: `project-hs-partial-fixes-and-false-green-tests`,
+This is the most recurrent defect in this repo. The driver and verification
+topics routed by `docs/memory/README.md` record it at least eight times:
+`project-hs-partial-fixes-and-false-green-tests`,
 `project-lua-closure-before-local-nil-global`,
 `project-hs-timer-callback-errors-invisible`, `project-hs-fs-dir-drops-state`,
 `project-ahk-guard-tests-must-loop-the-class`, `feedback-ahk-source-encoding`,
@@ -27,12 +28,12 @@ green.
 Measured on the three test trees. These are the numbers the baseline freezes —
 they are a debt ledger, not an approval.
 
-| Pattern | Count | Concentration |
-| --- | --- | --- |
-| 1 Tautology | 153 | windows 59, macos 65, linux 29 |
-| 2 Vacuous absence | 17 | windows only, of ~186 absence assertions |
-| 3 Dead / unregistered test | 5 | 2 are a real bug, 3 are intentional SKIPs |
-| 5 pcall-only | 374 | linux 219, macos 155, windows 0 |
+| Pattern                    | Count | Concentration                             |
+| -------------------------- | ----- | ----------------------------------------- |
+| 1 Tautology                | 153   | windows 59, macos 65, linux 29            |
+| 2 Vacuous absence          | 17    | windows only, of ~186 absence assertions  |
+| 3 Dead / unregistered test | 5     | 2 are a real bug, 3 are intentional SKIPs |
+| 5 pcall-only               | 374   | linux 219, macos 155, windows 0           |
 
 Two readings matter more than the totals. **Pattern 2 is nearly solved**: 169 of
 ~186 absence assertions already carry the guard, so the 17 that do not are
@@ -88,7 +89,7 @@ is exactly why a full-tree sweep is needed.
 
 `Test(Name, Callback)` pushes onto `TEST_REGISTRY`. `RunTests()` then **snapshots**
 that registry into `ActiveTests` and prints the `1..N` plan from the snapshot,
-before executing anything. A `Test()` call that happens *during* a run therefore
+before executing anything. A `Test()` call that happens _during_ a run therefore
 lands in `TEST_REGISTRY` but never in `ActiveTests`: it never executes, and the
 plan count never mentions it. No error, no warning, plan matches, suite green.
 
@@ -163,7 +164,7 @@ supposed to no-op, assert zero side effects — count the calls.
 
 ## 6. The source-grep that pins the spelling, not the invariant
 
-Also human judgement only. A meta-test asserting what the code *says* has two
+Also human judgement only. A meta-test asserting what the code _says_ has two
 failure modes, and the second is the dangerous one.
 
 It breaks on any legitimate refactor — annoying but loud. Worse: **if the bug is
@@ -209,10 +210,13 @@ a test, which `ship-fix` forbids outright.
 
 ## Writing a regression test that can actually fail
 
-Every bug fix ships with a regression test (§5.9). Before you call it done:
+Every bug fix ships with a regression test under the `AGENTS.md` delivery
+contract. Before you call it done:
 
-1. **Run it against the unfixed code.** If it does not go red, it is not a
-   regression test. This single step catches every pattern above.
+1. **Prove it red against a safely available unfixed state.** Prefer running the
+   test before editing production code. Never stash, reset, or rewrite an active
+   worktree to manufacture evidence; if no pre-fix state remains available,
+   record that limitation explicitly.
 2. **Assert the guarantee, not the mechanism.** "Zero shell execs" beats "the
    purge was scheduled". "No POST after the gate" beats "`stop_warmup` is
    called".
@@ -221,6 +225,6 @@ Every bug fix ships with a regression test (§5.9). Before you call it done:
    bug shape on both drivers.
 4. **Check your stub against the real module** before trusting a green run.
 
-And know what a green suite does *not* cover: the AHK runner and the JS gate
-cover disjoint ground, `test:js` silently no-ops without `node_modules`, and a
-fully green local AHK run has already let a ratchet violation reach CI.
+And know what a green suite does _not_ cover: driver and JavaScript gates cover
+different surfaces. A targeted green result only supports the claim selected by
+`verify-change`; a gate that cannot start is not green.

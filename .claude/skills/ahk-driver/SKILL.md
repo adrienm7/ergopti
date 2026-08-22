@@ -5,9 +5,9 @@ description: Apply the Windows driver's AutoHotkey v2 invariants. Use when writi
 
 # AutoHotkey v2 foot-guns
 
-Style rules live in `.github/copilot-instructions.md`. This skill covers only the
-language semantics that have caused real bugs here — every item below is a bug we
-actually shipped.
+Universal code rules live in `AGENTS.md`; the strict convention lint is the
+formatting authority. This skill covers only the language semantics that have
+caused real bugs here — every item below is a bug we actually shipped.
 
 ## Encoding — non-negotiable
 
@@ -62,7 +62,7 @@ far from your change. (This is exactly how F14 broke 10 hotstring tests.)
 ## `#Include` executes top-level globals at its include position
 
 A file's top-level `global X := …` runs **where the `#Include` sits** in the
-auto-execute flow, not at first use. So a sentinel-seeding file included *after*
+auto-execute flow, not at first use. So a sentinel-seeding file included _after_
 the loader that fills those values will silently re-zero them on every boot.
 
 Order matters: constants/sentinels first, loaders after. `#Include` also dedupes
@@ -91,7 +91,7 @@ InputHook callbacks, `SetTimer` ticks and `OnMessage` handlers keep firing while
 suspended. Every one of those paths needs an explicit `A_IsSuspended` guard, or
 the driver keeps acting while the user believes it is paused.
 
-See `project-suspend-pause-invariant` in PROJECT_MEMORY.
+See `project-suspend-pause-invariant` in `docs/memory/windows-ahk.md`.
 
 ## Other traps
 
@@ -100,13 +100,14 @@ See `project-suspend-pause-invariant` in PROJECT_MEMORY.
 - **`Critical()` is thread-scoped.** Safe in production hotkey callbacks, but it
   leaks into the main thread when a test calls the function directly, silently
   hanging background timers. Do not wrap file I/O or menu rebuilds in it.
-- **Never swallow errors.** `try … catch` with an empty body violates §5.3. Log
-  via the project logger (see the `logger` skill) or let it propagate to the
-  global `OnError` handler.
+- **Never swallow errors.** `try … catch` with an empty body violates the
+  fail-fast contract in `AGENTS.md`. Log via the project logger (see the
+  `logger` skill) or let it propagate to the global `OnError` handler.
 
 ## Guard the whole class
 
-Per `project-ahk-invariant-incomplete-application` in PROJECT_MEMORY, the
+Per `project-ahk-invariant-incomplete-application` in
+`docs/memory/windows-ahk.md`, the
 recurring failure here is not the missing guard — it is the ONE sibling site that
 was missed. When you fix one of the above, grep for every other occurrence of the
 same pattern and fix them together.

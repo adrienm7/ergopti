@@ -33,4 +33,6 @@ The 8 variants are organised on two axes — importance (`DEBUG`/`INFO`/`WARNING
 
 ## References
 
-`.github/copilot-instructions.md §4` — full logging conventions (when to use each variant, punctuation rules, language requirements).
+[`SPEC.md`](SPEC.md) is the normative logging contract. Repository-wide
+language and delivery rules live in
+[`AGENTS.md`](../../../../../AGENTS.md).

@@ -1,50 +1,49 @@
-<!-- AGENTS.md -->
+# Shared repository contract
 
-# Codex Project Instructions
+This is the small common startup context for Codex, Claude Code, GitHub
+Copilot, Gemini CLI, and other repository agents. Keep detailed procedures in
+skills and durable technical knowledge in routed memory.
 
-## Release Branch Safety
+## Safety
 
-Never run `git push` against `dev` or `main` unless the user explicitly asks
-to push that branch in the current conversation. Do not infer permission from
-an earlier commit, a successful test run, or a general request to work
-autonomously. A push to either branch triggers CI and a release, so commits
-must remain local until that explicit approval is received.
+- Preserve unrelated working-tree and index changes. Stage exact owned paths;
+  never use a broad add, stash, reset, clean, or worktree move as a shortcut.
+- Treat registered sibling worktrees as active user state. Do not modify,
+  delete, or relocate one unless the current request explicitly puts it in
+  scope.
+- Never push `dev` or `main` without explicit authorization in the current
+  conversation. Commits and green tests do not imply push permission.
+- Store text as LF on every OS. AutoHotkey source additionally keeps its
+  UTF-8 BOM; use the repository encoding gate after touching it.
 
-## Shared Project Rules
+## Context routing
 
-Read and follow [.github/copilot-instructions.md](.github/copilot-instructions.md)
-and use [docs/PROJECT_MEMORY.md](docs/PROJECT_MEMORY.md) to select only the
-relevant project-memory topics before non-trivial work.
+- Before non-trivial work, read [docs/memory/README.md](docs/memory/README.md),
+  then only the topics it routes for the current surface.
+- Reusable procedures live canonically in `.agents/skills/`. Select skills by
+  their descriptions and load only matching `SKILL.md` bodies and references.
+  `.claude/skills/` is a generated mirror; never edit it directly.
+- Use the project launcher documented in
+  [docs/tooling/rtk.md](docs/tooling/rtk.md) for interactive shell
+  commands. It verifies or installs the pinned user-local binary; CI remains
+  network-independent and can execute the child command unfiltered.
+- A small, local, low-risk edit does not require a formal or persisted plan.
+  Use a plan for multi-step, cross-driver, high-risk, or audit-campaign work.
 
-## Skills
+## Delivery
 
-Reusable procedures for recurring tasks live at `.claude/skills/<name>/SKILL.md`.
-They are plain Markdown with a YAML header — the header is inert for tools that
-do not consume it, so read the file directly when the situation matches. They
-hold procedure only, and link back to the two documents above rather than
-restating their rules.
-
-**Start here:** `windows-toolchain` (the shell will corrupt files if you let it)
-and `verify-change` (a green suite is not evidence unless it covers what you
-changed).
-
-| Skill | Read it when |
-| --- | --- |
-| `windows-toolchain` | Before scripting anything, and before every commit — shell, git and Node traps on this box |
-| `verify-change` | After ANY edit and before every commit — which gates cover what you touched |
-| `ship-fix` | Fixing any bug — root cause, regression test, local gate, commit |
-| `commit-and-push` | Before any commit or push — commit format, linear history, CI monitoring |
-| `ahk-driver` | Writing or editing `.ahk` files — the AutoHotkey v2 foot-guns that have bitten us |
-| `hammerspoon-driver` | Writing or editing macOS `.lua` files — the Hammerspoon foot-guns, several of which fail silently |
-| `linux-driver` | Working on the Linux driver — evdev, the grab/observe decision, ydotool, kanata |
-| `meta-test` | Adding a test that scans driver source instead of calling a function |
-| `false-green-tests` | Auditing the suite, or whenever a test passes and you are not sure it could ever fail |
-| `perf-profiling` | Before proposing any performance change — where the logs are and how to read them |
-| `cross-driver-parity` | Changing anything that exists on more than one driver (Windows / macOS / Linux / JS) |
-| `adversarial-audit` | Auditing or hunting latent bugs — includes the evidence-verification rule |
-| `orchestrate-pass` | Running a multi-agent pass — scouting, the rejected list, two-lens verification |
-| `bulk-edit` | Rewriting a tracked file with a script instead of by hand |
-| `retire-artifact` | Deleting a plan, report or archive without losing what it still carried |
-| `i18n` | Touching any user-facing text |
-| `logger` | Adding or reviewing log statements |
-| `project-memory` | Before non-trivial work, and after learning something worth keeping |
+- Write code, identifiers, developer documentation, logs, and commit messages
+  in English. Route user-facing French text through the `i18n` skill.
+- Treat the strict convention lint as authoritative for indentation, file
+  headers, section banners, documentation, and punctuation. Comments explain
+  why; public APIs use the language's established documentation format.
+- Keep one source of truth for defaults and shared constants. Fail fast on
+  invalid state or external failure; do not add magic values, silent fallbacks,
+  compatibility shims, or success paths that hide an error.
+- Stateful modules have explicit initialization ownership and reject invalid or
+  duplicate initialization. Use the central logger and pair lifecycle messages.
+- Fix root causes and add a regression test that can fail for the original bug.
+  Use `verify-change` to select proportional gates before each commit.
+- Change generated artifacts through their owner and regenerate them; do not
+  hand-edit generated output.
+- Keep local commits atomic and use English Conventional Commit subjects.

@@ -5,10 +5,10 @@ description: Add or change localized user-facing text across every locale. Use f
 
 # User-facing text
 
-**Code is English, UI is French** (`.github/copilot-instructions.md` §1) — but
-French is not hardcoded either. Every user-facing string goes through the i18n
-system, in **all 21 languages**. This includes WebView UIs (metrics, download
-window, onboarding), not just native menus.
+`AGENTS.md` makes developer text English and routes user-facing French through
+this skill. French is not hardcoded: every user-facing string goes through the
+i18n system in **all 21 languages**. This includes WebView UIs (metrics,
+download window, onboarding), not just native menus.
 
 Never hardcode a UI string anywhere. There is exactly one narrow exception, and
 it is documented in code where it applies: a fatal pre-boot error modal that

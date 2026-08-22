@@ -13,12 +13,12 @@ included before that loader" — that no runtime call can check.
 
 Defined in `tests/test_framework.ahk`:
 
-| Helper | Returns |
-|---|---|
-| `_DriverSourceConcat()` | the whole driver source, concatenated |
-| `_DriverSourceNoComments()` | same, with comments stripped |
-| `_DriverFuncBody(Name)` | one function's body |
-| `_DriverDirConcat(RelDir)` | every file under one directory |
+| Helper                        | Returns                                    |
+| ----------------------------- | ------------------------------------------ |
+| `_DriverSourceConcat()`       | the whole driver source, concatenated      |
+| `_DriverSourceNoComments()`   | same, with comments stripped               |
+| `_DriverFuncBody(Name)`       | one function's body                        |
+| `_DriverDirConcat(RelDir)`    | every file under one directory             |
 | `_StripFullLineComments(Src)` | comment-stripped copy of any source string |
 
 **Never hardcode a path like `"platform/remap/lalt.ahk"`.** A CI ratchet
@@ -44,7 +44,7 @@ Lua test that introduces a pinned read**, and `npm run fix:pinned-reads`
 converts it for you. `npm run lint:pinned-reads` surveys the whole tree.
 
 The one thing the fixer will not do for you is guess. `read_driver_source`
-returns *every* production file containing the symbol, concatenated — so a
+returns _every_ production file containing the symbol, concatenated — so a
 selector matching two files changes what a position-comparing assertion means,
 silently. The fixer therefore proves a candidate declaration is unique across
 the production tree before using it, and refuses when none is
@@ -58,6 +58,7 @@ position assertions. Your own module header describing `Bundle_Init()` becomes
 the first match, and the test asserts about prose instead of code.
 
 Defences, in order of preference:
+
 1. Scan `_DriverSourceNoComments()` / `_StripFullLineComments(...)`.
 2. Reword the comment so it does not contain the literal token.
 

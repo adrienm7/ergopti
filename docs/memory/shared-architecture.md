@@ -1,4 +1,4 @@
-<!-- docs/project-memory/shared-architecture.md -->
+<!-- docs/memory/shared-architecture.md -->
 
 # Shared architecture memory
 
@@ -131,4 +131,3 @@ with each real parser, not only a generic JSON/TOML check.
 
 Dynamic lists become persisted user choices. Preserve stable identifiers and
 handle entries disappearing between discovery and use.
-

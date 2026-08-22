@@ -12,8 +12,8 @@ and cuts a release. Pushing without being asked pollutes the release history and
 burns CI minutes.
 
 - **Commit** freely, without asking. Local commits are free and reversible.
-- **Push** to `dev` or `main` **only** when the user explicitly asks *in the
-  current conversation* — "push", "tu peux pusher", "merge".
+- **Push** to `dev` or `main` **only** when the user explicitly asks _in the
+  current conversation_ — "push", "tu peux pusher", "merge".
 - Approval does **not** carry over. Authorization given for one push covers that
   push only; the next one needs a new ask.
 - Do **not** infer approval from: a green test suite, a finished fix, a request

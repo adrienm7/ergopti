@@ -117,7 +117,7 @@ luajit tests/run.lua
 
 ## Regression-test discipline
 
-Per [CLAUDE.md](../CLAUDE.md) §5.9, **every bug fix ships a regression test in the
-same commit**, in the suite for the affected layer (`windows/tests`,
+Per the delivery contract in [AGENTS.md](../AGENTS.md), **every bug fix ships a
+regression test in the same commit**, in the suite for the affected layer (`windows/tests`,
 `macos/tests`, or `tools/test`). Encode the root cause, not just the symptom, so
 the bug can never silently return.
