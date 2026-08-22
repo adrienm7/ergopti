@@ -47,6 +47,7 @@ local function build_fixture(dialog_choice)
 		set_active_profile = function(profile_id)
 			calls.profiles[#calls.profiles + 1] = profile_id
 			runtime_profile = profile_id
+			return true
 		end,
 		set_llm_model_mlx = noop,
 		set_llm_model_ollama = noop,
@@ -68,7 +69,10 @@ local function build_fixture(dialog_choice)
 			calls.saves = calls.saves + 1
 			return true
 		end,
-		update_menu = function() calls.updates = calls.updates + 1 end,
+		update_menu = function()
+			calls.updates = calls.updates + 1
+			return true
+		end,
 	})
 
 	return switcher, state, calls

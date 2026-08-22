@@ -130,11 +130,11 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 					prediction_states[#prediction_states + 1] = enabled
 					return true
 				end,
-				set_llm_model = noop,
+				set_llm_model = function() return true end,
 				set_llm_display_model_name = noop,
 			},
 			save_prefs = function() return true end,
-			update_menu = noop,
+			update_menu = function() return true end,
 		})
 
 		switcher.switch_model("candidate-model")
@@ -186,12 +186,12 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 					prediction_states[#prediction_states + 1] = enabled
 					return true
 				end,
-				set_llm_model = noop,
+				set_llm_model = function() return true end,
 				set_llm_display_model_name = noop,
 			},
 			runtime_gate = function() return runtime_available end,
 			save_prefs = function() return true end,
-			update_menu = noop,
+			update_menu = function() return true end,
 		})
 
 		switcher.switch_model("candidate-model")
@@ -243,11 +243,14 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			},
 			keymap = {
 				set_llm_enabled = noop,
-				set_llm_model = function(model) runtime_models[#runtime_models + 1] = model end,
+				set_llm_model = function(model)
+					runtime_models[#runtime_models + 1] = model
+					return true
+				end,
 				set_llm_display_model_name = function(model) display_models[#display_models + 1] = model end,
 			},
 			save_prefs = function() saves = saves + 1; return true end,
-			update_menu = function() updates = updates + 1 end,
+			update_menu = function() updates = updates + 1; return true end,
 		})
 
 		switcher.switch_model("candidate-model")
@@ -289,7 +292,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		}
 		package.loaded["modules.llm"] = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
-			set_active_profile = noop,
+			set_active_profile = function() return true end,
 			set_llm_model_mlx = noop,
 			set_llm_model_ollama = noop,
 		}
@@ -315,7 +318,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 					prediction_states[#prediction_states + 1] = enabled
 					return true
 				end,
-				set_llm_model = noop,
+				set_llm_model = function() return true end,
 				set_llm_display_model_name = noop,
 			},
 			save_prefs = function() return true end,
