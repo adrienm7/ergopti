@@ -41,6 +41,7 @@ package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
 
 --- Load the module under test with a clean hs stub.
+package.loaded["adapters.timer_scheduler"] = nil
 local Handler = helpers.load_with_stubs("modules.llm.streaming_handler")
 local hs_stub = _G.hs
 
@@ -162,7 +163,7 @@ helpers.describe("streaming_handler: on_fail() cancels the stream watchdog", fun
 		local ctx = make_ctx(fetch_id, function() return fetch_id end)
 		Handler.arm_watchdog(ctx)
 
-		-- The hs stub records every doAfter call in __timers
+		-- The hs stub records the native timer.new candidate in __timers.
 		local timers = hs_stub.timer.__timers
 		helpers.assert_true(#timers >= 1, "expected at least one timer to be armed")
 		local watchdog = timers[#timers]

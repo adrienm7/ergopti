@@ -437,6 +437,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	sync_state_to_modules = function(saved, config_absent, restoring)
 		return MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
+			apply_llm_enabled         = function(enabled)
+				if type(llm_handler) == "table"
+					and type(llm_handler.set_llm_preference_runtime) == "function" then
+					return llm_handler.set_llm_preference_runtime(enabled) == true
+				end
+				if keymap and type(keymap.set_llm_enabled) == "function" then
+					return keymap.set_llm_enabled(enabled) == true
+				end
+				return false
+			end,
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
 			core_mods                = core_mods,
@@ -773,7 +783,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- assignment runs, so guard it like every other updateMenu call site.
 			-- Without the guard this threw "attempt to call a nil value (upvalue
 			-- 'updateMenu')" and the swallowed error silently killed the LLM startup.
-			update_menu    = function() if type(updateMenu) == "function" then updateMenu() end end,
+			update_menu    = function()
+				if type(updateMenu) == "function" then updateMenu() end
+				return true
+			end,
 			save_prefs     = save_prefs,
 			keymap         = keymap,
 			script_control = core_mods.shortcuts_mod,

@@ -28,6 +28,8 @@ local MODULES = {
 	"ui.menu.menu_llm.api_panel",
 	"ui.menu.menu_llm.models_selector",
 	"ui.menu.menu_llm.model_switcher",
+	"ui.menu.menu_llm.activation_pause_owner",
+	"ui.menu.menu_llm.prediction_lock_registry",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.startup_controller",
 	"ui.menu.menu_llm.trigger_orchestrator",
@@ -40,6 +42,7 @@ local MODULES = {
 local function with_fixture(callback)
 	return helpers.with_fresh_modules(MODULES, function()
 		local noop = function() end
+		local accept = function() return true end
 		local updates = 0
 		local probes = {}
 		local stop_mode = "sync"
@@ -96,15 +99,19 @@ local function with_fixture(callback)
 				llm_streaming_multi = false,
 				llm_instant_on_word_end = false,
 			},
-			set_backend = noop,
-			set_llm_model_mlx = noop,
-			set_llm_model_ollama = noop,
+			get_backend = function() return state.llm_backend end,
+			get_current_model = function() return state.llm_model or "" end,
+			set_backend = function() return true end,
+			set_llm_model_mlx = function() return true end,
+			set_llm_model_ollama = function() return true end,
 			is_backend_ready = function() return false end,
 			is_backend_load_failed = function() return false end,
-			load_api_entries = noop,
+			load_api_entries = accept,
 		}
 
 		local models = {
+			create_requirement_owner = function() return {} end,
+			pause_requirements = function() return true, false end,
 			get_presets = function() return {} end,
 			get_actual_model_name = function(name) return name end,
 			get_model_info = function() return {} end,
@@ -163,7 +170,7 @@ local function with_fixture(callback)
 		package.loaded["ui.menu.menu_llm.streaming_panel"] = {
 			build = function() return {} end,
 		}
-		package.loaded["ui.menu.menu_llm.warmup_controller"] = { warmup = noop }
+		package.loaded["ui.menu.menu_llm.warmup_controller"] = { warmup = accept }
 		package.loaded["ui.menu.menu_llm.trigger_panel"] = {
 			build = function() return {} end,
 		}
@@ -177,13 +184,17 @@ local function with_fixture(callback)
 		package.loaded["ui.menu.menu_llm.model_switcher"] = {
 			new = function()
 				return {
-					switch_model = noop,
-					disable_model = noop,
-					set_llm_profile = noop,
-					apply_recommended_prompt_profile = noop,
+					switch_model = accept,
+					disable_model = accept,
+					set_llm_profile = accept,
+					settle_recovery_debts = accept,
+					apply_recommended_prompt_profile = accept,
 					get_display_model_name = function(name) return name end,
 					get_model_power_level = function() return 1 end,
 					guarded_check_requirements = noop,
+					dispatch_resumable_requirements = function(model, on_ok, on_fail, opts)
+						return models.check_requirements(model, on_ok, on_fail, opts)
+					end,
 				}
 			end,
 		}
@@ -221,10 +232,10 @@ local function with_fixture(callback)
 			end,
 		}
 		package.loaded["modules.llm.mlx_deps_checker"] = {
-			check_and_install_deps = noop,
+			check_and_install_deps = accept,
 		}
 		package.loaded["modules.llm.ollama_deps_checker"] = {
-			check_and_install_deps = noop,
+			check_and_install_deps = accept,
 		}
 
 		local previous_async_get = hs.http.asyncGet
@@ -239,17 +250,26 @@ local function with_fixture(callback)
 		local ok, err = xpcall(function()
 			package.loaded["ui.menu.menu_llm.backend_panel"] = nil
 			local MenuLLM = require("ui.menu.menu_llm")
+			local script_control = {
+				is_paused = function() return false end,
+				get_pause_epoch = function() return 0 end,
+				register_pause_owner = function() return true end,
+			}
 			local handler = MenuLLM.create({
 				state = state,
 				keymap = {
-					set_llm_enabled = noop,
-					set_llm_model = noop,
+					set_llm_enabled = accept,
+					set_llm_model = function() return true end,
 					set_llm_display_model_name = noop,
-					set_llm_backend_name = noop,
+					set_llm_backend_name = accept,
 				},
 				save_prefs = function() return true end,
-				update_menu = function() updates = updates + 1 end,
+				update_menu = function()
+					updates = updates + 1
+					return true
+				end,
 				active_tasks = {},
+				script_control = script_control,
 			})
 			callback({
 				MenuLLM = MenuLLM,
@@ -295,9 +315,29 @@ local function with_fixture(callback)
 	end)
 end
 
+local function find_row(rows, identity)
+	for _, row in ipairs(rows or {}) do
+		local label = row.label or row.title
+		if type(label) == "string" and label:find(identity, 1, true) then
+			return row
+		end
+	end
+	return nil
+end
+
+local function find_nested_action(item, parent_identity, action_identity)
+	local parent = find_row(item and item.submenu, parent_identity)
+	helpers.assert_type(parent, "table")
+	local row = find_row(parent.menu, action_identity)
+	helpers.assert_type(row, "table")
+	helpers.assert_type(row.action, "function")
+	return row.action
+end
+
 local function build_and_assert_red(fixture)
 	local item = fixture.handler.build_item()
-	local model_row = item.submenu[2]
+	local model_row = find_row(item.submenu, "menu.llm.active_model_label")
+	helpers.assert_type(model_row, "table")
 	helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1,
 		"an invalidated health cache must render the current backend as unprobed")
 	return item
@@ -309,8 +349,9 @@ helpers.describe("LLM health probe ownership", function()
 			with_fixture(function(fixture)
 				local item = fixture.handler.build_item()
 				helpers.assert_eq(#fixture.probes, 1)
-				local backend_index = target == "api" and 3 or 2
-				item.submenu[1].menu[backend_index].action()
+				local target_identity = target == "api" and "API 🌐" or "Ollama 🦙"
+				find_nested_action(
+					item, "menu.llm.backend_title", target_identity)()
 				local updates_before_stale = fixture.updates()
 				fixture.probes[1].completion(200)
 				helpers.assert_eq(fixture.updates(), updates_before_stale,
@@ -322,6 +363,7 @@ helpers.describe("LLM health probe ownership", function()
 		with_fixture(function(fixture)
 			local item = fixture.handler.build_item()
 			local stale_probe = fixture.probes[1]
+			helpers.assert_type(item.action, "function")
 			item.action()
 			local updates_before_stale = fixture.updates()
 			stale_probe.completion(200)
@@ -344,13 +386,18 @@ helpers.describe("LLM health probe ownership", function()
 
 		with_fixture(function(fixture)
 			local item = build_and_assert_red(fixture)
-			helpers.assert_true(item.submenu[2].title:find("🔴 ", 1, true) == 1)
+			local model_row = find_row(item.submenu, "menu.llm.active_model_label")
+			helpers.assert_type(model_row, "table")
+			helpers.assert_true(model_row.title:find("🔴 ", 1, true) == 1)
 			local updates_before_current = fixture.updates()
 			fixture.probes[1].completion(200)
 			helpers.assert_eq(fixture.updates(), updates_before_current + 1,
 				"the current MLX probe must commit and repaint exactly once")
 			local refreshed = fixture.handler.build_item()
-			helpers.assert_true(refreshed.submenu[2].title:find("🟡 ", 1, true) == 1,
+			local refreshed_model = find_row(
+				refreshed.submenu, "menu.llm.active_model_label")
+			helpers.assert_type(refreshed_model, "table")
+			helpers.assert_true(refreshed_model.title:find("🟡 ", 1, true) == 1,
 				"a committed current MLX response must render the reachable state")
 		end)
 	end)
@@ -417,8 +464,10 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.state.llm_model_mlx = "A"
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
-			local port_action = item.submenu[2].menu[2].action
-			local backend_action = item.submenu[1].menu[3].action
+			local port_action = find_nested_action(
+				item, "menu.llm.active_model_label", "menu.llm.mlx_port_label")
+			local backend_action = find_nested_action(
+				item, "menu.llm.backend_title", "API 🌐")
 			helpers.assert_eq(type(port_action), "function")
 			helpers.assert_eq(type(backend_action), "function")
 
@@ -442,8 +491,10 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.state.llm_model_mlx = "A"
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
-			local port_action = item.submenu[2].menu[2].action
-			local backend_action = item.submenu[1].menu[3].action
+			local port_action = find_nested_action(
+				item, "menu.llm.active_model_label", "menu.llm.mlx_port_label")
+			local backend_action = find_nested_action(
+				item, "menu.llm.backend_title", "API 🌐")
 
 			helpers.assert_eq(backend_action(), true)
 			helpers.assert_eq(fixture.pending_stop_kind(), "backend")

@@ -41,6 +41,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 
 local LOG = "shortcuts.actions.system"
+local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 
 -- Explicit inter-key delay for simulated keystrokes. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on
@@ -97,6 +98,9 @@ local AWAKE_ACTIVATION_GRACE_SEC = 1.0
 
 local awake_timer      = nil
 local awake_active     = false
+-- ScriptControl pause is a reversible suspension, not a user preference write.
+-- Keep the original activation intent until its exact resume has committed.
+local awake_pause_snapshot = nil
 local awake_origin_pos = nil
 -- Timestamp (seconds since epoch) when keep-awake was last toggled ON; used
 -- to log the duration as an "awake" passive period on toggle OFF so the
@@ -242,6 +246,16 @@ local function finish_tap(consume, fence_events)
 	return consume == true, fence_events
 end
 
+--- Reads one optional parent admission guard without normalizing ambiguity.
+--- Raw eventtaps can begin delivering synchronously inside their factory/start
+--- boundary, before Bindings has published the returned owner.
+local function raw_binding_admitted(admission_guard)
+	if admission_guard == nil then return true end
+	if type(admission_guard) ~= "function" then return false end
+	local ok, admitted = pcall(admission_guard)
+	return ok and admitted == true
+end
+
 --- Posts a single no-op F18 key event (down + up) to register KEYBOARD activity
 --- with the OS and with presence-aware apps. Exposed as M._emit_activity_keystroke
 --- so the regression test can assert it fires. The auto-deactivation watcher
@@ -290,8 +304,12 @@ schedule_awake_tick = function(generation)
 	local interval = AWAKE_TICK_MIN_SEC + math.random() * span
 	local scheduled_handle
 	local committed
-	scheduled_handle, committed = TimerScheduler.after(interval, function()
-		if awake_timer == scheduled_handle and scheduled_handle.timer == nil then
+	local scheduled_ok
+	scheduled_ok, scheduled_handle, committed = xpcall(function()
+		return TimerScheduler.after(interval, function()
+		if awake_timer == scheduled_handle
+			and type(scheduled_handle) == "table"
+			and scheduled_handle.timer == nil then
 			awake_timer = nil
 		end
 		if not awake_active or generation ~= _awake_generation then return end
@@ -334,16 +352,21 @@ schedule_awake_tick = function(generation)
 			local return_generation = _awake_generation
 			local return_handle
 			local return_committed
-			return_handle, return_committed = TimerScheduler.after(AWAKE_RETURN_DELAY_SEC, function()
-				if _awake_return_timer == return_handle and return_handle.timer == nil then
+			local return_ok
+			return_ok, return_handle, return_committed = xpcall(function()
+				return TimerScheduler.after(AWAKE_RETURN_DELAY_SEC, function()
+				if _awake_return_timer == return_handle
+					and type(return_handle) == "table"
+					and return_handle.timer == nil then
 					_awake_return_timer = nil
 				end
 				if return_generation ~= _awake_generation or not awake_active then return end
 				if origin then pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y}) end
-			end)
+				end)
+			end, debug.traceback)
 			_awake_return_timer = return_handle
-			if return_committed ~= true then
-				if return_handle.timer == nil then _awake_return_timer = nil end
+			if not return_ok or return_committed ~= true then
+				if type(return_handle) ~= "table" then _awake_return_timer = nil end
 				Logger.error(LOG, "Keep-awake cursor-return timer did not commit; restoring immediately.")
 				pcall(hs.mouse.absolutePosition, {x = origin.x, y = origin.y})
 			end
@@ -366,10 +389,16 @@ schedule_awake_tick = function(generation)
 			close_awake_alert()
 			Logger.error(LOG, "Keep-awake auto-disabled because its next jitter tick could not be armed.")
 		end
-	end)
+		end)
+	end, debug.traceback)
+	if not scheduled_ok then
+		Logger.error(LOG, "Keep-awake jitter timer construction raised: %s.",
+			tostring(scheduled_handle))
+		return false
+	end
 	awake_timer = scheduled_handle
 	if committed ~= true then
-		if scheduled_handle.timer == nil then awake_timer = nil end
+		if type(scheduled_handle) ~= "table" then awake_timer = nil end
 		Logger.error(LOG, "Keep-awake jitter timer did not commit.")
 		return false
 	end
@@ -603,6 +632,40 @@ function M.stop_awake()
 	return watcher_settled and return_timer_settled and tick_timer_settled
 end
 
+--- Suspends keep-awake while preserving whether the user had enabled it.
+--- A refused cleanup retains both the native debt and the original intent.
+--- @return boolean settled
+function M.pause_awake()
+	if awake_pause_snapshot == nil then
+		awake_pause_snapshot = awake_active == true
+	end
+	if awake_pause_snapshot ~= true then return true end
+	return M.stop_awake() == true
+end
+
+--- Restores only a keep-awake session captured by pause_awake().
+--- The snapshot is consumed after literal activation settlement, never before.
+--- @return boolean committed
+function M.resume_awake()
+	if awake_pause_snapshot ~= true then
+		awake_pause_snapshot = nil
+		return true
+	end
+	if awake_active == true then
+		awake_pause_snapshot = nil
+		return true
+	end
+	local ok_awake, awake_result = xpcall(M.toggle_awake, debug.traceback)
+	if not ok_awake or awake_result ~= true then return false end
+	awake_pause_snapshot = nil
+	return true
+end
+
+--- @return boolean
+function M.is_awake_active()
+	return awake_active == true
+end
+
 --- Toggles the hardware CapsLock state through Hammerspoon's HID API.
 --- @return boolean|nil New CapsLock state, or nil when the HID call failed.
 function M.toggle_capslock()
@@ -748,14 +811,16 @@ local function capture_frontmost_window()
 		notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
 		return
 	end
-	return ScreenshotSave.save({ "-l", tostring(id) }, "screenshot")
+	return ScreenshotSave.save(
+		{ "-l", tostring(id) }, "screenshot", SHORTCUT_ACTION_PARENT)
 end
 
 --- Captures the frontmost window on the physical @/# key (key-code 10).
 --- Uses a raw keyDown tap so the shortcut fires before macOS generates characters.
 --- @return table Fake-hotkey object with :delete().
-function M.bind_instant_screenshot()
+function M.bind_instant_screenshot(admission_guard)
 	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
+		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.at_hash")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -771,21 +836,60 @@ function M.bind_instant_screenshot()
 		end
 
 		local scheduled = SyntheticInput.defer_after_callback(
-			"instant screenshot", capture_frontmost_window)
+			"instant screenshot", function()
+				if not raw_binding_admitted(admission_guard) then return false end
+				return capture_frontmost_window()
+			end)
 		return finish_tap(scheduled, fence_events)
 	end, "instant screenshot")
+end
+
+--- Adds one exact parent claim to the shared screenshot owner.
+--- @param parent string Stable parent ID.
+--- @return boolean settled
+function M.pause_screenshot_actions(parent)
+	return ScreenshotSave.pause_screenshot_actions(parent)
+end
+
+--- Releases one exact parent claim from the shared screenshot owner.
+--- @param parent string Stable parent ID.
+--- @return boolean settled
+function M.resume_screenshot_actions(parent)
+	return ScreenshotSave.resume_screenshot_actions(parent)
+end
+
+--- Retains one exact parent claim while stopping the shared screenshot owner.
+--- @param parent string Stable parent ID.
+--- @return boolean settled
+function M.stop_screenshot_actions(parent)
+	return ScreenshotSave.stop_screenshot_actions(parent)
+end
+
+--- Reports whether one exact parent owns a shared screenshot pause claim.
+--- @param parent string Stable parent ID.
+--- @return boolean claimed
+function M.has_screenshot_pause_claim(parent)
+	return ScreenshotSave.has_screenshot_pause_claim(parent)
+end
+
+--- Reports screenshot operation ownership and cleanup debt for one parent.
+--- @param parent string Stable parent ID.
+--- @return boolean pending
+function M.has_pending_screenshot_action(parent)
+	return ScreenshotSave.has_pending_screenshot_action(parent)
 end
 
 --- Maps F19 + scroll wheel to system volume up/down.
 --- F19 is the physical "layer" key; holding it while scrolling bypasses page scroll.
 --- @return table Fake-hotkey object with :delete().
-function M.bind_layer_scroll()
+function M.bind_layer_scroll(admission_guard)
 	local layer_held  = false
 	local f19_keycode = Keycodes.F19_VOLUME_SCROLL_MODIFIER
 
 	local key_owner = acquire_tap(
 		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
 		function(event)
+			if not raw_binding_admitted(admission_guard) then return false end
 			local is_physical, fence_events = classify_physical_event(
 				event, "shortcuts.f19_layer")
 			if not is_physical then return finish_tap(false, fence_events) end
@@ -807,6 +911,7 @@ function M.bind_layer_scroll()
 			layer_held = should_hold
 			if should_hold then
 				SyntheticInput.defer_after_callback("F19 gesture cleanup", function()
+					if not raw_binding_admitted(admission_guard) then return false end
 					if gestures and type(gestures.isRightClickHeld) == "function"
 						and gestures.isRightClickHeld() then
 						pcall(function() gestures.forceCleanup() end)
@@ -820,6 +925,7 @@ function M.bind_layer_scroll()
 	if not key_owner then return nil end
 
 	local scroll_owner = acquire_tap({hs.eventtap.event.types.scrollWheel}, function(event)
+		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
 			event, "shortcuts.f19_scroll")
 		if not is_physical or not layer_held then
@@ -841,6 +947,7 @@ function M.bind_layer_scroll()
 		local key  = delta > 0 and "SOUND_UP" or "SOUND_DOWN"
 		local reps = math.max(1, math.floor(math.abs(delta)))
 		local scheduled = SyntheticInput.defer_after_callback("F19 volume scroll", function()
+			if not raw_binding_admitted(admission_guard) then return false end
 			if gestures and type(gestures.isRightClickHeld) == "function"
 				and gestures.isRightClickHeld() then
 				pcall(function() gestures.forceCleanup() end)
@@ -879,8 +986,9 @@ end
 --- OS assigns the character after modifier processing; a raw tap fires first.
 --- @param on_trigger function|nil Called as on_trigger(label, app_name) for shortcut logging.
 --- @return table Fake-hotkey object with :delete().
-function M.bind_cmd_star(on_trigger)
+function M.bind_cmd_star(on_trigger, admission_guard)
 	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
+		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.cmd_star")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -910,6 +1018,7 @@ function M.bind_cmd_star(on_trigger)
 			alt = flags.alt == true, shift = flags.shift == true,
 		}
 		local scheduled = SyntheticInput.defer_after_callback("Cmd-star action", function()
+			if not raw_binding_admitted(admission_guard) then return false end
 			-- Queue the user-visible output first. Application lookup and shortcut
 			-- telemetry must never delay the replacement keystroke.
 			SyntheticInput.emit_key_stroke(mods, "s", KEYSTROKE_NO_DELAY_US)
@@ -1032,8 +1141,9 @@ end
 --- @param get_wrap_pairs function|nil Callback returning the live {[char]={left,right}} table.
 ---   When nil, falls back to text_acts.WRAP_PAIRS (the full built-in catalogue).
 --- @return table Fake-hotkey object with :delete().
-function M.bind_wrap_text_if_selected(get_wrap_pairs)
+function M.bind_wrap_text_if_selected(get_wrap_pairs, admission_guard)
 	return acquire_tap({hs.eventtap.event.types.keyDown}, function(e)
+		if not raw_binding_admitted(admission_guard) then return false end
 		local is_physical, fence_events = classify_physical_event(
 			e, "shortcuts.wrap_text")
 		if not is_physical then return finish_tap(false, fence_events) end
@@ -1091,7 +1201,8 @@ function M.bind_wrap_text_if_selected(get_wrap_pairs)
 
 		if decision ~= "wrap" then return finish_tap(false, fence_events) end
 		local ok_wrap, wrapped_or_err = pcall(
-			text_acts.wrap_selection, sel, pair.left, pair.right)
+			text_acts.wrap_selection, sel, pair.left, pair.right,
+			SHORTCUT_ACTION_PARENT)
 		if not ok_wrap then
 			SyntheticInput.defer_after_callback("wrap-selection diagnostic", function()
 				Logger.error(LOG, "Could not wrap the active selection: %s.",

@@ -893,8 +893,10 @@ end
 --- a scroll-block armed mid-gesture (3+ fingers) otherwise keeps swallowing native
 --- scroll until the user lifts all fingers — a "pause = everything off" violation.
 --- Idempotent and safe when nothing is armed.
+--- @return boolean settled
 function M.unblock_scroll()
 	stopScrollBlock()
+	return true
 end
 
 --- Returns whether the scroll-block is currently swallowing scroll events.

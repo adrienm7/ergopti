@@ -51,6 +51,7 @@ local function with_server_fixture(options, assertions)
 	local terminate_mode = options.terminate_mode or "self"
 	local start_mode = options.start_mode or "self"
 	local cleanup_mode = options.cleanup_mode or "true"
+	local reset_mode = options.reset_mode or "true"
 	local probe_body = options.probe_body or ""
 	local saved_modules = {}
 	for _, name in ipairs(MODULE_NAMES) do saved_modules[name] = package.loaded[name] end
@@ -64,6 +65,7 @@ local function with_server_fixture(options, assertions)
 		local cleanup_commands = {}
 		local events = {}
 		local timer_count = 0
+		local reset_calls = 0
 		local function lsof_command_contract(command)
 			local query = "/usr/sbin/lsof -nP -tiTCP:" .. tostring(math.floor(current_port))
 				.. " -sTCP:LISTEN"
@@ -137,7 +139,14 @@ local function with_server_fixture(options, assertions)
 		}
 		package.loaded["modules.llm.api_mlx"] = {
 			get_port = function() return current_port end,
-			reset_endpoints = noop,
+			reset_endpoints = function()
+				reset_calls = reset_calls + 1
+				events[#events + 1] = "reset"
+				if reset_mode == "throw" then error("fixture reset failure") end
+				if reset_mode == "false" then return false end
+				if reset_mode == "nil" then return nil end
+				return true
+			end,
 			set_model_hf_path = noop,
 			set_active_server_pgid = noop,
 			mark_load_failed = noop,
@@ -240,9 +249,11 @@ local function with_server_fixture(options, assertions)
 			cleanup_commands = cleanup_commands,
 			events = events,
 			timer_count = function() return timer_count end,
+			reset_calls = function() return reset_calls end,
 			set_port = function(port) current_port = port end,
 			set_start_mode = function(mode) start_mode = mode end,
 			set_cleanup_mode = function(mode) cleanup_mode = mode end,
+			set_reset_mode = function(mode) reset_mode = mode end,
 		})
 	end, debug.traceback)
 
@@ -357,9 +368,11 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 			helpers.assert_eq(#fixture.server_tasks, 2,
 				"a synchronous predecessor callback must install exactly one successor")
 			helpers.assert_eq(fixture.deps.active_tasks["mlx_server"], fixture.server_tasks[2])
-			helpers.assert_eq(fixture.events[2], "cleanup",
+			helpers.assert_eq(fixture.events[3], "cleanup",
 				"the exact listener cleanup must precede successor task publication")
-			helpers.assert_eq(fixture.events[3], "start")
+			helpers.assert_eq(fixture.events[4], "reset",
+				"settlement must join endpoint owners before successor publication")
+			helpers.assert_eq(fixture.events[6], "start")
 			mark_ready(fixture.server_tasks[2])
 			helpers.assert_eq(candidate_successes, 1)
 		end)
@@ -435,6 +448,14 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 				helpers.assert_eq(candidate_successes, 0, mode)
 				helpers.assert_eq(candidate_cancellations, 1,
 					"the recursive successor and its owner must share one terminal gate")
+				local successor = fixture.server_tasks[2]
+				helpers.assert_not_nil(successor)
+				helpers.assert_eq(fixture.deps.active_tasks["mlx_server"], successor,
+					"a task that activated before start refusal remains the exact owner")
+				helpers.assert_eq(successor.terminate_calls, 1)
+				successor:complete(15)
+				helpers.assert_eq(candidate_cancellations, 1,
+					"the exact late terminal cannot publish a second cancellation")
 				helpers.assert_eq(fixture.deps.active_tasks["mlx_server"], nil)
 				helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)
 			end)
@@ -589,7 +610,8 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 				helpers.assert_eq(#fixture.server_tasks, 1,
 					"a later " .. kind .. " intent must prevent B from launching")
 				helpers.assert_eq(winning_settlements, 1)
-				helpers.assert_eq(fixture.events[#fixture.events - 1], "cleanup")
+				helpers.assert_eq(fixture.events[#fixture.events - 2], "cleanup")
+				helpers.assert_eq(fixture.events[#fixture.events - 1], "reset")
 				helpers.assert_eq(fixture.events[#fixture.events], kind)
 				predecessor:complete(15)
 				helpers.assert_eq(winning_settlements, 1)
@@ -758,6 +780,71 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 		end)
 	end)
 
+	helpers.it("(HS-012-reset-launch-fence) rejects cold launch on false, nil, and throw", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_server_fixture({ reset_mode = mode }, function(fixture)
+				local cancellations = 0
+				helpers.assert_eq(fixture.obj.start_server("A", function() end, function(reason)
+					if reason == "endpoint_reset_refused" then cancellations = cancellations + 1 end
+				end), false, mode)
+				helpers.assert_eq(fixture.reset_calls(), 1, mode)
+				helpers.assert_eq(#fixture.server_tasks, 0,
+					"reset refusal must precede native server task creation")
+				helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)
+				helpers.assert_eq(fixture.obj._server_identity, nil)
+				helpers.assert_eq(cancellations, 1)
+			end)
+		end
+	end)
+
+	helpers.it("(HS-012-reset-adoption-fence) rejects adoption before ready publication", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_server_fixture({
+				reset_mode = mode,
+				probe_body = "models",
+				probe_model = "fixture/A",
+			}, function(fixture)
+				local successes = 0
+				local cancellations = 0
+				helpers.assert_eq(fixture.obj.start_server("A", function()
+					successes = successes + 1
+				end, function(reason)
+					if reason == "endpoint_reset_refused" then cancellations = cancellations + 1 end
+				end), false, mode)
+				helpers.assert_eq(successes, 0)
+				helpers.assert_eq(cancellations, 1)
+				helpers.assert_eq(#fixture.server_tasks, 0)
+				helpers.assert_eq(fixture.obj._server_ready, nil)
+				helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)
+			end)
+		end
+	end)
+
+	helpers.it("(HS-012-reset-settlement-fence) keeps predecessor and blocks successor", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_server_fixture("self", function(fixture)
+				local cancellations = 0
+				helpers.assert_true(fixture.obj.start_server("A", function() end, function() end))
+				local predecessor = fixture.server_tasks[1]
+				mark_ready(predecessor)
+				fixture.set_reset_mode(mode)
+				helpers.assert_true(fixture.obj.start_server("B", function() end, function()
+					cancellations = cancellations + 1
+				end))
+				predecessor:complete(15)
+				helpers.assert_eq(#fixture.server_tasks, 1, mode)
+				helpers.assert_eq(cancellations, 1, mode)
+				helpers.assert_eq(fixture.obj._server_lifecycle_owner.phase, "cleanup")
+				helpers.assert_eq(fixture.obj._server_identity.model, "A")
+
+				fixture.set_reset_mode("true")
+				helpers.assert_true(fixture.obj.start_server("B", function() end, function() end))
+				helpers.assert_eq(#fixture.server_tasks, 2,
+					"successor may launch only after retry joins endpoint reset debt")
+			end)
+		end
+	end)
+
 	helpers.it("(HS-008-stop-before-bind) reaps Python before publishing wrapper settlement", function()
 		with_server_fixture({
 			terminate_mode = "sync_self",
@@ -779,10 +866,12 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 				"accepted wrapper stop must reap its exact Python child")
 			helpers.assert_eq(predecessor:attempt_late_bind(), false,
 				"a stopped child cannot bind the MLX port after cleanup proof")
-			helpers.assert_eq(fixture.events[#fixture.events - 2], "child-exit",
+			helpers.assert_eq(fixture.events[#fixture.events - 3], "child-exit",
 				"the child must exit before listener cleanup begins")
-			helpers.assert_eq(fixture.events[#fixture.events - 1], "cleanup",
+			helpers.assert_eq(fixture.events[#fixture.events - 2], "cleanup",
 				"listener cleanup must run after the child exit")
+			helpers.assert_eq(fixture.events[#fixture.events - 1], "reset",
+				"endpoint owners must join before settlement publication")
 			helpers.assert_eq(fixture.events[#fixture.events], "settled",
 				"settlement must remain the final published event")
 			helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)

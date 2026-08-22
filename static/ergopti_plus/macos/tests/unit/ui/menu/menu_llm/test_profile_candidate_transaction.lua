@@ -305,14 +305,18 @@ local function with_fixture(options, body)
 			},
 			save_prefs = deps.save_prefs,
 			update_menu = deps.update_menu,
-			profile_mutation_gate = function()
+			profile_mutation_gate = function(switcher_recovery_capability)
 				for _, key in ipairs({
 					"settle_profile_delete_recovery",
 					"settle_profile_candidate_recovery",
 				}) do
 					local gate = deps[key]
 					if gate ~= nil then
-						if type(gate) ~= "function" or gate() ~= true then return false end
+						local capability = key == "settle_profile_candidate_recovery"
+							and switcher_recovery_capability or nil
+						if type(gate) ~= "function" or gate(capability) ~= true then
+							return false
+						end
 					end
 				end
 				return true
@@ -524,7 +528,7 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 		end)
 	end)
 
-	local void_refusal_modes = {"false", "throw"}
+	local void_refusal_modes = {"false", "nil", "throw"}
 	for _, mode in ipairs(void_refusal_modes) do
 		helpers.it("HS-034 contains a " .. mode .. " runtime activation refusal", function()
 			with_fixture({}, function(fixture)
@@ -599,6 +603,7 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 	for _, gate_key in ipairs({
 		"settle_profile_delete_recovery",
 		"settle_profile_candidate_recovery",
+		"settle_profile_edit_recovery",
 		"settle_llm_switcher_recovery",
 	}) do
 		helpers.it("HS-034 rejects nil from the strict " .. gate_key .. " gate", function()
@@ -613,14 +618,14 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 		end)
 	end
 
-	helpers.it("HS-034 accepts nil from void runtime, menu, and editor contracts", function()
+	helpers.it("HS-034 accepts nil only from the editor after exact runtime and menu commits", function()
 		local candidate = {id = "user_void_success", label = "Void Success"}
 		with_fixture({
 			created_profiles = {candidate},
 			editor_returns_nil = true,
 		}, function(fixture)
-			fixture.plan_runtime({{mode = "nil"}})
-			fixture.plan_menu({{mode = "nil"}})
+			fixture.plan_runtime({{mode = "ok"}})
+			fixture.plan_menu({{mode = "ok"}})
 			local create_row = find_row(fixture.manager.get_menu_item().menu,
 				"menu.profiles.create_profile")
 			helpers.assert_eq(create_row.action(), true)

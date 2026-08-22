@@ -21,7 +21,9 @@ local MODULES = {
 	"adapters.task_lifecycle",
 	"adapters.shell_runner",
 	"adapters.timer_scheduler",
+	"adapters.http_client",
 	"ui.download_window",
+	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
 }
 
@@ -82,21 +84,45 @@ local function with_fixture(spec, body)
 					args = args,
 					starts = 0,
 					completions = 0,
+					settled = false,
+					settlement_observers = {},
 				}
 				local handle = {}
 				function handle.start()
 					record.starts = record.starts + 1
 					local completion = synchronous_completions[index]
 					if completion ~= nil then
-						on_done(table.unpack(completion, 1, completion.n or #completion))
+						record.complete(table.unpack(completion, 1, completion.n or #completion))
 					end
-					if starts[index] == "nil" then return nil end
-					return starts[index] ~= false
+					if starts[index] == "nil" then
+						record.settled = true
+						return nil
+					end
+					if starts[index] == false then
+						record.settled = true
+						return false
+					end
+					return true
 				end
 				function handle.terminate() return true, "pending" end
+				function handle.isSettled() return record.settled end
+				function handle.onSettled(observer)
+					if record.settled then observer() else
+						record.settlement_observers[#record.settlement_observers + 1] = observer
+					end
+					return true
+				end
 				function record.complete(code, stdout, stderr)
 					record.completions = record.completions + 1
-					return on_done(code, stdout, stderr)
+					local first = not record.settled
+					record.settled = true
+					local result = on_done(code, stdout, stderr)
+					if first then
+						local observers = record.settlement_observers
+						record.settlement_observers = {}
+						for _, observer in ipairs(observers) do observer() end
+					end
+					return result
 				end
 				record.handle = handle
 				spawns[index] = record
@@ -107,10 +133,18 @@ local function with_fixture(spec, body)
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(delay, callback)
 				local index = #timers + 1
-				local handle = {cancelled = false}
+				local handle = {
+					cancelled = false,
+					timer = {},
+					settlement_observers = {},
+				}
 				local record = {delay = delay, handle = handle, fires = 0}
 				function record.fire()
 					record.fires = record.fires + 1
+					handle.timer = nil
+					local observers = handle.settlement_observers
+					handle.settlement_observers = {}
+					for _, observer in ipairs(observers) do observer() end
 					return callback()
 				end
 				timers[index] = record
@@ -118,7 +152,59 @@ local function with_fixture(spec, body)
 			end,
 			cancel = function(handle)
 				handle.cancelled = true
+				handle.timer = nil
+				local observers = handle.settlement_observers
+				handle.settlement_observers = {}
+				for _, observer in ipairs(observers) do observer() end
 				return true
+			end,
+			onSettled = function(handle, observer)
+				if handle.timer == nil then observer() else
+					handle.settlement_observers[#handle.settlement_observers + 1] = observer
+				end
+				return true
+			end,
+		}
+
+		package.loaded["adapters.http_client"] = {
+			new = function()
+				local client = { settled = false, observers = {} }
+				function client.post(url, headers, body, callback)
+					local record = { url = url, body = body, headers = headers }
+					function record.callback(status, response_body, response_headers)
+						local first = not client.settled
+						local result = callback({
+							status = status,
+							body = response_body,
+							headers = response_headers,
+						})
+						if first then
+							client.settled = true
+							local observers = client.observers
+							client.observers = {}
+							for _, observer in ipairs(observers) do observer() end
+						end
+						return result
+					end
+					http_callbacks[#http_callbacks + 1] = record
+					return true
+				end
+				function client.cancel()
+					if not client.settled then
+						client.settled = true
+						local observers = client.observers
+						client.observers = {}
+						for _, observer in ipairs(observers) do observer() end
+					end
+					return true
+				end
+				function client.onSettled(observer)
+					if client.settled then observer() else
+						client.observers[#client.observers + 1] = observer
+					end
+					return true
+				end
+				return client
 			end,
 		}
 
@@ -142,22 +228,33 @@ local function with_fixture(spec, body)
 					on_stream = on_stream,
 					starts = 0,
 					terminate_calls = 0,
+					running = false,
 				}
 				function task:terminate()
 					self.terminate_calls = self.terminate_calls + 1
 					return self
 				end
+				function task:isRunning() return self.running end
 				native_tasks[#native_tasks + 1] = task
 				return task
 			end,
 			start = function(task)
 				task.starts = task.starts + 1
+				task.running = true
 				local completion = native_synchronous_completions[task.index]
 				if completion ~= nil then
+					task.running = false
 					task.on_done(table.unpack(completion, 1, completion.n or #completion))
 				end
-				if task_starts[task.index] == "nil" then return nil end
-				return task_starts[task.index] ~= false
+				if task_starts[task.index] == "nil" then
+					task.running = false
+					return nil
+				end
+				if task_starts[task.index] == false then
+					task.running = false
+					return false
+				end
+				return true
 			end,
 		}
 
@@ -198,6 +295,12 @@ local function with_fixture(spec, body)
 			state = {},
 			keymap = {},
 		}, {}, function() return 0 end)
+		helpers.assert_eq(#timers, 1)
+		helpers.assert_eq(timers[1].delay, 0)
+		helpers.assert_eq(
+			package.loaded["adapters.timer_scheduler"].cancel(timers[1].handle), true)
+		helpers.assert_eq(timers[1].handle.timer, nil)
+		table.remove(timers, 1)
 
 		body({
 			manager = manager,
@@ -646,6 +749,11 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				active_tasks = {}, state = {}, keymap = {},
 				shared_system_check = function() return false end,
 			}, {}, function() return 0 end)
+			helpers.assert_eq(#native_timers, 1)
+			helpers.assert_eq(
+				require("adapters.timer_scheduler").cancelAll(), true)
+			helpers.assert_eq(native_timers[1]:running(), false)
+			table.remove(native_timers, 1)
 
 			local accepted = manager.check_requirements("demo", function() end, function() end,
 				{is_current = function() return true end})

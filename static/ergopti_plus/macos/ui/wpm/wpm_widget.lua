@@ -194,6 +194,10 @@ local _canvas            = nil
 local _timer             = nil
 local _mouse_tap         = nil   -- hs.eventtap watching mouse/touchpad events
 local _running           = false -- true between start() and stop(); guards redundant restarts
+-- A failed pause rollback can leave the runtime stopped while the pre-pause
+-- intent is still owed. Keep that ownership outside `_running` so a later
+-- pause transaction inventories this surface again and can finish restoring it.
+local _pause_restore_pending = false
 local _generation        = 0
 local _wpm_history       = {}
 local _show_graph        = false
@@ -422,8 +426,17 @@ update_widget_body = function()
 			end
 			_canvas:level(hs.drawing.windowLevels.cursor)
 			_canvas:behavior({ "canJoinAllSpaces", "stationary" })
+			local callback_canvas = _canvas
+			local callback_generation = _generation
 			-- Drag: mouseCallback fires on left-button down inside the canvas.
 			_canvas:mouseCallback(function(c, event, id, x, y)
+				-- Native canvas callbacks may already be queued when stop()/pause
+				-- deletes the surface. Fence the retained closure both while PAUSED
+				-- and after a later start creates a different canvas generation.
+				if not _running or callback_generation ~= _generation
+					or c ~= callback_canvas or _canvas ~= callback_canvas then
+					return
+				end
 				if event == "mouseDown" then
 					_drag_start_mouse = hs.mouse.absolutePosition()
 					_drag_start_frame = c:frame()
@@ -626,9 +639,13 @@ function M.start(show_graph)
 	-- redundant timer restart and full canvas re-render when already running with the
 	-- same graph mode — the 0.2 s timer already keeps the display fresh. Only a real
 	-- graph-mode change falls through to redraw immediately.
-	if _running and _show_graph == want_graph then return true end
+	if _running and _show_graph == want_graph then
+		_pause_restore_pending = false
+		return true
+	end
 	if _running then
 		_show_graph = want_graph
+		_pause_restore_pending = false
 		update_widget()
 		return true
 	end
@@ -696,6 +713,7 @@ function M.start(show_graph)
 		return false
 	end
 	_running = true
+	_pause_restore_pending = false
 	update_widget()
 	Logger.info(LOG, "Floating WPM widget started successfully.")
 	return true
@@ -721,7 +739,14 @@ function M.stop()
 end
 
 function M.is_running()
-	return _running == true
+	return _running == true or _pause_restore_pending == true
+end
+
+--- Restores a floating surface with the exact graph mode it owned before pause.
+--- @return boolean committed
+function M.resume_after_pause()
+	_pause_restore_pending = true
+	return M.start(_show_graph)
 end
 
 --- Resets the widget to its default bottom-right position.

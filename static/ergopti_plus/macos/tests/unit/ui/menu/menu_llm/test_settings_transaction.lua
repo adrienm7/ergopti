@@ -217,9 +217,11 @@ local function with_fixture(options, callback)
 
 	package.loaded["modules.llm"] = {
 		DEFAULT_STATE = clone_value(DEFAULT_STATE),
-		set_backend = function() end,
-		set_llm_model_mlx = function() end,
-		set_llm_model_ollama = function() end,
+		get_backend = function() return state.llm_backend end,
+		get_current_model = function() return state.llm_model or "" end,
+		set_backend = function() return true end,
+		set_llm_model_mlx = function() return true end,
+		set_llm_model_ollama = function() return true end,
 		is_backend_ready = function() return false end,
 		is_backend_load_failed = function() return false end,
 		load_api_entries = function() end,
@@ -272,6 +274,7 @@ local function with_fixture(options, callback)
 	}
 
 	local keymap = {}
+	keymap.set_llm_model = function() return true end
 	for _, key in ipairs({
 		"llm_debounce",
 		"llm_max_words",

@@ -55,21 +55,44 @@ local function with_fixture(options, scenario)
 
 	function scheduler.after(_, callback)
 		scheduler.after_calls = scheduler.after_calls + 1
-		local mode = after_modes[scheduler.after_calls] or "commit"
+		local after_index = scheduler.after_calls
+		local mode = after_modes[after_index] or "commit"
 		if mode == "throw" then error("scheduler-after-throw") end
 		if mode == "nil" then return nil, false end
-		local handle = { active = true, callback = callback }
+		local handle = { active = true, callback = callback, observers = {} }
 		scheduler.handles[#scheduler.handles + 1] = handle
+		local hook = scheduler.after_hook
+		if type(hook) == "function" then
+			scheduler.after_hook = nil
+			scheduler.after_hook_result = hook(handle)
+		end
 		return handle, mode == "commit"
 	end
 
 	function scheduler.cancel(handle)
 		if type(handle) ~= "table" or handle.active ~= true then return true end
 		scheduler.cancel_calls = scheduler.cancel_calls + 1
-		local result = cancel_results[scheduler.cancel_calls]
+		local cancel_index = scheduler.cancel_calls
+		local hook = scheduler.cancel_hook
+		if type(hook) == "function" then
+			scheduler.cancel_hook = nil
+			scheduler.cancel_hook_result = hook(handle)
+		end
+		local result = cancel_results[cancel_index]
 		if result == "throw" then error("scheduler-cancel-throw") end
+		if result == "nil" then return nil end
 		if result == false then return false end
 		handle.active = false
+		local observers = handle.observers
+		handle.observers = {}
+		for _, observer in ipairs(observers) do observer() end
+		return true
+	end
+
+	function scheduler.onSettled(handle, observer)
+		if type(handle) ~= "table" or type(observer) ~= "function" then return false end
+		if handle.active ~= true then observer(); return true end
+		handle.observers[#handle.observers + 1] = observer
 		return true
 	end
 
@@ -89,7 +112,14 @@ local function with_fixture(options, scenario)
 			is_backend_load_failed = function() return false end,
 			get_backend = function() return "test" end,
 			get_active_profile = function() return nil end,
-			warmup_model = function() calls.warmups = calls.warmups + 1 end,
+			warmup_model = function()
+				calls.warmups = calls.warmups + 1
+				if type(calls.warmup_hook) == "function" then
+					local hook = calls.warmup_hook
+					calls.warmup_hook = nil
+					calls.warmup_hook_result = hook()
+				end
+			end,
 		},
 		get_llm_enabled = function() return enabled end,
 	})
@@ -112,6 +142,63 @@ end
 -- ==========================================
 
 helpers.describe("LLM warmup owns every retry timer transaction", function()
+	helpers.it("keeps native acquisition visible to a reentrant PAUSE until exact rollback", function()
+		with_fixture({
+			after_modes = { "partial" },
+			cancel_results = { false, true },
+		}, function(controller, scheduler, calls)
+			scheduler.after_hook = function()
+				return controller.pause_warmup()
+			end
+			helpers.assert_eq(controller.schedule_warmup_with_retry("start reentry"), false)
+			helpers.assert_eq(scheduler.after_hook_result, false,
+				"PAUSE must not certify quiescence while native timer start is on-stack")
+			helpers.assert_eq(scheduler.handles[1].active, true,
+				"a refused rollback must retain the exact partial candidate")
+			helpers.assert_eq(calls.warmups, 0)
+			helpers.assert_eq(controller.stop(), true)
+			helpers.assert_eq(scheduler.handles[1].active, false)
+		end)
+	end)
+
+	helpers.it("preserves a successor installed by a native cancellation probe", function()
+		with_fixture({}, function(controller, scheduler, calls)
+			helpers.assert_true(controller.schedule_warmup_with_retry("owner A"))
+			scheduler.cancel_hook = function()
+				return controller.schedule_warmup_with_retry("owner B")
+			end
+			helpers.assert_eq(controller.stop(), false,
+				"the stale stop may settle A but cannot certify its nested successor B")
+			helpers.assert_true(scheduler.cancel_hook_result)
+			helpers.assert_eq(scheduler.after_calls, 2)
+			helpers.assert_eq(scheduler.handles[2].active, true)
+			helpers.assert_eq(calls.warmups, 0)
+			helpers.assert_true(controller.stop())
+			helpers.assert_eq(scheduler.handles[2].active, false)
+		end)
+	end)
+
+	helpers.it("keeps a delivered warmup callback owned across reentrant PAUSE", function()
+		with_fixture({}, function(controller, scheduler, calls)
+			helpers.assert_true(controller.schedule_warmup_with_retry("callback"))
+			calls.warmup_hook = function()
+				return controller.pause_warmup()
+			end
+			scheduler.handles[1].callback()
+			helpers.assert_eq(calls.warmup_hook_result, false,
+				"PAUSE must remain pending until the backend callback frame unwinds")
+			helpers.assert_eq(calls.warmups, 1)
+			helpers.assert_eq(scheduler.after_calls, 1,
+				"the revoked callback must not publish a retry successor")
+			helpers.assert_true(controller.pause_warmup(),
+				"the PAUSE retry must settle once the callback frame has unwound")
+			helpers.assert_true(controller.resume_warmup(),
+				"RESUME must restore the callback-owned retry-chain intent")
+			helpers.assert_eq(scheduler.after_calls, 2)
+			helpers.assert_true(controller.stop())
+		end)
+	end)
+
 	helpers.it("warmup timer retains partial acquisition and blocks a sibling until exact cleanup", function()
 		with_fixture({
 			after_modes = { "partial", "commit" },
@@ -146,6 +233,30 @@ helpers.describe("LLM warmup owns every retry timer transaction", function()
 			helpers.assert_eq(controller.stop(), true)
 		end)
 	end)
+
+	for _, mode in ipairs({ false, "nil", "throw" }) do
+		helpers.it("continues once after autonomous timer settlement from "
+			.. tostring(mode), function()
+			with_fixture({ cancel_results = { mode } }, function(controller, scheduler, calls)
+				helpers.assert_eq(controller.schedule_warmup_with_retry("autonomous"), true)
+				local owned = scheduler.handles[1]
+				owned.callback()
+				helpers.assert_eq(calls.warmups, 0,
+					"backend work must wait for exact native timer settlement")
+				helpers.assert_eq(#owned.observers, 1,
+					"the retained continuation must observe the same timer")
+
+				helpers.assert_eq(scheduler.cancel(owned), true)
+				helpers.assert_eq(calls.warmups, 1,
+					"autonomous settlement must continue the backend attempt once")
+				helpers.assert_eq(scheduler.after_calls, 2,
+					"the continued attempt must own exactly one retry successor")
+				helpers.assert_eq(scheduler.cancel(owned), true)
+				helpers.assert_eq(calls.warmups, 1,
+					"duplicate settlement cannot repeat backend work")
+			end)
+		end)
+	end
 
 	helpers.it("warmup timer stop fences a callback that was already queued", function()
 		with_fixture({}, function(controller, scheduler, calls)

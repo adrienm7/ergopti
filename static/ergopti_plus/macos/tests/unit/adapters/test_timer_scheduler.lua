@@ -269,10 +269,13 @@ helpers.describe("TimerScheduler adapter — after()", function()
 		native_callback()
 		helpers.assert_eq(callback_count, 0,
 			"callbacks from an uncommitted one-shot candidate must be inert")
-		helpers.assert_eq(TS.cancelAll(), false,
-			"cancelAll must expose a second explicit cleanup refusal")
+		helpers.assert_eq(stop_calls, 2,
+			"the inert native delivery must retry the exact cleanup and expose its second refusal")
+		helpers.assert_true(handle.timer == native,
+			"the second refusal must retain the same native one-shot candidate")
+		helpers.assert_eq(TS.activeCount(), 1)
 		helpers.assert_eq(TS.cancelAll(), true,
-			"cancelAll must retry the same retained candidate to completion")
+			"cancelAll must perform the remaining retry on the same retained candidate")
 		helpers.assert_eq(start_calls, 1)
 		helpers.assert_eq(stop_calls, 3)
 		helpers.assert_eq(TS.activeCount(), 0)
@@ -376,6 +379,71 @@ helpers.describe("TimerScheduler adapter — after()", function()
 end)
 
 helpers.describe("TimerScheduler adapter — cancel()", function()
+	helpers.it("notifies exact settlement after an uncommitted native delivery", function()
+		for _, start_mode in ipairs({ "false", "nil", "throw" }) do
+			for _, stop_mode in ipairs({ "false", "nil", "throw" }) do
+				local active = false
+				local native_callback = nil
+				local current_stop_mode = stop_mode
+				local user_calls = 0
+				local observer_calls = 0
+				local native = nil
+				local timer_stub = {
+					new = function(_, callback)
+						native_callback = callback
+						native = {
+							start = function(self)
+								active = true
+								if start_mode == "throw" then error("start refused") end
+								if start_mode == "nil" then return nil end
+								return false
+							end,
+							stop = function(self)
+								if current_stop_mode == "throw" then error("stop refused") end
+								if current_stop_mode == "nil" then return nil end
+								if current_stop_mode == "false" then return false end
+								active = false
+								return self
+							end,
+							running = function() return active end,
+						}
+						return native
+					end,
+					secondsSinceEpoch = function() return 0 end,
+				}
+				local TS = helpers.load_with_stubs("adapters.timer_scheduler",
+					{ timer = timer_stub })
+				local handle, committed = TS.after(0, function()
+					user_calls = user_calls + 1
+				end)
+				local case = start_mode .. "/" .. stop_mode
+
+				helpers.assert_eq(committed, false, case)
+				helpers.assert_true(handle.timer == native,
+					"rollback debt must retain the exact timer (" .. case .. ")")
+				helpers.assert_eq(TS.onSettled(handle, function()
+					observer_calls = observer_calls + 1
+				end), true, case)
+				current_stop_mode = "success"
+				native_callback()
+				helpers.assert_eq(user_calls, 0,
+					"uncommitted delivery must stay inert (" .. case .. ")")
+				helpers.assert_eq(observer_calls, 1,
+					"native delivery must settle one observer (" .. case .. ")")
+				helpers.assert_nil(handle.timer, case)
+				native_callback()
+				helpers.assert_eq(observer_calls, 1,
+					"duplicate native delivery cannot redeliver settlement (" .. case .. ")")
+				local immediate = 0
+				helpers.assert_eq(TS.onSettled(handle, function()
+					immediate = immediate + 1
+				end), true, case)
+				helpers.assert_eq(immediate, 1,
+					"an already-settled handle must notify synchronously once (" .. case .. ")")
+			end
+		end
+	end)
+
 	helpers.it("marks handle fired and stops the OS timer", function()
 		local timer_stub = make_timer_stub()
 		local TS = helpers.load_with_stubs("adapters.timer_scheduler",
@@ -621,10 +689,13 @@ helpers.describe("TimerScheduler adapter — every()", function()
 		native_callback()
 		helpers.assert_eq(callback_count, 0,
 			"both re-entrant and queued callbacks must be inert before commit")
-		helpers.assert_eq(TS.cancelAll(), false,
-			"cancelAll must expose a second explicit cleanup refusal")
+		helpers.assert_eq(stop_calls, 2,
+			"the inert queued delivery must retry the exact cleanup and expose its second refusal")
+		helpers.assert_true(handle.timer == native,
+			"the second refusal must retain the same native repeating candidate")
+		helpers.assert_eq(TS.activeCount(), 1)
 		helpers.assert_eq(TS.cancelAll(), true,
-			"cancelAll must retry the same retained candidate to completion")
+			"cancelAll must perform the remaining retry on the same retained candidate")
 		helpers.assert_eq(start_calls, 1)
 		helpers.assert_eq(stop_calls, 3)
 		helpers.assert_eq(TS.activeCount(), 0)

@@ -73,19 +73,18 @@ helpers.describe("mlx_deps_checker source invariants", function()
 	end)
 
 	helpers.it("fires queued callbacks when PTY wrapper cannot be created", function()
-		local marker = "_last_failure_message = i18n.get(\"mlx.deps_pty_write_failed\")"
-		local at = SOURCE:find(marker, 1, true)
-		helpers.assert_true(at ~= nil)
-		local tail = SOURCE:sub(at, at + 220)
-		helpers.assert_true(tail:find("fire_pending_callbacks(false)", 1, true) ~= nil)
+		helpers.assert_true(SOURCE:find(
+			"return settle_preflight_failure(i18n.get(\"mlx.deps_pty_write_failed\"))",
+			1, true) ~= nil)
+		helpers.assert_true(SOURCE:find(
+			"fire_pending_callbacks(false, _pause_controller.is_admitted)",
+			1, true) ~= nil)
 	end)
 
 	helpers.it("fires queued callbacks when hs.task creation fails", function()
-		local marker = "_last_failure_message = i18n.get(\"mlx.deps_task_create_failed\")"
-		local at = SOURCE:find(marker, 1, true)
-		helpers.assert_true(at ~= nil)
-		local tail = SOURCE:sub(at, at + 260)
-		helpers.assert_true(tail:find("fire_pending_callbacks(false)", 1, true) ~= nil)
+		helpers.assert_true(SOURCE:find(
+			"return settle_preflight_failure(i18n.get(\"mlx.deps_task_create_failed\"))",
+			1, true) ~= nil)
 	end)
 end)
 
@@ -113,10 +112,14 @@ helpers.describe("mlx_deps_checker: refused native launch settles immediately", 
 
 		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
 			task = {
-				new = function()
-					return {
-						start = function() return false end,
-					}
+				new = function(_, completion)
+					local task = {}
+					function task:start() return false end
+					function task:terminate()
+						completion(143, "", "start refused")
+						return self
+					end
+					return task
 				end,
 			},
 		})

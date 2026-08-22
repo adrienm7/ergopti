@@ -120,7 +120,7 @@ helpers.describe("gestures startup degraded mode", function()
 		init = function() end,
 		get_sg_names = function() return {} end,
 		get_label = function() return "" end,
-		force_cleanup = function() end,
+		force_cleanup = function() return true end,
 		toggle_right_click = function() end,
 		trigger_lookup = function() end,
 		is_right_click_held = function() return false end,

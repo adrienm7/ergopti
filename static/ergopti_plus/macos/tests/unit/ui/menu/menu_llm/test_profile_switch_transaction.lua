@@ -89,6 +89,7 @@ local function with_fixture(spec, body)
 			if not (failure and failure.mutate == false) then mutate() end
 			if failure then
 				if failure.mode == "throw" then error(name .. " injected failure") end
+				if failure.mode == "nil" then return nil end
 				return false
 			end
 			if nil_success[name] then return nil end
@@ -111,6 +112,9 @@ local function with_fixture(spec, body)
 		}
 		local persisted = copy_state(state)
 		local rendered = copy_state(state)
+		local switcher
+		local nested_result
+		local reentered = false
 		local calls = {
 			profiles = {},
 			save_profiles = {},
@@ -127,7 +131,14 @@ local function with_fixture(spec, body)
 			end,
 			set_active_profile = function(value)
 				calls.profiles[#calls.profiles + 1] = value
-				return run_boundary("runtime", function() runtime.profile = value end)
+				return run_boundary("runtime", function()
+					runtime.profile = value
+					if spec.reenter_boundary == "runtime" and value == "advanced"
+						and not reentered then
+						reentered = true
+						nested_result = switcher.set_llm_profile("raw")
+					end
+				end)
 			end,
 		}
 		package.loaded["modules.llm"] = core_llm
@@ -168,14 +179,22 @@ local function with_fixture(spec, body)
 		}
 		local function save_prefs()
 			calls.save_profiles[#calls.save_profiles + 1] = state.llm_active_profile
-			return run_boundary("save", function() persisted = copy_state(state) end)
+			return run_boundary("save", function()
+				persisted = copy_state(state)
+				if spec.reenter_boundary == "save"
+					and state.llm_active_profile == "advanced" and not reentered then
+					reentered = true
+					nested_result = switcher.set_llm_profile("raw")
+					persisted = copy_state(state)
+				end
+			end)
 		end
 		local function update_menu()
 			calls.menu_profiles[#calls.menu_profiles + 1] = state.llm_active_profile
 			return run_boundary("menu", function() rendered = copy_state(state) end)
 		end
 
-		local switcher = require("ui.menu.menu_llm.model_switcher").new({
+		switcher = require("ui.menu.menu_llm.model_switcher").new({
 			state = state,
 			models_mgr = manager,
 			keymap = keymap,
@@ -193,6 +212,7 @@ local function with_fixture(spec, body)
 			pending = pending,
 			dialog_calls = function() return dialog_call_count end,
 			notification_calls = function() return notification_call_count end,
+			nested_result = function() return nested_result end,
 		})
 	end, debug.traceback)
 
@@ -224,8 +244,25 @@ local function compensation_failures(boundary, mode)
 end
 
 helpers.describe("HS-028 direct profile selection is one recoverable transaction", function()
+	for _, boundary in ipairs({ "runtime", "save" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("HS-012 refuses nested profile selection during " .. boundary
+				.. " mutate-then-" .. mode, function()
+				with_fixture({
+					reenter_boundary = boundary,
+					failures = {{name = boundary, occurrence = 1, mode = mode}},
+				}, function(fixture)
+					helpers.assert_eq(fixture.switcher.set_llm_profile("advanced"), false)
+					helpers.assert_eq(fixture.nested_result(), false)
+					assert_old_profile(fixture)
+				end)
+			end)
+		end
+	end
+
 	local forward_failures = {
 		{name = "runtime", mode = "false"},
+		{name = "runtime", mode = "nil"},
 		{name = "runtime", mode = "throw"},
 		{name = "save", mode = "false"},
 		{name = "save", mode = "throw"},
@@ -338,13 +375,22 @@ helpers.describe("HS-028 direct profile selection is one recoverable transaction
 		end)
 	end)
 
-	helpers.it("HS-028 accepts nil from setter and menu success contracts", function()
-		with_fixture({nil_success = {runtime = true, menu = true}}, function(fixture)
-			helpers.assert_eq(fixture.switcher.set_llm_profile("advanced"), true)
-			helpers.assert_eq(fixture.state.llm_active_profile, "advanced")
-			helpers.assert_eq(fixture.runtime.profile, "advanced")
-			helpers.assert_eq(fixture.persisted().llm_active_profile, "advanced")
-			helpers.assert_eq(fixture.rendered().llm_active_profile, "advanced")
+	helpers.it("HS-028 rejects nil from the runtime identity setter", function()
+		with_fixture({nil_success = {runtime = true}}, function(fixture)
+			helpers.assert_eq(fixture.switcher.set_llm_profile("advanced"), false)
+			assert_old_profile(fixture)
+		end)
+	end)
+
+	helpers.it("HS-028 treats nil menu result as refusal and rolls back exactly", function()
+		with_fixture({
+			failures = {{name = "menu", occurrence = 1, mode = "nil"}},
+		}, function(fixture)
+			helpers.assert_eq(fixture.switcher.set_llm_profile("advanced"), false)
+			assert_old_profile(fixture)
+			helpers.assert_eq(fixture.calls.profiles, {"advanced", "basic"})
+			helpers.assert_eq(fixture.calls.save_profiles, {"advanced", "basic"})
+			helpers.assert_eq(fixture.calls.menu_profiles, {"advanced", "basic"})
 		end)
 	end)
 
@@ -365,6 +411,7 @@ end)
 helpers.describe("HS-031 recommended profiles share the profile transaction owner", function()
 	local forward_failures = {
 		{name = "runtime", mode = "false"},
+		{name = "runtime", mode = "nil"},
 		{name = "runtime", mode = "throw"},
 		{name = "save", mode = "false"},
 		{name = "menu", mode = "false"},

@@ -171,6 +171,12 @@ local _escape_trap = nil
 -- declared below one binds a nil global instead.
 local _preview_render_generation = 0
 
+-- Every zero-delay preview/telemetry callback is still a native capability.
+-- A logical generation fence prevents stale business delivery, while this
+-- registry retains the exact scheduler handle until native settlement.
+local _prediction_deferred_generation = 0
+local _prediction_deferred_handles = {}
+
 -- A finite-delay literal auto can outlive its nominal gate on screen if a native
 -- tooltip timer fires late. While that exact committed row is still visible, the
 -- eventtap honours the promise instead of falling through to a different action.
@@ -183,6 +189,82 @@ local _visible_magic_lease = nil
 local function invalidate_pending_preview(keep_visible_lease)
 	_preview_render_generation = _preview_render_generation + 1
 	if not keep_visible_lease then _visible_magic_lease = nil end
+end
+
+
+--- Retires one deferred prediction handle and its optional local latch.
+--- @param handle table Scheduler handle.
+local function retire_prediction_deferred_handle(handle)
+	local entry = _prediction_deferred_handles[handle]
+	if not entry then return end
+	_prediction_deferred_handles[handle] = nil
+	if type(entry.on_settled) == "function" then
+		local ok, err = xpcall(entry.on_settled, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Deferred prediction settlement '%s' raised: %s",
+				tostring(entry.label), tostring(err))
+		end
+	end
+end
+
+
+--- Schedules prediction work behind a shared lifecycle generation and retains
+--- the exact native timer until settlement.
+--- @param label string Diagnostic label.
+--- @param callback function Deferred business callback.
+--- @param on_settled function|nil Optional local-latch cleanup.
+--- @return table handle Scheduler handle.
+--- @return boolean committed True only when the timer committed.
+local function schedule_prediction_deferred(label, callback, on_settled)
+	local generation = _prediction_deferred_generation
+	local handle, committed = TimerScheduler.after(0, function()
+		if generation ~= _prediction_deferred_generation then return end
+		callback()
+	end)
+	if type(handle) == "table" and handle.timer ~= nil then
+		_prediction_deferred_handles[handle] = {
+			label = label,
+			on_settled = on_settled,
+		}
+		local observer_ok, observer_result = xpcall(function()
+			return TimerScheduler.onSettled(handle, function()
+				retire_prediction_deferred_handle(handle)
+			end)
+		end, debug.traceback)
+		if not observer_ok or observer_result ~= true then
+			Logger.error(LOG,
+				"Deferred prediction settlement observer '%s' was not accepted: %s",
+				tostring(label), tostring(observer_result))
+		end
+	end
+	return handle, committed == true
+end
+
+
+--- Fences and settles every bridge-owned deferred prediction capability.
+--- No callback is replayed after RESUME; all work in this registry is one-way.
+--- @return boolean settled True only when every exact timer settled.
+local function settle_prediction_deferred_handles()
+	_prediction_deferred_generation = _prediction_deferred_generation + 1
+	local snapshot = {}
+	for handle in pairs(_prediction_deferred_handles) do
+		snapshot[#snapshot + 1] = handle
+	end
+	local all_settled = true
+	for _, handle in ipairs(snapshot) do
+		local ok, result = xpcall(function()
+			return TimerScheduler.cancel(handle)
+		end, debug.traceback)
+		if ok and result == true then
+			retire_prediction_deferred_handle(handle)
+		else
+			all_settled = false
+			local entry = _prediction_deferred_handles[handle]
+			Logger.error(LOG, "Deferred prediction timer '%s' remains owned: %s",
+				tostring(entry and entry.label or "unknown"), tostring(result))
+		end
+	end
+	return all_settled
 end
 
 
@@ -913,7 +995,7 @@ function M.update_preview(buf)
 			invalidate_pending_preview()
 			local refresh_generation = _preview_render_generation
 			local schedule_ok, handle_or_err, refresh_committed = xpcall(function()
-				return TimerScheduler.after(0, function()
+				return schedule_prediction_deferred("winner-expiry refresh", function()
 					local callback_ok, callback_err = xpcall(function()
 						if refresh_generation ~= _preview_render_generation then return end
 						if _state.buffer == buf then
@@ -1007,7 +1089,7 @@ function M.update_preview(buf)
 			if may_persist_preview(primary_match) then
 				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
 				local schedule_ok, telemetry_handle, telemetry_committed = xpcall(function()
-					return TimerScheduler.after(0, function()
+					return schedule_prediction_deferred("hotstring suggestion telemetry", function()
 						pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
 					end)
 				end, debug.traceback)
@@ -1073,7 +1155,7 @@ function M.update_preview(buf)
 				end
 			end
 			local schedule_ok, handle_or_err, render_committed = xpcall(function()
-				return TimerScheduler.after(0, render_preview)
+				return schedule_prediction_deferred("hotstring preview render", render_preview)
 			end, debug.traceback)
 			if not schedule_ok or render_committed ~= true then
 				Logger.error(LOG, "Hotstring preview render could not be scheduled (result: %s).",
@@ -1295,13 +1377,14 @@ end
 local function schedule_quarantine_surface_hide()
 	if _quarantine_hide_pending then return end
 	_quarantine_hide_pending = true
-	local ok, handle_or_err, committed = pcall(TimerScheduler.after, 0, function()
+	local ok, handle_or_err, committed = pcall(schedule_prediction_deferred,
+		"quarantine surface hide", function()
 		_quarantine_hide_pending = false
 		if not M.is_runtime_available() then
 			local hide = tooltip.hide_forced_silent or tooltip.hide_forced
 			if type(hide) == "function" then pcall(hide) end
 		end
-	end)
+	end, function() _quarantine_hide_pending = false end)
 	if not ok or committed ~= true then
 		_quarantine_hide_pending = false
 	end
@@ -1310,9 +1393,11 @@ end
 
 --- Clears prediction state, optionally bypassing the action-epoch runtime gate.
 --- @param keep_hotstring_log boolean When true, skips dismiss telemetry.
---- @param force_full boolean True only for the async action-epoch reconciler.
+--- @param force_full boolean True only for a trusted lifecycle reconciler.
+--- @param suppress_telemetry boolean True at a global pause boundary, where
+---   scheduling a file-write callback would escape the pause transaction.
 --- @return boolean full_reset True when engine.reset ran.
-local function reset_predictions_impl(keep_hotstring_log, force_full)
+local function reset_predictions_impl(keep_hotstring_log, force_full, suppress_telemetry)
 	-- A preview render requested a tick ago must not land after this reset and
 	-- put the tooltip back on screen.
 	invalidate_pending_preview()
@@ -1342,9 +1427,9 @@ local function reset_predictions_impl(keep_hotstring_log, force_full)
 		-- Withheld for a private mapping, like its suggested sibling. This one is
 		-- the easier of the two to miss: the value was captured on a keystroke that
 		-- has already happened, and the record outlives the match it came from.
-		if may_persist_preview(dismissed) then
+		if may_persist_preview(dismissed) and suppress_telemetry ~= true then
 			local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
-				return TimerScheduler.after(0, function()
+				return schedule_prediction_deferred("hotstring dismissal telemetry", function()
 					pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
 				end)
 			end, debug.traceback)
@@ -1358,7 +1443,10 @@ local function reset_predictions_impl(keep_hotstring_log, force_full)
 		schedule_quarantine_surface_hide()
 		return false
 	end
-	local reset_ok, reset_result = xpcall(engine.reset, debug.traceback)
+	local reset_ok, reset_result = xpcall(function()
+		return engine.reset(suppress_telemetry == true
+			and { suppress_telemetry = true } or nil)
+	end, debug.traceback)
 	if not reset_ok or reset_result ~= true then
 		Logger.error(LOG, "Prediction-engine reset did not commit (result: %s).", tostring(reset_result))
 		return false
@@ -1398,6 +1486,17 @@ function M.reset_predictions(keep_hotstring_log)
 	return reset_predictions_impl(keep_hotstring_log, false)
 end
 
+
+--- Performs the authoritative prediction reset for a global pause transaction.
+--- Dismissal telemetry is intentionally omitted: it is not a user dismissal,
+--- and a timer scheduled here would remain natively deliverable after PAUSED.
+--- @return boolean committed True only after the full engine reset settles.
+function M.reset_predictions_for_pause()
+	local deferred_settled = settle_prediction_deferred_handles()
+	local reset_committed = reset_predictions_impl(true, true, true)
+	return deferred_settled and reset_committed
+end
+
 --- Invalidates any prospective/visible hotstring action before registry or
 --- provider semantics mutate. Without a committed row this is an O(1)
 --- generation fence; visible pixels and their exact lease are revoked together.
@@ -1432,7 +1531,9 @@ end
 --- quarantined; the listener that could reconcile that epoch is being removed.
 --- @return boolean committed True when engine teardown completed.
 function M.reset_for_teardown()
-	return reset_predictions_impl(false, true)
+	local deferred_settled = settle_prediction_deferred_handles()
+	local reset_committed = reset_predictions_impl(false, true, true)
+	return deferred_settled and reset_committed
 end
 
 
@@ -1558,7 +1659,7 @@ function M.apply_prediction(idx)
 	-- F16 (not F15) so the script-control kill-switch keycode stays exclusive.
 	if not cleanup_committed then
 		local retry_ok, retry_handle, retry_committed = xpcall(function()
-			return TimerScheduler.after(0, function()
+			return schedule_prediction_deferred("post-accept cleanup retry", function()
 				local callback_ok, callback_result = xpcall(function()
 					return M.reset_predictions(true)
 				end, debug.traceback)

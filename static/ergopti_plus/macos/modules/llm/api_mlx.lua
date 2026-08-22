@@ -28,6 +28,7 @@ local LOG            = "llm.api_mlx"
 -- MLX warmup timeout comes from the shared cross-driver registry ([llm]).
 local WARMUP_POST_TIMEOUT_SEC    = Timings.sec("llm", "warmup_post_timeout_ms")    -- Unblock _warmup_in_flight if the single-token POST never returns
 local WARMUP_RETRY_DELAY_SEC     = 2
+local WARMUP_STAGE_ACQUIRE_RETRIES = 1
 local PGID_PENDING_TIMEOUT_SEC   = 15.0
 
 -- MLX server bind address — single source of truth in _shared/modules/llm/mlx_server.json
@@ -287,17 +288,38 @@ local _warmup_gen        = 0     -- bumped on reset/load-failure; a warmup callb
 local _warmup_timeout    = nil   -- hard-timeout timer; cleared on callback or cancellation
 local _warmup_retry_timer = nil  -- exact self-retry capability, including refused cleanup debt
 local _warmup_stopped    = false -- set by stop_warmup(); blocks the self-retry chain during pause/disable (M-3)
+local _warmup_active     = false -- full discovery/POST/retry intention, not only the current HTTP request
+local _warmup_last_model = nil
+local _warmup_last_profile = nil
+local _warmup_pause_snapshot = nil
+-- Zero-delay activation staged by resume_warmup() while ScriptControl still
+-- publishes PAUSED. The exact timer is rollback-owned until its callback proves
+-- the same global resume epoch committed.
+local _warmup_resume_timer = nil
+-- In-memory continuation attached to an exact timer whose cleanup was refused
+-- after global RESUMED. It owns no native work and may stage a retry only after
+-- the same handle reports terminal settlement.
+local _warmup_settlement_recovery = nil
 
 --- Cancels one exact warmup timer slot without dropping refused cleanup debt.
---- @param slot_name string `_warmup_timeout` or `_warmup_retry_timer`.
+--- @param slot_name string `timeout`, `retry`, or `resume`.
 --- @return boolean settled True only when the native timer is gone.
 local function cancel_warmup_timer(slot_name)
-	local handle = slot_name == "timeout" and _warmup_timeout or _warmup_retry_timer
+	local handle
+	if slot_name == "timeout" then
+		handle = _warmup_timeout
+	elseif slot_name == "retry" then
+		handle = _warmup_retry_timer
+	else
+		handle = _warmup_resume_timer
+	end
 	if type(handle) ~= "table" or handle.timer == nil then
 		if slot_name == "timeout" then
 			_warmup_timeout = nil
-		else
+		elseif slot_name == "retry" then
 			_warmup_retry_timer = nil
+		else
+			_warmup_resume_timer = nil
 		end
 		return true
 	end
@@ -309,6 +331,8 @@ local function cancel_warmup_timer(slot_name)
 			_warmup_timeout = nil
 		elseif slot_name == "retry" and _warmup_retry_timer == handle then
 			_warmup_retry_timer = nil
+		elseif slot_name == "resume" and _warmup_resume_timer == handle then
+			_warmup_resume_timer = nil
 		end
 		return true
 	end
@@ -331,9 +355,12 @@ local function schedule_warmup_retry(model_name, profile)
 	local retry_committed
 	local schedule_ok, schedule_err = xpcall(function()
 		retry_handle, retry_committed = TimerScheduler.after(WARMUP_RETRY_DELAY_SEC, function()
-			if _warmup_retry_timer == retry_handle and retry_handle.timer == nil then
-				_warmup_retry_timer = nil
+			if _warmup_retry_timer ~= retry_handle then return end
+			if retry_handle.timer ~= nil then
+				Logger.error(LOG, "Warmup retry fired with exact timer cleanup debt retained.")
+				return
 			end
+			_warmup_retry_timer = nil
 			if retry_committed ~= true or retry_generation ~= _warmup_gen or _warmup_stopped then return end
 			M.warmup(model_name, profile)
 		end)
@@ -347,6 +374,7 @@ local function schedule_warmup_retry(model_name, profile)
 		return false
 	end
 	_warmup_retry_timer = retry_handle
+	_warmup_active = true
 	return true
 end
 
@@ -424,6 +452,8 @@ end
 --- @param notify boolean When true, fire the one-time error notification from here.
 function M.mark_load_failed(model_name, notify)
 	_is_ready = false
+	_warmup_active = false
+	_warmup_settlement_recovery = nil
 	_warmup_gen = _warmup_gen + 1  -- invalidate any in-flight warmup callback (F-L4)
 	cancel_warmup_timer("timeout")
 	cancel_warmup_timer("retry")
@@ -443,25 +473,446 @@ function M.mark_load_failed(model_name, notify)
 	end
 end
 
---- Stops the api_mlx self-retry warmup chain (M-3).
---- Bumps the generation counter (invalidates any in-flight callback), cancels the
---- hard-timeout timer, and sets _warmup_stopped so any 2s retry that fires from
---- the TimerScheduler queue self-discards inside M.warmup().
---- Called from script_control.pause_all() alongside warmup_controller.stop().
-function M.stop_warmup()
+--- Joins the local warmup timers and exact HTTP owner after logical revocation.
+--- @return boolean settled True only when every local capability settled.
+local function settle_local_warmup_owners()
+	local timeout_settled = cancel_warmup_timer("timeout") == true
+	local retry_settled = cancel_warmup_timer("retry") == true
+	local resume_settled = cancel_warmup_timer("resume") == true
+	local cancel_ok, cancel_result = xpcall(function()
+		if type(_warmup_client.cancel) ~= "function" then return false end
+		return _warmup_client.cancel()
+	end, debug.traceback)
+	local post_settled = cancel_ok == true and cancel_result == true
+	if not post_settled then
+		Logger.error(LOG, "Warmup POST cancellation retained exact HTTP debt: %s.",
+			tostring(cancel_result))
+	end
+	return timeout_settled and retry_settled and resume_settled and post_settled
+end
+
+--- Fences the complete MLX warmup graph and joins every exact owner.
+--- @return boolean settled True only when local and discovery owners settled.
+local function quiesce_warmup()
 	_warmup_gen     = _warmup_gen + 1
 	_warmup_stopped = true
 	_warmup_in_flight = false
-	cancel_warmup_timer("timeout")
-	cancel_warmup_timer("retry")
+	_warmup_active = false
+	local local_settled = settle_local_warmup_owners() == true
+	local discovery_ok, discovery_result = xpcall(function()
+		if type(ApiMlxDiscovery.stop) ~= "function" then return false end
+		return ApiMlxDiscovery.stop()
+	end, debug.traceback)
+	local discovery_settled = discovery_ok == true and discovery_result == true
+	if not discovery_settled then
+		Logger.error(LOG, "Warmup discovery cancellation retained exact cleanup debt: %s.",
+			tostring(discovery_result))
+	end
+	if not local_settled or not discovery_settled then
+		Logger.error(LOG, "MLX warmup owner remains unsettled after logical revocation.")
+		return false
+	end
 	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, self-retry chain stopped.", _warmup_gen)
+	return true
 end
 
---- Clears the _warmup_stopped flag so M.warmup() may proceed (M-3).
---- Called from script_control.resume_all() before re-arming warmup_controller.
-function M.resume_warmup()
+--- Stops the complete warmup graph for an explicit disable or teardown.
+--- @return boolean settled True only when every exact owner settled.
+function M.stop_warmup()
+	_warmup_settlement_recovery = nil
+	-- An explicit disable while script pause owns a snapshot must win over the
+	-- later resume; otherwise leaving pause resurrects a feature the user turned off
+	if _warmup_pause_snapshot then
+		_warmup_pause_snapshot.was_stopped = true
+		_warmup_pause_snapshot.was_active = false
+	end
+	return quiesce_warmup()
+end
+
+--- Quiesces the warmup graph while retaining only its pre-pause intention.
+--- @return boolean settled True only when every exact owner settled.
+function M.pause_warmup()
+	_warmup_settlement_recovery = nil
+	if not _warmup_pause_snapshot then
+		local client_active = false
+		if type(_warmup_client.isActive) == "function" then
+			local active_ok, active_result = xpcall(_warmup_client.isActive, debug.traceback)
+			client_active = not active_ok or active_result == true
+		end
+		local discovery_active = false
+		if type(ApiMlxDiscovery.is_active) == "function" then
+			local active_ok, active_result = xpcall(ApiMlxDiscovery.is_active, debug.traceback)
+			discovery_active = not active_ok or active_result == true
+		end
+		_warmup_pause_snapshot = {
+			was_stopped = _warmup_stopped == true,
+			was_active = _warmup_stopped ~= true and (
+				_warmup_active == true or _warmup_in_flight == true
+				or client_active or discovery_active or _warmup_timeout ~= nil
+				or _warmup_retry_timer ~= nil
+			),
+			model = _warmup_last_model,
+			profile = _warmup_last_profile,
+		}
+	end
+	return quiesce_warmup()
+end
+
+--- Reads the real ScriptControl pause publication and epoch without requiring it
+--- through the api_mlx -> discovery -> ScriptControl cycle.
+--- @return boolean available Whether the global lifecycle surface is loaded.
+--- @return boolean|nil paused Strict published state.
+--- @return integer|nil epoch Current global pause generation.
+--- @return string|nil reason Read failure detail.
+local function read_script_pause_fence()
+	local script_control = package.loaded["modules.shortcuts.script_control"]
+	if type(script_control) ~= "table" then return false, nil, nil, nil end
+	if type(script_control.is_paused) ~= "function"
+		or type(script_control.get_pause_epoch) ~= "function" then
+		return true, nil, nil, "global pause fence API unavailable"
+	end
+	local paused_ok, paused = xpcall(script_control.is_paused, debug.traceback)
+	if not paused_ok or type(paused) ~= "boolean" then
+		return true, nil, nil, "global pause state unreadable: " .. tostring(paused)
+	end
+	local epoch_ok, epoch = xpcall(script_control.get_pause_epoch, debug.traceback)
+	if not epoch_ok or type(epoch) ~= "number" then
+		return true, nil, nil, "global pause epoch unreadable: " .. tostring(epoch)
+	end
+	return true, paused, epoch, nil
+end
+
+local stage_warmup_resume
+local retry_warmup_after_settlement
+
+--- Attaches one recovery token to an exact live timer without acquiring work.
+--- @param recovery table Current settlement recovery token.
+--- @param handle table|nil TimerScheduler handle.
+--- @return boolean observed True when this handle can trigger the recovery.
+local function observe_warmup_settlement(recovery, handle)
+	if type(handle) ~= "table" or handle.timer == nil then return false end
+	if recovery.observed[handle] == true then return true end
+	if type(TimerScheduler.onSettled) ~= "function" then
+		Logger.error(LOG, "Warmup recovery cannot observe exact timer settlement.")
+		return false
+	end
+	recovery.observed[handle] = true
+	local observe_ok, observed = xpcall(function()
+		return TimerScheduler.onSettled(handle, function()
+			recovery.observed[handle] = nil
+			retry_warmup_after_settlement(recovery)
+		end)
+	end, debug.traceback)
+	if not observe_ok or observed ~= true then
+		recovery.observed[handle] = nil
+		Logger.error(LOG, "Warmup recovery could not attach to exact timer: %s.",
+			tostring(observed))
+		return false
+	end
+	return true
+end
+
+--- Attaches the recovery token to the exact warmup HttpClient owner.
+--- @param recovery table Current settlement recovery token.
+--- @return boolean observed
+local function observe_warmup_http_settlement(recovery)
+	if recovery.http_settled == true then return false end
+	if recovery.http_observed == true then return true end
+	if type(_warmup_client.onSettled) ~= "function" then return false end
+	recovery.http_observed = true
+	local observe_ok, observed = xpcall(function()
+		return _warmup_client.onSettled(function()
+			recovery.http_observed = false
+			recovery.http_settled = true
+			retry_warmup_after_settlement(recovery)
+		end)
+	end, debug.traceback)
+	if not observe_ok or observed ~= true then
+		recovery.http_observed = false
+		Logger.error(LOG, "Warmup recovery could not observe exact HTTP settlement: %s.",
+			tostring(observed))
+		return false
+	end
+	return true
+end
+
+--- Attaches the recovery token to the exact discovery owner aggregate.
+--- @param recovery table Current settlement recovery token.
+--- @return boolean observed
+local function observe_warmup_discovery_settlement(recovery)
+	if recovery.discovery_settled == true then return false end
+	if recovery.discovery_observed == true then return true end
+	if type(ApiMlxDiscovery.onSettled) ~= "function" then return false end
+	recovery.discovery_observed = true
+	local observe_ok, observed = xpcall(function()
+		return ApiMlxDiscovery.onSettled(function()
+			recovery.discovery_observed = false
+			recovery.discovery_settled = true
+			retry_warmup_after_settlement(recovery)
+		end)
+	end, debug.traceback)
+	if not observe_ok or observed ~= true then
+		recovery.discovery_observed = false
+		Logger.error(LOG, "Warmup recovery could not observe discovery settlement: %s.",
+			tostring(observed))
+		return false
+	end
+	return true
+end
+
+--- Observes every currently retained child owner for one recovery token.
+--- @param recovery table Current settlement recovery token.
+--- @return boolean observed True when at least one exact debt is observable.
+local function observe_warmup_settlements(recovery)
+	local observed = observe_warmup_settlement(recovery, _warmup_timeout)
+	if observe_warmup_settlement(recovery, _warmup_retry_timer) then observed = true end
+	if observe_warmup_settlement(recovery, _warmup_resume_timer) then observed = true end
+	if observe_warmup_http_settlement(recovery) then observed = true end
+	if observe_warmup_discovery_settlement(recovery) then observed = true end
+	return observed
+end
+
+--- Rechecks the whole owner graph after one exact timer reports settlement.
+--- @param recovery table Settlement token created by a failed activation.
+retry_warmup_after_settlement = function(recovery)
+	if _warmup_settlement_recovery ~= recovery or recovery.joining == true then return end
+	if recovery.generation ~= _warmup_gen
+		or _warmup_pause_snapshot ~= recovery.snapshot then
+		_warmup_settlement_recovery = nil
+		return
+	end
+
+	recovery.joining = true
+	local local_settled = settle_local_warmup_owners() == true
+	local discovery_ok, discovery_result = xpcall(function()
+		if type(ApiMlxDiscovery.stop) ~= "function" then return false end
+		return ApiMlxDiscovery.stop()
+	end, debug.traceback)
+	local discovery_settled = discovery_ok == true and discovery_result == true
+	recovery.joining = false
+	if not local_settled or not discovery_settled then
+		if observe_warmup_settlements(recovery) ~= true then
+			Logger.error(LOG,
+				"Warmup settlement recovery retained non-observable cleanup debt.")
+		end
+		return
+	end
+
+	local available, paused, current_epoch, fence_error = read_script_pause_fence()
+	if available ~= true or fence_error ~= nil or paused ~= false
+		or current_epoch ~= recovery.pause_epoch
+		or recovery.generation ~= _warmup_gen
+		or _warmup_pause_snapshot ~= recovery.snapshot
+		or recovery.snapshot.was_stopped == true
+		or recovery.snapshot.was_active ~= true then
+		_warmup_settlement_recovery = nil
+		Logger.debug(LOG,
+			"Warmup settlement recovery discarded behind a stale RESUMED fence: %s.",
+			tostring(fence_error or paused))
+		return
+	end
+
+	if stage_warmup_resume(recovery.snapshot, recovery.pause_epoch,
+		WARMUP_RETRY_DELAY_SEC, WARMUP_STAGE_ACQUIRE_RETRIES) == true then
+		_warmup_settlement_recovery = nil
+		return
+	end
+	-- A partially-acquired retry stage is itself the only legal next trigger.
+	if observe_warmup_settlements(recovery) ~= true then
+		Logger.error(LOG, "Warmup settlement recovery could not stage or observe its retry.")
+	end
+end
+
+--- Retains a post-commit warmup intention on its exact cleanup debt.
+--- @param snapshot table Pause intention being restored.
+--- @param pause_epoch integer ScriptControl RESUMED generation.
+--- @return boolean observed
+local function retain_warmup_settlement_recovery(snapshot, pause_epoch)
+	local recovery = {
+		snapshot = snapshot,
+		pause_epoch = pause_epoch,
+		generation = _warmup_gen,
+		observed = {},
+		http_observed = false,
+		http_settled = false,
+		discovery_observed = false,
+		discovery_settled = false,
+		joining = false,
+	}
+	_warmup_settlement_recovery = recovery
+	if observe_warmup_settlements(recovery) == true then return true end
+	Logger.error(LOG, "Warmup activation debt has no exact settlement trigger.")
+	return false
+end
+
+--- Restores one retained intention after the global RESUMED fence is proven.
+--- The snapshot is consumed only after discovery admission and any native
+--- continuation have committed.
+--- @param snapshot table|nil Retained pause intention.
+--- @param pause_epoch integer|nil ScriptControl generation authorizing recovery.
+--- @return boolean committed
+--- @return boolean retryable True only when a refused dispatch left no cleanup debt.
+local function activate_warmup_snapshot(snapshot, pause_epoch)
+	if _warmup_settlement_recovery
+		and _warmup_settlement_recovery.snapshot == snapshot then
+		_warmup_settlement_recovery = nil
+	end
+	local discovery_ok, discovery_result = xpcall(function()
+		if type(ApiMlxDiscovery.resume) ~= "function" then return false end
+		return ApiMlxDiscovery.resume()
+	end, debug.traceback)
+	if not discovery_ok or discovery_result ~= true then
+		Logger.error(LOG, "Warmup activation retained discovery cleanup debt: %s.",
+			tostring(discovery_result))
+		return false, false
+	end
+
 	_warmup_stopped = false
+	if snapshot and snapshot.was_active == true
+		and M.warmup(snapshot.model, snapshot.profile) ~= true then
+		local cleanup_settled = quiesce_warmup() == true
+		if _load_failed == true then
+			if _warmup_pause_snapshot == snapshot then _warmup_pause_snapshot = nil end
+		elseif cleanup_settled ~= true and type(pause_epoch) == "number"
+			and _warmup_pause_snapshot == snapshot and snapshot.was_stopped ~= true then
+			retain_warmup_settlement_recovery(snapshot, pause_epoch)
+		end
+		return false, cleanup_settled
+	end
+	if _warmup_pause_snapshot == snapshot then _warmup_pause_snapshot = nil end
 	Logger.debug(LOG, "resume_warmup() — self-retry chain re-enabled.")
+	return true, true
+end
+
+--- Stages one exact activation behind the global lifecycle publication.
+--- @param snapshot table Retained pause intention.
+--- @param pause_epoch integer ScriptControl generation captured by resume_all().
+--- @param delay_sec number|nil Zero for the transaction stage, warmup backoff for retry.
+--- @param acquire_retries integer|nil Bounded clean acquisition retries after commit.
+--- @return boolean committed True only when the exact timer was armed.
+stage_warmup_resume = function(snapshot, pause_epoch, delay_sec, acquire_retries)
+	if type(_warmup_resume_timer) == "table"
+		and _warmup_resume_timer.committed == true then
+		return true
+	end
+
+	local resume_generation = _warmup_gen
+	local resume_handle
+	local resume_committed
+	local schedule_ok, schedule_error = xpcall(function()
+		resume_handle, resume_committed = TimerScheduler.after(delay_sec or 0, function()
+			if _warmup_resume_timer ~= resume_handle then return end
+			if type(resume_handle) ~= "table" or resume_handle.timer ~= nil then
+				Logger.error(LOG, "Staged warmup resume fired with exact timer cleanup debt retained.")
+				return
+			end
+			_warmup_resume_timer = nil
+			if resume_committed ~= true or resume_generation ~= _warmup_gen
+				or _warmup_pause_snapshot ~= snapshot then return end
+
+			local available, paused, current_epoch, fence_error = read_script_pause_fence()
+			if available ~= true or fence_error ~= nil or paused ~= false
+				or current_epoch ~= pause_epoch then
+				Logger.debug(LOG,
+					"Staged warmup resume discarded — global RESUMED fence did not match: %s.",
+					tostring(fence_error or paused))
+				return
+			end
+			local activated, retryable = activate_warmup_snapshot(snapshot, pause_epoch)
+			if activated ~= true then
+				Logger.error(LOG, "Staged MLX warmup activation did not commit; intention retained.")
+				-- A refused timeout/HTTP acquisition after the global commit must not
+				-- strand the backend behind _warmup_stopped. Re-offer the same snapshot
+				-- through one delayed exact owner, but never arm it over cleanup debt.
+				if retryable == true and _load_failed ~= true
+					and _warmup_pause_snapshot == snapshot then
+					local staged = stage_warmup_resume(snapshot, pause_epoch,
+						WARMUP_RETRY_DELAY_SEC, WARMUP_STAGE_ACQUIRE_RETRIES) == true
+					if not staged then
+						Logger.error(LOG, "Warmup activation retry staging did not commit.")
+						-- A partially-acquired stage is now cleanup debt; attach
+						-- the retained snapshot to that exact timer and wait.
+						if type(_warmup_resume_timer) == "table"
+							and _warmup_resume_timer.timer ~= nil then
+							retain_warmup_settlement_recovery(snapshot, pause_epoch)
+						end
+					end
+				end
+			end
+		end)
+	end, debug.traceback)
+	if type(resume_handle) == "table" and resume_handle.timer ~= nil then
+		_warmup_resume_timer = resume_handle
+	end
+	if not schedule_ok or resume_committed ~= true then
+		Logger.error(LOG, "Warmup resume staging did not commit: %s.",
+			tostring(schedule_ok and resume_committed or schedule_error))
+		local clean_refusal = type(resume_handle) ~= "table"
+			or resume_handle.timer == nil
+		local retries_left = tonumber(acquire_retries) or 0
+		if clean_refusal and retries_left > 0
+			and resume_generation == _warmup_gen
+			and _warmup_pause_snapshot == snapshot then
+			Logger.debug(LOG,
+				"Retrying one clean warmup stage acquisition after global resume.")
+			return stage_warmup_resume(snapshot, pause_epoch, delay_sec,
+				retries_left - 1)
+		end
+		return false
+	end
+	_warmup_resume_timer = resume_handle
+	return true
+end
+
+--- Restores only the warmup intention captured by pause_warmup().
+--- While ScriptControl still publishes PAUSED, native activation is staged behind
+--- an exact next-tick owner and an epoch-matched global RESUMED fence.
+--- @return boolean committed True only when cleanup and any required staging settle.
+function M.resume_warmup()
+	local snapshot = _warmup_pause_snapshot
+	if type(_warmup_resume_timer) == "table"
+		and _warmup_resume_timer.committed == true then
+		return true
+	end
+	if snapshot == nil and _warmup_stopped ~= true then return true end
+
+	local available, paused, pause_epoch, fence_error = read_script_pause_fence()
+	if available and fence_error ~= nil then
+		Logger.error(LOG, "resume_warmup() refused: %s.", tostring(fence_error))
+		return false
+	end
+	local stage_for_global_resume = available == true and paused == true
+	local local_settled = settle_local_warmup_owners() == true
+	local must_remain_quiesced = (snapshot and snapshot.was_stopped == true)
+		or stage_for_global_resume
+	local discovery_ok, discovery_result = true, true
+	if must_remain_quiesced then
+		discovery_ok, discovery_result = xpcall(function()
+			if type(ApiMlxDiscovery.stop) ~= "function" then return false end
+			return ApiMlxDiscovery.stop()
+		end, debug.traceback)
+	end
+	local discovery_settled = discovery_ok == true and discovery_result == true
+	if not local_settled or not discovery_settled then
+		Logger.error(LOG, "resume_warmup() refused while exact cleanup remains pending: %s.",
+			tostring(discovery_result))
+		return false
+	end
+
+	if snapshot and snapshot.was_stopped == true then
+		_warmup_stopped = true
+		_warmup_pause_snapshot = nil
+		Logger.debug(LOG, "resume_warmup() preserved the pre-pause stopped state.")
+		return true
+	end
+	if stage_for_global_resume then
+		if type(snapshot) ~= "table" then
+			Logger.error(LOG, "resume_warmup() refused to stage without a pause snapshot.")
+			return false
+		end
+		return stage_warmup_resume(snapshot, pause_epoch)
+	end
+	return activate_warmup_snapshot(snapshot, pause_epoch)
 end
 
 --- @return integer The MLX server port (override > shared JSON > dedicated default 3460).
@@ -498,6 +949,15 @@ function M.set_port(port)
 		Logger.debug(LOG, "set_port: already on %d — no change.", port)
 		return true
 	end
+	-- Join every continuation tied to the old address before publishing or
+	-- persisting the successor. A false/nil/throwing reset leaves the old port
+	-- authoritative and retryable.
+	local reset_ok, reset_result = xpcall(M.reset_endpoints, debug.traceback)
+	if not reset_ok or reset_result ~= true then
+		Logger.error(LOG, "set_port: predecessor endpoint reset refused: %s.",
+			tostring(reset_result))
+		return false
+	end
 	-- Persist so the new port survives a Hammerspoon reload. read_user_port_override()
 	-- picks it up at the next module load; this in-memory update covers the live session.
 	if type(hs) == "table" and type(hs.settings) == "table" then
@@ -509,7 +969,6 @@ function M.set_port(port)
 	-- rebuilt for the new port; the next warmup re-probes there.
 	ApiMlxDiscovery.set_base_url(MLX_BASE_URL)
 	Logger.info(LOG, "MLX server port set to %d (base URL %s).", MLX_PORT, MLX_BASE_URL)
-	M.reset_endpoints()
 	return true
 end
 
@@ -526,36 +985,76 @@ end
 --- Resets the endpoint discovery state so the next warmup re-probes the live
 --- server. Called after an mlx-lm upgrade, because a new wheel may expose
 --- different route paths than the previously cached ones.
+--- @return boolean settled True only after every predecessor and new PGID guard settle.
 function M.reset_endpoints()
-	-- Discovery flags, pending callbacks, and the model identifiers live in the
-	-- discovery subsystem; clear them there. Readiness + zombie-kill state below
-	-- belong to this controller.
-	ApiMlxDiscovery.reset()
+	_warmup_settlement_recovery = nil
 	_is_ready                    = false
 	-- Invalidate any in-flight warmup POST: its 200 response is for the OLD server/
 	-- model and must NOT flip _is_ready=true after this reset switched servers (F-L4).
-	-- Also clear the in-flight flag so a fresh warmup for the new model is not blocked.
+	-- Logical revocation precedes every fallible native join, so a refused cleanup
+	-- can retain its exact handle without letting a late callback publish readiness.
 	_warmup_gen                  = _warmup_gen + 1
 	_warmup_in_flight            = false
-	cancel_warmup_timer("timeout")
-	cancel_warmup_timer("retry")
+	_warmup_active               = false
+	-- A staged resume belongs to the old server/model identity. Consume its logical
+	-- snapshot before fallible cancellation so neither a late timer nor a later
+	-- pause can replay the old model/profile. When the global resume already
+	-- committed, also reopen ordinary warmup admission for the new identity.
+	local discarded_snapshot = _warmup_pause_snapshot
+	_warmup_pause_snapshot = nil
+	local global_available, global_paused, _, global_fence_error = read_script_pause_fence()
+	if discarded_snapshot and discarded_snapshot.was_stopped ~= true then
+		if global_available == true and global_fence_error == nil and global_paused == false then
+			_warmup_stopped = false
+		end
+	end
 	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
 	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
 	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
 	_pgid_pending_generation = _pgid_pending_generation + 1
 	local pgid_generation = _pgid_pending_generation
-	local pgid_timeout_ready = cancel_pgid_pending_timeout()
-	if pgid_timeout_ready then
+
+	local discovery_ok, discovery_result = xpcall(function()
+		if type(ApiMlxDiscovery.reset) ~= "function" then return false end
+		return ApiMlxDiscovery.reset()
+	end, debug.traceback)
+	local discovery_settled = discovery_ok == true and discovery_result == true
+	local warmup_settled = settle_local_warmup_owners() == true
+	local pgid_timeout_settled = cancel_pgid_pending_timeout() == true
+	if not discovery_settled or not warmup_settled or not pgid_timeout_settled then
+		Logger.error(LOG,
+			"Endpoint reset retained predecessor debt (discovery=%s, warmup=%s, pgid=%s).",
+			tostring(discovery_result), tostring(warmup_settled), tostring(pgid_timeout_settled))
+		return false
+	end
+	if global_available == true and global_fence_error == nil
+		and global_paused == false and _warmup_stopped ~= true then
+		local resume_ok, resume_result = xpcall(function()
+			if type(ApiMlxDiscovery.resume) ~= "function" then return false end
+			return ApiMlxDiscovery.resume()
+		end, debug.traceback)
+		if not resume_ok or resume_result ~= true then
+			Logger.error(LOG, "Endpoint reset could not reopen discovery admission: %s.",
+				tostring(resume_result))
+			return false
+		end
+	end
+
+	local pgid_timeout_ready = false
+		do
 		-- Forward-declare the handle because the callback must compare against the
 		-- exact candidate that owns this reset generation.
 		local pgid_handle
 		local pgid_committed
 		local schedule_ok, schedule_err = xpcall(function()
 			pgid_handle, pgid_committed = TimerScheduler.after(PGID_PENDING_TIMEOUT_SEC, function()
-				if pgid_committed ~= true or pgid_generation ~= _pgid_pending_generation then return end
-				if _pgid_pending_timeout == pgid_handle and pgid_handle.timer == nil then
-					_pgid_pending_timeout = nil
+				if _pgid_pending_timeout ~= pgid_handle then return end
+				if pgid_handle.timer ~= nil then
+					Logger.error(LOG, "PGID guard fired with exact timer cleanup debt retained.")
+					return
 				end
+				_pgid_pending_timeout = nil
+				if pgid_committed ~= true or pgid_generation ~= _pgid_pending_generation then return end
 				if _server_pgid_pending then
 					Logger.warn(LOG, "PGID pending timeout (%.0fs) — unblocking zombie kills.",
 						PGID_PENDING_TIMEOUT_SEC)
@@ -572,10 +1071,10 @@ function M.reset_endpoints()
 				tostring(schedule_ok and pgid_handle or schedule_err))
 		else
 			_pgid_pending_timeout = pgid_handle
+			pgid_timeout_ready = true
 		end
-	else
-		Logger.error(LOG, "PGID pending timeout replacement refused — predecessor cleanup remains pending.")
 	end
+	if not pgid_timeout_ready then return false end
 	-- A fresh launch deserves a fresh verdict: clear any previous load-failure so a
 	-- newly selected (or relaunched) model is given the full warmup budget again.
 	_load_failed                 = false
@@ -583,7 +1082,7 @@ function M.reset_endpoints()
 	_discovery_started_at        = nil
 	_warmup_fail_notified        = false
 	Logger.warn(LOG, "Endpoint discovery state reset.")
-	return pgid_timeout_ready
+	return true
 end
 
 --- Supersedes the in-flight streaming task.
@@ -636,34 +1135,69 @@ end
 --- first real request onward.
 --- @param model_name string The MLX model identifier (logged only).
 --- @param profile table|nil The active profile object; falls back to a minimal ping.
+--- @return boolean accepted True when warmup is complete or owns a continuation.
 function M.warmup(model_name, profile)
-	Logger.debug(LOG, "warmup() called — model='%s' _is_ready=%s _warmup_in_flight=%s _endpoints_discovered=%s.",
-		tostring(model_name), tostring(_is_ready), tostring(_warmup_in_flight), tostring(ApiMlxDiscovery.is_discovered()))
+	local reoffered_snapshot = _warmup_pause_snapshot
+	local function consume_reoffered_snapshot()
+		if reoffered_snapshot and _warmup_pause_snapshot == reoffered_snapshot then
+			_warmup_pause_snapshot = nil
+		end
+	end
 	-- Skip if the backend already answered a previous warmup successfully — the
 	-- model is loaded, no need to re-prime
 	if _is_ready then
+		_warmup_active = false
+		consume_reoffered_snapshot()
 		Logger.debug(LOG, "MLX warmup skipped — backend already ready.")
-		return
+		return true
 	end
 	-- Stop dead once the model has been given up on — retrying a known-unloadable
 	-- model would spin forever and the user has already been shown the error.
 	if _load_failed then
+		_warmup_active = false
+		consume_reoffered_snapshot()
 		Logger.debug(LOG, "MLX warmup skipped — model '%s' already marked as failed to load.", tostring(model_name))
-		return
+		return false
 	end
 	-- Bail when the driver is paused or LLM has been disabled: stop_warmup() sets this
 	-- flag so that any 2s retry still in the TimerScheduler queue self-discards here
 	-- rather than firing a POST mid-pause or after set_llm_enabled(false) (M-3).
 	if _warmup_stopped then
 		Logger.debug(LOG, "MLX warmup skipped — warmup stopped (paused or LLM disabled).")
-		return
+		return false
 	end
+	-- A post-commit activation can retain a hard-timeout/HTTP/discovery capability
+	-- whose rollback refused. The MLX settlement token owns the later re-offer;
+	-- this preflight still forbids a successor until the whole graph settles.
+	if reoffered_snapshot and reoffered_snapshot.was_active == true then
+		local local_settled = settle_local_warmup_owners() == true
+		local discovery_ok, discovery_result = xpcall(function()
+			if type(ApiMlxDiscovery.resume) ~= "function" then return false end
+			return ApiMlxDiscovery.resume()
+		end, debug.traceback)
+		if not local_settled or not discovery_ok or discovery_result ~= true then
+			_warmup_active = false
+			Logger.error(LOG,
+				"Warmup re-offer refused while exact activation debt remains (local=%s, discovery=%s).",
+				tostring(local_settled), tostring(discovery_result))
+			return false
+		end
+		model_name = reoffered_snapshot.model
+		profile = reoffered_snapshot.profile
+	end
+	_warmup_last_model = model_name
+	_warmup_last_profile = profile
+	Logger.debug(LOG, "warmup() called — model='%s' _is_ready=%s _warmup_in_flight=%s _endpoints_discovered=%s.",
+		tostring(model_name), tostring(_is_ready), tostring(_warmup_in_flight), tostring(ApiMlxDiscovery.is_discovered()))
 	-- Skip if a warmup is already in flight; otherwise the user's log shows 4
 	-- simultaneous POST requests piling up against the single-threaded server
 	if _warmup_in_flight then
+		_warmup_active = true
+		consume_reoffered_snapshot()
 		Logger.debug(LOG, "MLX warmup skipped — request already in flight.")
-		return
+		return true
 	end
+	_warmup_active = true
 
 	-- Make sure we know which routes the live mlx-lm install exposes BEFORE we
 	-- send the warmup itself. Without this, a route rename in a freshly
@@ -682,14 +1216,23 @@ function M.warmup(model_name, profile)
 			Logger.error(LOG, "MLX discovery for '%s' gave up after %.0fs — surfacing as load failure.",
 				tostring(model_name), discovery_elapsed)
 			M.mark_load_failed(model_name, true)
-			return
+			return false
 		end
 		Logger.debug(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
 		-- Record the model we are waiting for so the discovery poll can reject a
 		-- /v1/models 200 from the old server (still alive for ~2 s during model switch).
 		ApiMlxDiscovery.set_expected_model_id(model_name)
-		ApiMlxDiscovery.discover(function() M.warmup(model_name, profile) end)
-		return
+		local discovery_ok, discovery_result = xpcall(function()
+			return ApiMlxDiscovery.discover(function() M.warmup(model_name, profile) end)
+		end, debug.traceback)
+		if not discovery_ok or discovery_result ~= true then
+			_warmup_active = false
+			Logger.error(LOG, "Warmup discovery dispatch did not commit: %s.",
+				tostring(discovery_result))
+			return false
+		end
+		consume_reoffered_snapshot()
+		return true
 	end
 
 	-- Track CONTINUOUS warmup duration across every retry/discovery re-entry, and give
@@ -702,7 +1245,7 @@ function M.warmup(model_name, profile)
 		Logger.error(LOG, "MLX warmup for '%s' gave up after %.0fs of failure — surfacing as load failure.",
 			tostring(model_name), warmup_elapsed)
 		M.mark_load_failed(model_name, true)
-		return
+		return false
 	end
 
 	Logger.info(LOG, "warmup() — sending warmup POST to '%s' for model '%s'…",
@@ -777,7 +1320,8 @@ function M.warmup(model_name, profile)
 		})
 		if not enc then
 			Logger.error(LOG, "warmup: fallback encode failed — %s", tostring(enc_err))
-			return
+			_warmup_active = false
+			return false
 		end
 		payload = enc
 	end
@@ -792,15 +1336,19 @@ function M.warmup(model_name, profile)
 	-- forever, silently blocking every subsequent warmup call.
 	if cancel_warmup_timer("timeout") ~= true then
 		Logger.error(LOG, "Warmup POST refused — predecessor hard-timeout cleanup remains pending.")
-		return
+		_warmup_active = false
+		return false
 	end
 	local _wt_handle
 	local timeout_committed
 	local schedule_ok, schedule_err = xpcall(function()
 		_wt_handle, timeout_committed = TimerScheduler.after(WARMUP_POST_TIMEOUT_SEC, function()
-			if _warmup_timeout == _wt_handle and _wt_handle.timer == nil then
-				_warmup_timeout = nil
+			if _warmup_timeout ~= _wt_handle then return end
+			if _wt_handle.timer ~= nil then
+				Logger.error(LOG, "Warmup hard timeout fired with exact timer cleanup debt retained.")
+				return
 			end
+			_warmup_timeout = nil
 			if timeout_committed ~= true or my_warmup_gen ~= _warmup_gen then return end
 			if not _warmup_in_flight then return end
 			_warmup_in_flight = false
@@ -812,7 +1360,9 @@ function M.warmup(model_name, profile)
 			_warmup_gen = _warmup_gen + 1
 			Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in %.0fs (gen %d).",
 				WARMUP_POST_TIMEOUT_SEC, WARMUP_RETRY_DELAY_SEC, _warmup_gen)
-			schedule_warmup_retry(model_name, profile)
+			if schedule_warmup_retry(model_name, profile) ~= true then
+				_warmup_active = false
+			end
 		end)
 	end, debug.traceback)
 	if type(_wt_handle) == "table" and _wt_handle.timer ~= nil then
@@ -821,12 +1371,19 @@ function M.warmup(model_name, profile)
 	if not schedule_ok or timeout_committed ~= true then
 		Logger.error(LOG, "Warmup hard-timeout timer did not commit; POST dispatch refused: %s.",
 			tostring(schedule_ok and _wt_handle or schedule_err))
-		return
+		_warmup_active = false
+		return false
 	end
 	_warmup_timeout = _wt_handle
 	_warmup_in_flight = true
-	_warmup_client.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
-		function(r)
+	local post_dispatch_state = "pending"
+	local pending_response = nil
+	local function handle_warmup_response(r)
+		if post_dispatch_state == "pending" then
+			pending_response = r
+			return
+		end
+		if post_dispatch_state ~= "committed" then return end
 			local status, body = r.status, r.body
 			-- Cancel THIS request's timeout, not whichever one happens to be
 			-- stored. After a timeout-triggered retry the slot holds the NEW
@@ -855,6 +1412,7 @@ function M.warmup(model_name, profile)
 			if status == 200 and has_tokens then
 				local became_ready = (_is_ready ~= true)
 				_is_ready = true
+				_warmup_active = false
 				-- A successful warmup clears the failure-tracking state so a later
 				-- transient hiccup starts its give-up budget fresh rather than from
 				-- this model's original launch time.
@@ -883,10 +1441,32 @@ function M.warmup(model_name, profile)
 				-- Retry automatically so the user does not have to manually trigger
 				-- set_llm_enabled / set_llm_model after a slow model load or a
 				-- generation-thread crash during the server hot-swap window.
-				schedule_warmup_retry(model_name, profile)
+				if schedule_warmup_retry(model_name, profile) ~= true then
+					_warmup_active = false
+				end
 			end
-		end
-	)
+	end
+	local post_ok, post_result = xpcall(function()
+		return _warmup_client.post(endpoint, { ["Content-Type"] = "application/json" }, payload,
+			handle_warmup_response)
+	end, debug.traceback)
+	if not post_ok or post_result ~= true then
+		post_dispatch_state = "refused"
+		pending_response = nil
+		_warmup_in_flight = false
+		_warmup_active = false
+		cancel_warmup_timer("timeout")
+		Logger.error(LOG, "Warmup POST dispatch did not commit: %s.", tostring(post_result))
+		return false
+	end
+	post_dispatch_state = "committed"
+	if pending_response ~= nil then
+		local response = pending_response
+		pending_response = nil
+		handle_warmup_response(response)
+	end
+	consume_reoffered_snapshot()
+	return true
 end
 
 

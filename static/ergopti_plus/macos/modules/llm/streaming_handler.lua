@@ -29,6 +29,7 @@ local Parser  = require("modules.llm.parser")
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local i18n    = require("infra.i18n")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.streaming_handler"
 
@@ -130,44 +131,40 @@ local function format_validation_shortcut(mods)
 	return table.concat(mods, "+")
 end
 
---- Reads a timer's running state from either the native Hammerspoon method or
---- the behavioral-test boolean field.
---- @param timer any Timer candidate.
---- @return boolean readable True when the state probe was available.
---- @return boolean|string running_or_error Running state, or a diagnostic.
-local function timer_running(timer)
-	local probe = timer and timer.running
-	if type(probe) == "function" then
-		local ok, running = pcall(probe, timer)
-		if not ok then return false, tostring(running) end
-		return true, running == true
-	end
-	if type(probe) == "boolean" then return true, probe end
-	return false, "running-state probe unavailable"
-end
-
 --- Stops and releases the current watchdog only after native state confirms it.
 --- @param reason string Diagnostic reason for the stop.
 --- @return boolean stopped True when no live watchdog remains owned here.
 local function stop_watchdog_timer(reason)
-	local timer = _stream_watchdog_timer
-	if not timer then return true end
-	if type(timer.stop) ~= "function" then
-		Logger.error(LOG, "Cannot stop LLM watchdog for %s: timer has no stop method.", tostring(reason))
+	local owner = _stream_watchdog_timer
+	if not owner then return true end
+	owner.authorized = false
+	owner.committed = false
+	if owner.callback_running == true then return false end
+	if owner.handle == nil then
+		if owner.installing == true then return false end
+		if _stream_watchdog_timer == owner then _stream_watchdog_timer = nil end
+		return true
+	end
+	if owner.native_settled == true then
+		if _stream_watchdog_timer == owner then _stream_watchdog_timer = nil end
+		return true
+	end
+	local cancel_ok, settled_or_error = xpcall(function()
+		return TimerScheduler.cancel(owner.handle)
+	end, debug.traceback)
+	if cancel_ok ~= true or settled_or_error ~= true then
+		Logger.error(LOG,
+			"Cannot settle LLM watchdog for %s; exact timer retained: %s.",
+			tostring(reason), tostring(settled_or_error))
 		return false
 	end
-	local stop_ok, stop_err = pcall(timer.stop, timer)
-	if not stop_ok then
-		Logger.error(LOG, "Cannot stop LLM watchdog for %s: %s", tostring(reason), tostring(stop_err))
+	owner.native_settled = true
+	if _stream_watchdog_timer ~= nil and _stream_watchdog_timer ~= owner then
+		Logger.error(LOG,
+			"LLM watchdog cleanup was superseded during native settlement; successor preserved.")
 		return false
 	end
-	local status_ok, running = timer_running(timer)
-	if not status_ok or running then
-		Logger.error(LOG, "Cannot verify stopped LLM watchdog for %s: %s",
-			tostring(reason), tostring(status_ok and "timer remained running" or running))
-		return false
-	end
-	_stream_watchdog_timer = nil
+	if _stream_watchdog_timer == owner then _stream_watchdog_timer = nil end
 	return true
 end
 
@@ -350,7 +347,8 @@ function M.build_callbacks(ctx)
 			return _tooltip.show_predictions(
 				new_preds, display_idx, ctx.is_ai_preview_enabled, streaming_info_bar,
 				nil, prediction_indent, navigation_mods,
-				_tooltip.tint("ai_prediction"), "…", num_predictions, my_fetch_id
+				_tooltip.tint("ai_prediction"), "…", num_predictions, my_fetch_id,
+				request_is_current
 			)
 		end) then return end
 
@@ -371,18 +369,23 @@ function M.build_callbacks(ctx)
 				my_fetch_id, tostring(current_id))
 			return
 		end
-		-- Reset the consecutive-failure counter only for non-stale responses; a
-		-- stale success must not mask real failures counted since the new request
-		-- was dispatched (D4 audit fix — reset moved after the stale guard).
-		_consecutive_llm_failures = 0
-
 		if is_final and not stop_watchdog_timer("final response") then
 			reject_ui_commit("watchdog cancellation", "timer did not stop")
 			return
 		end
+		-- Native stop proof can execute arbitrary timer methods. A reset or
+		-- superseding request entered from that boundary revokes this callback even
+		-- when no replacement watchdog is installed, so revalidate before logging,
+		-- filtering, or painting anything for the old request.
+		if is_final and not request_is_current() then return end
+
+		-- Reset the consecutive-failure counter only for a still-current response;
+		-- a stale success must not mask failures counted by its successor.
+		_consecutive_llm_failures = 0
 
 		local front    = hs.application.frontmostApplication()
 		local app_name = front and front:title() or nil
+		if not request_is_current() then return end
 		_keylogger.log_llm(buffer, raw_predictions, app_name)
 
 		-- ── Filter: remove noise, invalid entries, and exact duplicates ──────
@@ -438,7 +441,8 @@ function M.build_callbacks(ctx)
 			if is_final then
 				Logger.warn(LOG, "No valid predictions after filtering (final batch).")
 				if not visible_ref.value then
-					local hide_ok, hide_result = pcall(_tooltip.hide)
+					local hide_ok, hide_result = pcall(
+						_tooltip.hide, my_fetch_id, request_is_current)
 					if not hide_ok or hide_result ~= true then
 						reject_ui_commit("empty-result hide", hide_result)
 					end
@@ -475,7 +479,7 @@ function M.build_callbacks(ctx)
 			return _tooltip.show_predictions(
 				valid_preds, selected_idx, ctx.is_ai_preview_enabled, info_bar_text,
 				val_shortcut, prediction_indent, navigation_mods, _tooltip.tint("ai_prediction"),
-				loading_text, slot_count, my_fetch_id
+				loading_text, slot_count, my_fetch_id, request_is_current
 			)
 		end) then return end
 
@@ -507,6 +511,10 @@ function M.build_callbacks(ctx)
 			reject_ui_commit("watchdog cancellation", "timer did not stop")
 			return
 		end
+		-- The native cancellation boundary may have superseded this request while
+		-- proving the watchdog stopped. Do not let its stale failure update counters
+		-- or mutate the successor's surface.
+		if not request_is_current() then return end
 
 		-- Track consecutive failures to detect persistent issues (e.g. server
 		-- crashed, still loading weights, or misconfigured endpoint)
@@ -514,6 +522,7 @@ function M.build_callbacks(ctx)
 		if _consecutive_llm_failures >= CONSECUTIVE_FAIL_WARN_THRESHOLD then
 			_consecutive_llm_failures = 0  -- Reset so the notification is not spammed
 			local current_backend = _core_llm.get_backend()
+			if not request_is_current() then return end
 			-- Warn for every backend — not just MLX — so silent failure modes are surfaced
 			Logger.warn(LOG, "Repeated LLM failures (%d consecutive) on backend '%s' — server may be down or misconfigured.",
 				CONSECUTIVE_FAIL_WARN_THRESHOLD, tostring(current_backend))
@@ -528,10 +537,14 @@ function M.build_callbacks(ctx)
 				end)
 			end
 		end
+		-- Notification construction/send is another native boundary. If it changed
+		-- request ownership, the old failure must not hide or repaint the successor.
+		if not request_is_current() then return end
 
 		if not visible_ref.value then
 			Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
-			local hide_ok, hide_result = pcall(_tooltip.hide)
+			local hide_ok, hide_result = pcall(
+				_tooltip.hide, my_fetch_id, request_is_current)
 			if not hide_ok or hide_result ~= true then
 				reject_ui_commit("failure hide", hide_result)
 			end
@@ -543,7 +556,8 @@ function M.build_callbacks(ctx)
 				return _tooltip.show_predictions(
 					pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
 					val_shortcut, prediction_indent, navigation_mods,
-					_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id
+					_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id,
+					request_is_current
 				)
 			end) then return end
 			commit_final_ui()
@@ -602,10 +616,34 @@ function M.arm_watchdog(ctx)
 		end
 	end
 
-	-- Declare before the closure so it captures the local timer rather than a nil
-	-- global if the callback later needs to release its own one-shot handle.
-	local watchdog_timer
-	local create_ok, created_or_err = pcall(hs.timer.doAfter, STREAM_WATCHDOG_SEC, function()
+	local owner = {
+		handle = nil,
+		authorized = true,
+		committed = false,
+		installing = true,
+		native_settled = false,
+		callback_pending = false,
+		callback_running = false,
+		callback_consumed = false,
+	}
+	-- Publish the logical owner before the adapter crosses native start(). A
+	-- re-entrant reset can now fence this acquisition even before its exact handle
+	-- is returned; the post-start path then compensates that same handle.
+	_stream_watchdog_timer = owner
+
+	--- Paints the watchdog frame only after both scheduler commit and exact native
+	--- settlement. A one-shot whose self-stop refused remains cleanup debt and must
+	--- not expose UI while its native capability can still redeliver.
+	--- @return boolean delivered True only for the first authorized delivery.
+	local function deliver_watchdog()
+		if owner.callback_pending ~= true or owner.callback_consumed == true
+			or owner.native_settled ~= true then
+			return false
+		end
+		if owner.committed ~= true or owner.authorized ~= true then return false end
+		owner.callback_consumed = true
+		owner.callback_pending = false
+		owner.callback_running = true
 		local callback_ok, callback_err = xpcall(function()
 			if not request_is_current() then return end
 			if not visible_ref.value or #pending_ref.value == 0 then
@@ -622,30 +660,84 @@ function M.arm_watchdog(ctx)
 			local render_result = _tooltip.show_predictions(
 				pending_ref.value, 1, ctx.is_ai_preview_enabled, info,
 				val_shortcut, ctx.prediction_indent, ctx.navigation_mods,
-				_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id
+				_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id,
+				request_is_current
 			)
 			if render_result ~= true then reject_watchdog_ui(render_result) end
 		end, debug.traceback)
 		if not callback_ok then reject_watchdog_ui(callback_err) end
-		if _stream_watchdog_timer == watchdog_timer then _stream_watchdog_timer = nil end
-	end)
-	if not create_ok then
-		Logger.error(LOG, "Cannot create LLM stream watchdog: %s", tostring(created_or_err))
+		owner.callback_running = false
+		if _stream_watchdog_timer == owner then _stream_watchdog_timer = nil end
+		return true
+	end
+
+	local function watchdog_callback()
+		if owner.callback_consumed == true or owner.callback_pending == true then
+			return false
+		end
+		owner.callback_pending = true
+		if owner.installing == true then return true end
+		deliver_watchdog()
+		return true
+	end
+
+	local schedule_ok, handle_or_error, committed = xpcall(function()
+		return TimerScheduler.after(STREAM_WATCHDOG_SEC, watchdog_callback)
+	end, debug.traceback)
+	owner.installing = false
+	if schedule_ok == true and type(handle_or_error) == "table" then
+		owner.handle = handle_or_error
+		local observed_ok, observed = xpcall(function()
+			return TimerScheduler.onSettled(handle_or_error, function()
+				owner.native_settled = true
+				deliver_watchdog()
+				if owner.callback_consumed == true and owner.callback_running ~= true
+					and _stream_watchdog_timer == owner then
+					_stream_watchdog_timer = nil
+				end
+			end)
+		end, debug.traceback)
+		if observed_ok ~= true or observed ~= true then
+			owner.authorized = false
+			owner.committed = false
+			local cancel_ok, settled = xpcall(function()
+				return TimerScheduler.cancel(handle_or_error)
+			end, debug.traceback)
+			if cancel_ok == true and settled == true
+				and _stream_watchdog_timer == owner then
+				_stream_watchdog_timer = nil
+			end
+			Logger.error(LOG,
+				"Cannot observe LLM stream watchdog settlement: %s.", tostring(observed))
+			return false
+		end
+	end
+
+	if schedule_ok ~= true or type(handle_or_error) ~= "table" or committed ~= true then
+		owner.authorized = false
+		owner.committed = false
+		if owner.handle ~= nil then
+			xpcall(function() return TimerScheduler.cancel(owner.handle) end,
+				debug.traceback)
+		elseif _stream_watchdog_timer == owner then
+			_stream_watchdog_timer = nil
+		end
+		Logger.error(LOG, "Cannot arm LLM stream watchdog: %s.",
+			tostring(schedule_ok and committed or handle_or_error))
 		return false
 	end
-	watchdog_timer = created_or_err
-	if not watchdog_timer or type(watchdog_timer.stop) ~= "function" then
-		Logger.error(LOG, "Cannot create LLM stream watchdog: invalid timer object.")
+	if owner.authorized ~= true then
+		local cancel_ok, settled = xpcall(function()
+			return TimerScheduler.cancel(owner.handle)
+		end, debug.traceback)
+		if cancel_ok == true and settled == true
+			and _stream_watchdog_timer == owner then
+			_stream_watchdog_timer = nil
+		end
 		return false
 	end
-	local status_ok, running = timer_running(watchdog_timer)
-	if not status_ok or not running then
-		pcall(watchdog_timer.stop, watchdog_timer)
-		Logger.error(LOG, "Cannot verify started LLM stream watchdog: %s",
-			tostring(status_ok and "timer did not start" or running))
-		return false
-	end
-	_stream_watchdog_timer = watchdog_timer
+	owner.committed = true
+	deliver_watchdog()
 	return true
 end
 

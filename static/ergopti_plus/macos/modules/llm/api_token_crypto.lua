@@ -66,12 +66,15 @@ local function run_security(label, args, input, callback, mutates_keychain)
 	local cancellation_reason = nil
 	local task_started = false
 	local deadline_triggered = false
+	local pending_terminal = nil
+	local timeout_settlement_observer_handle = nil
+	local timeout_acquisition_in_progress = false
 	local operation = {}
+	local complete
 
 	local function cancel_timeout()
 		if timeout_handle == nil then return true end
 		local handle = timeout_handle
-		timeout_handle = nil
 		local ok, settled = xpcall(function()
 			return TimerScheduler.cancel(handle)
 		end, debug.traceback)
@@ -80,6 +83,7 @@ local function run_security(label, args, input, callback, mutates_keychain)
 				tostring(label), tostring(ok and settled or settled))
 			return false
 		end
+		if timeout_handle == handle then timeout_handle = nil end
 		return true
 	end
 
@@ -102,16 +106,76 @@ local function run_security(label, args, input, callback, mutates_keychain)
 		return false, "refused"
 	end
 
-	local function complete(process_completed, exit_code, stdout, stderr, reason)
-		if completed then return false end
+	--- Observes autonomous settlement after a timeout stop refusal. A repeating
+	--- native timer may later prove its own cleanup without another lifecycle
+	--- caller; the retained terminal must then be published exactly once.
+	--- @param handle table Exact TimerScheduler handle.
+	--- @return boolean registered
+	local function observe_timeout_settlement(handle)
+		if type(handle) ~= "table" or timeout_settlement_observer_handle == handle then
+			return true
+		end
+		if type(TimerScheduler.onSettled) ~= "function" then return false end
+		timeout_settlement_observer_handle = handle
+		local ok, registered_or_err = xpcall(function()
+			return TimerScheduler.onSettled(handle, function()
+				if timeout_settlement_observer_handle == handle then
+					timeout_settlement_observer_handle = nil
+				end
+				if timeout_handle == handle and handle.timer == nil then
+					timeout_handle = nil
+				end
+				if not completed and pending_terminal ~= nil then
+					complete(false, nil, nil, nil, "timeout_settled")
+				end
+			end)
+		end, debug.traceback)
+		if not ok or registered_or_err ~= true then
+			if timeout_settlement_observer_handle == handle then
+				timeout_settlement_observer_handle = nil
+			end
+			Logger.error(LOG, "%s timeout settlement observer failed: %s",
+				tostring(label), tostring(registered_or_err))
+			return false
+		end
+		return true
+	end
+
+	complete = function(process_completed, exit_code, stdout, stderr, reason)
+		if completed then return true end
+		if pending_terminal == nil then
+			pending_terminal = table.pack(
+				process_completed, exit_code, stdout, stderr, reason)
+		end
+		-- A hostile scheduler may deliver before after() publishes the exact handle.
+		-- Keep the terminal private until that acquisition frame can either join the
+		-- handle or prove that no native timer was created.
+		if timeout_acquisition_in_progress == true then return false end
+		-- The terminal callback is itself a capability boundary: publishing it while
+		-- the deadline timer is still live loses the only handle able to join a late
+		-- timeout. Retain both the result and handle until literal settlement.
+		if cancel_timeout() ~= true then
+			observe_timeout_settlement(timeout_handle)
+			return completed
+		end
+		-- TimerScheduler.cancel() settles observers synchronously. One of them
+		-- may have re-entered this function and consumed the retained terminal
+		-- while cancel_timeout() was still on the outer stack.
+		if completed then return true end
 		completed = true
-		cancel_timeout()
-		invoke_guarded(label, callback, process_completed, exit_code, stdout, stderr, reason)
+		local terminal = pending_terminal
+		pending_terminal = nil
+		invoke_guarded(label, callback,
+			table.unpack(terminal, 1, terminal.n))
 		return true
 	end
 
 	operation.cancel = function()
-		if completed then return true, "settled" end
+		if completed then
+			if cancel_timeout() == true then return true, "settled" end
+			observe_timeout_settlement(timeout_handle)
+			return false, "pending"
+		end
 		cancellation_reason = cancellation_reason or "cancelled"
 		if task_started and mutates_keychain == true then
 			-- SecItem write/delete is synchronous only from the helper's point of
@@ -124,7 +188,11 @@ local function run_security(label, args, input, callback, mutates_keychain)
 		-- An accepted SIGTERM is only a pending request. Keep the task and its
 		-- native completion observable so persistence cannot overlap a successor
 		-- with Security.framework side effects from this helper.
-		if settled then complete(false, nil, nil, nil, cancellation_reason) end
+		if settled then
+			local terminal_settled = complete(
+				false, nil, nil, nil, cancellation_reason)
+			if terminal_settled ~= true then return false, "pending" end
+		end
 		return settled, state
 	end
 
@@ -181,6 +249,7 @@ local function run_security(label, args, input, callback, mutates_keychain)
 		-- closeInput() is valid only for the streaming-callback task form.
 	end
 
+	timeout_acquisition_in_progress = true
 	local timer_ok, timer_or_err, timer_committed = xpcall(function()
 		local handle, committed = TimerScheduler.after(OPERATION_TIMEOUT_SEC, function()
 			if completed then return end
@@ -201,6 +270,7 @@ local function run_security(label, args, input, callback, mutates_keychain)
 		end)
 		return handle, committed
 	end, debug.traceback)
+	timeout_acquisition_in_progress = false
 	if timer_ok then timeout_handle = timer_or_err end
 	if not timer_ok or timer_committed ~= true then
 		Logger.error(LOG, "%s deadline could not be armed: %s",
@@ -210,11 +280,12 @@ local function run_security(label, args, input, callback, mutates_keychain)
 		complete(false, nil, nil, nil, "deadline_failed")
 		return operation
 	end
-	if deadline_triggered or completed then
+	if deadline_triggered or completed or pending_terminal ~= nil then
 		-- A hostile scheduler can deliver during acquisition and still return a
 		-- committed handle. The deadline callback already retired the task; the
-		-- newly returned timer handle still needs exact cancellation.
-		cancel_timeout()
+		-- newly returned timer handle must settle before the retained terminal is
+		-- published.
+		complete(false, nil, nil, nil, cancellation_reason or "timeout")
 		return operation
 	end
 

@@ -155,10 +155,40 @@ helpers.describe("F16 chain signal defers the LLM check off the event tap", func
 		{ name = "throw", build = function() error("CHAIN_DEFER_THROW") end },
 		{ name = "nil", build = function() return nil end },
 		{
-			name = "stopped handle",
+			name = "start false",
 			build = function(original, delay, callback)
 				local timer = original(delay, callback)
-				timer.running = false
+				timer.start = function(self)
+					self.running = false
+					return false
+				end
+				return timer
+			end,
+		},
+		{
+			name = "synchronous callback",
+			build = function(original, delay, callback, context)
+				local timer = original(delay, callback)
+				local start = timer.start
+				timer.start = function(self)
+					start(self)
+					callback()
+					context.callback = callback
+					return self
+				end
+				return timer
+			end,
+		},
+		{
+			name = "mutate then throw",
+			build = function(original, delay, callback, context)
+				local timer = original(delay, callback)
+				local start = timer.start
+				timer.start = function(self)
+					start(self)
+					context.callback = callback
+					error("CHAIN_DEFER_MUTATE_THROW")
+				end
 				return timer
 			end,
 		},
@@ -176,16 +206,25 @@ helpers.describe("F16 chain signal defers the LLM check off the event tap", func
 			local calls = 0
 			local real_perform = PE.perform_check
 			PE.perform_check = function() calls = calls + 1 end
-			local original = hs.timer.doAfter
-			hs.timer.doAfter = function(delay, callback)
-				return case.build(original, delay, callback)
+			local context = {}
+			local original = hs.timer.new
+			hs.timer.new = function(delay, callback)
+				return case.build(original, delay, callback, context)
 			end
 
 			local ok, consumed = pcall(PE.handle_chain_signal, PE.KEYCODE_LLM_CHAIN)
-			hs.timer.doAfter = original
+			hs.timer.new = original
 			helpers.assert_true(ok, "F16 constructor failure must not escape the eventtap")
 			helpers.assert_eq(consumed, true,
 				"the internal F16 signal must never leak to the application")
+			helpers.assert_eq(calls, 0,
+				"a synchronous or refused timer acquisition may not run inside the eventtap")
+			if context.callback then
+				context.callback()
+				context.callback()
+				helpers.assert_eq(calls, 0,
+					"late and duplicate callbacks from an uncommitted timer must stay inert")
+			end
 			helpers.assert_eq(PE.is_chain_pending(), true,
 				"the already-owned fallback remains authoritative")
 			fallback:fire()

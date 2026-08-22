@@ -35,6 +35,8 @@ local function with_fixture(config, body)
 		mouse_events = {},
 		post_attempts = {},
 		posted = {},
+		reentrant_cleanup_results = {},
+		reentrant_toggle_results = {},
 		deferred = {},
 		defer_calls = 0,
 		now = 100,
@@ -44,8 +46,10 @@ local function with_fixture(config, body)
 	config.enabled = config.enabled or {}
 	config.stop_failures = config.stop_failures or {}
 	config.stop_throws = config.stop_throws or {}
+	config.stop_nils = config.stop_nils or {}
 	config.stop_stays_enabled = config.stop_stays_enabled or {}
 	config.post = config.post or {}
+	config.reenter_post = config.reenter_post or {}
 	config.mouse_construct = config.mouse_construct or {}
 	if config.defer_result == nil then config.defer_result = true end
 
@@ -104,6 +108,19 @@ local function with_fixture(config, body)
 				}
 				function tap:start()
 					self.start_attempts = self.start_attempts + 1
+					if config.reenter_toggle_at == self.index
+						and fixture.click_actions then
+						config.reenter_toggle_at = nil
+						fixture.reentrant_toggle_results[
+							#fixture.reentrant_toggle_results + 1
+						] = fixture.click_actions.toggle_right_click(
+							config.reenter_toggle_parent or "shortcut_bindings")
+					end
+					if config.reenter_start and config.reenter_start[self.index]
+						and fixture.click_actions then
+						fixture.click_actions.force_cleanup(
+							config.reenter_parent or "gestures")
+					end
 					return apply_start_mode(config.start[self.index], self)
 				end
 				function tap:isEnabled()
@@ -119,6 +136,11 @@ local function with_fixture(config, body)
 					if throwing > 0 then
 						config.stop_throws[self.index] = throwing - 1
 						error("injected stop failure")
+					end
+					local nils = config.stop_nils[self.index] or 0
+					if nils > 0 then
+						config.stop_nils[self.index] = nils - 1
+						return nil
 					end
 					local remaining = config.stop_failures[self.index] or 0
 					if remaining > 0 then
@@ -154,6 +176,13 @@ local function with_fixture(config, body)
 					end
 					function event:post()
 						fixture.post_attempts[#fixture.post_attempts + 1] = self.event_type
+						local reenter_parent = config.reenter_post[self.event_type]
+						if reenter_parent and fixture.click_actions then
+							config.reenter_post[self.event_type] = nil
+							fixture.reentrant_cleanup_results[
+								#fixture.reentrant_cleanup_results + 1
+							] = fixture.click_actions.force_cleanup(reenter_parent)
+						end
 						local mode = config.post[self.event_type]
 						if mode == "false" then config.post[self.event_type] = nil; return false end
 						if mode == "nil" then config.post[self.event_type] = nil; return nil end
@@ -197,6 +226,7 @@ local function with_fixture(config, body)
 
 	local ok, err = xpcall(function()
 		local ClickActions = require("modules.gestures.actions_click")
+		fixture.click_actions = ClickActions
 		body(ClickActions, fixture, types)
 	end, debug.traceback)
 
@@ -243,6 +273,25 @@ local function assert_rejected_callbacks_are_inert(fixture, types, taps)
 end
 
 helpers.describe("click-hold acquisition transaction", function()
+	for _, parent in ipairs({ "gestures", "shortcut_bindings" }) do
+		for _, position in ipairs({ 1, 2 }) do
+			helpers.it("rolls back a " .. parent .. " acquisition when tap "
+				.. position .. " start reenters cleanup", function()
+				with_fixture({
+					reenter_start = { [position] = true },
+					reenter_parent = parent,
+				}, function(ClickActions, fixture, types)
+					helpers.assert_eq(ClickActions.toggle_left_click(parent), false)
+					assert_no_hold_published(ClickActions, fixture)
+					helpers.assert_true(fixture.taps[position].stop_attempts > 0,
+						"force_cleanup must see and settle the in-flight candidate")
+					assert_rejected_callbacks_are_inert(fixture, types)
+					helpers.assert_eq(ClickActions.force_cleanup(parent), true)
+				end)
+			end)
+		end
+	end
+
 	helpers.it("rejects mouseDown construction and property failures before tap acquisition (click-hold-acquisition-transaction)", function()
 		for _, mode in ipairs({ "nil", "false", "throw" }) do
 			with_fixture({ mouse_construct = { [4] = mode } }, function(ClickActions, fixture)
@@ -296,6 +345,25 @@ helpers.describe("click-hold acquisition transaction", function()
 				end)
 			end
 		end
+	end)
+
+	helpers.it("serializes sibling-parent acquisition over the shared native slots", function()
+		with_fixture({
+			reenter_toggle_at = 1,
+			reenter_toggle_parent = "shortcut_bindings",
+		}, function(ClickActions, fixture, types)
+			helpers.assert_eq(ClickActions.toggle_left_click("gestures"), true)
+			helpers.assert_eq(fixture.reentrant_toggle_results, { false })
+			helpers.assert_eq(#fixture.taps, 2,
+				"the sibling must allocate no competing key/drag candidates")
+			helpers.assert_eq(fixture.posted, { types.leftMouseDown })
+			helpers.assert_eq(ClickActions.is_left_click_held(), true)
+			helpers.assert_eq(ClickActions.is_right_click_held(), false)
+			helpers.assert_eq(
+				ClickActions.force_cleanup("shortcut_bindings"), true)
+			helpers.assert_eq(ClickActions.is_left_click_held(), true)
+			helpers.assert_eq(ClickActions.force_cleanup("gestures"), true)
+		end)
 	end)
 
 	helpers.it("requires isEnabled commitment from both taps (click-hold-acquisition-transaction)", function()
@@ -458,6 +526,61 @@ helpers.describe("click-hold acquisition transaction", function()
 			helpers.assert_eq(ClickActions.force_cleanup(), true)
 			helpers.assert_eq(ClickActions.is_left_click_held(), false)
 			helpers.assert_eq(fixture.posted, { types.leftMouseDown, types.leftMouseUp })
+		end)
+	end)
+
+	for _, parent in ipairs({ "gestures", "shortcut_bindings" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("retains " .. parent .. " release ownership when mouseDown post reenters cleanup and emergency mouseUp "
+				.. mode, function()
+				with_fixture({
+					reenter_post = { [3] = parent },
+					post = { [1] = mode },
+				}, function(ClickActions, fixture, types)
+					helpers.assert_eq(ClickActions.toggle_left_click(parent), false)
+					helpers.assert_eq(fixture.reentrant_cleanup_results, { false },
+						"PAUSE inside mouseDown:post must observe the unsettled boundary")
+					helpers.assert_eq(ClickActions.is_left_click_held(), true,
+						"a refused compensating mouseUp must retain explicit held ownership")
+					helpers.assert_eq(fixture.posted, { types.leftMouseDown })
+
+					local sibling = parent == "gestures"
+						and "shortcut_bindings" or "gestures"
+					helpers.assert_eq(ClickActions.force_cleanup(sibling), true,
+						"a sibling cleanup may not consume the retained release capability")
+					helpers.assert_eq(ClickActions.is_left_click_held(), true)
+					helpers.assert_eq(ClickActions.force_cleanup(parent), true,
+						"only the matching parent may retry the exact mouseUp")
+					helpers.assert_eq(ClickActions.is_left_click_held(), false)
+					helpers.assert_eq(fixture.posted,
+						{ types.leftMouseDown, types.leftMouseUp })
+					assert_rejected_callbacks_are_inert(fixture, types)
+				end)
+			end)
+		end
+	end
+
+	helpers.it("isolates held-click admission and cleanup between gesture and shortcut parents", function()
+		with_fixture({}, function(ClickActions, fixture, types)
+			helpers.assert_eq(ClickActions.toggle_right_click("gestures"), true)
+			helpers.assert_eq(ClickActions.force_cleanup("shortcut_bindings"), true,
+				"shortcut cleanup must not release a gesture-owned hold")
+			helpers.assert_eq(ClickActions.release_held_for_tap(
+				"open_config", "shortcut_bindings"), true)
+			helpers.assert_eq(ClickActions.toggle_right_click("shortcut_bindings"), false,
+				"a sibling toggle must not steal or release the live side")
+			helpers.assert_eq(ClickActions.is_right_click_held(), true)
+			helpers.assert_eq(fixture.posted, { types.rightMouseDown })
+			helpers.assert_eq(ClickActions.force_cleanup("gestures"), true)
+
+			helpers.assert_eq(ClickActions.toggle_right_click("shortcut_bindings"), true)
+			helpers.assert_eq(ClickActions.force_cleanup("gestures"), true,
+				"gesture cleanup must not release a shortcut-owned hold")
+			helpers.assert_eq(ClickActions.release_held_for_tap(
+				"select_line", "gestures"), true)
+			helpers.assert_eq(ClickActions.is_right_click_held(), true)
+			helpers.assert_eq(ClickActions.force_cleanup("shortcut_bindings"), true)
+			helpers.assert_eq(ClickActions.is_right_click_held(), false)
 		end)
 	end)
 end)

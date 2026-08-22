@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("shortcuts.start() starts both bindings and keyboard shortcuts", function()
 	helpers.it("M.start() invokes Bindings.start AND KeyboardShortcuts.start", function()
-		local calls = { bindings = 0, keyboard = 0, script_control = 0 }
+		local calls = { bindings = 0, keyboard = 0, script_control = 0, actions = 0 }
 
 		-- Stub the three sub-modules so we can count lifecycle calls. init.lua reads
 		-- Bindings.DEFAULT_CHATGPT_URL at load; every other field is proxied and may
@@ -42,6 +42,13 @@ helpers.describe("shortcuts.start() starts both bindings and keyboard shortcuts"
 			start = function() calls.keyboard = calls.keyboard + 1; return true end,
 			stop  = function() return true end,
 		}
+		package.loaded["modules.gestures.actions"] = {
+			resume_after_cleanup = function()
+				calls.actions = calls.actions + 1
+				return true
+			end,
+			force_cleanup = function() return true end,
+		}
 
 		local Shortcuts = helpers.load_with_stubs("modules.shortcuts")
 		Shortcuts.start()
@@ -49,6 +56,7 @@ helpers.describe("shortcuts.start() starts both bindings and keyboard shortcuts"
 		helpers.assert_eq(calls.bindings, 1)
 		-- The regression: this was 0 because M.start was a bare Bindings.start proxy.
 		helpers.assert_eq(calls.keyboard, 1)
+		helpers.assert_eq(calls.actions, 1)
 		-- start() must NOT start script_control — it has its own dedicated start so
 		-- its pause/quit/reload tap survives a bindings toggle.
 		helpers.assert_eq(calls.script_control, 0)
@@ -57,6 +65,7 @@ helpers.describe("shortcuts.start() starts both bindings and keyboard shortcuts"
 		package.loaded["modules.shortcuts.bindings"]        = nil
 		package.loaded["modules.shortcuts.script_control"]  = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
+		package.loaded["modules.gestures.actions"]          = nil
 		package.loaded["modules.shortcuts"]                 = nil
 	end)
 end)

@@ -15,7 +15,8 @@ local helpers = require("tests.helpers")
 --- @param shortcuts table Runtime shortcut double.
 --- @param enabled boolean Initial persisted state.
 --- @return table fixture Built action and side-effect counters.
-local function load_menu_fixture(shortcuts, enabled)
+local function load_menu_fixture(shortcuts, enabled, options)
+	options = options or {}
 	local noop = function() end
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
@@ -53,6 +54,9 @@ local function load_menu_fixture(shortcuts, enabled)
 		applyTriggerChar = function(value) return value end,
 		save_prefs = function()
 			counters.saves = counters.saves + 1
+			if options.save_mode == "false" then return false end
+			if options.save_mode == "nil" then return nil end
+			if options.save_mode == "throw" then error("synthetic save refusal") end
 			return true
 		end,
 		notify_feature = function() counters.notifications = counters.notifications + 1 end,
@@ -159,6 +163,129 @@ helpers.describe("Shortcuts master menu toggle commits runtime before persistenc
 		helpers.assert_eq(fixture.counters.notifications, 1)
 		helpers.assert_eq(fixture.counters.updates, 1)
 	end)
+
+	for _, previous in ipairs({ false, true }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("rolls back a mutate-then-" .. mode .. " shortcut edge", function()
+				local running = previous
+				local calls = {}
+				local function boundary(name, desired, result_mode)
+					return function(claim)
+						calls[#calls + 1] = { name = name, claim = claim }
+						running = desired
+						if result_mode == "false" then return false end
+						if result_mode == "nil" then return nil end
+						if result_mode == "throw" then error("synthetic lifecycle refusal") end
+						return true
+					end
+				end
+				local fixture = load_menu_fixture({
+					resume_bindings = boundary("resume", true,
+						previous and "true" or mode),
+					pause_bindings = boundary("pause", false,
+						previous and mode or "true"),
+				}, previous)
+				helpers.assert_eq(fixture.action(), false)
+				helpers.assert_eq(running, previous)
+				helpers.assert_eq(fixture.state.shortcuts, previous)
+				helpers.assert_eq(#calls, 2)
+				for _, call in ipairs(calls) do
+					helpers.assert_eq(call.claim, "feature_toggle")
+				end
+				helpers.assert_eq(fixture.counters.saves, 0)
+				helpers.assert_eq(fixture.counters.notifications, 0)
+			end)
+		end
+
+		for _, inverse_mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("blocks on shortcut inverse " .. inverse_mode .. " debt", function()
+				local running = previous
+				local calls = {}
+				local call_index = 0
+				local function edge(name, desired)
+					return function(claim)
+						call_index = call_index + 1
+						calls[#calls + 1] = { name = name, claim = claim }
+						if call_index == 1 then running = desired; return false end
+						if inverse_mode == "throw" then error("inverse refusal") end
+						if inverse_mode == "nil" then return nil end
+						return false
+					end
+				end
+				local fixture = load_menu_fixture({
+					resume_bindings = edge("resume", true),
+					pause_bindings = edge("pause", false),
+				}, previous)
+				helpers.assert_eq(fixture.action(), false)
+				helpers.assert_eq(fixture.action(), false,
+					"the next click must retry only the retained inverse")
+				helpers.assert_eq(#calls, 3)
+				for _, call in ipairs(calls) do
+					helpers.assert_eq(call.claim, "feature_toggle")
+				end
+				helpers.assert_eq(fixture.state.shortcuts, previous)
+				helpers.assert_eq(fixture.counters.saves, 0)
+			end)
+		end
+
+		for _, save_mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("rolls runtime back when shortcut save returns " .. save_mode, function()
+				local running = previous
+				local calls = {}
+				local fixture = load_menu_fixture({
+					resume_bindings = function(claim)
+						calls[#calls + 1] = claim; running = true; return true
+					end,
+					pause_bindings = function(claim)
+						calls[#calls + 1] = claim; running = false; return true
+					end,
+				}, previous, { save_mode = save_mode })
+				helpers.assert_eq(fixture.action(), false)
+				helpers.assert_eq(running, previous)
+				helpers.assert_eq(fixture.state.shortcuts, previous)
+				helpers.assert_eq(calls, { "feature_toggle", "feature_toggle" })
+				helpers.assert_eq(fixture.counters.notifications, 0)
+				helpers.assert_eq(fixture.counters.updates, 0)
+			end)
+
+			for _, inverse_mode in ipairs({ "false", "nil", "throw" }) do
+				helpers.it("retains shortcut debt when save " .. save_mode
+					.. " and inverse " .. inverse_mode, function()
+					local running = previous
+					local calls = {}
+					local call_index = 0
+					local function edge(name, desired)
+						return function(claim)
+							call_index = call_index + 1
+							calls[#calls + 1] = { name = name, claim = claim }
+							if call_index == 1 then running = desired; return true end
+							if inverse_mode == "throw" then error("inverse refusal") end
+							if inverse_mode == "nil" then return nil end
+							return false
+						end
+					end
+					local fixture = load_menu_fixture({
+						resume_bindings = edge("resume", true),
+						pause_bindings = edge("pause", false),
+					}, previous, { save_mode = save_mode })
+					helpers.assert_eq(fixture.action(), false)
+					helpers.assert_eq(fixture.state.shortcuts, previous)
+					helpers.assert_eq(running, not previous,
+						"the adverse inverse remains explicit runtime debt")
+					helpers.assert_eq(fixture.action(), false,
+						"the next click retries only retained save rollback debt")
+					helpers.assert_eq(#calls, 3)
+					for _, call in ipairs(calls) do
+						helpers.assert_eq(call.claim, "feature_toggle")
+					end
+					helpers.assert_eq(fixture.counters.saves, 1,
+						"debt settlement may not repeat the failed preference write")
+					helpers.assert_eq(fixture.counters.notifications, 0)
+					helpers.assert_eq(fixture.counters.updates, 0)
+				end)
+			end
+		end
+	end
 end)
 
 

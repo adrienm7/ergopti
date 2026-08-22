@@ -43,6 +43,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local models = {
 			check_requirements = function(_, on_ok)
 				pending_ok = on_ok
+				return true
 			end,
 			get_presets = function() return {} end,
 			get_model_info = function() return {} end,
@@ -54,6 +55,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			keymap = {
 				set_llm_enabled = function(enabled)
 					prediction_states[#prediction_states + 1] = enabled
+					return true
 				end,
 			},
 			save_prefs = function()
@@ -115,7 +117,10 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local switcher = require("ui.menu.menu_llm.model_switcher").new({
 			state = state,
 			models_mgr = {
-				check_requirements = function(_, on_ok) pending_ok = on_ok end,
+				check_requirements = function(_, on_ok)
+					pending_ok = on_ok
+					return true
+				end,
 				get_presets = function() return {} end,
 				get_model_info = function() return {} end,
 				get_actual_model_name = function(name) return name end,
@@ -123,6 +128,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			keymap = {
 				set_llm_enabled = function(enabled)
 					prediction_states[#prediction_states + 1] = enabled
+					return true
 				end,
 				set_llm_model = noop,
 				set_llm_display_model_name = noop,
@@ -136,8 +142,8 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			"MLX switch must really lock predictions before the interleaving")
 		state.llm_enabled = false
 		pending_ok()
-		helpers.assert_eq(prediction_states, { false },
-			"completion must not override the user's newer disabled choice")
+		helpers.assert_eq(prediction_states, { false, false },
+			"completion must reassert, never override, the user's newer disabled choice")
 	end)
 
 	helpers.it("(deferred-runtime-gate) does not unlock predictions after pause closes the runtime gate", function()
@@ -167,7 +173,10 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local switcher = require("ui.menu.menu_llm.model_switcher").new({
 			state = state,
 			models_mgr = {
-				check_requirements = function(_, on_ok) pending_ok = on_ok end,
+				check_requirements = function(_, on_ok)
+					pending_ok = on_ok
+					return true
+				end,
 				get_presets = function() return {} end,
 				get_model_info = function() return {} end,
 				get_actual_model_name = function(name) return name end,
@@ -175,6 +184,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			keymap = {
 				set_llm_enabled = function(enabled)
 					prediction_states[#prediction_states + 1] = enabled
+					return true
 				end,
 				set_llm_model = noop,
 				set_llm_display_model_name = noop,
@@ -223,7 +233,10 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local switcher = require("ui.menu.menu_llm.model_switcher").new({
 			state = state,
 			models_mgr = {
-				check_requirements = function(_, on_ok) pending_ok = on_ok end,
+				check_requirements = function(_, on_ok)
+					pending_ok = on_ok
+					return true
+				end,
 				get_presets = function() return {} end,
 				get_model_info = function() return {} end,
 				get_actual_model_name = function(name) return "actual:" .. tostring(name) end,
@@ -289,7 +302,10 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 		local switcher = require("ui.menu.menu_llm.model_switcher").new({
 			state = state,
 			models_mgr = {
-				check_requirements = function(_, on_ok) pending_ok = on_ok end,
+				check_requirements = function(_, on_ok)
+					pending_ok = on_ok
+					return true
+				end,
 				get_presets = function() return {} end,
 				get_model_info = function() return {} end,
 				get_actual_model_name = function(name) return name end,
@@ -297,6 +313,7 @@ helpers.describe("model switcher: backend changes invalidate pending requirement
 			keymap = {
 				set_llm_enabled = function(enabled)
 					prediction_states[#prediction_states + 1] = enabled
+					return true
 				end,
 				set_llm_model = noop,
 				set_llm_display_model_name = noop,

@@ -66,6 +66,8 @@ function M.new(ctx)
 	local cleanup_debts = {}
 	local recovery_debt = nil
 	local restore_fence = 0
+	local profile_trigger_in_progress = false
+	local profile_restore_debt = nil
 
 	--- Creates a detached shortcut snapshot for comparison and rollback.
 	--- @param value any Shortcut value.
@@ -385,12 +387,36 @@ function M.new(ctx)
 	function inst.trigger_prediction_with_profile(profile_id)
 		if type(profile_id) ~= "string" or profile_id == "" then
 			Logger.warn(LOG, "trigger_prediction_with_profile: invalid profile_id: %s", tostring(profile_id))
-			return
+			return false
 		end
 		if not keymap or type(keymap.trigger_prediction) ~= "function" then
 			Logger.error(LOG, "trigger_prediction_with_profile: keymap or trigger_prediction is unavailable.")
-			return
+			return false
 		end
+		if profile_trigger_in_progress then
+			Logger.warn(LOG, "trigger_prediction_with_profile: a profile transaction is already active.")
+			return false
+		end
+
+		local function set_profile_exact(label, target_profile)
+			local ok, result_or_error = xpcall(function()
+				return llm_mod.set_active_profile(target_profile)
+			end, debug.traceback)
+			if ok ~= true or result_or_error ~= true then
+				Logger.error(LOG, "%s did not commit for '%s': %s.",
+					label, tostring(target_profile), tostring(result_or_error))
+				return false
+			end
+			return true
+		end
+
+		if profile_restore_debt ~= nil then
+			if set_profile_exact("Profile recovery", profile_restore_debt) ~= true then
+				return false
+			end
+			profile_restore_debt = nil
+		end
+		profile_trigger_in_progress = true
 
 		Logger.debug(LOG, "Triggering prediction with profile '%s'", profile_id)
 
@@ -419,11 +445,33 @@ function M.new(ctx)
 			end
 		end
 
-		llm_mod.set_active_profile(profile_id)
-		pcall(keymap.trigger_prediction, true, profile_label)
-		llm_mod.set_active_profile(previous_profile)
+		-- Publish the inverse before crossing the candidate boundary: a native
+		-- implementation may mutate and then return false/nil or raise. No
+		-- prediction may start until the candidate reports literal success, and a
+		-- failed inverse remains the first obligation of the next trigger.
+		profile_restore_debt = previous_profile
+		if set_profile_exact("Profile activation", profile_id) ~= true then
+			if set_profile_exact("Profile activation rollback", previous_profile) == true then
+				profile_restore_debt = nil
+			end
+			profile_trigger_in_progress = false
+			return false
+		end
+
+		local trigger_ok, trigger_error = xpcall(function()
+			keymap.trigger_prediction(true, profile_label)
+		end, debug.traceback)
+		if trigger_ok ~= true then
+			Logger.error(LOG, "Profile prediction trigger raised: %s.", tostring(trigger_error))
+		end
+
+		local restored = set_profile_exact("Profile restoration", previous_profile)
+		if restored == true then profile_restore_debt = nil end
+		profile_trigger_in_progress = false
+		if trigger_ok ~= true or restored ~= true then return false end
 
 		Logger.debug(LOG, "Profile restored: %s", previous_profile)
+		return true
 	end
 
 

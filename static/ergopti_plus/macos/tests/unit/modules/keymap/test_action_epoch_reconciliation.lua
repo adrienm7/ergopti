@@ -61,6 +61,7 @@ local function load_fixture()
 	local abort_requires_consumption = false
 	local raw_failure = false
 	local admission_is_open = true
+	local key_provenance_status = "foreign"
 	local synthetic_stub = {
 		current_action_epoch = function() return epoch, 125 end,
 		claim_physical_fence = function()
@@ -98,7 +99,7 @@ local function load_fixture()
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function()
-		return nil, "foreign", synthetic_stub.claim_physical_fence()
+			return nil, key_provenance_status, synthetic_stub.claim_physical_fence()
 		end,
 	}
 
@@ -290,8 +291,18 @@ local function load_fixture()
 			record_nav_reset = false
 			return table.unpack(results, 1, results.n)
 		end,
+		shift_failure = function()
+			local shift_tap = tap_for(hs_stub.eventtap.event.types.flagsChanged)
+			helpers.assert_type(shift_tap and shift_tap.callback, "function")
+			return shift_tap.callback({
+				getKeyCode = function() error("SHIFT_KEYCODE_THROW") end,
+				getFlags = function() return { shift = true } end,
+			})
+		end,
+		deferred_count = function() return #deferred end,
 		queue_fence = function(events) pending_fence = { events = events } end,
 		set_admission = function(value) admission_is_open = value == true end,
+		set_key_provenance_status = function(value) key_provenance_status = value end,
 		set_reset_failure = function(value) reset_should_fail = value end,
 		llm_quarantined = function() return llm_quarantined end,
 		registered_epoch = function() return registered_epoch end,
@@ -311,6 +322,38 @@ helpers.describe("keymap action epochs", function()
 		helpers.assert_eq(fixture.state.buffer, "typed",
 			"the idle-to-PAUSED fence must not start a new logical replacement")
 		helpers.assert_eq(#fixture.calls, 0)
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("passes unreadable keyDown without context invalidation while PAUSED", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(fixture.keymap.pause_processing(), true)
+		fixture.state.buffer = "pause-owned"
+		fixture.state.start_is_word_boundary = true
+		fixture.set_key_provenance_status("unreadable")
+
+		local consumed = fixture.physical_letter("x")
+
+		helpers.assert_true(not consumed,
+			"an unreadable physical event must still pass through under PAUSED")
+		helpers.assert_eq(fixture.state.buffer, "pause-owned",
+			"unreadable delivery may not invalidate the paused text snapshot")
+		helpers.assert_eq(fixture.state.start_is_word_boundary, true)
+		helpers.assert_eq(#fixture.calls, 0,
+			"PAUSED unreadable delivery may not observe epochs or reset predictions")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("does not defer shift diagnostics after PAUSED is published", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(fixture.keymap.pause_processing(), true)
+		helpers.assert_eq(fixture.deferred_count(), 0)
+
+		local consumed = fixture.shift_failure()
+
+		helpers.assert_true(not consumed)
+		helpers.assert_eq(fixture.deferred_count(), 0,
+			"a paused flagsChanged failure may not acquire a deferred logger callback")
 		fixture.keymap.stop()
 	end)
 
@@ -378,6 +421,23 @@ helpers.describe("keymap action epochs", function()
 			"the always-on keymap mouse tap must return queued output before the original click")
 		helpers.assert_true(not fixture.state.start_is_word_boundary,
 			"a focus-changing click must close the stale word-boundary state synchronously")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("passes clicks without context mutation or deferred reset while PAUSED", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(fixture.keymap.pause_processing(), true)
+		fixture.state.buffer = "pause-owned"
+		fixture.state.start_is_word_boundary = true
+
+		local consumed = fixture.physical_click()
+
+		helpers.assert_true(not consumed)
+		helpers.assert_eq(fixture.state.buffer, "pause-owned",
+			"the installed mouse tap must not mutate keymap context under PAUSED")
+		helpers.assert_eq(fixture.state.start_is_word_boundary, true)
+		helpers.assert_eq(#fixture.calls, 0,
+			"the paused click must not enqueue nav-reset or reconciliation work")
 		fixture.keymap.stop()
 	end)
 
