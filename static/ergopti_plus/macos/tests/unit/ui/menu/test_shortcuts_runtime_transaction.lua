@@ -18,6 +18,7 @@ local helpers = require("tests.helpers")
 local function load_menu_fixture(shortcuts, enabled, options)
 	options = options or {}
 	local noop = function() end
+	helpers.load_with_stubs("infra.logger")
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
 	package.loaded["infra.dialog_util"] = {}
@@ -38,7 +39,7 @@ local function load_menu_fixture(shortcuts, enabled, options)
 	package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
 	package.loaded["ui.menu.menu_shortcuts"] = nil
-	local MenuShortcuts = helpers.load_with_stubs("ui.menu.menu_shortcuts")
+	local MenuShortcuts = require("ui.menu.menu_shortcuts")
 
 	local state = {
 		shortcuts = enabled,
@@ -74,7 +75,7 @@ end
 --- @return table deps
 local function state_sync_deps(shortcuts)
 	return {
-		keymap = {},
+		keymap = { set_llm_model = function() return true end },
 		hotstring_editor = {},
 		core_mods = { shortcuts_mod = shortcuts },
 		apply_metrics_shortcut = function() return true end,
@@ -300,13 +301,14 @@ end)
 
 helpers.describe("menu-state shortcut synchronization requires exact lifecycle success", function()
 	helpers.it("returns false when resume_bindings returns false", function()
+		helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
 		package.loaded["modules.keylogger.text_cipher"] = { set_enabled = function() end }
 		package.loaded["ui.menu.menu_state"] = nil
-		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
+		local MenuState = require("ui.menu.menu_state")
 
 		local state = {
 			shortcuts = true,
@@ -321,13 +323,14 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 	end)
 
 	helpers.it("returns true only for an exact true pause result", function()
+		helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
 		package.loaded["modules.keylogger.text_cipher"] = { set_enabled = function() end }
 		package.loaded["ui.menu.menu_state"] = nil
-		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
+		local MenuState = require("ui.menu.menu_state")
 
 		local state = {
 			shortcuts = false,
