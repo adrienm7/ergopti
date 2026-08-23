@@ -36,16 +36,19 @@ helpers.describe("backend_panel: no duplicate MLX server launch on backend switc
 			"backend_panel.lua must not call force_mlx_check — switch_model already starts the server via check_requirements")
 	end)
 
-	helpers.it("source still calls switch_model for the MLX target model", function()
+	helpers.it("source still dispatches the MLX target model through the exact boundary", function()
 		-- Selected by a declaration unique to ui/menu/menu_llm/backend_panel.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("\"menu.llm.backend_ollama_suffix\"")
 		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/backend_panel.lua source must be locatable")
 
-		helpers.assert_true(
-			src:find("switch_model(target_model)", 1, true) ~= nil,
-			"backend_panel.lua must still call switch_model(target_model) to start the server")
+		local dispatch_at = src:find('"MLX model successor", switch_model, target_model', 1, true)
+		helpers.assert_true(dispatch_at ~= nil,
+			"backend_panel.lua must still dispatch switch_model(target_model) to start the server")
+		local before = src:sub(math.max(1, dispatch_at - 120), dispatch_at)
+		helpers.assert_true(before:find("invoke_backend_boundary(", 1, true) ~= nil,
+			"the model successor must remain behind the exact-true backend boundary")
 	end)
 
 end)
