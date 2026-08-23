@@ -99,6 +99,13 @@ Boot success is published only after the complete chain commits.
 Adapters translate native semantics into explicit project contracts. Do not let
 callers depend on undocumented raw `hs.*` truthiness or callback behavior.
 
+### project-hs-pathwatcher-start-hides-native-refusal
+
+`hs.pathwatcher:start()` returns the watcher object and hides the underlying
+`FSEventStreamStart` Boolean. Lua tests can prove the exposed startup transaction
+and rollback contract, but an actual native start refusal requires a macOS
+binding-level or fault-injection test.
+
 ## Keyboard and OS integration
 
 ### project-hs-synthetic-injection-choke-point
