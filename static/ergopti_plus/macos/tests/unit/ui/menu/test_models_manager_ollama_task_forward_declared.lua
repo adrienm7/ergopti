@@ -1,62 +1,99 @@
 --- tests/unit/ui/menu/test_models_manager_ollama_task_forward_declared.lua
 
 --- ==============================================================================
---- MODULE: Regression — models_manager_ollama installed-models refresh closure-nil
+--- MODULE: Ollama Installed-Refresh Exact-Task Ownership Regression
 --- DESCRIPTION:
---- models_manager_ollama.lua refreshes the list of installed models by spawning
---- `ollama list` via hs.task. The completion callback clears the GC-root pin via
---- _active_tasks[task] = nil, using the task handle as a key.
----
---- The inline `local task = hs.task.new(...)` form compiled the closure before the
---- local was in scope, binding the nil global _G.task. The callback then attempted
---- _active_tasks[nil] = nil → "table index is nil" (swallowed to HS Console),
---- so the GC-root pin was never released and the task object was leaked.
----
---- Note: a second hs.task.new in this file (the `ollama pull` task) uses a
---- hardcoded string key `deps.active_tasks["ollama_pull"]` and is safe inline.
----
---- Fix: forward-declare only the dangerous handle (the one whose callback references
---- the variable as a key). This test pins the ROOT CAUSE (declaration order).
+--- The refresh completion no longer clears a callback-captured local directly.
+--- It settles an exact owner that owns the GC pin, pause join, authorization and
+--- start commitment. This guard follows that transaction instead of requiring
+--- the obsolete forward-declaration spelling, and includes mutations that prove
+--- the owner and publication checks are load-bearing.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("models_manager_ollama: installed-models refresh task is forward-declared (closure-nil guard)", function()
-	local function read_src()
-		-- Selected by a declaration unique to ui/menu/menu_llm/models_manager_ollama.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function get_ollama_path")
-		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/models_manager_ollama.lua source must be locatable")
-		return src
+local function read_src()
+	local src, err = helpers.read_driver_unit("local function get_ollama_path")
+	helpers.assert_true(src ~= nil,
+		"models_manager_ollama source must be uniquely locatable: " .. tostring(err))
+	return (src:gsub("%-%-[^\n]*", ""))
+end
+
+local function ordered(source, markers)
+	local cursor = 1
+	for _, marker in ipairs(markers) do
+		local position = source:find(marker, cursor, true)
+		if not position then return false, marker end
+		cursor = position + #marker
 	end
+	return true
+end
 
-	helpers.it("the installed-models refresh task is forward-declared before the hs.task.new closure", function()
-		local src = read_src()
-		-- Anchor on the nil-guard that only the dangerous (fixed) site uses:
-		-- `if task then _active_tasks[task] = nil end`
-		local guard_pos = src:find("if task then _active_tasks[task] = nil end", 1, true)
-		helpers.assert_true(guard_pos ~= nil,
-			"the installed-models callback must guard the GC-pin clear with `if task then _active_tasks[task] = nil end`")
+local function remove_after(source, anchor, marker)
+	local anchor_position = source:find(anchor, 1, true)
+	helpers.assert_true(anchor_position ~= nil, "mutation anchor must exist: " .. anchor)
+	local marker_position = source:find(marker, anchor_position, true)
+	helpers.assert_true(marker_position ~= nil, "mutation marker must exist: " .. marker)
+	return source:sub(1, marker_position - 1)
+		.. source:sub(marker_position + #marker)
+end
 
-		-- Extract the source window before the guard and confirm a forward declaration exists
-		local window = src:sub(1, guard_pos)
-		local decl_pos = window:find("local task\n", 1, true)
-		local new_pos  = window:find("task = TaskLifecycle.native", 1, true)
+local function refresh_contract(source)
+	return ordered(source, {
+		"local function release_requirement_task(owner)",
+		"owner.settled = true",
+		"local task = owner.task",
+		"if task ~= nil then _active_tasks[task] = nil end",
+		"owner.release_slot(task)",
+		"local function refresh_installed_async()",
+		"local operation = begin_maintenance(\"Ollama installed-model refresh\")",
+		"local owner = {",
+		"owner.release_slot = function(task)",
+		"local function finish_refresh",
+		"owner.authorized == true",
+		"owner.start_committed == true",
+		"operation.is_authorized() == true",
+		"release_requirement_task(owner)",
+		"if authorized ~= true then return false end",
+		"task = TaskLifecycle.native(\"Ollama installed-model refresh\"",
+		"owner.task = task",
+		"_installed_refresh_owner = owner",
+		"_active_tasks[task] = true",
+		"operation.lifecycle.adopt(owner, owner.pause_join,",
+		"owner.requirement_registered = true",
+		"TaskLifecycle.start(task, \"Ollama installed-model refresh\")",
+		"owner.dispatching = false",
+		"owner.start_committed = true",
+	})
+end
 
-		helpers.assert_true(decl_pos ~= nil,
-			"the installed-models task must be forward-declared as `local task` (own line)")
-		helpers.assert_true(new_pos ~= nil,
-			"the installed-models task must be assigned via `task = TaskLifecycle.native`")
-		helpers.assert_true(decl_pos < new_pos,
-			"forward declaration must precede the hs.task.new closure so the callback captures the upvalue")
+helpers.describe("models_manager_ollama: exact installed-refresh task ownership", function()
+	helpers.it("releases only the task recorded by the exact owner", function()
+		local source = read_src()
+		local ok, missing = refresh_contract(source)
+		helpers.assert_true(ok, "missing installed-refresh ownership edge: " .. tostring(missing))
+		helpers.assert_true(
+			source:find("if _installed_refresh_owner == owner then "
+				.. "_installed_refresh_owner = nil end", 1, true) ~= nil,
+			"refresh settlement must clear only the published owner")
+		helpers.assert_true(
+			source:find("if task == owner.task then _installed_loading = false end",
+				1, true) ~= nil,
+			"refresh settlement must release the loading slot for the same handle")
 	end)
 
-	helpers.it("the GC-pin release is guarded against nil task", function()
-		local src = read_src()
-		helpers.assert_true(
-			src:find("if task then _active_tasks[task] = nil end", 1, true) ~= nil,
-			"_active_tasks[task] = nil must be guarded with `if task then` "
-			.. "(_active_tasks[nil] = nil raises 'table index is nil')")
+	helpers.it("ownership guard rejects missing release and publication edges", function()
+		local source = read_src()
+		local mutations = {
+			{"local function release_requirement_task(owner)",
+				"if task ~= nil then _active_tasks[task] = nil end"},
+			{"local function refresh_installed_async()", "_installed_refresh_owner = owner"},
+		}
+		for _, mutation in ipairs(mutations) do
+			local mutant = remove_after(source, mutation[1], mutation[2])
+			local ok = refresh_contract(mutant)
+			helpers.assert_true(not ok,
+				"installed-refresh oracle must reject removal of: " .. mutation[2])
+		end
 	end)
 end)
