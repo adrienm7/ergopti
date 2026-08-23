@@ -36,7 +36,7 @@ assert.ok(
 assert.equal(vscode['files.eol'], '\n', 'VS Code must default new and saved text files to LF');
 assert.equal(
 	zed.line_ending,
-	'prefer_lf',
+	'enforce_lf',
 	'Zed must prefer LF for files without an existing line-ending convention'
 );
 

@@ -14,6 +14,30 @@ Use the launcher for the current operating system:
 ./tools/rtk/rtk.sh git status
 ```
 
+## Keep machine data raw
+
+RTK 0.43.0 is a lossy presentation adapter at the human/LLM boundary. Use the
+launcher only when the command's output will be read as terminal output. Run
+the child directly whenever stdout must remain byte- or syntax-exact, including
+input to a pipe, redirection, command capture, JSON or CSV parser, hash,
+generator, or test assertion.
+
+For example, these machine-to-machine commands deliberately bypass RTK:
+
+```powershell
+$commit = git rev-parse HEAD
+git diff --raw > candidate.diff
+```
+
+```sh
+commit=$(git rev-parse HEAD)
+git diff --raw > candidate.diff
+```
+
+Never put `rtk.ps1`, `rtk.sh`, or a bare `rtk` command on the producer side of
+such a boundary. The child may still invoke and validate its own subprocesses;
+only the outer stdout path determines whether the launcher is appropriate.
+
 The first invocation accepts an already-installed copy only when its version
 matches the pinned Rust Token Killer release and its `gain` command works. If
 none is available, it downloads that release into the current user's data

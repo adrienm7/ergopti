@@ -24,8 +24,9 @@ skills and durable technical knowledge in routed memory.
   their descriptions and load only matching `SKILL.md` bodies and references.
   `.claude/skills/` is a generated mirror; never edit it directly.
 - Use the project launcher documented in
-  [docs/tooling/rtk.md](docs/tooling/rtk.md) for interactive shell
-  commands. It verifies or installs the pinned user-local binary; CI remains
+  [docs/tooling/rtk.md](docs/tooling/rtk.md) when command output is read by a
+  human or LLM. Invoke the child directly when stdout feeds a pipe,
+  redirection, parser, hash, generator, or test assertion. CI remains
   network-independent and can execute the child command unfiltered.
 - A small, local, low-risk edit does not require a formal or persisted plan.
   Use a plan for multi-step, cross-driver, high-risk, or audit-campaign work.

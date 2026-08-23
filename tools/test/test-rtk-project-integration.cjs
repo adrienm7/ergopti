@@ -17,6 +17,12 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const TOOL_ROOT = path.join(ROOT, 'tools', 'rtk');
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-rtk-'));
+const RTK_INVOCATION =
+	/(?:^|[\s`"'$(&])(?:rtk|(?:\.{0,2}[\\/])?tools[\\/]rtk[\\/]rtk\.(?:ps1|sh))(?=\s)/i;
+const EXACT_OUTPUT_MODE =
+	/--(?:explain-)?json\b|--csv\b|--stdout\b|\b(?:sha256sum|shasum|Get-FileHash)\b|\bgit\s+(?:rev-parse|hash-object)\b/i;
+const OUTPUT_SINK =
+	/(?<!\|)\|(?!\|)|(?:^|\s)(?:[012]?>>?|[012]?>&[012])(?:\s|$)|\b(?:Out-File|Tee-Object)\b/i;
 
 const expectedRows = [
 	[
@@ -60,6 +66,51 @@ function read(relativePath) {
 	const content = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
 	assert.equal(content.includes('\r'), false, `${relativePath} must use LF`);
 	return content;
+}
+
+function agentInstructionPaths() {
+	const skillsRoot = path.join(ROOT, '.agents', 'skills');
+	const skills = fs
+		.readdirSync(skillsRoot, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => path.join('.agents', 'skills', entry.name, 'SKILL.md'))
+		.filter((relativePath) => fs.existsSync(path.join(ROOT, relativePath)));
+	return [
+		'AGENTS.md',
+		'docs/tooling/rtk.md',
+		'docs/memory/workflow-and-verification.md',
+		...skills
+	];
+}
+
+function unsafeRtkDataExamples(relativePath, content) {
+	const violations = [];
+	const lines = content.split('\n');
+	for (const [index, line] of lines.entries()) {
+		const invocation = RTK_INVOCATION.exec(line);
+		if (invocation === null) continue;
+		const prefix = line.slice(0, invocation.index);
+		let command = line.slice(invocation.index);
+		let cursor = index;
+		while (cursor + 1 < lines.length) {
+			const current = lines[cursor].trimEnd();
+			const next = lines[cursor + 1].trimStart();
+			const backticks = (current.match(/`/g) || []).length;
+			const continues =
+				current.endsWith('\\') ||
+				(current.endsWith('`') && backticks % 2 === 1) ||
+				/^(?:\||(?:[012]?>>?|[012]?>&[012])(?:\s|$)|Out-File\b|Tee-Object\b)/i.test(next);
+			if (!continues) break;
+			cursor += 1;
+			command += `\n${lines[cursor]}`;
+		}
+		const captured =
+			/\$\(\s*$/.test(prefix) || /(?:^|[\s`])\$[A-Za-z_][\w:.-]*\s*=\s*(?:&\s*)?$/.test(prefix);
+		if (captured || OUTPUT_SINK.test(command) || EXACT_OUTPUT_MODE.test(command)) {
+			violations.push(`${relativePath}:${index + 1}`);
+		}
+	}
+	return violations;
 }
 
 function copyTooling() {
@@ -122,6 +173,34 @@ try {
 	const posixBootstrap = read('tools/rtk/bootstrap.sh');
 	assert.match(posixBootstrap, /is_rtk "\$cached" "\$version"/);
 	assert.match(posixBootstrap, /is_rtk "\$candidate" "\$version"/);
+
+	const instructionPaths = agentInstructionPaths();
+	assert.ok(instructionPaths.length >= 10, 'instruction scan must keep a useful floor');
+	const unsafeExamples = instructionPaths.flatMap((relativePath) =>
+		unsafeRtkDataExamples(relativePath, read(relativePath))
+	);
+	assert.deepEqual(unsafeExamples, [], 'RTK examples must not feed exact machine-data consumers');
+	for (const example of [
+		'./tools/rtk/rtk.sh report --json | jq .',
+		'.\\tools\\rtk\\rtk.ps1 report > receipt.json',
+		'commit=$(./tools/rtk/rtk.sh git rev-parse HEAD)',
+		'./tools/rtk/rtk.sh tests --explain-json',
+		'./tools/rtk/rtk.sh report \\\n  | jq .',
+		'.\\tools\\rtk\\rtk.ps1 report `\n  | ConvertFrom-Json'
+	]) {
+		assert.equal(
+			unsafeRtkDataExamples('mutation.md', example).length,
+			1,
+			`unsafe mutation survived: ${example}`
+		);
+	}
+	assert.deepEqual(
+		unsafeRtkDataExamples(
+			'safe.md',
+			'./tools/rtk/rtk.sh git status\ngit diff --raw > candidate.diff\n'
+		),
+		[]
+	);
 
 	const isolatedTooling = copyTooling();
 	const exitProbe = path.join(temporaryRoot, 'exit-probe.cjs');
