@@ -17,10 +17,11 @@
 --- hole: it is exactly how the unpinned MLX server probe shipped green. A guard
 --- that answers a question about the file cannot protect a call site.
 ---
---- Each site is therefore judged on its own lexical window. The real spawns pin
---- within 15 lines of the call, so the window is generous enough to accept every
---- legitimate spelling and still far too narrow for an unrelated pin elsewhere
---- in the module to vouch for an unprotected spawn.
+--- Raw hs.task sites are judged on their own lexical window. TaskLifecycle sites
+--- instead follow the exact assigned handle (including a proven local alias) to
+--- an exact GC-root pin and then to the matching TaskLifecycle.start call. That
+--- keeps callback-heavy construction transactions valid without letting a fixed
+--- source slice associate the launch with another task's pin.
 ---
 --- HOW TO FIX a failure: add `M._active_tasks = {}` (or `local _active_tasks = {}`)
 --- to the affected module, pin the task before :start(), and clear it in the
@@ -30,12 +31,12 @@
 local helpers = require("tests.helpers")
 local DRIVER_ROOT = helpers.driver_root()
 
--- Lexical window, in lines, searched around a spawn for its GC-root pin.
+-- Lexical window, in lines, searched around a raw hs.task spawn for its GC-root pin.
 -- Measured worst case in the driver is 15 lines forward (shell_runner builds the
 -- task, nil-tests it, then pins), so LOOKAHEAD keeps a wide margin while staying
 -- far below the size of any enclosing module.
-local PIN_LOOKBACK  = 12
-local PIN_LOOKAHEAD = 40
+local RAW_PIN_LOOKBACK  = 12
+local RAW_PIN_LOOKAHEAD = 40
 
 -- Takes a selector unique to one production file rather than that file's
 -- path, so moving or splitting a module cannot turn these invariants into
@@ -54,32 +55,127 @@ end
 -- ===============================================
 -- ===============================================
 
---- True when a window of source contains a recognizable GC-root pin.
----
---- Four spellings are accepted, all of which genuinely root the task:
----   1. The canonical own-module root `_active_tasks` — and any `_active_*_tasks`
----      variant (e.g. `_active_probe_tasks` in keymap/input_sources.lua); the
----      pin is what matters, not its name.
----   2. The DELEGATED pin used by the models_manager_mlx_* split:
----      `deps.active_tasks[...]` / `active_tasks_gc_root`. The task is rooted in
----      a table owned by the PARENT module and injected via ctx/deps — equally
----      valid, since deps is long-lived and held by the caller.
----   3. `waitUntilExit`, which references the task from its local for the whole
----      blocking lifetime, so the GC can never reach it mid-run.
----   4. `start_owned_task`, the installer transaction helper whose behavioral
----      suite proves it inserts the exact task into `M._active_tasks` before
----      crossing native start, including synchronous completion.
+--- True when a raw-task window contains a recognizable root or blocking owner.
+--- Exact task identity and start ordering are enforced separately for adapter
+--- launches, where callbacks can make a safe transaction much longer than this
+--- raw fallback window.
 --- @param window string A slice of comment-free source.
 --- @return boolean
-local function window_has_pin(window)
+local function raw_window_has_pin(window)
 	return window:find("_active_[%w_]*tasks") ~= nil
 		or window:find("%.active_tasks") ~= nil
 		or window:find("active_tasks_gc_root", 1, true) ~= nil
 		or window:find("waitUntilExit", 1, true) ~= nil
-		or window:find("start_owned_task%s*%(") ~= nil
 end
 
---- Reports every raw or TaskLifecycle.native task site with no pin near it.
+--- Finds the outer call containing a function-value token.
+--- @param code string Comment-free source.
+--- @param token_at number Token byte position.
+--- @return number|nil open_at
+local function find_enclosing_call_open(code, token_at)
+	local depth = 0
+	for i = token_at - 1, 1, -1 do
+		local char = code:sub(i, i)
+		if char == ")" then
+			depth = depth + 1
+		elseif char == "(" then
+			if depth == 0 then return i end
+			depth = depth - 1
+		end
+	end
+	return nil
+end
+
+--- Resolves the exact assignment target of a direct or wrapped native call.
+--- @param code string Comment-free source.
+--- @param native_at number TaskLifecycle.native byte position.
+--- @return string|nil task_name
+local function assigned_native_name(code, native_at)
+	local prefix = code:sub(1, native_at - 1)
+	local direct = prefix:match("([%a_][%w_]*)%s*=%s*$")
+	if direct then return direct end
+
+	local open_at = find_enclosing_call_open(code, native_at)
+	if not open_at then return nil end
+	local before_call = code:sub(1, open_at - 1)
+	local callee = before_call:match("([%a_][%w_%.:]*)%s*$")
+	if not callee then return nil end
+	local assignment_prefix = before_call:gsub(
+		"[%a_][%w_%.:]*%s*$", "")
+	return assignment_prefix:match("([%a_][%w_]*)%s*=%s*$")
+end
+
+--- Tracks explicit aliases created after native construction.
+--- @param window string Source from one native site to the next.
+--- @param assigned_name string Exact construction result.
+--- @return table<string, number> Alias availability positions.
+local function task_aliases(window, assigned_name)
+	local aliases = { [assigned_name] = 1 }
+	local cursor = 1
+	while true do
+		local at, finish, lhs, rhs = window:find(
+			"([%a_][%w_]*)%s*=%s*([%a_][%w_]*)%f[^%w_]", cursor)
+		if not at then break end
+		if aliases[rhs] and aliases[rhs] <= at and aliases[lhs] == nil then
+			aliases[lhs] = at
+		end
+		cursor = finish + 1
+	end
+	return aliases
+end
+
+local function earliest_exact_pin(window, task_name, available_at)
+	local rhs = task_name .. "%f[^%w_]"
+	local earliest = nil
+	for _, pattern in ipairs({
+		"_active_[%w_]*tasks%s*%[%s*" .. task_name .. "%s*%]%s*=%s*true%f[^%w_]",
+		"_active_[%w_]*tasks%s*%b[]%s*=%s*" .. rhs,
+		"deps%.active_tasks%s*%b[]%s*=%s*" .. rhs,
+		"active_tasks_gc_root%s*%b[]%s*=%s*" .. rhs,
+		"owner%.tasks%.[%a_][%w_]*%s*=%s*" .. rhs,
+		"owner%.tasks%s*%b[]%s*=%s*" .. rhs,
+	}) do
+		local at = window:find(pattern, available_at)
+		if at then earliest = not earliest and at or math.min(earliest, at) end
+	end
+	return earliest
+end
+
+local function has_exact_start_after(window, task_name, pin_at)
+	local exact = task_name .. "%f[^%w_]"
+	for _, pattern in ipairs({
+		"TaskLifecycle%.start%s*%(%s*" .. exact,
+		"TaskLifecycle%.start%s*,%s*" .. exact,
+		"TaskLifecycle%.start%s*,%s*debug%.traceback%s*,%s*" .. exact,
+	}) do
+		local start_at = window:find(pattern, pin_at + 1)
+		if start_at then return true end
+	end
+	return false
+end
+
+local function delegates_exact_task(window, task_name, available_at)
+	return window:find(
+		"start_owned_task%s*%(%s*[%a_][%w_]*%s*,%s*"
+			.. task_name .. "%s*,", available_at) ~= nil
+end
+
+local function native_site_is_pinned(window, assigned_name)
+	if not assigned_name then return false end
+	for task_name, available_at in pairs(task_aliases(window, assigned_name)) do
+		local pin_at = earliest_exact_pin(window, task_name, available_at)
+		if pin_at and has_exact_start_after(window, task_name, pin_at) then return true end
+		if delegates_exact_task(window, task_name, available_at) then return true end
+	end
+	return false
+end
+
+local function line_number_at(code, position)
+	local _, newlines = code:sub(1, position - 1):gsub("\n", "")
+	return newlines + 1
+end
+
+--- Reports every raw or TaskLifecycle.native task site with no valid ownership.
 ---
 --- Comments are stripped first, and this is load-bearing rather than cosmetic:
 --- two modules DISCUSS `hs.task.new(...)` in prose while spawning nothing there
@@ -89,22 +185,39 @@ end
 --- @param src string Lua source.
 --- @return table Array of {line = number, text = string} for unpinned sites.
 local function scan_unpinned_sites(src)
+	local code = src:gsub("%-%-[^\n]*", "")
 	local lines = {}
-	for line in (src:gsub("%-%-[^\n]*", "") .. "\n"):gmatch("([^\n]*)\n") do
-		lines[#lines + 1] = line
-	end
+	for line in (code .. "\n"):gmatch("([^\n]*)\n") do lines[#lines + 1] = line end
 
 	local out = {}
 	for i, line in ipairs(lines) do
 		if line:find("hs%.task%.new%s*%(")
-				or line:find("pcall%s*%(%s*hs%.task%.new")
-				or line:find("TaskLifecycle%.native") then
+				or line:find("pcall%s*%(%s*hs%.task%.new") then
 			local window = table.concat(lines, "\n",
-				math.max(1, i - PIN_LOOKBACK), math.min(#lines, i + PIN_LOOKAHEAD))
-			if not window_has_pin(window) then
+				math.max(1, i - RAW_PIN_LOOKBACK),
+				math.min(#lines, i + RAW_PIN_LOOKAHEAD))
+			if not raw_window_has_pin(window) then
 				out[#out + 1] = { line = i, text = line:gsub("^%s+", "") }
 			end
 		end
+	end
+
+	local cursor = 1
+	while true do
+		local native_at = code:find("TaskLifecycle.native", cursor, true)
+		if not native_at then break end
+		local next_at = code:find("TaskLifecycle.native", native_at + 1, true)
+		local window = code:sub(native_at, (next_at or (#code + 1)) - 1)
+		local assigned_name = assigned_native_name(code, native_at)
+		if not native_site_is_pinned(window, assigned_name) then
+			local line = line_number_at(code, native_at)
+			out[#out + 1] = {
+				line = line,
+				text = (lines[line] or "TaskLifecycle.native"):gsub("^%s+", ""),
+			}
+		end
+		cursor = next_at or (#code + 1)
+		if not next_at then break end
 	end
 	return out
 end
@@ -121,9 +234,10 @@ local function assert_gc_pinned(selector)
 	if #offenders == 0 then return end
 	local where = {}
 	for _, o in ipairs(offenders) do where[#where + 1] = selector .. ":" .. o.line end
-	error(table.concat(where, ", ") .. ": hs.task.new with no GC-root pin within "
-		.. PIN_LOOKAHEAD .. " lines — add M._active_tasks = {} (own root) or pin via "
-		.. "deps.active_tasks / active_tasks_gc_root (delegated root) before :start()", 0)
+	error(table.concat(where, ", ") .. ": task launch with no GC-root ownership — "
+		.. "raw sites need a nearby root; TaskLifecycle sites need the exact handle pinned "
+		.. "through _active_tasks, deps.active_tasks, active_tasks_gc_root, or owner.tasks "
+		.. "before its exact TaskLifecycle.start", 0)
 end
 
 
@@ -178,18 +292,62 @@ helpers.describe("GC retention: the guard is per-site, not per-file", function()
 				.. "gets loosened until it protects nothing")
 	end)
 
-	helpers.it("a delegated pin counts, and only within the window", function()
+	helpers.it("a delegated raw pin counts, and only within the raw window", function()
 		local near = "local t = hs.task.new(\"/bin/ls\", cb)\ndeps.active_tasks[t] = true"
 		helpers.assert_eq(#scan_unpinned_sites(near), 0,
 			"the models_manager_mlx_* split roots its tasks in the parent module's table, "
 				.. "which is a real GC root")
 
 		local far = { "deps.active_tasks[other] = true" }
-		for _ = 1, PIN_LOOKAHEAD + 5 do far[#far + 1] = "local x = 1" end
+		for _ = 1, RAW_PIN_LOOKAHEAD + 5 do far[#far + 1] = "local x = 1" end
 		far[#far + 1] = "local t = hs.task.new(\"/bin/ls\", cb)"
 		far[#far + 1] = "t:start()"
 		helpers.assert_eq(#scan_unpinned_sites(table.concat(far, "\n")), 1,
 			"but a pin that far away belongs to a DIFFERENT task and must not vouch for this one")
+	end)
+
+	helpers.it("binds a callback-heavy native site to its exact owner slot and start", function()
+		local fixture = {
+			"local launcher_task",
+			"launcher_task = run_owner_task_acquisition(owner,",
+			"\t\"construction\", TaskLifecycle.native, \"launcher\", bin, cb)",
+		}
+		for _ = 1, RAW_PIN_LOOKAHEAD + 5 do
+			fixture[#fixture + 1] = "callback_state = callback_state"
+		end
+		fixture[#fixture + 1] = "owner.tasks.launcher = launcher_task"
+		fixture[#fixture + 1] = "local started = run_owner_task_acquisition(owner,"
+		fixture[#fixture + 1] = "\t\"start\", TaskLifecycle.start, launcher_task, \"launcher\")"
+
+		helpers.assert_eq(#scan_unpinned_sites(table.concat(fixture, "\n")), 0,
+			"the exact owner.tasks slot remains a valid root even when construction callbacks "
+				.. "place it beyond the old fixed lookahead")
+	end)
+
+	helpers.it("rejects a different pin, a different start, and reversed ordering", function()
+		local wrong_pin = table.concat({
+			"local task = TaskLifecycle.native(\"worker\", bin, cb)",
+			"owner.tasks.worker = other_task",
+			"TaskLifecycle.start(task, \"worker\")",
+		}, "\n")
+		helpers.assert_eq(#scan_unpinned_sites(wrong_pin), 1,
+			"another task's owner slot must not certify this native identity")
+
+		local wrong_start = table.concat({
+			"local task = TaskLifecycle.native(\"worker\", bin, cb)",
+			"owner.tasks.worker = task",
+			"TaskLifecycle.start(other_task, \"worker\")",
+		}, "\n")
+		helpers.assert_eq(#scan_unpinned_sites(wrong_start), 1,
+			"a real pin must still lead to TaskLifecycle.start for the same identity")
+
+		local start_before_pin = table.concat({
+			"local task = TaskLifecycle.native(\"worker\", bin, cb)",
+			"TaskLifecycle.start(task, \"worker\")",
+			"owner.tasks.worker = task",
+		}, "\n")
+		helpers.assert_eq(#scan_unpinned_sites(start_before_pin), 1,
+			"publication after native start is too late to protect synchronous completion")
 	end)
 
 	helpers.it("the onboarding owner helper must be called at the launch site", function()
@@ -271,7 +429,7 @@ local function all_driver_sources()
 end
 
 helpers.describe("GC retention: EVERY native task site in the driver is pinned", function()
-	helpers.it("no call site spawns without a GC-root pin near it", function()
+	helpers.it("no call site spawns without exact GC-root ownership", function()
 		local files = all_driver_sources()
 		helpers.assert_true(#files > 0,
 			"the source walk must find driver .lua files — an empty list would make this guard vacuous")
