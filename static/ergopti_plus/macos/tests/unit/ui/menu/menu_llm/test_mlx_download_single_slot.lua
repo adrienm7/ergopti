@@ -93,7 +93,21 @@ end
 --- @return table obj, table deps
 local function install_mixin()
 	return helpers.with_fresh_modules(MIXIN_MODULES, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("infra.logger", {
+			task = { new = function(_path, _done, _stream_or_args, _args)
+				local task = { running = false }
+				function task:start()
+					self.running = true
+					return self
+				end
+				function task:terminate()
+					self.running = false
+					return self
+				end
+				function task:isRunning() return self.running end
+				return task
+			end },
+		})
 		package.loaded["ui.download_window"] = {
 			show = function() return true end,
 			update = function() return true end,
