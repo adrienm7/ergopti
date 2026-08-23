@@ -293,8 +293,9 @@ local function load_remap(options)
 		run_first_run_wizard = function()
 			calls.wizard_runs = calls.wizard_runs + 1
 		end,
-		stop = function()
+		stop = function(on_done)
 			calls.onboarding_stops = calls.onboarding_stops + 1
+			if type(on_done) == "function" then on_done(true, "onboarding-stopped") end
 			return true
 		end,
 	}
@@ -506,23 +507,24 @@ helpers.describe("karabiner wake callback lifecycle", function()
 		wizard_timer:fire(true)
 		helpers.assert_eq(calls.wizard_runs, 0,
 			"an already-queued wizard callback must reject the stopped lifecycle")
-		helpers.assert_eq(calls.onboarding_stops, 1,
-			"teardown must still stop onboarding resources exactly once")
+		helpers.assert_eq(calls.onboarding_stops, 2,
+			"public revocation and final local teardown must each settle loaded onboarding")
 	end)
 
-	helpers.it("retries the exact deferred wizard after native cancellation refuses", function()
+	helpers.it("retries the exact deferred wizard within the bounded stop transaction", function()
 		local remap, calls = load_remap({ timer_cancel_refusals = 1 })
 		local wizard_timer = calls.timers[1]
 
 		helpers.assert_true(remap.stop())
 		calls.deliver_stopped()
-		helpers.assert_eq(calls.timer_cancel_attempts, 1)
-		helpers.assert_true(wizard_timer.running,
-			"a refused cancellation must retain the exact live native capability")
-		helpers.assert_true(remap.teardown_local(),
-			"a later local teardown must retry retained wizard cleanup debt")
 		helpers.assert_eq(calls.timer_cancel_attempts, 2,
-			"retry must target the same wizard timer exactly once more")
+			"the aggregate stop must retry the exact refused timer within its bounded join")
+		helpers.assert_true(wizard_timer.running == false,
+			"the successful bounded retry must settle the original native capability")
+		helpers.assert_true(remap.teardown_local(),
+			"a repeated local teardown must recognize the exact timer as already settled")
+		helpers.assert_eq(calls.timer_cancel_attempts, 2,
+			"settled cleanup must not issue a third native cancellation")
 		helpers.assert_true(wizard_timer.running == false)
 		wizard_timer:fire(true)
 		helpers.assert_eq(calls.wizard_runs, 0,
