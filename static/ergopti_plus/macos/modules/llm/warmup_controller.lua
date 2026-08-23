@@ -157,7 +157,7 @@ local function observe_warmup_timer_settlement(owned, my_gen, continuation)
 	end, debug.traceback)
 	if not ok or registered_or_err ~= true then
 		_warmup_settlement_observers[owned] = nil
-		Logger.error(LOG, "Warmup timer settlement observer failed â€” %s.",
+		Logger.error(LOG, "Warmup timer settlement observer failed — %s.",
 			tostring(registered_or_err))
 		return false
 	end
