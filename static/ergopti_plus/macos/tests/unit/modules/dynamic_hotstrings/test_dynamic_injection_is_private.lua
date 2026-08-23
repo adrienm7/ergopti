@@ -93,6 +93,7 @@ helpers.describe("personal_info: the @-tag expansion reaches inject_dynamic mark
 				captured.n         = select("#", ...)
 				captured.args      = { ... }
 				captured.is_private = select(INJECT_DYNAMIC_PRIVATE_ARG, ...)
+				return true
 			end,
 		}
 
@@ -151,6 +152,7 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 			inject_dynamic = function(...)
 				captured.n          = select("#", ...)
 				captured.is_private = select(INJECT_DYNAMIC_PRIVATE_ARG, ...)
+				return true
 			end,
 		}
 
@@ -196,14 +198,24 @@ helpers.describe("expander: is_private is forwarded to the keylogger, not droppe
 		package.loaded["modules.keymap.expander"] = nil
 		Expander = helpers.load_with_stubs("modules.keymap.expander")
 
-		Expander.init({
+		local expander_state = {
 			buffer                     = "abc",
+			llm_buffer                 = "",
 			magic_key                  = "\xe2\x98\x85",
 			groups                     = {},
 			current_group              = "t",
 			start_is_word_boundary     = true,
+			prepare_suppress_rescan    = function() return 1 end,
 			suppress_rescan            = function() end,
-		}, {}, {
+		}
+		expander_state.commit_suppress_rescan = function(deadline)
+			expander_state.no_rescan_until = deadline
+			expander_state.buffer = ""
+			expander_state.llm_buffer = ""
+			expander_state.start_is_word_boundary = true
+		end
+
+		Expander.init(expander_state, {}, {
 			-- The expander consults the LLM bridge while finishing a replacement.
 			-- Modelled with the same surface the e2e harness uses, so this test
 			-- exercises the real code path rather than an early return.
