@@ -28,6 +28,7 @@ local function load_menu_quit_action()
 	-- ui.menu.init at require time.
 	helpers.load_with_stubs("infra.logger")
 	local exit_calls = {}
+	local exit_mode = { value = "true" }
 	local stock_calls = { execute = 0, launch = 0 }
 	_G.hs.execute = function()
 		stock_calls.execute = stock_calls.execute + 1
@@ -39,6 +40,17 @@ local function load_menu_quit_action()
 	end
 
 	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["ui.menu.global_actions_transaction"] = {
+		create = function(deps)
+			return {
+				run_exclusive = function(_, callback)
+					if deps.terminal_pending() then return false end
+					local ok, result = xpcall(callback, debug.traceback)
+					return ok and result == true
+				end,
+			}
+		end,
+	}
 	package.loaded["ui.hotstring_editor"] = {}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.text_utils"] = {
@@ -84,8 +96,12 @@ local function load_menu_quit_action()
 		setMenu = function() end,
 	}
 	package.loaded["infra.termination_coordinator"] = {
+		is_pending = function() return false end,
 		request_exit = function(reason, code)
 			exit_calls[#exit_calls + 1] = { reason = reason, code = code }
+			if exit_mode.value == "throw" then error("coordinated exit fault") end
+			if exit_mode.value == "nil" then return nil end
+			if exit_mode.value == "false" then return false end
 			return true
 		end,
 	}
@@ -110,7 +126,7 @@ local function load_menu_quit_action()
 	helpers.assert_true(started, "ui.menu.init must start over the quit harness: " .. tostring(start_err))
 	helpers.assert_true(type(captured_actions) == "table" and type(captured_actions.quit) == "function",
 		"the real menu start must publish its quit action")
-	return captured_actions.quit, exit_calls, stock_calls
+	return captured_actions.quit, exit_calls, stock_calls, exit_mode
 end
 
 helpers.describe("menu Quit uses exact lease revocation", function()
@@ -134,9 +150,8 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 		end
 	end)
 
-	helpers.it("falls back when timer scheduling throws, returns nil, or explicitly refuses", function()
-		local quit_action, exit_calls, stock_calls = load_menu_quit_action()
-		local saved_do_after = _G.hs.timer.doAfter
+	helpers.it("fails closed when coordinated exit throws, returns nil, or explicitly refuses", function()
+		local quit_action, exit_calls, stock_calls, exit_mode = load_menu_quit_action()
 		local saved_exit = os.exit
 		local direct_exits = 0
 		local results = {}
@@ -145,18 +160,18 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 		os.exit = function() direct_exits = direct_exits + 1 end
 
 		for _, case in ipairs({
-			{ label = "throw", schedule = function() error("menu timer scheduling fault") end },
-			{ label = "nil", schedule = function() return nil end },
-			{ label = "false", schedule = function() return false end },
+			{ label = "throw" },
+			{ label = "nil" },
+			{ label = "false" },
 		}) do
-			_G.hs.timer.doAfter = case.schedule
+			exit_mode.value = case.label
 			local before = #exit_calls
-			local ok, err = pcall(quit_action)
+			local ok, accepted = pcall(quit_action)
 			local call = exit_calls[#exit_calls]
 			results[#results + 1] = {
 				label = case.label,
 				ok = ok,
-				err = err,
+				accepted = accepted,
 				before = before,
 				after = #exit_calls,
 				reason = call and call.reason,
@@ -164,15 +179,16 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 			}
 		end
 
-		_G.hs.timer.doAfter = saved_do_after
 		os.exit = saved_exit
 		for _, result in ipairs(results) do
 			helpers.assert_true(result.ok,
-				result.label .. " scheduling failure must not escape the menu callback: " .. tostring(result.err))
+				result.label .. " coordinator failure must not escape the menu callback")
 			helpers.assert_eq(result.after, result.before + 1,
-				result.label .. " scheduling failure must request the controlled exit directly")
+				result.label .. " must attempt the coordinated exit exactly once")
 			helpers.assert_eq(result.reason, "menu_quit")
 			helpers.assert_eq(result.code, 0)
+			helpers.assert_eq(result.accepted, false,
+				result.label .. " must not acknowledge an uncommitted exit")
 		end
 		helpers.assert_eq(direct_exits, 0)
 		helpers.assert_eq(stock_calls.execute, stock_execute_before,
