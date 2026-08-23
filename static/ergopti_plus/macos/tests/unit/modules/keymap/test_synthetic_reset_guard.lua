@@ -51,22 +51,30 @@ end
 
 
 helpers.describe("SyntheticInput explicit producer inventory", function()
-	local calls = {
-		'SyntheticInput.begin("terminator_replay", "replacement")',
-		'SyntheticInput.begin("external_replacement", "replacement")',
-		'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")',
-		'SyntheticInput.begin("clipboard_restore", "replacement")',
-		'SyntheticInput.begin("shortcuts.text.reselect", "action")',
-		'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
+	local producers = {
+		clipboard_restore = 'SyntheticInput.begin("clipboard_restore", "replacement")',
+		expander_replacement =
+			'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")',
+		external_replacement = 'SyntheticInput.begin("external_replacement", "replacement")',
+		keep_awake = 'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
+		terminator_replay = 'SyntheticInput.begin("terminator_replay", "replacement")',
+		text_reselect = 'SyntheticInput.begin("shortcuts.text.reselect", "action")',
+		text_surround = 'SyntheticInput.begin("shortcuts.text.surround", "action")',
 	}
 
 	helpers.it("enumerates the complete non-vacuous class", function()
 		local all = strip_line_comments(helpers.read_driver_source())
-		helpers.assert_eq(count_literal(all, "SyntheticInput.begin("), #calls,
+		local producer_names = {}
+		for name in pairs(producers) do producer_names[#producer_names + 1] = name end
+		table.sort(producer_names)
+		helpers.assert_eq(#producer_names, 7,
+			"the explicit producer inventory must name all seven reviewed owners")
+		helpers.assert_eq(count_literal(all, "SyntheticInput.begin("), #producer_names,
 			"a new explicit producer needs a lifecycle assertion in this inventory")
-		for _, call in ipairs(calls) do
+		for _, name in ipairs(producer_names) do
+			local call = producers[name]
 			helpers.assert_eq(count_literal(all, call), 1,
-				"each reviewed producer declaration must occur exactly once: " .. call)
+				"each reviewed producer declaration must occur exactly once: " .. name)
 		end
 	end)
 
@@ -93,7 +101,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 
 	helpers.it("external replacement exposes begin, scoped build, and seal as one API", function()
 		local source = read_unit("local function invalidate_observed_context")
-		local begin_pos = source:find(calls[2], 1, true)
+		local begin_pos = source:find(producers.external_replacement, 1, true)
 		local scope_pos = source:find("SyntheticInput.with_transaction(transaction, fn", 1, true)
 		local seal_pos = source:find("SyntheticInput.seal(transaction)", 1, true)
 		helpers.assert_true(begin_pos and scope_pos and seal_pos,
@@ -121,7 +129,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 
 	helpers.it("terminator replay commits only after scoped construction succeeds", function()
 		local source = read_unit("local REPLAY_RETRY_BASE_SEC")
-		local begin_pos = source:find(calls[1], 1, true)
+		local begin_pos = source:find(producers.terminator_replay, 1, true)
 		local scope_pos = source:find("pcall(SyntheticInput.with_transaction", 1, true)
 		local seal_pos = source:find("pcall(SyntheticInput.seal", 1, true)
 		local cancel_pos = source:find("pcall(SyntheticInput.cancel", 1, true)
@@ -132,7 +140,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 
 	helpers.it("clipboard restore is a sealed retained drain owner", function()
 		local source = read_unit("local function acquire_paste_debt")
-		local begin_pos = source:find(calls[4], 1, true)
+		local begin_pos = source:find(producers.clipboard_restore, 1, true)
 		local retain_pos = source:find("SyntheticInput.retain(tx)", begin_pos, true)
 		local seal_pos = source:find("SyntheticInput.seal(tx)", begin_pos, true)
 		local release_pos = source:find("SyntheticInput.release, tx, token", begin_pos, true)
@@ -144,7 +152,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 
 	helpers.it("deferred text reselection owns dispatch through terminal cleanup", function()
 		local source = read_unit("local TRANSFORM_LOCK_TIMEOUT_SEC")
-		local begin_pos = source:find(calls[4], 1, true)
+		local begin_pos = source:find(producers.text_reselect, 1, true)
 		local batch_pos = source:find("SyntheticInput.begin_batch(tx)", begin_pos, true)
 		local dispatch_pos = source:find("SyntheticInput.dispatch(batch)", begin_pos, true)
 		local seal_pos = source:find("SyntheticInput.seal(tx)", begin_pos, true)
@@ -154,9 +162,31 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		helpers.assert_true(begin_pos < batch_pos and batch_pos < dispatch_pos and dispatch_pos < seal_pos)
 	end)
 
+	helpers.it("parenthesis surround retains one transaction through every terminal path", function()
+		local source = read_unit("function M.surround_with_parens")
+		local begin_pos = source:find(producers.text_surround, 1, true)
+		helpers.assert_not_nil(begin_pos,
+			"parenthesis surround must open its named synthetic transaction")
+		local next_public_function = source:find("\nfunction M%.[%w_]+%(", begin_pos)
+		local surround = source:sub(begin_pos,
+			next_public_function and next_public_function - 1 or #source)
+		local retain_pos = surround:find("SyntheticInput.retain(tx)", 1, true)
+		local completion_pos = surround:find("SyntheticInput.on_complete(tx", 1, true)
+		local release_pos = surround:find("SyntheticInput.release, tx, retain", 1, true)
+		local seal_pos = surround:find("SyntheticInput.seal(tx)", 1, true)
+		local cancel_pos = surround:find("SyntheticInput.cancel, tx", 1, true)
+		helpers.assert_true(retain_pos and completion_pos and release_pos and seal_pos and cancel_pos,
+			"surround needs exact retain, completion, release, seal, and cancel ownership")
+		helpers.assert_true(retain_pos < completion_pos,
+			"surround must retain the closing sibling before observing transaction completion")
+		helpers.assert_true(completion_pos < release_pos and completion_pos < seal_pos
+			and completion_pos < cancel_pos,
+			"the completion observer must precede every surround terminal route")
+	end)
+
 	helpers.it("keep-awake heartbeat is an explicit non-observable transaction with rollback", function()
 		local source = read_unit("local function emit_activity_keystroke")
-		local begin_pos = source:find(calls[5], 1, true)
+		local begin_pos = source:find(producers.keep_awake, 1, true)
 		local emit_pos = source:find("SyntheticInput.emit_key_stroke", begin_pos, true)
 		local seal_pos = source:find("SyntheticInput.seal", begin_pos, true)
 		local cancel_pos = source:find("SyntheticInput.cancel, transaction", begin_pos, true)
