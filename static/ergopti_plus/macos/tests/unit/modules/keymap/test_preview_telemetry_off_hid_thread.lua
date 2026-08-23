@@ -44,12 +44,12 @@ local TELEMETRY_CALLS = {
 	"keylogger.log_hotstring_dismissed",
 }
 
--- How far back from a call the deferral wrapper may sit. The compliant form is
---   TimerScheduler.after(0, function()
+-- How far back from a call the shared deferral helper may sit. The compliant form is
+--   schedule_prediction_deferred("telemetry label", function()
 --       pcall(keylogger.log_hotstring_x, …)
--- so the wrapper is on the previous line: one short line of slack, not enough to
+-- so the helper is on the previous line: one short line of slack, not enough to
 -- let an unrelated deferral elsewhere in the function count.
-local DEFERRAL_LOOKBACK = 80
+local DEFERRAL_LOOKBACK = 120
 
 
 
@@ -84,10 +84,10 @@ helpers.describe("preview telemetry: no hotstring log write runs on the HID thre
 				-- throw here skips the state cleanup that follows it.
 				local guarded = code:sub(math.max(1, at - 7), at - 1):find("pcall(", 1, true) ~= nil
 
-				-- Condition 2: it sits inside a zero-delay deferral, so the write
+				-- Condition 2: it sits inside the shared owned deferral, so the write
 				-- happens on the next runloop turn instead of inside the tap callback.
 				local window = code:sub(math.max(1, at - DEFERRAL_LOOKBACK), at)
-				local deferred = window:find("TimerScheduler.after(0, function()", 1, true) ~= nil
+				local deferred = window:find("schedule_prediction_deferred(", 1, true) ~= nil
 
 				if not guarded or not deferred then
 					local why = (not deferred and "not deferred" or "")
@@ -116,11 +116,11 @@ helpers.describe("preview telemetry: no hotstring log write runs on the HID thre
 		-- assertion above pass over both sites — the vacuous absence assertion this
 		-- suite tracks as a false-green class.
 		local BARE = 'keylogger.log_hotstring_dismissed(nil, a, b, c)\n'
-		local COMPLIANT = 'TimerScheduler.after(0, function()\n'
+		local COMPLIANT = 'schedule_prediction_deferred("dismiss telemetry", function()\n'
 			.. '\t\t\tpcall(keylogger.log_hotstring_dismissed, nil, a, b, c)\n'
 		-- Deferred but NOT guarded: the latency is fixed and the state corruption
 		-- is not, which is a distinct and equally real defect.
-		local HALF = 'TimerScheduler.after(0, function()\n'
+		local HALF = 'schedule_prediction_deferred("dismiss telemetry", function()\n'
 			.. '\t\t\tkeylogger.log_hotstring_dismissed(nil, a, b, c)\n'
 
 		--- Mirrors the classifier above on a snippet.
@@ -131,7 +131,7 @@ helpers.describe("preview telemetry: no hotstring log write runs on the HID thre
 			if not at then return false end
 			local guarded = code:sub(math.max(1, at - 7), at - 1):find("pcall(", 1, true) ~= nil
 			local window  = code:sub(math.max(1, at - DEFERRAL_LOOKBACK), at)
-			local deferred = window:find("TimerScheduler.after(0, function()", 1, true) ~= nil
+			local deferred = window:find("schedule_prediction_deferred(", 1, true) ~= nil
 			return guarded and deferred
 		end
 
@@ -141,6 +141,20 @@ helpers.describe("preview telemetry: no hotstring log write runs on the HID thre
 			.. "is what a throw would skip")
 		helpers.assert_true(compliant(COMPLIANT),
 			"and the compliant form must be accepted, or the guard would forbid its own fix")
+	end)
+
+	helpers.it("the shared prediction deferral owns a zero-delay scheduler capability", function()
+		local src = helpers.read_driver_source(ANCHOR)
+		helpers.assert_true(src ~= nil and src ~= "",
+			"the LLM bridge must remain locatable by its preview ownership anchor")
+		local code = src:gsub("%-%-[^\n]*", "")
+		local helper_at = code:find("local function schedule_prediction_deferred", 1, true)
+		local helper_end = helper_at and code:find("\nend", helper_at, true)
+		helpers.assert_true(helper_at ~= nil and helper_end ~= nil,
+			"the shared prediction deferral helper must remain bounded")
+		local helper_body = code:sub(helper_at, helper_end)
+		helpers.assert_true(helper_body:find("TimerScheduler.after(0, function()", 1, true) ~= nil,
+			"the shared helper must keep preview telemetry off the HID callback")
 	end)
 
 end)
