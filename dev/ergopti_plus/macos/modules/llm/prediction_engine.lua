@@ -134,6 +134,7 @@ local _last_request_buffer_len = 0
 local _inactivity_timer = nil
 local timer_running
 local stop_inactivity_timer
+local _inactivity_generation = 0
 
 -- Holds the profile name to forward when the rate-limit deferral re-arms the
 -- inactivity timer; cleared by the timer callback after each deferred fire
@@ -145,6 +146,11 @@ local _chain_trigger_timer = nil
 local _chain_dispatch_timer = nil
 -- Fences fallback and dispatch callbacks across reset/re-arm transitions.
 local _chain_generation = 0
+
+-- Deferred dismissal telemetry is a native capability too. It is normally
+-- best-effort, but a global PAUSE must fence and settle every predecessor.
+local _deferred_telemetry_generation = 0
+local _deferred_telemetry_handles = {}
 
 -- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
@@ -163,6 +169,7 @@ local is_llm_enabled          = LLM_DEFAULTS.llm_enabled
 local active_model            = core_llm.get_current_model()  -- Backend-aware; overridden by set_llm_model
 local llm_display_name        = core_llm.get_current_model()  -- Human-readable label shown in the info bar
 local llm_backend_label       = nil                           -- "Ollama 🦙", "MLX 🚀", or a custom label
+local _model_transition_generation = 0
 local temperature             = LLM_DEFAULTS.llm_temperature
 local context_window_chars    = LLM_DEFAULTS.llm_context_length
 local min_words               = tonumber(hs.settings.get("llm_min_words")) or LLM_DEFAULTS.llm_min_words
@@ -187,6 +194,163 @@ local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
 local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypass debounce at word boundaries
+
+
+--- Schedules one dismissal-telemetry callback behind an exact lifecycle fence.
+--- @param callback function Deferred telemetry callback.
+--- @return table handle Scheduler handle.
+--- @return boolean committed True only when the native timer committed.
+local function schedule_deferred_telemetry(callback)
+	local generation = _deferred_telemetry_generation
+	local owner = {
+		handle = nil,
+		authorized = true,
+		committed = false,
+		installing = true,
+		native_settled = false,
+		callback_pending = false,
+		callback_running = false,
+		callback_consumed = false,
+	}
+	_deferred_telemetry_handles[owner] = true
+
+	local function release_owner()
+		if owner.installing == true or owner.native_settled ~= true
+			or owner.callback_running == true then
+			return false
+		end
+		if owner.authorized == true and owner.committed == true
+			and owner.callback_consumed ~= true then
+			return false
+		end
+		_deferred_telemetry_handles[owner] = nil
+		return true
+	end
+
+	local function deliver_callback()
+		if owner.callback_pending ~= true or owner.callback_consumed == true
+			or owner.native_settled ~= true then
+			return false
+		end
+		if owner.committed ~= true then return false end
+		if owner.authorized ~= true
+			or generation ~= _deferred_telemetry_generation then
+			release_owner()
+			return false
+		end
+		owner.callback_consumed = true
+		owner.callback_pending = false
+		owner.callback_running = true
+		local ok, detail = xpcall(callback, debug.traceback)
+		owner.callback_running = false
+		if not ok then
+			Logger.error(LOG, "Prediction telemetry callback raised: %s", tostring(detail))
+		end
+		release_owner()
+		return ok == true
+	end
+
+	local function timer_callback()
+		if owner.callback_pending == true or owner.callback_consumed == true then
+			return false
+		end
+		owner.callback_pending = true
+		if owner.installing == true then return true end
+		return deliver_callback()
+	end
+
+	local schedule_ok, handle_or_error, committed = xpcall(function()
+		return TimerScheduler.after(0, timer_callback)
+	end, debug.traceback)
+	owner.installing = false
+	if schedule_ok == true and type(handle_or_error) == "table" then
+		owner.handle = handle_or_error
+		local observer_ok, observer_result = xpcall(function()
+			return TimerScheduler.onSettled(handle_or_error, function()
+				owner.native_settled = true
+				deliver_callback()
+				release_owner()
+			end)
+		end, debug.traceback)
+		if not observer_ok or observer_result ~= true then
+			owner.authorized = false
+			owner.committed = false
+			local cancel_ok, settled = xpcall(function()
+				return TimerScheduler.cancel(handle_or_error)
+			end, debug.traceback)
+			if cancel_ok == true and settled == true then
+				owner.native_settled = true
+				release_owner()
+			end
+			Logger.error(LOG,
+				"Prediction telemetry settlement observer was not accepted: %s",
+				tostring(observer_result))
+			return handle_or_error, false
+		end
+	end
+	if schedule_ok ~= true or type(handle_or_error) ~= "table"
+		or committed ~= true or owner.authorized ~= true then
+		owner.authorized = false
+		owner.committed = false
+		if owner.handle ~= nil then
+			local cancel_ok, settled = xpcall(function()
+				return TimerScheduler.cancel(owner.handle)
+			end, debug.traceback)
+			if cancel_ok == true and settled == true then
+				owner.native_settled = true
+				release_owner()
+			end
+		else
+			owner.native_settled = true
+			release_owner()
+		end
+		return handle_or_error, false
+	end
+	owner.committed = true
+	deliver_callback()
+	return owner.handle, true
+end
+
+
+--- Fences and settles every deferred telemetry timer without replay.
+--- @return boolean settled True only after every exact timer settled.
+local function settle_deferred_telemetry()
+	_deferred_telemetry_generation = _deferred_telemetry_generation + 1
+	local snapshot = {}
+	for owner in pairs(_deferred_telemetry_handles) do
+		snapshot[#snapshot + 1] = owner
+	end
+	local all_settled = true
+	for _, owner in ipairs(snapshot) do
+		owner.authorized = false
+		owner.committed = false
+		if owner.installing == true or owner.callback_running == true then
+			all_settled = false
+		elseif owner.native_settled == true then
+			_deferred_telemetry_handles[owner] = nil
+		elseif owner.handle == nil then
+			owner.native_settled = true
+			_deferred_telemetry_handles[owner] = nil
+		else
+			local ok, result = xpcall(function()
+				return TimerScheduler.cancel(owner.handle)
+			end, debug.traceback)
+			if ok and result == true then
+				owner.native_settled = true
+				_deferred_telemetry_handles[owner] = nil
+			else
+				all_settled = false
+				Logger.error(LOG,
+					"Prediction telemetry timer remains owned: %s", tostring(result))
+			end
+		end
+	end
+	-- A native stop/running probe may synchronously re-enter an ordinary reset
+	-- and publish a fresh telemetry owner. Preserve that successor and make the
+	-- outer PAUSE retry instead of certifying a snapshot that is already stale.
+	if next(_deferred_telemetry_handles) ~= nil then all_settled = false end
+	return all_settled
+end
 
 --- Stable dependency identity for WarmupController. A retry after a later child
 --- refuses must present the same function object, not a fresh closure that the
@@ -235,26 +399,46 @@ end
 --- ===== 3.2) LLM Config =====
 --- ===========================
 
+--- @return boolean committed True after the runtime prediction gate is applied.
 function M.set_llm_enabled(enabled)
 	is_llm_enabled = (enabled == true)
-	if type(core_llm.set_runtime_llm_enabled) == "function" then
-		core_llm.set_runtime_llm_enabled(is_llm_enabled)
+	local committed = true
+
+	local function settle(label, fn, ...)
+		if type(fn) ~= "function" then
+			Logger.error(LOG, "LLM settlement '%s' is unavailable.", tostring(label))
+			committed = false
+			return false
+		end
+		local args = { ... }
+		local ok, result = xpcall(function()
+			return fn(table.unpack(args))
+		end, debug.traceback)
+		if not ok or result ~= true then
+			Logger.error(LOG, "LLM settlement '%s' did not commit (result: %s).",
+				tostring(label), tostring(result))
+			committed = false
+			return false
+		end
+		return true
 	end
+
+	settle("runtime gate", core_llm.set_runtime_llm_enabled, is_llm_enabled)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	if not is_llm_enabled then
-		M.reset()
+		settle("prediction reset", M.reset)
 		-- Stop BOTH warmup drivers, exactly as script_control.pause_all() does.
 		-- M.reset() only stops the prediction timers and cancels streaming; it never
 		-- touches warmup. WarmupController's chain self-guards on _get_llm_enabled(),
 		-- but api_mlx's own 2s self-retry is gated solely on _warmup_stopped — so
 		-- without stop_warmup() it keeps POSTing after the user turned AI off and
 		-- fires the "server ready" notification while AI is disabled (M-3).
-		if type(WarmupController.stop) == "function" then
-			pcall(function() WarmupController.stop() end)
-		end
+		settle("warmup-controller stop", WarmupController.stop)
 		local ok_api, api = pcall(require, "modules.llm.api_mlx")
 		if ok_api and api and type(api.stop_warmup) == "function" then
-			pcall(function() api.stop_warmup() end)
+			settle("MLX warmup stop", api.stop_warmup)
+		else
+			committed = false
 		end
 		-- Ollama needs the same invalidation: its warmup POST triggers the model load
 		-- and can stay in flight for tens of seconds, so without this the response
@@ -262,9 +446,20 @@ function M.set_llm_enabled(enabled)
 		-- notification while AI is off. Only the MLX leg was stopped (M-3's sibling).
 		local ok_ol, ollama = pcall(require, "modules.llm.api_ollama")
 		if ok_ol and ollama and type(ollama.stop_warmup) == "function" then
-			pcall(function() ollama.stop_warmup() end)
+			settle("Ollama warmup stop", ollama.stop_warmup)
+		else
+			committed = false
 		end
-		return
+		-- Remote warmup may still own a Keychain token read before it owns an HTTP
+		-- request. Disable must revoke that waiter too and consume any pause-resume
+		-- intent, otherwise leaving PAUSED resurrects a provider the user disabled.
+		local ok_remote, remote = pcall(require, "modules.llm.api_remote")
+		if ok_remote and remote and type(remote.stop_warmup) == "function" then
+			settle("Remote warmup stop", remote.stop_warmup)
+		else
+			committed = false
+		end
+		return committed
 	end
 	-- _warmup_stopped is owned by script_control.pause_all(); resume_all() clears it
 	-- and re-arms both drivers itself. Clearing it here would revive the 2 s POST loop
@@ -275,40 +470,65 @@ function M.set_llm_enabled(enabled)
 	local sc = package.loaded["modules.shortcuts.script_control"]
 	if sc and type(sc.is_paused) == "function" and sc.is_paused() then
 		Logger.debug(LOG, "set_llm_enabled(true) while paused — warmup stays parked until resume.")
-		return
+		return committed
 	end
+	if not committed then return false end
 
 	-- Symmetric to the disable-side pair: resume_warmup() clears the
 	-- _warmup_stopped short-circuit BEFORE the controller re-arms, otherwise the
 	-- scheduled warmup would immediately self-discard in M.warmup()'s guard
 	local ok_api, api = pcall(require, "modules.llm.api_mlx")
 	if ok_api and api and type(api.resume_warmup) == "function" then
-		pcall(function() api.resume_warmup() end)
+		settle("MLX warmup resume", api.resume_warmup)
+	else
+		committed = false
 	end
-	WarmupController.schedule_warmup_with_retry("set_llm_enabled")
+	settle("warmup-controller schedule", WarmupController.schedule_warmup_with_retry,
+		"set_llm_enabled")
+	return committed
 end
 
 --- @return boolean
 function M.get_llm_enabled() return is_llm_enabled end
 
 function M.set_llm_model(model_name)
+	_model_transition_generation = _model_transition_generation + 1
+	local my_transition_generation = _model_transition_generation
 	local changed = active_model ~= model_name
 	if changed then
 		-- Model identity owns every pending debounce, watchdog and backend request.
 		-- Tear those down before publishing the new identity so a completion from
 		-- the old model cannot appear under the new menu selection.
-		M.reset()
+		if M.reset() ~= true then return false end
+		if _model_transition_generation ~= my_transition_generation then return false end
 	end
 	local backend = core_llm.get_backend()
-	if backend == "mlx" then core_llm.set_llm_model_mlx(model_name)
-	else core_llm.set_llm_model_ollama(model_name) end
+	if _model_transition_generation ~= my_transition_generation then return false end
+	local setter = backend == "mlx" and core_llm.set_llm_model_mlx
+		or core_llm.set_llm_model_ollama
+	local setter_ok, committed = xpcall(setter, debug.traceback, model_name)
+	if setter_ok ~= true or committed ~= true then
+		Logger.error(LOG, "Model setter refused '%s' for backend %s: %s.",
+			tostring(model_name), tostring(backend), tostring(committed))
+		return false
+	end
+	if _model_transition_generation ~= my_transition_generation then return false end
 	active_model = model_name
 	Logger.info(LOG, "Model set: '%s' (backend: %s).", tostring(model_name), tostring(backend))
 	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
 	-- during startup when set_llm_model fires before set_llm_enabled(true))
 	if is_llm_enabled and type(model_name) == "string" and model_name ~= "" then
-		WarmupController.schedule_warmup_with_retry("set_llm_model")
+		local warmup_ok, accepted = xpcall(
+			WarmupController.schedule_warmup_with_retry, debug.traceback,
+			"set_llm_model")
+		if _model_transition_generation ~= my_transition_generation then return false end
+		if warmup_ok ~= true or accepted ~= true then
+			Logger.error(LOG, "Model warmup scheduling was refused: %s.",
+				tostring(accepted))
+			return false
+		end
 	end
+	return true
 end
 
 function M.set_llm_display_model_name(name)
@@ -413,16 +633,44 @@ end
 function M.set_llm_min_words(w)
 	-- Coerce + fail closed: a value from config.toml / a half-written plist can be a
 	-- string, which later reaches `<=`/`>` comparisons in the shared prompt_builder
-	-- and `> 0` in the menu — both crash on a non-number. Persist the coerced number.
+	-- and `> 0` in the menu — both crash on a non-number. SettingsManager remains
+	-- the sole native plist publisher; this setter owns runtime state only.
 	min_words = tonumber(w) or LLM_DEFAULTS.llm_min_words
-	hs.settings.set("llm_min_words", min_words)
 	Logger.debug(LOG, "Min words: %s.", tostring(min_words))
 end
 
 function M.set_llm_max_words(w)
 	max_words = tonumber(w) or LLM_DEFAULTS.llm_max_words
-	hs.settings.set("llm_max_words", max_words)
 	Logger.debug(LOG, "Max words: %s (0 = unlimited).", tostring(max_words))
+end
+
+--- Reads the actual engine-owned runtime value for one transactional menu key.
+--- The boolean discriminator keeps a valid false value distinct from an unknown key.
+--- @param key string Canonical preference key.
+--- @return boolean found True when this engine owns the requested runtime value.
+--- @return any value Current runtime value.
+function M.get_llm_runtime_setting(key)
+	if key == "llm_debounce" then return true, inactivity_debounce_sec end
+	if key == "llm_max_words" then return true, max_words end
+	if key == "llm_min_words" then return true, min_words end
+	if key == "llm_temperature" then return true, temperature end
+	if key == "llm_context_length" then return true, context_window_chars end
+	if key == "llm_num_predictions" then return true, num_predictions end
+	if key == "llm_show_info_bar" then return true, show_info_bar end
+	if key == "llm_sequential_mode" then return true, sequential_mode end
+	if key == "llm_auto_raise_temp" then return true, auto_raise_temperature end
+	if key == "llm_streaming" then return true, is_streaming_enabled end
+	if key == "llm_streaming_multi" then return true, is_streaming_multi_enabled end
+	if key == "llm_pred_indent" then return true, prediction_indent end
+	if key == "llm_nav_modifiers" then return true, navigation_mods end
+	if key == "llm_val_modifiers" then return true, validation_mods end
+	if key == "llm_instant_on_word_end" then return true, instant_on_word_end end
+	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
+	if key == "llm_secure_field_filter_enabled" then
+		return true, secure_field_filter_enabled
+	end
+	if key == "llm_disabled_apps" then return true, excluded_apps end
+	return false, nil
 end
 
 
@@ -430,8 +678,7 @@ end
 -- ===== 3.3) Debounce / Timer =========
 -- =====================================
 
---- Updates the inactivity debounce interval on the canonical timer.
---- Uses setDelay instead of recreating the timer to preserve the single-instance invariant.
+--- Updates the inactivity debounce interval after settling any active one-shot.
 function M.set_llm_debounce(seconds)
 	-- Coerce for the same reason as the other numeric setters: the value is fed
 	-- straight to setDelay() and to the adaptive-debounce arithmetic, and a string
@@ -440,13 +687,6 @@ function M.set_llm_debounce(seconds)
 	if _inactivity_timer then
 		if stop_inactivity_timer() ~= true then
 			Logger.error(LOG, "Debounce update rejected because the active timer could not be stopped.")
-			return false
-		end
-		local delay_ok, delay_err = xpcall(function()
-			_inactivity_timer:setDelay(inactivity_debounce_sec)
-		end, debug.traceback)
-		if not delay_ok then
-			Logger.error(LOG, "Debounce update failed: %s", tostring(delay_err))
 			return false
 		end
 	end
@@ -596,25 +836,105 @@ end
 --- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
 local function start_inactivity_timer(delay_override)
 	if not runtime_available() then return false end
-	if not is_llm_enabled or inactivity_debounce_sec < 0 or not _inactivity_timer then return false end
+	if not is_llm_enabled or inactivity_debounce_sec < 0 then return false end
+	if stop_inactivity_timer() ~= true then return false end
 	local delay = delay_override
 	if delay == nil then delay = compute_adaptive_debounce() end
-	local start_ok, start_err = xpcall(function()
-		_inactivity_timer:start(delay)
+	local generation = _inactivity_generation + 1
+	_inactivity_generation = generation
+	local descriptor = {
+		acquiring = true,
+		authorized = false,
+		callback_running = false,
+		delivered = false,
+		generation = generation,
+		handle = nil,
+		settled = false,
+	}
+	_inactivity_timer = descriptor
+
+	--- Releases this descriptor only after both native and business settlement.
+	--- @return boolean released True when this exact owner left the live slot.
+	local function release_descriptor()
+		if descriptor.acquiring == true or descriptor.callback_running == true
+			or descriptor.settled ~= true then
+			return false
+		end
+		if descriptor.authorized == true and descriptor.delivered ~= true then
+			return false
+		end
+		if _inactivity_timer == descriptor then _inactivity_timer = nil end
+		return true
+	end
+
+	--- Reports whether callback business may still publish after a dependency boundary.
+	--- @return boolean current True only for this exact callback generation.
+	local function callback_is_current()
+		return descriptor.callback_running == true
+			and descriptor.authorized == true
+			and descriptor.generation == _inactivity_generation
+			and _inactivity_timer == descriptor
+	end
+
+	local handle, committed = TimerScheduler.after(delay, function()
+		if descriptor.authorized ~= true or descriptor.delivered == true
+			or descriptor.generation ~= _inactivity_generation then
+			descriptor.authorized = false
+			release_descriptor()
+			return false
+		end
+		descriptor.delivered = true
+		descriptor.callback_running = true
+		local profile = _deferred_profile_name
+		_deferred_profile_name = nil
+		local ok, err = xpcall(function()
+			return M.perform_check(false, profile, callback_is_current)
+		end, debug.traceback)
+		local callback_remained_current = callback_is_current()
+		local rearm_delay = callback_remained_current and descriptor.rearm_delay or nil
+		local rearm_profile = descriptor.rearm_profile
+		descriptor.rearm_delay = nil
+		descriptor.rearm_profile = nil
+		descriptor.callback_running = false
+		if not ok then
+			Logger.error(LOG, "Inactivity debounce check raised: %s. This prediction is abandoned — "
+				.. "nothing retries it, so the user simply never sees one.", tostring(err))
+		end
+		release_descriptor()
+		if ok and callback_remained_current and rearm_delay ~= nil then
+			_deferred_profile_name = rearm_profile
+			if start_inactivity_timer(rearm_delay) ~= true then
+				_deferred_profile_name = nil
+				Logger.error(LOG, "Rate-limit deferral timer did not commit; request abandoned.")
+				return false
+			end
+		end
+		return ok and callback_remained_current
+	end)
+	descriptor.handle = handle
+	descriptor.acquiring = false
+	local observer_ok, observer_result = xpcall(function()
+		return TimerScheduler.onSettled(handle, function()
+			descriptor.settled = true
+			release_descriptor()
+		end)
 	end, debug.traceback)
-	if not start_ok then
-		Logger.error(LOG, "Cannot start inactivity timer: %s", tostring(start_err))
+	if not observer_ok or observer_result ~= true then
+		descriptor.authorized = false
+		TimerScheduler.cancel(handle)
+		Logger.error(LOG, "Inactivity timer settlement observer was not accepted: %s",
+			tostring(observer_result))
 		return false
 	end
-	local status_ok, running_or_err = timer_running(_inactivity_timer)
-	if not status_ok then
-		Logger.error(LOG, "Cannot verify started inactivity timer: %s", tostring(running_or_err))
+	if committed ~= true or generation ~= _inactivity_generation
+		or _inactivity_timer ~= descriptor then
+		descriptor.authorized = false
+		TimerScheduler.cancel(handle)
+		if handle.timer == nil and _inactivity_timer == descriptor then _inactivity_timer = nil end
+		Logger.error(LOG, "Cannot commit inactivity timer start; exact cleanup is retained.")
 		return false
 	end
-	if not running_or_err then
-		Logger.error(LOG, "Inactivity timer remained stopped after start().")
-		return false
-	end
+	descriptor.authorized = true
 	if delay_override ~= nil then
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
 	else
@@ -642,33 +962,40 @@ timer_running = function(timer)
 end
 
 
---- Cancels the inactivity timer without firing the LLM check.
---- The canonical handle is retained permanently; a failed verification is
---- retryable and must never be reported as a completed reset.
---- @return boolean stopped True only when native state reports not running.
+--- Cancels the exact inactivity timer without firing the LLM check.
+--- A failed native stop remains retryable through the same descriptor.
+--- @return boolean stopped True only when no native capability remains.
 stop_inactivity_timer = function()
-	local timer = _inactivity_timer
-	if not timer then return true end
-	if type(timer.stop) ~= "function" then
-		Logger.error(LOG, "Cannot stop inactivity timer: stop() is unavailable.")
+	local descriptor = _inactivity_timer
+	if not descriptor then return true end
+	descriptor.authorized = false
+	_inactivity_generation = _inactivity_generation + 1
+	if descriptor.callback_running == true then
+		Logger.error(LOG, "Inactivity timer callback is still running.")
 		return false
 	end
-	local stop_ok, stop_err = xpcall(function()
-		timer:stop()
+	if descriptor.acquiring == true then
+		Logger.error(LOG, "Inactivity timer acquisition is still unresolved.")
+		return false
+	end
+	local handle = descriptor.handle
+	if type(handle) ~= "table" or handle.timer == nil then
+		if _inactivity_timer == descriptor then _inactivity_timer = nil end
+		return true
+	end
+	local stop_ok, stop_result = xpcall(function()
+		return TimerScheduler.cancel(handle)
 	end, debug.traceback)
-	if not stop_ok then
-		Logger.error(LOG, "Cannot stop inactivity timer: %s", tostring(stop_err))
+	if not stop_ok or stop_result ~= true then
+		Logger.error(LOG, "Cannot stop inactivity timer: %s", tostring(stop_result))
 		return false
 	end
-	local status_ok, running_or_err = timer_running(timer)
-	if not status_ok then
-		Logger.error(LOG, "Cannot verify stopped inactivity timer: %s", tostring(running_or_err))
+	if _inactivity_timer ~= nil and _inactivity_timer ~= descriptor then
+		Logger.error(LOG,
+			"Inactivity timer cleanup was superseded during native settlement.")
 		return false
 	end
-	if running_or_err then
-		Logger.error(LOG, "Inactivity timer remained running after stop().")
-		return false
-	end
+	if _inactivity_timer == descriptor then _inactivity_timer = nil end
 	Logger.done(LOG, "Inactivity timer stopped.")
 	return true
 end
@@ -726,6 +1053,162 @@ local function stop_timer_handle(timer, label)
 end
 
 
+--- Returns one chain-timer descriptor slot.
+--- @param kind string "fallback" or "dispatch".
+--- @return table|nil descriptor
+local function get_chain_timer(kind)
+	if kind == "fallback" then return _chain_trigger_timer end
+	return _chain_dispatch_timer
+end
+
+
+--- Publishes one chain-timer descriptor slot.
+--- @param kind string "fallback" or "dispatch".
+--- @param descriptor table|nil
+local function set_chain_timer(kind, descriptor)
+	if kind == "fallback" then
+		_chain_trigger_timer = descriptor
+	else
+		_chain_dispatch_timer = descriptor
+	end
+end
+
+
+--- Fences and settles one exact TimerScheduler-owned chain capability.
+--- @param kind string "fallback" or "dispatch".
+--- @param label string Diagnostic label.
+--- @return boolean settled
+local function settle_chain_timer(kind, label)
+	local descriptor = get_chain_timer(kind)
+	if descriptor == nil then return true end
+	descriptor.authorized = false
+	if descriptor.callback_running == true then
+		Logger.error(LOG, "%s timer callback is still running.", tostring(label))
+		return false
+	end
+	if descriptor.acquiring == true then
+		Logger.error(LOG, "%s timer acquisition is still unresolved.", tostring(label))
+		return false
+	end
+	local handle = descriptor.handle
+	if type(handle) ~= "table" or handle.timer == nil then
+		if get_chain_timer(kind) == descriptor then set_chain_timer(kind, nil) end
+		return true
+	end
+	local cancel_ok, cancel_result = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not cancel_ok or cancel_result ~= true then
+		Logger.error(LOG, "%s timer remains owned: %s", tostring(label), tostring(cancel_result))
+		return false
+	end
+	if get_chain_timer(kind) ~= nil and get_chain_timer(kind) ~= descriptor then
+		Logger.error(LOG,
+			"%s timer cleanup was superseded during native settlement.", tostring(label))
+		return false
+	end
+	if get_chain_timer(kind) == descriptor then set_chain_timer(kind, nil) end
+	return true
+end
+
+
+--- Acquires one exact one-shot chain timer behind a publish-before-start marker.
+--- TimerScheduler buffers synchronous delivery and retains mutate-then-refuse debt.
+--- @param kind string "fallback" or "dispatch".
+--- @param delay number Delay in seconds.
+--- @param generation number Chain generation authorized to receive delivery.
+--- @param callback function Business callback.
+--- @return table descriptor
+--- @return boolean committed
+local function acquire_chain_timer(kind, delay, generation, callback)
+	local descriptor = {
+		acquiring = true,
+		authorized = false,
+		callback_running = false,
+		delivered = false,
+		delivery_attempted = false,
+		generation = generation,
+		handle = nil,
+		settled = false,
+	}
+	set_chain_timer(kind, descriptor)
+
+	--- Releases this chain owner only after native settlement and callback return.
+	--- @return boolean released True when the exact descriptor left its slot.
+	local function release_descriptor()
+		if descriptor.acquiring == true or descriptor.callback_running == true
+			or descriptor.settled ~= true then
+			return false
+		end
+		if descriptor.authorized == true and descriptor.delivered ~= true then
+			return false
+		end
+		if get_chain_timer(kind) == descriptor then set_chain_timer(kind, nil) end
+		return true
+	end
+
+	--- Reports whether business still belongs to this exact chain generation.
+	--- @return boolean current True only while this callback retains authority.
+	local function callback_is_current()
+		return descriptor.callback_running == true
+			and descriptor.authorized == true
+			and descriptor.generation == _chain_generation
+			and get_chain_timer(kind) == descriptor
+	end
+
+	local handle, committed = TimerScheduler.after(delay, function()
+		descriptor.delivery_attempted = true
+		if descriptor.authorized ~= true or descriptor.delivered == true
+			or descriptor.generation ~= _chain_generation then
+			descriptor.authorized = false
+			release_descriptor()
+			return false
+		end
+		descriptor.delivered = true
+		descriptor.callback_running = true
+		local callback_ok, callback_result = xpcall(function()
+			return callback(callback_is_current)
+		end, debug.traceback)
+		local callback_remained_current = callback_is_current()
+		descriptor.callback_running = false
+		if not callback_ok then
+			Logger.error(LOG, "%s timer business callback raised: %s.",
+				tostring(kind), tostring(callback_result))
+		end
+		release_descriptor()
+		return callback_ok and callback_remained_current
+	end)
+	descriptor.handle = handle
+	descriptor.acquiring = false
+
+	local observer_ok, observer_result = xpcall(function()
+		return TimerScheduler.onSettled(handle, function()
+			descriptor.settled = true
+			release_descriptor()
+		end)
+	end, debug.traceback)
+	if not observer_ok or observer_result ~= true then
+		descriptor.authorized = false
+		TimerScheduler.cancel(handle)
+		Logger.error(LOG, "%s timer settlement observer was not accepted: %s",
+			tostring(kind), tostring(observer_result))
+		return descriptor, false
+	end
+
+	if committed ~= true or descriptor.generation ~= _chain_generation
+		or get_chain_timer(kind) ~= descriptor then
+		descriptor.authorized = false
+		TimerScheduler.cancel(handle)
+		if handle.timer == nil and get_chain_timer(kind) == descriptor then
+			set_chain_timer(kind, nil)
+		end
+		return descriptor, false
+	end
+	descriptor.authorized = true
+	return descriptor, true
+end
+
+
 
 
 -- ============================================
@@ -748,9 +1231,32 @@ end
 ---
 --- @param force_trigger boolean If true, bypasses the freshness and word-count guards.
 --- @param profile_name string|nil Optional profile label override shown in the info bar.
-function M.perform_check(force_trigger, profile_name)
+--- @param continuation_guard function|nil Internal exact-owner predicate for timer delivery.
+function M.perform_check(force_trigger, profile_name, continuation_guard)
 	if not runtime_available() then return end
 	if not require_state("perform_check") then return end
+	local entry_request_counter = llm_request_counter
+	local entry_fetch_counter = fetch_request_counter
+
+	--- Revalidates an optional timer owner after crossing a dependency boundary.
+	--- @return boolean current True while the initiating owner remains authorized.
+	local function owner_is_current()
+		if type(continuation_guard) ~= "function" then return true end
+		local ok, current = xpcall(continuation_guard, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Prediction continuation guard raised: %s.", tostring(current))
+			return false
+		end
+		return current == true
+	end
+
+	--- Detects reset or supersession before this check publishes its request ID.
+	--- @return boolean current True while no re-entrant boundary invalidated the check.
+	local function predispatch_is_current()
+		return owner_is_current()
+			and llm_request_counter == entry_request_counter
+			and fetch_request_counter == entry_fetch_counter
+	end
 
 	-- Defence-in-depth: a debounce/chain timer armed in the moment before the
 	-- user paused must not fire an HTTP request or paint a prediction. pause_all
@@ -782,6 +1288,7 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.error(LOG, "Current model lookup raised — request aborted: %s", tostring(model_to_use))
 		return
 	end
+	if not predispatch_is_current() then return end
 	if type(model_to_use) ~= "string" or model_to_use == "" then
 		Logger.debug(LOG, "No active model — request skipped.")
 		return
@@ -794,10 +1301,12 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "Backend not ready yet — request skipped (model warming up).")
 		return
 	end
+	if not predispatch_is_current() then return end
 	if AppFilter.is_blocked(_state, excluded_apps, url_bar_filter_enabled, secure_field_filter_enabled) then
 		Logger.debug(LOG, "App excluded — LLM request skipped.")
 		return
 	end
+	if not predispatch_is_current() then return end
 
 	-- Sync dismiss delay before the first show call so the timer is created with the correct duration
 	local dismiss_delay = (_state.DELAYS and _state.DELAYS.llm_prediction) or 0
@@ -807,6 +1316,7 @@ function M.perform_check(force_trigger, profile_name)
 		M.reset()
 		return
 	end
+	if not predispatch_is_current() then return end
 
 	local buffer = _state.llm_buffer
 	if type(buffer) ~= "string" then buffer = _state.buffer end
@@ -833,6 +1343,7 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.error(LOG, "PromptBuilder.build raised — request aborted: %s", tostring(params))
 		return
 	end
+	if not predispatch_is_current() then return end
 
 	if not params then
 		Logger.debug(LOG, "%s — LLM request skipped.", skip_reason or "unknown reason")
@@ -848,16 +1359,26 @@ function M.perform_check(force_trigger, profile_name)
 		local backend_id   = core_llm.get_backend and core_llm.get_backend() or "ollama"
 		local min_interval = ApiCommon.get_rate_limit_min_interval_s(backend_id)
 		local elapsed      = now_s - _last_request_at_s
+		if not predispatch_is_current() then return end
 		if _last_request_at_s > 0 and elapsed < min_interval then
 			local remaining = min_interval - elapsed
 			Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
 				backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
 			-- Reuse the single canonical timer instead of creating an orphan;
 			-- store profile_name so the callback can forward it when it fires
-			_deferred_profile_name = profile_name
-			if stop_inactivity_timer() ~= true or start_inactivity_timer(remaining) ~= true then
-				_deferred_profile_name = nil
-				Logger.error(LOG, "Rate-limit deferral timer did not commit; request abandoned.")
+			local callback_owner = _inactivity_timer
+			if callback_owner and callback_owner.callback_running == true
+				and owner_is_current() then
+				-- A natural one-shot remains the logical owner until its business
+				-- callback returns, so publish its successor only after that boundary
+				callback_owner.rearm_delay = remaining
+				callback_owner.rearm_profile = profile_name
+			else
+				_deferred_profile_name = profile_name
+				if stop_inactivity_timer() ~= true or start_inactivity_timer(remaining) ~= true then
+					_deferred_profile_name = nil
+					Logger.error(LOG, "Rate-limit deferral timer did not commit; request abandoned.")
+				end
 			end
 			return
 		end
@@ -869,6 +1390,7 @@ function M.perform_check(force_trigger, profile_name)
 	local streaming_info_bar   = show_info_bar
 		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
 		or nil
+	if not predispatch_is_current() then return end
 
 	local num_preds       = params.num_preds
 
@@ -879,7 +1401,9 @@ function M.perform_check(force_trigger, profile_name)
 	--- Reports whether this exact request still owns the pipeline.
 	--- @return boolean current True while no reset or newer dispatch superseded it.
 	local function is_current_fetch()
-		return runtime_available() and fetch_request_counter == my_fetch_id
+		return owner_is_current()
+			and runtime_available()
+			and fetch_request_counter == my_fetch_id
 	end
 
 	--- Fails closed only while this request still owns the surface.
@@ -1095,9 +1619,13 @@ function M.perform_check(force_trigger, profile_name)
 end
 
 --- Clears all active predictions and fully resets the prediction pipeline state.
---- Emits a keylogger dismissal event when predictions were visible before the reset.
+--- Emits a keylogger dismissal event when predictions were visible before the reset,
+--- except at a global pause boundary where no deferred capability may survive.
 --- The keymap bridge wraps this to also handle hotstring dismissal telemetry.
-function M.reset()
+--- @param options table|nil Optional { suppress_telemetry = boolean }.
+function M.reset(options)
+	local suppress_telemetry = type(options) == "table"
+		and options.suppress_telemetry == true
 	local was_visible = predictions_visible and #pending_predictions > 0
 	local dismissed_predictions = was_visible and pending_predictions or nil
 	local cleanup_committed = true
@@ -1116,6 +1644,12 @@ function M.reset()
 			return false
 		end
 		return true
+	end
+
+	if suppress_telemetry then
+		cleanup_stage("deferred telemetry stop", settle_deferred_telemetry, true)
+		cleanup_stage("deferred profile warmup stop",
+			core_llm.pause_deferred_profile_warmup, true)
 	end
 
 	-- Finalise chain timing before tearing down state so the tooltip can
@@ -1141,19 +1675,13 @@ function M.reset()
 	chain_pending = false
 	_chain_generation = _chain_generation + 1
 	if _chain_trigger_timer then
-		local timer = _chain_trigger_timer
 		cleanup_stage("chain fallback timer stop", function()
-			local stopped = stop_timer_handle(timer, "chain fallback")
-			if stopped and _chain_trigger_timer == timer then _chain_trigger_timer = nil end
-			return stopped
+			return settle_chain_timer("fallback", "chain fallback")
 		end, true)
 	end
 	if _chain_dispatch_timer then
-		local timer = _chain_dispatch_timer
 		cleanup_stage("chain dispatch timer stop", function()
-			local stopped = stop_timer_handle(timer, "chain dispatch")
-			if stopped and _chain_dispatch_timer == timer then _chain_dispatch_timer = nil end
-			return stopped
+			return settle_chain_timer("dispatch", "chain dispatch")
 		end, true)
 	end
 
@@ -1192,17 +1720,18 @@ function M.reset()
 	-- no-op when nothing is streaming, mirroring stop_timer()'s unconditional cancel (F-L11).
 	cleanup_stage("backend stream cancel", core_llm.cancel_streaming, true)
 
-	if dismissed_predictions then
+	if dismissed_predictions and not suppress_telemetry then
 		-- Persistence performs an open/write/flush in the keylogger. reset() is
 		-- reached from the keyDown eventtap, so telemetry must run only after that
 		-- callback returns. Capture the immutable pool before clearing module state.
 		local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
-			return TimerScheduler.after(0, function()
+			return schedule_deferred_telemetry(function()
 				pcall(keylogger.log_llm_dismissed, nil, dismissed_predictions)
 				Logger.debug(LOG, "Predictions cleared (were visible).")
 			end)
 		end, debug.traceback)
 		if not schedule_ok or telemetry_committed ~= true then
+			cleanup_committed = false
 			Logger.error(LOG, "Prediction dismissal telemetry could not be scheduled (result: %s).",
 				tostring(handle_or_err))
 		end
@@ -1242,62 +1771,66 @@ function M.arm_chain()
 	if not runtime_available() then return false end
 	if not require_state("arm_chain") then return false end
 	if stop_inactivity_timer() ~= true then return false end
-	if _chain_trigger_timer then
-		local old_timer = _chain_trigger_timer
-		if stop_timer_handle(old_timer, "prior chain fallback") ~= true then return false end
-		if _chain_trigger_timer == old_timer then _chain_trigger_timer = nil end
-	end
-	if _chain_dispatch_timer then
-		local old_timer = _chain_dispatch_timer
-		if stop_timer_handle(old_timer, "prior chain dispatch") ~= true then return false end
-		if _chain_dispatch_timer == old_timer then _chain_dispatch_timer = nil end
-	end
-
+	-- A replacement attempt supersedes the logical intent before it crosses any
+	-- native cleanup/start boundary.  If exact cleanup or the replacement start
+	-- refuses, no stale chain_pending flag may survive without a business owner.
 	local next_generation = _chain_generation + 1
-	local candidate
-	local create_ok, created_or_err = xpcall(function()
-		candidate = hs.timer.doAfter(CHAIN_FALLBACK_SEC, function()
-			local callback_ok, callback_err = xpcall(function()
-				if next_generation ~= _chain_generation or _chain_trigger_timer ~= candidate then return end
-				_chain_trigger_timer = nil
-				if not chain_pending or not runtime_available() then
-					chain_pending = false
-					return
-				end
-				chain_pending = false
-				Logger.warn(LOG, "Fallback chain triggered — F16 signal was missed.")
-				M.perform_check(true)
-			end, debug.traceback)
-			if not callback_ok then
-				Logger.error(LOG, "Chain fallback callback raised: %s", tostring(callback_err))
-			end
-		end)
-		return candidate
-	end, debug.traceback)
-	if not create_ok or not verify_started_timer(created_or_err, "chain fallback") then
-		if type(created_or_err) == "table" or type(created_or_err) == "userdata" then
-			if stop_timer_handle(created_or_err, "invalid chain fallback") ~= true then
-				_chain_trigger_timer = created_or_err
-			end
-		end
-		Logger.error(LOG, "Chain fallback timer did not commit (result: %s).", tostring(created_or_err))
-		return false
-	end
-
-	local suppress_ok, suppress_err = xpcall(function()
-		_state.suppress_rescan_keep_buffer(CHAIN_FALLBACK_SEC)
-	end, debug.traceback)
-	if not suppress_ok then
-		if stop_timer_handle(candidate, "uncommitted chain fallback") ~= true then
-			_chain_trigger_timer = candidate
-		end
-		Logger.error(LOG, "Chain rescan suppression did not commit: %s", tostring(suppress_err))
-		return false
-	end
-
 	_chain_generation = next_generation
-	_chain_trigger_timer = candidate
+	chain_pending = false
+	if settle_chain_timer("fallback", "prior chain fallback") ~= true then return false end
+	if settle_chain_timer("dispatch", "prior chain dispatch") ~= true then return false end
+
+	local descriptor, timer_committed = acquire_chain_timer("fallback", CHAIN_FALLBACK_SEC,
+		next_generation, function(continuation_guard)
+			if not chain_pending or not runtime_available() then
+				chain_pending = false
+				return
+			end
+			chain_pending = false
+			Logger.warn(LOG, "Fallback chain triggered — F16 signal was missed.")
+			M.perform_check(true, nil, continuation_guard)
+		end)
+	if timer_committed ~= true then
+		Logger.error(LOG, "Chain fallback timer did not commit; exact cleanup is retained.")
+		return false
+	end
+	-- The fallback belongs to the whole arm transaction, not merely to its native
+	-- start.  Publish the logical intent before crossing the rescan boundary, but
+	-- keep callback delivery fenced until that boundary commits.  A synchronous
+	-- delivery can then only settle this exact candidate; it can never consume an
+	-- unpublished intent and leave chain_pending=true without a fallback.
+	descriptor.authorized = false
 	chain_pending = true
+
+	--- Rolls back only this arm attempt; a re-entrant successor owns the globals.
+	--- @param label string Cleanup label.
+	local function rollback_arm(label)
+		descriptor.authorized = false
+		if descriptor.generation ~= _chain_generation then return true end
+		chain_pending = false
+		_chain_generation = _chain_generation + 1
+		if get_chain_timer("fallback") ~= descriptor then return true end
+		return settle_chain_timer("fallback", label)
+	end
+
+	local suppress_ok, suppress_result = xpcall(function()
+		return _state.suppress_rescan_keep_buffer(CHAIN_FALLBACK_SEC)
+	end, debug.traceback)
+	if not suppress_ok or suppress_result ~= true then
+		rollback_arm("uncommitted chain fallback")
+		Logger.error(LOG, "Chain rescan suppression did not commit: %s", tostring(suppress_result))
+		return false
+	end
+	if descriptor.generation ~= _chain_generation
+		or get_chain_timer("fallback") ~= descriptor
+		or descriptor.delivery_attempted == true
+		or descriptor.delivered == true
+		or descriptor.settled == true then
+		rollback_arm("superseded chain fallback")
+		return false
+	end
+
+	descriptor.authorized = true
 	return true
 end
 
@@ -1410,6 +1943,13 @@ end
 function M.handle_chain_signal(keyCode)
 	if not runtime_available() then return false end
 	if keyCode ~= KEYCODE_LLM_CHAIN or not chain_pending then return false end
+	local fallback = get_chain_timer("fallback")
+	if type(fallback) ~= "table" or fallback.authorized ~= true
+		or fallback.generation ~= _chain_generation then
+		-- arm_chain publishes the logical intent before crossing its suppression
+		-- boundary, but the F16 consumer may only replace a fully committed fallback.
+		return false
+	end
 	-- Never run perform_check inline: this function is reached from the keymap
 	-- CGEventTap callback (llm_bridge.handle_llm_keys), and perform_check calls
 	-- AppFilter.is_blocked, which issues uncached cross-process Accessibility
@@ -1417,38 +1957,28 @@ function M.handle_chain_signal(keyCode)
 	-- the keyboard until the tap is re-armed. Deferring by one run-loop tick makes
 	-- this path structurally identical to the CHAIN_FALLBACK_SEC timer that calls
 	-- the same function.
+	if settle_chain_timer("dispatch", "prior chain dispatch") ~= true then
+		return true
+	end
 	local generation = _chain_generation
-	local candidate
-	local create_ok, created_or_err = xpcall(function()
-		candidate = hs.timer.doAfter(0, function()
-			local callback_ok, callback_err = xpcall(function()
-				if generation ~= _chain_generation or _chain_dispatch_timer ~= candidate then return end
-				_chain_dispatch_timer = nil
-				if runtime_available() then M.perform_check(true) end
-			end, debug.traceback)
-			if not callback_ok then
-				Logger.error(LOG, "Chain dispatch callback raised: %s", tostring(callback_err))
-			end
+	local descriptor, dispatch_committed = acquire_chain_timer("dispatch", 0, generation,
+		function(continuation_guard)
+			if runtime_available() then M.perform_check(true, nil, continuation_guard) end
 		end)
-		return candidate
-	end, debug.traceback)
-	if not create_ok or not verify_started_timer(created_or_err, "chain dispatch") then
-		if type(created_or_err) == "table" or type(created_or_err) == "userdata" then
-			stop_timer_handle(created_or_err, "invalid chain dispatch")
-		end
-		Logger.error(LOG, "F16 dispatch deferral did not commit; fallback retained (result: %s).",
-			tostring(created_or_err))
+	if dispatch_committed ~= true then
+		Logger.error(LOG, "F16 dispatch deferral did not commit; fallback retained.")
 		-- F16 is an internal owned signal. Consume it while the already-armed
 		-- fallback remains the sole path to the chained request.
 		return true
 	end
 
-	_chain_dispatch_timer = candidate
 	chain_pending = false
 	if _chain_trigger_timer then
-		local fallback = _chain_trigger_timer
-		if stop_timer_handle(fallback, "superseded chain fallback") then
-			if _chain_trigger_timer == fallback then _chain_trigger_timer = nil end
+		if settle_chain_timer("fallback", "superseded chain fallback") ~= true then
+			-- TimerScheduler fenced fallback business delivery before the native
+			-- stop attempt. Keep its exact cleanup debt, but do not revoke the one
+			-- committed dispatch or the chain would have no remaining business path.
+			Logger.error(LOG, "Superseded chain fallback remains exact cleanup debt.")
 		end
 	end
 	Logger.debug(LOG, "F16 received — chained LLM dispatch committed.")
@@ -1496,26 +2026,6 @@ function M.get_validation_mods() return normalize_mods(validation_mods) end
 M.KEYCODE_LLM_CHAIN  = KEYCODE_LLM_CHAIN   -- Bridge uses this to detect the chain signal
 M.CHAIN_FALLBACK_SEC = CHAIN_FALLBACK_SEC  -- Bridge passes this to suppress_rescan_keep_buffer
 
-
--- Create the single inactivity debounce timer at module load.
--- The callback drains _deferred_profile_name so rate-limit re-arms can forward
--- a profile without creating a second timer object.
-_inactivity_timer = hs.timer.delayed.new(inactivity_debounce_sec, function()
-	local profile = _deferred_profile_name
-	_deferred_profile_name = nil
-	-- Guarded explicitly rather than left to the console tee. An unhandled throw
-	-- in here reaches Hammerspoon's own handler, which prints a traceback: the
-	-- runtime capture does persist that, but as an anonymous [CONSOLE] line with
-	-- no module, no level and no context — and the prediction for that keystroke
-	-- is simply gone. This is the single entry point for EVERY debounced
-	-- prediction, so it is the last place that should report failures as console
-	-- noise.
-	local ok, err = xpcall(function() M.perform_check(false, profile) end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Inactivity debounce check raised: %s. This prediction is abandoned — "
-			.. "nothing retries it, so the user simply never sees one.", tostring(err))
-	end
-end)
 
 -- Enable Enter-to-accept only after the user has explicitly navigated at least once;
 -- without this guard, pressing Enter on the very first shown prediction would type a newline.

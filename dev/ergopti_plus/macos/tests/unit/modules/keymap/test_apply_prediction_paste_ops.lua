@@ -35,6 +35,8 @@ helpers.describe("apply_prediction: clipboard text uses one tagged callback batc
 			"the buffer must include clipboard text even though it emits no text key pairs")
 		helpers.assert_eq(result.accepted_count, 1)
 		helpers.assert_eq(result.notified_count, 1)
+		helpers.assert_eq(result.arm_chain_before_completion, 0,
+			"F16 ownership must not start before the Cmd+V transaction completes")
 		helpers.assert_eq(result.arm_chain_count, 1)
 
 		helpers.assert_nil(result.state.expected_synthetic_pastes,

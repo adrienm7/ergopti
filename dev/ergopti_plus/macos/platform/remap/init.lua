@@ -64,6 +64,7 @@ local LEASE_RECOVERY_TIMER_ARM_ATTEMPTS = 3
 local LEASE_GUARDIAN_STATUS_POLL_SEC = 3.0
 local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
 local FIRST_RUN_WIZARD_DELAY_SEC = 2.0
+local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
 -- replacement must not resolve keycodes until TIS has settled.  Transient
 -- failures inside that barrier therefore get their own bounded retry budget;
@@ -172,6 +173,9 @@ local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after a
 
 local _state = nil
 local _enabled_transition = nil
+local _enabled_preflight = nil -- Owns async onboarding settlement before disable can enter STOPPED
+local _bulk_settings_transaction = nil -- Owns candidate publication and exact inverse recovery
+local retry_bulk_settings_recovery = nil -- Forward declaration used by sibling mutation gates
 -- Unforgeable module-private capabilities allow only fail-closed lifecycle
 -- transactions to rebuild while the public script state remains paused
 local PAUSED_DISABLE_RECOVERY = {}
@@ -200,6 +204,19 @@ local function settle_enabled_callbacks(transaction, ok, reason)
 	for _, callback in ipairs(callbacks) do
 		invoke_public_callback("set_enabled", callback, ok, reason)
 	end
+end
+
+--- Invalidates a disable preflight without abandoning its native onboarding
+--- owner. Revoke/teardown independently join that owner before publishing their
+--- own terminal, while the superseded set_enabled callbacks settle exactly once.
+--- @param reason string Stable supersession reason.
+--- @return boolean invalidated True when one preflight was owned.
+local function invalidate_enabled_preflight(reason)
+	local preflight = _enabled_preflight
+	if not preflight then return false end
+	_enabled_preflight = nil
+	settle_enabled_callbacks(preflight, false, reason)
+	return true
 end
 
 --- Persists an enabled flag without mutating the live state before commit.
@@ -2806,6 +2823,158 @@ end
 -- ===============================================
 -- ===============================================
 
+--- Fences and settles the exact deferred first-run timer with bounded retries.
+--- Literal true is the only cancellation proof. Refusal leaves the original
+--- wrapper retained and callback-inert so no sibling capability can replace it.
+--- @param context string Lifecycle boundary requesting cancellation.
+--- @return boolean settled True only when no native timer remains owned.
+local function cancel_first_run_wizard_timer(context)
+	_wizard_timer_committed = false
+	local timer = _wizard_timer
+	if not timer then return true end
+	for attempt = 1, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS do
+		local cancel_ok, result = xpcall(function()
+			return TimerScheduler.cancel(timer)
+		end, debug.traceback)
+		if cancel_ok and result == true then
+			if _wizard_timer == timer then _wizard_timer = nil end
+			return true
+		end
+		Logger.error(LOG,
+			"%s: first-run wizard timer cancellation attempt %d/%d failed: %s.",
+			context, attempt, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS, tostring(result))
+	end
+	return false
+end
+
+--- Acquires the delayed first-run wizard without replacing unresolved debt.
+--- A scheduler refusal is rolled back exactly before the bounded successor
+--- attempt; a queued predecessor callback remains fenced by identity and epoch.
+--- @param wizard_epoch number Lifecycle epoch owning the deferred wizard.
+--- @return boolean committed True only when one exact timer was armed.
+local function schedule_first_run_wizard(wizard_epoch)
+	if cancel_first_run_wizard_timer("First-run wizard replacement") ~= true then
+		return false
+	end
+	for attempt = 1, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS do
+		local candidate = nil
+		local schedule_ok, handle_or_err, committed = xpcall(function()
+			return TimerScheduler.after(FIRST_RUN_WIZARD_DELAY_SEC, function()
+				if _wizard_timer ~= candidate or _wizard_timer_committed ~= true then return end
+				_wizard_timer_committed = false
+				cancel_first_run_wizard_timer("First-run wizard delivery")
+				if not is_current_lifecycle(wizard_epoch)
+					or not _state or _state.enabled ~= true then return end
+				local callback_ok, callback_err = xpcall(function()
+					local Onboarding = require("platform.remap.onboarding")
+					Onboarding.run_first_run_wizard()
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "First-run wizard callback failed: %s.", tostring(callback_err))
+				end
+			end)
+		end, debug.traceback)
+		candidate = type(handle_or_err) == "table" and handle_or_err or nil
+		if candidate then _wizard_timer = candidate end
+		if schedule_ok and committed == true and candidate then
+			_wizard_timer_committed = true
+			return true
+		end
+		_wizard_timer_committed = false
+		Logger.error(LOG,
+			"First-run wizard timer acquisition attempt %d/%d failed: %s.",
+			attempt, FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS, tostring(handle_or_err))
+		if candidate
+			and cancel_first_run_wizard_timer("First-run wizard acquisition rollback") ~= true then
+			return false
+		end
+	end
+	return false
+end
+
+--- Stops the loaded onboarding subsystem without constructing it during teardown.
+--- @param context string Lifecycle boundary requesting installer revocation.
+--- @param on_done function|nil Joined callback fn(ok, detail) after exact settlement.
+--- @return boolean accepted_or_settled Callback form reports acceptance; synchronous
+--- form reports whether every exact onboarding owner settled.
+local function stop_loaded_onboarding(context, on_done)
+	local first_run_settled = cancel_first_run_wizard_timer(context) == true
+	if not first_run_settled then
+		Logger.error(LOG, "%s: first-run wizard timer settlement failed.", context)
+	end
+	local onboarding = package.loaded["platform.remap.onboarding"]
+	if not onboarding then
+		local detail = first_run_settled and "onboarding-not-loaded"
+			or "first-run-wizard-stop-incomplete"
+		invoke_public_callback("onboarding stop", on_done, first_run_settled, detail)
+		return first_run_settled
+	end
+	if type(onboarding) ~= "table" or type(onboarding.stop) ~= "function" then
+		Logger.error(LOG, "%s: loaded onboarding module has no stop contract.", context)
+		invoke_public_callback("onboarding stop", on_done, false, "stop-unavailable")
+		return false
+	end
+	if type(on_done) ~= "function" then
+		local stop_ok, stop_result = xpcall(onboarding.stop, debug.traceback)
+		if not stop_ok or stop_result ~= true then
+			Logger.error(LOG, "%s: onboarding installer settlement failed: %s.",
+				context, tostring(stop_result))
+			return false
+		end
+		return first_run_settled
+	end
+
+	local callback_fired = false
+	local callback_succeeded = false
+	local dispatching = true
+	local pending_onboarding_ok = false
+	local pending_detail = nil
+	local function publish(onboarding_ok, detail)
+		callback_succeeded = onboarding_ok == true and first_run_settled
+		if not first_run_settled then detail = "first-run-wizard-stop-incomplete" end
+		invoke_public_callback("onboarding stop", on_done, callback_succeeded, detail)
+	end
+	local function finish(onboarding_ok, detail)
+		if callback_fired then
+			Logger.warn(LOG, "%s: duplicate onboarding stop completion ignored.", context)
+			return
+		end
+		callback_fired = true
+		if dispatching then
+			pending_onboarding_ok = onboarding_ok == true
+			pending_detail = detail
+			return
+		end
+		publish(onboarding_ok, detail)
+	end
+	local stop_ok, stop_result = xpcall(function()
+		return onboarding.stop(finish)
+	end, debug.traceback)
+	dispatching = false
+	if not stop_ok or stop_result ~= true then
+		Logger.error(LOG, "%s: onboarding installer settlement failed: %s.",
+			context, tostring(stop_result))
+		-- A synchronous terminal is only a candidate until the request itself
+		-- returns literal true; fence that candidate and every later duplicate
+		callback_fired = true
+		local refusal_detail = stop_ok and "stop-rejected" or "stop-raised"
+		if pending_onboarding_ok == false and pending_detail ~= nil then
+			refusal_detail = pending_detail
+		end
+		publish(false, refusal_detail)
+		return false
+	end
+	if callback_fired then
+		publish(pending_onboarding_ok, pending_detail)
+		return callback_succeeded
+	end
+	return true
+end
+
+-- Unforgeable recursion token: only a completion from stop_loaded_onboarding()
+-- may enter the continuation below the installer settlement fence.
+local ONBOARDING_STOP_JOINED = {}
+
 --- Returns true when the Karabiner integration is enabled.
 --- @return boolean
 function M.get_enabled()
@@ -2818,13 +2987,46 @@ end
 --- When disabling: revokes only that lease; stock Karabiner remains user-managed.
 --- @param value boolean
 --- @param on_done function|nil Callback fn(ok, reason) after READY or STOPPED.
+--- @param onboarding_gate table|nil Private exact-settlement continuation token.
 --- @return boolean True when accepted or already settled.
-function M.set_enabled(value, on_done)
+function M.set_enabled(value, on_done, onboarding_gate)
 	if not require_state("set_enabled") then
 		invoke_public_callback("set_enabled", on_done, false, "not-initialized")
 		return false
 	end
+	if not _running or _shutdown_requested then
+		local reason = _shutdown_requested and "shutdown-in-progress" or "lifecycle-inactive"
+		Logger.warn(LOG, "Karabiner enabled-state request refused while lifecycle is inactive.")
+		invoke_public_callback("set_enabled", on_done, false, reason)
+		return false
+	end
 	local target_enabled = value == true
+	if _bulk_settings_transaction then
+		local phase = _bulk_settings_transaction.phase
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+			retry_bulk_settings_recovery()
+		end
+		if _bulk_settings_transaction then
+			Logger.error(LOG,
+				"Karabiner enabled-state request refused during bulk phase '%s'.",
+				tostring(_bulk_settings_transaction.phase))
+			invoke_public_callback("set_enabled", on_done, false, "bulk-settings-busy")
+			return false
+		end
+	end
+	if _enabled_preflight then
+		if not target_enabled then
+			if type(on_done) == "function" then
+				_enabled_preflight.callbacks[#_enabled_preflight.callbacks + 1] = on_done
+			end
+			Logger.debug(LOG, "Joined the in-flight Karabiner disable onboarding preflight.")
+			return true
+		end
+		Logger.warn(LOG,
+			"Karabiner enable request rejected while disable onboarding preflight is in flight.")
+		invoke_public_callback("set_enabled", on_done, false, "transition-in-progress")
+		return false
+	end
 	if _enabled_transition then
 		local transition_targets_enabled = _enabled_transition.kind == "enabling"
 			or _enabled_transition.kind == "enable-aborting"
@@ -2839,6 +3041,36 @@ function M.set_enabled(value, on_done)
 		Logger.warn(LOG, "Karabiner state request rejected while the opposite transition is in flight.")
 		invoke_public_callback("set_enabled", on_done, false, "transition-in-progress")
 		return false
+	end
+	if not target_enabled and onboarding_gate ~= ONBOARDING_STOP_JOINED then
+		local preflight = { callbacks = {}, epoch = _lifecycle_epoch }
+		if type(on_done) == "function" then preflight.callbacks[1] = on_done end
+		_enabled_preflight = preflight
+		local callback_fired = false
+		local continuation_result = false
+		local accepted = stop_loaded_onboarding("Karabiner integration disable",
+			function(stopped)
+				callback_fired = true
+				if _enabled_preflight ~= preflight then return end
+				if preflight.epoch ~= _lifecycle_epoch or not _running or _shutdown_requested then
+					invalidate_enabled_preflight("shutdown-in-progress")
+					return
+				end
+				_enabled_preflight = nil
+				if stopped == true then
+					continuation_result = M.set_enabled(value, function(ok, reason)
+						settle_enabled_callbacks(preflight, ok == true, reason)
+					end, ONBOARDING_STOP_JOINED)
+				else
+					settle_enabled_callbacks(preflight, false, "onboarding-stop-incomplete")
+				end
+			end)
+		if callback_fired then return continuation_result end
+		if accepted ~= true and _enabled_preflight == preflight then
+			_enabled_preflight = nil
+			settle_enabled_callbacks(preflight, false, "onboarding-stop-incomplete")
+		end
+		return accepted == true
 	end
 
 	local was_enabled = _state.enabled == true
@@ -3021,17 +3253,14 @@ function M.set_enabled(value, on_done)
 end
 
 
---- Persists a prospective state and publishes one live mutation only after the
---- writer confirms success. The candidate has fresh nested config tables, so a
---- failed save cannot leak a partial setter mutation through shared references.
---- @param mutate function Receives a detached candidate state.
---- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
---- @return boolean committed
-local function commit_state_mutation(mutate, overwrite_corrupt)
+--- Clones the persisted settings without sharing either nested binding table.
+--- @param source table Source state.
+--- @return table candidate Detached settings candidate.
+local function clone_settings_state(source)
 	local candidate = {}
-	for key, value in pairs(_state) do candidate[key] = value end
+	for key, value in pairs(source) do candidate[key] = value end
 	candidate.tap_hold_config = {}
-	for key, value in pairs(_state.tap_hold_config or {}) do
+	for key, value in pairs(source.tap_hold_config or {}) do
 		if type(value) == "table" then
 			local copy = {}; for item_key, item_value in pairs(value) do copy[item_key] = item_value end
 			candidate.tap_hold_config[key] = copy
@@ -3040,7 +3269,7 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 		end
 	end
 	candidate.mod_combos_config = {}
-	for key, value in pairs(_state.mod_combos_config or {}) do
+	for key, value in pairs(source.mod_combos_config or {}) do
 		if type(value) == "table" then
 			local copy = {}; for item_key, item_value in pairs(value) do copy[item_key] = item_value end
 			candidate.mod_combos_config[key] = copy
@@ -3048,24 +3277,330 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 			candidate.mod_combos_config[key] = value
 		end
 	end
-	mutate(candidate)
-	local call_ok, saved = pcall(
-		Config.save_user_config,
-		candidate,
-		resolve_user_config(),
-		overwrite_corrupt
-	)
-	if not call_ok or saved ~= true then
-		Logger.error(LOG, "Karabiner setting mutation did not commit; live state was preserved.")
-		return false
-	end
+	return candidate
+end
+
+--- Publishes only persisted settings, preserving live lifecycle capabilities.
+--- @param candidate table Persisted settings candidate.
+local function publish_settings_state(candidate)
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
 	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
 	_state.sticky_timeout_ms = candidate.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = candidate.simultaneous_threshold_ms
 	_state.combo_symmetric = candidate.combo_symmetric
+end
+
+--- Persists and then publishes one detached settings candidate.
+--- @param candidate table Detached settings candidate.
+--- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
+--- @param label string Stable operation label for diagnostics.
+--- @return boolean committed
+local function persist_and_publish_settings(candidate, overwrite_corrupt, label)
+	local payload = clone_settings_state(candidate)
+	-- Settings compensation must never roll back a separately owned preference
+	payload.enabled = _state.enabled == true
+	local call_ok, saved = pcall(
+		Config.save_user_config,
+		payload,
+		resolve_user_config(),
+		overwrite_corrupt
+	)
+	if not call_ok or saved ~= true then
+		Logger.error(LOG, "%s did not persist; live Karabiner settings were preserved: %s.",
+			tostring(label), tostring(saved))
+		return false
+	end
+	publish_settings_state(payload)
 	return true
+end
+
+--- Completes the original bulk caller exactly once.
+--- @param transaction table Active bulk transaction.
+--- @param ok boolean Final operation result.
+--- @param reason string Stable terminal detail.
+local function finish_bulk_settings_callback(transaction, ok, reason)
+	if transaction.callback_settled then return end
+	transaction.callback_settled = true
+	invoke_public_callback(
+		transaction.label,
+		transaction.on_done,
+		ok == true,
+		reason,
+		transaction.change_count
+	)
+end
+
+--- Dispatches regeneration and requires both exact request acceptance and one
+--- exact terminal callback. Synchronous callbacks are held until the request's
+--- return value is known, so a callback followed by false/nil cannot look valid.
+--- @param transaction table Active bulk transaction.
+--- @param label string Stable regeneration boundary label.
+--- @param on_terminal function Callback fn(ok, reason).
+--- @return boolean accepted True only for a literal-true request result.
+local function dispatch_bulk_regeneration(transaction, label, on_terminal)
+	if _bulk_settings_transaction ~= transaction then
+		Logger.error(LOG, "%s refused a stale bulk transaction.", tostring(label))
+		on_terminal(false, "stale-bulk-transaction")
+		return false
+	end
+	local callback_seen = false
+	local dispatching = true
+	local pending_ok = false
+	local pending_reason = nil
+
+	local function handle_terminal(ok, reason)
+		if callback_seen then
+			Logger.warn(LOG, "Duplicate %s callback ignored.", tostring(label))
+			return
+		end
+		callback_seen = true
+		if dispatching then
+			pending_ok = ok == true
+			pending_reason = reason
+			return
+		end
+		on_terminal(ok == true, reason)
+	end
+
+	local call_ok, accepted_or_err = xpcall(function()
+		return M.regenerate(handle_terminal)
+	end, debug.traceback)
+	dispatching = false
+	if not call_ok or accepted_or_err ~= true then
+		callback_seen = true
+		local reason = call_ok and "regeneration-request-refused" or "regeneration-request-raised"
+		Logger.error(LOG, "%s failed: %s.", tostring(label), tostring(accepted_or_err))
+		on_terminal(false, reason)
+		return false
+	end
+	if callback_seen then on_terminal(pending_ok, pending_reason) end
+	return true
+end
+
+--- Requests the exact inverse deployment retained by a rejected bulk mutation.
+--- @param transaction table Active recovery ledger.
+--- @return boolean accepted True only when regeneration accepted the retry.
+local function request_bulk_inverse_regeneration(transaction)
+	transaction.phase = "rollback-regeneration-pending"
+	return dispatch_bulk_regeneration(
+		transaction,
+		transaction.label .. " inverse regeneration",
+		function(ok, reason)
+			if _bulk_settings_transaction ~= transaction then return end
+			if ok == true then
+				_bulk_settings_transaction = nil
+				Logger.info(LOG, "%s inverse configuration restored successfully.",
+					transaction.label)
+				finish_bulk_settings_callback(
+					transaction,
+					false,
+					transaction.failure_reason or "candidate-regeneration-failed"
+				)
+				return
+			end
+			transaction.phase = "rollback-regeneration"
+			Logger.error(LOG, "%s inverse regeneration remains pending: %s.",
+				transaction.label, tostring(reason))
+			finish_bulk_settings_callback(
+				transaction,
+				false,
+				transaction.failure_reason or "candidate-regeneration-failed"
+			)
+		end
+	)
+end
+
+--- Retries the exact inverse before any sibling settings mutation is admitted.
+--- @return boolean settled True only when no recovery debt remains.
+retry_bulk_settings_recovery = function()
+	local transaction = _bulk_settings_transaction
+	if not transaction then return true end
+	if transaction.phase == "rollback-persistence" then
+		Logger.warn(LOG, "Retrying retained %s inverse persistence.", transaction.label)
+		if not persist_and_publish_settings(
+			transaction.snapshot,
+			transaction.overwrite_corrupt,
+			transaction.label .. " inverse"
+		) then
+			return false
+		end
+		transaction.phase = "rollback-regeneration"
+	end
+	if transaction.phase == "rollback-regeneration" then
+		Logger.warn(LOG, "Retrying retained %s inverse regeneration.", transaction.label)
+		request_bulk_inverse_regeneration(transaction)
+		return _bulk_settings_transaction == nil
+	end
+	return false
+end
+
+--- Joins any retained bulk compensation before a lifecycle boundary can publish.
+--- A retryable inverse is attempted exactly once; an accepted asynchronous retry
+--- keeps the same transaction owner, so revoke/teardown callers must retry only
+--- after its terminal callback. Candidate terminals already in flight are never
+--- guessed or cancelled here.
+--- @param boundary string Stable lifecycle boundary label.
+--- @return boolean settled True only when no bulk owner or debt remains.
+local function settle_bulk_settings_before_lifecycle(boundary)
+	local transaction = _bulk_settings_transaction
+	if not transaction then return true end
+	local phase = transaction.phase
+	if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+		retry_bulk_settings_recovery()
+	end
+	if _bulk_settings_transaction == nil then return true end
+	Logger.error(LOG, "%s refused while %s remains in bulk phase '%s'.",
+		tostring(boundary), tostring(transaction.label),
+		tostring(_bulk_settings_transaction.phase))
+	return false
+end
+
+--- Rejects a failed candidate and retains every unsettled inverse boundary.
+--- @param transaction table Active bulk transaction.
+--- @param reason string Candidate failure detail.
+local function reject_bulk_settings_candidate(transaction, reason)
+	if _bulk_settings_transaction ~= transaction then return end
+	transaction.failure_reason = reason or "candidate-regeneration-failed"
+	transaction.phase = "rollback-persistence"
+	Logger.error(LOG, "%s failed after settings commit; restoring the exact prior configuration.",
+		transaction.label)
+	if not persist_and_publish_settings(
+		transaction.snapshot,
+		transaction.overwrite_corrupt,
+		transaction.label .. " inverse"
+	) then
+		Logger.error(LOG, "%s inverse persistence remains pending.", transaction.label)
+		finish_bulk_settings_callback(transaction, false, transaction.failure_reason)
+		return
+	end
+	transaction.phase = "rollback-regeneration"
+	request_bulk_inverse_regeneration(transaction)
+end
+
+--- Applies one multi-setting candidate, deploys it, and compensates exactly on
+--- any non-true terminal. All sibling setters remain gated until candidate
+--- success or the retained inverse has persisted and regenerated successfully.
+--- @param label string Stable operation label.
+--- @param mutate function Receives a detached candidate and returns a count.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
+--- @return boolean accepted True only when candidate regeneration was accepted.
+local function apply_bulk_settings_transaction(label, mutate, on_done, overwrite_corrupt)
+	if not require_state(label) then
+		invoke_public_callback(label, on_done, false, "not-initialized", 0)
+		return false
+	end
+	if not _running or _shutdown_requested then
+		local reason = _shutdown_requested and "shutdown-in-progress" or "lifecycle-inactive"
+		Logger.error(LOG, "%s refused while the Karabiner lifecycle is inactive.", label)
+		invoke_public_callback(label, on_done, false, reason, 0)
+		return false
+	end
+	if _enabled_preflight then
+		Logger.error(LOG, "%s refused during disable onboarding preflight.", label)
+		invoke_public_callback(label, on_done, false, "enabled-transition-in-progress", 0)
+		return false
+	end
+	if _enabled_transition then
+		Logger.error(LOG, "%s refused during enabled-state phase '%s'.",
+			label, tostring(_enabled_transition.kind))
+		invoke_public_callback(label, on_done, false, "enabled-transition-in-progress", 0)
+		return false
+	end
+	if _bulk_settings_transaction then
+		local phase = _bulk_settings_transaction.phase
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+			retry_bulk_settings_recovery()
+		end
+		Logger.error(LOG, "%s refused while another bulk settings transaction is '%s'.",
+			label, tostring(phase))
+		invoke_public_callback(label, on_done, false, "bulk-settings-busy", 0)
+		return false
+	end
+	if type(mutate) ~= "function" then
+		Logger.error(LOG, "%s refused an invalid settings mutator.", label)
+		invoke_public_callback(label, on_done, false, "invalid-mutator", 0)
+		return false
+	end
+
+	local snapshot = clone_settings_state(_state)
+	local candidate = clone_settings_state(snapshot)
+	local mutate_ok, change_count_or_err = xpcall(function()
+		return mutate(candidate)
+	end, debug.traceback)
+	if not mutate_ok then
+		Logger.error(LOG, "%s candidate construction failed: %s.",
+			label, tostring(change_count_or_err))
+		invoke_public_callback(label, on_done, false, "candidate-construction-failed", 0)
+		return false
+	end
+
+	local transaction = {
+		label = label,
+		on_done = on_done,
+		snapshot = snapshot,
+		change_count = tonumber(change_count_or_err) or 0,
+		overwrite_corrupt = overwrite_corrupt,
+		phase = "candidate-persistence",
+		callback_settled = false,
+	}
+	_bulk_settings_transaction = transaction
+	if not persist_and_publish_settings(candidate, overwrite_corrupt, label) then
+		_bulk_settings_transaction = nil
+		finish_bulk_settings_callback(transaction, false, "candidate-persistence-failed")
+		return false
+	end
+
+	transaction.phase = "candidate-regeneration-pending"
+	return dispatch_bulk_regeneration(transaction, label .. " regeneration", function(ok, reason)
+		if _bulk_settings_transaction ~= transaction then return end
+		if ok == true then
+			_bulk_settings_transaction = nil
+			finish_bulk_settings_callback(transaction, true, reason or "ready")
+			return
+		end
+		reject_bulk_settings_candidate(transaction, reason)
+	end)
+end
+
+--- Persists a prospective state and publishes one live mutation only after the
+--- writer confirms success. The candidate has fresh nested config tables, so a
+--- failed save cannot leak a partial setter mutation through shared references.
+--- @param mutate function Receives a detached candidate state.
+--- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
+--- @return boolean committed
+local function commit_state_mutation(mutate, overwrite_corrupt)
+	if not _running or _shutdown_requested then
+		Logger.error(LOG, "Karabiner setting mutation refused while lifecycle is inactive.")
+		return false
+	end
+	if _enabled_preflight then
+		Logger.error(LOG, "Karabiner setting mutation refused during disable onboarding preflight.")
+		return false
+	end
+	if _enabled_transition then
+		Logger.error(LOG, "Karabiner setting mutation refused during enabled-state phase '%s'.",
+			tostring(_enabled_transition.kind))
+		return false
+	end
+	if _bulk_settings_transaction then
+		local phase = _bulk_settings_transaction.phase
+		if phase == "rollback-persistence" or phase == "rollback-regeneration" then
+			retry_bulk_settings_recovery()
+		end
+		Logger.error(LOG, "Karabiner setting mutation refused during bulk phase '%s'.",
+			tostring(phase))
+		return false
+	end
+	local candidate = clone_settings_state(_state)
+	local mutate_ok, mutate_err = xpcall(function() mutate(candidate) end, debug.traceback)
+	if not mutate_ok then
+		Logger.error(LOG, "Karabiner setting candidate construction failed: %s.",
+			tostring(mutate_err))
+		return false
+	end
+	return persist_and_publish_settings(candidate, overwrite_corrupt, "Karabiner setting mutation")
 end
 
 --- Returns the current tap action id for a key.
@@ -3349,26 +3884,200 @@ function M.set_combo_symmetric(value)
 	return committed
 end
 
---- Resets all settings to their defaults and saves the user config.
---- Does NOT regenerate — call M.regenerate() explicitly when ready.
---- This is the only save allowed to overwrite an unparseable config file: every
---- other setter refuses, so without this the user could never repair a corrupt
---- config from the UI.
-function M.reset_to_defaults()
-	if not require_state("reset_to_defaults") then return false end
-	Logger.start(LOG, "Resetting all settings to defaults…")
-	local defaults                   = Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
-	local committed = commit_state_mutation(function(candidate)
+--- Copies exactly the settings persisted in config_karabiner.toml.
+--- Runtime handles and watcher capabilities from `_state` are deliberately
+--- excluded, so the snapshot can be retained by a parent transaction.
+--- @param source table Live or previously captured settings.
+--- @return table|nil snapshot Detached persisted settings.
+local function clone_persisted_settings(source)
+	if type(source) ~= "table"
+		or type(source.tap_hold_config) ~= "table"
+		or type(source.mod_combos_config) ~= "table"
+		or type(source.enabled) ~= "boolean"
+		or type(source.tap_hold_timeout_ms) ~= "number"
+		or type(source.sticky_timeout_ms) ~= "number"
+		or type(source.simultaneous_threshold_ms) ~= "number"
+		or type(source.combo_symmetric) ~= "boolean" then
+		return nil
+	end
+	local detached = clone_settings_state(source)
+	return {
+		enabled = detached.enabled == true,
+		tap_hold_config = detached.tap_hold_config,
+		mod_combos_config = detached.mod_combos_config,
+		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
+		sticky_timeout_ms = detached.sticky_timeout_ms,
+		simultaneous_threshold_ms = detached.simultaneous_threshold_ms,
+		combo_symmetric = detached.combo_symmetric == true,
+	}
+end
+
+--- Captures one detached, persistence-only settings snapshot.
+--- A parent transaction must never snapshot an enabled/bulk candidate in flight.
+--- @return table|nil snapshot
+function M.snapshot_settings()
+	if not require_state("snapshot_settings") then return nil end
+	if not _running or _shutdown_requested or _enabled_preflight
+		or _enabled_transition or _bulk_settings_transaction then
+		Logger.error(LOG, "Karabiner settings snapshot refused while another owner is active.")
+		return nil
+	end
+	return clone_persisted_settings(_state)
+end
+
+--- Restores one captured settings snapshot through the same exact bulk owner.
+--- The enabled flag belongs to the lease transition and must still match; this
+--- inverse owns only the remaining persisted settings and their regeneration.
+--- @param snapshot table Detached result of `snapshot_settings()`.
+--- @param on_done function|nil Callback fn(ok, reason).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.restore_settings(snapshot, on_done)
+	local desired = clone_persisted_settings(snapshot)
+	if not desired then
+		invoke_public_callback(
+			"Restore captured settings",
+			on_done,
+			false,
+			"invalid-settings-snapshot",
+			0
+		)
+		return false
+	end
+	if _state and desired.enabled ~= (_state.enabled == true) then
+		invoke_public_callback(
+			"Restore captured settings",
+			on_done,
+			false,
+			"enabled-intent-changed",
+			0
+		)
+		return false
+	end
+	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
+		local restored = clone_persisted_settings(desired)
+		candidate.tap_hold_config = restored.tap_hold_config
+		candidate.mod_combos_config = restored.mod_combos_config
+		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
+		candidate.sticky_timeout_ms = restored.sticky_timeout_ms
+		candidate.simultaneous_threshold_ms = restored.simultaneous_threshold_ms
+		candidate.combo_symmetric = restored.combo_symmetric
+		return 0
+	end, on_done)
+end
+
+--- Clears both slots for one tap/hold key as one exact transaction.
+--- @param key_id string Key id as defined in tap_hold_keys.json.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.clear_tap_hold_binding(key_id, on_done)
+	Logger.debug(LOG, "Clear tap/hold binding transaction requested: %s.", tostring(key_id))
+	return apply_bulk_settings_transaction("Clear tap/hold binding", function(candidate)
+		local cfg = candidate.tap_hold_config[key_id] or {}
+		local tap = cfg.tap or "none"
+		local hold = cfg.hold or "none"
+		candidate.tap_hold_config[key_id] = {
+			tap = "none",
+			hold = "none",
+			timeout_ms = cfg.timeout_ms,
+		}
+		return (tap ~= "none" or hold ~= "none") and 1 or 0
+	end, on_done)
+end
+
+--- Clears all three slots for one modifier combo as one exact transaction.
+--- @param combo_id string Combo id as defined in mod_combos.json.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.clear_combo_binding(combo_id, on_done)
+	Logger.debug(LOG, "Clear modifier combo transaction requested: %s.", tostring(combo_id))
+	return apply_bulk_settings_transaction("Clear modifier combo", function(candidate)
+		local cfg = candidate.mod_combos_config[combo_id] or {}
+		local tap = cfg.tap or "none"
+		local hold = cfg.hold or "none"
+		local combo = cfg.combo or "none"
+		candidate.mod_combos_config[combo_id] = {
+			tap = "none",
+			hold = "none",
+			combo = "none",
+		}
+		return (tap ~= "none" or hold ~= "none" or combo ~= "none") and 1 or 0
+	end, on_done)
+end
+
+--- Clears every tap/hold and modifier-combo binding as one exact transaction.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.clear_all_bindings(on_done)
+	Logger.debug(LOG, "Clear-all bindings transaction requested.")
+	return apply_bulk_settings_transaction("Clear-all bindings", function(candidate)
+		local changed = 0
+		for _, key_def in ipairs(M.TAP_HOLD_KEYS) do
+			local cfg = candidate.tap_hold_config[key_def.id] or {}
+			local tap = cfg.tap or "none"
+			local hold = cfg.hold or "none"
+			if tap ~= "none" or hold ~= "none" then changed = changed + 1 end
+			candidate.tap_hold_config[key_def.id] = {
+				tap = "none",
+				hold = "none",
+				timeout_ms = cfg.timeout_ms,
+			}
+		end
+		for _, combo_def in ipairs(M.MOD_COMBOS) do
+			local cfg = candidate.mod_combos_config[combo_def.id] or {}
+			local tap = cfg.tap or "none"
+			local hold = cfg.hold or "none"
+			local combo = cfg.combo or "none"
+			if tap ~= "none" or hold ~= "none" or combo ~= "none" then
+				changed = changed + 1
+			end
+			candidate.mod_combos_config[combo_def.id] = {
+				tap = "none",
+				hold = "none",
+				combo = "none",
+			}
+		end
+		return changed
+	end, on_done)
+end
+
+--- Restores all settings to defaults as one exact transaction.
+--- This remains the sole mutation allowed to overwrite an unparseable config.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.reset_to_defaults(on_done)
+	Logger.debug(LOG, "Reset-to-defaults transaction requested.")
+	return apply_bulk_settings_transaction("Reset-to-defaults", function(candidate)
+		local defaults = Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
 		candidate.sticky_timeout_ms         = defaults.sticky_timeout_ms
 		candidate.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
 		candidate.combo_symmetric           = defaults.combo_symmetric
-	end, true)
-	if not committed then return false end
-	Logger.success(LOG, "All settings reset to defaults.")
-	return true
+		return #M.TAP_HOLD_KEYS + #M.MOD_COMBOS
+	end, on_done, true)
+end
+
+--- Copies every combo tap binding into its chord slot as one exact transaction.
+--- @param on_done function|nil Callback fn(ok, reason, change_count).
+--- @return boolean accepted True only when exact regeneration was accepted.
+function M.copy_tap_actions_to_combos(on_done)
+	Logger.debug(LOG, "Tap-to-combo transaction requested.")
+	return apply_bulk_settings_transaction("Tap-to-combo propagation", function(candidate)
+		local changed = 0
+		for _, combo_def in ipairs(M.MOD_COMBOS) do
+			local cfg = candidate.mod_combos_config[combo_def.id] or {}
+			local tap = cfg.tap or "none"
+			local combo = cfg.combo or "none"
+			if tap ~= combo then changed = changed + 1 end
+			candidate.mod_combos_config[combo_def.id] = {
+				tap = tap,
+				hold = cfg.hold or "none",
+				combo = tap,
+			}
+		end
+		return changed
+	end, on_done)
 end
 
 
@@ -3886,10 +4595,25 @@ end
 --- No config file or stock Karabiner process is touched.
 --- Does nothing when the integration is disabled.
 --- @param on_done function|nil Callback fn(ok, reason) after PAUSED or failure.
-function M.pause(on_done)
+--- @param onboarding_gate table|nil Private exact-settlement continuation token.
+function M.pause(on_done, onboarding_gate)
 	if not _state or not _state.enabled then
 		invoke_public_callback("pause", on_done, false, "integration-disabled")
 		return false
+	end
+	if onboarding_gate ~= ONBOARDING_STOP_JOINED then
+		local callback_fired = false
+		local continuation_result = false
+		local accepted = stop_loaded_onboarding("Karabiner pause", function(stopped)
+			callback_fired = true
+			if stopped == true then
+				continuation_result = M.pause(on_done, ONBOARDING_STOP_JOINED)
+			else
+				invoke_public_callback("pause", on_done, false, "onboarding-stop-incomplete")
+			end
+		end)
+		if callback_fired then return continuation_result end
+		return accepted == true
 	end
 	cancel_guardian_regeneration_wait("script-pause-requested")
 	cancel_deferred_layout_regeneration("script-pause-requested")
@@ -4114,17 +4838,18 @@ end
 --- @param file_system table FileSystem port adapter (adapters/file_system.lua).
 ---   Used to resolve the KE config path through hs.fs.pathToAbsolute so the
 ---   module never hard-codes OS path logic outside the port boundary.
+--- @return boolean initialized True only after every required owner commits.
 function M.init(file_system)
 	Logger.start(LOG, "Initializing Karabiner bridge…")
 
 	if type(file_system) ~= "table" or type(file_system.expand_path) ~= "function" then
 		Logger.error(LOG, "M.init(): file_system adapter is required and must implement expand_path — module non-functional.")
-		return
+		return false
 	end
 
 	if _state then
 		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		return false
 	end
 
 	-- Resolve the KE output path through the FileSystem port so path logic is
@@ -4157,7 +4882,7 @@ function M.init(file_system)
 
 	if #M.AVAILABLE_ACTIONS == 0 or #M.TAP_HOLD_KEYS == 0 or #M.MOD_COMBOS == 0 then
 		Logger.error(LOG, "One or more data files failed to load — aborting initialization.")
-		return
+		return false
 	end
 
 	local user_cfg, user_config_status = timed("load_user_config", function()
@@ -4344,33 +5069,8 @@ function M.init(file_system)
 	if _state.enabled and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true
 		local wizard_epoch = _lifecycle_epoch
-		local candidate = nil
-		local schedule_ok, handle_or_err, committed = xpcall(function()
-			return TimerScheduler.after(FIRST_RUN_WIZARD_DELAY_SEC, function()
-				if _wizard_timer ~= candidate or _wizard_timer_committed ~= true then return end
-				_wizard_timer_committed = false
-				if candidate.timer == nil then _wizard_timer = nil end
-				if not is_current_lifecycle(wizard_epoch)
-					or not _state or _state.enabled ~= true then return end
-				local callback_ok, callback_err = xpcall(function()
-					local Onboarding = require("platform.remap.onboarding")
-					Onboarding.run_first_run_wizard()
-				end, debug.traceback)
-				if not callback_ok then
-					Logger.error(LOG, "First-run wizard callback failed: %s.", tostring(callback_err))
-				end
-			end)
-		end, debug.traceback)
-		candidate = handle_or_err
-		if type(candidate) == "table" and candidate.timer ~= nil then
-			_wizard_timer = candidate
-		end
-		if schedule_ok and committed == true and type(candidate) == "table" then
-			_wizard_timer = candidate
-			_wizard_timer_committed = true
-		else
-			Logger.error(LOG, "First-run wizard timer could not be scheduled: %s.",
-				tostring(handle_or_err))
+		if schedule_first_run_wizard(wizard_epoch) ~= true then
+			Logger.error(LOG, "First-run wizard timer could not be scheduled or settled.")
 		end
 	end
 
@@ -4386,35 +5086,13 @@ local function stop_local_resources()
 	_running = false
 	_shutdown_requested = true
 	_lifecycle_epoch = _lifecycle_epoch + 1
+	invalidate_enabled_preflight("shutdown-in-progress")
 	cancel_guardian_regeneration_wait("local-teardown")
 	cancel_deferred_layout_regeneration("local-teardown")
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
-	_wizard_timer_committed = false
-	if _wizard_timer then
-		local timer_ok, timer_result = xpcall(function()
-			return TimerScheduler.cancel(_wizard_timer)
-		end, debug.traceback)
-		if not timer_ok or timer_result ~= true then
-			Logger.error(LOG, "First-run wizard timer teardown failed: %s.",
-				tostring(timer_result))
-			all_stopped = false
-		else
-			_wizard_timer = nil
-		end
-	end
-	-- The onboarding poll is owned by its module rather than the shared
-	-- scheduler registry.  Consult package.loaded so teardown never starts the
-	-- onboarding subsystem merely to stop it, while still retrying an exact
-	-- timer handle retained after a failed native cancellation.
-	local onboarding = package.loaded["platform.remap.onboarding"]
-	if onboarding and type(onboarding.stop) == "function" then
-		local onboarding_ok, onboarding_result = xpcall(onboarding.stop, debug.traceback)
-		if not onboarding_ok or onboarding_result ~= true then
-			Logger.error(LOG, "Onboarding poll teardown failed: %s.", tostring(onboarding_result))
-			all_stopped = false
-		end
-	end
+	-- The module-level contract owns timers, installer tasks, partials, and mounts
+	if stop_loaded_onboarding("Karabiner local teardown") ~= true then all_stopped = false end
 	if _wake_watcher then
 		local stopped, stop_result = pcall(function() return _wake_watcher:stop() end)
 		if not stopped or stop_result == false then
@@ -4460,6 +5138,9 @@ end
 --- disabled hotkey with an unfenced Karabiner generation.
 --- @return boolean stopped True only when every local resource was released.
 function M.teardown_local()
+	if settle_bulk_settings_before_lifecycle("Karabiner local teardown") ~= true then
+		return false
+	end
 	local status_ok, phase = xpcall(LeaseController.status, debug.traceback)
 	if not status_ok then
 		Logger.error(LOG, "Cannot verify the exact lease before local teardown: %s.", tostring(phase))
@@ -4479,13 +5160,23 @@ function M.teardown_local()
 	return true
 end
 
---- Revokes only Ergopti's exact lease. Local F17 consumers stay mounted until
---- the STOPPED/fallback callback, and are deliberately owned by a later local
---- teardown transaction. Stock Karabiner processes remain user-managed.
+--- Revokes Ergopti's exact lease and joins onboarding installer settlement.
+--- Local F17 consumers stay mounted until both fences complete, and are
+--- deliberately owned by a later local teardown transaction. Stock Karabiner
+--- processes remain user-managed.
 --- @param reason string|nil Stable teardown reason for diagnostics.
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
+	if settle_bulk_settings_before_lifecycle("Karabiner lease revocation") ~= true then
+		invoke_public_callback(
+			"revoke",
+			on_done,
+			false,
+			"bulk-settings-recovery-pending"
+		)
+		return false
+	end
 	Logger.start(LOG, "Revoking the exact Ergopti Karabiner lease…")
 	-- The native fence is asynchronous, but every already-queued wake/layout
 	-- callback must become stale immediately. Keep F17 consumers and the KC
@@ -4494,12 +5185,19 @@ function M.revoke(reason, on_done)
 		_shutdown_requested = true
 		_lifecycle_epoch = _lifecycle_epoch + 1
 	end
+	invalidate_enabled_preflight("shutdown-in-progress")
 	cancel_guardian_regeneration_wait("lease-revocation-requested")
 	cancel_lease_recovery("lease-revocation-requested")
 	cancel_deferred_layout_regeneration("lease-revocation-requested")
 	_pending_layout_refresh = nil
 	local callback_fired = false
 	local callback_succeeded = false
+	local onboarding_done = false
+	local onboarding_succeeded = false
+	local onboarding_detail = nil
+	local lease_done = false
+	local lease_succeeded = false
+	local lease_detail = nil
 	local function settle_revoke(ok, detail)
 		if callback_fired then
 			Logger.warn(LOG, "Duplicate Ergopti Karabiner revocation completion ignored.")
@@ -4509,29 +5207,63 @@ function M.revoke(reason, on_done)
 		callback_succeeded = ok == true
 		invoke_public_callback("revoke", on_done, ok == true, detail)
 	end
-	local call_ok, accepted_or_err = xpcall(function()
-		return LeaseController.stop(reason or "hammerspoon_shutdown", function(stopped, stop_reason)
-			if stopped ~= true then
-				Logger.error(LOG, "Ergopti Karabiner lease revocation failed: %s.",
-					tostring(stop_reason))
-				settle_revoke(false, stop_reason or "revocation-failed")
+	local function settle_join_if_ready()
+		if not onboarding_done or not lease_done then return end
+		if onboarding_succeeded ~= true then
+			Logger.error(LOG, "Ergopti onboarding revocation failed: %s.",
+				tostring(onboarding_detail))
+			settle_revoke(false, onboarding_detail or "onboarding-stop-incomplete")
+			return
+		end
+		if lease_succeeded ~= true then
+			Logger.error(LOG, "Ergopti Karabiner lease revocation failed: %s.",
+				tostring(lease_detail))
+			settle_revoke(false, lease_detail or "revocation-failed")
+			return
+		end
+		settle_revoke(true, lease_detail or "stopped")
+	end
+
+	local onboarding_accepted = stop_loaded_onboarding("Karabiner lease revocation",
+		function(stopped, detail)
+			if onboarding_done then
+				Logger.warn(LOG, "Duplicate onboarding half of Karabiner revocation ignored.")
 				return
 			end
-			settle_revoke(true, stop_reason or "stopped")
+			onboarding_done = true
+			onboarding_succeeded = stopped == true
+			onboarding_detail = detail
+			settle_join_if_ready()
+		end)
+	if onboarding_accepted ~= true and not onboarding_done then
+		onboarding_done = true
+		onboarding_detail = "onboarding-stop-rejected"
+	end
+	local call_ok, accepted_or_err = xpcall(function()
+		return LeaseController.stop(reason or "hammerspoon_shutdown", function(stopped, stop_reason)
+			if lease_done then
+				Logger.warn(LOG, "Duplicate lease half of Karabiner revocation ignored.")
+				return
+			end
+			lease_done = true
+			lease_succeeded = stopped == true
+			lease_detail = stop_reason
+			settle_join_if_ready()
 		end)
 	end, debug.traceback)
 	if not call_ok then
 		Logger.error(LOG, "Ergopti Karabiner lease revocation raised: %s.",
 			tostring(accepted_or_err))
-		if not callback_fired then settle_revoke(false, "revocation-raised") end
-		return false
-	end
-	if accepted_or_err ~= true then
+		lease_done = true
+		lease_detail = "revocation-raised"
+	elseif accepted_or_err ~= true then
 		Logger.error(LOG, "Ergopti Karabiner lease revocation was not accepted.")
-		if not callback_fired then settle_revoke(false, "revocation-rejected") end
-		return false
+		lease_done = true
+		lease_detail = "revocation-rejected"
+	else
+		Logger.success(LOG, "Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.")
 	end
-	Logger.success(LOG, "Ergopti Karabiner lease revocation requested; stock Karabiner left untouched.")
+	settle_join_if_ready()
 	if callback_fired then return callback_succeeded end
 	return true
 end

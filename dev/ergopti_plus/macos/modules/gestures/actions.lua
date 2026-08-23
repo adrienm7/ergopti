@@ -18,11 +18,12 @@ local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
-local ShellRunner   = require("adapters.shell_runner")
 local SyntheticInput = require("adapters.synthetic_input")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
+local AuxOwner      = require("modules.gestures.actions_aux_owner")
+local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -32,8 +33,81 @@ local LOG           = "gestures.actions"
 -- here, above every closure that captures it, so it is never bound as a nil global.
 local KEYSTROKE_NO_DELAY_US = 0
 local CLIPBOARD_COPY_SETTLE_SEC = Timings.sec("debounce", "clipboard_copy_settle_ms")
+local GESTURE_ACTION_PARENT = "gestures"
+local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 
 local _state = nil
+local _dispatch_parent = GESTURE_ACTION_PARENT
+local _action_scope_lifecycles = {}
+local _lookup_operations = {}
+
+--- Resolves the composite admission state for one feature parent. The fence is
+--- separate from every child owner: opening Aux while Text/Mouse/Screenshot are
+--- still resuming must never make the aggregate action catalogue dispatchable.
+--- @param parent string|nil Stable action parent.
+--- @return table lifecycle
+local function action_scope_lifecycle(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or GESTURE_ACTION_PARENT
+	local lifecycle = _action_scope_lifecycles[scope_id]
+	if lifecycle then return lifecycle end
+	lifecycle = {
+		id = scope_id,
+		epoch = 0,
+		admission_open = true,
+		transition = nil,
+	}
+	_action_scope_lifecycles[scope_id] = lifecycle
+	return lifecycle
+end
+
+--- Closes aggregate admission synchronously and supersedes any in-flight resume.
+--- @param parent string Stable action parent.
+--- @return table lifecycle
+local function fence_action_scope(parent)
+	local lifecycle = action_scope_lifecycle(parent)
+	lifecycle.epoch = lifecycle.epoch + 1
+	lifecycle.admission_open = false
+	lifecycle.transition = nil
+	return lifecycle
+end
+
+--- Tests the identity of one aggregate resume transaction.
+--- @param lifecycle table Parent lifecycle state.
+--- @param attempt table Exact resume attempt.
+--- @return boolean current
+local function action_resume_is_current(lifecycle, attempt)
+	return lifecycle.transition == attempt
+		and lifecycle.epoch == attempt.epoch
+		and lifecycle.admission_open == false
+end
+
+--- The dedicated script-control tap survives global PAUSE, but only its two
+--- root lifecycle actions may bypass feature admission. Arbitrary catalogue
+--- actions assigned to the same physical slots remain fenced normally.
+--- @param name string Action identifier.
+--- @param binding string|nil Binding provenance.
+--- @return boolean control_plane
+local function is_script_control_plane_action(name, binding)
+	return type(binding) == "string" and binding:match("^script__") ~= nil
+		and (name == "script_reload" or name == "script_quit")
+end
+
+--- Maps a configurable keyboard binding to the shortcut parent while every
+--- engine and direct gesture dispatch remains in the gesture parent.
+--- @param binding any Binding identity supplied by execute_single().
+--- @return string parent
+local function parent_for_binding(binding)
+	if type(binding) == "string" and binding:match("^keyboard__") then
+		return SHORTCUT_ACTION_PARENT
+	end
+	return GESTURE_ACTION_PARENT
+end
+
+--- @return string parent
+local function current_action_parent()
+	return _dispatch_parent
+end
 
 --- Binds the global shared state reference.
 --- @param core_state table The shared state object from the core module.
@@ -88,6 +162,12 @@ local function postKeyStroke(mods, key)
 	return true
 end
 
+local function defer_key(label, mods, key, delay)
+	return AuxOwner.after(delay or 0, label, function()
+		return postKeyStroke(mods, key)
+	end, current_action_parent())
+end
+
 local function url_encode_query(value)
 	value = tostring(value or "")
 	return (value:gsub("[^%w%-%._~]", function(char)
@@ -98,6 +178,116 @@ end
 local function open_url(url)
 	if type(url) ~= "string" or url == "" then return end
 	pcall(function() hs.urlevent.openURL(url) end)
+end
+
+--- Reads the auxiliary owner's logical admission fence without letting a
+--- malformed owner reopen action dispatch.
+--- @return boolean open True only when the owner explicitly reports ACTIVE.
+local function aux_admission_open(parent)
+	local scope_id = parent or current_action_parent()
+	local lifecycle = action_scope_lifecycle(scope_id)
+	if lifecycle.admission_open ~= true or lifecycle.transition ~= nil then
+		return false
+	end
+	local ok, paused_or_error = xpcall(
+		AuxOwner.is_paused, debug.traceback, scope_id)
+	if not ok then
+		Logger.error(LOG, "Auxiliary admission query failed: %s.", tostring(paused_or_error))
+		return false
+	end
+	return paused_or_error == false
+end
+
+--- Cancels one staged auxiliary timer and reports retained exact cleanup debt.
+--- @param token table Exact token returned by AuxOwner.prepare_after().
+--- @param context string Transaction context.
+--- @return boolean settled
+local function rollback_aux_timer(token, context)
+	local ok, result = xpcall(AuxOwner.rollback_after, debug.traceback, token)
+	if not ok or result ~= true then
+		Logger.error(LOG, "%s timer rollback remains pending: %s.",
+			tostring(context), tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Constructs one lookup mouse event without crossing the native post boundary.
+--- @param event_type integer Native mouse event type.
+--- @param position table Current pointer position.
+--- @return table|userdata|nil event Native event candidate.
+--- @return string|nil detail Construction refusal detail.
+local function construct_lookup_mouse_event(event_type, position)
+	local ok, event_or_error = xpcall(function()
+		return hs.eventtap.event.newMouseEvent(event_type, position)
+	end, debug.traceback)
+	if not ok or event_or_error == nil or event_or_error == false then
+		return nil, tostring(event_or_error)
+	end
+	local method_ok, post_method = pcall(function() return event_or_error.post end)
+	if not method_ok or type(post_method) ~= "function" then
+		return nil, tostring(post_method)
+	end
+	return event_or_error, nil
+end
+
+--- Posts one preconstructed lookup mouse event with exact native result handling.
+--- @param event table|userdata Native event candidate.
+--- @return boolean committed
+--- @return string|nil detail Native refusal detail.
+local function post_lookup_mouse_event(event)
+	local ok, result_or_error = xpcall(function() return event:post() end, debug.traceback)
+	if not ok or result_or_error == nil or result_or_error == false then
+		return false, tostring(result_or_error)
+	end
+	return true, nil
+end
+
+--- Posts one lookup event while keeping the parent acquisition visible to a
+--- re-entrant cleanup.  The down ownership is published conservatively before
+--- crossing the native boundary because a mutate-then-refuse post still needs
+--- the exact compensating mouse-up.
+--- @param operation table Lookup acquisition.
+--- @param event table|userdata Exact preconstructed event.
+--- @param is_down boolean
+--- @return boolean committed
+--- @return string|nil detail
+local function post_lookup_mouse_boundary(operation, event, is_down)
+	operation.boundary_active = true
+	if is_down then operation.mouse_down_owned = true end
+	local posted, detail = post_lookup_mouse_event(event)
+	operation.boundary_active = false
+	if is_down ~= true and posted == true then operation.mouse_down_owned = false end
+	return posted, detail
+end
+
+--- Settles one lookup acquisition without allowing a sibling parent to consume
+--- its mouse-button or timer debt.
+--- @param parent string Stable action parent.
+--- @return boolean settled
+local function cleanup_lookup_operation(parent)
+	local operation = _lookup_operations[parent]
+	if not operation then return true end
+	operation.authorized = false
+	local timer_settled = true
+	if operation.timer_token ~= nil then
+		timer_settled = rollback_aux_timer(operation.timer_token, "Dictionary lookup")
+		if timer_settled then operation.timer_token = nil end
+	end
+	if operation.boundary_active == true then return false end
+	local mouse_settled = true
+	if operation.mouse_down_owned == true then
+		local posted = post_lookup_mouse_boundary(operation, operation.up_event, false)
+		mouse_settled = posted == true
+	end
+	if timer_settled and mouse_settled and operation.boundary_active ~= true
+		and operation.mouse_down_owned ~= true then
+		if _lookup_operations[parent] == operation then
+			_lookup_operations[parent] = nil
+		end
+		return true
+	end
+	return false
 end
 
 
@@ -184,21 +374,117 @@ local function switch_to_previous_window_precise()
 end
 
 --- Triggers a macOS system-wide dictionary lookup/definition.
-function M.trigger_lookup()
-	local pos = hs.mouse.absolutePosition()
-	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseDown, pos):post() end)
-	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
-	hs.timer.doAfter(0.05, function()
-		postKeyStroke({"cmd", "ctrl"}, "d")
-	end)
+function M.trigger_lookup(explicit_parent)
+	local requested_parent = explicit_parent or current_action_parent()
+	local parent = requested_parent == SHORTCUT_ACTION_PARENT
+		and SHORTCUT_ACTION_PARENT or GESTURE_ACTION_PARENT
+	if not aux_admission_open(parent) or _lookup_operations[parent] ~= nil then
+		return false
+	end
+	local acquired, prepared, timer_token = xpcall(function()
+		return AuxOwner.prepare_after(0.05, "dictionary lookup", function()
+			postKeyStroke({"cmd", "ctrl"}, "d")
+		end, parent)
+	end, debug.traceback)
+	if not acquired or prepared ~= true or type(timer_token) ~= "table" then
+		Logger.error(LOG, "Dictionary lookup timer acquisition failed: %s.",
+			tostring(prepared))
+		return false
+	end
+	local operation = {
+		parent = parent,
+		timer_token = timer_token,
+		up_event = nil,
+		mouse_down_owned = false,
+		boundary_active = false,
+		authorized = true,
+	}
+	_lookup_operations[parent] = operation
+
+	local position_ok, position_or_error = xpcall(hs.mouse.absolutePosition, debug.traceback)
+	if not position_ok or type(position_or_error) ~= "table" then
+		cleanup_lookup_operation(parent)
+		Logger.error(LOG, "Dictionary lookup mouse position read failed: %s.",
+			tostring(position_or_error))
+		return false
+	end
+	if not aux_admission_open(parent) then
+		cleanup_lookup_operation(parent)
+		return false
+	end
+
+	local types_ok, event_types_or_error = xpcall(function()
+		return hs.eventtap.event.types
+	end, debug.traceback)
+	if not types_ok or type(event_types_or_error) ~= "table" then
+		cleanup_lookup_operation(parent)
+		Logger.error(LOG, "Dictionary lookup mouse event types read failed: %s.",
+			tostring(event_types_or_error))
+		return false
+	end
+	local down_event, down_error = construct_lookup_mouse_event(
+		event_types_or_error.rightMouseDown, position_or_error)
+	local up_event, up_error = construct_lookup_mouse_event(
+		event_types_or_error.rightMouseUp, position_or_error)
+	if down_event == nil or up_event == nil then
+		cleanup_lookup_operation(parent)
+		Logger.error(LOG, "Dictionary lookup mouse event construction failed: %s / %s.",
+			tostring(down_error), tostring(up_error))
+		return false
+	end
+	operation.up_event = up_event
+	if not aux_admission_open(parent) then
+		cleanup_lookup_operation(parent)
+		return false
+	end
+
+	local down_posted, down_post_error =
+		post_lookup_mouse_boundary(operation, down_event, true)
+	if down_posted ~= true then
+		cleanup_lookup_operation(parent)
+		Logger.error(LOG, "Dictionary lookup mouse-down post failed: %s.",
+			tostring(down_post_error))
+		return false
+	end
+	if not aux_admission_open(parent) or operation.authorized ~= true then
+		cleanup_lookup_operation(parent)
+		return false
+	end
+
+	local up_posted, up_post_error =
+		post_lookup_mouse_boundary(operation, up_event, false)
+	if up_posted ~= true then
+		cleanup_lookup_operation(parent)
+		Logger.error(LOG, "Dictionary lookup mouse-up post failed: %s.",
+			tostring(up_post_error))
+		return false
+	end
+	if not aux_admission_open(parent) or operation.authorized ~= true then
+		cleanup_lookup_operation(parent)
+		return false
+	end
+
+	local commit_ok, committed = xpcall(AuxOwner.commit_after, debug.traceback, timer_token)
+	if not commit_ok or committed ~= true then
+		cleanup_lookup_operation(parent)
+		Logger.error(LOG, "Dictionary lookup timer commit failed: %s.", tostring(committed))
+		return false
+	end
+	operation.timer_token = nil
+	if _lookup_operations[parent] == operation then _lookup_operations[parent] = nil end
+	return true
 end
 
 -- The synthetic click-hold subsystem lives in its own module so the action
 -- registry below stays a pure name -> behaviour mapping. Re-export its public
 -- surface on M so existing callers (and the registry) keep their call sites.
 M.force_cleanup           = Click.force_cleanup
-M.toggle_right_click      = Click.toggle_right_click
-M.toggle_left_click       = Click.toggle_left_click
+M.toggle_right_click      = function()
+	return Click.toggle_right_click(current_action_parent())
+end
+M.toggle_left_click       = function()
+	return Click.toggle_left_click(current_action_parent())
+end
 M.is_right_click_held     = Click.is_right_click_held
 
 local function show_application_switcher_overlay()
@@ -339,12 +625,12 @@ ax("tracks",
 	function() sysKey("NEXT") end)
 
 ax("lines",      
-	function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end,
-	function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end, true)
+	function() return defer_key("line up", {"alt"}, "up") end,
+	function() return defer_key("line down", {"alt"}, "down") end, true)
 
 ax("line_bounds",
-	function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end,
-	function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
+	function() return defer_key("line start", {"cmd"}, "left") end,
+	function() return defer_key("line end", {"cmd"}, "right") end)
 
 ax("paragraphs", 
 	function() postKeyStroke({"alt"}, "up") end,
@@ -360,7 +646,9 @@ sg("none",                         function() end)
 -- Selection & navigation cursor
 sg("left_click_toggle",   M.toggle_left_click)
 sg("right_click_toggle",   M.toggle_right_click)
-sg("lookup",               M.trigger_lookup)
+sg("lookup", function()
+	return M.trigger_lookup(current_action_parent())
+end)
 sg("app_switcher",      show_application_switcher_overlay)
 sg("app_previous",      switch_to_previous_application)
 sg("app_window_previous",  switch_to_previous_window_precise)
@@ -459,7 +747,7 @@ end
 local function arm_sticky(modifiers)
 	local secs = sticky_timeout_sec()
 	if not secs then return end
-	Sticky.toggle(modifiers, secs)
+	return Sticky.toggle(modifiers, secs, current_action_parent())
 end
 
 sg("layer_on", function()
@@ -550,10 +838,10 @@ sg("app_expose",                  function()
 end)
 
 -- Cursor movement
-sg("line_up",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "up") end) end)
-sg("line_down",               function() hs.timer.doAfter(0, function() postKeyStroke({"alt"}, "down") end) end)
-sg("line_start",              function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "left") end) end)
-sg("line_end",                  function() hs.timer.doAfter(0, function() postKeyStroke({"cmd"}, "right") end) end)
+sg("line_up",               function() return defer_key("line up", {"alt"}, "up") end)
+sg("line_down",             function() return defer_key("line down", {"alt"}, "down") end)
+sg("line_start",            function() return defer_key("line start", {"cmd"}, "left") end)
+sg("line_end",              function() return defer_key("line end", {"cmd"}, "right") end)
 
 -- Media
 sg("vol_up",                        function() sysKey("SOUND_UP") end)
@@ -571,86 +859,24 @@ sg("track_prev",            function() sysKey("PREVIOUS") end)
 
 -- Shift + Alt + Arrows (Word selection)
 
--- Absolute path: the interactive layer must not inherit its binaries from PATH,
--- which differs between a login shell and the Hammerspoon process.
-local SCREENCAPTURE_BIN    = "/usr/sbin/screencapture"
-local MKDIR_BIN           = "/bin/mkdir"
-local SCREENSHOT_DIR_REL   = "/Pictures/screenshots"
-local SCREENSHOT_STAMP_FMT = "%Y%m%d%H%M%S"
-
---- Builds the absolute path a saved screenshot goes to.
----
---- `~` and the shell's `$(date …)` used to be expanded by the shell that
---- the blocking launcher spawned. The async one hands argv straight to the binary
---- no shell in between, so both are resolved here - which also means a space or a
---- `$` in HOME can no longer be re-interpreted.
---- @param prefix string Filename prefix identifying the capture mode.
---- @return string Absolute PNG path.
-local function screenshot_path(prefix)
-	local home = os.getenv("HOME") or ""
-	return string.format("%s%s/%s_%s.png",
-		home, SCREENSHOT_DIR_REL, prefix, os.date(SCREENSHOT_STAMP_FMT))
-end
-
---- Fires screencapture without blocking the runloop.
---- @param args table Array of argv entries (flags, then an optional target path).
-local function capture(args)
-	local task = ShellRunner.spawn(SCREENCAPTURE_BIN, args, function(exit_code)
-		if exit_code ~= 0 then
-			Logger.error(LOG, "Gesture screenshot capture failed with exit code %s.", tostring(exit_code))
-			notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-		end
-	end)
-	if not task or task.start() ~= true then
-		Logger.error(LOG, "Gesture screenshot task refused to start.")
-		notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-		return false
-	end
-	return true
-end
-
-local function capture_saved(flags, prefix)
-	local home = os.getenv("HOME") or ""
-	local dir = home .. SCREENSHOT_DIR_REL
-	local target = screenshot_path(prefix)
-	local mkdir_task = ShellRunner.spawn(MKDIR_BIN, { "-p", dir }, function(exit_code)
-		if exit_code ~= 0 then
-			Logger.error(LOG, "Gesture screenshot directory creation failed with exit code %s.", tostring(exit_code))
-			notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-			return
-		end
-		local args = {}
-		for _, flag in ipairs(flags) do args[#args + 1] = flag end
-		args[#args + 1] = target
-		capture(args)
-	end)
-	if not mkdir_task or mkdir_task.start() ~= true then
-		Logger.error(LOG, "Gesture screenshot directory task refused to start.")
-		notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
-		return false
-	end
-	return true
-end
-
-
 -- System
 sg("screenshot_window_clipboard",     function()
-	capture({ "-cw" })
+	return ScreenshotSave.capture({ "-cw" }, current_action_parent())
 end)
 sg("screenshot_window_save",          function()
-	capture_saved({ "-w" }, "win")
+	return ScreenshotSave.save({ "-w" }, "win", current_action_parent())
 end)
 sg("screenshot_region_clipboard",      function()
-	capture({ "-ci" })
+	return ScreenshotSave.capture({ "-ci" }, current_action_parent())
 end)
 sg("screenshot_region_save",           function()
-	capture_saved({ "-i" }, "reg")
+	return ScreenshotSave.save({ "-i" }, "reg", current_action_parent())
 end)
 sg("screenshot_fullscreen_clipboard",   function()
-	capture({ "-c" })
+	return ScreenshotSave.capture({ "-c" }, current_action_parent())
 end)
 sg("screenshot_fullscreen_save",        function()
-	capture_saved({}, "full")
+	return ScreenshotSave.save({}, "full", current_action_parent())
 end)
 
 -- Four actions macOS has always implemented — in the keyboard-SHORTCUT layer —
@@ -666,24 +892,41 @@ end)
 -- for users who never bind one of these.
 sg("select_line", function()
 	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
-	if ok and type(Text.select_line) == "function" then Text.select_line() end
+	if ok and type(Text.select_line) == "function" then
+		return Text.select_line(current_action_parent())
+	end
+	return false
 end)
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
-	if ok and type(Mouse.teleport_mouse) == "function" then Mouse.teleport_mouse() end
+	if ok and type(Mouse.teleport_mouse) == "function" then
+		return Mouse.teleport_mouse(current_action_parent())
+	end
+	return false
 end)
 sg("spotlight_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
-	if ok and type(Mouse.spotlight_mouse) == "function" then Mouse.spotlight_mouse() end
+	if ok and type(Mouse.spotlight_mouse) == "function" then
+		return Mouse.spotlight_mouse(nil, current_action_parent())
+	end
+	return false
 end)
 sg("toggle_capslock", function()
 	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
 	if ok and type(Sys.toggle_capslock) == "function" then Sys.toggle_capslock() end
 end)
 
-sg("lock_screen",                    function() pcall(hs.caffeinate.lockScreen) end)
+sg("lock_screen", function()
+	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	if ok and type(Mouse.lock_screen) == "function" then
+		return Mouse.lock_screen(current_action_parent())
+	end
+	return false
+end)
 sg("notification_center",          function()
-	ShellRunner.applescript("tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"")
+	return AuxOwner.applescript(
+		"tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"",
+		"open notification center", nil, current_action_parent())
 end)
 
 -- Applications and Stats
@@ -696,28 +939,32 @@ sg("open_metrics_apps",        function() invoke_ui("ui.metrics_apps", "show") e
 sg("open_hotstrings_editor",    function() invoke_ui("ui.hotstring_editor", "open") end)
 sg("open_paths_editor",            function() invoke_ui("ui.menu.menu_paths", "open_editor") end)
 sg("open_script_source",               function()
-	ShellRunner.open(hs.configdir)
+	return AuxOwner.open(hs.configdir, "open script source", nil, current_action_parent())
 end)
 sg("open_personal_shortcuts",     function()
-	ShellRunner.open(hs.configdir .. "/personal_shortcuts.toml")
+	return AuxOwner.open(hs.configdir .. "/personal_shortcuts.toml",
+		"open personal shortcuts", nil, current_action_parent())
 end)
 sg("open_personal_hotstrings",    function()
 	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
 	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
 	if type(p) == "string" and p ~= "" then
-		ShellRunner.open(p)
+		return AuxOwner.open(p, "open personal hotstrings", nil, current_action_parent())
 	else
-		ShellRunner.open(hs.configdir .. "/hotstrings/personal_hotstrings.toml")
+		return AuxOwner.open(hs.configdir .. "/hotstrings/personal_hotstrings.toml",
+			"open personal hotstrings", nil, current_action_parent())
 	end
 end)
 sg("open_personal_info",               function()
-	ShellRunner.open(hs.configdir .. "/personal_info.toml")
+	return AuxOwner.open(hs.configdir .. "/personal_info.toml",
+		"open personal info", nil, current_action_parent())
 end)
 sg("open_config",                    function()
-	ShellRunner.open(hs.configdir .. "/config.toml")
+	return AuxOwner.open(hs.configdir .. "/config.toml",
+		"open config", nil, current_action_parent())
 end)
 sg("open_logs_folder",                function()
-	ShellRunner.open(logs_dir())
+	return AuxOwner.open(logs_dir(), "open logs folder", nil, current_action_parent())
 end)
 sg("open_today_log",                   function()
 	local ok_p, path = pcall(function()
@@ -726,7 +973,8 @@ sg("open_today_log",                   function()
 	-- The open is skipped rather than attempted with a nil path: the launcher
 	-- logs an ERROR for a nil target, which is the fail-fast we want, but only
 	-- when there was really a path to open.
-	if ok_p then ShellRunner.open(path) end
+	if ok_p then return AuxOwner.open(path, "open today's log", nil, current_action_parent()) end
+	return false
 end)
 sg("open_error_log",                   function()
 	local ok_p, path = pcall(function()
@@ -736,7 +984,8 @@ sg("open_error_log",                   function()
 		end
 		return logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
 	end)
-	if ok_p then ShellRunner.open(path) end
+	if ok_p then return AuxOwner.open(path, "open error log", nil, current_action_parent()) end
+	return false
 end)
 
 -- Parameterized actions read their value from the binding that invoked them.
@@ -750,28 +999,93 @@ end)
 -- it: a local declared below one binds a nil global instead, and the failure
 -- surfaces only inside a timer callback where the file logger never sees it.
 local _search_capture_in_flight = false
+local _search_parent = nil
 local _search_saved_clipboard = nil
 local _search_capture_generation = 0
 local _search_recovery_only = false
+local _search_capture_authorized = false
 local _search_capture_timer = nil
 local _search_restore_retry_timer = nil
+local _search_capture_timer_parent = nil
+local _search_restore_retry_timer_parent = nil
 local _search_deferred_retry_armed = false
+local _search_mutation_depth = 0
+local _search_cleanup_requested = false
 
-local function stop_search_timer(handle)
-	if handle and type(handle.stop) == "function" then pcall(handle.stop, handle) end
+local function search_capture_is_current(parent, generation)
+	return _search_capture_in_flight == true
+		and _search_parent == parent
+		and _search_capture_authorized == true
+		and _search_capture_generation == generation
+		and aux_admission_open(parent)
+end
+
+--- Returns the exact timer currently owned by one search slot.
+--- @param slot string `capture` or `restore`.
+--- @return table|userdata|nil handle
+local function get_search_timer(slot)
+	return slot == "capture" and _search_capture_timer or _search_restore_retry_timer
+end
+
+local function get_search_timer_parent(slot)
+	return slot == "capture"
+		and _search_capture_timer_parent or _search_restore_retry_timer_parent
+end
+
+--- Publishes one exact timer into its search slot.
+--- @param slot string `capture` or `restore`.
+--- @param handle table|userdata|nil Native timer handle.
+local function set_search_timer(slot, handle, parent)
+	if slot == "capture" then
+		_search_capture_timer = handle
+		_search_capture_timer_parent = handle and parent or nil
+	else
+		_search_restore_retry_timer = handle
+		_search_restore_retry_timer_parent = handle and parent or nil
+	end
+end
+
+--- Stops one exact timer without clearing a refused cleanup capability.
+--- @param slot string `capture` or `restore`.
+--- @return boolean settled
+local function stop_search_timer(slot, parent)
+	local handle = get_search_timer(slot)
+	if handle == nil then return true end
+	if parent ~= nil and get_search_timer_parent(slot) ~= parent then return true end
+	local ok_method, stop_method = pcall(function() return handle.stop end)
+	if not ok_method or type(stop_method) ~= "function" then
+		Logger.error(LOG, "search_web %s timer has no readable stop method.", slot)
+		return false
+	end
+	local ok_stop, stop_result = xpcall(function()
+		return stop_method(handle)
+	end, debug.traceback)
+	if not ok_stop or stop_result == nil or stop_result == false then
+		Logger.error(LOG, "search_web %s timer stop refused; exact handle retained: %s.",
+			slot, tostring(stop_result))
+		return false
+	end
+	if get_search_timer(slot) == handle then set_search_timer(slot, nil, nil) end
+	return true
 end
 
 local function release_search_clipboard(generation)
 	if generation ~= _search_capture_generation then return end
-	stop_search_timer(_search_capture_timer)
-	stop_search_timer(_search_restore_retry_timer)
-	_search_capture_timer = nil
-	_search_restore_retry_timer = nil
+	local parent = _search_parent
+	local capture_stopped = stop_search_timer("capture", parent)
+	local restore_stopped = stop_search_timer("restore", parent)
+	if not capture_stopped or not restore_stopped then
+		return false, "search timer cleanup pending"
+	end
 	_search_capture_in_flight = false
+	_search_parent = nil
 	_search_saved_clipboard = nil
 	_search_recovery_only = false
+	_search_capture_authorized = false
 	_search_deferred_retry_armed = false
+	_search_cleanup_requested = false
 	_search_capture_generation = _search_capture_generation + 1
+	return true
 end
 
 local function restore_search_clipboard(generation)
@@ -780,33 +1094,41 @@ local function restore_search_clipboard(generation)
 	end
 	local saved = _search_saved_clipboard
 	local ok_restore, restore_result
+	_search_mutation_depth = _search_mutation_depth + 1
 	if type(saved) == "table" and next(saved) ~= nil then
 		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
-		if not ok_restore or restore_result ~= true then
-			return false, ok_restore and "writeAllData returned " .. tostring(restore_result)
-				or restore_result
-		end
 	else
 		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
-		if not ok_restore then return false, restore_result end
 	end
-	release_search_clipboard(generation)
-	return true
+	_search_mutation_depth = _search_mutation_depth - 1
+	if not ok_restore or restore_result ~= true then
+		return false, ok_restore and "clipboard restore returned " .. tostring(restore_result)
+			or restore_result
+	end
+	local released, release_error = release_search_clipboard(generation)
+	if released ~= true then return false, release_error end
+	return true, nil
 end
 
-local function arm_search_timer(slot, delay, label, generation, callback)
+local function arm_search_timer(slot, delay, label, generation, parent, callback)
+	if stop_search_timer(slot, parent) ~= true then
+		return false, "predecessor timer cleanup pending"
+	end
 	local handle = nil
 	local installing = true
 	local callback_ran = false
 	local ok_timer, timer_or_error = pcall(hs.timer.doAfter, delay, function()
 		callback_ran = true
 		if installing then return end
-		if slot == "capture" and _search_capture_timer == handle then
-			_search_capture_timer = nil
-		elseif slot == "restore" and _search_restore_retry_timer == handle then
-			_search_restore_retry_timer = nil
-		end
+		if get_search_timer(slot) ~= handle then return end
+		if get_search_timer_parent(slot) ~= parent then return end
+		-- Delivery is exact terminal proof for this one-shot even after the
+		-- logical search generation has been revoked. Retire the native slot
+		-- before applying the business fence so a later PAUSE retry does not
+		-- signal an already-terminal handle again.
+		set_search_timer(slot, nil, nil)
 		if generation ~= _search_capture_generation then return end
+		if slot == "capture" and not search_capture_is_current(parent, generation) then return end
 		local ok_callback, callback_error = xpcall(callback, debug.traceback)
 		if not ok_callback then
 			Logger.error(LOG, "search_web %s callback failed: %s.", label, tostring(callback_error))
@@ -814,16 +1136,16 @@ local function arm_search_timer(slot, delay, label, generation, callback)
 		end
 	end)
 	installing = false
+	handle = ok_timer and timer_or_error or nil
+	if handle ~= nil and handle ~= false then set_search_timer(slot, handle, parent) end
 	if not ok_timer or timer_or_error == nil or timer_or_error == false or callback_ran then
-		stop_search_timer(timer_or_error)
+		stop_search_timer(slot, parent)
 		return false, ok_timer and (callback_ran and "timer fired during installation"
 			or "hs.timer.doAfter returned no handle") or timer_or_error
 	end
-	handle = timer_or_error
-	if slot == "capture" then
-		_search_capture_timer = handle
-	else
-		_search_restore_retry_timer = handle
+	if slot == "capture" and not search_capture_is_current(parent, generation) then
+		stop_search_timer(slot, parent)
+		return false, "search capture superseded during timer acquisition"
 	end
 	return true
 end
@@ -840,7 +1162,8 @@ queue_search_restore_retry = function(generation)
 			queue_search_restore_retry(generation)
 	end
 	local timer_armed, timer_error = arm_search_timer(
-		"restore", CLIPBOARD_COPY_SETTLE_SEC, "restore retry", generation, attempt_restore)
+		"restore", CLIPBOARD_COPY_SETTLE_SEC, "restore retry", generation,
+		_search_parent, attempt_restore)
 	if timer_armed then
 		return true
 	end
@@ -869,10 +1192,24 @@ queue_search_restore_retry = function(generation)
 	return false
 end
 
-local function cleanup_search_capture()
-	if not _search_capture_in_flight then return true end
-	stop_search_timer(_search_capture_timer)
-	_search_capture_timer = nil
+local function cleanup_search_capture(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or GESTURE_ACTION_PARENT
+	if not _search_capture_in_flight or _search_parent ~= scope_id then
+		local capture_stopped = stop_search_timer("capture", scope_id)
+		local restore_stopped = stop_search_timer("restore", scope_id)
+		return capture_stopped == true and restore_stopped == true
+	end
+	-- Fence browser publication before crossing fallible timer/clipboard cleanup.
+	-- A refused native stop may still deliver its callback, but it can no longer
+	-- restore/open anything after the gesture lifecycle has been revoked.
+	_search_capture_authorized = false
+	if _search_mutation_depth > 0 then
+		_search_cleanup_requested = true
+		Logger.error(LOG,
+			"search_web cleanup deferred until the active clipboard boundary returns.")
+		return false
+	end
 	local generation = _search_capture_generation
 	local restored, restore_error = restore_search_clipboard(generation)
 	if restored then return true end
@@ -886,7 +1223,14 @@ end
 sg("search_web", function(binding)
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
+	local parent = current_action_parent()
 	if _search_capture_in_flight then
+		if _search_parent ~= parent then
+			Logger.debug(LOG,
+				"search_web refused while sibling parent '%s' owns clipboard recovery.",
+				tostring(_search_parent))
+			return false
+		end
 		if _search_recovery_only then
 			local recovered, recovery_error = restore_search_clipboard(_search_capture_generation)
 			if not recovered then
@@ -910,12 +1254,18 @@ sg("search_web", function(binding)
 		Logger.error(LOG, "search_web clipboard snapshot failed: %s.", tostring(snapshot_or_error))
 		return
 	end
+	if not aux_admission_open(parent) then return false end
 	_search_saved_clipboard = snapshot_or_error
 	_search_capture_in_flight = true
+	_search_parent = parent
+	_search_capture_authorized = true
+	_search_cleanup_requested = false
 	_search_capture_generation = _search_capture_generation + 1
 	local my_generation = _search_capture_generation
+	_search_mutation_depth = _search_mutation_depth + 1
 	local ok_clear, clear_error = pcall(hs.pasteboard.clearContents)
-	if not ok_clear then
+	_search_mutation_depth = _search_mutation_depth - 1
+	if not ok_clear or clear_error ~= true then
 		local restored, restore_error = restore_search_clipboard(my_generation)
 		if not restored then
 			_search_recovery_only = true
@@ -924,9 +1274,17 @@ sg("search_web", function(binding)
 		Logger.error(LOG, "search_web clipboard clear failed: %s.", tostring(clear_error))
 		return
 	end
+	if _search_cleanup_requested or not search_capture_is_current(parent, my_generation) then
+		if _search_capture_in_flight and _search_parent == parent
+			and _search_capture_generation == my_generation then
+			_search_capture_authorized = false
+			restore_search_clipboard(my_generation)
+		end
+		return false
+	end
 	local timer_armed, timer_error = arm_search_timer(
-		"capture", CLIPBOARD_COPY_SETTLE_SEC, "capture", my_generation, function()
-		if my_generation ~= _search_capture_generation then return end
+		"capture", CLIPBOARD_COPY_SETTLE_SEC, "capture", my_generation, parent, function()
+		if not search_capture_is_current(parent, my_generation) then return end
 		local ok_selected, selected = pcall(hs.pasteboard.getContents)
 		local restored, restore_error = restore_search_clipboard(my_generation)
 		if not restored then
@@ -939,6 +1297,7 @@ sg("search_web", function(binding)
 			Logger.error(LOG, "search_web selection copy produced no text: %s.", tostring(selected))
 			return
 		end
+		if not aux_admission_open(parent) then return end
 		-- url_encode_query returns percent-escapes, and this value lands on the
 		-- REPLACEMENT side of gsub where "%2" reads as capture reference #2. Any
 		-- selection containing a space encodes to "%20" and raised "invalid capture
@@ -947,20 +1306,41 @@ sg("search_web", function(binding)
 		open_url((template:gsub("%%s", text_utils.escape_gsub_replacement(url_encode_query(selected)))))
 	end)
 	if not timer_armed then
-		local restored, restore_error = restore_search_clipboard(my_generation)
-		if not restored then
-			_search_recovery_only = true
-			queue_search_restore_retry(my_generation)
+		local restore_error = "capture superseded before timer commit"
+		-- A lifecycle cleanup may have fully restored/released this generation
+		-- while hs.timer.doAfter() was still on-stack. Do not publish a stale
+		-- recovery timer after that cleanup has already certified settlement.
+		if _search_capture_in_flight and _search_parent == parent
+			and _search_capture_generation == my_generation then
+			local restored
+			restored, restore_error = restore_search_clipboard(my_generation)
+			if not restored then
+				_search_recovery_only = true
+				queue_search_restore_retry(my_generation)
+			end
 		end
 		Logger.error(LOG, "search_web capture timer was refused: %s (restore=%s).",
 			tostring(timer_error), tostring(restore_error))
 		return
 	end
+	if not search_capture_is_current(parent, my_generation) then
+		stop_search_timer("capture", parent)
+		if _search_capture_in_flight and _search_parent == parent
+			and _search_capture_generation == my_generation then
+			_search_capture_authorized = false
+			restore_search_clipboard(my_generation)
+		end
+		return false
+	end
+	_search_mutation_depth = _search_mutation_depth + 1
 	local ok_copy, copied = pcall(
 		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
-	if not ok_copy or copied ~= true then
-		stop_search_timer(_search_capture_timer)
-		_search_capture_timer = nil
+	_search_mutation_depth = _search_mutation_depth - 1
+	if not ok_copy or copied ~= true
+		or _search_cleanup_requested
+		or not search_capture_is_current(parent, my_generation) then
+		_search_capture_authorized = false
+		stop_search_timer("capture", parent)
 		local restored, restore_error = restore_search_clipboard(my_generation)
 		if not restored then
 			_search_recovery_only = true
@@ -968,15 +1348,181 @@ sg("search_web", function(binding)
 		end
 		Logger.error(LOG, "search_web copy shortcut was refused: %s (restore=%s).",
 			tostring(copied), tostring(restore_error))
+		return false
 	end
+	return true
 end)
 
-M.force_cleanup = function()
-	local click_ok, click_result = xpcall(Click.force_cleanup, debug.traceback)
-	local search_ok, search_result = xpcall(cleanup_search_capture, debug.traceback)
+--- Builds the exact lifecycle inventory shared by both action parents.
+--- @return table|nil children
+local function scoped_action_children()
+	local text_ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	local mouse_ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	if not text_ok or type(Text) ~= "table"
+		or not mouse_ok or type(Mouse) ~= "table" then
+		Logger.error(LOG, "Shared action lifecycle modules could not be loaded: %s / %s.",
+			tostring(Text), tostring(Mouse))
+		return nil
+	end
+	return {
+		{id = "auxiliary", subject = AuxOwner,
+			pause = "pause", resume = "resume", query = "is_paused",
+			pending = "has_pending"},
+		{id = "text", subject = Text,
+			pause = "pause_text_actions", resume = "resume_text_actions",
+			query = "is_text_actions_paused", pending = "has_pending_text_action"},
+		{id = "mouse", subject = Mouse,
+			pause = "pause_mouse_actions", resume = "resume_mouse_actions",
+			query = "is_mouse_actions_paused", pending = "has_pending_mouse_action"},
+		{id = "screenshot", subject = ScreenshotSave,
+			pause = "pause_screenshot_actions", resume = "resume_screenshot_actions",
+			query = "has_screenshot_pause_claim",
+			pending = "has_pending_screenshot_action"},
+	}
+end
+
+--- Invokes one scoped child lifecycle edge with an exact literal-true contract.
+--- @param child table Lifecycle descriptor.
+--- @param edge string `pause` or `resume`.
+--- @param parent string Stable action parent.
+--- @return boolean settled
+local function call_scoped_child(child, edge, parent)
+	local fn = child.subject and child.subject[child[edge]]
+	if type(fn) ~= "function" then return false end
+	local ok, result = xpcall(fn, debug.traceback, parent)
+	if not ok or result ~= true then
+		Logger.error(LOG, "%s %s did not settle for '%s': %s.",
+			child.id, edge, parent, tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Reads one scoped child pause state without normalizing nil or throws.
+--- @param child table Lifecycle descriptor.
+--- @param parent string Stable action parent.
+--- @return boolean readable
+--- @return boolean|nil paused
+local function scoped_child_is_paused(child, parent)
+	local fn = child.subject and child.subject[child.query]
+	if type(fn) ~= "function" then return false, nil end
+	local ok, paused = xpcall(fn, debug.traceback, parent)
+	if not ok or type(paused) ~= "boolean" then return false, nil end
+	return true, paused
+end
+
+--- Reads one scoped child pending state without normalizing ambiguity.
+--- @param child table Lifecycle descriptor.
+--- @param parent string Stable action parent.
+--- @return boolean readable
+--- @return boolean|nil pending
+local function scoped_child_has_pending(child, parent)
+	local fn = child.subject and child.subject[child.pending]
+	if type(fn) ~= "function" then return false, nil end
+	local ok, pending = xpcall(fn, debug.traceback, parent)
+	if not ok or type(pending) ~= "boolean" then return false, nil end
+	return true, pending
+end
+
+M.force_cleanup = function(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or GESTURE_ACTION_PARENT
+	-- Close the aggregate before the first fallible child cleanup. This also
+	-- invalidates an outer resume if cleanup is entered synchronously by a child.
+	fence_action_scope(scope_id)
+	local children = scoped_action_children()
+	local click_ok, click_result = xpcall(
+		Click.force_cleanup, debug.traceback, scope_id)
+	local search_ok, search_result = xpcall(
+		cleanup_search_capture, debug.traceback, scope_id)
+	local sticky_ok, sticky_result = xpcall(Sticky.clear, debug.traceback, scope_id)
+	local lookup_ok, lookup_result = xpcall(
+		cleanup_lookup_operation, debug.traceback, scope_id)
+	local children_settled = children ~= nil
+	for _, child in ipairs(children or {}) do
+		local paused_result = call_scoped_child(child, "pause", scope_id)
+		local readable, paused = scoped_child_is_paused(child, scope_id)
+		local pending_readable, pending = scoped_child_has_pending(child, scope_id)
+		if paused_result ~= true
+			or readable ~= true or paused ~= true
+			or pending_readable ~= true or pending ~= false then
+			children_settled = false
+		end
+	end
 	if not click_ok then Logger.error(LOG, "Click cleanup raised: %s.", tostring(click_result)) end
 	if not search_ok then Logger.error(LOG, "Search cleanup raised: %s.", tostring(search_result)) end
-	return click_ok and click_result ~= false and search_ok and search_result == true
+	if not sticky_ok then Logger.error(LOG, "Sticky cleanup raised: %s.", tostring(sticky_result)) end
+	if not lookup_ok then Logger.error(LOG, "Lookup cleanup raised: %s.", tostring(lookup_result)) end
+	return click_ok and click_result == true
+		and search_ok and search_result == true
+		and sticky_ok and sticky_result == true
+		and lookup_ok and lookup_result == true
+		and children_settled == true
+end
+
+function M.resume_after_cleanup(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or GESTURE_ACTION_PARENT
+	if M.force_cleanup(scope_id) ~= true then return false end
+	local children = scoped_action_children()
+	if not children then return false end
+	local lifecycle = action_scope_lifecycle(scope_id)
+	lifecycle.epoch = lifecycle.epoch + 1
+	local attempt = { epoch = lifecycle.epoch }
+	lifecycle.transition = attempt
+	lifecycle.admission_open = false
+	local attempted = {}
+	local function rollback_resume()
+		-- Retire our identity before rollback callbacks run so a synchronous
+		-- dispatch from cleanup observes the closed composite fence as well.
+		if lifecycle.transition == attempt then
+			lifecycle.transition = nil
+			lifecycle.admission_open = false
+			lifecycle.epoch = lifecycle.epoch + 1
+		end
+		for index = #attempted, 1, -1 do
+			call_scoped_child(attempted[index], "pause", scope_id)
+		end
+		return false
+	end
+	for _, child in ipairs(children) do
+		attempted[#attempted + 1] = child
+		if not action_resume_is_current(lifecycle, attempt) then
+			return rollback_resume()
+		end
+		local resumed = call_scoped_child(child, "resume", scope_id)
+		if not action_resume_is_current(lifecycle, attempt) then
+			return rollback_resume()
+		end
+		local readable, paused = scoped_child_is_paused(child, scope_id)
+		if not action_resume_is_current(lifecycle, attempt) then
+			return rollback_resume()
+		end
+		local pending_readable, pending = scoped_child_has_pending(child, scope_id)
+		if resumed ~= true or readable ~= true or paused ~= false
+			or pending_readable ~= true or pending ~= false
+			or not action_resume_is_current(lifecycle, attempt) then
+			return rollback_resume()
+		end
+	end
+	for _, child in ipairs(children) do
+		local readable, paused = scoped_child_is_paused(child, scope_id)
+		if not action_resume_is_current(lifecycle, attempt) then
+			return rollback_resume()
+		end
+		local pending_readable, pending = scoped_child_has_pending(child, scope_id)
+		if readable ~= true or paused ~= false
+			or pending_readable ~= true or pending ~= false
+			or not action_resume_is_current(lifecycle, attempt) then
+			return rollback_resume()
+		end
+	end
+	if not action_resume_is_current(lifecycle, attempt) then
+		return rollback_resume()
+	end
+	lifecycle.transition = nil
+	lifecycle.admission_open = true
+	return true
 end
 
 -- Script management
@@ -986,8 +1532,35 @@ sg("script_pause_toggle",     function()
 end)
 sg("script_reload",                       function() pcall(hs.reload) end)
 sg("script_save_reload",      function()
-	postKeyStroke({"cmd"}, "s")
-	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
+	if not aux_admission_open() then return false end
+	local acquired, prepared, timer_token = xpcall(function()
+		return AuxOwner.prepare_after(0.3, "script save reload", function()
+			pcall(hs.reload)
+		end, current_action_parent())
+	end, debug.traceback)
+	if not acquired or prepared ~= true or type(timer_token) ~= "table" then
+		Logger.error(LOG, "Script save/reload timer acquisition failed: %s.",
+			tostring(prepared))
+		return false
+	end
+
+	local post_ok, post_result = xpcall(function()
+		return postKeyStroke({"cmd"}, "s")
+	end, debug.traceback)
+	if not post_ok or post_result ~= true or not aux_admission_open() then
+		rollback_aux_timer(timer_token, "Script save/reload")
+		Logger.error(LOG, "Script save/reload save dispatch failed: %s.",
+			tostring(post_result))
+		return false
+	end
+
+	local commit_ok, committed = xpcall(AuxOwner.commit_after, debug.traceback, timer_token)
+	if not commit_ok or committed ~= true then
+		rollback_aux_timer(timer_token, "Script save/reload")
+		Logger.error(LOG, "Script save/reload timer commit failed: %s.", tostring(committed))
+		return false
+	end
+	return true
 end)
 sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
@@ -1428,28 +2001,68 @@ end
 --- action is unknown here, so the caller can try its own fallback instead of
 --- assuming the action ran.
 function M.execute_single(name, binding)
+	local parent = parent_for_binding(binding)
+	local control_plane = is_script_control_plane_action(name, binding)
+	if not control_plane and not aux_admission_open(parent) then return false end
 	local s = SG[name]
 	if not s or type(s.fn) ~= "function" then return false end
+	local prior_parent = _dispatch_parent
+	_dispatch_parent = parent
 	-- Any tap action (other than the click-toggle itself) must deactivate a held click
 	-- so that a selection started with left_click_toggle is properly released first.
 	if name ~= "left_click_toggle" and name ~= "right_click_toggle" then
-		Click.release_held_for_tap(name)
+		local released, release_result = xpcall(
+			Click.release_held_for_tap, debug.traceback, name, parent)
+		if not released or release_result ~= true then
+			_dispatch_parent = prior_parent
+			Logger.error(LOG, "Gesture action '%s' refused because held-click cleanup failed: %s.",
+				tostring(name), tostring(release_result))
+			return false
+		end
+	end
+	if not control_plane and not aux_admission_open(parent) then
+		_dispatch_parent = prior_parent
+		return false
 	end
 	-- Logger.callback (not a bare pcall) so a throwing action leaves a trace: with
 	-- ~150+ registered closures dispatched here, a caught-then-dropped exception
 	-- would otherwise be completely invisible in the logs (gestures-actions-silent-pcall).
-	local ok = Logger.callback(LOG, "Gesture action '" .. tostring(name) .. "'", s.fn, binding)
-	return ok == true
+	local dispatch_ok, callback_ok = xpcall(function()
+		return Logger.callback(LOG,
+			"Gesture action '" .. tostring(name) .. "'", s.fn, binding)
+	end, debug.traceback)
+	local admission_committed = control_plane or aux_admission_open(parent)
+	_dispatch_parent = prior_parent
+	if not dispatch_ok then
+		Logger.error(LOG, "Gesture action dispatch boundary failed: %s.",
+			tostring(callback_ok))
+		return false
+	end
+	-- A registered action owns the dispatch even when its business operation
+	-- refuses. Only transport failure or a superseded lifecycle admission lets
+	-- the caller fall through to another action provider.
+	return callback_ok == true and admission_committed == true
 end
 
 function M.execute_axis(name, goNext)
+	if not aux_admission_open(GESTURE_ACTION_PARENT) then return false end
 	local a = AX[name]
 	if not a then return false end
 	local fn = goNext and a.next or a.prev
 	if type(fn) == "function" then
-		local ok, result = Logger.callback(LOG,
-			"Gesture axis action '" .. tostring(name) .. "'", fn)
-		return ok == true and result ~= false
+		local prior_parent = _dispatch_parent
+		_dispatch_parent = GESTURE_ACTION_PARENT
+		local dispatch_ok, ok, result = xpcall(function()
+			return Logger.callback(LOG,
+				"Gesture axis action '" .. tostring(name) .. "'", fn)
+		end, debug.traceback)
+		local admission_committed = aux_admission_open(GESTURE_ACTION_PARENT)
+		_dispatch_parent = prior_parent
+		if not dispatch_ok then
+			Logger.error(LOG, "Gesture axis dispatch boundary failed: %s.", tostring(ok))
+			return false
+		end
+		return ok == true and result ~= false and admission_committed == true
 	end
 	return false
 end

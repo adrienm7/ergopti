@@ -32,8 +32,8 @@
 --- Tests:
 ---   1. api_mlx exports stop_warmup and resume_warmup.            (source)
 ---   2. M.warmup() has a _warmup_stopped guard.                   (source)
----   3. script_control.pause_all source calls api.stop_warmup.    (source)
----   4. script_control.resume_all source calls api.resume_warmup. (source)
+---   3. PAUSE/RESUME selects the exact MLX lifecycle endpoint.     (behavioural)
+---   4. Exact owner APIs suppress their compatibility fallbacks.  (behavioural)
 ---   5. BEHAVIOURAL: set_llm_enabled(false) stops the self-retry POST loop.
 ---
 --- Sections 1-2 are deliberately kept: they still encode the real pause-side
@@ -90,35 +90,199 @@ end)
 
 
 
--- ====================================================================================
--- ====================================================================================
--- ======= 2/ script_control.lua calls stop/resume_warmup on pause/resume (M-3) =======
--- ====================================================================================
--- ====================================================================================
+-- ================================================================================
+-- ================================================================================
+-- ======= 2/ ScriptControl selects one exact lifecycle endpoint (M-3) =============
+-- ================================================================================
+-- ================================================================================
 
-helpers.describe("M-3: script_control wires api_mlx stop/resume (source)", function()
+local SCRIPT_CONTROL_FIXTURE_MODULES = {
+	"modules.shortcuts.script_control",
+	"infra.logger",
+	"infra.notifications",
+	"infra.i18n",
+	"infra.keycodes",
+	"adapters.event_provenance",
+	"adapters.synthetic_input",
+	"adapters.timer_scheduler",
+	"adapters.key_state",
+	"modules.gestures.engine",
+	"modules.gestures.actions",
+	"modules.llm.api_mlx",
+	"modules.llm.warmup_controller",
+	"modules.llm.api_ollama",
+	"modules.llm.api_remote",
+	"ui.wpm.wpm_menubar",
+	"ui.wpm.wpm_widget",
+	"platform.remap.onboarding",
+	"ui.tooltip",
+	"modules.keylogger",
+}
 
-	helpers.it("pause_all calls api.stop_warmup", function()
-		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
-		-- The pause block must call stop_warmup() on the api_mlx handle
-		helpers.assert_true(src:find("stop_warmup", 1, true) ~= nil,
-			"script_control.pause_all must call api.stop_warmup() to halt the api_mlx self-retry chain (M-3)")
+--- Drives the real ScriptControl transaction over either the exact warmup-owner
+--- API or its legacy compatibility surface. The explicit input drain proves no
+--- owner is touched before PAUSE commits; counters make deleting or swapping one
+--- endpoint observable without depending on implementation-local names.
+local function exercise_script_control_warmup_transaction(use_exact_owner_api)
+	return helpers.with_fresh_modules(SCRIPT_CONTROL_FIXTURE_MODULES, function()
+		local calls = {}
+		local function count(name)
+			return function()
+				calls[name] = (calls[name] or 0) + 1
+				return true
+			end
+		end
+		local function total_calls()
+			local total = 0
+			for _, value in pairs(calls) do total = total + value end
+			return total
+		end
+
+		local idle_callback = nil
+		local admission_fence = nil
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["infra.keycodes"] = {
+			F13_KARABINER_RETURN = 106,
+			F14_KARABINER_BACKSPACE = 107,
+			F15_KARABINER_ESCAPE = 108,
+			BACKSPACE = 51,
+			RETURN = 36,
+			ESCAPE = 53,
+		}
+		package.loaded["adapters.event_provenance"] = {}
+		package.loaded["adapters.key_state"] = {
+			is_right_altgr_held = function() return false end,
+			describe_held_modifiers = function() return "(none)" end,
+		}
+		package.loaded["adapters.synthetic_input"] = {
+			when_idle = function(callback)
+				idle_callback = callback
+				return true
+			end,
+			acquire_admission_fence = function()
+				if admission_fence ~= nil then return nil end
+				admission_fence = { active = true }
+				return admission_fence
+			end,
+			release_admission_fence = function(token)
+				if token ~= admission_fence or token.active ~= true then return false end
+				token.active = false
+				admission_fence = nil
+				return true
+			end,
+			admission_open = function() return admission_fence == nil end,
+		}
+		package.loaded["adapters.timer_scheduler"] = {
+			every = function() return { timer = nil }, true end,
+			cancel = function() return true end,
+		}
+		package.loaded["modules.gestures.engine"] = {}
+		package.loaded["modules.gestures.actions"] = {
+			get_label = function(name) return name end,
+			execute_single = function() return true end,
+			SG_NAMES = { "none", "script_pause_toggle" },
+			AX_NAMES = {},
+		}
+
+		local mlx_api = {
+			stop_warmup = count("mlx_stop_fallback"),
+			resume_warmup = count("mlx_resume"),
+		}
+		local warmup_controller = {
+			stop = count("controller_stop_fallback"),
+			schedule_warmup_with_retry = count("controller_schedule_fallback"),
+		}
+		if use_exact_owner_api then
+			mlx_api.pause_warmup = count("mlx_pause_exact")
+			warmup_controller.pause_warmup = count("controller_pause_exact")
+			warmup_controller.resume_warmup = count("controller_resume_exact")
+		end
+		package.loaded["modules.llm.api_mlx"] = mlx_api
+		package.loaded["modules.llm.warmup_controller"] = warmup_controller
+		package.loaded["modules.llm.api_ollama"] = {
+			pause_warmup = function() return true end,
+			resume_warmup = function() return true end,
+		}
+		package.loaded["modules.llm.api_remote"] = {
+			pause_warmup = function() return true end,
+			resume_warmup = function() return true end,
+		}
+		package.loaded["ui.wpm.wpm_menubar"] = {
+			is_running = function() return false end,
+			stop = function() return true end,
+			resume_after_pause = function() return true end,
+		}
+		package.loaded["ui.wpm.wpm_widget"] = {
+			is_running = function() return false end,
+			stop = function() return true end,
+			resume_after_pause = function() return true end,
+		}
+		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
+		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+		package.loaded["modules.keylogger"] = { resync_context = function() return true end }
+
+		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
+		local pause_accepted = ScriptControl.pause_all()
+		local before_drain = total_calls()
+		local pending_before_drain = ScriptControl.is_pause_transition_pending()
+		local paused_before_drain = ScriptControl.is_paused()
+		if idle_callback then idle_callback() end
+		local paused_after_drain = ScriptControl.is_paused()
+		local resume_accepted = ScriptControl.resume_all()
+		local paused_after_resume = ScriptControl.is_paused()
+		local fence_released = admission_fence == nil
+		ScriptControl.stop()
+
+		return {
+			calls = calls,
+			pause_accepted = pause_accepted,
+			before_drain = before_drain,
+			pending_before_drain = pending_before_drain,
+			paused_before_drain = paused_before_drain,
+			paused_after_drain = paused_after_drain,
+			resume_accepted = resume_accepted,
+			paused_after_resume = paused_after_resume,
+			fence_released = fence_released,
+		}
+	end)
+end
+
+helpers.describe("M-3: ScriptControl selects the exact warmup lifecycle endpoint", function()
+	helpers.it("commits PAUSE/RESUME through exact APIs without invoking fallbacks", function()
+		local result = exercise_script_control_warmup_transaction(true)
+		helpers.assert_true(result.pause_accepted)
+		helpers.assert_true(result.pending_before_drain)
+		helpers.assert_eq(result.paused_before_drain, false)
+		helpers.assert_eq(result.before_drain, 0,
+			"the owner inventory must not run before SyntheticInput declares the boundary idle")
+		helpers.assert_true(result.paused_after_drain,
+			"delivering the exact input drain must commit PAUSED")
+		helpers.assert_eq(result.calls.mlx_pause_exact, 1)
+		helpers.assert_eq(result.calls.mlx_stop_fallback, nil,
+			"api_mlx.stop_warmup is only a compatibility fallback when pause_warmup exists")
+		helpers.assert_eq(result.calls.controller_pause_exact, 1)
+		helpers.assert_eq(result.calls.controller_stop_fallback, nil)
+		helpers.assert_true(result.resume_accepted)
+		helpers.assert_eq(result.paused_after_resume, false)
+		helpers.assert_eq(result.calls.mlx_resume, 1)
+		helpers.assert_eq(result.calls.controller_resume_exact, 1)
+		helpers.assert_eq(result.calls.controller_schedule_fallback, nil,
+			"schedule_warmup_with_retry must not be called when resume_warmup owns the inverse")
+		helpers.assert_true(result.fence_released)
 	end)
 
-	helpers.it("resume_all calls api.resume_warmup", function()
-		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
-		helpers.assert_true(src:find("resume_warmup", 1, true) ~= nil,
-			"script_control.resume_all must call api.resume_warmup() to re-enable the api_mlx self-retry chain (M-3)")
-	end)
-
-	helpers.it("resume_warmup appears before schedule_warmup_with_retry in resume_all", function()
-		local src = read_src("local function log_shortcut_if_available") -- modules/shortcuts/script_control.lua
-		local resume_pos = src:find("resume_warmup", 1, true)
-		local sched_pos  = src:find("schedule_warmup_with_retry", 1, true)
-		helpers.assert_true(resume_pos ~= nil and sched_pos ~= nil,
-			"both resume_warmup and schedule_warmup_with_retry must be present")
-		helpers.assert_true(resume_pos < sched_pos,
-			"resume_warmup() must be called BEFORE schedule_warmup_with_retry in resume_all")
+	helpers.it("keeps the compatibility fallback reachable when exact owner APIs are absent", function()
+		local result = exercise_script_control_warmup_transaction(false)
+		helpers.assert_true(result.paused_after_drain)
+		helpers.assert_eq(result.paused_after_resume, false)
+		helpers.assert_eq(result.calls.mlx_stop_fallback, 1)
+		helpers.assert_eq(result.calls.mlx_resume, 1)
+		helpers.assert_eq(result.calls.controller_stop_fallback, 1)
+		helpers.assert_eq(result.calls.controller_schedule_fallback, 1)
+		helpers.assert_eq(result.calls.mlx_pause_exact, nil)
+		helpers.assert_eq(result.calls.controller_pause_exact, nil)
+		helpers.assert_eq(result.calls.controller_resume_exact, nil)
 	end)
 end)
 
@@ -180,9 +344,13 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 					post = function(_url, _headers, _payload, cb)
 						post_count = post_count + 1
 						if cb then cb({ ok = false, status = 500, body = "" }) end
+						return true
 					end,
-					get      = function(_url, _headers, cb) if cb then cb({ ok = false, status = 500, body = "" }) end end,
-					cancel   = function() end,
+					get      = function(_url, _headers, cb)
+						if cb then cb({ ok = false, status = 500, body = "" }) end
+						return true
+					end,
+					cancel   = function() return true end,
 					isActive = function() return false end,
 				}
 			end,
@@ -191,10 +359,13 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		-- Discovery already done, so warmup goes straight to the POST
 		package.loaded["modules.llm.api_mlx_discovery"] = {
 			init                     = function(_) end,
-			reset                    = function() end,
+			reset                    = function() return true end,
+			stop                     = function() return true end,
+			resume                   = function() return true end,
+			is_active                = function() return false end,
 			set_base_url             = function(_) end,
 			is_discovered            = function() return true end,
-			discover                 = function(cb) if cb then cb() end end,
+			discover                 = function(cb) if cb then cb() end; return true end,
 			mark_undiscovered        = function() end,
 			set_expected_model_id    = function(_) end,
 			get_completions_endpoint = function() return "http://127.0.0.1:3460/v1/completions" end,

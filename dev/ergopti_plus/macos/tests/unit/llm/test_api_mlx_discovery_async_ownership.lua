@@ -68,8 +68,7 @@ local function make_env(options)
 			for _, timer in ipairs(env.timers) do
 				if timer.handle == handle then timer.active = false end
 			end
-			-- The port contract declares cancel() void.
-			return nil
+			return true
 		end,
 		activeCount = function()
 			local count = 0
@@ -104,6 +103,8 @@ local function make_env(options)
 				post = function(_url, _headers, _payload, callback)
 					callback({ status = 404, body = "" })
 				end,
+				cancel = function() return true end,
+				isActive = function() return false end,
 			}
 		end,
 	}

@@ -76,6 +76,7 @@ end
 local PROTECTED_KEYBOARD_ROUTES = {
 	"e:getKeyCode()",
 	"LLMBridge.handle_llm_keys",
+	"pcall(interceptor",
 	"if flags.cmd or flags.ctrl then",
 	"if keyCode == Keycodes.BACKSPACE then",
 	"e:getCharacters(false)",
@@ -92,6 +93,9 @@ local PROTECTED_KEYBOARD_ROUTES = {
 local function keyboard_echo_contract(raw, wrapper)
 	local raw_code = strip_line_comments(raw)
 	local wrapper_code = strip_line_comments(wrapper)
+	if count_literal(raw_code .. wrapper_code, "EventProvenance.classify") ~= 1 then
+		return false
+	end
 	if count_literal(wrapper_code, "EventProvenance.classify_with_fence") ~= 1 then
 		return false
 	end
@@ -107,12 +111,14 @@ local function keyboard_echo_contract(raw, wrapper)
 	local owned_at = raw_code:find(
 		"if provenance and not internal_loopback then return false end", 1, true)
 	local loopback_at = raw_code:find("if internal_loopback then", 1, true)
-	if not (unreadable_at and owned_at and loopback_at and unreadable_at < owned_at) then
+	if not (unreadable_at and owned_at and loopback_at) then
 		return false
 	end
 	for _, route in ipairs(PROTECTED_KEYBOARD_ROUTES) do
 		local route_at = raw_code:find(route, 1, true)
-		if route_at == nil or route_at <= owned_at then return false end
+		if route_at == nil or route_at <= unreadable_at or route_at <= owned_at then
+			return false
+		end
 	end
 	return true
 end
@@ -148,6 +154,23 @@ helpers.describe("keymap: one explicit-tag gate protects every keyboard echo (au
 			helpers.assert_true(not keyboard_echo_contract(mutant, wrapper),
 				"the class guard must fail when a sibling route precedes provenance: " .. route)
 		end
+
+		local unreadable_gate =
+			"if provenance_status == EventProvenance.STATUS_UNREADABLE then"
+		local unreadable_at = raw:find(unreadable_gate, 1, true)
+		helpers.assert_not_nil(unreadable_at,
+			"the unreadable-gate sensitivity mutations need the real gate")
+		for _, route in ipairs(PROTECTED_KEYBOARD_ROUTES) do
+			local mutant = raw:sub(1, unreadable_at - 1)
+				.. route .. "\n" .. raw:sub(unreadable_at)
+			helpers.assert_true(not keyboard_echo_contract(mutant, wrapper),
+				"the class guard must fail when unreadable input reaches a route: " .. route)
+		end
+
+		local duplicate_classifier_mutant = raw
+			.. '\nlocal _ = EventProvenance.classify(e, "keymap")'
+		helpers.assert_true(not keyboard_echo_contract(duplicate_classifier_mutant, wrapper),
+			"the class guard must fail if the raw handler classifies the event twice")
 	end)
 
 	helpers.it("the shared adapter makes immutable user-data authoritative before PID diagnostics", function()

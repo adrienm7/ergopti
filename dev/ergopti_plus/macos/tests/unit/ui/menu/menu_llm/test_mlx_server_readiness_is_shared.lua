@@ -59,7 +59,8 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 	helpers.it("does not resolve the reuse path on isRunning alone", function()
 		local code = server_code()
 
-		local at = code:find("obj._server_target == target_model", 1, true)
+		local at = code:find(
+			"same_server_identity(lifecycle.identity, target_identity)", 1, true)
 		helpers.assert_true(at ~= nil, "the reuse short-circuit must still exist")
 		local branch = code:sub(at, at + 900)
 
@@ -71,7 +72,10 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 
 	helpers.it("queues a caller that arrives during startup", function()
 		local code = server_code()
-		local at = code:find("obj._server_target == target_model", 1, true)
+		local at = code:find(
+			"same_server_identity(lifecycle.identity, target_identity)", 1, true)
+		helpers.assert_true(at ~= nil,
+			"the complete model/port reuse short-circuit must remain observable")
 		local branch = code:sub(at, at + 900)
 
 		helpers.assert_true(branch:find("_server_waiters", 1, true) ~= nil,
@@ -130,6 +134,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 		local saved_modules = {}
 		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
 		local saved_hs = _G.hs
+		local saved_os_execute = os.execute
 		local noop = function() end
 		local server_done
 		local server_stream
@@ -143,6 +148,9 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 			UNIFIED_LOG_FILE = "/tmp/ergopti-test.log",
 			debug = noop, info = noop, warn = noop,
 			error = function(...) table.insert(logged_errors, { ... }) end,
+			callback = function(_, _, callback, ...)
+				return xpcall(callback, debug.traceback, ...)
+			end,
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["modules.llm.api_common"] = {
@@ -161,7 +169,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 		}
 		package.loaded["modules.llm.api_mlx"] = {
 			get_port = function() return 8080 end,
-			reset_endpoints = noop,
+			reset_endpoints = function() return true end,
 			set_model_hf_path = noop,
 			set_active_server_pgid = noop,
 			mark_load_failed = noop,
@@ -193,6 +201,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				return task
 			end },
 		}
+		os.execute = function() return true, "exit", 0 end
 		package.loaded["ui.menu.menu_llm.models_manager_mlx_server"] = nil
 
 		local ok, err = pcall(function()
@@ -260,6 +269,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				"the server task must not survive after its readiness scheduler is lost")
 		end)
 
+		os.execute = saved_os_execute
 		_G.hs = saved_hs
 		for _, name in ipairs(module_names) do package.loaded[name] = saved_modules[name] end
 		if not ok then error(err) end

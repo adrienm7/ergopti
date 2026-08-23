@@ -95,24 +95,26 @@ end)
 
 
 
--- The pause invariant for this module is that it has none: bindings is a
--- declarative registry, and the decision not to run an action while paused
--- belongs to the dispatcher. All three cases here used to state that with
--- assert_true(true) and a sentence — including one that looped 150 times over a
--- body reading `-- simulate`, so it asserted nothing about nothing. What is
--- checkable is the claim itself.
-helpers.describe("bindings: the pause gate is not here (project_suspend_pause_invariant)", function()
-	helpers.it("the registry names no pause or suspend state", function()
-		-- A pause check HERE would mean two modules decide whether a shortcut
-		-- fires, and they will disagree: the registry is consulted at bind time,
-		-- the dispatcher at press time, and a shortcut disabled by one and bound
-		-- by the other is a key that does nothing with no error anywhere.
-		local src = helpers.read_driver_source("local function get_frontmost_app_name")
-		helpers.assert_true(src ~= nil, "modules/shortcuts/bindings.lua source must be locatable")
-		helpers.assert_true(src:find("paus") == nil,
-			"bindings must stay a declarative registry — the pause gate belongs to the dispatcher")
-		helpers.assert_true(src:find("suspend") == nil,
-			"same for suspend: this table describes what exists, not when it runs")
+
+-- Bindings owns exact native hotkey delivery and keep-awake intent across
+-- ScriptControl PAUSE. Exercise that public lifecycle instead of scanning for
+-- forbidden words: a nil return or no-op pause/resume must fail observably.
+helpers.describe("bindings: pause-owner lifecycle (project_suspend_pause_invariant)", function()
+	helpers.it("settles start, pause, resume-after-pause, and stop literally", function()
+		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		helpers.assert_eq(B.is_started(), false)
+		helpers.assert_eq(B.start(), true,
+			"positive control must acquire the real hotkey registry")
+		helpers.assert_eq(B.is_started(), true)
+		helpers.assert_eq(B.pause(), true,
+			"pause owner must prove exact hotkey and keep-awake settlement")
+		helpers.assert_eq(B.is_started(), false,
+			"a true pause return with live bindings would be a false PAUSED state")
+		helpers.assert_eq(B.resume_after_pause(), true,
+			"resume owner must prove exact re-acquisition")
+		helpers.assert_eq(B.is_started(), true)
+		helpers.assert_eq(B.stop(), true)
+		helpers.assert_eq(B.is_started(), false)
 	end)
 
 	helpers.it("enable/disable is idempotent however many times it is repeated", function()
@@ -383,7 +385,7 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 			hotkey = {
 				bind = function(_mods, key, fn)
 					if key == "g" then captured_ctrl_g = fn end
-					return { delete = function() end }
+					return { delete = function() return true end }
 				end,
 			},
 			urlevent = {
@@ -476,4 +478,187 @@ helpers.describe("shortcuts.bindings: start/stop lifecycle", function()
 	helpers.it("stop() called when not started is a safe no-op", function()
 		B.stop()
 	end)
+end)
+
+local function load_bindings_with_pixel_owner(options)
+	options = options or {}
+	local old_system = package.loaded["modules.shortcuts.actions.system"]
+	local old_text = package.loaded["modules.shortcuts.actions.text"]
+	local old_apps = package.loaded["modules.shortcuts.actions.apps"]
+	local ctx = {
+		paused = options.paused == true,
+		pending = options.pending == true,
+		paused_mode = options.paused_mode or "boolean",
+		pending_mode = options.pending_mode or "boolean",
+		resume_mode = options.resume_mode or "true",
+		pause_calls = 0,
+		resume_calls = 0,
+		stop_calls = 0,
+	}
+	local function mode_value(mode, value)
+		if mode == "throw" then error("synthetic pixel query failure") end
+		if mode == "nil" then return nil end
+		return value
+	end
+	local function exact_result(mode)
+		if mode == "throw" then error("synthetic pixel lifecycle failure") end
+		if mode == "nil" then return nil end
+		return mode == "true"
+	end
+	local function inert_handle()
+		return { delete = function() return true end }
+	end
+	local function make_settled_child(names)
+		local paused = false
+		local api = {}
+		api[names.pause] = function() paused = true; return true end
+		api[names.resume] = function() paused = false; return true end
+		api[names.stop] = function() paused = true; return true end
+		api[names.is_paused] = function() return paused end
+		api[names.has_pending] = function() return false end
+		return setmetatable(api, {
+			__index = function() return function() return true end end,
+		})
+	end
+	local mouse = make_settled_child({
+		pause = "pause_mouse_actions",
+		resume = "resume_mouse_actions",
+		stop = "stop_mouse_actions",
+		is_paused = "is_mouse_actions_paused",
+		has_pending = "has_pending_mouse_action",
+	})
+	local screenshot_claims = {}
+	local system = setmetatable({
+		is_pixel_actions_paused = function()
+			return mode_value(ctx.paused_mode, ctx.paused)
+		end,
+		has_pending_pixel_action = function()
+			return mode_value(ctx.pending_mode, ctx.pending)
+		end,
+		pause_pixel_actions = function()
+			ctx.pause_calls = ctx.pause_calls + 1
+			ctx.paused = true
+			ctx.pending = false
+			return true
+		end,
+		resume_pixel_actions = function()
+			ctx.resume_calls = ctx.resume_calls + 1
+			local result = exact_result(ctx.resume_mode)
+			if result == true then
+				ctx.paused = false
+				ctx.pending = false
+			end
+			return result
+		end,
+		stop_pixel_actions = function()
+			ctx.stop_calls = ctx.stop_calls + 1
+			ctx.paused = true
+			ctx.pending = false
+			return true
+		end,
+		pause_mouse_actions = mouse.pause_mouse_actions,
+		resume_mouse_actions = mouse.resume_mouse_actions,
+		stop_mouse_actions = mouse.stop_mouse_actions,
+		is_mouse_actions_paused = mouse.is_mouse_actions_paused,
+		has_pending_mouse_action = mouse.has_pending_mouse_action,
+		pause_screenshot_actions = function(parent)
+			screenshot_claims[parent] = true
+			return true
+		end,
+		resume_screenshot_actions = function(parent)
+			screenshot_claims[parent] = nil
+			return true
+		end,
+		stop_screenshot_actions = function(parent)
+			screenshot_claims[parent] = true
+			return true
+		end,
+		has_screenshot_pause_claim = function(parent)
+			return screenshot_claims[parent] == true
+		end,
+		has_pending_screenshot_action = function() return false end,
+		pause_awake = function() return true end,
+		resume_awake = function() return true end,
+		stop_awake = function() return true end,
+	}, {
+		__index = function()
+			return function() return inert_handle() end
+		end,
+	})
+	local text = make_settled_child({
+		pause = "pause_text_actions",
+		resume = "resume_text_actions",
+		stop = "stop_text_actions",
+		is_paused = "is_text_actions_paused",
+		has_pending = "has_pending_text_action",
+	})
+	local apps = make_settled_child({
+		pause = "pause_apps_actions",
+		resume = "resume_apps_actions",
+		stop = "stop_apps_actions",
+		is_paused = "is_apps_actions_paused",
+		has_pending = "has_pending_apps_action",
+	})
+	package.loaded["modules.shortcuts.actions.system"] = system
+	package.loaded["modules.shortcuts.actions.text"] = text
+	package.loaded["modules.shortcuts.actions.apps"] = apps
+	local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
+	package.loaded["modules.shortcuts.actions.system"] = old_system
+	package.loaded["modules.shortcuts.actions.text"] = old_text
+	package.loaded["modules.shortcuts.actions.apps"] = old_apps
+	return subject, ctx
+end
+
+helpers.describe("shortcuts.bindings: exact system-pixel child composition", function()
+	helpers.it("parks and reopens the child across the real bindings lifecycle", function()
+		local subject, ctx = load_bindings_with_pixel_owner()
+		helpers.assert_eq(subject.start(), true)
+		helpers.assert_eq(subject.pause(), true)
+		helpers.assert_eq(ctx.pause_calls, 1)
+		helpers.assert_eq(ctx.paused, true)
+		helpers.assert_eq(subject.resume_after_pause(), true)
+		helpers.assert_eq(ctx.resume_calls, 1)
+		helpers.assert_eq(ctx.paused, false)
+		helpers.assert_eq(subject.stop(), true)
+		helpers.assert_eq(ctx.stop_calls, 1)
+		helpers.assert_eq(ctx.paused, true)
+		helpers.assert_eq(subject.start(), true)
+		helpers.assert_eq(ctx.resume_calls, 2,
+			"restart must explicitly reopen the stopped child owner")
+	end)
+
+	for _, mode in ipairs({ "nil", "throw" }) do
+		helpers.it("fails closed when the paused-state query returns " .. mode, function()
+			local subject, ctx = load_bindings_with_pixel_owner({
+				paused = true,
+				paused_mode = mode,
+			})
+			helpers.assert_eq(subject.start(), false)
+			helpers.assert_eq(subject.is_started(), false)
+			helpers.assert_eq(ctx.resume_calls, 0,
+				"an ambiguous snapshot may not open native shortcut delivery")
+		end)
+	end
+
+	for _, mode in ipairs({ "nil", "throw" }) do
+		helpers.it("fails closed and retains an ambiguous pending query after " .. mode, function()
+			local subject, ctx = load_bindings_with_pixel_owner({
+				pending_mode = mode,
+				resume_mode = "false",
+			})
+			helpers.assert_eq(subject.start(), false)
+			helpers.assert_eq(subject.is_started(), false)
+			helpers.assert_eq(ctx.resume_calls, 0,
+				"an ambiguous query may not authorize any lifecycle mutation")
+			helpers.assert_eq(subject.has_pause_debt(), true,
+				"query ambiguity must remain cleanup debt")
+			ctx.pending_mode = "boolean"
+			ctx.pending = true
+			ctx.resume_mode = "true"
+			helpers.assert_eq(subject.start(), true)
+			helpers.assert_eq(ctx.pause_calls, 1,
+				"retry must fence the exact pending child before reopening it")
+			helpers.assert_eq(ctx.resume_calls, 1)
+		end)
+	end
 end)

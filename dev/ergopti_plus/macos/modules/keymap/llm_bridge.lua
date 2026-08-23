@@ -171,6 +171,12 @@ local _escape_trap = nil
 -- declared below one binds a nil global instead.
 local _preview_render_generation = 0
 
+-- Every zero-delay preview/telemetry callback is still a native capability.
+-- A logical generation fence prevents stale business delivery, while this
+-- registry retains the exact scheduler handle until native settlement.
+local _prediction_deferred_generation = 0
+local _prediction_deferred_handles = {}
+
 -- A finite-delay literal auto can outlive its nominal gate on screen if a native
 -- tooltip timer fires late. While that exact committed row is still visible, the
 -- eventtap honours the promise instead of falling through to a different action.
@@ -183,6 +189,82 @@ local _visible_magic_lease = nil
 local function invalidate_pending_preview(keep_visible_lease)
 	_preview_render_generation = _preview_render_generation + 1
 	if not keep_visible_lease then _visible_magic_lease = nil end
+end
+
+
+--- Retires one deferred prediction handle and its optional local latch.
+--- @param handle table Scheduler handle.
+local function retire_prediction_deferred_handle(handle)
+	local entry = _prediction_deferred_handles[handle]
+	if not entry then return end
+	_prediction_deferred_handles[handle] = nil
+	if type(entry.on_settled) == "function" then
+		local ok, err = xpcall(entry.on_settled, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Deferred prediction settlement '%s' raised: %s",
+				tostring(entry.label), tostring(err))
+		end
+	end
+end
+
+
+--- Schedules prediction work behind a shared lifecycle generation and retains
+--- the exact native timer until settlement.
+--- @param label string Diagnostic label.
+--- @param callback function Deferred business callback.
+--- @param on_settled function|nil Optional local-latch cleanup.
+--- @return table handle Scheduler handle.
+--- @return boolean committed True only when the timer committed.
+local function schedule_prediction_deferred(label, callback, on_settled)
+	local generation = _prediction_deferred_generation
+	local handle, committed = TimerScheduler.after(0, function()
+		if generation ~= _prediction_deferred_generation then return end
+		callback()
+	end)
+	if type(handle) == "table" and handle.timer ~= nil then
+		_prediction_deferred_handles[handle] = {
+			label = label,
+			on_settled = on_settled,
+		}
+		local observer_ok, observer_result = xpcall(function()
+			return TimerScheduler.onSettled(handle, function()
+				retire_prediction_deferred_handle(handle)
+			end)
+		end, debug.traceback)
+		if not observer_ok or observer_result ~= true then
+			Logger.error(LOG,
+				"Deferred prediction settlement observer '%s' was not accepted: %s",
+				tostring(label), tostring(observer_result))
+		end
+	end
+	return handle, committed == true
+end
+
+
+--- Fences and settles every bridge-owned deferred prediction capability.
+--- No callback is replayed after RESUME; all work in this registry is one-way.
+--- @return boolean settled True only when every exact timer settled.
+local function settle_prediction_deferred_handles()
+	_prediction_deferred_generation = _prediction_deferred_generation + 1
+	local snapshot = {}
+	for handle in pairs(_prediction_deferred_handles) do
+		snapshot[#snapshot + 1] = handle
+	end
+	local all_settled = true
+	for _, handle in ipairs(snapshot) do
+		local ok, result = xpcall(function()
+			return TimerScheduler.cancel(handle)
+		end, debug.traceback)
+		if ok and result == true then
+			retire_prediction_deferred_handle(handle)
+		else
+			all_settled = false
+			local entry = _prediction_deferred_handles[handle]
+			Logger.error(LOG, "Deferred prediction timer '%s' remains owned: %s",
+				tostring(entry and entry.label or "unknown"), tostring(result))
+		end
+	end
+	return all_settled
 end
 
 
@@ -431,7 +513,7 @@ end
 --- Delegates to the prediction engine which owns this flag.
 --- @param v boolean
 function M.set_preview_ai_enabled(v)
-	engine.set_preview_ai_enabled(v)
+	return engine.set_preview_ai_enabled(v)
 end
 
 --- Enables or disables all non-LLM preview tooltips simultaneously.
@@ -476,7 +558,7 @@ end
 --- Overrides the accent tint for AI prediction tooltips.
 --- @param color table|nil RGBA table, or nil to restore the default.
 function M.set_preview_ai_color(color)
-	engine.set_preview_ai_color(color)
+	return engine.set_preview_ai_color(color)
 end
 
 
@@ -486,29 +568,29 @@ end
 -- All LLM configuration is owned by the prediction engine; the bridge
 -- forwards these calls so the menu's public API surface does not change.
 
-function M.set_llm_enabled(v)               engine.set_llm_enabled(v)               end
+function M.set_llm_enabled(v)               return engine.set_llm_enabled(v)               end
 function M.get_llm_enabled()                return engine.get_llm_enabled()          end
-function M.set_llm_model(name)              engine.set_llm_model(name)              end
-function M.set_llm_display_model_name(name) engine.set_llm_display_model_name(name) end
-function M.set_llm_backend_name(label)      engine.set_llm_backend_name(label)      end
-function M.set_llm_context_length(l)        engine.set_llm_context_length(l)        end
-function M.set_llm_temperature(t)           engine.set_llm_temperature(t)           end
-function M.set_llm_num_predictions(n)       engine.set_llm_num_predictions(n)       end
-function M.set_llm_pred_indent(v)           engine.set_llm_pred_indent(v)           end
-function M.set_llm_show_info_bar(v)         engine.set_llm_show_info_bar(v)         end
-function M.set_llm_sequential_mode(v)       engine.set_llm_sequential_mode(v)       end
-function M.set_llm_auto_raise_temp(v)       engine.set_llm_auto_raise_temp(v)       end
-function M.set_llm_disabled_apps(apps)           engine.set_llm_disabled_apps(apps)           end
-function M.set_llm_url_bar_filter_enabled(v)      engine.set_llm_url_bar_filter_enabled(v)      end
-function M.set_llm_secure_field_filter_enabled(v) engine.set_llm_secure_field_filter_enabled(v) end
-function M.set_llm_instant_on_word_end(v)         engine.set_llm_instant_on_word_end(v)         end
-function M.set_llm_val_modifiers(mods)      engine.set_llm_val_modifiers(mods)      end
-function M.set_llm_nav_modifiers(mods)      engine.set_llm_nav_modifiers(mods)      end
-function M.set_llm_min_words(w)             engine.set_llm_min_words(w)             end
-function M.set_llm_max_words(w)             engine.set_llm_max_words(w)             end
-function M.set_llm_debounce(seconds)        engine.set_llm_debounce(seconds)        end
-function M.set_llm_streaming(v)             engine.set_llm_streaming(v)             end
-function M.set_llm_streaming_multi(v)       engine.set_llm_streaming_multi(v)       end
+function M.set_llm_model(name)              return engine.set_llm_model(name)              end
+function M.set_llm_display_model_name(name) return engine.set_llm_display_model_name(name) end
+function M.set_llm_backend_name(label)      return engine.set_llm_backend_name(label)      end
+function M.set_llm_context_length(l)        return engine.set_llm_context_length(l)        end
+function M.set_llm_temperature(t)           return engine.set_llm_temperature(t)           end
+function M.set_llm_num_predictions(n)       return engine.set_llm_num_predictions(n)       end
+function M.set_llm_pred_indent(v)           return engine.set_llm_pred_indent(v)           end
+function M.set_llm_show_info_bar(v)         return engine.set_llm_show_info_bar(v)         end
+function M.set_llm_sequential_mode(v)       return engine.set_llm_sequential_mode(v)       end
+function M.set_llm_auto_raise_temp(v)       return engine.set_llm_auto_raise_temp(v)       end
+function M.set_llm_disabled_apps(apps)           return engine.set_llm_disabled_apps(apps)           end
+function M.set_llm_url_bar_filter_enabled(v)      return engine.set_llm_url_bar_filter_enabled(v)      end
+function M.set_llm_secure_field_filter_enabled(v) return engine.set_llm_secure_field_filter_enabled(v) end
+function M.set_llm_instant_on_word_end(v)         return engine.set_llm_instant_on_word_end(v)         end
+function M.set_llm_val_modifiers(mods)      return engine.set_llm_val_modifiers(mods)      end
+function M.set_llm_nav_modifiers(mods)      return engine.set_llm_nav_modifiers(mods)      end
+function M.set_llm_min_words(w)             return engine.set_llm_min_words(w)             end
+function M.set_llm_max_words(w)             return engine.set_llm_max_words(w)             end
+function M.set_llm_debounce(seconds)        return engine.set_llm_debounce(seconds)        end
+function M.set_llm_streaming(v)             return engine.set_llm_streaming(v)             end
+function M.set_llm_streaming_multi(v)       return engine.set_llm_streaming_multi(v)       end
 
 --- Sets the "chain LLM after hotstring" flag, owned here because
 --- update_preview() consumes it directly.
@@ -524,6 +606,16 @@ end
 function M.set_llm_reset_on_nav(v)
 	reset_buffer_on_navigation = (v == true)
 	Logger.debug(LOG, "LLM context reset on nav: %s.", reset_buffer_on_navigation and "yes" or "no")
+end
+
+--- Reads the actual bridge/engine runtime value for a transactional menu key.
+--- @param key string Canonical preference key.
+--- @return boolean found True when the runtime owner recognizes the key.
+--- @return any value Current runtime value.
+function M.get_llm_runtime_setting(key)
+	if key == "llm_after_hotstring" then return true, fire_llm_after_hotstring end
+	if key == "llm_reset_on_nav" then return true, reset_buffer_on_navigation end
+	return engine.get_llm_runtime_setting(key)
 end
 
 
@@ -903,7 +995,7 @@ function M.update_preview(buf)
 			invalidate_pending_preview()
 			local refresh_generation = _preview_render_generation
 			local schedule_ok, handle_or_err, refresh_committed = xpcall(function()
-				return TimerScheduler.after(0, function()
+				return schedule_prediction_deferred("winner-expiry refresh", function()
 					local callback_ok, callback_err = xpcall(function()
 						if refresh_generation ~= _preview_render_generation then return end
 						if _state.buffer == buf then
@@ -997,7 +1089,7 @@ function M.update_preview(buf)
 			if may_persist_preview(primary_match) then
 				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
 				local schedule_ok, telemetry_handle, telemetry_committed = xpcall(function()
-					return TimerScheduler.after(0, function()
+					return schedule_prediction_deferred("hotstring suggestion telemetry", function()
 						pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
 					end)
 				end, debug.traceback)
@@ -1063,7 +1155,7 @@ function M.update_preview(buf)
 				end
 			end
 			local schedule_ok, handle_or_err, render_committed = xpcall(function()
-				return TimerScheduler.after(0, render_preview)
+				return schedule_prediction_deferred("hotstring preview render", render_preview)
 			end, debug.traceback)
 			if not schedule_ok or render_committed ~= true then
 				Logger.error(LOG, "Hotstring preview render could not be scheduled (result: %s).",
@@ -1213,6 +1305,7 @@ local function arm_escape_trap()
 				event, "llm.escape_trap")
 			fence_events = fence and fence.events or nil
 			local function finish(consume) return consume == true, fence_events end
+			if fence and fence.consume_original == true then return finish(true) end
 			if provenance ~= nil or status == EventProvenance.STATUS_UNREADABLE then
 				return finish(false)
 			end
@@ -1284,13 +1377,14 @@ end
 local function schedule_quarantine_surface_hide()
 	if _quarantine_hide_pending then return end
 	_quarantine_hide_pending = true
-	local ok, handle_or_err, committed = pcall(TimerScheduler.after, 0, function()
+	local ok, handle_or_err, committed = pcall(schedule_prediction_deferred,
+		"quarantine surface hide", function()
 		_quarantine_hide_pending = false
 		if not M.is_runtime_available() then
 			local hide = tooltip.hide_forced_silent or tooltip.hide_forced
 			if type(hide) == "function" then pcall(hide) end
 		end
-	end)
+	end, function() _quarantine_hide_pending = false end)
 	if not ok or committed ~= true then
 		_quarantine_hide_pending = false
 	end
@@ -1299,9 +1393,11 @@ end
 
 --- Clears prediction state, optionally bypassing the action-epoch runtime gate.
 --- @param keep_hotstring_log boolean When true, skips dismiss telemetry.
---- @param force_full boolean True only for the async action-epoch reconciler.
+--- @param force_full boolean True only for a trusted lifecycle reconciler.
+--- @param suppress_telemetry boolean True at a global pause boundary, where
+---   scheduling a file-write callback would escape the pause transaction.
 --- @return boolean full_reset True when engine.reset ran.
-local function reset_predictions_impl(keep_hotstring_log, force_full)
+local function reset_predictions_impl(keep_hotstring_log, force_full, suppress_telemetry)
 	-- A preview render requested a tick ago must not land after this reset and
 	-- put the tooltip back on screen.
 	invalidate_pending_preview()
@@ -1331,9 +1427,9 @@ local function reset_predictions_impl(keep_hotstring_log, force_full)
 		-- Withheld for a private mapping, like its suggested sibling. This one is
 		-- the easier of the two to miss: the value was captured on a keystroke that
 		-- has already happened, and the record outlives the match it came from.
-		if may_persist_preview(dismissed) then
+		if may_persist_preview(dismissed) and suppress_telemetry ~= true then
 			local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
-				return TimerScheduler.after(0, function()
+				return schedule_prediction_deferred("hotstring dismissal telemetry", function()
 					pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
 				end)
 			end, debug.traceback)
@@ -1347,7 +1443,10 @@ local function reset_predictions_impl(keep_hotstring_log, force_full)
 		schedule_quarantine_surface_hide()
 		return false
 	end
-	local reset_ok, reset_result = xpcall(engine.reset, debug.traceback)
+	local reset_ok, reset_result = xpcall(function()
+		return engine.reset(suppress_telemetry == true
+			and { suppress_telemetry = true } or nil)
+	end, debug.traceback)
 	if not reset_ok or reset_result ~= true then
 		Logger.error(LOG, "Prediction-engine reset did not commit (result: %s).", tostring(reset_result))
 		return false
@@ -1387,6 +1486,17 @@ function M.reset_predictions(keep_hotstring_log)
 	return reset_predictions_impl(keep_hotstring_log, false)
 end
 
+
+--- Performs the authoritative prediction reset for a global pause transaction.
+--- Dismissal telemetry is intentionally omitted: it is not a user dismissal,
+--- and a timer scheduled here would remain natively deliverable after PAUSED.
+--- @return boolean committed True only after the full engine reset settles.
+function M.reset_predictions_for_pause()
+	local deferred_settled = settle_prediction_deferred_handles()
+	local reset_committed = reset_predictions_impl(true, true, true)
+	return deferred_settled and reset_committed
+end
+
 --- Invalidates any prospective/visible hotstring action before registry or
 --- provider semantics mutate. Without a committed row this is an O(1)
 --- generation fence; visible pixels and their exact lease are revoked together.
@@ -1421,7 +1531,9 @@ end
 --- quarantined; the listener that could reconcile that epoch is being removed.
 --- @return boolean committed True when engine teardown completed.
 function M.reset_for_teardown()
-	return reset_predictions_impl(false, true)
+	local deferred_settled = settle_prediction_deferred_handles()
+	local reset_committed = reset_predictions_impl(false, true, true)
+	return deferred_settled and reset_committed
 end
 
 
@@ -1505,7 +1617,7 @@ function M.apply_prediction(idx)
 	-- is_ignored=true: reset_predictions() already hid the tooltip; the F16 chain
 	--   signal (injected below) handles the next prediction — do not arm the LLM
 	--   inactivity timer or trigger update_preview here.
-	local replaced = expander.perform_text_replacement(
+	local replaced, replacement_transaction = expander.perform_text_replacement(
 		delete_count,
 		function() return km_utils.emit_text(text_to_type) end,
 		function()
@@ -1540,14 +1652,14 @@ function M.apply_prediction(idx)
 
 	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
 
-	-- Chain trigger: F16 is injected after all deletions and text keystrokes.
-	-- The HID event queue is ordered, so by the time handle_llm_keys() sees F16,
-	-- all previous keystrokes have been delivered to the target application.
-	-- engine.arm_chain() sets a fallback timer in case F16 is somehow missed.
+	-- Chain trigger: register against the exact replacement transaction before it
+	-- can complete. F16 is constructed only from status=complete, after every
+	-- paced deletion and suffix post has settled. engine.arm_chain() owns the
+	-- fallback timer in case the later loopback signal is missed.
 	-- F16 (not F15) so the script-control kill-switch keycode stays exclusive.
 	if not cleanup_committed then
 		local retry_ok, retry_handle, retry_committed = xpcall(function()
-			return TimerScheduler.after(0, function()
+			return schedule_prediction_deferred("post-accept cleanup retry", function()
 				local callback_ok, callback_result = xpcall(function()
 					return M.reset_predictions(true)
 				end, debug.traceback)
@@ -1564,22 +1676,36 @@ function M.apply_prediction(idx)
 		return true
 	end
 
-	local arm_ok, arm_result = xpcall(engine.arm_chain, debug.traceback)
-	if not arm_ok or arm_result ~= true then
-		Logger.error(LOG, "Prediction applied, but LLM chain ownership did not commit (result: %s).",
-			tostring(arm_result))
-		return true
+	local completion_state = _state
+	local completion_generation = completion_state.lifecycle_generation
+	local registered, registration_error = pcall(SyntheticInput.on_complete,
+		replacement_transaction, function(_transaction, status)
+			if status ~= "complete" or _state ~= completion_state
+				or completion_state.lifecycle_generation ~= completion_generation
+				or not M.is_runtime_available() then return end
+			local arm_ok, arm_result = xpcall(engine.arm_chain, debug.traceback)
+			if not arm_ok or arm_result ~= true then
+				Logger.error(LOG,
+					"Prediction applied, but LLM chain ownership did not commit (result: %s).",
+					tostring(arm_result))
+				return
+			end
+			local signal_ok, signal_result = xpcall(function()
+				return SyntheticInput.emit_loopback_key_stroke(
+					{}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
+			end, debug.traceback)
+			if not signal_ok or signal_result ~= true then
+				Logger.error(LOG,
+					"Prediction applied; F16 signal failed, so the owned fallback remains active (result: %s).",
+					tostring(signal_result))
+				return
+			end
+			Logger.debug(LOG, "F16 signal sent after replacement completion — LLM chain pending.")
+		end)
+	if not registered then
+		Logger.error(LOG, "Prediction applied, but completion-gated F16 registration failed: %s.",
+			tostring(registration_error))
 	end
-	local signal_ok, signal_result = xpcall(function()
-		return SyntheticInput.emit_loopback_key_stroke(
-			{}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
-	end, debug.traceback)
-	if not signal_ok or signal_result ~= true then
-		Logger.error(LOG, "Prediction applied; F16 signal failed, so the owned fallback remains active (result: %s).",
-			tostring(signal_result))
-		return true
-	end
-	Logger.debug(LOG, "F16 signal sent — LLM chain pending.")
 	return true
 end
 

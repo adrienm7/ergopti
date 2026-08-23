@@ -67,11 +67,7 @@ local function load_fixture(streaming)
 		get = function(key) return key end,
 	}
 	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["adapters.timer_scheduler"] = {
-		after = function(_delay, callback)
-			return { timer = { stop = function() end }, callback = callback }
-		end,
-	}
+	package.loaded["adapters.timer_scheduler"] = nil
 
 	local core = {
 		DEFAULT_STATE = DEFAULTS,
@@ -248,8 +244,15 @@ helpers.describe("prediction_engine: action-epoch quarantine closes async produc
 			"the watchdog must be executable before its stale twin is tested")
 
 		local PE_debounce, _, _, _, _, _, get_debounce_fetches = load_fixture(false)
+		local timers_before = #hs.timer.__timers
 		PE_debounce.start_timer(0.02)
-		local debounce = hs.timer.__timers[1]
+		local debounce
+		for index = timers_before + 1, #hs.timer.__timers do
+			if hs.timer.__timers[index].delay == 0.02 then
+				debounce = hs.timer.__timers[index]
+				break
+			end
+		end
 		helpers.assert_not_nil(debounce)
 		debounce:fire()
 		helpers.assert_eq(get_debounce_fetches(), 1,
@@ -259,8 +262,15 @@ helpers.describe("prediction_engine: action-epoch quarantine closes async produc
 
 	helpers.it("a debounce timer armed by an old epoch cannot dispatch a fetch", function()
 		local PE, effects, _, set_available, clear_effects, _, get_fetches = load_fixture(false)
+		local timers_before = #hs.timer.__timers
 		PE.start_timer(0.02)
-		local debounce = hs.timer.__timers[1]
+		local debounce
+		for index = timers_before + 1, #hs.timer.__timers do
+			if hs.timer.__timers[index].delay == 0.02 then
+				debounce = hs.timer.__timers[index]
+				break
+			end
+		end
 		helpers.assert_not_nil(debounce, "the engine must own a real delayed debounce timer")
 		helpers.assert_true(debounce.running, "positive control: start_timer must arm it")
 		set_available(false)

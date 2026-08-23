@@ -41,9 +41,29 @@ local helpers = require("tests.helpers")
 --- @param started boolean Initial value reported by Bindings.is_started().
 --- @return table shortcuts The loaded module.
 --- @return table spy Counters {b_start, b_stop, b_rebind, ks_start, ks_stop}.
-local function load_shortcuts_with_spies(started)
-	local spy = { b_start = 0, b_stop = 0, b_rebind = 0, ks_start = 0, ks_stop = 0 }
+local function load_shortcuts_with_spies(started, options)
+	options = options or {}
+	local spy = {
+		b_start = 0, b_stop = 0, b_rebind = 0,
+		b_hotkey_pause = 0, b_hotkey_resume = 0,
+		ks_start = 0, ks_stop = 0, action_pause = 0, action_resume = 0,
+	}
+	spy.options = options
 	local is_started = started
+	local shortcuts
+	local function controlled(mode, message)
+		if mode == "false" then return false end
+		if mode == "nil" then return nil end
+		if mode == "throw" then error(message) end
+		return true
+	end
+	local function maybe_reenter(boundary)
+		if options.reenter_boundary ~= boundary then return false end
+		options.reenter_boundary = nil
+		spy.reentrant_pause_result = shortcuts.pause_bindings(
+			options.reenter_claim or "script_control")
+		return true
+	end
 
 	package.loaded["modules.shortcuts.bindings"] = {
 		DEFAULT_CHATGPT_URL  = "https://example.invalid/",
@@ -56,11 +76,63 @@ local function load_shortcuts_with_spies(started)
 		is_started           = function() return is_started end,
 		start                = function() spy.b_start  = spy.b_start  + 1; is_started = true; return true end,
 		stop                 = function() spy.b_stop   = spy.b_stop   + 1; is_started = false; return true end,
-		rebind               = function() spy.b_rebind = spy.b_rebind + 1; return true end,
+		rebind               = function()
+			spy.b_rebind = spy.b_rebind + 1
+			is_started = false
+			if maybe_reenter("bindings_rebind") then return false end
+			local result = controlled(options.bindings_rebind_mode,
+				"bindings rebind exploded")
+			if result == true then is_started = true end
+			return result
+		end,
+		pause                = function()
+			spy.b_stop = spy.b_stop + 1; is_started = false; return true
+		end,
+		resume_after_pause   = function()
+			spy.b_start = spy.b_start + 1; is_started = true; return true
+		end,
+		resume_rebind_after_pause = function()
+			spy.b_start = spy.b_start + 1
+			spy.b_rebind_pause_resume = (spy.b_rebind_pause_resume or 0) + 1
+			local result = controlled(options.bindings_recovery_mode,
+				"bindings paused-rebind recovery exploded")
+			if result == true then is_started = true end
+			return result
+		end,
+		pause_hotkeys_only = function()
+			spy.b_hotkey_pause = spy.b_hotkey_pause + 1
+			is_started = false
+			return controlled(options.bindings_inverse_mode,
+				"bindings hotkey inverse exploded")
+		end,
+		resume_hotkeys_after_pause = function()
+			spy.b_hotkey_resume = spy.b_hotkey_resume + 1
+			local result = controlled(options.bindings_recovery_mode,
+				"bindings hotkey recovery exploded")
+			if result == true then is_started = true end
+			return result
+		end,
+		has_pause_debt = function() return false end,
 	}
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-		start           = function() spy.ks_start = spy.ks_start + 1; return true end,
+		start           = function()
+			spy.ks_start = spy.ks_start + 1
+			maybe_reenter("keyboard_start")
+			return controlled(options.keyboard_start_mode,
+				"keyboard start exploded")
+		end,
 		stop            = function() spy.ks_stop  = spy.ks_stop  + 1; return true end,
+		pause           = function()
+			spy.ks_stop = spy.ks_stop + 1
+			return controlled(options.keyboard_inverse_mode,
+				"keyboard inverse exploded")
+		end,
+		resume_after_pause = function()
+			spy.ks_start = spy.ks_start + 1
+			maybe_reenter("keyboard_start")
+			return controlled(options.keyboard_recovery_mode,
+				"keyboard recovery exploded")
+		end,
 		set_action      = function() end,
 		get_action      = function() return "none" end,
 		get_slot_label  = function(s) return s end,
@@ -74,9 +146,16 @@ local function load_shortcuts_with_spies(started)
 		set_shortcut_action = function() end, set_on_pause_change = function() end,
 		set_extras = function() end, toggle = function() end,
 	}
+	package.loaded["modules.gestures.actions"] = {
+		force_cleanup = function() spy.action_pause = spy.action_pause + 1; return true end,
+		resume_after_cleanup = function()
+			spy.action_resume = spy.action_resume + 1
+			return true
+		end,
+	}
 
 	package.loaded["modules.shortcuts"] = nil
-	local shortcuts = helpers.load_with_stubs("modules.shortcuts")
+	shortcuts = helpers.load_with_stubs("modules.shortcuts")
 	return shortcuts, spy
 end
 
@@ -106,6 +185,9 @@ helpers.describe("shortcuts.rebind_for_layout: a disabled layer survives a layou
 			"there is nothing to re-arm on a stopped layer")
 		helpers.assert_eq(spy.b_stop, 0,
 			"a stopped layer must not be stopped again")
+		helpers.assert_eq(spy.action_pause, 0)
+		helpers.assert_eq(spy.action_resume, 0,
+			"a layout rebind must not touch action-scope lifecycle")
 	end)
 
 	helpers.it("leaves the layer reported as stopped afterwards", function()
@@ -116,6 +198,108 @@ helpers.describe("shortcuts.rebind_for_layout: a disabled layer survives a layou
 		helpers.assert_eq(shortcuts.is_bindings_started(), false,
 			"rebind_for_layout must never change whether the layer is running")
 	end)
+end)
+
+helpers.describe("shortcuts.rebind_for_layout: ordinary failure recovery", function()
+	helpers.it("recovers an interrupted ON rebind through global PAUSE/RESUME", function()
+		local options = { bindings_rebind_mode = "false" }
+		local shortcuts, spy = load_shortcuts_with_spies(true, options)
+		helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+		helpers.assert_eq(shortcuts.has_bindings_pause_debt(), true)
+		helpers.assert_eq(shortcuts.pause_bindings("script_control"), true)
+		options.bindings_rebind_mode = nil
+		helpers.assert_eq(shortcuts.resume_bindings("script_control"), true)
+		helpers.assert_eq(shortcuts.is_bindings_started(), true)
+		helpers.assert_eq(shortcuts.has_bindings_pause_debt(), false)
+		helpers.assert_true(spy.b_start > 0,
+			"rebind recovery must bypass the stale cleanup-only pause snapshot")
+	end)
+
+	for _, boundary in ipairs({ "bindings_rebind", "keyboard_start" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("retains a retryable ON intent after " .. boundary .. " " .. mode,
+				function()
+					local options = {}
+					options[boundary .. "_mode"] = mode
+					local shortcuts, spy = load_shortcuts_with_spies(true, options)
+					helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+					helpers.assert_eq(shortcuts.is_bindings_started(), true,
+						"the explicit recovery claim preserves the feature's ON intent")
+					helpers.assert_eq(shortcuts.has_bindings_pause_debt(), true)
+					options[boundary .. "_mode"] = nil
+					helpers.assert_eq(shortcuts.rebind_for_layout(), true)
+					helpers.assert_eq(shortcuts.is_bindings_started(), true)
+					helpers.assert_eq(shortcuts.has_bindings_pause_debt(), false)
+					helpers.assert_true(spy.b_hotkey_resume > 0)
+					helpers.assert_eq(spy.action_pause, 0)
+					helpers.assert_eq(spy.action_resume, 0,
+						"layout recovery must remain hotkeys-only")
+				end)
+		end
+	end
+
+	for _, inverse in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("keeps recovery debt when hotkey rollback returns " .. inverse,
+			function()
+				local options = {
+					keyboard_start_mode = "false",
+					bindings_inverse_mode = inverse,
+				}
+				local shortcuts, spy = load_shortcuts_with_spies(true, options)
+				helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+				helpers.assert_eq(shortcuts.has_bindings_pause_debt(), true)
+				options.keyboard_start_mode = nil
+				options.bindings_inverse_mode = nil
+				helpers.assert_eq(shortcuts.rebind_for_layout(), true)
+				helpers.assert_true(spy.b_hotkey_pause > 0)
+				helpers.assert_eq(shortcuts.has_bindings_pause_debt(), false)
+			end)
+	end
+
+	for _, boundary in ipairs({ "bindings_recovery", "keyboard_recovery" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("retains ON intent when " .. boundary .. " returns " .. mode,
+				function()
+					local options = { bindings_rebind_mode = "false" }
+					local shortcuts, spy = load_shortcuts_with_spies(true, options)
+					helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+					options.bindings_rebind_mode = nil
+					options[boundary .. "_mode"] = mode
+					helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+					helpers.assert_eq(shortcuts.is_bindings_started(), true)
+					helpers.assert_eq(shortcuts.has_bindings_pause_debt(), true)
+					options[boundary .. "_mode"] = nil
+					helpers.assert_eq(shortcuts.rebind_for_layout(), true)
+					helpers.assert_eq(shortcuts.is_bindings_started(), true)
+					helpers.assert_eq(shortcuts.has_bindings_pause_debt(), false)
+					helpers.assert_eq(spy.action_pause, 0)
+					helpers.assert_eq(spy.action_resume, 0,
+						"recovery retries must stay hotkeys-only")
+				end)
+		end
+	end
+
+	for _, inverse in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains the same recovery claim when Keyboard inverse returns " .. inverse,
+			function()
+				local options = { bindings_rebind_mode = "false" }
+				local shortcuts, spy = load_shortcuts_with_spies(true, options)
+				helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+				options.bindings_rebind_mode = nil
+				options.keyboard_recovery_mode = "false"
+				options.keyboard_inverse_mode = inverse
+				helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+				helpers.assert_eq(shortcuts.is_bindings_started(), true)
+				helpers.assert_eq(shortcuts.has_bindings_pause_debt(), true)
+				options.keyboard_recovery_mode = nil
+				options.keyboard_inverse_mode = nil
+				helpers.assert_eq(shortcuts.rebind_for_layout(), true)
+				helpers.assert_eq(shortcuts.has_bindings_pause_debt(), false)
+				helpers.assert_true(spy.ks_stop > 0)
+				helpers.assert_eq(spy.action_pause, 0)
+				helpers.assert_eq(spy.action_resume, 0)
+			end)
+	end
 end)
 
 
@@ -140,6 +324,9 @@ helpers.describe("shortcuts.rebind_for_layout: a running layer is rebound in pla
 		-- A layout rebind must never take that path (see test_rebind_preserves_keep_awake).
 		helpers.assert_eq(spy.b_stop, 0,
 			"a layout rebind must never call Bindings.stop() — that owns the keep-awake teardown")
+		helpers.assert_eq(spy.action_pause, 0)
+		helpers.assert_eq(spy.action_resume, 0,
+			"a layout rebind must remain hotkeys-only")
 	end)
 
 	helpers.it("restarts the configurable keyboard shortcuts so they track the new layout too", function()
@@ -158,5 +345,38 @@ helpers.describe("shortcuts.rebind_for_layout: a running layer is rebound in pla
 
 		helpers.assert_eq(shortcuts.is_bindings_started(), true,
 			"rebind_for_layout must never change whether the layer is running")
+	end)
+end)
+
+helpers.describe("shortcuts.rebind_for_layout: lifecycle claims supersede factories", function()
+	for _, boundary in ipairs({ "bindings_rebind", "keyboard_start" }) do
+		for _, claim in ipairs({ "feature_toggle", "script_control" }) do
+			helpers.it("rolls back when " .. boundary .. " publishes " .. claim, function()
+				local shortcuts, spy = load_shortcuts_with_spies(true, {
+					reenter_boundary = boundary,
+					reenter_claim = claim,
+				})
+				helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+				helpers.assert_eq(spy.reentrant_pause_result, true)
+				helpers.assert_eq(shortcuts.is_bindings_started(), false,
+					"the re-entrant claim must fence the aggregate before publication")
+				helpers.assert_eq(shortcuts.rebind_for_layout(), false,
+					"the retained claim remains admission-authoritative")
+				helpers.assert_eq(shortcuts.resume_bindings(claim), true)
+				helpers.assert_eq(shortcuts.is_bindings_started(), true)
+			end)
+		end
+	end
+
+	helpers.it("uses the full pre-rebind snapshot after a re-entrant global pause", function()
+		local shortcuts, spy = load_shortcuts_with_spies(true, {
+			reenter_boundary = "bindings_rebind",
+			reenter_claim = "script_control",
+		})
+		helpers.assert_eq(shortcuts.rebind_for_layout(), false)
+		helpers.assert_eq(shortcuts.resume_bindings("script_control"), true)
+		helpers.assert_eq(spy.b_rebind_pause_resume, 1,
+			"global resume must restore the full rebind snapshot, including keep-awake")
+		helpers.assert_eq(shortcuts.is_bindings_started(), true)
 	end)
 end)

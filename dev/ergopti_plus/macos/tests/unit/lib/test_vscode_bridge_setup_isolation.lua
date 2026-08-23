@@ -38,7 +38,7 @@ local helpers = require("tests.helpers")
 
 --- Loads vscode_bridge with the extension install forced down its "wrote the
 --- files" path and with every notification channel raising.
---- @return table bridge, function server_started
+--- @return table bridge, function server_started, function notice_calls
 local function load_bridge_with_throwing_notice()
 	package.loaded["infra.vscode_bridge"] = nil
 	package.loaded["infra.logger"] = nil
@@ -50,8 +50,12 @@ local function load_bridge_with_throwing_notice()
 		alert = function() error("dialog raised", 0) end,
 		block_alert = function() error("dialog raised", 0) end,
 	}
+	local notice_count = 0
 	package.loaded["infra.notifications"] = {
-		notify = function() error("notify raised", 0) end,
+		notify = function()
+			notice_count = notice_count + 1
+			error("notify raised", 0)
+		end,
 	}
 	package.loaded["infra.i18n"] = { get = function(k) return k end }
 
@@ -74,7 +78,9 @@ local function load_bridge_with_throwing_notice()
 			end,
 		},
 	})
-	return bridge, function() return started.count end
+	return bridge,
+		function() return started.count end,
+		function() return notice_count end
 end
 
 
@@ -85,27 +91,46 @@ end
 --- never reaches the notification at all — which is how the first version of the
 --- case below passed against the unfixed code.
 --- @param fn function
+--- @return boolean call_ok Whether setup stayed contained.
+--- @return any result Exact setup result or thrown error.
 local function with_install_path(fn)
 	local real_open = io.open
+	local real_execute = os.execute
+	local real_rename = os.rename
+	local real_remove = os.remove
 	io.open = function(path, mode)
 		if mode == "w" or mode == "wb" then
-			return { write = function() return true end, close = function() return true end }
+			local handle = {}
+			handle.write = function(self) return self end
+			handle.flush = function() return true end
+			handle.close = function() return true end
+			return handle
 		end
-		return nil
+		return nil, "missing", 2
 	end
+	os.execute = function() return true end
+	os.rename = function() return true end
+	os.remove = function() return true end
 	local ok, err = pcall(fn)
 	io.open = real_open
+	os.execute = real_execute
+	os.rename = real_rename
+	os.remove = real_remove
 	return ok, err
 end
 
 helpers.describe("vscode_bridge: setup() isolates the cosmetic step from the server", function()
 
 	helpers.it("starts the HTTP server even when the reload notice raises", function()
-		local bridge, server_started = load_bridge_with_throwing_notice()
+		local bridge, server_started, notice_calls = load_bridge_with_throwing_notice()
 		helpers.assert_type(bridge.setup, "function", "vscode_bridge must expose setup()")
 
-		with_install_path(bridge.setup)
+		local call_ok, result = with_install_path(bridge.setup)
 
+		helpers.assert_true(call_ok, "setup must contain the cosmetic notification failure")
+		helpers.assert_eq(result, true, "setup must return exact success once the server owns its port")
+		helpers.assert_eq(notice_calls(), 1,
+			"the fixture must reach the throwing cosmetic notification")
 		helpers.assert_true(server_started() >= 1,
 			"the caret bridge server is the functional half of setup(); a throw in the "
 			.. "cosmetic \"reload VS Code\" notice must not be able to prevent it from "
@@ -141,7 +166,9 @@ helpers.describe("vscode_bridge: setup() isolates the cosmetic step from the ser
 			},
 		})
 
-		with_install_path(bridge.setup)
+		local call_ok, result = with_install_path(bridge.setup)
+		helpers.assert_true(call_ok, "the positive setup path must stay contained")
+		helpers.assert_eq(result, true, "the positive setup path must return exact success")
 		helpers.assert_eq(started.count, 1,
 			"exactly one server, on the happy path too")
 	end)

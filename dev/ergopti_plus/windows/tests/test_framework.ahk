@@ -22,14 +22,14 @@
 ;
 ; KNOWN GOTCHA — SILENT MID-FILE PARSE ABORT:
 ; AHK v2's parser silently stops registering top-level statements partway
-; through a test file when the file's encoding is inconsistent (e.g. LF
-; line endings appended via ``cat >>`` into a CRLF/BOM source). The runner
+; through a test file when the file's encoding is inconsistent (e.g. CRLF
+; line endings appended via a shell redirect into an LF/BOM source). The runner
 ; then plans ``1..N`` for only the first batch of ``Test()`` calls and
 ; reports green — passing tests are real, missing ones are silently
 ; dropped. If a new test_*.ahk file shows fewer registrations than its
-; ``Test(...)`` count, check the file with ``file <path>``; it must read
-; ``UTF-8 (with BOM) text, with CRLF line terminators``. Use the Edit
-; tool, not ``cat >>``, to extend test files. The v2 config-refactor
+; ``Test(...)`` count, run the repository encoding gate; the source must be
+; UTF-8 with BOM and LF-only line endings. Use a BOM-preserving editor, not
+; shell append redirects, to extend test files. The v2 config-refactor
 ; suite (test_features_manifest.ahk) carries an ASCII-only convention
 ; for the same reason.
 ; ==============================================================================

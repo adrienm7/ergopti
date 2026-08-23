@@ -14,7 +14,8 @@ local helpers = require("tests.helpers")
 local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.text", "adapters.synthetic_input", "infra.logger",
+		"modules.shortcuts.actions.text", "adapters.synthetic_input",
+		"adapters.timer_scheduler", "infra.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "hello world",
@@ -72,15 +73,28 @@ local function load_fixture(options)
 	local text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
 		timer = {
-			doAfter = function(_delay, callback)
+			new = function(_delay, callback)
 				timer_calls = timer_calls + 1
 				local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]
 				if outcome == "throw" then error("injected timer allocation failure") end
 				if outcome == "nil" then return nil end
-				local handle = { callback = callback, stopped = false }
-				function handle:stop() self.stopped = true end
+				local handle = {
+					callback = callback,
+					stopped = false,
+					running_state = false,
+				}
+				function handle:start()
+					self.running_state = true
+					if outcome == "sync" then self.callback() end
+					return self
+				end
+				function handle:stop()
+					self.stopped = true
+					self.running_state = false
+					return self
+				end
+				function handle:running() return self.running_state end
 				timers[#timers + 1] = handle
-				if outcome == "sync" then callback() end
 				return handle
 			end,
 		},

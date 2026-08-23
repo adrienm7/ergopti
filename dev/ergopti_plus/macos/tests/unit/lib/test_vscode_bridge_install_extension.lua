@@ -19,7 +19,9 @@ helpers.assert_true(src ~= nil, "infra/vscode_bridge.lua source must be locatabl
 -- Locate install_extension body.
 local fn_start = src:find("function M.install_extension()", 1, true)
 helpers.assert_true(fn_start ~= nil, "vscode_bridge.lua must define M.install_extension() (lib-update-06)")
-local fn_body = src:sub(fn_start, fn_start + 1200)
+local fn_end = src:find("--- ======= 4/ HTTP Server API =======", fn_start, true)
+helpers.assert_true(fn_end ~= nil, "vscode_bridge.lua must retain its HTTP Server API section boundary")
+local fn_body = src:sub(fn_start, fn_end - 1)
 
 -- Test 1: write_file return values must be captured.
 local has_ok_pkg = fn_body:find("ok_pkg", 1, true) ~= nil

@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Hammerspoon Focused-Test Runner Regression Tests
 --- DESCRIPTION:
---- Verifies that the `--only` replay path selects candidate files before Lua
---- requires them, while an unknown or dynamically generated name falls back to
---- complete discovery so filtering can never hide a real test.
+--- Verifies that the `--only` replay path resolves exact test modules or selects
+--- candidate files before Lua requires them, while unknown and dynamic targets
+--- fall back to complete discovery so filtering can never hide a real test.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -48,9 +48,68 @@ local function load_source(module_name)
 	return SOURCES[module_name]
 end
 
+--- Replays the production runner in a child process and captures its verdict.
+--- @param target string Exact module/path target passed to --only.
+--- @return boolean success Whether the child exited successfully.
+--- @return string output Combined child stdout/stderr.
+local function run_focused_runner(target)
+	local root = helpers.driver_root()
+	local windows = package.config:sub(1, 1) == "\\"
+	local function quote(value)
+		value = tostring(value)
+		if windows then return '"' .. value:gsub('"', '""') .. '"' end
+		return "'" .. value:gsub("'", "'\\''") .. "'"
+	end
+	local command
+	if windows then
+		command = "cd /d " .. quote(root:gsub("/", "\\"))
+			.. " && lua tests\\run.lua --only " .. quote(target) .. " 2>&1"
+	else
+		command = "cd " .. quote(root)
+			.. " && lua tests/run.lua --only " .. quote(target) .. " 2>&1"
+	end
+	local pipe = assert(io.popen(command, "r"), "focused runner subprocess must start")
+	local output = pipe:read("*a")
+	local closed, _, status = pipe:close()
+	return closed == true or status == 0, output
+end
+
+--- Asserts that an exact module target bypasses case-name filtering.
+--- @param target string User-provided `--only` target.
+local function assert_exact_module_target(target)
+	local selected, narrowed, case_filter = OnlySelector.select_modules(
+		MODULES,
+		target,
+		load_source
+	)
+	helpers.assert_eq(narrowed, true)
+	helpers.assert_eq(#selected, 1)
+	helpers.assert_eq(selected[1], "tests.unit.test_target")
+	helpers.assert_nil(case_filter,
+		"an exact module target must run every registered case in that module")
+end
+
 helpers.describe("Hammerspoon --only selects modules before require", function()
+	helpers.it("maps an exact POSIX test path to one module", function()
+		assert_exact_module_target("tests/unit/test_target.lua")
+	end)
+
+	helpers.it("maps an exact Windows test path to one module", function()
+		assert_exact_module_target([[tests\unit\test_target.lua]])
+	end)
+
+	helpers.it("maps an absolute test path to one module", function()
+		assert_exact_module_target(
+			"/checkout/static/ergopti_plus/macos/tests/unit/test_target.lua"
+		)
+	end)
+
+	helpers.it("maps an exact dotted test module to one module", function()
+		assert_exact_module_target("tests.unit.test_target")
+	end)
+
 	helpers.it("excludes an unrelated module with load-time side effects", function()
-		local selected, narrowed = OnlySelector.select_modules(
+		local selected, narrowed, case_filter = OnlySelector.select_modules(
 			MODULES,
 			"focused target case",
 			load_source
@@ -59,10 +118,12 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		helpers.assert_eq(#selected, 2)
 		helpers.assert_eq(selected[1], "tests.unit.test_target")
 		helpers.assert_eq(selected[2], "tests.unit.test_dynamic")
+		helpers.assert_eq(case_filter, "focused target case",
+			"a historical case-name filter must remain active after module selection")
 	end)
 
 	helpers.it("retains modules whose test names are assembled at load time", function()
-		local selected, narrowed = OnlySelector.select_modules(
+		local selected, narrowed, case_filter = OnlySelector.select_modules(
 			MODULES,
 			"dynamic generated-value",
 			load_source
@@ -70,11 +131,12 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		helpers.assert_eq(narrowed, false,
 			"a runtime-generated target needs complete discovery")
 		helpers.assert_eq(#selected, #MODULES)
+		helpers.assert_eq(case_filter, "dynamic generated-value")
 	end)
 
 	helpers.it("falls back to all modules when no source contains the requested case", function()
 		local static_modules = { MODULES[1], MODULES[3] }
-		local selected, narrowed = OnlySelector.select_modules(
+		local selected, narrowed, case_filter = OnlySelector.select_modules(
 			static_modules,
 			"runtime-generated-case-42",
 			load_source
@@ -83,12 +145,35 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		helpers.assert_eq(#selected, #static_modules)
 		helpers.assert_eq(selected[1], static_modules[1])
 		helpers.assert_eq(selected[2], static_modules[2])
+		helpers.assert_eq(case_filter, "runtime-generated-case-42")
+	end)
+
+	helpers.it("fails closed for an unknown path-shaped target", function()
+		local target = "tests/unit/test_missing.lua"
+		local selected, narrowed, case_filter = OnlySelector.select_modules(
+			MODULES,
+			target,
+			load_source
+		)
+		helpers.assert_eq(narrowed, false)
+		helpers.assert_eq(#selected, #MODULES)
+		helpers.assert_eq(case_filter, target,
+			"an unknown path must remain a case filter so require_match reports it")
+		local results = { passed = 0, failed = 0, failures = {} }
+		helpers.assert_eq(OnlySelector.require_match(results, target), false)
+		helpers.assert_eq(results.failed, 1)
+		helpers.assert_eq(results.failures[1].name, "--only " .. target)
 	end)
 
 	helpers.it("keeps complete discovery when no --only filter is present", function()
-		local selected, narrowed = OnlySelector.select_modules(MODULES, nil, load_source)
+		local selected, narrowed, case_filter = OnlySelector.select_modules(
+			MODULES,
+			nil,
+			load_source
+		)
 		helpers.assert_eq(narrowed, false)
 		helpers.assert_eq(#selected, #MODULES)
+		helpers.assert_nil(case_filter)
 	end)
 
 	helpers.it("the production runner invokes selection before requiring modules", function()
@@ -102,11 +187,35 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		helpers.assert_true(require_index ~= nil, "runner must retain protected module loading")
 		helpers.assert_true(select_index < require_index,
 			"module selection must happen before any discovered test module is required")
+		local set_filter_index = source:find("helpers.set_only_filter(case_filter)", 1, true)
+		helpers.assert_true(set_filter_index ~= nil and select_index < set_filter_index
+			and set_filter_index < require_index,
+			"the runner must apply the selector's case filter after classifying --only")
 		local match_guard_index = source:find("OnlySelector.require_match", 1, true)
+		local classified_filter_guard = source:find(
+			"OnlySelector.require_match(r, case_filter)",
+			1,
+			true
+		)
 		local summary_index = source:find("OVERALL RESULTS", 1, true)
-		helpers.assert_true(match_guard_index ~= nil and summary_index ~= nil
+		helpers.assert_true(match_guard_index ~= nil and classified_filter_guard ~= nil
+			and summary_index ~= nil
 			and match_guard_index < summary_index,
-			"a zero-test focused replay must fail before printing its final verdict")
+			"only a classified case-name filter may guard zero-test replays")
+	end)
+
+	helpers.it("accepts an exact source-only module with zero registered cases", function()
+		local success, output = run_focused_runner(
+			"tests/unit/lib/test_config_overrides_comment_strip.lua"
+		)
+		helpers.assert_true(success, output)
+		helpers.assert_true(output:find("Focused discovery: 1 of", 1, true) ~= nil,
+			"the child runner must load only the exact source-only module")
+		helpers.assert_true(output:find("[PASS] test_config_overrides_comment_strip", 1, true) ~= nil,
+			"the source-only module's load-time contract must execute")
+		helpers.assert_true(output:find("[OK] All Lua unit tests passed.", 1, true) ~= nil)
+		helpers.assert_true(output:find("no test case matched", 1, true) == nil,
+			"an exact module is not a case-name typo")
 	end)
 
 	helpers.it("turns a zero-test focused replay into a failure", function()
@@ -124,5 +233,17 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 		local focused = { passed = 1, failed = 0, failures = {} }
 		helpers.assert_eq(OnlySelector.require_match(focused, "real case"), true)
 		helpers.assert_eq(focused.failed, 0)
+	end)
+
+	helpers.it("preserves a source-only module load failure", function()
+		local failed_load = {
+			passed = 0,
+			failed = 1,
+			failures = {{name = "source-only load", err = "fixture throw"}},
+		}
+		helpers.assert_eq(OnlySelector.require_match(failed_load, nil), true)
+		helpers.assert_eq(failed_load.failed, 1,
+			"exact-module handling must not erase a real load failure")
+		helpers.assert_eq(#failed_load.failures, 1)
 	end)
 end)

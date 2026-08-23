@@ -25,7 +25,7 @@ helpers.assert_true(
 -- Test 2: append_log must appear inside forward_chunk.
 local fc_pos = src:find("local function forward_chunk", 1, true)
 helpers.assert_true(fc_pos ~= nil, "forward_chunk must exist (lib-deps-3)")
-local fc_body = src:sub(fc_pos, fc_pos + 400)
+local fc_body = src:sub(fc_pos, fc_pos + 900)
 local has_append_in_fc = fc_body:find("append_log", 1, true) ~= nil
 helpers.assert_true(
 	has_append_in_fc,

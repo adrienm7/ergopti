@@ -50,13 +50,12 @@ helpers.describe("HttpClient: superseded request's stale callback is discarded (
 			http = {
 				asyncPost = function(url, _body, _headers, callback)
 					table.insert(captured_callbacks, { url = url, callback = callback })
-					-- Return a task stub; :cancel() is a no-op here because the
-					-- point of this test is that cancel() CANNOT stop an
-					-- already-queued OS completion from firing later.
-					return { cancel = function() end }
+					-- Native settlement cannot retract an already-queued completion,
+					-- so the generation fence remains the terminal ownership guard
+					return { cancel = function() return true end }
 				end,
 				asyncGet = function(_url, _headers, _callback)
-					return { cancel = function() end }
+					return { cancel = function() return true end }
 				end,
 			},
 			timer = {

@@ -85,16 +85,19 @@ local function make_karabiner()
 		set_tap_hold_timeout   = function(ms)
 			calls.set_tap_hold = calls.set_tap_hold + 1
 			calls.tap_hold_value = ms
+			return true
 		end,
 		set_sticky_timeout     = function(ms)
 			calls.set_sticky = calls.set_sticky + 1
 			calls.sticky_value = ms
+			return true
 		end,
 		regenerate             = function()
 			calls.regenerate = calls.regenerate + 1
 			-- Snapshot what a real generator would read at this instant.
 			calls.deployed_tap_hold = calls.tap_hold_value
 			calls.deployed_sticky   = calls.sticky_value
+			return true
 		end,
 	}
 end

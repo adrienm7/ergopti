@@ -60,18 +60,26 @@ local function with_fixture(scenario)
 	local notices = {}
 	local scheduler = { cancel_calls = 0 }
 	function scheduler.every(_, callback)
-		local handle = { active = true, callback = callback, cancel_refusals = 2 }
+		local handle = {
+			active = true,
+			callback = callback,
+			cancel_refusals = 5,
+			committed = false,
+			timer = {},
+		}
 		scheduler.handle = handle
 		return handle, false
 	end
 	function scheduler.cancel(handle)
-		if type(handle) ~= "table" or handle.active ~= true then return true end
+		if type(handle) ~= "table" or handle.timer == nil then return true end
 		scheduler.cancel_calls = scheduler.cancel_calls + 1
+		handle.committed = false
 		if handle.cancel_refusals > 0 then
 			handle.cancel_refusals = handle.cancel_refusals - 1
 			return false
 		end
 		handle.active = false
+		handle.timer = nil
 		return true
 	end
 	package.loaded["adapters.timer_scheduler"] = scheduler
@@ -130,8 +138,8 @@ helpers.describe("Karabiner onboarding polling owns partial recurring timers", f
 			helpers.assert_eq(onboarding.run_first_run_wizard(), nil)
 			helpers.assert_not_nil(scheduler.handle,
 				"the wizard must have reached the real recurring-poll acquisition")
-			helpers.assert_eq(scheduler.cancel_calls, 1,
-				"failed acquisition must immediately attempt exact rollback")
+			helpers.assert_eq(scheduler.cancel_calls, 3,
+				"failed acquisition must exhaust one bounded exact rollback series")
 			helpers.assert_eq(scheduler.handle.active, true,
 				"native stop refusal leaves a live callback that must retain cleanup context")
 			helpers.assert_eq(#notices, 2,
@@ -144,14 +152,14 @@ helpers.describe("Karabiner onboarding polling owns partial recurring timers", f
 			helpers.assert_eq(ok_callback, true,
 				"the callback must not dereference the nil constructor-assignment local: "
 					.. tostring(cancel_calls_or_err))
-			helpers.assert_eq(cancel_calls_or_err, 2,
-				"the stale callback must retry cancellation of the exact retained handle")
-			helpers.assert_eq(scheduler.handle.active, true,
-				"a second native stop refusal must remain module-owned after the callback")
+			helpers.assert_eq(cancel_calls_or_err, 6,
+				"the stale callback must settle the exact retained handle autonomously")
+			helpers.assert_eq(scheduler.handle.active, false,
+				"bounded callback cleanup must release the native timer without another action")
 			helpers.assert_eq(#notices, 2,
 				"a cleanup-only stale tick must not invoke the timeout callback twice")
 			helpers.assert_eq(onboarding.stop(), true,
-				"module teardown must retry the exact polling timer after callback fencing")
+				"module teardown must observe the already-settled polling timer")
 			helpers.assert_eq(scheduler.handle.active, false)
 		end)
 	end)

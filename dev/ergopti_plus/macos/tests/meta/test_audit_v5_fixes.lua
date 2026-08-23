@@ -79,19 +79,36 @@ local function keydown_slices(source)
 end
 
 
---- Checks every raw-handler route in the wrapper, not one hand-picked call site.
+--- Checks every raw-handler route and classifier, not one hand-picked call site.
+--- @param raw string
 --- @param wrapper string
 --- @return boolean valid
-local function wrapper_has_single_fenced_route(wrapper)
-	local code = strip_line_comments(wrapper)
-	if count_literal(code, "EventProvenance.classify_with_fence") ~= 1 then return false end
-	if count_literal(code, "onKeyDownRaw") ~= 1 then return false end
-	local classify_at = code:find(
+local function wrapper_has_single_fenced_route(raw, wrapper)
+	local raw_code = strip_line_comments(raw)
+	local wrapper_code = strip_line_comments(wrapper)
+	if count_literal(raw_code .. wrapper_code, "EventProvenance.classify") ~= 1 then
+		return false
+	end
+	if count_literal(wrapper_code, "EventProvenance.classify_with_fence") ~= 1 then
+		return false
+	end
+	if count_literal(wrapper_code, "onKeyDownRaw") ~= 1 then return false end
+	local classify_at = wrapper_code:find(
 		'pcall%s*%(%s*EventProvenance%.classify_with_fence%s*,%s*e%s*,%s*"keymap"%s*%)')
-	local route_at = code:find(
+	local route_at = wrapper_code:find(
 		'pcall%s*%(%s*onKeyDownRaw%s*,%s*e%s*,%s*provenance%s*,%s*provenance_status%s*%)')
 	return classify_at ~= nil and route_at ~= nil and classify_at < route_at
 end
+
+
+local PROTECTED_PHYSICAL_ROUTES = {
+	"e:getKeyCode()",
+	"e:getFlags()",
+	"e:getCharacters(false)",
+	"LLMBridge.handle_llm_keys",
+	"pcall(interceptor",
+	"CoreState.buffer = CoreState.buffer .. chars",
+}
 
 
 --- Checks that every ordinary owned/unreadable path exits before physical work.
@@ -101,6 +118,23 @@ end
 --- @return boolean valid
 local function raw_provenance_gates_precede_physical_work(raw)
 	local code = strip_line_comments(raw)
+	if count_literal(code, "SyntheticInput.current_action_epoch()") ~= 1 then return false end
+	if count_literal(code, "observe_action_epoch(action_epoch)") ~= 1 then return false end
+	if count_literal(code,
+		"if provenance and provenance.stale_loopback then return true end") ~= 1
+	then
+		return false
+	end
+	if count_literal(code,
+		"if provenance_status == EventProvenance.STATUS_UNREADABLE then") ~= 1
+	then
+		return false
+	end
+	if count_literal(code,
+		"if provenance and not internal_loopback then return false end") ~= 1
+	then
+		return false
+	end
 	local epoch_at = code:find("SyntheticInput.current_action_epoch()", 1, true)
 	local observe_at = code:find("observe_action_epoch(action_epoch)", 1, true)
 	local stale_at = code:find(
@@ -109,27 +143,31 @@ local function raw_provenance_gates_precede_physical_work(raw)
 		"if provenance_status == EventProvenance.STATUS_UNREADABLE then", 1, true)
 	local ordinary_owned_at = code:find(
 		"if provenance and not internal_loopback then return false end", 1, true)
+	local admission_at = code:find("SyntheticInput.admission_open()", 1, true)
+	local paused_at = code:find("CoreState.processing_paused == true", 1, true)
 	local decode_at = code:find("e:getKeyCode()", 1, true)
 	local live_loopback_at = decode_at and code:find("if internal_loopback then", decode_at, true)
 	if not (epoch_at and observe_at and stale_at and unreadable_at and ordinary_owned_at
-		and decode_at and live_loopback_at) then
+		and admission_at and paused_at and decode_at and live_loopback_at) then
 		return false
 	end
-	if not (epoch_at < observe_at and observe_at < stale_at and stale_at < unreadable_at
-		and unreadable_at < ordinary_owned_at and ordinary_owned_at < decode_at
-		and decode_at < live_loopback_at) then
+	-- HS-012 moved pause/admission ahead of epoch observation so a pass-through
+	-- paused key cannot mutate context. Owned echoes may leave even earlier, while
+	-- unreadable active input still invalidates context after observing the epoch.
+	-- These are independent gates; neither needs an artificial relative order to
+	-- the other, but every one must precede all human-input work below.
+	if not (ordinary_owned_at < admission_at and admission_at < epoch_at
+		and paused_at < epoch_at and epoch_at < observe_at
+		and observe_at < unreadable_at and decode_at < live_loopback_at) then
 		return false
 	end
-	local physical_routes = {
-		"e:getKeyCode()",
-		"e:getFlags()",
-		"e:getCharacters(false)",
-		"LLMBridge.handle_llm_keys",
-		"CoreState.buffer = CoreState.buffer .. chars",
-	}
-	for _, route in ipairs(physical_routes) do
+	for _, route in ipairs(PROTECTED_PHYSICAL_ROUTES) do
 		local route_at = code:find(route, 1, true)
-		if route_at == nil or route_at <= ordinary_owned_at then return false end
+		if route_at == nil or route_at <= observe_at or route_at <= stale_at
+			or route_at <= unreadable_at or route_at <= ordinary_owned_at
+		then
+			return false
+		end
 	end
 	return true
 end
@@ -256,8 +294,8 @@ helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated 
 
 	helpers.it("classifies exactly once with the physical fence before every raw route", function()
 		local src = read_unit("local function invalidate_observed_context")
-		local _, wrapper = keydown_slices(src)
-		helpers.assert_true(wrapper_has_single_fenced_route(wrapper),
+		local raw, wrapper = keydown_slices(src)
+		helpers.assert_true(wrapper_has_single_fenced_route(raw, wrapper),
 			"the wrapper must call classify_with_fence(e, keymap) exactly once, then pass "
 				.. "that metadata and status to its only onKeyDownRaw route")
 
@@ -265,12 +303,18 @@ helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated 
 			"EventProvenance%.classify_with_fence", "EventProvenance.classify", 1)
 		helpers.assert_eq(replacements, 1,
 			"the sensitivity mutation must replace the one real fenced classifier")
-		helpers.assert_true(not wrapper_has_single_fenced_route(classifier_mutant),
+		helpers.assert_true(not wrapper_has_single_fenced_route(raw, classifier_mutant),
 			"the guard must fail if classification loses the physical-ordering fence")
 
 		local sibling_route_mutant = wrapper .. "\nlocal _ = onKeyDownRaw(e)"
-		helpers.assert_true(not wrapper_has_single_fenced_route(sibling_route_mutant),
+		helpers.assert_true(not wrapper_has_single_fenced_route(raw, sibling_route_mutant),
 			"the guard must fail if a sibling raw route bypasses the classified metadata")
+
+		local duplicate_classifier_mutant = raw
+			.. '\nlocal _ = EventProvenance.classify(e, "keymap")'
+		helpers.assert_true(
+			not wrapper_has_single_fenced_route(duplicate_classifier_mutant, wrapper),
+			"the guard must fail if the raw handler classifies the event a second time")
 	end)
 
 	helpers.it("reconciles the epoch, then filters stale/unreadable/ordinary owned events", function()
@@ -293,6 +337,23 @@ helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated 
 			.. "\n\t" .. gate .. without_gate:sub(decode_at + #decode)
 		helpers.assert_true(not raw_provenance_gates_precede_physical_work(late_gate_mutant),
 			"the guard must fail if ordinary owned echoes reach native key decoding")
+
+		local unreadable_gate =
+			"if provenance_status == EventProvenance.STATUS_UNREADABLE then"
+		local unreadable_at = raw:find(unreadable_gate, 1, true)
+		helpers.assert_not_nil(unreadable_at,
+			"the unreadable sensitivity mutations need the real gate")
+		for _, route in ipairs(PROTECTED_PHYSICAL_ROUTES) do
+			local mutant = raw:sub(1, unreadable_at - 1)
+				.. route .. "\n" .. raw:sub(unreadable_at)
+			helpers.assert_true(not raw_provenance_gates_precede_physical_work(mutant),
+				"the guard must fail when unreadable input reaches a protected route: " .. route)
+		end
+
+		local duplicate_epoch_mutant = raw .. "\nSyntheticInput.current_action_epoch()"
+		helpers.assert_true(
+			not raw_provenance_gates_precede_physical_work(duplicate_epoch_mutant),
+			"the guard must fail if the raw route observes the action epoch twice")
 	end)
 
 	-- The purge used to be pinned to its position after an `elseif dt < 0.02`

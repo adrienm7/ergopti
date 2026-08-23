@@ -78,6 +78,7 @@ end
 
 local Logger             = require("infra.logger")
 local TimerScheduler     = require("adapters.timer_scheduler")
+local SyntheticInput     = require("adapters.synthetic_input")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -312,6 +313,8 @@ local LauncherGuard
 local _termination_coordinator_ready = false
 local _local_teardown_state = TeardownTransaction.new_state()
 local _local_teardown_started = false
+local _mlx_teardown_pending = false
+local _mlx_teardown_settled = false
 -- Set only after the controlled path has drained and released the logger. The
 -- native shutdown callback still fires for hs.reload(); without this fence it
 -- would reopen the synchronous fallback sink and request the already-STOPPED
@@ -421,12 +424,64 @@ end
 --- fence. The native shutdown callback intentionally does not call it because
 --- its asynchronous fence cannot be awaited safely.
 --- @param termination_kind string|nil `reload` or `exit` for diagnostics.
---- @return boolean completed
-local function teardown_all_resources(termination_kind)
+--- @param on_teardown_ready function|nil Retained by an asynchronous owner.
+--- @return boolean accepted
+--- @return string|nil state `pending` while an exact callback is retained.
+local function teardown_all_resources(termination_kind, on_teardown_ready)
 	if not _local_teardown_started then
 		_local_teardown_started = true
 		Logger.info(LOG, "Hammerspoon local teardown started (%s).", tostring(termination_kind or "shutdown"))
 	end
+
+	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM
+	-- Keep every remaining local owner alive until its exact callback proves the
+	-- captured listener absent, then let the coordinator retry this stateful pass
+	if not _mlx_teardown_settled then
+		if _mlx_teardown_pending then return true, "pending" end
+		local module = package.loaded["ui.menu.menu_llm"]
+		if module == nil then
+			_mlx_teardown_settled = true
+		elseif type(module.stop_mlx_server) ~= "function" then
+			Logger.error(LOG, "MLX teardown refused: stop_mlx_server is unavailable.")
+			return false
+		elseif type(on_teardown_ready) ~= "function" then
+			Logger.error(LOG, "MLX teardown refused: readiness callback is unavailable.")
+			return false
+		else
+			local callback_claimed = false
+			_mlx_teardown_pending = true
+			local function on_mlx_settled(settled, detail)
+				if callback_claimed then return false end
+				callback_claimed = true
+				_mlx_teardown_pending = false
+				_mlx_teardown_settled = settled == true
+				local callback_ok, callback_error = xpcall(function()
+					return on_teardown_ready(settled == true, detail)
+				end, debug.traceback)
+				if not callback_ok then
+					Logger.error(LOG, "MLX teardown readiness callback failed: %s.",
+						tostring(callback_error))
+				end
+				return callback_ok and settled == true
+			end
+
+			local stop_ok, accepted_or_error = xpcall(function()
+				return module.stop_mlx_server(on_mlx_settled)
+			end, debug.traceback)
+			-- Exact synchronous completion outranks a later native return or throw;
+			-- the coordinator observed the callback and owns the authorized retry
+			if callback_claimed then return true, "pending" end
+			if not stop_ok or accepted_or_error ~= true then
+				_mlx_teardown_pending = false
+				Logger.error(LOG, "MLX teardown stop was refused: %s.",
+					tostring(stop_ok and accepted_or_error or accepted_or_error))
+				return false
+			end
+			Logger.debug(LOG, "MLX teardown is awaiting exact task completion.")
+			return true, "pending"
+		end
+	end
+
 	local steps = {
 		{
 			name = "boot-ready-setting",
@@ -504,15 +559,6 @@ local function teardown_all_resources(termination_kind)
 					error("infra.vscode_bridge.stop_server is unavailable")
 				end
 				return module.stop_server()
-			end,
-		},
-		{
-			name = "mlx-server",
-			run = function()
-				local module = package.loaded["ui.menu.menu_llm"]
-				if module == nil then return true end
-				if type(module.stop_mlx_server) ~= "function" then error("stop_mlx_server is unavailable") end
-				return module.stop_mlx_server()
 			end,
 		},
 		{
@@ -732,6 +778,9 @@ do
 	local init_ok, initialized_or_err = xpcall(function()
 		return TerminationCoordinator.init({
 			request_lease = request_exact_lease_revoke,
+			drain_input = function(callback)
+				return SyntheticInput.when_idle(callback)
+			end,
 			teardown = teardown_all_resources,
 			begin_drain = Logger.begin_async_sink_shutdown,
 			finalize_teardown = finalize_teardown_resources,
@@ -881,6 +930,13 @@ end
 Logger.info(LOG, "Main modules initialized successfully.")
 Boot.mark("Script control engine started (panic-button eventtap)")
 
+-- Register both backend-local dependency owners before any menu or boot caller
+-- can admit bootstrap work. Each checker retains only its own timers/tasks.
+if mlx_deps_checker.configure_pause_owner(shortcuts) ~= true
+	or ollama_deps_checker.configure_pause_owner(shortcuts) ~= true then
+	error("dependency bootstrap pause-owner registration did not commit")
+end
+
 -- Fast-path LLM check: if LLM is explicitly disabled in hs.settings, skip the
 -- synchronous MLX cleanup (lsof + curl) — its sole consumer is the warmup retry
 -- loop which is also gated on LLM being enabled. When the setting is nil (user
@@ -983,19 +1039,17 @@ end
 if boot_llm_enabled then
 	local active_backend = backend_detector.effective_backend()
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
-	-- Defer the dependency check off the critical boot path. Its synchronous setup
-	-- (resolving the script, writing the PTY wrapper, chmod via os.execute, and
-	-- hs.task creation) costs hundreds of ms, and nothing on the boot path needs the
-	-- venv to be ready synchronously — the backend server start is itself lazy. A
-	-- doAfter(0) tick runs it right after boot completes, the same pattern
-	-- start_background_network_bootstrap already uses.
-	hs.timer.doAfter(0, function()
-		if active_backend == backend_detector.BACKEND_MLX then
-			pcall(mlx_deps_checker.check_and_install_deps)
-		else
-			pcall(ollama_deps_checker.check_and_install_deps)
-		end
-	end)
+	-- Each checker owns its retained zero-delay timer, pause admission, exact
+	-- task settlement, and same-epoch replay. A PAUSED caller is rejected and
+	-- does not create a new resume intent.
+	local selected_checker = active_backend == backend_detector.BACKEND_MLX
+		and mlx_deps_checker or ollama_deps_checker
+	local schedule_ok, scheduled = xpcall(
+		selected_checker.schedule_initial_check, debug.traceback)
+	if not schedule_ok or scheduled ~= true then
+		Logger.warn(LOG, "Backend dependency bootstrap was not scheduled: %s",
+			tostring(scheduled))
+	end
 	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
 		core_llm.start_background_network_bootstrap()
 	end
@@ -1364,7 +1418,7 @@ ui_restore.restore()
 -- Auto-reload file watchers (hotstrings dir + personal tree + project .lua) live
 -- in infra/file_watchers; _G.script_watchers (the GC root the shutdown callback
 -- stops) is populated there. Extracted from init.lua Section 7 — same behaviour.
-require("infra.file_watchers").start({
+local file_watchers_committed = require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
@@ -1390,6 +1444,10 @@ require("infra.file_watchers").start({
 		(config_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
 	},
 })
+if file_watchers_committed ~= true then
+	Logger.error(LOG, "Auto-reload file-watcher startup did not commit.")
+	error("file-watcher startup did not commit")
+end
 
 
 

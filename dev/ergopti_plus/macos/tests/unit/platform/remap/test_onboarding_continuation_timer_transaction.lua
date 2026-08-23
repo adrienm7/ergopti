@@ -66,31 +66,53 @@ local function with_fixture(options, scenario)
 	local cancel_results = options.cancel_results or {}
 	local scheduler = { after_handles = {}, every_handles = {} }
 
+	local function selected_mode(sequence, fallback, index)
+		if type(sequence) == "table" and sequence[index] ~= nil then return sequence[index] end
+		return fallback or "commit"
+	end
+
 	function scheduler.after(_, callback)
 		calls.after = calls.after + 1
-		local mode = options.after_mode or "commit"
+		local mode = selected_mode(options.after_modes, options.after_mode, calls.after)
 		if mode == "throw" then error("onboarding-after-throw") end
-		if mode == "nil" then return nil, false end
-		local handle = { active = true, callback = callback, kind = "after" }
+		local active = mode ~= "nil"
+		local handle = {
+			active = active,
+			callback = callback,
+			committed = mode == "commit",
+			kind = "after",
+			timer = active and {} or nil,
+		}
 		scheduler.after_handles[#scheduler.after_handles + 1] = handle
 		return handle, mode == "commit"
 	end
 
 	function scheduler.every(_, callback)
 		calls.every = calls.every + 1
-		local mode = options.every_mode or "commit"
+		local mode = selected_mode(options.every_modes, options.every_mode, calls.every)
 		if mode == "throw" then error("onboarding-every-throw") end
-		if mode == "nil" then return nil, false end
-		local handle = { active = true, callback = callback, kind = "every" }
+		local active = mode ~= "nil"
+		local handle = {
+			active = active,
+			callback = callback,
+			committed = mode == "commit",
+			kind = "every",
+			timer = active and {} or nil,
+		}
 		scheduler.every_handles[#scheduler.every_handles + 1] = handle
 		return handle, mode == "commit"
 	end
 
 	function scheduler.cancel(handle)
-		if type(handle) ~= "table" or handle.active ~= true then return true end
+		if type(handle) ~= "table" or handle.timer == nil then return true end
 		calls.cancel = calls.cancel + 1
-		if cancel_results[calls.cancel] == false then return false end
+		handle.committed = false
+		local result = cancel_results[calls.cancel]
+		if result == "throw" then error("onboarding-cancel-throw") end
+		if result == false then return false end
+		if result == "nil" then return nil end
 		handle.active = false
+		handle.timer = nil
 		return true
 	end
 
@@ -174,7 +196,7 @@ helpers.describe("Karabiner onboarding owns every delayed continuation", functio
 		end)
 	end)
 
-	helpers.it("onboarding timer cleanup debt blocks the post-success sibling", function()
+	helpers.it("onboarding timer cleanup retries before the post-success sibling", function()
 		with_fixture({
 			choice = "karabiner.onboarding.btn_open_settings",
 			poll_ready = true,
@@ -189,12 +211,12 @@ helpers.describe("Karabiner onboarding owns every delayed continuation", functio
 		}, function(onboarding, scheduler, calls)
 			onboarding.run_first_run_wizard()
 			scheduler.every_handles[1].callback()
-			helpers.assert_eq(calls.after, 0,
-				"cleanup debt must prevent the successful poll from arming a sibling")
-			helpers.assert_eq(#calls.notices, 1,
-				"the success notification must not publish before poll teardown commits")
+			helpers.assert_eq(calls.after, 1,
+				"bounded exact cleanup must acquire the sibling without another user action")
+			helpers.assert_eq(#calls.notices, 2,
+				"successful cleanup may publish the poll result exactly once")
 			helpers.assert_eq(onboarding.stop(), true)
-			helpers.assert_eq(calls.cancel, 2)
+			helpers.assert_eq(calls.cancel, 3)
 		end)
 	end)
 
@@ -228,7 +250,7 @@ helpers.describe("Karabiner onboarding owns every delayed continuation", functio
 			choice = "karabiner.onboarding.btn_open_settings",
 			poll_ready = true,
 			after_mode = "partial",
-			cancel_results = { true, false, false, true },
+			cancel_results = { true, false, false, false, false, false, true },
 			health_reports = {
 				{
 					all_ok = false,
@@ -250,16 +272,16 @@ helpers.describe("Karabiner onboarding owns every delayed continuation", functio
 			scheduler.every_handles[1].callback()
 			helpers.assert_eq(calls.after, 1)
 			helpers.assert_eq(scheduler.after_handles[1].active, true)
-			helpers.assert_eq(calls.cancel, 2,
-				"failed post-success acquisition must attempt exact rollback")
+			helpers.assert_eq(calls.cancel, 4,
+				"failed post-success acquisition must exhaust bounded exact rollback")
 
 			scheduler.after_handles[1].callback()
-			helpers.assert_eq(calls.cancel, 3,
-				"a stale partial callback must retry the same exact handle")
+			helpers.assert_eq(calls.cancel, 7,
+				"a stale partial callback must settle the same exact handle autonomously")
 			helpers.assert_eq(calls.health, 2,
 				"the uncommitted continuation callback must never reopen the wizard")
 			helpers.assert_eq(onboarding.stop(), true)
-			helpers.assert_eq(calls.cancel, 4)
+			helpers.assert_eq(calls.cancel, 7)
 		end)
 	end)
 
@@ -277,7 +299,8 @@ helpers.describe("Karabiner onboarding owns every delayed continuation", functio
 				},
 			}, function(onboarding, _, calls)
 				onboarding.run_first_run_wizard()
-				helpers.assert_eq(calls.every, 1)
+				helpers.assert_eq(calls.every, 3,
+					"recurring timer construction must exhaust its bounded retry series")
 				helpers.assert_eq(calls.after, 0)
 				helpers.assert_eq(#calls.notices, 2,
 					"timer acquisition failure must surface one terminal warning")
@@ -311,11 +334,99 @@ helpers.describe("Karabiner onboarding owns every delayed continuation", functio
 			}, function(onboarding, scheduler, calls)
 				onboarding.run_first_run_wizard()
 				scheduler.every_handles[1].callback()
-				helpers.assert_eq(calls.after, 1)
+				helpers.assert_eq(calls.after, 3,
+					"continuation construction must exhaust its bounded retry series")
 				helpers.assert_eq(calls.health, 2,
 					"a missing timer must not silently drop the next wizard step")
 				helpers.assert_eq(onboarding.stop(), true)
 			end)
 		end
 	end)
+
+	helpers.it("onboarding timer constructor refusal acquires a bounded successor", function()
+		with_fixture({
+			choice = "karabiner.onboarding.btn_open_settings",
+			every_modes = { "partial", "commit" },
+			report = {
+				all_ok = false,
+				ke_installed = true,
+				grabber_present = true,
+				sysext_activated = false,
+				grabber_running = true,
+			},
+		}, function(onboarding, scheduler, calls)
+			onboarding.run_first_run_wizard()
+			helpers.assert_eq(calls.every, 2)
+			helpers.assert_nil(scheduler.every_handles[1].timer,
+				"the refused wrapper must settle before successor acquisition")
+			helpers.assert_not_nil(scheduler.every_handles[2].timer)
+			helpers.assert_eq(calls.cancel, 1)
+			helpers.assert_eq(#calls.notices, 1,
+				"successful fallback acquisition must not publish a false timeout")
+			helpers.assert_eq(onboarding.stop(), true)
+		end)
+	end)
+
+	helpers.it("onboarding continuation constructor refusal acquires a bounded successor", function()
+		with_fixture({
+			choice = "karabiner.onboarding.btn_open_settings",
+			poll_ready = true,
+			after_modes = { "partial", "commit" },
+			health_reports = {
+				{
+					all_ok = false,
+					ke_installed = true,
+					grabber_present = true,
+					sysext_activated = false,
+					grabber_running = true,
+				},
+				{
+					all_ok = true,
+					ke_installed = true,
+					grabber_present = true,
+					sysext_activated = true,
+					grabber_running = true,
+				},
+			},
+		}, function(onboarding, scheduler, calls)
+			onboarding.run_first_run_wizard()
+			scheduler.every_handles[1].callback()
+			helpers.assert_eq(calls.after, 2)
+			helpers.assert_nil(scheduler.after_handles[1].timer)
+			helpers.assert_not_nil(scheduler.after_handles[2].timer)
+			helpers.assert_eq(calls.health, 1,
+				"successful timer fallback must not run the continuation early")
+			scheduler.after_handles[2].callback()
+			helpers.assert_eq(calls.health, 2)
+			helpers.assert_eq(onboarding.stop(), true)
+		end)
+	end)
+
+	for _, refusal in ipairs({ false, "throw" }) do
+		helpers.it("onboarding stop bounds exact timer cancel " .. tostring(refusal), function()
+			with_fixture({
+				choice = "karabiner.onboarding.btn_open_settings",
+				cancel_results = { refusal, refusal, refusal, true },
+				report = {
+					all_ok = false,
+					ke_installed = true,
+					grabber_present = true,
+					sysext_activated = false,
+					grabber_running = true,
+				},
+			}, function(onboarding, scheduler, calls)
+				onboarding.run_first_run_wizard()
+				helpers.assert_true(onboarding.stop() == false)
+				helpers.assert_eq(calls.cancel, 3)
+				helpers.assert_not_nil(scheduler.every_handles[1].timer,
+					"terminal refusal must retain the exact callback-inert wrapper")
+				scheduler.every_handles[1].callback()
+				helpers.assert_eq(calls.cancel, 4,
+					"a later native delivery must settle debt without another user gesture")
+				helpers.assert_nil(scheduler.every_handles[1].timer)
+				helpers.assert_eq(#calls.notices, 1,
+					"cleanup-only delivery must not publish a false wizard terminal")
+			end)
+		end)
+	end
 end)

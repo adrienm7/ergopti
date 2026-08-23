@@ -337,7 +337,11 @@ helpers.describe("ShellRunner: a task that refuses to launch is unpinned", funct
 		local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
 			task = {
 				new = function(_bin, _done, _stream)
-					fake_task = { start = function() return false end, terminate = function() end }
+					fake_task = {
+						start = function() return false end,
+						terminate = function() end,
+						isRunning = function() return false end,
+					}
 					return fake_task
 				end,
 			},

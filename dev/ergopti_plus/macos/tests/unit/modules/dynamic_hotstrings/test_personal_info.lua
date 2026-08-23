@@ -15,9 +15,10 @@ local helpers = require("tests.helpers")
 -- the early return at the top of the keystroke path — so this case used to be
 -- "assert_true(true)" with a comment saying where the real guard lived.
 --
--- What is checkable is WHERE that guard sits. Action-epoch reconciliation and
--- stale internal-loopback disposal intentionally precede it in every state, but
--- no physical event accessor, interceptor, or buffer mutation may. Otherwise the
+-- What is checkable is WHERE that guard sits. Stale/owned synthetic disposal
+-- intentionally precedes it, while action-epoch reconciliation and unreadable
+-- provenance cleanup follow it. No physical event accessor, interceptor, or
+-- buffer mutation may precede it. Otherwise the
 -- first thing typed after a resume could expand against a buffer built while the
 -- user thought nothing was listening.
 local PHYSICAL_OBSERVATION_MARKERS = {
@@ -51,14 +52,21 @@ local function pause_precedes_physical_observation(raw)
 	if parameters ~= "e,provenance,provenance_status" then return false end
 	local stale_at = code:find(
 		"if provenance and provenance.stale_loopback then return true end", 1, true)
-	local unreadable_at = code:find(
-		"if provenance_status == EventProvenance.STATUS_UNREADABLE then", 1, true)
 	local owned_at = code:find(
 		"if provenance and not internal_loopback then return false end", 1, true)
 	local pause_at = code:find(
-		"if CoreState.processing_paused then return internal_loopback == true end", 1, true)
-	if not (stale_at and unreadable_at and owned_at and pause_at) then return false end
-	if not (stale_at < unreadable_at and unreadable_at < owned_at and owned_at < pause_at) then
+		"if not SyntheticInput.admission_open()", 1, true)
+	local processing_paused_at = pause_at and code:find(
+		"or CoreState.processing_paused == true then", pause_at, true)
+	local epoch_at = code:find(
+		"local action_epoch = SyntheticInput.current_action_epoch()", 1, true)
+	local unreadable_at = code:find(
+		"if provenance_status == EventProvenance.STATUS_UNREADABLE then", 1, true)
+	if not (stale_at and owned_at and pause_at and processing_paused_at
+		and epoch_at and unreadable_at) then return false end
+	if not (stale_at < owned_at and owned_at < pause_at
+		and pause_at < processing_paused_at and processing_paused_at < epoch_at
+		and epoch_at < unreadable_at) then
 		return false
 	end
 	for _, marker in ipairs(PHYSICAL_OBSERVATION_MARKERS) do
@@ -78,7 +86,7 @@ helpers.describe("Personal info pause guard", function()
 			"the current (event, provenance, status) handler must reconcile provenance, "
 				.. "then stop paused input before every enumerated physical observation")
 
-		local pause = "if CoreState.processing_paused then return internal_loopback == true end"
+		local pause = "if not SyntheticInput.admission_open()"
 		local pause_at = raw:find(pause, 1, true)
 		helpers.assert_not_nil(pause_at, "the sensitivity mutation needs the real pause gate")
 		for _, marker in ipairs(PHYSICAL_OBSERVATION_MARKERS) do

@@ -46,12 +46,17 @@ helpers.describe("llm_bridge: the preview render leaves the keyboard callback", 
 		helpers.assert_true(at ~= nil, "the preview must still be rendered at some point")
 
 		local callback_at = code:sub(1, at):match(".*()local function render_preview%(")
-		local schedule_at = callback_at and code:find("TimerScheduler.after(0, render_preview)", at, true)
+		local owner_at = code:find("local function schedule_prediction_deferred", 1, true)
+		local schedule_at = callback_at and code:find(
+			'schedule_prediction_deferred("hotstring preview render", render_preview)', at, true)
 		helpers.assert_true(callback_at ~= nil and schedule_at ~= nil,
-			"the render must be scheduled off the keyboard callback. Resolving the tooltip anchor "
+			"the render must cross the owned deferral boundary off the keyboard callback. "
+				.. "Resolving the tooltip anchor "
 				.. "performs cross-process AX IPC on every preview keystroke, and against a hung "
 				.. "front app that blocks until the AX timeout — long enough for macOS to disable "
 				.. "the keyboard tap for being unresponsive")
+		helpers.assert_true(owner_at ~= nil and owner_at < schedule_at,
+			"the deferred render must use the shared exact timer owner so PAUSE can join it")
 		local callback_body = callback_at and schedule_at and code:sub(callback_at, schedule_at) or ""
 		helpers.assert_true(callback_body:find("_preview_render_generation", 1, true) ~= nil,
 			"and it must be stamped, so a render superseded during its deferral drops itself "
@@ -185,13 +190,29 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 		package.loaded["adapters.synthetic_input"] = {
 			current_action_epoch = function() return action_epoch end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
-			after = function(delay, fn)
-				local handle = { timer = {}, delay = delay, fn = fn }
-				scheduled[#scheduled + 1] = handle
-				return handle, true
-			end,
-		}
+		local timer_scheduler = {}
+		function timer_scheduler.cancel(handle)
+			if handle.timer == nil then return true end
+			handle.timer = nil
+			for _, observer in ipairs(handle.observers) do observer() end
+			handle.observers = {}
+			return true
+		end
+		function timer_scheduler.onSettled(handle, observer)
+			if handle.timer == nil then observer(); return true end
+			handle.observers[#handle.observers + 1] = observer
+			return true
+		end
+		function timer_scheduler.after(delay, fn)
+			local handle = { timer = {}, delay = delay, observers = {} }
+			handle.fn = function()
+				timer_scheduler.cancel(handle)
+				fn()
+			end
+			scheduled[#scheduled + 1] = handle
+			return handle, true
+		end
+		package.loaded["adapters.timer_scheduler"] = timer_scheduler
 		package.loaded["modules.keymap.utils"] = {
 			tokens_from_repl = function(value) return value end,
 			plain_text = function(value) return value end,

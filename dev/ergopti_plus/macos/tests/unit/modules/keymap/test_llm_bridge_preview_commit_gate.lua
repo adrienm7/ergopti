@@ -33,12 +33,30 @@ local function load_fixture(render_result, previews_enabled, options)
 	}
 	local action_epoch = {}
 	fixture.schedule_calls = 0
+	fixture.cancel_mode = options.cancel_mode
 
 	package.loaded["adapters.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
-		after = function(delay, callback)
+	local scheduler = {}
+	function scheduler.cancel(handle)
+		if type(handle) ~= "table" or handle.timer == nil then return true end
+		handle.committed = false
+		if fixture.cancel_mode == "throw" then error("preview timer cancellation failed") end
+		if fixture.cancel_mode == "false" then return false end
+		if fixture.cancel_mode == "nil" then return nil end
+		handle.timer = nil
+		local observers = handle.observers or {}
+		handle.observers = {}
+		for _, observer in ipairs(observers) do observer() end
+		return true
+	end
+	function scheduler.onSettled(handle, observer)
+		if handle.timer == nil then observer(); return true end
+		handle.observers[#handle.observers + 1] = observer
+		return true
+	end
+	function scheduler.after(delay, callback)
 			fixture.schedule_calls = fixture.schedule_calls + 1
 			if options.schedule_error_on == fixture.schedule_calls then
 				error("preview telemetry scheduling failed")
@@ -46,11 +64,63 @@ local function load_fixture(render_result, previews_enabled, options)
 			if options.schedule_failure_on == fixture.schedule_calls then
 				return { fired = true }, false
 			end
-			local handle = { timer = {}, delay = delay, callback = callback }
+			local handle = {
+				committed = true,
+				delay = delay,
+				fired = false,
+				observers = {},
+				timer = {},
+			}
+			handle.callback = function()
+				if handle.fired then
+					scheduler.cancel(handle)
+					return
+				end
+				if handle.committed ~= true then
+					scheduler.cancel(handle)
+					return
+				end
+				handle.fired = true
+				handle.committed = false
+				scheduler.cancel(handle)
+				callback()
+			end
 			fixture.scheduled[#fixture.scheduled + 1] = handle
 			return handle, true
-		end,
-	}
+	end
+	package.loaded["adapters.timer_scheduler"] = scheduler
+	if options.real_scheduler then
+		fixture.native_timers = {}
+		fixture.native_cancel_mode = nil
+		_G.hs.timer.new = function(delay, callback)
+			local candidate = {
+				callback = callback,
+				delay = delay,
+				live = false,
+				starts = 0,
+				stops = 0,
+			}
+			function candidate:start()
+				self.starts = self.starts + 1
+				self.live = true
+				return self
+			end
+			function candidate:stop()
+				self.stops = self.stops + 1
+				if fixture.native_cancel_mode == "throw" then
+					error("native prediction timer stop failed")
+				end
+				if fixture.native_cancel_mode == "false" then return false end
+				if fixture.native_cancel_mode == "nil" then return nil end
+				self.live = false
+				return self
+			end
+			function candidate:running() return self.live end
+			fixture.native_timers[#fixture.native_timers + 1] = candidate
+			return candidate
+		end
+		package.loaded["adapters.timer_scheduler"] = nil
+	end
 	package.loaded["modules.keymap.utils"] = {
 		tokens_from_repl = function(value) return value end,
 		plain_text = function(value) return value end,
@@ -115,7 +185,11 @@ local function load_fixture(render_result, previews_enabled, options)
 			if options.timer_result ~= nil then return options.timer_result end
 			return true
 		end,
-		reset = function() fixture.resets = fixture.resets + 1; return true end,
+		reset = function(reset_options)
+			fixture.resets = fixture.resets + 1
+			fixture.last_reset_options = reset_options
+			return true
+		end,
 	}
 	package.loaded["modules.keylogger"] = {
 		log_hotstring_suggested = function() fixture.suggested = fixture.suggested + 1 end,
@@ -235,6 +309,65 @@ helpers.describe("llm_bridge: deferred preview render owns downstream state", fu
 		helpers.assert_eq(fixture.dismissed, 1,
 			"the committed row must become the one dismissible suggestion record")
 	end)
+
+	helpers.it("performs a pause reset without scheduling dismissal telemetry", function()
+		local fixture = load_fixture(true, true)
+		fixture.bridge.update_preview(fixture.state.buffer)
+		drain(fixture)
+		drain(fixture)
+		local scheduled_before = #fixture.scheduled
+		local resets_before = fixture.resets
+
+		helpers.assert_true(fixture.bridge.reset_predictions_for_pause())
+		helpers.assert_eq(fixture.resets, resets_before + 1)
+		helpers.assert_eq(#fixture.scheduled, scheduled_before,
+			"global pause reset may not leave a telemetry timer capability")
+		helpers.assert_eq(fixture.dismissed, 0,
+			"global pause is not a user dismissal event")
+		helpers.assert_true(type(fixture.last_reset_options) == "table"
+			and fixture.last_reset_options.suppress_telemetry == true,
+			"the bridge must carry the no-deferral contract into the real engine boundary")
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("joins real deferred suggestion telemetry after " .. mode
+			.. " native cancellation", function()
+			local fixture = load_fixture(true, true, { real_scheduler = true })
+			fixture.bridge.update_preview(fixture.state.buffer)
+			local render_timer = fixture.native_timers[1]
+			helpers.assert_true(render_timer.live,
+				"positive control must own a real deferred render timer")
+			render_timer.callback()
+			helpers.assert_eq(fixture.renders, 1)
+			helpers.assert_eq(fixture.suggested, 0)
+			local telemetry_timer = fixture.native_timers[2]
+			helpers.assert_true(telemetry_timer.live,
+				"committed preview must publish deferred telemetry before PAUSE")
+
+			fixture.native_cancel_mode = mode
+			helpers.assert_eq(fixture.bridge.reset_predictions_for_pause(), false,
+				"PAUSE reset must reject an unsettled predecessor timer")
+			helpers.assert_true(telemetry_timer.live)
+			helpers.assert_eq(telemetry_timer.stops, 1)
+			telemetry_timer.callback()
+			helpers.assert_eq(telemetry_timer.stops, 2,
+				"queued delivery may only retry the exact native timer")
+			helpers.assert_eq(fixture.suggested, 0,
+				"pre-PAUSE telemetry must remain logically fenced")
+
+			fixture.native_cancel_mode = nil
+			helpers.assert_true(fixture.bridge.reset_predictions_for_pause(),
+				"same-state retry must settle the retained exact handle")
+			helpers.assert_eq(telemetry_timer.stops, 3)
+			helpers.assert_eq(telemetry_timer.live, false)
+			helpers.assert_eq(#fixture.native_timers, 2,
+				"pause cleanup is one-way and must not arm a successor")
+			telemetry_timer.callback()
+			render_timer.callback()
+			helpers.assert_eq(fixture.suggested, 0,
+				"late and duplicate callbacks must remain inert after settlement")
+		end)
+	end
 
 	helpers.it("publishes an opaque provider snapshot only after its exact row commits", function()
 		local fixture = load_fixture(true, true, { no_match = true })

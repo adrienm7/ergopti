@@ -249,7 +249,8 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 	end)
 
 	helpers.it("execute_single('none') runs the empty action without error", function()
-		Actions.execute_single("none")
+		helpers.assert_eq(Actions.execute_single("none"), true,
+			"a registered successful action must report handled to its caller")
 	end)
 
 	helpers.it("is_right_click_held returns a boolean", function()
@@ -283,10 +284,12 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 	-- so a second call must not post a second mouse-up into whatever the user is
 	-- doing.
 	helpers.it("force_cleanup is idempotent", function()
-		Actions.force_cleanup()
-		Actions.force_cleanup()
+		helpers.assert_eq(Actions.force_cleanup(), true)
+		helpers.assert_eq(Actions.force_cleanup(), true)
 		helpers.assert_eq(Actions.is_right_click_held(), false,
 			"after cleanup no synthetic right-click may remain held")
+		helpers.assert_eq(Actions.resume_after_cleanup(), true,
+			"a direct cleanup test must reopen the exact auxiliary owner it paused")
 	end)
 end)
 
@@ -307,56 +310,92 @@ end)
 helpers.describe("gestures.actions: throwing actions are traced via Logger.callback (HS-016)", function()
 
 	-- Loads a fresh actions module with a REAL (not stubbed) lib.logger instance so the
-	-- ring buffer genuinely reflects what Logger.pcall wrote, plus hs.timer.doAfter
-	-- replaced with a function that raises — driving an actual thrown exception through
-	-- the real action registry rather than a synthetic stub action.
+	-- ring buffer genuinely reflects what Logger.pcall wrote. The auxiliary owner is
+	-- replaced at its public scheduling boundary with a function that raises, driving
+	-- an actual acquisition failure through the real action registry rather than a
+	-- synthetic stub action.
 	local function make_actions_with_real_logger_and_throwing_timer()
 		package.loaded["infra.logger"] = nil
 		local FreshLogger = helpers.load_with_stubs("infra.logger")
 		FreshLogger.set_level("DEBUG")
 
+		local previous_aux = package.loaded["modules.gestures.actions_aux_owner"]
+		package.loaded["modules.gestures.actions_aux_owner"] = {
+			is_paused = function() return false end,
+			after = function() error("boom: injected auxiliary timer acquisition failure") end,
+			prepare_after = function()
+				error("boom: injected auxiliary timer acquisition failure")
+			end,
+			commit_after = function() return true end,
+			rollback_after = function() return true end,
+			open = function() return true end,
+			applescript = function() return true end,
+			pause = function() return true end,
+			resume = function() return true end,
+		}
 		package.loaded["modules.gestures.actions"] = nil
 		package.loaded["modules.gestures.actions_click"] = nil
-		local Actions2 = helpers.load_with_stubs("modules.gestures.actions", {
-			timer = {
-				doAfter = function() error("boom: injected hs.timer.doAfter failure") end,
-			},
-		})
+		local Actions2 = helpers.load_with_stubs("modules.gestures.actions")
+		package.loaded["modules.gestures.actions_aux_owner"] = previous_aux
 		return Actions2, FreshLogger
 	end
 
-	helpers.it("execute_single logs an ERROR when the dispatched action throws ('lookup' via hs.timer.doAfter)", function()
+	helpers.it("execute_single logs an ERROR when lookup timer acquisition throws", function()
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
 
-		-- 'lookup' -> M.trigger_lookup() calls hs.timer.doAfter(...) UNPROTECTED
-		-- (no internal pcall), so stubbing it to error() reaches Logger.callback's guard.
-		-- The containment IS the subject, so the pcall stays. What it was missing is
-		-- that the exception was CONTAINED rather than swallowed: Logger.callback is
-		-- meant to log it, and a guard that silently discarded every failure would
-		-- leave a dead gesture with nothing in the logs to explain it.
+		-- 'lookup' owns a local acquisition boundary because direct API callers use it
+		-- too. That direct boundary reports the operational refusal, while the gesture
+		-- dispatcher still owns its registered action and must not fall through to a
+		-- second provider after the callback returns normally.
+		helpers.assert_eq(Actions2.trigger_lookup(), false,
+			"the direct lookup boundary must expose its acquisition refusal")
 		local ok, result = pcall(Actions2.execute_single, "lookup")
-		helpers.assert_true(ok, "execute_single itself must never raise — Logger.callback must contain the exception")
-		helpers.assert_eq(result, false,
-			"a contained exception must be returned as an explicit dispatch refusal")
+		helpers.assert_true(ok, "execute_single itself must never raise across the lookup owner boundary")
+		helpers.assert_eq(result, true,
+			"a registered action remains owned after its contained operation refuses")
 
 		local snap = FreshLogger.ring_buffer_snapshot()
 		local found_error = false
 		for _, line in ipairs(snap) do
 			if line:find("[ERROR]", 1, true)
-				and line:find("Gesture action 'lookup'", 1, true)
+				and line:find("Dictionary lookup timer acquisition failed", 1, true)
 				and line:find("boom: injected", 1, true)
 				and line:find("stack traceback", 1, true) then
 				found_error = true
 			end
 		end
 		helpers.assert_true(found_error,
-			"a throwing action must leave an ERROR-level Logger trace (gestures-actions-silent-pcall)")
+			"a throwing acquisition must leave an ERROR-level Logger trace")
 	end)
 
-	helpers.it("execute_axis logs an ERROR when the dispatched axis action throws ('lines' via hs.timer.doAfter)", function()
+	helpers.it("execute_single refuses a registered callback that raises", function()
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
 
-		-- 'lines' next/prev call hs.timer.doAfter(...) UNPROTECTED directly.
+		-- Unlike lookup, line_up has no inner containment boundary. Its auxiliary
+		-- acquisition reaches Logger.callback as an exception, so the registered
+		-- dispatch itself did not complete and must be reported as refused.
+		local ok, result = pcall(Actions2.execute_single, "line_up")
+		helpers.assert_true(ok, "execute_single must contain a throwing registered callback")
+		helpers.assert_eq(result, false,
+			"a callback that raises through Logger.callback must refuse the dispatch")
+
+		local found_error = false
+		for _, line in ipairs(FreshLogger.ring_buffer_snapshot()) do
+			if line:find("[ERROR]", 1, true)
+				and line:find("Gesture action 'line_up'", 1, true)
+				and line:find("boom: injected", 1, true)
+				and line:find("stack traceback", 1, true) then
+				found_error = true
+			end
+		end
+		helpers.assert_true(found_error,
+			"the throwing single action must preserve its contextual traceback")
+	end)
+
+	helpers.it("execute_axis logs an ERROR when the dispatched axis action throws ('lines' via its auxiliary timer)", function()
+		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
+
+		-- 'lines' next/prev acquire their auxiliary timer without an inner guard.
 		local ok, result = pcall(Actions2.execute_axis, "lines", true)
 		helpers.assert_true(ok, "execute_axis itself must never raise — Logger.callback must contain the exception")
 		helpers.assert_eq(result, false,

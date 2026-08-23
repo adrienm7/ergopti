@@ -69,6 +69,15 @@ local _warmup_gen = 0
 -- The exact one-shot capability remains owned until native cancellation is
 -- proven; a fenced timer whose stop was refused is cleanup debt, not a free slot
 local _warmup_timer = nil
+local _warmup_settlement_observers = {}
+-- ScriptControl may synchronously re-enter while native start/running or a
+-- business callback is still on-stack.  These depths keep PAUSE from claiming
+-- quiescence before the outer frame has either committed or rolled back.
+local _warmup_acquisition_depth = 0
+local _warmup_callback_depth = 0
+-- Exact pre-pause scheduling intent. A quiescent controller must remain
+-- quiescent after resume; a refused native cancellation retains this debt.
+local _pause_resume_pending = false
 
 
 -- =====================================
@@ -91,19 +100,68 @@ end
 --- Cancels the exact warmup timer without losing a refused native handle.
 --- @param context string Operation requesting cancellation.
 --- @return boolean settled True only when no native timer can remain.
-local function cancel_warmup_timer(context)
+local function cancel_warmup_timer(context, allow_callback_owner)
+	if _warmup_acquisition_depth > 0
+		or (_warmup_callback_depth > 0 and allow_callback_owner ~= true) then
+		Logger.error(LOG, "%s: warmup ownership boundary is still in flight.", context)
+		return false
+	end
 	if not _warmup_timer then return true end
 	local owned = _warmup_timer
 	local ok, result = xpcall(function()
 		return TimerScheduler.cancel(owned)
 	end, debug.traceback)
 	if ok and result == true then
+		-- stop()/running() may synchronously install a successor.  Proving the
+		-- captured owner settled does not prove that successor settled too.
+		if _warmup_timer ~= nil and _warmup_timer ~= owned then return false end
 		if _warmup_timer == owned then _warmup_timer = nil end
 		return true
 	end
 	Logger.error(LOG, "%s: warmup timer cleanup remains pending — %s.",
 		context, tostring(result))
 	return false
+end
+
+--- Keeps a business/settlement continuation visible to ScriptControl until its
+--- complete Lua frame has unwound, including thrown dependency callbacks.
+--- @param context string Callback label for diagnostics.
+--- @param fn function Continuation.
+local function run_warmup_callback(context, fn)
+	_warmup_callback_depth = _warmup_callback_depth + 1
+	local ok, err = xpcall(fn, debug.traceback)
+	_warmup_callback_depth = _warmup_callback_depth - 1
+	if not ok then
+		Logger.error(LOG, "%s failed — %s.", context, tostring(err))
+	end
+end
+
+--- Continues a retry chain after a fired timer's native stop eventually settles.
+--- @param owned table Exact TimerScheduler handle.
+--- @param my_gen integer Retry-chain generation.
+--- @param continuation function Continuation to run after settlement.
+--- @return boolean registered
+local function observe_warmup_timer_settlement(owned, my_gen, continuation)
+	if type(owned) ~= "table" or type(continuation) ~= "function" then return false end
+	if _warmup_settlement_observers[owned] == true then return true end
+	if type(TimerScheduler.onSettled) ~= "function" then return false end
+	_warmup_settlement_observers[owned] = true
+	local ok, registered_or_err = xpcall(function()
+		return TimerScheduler.onSettled(owned, function()
+			_warmup_settlement_observers[owned] = nil
+			if _warmup_timer == owned then _warmup_timer = nil end
+			run_warmup_callback("Warmup timer settlement continuation", function()
+				if my_gen == _warmup_gen then continuation() end
+			end)
+		end)
+	end, debug.traceback)
+	if not ok or registered_or_err ~= true then
+		_warmup_settlement_observers[owned] = nil
+		Logger.error(LOG, "Warmup timer settlement observer failed — %s.",
+			tostring(registered_or_err))
+		return false
+	end
+	return true
 end
 
 --- Reads the live LLM enable gate without letting a dependency throw escape.
@@ -140,7 +198,9 @@ end
 --- @return boolean committed True for an intentional no-op or an owned timer.
 function M.schedule_warmup_with_retry(reason)
 	if not require_state("schedule_warmup_with_retry") then return false end
+	local entry_gen = _warmup_gen
 	local enabled = read_llm_enabled("schedule_warmup_with_retry")
+	if entry_gen ~= _warmup_gen then return false end
 	if enabled == nil then return false end
 	if enabled ~= true then
 		_warmup_gen = _warmup_gen + 1
@@ -149,6 +209,7 @@ function M.schedule_warmup_with_retry(reason)
 	end
 
 	local resolved_ok, resolved = xpcall(_core_llm.get_current_model, debug.traceback)
+	if entry_gen ~= _warmup_gen then return false end
 	if not resolved_ok then
 		Logger.error(LOG, "%s: backend model resolution failed — %s.", reason, tostring(resolved))
 		return false
@@ -173,28 +234,51 @@ function M.schedule_warmup_with_retry(reason)
 	--- @return boolean committed True only when the native timer was armed.
 	local function arm_attempt(delay, current_interval)
 		if my_gen ~= _warmup_gen then return false end
-		if cancel_warmup_timer("warmup retry acquisition") ~= true then return false end
+		if cancel_warmup_timer("warmup retry acquisition", true) ~= true then return false end
 
 		local candidate
+		local authorized = false
+		local delivery_attempted = false
+		_warmup_acquisition_depth = _warmup_acquisition_depth + 1
 		local schedule_ok, handle_or_err, committed = xpcall(function()
 			return TimerScheduler.after(delay, function()
-				if my_gen ~= _warmup_gen or _warmup_timer ~= candidate then return end
-				-- The adapter fences a fired one-shot before delivery, but the native
-				-- stop may still refuse. Never acquire its successor over that debt.
-				if cancel_warmup_timer("warmup timer completion") ~= true then return end
-				try_warmup(current_interval)
+				delivery_attempted = true
+				if authorized ~= true or my_gen ~= _warmup_gen
+					or _warmup_timer ~= candidate then return end
+				run_warmup_callback("Warmup timer delivery", function()
+					-- The adapter fences a fired one-shot before delivery, but the native
+					-- stop may still refuse. Never acquire its successor over that debt.
+					if cancel_warmup_timer("warmup timer completion", true) ~= true then
+						observe_warmup_timer_settlement(candidate, my_gen, function()
+							try_warmup(current_interval)
+						end)
+					else
+						try_warmup(current_interval)
+					end
+				end)
 			end)
 		end, debug.traceback)
+		_warmup_acquisition_depth = _warmup_acquisition_depth - 1
 		candidate = handle_or_err
-		if type(candidate) == "table" then _warmup_timer = candidate end
+		local acquisition_current = my_gen == _warmup_gen and _warmup_timer == nil
+		if type(candidate) == "table" and acquisition_current then
+			_warmup_timer = candidate
+		end
 
-		if not schedule_ok or committed ~= true or type(candidate) ~= "table" then
-			if type(candidate) == "table" then
+		if not schedule_ok or committed ~= true or type(candidate) ~= "table"
+			or delivery_attempted == true or acquisition_current ~= true then
+			if type(candidate) == "table" and _warmup_timer == nil then
+				-- Retain the exact partial/stale candidate while its native rollback
+				-- is attempted; refusal leaves it visible as the sole cleanup debt.
+				_warmup_timer = candidate
+			end
+			if _warmup_timer == candidate then
 				cancel_warmup_timer("warmup timer acquisition rollback")
 			end
 			Logger.error(LOG, "Warmup timer acquisition failed — %s.", tostring(handle_or_err))
 			return false
 		end
+		authorized = true
 		return true
 	end
 
@@ -202,6 +286,7 @@ function M.schedule_warmup_with_retry(reason)
 		-- Stale chain — a newer schedule_warmup_with_retry or M.stop() arrived
 		if my_gen ~= _warmup_gen then return end
 		local still_enabled = read_llm_enabled("warmup retry")
+		if my_gen ~= _warmup_gen then return end
 		if still_enabled == nil then return end
 		if still_enabled ~= true then
 			Logger.debug(LOG, "[WARMUP-LOOP] LLM disabled — stopping retry chain.")
@@ -211,13 +296,16 @@ function M.schedule_warmup_with_retry(reason)
 			Logger.debug(LOG, "[WARMUP-LOOP] Backend ready — stopping retry chain.")
 			return
 		end
+		if my_gen ~= _warmup_gen then return end
 		-- A failed load is a permanent terminal state; retrying would be pointless
 		-- and would produce an infinite timer chain that never resolves
 		if _core_llm.is_backend_load_failed and _core_llm.is_backend_load_failed() then
 			Logger.debug(LOG, "[WARMUP-LOOP] Backend load failed — stopping retry chain.")
 			return
 		end
+		if my_gen ~= _warmup_gen then return end
 		local model_ok, current = xpcall(_core_llm.get_current_model, debug.traceback)
+		if my_gen ~= _warmup_gen then return end
 		if not model_ok then
 			Logger.error(LOG, "[WARMUP-LOOP] Model resolution failed — %s.", tostring(current))
 			return
@@ -231,10 +319,12 @@ function M.schedule_warmup_with_retry(reason)
 			return
 		end
 		local backend_ok, backend = xpcall(_core_llm.get_backend, debug.traceback)
+		if my_gen ~= _warmup_gen then return end
 		if not backend_ok then backend = "unknown" end
 		Logger.debug(LOG, "[WARMUP-LOOP] Warmup attempt for '%s' (backend: %s, next retry: %.0fs).",
 			current, tostring(backend), next_interval)
 		local profile_ok, profile = xpcall(_core_llm.get_active_profile, debug.traceback)
+		if my_gen ~= _warmup_gen then return end
 		if not profile_ok then
 			Logger.error(LOG, "[WARMUP-LOOP] Active profile resolution failed — %s.", tostring(profile))
 			return
@@ -242,6 +332,7 @@ function M.schedule_warmup_with_retry(reason)
 		local warmup_ok, warmup_err = xpcall(function()
 			_core_llm.warmup_model(current, profile)
 		end, debug.traceback)
+		if my_gen ~= _warmup_gen then return end
 		if not warmup_ok then
 			Logger.error(LOG, "[WARMUP-LOOP] Warmup attempt failed — %s.", tostring(warmup_err))
 		end
@@ -264,6 +355,26 @@ function M.stop()
 	_warmup_gen = _warmup_gen + 1
 	Logger.debug(LOG, "Warmup retry chain cancelled (gen bumped to %d).", _warmup_gen)
 	return cancel_warmup_timer("M.stop")
+end
+
+--- Quiesces the retry controller while snapshotting only an actually-owned timer.
+--- @return boolean settled
+function M.pause_warmup()
+	if _pause_resume_pending ~= true then
+		_pause_resume_pending = _warmup_timer ~= nil
+			or _warmup_acquisition_depth > 0
+			or _warmup_callback_depth > 0
+	end
+	return M.stop()
+end
+
+--- Restores the retry intent captured by pause_warmup exactly once.
+--- @return boolean committed
+function M.resume_warmup()
+	if _pause_resume_pending ~= true then return true end
+	if M.schedule_warmup_with_retry("script-control resume") ~= true then return false end
+	_pause_resume_pending = false
+	return true
 end
 
 --- Initializes the warmup controller with its required dependencies.

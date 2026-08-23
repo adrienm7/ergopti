@@ -60,15 +60,19 @@ local function make_manager()
 	return MlxMgr.new(deps, {})
 end
 
---- Swaps hs.execute + hs.task.new for the duration of fn, capturing how many
---- server tasks were launched. Restores the originals afterwards.
+--- Swaps hs.execute, hs.task.new, and os.execute for the duration of fn,
+--- capturing how many server tasks were launched. The lifecycle now proves
+--- listener absence after a refused launch, so leaving os.execute real here
+--- would let this unit test kill an actual MLX listener on macOS.
+--- Every global is restored after the protected body, including assertion errors.
 --- @param exec_stdout string The body hs.execute returns for the /v1/models probe.
 --- @param fn function Receives a table with a live `task_count` field.
 local function with_probe(exec_stdout, fn)
 	local hs = _G.hs
 	local prev_exec = hs.execute
 	local prev_task_new = hs.task.new
-	local ctx = { task_count = 0 }
+	local prev_os_execute = os.execute
+	local ctx = { task_count = 0, cleanup_commands = {} }
 
 	hs.execute = function(_cmd) return exec_stdout end
 	hs.task.new = function(_bin, _cb, _args)
@@ -79,11 +83,16 @@ local function with_probe(exec_stdout, fn)
 			isRunning = function() return false end,
 		}
 	end
+	os.execute = function(command)
+		ctx.cleanup_commands[#ctx.cleanup_commands + 1] = command
+		return true, "exit", 0
+	end
 
-	local ok, err = pcall(fn, ctx)
+	local ok, err = xpcall(function() return fn(ctx) end, debug.traceback)
 
 	hs.execute = prev_exec
 	hs.task.new = prev_task_new
+	os.execute = prev_os_execute
 	return ok, err, ctx
 end
 

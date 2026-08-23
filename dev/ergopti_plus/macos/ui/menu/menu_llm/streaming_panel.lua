@@ -10,8 +10,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Isolated panel: keeps init.lua focused on wiring, not on individual
 ---    setting UIs — each toggle lives next to its i18n key and state flag.
---- 2. Indent sub-menu is delegated to settings_manager, which already owns
----    the per-indent-value state mutation logic.
+--- 2. Transactional delegation: every display setting routes through the shared
+---    settings manager so runtime, persistence, and menu publication settle once.
 --- ==============================================================================
 
 local M = {}
@@ -31,14 +31,11 @@ local ManifestMenu  = require("infra.manifest_menu")
 -- =============================
 
 --- Builds the display submenu items and returns the full submenu table.
---- @param ctx table Context: { state, keymap, is_disabled, save_prefs, update_menu, settings_mgr }.
+--- @param ctx table Context: { state, is_disabled, settings_mgr }.
 --- @return table The Hammerspoon menu structure for the display submenu.
 function M.build(ctx)
 	local state        = ctx.state
-	local keymap       = ctx.keymap
 	local is_disabled  = ctx.is_disabled
-	local save_prefs   = ctx.save_prefs
-	local update_menu  = ctx.update_menu
 	local settings_mgr = ctx.settings_mgr
 
 	local rows = {}
@@ -56,13 +53,13 @@ function M.build(ctx)
 		label    = i18n.get("menu.llm.show_info_bar"),
 		checked  = state.llm_show_info_bar,
 		disabled = is_disabled or nil,
-		action       = function()
-			state.llm_show_info_bar = not state.llm_show_info_bar
-			if keymap and type(keymap.set_llm_show_info_bar) == "function" then
-				pcall(keymap.set_llm_show_info_bar, state.llm_show_info_bar)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+		action   = function()
+			return settings_mgr.apply_setting_transaction({
+				key = "llm_show_info_bar",
+				value = not state.llm_show_info_bar,
+				runtime_fn = "set_llm_show_info_bar",
+				publish_setting = false,
+			})
 		end,
 	})
 
@@ -78,13 +75,13 @@ function M.build(ctx)
 		label    = i18n.get("menu.llm.show_streaming"),
 		checked  = streaming_on,
 		disabled = (is_disabled or not streaming_multi_on) or nil,
-		action       = not is_disabled and function()
-			state.llm_streaming = not streaming_on
-			if keymap and type(keymap.set_llm_streaming) == "function" then
-				pcall(keymap.set_llm_streaming, state.llm_streaming)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+		action   = not is_disabled and function()
+			return settings_mgr.apply_setting_transaction({
+				key = "llm_streaming",
+				value = not streaming_on,
+				runtime_fn = "set_llm_streaming",
+				publish_setting = false,
+			})
 		end or nil,
 	})
 
@@ -94,13 +91,13 @@ function M.build(ctx)
 		label    = i18n.get("menu.llm.show_all_at_once"),
 		checked  = not streaming_multi_on,
 		disabled = (is_disabled or num_preds_multi < 2) or nil,
-		action       = (not is_disabled and num_preds_multi >= 2) and function()
-			state.llm_streaming_multi = not streaming_multi_on
-			if keymap and type(keymap.set_llm_streaming_multi) == "function" then
-				pcall(keymap.set_llm_streaming_multi, state.llm_streaming_multi)
-			end
-			if save_prefs() ~= true then return false end
-			update_menu()
+		action   = (not is_disabled and num_preds_multi >= 2) and function()
+			return settings_mgr.apply_setting_transaction({
+				key = "llm_streaming_multi",
+				value = not streaming_multi_on,
+				runtime_fn = "set_llm_streaming_multi",
+				publish_setting = false,
+			})
 		end or nil,
 	})
 

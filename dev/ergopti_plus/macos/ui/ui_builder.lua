@@ -265,8 +265,29 @@ end
 --- @param wv userdata The hs.webview object.
 --- @param is_new boolean When true the window is being shown for the first time — skip hide/show to avoid a
 ---   flicker where the window appears briefly hidden before the HTML finishes loading.
-function M.force_focus(wv, is_new)
+--- @param lifecycle table|nil Optional exact owner `{ schedule_after, is_current }`.
+function M.force_focus(wv, is_new, lifecycle)
 	if not wv then return end
+	lifecycle = type(lifecycle) == "table" and lifecycle or {}
+	local function current()
+		if type(lifecycle.is_current) ~= "function" then return true end
+		local ok, result = xpcall(lifecycle.is_current, debug.traceback)
+		return ok == true and result == true
+	end
+	local function schedule(delay, callback, label)
+		if not current() then return false end
+		if type(lifecycle.schedule_after) == "function" then
+			local ok, result = xpcall(function()
+				return lifecycle.schedule_after(delay, callback, label)
+			end, debug.traceback)
+			return ok == true and result == true
+		end
+		local ok, handle = xpcall(function()
+			return hs.timer.doAfter(delay, callback)
+		end, debug.traceback)
+		return ok == true and handle ~= nil and handle ~= false
+	end
+	if not current() then return false end
 
 	Logger.debug(LOG, "Forcing window focus and teleporting to active space…")
 
@@ -277,14 +298,18 @@ function M.force_focus(wv, is_new)
 	-- races with the async HTML load and causes a blank first open.
 	if not is_new then
 		local ok_sp, hs_spaces = pcall(require, "hs.spaces")
+		if not current() then return false end
 		if ok_sp and hs_spaces then
 			local ok_win, win = pcall(function() return wv:hswindow() end)
+			if not current() then return false end
 			if ok_win and win then
 				local ok_active, active_space = pcall(function()
 					return hs_spaces.activeSpaceOnScreen(hs.screen.mainScreen())
 				end)
+				if not current() then return false end
 				if ok_active and active_space then
 					local ok_move = pcall(function() hs_spaces.moveWindowToSpace(win, active_space) end)
+					if not current() then return false end
 					if ok_move then
 						Logger.debug(LOG, "Window teleported via hs.spaces.")
 					end
@@ -301,29 +326,36 @@ function M.force_focus(wv, is_new)
 	local attempts = 0
 	local max_attempts = 20
 	local function try_focus()
-		if not wv then return end
+		if not wv or not current() then return end
 		local ok, win = pcall(function() return wv:hswindow() end)
 		
 		if ok and win and type(win.focus) == "function" then
 			-- Best case: we have a window handle.
 			pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
+			if not current() then return end
 			pcall(function() win:raise() end) -- Ensure top of Z-order
+			if not current() then return end
 			pcall(function() win:focus() end) -- Capture keyboard focus
+			if not current() then return end
 			pcall(function() hs.focus(true) end) -- Force Hammerspoon app to foreground
+			if not current() then return end
 			Logger.info(LOG, "Window focus applied successfully (attempt %d).", attempts + 1)
 		elseif attempts < max_attempts then
 			-- Handle not ready yet: retry shortly.
 			attempts = attempts + 1
-			hs.timer.doAfter(0.05, try_focus)
+			schedule(0.05, try_focus, "webview focus retry")
 		else
 			-- Final fallback: if no window handle after 1s, use the webview-level bringToFront.
 			pcall(function() wv:bringToFront(true) end)
+			if not current() then return end
 			pcall(function() hs.focus(true) end)
+			if not current() then return end
 			Logger.warn(LOG, "Window focus applied via bringToFront fallback after %d attempts.", max_attempts)
 		end
 	end
 
 	try_focus()
+	return true
 end
 
 --- Centralized factory to create a webview window with consistent properties.
@@ -345,39 +377,93 @@ function M.show_webview(opts)
 		Logger.error(LOG, "Failed to instantiate webview object.")
 		return nil 
 	end
+	if type(opts.on_webview_created) == "function" then
+		local acquired_ok, acquired = xpcall(function()
+			return opts.on_webview_created(wv)
+		end, debug.traceback)
+		if acquired_ok ~= true then
+			pcall(function() wv:delete() end)
+			return nil
+		end
+		-- A literal refusal after a successful ownership callback means the
+		-- caller already owns the exact candidate and will settle it. Deleting it
+		-- here would create an unobservable second cleanup attempt before the
+		-- caller has installed its close contract.
+		if acquired ~= true then return nil end
+	end
+	local function webview_current()
+		if type(opts.is_current) ~= "function" then return true end
+		local ok, result = xpcall(opts.is_current, debug.traceback)
+		return ok == true and result == true
+	end
+	local strict_lifecycle = type(opts.is_current) == "function"
+	local function apply_webview_mutation(callback)
+		if not webview_current() then return false end
+		local ok = xpcall(callback, debug.traceback)
+		if strict_lifecycle then
+			return ok == true and webview_current()
+		end
+		-- Preserve the legacy best-effort factory for callers that do not opt in
+		-- to exact ownership. Strict callers fail closed on any native exception.
+		return true
+	end
+	local function schedule_webview_timer(delay, callback, label)
+		if type(opts.schedule_after) == "function" then
+			local ok, result = xpcall(function()
+				return opts.schedule_after(delay, callback, label)
+			end, debug.traceback)
+			return ok == true and result == true
+		end
+		local ok, handle = xpcall(function()
+			return hs.timer.doAfter(delay, callback)
+		end, debug.traceback)
+		return ok == true and handle ~= nil and handle ~= false
+	end
 
 	local prefix = "ErgoptiPlus"
 	local win_title = (opts.title and opts.title ~= "") and (prefix .. " — " .. opts.title) or prefix
-	pcall(function() wv:windowTitle(win_title) end)
+	if not apply_webview_mutation(function() wv:windowTitle(win_title) end) then return nil end
 	
 	if opts.style_masks then 
-		pcall(function() wv:windowStyle(opts.style_masks) end) 
+		if not apply_webview_mutation(function() wv:windowStyle(opts.style_masks) end) then return nil end
 	else
 		local masks = hs.webview.windowMasks
-		pcall(function() wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["utility"] or 16)) end)
+		if not apply_webview_mutation(function()
+			wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2)
+				+ (masks["utility"] or 16))
+		end) then return nil end
 	end
 	
 	-- DEFAULT TO FLOATING: Ensures Ergopti UIs appear on top of other apps.
-	pcall(function() wv:level(opts.level or hs.drawing.windowLevels.floating) end)
-	pcall(function() wv:allowTextEntry(opts.allow_text_entry ~= false) end)
+	if not apply_webview_mutation(function()
+		wv:level(opts.level or hs.drawing.windowLevels.floating)
+	end) then return nil end
+	if not apply_webview_mutation(function()
+		wv:allowTextEntry(opts.allow_text_entry ~= false)
+	end) then return nil end
 	
-	pcall(function() wv:allowGestures(opts.allow_gestures == true) end)
-	if opts.allow_new_windows ~= nil then pcall(function() wv:allowNewWindows(opts.allow_new_windows) end) end
+	if not apply_webview_mutation(function()
+		wv:allowGestures(opts.allow_gestures == true)
+	end) then return nil end
+	if opts.allow_new_windows ~= nil and not apply_webview_mutation(function()
+		wv:allowNewWindows(opts.allow_new_windows)
+	end) then return nil end
 
 	-- Bind closing cleanup callback
 	if type(opts.on_close) == "function" then
-		pcall(function()
+		if not apply_webview_mutation(function()
 			wv:windowCallback(function(action)
 				if action == "closing" or action == "closed" then opts.on_close() end
 			end)
-		end)
+		end) then return nil end
 	end
 
 	-- Bind navigation callback; also inject i18n strings after every navigation
 	-- as a fallback for webviews where i18n.js fetch() cannot reach file:// URLs.
 	local caller_nav = opts.on_navigation
-	pcall(function()
+	if not apply_webview_mutation(function()
 		wv:navigationCallback(function(action, wv2, nav)
+			if not webview_current() then return false end
 			-- Forward to the caller's own handler first
 			local result = true
 			if type(caller_nav) == "function" then
@@ -387,8 +473,8 @@ function M.show_webview(opts)
 			-- data-i18n elements are populated even when fetch() fails (inline HTML,
 			-- about:blank origin, no file:// CORS access).
 			if action == "didFinishNavigation" and opts.inject_i18n ~= false then
-				hs.timer.doAfter(0.08, function()
-					if not wv or not wv2 then return end
+				schedule_webview_timer(0.08, function()
+					if not wv or not wv2 or not webview_current() then return end
 					local ok_mod, locale_mod = pcall(require, "infra.locale")
 					if not ok_mod or not locale_mod then return end
 					local all_strings = locale_mod.all()
@@ -400,20 +486,21 @@ function M.show_webview(opts)
 							"if(window.i18n_apply){window.i18n_apply(" .. json .. ");}"
 						)
 					end)
-				end)
+				end, "webview i18n injection")
 			end
 			return result
 		end)
-	end)
+	end) then return nil end
 
 	-- Inject HTML assets — prefer a pre-built html_string when provided so
 	-- callers that need to patch the HTML before loading (e.g. injecting a
 	-- config <script> block) can do so without duplicating the inlining logic.
 	if type(opts.html_string) == "string" and opts.html_string ~= "" then
-		pcall(function() wv:html(opts.html_string) end)
+		if not apply_webview_mutation(function() wv:html(opts.html_string) end) then return nil end
 	elseif type(opts.assets_dir) == "string" then
 		local final_html = M.build_injected_html(opts.assets_dir)
-		pcall(function() wv:html(final_html) end)
+		if not webview_current() then return nil end
+		if not apply_webview_mutation(function() wv:html(final_html) end) then return nil end
 	end
 
 	-- wv:html() loads content but does not show the window — explicit show() required.
@@ -421,8 +508,13 @@ function M.show_webview(opts)
 	-- and goes straight to the 50 ms delayed bringToFront + focus. This means every
 	-- UI opened through this factory automatically comes to the foreground and receives
 	-- keyboard focus without each caller having to remember to call it.
-	pcall(function() wv:show() end)
-	M.force_focus(wv, true)
+	if not apply_webview_mutation(function() wv:show() end) then return nil end
+	local focused = M.force_focus(wv, true, {
+		schedule_after = opts.schedule_after,
+		is_current = opts.is_current,
+	})
+	if strict_lifecycle and focused ~= true then return nil end
+	if not webview_current() then return nil end
 	Logger.info(LOG, "Webview window created successfully.")
 	return wv
 end

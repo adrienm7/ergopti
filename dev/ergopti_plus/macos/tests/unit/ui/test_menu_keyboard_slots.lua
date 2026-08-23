@@ -263,4 +263,24 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		end
 		helpers.assert_eq(still_listed, false, "and the row must disappear from the group")
 	end)
+
+	helpers.it("does not refresh the menu when the shortcut transaction refuses", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx, updates = make_ctx()
+		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local slot = group.prefix .. "m"
+		local original_set = shortcuts.set_keyboard_action
+		shortcuts.set_keyboard_action = function() return false end
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			rows[1].items[#rows[1].items].action()
+			picker.opened[1].confirm(slot)
+			picker.opened[2].confirm("copy_selection")
+			helpers.assert_eq(updates.count, 0,
+				"a refused native/persistence transaction must not publish a success refresh")
+		end, debug.traceback)
+		shortcuts.set_keyboard_action = original_set
+		if not ok then error(err, 0) end
+	end)
 end)

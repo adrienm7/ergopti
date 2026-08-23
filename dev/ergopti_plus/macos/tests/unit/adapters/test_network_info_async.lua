@@ -102,7 +102,10 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 			task = {
 				new = function(_executable, cb, _args)
 					return {
-						start = function() if cb then cb(exit_code, stdout, "") end end,
+						start = function()
+							if cb then cb(exit_code, stdout, "") end
+							return true
+						end,
 						isRunning = function() return false end,
 						terminate = function() end,
 					}

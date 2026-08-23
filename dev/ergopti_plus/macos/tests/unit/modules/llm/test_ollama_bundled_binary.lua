@@ -90,6 +90,7 @@ helpers.describe("bundled Ollama executable contract", function()
 		local original_spawn = shell_runner.spawn
 		local original_after = scheduler.after
 		local kill_done
+		local launch_server
 		local serve_command
 		resolver_hs.fs.attributes = function(path, ...)
 			if path == FIXTURE_BIN then
@@ -114,14 +115,20 @@ helpers.describe("bundled Ollama executable contract", function()
 			return { start = function() return true end, terminate = function() return true end }
 		end
 		scheduler.after = function(_, callback)
-			callback()
-			return { timer = {} }, true
+			local handle = { timer = {} }
+			launch_server = function()
+				handle.timer = nil
+				callback()
+			end
+			return handle, true
 		end
 
 		local ok, err = pcall(function()
 			helpers.assert_eq(ApiOllama.ensure_running(), true)
 			helpers.assert_eq(type(kill_done), "function")
 			kill_done()
+			helpers.assert_eq(type(launch_server), "function")
+			launch_server()
 			helpers.assert_true(type(serve_command) == "string"
 				and serve_command:find(FIXTURE_BIN, 1, true) ~= nil,
 				"the API server command must use the exact launcher-exported executable")
@@ -142,7 +149,9 @@ helpers.describe("bundled Ollama executable contract", function()
 
 	helpers.it("uses the exported path for both menu server and CLI tasks", function()
 		local restore_environment = override_environment()
-		local function hs_overrides(server_ready, commands, task_bins)
+		local previous_shell_runner = package.loaded["adapters.shell_runner"]
+		local previous_timer_scheduler = package.loaded["adapters.timer_scheduler"]
+		local function hs_overrides(task_bins)
 			return {
 				fs = { attributes = function(path)
 					if path == FIXTURE_BIN then
@@ -150,13 +159,7 @@ helpers.describe("bundled Ollama executable contract", function()
 					end
 					return nil
 				end },
-				execute = function(command)
-					commands[#commands + 1] = command
-					if command:find("curl", 1, true) then
-						return server_ready and '{"version":"fixture"}' or "", true
-					end
-					return "", true
-				end,
+				execute = function() error("menu Ollama work must not use hs.execute") end,
 				task = { new = function(bin, _done, _stream, _args)
 					task_bins[#task_bins + 1] = bin
 					local task = {}
@@ -166,23 +169,47 @@ helpers.describe("bundled Ollama executable contract", function()
 				timer = { doAfter = function() return { stop = function() end } end },
 			}
 		end
+		local function install_async_ports(server_ready, commands)
+			package.loaded["adapters.shell_runner"] = {
+				spawn = function(program, args, on_done)
+					local command = {program = program, args = args, on_done = on_done}
+					commands[#commands + 1] = command
+					return {
+						start = function()
+							if program == "/usr/bin/curl" then
+								on_done(server_ready and 0 or 28,
+									server_ready and '{"version":"fixture"}' or "", "")
+							end
+							return true
+						end,
+						terminate = function() return true, "pending" end,
+					}
+				end,
+			}
+			package.loaded["adapters.timer_scheduler"] = {
+				after = function() error("this fixture must not advance past daemon launch") end,
+				cancel = function() return true end,
+			}
+		end
 
 		local commands, task_bins = {}, {}
 		package.loaded["modules.llm.ollama_binary"] = nil
 		package.loaded["adapters.task_lifecycle"] = nil
+		install_async_ports(false, commands)
 		local Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama",
-			hs_overrides(false, commands, task_bins))
+			hs_overrides(task_bins))
 		local manager = Manager.new({}, {}, function() return 0 end)
 		manager.check_requirements("test-model", function() end, function() end)
 		local daemon_command
 		for _, command in ipairs(commands) do
-			if command:find("nohup", 1, true) then daemon_command = command; break end
+			if command.program == "/bin/bash" then daemon_command = command.args[2]; break end
 		end
 
 		package.loaded["modules.llm.ollama_binary"] = nil
 		package.loaded["adapters.task_lifecycle"] = nil
+		install_async_ports(true, commands)
 		Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama",
-			hs_overrides(true, commands, task_bins))
+			hs_overrides(task_bins))
 		manager = Manager.new({}, {}, function() return 0 end)
 		manager.check_requirements("test-model", function() end, function() end)
 
@@ -195,13 +222,16 @@ helpers.describe("bundled Ollama executable contract", function()
 		end)
 
 		restore_environment()
+		package.loaded["adapters.shell_runner"] = previous_shell_runner
+		package.loaded["adapters.timer_scheduler"] = previous_timer_scheduler
 		if not ok then error(err) end
 	end)
 
-	helpers.it("passes the exported executable through the bootstrap boundary", function()
+	helpers.it("passes only the exported executable through the install boundary", function()
 		local restore_environment = override_environment()
 		local Logger = require("infra.logger")
 		local previous_progress = package.loaded["ui.download_window"]
+		local previous_api = package.loaded["modules.llm.api_ollama"]
 		local task_args
 		local task_done
 		package.loaded["ui.download_window"] = {
@@ -211,6 +241,9 @@ helpers.describe("bundled Ollama executable contract", function()
 			append_log = function() end, hide = function() end,
 		}
 		package.loaded["modules.llm.ollama_binary"] = nil
+		package.loaded["modules.llm.api_ollama"] = {
+			ensure_running = function() return true end,
+		}
 		package.loaded["adapters.task_lifecycle"] = nil
 		local Checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 			fs = { attributes = function(path, attribute)
@@ -237,14 +270,16 @@ helpers.describe("bundled Ollama executable contract", function()
 		local ok, err = pcall(function()
 			Checker.check_and_install_deps()
 			helpers.assert_true(type(task_args) == "table")
-			helpers.assert_true(task_args[2]:find(FIXTURE_BIN, 1, true) ~= nil,
-				"the bootstrap server pipeline must use the exported executable")
-			helpers.assert_eq(task_args[3], FIXTURE_BIN,
+			helpers.assert_eq(task_args[3], "/bin/bash")
+			helpers.assert_eq(task_args[5], FIXTURE_BIN,
 				"the bootstrap shell must receive the pre-provisioned executable")
+			helpers.assert_nil(task_args[6],
+				"daemon command ownership must not cross into the install script")
 		end)
 
 		if type(task_done) == "function" then task_done(0, "", "") end
 		package.loaded["ui.download_window"] = previous_progress
+		package.loaded["modules.llm.api_ollama"] = previous_api
 		restore_environment()
 		if not ok then error(err) end
 	end)

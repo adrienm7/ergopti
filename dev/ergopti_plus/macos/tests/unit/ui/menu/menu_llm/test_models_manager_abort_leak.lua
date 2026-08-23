@@ -1,47 +1,132 @@
 --- tests/unit/ui/menu/menu_llm/test_models_manager_abort_leak.lua
 
---- Regression test for ui-menu-llm-models-1: when the user aborts a download
---- and then launches a new one, the stale download_aborted flag was not cleared,
---- silently making all update_icon() calls in the new download no-ops (the
---- menubar remained frozen in the aborted state).
----
---- Fix: clear_download_abort() is called before do_download() inside
---- shared_system_check so every new download starts with a clean abort state.
+--- ==============================================================================
+--- MODULE: Models Manager Download-Abort Reset Regression
+--- DESCRIPTION:
+--- Drives the real shared hardware-check continuation after an earlier abort.
+--- The new download must clear the sticky abort state before its first icon
+--- publication; source ordering alone cannot prove that runtime behavior.
+--- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Selected by a declaration unique to ui/menu/menu_llm/models_manager.lua rather than by
--- path, so moving or splitting the module cannot turn this invariant
--- into a path error.
-local src = helpers.read_driver_source("local function get_actual_model_name")
-helpers.assert_true(src ~= nil, "ui/menu/menu_llm/models_manager.lua source must be locatable")
 
--- Test 1: clear_download_abort is called before the contextual do_download
--- callback dispatch in the shared_system_check download path.
--- We detect this by asserting that clear_download_abort appears somewhere
--- BEFORE the uniquely labelled callback boundary in the source.
-local clear_pos = src:find("clear_download_abort", 1, true)
-local do_pos    = src:find('"Approved model download", do_download', 1, true)
 
-helpers.assert_true(
-	clear_pos ~= nil,
-	"models_manager.lua must reference clear_download_abort (ui-menu-llm-models-1)"
-)
-helpers.assert_true(
-	do_pos ~= nil,
-	"models_manager.lua must dispatch do_download through the contextual callback boundary"
-)
-helpers.assert_true(
-	clear_pos < do_pos,
-	"clear_download_abort must appear before the do_download dispatch in models_manager.lua"
-		.. " (pre-fix: stale abort flag not cleared before new download)"
-)
 
--- Test 2: the pattern is a guarded call (type-check before pcall), not bare.
-local guarded = src:find('type(deps.clear_download_abort) == "function"', 1, true) ~= nil
-helpers.assert_true(
-	guarded,
-	"models_manager.lua must guard clear_download_abort with a type-check (ui-menu-llm-models-1)"
-)
 
-print("[PASS] test_models_manager_abort_leak")
+-- ===================================
+-- ===================================
+-- ======= 1/ Behavioral Repro =======
+-- ===================================
+-- ===================================
+
+helpers.describe("models manager: aborted downloads are reset before retry", function()
+	helpers.it("(models-manager-abort-leak) clears abort before invoking the approved download", function()
+		local modules = {
+			"hs", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
+			"infra.dialog_util", "infra.paths",
+			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
+			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
+		}
+		local saved_hs = _G.hs
+		local timers = {}
+		local function new_timer(callback)
+			local timer = { callback = callback, running_state = false }
+			function timer:start()
+				self.running_state = true
+				return self
+			end
+			function timer:stop()
+				self.running_state = false
+				return self
+			end
+			function timer:running() return self.running_state end
+			function timer:fire() return self.callback() end
+			timers[#timers + 1] = timer
+			return timer
+		end
+		local hs_fixture = {
+			execute = function(command)
+				if command:find("memsize", 1, true) then
+					return tostring(16 * 1024 * 1024 * 1024)
+				end
+				return "100"
+			end,
+			json = {decode = function()
+				return {{families = {{models = {{name = "A", urls = {ollama = "A"}}}}}}}
+			end},
+			timer = {
+				doAfter = function(_, callback)
+					return new_timer(callback):start()
+				end,
+				new = function(_, callback) return new_timer(callback) end,
+			},
+		}
+		local outcome = table.pack(xpcall(function()
+			helpers.with_fresh_modules(modules, function()
+				_G.hs = hs_fixture
+				package.loaded["hs"] = hs_fixture
+				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["infra.i18n"] = {get = function(key) return key end}
+				package.loaded["infra.dialog_util"] = {
+					block_alert = function() return "menu.llm.btn_download" end,
+				}
+				package.loaded["infra.paths"] = {
+					shared_llm_path = function()
+						return helpers.shared("modules/llm/models.json")
+					end,
+				}
+				package.loaded["modules.llm"] = {get_backend = function() return "ollama" end}
+				package.loaded["ui.menu.menu_llm.models_manager_ollama"] = {
+					new = function() return {} end,
+				}
+				package.loaded["ui.menu.menu_llm.models_manager_mlx"] = {
+					new = function() return {} end,
+				}
+
+				local events = {}
+				local deps = {
+					update_icon = function(label)
+						events[#events + 1] = "icon:" .. tostring(label)
+						return true
+					end,
+					reset_menubar = function() return true end,
+				}
+				require("ui.menu.menu_llm.models_manager").new(deps)
+				deps.mark_download_aborted()
+				events = {}
+
+				local clear_download_abort = deps.clear_download_abort
+				deps.clear_download_abort = function()
+					events[#events + 1] = "clear"
+					return clear_download_abort()
+				end
+				local requirements = {}
+				local requirement_lifecycle = {
+					adopt = function(child, pause_join)
+						requirements[child] = pause_join
+						return true
+					end,
+					settle = function(child)
+						if requirements[child] == nil then return false end
+						requirements[child] = nil
+						return true
+					end,
+				}
+				deps.shared_system_check("A", "Ollama", "A", function()
+					events[#events + 1] = "download"
+					deps.update_icon("first-progress")
+					return true
+				end, nil, { _requirement_lifecycle = requirement_lifecycle })
+
+				helpers.assert_eq(#timers, 1)
+				timers[1]:fire()
+				helpers.assert_eq(events, {
+					"clear", "download", "icon:first-progress",
+				}, "abort reset must commit before the approved download can publish progress")
+			end)
+		end, debug.traceback))
+		_G.hs = saved_hs
+		if not outcome[1] then error(outcome[2], 0) end
+	end)
+end)

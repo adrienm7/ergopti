@@ -41,18 +41,34 @@ local helpers = require("tests.helpers")
 --- @param paused boolean What script_control.is_paused() reports.
 --- @return table engine, table calls
 local function load_engine(paused)
-	local calls = { mlx_stop = 0, ollama_stop = 0, mlx_resume = 0, scheduled = 0 }
+	local calls = {
+		mlx_stop = 0,
+		ollama_stop = 0,
+		remote_stop = 0,
+		mlx_resume = 0,
+		scheduled = 0,
+	}
 
 	package.loaded["modules.llm.api_mlx"] = {
-		stop_warmup   = function() calls.mlx_stop   = calls.mlx_stop   + 1 end,
-		resume_warmup = function() calls.mlx_resume = calls.mlx_resume + 1 end,
+		stop_warmup   = function() calls.mlx_stop   = calls.mlx_stop   + 1; return true end,
+		resume_warmup = function() calls.mlx_resume = calls.mlx_resume + 1; return true end,
+		cancel_streaming = function() return true end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {
-		stop_warmup = function() calls.ollama_stop = calls.ollama_stop + 1 end,
+		stop_warmup = function() calls.ollama_stop = calls.ollama_stop + 1; return true end,
+		cancel_streaming = function() return true end,
+	}
+	package.loaded["modules.llm.api_remote"] = {
+		stop_warmup = function() calls.remote_stop = calls.remote_stop + 1; return true end,
+		cancel_streaming = function() return true end,
+	}
+	package.loaded["modules.llm.streaming_handler"] = {
+		reset_failure_count = function() end,
+		stop_watchdog = function() return true end,
 	}
 	package.loaded["modules.llm.warmup_controller"] = {
-		stop = function() end,
-		schedule_warmup_with_retry = function() calls.scheduled = calls.scheduled + 1 end,
+		stop = function() return true end,
+		schedule_warmup_with_retry = function() calls.scheduled = calls.scheduled + 1; return true end,
 	}
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return paused end,
@@ -75,13 +91,16 @@ helpers.describe("disabling AI stops warmup on every backend", function()
 	helpers.it("stops the Ollama warmup as well as the MLX one", function()
 		local Engine, calls = load_engine(false)
 
-		Engine.set_llm_enabled(false)
+		helpers.assert_true(Engine.set_llm_enabled(false),
+			"the full disable transaction must commit before its warmup calls are evidence")
 
 		helpers.assert_true(calls.mlx_stop >= 1, "the MLX warmup must still be stopped")
 		helpers.assert_true(calls.ollama_stop >= 1,
 			"the Ollama warmup must be stopped too — its POST triggers the model load and "
 			.. "can stay in flight for tens of seconds, so the response lands after the gate "
 			.. "closed and fires the 'server ready' notification while AI is off")
+		helpers.assert_true(calls.remote_stop >= 1,
+			"the Remote warmup/token-resolution owner must be stopped too")
 	end)
 end)
 
@@ -89,7 +108,7 @@ helpers.describe("enabling AI does not revive warmup during a pause", function()
 	helpers.it("parks the warmup when the script is paused", function()
 		local Engine, calls = load_engine(true)
 
-		Engine.set_llm_enabled(true)
+		helpers.assert_true(Engine.set_llm_enabled(true))
 
 		helpers.assert_eq(calls.mlx_resume, 0,
 			"set_llm_enabled(true) must not clear _warmup_stopped mid-pause: that flag is "
@@ -104,7 +123,7 @@ helpers.describe("enabling AI does not revive warmup during a pause", function()
 		-- up from the menu toggle at all.
 		local Engine, calls = load_engine(false)
 
-		Engine.set_llm_enabled(true)
+		helpers.assert_true(Engine.set_llm_enabled(true))
 
 		helpers.assert_true(calls.mlx_resume >= 1,
 			"outside a pause, enabling AI must still clear the stop flag")

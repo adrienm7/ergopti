@@ -142,6 +142,22 @@ function M.load_with_stubs(module_name, hs_overrides)
 	if module_name == "modules.keymap.expander" then
 		package.loaded["modules.keymap.terminator_replay"] = nil
 	end
+	-- The system-action facade now exposes three stateful child owners. Reloading
+	-- only the facade would retain their pause claims, exact native debt, and the
+	-- previous test's native contracts as an impossible fresh-parent/stale-child
+	-- composition.
+	if module_name == "modules.shortcuts.actions.system" then
+		package.loaded["modules.shortcuts.actions.system_pixel"] = nil
+		package.loaded["modules.shortcuts.actions.system_mouse"] = nil
+		package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
+	end
+	-- Dependency checkers and their backend-local pause controller form one
+	-- stateful ownership unit. A fresh checker must never inherit the previous
+	-- fixture's registered owner, epoch token, or resume-stage timer.
+	if module_name == "modules.llm.mlx_deps_checker"
+		or module_name == "modules.llm.ollama_deps_checker" then
+		package.loaded["modules.llm.dependency_bootstrap_pause_owner"] = nil
+	end
 	package.loaded["hs"] = nil
 	-- Force a fresh stub table each call so overrides from one test never leak
 	-- into the next. Modules that override hs.execute or hs.timer with a partial

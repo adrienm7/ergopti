@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Locks down the menu handler that lets the user move Ergopti's MLX server off the
 --- dedicated default port. set_mlx_port() prompts, validates against api_mlx's port
---- bounds, applies via api_mlx.set_port (which persists to hs.settings + rebuilds the
---- server URL), and only then fires on_applied (the server relaunch). reset_mlx_port()
+--- bounds, lets on_applied join the exact server-stop transaction, then applies via
+--- api_mlx.set_port (which persists to hs.settings + rebuilds the server URL).
+--- reset_mlx_port()
 --- restores the dedicated default. The contract under test:
 ---   * a valid port is applied AND on_applied fires;
 ---   * an out-of-range port is rejected — no change, no relaunch;
@@ -97,7 +98,35 @@ helpers.describe("settings_manager — MLX port configuration", function()
 		helpers.assert_true(applied, "on_applied must fire after reset")
 	end)
 
-	helpers.it("refreshes the menu after a throwing apply callback and returns false (HS-016)", function()
+	helpers.it("defers port publication until the exact stop callback commits (HS-008)", function()
+		ApiMlx.set_port(ApiMlx.get_default_port())
+		prompt_value[1] = "54321"
+		local pending_commit
+		local result = make_settings().set_mlx_port(function(new_port, commit_port)
+			helpers.assert_eq(new_port, 54321)
+			pending_commit = commit_port
+			return true
+		end)
+		helpers.assert_eq(result, true)
+		helpers.assert_eq(ApiMlx.get_port(), ApiMlx.get_default_port(),
+			"signal acceptance cannot publish the successor port")
+		helpers.assert_eq(type(pending_commit), "function")
+		helpers.assert_eq(pending_commit(), true)
+		helpers.assert_eq(ApiMlx.get_port(), 54321)
+	end)
+
+	helpers.it("keeps the old port when the stop gate refuses (HS-008)", function()
+		ApiMlx.set_port(ApiMlx.get_default_port())
+		prompt_value[1] = "54321"
+		local refreshes = 0
+		local settings = make_settings(function() refreshes = refreshes + 1 end)
+		local result = settings.set_mlx_port(function() return false end)
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(ApiMlx.get_port(), ApiMlx.get_default_port())
+		helpers.assert_eq(refreshes, 0)
+	end)
+
+	helpers.it("keeps the old port after a throwing stop gate and returns false (HS-008)", function()
 		local Logger = require("infra.logger")
 		Logger.ring_buffer_clear()
 		ApiMlx.set_port(ApiMlx.get_default_port())
@@ -117,8 +146,9 @@ helpers.describe("settings_manager — MLX port configuration", function()
 
 		helpers.assert_eq(result, false,
 			"a thrown apply callback cannot publish a successful settings action")
-		helpers.assert_eq(refreshes, 1,
-			"menu refresh is finally-style cleanup after the port itself committed")
+		helpers.assert_eq(ApiMlx.get_port(), ApiMlx.get_default_port(),
+			"a throwing stop gate cannot publish the candidate port")
+		helpers.assert_eq(refreshes, 0)
 		helpers.assert_eq(matching, 1)
 	end)
 end)

@@ -19,6 +19,8 @@ local helpers = require("tests.helpers")
 
 local function load_fixture(cancel_result)
 	helpers.load_with_stubs("infra.logger")
+	local hs_stub = _G.hs
+	package.loaded["adapters.timer_scheduler"] = nil
 	local cancel_calls = 0
 	local core = {
 		DEFAULT_STATE = {
@@ -84,7 +86,7 @@ local function load_fixture(cancel_result)
 	local engine = require("modules.llm.prediction_engine")
 	engine.init({ buffer = "", mappings = {}, DELAYS = { llm_prediction = 0 } })
 	engine.set_llm_streaming(false)
-	return engine, function() return cancel_calls end
+	return engine, function() return cancel_calls end, hs_stub
 end
 
 local function find_upvalue(fn, target)
@@ -130,75 +132,202 @@ helpers.describe("prediction_engine.reset() quiesces stream + deferred state", f
 		end)
 	end
 
-	helpers.it("retains a no-op inactivity timer stop as retryable reset state", function()
-		local engine = load_fixture()
-		local _, stop_timer = find_upvalue(engine.reset, "stop_inactivity_timer")
-		helpers.assert_eq(type(stop_timer), "function",
-			"the negative control must reach the real timer teardown helper")
-		local timer_index = find_upvalue(stop_timer, "_inactivity_timer")
-		helpers.assert_not_nil(timer_index)
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains a " .. mode
+			.. " inactivity timer stop as retryable reset state", function()
+			local engine, _, hs_stub = load_fixture()
+			engine.set_llm_enabled(true)
+			local calls = 0
+			local real_perform = engine.perform_check
+			engine.perform_check = function() calls = calls + 1 end
+			local original_new = hs_stub.timer.new
+			local stop_calls = 0
+			local allow_stop = false
+			local live = false
+			local timer, native_callback
+			hs_stub.timer.new = function(delay, callback)
+				native_callback = callback
+				timer = {
+					delay = delay,
+					start = function(self)
+						live = true
+						return self
+					end,
+					running = function() return live end,
+				}
+				timer.stop = function(self)
+					stop_calls = stop_calls + 1
+					if allow_stop then live = false; return self end
+					if mode == "throw" then error("INACTIVITY_STOP_THROW") end
+					if mode == "nil" then return nil end
+					return false
+				end
+				return timer
+			end
+			helpers.assert_eq(engine.start_timer(), true)
+			hs_stub.timer.new = original_new
 
-		local running = true
-		local stop_calls = 0
-		local timer = {
-			stop = function()
-				stop_calls = stop_calls + 1
-				if stop_calls > 1 then running = false end
-			end,
-			running = function() return running end,
-		}
-		debug.setupvalue(stop_timer, timer_index, timer)
+			helpers.assert_eq(engine.reset(), false,
+				"reset cannot commit while its debounce callback remains armed")
+			helpers.assert_eq(timer:running(), true)
+			helpers.assert_eq(stop_calls, 1)
+			native_callback()
+			helpers.assert_eq(calls, 0,
+				"delivery while cleanup is refused must only retry the exact stop")
+			helpers.assert_eq(stop_calls, 2)
+			helpers.assert_eq(timer:running(), true)
+			allow_stop = true
+			helpers.assert_eq(engine.reset(), true,
+				"the exact retained timer must be retried by the next reset")
+			helpers.assert_eq(timer:running(), false)
+			helpers.assert_eq(stop_calls, 3)
+			native_callback()
+			native_callback()
+			helpers.assert_eq(calls, 0,
+				"late and duplicate delivery after exact settlement must stay inert")
+			helpers.assert_eq(stop_calls, 3,
+				"late delivery may not reacquire or recancel the settled capability")
+			engine.perform_check = real_perform
+		end)
+	end
 
-		helpers.assert_eq(engine.reset(), false,
-			"reset cannot commit while its debounce callback remains armed")
-		helpers.assert_eq(running, true)
-		helpers.assert_eq(engine.reset(), true,
-			"the canonical retained timer must be retried by the next reset")
-		helpers.assert_eq(running, false)
-		helpers.assert_eq(stop_calls, 2)
-	end)
-
-	helpers.it("rejects and retries a no-op inactivity timer start", function()
-		local engine = load_fixture()
+	helpers.it("rejects a false inactivity start and acquires one distinct retry", function()
+		local engine, _, hs_stub = load_fixture()
 		engine.set_llm_enabled(true)
-		local _, start_timer = find_upvalue(engine.start_timer, "start_inactivity_timer")
-		helpers.assert_eq(type(start_timer), "function")
-		local timer_index = find_upvalue(start_timer, "_inactivity_timer")
-		helpers.assert_not_nil(timer_index)
-
-		local running = false
-		local start_calls = 0
-		local timer = {
-			start = function()
-				start_calls = start_calls + 1
-				if start_calls > 1 then running = true end
-			end,
-			stop = function() running = false end,
-			running = function() return running end,
-		}
-		debug.setupvalue(start_timer, timer_index, timer)
+		local original_new = hs_stub.timer.new
+		local timers = {}
+		hs_stub.timer.new = function(delay, callback)
+			local timer = original_new(delay, callback)
+			timers[#timers + 1] = timer
+			if #timers == 1 then
+				timer.start = function(self)
+					self.running = false
+					return false
+				end
+			end
+			return timer
+		end
 
 		helpers.assert_eq(engine.start_timer(), false,
 			"a returned start call is not ownership while native state stays stopped")
 		helpers.assert_eq(engine.start_timer_word_end(), true,
-			"the canonical handle must remain available for the next retry")
-		helpers.assert_eq(running, true)
-		helpers.assert_eq(start_calls, 2)
+			"a later retry must acquire one distinct exact timer")
+		hs_stub.timer.new = original_new
+		helpers.assert_eq(#timers, 2)
+		helpers.assert_true(timers[1] ~= timers[2])
+		helpers.assert_eq(timers[2].running, true)
 	end)
 
-	helpers.it("contains a throwing inactivity timer start", function()
-		local engine = load_fixture()
+	helpers.it("contains and fences a mutate-then-throw inactivity start", function()
+		local engine, _, hs_stub = load_fixture()
 		engine.set_llm_enabled(true)
-		local _, start_timer = find_upvalue(engine.start_timer, "start_inactivity_timer")
-		local timer_index = find_upvalue(start_timer, "_inactivity_timer")
-		debug.setupvalue(start_timer, timer_index, {
-			start = function() error("START_THROW") end,
-			stop = function() end,
-			running = function() return false end,
-		})
+		local calls = 0
+		local real_perform = engine.perform_check
+		engine.perform_check = function() calls = calls + 1 end
+		local original_new = hs_stub.timer.new
+		local callback
+		hs_stub.timer.new = function(delay, cb)
+			callback = cb
+			local timer = original_new(delay, cb)
+			local start = timer.start
+			timer.start = function(self)
+				start(self)
+				error("START_MUTATE_THROW")
+			end
+			return timer
+		end
 
 		local ok, result = pcall(engine.start_timer)
+		hs_stub.timer.new = original_new
 		helpers.assert_true(ok, "timer start failure must not escape into an eventtap")
 		helpers.assert_eq(result, false)
+		callback()
+		callback()
+		helpers.assert_eq(calls, 0,
+			"late and duplicate delivery from a rejected start must stay inert")
+		engine.perform_check = real_perform
+	end)
+
+	helpers.it("rejects synchronous inactivity delivery before start commit", function()
+		local engine, _, hs_stub = load_fixture()
+		engine.set_llm_enabled(true)
+		local calls = 0
+		local real_perform = engine.perform_check
+		engine.perform_check = function() calls = calls + 1 end
+		local original_new = hs_stub.timer.new
+		hs_stub.timer.new = function(delay, callback)
+			local timer = original_new(delay, callback)
+			local start = timer.start
+			timer.start = function(self)
+				start(self)
+				callback()
+				return self
+			end
+			return timer
+		end
+		helpers.assert_eq(engine.start_timer(), false)
+		hs_stub.timer.new = original_new
+		helpers.assert_eq(calls, 0,
+			"a callback delivered inside start may not perform prediction work")
+		engine.perform_check = real_perform
+	end)
+
+	helpers.it("does not let a stopped predecessor consume its successor arm", function()
+		local engine, _, hs_stub = load_fixture()
+		engine.set_llm_enabled(true)
+		local calls = 0
+		local real_perform = engine.perform_check
+		engine.perform_check = function() calls = calls + 1 end
+		local original_new = hs_stub.timer.new
+		local callbacks = {}
+		hs_stub.timer.new = function(delay, callback)
+			callbacks[#callbacks + 1] = callback
+			return original_new(delay, callback)
+		end
+
+		helpers.assert_eq(engine.start_timer(), true)
+		helpers.assert_eq(engine.stop_timer(), true)
+		helpers.assert_eq(engine.start_timer(), true)
+		hs_stub.timer.new = original_new
+		callbacks[1]()
+		callbacks[1]()
+		helpers.assert_eq(calls, 0,
+			"late and duplicate predecessor delivery must not borrow successor authority")
+		callbacks[2]()
+		callbacks[2]()
+		helpers.assert_eq(calls, 1,
+			"only the exact successor may perform one prediction check")
+		engine.perform_check = real_perform
+	end)
+
+	helpers.it("contains a debounce callback throw through the module logger", function()
+		local engine, _, hs_stub = load_fixture()
+		engine.set_llm_enabled(true)
+		local logger = package.loaded["infra.logger"]
+		local original_error = logger.error
+		local messages = {}
+		logger.error = function(_, fmt, ...)
+			local ok, message = pcall(string.format, tostring(fmt), ...)
+			messages[#messages + 1] = ok and message or tostring(fmt)
+		end
+		local real_perform = engine.perform_check
+		engine.perform_check = function() error("DEBOUNCE_CALLBACK_THROW") end
+		helpers.assert_eq(engine.start_timer(0.02), true)
+		local timer = hs_stub.timer.__timers[#hs_stub.timer.__timers]
+
+		timer:fire()
+
+		engine.perform_check = real_perform
+		logger.error = original_error
+		local found = false
+		for _, message in ipairs(messages) do
+			if message:find("Inactivity debounce check raised", 1, true)
+				and message:find("DEBOUNCE_CALLBACK_THROW", 1, true) then
+				found = true
+				break
+			end
+		end
+		helpers.assert_true(found,
+			"the production debounce boundary must report the contained exception")
 	end)
 end)

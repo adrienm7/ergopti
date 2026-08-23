@@ -38,19 +38,39 @@ local helpers = require("tests.helpers")
 --- times the hotkey factories were re-invoked.
 --- @return table bindings The loaded module.
 --- @return table spy Counters {stop_awake, factory_calls}.
-local function load_bindings_with_system_spy()
-	local spy = { stop_awake = 0, factory_calls = 0 }
+local function load_bindings_with_system_spy(options)
+	options = options or {}
+	local spy = { stop_awake = 0, pause_awake = 0, resume_awake = 0, factory_calls = 0 }
+	local mouse_paused = false
+	local pixel_paused = false
+	local screenshot_claims = {}
+	local bindings
+	local function controlled(mode)
+		if mode == "false" then return false end
+		if mode == "nil" then return nil end
+		if mode == "throw" then error("synthetic keep-awake lifecycle refusal") end
+		return true
+	end
 
 	--- Returns a fake hotkey object, counting the factory invocation. Every bind_*
 	--- factory shares this so "did the rebind actually re-create the hotkeys?" is a
 	--- single number rather than a per-shortcut assertion.
 	local function fake_factory()
 		spy.factory_calls = spy.factory_calls + 1
-		return { delete = function() end }
+		if options.reenter_factory == true and bindings then
+			options.reenter_factory = false
+			spy.reentrant_pause_result = bindings.pause()
+		end
+		return { delete = function() return true end }
 	end
 
 	package.loaded["modules.shortcuts.actions.system"] = {
-		stop_awake                 = function() spy.stop_awake = spy.stop_awake + 1 end,
+		stop_awake                 = function() spy.stop_awake = spy.stop_awake + 1; return true end,
+		pause_awake                = function() spy.pause_awake = spy.pause_awake + 1; return true end,
+		resume_awake               = function()
+			spy.resume_awake = spy.resume_awake + 1
+			return controlled(options.resume_awake_mode)
+		end,
 		bind_instant_screenshot    = fake_factory,
 		bind_layer_scroll          = fake_factory,
 		bind_wrap_text_if_selected = fake_factory,
@@ -66,12 +86,38 @@ local function load_bindings_with_system_spy()
 		open_emoji_picker     = function() end,
 		spotlight_mouse       = function() end,
 		teleport_mouse        = function() end,
+		pause_mouse_actions = function() mouse_paused = true; return true end,
+		resume_mouse_actions = function() mouse_paused = false; return true end,
+		stop_mouse_actions = function() mouse_paused = true; return true end,
+		is_mouse_actions_paused = function() return mouse_paused end,
+		has_pending_mouse_action = function() return false end,
+		pause_pixel_actions = function() pixel_paused = true; return true end,
+		resume_pixel_actions = function() pixel_paused = false; return true end,
+		stop_pixel_actions = function() pixel_paused = true; return true end,
+		is_pixel_actions_paused = function() return pixel_paused end,
+		has_pending_pixel_action = function() return false end,
+		pause_screenshot_actions = function(parent)
+			screenshot_claims[parent] = true
+			return true
+		end,
+		resume_screenshot_actions = function(parent)
+			screenshot_claims[parent] = nil
+			return true
+		end,
+		stop_screenshot_actions = function(parent)
+			screenshot_claims[parent] = true
+			return true
+		end,
+		has_screenshot_pause_claim = function(parent)
+			return screenshot_claims[parent] == true
+		end,
+		has_pending_screenshot_action = function() return false end,
 	}
 
 	package.loaded["modules.shortcuts.bindings"] = nil
-	local bindings = helpers.load_with_stubs("modules.shortcuts.bindings", {
+	bindings = helpers.load_with_stubs("modules.shortcuts.bindings", {
 		hotkey = {
-			bind = function() return { delete = function() end } end,
+			bind = function() return { delete = function() return true end } end,
 		},
 	})
 	return bindings, spy
@@ -132,6 +178,46 @@ helpers.describe("shortcuts.bindings.rebind: keep-awake survives a layout re-arm
 		helpers.assert_eq(spy.stop_awake, 0, "rebind must never touch keep-awake")
 		helpers.assert_eq(bindings.is_started(), false, "rebind must not start a stopped layer")
 	end)
+
+	helpers.it("restores keep-awake when PAUSE re-enters the transient stopped rebind state", function()
+		local options = {}
+		local bindings, spy = load_bindings_with_system_spy(options)
+		helpers.assert_eq(bindings.start(), true)
+		options.reenter_factory = true
+
+		helpers.assert_eq(bindings.rebind(), false)
+		helpers.assert_eq(spy.reentrant_pause_result, false,
+			"PAUSE cannot settle while a native rebind factory is still on-stack")
+		helpers.assert_eq(spy.pause_awake, 1)
+		helpers.assert_eq(bindings.has_pause_debt(), true)
+
+		helpers.assert_eq(bindings.resume_rebind_after_pause(), true)
+		helpers.assert_eq(spy.resume_awake, 1,
+			"the ON snapshot preceding started=false must restore keep-awake exactly")
+		helpers.assert_eq(bindings.is_started(), true)
+		helpers.assert_eq(bindings.has_pause_debt(), false)
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains the rebind snapshot when keep-awake resume returns " .. mode,
+			function()
+				local options = {}
+				local bindings, spy = load_bindings_with_system_spy(options)
+				helpers.assert_eq(bindings.start(), true)
+				options.reenter_factory = true
+				helpers.assert_eq(bindings.rebind(), false)
+				options.resume_awake_mode = mode
+				helpers.assert_eq(bindings.resume_rebind_after_pause(), false)
+				helpers.assert_eq(bindings.is_started(), false)
+				helpers.assert_eq(bindings.has_pause_debt(), true)
+				options.resume_awake_mode = nil
+				helpers.assert_eq(bindings.resume_rebind_after_pause(), true)
+				helpers.assert_eq(bindings.is_started(), true)
+				helpers.assert_eq(bindings.has_pause_debt(), false)
+				helpers.assert_eq(spy.resume_awake, 2,
+					"only the same retained snapshot retries keep-awake restoration")
+			end)
+	end
 end)
 
 

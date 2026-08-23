@@ -272,6 +272,7 @@ local function load_keylogger(options)
 				return timer_handle(delay, callback)
 			end,
 			doAfter = function(delay, callback) return timer_handle(delay, callback) end,
+			doEvery = function(delay, callback) return timer_handle(delay, callback):start() end,
 			delayed = {
 				new = function(delay, callback) return timer_handle(delay, callback) end,
 			},

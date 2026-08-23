@@ -8,8 +8,9 @@ The launcher's job is to:
 
 1. Set the embedded Hammerspoon's `MJConfigFile` so it loads our bundled Lua
    tree instead of `~/.hammerspoon/init.lua`.
-2. Spawn the embedded Hammerspoon as a child `Process`, forwarding lifecycle
-   events so quitting the launcher cleanly terminates Hammerspoon.
+2. Launch embedded Hammerspoon with `NSWorkspace` so AppKit receives a real
+   application context, forwarding lifecycle events so quitting either side
+   shuts down the other cleanly.
 3. Host [Sparkle](https://sparkle-project.org/) so the in-app updater can
    ship new releases via the configured appcast.
 
@@ -103,6 +104,9 @@ in source.
 ## Bundle id
 
 The embedded Hammerspoon's `CFBundleIdentifier` is rewritten to
-`com.ergoptiplus.app` at bundle-assembly time. This isolates its preferences
-from a stock Hammerspoon install the user may also be running, so the two
-never fight over `MJConfigDir`.
+`com.ergoptiplus.app.hammerspoon` at bundle-assembly time. This isolates its
+preferences from stock Hammerspoon and gives it a Launch Services identity
+distinct from the single-instance outer `com.ergoptiplus.app` bundle. Before
+spawning that GUI child, the launcher removes inherited `__CFBundleIdentifier`
+and `XPC_SERVICE_NAME` markers so AppKit and `NSUserDefaults` resolve the
+embedded bundle rather than the outer Launch Services identity.

@@ -8,6 +8,7 @@
 --- FEATURES & RATIONALE:
 --- 1. Subprocess Handling: Spawns the huggingface cli cleanly.
 --- 2. File Verification: Safely verifies tensors to guarantee cache integrity.
+--- 3. Exact Requirement Ownership: Joins native import probes before pause.
 --- ==============================================================================
 
 local M = {}
@@ -18,6 +19,7 @@ local fs_dir       = require("infra.fs_dir")
 local i18n = require("infra.i18n")
 local ApiCommon = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
 -- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
@@ -55,6 +57,19 @@ function M.new(deps, presets)
 	deps.active_tasks = deps.active_tasks or {}
 	obj._installed_cache = nil
 	obj._installed_cache_ts = 0
+	-- Import probes are independently owned from their caller continuations. A
+	-- caller generation fence prevents stale business work, but only this ledger
+	-- can prove the exact native task has completed before PAUSED is published
+	local requirement_tasks = {}
+	local requirement_registry = RequirementRegistry.new({
+		backend = "MLX",
+		require_owned = deps.script_control ~= nil,
+	})
+	local maintenance_capability = requirement_registry.create_owner(
+		"MLX model maintenance")
+	local maintenance_registration_required = type(deps.script_control) == "table"
+		and type(deps.script_control.register_pause_owner) == "function"
+	local maintenance_registered = maintenance_registration_required ~= true
 	-- Installed-models scan cache TTL. The HF hub directory only changes on a
 	-- download or delete (both invalidate the cache below), so the old 1 s TTL just
 	-- wasted ~70-120 ms re-scanning the cache on nearly every menu open. 30 s
@@ -104,7 +119,15 @@ function M.new(deps, presets)
 	-- prompt_hf_login, _process_hf_token) are attached onto obj here. They share only
 	-- obj/deps/presets, so they live in a sibling module to keep the catalogue/auth
 	-- logic out of the server-lifecycle and download code below.
-	require("ui.menu.menu_llm.models_manager_mlx_hf").install({ obj = obj, deps = deps, presets = presets })
+	local begin_maintenance
+	require("ui.menu.menu_llm.models_manager_mlx_hf").install({
+		obj = obj,
+		deps = deps,
+		presets = presets,
+		begin_direct_operation = function(label)
+			return begin_maintenance(label)
+		end,
+	})
 
 	function obj.get_installed_models()
 		local now = hs.timer.secondsSinceEpoch()
@@ -202,49 +225,231 @@ function M.new(deps, presets)
 	-- =====================================
 	-- =====================================
 
+	--- Releases one exact requirement-task owner after native completion.
+	--- @param owner table Requirement-task lifecycle owner.
+	--- @return boolean released True only for the first terminal delivery.
+	local function release_requirement_task(owner)
+		if type(owner) ~= "table" or owner.settled == true then return false end
+		owner.settled = true
+		local task = owner.task
+		if task ~= nil then
+			if requirement_tasks[task] == owner then requirement_tasks[task] = nil end
+			M._active_tasks[task] = nil
+		end
+		return true
+	end
+
+	--- Proves that a start-refused native task never became live. A false/nil/
+	--- throwing start is otherwise ambiguous because native state may have mutated
+	--- before the refusal crossed the Lua boundary.
+	--- @param task any Exact native task handle.
+	--- @param label string Diagnostic label.
+	--- @return boolean stopped Literal true only for an exact `isRunning()==false`.
+	local function requirement_task_proven_not_running(task, label)
+		local ok_method, method = xpcall(function()
+			return task and task.isRunning
+		end, debug.traceback)
+		if not ok_method or type(method) ~= "function" then return false end
+		local ok_running, running = xpcall(function()
+			return method(task)
+		end, debug.traceback)
+		if not ok_running then
+			Logger.error(LOG, "%s running-state probe raised: %s.",
+				tostring(label), tostring(running))
+		end
+		return ok_running == true and running == false
+	end
+
+	--- Revokes and signals one exact requirement task without treating SIGTERM
+	--- acceptance as exit settlement. False, nil, and throw retain the same handle
+	--- for retry; a successful signal remains pending until its callback arrives.
+	--- @param owner table Requirement-task lifecycle owner.
+	--- @param label string Stable diagnostic label.
+	--- @return boolean settled True only after exact native completion.
+	local function cancel_requirement_task(owner, label)
+		if type(owner) ~= "table" or owner.settled == true then return true end
+		owner.authorized = false
+		owner.cleanup = true
+		if owner.termination_accepted == true then return false end
+		local task = owner.task
+		local ok_method, terminate_method = xpcall(function()
+			return task and task.terminate
+		end, debug.traceback)
+		if not ok_method or type(terminate_method) ~= "function" then
+			Logger.error(LOG,
+				"%s cannot terminate the exact requirement task; owner retained.",
+				tostring(label))
+			return false
+		end
+		local ok_terminate, signal_or_error = xpcall(function()
+			return terminate_method(task)
+		end, debug.traceback)
+		if owner.settled == true then return true end
+		if not ok_terminate or signal_or_error == nil or signal_or_error == false then
+			Logger.error(LOG,
+				"%s requirement-task termination refused; exact owner retained: %s.",
+				tostring(label), tostring(signal_or_error))
+			return false
+		end
+		owner.termination_accepted = true
+		Logger.debug(LOG,
+			"%s requirement-task termination accepted; awaiting exact completion.",
+			tostring(label))
+		return false
+	end
+
+	local function maintenance_admitted()
+		if maintenance_registered ~= true then return false end
+		if maintenance_registration_required ~= true then return true end
+		local control = deps.script_control
+		if type(control.is_paused) ~= "function"
+			or type(control.is_pause_transition_pending) ~= "function" then
+			return false
+		end
+		local paused_ok, paused = xpcall(control.is_paused, debug.traceback)
+		local pending_ok, pending = xpcall(
+			control.is_pause_transition_pending, debug.traceback)
+		return paused_ok == true and paused == false
+			and pending_ok == true and pending == false
+	end
+
+	begin_maintenance = function(label)
+		if maintenance_admitted() ~= true then
+			Logger.debug(LOG, "%s rejected by model-maintenance pause admission.", label)
+			return nil
+		end
+		local operation, reason = requirement_registry.begin(maintenance_capability)
+		if operation == nil then
+			Logger.error(LOG, "%s ownership acquisition refused: %s.",
+				label, tostring(reason))
+		end
+		return operation
+	end
+
+	if maintenance_registration_required then
+		local maintenance_owner = {
+			pause = function()
+				local settled = requirement_registry.pause(maintenance_capability)
+				return settled == true
+			end,
+			resume = function() return true end,
+		}
+		local registered_ok, registered = xpcall(function()
+			return deps.script_control.register_pause_owner(
+				"mlx_model_maintenance", maintenance_owner)
+		end, debug.traceback)
+		maintenance_registered = registered_ok == true and registered == true
+		if maintenance_registered ~= true then
+			Logger.error(LOG, "MLX model-maintenance pause-owner registration refused: %s.",
+				tostring(registered))
+		end
+	end
+
+	--- Creates one opaque requirement-operation pause capability.
+	--- @param label string Stable owner label for diagnostics.
+	--- @return table|nil capability Opaque exact-owner token, or nil on refusal.
+	function obj.create_requirement_owner(label)
+		return requirement_registry.create_owner(label)
+	end
+
+	--- Fences and joins every exact descendant launched by one MLX requirement
+	--- capability. Descendant modules retain their native owners; the registry
+	--- stores only their scoped pause/join delegates.
+	--- @param capability table Opaque token returned by create_requirement_owner().
+	--- @return boolean settled True only after every descendant settled.
+	--- @return boolean had_tasks True when this call observed a logical operation.
+	function obj.pause_requirements(capability)
+		return requirement_registry.pause(capability)
+	end
+
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
-		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local requirement_capability = type(opts) == "table"
+			and opts.requirement_owner or nil
+		local operation, refusal_reason = requirement_registry.begin(
+			requirement_capability)
+		if operation == nil then
+			if type(on_cancel) == "function" then
+				Logger.callback(LOG, "MLX requirement ownership refusal",
+					on_cancel, refusal_reason)
+			end
+			return false
+		end
+		local caller_is_current = type(opts) == "table" and opts.is_current
+			or function() return true end
+		local operation_opts = {}
+		if type(opts) == "table" then
+			for key, value in pairs(opts) do operation_opts[key] = value end
+		end
+		operation_opts._requirement_lifecycle = operation.lifecycle
+		operation_opts.is_current = function()
+			if operation.is_authorized() ~= true then return false end
+			local ok, current = Logger.callback(LOG,
+				"MLX caller requirement freshness check", caller_is_current)
+			return ok == true and current == true
+		end
+		opts = operation_opts
+		local is_current = operation_opts.is_current
 		local function still_current()
 			local ok, current = Logger.callback(LOG,
 				"MLX requirement freshness check", is_current)
-			return ok and current == true
+			return ok == true and current == true
 		end
-		if not still_current() then return end
+		local function settle(callback, label, ...)
+			return operation.finish(callback, label, ...)
+		end
+		local function settle_cancel(...)
+			return settle(on_cancel, "MLX requirement cancellation", ...)
+		end
+		local function current_or_cancel()
+			if still_current() then return true end
+			settle_cancel("stale")
+			return false
+		end
+		local function settle_success(...)
+			if not current_or_cancel() then return false end
+			return settle(on_success, "MLX requirement success", ...)
+		end
+		if not current_or_cancel() then return false end
 		if not target_model or target_model == "" then 
-			if still_current() and type(on_success) == "function" then
-				Logger.callback(LOG, "Empty MLX requirement success", on_success)
-			end
-			return 
+			return settle_success()
 		end
 		Logger.debug(LOG, "Checking MLX requirements for model %s…", tostring(target_model))
 
 		local function do_check()
-			if not still_current() then return end
+			if not current_or_cancel() then return false end
 			local installed = obj.get_installed_models()
 			if installed[target_model] then
 				Logger.info(LOG, "MLX model %s is installed. Starting server…", tostring(target_model))
-				if still_current() then obj.start_server(target_model, on_success, on_cancel, opts) end
+				if not current_or_cancel() then return false end
+				local started = obj.start_server(target_model, settle_success, settle_cancel, opts)
+				if started == false then settle_cancel("start_refused") end
+				return started ~= false
 			else
+				if not current_or_cancel() then return false end
 				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)
 				if not repo then 
 					pcall(notifications.notify, i18n.get("mlx.model_unavailable"), string.format(i18n.get("mlx.model_unavailable_body"), target_model), "error")
-					if type(on_cancel) == "function" then
-						Logger.callback(LOG, "Unavailable MLX model", on_cancel)
-					end
-					return 
+					settle_cancel("unavailable")
+					return false
 				end
 				
 				if type(deps.shared_system_check) == "function" then
 					local check_ok, accepted = Logger.callback(LOG, "MLX shared system check",
 						deps.shared_system_check, target_model, "Apple MLX", repo, function()
-						if still_current() then obj.pull_model(target_model, repo, on_success) end
-					end, on_cancel)
-					if (not check_ok or accepted == false) and type(on_cancel) == "function" then
-						Logger.callback(LOG, "MLX system-check failure", on_cancel)
+							if not current_or_cancel() then return false end
+							return obj.pull_model(target_model, repo,
+								settle_success, settle_cancel, opts)
+						end, settle_cancel, opts)
+					if not check_ok or accepted ~= true then
+						settle_cancel("system_check_refused")
+						return false
 					end
+					return true
 				else
-					if still_current() then obj.pull_model(target_model, repo, on_success) end
+					if not current_or_cancel() then return false end
+					return obj.pull_model(target_model, repo,
+						settle_success, settle_cancel, opts) ~= false
 				end
 			end
 		end
@@ -254,21 +459,24 @@ function M.new(deps, presets)
 		-- user must run modules/llm/ensure-mlx-deps.sh manually — silently
 		-- pip-installing a fallback would bypass pyproject.toml.
 		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors'"
-		-- Forward-declared, pinned before start() and released as the callback's
-		-- first act — the same three steps its sibling delete_task performs.
-		-- Held only by a local, the task was collectable the moment this function
-		-- returned, while the python import probe still had one to three seconds
-		-- to run. A GC cycle in that window makes Hammerspoon SIGTERM the
-		-- subprocess and the completion callback never fires: neither do_check nor
-		-- on_cancel runs, and on_cancel is what releases the prediction lock that
-		-- model_switcher and startup_controller set. Predictions then stay locked
-		-- with no START-without-SUCCESS trail, and only a full reload recovers.
+		-- Publish the exact owner before start(). TaskLifecycle.start() can mutate
+		-- native state and still return false/nil/throw, so refusal begins cleanup;
+		-- it never authorizes the queued completion or drops the GC pin
+		local task_owner = {
+			task = nil,
+			authorized = true,
+			cleanup = false,
+			settled = false,
+			start_committed = false,
+			dispatching = true,
+			pending_terminal = nil,
+			termination_accepted = false,
+		}
 		local check_task
-		check_task = TaskLifecycle.native("MLX requirement check", "/bin/bash", function(code)
-			if check_task then M._active_tasks[check_task] = nil end
-			if not still_current() then return end
+		local function handle_requirement_completion(code)
+			if not current_or_cancel() then return end
 			if code == 0 then
-				do_check()
+				return do_check()
 			else
 				-- Differentiate three cases so the user sees the truth:
 				--   1. bootstrap still running → "patientez", do not flip to error
@@ -276,19 +484,13 @@ function M.new(deps, presets)
 				--   3. unknown                 → previous generic message
 				if mlx_deps_checker and mlx_deps_checker.is_pending and mlx_deps_checker.is_pending() then
 					Logger.info(LOG, "MLX import probe failed but bootstrap still pending — launching install.")
-					-- Show the progress window and kick off the actual install.
-					-- The checker is idempotent: if it is already running, the second
-					-- call exits silently; if it was never started (e.g., LLM was
-					-- disabled at startup), this is the first real launch.
-					local llm_progress = require("ui.download_window")
-					if not llm_progress.is_active() then
-						pcall(llm_progress.show, {
-							kind     = "mlx_install",
-							title    = i18n.get("mlx.init_title"),
-							subtitle = i18n.get("mlx.init_subtitle"),
-						})
+					local bootstrap_ok, accepted = xpcall(
+						mlx_deps_checker.check_and_install_deps, debug.traceback)
+					if not bootstrap_ok or accepted ~= true then
+						Logger.debug(LOG,
+							"MLX dependency install was rejected by its pause admission.")
+						return settle_cancel("dependency_bootstrap_refused")
 					end
-					pcall(mlx_deps_checker.check_and_install_deps)
 				elseif mlx_deps_checker and mlx_deps_checker.has_failed and mlx_deps_checker.has_failed() then
 					local cause = (mlx_deps_checker.get_failure_message and mlx_deps_checker.get_failure_message())
 						or "Cause inconnue. Consultez la console Hammerspoon."
@@ -310,26 +512,94 @@ function M.new(deps, presets)
 					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
 						i18n.get("mlx.deps_missing_body"), "error")
 				end
-				ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
+				return settle_cancel("dependency_probe_failed")
 			end
-		end, {"-c", check_cmd})
+		end
+		local function complete_requirement_task(...)
+			if task_owner.settled == true then return false end
+			if task_owner.dispatching == true then
+				if task_owner.pending_terminal ~= nil then return false end
+				task_owner.pending_terminal = table.pack(...)
+				return true
+			end
+			local authorized = task_owner.authorized == true
+				and task_owner.start_committed == true
+				and operation.is_authorized() == true
+			release_requirement_task(task_owner)
+			operation.lifecycle.settle(task_owner)
+			if not authorized then return true end
+			return handle_requirement_completion(...)
+		end
+		check_task = TaskLifecycle.native("MLX requirement check", "/bin/bash",
+			complete_requirement_task, {"-c", check_cmd})
+		task_owner.task = check_task
 		
 		if check_task then
+			requirement_tasks[check_task] = task_owner
 			M._active_tasks[check_task] = true
-			if not TaskLifecycle.start(check_task, "MLX requirement check") then
-				M._active_tasks[check_task] = nil
-				ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
+			task_owner.pause_join = function()
+				return cancel_requirement_task(task_owner,
+					"MLX requirement operation pause")
+			end
+			if operation.lifecycle.adopt(task_owner, task_owner.pause_join,
+				"MLX import probe") ~= true then
+				task_owner.authorized = false
+				task_owner.cleanup = true
+				cancel_requirement_task(task_owner,
+					"MLX requirement owner adoption refusal")
+				settle_cancel("requirement_owner_adoption_refused")
+				return false
+			end
+			local started = TaskLifecycle.start(check_task, "MLX requirement check")
+			task_owner.dispatching = false
+			if started ~= true then
+				task_owner.authorized = false
+				task_owner.cleanup = true
+				if task_owner.pending_terminal ~= nil then
+					task_owner.pending_terminal = nil
+					release_requirement_task(task_owner)
+					operation.lifecycle.settle(task_owner)
+				elseif requirement_task_proven_not_running(check_task,
+					"MLX requirement start refusal") then
+					release_requirement_task(task_owner)
+					operation.lifecycle.settle(task_owner)
+				else
+					cancel_requirement_task(task_owner,
+						"MLX requirement start refusal")
+				end
+				settle_cancel("task_start_refused")
+				return false
+			end
+			task_owner.start_committed = true
+			if task_owner.pending_terminal ~= nil then
+				local terminal = task_owner.pending_terminal
+				task_owner.pending_terminal = nil
+				complete_requirement_task(table.unpack(terminal, 1, terminal.n))
 			end
 		else
-			ApiCommon.protected_call(on_cancel, "MLX requirement on_cancel")
+			task_owner.authorized = false
+			task_owner.dispatching = false
+			task_owner.settled = true
+			settle_cancel("task_construction_failed")
+			return false
 		end
+		return true
 	end
 
 	function obj.delete_model(model_name)
-		if not model_name or model_name == "" then return end
+		if not model_name or model_name == "" then return false end
+		local operation = begin_maintenance("MLX model deletion")
+		if operation == nil then return false end
 		local repo = obj.get_mlx_repo(model_name)
-		if not repo then return end
+		if not repo then
+			operation.finish(nil, "MLX model deletion repository refusal")
+			return false
+		end
 		local home = os.getenv("HOME")
+		if type(home) ~= "string" or home == "" then
+			operation.finish(nil, "MLX model deletion HOME refusal")
+			return false
+		end
 		local safe_repo = "models--" .. repo:gsub("/", "--")
 		local path = home .. "/.cache/huggingface/hub/" .. safe_repo
 		Logger.debug(LOG, "Deleting MLX model %s at %s…", tostring(model_name), path)
@@ -339,9 +609,30 @@ function M.new(deps, presets)
 		-- and a blocking synchronous shell-out here freezes keystrokes, timers,
 		-- and the menubar for the whole deletion (mirrors the identical bug class
 		-- already fixed on the Ollama manager's task-based deletes).
+		local owner = {
+			task = nil,
+			authorized = true,
+			cleanup = false,
+			settled = false,
+			start_committed = false,
+			dispatching = true,
+			pending_terminal = nil,
+			termination_accepted = false,
+		}
+		local function release_delete_owner()
+			if release_requirement_task(owner) ~= true then return false end
+			operation.lifecycle.settle(owner)
+			return true
+		end
 		local delete_task
-		delete_task = TaskLifecycle.native("MLX model deletion", "/bin/rm", function(code, _stdout, stderr)
-			if delete_task then M._active_tasks[delete_task] = nil end  -- delete_task captured by closure
+		local function finish_delete(code, _stdout, stderr)
+			if owner.settled == true then return false end
+			local authorized = owner.authorized == true
+				and owner.start_committed == true
+				and operation.is_authorized() == true
+			release_delete_owner()
+			operation.finish(nil, "MLX model deletion terminal")
+			if authorized ~= true then return false end
 			invalidate_installed_cache()
 			if code == 0 then
 				Logger.info(LOG, "MLX model %s deleted successfully.", tostring(model_name))
@@ -353,14 +644,89 @@ function M.new(deps, presets)
 			if type(deps.update_menu) == "function" then
 				Logger.callback(LOG, "MLX model deletion menu refresh", deps.update_menu)
 			end
+			return code == 0
+		end
+		delete_task = TaskLifecycle.native("MLX model deletion", "/bin/rm", function(...)
+			if owner.dispatching == true then
+				if owner.pending_terminal == nil then
+					owner.pending_terminal = table.pack(...)
+				end
+				return true
+			end
+			return finish_delete(...)
 		end, {"-rf", path})
+		owner.task = delete_task
 
 		if delete_task then
+			requirement_tasks[delete_task] = owner
 			M._active_tasks[delete_task] = true
-			if not TaskLifecycle.start(delete_task, "MLX model deletion") then
-				M._active_tasks[delete_task] = nil
+			owner.pause_join = function()
+				return cancel_requirement_task(owner, "MLX model deletion pause")
 			end
+			if operation.lifecycle.adopt(owner, owner.pause_join,
+				"MLX model deletion") ~= true then
+				owner.authorized = false
+				owner.cleanup = true
+				if requirement_task_proven_not_running(delete_task,
+					"MLX deletion adoption refusal") then
+					release_delete_owner()
+				else
+					cancel_requirement_task(owner, "MLX deletion adoption refusal")
+				end
+				operation.finish(nil, "MLX deletion adoption refusal")
+				return false
+			end
+			local start_ok, started = xpcall(function()
+				return TaskLifecycle.start(delete_task, "MLX model deletion")
+			end, debug.traceback)
+			owner.dispatching = false
+			if start_ok ~= true or started ~= true then
+				if start_ok ~= true then
+					Logger.error(LOG,
+						"MLX model deletion start raised; exact task retained: %s.",
+						tostring(started))
+				end
+				owner.authorized = false
+				owner.cleanup = true
+				if owner.pending_terminal ~= nil then
+					local terminal = owner.pending_terminal
+					owner.pending_terminal = nil
+					finish_delete(table.unpack(terminal, 1, terminal.n))
+				else
+					-- A native start may publish/mutate the process capability before
+					-- returning false, nil, or throwing. Signal the already-pinned exact
+					-- candidate first; an isRunning()==false probe may then prove that
+					-- even a refused signal left no physical task to await.
+					cancel_requirement_task(owner,
+						"MLX model deletion start refusal")
+					if owner.settled ~= true
+						and requirement_task_proven_not_running(delete_task,
+							"MLX model deletion start-refusal settlement") then
+						release_delete_owner()
+					end
+				end
+				operation.finish(nil, "MLX model deletion start refusal")
+				return false
+			end
+			owner.start_committed = true
+			if operation.is_authorized() ~= true then
+				owner.authorized = false
+				owner.cleanup = true
+				cancel_requirement_task(owner, "MLX model deletion post-start fence")
+				operation.finish(nil, "MLX model deletion revoked")
+				return false
+			end
+			if owner.pending_terminal ~= nil then
+				local terminal = owner.pending_terminal
+				owner.pending_terminal = nil
+				return finish_delete(table.unpack(terminal, 1, terminal.n))
+			end
+			return true
 		end
+		owner.dispatching = false
+		owner.settled = true
+		operation.finish(nil, "MLX model deletion construction refusal")
+		return false
 	end
 
 	return obj

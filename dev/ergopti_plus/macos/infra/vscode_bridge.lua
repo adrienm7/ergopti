@@ -34,6 +34,14 @@ local EXT_VERSION   = "0.0.3"
 -- failure inside the feature that needs the path.
 local HOME          = os.getenv("HOME") or ""
 local EXT_DIR       = HOME .. "/.vscode/extensions/" .. EXT_ID .. "-" .. EXT_VERSION
+local EXTENSION_STAGE_SUFFIX = ".ergoptiplus-stage"
+local EXTENSION_BACKUP_SUFFIX = ".ergoptiplus-backup"
+local EXTENSION_RESTORE_SUFFIX = ".ergoptiplus-restore"
+local EXTENSION_JOURNAL_NAME = ".ergoptiplus-extension-transaction"
+local EXTENSION_JOURNAL_STAGE_NAME = ".ergoptiplus-extension-transaction-stage"
+local EXTENSION_JOURNAL_MAGIC = "ergoptiplus-vscode-extension-transaction-v1"
+
+local _extension_cleanup = nil
 
 -- AX frame cache: the accessibility call can block for up to 100 ms on a
 -- busy VSCode instance. Cache the result for FRAME_CACHE_TTL_S so that rapid
@@ -147,27 +155,521 @@ module.exports = { activate, deactivate };
 -- =========================================
 -- =========================================
 
---- Writes string content to a file safely.
+--- Formats one protected native-operation failure without losing its detail.
+--- @param call_ok boolean Whether the protected call returned.
+--- @param result any Primary native result or thrown error.
+--- @param native_error any Secondary native error.
+--- @param fallback string Fallback detail.
+--- @return string detail Failure detail.
+local function native_failure_detail(call_ok, result, native_error, fallback)
+	if not call_ok then return tostring(result) end
+	return tostring(native_error or result or fallback)
+end
+
+--- Reads exact bytes while distinguishing native absence from uncertainty.
 --- @param path string Target file path.
---- @param content string File content.
---- @return boolean True if successful.
-local function write_file(path, content)
-	local f = io.open(path, "w")
-	if not f then return false end
-	f:write(content)
-	f:close()
+--- @return boolean read_safe Whether absence or exact content was proven.
+--- @return string|nil content Exact bytes, or nil only for native ENOENT.
+--- @return string|nil error_message Failure detail.
+local function read_file_with_status(path)
+	local open_ok, handle, open_error, error_code = pcall(io.open, path, "rb")
+	if open_ok and handle == nil and error_code == 2 then return true, nil, nil end
+	if not open_ok or handle == nil or handle == false then
+		return false, nil,
+			native_failure_detail(open_ok, handle, open_error, "open refused")
+	end
+
+	local read_ok, content, read_error = pcall(handle.read, handle, "*a")
+	local close_ok, close_result, close_error = pcall(handle.close, handle)
+	local read_committed = read_ok and type(content) == "string"
+	local close_committed = close_ok and close_result == true
+	if read_committed and close_committed then return true, content, nil end
+
+	local failures = {}
+	if not read_committed then
+		failures[#failures + 1] = "read: "
+			.. native_failure_detail(read_ok, content, read_error, "read refused")
+	end
+	if not close_committed then
+		failures[#failures + 1] = "close: "
+			.. native_failure_detail(close_ok, close_result, close_error, "close refused")
+	end
+	return false, nil, table.concat(failures, "; ")
+end
+
+--- Closes one retained file handle and consumes its Lua ownership exactly once.
+--- A failed native close may still leave a Lua file object permanently closed, so
+--- retaining and invoking that object again would create unrecoverable cleanup debt.
+--- @param entry table Transaction entry.
+--- @param role string Sidecar role.
+--- @param context string Diagnostic context.
+--- @return boolean closed Whether no handle remains owned.
+local function close_owned_handle(entry, role, context)
+	local handle_key = role .. "_handle"
+	local handle = entry[handle_key]
+	if not handle then return true end
+	entry[handle_key] = nil
+
+	local close_ok, close_result, close_error = pcall(handle.close, handle)
+	if close_ok and close_result == true then return true end
+	Logger.error(LOG, "Extension %s could not close '%s': %s.",
+		context,
+		tostring(entry[role .. "_path"]),
+		native_failure_detail(close_ok, close_result, close_error, "close refused"))
+	return false
+end
+
+--- Removes one owned path, accepting native ENOENT as already settled.
+--- @param path string Owned path.
+--- @param context string Diagnostic context.
+--- @return boolean removed Whether the path is proven absent.
+local function remove_owned_path(path, context)
+	local remove_ok, remove_result, remove_error, error_code = pcall(os.remove, path)
+	if remove_ok and (remove_result == true or error_code == 2) then return true end
+	Logger.error(LOG, "Extension %s could not remove '%s': %s.",
+		context,
+		path,
+		native_failure_detail(remove_ok, remove_result, remove_error, "remove refused"))
+	return false
+end
+
+--- Removes one private sidecar while retaining any unsettled handle or pathname.
+--- @param entry table Transaction entry.
+--- @param role string Sidecar role.
+--- @param context string Diagnostic context.
+--- @return boolean settled Whether all ownership for the sidecar settled.
+local function cleanup_sidecar(entry, role, context)
+	local handle_settled = close_owned_handle(entry, role, context)
+	local owned_key = role .. "_owned"
+	local path_settled = true
+	if entry[owned_key] then
+		path_settled = remove_owned_path(entry[role .. "_path"], context)
+		if path_settled then entry[owned_key] = false end
+	end
+	return handle_settled and path_settled
+end
+
+--- Writes one private sidecar and proves write, flush, and close exactly.
+--- @param entry table Transaction entry.
+--- @param role string Sidecar role.
+--- @param content string Exact payload bytes.
+--- @return boolean staged Whether the payload is durable and closed.
+--- @return string|nil error_message Failure detail.
+local function stage_payload(entry, role, content)
+	local path = entry[role .. "_path"]
+	local open_ok, handle, open_error = pcall(io.open, path, "wb")
+	if not open_ok or handle == nil or handle == false then
+		return false, native_failure_detail(open_ok, handle, open_error, "open refused")
+	end
+
+	entry[role .. "_handle"] = handle
+	entry[role .. "_owned"] = true
+
+	local write_ok, write_result, write_error = pcall(handle.write, handle, content)
+	local write_committed = write_ok and write_result == handle
+	local flush_ok, flush_result, flush_error = false, nil, nil
+	if write_committed then
+		flush_ok, flush_result, flush_error = pcall(handle.flush, handle)
+	end
+	local flush_committed = flush_ok and flush_result == true
+	local close_committed = close_owned_handle(entry, role, "staging")
+
+	if not write_committed then
+		return false, native_failure_detail(write_ok, write_result, write_error, "write refused")
+	end
+	if not flush_committed then
+		return false, native_failure_detail(flush_ok, flush_result, flush_error, "flush refused")
+	end
+	if not close_committed then return false, "close refused" end
 	return true
 end
 
---- Reads string content from a file safely.
---- @param path string Target file path.
---- @return string|nil The file content or nil.
-local function read_file(path)
-	local f = io.open(path, "r")
-	if not f then return nil end
-	local c = f:read("*a")
-	f:close()
-	return c
+--- Publishes one private sidecar over its final path on exact rename success.
+--- @param source string Owned source path.
+--- @param destination string Final path.
+--- @param context string Diagnostic context.
+--- @return boolean renamed Whether publication committed.
+--- @return string|nil error_message Failure detail.
+local function rename_owned_path(source, destination, context)
+	local rename_ok, rename_result, rename_error = pcall(os.rename, source, destination)
+	if rename_ok and rename_result == true then return true end
+	local detail = native_failure_detail(rename_ok, rename_result, rename_error, "rename refused")
+	Logger.error(LOG, "Extension %s rename '%s' -> '%s' failed: %s.",
+		context, source, destination, detail)
+	return false, detail
+end
+
+--- Returns every deterministic pathname owned by the extension transaction.
+--- @return table paths Transaction path set.
+local function extension_transaction_paths()
+	local package_path = EXT_DIR .. "/package.json"
+	local extension_path = EXT_DIR .. "/extension.js"
+	return {
+		package_path = package_path,
+		extension_path = extension_path,
+		journal_path = EXT_DIR .. "/" .. EXTENSION_JOURNAL_NAME,
+		journal_stage_path = EXT_DIR .. "/" .. EXTENSION_JOURNAL_STAGE_NAME,
+		orphan_paths = {
+			package_path .. EXTENSION_STAGE_SUFFIX,
+			package_path .. EXTENSION_BACKUP_SUFFIX,
+			package_path .. EXTENSION_RESTORE_SUFFIX,
+			extension_path .. EXTENSION_STAGE_SUFFIX,
+			extension_path .. EXTENSION_BACKUP_SUFFIX,
+			extension_path .. EXTENSION_RESTORE_SUFFIX,
+			EXT_DIR .. "/" .. EXTENSION_JOURNAL_STAGE_NAME,
+		},
+	}
+end
+
+--- Encodes the only persisted recovery facts in one canonical payload.
+--- @param package_existed boolean Whether package.json initially existed.
+--- @param extension_existed boolean Whether extension.js initially existed.
+--- @return string payload Canonical journal bytes.
+local function extension_journal_payload(package_existed, extension_existed)
+	return string.format("%s\npackage_existed=%s\nextension_existed=%s\n",
+		EXTENSION_JOURNAL_MAGIC,
+		tostring(package_existed),
+		tostring(extension_existed))
+end
+
+--- Decodes only one exact canonical journal schema.
+--- @param payload string Candidate journal bytes.
+--- @return table|nil facts Initial-existence facts, or nil when invalid.
+local function decode_extension_journal(payload)
+	for _, facts in ipairs({
+		{ package_existed = false, extension_existed = false },
+		{ package_existed = false, extension_existed = true },
+		{ package_existed = true, extension_existed = false },
+		{ package_existed = true, extension_existed = true },
+	}) do
+		if payload == extension_journal_payload(
+			facts.package_existed,
+			facts.extension_existed
+		) then
+			return facts
+		end
+	end
+	return nil
+end
+
+--- Creates one deterministic entry owned by a transaction.
+--- @param path string Final path.
+--- @param content string New payload.
+--- @param original string|nil Original bytes when observed in this process.
+--- @param existed boolean Initial existence fact.
+--- @return table entry Owned entry.
+local function new_extension_entry(path, content, original, existed)
+	return {
+		path = path,
+		content = content,
+		original = original,
+		existed = existed,
+		stage_path = path .. EXTENSION_STAGE_SUFFIX,
+		backup_path = path .. EXTENSION_BACKUP_SUFFIX,
+		restore_path = path .. EXTENSION_RESTORE_SUFFIX,
+		stage_owned = false,
+		backup_owned = false,
+		restore_owned = false,
+		published = false,
+	}
+end
+
+--- Creates one new transaction from an exact observed original pair.
+--- @param paths table Deterministic transaction paths.
+--- @param package_original string|nil Original package bytes.
+--- @param extension_original string|nil Original extension bytes.
+--- @return table transaction Owned transaction.
+local function new_extension_transaction(paths, package_original, extension_original)
+	local transaction = {
+		phase = "pre_journal",
+		journal_path = paths.journal_path,
+		journal_published = false,
+		journal = {
+			stage_path = paths.journal_stage_path,
+			stage_owned = false,
+		},
+		entries = {
+			new_extension_entry(
+				paths.package_path,
+				PACKAGE_JSON,
+				package_original,
+				package_original ~= nil
+			),
+			new_extension_entry(
+				paths.extension_path,
+				EXTENSION_JS,
+				extension_original,
+				extension_original ~= nil
+			),
+		},
+	}
+	_extension_cleanup = transaction
+	return transaction
+end
+
+--- Rebuilds recovery ownership using only the durable journal facts.
+--- @param paths table Deterministic transaction paths.
+--- @param facts table Decoded journal facts.
+--- @return table transaction Recovery transaction.
+local function new_recovery_transaction(paths, facts)
+	local transaction = new_extension_transaction(paths, nil, nil)
+	transaction.phase = "recovery"
+	transaction.journal_published = true
+	transaction.entries[1].existed = facts.package_existed
+	transaction.entries[2].existed = facts.extension_existed
+	transaction.journal.stage_owned = true
+	for _, entry in ipairs(transaction.entries) do
+		entry.stage_owned = true
+		entry.backup_owned = true
+		entry.restore_owned = true
+	end
+	return transaction
+end
+
+--- Removes transaction sidecars only after no live journal needs them.
+--- @param transaction table Owned transaction.
+--- @param context string Diagnostic context.
+--- @return boolean settled Whether all sidecars are proven absent.
+local function cleanup_extension_sidecars(transaction, context)
+	local settled = true
+	for _, entry in ipairs(transaction.entries) do
+		for _, role in ipairs({ "stage", "backup", "restore" }) do
+			if not cleanup_sidecar(entry, role, context) then settled = false end
+		end
+	end
+	if not cleanup_sidecar(transaction.journal, "stage", context) then settled = false end
+	return settled
+end
+
+--- Removes deterministic sidecars that cannot belong to a committed journal.
+--- @param paths table Deterministic transaction paths.
+--- @return boolean settled Whether all orphans are proven absent.
+local function cleanup_pre_journal_orphans(paths)
+	local settled = true
+	for _, path in ipairs(paths.orphan_paths) do
+		if not remove_owned_path(path, "orphan cleanup") then settled = false end
+	end
+	return settled
+end
+
+--- Restores one final path without consuming its durable backup.
+--- @param entry table Recovery entry.
+--- @param index number Entry index for diagnostics.
+--- @return boolean restored Whether the exact initial state was restored.
+local function restore_extension_entry(entry, index)
+	if not entry.existed then
+		local removed = remove_owned_path(entry.path, "rollback " .. tostring(index))
+		if removed then entry.published = false end
+		return removed
+	end
+
+	local read_safe, original, read_error = read_file_with_status(entry.backup_path)
+	if not read_safe or original == nil then
+		Logger.error(LOG, "Extension rollback cannot read backup '%s': %s.",
+			entry.backup_path,
+			tostring(read_error or "backup missing"))
+		return false
+	end
+	local staged, stage_error = stage_payload(entry, "restore", original)
+	if not staged then
+		Logger.error(LOG, "Extension rollback cannot stage restore '%s': %s.",
+			entry.restore_path, tostring(stage_error))
+		return false
+	end
+	local restored = rename_owned_path(entry.restore_path, entry.path,
+		"rollback " .. tostring(index))
+	if restored then
+		entry.restore_owned = false
+		entry.published = false
+	end
+	return restored
+end
+
+--- Replays one durable journal idempotently, including across module reloads.
+--- Backups are copied through restore sidecars and remain intact until both
+--- final paths are exact and the journal has been deleted.
+--- @param transaction table Recovery transaction.
+--- @return boolean settled Whether recovery and cleanup fully settled.
+local function recover_extension_transaction(transaction)
+	local restored = true
+	for index = #transaction.entries, 1, -1 do
+		if not restore_extension_entry(transaction.entries[index], index) then
+			restored = false
+		end
+	end
+	if not restored then return false end
+
+	if not remove_owned_path(transaction.journal_path, "rollback journal commit") then
+		return false
+	end
+	transaction.journal_published = false
+	transaction.phase = "cleanup_only"
+	local cleaned = cleanup_extension_sidecars(transaction, "rollback cleanup")
+	if cleaned and _extension_cleanup == transaction then _extension_cleanup = nil end
+	return cleaned
+end
+
+--- Commits a fully published pair by deleting its recovery journal first.
+--- @param transaction table Fully published transaction.
+--- @return boolean durable Whether the logical commit point was reached.
+--- @return boolean settled Whether post-commit sidecars also settled.
+local function finalize_extension_commit(transaction)
+	if not remove_owned_path(transaction.journal_path, "commit journal") then
+		Logger.error(LOG, "Extension pair is published but its journal still requires retry.")
+		return false, false
+	end
+	transaction.journal_published = false
+	transaction.phase = "cleanup_only"
+	local cleaned = cleanup_extension_sidecars(transaction, "post-commit cleanup")
+	if cleaned then
+		if _extension_cleanup == transaction then _extension_cleanup = nil end
+	else
+		Logger.warn(LOG, "Extension pair committed with retryable orphan cleanup debt.")
+	end
+	return true, cleaned
+end
+
+--- Settles retained in-process ownership before another install attempt.
+--- @param transaction table Owned transaction.
+--- @return boolean settled Whether a new transaction may start.
+local function settle_extension_transaction(transaction)
+	local settled = false
+	if transaction.phase == "recovery" then
+		settled = recover_extension_transaction(transaction)
+	elseif transaction.phase == "commit_pending" then
+		local durable, cleaned = finalize_extension_commit(transaction)
+		settled = durable and cleaned
+	elseif transaction.phase == "pre_journal" then
+		transaction.phase = "cleanup_only"
+		settled = cleanup_extension_sidecars(transaction, "pre-journal cleanup")
+	elseif transaction.phase == "cleanup_only" then
+		settled = cleanup_extension_sidecars(transaction, "orphan cleanup retry")
+	else
+		Logger.error(LOG, "Extension transaction has unknown phase '%s'.",
+			tostring(transaction.phase))
+	end
+	if settled and _extension_cleanup == transaction then _extension_cleanup = nil end
+	if not settled then
+		Logger.error(LOG, "Extension transaction cleanup remains pending; installation is blocked.")
+	end
+	return settled
+end
+
+--- Recovers a durable journal or cleans only harmless pre-journal orphans.
+--- @param paths table Deterministic transaction paths.
+--- @return boolean settled Whether a new transaction may start.
+local function settle_persisted_extension_state(paths)
+	local read_safe, payload, read_error = read_file_with_status(paths.journal_path)
+	if not read_safe then
+		Logger.error(LOG, "Extension recovery journal is unreadable at '%s': %s.",
+			paths.journal_path, tostring(read_error))
+		return false
+	end
+	if payload == nil then
+		if cleanup_pre_journal_orphans(paths) then return true end
+		Logger.error(LOG, "Extension orphan cleanup remains pending; installation is blocked.")
+		return false
+	end
+
+	local facts = decode_extension_journal(payload)
+	if not facts then
+		Logger.error(LOG, "Extension recovery journal is invalid at '%s'; installation is blocked.",
+			paths.journal_path)
+		return false
+	end
+	local transaction = new_recovery_transaction(paths, facts)
+	if recover_extension_transaction(transaction) then return true end
+	Logger.error(LOG, "Extension durable recovery remains pending; installation is blocked.")
+	return false
+end
+
+--- Settles both in-process and reload-persistent transaction ownership.
+--- @param paths table Deterministic transaction paths.
+--- @return boolean settled Whether a new transaction may start.
+local function settle_extension_state(paths)
+	if _extension_cleanup then
+		return settle_extension_transaction(_extension_cleanup)
+	end
+	return settle_persisted_extension_state(paths)
+end
+
+--- Aborts one transaction and retains any recovery debt for retry or reload.
+--- @param transaction table Owned transaction.
+--- @param stage string Failed transaction stage.
+--- @param detail any Failure detail.
+--- @return boolean Always false.
+local function abort_extension_transaction(transaction, stage, detail)
+	Logger.error(LOG, "Extension install %s failed in '%s': %s.", stage, EXT_DIR, tostring(detail))
+	local settled
+	if transaction.phase == "recovery" then
+		settled = recover_extension_transaction(transaction)
+	else
+		transaction.phase = "cleanup_only"
+		settled = cleanup_extension_sidecars(transaction, "pre-journal abort cleanup")
+	end
+	if settled then
+		if _extension_cleanup == transaction then _extension_cleanup = nil end
+	else
+		Logger.error(LOG, "Extension install recovery remains pending after %s failure.", stage)
+	end
+	return false
+end
+
+--- Publishes the durable recovery journal before either final path changes.
+--- @param transaction table Fully staged transaction.
+--- @return boolean published Whether recovery is reload-safe.
+local function publish_extension_journal(transaction)
+	local payload = extension_journal_payload(
+		transaction.entries[1].existed,
+		transaction.entries[2].existed
+	)
+	local staged, stage_error = stage_payload(transaction.journal, "stage", payload)
+	if not staged then
+		return abort_extension_transaction(transaction, "journal staging", stage_error)
+	end
+	local published, publish_error = rename_owned_path(
+		transaction.journal.stage_path,
+		transaction.journal_path,
+		"journal publication"
+	)
+	if not published then
+		return abort_extension_transaction(transaction, "journal publication", publish_error)
+	end
+	transaction.journal.stage_owned = false
+	transaction.journal_published = true
+	transaction.phase = "recovery"
+	return true
+end
+
+--- Publishes both candidates after the durable journal, then commits logically.
+--- POSIX cannot atomically replace two unrelated pathnames: an external observer
+--- between these renames may briefly see a mixed pair. The observable contract at
+--- function return or after reload recovery is all-or-nothing.
+--- @param transaction table Fully staged and journaled transaction.
+--- @return boolean committed Whether the logical commit point was reached.
+local function publish_extension_transaction(transaction)
+	-- extension.js lands first; package.json is the manifest/commit marker. VS Code
+	-- does not reload this unpacked extension until the post-commit notice asks the
+	-- user to do so. A manually concurrent reload could still observe a new script
+	-- under an incompatible old manifest; future incompatible schema changes (or a
+	-- hot-reload lifecycle) require a versioned directory pointer instead.
+	for publication_index, entry_index in ipairs({ 2, 1 }) do
+		local entry = transaction.entries[entry_index]
+		local published, publish_error = rename_owned_path(
+			entry.stage_path,
+			entry.path,
+			"publication " .. tostring(publication_index)
+		)
+		if not published then
+			return abort_extension_transaction(transaction, "publication", publish_error)
+		end
+		entry.stage_owned = false
+		entry.published = true
+	end
+
+	transaction.phase = "commit_pending"
+	local durable = finalize_extension_commit(transaction)
+	return durable == true
 end
 
 --- Installs or updates the VSCode extension files locally.
@@ -176,22 +678,54 @@ function M.install_extension()
 	Logger.debug(LOG, "Verifying VSCode extension installation…")
 	os.execute("mkdir -p " .. text_utils.shell_quote(EXT_DIR))
 
-	local pkg_path = EXT_DIR .. "/package.json"
-	local ext_path = EXT_DIR .. "/extension.js"
-
-	local already_ok = (read_file(pkg_path) == PACKAGE_JSON) and (read_file(ext_path) == EXTENSION_JS)
+	local paths = extension_transaction_paths()
+	if not settle_extension_state(paths) then return false end
+	local pkg_path = paths.package_path
+	local ext_path = paths.extension_path
+	local pkg_read_safe, pkg_original, pkg_read_error = read_file_with_status(pkg_path)
+	if not pkg_read_safe then
+		Logger.error(LOG, "Extension install could not read existing '%s': %s.",
+			pkg_path, tostring(pkg_read_error))
+		return false
+	end
+	local ext_read_safe, ext_original, ext_read_error = read_file_with_status(ext_path)
+	if not ext_read_safe then
+		Logger.error(LOG, "Extension install could not read existing '%s': %s.",
+			ext_path, tostring(ext_read_error))
+		return false
+	end
+	local already_ok = (pkg_original == PACKAGE_JSON) and (ext_original == EXTENSION_JS)
 
 	if already_ok then
 		Logger.info(LOG, string.format("Extension already up to date (v%s).", EXT_VERSION))
 		return false
 	end
 
-	local ok_pkg = write_file(pkg_path, PACKAGE_JSON)
-	local ok_ext = write_file(ext_path, EXTENSION_JS)
+	local transaction = new_extension_transaction(paths, pkg_original, ext_original)
+	local pkg_entry = transaction.entries[1]
+	local ext_entry = transaction.entries[2]
+	local ok_pkg, pkg_error = stage_payload(pkg_entry, "stage", pkg_entry.content)
+	local ok_ext, ext_error = false, "package staging did not commit"
+	if ok_pkg then ok_ext, ext_error = stage_payload(ext_entry, "stage", ext_entry.content) end
 	if not ok_pkg or not ok_ext then
-		Logger.error(LOG, "Extension install failed — could not write to '%s'.", EXT_DIR)
-		return false
+		return abort_extension_transaction(
+			transaction,
+			"staging",
+			ok_pkg and ext_error or pkg_error
+		)
 	end
+
+	for _, entry in ipairs(transaction.entries) do
+		if entry.existed then
+			local backed_up, backup_error = stage_payload(entry, "backup", entry.original)
+			if not backed_up then
+				return abort_extension_transaction(transaction, "backup staging", backup_error)
+			end
+		end
+	end
+	if not publish_extension_journal(transaction) then return false end
+	if not publish_extension_transaction(transaction) then return false end
+
 	Logger.info(LOG, string.format("Extension installed in %s.", EXT_DIR))
 	-- A transient toast, through the layer that actually provides one.
 	-- dialog_util.alert forwards to hs.dialog.alert, whose leading parameters are

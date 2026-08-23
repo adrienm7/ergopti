@@ -10,8 +10,8 @@
 --- and both write the same .venv directory.
 ---
 --- Fix (2026-06-19): added `_task_running` boolean, set to true before
---- task:start() and cleared in fire_pending_callbacks(), so nil-callback
---- callers are also blocked by the reentrancy guard.
+--- task:start() and cleared only after the exact native terminal callback, so
+--- nil-callback callers and pending termination debt remain blocked.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -28,14 +28,9 @@ local helpers = require("tests.helpers")
 
 helpers.describe("mlx_deps_checker: reentrancy guard with nil callback", function()
 	helpers.it("source uses _task_running boolean guard, not #_pending_callbacks", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/modules/llm/mlx_deps_checker.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open mlx_deps_checker.lua at: " .. src_file)
-		local src = fh:read("*a")
-		fh:close()
+		local src = helpers.read_driver_source(
+			"owner_name = \"mlx_dependency_bootstrap\"")
+		helpers.assert_not_nil(src)
 
 		-- The guard must use _task_running, not #_pending_callbacks
 		helpers.assert_true(
@@ -58,15 +53,10 @@ helpers.describe("mlx_deps_checker: reentrancy guard with nil callback", functio
 		helpers.assert_true(guard_pos ~= nil, "_task_running guard position must be found")
 	end)
 
-	helpers.it("_task_running is set before task:start() and cleared in fire_pending_callbacks", function()
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local src_file = base .. "/modules/llm/mlx_deps_checker.lua"
-
-		local fh = io.open(src_file, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open mlx_deps_checker.lua")
-		local src = fh:read("*a")
-		fh:close()
+	helpers.it("clears _task_running only from exact task settlement", function()
+		local src = helpers.read_driver_source(
+			"owner_name = \"mlx_dependency_bootstrap\"")
+		helpers.assert_not_nil(src)
 
 		-- _task_running = true must appear before the strict native-start call
 		local set_true_pos   = src:find("_task_running = true", 1, true)
@@ -79,15 +69,15 @@ helpers.describe("mlx_deps_checker: reentrancy guard with nil callback", functio
 			"_task_running = true must appear before the strict native-start call"
 		)
 
-		-- _task_running = false must appear inside fire_pending_callbacks body
-		-- (not just as the initial `local _task_running = false` declaration)
-		local fire_pos = src:find("local function fire_pending_callbacks", 1, true)
-		helpers.assert_true(fire_pos ~= nil, "fire_pending_callbacks must exist in source")
-		local after_fire = src:sub(fire_pos)
-		local clear_in_body = after_fire:find("_task_running = false", 1, true)
-		helpers.assert_true(
-			clear_in_body ~= nil,
-			"_task_running = false must appear in the body of fire_pending_callbacks"
-		)
+		local release_pos = src:find("local function release_task_owner", 1, true)
+		helpers.assert_true(release_pos ~= nil)
+		local release_body = src:sub(release_pos, release_pos + 700)
+		helpers.assert_true(release_body:find("_task_running = false", 1, true) ~= nil,
+			"only the first exact native terminal delivery may clear the guard")
+		local fire_pos = src:find("fire_pending_callbacks = function", 1, true)
+		helpers.assert_true(fire_pos ~= nil)
+		local fire_body = src:sub(fire_pos, fire_pos + 350)
+		helpers.assert_true(fire_body:find("_task_running = false", 1, true) == nil,
+			"business callback fan-out is not native task settlement")
 	end)
 end)
