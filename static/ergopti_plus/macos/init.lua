@@ -1418,7 +1418,7 @@ ui_restore.restore()
 -- Auto-reload file watchers (hotstrings dir + personal tree + project .lua) live
 -- in infra/file_watchers; _G.script_watchers (the GC root the shutdown callback
 -- stops) is populated there. Extracted from init.lua Section 7 — same behaviour.
-require("infra.file_watchers").start({
+local file_watchers_committed = require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
@@ -1444,6 +1444,10 @@ require("infra.file_watchers").start({
 		(config_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
 	},
 })
+if file_watchers_committed ~= true then
+	Logger.error(LOG, "Auto-reload file-watcher startup did not commit.")
+	error("file-watcher startup did not commit")
+end
 
 
 

@@ -49,7 +49,10 @@ helpers.describe("infra/file_watchers — reload deferral during git pull (macos
 
 		hs.pathwatcher = { new = function(_path, cb)
 			watch_cbs[#watch_cbs + 1] = cb
-			return { start = function() end }
+			local watcher = {}
+			function watcher:start() return self end
+			function watcher:stop() return nil end
+			return watcher
 		end }
 		-- Capture the timer fn instead of running it, so the test steps each
 		-- debounce / poll tick manually.

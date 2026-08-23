@@ -56,7 +56,10 @@ local function arm_watchers()
 
 	hs.pathwatcher = { new = function(_path, cb)
 		watch_cbs[#watch_cbs + 1] = cb
-		return { start = function() end }
+		local watcher = {}
+		function watcher:start() return self end
+		function watcher:stop() return nil end
+		return watcher
 	end }
 	hs.timer = {
 		doAfter = function(_s, fn) captured_fn = fn; return { stop = function() end } end,

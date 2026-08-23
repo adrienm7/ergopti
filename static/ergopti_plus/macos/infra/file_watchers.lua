@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Boot-time hs.pathwatcher setup that reloads Hammerspoon when the user edits a
 --- hotstring TOML (in the shared dir, the personal dir tree, or in place) or any
---- project .lua file. Extracted verbatim from init.lua Section 7 so the boot
---- orchestrator stays thin; behaviour is unchanged.
+--- project .lua file. The required hotstrings/project watchers and any available
+--- personal-root watcher commit as one startup transaction so boot never
+--- publishes a partially armed required reload surface.
 ---
 --- FEATURES & RATIONALE:
 --- 1. GC-rooting: one composite owner is pinned in _G.script_watchers so neither
@@ -15,9 +16,9 @@
 --- 2. Debounced reload: rapid successive saves collapse into a single reload via a
 ---    0.5 s timer, and the reload is deferred through ui_restore so open UI is
 ---    snapshotted/closed first.
---- 3. Reentrant personal-dir scan: watch_personal_hotstrings_dir recurses into
----    sub-folders and arms a per-file watcher for each .toml so in-place edits a
----    directory watcher might miss still trigger a reload.
+--- 3. Transactional Arming: constructor/start refusal revokes callbacks before a
+---    reverse rollback; any exact capability whose stop refuses remains rooted
+---    for shutdown retry without being advertised as a successful startup.
 --- ==============================================================================
 
 local M = {}
@@ -81,6 +82,8 @@ end
 --- @param ctx table { hotstrings_dir: string, base_dir: string,
 ---   personal_hotstrings_dir: string, self_written_files: string[] } — absolute
 ---   paths resolved by the boot script.
+--- @return boolean committed True only when both required watchers, plus the
+---   personal watcher when available, are started and their owner is published.
 function M.start(ctx)
 	local hotstrings_dir = ctx.hotstrings_dir
 	local base_dir       = ctx.base_dir
@@ -156,11 +159,18 @@ function M.start(ctx)
 	-- shared debounce timer are revoked as one lifecycle. A separate timer owner
 	-- would make shutdown order-dependent: the watcher could enqueue another
 	-- reload between the two stop calls.
-	_G.script_watchers = _G.script_watchers or {}
-	local lifecycle_active = true
+	local watcher_roots = rawget(_G, "script_watchers")
+	if watcher_roots ~= nil and type(watcher_roots) ~= "table" then
+		Logger.error(LOG, "File-watcher owner root is malformed; startup refused.")
+		return false
+	end
+	watcher_roots = watcher_roots or {}
+	local lifecycle_active = false
 	local lifecycle_generation = 0
 	local native_watchers = {}
 	local timer_cleanup_backlog = {}
+	local callback_admissions = {}
+	local owner_published = false
 
 	-- Drop FSEvents replays delivered during the post-boot suppress window (see
 	-- BOOT_SUPPRESS_SEC). Captured now because M.start runs at the tail of boot,
@@ -171,8 +181,8 @@ function M.start(ctx)
 	local reload_timer = nil
 
 	--- Stops one exact native capability without discarding it on uncertainty.
-	--- Hammerspoon stop methods return their receiver, while test doubles may
-	--- return nil; only an exception or explicit false proves cancellation failed.
+	--- hs.pathwatcher:stop() is a void API, so non-throw is its exact commitment;
+	--- explicit false is reserved by stateful test doubles to model refusal.
 	--- @param handle table|userdata Native watcher or timer.
 	--- @param label string Diagnostic owner.
 	--- @return boolean stopped
@@ -191,6 +201,7 @@ function M.start(ctx)
 		-- Logical revocation precedes native cleanup. A callback already queued by
 		-- FSEvents/NSTimer is therefore inert even when native stop is uncertain.
 		lifecycle_active = false
+		for _, admission in ipairs(callback_admissions) do admission.active = false end
 		lifecycle_generation = lifecycle_generation + 1
 		local all_stopped = true
 		if reload_timer then
@@ -216,7 +227,82 @@ function M.start(ctx)
 		end
 		return all_stopped
 	end
-	table.insert(_G.script_watchers, owner)
+
+	--- Publishes the composite owner once, either after a full startup commit or
+	--- as the root for exact rollback debt. A fully settled refusal publishes
+	--- nothing and therefore cannot be mistaken for operational ownership.
+	local function publish_owner()
+		if owner_published then return end
+		watcher_roots[#watcher_roots + 1] = owner
+		_G.script_watchers = watcher_roots
+		owner_published = true
+	end
+
+	--- Revokes callbacks and rolls every staged watcher back in reverse order.
+	--- @return boolean Always false: this helper is a startup refusal boundary.
+	local function rollback_startup()
+		local settled = owner:stop()
+		if not settled then
+			publish_owner()
+			Logger.error(LOG, "File-watcher startup rollback remains incomplete and retryable.")
+		end
+		return false
+	end
+
+	--- Tests whether a constructor returned the complete native watcher surface.
+	--- Construction does not activate hs.pathwatcher, so a malformed candidate is
+	--- rejected before start and owns no native cleanup obligation.
+	--- @param candidate any Constructor result.
+	--- @return boolean valid
+	local function valid_watcher(candidate)
+		local candidate_type = type(candidate)
+		if candidate_type ~= "table" and candidate_type ~= "userdata" then return false end
+		local ok, valid = pcall(function()
+			return type(candidate.start) == "function" and type(candidate.stop) == "function"
+		end)
+		return ok and valid == true
+	end
+
+	--- Constructs and starts one exact watcher, staging its constructor result
+	--- before activation so even a partial-then-throw start remains rollback-owned.
+	--- hs.pathwatcher:start() commits only by returning that same watcher object.
+	--- @param path string Watched root.
+	--- @param callback function Native event callback.
+	--- @param label string Diagnostic owner.
+	--- @param allow_unavailable boolean Whether constructor unavailability may be skipped.
+	--- @return boolean committed
+	local function acquire_watcher(path, callback, label, allow_unavailable)
+		local admission = { active = false }
+		local function guarded_callback(...)
+			if not lifecycle_active or admission.active ~= true then return end
+			return callback(...)
+		end
+		local constructed, candidate_or_err = xpcall(function()
+			return hs.pathwatcher.new(path, guarded_callback)
+		end, debug.traceback)
+		if not constructed or not valid_watcher(candidate_or_err) then
+			local detail = tostring(constructed and "malformed watcher" or candidate_or_err)
+			if allow_unavailable then
+				Logger.warn(LOG, "%s is unavailable and was skipped: %s.", label, detail)
+				return true
+			end
+			Logger.error(LOG, "%s construction did not commit: %s.", label, detail)
+			return false
+		end
+
+		local candidate = candidate_or_err
+		native_watchers[#native_watchers + 1] = candidate
+		local started, owner_or_err = xpcall(function()
+			return candidate:start()
+		end, debug.traceback)
+		if not started or owner_or_err ~= candidate then
+			Logger.error(LOG, "%s activation did not commit exact ownership: %s.", label,
+				tostring(owner_or_err))
+			return false
+		end
+		callback_admissions[#callback_admissions + 1] = admission
+		return true
+	end
 	-- Consecutive hold re-polls with NO new file activity; reset to 0 by any real
 	-- file event (note_change) and by a fired reload, capped by
 	-- GIT_SETTLE_MAX_DEFERRALS so only a genuinely stuck state (a stale index.lock,
@@ -351,7 +437,8 @@ function M.start(ctx)
 	-- ========================================
 
 	-- Catches file creation, deletion, and renames in the hotstrings directory
-	local dir_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
+	local function hotstrings_changed(paths)
+		if not lifecycle_active then return end
 		local hit = {}
 		for _, p in ipairs(paths) do
 			if (p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$"))
@@ -360,9 +447,11 @@ function M.start(ctx)
 			end
 		end
 		if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
-	end)
-	dir_watcher:start()
-	native_watchers[#native_watchers + 1] = dir_watcher
+	end
+	if not acquire_watcher(hotstrings_dir, hotstrings_changed,
+		"Hotstrings directory watcher", false) then
+		return rollback_startup()
+	end
 
 	-- ONE recursive watcher on the personal root, filtered exactly like the
 	-- directory watcher above.
@@ -376,32 +465,31 @@ function M.start(ctx)
 	-- depth cap and `visited` cycle guard existed only to survive a symlink loop
 	-- that no longer has to be walked at all.
 	local personal_root = (personal_dir):gsub("[/\\]+$", "")
-	local ok_personal, personal_watcher =
-		pcall(hs.pathwatcher.new, personal_root, function(paths)
-			local hit = {}
-			for _, p in ipairs(paths) do
-				-- /tmp is excluded for the same reason the old per-directory callback
-				-- excluded it. The self-written and runtime-artefact filters are the
-				-- ones the sibling watcher already applies; the per-file watchers had
-				-- neither, so a write the driver made itself could trigger a reload.
-				if not p:match("^/tmp/")
-					and not is_self_written(p) and not is_runtime_artefact(p) then
-					hit[#hit + 1] = p
-				end
+	local function personal_hotstrings_changed(paths)
+		if not lifecycle_active then return end
+		local hit = {}
+		for _, p in ipairs(paths) do
+			-- /tmp is excluded for the same reason the old per-directory callback
+			-- excluded it. The self-written and runtime-artefact filters are the
+			-- ones the sibling watcher already applies; the per-file watchers had
+			-- neither, so a write the driver made itself could trigger a reload.
+			if not p:match("^/tmp/")
+				and not is_self_written(p) and not is_runtime_artefact(p) then
+				hit[#hit + 1] = p
 			end
-			if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
-		end)
-	if ok_personal and personal_watcher then
-		personal_watcher:start()
-		native_watchers[#native_watchers + 1] = personal_watcher
-	else
-		Logger.warn(LOG, "Could not watch the personal hotstrings root '%s'.", personal_root)
+		end
+		if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
+	end
+	if personal_root ~= "" and not acquire_watcher(personal_root, personal_hotstrings_changed,
+		"Personal hotstrings watcher", true) then
+		return rollback_startup()
 	end
 
 	-- HTML/CSS/JS are webview assets loaded at open-time — only .lua changes
 	-- drive Hammerspoon runtime behavior and warrant a reload
 	Logger.debug(LOG, "Configuring file watchers for auto-reloading…")
-	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
+	local function project_changed(paths)
+		if not lifecycle_active then return end
 		local hit = {}
 		for _, p in ipairs(paths) do
 			-- Ignore temporary files (tokens, etc.); a batch may still carry a real
@@ -415,9 +503,10 @@ function M.start(ctx)
 			Logger.debug(LOG, "Lua file change detected: %s (+%d more)", hit[1], #hit - 1)
 			note_change(i18n.get("init.reload_script"), hit)
 		end
-	end)
-	project_watcher:start()
-	native_watchers[#native_watchers + 1] = project_watcher
+	end
+	if not acquire_watcher(base_dir, project_changed, "Project source watcher", false) then
+		return rollback_startup()
+	end
 
 
 
@@ -426,6 +515,10 @@ function M.start(ctx)
 	-- directory watcher above is recursive and reports the individual changed
 	-- paths, so it already saw every in-place edit these duplicated - while ALSO
 	-- applying the is_runtime_artefact filter they lacked.
+	publish_owner()
+	lifecycle_active = true
+	for _, admission in ipairs(callback_admissions) do admission.active = true end
+	return true
 end
 
 return M
