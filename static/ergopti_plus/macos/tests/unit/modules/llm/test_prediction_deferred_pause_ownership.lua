@@ -432,10 +432,7 @@ helpers.describe("prediction engine: settled timer callback ownership", function
 			helpers.assert_eq(#fixture.timers, 1,
 				"positive control must own exactly one real scheduler timer")
 			local timer = fixture.timers[1]
-			local fired_ok, fired_error = pcall(timer.callback)
-			helpers.assert_true(fired_ok,
-				"the real TimerScheduler boundary must contain delivery: "
-					.. tostring(fired_error))
+			timer.callback()
 
 			helpers.assert_eq(observations.pause, 1)
 			helpers.assert_eq(observations.pause_result, false,
@@ -760,10 +757,7 @@ helpers.describe("prediction engine: settled timer callback ownership", function
 					expected_timer_count = 2
 				end
 
-				local fired_ok, fired_error = pcall(timer.callback)
-				helpers.assert_true(fired_ok,
-					"chain callback failure must stay inside the real scheduler: "
-						.. tostring(fired_error))
+				timer.callback()
 				helpers.assert_eq(observations.pause_result, false,
 					"PAUSE cannot settle while chain business is on stack")
 				helpers.assert_eq(observations.model, 1)
