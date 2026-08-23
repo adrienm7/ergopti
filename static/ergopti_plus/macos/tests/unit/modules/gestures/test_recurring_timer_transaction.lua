@@ -127,6 +127,7 @@ local function with_fixture(options, scenario)
 	end
 
 	local function noop() end
+	local function committed() return true end
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["infra.notifications"] = { notify = noop }
@@ -140,11 +141,19 @@ local function with_fixture(options, scenario)
 	package.loaded["modules.gestures.actions"] = setmetatable({
 		AX_NAMES = {},
 		SG_NAMES = {},
-		init = noop,
+		init = committed,
+		force_cleanup = committed,
+		resume_after_cleanup = committed,
 	}, { __index = function() return noop end })
 	package.loaded["modules.gestures.engine"] = setmetatable({
-		init = function() scheduler.engine_init_calls = scheduler.engine_init_calls + 1 end,
-		stop = function() scheduler.engine_stop_calls = scheduler.engine_stop_calls + 1 end,
+		init = function()
+			scheduler.engine_init_calls = scheduler.engine_init_calls + 1
+			return true
+		end,
+		stop = function()
+			scheduler.engine_stop_calls = scheduler.engine_stop_calls + 1
+			return true
+		end,
 	}, {
 		__index = function() return noop end,
 	})
