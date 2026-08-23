@@ -362,6 +362,10 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 				* paced_owner.delay_sec
 			helpers.assert_true(math.abs(
 				synthetic.paced_settlement_budget(paced_owner) - expected_budget) < 0.000001)
+			local paced_timer = paced_owner.timer and paced_owner.timer.timer
+			helpers.assert_true(type(paced_timer) == "table"
+				and type(paced_timer.fire) == "function",
+				"the fixture must expose the scheduler-owned native pacing timer")
 
 			local watchdog = nil
 			for _, timer in ipairs(hs.timer.__timers) do
@@ -372,7 +376,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 			helpers.assert_true(math.abs(watchdog.delay - (expected_budget + 0.25)) < 0.000001,
 				"the canonical watchdog margin starts after the immutable paced budget")
 
-			for _ = 1, 13 do paced_owner.timer:fire() end
+			for _ = 1, 13 do paced_timer:fire() end
 			helpers.assert_true(not transaction.completed)
 			helpers.assert_true(replay.is_pending(),
 				"the physical Enter must remain owned after the old 250ms deadline")
@@ -390,7 +394,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 			helpers.assert_eq(synthetic.stats().pending, 3)
 
 			for _ = 14, deletes + synthetic.PACED_TRAILING_TICKS do
-				paced_owner.timer:fire()
+				paced_timer:fire()
 			end
 			helpers.assert_true(transaction.completed,
 				"the transaction becomes terminal only after the serializer settlement tick")

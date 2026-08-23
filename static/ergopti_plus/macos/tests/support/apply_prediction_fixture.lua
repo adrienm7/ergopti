@@ -191,12 +191,6 @@ function M.run(options)
 		init = function() return true end,
 		flush_now = noop,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
-			after = function(delay, callback)
-				local timer = hs_stub.timer.doAfter(delay, callback)
-				return { timer = timer, cancel = function() timer:stop() end }, true
-			end,
-	}
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(key)
 			if key == "hotstrings.trigger_char" then return "\u{2605}" end
