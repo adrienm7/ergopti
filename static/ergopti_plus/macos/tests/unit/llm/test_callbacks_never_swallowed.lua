@@ -292,7 +292,7 @@ helpers.describe("LLM orchestration: queued waiters use the visible callback con
 	helpers.it("covers dependency and model-manager callback aliases", function()
 		local targets = {
 			{
-				symbol = "local function fire_pending_callbacks",
+				symbol = "fire_pending_callbacks = function(ok, is_current)",
 				label = "MLX dependency callbacks",
 				boundary = "ApiCommon.protected_call",
 			},
@@ -380,7 +380,7 @@ helpers.describe("HS-016 callback owners: every hand-off is visible and truthful
 				forbidden = { "callback" },
 			},
 			{
-				symbol = "function obj.reattach_download", label = "MLX download callback",
+				symbol = "local function reattached_business_authorized()", label = "MLX download callback",
 				forbidden = { "on_success", "deps.update_icon", "deps.keymap.set_llm_model", "deps.save_prefs" },
 			},
 			{
