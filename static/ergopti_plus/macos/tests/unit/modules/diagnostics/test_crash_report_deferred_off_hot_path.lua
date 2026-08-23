@@ -124,11 +124,19 @@ helpers.describe("shell_runner: crash report is deferred off the hs.task complet
 			task = {
 				new = function(_, cb, _args)
 					captured_completion_cb = cb
-					return {
-						start     = function() if captured_completion_cb then captured_completion_cb(0, "", "") end end,
-						isRunning = function() return false end,
-						terminate = function() end,
-					}
+					local task = { running = false }
+					function task:start()
+						self.running = true
+						if captured_completion_cb then captured_completion_cb(0, "", "") end
+						self.running = false
+						return self
+					end
+					function task:isRunning() return self.running end
+					function task:terminate()
+						self.running = false
+						return self
+					end
+					return task
 				end,
 			},
 		}
