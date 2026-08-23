@@ -3875,6 +3875,154 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 	}
 
+	/// An idempotent mode ACK still requires a live private transport boundary.
+	func testOuterIdempotentModeAckCannotOutrankSameBatchInnerHUP() throws {
+		let cases: [(initialMode: Int, command: String, acknowledgement: String)] = [
+			(kLeaseModeActive, "RESUME", "RESUMED"),
+			(kLeaseModePaused, "PAUSE", "PAUSED"),
+		]
+		for testCase in cases {
+			for losesInner in [true, false] {
+				let fixture = try makeExecutableFixture(
+					body: "IFS= read -r command <&3 || exit 40\n"
+						+ "[ \"$command\" = 'ACTIVATE \(testCase.initialMode)' ] || exit 41\n"
+						+ "printf 'READY \(testCase.initialMode)\\n' >&3\n"
+						+ (losesInner
+							? "while [ ! -f \"$3\" ]; do /bin/sleep 0.01; done\nexit 0\n"
+							: "IFS= read -r command <&3 || exit 42\n"
+								+ "[ \"$command\" = STOP ] || exit 43\n"
+								+ "printf 'FENCED\\n' >&3\nexit 0\n")
+				)
+				defer {
+					try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent())
+				}
+				let directory = fixture.deletingLastPathComponent()
+				let innerExitMarker = directory.appendingPathComponent("close-inner")
+				let publicOutput = directory.appendingPathComponent("public-output")
+				let outputDescriptor = Darwin.open(
+					publicOutput.path,
+					O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC,
+					S_IRUSR | S_IWUSR
+				)
+				XCTAssertGreaterThanOrEqual(outputDescriptor, 0)
+				guard outputDescriptor >= 0 else { continue }
+				var parentPipe = [Int32](repeating: -1, count: 2)
+				let pipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
+					Darwin.pipe(buffer.baseAddress!)
+				}
+				XCTAssertEqual(pipeStatus, 0)
+				guard pipeStatus == 0 else {
+					_ = Darwin.close(outputDescriptor)
+					continue
+				}
+				defer {
+					_ = Darwin.close(parentPipe[0])
+					_ = Darwin.close(parentPipe[1])
+					_ = Darwin.close(outputDescriptor)
+				}
+				let identity = LeaseIdentity(
+					cliPath: "/unused/karabiner_cli",
+					token: token,
+					modeName: innerExitMarker.path,
+					revokedName: "ergopti_revoked_\(token)",
+					initialMode: testCase.initialMode,
+					heartbeatSeconds: 5
+				)
+				let registration = ScriptedLeaseGuardianRegistration(armResult: true)
+				let spawner = InitialThenUnavailableLeaseInnerSpawner(
+					initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
+				)
+				let recovery = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
+				var publicCommandQueued = false
+				var terminalBatchInjected = false
+				var livePublicationChecks = 0
+				let runtime = KarabinerLeaseOuterRuntime(
+					identity: identity,
+					detached: false,
+					spawner: spawner,
+					guardianRegistration: registration,
+					recoveryExecutor: recovery,
+					parentInputDescriptor: parentPipe[0],
+					parentOutputDescriptor: outputDescriptor,
+					poller: { descriptors, timeoutMilliseconds in
+						if losesInner && publicCommandQueued && !terminalBatchInjected {
+							XCTAssertTrue(FileManager.default.createFile(
+								atPath: innerExitMarker.path,
+								contents: Data()
+							))
+							var privateDescriptor = pollfd(
+								fd: descriptors[1].fd,
+								events: Int16(POLLIN | POLLHUP | POLLERR),
+								revents: 0
+							)
+							var terminalResult: Int32
+							repeat {
+								terminalResult = Darwin.poll(&privateDescriptor, 1, 2_000)
+							} while terminalResult == -1 && errno == EINTR
+							guard terminalResult > 0,
+								leasePollReportsTerminal(privateDescriptor.revents)
+							else {
+								XCTFail("the inner must close before the combined poll batch")
+								errno = EIO
+								return -1
+							}
+							descriptors[0].revents = Int16(POLLIN)
+							descriptors[1].revents = Int16(POLLHUP | POLLERR)
+							terminalBatchInjected = true
+							return 2
+						}
+						return descriptors.withUnsafeMutableBufferPointer { buffer in
+							Darwin.poll(
+								buffer.baseAddress!,
+								nfds_t(buffer.count),
+								timeoutMilliseconds
+							)
+						}
+					},
+					beforeLiveAcknowledgementPublish: {
+						livePublicationChecks += 1
+						if livePublicationChecks == 1 {
+							XCTAssertTrue(writeLeaseLine(
+								testCase.command,
+								to: parentPipe[1]
+							))
+							publicCommandQueued = true
+						} else if !losesInner && livePublicationChecks == 2 {
+							XCTAssertTrue(writeLeaseLine("STOP", to: parentPipe[1]))
+						}
+					}
+				)
+
+				let exitCode = runtime.run()
+				let output = try String(contentsOf: publicOutput, encoding: .utf8)
+				let publicLines = output.split(separator: "\n").map { String($0) }
+				let exactFence = LeasePayloads.fence(identity: identity)
+				if losesInner {
+					XCTAssertTrue(terminalBatchInjected)
+					XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
+					XCTAssertEqual(publicLines, ["READY"])
+					XCTAssertEqual(spawner.spawnAttempts, 2)
+					XCTAssertEqual(recovery.payloads, [exactFence, exactFence])
+				} else {
+					XCTAssertFalse(terminalBatchInjected)
+					XCTAssertEqual(exitCode, LeaseWorkerExit.success.rawValue)
+					XCTAssertEqual(publicLines, ["READY", testCase.acknowledgement, "STOPPED"])
+					XCTAssertEqual(
+						publicLines.filter { $0 == testCase.acknowledgement }.count,
+						1
+					)
+					XCTAssertEqual(spawner.spawnAttempts, 1)
+					XCTAssertEqual(recovery.payloads, [])
+				}
+				XCTAssertEqual(livePublicationChecks, 2)
+				XCTAssertEqual(registration.beginLiveTransportCalls, 2)
+				XCTAssertEqual(registration.endLiveTransportCalls, 2)
+				XCTAssertEqual(registration.retireCalls, 1)
+				XCTAssertEqual(registration.closeCalls, 1)
+			}
+		}
+	}
+
 	/// Preserves a stable failure when EINTR lands between its line and inner HUP.
 	func testInnerBoundaryEINTRPreservesSingleBufferedFailureDiagnostic() throws {
 		let fixture = try makeExecutableFixture(
