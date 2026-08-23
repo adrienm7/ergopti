@@ -137,11 +137,15 @@ helpers.describe("ollama_deps_checker: ownership is captured at claim time", fun
 		local at = code:find('set_step, i18n.get("ollama.deps_step_ready")', 1, true)
 		helpers.assert_true(at ~= nil, "the completion path must still report readiness")
 
-		local before = code:sub(math.max(1, at - 400), at)
-		helpers.assert_true(before:find("owns_window", 1, true) ~= nil,
+		local ownership_at = code:find(
+			"local owns_active_window = active_ok and active == true and owns_window()", 1, true)
+		helpers.assert_true(ownership_at ~= nil and ownership_at < at,
 			"writing the ready step and 100%% must be gated on still owning the window. "
 				.. "is_active() proves only that SOME window is open, so an ungated write "
 				.. "overwrites another operation's live progress with this one's outcome")
+		local guarded_path = code:sub(ownership_at, at)
+		helpers.assert_true(guarded_path:find("if owns_active_window then", 1, true) ~= nil,
+			"the exact claim-time ownership result must dominate the readiness write")
 	end)
 
 	helpers.it("the ownership state is declared before the closures that use it", function()
