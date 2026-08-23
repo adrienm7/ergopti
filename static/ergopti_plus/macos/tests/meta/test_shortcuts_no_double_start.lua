@@ -56,9 +56,17 @@ helpers.describe("shortcuts/keyboard_shortcuts.lua: double-start guard (shortcut
 
 	helpers.it("M.start() checks _started before rebinding hotkeys", function()
 		local src = read_source("local function load_assignments") -- modules/shortcuts/keyboard_shortcuts.lua
-		-- The fix adds: if _started then Logger.debug(...) return end at the top of M.start()
+		local start_pos = src:find("function M.start()", 1, true)
+		local stop_pos = start_pos and src:find("\nfunction M.stop()", start_pos, true) or nil
+		helpers.assert_true(start_pos ~= nil and stop_pos ~= nil,
+			"keyboard_shortcuts must retain bounded start and stop lifecycle methods")
+		local start_body = src:sub(start_pos, stop_pos)
+		local guard_pos = start_body:find("if _started then", 1, true)
+		local return_pos = guard_pos and start_body:find("return true", guard_pos, true) or nil
+		local bind_pos = start_body:find("bind_slot(slot, action)", 1, true)
 		helpers.assert_true(
-			src:match("if _started then[^\n]*\n[^\n]*debug") ~= nil,
+			guard_pos ~= nil and return_pos ~= nil and bind_pos ~= nil
+				and guard_pos < return_pos and return_pos < bind_pos,
 			"keyboard_shortcuts M.start() must guard against double-start by checking _started (shortcuts-watcher-leak)")
 	end)
 
