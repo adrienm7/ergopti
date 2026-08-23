@@ -70,6 +70,7 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 		package.loaded["hs"] = hs_stub
 
 		local function noop() end
+		local function committed() return true end
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["infra.logger"] = setmetatable({
 			pcall = function(_, fn, ...) return pcall(fn, ...) end,
@@ -81,10 +82,16 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 			sec = function() return 1 end,
 		}
 		package.loaded["modules.gestures.engine"] = setmetatable({
-			init = noop,
+			init           = committed,
+			stop           = committed,
+			unblock_scroll = committed,
 		}, { __index = function() return noop end })
 		package.loaded["modules.gestures.actions"] = setmetatable({
-			init = noop, AX_NAMES = {}, SG_NAMES = {},
+			init                 = committed,
+			force_cleanup        = committed,
+			resume_after_cleanup = committed,
+			AX_NAMES             = {},
+			SG_NAMES             = {},
 		}, { __index = function() return noop end })
 		package.loaded["modules.gestures.conflicts"] = setmetatable({}, {
 			__index = function() return noop end,
@@ -99,7 +106,7 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 			screensDidUnlock = 2,
 			new = function(callback)
 				wake_callback = callback
-				return { start = noop, stop = noop }
+				return { start = committed, stop = committed }
 			end,
 		}
 		package.loaded["hs.caffeinate.watcher"] = wake_module
