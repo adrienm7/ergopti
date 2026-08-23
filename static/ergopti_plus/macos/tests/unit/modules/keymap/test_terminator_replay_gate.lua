@@ -21,7 +21,7 @@ local function load_gate(options)
 	package.loaded["hs"] = hs_stub
 
 	for _, name in ipairs({
-		"adapters.synthetic_input", "adapters.event_provenance",
+		"adapters.timer_scheduler", "adapters.synthetic_input", "adapters.event_provenance",
 		"modules.keymap.terminator_replay",
 	}) do
 		package.loaded[name] = nil
