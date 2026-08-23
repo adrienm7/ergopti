@@ -70,9 +70,9 @@ check(
 );
 
 check(
-    'UI Builder: retry loop calls hs.timer.doAfter',
+    'UI Builder: retry loop uses the lifecycle scheduler',
     'static/ergopti_plus/macos/ui/ui_builder.lua',
-    /hs\.timer\.doAfter\(0\.05, try_focus\)/
+    /schedule\(0\.05,\s*try_focus,\s*["']webview focus retry["']\)/
 );
 
 check(
