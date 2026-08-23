@@ -315,12 +315,10 @@ helpers.describe("prediction_engine.reset() quiesces stream + deferred state", f
 		helpers.assert_eq(engine.start_timer(0.02), true)
 		local timer = hs_stub.timer.__timers[#hs_stub.timer.__timers]
 
-		local callback_ok = pcall(timer.fire, timer)
+		timer:fire()
 
 		engine.perform_check = real_perform
 		logger.error = original_error
-		helpers.assert_true(callback_ok,
-			"the debounce exception must not escape to Hammerspoon Console")
 		local found = false
 		for _, message in ipairs(messages) do
 			if message:find("Inactivity debounce check raised", 1, true)
