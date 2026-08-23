@@ -175,7 +175,22 @@ helpers.describe("raw task launchers: nullable construction and false start are 
 					-- Each launch must be committed only by a branch that inspects
 					-- TaskLifecycle.start. A bare start cannot compensate its pin,
 					-- latch, UI or callback when native start returns false.
-					local conditional_start = window:find("if%s+.-TaskLifecycle%.start%s*%(")
+					local start_call = window:find("TaskLifecycle.start", 1, true)
+					local after_start = start_call and window:sub(start_call) or ""
+					-- Strict owners may call start through xpcall/acquisition helpers, then
+					-- validate the captured result and roll the exact task back. Requiring
+					-- `if` to precede the call only recognizes the obsolete inline form.
+					local exact_result_guard = after_start:find("[%a_][%w_]*%s*~=%s*true")
+						or after_start:find("if%s+not%s+[%a_][%w_]*")
+					local rollback_path = after_start:find("terminate", 1, true)
+						or after_start:find("cancel", 1, true)
+						or after_start:find("release", 1, true)
+						or after_start:find("clear_", 1, true)
+						or after_start:find("signal_", 1, true)
+					local inline_guard = window:find(
+						"if%s+not%s+TaskLifecycle%.start%s*%(")
+					local conditional_start = inline_guard ~= nil or (start_call ~= nil
+						and exact_result_guard ~= nil and rollback_path ~= nil)
 					local assignment_prefix = code:sub(math.max(1, launch_at - 120), launch_at - 1)
 					local task_name = assignment_prefix:match("([%a_][%w_]*)%s*=%s*$")
 					local delegated = task_name ~= nil
@@ -210,8 +225,9 @@ helpers.describe("raw task launchers: nullable construction and false start are 
 			"ShellRunner must reject a nil native handle")
 		helpers.assert_true(code:find("local ok, started = pcall(function() return task:start() end)", 1, true) ~= nil,
 			"ShellRunner must protect start exceptions and inspect the operational result")
-		helpers.assert_true(code:find("if not ok then", 1, true) ~= nil
-			and code:find("if not started then", 1, true) ~= nil,
+		helpers.assert_true(code:find("if ok and started then", 1, true) ~= nil
+			and code:find("_lifecycle = \"start_failed\"", 1, true) ~= nil
+			and code:find("if not ok then", 1, true) ~= nil,
 			"ShellRunner must reject both a thrown and a false native start")
 	end)
 
