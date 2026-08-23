@@ -57,6 +57,14 @@ the user's real diff inside mechanical churn and can contaminate other active
 worktrees. A repository-wide normalization, if ever needed, is its own reviewed
 commit.
 
+## RTK stops before machine consumers
+
+Follow `docs/tooling/rtk.md`: the project launcher is for output read by a
+human or LLM. Call the child directly when stdout is captured, piped,
+redirected, parsed, hashed, generated into another file, or asserted by a
+test. RTK 0.43.0 may rewrite that stream, so it cannot sit on a
+machine-to-machine boundary.
+
 ## Node cannot spawn `npm` without a shell
 
 `npm` is a `.cmd` shim, and Node 20+ refuses to spawn one without `shell: true`

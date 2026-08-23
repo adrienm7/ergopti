@@ -92,7 +92,7 @@ assert.ok(zedLanguages.length >= 10, 'the Zed contract must cover the repository
 assert.strictEqual(zed.format_on_save, 'off', 'Zed formatting must be opt-in by language');
 assert.strictEqual(
 	zed.line_ending,
-	'prefer_lf',
+	'enforce_lf',
 	'Zed must prefer LF for new files without rewriting existing line endings'
 );
 for (const language of zedLanguages) {

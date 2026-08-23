@@ -214,9 +214,12 @@ about both positive and negative triggers.
 
 ### project-rtk-is-local-integration
 
-Interactive agents use the launcher in `docs/tooling/rtk.md`. It may install
-only the pinned, checksum-verified user-local binary and never modifies persistent `PATH` or
-global hooks. CI must retain the raw-command fallback and never download RTK.
+Interactive agents use the launcher in `docs/tooling/rtk.md` only for output
+read by a human or LLM. RTK 0.43.0 may rewrite output, so a pipe, redirection,
+capture, structured parser, hash, generator, or test assertion invokes the
+child directly. The launcher may install only the pinned, checksum-verified
+user-local binary and never modifies persistent `PATH` or global hooks. CI
+must retain the raw-command fallback and never download RTK.
 
 ### project-external-skills-are-reviewed-dependencies
 
