@@ -1,95 +1,101 @@
 --- tests/unit/ui/menu/test_models_manager_mlx_task_forward_declared.lua
 
 --- ==============================================================================
---- MODULE: Regression — models_manager_mlx_server closure-nil forward declarations
+--- MODULE: MLX Server Exact-Task Ownership Regression
 --- DESCRIPTION:
---- start_server (extracted to models_manager_mlx_server.lua in the models-manager
---- split) retains two hs.task sites whose callbacks reference the task handle itself
---- (not a hardcoded string key):
----
----   1. probe_task — HTTP probe loop; callback clears _active_tasks[probe_task]
----   2. task (mlx-server bash kill) — callback compares
----      deps.active_tasks["mlx_server"] == task to guard the cleanup
----
---- An inline `local X = <constructor>(...)` form binds _G.X (nil) inside the
---- callback closure. For probe_task: _active_tasks[nil] = nil → "table index is
---- nil" (swallowed to HS Console). For the bash-kill task: the comparison
---- would always be `deps.active_tasks["mlx_server"] == nil`, unconditionally
---- clearing the active-task slot even when a different MLX process is running.
----
---- The former detached pre-launch sweep was removed because its late broad kill
---- could terminate the successor. This test pins both the absence of that race
---- and the ROOT CAUSE at each retained closure site.
+--- The readiness probe and server launcher now settle callback work through
+--- exact owners. A forward-declaration spelling scan no longer proves safety:
+--- ownership must be published and GC-pinned before native start, then released
+--- only through the owner after terminal observation.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("models_manager_mlx: retained task closures own exact handles", function()
-	-- The retained dangerous hs.task sites live inside start_server, which moved to
-	-- the server-lifecycle sibling module during the models-manager split.
-	--
-	-- Selected by a function declaration unique to that production module rather
-	-- than by path, so moving it cannot turn these invariants into a path error.
-	local function read_src()
-		local src = helpers.read_driver_source("function obj.start_server")
-		helpers.assert_true(src ~= nil, "models_manager_mlx_server.lua source must be locatable")
-		return src
+local function read_src()
+	local src, err = helpers.read_driver_unit("function obj.start_server")
+	helpers.assert_true(src ~= nil,
+		"models_manager_mlx_server source must be uniquely locatable: " .. tostring(err))
+	return (src:gsub("%-%-[^\n]*", ""))
+end
+
+local function ordered(source, markers)
+	local cursor = 1
+	for _, marker in ipairs(markers) do
+		local position = source:find(marker, cursor, true)
+		if not position then return false, marker end
+		cursor = position + #marker
 	end
+	return true
+end
 
+local function remove_once(source, marker)
+	local position = source:find(marker, 1, true)
+	helpers.assert_true(position ~= nil, "mutation marker must exist: " .. marker)
+	return source:sub(1, position - 1) .. source:sub(position + #marker)
+end
 
-	-- ===== Removed site: detached pre-launch sweep =====
+local function readiness_contract(source)
+	return ordered(source, {
+		"local function release_readiness_task",
+		"local task = task_owner.task",
+		"if task ~= nil then _active_tasks[task] = nil end",
+		"probe_server_ready = function(retries)",
+		"local task_owner = {",
+		"task_owner.authorized == true",
+		"task_owner.start_committed == true",
+		"release_readiness_task(launched_lifecycle, task_owner)",
+		"probe_task = TaskLifecycle.native(\"MLX readiness probe\"",
+		"task_owner.task = probe_task",
+		"launched_lifecycle.readiness_task_owner = task_owner",
+		"_active_tasks[probe_task] = true",
+		"TaskLifecycle.start(probe_task, \"MLX readiness probe\")",
+		"task_owner.start_committed = true",
+	})
+end
 
-	helpers.it("(HS-007-no-detached-prelaunch-sweep) has no detached pre-launch sweep", function()
-		local src = read_src()
-		local native_labels = {}
-		for label in src:gmatch('TaskLifecycle%.native%("([^"]+)"') do
-			native_labels[#native_labels + 1] = label
+local function server_contract(source)
+	return ordered(source, {
+		"local function claim_server_completion",
+		"owner.task ~= task",
+		"local function release_native_server_task",
+		"_active_tasks[\"mlx_server\"] == task",
+		"deps.active_tasks[\"mlx_server\"] == task",
+		"server_completion = function(code)",
+		"pending_server_completion = table.pack(code)",
+		"local owner = claim_server_completion(task)",
+		"task = TaskLifecycle.native(\"MLX server launch\"",
+		"obj._server_lifecycle_owner = lifecycle",
+		"active_tasks_gc_root[\"mlx_server\"] = task",
+		"TaskLifecycle.start(task, \"MLX server launch\")",
+		"lifecycle.start_committed = true",
+	})
+end
+
+helpers.describe("models_manager_mlx: exact native task ownership", function()
+	helpers.it("owns only the readiness probe and exact server launcher", function()
+		local labels = {}
+		for label in read_src():gmatch('TaskLifecycle%.native%(%s*"([^"]+)"') do
+			labels[#labels + 1] = label
 		end
-		helpers.assert_eq(native_labels, {"MLX readiness probe", "MLX server launch"},
-			"start_server may own only its readiness probe and exact server launcher")
-		helpers.assert_nil(src:find('TaskLifecycle.native("MLX pre-launch port sweep"', 1, true),
-			"a pre-launch cleanup must not run as a detached task that can kill its successor")
-		helpers.assert_nil(src:find("sweep = TaskLifecycle.native", 1, true),
-			"the removed detached sweep constructor must not return under another comment")
-		helpers.assert_nil(src:find("_active_tasks[sweep]", 1, true),
-			"the removed sweep must not retain an independently scheduled GC owner")
+		helpers.assert_eq(labels, {"MLX readiness probe", "MLX server launch"},
+			"a detached pre-launch sweep can race and terminate its successor")
 	end)
 
-
-	-- ===== Site 1: probe_task =====
-
-	helpers.it("probe_task handle is forward-declared before the constructor closure", function()
-		local src = read_src()
-		local decl_pos = src:find("local probe_task\n", 1, true)
-		local new_pos  = src:find("probe_task = TaskLifecycle.native", 1, true)
-		helpers.assert_true(decl_pos ~= nil, "probe_task must be forward-declared as `local probe_task`")
-		helpers.assert_true(new_pos  ~= nil,
-			"probe_task must be assigned via `probe_task = TaskLifecycle.native`")
-		helpers.assert_true(decl_pos < new_pos,
-			"forward declaration must precede the constructor closure")
+	helpers.it("publishes the readiness owner before native start", function()
+		local source = read_src()
+		local ok, missing = readiness_contract(source)
+		helpers.assert_true(ok, "missing readiness ownership edge: " .. tostring(missing))
+		local mutant = remove_once(source, "_active_tasks[probe_task] = true")
+		helpers.assert_true(not readiness_contract(mutant),
+			"the guard must fail when the readiness task loses its GC root")
 	end)
 
-	helpers.it("probe_task GC-pin release is guarded against nil probe_task", function()
-		local src = read_src()
-		helpers.assert_true(
-			src:find("if probe_task then _active_tasks[probe_task] = nil end", 1, true) ~= nil,
-			"probe_task callback must guard the GC-pin clear with `if probe_task then`")
-	end)
-
-
-	-- ===== Site 2: task (mlx-server bash kill) =====
-
-	helpers.it("mlx-server bash-kill task handle is forward-declared before the native constructor", function()
-		local src = read_src()
-		-- Anchor on the unique sentinel that only appears in this scope
-		local anchor = src:find('deps.active_tasks["mlx_server"] == task', 1, true)
-		helpers.assert_true(anchor ~= nil, 'the mlx-server bash-kill callback must contain `deps.active_tasks["mlx_server"] == task`')
-		-- Find the `local task` declaration immediately before this closure
-		-- (search backwards from the anchor by extracting a window before it)
-		local window = src:sub(1, anchor)
-		local last_decl = window:match(".*local task\n")
-		helpers.assert_true(last_decl ~= nil,
-			"the mlx-server bash-kill task must be forward-declared (`local task` on its own line) "
-			.. "so the callback captures the upvalue, not nil; otherwise the active-task comparison always evaluates to nil")
+	helpers.it("publishes and claims the exact server owner", function()
+		local source = read_src()
+		local ok, missing = server_contract(source)
+		helpers.assert_true(ok, "missing server ownership edge: " .. tostring(missing))
+		local mutant = remove_once(source, "obj._server_lifecycle_owner = lifecycle")
+		helpers.assert_true(not server_contract(mutant),
+			"the guard must fail when completion cannot claim the published lifecycle")
 	end)
 end)
