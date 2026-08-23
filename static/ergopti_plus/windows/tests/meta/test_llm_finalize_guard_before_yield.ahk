@@ -110,9 +110,31 @@ _LFGY_RenderCarriesItsOwnGuard() {
 	ShowAt := InStr(Body, "LLM_Tooltip_Show(display_slots")
 	Assert(ShowAt > 0, "the tooltip render must still exist")
 
-	GuardAt := InStr(Body, "_LLM_Engine_IsCurrent(")
+	; The last render-side guard owns the tooltip call. Earlier final-only guards
+	; (such as inline auto-type) cannot protect an intermediate streaming paint.
+	GuardAt := 0
+	Pos := 1
+	while (Found := InStr(Body, "_LLM_Engine_IsCurrent(", false, Pos)) {
+		if Found >= ShowAt
+			break
+		GuardAt := Found
+		Pos := Found + 1
+	}
 	Assert(GuardAt > 0 and GuardAt < ShowAt,
 		"LLM_Engine_OnResults must re-check staleness before it paints. LLM_Diff_Compute runs a RegExMatch per character over every slot and the display-opts resolution queries the focused window, so the caller's check is already stale by the time the paint happens")
+	ConditionAt := 0
+	Pos := 1
+	while (Found := InStr(Body, "if (", false, Pos)) {
+		if Found >= GuardAt
+			break
+		ConditionAt := Found
+		Pos := Found + 1
+	}
+	Assert(ConditionAt > 0,
+		"the render-side staleness predicate must remain an explicit condition")
+	Condition := SubStr(Body, ConditionAt, GuardAt - ConditionAt)
+	Assert(InStr(Condition, "is_final", true) == 0,
+		"the render-side staleness gate must protect intermediate and final paints; a final-only guard lets a superseded streaming callback repaint abandoned text")
 
 	Fin := _DriverFuncBody("_LLM_Engine_FinalizeRequest")
 	Fin := RegExReplace(Fin, "\s+", " ")

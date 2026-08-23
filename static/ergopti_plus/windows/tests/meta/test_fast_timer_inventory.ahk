@@ -73,6 +73,7 @@ _FTI_Inventory() {
 		"WPMWidget_MouseWatch",         "50",    ; only armed while the WPM widget is visible
 		"_SR_Poll",                     "100",   ; shell_runner completion poll
 		"_SR_TreePoll",                 "100",   ; only armed while a Job-owned process tree is live
+		"_LLM_NavEventOwnerServiceFn",  "100",   ; native receipt/fault drain, disarmed on Stop
 		"_SpotlightTick",               "100",   ; only armed while spotlight is open
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode

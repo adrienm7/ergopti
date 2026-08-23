@@ -308,6 +308,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/app_launcher.ahk
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
+#Include adapters/llm_nav_event_owner.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
 #Include adapters/graphics_renderer.ahk

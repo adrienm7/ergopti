@@ -224,6 +224,16 @@ _SuspendRestoreFromMarker() {
 _SuspendHandoffBeforeToggle() {
 		LoggerInfo("Lifecycle", "Restoring the pause that a menu-driven Reload would otherwise have dropped.")
 }
+
+; The native navigation hook is independent of AHK's Suspend command. Refuse
+; the transition unless it is quiesced first; if its own suspend operation
+; fails, stop/unhook it so a paused driver can never keep consuming digits.
+_LifecycleSetNavEventOwnerSuspended(Suspended) {
+	if !IsSet(LLM_NavEventOwner_QuiesceForLifecycle)
+		return true
+	return LLM_NavEventOwner_QuiesceForLifecycle(Suspended)
+}
+
 ToggleSuspend(*) {
 		global _SuspendPending, _SuspendPendingSince
 		; A second press while a suspend is PENDING must cancel it. Without this
@@ -246,6 +256,8 @@ ToggleSuspend(*) {
 		}
 		if _SuspendPrefixesAreClear() {
 				_SuspendPending := false
+				if !_LifecycleSetNavEventOwnerSuspended(true)
+					return
 				Suspend(1)
 				_SuspendStateWatchdog()
 				return
@@ -282,12 +294,16 @@ _SuspendPendingPoll() {
 		}
 		_SuspendPending := false
 		SetTimer(_SuspendPendingPoll, 0)
+		if !_LifecycleSetNavEventOwnerSuspended(true)
+			return
 		Suspend(1)
 		_SuspendStateWatchdog()
 }
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook, _OneShotShiftInputHook, _DeadKeyInputHook
 	global _MagicKeyEditorInputHook
+	if !_LifecycleSetNavEventOwnerSuspended(true)
+		return false
 	if IsSet(LLM_AuxInvalidate)
 		try LLM_AuxInvalidate("suspend")
 	; Release OS-level modifiers before even the lifecycle START log: LoggerStart
@@ -405,9 +421,11 @@ Ergopti_OnSuspendEnter() {
 		if IsSet(_LLM_Deps_PollTimer)
 				try SetTimer(_LLM_Deps_PollTimer, 0)
 		LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
+		return true
 }
 Ergopti_OnSuspendResume() {
 		LoggerStart("Lifecycle", "Resuming from suspend…")
+		NavEventOwnerReady := _LifecycleSetNavEventOwnerSuspended(false)
 		; Transfer any pre-pause fire batch to one new timer owner only after native
 		; Suspend has been lifted. A stale pre-pause callback cannot pass the new
 		; generation even if it was already queued in the message pump.
@@ -469,7 +487,10 @@ Ergopti_OnSuspendResume() {
 			and Features["shortcuts"].Has("wrap_text_if_selected")
 			and Features["shortcuts"]["wrap_text_if_selected"]
 			try SetTimer(UIASW_Start, -1)
-		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
+		if NavEventOwnerReady
+				LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
+		else
+				LoggerError("Lifecycle", "Resume completed with the navigation event owner unavailable; its retained plan will retry on the next lifecycle transition.")
 }
 
 _SuspendStateWatchdog() {
@@ -509,12 +530,9 @@ _SuspendStateWatchdog() {
 				return
 		_TransitionBusy := true
 		try {
-				_LastSuspendState := A_IsSuspended
-				UpdateTrayIcon()
-				if A_IsSuspended
-						Ergopti_OnSuspendEnter()
-				else
-						Ergopti_OnSuspendResume()
+				_LLM_NavEventOwnerApplyExternalSuspendTransition(
+					A_IsSuspended, Ergopti_OnSuspendEnter,
+					Ergopti_OnSuspendResume, Suspend, UpdateTrayIcon)
 		} finally {
 				_TransitionBusy := false
 		}
@@ -684,6 +702,7 @@ Ergopti_OnShutdown(reason, code) {
 		try HotstringPrefixWatcherOnShutdown()
 		try KL_Stop()
 		try UIASW_Stop("canceled")
+		try LLM_NavEventOwner_Stop(false, true)
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
 		try OllamaWV_Close()

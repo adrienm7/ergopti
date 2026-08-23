@@ -347,6 +347,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build and test native navigation event owner
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
+
       - name: Cache AutoHotkey runtime
         id: cache-ahk
         uses: actions/cache@v4
@@ -2107,6 +2111,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Build and test native navigation event owner
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
 
       - name: Set up Python
         uses: actions/setup-python@v5

@@ -1142,22 +1142,94 @@ Test("LLM engine: loading spinner suppressed while a prediction is visible", _LL
 
 _LLM_EngineShowLoading_ShownWhenScreenEmpty() {
 	global _LLM_Engine, _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
-	_LLM_Engine := Map("inline_autotype", false)
+	_LLM_Engine := Map(
+		"inline_autotype", false,
+		"request_id", 41,
+		"active_request_signature", "sig-A")
 	_Stub_LlmTooltipVisible := false   ; nothing on screen
 	_Stub_LlmTooltipLoading := false
 	_Stub_LlmTooltipCalls := []
 	_LLM_Engine_ShowLoadingTooltip()
 	shown := false
+	LoadingCall := 0
 	for c in _Stub_LlmTooltipCalls {
-		if (c.HasOwnProp("loading") and c.loading)
+		if (c.HasOwnProp("loading") and c.loading) {
 			shown := true
+			LoadingCall := c
+		}
 	}
 	AssertTrue(shown, "loading spinner must paint when the screen is empty")
+	AssertTrue(IsObject(LoadingCall) && LoadingCall.meta.Has("render_guard")
+			&& HasMethod(LoadingCall.meta["render_guard"], "Call"),
+		"deferred loading must carry the exact request identity to publication")
+	LoadingGuard := LoadingCall.meta["render_guard"]
+	AssertTrue(LoadingGuard.Call(),
+		"loading identity must accept the request which scheduled it")
+	_LLM_Engine["request_id"] := 42
+	_LLM_Engine["active_request_signature"] := "sig-B"
+	AssertFalse(LoadingGuard.Call(),
+		"loading identity must reject after a later keystroke cancels its request")
 	; Leave the toggles in the default state so later suites are unaffected.
 	_Stub_LlmTooltipVisible := false
 	_Stub_LlmTooltipLoading := false
 }
 Test("LLM engine: loading spinner shown when no prediction is visible", _LLM_EngineShowLoading_ShownWhenScreenEmpty)
+
+
+_LLM_EnginePartialRender_RejectsSupersededIdentity() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+	Saved := {
+		Engine: _LLM_Engine, Calls: _Stub_LlmTooltipCalls,
+		Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading,
+		Text: _Stub_LlmTooltipText, Presented: _Stub_LlmPresentedRecord
+	}
+	try {
+		_LLM_Engine := Map(
+			"request_id", 2,
+			"active_request_signature", "sig-B",
+			"profile_id", "",
+			"user_profiles", [],
+			"inline_autotype", false)
+		_Stub_LlmTooltipCalls := []
+
+		LLM_Engine_OnResults(
+			["stale-A"], "ctx-A", 1, false, 1, "sig-A")
+		AssertEqual(0, _Stub_LlmTooltipCalls.Length,
+			"a superseded intermediate callback must not repaint after its request was cancelled")
+
+		LLM_Engine_OnResults(
+			["live-B"], "ctx-B", 1, false, 2, "sig-B")
+		AssertEqual(1, _Stub_LlmTooltipCalls.Length,
+			"the current intermediate callback must still paint exactly once")
+		Call := _Stub_LlmTooltipCalls[1]
+		AssertFalse(Call.is_final,
+			"the control render must remain an intermediate tooltip update")
+		AssertEqual("live-B", Call.slots[1],
+			"the admitted intermediate render must carry the current request's slot")
+		AssertTrue(Call.meta.Has("render_guard")
+				&& HasMethod(Call.meta["render_guard"], "Call"),
+			"each identified render must carry its immutable publication guard")
+		RenderGuard := Call.meta["render_guard"]
+		AssertTrue(RenderGuard.Call(),
+			"the publication guard must accept the exact current request identity")
+		_LLM_Engine["request_id"] := 3
+		_LLM_Engine["active_request_signature"] := "sig-C"
+		AssertFalse(RenderGuard.Call(),
+			"the same bound guard must reject after a later keystroke supersedes its request")
+	} finally {
+		_LLM_Engine := Saved.Engine
+		_Stub_LlmTooltipCalls := Saved.Calls
+		_Stub_LlmTooltipVisible := Saved.Visible
+		_Stub_LlmTooltipLoading := Saved.Loading
+		_Stub_LlmTooltipText := Saved.Text
+		_Stub_LlmPresentedRecord := Saved.Presented
+	}
+}
+
+Test("LLM engine: superseded partial render cannot repaint (ahk026-partial-render-identity)",
+	_LLM_EnginePartialRender_RejectsSupersededIdentity)
 
 
 ; A5 follow-up — per-call token budget mirrors macOS fetch_batch scaling.

@@ -41,18 +41,20 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER_PREFIX = 'static/ergopti_plus/';
 const REQUIRED_DRIVERS = ['linux', 'macos', 'windows'];
 
-// The top-level trees that hold a driver's own source. `data`, `_generated`,
-// `tests`, `vendor`, `build` and `docs` are deliberately NOT here: they are not
-// hand-written driver source and the scanners that care about them say so.
+// The top-level trees that hold managed driver source scanned symmetrically.
+// `data`, `_generated`, `tests`, `vendor`, `build` and `docs` are deliberately
+// NOT here: they are not hand-written driver source and the scanners that care
+// about them say so. Per-driver native/toolchain trees have their own gates.
 const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui'];
 
-// Folders that legitimately sit beside the canonical trees. `apps`, `launcher`
-// and `bin` hold code in another language entirely (AppleScript bundles, a Swift
-// package, a shell entry point), which is why no Lua/AHK scanner should reach
-// them.
+// Folders that legitimately sit beside the canonical trees. `apps`, `launcher`,
+// `bin` and `native` hold code in another language/toolchain entirely
+// (AppleScript bundles, Swift/C packages, shell entry points), which is why no
+// Lua/AHK scanner should reach them. Their dedicated build gates remain
+// responsible for their source.
 const NON_SOURCE = new Set([
 	'tests', 'data', '_generated', 'vendor', 'build', 'docs', 'extensions', 'old', 'scripts',
-	'apps', 'launcher', 'bin', '__pycache__', '.pytest_cache', '.venv',
+	'apps', 'launcher', 'bin', 'native', '__pycache__', '.pytest_cache', '.venv',
 ]);
 
 // A list literal naming two or more canonical trees, in any of the three

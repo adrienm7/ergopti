@@ -100,6 +100,7 @@ graph TD
         WINDOWS_http_client["HttpClient.ahk"]
         WINDOWS_key_state["KeyState.ahk"]
         WINDOWS_keyboard_hook["KeyboardHook.ahk"]
+        WINDOWS_llm_nav_event_owner["LlmNavEventOwner.ahk"]
         WINDOWS_mouse_control["MouseControl.ahk"]
         WINDOWS_network_info["NetworkInfo.ahk"]
         WINDOWS_notifier["Notifier.ahk"]

@@ -47,6 +47,11 @@ const FAST_MS = 1000;
  * The interval is read from the source, not repeated here — one source of truth.
  */
 const INVENTORY = {
+	'adapters/llm_nav_event_owner.ahk:_LLM_NavEventOwnerServiceFn':
+		'Drains receipts from the native navigation owner when its wake message is delayed or ' +
+		'lost, and observes fail-open native delivery faults. 100 ms bounds how long a ' +
+		'physically suppressed key or suspended native owner can wait for exact recovery; the ' +
+		'timer is disarmed whenever the native owner stops.',
 	'infra/lifecycle.ahk:_SuspendPendingPoll':
 		'Runs ONLY while a suspend is deferred waiting for held prefix keys to be released, ' +
 		'and stops as soon as they are. 25 ms because the user is mid-chord and any visible ' +

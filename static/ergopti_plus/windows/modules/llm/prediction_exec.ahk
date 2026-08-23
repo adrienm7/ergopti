@@ -580,11 +580,14 @@ _LLM_Engine_ShowLoadingTooltip() {
 		return
 	_LLM_Engine_ApplyTooltipDisplayOpts(1)
 	RequestId := _LLM_Engine.Get("request_id", 0)
+	SemanticSignature := _LLM_Engine.Get("active_request_signature", "")
 	Source := _LLM_Engine_RequestAcceptSourceForRender(RequestId)
 	Meta := Map(
 		"offer_id", RequestId,
 		"accept_source", Source,
-		"app_name", (Source is Map) ? Source.Get("app_name", "") : ""
+		"app_name", (Source is Map) ? Source.Get("app_name", "") : "",
+		"render_guard", _LLM_Engine_RenderIdentityIsCurrent.Bind(
+			RequestId, SemanticSignature)
 	)
 	try LLM_Tooltip_ShowLoading(Meta)
 }
@@ -878,6 +881,12 @@ _LLM_Engine_IsCurrent(state) {
 			state["semantic_signature"], _LLM_Engine.Get("active_request_signature", "")))
 }
 
+_LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature) {
+	return _LLM_Engine_IsCurrent(Map(
+		"request_id", RequestId,
+		"semantic_signature", SemanticSignature))
+}
+
 _LLM_Engine_FinalizeRequest(state) {
 	global _LLM_Engine
 	if !_LLM_Engine_IsCurrent(state)
@@ -1147,7 +1156,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; caller's check and the paint. Painting after a supersede leaves a prediction
 	; for abandoned text on screen that the keystroke's deferred hide can no longer
 	; dismiss, because the paint itself bumps the tooltip generation it compares.
-	if (is_final and request_id != "" and !_LLM_Engine_IsCurrent(Map(
+	if (request_id != "" and !_LLM_Engine_IsCurrent(Map(
 			"request_id", request_id, "semantic_signature", semantic_signature))) {
 		try LoggerInfo("LLM", "Prediction superseded during render — discarding request #{1}.", request_id)
 		return
@@ -1167,6 +1176,10 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 			? RenderAcceptSource.Get("app_name", "") : "",
 		"is_final", is_final ? true : false
 	)
+	if request_id != ""
+		PresentationMeta["render_guard"] :=
+			_LLM_Engine_RenderIdentityIsCurrent.Bind(
+				request_id, semantic_signature)
 	; The common surface transaction publishes pixels, slots, active index,
 	; acceptance target and lifecycle metrics as one owner. A refused/stale render
 	; therefore cannot emit llm_suggested or replace the source of visible A.
