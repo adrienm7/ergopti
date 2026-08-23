@@ -29,6 +29,7 @@ local function load_gate(options)
 
 	local sent = {}
 	local post_attempts = 0
+	local posted_trigger = nil
 	local native_new_key_event = hs_stub.eventtap.event.newKeyEvent
 	hs_stub.eventtap.event.newKeyEvent = function(modifiers, key, is_down)
 		local event = native_new_key_event(modifiers, key, is_down)
@@ -43,6 +44,16 @@ local function load_gate(options)
 					sent[#sent + 1] = { kind = "key", key = self.key, delay = 0, app = app }
 				end
 			end
+			return native_post(self, app)
+		end
+		return event
+	end
+	local native_new_mouse_event = hs_stub.eventtap.event.newMouseEvent
+	hs_stub.eventtap.event.newMouseEvent = function(event_type, position, modifiers)
+		local event = native_new_mouse_event(event_type, position, modifiers)
+		local native_post = event.post
+		event.post = function(self, app)
+			posted_trigger = self
 			return native_post(self, app)
 		end
 		return event
@@ -105,6 +116,26 @@ local function load_gate(options)
 		timers = timers,
 		set_send_failure = function(value) fail_send = value == true end,
 		post_attempts = function() return post_attempts end,
+		drain_deferred = function()
+			local broker = hs_stub.timer.__timers[#hs_stub.timer.__timers]
+			assert(broker and broker.running,
+				"terminator fallback did not schedule its deferred broker")
+			broker:fire()
+			assert(posted_trigger ~= nil,
+				"terminator fallback broker did not post its tagged trigger")
+			local pump = nil
+			for _, tap in ipairs(hs_stub.eventtap.__taps) do
+				if tap.types and tap.types[1] == hs_stub.eventtap.event.types.otherMouseUp then
+					pump = tap
+					break
+				end
+			end
+			assert(pump ~= nil, "terminator fallback synthetic pump was not created")
+			local consume, events = pump.fn(posted_trigger)
+			posted_trigger = nil
+			hs_stub.timer.__fire_all()
+			return consume, events
+		end,
 	}
 end
 
@@ -139,6 +170,23 @@ end
 
 local function new_transaction(fixture)
 	return fixture.synthetic.begin("replacement-under-test", "replacement")
+end
+
+
+--- Replaces one named module upvalue for an otherwise unreachable hardening path.
+--- @param fn function Closure that owns the upvalue.
+--- @param target string Upvalue name.
+--- @param value any Replacement value.
+local function set_upvalue(fn, target, value)
+	for index = 1, math.huge do
+		local name = debug.getupvalue(fn, index)
+		if name == nil then break end
+		if name == target then
+			debug.setupvalue(fn, index, value)
+			return true
+		end
+	end
+	return false
 end
 
 
@@ -390,6 +438,90 @@ end)
 
 
 helpers.describe("terminator replay: construction refusal never consumes the key", function()
+	local seal_refusals = {
+		{ name = "false", refuse = function() return false end },
+		{ name = "nil", refuse = function() return nil end },
+		{ name = "truthy non-contract value", refuse = function() return "sealed" end },
+		{ name = "throw", refuse = function() error("seal exploded") end },
+	}
+
+	for _, refusal in ipairs(seal_refusals) do
+		helpers.it("keeps the fallback owner private when seal returns " .. refusal.name, function()
+			local fixture = load_gate()
+			local original_seal = fixture.synthetic.seal
+			local original_cancel = fixture.synthetic.cancel
+			local original_reserve = fixture.synthetic.prepare_reserved_successor
+			local seal_attempts = 0
+			local cancellations = 0
+			local reservations = 0
+			local refusing = true
+			fixture.synthetic.seal = function(tx)
+				seal_attempts = seal_attempts + 1
+				if refusing then return refusal.refuse() end
+				return original_seal(tx)
+			end
+			fixture.synthetic.cancel = function(tx)
+				cancellations = cancellations + 1
+				return original_cancel(tx)
+			end
+			fixture.synthetic.prepare_reserved_successor = function(...)
+				reservations = reservations + 1
+				return original_reserve(...)
+			end
+
+			local outcome = table.pack(xpcall(function()
+				-- Stock prepare() always returns a reserved successor. Injecting the
+				-- unreserved fallback owner keeps this non-reachable hardening contract
+				-- executable without inventing a production-facing test seam.
+				helpers.assert_true(set_upvalue(fixture.replay.is_pending, "_pending", {
+					kind = "key", key = "return", chars = "\r",
+				}), "the fixture must reach the module's exact pending owner")
+
+				helpers.assert_true(not fixture.replay.flush_now("seal refusal"),
+					"only literal true may publish a constructed replay")
+				helpers.assert_true(fixture.replay.is_pending(),
+					"a refused seal must retain the same logical terminator for retry")
+				helpers.assert_eq(seal_attempts, 1)
+				helpers.assert_eq(cancellations, 1,
+					"the refused private transaction must be cancelled exactly once")
+				helpers.assert_eq(reservations, 0,
+					"the fallback must not create or publish a reserved successor")
+				helpers.assert_eq(fixture.post_attempts(), 0,
+					"no native event may escape after seal refusal")
+				helpers.assert_eq(fixture.synthetic.stats().pending, 0,
+					"the refused synthetic batch must leave no FIFO publication")
+				helpers.assert_eq(#fixture.timers, 1,
+					"one refusal must acquire exactly one bounded retry")
+				helpers.assert_true(math.abs(fixture.timers[1].delay - 0.05) < 0.000001)
+
+				refusing = false
+				helpers.assert_true(fire_timer(fixture, 0.05))
+				helpers.assert_true(not fixture.replay.is_pending(),
+					"one exact-true retry must commit the retained terminator")
+				local consume, events = fixture.drain_deferred()
+				helpers.assert_true(consume,
+					"the synthetic pump must consume its private broker trigger")
+				helpers.assert_eq(#events, 2,
+					"recovery must return exactly one terminator key pair to Quartz")
+				helpers.assert_eq(events[1].key, "return")
+				helpers.assert_true(events[1].isDown)
+				helpers.assert_true(not events[2].isDown)
+				helpers.assert_eq(seal_attempts, 2)
+				helpers.assert_eq(cancellations, 1)
+				helpers.assert_eq(reservations, 0)
+				helpers.assert_eq(fixture.synthetic.stats().pending, 0,
+					"the callback-returned key pair must release FIFO ownership")
+				helpers.assert_eq(fixture.synthetic.stats().active_transactions, 0,
+					"the successful retry must reach exact terminal completion")
+			end, debug.traceback))
+
+			fixture.synthetic.seal = original_seal
+			fixture.synthetic.cancel = original_cancel
+			fixture.synthetic.prepare_reserved_successor = original_reserve
+			if not outcome[1] then error(outcome[2], 0) end
+		end)
+	end
+
 	helpers.it("rolls the reserved owner back when predecessor registration throws", function()
 		local fixture = load_gate()
 		local tx = new_transaction(fixture)

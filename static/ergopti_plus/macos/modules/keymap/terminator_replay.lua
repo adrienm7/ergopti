@@ -273,12 +273,12 @@ emit_pending = function(reason, quiet)
 		schedule_retry(pending, reason, quiet)
 		return false
 	end
-	local sealed, seal_err = pcall(SyntheticInput.seal, transaction)
-	if not sealed then
+	local seal_call_ok, seal_result_or_error = pcall(SyntheticInput.seal, transaction)
+	if not seal_call_ok or seal_result_or_error ~= true then
 		pcall(SyntheticInput.cancel, transaction)
 		if not quiet then
 			Logger.error(LOG, "Terminator replay commit failed (%s): %s.",
-				reason, tostring(seal_err))
+				reason, tostring(seal_result_or_error))
 		end
 		schedule_retry(pending, reason, quiet)
 		return false
