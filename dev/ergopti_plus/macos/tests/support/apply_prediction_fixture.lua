@@ -43,19 +43,67 @@ function M.run(options)
 	package.loaded["hs"] = hs_stub
 
 	local clipboard_writes = {}
-	hs_stub.pasteboard.getContents = function() return "" end
-	hs_stub.pasteboard.readAllData = function() return {} end
+	local clipboard_value = "original"
+	local clipboard_restores = 0
+	hs_stub.pasteboard.getContents = function() return clipboard_value end
+	hs_stub.pasteboard.readAllData = function() return { text = clipboard_value } end
 	hs_stub.pasteboard.setContents = function(value)
 		clipboard_writes[#clipboard_writes + 1] = value
+		clipboard_value = value
 		return true
 	end
-	hs_stub.pasteboard.writeAllData = function() return true end
+	hs_stub.pasteboard.writeAllData = function(data)
+		clipboard_restores = clipboard_restores + 1
+		clipboard_value = type(data) == "table" and data.text or nil
+		return true
+	end
+	hs_stub.pasteboard.clearContents = function()
+		clipboard_restores = clipboard_restores + 1
+		clipboard_value = nil
+	end
+
+	local posted_events = {}
+	local base_new_key_event = hs_stub.eventtap.event.newKeyEvent
+	hs_stub.eventtap.event.newKeyEvent = function(modifiers, key, is_down)
+		local event = base_new_key_event(modifiers, key, is_down)
+		event.post = function(self, app)
+			posted_events[#posted_events + 1] = {
+				key = self.key,
+				is_down = self.isDown,
+				app = app,
+				clipboard = clipboard_value,
+				restores = clipboard_restores,
+			}
+			return self
+		end
+		return event
+	end
+	local base_new_mouse_event = hs_stub.eventtap.event.newMouseEvent
+	hs_stub.eventtap.event.newMouseEvent = function(event_type, position, modifiers)
+		local event = base_new_mouse_event(event_type, position, modifiers)
+		event.post = function(self)
+			for _, tap in ipairs(hs_stub.eventtap.__taps) do
+				if tap.enabled then
+					for _, watched in ipairs(tap.types or {}) do
+						if watched == event_type then
+							local _, returned = tap.fn(self)
+							for _, returned_event in ipairs(returned or {}) do returned_event:post() end
+							return self
+						end
+					end
+				end
+			end
+			return self
+		end
+		return event
+	end
 
 	local logger = helpers.make_logger_stub()
 	logger.LEVELS = { DEBUG = 10 }
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.timings"] = {
 		sec = function() return 0.05 end,
+		ms = function() return options.pace_ms or 20 end,
 	}
 
 	local accepted_count = 0
@@ -79,7 +127,7 @@ function M.run(options)
 		consume = function(index)
 			if index ~= 1 then return nil, nil end
 			if options.no_prediction then return nil, nil end
-			local prediction = { deletes = 0, to_type = prediction_text }
+			local prediction = { deletes = options.deletes or 0, to_type = prediction_text }
 			return prediction, { prediction }
 		end,
 		reset = function()
@@ -118,6 +166,7 @@ function M.run(options)
 		check_modifiers = function() return false end,
 	}
 
+	local tooltip_accept_callback = nil
 	package.loaded["ui.tooltip"] = {
 		hide = noop,
 		show_stacked = noop,
@@ -126,7 +175,7 @@ function M.run(options)
 		tint = function() return nil end,
 		set_colorization_enabled = noop,
 		set_accent_color = noop,
-		set_accept_callback = noop,
+		set_accept_callback = function(callback) tooltip_accept_callback = callback end,
 		set_cancel_callback = noop,
 		set_on_show_callback = noop,
 		set_runtime_guard = noop,
@@ -141,12 +190,6 @@ function M.run(options)
 	package.loaded["modules.keymap.terminator_replay"] = {
 		init = function() return true end,
 		flush_now = noop,
-	}
-	package.loaded["adapters.timer_scheduler"] = {
-			after = function(delay, callback)
-				local timer = hs_stub.timer.doAfter(delay, callback)
-				return { timer = timer, cancel = function() timer:stop() end }, true
-			end,
 	}
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(key)
@@ -163,6 +206,11 @@ function M.run(options)
 
 	local synthetic = require("adapters.synthetic_input")
 	local km_utils = require("modules.keymap.utils")
+	local terminal_target = options.terminal and { id = "terminal-app" } or nil
+	if terminal_target then
+		local text_sender = require("adapters.text_sender")
+		text_sender.terminalInputTarget = function() return terminal_target end
+	end
 	-- Keep the fixture about dispatch, not overlap policy.
 	km_utils.resolve_prediction_overlap = function(_, deletes, text)
 		if options.overlap_error then error("OVERLAP_THROW") end
@@ -186,11 +234,15 @@ function M.run(options)
 	local state = {
 		buffer = options.buffer or "prefix ",
 		magic_key = "\u{2605}",
+		lifecycle_generation = 0,
 		mappings = {},
 		groups = {},
 		preview_providers = {},
 		start_is_word_boundary = true,
-		suppress_rescan = function() suppress_count = suppress_count + 1 end,
+		prepare_suppress_rescan = function() return 1 end,
+		commit_suppress_rescan = function()
+			suppress_count = suppress_count + 1
+		end,
 	}
 	bridge.init(state, {
 		preview_star_enabled = true,
@@ -202,17 +254,49 @@ function M.run(options)
 
 	local buffer_before = state.buffer
 	local timers_before = #hs_stub.timer.__timers
-	synthetic.enter_callback()
-	local call_ok, applied = pcall(bridge.apply_prediction, 1)
+	local call_ok, applied
 	local consume, events
-	if call_ok then
-		consume, events = synthetic.leave_callback(applied == true)
+	if options.invoke_tooltip then
+		call_ok, applied = pcall(assert(tooltip_accept_callback,
+			"tooltip accept callback was not registered"), 1)
 	else
-		synthetic.abort_callback()
+		synthetic.enter_callback()
+		call_ok, applied = pcall(bridge.apply_prediction, 1)
+		if call_ok then
+			consume, events = synthetic.leave_callback(applied == true)
+		else
+			synthetic.abort_callback()
+		end
+	end
+	local arm_chain_before_completion = arm_chain_count
+	local timer_delta = #hs_stub.timer.__timers - timers_before
+	if options.settle ~= false and call_ok and applied == true and options.reset_result == nil
+		and hs_stub.timer and hs_stub.timer.__fire_all then
+		-- Callback handoff confirmation, transaction completion, and the chained
+		-- loopback each occupy their own run-loop turn. Drive them explicitly so
+		-- tests can distinguish pre-completion state from the settled result.
+		for _ = 1, 2 do
+			local turn = {}
+			for _, timer in ipairs(hs_stub.timer.__timers) do
+				if timer.running then turn[#turn + 1] = timer end
+			end
+			for _, timer in ipairs(turn) do timer:fire() end
+		end
 	end
 
 	package.loaded["adapters.event_provenance"] = nil
 	local provenance = require("adapters.event_provenance")
+	local function fire_next_timer()
+		local selected = nil
+		for _, timer in ipairs(hs_stub.timer.__timers) do
+			if timer.running and (selected == nil or timer.delay < selected.delay) then
+				selected = timer
+			end
+		end
+		if selected == nil then return nil end
+		selected:fire()
+		return selected.delay
+	end
 	return {
 		applied = applied,
 		call_ok = call_ok,
@@ -225,9 +309,16 @@ function M.run(options)
 		keylogger_buffers = keylogger_buffers,
 		reset_count = reset_count,
 		arm_chain_count = arm_chain_count,
+		arm_chain_before_completion = arm_chain_before_completion,
 		suppress_count = suppress_count,
 		clipboard_writes = clipboard_writes,
-		timer_delta = #hs_stub.timer.__timers - timers_before,
+		clipboard_value = function() return clipboard_value end,
+		clipboard_restores = function() return clipboard_restores end,
+		posted_events = posted_events,
+		terminal_target = terminal_target,
+		fire_next_timer = fire_next_timer,
+		arm_chain_count_now = function() return arm_chain_count end,
+		timer_delta = timer_delta,
 		synthetic = synthetic,
 		provenance = provenance,
 	}

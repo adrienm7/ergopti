@@ -198,22 +198,6 @@ if [ ! -f "$PYPROJECT" ]; then
 	exit 1
 fi
 
-# Clean up stale venv lock files. uv holds exclusive locks while resolving
-# dependencies. If a previous uv process crashed or was killed, the lock
-# persists and blocks the next invocation indefinitely. Rather than hang,
-# remove any lock file older than 5 seconds — it's definitely stale.
-LOCK_FILE="$VENV_DIR/.lock"
-if [ -f "$LOCK_FILE" ]; then
-	LOCK_AGE=$(($(date +%s) - $(stat -f%m "$LOCK_FILE" 2>/dev/null || echo 0)))
-	if [ "$LOCK_AGE" -gt 5 ]; then
-		log_info "Stale venv lock detected (age: ${LOCK_AGE}s) — removing."
-		rm -f "$LOCK_FILE"
-	fi
-fi
-
-
-
-
 # ====================================
 # ====================================
 # ======= 2/ Bootstrap of uv =========
@@ -306,28 +290,9 @@ fi
 
 
 
-# =========================================
-# =========================================
-# ======= 4/ Venv Provisioning ============
-# =========================================
-# =========================================
-
-if [ ! -x "$VENV_DIR/bin/python" ]; then
-	emit_marker "VENV_CREATING"
-	log_info "Création du virtualenv local : $VENV_DIR"
-	if ! "$UV_BIN" venv "$VENV_DIR" --python "$PYTHON_VERSION" >&2; then
-		log_error "Impossible de créer le virtualenv via 'uv venv'."
-		exit 1
-	fi
-	emit_marker "VENV_CREATED"
-fi
-
-
-
-
 # =====================================================
 # =====================================================
-# ======= 5/ Hash-Gated Dependencies Sync =============
+# ======= 4/ Hash-Gated Atomic Venv Publication =======
 # =====================================================
 # =====================================================
 
@@ -361,7 +326,6 @@ if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 			exit 0
 		fi
 		log_info "Hash matched but site-packages incomplete — re-syncing dependencies."
-		rm -f "$SYNC_HASH_FILE"
 	fi
 fi
 
@@ -370,6 +334,44 @@ fi
 # emit the granular DEPS_SYNCING marker so the user knows we are at the
 # pip-sync step specifically.
 emit_marker "VENV_SYNC_RAN"
+emit_marker "VENV_CREATING"
+
+# Build the replacement beside the live environment. A signal may arrive at
+# any instruction below; the trap either removes the unpublished candidate or
+# restores the exact prior environment after the atomic rename boundary.
+STAGING_VENV="${VENV_DIR}.bootstrap.$$"
+ROLLBACK_VENV="${VENV_DIR}.rollback.$$"
+if [ -e "$STAGING_VENV" ] || [ -e "$ROLLBACK_VENV" ]; then
+	log_error "Un ancien espace de staging MLX existe encore; publication refusée."
+	exit 1
+fi
+
+cleanup_staged_venv() {
+	cleanup_rc=$?
+	trap - EXIT INT TERM HUP
+	if [ -e "$ROLLBACK_VENV" ]; then
+		if [ ! -e "$VENV_DIR" ]; then
+			mv "$ROLLBACK_VENV" "$VENV_DIR" 2>/dev/null || true
+		else
+			rm -rf "$ROLLBACK_VENV"
+		fi
+	fi
+	if [ -e "$STAGING_VENV" ]; then rm -rf "$STAGING_VENV"; fi
+	exit "$cleanup_rc"
+}
+trap cleanup_staged_venv EXIT
+# Preserve a terminal exit status even when the signal interrupts a shell
+# builtin whose previous status was zero. EXIT owns the exact restoration.
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+log_info "Création du virtualenv candidat : $STAGING_VENV"
+if ! "$UV_BIN" venv "$STAGING_VENV" --python "$PYTHON_VERSION" >&2; then
+	log_error "Impossible de créer le virtualenv candidat via 'uv venv'."
+	exit 1
+fi
+emit_marker "VENV_CREATED"
 emit_marker "DEPS_SYNCING"
 log_info "Synchronisation des dépendances depuis pyproject.toml…"
 cd "$HS_ROOT"
@@ -388,9 +390,9 @@ uv_deps_sync() {
 	# $UV_SYNC_FROZEN_FLAG is "--frozen" in bundle mode (read-only .app) so uv
 	# reads the committed lock file without attempting to rewrite it.
 	# shellcheck disable=SC2086
-	VIRTUAL_ENV="$VENV_DIR" "$UV_BIN" sync \
+	UV_PROJECT_ENVIRONMENT="$STAGING_VENV" VIRTUAL_ENV="$STAGING_VENV" "$UV_BIN" sync \
 		--project "$HS_ROOT" \
-		--python "$VENV_DIR/bin/python" \
+		--python "$STAGING_VENV/bin/python" \
 		$UV_SYNC_FROZEN_FLAG \
 		--verbose --no-progress >&2
 }
@@ -401,8 +403,21 @@ fi
 
 emit_marker "DEPS_SYNCED"
 
-# Persist the hash so the next invocation takes the silent fast path.
-printf "%s" "$PYPROJECT_HASH" > "$SYNC_HASH_FILE"
+# Persist the hash inside the unpublished candidate, then atomically swap the
+# whole environment. The live path is never a partially provisioned venv.
+printf "%s" "$PYPROJECT_HASH" > "$STAGING_VENV/.last_sync_hash"
+if [ -e "$VENV_DIR" ]; then
+	if ! mv "$VENV_DIR" "$ROLLBACK_VENV"; then
+		log_error "Impossible de préserver le virtualenv MLX existant."
+		exit 1
+	fi
+fi
+if ! mv "$STAGING_VENV" "$VENV_DIR"; then
+	log_error "Publication atomique du virtualenv MLX refusée."
+	exit 1
+fi
+if [ -e "$ROLLBACK_VENV" ]; then rm -rf "$ROLLBACK_VENV"; fi
+trap - EXIT INT TERM HUP
 
 log_info "✅ Virtualenv prêt : $VENV_DIR"
 exit 0

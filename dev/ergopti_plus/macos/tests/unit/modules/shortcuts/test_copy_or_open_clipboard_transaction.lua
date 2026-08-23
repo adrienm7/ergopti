@@ -15,7 +15,7 @@ local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps", "adapters.window_info",
-		"adapters.synthetic_input", "infra.logger",
+		"adapters.synthetic_input", "adapters.timer_scheduler", "infra.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",
@@ -52,19 +52,45 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	local timer = {
-		doAfter = function(_delay, callback)
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(_delay, callback)
 			timer_calls = timer_calls + 1
 			local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]
-			if outcome == "nil" then return nil end
-			local handle = { callback = callback }
+			if outcome == "nil" then return { timer = nil, committed = false }, false end
+			local handle = {
+				timer = {},
+				committed = true,
+				observers = {},
+			}
+			function handle.callback()
+				if handle.timer == nil then return end
+				handle.timer = nil
+				handle.committed = false
+				local observers = handle.observers
+				handle.observers = {}
+				for _, observer in ipairs(observers) do observer() end
+				callback()
+			end
 			timers[#timers + 1] = handle
-			return handle
+			return handle, true
+		end,
+		cancel = function(handle)
+			if handle.timer == nil then return true end
+			handle.timer = nil
+			handle.committed = false
+			local observers = handle.observers
+			handle.observers = {}
+			for _, observer in ipairs(observers) do observer() end
+			return true
+		end,
+		onSettled = function(handle, observer)
+			if handle.timer == nil then observer()
+			else handle.observers[#handle.observers + 1] = observer end
+			return true
 		end,
 	}
 	local actions = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
 		pasteboard = pasteboard,
-		timer = timer,
 		http = { encodeForQuery = function(value) return value end },
 		urlevent = { openURL = function() return true end },
 	})

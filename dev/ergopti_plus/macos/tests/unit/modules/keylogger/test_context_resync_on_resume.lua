@@ -104,25 +104,70 @@ helpers.describe("context is re-synchronised on resume", function()
 
 	helpers.it("the public script-control resume invokes keylogger resync", function()
 		local calls = 0
+		local idle_callbacks = {}
+		local admission_fence = nil
+		local saved_synthetic_input = package.loaded["adapters.synthetic_input"]
+		package.loaded["adapters.synthetic_input"] = {
+			when_idle = function(callback)
+				idle_callbacks[#idle_callbacks + 1] = callback
+				return true
+			end,
+			acquire_admission_fence = function(owner)
+				if admission_fence ~= nil then return nil end
+				admission_fence = { owner = owner, active = true }
+				return admission_fence
+			end,
+			release_admission_fence = function(token)
+				if token ~= admission_fence or token.active ~= true then return false end
+				token.active = false
+				admission_fence = nil
+				return true
+			end,
+			admission_open = function() return admission_fence == nil end,
+		}
 		local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
 		package.loaded["modules.llm.api_mlx"] = {
-			stop_warmup = function() end,
-			resume_warmup = function() end,
+			stop_warmup = function() return true end,
+			resume_warmup = function() return true end,
 		}
-		package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() end }
+		package.loaded["modules.llm.api_ollama"] = { stop_warmup = function() return true end }
+		package.loaded["modules.llm.api_remote"] = { stop_warmup = function() return true end }
 		package.loaded["modules.llm.warmup_controller"] = {
-			stop = function() end,
-			schedule_warmup_with_retry = function() end,
+			stop = function() return true end,
+			schedule_warmup_with_retry = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = { hide_forced = function() end }
+		package.loaded["ui.wpm.wpm_menubar"] = {
+			is_running = function() return false end,
+		}
+		package.loaded["ui.wpm.wpm_widget"] = {
+			is_running = function() return false end,
+		}
+		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
+		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
 		package.loaded["modules.keylogger"] = {
 			resync_context = function() calls = calls + 1; return true end,
 		}
 
-		script_control.pause_all()
-		script_control.resume_all()
+		helpers.assert_true(script_control.pause_all())
+		helpers.assert_eq(#idle_callbacks, 1)
+		helpers.assert_eq(calls, 0,
+			"context resync may not overtake the owned PAUSE drain")
+		idle_callbacks[1]()
+		helpers.assert_eq(script_control.is_paused(), true,
+			"the explicit drain terminal must commit PAUSED before RESUME")
+		helpers.assert_eq(calls, 0)
+		local exact_fence = admission_fence
+		helpers.assert_true(exact_fence ~= nil and exact_fence.active == true)
+
+		helpers.assert_true(script_control.resume_all())
+		helpers.assert_eq(script_control.is_paused(), false,
+			"resync is part of the committed local RESUME transaction")
 
 		helpers.assert_eq(calls, 1,
 			"resume must refresh context exactly once through the public keylogger API")
+		helpers.assert_eq(admission_fence, nil)
+		helpers.assert_eq(exact_fence.active, false)
+		package.loaded["adapters.synthetic_input"] = saved_synthetic_input
+		package.loaded["modules.shortcuts.script_control"] = nil
 	end)
 end)

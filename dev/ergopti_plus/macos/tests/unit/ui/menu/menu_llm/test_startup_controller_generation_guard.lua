@@ -26,8 +26,8 @@ local helpers = require("tests.helpers")
 local function make_keymap_stub()
 	local calls = {}
 	local stub = {
-		set_llm_enabled = function(v) calls[#calls + 1] = v end,
-		set_llm_backend_name = function(_) end,
+		set_llm_enabled = function(v) calls[#calls + 1] = v; return true end,
+		set_llm_backend_name = function(_) return true end,
 	}
 	return stub, calls
 end
@@ -46,6 +46,7 @@ local function make_models_mgr_stub()
 		force_mlx_check = function(_model_name, on_ok, on_fail, _opts)
 			call_index = call_index + 1
 			captured[call_index] = { on_ok = on_ok, on_fail = on_fail }
+			return true
 		end,
 	}
 	return stub, captured
@@ -69,14 +70,17 @@ local function make_ctx(keymap, models_mgr, captured_timers)
 		state = state,
 		keymap = keymap,
 		models_mgr = models_mgr,
-		guarded_check_requirements = function(_model, on_ok, _on_fail) pcall(on_ok) end,
-		save_prefs = function() end,
-		update_menu = function() end,
-		apply_llm_shortcut = function() end,
-		apply_llm_profile_shortcut = function() end,
-		activate_hotkey = function() end,
+		guarded_check_requirements = function(_model, on_ok, _on_fail)
+			local ok, result = pcall(on_ok)
+			return ok == true and result ~= false
+		end,
+		save_prefs = function() return true end,
+		update_menu = function() return true end,
+		apply_llm_shortcut = function() return true end,
+		apply_llm_profile_shortcut = function() return true end,
+		activate_hotkey = function() return true end,
 		mlx_deps_checker = {},
-		deps = { update_menu = function() end },
+		deps = { update_menu = function() return true end },
 		get_startup_silence = function() return false end,
 		set_startup_silence = function() end,
 		get_trigger_hk = function() return nil end,
@@ -84,7 +88,8 @@ local function make_ctx(keymap, models_mgr, captured_timers)
 	}
 end
 
---- Loads a fresh startup_controller with hs.timer.doAfter stubbed to CAPTURE
+--- Loads a fresh startup_controller with native-shaped hs.timer.new candidates
+--- captured behind the real TimerScheduler adapter.
 --- (not fire) every scheduled callback, and modules.llm minimally stubbed
 --- (only BUILTIN_PROFILES is read at require time).
 --- @return table StartupCtrl, table[] captured_timers
@@ -92,14 +97,30 @@ local function load_fresh_startup_controller()
 	local captured_timers = {}
 	local hs_overrides = {
 		timer = {
-			doAfter = function(delay, fn)
-				captured_timers[#captured_timers + 1] = { delay = delay, fn = fn }
-				return { stop = function() end }
+			new = function(delay, fn)
+				local timer = { delay = delay, fn = fn, live = false }
+				function timer:start()
+					self.live = true
+					return self
+				end
+				function timer:stop()
+					self.live = false
+					return self
+				end
+				function timer:running() return self.live end
+				function timer:fire()
+					if not self.live then return false end
+					self.fn()
+					return true
+				end
+				captured_timers[#captured_timers + 1] = timer
+				return timer
 			end,
 			secondsSinceEpoch = function() return os.time() end,
 		},
 	}
 	package.loaded["ui.menu.menu_llm.startup_controller"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	-- get_current_model is called unconditionally by prediction_engine.lua's
 	-- module-level code; without it, any later test whose require chain
 	-- reaches prediction_engine while this stub is still cached crashes with
@@ -122,7 +143,7 @@ local function fire_all_timers(captured_timers)
 	-- timers are scheduled by firing these.
 	local n = #captured_timers
 	for i = 1, n do
-		captured_timers[i].fn()
+		captured_timers[i]:fire()
 	end
 end
 

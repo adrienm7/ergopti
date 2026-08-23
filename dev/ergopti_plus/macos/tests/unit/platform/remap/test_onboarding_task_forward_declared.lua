@@ -1,69 +1,99 @@
 --- tests/unit/platform/remap/test_onboarding_task_forward_declared.lua
 
 --- ==============================================================================
---- MODULE: Regression — onboarding async task closure-nil forward declaration
+--- MODULE: Regression — onboarding installer task ownership transaction
 --- DESCRIPTION:
---- onboarding.lua spawns four hs.task jobs (shasum, curl, hdiutil, osascript).
---- Each completion callback clears the GC-root pin via M._active_tasks[task] = nil.
---- When the task handle is declared inline — `local task = hs.task.new(...)` —
---- the closure is compiled before the local is in scope, so `task` binds the nil
---- global _G.task. The callback then executes M._active_tasks[nil] = nil, which
---- raises "table index is nil". Hammerspoon swallows hs.task callback errors to
---- the Console (never the file logger), so the KE install wedges silently.
+--- onboarding.lua constructs four native installer tasks. Each exact handle must
+--- enter both the installer owner and the GC root before native start, then leave
+--- both roots on start refusal or callback settlement. The callback must capture
+--- the forward-declared handle; an inline declaration binds the nil global and
+--- silently leaves ownership behind after completion.
 ---
---- Fix: forward-declare each handle before the strict constructor call:
----   local task
----   task = TaskLifecycle.native(label, path, callback, args)
---- and guard the pin clear: if task then M._active_tasks[task] = nil end
----
---- This test pins the ROOT CAUSE (declaration order) — it fails on the inline form
---- and passes only on the split forward-declaration form.
+--- These guards follow the current start_owned_task/release_install_task owner
+--- helpers instead of pinning the retired raw hs.task.new spelling.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("karabiner/onboarding: all four hs.task closures forward-declare their handle (closure-nil guard)", function()
+helpers.describe("karabiner/onboarding: every installer task has one exact owner transaction", function()
 	local function read_src()
-		-- Selected by a declaration unique to platform/remap/onboarding.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function run_pkg_with_sudo_async")
-		helpers.assert_true(src ~= nil, "platform/remap/onboarding.lua source must be locatable")
+		local src, err = helpers.read_driver_unit("local function start_owned_task")
+		helpers.assert_true(src ~= nil,
+			"the onboarding task-owner unit must be uniquely locatable: " .. tostring(err))
 		return src
 	end
 
-	helpers.it("no hs.task.new handle is assigned inline into a `local` on the same line", function()
-		local src = read_src()
-		-- Scan non-comment lines: any `local <id> = hs.task.new(` is the broken form.
-		-- A comment may document why the broken form is forbidden; don't fail on those.
-		local offending
-		for line in src:gmatch("[^\n]+") do
-			local stripped = line:match("^%s*(.-)%s*$") or line
-			if not stripped:match("^%-%-") and stripped:find("local%s+[%w_]+%s*=%s*hs%.task%.new") then
-				offending = stripped
-				break
-			end
+	local function count_literal(src, needle)
+		local count, cursor = 0, 1
+		while true do
+			local position = src:find(needle, cursor, true)
+			if not position then return count end
+			count = count + 1
+			cursor = position + #needle
 		end
-		helpers.assert_true(offending == nil,
-			"all hs.task.new handles that are referenced inside callbacks must be forward-declared "
-			.. "(local X; X = hs.task.new(...)). Offending line: " .. tostring(offending))
+	end
+
+	helpers.it("routes all four native constructors through the exact owner helper", function()
+		local src = read_src()
+		helpers.assert_eq(count_literal(src, "task = TaskLifecycle.native("), 4,
+			"the owner inventory must include checksum, download, mount, and install")
+		helpers.assert_eq(count_literal(src, "start_owned_task(owner, task, \""), 4,
+			"every native installer candidate must enter the shared owner helper")
+		for _, stage in ipairs({ "checksum", "download", "mount", "install" }) do
+			helpers.assert_eq(count_literal(src,
+				"start_owned_task(owner, task, \"" .. stage .. "\""), 1,
+				stage .. " must have one exact owner admission")
+		end
 	end)
 
-	helpers.it("all four async task sites use the split forward-declaration pattern", function()
+	helpers.it("pins both owner roots before literal native start commitment", function()
 		local src = read_src()
-		-- Each site must keep the declaration above TaskLifecycle.native so the
-		-- callback captures the local while construction remains protected.
-		local _, fwd_count = src:gsub("local task%s*\n%s*task = TaskLifecycle%.native", "")
-		helpers.assert_true(fwd_count >= 4,
-			"expected at least 4 forward-declared `local task` sites in onboarding.lua; got " .. tostring(fwd_count))
+		local helper_start = assert(src:find("local function start_owned_task", 1, true))
+		local helper_end = assert(src:find("--- Latches one exact native task completion",
+			helper_start, true))
+		local body = src:sub(helper_start, helper_end - 1)
+		local owner_pin = assert(body:find("owner.tasks[task] = stage", 1, true))
+		local gc_pin = assert(body:find("M._active_tasks[task] = true", 1, true))
+		local start = assert(body:find("TaskLifecycle.start(task, label) ~= true", 1, true))
+		local gc_release = assert(body:find("M._active_tasks[task] = nil", start, true))
+		local owner_release = assert(body:find("release_install_task(owner, task)",
+			gc_release, true))
+		helpers.assert_true(owner_pin < start and gc_pin < start,
+			"both exact ownership roots must commit before native start")
+		helpers.assert_true(start < gc_release and gc_release < owner_release,
+			"a refused start must release the GC root and installer owner in order")
 	end)
 
-	helpers.it("all four GC-pin releases are guarded against nil task", function()
+	helpers.it("all four callbacks release the exact task from both roots", function()
 		local src = read_src()
-		-- Without the guard, if hs.task.new returns nil (binary missing), the callback
-		-- would still run M._active_tasks[nil] = nil → "table index is nil".
-		local _, guard_count = src:gsub("if task then M%._active_tasks%[task%] = nil end", "")
-		helpers.assert_true(guard_count >= 4,
-			"expected at least 4 nil-guarded GC-pin releases in onboarding.lua; got " .. tostring(guard_count))
+		local stages = {
+			{ name = "checksum", owner = "local function verify_sha256_async" },
+			{ name = "download", owner = "local function download_async" },
+			{ name = "mount", owner = "local function mount_dmg_async" },
+			{ name = "install", owner = "local function run_pkg_with_sudo_async" },
+		}
+		for _, stage in ipairs(stages) do
+			local owner = src:find(stage.owner, 1, true)
+			local declaration = owner and src:find("local task\n", owner, true)
+			local latch = declaration and src:find(
+				"latch_install_task_completion(owner, \"" .. stage.name .. "\"",
+				declaration, true)
+			local gc_release = latch and src:find(
+				"if task then M._active_tasks[task] = nil end", latch, true)
+			local owner_release = gc_release and src:find(
+				"release_install_task(owner, task)", gc_release, true)
+			local construction = owner_release and src:find(
+				"task = TaskLifecycle.native", owner_release, true)
+			local admission = construction and src:find(
+				"start_owned_task(owner, task, \"" .. stage.name .. "\"",
+				construction, true)
+			helpers.assert_true(owner and declaration and latch and gc_release
+				and owner_release and construction and admission,
+				stage.name .. " must expose one complete task ownership transaction")
+			helpers.assert_true(owner < declaration and declaration < latch
+				and latch < gc_release and gc_release < owner_release
+				and owner_release < construction and construction < admission,
+				stage.name .. " must release the callback's exact captured task")
+		end
 	end)
 end)

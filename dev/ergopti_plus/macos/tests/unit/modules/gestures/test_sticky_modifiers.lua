@@ -50,16 +50,20 @@ local TIMEOUT_SEC = 1.0
 --- Loads the module against recording stubs of its two adapters.
 --- @return table Sticky module, table injector recorder, table timer recorder.
 local function fresh_sticky()
+	local Sticky
 	local injector = {
 		armed_with  = nil,
 		on_applied  = nil,
 		arm_calls   = 0,
 		disarm_calls = 0,
 		next_arm_fails = false,
+		disarm_modes = {},
+		reenter_clear_parent = nil,
 	}
 	local timers = {
 		scheduled = {}, cancelled = 0, cancel_handles = {},
 		next_committed = true, next_after_throws = false, cancel_results = {},
+		reenter_clear_parent = nil,
 	}
 
 	package.loaded["adapters.modifier_injector"] = {
@@ -70,12 +74,22 @@ local function fresh_sticky()
 			for name in pairs(flags) do copy[name] = true end
 			injector.armed_with = copy
 			injector.on_applied = on_applied
+			if injector.reenter_clear_parent ~= nil then
+				local parent = injector.reenter_clear_parent
+				injector.reenter_clear_parent = nil
+				injector.reentrant_clear_result = Sticky.clear(parent)
+			end
 			return true
 		end,
 		disarm = function()
 			injector.disarm_calls = injector.disarm_calls + 1
+			local mode = table.remove(injector.disarm_modes, 1)
+			if mode == "false" then return false end
+			if mode == "nil" then return nil end
+			if mode == "throw" then error("synthetic disarm refusal") end
 			injector.armed_with   = nil
 			injector.on_applied   = nil
+			return true
 		end,
 		is_armed = function() return injector.armed_with ~= nil end,
 	}
@@ -89,6 +103,11 @@ local function fresh_sticky()
 			timers.next_committed = true
 			local handle = { delay = delay, fn = fn, timer = {}, committed = committed, fired = false }
 			timers.scheduled[#timers.scheduled + 1] = handle
+			if timers.reenter_clear_parent ~= nil then
+				local parent = timers.reenter_clear_parent
+				timers.reenter_clear_parent = nil
+				timers.reentrant_clear_result = Sticky.clear(parent)
+			end
 			return handle, committed
 		end,
 		cancel = function(handle)
@@ -106,7 +125,7 @@ local function fresh_sticky()
 	}
 
 	package.loaded["modules.gestures.sticky_modifiers"] = nil
-	local Sticky = helpers.load_with_stubs("modules.gestures.sticky_modifiers")
+	Sticky = helpers.load_with_stubs("modules.gestures.sticky_modifiers")
 	return Sticky, injector, timers
 end
 
@@ -219,12 +238,17 @@ helpers.describe("gestures.sticky_modifiers", function()
 		helpers.assert_eq(describe(Sticky.armed()), "(none)",
 			"believing itself armed while the tap never started would make the NEXT toggle read "
 			.. "as a release, so one failed arm inverts the feature until the process restarts")
+		injector.next_arm_fails = false
+		helpers.assert_eq(Sticky.toggle(
+			{ "shift" }, TIMEOUT_SEC, "shortcut_bindings"), true,
+			"a refused gesture arm must retain no parent admission claim")
 	end)
 
 	helpers.it("clear() releases an armed set", function()
 		local Sticky, injector = fresh_sticky()
 		Sticky.toggle({ "cmd" }, TIMEOUT_SEC)
-		Sticky.clear()
+		helpers.assert_eq(Sticky.clear(), true,
+			"clear must expose literal settlement to the gesture pause owner")
 		helpers.assert_eq(describe(Sticky.armed()), "(none)")
 		helpers.assert_true(injector.disarm_calls > 0)
 	end)
@@ -286,5 +310,146 @@ helpers.describe("gestures.sticky_modifiers", function()
 		helpers.assert_eq(timers.cancel_handles[2], first)
 		helpers.assert_eq(describe(Sticky.armed()), "shift")
 	end)
+
+	helpers.it("isolates sticky admission and cleanup between gesture and shortcut parents", function()
+		local Sticky, injector, timers = fresh_sticky()
+		helpers.assert_eq(Sticky.toggle({ "cmd" }, TIMEOUT_SEC, "gestures"), true)
+		local disarms_before = injector.disarm_calls
+		helpers.assert_eq(Sticky.clear("shortcut_bindings"), true)
+		helpers.assert_eq(Sticky.toggle(
+			{ "shift" }, TIMEOUT_SEC, "shortcut_bindings"), false,
+			"shortcut admission must refuse rather than replace a gesture-owned arm")
+		helpers.assert_eq(describe(Sticky.armed()), "cmd")
+		helpers.assert_eq(injector.disarm_calls, disarms_before)
+		helpers.assert_eq(timers.cancelled, 0,
+			"sibling cleanup must not retire the live parent's timer")
+		helpers.assert_eq(Sticky.clear("gestures"), true)
+
+		helpers.assert_eq(Sticky.toggle(
+			{ "shift" }, TIMEOUT_SEC, "shortcut_bindings"), true)
+		disarms_before = injector.disarm_calls
+		helpers.assert_eq(Sticky.clear("gestures"), true)
+		helpers.assert_eq(describe(Sticky.armed()), "shift")
+		helpers.assert_eq(injector.disarm_calls, disarms_before)
+		helpers.assert_eq(Sticky.clear("shortcut_bindings"), true)
+		helpers.assert_eq(describe(Sticky.armed()), "(none)")
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains the gesture parent until disarm " .. mode
+			.. " debt settles", function()
+			local Sticky, injector = fresh_sticky()
+			helpers.assert_eq(Sticky.toggle(
+				{ "cmd" }, TIMEOUT_SEC, "gestures"), true)
+			injector.disarm_modes[1] = mode
+			local before = injector.disarm_calls
+			helpers.assert_eq(Sticky.clear("gestures"), false)
+			helpers.assert_eq(describe(Sticky.armed()), "cmd",
+				"a refused native disarm must retain the exact logical identity")
+			helpers.assert_eq(Sticky.clear("shortcut_bindings"), true)
+			helpers.assert_eq(injector.disarm_calls, before + 1,
+				"sibling cleanup may not consume another parent's disarm debt")
+			helpers.assert_eq(Sticky.toggle(
+				{ "shift" }, TIMEOUT_SEC, "shortcut_bindings"), false)
+
+			helpers.assert_eq(Sticky.clear("gestures"), true)
+			helpers.assert_eq(injector.disarm_calls, before + 2,
+				"only the owning parent retries the exact injector debt")
+			helpers.assert_eq(describe(Sticky.armed()), "(none)")
+			helpers.assert_eq(Sticky.toggle(
+				{ "shift" }, TIMEOUT_SEC, "shortcut_bindings"), true,
+				"the sibling is admitted only after exact owner settlement")
+		end)
+	end
+
+	for _, boundary in ipairs({ "arm", "timer" }) do
+		for _, parent in ipairs({ "gestures", "shortcut_bindings" }) do
+			helpers.it("rolls back " .. parent .. " when " .. boundary
+				.. " acquisition reenters same-parent clear", function()
+				local Sticky, injector, timers = fresh_sticky()
+				if boundary == "arm" then
+					injector.reenter_clear_parent = parent
+				else
+					timers.reenter_clear_parent = parent
+				end
+				helpers.assert_eq(Sticky.toggle(
+					{ "cmd" }, TIMEOUT_SEC, parent), false)
+				local nested_result
+				if boundary == "arm" then
+					nested_result = injector.reentrant_clear_result
+				else
+					nested_result = timers.reentrant_clear_result
+				end
+				helpers.assert_eq(nested_result, false,
+					"matching cleanup cannot settle while its native acquisition is on-stack")
+				helpers.assert_eq(describe(Sticky.armed()), "(none)")
+				helpers.assert_eq(describe(injector.armed_with), "(none)")
+				if #timers.scheduled > 0 then
+					local stale = timers.scheduled[#timers.scheduled]
+					stale.fn()
+					helpers.assert_eq(describe(Sticky.armed()), "(none)",
+						"a rolled-back timer callback must remain inert")
+				end
+			end)
+
+			helpers.it("does not let sibling clear cancel " .. parent .. " "
+				.. boundary .. " acquisition", function()
+				local Sticky, injector, timers = fresh_sticky()
+				local sibling = parent == "gestures"
+					and "shortcut_bindings" or "gestures"
+				if boundary == "arm" then
+					injector.reenter_clear_parent = sibling
+				else
+					timers.reenter_clear_parent = sibling
+				end
+				helpers.assert_eq(Sticky.toggle(
+					{ "cmd" }, TIMEOUT_SEC, parent), true)
+				local nested_result
+				if boundary == "arm" then
+					nested_result = injector.reentrant_clear_result
+				else
+					nested_result = timers.reentrant_clear_result
+				end
+				helpers.assert_eq(nested_result, true,
+					"a sibling scope remains independently settled")
+				helpers.assert_eq(describe(Sticky.armed()), "cmd")
+				helpers.assert_eq(Sticky.clear(parent), true)
+			end)
+		end
+	end
+
+	for _, boundary in ipairs({ "arm", "timer" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("retains matching " .. boundary .. " rollback debt after disarm "
+				.. mode, function()
+				local Sticky, injector, timers = fresh_sticky()
+				injector.disarm_modes[1] = mode
+				injector.disarm_modes[2] = mode
+				if boundary == "arm" then
+					injector.reenter_clear_parent = "gestures"
+				else
+					timers.reenter_clear_parent = "gestures"
+				end
+
+				helpers.assert_eq(Sticky.toggle(
+					{ "cmd" }, TIMEOUT_SEC, "gestures"), false)
+				local nested_result
+				if boundary == "arm" then
+					nested_result = injector.reentrant_clear_result
+				else
+					nested_result = timers.reentrant_clear_result
+				end
+				helpers.assert_eq(nested_result, false)
+				helpers.assert_eq(describe(Sticky.armed()), "cmd",
+					"failed on-stack inverse retains the original parent's exact debt")
+				local disarms = injector.disarm_calls
+				helpers.assert_eq(Sticky.clear("shortcut_bindings"), true)
+				helpers.assert_eq(injector.disarm_calls, disarms,
+					"sibling cleanup cannot consume the acquisition rollback debt")
+				helpers.assert_eq(Sticky.clear("gestures"), true)
+				helpers.assert_eq(describe(Sticky.armed()), "(none)")
+			end)
+		end
+	end
 
 end)

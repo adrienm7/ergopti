@@ -147,7 +147,10 @@ helpers.describe("infra/file_watchers — arming contract", function()
 
 		local prev_pw, prev_timer, prev_attr = hs.pathwatcher, hs.timer, hs.fs.attributes
 		hs.pathwatcher = { new = function(_path, _cb)
-			return { start = function() end }
+			local watcher = {}
+			function watcher:start() return self end
+			function watcher:stop() return nil end
+			return watcher
 		end }
 		hs.timer = { doAfter = function(_s, _fn) return { stop = function() end } end, secondsSinceEpoch = function() return 0 end }
 		-- Every path in this fixture is a directory — there is no file to bottom

@@ -80,6 +80,14 @@ local function fire_existing_delay(hs_stub, delay)
 end
 
 
+local function settle_callback_transaction(hs_stub)
+	helpers.assert_true(fire_existing_delay(hs_stub, 0) >= 1,
+		"callback handoff confirmation must retain a zero-delay owner")
+	helpers.assert_true(fire_existing_delay(hs_stub, 0) >= 1,
+		"transaction completion must dispatch on the following run-loop turn")
+end
+
+
 local function metadata(fixture, event)
 	local property = fixture.hs.eventtap.event.properties.eventSourceUserData
 	return fixture.synthetic.lookup_tag(event:getProperty(property))
@@ -95,14 +103,21 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		helpers.assert_eq(fixture.pasted_values[1], ("A"):rep(60))
 	end)
 
-	helpers.it("writes the second segment only after the settle timer fires", function()
+	helpers.it("writes the second segment from one ordered settle owner", function()
 		local fixture = load_fixture()
 		local results = emit_in_callback(fixture, two_segment_tokens())
 		helpers.assert_eq(#fixture.pasted_values, 1)
 
 		local gap = results[4] / 2
-		helpers.assert_eq(fire_existing_delay(fixture.hs, gap), 2,
-			"the intervening key and second paste must share the first settle deadline")
+		local running_at_gap = 0
+		for _, timer in ipairs(fixture.hs.timer.__timers) do
+			if timer.running and math.abs(timer.delay - gap) < 0.000001 then
+				running_at_gap = running_at_gap + 1
+			end
+		end
+		helpers.assert_eq(running_at_gap, 1,
+			"the intervening key and second paste must share one FIFO owner, not a timer race")
+		helpers.assert_eq(fire_existing_delay(fixture.hs, gap), 1)
 		helpers.assert_eq(#fixture.pasted_values, 2)
 		helpers.assert_eq(fixture.pasted_values[2], ("B"):rep(60))
 	end)
@@ -156,7 +171,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		helpers.assert_eq(fixture.synthetic.stats().pending, 0)
 	end)
 
-	helpers.it("restores the first snapshot when a later clipboard write is rejected", function()
+	helpers.it("fails the exact transaction and stops continuation when the second payload is rejected", function()
 		local fixture = load_fixture()
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
 		local current = original
@@ -173,12 +188,33 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 			return true
 		end
 
-		local results = emit_in_callback(fixture, two_segment_tokens())
+		local tokens = two_segment_tokens()
+		tokens[#tokens + 1] = { kind = "key", value = "tab" }
+		local results, _, _, transaction = emit_in_callback(fixture, tokens)
 		local gap = results[4] / 2
-		fire_existing_delay(fixture.hs, gap)
+		helpers.assert_eq(fire_existing_delay(fixture.hs, gap), 1)
+		helpers.assert_eq(fire_existing_delay(fixture.hs, gap), 0,
+			"payload refusal must retire the sole recurring continuation owner")
 
 		helpers.assert_true(current == original,
 			"rejecting an overlapping payload must not cancel the first owner's restore")
+		local fence = fixture.synthetic.claim_physical_fence()
+		helpers.assert_not_nil(fence,
+			"the key ordered before the refused payload remains an exact handed-off prefix")
+		helpers.assert_eq(#fence.events, 2)
+		helpers.assert_eq(fence.events[1].key, "return")
+		for _, event in ipairs(fence.events) do
+			helpers.assert_true(event.key ~= "tab",
+				"no token after the refused payload may continue")
+		end
+		for _ = 1, 8 do
+			if transaction.completed then break end
+			fire_existing_delay(fixture.hs, 0)
+		end
+		helpers.assert_true(transaction.completed,
+			"all already-owned prefix batches must still reach terminal accounting")
+		helpers.assert_eq(transaction.completion_status, "failed",
+			"a refused deferred payload must never publish logical completion")
 	end)
 
 	helpers.it("retains ownership and retries when the native restore is refused", function()
@@ -201,8 +237,25 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		emit_in_callback(fixture, {
 			{ kind = "text", value = ("R"):rep(60) },
 		})
+		local drained = { idle = 0, pause = 0, reload = 0 }
+		helpers.assert_true(fixture.synthetic.when_idle(function()
+			drained.idle = drained.idle + 1
+		end), "the global drain must accept ownership while clipboard restore is pending")
+		helpers.assert_true(fixture.synthetic.when_idle(function()
+			drained.pause = drained.pause + 1
+		end), "the pause continuation must wait on the same clipboard owner")
+		helpers.assert_true(fixture.synthetic.when_idle(function()
+			drained.reload = drained.reload + 1
+		end), "the reload continuation must wait on the same clipboard owner")
+		helpers.assert_eq(fire_existing_delay(fixture.hs, 0.15), 0,
+			"clipboard restore must not start before Cmd+V transaction completion")
+		settle_callback_transaction(fixture.hs)
+		helpers.assert_true(helpers.deep_equal(drained, { idle = 0, pause = 0, reload = 0 }),
+			"Cmd+V handoff alone must not declare the clipboard debt drained")
 		helpers.assert_eq(fire_existing_delay(fixture.hs, 0.15), 1)
 		helpers.assert_eq(restore_attempts, 1)
+		helpers.assert_true(helpers.deep_equal(drained, { idle = 0, pause = 0, reload = 0 }),
+			"a refused exact restore keeps pause/reload/quit behind the drain")
 		helpers.assert_eq(current, ("R"):rep(60),
 			"a refused restore must keep ownership instead of pretending recovery succeeded")
 
@@ -211,6 +264,9 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		helpers.assert_eq(restore_attempts, 2)
 		helpers.assert_true(current == original,
 			"the retained retry must restore the original all-type snapshot")
+		for _ = 1, 4 do fire_existing_delay(fixture.hs, 0) end
+		helpers.assert_true(helpers.deep_equal(drained, { idle = 1, pause = 1, reload = 1 }),
+			"idle, pause, and reload each open once only after the original snapshot is restored")
 	end)
 
 	helpers.it("acquires trailing ordering timers before the first visible paste", function()
@@ -241,7 +297,7 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 			"the failed preflight must release every retained transaction token")
 	end)
 
-	helpers.it("rolls back without Cmd+V when the restore timer is refused", function()
+	helpers.it("keeps committed Cmd+V and restores through the fallback when its post-handoff timer is refused", function()
 		local fixture = load_fixture()
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
 		local current = original
@@ -266,13 +322,19 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		if ok then fixture.synthetic.seal(transaction) else fixture.synthetic.cancel(transaction) end
 		local consume, events = fixture.synthetic.leave_callback(ok)
 
-		helpers.assert_true(not ok,
-			"timer allocation refusal must fail the logical replacement")
-		helpers.assert_true(not consume)
-		helpers.assert_nil(events,
-			"Cmd+V must not be published unless exact clipboard restoration is armed")
+		helpers.assert_true(ok,
+			"restore ownership is completion-gated, so post-handoff allocation cannot retract Cmd+V")
+		helpers.assert_true(consume)
+		helpers.assert_eq(#events, 2)
+		helpers.assert_eq(current, ("T"):rep(60),
+			"the payload must remain available until Cmd+V is handed off")
+		settle_callback_transaction(fixture.hs)
+		for _ = 1, 4 do
+			if current == original then break end
+			fire_existing_delay(fixture.hs, 0)
+		end
 		helpers.assert_true(current == original,
-			"timer refusal must synchronously roll the clipboard back")
+			"timer refusal must use the independent lifecycle fallback after handoff")
 	end)
 
 	helpers.it("rejects synchronous recovery dispatchers without recursive re-entry", function()
@@ -317,16 +379,17 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		if ok then fixture.synthetic.seal(transaction) else fixture.synthetic.cancel(transaction) end
 		local consume, events = fixture.synthetic.leave_callback(ok)
 
-		helpers.assert_true(not ok,
-			"a synchronous timer callback is allocation refusal, not a committed restore")
-		helpers.assert_true(not consume)
-		helpers.assert_nil(events, "Cmd+V must not escape a refused restore transaction")
+		helpers.assert_true(ok,
+			"synchronous restore-timer refusal occurs only after committed Cmd+V handoff")
+		helpers.assert_true(consume)
+		helpers.assert_eq(#events, 2)
+		settle_callback_transaction(fixture.hs)
 		helpers.assert_eq(timer_calls, 2,
-			"one initial arm and one bounded retry are allowed; recursion is not")
+			"one post-handoff arm and one bounded retry are allowed; recursion is not")
 		helpers.assert_eq(defer_calls, 1,
 			"the synchronous fallback must be rejected after one bounded attempt")
-		helpers.assert_eq(restore_attempts, 1,
-			"installer callbacks must not race the caller's single rollback attempt")
+		helpers.assert_eq(restore_attempts, 0,
+			"installer callbacks must not race before timer ownership commits")
 		helpers.assert_eq(current, ("S"):rep(60),
 			"failed recovery retains ownership of the injected payload for a later retry")
 	end)

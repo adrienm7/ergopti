@@ -454,7 +454,7 @@ contracts. See ADR-001.
 The system through which all user-facing strings are delivered in the user's
 active language. Ergopti+ supports 21 languages. All UI text must go through
 `lib.i18n.get("key")` — hardcoded strings in any language are a violation.
-See `copilot-instructions.md` §1 and ADR-007.
+See the repository-wide language contract in `AGENTS.md`, the `i18n` skill, and ADR-007.
 
 **Manifest Schema**
 A JSON Schema file (`_shared/modules/features/manifest.schema.json`) that validates

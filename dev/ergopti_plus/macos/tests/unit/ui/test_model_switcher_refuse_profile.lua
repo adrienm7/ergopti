@@ -15,31 +15,39 @@ local function build_fixture(dialog_choice)
 		profiles = {},
 		saves = 0,
 		updates = 0,
+		notifications = {},
 	}
 	local state = {
 		llm_active_profile = "basic",
 		llm_model = "old-model",
 		llm_num_predictions = 1,
 	}
+	local runtime_profile = "basic"
 
-	package.loaded["infra.logger"] = {
-		debug = noop,
-		info = noop,
-		warn = noop,
-		error = noop,
-	}
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = {
-		block_alert = function() return dialog_choice end,
+		block_alert = function()
+			if dialog_choice == "throw" then error("dialog exploded") end
+			return dialog_choice
+		end,
 	}
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["infra.notifications"] = {
+		notify = function(...)
+			calls.notifications[#calls.notifications + 1] = {...}
+			return true
+		end,
+	}
 	package.loaded["ui.menu.menu_llm.profile_label"] = {
 		format = function(label) return label end,
 	}
 	package.loaded["modules.llm"] = {
 		DEFAULT_STATE = { llm_num_predictions = 1 },
+		get_active_profile = function() return {id = runtime_profile} end,
 		set_active_profile = function(profile_id)
 			calls.profiles[#calls.profiles + 1] = profile_id
+			runtime_profile = profile_id
+			return true
 		end,
 		set_llm_model_mlx = noop,
 		set_llm_model_ollama = noop,
@@ -61,7 +69,10 @@ local function build_fixture(dialog_choice)
 			calls.saves = calls.saves + 1
 			return true
 		end,
-		update_menu = function() calls.updates = calls.updates + 1 end,
+		update_menu = function()
+			calls.updates = calls.updates + 1
+			return true
+		end,
 	})
 
 	return switcher, state, calls
@@ -71,7 +82,7 @@ helpers.describe("model switcher: suggested profile decision", function()
 	helpers.it("leaves state and runtime untouched when the user refuses", function()
 		local switcher, state, calls = build_fixture("button.cancel")
 
-		switcher.apply_recommended_prompt_profile("candidate-model")
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), true)
 
 		helpers.assert_eq(state.llm_active_profile, "basic")
 		helpers.assert_eq(calls.profiles, {},
@@ -85,12 +96,36 @@ helpers.describe("model switcher: suggested profile decision", function()
 	helpers.it("sets, saves, and renders the accepted profile exactly once", function()
 		local switcher, state, calls = build_fixture("button.confirm")
 
-		switcher.apply_recommended_prompt_profile("candidate-model")
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), true)
 
 		helpers.assert_eq(state.llm_active_profile, "advanced")
 		helpers.assert_eq(calls.profiles, { "advanced" })
 		helpers.assert_eq(calls.saves, 1)
 		helpers.assert_eq(calls.updates, 1)
+	end)
+
+	helpers.it("reports a throwing profile dialog as a failed action", function()
+		local switcher, state, calls = build_fixture("throw")
+
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile("candidate-model"), false)
+		helpers.assert_eq(state.llm_active_profile, "basic")
+		helpers.assert_eq(calls.profiles, {})
+		helpers.assert_eq(calls.saves, 0)
+		helpers.assert_eq(calls.updates, 0)
+	end)
+
+	helpers.it("reports No Model as a visible failed action", function()
+		local switcher, state, calls = build_fixture("button.confirm")
+
+		helpers.assert_eq(switcher.apply_recommended_prompt_profile(""), false)
+		helpers.assert_eq(state.llm_active_profile, "basic")
+		helpers.assert_eq(calls.profiles, {})
+		helpers.assert_eq(calls.saves, 0)
+		helpers.assert_eq(calls.updates, 0)
+		helpers.assert_eq(#calls.notifications, 1)
+		helpers.assert_eq(calls.notifications[1][1],
+			"menu.profiles.recommended_unavailable_title")
+		helpers.assert_eq(calls.notifications[1][3], "warning")
 	end)
 end)
 

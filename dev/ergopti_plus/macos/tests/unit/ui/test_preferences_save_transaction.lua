@@ -186,6 +186,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 				keylogger_enabled = false,
 			}, {}, false, {
 				keymap = {
+					set_llm_model = function() return true end,
 					set_preview_star_enabled = setter,
 				},
 				hotstring_editor = {},
@@ -239,6 +240,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 			restore_runtime = function(saved)
 				return MenuState.sync_state_to_modules(state, saved, false, {
 					keymap = {
+						set_llm_model = function() return true end,
 						set_preview_star_enabled = function()
 							error("rollback setter failure", 0)
 						end,
@@ -362,7 +364,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 			keylogger_encrypt = false,
 			keylogger_enabled = false,
 		}, {}, false, {
-			keymap = {},
+			keymap = { set_llm_model = function() return true end },
 			hotstring_editor = {},
 			core_mods = {},
 			apply_metrics_shortcut = function() return true end,
@@ -384,9 +386,10 @@ helpers.describe("menu preferences: first-click rollback", function()
 			gesture_sensitivities = { swipe_left = 1.25 },
 			gesture_space_wrap = false,
 		}, false, {
-			keymap = {},
+			keymap = { set_llm_model = function() return true end },
 			gestures = {
-				enable_all = function() end,
+				enable_all = function() return true end,
+				is_enabled = function() return true end,
 				set_mode = function(_, value) observed.mode = value end,
 				set_sensitivity = function(_, value) observed.sensitivity = value end,
 				set_space_wrap = function(value) observed.space_wrap = value end,

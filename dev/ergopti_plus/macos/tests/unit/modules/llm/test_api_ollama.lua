@@ -233,9 +233,15 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			_ollama_started = false,
 			_ollama_starting = false,
 			_ollama_start_generation = 0,
+			_ollama_start_resume_pending = false,
+			_ollama_start_cleanup_pending = false,
+			_ollama_start_pause_fenced = false,
 		}) do
 			helpers.assert_true(set_upvalue(ensure_impl, name, value), "missing startup state: " .. name)
 		end
+		helpers.assert_true(set_upvalue(ApiOllama.pause_warmup,
+			"_ollama_start_pause_in_progress", false),
+			"missing startup state: _ollama_start_pause_in_progress")
 		for _, name in ipairs({
 			"_ollama_kill_task", "_ollama_launch_timer", "_ollama_serve_task", "_ollama_ambiguous_task",
 		}) do
@@ -245,6 +251,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 
 	for _, case in ipairs({
 		{ name = "false", start = function() return false end },
+		{ name = "nil", start = function() return nil end },
 		{ name = "throw", start = function() error("native start raised") end },
 	}) do
 		helpers.it("retries the stale-process task after start " .. case.name, function()
@@ -256,7 +263,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				spawn_calls = spawn_calls + 1
 				return {
 					start = spawn_calls == 1 and case.start or function() return true end,
-					terminate = function() terminate_calls = terminate_calls + 1; return true end,
+					terminate = function() terminate_calls = terminate_calls + 1; return true, "settled" end,
 				}
 			end
 
@@ -265,10 +272,8 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				helpers.assert_eq(ApiOllama.ensure_running(), true,
 					"a refused launch must not poison the process-lifetime deduplication latch")
 				helpers.assert_eq(spawn_calls, 2, "the second demand must construct a fresh kill task")
-				if case.name == "throw" then
-					helpers.assert_eq(terminate_calls, 1,
-						"an exceptional start must revoke the ambiguous native capability before retry")
-				end
+				helpers.assert_eq(terminate_calls, 1,
+					"every non-true start must revoke the ambiguous native capability before retry")
 			end)
 			shell_runner.spawn = original_spawn
 			if not ok then error(err) end
@@ -277,6 +282,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 
 	for _, case in ipairs({
 		{ name = "false", start = function() return false end },
+		{ name = "nil", start = function() return nil end },
 		{ name = "throw", start = function() error("serve start raised") end },
 	}) do
 		helpers.it("retries the full transaction after server start " .. case.name, function()
@@ -291,19 +297,23 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				spawn_calls = spawn_calls + 1
 				if spawn_calls == 1 then
 					kill_done = on_done
-					return { start = function() return true end, terminate = function() return true end }
+					return { start = function() return true end, terminate = function() return true, "settled" end }
 				end
 				if spawn_calls == 2 then
 					return {
 						start = case.start,
-						terminate = function() terminate_calls = terminate_calls + 1; return true end,
+						terminate = function() terminate_calls = terminate_calls + 1; return true, "settled" end,
 					}
 				end
-				return { start = function() return true end, terminate = function() return true end }
+				return { start = function() return true end, terminate = function() return true, "settled" end }
 			end
 			scheduler.after = function(_, callback)
-				launch_server = callback
-				return { timer = {} }, true
+				local handle = { timer = {} }
+				launch_server = function()
+					handle.timer = nil
+					callback()
+				end
+				return handle, true
 			end
 
 			local ok, err = pcall(function()
@@ -315,7 +325,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				helpers.assert_eq(ApiOllama.ensure_running(), true,
 					"a failed nested serve launch must release the outer in-flight latch")
 				helpers.assert_eq(spawn_calls, 3, "retry must restart from stale-process cleanup")
-				if case.name == "throw" then helpers.assert_eq(terminate_calls, 1) end
+				helpers.assert_eq(terminate_calls, 1)
 			end)
 			shell_runner.spawn = original_spawn
 			scheduler.after = original_after

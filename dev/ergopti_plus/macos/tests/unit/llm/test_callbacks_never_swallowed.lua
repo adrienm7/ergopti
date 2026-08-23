@@ -291,9 +291,21 @@ end)
 helpers.describe("LLM orchestration: queued waiters use the visible callback contract", function()
 	helpers.it("covers dependency and model-manager callback aliases", function()
 		local targets = {
-			{ symbol = "local function fire_pending_callbacks", label = "MLX dependency callbacks" },
-			{ symbol = "function M.new(deps, presets)", label = "MLX model-manager callbacks" },
-			{ symbol = "function obj.start_server", label = "MLX server waiters" },
+			{
+				symbol = "fire_pending_callbacks = function(ok, is_current)",
+				label = "MLX dependency callbacks",
+				boundary = "ApiCommon.protected_call",
+			},
+			{
+				symbol = "function M.new(deps, presets)",
+				label = "MLX model-manager callbacks",
+				boundary = "Logger.callback",
+			},
+			{
+				symbol = "function obj.start_server",
+				label = "MLX server waiters",
+				boundary = "ApiCommon.protected_call",
+			},
 		}
 		local offenders = {}
 		for _, target in ipairs(targets) do
@@ -307,16 +319,16 @@ helpers.describe("LLM orchestration: queued waiters use the visible callback con
 					break
 				end
 			end
-			helpers.assert_true(code:find("ApiCommon.protected_call", 1, true) ~= nil,
+			helpers.assert_true(code:find(target.boundary, 1, true) ~= nil,
 				target.label .. " must route every caller callback through the tested "
-					.. "traceback-and-ERROR wrapper")
+					.. "traceback-and-ERROR wrapper " .. target.boundary)
 		end
 		helpers.assert_eq(0, #offenders,
 			"bare callback pcall still deletes errors in: " .. table.concat(offenders, ", "))
 	end)
 
 	helpers.it("recognises the MLX server's local xpcall as an owned logged boundary", function()
-		local src, err = helpers.read_driver_unit("MLX pre-launch port sweep completion")
+		local src, err = helpers.read_driver_unit("Async callback '%s' raised")
 		helpers.assert_true(src ~= nil,
 			"MLX async callback owner must be reachable: " .. tostring(err))
 		local owner_at = src:find("local function run_async_callback", 1, true)
@@ -368,7 +380,7 @@ helpers.describe("HS-016 callback owners: every hand-off is visible and truthful
 				forbidden = { "callback" },
 			},
 			{
-				symbol = "function obj.reattach_download", label = "MLX download callback",
+				symbol = "local function reattached_business_authorized()", label = "MLX download callback",
 				forbidden = { "on_success", "deps.update_icon", "deps.keymap.set_llm_model", "deps.save_prefs" },
 			},
 			{

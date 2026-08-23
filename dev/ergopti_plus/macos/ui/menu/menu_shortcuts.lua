@@ -26,6 +26,8 @@ local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
 local ManifestReader = require("infra.manifest_reader")
 local LOG           = "menu_shortcuts"
+local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
+local shortcut_toggle_debt = nil
 
 
 
@@ -348,25 +350,36 @@ function M.build(ctx)
 	--- @param enabled boolean Desired binding state.
 	--- @param previous boolean Previously committed binding state.
 	--- @return boolean committed True only after exact runtime commitment.
-	local function commit_shortcuts_runtime(enabled, previous)
-		local apply = enabled and shortcuts.resume_bindings or shortcuts.pause_bindings
-		local rollback = previous and shortcuts.resume_bindings or shortcuts.pause_bindings
-		if type(apply) ~= "function" or type(rollback) ~= "function" then
+	local function apply_shortcut_posture(enabled, label)
+		local lifecycle = enabled and shortcuts.resume_bindings or shortcuts.pause_bindings
+		if type(lifecycle) ~= "function" then
 			Logger.error(LOG, "Shortcuts toggle refused because its lifecycle contract is incomplete.")
 			return false
 		end
-
-		local apply_ok, result_or_err = xpcall(apply, debug.traceback)
+		local apply_ok, result_or_err = xpcall(
+			lifecycle, debug.traceback, SHORTCUT_TOGGLE_CLAIM)
 		if apply_ok and result_or_err == true then return true end
-		Logger.error(LOG, "Shortcuts runtime toggle did not commit: %s.",
-			tostring(result_or_err))
+		Logger.error(LOG, "Shortcuts runtime %s did not commit: %s.",
+			tostring(label), tostring(result_or_err))
+		return false
+	end
 
-		local rollback_ok, rollback_result = xpcall(rollback, debug.traceback)
-		if not rollback_ok or rollback_result ~= true then
-			Logger.error(LOG, "Shortcuts runtime rollback did not settle: %s.",
-				tostring(rollback_result))
+	local function commit_shortcuts_runtime(enabled, previous)
+		if apply_shortcut_posture(enabled, "toggle") == true then return true end
+		if apply_shortcut_posture(previous, "rollback") ~= true then
+			shortcut_toggle_debt = { restore_enabled = previous }
 		end
 		return false
+	end
+
+	local function settle_shortcut_toggle_debt()
+		local debt = shortcut_toggle_debt
+		if not debt then return true end
+		if apply_shortcut_posture(debt.restore_enabled, "rollback retry") ~= true then
+			return false
+		end
+		if shortcut_toggle_debt == debt then shortcut_toggle_debt = nil end
+		return true
 	end
 
 	local item = {
@@ -380,6 +393,7 @@ function M.build(ctx)
 		-- deliberately left alone: it must keep reporting the stored preference.
 		disabled = paused or nil,
 		action   = (not paused) and function()
+			if settle_shortcut_toggle_debt() ~= true then return false end
 			local previous = state.shortcuts == true
 			local desired = not previous
 			-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
@@ -390,7 +404,16 @@ function M.build(ctx)
 			-- the symmetric pair that leave the script-control tap untouched.
 			if commit_shortcuts_runtime(desired, previous) ~= true then return false end
 			state.shortcuts = desired
-			if ctx.save_prefs() ~= true then return false end
+			local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+			if not save_ok or save_result ~= true then
+				state.shortcuts = previous
+				if apply_shortcut_posture(previous, "preference rollback") ~= true then
+					shortcut_toggle_debt = { restore_enabled = previous }
+				end
+				Logger.error(LOG, "Shortcut preference publication did not commit: %s.",
+					tostring(save_result))
+				return false
+			end
 			ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
 			ctx.updateMenu()
 			return true

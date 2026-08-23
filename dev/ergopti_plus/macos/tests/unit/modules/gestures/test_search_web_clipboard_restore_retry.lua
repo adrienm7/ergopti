@@ -32,7 +32,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 			["public.html"] = "<b>ORIGINAL</b>",
 		}
 		hs_stub.pasteboard.readAllData = function() snapshots = snapshots + 1; return original end
-		hs_stub.pasteboard.clearContents = function() end
+		hs_stub.pasteboard.clearContents = function() return true end
 		hs_stub.pasteboard.getContents = function() return "selected words" end
 		hs_stub.pasteboard.writeAllData = function(value)
 			restores[#restores + 1] = value
@@ -93,7 +93,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		local original = { ["public.png"] = "PNG" }
 		local restored = nil
 		hs_stub.pasteboard.readAllData = function() return original end
-		hs_stub.pasteboard.clearContents = function() end
+		hs_stub.pasteboard.clearContents = function() return true end
 		hs_stub.pasteboard.writeAllData = function(value)
 			restored = value
 			return true
@@ -133,7 +133,7 @@ helpers.describe("search_web: native clipboard refusal retains ownership", funct
 		local restored = nil
 		local selection_reads = 0
 		hs_stub.pasteboard.readAllData = function() return original end
-		hs_stub.pasteboard.clearContents = function() end
+		hs_stub.pasteboard.clearContents = function() return true end
 		hs_stub.pasteboard.getContents = function()
 			selection_reads = selection_reads + 1
 			return "stale"

@@ -80,8 +80,62 @@ end
 --- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
 --- @param source_type string Telemetry label passed to the keylogger.
 --- @param source_variant string|nil Optional sub-type for the keylogger.
-function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant, is_private)
+function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored,
+	source_type, source_variant, is_private, terminator_spec, terminal_target_override)
 	if not require_state("perform_text_replacement") then return false end
+	local discovered_terminal = terminal_target_override
+	if discovered_terminal == nil and deletes > 0
+		and type(TextSender.terminalInputTarget) == "function" then
+		local target_ok, target_or_error = pcall(TextSender.terminalInputTarget)
+		if not target_ok then
+			pcall(Logger.error, LOG, "Terminal target discovery failed: %s.",
+				tostring(target_or_error))
+			return false
+		end
+		discovered_terminal = target_or_error
+	end
+	if discovered_terminal ~= nil and type(discovered_terminal) ~= "table"
+		and type(discovered_terminal) ~= "userdata" then
+		pcall(Logger.error, LOG, "Terminal target discovery returned invalid type '%s'.",
+			type(discovered_terminal))
+		return false
+	end
+	if discovered_terminal ~= nil
+		and type(SyntheticInput.is_collecting_callback) == "function"
+		and SyntheticInput.is_collecting_callback() ~= true then
+		-- Tooltip acceptance runs from a deferred callback, after its eventtap has
+		-- already returned. Give that path the same one-batch terminal transaction
+		-- as a raw key callback; otherwise each delete is dispatched separately and
+		-- no paced owner can be prepared.
+		local entered_ok, entered_or_error = pcall(SyntheticInput.enter_paced_collection)
+		if not entered_ok or type(entered_or_error) ~= "table" then
+			Logger.error(LOG, "Terminal replacement collector could not be acquired: %s.",
+				tostring(entered_or_error))
+			return false
+		end
+		local outcome = table.pack(xpcall(function()
+			return M.perform_text_replacement(deletes, emit_action, buffer_action,
+				is_final, is_ignored, source_type, source_variant, is_private,
+				terminator_spec, discovered_terminal)
+		end, debug.traceback))
+		if outcome[1] ~= true or outcome[2] ~= true then
+			pcall(SyntheticInput.abort_callback)
+			if outcome[1] ~= true then
+				Logger.error(LOG, "Deferred terminal replacement failed: %s.", tostring(outcome[2]))
+				return false
+			end
+			return table.unpack(outcome, 2, outcome.n)
+		end
+		local left_ok, left_or_error = pcall(SyntheticInput.leave_paced_collection)
+		if not left_ok or left_or_error ~= true then
+			-- The paced owner already committed before this memory-only close. Preserve
+			-- acceptance so the caller cannot replay its validation key.
+			pcall(SyntheticInput.abort_callback)
+			Logger.error(LOG, "Deferred terminal collector close failed after commit: %s.",
+				tostring(left_or_error))
+		end
+		return table.unpack(outcome, 2, outcome.n)
+	end
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
 	-- Every logical producer receives a fresh immutable generation. A previous
@@ -89,10 +143,11 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- start within the old timing window.
 	TerminatorReplay.flush_now("superseded by a new replacement")
 	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")
-	local terminal_target = nil
-	if deletes > 0 and type(TextSender.terminalInputTarget) == "function" then
-		terminal_target = TextSender.terminalInputTarget()
-	end
+	local terminal_target = discovered_terminal
+	local paced_owner = nil
+	local paced_settlement_budget = 0
+	local replay_owner = nil
+	local suppress_deadline = nil
 	if not is_ignored then TooltipRenderer.hide({ forced = true }) end
 
 	-- The preview refresh belongs to the same replacement transaction as its
@@ -103,10 +158,11 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	if not is_ignored then
 		local preview_state = _state
 		local preview_llm = _llm
+		local preview_generation = preview_state.lifecycle_generation
 		local registered, register_err = pcall(SyntheticInput.on_complete,
 			transaction, function(_completed_tx, status)
-				if status ~= "complete"
-					or _state ~= preview_state or _llm ~= preview_llm then return end
+				if status ~= "complete" or _state ~= preview_state or _llm ~= preview_llm
+					or preview_state.lifecycle_generation ~= preview_generation then return end
 				local ok, err = pcall(preview_llm.update_preview, preview_state.buffer)
 				if not ok then
 					Logger.error(LOG, "Replacement preview refresh failed: %s.", tostring(err))
@@ -120,7 +176,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
-	local ok, emit_count, emitted_str, logical_text = pcall(function()
+	local ok, emit_count, emitted_str, logical_text, order_delay = pcall(function()
 		return SyntheticInput.with_transaction(transaction, function()
 			assert(TextSender.eraseChars(deletes, 0) ~= false,
 				"replacement deletion could not be constructed")
@@ -138,19 +194,90 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	if terminal_target then
 		local terminal_key_delay_us = Timings.ms(
 			"debounce", "terminal_hotstring_key_delay_ms") * 1000
-		local paced_ok, paced_or_error = pcall(SyntheticInput.deliver_collected_paced,
+		local paced_ok, paced_or_error = pcall(SyntheticInput.prepare_collected_paced,
 			transaction, deletes, terminal_key_delay_us, terminal_target)
-		if not paced_ok then
+		if not paced_ok or paced_or_error == nil then
 			pcall(SyntheticInput.cancel, transaction)
-			Logger.error(LOG, "Terminal replacement delivery failed: %s.",
+			Logger.error(LOG, "Terminal replacement serializer preparation failed: %s.",
 				tostring(paced_or_error))
 			return false, transaction
 		end
+		paced_owner = paced_or_error
+		local budget_ok, budget_or_error = pcall(
+			SyntheticInput.paced_settlement_budget, paced_owner)
+		if not budget_ok or type(budget_or_error) ~= "number" then
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Terminal replacement settlement budget failed: %s.",
+				tostring(budget_or_error))
+			return false, transaction
+		end
+		paced_settlement_budget = budget_or_error
 	end
 	emitted_str = emitted_str or ""
 	-- Keep extensions that still return the historical two values working. The
 	-- built-in clipboard emitter supplies an explicit logical value instead.
 	logical_text = logical_text or emitted_str
+	if terminator_spec then
+		terminator_spec.transaction = transaction
+		terminator_spec.min_delay = type(order_delay) == "number" and order_delay > 0
+			and order_delay or 0
+		terminator_spec.dispatch_budget = paced_settlement_budget
+		terminator_spec.target_app = terminal_target
+		local replay_ok, replay_or_error = pcall(TerminatorReplay.prepare, terminator_spec)
+		if not replay_ok or type(replay_or_error) ~= "table" then
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Terminator replay preparation failed: %s.",
+				tostring(replay_or_error))
+			return false, transaction
+		end
+		replay_owner = replay_or_error
+	end
+	if is_final then
+		local clock_ok, deadline_or_error = pcall(
+			_state.prepare_suppress_rescan, CoreStateM.FINAL_RESULT_SUPPRESS_SEC)
+		if not clock_ok or type(deadline_or_error) ~= "number" then
+			if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Replacement rescan deadline preparation failed: %s.",
+				tostring(deadline_or_error))
+			return false, transaction
+		end
+		suppress_deadline = deadline_or_error
+	end
+
+	-- Terminal preparation retained the still-reversible callback batch. Require
+	-- an exact seal before publishing the matching engine/telemetry state; a false
+	-- native-style result is a refusal, not a successful pcall.
+	local seal_call_ok, seal_result = pcall(SyntheticInput.seal, transaction)
+	if not seal_call_ok or seal_result ~= true then
+		if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
+		pcall(SyntheticInput.cancel, transaction)
+		Logger.error(LOG, "replacement transaction could not be sealed: %s.",
+			tostring(seal_result))
+		return false, transaction
+	end
+	if paced_owner then
+		local authorize_ok, authorized_or_error = pcall(
+			SyntheticInput.authorize_collected_paced, paced_owner)
+		if not authorize_ok or authorized_or_error ~= true then
+			if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Terminal replacement serializer authorization failed: %s.",
+				tostring(authorized_or_error))
+			return false, transaction
+		end
+	end
+	if replay_owner then
+		local authorize_ok, authorized_or_error = pcall(
+			TerminatorReplay.authorize_prepared, replay_owner)
+		if not authorize_ok or authorized_or_error ~= true then
+			pcall(TerminatorReplay.cancel_prepared, replay_owner)
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "Terminator replay authorization failed: %s.",
+				tostring(authorized_or_error))
+			return false, transaction
+		end
+	end
 
 	if type(buffer_action) == "function" then
 		local ok_buf, buf_err = pcall(buffer_action)
@@ -158,11 +285,19 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			-- Buffer commit and synthetic output are one transaction. Since the batch
 			-- is still only being built, roll it back instead of displaying output the
 			-- engine cannot describe afterwards.
+			if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
 			pcall(SyntheticInput.cancel, transaction)
 			Logger.error(LOG, "buffer_action failed: %s.", tostring(buf_err))
 			return false, transaction
 		end
 	end
+
+	-- From this point through ownership publication every operation is a bounded
+	-- Lua table mutation. Native clocks, timers, target lookup, callback
+	-- registration and snapshot validation all completed while rollback was exact.
+	if suppress_deadline then _state.commit_suppress_rescan(suppress_deadline) end
+	if paced_owner then SyntheticInput.commit_collected_paced(paced_owner) end
+	if replay_owner then TerminatorReplay.commit_prepared(replay_owner) end
 
 	-- Guard: skip telemetry when nothing was actually injected. This runs only
 	-- after the buffer commit succeeded, so a rolled-back replacement cannot be
@@ -178,38 +313,29 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str,
 			is_private)
 		if not ok_notify then
-			Logger.error(LOG, "notify_synthetic failed: %s.", tostring(notify_err))
+			pcall(Logger.error, LOG, "notify_synthetic failed: %s.", tostring(notify_err))
 		end
-	end
-
-	-- Deferred emitters retain the transaction before arming their timer. Sealing
-	-- closes the synchronous producer boundary; completion waits for those holds
-	-- and for every tagged batch to be handed to Quartz.
-	local sealed, seal_err = pcall(SyntheticInput.seal, transaction)
-	if not sealed then
-		pcall(SyntheticInput.cancel, transaction)
-		Logger.error(LOG, "replacement transaction could not be sealed: %s.", tostring(seal_err))
-		return false, transaction
 	end
 
 	if keylogger and type(keylogger.set_buffer) == "function" then
 		local ok_set, set_err = pcall(keylogger.set_buffer, _state.buffer)
 		if not ok_set then
-			Logger.error(LOG, "keylogger.set_buffer failed: %s.", tostring(set_err))
+			pcall(Logger.error, LOG, "keylogger.set_buffer failed: %s.", tostring(set_err))
 		end
 	end
 
 	-- Named constant rather than a bare 1.0: it is deliberately DOUBLE the module
 	-- default, and that relationship is invisible when the literal sits here.
-	if is_final then _state.suppress_rescan(CoreStateM.FINAL_RESULT_SUPPRESS_SEC) end
-
-	if not is_ignored
-		and (type(_llm.is_runtime_available) ~= "function" or _llm.is_runtime_available())
-		and _llm.get_llm_enabled() then
-		_llm.start_timer()
+	if not is_ignored then
+		local llm_ok, llm_err = pcall(function()
+			if (type(_llm.is_runtime_available) ~= "function" or _llm.is_runtime_available())
+				and _llm.get_llm_enabled() then _llm.start_timer() end
+		end)
+		if not llm_ok then
+			pcall(Logger.error, LOG, "Post-commit LLM timer update failed: %s.", tostring(llm_err))
+		end
 	end
-
-	Logger.done(LOG, "Replacement complete.")
+	pcall(Logger.done, LOG, "Replacement complete.")
 	return true, transaction
 end
 
@@ -800,9 +926,16 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- to emit tokens (replacements with {Token} directives).
 		local repl_text        = eff_plain
 		local deletes, to_type = trig_len, repl_text
-		-- Filled in by the emit closure and completed with the immutable transaction
-		-- returned by perform_text_replacement below.
-		local replay_spec      = nil
+		local replay_spec = nil
+		if not consume_term then
+			if chars == "\r" or chars == "\n" then
+				replay_spec = { kind = "key", key = "return", chars = chars }
+		elseif chars == "\t" then
+				replay_spec = { kind = "key", key = "tab", chars = chars }
+		else
+				replay_spec = { kind = "text", chars = chars }
+			end
+		end
 
 		if repl_text == eff_repl then
 			-- Simple text: keep common prefix to reduce backspaces. Compared against
@@ -822,7 +955,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- add 1 extra backspace to erase the nbsp that sits between trigger and endchar.
 		if extra_bs_bytes > 0 then deletes = deletes + 1 end
 
-		local replacement_ok, replacement_transaction = M.perform_text_replacement(
+		local replacement_ok = M.perform_text_replacement(
 			deletes,
 			function()
 				local c, s, logical, order_delay = emit_dispatch(m, to_type)
@@ -837,27 +970,13 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- through as a floor for the paste path, where there is no
 				-- per-character echo to wait on.
 				if not consume_term then
-					if chars == "\r" or chars == "\n" then
-						replay_spec = { kind = "key", key = "return", chars = chars }
-						-- Keep the logical replacement and keylogger record aligned with
-						-- the terminator replay. Its later OS event is excluded
-						-- independently by the immutable provenance tag.
-						s = s .. chars
-						logical = logical .. chars
-					elseif chars == "\t" then
-						replay_spec = { kind = "key", key = "tab", chars = chars }
-						s = s .. chars
-						logical = logical .. chars
-					else
-						replay_spec = { kind = "text", chars = chars }
-						s = s .. chars
-						logical = logical .. chars
-					end
-					replay_spec.min_delay  = (type(order_delay) == "number" and order_delay > 0)
-						and order_delay or 0
+					-- Keep the logical replacement and keylogger record aligned with
+					-- the later owned replay.
+					s = s .. chars
+					logical = logical .. chars
 					c = c + text_utils.utf8_len(chars)
 				end
-				return c, s, logical
+				return c, s, logical, order_delay
 			end,
 			function()
 				-- buf_start is a valid byte index into _state.buffer: the buffer
@@ -870,24 +989,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 			is_ignored,
 			"hotstring",
 			m.group or nil,
-			m.is_private
+			m.is_private,
+			replay_spec
 		)
 		if not replacement_ok then return false end
-
-		-- Armed only now because perform_text_replacement creates and returns the
-		-- transaction after invoking the emit closure. on_complete is safe even if
-		-- an unusual adapter completes synchronously: late registration immediately
-		-- receives the terminal status.
-		if replay_spec then
-			replay_spec.transaction = replacement_transaction
-			if not TerminatorReplay.arm(replay_spec) then
-				-- The replacement batch is returned before the original event. If an
-				-- older undeliverable terminator prevented arming this one, passing the
-				-- physical terminator through preserves the current user's key instead
-				-- of consuming it with no replay owner.
-				return false
-			end
-		end
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
 		-- and replacement are both secrets and must reach neither the keylogger

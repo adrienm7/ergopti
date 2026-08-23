@@ -46,7 +46,7 @@ function M.build_action_picker(actions, current_id, on_select, filter)
 		items[#items + 1] = {
 			label   = action.label,
 			checked = (aid == current_id),
-			action  = function() on_select(aid) end,
+			action  = function() return on_select(aid) end,
 		}
 		::continue::
 	end

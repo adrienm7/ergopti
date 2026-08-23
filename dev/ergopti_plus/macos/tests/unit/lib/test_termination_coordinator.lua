@@ -3,9 +3,11 @@
 --- ==============================================================================
 --- MODULE: Controlled Termination Transaction Tests
 --- DESCRIPTION:
---- Drives reload and exit requests through an exact asynchronous lease double.
+--- Drives reload and exit requests through exact asynchronous lease and teardown
+--- doubles.
 --- Proves local consumers are never torn down before the fence, pre-fence failures
---- retain the live environment, post-fence failures exit, and quit supersedes reload.
+--- retain the live environment, post-fence failures exit, callback-owned teardown
+--- pauses the terminal drain, and quit supersedes reload.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -15,6 +17,7 @@ local function load_coordinator(options)
 	local calls = {
 		order = {},
 		lease_requests = 0,
+		input_drains = 0,
 		teardowns = 0,
 		drains = 0,
 		finalizers = 0,
@@ -53,10 +56,32 @@ local function load_coordinator(options)
 			end
 			return options.request_accepted ~= false
 		end,
-		teardown = function(kind)
+		drain_input = function(callback)
+			calls.input_drains = calls.input_drains + 1
+			calls.input_drain_callback = callback
+			append("drain-input")
+			if options.input_drain_raises then
+				error("synthetic input drain acquisition failure")
+			end
+			if options.input_drain_deferred ~= true then callback() end
+			return options.input_drain_accepted ~= false
+		end,
+		teardown = function(kind, on_ready)
 			calls.teardowns = calls.teardowns + 1
 			calls.teardown_kind = kind
 			append("teardown-" .. kind)
+			if options.teardown_synchronous_ready ~= nil and not calls.teardown_released then
+				calls.teardown_released = true
+				on_ready(options.teardown_synchronous_ready, "synchronous teardown boundary")
+				if options.teardown_raises_after_callback then
+					error("synthetic teardown failure after callback")
+				end
+				return options.teardown_return_after_callback ~= false
+			end
+			if options.teardown_deferred and not calls.teardown_released then
+				calls.teardown_callback = on_ready
+				return true, "pending"
+			end
 			if options.partial_teardown then
 				calls.first_owner_stopped = true
 				append("first-owner-stopped")
@@ -120,6 +145,26 @@ local function load_coordinator(options)
 end
 
 helpers.describe("controlled termination coordinator", function()
+	helpers.it("retains an exclusive reload caller until the exact lease aborts", function()
+		local coordinator, calls = load_coordinator()
+		local aborted = 0
+		local abort_detail = nil
+		helpers.assert_eq(coordinator.request_reload_owned("factory_reset", function(detail)
+			aborted = aborted + 1
+			abort_detail = detail
+		end), true)
+		helpers.assert_eq(coordinator.request_reload_owned("sibling_reset", function() end), false,
+			"an owned handoff cannot join an older terminal transition")
+		helpers.assert_true(coordinator.is_pending())
+
+		calls.lease_callback(false, "native fence refused")
+		helpers.assert_eq(aborted, 1)
+		helpers.assert_eq(abort_detail, "exact Karabiner revocation was not proven: native fence refused")
+		helpers.assert_eq(calls.teardowns, 0)
+		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_true(not coordinator.is_pending())
+	end)
+
 	helpers.it("accepts a returning hs.reload after the exact fence and drained teardown", function()
 		local coordinator, calls = load_coordinator()
 		helpers.assert_true(coordinator.request_reload("menu_reload", "arg-a", 7))
@@ -129,7 +174,7 @@ helpers.describe("controlled termination coordinator", function()
 
 		calls.lease_callback(true, "stopped")
 		helpers.assert_true(helpers.deep_equal(calls.order, {
-			"request-lease", "mark-reload", "teardown-reload", "begin-drain",
+			"request-lease", "drain-input", "mark-reload", "teardown-reload", "begin-drain",
 			"finalize-teardown", "reload",
 		}))
 		helpers.assert_eq(calls.reload_arguments.n, 2)
@@ -144,6 +189,177 @@ helpers.describe("controlled termination coordinator", function()
 		calls.lease_callback(true, "duplicate stopped")
 		helpers.assert_eq(calls.logger_calls, logs_after_reload,
 			"a late duplicate lease callback must not reopen the stopped logger")
+	end)
+
+	helpers.it("keeps every teardown owner live until synthetic input is exactly idle", function()
+		local coordinator, calls = load_coordinator({ input_drain_deferred = true })
+		helpers.assert_true(coordinator.request_reload("paced_replacement_in_flight"))
+		calls.lease_callback(true, "stopped")
+
+		helpers.assert_eq(calls.input_drains, 1)
+		helpers.assert_eq(calls.marks, 0,
+			"the reload sentinel must not publish before the replacement owner settles")
+		helpers.assert_eq(calls.teardowns, 0,
+			"eventtaps and paced timers must remain live until serializer idle")
+		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_true(coordinator.is_pending())
+
+		calls.input_drain_callback()
+		helpers.assert_true(helpers.deep_equal(calls.order, {
+			"request-lease", "drain-input", "mark-reload", "teardown-reload",
+			"begin-drain", "finalize-teardown", "reload",
+		}))
+		helpers.assert_true(not coordinator.is_pending())
+	end)
+
+	helpers.it("keeps quit and its fatal backstop behind the same synthetic drain", function()
+		local coordinator, calls = load_coordinator({ input_drain_deferred = true })
+		helpers.assert_true(coordinator.request_exit("paced_quit", 17))
+		calls.lease_callback(true, "stopped")
+
+		helpers.assert_eq(calls.teardowns, 0)
+		helpers.assert_eq(calls.exits, 0)
+		helpers.assert_eq(calls.fatal_exits, 0)
+		calls.input_drain_callback()
+
+		helpers.assert_true(helpers.deep_equal(calls.order, {
+			"request-lease", "drain-input", "teardown-exit", "begin-drain",
+			"finalize-teardown", "exit", "fatal-exit",
+		}))
+		helpers.assert_eq(calls.exit_code, 17)
+		helpers.assert_true(not coordinator.is_pending())
+	end)
+
+	helpers.it("awaits an exact asynchronous teardown boundary before drain or exit (HS-008)", function()
+		local coordinator, calls = load_coordinator({
+			teardown_deferred = true,
+			drain_deferred = true,
+		})
+		helpers.assert_true(coordinator.request_exit("mlx_task_pending", 17))
+		calls.lease_callback(true, "stopped")
+
+		helpers.assert_eq(calls.teardowns, 1)
+		helpers.assert_eq(type(calls.teardown_callback), "function")
+		helpers.assert_eq(calls.drains, 0,
+			"logger drain cannot start while the exact MLX task callback is pending")
+		helpers.assert_eq(calls.exits, 0)
+		helpers.assert_eq(calls.fatal_exits, 0,
+			"accepted asynchronous teardown is not a post-fence failure")
+		helpers.assert_true(coordinator.is_pending())
+
+		local exact_callback = calls.teardown_callback
+		calls.teardown_released = true
+		helpers.assert_true(exact_callback(true, "mlx listener absent"))
+		helpers.assert_eq(calls.teardowns, 2,
+			"only the retained callback may authorize the stateful teardown retry")
+		helpers.assert_eq(calls.drains, 1)
+		helpers.assert_eq(calls.exits, 0)
+		helpers.assert_eq(calls.fatal_exits, 0)
+
+		exact_callback(true, "duplicate")
+		helpers.assert_eq(calls.teardowns, 2,
+			"a duplicate native completion cannot repeat local teardown")
+		helpers.assert_eq(calls.drains, 1)
+
+		calls.drain_callback(true, "all ACKed")
+		helpers.assert_eq(calls.exits, 1)
+		helpers.assert_eq(calls.fatal_exits, 1,
+			"the returning exit double reaches its backstop only after exact settlement")
+		helpers.assert_true(not coordinator.is_pending())
+	end)
+
+	helpers.it("fails once only after an exact pending teardown refusal (HS-008)", function()
+		local coordinator, calls = load_coordinator({ teardown_deferred = true })
+		helpers.assert_true(coordinator.request_reload("mlx_cleanup_refused"))
+		calls.lease_callback(true, "stopped")
+
+		helpers.assert_eq(calls.fatal_exits, 0,
+			"pending cleanup cannot trigger the fatal backstop before its callback")
+		local exact_callback = calls.teardown_callback
+		helpers.assert_true(exact_callback(false, "listener still present") == false)
+		helpers.assert_eq(calls.teardowns, 1)
+		helpers.assert_eq(calls.drains, 0)
+		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_eq(calls.fatal_exits, 1)
+		helpers.assert_true(not coordinator.is_pending())
+
+		exact_callback(false, "duplicate refusal")
+		helpers.assert_eq(calls.fatal_exits, 1,
+			"a duplicate refusal cannot invoke the fatal backstop twice")
+	end)
+
+	helpers.it("retries a pending reload teardown with the latest exit intent (HS-008)", function()
+		local coordinator, calls = load_coordinator({
+			teardown_deferred = true,
+			drain_deferred = true,
+		})
+		helpers.assert_true(coordinator.request_reload("mlx_pending_reload"))
+		calls.lease_callback(true, "stopped")
+		helpers.assert_eq(calls.teardown_kind, "reload")
+		helpers.assert_eq(calls.marks, 1)
+
+		helpers.assert_true(coordinator.request_exit("mlx_pending_exit", 23))
+		helpers.assert_eq(calls.clears, 1)
+		helpers.assert_eq(calls.teardowns, 1,
+			"an exit upgrade cannot bypass the callback-owned teardown boundary")
+		helpers.assert_eq(calls.exits, 0)
+		helpers.assert_eq(calls.fatal_exits, 0)
+
+		calls.teardown_released = true
+		calls.teardown_callback(true, "mlx listener absent")
+		helpers.assert_eq(calls.teardowns, 2)
+		helpers.assert_eq(calls.teardown_kind, "exit",
+			"the callback-authorized retry must observe the globally latest intent")
+		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_eq(calls.exits, 0)
+		helpers.assert_eq(calls.fatal_exits, 0)
+
+		calls.drain_callback(true, "all ACKed")
+		helpers.assert_eq(calls.reloads, 0)
+		helpers.assert_eq(calls.exits, 1)
+		helpers.assert_eq(calls.exit_code, 23)
+	end)
+
+	helpers.it("lets a synchronous exact teardown callback outrank a late failure", function()
+		for _, options in ipairs({
+			{ teardown_synchronous_ready = true, teardown_return_after_callback = false },
+			{ teardown_synchronous_ready = true, teardown_raises_after_callback = true },
+		}) do
+			local coordinator, calls = load_coordinator(options)
+			helpers.assert_true(coordinator.request_reload("sync_mlx_completion"))
+			calls.lease_callback(true, "stopped")
+			helpers.assert_eq(calls.teardowns, 2)
+			helpers.assert_eq(calls.reloads, 1)
+			helpers.assert_eq(calls.fatal_exits, 0)
+		end
+	end)
+
+	helpers.it("runs teardown before fatal exit when pre-teardown input drain refuses", function()
+		local cases = {
+			{
+				name = "false",
+				options = { input_drain_deferred = true, input_drain_accepted = false },
+			},
+			{
+				name = "throw",
+				options = { input_drain_deferred = true, input_drain_raises = true },
+			},
+		}
+		for _, case in ipairs(cases) do
+			local coordinator, calls = load_coordinator(case.options)
+			helpers.assert_true(coordinator.request_exit("input_drain_" .. case.name, 17))
+			calls.lease_callback(true, "stopped")
+
+			helpers.assert_eq(calls.teardowns, 1,
+				case.name .. " pre-drain failure must not skip local capability teardown")
+			helpers.assert_eq(calls.teardown_kind, "exit")
+			helpers.assert_eq(calls.fatal_exits, 1,
+				case.name .. " remains terminal after exact native fencing")
+			helpers.assert_true(helpers.deep_equal(calls.order, {
+				"request-lease", "drain-input", "teardown-exit", "fatal-exit",
+			}), case.name .. " must order teardown before the fatal backstop")
+			helpers.assert_true(not coordinator.is_pending())
+		end
 	end)
 
 	helpers.it("aborts without teardown when exact revocation is not proven", function()
@@ -229,7 +445,7 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(calls.reloads, 1)
 		helpers.assert_true(not coordinator.is_pending())
 		helpers.assert_true(helpers.deep_equal(calls.order, {
-			"request-lease", "mark-reload", "teardown-reload", "begin-drain",
+			"request-lease", "drain-input", "mark-reload", "teardown-reload", "begin-drain",
 			"finalize-teardown", "reload",
 		}))
 	end)
@@ -358,13 +574,21 @@ helpers.describe("controlled termination coordinator", function()
 			calls.lease_callback(true, "stopped")
 
 			helpers.assert_eq(calls.marks, 1)
-			helpers.assert_eq(calls.teardowns, 0,
-				"the sentinel fixture must fail before local teardown")
+			helpers.assert_eq(calls.teardowns, 1,
+				"an exact fence requires one local teardown even when marking fails first")
+			helpers.assert_true(helpers.deep_equal(calls.order, {
+				"request-lease", "drain-input", "mark-reload", "teardown-reload",
+				"fatal-exit",
+			}), "mark refusal must teardown before the fatal backstop")
 			helpers.assert_eq(calls.reloads, 0)
 			helpers.assert_eq(calls.fatal_exits, 1,
 				"exact STOPPED makes sentinel failure an irreversible split state")
 			helpers.assert_eq(calls.fatal_exit_code, 70)
 			helpers.assert_true(not coordinator.is_pending())
+			calls.lease_callback(true, "duplicate stopped")
+			helpers.assert_eq(calls.teardowns, 1,
+				"a late callback must not repeat the post-fence teardown")
+			helpers.assert_eq(calls.fatal_exits, 1)
 		end
 	end)
 
@@ -406,13 +630,19 @@ helpers.describe("controlled termination coordinator", function()
 
 		calls.lease_callback(true, "stopped")
 
-		helpers.assert_eq(calls.teardowns, 0,
-			"the fixture must fail before local teardown to isolate the committed fence")
+		helpers.assert_eq(calls.teardowns, 1,
+			"a throwing post-fence diagnostic must still teardown every local owner")
+		helpers.assert_true(helpers.deep_equal(calls.order, {
+			"request-lease", "teardown-exit", "fatal-exit",
+		}), "logger failure must never jump directly from exact fence to fatal exit")
 		helpers.assert_eq(calls.exits, 0)
 		helpers.assert_eq(calls.fatal_exits, 1,
 			"an already-fenced half-disabled driver must never return as live")
 		helpers.assert_eq(calls.fatal_exit_code, 70)
 		helpers.assert_true(not coordinator.is_pending())
+		calls.lease_callback(true, "duplicate stopped")
+		helpers.assert_eq(calls.teardowns, 1)
+		helpers.assert_eq(calls.fatal_exits, 1)
 	end)
 
 	helpers.it("forces one non-zero fallback when hs.reload raises after finalization", function()

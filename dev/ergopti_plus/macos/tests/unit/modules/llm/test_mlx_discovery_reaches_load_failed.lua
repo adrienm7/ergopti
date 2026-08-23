@@ -55,9 +55,9 @@ local function load_api_mlx()
 		-- module fails to load and every assertion below reports a traceback instead.
 		init                   = function() end,
 		is_discovered          = function() return false end,
-		discover               = function(cb) ctl.pending = cb end,
+		discover               = function(cb) ctl.pending = cb; return true end,
 		set_expected_model_id  = function() end,
-		reset_endpoints        = function() end,
+		reset_endpoints        = function() return true end,
 		get_completions_endpoint = function() return nil end,
 		get_chat_endpoint      = function() return nil end,
 	}

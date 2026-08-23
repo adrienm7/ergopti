@@ -36,6 +36,7 @@ local function load_fixture(options)
 		hs_module = package.loaded["hs"],
 		logger = package.loaded["infra.logger"],
 		synthetic = package.loaded["adapters.synthetic_input"],
+		timer_scheduler = package.loaded["adapters.timer_scheduler"],
 		text = package.loaded["modules.shortcuts.actions.text"],
 	}
 
@@ -141,7 +142,7 @@ local function load_fixture(options)
 	}
 
 	local timer = {
-		doAfter = function(delay, callback)
+		new = function(delay, callback)
 			calls.timer = calls.timer + 1
 			local outcome = next_outcome(timer_outcomes, calls.timer)
 			if outcome == "throw" then error("injected timer allocation failure") end
@@ -150,14 +151,25 @@ local function load_fixture(options)
 				delay = delay,
 				callback = callback,
 				stopped = false,
+				running_state = false,
 			}
-			function handle:stop() self.stopped = true end
+			function handle:start()
+				self.running_state = true
+				if outcome == "sync" then self.callback() end
+				return self
+			end
+			function handle:stop()
+				self.stopped = true
+				self.running_state = false
+				return self
+			end
+			function handle:running() return self.running_state end
 			timers[#timers + 1] = handle
-			if outcome == "sync" then callback() end
 			return handle
 		end,
 	}
 
+	package.loaded["adapters.timer_scheduler"] = nil
 	local Text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
 		timer = timer,
@@ -189,6 +201,7 @@ local function load_fixture(options)
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
 			package.loaded["infra.logger"] = saved.logger
 			package.loaded["adapters.synthetic_input"] = saved.synthetic
+			package.loaded["adapters.timer_scheduler"] = saved.timer_scheduler
 			package.loaded["hs"] = saved.hs_module
 			_G.hs = saved.hs_global
 		end,

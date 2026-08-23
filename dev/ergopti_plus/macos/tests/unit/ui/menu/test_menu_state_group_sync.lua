@@ -66,6 +66,44 @@ helpers.describe("menu_state: hotstring group sync applies only the delta", func
 	end)
 end)
 
+helpers.describe("menu_state: gesture boot restore requires an exact lifecycle commit", function()
+	for _, desired in ipairs({ false, true }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("restores runtime state after "
+				.. (desired and "enable " or "disable ") .. mode, function()
+				local runtime_enabled = not desired
+				local lifecycle_calls = 0
+				local save_calls = 0
+				local function lifecycle()
+					lifecycle_calls = lifecycle_calls + 1
+					if mode == "false" then return false end
+					if mode == "nil" then return nil end
+					error("synthetic gesture boot refusal")
+				end
+				local state = { gestures = desired, hotstrings = {} }
+				local committed = MenuState.sync_state_to_modules(state, {}, false, {
+					keymap = {}, hotstring_editor = {}, core_mods = {},
+					gestures = {
+						enable_all = desired and lifecycle or function() return true end,
+						disable_all = desired and function() return true end or lifecycle,
+						is_enabled = function() return runtime_enabled end,
+					},
+					save_prefs = function()
+						save_calls = save_calls + 1
+						return true
+					end,
+				})
+				helpers.assert_eq(committed, false)
+				helpers.assert_eq(lifecycle_calls, 1)
+				helpers.assert_eq(state.gestures, runtime_enabled,
+					"the restored state must describe the exact surviving runtime")
+				helpers.assert_eq(save_calls, 1,
+					"the corrected runtime posture must replace the rejected preference")
+			end)
+		end
+	end
+end)
+
 helpers.describe("menu_state: keylogger start is deferred off the boot path", function()
 	helpers.it("does NOT start the keylogger synchronously during sync", function()
 		-- ROOT CAUSE ENCODED: keylogger.start (~1.3 s of SQLite + rotation work) ran

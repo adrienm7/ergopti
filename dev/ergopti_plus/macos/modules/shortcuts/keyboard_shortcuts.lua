@@ -34,6 +34,21 @@ local _hotkeys   = {}  -- slot_id → registrar handle
 local _actions   = {}  -- slot_id → action_id
 local _started   = false
 local _settings_prefix = "keyboard_shortcut_"
+local _delivery_enabled = false
+local _lifecycle_paused = false
+local _lifecycle_epoch = 0
+local _start_attempt = nil
+local _native_acquisition_depth = 0
+
+local function invalidate_lifecycle()
+	_lifecycle_epoch = _lifecycle_epoch + 1
+end
+
+local function start_is_current(attempt)
+	return _start_attempt == attempt
+		and _lifecycle_epoch == attempt.epoch
+		and _lifecycle_paused ~= true
+end
 
 
 
@@ -195,26 +210,66 @@ end
 --- @return boolean committed True when no binding is needed or one is owned.
 local function bind_slot(slot_id, action_id)
 	if action_id == "none" then return true end
+	if _hotkeys[slot_id] then
+		local retained_handle = _hotkeys[slot_id]
+		local acquisition_epoch = _lifecycle_epoch
+		_native_acquisition_depth = _native_acquisition_depth + 1
+		local ok_enable, enabled = xpcall(Registrar.setEnabled, debug.traceback,
+			retained_handle, true)
+		_native_acquisition_depth = _native_acquisition_depth - 1
+		if ok_enable and enabled == true
+			and _lifecycle_paused ~= true
+			and _lifecycle_epoch == acquisition_epoch then return true end
+		if _lifecycle_paused == true or _lifecycle_epoch ~= acquisition_epoch then
+			local ok_release, released = xpcall(
+				Registrar.unbind, debug.traceback, retained_handle)
+			if ok_release and released == true
+				and _hotkeys[slot_id] == retained_handle then
+				_hotkeys[slot_id] = nil
+			end
+		end
+		Logger.error(LOG, "Failed to re-enable retained slot '%s': %s.",
+			slot_id, tostring(enabled))
+		return false
+	end
 	local chord = slot_to_chord(slot_id)
 	if not chord then
 		Logger.error(LOG, "Slot '%s' has no valid chord mapping — startup refused.", slot_id)
 		return false
 	end
+	local acquisition_epoch = _lifecycle_epoch
+	_native_acquisition_depth = _native_acquisition_depth + 1
 	local ok_bind, handle = xpcall(Registrar.bind, debug.traceback, chord, function()
-		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, action_id)
+		if _delivery_enabled ~= true or _lifecycle_paused == true then return false end
+		local current_action = _actions[slot_id] or "none"
+		if current_action == "none" then
+			Logger.debug(LOG, "Ignored inactive configurable shortcut slot '%s'.", slot_id)
+			return false
+		end
+		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, current_action)
 		local ok_action, handled = Logger.callback(LOG,
 			"Configurable shortcut '" .. tostring(slot_id) .. "'",
-			GestActions.execute_single, action_id, "keyboard__" .. slot_id)
+			GestActions.execute_single, current_action, "keyboard__" .. slot_id)
 		if not ok_action then return false end
 		if handled ~= true then
 			Logger.error(LOG, "Configurable shortcut '%s' was not handled by action '%s'.",
-				tostring(slot_id), tostring(action_id))
+				tostring(slot_id), tostring(current_action))
 			return false
 		end
 		return true
 	end)
+	_native_acquisition_depth = _native_acquisition_depth - 1
 	if ok_bind and handle then
 		_hotkeys[slot_id] = handle
+		if _lifecycle_paused == true or _lifecycle_epoch ~= acquisition_epoch then
+			local ok_release, released = xpcall(
+				Registrar.unbind, debug.traceback, handle)
+			if ok_release and released == true then _hotkeys[slot_id] = nil end
+			Logger.error(LOG,
+				"Slot '%s' acquisition was superseded; exact candidate retained only on cleanup refusal.",
+				tostring(slot_id))
+			return false
+		end
 		Logger.done(LOG, "Bound %s → %s.", slot_label(slot_id), action_id)
 		return true
 	else
@@ -222,6 +277,54 @@ local function bind_slot(slot_id, action_id)
 			slot_id, chord, tostring(handle))
 		return false
 	end
+end
+
+--- Changes whether an exact retained slot handle may deliver callbacks.
+--- @param slot_id string
+--- @param enabled boolean
+--- @return boolean settled
+local function set_slot_enabled(slot_id, enabled)
+	local handle = _hotkeys[slot_id]
+	if not handle then return false end
+	local ok, result = xpcall(Registrar.setEnabled, debug.traceback, handle, enabled)
+	if ok and result == true then return true end
+	Logger.error(LOG, "Failed to set slot '%s' enabled=%s: %s — exact handle retained.",
+		slot_id, tostring(enabled), tostring(result))
+	return false
+end
+
+--- Reads the exact persisted value before a mutation.
+--- @param key string
+--- @return boolean ok
+--- @return any value_or_error
+local function read_setting(key)
+	local ok, value = xpcall(hs.settings.get, debug.traceback, key)
+	if not ok then
+		Logger.error(LOG, "Shortcut setting snapshot failed for '%s': %s.", key, tostring(value))
+		return false, value
+	end
+	return true, value
+end
+
+--- Writes a value and restores the snapshot when the write raises after mutation.
+--- @param key string
+--- @param value any
+--- @param snapshot any
+--- @return boolean committed
+local function persist_setting(key, value, snapshot)
+	local ok, err = xpcall(hs.settings.set, debug.traceback, key, value)
+	if ok then return true end
+
+	local restored, restore_err = xpcall(hs.settings.set, debug.traceback, key, snapshot)
+	if not restored then
+		Logger.error(LOG,
+			"Shortcut setting write failed for '%s': %s; snapshot restore also failed: %s.",
+			key, tostring(err), tostring(restore_err))
+	else
+		Logger.error(LOG, "Shortcut setting write failed for '%s': %s; snapshot restored.",
+			key, tostring(err))
+	end
+	return false
 end
 
 --- Releases the hotkey for a slot if active.
@@ -310,7 +413,7 @@ function M.assigned_slots(prefix)
 	return out
 end
 
---- Configures the action for a slot and hot-rebinds without a full reload.
+--- Configures the action for a slot without replacing an already-owned chord.
 --- Persists the assignment in hs.settings so it survives reloads.
 --- @param slot_id string
 --- @param action_id string
@@ -319,26 +422,40 @@ function M.set_action(slot_id, action_id)
 		Logger.error(LOG, "set_action(): both arguments must be strings.")
 		return false
 	end
+	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
 	local old_action = _actions[slot_id] or "none"
 	if old_action == action_id then return true end
-	if _started then
-		if unbind_slot(slot_id) ~= true then return false end
-		if action_id ~= "none" and bind_slot(slot_id, action_id) ~= true then
-			if old_action ~= "none" then bind_slot(slot_id, old_action) end
-			return false
-		end
+
+	local setting_key = _settings_prefix .. slot_id
+	local snap_ok, persisted_snapshot = read_setting(setting_key)
+	if not snap_ok then return false end
+
+	local native_transition = nil
+	if _started and old_action == "none" and action_id ~= "none" then
+		if bind_slot(slot_id, action_id) ~= true then return false end
+		native_transition = "enabled"
+	elseif _started and old_action ~= "none" and action_id == "none" then
+		if set_slot_enabled(slot_id, false) ~= true then return false end
+		native_transition = "disabled"
 	end
-	local persisted, persist_err = pcall(hs.settings.set,
-		_settings_prefix .. slot_id, action_id)
-	if not persisted then
-		if _started then
-			unbind_slot(slot_id)
-			if old_action ~= "none" then bind_slot(slot_id, old_action) end
+
+	if persist_setting(setting_key, action_id, persisted_snapshot) ~= true then
+		if native_transition == "enabled" then
+			if set_slot_enabled(slot_id, false) ~= true then
+				Logger.error(LOG,
+					"Slot '%s' publication rollback is incomplete; retained handle remains fenced for retry.",
+					slot_id)
+			end
+		elseif native_transition == "disabled" then
+			if set_slot_enabled(slot_id, true) ~= true then
+				Logger.error(LOG,
+					"Slot '%s' rollback could not restore delivery; exact handle retained for retry.",
+					slot_id)
+			end
 		end
-		Logger.error(LOG, "Shortcut setting write failed for slot '%s': %s.",
-			slot_id, tostring(persist_err))
 		return false
 	end
+
 	_actions[slot_id] = action_id
 	Logger.debug(LOG, "Slot '%s' → '%s' persisted.", slot_id, action_id)
 
@@ -372,7 +489,12 @@ end
 --- Starts the keyboard shortcuts module and owns every configured binding.
 --- @return boolean committed True only when every required slot was bound.
 function M.start()
+	if _lifecycle_paused == true or _start_attempt ~= nil then
+		_delivery_enabled = false
+		return false
+	end
 	if _started then
+		_delivery_enabled = true
 		Logger.debug(LOG, "M.start() called again after menu-state synchronization; bindings already active.")
 		return true
 	end
@@ -380,11 +502,20 @@ function M.start()
 		Logger.error(LOG, "Keyboard shortcuts cannot start while native cleanup is pending.")
 		return false
 	end
+	if _lifecycle_paused == true then return false end
+	local attempt = { epoch = _lifecycle_epoch }
+	_start_attempt = attempt
+	_delivery_enabled = false
 	Logger.start(LOG, "Starting keyboard shortcuts…")
 	local assignments_ok, assignments_err = xpcall(load_assignments, debug.traceback)
 	if not assignments_ok then
 		Logger.error(LOG, "Keyboard shortcut assignments could not be loaded: %s.",
 			tostring(assignments_err))
+		if _start_attempt == attempt then _start_attempt = nil end
+		return false
+	end
+	if not start_is_current(attempt) then
+		M.stop()
 		return false
 	end
 	for slot, action in pairs(_actions) do
@@ -393,8 +524,20 @@ function M.start()
 			M.stop()
 			return false
 		end
+		if not start_is_current(attempt) then
+			Logger.error(LOG,
+				"Keyboard shortcuts startup superseded during slot '%s'.", tostring(slot))
+			M.stop()
+			return false
+		end
+	end
+	if not start_is_current(attempt) then
+		M.stop()
+		return false
 	end
 	_started = true
+	_delivery_enabled = true
+	_start_attempt = nil
 	local count = 0
 	for _ in pairs(_hotkeys) do count = count + 1 end
 	Logger.success(LOG, "Keyboard shortcuts started (%d active binding(s)).", count)
@@ -404,7 +547,10 @@ end
 --- Stops the keyboard shortcuts module and releases all hotkeys.
 --- @return boolean settled True only when every native owner was released.
 function M.stop()
-	if not _started and next(_hotkeys) == nil then
+	_delivery_enabled = false
+	invalidate_lifecycle()
+	_start_attempt = nil
+	if not _started and next(_hotkeys) == nil and _native_acquisition_depth == 0 then
 		Logger.debug(LOG, "stop() called before start() — nothing to stop.")
 		return true
 	end
@@ -416,11 +562,36 @@ function M.stop()
 	for _, slot in ipairs(slots) do
 		if unbind_slot(slot) ~= true then settled = false end
 	end
-	if not settled then
+	if _native_acquisition_depth ~= 0 or not settled then
 		Logger.error(LOG, "Keyboard shortcuts stop is incomplete and remains retryable.")
 		return false
 	end
 	Logger.success(LOG, "Keyboard shortcuts stopped.")
+	return true
+end
+
+--- Admission-authoritative PAUSE edge used by the aggregate shortcuts owner.
+function M.pause()
+	_lifecycle_paused = true
+	_delivery_enabled = false
+	invalidate_lifecycle()
+	_start_attempt = nil
+	return M.stop()
+end
+
+--- Releases the local PAUSE fence and starts one guarded replacement set.
+function M.resume_after_pause()
+	_lifecycle_paused = false
+	invalidate_lifecycle()
+	return M.start()
+end
+
+--- Releases only the local PAUSE fence.  The aggregate Shortcuts owner calls
+--- this inside its guarded start transaction after all external claims have
+--- been checked; stop() itself must not silently reopen a paused subsystem.
+function M.release_pause_admission()
+	_lifecycle_paused = false
+	invalidate_lifecycle()
 	return true
 end
 

@@ -48,10 +48,11 @@ commands for every layer live in [`../../../docs/TESTING.md`](../../../docs/TEST
 
 ## Conventions
 
-Code is English, UI is French; tabs for indentation; EmmyLua docstrings; section
-banners and logging conventions are defined in
-[`../../../.github/copilot-instructions.md`](../../../.github/copilot-instructions.md).
+Repository-wide delivery rules live in [`AGENTS.md`](../../../AGENTS.md), macOS
+semantics in the
+[`hammerspoon-driver` skill](../../../.agents/skills/hammerspoon-driver/SKILL.md),
+and logging in the shared [`logger contract`](../_shared/modules/logger/SPEC.md).
 Hard-won gotchas live in
-[`../../../docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md). Work that is
+[`../../../docs/memory/README.md`](../../../docs/memory/README.md). Work that is
 known but not done lives in the gate that measures it: each ratchet under
 `tools/test/` carries its own count and, in its header, what would move it.

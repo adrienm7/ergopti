@@ -41,7 +41,8 @@ package.loaded["modules.gestures.actions"] = {
 	init                 = function() end,
 	get_sg_names         = function() return {} end,
 	get_label            = function() return "" end,
-	force_cleanup        = function() end,
+	force_cleanup        = function() return true end,
+	resume_after_cleanup = function() return true end,
 	toggle_right_click   = function() end,
 	trigger_lookup       = function() end,
 	is_right_click_held  = function() return false end,
@@ -50,6 +51,7 @@ package.loaded["modules.gestures.actions"] = {
 package.loaded["modules.gestures.engine"] = {
 	init          = function() end,
 	process_frame = function() end,
+	stop          = function() return true end,
 }
 
 package.loaded["modules.gestures.conflicts"] = {
@@ -200,7 +202,8 @@ helpers.describe("M.stop() clears CoreState.enabled", function()
 		clear_live_tables()
 
 		-- Restore the enabled flag first so the test does not depend on prior state
-		Gestures.enable_all()
+		helpers.assert_eq(Gestures.enable_all(), true,
+			"the precondition must reopen the exact action owner")
 		helpers.assert_eq(Gestures.is_enabled(), true, "precondition: module must be enabled before stop()")
 
 		Gestures.stop()
@@ -215,7 +218,7 @@ helpers.describe("M.stop() clears CoreState.enabled", function()
 	helpers.it("enabled flag stays false even when watchers were already empty", function()
 		clear_live_tables()
 
-		Gestures.enable_all()
+		helpers.assert_eq(Gestures.enable_all(), true)
 		Gestures.stop()
 
 		helpers.assert_eq(Gestures.is_enabled(), false, "CoreState.enabled must be false after M.stop() with no watchers")
@@ -229,7 +232,7 @@ helpers.describe("M.stop() clears CoreState.enabled", function()
 			_G.ERGOPTI_TOUCH_WATCHERS[4000 + i] = make_mock_watcher()
 		end
 
-		Gestures.enable_all()
+		helpers.assert_eq(Gestures.enable_all(), true)
 		Gestures.stop()
 
 		helpers.assert_eq(Gestures.is_enabled(), false, "CoreState.enabled must be false after M.stop() with multiple watchers")

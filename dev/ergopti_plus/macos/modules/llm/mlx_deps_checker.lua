@@ -46,6 +46,9 @@ local Paths        = require("infra.paths")
 local llm_progress = require("ui.download_window")
 local ApiCommon    = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local TimerScheduler = require("adapters.timer_scheduler")
+local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
+local PtyProcessGroup = require("modules.llm.pty_process_group")
 
 local LOG = "mlx_deps"
 
@@ -109,6 +112,27 @@ local _task_running = false
 -- killing the install and dropping its completion callback. Canonical spelling
 -- recognised by tests/unit/meta/test_gc_retention.lua; released in the callback.
 local _active_tasks = {}
+
+-- Exact backend-local native owners. Timer candidates remain reachable even
+-- when activation or cancellation refuses, and the task descriptor survives
+-- until its one native terminal callback proves process settlement.
+local _owned_timers = { initial = nil, hide = nil }
+local _task_owner = nil
+local _resume_intent = nil
+local _terminal_outcome = nil
+
+local quiesce_owned_work
+local replay_committed_intent
+local schedule_initial_for_token
+local schedule_hide_for_token
+local fire_pending_callbacks
+
+local _pause_controller = BootstrapPauseOwner.new({
+	owner_name = "mlx_dependency_bootstrap",
+	label = "MLX dependency",
+	quiesce = function() return quiesce_owned_work() end,
+	replay = function(token, epoch) return replay_committed_intent(token, epoch) end,
+})
 
 
 
@@ -206,18 +230,31 @@ end
 --- the progress UI's verbose detail line + scrollable terminal log,
 --- skipping protocol markers.
 --- @param chunk string A stdout or stderr chunk.
-local function forward_chunk(chunk)
-	if type(chunk) ~= "string" or chunk == "" then return end
+--- @param is_current function|nil Authorization predicate.
+--- @param owns_ui function|nil Exact shared-window ownership predicate.
+--- @return boolean delivered
+local function forward_chunk(chunk, is_current, owns_ui)
+	if type(chunk) ~= "string" or chunk == "" then return true end
+	is_current = type(is_current) == "function" and is_current or function() return true end
+	owns_ui = type(owns_ui) == "function" and owns_ui or function() return false end
 	for line in chunk:gmatch("([^\n\r]+)") do
 		if line:match("%S") and not KNOWN_MARKERS[line] then
+			if not is_current() then return false end
 			Logger.info(LOG, "[script] %s", line)
 			-- The detail line shows the latest, the log area shows history.
 			-- Both are wired so the user sees progress at a glance and the
 			-- full audit trail — matching how model downloads already render.
-			pcall(llm_progress.set_detail, line)
-			pcall(llm_progress.append_log, line)
+			if owns_ui() then
+				if not is_current() then return false end
+				pcall(llm_progress.set_detail, line)
+			end
+			if owns_ui() then
+				if not is_current() then return false end
+				pcall(llm_progress.append_log, line)
+			end
 		end
 	end
+	return true
 end
 
 -- Map each progress marker to a percentage so the bootstrap bar visibly
@@ -290,6 +327,7 @@ end
 -- path reads it, so a local inside either would be out of scope for the other
 -- and would silently bind a nil global instead.
 local _ui_session = nil
+local _ui_claimed = false
 
 local function owned_session()
 	if type(llm_progress.session_id) ~= "function" then return nil end
@@ -301,31 +339,39 @@ end
 --- true when no session was ever recorded, so a build without session support
 --- behaves exactly as before rather than silently doing nothing.
 local function owns_window()
+	if _ui_claimed ~= true then return false end
 	if _ui_session == nil then return true end
 	local current = owned_session()
 	if current == nil then return true end
 	return current == _ui_session
 end
 
-local function make_streaming_handler()
+local function release_window_claim()
+	_ui_claimed = false
+	_ui_session = nil
+end
+
+local function make_streaming_handler(is_current)
+	is_current = type(is_current) == "function" and is_current or function() return true end
 	-- Per-marker dedupe: stdout is line-buffered but each marker may arrive
 	-- multiple times across chunks; we want exactly one transition each.
 	local shown = {}
-	-- The proactive-show fallback in M.check_and_install_deps can flip the
-	-- progress UI on without going through this handler. Querying the UI
-	-- directly each time is more reliable than a cached local: it lets the
-	-- markers transition cleanly from "show" to "set_step" even when the UI
-	-- is already visible from the fallback path.
+	-- Query the shared surface before every claim. An already visible window
+	-- may belong to a model download or the sibling backend and is never ours
+	-- merely because this task produced a progress marker.
 	local function ui_already_visible()
 		local ok, visible = pcall(llm_progress.is_active)
-		return ok and visible == true
+		-- An unreadable shared surface is potentially owned by somebody else.
+		-- Treat uncertainty as occupied so this backend cannot take it over.
+		return not ok or visible == true
 	end
 
 	return function(_, stdout_chunk, stderr_chunk)
+		if not is_current() then return false end
 		-- Forward stderr (uv's verbose output) so the live log AND the
 		-- progress UI's detail line both reflect real-time progress.
-		forward_chunk(stderr_chunk)
-		forward_chunk(stdout_chunk)
+		if not forward_chunk(stderr_chunk, is_current, owns_window) then return false end
+		if not forward_chunk(stdout_chunk, is_current, owns_window) then return false end
 
 		if type(stdout_chunk) ~= "string" or stdout_chunk == "" then
 			return true
@@ -334,31 +380,52 @@ local function make_streaming_handler()
 		-- VENV_SYNC_RAN is the first thing emitted on a slow path: that's
 		-- our cue to show the progress UI for the rest of the run.
 		if not shown[SYNC_MARKER_LINE] and chunk_contains(stdout_chunk, SYNC_MARKER_LINE) then
+			if not is_current() then return false end
 			shown[SYNC_MARKER_LINE] = true
 			Logger.debug(LOG, "Slow-path marker observed (real sync in progress).")
-			if not ui_already_visible() then
-				pcall(llm_progress.show, {
+			local already_visible = ui_already_visible()
+			if not is_current() then return false end
+			if not already_visible then
+				local shown_ok = pcall(llm_progress.show, {
 					kind     = "mlx_install",
 					title    = i18n.get("mlx.install_title"),
 					subtitle = i18n.get("mlx.deps_preparing"),
 				})
-				_ui_session = owned_session()
+				if not is_current() then return false end
+				local claimed_session = owned_session()
+				if not is_current() then return false end
+				if shown_ok then
+					_ui_session = claimed_session
+					_ui_claimed = true
+				end
 			end
 		end
 
 		for marker, label in pairs(PROGRESS_LABELS) do
 			if not shown[marker] and chunk_contains(stdout_chunk, marker) then
+				if not is_current() then return false end
 				shown[marker] = true
 				Logger.info(LOG, "Progress marker '%s' observed — updating UI.", marker)
-				if not ui_already_visible() then
-					pcall(llm_progress.show, {
+				local already_visible = ui_already_visible()
+				if not is_current() then return false end
+				if not already_visible then
+					local shown_ok = pcall(llm_progress.show, {
 						kind     = "mlx_install",
 						title    = i18n.get("mlx.install_title"),
 						subtitle = label,
 					})
-					_ui_session = owned_session()
+					if not is_current() then return false end
+					local claimed_session = owned_session()
+					if not is_current() then return false end
+					if shown_ok then
+						_ui_session = claimed_session
+						_ui_claimed = true
+					end
 				else
-					pcall(llm_progress.set_step, label)
+					if owns_window() then
+						if not is_current() then return false end
+						pcall(llm_progress.set_step, label)
+					end
 				end
 			end
 		end
@@ -375,7 +442,10 @@ local function make_streaming_handler()
 				if not max_pct or pct > max_pct then max_pct = pct end
 			end
 		end
-		if max_pct then pcall(llm_progress.set_progress, max_pct) end
+		if max_pct and owns_window() then
+			if not is_current() then return false end
+			pcall(llm_progress.set_progress, max_pct)
+		end
 		return true
 	end
 end
@@ -383,9 +453,322 @@ end
 
 
 
+
+-- ==========================================
+-- ==========================================
+-- ======= 4/ Pause-Owned Native Work =======
+-- ==========================================
+-- ==========================================
+
+--- Arms and retains one exact backend-local timer.
+--- @param slot string Timer slot name.
+--- @param delay_sec number Delay in seconds.
+--- @param callback function Authorized user callback.
+--- @param label string Diagnostic label.
+--- @return boolean committed
+local function arm_owned_timer(slot, delay_sec, callback, label)
+	local prior = _owned_timers[slot]
+	if type(prior) == "table" and prior.settled ~= true then
+		Logger.error(LOG, "%s timer acquisition refused while its predecessor remains owned.", label)
+		return false
+	end
+	local owner = {
+		acquiring = true,
+		cancel_requested = false,
+		acquisition_valid = false,
+		delivery_requested = false,
+		delivery_seen = false,
+		delivery_during_acquisition = false,
+		native_settled = false,
+		observer_attached = false,
+		settled = false,
+		handle = nil,
+	}
+	-- Publish identity before crossing TimerScheduler.after(): native start may
+	-- synchronously re-enter ScriptControl PAUSE before the handle is returned.
+	_owned_timers[slot] = owner
+	local release_owner
+	local deliver_owner
+	local observe_owner
+	release_owner = function()
+		if owner.settled == true then return false end
+		owner.settled = true
+		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
+		return true
+	end
+	observe_owner = function()
+		if owner.settled == true or owner.observer_attached == true then return true end
+		local handle = owner.handle
+		if type(handle) ~= "table" or handle.timer == nil then
+			owner.native_settled = true
+			if owner.delivery_requested == true then
+				return deliver_owner()
+			end
+			if owner.cancel_requested == true or owner.acquisition_valid ~= true then
+				release_owner()
+			end
+			return true
+		end
+		-- Publish observer ownership before registration because onSettled may
+		-- synchronously call back for an already-settled native handle.
+		owner.observer_attached = true
+		local observed_ok, observed = xpcall(function()
+			return TimerScheduler.onSettled(handle, function()
+				owner.observer_attached = false
+				owner.native_settled = true
+				if owner.delivery_requested == true then
+					deliver_owner()
+				elseif owner.cancel_requested == true or owner.acquisition_valid ~= true then
+					release_owner()
+				end
+			end)
+		end, debug.traceback)
+		if not observed_ok or observed ~= true then
+			owner.observer_attached = false
+			Logger.error(LOG, "%s timer settlement observer refused: %s.",
+				label, tostring(observed_ok and observed or observed))
+			return false
+		end
+		return true
+	end
+	deliver_owner = function()
+		if owner.delivery_seen == true or owner.settled == true then return false end
+		owner.delivery_requested = true
+		if owner.acquiring == true then
+			owner.delivery_during_acquisition = true
+			return false
+		end
+		local handle = owner.handle
+		if type(handle) == "table" and handle.timer ~= nil then
+			observe_owner()
+			return false
+		end
+		owner.native_settled = true
+		local authorized = owner.acquisition_valid == true
+			and owner.cancel_requested ~= true
+			and _owned_timers[slot] == owner
+		owner.delivery_seen = true
+		release_owner()
+		if not authorized then return false end
+		callback()
+		return true
+	end
+	local candidate
+	local ok, handle_or_error, committed = xpcall(function()
+		return TimerScheduler.after(delay_sec, function()
+			deliver_owner()
+		end)
+	end, debug.traceback)
+	if ok and type(handle_or_error) == "table" then candidate = handle_or_error end
+	owner.handle = candidate
+	owner.acquiring = false
+	if ok and committed == true and type(candidate) == "table"
+		and candidate.timer ~= nil and owner.delivery_during_acquisition ~= true
+		and owner.cancel_requested ~= true
+		and _owned_timers[slot] == owner then
+		owner.acquisition_valid = true
+		observe_owner()
+		return true
+	end
+	owner.acquisition_valid = false
+	owner.cancel_requested = true
+	if type(candidate) == "table" and candidate.timer ~= nil then
+		local cancel_ok, settled = xpcall(function()
+			return TimerScheduler.cancel(candidate)
+		end, debug.traceback)
+		if cancel_ok and settled == true then
+			owner.native_settled = true
+			release_owner()
+		else
+			observe_owner()
+		end
+	else
+		owner.native_settled = true
+		release_owner()
+	end
+	Logger.error(LOG, "%s timer acquisition refused: %s.",
+		label, tostring(ok and committed or handle_or_error))
+	return false
+end
+
+--- Cancels one exact timer without dropping refused native cleanup debt.
+--- @param slot string Timer slot name.
+--- @param label string Diagnostic label.
+--- @return boolean settled
+local function cancel_owned_timer(slot, label)
+	local owner = _owned_timers[slot]
+	if type(owner) == "table" and owner.acquiring == true then
+		owner.cancel_requested = true
+		owner.acquisition_valid = false
+		Logger.debug(LOG, "%s timer cancellation joined an in-flight acquisition.", label)
+		return false
+	end
+	if type(owner) ~= "table" or owner.settled == true then
+		_owned_timers[slot] = nil
+		return true
+	end
+	owner.cancel_requested = true
+	owner.acquisition_valid = false
+	local handle = owner.handle
+	if type(handle) ~= "table" or handle.timer == nil then
+		owner.native_settled = true
+		owner.settled = true
+		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
+		return true
+	end
+	local ok, settled_or_error = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if ok and settled_or_error == true then
+		owner.native_settled = true
+		owner.settled = true
+		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
+		return true
+	end
+	Logger.error(LOG, "%s timer cancellation refused; exact handle retained: %s.",
+		label, tostring(settled_or_error))
+	return false
+end
+
+--- Releases one exact task only from its first native terminal delivery.
+--- @param owner table Task lifecycle descriptor.
+--- @return boolean released
+local function release_task_owner(owner)
+	if type(owner) ~= "table" or owner.settled == true then return false end
+	owner.settled = true
+	local task = owner.task
+	if task ~= nil then _active_tasks[task] = nil end
+	if _task_owner == owner then _task_owner = nil end
+	_task_running = false
+	return true
+end
+
+--- Signals one exact task and waits for its callback to prove settlement.
+--- False, nil, throw, and accepted-but-pending results retain the same owner.
+--- @param owner table Task lifecycle descriptor.
+--- @param label string Diagnostic label.
+--- @return boolean settled
+local function terminate_task_owner(owner, label)
+	if type(owner) ~= "table" or owner.settled == true then return true end
+	owner.authorized = false
+	if owner.termination_accepted == true then return false end
+	local accepted = TaskLifecycle.terminate(owner.task, label)
+	if owner.settled == true then return true end
+	if accepted ~= true then return false end
+	owner.termination_accepted = true
+	Logger.debug(LOG, "%s termination accepted; awaiting exact completion.", label)
+	return false
+end
+
+quiesce_owned_work = function()
+	local initial_settled = cancel_owned_timer("initial", "MLX initial bootstrap")
+	local hide_settled = cancel_owned_timer("hide", "MLX bootstrap auto-hide")
+	local task_settled = terminate_task_owner(_task_owner, "MLX dependency bootstrap")
+	return initial_settled == true and hide_settled == true and task_settled == true
+end
+
+schedule_initial_for_token = function(token)
+	local authorization = _pause_controller.capture(token)
+	if authorization == nil then return false end
+	_resume_intent = { kind = "initial" }
+	local committed = arm_owned_timer("initial", 0, function()
+		if not _pause_controller.is_current(token, authorization) then return false end
+		return M.check_and_install_deps(nil, token)
+	end, "MLX initial bootstrap")
+	if committed ~= true then
+		_pause_controller.complete(token)
+		return false
+	end
+	if _pause_controller.commit(token) ~= true then
+		cancel_owned_timer("initial", "MLX initial bootstrap rollback")
+		_pause_controller.complete(token)
+		return false
+	end
+	return true
+end
+
+schedule_hide_for_token = function(token, hide_session)
+	local authorization = _pause_controller.capture(token)
+	if authorization == nil then return false end
+	local committed = arm_owned_timer("hide", SUCCESS_AUTO_HIDE_SEC, function()
+		if not _pause_controller.is_current(token, authorization) then return false end
+		if hide_session ~= nil then
+			local ok_sid, current = pcall(llm_progress.session_id)
+			if not _pause_controller.is_current(token, authorization) then return false end
+			if ok_sid and current ~= hide_session then
+				Logger.debug(LOG,
+					"Auto-hide skipped — the progress window now belongs to another operation.")
+				release_window_claim()
+				if _terminal_outcome ~= nil then
+					if fire_pending_callbacks(_terminal_outcome, function()
+						return _pause_controller.is_current(token, authorization)
+					end) ~= true then return false end
+					_terminal_outcome = nil
+				end
+				_pause_controller.complete(token)
+				return true
+			end
+		end
+		pcall(llm_progress.hide)
+		if not _pause_controller.is_current(token, authorization) then return false end
+		release_window_claim()
+		if _terminal_outcome ~= nil then
+			if fire_pending_callbacks(_terminal_outcome, function()
+				return _pause_controller.is_current(token, authorization)
+			end) ~= true then return false end
+			_terminal_outcome = nil
+		end
+		_pause_controller.complete(token)
+		return true
+	end, "MLX bootstrap auto-hide")
+	if committed ~= true then
+		return false
+	end
+	if not _pause_controller.is_current(token, authorization) then
+		cancel_owned_timer("hide", "MLX bootstrap auto-hide rollback")
+		return false
+	end
+	_resume_intent = { kind = "hide", session = hide_session }
+	return true
+end
+
+replay_committed_intent = function(token, _epoch)
+	local intent = _resume_intent
+	if type(intent) ~= "table" then return _pause_controller.complete(token) end
+	if intent.kind == "initial" then return schedule_initial_for_token(token) end
+	if intent.kind == "task" then return M.check_and_install_deps(nil, token) end
+	if intent.kind == "hide" then
+		return schedule_hide_for_token(token, intent.session)
+	end
+	return false
+end
+
+--- Registers the exact MLX dependency bootstrap pause owner.
+--- @param script_control table ScriptControl facade.
+--- @return boolean committed
+function M.configure_pause_owner(script_control)
+	return _pause_controller.configure(script_control)
+end
+
+--- Schedules the boot-time dependency check under an exact retained timer.
+--- @return boolean committed
+function M.schedule_initial_check()
+	if not _pause_controller.is_admitted() then
+		Logger.debug(LOG, "MLX initial bootstrap rejected by pause admission.")
+		return false
+	end
+	if _task_running or _owned_timers.initial ~= nil then return true end
+	local token = _pause_controller.begin()
+	if token == nil then return false end
+	return schedule_initial_for_token(token)
+end
+
+
+
+
 -- ========================================
 -- ========================================
--- ======= 4/ Public Bootstrap API ========
+-- ======= 5/ Public Bootstrap API ========
 -- ========================================
 -- ========================================
 
@@ -398,59 +781,115 @@ end
 ---   true on success, false on failure. Safe to call repeatedly; only the
 ---   first invocation runs the script, subsequent ones queue the callback.
 -- Fires all pending callbacks with the given result and clears the queue.
--- Also clears _task_running so the next ensure_bootstrap() call can launch.
-local function fire_pending_callbacks(ok)
-	_task_running = false
-	local cbs = _pending_callbacks
-	_pending_callbacks = {}
-	for _, cb in ipairs(cbs) do
+-- Exact task settlement, not business callback delivery, owns _task_running.
+fire_pending_callbacks = function(ok, is_current)
+	while #_pending_callbacks > 0 do
+		if type(is_current) == "function" and not is_current() then return false end
+		local cb = table.remove(_pending_callbacks, 1)
 		ApiCommon.protected_call(cb, "MLX dependency on_complete", ok)
 	end
+	return true
 end
 
-function M.check_and_install_deps(on_complete)
+local function discard_pending_callbacks()
+	_pending_callbacks = {}
+	_terminal_outcome = nil
+end
+
+function M.check_and_install_deps(on_complete, replay_token)
+	if not _pause_controller.is_admitted() then
+		Logger.debug(LOG, "MLX dependency bootstrap rejected by pause admission.")
+		return false
+	end
 	-- If already done, fire the callback immediately — no need to re-run.
 	if _bootstrap_state == "ready" then
+		if replay_token ~= nil then
+			local replay_authorization = _pause_controller.capture(replay_token)
+			if replay_authorization == nil then return false end
+			if fire_pending_callbacks(true, function()
+				return _pause_controller.is_current(replay_token, replay_authorization)
+			end) ~= true then return false end
+			_terminal_outcome = nil
+			return _pause_controller.complete(replay_token)
+		end
 		ApiCommon.protected_call(on_complete, "MLX dependency on_complete", true)
-		return
+		return true
 	end
 	if _bootstrap_state == "failed" then
+		if replay_token ~= nil then
+			local replay_authorization = _pause_controller.capture(replay_token)
+			if replay_authorization == nil then return false end
+			if fire_pending_callbacks(false, function()
+				return _pause_controller.is_current(replay_token, replay_authorization)
+			end) ~= true then return false end
+			_terminal_outcome = nil
+			return _pause_controller.complete(replay_token)
+		end
 		ApiCommon.protected_call(on_complete, "MLX dependency on_complete", false)
-		return
+		return true
 	end
 
 	-- Script is already running — queue the callback instead of launching a
 	-- second bash process in parallel. Guard on _task_running (not on
 	-- #_pending_callbacks) so nil-callback callers are also blocked.
 	if _task_running then
+		local owner = _task_owner
+		if type(owner) ~= "table"
+			or not _pause_controller.is_current(owner.token, owner.authorization) then
+			Logger.debug(LOG, "Stale MLX dependency task cannot accept another caller.")
+			return false
+		end
 		if type(on_complete) == "function" then
 			table.insert(_pending_callbacks, on_complete)
 		end
 		Logger.debug(LOG, "Bootstrap already running — queued on_complete callback (%d total).", #_pending_callbacks)
-		return
+		return true
+	end
+
+	local token = replay_token or _pause_controller.begin()
+	local authorization = token and _pause_controller.capture(token) or nil
+	if token == nil or authorization == nil then
+		Logger.debug(LOG, "MLX dependency bootstrap intent acquisition refused.")
+		return false
 	end
 
 	if type(on_complete) == "function" then
 		table.insert(_pending_callbacks, on_complete)
+	end
+	local function settle_preflight_failure(message)
+		local current = _pause_controller.is_current(token, authorization)
+		if current then
+			_bootstrap_state = "failed"
+			_last_failure_message = message
+			_pause_controller.complete(token)
+			if fire_pending_callbacks(false, _pause_controller.is_admitted) ~= true then
+				discard_pending_callbacks()
+			end
+		elseif not _pause_controller.is_committed(token) then
+			_pause_controller.complete(token)
+			discard_pending_callbacks()
+		end
+		return false
+	end
+	local function settle_stale_intent()
+		if not _pause_controller.is_committed(token) then
+			_pause_controller.complete(token)
+			discard_pending_callbacks()
+		end
+		return false
 	end
 
 	Logger.start(LOG, "Bootstrapping MLX virtualenv…")
 	local script_path = resolve_bootstrap_script_path()
 	if not script_path then
 		Logger.error(LOG, "Unable to resolve ensure-mlx-deps.sh from current runtime paths — bootstrap aborted.")
-		_bootstrap_state = "failed"
-		_last_failure_message = "ensure-mlx-deps.sh introuvable."
-		fire_pending_callbacks(false)
-		return
+		return settle_preflight_failure("ensure-mlx-deps.sh introuvable.")
 	end
 
 	local hs_root = script_path:match("^(.*)/modules/llm/ensure%-mlx%-deps%.sh$") or ""
 	if hs_root == "" then
 		Logger.error(LOG, "Could not derive HS root from script path '%s' — bootstrap aborted.", script_path)
-		_bootstrap_state = "failed"
-		_last_failure_message = "Chemin du script MLX invalide."
-		fire_pending_callbacks(false)
-		return
+		return settle_preflight_failure("Chemin du script MLX invalide.")
 	end
 
 	-- Forward the project root so the script knows where to find .venv even
@@ -464,50 +903,34 @@ function M.check_and_install_deps(on_complete)
 	-- visible proof that work has started — even before uv emits its first
 	-- line. The step-line communicates the macro phase; the detail-line is
 	-- left blank so the very first real subprocess line populates it.
-	pcall(llm_progress.append_log, "$ " .. bash_cmd)
-	pcall(llm_progress.set_step, i18n.get("mlx.deps_step_bootstrap"))
-	Logger.debug(LOG, "Full bash command: %s", bash_cmd)
-
-	-- Write the PTY wrapper to a temp file so we can pass it to Python properly
-	local random_suffix = math.random(100000, 999999)
-	local pty_wrapper_path = "/tmp/hs_pty_wrapper_" .. random_suffix .. ".py"
-	Logger.debug(LOG, "Creating PTY wrapper at %s…", pty_wrapper_path)
-	local pty_file = io.open(pty_wrapper_path, "w")
-	if not pty_file then
-		Logger.error(LOG, "Failed to write PTY wrapper to %s — aborting bootstrap.", pty_wrapper_path)
-		_bootstrap_state = "failed"
-		_last_failure_message = i18n.get("mlx.deps_pty_write_failed")
-		fire_pending_callbacks(false)
-		return
+	if not _pause_controller.is_current(token, authorization) then
+		return settle_stale_intent()
 	end
-	-- pty.spawn() alone doesn't forward PTY output to stdout (the Python
-	-- process's stdout pipe). We must use os.openpty() and manually forward
-	-- the PTY master fd to sys.stdout so hs.task's streaming callback sees
-	-- the output. The child process runs with its stdin/stdout/stderr all
-	-- wired to the PTY slave, so it behaves as if attached to a real terminal
-	-- and never switches to block-buffered I/O.
-	pty_file:write("import os, sys, select, subprocess\n")
-	pty_file:write("master_fd, slave_fd = os.openpty()\n")
-	pty_file:write("proc = subprocess.Popen(sys.argv[1:], stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True)\n")
-	pty_file:write("os.close(slave_fd)\n")
-	pty_file:write("buf = b''\n")
-	pty_file:write("while True:\n")
-	pty_file:write("    try:\n")
-	pty_file:write("        r, _, _ = select.select([master_fd], [], [], 0.05)\n")
-	pty_file:write("    except (OSError, ValueError): break\n")
-	pty_file:write("    if r:\n")
-	pty_file:write("        try:\n")
-	pty_file:write("            data = os.read(master_fd, 4096)\n")
-	pty_file:write("        except OSError: break\n")
-	pty_file:write("        if not data: break\n")
-	pty_file:write("        sys.stdout.buffer.write(data)\n")
-	pty_file:write("        sys.stdout.buffer.flush()\n")
-	pty_file:write("    elif proc.poll() is not None: break\n")
-	pty_file:write("proc.wait()\n")
-	pty_file:write("os.close(master_fd)\n")
-	pty_file:write("sys.exit(proc.returncode)\n")
-	pty_file:close()
-	os.execute("chmod +x " .. pty_wrapper_path)
+	if owns_window() then
+		pcall(llm_progress.append_log, "$ " .. bash_cmd)
+		if not _pause_controller.is_current(token, authorization) then
+			return settle_stale_intent()
+		end
+		pcall(llm_progress.set_step, i18n.get("mlx.deps_step_bootstrap"))
+		if not _pause_controller.is_current(token, authorization) then
+			return settle_stale_intent()
+		end
+	end
+	Logger.debug(LOG, "Full bash command: %s", bash_cmd)
+	if not _pause_controller.is_current(token, authorization) then
+		return settle_stale_intent()
+	end
+
+	local pty_wrapper_path, wrapper_error = PtyProcessGroup.create("MLX dependency")
+	if not pty_wrapper_path then
+		Logger.error(LOG, "Failed to publish the MLX process-group wrapper: %s.",
+			tostring(wrapper_error))
+		return settle_preflight_failure(i18n.get("mlx.deps_pty_write_failed"))
+	end
+	if not _pause_controller.is_current(token, authorization) then
+		PtyProcessGroup.remove(pty_wrapper_path)
+		return settle_stale_intent()
+	end
 	Logger.debug(LOG, "PTY wrapper created successfully at %s", pty_wrapper_path)
 
 	-- Wrap the bash invocation in a tiny Python pty.spawn shim so the child
@@ -522,108 +945,232 @@ function M.check_and_install_deps(on_complete)
 	-- python -u + pty.spawn gives us unbuffered, line-by-line forwarding.
 
 	Logger.debug(LOG, "Creating hs.task for PTY wrapper execution…")
+	local owner = {
+		token = token,
+		authorization = authorization,
+		task = nil,
+		authorized = true,
+		dispatching = true,
+		start_committed = false,
+		settled = false,
+		terminal_received = false,
+		terminal_processed = false,
+		pending_terminal = nil,
+		pending_streams = {},
+		termination_accepted = false,
+	}
 	local task
-	-- Construct the full Python invocation: python3 executes the PTY wrapper,
-	-- passing bash_cmd as the first argument so pty.spawn(sys.argv[1:]) receives ["/bin/bash", "-c", bash_cmd].
-	-- The signature is: hs.task.new(launchPath, completionCallback, streamingCallback, arguments)
-	task = TaskLifecycle.native("MLX dependency bootstrap", "/usr/bin/python3", function(exit_code, stdout, stderr)
-		if task then _active_tasks[task] = nil end
+	local function owner_is_current()
+		return owner.authorized == true
+			and _pause_controller.is_current(owner.token, owner.authorization)
+	end
+	local consume_stream = make_streaming_handler(owner_is_current)
+	local function process_terminal(exit_code, stdout, stderr)
 		-- Completion callback: fires when the process exits
 		local combined = (stdout or "") .. (stderr or "")
-		-- Clean up the temporary PTY wrapper script
-		os.execute("rm -f " .. pty_wrapper_path)
 
 		-- Final pass: forward any residual lines the streaming callback may
 		-- have missed if the task ended before its final flush.
-		forward_chunk(stdout or "")
-		forward_chunk(stderr or "")
+		if not forward_chunk(stdout or "", owner_is_current, owns_window) then return false end
+		if not forward_chunk(stderr or "", owner_is_current, owns_window) then return false end
 
 		local ran_real_sync = chunk_marked_real_sync(stdout or "")
 
 		if exit_code == 0 then
-			_bootstrap_state = "ready"
-			_last_failure_message = nil
+			if not owner_is_current() then return false end
+			local hide_committed = false
 			if ran_real_sync then
 				Logger.success(LOG, "MLX virtualenv synchronised — engine ready.")
-				pcall(llm_progress.set_step, i18n.get("mlx.deps_step_ready"))
-				pcall(llm_progress.set_progress, 100)
-				-- The progress window is a shared, single-instance surface: a model
-				-- download or the Ollama bootstrap can claim it during this delay.
-				-- Capture whose window it is now and only hide THAT one, otherwise
-				-- this timer tears down an unrelated operation's UI mid-flight while
-				-- that operation keeps running with nothing on screen.
-				-- The session captured at CLAIM time, not sampled now.
-				local hide_session = _ui_session
-				hs.timer.doAfter(SUCCESS_AUTO_HIDE_SEC, function()
-					if hide_session ~= nil then
-						local ok_sid, current = pcall(llm_progress.session_id)
-						if ok_sid and current ~= hide_session then
-							Logger.debug(LOG, "Auto-hide skipped — the progress window now belongs to another operation.")
-							return
-						end
+				if owns_window() then
+					if not owner_is_current() then return false end
+					pcall(llm_progress.set_step, i18n.get("mlx.deps_step_ready"))
+					if not owner_is_current() then return false end
+					pcall(llm_progress.set_progress, 100)
+					-- The progress window is a shared, single-instance surface. Arm
+					-- hide only for the exact session this checker already claimed.
+					local hide_session = _ui_session
+					hide_committed = schedule_hide_for_token(token, hide_session)
+					if hide_committed ~= true and not _pause_controller.is_admitted() then
+						return false
 					end
-					pcall(llm_progress.hide)
-				end)
+				end
 			else
 				Logger.success(LOG, "MLX virtualenv already in sync — fast path.")
-				-- Fast path can race with the proactive UI fallback (e.g. the
-				-- import probe took just over the threshold). Hide the UI so a
-				-- transient "Préparation en cours" stays out of the way once the
-				-- bootstrap is actually done -- but ONLY if this checker still
-				-- owns the window. Unguarded, this closes a model download or an
-				-- Ollama bootstrap that claimed the shared surface meanwhile,
-				-- leaving it running with nothing on screen.
+				-- A replay can take the fast path while this checker's earlier
+				-- progress session remains visible. Hide only that exact session.
+				if not owner_is_current() then return false end
 				if owns_window() then
+					if not owner_is_current() then return false end
 					pcall(llm_progress.hide)
+					if not owner_is_current() then return false end
+					release_window_claim()
 				else
 					Logger.debug(LOG, "Fast-path hide skipped: the window now belongs to another operation.")
 				end
+				if not owner_is_current() then return false end
 			end
-			fire_pending_callbacks(true)
+			if hide_committed == true then
+				if not owner_is_current() then return false end
+			elseif not owner_is_current() then
+				return false
+			end
+			_bootstrap_state = "ready"
+			_last_failure_message = nil
+			_terminal_outcome = true
+			local callbacks_delivered = fire_pending_callbacks(true, owner_is_current)
+			if callbacks_delivered == true then
+				_terminal_outcome = nil
+				if hide_committed ~= true then _pause_controller.complete(token) end
+			end
+			return callbacks_delivered
 		else
-			_bootstrap_state = "failed"
+			if not owner_is_current() then return false end
 			local tail = tail_for_error(combined)
 			if tail == "" then tail = "Cause inconnue. Consultez " .. Logger.UNIFIED_LOG_FILE .. "." end
-			_last_failure_message = tail
 			Logger.error(LOG, "MLX bootstrap failed (exit=%d) — %s",
 				tonumber(exit_code) or -1, tail:gsub("\n", " | "))
 			-- Make sure the UI is visible so the error is surfaced even when
 			-- the failure happened before the slow-path marker was emitted.
-			if not llm_progress.is_active() then
-				pcall(llm_progress.show, {
+			if not owner_is_current() then return false end
+			local active_ok, active = pcall(llm_progress.is_active)
+			if not owner_is_current() then return false end
+			if active_ok and active ~= true then
+				if not owner_is_current() then return false end
+				local shown_ok = pcall(llm_progress.show, {
 					kind     = "mlx_install",
 					title    = i18n.get("mlx.install_title"),
 					subtitle    = i18n.get("mlx.deps_failed"),
 				})
+				if not owner_is_current() then return false end
+				if shown_ok then
+					local claimed_session = owned_session()
+					if not owner_is_current() then return false end
+					_ui_session = claimed_session
+					_ui_claimed = true
+				end
 			end
-			pcall(llm_progress.set_error, tail)
-			fire_pending_callbacks(false)
+			if not owner_is_current() then return false end
+			if owns_window() then
+				pcall(llm_progress.set_error, tail)
+				if not owner_is_current() then return false end
+			end
+			_bootstrap_state = "failed"
+			_last_failure_message = tail
+			_terminal_outcome = false
+			local callbacks_delivered = fire_pending_callbacks(false, owner_is_current)
+			if callbacks_delivered == true then
+				_terminal_outcome = nil
+				_pause_controller.complete(token)
+			end
+			return callbacks_delivered
 		end
-	end, make_streaming_handler(), { "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
+	end
+
+	local function deliver_terminal(args)
+		if owner.terminal_processed == true then return false end
+		owner.terminal_processed = true
+		release_task_owner(owner)
+		PtyProcessGroup.remove(pty_wrapper_path)
+		if owner.start_committed ~= true or not owner_is_current() then return false end
+		return process_terminal(table.unpack(args, 1, args.n))
+	end
+
+	local function completion_callback(...)
+		if owner.terminal_received == true then return false end
+		owner.terminal_received = true
+		local args = table.pack(...)
+		if owner.dispatching == true then
+			owner.pending_terminal = args
+			return true
+		end
+		return deliver_terminal(args)
+	end
+
+	local function streaming_callback(...)
+		if owner.terminal_received == true or not owner_is_current() then return false end
+		local args = table.pack(...)
+		if owner.dispatching == true then
+			owner.pending_streams[#owner.pending_streams + 1] = args
+			return true
+		end
+		return consume_stream(table.unpack(args, 1, args.n))
+	end
+
+	-- Construct the full Python invocation: python3 executes the PTY wrapper,
+	-- passing bash_cmd so the child process receives the exact shell command.
+	task = TaskLifecycle.native("MLX dependency bootstrap", "/usr/bin/python3",
+		completion_callback, streaming_callback,
+		{ "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
 
 	if not task then
-		_bootstrap_state = "failed"
-		_last_failure_message = i18n.get("mlx.deps_task_create_failed")
-		os.execute("rm -f " .. pty_wrapper_path)
-		fire_pending_callbacks(false)
-		return
+		owner.authorized = false
+		PtyProcessGroup.remove(pty_wrapper_path)
+		return settle_preflight_failure(i18n.get("mlx.deps_task_create_failed"))
 	end
+	owner.task = task
+	_task_owner = owner
+	_task_running = true
+	_active_tasks[task] = true
 	Logger.debug(LOG, "hs.task created successfully")
+	if owner.pending_terminal ~= nil then
+		owner.dispatching = false
+		deliver_terminal(owner.pending_terminal)
+		return settle_preflight_failure(i18n.get("mlx.deps_task_start_failed"))
+	end
 
 	Logger.debug(LOG, "Starting hs.task…")
-	-- Arm the reentrancy guard before task:start() so any callback that fires
-	-- synchronously (unlikely but possible) sees _task_running = true.
-	_task_running = true
-	if task then _active_tasks[task] = true end
-	if not TaskLifecycle.start(task, "MLX dependency bootstrap") then
-		if task then _active_tasks[task] = nil end
-		_bootstrap_state = "failed"
-		_last_failure_message = i18n.get("mlx.deps_task_start_failed")
-		os.execute("rm -f " .. pty_wrapper_path)
-		fire_pending_callbacks(false)
-	else
-		Logger.debug(LOG, "hs.task started successfully")
+	local started = TaskLifecycle.start(task, "MLX dependency bootstrap")
+	if started ~= true then
+		owner.dispatching = false
+		owner.authorized = false
+		if owner.pending_terminal ~= nil then
+			deliver_terminal(owner.pending_terminal)
+		else
+			terminate_task_owner(owner, "MLX dependency bootstrap start rollback")
+		end
+		local current = _pause_controller.is_current(token, authorization)
+		if current then
+			_bootstrap_state = "failed"
+			_last_failure_message = i18n.get("mlx.deps_task_start_failed")
+			_pause_controller.complete(token)
+			if fire_pending_callbacks(false, _pause_controller.is_admitted) ~= true then
+				discard_pending_callbacks()
+			end
+		elseif not _pause_controller.is_committed(token) then
+			_pause_controller.complete(token)
+			discard_pending_callbacks()
+		end
+		return false
 	end
+	owner.start_committed = true
+	if _pause_controller.commit(token) ~= true then
+		owner.dispatching = false
+		owner.authorized = false
+		if owner.pending_terminal ~= nil then
+			deliver_terminal(owner.pending_terminal)
+		else
+			terminate_task_owner(owner, "MLX dependency bootstrap commit rollback")
+		end
+		if not _pause_controller.is_committed(token) then
+			_pause_controller.complete(token)
+			discard_pending_callbacks()
+		end
+		return false
+	end
+	_resume_intent = { kind = "task" }
+	owner.dispatching = false
+	for _, args in ipairs(owner.pending_streams) do
+		if not owner_is_current()
+			or consume_stream(table.unpack(args, 1, args.n)) ~= true then
+			owner.authorized = false
+			terminate_task_owner(owner, "MLX dependency bootstrap stream rollback")
+			return false
+		end
+	end
+	owner.pending_streams = {}
+	if owner.pending_terminal ~= nil then deliver_terminal(owner.pending_terminal) end
+	Logger.debug(LOG, "hs.task started successfully")
+	return true
 end
 
 
@@ -632,7 +1179,7 @@ end
 
 --- ==================================
 --- ==================================
---- ======= 5/ State Accessors =======
+--- ======= 6/ State Accessors =======
 --- ==================================
 --- ==================================
 
@@ -669,6 +1216,10 @@ function M.get_failure_message() return _last_failure_message end
 --- @return boolean True if the reset was applied, false if a no-op (already
 --- pending/ready, or a bootstrap task is currently running).
 function M.reset_bootstrap_state()
+	if not _pause_controller.is_admitted() then
+		Logger.debug(LOG, "reset_bootstrap_state(): rejected by pause admission.")
+		return false
+	end
 	if _task_running then
 		Logger.debug(LOG, "reset_bootstrap_state(): a bootstrap task is already running — ignoring.")
 		return false
@@ -679,6 +1230,7 @@ function M.reset_bootstrap_state()
 	Logger.info(LOG, "Resetting MLX bootstrap state from 'failed' back to 'pending' — retry now possible.")
 	_bootstrap_state      = "pending"
 	_last_failure_message = nil
+	_terminal_outcome     = nil
 	return true
 end
 

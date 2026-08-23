@@ -61,22 +61,33 @@ helpers.describe("ShellRunner: on_chunk throws are visible (F-HIGH-21 source)", 
 			"hs.task.new must be called with wrapped_on_chunk, not the raw on_chunk")
 	end)
 
-	helpers.it("wrapped_on_chunk uses xpcall so a throw is surfaced (not swallowed)", function()
+	helpers.it("the chunk delivery boundary uses xpcall before wrapped_on_chunk delegates", function()
 		local src = read_shell_runner_src()
-		local fn_start = src:find("local function wrapped_on_chunk", 1, true)
-		helpers.assert_true(fn_start ~= nil, "wrapped_on_chunk must be defined")
-		local fn_body = src:sub(fn_start, src:find("\n\t--", fn_start + 1) or #src)
-		helpers.assert_true(fn_body:find("xpcall", 1, true) ~= nil,
-			"wrapped_on_chunk must use xpcall so a throw inside on_chunk is surfaced")
+		local delivery_start = src:find("_deliver_business_chunk = function", 1, true)
+		local wrapper_start = src:find("local function wrapped_on_chunk", 1, true)
+		helpers.assert_true(delivery_start ~= nil,
+			"the guarded chunk delivery boundary must be defined")
+		helpers.assert_true(wrapper_start ~= nil and wrapper_start > delivery_start,
+			"wrapped_on_chunk must delegate through the guarded delivery boundary")
+		local delivery_body = src:sub(delivery_start, wrapper_start - 1)
+		helpers.assert_true(delivery_body:find("xpcall", 1, true) ~= nil,
+			"the chunk delivery boundary must surface throws through xpcall")
+		local wrapper_body = src:sub(wrapper_start,
+			src:find("\n\t-- Build the hs.task", wrapper_start, true) or #src)
+		helpers.assert_true(wrapper_body:find("_deliver_business_chunk", 1, true) ~= nil,
+			"wrapped_on_chunk must route committed chunks through the guarded boundary")
 	end)
 
-	helpers.it("wrapped_on_chunk logs an ERROR when the callback throws", function()
+	helpers.it("the chunk delivery boundary reports callback throws", function()
 		local src = read_shell_runner_src()
-		local fn_start   = src:find("local function wrapped_on_chunk", 1, true)
-		helpers.assert_true(fn_start ~= nil, "wrapped_on_chunk must be defined")
-		local log_pos = src:find("report_callback_throw", fn_start, true)
-		helpers.assert_true(log_pos ~= nil and log_pos > fn_start,
-			"wrapped_on_chunk must report the throw (Logger.error + crash forwarding) on failure")
+		local delivery_start = src:find("_deliver_business_chunk = function", 1, true)
+		local wrapper_start = src:find("local function wrapped_on_chunk", 1, true)
+		helpers.assert_true(delivery_start ~= nil and wrapper_start ~= nil,
+			"the guarded chunk delivery and native wrapper must both exist")
+		local delivery_body = src:sub(delivery_start, wrapper_start - 1)
+		helpers.assert_true(
+			delivery_body:find('report_callback_throw("on_chunk"', 1, true) ~= nil,
+			"the chunk delivery boundary must report throws with on_chunk context")
 	end)
 end)
 
@@ -117,6 +128,7 @@ helpers.describe("ShellRunner: ERROR logged when on_chunk throws (F-HIGH-21 beha
 							if captured_chunk_cb then
 								chunk_return_value = captured_chunk_cb(nil, "some chunk", "")
 							end
+							return true
 						end,
 						isRunning = function() return false end,
 						terminate = function() end,
@@ -173,7 +185,7 @@ helpers.describe("ShellRunner: ERROR logged when on_chunk throws (F-HIGH-21 beha
 				new = function(_executable, _on_done_cb, on_chunk_cb, _args)
 					captured_chunk_cb = on_chunk_cb
 					return {
-						start     = function() end,
+						start     = function() return true end,
 						isRunning = function() return false end,
 						terminate = function() end,
 					}

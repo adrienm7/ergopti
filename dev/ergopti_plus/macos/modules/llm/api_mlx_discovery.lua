@@ -79,6 +79,9 @@ local _cooldown_timer           = nil
 -- verified cancel/terminate or their identity-matched callback completes.
 local _poll_timer               = nil
 local _poll_task                = nil
+-- Lifecycle fence owned by api_mlx.stop_warmup(). A stopped discovery keeps
+-- every late native completion inert until the matching owner explicitly resumes
+local _quiesced                 = false
 -- One cycle token prevents a late duplicate callback from clearing a newer
 -- cycle that happens to share the same model-switch generation.
 local _active_cycle             = nil
@@ -89,6 +92,13 @@ local _discovery_callbacks_draining = false
 -- scheduler rejects that retry too, keep the waiter queued for the next external
 -- signal rather than recursing until the Lua stack overflows.
 local _infrastructure_retry_in_progress = false
+-- Exact owner-level settlement waiters. TimerScheduler and HttpClient can
+-- report their own terminal transition; the curl task is completed through the
+-- identity-matched ShellRunner callback below. A waiter is released only after
+-- the whole discovery aggregate joins, never after one child settles alone.
+local _settlement_waiters = {}
+local retry_settlement_waiter
+local notify_settlement_waiters
 
 -- Inter-probe delay, carried ACROSS discovery cycles. Declared here rather than
 -- inside discover() so a failed cycle's backoff is still in force when the next
@@ -263,10 +273,7 @@ local function cancel_timer(handle, label)
 	local ok, result = xpcall(function()
 		return TimerScheduler.cancel(handle)
 	end, debug.traceback)
-	-- The shared port declares cancel() void; the macOS adapter additionally
-	-- returns false when native stop fails. Accept nil/true, retain only on a
-	-- throw or the adapter's explicit failure extension.
-	if not ok or result == false then
+	if not ok or result ~= true then
 		Logger.error(LOG, "Cannot cancel %s timer; handle retained for retry (result: %s).",
 			tostring(label), tostring(result))
 		return false
@@ -284,7 +291,7 @@ local function terminate_task(task, label)
 		Logger.error(LOG, "Cannot terminate %s task; terminate() is unavailable.", tostring(label))
 		return false
 	end
-	local ok, result = xpcall(function()
+	local ok, result, settlement = xpcall(function()
 		return task.terminate()
 	end, debug.traceback)
 	if not ok or result ~= true then
@@ -292,6 +299,185 @@ local function terminate_task(task, label)
 			tostring(label), tostring(result))
 		return false
 	end
+	-- ShellRunner distinguishes a delivered SIGTERM from the completion callback
+	-- that proves native exit. Retain the exact task across that pending interval
+	if settlement == "pending" then
+		Logger.debug(LOG, "%s task termination is pending native completion.", tostring(label))
+		return false
+	end
+	return true
+end
+
+--- Cancels every exact asynchronous capability owned by discovery.
+--- @param label string Stable diagnostic operation.
+--- @return boolean settled True only when no timer, task, or HTTP owner remains.
+local function settle_async_owners(label)
+	local poll_timer_settled = true
+	local cooldown_settled = true
+	local poll_task_settled = true
+	local probe_settled = true
+
+	if _poll_timer then
+		poll_timer_settled = cancel_timer(_poll_timer, label .. " poll") == true
+		if poll_timer_settled then _poll_timer = nil end
+	end
+	if _cooldown_timer then
+		cooldown_settled = cancel_timer(_cooldown_timer, label .. " cooldown") == true
+		if cooldown_settled then _cooldown_timer = nil end
+	end
+	if _poll_task then
+		poll_task_settled = terminate_task(_poll_task, label .. " poll") == true
+		if poll_task_settled then _poll_task = nil end
+	end
+
+	local cancel_ok, cancel_result = xpcall(function()
+		if type(_probe_client.cancel) ~= "function" then return false end
+		return _probe_client.cancel()
+	end, debug.traceback)
+	probe_settled = cancel_ok == true and cancel_result == true
+	if not probe_settled then
+		Logger.error(LOG, "%s POST-probe cancellation retained exact HTTP debt: %s.",
+			tostring(label), tostring(cancel_result))
+	end
+
+	return poll_timer_settled and cooldown_settled
+		and poll_task_settled and probe_settled
+end
+
+--- Attaches one discovery waiter to an exact timer debt.
+--- @param waiter table Composite settlement token.
+--- @param handle table|nil TimerScheduler handle.
+--- @return boolean observed
+local function observe_settlement_timer(waiter, handle)
+	if type(handle) ~= "table" or handle.timer == nil then return false end
+	if waiter.timers[handle] == true then return true end
+	if type(TimerScheduler.onSettled) ~= "function" then return false end
+	waiter.timers[handle] = true
+	local observe_ok, observed = xpcall(function()
+		return TimerScheduler.onSettled(handle, function()
+			waiter.timers[handle] = nil
+			retry_settlement_waiter(waiter)
+		end)
+	end, debug.traceback)
+	if not observe_ok or observed ~= true then
+		waiter.timers[handle] = nil
+		Logger.error(LOG, "Discovery could not observe exact timer settlement: %s.",
+			tostring(observed))
+		return false
+	end
+	return true
+end
+
+--- Attaches one discovery waiter to the exact POST-probe client aggregate.
+--- @param waiter table Composite settlement token.
+--- @return boolean observed
+local function observe_probe_settlement(waiter)
+	if waiter.probe_settled == true then return false end
+	if waiter.probe_observed == true then return true end
+	if type(_probe_client.onSettled) ~= "function" then return false end
+	waiter.probe_observed = true
+	local observe_ok, observed = xpcall(function()
+		return _probe_client.onSettled(function()
+			waiter.probe_observed = false
+			waiter.probe_settled = true
+			retry_settlement_waiter(waiter)
+		end)
+	end, debug.traceback)
+	if not observe_ok or observed ~= true then
+		waiter.probe_observed = false
+		Logger.error(LOG, "Discovery could not observe exact POST-probe settlement: %s.",
+			tostring(observed))
+		return false
+	end
+	return true
+end
+
+--- Observes every retained child without acquiring any successor work.
+--- @param waiter table Composite settlement token.
+--- @return boolean observed True when at least one debt has a terminal trigger.
+local function observe_settlement_children(waiter)
+	local observed = observe_settlement_timer(waiter, _poll_timer)
+	if observe_settlement_timer(waiter, _cooldown_timer) then observed = true end
+	-- ShellRunner has no standalone settlement port. Keeping the waiter in the
+	-- module ledger lets the exact task completion callback below trigger it.
+	if _poll_task ~= nil then observed = true end
+	if observe_probe_settlement(waiter) then observed = true end
+	return observed
+end
+
+--- Rejoins the whole discovery owner after one child becomes terminal.
+--- @param waiter table Composite settlement token.
+retry_settlement_waiter = function(waiter)
+	if _settlement_waiters[waiter] ~= true or waiter.joining == true then return end
+	waiter.joining = true
+	local settled = settle_async_owners("Discovery settlement observer") == true
+	waiter.joining = false
+	if not settled then
+		if observe_settlement_children(waiter) ~= true then
+			Logger.error(LOG, "Discovery retained non-observable cleanup debt.")
+		end
+		return
+	end
+
+	_settlement_waiters[waiter] = nil
+	ApiCommon.protected_call(waiter.callback, "discovery settlement observer")
+end
+
+--- Retries every waiter after the identity-matched curl task becomes terminal.
+notify_settlement_waiters = function()
+	local snapshot = {}
+	for waiter in pairs(_settlement_waiters) do snapshot[#snapshot + 1] = waiter end
+	for _, waiter in ipairs(snapshot) do retry_settlement_waiter(waiter) end
+end
+
+--- Registers a continuation for exact settlement of the whole discovery owner.
+--- The callback runs synchronously when no timer/task/HTTP child remains, or
+--- exactly once after the last retained child later reaches its terminal path.
+--- @param observer function Zero-arity settlement callback.
+--- @return boolean registered
+function M.onSettled(observer)
+	if type(observer) ~= "function" then return false end
+	local waiter = {
+		callback = observer,
+		timers = {},
+		probe_observed = false,
+		probe_settled = false,
+		joining = false,
+	}
+	_settlement_waiters[waiter] = true
+	retry_settlement_waiter(waiter)
+	return true
+end
+
+--- Reports whether discovery currently owns deferred or native work.
+--- @return boolean active True while any discovery continuation remains owned.
+function M.is_active()
+	if _endpoint_probe_in_flight or _poll_timer or _poll_task or _cooldown_timer
+		or #_discovery_pending_callbacks > 0 then
+		return true
+	end
+	if type(_probe_client.isActive) ~= "function" then return false end
+	local ok, active = xpcall(_probe_client.isActive, debug.traceback)
+	return not ok or active == true
+end
+
+--- Fences every callback and joins all exact discovery capabilities.
+--- @return boolean settled True only after every owned capability settled.
+function M.stop()
+	_quiesced = true
+	_discovery_gen = _discovery_gen + 1
+	_endpoint_probe_in_flight = false
+	_active_cycle = nil
+	_discovery_pending_callbacks = {}
+	_last_cycle_finished_at = nil
+	return settle_async_owners("Discovery stop")
+end
+
+--- Reopens discovery only after prior cleanup debt has settled.
+--- @return boolean settled True when future discovery is admitted.
+function M.resume()
+	if settle_async_owners("Discovery resume") ~= true then return false end
+	_quiesced = false
 	return true
 end
 
@@ -317,17 +503,7 @@ function M.reset()
 	-- timestamp here would make a model switch wait out a cooldown earned by the
 	-- model the user just left.
 	_last_cycle_finished_at = nil
-	if _poll_timer and cancel_timer(_poll_timer, "discovery poll") then
-		_poll_timer = nil
-	end
-	if _poll_task and terminate_task(_poll_task, "discovery poll") then
-		_poll_task = nil
-	end
-	if _cooldown_timer then
-		if cancel_timer(_cooldown_timer, "discovery cooldown") then
-			_cooldown_timer = nil
-		end
-	end
+	return settle_async_owners("Discovery reset")
 end
 
 
@@ -362,25 +538,34 @@ local function _is_paused()
 end
 
 function M.discover(on_done)
+	if _quiesced then
+		Logger.debug(LOG, "Discovery skipped — lifecycle owner is quiesced.")
+		return false
+	end
 	if _is_paused() then
 		Logger.debug(LOG, "Discovery skipped — script is paused.")
-		-- The caller is answered rather than dropped: a warmup waiting on a
-		-- callback that never fires is how the prediction lock got stuck.
-		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done") end
-		return
+		return false
 	end
 	if _endpoints_discovered then
 		if type(on_done) == "function" then ApiCommon.protected_call(on_done, "on_done") end
-		return
+		return true
 	end
 	-- Enqueue the callback so it fires when the in-flight probe completes —
 	-- previously we returned silently here, dropping the caller's on_done and
 	-- causing every warmup issued during the server boot window to be lost.
+	local callback_index
 	if type(on_done) == "function" then
 		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = on_done
+		callback_index = #_discovery_pending_callbacks
 	end
-	if _discovery_callbacks_draining then return end
-	if _endpoint_probe_in_flight then return end
+	local function withdraw_unaccepted_callback()
+		if callback_index
+			and _discovery_pending_callbacks[callback_index] == on_done then
+			table.remove(_discovery_pending_callbacks, callback_index)
+		end
+	end
+	if _discovery_callbacks_draining then return true end
+	if _endpoint_probe_in_flight then return true end
 	-- A prior reset or failed launch can retain an exact native capability when
 	-- cancellation itself refused. Retry that cleanup before starting a sibling
 	-- poll; otherwise two curl tasks can race the same route cache.
@@ -388,14 +573,16 @@ function M.discover(on_done)
 		if cancel_timer(_poll_timer, "stale discovery poll") then
 			_poll_timer = nil
 		else
-			return
+			withdraw_unaccepted_callback()
+			return false
 		end
 	end
 	if _poll_task then
 		if terminate_task(_poll_task, "stale discovery poll") then
 			_poll_task = nil
 		else
-			return
+			withdraw_unaccepted_callback()
+			return false
 		end
 	end
 
@@ -419,6 +606,10 @@ function M.discover(on_done)
 				local ok, result = xpcall(function()
 					candidate, arm_committed = TimerScheduler.after(remaining, function()
 						if _cooldown_timer ~= candidate then return end
+						if candidate.timer ~= nil then
+							Logger.error(LOG, "Discovery cooldown fired with exact timer cleanup debt retained.")
+							return
+						end
 						_cooldown_timer = nil
 						if generation ~= _discovery_gen then return end
 						-- nil so this re-entry cannot be deferred again by the same window.
@@ -445,7 +636,7 @@ function M.discover(on_done)
 					_last_cycle_finished_at = nil
 				end
 			end
-			if _cooldown_timer then return end
+			if _cooldown_timer then return true end
 		end
 	end
 
@@ -623,11 +814,21 @@ function M.discover(on_done)
 	--- @param stage string Stable diagnostic label.
 	--- @return boolean committed True only when the timer is live and owned.
 	local function schedule_poll(delay, stage)
+		if _poll_timer then
+			if cancel_timer(_poll_timer, stage .. " predecessor poll") ~= true then
+				return false
+			end
+			_poll_timer = nil
+		end
 		local candidate
 		local arm_committed
 		local ok, result = xpcall(function()
 			candidate, arm_committed = TimerScheduler.after(delay, function()
 				if _poll_timer ~= candidate then return end
+				if candidate.timer ~= nil then
+					Logger.error(LOG, "Discovery poll fired with exact timer cleanup debt retained.")
+					return
+				end
 				_poll_timer = nil
 				if cycle ~= _active_cycle or my_discovery_gen ~= _discovery_gen then return end
 				local callback_ok, callback_err = xpcall(do_poll, debug.traceback)
@@ -691,6 +892,7 @@ function M.discover(on_done)
 				-- Only the callback for the exact published task may release it.
 				if _poll_task ~= curl_task then return end
 				_poll_task = nil
+				notify_settlement_waiters()
 				if my_discovery_gen ~= _discovery_gen or cycle ~= _active_cycle then return end
 
 				local callback_ok, callback_err = xpcall(function()
@@ -758,7 +960,11 @@ function M.discover(on_done)
 		end
 	end
 
-	if not schedule_poll(0, "initial") then finish_discovery(false, false) end
+	if not schedule_poll(0, "initial") then
+		finish_discovery(false, false)
+		return false
+	end
+	return true
 end
 
 return M

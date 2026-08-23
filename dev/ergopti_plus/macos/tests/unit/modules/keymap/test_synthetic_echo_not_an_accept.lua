@@ -161,20 +161,3 @@ helpers.describe("keymap: an owned Return is not an LLM accept", function()
 		fixture.cleanup()
 	end)
 end)
-
-
-helpers.describe("prediction engine: the debounce callback is guarded", function()
-	helpers.it("reports a throw through the logger, not the console", function()
-		local src = helpers.read_driver_source("_inactivity_timer")
-		helpers.assert_true(src ~= nil and src ~= "", "the prediction engine must be locatable")
-
-		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("hs.timer.delayed.new", 1, true)
-		helpers.assert_not_nil(at, "the debounce timer must still be created")
-		local body = code:sub(at, at + 600)
-		helpers.assert_true(body:find("xpcall", 1, true) ~= nil,
-			"a debounce exception must be contained outside Hammerspoon Console")
-		helpers.assert_true(body:find("Logger.error", 1, true) ~= nil,
-			"the contained exception must reach the file logger")
-	end)
-end)

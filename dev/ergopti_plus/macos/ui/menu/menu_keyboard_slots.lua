@@ -115,8 +115,12 @@ local function choose_action_for(slot_id, ctx)
 		items   = build_action_items(ctx.gestures),
 	}, function(action_id)
 		if type(action_id) ~= "string" then return end
-		KbShortcuts.set_keyboard_action(slot_id, action_id)
+		if KbShortcuts.set_keyboard_action(slot_id, action_id) ~= true then
+			Logger.error(LOG, "Keyboard shortcut edit refused for slot '%s'.", tostring(slot_id))
+			return false
+		end
 		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+		return true
 	end)
 end
 

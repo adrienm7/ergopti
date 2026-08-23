@@ -184,8 +184,17 @@ function M.classify_with_fence(event, consumer_id)
 		report_read_failure("adapter", tostring(metadata))
 		metadata, status = nil, M.STATUS_UNREADABLE
 	end
-	if status == M.STATUS_OWNED then return metadata, status, nil end
-	local fence_ok, fence_or_err = xpcall(SyntheticInput.claim_physical_fence, debug.traceback)
+	if status == M.STATUS_OWNED then
+		-- A fenced physical replay carries an Ergopti tag solely to prevent a
+		-- second fence. Every consumer must otherwise process it exactly like the
+		-- original human event, including keylogger and shortcut taps.
+		if metadata.physical_replay == true then
+			return nil, M.STATUS_FOREIGN, nil
+		end
+		return metadata, status, nil
+	end
+	local fence_ok, fence_or_err = xpcall(
+		SyntheticInput.claim_physical_fence, debug.traceback, event)
 	if not fence_ok then
 		report_read_failure("adapter", tostring(fence_or_err))
 		-- A foreign event is only authoritative after every older payload was

@@ -93,11 +93,13 @@ helpers.describe("the MLX auto-hide only closes the window it armed for", functi
 		-- rather than by path, so moving the module cannot turn this into a path
 		-- error. The bootstrap needs a real uv sync to observe behaviourally; what
 		-- is decidable is that the deferred hide is guarded by the owner check.
-		local src = helpers.read_driver_source("SUCCESS_AUTO_HIDE_SEC")
+		local src = helpers.read_driver_source(
+			"owner_name = \"mlx_dependency_bootstrap\"")
 		helpers.assert_true(src ~= nil, "mlx_deps_checker source must be locatable")
 		if not src then return end
 
-		local arm_at = src:find("doAfter%(SUCCESS_AUTO_HIDE_SEC")
+		local arm_at = src:find(
+			"arm_owned_timer(\"hide\", SUCCESS_AUTO_HIDE_SEC", 1, true)
 		helpers.assert_true(arm_at ~= nil, "the deferred auto-hide must be locatable")
 		if not arm_at then return end
 
@@ -110,10 +112,12 @@ helpers.describe("the MLX auto-hide only closes the window it armed for", functi
 	end)
 
 	helpers.it("degrades safely when the window exposes no session id", function()
-		local src = helpers.read_driver_source("SUCCESS_AUTO_HIDE_SEC")
+		local src = helpers.read_driver_source(
+			"owner_name = \"mlx_dependency_bootstrap\"")
 		if not src then return end
 
-		local arm_at = src:find("doAfter%(SUCCESS_AUTO_HIDE_SEC")
+		local arm_at = src:find(
+			"arm_owned_timer(\"hide\", SUCCESS_AUTO_HIDE_SEC", 1, true)
 		if not arm_at then return end
 		local window = src:sub(math.max(1, arm_at - 400), arm_at + 600)
 

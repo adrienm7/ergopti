@@ -34,6 +34,8 @@ local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
+local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
+local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
 
 local LOG = "menu"
 local load_errors = {}
@@ -330,12 +332,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		pcall(function() myMenu:setTitle("") end)
 	end
 
+	local run_global_exclusive
 	local function do_reload(source)
-		local msg = source == "watcher"
-			and i18n.get("menu.reloading_files")
-			or  i18n.get("menu.reloading")
-		pcall(notifications.notify, msg, nil, "info")
-		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
+		if type(run_global_exclusive) ~= "function" then return false end
+		return run_global_exclusive(
+			source == "watcher" and "Watcher reload" or "Reload",
+			function()
+				local msg = source == "watcher"
+					and i18n.get("menu.reloading_files")
+					or  i18n.get("menu.reloading")
+				pcall(notifications.notify, msg, nil, "info")
+				local request_ok, accepted = xpcall(function()
+					return TerminationCoordinator.request_reload(source)
+				end, debug.traceback)
+				return request_ok and accepted == true
+			end)
 	end
 
 	local function notify_feature(label, is_enabled)
@@ -437,6 +448,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	sync_state_to_modules = function(saved, config_absent, restoring)
 		return MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
+			apply_llm_enabled         = function(enabled)
+				if type(llm_handler) == "table"
+					and type(llm_handler.set_llm_preference_runtime) == "function" then
+					return llm_handler.set_llm_preference_runtime(enabled) == true
+				end
+				if keymap and type(keymap.set_llm_enabled) == "function" then
+					return keymap.set_llm_enabled(enabled) == true
+				end
+				return false
+			end,
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
 			core_mods                = core_mods,
@@ -450,87 +471,89 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local gestures_core_mod = safe_require("modules.gestures", "gestures core")
-
-	local function clear_keyboard_shortcut_settings()
-		local prefix = "keyboard_shortcut_"
-		local prefix_len = #prefix
-		local keys = hs.settings.getKeys() or {}
-		for _, k in ipairs(keys) do
-			if k:sub(1, prefix_len) == prefix then
-				local slot = k:sub(prefix_len + 1)
-				if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_keyboard_action) == "function" then
-					pcall(core_mods.shortcuts_mod.set_keyboard_action, slot, "none")
-				else
-					pcall(function() hs.settings.set(k, "none") end)
-				end
-			end
+	local file_mover = RecoverableFileMoves.create()
+	local script_defaults = core_mods.shortcuts_mod
+		and core_mods.shortcuts_mod.DEFAULT_STATE
+		and core_mods.shortcuts_mod.DEFAULT_STATE.script_control_shortcuts
+	local global_gesture_slots = {}
+	local global_gesture_slot_set = {}
+	for _, slot in ipairs(gestures_core_mod and gestures_core_mod.SINGLE_SLOTS or {}) do
+		global_gesture_slots[#global_gesture_slots + 1] = slot
+		global_gesture_slot_set[slot] = true
+	end
+	for slot in pairs(gestures_core_mod and gestures_core_mod.DEFAULT_GESTURES or {}) do
+		if not global_gesture_slot_set[slot] then
+			global_gesture_slots[#global_gesture_slots + 1] = slot
+			global_gesture_slot_set[slot] = true
 		end
 	end
+	table.sort(global_gesture_slots)
+	local global_actions_owner = GlobalActionsTransaction.create({
+		state = state,
+		capture_preferences = function()
+			return Preferences.snapshot(state, hotfiles, core_mods)
+		end,
+		sync_runtime = function(snapshot, restoring)
+			return sync_state_to_modules(snapshot, false, restoring == true) == true
+		end,
+		save_preferences = save_prefs,
+		restore_state = PreferencesTransaction.restore_table,
+		settings = {
+			get = hs.settings.get,
+			set = hs.settings.set,
+			get_keys = function() return hs.settings.getKeys() end,
+		},
+		file_mover = file_mover,
+		reset_paths = {
+			MenuPaths.get("ConfigTomlPath"),
+			MenuPaths.get("KarabinerConfigPath"),
+		},
+		gestures = gestures,
+		gesture_slots = global_gesture_slots,
+		gesture_defaults = gestures_core_mod and gestures_core_mod.DEFAULT_GESTURES or {},
+		shortcuts = core_mods.shortcuts_mod,
+		script_defaults = script_defaults,
+		karabiner = karabiner,
+		request_reload = function(on_aborted)
+			return TerminationCoordinator.request_reload_owned(
+				"factory_reset", on_aborted)
+		end,
+		terminal_pending = function()
+			return TerminationCoordinator.is_pending()
+		end,
+		notify_success = function(kind)
+			if kind == "disable" then
+				return notifications.notify(
+					i18n.get("notify.all_features_disabled"), nil, "error")
+			end
+			return notifications.notify(i18n.get("notify.defaults_reset"), nil, "info")
+		end,
+		update_menu = function()
+			if type(updateMenu) == "function" then updateMenu() end
+			return true
+		end,
+	})
 
-	local function clear_config_backed_bindings()
-		local disabled_action = "none"
-		if gestures and gestures_core_mod and type(gestures_core_mod.SINGLE_SLOTS) == "table" then
-			for _, slot in ipairs(gestures_core_mod.SINGLE_SLOTS) do
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, disabled_action) end
-			end
+	run_global_exclusive = function(action_label, callback)
+		if not global_actions_owner
+			or type(global_actions_owner.run_exclusive) ~= "function" then
+			Logger.error(LOG, "%s refused because the global action owner is unavailable.",
+				tostring(action_label))
+			return false
 		end
-		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
-			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
-			for _, keyname in ipairs({ "return_key", "backspace", "escape" }) do
-				state.script_control_shortcuts[keyname] = disabled_action
-				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, disabled_action)
-			end
-		end
-	end
-
-	local function clear_external_bindings()
-		local disabled_action = "none"
-		if karabiner then
-			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
-				pcall(karabiner.set_tap_action,  key_def.id, disabled_action)
-				pcall(karabiner.set_hold_action, key_def.id, disabled_action)
-			end
-			for _, combo_def in ipairs(karabiner.MOD_COMBOS or {}) do
-				pcall(karabiner.set_combo_combo_action, combo_def.id, disabled_action)
-				pcall(karabiner.set_combo_tap_action,   combo_def.id, disabled_action)
-				pcall(karabiner.set_combo_hold_action,  combo_def.id, disabled_action)
-			end
-			if type(karabiner.regenerate) == "function" then pcall(karabiner.regenerate) end
-		end
-		clear_keyboard_shortcut_settings()
-	end
-
-	local function restore_factory_bindings()
-		if gestures and gestures_core_mod and type(gestures_core_mod.DEFAULT_GESTURES) == "table" then
-			for slot, action in pairs(gestures_core_mod.DEFAULT_GESTURES) do
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
-			end
-		end
-		if karabiner and type(karabiner.reset_to_defaults) == "function" then
-			pcall(karabiner.reset_to_defaults)
-			if type(karabiner.regenerate) == "function" then pcall(karabiner.regenerate) end
-		end
-		clear_keyboard_shortcut_settings()
-		local sc_defaults = core_mods.shortcuts_mod
-			and core_mods.shortcuts_mod.DEFAULT_STATE
-			and core_mods.shortcuts_mod.DEFAULT_STATE.script_control_shortcuts
-		if sc_defaults and core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_shortcut_action) == "function" then
-			if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
-			for keyname, action in pairs(sc_defaults) do
-				state.script_control_shortcuts[keyname] = action
-				pcall(core_mods.shortcuts_mod.set_shortcut_action, keyname, action)
-			end
-		end
-	end
-
-	local function clear_persisted_binding_overrides()
-		clear_keyboard_shortcut_settings()
-		pcall(function() hs.settings.set("llm_api_entries", {}) end)
-		pcall(function() hs.settings.set("llm_api_entry_id", "") end)
+		return global_actions_owner.run_exclusive(action_label, callback)
 	end
 
 	local function set_all_enabled(enabled)
-		if enabled and not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
+		if enabled ~= true then
+			if not global_actions_owner then
+				Logger.error(LOG, "Disable All transaction owner is unavailable.")
+				return false
+			end
+			return global_actions_owner.disable_all()
+		end
+		return run_global_exclusive("Enable All", function()
+		if not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
 			"enable all features") then
 			return false
 		end
@@ -600,46 +623,23 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 		
-		-- Config-backed bindings must be in the candidate snapshot; rollback can
-		-- restore them because their runtimes are represented in Preferences.snapshot.
-		if not enabled then clear_config_backed_bindings() end
-
-		-- Publish the candidate state before destructive external effects. In
-		-- particular, clearing Karabiner bindings and hs.settings cannot be made
-		-- atomic by rolling back the config.toml snapshot alone.
 		if save_prefs() ~= true then return false end
 
-		-- 5. « Tout désactiver » also empties external tap-hold / keyboard slots.
-		if not enabled then clear_external_bindings() end
-
-		-- 6. Sync engines only after the candidate was acknowledged.
+		-- Sync engines only after the candidate was acknowledged.
 		sync_state_to_modules(state, false)
 		
 		notify_feature(enabled and i18n.get("notify.all_features_enabled") or i18n.get("notify.all_features_disabled"), enabled)
 		if type(updateMenu) == "function" then updateMenu() end
 		return true
+		end)
 	end
 
 	local function reset_all_defaults()
-		-- Restore the full factory state, not only the config.toml-backed toggles.
-		-- Bindings live in several stores: config.toml (gestures, script shortcuts),
-		-- config_karabiner.toml (tap/hold), and hs.settings (keyboard shortcuts,
-		-- LLM API entries). Wipe every store so the reload seeds factory defaults.
-		restore_factory_bindings()
-		clear_persisted_binding_overrides()
-		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
-		pcall(os.remove, MenuPaths.get("KarabinerConfigPath"))
-		-- NO save_prefs() here. It rewrote config.toml from the still-current
-		-- in-memory `state`, which restore_factory_bindings does not touch: it
-		-- resets bindings only, never the feature toggles. The reload that
-		-- follows then found a NON-empty config, so config_absent was false, the
-		-- factory-seed branch was skipped, and merge_saved_data re-hydrated every
-		-- toggle the user had just asked to reset. Deleting the files and letting
-		-- the reload take the config_absent path is what actually seeds defaults;
-		-- the two calls above already clear the bindings through their own stores,
-		-- which is the job this save_prefs() was added for.
-		pcall(notifications.notify, i18n.get("notify.defaults_reset"), nil, "info")
-		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
+		if not global_actions_owner then
+			Logger.error(LOG, "Factory reset transaction owner is unavailable.")
+			return false
+		end
+		return global_actions_owner.reset_defaults()
 	end
 
 
@@ -773,7 +773,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- assignment runs, so guard it like every other updateMenu call site.
 			-- Without the guard this threw "attempt to call a nil value (upvalue
 			-- 'updateMenu')" and the swallowed error silently killed the LLM startup.
-			update_menu    = function() if type(updateMenu) == "function" then updateMenu() end end,
+			update_menu    = function()
+				if type(updateMenu) == "function" then updateMenu() end
+				return true
+			end,
 			save_prefs     = save_prefs,
 			keymap         = keymap,
 			script_control = core_mods.shortcuts_mod,
@@ -929,34 +932,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local actions = {
-		enable_all                = function() set_all_enabled(true) end,
-		disable_all               = function() set_all_enabled(false) end,
-		reset_defaults            = function() reset_all_defaults() end,
+		enable_all                = function() return set_all_enabled(true) end,
+		disable_all               = function() return set_all_enabled(false) end,
+		reset_defaults            = function() return reset_all_defaults() end,
 		open_paths                = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
-		reload                    = function() do_reload("menu") end,
+		reload                    = function()
+			return do_reload("menu")
+		end,
 		quit                      = function()
-			local exit_requested = false
-			local function request_controlled_exit()
-				if exit_requested then return end
-				exit_requested = true
-				local request_ok, accepted_or_err = xpcall(function()
+			return run_global_exclusive("Quit", function()
+				local request_ok, accepted = xpcall(function()
 					return TerminationCoordinator.request_exit("menu_quit", 0)
 				end, debug.traceback)
-				if not request_ok or accepted_or_err ~= true then
-					Logger.error(LOG, "Menubar controlled exit was rejected: %s",
-						tostring(accepted_or_err))
-				end
-			end
-			local scheduled, timer_or_err = pcall(function()
-				return hs.timer.doAfter(0.05, request_controlled_exit)
+				return request_ok and accepted == true
 			end)
-			if not scheduled or timer_or_err == nil or timer_or_err == false then
-				Logger.error(LOG, "Menubar controlled exit scheduling failed: %s",
-					tostring(timer_or_err))
-				-- The asynchronous coordinator remains the sole owner of the exact
-				-- lease fence, sibling teardown and eventual process exit.
-				request_controlled_exit()
-			end
 		end,
 		open_logs                 = function()
 			local dir = logs_dir()
@@ -1204,7 +1193,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- watchers cover this tree and only that one was using it.
 	local configWatcher = MenuWatchers.start_config_watcher(
 		base_dir,
-		function() do_reload("watcher") end,
+		function() return do_reload("watcher") end,
 		function() return _suppress_watcher_until end,
 		ui_restore,
 		{ (hs.configdir or ".") .. "/cache" },

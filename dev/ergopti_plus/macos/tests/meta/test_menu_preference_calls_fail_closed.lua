@@ -48,8 +48,11 @@ helpers.describe("menu preference call sites fail closed", function()
 			end
 		end
 
-		helpers.assert_true(calls >= 80,
-			"the class scan must enumerate the large sibling set, not a token sample")
+		-- Transactional helpers consolidated several formerly direct writes. Keep a
+		-- conservative floor high enough to reject token samples while tracking the
+		-- current direct-call class rather than its pre-refactor cardinality.
+		helpers.assert_true(calls >= 60,
+			"the class scan must enumerate the consolidated sibling set, not a token sample")
 		helpers.assert_eq(guarded, calls,
 			"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "
 				.. table.concat(unguarded, " | "))
@@ -59,7 +62,7 @@ helpers.describe("menu preference call sites fail closed", function()
 		local source, err = helpers.read_driver_unit("Restore the backend/profile/model identity")
 		helpers.assert_not_nil(source, err)
 		local backend = source:find('fn = "set_backend"', 1, true)
-		local keymap = source:find('fn = "set_llm_enabled"', 1, true)
+		local keymap = source:find('"keymap.set_llm_model"', 1, true)
 		helpers.assert_true(backend ~= nil and keymap ~= nil and backend < keymap,
 			"rollback must restore the core backend before keymap setters can schedule warmup")
 	end)

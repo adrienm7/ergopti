@@ -125,4 +125,37 @@ function M.start(task, label)
 	return true
 end
 
+--- Sends one termination signal to an exact native task handle.
+--- A truthy native return means only that signal delivery was accepted; the
+--- owning feature must retain the task until its native completion callback.
+--- @param task any Native task handle retained by the caller.
+--- @param label string Human-readable operation label.
+--- @return boolean accepted True only for a truthy native signal result.
+function M.terminate(task, label)
+	if not task then
+		Logger.error(LOG, "%s task termination received no native handle.", tostring(label))
+		return false
+	end
+	local ok_method, terminate_method = xpcall(function()
+		return task.terminate
+	end, debug.traceback)
+	if not ok_method or type(terminate_method) ~= "function" then
+		Logger.error(LOG, "%s task termination method is unavailable.", tostring(label))
+		return false
+	end
+	local ok, accepted_or_err = xpcall(function()
+		return terminate_method(task)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s task termination raised: %s.", tostring(label),
+			tostring(accepted_or_err))
+		return false
+	end
+	if accepted_or_err == false or accepted_or_err == nil then
+		Logger.error(LOG, "%s task termination was refused.", tostring(label))
+		return false
+	end
+	return true
+end
+
 return M

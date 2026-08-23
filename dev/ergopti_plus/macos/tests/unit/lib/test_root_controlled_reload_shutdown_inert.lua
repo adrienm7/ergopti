@@ -18,6 +18,7 @@ local MODULE_NAMES = {
 	"tests.stubs.hs",
 	"infra.logger",
 	"adapters.timer_scheduler",
+	"adapters.synthetic_input",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
 	"infra.boot_profiler",
@@ -41,6 +42,7 @@ local MODULE_NAMES = {
 	"adapters.file_system",
 	"platform.remap",
 	"ui.menu",
+	"ui.menu.menu_llm",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 	"modules.llm.backend_detector",
@@ -49,7 +51,12 @@ local MODULE_NAMES = {
 	"ui.onboarding",
 }
 
-local function run_isolated(assertions)
+local function run_isolated(options, assertions)
+	if type(options) == "function" then
+		assertions = options
+		options = {}
+	end
+	options = options or {}
 	local saved_modules = {}
 	for _, name in ipairs(MODULE_NAMES) do saved_modules[name] = package.loaded[name] end
 	local saved_globals = {
@@ -59,6 +66,7 @@ local function run_isolated(assertions)
 		script_watchers = rawget(_G, "script_watchers"),
 	}
 	local saved_path = package.path
+	local saved_os_exit = os.exit
 	local searchers = package.searchers or package.loaders
 	local saved_searchers = {}
 	for index, searcher in ipairs(searchers or {}) do saved_searchers[index] = searcher end
@@ -72,6 +80,7 @@ local function run_isolated(assertions)
 			post_stop_logs = 0,
 			logger_stopped = false,
 			logger_stop_calls = 0,
+			fatal_exit_calls = 0,
 			drain_calls = 0,
 			cancel_all_calls = 0,
 			native_reload_calls = 0,
@@ -80,6 +89,7 @@ local function run_isolated(assertions)
 			revoke_calls = 0,
 			revoke_reasons = {},
 			teardown_local_calls = 0,
+			mlx_stop_calls = 0,
 			reload_marks = 0,
 			reload_clears = 0,
 			onboarding_runs = 0,
@@ -165,12 +175,35 @@ local function run_isolated(assertions)
 				return true
 			end,
 		}
+		local MenuLLM = {
+			stop_mlx_server = function(callback)
+				state.mlx_stop_calls = state.mlx_stop_calls + 1
+				if type(callback) ~= "function" then
+					state.mlx_missing_callback = true
+					return false
+				end
+				if options.mlx_stop_mode == "deferred" then
+					state.mlx_stop_callback = callback
+					return true
+				end
+				callback(true, "fixture MLX listener absent")
+				return true
+			end,
+			terminate_helper_processes = function() return true end,
+			terminate_orphan_mlx_server = function() return true end,
+		}
 
 		local fakes = {
 			["infra.logger"] = Logger,
 			["adapters.timer_scheduler"] = {
 				cancelAll = function()
 					state.cancel_all_calls = state.cancel_all_calls + 1
+					return true
+				end,
+			},
+			["adapters.synthetic_input"] = {
+				when_idle = function(callback)
+					callback()
 					return true
 				end,
 			},
@@ -218,6 +251,7 @@ local function run_isolated(assertions)
 			["adapters.file_system"] = {},
 			["platform.remap"] = Karabiner,
 			["ui.menu"] = { stop_watchers = function() return true end },
+			["ui.menu.menu_llm"] = MenuLLM,
 			["modules.llm.mlx_deps_checker"] = {},
 			["modules.llm.ollama_deps_checker"] = {},
 			["modules.llm.backend_detector"] = {},
@@ -243,6 +277,11 @@ local function run_isolated(assertions)
 
 		_G.hs = hs_stub
 		_G.script_watchers = {}
+		os.exit = function(code)
+			state.fatal_exit_calls = state.fatal_exit_calls + 1
+			state.fatal_exit_code = code
+			return true
+		end
 		hs_stub.reload = function(...)
 			state.native_reload_calls = state.native_reload_calls + 1
 			state.native_reload_args = table.pack(...)
@@ -271,6 +310,7 @@ local function run_isolated(assertions)
 	end, debug.traceback)
 
 	package.path = saved_path
+	os.exit = saved_os_exit
 	if searchers then
 		for index = #searchers, 1, -1 do searchers[index] = nil end
 		for index, searcher in ipairs(saved_searchers) do searchers[index] = searcher end
@@ -284,6 +324,60 @@ local function run_isolated(assertions)
 end
 
 helpers.describe("init: controlled reload owns the native shutdown handoff", function()
+	helpers.it("awaits the real root MLX callback before final teardown and reload (HS-008)", function()
+		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
+			local accepted = hs_stub.reload("mlx-callback-pending")
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(state.mlx_stop_calls, 1)
+			helpers.assert_eq(type(state.mlx_stop_callback), "function")
+			helpers.assert_eq(state.drain_calls, 0,
+				"the logger cannot drain before exact MLX listener settlement")
+			helpers.assert_eq(state.cancel_all_calls, 0)
+			helpers.assert_eq(state.logger_stop_calls, 0)
+			helpers.assert_eq(state.native_reload_calls, 0,
+				"the native reload cannot run while the MLX task callback is pending")
+			helpers.assert_eq(state.fatal_exit_calls, 0,
+				"pending MLX teardown cannot be misclassified as a fatal failure")
+
+			local exact_callback = state.mlx_stop_callback
+			helpers.assert_eq(exact_callback(true, "fixture MLX listener absent"), true)
+			helpers.assert_eq(state.mlx_stop_calls, 1,
+				"the callback-driven retry must consume the settled gate without re-signalling")
+			helpers.assert_eq(state.drain_calls, 1)
+			helpers.assert_eq(state.cancel_all_calls, 1)
+			helpers.assert_eq(state.logger_stop_calls, 1)
+			helpers.assert_eq(state.native_reload_calls, 1)
+			helpers.assert_eq(state.fatal_exit_calls, 0)
+
+			exact_callback(true, "duplicate")
+			helpers.assert_eq(state.native_reload_calls, 1)
+			helpers.assert_eq(state.post_stop_logs, 0,
+				"a duplicate MLX callback cannot reopen the finalized logger")
+		end)
+	end)
+
+	helpers.it("fails the exact controlled waiter when MLX cleanup is refused (HS-008)", function()
+		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
+			helpers.assert_eq(hs_stub.reload("mlx-cleanup-refused"), true)
+			helpers.assert_eq(type(state.mlx_stop_callback), "function")
+			helpers.assert_eq(state.drain_calls, 0)
+
+			local exact_callback = state.mlx_stop_callback
+			helpers.assert_eq(exact_callback(false, "cleanup_refused"), false)
+			helpers.assert_eq(state.fatal_exit_calls, 1,
+				"a negative exact teardown terminal must leave pending state through fatal exit")
+			helpers.assert_true(type(state.fatal_exit_code) == "number" and state.fatal_exit_code ~= 0)
+			helpers.assert_eq(state.native_reload_calls, 0)
+			helpers.assert_eq(state.drain_calls, 0,
+				"logger drain cannot start after listener absence was refused")
+			helpers.assert_eq(state.logger_stop_calls, 0)
+
+			exact_callback(false, "duplicate")
+			helpers.assert_eq(state.fatal_exit_calls, 1,
+				"the same shutdown waiter cannot publish two negative terminals")
+		end)
+	end)
+
 	helpers.it("keeps uncontrolled shutdown active but makes the post-finalizer callback inert", function()
 		run_isolated(function(state, hs_stub)
 			hs_stub.shutdownCallback()

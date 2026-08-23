@@ -85,6 +85,113 @@ local function request_regeneration(karabiner, source)
 	return true
 end
 
+--- Commits one synchronous facade mutation before requesting regeneration.
+--- A thrown, false, or nil setter result stops at the persistence boundary, so
+--- a bulk-transaction gate cannot be bypassed by a stale menu closure.
+--- @param karabiner table Remap facade.
+--- @param source string User action label for diagnostics.
+--- @param mutate function Synchronous mutation returning literal true on commit.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return boolean accepted
+local function commit_menu_setting(karabiner, source, mutate, update_menu)
+	local call_ok, committed_or_err = xpcall(mutate, debug.traceback)
+	if not call_ok or committed_or_err ~= true then
+		Logger.error(LOG, "%s setting mutation failed: %s.",
+			tostring(source), tostring(committed_or_err))
+		return false
+	end
+	local accepted = request_regeneration(karabiner, source)
+	if update_menu then
+		local refresh_ok, refresh_err = pcall(update_menu)
+		if not refresh_ok then
+			Logger.error(LOG, "%s menu refresh failed: %s.",
+				tostring(source), tostring(refresh_err))
+		end
+	end
+	return accepted
+end
+
+--- Runs one manifest bulk command and publishes success only after both exact
+--- request acceptance and the transaction's terminal callback are true.
+--- @param karabiner table Remap facade.
+--- @param method_name string Facade method name.
+--- @param start_message string START log message.
+--- @param success_message string SUCCESS log format.
+--- @param success_uses_count boolean Whether the format consumes change_count.
+--- @param update_menu function|nil Menu refresh callback.
+--- @param operation_arg string|nil Optional identifier passed before callback.
+--- @return boolean accepted
+local function run_bulk_menu_command(
+	karabiner,
+	method_name,
+	start_message,
+	success_message,
+	success_uses_count,
+	update_menu,
+	operation_arg
+)
+	local operation = karabiner and karabiner[method_name]
+	Logger.start(LOG, start_message)
+	if type(operation) ~= "function" then
+		Logger.error(LOG, "Karabiner bulk command '%s' is unavailable.", method_name)
+		return false
+	end
+
+	local callback_seen = false
+	local dispatching = true
+	local pending_ok = false
+	local pending_reason = nil
+	local pending_count = 0
+	local function finish(ok, reason, change_count)
+		if callback_seen then
+			Logger.warn(LOG, "Duplicate Karabiner bulk command '%s' callback ignored.", method_name)
+			return
+		end
+		callback_seen = true
+		if dispatching then
+			pending_ok = ok == true
+			pending_reason = reason
+			pending_count = tonumber(change_count) or 0
+			return
+		end
+		if ok == true then
+			if success_uses_count then
+				Logger.success(LOG, success_message, tonumber(change_count) or 0)
+			else
+				Logger.success(LOG, success_message)
+			end
+		else
+			Logger.error(LOG, "Karabiner bulk command '%s' failed: %s.",
+				method_name, tostring(reason))
+		end
+		if update_menu then
+			local refresh_ok, refresh_err = pcall(update_menu)
+			if not refresh_ok then
+				Logger.error(LOG, "Karabiner menu refresh after '%s' failed: %s.",
+					method_name, tostring(refresh_err))
+			end
+		end
+	end
+
+	local call_ok, accepted_or_err = xpcall(function()
+		if operation_arg ~= nil then
+			return operation(operation_arg, finish)
+		end
+		return operation(finish)
+	end, debug.traceback)
+	dispatching = false
+	if not call_ok or accepted_or_err ~= true then
+		callback_seen = false
+		finish(false, call_ok and "request-refused" or accepted_or_err, 0)
+		return false
+	end
+	if callback_seen then
+		callback_seen = false
+		finish(pending_ok, pending_reason, pending_count)
+	end
+	return true
+end
+
 --- Builds an index of action id → action definition for fast lookup.
 --- @param karabiner table The karabiner module.
 --- @return table Map of id → action def.
@@ -167,9 +274,9 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 				label   = action.label,
 				checked = (aid == current_id),
 				action      = function()
-					pcall(set_fn, aid)
-					pcall(karabiner.regenerate)
-					if update_menu then update_menu() end
+					return commit_menu_setting(karabiner, "Action picker", function()
+						return set_fn(aid)
+					end, update_menu)
 				end,
 			}
 		else
@@ -182,9 +289,9 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 	if #non_special > 0 then
 		if #items > 0 then items[#items + 1] = { separator = true } end
 		local grouped = MenuUtils.build_action_picker(non_special, current_id, function(aid)
-			pcall(set_fn, aid)
-			pcall(karabiner.regenerate)
-			if update_menu then update_menu() end
+			return commit_menu_setting(karabiner, "Grouped action picker", function()
+				return set_fn(aid)
+			end, update_menu)
 		end)
 		for _, it in ipairs(grouped) do
 			items[#items + 1] = it
@@ -303,10 +410,15 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			label    = i18n.get("menu.karabiner.nothing_tap_hold"),
 			disabled = (current_tap == "none" and current_hold == "none"),
 			action       = function()
-				pcall(karabiner.set_tap_action,  kid, "none")
-				pcall(karabiner.set_hold_action, kid, "none")
-				pcall(karabiner.regenerate)
-				if update_menu then update_menu() end
+				return run_bulk_menu_command(
+					karabiner,
+					"clear_tap_hold_binding",
+					"Clearing one tap/hold binding…",
+					"Tap/hold binding cleared.",
+					false,
+					update_menu,
+					kid
+				)
 			end,
 		},
 		{ separator = true },
@@ -314,7 +426,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			label = string.format(i18n.get("menu.karabiner.tap_arrow"), tap_slbl),
 			items  = build_action_picker(
 				karabiner,
-				function(action_id) karabiner.set_tap_action(kid, action_id) end,
+				function(action_id) return karabiner.set_tap_action(kid, action_id) end,
 				current_tap,
 				update_menu,
 				"tap"
@@ -324,7 +436,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			label = string.format(i18n.get("menu.karabiner.hold_arrow"), hold_slbl),
 			items  = build_action_picker(
 				karabiner,
-				function(action_id) karabiner.set_hold_action(kid, action_id) end,
+				function(action_id) return karabiner.set_hold_action(kid, action_id) end,
 				current_hold,
 				update_menu,
 				"hold"
@@ -353,9 +465,9 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 							Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
 							return
 						end
-						karabiner.set_tap_timeout(kid, math.floor(ms))
-						pcall(karabiner.regenerate)
-						if update_menu then update_menu() end
+						commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
+							return karabiner.set_tap_timeout(kid, math.floor(ms))
+						end, update_menu)
 					end,
 				},
 				{
@@ -363,9 +475,9 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 					checked = (per_key_ms == nil),
 					disabled = (per_key_ms == nil),
 					action      = function()
-						karabiner.set_tap_timeout(kid, nil)
-						pcall(karabiner.regenerate)
-						if update_menu then update_menu() end
+						commit_menu_setting(karabiner, "Per-key timeout reset", function()
+							return karabiner.set_tap_timeout(kid, nil)
+						end, update_menu)
 					end,
 				},
 			},
@@ -456,11 +568,15 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			label    = i18n.get("menu.karabiner.nothing_combo"),
 			disabled = is_empty,
 			action       = function()
-				pcall(karabiner.set_combo_combo_action, cid, "none")
-				pcall(karabiner.set_combo_tap_action,   cid, "none")
-				pcall(karabiner.set_combo_hold_action,  cid, "none")
-				pcall(karabiner.regenerate)
-				if update_menu then update_menu() end
+				return run_bulk_menu_command(
+					karabiner,
+					"clear_combo_binding",
+					"Clearing one modifier combo…",
+					"Modifier combo cleared.",
+					false,
+					update_menu,
+					cid
+				)
 			end,
 		},
 		{ separator = true },
@@ -468,7 +584,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			label = string.format(i18n.get("menu.karabiner.combo_arrow"), combo_slbl),
 			items  = build_action_picker(
 				karabiner,
-				function(action_id) karabiner.set_combo_combo_action(cid, action_id) end,
+				function(action_id) return karabiner.set_combo_combo_action(cid, action_id) end,
 				current_combo,
 				update_menu,
 				"combo"
@@ -478,7 +594,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			label = string.format(i18n.get("menu.karabiner.tap_colon"), tap_slbl),
 			items  = build_action_picker(
 				karabiner,
-				function(action_id) karabiner.set_combo_tap_action(cid, action_id) end,
+				function(action_id) return karabiner.set_combo_tap_action(cid, action_id) end,
 				current_tap,
 				update_menu,
 				"tap"
@@ -488,7 +604,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			label = string.format(i18n.get("menu.karabiner.hold_colon"), hold_slbl),
 			items  = build_action_picker(
 				karabiner,
-				function(action_id) karabiner.set_combo_hold_action(cid, action_id) end,
+				function(action_id) return karabiner.set_combo_hold_action(cid, action_id) end,
 				current_hold,
 				update_menu,
 				"hold"
@@ -579,13 +695,9 @@ local function build_delay_item(karabiner, update_menu)
 				Logger.warn(LOG, "Invalid delay input '%s' — ignored.", tostring(result["text returned"]))
 				return
 			end
-			karabiner.set_tap_hold_timeout(math.floor(ms))
-			-- The setter only persists to the user config; without this the menu
-			-- would show the new threshold while typing kept the old one until an
-			-- unrelated click regenerated karabiner.json (every sibling item here
-			-- regenerates explicitly for exactly that reason).
-			pcall(karabiner.regenerate)
-			if update_menu then update_menu() end
+			commit_menu_setting(karabiner, "Tap/hold timeout", function()
+				return karabiner.set_tap_hold_timeout(math.floor(ms))
+			end, update_menu)
 		end,
 	}
 end
@@ -616,12 +728,9 @@ local function build_sticky_delay_item(karabiner, update_menu)
 				Logger.warn(LOG, "Invalid sticky delay '%s' — ignored.", tostring(result["text returned"]))
 				return
 			end
-			karabiner.set_sticky_timeout(math.floor(ms))
-			-- Same rationale as the tap/hold delay above: the setter persists but
-			-- never regenerates, so without this the new value only reaches the
-			-- keyboard on some later, unrelated click.
-			pcall(karabiner.regenerate)
-			if update_menu then update_menu() end
+			commit_menu_setting(karabiner, "Sticky timeout", function()
+				return karabiner.set_sticky_timeout(math.floor(ms))
+			end, update_menu)
 		end,
 	}
 end
@@ -653,9 +762,9 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 				Logger.warn(LOG, "Invalid threshold '%s' — ignored.", tostring(result["text returned"]))
 				return
 			end
-			karabiner.set_simultaneous_threshold(math.floor(ms))
-			pcall(karabiner.regenerate)
-			if update_menu then update_menu() end
+			commit_menu_setting(karabiner, "Simultaneous threshold", function()
+				return karabiner.set_simultaneous_threshold(math.floor(ms))
+			end, update_menu)
 		end,
 	}
 end
@@ -673,9 +782,9 @@ local function build_combo_symmetric_item(karabiner, update_menu)
 		label   = i18n.get("menu.karabiner.symmetric"),
 		checked = is_symmetric,
 		action      = function()
-			karabiner.set_combo_symmetric(not is_symmetric)
-			pcall(karabiner.regenerate)
-			if update_menu then update_menu() end
+			commit_menu_setting(karabiner, "Combo symmetry", function()
+				return karabiner.set_combo_symmetric(not is_symmetric)
+			end, update_menu)
 		end,
 	}
 end
@@ -906,60 +1015,34 @@ function M.build(ctx)
 
 	local commands = {
 		["karabiner_clear_all"] = function()
-			Logger.start(LOG, "Clearing every tap/hold and combo slot…")
-			local cleared = 0
-			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
-				local ok_tap, tap_result = pcall(karabiner.set_tap_action, key_def.id, "none")
-				local ok_hold, hold_result = pcall(karabiner.set_hold_action, key_def.id, "none")
-				if not ok_tap or tap_result ~= true or not ok_hold or hold_result ~= true then
-					Logger.error(LOG, "Clear All refused at tap/hold slot %s; no success published.", tostring(key_def.id))
-					return false
-				end
-				cleared = cleared + 1
-			end
-			for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
-				for _, setter in ipairs({
-					karabiner.set_combo_combo_action,
-					karabiner.set_combo_tap_action,
-					karabiner.set_combo_hold_action,
-				}) do
-					local ok_set, set_result = pcall(setter, combo_def.id, "none")
-					if not ok_set or set_result ~= true then
-						Logger.error(LOG, "Clear All refused at combo slot %s; no success published.", tostring(combo_def.id))
-						return false
-					end
-				end
-				cleared = cleared + 1
-			end
-			local ok_regen, regen_result = pcall(karabiner.regenerate)
-			if not ok_regen or regen_result ~= true then
-				Logger.error(LOG, "Clear All regeneration refused; no success published.")
-				return false
-			end
-			Logger.success(LOG, "Cleared %d entry/entries — all slots are now 'none'.", cleared)
-			if update_menu then update_menu() end
-			return true
+			return run_bulk_menu_command(
+				karabiner,
+				"clear_all_bindings",
+				"Clearing every tap/hold and combo slot…",
+				"Cleared %d changed entry/entries — all slots are now 'none'.",
+				true,
+				update_menu
+			)
 		end,
 		["karabiner_restore_defaults"] = function()
-			pcall(karabiner.reset_to_defaults)
-			pcall(karabiner.regenerate)
-			if update_menu then update_menu() end
+			return run_bulk_menu_command(
+				karabiner,
+				"reset_to_defaults",
+				"Restoring every Karabiner setting to defaults…",
+				"All Karabiner settings restored to defaults.",
+				false,
+				update_menu
+			)
 		end,
 		["karabiner_copy_tap_to_combo"] = function()
-			Logger.start(LOG, "Propagating tap → combo for all modifier combos…")
-			local changed = 0
-			for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
-				local cid              = combo_def.id
-				local ok_tap, tap_id   = pcall(karabiner.get_combo_tap_action,   cid)
-				local ok_cmb, combo_id = pcall(karabiner.get_combo_combo_action, cid)
-				if ok_tap and ok_cmb and tap_id ~= combo_id then
-					pcall(karabiner.set_combo_combo_action, cid, tap_id)
-					changed = changed + 1
-				end
-			end
-			pcall(karabiner.regenerate)
-			Logger.success(LOG, "Tap → combo propagation done (%d combo(s) updated).", changed)
-			if update_menu then update_menu() end
+			return run_bulk_menu_command(
+				karabiner,
+				"copy_tap_actions_to_combos",
+				"Propagating tap → combo for all modifier combos…",
+				"Tap → combo propagation done (%d combo(s) updated).",
+				true,
+				update_menu
+			)
 		end,
 	}
 

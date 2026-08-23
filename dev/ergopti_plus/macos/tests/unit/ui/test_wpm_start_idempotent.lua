@@ -96,10 +96,14 @@ helpers.describe("wpm_widget.start() guards redundant restarts at source", funct
 	end)
 
 	helpers.it("start() early-returns only when already running with the same graph mode", function()
-		local src = read_src()
+		local src = read_src():gsub("%-%-[^\n]*", "")
 		-- The guard must key off BOTH _running and the graph mode, so a genuine
-		-- graph-mode change still falls through to redraw.
-		helpers.assert_true(src:find("if _running and _show_graph == want_graph then return true end", 1, true) ~= nil,
+		-- graph-mode change still falls through to redraw. Match whitespace rather
+		-- than a one-line spelling: the idempotent branch also clears pause debt.
+		local guard = src:find(
+			"if%s+_running%s+and%s+_show_graph%s*==%s*want_graph%s+then%s+"
+				.. "_pause_restore_pending%s*=%s*false%s+return%s+true%s+end")
+		helpers.assert_true(guard ~= nil,
 			"start() must early-return on (already running AND same graph mode) — not on _running alone")
 	end)
 

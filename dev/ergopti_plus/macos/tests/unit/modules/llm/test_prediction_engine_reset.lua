@@ -161,7 +161,10 @@ local suppress_calls = {}
 local core_state = {
 	mappings = {},
 	DELAYS   = { llm_prediction = 0 },
-	suppress_rescan_keep_buffer = function(sec) suppress_calls[#suppress_calls + 1] = sec end,
+	suppress_rescan_keep_buffer = function(sec)
+		suppress_calls[#suppress_calls + 1] = sec
+		return true
+	end,
 }
 
 
@@ -286,10 +289,47 @@ helpers.describe("prediction_engine.reset(): chain state cleanup (D3, real modul
 		{ name = "throw", build = function() error("FALLBACK_CREATE_THROW") end },
 		{ name = "nil", build = function() return nil end },
 		{
-			name = "stopped handle",
+			name = "start false",
 			build = function(original, delay, callback)
 				local timer = original(delay, callback)
-				timer.running = false
+				timer.start = function(self)
+					self.running = false
+					return false
+				end
+				return timer
+			end,
+		},
+		{
+			name = "synchronous callback",
+			build = function(original, delay, callback, context)
+				local timer = original(delay, callback)
+				local start = timer.start
+				timer.start = function(self)
+					start(self)
+					context.callback = callback
+					callback()
+					return self
+				end
+				return timer
+			end,
+		},
+		{
+			name = "mutate then throw with retained rollback debt",
+			retained = true,
+			build = function(original, delay, callback, context)
+				local timer = original(delay, callback)
+				local start = timer.start
+				timer.start = function(self)
+					start(self)
+					context.callback = callback
+					error("FALLBACK_START_MUTATE_THROW")
+				end
+				timer.stop = function(self)
+					context.stop_calls = (context.stop_calls or 0) + 1
+					if context.allow_stop ~= true then return false end
+					self.running = false
+					return self
+				end
 				return timer
 			end,
 		},
@@ -297,17 +337,35 @@ helpers.describe("prediction_engine.reset(): chain state cleanup (D3, real modul
 		helpers.it("arm_chain rejects a " .. case.name .. " fallback constructor", function()
 			PE.reset()
 			PE.init(core_state)
-			local original = hs_stub.timer.doAfter
-			hs_stub.timer.doAfter = function(delay, callback)
-				return case.build(original, delay, callback)
+			local context = {}
+			local calls = 0
+			local real_perform = PE.perform_check
+			PE.perform_check = function() calls = calls + 1 end
+			local original = hs_stub.timer.new
+			hs_stub.timer.new = function(delay, callback)
+				return case.build(original, delay, callback, context)
 			end
 			local ok, result = pcall(PE.arm_chain)
-			hs_stub.timer.doAfter = original
+			hs_stub.timer.new = original
 
 			helpers.assert_true(ok, "fallback construction failure must be contained")
 			helpers.assert_eq(result, false)
 			helpers.assert_eq(PE.is_chain_pending(), false,
 				"chain state cannot publish before the fallback timer is running")
+			if context.callback then
+				context.callback()
+				context.callback()
+				helpers.assert_eq(calls, 0,
+					"synchronous, late, and duplicate callbacks from a rejected fallback stay inert")
+			end
+			if case.retained then
+				helpers.assert_eq(PE.reset(), false,
+					"reset must retain the exact fallback while native stop still refuses")
+				context.allow_stop = true
+				helpers.assert_eq(PE.reset(), true,
+					"the same retained fallback must settle on retry")
+			end
+			PE.perform_check = real_perform
 		end)
 	end
 end)

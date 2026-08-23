@@ -70,9 +70,11 @@ local function instrument_client(client)
 
 	client.get = function(url, headers, callback)
 		capture("get", url, headers, nil, callback)
+		return true
 	end
 	client.post = function(url, headers, body, callback)
 		capture("post", url, headers, body, callback)
+		return true
 	end
 	client.cancel = function()
 		state.cancel_count = state.cancel_count + 1
@@ -80,6 +82,7 @@ local function instrument_client(client)
 			state.active.cancelled = true
 			state.active = nil
 		end
+		return true
 	end
 
 	return state, function()

@@ -324,9 +324,12 @@ local function load_fixture()
 	local listener = nil
 	local register_calls = 0
 	local unregister_calls = 0
+	local provenance_calls = 0
+	local physical_fence_claims = 0
 	local synthetic_stub = {
 		current_action_epoch = function() return epoch, handoff_time_ms end,
 		claim_physical_fence = function()
+			physical_fence_claims = physical_fence_claims + 1
 			if pending_fence == nil then return nil end
 			local fence = pending_fence
 			pending_fence = nil
@@ -352,6 +355,14 @@ local function load_fixture()
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function(event)
+			provenance_calls = provenance_calls + 1
+			-- Production EventProvenance deliberately decodes a tagged physical
+			-- replay back to FOREIGN without taking another fence. This is the
+			-- observable distinction that prevents a mouse/scroll replay from
+			-- consuming itself forever in the real keylogger tap.
+			if event.provenance and event.provenance.physical_replay == true then
+				return nil, "foreign", nil
+			end
 			if event.provenance then return event.provenance, "owned", nil end
 			return nil, "foreign", synthetic_stub.claim_physical_fence()
 		end,
@@ -450,6 +461,13 @@ local function load_fixture()
 		return action_event({ effect = "action", loopback = false })
 	end
 	local function physical_action_event() return action_event(nil) end
+	local function physical_replay_event(event_type)
+		helpers.assert_type(handle_key, "function")
+		return handle_key({
+			provenance = { physical_replay = true },
+			getType = function() return event_type end,
+		})
+	end
 
 	return {
 		keylogger = keylogger,
@@ -465,12 +483,16 @@ local function load_fixture()
 		end,
 		tagged_action_event = tagged_action_event,
 		physical_action_event = physical_action_event,
+		physical_replay_event = physical_replay_event,
 		queue_fence = function(events) pending_fence = { events = events } end,
 		deferred_calls = function() return deferred_calls end,
 		synchronous_flushes = function() return synchronous_flushes end,
 		synchronous_appends = function() return synchronous_appends end,
 		register_calls = function() return register_calls end,
 		unregister_calls = function() return unregister_calls end,
+		provenance_calls = function() return provenance_calls end,
+		physical_fence_claims = function() return physical_fence_claims end,
+		event_types = hs_stub.eventtap.event.types,
 	}
 end
 
@@ -513,6 +535,33 @@ helpers.describe("keylogger action epochs", function()
 			"the upstream keylogger tap must return older output before the original")
 		helpers.assert_eq(fixture.deferred_calls(), 1,
 			"the prior human run must split before the physical key is recorded")
+		fixture.keylogger.stop()
+	end)
+
+	helpers.it("classifies tagged mouse and scroll replays before any physical-fence claim", function()
+		local fixture = load_fixture()
+		local state = fixture.core_state()
+		local replay_types = {
+			fixture.event_types.leftMouseDown,
+			fixture.event_types.scrollWheel,
+		}
+		for _, event_type in ipairs(replay_types) do
+			fixture.queue_fence({ { key = "must-remain-older" } })
+			local consume, returned = fixture.physical_replay_event(event_type)
+			helpers.assert_true(not consume,
+				"a globally posted physical replay must propagate through the keylogger")
+			helpers.assert_nil(returned,
+				"a tagged replay must not reclaim the older FIFO as if it were new input")
+		end
+
+		helpers.assert_eq(fixture.provenance_calls(), 2,
+			"non-keyboard events need the same immutable provenance classification")
+		helpers.assert_eq(fixture.physical_fence_claims(), 0,
+			"EventProvenance must suppress the replay's second physical-fence claim")
+		helpers.assert_eq(state.session_mouse_clicks, 1,
+			"the physical mouse replay is still counted once as human activity")
+		helpers.assert_eq(state.session_mouse_scrolls, 1,
+			"the physical scroll replay is still counted once as human activity")
 		fixture.keylogger.stop()
 	end)
 

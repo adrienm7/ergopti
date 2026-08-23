@@ -12,7 +12,8 @@
 --- the module table is cached by require(), re-require returns the same module.
 --- The real problem is that gestures/init.lua M.stop() never called Engine.stop().
 ---
---- Fix: Added Engine.stop() that stops+nils scrollBlocker; called from M.stop().
+--- Fix: Added Engine.stop() that stops+nils scrollBlocker; the shared exact
+--- teardown helper calls it, and M.stop() delegates to that helper.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -46,33 +47,26 @@ end)
 -- ===========================================================
 
 helpers.describe("gestures init M.stop(): tears down engine", function()
-	helpers.it("M.stop() source calls Engine.stop()", function()
-		-- Read the gestures init source and assert Engine.stop is called in M.stop().
-		-- This is a static source audit: we locate the M.stop() block and verify
-		-- that pcall(Engine.stop) appears within it, so the scroll-blocker tap
-		-- is always released on module teardown.
-		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
-		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
-		local init_src = base .. "/modules/gestures/init.lua"
+	helpers.it("M.stop() delegates to the helper that stops Engine", function()
+		local source = helpers.read_driver_source("local function schedule_emergency_recycle")
+		helpers.assert_true(source ~= nil and source ~= "",
+			"modules/gestures/init.lua source must be locatable")
+		local teardown_pos = source:find("teardown_gesture_runtime = function", 1, true)
+		local teardown_end = teardown_pos
+			and source:find("\nlocal function reject_gesture_start", teardown_pos, true)
+		local m_stop_pos = source:find("function M.stop()", 1, true)
+		local m_stop_end = m_stop_pos and source:find("\nfunction M.diagnose()", m_stop_pos, true)
+		helpers.assert_true(teardown_pos ~= nil and teardown_end ~= nil
+			and m_stop_pos ~= nil and m_stop_end ~= nil,
+			"the shared teardown and public stop entry point must remain bounded")
 
-		local fh = io.open(init_src, "r")
-		helpers.assert_true(fh ~= nil, "Cannot open gestures/init.lua at: " .. init_src)
-
-		local source = fh:read("*a")
-		fh:close()
-
-		-- Check that Engine.stop is referenced inside the file
+		local teardown = source:sub(teardown_pos, teardown_end - 1)
+		local stop_body = source:sub(m_stop_pos, m_stop_end - 1)
 		helpers.assert_true(
-			source:find("Engine%.stop", 1, false) ~= nil,
-			"gestures/init.lua must call Engine.stop() to release the scroll-blocker tap"
-		)
-
-		-- Verify both appear in the file and that Engine.stop appears after M.stop
-		local m_stop_pos  = source:find("function M%.stop%(%)") or 0
-		local eng_stop_pos = source:find("Engine%.stop") or 0
+			teardown:find("xpcall(Engine.stop, debug.traceback)", 1, true) ~= nil,
+			"the shared gesture teardown must stop Engine to release the scroll blocker")
 		helpers.assert_true(
-			m_stop_pos > 0 and eng_stop_pos > m_stop_pos,
-			"Engine.stop() must be called inside M.stop() in gestures/init.lua"
-		)
+			stop_body:find("teardown_gesture_runtime(false)", 1, true) ~= nil,
+			"M.stop() must route through the exact teardown that owns Engine.stop")
 	end)
 end)

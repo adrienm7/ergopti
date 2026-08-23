@@ -96,8 +96,10 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 		fh:close()
 		helpers.assert_true(body:find("build_num_pred_menu", 1, true) ~= nil,
 			"init.lua must define build_num_pred_menu")
-		helpers.assert_true(body:find("state.llm_num_predictions = i", 1, true) ~= nil,
-			"num_predictions handler must assign loop index i")
+		helpers.assert_true(body:find('key = "llm_num_predictions"', 1, true) ~= nil
+			and body:find("value = i", 1, true) ~= nil
+			and body:find('runtime_fn = "set_llm_num_predictions"', 1, true) ~= nil,
+			"num_predictions handler must submit loop index i through the exact settings transaction")
 		helpers.assert_true(body:find("for i = 1, 10", 1, true) ~= nil,
 			"num_predictions menu must offer 1..10 choices")
 	end)

@@ -4,9 +4,10 @@
 --- MODULE: Synthetic Input Adapter
 --- DESCRIPTION:
 --- Builds explicitly tagged Quartz keyboard events and normally dispatches them
---- in one eventtap callback-return batch. Terminal compatibility may target-post
---- a collected batch with bounded pacing while the originating callback remains
---- open; timer/menu producers use one tagged otherMouseUp broker trigger.
+--- in one eventtap callback-return batch. Terminal compatibility transfers a
+--- sealed callback batch to the same process-wide FIFO, then target-posts it with
+--- bounded pacing after callback return; timer/menu producers use one tagged
+--- otherMouseUp broker trigger.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact Provenance: Every emitted event carries a unique user-data tag whose
@@ -21,9 +22,10 @@
 
 local M = {}
 
-local hs            = hs
-local Logger        = require("infra.logger")
-local LOG           = "adapters.synthetic_input"
+local hs             = hs
+local Logger         = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
+local LOG            = "adapters.synthetic_input"
 
 local eventtap = assert(hs and hs.eventtap,
 	"adapters.synthetic_input: hs.eventtap is unavailable")
@@ -63,6 +65,9 @@ local CURRENT_PROCESS_ID = assert(hs.processInfo and tonumber(hs.processInfo.pro
 	"adapters.synthetic_input: hs.processInfo.processID is unavailable")
 local mouse_position = assert(hs.mouse and hs.mouse.absolutePosition,
 	"adapters.synthetic_input: hs.mouse.absolutePosition is unavailable")
+local application_api = assert(hs.application,
+	"adapters.synthetic_input: hs.application is unavailable")
+local application_get = application_api.get
 
 M.MAGIC = "ERGOPTI_SYNTHETIC_V1"
 M.RECORD_LIMIT = 4096
@@ -80,6 +85,12 @@ M.PUMP_WATCHDOG_MAX_FAILURES = 5
 M.ACTION_LISTENER_RETRY_SEC = 0.05
 M.ACTION_LISTENER_RETRY_MAX_SEC = 0.8
 M.ACTION_LISTENER_MAX_ATTEMPTS = 5
+M.SERIAL_POST_MAX_ATTEMPTS = 5
+M.PERIODIC_OWNER_TICK_SEC = 0.005
+M.IDLE_WAITER_TICK_SEC = 0.01
+-- After the final delete-pair turn, one turn posts the contiguous replacement
+-- suffix and the next settles transaction lifecycle callbacks.
+M.PACED_TRAILING_TICKS = 2
 
 local EFFECTS = {
 	action = true,
@@ -154,11 +165,23 @@ local SESSION_ID = string.format("%d:%d:%d", CURRENT_PROCESS_ID, first_sequence,
 local TRANSACTION_MARKER = {}
 local RETAIN_MARKER = {}
 local BATCH_MARKER = {}
+local PACED_OWNER_MARKER = {}
+local PHYSICAL_OWNER_MARKER = {}
+local RESERVED_OWNER_MARKER = {}
+local IDLE_WAITER_MARKER = {}
+local ADMISSION_FENCE_MARKER = {}
 
 local _generation = 0
 local _active_transactions = {}
 local _active_transaction_count = 0
 local _idle_callbacks = {}
+local _idle_waiter_cleanup = {}
+local _admission_fence = nil
+-- Scheduler-owned recurring handles remain lifecycle debt until cancel()
+-- proves the exact native candidate stopped. A refusal keeps that capability
+-- strongly owned and pause/reload admission closed while its next tick retries
+-- cleanup autonomously.
+local _periodic_cleanup_count = 0
 local _records = {}
 local _oldest_tag = nil
 local _newest_tag = nil
@@ -187,6 +210,7 @@ local _deferred_head = 1
 local _deferred_tail = 0
 local _broker_scheduled = false
 local _broker_timer = nil
+local _broker_generation = 0
 local _inflight_batch = nil
 local _pump_watchdog = nil
 local _pump_watchdog_batch = nil
@@ -210,6 +234,7 @@ local _deferred_lifecycle_dispatcher = nil
 local _deferred_lifecycle_backup_dispatcher = nil
 local _deferred_lifecycle_fallback_timer = nil
 local _deferred_post_callback_count = 0
+local _owned_completion_depth = 0
 
 
 --- Raises on programmer misuse while keeping the checks out of the event hot path.
@@ -353,10 +378,13 @@ end
 --- @param label string Diagnostic label.
 --- @param callback function Callback.
 --- @param args table Packed arguments.
---- @param post_callback boolean Whether a feature action may be dropped if no
----        dispatcher could be armed (lifecycle callbacks remain queued).
+--- @param post_callback boolean Whether this is accepted feature work counted
+---        against the lifecycle admission boundary.
+--- @param discard_on_refusal boolean|nil Remove this exact FIFO entry if no
+---        dispatcher could be armed. Callers returning false must never leave a
+---        callback that a later unrelated enqueue can revive.
 --- @return boolean scheduled
-local function enqueue_deferred_call(label, callback, args, post_callback)
+local function enqueue_deferred_call(label, callback, args, post_callback, discard_on_refusal)
 	_deferred_lifecycle_tail = _deferred_lifecycle_tail + 1
 	local index = _deferred_lifecycle_tail
 	_deferred_lifecycle_calls[index] = {
@@ -369,11 +397,14 @@ local function enqueue_deferred_call(label, callback, args, post_callback)
 		_deferred_post_callback_count = _deferred_post_callback_count + 1
 	end
 	if start_deferred_lifecycle_dispatcher() then return true end
-	if post_callback then
+	if post_callback or discard_on_refusal == true then
 		-- A caller that receives false will pass the original key through. Remove
-		-- this action atomically so a later enqueue cannot execute it as a duplicate.
+		-- this exact action atomically so a later enqueue cannot execute a callback
+		-- whose ownership was explicitly refused.
 		_deferred_lifecycle_calls[index] = nil
 		_deferred_lifecycle_tail = index - 1
+	end
+	if post_callback then
 		_deferred_post_callback_count = _deferred_post_callback_count - 1
 	end
 	return false
@@ -429,14 +460,18 @@ end
 --- Allocates one globally unique, self-describing Quartz user-data tag.
 --- @param effect string action|replacement.
 --- @param loopback boolean Whether keymap must deliberately process this signal.
+--- @param physical_replay boolean|nil Whether this is a delayed physical event.
 --- @return integer tag
-local function next_tag(effect, loopback)
+local function next_tag(effect, loopback, physical_replay)
 	if _sequence_remaining == 0 then reserve_sequence_block() end
 	local sequence = _sequence_next
 	_sequence_next = (_sequence_next + 1) % TAG_SEQUENCE_LIMIT
 	_sequence_remaining = _sequence_remaining - 1
 	local flags = effect == "action" and (1 << TAG_EFFECT_SHIFT) or 0
-	if loopback then flags = flags | (1 << TAG_LOOPBACK_SHIFT) end
+	-- replacement+loopback is intentionally reserved for a delayed physical
+	-- replay. It remains self-describing after bounded-ledger eviction, yet can
+	-- never acquire the action-loopback authority used by F16.
+	if loopback or physical_replay then flags = flags | (1 << TAG_LOOPBACK_SHIFT) end
 	return (TAG_NAMESPACE << TAG_NAMESPACE_SHIFT) | flags | sequence
 end
 
@@ -474,7 +509,8 @@ local function register_record(fields)
 			"adapters.synthetic_input: record ledger exhausted by live loopback events")
 		discard_record(candidate)
 	end
-	local tag = next_tag(fields.effect, fields.loopback == true)
+	local tag = next_tag(fields.effect, fields.loopback == true,
+		fields.physical_replay == true)
 	fields.tag = tag
 	fields.magic = M.MAGIC
 	fields.session = SESSION_ID
@@ -482,6 +518,7 @@ local function register_record(fields)
 	fields.seen_by = {}
 	fields.seen_count = 0
 	fields._loopback_pinned = fields.loopback == true
+		and fields.physical_replay ~= true
 	fields._previous = _newest_tag
 	fields._next = nil
 	_records[tag] = fields
@@ -517,33 +554,195 @@ end
 --- @param callback function Callback.
 --- @param ... any Callback arguments.
 local function invoke_lifecycle(label, callback, ...)
+	if _owned_completion_depth > 0 then
+		return run_logged(label, callback, ...)
+	end
 	-- Lifecycle APIs are intentionally always asynchronous. A terminal
 	-- transaction or an idle adapter can be observed from a raw eventtap that did
 	-- not enter an ambient collector (reload/quit is the important case). Running
 	-- the callback inline there could reload Hammerspoon before Quartz receives the
 	-- callback's return table.
-	enqueue_deferred_call(label, callback, table.pack(...), false)
+	return enqueue_deferred_call(label, callback, table.pack(...), false)
 end
 
 
---- Defers an idle callback and revalidates the global state at execution time.
---- A transaction may start after the adapter first observes idle but before the
---- lifecycle dispatcher runs; in that case the callback returns to the queue.
+--- Returns whether every accepted user producer and native cleanup owner is idle.
+--- Post-eventtap work is counted from acceptance, before it has a chance to open
+--- its transaction, closing the final idle-to-PAUSED admission race.
+--- @return boolean idle
+local function lifecycle_is_idle()
+	return _active_transaction_count == 0
+		and _deferred_post_callback_count == 0
+		and _periodic_cleanup_count == 0
+end
+
+
+--- Adds an exact scheduler-owned native capability to cleanup debt once.
+--- @param owner table Periodic/idle owner.
+local function retain_periodic_cleanup(owner)
+	if owner.cleanup_counted == true then return end
+	owner.cleanup_counted = true
+	_periodic_cleanup_count = _periodic_cleanup_count + 1
+end
+
+
+--- Removes an exact scheduler-owned native cleanup debt once.
+--- @param owner table Periodic/idle owner.
+local function release_periodic_cleanup(owner)
+	if owner.cleanup_counted ~= true then return end
+	owner.cleanup_counted = false
+	_periodic_cleanup_count = _periodic_cleanup_count - 1
+	assert(_periodic_cleanup_count >= 0,
+		"adapters.synthetic_input: periodic cleanup count underflow")
+end
+
+
+local finish_idle_waiter
+
+
+--- Releases synthetic lifecycle debt only after TimerScheduler proves that its
+--- exact native candidate is gone. A refused cancel stays callback-inert inside
+--- the scheduler, whose next native delivery retries cleanup and settles here.
+--- @param owner table Periodic/idle owner.
+--- @param timer table Scheduler handle.
+local function observe_periodic_settlement(owner, timer)
+	local registered = TimerScheduler.onSettled(timer, function()
+		if owner.timer ~= timer then return end
+		owner.timer = nil
+		owner.stop_error_reported = false
+		release_periodic_cleanup(owner)
+		if owner._marker == IDLE_WAITER_MARKER then
+			_idle_waiter_cleanup[owner] = nil
+			if owner.settling == true then finish_idle_waiter(owner) end
+		end
+	end)
+	assert(registered == true,
+		"adapters.synthetic_input: periodic settlement observer rejected")
+end
+
+
+--- Stops one exact scheduler-owned recurring handle; refusal remains
+--- autonomously retryable through TimerScheduler's retained native candidate.
+--- @param owner table Periodic/idle owner.
+--- @param label string Diagnostic label.
+--- @return boolean settled
+local function stop_periodic_handle(owner, label)
+	local timer = owner.timer
+	if timer == nil then
+		release_periodic_cleanup(owner)
+		return true
+	end
+	local ok, result = pcall(TimerScheduler.cancel, timer)
+	if ok and result == true then
+		assert(owner.timer ~= timer,
+			"adapters.synthetic_input: settled periodic timer remained published")
+		return true
+	end
+	retain_periodic_cleanup(owner)
+	if owner.stop_error_reported ~= true then
+		owner.stop_error_reported = true
+		defer_diagnostic("error", "%s cleanup remains pending - %s.",
+			label, tostring(result))
+	end
+	return false
+end
+
+
+--- Retries release of an inert idle-waiter timer without re-running user work.
+--- @param owner table Idle waiter owner.
+--- @return boolean settled
+local function stop_idle_waiter(owner)
+	if type(owner) ~= "table" or owner._marker ~= IDLE_WAITER_MARKER then return true end
+	local settled = stop_periodic_handle(owner, "Idle waiter timer")
+	if settled then
+		_idle_waiter_cleanup[owner] = nil
+		return true
+	end
+	_idle_waiter_cleanup[owner] = true
+	return false
+end
+
+
+--- Publishes one already-stopped idle waiter exactly once.
+--- @param owner table Idle waiter owner.
+finish_idle_waiter = function(owner)
+	if owner.callback_delivered == true then return end
+	owner.callback_delivered = true
+	owner.settling = false
+	run_logged("when_idle", owner.callback)
+end
+
+
+--- Completes one accepted active-state waiter exactly once.
+--- @param owner table Idle waiter owner.
+local function settle_idle_waiter(owner)
+	if owner.active ~= true or not lifecycle_is_idle() then return end
+	owner.active = false
+	owner.settling = true
+	if stop_idle_waiter(owner) then finish_idle_waiter(owner) end
+end
+
+
+--- Attempts the low-latency lifecycle wake for an already-owned idle waiter.
+--- The periodic owner is acquired before this entry exists, so a dispatcher
+--- refusal can discard the exact entry without losing an accepted callback.
+--- @param owner table Idle waiter owner.
+--- @return boolean scheduled
+local function invoke_when_idle(owner)
+	return enqueue_deferred_call("when_idle", function()
+		settle_idle_waiter(owner)
+	end, table.pack(), false, true)
+end
+
+
+--- Acquires an autonomous periodic wake before accepting an active-state waiter.
 --- @param callback function Idle callback.
-local function invoke_when_idle(callback)
-	invoke_lifecycle("when_idle", function()
-		if _active_transaction_count ~= 0 then
-			_idle_callbacks[#_idle_callbacks + 1] = callback
+--- @return table|nil owner
+local function acquire_idle_waiter(callback)
+	local owner = {
+		_marker = IDLE_WAITER_MARKER,
+		callback = callback,
+		active = false,
+		settling = false,
+		callback_delivered = false,
+		timer = nil,
+	}
+	local timer, committed = TimerScheduler.every(M.IDLE_WAITER_TICK_SEC, function()
+		if owner.settling == true then
+			if stop_idle_waiter(owner) then finish_idle_waiter(owner) end
 			return
 		end
-		callback()
+		if owner.active ~= true then
+			stop_idle_waiter(owner)
+			return
+		end
+		settle_idle_waiter(owner)
 	end)
+	owner.timer = timer
+	observe_periodic_settlement(owner, timer)
+	if committed ~= true then
+		if owner.timer == timer then
+			retain_periodic_cleanup(owner)
+			_idle_waiter_cleanup[owner] = true
+		end
+		defer_diagnostic("error", "Cannot acquire autonomous idle waiter - scheduler refused ownership.")
+		return nil
+	end
+	owner.active = true
+	return owner
 end
 
 
 local try_complete
 local schedule_broker
 local fail_queued_batch
+local start_paced_batch
+local pump_physical_batch
+local pump_reserved_batch
+local start_reserved_batch
+local start_unowned_fifo_head
+local invalidate_paced_owner
+local invalidate_periodic_owner
 local run_pending_action_listeners
 local start_action_dispatcher
 local post_deferred_trigger
@@ -634,10 +833,14 @@ try_complete = function(tx)
 		invoke_lifecycle("on_complete", callback, tx, status)
 	end
 	if _active_transaction_count == 0 and #_idle_callbacks > 0 then
-		local callbacks = _idle_callbacks
+		local waiters = _idle_callbacks
 		_idle_callbacks = {}
-		for _, callback in ipairs(callbacks) do
-			invoke_when_idle(callback)
+		for _, owner in ipairs(waiters) do
+			if owner.active == true then
+				-- The periodic timer remains the authoritative fallback if every
+				-- one-shot dispatcher refuses this fast completion path.
+				invoke_when_idle(owner)
+			end
 		end
 	end
 end
@@ -681,7 +884,7 @@ end
 
 --- Creates a transaction-owned batch.
 --- @param tx table Transaction.
---- @param mode string callback|deferred.
+--- @param mode string callback|deferred (callback can commit to paced).
 --- @param token table|nil Active retain token when opening after seal.
 --- @return table batch
 local function create_batch(tx, mode, token)
@@ -1076,6 +1279,13 @@ end
 --- @param reset_pump boolean Stop/drop the current pump before the next dispatch.
 fail_queued_batch = function(batch, reason, reset_pump, quiet)
 	if batch.status ~= "queued" then return end
+	if batch.mode == "paced" and invalidate_paced_owner then
+		invalidate_paced_owner(batch.paced_owner, "failed")
+	elseif batch.mode == "physical" and batch.physical_owner then
+		invalidate_periodic_owner(batch.physical_owner, "failed")
+	elseif batch.mode == "reserved" and batch.reserved_owner then
+		invalidate_periodic_owner(batch.reserved_owner, "failed")
+	end
 	clear_pump_watchdog(batch)
 	if _inflight_batch == batch then _inflight_batch = nil end
 	discard_active_trigger(batch)
@@ -1223,6 +1433,38 @@ function M.current_action_epoch()
 end
 
 
+--- Closes new synthetic admission only after every active transaction settled.
+--- @param owner string Lifecycle owner label.
+--- @return table|nil token Exact fence token, or nil when not idle/already fenced.
+function M.acquire_admission_fence(owner)
+	assert(type(owner) == "string" and owner ~= "",
+		"adapters.synthetic_input.acquire_admission_fence: owner must be non-empty")
+	if not lifecycle_is_idle() or _admission_fence ~= nil then return nil end
+	local token = { _marker = ADMISSION_FENCE_MARKER, owner = owner, active = true }
+	_admission_fence = token
+	return token
+end
+
+
+--- Reopens synthetic admission for the exact lifecycle fence owner.
+--- @param token table Token returned by acquire_admission_fence().
+--- @return boolean released
+function M.release_admission_fence(token)
+	if type(token) ~= "table" or token._marker ~= ADMISSION_FENCE_MARKER
+		or token.active ~= true or _admission_fence ~= token then return false end
+	token.active = false
+	_admission_fence = nil
+	return true
+end
+
+
+--- Reports whether a user producer may open a new synthetic transaction.
+--- @return boolean open
+function M.admission_open()
+	return _admission_fence == nil
+end
+
+
 --- Opens one synthetic transaction.
 --- @param owner string Stable producer name.
 --- @param effect string replacement|action.
@@ -1232,6 +1474,8 @@ function M.begin(owner, effect)
 		"adapters.synthetic_input.begin: owner must be a non-empty string")
 	assert(EFFECTS[effect] == true,
 		"adapters.synthetic_input.begin: effect must be 'replacement' or 'action'")
+	assert(_admission_fence == nil,
+		"adapters.synthetic_input.begin: lifecycle admission is fenced")
 	_generation = _generation + 1
 	local tx = {
 		_marker = TRANSACTION_MARKER,
@@ -1325,11 +1569,16 @@ end
 function M.when_idle(callback)
 	assert(type(callback) == "function",
 		"adapters.synthetic_input.when_idle: callback must be a function")
-	if _active_transaction_count == 0 then
-		invoke_when_idle(callback)
-		return
+	local owner = acquire_idle_waiter(callback)
+	if owner == nil then return false end
+	if lifecycle_is_idle() then
+		-- The retained periodic owner is the acceptance authority. This one-shot is
+		-- only a latency optimization and is removed exactly if dispatch refuses.
+		invoke_when_idle(owner)
+	else
+		_idle_callbacks[#_idle_callbacks + 1] = owner
 	end
-	_idle_callbacks[#_idle_callbacks + 1] = callback
+	return true
 end
 
 
@@ -1351,6 +1600,19 @@ end
 function M.cancel(tx)
 	tx = require_transaction(tx)
 	if tx.cancelled or tx.completed then return false end
+	-- Once a paced callback batch owns the consumed physical action, cancellation
+	-- cannot retract its output. Refuse the whole cancellation before mutating the
+	-- transaction; the serializer or the next physical fence must finish its exact
+	-- suffix so pause/reload cannot strand a partial replacement on screen.
+	for _, batch in ipairs(tx.batches) do
+		local owner = batch.paced_owner
+		if owner and owner.committed == true and batch.status == "queued" then
+			defer_diagnostic("warn",
+				"Cancellation deferred behind committed paced output for '%s'.",
+				tostring(tx.owner))
+			return false
+		end
+	end
 	tx.cancelled = true
 	tx.sealed = true
 	for token in pairs(tx.retains) do token.active = false end
@@ -1358,6 +1620,15 @@ function M.cancel(tx)
 	tx.retain_count = 0
 	for _, batch in ipairs(tx.batches) do
 		if batch.status == "building" or batch.status == "queued" then
+			if batch.paced_owner and invalidate_paced_owner then
+				invalidate_paced_owner(batch.paced_owner, "cancelled")
+			end
+			if batch.physical_owner then
+				invalidate_periodic_owner(batch.physical_owner, "cancelled")
+			end
+			if batch.reserved_owner then
+				invalidate_periodic_owner(batch.reserved_owner, "cancelled")
+			end
 			if batch.loopback_timer and type(batch.loopback_timer.stop) == "function" then
 				pcall(batch.loopback_timer.stop, batch.loopback_timer)
 			end
@@ -1375,6 +1646,22 @@ function M.cancel(tx)
 			finish_batch(batch, "cancelled")
 		end
 	end
+	try_complete(tx)
+	return true
+end
+
+
+--- Marks an active transaction failed without inventing successful completion.
+--- Existing handed-off batches retain their exact settlement ownership; later
+--- producers must stop their continuation before calling this boundary.
+--- @param tx table Transaction.
+--- @param detail any Root-cause diagnostic retained on the transaction.
+--- @return boolean changed False when already terminal/cancelled/failed.
+function M.fail(tx, detail)
+	tx = require_transaction(tx)
+	if tx.completed or tx.cancelled or tx.failed then return false end
+	tx.failed = true
+	tx.failure = tostring(detail or "synthetic producer failed")
 	try_complete(tx)
 	return true
 end
@@ -1409,6 +1696,21 @@ end
 --- @return table batch
 function M.begin_batch(tx, token)
 	return create_batch(tx, "deferred", token)
+end
+
+
+--- Discards one batch that could not be constructed before dispatch.
+--- This is deliberately narrower than cancel(tx): a retained transaction may
+--- already have published a prefix and still need to build an exact cleanup
+--- sibling. The building batch is terminalized without cancelling that sibling.
+--- @param batch table Building batch returned by begin_batch().
+--- @return boolean discarded True only for the first building-state discard.
+function M.discard_batch(batch)
+	batch = require_batch(batch)
+	if batch.status ~= "building" then return false end
+	discard_batch_records(batch)
+	finish_batch(batch, "cancelled")
+	return true
 end
 
 
@@ -1510,19 +1812,51 @@ function M.finish_callback(batch, consume)
 end
 
 
---- Pops the oldest still-live deferred batch.
+--- Resolves the oldest dispatchable batch without crossing a reserved successor.
+--- A reservation is a barrier for every later transaction, including physical
+--- input, but its own predecessor may still create deferred batches after the
+--- ordinal was reserved. Those exact sibling batches are the sole legal
+--- overtakers; otherwise the predecessor could never complete and open the
+--- reservation.
 --- @return table|nil batch
-local function pop_deferred_batch()
+--- @return integer|nil index
+local function next_dispatchable_batch()
 	while _deferred_head <= _deferred_tail do
 		local batch = _deferred_queue[_deferred_head]
-		_deferred_queue[_deferred_head] = nil
-		_deferred_head = _deferred_head + 1
-		if batch and batch.status == "queued" then return batch end
+		if not batch or batch.status ~= "queued" then
+			_deferred_queue[_deferred_head] = nil
+			_deferred_head = _deferred_head + 1
+		elseif batch.mode == "reserved"
+			and batch.reserved_owner.ready ~= true then
+			local predecessor = batch.reserved_owner.predecessor
+			for index = _deferred_head + 1, _deferred_tail do
+				local candidate = _deferred_queue[index]
+				if candidate and candidate.status == "queued"
+					and candidate.mode == "deferred"
+					and candidate.tx == predecessor then
+					return candidate, index
+				end
+			end
+			return nil, nil
+		else
+			return batch, _deferred_head
+		end
 	end
 	_deferred_queue = {}
 	_deferred_head = 1
 	_deferred_tail = 0
-	return nil
+	return nil, nil
+end
+
+
+--- Pops the batch selected by next_dispatchable_batch().
+--- @return table|nil batch
+local function pop_deferred_batch()
+	local batch, index = next_dispatchable_batch()
+	if batch == nil then return nil end
+	_deferred_queue[index] = nil
+	if index == _deferred_head then _deferred_head = _deferred_head + 1 end
+	return batch
 end
 
 
@@ -1670,6 +2004,18 @@ end
 --- @param batch table Deferred batch.
 local function start_deferred_batch(batch)
 	_inflight_batch = batch
+	if batch.mode == "paced" then
+		start_paced_batch(batch)
+		return
+	end
+	if batch.mode == "physical" then
+		pump_physical_batch(batch)
+		return
+	end
+	if batch.mode == "reserved" then
+		start_reserved_batch(batch)
+		return
+	end
 	if not ensure_pump_started() then
 		fail_queued_batch(batch, "synthetic pump could not start", true)
 		return
@@ -1682,24 +2028,30 @@ end
 --- @return boolean scheduled
 schedule_broker = function()
 	if _broker_scheduled or _inflight_batch ~= nil then return true end
-	local has_work = false
-	for index = _deferred_head, _deferred_tail do
-		local batch = _deferred_queue[index]
-		if batch and batch.status == "queued" then has_work = true break end
-	end
-	if not has_work then return true end
+	if next_dispatchable_batch() == nil then return true end
 	_broker_scheduled = true
+	_broker_generation = _broker_generation + 1
+	local generation = _broker_generation
 	_broker_timer = schedule_zero("synthetic FIFO broker", function()
+		if generation ~= _broker_generation then return end
 		_broker_timer = nil
 		_broker_scheduled = false
-		local batch = pop_deferred_batch()
-		if batch then start_deferred_batch(batch) end
+		-- The generic zero-delay broker owns only ordinary deferred batches.
+		-- Paced/physical/reserved heads already own their exact periodic wake;
+		-- starting one here can place a zero turn immediately beside an overdue
+		-- cadence tick and post two render turns back to back.
+		start_unowned_fifo_head()
 	end)
 	if _broker_timer then return true end
 	-- With no run-loop timer there is no safe fallback from an input callback.
-	-- Fail the head terminally so completion cannot hang or eat a terminator.
+	-- Fail only an ordinary head terminally so completion cannot hang. An owned
+	-- head retains its periodic authority, so this generic timer refusal does not
+	-- reject a later ordinary batch waiting behind it.
 	_broker_scheduled = false
-	local batch = pop_deferred_batch()
+	_broker_generation = _broker_generation + 1
+	local head = next_dispatchable_batch()
+	if head and head.mode ~= "deferred" then return true end
+	local batch = head and pop_deferred_batch() or nil
 	if batch then fail_queued_batch(batch, "FIFO broker timer could not be scheduled", false) end
 	-- finish_batch normally schedules the next sibling after the flag was cleared.
 	-- Keep an explicit backstop for a future finish path that does not recurse.
@@ -1740,9 +2092,53 @@ function M.enter_callback()
 		batches = {},
 		batch_by_tx = {},
 		implicit_transactions = {},
+		delivery_mode = "callback",
 	}
 	_callback_stack[#_callback_stack + 1] = collector
 	return collector
+end
+
+
+--- Returns whether one ambient collector is active on this Lua stack.
+--- @return boolean active
+function M.is_collecting_callback()
+	return _callback_stack[#_callback_stack] ~= nil
+end
+
+
+--- Opens a private collector for an action invoked after its eventtap returned.
+--- It exists only to let terminal output acquire one paced batch atomically; its
+--- payload is globally posted by that owner and is never returned to Quartz.
+--- @return table collector
+function M.enter_paced_collection()
+	assert(_callback_stack[#_callback_stack] == nil,
+		"adapters.synthetic_input.enter_paced_collection: nested collector is forbidden")
+	local collector = M.enter_callback()
+	collector.delivery_mode = "paced"
+	return collector
+end
+
+
+--- Closes a private paced collector after every non-cancelled batch committed.
+--- No native call, callback, timer start, logger, or allocation occurs here.
+--- @return boolean closed
+function M.leave_paced_collection()
+	local collector = _callback_stack[#_callback_stack]
+	assert(collector ~= nil and collector.delivery_mode == "paced",
+		"adapters.synthetic_input.leave_paced_collection: no private paced collector")
+	for _, batch in ipairs(collector.batches) do
+		local settled = batch.status == "cancelled" or batch.status == "failed"
+		local owned = batch.mode == "paced" and batch.status == "queued"
+			and batch.paced_owner and batch.paced_owner.committed == true
+		assert(settled or owned,
+			"adapters.synthetic_input.leave_paced_collection: output lacks paced ownership")
+	end
+	assert(#collector.events == 0,
+		"adapters.synthetic_input.leave_paced_collection: unowned events remain")
+	assert(next(collector.implicit_transactions) == nil,
+		"adapters.synthetic_input.leave_paced_collection: implicit transactions are forbidden")
+	_callback_stack[#_callback_stack] = nil
+	return true
 end
 
 
@@ -1997,140 +2393,887 @@ function M.emit_key_strokes(value, explicit_tx)
 end
 
 
---- Transfers one callback transaction to a retained timer serializer. No native
---- post or sleep occurs while the originating eventtap callback is active. The
---- owner advances its ordinal only after a successful post, so a failed post
---- retries the exact undispatched suffix without duplicating its prefix.
+local pump_paced_batch
+
+
+--- Reads a stable process identity without making an optional PID accessor fail.
+--- @param app userdata|table Application object.
+--- @return integer|nil pid
+local function application_pid(app)
+	if app == nil or type(app.pid) ~= "function" then return nil end
+	local ok, pid = pcall(app.pid, app)
+	if not ok or type(pid) ~= "number" then return nil end
+	return math.tointeger(pid)
+end
+
+
+--- Proves that an application-targeted serializer still owns its original PID.
+--- A nil/global target needs no application liveness proof.
+--- @param app userdata|table|nil Target application.
+--- @param pid integer|nil Captured PID.
+--- @return boolean live
+local function target_is_live(app, pid)
+	if app == nil then return true end
+	if pid ~= nil and type(application_get) == "function" then
+		local ok, current = pcall(application_get, pid)
+		if not ok or current == nil then return false end
+		local current_pid = application_pid(current)
+		-- Once a concrete PID was captured, an unreadable replacement object is
+		-- not proof that the same process still owns the target.
+		return current_pid == pid
+	end
+	if type(app.isRunning) == "function" then
+		local ok, running = pcall(app.isRunning, app)
+		return ok and running == true
+	end
+	return true
+end
+
+
+--- Stops one pre-acquired periodic owner and fences any late callback.
+--- @param owner table Paced/physical owner.
+--- @param status string Terminal owner status.
+invalidate_periodic_owner = function(owner, status)
+	if type(owner) ~= "table" then return end
+	if owner.cleanup_requested ~= true then
+		owner.cleanup_requested = true
+		owner.generation = owner.generation + 1
+		owner.status = status
+		owner.committed = false
+	end
+	return stop_periodic_handle(owner, "Periodic synthetic owner")
+end
+
+
+--- Discards provenance only for events that never reached Quartz.
+--- @param batch table Serialized batch.
+--- @param ordinal integer First unposted event.
+local function discard_unposted_suffix(batch, ordinal)
+	for index = ordinal, #batch.tags do discard_record(batch.tags[index]) end
+	for index = #batch.tags, ordinal, -1 do batch.tags[index] = nil end
+end
+
+
+--- Returns the owner-specific invalidator for a serialized batch.
+--- @param owner table Periodic owner.
+--- @param status string Terminal status.
+local function invalidate_serial_owner(owner, status)
+	if owner._marker == PACED_OWNER_MARKER then
+		invalidate_paced_owner(owner, status)
+	else
+		invalidate_periodic_owner(owner, status)
+	end
+end
+
+
+--- Finishes a serialized batch exactly once and advances the global FIFO.
+--- @param batch table Serialized batch.
+--- @param owner table Periodic owner.
+--- @param status string dispatched|failed.
+--- @param detail string|nil Failure detail.
+local function finish_serial_batch(batch, owner, status, detail)
+	if batch.status ~= "queued" then return end
+	if detail then batch.tx.failure = detail end
+	if _inflight_batch == batch then _inflight_batch = nil end
+	if batch.pending_counted then
+		_pending_count = _pending_count - 1
+		assert(_pending_count >= 0,
+			"adapters.synthetic_input: pending serialized count underflow")
+		batch.pending_counted = false
+	end
+	-- Establish any native stop debt before finish_batch can make the transaction
+	-- appear idle and synchronously run lifecycle callbacks.
+	invalidate_serial_owner(owner, status)
+	_owned_completion_depth = _owned_completion_depth + 1
+	local ok, err = xpcall(function() finish_batch(batch, status) end, debug.traceback)
+	_owned_completion_depth = _owned_completion_depth - 1
+	if not ok then
+		defer_diagnostic("error", "Serialized batch settlement failed - %s.", tostring(err))
+	end
+	start_unowned_fifo_head()
+end
+
+
+--- Applies one bounded retry budget to an exact native post ordinal.
+--- @param batch table Serialized batch.
+--- @param owner table Periodic owner.
+--- @param label string Diagnostic label.
+--- @param detail any Native failure detail.
+--- @return boolean retry True while the exact ordinal remains retryable.
+local function retain_or_fail_post(batch, owner, label, detail)
+	owner.post_failures = (owner.post_failures or 0) + 1
+	owner.status = "queued"
+	if owner.post_failures == 1 then
+		pcall(Logger.warn, LOG, "%s refused at ordinal %d; exact suffix retained: %s.",
+			label, owner.ordinal, tostring(detail))
+	end
+	if owner.post_failures < M.SERIAL_POST_MAX_ATTEMPTS then return true end
+	local failure = string.format("%s permanently refused at ordinal %d after %d attempts: %s",
+		label, owner.ordinal, owner.post_failures, tostring(detail))
+	pcall(Logger.error, LOG, "%s.", failure)
+	discard_unposted_suffix(batch, owner.ordinal)
+	finish_serial_batch(batch, owner, "failed", failure)
+	return false
+end
+
+
+--- Releases and invalidates one paced owner so an already-queued callback/timer
+--- cannot replay its suffix after cancellation, adoption, failure, or completion.
+--- @param owner table|nil Paced owner.
+--- @param status string Terminal owner status.
+invalidate_paced_owner = function(owner, status)
+	if type(owner) ~= "table" or owner._marker ~= PACED_OWNER_MARKER then return end
+	invalidate_periodic_owner(owner, status)
+	local token = owner.token
+	owner.token = nil
+	if token and token.active then
+		local released_ok, release_err = pcall(M.release, owner.tx, token)
+		if not released_ok then
+			defer_diagnostic("error", "Cannot release paced terminal owner - %s.",
+				tostring(release_err))
+		end
+	end
+end
+
+
+--- Lets a pre-acquired periodic owner recover the global FIFO without allocating
+--- anything after commit. Timer-zero normally starts the head immediately; if
+--- that timer was accepted but never delivered, the first periodic tick fences
+--- its generation and takes over. A late broker callback then becomes inert.
+--- @param owner table Paced/physical owner.
+local function wake_owned_fifo(owner)
+	if owner.committed ~= true or owner.batch.status ~= "queued" then return end
+	local batch = owner.batch
+	if _inflight_batch == batch then
+		if batch.mode == "paced" then pump_paced_batch(batch)
+		elseif batch.mode == "reserved" then pump_reserved_batch(batch)
+		else pump_physical_batch(batch) end
+		return
+	end
+	if _inflight_batch ~= nil then return end
+	local head = next_dispatchable_batch()
+	-- A 5 ms physical/reserved owner may only wake its own ordinal. Borrowing its
+	-- callback to pump a preceding 20 ms paced head shortens the Terminal render
+	-- interval and makes cadence depend on unrelated FIFO siblings.
+	if head ~= batch then return end
+	if _broker_scheduled then
+		_broker_generation = _broker_generation + 1
+		_broker_scheduled = false
+		if _broker_timer and type(_broker_timer.stop) == "function" then
+			pcall(_broker_timer.stop, _broker_timer)
+		end
+		_broker_timer = nil
+	end
+	local next_batch = pop_deferred_batch()
+	if next_batch then
+		assert(next_batch == batch,
+			"adapters.synthetic_input: periodic owner popped a foreign FIFO head")
+		start_deferred_batch(next_batch)
+	end
+end
+
+
+--- Acquires and starts the retry/cadence owner before any irreversible commit.
+--- Its callback is the only post-commit scheduling authority: pump code merely
+--- posts one render turn and returns, so timer allocation can never collapse the
+--- Terminal pacing workaround into an immediate burst.
+--- @param owner table Prepared owner.
+--- @param interval number Seconds between ticks.
+--- @return boolean acquired
+local function acquire_periodic_owner(owner, interval)
+	local generation = owner.generation
+	local timer, committed = TimerScheduler.every(interval, function()
+		if owner.generation ~= generation or owner.cleanup_requested == true then
+			stop_periodic_handle(owner, "Periodic synthetic owner")
+			return
+		end
+		local ran, run_error = xpcall(function() wake_owned_fifo(owner) end, debug.traceback)
+		if not ran then
+			defer_diagnostic("error", "Periodic synthetic owner failed - %s.",
+				tostring(run_error))
+		end
+	end)
+	owner.timer = timer
+	observe_periodic_settlement(owner, timer)
+	if committed ~= true then
+		owner.cleanup_requested = true
+		owner.generation = owner.generation + 1
+		if owner.timer == timer then retain_periodic_cleanup(owner) end
+		defer_diagnostic("error",
+			"Cannot acquire periodic synthetic owner - scheduler refused ownership.")
+		return false
+	end
+	return true
+end
+
+
+--- Starts an ordinary deferred FIFO head from the already-owned run-loop turn.
+--- Paced/physical siblings retain their own periodic wake and must not borrow an
+--- immediate turn that would alter their cadence.
+start_unowned_fifo_head = function()
+	if _inflight_batch ~= nil then return end
+	local candidate = next_dispatchable_batch()
+	if candidate == nil or candidate.mode ~= "deferred" then return end
+	local next_batch = pop_deferred_batch()
+	if next_batch then start_deferred_batch(next_batch) end
+end
+
+
+--- Finishes one fully target-posted paced batch and advances the global FIFO.
+--- @param batch table Paced batch.
+local function finish_paced_batch(batch)
+	local owner = batch.paced_owner
+	finish_serial_batch(batch, owner, "dispatched")
+end
+
+
+--- Posts one complete delete pair per periodic render turn, then the replacement
+--- suffix contiguously. A refusal advances no ordinal and returns to the already
+--- running periodic owner; it never allocates or immediately retries post-commit.
+--- @param batch table Paced batch.
+pump_paced_batch = function(batch)
+	if batch.status ~= "queued" then return end
+	local owner = batch.paced_owner
+	assert(type(owner) == "table" and owner._marker == PACED_OWNER_MARKER
+		and owner.committed == true,
+		"adapters.synthetic_input: queued paced batch has no committed owner")
+	if owner.awaiting_settlement == true then
+		finish_paced_batch(batch)
+		return
+	end
+	if not target_is_live(owner.app, owner.target_pid) then
+		local failure = string.format("Paced terminal target PID %s is no longer live",
+			tostring(owner.target_pid or "unknown"))
+		pcall(Logger.error, LOG, "%s; undispatched suffix dropped without rerouting.", failure)
+		discard_unposted_suffix(batch, owner.ordinal)
+		finish_serial_batch(batch, owner, "failed", failure)
+		return
+	end
+	owner.status = "running"
+	if not owner.handoff_published then
+		publish_action_epoch(batch)
+		owner.handoff_published = true
+	end
+
+	local stop_index = #owner.events
+	if owner.ordinal <= owner.delete_event_count then
+		-- If keyDown succeeded and keyUp refused, retry only that up event on the
+		-- next tick; never open a second delete pair in the same render turn.
+		stop_index = owner.ordinal + (owner.ordinal % 2 == 1 and 1 or 0)
+		stop_index = math.min(stop_index, owner.delete_event_count)
+	end
+	for index = owner.ordinal, stop_index do
+		local event = owner.events[index]
+		local posted, post_error = xpcall(function()
+			event:post(owner.app)
+		end, debug.traceback)
+		if not posted then
+			retain_or_fail_post(batch, owner, "Paced terminal post", post_error)
+			return
+		end
+		owner.post_failures = 0
+		owner.irreversible = true
+		owner.ordinal = index + 1
+	end
+	if owner.ordinal > #owner.events then
+		-- Keep lifecycle effects one render turn behind the final native post. The
+		-- already-running owner is the non-fallible completion capability.
+		owner.awaiting_settlement = true
+		owner.status = "queued"
+	end
+end
+
+
+--- Starts the process-wide FIFO head after the originating callback returned.
+--- @param batch table Paced batch.
+start_paced_batch = function(batch)
+	if batch.status ~= "queued" then
+		if _inflight_batch == batch then _inflight_batch = nil end
+		schedule_broker()
+		return
+	end
+	pump_paced_batch(batch)
+end
+
+
+--- Posts a pre-built terminator only when its domain owner opens the gate.
+--- The reserved FIFO position itself blocks later physical replays meanwhile.
+--- @param batch table Reserved successor batch.
+pump_reserved_batch = function(batch)
+	if batch.status ~= "queued" then return end
+	local owner = batch.reserved_owner
+	assert(type(owner) == "table" and owner._marker == RESERVED_OWNER_MARKER
+		and owner.committed == true,
+		"adapters.synthetic_input: queued reserved successor has no committed owner")
+	if owner.awaiting_settlement == true then
+		finish_serial_batch(batch, owner, "dispatched")
+		return
+	end
+	if owner.ready ~= true then return end
+	if not target_is_live(owner.target_app, owner.target_pid) then
+		local failure = string.format("Reserved target PID %s is no longer live",
+			tostring(owner.target_pid or "unknown"))
+		pcall(Logger.error, LOG, "%s; terminator was not rerouted.", failure)
+		discard_unposted_suffix(batch, owner.ordinal)
+		finish_serial_batch(batch, owner, "failed", failure)
+		return
+	end
+	owner.status = "running"
+	for index = owner.ordinal, #owner.events do
+		local event = owner.events[index]
+		local posted, post_error = xpcall(function()
+			if owner.target_app then event:post(owner.target_app) else event:post() end
+		end, debug.traceback)
+		if not posted then
+			retain_or_fail_post(batch, owner, "Reserved terminator post", post_error)
+			return
+		end
+		owner.post_failures = 0
+		owner.ordinal = index + 1
+	end
+	owner.awaiting_settlement = true
+	owner.status = "queued"
+end
+
+
+--- Starts one reserved successor from its already-owned periodic wake.
+--- @param batch table Reserved successor batch.
+start_reserved_batch = function(batch)
+	if batch.status ~= "queued" then
+		if _inflight_batch == batch then _inflight_batch = nil end
+		schedule_broker()
+		return
+	end
+	pump_reserved_batch(batch)
+end
+
+
+--- Posts one owned physical replay only after every older FIFO batch settled.
+--- Failure leaves the exact event and target under the pre-acquired periodic
+--- owner; the next tick retries without allocating or waiting for new input.
+--- @param batch table Physical replay batch.
+pump_physical_batch = function(batch)
+	if batch.status ~= "queued" then return end
+	local owner = batch.physical_owner
+	assert(type(owner) == "table" and owner._marker == PHYSICAL_OWNER_MARKER
+		and owner.committed == true,
+		"adapters.synthetic_input: queued physical replay has no committed owner")
+	if owner.awaiting_settlement == true then
+		finish_serial_batch(batch, owner, "dispatched")
+		return
+	end
+	owner.status = "running"
+	local posted, post_error = xpcall(function()
+		owner.event:post()
+	end, debug.traceback)
+	if not posted then
+		retain_or_fail_post(batch, owner, "Physical replay post", post_error)
+		return
+	end
+	owner.post_failures = 0
+	owner.ordinal = 2
+	owner.awaiting_settlement = true
+	owner.status = "queued"
+end
+
+
+--- Prepares reversible ownership of a callback transaction for terminal pacing.
+--- This function allocates, validates, and arms every fallible native artifact
+--- but neither detaches nor posts an event. The caller must seal, authorize, and
+--- commit its local state before passing the owner to commit_collected_paced().
 --- @param tx table Active transaction represented in the ambient collector.
 --- @param delete_pairs number Number of leading Backspace pairs to pace.
 --- @param delay_us number Inter-pair delay in microseconds.
 --- @param app userdata|table Target hs.application.
---- @return boolean|nil delivered True when posted; nil outside a callback batch.
-function M.deliver_collected_paced(tx, delete_pairs, delay_us, app)
+--- @return table|nil owner Prepared owner, or nil outside a callback batch.
+function M.prepare_collected_paced(tx, delete_pairs, delay_us, app)
 	tx = require_transaction(tx)
 	assert(type(delete_pairs) == "number" and delete_pairs >= 1
 		and delete_pairs == math.floor(delete_pairs),
-		"adapters.synthetic_input.deliver_collected_paced: delete_pairs must be a positive integer")
+		"adapters.synthetic_input.prepare_collected_paced: delete_pairs must be a positive integer")
 	assert(type(delay_us) == "number" and delay_us >= 1000,
-		"adapters.synthetic_input.deliver_collected_paced: delay must be at least 1000 us")
+		"adapters.synthetic_input.prepare_collected_paced: delay must be at least 1000 us")
 	assert(app ~= nil,
-		"adapters.synthetic_input.deliver_collected_paced: target application is required")
+		"adapters.synthetic_input.prepare_collected_paced: target application is required")
 
 	local collector = _callback_stack[#_callback_stack]
 	if collector == nil then return nil end
 	local batch = collector.batch_by_tx[tx]
 	if batch == nil or batch.status ~= "building" then return nil end
-	local events = batch.events
+	assert(batch.mode == "callback" and batch.paced_owner == nil,
+		"adapters.synthetic_input.prepare_collected_paced: callback batch already has an owner")
 	local delete_event_count = delete_pairs * 2
-	assert(#events >= delete_event_count,
-		"adapters.synthetic_input.deliver_collected_paced: collected batch is shorter than its deletion prefix")
-	for _, event in ipairs(events) do
-		assert(type(event) == "table" or type(event) == "userdata",
-			"adapters.synthetic_input.deliver_collected_paced: invalid event")
-		assert(type(event.post) == "function",
-			"adapters.synthetic_input.deliver_collected_paced: event cannot be posted")
-	end
+	assert(#batch.events >= delete_event_count,
+		"adapters.synthetic_input.prepare_collected_paced: collected batch is shorter than its deletion prefix")
 
-	local retain_token = M.retain(tx)
+	local selected = {}
+	local events = {}
+	for index, event in ipairs(batch.events) do
+		assert((type(event) == "table" or type(event) == "userdata")
+			and type(event.post) == "function",
+			"adapters.synthetic_input.prepare_collected_paced: event cannot be posted")
+		assert(not selected[event],
+			"adapters.synthetic_input.prepare_collected_paced: duplicate event identity")
+		selected[event] = true
+		events[index] = event
+	end
+	local collector_snapshot = {}
+	local remaining = {}
+	local found = 0
+	for index, event in ipairs(collector.events) do
+		collector_snapshot[index] = event
+		if selected[event] then
+			found = found + 1
+		else
+			remaining[#remaining + 1] = event
+		end
+	end
+	assert(found == #events,
+		"adapters.synthetic_input.prepare_collected_paced: batch is not fully owned by its collector")
+
 	local owner = {
+		_marker = PACED_OWNER_MARKER,
 		tx = tx,
-		token = retain_token,
+		batch = batch,
+		collector = collector,
 		events = events,
+		collector_snapshot = collector_snapshot,
+		remaining = remaining,
 		ordinal = 1,
 		delete_event_count = delete_event_count,
 		delay_sec = delay_us / 1000000,
+		-- Worst-case owned cadence when the timer-zero wake is unavailable: one
+		-- tick per delete pair, one for the contiguous suffix, and one settlement
+		-- tick before transaction lifecycle callbacks may run.
+		settlement_budget_sec = (delete_pairs + M.PACED_TRAILING_TICKS)
+			* (delay_us / 1000000),
 		app = app,
+		target_pid = application_pid(app),
+		generation = 0,
+		status = "prepared",
+		committed = false,
 	}
-	local function pump()
-		if tx.cancelled or tx.completed then return end
-		local event = owner.events[owner.ordinal]
-		if event == nil then
-			M.release(tx, retain_token)
-			return
-		end
-		local posted, post_error = xpcall(function() event:post(owner.app) end, debug.traceback)
-		if not posted then
-			Logger.error(LOG,
-				"Paced terminal post refused at ordinal %d; retaining suffix for retry: %s",
-				owner.ordinal, tostring(post_error))
-			local retry = schedule_after(owner.delay_sec,
-				"paced terminal retry", pump)
-			if not retry then
-				Logger.error(LOG,
-					"Paced terminal retry timer refused; transaction remains retained at ordinal %d.",
-					owner.ordinal)
-			end
-			return
-		end
-		owner.ordinal = owner.ordinal + 1
-		local completed_delete_pair = (owner.ordinal - 1) % 2 == 0
-			and (owner.ordinal - 1) <= owner.delete_event_count
-		local delay = completed_delete_pair and owner.ordinal <= #owner.events
-			and owner.delay_sec or 0
-		local scheduled = schedule_after(delay, "paced terminal serializer", pump)
-		if not scheduled then
-			Logger.error(LOG,
-				"Paced terminal serializer timer refused; transaction remains retained at ordinal %d.",
-				owner.ordinal)
-		end
+	owner.token = M.retain(tx)
+	batch.paced_owner = owner
+	if not acquire_periodic_owner(owner, owner.delay_sec) then
+		batch.paced_owner = nil
+		invalidate_paced_owner(owner, "refused")
+		return nil
 	end
-	local scheduled = M.defer_after_callback("paced terminal serializer", pump)
-	if not scheduled then
-		M.release(tx, retain_token)
-		return false
-	end
+	-- The recurring owner is deliberately the sole paced wake. A second
+	-- zero-delay callback could run immediately before or after an overdue timer
+	-- tick and post two delete pairs without the required render interval.
+	return owner
+end
 
-	-- Ownership has committed before the exact objects leave the callback-return
-	-- batch. Their immutable tags remain attached to the retained serializer.
-	local delivered = {}
-	for _, event in ipairs(events) do delivered[event] = true end
-	local remaining = {}
-	for _, event in ipairs(collector.events) do
-		if not delivered[event] then remaining[#remaining + 1] = event end
+
+--- Returns the conservative post-callback settlement budget captured by a
+--- prepared paced plan. Consumers use this immutable value to place their own
+--- safety timers after, never inside, the serializer's native delivery window.
+--- @param owner table Owner returned by prepare_collected_paced().
+--- @return number seconds
+function M.paced_settlement_budget(owner)
+	assert(type(owner) == "table" and owner._marker == PACED_OWNER_MARKER,
+		"adapters.synthetic_input.paced_settlement_budget: invalid owner")
+	assert(type(owner.settlement_budget_sec) == "number"
+		and owner.settlement_budget_sec > 0,
+		"adapters.synthetic_input.paced_settlement_budget: owner has no valid budget")
+	return owner.settlement_budget_sec
+end
+
+
+--- Authorizes a sealed prepared owner before any engine-side state mutation.
+--- Every assertion and mutable-snapshot check belongs here so the later commit
+--- is a guaranteed in-memory ownership transfer.
+--- @param owner table Owner returned by prepare_collected_paced().
+--- @return boolean authorized
+function M.authorize_collected_paced(owner)
+	assert(type(owner) == "table" and owner._marker == PACED_OWNER_MARKER,
+		"adapters.synthetic_input.authorize_collected_paced: invalid owner")
+	assert(owner.status == "prepared" and owner.committed == false,
+		"adapters.synthetic_input.authorize_collected_paced: owner is not prepared")
+	local tx = require_transaction(owner.tx)
+	local batch = require_batch(owner.batch)
+	local collector = _callback_stack[#_callback_stack]
+	assert(tx.sealed == true and not tx.cancelled and not tx.completed,
+		"adapters.synthetic_input.authorize_collected_paced: transaction is not sealed and active")
+	assert(owner.token and owner.token.active,
+		"adapters.synthetic_input.authorize_collected_paced: retain token is inactive")
+	assert(owner.timer ~= nil,
+		"adapters.synthetic_input.authorize_collected_paced: periodic owner is not live")
+	assert(collector == owner.collector and batch.collector == collector
+		and batch.status == "building" and batch.mode == "callback",
+		"adapters.synthetic_input.authorize_collected_paced: callback ownership changed")
+	assert(#batch.events == #owner.events
+		and #collector.events == #owner.collector_snapshot,
+		"adapters.synthetic_input.authorize_collected_paced: prepared output changed")
+	for index, event in ipairs(owner.events) do
+		assert(batch.events[index] == event,
+			"adapters.synthetic_input.authorize_collected_paced: batch order changed")
 	end
-	collector.events = remaining
-	batch.events = {}
+	for index, event in ipairs(owner.collector_snapshot) do
+		assert(collector.events[index] == event,
+			"adapters.synthetic_input.authorize_collected_paced: collector order changed")
+	end
+	owner.status = "authorized"
 	return true
+end
+
+
+--- Commits an authorized owner to the process-wide FIFO after engine state.
+--- All validation and native scheduling already committed in authorize; this
+--- path invokes no callback, logger, timer, assertion, or application API.
+--- @param owner table Owner authorized by authorize_collected_paced().
+--- @return boolean committed Always true for an authorized owner.
+function M.commit_collected_paced(owner)
+	local batch = owner.batch
+	local collector = owner.collector
+	owner.committed = true
+	owner.status = "queued"
+	batch.mode = "paced"
+	batch.status = "queued"
+	_pending_count = _pending_count + 1
+	batch.pending_counted = true
+	_deferred_tail = _deferred_tail + 1
+	_deferred_queue[_deferred_tail] = batch
+	collector.events = owner.remaining
+	owner.remaining = nil
+	return true
+end
+
+
+--- Pre-builds a synthetic successor under an isolated collector and acquires its
+--- autonomous FIFO owner before the originating physical key can be consumed.
+--- @param predecessor table Replacement transaction that must complete first.
+--- @param build function Constructs the exact terminator events.
+--- @param target_app userdata|table|nil Terminal target; nil keeps global routing.
+--- @return table|nil owner Prepared successor owner.
+function M.prepare_reserved_successor(predecessor, build, target_app)
+	predecessor = require_transaction(predecessor)
+	assert(type(build) == "function",
+		"adapters.synthetic_input.prepare_reserved_successor: build must be a function")
+	local owner = {
+		_marker = RESERVED_OWNER_MARKER,
+		predecessor = predecessor,
+		target_app = target_app,
+		target_pid = application_pid(target_app),
+		generation = 0,
+		status = "preparing",
+		committed = false,
+		ready = false,
+		ordinal = 1,
+	}
+	if not acquire_periodic_owner(owner, M.PERIODIC_OWNER_TICK_SEC) then return nil end
+
+	local collector = M.enter_callback()
+	local tx = nil
+	local ok, build_error = xpcall(function()
+		tx = M.begin("terminator_replay", "replacement")
+		M.with_transaction(tx, function()
+			assert(build() ~= false, "reserved successor construction refused")
+		end)
+		assert(#collector.batches == 1 and collector.batch_by_tx[tx] ~= nil,
+			"reserved successor must build exactly one batch")
+		local batch = collector.batch_by_tx[tx]
+		assert(#batch.events > 0,
+			"reserved successor constructed no events")
+		assert(M.seal(tx) == true,
+			"reserved successor transaction could not be sealed")
+		owner.tx = tx
+		owner.batch = batch
+		owner.events = batch.events
+		batch.reserved_owner = owner
+	end, debug.traceback)
+	assert(_callback_stack[#_callback_stack] == collector,
+		"adapters.synthetic_input: reserved collector ownership changed")
+	_callback_stack[#_callback_stack] = nil
+	if not ok then
+		if tx then pcall(M.cancel, tx) end
+		invalidate_periodic_owner(owner, "refused")
+		defer_diagnostic("error", "Cannot prepare reserved synthetic successor - %s.",
+			tostring(build_error))
+		return nil
+	end
+	owner.status = "prepared"
+	return owner
+end
+
+
+--- Validates every reserved successor invariant before engine-state commit.
+--- @param owner table Owner returned by prepare_reserved_successor().
+--- @return boolean authorized
+function M.authorize_reserved_successor(owner)
+	assert(type(owner) == "table" and owner._marker == RESERVED_OWNER_MARKER,
+		"adapters.synthetic_input.authorize_reserved_successor: invalid owner")
+	assert(owner.status == "prepared" and owner.committed == false,
+		"adapters.synthetic_input.authorize_reserved_successor: owner is not prepared")
+	local predecessor = require_transaction(owner.predecessor)
+	local tx = require_transaction(owner.tx)
+	local batch = require_batch(owner.batch)
+	-- Authorization is deliberately memory-only and may happen while the caller
+	-- is still building the predecessor transaction.  FIFO readiness remains
+	-- gated by predecessor completion, so publishing the ordinal here cannot
+	-- overtake any of its later batches.
+	assert(not predecessor.cancelled,
+		"adapters.synthetic_input.authorize_reserved_successor: predecessor was cancelled")
+	assert(tx.sealed == true and not tx.cancelled and not tx.completed,
+		"adapters.synthetic_input.authorize_reserved_successor: transaction is inactive")
+	assert(owner.timer ~= nil and batch.status == "building"
+		and batch.mode == "callback" and #batch.events == #owner.events,
+		"adapters.synthetic_input.authorize_reserved_successor: ownership changed")
+	owner.status = "authorized"
+	return true
+end
+
+
+--- Commits the already-authorized FIFO ordinal using memory-only mutations.
+--- @param owner table Authorized reserved successor.
+--- @return boolean committed
+function M.commit_reserved_successor(owner)
+	local batch = owner.batch
+	owner.committed = true
+	owner.status = "queued"
+	batch.collector = nil
+	batch.mode = "reserved"
+	batch.status = "queued"
+	_pending_count = _pending_count + 1
+	batch.pending_counted = true
+	_deferred_tail = _deferred_tail + 1
+	_deferred_queue[_deferred_tail] = batch
+	return true
+end
+
+
+--- Opens the reserved replay gate without posting on the caller's stack.
+--- @param owner table Committed reserved successor.
+--- @return boolean activated
+function M.activate_reserved_successor(owner)
+	if type(owner) ~= "table" or owner._marker ~= RESERVED_OWNER_MARKER
+		or owner.committed ~= true or owner.batch.status ~= "queued" then return false end
+	owner.ready = true
+	return true
+end
+
+
+--- Registers a terminal observer for the reserved successor transaction.
+--- @param owner table Prepared reserved successor.
+--- @param callback function function(transaction, status).
+--- @return boolean registered
+function M.on_reserved_complete(owner, callback)
+	assert(type(owner) == "table" and owner._marker == RESERVED_OWNER_MARKER,
+		"adapters.synthetic_input.on_reserved_complete: invalid owner")
+	return M.on_complete(owner.tx, callback)
+end
+
+
+--- Cancels a reversible reserved successor and leaves later callbacks inert.
+--- @param owner table Prepared/queued reserved successor.
+--- @return boolean cancelled
+function M.cancel_reserved_successor(owner)
+	if type(owner) ~= "table" or owner._marker ~= RESERVED_OWNER_MARKER then return false end
+	if owner.ordinal > 1 then return false end
+	local batch = owner.batch
+	if owner.committed == true and batch.status == "queued" then
+		if _inflight_batch == batch then _inflight_batch = nil end
+		if batch.pending_counted then
+			_pending_count = _pending_count - 1
+			batch.pending_counted = false
+		end
+		discard_unposted_suffix(batch, 1)
+		invalidate_periodic_owner(owner, "cancelled")
+		_owned_completion_depth = _owned_completion_depth + 1
+		pcall(finish_batch, batch, "cancelled")
+		_owned_completion_depth = _owned_completion_depth - 1
+		start_unowned_fifo_head()
+		return true
+	end
+	invalidate_periodic_owner(owner, "cancelled")
+	local ok, cancelled = pcall(M.cancel, owner.tx)
+	return ok and cancelled == true
+end
+
+
+--- Prepares one exact global physical replay without mutating the live FIFO.
+--- Every native failure rolls back its private transaction and provenance.
+--- @param event userdata|table Physical event being intercepted.
+--- @return table|nil owner Prepared replay owner.
+local function prepare_physical_replay(event)
+	assert(event ~= nil and type(event.copy) == "function",
+		"adapters.synthetic_input: physical event.copy is unavailable")
+	local owner = {
+		_marker = PHYSICAL_OWNER_MARKER,
+		generation = 0,
+		status = "preparing",
+		committed = false,
+		ordinal = 1,
+	}
+	if not acquire_periodic_owner(owner, M.PERIODIC_OWNER_TICK_SEC) then return nil end
+	local tx = nil
+	local batch = nil
+	local ok, replay_or_error = xpcall(function()
+		local replay = assert(event:copy(),
+			"adapters.synthetic_input: physical event.copy returned nil")
+		assert(type(replay.setProperty) == "function" and type(replay.post) == "function",
+			"adapters.synthetic_input: copied physical event contract is incomplete")
+		tx = M.begin("physical_input_fence", "replacement")
+		batch = create_batch(tx, "physical")
+		owner.tx = tx
+		owner.batch = batch
+		owner.event = replay
+		batch.physical_owner = owner
+		local tag = register_record({
+			generation = tx.generation,
+			owner = tx.owner,
+			effect = "replacement",
+			batch = batch.id,
+			ordinal = 1,
+			phase = "physical",
+			control = false,
+			loopback = false,
+			physical_replay = true,
+		})
+		batch.events[1] = replay
+		batch.tags[1] = tag
+		replay:setProperty(USER_DATA_PROPERTY, tag)
+		assert(M.seal(tx) == true,
+			"adapters.synthetic_input: physical replay transaction could not be sealed")
+	end, debug.traceback)
+	if not ok then
+		invalidate_periodic_owner(owner, "refused")
+		if tx then pcall(M.cancel, tx) end
+		defer_diagnostic("error", "Cannot own physical-input replay - %s.",
+			tostring(replay_or_error))
+		return nil
+	end
+	owner.status = "prepared"
+	return owner
+end
+
+
+--- Commits a prepared physical replay behind the already-preserved FIFO suffix.
+--- @param owner table Owner returned by prepare_physical_replay().
+local function commit_physical_replay(owner)
+	local batch = owner.batch
+	batch.status = "queued"
+	_pending_count = _pending_count + 1
+	batch.pending_counted = true
+	_deferred_tail = _deferred_tail + 1
+	_deferred_queue[_deferred_tail] = batch
+	owner.committed = true
+	owner.status = "queued"
 end
 
 
 --- Builds an immutable adoption plan before touching the live FIFO. Allocation
 --- and validation happen here so a later commit cannot destroy the only copy of
 --- queued user output and then fail while assembling its return table.
---- @return table adoption { batches, events }.
-local function prepare_pending_adoption()
-	local batches = {}
+--- @param excluded_collector table|nil Current collector whose paced batch must
+---        remain queued until this callback returns.
+--- @return table adoption { batches, events, event_groups, remaining_batches }.
+local function prepare_pending_adoption(excluded_collector)
+	local all_batches = {}
 	local seen = {}
 	if _inflight_batch and _inflight_batch.status == "queued" then
-		batches[#batches + 1] = _inflight_batch
+		all_batches[#all_batches + 1] = _inflight_batch
 		seen[_inflight_batch] = true
 	end
 	for index = _deferred_head, _deferred_tail do
 		local batch = _deferred_queue[index]
 		if batch and batch.status == "queued" and not seen[batch] then
-			batches[#batches + 1] = batch
+			all_batches[#all_batches + 1] = batch
 			seen[batch] = true
 		end
 	end
-	if #batches == 0 then return { batches = batches, events = nil } end
-	assert(#batches == _pending_count,
+	if #all_batches == 0 then
+		return { batches = {}, events = nil, event_groups = {}, remaining_batches = {} }
+	end
+	assert(#all_batches == _pending_count,
 		"adapters.synthetic_input: pending FIFO count cannot be adopted atomically")
-	for _, batch in ipairs(batches) do
+	for _, batch in ipairs(all_batches) do
 		assert(batch.status == "queued" and batch.pending_counted == true
 			and type(batch.events) == "table" and #batch.events > 0,
 			"adapters.synthetic_input: queued batch is not adoption-ready")
 	end
 
-	local events
-	if #batches == 1 then
-		events = batches[1].events
-	else
-		events = {}
-		for _, batch in ipairs(batches) do
-			for _, event in ipairs(batch.events) do events[#events + 1] = event end
+	local batches = {}
+	local remaining_batches = {}
+	local excluded = false
+	local reserved_predecessor = nil
+	for _, batch in ipairs(all_batches) do
+		-- An unopened reservation is a barrier for unrelated/physical input, but
+		-- not for deferred batches that still belong to its own predecessor. Those
+		-- batches were intentionally allowed to be created after the ordinal was
+		-- reserved and must be able to complete the transaction that opens it.
+		if reserved_predecessor ~= nil then
+			if batch.mode == "deferred" and batch.tx == reserved_predecessor then
+				batches[#batches + 1] = batch
+			else
+				remaining_batches[#remaining_batches + 1] = batch
+			end
+		elseif excluded then
+			remaining_batches[#remaining_batches + 1] = batch
+		else
+			local owner = batch.paced_owner
+			if excluded_collector ~= nil and batch.mode == "paced"
+				and owner and owner.collector == excluded_collector then
+				excluded = true
+			end
+			if not excluded and (batch.mode == "paced" or batch.mode == "physical"
+				or batch.mode == "reserved") then
+				-- Paced output may never be flattened into a callback-return table:
+				-- doing so removes its inter-pair render turns. Physical replay must
+				-- remain globally posted so every tap observes it.
+				excluded = true
+				if batch.mode == "reserved"
+					and batch.reserved_owner.ready ~= true then
+					reserved_predecessor = batch.reserved_owner.predecessor
+				end
+			end
+			if excluded then
+				remaining_batches[#remaining_batches + 1] = batch
+			else
+				batches[#batches + 1] = batch
+			end
 		end
 	end
-	return { batches = batches, events = events }
+
+	local event_groups = {}
+	local event_count = 0
+	for index, batch in ipairs(batches) do
+		local group = batch.events
+		if batch.mode == "paced" then
+			local owner = batch.paced_owner
+			assert(owner and owner._marker == PACED_OWNER_MARKER
+				and owner.committed == true and owner.ordinal <= #owner.events,
+				"adapters.synthetic_input: paced batch has no adoptable suffix")
+			if owner.ordinal > 1 then
+				group = {}
+				for event_index = owner.ordinal, #owner.events do
+					group[#group + 1] = owner.events[event_index]
+				end
+			end
+		end
+		event_groups[index] = group
+		event_count = event_count + #group
+	end
+
+	local events = nil
+	if #batches == 1 then
+		events = event_groups[1]
+	elseif #batches > 1 then
+		events = {}
+		for _, group in ipairs(event_groups) do
+			for _, event in ipairs(group) do events[#events + 1] = event end
+		end
+		assert(#events == event_count,
+			"adapters.synthetic_input: adoption event count changed during preparation")
+	end
+	return {
+		batches = batches,
+		events = events,
+		event_groups = event_groups,
+		remaining_batches = remaining_batches,
+	}
 end
 
 
@@ -2141,17 +3284,33 @@ end
 local function commit_pending_adoption(adoption)
 	if #adoption.batches == 0 then return end
 
-	if _broker_timer and type(_broker_timer.stop) == "function" then
-		pcall(_broker_timer.stop, _broker_timer)
+	local has_remaining = #adoption.remaining_batches > 0
+	if not has_remaining then
+		if _broker_timer and type(_broker_timer.stop) == "function" then
+			pcall(_broker_timer.stop, _broker_timer)
+		end
+		_broker_timer = nil
+		_broker_scheduled = false
 	end
-	_broker_timer = nil
-	_broker_scheduled = false
-	_inflight_batch = nil
+	local selected = {}
+	for _, batch in ipairs(adoption.batches) do selected[batch] = true end
+	if _inflight_batch and selected[_inflight_batch] then _inflight_batch = nil end
 	_deferred_queue = {}
 	_deferred_head = 1
 	_deferred_tail = 0
+	for _, batch in ipairs(adoption.remaining_batches) do
+		if batch ~= _inflight_batch then
+			_deferred_tail = _deferred_tail + 1
+			_deferred_queue[_deferred_tail] = batch
+		end
+	end
 
-	for _, batch in ipairs(adoption.batches) do
+	for index, batch in ipairs(adoption.batches) do
+		if batch.mode == "paced" then
+			batch.events = adoption.event_groups[index]
+			invalidate_paced_owner(batch.paced_owner, "adopted")
+			batch.paced_owner = nil
+		end
 		clear_pump_watchdog(batch)
 		discard_active_trigger(batch)
 		if batch.pending_counted then
@@ -2165,9 +3324,10 @@ end
 
 
 --- Detaches every older deferred payload so a later callback cannot overtake it.
+--- @param excluded_collector table|nil Current callback's paced owner.
 --- @return table adoption Prepared and committed FIFO payload.
-local function adopt_pending_deferred_batches()
-	local adoption = prepare_pending_adoption()
+local function adopt_pending_deferred_batches(excluded_collector)
+	local adoption = prepare_pending_adoption(excluded_collector)
 	commit_pending_adoption(adoption)
 	return adoption
 end
@@ -2197,25 +3357,36 @@ local function handoff_returned_batch(batch)
 end
 
 
---- Claims every older deferred payload at the first physical-input tap.
---- Callers must return `fence.events` as the eventtap callback's second value
---- while returning false for the physical original. Hammerspoon then delivers
---- the older tagged payload downstream before propagating that original event.
+--- Claims every eligible older deferred payload at the first physical-input tap.
+--- Paced output keeps its cadence and exact target. When such output remains,
+--- the original event is copied into the global FIFO and the caller consumes the
+--- original; the tagged replay later re-enters every tap as physical input.
 --- The empty fast path is one integer comparison on every ordinary input event.
---- @return table|nil fence { events, batches }, or nil when no output is pending.
-function M.claim_physical_fence()
+--- @param event userdata|table Physical event to fence.
+--- @return table|nil fence { events, batches, consume_original }, or nil.
+function M.claim_physical_fence(event)
 	if _pending_count == 0 and _pending_loopback_count == 0 then return nil end
 	_lifecycle_defer_depth = _lifecycle_defer_depth + 1
 	local ok, adoption_or_err = xpcall(function()
 		local adoption
 		if _pending_count > 0 then
-			adoption = adopt_pending_deferred_batches()
-			assert(#adoption.batches > 0 and type(adoption.events) == "table",
-				"pending synthetic output disappeared before physical fence claim")
+			adoption = prepare_pending_adoption()
 		else
-			adoption = { batches = {}, events = nil }
+			adoption = { batches = {}, events = nil, remaining_batches = {} }
 		end
-		for _, batch in ipairs(adoption.batches) do handoff_returned_batch(batch) end
+		local physical_owner = nil
+		if #adoption.remaining_batches > 0 then
+			physical_owner = prepare_physical_replay(event)
+			if physical_owner == nil then return nil end
+		end
+
+		-- No FIFO node, trigger claim, or transaction acknowledgement mutates until
+		-- the exact physical copy, tag, and autonomous owner all exist.
+		commit_pending_adoption(adoption)
+		if physical_owner then
+			commit_physical_replay(physical_owner)
+			adoption.consume_original = true
+		end
 
 		-- A loopback must re-enter the keymap tap globally; returning it from that
 		-- same tap would bypass the consumer. Once real input has overtaken the
@@ -2230,6 +3401,9 @@ function M.claim_physical_fence()
 		assert(_pending_loopback_count == 0,
 			"adapters.synthetic_input: physical fence left a loopback pending")
 		adoption.cancelled_loopbacks = cancelled_loopbacks
+		for _, batch in ipairs(adoption.batches) do handoff_returned_batch(batch) end
+		if #adoption.batches == 0 and cancelled_loopbacks == 0
+			and adoption.consume_original ~= true then return nil end
 		return adoption
 	end, debug.traceback)
 	_lifecycle_defer_depth = _lifecycle_defer_depth - 1
@@ -2258,12 +3432,17 @@ function M.leave_callback(consume)
 	-- If validation fails, the wrapper can still call abort_callback() and roll
 	-- every batch back atomically.
 	for _, batch in ipairs(collector.batches) do
+		local retained_paced = batch.mode == "paced" and batch.status == "queued"
+			and batch.paced_owner and batch.paced_owner.collector == collector
 		if batch.status ~= "building" and batch.status ~= "cancelled"
-			and batch.status ~= "failed" then
+			and batch.status ~= "failed" and not retained_paced then
 			error("adapters.synthetic_input.leave_callback: collector batch already handed off", 0)
 		end
 	end
-	local adoption = adopt_pending_deferred_batches()
+	-- Eligible older FIFO work is returned before this callback's own events. A
+	-- target-mismatched paced batch, the freshly committed paced batch, and every
+	-- later sibling remain queued behind their retained post-return wake
+	local adoption = adopt_pending_deferred_batches(collector)
 	local adopted = adoption.batches
 	if #adopted > 0 then
 		if #collector.events == 0 then
@@ -2300,15 +3479,28 @@ end
 
 
 --- Cancels and removes the current collector after an enclosing callback failure.
+--- A committed paced owner cannot be revoked, so the caller must still consume
+--- the physical event whose output that owner represents.
 --- @return boolean removed False when no collector is active.
+--- @return boolean consume_original True when committed output retains ownership.
 function M.abort_callback()
 	local collector = _callback_stack[#_callback_stack]
-	if collector == nil then return false end
+	if collector == nil then return false, false end
 	_callback_stack[#_callback_stack] = nil
+	local consume_original = false
 	for _, batch in ipairs(collector.batches) do
-		if not batch.tx.cancelled then M.cancel(batch.tx) end
+		local owner = batch.paced_owner
+		if owner and owner.committed == true and batch.status == "queued" then
+			consume_original = true
+		elseif not batch.tx.cancelled then
+			local cancelled_ok, cancelled_or_error = pcall(M.cancel, batch.tx)
+			if not cancelled_ok then
+				defer_diagnostic("error", "Cannot cancel aborted callback transaction - %s.",
+					tostring(cancelled_or_error))
+			end
+		end
 	end
-	return true
+	return true, consume_original
 end
 
 
@@ -2320,12 +3512,17 @@ function M.decode_tag(tag)
 	if integer_tag == nil or integer_tag < 0 then return nil end
 	local namespace = (integer_tag >> TAG_NAMESPACE_SHIFT) & ((1 << TAG_NAMESPACE_BITS) - 1)
 	if namespace ~= TAG_NAMESPACE then return nil end
+	local effect = ((integer_tag >> TAG_EFFECT_SHIFT) & 1) == 1
+		and "action" or "replacement"
+	local encoded_loopback = ((integer_tag >> TAG_LOOPBACK_SHIFT) & 1) == 1
+	local physical_replay = effect == "replacement" and encoded_loopback
 	return {
 		owned = true,
 		magic = M.MAGIC,
 		tag = integer_tag,
-		effect = ((integer_tag >> TAG_EFFECT_SHIFT) & 1) == 1 and "action" or "replacement",
-		loopback = ((integer_tag >> TAG_LOOPBACK_SHIFT) & 1) == 1,
+		effect = effect,
+		loopback = effect == "action" and encoded_loopback,
+		physical_replay = physical_replay,
 		sequence = integer_tag & TAG_SEQUENCE_MASK,
 		enriched = false,
 		stale = true,
@@ -2351,6 +3548,7 @@ local function copy_record(record)
 		phase = record.phase,
 		control = record.control == true,
 		loopback = record.loopback == true,
+		physical_replay = record.physical_replay == true,
 		source_pid = record.source_pid,
 		sequence = record.tag & TAG_SEQUENCE_MASK,
 		enriched = true,
@@ -2446,6 +3644,7 @@ function M.stats()
 		pending_lifecycle_callbacks = math.max(0,
 			_deferred_lifecycle_tail - _deferred_lifecycle_head + 1),
 		pending_post_callback_actions = _deferred_post_callback_count,
+		pending_periodic_cleanup = _periodic_cleanup_count,
 		pump_started = _pump_tap ~= nil,
 		stale_context_tags = _stale_context_count,
 	}

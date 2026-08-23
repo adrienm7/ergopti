@@ -58,6 +58,10 @@ local function load_fixture()
 	local unregister_calls = 0
 	local registered_epoch = nil
 	local deferred = {}
+	local abort_requires_consumption = false
+	local raw_failure = false
+	local admission_is_open = true
+	local key_provenance_status = "foreign"
 	local synthetic_stub = {
 		current_action_epoch = function() return epoch, 125 end,
 		claim_physical_fence = function()
@@ -82,7 +86,8 @@ local function load_fixture()
 		end,
 		enter_callback = function() end,
 		leave_callback = function(consume) return consume == true, {} end,
-		abort_callback = function() end,
+		abort_callback = function() return true, abort_requires_consumption end,
+		admission_open = function() return admission_is_open end,
 		defer_after_callback = function(_label, callback)
 			deferred[#deferred + 1] = callback
 			return true
@@ -94,7 +99,7 @@ local function load_fixture()
 		STATUS_FOREIGN = "foreign",
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function()
-		return nil, "foreign", synthetic_stub.claim_physical_fence()
+			return nil, key_provenance_status, synthetic_stub.claim_physical_fence()
 		end,
 	}
 
@@ -120,6 +125,10 @@ local function load_fixture()
 	}
 	package.loaded["modules.keymap.registry"] = api({
 		init = function() return true end,
+		is_terminator = function()
+			if raw_failure then error("forced post-commit callback failure") end
+			return false
+		end,
 		is_repeat_feature_enabled = function() return false end,
 		set_repeat_feature_enabled = noop,
 	})
@@ -231,6 +240,18 @@ local function load_fixture()
 			"the keymap wrapper must not hide a fixture/runtime error as physical pass-through")
 		return table.unpack(results, 1, results.n)
 	end
+	local function failing_physical_key(key_code, chars)
+		local before = #callback_errors
+		local results = table.pack(taps[1].callback({
+			getKeyCode = function() return key_code end,
+			getFlags = function() return {} end,
+			getCharacters = function() return chars end,
+			getProperty = function() return 0 end,
+		}))
+		helpers.assert_eq(#callback_errors, before + 1,
+			"the forced raw failure must reach the wrapper's diagnostic path")
+		return table.unpack(results, 1, results.n)
+	end
 	local function tap_for(event_type)
 		for _, candidate in ipairs(taps) do
 			for _, watched in ipairs(candidate.types or {}) do
@@ -251,6 +272,11 @@ local function load_fixture()
 		end,
 		physical_enter = function() return physical_key(36, "\r") end,
 		physical_letter = function(chars) return physical_key(0, chars or "x") end,
+		fail_after_paced_commit = function()
+			abort_requires_consumption = true
+			raw_failure = true
+			return failing_physical_key(0, "x")
+		end,
 		physical_click = function()
 			local mouse_tap = tap_for(hs_stub.eventtap.event.types.leftMouseDown)
 			helpers.assert_type(mouse_tap and mouse_tap.callback, "function")
@@ -265,7 +291,18 @@ local function load_fixture()
 			record_nav_reset = false
 			return table.unpack(results, 1, results.n)
 		end,
+		shift_failure = function()
+			local shift_tap = tap_for(hs_stub.eventtap.event.types.flagsChanged)
+			helpers.assert_type(shift_tap and shift_tap.callback, "function")
+			return shift_tap.callback({
+				getKeyCode = function() error("SHIFT_KEYCODE_THROW") end,
+				getFlags = function() return { shift = true } end,
+			})
+		end,
+		deferred_count = function() return #deferred end,
 		queue_fence = function(events) pending_fence = { events = events } end,
+		set_admission = function(value) admission_is_open = value == true end,
+		set_key_provenance_status = function(value) key_provenance_status = value end,
 		set_reset_failure = function(value) reset_should_fail = value end,
 		llm_quarantined = function() return llm_quarantined end,
 		registered_epoch = function() return registered_epoch end,
@@ -276,6 +313,50 @@ end
 
 
 helpers.describe("keymap action epochs", function()
+	helpers.it("passes physical input without engine mutation while pause owns admission", function()
+		local fixture = load_fixture()
+		fixture.set_admission(false)
+		local consumed = fixture.physical_letter("x")
+
+		helpers.assert_true(not consumed)
+		helpers.assert_eq(fixture.state.buffer, "typed",
+			"the idle-to-PAUSED fence must not start a new logical replacement")
+		helpers.assert_eq(#fixture.calls, 0)
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("passes unreadable keyDown without context invalidation while PAUSED", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(fixture.keymap.pause_processing(), true)
+		fixture.state.buffer = "pause-owned"
+		fixture.state.start_is_word_boundary = true
+		fixture.set_key_provenance_status("unreadable")
+
+		local consumed = fixture.physical_letter("x")
+
+		helpers.assert_true(not consumed,
+			"an unreadable physical event must still pass through under PAUSED")
+		helpers.assert_eq(fixture.state.buffer, "pause-owned",
+			"unreadable delivery may not invalidate the paused text snapshot")
+		helpers.assert_eq(fixture.state.start_is_word_boundary, true)
+		helpers.assert_eq(#fixture.calls, 0,
+			"PAUSED unreadable delivery may not observe epochs or reset predictions")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("does not defer shift diagnostics after PAUSED is published", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(fixture.keymap.pause_processing(), true)
+		helpers.assert_eq(fixture.deferred_count(), 0)
+
+		local consumed = fixture.shift_failure()
+
+		helpers.assert_true(not consumed)
+		helpers.assert_eq(fixture.deferred_count(), 0,
+			"a paused flagsChanged failure may not acquire a deferred logger callback")
+		fixture.keymap.stop()
+	end)
+
 	helpers.it("an action with no following key clears the buffer and hides predictions", function()
 		local fixture = load_fixture()
 		fixture.advance()
@@ -318,6 +399,16 @@ helpers.describe("keymap action epochs", function()
 		fixture.keymap.stop()
 	end)
 
+	helpers.it("consumes a physical key already owned by paced output when the wrapper aborts", function()
+		local fixture = load_fixture()
+		fixture.advance()
+		local consumed = fixture.fail_after_paced_commit()
+
+		helpers.assert_true(consumed,
+			"post-commit callback failure must not pass the owned magic key through")
+		fixture.keymap.stop()
+	end)
+
 	helpers.it("claims older output before a focus-changing click without keylogger", function()
 		local fixture = load_fixture()
 		local older_events = { { key = "before-focus-change" } }
@@ -330,6 +421,23 @@ helpers.describe("keymap action epochs", function()
 			"the always-on keymap mouse tap must return queued output before the original click")
 		helpers.assert_true(not fixture.state.start_is_word_boundary,
 			"a focus-changing click must close the stale word-boundary state synchronously")
+		fixture.keymap.stop()
+	end)
+
+	helpers.it("passes clicks without context mutation or deferred reset while PAUSED", function()
+		local fixture = load_fixture()
+		helpers.assert_eq(fixture.keymap.pause_processing(), true)
+		fixture.state.buffer = "pause-owned"
+		fixture.state.start_is_word_boundary = true
+
+		local consumed = fixture.physical_click()
+
+		helpers.assert_true(not consumed)
+		helpers.assert_eq(fixture.state.buffer, "pause-owned",
+			"the installed mouse tap must not mutate keymap context under PAUSED")
+		helpers.assert_eq(fixture.state.start_is_word_boundary, true)
+		helpers.assert_eq(#fixture.calls, 0,
+			"the paused click must not enqueue nav-reset or reconciliation work")
 		fixture.keymap.stop()
 	end)
 
@@ -436,8 +544,11 @@ helpers.describe("keymap action epochs", function()
 		fixture.physical_letter("x")
 		helpers.assert_true(fixture.llm_quarantined())
 
+		local generation_before_stop = fixture.state.lifecycle_generation or 0
 		helpers.assert_eq(fixture.keymap.stop(), true,
 			"teardown must not wait for a listener that stop has already unregistered")
+		helpers.assert_eq(fixture.state.lifecycle_generation, generation_before_stop + 1,
+			"stop must invalidate every pending replacement completion callback")
 		helpers.assert_eq(table.concat(fixture.calls, ","),
 			"observe,teardown-reset,bridge-stop",
 			"keymap.stop must bypass the ordinary quarantine gate and still stop the sibling trap")

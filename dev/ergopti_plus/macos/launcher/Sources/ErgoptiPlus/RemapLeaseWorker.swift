@@ -1571,6 +1571,7 @@ struct LeasePrivateCommandDeadline {
 enum LeaseOuterAction: Equatable {
 	case send(LeaseInnerCommand)
 	case publish(String)
+	case publishLive(String)
 	case fenceAndFinish(Int32, Bool)
 	case finish(Int32)
 }
@@ -1703,7 +1704,7 @@ struct LeaseOuterStateMachine {
 		desiredMode = mode
 		guard inFlight == nil else { return [] }
 		if transportedMode == mode {
-			return [.publish(mode == kLeaseModePaused ? "PAUSED" : "RESUMED")]
+			return [.publishLive(mode == kLeaseModePaused ? "PAUSED" : "RESUMED")]
 		}
 		let command = LeaseInnerCommand.setMode(mode)
 		inFlight = command
@@ -2448,7 +2449,15 @@ final class KarabinerLeaseOuterRuntime {
 					for: command,
 					now: uptime()
 				)
-			case .publish(let line):
+			case .publish(let line), .publishLive(let line):
+				if case .publishLive = action {
+					guard !liveTransportGateHeld,
+						guardianRegistration?.beginLiveTransport() == true
+					else {
+						return finishAfterRecovery(machine.innerLost())
+					}
+					liveTransportGateHeld = true
+				}
 				if liveTransportGateHeld, isLeaseLiveAcknowledgementLine(line) {
 					guard guardianRegistration?.guardianStillPresent() == true else {
 						return finishAfterRecovery(machine.innerLost())

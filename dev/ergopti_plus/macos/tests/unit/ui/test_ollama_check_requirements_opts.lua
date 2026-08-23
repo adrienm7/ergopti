@@ -33,8 +33,16 @@ helpers.assert_true(
 	"models_manager_ollama.lua check_requirements must accept an opts parameter (ui-menu-llm-models-3)"
 )
 
+-- Bound the complete method at the next object method. Fixed-width slices
+-- become false negatives whenever lifecycle ownership checks grow.
+local fn_end = src:find("\n\tfunction obj.delete_model", fn_start, true)
+helpers.assert_true(
+	fn_end ~= nil,
+	"models_manager_ollama.lua check_requirements must have a bounded method body"
+)
+
 -- Test 2: silent_notifications must be read from opts inside the function body.
-local fn_body = src:sub(fn_start, fn_start + 3000)
+local fn_body = src:sub(fn_start, fn_end)
 local has_silent_read = fn_body:find("silent_notifications", 1, true) ~= nil
 helpers.assert_true(
 	has_silent_read,

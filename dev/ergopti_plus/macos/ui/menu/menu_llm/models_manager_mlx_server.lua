@@ -6,7 +6,7 @@
 --- Attaches the MLX server-launch lifecycle (obj.start_server) onto the shared
 --- MLX models-manager object. Owns everything between "user picked a model" and
 --- "a healthy mlx_lm.server is answering on the configured port": cross-session
---- adoption, defensive port sweeps, the detached bash launcher, readiness probing,
+--- adoption, the detached bash launcher's serialized cleanup, readiness probing,
 --- and crash auto-recovery.
 ---
 --- FEATURES & RATIONALE:
@@ -15,9 +15,11 @@
 ---    obj.start_server unchanged while this 570-line lifecycle lives on its own.
 --- 2. Single canonical GC root: hs.task handles are pinned in ctx.active_tasks_gc_root
 ---    (the parent manager's M._active_tasks) so the same table roots every spawned
----    task and the GC cannot SIGTERM a sweep/probe mid-run.
---- 3. Port-late binding: MLX_PORT is re-resolved from api_mlx at launch time, not
----    module load, so a menu-driven port change is honoured by every command string.
+---    task and the GC cannot SIGTERM a readiness probe mid-run.
+--- 3. Port identity: each request captures api_mlx's current port, and that exact
+---    model/port pair is retained through deferred replacement and command creation.
+--- 4. Exact teardown: native and adopted owners retain one latest transition
+---    intent until the captured port is proved listener-free.
 --- =============================================================================
 
 local M = {}
@@ -28,6 +30,7 @@ local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local ApiCommon     = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 -- Required to inform the discovery poller of the active server PID so it can
 -- exclude it from zombie kills; safe to require here because api_mlx holds no
@@ -59,14 +62,9 @@ function M.install(ctx)
 	local obj                         = ctx.obj
 	local deps                        = ctx.deps
 	local project_venv_python_escaped = ctx.project_venv_python_escaped
-	-- Single canonical GC root, shared with the parent manager: sweep/probe tasks
+	-- Single canonical GC root, shared with the parent manager: probe tasks
 	-- are pinned here so the collector cannot SIGTERM them before their callbacks fire.
 	local _active_tasks = ctx.active_tasks_gc_root or {}
-
-	-- Single source of truth for the MLX server port: api_mlx, backed by the per-user
-	-- override and _shared/modules/llm/mlx_server.json. Re-resolved at launch time in
-	-- start_server in case the user changed it via the menu (M.set_port).
-	local MLX_PORT = ApiMlx.get_port()
 
 	local function take_server_waiters()
 		local waiters = obj._server_waiters or {}
@@ -74,11 +72,273 @@ function M.install(ctx)
 		return waiters
 	end
 
-	local function cancel_server_waiters()
-		for _, waiter in ipairs(take_server_waiters()) do
+	local function cancel_waiter_list(waiters)
+		for _, waiter in ipairs(waiters or {}) do
 			local callback = type(waiter) == "table" and waiter.on_cancel or nil
 			ApiCommon.protected_call(callback, "MLX server waiter on_cancel")
 		end
+	end
+
+	local function cancel_server_waiters()
+		cancel_waiter_list(take_server_waiters())
+	end
+	local settle_server_requirement_requests
+
+	local function task_proven_not_running(task, label)
+		local ok_method, method = xpcall(function()
+			return task and task.isRunning
+		end, debug.traceback)
+		if not ok_method or type(method) ~= "function" then return false end
+		local ok_running, running = xpcall(function()
+			return method(task)
+		end, debug.traceback)
+		if not ok_running then
+			Logger.error(LOG, "%s running-state probe raised: %s.",
+				tostring(label), tostring(running))
+		end
+		return ok_running == true and running == false
+	end
+
+	local function release_readiness_task(server_owner, task_owner)
+		if type(task_owner) ~= "table" or task_owner.settled == true then return false end
+		task_owner.settled = true
+		local task = task_owner.task
+		if task ~= nil then _active_tasks[task] = nil end
+		if type(server_owner) == "table"
+			and server_owner.readiness_task_owner == task_owner then
+			server_owner.readiness_task_owner = nil
+		end
+		return true
+	end
+
+	local function cancel_readiness_task(server_owner)
+		local task_owner = type(server_owner) == "table"
+			and server_owner.readiness_task_owner or nil
+		if type(task_owner) ~= "table" or task_owner.settled == true then return true end
+		task_owner.authorized = false
+		if task_owner.termination_accepted == true then return false end
+		local task = task_owner.task
+		local ok, result = xpcall(function()
+			if task == nil or type(task.terminate) ~= "function" then return false end
+			return task:terminate()
+		end, debug.traceback)
+		if task_owner.settled == true then return true end
+		if not ok or result == false or result == nil then
+			Logger.error(LOG,
+				"MLX readiness task cancellation refused; exact handle retained: %s.",
+				tostring(result))
+			return false
+		end
+		task_owner.termination_accepted = true
+		return false
+	end
+
+	local function cancel_readiness_timer(server_owner)
+		local handle = type(server_owner) == "table"
+			and server_owner.readiness_timer or nil
+		if handle == nil then return true end
+		local ok, settled = Logger.callback(LOG,
+			"MLX readiness retry cancellation", TimerScheduler.cancel, handle)
+		if ok == true and settled == true then
+			if server_owner.readiness_timer == handle then
+				server_owner.readiness_timer = nil
+			end
+			return true
+		end
+		if server_owner.readiness_timer_observed ~= handle then
+			local observe_ok, observed = Logger.callback(LOG,
+				"MLX readiness retry settlement observation",
+				TimerScheduler.onSettled, handle, function()
+					if server_owner.readiness_timer == handle then
+						server_owner.readiness_timer = nil
+					end
+					if server_owner.readiness_timer_observed == handle then
+						server_owner.readiness_timer_observed = nil
+					end
+					settle_server_requirement_requests(server_owner)
+				end)
+			if observe_ok == true and observed == true then
+				server_owner.readiness_timer_observed = handle
+			end
+		end
+		return false
+	end
+
+	local function cancel_server_readiness(server_owner)
+		if type(server_owner) ~= "table" then return true end
+		server_owner.readiness_revoked = true
+		local timer_settled = cancel_readiness_timer(server_owner)
+		local task_settled = cancel_readiness_task(server_owner)
+		return timer_settled == true and task_settled == true
+	end
+
+	local function settle_requirement_request(request)
+		if type(request) ~= "table" or request.settled == true then return false end
+		request.settled = true
+		local owner = request.owner
+		if type(owner) == "table" and type(owner.requirement_requests) == "table"
+			and owner.requirement_requests[request] == true then
+			owner.requirement_requests[request] = nil
+		end
+		request.owner = nil
+		if request.registered == true and type(request.lifecycle) == "table"
+			and type(request.lifecycle.settle) == "function" then
+			request.registered = false
+			request.lifecycle.settle(request)
+		end
+		return true
+	end
+
+	settle_server_requirement_requests = function(server_owner)
+		if type(server_owner) ~= "table"
+			or server_owner.readiness_task_owner ~= nil
+			or server_owner.readiness_timer ~= nil then
+			return false
+		end
+		local requests = {}
+		for request in pairs(server_owner.requirement_requests or {}) do
+			requests[#requests + 1] = request
+		end
+		for _, request in ipairs(requests) do
+			if request.owner == server_owner then settle_requirement_request(request) end
+		end
+		return true
+	end
+
+	local function server_has_live_demand(server_owner)
+		if type(server_owner) ~= "table" then return false end
+		local predicates = {}
+		if type(server_owner.primary_is_current) == "function" then
+			predicates[#predicates + 1] = server_owner.primary_is_current
+		end
+		for _, waiter in ipairs(obj._server_waiters or {}) do
+			if type(waiter) == "table" and type(waiter.is_current) == "function" then
+				predicates[#predicates + 1] = waiter.is_current
+		end
+		end
+		for request in pairs(server_owner.requirement_requests or {}) do
+			if type(request.is_current) == "function" then
+				predicates[#predicates + 1] = request.is_current
+			end
+		end
+		for _, predicate in ipairs(predicates) do
+			local ok, current = xpcall(predicate, debug.traceback)
+			if ok == true and current == true then return true end
+		end
+		return false
+	end
+
+	local function attach_requirement_request(server_owner, request, has_live_demand)
+		if type(server_owner) ~= "table" or type(request) ~= "table" then return false end
+		local previous = request.owner
+		if previous ~= server_owner and type(previous) == "table"
+			and type(previous.requirement_requests) == "table" then
+			previous.requirement_requests[request] = nil
+		end
+		server_owner.requirement_requests = server_owner.requirement_requests or {}
+		server_owner.requirement_requests[request] = true
+		request.owner = server_owner
+		request.has_live_demand = has_live_demand
+		if request.registered == true then return true end
+		if type(request.lifecycle) ~= "table"
+			or type(request.lifecycle.adopt) ~= "function" then return true end
+
+		request.pause_join = function()
+			if request.settled == true then return true end
+			local owner = request.owner
+			if type(owner) ~= "table" then return settle_requirement_request(request) end
+			request.revoked = true
+			local live = false
+			if type(request.has_live_demand) == "function" then
+				local ok, result = xpcall(request.has_live_demand, debug.traceback)
+				live = ok == true and result == true
+			end
+			if live then return settle_requirement_request(request) end
+
+			local readiness_settled = cancel_server_readiness(owner)
+			if owner.settled == true then
+				if readiness_settled == true then
+					settle_requirement_request(request)
+					return true
+				end
+				return false
+			end
+			if request.stop_pending ~= true then
+				local accepted = obj.stop_server_if_needed(function()
+					request.stop_pending = false
+					if cancel_server_readiness(owner) == true then
+						settle_server_requirement_requests(owner)
+					end
+					return true
+				end, {
+					kind = "requirements_pause",
+					on_cancel = function() request.stop_pending = false end,
+				})
+				if request.settled == true then return readiness_settled == true end
+				request.stop_pending = accepted == true
+			end
+			return false
+		end
+		if request.lifecycle.adopt(request, request.pause_join,
+			"MLX requirement server/readiness") ~= true then
+			server_owner.requirement_requests[request] = nil
+			request.owner = nil
+			return false
+		end
+		request.registered = true
+		return true
+	end
+
+	local function same_server_identity(left, right)
+		return type(left) == "table"
+			and type(right) == "table"
+			and left.backend == right.backend
+			and left.model == right.model
+			and left.port == right.port
+	end
+
+	--- Allocates the next process-wide transition epoch for this manager.
+	--- @return number epoch
+	local function next_server_transition_epoch()
+		obj._server_transition_epoch = (tonumber(obj._server_transition_epoch) or 0) + 1
+		return obj._server_transition_epoch
+	end
+
+	--- Cancels one superseded intent at most once.
+	--- @param intent table|nil Transition intent.
+	--- @param reason string|nil Cancellation reason.
+	local function cancel_server_intent(intent, reason)
+		if type(intent) ~= "table" or intent.cancelled then return end
+		intent.cancelled = true
+		ApiCommon.protected_call(intent.on_cancel,
+			"Superseded MLX server intent", reason or "superseded")
+	end
+
+	--- Installs the sole authoritative transition intent on an exact owner.
+	--- @param owner table Exact lifecycle owner.
+	--- @param intent table Candidate transition intent.
+	--- @return table intent
+	local function install_server_intent(owner, intent)
+		local previous = owner.intent
+		if type(previous) == "table" and previous ~= intent then
+			cancel_server_intent(previous, "superseded")
+		end
+		intent.epoch = next_server_transition_epoch()
+		owner.intent = intent
+		obj._server_transition_intent = intent
+		return intent
+	end
+
+	--- Withdraws a refused intent without releasing its retryable owner.
+	--- @param owner table Exact lifecycle owner.
+	--- @param intent table Refused transition intent.
+	--- @param reason string Refusal reason.
+	local function withdraw_server_intent(owner, intent, reason)
+		if owner.intent == intent then owner.intent = nil end
+		if obj._server_transition_intent == intent then
+			obj._server_transition_intent = nil
+		end
+		cancel_server_intent(intent, reason)
 	end
 
 	--- Runs a native Hammerspoon async callback behind a logged boundary.
@@ -97,32 +357,335 @@ function M.install(ctx)
 		return true, result
 	end
 
+	--- Joins the complete API/discovery owner before a server identity is retired
+	--- or replaced. Only literal true authorizes successor publication.
+	--- @param operation string Diagnostic context.
+	--- @return boolean settled
+	local function reset_mlx_endpoints(operation)
+		local ok_reset, reset_result = xpcall(function()
+			if type(ApiMlx) ~= "table" or type(ApiMlx.reset_endpoints) ~= "function" then
+				return false
+			end
+			return ApiMlx.reset_endpoints()
+		end, debug.traceback)
+		if not ok_reset or reset_result ~= true then
+			Logger.error(LOG, "%s refused MLX endpoint reset: %s.",
+				operation, tostring(reset_result))
+			return false
+		end
+		return true
+	end
+
+	--- Claims one native completion for the exact server owner.
+	--- @param task userdata|table Hammerspoon task handle.
+	--- @return table|nil owner
+	local function claim_server_completion(task)
+		local owner = obj._server_lifecycle_owner
+		if type(owner) ~= "table"
+			or owner.phase ~= "native"
+			or owner.task ~= task
+			or owner.completion_seen then
+			return nil
+		end
+		owner.completion_seen = true
+		return owner
+	end
+
+	--- Transfers a completed native task into its retained cleanup owner.
+	--- @param owner table Lifecycle owner returned by claim_server_completion.
+	--- @return boolean released
+	local function release_native_server_task(owner)
+		if type(owner) ~= "table" or owner.phase ~= "native" then return false end
+		local task = owner.task
+		if _active_tasks["mlx_server"] == task then
+			_active_tasks["mlx_server"] = nil
+		end
+		if deps.active_tasks and deps.active_tasks["mlx_server"] == task then
+			deps.active_tasks["mlx_server"] = nil
+		end
+		if obj._server_owner == task then obj._server_owner = nil end
+		owner.phase = "cleanup"
+		return true
+	end
+
+	--- Hard-kills the listener bound to the owner's exact captured port and proves
+	--- the socket is absent. A non-throwing nil/false result is still a refusal.
+	--- @param owner table Exact lifecycle or adopted cleanup owner.
+	--- @return boolean cleaned
+	local function cleanup_server_listener(owner)
+		local port = type(owner.identity) == "table" and tonumber(owner.identity.port) or nil
+		if not port then
+			Logger.error(LOG, "Cannot clean MLX listener: owner port identity is unavailable.")
+			return false
+		end
+		local port_text = tostring(math.floor(port))
+		-- Apple's bundled /usr/sbin/lsof is still 4.91 and has no `-Q`. Its
+		-- documented no-match shape is exit 1 with empty stdout/stderr, whereas a
+		-- malformed query or operational failure writes a diagnostic. Capture that
+		-- diagnostic explicitly so an empty error can never masquerade as absence.
+		local lsof_query = "/usr/sbin/lsof -nP -tiTCP:" .. port_text .. " -sTCP:LISTEN"
+		local command =
+			"[ -x /usr/sbin/lsof ] || exit 1; " ..
+			"err_file=$(/usr/bin/mktemp /tmp/ergopti_mlx_lsof.XXXXXX) || exit 1; " ..
+			"trap '/bin/rm -f \"$err_file\"' EXIT HUP INT TERM; " ..
+			"probe_listener() { " ..
+			": > \"$err_file\" || return 2; " ..
+			"output=$(" .. lsof_query .. " 2>\"$err_file\"); status=$?; " ..
+			"if [ -s \"$err_file\" ]; then return 2; fi; " ..
+			"if [ \"$status\" -eq 0 ]; then printf '%s' \"$output\"; return 0; fi; " ..
+			"if [ \"$status\" -eq 1 ] && [ -z \"$output\" ]; then return 0; fi; " ..
+			"return 2; }; " ..
+			"pids=$(probe_listener) || exit 1; " ..
+			"if [ -n \"$pids\" ]; then kill -9 $pids 2>/dev/null || exit 1; fi; " ..
+			"remaining=$(probe_listener) || exit 1; " ..
+			"[ -z \"$remaining\" ]"
+		local ok_execute, result, exit_kind, exit_code = pcall(os.execute, command)
+		if not ok_execute or result ~= true then
+			Logger.error(LOG,
+				"Cannot prove MLX listener absence on port %s: result=%s, kind=%s, code=%s.",
+				port_text, tostring(result), tostring(exit_kind), tostring(exit_code))
+			return false
+		end
+		Logger.debug(LOG, "MLX listener absence proved on port %s.", port_text)
+		return true
+	end
+
+	--- Finalizes an exact cleanup owner and dispatches only its latest intent.
+	--- @param owner table Owner whose native task already completed or was adopted.
+	--- @return boolean settled
+	local function settle_server_owner(owner)
+		if type(owner) ~= "table" or owner.settled or owner.phase ~= "cleanup" then
+			return false
+		end
+		if cleanup_server_listener(owner) ~= true then
+			owner.stop_requested = false
+			owner.settlement_result = false
+			-- A signal accepted asynchronously already transferred terminal ownership
+			-- to this intent. Refusing the later absence proof must therefore notify
+			-- that exact waiter once, while the cleanup owner itself remains retryable.
+			local intent = owner.intent
+			if type(intent) == "table" then
+				withdraw_server_intent(owner, intent, "cleanup_refused")
+			end
+			return false
+		end
+		if obj._server_identity == owner.identity
+			and reset_mlx_endpoints("Server settlement") ~= true then
+			owner.stop_requested = false
+			owner.settlement_result = false
+			local intent = owner.intent
+			if type(intent) == "table" then
+				withdraw_server_intent(owner, intent, "endpoint_reset_refused")
+			end
+			return false
+		end
+
+		owner.settled = true
+		owner.settlement_result = true
+		if obj._server_lifecycle_owner == owner then obj._server_lifecycle_owner = nil end
+		if obj._server_identity == owner.identity then
+			obj._server_identity = nil
+			obj._server_target = nil
+			obj._server_port = nil
+			obj._server_ready = false
+		end
+
+		local intent = owner.intent
+		owner.intent = nil
+		if obj._server_transition_intent == intent then
+			obj._server_transition_intent = nil
+		end
+		if type(intent) == "table" and not intent.cancelled then
+			if intent.epoch ~= obj._server_transition_epoch then
+				cancel_server_intent(intent, "stale_epoch")
+				owner.settlement_result = false
+			elseif type(intent.on_settled) == "function" then
+				local ok_intent, intent_result = ApiCommon.protected_call(
+					intent.on_settled, "MLX server transition settlement")
+				if ok_intent ~= true or intent_result == false then
+					Logger.error(LOG, "MLX server '%s' settlement continuation was refused.",
+						tostring(intent.kind))
+					owner.settlement_result = false
+				end
+			end
+		end
+		settle_server_requirement_requests(owner)
+		return owner.settlement_result == true
+	end
+
+	--- Creates a retained cleanup owner for a detached or otherwise untracked
+	--- listener. Even the no-task path must prove absence before reporting stop.
+	--- @return table|nil owner
+	local function create_legacy_cleanup_owner()
+		local task = deps.active_tasks and deps.active_tasks["mlx_server"] or nil
+		if task ~= nil then
+			Logger.error(LOG, "MLX server stop refused: exact lifecycle owner is unavailable.")
+			return nil
+		end
+		local ok_port, current_port = xpcall(function()
+			return ApiMlx.get_port()
+		end, debug.traceback)
+		if not ok_port or tonumber(current_port) == nil then
+			Logger.error(LOG, "Cannot create MLX cleanup owner: port lookup failed (%s).",
+				tostring(current_port))
+			return nil
+		end
+		local identity = obj._server_identity
+		if type(identity) ~= "table" then
+			identity = {
+				backend = "mlx",
+				model = obj._server_target,
+				port = tonumber(current_port),
+			}
+			obj._server_identity = identity
+			obj._server_port = identity.port
+		end
+		local owner = {
+			task = nil,
+			identity = identity,
+			phase = "cleanup",
+			completion_seen = true,
+			settled = false,
+			stop_requested = false,
+			intent = nil,
+			epoch = next_server_transition_epoch(),
+			requirement_requests = {},
+		}
+		obj._server_lifecycle_owner = owner
+		return owner
+	end
+
+	--- Checks that any published native task belongs to the exact lifecycle owner.
+	--- @param owner table Exact lifecycle owner.
+	--- @return boolean coherent
+	local function server_owner_is_coherent(owner)
+		local active_task = deps.active_tasks and deps.active_tasks["mlx_server"] or nil
+		if active_task == nil then return true end
+		return owner.phase == "native" and owner.task == active_task
+	end
+
+	--- Signals the exact MLX task and reports acceptance, never settlement.
+	--- The task remains authoritative until its native completion callback drains
+	--- on_stopped. A false/nil/throwing terminate is retryable and keeps ownership.
+	--- @param on_stopped function|nil Called after exact native completion.
+	--- @param opts table|nil Transition metadata with kind and on_cancel.
+	--- @return boolean accepted
+	function obj.stop_server_if_needed(on_stopped, opts)
+		local owner = obj._server_lifecycle_owner
+		if type(owner) ~= "table" or owner.settled then
+			owner = create_legacy_cleanup_owner()
+			if not owner then return false end
+		end
+		if not server_owner_is_coherent(owner) then
+			Logger.error(LOG, "MLX server stop refused: active task and lifecycle owner disagree.")
+			return false
+		end
+		local intent = install_server_intent(owner, {
+			kind = type(opts) == "table" and opts.kind or "stop",
+			on_settled = on_stopped,
+			on_cancel = type(opts) == "table" and opts.on_cancel or nil,
+		})
+
+		if owner.phase == "adopted" then owner.phase = "cleanup" end
+		if owner.phase == "cleanup" then
+			owner.stop_requested = true
+			local settled = settle_server_owner(owner)
+			if settled ~= true and owner.intent == intent then
+				withdraw_server_intent(owner, intent, "cleanup_refused")
+			end
+			return settled == true
+		end
+		if owner.phase ~= "native" or owner.task == nil then
+			withdraw_server_intent(owner, intent, "owner_unavailable")
+			Logger.error(LOG, "MLX server stop refused: exact lifecycle owner is unavailable.")
+			return false
+		end
+		if owner.stop_requested then return true end
+
+		-- Latch before calling native code: a faithful double (or a future native
+		-- implementation) may synchronously invoke the completion callback.
+		owner.stop_requested = true
+		local ok_terminate, signal = xpcall(function()
+			return owner.task:terminate()
+		end, debug.traceback)
+		if owner.settled then return owner.settlement_result == true end
+		if owner.phase == "cleanup" then
+			if owner.intent == intent then
+				withdraw_server_intent(owner, intent, "cleanup_refused")
+			end
+			return false
+		end
+		if not ok_terminate or not signal then
+			owner.stop_requested = false
+			withdraw_server_intent(owner, intent, "termination_refused")
+			Logger.error(LOG, "MLX server stop signal was refused: %s.",
+				tostring(ok_terminate and signal or signal))
+			return false
+		end
+		ApiCommon.protected_call(owner.on_stop_accepted,
+			"MLX server accepted-stop terminal")
+		Logger.debug(LOG, "MLX server stop signal accepted; awaiting exact task completion.")
+		return true
+	end
+
 	function obj.start_server(target_model, on_success, on_cancel, opts)
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
+		local requirement_lifecycle = type(opts) == "table"
+			and opts._requirement_lifecycle or nil
+		local requirement_request = type(opts) == "table"
+			and opts._requirement_server_request or nil
+		if requirement_request == nil and type(requirement_lifecycle) == "table"
+			and type(requirement_lifecycle.adopt) == "function" then
+			requirement_request = {
+				lifecycle = requirement_lifecycle,
+				is_current = is_current,
+				registered = false,
+				settled = false,
+			}
+		end
+		local pinned_port = type(opts) == "table" and tonumber(opts._mlx_port) or nil
+		local target_port = pinned_port or ApiMlx.get_port()
+		local target_identity = {
+			backend = "mlx",
+			model = target_model,
+			port = target_port,
+		}
+		local terminal_sent = false
+		local function settle(callback, label, ...)
+			if terminal_sent then return false end
+			terminal_sent = true
+			if type(callback) ~= "function" then return true end
+			local ok, result = ApiCommon.protected_call(callback, label, ...)
+			return ok and result ~= false
+		end
+		local function settle_cancel(...)
+			return settle(on_cancel, "MLX server on_cancel", ...)
+		end
 		local function still_current()
 			local ok, current = ApiCommon.protected_call(
 				is_current, "MLX server freshness check")
-			return ok and current == true
+			return ok == true and current == true
 		end
-		if not still_current() then return false end
+		local function current_or_cancel()
+			if still_current() then return true end
+			settle_cancel("stale")
+			return false
+		end
+		local function settle_success(...)
+			if not current_or_cancel() then return false end
+			return settle(on_success, "MLX server on_success", ...)
+		end
+		if not current_or_cancel() then return false end
 		local repo = obj.get_mlx_repo(target_model)
 		if not repo then
 			Logger.warn(LOG, "Cannot start MLX server: no repository found for model %s.", tostring(target_model))
 			-- Fire on_cancel so the caller's prediction lock is released; otherwise
 			-- predictions stay silently disabled for the rest of the session
-			ApiCommon.protected_call(on_cancel, "MLX server on_cancel")
-			return
+			settle_cancel("repository_unavailable")
+			return false
 		end
 		Logger.info(LOG, "Ensuring MLX server for model %s…", tostring(target_model))
 		local silent_notifications = type(opts) == "table" and opts.silent_notifications == true
-
-		-- Re-resolve the port from api_mlx at launch time, not module load time: the
-		-- user may have changed it via the menu (M.set_port) since this module loaded.
-		-- Every command string below (sweep, launcher, adoption probe) reads MLX_PORT,
-		-- so refreshing this upvalue makes them all target the current port.
-		if ApiMlx and type(ApiMlx.get_port) == "function" then
-			MLX_PORT = ApiMlx.get_port()
-		end
 
 		local function probe_matches_target(body)
 			if type(body) ~= "string" or body == "" then return false end
@@ -145,12 +708,27 @@ function M.install(ctx)
 			return false
 		end
 
-		if deps.active_tasks and deps.active_tasks["mlx_server"] then
-			local existing = deps.active_tasks["mlx_server"]
-			local running = type(existing.isRunning) == "function" and existing:isRunning()
-			Logger.debug(LOG, "Existing MLX task found — running=%s, server_target='%s', target_model='%s'.",
-				tostring(running), tostring(obj._server_target), tostring(target_model))
-			if running and obj._server_target == target_model then
+		local lifecycle = obj._server_lifecycle_owner
+		if type(lifecycle) == "table" and not lifecycle.settled then
+			if not server_owner_is_coherent(lifecycle) then
+				Logger.error(LOG, "Cannot replace MLX server: active task and lifecycle owner disagree.")
+				settle_cancel("lifecycle_owner_mismatch")
+				return false
+			end
+			local existing = lifecycle.task
+			local running = lifecycle.phase == "adopted"
+			if lifecycle.phase == "native" and existing ~= nil then
+				local ok_running, native_running = xpcall(function()
+					return type(existing.isRunning) == "function" and existing:isRunning()
+				end, debug.traceback)
+				running = ok_running and native_running == true
+			end
+			Logger.debug(LOG, "Existing MLX owner found — phase=%s, running=%s, server_target='%s', target_model='%s', server_port='%s', target_port='%s'.",
+				tostring(lifecycle.phase), tostring(running), tostring(obj._server_target),
+				tostring(target_model), tostring(obj._server_port), tostring(target_port))
+			if running
+				and lifecycle.stop_requested ~= true
+				and same_server_identity(lifecycle.identity, target_identity) then
 				-- isRunning() means the PROCESS is alive, not that the model is loaded.
 				-- Resolving on it fired the second caller's on_success while the first
 				-- caller's readiness probe was still running, so a duplicate request was
@@ -158,102 +736,133 @@ function M.install(ctx)
 				if obj._server_ready then
 					Logger.info(LOG, "MLX server already ready for '%s' — reusing.",
 						tostring(target_model))
-					ApiCommon.protected_call(on_success, "MLX server on_success")
+					settle_success()
 				elseif on_success or on_cancel then
 					-- Join the startup already in flight. The waiter is drained by
 					-- mark_server_ready below, so nobody is told "ready" early and nobody
 					-- has their callback dropped either.
 					obj._server_waiters = obj._server_waiters or {}
 					table.insert(obj._server_waiters, {
-						on_success = on_success,
-						on_cancel = on_cancel,
+						on_success = settle_success,
+						on_cancel = settle_cancel,
+						is_current = still_current,
 					})
+					if requirement_request ~= nil
+						and attach_requirement_request(lifecycle, requirement_request,
+							function() return server_has_live_demand(lifecycle) end) ~= true then
+						settle_cancel("requirement_owner_adoption_refused")
+						return false
+					end
 					Logger.info(LOG, "MLX server for '%s' still starting — joined as waiter #%d.",
 						tostring(target_model), #obj._server_waiters)
 				end
-				return
+				return true
 			end
-			if running then
-				Logger.info(LOG, "MLX server running for different model — terminating.")
-				cancel_server_waiters()
-				local ok_terminate, terminated = xpcall(function()
-					return existing:terminate()
-				end, debug.traceback)
-				if not ok_terminate or terminated ~= true then
-					Logger.error(LOG, "MLX server replacement refused: predecessor termination did not commit (%s).",
-						tostring(ok_terminate and terminated or terminated))
-					ApiCommon.protected_call(on_cancel, "MLX server replacement on_cancel")
+			if not current_or_cancel() then return false end
+			Logger.info(LOG, "MLX server identity changed — queueing replacement after exact predecessor settlement.")
+
+			local replacement_opts = {}
+			if type(opts) == "table" then
+				for key, value in pairs(opts) do replacement_opts[key] = value end
+			end
+			replacement_opts._mlx_port = target_port
+			if requirement_request ~= nil then
+				replacement_opts._requirement_server_request = requirement_request
+				if attach_requirement_request(lifecycle, requirement_request,
+					function() return server_has_live_demand(lifecycle) end) ~= true then
+					settle_cancel("requirement_owner_adoption_refused")
 					return false
 				end
 			end
-			deps.active_tasks["mlx_server"] = nil
+			local request = { identity = target_identity }
+			request.launch = function()
+				-- Reuse this request's terminal gate across the recursive launch. Passing
+				-- the raw callbacks would create a second independent terminal owner and
+				-- could notify the same caller twice when the successor returns false.
+				return obj.start_server(target_model, settle_success, settle_cancel,
+					replacement_opts)
+			end
+			local predecessor_waiters = obj._server_waiters
+			local accepted = obj.stop_server_if_needed(function()
+				local ok_launch, launch_result = ApiCommon.protected_call(request.launch,
+					"MLX server successor launch")
+				if ok_launch ~= true or launch_result ~= true then
+					settle_cancel("successor_launch_error")
+					return false
+				end
+				return true
+			end, {
+				kind = "replace",
+				on_cancel = settle_cancel,
+			})
+			if accepted ~= true then
+				return false
+			end
+			-- Only the waiters owned by the accepted predecessor signal are stale.
+			-- If terminate completed synchronously, settlement may already have
+			-- installed a successor with a different waiter table.
+			if obj._server_lifecycle_owner == lifecycle
+				and obj._server_waiters == predecessor_waiters then
+				obj._server_waiters = {}
+				cancel_waiter_list(predecessor_waiters)
+			end
+			return true
 		end
-		if not still_current() then return false end
+		if deps.active_tasks and deps.active_tasks["mlx_server"] ~= nil then
+			Logger.error(LOG, "Cannot replace MLX server: native task has no exact lifecycle owner.")
+			settle_cancel("lifecycle_owner_unavailable")
+			return false
+		end
+		if not current_or_cancel() then return false end
 
 		-- Cross-session adoption — after a Hammerspoon reload the in-memory hs.task
 		-- handle checked above is gone, but the detached Python server launched in
 		-- the previous session is still listening on 8080 with the model already
-		-- mapped into GPU memory. Sweeping it (below) and cold-reloading costs
+		-- mapped into GPU memory. Replacing it and cold-reloading costs
 		-- 45-90 s on every reload — the "rond rouge / jaune trop longtemps au
 		-- démarrage" regression. A single /v1/models probe lets us adopt the live
-		-- server instead: if it already serves the target model, skip the sweep and
-		-- relaunch entirely and let the normal warmup path re-discover + prime it
+		-- server instead: if it already serves the target model, skip the relaunch
+		-- entirely and let the normal warmup path re-discover + prime it
 		-- (a few seconds, weights already resident). This restores the behaviour of
 		-- the old async pre-probe but synchronously with a hard 1 s curl timeout, so
 		-- it can never stall the boot path the way the async callback could.
 		if not (deps.active_tasks and deps.active_tasks["mlx_server"]) then
 			local ok_probe, body = pcall(hs.execute,
 				"/usr/bin/curl --silent --max-time 1 --no-keepalive " ..
-				"-H 'Connection: close' http://127.0.0.1:" .. MLX_PORT .. "/v1/models")
-			if ok_probe and probe_matches_target(body) and still_current() then
+				"-H 'Connection: close' http://127.0.0.1:" .. target_port .. "/v1/models")
+			if not current_or_cancel() then return false end
+			if ok_probe and probe_matches_target(body) then
+				if reset_mlx_endpoints("Cross-session adoption") ~= true then
+					settle_cancel("endpoint_reset_refused")
+					return false
+				end
 				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :%d) — skipping cold restart.",
-					tostring(target_model), MLX_PORT)
+					tostring(target_model), target_port)
+				local adopted_owner = {
+					task = nil,
+					identity = target_identity,
+					phase = "adopted",
+					completion_seen = true,
+					settled = false,
+					stop_requested = false,
+					intent = nil,
+					epoch = next_server_transition_epoch(),
+					requirement_requests = {},
+				}
+				obj._server_lifecycle_owner = adopted_owner
 				obj._server_target = target_model
+				obj._server_port = target_port
+				obj._server_identity = target_identity
 				-- Adopted from a previous session with the weights already resident, so
 				-- this one really is ready — a later duplicate request must resolve
 				-- immediately rather than queue behind a startup that will never run.
 				obj._server_ready = true
 				cancel_server_waiters()
-				if type(ApiMlx) == "table" and type(ApiMlx.reset_endpoints) == "function" then
-					ApiMlx.reset_endpoints()
-				end
 				if type(ApiMlx) == "table" and type(ApiMlx.set_model_hf_path) == "function" then
 					ApiMlx.set_model_hf_path(repo)
 				end
-				ApiCommon.protected_call(on_success, "MLX server on_success")
-				return
-			end
-		end
-
-		-- Defensive cross-session port sweep: at this point we are committed to launching
-		-- a fresh server. Any python+mlx_lm process still alive — typically a leftover from
-		-- a previous Hammerspoon session whose hs.task handle is gone, or an orphan whose
-		-- bash wrapper exited but Python child survived — must die before the new server
-		-- binds 8080. The bash launcher does its own kill+lsof loop, but it trusts
-		-- /tmp/mlx_server.pgid which can be stale; firing this sweep here closes that gap.
-		-- Fire-and-forget — the bash launcher's own sleep+lsof retry loop will catch any
-		-- survivor that this async kill doesn't reach in time.
-		if not still_current() then return false end
-			do
-			local sweep_cmd =
-				"PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
-				"PORT_PIDS=$(lsof -ti TCP:" .. MLX_PORT .. " 2>/dev/null); " ..
-				"ALL=\"$PIDS $PORT_PIDS\"; " ..
-				"[ -n \"$(echo $ALL | tr -d ' ')\" ] && echo \"$ALL\" | tr ' ' '\\n' | sort -u | xargs kill -9 2>/dev/null; " ..
-				"rm -f /tmp/mlx_server.pid /tmp/mlx_server.pgid; " ..
-				"echo done"
-			local sweep
-			sweep = TaskLifecycle.native("MLX pre-launch port sweep", "/bin/bash", function(_, stdout)
-				if sweep then _active_tasks[sweep] = nil end  -- sweep captured by closure
-				run_async_callback("MLX pre-launch port sweep completion", function()
-					Logger.debug(LOG, "Pre-launch port-%d sweep done: %s", MLX_PORT, tostring(stdout):gsub("\n", " "))
-				end)
-			end, {"-c", sweep_cmd})
-			if sweep then
-				_active_tasks[sweep] = true
-				if not TaskLifecycle.start(sweep, "MLX pre-launch port sweep") then
-					_active_tasks[sweep] = nil
-				end
+				settle_success()
+				return true
 			end
 		end
 
@@ -264,14 +873,18 @@ function M.install(ctx)
 		-- connection refused on macOS can take several seconds to resolve asynchronously),
 		-- causing the task to never be created and predictions to stay locked indefinitely.
 		do
+			if not current_or_cancel() then return false end
+			if reset_mlx_endpoints("Cold server launch") ~= true then
+				settle_cancel("endpoint_reset_refused")
+				return false
+			end
 			obj._server_target = target_model
+			obj._server_port = target_port
+			obj._server_identity = target_identity
 			-- The new server process may run a different mlx-lm version or be
 			-- configured for different routes than the previous one; clear the
 			-- cached discovery result so the first warmup re-probes rather than
 			-- reusing stale endpoint paths that return 404 for this new server
-			if type(ApiMlx) == "table" and type(ApiMlx.reset_endpoints) == "function" then
-				ApiMlx.reset_endpoints()
-			end
 			-- Store the authoritative HF path used to launch the server so the
 			-- discovery bypass can fall back to it when /v1/models returns a stale
 			-- model ID. Without this, warmup sends the wrong model name and every
@@ -294,15 +907,53 @@ function M.install(ctx)
 			obj._server_ready = false
 			cancel_server_waiters()
 
+			-- Declared before every retry/error closure. A declaration beside the
+			-- later constructor would bind those closures to a global `task` instead.
+			local task
+			local launched_lifecycle
+			local probe_server_ready
+			local fail_server_start
+
+			local function waiter_is_current(waiter)
+				if type(waiter) ~= "table" or type(waiter.is_current) ~= "function" then
+					return true
+				end
+				local ok, current = ApiCommon.protected_call(
+					waiter.is_current, "MLX server waiter freshness check")
+				return ok == true and current == true
+			end
+
+			local function has_live_demand()
+				if terminal_sent ~= true then
+					if still_current() then return true end
+					settle_cancel("stale")
+				end
+				for _, waiter in ipairs(obj._server_waiters or {}) do
+					if waiter_is_current(waiter) then return true end
+				end
+				return false
+			end
+
 			local function mark_server_ready()
 				if startup_confirmed or startup_closed then return end
+				if not has_live_demand() then
+					fail_server_start()
+					obj.stop_server_if_needed()
+					return
+				end
+				if obj._server_owner ~= task then
+					fail_server_start()
+					return
+				end
 				startup_confirmed = true
 				-- Promoted to obj state: a start_server call arriving after this point
 				-- must be able to see that the server is ready, and one arriving BEFORE
 				-- it must be able to queue. A per-invocation local could do neither.
 				obj._server_ready = true
-				ApiCommon.protected_call(on_success, "MLX server on_success")
-				on_success = nil
+				local ready_owner = obj._server_lifecycle_owner
+				cancel_server_readiness(ready_owner)
+				settle_server_requirement_requests(ready_owner)
+				settle_success()
 				local waiters = obj._server_waiters or {}
 				obj._server_waiters = {}
 				for _, waiter in ipairs(waiters) do
@@ -311,71 +962,89 @@ function M.install(ctx)
 				end
 			end
 
-			local function fail_server_start()
+			fail_server_start = function()
 				if startup_confirmed or startup_closed then return false end
 				startup_closed = true
-				obj._server_ready = false
-				if obj._server_target == target_model then obj._server_target = nil end
-				ApiCommon.protected_call(on_cancel, "MLX server on_cancel")
-				on_cancel = nil
-				for _, waiter in ipairs(take_server_waiters()) do
-					local callback = type(waiter) == "table" and waiter.on_cancel or nil
-					ApiCommon.protected_call(callback, "MLX server waiter on_cancel")
+				local owns_server_state = obj._server_owner == nil or obj._server_owner == task
+				if owns_server_state then
+					obj._server_ready = false
+					-- Once native start committed, task/capability ownership survives every
+					-- logical failure until the exact native completion callback. Before a
+					-- task exists, this invocation can release its unpublished identity.
+					if task == nil and obj._server_identity == target_identity then
+						obj._server_identity = nil
+						obj._server_target = nil
+						obj._server_port = nil
+					end
+				end
+				settle_cancel("server_start_failed")
+				if owns_server_state then
+					for _, waiter in ipairs(take_server_waiters()) do
+						local callback = type(waiter) == "table" and waiter.on_cancel or nil
+						ApiCommon.protected_call(callback, "MLX server waiter on_cancel")
+					end
 				end
 				return true
 			end
 
-			-- Declared before every retry/error closure. A declaration beside the
-			-- later constructor would bind those closures to a global `task` instead.
-			local task
-			local probe_server_ready
-
 			local function close_after_async_error()
 				if not fail_server_start() then
 					startup_closed = true
-					obj._server_ready = false
-					if obj._server_target == target_model then obj._server_target = nil end
+					if obj._server_owner == task then obj._server_ready = false end
 				end
 				-- A failed scheduler leaves no readiness owner. Stop the exact server
 				-- task rather than allowing an unobservable process to keep serving a
 				-- model whose callers were already released as failed.
-				if task then
-					local ok_terminate, terminated = xpcall(function()
-						return task:terminate()
-					end, debug.traceback)
-					if not ok_terminate or terminated == false then
-						Logger.error(LOG, "MLX server termination after async failure was refused: %s.",
-							tostring(terminated))
-					end
-				end
+				if task then obj.stop_server_if_needed() end
+			end
+
+			local function demand_or_close()
+				if has_live_demand() then return true end
+				close_after_async_error()
+				return false
 			end
 
 			local function schedule_probe_retry(retries)
-				local installing = true
-				local callback_ran = false
-				local ok_timer, timer_or_error = xpcall(function()
-					return hs.timer.doAfter(0.5, function()
-						callback_ran = true
-						if installing then return end
-						local ok = run_async_callback("MLX readiness retry timer", function()
-							probe_server_ready(retries)
-						end)
-						if not ok then close_after_async_error() end
-					end)
-				end, debug.traceback)
-				installing = false
-				if not ok_timer or not timer_or_error or callback_ran then
-					Logger.error(LOG, "MLX readiness retry timer was not committed: %s.",
-						tostring(ok_timer and (callback_ran and "callback ran before handle publication"
-							or timer_or_error) or timer_or_error))
+				if not demand_or_close() then return false end
+				if type(launched_lifecycle) ~= "table"
+					or launched_lifecycle.readiness_timer ~= nil then
+					Logger.error(LOG, "MLX readiness retry refused without an empty exact slot.")
 					close_after_async_error()
 					return false
 				end
+				local handle
+				local ok_timer, candidate, committed = Logger.callback(LOG,
+					"MLX readiness retry timer", TimerScheduler.after, 0.5, function()
+						if launched_lifecycle.readiness_timer ~= handle then return false end
+						launched_lifecycle.readiness_timer = nil
+						launched_lifecycle.readiness_timer_observed = nil
+						if launched_lifecycle.readiness_revoked == true then return false end
+						local ok = run_async_callback("MLX readiness retry timer", function()
+							if not demand_or_close() then return end
+							probe_server_ready(retries)
+						end)
+						if not ok then close_after_async_error() end
+						if startup_confirmed or launched_lifecycle.settled == true then
+							settle_server_requirement_requests(launched_lifecycle)
+						end
+						return ok
+					end)
+				if type(candidate) == "table" and candidate.timer ~= nil then
+					launched_lifecycle.readiness_timer = candidate
+				end
+				if ok_timer ~= true or type(candidate) ~= "table" or committed ~= true then
+					Logger.error(LOG, "MLX readiness retry timer was not committed.")
+					close_after_async_error()
+					return false
+				end
+				handle = candidate
+				launched_lifecycle.readiness_timer = handle
 				return true
 			end
 
 			probe_server_ready = function(retries)
 				if startup_closed or startup_confirmed then return end
+				if not demand_or_close() then return end
 				if retries <= 0 then
 					-- 60 s elapsed without the server answering — release the prediction
 					-- lock so the user is not silently stuck; log for diagnosis
@@ -387,11 +1056,42 @@ function M.install(ctx)
 				-- Use curl --no-keepalive so each probe opens a fresh TCP connection.
 				-- hs.http pools connections and reuses a keep-alive socket to a zombie
 				-- server, making this probe see the zombie's stale model ID indefinitely.
+				if type(launched_lifecycle) ~= "table"
+					or launched_lifecycle.readiness_task_owner ~= nil then
+					close_after_async_error()
+					return
+				end
+				local task_owner = {
+					task = nil,
+					authorized = true,
+					settled = false,
+					start_committed = false,
+					dispatching = true,
+					pending_terminal = nil,
+					termination_accepted = false,
+				}
 				local probe_task
-				probe_task = TaskLifecycle.native("MLX readiness probe", "/usr/bin/curl", function(exit_code, stdout)
-					if probe_task then _active_tasks[probe_task] = nil end  -- probe_task captured by closure
+				local function finish_probe(exit_code, stdout)
+					if task_owner.settled == true then return false end
+					if task_owner.dispatching == true then
+						if task_owner.pending_terminal == nil then
+							task_owner.pending_terminal = table.pack(exit_code, stdout)
+						end
+						return true
+					end
+					local authorized = task_owner.authorized == true
+						and task_owner.start_committed == true
+						and launched_lifecycle.readiness_revoked ~= true
+					release_readiness_task(launched_lifecycle, task_owner)
+					if not authorized then
+						if launched_lifecycle.settled == true then
+							settle_server_requirement_requests(launched_lifecycle)
+						end
+						return true
+					end
 					local ok = run_async_callback("MLX readiness probe completion", function()
 						if startup_closed or startup_confirmed then return end
+						if not demand_or_close() then return end
 						if exit_code == 0 and probe_matches_target(stdout or "") then
 							mark_server_ready()
 						else
@@ -399,18 +1099,47 @@ function M.install(ctx)
 						end
 					end)
 					if not ok then close_after_async_error() end
-				end, {
+					if startup_confirmed or launched_lifecycle.settled == true then
+						settle_server_requirement_requests(launched_lifecycle)
+					end
+					return ok
+				end
+				probe_task = TaskLifecycle.native("MLX readiness probe", "/usr/bin/curl",
+					finish_probe, {
 					"--silent", "--max-time", "5", "--no-keepalive",
 					"-H", "Connection: close",
-					"http://127.0.0.1:" .. MLX_PORT .. "/v1/models",
+					"http://127.0.0.1:" .. target_port .. "/v1/models",
 				})
+				task_owner.task = probe_task
 				if probe_task then
+					if not demand_or_close() then return end
+					launched_lifecycle.readiness_task_owner = task_owner
 					_active_tasks[probe_task] = true
-					if not TaskLifecycle.start(probe_task, "MLX readiness probe") then
-						_active_tasks[probe_task] = nil
-						schedule_probe_retry(retries - 1)
+					local started = TaskLifecycle.start(probe_task, "MLX readiness probe")
+					task_owner.dispatching = false
+					if started ~= true then
+						task_owner.authorized = false
+						if task_owner.pending_terminal ~= nil then
+							task_owner.pending_terminal = nil
+							release_readiness_task(launched_lifecycle, task_owner)
+						elseif task_proven_not_running(probe_task,
+							"MLX readiness start refusal") then
+							release_readiness_task(launched_lifecycle, task_owner)
+						else
+							cancel_readiness_task(launched_lifecycle)
+						end
+						close_after_async_error()
+						return
+					end
+					task_owner.start_committed = true
+					if task_owner.pending_terminal ~= nil then
+						local terminal = task_owner.pending_terminal
+						task_owner.pending_terminal = nil
+						finish_probe(table.unpack(terminal, 1, terminal.n))
 					end
 				else
+					task_owner.dispatching = false
+					task_owner.settled = true
 					schedule_probe_retry(retries - 1)
 				end
 			end
@@ -518,16 +1247,16 @@ function M.install(ctx)
 				"sleep 3; " ..
 				"LSOF_ATTEMPTS=0; " ..
 				"while true; do " ..
-				"STALE_PIDS=$(lsof -ti TCP:" .. MLX_PORT .. " 2>/dev/null || true); " ..
+				"STALE_PIDS=$(lsof -ti TCP:" .. target_port .. " 2>/dev/null || true); " ..
 				"if [ -z \"$STALE_PIDS\" ]; then " ..
-				"echo \"[MLX] Port " .. MLX_PORT .. " free — starting server.\"; " ..
+				"echo \"[MLX] Port " .. target_port .. " free — starting server.\"; " ..
 				"break; " ..
 				"fi; " ..
 				"LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); " ..
-				"echo \"[MLX] Port " .. MLX_PORT .. " still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…\"; " ..
+				"echo \"[MLX] Port " .. target_port .. " still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…\"; " ..
 				"echo \"$STALE_PIDS\" | xargs kill -9 2>/dev/null || true; " ..
 				"if [ \"$LSOF_ATTEMPTS\" -ge 10 ]; then " ..
-				"echo \"[MLX] ❌ Port " .. MLX_PORT .. " still occupied after 10 attempts — giving up.\"; " ..
+				"echo \"[MLX] ❌ Port " .. target_port .. " still occupied after 10 attempts — giving up.\"; " ..
 				"exit 1; " ..
 				"fi; " ..
 				"sleep 0.5; " ..
@@ -540,6 +1269,27 @@ function M.install(ctx)
 				-- loop drains it for as long as the server lives.
 				"MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); " ..
 				"mkfifo \"$MLX_FIFO\"; " ..
+				-- hs.task owns this bash wrapper, not the background Python process.
+				-- Latch an early signal before the child PID exists, then replace the
+				-- latch with a reaping handler as soon as $! is captured. This closes
+				-- the stop-before-bind race: task completion cannot outrun a child that
+				-- would otherwise survive the wrapper and bind the port later.
+				"MLX_PID=''; MLX_PGID=''; MLX_STOP_PENDING=0; MLX_CLEANED=0; " ..
+				"OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); " ..
+				"PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); " ..
+				"cleanup_mlx_child() { " ..
+				"if [ \"$MLX_CLEANED\" -eq 1 ]; then return 0; fi; " ..
+				"MLX_CLEANED=1; trap '' TERM INT HUP; " ..
+				"if [ -n \"$MLX_PID\" ] && kill -0 \"$MLX_PID\" 2>/dev/null; then " ..
+				"KILL_TARGET=\"$MLX_PID\"; " ..
+				"if [ -n \"$MLX_PGID\" ] && [ \"$MLX_PGID\" != \"$OWN_PGID\" ] && [ \"$MLX_PGID\" != \"$PARENT_PGID\" ]; then KILL_TARGET=\"-$MLX_PGID\"; fi; " ..
+				"kill -TERM -- \"$KILL_TARGET\" 2>/dev/null || true; " ..
+				"STOP_ATTEMPTS=0; " ..
+				"while kill -0 -- \"$KILL_TARGET\" 2>/dev/null && [ \"$STOP_ATTEMPTS\" -lt 20 ]; do STOP_ATTEMPTS=$((STOP_ATTEMPTS + 1)); sleep 0.1; done; " ..
+				"if kill -0 -- \"$KILL_TARGET\" 2>/dev/null; then kill -KILL -- \"$KILL_TARGET\" 2>/dev/null || true; fi; " ..
+				"wait \"$MLX_PID\" 2>/dev/null || true; " ..
+				"fi; rm -f \"$MLX_FIFO\"; }; " ..
+				"trap 'MLX_STOP_PENDING=1' TERM INT HUP; " ..
 				-- set -m (job control) makes bash assign a fresh PGID to every
 				-- backgrounded job — the macOS-compatible replacement for Linux setsid.
 				-- set +m immediately after so the rest of the script is unaffected.
@@ -601,8 +1351,11 @@ function M.install(ctx)
 				-- otherwise binds its own 8080 default, which would silently ignore
 				-- the shared-config / user-override port and make every client probe
 				-- the wrong address (the centralized port var would be a lie).
-				"\"$PYTHON_BIN\" -m mlx_lm server --model \"$MODEL_ARG\" --port " .. MLX_PORT .. " --decode-concurrency 1 --prompt-concurrency 1 > \"$MLX_FIFO\" 2>&1 & " ..
+				"\"$PYTHON_BIN\" -m mlx_lm server --model \"$MODEL_ARG\" --port " .. target_port .. " --decode-concurrency 1 --prompt-concurrency 1 > \"$MLX_FIFO\" 2>&1 & " ..
 				"MLX_PID=$!; " ..
+				"trap 'cleanup_mlx_child' EXIT; " ..
+				"trap 'cleanup_mlx_child; exit 15' TERM INT HUP; " ..
+				"if [ \"$MLX_STOP_PENDING\" -eq 1 ]; then cleanup_mlx_child; exit 15; fi; " ..
 				"set +m; " ..
 				"MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); " ..
 				"echo \"[MLX] Server started with PID $MLX_PID PGID $MLX_PGID.\"; " ..
@@ -611,8 +1364,6 @@ function M.install(ctx)
 				-- own process group. If MLX_PGID equals our own bash PGID or our
 				-- parent's (Hammerspoon's), saving it would arm a fratricidal
 				-- `kill -9 -<PGID>` on the next switch that wipes the menubar app.
-				"OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); " ..
-				"PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); " ..
 				"if [ -n \"$MLX_PGID\" ] && [ \"$MLX_PGID\" != \"$OWN_PGID\" ] && [ \"$MLX_PGID\" != \"$PARENT_PGID\" ]; then " ..
 				"echo \"$MLX_PGID\" > \"$MLX_PGID_FILE\"; " ..
 				"echo \"[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID).\"; " ..
@@ -625,7 +1376,9 @@ function M.install(ctx)
 				"printf '%s\\n' \"$OUT\"; " ..
 				"printf '%s\\n' \"$OUT\" >> " .. unified_log_file .. "; " ..
 				"done < \"$MLX_FIFO\"; " ..
-				"rm -f \"$MLX_FIFO\""
+				"wait \"$MLX_PID\"; MLX_STATUS=$?; " ..
+				"rm -f \"$MLX_FIFO\"; " ..
+				"exit \"$MLX_STATUS\""
 
 			local server_last_line = ""
 			local server_log_buffer = {}
@@ -701,15 +1454,27 @@ function M.install(ctx)
 				fail_server_start()
 			end
 
-			task = TaskLifecycle.native("MLX server launch", "/bin/bash", function(code)
-				if deps.active_tasks and deps.active_tasks["mlx_server"] == task then
-					deps.active_tasks["mlx_server"] = nil
+			local active_tasks_gc_root = _active_tasks
+			local server_starting = true
+			local pending_server_completion = nil
+			local server_completion
+			server_completion = function(code)
+				if server_starting then
+					if pending_server_completion == nil then
+						pending_server_completion = table.pack(code)
+					end
+					return true
+				end
+				local owner = claim_server_completion(task)
+				if not owner then return end
+				if owner.authorized ~= true or owner.start_committed ~= true then
+					release_native_server_task(owner)
+					settle_server_owner(owner)
+					return true
 				end
 				local ok = run_async_callback("MLX server completion", function()
 					if startup_confirmed then
 						startup_closed = true
-						obj._server_ready = false
-						if obj._server_target == target_model then obj._server_target = nil end
 						Logger.info(LOG, "MLX server process exited with code %d.", code)
 						return
 					end
@@ -754,9 +1519,22 @@ function M.install(ctx)
 					end
 					Logger.info(LOG, "MLX server process exited with code %d.", code)
 				end)
-				if not ok then close_after_async_error() end
-			end, function(_, stdout, stderr)
+				if not ok then fail_server_start() end
+				-- terminate() only requested SIGTERM. This exact native callback is the
+				-- sole event that releases the task handle; the cleanup owner remains
+				-- authoritative until the exact port is proved listener-free.
+				release_native_server_task(owner)
+				settle_server_owner(owner)
+			end
+			task = TaskLifecycle.native("MLX server launch", "/bin/bash",
+				server_completion, function(_, stdout, stderr)
 				local ok, continue_streaming = run_async_callback("MLX server stream", function()
+					if startup_closed then return false end
+					if not demand_or_close() then return false end
+					if obj._server_owner ~= task then
+						fail_server_start()
+						return false
+					end
 					local out = (stdout or "") .. (stderr or "")
 					if out ~= "" then
 						Logger.debug(LOG, "MLX server stream chunk (%d bytes).", #out)
@@ -796,21 +1574,91 @@ function M.install(ctx)
 
 			Logger.debug(LOG, "MLX server bash_cmd: %s", bash_cmd)
 			if task then
-				deps.active_tasks["mlx_server"] = task
-				if TaskLifecycle.start(task, "MLX server launch") then
+				if not has_live_demand() then
+					task = nil
+					fail_server_start()
+					return false
+				end
+				local lifecycle = {
+					task = task,
+					identity = target_identity,
+					phase = "native",
+					completion_seen = false,
+					settled = false,
+					stop_requested = false,
+					intent = nil,
+					epoch = next_server_transition_epoch(),
+					authorized = true,
+					start_committed = false,
+					requirement_requests = {},
+					primary_is_current = still_current,
+					readiness_task_owner = nil,
+					readiness_timer = nil,
+					readiness_timer_observed = nil,
+					readiness_revoked = false,
+					on_stop_accepted = function()
+						if not startup_confirmed then fail_server_start() end
+					end,
+				}
+				launched_lifecycle = lifecycle
+				obj._server_owner = task
+				obj._server_lifecycle_owner = lifecycle
+				if deps.active_tasks then deps.active_tasks["mlx_server"] = task end
+				active_tasks_gc_root["mlx_server"] = task
+				if requirement_request ~= nil
+					and attach_requirement_request(lifecycle, requirement_request,
+						function() return server_has_live_demand(lifecycle) end) ~= true then
+					server_starting = false
+					lifecycle.authorized = false
+					release_native_server_task(lifecycle)
+					settle_server_owner(lifecycle)
+					fail_server_start()
+					return false
+				end
+				local started = TaskLifecycle.start(task, "MLX server launch")
+				server_starting = false
+				if started == true then
+					lifecycle.start_committed = true
+					if obj._server_lifecycle_owner ~= lifecycle
+						or lifecycle.phase ~= "native" then
+						return false
+					end
+					if pending_server_completion ~= nil then
+						local terminal = pending_server_completion
+						pending_server_completion = nil
+						server_completion(table.unpack(terminal, 1, terminal.n))
+					end
+					if obj._server_lifecycle_owner ~= lifecycle
+						or lifecycle.phase ~= "native" then
+						return false
+					end
 					Logger.info(LOG, "MLX server task started for model ‘%s’.", tostring(target_model))
 				else
-					if deps.active_tasks["mlx_server"] == task then
-						deps.active_tasks["mlx_server"] = nil
-					end
+					lifecycle.authorized = false
 					fail_server_start()
-					return
+					if pending_server_completion ~= nil then
+						local terminal = pending_server_completion
+						pending_server_completion = nil
+						server_completion(table.unpack(terminal, 1, terminal.n))
+					elseif task_proven_not_running(task,
+						"MLX server start refusal") then
+						lifecycle.completion_seen = true
+						release_native_server_task(lifecycle)
+						settle_server_owner(lifecycle)
+					end
+					if lifecycle.phase == "native" then
+						obj.stop_server_if_needed(nil, { kind = "start_refusal" })
+					end
+					return false
 				end
+				if not demand_or_close() then return false end
 				-- 120 retries × 0.5 s = 60 s total; large models can take >30 s to load weights
 				probe_server_ready(120)
 			else
 				fail_server_start()
+				return false
 			end
+			return true
 		end
 	end
 end

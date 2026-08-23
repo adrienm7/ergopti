@@ -189,9 +189,238 @@ local _entries = {}
 local _active_id = ""
 local _is_ready = false
 local _identity_generation = 0
+local _availability_generation = 0
 local _warmup_generation = 0
+local _warmup_active = false
+local _warmup_last_model = nil
+local _warmup_last_profile = nil
+local _warmup_resume_pending = false
+local _warmup_explicitly_stopped = false
+local _warmup_resume_timer = nil
+local _warmup_resume_observers = {}
+local _warmup_resume_activation_pending = false
+local _warmup_token_lease = nil
+local WARMUP_RESUME_COMMIT_DELAY_SEC = 0.05
 local _token_cache = {}
 local _token_inflight = {}
+local _token_cleanup_debt = false
+local _token_cleanup_in_progress = false
+local _availability_pause_cleanup_pending = false
+local _warmup_client_recovery_token = nil
+
+local function read_script_pause_state()
+	local control = package.loaded["modules.shortcuts.script_control"]
+	if type(control) ~= "table" then return false, 0, true end
+	local epoch = 0
+	if type(control.get_pause_epoch) == "function" then
+		local epoch_ok, value = xpcall(control.get_pause_epoch, debug.traceback)
+		if not epoch_ok or type(value) ~= "number" then return true, -1, false end
+		epoch = value
+	end
+	if type(control.is_paused) ~= "function" then return false, epoch, true end
+	local paused_ok, paused = xpcall(control.is_paused, debug.traceback)
+	if not paused_ok or type(paused) ~= "boolean" then return true, epoch, false end
+	return paused, epoch, true
+end
+
+local stage_warmup_resume
+local recover_warmup_resume
+local recover_warmup_after_client
+local begin_warmup_resume_activation
+
+local function cancel_warmup_resume_timer()
+	local handle = _warmup_resume_timer
+	if type(handle) ~= "table" or handle.timer == nil then
+		_warmup_resume_timer = nil
+		return true
+	end
+	local ok, result = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or result ~= true then return false end
+	if _warmup_resume_timer == handle then _warmup_resume_timer = nil end
+	return true
+end
+
+local function cancel_warmup_token_lease()
+	local lease = _warmup_token_lease
+	if lease == nil then return true end
+	if type(lease) ~= "table" or type(lease.cancel) ~= "function" then return false end
+	local ok, result = xpcall(lease.cancel, debug.traceback)
+	if not ok or result ~= true then return false end
+	if _warmup_token_lease == lease then _warmup_token_lease = nil end
+	return true
+end
+
+--- Retains one continuation for a staging timer whose native cleanup settles
+--- after the lifecycle call already returned.
+local function observe_warmup_resume_settlement(handle, epoch, generation)
+	if type(handle) ~= "table" or _warmup_resume_observers[handle] == true then return true end
+	if type(TimerScheduler.onSettled) ~= "function" then return false end
+	_warmup_resume_observers[handle] = true
+	local ok, registered_or_err = xpcall(function()
+		return TimerScheduler.onSettled(handle, function()
+			_warmup_resume_observers[handle] = nil
+			if _warmup_resume_timer == handle then _warmup_resume_timer = nil end
+			if generation ~= _warmup_generation or _warmup_resume_pending ~= true then return end
+			local paused, current_epoch, state_ok = read_script_pause_state()
+			if state_ok == true and paused ~= true and current_epoch == epoch then
+				recover_warmup_resume(epoch, true)
+			end
+		end)
+	end, debug.traceback)
+	if not ok or registered_or_err ~= true then
+		_warmup_resume_observers[handle] = nil
+		return false
+	end
+	return true
+end
+
+local function arm_warmup_resume(epoch)
+	if type(_warmup_resume_timer) == "table"
+		and _warmup_resume_timer.timer ~= nil
+		and _warmup_resume_timer.committed == true then
+		return true
+	end
+	if cancel_warmup_resume_timer() ~= true then return false end
+	-- cancel() may synchronously deliver an old handle's settlement observer,
+	-- which can already acquire the one valid successor before this outer frame
+	-- resumes. Never overwrite that re-entrant publication with a sibling.
+	if _warmup_resume_pending ~= true then return true end
+	if type(_warmup_resume_timer) == "table"
+		and _warmup_resume_timer.timer ~= nil
+		and _warmup_resume_timer.committed == true then
+		return true
+	end
+	local generation = _warmup_generation
+	local handle
+	local committed
+	local arm_ok, arm_error = xpcall(function()
+		handle, committed = TimerScheduler.after(WARMUP_RESUME_COMMIT_DELAY_SEC, function()
+			if _warmup_resume_timer ~= handle then return end
+			if handle.timer ~= nil then
+				observe_warmup_resume_settlement(handle, epoch, generation)
+				return
+			end
+			_warmup_resume_timer = nil
+			if committed ~= true or generation ~= _warmup_generation
+				or _warmup_resume_pending ~= true then return end
+			local paused, current_epoch, state_ok = read_script_pause_state()
+			if state_ok ~= true then
+				recover_warmup_resume(epoch, false)
+				return
+			end
+			if current_epoch ~= epoch then return end
+			if paused == true then
+				recover_warmup_resume(epoch, false)
+				return
+			end
+			begin_warmup_resume_activation(epoch, true)
+		end)
+	end, debug.traceback)
+	if type(handle) == "table" and handle.timer ~= nil then
+		_warmup_resume_timer = handle
+	end
+	if not arm_ok or committed ~= true or type(handle) ~= "table" or handle.timer == nil then
+		if type(handle) == "table" and handle.timer ~= nil then
+			observe_warmup_resume_settlement(handle, epoch, generation)
+		end
+		Logger.error(LOG, "Remote warmup resume staging failed: %s.",
+			tostring(arm_ok and committed or arm_error))
+		return false
+	end
+	handle.committed = true
+	_warmup_resume_timer = handle
+	return true
+end
+
+stage_warmup_resume = arm_warmup_resume
+
+--- Performs a bounded recovery after a post-commit retry acquisition refuses.
+--- One clean scheduler refusal gets one immediate replacement attempt; if the
+--- scheduler remains unavailable, a confirmed RESUMED runtime may perform the
+--- warmup directly once. Pending intent remains observable through is_ready().
+recover_warmup_resume = function(epoch, allow_direct)
+	if _warmup_resume_activation_pending == true then return true end
+	if _warmup_client_recovery_token ~= nil then return true end
+	if stage_warmup_resume(epoch) == true then return true end
+	if type(_warmup_resume_timer) == "table" and _warmup_resume_timer.timer ~= nil then
+		return false
+	end
+	if stage_warmup_resume(epoch) == true then return true end
+	if type(_warmup_resume_timer) == "table" and _warmup_resume_timer.timer ~= nil then
+		return false
+	end
+	if allow_direct ~= true then return false end
+	local paused, current_epoch, state_ok = read_script_pause_state()
+	if state_ok ~= true or paused == true or current_epoch ~= epoch
+		or _warmup_resume_pending ~= true then return false end
+	return begin_warmup_resume_activation(epoch, false)
+end
+
+--- Waits for all private HttpClient capabilities before staging a successor.
+--- `onSettled` invokes synchronously for a clean refusal and asynchronously for
+--- a retained timeout/task debt, so the same path covers both without overlap.
+recover_warmup_after_client = function(epoch, allow_direct)
+	local recovery_generation = _warmup_generation
+	if type(_warmup_client.onSettled) ~= "function" then
+		return recover_warmup_resume(epoch, allow_direct)
+	end
+	local token = {}
+	_warmup_client_recovery_token = token
+	local ok, registered_or_err = xpcall(function()
+		return _warmup_client.onSettled(function()
+			if _warmup_client_recovery_token ~= token then return end
+			_warmup_client_recovery_token = nil
+			if recovery_generation ~= _warmup_generation
+				or _warmup_resume_pending ~= true then return end
+			local paused, current_epoch, state_ok = read_script_pause_state()
+			if state_ok == true and paused ~= true and current_epoch == epoch then
+				recover_warmup_resume(epoch, allow_direct)
+			end
+		end)
+	end, debug.traceback)
+	if not ok or registered_or_err ~= true then
+		if _warmup_client_recovery_token == token then
+			_warmup_client_recovery_token = nil
+		end
+		return recover_warmup_resume(epoch, allow_direct)
+	end
+	return true
+end
+
+--- Starts one resumed warmup but consumes restore intent only when the real GET
+--- acquisition commits. Encrypted tokens may resolve long after M.warmup returns.
+begin_warmup_resume_activation = function(epoch, allow_direct_recovery)
+	if _warmup_resume_activation_pending == true then return true end
+	local terminal = false
+	local outcome = false
+	_warmup_resume_activation_pending = true
+	local call_ok, accepted_or_err = xpcall(function()
+		return M.warmup(_warmup_last_model, _warmup_last_profile, function(committed)
+			if terminal then return end
+			terminal = true
+			_warmup_resume_activation_pending = false
+			if committed == true then
+				_warmup_resume_pending = false
+				outcome = true
+				return
+			end
+			outcome = recover_warmup_after_client(epoch, allow_direct_recovery)
+		end)
+	end, debug.traceback)
+	local accepted = call_ok == true and accepted_or_err or false
+	if not call_ok then
+		Logger.error(LOG, "Remote resumed warmup raised: %s.", tostring(accepted_or_err))
+	end
+	if accepted ~= true and terminal ~= true then
+		terminal = true
+		_warmup_resume_activation_pending = false
+		return recover_warmup_after_client(epoch, allow_direct_recovery)
+	end
+	if terminal == true then return outcome == true end
+	return accepted == true
+end
 
 --- Delivers one token-resolution result without exposing a callback throw to
 --- the task-completion boundary that called it.
@@ -208,30 +437,96 @@ local function invoke_token_callback(callback, ...)
 	end
 end
 
---- Completes every waiter owned by superseded identity state exactly once.
---- Cleartext is cached outside persisted entry objects and is discarded here.
---- @param reason string Stable failure reason.
-local function invalidate_token_resolutions(reason)
-	local pending = _token_inflight
-	_token_inflight = {}
+--- Returns an already-settled resolver lease for synchronous/no-op outcomes.
+--- @return table lease
+local function settled_token_lease()
+	return { cancel = function() return true end }
+end
+
+--- Removes one waiter identity without disturbing siblings sharing the task.
+local function remove_token_waiter(record, waiter)
+	for index, candidate in ipairs(record.waiters or {}) do
+		if candidate == waiter then
+			table.remove(record.waiters, index)
+			return
+		end
+	end
+end
+
+--- Fences every waiter and joins the shared Keychain operations exactly. Records
+--- remain globally owned across false/nil/throw so neither a pause retry nor an
+--- identity successor can overlap the native task/timeout.
+--- @param reason string Stable invalidation reason.
+--- @param notify_waiters boolean Whether superseded callers receive a terminal.
+--- @return boolean settled
+local function settle_token_resolutions(reason, notify_waiters)
 	_token_cache = {}
-	for _, record in pairs(pending) do
-		if record.done ~= true then
-			record.done = true
-			if type(record.operation) == "table" and type(record.operation.cancel) == "function" then
-				local cancel_ok, settled = xpcall(function()
-					return record.operation.cancel()
-				end, debug.traceback)
-				if not cancel_ok or settled ~= true then
-					Logger.error(LOG, "Superseded Keychain read could not be terminated: %s",
-						tostring(cancel_ok and settled or settled))
+	if _token_cleanup_in_progress == true then
+		_token_cleanup_debt = true
+		return false
+	end
+	_token_cleanup_in_progress = true
+	_token_cleanup_debt = true
+
+	-- Detach a stable waiter snapshot before any callback is delivered. A
+	-- superseded callback is allowed to re-enter the resolver, but the cleanup
+	-- fence above makes that attempt settle synchronously without coalescing onto
+	-- either this record or a successor operation.
+	local records = {}
+	for cache_key, record in pairs(_token_inflight) do
+		local waiters = record.waiters or {}
+		record.waiters = {}
+		records[#records + 1] = {
+			cache_key = cache_key,
+			record = record,
+			waiters = waiters,
+		}
+	end
+
+	local settled = true
+	for _, owned in ipairs(records) do
+		local cache_key = owned.cache_key
+		local record = owned.record
+		if record.done == true then
+			if _token_inflight[cache_key] == record then
+				_token_inflight[cache_key] = nil
+			end
+		else
+			for _, waiter in ipairs(owned.waiters) do
+				if waiter.active == true then
+					waiter.active = false
+					if notify_waiters == true then
+						invoke_token_callback(waiter.callback, false, nil, reason)
+					end
 				end
 			end
-			for _, callback in ipairs(record.waiters) do
-				invoke_token_callback(callback, false, nil, reason)
+			local cancel_ok, cancel_result = xpcall(function()
+				if type(record.operation) ~= "table"
+					or type(record.operation.cancel) ~= "function" then
+					return false
+				end
+				return record.operation.cancel()
+			end, debug.traceback)
+			if record.done == true or (cancel_ok == true and cancel_result == true) then
+				if record.done ~= true then record.done = true end
+				if _token_inflight[cache_key] == record then
+					_token_inflight[cache_key] = nil
+				end
+			else
+				settled = false
+				Logger.error(LOG, "Keychain read cancellation retained exact debt: %s",
+					tostring(cancel_result))
 			end
 		end
 	end
+	_token_cache = {}
+	_token_cleanup_debt = settled ~= true
+	_token_cleanup_in_progress = false
+	return settled
+end
+
+local function invalidate_token_resolutions(reason)
+	return settle_token_resolutions(reason, true)
 end
 
 --- Invalidates every asynchronous operation owned by the prior remote entry.
@@ -240,9 +535,20 @@ end
 --- selected. The adapter generation is the first fence; this module generation
 --- remains authoritative even when a native completion was already queued.
 local function invalidate_identity()
-	invalidate_token_resolutions("identity_changed")
 	_identity_generation = _identity_generation + 1
+	_availability_generation = _availability_generation + 1
 	_warmup_generation = _warmup_generation + 1
+	_token_cleanup_debt = true
+	invalidate_token_resolutions("identity_changed")
+	_warmup_active = false
+	_warmup_resume_pending = false
+	_warmup_explicitly_stopped = true
+	if cancel_warmup_resume_timer() ~= true then
+		Logger.error(LOG, "Remote resume-stage cancellation failed during identity change.")
+	end
+	if cancel_warmup_token_lease() ~= true then
+		Logger.error(LOG, "Remote token-waiter cancellation failed during identity change.")
+	end
 	_is_ready = false
 	for label, client in pairs({
 		availability = _check_client,
@@ -250,7 +556,7 @@ local function invalidate_identity()
 		warmup = _warmup_client,
 	}) do
 		local ok, result = xpcall(function() return client.cancel() end, debug.traceback)
-		if not ok or result == false then
+		if not ok or result ~= true then
 			Logger.error(LOG, "Remote %s cancellation failed during identity change: %s.",
 				tostring(label), tostring(result))
 		end
@@ -290,6 +596,13 @@ function M.get_active_entry_id()
 	return _active_id
 end
 
+--- Returns the opaque generation for the complete remote-entry identity.
+--- Consumers may compare tokens for freshness but must never infer or mutate it.
+--- @return number generation
+function M.get_identity_generation()
+	return _identity_generation
+end
+
 --- Finds the currently active entry object by exact id without resolving its
 --- token. An empty or unknown id intentionally means "No Model".
 --- @return table|nil entry
@@ -314,16 +627,25 @@ end
 --- share one Keychain task. Identity changes complete all waiters as stale and
 --- prevent the old task from publishing cache state.
 --- @param callback function Receives (ok, resolved_entry, reason).
+--- @return table lease Exact ownership of this one waiter.
 function M.resolve_active_entry(callback)
+	local paused, _, pause_state_ok = read_script_pause_state()
+	if _token_cleanup_debt == true and _token_cleanup_in_progress ~= true then
+		settle_token_resolutions("resolver_preflight", false)
+	end
+	if pause_state_ok ~= true or paused == true or _token_cleanup_debt == true then
+		invoke_token_callback(callback, false, nil, "resolver_quiesced")
+		return settled_token_lease()
+	end
 	local entry = find_active_entry()
 	if not entry then
 		invoke_token_callback(callback, false, nil, "no_active_entry")
-		return
+		return settled_token_lease()
 	end
 	local stored = entry.token
 	if type(stored) ~= "string" or stored == "" then
 		invoke_token_callback(callback, false, nil, "missing_token")
-		return
+		return settled_token_lease()
 	end
 
 	local function resolved_copy(cleartext)
@@ -335,20 +657,62 @@ function M.resolve_active_entry(callback)
 
 	if not TokenCrypto.is_encrypted(stored) then
 		invoke_token_callback(callback, true, resolved_copy(stored), nil)
-		return
+		return settled_token_lease()
 	end
 
 	local cache_key = tostring(entry.id) .. "\0" .. stored
 	local cached = _token_cache[cache_key]
 	if type(cached) == "string" and cached ~= "" then
 		invoke_token_callback(callback, true, resolved_copy(cached), nil)
-		return
+		return settled_token_lease()
+	end
+
+	local waiter = { callback = callback, active = true, record = nil }
+	local lease = {}
+	lease.cancel = function()
+		if waiter.active ~= true then return true end
+		local record = waiter.record
+		if type(record) ~= "table" or record.done == true then
+			waiter.active = false
+			return true
+		end
+		for _, sibling in ipairs(record.waiters or {}) do
+			if sibling ~= waiter and sibling.active == true then
+				waiter.active = false
+				remove_token_waiter(record, waiter)
+				return true
+			end
+		end
+		if type(record.operation) ~= "table"
+			or type(record.operation.cancel) ~= "function" then
+			return false
+		end
+
+		-- Revoke callback delivery before crossing the fallible native boundary.
+		-- Restore it only when the same operation remains genuinely unsettled.
+		waiter.active = false
+		local cancel_ok, cancel_result = xpcall(function()
+			return record.operation.cancel()
+		end, debug.traceback)
+		if not cancel_ok or cancel_result ~= true then
+			if record.done ~= true then waiter.active = true end
+			return record.done == true
+		end
+		remove_token_waiter(record, waiter)
+		if record.done ~= true then
+			record.done = true
+			for key, candidate in pairs(_token_inflight) do
+				if candidate == record then _token_inflight[key] = nil end
+			end
+		end
+		return true
 	end
 
 	local existing = _token_inflight[cache_key]
 	if existing and existing.done ~= true then
-		existing.waiters[#existing.waiters + 1] = callback
-		return
+		waiter.record = existing
+		existing.waiters[#existing.waiters + 1] = waiter
+		return lease
 	end
 
 	local record = {
@@ -356,8 +720,9 @@ function M.resolve_active_entry(callback)
 		entry = entry,
 		stored = stored,
 		generation = _identity_generation,
-		waiters = { callback },
+		waiters = { waiter },
 	}
+	waiter.record = record
 	_token_inflight[cache_key] = record
 
 	local function finish(ok, cleartext, reason)
@@ -374,8 +739,12 @@ function M.resolve_active_entry(callback)
 		else
 			ok, cleartext, reason = false, nil, reason or "decrypt_failed"
 		end
-		for _, waiter in ipairs(record.waiters) do
-			invoke_token_callback(waiter, ok, ok and resolved_copy(cleartext) or nil, reason)
+		for _, pending_waiter in ipairs(record.waiters) do
+			if pending_waiter.active == true then
+				pending_waiter.active = false
+				invoke_token_callback(pending_waiter.callback,
+					ok, ok and resolved_copy(cleartext) or nil, reason)
+			end
 		end
 	end
 
@@ -393,11 +762,12 @@ function M.resolve_active_entry(callback)
 			local cancel_ok, cancel_err = xpcall(function()
 				return operation_or_err.cancel()
 			end, debug.traceback)
-			if not cancel_ok then
+			if not cancel_ok or cancel_err ~= true then
 				Logger.error(LOG, "Completed Keychain read cleanup raised: %s", tostring(cancel_err))
 			end
 		end
 	end
+	return lease
 end
 
 --- Starts a best-effort asynchronous token resolution after persisted state
@@ -618,6 +988,14 @@ end
 --- ready. The prediction engine uses this to gate its loading-tooltip /
 --- dispatch path — same contract as api_ollama.is_ready.
 function M.is_ready()
+	if _warmup_resume_pending == true
+		and _warmup_resume_activation_pending ~= true
+		and _warmup_client_recovery_token == nil then
+		local paused, epoch, state_ok = read_script_pause_state()
+		if state_ok == true and paused ~= true then
+			recover_warmup_after_client(epoch, true)
+		end
+	end
 	return _is_ready
 end
 
@@ -625,30 +1003,74 @@ end
 --- remote providers don't have a GPU-cache cold-start the way Ollama/MLX do.
 --- A successful ping flips ``_is_ready`` so the prediction engine starts
 --- dispatching real requests immediately.
-function M.warmup(_model_name, _profile)
+function M.warmup(_model_name, _profile, on_acquired)
+	local acquisition_reported = false
+	local function report_acquisition(committed)
+		if acquisition_reported then return end
+		acquisition_reported = true
+		if type(on_acquired) ~= "function" then return end
+		local ok, err = xpcall(function() on_acquired(committed == true) end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Remote warmup acquisition callback raised: %s.", tostring(err))
+		end
+	end
+	_warmup_last_model = _model_name
+	_warmup_last_profile = _profile
+	_warmup_explicitly_stopped = false
 	_warmup_generation = _warmup_generation + 1
+	_warmup_active = false
+	if _token_cleanup_debt == true
+		and settle_token_resolutions("warmup_predecessor", false) ~= true then
+		Logger.error(LOG, "Remote warmup refused over shared Keychain cleanup debt.")
+		report_acquisition(false)
+		return false
+	end
+	if cancel_warmup_token_lease() ~= true then
+		Logger.error(LOG, "Remote warmup refused over unsettled token-resolution ownership.")
+		report_acquisition(false)
+		return false
+	end
 	local my_warmup = _warmup_generation
 	local my_identity = _identity_generation
 	_is_ready = false
-	M.resolve_active_entry(function(resolved, entry, reason)
+	_warmup_active = true
+	local accepted = true
+	local resolver_terminal = false
+	local resolver_lease
+	local launch_ok, launch_error = xpcall(function()
+		resolver_lease = M.resolve_active_entry(function(resolved, entry, reason)
+		resolver_terminal = true
+		if _warmup_token_lease == resolver_lease then _warmup_token_lease = nil end
 		if my_warmup ~= _warmup_generation or my_identity ~= _identity_generation then return end
 		if resolved ~= true or not entry then
+			_warmup_active = false
+			accepted = false
 			Logger.debug(LOG, "warmup: active API token unavailable (%s).", tostring(reason))
+			report_acquisition(false)
 			return
 		end
 		local provider = M.PROVIDERS[entry.provider]
 		if not provider then
+			_warmup_active = false
+			accepted = false
 			Logger.debug(LOG, "warmup: unknown provider '%s'.", tostring(entry.provider))
+			report_acquisition(false)
 			return
 		end
 		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
 		if base == "" then
+			_warmup_active = false
+			accepted = false
 			Logger.debug(LOG, "warmup: empty base_url for provider '%s'.", entry.provider)
+			report_acquisition(false)
 			return
 		end
 		local token = entry.token or ""
 		if token == "" then
+			_warmup_active = false
+			accepted = false
 			Logger.debug(LOG, "warmup: no token configured for entry '%s'.", tostring(entry.id))
+			report_acquisition(false)
 			return
 		end
 
@@ -662,12 +1084,15 @@ function M.warmup(_model_name, _profile)
 			ping_url = rtrim_slash(base) .. "/models"
 		end
 
-		_warmup_client.get(ping_url, build_headers(format, token), function(r)
+		local dispatch_committed = false
+		local pending_response = nil
+		local function apply_response(r)
 			if my_warmup ~= _warmup_generation
 				or my_identity ~= _identity_generation
 				or find_active_entry() ~= identity_entry then
 				return
 			end
+			_warmup_active = false
 			local was_ready = _is_ready
 			_is_ready = r.ok
 			if _is_ready and not was_ready then
@@ -677,26 +1102,144 @@ function M.warmup(_model_name, _profile)
 				Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
 					tostring(r.status), tostring(entry.provider))
 			end
+		end
+		local dispatch_ok, dispatched_or_err = xpcall(function()
+			return _warmup_client.get(ping_url, build_headers(format, token), function(r)
+				if dispatch_committed ~= true then
+					pending_response = r
+					return
+				end
+				apply_response(r)
+			end)
+		end, debug.traceback)
+		if not dispatch_ok or dispatched_or_err ~= true then
+			pending_response = nil
+			_warmup_active = false
+			accepted = false
+			Logger.error(LOG, "Remote warmup GET acquisition failed: %s.",
+				tostring(dispatched_or_err))
+			report_acquisition(false)
+		else
+			dispatch_committed = true
+			if pending_response ~= nil then
+				local response = pending_response
+				pending_response = nil
+				apply_response(response)
+			end
+			report_acquisition(true)
+		end
 		end)
-	end)
-end
-
-function M.stop_warmup()
-	_warmup_generation = _warmup_generation + 1
-	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
-	if not ok or result == false then
-		Logger.error(LOG, "Remote warmup cancellation failed: %s.", tostring(result))
+	end, debug.traceback)
+	if not launch_ok then
+		_warmup_active = false
+		Logger.error(LOG, "Remote warmup dispatch raised: %s.", tostring(launch_error))
+		report_acquisition(false)
 		return false
 	end
+	if type(resolver_lease) ~= "table" or type(resolver_lease.cancel) ~= "function" then
+		_warmup_active = false
+		Logger.error(LOG, "Remote warmup token resolver returned no exact waiter lease.")
+		report_acquisition(false)
+		return false
+	end
+	if resolver_terminal ~= true then _warmup_token_lease = resolver_lease end
+	return accepted
+end
+
+local function settle_paused_availability()
+	if _availability_pause_cleanup_pending ~= true then return true end
+	local ok, result = xpcall(function() return _check_client.cancel() end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Remote availability cancellation failed: %s.", tostring(result))
+		return false
+	end
+	_availability_pause_cleanup_pending = false
+	return true
+end
+
+local function quiesce_warmup(include_availability)
+	_warmup_generation = _warmup_generation + 1
+	_warmup_active = false
+	_warmup_resume_activation_pending = false
+	local timer_settled = cancel_warmup_resume_timer() == true
+	local resolver_settled = settle_token_resolutions("warmup_quiesced", false) == true
+	local token_settled = cancel_warmup_token_lease() == true
+	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
+	local client_settled = ok == true and result == true
+	if client_settled then _warmup_client_recovery_token = nil end
+	if not client_settled then
+		Logger.error(LOG, "Remote warmup cancellation failed: %s.", tostring(result))
+	end
+	local check_settled = true
+	if include_availability == true then
+		_availability_generation = _availability_generation + 1
+		_availability_pause_cleanup_pending = true
+		check_settled = settle_paused_availability()
+	end
+	if not timer_settled or not resolver_settled or not token_settled
+		or not client_settled or not check_settled then return false end
 	Logger.debug(LOG, "Remote warmup stopped (generation %d).", _warmup_generation)
 	return true
 end
 
+function M.stop_warmup()
+	_warmup_resume_pending = false
+	_warmup_explicitly_stopped = true
+	return quiesce_warmup(false)
+end
+
+--- Quiesces one in-flight warmup while retaining its exact pre-pause intent.
+--- @return boolean settled
+function M.pause_warmup()
+	if _warmup_explicitly_stopped == true then
+		_warmup_resume_pending = false
+	elseif _warmup_resume_pending ~= true then
+		local active = _warmup_active == true or _warmup_token_lease ~= nil
+		if not active and type(_warmup_client.isActive) == "function" then
+			local ok, value = xpcall(_warmup_client.isActive, debug.traceback)
+			active = ok == true and value == true
+		end
+		_warmup_resume_pending = active
+	end
+	return quiesce_warmup(true)
+end
+
+--- Restarts only the exact warmup that pause_warmup() invalidated.
+--- @return boolean committed
+function M.resume_warmup()
+	-- A failed pause leaves the exact HTTP handle owned by HttpClient. Settle
+	-- that debt before starting the asynchronous token-resolution path; warmup()
+	-- can otherwise report acceptance before its later GET discovers the same
+	-- uncancellable predecessor.
+	local timer_settled = cancel_warmup_resume_timer() == true
+	local resolver_settled = settle_token_resolutions("warmup_resume", false) == true
+	local token_settled = cancel_warmup_token_lease() == true
+	local availability_settled = settle_paused_availability() == true
+	local ok_cancel, cancel_result = xpcall(function()
+		return _warmup_client.cancel()
+	end, debug.traceback)
+	if not timer_settled or not resolver_settled or not token_settled
+		or not availability_settled
+		or not ok_cancel or cancel_result ~= true then
+		Logger.error(LOG, "Remote warmup resume is waiting for prior cancellation: %s.",
+			tostring(cancel_result))
+		return false
+	end
+	if _warmup_resume_pending ~= true or _warmup_explicitly_stopped == true then
+		_warmup_resume_pending = false
+		return true
+	end
+	local paused, epoch, state_ok = read_script_pause_state()
+	if state_ok ~= true then return false end
+	if paused == true then return stage_warmup_resume(epoch) end
+	return begin_warmup_resume_activation(epoch, true)
+end
+
 --- Cancels the active request/response inference, if any.
 function M.cancel_streaming()
-	local ok, err = xpcall(function() return _infer_client.cancel() end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Remote inference cancellation raised: %s", tostring(err))
+	local ok, result = xpcall(function() return _infer_client.cancel() end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Remote inference cancellation failed: %s", tostring(result))
 		return false
 	end
 	return true
@@ -708,19 +1251,29 @@ end
 --- remote providers list models, not a single configured one — exhaustive
 --- model verification belongs in the picker, not the hot path.
 function M.check_availability(_model_name, on_available, on_missing)
-	M.resolve_active_entry(function(resolved, entry)
+	local paused, _, pause_state_ok = read_script_pause_state()
+	if pause_state_ok ~= true or paused == true then return false end
+	if settle_paused_availability() ~= true then return false end
+	_availability_generation = _availability_generation + 1
+	local my_availability = _availability_generation
+	local accepted = true
+	local lease = M.resolve_active_entry(function(resolved, entry)
+		if my_availability ~= _availability_generation then return end
 		if resolved ~= true or not entry then
 			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+			accepted = false
 			return
 		end
 		local provider = M.PROVIDERS[entry.provider]
 		if not provider then
 			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+			accepted = false
 			return
 		end
 		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
 		if base == "" or (entry.token or "") == "" then
 			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+			accepted = false
 			return
 		end
 
@@ -735,15 +1288,22 @@ function M.check_availability(_model_name, on_available, on_missing)
 			url = rtrim_slash(base) .. "/models"
 		end
 
-		_check_client.get(url, build_headers(format, entry.token), function(r)
-			if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then return end
+		local dispatched = _check_client.get(url, build_headers(format, entry.token), function(r)
+			local callback_paused, _, callback_state_ok = read_script_pause_state()
+			if my_availability ~= _availability_generation
+				or my_identity ~= _identity_generation
+				or find_active_entry() ~= identity_entry
+				or callback_state_ok ~= true or callback_paused == true then return end
 			if r.ok then
 				if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 			else
 				if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", r.status == 0) end
 			end
 		end)
+		if dispatched ~= true then accepted = false end
 	end)
+	if type(lease) ~= "table" or type(lease.cancel) ~= "function" then return false end
+	return accepted
 end
 
 

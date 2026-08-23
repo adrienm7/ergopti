@@ -576,6 +576,7 @@ end
 --- @return table|nil Older deferred synthetic events ordered before the original.
 local function handle_key(event_obj)
 	local returned_events = nil
+	local consume_original = false
 	local ok, err = pcall(function()
 		local evt_type = event_obj:getType()
 
@@ -583,18 +584,18 @@ local function handle_key(event_obj)
 		-- character equality and arrival time cannot distinguish another Spoon, a
 		-- sibling action or an older generation. Run this before pause/privacy/state
 		-- gates so tagged output can never be persisted during a transition.
-		local is_keyboard_event = evt_type == hs.eventtap.event.types.keyDown
-			or evt_type == hs.eventtap.event.types.keyUp
-			or evt_type == hs.eventtap.event.types.flagsChanged
-		local provenance, provenance_status, fence
-		if is_keyboard_event then
-			provenance, provenance_status, fence = EventProvenance.classify_with_fence(
-				event_obj, "keylogger")
-		else
-			provenance_status = EventProvenance.STATUS_FOREIGN
-			fence = SyntheticInput.claim_physical_fence()
+		-- Physical mouse/scroll events can be copied and globally replayed behind a
+		-- paced keyboard suffix. Those copies carry the same immutable physical-
+		-- replay tag as a delayed key and must pass through EventProvenance before
+		-- any fence claim; treating every non-keyboard event as foreign re-adopted
+		-- the replay forever and the user click/scroll never reached the app.
+		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
+			event_obj, "keylogger")
+		if fence then
+			returned_events = fence.events
+			consume_original = fence.consume_original == true
 		end
-		if fence then returned_events = fence.events end
+		if consume_original then return end
 		-- This tap may be upstream or downstream of keymap. Whichever non-owned
 		-- consumer runs first claims every older deferred action in
 		-- classify_with_fence(), making the returned payload order independent of
@@ -986,7 +987,7 @@ local function handle_key(event_obj)
 	end
 	-- A failure after the fence claim may not veto the older user action. Returning
 	-- the captured table still places it before the physical original at Quartz.
-	return false, returned_events
+	return consume_original, returned_events
 end
 
 

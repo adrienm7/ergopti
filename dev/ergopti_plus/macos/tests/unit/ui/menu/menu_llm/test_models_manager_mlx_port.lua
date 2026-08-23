@@ -16,23 +16,17 @@
 ---    built inside an integration-tier closure not exercised by the unit harness,
 ---    so we assert on the source text instead.
 --- 2. Encodes the ROOT CAUSE — the mlx_lm server invocation MUST carry --port AND
----    that port MUST come from the resolved MLX_PORT variable, never a literal.
+---    that port MUST come from the request's captured target_port identity.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
---- Reads the models_manager_mlx_server.lua source via the active package.path so
---- the test is independent of the runner's working directory. The bash launcher
---- (and its --port flag) lives in the server-lifecycle sibling module since the
---- start_server extraction; this test follows it there.
+--- Reads the uniquely anchored server-lifecycle source through the relocatable helper.
+--- @return string source
 local function read_models_manager_source()
-	local path = package.searchpath("ui.menu.menu_llm.models_manager_mlx_server", package.path)
-	helpers.assert_true(type(path) == "string" and path ~= "",
-		"could not resolve ui.menu.menu_llm.models_manager_mlx_server on package.path")
-	local fh = io.open(path, "r")
-	helpers.assert_true(fh ~= nil, "could not open models_manager_mlx_server.lua")
-	local src = fh:read("*a")
-	fh:close()
+	local src = helpers.read_driver_source("local function same_server_identity")
+	helpers.assert_true(type(src) == "string" and src ~= "",
+		"could not locate the uniquely anchored MLX server lifecycle source")
 	return src
 end
 
@@ -59,12 +53,16 @@ helpers.describe("models_manager_mlx — launcher binds the configured port", fu
 		)
 	end)
 
-	helpers.it("derives the launch port from the resolved MLX_PORT variable, not a literal", function()
+	helpers.it("derives the launch port from the request's captured identity", function()
 		local src = read_models_manager_source()
-		-- The exact concatenation that injects the resolved port into the bash command.
+		local capture_at = src:find(
+			"local target_port = pinned_port or ApiMlx.get_port()", 1, true)
+		local launch_at = capture_at and src:find(
+			'--port " .. target_port .. " --decode-concurrency 1', capture_at, true)
+			or nil
 		helpers.assert_true(
-			src:find("--port \" .. MLX_PORT", 1, true) ~= nil,
-			"the --port value must come from MLX_PORT (api_mlx.get_port()), not a hardcoded number"
+			capture_at ~= nil and launch_at ~= nil and capture_at < launch_at,
+			"the --port value must come from the request-captured target_port identity"
 		)
 	end)
 end)

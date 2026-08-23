@@ -632,6 +632,8 @@ local function make_sys_screenshot_spies(window_override)
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["adapters.file_system"] = nil
+	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
 	package.loaded["infra.notifications"] = { notify = function() end }
@@ -659,10 +661,17 @@ local function make_sys_screenshot_spies(window_override)
 		absoluteTime      = function() return 0 end,
 		usleep   = function() end,
 	})
+	local fs = extend_contract(contract.fs, {
+		pathToAbsolute = function(path)
+			if path == "~" then return "/tmp/hs015-home" end
+			return path
+		end,
+	})
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system", {
 		eventtap = eventtap,
 		timer    = timer,
+		fs       = fs,
 		execute  = function(cmd) table.insert(spy.exec_calls, cmd) return "", true, "exit", 0 end,
 		-- hs.task is stubbed rather than the ShellRunner module: the capture now
 		-- goes through the real adapter, so stubbing at the OS boundary exercises
@@ -1109,6 +1118,8 @@ local function load_h01_system(options)
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	package.loaded["modules.gestures"] = options.gestures or {}
 	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["adapters.file_system"] = nil
+	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	if options.logger then package.loaded["infra.logger"] = options.logger end
 	if options.text_actions then
 		package.loaded["modules.shortcuts.actions.text"] = options.text_actions
@@ -1406,6 +1417,10 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 
 	helpers.it("screenshot target lookup happens after every older fence event (HS-H-01)", function()
 		local fixture = load_h01_system()
+		fixture.hs.fs.pathToAbsolute = function(path)
+			if path == "~" then return "/tmp/hs015-home" end
+			return path
+		end
 		local current_window_id = 1
 		local tasks = {}
 		fixture.hs.window.frontmostWindow = function()
