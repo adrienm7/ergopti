@@ -468,14 +468,15 @@ LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnap
 			IsPhysicalTabEvent, Modifiers, InputSnapshot,
 			Presented.AcceptSource)
 			return false
-		ClaimedLifecycle := LLM_Tooltip_ClaimAcceptance(Presented.Record)
-		if !IsObject(ClaimedLifecycle)
-			return false
-		_LLM_AcceptInProgress := true
 		if !IsSet(AcceptFn) {
 			AdmissionSeed := _LLM_Bridge_CaptureAdmissionSeed(
 				Presented.AcceptSource)
 		}
+		ClaimedLifecycle := LLM_Tooltip_ClaimAcceptance(
+			Presented.Record, Presented.Surface, Presented.ActiveIdx)
+		if !IsObject(ClaimedLifecycle)
+			return false
+		_LLM_AcceptInProgress := true
 	} finally {
 		Critical(PreviousCritical)
 	}

@@ -88,6 +88,16 @@ ASSET_FILES: list[tuple[str, str]] = [
 	("static/img/ergopti.jpg", "static/img/ergopti.jpg"),
 ]
 
+# Generated native assets that must exist and reach their exact runtime path.
+# Keeping this contract separate from ASSET_TREES prevents an existing vendor
+# directory from making a release silently green when its required DLL is absent.
+REQUIRED_ASSETS: tuple[tuple[str, str], ...] = (
+	(
+		"static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll",
+		"vendor/ergopti_nav_owner.dll",
+	),
+)
+
 
 
 
@@ -119,8 +129,18 @@ def _is_excluded(rel_path: Path, patterns: tuple[str, ...]) -> bool:
 
 def build_bundle(repo_root: Path, output: Path) -> int:
 	"""Writes the bundle zip and returns the number of files included."""
+	for src_rel, _ in REQUIRED_ASSETS:
+		if not (repo_root / src_rel).is_file():
+			print(
+				f"[bundle] ERROR: required asset '{src_rel}' does not exist. "
+				"Run tools/build/build_windows_nav_owner.ps1 first.",
+				file=sys.stderr,
+			)
+			return -1
+
 	output.parent.mkdir(parents=True, exist_ok=True)
 	count = 0
+	bundled_paths: set[str] = set()
 	with zipfile.ZipFile(output, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
 		# Walk every declared tree and add matching files.
 		for src_rel, dst_rel, excludes in ASSET_TREES:
@@ -145,6 +165,7 @@ def build_bundle(repo_root: Path, output: Path) -> int:
 					continue
 				arcname = f"{dst_rel}/{rel.as_posix()}"
 				zf.write(path, arcname)
+				bundled_paths.add(arcname)
 				count += 1
 		# Add single-file assets.
 		for src_rel, dst_rel in ASSET_FILES:
@@ -153,7 +174,17 @@ def build_bundle(repo_root: Path, output: Path) -> int:
 				print(f"[bundle] WARN: missing file '{src_rel}' — skipped.", file=sys.stderr)
 				continue
 			zf.write(src_path, dst_rel)
+			bundled_paths.add(dst_rel)
 			count += 1
+
+	missing_bundle_paths = [dst_rel for _, dst_rel in REQUIRED_ASSETS if dst_rel not in bundled_paths]
+	if missing_bundle_paths:
+		print(
+			"[bundle] ERROR: required runtime path(s) were not written: "
+			+ ", ".join(missing_bundle_paths),
+			file=sys.stderr,
+		)
+		return -1
 	return count
 
 

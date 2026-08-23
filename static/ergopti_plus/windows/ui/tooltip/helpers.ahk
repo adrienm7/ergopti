@@ -9,6 +9,13 @@
 ; Split out of the former infra/tooltip.ahk (the module split); see ui/tooltip/init.ahk
 ; for the module overview. Functions and globals are hoisted, so load order
 ; across the tooltip/*.ahk files is irrelevant.
+
+class TooltipNavOwnerRetryError extends Error {
+}
+class TooltipLlmTerminalOutcomeError extends Error {
+}
+class TooltipLlmStaleRenderError extends Error {
+}
 ; ==============================================================================
 
 
@@ -372,6 +379,8 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 		CommitError := 0
 		CommitAllowed := false
 		SurfaceSwapped := false
+		NavSwap := 0
+		NavSwapCommitted := false
 		RetiredSurface := 0
 		Selection := { Committed: false }
 		PublishItems := IsObject(Items) ? Items : []
@@ -420,8 +429,29 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 						; cannot blank a still-valid visible prediction.
 						if HasMethod(CommitFn, "Call")
 							CommitFn.Call(PreparedSurface, RetiredSurface)
-						else if IsSet(_LLM_TooltipRetireSurfaceRecord)
-							_LLM_TooltipRetireSurfaceRecord(RetiredSurface)
+
+						; Fence the native hook before changing the one active pointer.
+						; While the fence is open every navigation event is passed to
+						; Windows unchanged. A receipt committed immediately before the
+						; fence retains RetiredSurface by token and can never target B.
+						if IsSet(LLM_NavEventOwner_BeginSurfaceSwap) {
+							NavSwap := LLM_NavEventOwner_BeginSurfaceSwap(
+								RetiredSurface, PreparedSurface)
+							if !(NavSwap is Map)
+								throw Error("Navigation owner refused the surface fence.")
+							if NavSwap.Get("retry", false)
+								throw TooltipNavOwnerRetryError(
+									"Navigation repaint index changed before its fence.")
+						}
+						if IsSet(_LLM_TooltipRetireSurfaceRecord) {
+							Replacement := IsSet(_LLM_TooltipPresentedFromSurface)
+								? _LLM_TooltipPresentedFromSurface(PreparedSurface) : 0
+							ReplacementLifecycle := IsObject(Replacement)
+								&& Replacement.HasOwnProp("Lifecycle")
+								? Replacement.Lifecycle : 0
+							_LLM_TooltipRetireSurfaceRecord(RetiredSurface,
+								ReplacementLifecycle)
+						}
 
 						_hpRetire := HotPath_Now()
 						_TooltipHideSurfaceObjects(RetiredSurface)
@@ -431,6 +461,11 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 						; owner generation together. No callback can observe a half-swap.
 						_TooltipActiveSurface := PreparedSurface
 						SurfaceSwapped := true
+						if NavSwap is Map {
+							if !LLM_NavEventOwner_CommitSurfaceSwap(NavSwap)
+								throw Error("Navigation owner surface commit failed.")
+							NavSwapCommitted := true
+						}
 						; Retire the exact pending request in the same pixel transaction.
 						; A newer B tuple has a different serial and remains untouched.
 						if (ExpectedRequestSerial != -1
@@ -494,6 +529,8 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 		} catch Error as Err {
 			CommitError := Err
 		} finally {
+			if (NavSwap is Map) && !NavSwapCommitted && !SurfaceSwapped
+				try LLM_NavEventOwner_AbortSurfaceSwap(NavSwap)
 			Critical(PreviousCritical)
 		}
 
@@ -513,6 +550,10 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 		_TooltipQueueSurfaceDisposal(DisposalSurface)
 		HotPath_BreakdownMark("dispose_schedule", _hpDispose)
 		if IsObject(CommitError) {
+			if CommitError is TooltipNavOwnerRetryError
+					|| CommitError is TooltipLlmTerminalOutcomeError
+					|| CommitError is TooltipLlmStaleRenderError
+				throw CommitError
 			_UiOracleReportError("Presentation commit failed: " . CommitError.Message)
 			throw CommitError
 		}

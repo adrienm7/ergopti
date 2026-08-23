@@ -53,7 +53,8 @@ _LLM_Menu_CommitNavMutation(Context, MutateFn, Port := 0) {
 	DefaultPrepare := (Candidate) => _LLM_Menu_PrepareNavBindingCandidate(Candidate,
 		ResolvedPort.Get("hotkey", 0), ResolvedPort.Get("hotif", 0),
 		ResolvedPort.Get("log", 0), ResolvedPort.Get("reset", 0),
-		ResolvedPort.Get("key_resolver", 0))
+		ResolvedPort.Get("key_resolver", 0),
+		ResolvedPort.Get("native_owner", 0))
 	DefaultPublish := (CandidateFeatures, CandidateMenu, Owner) =>
 		_LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures,
 			CandidateMenu, Owner)
@@ -302,13 +303,14 @@ _LLM_Menu_LogNavBindingFailure(Message, LogFn := 0) {
 }
 
 _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
-		LogFn := 0, ResetFn := 0, KeyResolverFn := 0) {
+		LogFn := 0, ResetFn := 0, KeyResolverFn := 0,
+		NativeOwnerPort := 0) {
 	global _LLM_Menu, _LLM_Menu_NavSlotPlans, _LLM_Menu_NavActiveSlot
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return _LLM_Menu_PrepareNavHotkeys(MenuState, HotkeyFn, HotIfFn,
-			LogFn, ResetFn, KeyResolverFn)
+			LogFn, ResetFn, KeyResolverFn, NativeOwnerPort)
 		finally Critical(InheritedCritical)
 	}
 
@@ -349,6 +351,27 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 	if !_LLM_Menu_NavSlotPlans.Has(CandidateSlot)
 		_LLM_Menu_NavSlotPlans[CandidateSlot] := []
 	OldPlan := _LLM_Menu_NavSlotPlans[CandidateSlot]
+	; Production navigation is owned at the keyboard-hook boundary. The legacy
+	; Hotkey/HotIf transaction remains only as an injected compatibility seam for
+	; its fault-atomicity tests; no production callback may suppress a digit and
+	; then re-read a replacement tooltip record.
+	UseNativeOwner := !HasMethod(HotkeyFn, "Call")
+		&& !HasMethod(HotIfFn, "Call")
+	if UseNativeOwner {
+		NativeGeneration := LLM_NavEventOwner_PreparePlan(CandidatePlan,
+			NativeOwnerPort)
+		if !(NativeGeneration is Integer) || NativeGeneration <= 0 {
+			_LLM_Menu_LogNavBindingFailure(
+				"Navigation event owner rejected the candidate plan.", LogFn)
+			return false
+		}
+		PreviousCritical := Critical("On")
+		try _LLM_Menu_NavSlotPlans[CandidateSlot] := CandidatePlan
+		finally Critical(PreviousCritical)
+		return Map("slot", CandidateSlot, "plan", CandidatePlan,
+			"native_owner", true,
+			"native_generation", NativeGeneration)
+	}
 	SlotPredicate := _LLM_Menu_NavSlotPredicate(CandidateSlot)
 	if !HasMethod(HotkeyFn, "Call")
 		HotkeyFn := _LLM_Menu_NavNativeHotkey
@@ -428,9 +451,10 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 }
 
 _LLM_Menu_PrepareNavBindingCandidate(CandidateMenu, HotkeyFn := 0,
-		HotIfFn := 0, LogFn := 0, ResetFn := 0, KeyResolverFn := 0) {
+		HotIfFn := 0, LogFn := 0, ResetFn := 0, KeyResolverFn := 0,
+		NativeOwnerPort := 0) {
 	return _LLM_Menu_PrepareNavHotkeys(CandidateMenu, HotkeyFn, HotIfFn,
-		LogFn, ResetFn, KeyResolverFn)
+		LogFn, ResetFn, KeyResolverFn, NativeOwnerPort)
 }
 
 _LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures, CandidateMenu,
@@ -448,6 +472,12 @@ _LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures, CandidateMenu,
 				|| !(_LLM_Menu_NavSlotPlans[Slot] == Owner["plan"])
 				|| !_LLM_Menu_NavPlanIsValid(Owner["plan"], CandidateMenu)
 			return false
+		if Owner.Get("native_owner", false) {
+			Generation := Owner.Get("native_generation", 0)
+			if !(Generation is Integer) || Generation <= 0
+					|| !LLM_NavEventOwner_CommitPlan(Generation)
+				return false
+		}
 		Features := CandidateFeatures
 		_LLM_Menu := CandidateMenu
 		_LLM_Menu_NavHotkeysBound := Owner["plan"]
@@ -457,9 +487,10 @@ _LLM_Menu_PublishPreparedNavCandidate(CandidateFeatures, CandidateMenu,
 }
 
 LLM_Menu_BindNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
-		LogFn := 0, ResetFn := 0, KeyResolverFn := 0) {
+		LogFn := 0, ResetFn := 0, KeyResolverFn := 0,
+		NativeOwnerPort := 0) {
 	Owner := _LLM_Menu_PrepareNavHotkeys(MenuState, HotkeyFn, HotIfFn,
-		LogFn, ResetFn, KeyResolverFn)
+		LogFn, ResetFn, KeyResolverFn, NativeOwnerPort)
 	if !(Owner is Map)
 		return false
 	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavActiveSlot
@@ -469,6 +500,12 @@ LLM_Menu_BindNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 	try {
 		if !_LLM_Menu_NavPlanIsValid(Owner["plan"], ResolvedMenu)
 			return false
+		if Owner.Get("native_owner", false) {
+			Generation := Owner.Get("native_generation", 0)
+			if !(Generation is Integer) || Generation <= 0
+					|| !LLM_NavEventOwner_CommitPlan(Generation)
+				return false
+		}
 		_LLM_Menu_NavHotkeysBound := Owner["plan"]
 		_LLM_Menu_NavActiveSlot := Owner["slot"]
 		return true

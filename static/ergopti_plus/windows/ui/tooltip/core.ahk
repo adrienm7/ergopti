@@ -159,8 +159,6 @@ _TooltipTimerFn() {
     ; already guard against. The suspend reactor has already hidden the tooltip
     ; and reset the engine, so a fire while paused would only tear down a
     ; surface that is already gone.
-    if A_IsSuspended
-        return
     ExpectedGeneration := 0
     ExpectedSurface := 0
     PreviousCritical := Critical("On")
@@ -188,15 +186,10 @@ _TooltipTimerFn() {
     ; terminator, a caret move, a fire — each of which resets the engine too.
 }
 
-_TooltipTimerHideOrRetry(ExpectedGeneration, ExpectedSurface) {
+_TooltipScheduleTimerRetry(ExpectedGeneration, ExpectedSurface,
+		ScheduleFn := 0) {
 	global _TooltipGeneration, _TooltipActiveSurface
 	global _TOOLTIP_OWNER_RETRY_MS
-	if A_IsSuspended
-		return false
-	; TooltipHide refuses an exact old-surface timeout while a newer request is
-	; pending. That refusal is safe only if the one-shot remains live.
-	if TooltipHide("TimerFn", true, ExpectedGeneration, ExpectedSurface)
-		return true
 	RetryCurrentOwner := false
 	PreviousCritical := Critical("On")
 	try {
@@ -206,10 +199,31 @@ _TooltipTimerHideOrRetry(ExpectedGeneration, ExpectedSurface) {
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if RetryCurrentOwner
-		SetTimer(_TooltipTimerHideOrRetry.Bind(
-			ExpectedGeneration, ExpectedSurface), -_TOOLTIP_OWNER_RETRY_MS)
-	return false
+	if !RetryCurrentOwner
+		return false
+	Callback := _TooltipTimerHideOrRetry.Bind(
+		ExpectedGeneration, ExpectedSurface, ScheduleFn)
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(Callback, -_TOOLTIP_OWNER_RETRY_MS)
+	else
+		SetTimer(Callback, -_TOOLTIP_OWNER_RETRY_MS)
+	return true
+}
+
+_TooltipTimerHideOrRetry(ExpectedGeneration, ExpectedSurface,
+		ScheduleFn := 0) {
+	; SetTimer bypasses Suspend. A raw external pause may later be compensated if
+	; the native hook refuses its lifecycle fence, so never consume the absolute
+	; deadline while A still owns the pixels: retain one exact retry obligation.
+	if A_IsSuspended
+		return _TooltipScheduleTimerRetry(
+			ExpectedGeneration, ExpectedSurface, ScheduleFn)
+	; TooltipHide refuses an exact old-surface timeout while a newer request is
+	; pending. That refusal is safe only if the one-shot remains live.
+	if TooltipHide("TimerFn", true, ExpectedGeneration, ExpectedSurface)
+		return true
+	return _TooltipScheduleTimerRetry(
+		ExpectedGeneration, ExpectedSurface, ScheduleFn)
 }
 
 _TooltipDeferredShowFn(ExpectedSerial) {
@@ -502,10 +516,13 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 TooltipShow(Items, DurationSec := 0, ArmSafety := true, CommitFn := 0) {
 	global _TooltipPendingRequest, _TooltipRequestSerial
 	global TOOLTIP_RENDER_DEBOUNCE_MS
+	OwnedPresentation := HasMethod(CommitFn, "Call")
 
     if A_IsSuspended {
+		if OwnedPresentation
+			return false
         TooltipHide("Suspend", true)
-        return
+		return false
     }
 	; Stamp and allocate before the transaction: neither action touches shared
 	; state, and no GUI/COM work is allowed under Critical.
@@ -525,6 +542,18 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true, CommitFn := 0) {
 	; immutable record under the same barrier.
 	PreviousCritical := Critical("On")
 	try {
+		if OwnedPresentation
+				&& (A_IsSuspended
+					|| (IsSet(LLM_NavEventOwner_LifecycleBarrierActive)
+						&& LLM_NavEventOwner_LifecycleBarrierActive()))
+			return false
+		; A hotstring preview may be requested while a native navigation receipt
+		; is repainting the prediction which already owns the surface. Reject that
+		; incidental request before it can steal the repaint's request serial or
+		; cancel its timer. Owned prediction/loading renders carry CommitFn and
+		; remain eligible for the normal replacement transaction below.
+		if !HasMethod(CommitFn, "Call") && LLM_TooltipOwnsSurface()
+			return false
 		OldRequest := _TooltipPendingRequest
 		if (IsObject(OldRequest) and OldRequest.HasOwnProp("TimerFn")
 			and IsObject(OldRequest.TimerFn))
@@ -537,6 +566,7 @@ TooltipShow(Items, DurationSec := 0, ArmSafety := true, CommitFn := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	return true
 }
 
 ; Runs from the debounced timer, never directly from the prefix watcher.
@@ -557,9 +587,14 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
     ; The per-callback input guards normally prevent reaching here, but the
     ; dequeue poll timer and async LLM callers can still land mid-pause, so tear
     ; down anything still up and refuse the show.
+	if OwnedPresentation
+			&& (A_IsSuspended
+				|| (IsSet(LLM_NavEventOwner_LifecycleBarrierActive)
+					&& LLM_NavEventOwner_LifecycleBarrierActive()))
+		return false
     if A_IsSuspended {
         TooltipHide("Suspend", true)
-        return
+		return false
     }
 
     ; While a real prediction OWNS the shared surface, refuse any incidental rebuild
@@ -691,10 +726,13 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
 			OwnedPresentation ? [] : Items,
 			RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan,
 			CommitFn)
-    } catch {
+	} catch Error as PresentError {
+		if PresentError is TooltipNavOwnerRetryError
+				|| PresentError is TooltipLlmStaleRenderError
+			return false
         TooltipHide("ShowFail", true, RenderGeneration,
             unset, RequestSerial)
-        return
+		return false
     }
     ; Drain sub-step attribution even when the final freshness/deadline commit
     ; refuses the reveal; otherwise its marks leak into the next render.
@@ -753,6 +791,9 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
     DismissedRecord := 0
     RefusedReason := ""
     Authorized := false
+	NavSwap := 0
+	NavSwapCommitted := false
+	NavSurfaceCleared := false
     _llm_on_screen := false
     _llm_was_visible := false
     _llm_was_loading := false
@@ -793,7 +834,14 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
         } else if (!Force and _TooltipDequeueActive) {
             RefusedReason := "dequeue_owner"
         } else {
-            Authorized := true
+			if IsSet(LLM_NavEventOwner_BeginSurfaceSwap) {
+				NavSwap := LLM_NavEventOwner_BeginSurfaceSwap(
+					_TooltipActiveSurface, 0)
+				if !(NavSwap is Map)
+					RefusedReason := "nav_owner_fence"
+			}
+			if RefusedReason == "" {
+				Authorized := true
             if IsSet(HotstringPrefixWatcherClearVisibleDecisions) {
                 ; Pure detach only. Privacy/keylogger work is emitted below after
                 ; restoring the caller's interruptibility.
@@ -826,8 +874,17 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
             ; here against the captured owner.
             _TooltipHideSurfaceObjects(RetiredSurface)
             _TooltipActiveSurface := 0
+				NavSurfaceCleared := true
+				if NavSwap is Map {
+					if !LLM_NavEventOwner_CommitSurfaceSwap(NavSwap)
+						throw Error("Navigation owner hide commit failed.")
+					NavSwapCommitted := true
+				}
+			}
         }
     } finally {
+		if (NavSwap is Map) && !NavSwapCommitted && !NavSurfaceCleared
+			try LLM_NavEventOwner_AbortSurfaceSwap(NavSwap)
         Critical(PreviousCritical)
     }
     if (RefusedReason == "llm_owner" and _llm_on_screen)
@@ -885,6 +942,8 @@ _TooltipDisposeRetired(RetiredSurface) {
     } catch as Err {
         try LoggerWarn("Tooltip", "Deferred tooltip teardown failed for generation {1}: {2}.", RetiredGeneration, Err.Message)
     }
+	if IsSet(LLM_NavEventOwner_ReleaseSurface)
+		LLM_NavEventOwner_ReleaseSurface(RetiredSurface)
 }
 
 ; Returns true when a hotstring-style tooltip (built by TooltipShow) is

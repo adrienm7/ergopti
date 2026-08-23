@@ -136,6 +136,19 @@ _LLM_TooltipRetireSurfaceRecord(Surface, ReplacementLifecycle := 0) {
 
 ; Attach the full semantics to the detached candidate BEFORE the one active
 ; surface assignment. No back-reference is stored, avoiding a ref-count cycle.
+_LLM_TooltipRenderGuardIsCurrent(PresentationMeta) {
+	Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
+	if !Meta.Has("render_guard")
+		return true
+	Guard := Meta["render_guard"]
+	if !HasMethod(Guard, "Call")
+		return false
+	try Current := Guard.Call()
+	catch
+		return false
+	return (Current is Integer) && Current == true
+}
+
 _LLM_TooltipCommitSurfaceState(slots, active_idx, RenderGeneration,
 		PresentationMeta, SurfaceToken, RetiredSurface) {
 	global _TooltipGeneration
@@ -147,8 +160,37 @@ _LLM_TooltipCommitSurfaceState(slots, active_idx, RenderGeneration,
 	if !(slots is Array) or slots.Length == 0
 		throw ValueError("LLM prediction state requires at least one slot.")
 	Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
+	; The engine request may be cancelled while detached GUI/UIA work yields.
+	; Recheck its immutable identity under the presenter's Critical transaction,
+	; before reading or mutating A's lifecycle and before attaching B.
+	if !_LLM_TooltipRenderGuardIsCurrent(Meta)
+		throw TooltipLlmStaleRenderError(
+			"LLM render request was superseded before pixel publication.")
+	; A candidate may have completed its detached GUI build before an external
+	; Suspend or lifecycle fence began. The common presenter invokes this commit
+	; under Critical, so reject before resolving/reusing the visible lifecycle:
+	; BeginSurfaceSwap is a necessary native backstop but is too late to roll back
+	; mutations of A's shared acceptance semantics.
+	if A_IsSuspended
+			|| (IsSet(LLM_NavEventOwner_LifecycleBarrierActive)
+				&& LLM_NavEventOwner_LifecycleBarrierActive())
+		throw TooltipNavOwnerRetryError(
+			"LLM state commit crossed the navigation lifecycle fence.")
 	OfferId := Meta.Get("offer_id", 0)
 	Previous := _LLM_TooltipPresentedFromSurface(RetiredSurface)
+	; A terminal visible prediction owns the surface until its exact hide retires
+	; those pixels. This also blocks a different offer which finished building
+	; after Tab's native CAS; such a candidate must not recreate native ownership
+	; in the acceptance-to-hide window.
+	if IsObject(Previous) and Previous.Kind == "prediction" {
+		if !Previous.HasOwnProp("Lifecycle")
+				or !IsObject(Previous.Lifecycle)
+				or !Previous.Lifecycle.HasOwnProp("Outcome")
+			throw TypeError("Visible LLM lifecycle is missing its terminal outcome.")
+		if Previous.Lifecycle.Outcome != ""
+			throw TooltipLlmTerminalOutcomeError(
+				"Visible LLM lifecycle already reached a terminal outcome.")
+	}
 	Lifecycle := Meta.Get("lifecycle", 0)
 	if !IsObject(Lifecycle) and IsObject(Previous)
 			and Previous.Kind == "prediction"
@@ -167,37 +209,64 @@ _LLM_TooltipCommitSurfaceState(slots, active_idx, RenderGeneration,
 			TimeoutDurationMs: 0
 		}
 	}
-	Lifecycle.AcceptSource := _LLM_TooltipCloneAcceptSource(
+	; A Tab claim linearizes acceptance by detaching the native owner before text
+	; injection. A same-offer render which was already building may reach this
+	; commit afterward; it must lose before it can rewrite lifecycle semantics or
+	; attach a fresh native token to its detached surface.
+	if !Lifecycle.HasOwnProp("Outcome")
+		throw TypeError("LLM lifecycle is missing its terminal outcome.")
+	if Lifecycle.Outcome != ""
+		throw TooltipLlmTerminalOutcomeError(
+			"LLM lifecycle already reached a terminal outcome.")
+	; Stage every replacement value before touching a lifecycle which may still
+	; describe visible pixels. An expired or malformed same-offer candidate must
+	; not rewrite A's acceptance source or metric attribution before it loses.
+	NextAcceptSource := _LLM_TooltipCloneAcceptSource(
 		Meta.Get("accept_source", Lifecycle.AcceptSource))
-	Lifecycle.AppName := Meta.Get("app_name", Lifecycle.AppName)
-	Lifecycle.Slots := slots.Clone()
+	NextAppName := Meta.Get("app_name", Lifecycle.AppName)
+	NextLifecycleSlots := slots.Clone()
+	NextRecordSlots := slots.Clone()
 	IsFinalValue := Meta.Get("is_final", false)
 	IsFinal := (IsFinalValue is Integer and IsFinalValue == true)
 	TimeoutMs := Meta.Get("timeout_ms", 0)
 	if !(TimeoutMs is Number)
 		TimeoutMs := 0
 	TimeoutMs := Max(0, Round(TimeoutMs))
-	if (TimeoutMs > 0 and Lifecycle.TimeoutDurationMs == 0) {
-		Lifecycle.TimeoutOrigin := A_TickCount
-		Lifecycle.TimeoutDurationMs := TimeoutMs
+	NextTimeoutOrigin := Lifecycle.TimeoutOrigin
+	NextTimeoutDurationMs := Lifecycle.TimeoutDurationMs
+	if (TimeoutMs > 0 and NextTimeoutDurationMs == 0) {
+		NextTimeoutOrigin := A_TickCount
+		NextTimeoutDurationMs := TimeoutMs
 	}
-	RemainingMs := Lifecycle.TimeoutDurationMs > 0
-		? TickRemaining(Lifecycle.TimeoutOrigin,
-			Lifecycle.TimeoutDurationMs) : 0
-	if (Lifecycle.TimeoutDurationMs > 0 and RemainingMs <= 0)
+	RemainingMs := NextTimeoutDurationMs > 0
+		? TickRemaining(NextTimeoutOrigin, NextTimeoutDurationMs) : 0
+	if (NextTimeoutDurationMs > 0 and RemainingMs <= 0)
 		throw Error("LLM presentation expired before pixel publication.")
+	NextActiveIdx := Max(1, Min(Integer(active_idx), slots.Length))
+	ExactIndexValue := Meta.Get("nav_owner_exact_index", false)
 	Record := {
 		Kind: "prediction",
-		Slots: slots.Clone(),
-		ActiveIdx: Max(1, Min(Integer(active_idx), slots.Length)),
+		Slots: NextRecordSlots,
+		ActiveIdx: NextActiveIdx,
+		NavOwnerRequireExactIndex:
+			(ExactIndexValue is Integer) && ExactIndexValue == true,
 		Lifecycle: Lifecycle,
 		IsFinal: IsFinal,
-		ShownAt: Lifecycle.TimeoutOrigin,
+		ShownAt: NextTimeoutOrigin,
 		Generation: RenderGeneration,
 		TimeoutRemainingMs: RemainingMs
 	}
-	_LLM_TooltipRetireSurfaceRecord(RetiredSurface, Lifecycle)
+	; All candidate validation is complete. Publish the shared lifecycle fields as
+	; one final semantic step immediately before attaching the detached surface.
+	Lifecycle.AcceptSource := NextAcceptSource
+	Lifecycle.AppName := NextAppName
+	Lifecycle.Slots := NextLifecycleSlots
+	Lifecycle.TimeoutOrigin := NextTimeoutOrigin
+	Lifecycle.TimeoutDurationMs := NextTimeoutDurationMs
 	SurfaceToken.LlmPresented := Record
+	SurfaceToken.RenderedActiveIdx := Record.ActiveIdx
+	if IsSet(LLM_NavEventOwner_AttachRecord)
+		LLM_NavEventOwner_AttachRecord(Record, SurfaceToken)
 	return true
 }
 
@@ -219,11 +288,19 @@ _LLM_TooltipMarkSurfaceSuggested(Surface) {
 _LLM_TooltipCommitLoadingState(PresentationMeta, SurfaceToken,
 		RetiredSurface) {
 	global _TooltipGeneration
+	Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
+	if !_LLM_TooltipRenderGuardIsCurrent(Meta)
+		throw TooltipLlmStaleRenderError(
+			"LLM loading request was superseded before pixel publication.")
+	if A_IsSuspended
+			|| (IsSet(LLM_NavEventOwner_LifecycleBarrierActive)
+				&& LLM_NavEventOwner_LifecycleBarrierActive())
+		throw TooltipNavOwnerRetryError(
+			"LLM loading commit crossed the navigation lifecycle fence.")
 	if !IsObject(SurfaceToken)
 		throw TypeError("LLM loading state requires a detached surface.")
 	if (SurfaceToken.Generation != _TooltipGeneration)
 		throw Error("LLM loading state lost its render owner.")
-	Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
 	Lifecycle := {
 		OfferId: Meta.Get("offer_id", 0),
 		AcceptSource: _LLM_TooltipCloneAcceptSource(
@@ -232,13 +309,110 @@ _LLM_TooltipCommitLoadingState(PresentationMeta, SurfaceToken,
 		Slots: [], Suggested: false, Outcome: "",
 		TimeoutOrigin: 0, TimeoutDurationMs: 0
 	}
-	_LLM_TooltipRetireSurfaceRecord(RetiredSurface, Lifecycle)
 	SurfaceToken.LlmPresented := {
 		Kind: "loading", Slots: [], ActiveIdx: 0,
 		Lifecycle: Lifecycle, IsFinal: false, ShownAt: 0,
 		Generation: SurfaceToken.Generation, TimeoutRemainingMs: 0
 	}
 	return true
+}
+
+_LLM_TooltipScheduleReservationDeadlineRetry(ExpectedSurface,
+		ScheduleFn := 0) {
+	global _TooltipActiveSurface, _TOOLTIP_OWNER_RETRY_MS
+	StillOwnsPixels := false
+	PreviousCritical := Critical("On")
+	try {
+		StillOwnsPixels := IsObject(ExpectedSurface)
+			&& IsObject(_TooltipActiveSurface)
+			&& ObjPtr(ExpectedSurface) == ObjPtr(_TooltipActiveSurface)
+	} finally Critical(PreviousCritical)
+	if !StillOwnsPixels
+		return false
+	Callback := _LLM_TooltipReservationDeadlineFn.Bind(
+		ExpectedSurface, ScheduleFn)
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(Callback, -_TOOLTIP_OWNER_RETRY_MS)
+	else
+		SetTimer(Callback, -_TOOLTIP_OWNER_RETRY_MS)
+	return true
+}
+
+_LLM_TooltipReservationDeadlineFn(ExpectedSurface, ScheduleFn := 0) {
+	if A_IsSuspended
+		return _LLM_TooltipScheduleReservationDeadlineRetry(
+			ExpectedSurface, ScheduleFn)
+	if TooltipHide("TimerFn", true, unset, ExpectedSurface)
+		return true
+	return _LLM_TooltipScheduleReservationDeadlineRetry(
+		ExpectedSurface, ScheduleFn)
+}
+
+; The canonical timer is generation-owned and must be cancelled when B reserves
+; a new generation. Preserve A's already-published absolute deadline with an
+; exact-surface one-shot; it no-ops if B wins and retries only while A still owns
+; the pixels. This prevents a later stale-B rejection from making A immortal.
+_LLM_TooltipPreserveActiveDeadline() {
+	global _TooltipActiveSurface
+	Surface := _TooltipActiveSurface
+	Record := _LLM_TooltipPresentedFromSurface(Surface)
+	if !IsObject(Surface) || !IsObject(Record)
+			|| Record.Kind != "prediction"
+			|| !Record.HasOwnProp("Lifecycle")
+			|| !IsObject(Record.Lifecycle)
+		return false
+	Lifecycle := Record.Lifecycle
+	if !Lifecycle.HasOwnProp("TimeoutDurationMs")
+			|| !Lifecycle.HasOwnProp("TimeoutOrigin")
+			|| !(Lifecycle.TimeoutDurationMs is Number)
+			|| Lifecycle.TimeoutDurationMs <= 0
+		return false
+	RemainingMs := TickRemaining(
+		Lifecycle.TimeoutOrigin, Lifecycle.TimeoutDurationMs)
+	SetTimer(_LLM_TooltipReservationDeadlineFn.Bind(Surface),
+		-Max(1, RemainingMs))
+	return true
+}
+
+; Atomically reserves the generation/request owner for one detached LLM paint.
+; A lifecycle fence must win before it can cancel the currently visible
+; prediction's timer or invalidate its request serial.
+_LLM_TooltipReserveLlmRender(PresentationMeta := 0) {
+    global _TooltipGeneration, _TooltipTimerGeneration, _TooltipTimerFn
+    global _TooltipDequeueItems, _TooltipDequeueActive
+    global _TooltipDequeueDeadlineTimer
+	global _TooltipPendingRequest, _TooltipRequestSerial
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_TooltipRenderGuardIsCurrent(PresentationMeta)
+			return 0
+		if A_IsSuspended
+				|| (IsSet(LLM_NavEventOwner_LifecycleBarrierActive)
+					&& LLM_NavEventOwner_LifecycleBarrierActive())
+			return 0
+		OldRequest := _TooltipPendingRequest
+		if (IsObject(OldRequest) and OldRequest.HasOwnProp("TimerFn")
+			and IsObject(OldRequest.TimerFn))
+			SetTimer(OldRequest.TimerFn, 0)
+		_TooltipPendingRequest := 0
+		_TooltipRequestSerial += 1
+		RenderRequestSerial := _TooltipRequestSerial
+		_LLM_TooltipPreserveActiveDeadline()
+        RenderGeneration := _TooltipGeneration + 1
+        _TooltipGeneration := RenderGeneration
+        _TooltipTimerGeneration := RenderGeneration
+        SetTimer(_TooltipTimerFn, 0)
+        if IsObject(_TooltipDequeueDeadlineTimer)
+            SetTimer(_TooltipDequeueDeadlineTimer, 0)
+        _TooltipDequeueDeadlineTimer := 0
+        _TooltipDequeueItems := 0
+        _TooltipDequeueActive := false
+		return Map(
+			"generation", RenderGeneration,
+			"request_serial", RenderRequestSerial)
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Show the LLM multi-slot tooltip using the shared Gui engine.
@@ -320,29 +494,14 @@ LLM_TooltipShow(payload, active := 1, is_final := false,
 		Meta["timeout_ms"] := Round(
 			Max(0.05, llm_timeout_sec - 0.2) * 1000)
 	}
-
-    global _TooltipGeneration, _TooltipTimerGeneration
-    global _TooltipDequeueItems, _TooltipDequeueActive
-    global _TooltipDequeueDeadlineTimer
-	global _TooltipRequestSerial
     ; Reserve render ownership and cancel the older hotstring dequeue cycle in
     ; one short transaction. Slots/Visible/ShownAt deliberately remain owned by
     ; the current pixels until the detached replacement wins the common commit.
-    PreviousCritical := Critical("On")
-    try {
-        RenderGeneration := _TooltipGeneration + 1
-        _TooltipGeneration := RenderGeneration
-		RenderRequestSerial := _TooltipRequestSerial
-        _TooltipTimerGeneration := RenderGeneration
-        SetTimer(_TooltipTimerFn, 0)
-        if IsObject(_TooltipDequeueDeadlineTimer)
-            SetTimer(_TooltipDequeueDeadlineTimer, 0)
-        _TooltipDequeueDeadlineTimer := 0
-        _TooltipDequeueItems := 0
-        _TooltipDequeueActive := false
-    } finally {
-        Critical(PreviousCritical)
-    }
+	Reservation := _LLM_TooltipReserveLlmRender(Meta)
+	if !(Reservation is Map)
+		return false
+	RenderGeneration := Reservation["generation"]
+	RenderRequestSerial := Reservation["request_serial"]
 
 	; Detect whether any slot carries diff chunks — if so use the rich Gui path.
 	has_chunks := false
@@ -359,11 +518,20 @@ LLM_TooltipShow(payload, active := 1, is_final := false,
 	; own catch disposes a partially-built candidate before this outer lifecycle
 	; handler clears the prediction flags.
 	try {
-		if !_TooltipBuildGuiLlm(slots, active_idx, RenderGeneration, Meta) {
+		if !_TooltipBuildGuiLlm(slots, active_idx, RenderGeneration, Meta,
+				RenderRequestSerial) {
 			LLM_TooltipHide(false, RenderGeneration, RenderRequestSerial)
             return false
 		}
-    } catch as _llm_build_err {
+	} catch as _llm_build_err {
+		if _llm_build_err is TooltipLlmTerminalOutcomeError
+				|| _llm_build_err is TooltipLlmStaleRenderError
+			return false
+		if _llm_build_err is TooltipNavOwnerRetryError {
+			if IsSet(LLM_NavEventOwner_ScheduleDrain)
+				LLM_NavEventOwner_ScheduleDrain()
+			return false
+		}
 		try LoggerError("LLM.tt", "Prediction render failed — hiding cleanly: {1} | file={2} line={3}.",
 			_llm_build_err.Message,
 			(_llm_build_err.HasOwnProp("File") ? _llm_build_err.File : "?"),
@@ -391,7 +559,7 @@ LLM_TooltipRenderGenerationIsCurrent(RenderGeneration) {
 ; Stays visible until replaced by ``LLM_TooltipShow`` or ``LLM_TooltipHide``.
 LLM_TooltipShowLoading(PresentationMeta := 0) {
 	if A_IsSuspended
-		return
+		return false
 	label := (IsSet(t)) ? t("llm.generating") : _LLM_TOOLTIP_LOADING_FALLBACK
 	accent := _TooltipResolveAccent("ai_loading")
 	; DurationSec 0 + ArmSafety false: the spinner must live until the prediction
@@ -402,10 +570,27 @@ LLM_TooltipShowLoading(PresentationMeta := 0) {
 	; and silently do nothing, letting the spinner vanish mid-inference.
 	Meta := (PresentationMeta is Map) ? PresentationMeta : Map()
 	CommitFn := _LLM_TooltipCommitLoadingState.Bind(Meta)
-	TooltipShow([{
-		Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0
-	}], 0, false, CommitFn)
+	; Every loading ingress, including an all-placeholder streaming partial, must
+	; preserve the real prediction which already owns the pixels. Keep this guard
+	; in the same short transaction as TooltipShow's request publication so the
+	; loading candidate cannot win between an earlier policy check and its timer.
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_TooltipRenderGuardIsCurrent(Meta)
+			return false
+		if A_IsSuspended
+				|| (IsSet(LLM_NavEventOwner_LifecycleBarrierActive)
+					&& LLM_NavEventOwner_LifecycleBarrierActive())
+				|| LLM_TooltipOwnsSurface()
+			return false
+		Shown := TooltipShow([{
+			Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0
+		}], 0, false, CommitFn)
+	} finally Critical(PreviousCritical)
+	if !Shown
+		return false
 	try LoggerDebug("LLM.tt", "SHOW loading (no auto-hide).")
+	return true
 }
 
 LLM_TooltipHide(accepted := false, ExpectedGeneration := unset,
@@ -479,13 +664,30 @@ _LLM_TooltipGetCurrentRecord() {
 	return IsObject(Presentation) ? Presentation.Record : 0
 }
 
+_LLM_TooltipPresentationIndexIsPainted(Presentation) {
+	if !IsObject(Presentation) || !IsObject(Presentation.Record)
+			|| !IsObject(Presentation.Surface)
+			|| !Presentation.Surface.HasOwnProp("RenderedActiveIdx")
+		return false
+	RenderedIdx := Presentation.Surface.RenderedActiveIdx
+	return (RenderedIdx is Integer)
+		&& (Presentation.Record.ActiveIdx is Integer)
+		&& RenderedIdx == Presentation.Record.ActiveIdx
+}
+
 LLM_TooltipGetText() {
 	; Reachable from a PARSE-TIME #HotIf (`Tab::` in menu_llm/tab_accept.ahk),
 	; which can run before the active surface exists. A missing/loading surface
 	; is deliberately non-acceptable even if a retired prediction still owns
 	; objects waiting for deferred destruction.
-	Record := _LLM_TooltipGetCurrentRecord()
+	Presentation := _LLM_TooltipGetCurrentPresentation()
+	Record := IsObject(Presentation) ? Presentation.Record : 0
 	if !IsObject(Record) or Record.Kind != "prediction"
+		return ""
+	if IsSet(LLM_NavEventOwner_SyncRecord)
+			&& !LLM_NavEventOwner_SyncRecord(Record)
+		return ""
+	if !_LLM_TooltipPresentationIndexIsPainted(Presentation)
 		return ""
 	if (Record.ActiveIdx < 1 or Record.ActiveIdx > Record.Slots.Length)
 		return ""
@@ -494,11 +696,15 @@ LLM_TooltipGetText() {
 
 LLM_TooltipGetSlots() {
 	Record := _LLM_TooltipGetCurrentRecord()
+	if IsObject(Record) && IsSet(LLM_NavEventOwner_SyncRecord)
+		LLM_NavEventOwner_SyncRecord(Record)
 	return IsObject(Record) ? Record.Slots.Clone() : []
 }
 
 LLM_TooltipGetActiveIdx() {
 	Record := _LLM_TooltipGetCurrentRecord()
+	if IsObject(Record) && IsSet(LLM_NavEventOwner_SyncRecord)
+		LLM_NavEventOwner_SyncRecord(Record)
 	return IsObject(Record) ? Record.ActiveIdx : 1
 }
 
@@ -552,6 +758,40 @@ LLM_TooltipSetActiveIdx(idx) {
 	return LLM_TooltipShow(Record.Slots, NextIdx, Record.IsFinal, Meta)
 }
 
+; A native receipt has already committed the semantic index against
+; ExpectedRecord before the digit was suppressed. This function is therefore
+; repaint-only: it may lose to a newer surface generation, but it must never
+; fall back to whichever record happens to be current when the wake is drained.
+_LLM_TooltipRenderOwnedNavigation(ExpectedRecord, ExpectedSurface) {
+	global _TooltipActiveSurface
+	if !IsObject(ExpectedRecord) || !IsObject(ExpectedSurface)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		Current := _LLM_TooltipPresentedFromSurface(_TooltipActiveSurface)
+		if !IsObject(Current)
+				|| ObjPtr(Current) != ObjPtr(ExpectedRecord)
+				|| !IsObject(_TooltipActiveSurface)
+				|| ObjPtr(_TooltipActiveSurface) != ObjPtr(ExpectedSurface)
+			return false
+		if !(ExpectedRecord.Slots is Array)
+				|| ExpectedRecord.ActiveIdx < 1
+				|| ExpectedRecord.ActiveIdx > ExpectedRecord.Slots.Length
+			return false
+		Slots := ExpectedRecord.Slots.Clone()
+		ActiveIdx := ExpectedRecord.ActiveIdx
+		IsFinal := ExpectedRecord.IsFinal
+		Meta := Map(
+			"offer_id", ExpectedRecord.Lifecycle.OfferId,
+			"lifecycle", ExpectedRecord.Lifecycle,
+			"accept_source", ExpectedRecord.Lifecycle.AcceptSource,
+			"app_name", ExpectedRecord.Lifecycle.AppName,
+			"timeout_ms", ExpectedRecord.Lifecycle.TimeoutDurationMs,
+			"nav_owner_exact_index", true)
+	} finally Critical(PreviousCritical)
+	return LLM_TooltipShow(Slots, ActiveIdx, IsFinal, Meta)
+}
+
 LLM_TooltipGetPresentedToken() {
 	return _LLM_TooltipGetCurrentRecord()
 }
@@ -560,6 +800,11 @@ LLM_TooltipGetAcceptSnapshot() {
 	Presentation := _LLM_TooltipGetCurrentPresentation()
 	Record := IsObject(Presentation) ? Presentation.Record : 0
 	if !IsObject(Record) or Record.Kind != "prediction"
+		return 0
+	if IsSet(LLM_NavEventOwner_SyncRecord)
+			&& !LLM_NavEventOwner_SyncRecord(Record)
+		return 0
+	if !_LLM_TooltipPresentationIndexIsPainted(Presentation)
 		return 0
 	if (Record.ActiveIdx < 1 or Record.ActiveIdx > Record.Slots.Length)
 		return 0
@@ -579,17 +824,32 @@ LLM_TooltipGetAcceptSnapshot() {
 	}
 }
 
-LLM_TooltipClaimAcceptance(ExpectedRecord) {
+LLM_TooltipClaimAcceptance(ExpectedRecord, ExpectedSurface := 0,
+		ExpectedActiveIdx := 0) {
 	global _TooltipActiveSurface
-	if !IsObject(ExpectedRecord)
+	if !IsObject(ExpectedRecord) || !IsObject(ExpectedSurface)
+			|| !(ExpectedActiveIdx is Integer)
 		return 0
 	PreviousCritical := Critical("On")
 	try {
 		Current := _LLM_TooltipPresentedFromSurface(_TooltipActiveSurface)
-		if !IsObject(Current) or ObjPtr(Current) != ObjPtr(ExpectedRecord)
+		if !IsObject(Current) || ObjPtr(Current) != ObjPtr(ExpectedRecord)
+				|| !IsObject(_TooltipActiveSurface)
+				|| ObjPtr(_TooltipActiveSurface) != ObjPtr(ExpectedSurface)
 			return 0
 		if (Current.Kind != "prediction"
-			or Current.Lifecycle.Outcome != "")
+				|| Current.Lifecycle.Outcome != ""
+				|| !(Current.Slots is Array)
+				|| ExpectedActiveIdx < 1
+				|| ExpectedActiveIdx > Current.Slots.Length)
+			return 0
+		if !ExpectedSurface.HasOwnProp("RenderedActiveIdx")
+				|| !(ExpectedSurface.RenderedActiveIdx is Integer)
+				|| ExpectedSurface.RenderedActiveIdx != ExpectedActiveIdx
+			return 0
+		if IsSet(LLM_NavEventOwner_ClaimAcceptance)
+				&& !LLM_NavEventOwner_ClaimAcceptance(
+					ExpectedRecord, ExpectedSurface, ExpectedActiveIdx)
 			return 0
 		Current.Lifecycle.Outcome := "claimed"
 		return Current.Lifecycle
@@ -962,7 +1222,7 @@ _LLM_TooltipAppendFooter(G, &TotalH, TotalW, bgHex) {
 ; within a row, segment coloring is achieved by multiple Text controls placed
 ; side-by-side (same Y, X incremented by measured segment width).
 _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
-		PresentationMeta := 0) {
+		PresentationMeta, RequestSerial) {
 	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
 	global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE
 	global _TOOLTIP_INFO_FONT_SIZE, _LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods
@@ -1193,7 +1453,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	StateCommit := _LLM_TooltipCommitSurfaceState.Bind(
 		slots, active_idx, RenderGeneration, PresentationMeta)
 	Presented := _TooltipPresentStack(Pos, Row, false, [],
-		RenderGeneration, true, -1, 0, StateCommit)
+		RenderGeneration, true, RequestSerial, 0, StateCommit)
     HotPath_LogIfSlow("Tooltip.LlmPresent", _hpLlmPresent, HotPath_BreakdownDetail())
 	if !Presented
 		return false

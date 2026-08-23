@@ -88,7 +88,88 @@ _LPRS_MetricsAndTimeoutFollowCommittedSurface() {
 		"the common pixel commit must arm the timeout carried by that exact record")
 }
 
+_LPRS_StaleNavigationRepaintNeverHidesCurrentPixels() {
+	; Function bodies stay contiguous under the move-resilient source helper, so
+	; relative positions prove the stale-repaint branch precedes every pixel
+	; retirement/reveal without pinning either production file path.
+	Present := _StripFullLineComments(
+		_DriverFuncBody("_TooltipPresentStack"))
+	Show := _StripFullLineComments(_DriverFuncBody("LLM_TooltipShow"))
+	Commit := _StripFullLineComments(
+		_DriverFuncBody("_LLM_TooltipCommitSurfaceState"))
+	Render := _StripFullLineComments(
+		_DriverFuncBody("_LLM_TooltipRenderOwnedNavigation"))
+	ScheduleDrain := _StripFullLineComments(
+		_DriverFuncBody("LLM_NavEventOwner_ScheduleDrain"))
+	RetryDrain := _StripFullLineComments(
+		_DriverFuncBody("_LLM_NavEventOwnerRetryDrain"))
+	Service := _StripFullLineComments(
+		_DriverFuncBody("_LLM_NavEventOwnerService"))
+	Assert(Present != "" and Show != "" and Commit != "" and Render != ""
+		and ScheduleDrain != "" and RetryDrain != "" and Service != "",
+		"navigation repaint ownership bodies must remain discoverable")
+
+	BeginPos := InStr(Present, "LLM_NavEventOwner_BeginSurfaceSwap(")
+	RetryPos := InStr(Present, 'NavSwap.Get("retry", false)', true, BeginPos)
+	RetirePos := InStr(Present,
+		"_LLM_TooltipRetireSurfaceRecord(RetiredSurface", true, RetryPos)
+	HidePos := InStr(Present,
+		"_TooltipHideSurfaceObjects(RetiredSurface)", true, RetryPos)
+	SwapPos := InStr(Present,
+		"_TooltipActiveSurface := PreparedSurface", true, RetryPos)
+	RevealPos := InStr(Present,
+		"_TooltipRevealPreparedSurfaces(PreparedSurface)", true, RetryPos)
+	Assert(BeginPos > 0 and RetryPos > BeginPos
+		and RetirePos > RetryPos and HidePos > RetryPos
+		and SwapPos > RetryPos and RevealPos > RetryPos,
+		"a stale navigation repaint must abort before semantics, pixels, pointer, or reveal can leave A")
+	TypedRethrowPos := InStr(Present,
+		"if CommitError is TooltipNavOwnerRetryError")
+	ReportPos := InStr(Present, "_UiOracleReportError(", true,
+		TypedRethrowPos)
+	Assert(TypedRethrowPos > 0 and ReportPos > TypedRethrowPos,
+		"the normal repaint race must rethrow without entering generic UI error reporting")
+
+	RetryCatchPos := InStr(Show,
+		"if _llm_build_err is TooltipNavOwnerRetryError")
+	ServicePos := InStr(Show,
+		"LLM_NavEventOwner_ScheduleDrain()", true, RetryCatchPos)
+	RetryReturnPos := InStr(Show, "return false", true, ServicePos)
+	GenericLogPos := InStr(Show, 'LoggerError("LLM.tt"', true,
+		RetryReturnPos)
+	GenericHidePos := InStr(Show, "LLM_TooltipHide(false", true,
+		RetryReturnPos)
+	Assert(RetryCatchPos > 0 and ServicePos > RetryCatchPos
+		and RetryReturnPos > ServicePos and GenericLogPos > RetryReturnPos
+		and GenericHidePos > RetryReturnPos,
+		"stale repaint retry must keep A visible, schedule its receipt drain, and bypass generic hide/log")
+	Assert(InStr(Commit, "NavOwnerRequireExactIndex:") > 0
+		and InStr(Commit,
+			"SurfaceToken.RenderedActiveIdx := Record.ActiveIdx") > 0
+		and InStr(Render, '"nav_owner_exact_index", true') > 0,
+		"repaint records must carry both exact native-index matching and an immutable painted-index oracle")
+	GetText := _StripFullLineComments(_DriverFuncBody("LLM_TooltipGetText"))
+	Snapshot := _StripFullLineComments(
+		_DriverFuncBody("LLM_TooltipGetAcceptSnapshot"))
+	Assert(InStr(GetText,
+		"_LLM_TooltipPresentationIndexIsPainted(Presentation)") > 0
+		and InStr(Snapshot,
+			"_LLM_TooltipPresentationIndexIsPainted(Presentation)") > 0,
+		"text and Tab acceptance must fail open until native semantics equal painted pixels")
+	Assert(InStr(ScheduleDrain,
+		"SetTimer(_LLM_NavEventOwnerRetryDrain, -1)") > 0,
+		"one-shot retry must schedule the distinct drain callback")
+	Assert(InStr(RetryDrain, "_LLM_NavEventOwnerDrain()") > 0,
+		"the distinct one-shot callback must drain navigation receipts")
+	Assert(InStr(Service, "_LLM_NavEventOwnerDrain(RenderFn)") > 0,
+		"the repeating service callback must retain its injectable receipt drain")
+	Assert(InStr(Show, "SetTimer(_LLM_NavEventOwnerService, -1)") == 0,
+		"a repaint retry must not overwrite the repeating service timer")
+}
+
 Test("LLM presented record is the sole visible semantic owner (llm-presented-record)",
 	_LPRS_VisibleSemanticsHaveOneOwner)
 Test("LLM metrics and timeout belong to committed pixels (llm-presented-record)",
 	_LPRS_MetricsAndTimeoutFollowCommittedSurface)
+Test("LLM stale navigation repaint never hides current pixels (llm-presented-record)",
+	_LPRS_StaleNavigationRepaintNeverHidesCurrentPixels)

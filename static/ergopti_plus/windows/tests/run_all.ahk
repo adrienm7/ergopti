@@ -394,6 +394,7 @@ global _LLM_Menu_Loaded := false
 ; owns every native transition; this include registers no real hotkey.
 #Include ../ui/menu/menu_llm/trigger_journal.ahk
 #Include ../ui/menu/menu_llm/trigger_shortcut.ahk
+#Include ../adapters/llm_nav_event_owner.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
 ; harness; the regression suite calls only its one-shot saved-options seam.
@@ -786,6 +787,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_chord_notation.ahk
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_llm_trigger_shortcut_transactions.ahk
+#Include unit/test_llm_nav_event_owner.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
 #Include unit/test_llm_profile_hotkey_transaction.ahk
 #Include unit/test_llm_hotkey_cross_owner_collision.ahk

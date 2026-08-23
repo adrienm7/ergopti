@@ -178,7 +178,13 @@ const BASELINE_SHARED = 26;
 //   The alternative was to leave the gap: presets on Linux, free entry on
 //   macOS, for a setting the manifest declares once. That is convergence
 //   downwards wearing a clean ratchet.
-const BASELINE_UNION = 49;
+//
+//   49 → 51 on 2026-08-23 — windows/native plus native/nav_event_owner. AHK's
+//   split HotIf/callback model cannot atomically own a physical event, so the
+//   Windows driver needs a packaged WH_KEYBOARD_LL component with its own C ABI,
+//   hook-free tests and hardened-build gate. Empty Lua counterparts would add
+//   structure without a corresponding macOS/Linux runtime responsibility.
+const BASELINE_UNION = 51;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //
