@@ -46,6 +46,7 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 		}
 		local deps = {
 			keymap = {
+				set_llm_model = function() return true end,
 				set_llm_backend_name = function(value)
 					observed.backend_labels[#observed.backend_labels + 1] = value
 				end,
@@ -61,7 +62,12 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 				llm = {
 					set_backend = function(value)
 						observed.core_backends[#observed.core_backends + 1] = value
+						return true
 					end,
+					set_user_profiles = function() return true end,
+					set_active_profile = function() return true end,
+					set_llm_model_ollama = function() return true end,
+					set_llm_model_mlx = function() return true end,
 				},
 				shortcuts_mod = {
 					pause_bindings = function() return true end,
