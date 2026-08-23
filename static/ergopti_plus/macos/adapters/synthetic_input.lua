@@ -22,9 +22,10 @@
 
 local M = {}
 
-local hs            = hs
-local Logger        = require("infra.logger")
-local LOG           = "adapters.synthetic_input"
+local hs             = hs
+local Logger         = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
+local LOG            = "adapters.synthetic_input"
 
 local eventtap = assert(hs and hs.eventtap,
 	"adapters.synthetic_input: hs.eventtap is unavailable")
@@ -52,8 +53,6 @@ local timer_api = assert(hs.timer,
 	"adapters.synthetic_input: hs.timer is unavailable")
 local do_after = assert(timer_api.doAfter,
 	"adapters.synthetic_input: hs.timer.doAfter is unavailable")
-local do_every = assert(timer_api.doEvery,
-	"adapters.synthetic_input: hs.timer.doEvery is unavailable")
 local delayed_api = assert(timer_api.delayed,
 	"adapters.synthetic_input: hs.timer.delayed is unavailable")
 local new_delayed_timer = assert(delayed_api.new,
@@ -178,10 +177,10 @@ local _active_transaction_count = 0
 local _idle_callbacks = {}
 local _idle_waiter_cleanup = {}
 local _admission_fence = nil
--- Native recurring handles remain lifecycle debt until stop() returns a
--- committed truthy result. A false/nil/throw keeps the exact handle strongly
--- owned and therefore keeps pause/reload admission closed while its own next
--- tick retries cleanup autonomously.
+-- Scheduler-owned recurring handles remain lifecycle debt until cancel()
+-- proves the exact native candidate stopped. A refusal keeps that capability
+-- strongly owned and pause/reload admission closed while its next tick retries
+-- cleanup autonomously.
 local _periodic_cleanup_count = 0
 local _records = {}
 local _oldest_tag = nil
@@ -578,7 +577,7 @@ local function lifecycle_is_idle()
 end
 
 
---- Adds an exact native periodic handle to process-wide cleanup debt once.
+--- Adds an exact scheduler-owned native capability to cleanup debt once.
 --- @param owner table Periodic/idle owner.
 local function retain_periodic_cleanup(owner)
 	if owner.cleanup_counted == true then return end
@@ -587,7 +586,7 @@ local function retain_periodic_cleanup(owner)
 end
 
 
---- Removes an exact native periodic cleanup debt once.
+--- Removes an exact scheduler-owned native cleanup debt once.
 --- @param owner table Periodic/idle owner.
 local function release_periodic_cleanup(owner)
 	if owner.cleanup_counted ~= true then return end
@@ -598,18 +597,32 @@ local function release_periodic_cleanup(owner)
 end
 
 
---- Reads one candidate's stop capability without indexing false/native garbage.
---- @param candidate any Native recurring handle candidate.
---- @return function|nil stop_fn
-local function periodic_stop_function(candidate)
-	if type(candidate) ~= "table" and type(candidate) ~= "userdata" then return nil end
-	local ok, stop_fn = pcall(function() return candidate.stop end)
-	if not ok or type(stop_fn) ~= "function" then return nil end
-	return stop_fn
+local finish_idle_waiter
+
+
+--- Releases synthetic lifecycle debt only after TimerScheduler proves that its
+--- exact native candidate is gone. A refused cancel stays callback-inert inside
+--- the scheduler, whose next native delivery retries cleanup and settles here.
+--- @param owner table Periodic/idle owner.
+--- @param timer table Scheduler handle.
+local function observe_periodic_settlement(owner, timer)
+	local registered = TimerScheduler.onSettled(timer, function()
+		if owner.timer ~= timer then return end
+		owner.timer = nil
+		owner.stop_error_reported = false
+		release_periodic_cleanup(owner)
+		if owner._marker == IDLE_WAITER_MARKER then
+			_idle_waiter_cleanup[owner] = nil
+			if owner.settling == true then finish_idle_waiter(owner) end
+		end
+	end)
+	assert(registered == true,
+		"adapters.synthetic_input: periodic settlement observer rejected")
 end
 
 
---- Stops one exact recurring handle; refusal remains autonomously retryable.
+--- Stops one exact scheduler-owned recurring handle; refusal remains
+--- autonomously retryable through TimerScheduler's retained native candidate.
 --- @param owner table Periodic/idle owner.
 --- @param label string Diagnostic label.
 --- @return boolean settled
@@ -619,20 +632,10 @@ local function stop_periodic_handle(owner, label)
 		release_periodic_cleanup(owner)
 		return true
 	end
-	local stop_fn = periodic_stop_function(timer)
-	if stop_fn == nil then
-		retain_periodic_cleanup(owner)
-		if owner.stop_error_reported ~= true then
-			owner.stop_error_reported = true
-			defer_diagnostic("error", "%s cleanup has no native stop capability.", label)
-		end
-		return false
-	end
-	local ok, result = pcall(stop_fn, timer)
-	if ok and result ~= nil and result ~= false then
-		owner.timer = nil
-		owner.stop_error_reported = false
-		release_periodic_cleanup(owner)
+	local ok, result = pcall(TimerScheduler.cancel, timer)
+	if ok and result == true then
+		assert(owner.timer ~= timer,
+			"adapters.synthetic_input: settled periodic timer remained published")
 		return true
 	end
 	retain_periodic_cleanup(owner)
@@ -662,7 +665,7 @@ end
 
 --- Publishes one already-stopped idle waiter exactly once.
 --- @param owner table Idle waiter owner.
-local function finish_idle_waiter(owner)
+finish_idle_waiter = function(owner)
 	if owner.callback_delivered == true then return end
 	owner.callback_delivered = true
 	owner.settling = false
@@ -704,11 +707,7 @@ local function acquire_idle_waiter(callback)
 		callback_delivered = false,
 		timer = nil,
 	}
-	local installing = true
-	local callback_ran = false
-	local ok, timer_or_error = pcall(do_every, M.IDLE_WAITER_TICK_SEC, function()
-		callback_ran = true
-		if installing then return end
+	local timer, committed = TimerScheduler.every(M.IDLE_WAITER_TICK_SEC, function()
 		if owner.settling == true then
 			if stop_idle_waiter(owner) then finish_idle_waiter(owner) end
 			return
@@ -719,18 +718,16 @@ local function acquire_idle_waiter(callback)
 		end
 		settle_idle_waiter(owner)
 	end)
-	installing = false
-	local stop_fn = periodic_stop_function(timer_or_error)
-	if not ok or stop_fn == nil or callback_ran then
-		if stop_fn then
-			owner.timer = timer_or_error
-			stop_periodic_handle(owner, "Refused idle waiter timer")
+	owner.timer = timer
+	observe_periodic_settlement(owner, timer)
+	if committed ~= true then
+		if owner.timer == timer then
+			retain_periodic_cleanup(owner)
+			_idle_waiter_cleanup[owner] = true
 		end
-		defer_diagnostic("error", "Cannot acquire autonomous idle waiter - %s.",
-			callback_ran and "timer ran inline" or tostring(timer_or_error))
+		defer_diagnostic("error", "Cannot acquire autonomous idle waiter - scheduler refused ownership.")
 		return nil
 	end
-	owner.timer = timer_or_error
 	owner.active = true
 	return owner
 end
@@ -2584,10 +2581,8 @@ end
 --- @param interval number Seconds between ticks.
 --- @return boolean acquired
 local function acquire_periodic_owner(owner, interval)
-	local callback_ran = false
 	local generation = owner.generation
-	local ok, timer_or_error = pcall(do_every, interval, function()
-		callback_ran = true
+	local timer, committed = TimerScheduler.every(interval, function()
 		if owner.generation ~= generation or owner.cleanup_requested == true then
 			stop_periodic_handle(owner, "Periodic synthetic owner")
 			return
@@ -2598,19 +2593,16 @@ local function acquire_periodic_owner(owner, interval)
 				tostring(run_error))
 		end
 	end)
-	local stop_fn = periodic_stop_function(timer_or_error)
-	if not ok or stop_fn == nil or callback_ran then
-		if stop_fn then
-			owner.timer = timer_or_error
-			owner.cleanup_requested = true
-			owner.generation = owner.generation + 1
-			stop_periodic_handle(owner, "Refused periodic synthetic owner")
-		end
-		defer_diagnostic("error", "Cannot acquire periodic synthetic owner - %s.",
-			callback_ran and "timer ran inline" or tostring(timer_or_error))
+	owner.timer = timer
+	observe_periodic_settlement(owner, timer)
+	if committed ~= true then
+		owner.cleanup_requested = true
+		owner.generation = owner.generation + 1
+		if owner.timer == timer then retain_periodic_cleanup(owner) end
+		defer_diagnostic("error",
+			"Cannot acquire periodic synthetic owner - scheduler refused ownership.")
 		return false
 	end
-	owner.timer = timer_or_error
 	return true
 end
 

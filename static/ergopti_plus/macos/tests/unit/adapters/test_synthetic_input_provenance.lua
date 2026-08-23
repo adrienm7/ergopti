@@ -56,7 +56,9 @@ local function make_fixture(options)
 		key_attempts = {},
 		frontmost_app = options.frontmost_app,
 		do_after_calls = 0,
-		do_every_calls = 0,
+		timer_new_calls = 0,
+		timer_start_calls = 0,
+		raw_do_every_calls = 0,
 	}
 
 	local logger = helpers.make_logger_stub()
@@ -111,40 +113,63 @@ local function make_fixture(options)
 		end
 		return handle
 	end
-	function timer.doEvery(interval, callback)
-		fixture.do_every_calls = fixture.do_every_calls + 1
-		local call_index = fixture.do_every_calls
-		if options.throw_on_do_every_call == fixture.do_every_calls then
-			error("doEvery exploded")
+	function timer.new(interval, callback)
+		fixture.timer_new_calls = fixture.timer_new_calls + 1
+		local call_index = fixture.timer_new_calls
+		if options.throw_on_timer_new_call == call_index then
+			error("timer.new exploded")
 		end
-		if fixture.fail_next_do_every then
-			fixture.fail_next_do_every = false
+		if fixture.fail_next_timer_new then
+			fixture.fail_next_timer_new = false
 			return nil
 		end
-		if (options.do_every_failures or 0) > 0 then
-			options.do_every_failures = options.do_every_failures - 1
+		if (options.timer_new_failures or 0) > 0 then
+			options.timer_new_failures = options.timer_new_failures - 1
 			return nil
 		end
-		if options.fail_on_do_every_call == fixture.do_every_calls then return nil end
-		if options.false_on_do_every_call == fixture.do_every_calls then return false end
+		if options.fail_on_timer_new_call == call_index then return nil end
+		if options.false_on_timer_new_call == call_index then return false end
 		local entry = {
 			delay = interval,
 			callback = callback,
-			stopped = false,
+			stopped = true,
+			running = false,
 			recurring = true,
+			start_calls = 0,
 			stop_calls = 0,
-			stop_failures = options.do_every_stop_failures_by_call
-				and (options.do_every_stop_failures_by_call[call_index] or 0)
-				or (options.do_every_stop_failures or 0),
-			stop_nils = options.do_every_stop_nils_by_call
-				and (options.do_every_stop_nils_by_call[call_index] or 0)
-				or (options.do_every_stop_nils or 0),
-			stop_throws = options.do_every_stop_throws_by_call
-				and (options.do_every_stop_throws_by_call[call_index] or 0)
-				or (options.do_every_stop_throws or 0),
+			stop_failures = options.timer_stop_failures_by_call
+				and (options.timer_stop_failures_by_call[call_index] or 0)
+				or (options.timer_stop_failures or 0),
+			stop_nils = options.timer_stop_nils_by_call
+				and (options.timer_stop_nils_by_call[call_index] or 0)
+				or (options.timer_stop_nils or 0),
+			stop_throws = options.timer_stop_throws_by_call
+				and (options.timer_stop_throws_by_call[call_index] or 0)
+				or (options.timer_stop_throws or 0),
 		}
 		fixture.timers[#fixture.timers + 1] = entry
 		local handle = {}
+		function handle:start()
+			fixture.timer_start_calls = fixture.timer_start_calls + 1
+			entry.start_calls = entry.start_calls + 1
+			entry.stopped = false
+			entry.running = true
+			local inline = options.timer_start_inline_by_call
+				and options.timer_start_inline_by_call[call_index]
+			if inline == true or options.timer_start_inline == true then callback() end
+			local mode = options.timer_start_modes_by_call
+				and options.timer_start_modes_by_call[call_index]
+				or options.timer_start_mode
+			if mode == "throw" then error("periodic start exploded") end
+			if mode == "false" then return false end
+			if mode == "nil" then return nil end
+			if mode == "stopped" then
+				entry.stopped = true
+				entry.running = false
+			end
+			return self
+		end
+		function handle:running() return entry.running end
 		function handle:stop()
 			entry.stop_calls = entry.stop_calls + 1
 			if entry.stop_throws > 0 then
@@ -160,11 +185,15 @@ local function make_fixture(options)
 				return nil
 			end
 			entry.stopped = true
+			entry.running = false
 			return self
 		end
 		entry.handle = handle
-		if options.do_every_synchronous then callback() end
 		return handle
+	end
+	function timer.doEvery()
+		fixture.raw_do_every_calls = fixture.raw_do_every_calls + 1
+		error("synthetic_input must route recurring timers through TimerScheduler")
 	end
 	timer.delayed = {}
 	local delayed_new_calls = 0
@@ -465,6 +494,7 @@ local function make_fixture(options)
 
 	function fixture.load()
 		package.loaded["infra.logger"] = fixture.logger
+		package.loaded["adapters.timer_scheduler"] = nil
 		local synthetic = helpers.load_with_stubs(
 			"adapters.synthetic_input", fixture.hs_overrides)
 		package.loaded["infra.logger"] = fixture.logger
@@ -1355,19 +1385,19 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			local synthetic = fixture.load()
 			local calls = 0
 			helpers.assert_true(synthetic.when_idle(function() calls = calls + 1 end))
-			helpers.assert_eq(fixture.do_every_calls, 1,
+			helpers.assert_eq(fixture.timer_new_calls, 1,
 				"initial acceptance must acquire exactly one autonomous periodic owner")
 
 			-- Production now owns the autonomous waiter before accepting. The old
 			-- implementation first accepted only a lifecycle entry, then attempted a
-			-- fresh doEvery acquisition from its stale recheck and discarded false.
-			local refused_call = fixture.do_every_calls + 1
+			-- fresh periodic acquisition from its stale recheck and discarded false.
+			local refused_call = fixture.timer_new_calls + 1
 			if case == "false" then
-				fixture.options.false_on_do_every_call = refused_call
+				fixture.options.false_on_timer_new_call = refused_call
 			elseif case == "nil" then
-				fixture.options.fail_on_do_every_call = refused_call
+				fixture.options.fail_on_timer_new_call = refused_call
 			else
-				fixture.options.throw_on_do_every_call = refused_call
+				fixture.options.throw_on_timer_new_call = refused_call
 			end
 			local racer = synthetic.begin("unit.idle-recheck-" .. case, "replacement")
 			fixture.fire_timer_matching(0)
@@ -1382,7 +1412,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			end
 			helpers.assert_eq(calls, 1,
 				case .. " may not lose a callback whose initial acceptance was true")
-			helpers.assert_eq(fixture.do_every_calls, 1,
+			helpers.assert_eq(fixture.timer_new_calls, 1,
 				case .. " stale recheck must reuse its initial owner, never hit a rearm trap")
 		end
 	end)
@@ -1390,9 +1420,9 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 	helpers.it("removes a refused idle FIFO entry before any unrelated enqueue", function()
 		for _, case in ipairs({ "false", "nil", "throw" }) do
 			local options = { delayed_start_failures = 2 }
-			options[case == "false" and "false_on_do_every_call"
-				or (case == "nil" and "fail_on_do_every_call"
-					or "throw_on_do_every_call")] = 1
+			options[case == "false" and "false_on_timer_new_call"
+				or (case == "nil" and "fail_on_timer_new_call"
+					or "throw_on_timer_new_call")] = 1
 			local fixture = make_fixture(options)
 			fixture.fail_next_do_after = true
 			local synthetic = fixture.load()
@@ -1400,13 +1430,13 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			helpers.assert_true(synthetic.when_idle(function()
 				stale_calls = stale_calls + 1
 			end) ~= true, case .. " acquisition refusal must reject the idle request")
-			helpers.assert_eq(fixture.do_every_calls, 1,
+			helpers.assert_eq(fixture.timer_new_calls, 1,
 				case .. " must exercise exactly one initial periodic acquisition")
 
 			fixture.options.delayed_start_failures = 0
-			fixture.options.false_on_do_every_call = nil
-			fixture.options.fail_on_do_every_call = nil
-			fixture.options.throw_on_do_every_call = nil
+			fixture.options.false_on_timer_new_call = nil
+			fixture.options.fail_on_timer_new_call = nil
+			fixture.options.throw_on_timer_new_call = nil
 			fixture.fail_next_do_after = false
 			local unrelated_calls = 0
 			helpers.assert_true(synthetic.defer_after_callback("unit unrelated enqueue", function()
@@ -1460,11 +1490,25 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		helpers.assert_eq(idle_calls, 1)
 	end)
 
-	helpers.it("refuses malformed periodic constructors without throwing or accepting idle", function()
+	helpers.it("accepts idle ownership only after transactional construction and start", function()
 		local cases = {
-			{ name = "false", options = { false_on_do_every_call = 1 } },
-			{ name = "nil", options = { fail_on_do_every_call = 1 } },
-			{ name = "throw", options = { throw_on_do_every_call = 1 } },
+			{ name = "constructor false", options = { false_on_timer_new_call = 1 }, starts = 0 },
+			{ name = "constructor nil", options = { fail_on_timer_new_call = 1 }, starts = 0 },
+			{ name = "constructor throw", options = { throw_on_timer_new_call = 1 }, starts = 0 },
+			{ name = "start false", options = { timer_start_mode = "false" }, starts = 1 },
+			{ name = "start nil", options = { timer_start_mode = "nil" }, starts = 1 },
+			{ name = "start throw", options = { timer_start_mode = "throw" }, starts = 1 },
+			{ name = "start state mismatch", options = { timer_start_mode = "stopped" }, starts = 1 },
+			{ name = "start callback reentry", options = { timer_start_inline = true }, starts = 1 },
+			{
+				name = "start callback rollback debt",
+				options = {
+					timer_start_inline = true,
+					timer_stop_failures_by_call = { [1] = 1 },
+				},
+				starts = 1,
+				cleanup = 1,
+			},
 		}
 		for _, case in ipairs(cases) do
 			local fixture = make_fixture(case.options)
@@ -1481,6 +1525,25 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			helpers.assert_true(accepted ~= true,
 				case.name .. " cannot authorize a drain with no autonomous owner")
 			helpers.assert_eq(callback_calls, 0)
+			helpers.assert_eq(fixture.timer_new_calls, 1,
+				case.name .. " must construct at most one exact native candidate")
+			helpers.assert_eq(fixture.timer_start_calls, case.starts,
+				case.name .. " must not hide a successor start")
+			helpers.assert_eq(fixture.raw_do_every_calls, 0,
+				case.name .. " must stay behind TimerScheduler")
+			local expected_cleanup = case.cleanup or 0
+			helpers.assert_eq(synthetic.stats().pending_periodic_cleanup, expected_cleanup,
+				case.name .. " must publish exact rollback debt before refusing admission")
+			if expected_cleanup > 0 then
+				local periodic = fixture.fire_timer_matching(synthetic.IDLE_WAITER_TICK_SEC)
+				helpers.assert_not_nil(periodic)
+				helpers.assert_eq(periodic.stop_calls, 2,
+					"queued reentry must retry the exact uncommitted candidate")
+				helpers.assert_true(periodic.stopped)
+				helpers.assert_eq(fixture.timer_new_calls, 1)
+				helpers.assert_eq(callback_calls, 0)
+				helpers.assert_eq(synthetic.stats().pending_periodic_cleanup, 0)
+			end
 			synthetic.release(tx, token)
 		end
 	end)
@@ -1489,15 +1552,15 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		local cases = {
 			{
 				name = "false",
-				options = { do_every_stop_failures_by_call = { [1] = 1 } },
+				options = { timer_stop_failures_by_call = { [1] = 1 } },
 			},
 			{
 				name = "nil",
-				options = { do_every_stop_nils_by_call = { [1] = 1 } },
+				options = { timer_stop_nils_by_call = { [1] = 1 } },
 			},
 			{
 				name = "throw",
-				options = { do_every_stop_throws_by_call = { [1] = 1 } },
+				options = { timer_stop_throws_by_call = { [1] = 1 } },
 			},
 		}
 		for _, case in ipairs(cases) do
@@ -1510,6 +1573,8 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			helpers.assert_true(synthetic.when_idle(function()
 				idle_calls = idle_calls + 1
 			end))
+			helpers.assert_eq(fixture.timer_new_calls, 1)
+			helpers.assert_eq(fixture.timer_start_calls, 1)
 			helpers.assert_true(synthetic.release(tx, token))
 
 			local periodic = fixture.fire_timer_matching(synthetic.IDLE_WAITER_TICK_SEC)
@@ -1522,6 +1587,8 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 				case.name .. " stop refusal must retain the recurring handle")
 			helpers.assert_eq(synthetic.stats().pending_periodic_cleanup, 1,
 				case.name .. " stop refusal must remain observable lifecycle debt")
+			helpers.assert_eq(fixture.timer_new_calls, 1,
+				case.name .. " cancel refusal must retain rather than reacquire")
 
 			local retried = fixture.fire_timer_matching(synthetic.IDLE_WAITER_TICK_SEC)
 			helpers.assert_true(retried == periodic,
@@ -1531,6 +1598,10 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			helpers.assert_eq(periodic.stop_calls, 2,
 				case.name .. " retained handle must retry autonomously on its next tick")
 			helpers.assert_true(periodic.stopped)
+			helpers.assert_eq(fixture.timer_new_calls, 1,
+				case.name .. " callback reentry must settle the original construction")
+			helpers.assert_eq(fixture.timer_start_calls, 1)
+			helpers.assert_eq(fixture.raw_do_every_calls, 0)
 			helpers.assert_eq(synthetic.stats().pending_periodic_cleanup, 0)
 			helpers.assert_eq(idle_calls, 1,
 				case.name .. " accepted drain must settle once after exact stop")
@@ -2277,43 +2348,61 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 	end)
 
 	helpers.it("retains paced timer cleanup debt until the exact stop retry succeeds", function()
-		local fixture = make_fixture({ do_every_stop_failures_by_call = { [1] = 1 } })
-		local synthetic = fixture.load()
-		synthetic.enter_callback()
-		local tx = synthetic.begin("unit.paced-stop-debt", "replacement")
-		synthetic.with_transaction(tx, function()
-			synthetic.emit_key_stroke({}, "delete", 0)
-			synthetic.emit_key_strokes("X")
-		end)
-		local owner = synthetic.prepare_collected_paced(tx, 1, 20000,
-			{ id = "terminal-app" })
-		helpers.assert_not_nil(owner)
-		helpers.assert_true(synthetic.seal(tx))
-		helpers.assert_true(synthetic.authorize_collected_paced(owner))
-		helpers.assert_true(synthetic.commit_collected_paced(owner))
-		synthetic.leave_callback(true)
-		local drained = 0
-		helpers.assert_true(synthetic.when_idle(function() drained = drained + 1 end))
+		local cases = {
+			{ name = "false", option = "timer_stop_failures_by_call" },
+			{ name = "nil", option = "timer_stop_nils_by_call" },
+			{ name = "throw", option = "timer_stop_throws_by_call" },
+		}
+		for _, case in ipairs(cases) do
+			local options = { [case.option] = { [1] = 1 } }
+			local fixture = make_fixture(options)
+			local synthetic = fixture.load()
+			synthetic.enter_callback()
+			local tx = synthetic.begin("unit.paced-stop-debt-" .. case.name, "replacement")
+			synthetic.with_transaction(tx, function()
+				synthetic.emit_key_stroke({}, "delete", 0)
+				synthetic.emit_key_strokes("X")
+			end)
+			local owner = synthetic.prepare_collected_paced(tx, 1, 20000,
+				{ id = "terminal-app" })
+			helpers.assert_not_nil(owner)
+			helpers.assert_true(synthetic.seal(tx))
+			helpers.assert_true(synthetic.authorize_collected_paced(owner))
+			helpers.assert_true(synthetic.commit_collected_paced(owner))
+			synthetic.leave_callback(true)
+			local drained = 0
+			helpers.assert_true(synthetic.when_idle(function() drained = drained + 1 end))
+			local timer_new_before = fixture.timer_new_calls
 
-		local periodic = fixture.fire_timer_matching(0.02)
-		helpers.assert_eq(fixture.key_posts, 2)
-		fixture.fire_timer_matching(0.02)
-		helpers.assert_eq(fixture.key_posts, 4)
-		fixture.fire_timer_matching(0.02)
-		helpers.assert_eq(periodic.stop_calls, 1)
-		helpers.assert_true(not periodic.stopped)
-		helpers.assert_eq(drained, 0,
-			"transaction completion may not hide an unstopped periodic handle")
-		fixture.fire_timer_matching(0.02)
-		helpers.assert_eq(periodic.stop_calls, 2)
-		helpers.assert_true(periodic.stopped)
-		local guard = 0
-		while drained == 0 and #fixture.timers > 0 do
-			fixture.fire_next_timer()
-			guard = guard + 1
-			helpers.assert_true(guard < 20, "paced cleanup debt stranded global idle")
+			local periodic = fixture.fire_timer_matching(0.02)
+			helpers.assert_eq(fixture.key_posts, 2)
+			fixture.fire_timer_matching(0.02)
+			helpers.assert_eq(fixture.key_posts, 4)
+			fixture.fire_timer_matching(0.02)
+			helpers.assert_eq(periodic.stop_calls, 1)
+			helpers.assert_true(not periodic.stopped)
+			helpers.assert_eq(drained, 0,
+				case.name .. " completion may not hide an unstopped periodic handle")
+			helpers.assert_eq(fixture.timer_new_calls, timer_new_before,
+				case.name .. " cancel refusal must retain the exact construction")
+
+			local retried = fixture.fire_timer_matching(0.02)
+			helpers.assert_true(retried == periodic,
+				case.name .. " callback reentry must target the retained native timer")
+			helpers.assert_true(retried.handle == periodic.handle)
+			helpers.assert_eq(periodic.stop_calls, 2)
+			helpers.assert_true(periodic.stopped)
+			helpers.assert_eq(fixture.timer_new_calls, timer_new_before)
+			helpers.assert_eq(fixture.raw_do_every_calls, 0)
+			local guard = 0
+			while drained == 0 and #fixture.timers > 0 do
+				fixture.fire_next_timer()
+				guard = guard + 1
+				helpers.assert_true(guard < 20,
+					case.name .. " paced cleanup debt stranded global idle")
+			end
+			helpers.assert_eq(drained, 1)
 		end
-		helpers.assert_eq(drained, 1)
 	end)
 
 	helpers.it("retries the exact terminal ordinal after a refused paced post", function()
@@ -2366,8 +2455,8 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			{ name = "copy nil", options = { physical_copy_nil = true } },
 			{ name = "tagging throw", options = { physical_set_property_throw = true } },
 			{ name = "periodic owner refusal", options = {}, refuse_owner = true },
-			{ name = "periodic owner false", options = { false_on_do_every_call = 2 } },
-			{ name = "periodic owner throw", options = { throw_on_do_every_call = 2 } },
+			{ name = "periodic owner false", options = { false_on_timer_new_call = 2 } },
+			{ name = "periodic owner throw", options = { throw_on_timer_new_call = 2 } },
 		}
 		for _, case in ipairs(cases) do
 			local fixture = make_fixture(case.options)
@@ -2393,7 +2482,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			helpers.assert_true(synthetic.leave_paced_collection())
 			helpers.assert_eq(synthetic.stats().pending, 2)
 
-			if case.refuse_owner then fixture.fail_next_do_every = true end
+			if case.refuse_owner then fixture.fail_next_timer_new = true end
 			local fence = synthetic.claim_physical_fence(fixture.external_event(nil, 42))
 			helpers.assert_nil(fence, case.name .. " must pass the untouched original through")
 			helpers.assert_eq(synthetic.stats().pending, 2,
@@ -2545,7 +2634,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 	end)
 
 	helpers.it("retains physical replay timer debt until its exact stop succeeds", function()
-		local fixture = make_fixture({ do_every_stop_failures_by_call = { [2] = 1 } })
+		local fixture = make_fixture({ timer_stop_failures_by_call = { [2] = 1 } })
 		local synthetic = fixture.load()
 		synthetic.enter_callback()
 		local tx = synthetic.begin("unit.physical-stop-debt", "replacement")
@@ -2765,28 +2854,63 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			"abort must preserve the committed output batch for post-return delivery")
 	end)
 
-	helpers.it("keeps the callback batch intact when paced wake ownership is refused", function()
-		local fixture = make_fixture({
-			do_every_failures = 1,
-		})
-		local synthetic = fixture.load()
-		local target = { id = "terminal-app" }
-		synthetic.enter_callback()
-		local tx = synthetic.begin("unit.terminal.wake-refused", "replacement")
-		synthetic.with_transaction(tx, function()
-			synthetic.emit_key_stroke({}, "delete", 0)
-			synthetic.emit_key_strokes("X")
-		end)
-		local owner = synthetic.prepare_collected_paced(tx, 1, 12000, target)
-		helpers.assert_nil(owner,
-			"fallible wake ownership must be refused during reversible preparation")
-		helpers.assert_true(synthetic.seal(tx))
-		local consume, returned = synthetic.leave_callback(true)
-		helpers.assert_true(consume)
-		helpers.assert_eq(#returned, 4,
-			"failed pacing acquisition must fall back to the complete callback batch")
-		helpers.assert_eq(fixture.key_posts, 0)
-		helpers.assert_eq(synthetic.stats().pending, 0)
+	helpers.it("keeps callback output reversible until periodic construction commits", function()
+		local cases = {
+			{ name = "constructor false", options = { false_on_timer_new_call = 1 }, starts = 0 },
+			{ name = "constructor nil", options = { fail_on_timer_new_call = 1 }, starts = 0 },
+			{ name = "constructor throw", options = { throw_on_timer_new_call = 1 }, starts = 0 },
+			{ name = "start false", options = { timer_start_mode = "false" }, starts = 1 },
+			{ name = "start nil", options = { timer_start_mode = "nil" }, starts = 1 },
+			{ name = "start throw", options = { timer_start_mode = "throw" }, starts = 1 },
+			{ name = "start state mismatch", options = { timer_start_mode = "stopped" }, starts = 1 },
+			{ name = "start callback reentry", options = { timer_start_inline = true }, starts = 1 },
+			{
+				name = "start callback rollback debt",
+				options = {
+					timer_start_inline = true,
+					timer_stop_failures_by_call = { [1] = 2 },
+				},
+				starts = 1,
+				cleanup = 1,
+			},
+		}
+		for _, case in ipairs(cases) do
+			local fixture = make_fixture(case.options)
+			local synthetic = fixture.load()
+			local target = { id = "terminal-app" }
+			synthetic.enter_callback()
+			local tx = synthetic.begin("unit.terminal.wake-" .. case.name, "replacement")
+			synthetic.with_transaction(tx, function()
+				synthetic.emit_key_stroke({}, "delete", 0)
+				synthetic.emit_key_strokes("X")
+			end)
+			local owner = synthetic.prepare_collected_paced(tx, 1, 12000, target)
+			helpers.assert_nil(owner,
+				case.name .. " must refuse periodic ownership during reversible preparation")
+			helpers.assert_true(synthetic.seal(tx))
+			local consume, returned = synthetic.leave_callback(true)
+			helpers.assert_true(consume)
+			helpers.assert_eq(#returned, 4,
+				case.name .. " must fall back to the complete callback batch")
+			helpers.assert_eq(fixture.key_posts, 0)
+			helpers.assert_eq(synthetic.stats().pending, 0)
+			local expected_cleanup = case.cleanup or 0
+			helpers.assert_eq(synthetic.stats().pending_periodic_cleanup, expected_cleanup)
+			helpers.assert_eq(fixture.timer_new_calls, 1,
+				case.name .. " must not construct a hidden successor")
+			helpers.assert_eq(fixture.timer_start_calls, case.starts)
+			helpers.assert_eq(fixture.raw_do_every_calls, 0)
+			if expected_cleanup > 0 then
+				local periodic = fixture.fire_timer_matching(0.012)
+				helpers.assert_not_nil(periodic)
+				helpers.assert_eq(periodic.stop_calls, 3,
+					"queued reentry must settle the twice-refused acquisition")
+				helpers.assert_true(periodic.stopped)
+				helpers.assert_eq(fixture.timer_new_calls, 1)
+				helpers.assert_eq(fixture.key_posts, 0)
+				helpers.assert_eq(synthetic.stats().pending_periodic_cleanup, 0)
+			end
+		end
 	end)
 
 	helpers.it("uses only its pre-acquired owner after paced commit, across wake and post refusals", function()
@@ -2804,7 +2928,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		helpers.assert_true(synthetic.seal(tx))
 		helpers.assert_true(synthetic.authorize_collected_paced(owner))
 		local do_after_before = fixture.do_after_calls
-		local do_every_before = fixture.do_every_calls
+		local timer_new_before = fixture.timer_new_calls
 		synthetic.defer_after_callback = function()
 			error("late dispatcher acquisition")
 		end
@@ -2817,7 +2941,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		helpers.assert_true(consume)
 		helpers.assert_nil(returned)
 		fixture.fail_next_do_after = true
-		fixture.fail_next_do_every = true
+		fixture.fail_next_timer_new = true
 		fixture.fire_next_timer() -- first pair succeeds through the prepared wake
 		fixture.fire_next_timer() -- suffix post is refused; this turn must stop
 		helpers.assert_eq(#fixture.key_attempts, 3)
@@ -2830,7 +2954,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 		helpers.assert_eq(fixture.key_posts, 4)
 		helpers.assert_eq(fixture.do_after_calls, do_after_before,
 			"post-commit recovery must never acquire a one-shot dispatcher")
-		helpers.assert_eq(fixture.do_every_calls, do_every_before,
+		helpers.assert_eq(fixture.timer_new_calls, timer_new_before,
 			"post-commit recovery must never acquire another periodic owner")
 	end)
 
