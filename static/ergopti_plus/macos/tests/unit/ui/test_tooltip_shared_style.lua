@@ -1,4 +1,4 @@
-﻿--- tests/unit/ui/test_tooltip_shared_style.lua
+--- tests/unit/ui/test_tooltip_shared_style.lua
 
 --- ==============================================================================
 --- MODULE: Tooltip Shared-Style Contract Tests

@@ -1,4 +1,4 @@
-﻿--- ui/onboarding/init.lua
+--- ui/onboarding/init.lua
 
 --- ==============================================================================
 --- MODULE: Onboarding Wizard

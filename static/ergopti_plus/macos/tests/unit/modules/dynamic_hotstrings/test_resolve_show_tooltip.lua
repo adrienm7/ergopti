@@ -1,4 +1,4 @@
-﻿--- tests/unit/modules/dynamic_hotstrings/test_resolve_show_tooltip.lua
+--- tests/unit/modules/dynamic_hotstrings/test_resolve_show_tooltip.lua
 
 --- ==============================================================================
 --- MODULE: hotstrings_config resolve show_tooltip regression tests

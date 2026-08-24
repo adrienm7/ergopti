@@ -1,4 +1,4 @@
-﻿--- platform/remap/defaults.lua
+--- platform/remap/defaults.lua
 
 --- ==============================================================================
 --- MODULE: Karabiner Defaults

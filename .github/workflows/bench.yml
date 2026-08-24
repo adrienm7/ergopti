@@ -1,4 +1,4 @@
-﻿# .github/workflows/bench.yml
+# .github/workflows/bench.yml
 #
 # Hotstring scan performance benchmark.
 # Runs on every push to main; fails if p95 latency exceeds 5 ms or regresses

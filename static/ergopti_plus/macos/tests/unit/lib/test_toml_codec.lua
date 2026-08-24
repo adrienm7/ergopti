@@ -1,4 +1,4 @@
-﻿--- tests/unit/lib/test_toml_codec.lua
+--- tests/unit/lib/test_toml_codec.lua
 
 --- ==============================================================================
 --- MODULE: TOML Codec Tests

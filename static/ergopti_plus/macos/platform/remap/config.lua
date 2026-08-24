@@ -1,4 +1,4 @@
-﻿--- platform/remap/config.lua
+--- platform/remap/config.lua
 
 --- ==============================================================================
 --- MODULE: Karabiner Config Loader and Persistence

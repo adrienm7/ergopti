@@ -1,4 +1,4 @@
-﻿--- tests/unit/ui/test_onboarding_bool_value_type.lua
+--- tests/unit/ui/test_onboarding_bool_value_type.lua
 
 --- ==============================================================================
 --- MODULE: Onboarding Wizard — boolean value TYPE (regression)

@@ -1,4 +1,4 @@
-﻿--- modules/gestures/geometry.lua
+--- modules/gestures/geometry.lua
 
 --- ==============================================================================
 --- MODULE: Gestures Geometry

@@ -1,4 +1,4 @@
-﻿--- tests/unit/lib/test_toml_reader.lua
+--- tests/unit/lib/test_toml_reader.lua
 
 --- ==============================================================================
 --- MODULE: toml_reader Unit Tests

@@ -1,4 +1,4 @@
-﻿--- tests/unit/lib/test_toml_fuzz.lua
+--- tests/unit/lib/test_toml_fuzz.lua
 
 --- ==============================================================================
 --- MODULE: TOML Fuzz + Crash-Safety Tests
