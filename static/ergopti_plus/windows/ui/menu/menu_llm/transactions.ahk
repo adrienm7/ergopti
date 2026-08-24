@@ -417,14 +417,14 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 			; committed_new already proves both targets durable. Publish the same
 			; candidate so RAM never advertises the rolled-back old authority while
 			; the retained barrier forces lifecycle recovery of the WAL.
-			Published := _LLM_Menu_PublishCandidate(CandidateFeatures,
+			Published := _LLM_Menu_PublishApiEntriesCandidate(CandidateFeatures,
 				CandidateMenu)
 			if Published && HasMethod(ApplyFn, "Call")
 				try ApplyFn.Call(CandidateMenu)
 			return _LLM_Menu_ReportApiTransitionFailure(Context, CleanupResult,
 				NotifyFn, false)
 		}
-		if !_LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
+		if !_LLM_Menu_PublishApiEntriesCandidate(CandidateFeatures, CandidateMenu) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"both files are durable but live publication was refused", false)
 		}

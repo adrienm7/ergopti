@@ -239,7 +239,17 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
 	; the save path returns immediately and the result is surfaced from the
 	; poll callback once it resolves.
-	try LLM_RemoteIsReady_Async(new_entry, _LLM_Menu_MakeApiValidationHandler(new_name))
+	ValidationOwner := LLM_AuxBegin("api_validation:" . new_entry["Id"], Map(
+		"backend", "api",
+		"endpoint", new_entry["BaseUrl"],
+		"identity", new_entry["Id"]))
+	try LLM_RemoteIsReady_Async(new_entry,
+		_LLM_Menu_MakeApiValidationHandler(new_name, new_entry["Id"],
+			ValidationOwner), ValidationOwner)
+	catch as Err {
+		LLM_AuxFinish(ValidationOwner)
+		try LoggerError("LLM", "Remote API validation dispatch failed: {1}.", Err.Message)
+	}
 	return true
 }
 
@@ -266,22 +276,44 @@ _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
 	return true
 }
 
-; Builds the async validation callback for an API save. Captured ``Name`` is
-; bound at save time so a later edit/save does not relabel an in-flight TrayTip.
-; Kept as a factory (not an inline closure) so the captured value is explicit
-; and the save path reads as a single non-blocking dispatch.
-_LLM_Menu_MakeApiValidationHandler(Name) {
-	return (reachable) => _LLM_Menu_OnApiValidationDone(reachable, Name)
+; Builds the async validation callback for an API save. The stable entry id and
+; exact auxiliary owner prevent a later edit/delete/backend change from
+; relabelling or publishing this completion.
+_LLM_Menu_MakeApiValidationHandler(Name, EntryId, Owner) {
+	return (reachable) => _LLM_Menu_OnApiValidationDone(
+		reachable, Name, EntryId, Owner)
 }
 
-_LLM_Menu_OnApiValidationDone(reachable, Name) {
-	if (reachable) {
-		TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", Name),
-			t("menu.llm.api_validated_title"), "Iconi")
-	} else {
-		TrayTip(StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name),
-			t("menu.llm.api_unreachable_title"), "Icon!")
-	}
+_LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
+	global _LLM_Menu
+	PreviousCritical := Critical("On")
+	try {
+		if !LLM_AuxIsCurrent(Owner) || A_IsSuspended
+			return false
+		if !(_LLM_Menu is Map) || !_LLM_Menu.Get("enabled", false)
+				|| _LLM_Menu.Get("backend", "") != "api"
+			return false
+		Matches := 0
+		CurrentName := Name
+		for Entry in _LLM_Menu.Get("api_entries", []) {
+			if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId {
+				Matches += 1
+				CurrentName := _LLM_MenuApiEntryGet(Entry, "Name", Name)
+			}
+		}
+		if Matches != 1 || !LLM_AuxFinish(Owner)
+			return false
+		if HasMethod(NotifyFn, "Call") {
+			NotifyFn.Call(reachable ? true : false, CurrentName)
+		} else if reachable {
+			TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", CurrentName),
+				t("menu.llm.api_validated_title"), "Iconi")
+		} else {
+			TrayTip(StrReplace(t("menu.llm.api_unreachable_body"), "%s", CurrentName),
+				t("menu.llm.api_unreachable_title"), "Icon!")
+		}
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_RemoveActiveApiEntry() {

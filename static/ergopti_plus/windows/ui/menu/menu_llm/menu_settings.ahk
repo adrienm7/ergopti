@@ -515,19 +515,28 @@ LLM_Menu_PromptOllamaPort() {
 		return
 	return LLM_Menu_CommitMutation("the Ollama port setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"ollama_port", val), _LLM_Menu_ApplyOllamaPortCommitted)
+			"ollama_port", val), _LLM_Menu_ApplyOllamaPortCommitted,
+		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
 ; Resets the Ollama port to its shared default and applies it live.
 LLM_Menu_ResetOllamaPort(default_port) {
 	return LLM_Menu_CommitMutation("the Ollama port reset",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"ollama_port", default_port), _LLM_Menu_ApplyOllamaPortCommitted)
+			"ollama_port", default_port), _LLM_Menu_ApplyOllamaPortCommitted,
+		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
 _LLM_Menu_ApplyOllamaPortCommitted(Candidate) {
-	LLM_Ollama_SetPort(Candidate["ollama_port"])
+	if !LLM_Ollama_SetPort(Candidate["ollama_port"])
+		return false
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
 	LLM_Menu_Build()
+	if Candidate.Get("enabled", false)
+			&& Candidate.Get("backend", "") == "ollama"
+		LLM_Menu_ScheduleBackendLifecycle(false)
 	return true
 }
 

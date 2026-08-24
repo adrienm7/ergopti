@@ -44,13 +44,53 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 	Assert(InStr(TriggerBody, "LLM_Deps_IsReady()") = 0,
 		"manual API prediction must not inherit Ollama readiness")
 
-	for Name in ["_LLM_Ollama_PingPoll", "_LLM_Ollama_TagsPoll"] {
+	for Name in ["_LLM_Ollama_PingPoll", "_LLM_Ollama_TagsPoll",
+			"_LLM_Ollama_DeletePoll"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must exist for the AHK-003 ownership guard")
-		OwnerPos := InStr(Body, "owner_generation != LLM_AuxGeneration()")
+		OwnerPos := InStr(Body, "!LLM_AuxIsCurrent(Owner)")
 		ProcessPos := InStr(Body, "ProcessExist(pid)")
 		Assert(OwnerPos > 0 && ProcessPos > 0 && OwnerPos < ProcessPos,
 			Name . " must reject stale ownership before timeout or callback delivery")
+	}
+
+	for Producer in Map(
+		"_LLM_Menu_FireHealthProbe", '"menu_health"',
+		"_LLM_Menu_FireInstalledTagsProbe", '"menu_tags"',
+		"_LLM_Menu_PromptDeleteCachedModel", '"menu_delete:"') {
+		Body := _DriverFuncBody(Producer)
+		Assert(Body != "", Producer . " must remain an inventoried auxiliary producer")
+		Assert(InStr(Body, "_LLM_Menu_BeginOllamaAux(") > 0,
+			Producer . " must publish its owner before dispatch")
+	}
+	ApiBody := _DriverFuncBody("_LLM_Menu_PromptApiEntry")
+	Assert(ApiBody != "", "API-entry validation producer must remain reachable")
+	Assert(InStr(ApiBody, 'LLM_AuxBegin("api_validation:"') > 0,
+		"API validation must bind the stable entry identity before dispatch")
+	Assert(InStr(ApiBody, "ValidationOwner), ValidationOwner)") > 0,
+		"the callback and remote poll must share the same validation owner")
+
+	CancelBody := _DriverFuncBody("LLM_Menu_CancelOllamaOwnership")
+	Assert(CancelBody != "", "the Ollama ownership retirement boundary must exist")
+	Assert(InStr(CancelBody, '_LLM_Menu_ResetOllamaAuxState') > 0,
+		"backend and endpoint transfer must expire health and installed-tag state")
+	for Transport in ["LLM_OllamaIsRunning_Async",
+			"LLM_OllamaListModels_Async", "LLM_OllamaDeleteModel_Async"] {
+		Body := _DriverFuncBody(Transport)
+		Assert(InStr(Body, "LLM_AuxBindResources(Owner") > 0,
+			Transport . " must bind its process and finalizer to the owner receipt")
+	}
+	RemoteBody := _DriverFuncBody("LLM_RemoteIsReady_Async")
+	Assert(InStr(RemoteBody, "LLM_AuxBindResources(Owner") > 0,
+		"remote validation must bind its exact WinHTTP abort resource")
+	ApiTransactionBody := _DriverFuncBody("_LLM_Menu_CommitApiEntriesMutationNonCritical")
+	Assert(InStr(ApiTransactionBody, "_LLM_Menu_PublishApiEntriesCandidate(") > 0,
+		"API-entry transaction must retire validations at its publication boundary")
+	for PortProducer in ["LLM_Menu_PromptOllamaPort", "LLM_Menu_ResetOllamaPort"] {
+		Body := _DriverFuncBody(PortProducer)
+		Assert(InStr(Body, "_LLM_Menu_PrepareOllamaPortCandidate") > 0
+				&& InStr(Body, "_LLM_Menu_PublishOllamaPortCandidate") > 0,
+			PortProducer . " must retire endpoint A before publishing endpoint B")
 	}
 
 	CheckBody := _DriverFuncBody("LLM_Deps_CheckAndInstall")
