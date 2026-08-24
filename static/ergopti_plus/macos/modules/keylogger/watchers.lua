@@ -1,4 +1,4 @@
-﻿--- modules/keylogger/watchers.lua
+--- modules/keylogger/watchers.lua
 
 --- ==============================================================================
 --- MODULE: Keylogger Hardware Watchers And Sensors

@@ -1,4 +1,4 @@
-﻿--- tests/unit/lib/test_toml_reader_cache_hook.lua
+--- tests/unit/lib/test_toml_reader_cache_hook.lua
 
 --- ==============================================================================
 --- MODULE: toml_reader cache-provider hook (regression)

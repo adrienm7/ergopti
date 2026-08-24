@@ -1,4 +1,4 @@
-﻿--- tests/unit/platform/remap/test_config.lua
+--- tests/unit/platform/remap/test_config.lua
 
 --- ==============================================================================
 --- MODULE: karabiner.config Unit Tests

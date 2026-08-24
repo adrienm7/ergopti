@@ -1,4 +1,4 @@
-﻿--- ui/metrics_apps/init.lua
+--- ui/metrics_apps/init.lua
 
 --- ==============================================================================
 --- MODULE: Apps Time Dashboard UI

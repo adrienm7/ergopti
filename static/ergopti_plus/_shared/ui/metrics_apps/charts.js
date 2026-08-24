@@ -1,4 +1,4 @@
-﻿// _shared/ui/metrics_apps/charts.js
+// _shared/ui/metrics_apps/charts.js
 // ======= 5/ Hour × Weekday Heatmap =======
 // =====================================================
 // =====================================================

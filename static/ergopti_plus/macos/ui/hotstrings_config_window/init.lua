@@ -1,4 +1,4 @@
-﻿--- ui/hotstrings_config_window/init.lua
+--- ui/hotstrings_config_window/init.lua
 
 --- ==============================================================================
 --- MODULE: Hotstrings Config Window

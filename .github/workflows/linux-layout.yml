@@ -29,6 +29,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  hygiene:
+    name: 'Encoding hygiene (no UTF-8 BOM outside .ahk)'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Repository contract: LF everywhere, UTF-8 BOM reserved to AutoHotkey
+      # sources. A stray BOM makes Lua modules fail to load ("unexpected
+      # symbol") on POSIX runners while staying invisible on Windows.
+      - name: Reject UTF-8 BOM in tracked non-AHK text files
+        run: |
+          bad=""
+          while IFS= read -r f; do
+            case "$f" in
+              *.ahk) continue ;;
+            esac
+            if [ "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
+              bad="$bad$f\n"
+            fi
+          done < <(git ls-files)
+          if [ -n "$bad" ]; then
+            echo "::error::UTF-8 BOM detected in:$bad"
+            exit 1
+          fi
+
   tests:
     name: 'Installer unit + sandbox tests'
     runs-on: ubuntu-latest

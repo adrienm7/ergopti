@@ -1,4 +1,4 @@
-﻿--- ui/hotstring_editor/init.lua
+--- ui/hotstring_editor/init.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Editor UI
