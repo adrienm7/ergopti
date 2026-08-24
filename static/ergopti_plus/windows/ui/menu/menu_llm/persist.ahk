@@ -180,6 +180,27 @@ _LLM_Menu_PutValidatedPersistedOption(Opts, Key, Value, SourceKey := "") {
 	return true
 }
 
+_LLM_Menu_LoadAppProfileOverridesFromCache(SavedOpts, Cache) {
+	if !(SavedOpts is Map) || !(Cache is Map)
+		return false
+	Raw := IniCacheGet(Cache, "llm", "app_profile_overrides")
+	if (Raw is String) {
+		if (Raw == "_" || Raw == "")
+			return true
+		Overrides := _LLM_Menu_DeserializeAppProfileOverrides(Raw)
+		if (Overrides is Map) {
+			SavedOpts["app_profile_overrides"] := Overrides
+			return true
+		}
+		LoggerError("LLM",
+			"Persisted app-profile overrides are malformed; refusing partial restore.")
+		return false
+	}
+	LoggerError("LLM",
+		"Persisted app-profile overrides have the wrong type; refusing restore.")
+	return false
+}
+
 LLM_Menu_BuildSavedOpts(Cache := unset) {
 	global Features
 	opts := Map()
