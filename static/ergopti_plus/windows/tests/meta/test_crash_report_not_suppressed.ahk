@@ -61,10 +61,14 @@ _CRNS_ThrottleIsReleasedOnFailure() {
 
 	Deferred := _DriverFuncBody("_ErgoptiDeferredCrashReport")
 	Assert(Deferred != "", "_ErgoptiDeferredCrashReport() must exist")
-	Assert(InStr(Deferred, "if !Task.start()") > 0,
+	Assert(InStr(Deferred, "if !CrashReportWorker_Start(") > 0,
 		"the deferred report must release its throttle when the worker cannot start")
 	Assert(InStr(Deferred, "ReleaseDedup()") > 0,
 		"the throttle must be released when the report was not written — otherwise a single failed save silences every recurrence of that fault for the whole TTL")
+	Completion := _DriverFuncBody("_CrashReport_WorkerDone")
+	Assert(Completion != "", "_CrashReport_WorkerDone() must exist")
+	Assert(InStr(Completion, "if ReleaseDedup") > 0 and InStr(Completion, "ReleaseDedup()") > 0,
+		"a worker that starts but fails to write must also release the throttle entry")
 
 	; Both failure routes matter: a save that returns empty, and a build that
 	; throws. The catch was already there; it must release too.

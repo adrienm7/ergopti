@@ -314,6 +314,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
+#Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
 
 ; Compiled workers reuse this executable. Exit into the minimal worker loop as
