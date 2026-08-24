@@ -103,7 +103,7 @@ _LLM_Menu_ApplyToggleCommitted(Candidate) {
 	global LLM_HEALTH_PROBE_INTERVAL_MS
 	LoggerInfo("LLM", "Toggle clicked — enabled: "
 		. (Candidate["enabled"] ? "true" : "false") . ".")
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("toggle_committed")
 	if Candidate["enabled"] {
 		; Model readiness is checked by the deferred bootstrap after this global
 		; barrier releases, so it cannot start a nested persistence transaction.
@@ -224,7 +224,7 @@ _LLM_Menu_ApplyBackendCommitted(Candidate) {
 	if !LLM_BackendCapabilities(Candidate["backend"])["streaming"]
 		Candidate["streaming"] := false
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("backend_committed")
 	if Candidate["enabled"]
 		LLM_Menu_ScheduleBackendLifecycle(false)
 	return true
@@ -260,7 +260,7 @@ _LLM_Menu_ApplyModelCommitted(Candidate) {
 		_LLM_Ollama_IsReady := false
 		try LLM_OllamaScheduleWarmupRetry(Candidate["model"])
 	}
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("model_committed")
 	return true
 }
 
@@ -605,7 +605,7 @@ LLM_Menu_OnResume() {
 			try LoggerError("LLM",
 				"Trigger shortcut recovery resume service failed: {1}.", Err.Message)
 	}
-	LLM_Menu_Build()
+	LLM_Menu_ServiceBuilds()
 	if _LLM_Menu["bootstrap_pending"] {
 		_LLM_Menu["bootstrap_pending"] := false
 		if _LLM_Menu["enabled"]

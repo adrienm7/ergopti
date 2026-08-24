@@ -28,11 +28,12 @@ _LLM_Menu_AuxOwnerIsCurrent(Owner, Backend := "ollama") {
 }
 
 _LLM_Menu_AuxBuild(BuildFn := 0) {
-	if A_IsSuspended
-		return false
-	if HasMethod(BuildFn, "Call")
+	if HasMethod(BuildFn, "Call") {
+		if A_IsSuspended
+			return false
 		return BuildFn.Call()
-	return LLM_Menu_Build()
+	}
+	return LLM_Menu_RequestBuild("aux_completion")
 }
 
 _LLM_Menu_ResetOllamaAuxState(*) {
@@ -138,9 +139,7 @@ _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok, Owner := 0,
 		if !LLM_AuxFinish(Owner)
 			return false
 	} finally Critical(PreviousCritical)
-	if A_IsSuspended
-		return true
-	if !ok {
+	if !ok && !A_IsSuspended {
 		if HasMethod(WarnFn, "Call")
 			WarnFn.Call(name, tag)
 		else

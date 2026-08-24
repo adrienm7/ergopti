@@ -77,19 +77,21 @@ _MetaCheckLlmTrayDeferredBuild() {
 	; flag (which was always false here, so the build never armed at all).
 	BootBody := _DriverSourceConcat()
 	Assert(BootBody != "", "driver source must be readable")
-	Assert(InStr(BootBody, "SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)") > 0,
-		"ErgoptiPlus.ahk boot tail must arm the deferred LLM_Menu_Build (for the OFF case)")
+	Assert(InStr(BootBody,
+		'SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)') > 0,
+		"ErgoptiPlus.ahk boot tail must arm one owned LLM menu request (for the OFF case)")
 	Assert(!InStr(BootBody, "_LLM_Menu_BuildPending"),
 		"ErgoptiPlus.ahk must NOT gate the LLM_Menu_Build arming on _LLM_Menu_BuildPending — that flag is set by the deferred initMenu and is still false when this synchronous boot-tail line runs, so the build was never armed when the feature was OFF")
 	; The boot build must be gated on the feature being OFF, immediately before the
 	; SetTimer — when ON, the menu is built by the async deps-bootstrap path instead,
 	; so the boot thread never hits the synchronous /api/tags install-probe.
 	GatePos  := InStr(BootBody, 'if !_LLM_Menu["enabled"]')
-	ArmPos   := InStr(BootBody, "SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)")
+	ArmPos   := InStr(BootBody,
+		'SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)')
 	Assert(GatePos > 0,
 		'ErgoptiPlus.ahk must gate the boot IA build on (if !_LLM_Menu["enabled"]) so it never runs the synchronous /api/tags probe at boot when ON')
 	Assert(GatePos < ArmPos and (ArmPos - GatePos) < 60,
-		'the (if !_LLM_Menu["enabled"]) gate must immediately precede the SetTimer(LLM_Menu_Build ...) arming — the ON path builds via LLM_Menu_BootstrapOllama after async Ollama-readiness, never at boot')
+		'the (if !_LLM_Menu["enabled"]) gate must immediately precede the owned build-request timer — the ON path builds via LLM_Menu_BootstrapOllama after async Ollama-readiness, never at boot')
 }
 
 Test("meta llm: LLM_Menu_Init defers the IA submenu build", _MetaCheckLlmTrayDeferredBuild)
