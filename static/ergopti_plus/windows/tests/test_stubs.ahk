@@ -568,15 +568,21 @@ _Stub_OutputHostIdentity() {
 }
 
 _Stub_OutputHostMetadata(Hwnd, Pid) {
-	global _Stub_OutputHostExe, _Stub_OutputHostTitle
-	return Map("Exe", _Stub_OutputHostExe, "Class", "fixture", "Title", _Stub_OutputHostTitle)
+	global _Stub_OutputHostExe
+	return Map("Exe", _Stub_OutputHostExe, "Class", "fixture")
+}
+
+_Stub_OutputHostTitleProbe(Hwnd, Pid) {
+	global _Stub_OutputHostTitle
+	return Map("Ok", true, "Title", _Stub_OutputHostTitle, "TimedOut", false)
 }
 
 _Stub_SetOutputHost(Exe, Title) {
 	global _Stub_OutputHostExe, _Stub_OutputHostTitle
 	_Stub_OutputHostExe := Exe
 	_Stub_OutputHostTitle := Title
-	OutputHostResolverConfigure(_Stub_OutputHostIdentity, _Stub_OutputHostMetadata)
+	OutputHostResolverConfigure(_Stub_OutputHostIdentity,
+		_Stub_OutputHostMetadata, _Stub_OutputHostTitleProbe)
 }
 
 SimulateNotepadActive() {

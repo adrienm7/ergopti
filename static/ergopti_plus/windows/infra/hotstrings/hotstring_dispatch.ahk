@@ -151,7 +151,8 @@ _HSE_TerminalOwnerIsCurrent(Owner) {
 			|| _PrefixDeferredGeneration != Owner["LifecycleGeneration"])
 		return false
 	Host := OutputHostResolve()
-	if (Host["Hwnd"] != Owner["Hwnd"] || Host["Pid"] != Owner["Pid"])
+	if !Host["Valid"]
+			|| Host["Hwnd"] != Owner["Hwnd"] || Host["Pid"] != Owner["Pid"]
 		return false
 	Snapshot := Owner["BufferSnapshot"]
 	return StrLen(HSE_Buffer) >= StrLen(Snapshot)
@@ -557,6 +558,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		IsConform := Prepared.IsConform
 		Replacement := Prepared.Replacement
 		OnlyText := Prepared.OnlyText
+		; Sender choice and terminal ownership must share one foreground receipt.
+		; Acquire it before suppression/synthetic ownership so an ambiguous focus or
+		; title probe declines with no output-side mutation.
+		OutputHost := OutputHostResolve(true)
+		if !OutputHost["Valid"]
+			return false
 
 		Fired := false
 		DeferredOwner := 0
@@ -620,15 +627,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; preflight above. Never resolve a callable again here: when the tooltip
 				; supplied the visible decision, this exact value is what it promised.
 				; (KLHook global removed)
-				IsNotepadApp := false
-				IsTerminalApp := false
-					try {
-							OutputHost := OutputHostResolve()
-							exe := OutputHost["Exe"]
-							WindowTitle := OutputHost["Title"]
-							IsNotepadApp := (StrLower(exe) = "notepad.exe")
-							IsTerminalApp := _HSE_IsTerminalInputHost(exe, WindowTitle)
-					}
+				exe := OutputHost["Exe"]
+				WindowTitle := OutputHost["Title"]
+				IsNotepadApp := (StrLower(exe) = "notepad.exe")
+				IsTerminalApp := _HSE_IsTerminalInputHost(exe, WindowTitle)
 					; The clipboard route can only paste literal text. A Send-key payload such
 					; as '""{Left}' must keep its interpreted cursor movement in Notepad;
 					; pasting it would silently put the five characters "{Left}" on screen.
@@ -682,7 +684,6 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 								} else {
 										EmitFn := 0
 								}
-								HostSnapshot := OutputHostResolve()
 								DeferredOwner := Map(
 									"Id", ++_HSE_TerminalOwnerSerial,
 									"Pending", true,
@@ -696,8 +697,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"DelayFn", 0,
 									"BlockFn", 0,
 									"BufferSnapshot", HSE_Buffer,
-									"Hwnd", HostSnapshot["Hwnd"],
-									"Pid", HostSnapshot["Pid"],
+									"Hwnd", OutputHost["Hwnd"],
+									"Pid", OutputHost["Pid"],
 									"RegistryGeneration", HSE_RegistryGeneration,
 									"DecisionGeneration", HSE_RuntimeDecisionGeneration,
 									"InputGeneration", _PrefixInputContextGeneration,
