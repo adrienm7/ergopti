@@ -896,6 +896,20 @@ _GetActiveEntry_ReturnsMatchedEntry() {
 Test("_LLM_Engine_GetActiveApiEntry: returns entry matching api_entry_id", _GetActiveEntry_ReturnsMatchedEntry)
 
 
+_GetActiveEntry_RejectsDuplicateIdentity() {
+	global _LLM_Engine
+	e1 := Map("Id", "duplicate", "Provider", "openai", "Token", "t1", "Model", "m1")
+	e2 := Map("Id", "duplicate", "Provider", "anthropic", "Token", "t2", "Model", "m2")
+	_LLM_Engine["api_entries"] := [e1, e2]
+	_LLM_Engine["api_entry_id"] := "duplicate"
+	AssertEqual("", _LLM_Engine_GetActiveApiEntry(),
+		"an ambiguous durable identity must fail closed instead of choosing the first credential")
+}
+Test("_LLM_Engine_GetActiveApiEntry: rejects duplicate identities "
+	. "(api-entry-identity-cardinality)",
+	_GetActiveEntry_RejectsDuplicateIdentity)
+
+
 _GetActiveEntry_FallsBackToFirstOnUnknownId() {
 	global _LLM_Engine
 	e1 := Map("Id", "e1", "Provider", "openai", "Token", "t", "Model", "m")

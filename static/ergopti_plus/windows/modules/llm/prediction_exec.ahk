@@ -1047,13 +1047,23 @@ _LLM_Engine_GetActiveApiEntry() {
 	if (Type(entries) != "Array" or entries.Length == 0)
 		return ""
 	active_id := _LLM_Engine.Has("api_entry_id") ? _LLM_Engine["api_entry_id"] : ""
-	if (active_id != "") {
-		for , e in entries {
-			id := (e is Map and e.Has("Id")) ? e["Id"] : (e.HasOwnProp("Id") ? e.Id : "")
-			if (id == active_id)
-				return e
-		}
+	SeenIds := Map()
+	Matched := ""
+	for , e in entries {
+		if e is Map
+			id := e.Has("Id") ? e["Id"] : ""
+		else if IsObject(e)
+			id := e.HasOwnProp("Id") ? e.Id : ""
+		else
+			return ""
+		if !(id is String) || Trim(id) == "" || SeenIds.Has(id)
+			return ""
+		SeenIds[id] := true
+		if active_id != "" && id == active_id
+			Matched := e
 	}
+	if Matched != ""
+		return Matched
 	; Fallback: first entry. Better than silent zero predictions when the
 	; user has at least one entry configured but has not picked one yet.
 	return entries[1]

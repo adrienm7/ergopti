@@ -7,16 +7,14 @@
 ; Google Gemini, OpenAI-compatible). When backend = "api", the model picker
 ; becomes an "API endpoints" picker built from this list. Includes the
 ; create/edit dialog flow, the JSON persistence layer (api_entries.json
-; alongside config.toml), DPAPI token encryption, and the brace-aware JSON
-; splitter required to survive tokens that contain literal braces.
+; alongside config.toml), DPAPI token encryption, and complete schema
+; validation before publication.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Separate JSON file: the array-of-maps schema would be mangled by the
 ;    project's flat-TOML writer; api_entries.json sidesteps the round-trip.
-; 2. State-aware JSON splitter: regex-based ``\{[^{}]*\}`` truncates entries
-;    when a token or URL contains literal braces. The custom scanner tracks
-;    string boundaries and escape sequences so braces inside strings don't
-;    count.
+; 2. Full JSON parse: the shared recursive parser preserves braces and escaped
+;    strings while rejecting malformed, non-array, partial, or trailing input.
 ; 3. DPAPI token encryption: tokens land in api_entries.json prefixed with
 ;    ``dpapi:`` so the loader can detect encrypted blobs; legacy plaintext
 ;    entries get encrypted on the first save after this build lands.
@@ -105,17 +103,39 @@ _LLM_Menu_SelectApiEntry(Entry) {
 }
 
 _LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId) {
-	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
+	if !(Candidate is Map) || !Candidate.Has("api_entries")
+			|| !(Candidate["api_entries"] is Array)
+			|| !_LLM_Menu_ApiEntryIdsAreUnique(Candidate["api_entries"])
 		return false
-	Matches := 0
-	for Entry in Candidate["api_entries"] {
-		if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId {
-			Matches += 1
-		}
-	}
-	if (Matches != 1)
+	if (_LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], EntryId) != 1)
 		return false
 	Candidate["api_entry_id"] := EntryId
+	return true
+}
+
+
+_LLM_Menu_ApiEntryIdCount(Entries, EntryId) {
+	if !(Entries is Array) || !(EntryId is String) || EntryId == ""
+		return 0
+	Matches := 0
+	for Entry in Entries {
+		if _LLM_MenuApiEntryGet(Entry, "Id", "") == EntryId
+			Matches += 1
+	}
+	return Matches
+}
+
+
+_LLM_Menu_ApiEntryIdsAreUnique(Entries) {
+	if !(Entries is Array)
+		return false
+	Seen := Map()
+	for Entry in Entries {
+		EntryId := _LLM_MenuApiEntryGet(Entry, "Id", "")
+		if !(EntryId is String) || Trim(EntryId) == "" || Seen.Has(EntryId)
+			return false
+		Seen[EntryId] := true
+	}
 	return true
 }
 
@@ -261,10 +281,18 @@ _LLM_Menu_PromptApiEntry(EditId) {
 }
 
 _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
-	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
+	if !(Candidate is Map) || !Candidate.Has("api_entries")
+			|| !(Candidate["api_entries"] is Array)
+			|| !_LLM_Menu_ApiEntryIdsAreUnique(Candidate["api_entries"])
 			|| !(NewEntry is Map) || !NewEntry.Has("Id")
+			|| !(NewEntry["Id"] is String) || Trim(NewEntry["Id"]) == ""
 		return false
 	if EditId != "" {
+		if (_LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], EditId) != 1)
+			return false
+		if (NewEntry["Id"] != EditId
+				&& _LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], NewEntry["Id"]) != 0)
+			return false
 		for Index, Entry in Candidate["api_entries"] {
 			if _LLM_MenuApiEntryGet(Entry, "Id", "") == EditId {
 				Candidate["api_entries"][Index] := LLM_Menu_DeepClone(NewEntry)
@@ -274,10 +302,8 @@ _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
 		}
 		return false
 	}
-	for Entry in Candidate["api_entries"] {
-		if _LLM_MenuApiEntryGet(Entry, "Id", "") == NewEntry["Id"]
-			return false
-	}
+	if (_LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], NewEntry["Id"]) != 0)
+		return false
 	Candidate["api_entries"].Push(LLM_Menu_DeepClone(NewEntry))
 	Candidate["api_entry_id"] := NewEntry["Id"]
 	return true
@@ -358,7 +384,10 @@ _LLM_Menu_RemoveActiveApiEntry() {
 }
 
 _LLM_Menu_RemoveApiEntryCandidate(Candidate, EntryId) {
-	if !(Candidate is Map) || !(Candidate["api_entries"] is Array)
+	if !(Candidate is Map) || !Candidate.Has("api_entries")
+			|| !(Candidate["api_entries"] is Array)
+			|| !_LLM_Menu_ApiEntryIdsAreUnique(Candidate["api_entries"])
+			|| _LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], EntryId) != 1
 		return false
 	Kept := []
 	Removed := 0
@@ -423,53 +452,114 @@ _LLM_Menu_ApiEntriesPath() {
 	return ParentDir . "\api_entries.json"
 }
 
-; Read api_entries.json on startup and populate the tray state. Silent on
-; missing file (first-run user) and on parse failure (corrupt file) — both
-; cases just leave the user with an empty entries list, which the UI handles
-; gracefully via the "+ Add an API…" affordance.
-_LLM_Menu_LoadApiEntries() {
-	global _LLM_Menu
+; Parses and validates the complete persisted image before any row becomes
+; visible. A malformed sibling invalidates the whole authority: publishing a
+; prefix would make selection and credential identity depend on parser order.
+_LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
+	global LLM_API_PROVIDERS
+	if !IsSet(Providers)
+		Providers := LLM_API_PROVIDERS
+	Result := Map("ok", false, "entries", [], "reason", "")
+	try Parsed := JsonParse(Raw)
+	catch as Err {
+		Result["reason"] := "invalid JSON: " . Err.Message
+		return Result
+	}
+	if !(Parsed is Array) {
+		Result["reason"] := "the top-level value is not an array"
+		return Result
+	}
+	if !(Providers is Map) {
+		Result["reason"] := "the provider catalogue is unavailable"
+		return Result
+	}
+	SeenIds := Map()
+	RequiredFields := ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+	for Index, Entry in Parsed {
+		if !(Entry is Map) {
+			Result["reason"] := "entry " . Index . " is not an object"
+			return Result
+		}
+		for Field in RequiredFields {
+			if !Entry.Has(Field) || !(Entry[Field] is String) {
+				Result["reason"] := "entry " . Index
+					. " has a missing or non-string " . Field . " field"
+				return Result
+			}
+		}
+		EntryId := Entry["Id"]
+		if Trim(EntryId) == "" {
+			Result["reason"] := "entry " . Index . " has an empty Id"
+			return Result
+		}
+		if SeenIds.Has(EntryId) {
+			Result["reason"] := "duplicate API entry id '" . EntryId . "'"
+			return Result
+		}
+		ProviderId := Entry["Provider"]
+		if Trim(ProviderId) == "" || !Providers.Has(ProviderId) {
+			Result["reason"] := "entry " . Index
+				. " names unknown provider '" . ProviderId . "'"
+			return Result
+		}
+		Candidate := Map()
+		for Field in RequiredFields
+			Candidate[Field] := Entry[Field]
+		try Candidate["Token"] := HasMethod(DecryptFn, "Call")
+			? DecryptFn.Call(Entry["Token"])
+			: LLM_ApiToken_Decrypt(Entry["Token"])
+		catch as Err {
+			Result["reason"] := "entry " . Index
+				. " token decryption failed: " . Err.Message
+			return Result
+		}
+		if !(Candidate["Token"] is String) {
+			Result["reason"] := "entry " . Index
+				. " token decryption returned a non-string value"
+			return Result
+		}
+		SeenIds[EntryId] := true
+		Result["entries"].Push(Candidate)
+	}
+	Result["ok"] := true
+	return Result
+}
+
+
+_LLM_Menu_ReportApiEntriesLoadFailure(Reason, ReportFn := 0) {
+	if HasMethod(ReportFn, "Call") {
+		try ReportFn.Call(Reason)
+		catch as Err
+			try LoggerError("LLM", "API-entry load reporter failed: {1}.", Err.Message)
+		return false
+	}
+	try LoggerError("LLM", "Rejected api_entries.json: {1}.", Reason)
+	return false
+}
+
+
+; Read api_entries.json on startup and publish only one completely validated
+; authority. A missing file is normal first-run state; unreadable or corrupt
+; files are reported and retained byte-for-byte for recovery.
+_LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
+		Providers := unset) {
+	global _LLM_Menu, LLM_API_PROVIDERS
+	if !IsSet(Providers)
+		Providers := LLM_API_PROVIDERS
 	path := _LLM_Menu_ApiEntriesPath()
 	if (path == "" or !FileExist(path))
-		return
+		return true
 	try {
-		raw := FileRead(path, "UTF-8")
-	} catch {
-		return
+		raw := HasMethod(ReadFn, "Call") ? ReadFn.Call(path)
+			: FileRead(path, "UTF-8")
+	} catch as Err {
+		return _LLM_Menu_ReportApiEntriesLoadFailure(
+			"the file could not be read: " . Err.Message, ReportFn)
 	}
-	entries := []
-	seen_ids := Map()
-	; Split the array into top-level object blocks via a state-aware scanner
-	; (NOT a regex like ``{[^{}]*}``). A token that happens to contain a
-	; literal ``{`` or ``}`` would silently truncate one entry and shift the
-	; rest by one — a regression that's invisible until a user pastes an
-	; OAuth bearer token containing those characters.
-	for obj_str in _LLM_Menu_SplitJsonObjects(raw) {
-		obj := Map()
-		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
-			if RegExMatch(obj_str, '"' . field . '"\s*:\s*"((?:[^"\\]|\\.)*)"', &fm) {
-				obj[field] := _LLM_MenuApiJsonUnescape(fm[1])
-			} else {
-				obj[field] := ""
-			}
-		}
-		; Decrypt the token field on load so callers always see cleartext.
-		; LLM_ApiToken_Decrypt is a no-op on legacy unencrypted values
-		; (any string without the ``dpapi:`` prefix), so existing configs
-		; keep working unchanged until the next persist re-encrypts.
-		if (obj["Token"] != "")
-			obj["Token"] := LLM_ApiToken_Decrypt(obj["Token"])
-		if (obj["Id"] != "") {
-			if seen_ids.Has(obj["Id"]) {
-				OldId := obj["Id"]
-				obj["Id"] := _LLM_Menu_NewApiId()
-				LoggerError("LLM", "Duplicate API entry id '{1}' was quarantined as '{2}'.",
-					OldId, obj["Id"])
-			}
-			seen_ids[obj["Id"]] := true
-			entries.Push(obj)
-		}
-	}
+	Parsed := _LLM_Menu_ParseAndValidateApiEntries(raw, Providers, DecryptFn)
+	if !Parsed["ok"]
+		return _LLM_Menu_ReportApiEntriesLoadFailure(Parsed["reason"], ReportFn)
+	entries := Parsed["entries"]
 	_LLM_Menu["api_entries"] := entries
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
@@ -489,6 +579,7 @@ _LLM_Menu_LoadApiEntries() {
 	if (active == "" and entries.Length > 0)
 		active := entries[1]["Id"]
 	_LLM_Menu["api_entry_id"] := active
+	return true
 }
 
 ; Builds the exact api_entries.json image for a detached menu candidate. Token
@@ -592,93 +683,5 @@ _LLM_MenuApiJsonEscape(s) {
 	s := StrReplace(s, "`n", "\n")
 	s := StrReplace(s, "`r", "\r")
 	s := StrReplace(s, "`t", "\t")
-	return s
-}
-
-/**
- * Splits a JSON array text into its top-level ``{...}`` object substrings,
- * tracking string boundaries and backslash escapes so a literal ``{`` or
- * ``}`` inside a token / URL never trips the split. Used by
- * _LLM_Menu_LoadApiEntries.
- *
- * @param {string} raw - Raw file contents (typically the contents of api_entries.json).
- * @returns {Array} Array of substrings, each one a complete ``{...}`` block.
- */
-_LLM_Menu_SplitJsonObjects(raw) {
-	objects := []
-	n := StrLen(raw)
-	i := 1
-	while (i <= n) {
-		; Skip ahead to the next opening brace that's NOT inside a string.
-		start := 0
-		j := i
-		in_str := false
-		escape := false
-		while (j <= n) {
-			c := SubStr(raw, j, 1)
-			if escape {
-				escape := false
-			} else if (c == "\") {
-				escape := true
-			} else if (c == '"') {
-				in_str := !in_str
-			} else if (!in_str and c == "{") {
-				start := j
-				break
-			}
-			j += 1
-		}
-		if (start == 0)
-			break
-		; Scan from ``start`` to the matching close brace, tracking depth
-		; and string boundaries so braces inside strings don't count.
-		depth := 0
-		in_str := false
-		escape := false
-		k := start
-		end_at := 0
-		while (k <= n) {
-			c := SubStr(raw, k, 1)
-			if escape {
-				escape := false
-			} else if (c == "\") {
-				escape := true
-			} else if (c == '"') {
-				in_str := !in_str
-			} else if (!in_str) {
-				if (c == "{") {
-					depth += 1
-				} else if (c == "}") {
-					depth -= 1
-					if (depth == 0) {
-						end_at := k
-						break
-					}
-				}
-			}
-			k += 1
-		}
-		if (end_at == 0)
-			break   ; Malformed input — stop rather than loop forever.
-		objects.Push(SubStr(raw, start, end_at - start + 1))
-		i := end_at + 1
-	}
-	return objects
-}
-
-_LLM_MenuApiJsonUnescape(s) {
-	; Two-pass with a placeholder so an escaped backslash (``\\``) doesn't
-	; trick the subsequent passes. The naive ordering ``\n → newline ;
-	; \\ → \`` mis-handled input like ``\\n`` (escaped backslash + literal
-	; n): the first pass found ``\n`` inside ``\\n`` and consumed the
-	; backslash, leaving ``\<newline>`` instead of ``\n``. The placeholder
-	; is a Private-Use-Area codepoint that never appears in valid text.
-	PH := Chr(0xE000)
-	s := StrReplace(s, "\\", PH)
-	s := StrReplace(s, "\n", "`n")
-	s := StrReplace(s, "\r", "`r")
-	s := StrReplace(s, "\t", "`t")
-	s := StrReplace(s, '\"', '"')
-	s := StrReplace(s, PH,   "\")
 	return s
 }
