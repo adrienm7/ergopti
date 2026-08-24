@@ -19,8 +19,14 @@ _TPD_Check() {
 		&& InStr(Entry, "_LLM_Menu_DeleteProfileCandidate") > 0
 		&& InStr(Entry, "_LLM_Menu_ApplyProfileCommitted") > 0,
 		"confirmed deletion must flow through the shared persist-before-publish transaction")
-	Assert(InStr(Candidate, 'Candidate["user_profiles"].RemoveAt(Index)') > 0,
-		"the detached candidate must remove the selected user profile")
+	CardinalityPos := InStr(Candidate, "if MatchIndex == 0")
+	RemovePos := InStr(Candidate, "Profiles.RemoveAt(MatchIndex)")
+	CollectPos := InStr(Candidate, "OverrideKeys.Push(AppName)")
+	DeletePos := InStr(Candidate, "Overrides.Delete(AppName)")
+	Assert(CardinalityPos > 0 && RemovePos > CardinalityPos,
+		"the detached candidate must prove one exact profile before removing it")
+	Assert(CollectPos > 0 && DeletePos > CollectPos,
+		"override keys must be collected before the detached Map is mutated")
 	Assert(InStr(Candidate, 'Candidate["profile_id"] := "basic"') > 0,
 		"deleting the active profile must select a valid built-in fallback")
 	Assert(InStr(Publisher, "LLM_Menu_BindProfileHotkeys") == 0,
