@@ -1,4 +1,4 @@
-﻿--- ui/menu/menu_hotstrings_custom.lua
+--- ui/menu/menu_hotstrings_custom.lua
 
 --- ==============================================================================
 --- MODULE: Menu Hotstrings — Custom/personal menu builder

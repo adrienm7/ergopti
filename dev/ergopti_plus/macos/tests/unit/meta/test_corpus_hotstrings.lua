@@ -1,4 +1,4 @@
-﻿--- tests/unit/meta/test_corpus_hotstrings.lua
+--- tests/unit/meta/test_corpus_hotstrings.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Corpus Consumer (Hammerspoon)

@@ -1,4 +1,4 @@
-﻿--- modules/gestures/actions.lua
+--- modules/gestures/actions.lua
 
 --- ==============================================================================
 --- MODULE: Gestures Actions Registry

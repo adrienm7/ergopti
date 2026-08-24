@@ -1,4 +1,4 @@
-﻿--- tests/helpers/init.lua
+--- tests/helpers/init.lua
 
 --- ==============================================================================
 --- MODULE: Test Helpers

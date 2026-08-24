@@ -1,4 +1,4 @@
-﻿--- tests/unit/menu/test_llm_menu_persistence.lua
+--- tests/unit/menu/test_llm_menu_persistence.lua
 
 --- ==============================================================================
 --- MODULE: LLM Menu Persistence Tests (Hammerspoon)

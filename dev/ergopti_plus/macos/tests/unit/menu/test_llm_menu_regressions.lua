@@ -1,4 +1,4 @@
-﻿--- tests/unit/menu/test_llm_menu_regressions.lua
+--- tests/unit/menu/test_llm_menu_regressions.lua
 ---
 --- Non-regression guards for fixed LLM tray/menu bugs (Hammerspoon). Mirrors
 --- windows/tests/test_llm_menu_regressions.ahk where the platform shares the bug class.

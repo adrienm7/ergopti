@@ -1,4 +1,4 @@
-﻿--- tests/unit/lib/test_toml_codec_edge_cases.lua
+--- tests/unit/lib/test_toml_codec_edge_cases.lua
 
 --- ==============================================================================
 --- MODULE: TOML Codec Edge-Case Regression Tests

@@ -1,4 +1,4 @@
-﻿--- ui/prompt_editor/init.lua
+--- ui/prompt_editor/init.lua
 
 --- ==============================================================================
 --- MODULE: Prompt Editor UI

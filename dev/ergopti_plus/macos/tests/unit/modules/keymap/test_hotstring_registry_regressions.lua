@@ -1,4 +1,4 @@
-﻿--- static/ergopti_plus/macos/tests/unit/modules/keymap/test_hotstring_registry_regressions.lua
+--- static/ergopti_plus/macos/tests/unit/modules/keymap/test_hotstring_registry_regressions.lua
 ---
 --- DESCRIPTION:
 --- Regression tests for registry counting and loading bugs fixed during the session.

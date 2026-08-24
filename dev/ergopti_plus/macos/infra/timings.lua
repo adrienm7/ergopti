@@ -1,4 +1,4 @@
-﻿--- infra/timings.lua
+--- infra/timings.lua
 
 --- ==============================================================================
 --- MODULE: Shared Timings Reader (Hammerspoon)

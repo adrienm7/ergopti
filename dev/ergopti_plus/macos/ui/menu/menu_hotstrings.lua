@@ -1,4 +1,4 @@
-﻿--- ui/menu/menu_hotstrings.lua
+--- ui/menu/menu_hotstrings.lua
 
 --- ==============================================================================
 --- MODULE: Menu Hotstrings

@@ -1,4 +1,4 @@
-﻿--- modules/keymap/registry_groups.lua
+--- modules/keymap/registry_groups.lua
 
 --- ==============================================================================
 --- MODULE: Keymap Registry — Group Loaders & Lifecycle
