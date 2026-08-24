@@ -49,11 +49,11 @@ global _SpaceHoldOwnerReleased := false
 ; Shift+Space or Ctrl+Space. After the IH resolves, HoldFn receives
 ; ih.Input (the translated char) and emits the correct modified keystroke.
 ;
-; Phase 2 (hold, layer variant) — mirrors LAlt: the layer is activated
-; immediately at hold-threshold so physical keys land directly on the
-; #HotIf LayerEnabled hotkeys. No InputHook is used; nav_layer.ahk
-; already has SC039::return to silence Space auto-repeat while the layer
-; is active.
+; Layer variant — unlike synthetic-modifier holds, ownership begins on the
+; physical Space key-down. LayerEnabled is therefore visible to a second key
+; even before the tap threshold; a quick isolated release disables the layer
+; and then emits Space. No InputHook is used; nav_layer.ahk already has
+; SC039::return to silence Space auto-repeat while the layer is active.
 ;
 ; After sending Space on tap, HSE_FeedChar(" ") is called explicitly because
 ; SendInput bypasses the prefix-watcher InputHook.
@@ -115,37 +115,12 @@ _SpaceHoldOnKeyUp(ih, vk, sc) {
 }
 
 SpaceTapHoldLayer() {
-		; Two-phase detection to avoid a CapsLock LED flash on tap:
-		; Phase 1 — wait for the hold threshold; if Space is released first it was
-		;            a tap, so send Space and return without ever activating the layer.
-		; Phase 2 — threshold elapsed → real hold; activate the layer and let every
-		;            subsequent physical key land on #HotIf LayerEnabled hotkeys.
-		;            Disable the layer once Space is released.
-		TimeoutSec := TapHoldDuration(TapHold, "space")
-		tap := KeyWait("SC039", "T" . TimeoutSec)
-		if tap {
-				_SpaceTapOrDispatch()
-				return
-		}
-		UpdateLastSentCharacter("Space")
-		ActivateLayer()
-		try {
-				; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-				; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-				; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-				; dropped the layer out from under the user after five seconds of legitimate
-				; navigation, and base-layer letters then landed in the document until it
-				; re-armed. Re-arm the wait instead while the key is still physically down: every
-				; iteration stays bounded, which is the property test_hold_layer_release_bounded
-				; pins, and a timeout with the key already up means the key-up really was lost --
-				; exactly the case the failsafe exists for.
-				while !KeyWait("SC039", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-						if !GetKeyState("SC039", "P")
-								break
-				}
-		} finally {
-				DisableLayer()
-		}
+	Result := TapHoldOwnImmediateLayer("SC039", TapHoldDuration(TapHold, "space"))
+	if Result["tap"] {
+		_SpaceTapOrDispatch()
+		return
+	}
+	UpdateLastSentCharacter("Space")
 }
 
 ; Tap: send the configured tap action, or native Space if none / "space".

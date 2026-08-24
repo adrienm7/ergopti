@@ -41,59 +41,31 @@
 ; ==================================================================
 ; ==================================================================
 
-; A layer-hold wait is a capped KeyWait whose failure path disables a layer.
-; Returns one record per site: the wait line and the few lines that follow it,
-; which is where both the re-arm and the DisableLayer live.
-_HLSL_LayerHoldSites() {
-	Sites := []
-	Src := _DriverDirConcat("platform/remap")
-	Lines := StrSplit(_StripFullLineComments(Src), "`n", "`r")
-	for Idx, Line in Lines {
-		if !InStr(Line, "KeyWait(")
-			continue
-		if !InStr(Line, "STUCK_MODIFIER_RELEASE_TIMEOUT_SEC")
-			continue
-		; Look ahead for the DisableLayer that makes this a LAYER hold rather
-		; than a synthetic-modifier hold (which legitimately keeps the plain cap).
-		Window := ""
-		Loop 6 {
-			Ahead := Idx + A_Index - 1
-			if (Ahead <= Lines.Length)
-				Window .= Lines[Ahead] . "`n"
-		}
-		if !InStr(Window, "DisableLayer()")
-			continue
-		Sites.Push({ Wait: Trim(Line, " `t"), Window: Window })
-	}
-	return Sites
+_HLSL_SharedOwnerBody() {
+	Src := _DriverDirConcat("infra")
+	Start := InStr(Src, "TapHoldOwnImmediateLayer(")
+	Assert(Start > 0, "the shared immediate layer owner must exist")
+	return SubStr(Src, Start, 2400)
 }
 
 ; The fix, asserted per site: the wait is re-armed in a loop, and the loop only
 ; gives up once the key is no longer physically down.
 _HLSL_EveryLayerHoldReArms() {
-	Sites := _HLSL_LayerHoldSites()
-	; Non-vacuity floor: a dozen tap-hold files carry this shape. A scan that
-	; matched nothing would pass every assertion below.
-	Assert(Sites.Length >= 8,
-		"the scan must reach the real layer-hold waits (found only " . Sites.Length . ") — a scan that matches nothing cannot fail")
-
-	for Site in Sites {
-		Assert(RegExMatch(Site.Wait, "i)^while\s*!\s*KeyWait\("),
-			"a layer-hold wait must be re-armed while the key is still held, not run once: '" . Site.Wait . "'. Run once, its cap expires after five seconds of legitimate navigation and the finally disables the layer under the user's fingers")
-		Assert(InStr(Site.Window, "GetKeyState") > 0,
-			"the re-armed wait must stop on the physical key state — without that check the loop never ends and the cap's real purpose (releasing after a genuinely lost key-up) is defeated: '" . Site.Wait . "'")
-		Assert(InStr(Site.Window, '"P"') > 0,
-			"the key-state probe must read the PHYSICAL state, not the logical one: the logical state is exactly what a lost key-up event corrupts, so a logical probe would loop forever: '" . Site.Wait . "'")
-	}
+	Body := _HLSL_SharedOwnerBody()
+	Assert(RegExMatch(Body, "i)while\s*!\s*WaitReleaseFn\.Call\("),
+		"the shared layer owner must re-arm its bounded wait while the key remains held")
+	Assert(InStr(Body, "KeyIsDownFn.Call(KeyName)") > 0,
+		"the shared layer owner must stop re-arming when the physical key is no longer down")
+	Assert(InStr(Body, "finally") > 0 and InStr(Body, "DisableFn.Call()") > 0,
+		"the shared layer owner must always disable in a finally")
 }
 
 ; The cap must survive. Uncapping would make the loop unnecessary and reopen
 ; the stuck-layer bug the cap was introduced to fix.
 _HLSL_CapIsNotRemoved() {
-	Sites := _HLSL_LayerHoldSites()
-	for Site in Sites
-		Assert(InStr(Site.Wait, "STUCK_MODIFIER_RELEASE_TIMEOUT_SEC") > 0,
-			"each individual wait must stay capped — an unbounded KeyWait trades this bug for the stuck-layer bug the cap exists to prevent: '" . Site.Wait . "'")
+	Body := _HLSL_SharedOwnerBody()
+	Assert(InStr(Body, "WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)") > 0,
+		"each shared release wait must stay capped — an unbounded wait reopens the stuck-layer bug")
 }
 
 ; The constant itself must keep saying what it is for. Its docstring is the

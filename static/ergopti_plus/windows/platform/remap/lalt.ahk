@@ -125,30 +125,8 @@ SC038::
 {
 	UpdateLastSentCharacter("LAlt")
 
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC038", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	ElapsedMs := TickElapsed(CharacterSentTime, Now)
-	tap := (ElapsedMs <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if (tap and ElapsedMs >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))
 	}
 }
@@ -252,33 +230,13 @@ SC038::
 #HotIf _LAltIsBackspaceLayer() and not LayerEnabled
 *SC038::
 {
-	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
-	if tap {
-		if (
-			A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
-			and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
-		) {
-			TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
-		}
-		return
-	}
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC038", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
+	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	if (
+		Result["tap"]
+		and A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
+		and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
+	) {
+		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
 	}
 }
 #HotIf
@@ -399,30 +357,8 @@ $SC038:: {
 $SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC038", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	ElapsedMs := TickElapsed(CharacterSentTime, Now)
-	tap := (ElapsedMs <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if (tap and ElapsedMs >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		_LAltDispatch()
 	}
 }

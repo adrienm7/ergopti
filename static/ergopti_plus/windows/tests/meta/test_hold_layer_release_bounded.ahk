@@ -56,22 +56,18 @@ _HLRB_Block(Src, Anchor) {
 	return Rest
 }
 
-; Asserts the hold-layer long-press block bounds its KeyWait and releases the
-; layer in a finally, and that no bare unbounded KeyWait remains.
+; Every hold-layer hotkey must delegate to the shared owner.  That owner makes
+; LayerEnabled visible synchronously on key-down, bounds every physical-release
+; wait, and disables the layer in a finally before the caller emits a tap.
 _HLRB_AssertBounded(RelPath, Anchor, Where) {
 	Q := Chr(34)
 	Src := _HLRB_ReadSource(RelPath)
 	Body := _HLRB_Block(Src, Anchor)
 	Assert(Body != "", Where . " hold-layer #HotIf block must exist")
-	Assert(InStr(Body, "STUCK_MODIFIER_RELEASE_TIMEOUT_SEC") > 0,
-		Where . " long-press KeyWait must be capped by STUCK_MODIFIER_RELEASE_TIMEOUT_SEC so a lost key-up cannot block DisableLayer() forever")
-	Assert(InStr(Body, "finally") > 0,
-		Where . " must call DisableLayer() in a finally so a lost key-up or thrown error can never leave the layer stuck on")
-	Assert(InStr(Body, "KeyWait") > 0, Where . " must still KeyWait for the physical release")
-	; A bare unbounded wait ends with the literal "U") or bare KeyWait("key") --
-	; detect both: "U") signals no timeout cap, bare no-arg form misses "U T".
-	Assert(!InStr(Body, Q . "U" . Q . ")"),
-		Where . " must not use a bare unbounded KeyWait(key, " . Q . "U" . Q . ") — use the capped " . Q . "U T" . Q . " . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC form")
+	Assert(InStr(Body, "TapHoldOwnImmediateLayer(") > 0,
+		Where . " must activate the shared layer owner synchronously on key-down")
+	Assert(!InStr(Body, "KeyWait("),
+		Where . " must not wait for the tap threshold before publishing LayerEnabled")
 }
 
 
@@ -141,3 +137,45 @@ _HLRB_LAltGenericLayer() {
 		"lalt.ahk 4.8")
 }
 Test("tap-holds: LAlt generic hold-layer release is bounded + in finally (hold-layer-unbounded-keywait)", _HLRB_LAltGenericLayer)
+
+_HLRB_BackspaceHoldLayer() {
+	Q := Chr(34)
+	_HLRB_AssertBounded("platform/remap/backspace.ahk",
+		"TapHoldHoldLayer(TapHold, " . Q . "backspace" . Q . ") != " . Q . Q,
+		"backspace.ahk 10.2")
+}
+Test("tap-holds: Backspace hold-layer is immediate and shared", _HLRB_BackspaceHoldLayer)
+
+_HLRB_DeleteHoldLayer() {
+	Q := Chr(34)
+	_HLRB_AssertBounded("platform/remap/delete.ahk",
+		"TapHoldHoldLayer(TapHold, " . Q . "delete" . Q . ") != " . Q . Q,
+		"delete.ahk 13.2")
+}
+Test("tap-holds: Delete hold-layer is immediate and shared", _HLRB_DeleteHoldLayer)
+
+_HLRB_WinHoldLayer() {
+	Q := Chr(34)
+	_HLRB_AssertBounded("platform/remap/win.ahk",
+		"TapHoldHoldLayer(TapHold, " . Q . "win" . Q . ") != " . Q . Q,
+		"win.ahk 12.2")
+}
+Test("tap-holds: Win hold-layer is immediate and shared", _HLRB_WinHoldLayer)
+
+_HLRB_SpaceHoldLayer() {
+	_HLRB_AssertBounded("platform/remap/space.ahk", "SpaceTapHoldLayer()", "space.ahk layer owner")
+}
+Test("tap-holds: Space hold-layer is immediate and shared", _HLRB_SpaceHoldLayer)
+
+_HLRB_TabHoldLayer() {
+	Q := Chr(34)
+	_HLRB_AssertBounded("platform/remap/tab.ahk",
+		"TapHoldTapAction(TapHold, " . Q . "tab" . Q . ") != " . Q . "alt_tab_monitor" . Q . " and TapHoldHoldLayer",
+		"tab.ahk 8.3")
+}
+Test("tap-holds: Tab hold-layer is immediate and shared", _HLRB_TabHoldLayer)
+
+_HLRB_CapsLockHoldLayer() {
+	_HLRB_AssertBounded("platform/remap/capslock.ahk", "_CapsLockHasHoldLayer() and not LayerEnabled", "capslock.ahk layer owner")
+}
+Test("tap-holds: CapsLock hold-layer is immediate and shared", _HLRB_CapsLockHoldLayer)

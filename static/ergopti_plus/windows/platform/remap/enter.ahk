@@ -92,31 +92,9 @@ _EnterHoldModKey() {
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
 *$SC01C:: {
-	tap := KeyWait("Enter", "T" . TapHoldDuration(TapHold, "enter"))
-	if tap {
-		if (A_PriorKey == "Enter")
-			_EnterDispatch()
-		return
-	}
-	; Long press — activate layer until key-up.
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("Enter", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("Enter", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
+	Result := TapHoldOwnImmediateLayer("Enter", TapHoldDuration(TapHold, "enter"))
+	if (Result["tap"] and A_PriorKey == "Enter")
+		_EnterDispatch()
 }
 #HotIf
 
