@@ -83,15 +83,15 @@
 
 <p>
 	Le processus d'installation utilise un script bash unique qui gère la sélection interactive
-	(version, variante, options) puis lance automatiquement l'installateur approprié. Deux méthodes
+	(version, variante) puis lance automatiquement l'installateur approprié. Deux méthodes
 	d'installation sont disponibles :
 </p>
 <ul>
 	<li>
-		<strong>Méthode "Clean"</strong> (recommandée) : utilise un répertoire d'extensions utilisateur
-		non invasif (<code>/usr/share/xkeyboard-config.d/</code>). Cette méthode n'existe que depuis fin
-		2025 et n'est disponible que sur les distributions les plus à jour comme Arch ou Fedora. En
-		effet, elle nécessite libxkbcommon ≥ 1.13.0.
+		<strong>Méthode "Clean"</strong> (recommandée) : installe la disposition dans un répertoire
+		d'extensions dédié (<code>/usr/share/xkeyboard-config.d/ergopti/</code>) sans modifier aucun
+		fichier système. Cette méthode nécessite <code>libxkbcommon</code> ≥ 1.13.0 et
+		<code>xkeyboard-config</code> ≥ 2.45 (Arch et Fedora récentes la proposent).
 	</li>
 	<li>
 		<strong>Méthode "Legacy"</strong> : modifie directement les fichiers système XKB (<code
@@ -101,9 +101,27 @@
 	</li>
 </ul>
 <p>
-	Le script de détection choisit automatiquement la méthode optimale selon votre système.
-	L'installation nécessite <code>sudo</code>.
+	Le script de détection choisit automatiquement la méthode optimale selon votre système, puis
+	chacune de ses étapes affiche son résultat (plus rien n'est silencieux). Les couches Maj,
+	Verr Maj et AltGr sont fournies par un fichier de <em>types</em> désormais <strong>toujours
+	inclus</strong> : la couche raccourcis (<kbd>Ctrl</kbd>/<kbd>Alt</kbd>/<kbd>Win</kbd>) rend
+	la lettre de base Ergopti de chaque touche — et sur les touches sans lettre simple comme
+	<kbd>é</kbd>, <kbd>à</kbd>, <kbd>ê</kbd>, elle rend respectivement <kbd-output>C</kbd-output>,
+	<kbd-output>V</kbd-output>, <kbd-output>Z</kbd-output> pour garder Copier/Coller/Annuler sous les
+	doigts.
+	La réinstallation par-dessus une version précédente (y compris l'ancienne méthode) nettoie
+	automatiquement les restes de l'installation antérieure. Enfin, la variante « Ergopti++ » n'est
+	plus proposée à l'installation : elle sature la table XCompose ; utilisez Ergopti ou Ergopti+.
 </p>
+<p>
+	Le script demande les droits <code>sudo</code>. Pour désinstaller :
+</p>
+<code
+	style="display:inline-block; width:100%; padding:1em; text-align:left"
+	>branch="${branch}"; curl -fsSL
+	"https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh"
+	| BRANCH="$branch" bash -s -- --uninstall</code
+>
 <div class="download-buttons">
 	<a href={urlInstallSh} download="install.sh">
 		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>

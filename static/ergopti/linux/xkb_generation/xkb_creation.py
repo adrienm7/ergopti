@@ -71,7 +71,7 @@ def generate_xkb(
         pattern = rf"key {re.escape(xkb_key)}[^\n]*;"
         comment = " // " + " ".join(comment_symbols)
         replacement = (
-            f'key {xkb_key} {{ type[group1] = "SEVEN_LEVEL_KEY", '
+            f'key {xkb_key} {{ type[group1] = "ERGOPTI_SEVEN_LEVEL", '
             f"[{', '.join(symbols)}] }};{comment}"
         )
         xkb_template = re.sub(pattern, replacement, xkb_template)

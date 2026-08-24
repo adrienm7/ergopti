@@ -1,7 +1,7 @@
 xkb_types         { 
     include "complete"
 
-    type "SEVEN_LEVEL_KEY" {
+    type "ERGOPTI_SEVEN_LEVEL" {
         modifiers = Shift + Lock + LevelThree + Control + Alt + Mod4;
 
         // ==============================

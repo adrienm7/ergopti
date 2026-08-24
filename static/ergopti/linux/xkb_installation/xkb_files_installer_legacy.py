@@ -18,6 +18,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from layout_package import resolve_roots, validate_layout_files
+
 # --- Constants ---
 XKB_BASE_DIR = Path("/usr/share/X11/xkb")
 XKB_SYMBOLS_DIR = XKB_BASE_DIR / "symbols"
@@ -418,7 +422,11 @@ def parse_args() -> dict:
         "--xcompose", type=Path, help="Path to the .XCompose file."
     )
     parser.add_argument(
-        "--types", type=Path, help="Path to the xkb_types.txt file."
+        "--types",
+        type=Path,
+        required=True,
+        help="Path to the full xkb_types.txt file (mandatory: it owns the "
+        "Shift/CapsLock/AltGr layers).",
     )
     parser.add_argument(
         "--force-xcompose",
@@ -428,6 +436,24 @@ def parse_args() -> dict:
     return vars(parser.parse_args())
 
 
+def remove_conflicting_clean_package() -> None:
+    """Remove the extensions-directory package if a clean install exists.
+
+    The two methods are mutually exclusive; keeping both would let the rules
+    composition and the legacy tree fight over the same layout id.
+    """
+    try:
+        package_dir = resolve_roots().package_dir
+    except Exception as error:  # pragma: no cover - defensive, roots are static
+        logging.debug("Could not resolve extensions roots: %s", error)
+        return
+    if package_dir.is_dir():
+        shutil.rmtree(package_dir)
+        logging.info(
+            "Removed conflicting clean-method package directory: %s", package_dir
+        )
+
+
 def main() -> None:
     if sys.platform == "win32":
         logging.error("This script is for Linux and cannot be run on Windows.")
@@ -435,6 +461,25 @@ def main() -> None:
 
     check_sudo()
     args = parse_args()
+
+    xkb_path: Path = args["xkb"]
+    if "_plus_plus" in xkb_path.name.lower():
+        logging.error(
+            "Ergopti++ is no longer installable (it saturates XCompose). "
+            "Choose Ergopti or Ergopti+ instead."
+        )
+        sys.exit(1)
+
+    symbols_content = xkb_path.read_text(encoding="utf-8")
+    types_content = args["types"].read_text(encoding="utf-8")
+    problems = validate_layout_files(symbols_content, types_content)
+    if problems:
+        for problem in problems:
+            logging.error("Layout package inconsistency: %s", problem)
+        logging.error("Aborting: refusing to write an incoherent layout.")
+        sys.exit(1)
+
+    remove_conflicting_clean_package()
     perform_install(
         args["xkb"], args.get("xcompose"), args.get("types"), args.get("force_xcompose", False)
     )

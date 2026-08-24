@@ -78,13 +78,13 @@ Le script `install.sh` gère automatiquement le téléchargement, la sélection 
 **Installation depuis internet (recommandé) :**
 
 ```bash
-branch="main"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/drivers/linux/xkb_installation/install.sh" | BRANCH="$branch" bash
+branch="main"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh" | BRANCH="$branch" bash
 ```
 
 **Installation locale depuis le dépôt cloné :**
 
 ```bash
-cd static/drivers/linux/xkb_installation
+cd static/ergopti/linux/xkb_installation
 bash install.sh
 ```
 
