@@ -1,4 +1,4 @@
-﻿--- tests/unit/ui/test_tooltip_stacked_panel.lua
+--- tests/unit/ui/test_tooltip_stacked_panel.lua
 
 --- ==============================================================================
 --- MODULE: Tooltip Stacked Panel — Outer-Box Rounding, Per-Row Colors (regression)

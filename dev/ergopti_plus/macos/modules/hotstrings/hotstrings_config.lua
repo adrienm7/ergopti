@@ -1,4 +1,4 @@
-﻿--- modules/hotstrings/hotstrings_config.lua
+--- modules/hotstrings/hotstrings_config.lua
 
 --- ==============================================================================
 --- MODULE: Hotstrings Config

@@ -1,4 +1,4 @@
-﻿// _shared/ui/metrics_apps/main.js
+// _shared/ui/metrics_apps/main.js
 // ======= 3/ Initialization =======
 // =================================
 // =================================

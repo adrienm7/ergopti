@@ -1,4 +1,4 @@
-﻿--- tests/unit/meta/test_hotstringmatcher.lua
+--- tests/unit/meta/test_hotstringmatcher.lua
 
 --- ==============================================================================
 --- MODULE: HotstringMatcher — Domain Spec Coverage (Hammerspoon)

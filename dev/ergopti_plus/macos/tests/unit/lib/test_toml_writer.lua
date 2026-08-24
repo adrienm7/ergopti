@@ -1,4 +1,4 @@
-﻿--- tests/unit/lib/test_toml_writer.lua
+--- tests/unit/lib/test_toml_writer.lua
 
 --- ==============================================================================
 --- MODULE: toml_writer Unit Tests

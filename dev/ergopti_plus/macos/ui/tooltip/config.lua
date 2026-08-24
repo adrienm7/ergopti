@@ -1,4 +1,4 @@
-﻿--- ui/tooltip/config.lua
+--- ui/tooltip/config.lua
 
 --- ==============================================================================
 --- MODULE: Tooltip Configuration

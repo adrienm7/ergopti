@@ -1,4 +1,4 @@
-﻿--- tests/unit/lib/test_toml_roundtrip.lua
+--- tests/unit/lib/test_toml_roundtrip.lua
 
 --- ==============================================================================
 --- MODULE: TOML Roundtrip Tests

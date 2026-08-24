@@ -1,4 +1,4 @@
-﻿// _shared/ui/metrics_apps/state.js
+// _shared/ui/metrics_apps/state.js
 // ======= 2/ State Management =======
 // ===================================
 // ===================================

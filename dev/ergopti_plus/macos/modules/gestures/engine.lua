@@ -1,4 +1,4 @@
-﻿--- modules/gestures/engine.lua
+--- modules/gestures/engine.lua
 
 --- ==============================================================================
 --- MODULE: Gestures Engine

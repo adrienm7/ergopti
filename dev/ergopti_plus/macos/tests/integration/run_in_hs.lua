@@ -1,4 +1,4 @@
-﻿--- tests/integration/run_in_hs.lua
+--- tests/integration/run_in_hs.lua
 
 --- ==============================================================================
 --- MODULE: In-Hammerspoon Integration Smoke Test

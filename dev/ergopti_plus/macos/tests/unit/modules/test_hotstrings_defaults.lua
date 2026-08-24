@@ -1,4 +1,4 @@
-﻿--- tests/unit/modules/test_hotstrings_defaults.lua
+--- tests/unit/modules/test_hotstrings_defaults.lua
 
 --- ==============================================================================
 --- MODULE: hotstrings_config Shared-Defaults Single-Source Tests

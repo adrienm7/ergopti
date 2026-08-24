@@ -1,4 +1,4 @@
-﻿--- tests/unit/modules/gestures/test_finger_upgrade_scroll_guard.lua
+--- tests/unit/modules/gestures/test_finger_upgrade_scroll_guard.lua
 
 --- ==============================================================================
 --- MODULE: modules.gestures.engine — 3-finger upgrade guard during scroll

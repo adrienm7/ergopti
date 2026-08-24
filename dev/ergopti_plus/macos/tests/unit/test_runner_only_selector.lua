@@ -61,12 +61,13 @@ local function run_focused_runner(target)
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end
 	local command
+	local lua_bin = os.getenv("LUA") or "lua"
 	if windows then
 		command = "cd /d " .. quote(root:gsub("/", "\\"))
-			.. " && lua tests\\run.lua --only " .. quote(target) .. " 2>&1"
+			.. " && " .. lua_bin .. " tests\\run.lua --only " .. quote(target) .. " 2>&1"
 	else
 		command = "cd " .. quote(root)
-			.. " && lua tests/run.lua --only " .. quote(target) .. " 2>&1"
+			.. " && " .. lua_bin .. " tests/run.lua --only " .. quote(target) .. " 2>&1"
 	end
 	local pipe = assert(io.popen(command, "r"), "focused runner subprocess must start")
 	local output = pipe:read("*a")
