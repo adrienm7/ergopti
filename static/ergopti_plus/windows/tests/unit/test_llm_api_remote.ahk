@@ -521,6 +521,52 @@ _RemoteCatalog_LoadedFromShared() {
 Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_LoadedFromShared)
 
 
+_RemoteCatalog_InvalidScalarsNeverPublish() {
+	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
+	oldProviders := LLM_API_PROVIDERS
+	oldOrder := LLM_API_PROVIDER_ORDER
+	oldPrices := LLM_REMOTE_MODEL_PRICES
+	oldSharedDir := _SharedDir
+	testRoot := A_Temp . "\ergopti-ahk013-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
+	fixture := FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\api_provider_catalog_validation.json", "UTF-8")
+	try {
+		DirCreate(testRoot . "\modules\llm")
+		FileAppend(fixture, testRoot . "\modules\llm\api_providers.json", "UTF-8")
+		_SharedDir := testRoot
+		_LLMRemote_LoadCatalog()
+
+		AssertEqual(2, LLM_API_PROVIDER_ORDER.Length,
+			"only the valid provider and the configurable compatibility provider may publish")
+		AssertEqual("valid", LLM_API_PROVIDER_ORDER[1])
+		AssertEqual("openai_compat", LLM_API_PROVIDER_ORDER[2])
+		AssertTrue(LLM_API_PROVIDERS.Has("valid"))
+		AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
+		for invalidId in ["empty_base", "empty_model", "bad_url", "space_model", "space_label", "object_label", "array_url", "null_model", "number_format", "unknown_format"]
+			AssertFalse(LLM_API_PROVIDERS.Has(invalidId), invalidId . " must not reach the published catalogue")
+		AssertEqual("", LLM_API_PROVIDERS["openai_compat"]["BaseUrl"])
+		AssertEqual("", LLM_API_PROVIDERS["openai_compat"]["DefaultModel"])
+		providerChoices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
+		AssertContains(providerChoices, "valid (Valid)")
+		AssertContains(providerChoices, "openai_compat (Compatible)")
+
+		AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("valid_integer"))
+		AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("valid_float"))
+		for invalidModel in ["string_price", "null_price", "container_price", "negative_price"]
+			AssertFalse(LLM_REMOTE_MODEL_PRICES.Has(invalidModel), invalidModel . " must remain unpriced")
+		AssertEqual(3.0, _LLMRemoteEstimateCost("valid_integer", 1000000, 1000000))
+		AssertEqual(0.875, _LLMRemoteEstimateCost("valid_float", 1000000, 1000000))
+		AssertEqual(0.0, _LLMRemoteEstimateCost("string_price", 1000000, 1000000))
+	} finally {
+		_SharedDir := oldSharedDir
+		LLM_API_PROVIDERS := oldProviders
+		LLM_API_PROVIDER_ORDER := oldOrder
+		LLM_REMOTE_MODEL_PRICES := oldPrices
+		try DirDelete(testRoot, true)
+	}
+}
+Test("api_providers.json: invalid descriptor and price scalars never publish", _RemoteCatalog_InvalidScalarsNeverPublish)
+
+
 _RemoteBuildContext_PrefixTail() {
 	req := _LLMRemote_BuildRequestContext("PREFIX and TAIL markers", "full ctx", "tail bit")
 	AssertContains(req["user"], 'PREFIX: "full ctx"')

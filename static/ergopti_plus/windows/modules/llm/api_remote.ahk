@@ -1003,6 +1003,38 @@ _LLMRemoteJsonUnescape(s) {
 ; ======= 4/ Shared catalogue loader =========
 ; ============================================
 
+_LLMRemote_CatalogDescriptorIsValid(providerId, desc) {
+    if !(desc is Map)
+        return false
+    for req in ["label", "base_url", "default_model", "format"] {
+        if (!desc.Has(req) or Type(desc[req]) != "String")
+            return false
+    }
+
+    label := desc["label"]
+    baseUrl := desc["base_url"]
+    defaultModel := desc["default_model"]
+    format := desc["format"]
+    if (Trim(label) = "" or (format != "openai" and format != "anthropic" and format != "gemini"))
+        return false
+
+    ; The compatibility row is a user-supplied endpoint/model template. Every
+    ; shipped concrete provider must be immediately usable from the catalogue.
+    if (providerId != "openai_compat" and (Trim(baseUrl) = "" or Trim(defaultModel) = ""))
+        return false
+    if (baseUrl != "" and !RegExMatch(baseUrl, "i)^https?://[^[:space:]]+$"))
+        return false
+    return true
+}
+
+
+_LLMRemote_CatalogPriceIsValid(value) {
+    ; JsonParse normally produces finite doubles, but keep the publication
+    ; boundary explicit so an alternate decoder/test port cannot inject NaN or
+    ; infinity into the later arithmetic callback.
+    return value is Number and value >= 0 and value <= 1.7976931348623157e308
+}
+
 /**
  * Loads provider descriptors + model prices from _shared/modules/llm/api_providers.json.
  * Fail-fast when the file is missing or malformed — same contract as the HS twin.
@@ -1031,40 +1063,29 @@ _LLMRemote_LoadCatalog() {
 
     candidateProviders := Map()
     candidateOrder := []
+    seenProviders := Map()
     for _, pid in order {
-        if (Type(pid) != "String" or pid = "")
+        if (Type(pid) != "String" or Trim(pid) = "")
             continue
+        if seenProviders.Has(pid) {
+            try LoggerWarn("LLM.remote", "api_providers.json: duplicate provider_order entry '{1}' skipped.", pid)
+            continue
+        }
+        seenProviders[pid] := true
         if !providers.Has(pid) {
             try LoggerWarn("LLM.remote", "api_providers.json: unknown provider '{1}' skipped.", pid)
             continue
         }
         desc := providers[pid]
-        if !(desc is Map) {
-            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' is not an object and was skipped.", pid)
-            continue
-        }
-        valid := true
-        for req in ["label", "base_url", "default_model", "format"] {
-			if (!desc.Has(req) or Type(desc[req]) != "String"
-				or ((req = "label" or req = "format") and desc[req] = "")) {
-                valid := false
-                break
-            }
-        }
-        if !valid {
-            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has a non-string or empty descriptor and was skipped.", pid)
-            continue
-        }
-        fmt := desc["format"]
-        if (fmt != "openai" and fmt != "anthropic" and fmt != "gemini") {
-            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has an unsupported format and was skipped.", pid)
+        if !_LLMRemote_CatalogDescriptorIsValid(pid, desc) {
+            try LoggerWarn("LLM.remote", "api_providers.json: provider '{1}' has an invalid descriptor and was skipped.", pid)
             continue
         }
         candidateProviders[pid] := Map(
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],
             "DefaultModel", desc["default_model"],
-            "Format", fmt)
+            "Format", desc["format"])
         candidateOrder.Push(pid)
     }
 
@@ -1073,8 +1094,8 @@ _LLMRemote_LoadCatalog() {
         validModel := Type(model) = "String" and model != ""
         validRow := row is Map and row.Has("in") and row.Has("out")
         if validRow
-            validRow := row["in"] is Number and row["out"] is Number
-                and row["in"] >= 0 and row["out"] >= 0
+            validRow := _LLMRemote_CatalogPriceIsValid(row["in"])
+                and _LLMRemote_CatalogPriceIsValid(row["out"])
         if (!validModel or !validRow) {
             try LoggerWarn("LLM.remote", "api_providers.json: invalid price row '{1}' skipped.", model)
             continue

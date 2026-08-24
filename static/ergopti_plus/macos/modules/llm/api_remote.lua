@@ -69,6 +69,29 @@ if not ok_kl then keylogger = nil end
 --- Returns (providers_table, order_array, prices_table) on success, or three
 --- empty-catalogue equivalents on any failure so that a corrupted JSON file
 --- never aborts the full keymap-engine require chain.
+local function catalog_descriptor_is_valid(provider_id, desc)
+	if type(desc) ~= "table" then return false end
+	for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
+		if type(desc[key]) ~= "string" then return false end
+	end
+	if desc.label:match("^%s*$") then return false end
+	if desc.format ~= "openai" and desc.format ~= "anthropic" and desc.format ~= "gemini" then
+		return false
+	end
+	if provider_id ~= "openai_compat"
+		and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$"))
+	then
+		return false
+	end
+	if desc.base_url ~= "" and not desc.base_url:match("^https?://%S+$") then return false end
+	return true
+end
+
+local function catalog_price_is_valid(value)
+	return type(value) == "number" and value == value and value >= 0
+		and value ~= math.huge and value ~= -math.huge
+end
+
 local function load_api_providers()
 	local path = Paths.shared_llm_path("api_providers.json")
 	if not path then
@@ -105,35 +128,26 @@ local function load_api_providers()
 			return {}, {}, {}
 		end
 		local out_providers = {}
+		local out_order = {}
+		local seen_providers = {}
 		for _, pid in ipairs(p_order) do
 			if type(pid) ~= "string" or pid == "" then
 				Logger.warn("llm.api_remote", "api_providers.json: skipping invalid provider_order entry.")
+			elseif seen_providers[pid] then
+				Logger.warn("llm.api_remote", "api_providers.json: duplicate provider_order entry '%s' skipped.", pid)
 			else
+				seen_providers[pid] = true
 				local desc = p_providers[pid]
-				if type(desc) ~= "table" then
-					Logger.warn("llm.api_remote", "api_providers.json: missing providers.%s — skipped.", tostring(pid))
+				if not catalog_descriptor_is_valid(pid, desc) then
+					Logger.warn("llm.api_remote", "api_providers.json: providers.%s has an invalid descriptor — skipped.", tostring(pid))
 				else
-					local invalid_descriptor = false
-					for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
-						if type(desc[key]) ~= "string"
-							or ((key == "label" or key == "format") and desc[key] == "") then
-							Logger.warn("llm.api_remote", "api_providers.json: providers.%s has invalid %s — skipped.", pid, key)
-							invalid_descriptor = true
-						end
-					end
-					local fmt = desc.format
-					if not invalid_descriptor then
-						if fmt ~= "openai" and fmt ~= "anthropic" and fmt ~= "gemini" then
-							Logger.warn("llm.api_remote", "api_providers.json: providers.%s invalid format '%s' — skipped.", pid, tostring(fmt))
-						else
-							out_providers[pid] = {
-								label         = desc.label,
-								base_url      = desc.base_url,
-								default_model = desc.default_model,
-								format        = fmt,
-							}
-						end
-					end
+					out_providers[pid] = {
+						label         = desc.label,
+						base_url      = desc.base_url,
+						default_model = desc.default_model,
+						format        = desc.format,
+					}
+					out_order[#out_order + 1] = pid
 				end
 			end
 		end
@@ -141,16 +155,16 @@ local function load_api_providers()
 		for model, row in pairs(p_prices) do
 			if type(model) == "string" and model ~= ""
 				and type(row) == "table"
-				and type(row["in"]) == "number" and row["in"] >= 0
-				and type(row["out"]) == "number" and row["out"] >= 0
+				and catalog_price_is_valid(row["in"])
+				and catalog_price_is_valid(row["out"])
 			then
 				out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
 			else
 				Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", tostring(model))
 			end
 		end
-		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #p_order, path)
-		return out_providers, p_order, out_prices
+		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #out_order, path)
+		return out_providers, out_order, out_prices
 	end)
 
 	if not ok then
@@ -910,6 +924,7 @@ local function estimate_cost(model, in_tokens, out_tokens)
 	local p = MODEL_PRICES[model]
 	return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
 end
+M.__estimate_cost_for_test = estimate_cost
 
 --- Extract token usage from the already-decoded provider root. Each format
 --- owns one exact top-level usage map, so nested prompt text cannot spoof

@@ -1,0 +1,99 @@
+{
+  "provider_order": [
+    "valid",
+    "empty_base",
+    "empty_model",
+    "bad_url",
+    "space_model",
+    "space_label",
+    "object_label",
+    "array_url",
+    "null_model",
+    "number_format",
+    "unknown_format",
+    "openai_compat",
+    "valid"
+  ],
+  "providers": {
+    "valid": {
+      "label": "Valid",
+      "base_url": "https://valid.example/v1",
+      "default_model": "valid-model",
+      "format": "openai"
+    },
+    "empty_base": {
+      "label": "Empty base",
+      "base_url": "",
+      "default_model": "model",
+      "format": "openai"
+    },
+    "empty_model": {
+      "label": "Empty model",
+      "base_url": "https://model.example/v1",
+      "default_model": "",
+      "format": "openai"
+    },
+    "bad_url": {
+      "label": "Bad URL",
+      "base_url": "not a URL",
+      "default_model": "model",
+      "format": "openai"
+    },
+    "space_model": {
+      "label": "Space model",
+      "base_url": "https://space.example/v1",
+      "default_model": "   ",
+      "format": "openai"
+    },
+    "space_label": {
+      "label": "   ",
+      "base_url": "https://label.example/v1",
+      "default_model": "model",
+      "format": "openai"
+    },
+    "object_label": {
+      "label": { "nested": true },
+      "base_url": "https://object.example/v1",
+      "default_model": "model",
+      "format": "openai"
+    },
+    "array_url": {
+      "label": "Array URL",
+      "base_url": [],
+      "default_model": "model",
+      "format": "openai"
+    },
+    "null_model": {
+      "label": "Null model",
+      "base_url": "https://null.example/v1",
+      "default_model": null,
+      "format": "openai"
+    },
+    "number_format": {
+      "label": "Number format",
+      "base_url": "https://number.example/v1",
+      "default_model": "model",
+      "format": 7
+    },
+    "unknown_format": {
+      "label": "Unknown format",
+      "base_url": "https://unknown.example/v1",
+      "default_model": "model",
+      "format": "other"
+    },
+    "openai_compat": {
+      "label": "Compatible",
+      "base_url": "",
+      "default_model": "",
+      "format": "openai"
+    }
+  },
+  "model_prices": {
+    "valid_integer": { "in": 1, "out": 2 },
+    "valid_float": { "in": 0.125, "out": 0.75 },
+    "string_price": { "in": "bad", "out": 2 },
+    "null_price": { "in": null, "out": 2 },
+    "container_price": { "in": { "nested": 1 }, "out": 2 },
+    "negative_price": { "in": -1, "out": 2 }
+  }
+}
