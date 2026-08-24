@@ -10,9 +10,11 @@
 #Requires AutoHotkey v2.0
 
 _LMSB_ActionsLifecycleEntriesAreSuspendFenced() {
-	for Name in ["LLM_Menu_BootstrapOllama", "LLM_Menu_OnDepsReady", "LLM_Menu_OnDepsFailed", "LLM_Menu_TryStartBridge", "LLM_Menu_StartBridge"] {
+	for Name in ["LLM_Menu_RunBackendLifecycle", "LLM_Menu_BootstrapOllama",
+			"LLM_Menu_OnDepsReady", "LLM_Menu_OnDepsFailed",
+			"LLM_Menu_TryStartBridge", "LLM_Menu_StartBridge"] {
 		Body := _DriverFuncBody(Name)
-		Assert(Body != "", Name " must exist in ui/menu/menu_llm/actions.ahk")
+		Assert(Body != "", Name " must exist in the LLM menu lifecycle")
 		Assert(InStr(Body, "if A_IsSuspended") > 0,
 			Name " must defer its lifecycle work while suspended because timer and dependency callbacks bypass native Suspend")
 		Assert(InStr(Body, '"bootstrap_pending"') > 0,
@@ -26,8 +28,8 @@ _LMSB_ResumeReplaysPendingBootstrap() {
 	Assert(Body != "", "LLM_Menu_OnResume must exist in ui/menu/menu_llm/actions.ahk")
 	Assert(InStr(Body, '"bootstrap_pending"') > 0,
 		"LLM_Menu_OnResume must consume the pending suspended lifecycle marker")
-	Assert(InStr(Body, "SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)") > 0,
-		"LLM_Menu_OnResume must replay bootstrap asynchronously after resume")
+	Assert(InStr(Body, "LLM_Menu_ScheduleBackendLifecycle(false)") > 0,
+		"LLM_Menu_OnResume must replay the exact owned lifecycle after resume")
 	Lifecycle := _DriverFuncBody("Ergopti_OnSuspendResume")
 	Assert(Lifecycle != "", "Ergopti_OnSuspendResume must exist")
 	Assert(InStr(Lifecycle, "LLM_Menu_OnResume()") > 0,

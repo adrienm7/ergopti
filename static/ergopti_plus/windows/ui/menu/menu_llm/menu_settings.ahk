@@ -663,7 +663,7 @@ LLM_Menu_PromptTriggerShortcut() {
  */
 LLM_Menu_TriggerPrediction() {
 	global _LLM_Menu
-	if !_LLM_Menu["enabled"] || !LLM_Deps_IsReady()
+	if A_IsSuspended || !_LLM_Menu_BackendIsReadyForUse()
 		return
 	ctx := SubStr(_LLM_Bridge_Buffer, -_LLM_Menu["ctx_chars"])
 	if (ctx != "")

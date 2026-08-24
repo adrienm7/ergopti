@@ -149,6 +149,7 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
 	; check recognises itself as stale and discards its result without clearing
 	; _LLM_Deps_Checking that now belongs to this newer check.
 	_LLM_Deps_Epoch   += 1
+	captured_epoch := _LLM_Deps_Epoch
 	_LLM_Deps_Checking := true
 
 	; Reset failure state so a re-try after a failed install can proceed
@@ -158,7 +159,8 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
 	; Defer everything to a timer so the menu can close and the message loop
 	; can process pending paint events before any blocking call (WinHTTP, WebView2).
 	LoggerInfo("LLM", "Scheduling async Ollama reachability check…")
-	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui), -50)
+	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed,
+		show_ui, captured_epoch), -50)
 }
 
 /**
@@ -168,30 +170,34 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
  * For the silent auto-boot path (show_ui=false) the UI is skipped and the
  * HTTP check runs immediately (no window to paint anyway).
  */
-LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
-	global _LLM_Deps_Checking, _LLM_Deps_State
+LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui,
+		captured_epoch) {
+	global _LLM_Deps_Epoch
+	if captured_epoch != _LLM_Deps_Epoch
+		return false
 
 	; No more WebView2 + hidden-PowerShell UI. We hand the install off to
 	; winget (or the Ollama download page in the browser); the user gets
 	; the official installer's native UI, which is more familiar AND
 	; doesn't contest CPU/disk with the AHK input pipeline. Run the
 	; reachability check directly — there's nothing left to "paint" first.
-	LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui)
+	LLM_Deps_DoCheck(default_model, captured_epoch, on_ready, on_failed, show_ui)
+	return true
 }
 
 /**
  * Phase 2 of the async bootstrap: performs the blocking HTTP reachability
  * check and either fast-paths (already running) or launches the installer.
  */
-LLM_Deps_DoCheck(default_model, on_ready?, on_failed?, show_ui?) {
-	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
+LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui?) {
+	global _LLM_Deps_Epoch
+	if captured_epoch != _LLM_Deps_Epoch
+		return false
 
 	t_start := A_TickCount
-	; AHK-14: capture the current epoch so the async callback can bail when
-	; a newer check or Cancel() has bumped the epoch counter since dispatch.
-	captured_epoch := _LLM_Deps_Epoch
 	LoggerInfo("LLM", "DoCheck — checking if Ollama is running…")
 	LLM_OllamaIsRunning_Async((running) => _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?))
+	return true
 }
 
 _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?) {
@@ -223,7 +229,7 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 	}
 
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
-	LLM_Deps_RunInstaller(default_model, on_ready?, on_failed?)
+	LLM_Deps_RunInstaller(default_model, captured_epoch, on_ready?, on_failed?)
 }
 
 
@@ -271,8 +277,10 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
  * @param {Func} on_failed - Callback on failure (rare — only when we
  *                           can't even launch the installer).
  */
-LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
-	global _LLM_Deps_PollTimer, _LLM_Deps_Checking
+LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
+	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_Epoch
+	if captured_epoch != _LLM_Deps_Epoch
+		return false
 
 	; Boost AHK's own priority BEFORE we kick the installer off. Any heavy
 	; download — winget, the browser's download manager, the OllamaSetup
@@ -307,7 +315,8 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 			Run('https://ollama.com/download')
 		} catch as err {
 			LoggerError("LLM", "Could not open the download page: " err.Message ".")
-			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"), on_failed)
+			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"),
+				on_failed, captured_epoch)
 			return
 		}
 		; Surface a tray tip so the user knows what to do — without it,
@@ -319,7 +328,8 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
 	; Poll the daemon every 3 s. When it answers, fire on_ready.
 	LoggerInfo("LLM", "Polling http://localhost:11434 every 3 s until Ollama responds…")
 	global _LLM_Deps_PollStartTick := A_TickCount
-	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(on_ready?, on_failed?)
+	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(
+		on_ready?, on_failed?, captured_epoch)
 	SetTimer(_LLM_Deps_PollTimer, 3000)
 }
 
@@ -329,11 +339,13 @@ LLM_Deps_RunInstaller(model, on_ready?, on_failed?) {
  * considered done (regardless of HOW the user installed it — via winget,
  * a manual download, or anything else).
  */
-LLM_Deps_PollServerReady(on_ready?, on_failed?) {
+LLM_Deps_PollServerReady(on_ready?, on_failed?, captured_epoch := 0) {
 	if A_IsSuspended
 		return
 	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer, _LLM_Deps_Epoch
 	global _LLM_Deps_PollStartTick, LLM_DEPS_POLL_TIMEOUT_MS
+	if captured_epoch != _LLM_Deps_Epoch
+		return false
 	; AHK-30: bound the poll so a user who installs via the browser fallback
 	; and then abandons the install without clicking Cancel does not leave AHK
 	; pinned at High priority indefinitely.
@@ -342,7 +354,7 @@ LLM_Deps_PollServerReady(on_ready?, on_failed?) {
 		LoggerWarn("LLM", "Daemon poll timed out after " Round(elapsed / 60000) " min — aborting.")
 		if IsSet(_LLM_Deps_PollTimer)
 			SetTimer(_LLM_Deps_PollTimer, 0)
-		LLM_Deps_Fail(t("llm.deps.fail_timeout"), on_failed?)
+		LLM_Deps_Fail(t("llm.deps.fail_timeout"), on_failed?, captured_epoch)
 		return
 	}
 	; ASYNC probe — never call the sync LLM_OllamaIsRunning here. When
@@ -429,8 +441,10 @@ LLM_Deps_Cancel() {
  * @param {string} msg - Human-readable failure reason.
  * @param {Func} on_failed - Optional callback.
  */
-LLM_Deps_Fail(msg, on_failed) {
-	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, DRIVER_BASELINE_PRIORITY_CLASS
+LLM_Deps_Fail(msg, on_failed, captured_epoch := 0) {
+	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
+	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
+		return false
 	LoggerError("LLM", "Deps failure: " msg)
 	_LLM_Deps_State          := "failed"
 	_LLM_Deps_FailureMessage := msg
@@ -442,4 +456,5 @@ LLM_Deps_Fail(msg, on_failed) {
 	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 	if IsSet(on_failed)
 		on_failed(msg)
+	return true
 }

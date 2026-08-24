@@ -101,7 +101,7 @@ _LLM_Menu_SelectApiEntry(Entry) {
 		return false
 	return LLM_Menu_CommitMutation("the active LLM API entry",
 		(Candidate) => _LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId),
-		_LLM_Menu_ApplyStandardCommitted)
+		_LLM_Menu_ApplyApiEntriesCommitted)
 }
 
 _LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId) {
@@ -226,7 +226,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		(existing != "") ? "the LLM API-entry edit"
 			: "the LLM API-entry creation",
 		(Candidate) => _LLM_Menu_UpsertApiEntryCandidate(Candidate,
-			new_entry, EditId), _LLM_Menu_ApplyStandardCommitted)
+			new_entry, EditId), _LLM_Menu_ApplyApiEntriesCommitted)
 	if !Committed
 		return false
 
@@ -315,7 +315,7 @@ _LLM_Menu_RemoveActiveApiEntry() {
 		return
 	return LLM_Menu_CommitApiEntriesMutation("the LLM API-entry removal",
 		(Candidate) => _LLM_Menu_RemoveApiEntryCandidate(Candidate, active_id),
-		_LLM_Menu_ApplyStandardCommitted)
+		_LLM_Menu_ApplyApiEntriesCommitted)
 }
 
 _LLM_Menu_RemoveApiEntryCandidate(Candidate, EntryId) {

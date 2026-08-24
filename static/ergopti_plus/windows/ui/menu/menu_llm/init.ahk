@@ -240,7 +240,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 		TrayMenuStage_Add(t("menu.llm.title"), _LLM_Menu_Handle)
 	}
 
-	; Bootstrap Ollama silently on reload when the feature was already enabled.
+	; Bootstrap the selected backend silently on reload when the feature was enabled.
 	; show_ui=false so the install window NEVER opens automatically — the user
 	; must click the menu toggle to trigger a visible installation.
 	;
@@ -254,7 +254,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; the missing-install state in the menu so the user can re-trigger the
 	; install themselves when they're ready.
 	if _LLM_Menu["enabled"]
-		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+		LLM_Menu_ScheduleBackendLifecycle(false)
 
 	; Background health-tick: refreshes the dot on the shared cadence without
 	; waiting for the user to open the menu. The previous "probe on menu open"

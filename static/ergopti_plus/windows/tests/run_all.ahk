@@ -403,7 +403,9 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/menu_profiles.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include ../ui/menu/menu_llm/transactions.ahk
+#Include ../ui/menu/menu_llm/backend_lifecycle.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include unit/test_llm_backend_lifecycle_dispatch.ahk
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
@@ -734,6 +736,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_suspend_bootstrap.ahk
+#Include meta/test_llm_backend_lifecycle_ownership.ahk
 #Include meta/test_llm_menu_disabled_greyed.ahk
 #Include meta/test_language_menu_deferred_publication.ahk
 #Include meta/test_llm_menu_layout_shared.ahk
