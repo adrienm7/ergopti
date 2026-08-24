@@ -36,6 +36,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from layout_package import (  # noqa: E402
+    EXIT_INSTALL_ABORTED,
+    EXIT_OK,
+    EXIT_VALIDATION,
     InstallerRoots,
     PACKAGE_NAME,
     SUPPORTED_VARIANTS,
@@ -43,10 +46,16 @@ from layout_package import (  # noqa: E402
     VARIANT_STANDARD,
     build_evdev_post,
     build_registry_xml,
+    format_gsettings_sources,
+    merge_gsettings_source,
+    merge_kde_layout_list,
+    parse_gsettings_sources,
+    parse_kde_layout_list,
     patch_symbols_default,
     remove_generation_two_links,
     resolve_roots,
     strip_legacy_evdev_patch,
+    user_roots,
     validate_component_identifier,
     validate_layout_files,
 )
@@ -193,9 +202,8 @@ def install_clean(
     if problems:
         for problem in problems:
             print(f"   ❌ {problem}")
-        raise SystemExit(
-            "Erreur : le paquet de disposition est incohérent ; installation annulée."
-        )
+        print("Erreur : le paquet de disposition est incohérent ; installation annulée.")
+        raise SystemExit(EXIT_VALIDATION)
     print("   ✅ Chaque type référencé par les symboles est bien défini.")
 
     layout_id = validate_component_identifier(PACKAGE_NAME)
@@ -232,7 +240,7 @@ def install_clean(
 
     if not compile_validation(staging_dir, layout_id):
         shutil.rmtree(staging_dir, ignore_errors=True)
-        raise SystemExit(1)
+        raise SystemExit(EXIT_VALIDATION)
 
     if package_dir.exists():
         shutil.rmtree(package_dir)
@@ -302,43 +310,102 @@ def purge_cache(roots: InstallerRoots) -> None:
 
 
 def activate(layout_id: str, variant: str) -> None:
-    """Best-effort activation; every attempt is reported, none is fatal."""
+    """Best-effort desktop activation that never drops existing layouts.
+
+    GNOME and KDE store the user's layout list; the previous installer
+    overwrote it, silently removing the user's other keyboards. The merge
+    helpers below append our layouts only when missing.
+    """
     sudo_user = os.environ.get("SUDO_USER")
     prefix = ["sudo", "-u", sudo_user] if sudo_user else []
 
-    def run_user(command: list[str], label: str) -> bool:
-        if prefix:
-            return run_reported(prefix + command, label)
-        return run_reported(command, label)
+    def run_capture(command: list[str]) -> str | None:
+        try:
+            result = subprocess.run(
+                prefix + command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return result.stdout if result.returncode == 0 else None
 
-    print("🚀 Activation (best-effort)…")
-    run_user(["setxkbmap", "-layout", layout_id], "setxkbmap -layout (session X11)")
-    sources = f"[('xkb', '{layout_id}'), ('xkb', '{layout_id}+plus')]"
+    def run_report(command: list[str], label: str) -> bool:
+        return run_reported(prefix + command, label)
+
+    wanted = [("xkb", layout_id)]
     if variant == VARIANT_PLUS:
-        sources = f"[('xkb', '{layout_id}+plus')]"
-    run_user(
-        [
-            "gsettings",
-            "set",
-            "org.gnome.desktop.input-sources",
-            "sources",
-            sources,
-        ],
-        "Sélection GNOME",
-    )
-    run_user(
-        [
-            "kwriteconfig6",
-            "--file",
-            "kxkbrc",
-            "--group",
-            "Layout",
-            "--key",
-            "LayoutList",
-            f"{layout_id}, {layout_id}+plus",
-        ],
-        "Sélection KDE Plasma",
-    )
+        wanted.insert(0, ("xkb", f"{layout_id}+plus"))
+
+    print("🚀 Activation (best-effort, sans écraser vos dispositions)…")
+
+    # --- GNOME / Wayland (mutter) ---
+    current_raw = run_capture(["gsettings", "get", "org.gnome.desktop.input-sources", "sources"])
+    if current_raw is None:
+        print("   ℹ️  gsettings indisponible : GNOME non détecté, étape ignorée.")
+    else:
+        merged, added = merge_gsettings_source(
+            parse_gsettings_sources(current_raw), wanted
+        )
+        if added:
+            run_report(
+                [
+                    "gsettings",
+                    "set",
+                    "org.gnome.desktop.input-sources",
+                    "sources",
+                    format_gsettings_sources(merged),
+                ],
+                "GNOME : disposition ajoutée à vos sources existantes",
+            )
+        else:
+            print("   ✅ GNOME : déjà présente dans vos sources, rien à changer.")
+
+    # --- KDE Plasma ---
+    kde_readers = ["kreadconfig6", "kreadconfig5"]
+    current_list = None
+    for reader in kde_readers:
+        current_list = run_capture(
+            [reader, "--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList"]
+        )
+        if current_list is not None:
+            break
+    kde_ids = [layout_id, f"{layout_id}+plus"] if variant == VARIANT_PLUS else [layout_id]
+    if current_list is None:
+        print("   ℹ️  kreadconfig indisponible : KDE non détecté, étape ignorée.")
+    else:
+        merged_kde, added_kde = merge_kde_layout_list(
+            parse_kde_layout_list(current_list), kde_ids
+        )
+        if added_kde:
+            writer = (
+                "kwriteconfig6"
+                if shutil.which("kwriteconfig6")
+                else "kwriteconfig5"
+            )
+            run_report(
+                [
+                    writer,
+                    "--file",
+                    "kxkbrc",
+                    "--group",
+                    "Layout",
+                    "--key",
+                    "LayoutList",
+                    ",".join(merged_kde),
+                ],
+                "KDE : disposition ajoutée à votre liste",
+            )
+        else:
+            print("   ✅ KDE : déjà présente dans votre liste, rien à changer.")
+        run_report(
+            ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
+            "KDE : reconfiguration de KWin",
+        )
+
     print("   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition n'est pas active.")
 
 
@@ -392,8 +459,10 @@ def force_utf8_stdio() -> None:
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Installeur Ergopti (méthode clean)")
-    parser.add_argument("--xkb", type=Path, required=True, help="Fichier .xkb de la disposition")
-    parser.add_argument("--types", type=Path, required=True, help="Fichier de types complet (obligatoire)")
+    parser.add_argument("--xkb", type=Path, help="Fichier .xkb de la disposition")
+    parser.add_argument(
+        "--types", type=Path, help="Fichier de types complet (obligatoire sauf --uninstall)"
+    )
     parser.add_argument("--xcompose", type=Path, default=None, help="Fichier .XCompose optionnel")
     parser.add_argument(
         "--variant",
@@ -406,28 +475,47 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Créer aussi les liens pour les sessions X11 (Xorg) réelles",
     )
+    parser.add_argument(
+        "--user",
+        action="store_true",
+        help="Installer dans ~/.config/xkb sans sudo (visible des sessions "
+        "Wayland uniquement)",
+    )
     parser.add_argument("--uninstall", action="store_true", help="Désinstaller le paquet")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if not args.uninstall:
+        missing = [name for name in ("--xkb", "--types") if getattr(args, name.lstrip("-")) is None]
+        if missing:
+            parser.error("les options suivantes sont requises : " + ", ".join(missing))
+    return args
 
 
 def main(argv: list[str]) -> int:
     force_utf8_stdio()
     args = parse_args(argv)
-    roots = resolve_roots()
+    roots = user_roots() if args.user else resolve_roots()
     check_root(roots)
     if args.uninstall:
         uninstall_clean(roots)
-        return 0
-    install_clean(
-        symbols_path=args.xkb,
-        types_path=args.types,
-        xcompose_path=args.xcompose,
-        variant=args.variant,
-        support_x11=args.support_x11,
-        roots=roots,
-    )
+        return EXIT_OK
+    if args.user and args.support_x11:
+        print("ℹ️  Mode utilisateur : --support-x11 ignoré (aucun lien système créé).")
+    try:
+        install_clean(
+            symbols_path=args.xkb,
+            types_path=args.types,
+            xcompose_path=args.xcompose,
+            variant=args.variant,
+            support_x11=args.support_x11 and not args.user,
+            roots=roots,
+        )
+    except SystemExit as error:
+        # install_clean already printed a diagnostic; map its aborts to the
+        # documented exit codes so scripts can branch on them.
+        code = error.code
+        return code if isinstance(code, int) else EXIT_INSTALL_ABORTED
     print("\n✨ Installation terminée. Redémarrez la session pour tout prendre en compte.")
-    return 0
+    return EXIT_OK
 
 
 if __name__ == "__main__":

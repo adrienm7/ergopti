@@ -19,12 +19,16 @@ import sys
 import unittest
 from pathlib import Path
 
+INSTALLER_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(INSTALLER_DIR))
+
+from layout_package import ERGOPTI_TYPE_NAME  # noqa: E402
+
 LAYOUT_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = Path(__file__).resolve().parents[5]
 
 TYPE_REFERENCE_RE = re.compile(r'type(?:\[[^\]]*\])?\s*=\s*"([^"]+)"')
 TYPE_DEFINITION_RE = re.compile(r'^\s*type\s+"([^"]+)"', re.MULTILINE)
-ERGOPTI_TYPE_NAME = "ERGOPTI_SEVEN_LEVEL"
 
 
 def version_directories() -> list[Path]:

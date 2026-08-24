@@ -29,6 +29,10 @@ VARIANT_STANDARD = "ergopti"
 VARIANT_PLUS = "ergopti_plus"
 SUPPORTED_VARIANTS = (VARIANT_STANDARD, VARIANT_PLUS)
 
+# Namespaced key-type name shared by every Ergopti variant. The prefix keeps it
+# collision-free inside the shared extensions-directory type namespace.
+ERGOPTI_TYPE_NAME = "ERGOPTI_SEVEN_LEVEL"
+
 # Environment overrides. They exist so tests and CI sandboxes can drive the
 # installer against temporary roots; production defaults match the paths
 # documented by libxkbcommon >= 1.13 and the historical X11 tree.
@@ -45,6 +49,11 @@ DEFAULT_CACHE_DIR = Path("/var/lib/xkb")
 # config 2.45 moved the canonical root out of the legacy X11 tree.
 MIN_LIBXKBCOMMON_CLEAN = (1, 13, 0)
 MIN_XKEYBOARDCONFIG_CLEAN = (2, 45, 0)
+
+# Installer exit codes (argparse owns 2 for usage errors).
+EXIT_OK = 0
+EXIT_VALIDATION = 3
+EXIT_INSTALL_ABORTED = 4
 
 _SYMBOLS_SECTION_RE = re.compile(r'xkb_symbols\s+"[^"]+"')
 _TYPE_REFERENCE_RE = re.compile(r'type(?:\[[^\]]*\])?\s*=\s*"([^"]+)"')
@@ -79,6 +88,93 @@ def resolve_roots() -> InstallerRoots:
         cache_dir=Path(cache_dir) if cache_dir else DEFAULT_CACHE_DIR,
         sandboxed=sandboxed,
     )
+
+
+def user_roots() -> InstallerRoots:
+    """Roots for a per-user installation (no sudo required).
+
+    libxkbcommon reads ``$XDG_CONFIG_HOME/xkb`` (default ``~/.config/xkb``)
+    before the system tree, so a layout package installed there is picked up
+    by every libxkbcommon consumer — i.e. all Wayland compositors. Real X11
+    sessions cannot see it: the X server only knows its hard-coded path.
+    """
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(config_home) if config_home else Path.home() / ".config"
+    return InstallerRoots(
+        extensions_root=base / "xkb",
+        system_root=DEFAULT_SYSTEM_ROOT,
+        cache_dir=base / "cache" / "xkb",
+        sandboxed=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Desktop-environment activation helpers (pure, unit-testable)
+# ---------------------------------------------------------------------------
+
+
+def parse_gsettings_sources(text: str) -> list[tuple[str, str]]:
+    """Parse ``gsettings get`` output for input-sources into (type, id) pairs.
+
+    Handles the empty forms ``@a(ss) []`` and ``[]`` as well as populated
+    lists like ``[('xkb', 'fr'), ('xkb', 'ergopti+plus')]``. Unparsable text
+    yields an empty list so callers can fall back to append-only behaviour.
+    """
+    stripped = (text or "").strip()
+    if not stripped or stripped in ("@a(ss) []", "[]"):
+        return []
+    if not stripped.startswith("["):
+        return []
+    pairs: list[tuple[str, str]] = []
+    for match in re.finditer(r"\(\s*'([^']*)'\s*,\s*'([^']*)'\s*\)", stripped):
+        pairs.append((match.group(1), match.group(2)))
+    return pairs
+
+
+def format_gsettings_sources(pairs: list[tuple[str, str]]) -> str:
+    """Render (type, id) pairs back into a gsettings value string."""
+    inner = ", ".join(f"('{kind}', '{identifier}')" for kind, identifier in pairs)
+    return f"[{inner}]"
+
+
+def merge_gsettings_source(
+    pairs: list[tuple[str, str]], new_entries: list[tuple[str, str]]
+) -> tuple[list[tuple[str, str]], bool]:
+    """Append entries that are missing; never reorder or drop existing ones.
+
+    Returns the merged list and whether anything was added.
+    """
+    existing = set(pairs)
+    merged = list(pairs)
+    added = False
+    for entry in new_entries:
+        if entry in existing:
+            continue
+        merged.append(entry)
+        existing.add(entry)
+        added = True
+    return merged, added
+
+
+def parse_kde_layout_list(text: str | None) -> list[str]:
+    """Split ``kreadconfig LayoutList`` output on commas."""
+    if not text:
+        return []
+    return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def merge_kde_layout_list(current: list[str], new_ids: list[str]) -> tuple[list[str], bool]:
+    """Append missing layout ids; returns merged list and whether it changed."""
+    existing = set(current)
+    merged = list(current)
+    added = False
+    for identifier in new_ids:
+        if identifier in existing:
+            continue
+        merged.append(identifier)
+        existing.add(identifier)
+        added = True
+    return merged, added
 
 
 def patch_symbols_default(content: str) -> str:

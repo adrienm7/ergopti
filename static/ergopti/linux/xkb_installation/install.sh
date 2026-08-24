@@ -32,6 +32,10 @@ SELECTED_BRANCH="${BRANCH:-$DEFAULT_BRANCH}"
 FORCE_INSTALLATION_METHOD=""
 WANT_UNINSTALL=false
 WANT_ANSI=false
+WANT_USER=false
+WANT_YES=false
+SELECTED_VERSION_ARG=""
+SELECTED_VARIANT_ARG=""
 
 RED=$(printf '\033[31m')
 GREEN=$(printf '\033[32m')
@@ -43,6 +47,13 @@ NO_COLOR=$(printf '\033[0m')
 LOG_INDENT=""
 
 unset FZF_DEFAULT_OPTS || true
+
+usage_error() {
+    printf "${RED}❌ %s${NO_COLOR}\n" "$1" >&2
+    echo "Usage : $0 [--installation-method clean|legacy] [--version v2_2_1]" \
+        "[--variant ergopti|ergopti_plus] [--ansi] [--user] [--uninstall] [--yes]" >&2
+    exit 1
+}
 
 log_section() {
     LOG_INDENT=""
@@ -91,13 +102,30 @@ while [[ $# -gt 0 ]]; do
         --installation-method)
             FORCE_INSTALLATION_METHOD="$2"
             if [[ "$FORCE_INSTALLATION_METHOD" != "clean" && "$FORCE_INSTALLATION_METHOD" != "legacy" ]]; then
-                printf "${RED}❌ Erreur : --installation-method doit être 'clean' ou 'legacy'${NO_COLOR}\n" >&2
-                exit 1
+                usage_error "--installation-method doit être 'clean' ou 'legacy'"
             fi
+            shift 2
+            ;;
+        --version)
+            [ -n "${2:-}" ] || usage_error "--version requiert une valeur (ex. v2_2_1)"
+            SELECTED_VERSION_ARG="$2"
+            shift 2
+            ;;
+        --variant)
+            [ -n "${2:-}" ] || usage_error "--variant requiert une valeur"
+            SELECTED_VARIANT_ARG="$2"
             shift 2
             ;;
         --ansi)
             WANT_ANSI=true
+            shift
+            ;;
+        --user)
+            WANT_USER=true
+            shift
+            ;;
+        --yes)
+            WANT_YES=true
             shift
             ;;
         --uninstall)
@@ -105,12 +133,23 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            printf "${RED}❌ Option inconnue : $1${NO_COLOR}\n" >&2
-            echo "Usage : $0 [--installation-method clean|legacy] [--ansi] [--uninstall]" >&2
-            exit 1
+            usage_error "Option inconnue : $1"
             ;;
     esac
 done
+
+if [[ -n "$SELECTED_VERSION_ARG" ]]; then
+    [[ "$SELECTED_VERSION_ARG" =~ ^v[0-9._]+$ ]] || usage_error "Version invalide : $SELECTED_VERSION_ARG"
+    SELECTED_VERSION_ARG="${SELECTED_VERSION_ARG//./_}"
+fi
+case "$SELECTED_VARIANT_ARG" in
+    "") ;;
+    ergopti | ergopti_plus) ;;
+    *) usage_error "Variante invalide : $SELECTED_VARIANT_ARG (ergopti|ergopti_plus)" ;;
+esac
+if [ "$WANT_YES" = true ] && { [ -z "$SELECTED_VERSION_ARG" ] || [ -z "$SELECTED_VARIANT_ARG" ]; }; then
+    usage_error "--yes requiert --version et --variant"
+fi
 
 if [ ! -t 1 ]; then
     printf "%s❌ Erreur : terminal interactif requis.%s\n" "${RED}" "${NO_COLOR}" >&2
@@ -204,10 +243,19 @@ fi
 if [ "$WANT_UNINSTALL" = true ]; then
     log_section "Désinstallation"
     INSTALLER_SCRIPTS_DIR="$DRIVERS_ROOT/$INSTALLER_REL_PATH"
-    printf "${LOG_INDENT}Cette commande retire le paquet « ergopti » des répertoires d'extension,\n"
-    printf "${LOG_INDENT}ainsi que les liens hérités éventuels dans %s.\n" "/usr/share/X11/xkb"
-    sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --uninstall \
-        || printf "${YELLOW}ℹ️  Rien n'a été désinstallé (paquet déjà absent ?).%s\n" "${NO_COLOR}"
+    if [ "$WANT_USER" = true ]; then
+        printf "${LOG_INDENT}Désinstallation utilisateur (%s).\n" "~/.config/xkb"
+        python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --user --uninstall \
+            || printf "${YELLOW}ℹ️  Rien n'a été désinstallé (paquet utilisateur déjà absent ?).%s\n" "${NO_COLOR}"
+    else
+        printf "${LOG_INDENT}Retire le paquet « ergopti » des répertoires d'extension,\n"
+        printf "${LOG_INDENT}ainsi que les liens hérités éventuels dans %s.\n" "/usr/share/X11/xkb"
+        sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --uninstall \
+            || printf "${YELLOW}ℹ️  Rien n'a été désinstallé (paquet déjà absent ?).%s\n" "${NO_COLOR}"
+        # Legacy uninstall: restore the pre-Ergopti backups when they exist.
+        sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --uninstall \
+            || true
+    fi
     printf "\n${GREEN}Désinstallation terminée. Redémarrez la session pour retrouver votre disposition précédente.${NO_COLOR}\n"
     exit 0
 fi
@@ -229,16 +277,33 @@ if [ ${#RELEASES[@]} -eq 0 ]; then
     exit 1
 fi
 
-RELEASE_LIST=""
-for r in "${RELEASES[@]}"; do
-    raw_name=$(basename "$r")
-    RELEASE_LIST="${RELEASE_LIST}${raw_name//_/.}\n"
-done
+if [ -n "$SELECTED_VERSION_ARG" ]; then
+    VERSION_FOUND=false
+    for r in "${RELEASES[@]}"; do
+        if [ "$(basename "$r")" = "$SELECTED_VERSION_ARG" ]; then
+            VERSION_FOUND=true
+            break
+        fi
+    done
+    if [ "$VERSION_FOUND" = false ]; then
+        printf "${LOG_INDENT}${RED}❌ Version inconnue sur $SELECTED_BRANCH : $SELECTED_VERSION_ARG${NO_COLOR}\n" >&2
+        echo "Versions disponibles :" >&2
+        for r in "${RELEASES[@]}"; do echo "  $(basename "$r")" >&2; done
+        exit 1
+    fi
+    SELECTED_NAME="$SELECTED_VERSION_ARG"
+else
+    RELEASE_LIST=""
+    for r in "${RELEASES[@]}"; do
+        raw_name=$(basename "$r")
+        RELEASE_LIST="${RELEASE_LIST}${raw_name//_/.}\n"
+    done
 
-SELECTED_NAME=$(printf "%b" "$RELEASE_LIST" | run_fzf --prompt="Version > " --header="Sélectionnez la version du layout (Entrée = plus récente en haut)")
-if [ -z "$SELECTED_NAME" ]; then
-    printf "\nAnnulé.\n"
-    exit 0
+    SELECTED_NAME=$(printf "%b" "$RELEASE_LIST" | run_fzf --prompt="Version > " --header="Sélectionnez la version du layout (Entrée = plus récente en haut)")
+    if [ -z "$SELECTED_NAME" ]; then
+        printf "\nAnnulé.\n"
+        exit 0
+    fi
 fi
 REAL_NAME="${SELECTED_NAME//./_}"
 printf "${LOG_INDENT}${GREEN}➡️  Version choisie : $SELECTED_NAME${NO_COLOR}\n"
@@ -280,10 +345,25 @@ if [ -z "$VARIANTS_MENU" ]; then
     exit 1
 fi
 
-SELECTED_VARIANT_RAW=$(printf "%b" "$VARIANTS_MENU" | run_fzf --prompt="Variante > " --header="Sélectionnez la variante (Ergopti++ n'est plus proposé)")
-if [ -z "$SELECTED_VARIANT_RAW" ]; then
-    printf "\nAnnulé.\n"
-    exit 0
+if [ -n "$SELECTED_VARIANT_ARG" ]; then
+    VARIANT_AVAILABLE=false
+    if [ "$SELECTED_VARIANT_ARG" = "ergopti_plus" ] && $HAS_PLUS; then
+        VARIANT_AVAILABLE=true
+        SELECTED_VARIANT_RAW="2. Ergopti+ (à utiliser avec Espanso)"
+    elif [ "$SELECTED_VARIANT_ARG" = "ergopti" ] && $HAS_STANDARD; then
+        VARIANT_AVAILABLE=true
+        SELECTED_VARIANT_RAW="1. Ergopti (standard)"
+    fi
+    if [ "$VARIANT_AVAILABLE" = false ]; then
+        printf "${LOG_INDENT}${RED}❌ Variante indisponible dans cette version : $SELECTED_VARIANT_ARG${NO_COLOR}\n" >&2
+        exit 1
+    fi
+else
+    SELECTED_VARIANT_RAW=$(printf "%b" "$VARIANTS_MENU" | run_fzf --prompt="Variante > " --header="Sélectionnez la variante (Ergopti++ n'est plus proposé)")
+    if [ -z "$SELECTED_VARIANT_RAW" ]; then
+        printf "\nAnnulé.\n"
+        exit 0
+    fi
 fi
 
 case "$SELECTED_VARIANT_RAW" in
@@ -412,16 +492,27 @@ if [ -n "$XCOMPOSE_FILENAME" ]; then
 fi
 
 VARIANT_ARG=""
+USER_ARG=""
 if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
     VARIANT_ARG="--variant $VARIANT_ID"
+    if [ "$WANT_USER" = true ]; then
+        USER_ARG="--user"
+        printf "${LOG_INDENT}${BOLD}Mode utilisateur : installation dans ~/.config/xkb (sans sudo, sessions Wayland).${NO_COLOR}\n"
+        CMD="python3 $INSTALLER_FULL_PATH --xkb $XKB_FULL_PATH --types $TYPES_FULL_PATH $XCOMPOSE_ARG $VARIANT_ARG $USER_ARG"
+    fi
+elif [ "$WANT_USER" = true ]; then
+    printf "${LOG_INDENT}${YELLOW}⚠️  --user ignoré : la méthode legacy modifie les fichiers système.${NO_COLOR}\n"
 fi
 
 printf "${LOG_INDENT}Méthode d'installation : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
-printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copier les fichiers.\n"
 
-CMD="python3 $INSTALLER_FULL_PATH --xkb $XKB_FULL_PATH --types $TYPES_FULL_PATH $XCOMPOSE_ARG $VARIANT_ARG"
-
-printf "\n🚀 Exécution de l'installeur...\n"
-tput cnorm >/dev/null 2>&1 || true
-
-sudo $CMD
+if [ "$WANT_USER" = true ] && [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
+    python3 $INSTALLER_FULL_PATH --xkb "$XKB_FULL_PATH" --types "$TYPES_FULL_PATH" \
+        $XCOMPOSE_ARG $VARIANT_ARG $USER_ARG
+else
+    printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copier les fichiers.\n"
+    printf "\n🚀 Exécution de l'installeur...\n"
+    tput cnorm >/dev/null 2>&1 || true
+    sudo python3 "$INSTALLER_FULL_PATH" --xkb "$XKB_FULL_PATH" --types "$TYPES_FULL_PATH" \
+        $XCOMPOSE_ARG $VARIANT_ARG
+fi
