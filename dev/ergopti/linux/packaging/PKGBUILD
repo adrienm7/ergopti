@@ -1,0 +1,69 @@
+# Maintainer: Ergopti Contributors <ergopti@example.com>
+#
+# Arch Linux package for the Ergopti XKB keyboard layout only (no driver).
+# Installs through the XKB extensions directories contract (libxkbcommon >= 1.13
+# with xkeyboard-config >= 2.45): nothing outside /usr/share/xkeyboard-config.d
+# is touched.
+#
+# Build with:  makepkg -si
+
+pkgname=xkb-ergopti
+pkgver=2.2.1
+pkgrel=1
+pkgdesc="Ergopti ergonomic French keyboard layout (XKB extensions directory)"
+arch=('any')
+url="https://ergopti.fr"
+license=('MIT')
+depends=('libxkbcommon>=1.13' 'xkeyboard-config>=2.45')
+makedepends=('git')
+source=("ergopti::git+https://github.com/adrienm7/ergopti.git#tag=v$pkgver")
+sha256sums=('SKIP')
+install="$pkgname.install"
+
+package() {
+  cd "$srcdir/ergopti/static/ergopti/linux/v${pkgver//./_}"
+
+  local pkgroot="$pkgdir/usr/share/xkeyboard-config.d/ergopti"
+  install -d "$pkgroot/symbols" "$pkgroot/types" "$pkgroot/rules"
+
+  # Symbols: rename the section to "default" and add the default marker so
+  # GUI layout pickers resolve the file without an explicit variant.
+  {
+    printf 'default partial alphanumeric_keys\n'
+    sed 's/xkb_symbols "[^"]*"/xkb_symbols "default"/' Ergopti_v"${pkgver//./_}".xkb
+  } > "$pkgroot/symbols/ergopti"
+
+  # Types own the Shift/CapsLock/AltGr/shortcut layers - mandatory.
+  install -Dm644 xkb_types.txt "$pkgroot/types/ergopti"
+
+  # Registry entry so desktop environments list the layout.
+  cat > "$pkgroot/rules/evdev.xml" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xkbConfigRegistry SYSTEM "xkb.dtd">
+<xkbConfigRegistry version="1.1">
+  <layoutList>
+    <layout>
+      <configItem>
+        <name>ergopti</name>
+        <shortDescription>Ergo</shortDescription>
+        <description>Français — Ergopti</description>
+        <languageList><iso639Id>fra</iso639Id></languageList>
+      </configItem>
+      <variantList>
+        <variant>
+          <configItem>
+            <name>plus</name>
+            <description>Ergopti+</description>
+          </configItem>
+        </variant>
+      </variantList>
+    </layout>
+  </layoutList>
+</xkbConfigRegistry>
+XML
+
+  # Rules composition fragment: binds our custom types to the layout without
+  # touching the system evdev file.
+  printf '! layout\t=\ttypes\n  ergopti\t=\t+ergopti\n' \
+    > "$pkgroot/rules/evdev.post"
+}

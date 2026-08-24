@@ -1,435 +1,522 @@
+"""Clean-method installer for the Ergopti XKB layout.
+
+Implements the libxkbcommon >= 1.13 "XKB extensions directories" contract:
+
+    <extensions root>/<package>/
+    ├── symbols/<layout id>
+    ├── types/<layout id>
+    └── rules/evdev.xml + rules/evdev.post
+
+Nothing outside that directory is modified: the custom types reach the keymap
+through the composable ``rules/evdev.post`` fragment instead of patching the
+system ``rules/evdev`` file, and the legacy X11 tree is only touched when the
+user explicitly asks for X11 (non-Xwayland) session support.
+
+Hardening rules enforced here:
+
+- the types file is mandatory and validated against the symbols references
+  before anything is installed (issue #84 class: an undefined key type kills
+  the whole keymap, e.g. a dead Shift layer);
+- the installation is staged then moved into place, so a failure never leaves
+  a half-installed package behind;
+- every best-effort activation step reports its outcome instead of swallowing
+  errors silently;
+- ``--uninstall`` removes exactly what was installed.
 """
-UNIVERSAL XKB LAYOUT INSTALLER (Hybrid Architecture + Strict Cleanup)
 
-Overview:
-    This script installs any custom XKB keyboard layout on Linux systems.
-    It implements a "Hybrid" approach to ensure maximum compatibility:
-    1. Modern: Installs files to /usr/share/xkeyboard-config.d/
-    2. Legacy Bridge: Creates symbolic links in /usr/share/X11/xkb/
-    3. Force Patch: Directly registers the layout in system evdev rules.
-
-Features:
-    - Deep Cleanup: Aggressively removes old symlinks and artifacts to prevent
-      conflicts or dead links when switching variants.
-    - XCompose Sync: Forces the update of the user's .XCompose file.
-    - Cache Purge: Automatically clears XKB cache and refreshes input sources.
-
-Usage:
-    sudo python3 install.py --xkb <layout_file>.xkb [--types <types_file>] [--xcompose <compose_file>]
-
-Example:
-    sudo python3 install.py --xkb ergopti.xkb --types types.txt --xcompose .XCompose
-"""
+from __future__ import annotations
 
 import argparse
-import glob
-import logging
 import os
-import pwd
-import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
-# --- Constants & Paths ---
-# Internal package name for folder organization
-PACKAGE_NAME = "ergopti"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# Paths
-MODERN_XKB_PATH = Path("/usr/share/xkeyboard-config.d")
-SYSTEM_XKB_PATH = Path("/usr/share/X11/xkb")
-RULES_EVDEV_PATH = SYSTEM_XKB_PATH / "rules" / "evdev"
-XKB_CACHE_DIR = Path("/var/lib/xkb")
+from layout_package import (  # noqa: E402
+    EXIT_INSTALL_ABORTED,
+    EXIT_OK,
+    EXIT_VALIDATION,
+    InstallerRoots,
+    PACKAGE_NAME,
+    SUPPORTED_VARIANTS,
+    VARIANT_PLUS,
+    VARIANT_STANDARD,
+    build_evdev_post,
+    build_registry_xml,
+    format_gsettings_sources,
+    merge_gsettings_source,
+    merge_kde_layout_list,
+    parse_gsettings_sources,
+    parse_kde_layout_list,
+    patch_symbols_default,
+    remove_generation_two_links,
+    resolve_roots,
+    strip_legacy_evdev_patch,
+    user_roots,
+    validate_component_identifier,
+    validate_layout_files,
+)
 
-# --- Logging Setup ---
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+def check_root(roots: InstallerRoots) -> None:
+    """Refuse to run as non-root outside of a sandbox."""
+    if roots.sandboxed:
+        return
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise SystemExit(
+            "Erreur : ce script doit être lancé avec sudo "
+            "(ou avec les variables ERGOPTI_XKB_* pour un bac à sable)."
+        )
 
 
-# ==================================================
-# ============== EXECUTION PHASE ===================
-# ==================================================
+def read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise SystemExit(f"Erreur : lecture impossible de {path} ({error}).")
 
 
-def main():
-    """Main execution flow."""
-    parser = argparse.ArgumentParser(description="Universal XKB Layout Installer")
-    parser.add_argument(
-        "--xkb", type=Path, required=True, help="Path to the .xkb symbols file"
+def run_reported(command: list[str], label: str, env: dict[str, str] | None = None) -> bool:
+    """Run a best-effort command and report its outcome; never raise."""
+    effective_env = os.environ.copy()
+    if env:
+        effective_env.update(env)
+    try:
+        result = subprocess.run(
+            command,
+            env=effective_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"   ⚠️  {label} : impossible de lancer la commande ({error}).")
+        return False
+    if result.returncode == 0:
+        print(f"   ✅ {label}.")
+        return True
+    output = (result.stdout or "").strip()
+    detail = f" — {output.splitlines()[0]}" if output else ""
+    print(f"   ⚠️  {label} : échec (code {result.returncode}){detail}.")
+    return False
+
+
+def compile_validation(staging_dir: Path, layout_id: str) -> bool:
+    """Compile-test the staged package with xkbcli when it is available.
+
+    Returns True when validation ran and succeeded. A missing or too-old
+    xkbcli is not fatal: the structural validator already guarantees symbol/
+    types coherence, and CI exercises both paths.
+    """
+    xkbcli = shutil.which("xkbcli")
+    if not xkbcli:
+        print("   ℹ️  xkbcli absent : compilation réelle ignorée (validation structurelle OK).")
+        return True
+    env = {
+        "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(staging_dir),
+        # Keep the versioned path out of the way so the staging tree is authoritative.
+        "XKB_CONFIG_VERSIONED_EXTENSIONS_PATH": "",
+    }
+    command = [
+        xkbcli,
+        "compile-keymap",
+        "--rules",
+        "evdev",
+        "--model",
+        "pc105",
+        "--layout",
+        layout_id,
+        "--test",
+    ]
+    print(f"   🔎 Compilation de contrôle via xkbcli (layout {layout_id})…")
+    try:
+        result = subprocess.run(
+            command,
+            env={**os.environ, **env},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print(f"   ⚠️  Validation xkbcli impossible ({error}); installation poursuivie.")
+        return True
+    if result.returncode == 0:
+        print("   ✅ La keymap compile (types inclus).")
+        return True
+    output = (result.stdout or "").strip()
+    print("   ❌ La keymap ne compile pas ; installation annulée.")
+    for line in output.splitlines()[:20]:
+        print(f"      {line}")
+    return False
+
+
+def cleanup_previous_installations(roots: InstallerRoots) -> None:
+    """Neutralise artefacts left by earlier installer generations.
+
+    Idempotent: running an upgrade over any previous version or method ends in
+    exactly one coherent package state.
+    """
+    package_dir = roots.package_dir
+    if package_dir.exists():
+        shutil.rmtree(package_dir)
+        print(f"   🧹 Ancien paquet remplacé ({package_dir}).")
+    staging = package_dir.with_name(f".{PACKAGE_NAME}.staging")
+    if staging.exists():
+        shutil.rmtree(staging, ignore_errors=True)
+    removed_links = remove_generation_two_links(roots.system_root)
+    if removed_links:
+        print(f"   🧹 {removed_links} lien(s) hérité(s) supprimé(s) dans {roots.system_root}.")
+    stripped_lines = strip_legacy_evdev_patch(roots.system_root)
+    if stripped_lines:
+        print(
+            f"   🧹 {stripped_lines} ligne(s) de règles héritée(s) retirée(s) "
+            f"de {roots.system_root / 'rules' / 'evdev'}."
+        )
+
+
+def install_clean(
+    symbols_path: Path,
+    types_path: Path,
+    xcompose_path: Path | None,
+    variant: str,
+    support_x11: bool,
+    roots: InstallerRoots,
+) -> None:
+    """Install the layout package through the extensions-directory contract."""
+    if variant not in SUPPORTED_VARIANTS:
+        raise SystemExit(
+            "Erreur : variante non prise en charge. Choisissez 'ergopti' ou 'ergopti_plus'."
+        )
+    symbols_content = read_text(symbols_path)
+    types_content = read_text(types_path)
+
+    print("🔎 Validation structurelle du paquet (symbols ↔ types)…")
+    problems = validate_layout_files(symbols_content, types_content)
+    if problems:
+        for problem in problems:
+            print(f"   ❌ {problem}")
+        print("Erreur : le paquet de disposition est incohérent ; installation annulée.")
+        raise SystemExit(EXIT_VALIDATION)
+    print("   ✅ Chaque type référencé par les symboles est bien défini.")
+
+    layout_id = validate_component_identifier(PACKAGE_NAME)
+    patched_symbols = patch_symbols_default(symbols_content)
+
+    print("🧼 Nettoyage des installations précédentes…")
+    cleanup_previous_installations(roots)
+
+    package_dir = roots.package_dir
+    staging_dir = package_dir.with_name(f".{PACKAGE_NAME}.staging")
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir, ignore_errors=True)
+    (staging_dir / "symbols").mkdir(parents=True)
+    (staging_dir / "types").mkdir()
+    (staging_dir / "rules").mkdir()
+
+    (staging_dir / "symbols" / layout_id).write_text(patched_symbols, encoding="utf-8")
+    (staging_dir / "types" / layout_id).write_text(types_content, encoding="utf-8")
+    variants = []
+    description = "Français — Ergopti"
+    if variant == VARIANT_PLUS:
+        description = "Français — Ergopti+"
+        variants.append(("plus", "Ergopti+"))
+    else:
+        variants.append(("plus", "Ergopti+ (avec Espanso)"))
+    (staging_dir / "rules" / "evdev.xml").write_text(
+        build_registry_xml(layout_id, description, variants),
+        encoding="utf-8",
     )
-    parser.add_argument("--types", type=Path, help="Path to the types definition file")
-    parser.add_argument("--xcompose", type=Path, help="Path to the .XCompose file")
-    args = parser.parse_args()
+    (staging_dir / "rules" / "evdev.post").write_text(
+        build_evdev_post(layout_id),
+        encoding="utf-8",
+    )
 
-    # 1. Privileges Validation
-    check_sudo()
-    logging.info(f"🚀 Installation de la disposition : {args.xkb.stem}")
-    logging.info("   (Mode: Hybride + Nettoyage Strict + Force Patch)")
+    if not compile_validation(staging_dir, layout_id):
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise SystemExit(EXIT_VALIDATION)
 
+    if package_dir.exists():
+        shutil.rmtree(package_dir)
+    staging_dir.rename(package_dir)
+    print(f"📦 Paquet installé dans {package_dir}.")
+
+    if xcompose_path is not None:
+        install_user_xcompose(xcompose_path)
+
+    if support_x11:
+        create_legacy_symlinks(package_dir, layout_id, roots.system_root)
+
+    purge_cache(roots)
+    activate(layout_id, variant)
+
+
+def install_user_xcompose(source: Path) -> None:
+    sudo_user = os.environ.get("SUDO_USER", "")
+    home = Path.home() if not sudo_user else Path(os.path.expanduser(f"~{sudo_user}"))
+    destination = home / ".XCompose"
     try:
-        # 2. Deep Cleanup of previous versions (Fixes dead links/variants)
-        deep_cleanup_artifacts()
-
-        # 3. Setup Directory Structure
-        pkg_dir = setup_package_directory()
-        layout_id = args.xkb.stem  # e.g., "ergopti", "fr-optimised"
-
-        # 4. Install Core Files (Modern Path)
-        install_file(args.xkb, pkg_dir / "symbols" / layout_id, patch_default=True)
-        if args.types:
-            install_file(args.types, pkg_dir / "types" / layout_id)
-
-        # 5. Generate Configuration (Partial XML for UI)
-        create_partial_xml(pkg_dir, layout_id, display_name="Custom Ergo")
-
-        # 6. System Integration (Symlinks Bridge)
-        create_system_symlinks(pkg_dir, layout_id)
-
-        # 7. Apply Forced Rules Patch (Crucial for types loading)
-        patch_system_evdev_rules(layout_id)
-
-        # 8. User Configuration (Force Update XCompose)
-        if args.xcompose:
-            install_user_xcompose(args.xcompose)
-
-        # 9. Activation & Cleanup
-        refresh_and_activate(layout_id)
-
-        logging.info("\n✨ Installation terminée avec succès.")
-
-    except Exception as e:
-        logging.error(f"\n❌ Erreur critique : {e}")
-        sys.exit(1)
+        if source.resolve() == destination.resolve():
+            print("   ℹ️  .XCompose déjà en place.")
+            return
+        if destination.exists():
+            shutil.copy2(destination, destination.with_suffix(".bak"))
+            destination.unlink()
+        shutil.copy(source, destination)
+        print(f"   ✅ ~/.XCompose mis à jour ({destination.stat().st_size} octets).")
+    except OSError as error:
+        print(f"   ⚠️  .XCompose non installé : {error}")
 
 
-# ==================================================
-# ============= SYSTEM & PRIVILEGES ================
-# ==================================================
+def create_legacy_symlinks(package_dir: Path, layout_id: str, system_root: Path) -> None:
+    """Bridge into the legacy tree so real X11 sessions can load the layout."""
+    created = 0
+    for component in ("symbols", "types"):
+        target = system_root / component / layout_id
+        source = package_dir / component / layout_id
+        try:
+            if target.exists() or target.is_symlink():
+                target.unlink()
+            target.symlink_to(source)
+            created += 1
+        except OSError as error:
+            print(f"   ⚠️  Lien X11 {component} non créé : {error}")
+    print(
+        f"   🔗 Support X11 (Xorg) : {created}/2 liens créés dans {system_root}."
+        if created
+        else "   ⚠️  Aucun lien X11 créé."
+    )
 
 
-def check_sudo():
-    """Ensures the script is running with root privileges."""
-    if os.geteuid() != 0:
-        logging.error("❌ Ce script doit être lancé avec sudo (root).")
-        sys.exit(1)
+def purge_cache(roots: InstallerRoots) -> None:
+    cache = roots.cache_dir
+    if not cache.exists():
+        return
+    for child in cache.iterdir():
+        try:
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        except OSError as error:
+            print(f"   ⚠️  Cache XKB : élément non supprimé {child.name} ({error})")
+    print("   🧹 Cache XKB purgé.")
 
 
-def get_sudo_user_info() -> Optional[pwd.struct_passwd]:
-    """Retrieves the actual user invoking sudo (to locate home dir)."""
-    try:
-        sudo_user = os.getenv("SUDO_USER")
-        if sudo_user:
-            return pwd.getpwnam(sudo_user)
-    except KeyError:
-        pass
-    return None
+def activate(layout_id: str, variant: str) -> None:
+    """Best-effort desktop activation that never drops existing layouts.
 
-
-# ==================================================
-# ============ CLEANUP & FILESYSTEM ================
-# ==================================================
-
-
-def deep_cleanup_artifacts():
+    GNOME and KDE store the user's layout list; the previous installer
+    overwrote it, silently removing the user's other keyboards. The merge
+    helpers below append our layouts only when missing.
     """
-    Aggressively removes old symlinks and files related to the package
-    in the system XKB directories to prevent dead links or shadow files.
+    sudo_user = os.environ.get("SUDO_USER")
+    prefix = ["sudo", "-u", sudo_user] if sudo_user else []
+
+    def run_capture(command: list[str]) -> str | None:
+        try:
+            result = subprocess.run(
+                prefix + command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return result.stdout if result.returncode == 0 else None
+
+    def run_report(command: list[str], label: str) -> bool:
+        return run_reported(prefix + command, label)
+
+    wanted = [("xkb", layout_id)]
+    if variant == VARIANT_PLUS:
+        wanted.insert(0, ("xkb", f"{layout_id}+plus"))
+
+    print("🚀 Activation (best-effort, sans écraser vos dispositions)…")
+
+    # --- GNOME / Wayland (mutter) ---
+    current_raw = run_capture(["gsettings", "get", "org.gnome.desktop.input-sources", "sources"])
+    if current_raw is None:
+        print("   ℹ️  gsettings indisponible : GNOME non détecté, étape ignorée.")
+    else:
+        merged, added = merge_gsettings_source(
+            parse_gsettings_sources(current_raw), wanted
+        )
+        if added:
+            run_report(
+                [
+                    "gsettings",
+                    "set",
+                    "org.gnome.desktop.input-sources",
+                    "sources",
+                    format_gsettings_sources(merged),
+                ],
+                "GNOME : disposition ajoutée à vos sources existantes",
+            )
+        else:
+            print("   ✅ GNOME : déjà présente dans vos sources, rien à changer.")
+
+    # --- KDE Plasma ---
+    kde_readers = ["kreadconfig6", "kreadconfig5"]
+    current_list = None
+    for reader in kde_readers:
+        current_list = run_capture(
+            [reader, "--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList"]
+        )
+        if current_list is not None:
+            break
+    kde_ids = [layout_id, f"{layout_id}+plus"] if variant == VARIANT_PLUS else [layout_id]
+    if current_list is None:
+        print("   ℹ️  kreadconfig indisponible : KDE non détecté, étape ignorée.")
+    else:
+        merged_kde, added_kde = merge_kde_layout_list(
+            parse_kde_layout_list(current_list), kde_ids
+        )
+        if added_kde:
+            writer = (
+                "kwriteconfig6"
+                if shutil.which("kwriteconfig6")
+                else "kwriteconfig5"
+            )
+            run_report(
+                [
+                    writer,
+                    "--file",
+                    "kxkbrc",
+                    "--group",
+                    "Layout",
+                    "--key",
+                    "LayoutList",
+                    ",".join(merged_kde),
+                ],
+                "KDE : disposition ajoutée à votre liste",
+            )
+        else:
+            print("   ✅ KDE : déjà présente dans votre liste, rien à changer.")
+        run_report(
+            ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
+            "KDE : reconfiguration de KWin",
+        )
+
+    print("   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition n'est pas active.")
+
+
+def uninstall_clean(roots: InstallerRoots) -> None:
+    package_dir = roots.package_dir
+    removed = False
+    if package_dir.exists():
+        shutil.rmtree(package_dir)
+        print(f"🗑️  {package_dir} supprimé.")
+        removed = True
+    legacy_links = [
+        roots.system_root / "symbols" / PACKAGE_NAME,
+        roots.system_root / "types" / PACKAGE_NAME,
+    ]
+    for link in legacy_links:
+        if link.is_symlink():
+            link.unlink()
+            print(f"🗑️  Lien hérité supprimé : {link}")
+            removed = True
+    stripped = strip_legacy_evdev_patch(roots.system_root)
+    if stripped:
+        print(
+            f"🗑️  {stripped} ligne(s) de règles héritée(s) retirée(s) du fichier evdev système."
+        )
+        removed = True
+    stale_links = remove_generation_two_links(roots.system_root)
+    if stale_links:
+        print(f"🗑️  {stale_links} lien(s) d'anciennes générations supprimé(s).")
+        removed = True
+    if not removed:
+        print("ℹ️  Rien à désinstaller.")
+
+
+def force_utf8_stdio() -> None:
+    """Keep the CLI alive on consoles that cannot encode every glyph.
+
+    The installer prints progress glyphs; on a cp1252 terminal (or any host
+    with a legacy ANSI code page) the default print encoding raises
+    UnicodeEncodeError mid-install. Reconfigure both streams to UTF-8 with
+    replacement characters so output degrades instead of crashing.
     """
-    logging.info("   🧹 Nettoyage approfondi des anciennes versions...")
-
-    # Directories where artifacts might linger
-    subdirs = ["symbols", "types", "rules", "compat"]
-
-    # Patterns to match (files containing the package name)
-    # Adding variations to catch previous manual installs
-    patterns = [f"*{PACKAGE_NAME}*", "*Ergopti*", "*ergopti*"]
-
-    for subdir in subdirs:
-        target_dir = SYSTEM_XKB_PATH / subdir
-        if not target_dir.exists():
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
             continue
 
-        # 1. Remove by name pattern
-        for pattern in patterns:
-            for path_str in glob.glob(str(target_dir / pattern)):
-                try:
-                    p = Path(path_str)
-                    if p.is_symlink() or p.is_file():
-                        p.unlink()
-                        logging.info(f"      🗑️ Supprimé : {p.name}")
-                except Exception as e:
-                    logging.warning(f"      ⚠️ Impossible de supprimer {path_str}: {e}")
 
-        # 2. Remove broken symlinks pointing to our modern package folder
-        # This catches links even if they were renamed to something else
-        for p in target_dir.iterdir():
-            if p.is_symlink():
-                try:
-                    target = p.resolve()
-                    if PACKAGE_NAME in str(target):
-                        p.unlink()
-                        logging.info(f"      🔗 Lien obsolète supprimé : {p.name}")
-                except FileNotFoundError:
-                    # It's a broken link, check if it looks like ours
-                    if PACKAGE_NAME in str(p):
-                        p.unlink()
-
-
-def setup_package_directory() -> Path:
-    """Creates the package directory structure, wiping previous content."""
-    pkg_dir = MODERN_XKB_PATH / PACKAGE_NAME
-    if pkg_dir.exists():
-        shutil.rmtree(pkg_dir)
-
-    for folder in ("symbols", "types", "rules"):
-        target = pkg_dir / folder
-        target.mkdir(parents=True, exist_ok=True)
-        os.chmod(target, 0o755)
-    return pkg_dir
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Installeur Ergopti (méthode clean)")
+    parser.add_argument("--xkb", type=Path, help="Fichier .xkb de la disposition")
+    parser.add_argument(
+        "--types", type=Path, help="Fichier de types complet (obligatoire sauf --uninstall)"
+    )
+    parser.add_argument("--xcompose", type=Path, default=None, help="Fichier .XCompose optionnel")
+    parser.add_argument(
+        "--variant",
+        choices=list(SUPPORTED_VARIANTS),
+        default=VARIANT_STANDARD,
+        help="Variante installée",
+    )
+    parser.add_argument(
+        "--support-x11",
+        action="store_true",
+        help="Créer aussi les liens pour les sessions X11 (Xorg) réelles",
+    )
+    parser.add_argument(
+        "--user",
+        action="store_true",
+        help="Installer dans ~/.config/xkb sans sudo (visible des sessions "
+        "Wayland uniquement)",
+    )
+    parser.add_argument("--uninstall", action="store_true", help="Désinstaller le paquet")
+    args = parser.parse_args(argv)
+    if not args.uninstall:
+        missing = [name for name in ("--xkb", "--types") if getattr(args, name.lstrip("-")) is None]
+        if missing:
+            parser.error("les options suivantes sont requises : " + ", ".join(missing))
+    return args
 
 
-def install_file(src: Path, dest: Path, patch_default: bool = False):
-    """Copies source file to destination, optionally adding 'default' group."""
-    if not src.exists():
-        raise FileNotFoundError(f"Fichier introuvable : {src}")
+def main(argv: list[str]) -> int:
+    force_utf8_stdio()
+    args = parse_args(argv)
+    roots = user_roots() if args.user else resolve_roots()
+    check_root(roots)
+    if args.uninstall:
+        uninstall_clean(roots)
+        return EXIT_OK
+    if args.user and args.support_x11:
+        print("ℹ️  Mode utilisateur : --support-x11 ignoré (aucun lien système créé).")
     try:
-        with src.open("r", encoding="utf-8") as f:
-            content = f.read()
-
-        if patch_default:
-            # Ensure compatibility with Gnome/X11 requiring a default section
-            content = re.sub(r'xkb_symbols\s+"[^"]+"', 'xkb_symbols "default"', content)
-            if "default partial" not in content:
-                content = content.replace(
-                    'xkb_symbols "default"',
-                    'default partial alphanumeric_keys\nxkb_symbols "default"',
-                )
-
-        with dest.open("w", encoding="utf-8") as f:
-            f.write(content)
-        os.chmod(dest, 0o644)
-    except Exception as e:
-        raise IOError(f"Erreur d’installation pour {src.name} : {e}")
-
-
-# ==================================================
-# ============ RULES PATCHING ======================
-# ==================================================
-
-
-def patch_system_evdev_rules(layout_name: str):
-    """
-    Directly modifies /usr/share/X11/xkb/rules/evdev to associate layout=types.
-    This is the "Force Patch" method required when evdev.post fails.
-    """
-    logging.info("   🔧 Application du patch système (rules/evdev)...")
-
-    if not RULES_EVDEV_PATH.exists():
-        logging.warning("⚠️ Fichier rules/evdev introuvable.")
-        return
-
-    try:
-        with open(RULES_EVDEV_PATH, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        # --- [MODIFICATION STARTED] ---
-        # Clean up ANY old lines containing 'ergopti' or the package name.
-        # This prevents accumulation of old variants like "Ergopti_v2", "Ergopti_v3", etc.
-        clean_lines = []
-        blacklist_terms = [PACKAGE_NAME.lower(), "ergopti"]
-
-        for line in lines:
-            # If the line contains an equals sign (it's a rule) AND matches "ergopti"
-            # we skip it (delete it).
-            if "=" in line and any(term in line.lower() for term in blacklist_terms):
-                continue
-            clean_lines.append(line)
-
-        if len(lines) != len(clean_lines):
-            logging.info(
-                f"      🧹 {len(lines) - len(clean_lines)} anciennes entrées nettoyées dans evdev."
-            )
-            lines = clean_lines
-        # --- [MODIFICATION ENDED] ---
-
-        # 2. Prepare the patch logic
-        section_regex = re.compile(r"^\s*!\s*layout\s*=\s*types\s*$")
-        start_idx = -1
-        patch_line = f"  {layout_name} = +{layout_name}\n"
-
-        # Find the section header
-        for i, line in enumerate(lines):
-            if section_regex.match(line):
-                start_idx = i
-                break
-
-        # 3. Apply the patch
-        if start_idx != -1:
-            # Normal: Insert after the header
-            lines.insert(start_idx + 1, patch_line)
-            with open(RULES_EVDEV_PATH, "w", encoding="utf-8") as f:
-                f.writelines(lines)
-            logging.info("      ✅ Règles mises à jour (Insertion).")
-        else:
-            # Fallback: Force append to end of file if section missing
-            needs_newline = lines and not lines[-1].endswith("\n")
-            with open(RULES_EVDEV_PATH, "a", encoding="utf-8") as f:
-                if needs_newline:
-                    f.write("\n")
-                f.write(f"\n! layout = types\n{patch_line}")
-            logging.info("      ✅ Règles ajoutées à la fin (Force Append).")
-
-    except Exception as e:
-        logging.error(f"❌ Erreur patch rules : {e}")
-
-
-def create_partial_xml(pkg_dir: Path, layout_name: str, display_name: str):
-    """Creates XML for GUI registry (Gnome Settings / KDE)."""
-    xml_file = pkg_dir / "rules" / "evdev.xml"
-    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE xkbConfigRegistry SYSTEM "xkb.dtd">
-<xkbConfigRegistry version="1.1">
-  <layoutList>
-    <layout>
-      <configItem>
-        <name>{layout_name}</name>
-        <shortDescription>Ergo</shortDescription>
-        <description>{display_name}</description>
-        <languageList><iso639Id>fra</iso639Id></languageList>
-      </configItem>
-    </layout>
-  </layoutList>
-</xkbConfigRegistry>
-"""
-    try:
-        with xml_file.open("w", encoding="utf-8") as f:
-            f.write(xml_content)
-        os.chmod(xml_file, 0o644)
-    except Exception:
-        pass
-
-
-# ==================================================
-# ========= SYSTEM INTEGRATION (BRIDGE) ============
-# ==================================================
-
-
-def create_system_symlinks(pkg_dir: Path, layout_name: str):
-    """Create new symbolic links to bridge modern path to legacy system path."""
-    logging.info("   🔗 Création des liens système...")
-    folders = ["symbols", "types"]
-    for folder in folders:
-        src = pkg_dir / folder / layout_name
-        dest = SYSTEM_XKB_PATH / folder / layout_name
-
-        if src.exists():
-            try:
-                # Determine if dest exists (symlink or file) and remove it
-                if dest.exists() or dest.is_symlink():
-                    dest.unlink()
-                os.symlink(src, dest)
-            except OSError as e:
-                logging.error(f"      ❌ Erreur lien {folder}: {e}")
-
-
-# ==================================================
-# ======== USER ENVIRONMENT & ACTIVATION ===========
-# ==================================================
-
-
-def install_user_xcompose(src: Path):
-    """
-    Installs .XCompose. Forces overwrite to ensure update.
-    """
-    if not src.exists():
-        logging.warning("⚠️ Fichier source XCompose introuvable.")
-        return
-
-    user = get_sudo_user_info()
-    if not user:
-        logging.warning("⚠️ Impossible de déterminer l'utilisateur sudo.")
-        return
-
-    dest = Path(user.pw_dir) / ".XCompose"
-
-    try:
-        # 1. Backup existing
-        if dest.exists():
-            shutil.copy2(dest, dest.with_suffix(".bak"))
-            dest.unlink()  # Explicitly remove old file to break inodes
-
-        # 2. Copy new file
-        shutil.copy(src, dest)
-
-        # 3. Set Permissions
-        os.chown(dest, user.pw_uid, user.pw_gid)
-        os.chmod(dest, 0o644)
-
-        # 4. Verification log
-        size = dest.stat().st_size
-        logging.info(f"   ⌨️ .XCompose mis à jour pour {user.pw_name} ({size} octets)")
-
-    except Exception as e:
-        logging.error(f"❌ Erreur critique .XCompose : {e}")
-
-
-def refresh_and_activate(layout_id: str):
-    """Purge cache and attempt to activate configuration via CLI."""
-    # 1. Purge XKB cache
-    if XKB_CACHE_DIR.exists():
-        subprocess.run(
-            f"rm -rf {XKB_CACHE_DIR}/*", shell=True, stderr=subprocess.DEVNULL
+        install_clean(
+            symbols_path=args.xkb,
+            types_path=args.types,
+            xcompose_path=args.xcompose,
+            variant=args.variant,
+            support_x11=args.support_x11 and not args.user,
+            roots=roots,
         )
-        logging.info("   🔄 Cache XKB purgé.")
-
-    user = get_sudo_user_info()
-    if not user:
-        return
-
-    def run_as_user(cmd_list):
-        """Helper to run command as the real user."""
-        try:
-            env = os.environ.copy()
-            env["XDG_RUNTIME_DIR"] = f"/run/user/{user.pw_uid}"
-            subprocess.run(
-                ["su", user.pw_name, "-c", " ".join(cmd_list)],
-                env=env,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except Exception:
-            pass
-
-    logging.info("   🚀 Rechargement de la configuration...")
-
-    # 2. Force types explicitly using setxkbmap (Immediate effect)
-    run_as_user(["setxkbmap", "-layout", layout_id, "-types", f"complete+{layout_id}"])
-
-    # 3. Update DE settings
-    run_as_user(
-        [
-            "gsettings",
-            "set",
-            "org.gnome.desktop.input-sources",
-            "sources",
-            f"[('xkb', '{layout_id}')]",
-        ]
-    )
-    run_as_user(
-        [
-            "kwriteconfig6",
-            "--file",
-            "kxkbrc",
-            "--group",
-            "Layout",
-            "--key",
-            "LayoutList",
-            layout_id,
-        ]
-    )
-    run_as_user(["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"])
+    except SystemExit as error:
+        # install_clean already printed a diagnostic; map its aborts to the
+        # documented exit codes so scripts can branch on them.
+        code = error.code
+        return code if isinstance(code, int) else EXIT_INSTALL_ABORTED
+    print("\n✨ Installation terminée. Redémarrez la session pour tout prendre en compte.")
+    return EXIT_OK
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(sys.argv[1:]))

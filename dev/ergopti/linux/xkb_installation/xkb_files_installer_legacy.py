@@ -18,6 +18,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Optional, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from layout_package import resolve_roots, validate_layout_files
+
 # --- Constants ---
 XKB_BASE_DIR = Path("/usr/share/X11/xkb")
 XKB_SYMBOLS_DIR = XKB_BASE_DIR / "symbols"
@@ -369,6 +373,67 @@ def install_xcompose_file(xcompose_file: Path, force: bool = True) -> None:
         logging.error("Failed to install .XCompose file: %s", e)
 
 
+LEGACY_TOUCHED_FILES = (
+    XKB_SYMBOLS_DIR / "fr",
+    XKB_TYPES_DIR / "extra",
+    XKB_RULES_DIR / "evdev.lst",
+    XKB_RULES_DIR / "evdev.xml",
+)
+
+
+def find_backups(target: Path) -> list[Path]:
+    """Return the ``<name>.<N>`` backups of *target*, oldest first."""
+    backups: list[tuple[int, Path]] = []
+    for candidate in target.parent.glob(f"{target.name}.*"):
+        suffix = candidate.name[len(target.name) + 1 :]
+        if suffix.isdigit():
+            backups.append((int(suffix), candidate))
+    backups.sort()
+    return [path for _, path in backups]
+
+
+def uninstall_legacy() -> None:
+    """Restore every file the legacy installer touched, from its first backup.
+
+    The first backup (``.1``) is the pristine pre-Ergopti snapshot taken
+    before the very first modification. When a file has no backup, it was
+    never touched by this installer and is left alone.
+    """
+    changed = False
+
+    home = Path.home()
+    compose_targets = list(LEGACY_TOUCHED_FILES) + [home / ".XCompose"]
+    for target in compose_targets:
+        backups = find_backups(target)
+        if not backups:
+            continue
+        pristine = backups[0]
+        try:
+            shutil.copy(pristine, target)
+        except OSError as error:
+            logging.error("Could not restore %s: %s", target, error)
+            continue
+        logging.info("Restored %s from %s", target, pristine.name)
+        for extra in backups[1:]:
+            extra.unlink(missing_ok=True)
+        changed = True
+
+    rules_path = XKB_RULES_DIR / "evdev"
+    if rules_path.is_file():
+        removed = strip_legacy_evdev_patch(XKB_RULES_DIR.parent.parent)
+        if removed:
+            logging.info("Removed %d inherited Ergopti rule line(s).", removed)
+            changed = True
+
+    if not changed:
+        logging.info("Nothing to uninstall: no legacy backup found.")
+        return
+    logging.warning(
+        "Legacy uninstall complete. Log out / log back in, and check "
+        "~/.XCompose if you had custom Compose sequences."
+    )
+
+
 def perform_install(
     xkb_file: Path,
     xcompose_file: Optional[Path],
@@ -412,20 +477,46 @@ def parse_args() -> dict:
         description="Apply Ergopti XKB installation (non-interactive)."
     )
     parser.add_argument(
-        "--xkb", type=Path, required=True, help="Path to the .xkb file."
+        "--xkb", type=Path, help="Path to the .xkb file (required unless --uninstall)."
     )
     parser.add_argument(
         "--xcompose", type=Path, help="Path to the .XCompose file."
     )
     parser.add_argument(
-        "--types", type=Path, help="Path to the xkb_types.txt file."
+        "--types",
+        type=Path,
+        help="Path to the full xkb_types.txt file (required when installing: "
+        "it owns the Shift/CapsLock/AltGr layers).",
     )
     parser.add_argument(
         "--force-xcompose",
         action="store_true",
         help="When provided, overwrite the user's ~/.XCompose without prompting.",
     )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Restore the files this installer previously backed up.",
+    )
     return vars(parser.parse_args())
+
+
+def remove_conflicting_clean_package() -> None:
+    """Remove the extensions-directory package if a clean install exists.
+
+    The two methods are mutually exclusive; keeping both would let the rules
+    composition and the legacy tree fight over the same layout id.
+    """
+    try:
+        package_dir = resolve_roots().package_dir
+    except Exception as error:  # pragma: no cover - defensive, roots are static
+        logging.debug("Could not resolve extensions roots: %s", error)
+        return
+    if package_dir.is_dir():
+        shutil.rmtree(package_dir)
+        logging.info(
+            "Removed conflicting clean-method package directory: %s", package_dir
+        )
 
 
 def main() -> None:
@@ -433,8 +524,38 @@ def main() -> None:
         logging.error("This script is for Linux and cannot be run on Windows.")
         sys.exit(1)
 
-    check_sudo()
     args = parse_args()
+
+    if args.get("uninstall"):
+        check_sudo()
+        uninstall_legacy()
+        return
+
+    check_sudo()
+
+    xkb_path: Path = args["xkb"]
+    types_path: Optional[Path] = args.get("types")
+    if xkb_path is None or types_path is None:
+        logging.error("Installing requires both --xkb and --types.")
+        sys.exit(1)
+
+    if "_plus_plus" in xkb_path.name.lower():
+        logging.error(
+            "Ergopti++ is no longer installable (it saturates XCompose). "
+            "Choose Ergopti or Ergopti+ instead."
+        )
+        sys.exit(1)
+
+    symbols_content = xkb_path.read_text(encoding="utf-8")
+    types_content = args["types"].read_text(encoding="utf-8")
+    problems = validate_layout_files(symbols_content, types_content)
+    if problems:
+        for problem in problems:
+            logging.error("Layout package inconsistency: %s", problem)
+        logging.error("Aborting: refusing to write an incoherent layout.")
+        sys.exit(1)
+
+    remove_conflicting_clean_package()
     perform_install(
         args["xkb"], args.get("xcompose"), args.get("types"), args.get("force_xcompose", False)
     )

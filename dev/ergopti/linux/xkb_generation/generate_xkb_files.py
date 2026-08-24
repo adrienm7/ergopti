@@ -122,22 +122,19 @@ def main(
         out_dir = linux_dir.parent / version_name
         out_dir.mkdir(exist_ok=True)
 
-        # Copy the xkb types files
+        # Copy the xkb types file. The full custom types file is the single
+        # source of the Shift/CapsLock/AltGr/shortcut layers; the historical
+        # "without_ctrl" variant was removed when the installer stopped making
+        # it a choice (it broke Ctrl-shortcuts on accented keys).
         try:
             data_dir = Path(__file__).parent / "data"
             src_types = data_dir / "xkb_types.txt"
-            src_types_no_ctrl = data_dir / "xkb_types_without_ctrl.txt"
 
             dest_types = out_dir / src_types.name
-            dest_types_no_ctrl = out_dir / src_types_no_ctrl.name
 
             # read/write preserves UTF-8 encoding
             dest_types.write_text(
                 src_types.read_text(encoding="utf-8"), encoding="utf-8"
-            )
-            dest_types_no_ctrl.write_text(
-                src_types_no_ctrl.read_text(encoding="utf-8"),
-                encoding="utf-8",
             )
         except OSError:
             logger.error("Failed to copy xkb types files into %s", out_dir)

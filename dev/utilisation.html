@@ -19,19 +19,19 @@
 		<link type="image/svg+xml" rel="icon" href="img/logo/logo_simple.svg" sizes="any" />
 		<link rel="alternate icon" type="image/x-icon" href="favicon.ico" />
 		<link type="text/plain" rel="author" href="https://www.beseven.fr/humans.txt" />
-		<link href="./_app/immutable/entry/start.Dl0mpne1.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/CosMVFRy.js" rel="modulepreload">
+		<link href="./_app/immutable/entry/start.D5Ka2hHZ.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/Dx6pXAi0.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/CiRgm-OL.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/CnL1so-l.js" rel="modulepreload">
-		<link href="./_app/immutable/entry/app.e4Nr-dFY.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/D3aRqrFP.js" rel="modulepreload">
+		<link href="./_app/immutable/entry/app.Dze85tdM.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/PPVm8Dsz.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DF0cmlBc.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/B5DxnG2o.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/gJbaXoZ4.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/Bt95CTUG.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/w_dd4zAC.js" rel="modulepreload">
-		<link href="./_app/immutable/nodes/0.DNMSWeB5.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/DVVPBqQ3.js" rel="modulepreload">
+		<link href="./_app/immutable/nodes/0.ByrJIvgU.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/CYOuvHC7.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/x2UYsuy_.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/jOxGynxM.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DWckuLyb.js" rel="modulepreload">
@@ -42,7 +42,7 @@
 		<link href="./_app/immutable/chunks/BECxPZor.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/B6g4BgdC.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/BrMzX8rW.js" rel="modulepreload">
-		<link href="./_app/immutable/nodes/7.D-OMGnez.js" rel="modulepreload">
+		<link href="./_app/immutable/nodes/7.Cv82IXxG.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DE0T8xsr.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/BRXYg75w.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/0rd7nram.js" rel="modulepreload">
@@ -123,13 +123,30 @@
 	disposition <name-ergopti><span class="namecolor">Ergopti</span></name-ergopti><!----> devrait désormais être sélectionnable dans le groupe de langues Français,
 	ou en tant que groupe de langue à part entière selon la méthode d'installation choisie. <strong>À noter :</strong> Les scripts d'installation tentent d'appliquer la disposition automatiquement,
 	ce qui rend cette étape de sélection de la disposition après redémarrage parfois inutile.</p> <tiny-space></tiny-space> <hr/> <tiny-space></tiny-space> <p>Le processus d'installation utilise un script bash unique qui gère la sélection interactive
-	(version, variante, options) puis lance automatiquement l'installateur approprié. Deux méthodes
-	d'installation sont disponibles :</p> <ul><li><strong>Méthode "Clean"</strong> (recommandée) : utilise un répertoire d'extensions utilisateur
-		non invasif (<code>/usr/share/xkeyboard-config.d/</code>). Cette méthode n'existe que depuis fin
-		2025 et n'est disponible que sur les distributions les plus à jour comme Arch ou Fedora. En
-		effet, elle nécessite libxkbcommon ≥ 1.13.0.</li> <li><strong>Méthode "Legacy"</strong> : modifie directement les fichiers système XKB (<code>/usr/share/X11/xkb/</code>). Compatible avec toutes les versions, mais moins propre. C'est la méthode qui était utilisée
-		historiquement.</li></ul> <p>Le script de détection choisit automatiquement la méthode optimale selon votre système.
-	L'installation nécessite <code>sudo</code>.</p> <div class="download-buttons"><a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/install.sh" download="install.sh"><button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button></a> <a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/detect_installation_method.sh" download="detect_installation_method.sh"><button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button></a></div> <div class="download-buttons" style="margin-top: 1em;"><a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/xkb_files_installer_clean.py" download="xkb_files_installer_clean.py"><button><i class="icon-linux"></i> Installateur Clean</button></a> <a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/xkb_files_installer_legacy.py" download="xkb_files_installer_legacy.py"><button><i class="icon-linux"></i> Installateur Legacy</button></a></div> <h3>Détails techniques de l'installation</h3> <h4>Méthode Clean (recommandée)</h4> <p>Voici un résumé de ce que réalise l'installateur Clean :</p> <ul><li><strong>Installation non invasive</strong> : crée un répertoire d'extension dans <code>/usr/share/xkeyboard-config.d/ergopti/</code> contenant les fichiers de définition du layout (symbols, types, règles). Cette méthode ne modifie
+	(version, variante) puis lance automatiquement l'installateur approprié. Deux méthodes
+	d'installation sont disponibles :</p> <ul><li><strong>Méthode "Clean"</strong> (recommandée) : installe la disposition dans un répertoire
+		d'extensions dédié (<code>/usr/share/xkeyboard-config.d/ergopti/</code>) sans modifier aucun
+		fichier système. Cette méthode nécessite <code>libxkbcommon</code> ≥ 1.13.0 et <code>xkeyboard-config</code> ≥ 2.45 (Arch et Fedora récentes la proposent).</li> <li><strong>Méthode "Legacy"</strong> : modifie directement les fichiers système XKB (<code>/usr/share/X11/xkb/</code>). Compatible avec toutes les versions, mais moins propre. C'est la méthode qui était utilisée
+		historiquement.</li></ul> <p>Le script de détection choisit automatiquement la méthode optimale selon votre système, puis
+	chacune de ses étapes affiche son résultat (plus rien n'est silencieux). Les couches Maj,
+	Verr Maj et AltGr sont fournies par un fichier de <em>types</em> désormais <strong>toujours
+	inclus</strong> : la couche raccourcis (<kbd>Ctrl</kbd>/<kbd>Alt</kbd>/<kbd>Win</kbd>) rend
+	la lettre de base Ergopti de chaque touche — et sur les touches sans lettre simple comme <kbd>é</kbd>, <kbd>à</kbd>, <kbd>ê</kbd>, elle rend respectivement <kbd-output>C</kbd-output>, <kbd-output>V</kbd-output>, <kbd-output>Z</kbd-output> pour garder Copier/Coller/Annuler sous les
+	doigts.
+	La réinstallation par-dessus une version précédente (y compris l'ancienne méthode) nettoie
+	automatiquement les restes de l'installation antérieure. Enfin, la variante « Ergopti++ » n'est
+	plus proposée à l'installation : elle sature la table XCompose ; utilisez Ergopti ou Ergopti+.</p> <p>Le script demande les droits <code>sudo</code>. Pour désinstaller :</p> <code style="display:inline-block; width:100%; padding:1em; text-align:left">branch="$main"; curl -fsSL
+	"https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh"
+	| BRANCH="$branch" bash -s -- --uninstall</code> <h4>Mode utilisateur (sans sudo)</h4> <p>Sur Wayland, vous pouvez installer la disposition dans votre home
+	(<code>~/.config/xkb</code>) sans aucun droit administrateur :</p> <code style="display:inline-block; width:100%; padding:1em; text-align:left">branch="$main"; curl -fsSL
+	"https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh"
+	| BRANCH="$branch" bash -s -- --user --variant ergopti_plus</code> <p>L'installeur accepte aussi <code>--version v2_2_1</code>, <code>--ansi</code> et le mode
+	totalement non interactif (<code>--yes --version … --variant …</code>) pour les installations
+	scriptées.</p> <h3 id="linux-faq">Questions fréquentes</h3> <ul><li><strong>La touche Maj ne fonctionne pas après une ancienne installation.</strong> Les versions
+		de l'installeur antérieures à juin 2026 pouvaient installer la disposition sans son fichier de
+		« types » — sans lui, aucune couche n'existe. Réinstallez avec la commande ci-dessus puis
+		reconnectez-vous : l'installation nettoie automatiquement les restes des anciennes versions.</li> <li><strong>Vos dispositions existantes sont-elles conservées ?</strong> Oui : l'activation ajoute
+		Ergopti à votre liste GNOME/KDE sans jamais retirer vos dispositions actuelles.</li></ul> <div class="download-buttons"><a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/install.sh" download="install.sh"><button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button></a> <a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/detect_installation_method.sh" download="detect_installation_method.sh"><button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button></a></div> <div class="download-buttons" style="margin-top: 1em;"><a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/xkb_files_installer_clean.py" download="xkb_files_installer_clean.py"><button><i class="icon-linux"></i> Installateur Clean</button></a> <a href="https://raw.githubusercontent.com/adrienm7/ergopti/main/static/ergopti/linux/xkb_installation/xkb_files_installer_legacy.py" download="xkb_files_installer_legacy.py"><button><i class="icon-linux"></i> Installateur Legacy</button></a></div> <h3>Détails techniques de l'installation</h3> <h4>Méthode Clean (recommandée)</h4> <p>Voici un résumé de ce que réalise l'installateur Clean :</p> <ul><li><strong>Installation non invasive</strong> : crée un répertoire d'extension dans <code>/usr/share/xkeyboard-config.d/ergopti/</code> contenant les fichiers de définition du layout (symbols, types, règles). Cette méthode ne modifie
 		aucun fichier système existant.</li> <li><strong>.XCompose</strong> : création (ou remplacement s'il existe déjà) du fichier <code>.XCompose</code> dans le home de l'utilisateur (<code>~/.XCompose</code>). Cela permet d'utiliser les touches
 		mortes ainsi que les sorties en plusieurs caractères, comme les ponctuations avec espaces
 		insécables automatiques.</li> <li><strong>Activation</strong> : le script tente d'appliquer la disposition via <code>setxkbmap</code> et de purger le cache XKB pour une application immédiate des changements.</li></ul> <h4>Méthode Legacy (compatibilité)</h4> <p>Voici un résumé de ce que réalise l'installateur Legacy :</p> <ul><li><strong>Sauvegarde</strong> : création d'une copie de sauvegarde pour chaque fichier modifié.
@@ -158,7 +175,7 @@
 			
 			<script>
 				{
-					__sveltekit_14687eb = {
+					__sveltekit_1hff4jg = {
 						base: new URL(".", location).pathname.slice(0, -1),
 						assets: "/dev"
 					};
@@ -166,8 +183,8 @@
 					const element = document.currentScript.parentElement;
 
 					Promise.all([
-						import("./_app/immutable/entry/start.Dl0mpne1.js"),
-						import("./_app/immutable/entry/app.e4Nr-dFY.js")
+						import("./_app/immutable/entry/start.D5Ka2hHZ.js"),
+						import("./_app/immutable/entry/app.Dze85tdM.js")
 					]).then(([kit, app]) => {
 						kit.start(app, element, {
 							node_ids: [0, 7],
