@@ -1,9 +1,9 @@
 ﻿; tests/meta/test_output_host_resolver_single_owner.ahk
 
 ; ==============================================================================
-; MODULE: Output Host Resolver Single-Owner Guard
+; MODULE: Output Host Resolver Ownership Guard
 ; DESCRIPTION:
-; Prevents functional output routing from regressing to KLHook.prev_app.
+; AHK-002 source contract: functional routing has one bounded foreground owner.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -18,23 +18,42 @@ _OHRSO_Count(Haystack, Needle) {
 	return Count
 }
 
-_OHRSO_NoFunctionalMetricsReads() {
-	Files := [
-		"infra\hotstrings\hotstring_dispatch.ahk",
-		"infra\hotstrings\hotstring_builder.ahk",
-		"infra\hotstrings\hotstring_send.ahk",
-		"modules\keymap\layout.ahk"
-	]
-	ResolverCalls := 0
-	for RelativePath in Files {
-		Src := ""
-		try Src := FileRead(A_ScriptDir . "\..\" . RelativePath, "UTF-8")
-		AssertTrue(Src != "", RelativePath . " must be readable")
-		AssertTrue(InStr(Src, "KLHook.prev_app", true) == 0,
-			RelativePath . " must not route functional output through metrics state")
-		ResolverCalls += _OHRSO_Count(Src, "OutputHostResolve()")
-	}
-	AssertTrue(ResolverCalls >= 4,
-		"all four audited functional routing sites must use the canonical resolver")
+_OHRSO_NoFunctionalMetricsReaders() {
+	AllSource := _DriverSourceNoComments()
+	Allowed := _StripFullLineComments(
+		_DriverDirConcat("modules/keylogger") . "`n"
+		. _DriverDirConcat("infra/metrics"))
+	AssertTrue(AllSource != "" && Allowed != "",
+		"the guard must read both the full source and its nonempty allowance")
+	AssertEqual(_OHRSO_Count(Allowed, "KLHook.prev_app"),
+		_OHRSO_Count(AllSource, "KLHook.prev_app"),
+		"KLHook.prev_app must have no functional readers outside metrics/keylogger")
 }
-Test("output host: functional routing has one owner outside metrics", _OHRSO_NoFunctionalMetricsReads)
+Test("output host: metrics cache has no functional readers (ahk-002)",
+	_OHRSO_NoFunctionalMetricsReaders)
+
+_OHRSO_ResolverAndDispatchOwnBoundedReceipts() {
+	MetadataBody := _DriverFuncBody("_OutputHostReadMetadata")
+	TitleBody := _DriverFuncBody("_OutputHostReadTitle")
+	ValidBody := _DriverFuncBody("_OutputHostValidReceipt")
+	InvalidBody := _DriverFuncBody("_OutputHostInvalidReceipt")
+	ResolveBody := _DriverFuncBody("OutputHostResolve")
+	DispatchBody := _DriverFuncBody("HSE_DispatchMatch")
+	for Body in [MetadataBody, TitleBody, ValidBody, InvalidBody,
+			ResolveBody, DispatchBody]
+		AssertTrue(Body != "", "every audited production function must be readable")
+	AssertEqual(0, _OHRSO_Count(MetadataBody, "WinGetTitle("),
+		"cached metadata must exclude mutable window titles")
+	AssertTrue(InStr(TitleBody, "_WIReadTitleBounded(") > 0,
+		"title routing must delegate to the bounded WindowInfo primitive")
+	AssertTrue(InStr(ValidBody, '"Valid", true') > 0
+		&& InStr(InvalidBody, '"Valid", false') > 0
+		&& InStr(ResolveBody, '"focus_changed"') > 0,
+		"the resolver must publish a typed receipt and reject mixed identities")
+	AssertEqual(1, _OHRSO_Count(DispatchBody, "OutputHostResolve(true)"),
+		"one dispatch must acquire exactly one title-bearing receipt")
+	AssertEqual(0, _OHRSO_Count(DispatchBody, "HostSnapshot"),
+		"terminal ownership must reuse the dispatch receipt")
+}
+Test("output host: resolver and dispatch own one bounded receipt (ahk-002)",
+	_OHRSO_ResolverAndDispatchOwnBoundedReceipts)

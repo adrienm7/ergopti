@@ -761,7 +761,11 @@ _UIA_SelectionPollTick() {
 		and !IsObject(_UIA_SelectionCache))
 		return
 	ProcName := ""
-	try ProcName := OutputHostResolve()["Exe"]
+	try {
+		Host := OutputHostResolve()
+		if Host["Valid"]
+			ProcName := Host["Exe"]
+	}
 	if (ProcName == "" or ProcName == "Code.exe") {
 		_UIA_SelectionCache := 0
 		return

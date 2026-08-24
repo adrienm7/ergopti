@@ -341,8 +341,92 @@ _AHK04_NotepadPreservesSendMode() {
 
 
 
+; ======================================================
+; ===== 1.3) AHK-002 functional host ownership ========
+; ======================================================
+
+_AHK002_MetricsOffNotepadUsesClipboardImpl() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer
+	global _AHK04_SendCalls, _OHR_IdentityReads
+	MetricsShortcuts.enabled := false
+	KLHook.prev_app := ""
+	_OHR_Reset("notepad.exe", 1401, 2401, "Untitled - Notepad")
+	HSE_Buffer := "ab"
+	HSE_StartIsWordBoundary := true
+	_PrefixBuffer := "ab"
+	_AHK04_SetSendVerdict(true)
+
+	AssertTrue(HSE_DispatchMatch(_AHK04_NormalSpec(), ""),
+		"metrics-off Notepad must still publish a real expansion")
+	AssertEqual(1, _AHK04_SendCalls.Length)
+	AssertEqual("SendInstant", _AHK04_SendCalls[1].Name,
+		"the exact output-host receipt must select the Notepad clipboard route")
+	AssertEqual(2, _OHR_IdentityReads,
+		"sender selection must acquire one initial/final foreground receipt")
+}
+
+_AHK002_MetricsOffNotepadUsesClipboard() {
+	SavedEnabled := MetricsShortcuts.enabled
+	try _AHK04_RunIsolated(_AHK002_MetricsOffNotepadUsesClipboardImpl)
+	finally {
+		MetricsShortcuts.enabled := SavedEnabled
+		_Stub_SetOutputHost("test.exe", "Test App")
+	}
+}
+Test("output host: metrics-off Notepad uses clipboard (ahk-002)",
+	_AHK002_MetricsOffNotepadUsesClipboard)
+
+_AHK002_StableCodeWindowBecomesTerminalImpl() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer
+	global _AHK04_SendCalls, _OHR_IdentityReads
+	global _HSE_TerminalOwner, _PrefixInputContextGeneration
+	MetricsShortcuts.enabled := false
+	KLHook.prev_app := ""
+	_OHR_Reset("Code.exe", 1501, 2501, "Codebuff")
+	HSE_Buffer := "ab"
+	HSE_StartIsWordBoundary := true
+	_PrefixBuffer := "ab"
+	_AHK04_SetSendVerdict(true)
+
+	AssertTrue(HSE_DispatchMatch(_AHK04_NormalSpec(), ""),
+		"the fresh Codebuff title must select the terminal transaction")
+	AssertTrue(_HSE_TerminalOwner is Map,
+		"terminal routing must publish a deferred transaction owner")
+	AssertEqual(0, _AHK04_SendCalls.Length,
+		"classification must not execute the deferred sender inline")
+	AssertEqual(2, _OHR_IdentityReads,
+		"classification and owner creation must reuse one foreground receipt")
+
+	SavedGeneration := _PrefixInputContextGeneration
+	try {
+		_PrefixInputContextGeneration += 1
+		PreviousCritical := Critical("Off")
+		try Sleep(_HSE_TerminalOwner["DelayMs"] + 30)
+		finally Critical(PreviousCritical)
+		AssertFalse(_HSE_TerminalOwner is Map,
+			"the deliberately invalidated fixture owner must clean itself up")
+		AssertEqual(0, _AHK04_SendCalls.Length,
+			"the invalidated owner must emit no terminal output")
+	} finally {
+		_PrefixInputContextGeneration := SavedGeneration
+	}
+}
+
+_AHK002_StableCodeWindowBecomesTerminal() {
+	SavedEnabled := MetricsShortcuts.enabled
+	try _AHK04_RunIsolated(_AHK002_StableCodeWindowBecomesTerminalImpl)
+	finally {
+		MetricsShortcuts.enabled := SavedEnabled
+		_Stub_SetOutputHost("test.exe", "Test App")
+	}
+}
+Test("output host: same Code window can become terminal (ahk-002)",
+	_AHK002_StableCodeWindowBecomesTerminal)
+
+
+
 ; ==========================================
-; ===== 1.3) Raw callback transactions =====
+; ===== 1.4) Raw callback transactions =====
 ; ==========================================
 
 _AHK04_EllipsisRawCallback(*) {

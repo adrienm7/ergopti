@@ -20,91 +20,208 @@
 ; =======================================
 ; =======================================
 
-; Functional output routing must never depend on the optional metrics snapshot: it is
-; an optional metrics snapshot and can be empty or one foreground transition
-; behind. This resolver owns a cache only while the exact foreground HWND/PID
-; pair remains current. Tests can inject the two probes without teaching
-; production callers about the keylogger.
+; Functional routing owns its foreground receipt. Process/class metadata is
+; cacheable only for one exact HWND/PID; the title is deliberately not cached
+; because one editor window can become a terminal surface without changing
+; identity. The final identity probe prevents an A-metadata/B-focus mixture.
 global _OUTPUT_HOST_CACHE := 0
 global _OUTPUT_HOST_IDENTITY_PROBE := 0
 global _OUTPUT_HOST_METADATA_PROBE := 0
+global _OUTPUT_HOST_TITLE_PROBE := 0
+global _OUTPUT_HOST_RESOLVE_SERIAL := 0
 
-OutputHostResolverConfigure(IdentityProbe := 0, MetadataProbe := 0) {
-	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE, _OUTPUT_HOST_METADATA_PROBE
+OutputHostResolverConfigure(IdentityProbe := 0, MetadataProbe := 0,
+		TitleProbe := 0) {
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE
+	global _OUTPUT_HOST_METADATA_PROBE, _OUTPUT_HOST_TITLE_PROBE
+	global _OUTPUT_HOST_RESOLVE_SERIAL
 	_OUTPUT_HOST_CACHE := 0
 	_OUTPUT_HOST_IDENTITY_PROBE := IdentityProbe
 	_OUTPUT_HOST_METADATA_PROBE := MetadataProbe
+	_OUTPUT_HOST_TITLE_PROBE := TitleProbe
+	_OUTPUT_HOST_RESOLVE_SERIAL += 1
 }
 
 _OutputHostForegroundIdentity() {
-	Hwnd := DllCall("GetForegroundWindow", "ptr")
+	Hwnd := WIGetForegroundHwnd()
 	if !Hwnd
 		return Map("Hwnd", 0, "Pid", 0)
-	Pid := WinGetPID("ahk_id " . Hwnd)
+	Pid := 0
+	ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd,
+		"UInt*", &Pid, "UInt")
+	if !ThreadId || !Pid
+		return Map("Hwnd", 0, "Pid", 0)
 	return Map("Hwnd", Hwnd, "Pid", Pid)
 }
 
 _OutputHostReadMetadata(Hwnd, Pid) {
-	Target := "ahk_id " . Hwnd
+	Identity := _WIReadProcessIdentityLocal(Hwnd)
+	if !IsObject(Identity) || Identity.process_id != Pid
+		throw Error("foreground process identity changed")
+	ClassName := _WIReadClassNameLocal(Hwnd)
+	if !(ClassName is String) || ClassName == ""
+		throw Error("foreground class unavailable")
+	return Map("Exe", Identity.name, "Class", ClassName)
+}
+
+_OutputHostReadTitle(Hwnd, Pid) {
+	Result := _WIReadTitleBounded(Hwnd, WI_FOCUS_TITLE_TIMEOUT_MS)
+	return Map("Ok", Result.ok, "Title", Result.title,
+		"TimedOut", Result.timed_out)
+}
+
+_OutputHostInvalidReceipt(Failure, Hwnd := 0, Pid := 0,
+		TimedOut := false) {
 	return Map(
-		"Exe", WinGetProcessName(Target),
-		"Class", WinGetClass(Target),
-		"Title", WinGetTitle(Target)
+		"Valid", false, "Failure", Failure, "TimedOut", TimedOut,
+		"Hwnd", Hwnd, "Pid", Pid,
+		"Exe", "", "Class", "", "Title", ""
 	)
 }
 
-OutputHostResolve() {
-	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE, _OUTPUT_HOST_METADATA_PROBE
+_OutputHostReject(Failure, Hwnd := 0, Pid := 0, TimedOut := false) {
+	static LastFailure := ""
+	static LastAt := 0
+	Now := A_TickCount
+	Elapsed := LastAt == 0 ? 0xFFFFFFFF : ((Now - LastAt) & 0xFFFFFFFF)
+	if (Failure != LastFailure || Elapsed >= 60000) {
+		LastFailure := Failure
+		LastAt := Now
+		try LoggerWarn("OutputHost",
+			"Foreground output-host receipt rejected ({1}).", Failure)
+	}
+	return _OutputHostInvalidReceipt(Failure, Hwnd, Pid, TimedOut)
+}
+
+_OutputHostValidReceipt(Hwnd, Pid, Exe, ClassName, Title := "") {
+	return Map(
+		"Valid", true, "Failure", "", "TimedOut", false,
+		"Hwnd", Hwnd, "Pid", Pid,
+		"Exe", Exe, "Class", ClassName, "Title", Title
+	)
+}
+
+_OutputHostProbeIdentity() {
+	global _OUTPUT_HOST_IDENTITY_PROBE
+	; MicrosoftApps() is a parse-time #HotIf criterion. Keep this leaf safe even
+	; when AHK evaluates it during the first message pump before module globals
+	; have been assigned.
+	if !IsSet(_OUTPUT_HOST_IDENTITY_PROBE)
+		return Map("Hwnd", 0, "Pid", 0)
+	Identity := HasMethod(_OUTPUT_HOST_IDENTITY_PROBE, "Call")
+		? _OUTPUT_HOST_IDENTITY_PROBE.Call() : _OutputHostForegroundIdentity()
+	if !(Identity is Map) || !Identity.Has("Hwnd") || !Identity.Has("Pid")
+		return Map("Hwnd", 0, "Pid", 0)
+	Hwnd := Identity["Hwnd"]
+	Pid := Identity["Pid"]
+	if !(Hwnd is Integer) || Hwnd <= 0 || !(Pid is Integer) || Pid <= 0
+		return Map("Hwnd", 0, "Pid", 0)
+	return Map("Hwnd", Hwnd, "Pid", Pid)
+}
+
+_OutputHostNormalizeTitle(Result) {
+	if (Result is String)
+		return Map("Ok", true, "Title", Result, "TimedOut", false)
+	if !(Result is Map)
+		return Map("Ok", false, "Title", "", "TimedOut", false)
+	Title := Result.Get("Title", "")
+	Ok := Result.Get("Ok", Result.Has("Title"))
+	TimedOut := Result.Get("TimedOut", false)
+	return Map(
+		"Ok", (Ok is Integer) && Ok && (Title is String),
+		"Title", (Title is String) ? Title : "",
+		"TimedOut", (TimedOut is Integer) && TimedOut
+	)
+}
+
+OutputHostResolve(RequireTitle := false) {
+	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE
+	global _OUTPUT_HOST_METADATA_PROBE, _OUTPUT_HOST_TITLE_PROBE
+	global _OUTPUT_HOST_RESOLVE_SERIAL
 	; MicrosoftApps() is a parse-time #HotIf criterion and reaches this resolver
 	; during Bundle_Init's first message pump, before these module globals exist.
 	if (!IsSet(_OUTPUT_HOST_CACHE) || !IsSet(_OUTPUT_HOST_IDENTITY_PROBE)
-			|| !IsSet(_OUTPUT_HOST_METADATA_PROBE))
-		return Map("Hwnd", 0, "Pid", 0, "Exe", "", "Class", "", "Title", "")
-	try Identity := HasMethod(_OUTPUT_HOST_IDENTITY_PROBE, "Call")
-		? _OUTPUT_HOST_IDENTITY_PROBE.Call() : _OutputHostForegroundIdentity()
-	catch as Err {
-		try LoggerWarn("OutputHost", "Foreground identity probe failed: {1}", Err.Message)
-		_OUTPUT_HOST_CACHE := 0
-		return Map("Hwnd", 0, "Pid", 0, "Exe", "", "Class", "", "Title", "")
+			|| !IsSet(_OUTPUT_HOST_METADATA_PROBE)
+			|| !IsSet(_OUTPUT_HOST_TITLE_PROBE)
+			|| !IsSet(_OUTPUT_HOST_RESOLVE_SERIAL))
+		return _OutputHostInvalidReceipt("not_initialized")
+
+	Serial := ++_OUTPUT_HOST_RESOLVE_SERIAL
+	try Identity := _OutputHostProbeIdentity()
+	catch {
+		return _OutputHostReject("identity_error")
 	}
-	if !(Identity is Map) || !Identity.Has("Hwnd") || !Identity.Has("Pid")
-			|| !Identity["Hwnd"] || !Identity["Pid"] {
-		_OUTPUT_HOST_CACHE := 0
-		return Map("Hwnd", 0, "Pid", 0, "Exe", "", "Class", "", "Title", "")
+	Hwnd := Identity["Hwnd"]
+	Pid := Identity["Pid"]
+	if !Hwnd || !Pid {
+		if (_OUTPUT_HOST_RESOLVE_SERIAL == Serial)
+			_OUTPUT_HOST_CACHE := 0
+		return _OutputHostReject("identity_unavailable")
 	}
+
 	if (_OUTPUT_HOST_CACHE is Map
-			&& _OUTPUT_HOST_CACHE["Hwnd"] == Identity["Hwnd"]
-			&& _OUTPUT_HOST_CACHE["Pid"] == Identity["Pid"])
-		return _OUTPUT_HOST_CACHE
-	try Metadata := HasMethod(_OUTPUT_HOST_METADATA_PROBE, "Call")
-		? _OUTPUT_HOST_METADATA_PROBE.Call(Identity["Hwnd"], Identity["Pid"])
-		: _OutputHostReadMetadata(Identity["Hwnd"], Identity["Pid"])
-	catch as Err {
-		try LoggerWarn("OutputHost", "Foreground metadata probe failed: {1}", Err.Message)
-		_OUTPUT_HOST_CACHE := 0
-		return Map("Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
-			"Exe", "", "Class", "", "Title", "")
+			&& _OUTPUT_HOST_CACHE["Hwnd"] == Hwnd
+			&& _OUTPUT_HOST_CACHE["Pid"] == Pid) {
+		Candidate := _OUTPUT_HOST_CACHE
+	} else {
+		try Metadata := HasMethod(_OUTPUT_HOST_METADATA_PROBE, "Call")
+			? _OUTPUT_HOST_METADATA_PROBE.Call(Hwnd, Pid)
+			: _OutputHostReadMetadata(Hwnd, Pid)
+		catch {
+			if (_OUTPUT_HOST_RESOLVE_SERIAL == Serial)
+				_OUTPUT_HOST_CACHE := 0
+			return _OutputHostReject("metadata_error", Hwnd, Pid)
+		}
+		if !(Metadata is Map)
+				|| !(Metadata.Get("Exe", "") is String)
+				|| Metadata.Get("Exe", "") == ""
+				|| !(Metadata.Get("Class", "") is String)
+				|| Metadata.Get("Class", "") == ""
+			return _OutputHostReject("metadata_invalid", Hwnd, Pid)
+		Candidate := Map(
+			"Hwnd", Hwnd, "Pid", Pid,
+			"Exe", Metadata["Exe"], "Class", Metadata["Class"])
 	}
-	if !(Metadata is Map) || !Metadata.Has("Exe") {
-		_OUTPUT_HOST_CACHE := 0
-		return Map("Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
-			"Exe", "", "Class", "", "Title", "")
+
+	Title := ""
+	if RequireTitle {
+		try RawTitle := HasMethod(_OUTPUT_HOST_TITLE_PROBE, "Call")
+			? _OUTPUT_HOST_TITLE_PROBE.Call(Hwnd, Pid)
+			: _OutputHostReadTitle(Hwnd, Pid)
+		catch {
+			return _OutputHostReject("title_error", Hwnd, Pid)
+		}
+		TitleResult := _OutputHostNormalizeTitle(RawTitle)
+		if !TitleResult["Ok"]
+			return _OutputHostReject(
+				TitleResult["TimedOut"] ? "title_timeout" : "title_error",
+				Hwnd, Pid, TitleResult["TimedOut"])
+		Title := TitleResult["Title"]
 	}
-	_OUTPUT_HOST_CACHE := Map(
-		"Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
-		"Exe", Metadata["Exe"],
-		"Class", Metadata.Has("Class") ? Metadata["Class"] : "",
-		"Title", Metadata.Has("Title") ? Metadata["Title"] : ""
-	)
-	return _OUTPUT_HOST_CACHE
+
+	try FinalIdentity := _OutputHostProbeIdentity()
+	catch {
+		return _OutputHostReject("identity_error", Hwnd, Pid)
+	}
+	if (FinalIdentity["Hwnd"] != Hwnd || FinalIdentity["Pid"] != Pid) {
+		if (_OUTPUT_HOST_RESOLVE_SERIAL == Serial)
+			_OUTPUT_HOST_CACHE := 0
+		return _OutputHostReject("focus_changed", Hwnd, Pid)
+	}
+	if (_OUTPUT_HOST_RESOLVE_SERIAL != Serial)
+		return _OutputHostReject("superseded", Hwnd, Pid)
+
+	_OUTPUT_HOST_CACHE := Candidate
+	return _OutputHostValidReceipt(
+		Hwnd, Pid, Candidate["Exe"], Candidate["Class"], Title)
 }
 
-OutputHostResolverPrimeForTest(Exe, Title := "", ClassName := "") {
+OutputHostResolverPrimeForTest(Exe, ClassName := "fixture") {
 	global _OUTPUT_HOST_CACHE, _OUTPUT_HOST_IDENTITY_PROBE
 	Identity := HasMethod(_OUTPUT_HOST_IDENTITY_PROBE, "Call")
 		? _OUTPUT_HOST_IDENTITY_PROBE.Call() : _OutputHostForegroundIdentity()
 	_OUTPUT_HOST_CACHE := Map("Hwnd", Identity["Hwnd"], "Pid", Identity["Pid"],
-		"Exe", Exe, "Class", ClassName, "Title", Title)
+		"Exe", Exe, "Class", ClassName)
 }
 
 ; Internal — the production-lean registration path used by every CreateHotstring
@@ -673,8 +790,8 @@ global MICROSOFT_OFFICE_EXES := Map(
 
 MicrosoftApps() {
 		try {
-				exe := OutputHostResolve()["Exe"]
-				return MICROSOFT_OFFICE_EXES.Has(exe)
+				Host := OutputHostResolve()
+				return Host["Valid"] && MICROSOFT_OFFICE_EXES.Has(Host["Exe"])
 		}
 		return false
 }
