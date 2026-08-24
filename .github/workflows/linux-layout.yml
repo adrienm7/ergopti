@@ -38,19 +38,24 @@ jobs:
       # Repository contract: LF everywhere, UTF-8 BOM reserved to AutoHotkey
       # sources. A stray BOM makes Lua modules fail to load ("unexpected
       # symbol") on POSIX runners while staying invisible on Windows.
+      #
+      # Exclusions: historical corpus texts are data, not code; .gitkeep
+      # placeholders inside committed bundle fixtures must stay byte-stable.
       - name: Reject UTF-8 BOM in tracked non-AHK text files
         run: |
           bad=""
-          while IFS= read -r f; do
+          while IFS= read -r -d '' f; do
             case "$f" in
               *.ahk) continue ;;
+              static/corpus/original/*) continue ;;
+              *.gitkeep) continue ;;
             esac
             if [ "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
               bad="$bad$f\n"
             fi
-          done < <(git ls-files)
+          done < <(git -c core.quotepath=off ls-files -z)
           if [ -n "$bad" ]; then
-            echo "::error::UTF-8 BOM detected in:$bad"
+            printf '::error::UTF-8 BOM detected in:%b' "$bad"
             exit 1
           fi
 
