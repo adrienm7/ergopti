@@ -195,7 +195,8 @@ LLM_Menu_OnInstantToggle(*) {
  */
 LLM_Menu_ToggleBool(key) {
 	global _LLM_Menu
-	if (key == "streaming" && !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"])
+	if (key == "streaming"
+			&& !LLM_EffectiveStreaming(_LLM_Menu["backend"], true))
 		return false
 	return LLM_Menu_CommitMutation("the LLM '" . key . "' setting",
 		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, key),
@@ -221,8 +222,8 @@ LLM_Menu_SetBackend(id) {
 _LLM_Menu_ApplyBackendCommitted(Candidate) {
 	LLM_Menu_BackendLifecycleInvalidate(true)
 	try LLM_Engine_StopGeneration()
-	if !LLM_BackendCapabilities(Candidate["backend"])["streaming"]
-		Candidate["streaming"] := false
+	Candidate["streaming"] := LLM_EffectiveStreaming(
+		Candidate["backend"], Candidate["streaming"])
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
 	LLM_Menu_RequestBuild("backend_committed")
 	if Candidate["enabled"]

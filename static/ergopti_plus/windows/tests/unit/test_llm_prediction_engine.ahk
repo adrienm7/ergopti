@@ -84,6 +84,90 @@ _EngineInit_LanguageOptsOverride() {
 Test("LLM_Engine_Init: explicit opts language overrides the locale default", _EngineInit_LanguageOptsOverride)
 
 
+_AHK011_EngineInitPublishesEffectiveStreaming() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		for Backend in ["ollama", "api"] {
+			LLM_Engine_Init(Map("backend", Backend, "streaming", true))
+			AssertFalse(_LLM_Engine["streaming"],
+				Backend . " must not publish an enabled runtime setting while its "
+				. "backend has no supported streaming transport")
+		}
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("AHK-011: engine admission publishes only effective streaming",
+	_AHK011_EngineInitPublishesEffectiveStreaming)
+
+
+_AHK011_DispatchFixture(ShowAllAtOnce) {
+	global _LLM_Engine
+	return Map(
+		"ctx", "bonjour",
+		"request_id", _LLM_Engine["request_id"],
+		"semantic_signature", _LLM_Engine["active_request_signature"],
+		"slots", ["premiere"],
+		"requested", 2,
+		"attempt_index", 2,
+		"max_attempts", 4,
+		"base_temp", 0.1,
+		"dispatch_fn", (Temp, OnSuccess, OnFail) => 0,
+		"dispatch_stream_fn", "",
+		"streaming", false,
+		"show_all_at_once", ShowAllAtOnce)
+}
+
+
+_AHK011_AllAtOnceSuppressesEveryIntermediateFrame() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedCalls := _Stub_LlmTooltipCalls
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		_LLM_Engine["request_id"] := 11011
+		_LLM_Engine["active_request_signature"] := "ahk-011"
+		_Stub_LlmTooltipCalls := []
+		_LLM_Engine_DispatchVariant(_AHK011_DispatchFixture(true))
+		AssertEqual(0, _Stub_LlmTooltipCalls.Length,
+			"show_all_at_once must suppress the sibling preview emitted while "
+			. "the next sequential variant is dispatched")
+	} finally {
+		_LLM_Engine := SavedEngine
+		_Stub_LlmTooltipCalls := SavedCalls
+	}
+}
+Test("AHK-011: show-all-at-once suppresses every intermediate frame",
+	_AHK011_AllAtOnceSuppressesEveryIntermediateFrame)
+
+
+_AHK011_ProgressiveModeStillPaintsIntermediateFrame() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedCalls := _Stub_LlmTooltipCalls
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		_LLM_Engine["request_id"] := 11012
+		_LLM_Engine["active_request_signature"] := "ahk-011-control"
+		_Stub_LlmTooltipCalls := []
+		_LLM_Engine_DispatchVariant(_AHK011_DispatchFixture(false))
+		AssertEqual(1, _Stub_LlmTooltipCalls.Length,
+			"the progressive control must still publish one intermediate frame")
+		AssertFalse(_Stub_LlmTooltipCalls[1].is_final,
+			"the control frame must remain explicitly intermediate")
+		AssertEqual("premiere", _Stub_LlmTooltipCalls[1].slots[1],
+			"the progressive frame must carry the accumulated real slot")
+	} finally {
+		_LLM_Engine := SavedEngine
+		_Stub_LlmTooltipCalls := SavedCalls
+	}
+}
+Test("AHK-011: progressive mode retains its intermediate frame control",
+	_AHK011_ProgressiveModeStillPaintsIntermediateFrame)
+
+
 _LLM_TooltipVanishOnAccept() {
     global _TooltipDequeueActive
     _TooltipDequeueActive := true

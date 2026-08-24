@@ -126,6 +126,10 @@ LLM_BackendCapabilities(Backend) {
 	return Map("streaming", false)
 }
 
+LLM_EffectiveStreaming(Backend, Requested) {
+	return !!Requested && LLM_BackendCapabilities(Backend)["streaming"]
+}
+
 global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
 	"debounce_ms",
 	"instant_on_word_end",
@@ -426,6 +430,13 @@ LLM_Engine_Init(opts) {
 		for _, k in _keys
 			if ValidatedOpts.Has(k)
 				_LLM_Engine[k] := ValidatedOpts[k]
+
+		; The runtime publishes the effective capability, not a requested flag
+		; which every backend branch would later override. This keeps engine,
+		; menu, persistence, and dispatch on one truthful value.
+		_LLM_Engine["streaming"] := LLM_EffectiveStreaming(
+			_LLM_Engine.Get("backend", "ollama"),
+			_LLM_Engine.Get("streaming", false))
 
 		; The prediction language follows the active UI locale (the i18n single source
 		; of truth, infra/i18n.ahk) instead of a hardcoded "fr", so a user typing in their

@@ -432,11 +432,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	log_model := ""
 	dispatch_fn := ""
 	dispatch_stream_fn := ""
-	streaming_enabled := _LLM_Engine.Has("streaming") and _LLM_Engine["streaming"]
-	; Windows curl streaming is not reliable yet (logs: empty stdout / No stdout
-	; file). WinHTTP async matches macOS behaviour and completes on this driver.
-	if (backend == "ollama")
-		streaming_enabled := false
+	streaming_enabled := LLM_EffectiveStreaming(backend,
+		_LLM_Engine.Has("streaming") and _LLM_Engine["streaming"])
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "") {
@@ -449,9 +446,6 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
 			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens)
-		; No remote-streaming dispatcher — disable streaming for the API
-		; backend so the engine falls back to the async non-streaming path.
-		streaming_enabled := false
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -714,7 +708,8 @@ _LLM_Engine_DispatchVariant(state) {
 			break
 		}
 	}
-	if has_real_slot {
+	if (has_real_slot
+			and !(state.Has("show_all_at_once") and state["show_all_at_once"])) {
 		active_idx := 1
 		for i, s in preview_slots {
 			if (s != "" and s != LLM_TOOLTIP_PLACEHOLDER) {

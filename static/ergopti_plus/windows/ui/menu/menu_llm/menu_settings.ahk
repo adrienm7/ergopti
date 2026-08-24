@@ -295,8 +295,8 @@ _LLM_Menu_DisplayRows() {
 	; (multi) is enabled
 	Rows.Push(Map(
 "label",    t("menu.llm.show_streaming"),
-"checked",  _LLM_Menu["streaming"] && LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"],
-"disabled", !_LLM_Menu["show_all_at_once"] || !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"],
+"checked",  LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
+"disabled", !_LLM_Menu["show_all_at_once"] || !LLM_EffectiveStreaming(_LLM_Menu["backend"], true),
 		"action",   (*) => LLM_Menu_ToggleBool("streaming")))
 
 	; Show all predictions at once

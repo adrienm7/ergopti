@@ -77,6 +77,8 @@ _LLM_Menu_SyncToFeatures(FeaturesTarget := 0, MenuState := 0) {
 		}
 		Validated[Key] := Normalized
 	}
+	Validated["streaming"] := LLM_EffectiveStreaming(
+		Validated["backend"], Validated["streaming"])
 	ValModifiers := _LLM_Menu_ModifiersStringToArray(Validated["val_modifiers"])
 	if !(ValModifiers is Array) {
 		try LoggerError("LLM",

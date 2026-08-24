@@ -80,8 +80,8 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 			try LoggerError("LLM",
 				"Ignoring persisted '{1}' because it is not a Boolean.", key)
 	}
-	if !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"]
-		_LLM_Menu["streaming"] := false
+	_LLM_Menu["streaming"] := LLM_EffectiveStreaming(
+		_LLM_Menu["backend"], _LLM_Menu["streaming"])
 	for key in _arr_keys {
 		if !saved_opts.Has(key)
 			continue
