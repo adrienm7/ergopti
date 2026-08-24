@@ -81,6 +81,20 @@ _LLM_OllamaDeleteTerminalOk(ExitCode, HttpStatus, BodyRead, Body) {
 	return ExitCode = 0 and HttpStatus >= 200 and HttpStatus < 300 and BodyRead
 }
 
+_LLM_OllamaFinishDelete(Terminal, tag, on_result, SuccessFn := LoggerSuccess, WarnFn := LoggerWarn) {
+	ok := _LLM_OllamaDeleteTerminalOk(
+		Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
+	try {
+		if ok
+			SuccessFn.Call("LLM.ollama", "Deleted Ollama model '{1}'.", tag)
+		else
+			WarnFn.Call("LLM.ollama", "Ollama delete '{1}' failed (exit={2}, status={3}, body_chars={4}).",
+				tag, Terminal["exit"], Terminal["status"], StrLen(Terminal["body"]))
+	}
+	_LLM_InvokeCallback(on_result, "on_result", ok)
+	return ok
+}
+
 /**
  * Sends a JSON body via WinHTTP. Async ``Open(..., true)`` rejects ADODB binary
  * SafeArrays (hard failure / E_NOINTERFACE); sync mode tolerated them but the
@@ -177,9 +191,8 @@ LLM_OllamaIsRunning_Async(on_result) {
 
 /**
  * Polls a reachability-ping curl child WITHOUT blocking the message loop. Reachable
- * iff curl exited having written a non-empty body (GET /api/version → 200 + JSON);
- * a connection refusal / timeout exits non-zero with an empty file. Mirrors the
- * non-streaming generation poll (_LLM_Ollama_PollCurl), scaled down for a tiny ping.
+ * requires a successful curl exit, 2xx status, readable body, and the canonical
+ * ``GET /api/version`` JSON schema. Mirrors the generation poll at a shorter bound.
  * @param {integer}  pid        - curl child PID (0 if Run failed).
  * @param {string}   tmp_out    - Temp file curl writes the response body to.
  * @param {function} on_result  - Callback receiving the boolean reachability.
@@ -225,10 +238,15 @@ _LLM_Ollama_PingPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, 
  */
 _LLM_Ollama_ParseTagNames(raw) {
 	models := []
-	pos := 1
-	while (RegExMatch(raw, '"name"\s*:\s*"([^"]+)"', &m, pos)) {
-		models.Push(m[1])
-		pos := m.Pos + m.Len
+	try Root := JsonParse(raw)
+	catch
+		return models
+	if !(Root is Map) or !Root.Has("models") or !(Root["models"] is Array)
+		return models
+	for Row in Root["models"] {
+		if !(Row is Map) or !Row.Has("name") or Type(Row["name"]) != "String" or Row["name"] == ""
+			continue
+		models.Push(Row["name"])
 	}
 	return models
 }
@@ -438,15 +456,7 @@ _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tmp_status, tmp_exit, tag, on_
 	try FSDelete(tmp_payload)
 	for Path in [tmp_out, tmp_status, tmp_exit]
 		try FSDelete(Path)
-	ok := _LLM_OllamaDeleteTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
 	if owner_generation != LLM_AuxGeneration()
 		return
-	try {
-		if (ok)
-			LoggerSuccess("LLM.ollama", "Deleted Ollama model '{1}'.", tag)
-		else
-			LoggerWarn("LLM.ollama", "Ollama delete '{1}' failed (exit={2}, status={3}): {4}.",
-				tag, Terminal["exit"], Terminal["status"], Terminal["body"])
-	}
-	_LLM_InvokeCallback(on_result, "on_result", ok)
+	_LLM_OllamaFinishDelete(Terminal, tag, on_result)
 }

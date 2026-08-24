@@ -68,6 +68,10 @@ _MetaCheckInstalledTagsNonBlocking() {
 	Assert(PollBody != "", "api_ollama.ahk must define _LLM_Ollama_TagsPoll()")
 	Assert(InStr(PollBody, "ProcessExist("),
 		"_LLM_Ollama_TagsPoll must poll the curl child via ProcessExist (non-blocking)")
+	Assert(InStr(PollBody, "_LLM_CurlReadTerminal(") > 0
+		and InStr(PollBody, "_LLM_CurlTerminalOk(") > 0
+		and InStr(PollBody, "_LLM_Ollama_ParseTagNames(") > 0,
+		"the tags poll must require typed terminal evidence before parsing the canonical models array")
 
 	; (3) The blocking list call survives ONLY in the sanctioned off-hot-path warm.
 	WarmBody := _DriverFuncBody("_LLM_WarmInstalledTagsSync")
