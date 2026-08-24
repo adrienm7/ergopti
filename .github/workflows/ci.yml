@@ -211,9 +211,12 @@ jobs:
 
       - name: Run unit + meta tests
         working-directory: static/ergopti_plus/macos
-        # Wrapped in the unified reporter: streams output unchanged, exits with the
-        # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
-        # summary on failure. report.cjs lives at the repo root tools/.
+        # The focused-runner regression tests spawn child interpreters; pin
+        # the same binary as this job so runner-image defaults (which may
+        # resolve bare `lua` to an interpreter without package.searchpath)
+        # cannot change semantics under us.
+        env:
+          LUA: lua5.4
         run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
 
   # ─────────────────────────────────────────────────
