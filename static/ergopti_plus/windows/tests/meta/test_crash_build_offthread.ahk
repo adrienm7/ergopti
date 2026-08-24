@@ -1,39 +1,52 @@
 ﻿; tests/meta/test_crash_build_offthread.ahk
 
 ; ==============================================================================
-; MODULE: Crash-Report Build Off-Thread Meta Test
+; MODULE: Crash Report Process Isolation Meta Test
 ; DESCRIPTION:
-; Static source guard for finding crash-build-offthread (F-H06).
-;
-; ErgoptiGlobalErrorHandler ran CrashReport_Build + CrashReport_PromptUser inline.
-; CrashReport_Build does a WMI ConnectServer + RegRead + a git subprocess Sleep-poll
-; + a full healthcheck adapter re-validation — ~100-500 ms of blocking work. The
-; handler can fire mid-keystroke (OnError, or HookDispatcher's per-subscriber catch
-; on the keyboard thread), so this froze the keyboard on the first error per
-; signature. The already-fixed HIGH-02 crash MsgBox was the documented sibling; the
-; sysinfo collection was the missed one. The fix keeps the cheap modifier-release +
-; LoggerError synchronous and defers the build/prompt via a one-shot SetTimer.
-;
-; Meta-static: asserts the handler defers via SetTimer and no longer calls
-; CrashReport_Build inline.
+; Guards the parent-side boundary for AHK-005. A SetTimer is only another AHK
+; logical thread, so the deferred callback must launch the retained mapping
+; worker and must never reintroduce blocking diagnostic or payload work into the
+; resident interpreter.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 
-_CBOT_AssertDeferred() {
-	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(Body != "", "ErgoptiGlobalErrorHandler must exist")
-	Assert(InStr(Body, "SetTimer") > 0,
-		"ErgoptiGlobalErrorHandler must defer the crash-report build via SetTimer so it never blocks the input/dispatch thread (crash-build-offthread)")
-	Assert(!InStr(Body, "CrashReport_Build("),
-		"ErgoptiGlobalErrorHandler must not call CrashReport_Build inline — defer it off the input thread (crash-build-offthread)")
-	Helper := _DriverFuncBody("_ErgoptiDeferredCrashReport")
-	Assert(Helper != "", "_ErgoptiDeferredCrashReport (the deferred worker) must exist")
-	Assert(InStr(Helper, "ShellRunner_Spawn(") > 0,
-		"_ErgoptiDeferredCrashReport must launch a real child-process worker")
-	for Forbidden in ["CrashReport_Build(", "HealthCheck_Run(", "ComObject(", "RegRead(", "Sleep(", "FileOpen("]
-		Assert(InStr(Helper, Forbidden) = 0,
-			"the deferred AHK timer must not perform blocking diagnostic work: " . Forbidden)
+
+
+
+; ================================================
+; ================================================
+; ======= 1/ Parent Process Boundary =============
+; ================================================
+; ================================================
+
+_CBPI_AssertIsolatedWorkerBoundary() {
+	Handler := _DriverFuncBody("ErgoptiGlobalErrorHandler")
+	Assert(Handler != "", "ErgoptiGlobalErrorHandler must exist")
+	Assert(InStr(Handler, "SetTimer(_ErgoptiDeferredCrashReport") > 0,
+		"the input-path handler must schedule only the cheap parent snapshot")
+	Assert(!InStr(Handler, "CrashReport_Build("),
+		"the input-path handler must not build diagnostics inline")
+
+	Deferred := _DriverFuncBody("_ErgoptiDeferredCrashReport")
+	Assert(Deferred != "", "_ErgoptiDeferredCrashReport must exist")
+	Assert(InStr(Deferred, "CrashReportWorker_Start(") > 0,
+		"the deferred parent callback must transfer ownership to the isolated worker adapter")
+	for Forbidden in [
+		"CrashReport_Build(", "HealthCheck_Run(", "ComObject(", "RegRead(",
+		"Sleep(", "FileOpen(", "CryptoBase64EncodeUtf8(", "ShellRunner_Spawn("
+	]
+		Assert(InStr(Deferred, Forbidden) = 0,
+			"the deferred parent callback must not perform blocking or command-line payload work: " . Forbidden)
+
+	StartBody := _DriverFuncBody("CrashReportWorker_Start")
+	Assert(StartBody != "", "CrashReportWorker_Start must exist")
+	Assert(InStr(StartBody, "_CrashReportWorkerCreateMapping(") > 0,
+		"the worker adapter must stage the payload in its bounded pagefile mapping")
+	Assert(InStr(StartBody, "_CrashReportWorkerFallbackArgs(") > 0,
+		"the worker adapter must retain an isolated minimal fallback")
 }
-Test("error-net: crash-report build is deferred off the input thread (crash-build-offthread)", _CBOT_AssertDeferred)
+
+Test("error-net: crash diagnostics cross an owned process boundary (ahk-005-crash-build-process-isolation)",
+	_CBPI_AssertIsolatedWorkerBoundary)

@@ -703,6 +703,7 @@ Ergopti_OnShutdown(reason, code) {
 		try KL_Stop()
 		try UIASW_Stop("canceled")
 		try LLM_NavEventOwner_Stop(false, true)
+		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
 		try OllamaWV_Close()

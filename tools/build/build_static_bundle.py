@@ -96,6 +96,10 @@ REQUIRED_ASSETS: tuple[tuple[str, str], ...] = (
 		"static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll",
 		"vendor/ergopti_nav_owner.dll",
 	),
+	(
+		"static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1",
+		"vendor/ergopti_crash_worker.ps1",
+	),
 )
 
 
@@ -133,7 +137,7 @@ def build_bundle(repo_root: Path, output: Path) -> int:
 		if not (repo_root / src_rel).is_file():
 			print(
 				f"[bundle] ERROR: required asset '{src_rel}' does not exist. "
-				"Run tools/build/build_windows_nav_owner.ps1 first.",
+				"Build or restore that runtime asset before bundling.",
 				file=sys.stderr,
 			)
 			return -1

@@ -201,6 +201,9 @@ InstallHotstringHooks()
 #Include ../adapters/mouse_control.ahk
 #Include ../adapters/graphics_renderer.ahk
 #Include ../adapters/shell_runner.ahk
+#Include ../adapters/crash_report_worker.ahk
+#Include ../modules/diagnostics/crash_reporter.ahk
+#Include ../infra/error_net.ahk
 #Include ../modules/keymap/uia_selection_worker.ahk
 ; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
@@ -1394,6 +1397,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_legacy_state_machine.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk
 #Include unit/test_shell_runner_tree_owned.ahk
+#Include unit/test_crash_report_worker_transport.ahk
 #Include unit/test_taphold_inherit_defaults_roundtrip.ahk
 #Include unit/test_taphold_synthetic_refcount_combo.ahk
 #Include unit/test_taphold_unreadable_blocks_rewrite.ahk

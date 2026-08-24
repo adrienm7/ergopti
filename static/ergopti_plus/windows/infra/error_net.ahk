@@ -188,43 +188,89 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		return true
 }
 
-global _CrashReportWorkerOwners := Map()
-global _CrashReportWorkerSerial := 0
-
-_CrashReport_EncodePowerShellCommand(Command) {
-	Bytes := Buffer(StrLen(Command) * 2, 0)
-	if Bytes.Size
-		DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", StrPtr(Command), "UPtr", Bytes.Size)
-	return CryptoBase64Encode(Bytes)
+_CrashReport_CheapAdapterState() {
+	Validated := []
+	Failed := []
+	try {
+		Specs := _HealthCheck_AdapterSpecs()
+		for AdapterId, RequiredFns in Specs {
+			Complete := true
+			for _, FnName in RequiredFns {
+				if !IsSet(%FnName%) or !((%FnName%) is Func) {
+					Complete := false
+					break
+				}
+			}
+			if Complete
+				Validated.Push(AdapterId)
+			else
+				Failed.Push(AdapterId . " (contract incomplete)")
+		}
+	}
+	return Map(
+		"validated", _CrashReport_JoinArr(Validated),
+		"failed", _CrashReport_JoinArr(Failed))
 }
 
-_CrashReport_WorkerSource() {
-	return '$ErrorActionPreference="Stop";'
-		. '$snapshot=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($args[0]))|ConvertFrom-Json;'
-		. '$snapshot|Add-Member os_name ([Environment]::OSVersion.VersionString) -Force;'
-		. '$snapshot|Add-Member os_arch $env:PROCESSOR_ARCHITECTURE -Force;'
-		. '$snapshot|Add-Member locale ([Globalization.CultureInfo]::CurrentCulture.Name) -Force;'
-		. '$os=Get-CimInstance Win32_OperatingSystem;'
-		. '$cpu=Get-CimInstance Win32_Processor|Select-Object -First 1;'
-		. '$snapshot|Add-Member os_build ([string]$os.BuildNumber) -Force;'
-		. '$snapshot|Add-Member cpu_name ([string]$cpu.Name) -Force;'
-		. '$snapshot|Add-Member cpu_cores ([string]$cpu.NumberOfLogicalProcessors) -Force;'
-		. '$snapshot|Add-Member ram_total_gb ([math]::Round($os.TotalVisibleMemorySize/1MB,2)) -Force;'
-		. '$snapshot|Add-Member ram_free_gb ([math]::Round($os.FreePhysicalMemory/1MB,2)) -Force;'
-		. '$dir=Join-Path $snapshot.config_dir "autohotkey\crash_reports";'
-		. '[IO.Directory]::CreateDirectory($dir)|Out-Null;'
-		. '$name="{0}_{1}.json" -f (Get-Date -Format "yyyy-MM-ddTHH-mm-ss"),[guid]::NewGuid().ToString("N");'
-		. '$path=Join-Path $dir $name;'
-		. '[IO.File]::WriteAllText($path,($snapshot|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false));'
-		. 'Write-Output ("OK:"+$path)'
+_CrashReport_CheapSnapshot(Exc) {
+	global _ConfigDir, _HealthCheckStartMs, _HealthCheckWarnCount, _HealthCheckErrCount
+
+	Version := "unknown"
+	try Version := Updater_CurrentVersion()
+	UptimeSec := -1
+	if IsSet(_HealthCheckStartMs)
+		UptimeSec := (A_TickCount - _HealthCheckStartMs & 0xFFFFFFFF) // 1000
+	ActiveWindowTitle := ""
+	ActiveWindowProcess := ""
+	try ActiveWindowTitle := WinGetTitle("A")
+	try ActiveWindowProcess := WinGetProcessName("A")
+	StuckMods := []
+	for _, ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
+		try {
+			if GetKeyState(ModKey, "P")
+				StuckMods.Push(ModKey)
+		}
+	}
+	KeyloggerInitialized := "unknown"
+	try KeyloggerInitialized := Keylogger.initialized ? "true" : "false"
+	AdapterState := _CrashReport_CheapAdapterState()
+	LogTail := ""
+	try LogTail := _CrashReport_JoinNewlines(LoggerRingBufferSnapshot())
+
+	return Map(
+		"version", Version, "driver", "autohotkey",
+		"timestamp", _CrashReport_IsoTimestamp(),
+		"error_type", Type(Exc),
+		"error_msg", Exc.HasProp("Message") ? Exc.Message : "",
+		"error_extra", Exc.HasProp("Extra") ? String(Exc.Extra) : "",
+		"error_what", Exc.HasProp("What") ? String(Exc.What) : "",
+		"error_file", Exc.HasProp("File") ? String(Exc.File) : "",
+		"error_line", Exc.HasProp("Line") ? String(Exc.Line) : "",
+		"stack_trace", Exc.HasProp("Stack") ? Exc.Stack : "",
+		"os_name", A_OSVersion, "os_build", "",
+		"os_arch", A_Is64bitOS ? "64 bits" : "32 bits",
+		"ahk_version", A_AhkVersion,
+		"ahk_bitness", A_PtrSize = 8 ? "64-bit" : "32-bit",
+		"cpu_name", "", "cpu_cores", "",
+		"ram_total_gb", "", "ram_free_gb", "",
+		"screen_resolution", A_ScreenWidth . "x" . A_ScreenHeight,
+		"dpi", String(A_ScreenDPI),
+		"dpi_scale", String(Round(A_ScreenDPI / 96 * 100)),
+		"locale", A_Language, "script_dir", A_ScriptDir, "git_hash", "",
+		"username_hash", _CrashReport_FoldHash(A_UserName),
+		"uptime_sec", String(UptimeSec),
+		"active_window_title", ActiveWindowTitle,
+		"active_window_process", ActiveWindowProcess,
+		"stuck_modifiers", StuckMods.Length ? _CrashReport_JoinArr(StuckMods) : "none",
+		"adapters_ok", AdapterState["validated"],
+		"adapters_failed", AdapterState["failed"],
+		"session_warnings", IsSet(_HealthCheckWarnCount) ? String(_HealthCheckWarnCount) : "unknown",
+		"session_errors", IsSet(_HealthCheckErrCount) ? String(_HealthCheckErrCount) : "unknown",
+		"keylogger_initialized", KeyloggerInitialized,
+		"config_dir", _ConfigDir, "log_tail", LogTail)
 }
 
-_CrashReport_WorkerDone(OwnerId, ReleaseDedup, ExitCode, Stdout, Stderr) {
-	global _CrashReportWorkerOwners
-	if !_CrashReportWorkerOwners.Has(OwnerId)
-		return
-	Owner := _CrashReportWorkerOwners[OwnerId]
-	_CrashReportWorkerOwners.Delete(OwnerId)
+_CrashReport_WorkerDone(ReleaseDedup, ExitCode, Stdout, Stderr) {
 	Text := Trim(Stdout . "`n" . Stderr)
 	if (ExitCode = 0 and RegExMatch(Text, "m)^OK:(.+)$", &Match)) {
 		try LoggerSuccess("CrashReporter", "Crash report saved by worker: {1}.", Match[1])
@@ -236,32 +282,14 @@ _CrashReport_WorkerDone(OwnerId, ReleaseDedup, ExitCode, Stdout, Stderr) {
 	try LoggerError("CrashReporter", "Crash-report worker failed (exit={1}): {2}.", ExitCode, Text)
 }
 
-; The timer only snapshots cheap in-memory state and starts a retained child.
-; WMI, JSON serialization and filesystem work execute in PowerShell, outside
-; AHK's cooperative scheduler and therefore outside the keyboard-hook thread.
+; The timer only snapshots cheap in-memory state, serializes that bounded Map,
+; and starts a retained child. WMI, subprocess probes, and filesystem work run
+; in PowerShell outside AHK's cooperative keyboard scheduler.
 _ErgoptiDeferredCrashReport(Exc, ReleaseDedup := 0) {
-	global _CrashReportWorkerOwners, _CrashReportWorkerSerial, _ConfigDir
 	try {
-		Snapshot := Map(
-			"version", Updater_CurrentVersion(), "driver", "autohotkey",
-			"timestamp", _CrashReport_IsoTimestamp(), "config_dir", _ConfigDir,
-			"error_type", Type(Exc),
-			"error_msg", Exc.HasProp("Message") ? Exc.Message : "",
-			"error_extra", Exc.HasProp("Extra") ? String(Exc.Extra) : "",
-			"error_what", Exc.HasProp("What") ? String(Exc.What) : "",
-			"error_file", Exc.HasProp("File") ? String(Exc.File) : "",
-			"error_line", Exc.HasProp("Line") ? String(Exc.Line) : "",
-			"stack_trace", Exc.HasProp("Stack") ? Exc.Stack : "",
-			"log_tail", _CrashReport_JoinNewlines(LoggerRingBufferSnapshot()))
-		Payload := CryptoBase64EncodeUtf8(_CrashReport_ToJson(Snapshot))
-		WorkerId := ++_CrashReportWorkerSerial
-		Done := _CrashReport_WorkerDone.Bind(WorkerId, ReleaseDedup)
-		Task := ShellRunner_Spawn(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
-			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-			 "-EncodedCommand", _CrashReport_EncodePowerShellCommand(_CrashReport_WorkerSource()), Payload], Done)
-		_CrashReportWorkerOwners[WorkerId] := Task
-		if !Task.start() {
-			_CrashReportWorkerOwners.Delete(WorkerId)
+		Snapshot := _CrashReport_CheapSnapshot(Exc)
+		Done := _CrashReport_WorkerDone.Bind(ReleaseDedup)
+		if !CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), Done) {
 			if ReleaseDedup
 				try ReleaseDedup()
 			try LoggerError("CrashReporter", "Crash-report worker could not start.")
