@@ -320,6 +320,7 @@ InstallSendNoOps()
 
 ; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
 ; registered at top level) so the file is safe to include in the headless runner.
+#Include ../infra/app_picker.ahk
 #Include ../infra/config_shortcuts.ahk
 #Include ../infra/metrics/metrics_filters.ahk
 #Include ../infra/metrics/metrics_shortcuts.ahk
@@ -422,6 +423,8 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
+#Include unit/test_app_picker_generation.ahk
+#Include meta/test_app_picker_generation_wiring.ahk
 #Include unit/test_llm_menu_regressions.ahk
 ; The prompt-editor host is definitions-only until TryOpen is called. Load it so
 ; its deferred context fence can be exercised without creating a Gui/WebView.

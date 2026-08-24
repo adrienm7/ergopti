@@ -422,6 +422,7 @@ LLM_Menu_SetIndent(lvl) {
 LLM_Menu_OpenAppPicker() {
 	global _LLM_Menu
 	AppPicker_Show(Map(
+		"owner",    "llm:disabled_apps",
 		"title",    t("menu.llm.exclude_from_ai"),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
@@ -430,10 +431,10 @@ LLM_Menu_OpenAppPicker() {
 	))
 }
 
-LLM_Menu_OnAppPickerSave(selected) {
+LLM_Menu_OnAppPickerSave(selected, receipt) {
 	return LLM_Menu_CommitMutation("the LLM disabled-applications setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"disabled_apps", LLM_Menu_DeepClone(selected)),
+		(Candidate) => _LLM_Menu_ApplyAppPickerSelection(Candidate,
+			selected, receipt),
 		_LLM_Menu_ApplyStandardCommitted)
 }
 
