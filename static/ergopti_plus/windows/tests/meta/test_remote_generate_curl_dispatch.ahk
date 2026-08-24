@@ -32,10 +32,14 @@ _RGC_AssertCurlDispatch() {
 
 	disp := _DriverFuncBody("_LLMRemote_DispatchCurl")
 	Assert(disp != "", "_LLMRemote_DispatchCurl must exist")
-	Assert(InStr(disp, "curl.exe") > 0 and InStr(disp, "Run(") > 0,
-		"_LLMRemote_DispatchCurl must launch a curl child via Run so the connect happens off the message-loop thread (remote-generate-connect-blocks)")
+	Assert(InStr(disp, "curl.exe") > 0 and InStr(disp, "RunFn.Call(") > 0,
+		"_LLMRemote_DispatchCurl must launch through its child-process port so the connect happens off the message-loop thread (remote-generate-connect-blocks)")
 	Assert(!InStr(disp, "http.Send") and !InStr(disp, "WinHttpRequest"),
 		"_LLMRemote_DispatchCurl must not perform a synchronous WinHTTP Send on the dispatch path (remote-generate-connect-blocks)")
+	runner := _DriverFuncBody("_LLM_CurlArtifactRun")
+	Assert(runner != "", "the default curl artifact runner must exist")
+	Assert(InStr(runner, "Run(") > 0,
+		"the default child-process port must delegate to AHK Run in production")
 
 	poll := _DriverFuncBody("_LLMRemote_PollCurl")
 	Assert(poll != "", "_LLMRemote_PollCurl must exist")

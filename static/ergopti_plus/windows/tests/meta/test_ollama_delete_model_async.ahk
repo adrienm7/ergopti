@@ -35,8 +35,12 @@ _ODMA_AssertDeleteModelIsCurlChild() {
 	Assert(Body != "", "LLM_OllamaDeleteModel_Async must exist in modules/llm/api_ollama")
 	Assert(!InStr(Body, 'ComObject("WinHttp.WinHttpRequest.5.1")'),
 		"LLM_OllamaDeleteModel_Async must not use a synchronous WinHTTP COM request — it must spawn curl and poll ProcessExist like LLM_OllamaListModels_Async")
-	Assert(InStr(Body, "Run(") > 0,
-		"LLM_OllamaDeleteModel_Async must launch curl via Run() (curl-child async pattern)")
+	Assert(InStr(Body, "RunFn.Call(") > 0,
+		"LLM_OllamaDeleteModel_Async must invoke its child-process port (the behavioral ownership suite proves the exact call)")
+	Runner := _DriverFuncBody("_LLM_CurlArtifactRun")
+	Assert(Runner != "", "the default curl artifact runner must exist")
+	Assert(InStr(Runner, "Run(") > 0,
+		"the default curl artifact runner must delegate to AHK Run so production remains asynchronous")
 }
 Test("api_ollama: LLM_OllamaDeleteModel_Async spawns a curl child, never a sync WinHTTP request (F24)", _ODMA_AssertDeleteModelIsCurlChild)
 

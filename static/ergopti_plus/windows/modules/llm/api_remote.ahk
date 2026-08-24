@@ -192,28 +192,41 @@ _LLMRemote_CurlCleanup(entry) {
         try FSDelete(entry["tmp_config"])
 }
 
+_LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn) {
+    for Path in [tmp_payload, tmp_stdout, tmp_config, terminal["status"], terminal["exit"]]
+        try DeleteFn.Call(Path)
+}
+
 ; Dispatch the POST through a curl child process so the connect happens in curl's own
 ; process — the AHK message loop only polls ProcessExist. Mirrors _LLM_Ollama_DispatchAsync.
 ; Returns true once it owns the request (dispatched, or failed and fired on_fail); returns
 ; false ONLY when curl is unavailable, so the caller falls back to WinHTTP.
-_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms) {
+_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms, Port := 0) {
     global _LLM_Remote_Async
+    FileExistsFn := _LLM_CurlArtifactPortFn(Port, "file_exists", FileExist)
+    TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
+    WriteFn := _LLM_CurlArtifactPortFn(Port, "write", FSWrite)
+    DeleteFn := _LLM_CurlArtifactPortFn(Port, "delete", FSDelete)
+    RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
+    PollFn := _LLM_CurlArtifactPortFn(Port, "poll", _LLMRemote_PollCurl)
+    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
     curl_exe := A_WinDir . "\System32\curl.exe"
-    if !FileExist(curl_exe)
+    if !FileExistsFn.Call(curl_exe)
         return false
-    uid := req_id . "_" . A_TickCount
-    tmp_dir := _LLM_Ollama_TempDir()
+    uid := req_id . "_" . TickFn.Call()
+    tmp_dir := TempDirFn.Call()
     tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"
     tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
     tmp_config  := tmp_dir . "\ergopti_remote_" . uid . ".conf"
     terminal    := _LLM_CurlTerminalPaths(tmp_stdout)
-    if !FSWrite(tmp_payload, Payload) {
+    if !WriteFn.Call(tmp_payload, Payload) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "Failed to write curl payload file.")
         _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
-    if !FSWrite(tmp_config, _LLMRemote_BuildCurlConfig(resolved["Format"], resolved["Token"], Url)) {
-        try FSDelete(tmp_payload)
+    if !WriteFn.Call(tmp_config, _LLMRemote_BuildCurlConfig(resolved["Format"], resolved["Token"], Url)) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "Failed to write curl config file — request abandoned rather than sent with the token on the command line.")
         _LLM_InvokeCallback(on_fail, "on_fail")
         return true
@@ -227,10 +240,9 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
     pid := 0
     try {
-        Run(cmdLine, , "Hide", &pid)
+        RunFn.Call(cmdLine, "", "Hide", &pid)
     } catch as err {
-        try FSDelete(tmp_payload)
-        try FSDelete(tmp_config)
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "curl launch failed: {1}.", err.Message)
         _LLM_InvokeCallback(on_fail, "on_fail")
         return true
@@ -245,8 +257,8 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
         "tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
         "format", resolved["Format"], "model_id_at_dispatch", resolved["Model"],
         "on_success", on_success, "on_fail", on_fail,
-        "cancelled", false, "start_tick", A_TickCount, "timeout_ms", timeout_ms)
-    _LLMRemote_PollCurl(req_id)
+        "cancelled", false, "start_tick", TickFn.Call(), "timeout_ms", timeout_ms)
+    PollFn.Call(req_id)
     return true
 }
 

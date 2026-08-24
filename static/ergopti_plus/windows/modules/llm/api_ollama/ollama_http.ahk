@@ -18,6 +18,23 @@ _LLM_CurlTerminalPaths(BasePath) {
 	return Map("status", BasePath . ".status", "exit", BasePath . ".exit")
 }
 
+_LLM_CurlArtifactPortFn(Port, Name, DefaultFn) {
+	if !(Port is Map) or !Port.Has(Name)
+		return DefaultFn
+	Candidate := Port[Name]
+	if !HasMethod(Candidate, "Call")
+		throw TypeError("curl artifact port '" . Name . "' must be callable")
+	return Candidate
+}
+
+_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid) {
+	Run(Command, WorkingDir, Options, &Pid)
+}
+
+_LLM_CurlArtifactTick(*) {
+	return A_TickCount
+}
+
 _LLM_CurlOwnedCommand(CurlCommand, StatusPath, ExitPath) {
 	return A_ComSpec . ' /D /V:ON /S /C ""' . CurlCommand
 		. ' --write-out "%{http_code}" > ' . _Q(StatusPath)
@@ -324,20 +341,28 @@ _LLM_Ollama_TagsPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, 
  *
  * @param {string}   tag       - Ollama model tag (e.g. ``qwen3-coder:30b``).
  * @param {function} on_result - Callback receiving a Boolean (true on success).
+ * @param {Map|0}    Port      - Optional deterministic transport seam for tests.
  */
-LLM_OllamaDeleteModel_Async(tag, on_result) {
+LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0) {
 	global LLM_OLLAMA_BASE_URL, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	if (tag == "") {
 		_LLM_InvokeCallback(on_result, "on_result", false)
 		return
 	}
+	WriteFn := _LLM_CurlArtifactPortFn(Port, "write", FSWrite)
+	DeleteFn := _LLM_CurlArtifactPortFn(Port, "delete", FSDelete)
+	RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
+	PollFn := _LLM_CurlArtifactPortFn(Port, "poll", _LLM_Ollama_DeletePoll)
+	TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
+	TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
 	tmp_payload := ""
 	tmp_out := ""
 	Transferred := false
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
-		tmp_payload := _LLM_Ollama_TempDir() . "\ergopti_ollama_delete_" . uid . ".json"
-		tmp_out     := _LLM_Ollama_TempDir() . "\ergopti_ollama_delete_" . uid . ".out"
+		tmp_dir := TempDirFn.Call()
+		tmp_payload := tmp_dir . "\ergopti_ollama_delete_" . uid . ".json"
+		tmp_out     := tmp_dir . "\ergopti_ollama_delete_" . uid . ".out"
 		terminal := _LLM_CurlTerminalPaths(tmp_out)
 		owner_generation := LLM_AuxGeneration()
 		; The payload is intentionally minimal — Ollama tolerates the
@@ -345,7 +370,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result) {
 		; documented one and works on every release we care about
 		; (mirrors the retired blocking body).
 		body := '{"name":"' . StrReplace(tag, '"', '\"') . '"}'
-		if !FSWrite(tmp_payload, body) {
+		if !WriteFn.Call(tmp_payload, body) {
 			try LoggerWarn("LLM.ollama", "Failed to write delete payload file for '{1}'.", tag)
 			_LLM_InvokeCallback(on_result, "on_result", false)
 			return
@@ -358,23 +383,23 @@ LLM_OllamaDeleteModel_Async(tag, on_result) {
 			. '-o ' . _Q(tmp_out)
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		Run(cmdLine, , "Hide", &pid)
+		RunFn.Call(cmdLine, "", "Hide", &pid)
+		PollFn.Call(pid, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, TickFn.Call(), owner_generation)
 		Transferred := true
-		_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, A_TickCount, owner_generation)
 	} catch as e {
 		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
 		_LLM_InvokeCallback(on_result, "on_result", false)
 	} finally {
-		; Ownership transfers to the poller only after the child launched. Every
-		; earlier exit is complete-or-absent, including a Run() exception.
+		; Ownership transfers only after the poller accepted the exact artifact
+		; tuple. A launch or synchronous poll-admission failure remains ours.
 		if !Transferred {
 			if tmp_payload != ""
-				try FSDelete(tmp_payload)
+				try DeleteFn.Call(tmp_payload)
 			if tmp_out != ""
-				try FSDelete(tmp_out)
+				try DeleteFn.Call(tmp_out)
 			if IsSet(terminal)
 				for Path in [terminal["status"], terminal["exit"]]
-					try FSDelete(Path)
+					try DeleteFn.Call(Path)
 		}
 	}
 }
