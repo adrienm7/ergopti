@@ -191,18 +191,7 @@ initMenu(PublishAuthorizeFn := 0) {
 	global _LLM_Menu_InTray
 	_LLM_Menu_InTray := false
 	_LlmSavedOpts := LLM_Menu_BuildSavedOpts(_IniCache)
-
-	_LlmRawAppOverrides := IniCacheGet(_IniCache, "llm", "app_profile_overrides")
-	if (_LlmRawAppOverrides is String)
-			&& _LlmRawAppOverrides != "_" && _LlmRawAppOverrides != "" {
-		_LlmAppOverridesMap := _LLM_Menu_DeserializeAppProfileOverrides(
-			_LlmRawAppOverrides)
-		if (_LlmAppOverridesMap is Map)
-			_LlmSavedOpts["app_profile_overrides"] := _LlmAppOverridesMap
-		else
-			LoggerError("LLM", "Persisted app-profile overrides are malformed; refusing partial restore.")
-	} else if !(_LlmRawAppOverrides is String)
-		LoggerError("LLM", "Persisted app-profile overrides have the wrong type; refusing restore.")
+	_LLM_Menu_LoadAppProfileOverridesFromCache(_LlmSavedOpts, _IniCache)
 	LLM_Menu_Init(_LlmSavedOpts)
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 

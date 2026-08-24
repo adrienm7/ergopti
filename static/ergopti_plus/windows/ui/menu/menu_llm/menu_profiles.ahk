@@ -514,13 +514,16 @@ _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 		; Strict migration reader for the legacy app=profile;... representation.
 		Decoded := Map()
 		for Pair in StrSplit(Payload, ";") {
-			Pair := Trim(Pair)
 			if Pair == ""
-				continue
-			Parts := StrSplit(Pair, "=", , 2)
-			if Parts.Length != 2 || Parts[1] == "" || Parts[2] == "" || Decoded.Has(Parts[1])
 				return false
-			Decoded[Parts[1]] := Parts[2]
+			Separator := InStr(Pair, "=", true, -1)
+			if (Separator <= 1 || Separator == StrLen(Pair))
+				return false
+			AppName := SubStr(Pair, 1, Separator - 1)
+			ProfileId := SubStr(Pair, Separator + 1)
+			if Decoded.Has(AppName)
+				return false
+			Decoded[AppName] := ProfileId
 		}
 		return Decoded
 	}

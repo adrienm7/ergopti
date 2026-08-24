@@ -591,11 +591,51 @@ Test_LLM_Persist_LosslessAppOverrides() {
 	AssertEqual("advanced", Decoded["semi;tool"])
 	AssertEqual("basic", Decoded["eq=tool"])
 	AssertEqual("raw", Decoded["éditeur"])
+	Legacy := _LLM_Menu_DeserializeAppProfileOverrides("eq=tool=advanced")
+	Assert(Legacy is Map, "a recoverable legacy payload must decode")
+	AssertEqual(1, Legacy.Count)
+	AssertEqual("advanced", Legacy["eq=tool"],
+		"legacy migration must split on the last equals sign so a legal app basename survives")
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("dup=raw;dup=basic"))
 	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("broken"))
+	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("good=basic;;late=advanced"),
+		"an empty legacy fragment is corruption, not an entry to skip")
+	AssertEqual(false, _LLM_Menu_DeserializeAppProfileOverrides("semi;tool=advanced"),
+		"an ambiguous semicolon basename must fail as one complete legacy image")
 }
 Test("LLM persist: app overrides round-trip delimiter and Unicode basenames",
 	Test_LLM_Persist_LosslessAppOverrides)
+
+Test_LLM_Persist_AppOverridesTraverseRealFullSave() {
+	global Features, _LLM_Menu
+	Path := A_Temp . "\ergopti_llm_app_overrides_full_save.toml"
+	try {
+		try FileDelete(Path)
+		CandidateFeatures := _HSDeepCloneMap(Features)
+		CandidateMenu := _LLM_Persist_MakeDefaultTray()
+		CandidateMenu["onboarding_seen"] := false
+		CandidateMenu["app_profile_overrides"] := Map(
+			"semi;tool", "advanced", "eq=tool", "basic", "éditeur", "raw")
+		Updates := _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
+		AssertTrue(TOML_BatchWrite(Path, Updates),
+			"the real full-save collector image must reach the canonical TOML writer")
+		Cache := ParseTomlFile(Path)
+		Opts := LLM_Menu_BuildSavedOpts(Cache)
+		AssertTrue(_LLM_Menu_LoadAppProfileOverridesFromCache(Opts, Cache),
+			"the boot restore boundary must accept the canonical full-save image")
+		AssertTrue(Opts.Has("app_profile_overrides"),
+			"the production saved-options loader must restore the serialized override graph")
+		Decoded := Opts["app_profile_overrides"]
+		AssertEqual(3, Decoded.Count)
+		AssertEqual("advanced", Decoded["semi;tool"])
+		AssertEqual("basic", Decoded["eq=tool"])
+		AssertEqual("raw", Decoded["éditeur"])
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("LLM persist: app overrides traverse the real full-save and boot codecs (AHK-019)",
+	Test_LLM_Persist_AppOverridesTraverseRealFullSave)
 
 _LLM_Persist_AssertCompositeScalarRejected(Key, Literal, Slug) {
 	Path := A_Temp . "\ergopti_llm_scalar_" . Slug . ".toml"
