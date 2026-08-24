@@ -134,6 +134,17 @@ _LLM_Menu_SelectApiEntryCandidate(Candidate, EntryId) {
 ; updates it in place. The dialog stays InputBox-driven (one field per call)
 ; so it works on the AHK v2 baseline with no custom Gui — same UX as the
 ; existing single-field prompts the menu already uses.
+_LLM_Menu_BuildApiProviderChoices(providers) {
+	choices := ""
+	for providerId, descriptor in providers {
+		if !(descriptor is Map) or !descriptor.Has("Label") or Type(descriptor["Label"]) != "String"
+			throw Error("API provider catalogue published an invalid menu descriptor: " . providerId)
+		choices .= providerId . " (" . descriptor["Label"] . "), "
+	}
+	return RTrim(choices, ", ")
+}
+
+
 _LLM_Menu_PromptApiEntry(EditId) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -161,11 +172,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	new_name := Trim(ib.Value)
 
 	; Step 2 — provider id.
-	provider_choices := ""
-	for k, v in LLM_API_PROVIDERS {
-		provider_choices .= k . " (" . v["Label"] . "), "
-	}
-	provider_choices := RTrim(provider_choices, ", ")
+	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
 	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
 	ib := InputBox(
 		Format(t("menu.llm.api_prompt_provider"), provider_choices),
