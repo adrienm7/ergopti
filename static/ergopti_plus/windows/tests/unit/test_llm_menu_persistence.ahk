@@ -408,6 +408,163 @@ Test_LLM_Persist_LosslessCustomProfiles() {
 Test("LLM persist: custom profiles use a lossless versioned codec",
 	Test_LLM_Persist_LosslessCustomProfiles)
 
+_LLM_Persist_AssertProfilesExact(Expected, Actual, Context) {
+	Assert(Expected is Array, Context . " expected profiles must be an Array")
+	Assert(Actual is Array, Context . " restored profiles must be an Array")
+	AssertEqual(Expected.Length, Actual.Length, Context . " profile count")
+	Schema := ["id", "label", "system_single", "system_multi",
+		"system_multi_template", "raw_prompt", "batch", "stop_sequences"]
+	loop Expected.Length {
+		ExpectedProfile := Expected[A_Index]
+		ActualProfile := Actual[A_Index]
+		Assert(ExpectedProfile is Map, Context . " expected profile must be a Map")
+		Assert(ActualProfile is Map, Context . " restored profile must be a Map")
+		for Key in Schema {
+			AssertEqual(ExpectedProfile.Has(Key), ActualProfile.Has(Key),
+				Context . " field presence " . Key)
+			if !ExpectedProfile.Has(Key)
+				continue
+			ExpectedValue := ExpectedProfile[Key]
+			ActualValue := ActualProfile[Key]
+			if (ExpectedValue is Array) {
+				Assert(ActualValue is Array, Context . " " . Key . " must remain an Array")
+				AssertEqual(ExpectedValue.Length, ActualValue.Length,
+					Context . " " . Key . " length")
+				loop ExpectedValue.Length
+					AssertEqual(ExpectedValue[A_Index], ActualValue[A_Index],
+						Context . " " . Key . " item")
+			} else
+				AssertEqual(ExpectedValue, ActualValue, Context . " " . Key)
+		}
+	}
+}
+
+_LLM_Persist_ProfileRoundTrip(Path) {
+	global _LLM_Menu, _LLM_Menu_Loaded
+	Updates := _LLM_Persist_CollectUpdates()
+	FoundStore := false
+	for Update in Updates {
+		if (Update.Section == "llm" && Update.Key == "user_profiles") {
+			FoundStore := true
+			break
+		}
+	}
+	AssertTrue(FoundStore,
+		"the real full collector must emit the canonical custom-profile store")
+	AssertTrue(TOML_BatchWrite(Path, Updates),
+		"the real TOML writer must commit the custom-profile store")
+	SavedOpts := LLM_Menu_BuildSavedOpts(ParseTomlFile(Path))
+	AssertTrue(SavedOpts.Has("user_profiles"),
+		"the real saved-options loader must reconstruct custom profiles")
+	_LLM_Menu := _LLM_Persist_MakeDefaultTray()
+	_LLM_Menu_Loaded := false
+	AssertTrue(_LLM_Menu_RestoreSavedOptsOnce(SavedOpts),
+		"the real boot restore must publish the reconstructed custom profiles")
+	return _LLM_Menu["user_profiles"]
+}
+
+Test_LLM_Persist_CustomProfileCrudSurvivesRestart() {
+	global _LLM_Menu, _LLM_Menu_Loaded, Features
+	SavedMenu := _LLM_Menu
+	SavedLoaded := _LLM_Menu_Loaded
+	SavedFeatures := Features
+	Path := A_Temp . "\ergopti_ahk018_custom_profiles.toml"
+	try {
+		try FileDelete(Path)
+		Features := _LLM_Persist_CloneFeatures(SavedFeatures)
+		_LLM_Menu := _LLM_Persist_MakeDefaultTray()
+		First := Map(
+			"id", "user_création_一",
+			"label", 'Profil "création"',
+			"system_single", "Première ligne`nDeuxième ligne = " . Chr(59) . " 一",
+			"system_multi", "Multi ligne`n{context}",
+			"system_multi_template", "Produis {n}`nrésultats",
+			"raw_prompt", 'RAW "exact"`n{context}',
+			"batch", true,
+			"stop_sequences", [Chr(96) . Chr(96) . Chr(96), "`n`n",
+				" padded ", "終", "終"])
+		Second := Map(
+			"id", "user_second",
+			"label", "Second",
+			"system_single", "Prompt second",
+			"system_multi", "",
+			"batch", false)
+		AssertTrue(_LLM_Menu_AddProfileCandidate(_LLM_Menu, First),
+			"the production create mutator must accept the first profile")
+		AssertTrue(_LLM_Menu_AddProfileCandidate(_LLM_Menu, Second),
+			"the production create mutator must accept the second profile")
+		Expected := LLM_Menu_DeepClone(_LLM_Menu["user_profiles"])
+		Restored := _LLM_Persist_ProfileRoundTrip(Path)
+		_LLM_Persist_AssertProfilesExact(Expected, Restored,
+			"create then restart")
+
+		AssertTrue(_LLM_Menu_EditProfileCandidate(_LLM_Menu, First["id"],
+			"Édité", "Prompt édité`nligne 2"),
+			"the production edit mutator must find the restored profile")
+		Expected := LLM_Menu_DeepClone(_LLM_Menu["user_profiles"])
+		Restored := _LLM_Persist_ProfileRoundTrip(Path)
+		_LLM_Persist_AssertProfilesExact(Expected, Restored,
+			"edit then restart")
+
+		AssertTrue(_LLM_Menu_DeleteProfileCandidate(_LLM_Menu, First["id"]),
+			"the production delete mutator must remove the first profile")
+		Expected := LLM_Menu_DeepClone(_LLM_Menu["user_profiles"])
+		Restored := _LLM_Persist_ProfileRoundTrip(Path)
+		_LLM_Persist_AssertProfilesExact(Expected, Restored,
+			"delete one then restart")
+
+		AssertTrue(_LLM_Menu_DeleteProfileCandidate(_LLM_Menu, Second["id"]),
+			"the production delete mutator must remove the last profile")
+		Restored := _LLM_Persist_ProfileRoundTrip(Path)
+		AssertEqual(0, Restored.Length,
+			"deleting the last custom profile must clear the durable store")
+		RawToml := FileRead(Path, "UTF-8")
+		Assert(InStr(RawToml, First["id"]) == 0 && InStr(RawToml, Second["id"]) == 0,
+			"empty-list persistence must not retain a stale profile payload")
+
+		InvalidUpdates := []
+		Invalid := _LLM_Persist_MakeDefaultTray()
+		Invalid["user_profiles"] := [First, LLM_Menu_DeepClone(First)]
+		AssertFalse(_LLM_Menu_AppendPersistedUpdates(InvalidUpdates, Invalid),
+			"duplicate profile ids must fail before durable publication")
+		AssertEqual(0, InvalidUpdates.Length,
+			"a rejected profile graph must not append a partial update list")
+		Incomplete := _LLM_Persist_MakeDefaultTray()
+		Incomplete["user_profiles"] := [Map("id", "missing_required_fields")]
+		AssertFalse(_LLM_Menu_AppendPersistedUpdates([], Incomplete),
+			"missing required profile strings and Boolean must fail closed")
+	} finally {
+		try FileDelete(Path)
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Loaded := SavedLoaded
+		Features := SavedFeatures
+	}
+}
+Test("LLM persist: profile CRUD survives the real restart path "
+	. "(ahk-018-profile-durability)",
+	Test_LLM_Persist_CustomProfileCrudSurvivesRestart)
+
+Test_LLM_Persist_ProfileStoreWiringIsBidirectional() {
+	Collector := _DriverFuncBody("_LLM_Menu_AppendPersistedUpdates")
+	Loader := _DriverFuncBody("LLM_Menu_BuildSavedOpts")
+	Assert(InStr(Collector, "user_profiles") > 0,
+		"the full collector must enumerate the canonical custom-profile store")
+	Assert(InStr(Loader, "user_profiles") > 0,
+		"the saved-options loader must enumerate the canonical custom-profile store")
+	Combined := Collector . Loader
+	Count := 0
+	Pos := 1
+	while Pos := InStr(Combined, '"user_profiles"', true, Pos) {
+		Count += 1
+		Pos += StrLen('"user_profiles"')
+	}
+	Assert(Count >= 4,
+		"collector and loader must keep a non-vacuous bidirectional profile-store floor")
+}
+Test("LLM persist: custom-profile store wiring is bidirectional "
+	. "(ahk-018-profile-store-class)",
+	Test_LLM_Persist_ProfileStoreWiringIsBidirectional)
+
 Test_LLM_Persist_LosslessAppOverrides() {
 	Overrides := Map("semi;tool", "advanced", "eq=tool", "basic", "éditeur", "raw")
 	Payload := _LLM_Menu_SerializeAppProfileOverrides(Overrides)
