@@ -327,40 +327,72 @@ LLM_Menu_OnUserProfileClick(profile) {
 }
 
 _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
-	for Index, Profile in Candidate["user_profiles"] {
-		if (Profile.Has("id") && Profile["id"] == ProfileId) {
-			Candidate["user_profiles"].RemoveAt(Index)
-			if Candidate["profile_id"] == ProfileId
-				Candidate["profile_id"] := "basic"
-			if Candidate.Has("app_profile_overrides")
-					&& (Candidate["app_profile_overrides"] is Map) {
-				for AppName, OverrideId in Candidate["app_profile_overrides"] {
-					if (OverrideId == ProfileId)
-						Candidate["app_profile_overrides"].Delete(AppName)
-				}
-			}
-			return true
+	if !(Candidate is Map) || !(ProfileId is String) || ProfileId == ""
+			|| !Candidate.Has("user_profiles")
+			|| !(Candidate["user_profiles"] is Array)
+			|| !Candidate.Has("profile_id")
+			|| !(Candidate["profile_id"] is String)
+		return false
+	Profiles := Candidate["user_profiles"]
+	SeenIds := Map()
+	MatchIndex := 0
+	for Index, Profile in Profiles {
+		if !(Profile is Map) || !Profile.Has("id")
+				|| !(Profile["id"] is String) || Profile["id"] == ""
+			return false
+		Id := Profile["id"]
+		if SeenIds.Has(Id)
+			return false
+		SeenIds[Id] := true
+		if Id == ProfileId
+			MatchIndex := Index
+	}
+	if MatchIndex == 0
+		return false
+
+	OverrideKeys := []
+	Overrides := 0
+	if Candidate.Has("app_profile_overrides") {
+		Overrides := Candidate["app_profile_overrides"]
+		if !(Overrides is Map)
+			return false
+		for AppName, OverrideId in Overrides {
+			if OverrideId == ProfileId
+				OverrideKeys.Push(AppName)
 		}
 	}
-	return false
+
+	Profiles.RemoveAt(MatchIndex)
+	if Candidate["profile_id"] == ProfileId
+		Candidate["profile_id"] := "basic"
+	if Overrides is Map {
+		for AppName in OverrideKeys
+			Overrides.Delete(AppName)
+	}
+	return true
 }
 
 _LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
-	if !(MenuState is Map) || !(MenuState["app_profile_overrides"] is Map)
+	if !(MenuState is Map) || !MenuState.Has("app_profile_overrides")
+			|| !(MenuState["app_profile_overrides"] is Map)
+			|| !MenuState.Has("user_profiles")
+			|| !(MenuState["user_profiles"] is Array)
 		return false
 	Valid := Map("raw", true, "basic", true, "advanced", true, "batch_advanced", true)
 	for Profile in MenuState["user_profiles"] {
-		if (Profile is Map) && Profile.Has("id")
-			Valid[Profile["id"]] := true
+		if !(Profile is Map) || !Profile.Has("id")
+				|| !(Profile["id"] is String) || Profile["id"] == ""
+			return false
+		Valid[Profile["id"]] := true
 	}
-	Changed := false
+	OrphanKeys := []
 	for AppName, ProfileId in MenuState["app_profile_overrides"] {
-		if !Valid.Has(ProfileId) {
-			MenuState["app_profile_overrides"].Delete(AppName)
-			Changed := true
-		}
+		if !(ProfileId is String) || !Valid.Has(ProfileId)
+			OrphanKeys.Push(AppName)
 	}
-	return Changed
+	for AppName in OrphanKeys
+		MenuState["app_profile_overrides"].Delete(AppName)
+	return OrphanKeys.Length > 0
 }
 
 _LLM_Menu_NormalizeStoredUserProfiles(Profiles) {

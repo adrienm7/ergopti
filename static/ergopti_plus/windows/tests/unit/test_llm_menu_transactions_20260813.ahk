@@ -294,6 +294,114 @@ Test("LLM menu: process-wide terminal admission rejects overlapping actions "
 	. "(llm-menu-global-terminal-admission)",
 	_LMT_GlobalAdmissionRefusalDoesNotBuildCandidate)
 
+_LMT_Profile(Id, Label := "Profile") {
+	return Map("id", Id, "label", Label,
+		"system_single", "Single " . Id,
+		"system_multi", "Multi " . Id,
+		"batch", false)
+}
+
+
+_LMT_DuplicateProfileDeleteIsMutationFree() {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["user_profiles"] := [
+			_LMT_Profile("profile_p", "First P"),
+			_LMT_Profile("profile_p", "Second P"),
+			_LMT_Profile("profile_q", "Profile Q")]
+		_LLM_Menu["profile_id"] := "profile_p"
+		_LLM_Menu["app_profile_overrides"] := Map(
+			"app_one", "profile_p", "app_two", "profile_p",
+			"app_q", "profile_q")
+		OldMenu := _LLM_Menu
+
+		AssertFalse(LLM_Menu_CommitMutation("the duplicate profile removal",
+			(Candidate) => _LLM_Menu_DeleteProfileCandidate(
+				Candidate, "profile_p"),
+			_LMT_Apply, _LMT_Writer, _LMT_Notify,
+			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+		AssertEqual(0, _LMT_WriterCalls,
+			"ambiguous identity must be rejected before durable mutation")
+		AssertEqual(0, _LMT_ApplyCalls)
+		AssertTrue(_LLM_Menu == OldMenu,
+			"ambiguous deletion must preserve the exact published menu owner")
+		AssertEqual(3, _LLM_Menu["user_profiles"].Length)
+		AssertEqual("profile_p", _LLM_Menu["profile_id"])
+		AssertEqual(3, _LLM_Menu["app_profile_overrides"].Count)
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM profiles: duplicate delete is refused before mutation or persistence "
+	. "(ahk-015-duplicate-delete-no-mutation)",
+	_LMT_DuplicateProfileDeleteIsMutationFree)
+
+
+_LMT_ProfileDeleteRemovesEveryExactOverride() {
+	global _LLM_Menu, _LMT_WriterCalls, _LMT_ApplyCalls
+	Previous := _LMT_InstallFixture()
+	try {
+		_LLM_Menu["user_profiles"] := [
+			_LMT_Profile("profile_p", "Profile P"),
+			_LMT_Profile("profile_q", "Profile Q")]
+		_LLM_Menu["profile_id"] := "profile_p"
+		_LLM_Menu["app_profile_overrides"] := Map(
+			"app_one", "profile_p", "app_two", "profile_p",
+			"app_q", "profile_q")
+
+		AssertTrue(LLM_Menu_CommitMutation("the exact profile removal",
+			(Candidate) => _LLM_Menu_DeleteProfileCandidate(
+				Candidate, "profile_p"),
+			_LMT_Apply, _LMT_Writer, _LMT_Notify,
+			_LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect))
+		AssertEqual(1, _LMT_WriterCalls)
+		AssertEqual(1, _LMT_ApplyCalls)
+		AssertEqual(1, _LLM_Menu["user_profiles"].Length)
+		AssertEqual("profile_q", _LLM_Menu["user_profiles"][1]["id"])
+		AssertEqual("basic", _LLM_Menu["profile_id"],
+			"only deletion of the active profile may reset the global selection")
+		AssertEqual(1, _LLM_Menu["app_profile_overrides"].Count)
+		AssertFalse(_LLM_Menu["app_profile_overrides"].Has("app_one"))
+		AssertFalse(_LLM_Menu["app_profile_overrides"].Has("app_two"))
+		AssertEqual("profile_q",
+			_LLM_Menu["app_profile_overrides"]["app_q"])
+
+		Candidate := _LMT_Menu()
+		Candidate["user_profiles"] := [
+			_LMT_Profile("profile_p"), _LMT_Profile("profile_q")]
+		Candidate["profile_id"] := "advanced"
+		Candidate["app_profile_overrides"] := Map("app_one", "profile_p")
+		AssertTrue(_LLM_Menu_DeleteProfileCandidate(Candidate, "profile_p"))
+		AssertEqual("advanced", Candidate["profile_id"],
+			"deleting an inactive profile must preserve the active selection")
+	} finally _LMT_RestoreFixture(Previous)
+}
+Test("LLM profiles: delete removes all and only exact override references "
+	. "(ahk-015-delete-exact-reference-class)",
+	_LMT_ProfileDeleteRemovesEveryExactOverride)
+
+
+_LMT_ProfileBootPruneRemovesEveryOrphan() {
+	MenuState := _LMT_Menu()
+	MenuState["user_profiles"] := [_LMT_Profile("profile_q")]
+	MenuState["app_profile_overrides"] := Map(
+		"orphan_one", "missing_one",
+		"valid_builtin", "advanced",
+		"orphan_two", "missing_two",
+		"valid_custom", "profile_q",
+		"orphan_three", "missing_three")
+	AssertTrue(_LLM_Menu_PruneOrphanProfileOverrides(MenuState))
+	AssertEqual(2, MenuState["app_profile_overrides"].Count)
+	AssertEqual("advanced",
+		MenuState["app_profile_overrides"]["valid_builtin"])
+	AssertEqual("profile_q",
+		MenuState["app_profile_overrides"]["valid_custom"])
+	AssertFalse(_LLM_Menu_PruneOrphanProfileOverrides(MenuState),
+		"a fully-pruned image must be idempotent")
+}
+Test("LLM profiles: boot prune removes every orphan without skipping siblings "
+	. "(ahk-015-boot-prune-all-orphans)",
+	_LMT_ProfileBootPruneRemovesEveryOrphan)
+
 _LMT_ApiBuildConfig(Path, Updates) {
 	OldContent := FSReadUtf8Exact(Path)
 	if !(OldContent is String)
