@@ -44,6 +44,23 @@ Use explicit string or numeric normalization at configuration boundaries.
 `Map.Delete` is not an idempotent cleanup operation. Check `Has` when absence is
 an accepted state.
 
+### project-ahk-equality-and-case-identity
+
+Identity rules disagree across the language and were measured, not recalled,
+on the shipped interpreter (AutoHotkey v2.0.26): the `==` operator compares
+plain strings **case-sensitively** (v1 muscle memory says otherwise; there is
+no `===` — writing one is a load-time `Missing operand` error), while
+`StrCompare(a, b)` and `InStr` default to **case-insensitive**, and object
+property names are always case-insensitive. `Map` adds two more splits: keys
+are case-sensitive by default, and integer/string key types are distinct
+slots (`m[1]` never finds `m["1"]`). Pick one identity rule per boundary and
+pin it with a mixed-case test vector; rewriting a check from `==` onto
+default `StrCompare`, or from a `Map` index onto property access, silently
+loosens or tightens matching. Concrete near-miss: an audit refutation of a
+duplicate-API-entry-ID wedge was argued from remembered v1-style `==`
+semantics; measuring showed validator `Map.Has` dedup and consumer `==`
+matching already agreed, killing the candidate.
+
 ## Startup and callbacks
 
 ### project-ahk-entry-smoke-is-the-startup-proof
