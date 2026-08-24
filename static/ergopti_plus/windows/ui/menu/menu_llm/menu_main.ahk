@@ -63,9 +63,9 @@ _Building := true
 
 	; Enable / Disable toggle. The checked state MUST reflect
 	; ``_LLM_Menu["enabled"]`` alone — that's the user's intent. We keep a
-	; separate ``_llm_is_operational`` flag (enabled AND deps ready) for the
-	; health dot below, because we still want a visual cue when the user
-	; has flipped the toggle ON but Ollama hasn't finished installing yet.
+	; separate ``_llm_is_operational`` flag (enabled AND active-backend ready)
+	; for the health dot below, because we still want a visual cue when the user
+	; has flipped the toggle ON but the selected backend is not usable yet.
 	; Previously the checkbox itself used _llm_is_operational, so clicking
 	; ON while Ollama was missing left the toggle visually OFF — the user
 	; thought the click did nothing.
@@ -75,7 +75,9 @@ _Building := true
 	; empty, with no visible control to switch the feature back on.
 	_deps_ready := false
 	try _deps_ready := LLM_Deps_IsReady()
-	_llm_is_operational := (_LLM_Menu["enabled"] && _deps_ready)
+	_backend_ready := false
+	try _backend_ready := _LLM_Menu_BackendIsReadyForUse()
+	_llm_is_operational := (_LLM_Menu["enabled"] && _backend_ready)
 
 	; Mirror the macOS menu (ui/menu/menu_llm/init.lua is_disabled): when the
 	; feature is OFF, render the FULL menu unchanged but grey out every settings
@@ -143,10 +145,10 @@ _Building := true
 	_LLM_Menu_InTray := true
 	Published := true
 
-	; Check the parent tray entry only when enabled AND Ollama is confirmed ready.
+	; Check the parent tray entry only when enabled and the active backend is ready.
 	; Both branches are guarded with try: the item may not exist yet if the updater
 	; timer fires LLM_Menu_Build() before initMenu has had a chance to register it.
-	if (_LLM_Menu["enabled"] && _deps_ready) {
+	if (_LLM_Menu["enabled"] && _backend_ready) {
 		try A_TrayMenu.Check(t("menu.llm.title"))
 	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))

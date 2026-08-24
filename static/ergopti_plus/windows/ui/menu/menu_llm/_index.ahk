@@ -289,6 +289,7 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 
 #Include persist.ahk
 #Include transactions.ahk
+#Include backend_lifecycle.ahk
 #Include init.ahk
 #Include menu_main.ahk
 #Include menu_models.ahk

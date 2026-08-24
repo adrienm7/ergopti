@@ -169,6 +169,13 @@ LLM_OllamaIsRunning_Async(on_result) {
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
 _LLM_Ollama_PingPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, owner_generation) {
+	if owner_generation != LLM_AuxGeneration() {
+		if (pid > 0 and ProcessExist(pid))
+			try ProcessClose(pid)
+		for Path in [tmp_out, tmp_status, tmp_exit]
+			try FSDelete(Path)
+		return
+	}
 	; 4 s backstop: curl -m 2 should exit by ~2 s, but ProcessClose if it overruns so
 	; a wedged child can never keep the poll chain (or its temp handle) alive.
 	if (pid > 0 and ProcessExist(pid)) {
@@ -277,6 +284,13 @@ LLM_OllamaListModels_Async(on_result) {
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
 _LLM_Ollama_TagsPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, owner_generation) {
+	if owner_generation != LLM_AuxGeneration() {
+		if (pid > 0 and ProcessExist(pid))
+			try ProcessClose(pid)
+		for Path in [tmp_out, tmp_status, tmp_exit]
+			try FSDelete(Path)
+		return
+	}
 	if (pid > 0 and ProcessExist(pid)) {
 		; 4 s backstop: curl -m 2 should exit by ~2 s; ProcessClose a wedged child so it
 		; can never keep the poll chain (or its temp handle) alive.

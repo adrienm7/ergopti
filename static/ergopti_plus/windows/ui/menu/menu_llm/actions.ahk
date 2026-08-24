@@ -108,12 +108,10 @@ _LLM_Menu_ApplyToggleCommitted(Candidate) {
 		; Model readiness is checked by the deferred bootstrap after this global
 		; barrier releases, so it cannot start a nested persistence transaction.
 		SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
-		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(true), -1)
+		LLM_Menu_ScheduleBackendLifecycle(true)
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
-		try LLM_Deps_Cancel()
-		try OllamaWV_Close()
-		try LLM_OllamaCancelWarmupRetry()
+		LLM_Menu_BackendLifecycleInvalidate(true)
 		LLM_Bridge_Stop()
 	}
 	return true
@@ -204,48 +202,6 @@ LLM_Menu_ToggleBool(key) {
 		_LLM_Menu_ApplyStandardCommitted)
 }
 
-LLM_Menu_BootstrapCurrentBackend(show_ui := true) {
-	global _LLM_Menu
-	if (_LLM_Menu["backend"] == "api") {
-		try LLM_Deps_Cancel()
-		try LLM_OllamaCancelWarmupRetry()
-		if A_IsSuspended {
-			_LLM_Menu["bootstrap_pending"] := true
-			return false
-		}
-		_LLM_Menu["bootstrap_pending"] := false
-		return LLM_Menu_TryStartBridge()
-	}
-	return LLM_Menu_BootstrapOllama(show_ui)
-}
-
-/**
- * Triggers the Ollama deps checker.
- * @param {boolean} show_ui - True when the user explicitly clicked the toggle.
- */
-LLM_Menu_BootstrapOllama(show_ui := true) {
-	global _LLM_Menu
-	if A_IsSuspended {
-		_LLM_Menu["bootstrap_pending"] := true
-		LoggerDebug("LLM", "BootstrapOllama deferred while suspended.")
-		return
-	}
-	_LLM_Menu["bootstrap_pending"] := false
-	LoggerInfo("LLM", "BootstrapOllama fired — deps state: " LLM_Deps_GetState() " show_ui=" (show_ui ? "true" : "false") ".")
-	if LLM_Deps_IsReady() {
-		LoggerInfo("LLM", "Ollama already ready — starting bridge directly.")
-		LLM_Menu_OnDepsReady()
-		return
-	}
-	LoggerInfo("LLM", "Ollama not ready — launching CheckAndInstall…")
-	LLM_Deps_CheckAndInstall(
-		_LLM_Menu["model"],
-		(*) => LLM_Menu_OnDepsReady(),
-		(msg) => LLM_Menu_OnDepsFailed(msg),
-		show_ui
-	)
-}
-
 
 
 
@@ -263,16 +219,21 @@ LLM_Menu_SetBackend(id) {
 }
 
 _LLM_Menu_ApplyBackendCommitted(Candidate) {
-	try LLM_AuxInvalidate("backend")
+	LLM_Menu_BackendLifecycleInvalidate(true)
 	try LLM_Engine_StopGeneration()
-	try LLM_Deps_Cancel()
-	try LLM_OllamaCancelWarmupRetry()
 	if !LLM_BackendCapabilities(Candidate["backend"])["streaming"]
 		Candidate["streaming"] := false
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
 	LLM_Menu_Build()
 	if Candidate["enabled"]
-		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+		LLM_Menu_ScheduleBackendLifecycle(false)
+	return true
+}
+
+_LLM_Menu_ApplyApiEntriesCommitted(Candidate) {
+	_LLM_Menu_ApplyStandardCommitted(Candidate)
+	if Candidate["enabled"] && Candidate["backend"] == "api"
+		LLM_Menu_ScheduleBackendLifecycle(false)
 	return true
 }
 
@@ -375,6 +336,9 @@ _LLM_Menu_FireHealthProbe(Force := false) {
 
 _LLM_Menu_OnHealthProbeDone(reachable) {
 	global _LLM_Menu
+	if A_IsSuspended || !_LLM_Menu.Get("enabled", false)
+			|| _LLM_Menu.Get("backend", "") != "ollama"
+		return false
 	prev := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
 	new_status := reachable ? "ok" : "ko"
 	_LLM_Menu["last_health_status"] := new_status
@@ -418,6 +382,10 @@ _LLM_Menu_FireInstalledTagsProbe() {
 }
 
 _LLM_Menu_OnInstalledTagsProbeDone(tags) {
+	global _LLM_Menu
+	if A_IsSuspended || !_LLM_Menu.Get("enabled", false)
+			|| _LLM_Menu.Get("backend", "") != "ollama"
+		return false
 	prev := _LLM_GetInstalledTagsCached()
 	LLM_SetInstalledTagsCache(tags)
 	; Repaint only when the installed SET actually changed (mirrors the health dot's
@@ -525,10 +493,15 @@ LLM_Menu_TryStartBridge() {
 		return false
 	if (_LLM_Menu["backend"] == "ollama" && !LLM_Deps_IsReady())
 		return
+	if (_LLM_Menu["backend"] == "api"
+			&& !_LLM_Menu_SelectedApiEntryIsUsable())
+		return false
 	_LLM_Menu["bridge_pending"] := false
-	LLM_Menu_StartBridge()
+	if !LLM_Menu_StartBridge()
+		return false
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook && IsSet(LLM_Bridge_OnPrefixWatcherReady))
 		LLM_Bridge_OnPrefixWatcherReady()
+	return true
 }
 
 LLM_Menu_StartBridge() {
@@ -641,59 +614,6 @@ LLM_Menu_BuildOpts() {
 
 
 
-; =============================================
-; =============================================
-; ======= 5/ Ollama Lifecycle Callbacks =======
-; =============================================
-; =============================================
-
-/**
- * Called by the deps checker when Ollama is confirmed ready.
- */
-LLM_Menu_OnDepsReady() {
-	global _LLM_Menu
-	if (_LLM_Menu["backend"] != "ollama")
-		return
-	if A_IsSuspended {
-		_LLM_Menu["bootstrap_pending"] := true
-		LoggerDebug("LLM", "Deps-ready callback deferred while suspended.")
-		return
-	}
-	LoggerInfo("LLM", "Ollama ready — LLM enabled: {1}.",
-		_LLM_Menu["enabled"] ? "true" : "false")
-	LLM_Menu_Build()
-	if _LLM_Menu["enabled"] {
-		LLM_Menu_TryStartBridge()
-		; Prime the current model so the first user keystroke does not
-		; pay the cold-start penalty. Async — no blocking on Build.
-		if (_LLM_Menu["backend"] == "ollama" and _LLM_Menu["model"] != "") {
-			global _LLM_Ollama_IsReady
-			_LLM_Ollama_IsReady := false
-			try LLM_OllamaScheduleWarmupRetry(_LLM_Menu["model"])
-		} else {
-			global _LLM_Ollama_IsReady
-			_LLM_Ollama_IsReady := true
-		}
-	}
-}
-
-/**
- * Called by the deps checker on permanent failure.
- * @param {string} msg - Failure reason.
- */
-LLM_Menu_OnDepsFailed(msg) {
-	global _LLM_Menu
-	if (_LLM_Menu["backend"] != "ollama")
-		return
-	if A_IsSuspended {
-		_LLM_Menu["bootstrap_pending"] := true
-		LoggerDebug("LLM", "Deps-failed callback deferred while suspended.")
-		return
-	}
-	_LLM_Menu["enabled"] := false
-	LLM_Menu_Build()
-}
-
 ; Replays the suspended lifecycle work from the resume watchdog, after native
 ; Suspend has released hotkeys. The one-shot avoids performing dependency work
 ; inside the watchdog callback itself.
@@ -714,6 +634,6 @@ LLM_Menu_OnResume() {
 	if _LLM_Menu["bootstrap_pending"] {
 		_LLM_Menu["bootstrap_pending"] := false
 		if _LLM_Menu["enabled"]
-			SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+			LLM_Menu_ScheduleBackendLifecycle(false)
 	}
 }
