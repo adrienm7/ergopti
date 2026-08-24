@@ -210,38 +210,9 @@ $SC11D:: {
 ; the hold alone or the picker offers a choice the driver silently ignores.
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
-	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
-	if tap {
-		if (A_PriorKey == "RControl")
-			_RCtrlDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "right_ctrl") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("right_ctrl", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "RCtrl layer hold suppressed before activation because wheel activity was detected.")
-		return
-	}
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC11D", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
+	Result := TapHoldOwnImmediateLayer("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
+	if (Result["tap"] and A_PriorKey == "RControl")
+		_RCtrlDispatch()
 }
 #HotIf
 

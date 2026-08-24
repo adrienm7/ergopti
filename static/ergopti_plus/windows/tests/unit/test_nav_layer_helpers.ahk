@@ -50,10 +50,126 @@ Test("DisableLayer: sets LayerEnabled to false", _NL_DisableLayerSetsDisabled)
 
 
 
+; ======================================================================
+; ======================================================================
+; ======= 2/ Immediate tap-hold layer ownership =======================
+; ======================================================================
+; ======================================================================
+
+global _NL_ImmediateOrder := []
+global _NL_ImmediateTicks := []
+global _NL_ImmediateWaitResults := []
+global _NL_ImmediateDownResults := []
+
+_NL_ImmediateReset(Ticks, WaitResults, DownResults := []) {
+	global _NL_ImmediateOrder := []
+	global _NL_ImmediateTicks := Ticks.Clone()
+	global _NL_ImmediateWaitResults := WaitResults.Clone()
+	global _NL_ImmediateDownResults := DownResults.Clone()
+}
+
+_NL_ImmediateActivate() {
+	global _NL_ImmediateOrder, LayerEnabled
+	_NL_ImmediateOrder.Push("activate")
+	LayerEnabled := true
+	return true
+}
+
+_NL_ImmediateDisable() {
+	global _NL_ImmediateOrder, LayerEnabled
+	_NL_ImmediateOrder.Push("disable")
+	LayerEnabled := false
+}
+
+_NL_ImmediateWait(KeyName, TimeoutSec) {
+	global _NL_ImmediateOrder, _NL_ImmediateWaitResults, LayerEnabled
+	AssertTrue(LayerEnabled,
+		"LayerEnabled must be visible before the owner yields to the physical-release wait")
+	AssertEqual(STUCK_MODIFIER_RELEASE_TIMEOUT_SEC, TimeoutSec,
+		"Every release wait must retain the stuck-key timeout")
+	_NL_ImmediateOrder.Push("wait")
+	return _NL_ImmediateWaitResults.RemoveAt(1)
+}
+
+_NL_ImmediateIsDown(KeyName) {
+	global _NL_ImmediateDownResults
+	return _NL_ImmediateDownResults.RemoveAt(1)
+}
+
+_NL_ImmediateNow() {
+	global _NL_ImmediateTicks
+	return _NL_ImmediateTicks.RemoveAt(1)
+}
+
+_NL_ImmediateThrowingWait(KeyName, TimeoutSec) {
+	throw Error("release seam failed")
+}
+
+_NL_ImmediateQuickTapDisablesBeforeTap() {
+	global _NL_ImmediateOrder, LayerEnabled := false
+	_NL_ImmediateReset([1000, 1050], [true])
+	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
+		_NL_ImmediateActivate, _NL_ImmediateDisable)
+	if Result["tap"]
+		_NL_ImmediateOrder.Push("tap")
+	AssertTrue(Result["activated"])
+	AssertFalse(LayerEnabled)
+	AssertEqual(4, _NL_ImmediateOrder.Length)
+	AssertEqual("activate", _NL_ImmediateOrder[1])
+	AssertEqual("wait", _NL_ImmediateOrder[2])
+	AssertEqual("disable", _NL_ImmediateOrder[3])
+	AssertEqual("tap", _NL_ImmediateOrder[4],
+		"The tap must be emitted only after the layer owner has disabled the layer")
+}
+Test("tap-hold layer: key-down activates immediately and quick release taps after disable (tap-hold-layer-immediate)", _NL_ImmediateQuickTapDisablesBeforeTap)
+
+_NL_ImmediateInterposedKeySeesLayer() {
+	global LayerEnabled := false
+	_NL_ImmediateReset([2000, 2300], [true])
+	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
+		_NL_ImmediateActivate, _NL_ImmediateDisable)
+	AssertFalse(Result["tap"], "A key held past the threshold must never emit its tap")
+	AssertFalse(LayerEnabled)
+}
+Test("tap-hold layer: an interposed key before the threshold observes the active layer (tap-hold-layer-immediate)", _NL_ImmediateInterposedKeySeesLayer)
+
+_NL_ImmediateReleaseWaitRearmsWhileHeld() {
+	global _NL_ImmediateOrder, LayerEnabled := false
+	_NL_ImmediateReset([3000, 5400], [false, true], [true])
+	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
+		_NL_ImmediateActivate, _NL_ImmediateDisable)
+	AssertFalse(Result["tap"])
+	AssertEqual(4, _NL_ImmediateOrder.Length,
+		"The bounded release wait must re-arm while the physical key remains down")
+	AssertEqual("wait", _NL_ImmediateOrder[2])
+	AssertEqual("wait", _NL_ImmediateOrder[3])
+	AssertFalse(LayerEnabled)
+}
+Test("tap-hold layer: bounded release waits re-arm while held (tap-hold-layer-immediate)", _NL_ImmediateReleaseWaitRearmsWhileHeld)
+
+_NL_ImmediateExceptionAlwaysDisables() {
+	global _NL_ImmediateOrder, LayerEnabled := false
+	_NL_ImmediateReset([4000], [])
+	AssertThrows(() => TapHoldOwnImmediateLayer("SC038", 0.2,
+		_NL_ImmediateThrowingWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
+		_NL_ImmediateActivate, _NL_ImmediateDisable),
+		"A release seam exception must propagate after cleanup")
+	AssertFalse(LayerEnabled)
+	AssertEqual("disable", _NL_ImmediateOrder[_NL_ImmediateOrder.Length],
+		"DisableLayer must remain in a finally")
+}
+Test("tap-hold layer: exceptions cannot leave the layer latched (tap-hold-layer-immediate)", _NL_ImmediateExceptionAlwaysDisables)
+
+
+
+
 
 ; =============================================
 ; =============================================
-; ======= 2/ Repetition counter helpers =======
+; ======= 3/ Repetition counter helpers =======
 ; =============================================
 ; =============================================
 
@@ -90,7 +206,7 @@ Test("ResetNumberOfRepetitions: idempotent when already 1", _NL_ResetRepetitions
 
 ; ===================================
 ; ===================================
-; ======= 3/ ActionLayer stub =======
+; ======= 4/ ActionLayer stub =======
 ; ===================================
 ; ===================================
 
@@ -110,7 +226,7 @@ Test("ActionLayer: resets NumberOfRepetitions after firing", _NL_ActionLayerRese
 
 ; =====================================================================
 ; =====================================================================
-; ======= 4/ MaxHotkeysPerInterval symmetry (layer-rate-limit) ========
+; ======= 5/ MaxHotkeysPerInterval symmetry (layer-rate-limit) ========
 ; =====================================================================
 ; =====================================================================
 
