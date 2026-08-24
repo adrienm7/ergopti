@@ -77,6 +77,17 @@ local ACTION_LLM_GENERATION_FAILED = "llm_generation_failed"
 --- events_system.action discriminator for a native macOS autocorrect substitution.
 local ACTION_SYS_AUTOCORRECT = "sys_autocorrect"
 
+--- Optional accounting fields carried by every events_llm serializer and by
+--- the existing-cache migration. Keeping both consumers on this one ordered
+--- declaration prevents a field from being writable only on fresh installs or
+--- being migrated without ever reaching an INSERT.
+local LLM_ACCOUNTING_COLUMNS = {
+	{ "prompt_tokens", "INTEGER" },
+	{ "completion_tokens", "INTEGER" },
+	{ "total_tokens", "INTEGER" },
+	{ "est_cost_usd", "REAL" },
+}
+
 
 
 
@@ -181,12 +192,7 @@ function M.open_db()
 	for row in _db:nrows("PRAGMA table_info(events_llm)") do
 		llm_columns[row.name] = true
 	end
-	for _, column in ipairs({
-		{ "prompt_tokens", "INTEGER" },
-		{ "completion_tokens", "INTEGER" },
-		{ "total_tokens", "INTEGER" },
-		{ "est_cost_usd", "REAL" },
-	}) do
+	for _, column in ipairs(LLM_ACCOUNTING_COLUMNS) do
 		if not llm_columns[column[1]] then
 			local rc = _db:exec("ALTER TABLE events_llm ADD COLUMN " .. column[1] .. " " .. column[2])
 			if rc ~= sqlite3.OK then
@@ -439,19 +445,26 @@ function _builders.hotstring(e, id, kind)
 end
 
 function _builders.llm(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count, prompt_tokens, completion_tokens, total_tokens, est_cost_usd) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app or "Unknown"), _sql_str(kind),
-		_sql_str(e.context),
-		(e.predictions and _sql_json(e.predictions) or "NULL"),
+	local columns = {
+		"device_id", "id", "ts", "date", "app", "kind", "context",
+		"predictions_json", "prediction", "all_predictions_json", "chosen_index",
+		"deletes", "deleted_text", "net_saved_chars", "count",
+	}
+	local values = {
+		_sql_str(_device_id), tostring(id), _sql_str(e.timestamp),
+		_sql_str(e.timestamp:sub(1, 10)), _sql_str(e.app or "Unknown"), _sql_str(kind),
+		_sql_str(e.context), (e.predictions and _sql_json(e.predictions) or "NULL"),
 		_sql_str(e.prediction),
 		(e.all_predictions and _sql_json(e.all_predictions) or "NULL"),
-		_sql_num(e.chosen_index), _sql_num(e.deletes),
-		_sql_str(e.deleted_text), _sql_num(e.net_saved_chars), _sql_num(e.count),
-		_sql_num(e.prompt_tokens), _sql_num(e.completion_tokens),
-		_sql_num(e.total_tokens), _sql_num(e.est_cost_usd))
+		_sql_num(e.chosen_index), _sql_num(e.deletes), _sql_str(e.deleted_text),
+		_sql_num(e.net_saved_chars), _sql_num(e.count),
+	}
+	for _, column in ipairs(LLM_ACCOUNTING_COLUMNS) do
+		columns[#columns + 1] = column[1]
+		values[#values + 1] = _sql_num(e[column[1]])
+	end
+	return "INSERT OR IGNORE INTO events_llm (" .. table.concat(columns, ", ")
+		.. ") VALUES (" .. table.concat(values, ", ") .. ");"
 end
 
 function _builders.session(e, id, kind)
