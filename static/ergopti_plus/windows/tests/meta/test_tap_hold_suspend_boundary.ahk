@@ -11,16 +11,20 @@
 #Requires AutoHotkey v2.0
 
 _THSB_HoldModifierGateChecksSuspendBeforeInjection() {
-	Body := _DriverFuncBody("TapHoldShouldSuppressHold")
-	Assert(Body != "", "TapHoldShouldSuppressHold must remain the common hold-modifier gate")
-	SuspendPos := InStr(Body, "if A_IsSuspended")
-	SuccessPos := InStr(Body, "if (CancelReason != " . Chr(34) . Chr(34) . ")")
+	Body := _DriverFuncBody("TapHoldOwnImmediateModifier")
+	Assert(Body != "", "TapHoldOwnImmediateModifier must remain the common hold-modifier owner")
+	DownPos := InStr(Body, "KeyDownFn.Call(ModKey)")
+	WaitPos := InStr(Body, "WaitReleaseFn.Call(KeyName")
+	SuspendPos := InStr(Body, "!A_IsSuspended")
+	TapPos := InStr(Body, "TapAllowed :=")
+	Assert(DownPos > 0 and WaitPos > DownPos,
+		"the modifier owner must acquire before its first interruptible release wait")
 	Assert(SuspendPos > 0,
-		"TapHoldShouldSuppressHold must reject candidates when Suspend occurs during KeyWait")
-	Assert(SuccessPos > SuspendPos,
-		"the suspend veto must run before the normal hold activation path can report success")
+		"TapHoldOwnImmediateModifier must reject a tap when Suspend occurs during its release wait")
+	Assert(TapPos > SuspendPos,
+		"the suspend veto must run before the owner can report an isolated tap")
 }
-Test("tap-holds: in-flight hold-modifier candidates are cancelled by Suspend (tap-hold-suspend-boundary)",
+Test("tap-holds: immediate hold-modifier owners suppress their tap after Suspend (tap-hold-suspend-boundary)",
 	_THSB_HoldModifierGateChecksSuspendBeforeInjection)
 
 _THSB_HoldLayerGateChecksSuspendBeforeMutation() {
@@ -183,8 +187,11 @@ _THSB_EverySyntheticDownCallerConsumesTheVerdict() {
 		Assert(RegExMatch(Line, "i)^\s*if\b[^`r`n]*!\s*TapHoldSyntheticKeyDown\("),
 			"every synthetic Down caller must stop when ownership is not proven: " . Line)
 	}
-	Assert(CallCount >= 15,
-		"the verdict guard must enumerate the full driver-wide synthetic-Down caller class")
+	OwnerBody := _DriverFuncBody("TapHoldOwnImmediateModifier")
+	Assert(InStr(OwnerBody, "if !KeyDownFn.Call(ModKey)") > 0,
+		"the common immediate owner must stop before waiting/tapping when modifier Down is unproved")
+	Assert(CallCount >= 5,
+		"the remaining direct synthetic-Down caller class plus the shared owner must stay enumerated")
 }
 Test("tap-holds AHK-03: every synthetic Down caller consumes the ownership verdict",
 	_THSB_EverySyntheticDownCallerConsumesTheVerdict)

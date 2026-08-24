@@ -7,10 +7,8 @@
 ; Escape tap-hold: any action from GESTURE_ACTIONS on tap (default: escape),
 ; any hold modifier or nav layer on hold. Scancode SC001.
 ;
-; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
-; Phase 1 — KeyWait with timeout discriminates tap from hold.
-; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
-; Phase 2 (layer) — activate layer until key-up.
+; Modifier or layer ownership begins synchronously on physical key-down. The
+; owner is balanced on release before a quick isolated press emits the tap.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,28 +43,10 @@ _EscapeHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
 *$SC001:: {
-	tap := KeyWait("Escape", "T" . TapHoldDuration(TapHold, "escape"))
-	if tap {
-		if (A_PriorKey == "Escape")
-			_EscapeDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "escape") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("escape", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "Escape hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	ModKey := _EscapeHoldModKey()
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	try {
-		KeyWait("Escape", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
+	Result := TapHoldOwnImmediateModifier("escape", "Escape",
+		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"))
+	if (Result["tap"] and A_PriorKey == "Escape")
+		_EscapeDispatch()
 }
 #HotIf
 

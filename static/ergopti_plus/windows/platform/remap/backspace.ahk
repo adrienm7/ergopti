@@ -7,10 +7,8 @@
 ; Backspace tap-hold: any action from GESTURE_ACTIONS on tap (default:
 ; backspace), any hold modifier or nav layer on hold. Scancode SC00E.
 ;
-; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
-; Phase 1 — KeyWait with timeout discriminates tap from hold.
-; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
-; Phase 2 (layer) — activate layer until key-up.
+; Modifier or layer ownership begins synchronously on physical key-down. The
+; owner is balanced on release before a quick isolated press emits the tap.
 ;
 ; Note: the physical Backspace key is also used by CapsLock and LAlt modules
 ; as their tap output — those are output actions, not remappings of the
@@ -49,28 +47,10 @@ _BackspaceHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled
 *$SC00E:: {
-	tap := KeyWait("BackSpace", "T" . TapHoldDuration(TapHold, "backspace"))
-	if tap {
-		if (A_PriorKey == "BackSpace")
-			_BackspaceDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "backspace") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("backspace", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "Backspace hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	ModKey := _BackspaceHoldModKey()
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	try {
-		KeyWait("BackSpace", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
+	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace",
+		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"))
+	if (Result["tap"] and A_PriorKey == "BackSpace")
+		_BackspaceDispatch()
 }
 #HotIf
 

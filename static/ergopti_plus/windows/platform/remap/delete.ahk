@@ -7,10 +7,8 @@
 ; Delete tap-hold: any action from GESTURE_ACTIONS on tap (default: delete),
 ; any hold modifier or nav layer on hold. Scancode SC153.
 ;
-; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
-; Phase 1 — KeyWait with timeout discriminates tap from hold.
-; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
-; Phase 2 (layer) — activate layer until key-up.
+; Modifier or layer ownership begins synchronously on physical key-down. The
+; owner is balanced on release before a quick isolated press emits the tap.
 ;
 ; Note: this remaps the physical Delete/Suppr key (SC153 — the EXTENDED scancode).
 ; SC053 is NumpadDel/NumpadDot, a different physical key: binding it meant the
@@ -50,28 +48,10 @@ _DeleteHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
 *$SC153:: {
-	tap := KeyWait("Delete", "T" . TapHoldDuration(TapHold, "delete"))
-	if tap {
-		if (A_PriorKey == "Delete")
-			_DeleteDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "delete") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("delete", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "Delete hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	ModKey := _DeleteHoldModKey()
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	try {
-		KeyWait("Delete", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
+	Result := TapHoldOwnImmediateModifier("delete", "Delete",
+		_DeleteHoldModKey(), TapHoldDuration(TapHold, "delete"))
+	if (Result["tap"] and A_PriorKey == "Delete")
+		_DeleteDispatch()
 }
 #HotIf
 

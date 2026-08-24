@@ -87,7 +87,7 @@ _HLRB_RCtrlHoldLayer() {
 	; the `not _RCtrlIsSpecialTap()` prefix is the stable half and is what
 	; test_hold_modifier_release_bounded already anchors on for block 7.4.
 	_HLRB_AssertBounded("platform/remap/rctrl.ahk",
-		"not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, " . Q . "right_ctrl" . Q . ") != " . Q . Q,
+		"TapHoldHoldLayer(TapHold, " . Q . "right_ctrl" . Q . ") != " . Q . Q,
 		"rctrl.ahk 7.5")
 }
 Test("tap-holds: RCtrl hold-layer release is bounded + in finally (hold-layer-unbounded-keywait)", _HLRB_RCtrlHoldLayer)
@@ -112,7 +112,7 @@ _HLRB_LAltTabLayer() {
 	Q := Chr(34)
 	; Section 4.2: tab tap + hold-layer — bare KeyWait("SC038") with no flags.
 	_HLRB_AssertBounded("platform/remap/lalt.ahk",
-		"TapHoldTapAction(TapHold, " . Q . "left_alt" . Q . ") == " . Q . "tab" . Q . " and not LayerEnabled",
+		"TapHoldTapAction(TapHold, " . Q . "left_alt" . Q . ") == " . Q . "tab" . Q . " and TapHoldHoldModifier",
 		"lalt.ahk 4.2")
 }
 Test("tap-holds: LAlt tab+layer hold-layer release is bounded + in finally (hold-layer-unbounded-keywait)", _HLRB_LAltTabLayer)
@@ -133,7 +133,7 @@ _HLRB_LAltGenericLayer() {
 	; requires a tap action so a hold arms on the hold alone
 	; (taphold-hold-option-unreachable). The assertions are unchanged.
 	_HLRB_AssertBounded("platform/remap/lalt.ahk",
-		"not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, " . Q . "left_alt" . Q . ") != " . Q . Q,
+		"TapHoldTapAction(TapHold, " . Q . "left_alt" . Q . ") != " . Q . "backspace" . Q . " and TapHoldTapAction",
 		"lalt.ahk 4.8")
 }
 Test("tap-holds: LAlt generic hold-layer release is bounded + in finally (hold-layer-unbounded-keywait)", _HLRB_LAltGenericLayer)
@@ -170,7 +170,7 @@ Test("tap-holds: Space hold-layer is immediate and shared", _HLRB_SpaceHoldLayer
 _HLRB_TabHoldLayer() {
 	Q := Chr(34)
 	_HLRB_AssertBounded("platform/remap/tab.ahk",
-		"TapHoldTapAction(TapHold, " . Q . "tab" . Q . ") != " . Q . "alt_tab_monitor" . Q . " and TapHoldHoldLayer",
+		"TapHoldHoldLayer(TapHold, " . Q . "tab" . Q . ") != " . Q . Q,
 		"tab.ahk 8.3")
 }
 Test("tap-holds: Tab hold-layer is immediate and shared", _HLRB_TabHoldLayer)

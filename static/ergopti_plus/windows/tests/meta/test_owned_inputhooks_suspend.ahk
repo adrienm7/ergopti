@@ -14,22 +14,18 @@ _OIH_AssertSuspendOwnedHook(FunctionName, HookName) {
 }
 
 _OIH_SpaceAndOneShotHooksStopOnSuspend() {
-	_OIH_AssertSuspendOwnedHook("SpaceTapHold", "_SpaceHoldInputHook")
 	_OIH_AssertSuspendOwnedHook("OneShotShift", "_OneShotShiftInputHook")
 	_OIH_AssertSuspendOwnedHook("DeadKey", "_DeadKeyInputHook")
+	Space := _DriverFuncBody("SpaceTapHold")
+	Assert(InStr(Space, 'TapHoldOwnImmediateModifier("space",') > 0
+		and !InStr(Space, "InputHook("),
+		"Space no longer owns an InputHook: its configured modifier must be active before the first chord")
 }
-Test("lifecycle: owned Space, OneShotShift, and DeadKey InputHooks stop on suspend (owned-inputhooks-suspend)", _OIH_SpaceAndOneShotHooksStopOnSuspend)
+Test("lifecycle: owned InputHooks stop on suspend and Space uses no capture hook (owned-inputhooks-suspend)", _OIH_SpaceAndOneShotHooksStopOnSuspend)
 
 _OIH_SpaceOwnerReleaseStopsCaptureBeforeNextKey() {
 	Body := _DriverFuncBody("SpaceTapHold")
-	Assert(InStr(Body, 'ih.KeyOpt("{SC039}", "+N")') > 0,
-		"Space capture must receive its physical owner key-up")
-	Assert(InStr(Body, "ih.OnKeyUp := _SpaceHoldOnKeyUp") > 0,
-		"Space capture must bind an owner-release callback")
-	Assert(InStr(Body, "if _SpaceHoldOwnerReleased") > 0,
-		"Space capture must exit before dispatch after its owner was released")
-	Callback := _DriverFuncBody("_SpaceHoldOnKeyUp")
-	Assert(InStr(Callback, "ih.Stop()") > 0 and InStr(Callback, "_SpaceHoldOwnerReleased := true") > 0,
-		"Space owner key-up must stop the suppressing hook and mark the transaction closed")
+	Assert(!InStr(Body, "InputHook(") and !InStr(Body, "ih.Wait()"),
+		"Space must not swallow a chord into a delayed capture window")
 }
-Test("lifecycle: Space owner key-up terminates the suppressing capture", _OIH_SpaceOwnerReleaseStopsCaptureBeforeNextKey)
+Test("lifecycle: Space has no suppressing capture after immediate ownership", _OIH_SpaceOwnerReleaseStopsCaptureBeforeNextKey)
