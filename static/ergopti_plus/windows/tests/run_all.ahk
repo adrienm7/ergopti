@@ -92,6 +92,7 @@ OnError(_FatalErrorHandler)
 ; are invoked directly by the regression test.
 #Include ../infra/bundle.ahk
 #Include ../infra/tray_bootstrap.ahk
+#Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../infra/logger.ahk
@@ -252,6 +253,7 @@ InstallSendNoOps()
 #Include unit/test_gesture_modifier_release_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_tray_bootstrap_publication_transaction.ahk
+#Include unit/test_llm_menu_build_coordinator.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
 #Include unit/test_prefix_visible_suggestion_epoch.ahk
@@ -380,9 +382,10 @@ _LogBootProgress("loading LLM modules")
 #Include meta/test_ollama_reachability_async_nonblocking.ahk
 ; Orphan temp-file sweep is bounded + off the Critical dispatch path (llm-orphan-sweep-temp-recursion).
 #Include meta/test_llm_orphan_sweep_nonblocking.ahk
-; LLM_Menu_Build runs under Critical so deferred boot tasks cannot preempt it (menu-build-boot-preempt).
+; The coordinator serializes detached LLM menu builds and retains re-entrant work.
 #Include meta/test_llm_markchain_no_rerender.ahk
 #Include meta/test_llm_menu_build_critical.ahk
+#Include meta/test_llm_menu_build_coordinator.ahk
 _LogBootProgress("LLM modules + tests included")
 
 ; LLM tray menu -> config.toml persistence (contract-driven round-trips).

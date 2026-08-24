@@ -40,9 +40,9 @@ Test("menu_llm: LLM_Menu_SetBackend propagates to the prediction engine (F25)", 
 _LSPE_AssertInitCallPrecedesBuild() {
 	Body := _DriverFuncBody("_LLM_Menu_ApplyBackendCommitted")
 	InitPos  := InStr(Body, "LLM_Engine_Init(LLM_Menu_BuildOpts())")
-	BuildPos := InStr(Body, "LLM_Menu_Build()")
+	BuildPos := InStr(Body, "LLM_Menu_RequestBuild(")
 	Assert(InitPos > 0 and BuildPos > 0 and InitPos < BuildPos,
-		"LLM_Menu_SetBackend must call LLM_Engine_Init before LLM_Menu_Build, matching every sibling setter's ordering (F25)")
+		"LLM_Menu_SetBackend must call LLM_Engine_Init before requesting a menu build, matching every sibling setter's ordering (F25)")
 }
 Test("menu_llm: LLM_Menu_SetBackend inits the engine before rebuilding the tray (F25)", _LSPE_AssertInitCallPrecedesBuild)
 

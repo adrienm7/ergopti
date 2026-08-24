@@ -292,6 +292,7 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 #Include backend_lifecycle.ahk
 #Include aux_ownership.ahk
 #Include init.ahk
+#Include menu_build_coordinator.ahk
 #Include menu_main.ahk
 #Include menu_models.ahk
 #Include menu_api_entries.ahk

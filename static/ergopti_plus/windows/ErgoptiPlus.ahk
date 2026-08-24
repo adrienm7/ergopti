@@ -1187,7 +1187,7 @@ if _LangMenuBuildPending
 ; a still-cold daemon and block the keyboard thread for seconds — a stuck/empty menu
 ; AND missed prediction-cancel on mouse/keystroke while the thread is frozen.
 if !_LLM_Menu["enabled"]
-	SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)
+	SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
 ; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().

@@ -74,7 +74,7 @@ _MetaCheckBootDeferredTasks() {
 		"SetTimer(WPMWidget_Show",
 		"SetTimer(BuildLanguageMenuDeferred",
 		"SetTimer(I18nWarmFallbacks",
-		"SetTimer(LLM_Menu_Build" ] {
+		"SetTimer(LLM_Menu_RequestBuild" ] {
 		Pos := InStr(Body, Probe)
 		Assert(Pos > 0, "ErgoptiPlus.ahk must arm '" . Probe . "...' at boot")
 		Assert(Pos > ReadyPos,

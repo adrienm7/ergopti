@@ -511,7 +511,8 @@ _LLM_Menu_PullModel(name) {
 	; Rebuild after a short delay so the green dot appears once Ollama finishes
 	; (the user will close the window manually; this just keeps the menu fresh
 	; if they glance at it again while the terminal is still open).
-	SetTimer(() => LLM_Menu_Build(), -LLM_MENU_POST_PULL_REBUILD_MS)
+	SetTimer(LLM_Menu_RequestBuild.Bind("post_pull"),
+		-LLM_MENU_POST_PULL_REBUILD_MS)
 }
 
 _LLM_Menu_MakeOpenUrlHandler(url) {

@@ -65,7 +65,7 @@ _LLM_Menu_BackendLifecycleCall(Port, Name, Args*) {
 		case "deps_check":
 			return LLM_Deps_CheckAndInstall(Args*)
 		case "menu_build":
-			return LLM_Menu_Build()
+			return LLM_Menu_RequestBuild("backend_lifecycle")
 		case "warmup":
 			return _LLM_Menu_WarmCurrentOllamaModel()
 		case "deps_failed":
@@ -251,6 +251,6 @@ _LLM_Menu_WarmCurrentOllamaModel() {
 _LLM_Menu_ApplyCurrentDepsFailure(*) {
 	global _LLM_Menu
 	_LLM_Menu["enabled"] := false
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("deps_failure")
 	return true
 }

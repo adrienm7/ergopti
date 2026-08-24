@@ -87,7 +87,7 @@ _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
 ; Applies the ordinary post-commit tail shared by scalar LLM settings.
 _LLM_Menu_ApplyStandardCommitted(*) {
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("standard_committed")
 	return true
 }
 

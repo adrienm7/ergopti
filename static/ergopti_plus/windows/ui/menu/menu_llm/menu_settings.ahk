@@ -533,7 +533,7 @@ _LLM_Menu_ApplyOllamaPortCommitted(Candidate) {
 	if !LLM_Ollama_SetPort(Candidate["ollama_port"])
 		return false
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("ollama_port_committed")
 	if Candidate.Get("enabled", false)
 			&& Candidate.Get("backend", "") == "ollama"
 		LLM_Menu_ScheduleBackendLifecycle(false)
@@ -663,7 +663,7 @@ LLM_Menu_PromptTriggerShortcut() {
 	; A partial native cleanup failure returns false but publishes an explicit
 	; recovery projection. Rebuild that warning instead of leaving a stale label
 	if Committed || LLM_Menu_TriggerNeedsAttention()
-		LLM_Menu_Build()
+		LLM_Menu_RequestBuild("setting_committed")
 	return Committed
 }
 

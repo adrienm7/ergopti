@@ -224,7 +224,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; before this point (the "menu shows only the first items" bug). Re-populating
 	; _LLM_Menu_Handle in place later keeps the entry's position (see the persistent-
 	; Menu note at its declaration), so menu order is preserved. The population is
-	; armed UNCONDITIONALLY at the boot tail (SetTimer LLM_Menu_Build) — NOT signalled
+	; armed UNCONDITIONALLY at the boot tail (SetTimer LLM_Menu_RequestBuild) — NOT signalled
 	; from here via a flag: initMenu() itself runs inside the deferred tray-build pass,
 	; so any flag set here would be read by the boot tail long before this line runs.
 	if !_LLM_Menu_InTray {

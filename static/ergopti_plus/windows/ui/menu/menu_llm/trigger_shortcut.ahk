@@ -899,7 +899,7 @@ _LLM_Menu_RunClaimedTriggerRecovery(Record) {
 			if HasMethod(RefreshFn, "Call")
 				RefreshFn.Call()
 			else
-				LLM_Menu_Build()
+				LLM_Menu_RequestBuild("trigger_recovery")
 		} catch as Err {
 			try LoggerError("LLM", "Could not refresh the recovered trigger shortcut row: {1}.",
 				Err.Message)
