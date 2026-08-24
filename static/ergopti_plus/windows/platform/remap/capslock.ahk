@@ -144,32 +144,10 @@ SC03A:: {
 	}
 
 	ModKey := _CapsLockHoldModKey()
-	HoldGuardMs := TapHoldDuration(TapHold, "caps_lock") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("caps_lock", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "CapsLock hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
-	if tap {
-		; Short press — release modifier then dispatch tap action.
-		if !TapHoldSyntheticKeyUp(ModKey)
-			return
+	Result := TapHoldOwnImmediateModifier("caps_lock", "CapsLock", ModKey,
+		TapHoldDuration(TapHold, "caps_lock"))
+	if Result["tap"]
 		_CapsLockDispatch(CtrlActivated)
-		return
-	}
-	; Long press — modifier stays armed until key-up. Bound the wait and release
-	; the modifier in a finally so a lost key-up (UAC focus steal, Suspend toggled
-	; mid-press) or a thrown Send can never latch Ctrl/Shift/Alt/Win Down forever
-	try {
-		KeyWait("CapsLock", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
 }
 #HotIf
 

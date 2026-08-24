@@ -289,28 +289,75 @@ TapHoldShouldCancelTap(KeyId, GuardMs := 250) {
 	return ""
 }
 
-; Return true when a hold gesture should be blocked after the user has already
-; held the key. This is a hold-specific wrapper over TapHoldShouldCancelTap()
-; that keeps all cancel reasons and debug trail in one place.
-TapHoldShouldSuppressHold(KeyId, GuardMs := 250) {
-	global _TH_LastTapHoldCancelReason
-	CancelReason := TapHoldShouldCancelTap(KeyId, GuardMs)
-	; A KeyWait started before Suspend keeps its pseudo-thread alive even though
-	; native Suspend disarms the hotkey that started it.  Every generic
-	; hold-modifier branch calls this helper immediately before injecting its
-	; synthetic modifier, so make the suspension transition an explicit
-	; cancellation reason here rather than allowing a stale candidate to arm a
-	; modifier after the driver has promised to be inert.
-	if A_IsSuspended {
-		_TH_LastTapHoldCancelReason := "driver suspended during hold"
-		try LoggerDebug("TapHoldTrack", "Hold suppressed for '{1}' because the driver was suspended during its KeyWait.", KeyId)
-		return true
+_TapHoldModifierWaitRelease(KeyName, TimeoutSec) {
+	return KeyWait(KeyName, "U T" . TimeoutSec)
+}
+
+_TapHoldModifierKeyIsDown(KeyName) {
+	return GetKeyState(KeyName, "P")
+}
+
+_TapHoldModifierTickNow() {
+	return A_TickCount
+}
+
+; Own one configured synthetic-modifier gesture from physical key-down through
+; release. The Down is published before the first interruptible wait, so the
+; first chord belongs to the hold. Activity cancels only the eventual tap; it
+; never retracts a hold after that hold has already owned an input event.
+TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
+	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
+	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0) {
+	if !IsObject(WaitReleaseFn)
+		WaitReleaseFn := _TapHoldModifierWaitRelease
+	if !IsObject(KeyIsDownFn)
+		KeyIsDownFn := _TapHoldModifierKeyIsDown
+	if !IsObject(TickNowFn)
+		TickNowFn := _TapHoldModifierTickNow
+	if !IsObject(KeyDownFn)
+		KeyDownFn := TapHoldSyntheticKeyDown
+	if !IsObject(KeyUpFn)
+		KeyUpFn := TapHoldSyntheticKeyUp
+	if !IsObject(CancelTapFn)
+		CancelTapFn := TapHoldShouldCancelTap
+
+	StartedAt := TickNowFn.Call()
+	if !KeyDownFn.Call(ModKey) {
+		return Map("activated", false, "released", false,
+			"tap", false, "elapsed_ms", 0)
 	}
-	if (CancelReason != "") {
-		try LoggerDebug("TapHoldTrack", "Hold suppressed for '{1}' ({2}, guard={3}ms).", KeyId, CancelReason, GuardMs)
-		return true
+
+	Released := false
+	ReleaseProved := false
+	try {
+		loop {
+			if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+				Released := true
+				break
+			}
+			if !KeyIsDownFn.Call(KeyName) {
+				Released := true
+				break
+			}
+		}
+	} finally {
+		ReleaseProved := KeyUpFn.Call(ModKey)
 	}
-	return false
+
+	ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
+	GuardMs := TapThresholdSec * 1100
+	if (GuardMs < 250)
+		GuardMs := 250
+	CancelReason := ""
+	if (Released and ReleaseProved and !A_IsSuspended)
+		CancelReason := CancelTapFn.Call(KeyId, GuardMs)
+	TapAllowed := Released and ReleaseProved and !A_IsSuspended
+		and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
+	return Map(
+		"activated", true,
+		"released", ReleaseProved,
+		"tap", TapAllowed,
+		"elapsed_ms", ElapsedMs)
 }
 
 ; Flatten a hold-modifier value into the list of individual key names it holds.

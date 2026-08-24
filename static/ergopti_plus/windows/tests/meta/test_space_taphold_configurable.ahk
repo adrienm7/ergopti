@@ -44,12 +44,10 @@ _TSTC_ConfigurableTimeout() {
 	Src := _TSTC_StripLineComments(_DriverDirConcat("platform/remap"))
 	Assert(Src != "", "platform/remap/space.ahk must be readable")
 
-	; The constant must be declared
-	Assert(InStr(Src, "SPACE_HOLD_INPUT_TIMEOUT_FACTOR") > 0,
-		"platform/remap/space.ahk must define SPACE_HOLD_INPUT_TIMEOUT_FACTOR constant (replaces hardcoded T3)")
-
-	; The constant must be used in the dynamic timeout calculation
-	Assert(InStr(Src, "TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR") > 0,
-		"platform/remap/space.ahk must compute the InputHook timeout as TimeoutSec * SPACE_HOLD_INPUT_TIMEOUT_FACTOR")
+	Body := _DriverFuncBody("SpaceTapHold")
+	Assert(InStr(Body, 'TapHoldDuration(TapHold, "space")') > 0,
+		"Space must pass its configured tap threshold to the common owner")
+	Assert(!InStr(Body, "InputHook(") and !InStr(Src, "SPACE_HOLD_INPUT_TIMEOUT_FACTOR"),
+		"Space must not retain a second capture timeout independent of the configured tap threshold")
 }
-Test("tap_holds/space: InputHook timeout uses SPACE_HOLD_INPUT_TIMEOUT_FACTOR constant (not hardcoded T3)", _TSTC_ConfigurableTimeout)
+Test("tap_holds/space: configured threshold feeds the immediate owner directly", _TSTC_ConfigurableTimeout)

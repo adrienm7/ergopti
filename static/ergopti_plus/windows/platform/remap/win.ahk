@@ -45,28 +45,10 @@ _WinHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "win") != "" and not LayerEnabled
 *$SC15B:: {
-	tap := KeyWait("LWin", "T" . TapHoldDuration(TapHold, "win"))
-	if tap {
-		if (A_PriorKey == "LWin")
-			_WinDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "win") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("win", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "Win hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	ModKey := _WinHoldModKey()
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	try {
-		KeyWait("LWin", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
+	Result := TapHoldOwnImmediateModifier("win", "LWin",
+		_WinHoldModKey(), TapHoldDuration(TapHold, "win"))
+	if (Result["tap"] and A_PriorKey == "LWin")
+		_WinDispatch()
 }
 #HotIf
 

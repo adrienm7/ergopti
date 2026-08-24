@@ -63,17 +63,20 @@ _SADRD_Count(Haystack, Needle) {
 ; ==================================================
 
 _SADRD_AltGrModifierBalanced() {
-	Body := _DriverFuncBody("_SpaceHoldWithModifier")
-	Assert(Body != "", "_SpaceHoldWithModifier(captured) must exist in platform/remap/space.ahk")
+	Body := _DriverFuncBody("TapHoldOwnImmediateModifier")
+	Space := _DriverFuncBody("SpaceTapHold")
+	Assert(Body != "" and Space != "", "Space and its common modifier owner must exist")
 
-	Downs := _SADRD_Count(Body, "TapHoldSyntheticKeyDown(ModKey)")
-	Ups := _SADRD_Count(Body, "TapHoldSyntheticKeyUp(ModKey)")
+	Downs := _SADRD_Count(Body, "KeyDownFn.Call(ModKey)")
+	Ups := _SADRD_Count(Body, "KeyUpFn.Call(ModKey)")
 
 	AssertEqual(1, Downs,
-		"_SpaceHoldWithModifier must acquire its resolved modifier exactly once through the suspend-owned helper, including AltGr's RAlt mapping (space-altgr-double-raalt-down)")
+		"the shared owner must acquire the resolved modifier exactly once")
 	AssertEqual(1, Ups,
-		"_SpaceHoldWithModifier must release its resolved modifier exactly once through the suspend-owned helper (space-altgr-double-raalt-down)")
+		"the shared owner must release the resolved modifier exactly once")
 	AssertEqual(Downs, Ups,
-		"_SpaceHoldWithModifier must keep a balanced modifier Down/Up count so AltGr is never left logically held (space-altgr-double-raalt-down)")
+		"Space AltGr ownership must keep a balanced Down/Up pair")
+	Assert(InStr(Space, "_SpaceHoldModKey()") > 0,
+		"Space must pass its configured resolver result to the shared owner")
 }
 Test("tap_holds: generic Space modifier path keeps AltGr's Down/Up pair balanced (space-altgr-double-raalt-down)", _SADRD_AltGrModifierBalanced)

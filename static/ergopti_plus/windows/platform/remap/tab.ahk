@@ -50,7 +50,7 @@ _TabHoldModKey() {
 ; ========================================
 
 ; SC00F::LAlt remap so the OS hold phase sees Alt (enables Alt+Tab switching).
-#HotIf TapHoldTapAction(TapHold, "tab") == "alt_tab_monitor" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "tab") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and not LayerEnabled
 SC00F::LAlt
 SC00F::
 {
@@ -106,31 +106,12 @@ SC00F Up:: TapHoldSyntheticKeyUp("LAlt")
 ; + hold=<modifier> match no variant at all, and the hold the user just picked
 ; did nothing. _TabDispatch below emits the native Tab when no action is
 ; configured, so the tap keeps working too.
-#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "tab") != "" and not LayerEnabled
 $SC00F:: {
-	ModKey := _TabHoldModKey()
-	HoldGuardMs := TapHoldDuration(TapHold, "tab") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("tab", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "Tab hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
-	if tap {
-		if !TapHoldSyntheticKeyUp(ModKey)
-			return
+	Result := TapHoldOwnImmediateModifier("tab", "SC00F",
+		_TabHoldModKey(), TapHoldDuration(TapHold, "tab"))
+	if Result["tap"]
 		_TabDispatch()
-		return
-	}
-	try {
-		KeyWait("SC00F", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
 }
 #HotIf
 
@@ -148,7 +129,7 @@ $SC00F:: {
 
 ; No tap-action conjunct, for the reason given on block 8.2: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
-#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldLayer(TapHold, "tab") != "" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "tab") != "" and TapHoldHoldModifier(TapHold, "tab") == "" and not LayerEnabled
 $SC00F:: {
 	Result := TapHoldOwnImmediateLayer("SC00F", TapHoldDuration(TapHold, "tab"))
 	if (Result["tap"] and A_PriorKey == "Tab")
