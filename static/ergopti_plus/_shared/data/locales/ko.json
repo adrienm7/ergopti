@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ 종료",
 	"menu.global.reload": "🔄 다시 로드",
 	"menu.global.reset_defaults": "↺ 기본값 초기화",
+	"menu.global.starting": "시작 중…",
 	"menu.global.setup_wizard": "설정 마법사…",
 	"menu.global.suspend": "⏸︎ 일시 정지",
 	"menu.global.title": "전체 동작",

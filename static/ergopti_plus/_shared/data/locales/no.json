@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Avslutt",
 	"menu.global.reload": "🔄 Oppdater",
 	"menu.global.reset_defaults": "↺ Tilbakestill til standard",
+	"menu.global.starting": "Starter…",
 	"menu.global.setup_wizard": "Oppsettprogrammet…",
 	"menu.global.suspend": "⏸︎ Pause",
 	"menu.global.title": "Globale handlinger",

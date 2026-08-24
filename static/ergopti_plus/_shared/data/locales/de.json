@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Beenden",
 	"menu.global.reload": "🔄 Neu laden",
 	"menu.global.reset_defaults": "↺ Standardwerte zurücksetzen",
+	"menu.global.starting": "Wird gestartet…",
 	"menu.global.setup_wizard": "Einrichtungsassistent…",
 	"menu.global.suspend": "⏸︎ Pausieren",
 	"menu.global.title": "Globale Aktionen",

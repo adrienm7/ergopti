@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ إنهاء",
 	"menu.global.reload": "🔄 إعادة تحميل",
 	"menu.global.reset_defaults": "↺ إعادة تعيين الإعدادات الافتراضية",
+	"menu.global.starting": "جارٍ البدء…",
 	"menu.global.setup_wizard": "معالج الإعداد…",
 	"menu.global.suspend": "⏸︎ تعليق",
 	"menu.global.title": "إجراءات عامة",

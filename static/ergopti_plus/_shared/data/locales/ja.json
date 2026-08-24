@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ 終了",
 	"menu.global.reload": "🔄 リロード",
 	"menu.global.reset_defaults": "↺ デフォルトにリセット",
+	"menu.global.starting": "起動中…",
 	"menu.global.setup_wizard": "セットアップウィザード…",
 	"menu.global.suspend": "⏸︎ 一時停止",
 	"menu.global.title": "グローバルアクション",

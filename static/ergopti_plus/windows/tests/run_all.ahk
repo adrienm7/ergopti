@@ -91,6 +91,7 @@ OnError(_FatalErrorHandler)
 ; anyway) — only its pure helpers (_Bundle_ResolveDir, ResolveLocalAppDataDir)
 ; are invoked directly by the regression test.
 #Include ../infra/bundle.ahk
+#Include ../infra/tray_bootstrap.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../infra/logger.ahk
@@ -250,6 +251,7 @@ InstallSendNoOps()
 #Include unit/test_output_host_resolver_independent_of_metrics.ahk
 #Include unit/test_gesture_modifier_release_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
+#Include unit/test_tray_bootstrap_publication_transaction.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
 #Include unit/test_prefix_visible_suggestion_epoch.ahk
@@ -1022,6 +1024,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_swap_exit_guard.ahk
 #Include meta/test_keyboard_hook_dispatch_error_logged.ahk
 #Include meta/test_tray_menu_cleared_before_onboarding.ahk
+#Include meta/test_tray_bootstrap_publication_transaction.ahk
 #Include meta/test_config_shortcuts_unescape_ordering.ahk
 #Include meta/test_gesture_selfactivated_bounded.ahk
 #Include meta/test_llm_api_no_entry_logged.ahk

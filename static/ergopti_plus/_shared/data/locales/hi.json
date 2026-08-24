@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ बंद करें",
 	"menu.global.reload": "🔄 पुनः लोड करें",
 	"menu.global.reset_defaults": "↺ डिफ़ॉल्ट पर रीसेट करें",
+	"menu.global.starting": "शुरू हो रहा है…",
 	"menu.global.setup_wizard": "सेटअप विज़ार्ड…",
 	"menu.global.suspend": "⏸︎ निलंबित करें",
 	"menu.global.title": "वैश्विक क्रियाएं",
