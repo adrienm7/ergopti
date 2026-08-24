@@ -373,6 +373,67 @@ def install_xcompose_file(xcompose_file: Path, force: bool = True) -> None:
         logging.error("Failed to install .XCompose file: %s", e)
 
 
+LEGACY_TOUCHED_FILES = (
+    XKB_SYMBOLS_DIR / "fr",
+    XKB_TYPES_DIR / "extra",
+    XKB_RULES_DIR / "evdev.lst",
+    XKB_RULES_DIR / "evdev.xml",
+)
+
+
+def find_backups(target: Path) -> list[Path]:
+    """Return the ``<name>.<N>`` backups of *target*, oldest first."""
+    backups: list[tuple[int, Path]] = []
+    for candidate in target.parent.glob(f"{target.name}.*"):
+        suffix = candidate.name[len(target.name) + 1 :]
+        if suffix.isdigit():
+            backups.append((int(suffix), candidate))
+    backups.sort()
+    return [path for _, path in backups]
+
+
+def uninstall_legacy() -> None:
+    """Restore every file the legacy installer touched, from its first backup.
+
+    The first backup (``.1``) is the pristine pre-Ergopti snapshot taken
+    before the very first modification. When a file has no backup, it was
+    never touched by this installer and is left alone.
+    """
+    changed = False
+
+    home = Path.home()
+    compose_targets = list(LEGACY_TOUCHED_FILES) + [home / ".XCompose"]
+    for target in compose_targets:
+        backups = find_backups(target)
+        if not backups:
+            continue
+        pristine = backups[0]
+        try:
+            shutil.copy(pristine, target)
+        except OSError as error:
+            logging.error("Could not restore %s: %s", target, error)
+            continue
+        logging.info("Restored %s from %s", target, pristine.name)
+        for extra in backups[1:]:
+            extra.unlink(missing_ok=True)
+        changed = True
+
+    rules_path = XKB_RULES_DIR / "evdev"
+    if rules_path.is_file():
+        removed = strip_legacy_evdev_patch(XKB_RULES_DIR.parent.parent)
+        if removed:
+            logging.info("Removed %d inherited Ergopti rule line(s).", removed)
+            changed = True
+
+    if not changed:
+        logging.info("Nothing to uninstall: no legacy backup found.")
+        return
+    logging.warning(
+        "Legacy uninstall complete. Log out / log back in, and check "
+        "~/.XCompose if you had custom Compose sequences."
+    )
+
+
 def perform_install(
     xkb_file: Path,
     xcompose_file: Optional[Path],
@@ -416,7 +477,7 @@ def parse_args() -> dict:
         description="Apply Ergopti XKB installation (non-interactive)."
     )
     parser.add_argument(
-        "--xkb", type=Path, required=True, help="Path to the .xkb file."
+        "--xkb", type=Path, help="Path to the .xkb file (required unless --uninstall)."
     )
     parser.add_argument(
         "--xcompose", type=Path, help="Path to the .XCompose file."
@@ -424,14 +485,18 @@ def parse_args() -> dict:
     parser.add_argument(
         "--types",
         type=Path,
-        required=True,
-        help="Path to the full xkb_types.txt file (mandatory: it owns the "
-        "Shift/CapsLock/AltGr layers).",
+        help="Path to the full xkb_types.txt file (required when installing: "
+        "it owns the Shift/CapsLock/AltGr layers).",
     )
     parser.add_argument(
         "--force-xcompose",
         action="store_true",
         help="When provided, overwrite the user's ~/.XCompose without prompting.",
+    )
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Restore the files this installer previously backed up.",
     )
     return vars(parser.parse_args())
 
@@ -459,10 +524,21 @@ def main() -> None:
         logging.error("This script is for Linux and cannot be run on Windows.")
         sys.exit(1)
 
-    check_sudo()
     args = parse_args()
 
+    if args.get("uninstall"):
+        check_sudo()
+        uninstall_legacy()
+        return
+
+    check_sudo()
+
     xkb_path: Path = args["xkb"]
+    types_path: Optional[Path] = args.get("types")
+    if xkb_path is None or types_path is None:
+        logging.error("Installing requires both --xkb and --types.")
+        sys.exit(1)
+
     if "_plus_plus" in xkb_path.name.lower():
         logging.error(
             "Ergopti++ is no longer installable (it saturates XCompose). "

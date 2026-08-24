@@ -43,6 +43,26 @@ GitHub Pages deployment source can be branch-based or workflow-based. Verify the
 repository setting before changing CI; workflow files alone do not prove the
 active deployment mode.
 
+### project-xkb-extensions-dir-is-the-clean-install-contract
+
+Since libxkbcommon 1.13 + xkeyboard-config 2.45, layout packages install under
+`/usr/share/xkeyboard-config.d/<package>/{symbols,types,rules}` and compose
+rules through a `<ruleset>.post` file - never by patching the system
+`rules/evdev`. The Ergopti clean installer and the AUR PKGBUILD both rely on
+this; the sandbox tests override the roots via `ERGOPTI_XKB_*` env vars.
+Action: any new install target must keep the extensions-dir contract or
+explicitly justify an X11-only bridge.
+
+### project-gsettings-input-sources-must-be-merged-not-set
+
+GNOME stores the user's keyboard list in `org.gnome.desktop.input-sources
+sources`; writing a single-entry list silently deletes the user's other
+keyboards (reported as "my old layout disappeared"). The installer reads,
+merges, then writes only when something was added. Action: reuse
+`merge_gsettings_source()` from `layout_package.py`; never hand-write a
+sources value.
+
+
 ## Release artifacts
 
 ### project-release-notes-are-not-joined-to-the-assets

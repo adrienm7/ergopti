@@ -122,6 +122,37 @@
 	"https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh"
 	| BRANCH="$branch" bash -s -- --uninstall</code
 >
+
+<h4>Mode utilisateur (sans sudo)</h4>
+<p>
+	Sur Wayland, vous pouvez installer la disposition dans votre home
+	(<code>~/.config/xkb</code>) sans aucun droit administrateur :
+</p>
+<code
+	style="display:inline-block; width:100%; padding:1em; text-align:left"
+	>branch="${branch}"; curl -fsSL
+	"https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh"
+	| BRANCH="$branch" bash -s -- --user --variant ergopti_plus</code
+>
+<p>
+	L'installeur accepte aussi <code>--version v2_2_1</code>, <code>--ansi</code> et le mode
+	totalement non interactif (<code>--yes --version … --variant …</code>) pour les installations
+	scriptées.
+</p>
+
+<h3 id="linux-faq">Questions fréquentes</h3>
+<ul>
+	<li>
+		<strong>La touche Maj ne fonctionne pas après une ancienne installation.</strong> Les versions
+		de l'installeur antérieures à juin 2026 pouvaient installer la disposition sans son fichier de
+		« types » — sans lui, aucune couche n'existe. Réinstallez avec la commande ci-dessus puis
+		reconnectez-vous : l'installation nettoie automatiquement les restes des anciennes versions.
+	</li>
+	<li>
+		<strong>Vos dispositions existantes sont-elles conservées ?</strong> Oui : l'activation ajoute
+		Ergopti à votre liste GNOME/KDE sans jamais retirer vos dispositions actuelles.
+	</li>
+</ul>
 <div class="download-buttons">
 	<a href={urlInstallSh} download="install.sh">
 		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>
