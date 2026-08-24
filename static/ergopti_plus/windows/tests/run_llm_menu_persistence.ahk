@@ -17,6 +17,7 @@ global _ConfigBootReadFailed := false
 #Include ../infra/toml/toml_loader.ahk
 #Include ../infra/toml/toml_config_loader.ahk
 #Include ../modules/llm/option_validation.ahk
+#Include ../modules/llm/prediction_engine.ahk
 global _LLM_Menu := Map(
 	"enabled", true, "backend", "ollama", "model", "Qwen3.5-0.8B",
 	"profile_id", "basic", "n_predictions", 3, "auto_profile_for_model", true,
@@ -29,10 +30,13 @@ global _LLM_Menu := Map(
 	"trigger_shortcut", "Ctrl+Space", "api_entry_id", "api_primary",
 	"ollama_port", 11434, "inline_autotype", false, "user_profiles", []
 )
+global _LLM_Menu_Loaded := false
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/transactions.ahk
 #Include ../ui/menu/menu_llm/menu_profiles.ahk
 #Include ../ui/menu/menu_llm/trigger_shortcut.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
+#Include ../ui/menu/menu_llm/init.ahk
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_menu_regressions.ahk
 

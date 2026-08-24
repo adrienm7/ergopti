@@ -87,9 +87,14 @@ LLM_Option_NormalizeUserProfiles(Value) {
 			if !(Key is String)
 				return false
 			if (Key == "stop_sequences") {
-				Sequences := LLM_Option_NormalizeStringArray(Item)
-				if !(Sequences is Array)
+				if !(Item is Array)
 					return false
+				Sequences := []
+				for Sequence in Item {
+					if !(Sequence is String) || Sequence == ""
+						return false
+					Sequences.Push(Sequence)
+				}
 				Copy[Key] := Sequences
 				continue
 			}

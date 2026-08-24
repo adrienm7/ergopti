@@ -363,22 +363,86 @@ _LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
 	return Changed
 }
 
+_LLM_Menu_NormalizeStoredUserProfiles(Profiles) {
+	if !(Profiles is Array)
+		return false
+	Out := []
+	Seen := Map()
+	Allowed := Map(
+		"id", true,
+		"label", true,
+		"system_single", true,
+		"system_multi", true,
+		"system_multi_template", true,
+		"raw_prompt", true,
+		"batch", true,
+		"stop_sequences", true)
+	for Profile in Profiles {
+		if !(Profile is Map)
+			return false
+		for Key in ["id", "label", "system_single", "system_multi"] {
+			if !Profile.Has(Key) || !(Profile[Key] is String)
+					|| (Key == "id" && Profile[Key] == "")
+				return false
+		}
+		if Seen.Has(Profile["id"])
+			return false
+		if !Profile.Has("batch") || !(Profile["batch"] is Integer)
+				|| (Profile["batch"] != 0 && Profile["batch"] != 1)
+			return false
+		Copy := Map()
+		for Key, Value in Profile {
+			if !(Key is String) || !Allowed.Has(Key)
+				return false
+			if (Key == "stop_sequences") {
+				if !(Value is Array)
+					return false
+				Sequences := []
+				for Sequence in Value {
+					if !(Sequence is String) || Sequence == ""
+						return false
+					Sequences.Push(Sequence)
+				}
+				Copy[Key] := Sequences
+				continue
+			}
+			if (Key == "batch") {
+				Copy[Key] := Value == 1
+				continue
+			}
+			if !(Value is String)
+				return false
+			Copy[Key] := Value
+		}
+		Seen[Copy["id"]] := true
+		Out.Push(Copy)
+	}
+	return Out
+}
+
 _LLM_Menu_SerializeUserProfiles(Profiles) {
+	Profiles := _LLM_Menu_NormalizeStoredUserProfiles(Profiles)
 	if !(Profiles is Array)
 		return false
 	Rows := []
 	for Profile in Profiles {
-		if !(Profile is Map) || !Profile.Has("id") || !(Profile["id"] is String)
-				|| Profile["id"] == ""
-			return false
 		Fields := []
-		for Key in ["id", "label", "system_single", "system_multi", "system_multi_template"] {
-			Value := Profile.Has(Key) ? Profile[Key] : ""
-			if !(Value is String)
-				return false
+		for Key in ["id", "label", "system_single", "system_multi"] {
+			Value := Profile[Key]
 			Fields.Push('"' . Key . '":"' . _LLM_MenuApiJsonEscape(Value) . '"')
 		}
-		Fields.Push('"batch":' . ((Profile.Has("batch") && Profile["batch"] == true) ? "true" : "false"))
+		for Key in ["system_multi_template", "raw_prompt"] {
+			if Profile.Has(Key)
+				Fields.Push('"' . Key . '":"'
+					. _LLM_MenuApiJsonEscape(Profile[Key]) . '"')
+		}
+		Fields.Push('"batch":' . (Profile["batch"] ? "true" : "false"))
+		if Profile.Has("stop_sequences") {
+			SequenceFields := []
+			for Sequence in Profile["stop_sequences"]
+				SequenceFields.Push('"' . _LLM_MenuApiJsonEscape(Sequence) . '"')
+			Fields.Push('"stop_sequences":[' . _LLM_MenuJoin(SequenceFields, ",") . ']')
+		}
 		Rows.Push("{" . _LLM_MenuJoin(Fields, ",") . "}")
 	}
 	return "v1:" . CryptoBase64EncodeUtf8("[" . _LLM_MenuJoin(Rows, ",") . "]")
@@ -395,20 +459,7 @@ _LLM_Menu_DeserializeUserProfiles(Payload) {
 		return false
 	if !(Parsed is Array)
 		return false
-	Validated := []
-	Seen := Map()
-	for Profile in Parsed {
-		if !(Profile is Map) || !Profile.Has("id") || !(Profile["id"] is String)
-				|| Profile["id"] == "" || Seen.Has(Profile["id"])
-			return false
-		for Key in ["label", "system_single", "system_multi", "system_multi_template"]
-			if Profile.Has(Key) && !(Profile[Key] is String)
-				return false
-		Profile["batch"] := Profile.Has("batch") && Profile["batch"] == true
-		Seen[Profile["id"]] := true
-		Validated.Push(Profile)
-	}
-	return Validated
+	return _LLM_Menu_NormalizeStoredUserProfiles(Parsed)
 }
 
 _LLM_Menu_SerializeAppProfileOverrides(Overrides) {
