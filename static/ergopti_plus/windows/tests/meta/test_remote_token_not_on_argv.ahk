@@ -46,7 +46,7 @@ _RTNA_DispatchPutsNoCredentialOnTheCommandLine() {
 	Assert(InStr(Disp, "--config") > 0,
 		"credentials must travel through a curl --config file — the same hardened per-PID directory the typed-context payload already uses")
 
-	Assert(InStr(Disp, "_LLM_Ollama_TempDir()") > 0,
+	Assert(InStr(Disp, "_LLM_Ollama_TempDir") > 0,
 		"that config file must live in _LLM_Ollama_TempDir(), not the shared %TEMP% root — the per-PID directory is what the PII payload hardening bought")
 }
 
