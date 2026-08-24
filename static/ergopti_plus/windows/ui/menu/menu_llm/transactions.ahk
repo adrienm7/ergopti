@@ -62,14 +62,30 @@ _LLM_Menu_ToggleCandidateBool(Candidate, Key) {
 	return true
 }
 
+_LLM_Menu_ApplyAppPickerSelection(Candidate, Selected, Receipt) {
+	if !(Candidate is Map) || !(Selected is Array)
+			|| !Candidate.Has("disabled_apps")
+		return false
+	if !AppPicker_ClaimReceipt(Receipt, Candidate["disabled_apps"])
+		return false
+	Candidate["disabled_apps"] := LLM_Menu_DeepClone(Selected)
+	return true
+}
+
 _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
 	global Features, _LLM_Menu
 	if !(CandidateFeatures is Map) || !(CandidateMenu is Map)
 		return false
+	DisabledAppsChanged := _LLM_Menu.Has("disabled_apps")
+		&& CandidateMenu.Has("disabled_apps")
+		&& !AppPicker_SelectionsEqual(_LLM_Menu["disabled_apps"],
+			CandidateMenu["disabled_apps"])
 	PreviousCritical := Critical("On")
 	try {
 		Features := CandidateFeatures
 		_LLM_Menu := CandidateMenu
+		if DisabledAppsChanged
+			AppPicker_AdvanceOwner("llm:disabled_apps")
 		return true
 	} finally Critical(PreviousCritical)
 }
