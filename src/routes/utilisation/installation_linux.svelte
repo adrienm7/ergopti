@@ -66,6 +66,21 @@
 	<i class="icon-linux"></i> Copier le code bash d'installation
 </button>
 
+<div class="download-buttons" style="margin-top: 1em;">
+	<a href={urlInstallSh} download="install.sh">
+		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>
+	</a>
+	<a href={urlDetectSh} download="detect_installation_method.sh">
+		<button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button>
+	</a>
+	<a href={urlInstallerClean} download="xkb_files_installer_clean.py">
+		<button><i class="icon-linux"></i> Installateur Clean</button>
+	</a>
+	<a href={urlInstallerLegacy} download="xkb_files_installer_legacy.py">
+		<button><i class="icon-linux"></i> Installateur Legacy</button>
+	</a>
+</div>
+
 <p>
 	Après l'installation, <strong>redémarrer l'ordinateur</strong> pour que les changements prennent effet.
 </p>
@@ -140,35 +155,6 @@
 	scriptées.
 </p>
 
-<h3 id="linux-faq">Questions fréquentes</h3>
-<ul>
-	<li>
-		<strong>La touche Maj ne fonctionne pas après une ancienne installation.</strong> Les versions
-		de l'installeur antérieures à juin 2026 pouvaient installer la disposition sans son fichier de
-		« types » — sans lui, aucune couche n'existe. Réinstallez avec la commande ci-dessus puis
-		reconnectez-vous : l'installation nettoie automatiquement les restes des anciennes versions.
-	</li>
-	<li>
-		<strong>Vos dispositions existantes sont-elles conservées ?</strong> Oui : l'activation ajoute
-		Ergopti à votre liste GNOME/KDE sans jamais retirer vos dispositions actuelles.
-	</li>
-</ul>
-<div class="download-buttons">
-	<a href={urlInstallSh} download="install.sh">
-		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>
-	</a>
-	<a href={urlDetectSh} download="detect_installation_method.sh">
-		<button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button>
-	</a>
-</div>
-<div class="download-buttons" style="margin-top: 1em;">
-	<a href={urlInstallerClean} download="xkb_files_installer_clean.py">
-		<button><i class="icon-linux"></i> Installateur Clean</button>
-	</a>
-	<a href={urlInstallerLegacy} download="xkb_files_installer_legacy.py">
-		<button><i class="icon-linux"></i> Installateur Legacy</button>
-	</a>
-</div>
 
 <h3>Détails techniques de l'installation</h3>
 
