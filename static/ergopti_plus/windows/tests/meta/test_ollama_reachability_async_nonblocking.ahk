@@ -58,6 +58,9 @@ _MetaCheckReachabilityNonBlocking() {
 	Assert(PollBody != "", "api_ollama.ahk must define _LLM_Ollama_PingPoll()")
 	Assert(InStr(PollBody, "ProcessExist("),
 		"_LLM_Ollama_PingPoll must poll the curl child via ProcessExist (non-blocking)")
+	Assert(InStr(PollBody, "_LLM_CurlReadTerminal(") > 0
+		and InStr(PollBody, "_LLM_OllamaPingTerminalOk(") > 0,
+		"_LLM_Ollama_PingPoll must classify exit, HTTP status, readable body, and the Ollama version schema before readiness")
 	; Either call shape satisfies the invariant. The completion callbacks now go
 	; through _LLM_InvokeCallback so a throw inside one cannot vanish, which
 	; changes the SPELLING of the hand-off but not the contract being asserted:

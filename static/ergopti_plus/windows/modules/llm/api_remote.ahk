@@ -263,14 +263,29 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
 }
 
 ; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollCurl.
-_LLMRemote_PollCurl(req_id) {
+_LLMRemoteClassifyTerminal(Format, Terminal, Model := "") {
+    if !_LLM_CurlTerminalOk(Terminal) {
+        Result := _LLMRemoteClassifyResponse(Format, "", Model)
+        Result["terminal_ok"] := false
+        Result["reason"] := "transport"
+        return Result
+    }
+    Result := _LLMRemoteClassifyResponse(Format, Terminal["body"], Model)
+    Result["terminal_ok"] := true
+    return Result
+}
+
+_LLMRemote_PollCurl(req_id, Port := 0) {
     global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
+    ProcessExistsFn := _LLM_CurlArtifactPortFn(Port, "process_exists", ProcessExist)
+    ReadTerminalFn := _LLM_CurlArtifactPortFn(Port, "read_terminal", _LLM_CurlReadTerminal)
+    CleanupFn := _LLM_CurlArtifactPortFn(Port, "cleanup", _LLMRemote_CurlCleanup)
     if !_LLM_Remote_Async.Has(req_id)
         return
     entry := _LLM_Remote_Async[req_id]
     if entry["cancelled"] {
         try ProcessClose(entry["pid"])
-        _LLMRemote_CurlCleanup(entry)
+        CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         return
     }
@@ -279,51 +294,42 @@ _LLMRemote_PollCurl(req_id) {
         ; the sibling branches in _LLMRemote_PollRequest.
         on_fail := entry["on_fail"]
         try ProcessClose(entry["pid"])
-        _LLMRemote_CurlCleanup(entry)
+        CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    if ProcessExist(entry["pid"]) {
-        SetTimer(() => _LLMRemote_PollCurl(req_id), -LLM_REMOTE_POLL_MS)
+    if ProcessExistsFn.Call(entry["pid"]) {
+        SetTimer(() => _LLMRemote_PollCurl(req_id, Port), -LLM_REMOTE_POLL_MS)
         return
     }
     on_success := entry["on_success"]
     on_fail    := entry["on_fail"]
     fmt        := entry["format"]
     model_id   := entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : ""
-    terminal := _LLM_CurlReadTerminal(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
+    terminal := ReadTerminalFn.Call(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
     body := terminal["body"]
-    if !_LLM_CurlTerminalOk(terminal) {
-        snip := StrLen(body) > 200 ? SubStr(body, 1, 200) . "…" : body
-        try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body=«{4}».",
-            req_id, terminal["exit"], terminal["status"], snip)
-        _LLMRemote_CurlCleanup(entry)
+    Classified := _LLMRemoteClassifyTerminal(fmt, terminal, model_id)
+    if !Classified["terminal_ok"] {
+        try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4}.",
+            req_id, terminal["exit"], terminal["status"], StrLen(body))
+        CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    text := _LLMRemoteParseResponse(fmt, body)
-    if (text == "") {
-        ; curl writes a provider ERROR body (401 bad key, 429 quota, 400 bad model)
-        ; to the same file as a success, and only the parse miss distinguishes the
-        ; two. Without the snippet a rejected API key is indistinguishable from a
-        ; model that simply answered nothing.
-        snip := StrLen(body) > 200 ? SubStr(body, 1, 200) . "…" : body
-        try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion — body: «{2}».", req_id, snip)
-        _LLMRemote_CurlCleanup(entry)
+    if !Classified["ok"] {
+        try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, body_chars={3}).",
+            req_id, Classified["reason"], StrLen(body))
+        CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    ; Same tail as _LLMRemote_PollRequest: the engine records tokens + estimated
-    ; cost from this block, and curl is the transport every shipping Windows host
-    ; actually takes — dropping it here zeroed every metric on the API backend.
-    meta := _LLMRemoteExtractUsage(fmt, body, model_id)
-    _LLMRemote_CurlCleanup(entry)
+    CleanupFn.Call(entry)
     _LLM_Remote_Async.Delete(req_id)
-    _LLM_InvokeCallback(on_success, "on_success", text, meta)
+    _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
 }
 
 LLM_RemoteCancelAsync(req_id) {
@@ -431,23 +437,18 @@ _LLMRemote_PollRequest(req_id) {
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    if (status < 200 or status >= 300) {
+    Classified := _LLMRemoteClassifyTerminal(entryFormat,
+        Map("exit", 0, "status", status, "body_read", true, "body", body),
+        entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
+    if !Classified["terminal_ok"] {
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    text := _LLMRemoteParseResponse(entryFormat, body)
-    if (text == "") {
+    if !Classified["ok"] {
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    ; Pull the per-provider ``usage`` block out of the response so the
-    ; engine can record tokens consumed + estimated cost in the keylogger
-    ; event. Same shape as OpenAI / Anthropic / Gemini all carry; Ollama
-    ; doesn't (its non-streaming response has ``eval_count`` /
-    ; ``prompt_eval_count`` instead, which we don't parse for the remote
-    ; path because the engine only treats local backends as "free").
-    meta := _LLMRemoteExtractUsage(entryFormat, body, entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
-    _LLM_InvokeCallback(on_success, "on_success", text, meta)
+    _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
 }
 
 ; Token + cost extraction. Each provider exposes the same numeric fields
@@ -455,13 +456,12 @@ _LLMRemote_PollRequest(req_id) {
 ; / xAI / Cerebras / DeepSeek) or under ``usageMetadata`` (Gemini). We
 ; pull prompt + completion + total when present and compute an estimated
 ; cost in USD from the per-model price table below.
-_LLMRemoteExtractUsage(format, body, model) {
-    out := Map("prompt_tokens", 0, "completion_tokens", 0, "total_tokens", 0, "est_cost_usd", 0.0)
-    if (body == "")
-        return out
-    try root := JsonParse(body)
-    catch
-        return out
+_LLMRemoteEmptyUsage() {
+    return Map("prompt_tokens", 0, "completion_tokens", 0, "total_tokens", 0, "est_cost_usd", 0.0)
+}
+
+_LLMRemoteExtractUsageRoot(format, root, model) {
+    out := _LLMRemoteEmptyUsage()
     if !(root is Map)
         return out
     usageKey := format == "gemini" ? "usageMetadata" : "usage"
@@ -483,6 +483,16 @@ _LLMRemoteExtractUsage(format, body, model) {
         out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
     out["est_cost_usd"] := _LLMRemoteEstimateCost(model, out["prompt_tokens"], out["completion_tokens"])
     return out
+}
+
+_LLMRemoteExtractUsage(format, body, model) {
+    out := _LLMRemoteEmptyUsage()
+    if (body == "")
+        return out
+    try root := JsonParse(body)
+    catch
+        return out
+    return _LLMRemoteExtractUsageRoot(format, root, model)
 }
 
 ; Per-model USD price table (per 1M tokens) — loaded from api_providers.json.
@@ -813,127 +823,96 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
         ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
 }
 
-; Pull the generated text out of a provider response. First navigates the
-; canonical JSON path per format with JsonParse (the same parser the Ollama
-; path uses), which is robust against multi-block / reasoning shapes where the
-; FIRST "content"/"text" string is NOT the answer (e.g. an Anthropic ``thinking``
-; block preceding the ``text`` block, or an OpenRouter ``reasoning`` field before
-; ``choices``). Only when the structured navigation misses (HTTP error body, a
-; shape we don't model, malformed JSON) does it fall back to the legacy
-; first-match regex. Returns "" when both miss — the caller treats that the same
-; as a network failure: no tooltip, no crash.
-_LLMRemoteParseResponse(Format, Body) {
+; Parse one immutable provider root and classify both the completion and usage
+; owned by that root. Canonical containers own an empty result too: falling back
+; after ``content:null`` or an empty parts array would promote reasoning/metadata
+; decoys that are not assistant output. Compatibility extraction is allowed only
+; for valid JSON maps that carry no canonical container and no provider error.
+_LLMRemoteClassifyResponse(Format, Body, Model := "") {
+    Result := Map(
+        "ok", false, "valid_json", false, "recognized", false,
+        "text", "", "usage", _LLMRemoteEmptyUsage(), "reason", "empty_body")
     if (Body == "")
-        return ""
-    state := _LLMRemoteParseStructuredState(Format, Body)
-    if !state["valid"]
-        return ""
-    if state["recognized"]
-        return state["text"]
-    return _LLMRemoteParseResponseRegex(Format, Body)
-}
-
-_LLMRemoteParseStructuredState(Format, Body) {
-	try root := JsonParse(Body)
-	catch
-		return Map("valid", false, "recognized", false, "text", "")
-	if !(root is Map)
-		return Map("valid", true, "recognized", false, "text", "")
-	if (Format == "anthropic") {
-		if root.Has("content") and (root["content"] is Array) {
-			for _, block in root["content"]
-				if (block is Map) and block.Has("type") and block["type"] == "text"
-						and block.Has("text") and Type(block["text"]) == "String"
-					return Map("valid", true, "recognized", true, "text", block["text"])
-		}
-	} else if (Format == "gemini") {
-		if root.Has("candidates") and (root["candidates"] is Array) and root["candidates"].Length {
-			candidate := root["candidates"][1]
-			if (candidate is Map) and candidate.Has("content") and (candidate["content"] is Map) {
-				content := candidate["content"]
-				if content.Has("parts") and (content["parts"] is Array)
-					for _, part in content["parts"]
-						if (part is Map) and part.Has("text") and Type(part["text"]) == "String"
-							return Map("valid", true, "recognized", true, "text", part["text"])
-			}
-		}
-	} else if root.Has("choices") and (root["choices"] is Array) and root["choices"].Length {
-		choice := root["choices"][1]
-		if (choice is Map) and choice.Has("message") and (choice["message"] is Map) {
-			message := choice["message"]
-			if message.Has("content") and Type(message["content"]) == "String"
-				return Map("valid", true, "recognized", true, "text", message["content"])
-		}
-	}
-	return Map("valid", true, "recognized", false, "text", "")
-}
-
-; Structured-navigation parse: walks the documented response tree for the
-; format and returns the answer text, or "" when the expected path is absent
-; (so the caller can fall back to the regex). Wrapped in try because JsonParse
-; throws on malformed bodies (HTTP error pages) — that just means "fall back".
-_LLMRemoteParseStructured(Format, Body) {
-	state := _LLMRemoteParseStructuredState(Format, Body)
-	return state["valid"] and state["recognized"] ? state["text"] : ""
-}
-
-; Anthropic Messages: ``content`` is an ARRAY of blocks; the answer is the first
-; block with ``type == "text"`` — NOT necessarily the first block, which may be
-; a ``thinking`` block. Returns the text already JSON-unescaped by JsonParse.
-_LLMRemoteNavAnthropic(root) {
-    if !root.Has("content") or !(root["content"] is Array)
-        return ""
-    for _idx, block in root["content"] {
-        if !(block is Map)
-            continue
-        if !block.Has("type") or block["type"] != "text"
-            continue
-        if block.Has("text") and Type(block["text"]) == "String"
-            return block["text"]
+        return Result
+    try Root := JsonParse(Body)
+    catch {
+        Result["reason"] := "malformed_json"
+        return Result
     }
-    return ""
-}
-
-; Gemini: ``candidates[1].content.parts[1].text``. AHK arrays are 1-indexed, so
-; the first candidate is index 1. Returns the FIRST text part of the first
-; candidate — the cross-driver corpus contract (gemini_multipart_uses_first)
-; requires first-part-only, mirroring the Anthropic/OpenAI navigators; a later
-; part is a continuation/decoy, not a fragment to concatenate.
-_LLMRemoteNavGemini(root) {
-    if !root.Has("candidates") or !(root["candidates"] is Array) or root["candidates"].Length < 1
-        return ""
-    cand := root["candidates"][1]
-    if !(cand is Map) or !cand.Has("content") or !(cand["content"] is Map)
-        return ""
-    content := cand["content"]
-    if !content.Has("parts") or !(content["parts"] is Array)
-        return ""
-    for _idx, part in content["parts"] {
-        if (part is Map) and part.Has("text") and Type(part["text"]) == "String"
-            return part["text"]
+    Result["valid_json"] := true
+    if !(Root is Map) {
+        Result["reason"] := "unsupported_json_root"
+        return Result
     }
-    return ""
+    State := _LLMRemoteParseStructuredRootState(Format, Root)
+    Result["recognized"] := State["recognized"]
+    Result["usage"] := _LLMRemoteExtractUsageRoot(Format, Root, Model)
+    if State["recognized"]
+        Result["text"] := State["text"]
+    else
+        Result["text"] := _LLMRemoteParseResponseRegex(Format, Body)
+    Result["ok"] := Result["text"] != ""
+    Result["reason"] := Result["ok"] ? "completion"
+        : (State["recognized"] ? State["reason"] : "unsupported_shape")
+    return Result
 }
 
-; OpenAI Chat Completions (and every OpenAI-compatible gateway): the answer is
-; ``choices[1].message.content``. Navigating to that exact field skips any
-; sibling ``reasoning`` field (OpenRouter) or other decoy "content"-like keys
-; that a first-match regex would grab by mistake.
-_LLMRemoteNavOpenAI(root) {
-    if !root.Has("choices") or !(root["choices"] is Array) or root["choices"].Length < 1
-        return ""
-    choice := root["choices"][1]
-    if !(choice is Map) or !choice.Has("message") or !(choice["message"] is Map)
-        return ""
-    msg := choice["message"]
-    if msg.Has("content") and Type(msg["content"]) == "String"
-        return msg["content"]
-    return ""
+_LLMRemoteParseResponse(Format, Body) {
+    return _LLMRemoteClassifyResponse(Format, Body)["text"]
 }
 
-; Legacy first-match regex fallback. Kept verbatim from the original parser so a
-; provider shape the structured navigator does not model still extracts SOMETHING
-; rather than nothing — the same lenient behaviour the engine shipped before.
+_LLMRemoteParseStructuredRootState(Format, Root) {
+    if Root.Has("error")
+        return Map("recognized", true, "text", "", "reason", "provider_error")
+    if (Format == "anthropic") {
+        if !Root.Has("content")
+            return Map("recognized", false, "text", "", "reason", "unsupported_shape")
+        if Root["content"] is Array {
+            for _, Block in Root["content"] {
+                if !(Block is Map) or !Block.Has("type") or Block["type"] != "text"
+                    continue
+                Text := Block.Has("text") and Type(Block["text"]) == "String" ? Block["text"] : ""
+                return Map("recognized", true, "text", Text, "reason", "canonical_empty")
+            }
+        }
+        return Map("recognized", true, "text", "", "reason", "canonical_empty")
+    }
+    if (Format == "gemini") {
+        if !Root.Has("candidates")
+            return Map("recognized", false, "text", "", "reason", "unsupported_shape")
+        if Root["candidates"] is Array and Root["candidates"].Length {
+            Candidate := Root["candidates"][1]
+            if (Candidate is Map) and Candidate.Has("content") and (Candidate["content"] is Map) {
+                Content := Candidate["content"]
+                if Content.Has("parts") and (Content["parts"] is Array) {
+                    for _, Part in Content["parts"] {
+                        if (Part is Map) and Part.Has("text") {
+                            Text := Type(Part["text"]) == "String" ? Part["text"] : ""
+                            return Map("recognized", true, "text", Text, "reason", "canonical_empty")
+                        }
+                    }
+                }
+            }
+        }
+        return Map("recognized", true, "text", "", "reason", "canonical_empty")
+    }
+    if !Root.Has("choices")
+        return Map("recognized", false, "text", "", "reason", "unsupported_shape")
+    if Root["choices"] is Array and Root["choices"].Length {
+        Choice := Root["choices"][1]
+        if (Choice is Map) and Choice.Has("message") and (Choice["message"] is Map) {
+            Message := Choice["message"]
+            if Message.Has("content") {
+                Text := Type(Message["content"]) == "String" ? Message["content"] : ""
+                return Map("recognized", true, "text", Text, "reason", "canonical_empty")
+            }
+        }
+    }
+    return Map("recognized", true, "text", "", "reason", "canonical_empty")
+}
+
+; Compatibility extraction is intentionally limited to syntactically valid
+; JSON maps without a canonical response container or provider-error envelope.
 _LLMRemoteParseResponseRegex(Format, Body) {
     if (Format == "anthropic") {
         ; { "content": [ { "type": "text", "text": "..." } ], ... }

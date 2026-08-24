@@ -48,6 +48,7 @@ local _warmup_client = _http_adapter.new()   -- warmup has independent cancellat
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
+local ResponseClassifier = require("modules.llm.remote_response_classifier")
 local LOG            = "llm.api_remote"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -910,71 +911,9 @@ local function estimate_cost(model, in_tokens, out_tokens)
 	return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
 end
 
---- Extract token usage from the provider response. Each format exposes the
---- same numeric fields under a top-level ``usage`` block (OpenAI shape) or
---- under ``usageMetadata`` (Gemini). We regex-scrape rather than re-parse
---- JSON (the response body has already been parsed once in parse_response;
---- doing it twice on every request is wasteful when this is a hot path).
-local function _extract_usage(format, body, model)
-	local out = { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0, est_cost_usd = 0.0 }
-	if not body or body == "" then return out end
-	if format == "gemini" then
-		out.prompt_tokens     = tonumber((body:match('"promptTokenCount"%s*:%s*(%d+)'))     or 0) or 0
-		out.completion_tokens = tonumber((body:match('"candidatesTokenCount"%s*:%s*(%d+)')) or 0) or 0
-		out.total_tokens      = tonumber((body:match('"totalTokenCount"%s*:%s*(%d+)'))      or 0) or 0
-	elseif format == "anthropic" then
-		out.prompt_tokens     = tonumber((body:match('"input_tokens"%s*:%s*(%d+)'))  or 0) or 0
-		out.completion_tokens = tonumber((body:match('"output_tokens"%s*:%s*(%d+)')) or 0) or 0
-		out.total_tokens      = out.prompt_tokens + out.completion_tokens
-	else
-		out.prompt_tokens     = tonumber((body:match('"prompt_tokens"%s*:%s*(%d+)'))     or 0) or 0
-		out.completion_tokens = tonumber((body:match('"completion_tokens"%s*:%s*(%d+)')) or 0) or 0
-		out.total_tokens      = tonumber((body:match('"total_tokens"%s*:%s*(%d+)'))      or 0) or 0
-	end
-	if out.total_tokens == 0 and out.prompt_tokens > 0 then
-		out.total_tokens = out.prompt_tokens + out.completion_tokens
-	end
-	out.est_cost_usd = estimate_cost(model, out.prompt_tokens, out.completion_tokens)
-	return out
-end
-
---- Pull the generated text out of a provider response. Each branch targets the
---- canonical "first choice / first candidate / first content block" path. When
---- the path is missing, returns "" — the caller treats that as a soft failure
---- (no tooltip) rather than a crash.
-local function parse_response(format, body)
-	if type(body) ~= "string" or body == "" then return "" end
-	local resp, _ = JsonCodec.decode(body)
-	if type(resp) ~= "table" then return "" end
-
-	if format == "anthropic" then
-		local content = resp.content
-		if type(content) == "table" and type(content[1]) == "table" then
-			return tostring(content[1].text or "")
-		end
-		return ""
-	end
-	if format == "gemini" then
-		local cand = resp.candidates
-		if type(cand) == "table" and type(cand[1]) == "table" then
-			local cnt = cand[1].content
-			if type(cnt) == "table" and type(cnt.parts) == "table" and type(cnt.parts[1]) == "table" then
-				return tostring(cnt.parts[1].text or "")
-			end
-		end
-		return ""
-	end
-	-- OpenAI shape: { choices = [ { message = { content = "..." } } ] }
-	local choices = resp.choices
-	if type(choices) == "table" and type(choices[1]) == "table" then
-		local msg = choices[1].message
-		if type(msg) == "table" then
-			return tostring(msg.content or "")
-		end
-	end
-	return ""
-end
-
+--- Extract token usage from the already-decoded provider root. Each format
+--- owns one exact top-level usage map, so nested prompt text cannot spoof
+--- telemetry fields.
 
 
 
@@ -1418,7 +1357,10 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 				return
 			end
 
-			local raw_text = parse_response(provider.format, body)
+			local classified = ResponseClassifier.classify(provider.format, body)
+			classified.usage.est_cost_usd = estimate_cost(tostring(model),
+				classified.usage.prompt_tokens, classified.usage.completion_tokens)
+			local raw_text = classified.text
 			if raw_text == "" then
 				Logger.warn(LOG, "[%s] #%d empty completion (could not parse).", model, req_id)
 				if keylogger and type(keylogger.log_llm_failed) == "function" then
@@ -1468,7 +1410,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			-- numeric fields under a top-level ``usage`` block (OpenAI shape)
 			-- or under ``usageMetadata`` (Gemini). Cost is computed from the
 			-- per-model price table in pricing.lua.
-			local usage = _extract_usage(provider.format, body, tostring(model))
+			local usage = classified.usage
 
 			Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s) in %dms", model, req_id, #results, ms)
 			if keylogger and type(keylogger.log_llm) == "function" then

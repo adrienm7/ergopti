@@ -127,6 +127,22 @@ _RPFCM_RecognizedEmptyNeverPromotesDecoy() {
 }
 Test("_LLMRemoteParseResponse: recognized empty output suppresses compatibility fallback", _RPFCM_RecognizedEmptyNeverPromotesDecoy)
 
+_RPFCM_CanonicalContainerWithoutTextNeverPromotesDecoy() {
+	Vectors := [
+		["openai", '{"reasoning":{"content":"secret"},"choices":[{"message":{"content":null}}]}'],
+		["anthropic", '{"content":[{"type":"thinking","text":"secret"}]}'],
+		["gemini", '{"metadata":{"text":"secret"},"candidates":[{"content":{"parts":[]}}]}']
+	]
+	for Vector in Vectors
+		AssertEqual("", _LLMRemoteParseResponse(Vector[1], Vector[2]),
+			Vector[1] . " canonical empty container must own the result instead of promoting a decoy")
+
+	AssertEqual("legacy answer", _LLMRemoteParseResponse("openai", '{"content":"legacy answer"}'),
+		"syntactically valid non-canonical legacy JSON must retain compatibility extraction")
+}
+Test("_LLMRemoteParseResponse: canonical empty containers suppress compatibility fallback (ahk-007-remote-response-classification)",
+	_RPFCM_CanonicalContainerWithoutTextNeverPromotesDecoy)
+
 _RPFCM_CompleteFieldInsideMalformedEnvelopeIsRejected() {
 	Vectors := [
 		["openai", '{"choices":[{"message":{"content":"wrong partial output"}}]'],
