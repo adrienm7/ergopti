@@ -502,21 +502,14 @@ if !LLM_TriggerJournalRecoverAtBoot()
 	throw Error("LLM trigger journal recovery failed before configuration boot")
 
 #Include infra/feature_state.ahk
+#Include infra/tray_bootstrap.ahk
 
-_InstallSafeBootstrapTray() {
-	; The stock menu is unsafe during onboarding, but an empty visible tray root
-	; is also not a valid publication. Keep one inert branded row until the root
-	; coordinator atomically replaces it with the complete staged tree.
-	A_TrayMenu.Add("ErgoptiPlus", (*) => 0)
-	A_TrayMenu.Disable("ErgoptiPlus")
-}
-
-; AHK-21: clear the stock AHK tray items (Pause/Suspend/Reload/Exit/Edit)
-; BEFORE the blocking onboarding wizard so those stock actions are never live
+; AHK-21: atomically replace the stock AHK tray items
+; (Pause/Suspend/Reload/Exit/Edit) BEFORE the blocking onboarding wizard so
+; those stock actions are never live
 ; during first-run setup. On a normal (non-first-run) boot Onboarding_Run is
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
-A_TrayMenu.Delete()
 _InstallSafeBootstrapTray()
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
@@ -983,15 +976,15 @@ BootProfile_Mark("Config, features & shortcuts loaded")
 ; BuildTrayMenuDeferred armed right after "ready" (see the deferred-task block).
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
-; This second Delete() is a safe no-op on an already-empty menu — kept to make the
-; comment block here accurate; _DriverReady stays false until "ready".
+; Replace the neutral pre-i18n brand row with a truthful localized status.
+; The helper owns Delete + Add + Disable under one Critical transaction, so no
+; tray click can observe an empty root. _DriverReady stays false until "ready".
 _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
-A_TrayMenu.Delete()
-_InstallSafeBootstrapTray()
+_InstallSafeBootstrapTray(t("menu.global.starting"))
 if !(IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
 	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")

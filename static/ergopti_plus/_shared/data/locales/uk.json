@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Вийти",
 	"menu.global.reload": "🔄 Перезавантажити",
 	"menu.global.reset_defaults": "↺ Скинути до стандартних",
+	"menu.global.starting": "Запуск…",
 	"menu.global.setup_wizard": "Майстер налаштування…",
 	"menu.global.suspend": "⏸︎ Призупинити",
 	"menu.global.title": "Глобальні дії",

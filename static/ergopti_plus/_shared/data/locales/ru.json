@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Выйти",
 	"menu.global.reload": "🔄 Перезагрузить",
 	"menu.global.reset_defaults": "↺ Сбросить по умолчанию",
+	"menu.global.starting": "Запуск…",
 	"menu.global.setup_wizard": "Мастер настройки…",
 	"menu.global.suspend": "⏸︎ Приостановить",
 	"menu.global.title": "Глобальные действия",

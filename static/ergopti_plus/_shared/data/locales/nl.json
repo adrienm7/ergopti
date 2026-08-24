@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Afsluiten",
 	"menu.global.reload": "🔄 Herladen",
 	"menu.global.reset_defaults": "↺ Standaard herstellen",
+	"menu.global.starting": "Bezig met starten…",
 	"menu.global.setup_wizard": "Installatiewizard…",
 	"menu.global.suspend": "⏸︎ Onderbreken",
 	"menu.global.title": "Globale acties",
