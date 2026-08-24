@@ -24,6 +24,7 @@ global _LMT_PrepareResult := 1
 global _LMT_PrepareCalls := 0
 global _LMT_PublishCalls := 0
 global _LMT_Events := []
+global _LMT_ApiLoadReports := []
 
 _LMT_Features() {
 	return _LLMST_Features(false, "live-model", "ollama")
@@ -420,3 +421,220 @@ _LMT_ApiSecondTargetFailureRollsEverythingOld() {
 Test("LLM API entries: second-target refusal restores both old authorities "
 	. "(llm-api-two-target-failure-rollback)",
 	_LMT_ApiSecondTargetFailureRollsEverythingOld)
+
+
+_LMT_ApiEntry(Id, Name := "Entry", Provider := "openai") {
+	return Map("Id", Id, "Name", Name, "Provider", Provider,
+		"BaseUrl", "https://example.invalid", "Token", "secret",
+		"Model", "model")
+}
+
+
+_LMT_ApiLoadReport(Reason) {
+	global _LMT_ApiLoadReports
+	_LMT_ApiLoadReports.Push(Reason)
+	return true
+}
+
+
+_LMT_DuplicateApiImageIsRejectedWithoutPublication() {
+	global _LLM_Menu, ConfigurationFile, LLM_API_PROVIDERS
+	global _LMT_ApiLoadReports
+	Previous := _LMT_InstallFixture()
+	PreviousProviders := LLM_API_PROVIDERS
+	Dir := A_Temp . "\ergopti-api-identity-load-"
+		. A_ScriptHwnd . "-" . A_TickCount
+	DirCreate(Dir)
+	ConfigurationFile := Dir . "\config.toml"
+	Raw := '[{"Id":"duplicate","Name":"First","Provider":"openai",'
+		. '"BaseUrl":"https://first.invalid","Token":"one","Model":"m1"},'
+		. '{"Id":"duplicate","Name":"Second","Provider":"openai",'
+		. '"BaseUrl":"https://second.invalid","Token":"two","Model":"m2"}]'
+	Path := Dir . "\api_entries.json"
+	FSWriteCreateDurable(Path, Raw)
+	SentinelEntries := [_LMT_ApiEntry("live", "Live")]
+	_LLM_Menu["api_entries"] := SentinelEntries
+	_LLM_Menu["api_entry_id"] := "live"
+	LLM_API_PROVIDERS := Map("openai", Map())
+	_LMT_ApiLoadReports := []
+	try {
+		AssertFalse(_LLM_Menu_LoadApiEntries(0, _LMT_ApiLoadReport,
+			(Token) => Token, LLM_API_PROVIDERS),
+			"a duplicate persisted identity must reject the complete image")
+		AssertTrue(_LLM_Menu["api_entries"] == SentinelEntries,
+			"a rejected persisted image must not publish any detached row")
+		AssertEqual("live", _LLM_Menu["api_entry_id"],
+			"a rejected persisted image must preserve the active identity")
+		AssertEqual(Raw, FSReadUtf8Exact(Path),
+			"load rejection must never rewrite or quarantine user credentials")
+		AssertEqual(1, _LMT_ApiLoadReports.Length,
+			"one corrupt persisted image must produce one terminal diagnostic")
+		AssertContains(_LMT_ApiLoadReports[1], "duplicate API entry id 'duplicate'",
+			"the diagnostic must identify the ambiguous stable identity")
+	} finally {
+		LLM_API_PROVIDERS := PreviousProviders
+		try DirDelete(Dir, true)
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM API entries: duplicate persisted ids reject the whole image "
+	. "(api-entry-identity-cardinality)",
+	_LMT_DuplicateApiImageIsRejectedWithoutPublication)
+
+
+_LMT_AssertApiImageRejected(Raw, CaseName) {
+	global _LLM_Menu, ConfigurationFile
+	Dir := A_Temp . "\ergopti-api-schema-load-"
+		. A_ScriptHwnd . "-" . A_TickCount
+	DirCreate(Dir)
+	ConfigurationFile := Dir . "\config.toml"
+	Path := Dir . "\api_entries.json"
+	FSWriteCreateDurable(Path, Raw)
+	SentinelEntries := [_LMT_ApiEntry("live", "Live")]
+	_LLM_Menu["api_entries"] := SentinelEntries
+	_LLM_Menu["api_entry_id"] := "live"
+	try {
+		_LLM_Menu_LoadApiEntries()
+		AssertTrue(_LLM_Menu["api_entries"] == SentinelEntries,
+			CaseName . " must reject the complete image before publication")
+		AssertEqual("live", _LLM_Menu["api_entry_id"],
+			CaseName . " must preserve the exact active identity")
+		AssertEqual(Raw, FSReadUtf8Exact(Path),
+			CaseName . " rejection must preserve the persisted bytes")
+	} finally try DirDelete(Dir, true)
+}
+
+
+_LMT_ApiImageWithFieldValue(Field, JsonValue) {
+	Values := Map(
+		"Id", '"one"',
+		"Name", '"One"',
+		"Provider", '"openai"',
+		"BaseUrl", '"https://one.invalid"',
+		"Token", '"secret"',
+		"Model", '"m1"')
+	Values[Field] := JsonValue
+	Parts := []
+	for Key in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+		Parts.Push('"' . Key . '":' . Values[Key])
+	return "[{" . _LLM_MenuJoin(Parts, ",") . "}]"
+}
+
+
+_LMT_ApiLoaderRejectsMalformedSchemaAsOneImage() {
+	global LLM_API_PROVIDERS
+	Previous := _LMT_InstallFixture()
+	PreviousProviders := LLM_API_PROVIDERS
+	LLM_API_PROVIDERS := Map("openai", Map())
+	ValidObject := '{"Id":"one","Name":"One","Provider":"openai",'
+		. '"BaseUrl":"https://one.invalid","Token":"secret","Model":"m1"}'
+	try {
+		_LMT_AssertApiImageRejected(ValidObject, "non-array top-level JSON")
+		_LMT_AssertApiImageRejected("[" . ValidObject . "] trailing",
+			"JSON with trailing data")
+		for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+			_LMT_AssertApiImageRejected(_LMT_ApiImageWithFieldValue(Field, "42"),
+				"non-string required field " . Field)
+		_LMT_AssertApiImageRejected('[{"Id":"one","Name":"One",'
+			. '"Provider":"unknown","BaseUrl":"https://one.invalid",'
+			. '"Token":"secret","Model":"m1"}]', "unknown provider")
+		_LMT_AssertApiImageRejected('[{"Id":"one","Name":"One",'
+			. '"Provider":"openai","BaseUrl":"https://one.invalid",'
+			. '"Token":"secret"}]', "missing required field")
+	} finally {
+		LLM_API_PROVIDERS := PreviousProviders
+		_LMT_RestoreFixture(Previous)
+	}
+}
+Test("LLM API entries: loader rejects malformed schema as one image "
+	. "(api-entry-identity-cardinality)",
+	_LMT_ApiLoaderRejectsMalformedSchemaAsOneImage)
+
+
+_LMT_ApiParserPreservesEscapedStrings() {
+	Providers := Map("openai", Map())
+	Parsed := _LLM_Menu_ParseAndValidateApiEntries(
+		'[{"Id":"one","Name":"Quoted \"name\"","Provider":"openai",'
+		. '"BaseUrl":"https://one.invalid/{path}",'
+		. '"Token":"brace{token}\\tail","Model":"m1"}]',
+		Providers, (Token) => Token)
+	AssertTrue(Parsed["ok"],
+		"the strict parser must retain valid escaped strings and literal braces")
+	AssertEqual('Quoted "name"', Parsed["entries"][1]["Name"])
+	AssertEqual("https://one.invalid/{path}", Parsed["entries"][1]["BaseUrl"])
+	AssertEqual("brace{token}\tail", Parsed["entries"][1]["Token"])
+}
+Test("LLM API entries: strict parser preserves escaped strings and braces "
+	. "(api-entry-identity-cardinality)",
+	_LMT_ApiParserPreservesEscapedStrings)
+
+
+_LMT_DuplicateApiCandidatesRefuseEveryCrudMutation() {
+	DuplicateA := _LMT_ApiEntry("duplicate", "First")
+	DuplicateB := _LMT_ApiEntry("duplicate", "Second")
+
+	SelectCandidate := Map("api_entries", [DuplicateA, DuplicateB],
+		"api_entry_id", "before")
+	AssertFalse(_LLM_Menu_SelectApiEntryCandidate(SelectCandidate, "duplicate"))
+	AssertEqual("before", SelectCandidate["api_entry_id"])
+
+	EditCandidate := Map("api_entries", [DuplicateA, DuplicateB],
+		"api_entry_id", "duplicate")
+	BeforeEdit := _LLM_Menu_SerializeApiEntries(EditCandidate, (Token) => Token)
+	AssertFalse(_LLM_Menu_UpsertApiEntryCandidate(EditCandidate,
+		_LMT_ApiEntry("duplicate", "Replacement"), "duplicate"),
+		"editing an ambiguous identity must refuse instead of replacing the first row")
+	AssertEqual(BeforeEdit,
+		_LLM_Menu_SerializeApiEntries(EditCandidate, (Token) => Token),
+		"a refused ambiguous edit must leave every credential byte unchanged")
+
+	RemoveCandidate := Map("api_entries", [DuplicateA, DuplicateB],
+		"api_entry_id", "duplicate")
+	BeforeRemove := _LLM_Menu_SerializeApiEntries(RemoveCandidate, (Token) => Token)
+	AssertFalse(_LLM_Menu_RemoveApiEntryCandidate(RemoveCandidate, "duplicate"))
+	AssertEqual(BeforeRemove,
+		_LLM_Menu_SerializeApiEntries(RemoveCandidate, (Token) => Token),
+		"a refused ambiguous removal must leave every credential byte unchanged")
+
+	CorruptSiblingCandidate := Map("api_entries", [
+		_LMT_ApiEntry("duplicate", "First"),
+		_LMT_ApiEntry("duplicate", "Second"),
+		_LMT_ApiEntry("unique", "Unique")], "api_entry_id", "unique")
+	BeforeSiblingEdit := _LLM_Menu_SerializeApiEntries(
+		CorruptSiblingCandidate, (Token) => Token)
+	AssertFalse(_LLM_Menu_UpsertApiEntryCandidate(CorruptSiblingCandidate,
+		_LMT_ApiEntry("unique", "Replacement"), "unique"),
+		"CRUD must refuse a corrupt sibling identity outside the selected target")
+	AssertEqual(BeforeSiblingEdit, _LLM_Menu_SerializeApiEntries(
+		CorruptSiblingCandidate, (Token) => Token))
+}
+Test("LLM API entries: duplicate candidate ids refuse select edit and remove "
+	. "(api-entry-identity-cardinality)",
+	_LMT_DuplicateApiCandidatesRefuseEveryCrudMutation)
+
+
+_LMT_UniqueApiCandidatesMutateExactlyOneRow() {
+	First := _LMT_ApiEntry("first", "First")
+	Second := _LMT_ApiEntry("second", "Second")
+
+	SelectCandidate := Map("api_entries", [First, Second],
+		"api_entry_id", "first")
+	AssertTrue(_LLM_Menu_SelectApiEntryCandidate(SelectCandidate, "second"))
+	AssertEqual("second", SelectCandidate["api_entry_id"])
+
+	EditCandidate := Map("api_entries", [First, Second],
+		"api_entry_id", "first")
+	AssertTrue(_LLM_Menu_UpsertApiEntryCandidate(EditCandidate,
+		_LMT_ApiEntry("second", "Replacement"), "second"))
+	AssertEqual("First", EditCandidate["api_entries"][1]["Name"])
+	AssertEqual("Replacement", EditCandidate["api_entries"][2]["Name"])
+
+	RemoveCandidate := Map("api_entries", [First, Second],
+		"api_entry_id", "second")
+	AssertTrue(_LLM_Menu_RemoveApiEntryCandidate(RemoveCandidate, "second"))
+	AssertEqual(1, RemoveCandidate["api_entries"].Length)
+	AssertEqual("first", RemoveCandidate["api_entries"][1]["Id"])
+}
+Test("LLM API entries: unique candidate ids mutate exactly one row "
+	. "(api-entry-identity-cardinality)",
+	_LMT_UniqueApiCandidatesMutateExactlyOneRow)
