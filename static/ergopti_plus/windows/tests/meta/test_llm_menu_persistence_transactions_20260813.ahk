@@ -60,7 +60,7 @@ _LMPT_ApiTransactionUsesOneWalAndPublishesLast() {
 	ApiTargetPos := InStr(Body, "ConfigTransitionPresentTarget(ApiPath")
 	CommitPos := InStr(Body, "ConfigTransitionCommitOwned(")
 	RecoverPos := InStr(Body, "ConfigTransitionRecoverOwned(")
-	PublishPos := InStr(Body, "_LLM_Menu_PublishCandidate(")
+	PublishPos := InStr(Body, "_LLM_Menu_PublishApiEntriesCandidate(")
 	Assert(AcquirePos > 0 && ConfigTargetPos > AcquirePos
 		&& ApiTargetPos > ConfigTargetPos && CommitPos > ApiTargetPos
 		&& RecoverPos > CommitPos && PublishPos > RecoverPos,
@@ -72,6 +72,12 @@ _LMPT_ApiTransactionUsesOneWalAndPublishesLast() {
 		"both API transition targets must pin the exact pre-commit authority")
 	Assert(InStr(Body, "_ConfigFullSaveSettleTerminal") == 0,
 		"transition acquisition owns pending-generation settlement exactly once")
+	PublishBody := _DriverFuncBody("_LLM_Menu_PublishApiEntriesCandidate")
+	RetirePos := InStr(PublishBody, 'LLM_AuxRetirePrefix("api_validation:")')
+	CanonicalPos := InStr(PublishBody, "_LLM_Menu_PublishCandidate(")
+	Assert(RetirePos > 0 && CanonicalPos > RetirePos,
+		"the owned API publication must retire stale validations before delegating "
+		. "to the canonical RAM publication")
 }
 Test("meta LLM menu: API CRUD journals both authorities before publication "
 	. "(llm-api-entry-two-target-wal-guard)",

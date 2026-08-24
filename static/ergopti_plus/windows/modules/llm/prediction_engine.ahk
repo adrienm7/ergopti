@@ -421,7 +421,7 @@ LLM_Engine_Init(opts) {
 			"disable_url_bars", "disable_password_fields",
 			"show_info_bar", "streaming", "show_all_at_once",
 			"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
-			"inline_autotype", "api_entry_id"]
+			"inline_autotype", "api_entry_id", "ollama_port"]
 
 		for _, k in _keys
 			if ValidatedOpts.Has(k)

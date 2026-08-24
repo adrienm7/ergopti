@@ -329,27 +329,13 @@ _LLM_Menu_FireHealthProbe(Force := false) {
 		LoggerDebug("LLM", "Health probe resumed — physical input detected again.")
 	}
 	_LLM_Menu["last_health_probe_tick"] := now
+	Owner := _LLM_Menu_BeginOllamaAux("menu_health")
 	try {
-		LLM_OllamaIsRunning_Async((reachable) => _LLM_Menu_OnHealthProbeDone(reachable))
+		LLM_OllamaIsRunning_Async(
+			(reachable) => _LLM_Menu_OnHealthProbeDone(reachable, Owner), Owner)
+	} catch {
+		LLM_AuxFinish(Owner)
 	}
-}
-
-_LLM_Menu_OnHealthProbeDone(reachable) {
-	global _LLM_Menu
-	if A_IsSuspended || !_LLM_Menu.Get("enabled", false)
-			|| _LLM_Menu.Get("backend", "") != "ollama"
-		return false
-	prev := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
-	new_status := reachable ? "ok" : "ko"
-	_LLM_Menu["last_health_status"] := new_status
-	; Only repaint when the status actually flipped — avoids an infinite
-	; rebuild loop and keeps the menu stable when the user is not staring
-	; at it. Also skip the rebuild while suspended: a probe fired just before
-	; Pause could still land here and churn the tray menu, violating the
-	; "pause silences everything" invariant. The stashed status above still
-	; updates so the next unpaused build paints the correct dot.
-	if (prev != new_status and !A_IsSuspended)
-		LLM_Menu_Build()
 }
 
 /**
@@ -378,22 +364,11 @@ _LLM_Menu_FireInstalledTagsProbe() {
 	now := A_TickCount
 	if (_LLM_InstalledTagsCacheAt > 0 and (now - _LLM_InstalledTagsCacheAt) < LLM_INSTALLED_CACHE_TTL_MS)
 		return
-	try LLM_OllamaListModels_Async((tags) => _LLM_Menu_OnInstalledTagsProbeDone(tags))
-}
-
-_LLM_Menu_OnInstalledTagsProbeDone(tags) {
-	global _LLM_Menu
-	if A_IsSuspended || !_LLM_Menu.Get("enabled", false)
-			|| _LLM_Menu.Get("backend", "") != "ollama"
-		return false
-	prev := _LLM_GetInstalledTagsCached()
-	LLM_SetInstalledTagsCache(tags)
-	; Repaint only when the installed SET actually changed (mirrors the health dot's
-	; flip-guard) and never while suspended — so a probe landing mid-build doesn't
-	; churn the tray, and the green dots appear a moment after the daemon answers.
-	; The next rebuild's probe sees a fresh cache and skips, so there is no loop.
-	if (_LLM_InstalledTagsListChanged(prev, IsSet(tags) ? tags : []) and !A_IsSuspended)
-		LLM_Menu_Build()
+	Owner := _LLM_Menu_BeginOllamaAux("menu_tags")
+	try LLM_OllamaListModels_Async(
+		(tags) => _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner), Owner)
+	catch
+		LLM_AuxFinish(Owner)
 }
 
 LLM_Menu_SetProfile(id) {

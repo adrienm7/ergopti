@@ -77,7 +77,8 @@ _LLM_Menu_BackendLifecycleCall(Port, Name, Args*) {
 LLM_Menu_CancelOllamaOwnership() {
 	Succeeded := true
 	for Operation in [
-			(*) => LLM_AuxInvalidate("backend_lifecycle"),
+			(*) => LLM_AuxInvalidate("backend_lifecycle",
+				_LLM_Menu_ResetOllamaAuxState),
 			(*) => LLM_Deps_Cancel(),
 			(*) => OllamaWV_Close(),
 			(*) => LLM_OllamaCancelWarmupRetry()] {

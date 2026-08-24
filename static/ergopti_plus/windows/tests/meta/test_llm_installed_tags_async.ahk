@@ -115,10 +115,14 @@ _MetaCheckInstalledTagsNonBlocking() {
 		. "path bypasses native Suspend like the health probe")
 
 	DoneBody := _DriverFuncBody("_LLM_Menu_OnInstalledTagsProbeDone")
+	OwnerGuard := _DriverFuncBody("_LLM_Menu_AuxOwnerIsCurrent")
 	Assert(DoneBody != "", "actions.ahk must define _LLM_Menu_OnInstalledTagsProbeDone()")
+	Assert(OwnerGuard != "", "the shared auxiliary menu-owner guard must exist")
 	Assert(InStr(DoneBody, "LLM_SetInstalledTagsCache("),
 		"_LLM_Menu_OnInstalledTagsProbeDone must stash the result via LLM_SetInstalledTagsCache")
-	Assert(InStr(DoneBody, "_LLM_InstalledTagsListChanged(") and InStr(DoneBody, "!A_IsSuspended"),
+	Assert(InStr(DoneBody, "_LLM_InstalledTagsListChanged(")
+			and InStr(DoneBody, "_LLM_Menu_AuxOwnerIsCurrent(Owner)")
+			and InStr(OwnerGuard, "A_IsSuspended"),
 		"_LLM_Menu_OnInstalledTagsProbeDone must repaint only on a real change and never "
 		. "while suspended (flip-guard, mirrors the health dot)")
 

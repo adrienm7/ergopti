@@ -627,21 +627,44 @@ global LLM_REMOTE_READY_PING_POLL_MS := 250
  * @param {Map|Object} Entry     - API entry record (Provider / BaseUrl / Token).
  * @param {function}   on_result - Callback receiving the boolean reachability.
  */
-LLM_RemoteIsReady_Async(Entry, on_result) {
+_LLMRemote_ReadyOwnerIsCurrent(Owner) {
+    return Owner is Map && LLM_AuxIsCurrent(Owner)
+}
+
+_LLMRemote_CompleteReady(Owner, on_result, reachable) {
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
+        return false
+    try _LLM_InvokeCallback(on_result, "on_result", reachable)
+    finally {
+        if Owner is Map
+            LLM_AuxFinish(Owner)
+    }
+    return true
+}
+
+LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0) {
     global LLM_API_PROVIDERS
     global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
 
     ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    if !(Owner is Map) {
+        EntryId := _LLMRemoteEntryGet(Entry, "Id", "")
+        OwnerKind := EntryId != "" ? "api_validation:" . EntryId : "remote_ready"
+        Owner := LLM_AuxBegin(OwnerKind, Map(
+            "backend", "api",
+            "endpoint", _LLMRemoteEntryGet(Entry, "BaseUrl", ""),
+            "identity", EntryId))
+    }
     if !LLM_API_PROVIDERS.Has(ProviderId) {
-        _LLM_InvokeCallback(on_result, "on_result", false)
-        return
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return Owner
     }
     Provider := LLM_API_PROVIDERS[ProviderId]
     BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", Provider["BaseUrl"])
     Token    := _LLMRemoteEntryGet(Entry, "Token", "")
     if (BaseUrl == "" or Token == "") {
-        _LLM_InvokeCallback(on_result, "on_result", false)
-        return
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return Owner
     }
 
     ProvFmt := Provider["Format"]
@@ -652,8 +675,8 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
         PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
     }
     if (PingUrl == "") {
-        _LLM_InvokeCallback(on_result, "on_result", false)
-        return
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return Owner
     }
 
     try {
@@ -664,18 +687,26 @@ LLM_RemoteIsReady_Async(Entry, on_result) {
         _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
         Http.Send()
     } catch {
-        _LLM_InvokeCallback(on_result, "on_result", false)
-        return
+        _LLMRemote_CompleteReady(Owner, on_result, false)
+        return Owner
     }
-    _LLMRemote_PollReady(Http, on_result, A_TickCount, LLM_REMOTE_READY_PING_DEADLINE_MS)
+    if !LLM_AuxBindResources(Owner, Map("cancel", (*) => Http.Abort()))
+        return Owner
+    _LLMRemote_PollReady(Http, on_result, A_TickCount,
+        LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
+    return Owner
 }
 
 ; Polling tick for LLM_RemoteIsReady_Async. Re-arms itself on a relaxed cadence
 ; until the response is ready or the elapsed time exceeds timeout_ms, then aborts
 ; the in-flight request and reports the result exactly once. Uses wrap-safe
 ; elapsed-delta arithmetic via _LLM_DeadlineExpired.
-_LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
+_LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms, Owner := 0) {
     global LLM_REMOTE_READY_PING_POLL_MS
+    if !_LLMRemote_ReadyOwnerIsCurrent(Owner) {
+        try Http.Abort()
+        return
+    }
     ready := false
     try {
         ready := Http.WaitForResponse(0)
@@ -687,7 +718,7 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
         ; nothing in the log to say why the backend looked unreachable.
         try LoggerWarn("LLM.remote", "PollReady WaitForResponse threw COM error — abandoning: {1}", com_err.Message)
         try Http.Abort()
-        _LLM_InvokeCallback(on_result, "on_result", false)
+        _LLMRemote_CompleteReady(Owner, on_result, false)
         return
     }
     if !ready {
@@ -695,15 +726,17 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms) {
             ; Abort the stalled request so the COM object + socket are released
             ; now rather than lingering until WinHTTP's own timeout fires.
             try Http.Abort()
-            _LLM_InvokeCallback(on_result, "on_result", false)
+            _LLMRemote_CompleteReady(Owner, on_result, false)
             return
         }
-        SetTimer(() => _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms), -LLM_REMOTE_READY_PING_POLL_MS)
+        LLM_AuxSchedule(Owner,
+            () => _LLMRemote_PollReady(Http, on_result, start_tick,
+                timeout_ms, Owner), -LLM_REMOTE_READY_PING_POLL_MS)
         return
     }
     status := 0
     try status := Http.Status
-    _LLM_InvokeCallback(on_result, "on_result", status >= 200 and status < 300)
+    _LLMRemote_CompleteReady(Owner, on_result, status >= 200 and status < 300)
 }
 
 

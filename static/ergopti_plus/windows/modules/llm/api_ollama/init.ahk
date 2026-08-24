@@ -28,16 +28,240 @@
 global LLM_OLLAMA_PORT     := 0
 global LLM_OLLAMA_BASE_URL := "http://localhost:" . LLM_OLLAMA_PORT
 global _LLM_AuxGeneration := 1
+global _LLM_AuxOwnerCounter := 0
+global _LLM_AuxOwners := Map()
 
 LLM_AuxGeneration() {
 	global _LLM_AuxGeneration
 	return _LLM_AuxGeneration
 }
 
-LLM_AuxInvalidate(*) {
-	global _LLM_AuxGeneration
-	_LLM_AuxGeneration += 1
+_LLM_AuxOwnerIsCurrentLocked(Owner) {
+	global _LLM_AuxGeneration, _LLM_AuxOwners
+	if !(Owner is Map) || !Owner.Has("token") || !Owner.Has("kind")
+			|| !Owner.Has("backend_generation")
+			|| !Owner.Has("endpoint_generation")
+			|| !Owner.Has("lifecycle_generation")
+		return false
+	Kind := Owner["kind"]
+	if !(Kind is String) || !_LLM_AuxOwners.Has(Kind)
+		return false
+	Stored := _LLM_AuxOwners[Kind]
+	return ObjPtr(Stored) == ObjPtr(Owner)
+		&& Owner["backend_generation"] == _LLM_AuxGeneration
+		&& Owner["endpoint_generation"] == _LLM_AuxGeneration
+		&& Owner["lifecycle_generation"] == _LLM_AuxGeneration
+}
+
+_LLM_AuxCleanupDetached(Resources, CancelWork := true) {
+	if !(Resources is Map)
+		return false
+	TimerFn := Resources.Get("timer", 0)
+	TimerCancelFn := Resources.Get("timer_cancel", 0)
+	CancelFn := Resources.Get("cancel", 0)
+	FinalizerFn := Resources.Get("finalizer", 0)
+	if HasMethod(TimerCancelFn, "Call") {
+		try TimerCancelFn.Call()
+	} else if HasMethod(TimerFn, "Call") {
+		try SetTimer(TimerFn, 0)
+	}
+	if CancelWork && HasMethod(CancelFn, "Call")
+		try CancelFn.Call()
+	if HasMethod(FinalizerFn, "Call")
+		try FinalizerFn.Call()
+	return true
+}
+
+_LLM_AuxCleanupOwner(Owner, CancelWork := true) {
+	if !(Owner is Map)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if Owner.Get("cleanup_claimed", false)
+			return false
+		Owner["cleanup_claimed"] := true
+		Resources := Map(
+			"timer", Owner.Get("timer", 0),
+			"timer_cancel", Owner.Get("timer_cancel", 0),
+			"cancel", Owner.Get("cancel", 0),
+			"finalizer", Owner.Get("finalizer", 0))
+		Owner["timer"] := 0
+		Owner["timer_cancel"] := 0
+		Owner["cancel"] := 0
+		Owner["finalizer"] := 0
+	} finally Critical(PreviousCritical)
+	return _LLM_AuxCleanupDetached(Resources, CancelWork)
+}
+
+LLM_AuxInvalidate(Reason := "", ResetFn := 0) {
+	global _LLM_AuxGeneration, _LLM_AuxOwners
+	ResetError := 0
+	PreviousCritical := Critical("On")
+	try {
+		Retired := []
+		for _, Owner in _LLM_AuxOwners
+			Retired.Push(Owner)
+		_LLM_AuxGeneration += 1
+		_LLM_AuxOwners := Map()
+		if HasMethod(ResetFn, "Call") {
+			try ResetFn.Call(Reason)
+			catch as Err
+				ResetError := Err
+		}
+	} finally Critical(PreviousCritical)
+	for Owner in Retired
+		_LLM_AuxCleanupOwner(Owner, true)
+	if IsObject(ResetError)
+		throw ResetError
 	return _LLM_AuxGeneration
+}
+
+; Publishes one immutable latest-owner receipt per auxiliary request kind. The
+; same generation is deliberately stamped into the backend, endpoint, and
+; lifecycle fields: LLM_AuxInvalidate is the single atomic boundary called by
+; every one of those transitions (backend/port/suspend). A per-kind token then
+; distinguishes A/B requests that share the same configuration generation.
+LLM_AuxBegin(Kind, Context := 0) {
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	if !(Kind is String) || Kind == ""
+		throw ValueError("An auxiliary LLM owner requires a non-empty kind.")
+	if !(Context is Map)
+		Context := Map()
+	PreviousCritical := Critical("On")
+	try {
+		Retired := _LLM_AuxOwners.Has(Kind) ? _LLM_AuxOwners[Kind] : 0
+		_LLM_AuxOwnerCounter += 1
+		Owner := Map(
+			"token", _LLM_AuxOwnerCounter,
+			"kind", Kind,
+			"backend_generation", _LLM_AuxGeneration,
+			"endpoint_generation", _LLM_AuxGeneration,
+			"lifecycle_generation", _LLM_AuxGeneration,
+			"backend", Context.Get("backend", ""),
+			"endpoint", Context.Get("endpoint", ""),
+			"identity", Context.Get("identity", ""),
+			"process_pid", 0,
+			"timer", 0,
+			"timer_cancel", 0,
+			"cancel", 0,
+			"finalizer", 0,
+			"cleanup_claimed", false)
+		_LLM_AuxOwners[Kind] := Owner
+	} finally Critical(PreviousCritical)
+	if Retired is Map
+		_LLM_AuxCleanupOwner(Retired, true)
+	return Owner
+}
+
+LLM_AuxIsCurrent(Owner) {
+	PreviousCritical := Critical("On")
+	try return _LLM_AuxOwnerIsCurrentLocked(Owner)
+	finally Critical(PreviousCritical)
+}
+
+_LLM_AuxRetireOwner(Owner, CancelWork := true) {
+	global _LLM_AuxOwners
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_AuxOwnerIsCurrentLocked(Owner)
+			return false
+		_LLM_AuxOwners.Delete(Owner["kind"])
+	} finally Critical(PreviousCritical)
+	_LLM_AuxCleanupOwner(Owner, CancelWork)
+	return true
+}
+
+LLM_AuxBindResources(Owner, Resources) {
+	if !(Resources is Map)
+		throw TypeError("Auxiliary LLM resources must be a Map.")
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_AuxOwnerIsCurrentLocked(Owner)
+			Bound := false
+		else {
+			for Key in ["process_pid", "timer", "timer_cancel", "cancel", "finalizer"] {
+				if Resources.Has(Key)
+					Owner[Key] := Resources[Key]
+			}
+			Bound := true
+		}
+	} finally Critical(PreviousCritical)
+	if !Bound
+		_LLM_AuxCleanupDetached(Resources, true)
+	return Bound
+}
+
+_LLM_AuxRunScheduled(Owner, TimerFn, Callback) {
+	PreviousCritical := Critical("On")
+	try {
+		if !(Owner is Map) || Owner.Get("timer", 0) != TimerFn
+				|| !_LLM_AuxOwnerIsCurrentLocked(Owner)
+			return false
+		Owner["timer"] := 0
+		Owner["timer_cancel"] := 0
+	} finally Critical(PreviousCritical)
+	Callback.Call()
+	return true
+}
+
+LLM_AuxSchedule(Owner, Callback, Period, ScheduleFn := 0) {
+	if !HasMethod(Callback, "Call")
+		throw TypeError("An auxiliary LLM timer requires a callable callback.")
+	DelayMs := Max(1, Abs(Period))
+	TimerFn := 0
+	TimerFn := (*) => _LLM_AuxRunScheduled(Owner, TimerFn, Callback)
+	ScheduleError := 0
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_AuxOwnerIsCurrentLocked(Owner)
+			return false
+		OldTimerCancelFn := Owner.Get("timer_cancel", 0)
+		if HasMethod(OldTimerCancelFn, "Call")
+			try OldTimerCancelFn.Call()
+		Owner["timer"] := TimerFn
+		try {
+			if HasMethod(ScheduleFn, "Call") {
+				Owner["timer_cancel"] := (*) => ScheduleFn.Call(TimerFn, 0)
+				ScheduleFn.Call(TimerFn, -DelayMs)
+			} else {
+				Owner["timer_cancel"] := (*) => SetTimer(TimerFn, 0)
+				SetTimer(TimerFn, -DelayMs)
+			}
+		} catch as Err
+			ScheduleError := Err
+	} finally Critical(PreviousCritical)
+	if IsObject(ScheduleError) {
+		_LLM_AuxRetireOwner(Owner, true)
+		return false
+	}
+	return true
+}
+
+LLM_AuxFinish(Owner) {
+	return _LLM_AuxRetireOwner(Owner, false)
+}
+
+LLM_AuxRetirePrefix(Prefix) {
+	global _LLM_AuxOwners
+	if !(Prefix is String) || Prefix == ""
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		RetiredKinds := []
+		RetiredOwners := []
+		for Kind, Owner in _LLM_AuxOwners {
+			if SubStr(Kind, 1, StrLen(Prefix)) == Prefix
+			{
+				RetiredKinds.Push(Kind)
+				RetiredOwners.Push(Owner)
+			}
+		}
+		for Kind in RetiredKinds
+			_LLM_AuxOwners.Delete(Kind)
+	} finally Critical(PreviousCritical)
+	for Owner in RetiredOwners
+		_LLM_AuxCleanupOwner(Owner, true)
+	return true
 }
 ; Keep-alive duration sent in /api/chat payloads — canonical value lives in
 ; _shared/modules/llm/defaults.json (llm_ollama_keep_alive). Sentinel "" —
