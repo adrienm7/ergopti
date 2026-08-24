@@ -1,0 +1,63 @@
+# .github/workflows/linux-layout.yml
+#
+# Dedicated gate for the Ergopti XKB layout installation stack:
+#   - unit + sandbox tests for the Python installers (layout_package core,
+#     clean installer end-to-end against temporary roots);
+#   - coherence checks over every generated layout shipped in the repository
+#     (symbols must only reference types their version defines - issue #84);
+#   - shellcheck over the bash entry points.
+
+name: Linux layout installer
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'static/ergopti/linux/**'
+      - '.github/workflows/linux-layout.yml'
+  pull_request:
+    paths:
+      - 'static/ergopti/linux/**'
+      - '.github/workflows/linux-layout.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-layout-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: 'Installer unit + sandbox tests'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run installer test suites (unit, consistency, sandbox)
+        run: python static/ergopti/linux/xkb_installation/tests/run_all_tests.py
+
+  shell-lint:
+    name: 'Shell syntax + shellcheck'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: shellcheck (installer entry points)
+        run: |
+          shellcheck -S error \
+            static/ergopti/linux/xkb_installation/install.sh \
+            static/ergopti/linux/xkb_installation/detect_installation_method.sh
+
+      - name: bash syntax check
+        run: |
+          bash -n static/ergopti/linux/xkb_installation/install.sh
+          bash -n static/ergopti/linux/xkb_installation/detect_installation_method.sh

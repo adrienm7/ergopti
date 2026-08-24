@@ -151,7 +151,8 @@ static/ergopti_plus/      The Ergopti+ driver suite
   linux/                  Lua daemon + kanata integration (alpha)
   _shared/                Cross-driver single source of truth
                           (hotstrings TOML, LLM catalogue, locales, menus, webview UIs…)
-static/drivers/           Ergopti layout artefacts (keylayout, XKB, …)
+static/ergopti/           Ergopti layout artefacts (keylayout, XKB, XCompose)
+static/drivers/           Driver support assets (alfred, espanso, kanata, kalamine)
 tools/                    Build, codegen, lint and test tooling
 docs/                     Engineering docs — start with docs/memory/README.md
 ```
