@@ -49,6 +49,89 @@ _RemoteBuildUrl_TrailingSlashStripped() {
 Test("_LLMRemoteBuildUrl: trailing slash on base URL is stripped", _RemoteBuildUrl_TrailingSlashStripped)
 
 
+_RemoteCurlConfig_RejectsControlCharacterDirectives() {
+	HostileCases := [
+		["openai", 'secret`nheader = "X-Evil: yes"', "https://safe.invalid/v1"],
+		["openai", "secret`tcontinued", "https://safe.invalid/v1"],
+		["anthropic", "secret" . Chr(27) . "escape", "https://safe.invalid/v1"],
+		["openai", "secret`rinclude = injected", "https://safe.invalid/v1"],
+		["gemini", "secret", 'https://safe.invalid/v1`noutput = "stolen"'],
+		["openai", "secret" . Chr(127) . "delete", "https://safe.invalid/v1"],
+		["openai", "secret" . Chr(0x85) . "next-line", "https://safe.invalid/v1"]
+	]
+	for Vector in HostileCases
+		AssertEqual("", _LLMRemote_BuildCurlConfig(Vector[1], Vector[2], Vector[3]),
+			"(ahk2-12-curl-config-boundary) a control character must reject the complete curl config")
+
+	Valid := _LLMRemote_BuildCurlConfig("openai", 'token with spaces\and"quotes',
+		"https://safe.invalid/v1?q=é")
+	Assert(Valid != "",
+		"(ahk2-12-curl-config-boundary) ordinary escaped and Unicode values must remain valid")
+	AssertContains(Valid, "Authorization: Bearer token with spaces")
+}
+Test("remote curl config: control characters cannot inject directives (ahk2-12-curl-config-boundary)",
+	_RemoteCurlConfig_RejectsControlCharacterDirectives)
+
+
+_RemoteCurlControl_TempDir(State, *) {
+	State["temp_calls"] += 1
+	return A_Temp
+}
+
+_RemoteCurlControl_Write(State, *) {
+	State["write_calls"] += 1
+	return true
+}
+
+_RemoteCurlControl_Run(State, Command, WorkingDir, Options, &Pid) {
+	State["run_calls"] += 1
+	Pid := 4242
+}
+
+_RemoteCurlControl_Fail(State, *) {
+	State["fail_calls"] += 1
+}
+
+_RemoteCurlControl_DispatchRejectsBeforeArtifacts() {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_12_control_dispatch"
+	State := Map("temp_calls", 0, "write_calls", 0, "run_calls", 0,
+		"fail_calls", 0)
+	Port := Map(
+		"file_exists", (*) => true,
+		"temp_dir", _RemoteCurlControl_TempDir.Bind(State),
+		"write", _RemoteCurlControl_Write.Bind(State),
+		"delete", (*) => true,
+		"run", _RemoteCurlControl_Run.Bind(State),
+		"poll", (*) => true,
+		"tick", (*) => 6212)
+	Resolved := Map("Format", "openai", "Token", "secret`nheader = injected",
+		"Model", "model")
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved,
+			"https://safe.invalid/v1", '{"input":"private"}', (*) => 0,
+			_RemoteCurlControl_Fail.Bind(State), 1000, Port),
+			"curl availability must transfer terminal refusal to the dispatcher")
+		AssertEqual(1, State["fail_calls"],
+			"(ahk2-12-curl-config-boundary) invalid config input must fail exactly once")
+		AssertEqual(0, State["temp_calls"],
+			"invalid config input must be rejected before artifact paths are allocated")
+		AssertEqual(0, State["write_calls"],
+			"invalid config input must create neither payload nor credential artifact")
+		AssertEqual(0, State["run_calls"],
+			"invalid config input must never launch curl")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"invalid config input must not publish an async owner")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+Test("remote curl dispatch: invalid config is refused before artifacts "
+	. "(ahk2-12-curl-config-boundary)",
+	_RemoteCurlControl_DispatchRejectsBeforeArtifacts)
+
+
 
 
 ; ======================================================
@@ -353,6 +436,19 @@ _RemoteResolve_GeminiFormat() {
 	AssertEqual("gemini", resolved["Format"])
 }
 Test("_LLMRemoteResolveEntry: gemini provider resolves to gemini format", _RemoteResolve_GeminiFormat)
+
+
+_RemoteResolve_ControlCharactersFailClosed() {
+	for Field in ["BaseUrl", "Token", "Model"] {
+		Entry := Map("Provider", "openai", "Token", "secret", "Model", "gpt-4o-mini",
+			"BaseUrl", "https://safe.invalid/v1")
+		Entry[Field] .= "`noutput = injected"
+		AssertEqual("", _LLMRemoteResolveEntry(Entry),
+			"(ahk2-12-curl-config-boundary) resolver must reject control characters in " . Field)
+	}
+}
+Test("remote resolver: control-bearing transport scalars fail closed (ahk2-12-curl-config-boundary)",
+	_RemoteResolve_ControlCharactersFailClosed)
 
 
 

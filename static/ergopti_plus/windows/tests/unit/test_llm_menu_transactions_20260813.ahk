@@ -677,6 +677,39 @@ Test("LLM API entries: strict parser preserves escaped strings and braces "
 	_LMT_ApiParserPreservesEscapedStrings)
 
 
+_LMT_ApiEntryControlCharactersNeverPublish() {
+	Providers := Map("openai", Map())
+	for Field in ["Id", "Name", "BaseUrl", "Token", "Model"] {
+		Raw := _LMT_ApiImageWithFieldValue(Field, '"bad\noutput = injected"')
+		Parsed := _LLM_Menu_ParseAndValidateApiEntries(
+			Raw, Providers, (Token) => Token)
+		AssertFalse(Parsed["ok"],
+			"(ahk2-12-curl-config-boundary) persisted control-bearing " . Field
+			. " must reject the complete image")
+
+		Candidate := Map("api_entries", [_LMT_ApiEntry("live", "Live")],
+			"api_entry_id", "live")
+		Before := _LLM_Menu_SerializeApiEntries(Candidate, (Token) => Token)
+		NewEntry := _LMT_ApiEntry("new", "New")
+		NewEntry[Field] .= "`noutput = injected"
+		AssertFalse(_LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, ""),
+			"(ahk2-12-curl-config-boundary) interactive control-bearing " . Field
+			. " must be refused before candidate mutation")
+		AssertEqual(Before,
+			_LLM_Menu_SerializeApiEntries(Candidate, (Token) => Token),
+			"a refused API entry must preserve the detached graph byte-for-byte")
+	}
+	EncryptedImage := _LMT_ApiImageWithFieldValue("Token", '"encrypted"')
+	DecryptedControl := _LLM_Menu_ParseAndValidateApiEntries(
+		EncryptedImage, Providers, (*) => "secret`nheader = injected")
+	AssertFalse(DecryptedControl["ok"],
+		"(ahk2-12-curl-config-boundary) controls revealed by token decryption must fail closed")
+}
+Test("LLM API entries: control characters never publish from disk or CRUD "
+	. "(ahk2-12-curl-config-boundary)",
+	_LMT_ApiEntryControlCharactersNeverPublish)
+
+
 _LMT_DuplicateApiCandidatesRefuseEveryCrudMutation() {
 	DuplicateA := _LMT_ApiEntry("duplicate", "First")
 	DuplicateB := _LMT_ApiEntry("duplicate", "Second")

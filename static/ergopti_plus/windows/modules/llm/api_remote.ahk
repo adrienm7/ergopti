@@ -144,6 +144,11 @@ _LLMRemote_CurlAvailable() {
 ; Quotes a value for a curl config file. curl unescapes `\\` and `\"` inside a
 ; quoted value, so both have to be escaped here — an unescaped backslash or quote
 ; in a provider token would truncate the header and ship a malformed credential.
+_LLMRemote_ConfigScalarIsSafe(Value) {
+    return Value is String
+        && !RegExMatch(Value, "[\x00-\x1F\x7F-\x9F]")
+}
+
 _LLMRemote_CurlConfQuote(Value) {
     Escaped := StrReplace(Value, '\', '\\')
     Escaped := StrReplace(Escaped, '"', '\"')
@@ -160,6 +165,10 @@ _LLMRemote_CurlConfQuote(Value) {
 ; same boundary the request payload already accepted, and it is deleted on every
 ; completion path.
 _LLMRemote_BuildCurlConfig(Format, Token, Url) {
+    if !_LLMRemote_ConfigScalarIsSafe(Format)
+            || !_LLMRemote_ConfigScalarIsSafe(Token)
+            || !_LLMRemote_ConfigScalarIsSafe(Url)
+        return ""
     ; Gemini carries the key inside the URL, which is why the URL travels through
     ; this file too rather than being spliced into the command line.
     cfg := "url = " . _LLMRemote_CurlConfQuote(Url) . "`n"
@@ -213,6 +222,13 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     curl_exe := A_WinDir . "\System32\curl.exe"
     if !FileExistsFn.Call(curl_exe)
         return false
+    config_image := _LLMRemote_BuildCurlConfig(
+        resolved["Format"], resolved["Token"], Url)
+    if (config_image == "") {
+        try LoggerWarn("LLM.remote", "Rejected curl config input containing control characters.")
+        _LLM_InvokeCallback(on_fail, "on_fail")
+        return true
+    }
     uid := req_id . "_" . TickFn.Call()
     tmp_dir := TempDirFn.Call()
     tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"
@@ -225,7 +241,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
         _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
-    if !WriteFn.Call(tmp_config, _LLMRemote_BuildCurlConfig(resolved["Format"], resolved["Token"], Url)) {
+    if !WriteFn.Call(tmp_config, config_image) {
         _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "Failed to write curl config file — request abandoned rather than sent with the token on the command line.")
         _LLM_InvokeCallback(on_fail, "on_fail")
@@ -557,6 +573,10 @@ _LLMRemoteResolveEntry(Entry) {
     Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
     if (Model == "")
         return ""
+    for Scalar in [ProviderId, ProvFmt, BaseUrl, Token, Model] {
+        if !_LLMRemote_ConfigScalarIsSafe(Scalar)
+            return ""
+    }
     return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model)
 }
 
