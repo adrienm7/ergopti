@@ -14,7 +14,7 @@ _LMBCM_AllProducersUseTheCoordinator() {
 	RequestProducers := [
 		"_LLM_Menu_ApplyToggleCommitted",
 		"_LLM_Menu_ApplyBackendCommitted",
-		"_LLM_Menu_ApplyModelCommitted",
+		"_LLM_Menu_ApplyModelRuntimeCommitted",
 		"_LLM_Menu_ApplyStandardCommitted",
 		"_LLM_Menu_ApplyCurrentDepsFailure",
 		"_LLM_Menu_ApplyOllamaPortCommitted",

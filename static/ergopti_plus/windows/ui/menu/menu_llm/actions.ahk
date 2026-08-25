@@ -252,15 +252,12 @@ _LLM_Menu_SetModelCandidate(Candidate, Tag) {
 }
 
 _LLM_Menu_ApplyModelCommitted(Candidate) {
+	return LLM_Menu_ApplyModelLifecycleCommitted(Candidate,
+		_LLM_Menu_ApplyModelRuntimeCommitted)
+}
+
+_LLM_Menu_ApplyModelRuntimeCommitted(Candidate) {
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	; Pre-load the new model into Ollama's GPU cache asynchronously so the
-	; first real prediction skips the cold-start penalty. No-op for the
-	; remote API backend — there's no local server to warm.
-	if (Candidate["backend"] == "ollama") {
-		global _LLM_Ollama_IsReady
-		_LLM_Ollama_IsReady := false
-		try LLM_OllamaScheduleWarmupRetry(Candidate["model"])
-	}
 	LLM_Menu_RequestBuild("model_committed")
 	return true
 }

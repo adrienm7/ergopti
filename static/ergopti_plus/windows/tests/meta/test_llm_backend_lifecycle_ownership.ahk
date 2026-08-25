@@ -32,6 +32,9 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 		"LLM_Menu_ScheduleBackendLifecycle(")
 	Assert(ScheduleCalls >= 6,
 		"boot, toggle, backend change, API-entry change and resume must share the owned scheduler")
+	ModelApplyBody := _DriverFuncBody("_LLM_Menu_ApplyModelCommitted")
+	Assert(InStr(ModelApplyBody, "LLM_Menu_ApplyModelLifecycleCommitted(") > 0,
+		"model publication must enter the definitions-only lifecycle owner before runtime apply")
 	for Name in ["_LLM_Menu_SelectApiEntry", "_LLM_Menu_PromptApiEntry",
 			"_LLM_Menu_RemoveActiveApiEntry"] {
 		Body := _DriverFuncBody(Name)
@@ -113,7 +116,7 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 _LBLM_OllamaReadinessWritersAreOwned() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for AHK2-13")
-	AssertEqual(7, _LBLM_CountOccurrences(Src, "_LLM_Ollama_IsReady :="),
+	AssertEqual(6, _LBLM_CountOccurrences(Src, "_LLM_Ollama_IsReady :="),
 		"every Ollama readiness writer must remain in the reviewed owner inventory")
 
 	FinalizeBody := _DriverFuncBody("_LLM_Engine_FinalizeRequest")
@@ -126,8 +129,7 @@ _LBLM_OllamaReadinessWritersAreOwned() {
 	for Owner in [
 		"_LLM_Ollama_OnWarmupDone",
 		"LLM_OllamaNoteInferenceSuccess",
-		"_LLM_Menu_WarmCurrentOllamaModel",
-		"_LLM_Menu_ApplyModelCommitted"
+		"_LLM_Menu_WarmCurrentOllamaModel"
 	] {
 		Body := _DriverFuncBody(Owner)
 		Assert(Body != "", Owner . " must remain an explicit Ollama readiness owner")

@@ -29,12 +29,14 @@ _LLM_Menu_BackendLifecycleIntentIsCurrent(Intent) {
 	if !(Intent is Map)
 			|| !Intent.Has("epoch") || !Intent.Has("backend")
 			|| !Intent.Has("enabled") || !Intent.Has("api_entry_id")
+			|| !Intent.Has("model")
 		return false
 	if Intent["epoch"] != _LLM_BackendLifecycleEpoch
 		return false
 	return Intent["backend"] == _LLM_Menu.Get("backend", "")
 		&& Intent["enabled"] == _LLM_Menu.Get("enabled", false)
 		&& Intent["api_entry_id"] == _LLM_Menu.Get("api_entry_id", "")
+		&& Intent["model"] == _LLM_Menu.Get("model", "")
 }
 
 LLM_Menu_BackendLifecycleInvalidate(CancelOllama := false, Port := 0) {
@@ -43,6 +45,20 @@ LLM_Menu_BackendLifecycleInvalidate(CancelOllama := false, Port := 0) {
 	if CancelOllama
 		_LLM_Menu_BackendLifecycleCall(Port, "cancel_ollama")
 	return _LLM_BackendLifecycleEpoch
+}
+
+LLM_Menu_ApplyModelLifecycleCommitted(Candidate, ApplyFn := 0,
+		ScheduleFn := 0, Port := 0) {
+	if !(Candidate is Map) || !Candidate.Has("backend")
+			|| !Candidate.Has("enabled") || !Candidate.Has("model")
+		return false
+	LLM_Menu_BackendLifecycleInvalidate(
+		Candidate["backend"] == "ollama", Port)
+	if HasMethod(ApplyFn, "Call") && !ApplyFn.Call(Candidate)
+		return false
+	if Candidate["enabled"]
+		LLM_Menu_ScheduleBackendLifecycle(false, ScheduleFn, Port)
+	return true
 }
 
 _LLM_Menu_BackendLifecycleCall(Port, Name, Args*) {
