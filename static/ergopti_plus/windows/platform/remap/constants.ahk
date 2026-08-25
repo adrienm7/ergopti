@@ -307,7 +307,8 @@ _TapHoldModifierTickNow() {
 ; never retracts a hold after that hold has already owned an input event.
 TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
-	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0) {
+	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0,
+	PhysicalModifierPassthrough := false) {
 	if !IsObject(WaitReleaseFn)
 		WaitReleaseFn := _TapHoldModifierWaitRelease
 	if !IsObject(KeyIsDownFn)
@@ -322,9 +323,11 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		CancelTapFn := TapHoldShouldCancelTap
 
 	StartedAt := TickNowFn.Call()
-	if !KeyDownFn.Call(ModKey) {
-		return Map("activated", false, "released", false,
-			"tap", false, "elapsed_ms", 0)
+	if !PhysicalModifierPassthrough {
+		if !KeyDownFn.Call(ModKey) {
+			return Map("activated", false, "released", false,
+				"tap", false, "elapsed_ms", 0)
+		}
 	}
 
 	Released := false
@@ -341,7 +344,10 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			}
 		}
 	} finally {
-		ReleaseProved := KeyUpFn.Call(ModKey)
+		; A native modifier selected on its own physical key is already Down
+		; before a ~ hotkey thread starts and its physical Up ends KeyWait. A
+		; second synthetic Down would race the following key's hotkey admission.
+		ReleaseProved := PhysicalModifierPassthrough ? true : KeyUpFn.Call(ModKey)
 	}
 
 	ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
@@ -353,6 +359,11 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		CancelReason := CancelTapFn.Call(KeyId, GuardMs)
 	TapAllowed := Released and ReleaseProved and !A_IsSuspended
 		and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
+	if LoggerIsDebugEnabled() {
+		LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
+			KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
+			Released ? "true" : "false", ElapsedMs, TapAllowed ? "true" : "false")
+	}
 	return Map(
 		"activated", true,
 		"released", ReleaseProved,

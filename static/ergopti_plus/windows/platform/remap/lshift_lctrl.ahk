@@ -38,13 +38,21 @@ _LShiftHoldModKey() {
 	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_shift"), "left_shift", "LShift")
 }
 
-#HotIf TapHoldHoldModifier(TapHold, "left_shift") != "" and not LayerEnabled
-*$SC02A:: {
+_LShiftHandleHold(PhysicalModifierPassthrough) {
 	Result := TapHoldOwnImmediateModifier("left_shift", "SC02A",
-		_LShiftHoldModKey(), TapHoldDuration(TapHold, "left_shift"))
+		_LShiftHoldModKey(), TapHoldDuration(TapHold, "left_shift"),
+		,,,,,, PhysicalModifierPassthrough)
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LShift")
 		_LShiftDispatch()
 }
+
+; When Shift is configured to remain Shift, let the physical edge reach the OS
+; before this thread runs. That edge makes even a 4 ms Shift+key chord eligible
+; for other AHK hotkeys without waiting for a synthetic modifier injection.
+#HotIf _LShiftHoldModKey() == "LShift" and not LayerEnabled
+~*$SC02A:: _LShiftHandleHold(true)
+#HotIf TapHoldHoldModifier(TapHold, "left_shift") != "" and _LShiftHoldModKey() != "LShift" and not LayerEnabled
+*$SC02A:: _LShiftHandleHold(false)
 #HotIf
 
 ; Gate: any configured tap action activates the handler.
