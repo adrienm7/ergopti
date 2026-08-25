@@ -25,13 +25,16 @@ _TRLR_SaveRootState() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	return {
 		RequestedGeneration: _TrayRootRequestedGeneration,
 		PublishedGeneration: _TrayRootPublishedGeneration,
 		Active: _TrayRootActive,
 		LifecycleEpoch: _TrayRootLifecycleEpoch,
 		LatestAuthorizeFn: _TrayRootLatestAuthorizeFn,
-		LatestWorkerFn: _TrayRootLatestWorkerFn
+		LatestWorkerFn: _TrayRootLatestWorkerFn,
+		RetryGeneration: _TrayRootRetryGeneration,
+		AutomaticRetryCount: _TrayRootAutomaticRetryCount
 	}
 }
 
@@ -39,24 +42,30 @@ _TRLR_ResetRootState() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	_TrayRootRequestedGeneration := 0
 	_TrayRootPublishedGeneration := 0
 	_TrayRootActive := false
 	_TrayRootLifecycleEpoch := 0
 	_TrayRootLatestAuthorizeFn := 0
 	_TrayRootLatestWorkerFn := 0
+	_TrayRootRetryGeneration := 0
+	_TrayRootAutomaticRetryCount := 0
 }
 
 _TRLR_RestoreRootState(Saved) {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	_TrayRootRequestedGeneration := Saved.RequestedGeneration
 	_TrayRootPublishedGeneration := Saved.PublishedGeneration
 	_TrayRootActive := Saved.Active
 	_TrayRootLifecycleEpoch := Saved.LifecycleEpoch
 	_TrayRootLatestAuthorizeFn := Saved.LatestAuthorizeFn
 	_TrayRootLatestWorkerFn := Saved.LatestWorkerFn
+	_TrayRootRetryGeneration := Saved.RetryGeneration
+	_TrayRootAutomaticRetryCount := Saved.AutomaticRetryCount
 }
 
 

@@ -3480,6 +3480,7 @@ _UpdaterTest_SaveTrayRootState() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	return {
 		Stage: _TrayMenuStage,
 		RequestedGeneration: _TrayRootRequestedGeneration,
@@ -3487,7 +3488,9 @@ _UpdaterTest_SaveTrayRootState() {
 		Active: _TrayRootActive,
 		LifecycleEpoch: _TrayRootLifecycleEpoch,
 		LatestAuthorizeFn: _TrayRootLatestAuthorizeFn,
-		LatestWorkerFn: _TrayRootLatestWorkerFn
+		LatestWorkerFn: _TrayRootLatestWorkerFn,
+		RetryGeneration: _TrayRootRetryGeneration,
+		AutomaticRetryCount: _TrayRootAutomaticRetryCount
 	}
 }
 
@@ -3496,6 +3499,7 @@ _UpdaterTest_ResetTrayRootState() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	_TrayMenuStage := false
 	_TrayRootRequestedGeneration := 0
 	_TrayRootPublishedGeneration := 0
@@ -3503,6 +3507,8 @@ _UpdaterTest_ResetTrayRootState() {
 	_TrayRootLifecycleEpoch := 0
 	_TrayRootLatestAuthorizeFn := 0
 	_TrayRootLatestWorkerFn := 0
+	_TrayRootRetryGeneration := 0
+	_TrayRootAutomaticRetryCount := 0
 }
 
 _UpdaterTest_RestoreTrayRootState(Saved) {
@@ -3510,6 +3516,7 @@ _UpdaterTest_RestoreTrayRootState(Saved) {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	_TrayMenuStage := Saved.Stage
 	_TrayRootRequestedGeneration := Saved.RequestedGeneration
 	_TrayRootPublishedGeneration := Saved.PublishedGeneration
@@ -3517,6 +3524,8 @@ _UpdaterTest_RestoreTrayRootState(Saved) {
 	_TrayRootLifecycleEpoch := Saved.LifecycleEpoch
 	_TrayRootLatestAuthorizeFn := Saved.LatestAuthorizeFn
 	_TrayRootLatestWorkerFn := Saved.LatestWorkerFn
+	_TrayRootRetryGeneration := Saved.RetryGeneration
+	_TrayRootAutomaticRetryCount := Saved.AutomaticRetryCount
 }
 
 _UpdaterTest_StageThenSuspend(State, PublishAuthorizeFn) {

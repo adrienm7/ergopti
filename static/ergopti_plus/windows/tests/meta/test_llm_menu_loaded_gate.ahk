@@ -128,13 +128,21 @@ _LTLG_CheckTypedTrayRootErrorsStaySilent() {
 		? InStr(DrainBody, "throw Err", , RetirePos) : 0
 	PendingThrowPos := PendingPos > 0
 		? InStr(DrainBody, "throw Err", , PendingPos) : 0
-	DrainLogPos := InStr(DrainBody, "LoggerError")
-	Assert(PendingPos > 0 && FatalPos > 0 && DrainLogPos > 0,
-		"typed tray-root branches and the ordinary diagnostic must remain present")
+	ReportablePos := InStr(DrainBody, "_TrayRootFinishReportableFailure")
+	FinishBody := _DriverFuncBody("_TrayRootFinishReportableFailure")
+	TerminalBody := _DriverFuncBody("_TrayRootReportTerminalFailure")
+	Assert(PendingPos > 0 && FatalPos > 0 && ReportablePos > 0,
+		"typed tray-root branches and the reportable-failure boundary must remain present")
+	Assert(FinishBody != "" && TerminalBody != "",
+		"ordinary and terminal tray-root diagnostics must remain source-visible")
+	Assert(InStr(FinishBody, "LoggerError") > 0
+		&& InStr(FinishBody, "_TrayRootReportTerminalFailure") > 0
+		&& InStr(TerminalBody, "LoggerError") > 0,
+		"ordinary failures and exhausted generations must remain reportable")
 	Assert(FatalPos < RetirePos && RetirePos < FatalThrowPos
-		&& FatalThrowPos < DrainLogPos,
+		&& FatalThrowPos < ReportablePos,
 		"fatal root control must retire and throw before ordinary logging")
-	Assert(PendingPos < PendingThrowPos && PendingThrowPos < DrainLogPos,
+	Assert(PendingPos < PendingThrowPos && PendingThrowPos < ReportablePos,
 		"pending root control must throw before ordinary logging")
 
 	ServiceBody := _DriverFuncBody("_TrayRootServiceRetainedWork")
