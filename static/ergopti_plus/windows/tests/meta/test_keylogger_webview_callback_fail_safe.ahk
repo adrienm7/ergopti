@@ -10,6 +10,35 @@
 
 #Requires AutoHotkey v2.0
 
+class _KLWVFS_FakeWebView {
+	__New(ShouldThrow := false) {
+		this.ShouldThrow := ShouldThrow
+		this.Calls := 0
+		this.LastMessage := ""
+	}
+
+	PostWebMessageAsString(Message) {
+		this.Calls += 1
+		this.LastMessage := Message
+		if this.ShouldThrow
+			throw Error("COM delivery refused")
+	}
+}
+
+_KLWVFS_ThrowDiagnostic(*) {
+	throw Error("webview.log is locked")
+}
+
+_KLWVFS_ThrowDirCreate(*) {
+	throw Error("profile directory refused")
+}
+
+global _KLWVFS_ProfileErrors := []
+_KLWVFS_RecordProfileError(Args*) {
+	global _KLWVFS_ProfileErrors
+	_KLWVFS_ProfileErrors.Push(Args)
+}
+
 _KLWVFS_CallbacksFailSafe() {
     Push := _DriverFuncBody("KLWV_PushPrefetch")
     Range := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
@@ -33,3 +62,63 @@ _KLWVFS_CallbacksFailSafe() {
 
 Test("keylogger WebView: deferred bridge callbacks contain I/O errors and honour Suspend",
     _KLWVFS_CallbacksFailSafe)
+
+_KLWVFS_PushVerdictIgnoresDiagnosticFailure() {
+	global KLPF_LAST_JSON
+	SavedWindows := KLWV.windows
+	HadCache := IsSet(KLPF_LAST_JSON)
+	SavedCache := HadCache ? KLPF_LAST_JSON : 0
+	try {
+		WebView := _KLWVFS_FakeWebView()
+		KLWV.windows := Map("typing", Map("webview", WebView))
+		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
+
+		AssertTrue(KLWV_PushPrefetch("typing", _KLWVFS_ThrowDiagnostic),
+			"a delivered dashboard payload must stay successful when diagnostic I/O fails")
+		AssertEqual(1, WebView.Calls,
+			"diagnostic failure must not retry or duplicate the COM delivery")
+		AssertContains(WebView.LastMessage, '"type":"prefetch"',
+			"the successful call must deliver the real prefetch envelope")
+	} finally {
+		KLWV.windows := SavedWindows
+		KLPF_LAST_JSON := HadCache ? SavedCache : Map()
+	}
+}
+Test("keylogger WebView push success is independent from diagnostic files "
+	. "(ahk5-02-webview-diagnostic-boundary)",
+	_KLWVFS_PushVerdictIgnoresDiagnosticFailure)
+
+_KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails() {
+	global KLPF_LAST_JSON
+	SavedWindows := KLWV.windows
+	HadCache := IsSet(KLPF_LAST_JSON)
+	SavedCache := HadCache ? KLPF_LAST_JSON : 0
+	try {
+		WebView := _KLWVFS_FakeWebView(true)
+		KLWV.windows := Map("typing", Map("webview", WebView))
+		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
+
+		AssertFalse(KLWV_PushPrefetch("typing", _KLWVFS_ThrowDiagnostic),
+			"a COM refusal must return false even when its diagnostic file is also unavailable")
+		AssertEqual(1, WebView.Calls,
+			"the functional delivery boundary must be attempted exactly once")
+	} finally {
+		KLWV.windows := SavedWindows
+		KLPF_LAST_JSON := HadCache ? SavedCache : Map()
+	}
+}
+Test("keylogger WebView push failure contains secondary diagnostic faults "
+	. "(ahk5-02-webview-diagnostic-boundary)",
+	_KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails)
+
+_KLWVFS_ProfileDirectoryFailureIsContained() {
+	global _KLWVFS_ProfileErrors := []
+	AssertFalse(_KLWV_CreateProfileDir("X:\refused", _KLWVFS_ThrowDirCreate,
+		_KLWVFS_RecordProfileError),
+		"a refused WebView profile directory must fail closed without escaping")
+	AssertEqual(1, _KLWVFS_ProfileErrors.Length,
+		"profile-directory refusal must be reported exactly once through the central logger seam")
+}
+Test("keylogger WebView profile-directory refusal is contained and logged "
+	. "(ahk5-02-webview-diagnostic-boundary)",
+	_KLWVFS_ProfileDirectoryFailureIsContained)
