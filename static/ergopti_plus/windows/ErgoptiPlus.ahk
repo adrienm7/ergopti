@@ -164,6 +164,14 @@ global TapHold := Map("keys", Map(), "layers", Map())
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
 ; real value (auto-probe + TOML override) later in boot.
 global _ALTGR_KANA_FIXUP := False
+; Personal hotkeys become callable before layout registration finishes. Their
+; callbacks may emit text while the auto-execute thread is still pumping, so the
+; registry read by _EmitReachedScreen must already exist. The entries are global
+; names because the owning InputHooks are initialised later in separate modules.
+global _EMIT_SUPPRESSING_HOOKS := [
+	"_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook",
+	"_MagicKeyEditorInputHook"
+]
 ; The global error net must distinguish a recoverable callback fault from an
 ; init fault. Before this reaches "ready", continuing would leave a resident
 ; half-driver with a subset of hooks/menu state registered.
