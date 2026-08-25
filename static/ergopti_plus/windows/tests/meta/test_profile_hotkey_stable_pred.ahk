@@ -121,16 +121,25 @@ Test("Profile hotkeys: profile and nav binders expose native transaction ports",
 _PHSP_ProfileCallbackNeverSynthesizesPassThrough() {
 	Callback := _StripFullLineComments(
 		_DriverFuncBody("_LLM_Menu_OnProfileHotkey"))
+	Predicate := _StripFullLineComments(
+		_DriverFuncBody("_LLM_Menu_IsProfileHotkeyActive"))
+	Receipt := _StripFullLineComments(
+		_DriverFuncBody("_LLM_NavEventOwnerApplyProfileReceipt"))
 	NativeSelect := _StripFullLineComments(
 		_DriverFuncBody("_LLM_Menu_ProfileNativeSelect"))
 	Binder := _StripFullLineComments(
 		_DriverFuncBody("LLM_Menu_BindProfileHotkeys"))
 	Assert(Callback != "",
 		"the production profile callback must remain reachable")
-	Assert(NativeSelect != "" && Binder != "",
+	Assert(NativeSelect != "" && Binder != "" && Predicate != ""
+		&& Receipt != "",
 		"the tested selection seam and its production binder must remain reachable")
-	Assert(InStr(Callback, "LLM_Menu_GetHotkeyProfileOrder()") > 0,
-		"the callback must recheck the current profile range before selection")
+	Assert(InStr(Predicate, 'Get("native", false)') > 0
+		&& InStr(Callback, 'Get("native", false)') > 0,
+		"native profile ownership must disarm both legacy AHK admission stages")
+	Assert(InStr(Receipt, "Entry.Order[TargetIdx]") > 0
+		&& InStr(Receipt, 'Receipt["profile_effect_done"] := true') > 0,
+		"profile receipts must resolve their retained order and separate effect from ACK")
 	Assert(InStr(NativeSelect, "LLM_Menu_SetProfile(ProfileId)") > 0
 		&& InStr(Binder, "SelectFn := _LLM_Menu_ProfileNativeSelect") > 0
 		&& InStr(Binder,

@@ -189,6 +189,8 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			"another configuration transaction owns the global barrier")
 	}
 	PreparedOwner := 0
+	PreparedProfileOwner := 0
+	ProfileOwnerCommitted := false
 	try {
 		try Settled := HasMethod(SettleFn, "Call")
 			? SettleFn.Call(Bundle) : _ConfigFullSaveSettleTerminal(Bundle)
@@ -227,6 +229,16 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"the detached LLM state could not be reconciled into Features")
 		}
+		try PreparedProfileOwner :=
+			_LLM_Menu_PrepareProfileOwnerCandidate(CandidateMenu)
+		catch as Err {
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"profile hotkey owner preparation raised: " . Err.Message)
+		}
+		if !(PreparedProfileOwner is Map) {
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"profile hotkey owner preparation was refused")
+		}
 		try Updates := HasMethod(CollectFn, "Call")
 			? CollectFn.Call(CandidateFeatures, CandidateMenu)
 			: _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
@@ -257,15 +269,29 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		if !ConfigCommitBorrowedUpdates(OwnerToken, ConfigurationFile, Updates,
 				Context, WriterFn, NotifyFn)
 			return false
-		try Published := HasMethod(PublishFn, "Call")
-			? PublishFn.Call(CandidateFeatures, CandidateMenu, PreparedOwner)
-			: _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu)
+		try {
+			PreviousCritical := Critical("On")
+			try {
+				if !_LLM_Menu_CommitProfileOwnerCandidate(
+						PreparedProfileOwner)
+					return ConfigReportPersistenceFailure(Context, NotifyFn,
+						"config.toml is durable but the profile hotkey owner commit was refused",
+						false)
+				ProfileOwnerCommitted := true
+				Published := HasMethod(PublishFn, "Call")
+					? PublishFn.Call(CandidateFeatures, CandidateMenu, PreparedOwner)
+					: _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu)
+			} finally Critical(PreviousCritical)
+		}
 		catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml is durable but live publication raised: "
 				. Err.Message, false)
 		}
 		if !((Published is Integer) && Published == 1) {
+			if PreparedProfileOwner.Get("changed", false)
+				_LLM_NavEventOwnerQuarantine(
+					"Durable profile state could not be published after its native owner commit")
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml is durable but live publication was refused", false)
 		}
@@ -282,7 +308,11 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			}
 		}
 		return true
-	} finally _ConfigWriteTerminalRelease(Bundle)
+	} finally {
+		if PreparedProfileOwner is Map && !ProfileOwnerCommitted
+			_LLM_Menu_AbortProfileOwnerCandidate(PreparedProfileOwner)
+		_ConfigWriteTerminalRelease(Bundle)
+	}
 }
 
 

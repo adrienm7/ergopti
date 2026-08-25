@@ -19,6 +19,11 @@ EXPORTS
 	ErgoptiNav_AbortOwnerSwap
 	ErgoptiNav_ClaimOwner
 	ErgoptiNav_GetOwner
+	ErgoptiNav_BeginProfileSwap
+	ErgoptiNav_CommitProfileSwap
+	ErgoptiNav_AbortProfileSwap
+	ErgoptiNav_ProfilePendingMask
+	ErgoptiNav_CanStop
 	ErgoptiNav_PollReceipt
 	ErgoptiNav_CompleteReceipt
 	ErgoptiNav_PendingForToken

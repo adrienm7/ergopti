@@ -31,6 +31,10 @@ global _LLM_NavEventOwnerLifecycleResuming := false
 global _LLM_NavEventOwnerPort := 0
 global _LLM_NavEventOwnerNextToken := 0
 global _LLM_NavEventOwnerRecords := Map()
+global _LLM_NavEventOwnerProfileOwners := Map()
+global _LLM_NavEventOwnerActiveProfileToken := 0
+global _LLM_NavEventOwnerProfileEffectActive := false
+global _LLM_NavEventOwnerShutdownFenced := false
 global _LLM_NavEventOwnerDrainActive := false
 global _LLM_NavEventOwnerClaimedReceipt := 0
 global _LLM_NavEventOwnerPendingRepaints := Map()
@@ -189,6 +193,9 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 				if !_LLM_NavEventOwnerPublishCurrentSurface(
 						AllowLifecycleResume)
 					throw Error("Navigation owner rejected the current surface")
+				if !_LLM_NavEventOwnerPublishCurrentProfileSurface(
+						AllowLifecycleResume)
+					throw Error("Navigation owner rejected the current profile surface")
 			} catch as Err {
 				FailureDetail := "Navigation event owner startup publication failed: "
 					. Err.Message . "."
@@ -269,6 +276,10 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 	global _LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn
 	global _LLM_NavEventOwnerServiceFn, _LLM_NavEventOwnerServiceArmed
 	global _LLM_NavEventOwnerRecords
+	global _LLM_NavEventOwnerProfileOwners
+	global _LLM_NavEventOwnerActiveProfileToken
+	global _LLM_NavEventOwnerProfileEffectActive
+	global _LLM_NavEventOwnerShutdownFenced
 	global _LLM_NavEventOwnerClaimedReceipt
 	global _LLM_NavEventOwnerPendingRepaints
 	global _LLM_NavEventOwnerRepaintFailures
@@ -357,6 +368,10 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 		_LLM_NavEventOwnerServiceFn := 0
 		_LLM_NavEventOwnerServiceArmed := false
 		_LLM_NavEventOwnerRecords := Map()
+		_LLM_NavEventOwnerProfileOwners := Map()
+		_LLM_NavEventOwnerActiveProfileToken := 0
+		_LLM_NavEventOwnerProfileEffectActive := false
+		_LLM_NavEventOwnerShutdownFenced := false
 		_LLM_NavEventOwnerClaimedReceipt := 0
 		_LLM_NavEventOwnerPendingRepaints := Map()
 		_LLM_NavEventOwnerRepaintFailures := Map()
@@ -385,8 +400,10 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 _LLM_NavEventOwnerHasTerminalDebt() {
 	global _LLM_NavEventOwnerClaimedReceipt
 	global _LLM_NavEventOwnerPendingRepaints
+	global _LLM_NavEventOwnerProfileEffectActive
 	return IsObject(_LLM_NavEventOwnerClaimedReceipt)
 		|| _LLM_NavEventOwnerPendingRepaints.Count > 0
+		|| _LLM_NavEventOwnerProfileEffectActive
 }
 
 _LLM_NavEventOwnerRecoverPendingStop() {
@@ -571,6 +588,55 @@ LLM_NavEventOwner_SetSuspended(Suspended) {
 	return (Status is Integer) && Status == 1
 }
 
+_LLM_NavEventOwnerCanStop(Port := 0) {
+	Fn := _LLM_NavEventOwnerPortFn("can_stop", Port)
+	try Status := HasMethod(Fn, "Call")
+		? Fn.Call() : _LLM_NavEventOwnerNativeCanStop()
+	catch
+		return false
+	return (Status is Integer) && Status == 1
+}
+
+LLM_NavEventOwner_PrepareShutdown(ProfileSelectFn := 0, Port := 0) {
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
+	global _LLM_NavEventOwnerShutdownFenced
+	if !_LLM_NavEventOwnerStarted {
+		_LLM_NavEventOwnerShutdownFenced := false
+		return !_LLM_NavEventOwnerQuarantined
+	}
+	if _LLM_NavEventOwnerQuarantined
+		return false
+	if !LLM_NavEventOwner_SetSuspended(true)
+		return false
+	_LLM_NavEventOwnerShutdownFenced := true
+	Drained := false
+	try Drained := _LLM_NavEventOwnerDrain(0, 0, ProfileSelectFn)
+	catch as Err
+		_LLM_NavEventOwnerReport(
+			"Shutdown receipt drain raised an error: " . Err.Message . ".")
+	Ready := Drained && !_LLM_NavEventOwnerHasTerminalDebt()
+		&& _LLM_NavEventOwnerCanStop(Port)
+	if Ready
+		return true
+	LLM_NavEventOwner_CancelShutdown()
+	return false
+}
+
+LLM_NavEventOwner_CancelShutdown() {
+	global _LLM_NavEventOwnerShutdownFenced
+	if !_LLM_NavEventOwnerShutdownFenced
+		return true
+	Resumed := LLM_NavEventOwner_SetSuspended(false)
+	if Resumed {
+		_LLM_NavEventOwnerShutdownFenced := false
+		try _LLM_NavEventOwnerSetServiceTimer(true)
+		return true
+	}
+	_LLM_NavEventOwnerReport(
+		"Refused shutdown could not resume the native event owner.")
+	return false
+}
+
 _LLM_NavEventOwnerApplyExternalSuspendTransition(Suspended,
 		EnterFn, ResumeFn, SuspendFn, IconFn) {
 	global _LastSuspendState
@@ -609,6 +675,7 @@ LLM_NavEventOwner_QuiesceForLifecycle(Suspended) {
 	global _LLM_NavEventOwnerStopPending
 	global _LLM_NavEventOwnerPendingStopRecovery
 	global _LLM_NavEventOwnerRuntimeEpoch
+	global _LLM_NavEventOwnerProfileEffectActive
 	RuntimePlan := 0
 	RuntimePort := 0
 	RuntimeEpoch := 0
@@ -623,6 +690,7 @@ LLM_NavEventOwner_QuiesceForLifecycle(Suspended) {
 	try {
 		if _LLM_NavEventOwnerPendingStopRecovery
 				|| _LLM_NavEventOwnerLifecycleResuming
+				|| _LLM_NavEventOwnerProfileEffectActive
 			return false
 		if Suspended && _LLM_NavEventOwnerLifecycleQuiesced {
 			AlreadyQuiesced := true
@@ -1039,8 +1107,312 @@ _LLM_NavEventOwnerTokenFromSurface(Surface) {
 	return (Token is Integer) && Token > 0 ? Token : 0
 }
 
+_LLM_NavEventOwnerAllocateToken() {
+	global _LLM_NavEventOwnerNextToken
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_NavEventOwnerNextToken += 1
+		if _LLM_NavEventOwnerNextToken <= 0
+			_LLM_NavEventOwnerNextToken := 1
+		return _LLM_NavEventOwnerNextToken
+	} finally Critical(PreviousCritical)
+}
+
+_LLM_NavEventOwnerProfilePlanIsValid(Plan) {
+	if !(Plan is Array) || Plan.Length != 9
+		return false
+	Seen := Map()
+	Loop 9 {
+		if !Plan.Has(A_Index)
+			return false
+		Entry := Plan[A_Index]
+		if !(Entry is Map) || Entry.Get("profile_idx", 0) != A_Index
+				|| !(Entry.Get("physical_id", "") is String)
+				|| Entry.Get("physical_id", "") == ""
+			return false
+		Identity := Entry["physical_id"]
+		if Seen.Has(Identity)
+			return false
+		Seen[Identity] := true
+	}
+	return true
+}
+
+_LLM_NavEventOwnerProfileOrderClone(Order) {
+	if !(Order is Array) || Order.Length > 9
+		return 0
+	Copy := []
+	Seen := Map()
+	for Id in Order {
+		if !(Id is String) || Id == "" || Seen.Has(Id)
+			return 0
+		Seen[Id] := true
+		Copy.Push(Id)
+	}
+	return Copy
+}
+
+_LLM_NavEventOwnerProfileIdSet(CandidateIds) {
+	if CandidateIds is Map
+		return CandidateIds.Clone()
+	if !(CandidateIds is Array)
+		return 0
+	Ids := Map()
+	for Id in CandidateIds {
+		if !(Id is String) || Id == "" || Ids.Has(Id)
+			return 0
+		Ids[Id] := true
+	}
+	return Ids
+}
+
+LLM_NavEventOwner_ProfileSurfaceMatches(Order, Enabled) {
+	global _LLM_NavEventOwnerActiveProfileToken
+	global _LLM_NavEventOwnerProfileOwners
+	NormalizedOrder := _LLM_NavEventOwnerProfileOrderClone(Order)
+	if !(NormalizedOrder is Array)
+		return false
+	ExpectedEnabled := (Enabled is Integer) && Enabled == 1
+	Token := _LLM_NavEventOwnerActiveProfileToken
+	if !ExpectedEnabled
+		return Token == 0
+	if Token <= 0 || !_LLM_NavEventOwnerProfileOwners.Has(Token)
+		return false
+	Entry := _LLM_NavEventOwnerProfileOwners[Token]
+	if !IsObject(Entry) || !Entry.Active || Entry.Retired
+			|| !(Entry.Order is Array)
+		return false
+	if Entry.Order.Length != NormalizedOrder.Length
+		return false
+	for Index, Id in NormalizedOrder
+		if Entry.Order[Index] != Id
+			return false
+	return true
+}
+
+_LLM_NavEventOwnerProfilePendingMask(Token, Port := 0) {
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
+	if !(Token is Integer) || Token <= 0
+		return -1
+	if _LLM_NavEventOwnerQuarantined
+		return -1
+	if !_LLM_NavEventOwnerStarted
+		return 0
+	Fn := _LLM_NavEventOwnerPortFn("profile_pending_mask", Port)
+	try Mask := HasMethod(Fn, "Call")
+		? Fn.Call(Token) : _LLM_NavEventOwnerNativeProfilePendingMask(Token)
+	catch
+		return -1
+	return (Mask is Integer) && Mask >= 0 && Mask <= 0x1FF ? Mask : -1
+}
+
+_LLM_NavEventOwnerProfileMaskIsAdmissible(Entry, Mask, CandidateIds) {
+	if !IsObject(Entry) || !(Entry.Order is Array)
+			|| !(Mask is Integer) || Mask < 0 || Mask > 0x1FF
+			|| !(CandidateIds is Map)
+		return false
+	Loop 9 {
+		Bit := 1 << (A_Index - 1)
+		if !(Mask & Bit)
+			continue
+		if A_Index > Entry.Order.Length
+			return false
+		if !CandidateIds.Has(Entry.Order[A_Index])
+			return false
+	}
+	return true
+}
+
+LLM_NavEventOwner_ProfileCandidateIsAdmissible(CandidateIds, Port := 0,
+		FencedToken := 0, FencedMask := -1) {
+	global _LLM_NavEventOwnerProfileOwners
+	NormalizedIds := _LLM_NavEventOwnerProfileIdSet(CandidateIds)
+	if !(NormalizedIds is Map)
+		return false
+	Owners := []
+	PreviousCritical := Critical("On")
+	try {
+		for Token, Entry in _LLM_NavEventOwnerProfileOwners
+			Owners.Push(Map("token", Token, "entry", Entry))
+	} finally Critical(PreviousCritical)
+	for Owner in Owners {
+		Token := Owner["token"]
+		Mask := Token == FencedToken
+			&& (FencedMask is Integer) && FencedMask >= 0
+			&& FencedMask <= 0x1FF
+			? FencedMask : _LLM_NavEventOwnerProfilePendingMask(Token, Port)
+		if !_LLM_NavEventOwnerProfileMaskIsAdmissible(
+				Owner["entry"], Mask, NormalizedIds)
+			return false
+	}
+	return true
+}
+
+LLM_NavEventOwner_BeginProfileSwap(Plan, Order, Enabled, CandidateIds,
+		Port := 0, AllowLifecycleResume := false) {
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerLifecycleQuiesced
+	global _LLM_NavEventOwnerPendingStopRecovery
+	global _LLM_NavEventOwnerProfileOwners
+	global _LLM_NavEventOwnerActiveProfileToken
+	if !_LLM_NavEventOwnerProfilePlanIsValid(Plan)
+		return 0
+	NormalizedOrder := _LLM_NavEventOwnerProfileOrderClone(Order)
+	NormalizedIds := _LLM_NavEventOwnerProfileIdSet(CandidateIds)
+	if !(NormalizedOrder is Array) || !(NormalizedIds is Map)
+		return 0
+	for Id in NormalizedOrder
+		if !NormalizedIds.Has(Id)
+			return 0
+	if !((Enabled is Integer) && (Enabled == 0 || Enabled == 1))
+		return 0
+	if Enabled == 1 && NormalizedOrder.Length == 0
+		return 0
+	if !LLM_NavEventOwner_EnsureStarted(Port, AllowLifecycleResume)
+		return 0
+	ExpectedToken := _LLM_NavEventOwnerActiveProfileToken
+	NewToken := Enabled == 1 ? _LLM_NavEventOwnerAllocateToken() : 0
+	NewEntry := NewToken > 0 ? {
+		Order: NormalizedOrder, Active: false, Retired: false
+	} : 0
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || !_LLM_NavEventOwnerStarted
+				|| _LLM_NavEventOwnerQuarantined
+				|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+				|| (_LLM_NavEventOwnerPendingStopRecovery
+					&& !AllowLifecycleResume)
+				|| (_LLM_NavEventOwnerLifecycleQuiesced
+					&& !AllowLifecycleResume)
+			return 0
+	} finally Critical(PreviousCritical)
+	Fn := _LLM_NavEventOwnerPortFn("begin_profile_swap", Port)
+	try Result := HasMethod(Fn, "Call")
+		? Fn.Call(ExpectedToken, Plan, NewToken, NormalizedOrder.Length)
+		: _LLM_NavEventOwnerNativeBeginProfileSwap(
+			ExpectedToken, Plan, NewToken, NormalizedOrder.Length)
+	catch as Err
+		return _LLM_NavEventOwnerQuarantine(
+			"Profile hotkey owner preparation raised an ambiguous error: "
+			. Err.Message . ".")
+	; Integer zero is the only explicit pre-fence refusal. Every other malformed
+	; result is ambiguous because the native call may already have armed the
+	; transition before its return boundary failed.
+	if (Result is Integer) && Result == 0
+		return 0
+	if !(Result is Map)
+		return _LLM_NavEventOwnerQuarantine(
+			"Profile hotkey owner preparation returned a malformed result.")
+	Ticket := Result.Get("ticket", 0)
+	CurrentMask := Result.Get("pending_mask", -1)
+	if !(Ticket is Integer) || Ticket <= 0
+		return _LLM_NavEventOwnerQuarantine(
+			"Profile hotkey owner preparation returned no abortable ticket.")
+	if !(CurrentMask is Integer) || CurrentMask < 0
+			|| CurrentMask > 0x1FF {
+		MalformedTransaction := Map("native", true, "ticket", Ticket,
+			"old_token", ExpectedToken, "new_token", 0,
+			"port", Port, "committed", false)
+		if !LLM_NavEventOwner_AbortProfileSwap(MalformedTransaction)
+			return false
+		_LLM_NavEventOwnerReport(
+			"Profile hotkey owner preparation returned an invalid pending mask.")
+		return 0
+	}
+	Admissible := LLM_NavEventOwner_ProfileCandidateIsAdmissible(
+		NormalizedIds, Port, ExpectedToken, CurrentMask)
+	Transaction := Map("native", true, "ticket", Ticket,
+		"old_token", ExpectedToken, "new_token", NewToken,
+		"port", Port, "committed", false)
+	if Admissible {
+		if NewToken > 0
+			_LLM_NavEventOwnerProfileOwners[NewToken] := NewEntry
+		return Transaction
+	}
+	LLM_NavEventOwner_AbortProfileSwap(Transaction)
+	return 0
+}
+
+LLM_NavEventOwner_CommitProfileSwap(Transaction) {
+	global _LLM_NavEventOwnerProfileOwners
+	global _LLM_NavEventOwnerActiveProfileToken
+	if !(Transaction is Map) || !Transaction.Get("native", false)
+			|| Transaction.Get("committed", false)
+		return false
+	Port := Transaction.Get("port", 0)
+	Fn := _LLM_NavEventOwnerPortFn("commit_profile_swap", Port)
+	try Status := HasMethod(Fn, "Call")
+		? Fn.Call(Transaction.Get("ticket", 0))
+		: _LLM_NavEventOwnerNativeCommitProfileSwap(
+			Transaction.Get("ticket", 0))
+	catch as Err
+		return _LLM_NavEventOwnerQuarantine(
+			"Profile hotkey owner commit raised an error: "
+			. Err.Message . ".")
+	if !((Status is Integer) && Status == 1)
+		return _LLM_NavEventOwnerQuarantine(
+			"Profile hotkey owner commit was not acknowledged.")
+	OldToken := Transaction.Get("old_token", 0)
+	NewToken := Transaction.Get("new_token", 0)
+	if OldToken > 0 && _LLM_NavEventOwnerProfileOwners.Has(OldToken) {
+		Old := _LLM_NavEventOwnerProfileOwners[OldToken]
+		Old.Active := false
+		Old.Retired := true
+	}
+	if NewToken > 0 && _LLM_NavEventOwnerProfileOwners.Has(NewToken) {
+		New := _LLM_NavEventOwnerProfileOwners[NewToken]
+		New.Active := true
+		New.Retired := false
+	}
+	_LLM_NavEventOwnerActiveProfileToken := NewToken
+	Transaction["committed"] := true
+	_LLM_NavEventOwnerCollectProfileToken(OldToken, Port)
+	return true
+}
+
+LLM_NavEventOwner_AbortProfileSwap(Transaction) {
+	global _LLM_NavEventOwnerProfileOwners
+	if !(Transaction is Map) || !Transaction.Get("native", false)
+		return false
+	if Transaction.Get("committed", false)
+		return true
+	Port := Transaction.Get("port", 0)
+	Fn := _LLM_NavEventOwnerPortFn("abort_profile_swap", Port)
+	try Status := HasMethod(Fn, "Call")
+		? Fn.Call(Transaction.Get("ticket", 0))
+		: _LLM_NavEventOwnerNativeAbortProfileSwap(
+			Transaction.Get("ticket", 0))
+	catch as Err
+		return _LLM_NavEventOwnerQuarantine(
+			"Profile hotkey owner abort raised an error: "
+			. Err.Message . ".")
+	if !((Status is Integer) && Status == 1)
+		return _LLM_NavEventOwnerQuarantine(
+			"Profile hotkey owner abort was not acknowledged.")
+	NewToken := Transaction.Get("new_token", 0)
+	if NewToken > 0 && _LLM_NavEventOwnerProfileOwners.Has(NewToken)
+		_LLM_NavEventOwnerProfileOwners.Delete(NewToken)
+	return true
+}
+
+_LLM_NavEventOwnerCollectProfileToken(Token, Port := 0) {
+	global _LLM_NavEventOwnerProfileOwners
+	if !(Token is Integer) || Token <= 0
+		return true
+	if !_LLM_NavEventOwnerProfileOwners.Has(Token)
+		return true
+	Entry := _LLM_NavEventOwnerProfileOwners[Token]
+	if Entry.Active || !Entry.Retired
+		return false
+	if _LLM_NavEventOwnerProfilePendingMask(Token, Port) != 0
+		return false
+	_LLM_NavEventOwnerProfileOwners.Delete(Token)
+	return true
+}
+
 LLM_NavEventOwner_AttachRecord(Record, Surface) {
-	global _LLM_NavEventOwnerNextToken, _LLM_NavEventOwnerRecords
+	global _LLM_NavEventOwnerRecords
 	if !IsObject(Record) || !IsObject(Surface)
 		return 0
 	PreviousCritical := Critical("On")
@@ -1055,8 +1427,7 @@ LLM_NavEventOwner_AttachRecord(Record, Surface) {
 					? ExistingToken : 0
 			}
 		}
-		_LLM_NavEventOwnerNextToken += 1
-		Token := _LLM_NavEventOwnerNextToken
+		Token := _LLM_NavEventOwnerAllocateToken()
 		Record.NavOwnerToken := Token
 		_LLM_NavEventOwnerRecords[Token] := {
 			Record: Record, Surface: Surface,
@@ -1282,6 +1653,9 @@ _LLM_NavEventOwnerApplyReceipt(Receipt) {
 	global _LLM_NavEventOwnerRecords
 	if !(Receipt is Map)
 		return 0
+	Action := Receipt.Get("action", 0)
+	if !(Action is Integer) || (Action != 1 && Action != 2)
+		return 0
 	Token := Receipt.Get("owner_token", 0)
 	TargetIdx := Receipt.Get("target_idx", 0)
 	if !(Token is Integer) || Token <= 0
@@ -1295,6 +1669,86 @@ _LLM_NavEventOwnerApplyReceipt(Receipt) {
 		return 0
 	Record.ActiveIdx := TargetIdx
 	return Entry
+}
+
+_LLM_NavEventOwnerProfileEntryFromReceipt(Receipt) {
+	global _LLM_NavEventOwnerProfileOwners
+	if !(Receipt is Map) || Receipt.Get("action", 0) != 3
+		return 0
+	Token := Receipt.Get("owner_token", 0)
+	Epoch := Receipt.Get("owner_epoch", 0)
+	TargetIdx := Receipt.Get("target_idx", 0)
+	if !(Token is Integer) || Token <= 0 || Epoch != Token
+			|| !_LLM_NavEventOwnerProfileOwners.Has(Token)
+		return 0
+	Entry := _LLM_NavEventOwnerProfileOwners[Token]
+	if !IsObject(Entry) || !(Entry.Order is Array)
+			|| !(TargetIdx is Integer) || TargetIdx < 1
+			|| TargetIdx > Entry.Order.Length
+		return 0
+	return Entry
+}
+
+_LLM_NavEventOwnerApplyProfileReceipt(Receipt, SelectFn := 0) {
+	global _LLM_NavEventOwnerClaimedReceipt
+	global _LLM_NavEventOwnerLifecycleQuiesced
+	global _LLM_NavEventOwnerProfileEffectActive
+	if !(Receipt is Map)
+		return false
+	Entry := _LLM_NavEventOwnerProfileEntryFromReceipt(Receipt)
+	if !IsObject(Entry)
+		return false
+	Sequence := Receipt.Get("seq", 0)
+	Token := Receipt.Get("owner_token", 0)
+	TargetIdx := Receipt.Get("target_idx", 0)
+	if !Receipt.Get("profile_effect_done", false) {
+		PreviousCritical := Critical("On")
+		try {
+			if A_IsSuspended || _LLM_NavEventOwnerLifecycleQuiesced
+				return false
+			_LLM_NavEventOwnerProfileEffectActive := true
+			ProfileId := Entry.Order[TargetIdx]
+		} finally Critical(PreviousCritical)
+		Applied := false
+		FailureDetail := ""
+		try {
+			if !HasMethod(SelectFn, "Call") {
+				if !IsSet(LLM_Menu_SetProfile)
+					throw Error("Profile selection callback is unavailable")
+				SelectFn := LLM_Menu_SetProfile
+			}
+			Status := SelectFn.Call(ProfileId)
+			Applied := (Status is Integer) && Status == 1
+			if !Applied
+				FailureDetail := "Profile hotkey selection was refused."
+		} catch as Err
+			FailureDetail := "Profile hotkey selection raised an error: "
+				. Err.Message . "."
+		PreviousCritical := Critical("On")
+		try {
+			_LLM_NavEventOwnerProfileEffectActive := false
+			if Applied
+				Receipt["profile_effect_done"] := true
+		} finally Critical(PreviousCritical)
+		if !Applied {
+			_LLM_NavEventOwnerReport(FailureDetail)
+			return false
+		}
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || _LLM_NavEventOwnerLifecycleQuiesced
+			return false
+		if !_LLM_NavEventOwnerCompleteReceipt(
+				Sequence, Token, TargetIdx) {
+			_LLM_NavEventOwnerReport(
+				"Profile hotkey receipt completion was not acknowledged.")
+			return false
+		}
+		_LLM_NavEventOwnerClaimedReceipt := 0
+		_LLM_NavEventOwnerCollectProfileToken(Token)
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_NavEventOwnerCompleteReceipt(Sequence, OwnerToken, AppliedIndex) {
@@ -1313,7 +1767,7 @@ _LLM_NavEventOwnerPollReceipt() {
 		return 0
 }
 
-_LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0) {
+_LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0) {
 	global _LLM_NavEventOwnerDrainActive
 	global _LLM_NavEventOwnerPendingStopRecovery
 	global _LLM_NavEventOwnerClaimedReceipt
@@ -1345,6 +1799,15 @@ _LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0) {
 				: _LLM_NavEventOwnerPollReceipt()
 			if !(Receipt is Map)
 				break
+			if Receipt.Get("action", 0) == 3 {
+				PreviousCritical := Critical("On")
+				try _LLM_NavEventOwnerClaimedReceipt := Receipt
+				finally Critical(PreviousCritical)
+				if !_LLM_NavEventOwnerApplyProfileReceipt(
+						Receipt, ProfileSelectFn)
+					break
+				continue
+			}
 			BreakDrain := false
 			FailureDetail := ""
 			PreviousCritical := Critical("On")
@@ -1481,8 +1944,9 @@ _LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0) {
 	} finally _LLM_NavEventOwnerDrainActive := false
 }
 
-LLM_NavEventOwner_Drain(RenderFn := 0, DegradeFn := 0) {
-	return _LLM_NavEventOwnerDrain(RenderFn, DegradeFn)
+LLM_NavEventOwner_Drain(RenderFn := 0, DegradeFn := 0,
+		ProfileSelectFn := 0) {
+	return _LLM_NavEventOwnerDrain(RenderFn, DegradeFn, ProfileSelectFn)
 }
 
 _LLM_NavEventOwnerRecoverNativeHealth(NativeErrorCode, RuntimeEpoch) {
@@ -1653,6 +2117,21 @@ _LLM_NavEventOwnerPublishCurrentSurface(AllowLifecycleResume := false) {
 		&& LLM_NavEventOwner_CommitSurfaceSwap(Transaction)
 }
 
+_LLM_NavEventOwnerPublishCurrentProfileSurface(
+		AllowLifecycleResume := false) {
+	if !IsSet(_LLM_Menu_PublishCurrentNativeProfileOwner)
+		return true
+	try Status := _LLM_Menu_PublishCurrentNativeProfileOwner(
+		AllowLifecycleResume)
+	catch as Err {
+		_LLM_NavEventOwnerReport(
+			"Current profile hotkey owner publication raised an error: "
+			. Err.Message . ".")
+		return false
+	}
+	return (Status is Integer) && Status == 1
+}
+
 ; Native adapter functions are implemented below the domain-facing bridge so
 ; unit tests can replace each boundary through a Map port without loading the
 ; DLL or installing a hook.
@@ -1713,6 +2192,15 @@ _LLM_NavEventOwnerNativeSuspend(Value) {
 	_LLM_NavEventOwnerNativeRequireOk(Status,
 		"Navigation owner suspend transition")
 	return 1
+}
+
+_LLM_NavEventOwnerNativeCanStop() {
+	CanStop := 0
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_CanStop"), "UChar*", &CanStop, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Navigation owner terminal-debt query")
+	return CanStop == 1 ? 1 : 0
 }
 
 _LLM_NavEventOwnerNativeBeginTerminalCapture(Token) {
@@ -1814,6 +2302,84 @@ _LLM_NavEventOwnerNativeCommitPlan(Generation) {
 	_LLM_NavEventOwnerNativeRequireOk(Status,
 		"Navigation owner plan commit")
 	return 1
+}
+
+_LLM_NavEventOwnerNativeBeginProfileSwap(ExpectedToken, Plan, NewToken,
+		ProfileCount) {
+	global LLM_NAV_EVENT_OWNER_INPUT_LEVEL
+	if !_LLM_NavEventOwnerProfilePlanIsValid(Plan)
+			|| !(ExpectedToken is Integer) || ExpectedToken < 0
+			|| !(NewToken is Integer) || NewToken < 0
+			|| !(ProfileCount is Integer) || ProfileCount < 0
+			|| ProfileCount > 9 || (NewToken == 0) != (ProfileCount == 0)
+		return 0
+	Bindings := Buffer(9 * 12, 0)
+	Loop 9 {
+		Entry := Plan[A_Index]
+		Identity := Entry["physical_id"]
+		if !RegExMatch(Identity,
+				"i)^([*]?)([\^!+#]*)(vk|sc)([0-9a-f]{4})$", &Match)
+			return 0
+		if Match[1] != ""
+			return 0
+		Modifiers := 0
+		Loop Parse, Match[2] {
+			Modifiers |= A_LoopField == "^" ? 0x01
+				: A_LoopField == "!" ? 0x02
+				: A_LoopField == "+" ? 0x04
+				: A_LoopField == "#" ? 0x08 : 0
+		}
+		Axis := StrLower(Match[3]) == "vk" ? 1 : 2
+		Code := Integer("0x" . Match[4])
+		Offset := (A_Index - 1) * 12
+		NumPut("UChar", Axis, "UChar", 3,
+			"UChar", Modifiers, "UChar", 0,
+			"UShort", Code, "Char", 0,
+			"UChar", A_Index,
+			"UChar", LLM_NAV_EVENT_OWNER_INPUT_LEVEL,
+			Bindings, Offset)
+	}
+	Owner := Buffer(24, 0)
+	if NewToken > 0
+		NumPut("UInt64", NewToken, "UInt64", NewToken,
+			"UChar", ProfileCount, Owner, 0)
+	Ticket := 0
+	PendingMask := 0
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_BeginProfileSwap"), "UInt64", ExpectedToken,
+		"Ptr", Bindings, "UInt", 9, "Ptr", Owner,
+		"UInt64*", &Ticket, "UShort*", &PendingMask, "Int")
+	if Status == 5 || Status == 8
+		return 0
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Profile hotkey owner preparation")
+	return Map("ticket", Ticket, "pending_mask", PendingMask)
+}
+
+_LLM_NavEventOwnerNativeCommitProfileSwap(Ticket) {
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_CommitProfileSwap"), "UInt64", Ticket, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Profile hotkey owner commit")
+	return 1
+}
+
+_LLM_NavEventOwnerNativeAbortProfileSwap(Ticket) {
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_AbortProfileSwap"), "UInt64", Ticket, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Profile hotkey owner abort")
+	return 1
+}
+
+_LLM_NavEventOwnerNativeProfilePendingMask(Token) {
+	PendingMask := 0
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_ProfilePendingMask"), "UInt64", Token,
+		"UShort*", &PendingMask, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Profile hotkey receipt retention query")
+	return PendingMask
 }
 
 _LLM_NavEventOwnerNativeBeginSwap(OldToken, NewToken, SlotCount, ActiveIdx,
@@ -1953,7 +2519,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded() {
 	Names := [
 		"ErgoptiNav_Start", "ErgoptiNav_Stop",
 		"ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
-		"ErgoptiNav_SetSuspended",
+		"ErgoptiNav_SetSuspended", "ErgoptiNav_CanStop",
 		"ErgoptiNav_BeginTerminalCapture",
 		"ErgoptiNav_CommitTerminalCapture",
 		"ErgoptiNav_AbortTerminalCapture",
@@ -1962,6 +2528,10 @@ _LLM_NavEventOwnerNativeEnsureLoaded() {
 		"ErgoptiNav_CommitOwnerSwap", "ErgoptiNav_AbortOwnerSwap",
 		"ErgoptiNav_ClaimOwner",
 		"ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
+		"ErgoptiNav_BeginProfileSwap",
+		"ErgoptiNav_CommitProfileSwap",
+		"ErgoptiNav_AbortProfileSwap",
+		"ErgoptiNav_ProfilePendingMask",
 		"ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
 		"ErgoptiNav_GetLastOsError", "ErgoptiNav_TestDispatch"
 	]

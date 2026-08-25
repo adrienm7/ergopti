@@ -549,6 +549,12 @@ Test_LLM_Persist_CustomProfileCrudSurvivesRestart() {
 		Incomplete["user_profiles"] := [Map("id", "missing_required_fields")]
 		AssertFalse(_LLM_Menu_AppendPersistedUpdates([], Incomplete),
 			"missing required profile strings and Boolean must fail closed")
+		BuiltinCollision := _LLM_Persist_MakeDefaultTray()
+		Colliding := LLM_Menu_DeepClone(Second)
+		Colliding["id"] := "raw"
+		BuiltinCollision["user_profiles"] := [Colliding]
+		AssertFalse(_LLM_Menu_AppendPersistedUpdates([], BuiltinCollision),
+			"custom profile ids must never shadow a built-in receipt target")
 	} finally {
 		try FileDelete(Path)
 		_LLM_Menu := SavedMenu

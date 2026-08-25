@@ -204,12 +204,6 @@ global _LLM_Menu := Map(
 global LLM_PROFILE_ADVANCED_PARAMS_B := 2.0   ; ≥ 2B → advanced
 global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
 
-; Ordered profile list used by the Ctrl+<n> hotkeys. Index 1 maps to the
-; first row of the profile submenu (Ctrl+1), index 2 to Ctrl+2, etc. The
-; built-ins always come first so the shortcut layout stays stable across
-; sessions — appending user profiles after them lets a user keep their
-; muscle memory while still reaching their own profiles by index.
-global LLM_PROFILE_BUILTIN_ORDER := ["raw", "basic", "advanced", "batch_advanced"]
 ; How many Ctrl+<n> shortcuts we register. We stop at Ctrl+9 because Ctrl+0
 ; collides with browser zoom reset on too many apps to be worth binding.
 global LLM_PROFILE_HOTKEY_LIMIT := 9

@@ -13,6 +13,11 @@ global LLM_OPTION_MAX_API_ENTRIES := 64
 global LLM_OPTION_MAX_RECORD_FIELDS := 32
 global LLM_OPTION_MAX_STOP_SEQUENCES := 64
 global LLM_OPTION_MAX_AGGREGATE_CHARS := 1048576
+; Canonical built-in profile ids. Validation must reject custom records which
+; would shadow resolution, while menu hotkeys preserve this exact order.
+global LLM_PROFILE_BUILTIN_ORDER := [
+	"raw", "basic", "advanced", "batch_advanced"
+]
 
 _LLM_Option_TryConsumeString(Value, &AggregateChars, AllowEmpty := true) {
 	global LLM_OPTION_MAX_SCALAR_CHARS, LLM_OPTION_MAX_AGGREGATE_CHARS
@@ -100,6 +105,16 @@ LLM_Option_NormalizeModifierString(Value) {
 	return Out
 }
 
+LLM_Option_IsBuiltinProfileId(Id) {
+	global LLM_PROFILE_BUILTIN_ORDER
+	if !(Id is String)
+		return false
+	for BuiltinId in LLM_PROFILE_BUILTIN_ORDER
+		if Id == BuiltinId
+			return true
+	return false
+}
+
 /** Returns a detached, schema-safe custom-profile array or false. */
 LLM_Option_NormalizeUserProfiles(Value) {
 	global LLM_OPTION_MAX_PROFILE_ITEMS, LLM_OPTION_MAX_RECORD_FIELDS,
@@ -114,6 +129,7 @@ LLM_Option_NormalizeUserProfiles(Value) {
 	for Profile in Value {
 		if !(Profile is Map) || !Profile.Has("id")
 				|| !(Profile["id"] is String) || Profile["id"] == ""
+				|| LLM_Option_IsBuiltinProfileId(Profile["id"])
 				|| SeenIds.Has(Profile["id"])
 			return false
 		if Profile.Count > LLM_OPTION_MAX_RECORD_FIELDS

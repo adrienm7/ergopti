@@ -133,6 +133,29 @@ static void TestBuildPlan(
 
 
 
+/** Builds the fixed Ctrl+1 through Ctrl+9 profile-selection route family. */
+static void TestBuildProfilePlan(
+	ErgoptiNav_Binding plan[ERGOPTI_NAV_PROFILE_ROUTE_COUNT])
+{
+	uint32_t target;
+	memset(
+		plan,
+		0,
+		sizeof(ErgoptiNav_Binding) * ERGOPTI_NAV_PROFILE_ROUTE_COUNT);
+	for (target = 1; target <= ERGOPTI_NAV_PROFILE_ROUTE_COUNT; ++target) {
+		TestFillBinding(
+			&plan[target - 1u],
+			ERGOPTI_NAV_ACTION_PROFILE_SELECT,
+			0,
+			(uint16_t)('0' + target),
+			ERGOPTI_NAV_MOD_CONTROL,
+			0,
+			(uint8_t)target);
+	}
+}
+
+
+
 /**
  * Constructs a canonical nonempty tooltip owner.
  *
@@ -152,6 +175,21 @@ static ErgoptiNav_Owner TestOwner(
 	owner.epoch = TEST_SHARED_EPOCH;
 	owner.slot_count = slot_count;
 	owner.active_index = active_index;
+	return owner;
+}
+
+
+
+/** Constructs one immutable profile-order owner. */
+static ErgoptiNav_ProfileOwner TestProfileOwner(
+	uint64_t token,
+	uint8_t profile_count)
+{
+	ErgoptiNav_ProfileOwner owner;
+	memset(&owner, 0, sizeof(owner));
+	owner.token = token;
+	owner.epoch = token == 0 ? 0 : TEST_SHARED_EPOCH;
+	owner.profile_count = profile_count;
 	return owner;
 }
 
@@ -269,6 +307,35 @@ static bool TestPublishOwner(
 	TEST_ASSERT(test_name, ticket != 0);
 	TEST_ASSERT(test_name,
 		ErgoptiNav_CommitOwnerSwap(ticket) == ERGOPTI_NAV_STATUS_OK);
+	return true;
+}
+
+
+
+/** Publishes one fixed profile plan and immutable order owner. */
+static bool TestPublishProfileOwner(
+	const char *test_name,
+	uint64_t expected_token,
+	const ErgoptiNav_ProfileOwner *owner,
+	uint16_t *out_pending_mask)
+{
+	ErgoptiNav_Binding plan[ERGOPTI_NAV_PROFILE_ROUTE_COUNT];
+	uint64_t ticket = 0;
+	uint16_t pending_mask = 0;
+	TestBuildProfilePlan(plan);
+	TEST_ASSERT(test_name,
+		ErgoptiNav_BeginProfileSwap(
+			expected_token,
+			plan,
+			ERGOPTI_NAV_PROFILE_ROUTE_COUNT,
+			owner,
+			&ticket,
+			&pending_mask) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(test_name, ticket != 0);
+	TEST_ASSERT(test_name,
+		ErgoptiNav_CommitProfileSwap(ticket) == ERGOPTI_NAV_STATUS_OK);
+	if (out_pending_mask != NULL)
+		*out_pending_mask = pending_mask;
 	return true;
 }
 
@@ -2660,6 +2727,303 @@ static bool TestTerminalCaptureAdmissionAndOverflow(void)
 
 
 /**
+ * Proves a passed first down cannot become suppressed after modifiers change.
+ *
+ * @return True when one physical hold keeps its initial disposition.
+ */
+static bool TestUnmatchedDownLatchesPassAcrossModifiers(void)
+{
+	const char *name = "unmatched down latches pass across modifiers";
+	ErgoptiNav_ProfileOwner owner = TestProfileOwner(TEST_OWNER_A, 9);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_Receipt receipt;
+	uint64_t generation = 0;
+	uint8_t can_stop = 1;
+
+	TEST_ASSERT(name, TestResetWithPlan(name, &generation));
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestPublishProfileOwner(name, 0, &owner, NULL));
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'1', ERGOPTI_NAV_EVENT_DOWN, 0, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'1', ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_MOD_CONTROL, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'1', ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_MOD_CONTROL, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name,
+		ErgoptiNav_PollReceipt(&receipt) == ERGOPTI_NAV_STATUS_NOT_FOUND);
+
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'1', ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_MOD_CONTROL, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, result.receipt_created == 1);
+	TEST_ASSERT(name,
+		ErgoptiNav_CanStop(&can_stop) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, can_stop == 0);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'1', ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_MOD_CONTROL, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, TestDrainReceipts(name, 1));
+	return true;
+}
+
+
+
+/**
+ * Proves an admitted profile target keeps its event-time owner across reorder.
+ *
+ * @return True when the old receipt remains exact and the new owner is isolated.
+ */
+static bool TestProfileReceiptSurvivesOrderSwap(void)
+{
+	const char *name = "profile receipt survives order swap";
+	ErgoptiNav_Binding plan[ERGOPTI_NAV_PROFILE_ROUTE_COUNT];
+	ErgoptiNav_ProfileOwner owner_a = TestProfileOwner(TEST_OWNER_A, 7);
+	ErgoptiNav_ProfileOwner owner_b = TestProfileOwner(TEST_OWNER_B, 7);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_Receipt receipt;
+	uint64_t generation = 0;
+	uint64_t ticket = 0;
+	uint16_t pending_mask = 0;
+	uint8_t can_stop = 1;
+
+	TEST_ASSERT(name, TestResetWithPlan(name, &generation));
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestPublishProfileOwner(name, 0, &owner_a, NULL));
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'6', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, result.receipt_created == 1);
+
+	TestBuildProfilePlan(plan);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginProfileSwap(
+			TEST_OWNER_A,
+			plan,
+			ERGOPTI_NAV_PROFILE_ROUTE_COUNT,
+			&owner_b,
+			&ticket,
+			&pending_mask) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, pending_mask == (uint16_t)(1u << 5));
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'7', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'7', ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name,
+		ErgoptiNav_CommitProfileSwap(ticket) == ERGOPTI_NAV_STATUS_OK);
+
+	TEST_ASSERT(name,
+		ErgoptiNav_PollReceipt(&receipt) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, receipt.owner_token == TEST_OWNER_A);
+	TEST_ASSERT(name, receipt.owner_epoch == TEST_SHARED_EPOCH);
+	TEST_ASSERT(name, receipt.action == ERGOPTI_NAV_ACTION_PROFILE_SELECT);
+	TEST_ASSERT(name, receipt.from_index == 0);
+	TEST_ASSERT(name, receipt.target_index == 6);
+	TEST_ASSERT(name,
+		ErgoptiNav_ProfilePendingMask(TEST_OWNER_A, &pending_mask)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, pending_mask == (uint16_t)(1u << 5));
+	TEST_ASSERT(name,
+		TestDispatch(
+			name, (uint16_t)'6', ERGOPTI_NAV_EVENT_UP,
+			ERGOPTI_NAV_MOD_CONTROL, 0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name,
+		ErgoptiNav_CanStop(&can_stop) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, can_stop == 0);
+	TEST_ASSERT(name,
+		ErgoptiNav_CompleteReceipt(
+			receipt.sequence,
+			receipt.owner_token,
+			receipt.target_index) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_CanStop(&can_stop) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, can_stop == 1);
+
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'6', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name,
+		ErgoptiNav_PollReceipt(&receipt) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, receipt.owner_token == TEST_OWNER_B);
+	TEST_ASSERT(name, receipt.target_index == 6);
+	TEST_ASSERT(name,
+		ErgoptiNav_CompleteReceipt(
+			receipt.sequence,
+			receipt.owner_token,
+			receipt.target_index) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'6', ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	return true;
+}
+
+
+
+/**
+ * Proves queued and claimed targets freeze profile admission during a swap.
+ *
+ * @return True when the target mask and abort fence are exact.
+ */
+static bool TestProfileTransitionFreezesPendingTargets(void)
+{
+	const char *name = "profile transition freezes pending targets";
+	ErgoptiNav_Binding plan[ERGOPTI_NAV_PROFILE_ROUTE_COUNT];
+	ErgoptiNav_ProfileOwner owner_a = TestProfileOwner(TEST_OWNER_A, 9);
+	ErgoptiNav_ProfileOwner owner_b = TestProfileOwner(TEST_OWNER_B, 9);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_Receipt claimed;
+	uint64_t generation = 0;
+	uint64_t ticket = 0;
+	uint16_t pending_mask = 0;
+	uint8_t target;
+
+	TEST_ASSERT(name, TestResetWithPlan(name, &generation));
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestPublishProfileOwner(name, 0, &owner_a, NULL));
+	for (target = 5; target <= 6; ++target) {
+		TEST_ASSERT(name, TestDispatch(
+			name, (uint16_t)('0' + target), ERGOPTI_NAV_EVENT_DOWN,
+			ERGOPTI_NAV_MOD_CONTROL, 0, 0, &result));
+		TEST_ASSERT(name,
+			result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+		TEST_ASSERT(name, TestDispatch(
+			name, (uint16_t)('0' + target), ERGOPTI_NAV_EVENT_UP,
+			ERGOPTI_NAV_MOD_CONTROL, 0, 0, &result));
+	}
+	TEST_ASSERT(name,
+		ErgoptiNav_PollReceipt(&claimed) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, claimed.target_index == 5);
+
+	TestBuildProfilePlan(plan);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginProfileSwap(
+			TEST_OWNER_A,
+			plan,
+			ERGOPTI_NAV_PROFILE_ROUTE_COUNT,
+			&owner_b,
+			&ticket,
+			&pending_mask) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, pending_mask == 0x30u);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'7', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'7', ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name,
+		ErgoptiNav_AbortProfileSwap(ticket) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'7', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'7', ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name,
+		ErgoptiNav_CompleteReceipt(
+			claimed.sequence,
+			claimed.owner_token,
+			claimed.target_index) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestDrainReceipts(name, 2));
+	return true;
+}
+
+
+
+/**
+ * Proves an active tooltip owns a colliding chord before the profile domain.
+ *
+ * @return True when an ineligible nav target passes rather than selecting a profile.
+ */
+static bool TestNavigationPrecedesProfileSelection(void)
+{
+	const char *name = "navigation precedes profile selection";
+	ErgoptiNav_Owner nav_owner = TestOwner(TEST_OWNER_A, 5, 1);
+	ErgoptiNav_Owner no_nav_owner;
+	ErgoptiNav_ProfileOwner profile_owner = TestProfileOwner(TEST_OWNER_B, 9);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_Receipt receipt;
+	uint64_t generation = 0;
+	memset(&no_nav_owner, 0, sizeof(no_nav_owner));
+
+	TEST_ASSERT(name, TestSetupOwner(name, &nav_owner, &generation));
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestCommitPlanAtModifiers(name, 0, ERGOPTI_NAV_MOD_CONTROL));
+	TEST_ASSERT(name, TestPublishProfileOwner(name, 0, &profile_owner, NULL));
+
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'6', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, result.receipt_created == 0);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'6', ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'4', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name,
+		ErgoptiNav_PollReceipt(&receipt) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, receipt.action == ERGOPTI_NAV_ACTION_JUMP);
+	TEST_ASSERT(name, receipt.owner_token == TEST_OWNER_A);
+	TEST_ASSERT(name,
+		ErgoptiNav_CompleteReceipt(
+			receipt.sequence,
+			receipt.owner_token,
+			receipt.target_index) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'4', ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+
+	TEST_ASSERT(name, TestPublishOwner(name, TEST_OWNER_A, &no_nav_owner));
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'6', ERGOPTI_NAV_EVENT_DOWN, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	TEST_ASSERT(name,
+		ErgoptiNav_PollReceipt(&receipt) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, receipt.action == ERGOPTI_NAV_ACTION_PROFILE_SELECT);
+	TEST_ASSERT(name, receipt.owner_token == TEST_OWNER_B);
+	TEST_ASSERT(name, receipt.target_index == 6);
+	TEST_ASSERT(name,
+		ErgoptiNav_CompleteReceipt(
+			receipt.sequence,
+			receipt.owner_token,
+			receipt.target_index) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestDispatch(
+		name, (uint16_t)'6', ERGOPTI_NAV_EVENT_UP, ERGOPTI_NAV_MOD_CONTROL,
+		0, 0, &result));
+	return true;
+}
+
+
+
+/**
  * Proves malformed or incomplete plans cannot replace the current generation.
  *
  * @return True when candidate validation rejects the broken route family.
@@ -2668,7 +3032,11 @@ static bool TestPlanValidationIsAtomic(void)
 {
 	const char *name = "plan validation is atomic";
 	ErgoptiNav_Binding plan[ERGOPTI_NAV_ROUTE_COUNT];
+	ErgoptiNav_Binding profile_plan[ERGOPTI_NAV_PROFILE_ROUTE_COUNT];
+	ErgoptiNav_ProfileOwner profile_owner = TestProfileOwner(TEST_OWNER_A, 9);
 	uint64_t generation = 0;
+	uint64_t ticket = 0;
+	uint16_t pending_mask = 0;
 	TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
 	TestBuildPlan(plan);
 	TEST_ASSERT(name,
@@ -2683,6 +3051,38 @@ static bool TestPlanValidationIsAtomic(void)
 			ERGOPTI_NAV_ROUTE_COUNT,
 			&generation) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
 	TEST_ASSERT(name, generation == 0);
+
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TestBuildProfilePlan(profile_plan);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginProfileSwap(
+			0,
+			profile_plan,
+			ERGOPTI_NAV_PROFILE_ROUTE_COUNT - 1u,
+			&profile_owner,
+			&ticket,
+			&pending_mask) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	profile_plan[8].target = 8;
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginProfileSwap(
+			0,
+			profile_plan,
+			ERGOPTI_NAV_PROFILE_ROUTE_COUNT,
+			&profile_owner,
+			&ticket,
+			&pending_mask) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TestBuildProfilePlan(profile_plan);
+	profile_owner.profile_count = 0;
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginProfileSwap(
+			0,
+			profile_plan,
+			ERGOPTI_NAV_PROFILE_ROUTE_COUNT,
+			&profile_owner,
+			&ticket,
+			&pending_mask) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, ticket == 0);
 	return true;
 }
 
@@ -2745,6 +3145,14 @@ int main(void)
 			TestTerminalCapturePartialReplayIsRetryable},
 		{"terminal capture admission and overflow",
 			TestTerminalCaptureAdmissionAndOverflow},
+		{"unmatched down latches pass across modifiers",
+			TestUnmatchedDownLatchesPassAcrossModifiers},
+		{"profile receipt survives order swap",
+			TestProfileReceiptSurvivesOrderSwap},
+		{"profile transition freezes pending targets",
+			TestProfileTransitionFreezesPendingTargets},
+		{"navigation precedes profile selection",
+			TestNavigationPrecedesProfileSelection},
 		{"plan validation is atomic", TestPlanValidationIsAtomic}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));

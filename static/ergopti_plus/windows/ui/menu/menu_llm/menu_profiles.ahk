@@ -787,15 +787,19 @@ LLM_Menu_AutoApplyProfileForModel(MenuState) {
  *
  * @returns {Array} Ordered profile id strings.
  */
-LLM_Menu_GetHotkeyProfileOrder() {
+LLM_Menu_GetHotkeyProfileOrder(MenuState := 0) {
 	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	State := MenuState is Map ? MenuState : _LLM_Menu
+	if !(State is Map) || !State.Has("user_profiles")
+			|| !(State["user_profiles"] is Array)
+		return []
 	out := []
 	for _, id in LLM_PROFILE_BUILTIN_ORDER {
 		out.Push(id)
 		if (out.Length >= LLM_PROFILE_HOTKEY_LIMIT)
 			return out
 	}
-	for p in _LLM_Menu["user_profiles"] {
+	for p in State["user_profiles"] {
 		if !(p is Map) or !p.Has("id")
 			continue
 		out.Push(p["id"])
@@ -803,6 +807,82 @@ LLM_Menu_GetHotkeyProfileOrder() {
 			return out
 	}
 	return out
+}
+
+_LLM_Menu_ProfileCandidateIds(MenuState) {
+	global LLM_PROFILE_BUILTIN_ORDER
+	if !(MenuState is Map) || !MenuState.Has("user_profiles")
+			|| !(MenuState["user_profiles"] is Array)
+		return 0
+	Ids := Map()
+	for Id in LLM_PROFILE_BUILTIN_ORDER {
+		if !(Id is String) || Id == "" || Ids.Has(Id)
+			return 0
+		Ids[Id] := true
+	}
+	for Profile in MenuState["user_profiles"] {
+		if !(Profile is Map) || !Profile.Has("id")
+				|| !(Profile["id"] is String) || Profile["id"] == ""
+				|| Ids.Has(Profile["id"])
+			return 0
+		Ids[Profile["id"]] := true
+	}
+	return Ids
+}
+
+_LLM_Menu_PrepareProfileOwnerCandidate(CandidateMenu,
+		AllowLifecycleResume := false) {
+	global _LLM_Menu_ProfileHotkeyOwner
+	if !(_LLM_Menu_ProfileHotkeyOwner is Map)
+			|| !_LLM_Menu_ProfileHotkeyOwner.Get("native", false)
+		return Map("changed", false)
+	Plan := _LLM_Menu_ProfileHotkeyOwner.Get("plan", 0)
+	Order := LLM_Menu_GetHotkeyProfileOrder(CandidateMenu)
+	CandidateIds := _LLM_Menu_ProfileCandidateIds(CandidateMenu)
+	if !(Plan is Array) || !(CandidateIds is Map)
+		return 0
+	Enabled := CandidateMenu.Get("enabled", false) ? 1 : 0
+	; Retired profile owners may still retain suppressed receipts after the
+	; active surface was disabled or otherwise remained byte-identical. Validate
+	; every retained token before taking the no-op path.
+	if !LLM_NavEventOwner_ProfileCandidateIsAdmissible(CandidateIds)
+		return 0
+	if LLM_NavEventOwner_ProfileSurfaceMatches(Order, Enabled)
+		return Map("changed", false)
+	Transaction := LLM_NavEventOwner_BeginProfileSwap(
+		Plan, Order, Enabled, CandidateIds, 0, AllowLifecycleResume)
+	if !(Transaction is Map)
+		return 0
+	Transaction["changed"] := true
+	return Transaction
+}
+
+_LLM_Menu_CommitProfileOwnerCandidate(Transaction) {
+	if !(Transaction is Map)
+		return false
+	if !Transaction.Get("changed", false)
+		return true
+	return LLM_NavEventOwner_CommitProfileSwap(Transaction)
+}
+
+_LLM_Menu_AbortProfileOwnerCandidate(Transaction) {
+	if !(Transaction is Map) || !Transaction.Get("changed", false)
+		return true
+	return LLM_NavEventOwner_AbortProfileSwap(Transaction)
+}
+
+_LLM_Menu_PublishCurrentNativeProfileOwner(
+		AllowLifecycleResume := false) {
+	global _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner
+	if !(_LLM_Menu_ProfileHotkeyOwner is Map)
+			|| !_LLM_Menu_ProfileHotkeyOwner.Get("native", false)
+		return true
+	if !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return false
+	Transaction := _LLM_Menu_PrepareProfileOwnerCandidate(
+		_LLM_Menu, AllowLifecycleResume)
+	return Transaction is Map
+		&& _LLM_Menu_CommitProfileOwnerCandidate(Transaction)
 }
 
 /**
@@ -839,10 +919,10 @@ global _LLM_PROFILE_HOTKEY_RETRY_LIMIT := 3
 
 /**
  * Registers Ctrl+1 … Ctrl+9 globally so the user can switch profiles from
- * any focused app. The surface is immutable: every callback resolves the
- * current profile order at fire time. Therefore one retained readiness owner
- * is sufficient — retries overwrite the same nine variants and publication
- * happens only after the complete pass and a proven HotIf reset.
+ * any focused app. Production keeps those AHK variants inert and publishes the
+ * same fixed physical plan to the native event owner. Each admitted receipt
+ * retains its immutable profile order until exact completion. Test seams may
+ * still exercise the legacy callbacks without installing the native hook.
  */
 LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 		ResetFn := 0, SelectFn := 0, KeyResolverFn := 0) {
@@ -851,6 +931,11 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 	global _LLM_PROFILE_HOTKEY_STATUS_READY
 	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
 	global _LLM_PROFILE_HOTKEY_RETRY_LIMIT
+	UseNativeOwner := !HasMethod(HotkeyFn, "Call")
+		&& !HasMethod(HotIfFn, "Call")
+		&& !HasMethod(ResetFn, "Call")
+		&& !HasMethod(SelectFn, "Call")
+		&& !HasMethod(KeyResolverFn, "Call")
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -908,13 +993,13 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 					FailureDetail := e.Message
 				}
 			}
-			if Succeeded {
+			if Succeeded && !UseNativeOwner {
 				_LLM_Menu_ProfileHotkeyFailureCount := 0
 				_LLM_Menu_ProfileHotkeyOwner := Map(
 					"ready", true, "degraded", false,
-					"plan", CandidatePlan)
+					"native", false, "plan", CandidatePlan)
 				TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_READY
-			} else if !IsObject(ResetFailure) {
+			} else if !Succeeded && !IsObject(ResetFailure) {
 				_LLM_Menu_ProfileHotkeyFailureCount := Min(
 					_LLM_Menu_ProfileHotkeyFailureCount + 1,
 					_LLM_PROFILE_HOTKEY_RETRY_LIMIT)
@@ -932,11 +1017,57 @@ LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
 		throw TrayRootFatalContextError(ResetFailure.Message, -1,
 			ResetFailure.Extra)
 	}
+	if Succeeded && UseNativeOwner {
+		NativePublished := _LLM_Menu_ActivateInitialNativeProfileOwner(
+			CandidatePlan)
+		PreviousCritical := Critical("On")
+		try {
+			if NativePublished {
+				_LLM_Menu_ProfileHotkeyFailureCount := 0
+				_LLM_Menu_ProfileHotkeyOwner := Map(
+					"ready", true, "degraded", false,
+					"native", true, "plan", CandidatePlan)
+				TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_READY
+			} else {
+				_LLM_Menu_ProfileHotkeyFailureCount := Min(
+					_LLM_Menu_ProfileHotkeyFailureCount + 1,
+					_LLM_PROFILE_HOTKEY_RETRY_LIMIT)
+				if (_LLM_Menu_ProfileHotkeyFailureCount
+						>= _LLM_PROFILE_HOTKEY_RETRY_LIMIT) {
+					_LLM_Menu_ProfileHotkeyOwner := Map(
+						"ready", false, "degraded", true,
+						"native", false, "plan", [])
+					TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+				}
+			}
+		} finally Critical(PreviousCritical)
+		if !NativePublished
+			FailureDetail := "Profile hotkey native ownership was refused"
+	}
 	if (TerminalStatus == _LLM_PROFILE_HOTKEY_STATUS_DEGRADED) {
 		_LLM_Menu_LogProfileHotkeyFailure(FailureDetail, LogFn)
 		return _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
 	}
 	return TerminalStatus
+}
+
+_LLM_Menu_ActivateInitialNativeProfileOwner(Plan) {
+	global _LLM_Menu
+	if !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return false
+	Order := LLM_Menu_GetHotkeyProfileOrder(_LLM_Menu)
+	CandidateIds := _LLM_Menu_ProfileCandidateIds(_LLM_Menu)
+	if !(CandidateIds is Map)
+		return false
+	Enabled := _LLM_Menu.Get("enabled", false) ? 1 : 0
+	if !LLM_NavEventOwner_ProfileCandidateIsAdmissible(CandidateIds)
+		return false
+	if LLM_NavEventOwner_ProfileSurfaceMatches(Order, Enabled)
+		return true
+	Transaction := LLM_NavEventOwner_BeginProfileSwap(
+		Plan, Order, Enabled, CandidateIds)
+	return Transaction is Map
+		&& LLM_NavEventOwner_CommitProfileSwap(Transaction)
 }
 
 _LLM_Menu_ProfileNativeHotkey(Args*) {
@@ -1066,8 +1197,12 @@ _LLM_Menu_ProfileHotkeyIndex(ThisHotkey) {
 }
 
 _LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {
-	global _LLM_Menu, _LLM_Menu_Loaded
+	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Menu_ProfileHotkeyOwner
 	if !_LLM_Menu_Loaded || !_LLM_Menu_ProfileHotkeyOwnerReady()
+		return false
+	; Production variants are registration-only compatibility shells. The native
+	; hook owns the physical event and emits an immutable profile receipt instead.
+	if _LLM_Menu_ProfileHotkeyOwner.Get("native", false)
 		return false
 	if !IsSet(_LLM_Menu) or !_LLM_Menu["enabled"]
 		return false
@@ -1086,9 +1221,9 @@ _LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {
 }
 
 /**
- * Builds the closure assigned to a Ctrl+<n> shortcut. The closure resolves
- * the active profile order each time it fires (not at registration time)
- * so new user profiles created after boot are reachable without a reload.
+ * Builds the compatibility closure assigned to a Ctrl+<n> shortcut. Production
+ * disarms it after native ownership publishes; injected registration tests keep
+ * the legacy dynamic route available without installing a system hook.
  */
 _LLM_Menu_MakeProfileHotkey(idx, SelectFn := 0) {
 	if !HasMethod(SelectFn, "Call")
@@ -1097,6 +1232,10 @@ _LLM_Menu_MakeProfileHotkey(idx, SelectFn := 0) {
 }
 
 _LLM_Menu_OnProfileHotkey(idx, SelectFn := 0) {
+	global _LLM_Menu_ProfileHotkeyOwner
+	if (_LLM_Menu_ProfileHotkeyOwner is Map)
+			&& _LLM_Menu_ProfileHotkeyOwner.Get("native", false)
+		return false
 	; The predicate owns only in-range digits. Recheck because the separate
 	; HotIf callback thread can observe a newer profile order; never synthesize a
 	; replacement chord here because that would not be native pass-through.
