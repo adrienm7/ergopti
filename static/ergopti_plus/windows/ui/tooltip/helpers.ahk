@@ -1389,13 +1389,11 @@ _TooltipResolvePosition() {
 		}
 
 		ActiveHwnd := WinExist("A")
-		if IsObject(_TooltipPositionCache) {
-				Age := TickElapsed(_TooltipPositionCache["tick"])
-				if (_TooltipPositionCache["hwnd"] == ActiveHwnd
-						and Age <= TOOLTIP_POSITION_CACHE_MS) {
-						_TooltipCountResolveExit("cache")
-						return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
-				}
+		CurrentEnvironment := _TooltipReadPositionReceipt(ActiveHwnd)
+		if _TooltipPositionCacheCanReuse(_TooltipPositionCache, ActiveHwnd,
+				CurrentEnvironment, A_TickCount, TOOLTIP_POSITION_CACHE_MS) {
+				_TooltipCountResolveExit("cache")
+				return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
 		}
 
 		; ----- 2. UIA focused element bounding rectangle ---------------------
@@ -1527,7 +1525,8 @@ _TooltipCachePosition(Hwnd, Pos) {
 				"hwnd", Hwnd,
 				"x", Pos.X,
 				"y", Pos.Y,
-				"tick", A_TickCount
+				"tick", A_TickCount,
+				"environment", _TooltipReadPositionReceipt(Hwnd)
 		)
 		return Pos
 }
