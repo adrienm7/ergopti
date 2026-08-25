@@ -284,8 +284,8 @@ _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
 	if !(Candidate is Map) || !Candidate.Has("api_entries")
 			|| !(Candidate["api_entries"] is Array)
 			|| !_LLM_Menu_ApiEntryIdsAreUnique(Candidate["api_entries"])
-			|| !(NewEntry is Map) || !NewEntry.Has("Id")
-			|| !(NewEntry["Id"] is String) || Trim(NewEntry["Id"]) == ""
+			|| !_LLM_Menu_ApiEntryFieldsAreSafe(NewEntry)
+			|| Trim(NewEntry["Id"]) == ""
 		return false
 	if EditId != "" {
 		if (_LLM_Menu_ApiEntryIdCount(Candidate["api_entries"], EditId) != 1)
@@ -452,6 +452,17 @@ _LLM_Menu_ApiEntriesPath() {
 	return ParentDir . "\api_entries.json"
 }
 
+_LLM_Menu_ApiEntryFieldsAreSafe(Entry) {
+	if !(Entry is Map)
+		return false
+	for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
+		if !Entry.Has(Field) || !(Entry[Field] is String)
+				|| !_LLMRemote_ConfigScalarIsSafe(Entry[Field])
+			return false
+	}
+	return true
+}
+
 ; Parses and validates the complete persisted image before any row becomes
 ; visible. A malformed sibling invalidates the whole authority: publishing a
 ; prefix would make selection and credential identity depend on parser order.
@@ -486,6 +497,11 @@ _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
 					. " has a missing or non-string " . Field . " field"
 				return Result
 			}
+			if !_LLMRemote_ConfigScalarIsSafe(Entry[Field]) {
+				Result["reason"] := "entry " . Index
+					. " has a control character in " . Field
+				return Result
+			}
 		}
 		EntryId := Entry["Id"]
 		if Trim(EntryId) == "" {
@@ -516,6 +532,11 @@ _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
 		if !(Candidate["Token"] is String) {
 			Result["reason"] := "entry " . Index
 				. " token decryption returned a non-string value"
+			return Result
+		}
+		if !_LLMRemote_ConfigScalarIsSafe(Candidate["Token"]) {
+			Result["reason"] := "entry " . Index
+				. " has a control character in decrypted Token"
 			return Result
 		}
 		SeenIds[EntryId] := true
