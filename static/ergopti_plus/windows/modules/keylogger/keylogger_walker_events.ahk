@@ -273,194 +273,190 @@ KLW_WalkTypingEntry(entry) {
 								k_hx := (p5 != "") ? p5 . p4 . p3 . p2 . p1 . k_c : ""
 								k_hp := (p6 != "") ? p6 . p5 . p4 . p3 . p2 . p1 . k_c : ""
 
-								is_bracket_key := (StrLen(k_c) > 0
-										&& SubStr(k_c, 1, 1) = "["
-										&& SubStr(k_c, -1) = "]")
-								record_delay := (delay < KLWConst.MAX_KEYSTROKE_DELAY_MS) ? delay : 0
+								ngram_delay := (delay < KLWConst.MAX_KEYSTROKE_DELAY_MS) ? delay : 0
 
 								entry_marks := Map()
-								if (is_synthetic || is_bracket_key || delay < KLWConst.MAX_KEYSTROKE_DELAY_MS) {
-										KLW_PushNgram("ngram_chars", date_str, app, k_c, record_delay, false, synth_type)
-										entry_marks["c"] := k_c
-										if (k_bg != "") {
-												KLW_PushNgram("ngram_bigrams",    date_str, app, k_bg, record_delay, false, synth_type)
-												entry_marks["bg"] := k_bg
-										}
-										if (k_tg != "") {
-												KLW_PushNgram("ngram_trigrams",   date_str, app, k_tg, record_delay, false, synth_type)
-												entry_marks["tg"] := k_tg
-										}
-										if (k_qg != "") {
-												KLW_PushNgram("ngram_quadgrams",  date_str, app, k_qg, record_delay, false, synth_type)
-												entry_marks["qg"] := k_qg
-										}
-										if (k_pg != "") {
-												KLW_PushNgram("ngram_pentagrams", date_str, app, k_pg, record_delay, false, synth_type)
-												entry_marks["pg"] := k_pg
-										}
-										if (k_hx != "") {
-												KLW_PushNgram("ngram_hexagrams",  date_str, app, k_hx, record_delay, false, synth_type)
-												entry_marks["hx"] := k_hx
-										}
-										if (k_hp != "") {
-												KLW_PushNgram("ngram_heptagrams", date_str, app, k_hp, record_delay, false, synth_type)
-												entry_marks["hp"] := k_hp
-										}
-
-										if !is_synthetic {
-												KLW_BumpAppDay(date_str, app, "chars", 1)
-												hr["c"] += 1
-												m5["c"] += 1
-												if (record_delay > KLWConst.THINK_PAUSE_MS) {
-														KLW_BumpAppDay(date_str, app, "think_time_ms", record_delay)
-														KLW_BumpAppDay(date_str, app, "pauses", 1)
-												} else {
-														KLW_BumpAppDay(date_str, app, "time_ms", record_delay)
-												}
-												; time / credited buckets.
-												for _, bucketMs in KLWConst.UI_PAUSE_BUCKETS_MS {
-														if (record_delay <= bucketMs) {
-																bkey := app_day_key . Chr(1) . String(bucketMs)
-																if !KLW.batch["app_buckets"].Has(bkey) {
-																		KLW.batch["app_buckets"][bkey] := Map(
-																				"date", date_str, "app", app, "bucket_ms", bucketMs,
-																				"time_sum", 0, "credited", 0,
-																				"hs_in_t", 0, "hs_in_c", 0,
-																				"llm_in_t", 0, "llm_in_c", 0
-																		)
-																}
-																row := KLW.batch["app_buckets"][bkey]
-																row["time_sum"] += record_delay
-																row["credited"] += 1
-														}
-												}
-												ctx["recent_typing"].Push(Map("delay", record_delay))
-												if (ctx["recent_typing"].Length > KLWConst.TRIGGER_LOOKBACK_LEN)
-														ctx["recent_typing"].RemoveAt(1)
-
-												; Burst tracking.
-												if !ctx.Has("current_burst") || record_delay > KLWConst.BURST_GAP_MS {
-														if ctx.Has("current_burst")
-																KLW_FinalizeBurst(date_str, app, ctx["current_burst"])
-														ctx["current_burst"] := Map(
-																"char_count", 1, "sum_delays", 0,
-																"sum_delays_sq", 0, "max_delay", 0)
-												} else {
-														b := ctx["current_burst"]
-														b["char_count"]    += 1
-														b["sum_delays"]    += record_delay
-														b["sum_delays_sq"] += record_delay * record_delay
-														if (record_delay > b["max_delay"])
-																b["max_delay"] := record_delay
-												}
-
-												; Session tracking.
-												if !ctx.Has("current_session") || record_delay > KLWConst.SESSION_GAP_MS {
-														if ctx.Has("current_session")
-																KLW_FinalizeSession(date_str, app, ctx["current_session"])
-														ctx["current_session"] := Map("char_count", 1, "total_ms", 0)
-												} else {
-														s := ctx["current_session"]
-														s["char_count"] += 1
-														s["total_ms"]   += record_delay
-												}
-
-												; Cascade close + recovery.
-												if ctx["last_was_bs"] {
-														if (ctx["bs_run_len"] >= KLWConst.CASCADE_MIN_BS) {
-																er["cascade_count"] += 1
-																if (ctx["bs_run_len"] > er["cascade_max_len"])
-																		er["cascade_max_len"] := ctx["bs_run_len"]
-														}
-														if (record_delay <= KLWConst.MAX_KEYSTROKE_DELAY_MS) {
-																er["recovery_sum_ms"] += record_delay
-																er["recovery_count"]  += 1
-														}
-														ctx["bs_run_len"] := 0
-														ctx["last_was_bs"] := false
-												}
-
-												; Same-finger / same-hand streaks.
-												kc_num := KLW_GetMap(meta, "kc", "")
-												cur_finger := ""
-												if (kc_num != "" && IsNumber(kc_num) && KLW_VK_FINGER.Has(kc_num))
-														cur_finger := KLW_VK_FINGER[kc_num]
-												if (cur_finger != "") {
-														if (ctx["last_finger"] = cur_finger)
-																ctx["same_finger_run"] += 1
-														else
-																ctx["same_finger_run"] := 1
-														if (ctx["same_finger_run"] > eg["same_finger_streak_max"])
-																eg["same_finger_streak_max"] := ctx["same_finger_run"]
-														cur_hand  := SubStr(cur_finger, 1, 1)
-														last_hand := (ctx["last_finger"] != "") ? SubStr(ctx["last_finger"], 1, 1) : ""
-														if (last_hand = cur_hand)
-																ctx["same_hand_run"] += 1
-														else
-																ctx["same_hand_run"] := 1
-														if (ctx["same_hand_run"] > eg["same_hand_streak_max"])
-																eg["same_hand_streak_max"] := ctx["same_hand_run"]
-														ctx["last_finger"] := cur_finger
-												} else {
-														ctx["last_finger"] := ""
-														ctx["same_finger_run"] := 0
-														ctx["same_hand_run"] := 0
-												}
-
-												; Auto-repeat.
-												if (ctx["last_char"] = k_c && record_delay > 0
-																&& record_delay <= KLWConst.AUTO_REPEAT_MAX_DELAY_MS)
-														eg["auto_repeat_count"] += 1
-												ctx["last_char"] := k_c
-
-												; Char class.
-												cls := KLW_CharClass(k_c)
-												if (cls = "letter") {
-														cc["letter"] += 1
-												} else if (cls = "digit") {
-														cc["digit"] += 1
-												} else if (cls = "punct") {
-														cc["punct"] += 1
-												} else if (cls = "space") {
-														cc["space"] += 1
-												} else {
-														cc["other"] += 1
-												}
-
-												if !cc.Has("first_typed_min") || cc["first_typed_min"] = ""
-														cc["first_typed_min"] := current_min5
-												cc["last_typed_min"] := current_min5
-										} else {
-												if (synth_type = "hotstring")
-														KLW_BumpAppDay(date_str, app, "hs_chars", 1)
-												else if (synth_type = "llm")
-														KLW_BumpAppDay(date_str, app, "llm_chars", 1)
-										}
-
-										; Word boundary detection.
-										is_separator := false
-										if (StrLen(k_c) > 0) {
-												if RegExMatch(k_c, '[\s.,!?;:"' . "'" . '()%{}\[\]<>=+*/\\|\-]')
-														is_separator := true
-												else if (k_c = "`n" || k_c = Chr(0xA0) || k_c = Chr(0x202F))
-														is_separator := true
-										}
-										if is_separator {
-												if (StrLen(cur_word) > 0) {
-														if (prev_word != "")
-																KLW_PushNgram("ngram_word_bigrams", date_str, app,
-																		prev_word . " " . cur_word, 0, word_err, "none")
-														KLW_PushNgram("ngram_words", date_str, app,
-																cur_word, 0, word_err, "none")
-														prev_word := cur_word
-														cur_word := ""
-														word_err := false
-												}
-										} else {
-												cur_word .= k_c
-										}
+								; A long pause breaks n-gram continuity, but it never erases the
+								; physical character or its raw timing from the other aggregates.
+								KLW_PushNgram("ngram_chars", date_str, app, k_c, ngram_delay, false, synth_type)
+								entry_marks["c"] := k_c
+								if (k_bg != "") {
+										KLW_PushNgram("ngram_bigrams",    date_str, app, k_bg, ngram_delay, false, synth_type)
+										entry_marks["bg"] := k_bg
+								}
+								if (k_tg != "") {
+										KLW_PushNgram("ngram_trigrams",   date_str, app, k_tg, ngram_delay, false, synth_type)
+										entry_marks["tg"] := k_tg
+								}
+								if (k_qg != "") {
+										KLW_PushNgram("ngram_quadgrams",  date_str, app, k_qg, ngram_delay, false, synth_type)
+										entry_marks["qg"] := k_qg
+								}
+								if (k_pg != "") {
+										KLW_PushNgram("ngram_pentagrams", date_str, app, k_pg, ngram_delay, false, synth_type)
+										entry_marks["pg"] := k_pg
+								}
+								if (k_hx != "") {
+										KLW_PushNgram("ngram_hexagrams",  date_str, app, k_hx, ngram_delay, false, synth_type)
+										entry_marks["hx"] := k_hx
+								}
+								if (k_hp != "") {
+										KLW_PushNgram("ngram_heptagrams", date_str, app, k_hp, ngram_delay, false, synth_type)
+										entry_marks["hp"] := k_hp
 								}
 
+								if !is_synthetic {
+										KLW_BumpAppDay(date_str, app, "chars", 1)
+										hr["c"] += 1
+										m5["c"] += 1
+										if (delay > KLWConst.THINK_PAUSE_MS) {
+												KLW_BumpAppDay(date_str, app, "think_time_ms", delay)
+												KLW_BumpAppDay(date_str, app, "pauses", 1)
+										} else {
+												KLW_BumpAppDay(date_str, app, "time_ms", delay)
+										}
+										; time / credited buckets.
+										for _, bucketMs in KLWConst.UI_PAUSE_BUCKETS_MS {
+												if (delay <= bucketMs) {
+														bkey := app_day_key . Chr(1) . String(bucketMs)
+														if !KLW.batch["app_buckets"].Has(bkey) {
+																KLW.batch["app_buckets"][bkey] := Map(
+																		"date", date_str, "app", app, "bucket_ms", bucketMs,
+																		"time_sum", 0, "credited", 0,
+																		"hs_in_t", 0, "hs_in_c", 0,
+																		"llm_in_t", 0, "llm_in_c", 0
+																)
+														}
+														row := KLW.batch["app_buckets"][bkey]
+														row["time_sum"] += delay
+														row["credited"] += 1
+												}
+										}
+										ctx["recent_typing"].Push(Map("delay", delay))
+										if (ctx["recent_typing"].Length > KLWConst.TRIGGER_LOOKBACK_LEN)
+												ctx["recent_typing"].RemoveAt(1)
+
+										; Burst tracking.
+										if !ctx.Has("current_burst") || delay > KLWConst.BURST_GAP_MS {
+												if ctx.Has("current_burst")
+														KLW_FinalizeBurst(date_str, app, ctx["current_burst"])
+												ctx["current_burst"] := Map(
+														"char_count", 1, "sum_delays", 0,
+														"sum_delays_sq", 0, "max_delay", 0)
+										} else {
+												b := ctx["current_burst"]
+												b["char_count"]    += 1
+												b["sum_delays"]    += delay
+												b["sum_delays_sq"] += delay * delay
+												if (delay > b["max_delay"])
+														b["max_delay"] := delay
+										}
+
+										; Session tracking.
+										if !ctx.Has("current_session") || delay > KLWConst.SESSION_GAP_MS {
+												if ctx.Has("current_session")
+														KLW_FinalizeSession(date_str, app, ctx["current_session"])
+												ctx["current_session"] := Map("char_count", 1, "total_ms", 0)
+										} else {
+												s := ctx["current_session"]
+												s["char_count"] += 1
+												s["total_ms"]   += delay
+										}
+
+										; Cascade close + recovery.
+										if ctx["last_was_bs"] {
+												if (ctx["bs_run_len"] >= KLWConst.CASCADE_MIN_BS) {
+														er["cascade_count"] += 1
+														if (ctx["bs_run_len"] > er["cascade_max_len"])
+																er["cascade_max_len"] := ctx["bs_run_len"]
+												}
+												if (delay <= KLWConst.MAX_KEYSTROKE_DELAY_MS) {
+														er["recovery_sum_ms"] += delay
+														er["recovery_count"]  += 1
+												}
+												ctx["bs_run_len"] := 0
+												ctx["last_was_bs"] := false
+										}
+
+										; Same-finger / same-hand streaks.
+										kc_num := KLW_GetMap(meta, "kc", "")
+										cur_finger := ""
+										if (kc_num != "" && IsNumber(kc_num) && KLW_VK_FINGER.Has(kc_num))
+												cur_finger := KLW_VK_FINGER[kc_num]
+										if (cur_finger != "") {
+												if (ctx["last_finger"] = cur_finger)
+														ctx["same_finger_run"] += 1
+												else
+														ctx["same_finger_run"] := 1
+												if (ctx["same_finger_run"] > eg["same_finger_streak_max"])
+														eg["same_finger_streak_max"] := ctx["same_finger_run"]
+												cur_hand  := SubStr(cur_finger, 1, 1)
+												last_hand := (ctx["last_finger"] != "") ? SubStr(ctx["last_finger"], 1, 1) : ""
+												if (last_hand = cur_hand)
+														ctx["same_hand_run"] += 1
+												else
+														ctx["same_hand_run"] := 1
+												if (ctx["same_hand_run"] > eg["same_hand_streak_max"])
+														eg["same_hand_streak_max"] := ctx["same_hand_run"]
+												ctx["last_finger"] := cur_finger
+										} else {
+												ctx["last_finger"] := ""
+												ctx["same_finger_run"] := 0
+												ctx["same_hand_run"] := 0
+										}
+
+										; Auto-repeat.
+										if (ctx["last_char"] = k_c && delay > 0
+														&& delay <= KLWConst.AUTO_REPEAT_MAX_DELAY_MS)
+												eg["auto_repeat_count"] += 1
+										ctx["last_char"] := k_c
+
+										; Char class.
+										cls := KLW_CharClass(k_c)
+										if (cls = "letter") {
+												cc["letter"] += 1
+										} else if (cls = "digit") {
+												cc["digit"] += 1
+										} else if (cls = "punct") {
+												cc["punct"] += 1
+										} else if (cls = "space") {
+												cc["space"] += 1
+										} else {
+												cc["other"] += 1
+										}
+
+										if !cc.Has("first_typed_min") || cc["first_typed_min"] = ""
+												cc["first_typed_min"] := current_min5
+										cc["last_typed_min"] := current_min5
+								} else {
+										if (synth_type = "hotstring")
+												KLW_BumpAppDay(date_str, app, "hs_chars", 1)
+										else if (synth_type = "llm")
+												KLW_BumpAppDay(date_str, app, "llm_chars", 1)
+								}
+
+								; Word boundary detection.
+								is_separator := false
+								if (StrLen(k_c) > 0) {
+										if RegExMatch(k_c, '[\s.,!?;:"' . "'" . '()%{}\[\]<>=+*/\\|\-]')
+												is_separator := true
+										else if (k_c = "`n" || k_c = Chr(0xA0) || k_c = Chr(0x202F))
+												is_separator := true
+								}
+								if is_separator {
+										if (StrLen(cur_word) > 0) {
+												if (prev_word != "")
+														KLW_PushNgram("ngram_word_bigrams", date_str, app,
+																prev_word . " " . cur_word, 0, word_err, "none")
+												KLW_PushNgram("ngram_words", date_str, app,
+														cur_word, 0, word_err, "none")
+												prev_word := cur_word
+												cur_word := ""
+												word_err := false
+										}
+								} else {
+										cur_word .= k_c
+								}
 								backtrack.Push(entry_marks)
 								if (backtrack.Length > KLWConst.HIST_CAP)
 										backtrack.RemoveAt(1)

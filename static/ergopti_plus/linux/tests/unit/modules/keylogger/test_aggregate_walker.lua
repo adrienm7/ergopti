@@ -35,6 +35,7 @@ local Walker = helpers.load_module("modules.keylogger.aggregate_walker")
 local Timings = helpers.load_module("infra.timings")
 
 local PAUSE_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
+local SESSION_GAP_MS = Timings.ms("keylogger", "session_gap_ms")
 
 --- One buffered keystroke.
 --- @param char string
@@ -123,6 +124,32 @@ end)
 -- =================================================================
 
 helpers.describe("ngram walker: what must not become a sequence", function()
+	helpers.it("keeps long-gap characters but excludes their delay from n-gram timing", function()
+		local batch = Walker.walk({
+			key("a", 200),
+			key("b", PAUSE_MS + 4000),
+			key("c", 200),
+			key("d", SESSION_GAP_MS + 1000),
+			key("e", 200),
+		}, "2026-08-06", "app")
+		local rows = batch.ngram.ngram_chars
+		local total_delay, delay_count = 0, 0
+		for _, item in pairs(rows) do
+			total_delay = total_delay + item.td
+			delay_count = delay_count + item.cd
+		end
+
+		helpers.assert_eq(total_delay, 600,
+			"only the three short gaps belong to character n-gram timing")
+		helpers.assert_eq(delay_count, 3,
+			"long gaps do not create character n-gram delay samples")
+		for _, token in ipairs({ "b", "d" }) do
+			local item = rows["2026-08-06\1app\1" .. token]
+			helpers.assert_not_nil(item, "the long-gap character itself remains counted")
+			helpers.assert_eq(item.td, 0, "long-gap timing is excluded for " .. token)
+			helpers.assert_eq(item.cd, 0, "long-gap delay samples are excluded for " .. token)
+		end
+	end)
 
 	helpers.it("does not join two characters across a long pause", function()
 		local batch = Walker.walk({
@@ -739,4 +766,3 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 	end)
 
 end)
-
