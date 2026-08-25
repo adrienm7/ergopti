@@ -415,8 +415,10 @@ SQLite_Query(db, sql, YieldOps := 0) {
 ; the walker got a chance to consume a single one.  `consumer` receives one
 ; Map per row and may return false to stop early.  The return value is the
 ; number of delivered rows, or -1 when preparing/stepping/calling the consumer
-; failed.
-SQLite_EachRow(db, sql, consumer, YieldEvery := 0) {
+; failed.  An optional Map receives the exact consumer exception and row index
+; so a higher-level owner can diagnose the rejected transaction without making
+; generic SQLite callers exception-based.
+SQLite_EachRow(db, sql, consumer, YieldEvery := 0, Failure := 0) {
 		if !db || !IsObject(consumer)
 				return -1
 
@@ -472,7 +474,13 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0) {
 						}
 				}
 				try keep_going := consumer.Call(row)
-				catch {
+				catch Error as Err {
+						if Failure is Map {
+								Failure["row_index"] := delivered + 1
+								Failure["row_id"] := row.Get("id", "unknown")
+								Failure["timestamp"] := row.Get("ts", "unknown")
+								Failure["error"] := Err
+						}
 						ok := false
 						break
 				}
