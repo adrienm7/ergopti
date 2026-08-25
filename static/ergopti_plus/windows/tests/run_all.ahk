@@ -551,7 +551,9 @@ global _AhkSubDir := ""
 ; driven headless and the buffer they fill read straight back — the previous
 ; test asserted only on KL_LogHotstring's row and missed this one entirely.
 #Include ../modules/keylogger/keylogger_hook.ahk
+#Include ../modules/keylogger/keylogger_mouse.ahk
 #Include unit/test_bounded_focus_snapshot.ahk
+#Include unit/test_keylogger_mouse_coordinates.ahk
 #Include unit/test_hotstring_fire_log_privacy.ahk
 #Include unit/test_synthetic_typing_row_privacy.ahk
 ; The near-miss row — the third persisted sink, and the one that had no privacy

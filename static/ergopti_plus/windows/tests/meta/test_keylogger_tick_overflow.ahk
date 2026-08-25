@@ -196,15 +196,15 @@ _KLTO_MouseParkWrapSafe() {
 	Assert(Src != "", "modules/keylogger/keylogger_mouse.ahk must be readable")
 
 	; park_still_since must be masked before comparison
-	Assert(!InStr(Src, "still_ms := A_TickCount - KLMouse.park_still_since"),
+	Assert(!InStr(Src, "still_ms := Now - State.park_still_since"),
 		"keylogger_mouse.ahk must not assign still_ms from bare A_TickCount - park_still_since (tickcount-wrap)")
-	Assert(InStr(Src, "still_ms := (A_TickCount - KLMouse.park_still_since) & 0xFFFFFFFF") > 0,
+	Assert(InStr(Src, "still_ms := (Now - State.park_still_since) & 0xFFFFFFFF") > 0,
 		"keylogger_mouse.ahk must mask park_still_since delta with & 0xFFFFFFFF (tickcount-wrap)")
 
 	; park_fired_at dedup guard must be masked
-	Assert(!InStr(Src, "(A_TickCount - KLMouse.park_fired_at) < 30000"),
+	Assert(!InStr(Src, "(Now - State.park_fired_at) < 30000"),
 		"keylogger_mouse.ahk must not use bare (A_TickCount - park_fired_at) without & 0xFFFFFFFF mask (tickcount-wrap)")
-	Assert(InStr(Src, "(KLMouse.park_fired_at) & 0xFFFFFFFF) < 30000") > 0,
+	Assert(InStr(Src, "State.park_fired_at) & 0xFFFFFFFF) < 30000") > 0,
 		"keylogger_mouse.ahk must mask park_fired_at dedup guard with & 0xFFFFFFFF (tickcount-wrap)")
 }
 Test("keylogger: keylogger_mouse.ahk park idle and dedup guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_MouseParkWrapSafe)
