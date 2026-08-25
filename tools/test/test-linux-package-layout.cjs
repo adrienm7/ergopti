@@ -456,10 +456,10 @@ const layoutInstallPageSrc = read(LAYOUT_INSTALL_PAGE);
 const scriptEnd = layoutInstallPageSrc.indexOf('</script>');
 const layoutInstallMarkup = layoutInstallPageSrc.slice(scriptEnd + '</script>'.length);
 
-if (!/const uninstallCmd = `\$\{cmd\} -s -- --installation-method clean --uninstall --yes`;/.test(layoutInstallPageSrc)) {
+if (!/const uninstallCmd = `\$\{cmd\} -s -- --uninstall --yes`;/.test(layoutInstallPageSrc)) {
 	errors.push(
 		`${LAYOUT_INSTALL_PAGE}: the uninstall command must reuse the self-contained install.sh ` +
-		`entrypoint with explicit non-interactive arguments.`
+			`entrypoint and let it infer the installed method from owned artifacts.`
 	);
 }
 if (!layoutInstallMarkup.includes('{uninstallCmd}')) {

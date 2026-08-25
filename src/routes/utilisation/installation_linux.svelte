@@ -7,7 +7,7 @@
 
 	// Commande bash d'installation : pointe vers le bon branch selon le contexte
 	const cmd = `branch="${branch}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
-	const uninstallCmd = `${cmd} -s -- --installation-method clean --uninstall --yes`;
+	const uninstallCmd = `${cmd} -s -- --uninstall --yes`;
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
