@@ -253,10 +253,12 @@ function M.get_db()
 end
 
 --- Persist the next_event_id counter back into meta.
+--- @return boolean True only when SQLite accepted the update.
 function M.persist_next_event_id()
-	if not _db then return end
-	_db:exec(string.format(
+	if not _db then return false end
+	local rc = _db:exec(string.format(
 		"UPDATE meta SET value='%d' WHERE key='next_event_id';", _next_event_id))
+	return rc == sqlite3.OK
 end
 
 --- Returns the current event-id counter. Used to snapshot it before an ingest
