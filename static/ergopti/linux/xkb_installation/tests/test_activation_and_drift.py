@@ -142,6 +142,69 @@ class OwnedDesktopTeardownTests(unittest.TestCase):
         self.assertEqual(len(kde_writes), 1)
         self.assertEqual(kde_writes[0][-1], "us,fr")
 
+    def test_deactivate_fails_when_gnome_read_returns_nonzero(self):
+        def fake_run(command, **kwargs):
+            if "gsettings" in command and "get" in command:
+                return SimpleNamespace(returncode=1, stdout="", stderr="dconf unavailable")
+            raise FileNotFoundError(command[0])
+
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer.subprocess, "run", side_effect=fake_run
+        ):
+            self.assertEqual(
+                clean_installer.deactivate("ergopti"),
+                clean_installer.CleanupStatus.FAILED,
+                "an installed gsettings command that rejects the read is an external failure, not an absent GNOME desktop",
+            )
+
+    def test_deactivate_fails_when_kde_read_returns_nonzero(self):
+        def fake_run(command, **kwargs):
+            if "gsettings" in command:
+                raise FileNotFoundError(command[0])
+            if "kreadconfig6" in command:
+                return SimpleNamespace(returncode=1, stdout="", stderr="kxkbrc unreadable")
+            raise FileNotFoundError(command[0])
+
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer.subprocess, "run", side_effect=fake_run
+        ):
+            self.assertEqual(
+                clean_installer.deactivate("ergopti"),
+                clean_installer.CleanupStatus.FAILED,
+                "an installed KDE reader that fails must not be collapsed into desktop absence",
+            )
+
+    def test_deactivate_fails_when_kde_reconfigure_fails(self):
+        def fake_run(command, **kwargs):
+            if "gsettings" in command:
+                raise FileNotFoundError(command[0])
+            if "kreadconfig6" in command:
+                return SimpleNamespace(returncode=0, stdout="us,ergopti")
+            if "kwriteconfig6" in command:
+                return SimpleNamespace(returncode=0, stdout="")
+            if "qdbus" in command:
+                return SimpleNamespace(returncode=1, stdout="", stderr="KWin unavailable")
+            raise AssertionError(f"unexpected command: {command}")
+
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(clean_installer.shutil, "which", return_value="kwriteconfig6"):
+            self.assertEqual(
+                clean_installer.deactivate("ergopti"),
+                clean_installer.CleanupStatus.FAILED,
+                "a refused KWin reconfigure leaves desktop cleanup partial and must retain the package",
+            )
+
+    def test_deactivate_treats_missing_desktop_commands_as_absent(self):
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer.subprocess, "run", side_effect=FileNotFoundError("missing")
+        ):
+            self.assertEqual(
+                clean_installer.deactivate("ergopti"),
+                clean_installer.CleanupStatus.ABSENT,
+                "missing GNOME and KDE commands mean those desktops are absent, not broken",
+            )
+
     def test_xcompose_include_is_idempotent_and_external_edits_survive_uninstall(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

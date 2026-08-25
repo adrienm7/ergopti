@@ -46,6 +46,12 @@ class CleanupStatus(Enum):
     CHANGED = "changed"
     FAILED = "failed"
 
+
+class CommandCaptureStatus(Enum):
+    ABSENT = "absent"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from layout_package import (  # noqa: E402
@@ -570,7 +576,7 @@ def deactivate(layout_id: str) -> CleanupStatus:
     changed = False
     failed = False
 
-    def run_capture(command: list[str]) -> str | None:
+    def run_capture(command: list[str]) -> tuple[CommandCaptureStatus, str]:
         try:
             result = subprocess.run(
                 prefix + command,
@@ -580,14 +586,20 @@ def deactivate(layout_id: str) -> CleanupStatus:
                 timeout=15,
                 check=False,
             )
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-        return result.stdout if result.returncode == 0 else None
+        except FileNotFoundError:
+            return CommandCaptureStatus.ABSENT, ""
+        except (subprocess.TimeoutExpired, OSError):
+            return CommandCaptureStatus.FAILED, ""
+        if result.returncode != 0:
+            return CommandCaptureStatus.FAILED, ""
+        return CommandCaptureStatus.SUCCEEDED, result.stdout
 
-    current_raw = run_capture(
+    gnome_status, current_raw = run_capture(
         ["gsettings", "get", "org.gnome.desktop.input-sources", "sources"]
     )
-    if current_raw is not None:
+    if gnome_status is CommandCaptureStatus.FAILED:
+        failed = True
+    elif gnome_status is CommandCaptureStatus.SUCCEEDED:
         current_sources = parse_gsettings_sources(current_raw)
         if current_sources is None:
             failed = True
@@ -613,14 +625,20 @@ def deactivate(layout_id: str) -> CleanupStatus:
                 else:
                     failed = True
 
-    current_list = None
+    kde_status = CommandCaptureStatus.ABSENT
+    current_list = ""
     for reader in ("kreadconfig6", "kreadconfig5"):
-        current_list = run_capture(
+        read_status, read_output = run_capture(
             [reader, "--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList"]
         )
-        if current_list is not None:
-            break
-    if current_list is not None:
+        if read_status is CommandCaptureStatus.ABSENT:
+            continue
+        kde_status = read_status
+        current_list = read_output
+        break
+    if kde_status is CommandCaptureStatus.FAILED:
+        failed = True
+    elif kde_status is CommandCaptureStatus.SUCCEEDED:
         current_ids = parse_kde_layout_list(current_list)
         kept_ids = [entry for entry in current_ids if entry not in owned_ids]
         if kept_ids != current_ids:
@@ -640,11 +658,12 @@ def deactivate(layout_id: str) -> CleanupStatus:
                 "KDE : dispositions Ergopti retirées",
             ):
                 changed = True
-                run_reported(
+                if not run_reported(
                     prefix
                     + ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
                     "KDE : reconfiguration de KWin",
-                )
+                ):
+                    failed = True
             else:
                 failed = True
     if failed:

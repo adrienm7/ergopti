@@ -289,6 +289,35 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             self.assertFalse(clean_installer.uninstall_clean(roots))
         self.assertTrue(self.package_dir.exists())
 
+    def test_public_uninstall_keeps_package_when_gnome_read_fails(self):
+        (self.package_dir / "symbols").mkdir(parents=True)
+
+        def fake_run(command, **kwargs):
+            if "gsettings" in command and "get" in command:
+                return SimpleNamespace(
+                    returncode=1,
+                    stdout="",
+                    stderr="dconf profile unavailable",
+                )
+            raise FileNotFoundError(command[0])
+
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch(
+            "builtins.print"
+        ), mock.patch.object(
+            clean_installer,
+            "remove_user_xcompose_include",
+            return_value=clean_installer.CleanupStatus.ABSENT,
+        ), mock.patch.object(clean_installer.subprocess, "run", side_effect=fake_run):
+            self.assertEqual(
+                clean_installer.main(["--uninstall"]),
+                clean_installer.EXIT_INSTALL_ABORTED,
+                "the public CLI must surface partial desktop cleanup instead of reporting success",
+            )
+        self.assertTrue(
+            self.package_dir.exists(),
+            "a failed desktop read must preserve the installed package for a safe retry",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
