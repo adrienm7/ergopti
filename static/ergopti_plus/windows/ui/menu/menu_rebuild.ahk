@@ -285,7 +285,20 @@ _TrayRootDrain() {
 }
 
 _TrayRootServiceRetained() {
-	global _TrayRootLatestAuthorizeFn
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TrayRootLifecycleEpoch
+	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	; lifecycle.ahk is included before this module and arms its watchdog before
+	; the auto-execute thread reaches these top-level initializers. A timer tick
+	; in that window must be a no-op rather than reading a hoisted-but-unassigned
+	; tray-root field.
+	if !IsSet(_TrayRootRequestedGeneration)
+			|| !IsSet(_TrayRootPublishedGeneration)
+			|| !IsSet(_TrayRootActive)
+			|| !IsSet(_TrayRootLifecycleEpoch)
+			|| !IsSet(_TrayRootLatestAuthorizeFn)
+			|| !IsSet(_TrayRootLatestWorkerFn)
+		return true
 	; A caller-specific ticket (HSLR/updater) must be refreshed by that caller;
 	; replaying it here would spin forever on a deliberately stale generation.
 	if HasMethod(_TrayRootLatestAuthorizeFn, "Call")
