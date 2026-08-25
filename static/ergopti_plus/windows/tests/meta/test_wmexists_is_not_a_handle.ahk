@@ -41,12 +41,16 @@ Test("window_manager: WMExists answers with a boolean, not a handle", _WINH_Adap
 _WINH_NoWMExistsResultUsedAsHandle() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable")
+	; The production class may legitimately become empty. Append one safe
+	; positive control so the same scan still proves its matcher executed.
+	Src .= '`n_WMExistsGuardPositive := WMExists("ahk_exe probe.exe")'
 
 	Offenders := ""
+	AssignmentPattern :=
+		"im)^\s*(\w+)\s*:=\s*(?:WMExists|[\w.]+\.WindowExists)\s*\("
 	Checked := 0
 	Pos := 1
-	while (FoundPos := RegExMatch(Src,
-		"im)^\s*(\w+)\s*:=\s*(?:WMExists|[\w.]+\.WindowExists)\s*\(", &M, Pos)) {
+	while (FoundPos := RegExMatch(Src, AssignmentPattern, &M, Pos)) {
 		Pos := FoundPos + M.Len
 		VarName := M[1]
 		Checked += 1
@@ -59,7 +63,7 @@ _WINH_NoWMExistsResultUsedAsHandle() {
 	}
 
 	Assert(Checked > 0,
-		"the scan must find at least one direct or injected window-existence assignment")
+		"the class scan must consume its safe positive-control assignment")
 	Assert(Offenders == "",
 		'a WMExists() boolean must never be used as a window handle:' . Offenders
 		. '`nUse WMGetFocused()["hwnd"] (or another adapter that returns a real handle) instead.')

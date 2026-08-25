@@ -16,10 +16,10 @@ _TTNWMG_CheckWinMaximizeGuard() {
 		"TakeNote must queue the shared transaction")
 	Assert(InStr(Body, "WinWait") = 0 and InStr(Body, "WinMaximize") = 0,
 		"TakeNote must not wait or maximise on the hotkey thread")
-	Assert(InStr(PollBody, 'Ops.WindowExists(Job["pattern"])') > 0,
-		"the poll must check the explicit Notepad target before finalization")
-	Assert(InStr(PollBody, 'Ops.Maximize(Job["pattern"])') > 0,
-		"the poll must maximise the explicit target, never AHK's last-found window")
+	Assert(InStr(PollBody, 'Ops.FindWindow(Job["file_name"])') > 0,
+		"the poll must resolve the exact Notepad document before finalization")
+	Assert(InStr(PollBody, "Ops.Maximize(WindowHwnd)") > 0,
+		"the poll must maximise the enumerated HWND, never AHK's last-found window")
 }
 Test("shortcuts: TakeNote defers and targets maximize safely",
 	_TTNWMG_CheckWinMaximizeGuard)
@@ -32,12 +32,20 @@ _TTNWMG_CheckTimeoutIsLogged() {
 Test("shortcuts: TakeNote reports the bounded Notepad deadline",
 	_TTNWMG_CheckTimeoutIsLogged)
 
-_TTNWMG_CheckTitleMatchModeRestored() {
+_TTNWMG_CheckTitleMatchingIsNotAmbient() {
 	EntryBody := _DriverFuncBody("TakeNote")
 	Assert(!InStr(EntryBody, "SetTitleMatchMode"),
 		"the hotkey callback must not mutate title-match state")
-	Assert(InStr(_DriverSourceNoComments(), "SetTitleMatchMode(PreviousMode)") > 0,
-		"the shared native boundary must restore title-match mode after target operations")
+	Src := _DriverSourceNoComments()
+	StartPos := InStr(Src, "class _TakeNoteNative")
+	EndPos := InStr(Src, "_TakeNoteQueueFromFeatures(", , StartPos)
+	Assert(StartPos > 0 and EndPos > StartPos,
+		"the shared native note boundary must remain discoverable")
+	NativeBody := SubStr(Src, StartPos, EndPos - StartPos)
+	Assert(InStr(NativeBody, "_TakeNoteTitleMatchesFile") > 0,
+		"the shared boundary must own an exact document-title matcher")
+	Assert(InStr(NativeBody, "SetTitleMatchMode") = 0,
+		"the native boundary must not depend on ambient substring matching")
 }
-Test("shortcuts: TakeNote leaves title matching to the restoring shared native boundary",
-	_TTNWMG_CheckTitleMatchModeRestored)
+Test("shortcuts: TakeNote title matching is independent of ambient match mode",
+	_TTNWMG_CheckTitleMatchingIsNotAmbient)
