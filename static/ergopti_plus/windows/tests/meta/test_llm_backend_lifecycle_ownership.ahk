@@ -110,5 +110,33 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 	}
 }
 
+_LBLM_OllamaReadinessWritersAreOwned() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "driver source must be readable for AHK2-13")
+	AssertEqual(7, _LBLM_CountOccurrences(Src, "_LLM_Ollama_IsReady :="),
+		"every Ollama readiness writer must remain in the reviewed owner inventory")
+
+	FinalizeBody := _DriverFuncBody("_LLM_Engine_FinalizeRequest")
+	BackendGuardPos := InStr(FinalizeBody,
+		'state.Get("backend", "") == "ollama"')
+	ReadyWritePos := InStr(FinalizeBody, "_LLM_Ollama_IsReady := true")
+	Assert(BackendGuardPos > 0 && ReadyWritePos > BackendGuardPos,
+		"the common prediction finalizer may publish readiness only for Ollama")
+
+	for Owner in [
+		"_LLM_Ollama_OnWarmupDone",
+		"LLM_OllamaNoteInferenceSuccess",
+		"_LLM_Menu_WarmCurrentOllamaModel",
+		"_LLM_Menu_ApplyModelCommitted"
+	] {
+		Body := _DriverFuncBody(Owner)
+		Assert(Body != "", Owner . " must remain an explicit Ollama readiness owner")
+		Assert(InStr(Body, "_LLM_Ollama_IsReady :=") > 0,
+			Owner . " must retain its inventoried readiness publication")
+	}
+}
+
 Test("[ahk-003-meta] every backend lifecycle producer preserves ownership",
 	_LBLM_BackendLifecycleProducersAreOwned)
+Test("[ahk2-13-meta] every Ollama readiness writer remains backend-owned",
+	_LBLM_OllamaReadinessWritersAreOwned)
