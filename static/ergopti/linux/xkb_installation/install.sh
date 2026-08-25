@@ -35,6 +35,7 @@ WANT_ANSI=false
 WANT_YES=false
 SELECTED_VERSION_ARG=""
 SELECTED_VARIANT_ARG=""
+UNINSTALL_METHOD_REQUIRED_MESSAGE="--uninstall requiert --installation-method clean|legacy"
 
 RED=$(printf '\033[31m')
 GREEN=$(printf '\033[32m')
@@ -96,6 +97,92 @@ run_fzf() {
     fzf --height=12 --layout=reverse --border --inline-info "$@"
 }
 
+has_numbered_backup() {
+    local target backup suffix
+    for target in "$@"; do
+        for backup in "$target".*; do
+            [ -e "$backup" ] || continue
+            suffix="${backup#"$target".}"
+            if [[ "$suffix" =~ ^[0-9]+$ ]]; then
+                return 0
+            fi
+        done
+    done
+    return 1
+}
+
+has_legacy_installation() {
+    local system_root="$1"
+    local target
+    for target in \
+            "$system_root/symbols/fr" \
+            "$system_root/types/extra" \
+            "$system_root/rules/evdev.lst" \
+            "$system_root/rules/evdev.xml"; do
+        if [ -f "$target" ] && grep -qi 'ergopti' "$target" \
+                && has_numbered_backup "$target"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+has_clean_installation() {
+    local extensions_root="$1"
+    local system_root="$2"
+    local user_home="$3"
+    local component
+
+    if [ -d "$extensions_root/ergopti" ]; then
+        return 0
+    fi
+    for component in symbols types; do
+        if [ -d "$system_root/$component" ] \
+                && find "$system_root/$component" -maxdepth 1 \
+                    \( -type f -o -type l \) -iname '*ergopti*' -print -quit \
+                    2>/dev/null | grep -q .; then
+            return 0
+        fi
+    done
+    if [ -f "$system_root/rules/evdev" ] \
+            && grep -i 'ergopti' "$system_root/rules/evdev" | grep -q '='; then
+        return 0
+    fi
+    if [ -n "$user_home" ] && [ -f "$user_home/.XCompose" ] \
+            && grep -qFx '# Ergopti managed XCompose' "$user_home/.XCompose"; then
+        return 0
+    fi
+    return 1
+}
+
+infer_uninstall_method() {
+    local extensions_root="${ERGOPTI_XKB_EXTENSIONS_ROOT:-/usr/share/xkeyboard-config.d}"
+    local system_root="${ERGOPTI_XKB_SYSTEM_ROOT:-/usr/share/X11/xkb}"
+    local user_home="${ERGOPTI_XKB_USER_HOME:-${HOME:-}}"
+    local clean_found=false
+    local legacy_found=false
+
+    if has_clean_installation "$extensions_root" "$system_root" "$user_home"; then
+        clean_found=true
+    fi
+
+    if has_legacy_installation "$system_root"; then
+        legacy_found=true
+    fi
+
+    if [ "$clean_found" = true ] && [ "$legacy_found" = true ]; then
+        usage_error "$UNINSTALL_METHOD_REQUIRED_MESSAGE"
+    fi
+    if [ "$clean_found" != true ] && [ "$legacy_found" != true ]; then
+        usage_error "$UNINSTALL_METHOD_REQUIRED_MESSAGE"
+    fi
+    if [ "$clean_found" = true ]; then
+        FORCE_INSTALLATION_METHOD="clean"
+    else
+        FORCE_INSTALLATION_METHOD="legacy"
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --installation-method)
@@ -145,9 +232,6 @@ esac
 if [ "$WANT_YES" = true ] && [ "$WANT_UNINSTALL" != true ] \
         && { [ -z "$SELECTED_VERSION_ARG" ] || [ -z "$SELECTED_VARIANT_ARG" ]; }; then
     usage_error "--yes requiert --version et --variant"
-fi
-if [ "$WANT_UNINSTALL" = true ] && [ -z "$FORCE_INSTALLATION_METHOD" ]; then
-    usage_error "--uninstall requiert --installation-method clean|legacy"
 fi
 if [[ ! "$SELECTED_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
         || "$SELECTED_BRANCH" == *..* \
@@ -256,6 +340,9 @@ fi
 if [ "$WANT_UNINSTALL" = true ]; then
     log_section "Désinstallation"
     INSTALLER_SCRIPTS_DIR="$DRIVERS_ROOT/$INSTALLER_REL_PATH"
+    if [ -z "$FORCE_INSTALLATION_METHOD" ]; then
+        infer_uninstall_method
+    fi
     if [ "$FORCE_INSTALLATION_METHOD" = "legacy" ]; then
         run_step "Retrait de l'installation Legacy" "Installation Legacy retirée" \
             sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --uninstall
