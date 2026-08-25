@@ -689,12 +689,9 @@ end
 
 --- Disables gestures entirely (menu master toggle and the dedicated "disable
 --- all" action both route through this single function). Mirrors what
---- M.suspend()/M.stop() already do: release any held synthetic click-lock
---- and unblock native scroll BEFORE flipping the flag, otherwise an
---- already-engaged click-drag (left/right_click_toggle) or an armed
---- scroll-block is orphaned — it self-heals on the next real keypress/
---- mouseUp, but until then the OS is left with a button stuck down or
---- native scroll still swallowed (gestures-disable-all-stuck-click, F-MED-22).
+--- M.suspend()/M.stop() already do: cancel the in-flight gesture and release
+--- any held synthetic click-lock BEFORE flipping the flag. Merely unblocking
+--- scroll leaves gesture state that a later lift can commit after re-enable.
 function M.disable_all()
 	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
 	gesture_start_attempt = nil
@@ -702,10 +699,11 @@ function M.disable_all()
 	if gesture_resume_start_required == true then
 		cleanup_settled = teardown_gesture_runtime(true)
 	else
-		local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
+		local ok_cancel, cancel_result = xpcall(
+			Engine.cancel_current_gesture, debug.traceback)
 		local ok_cleanup, cleanup_result = xpcall(
 			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
-		cleanup_settled = ok_scroll and scroll_result == true
+		cleanup_settled = ok_cancel and cancel_result == true
 			and ok_cleanup and cleanup_result == true
 	end
 	if cleanup_settled ~= true then
@@ -733,11 +731,9 @@ function M.is_enabled()  return CoreState.enabled end
 -- ON/OFF via the menu during pause has the correct effect at resume — we never
 -- clobber the user's intent with a stale snapshot.
 function M.suspend()
-	-- "Pause = everything off": also quiesce state armed mid-gesture. The suspended
-	-- flag only gates NEW activity; a scroll-block armed by a 3+finger gesture keeps
-	-- swallowing native scroll until finger-lift, and a held synthetic click-lock
-	-- (left/right_click_toggle) keeps its drag + key-watcher eventtaps live. Release
-	-- both here, exactly as M.stop() does (force_cleanup is idempotent).
+	-- "Pause = everything off": cancel state armed mid-gesture. The suspended flag
+	-- gates the physical lift frame, so merely unblocking scroll preserves a gesture
+	-- that the first fresh frame after resume could commit.
 	-- Publish the logical fence before fallible native cleanup. During a failed
 	-- RESUME transaction ScriptControl may call suspend() as a rollback; even if a
 	-- native owner then refuses cleanup, newly arriving gestures must remain gated
@@ -745,10 +741,11 @@ function M.suspend()
 	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
 	gesture_start_attempt = nil
 	CoreState.suspended = true
-	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
+	local ok_cancel, cancel_result = xpcall(
+		Engine.cancel_current_gesture, debug.traceback)
 	local ok_cleanup, cleanup_result = xpcall(
 		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
-	if not ok_scroll or scroll_result ~= true or not ok_cleanup or cleanup_result ~= true then
+	if not ok_cancel or cancel_result ~= true or not ok_cleanup or cleanup_result ~= true then
 		Logger.error(LOG, "Gesture suspend cleanup refused; logical fence retained.")
 		return false
 	end

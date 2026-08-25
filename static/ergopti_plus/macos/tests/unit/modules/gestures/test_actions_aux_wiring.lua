@@ -582,7 +582,7 @@ local function with_feature_lifecycles(actions, calls, body)
 	local feature = {
 		bindings_started = false,
 		keyboard_started = false,
-		unblock_calls = 0,
+		cancel_calls = 0,
 	}
 	package.loaded["modules.shortcuts.bindings"] = {
 		DEFAULT_CHATGPT_URL = "",
@@ -628,8 +628,8 @@ local function with_feature_lifecycles(actions, calls, body)
 	}
 	package.loaded["modules.gestures.engine"] = setmetatable({
 		init = function() return true end,
-		unblock_scroll = function()
-			feature.unblock_calls = feature.unblock_calls + 1
+		cancel_current_gesture = function()
+			feature.cancel_calls = feature.cancel_calls + 1
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
