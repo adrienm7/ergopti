@@ -582,18 +582,13 @@ LLM_Menu_PromptTemperature() {
 	if (ib.Result != "OK" || ib.Value == "")
 		return
 	; Accept the comma-decimal habit common on a French keyboard (the project's
-	; UI locale) by normalising "12,5" to "12.5" before validating
+	; UI locale) by normalising "0,7" to "0.7" before validating.
 	raw := StrReplace(ib.Value, ",", ".")
-	; Reject non-numeric typos before converting — Float() throws on a bad
-	; string in this menu-callback thread (mirrors LLM_Menu_PromptOllamaPort)
-	if !IsNumber(raw)
-		return
-	val := Float(raw)
-	if (val < 0.0 || val > 2.0)
+	if !LLM_Option_TryNormalizeTemperature(raw, &Normalized)
 		return
 	return LLM_Menu_CommitMutation("the LLM temperature setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"temperature", Format("{:.2f}", val)),
+			"temperature", Normalized),
 		_LLM_Menu_ApplyStandardCommitted)
 }
 
