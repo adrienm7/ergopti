@@ -253,15 +253,11 @@ def install_clean(
         (staged_package / "types" / layout_id).write_text(
             types_content, encoding="utf-8"
         )
-        variants = []
         description = "Français — Ergopti"
         if variant == VARIANT_PLUS:
             description = "Français — Ergopti+"
-            variants.append(("plus", "Ergopti+"))
-        else:
-            variants.append(("plus", "Ergopti+ (avec Espanso)"))
         (staged_package / "rules" / "evdev.xml").write_text(
-            build_registry_xml(layout_id, description, variants),
+            build_registry_xml(layout_id, description, []),
             encoding="utf-8",
         )
         (staged_package / "rules" / "evdev.post").write_text(
@@ -368,8 +364,6 @@ def activate(layout_id: str, variant: str) -> None:
         return run_reported(prefix + command, label)
 
     wanted = [("xkb", layout_id)]
-    if variant == VARIANT_PLUS:
-        wanted.insert(0, ("xkb", f"{layout_id}+plus"))
 
     print("🚀 Activation (best-effort, sans écraser vos dispositions)…")
 
@@ -378,22 +372,24 @@ def activate(layout_id: str, variant: str) -> None:
     if current_raw is None:
         print("   ℹ️  gsettings indisponible : GNOME non détecté, étape ignorée.")
     else:
-        merged, added = merge_gsettings_source(
-            parse_gsettings_sources(current_raw), wanted
-        )
-        if added:
-            run_report(
-                [
-                    "gsettings",
-                    "set",
-                    "org.gnome.desktop.input-sources",
-                    "sources",
-                    format_gsettings_sources(merged),
-                ],
-                "GNOME : disposition ajoutée à vos sources existantes",
-            )
+        current_sources = parse_gsettings_sources(current_raw)
+        if current_sources is None:
+            print("   ℹ️  gsettings indisponible : GNOME non détecté, étape ignorée.")
         else:
-            print("   ✅ GNOME : déjà présente dans vos sources, rien à changer.")
+            merged, added = merge_gsettings_source(current_sources, wanted)
+            if added:
+                run_report(
+                    [
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.input-sources",
+                        "sources",
+                        format_gsettings_sources(merged),
+                    ],
+                    "GNOME : disposition ajoutée à vos sources existantes",
+                )
+            else:
+                print("   ✅ GNOME : déjà présente dans vos sources, rien à changer.")
 
     # --- KDE Plasma ---
     kde_readers = ["kreadconfig6", "kreadconfig5"]
@@ -404,7 +400,7 @@ def activate(layout_id: str, variant: str) -> None:
         )
         if current_list is not None:
             break
-    kde_ids = [layout_id, f"{layout_id}+plus"] if variant == VARIANT_PLUS else [layout_id]
+    kde_ids = [layout_id]
     if current_list is None:
         print("   ℹ️  kreadconfig indisponible : KDE non détecté, étape ignorée.")
     else:

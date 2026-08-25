@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
 
@@ -99,6 +100,8 @@ class CleanInstallerSandboxTests(unittest.TestCase):
         self.assertIn('xkb_symbols "default"', symbols_content)
         self.assertIn("ERGOPTI_SEVEN_LEVEL", symbols_content)
         self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 2)
+        names = [node.text for node in ET.parse(registry).getroot().iter("name")]
+        self.assertEqual(names, ["ergopti"])
 
     def test_install_upgrades_from_previous_generation_and_uninstalls(self):
         result = self.run_installer()

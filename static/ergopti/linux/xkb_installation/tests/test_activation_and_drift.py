@@ -2,7 +2,9 @@
 
 import sys
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -14,6 +16,7 @@ from layout_package import (  # noqa: E402
     parse_gsettings_sources,
     parse_kde_layout_list,
 )
+import xkb_files_installer_clean as clean_installer  # noqa: E402
 
 LAYOUT_DIR = Path(__file__).resolve().parents[2]
 
@@ -27,10 +30,48 @@ class GSettingsMergeTests(unittest.TestCase):
         pairs = parse_gsettings_sources("[('xkb', 'fr'), ('xkb', 'us')]")
         self.assertEqual(pairs, [("xkb", "fr"), ("xkb", "us")])
 
-    def test_unparsable_text_yields_empty(self):
-        self.assertEqual(parse_gsettings_sources("garbage without brackets"), [])
-        # A bracketed but malformed list must not crash the installer.
-        self.assertEqual(parse_gsettings_sources("[not a tuple]"), [])
+    def test_unparsable_text_is_distinct_from_an_empty_list(self):
+        self.assertIsNone(parse_gsettings_sources("garbage without brackets"))
+        self.assertIsNone(parse_gsettings_sources("[not a tuple]"))
+
+    def test_activation_never_replaces_sources_after_a_parse_failure(self):
+        calls = []
+
+        def fake_run(command, **kwargs):
+            calls.append(command)
+            if "gsettings" in command and "get" in command:
+                return SimpleNamespace(returncode=0, stdout="[not a tuple]")
+            return SimpleNamespace(returncode=1, stdout="")
+
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(clean_installer.shutil, "which", return_value=None):
+            clean_installer.activate("ergopti", "ergopti_plus")
+
+        self.assertFalse(
+            any("gsettings" in call and "set" in call for call in calls),
+            calls,
+        )
+
+    def test_plus_content_activates_the_installed_default_section(self):
+        calls = []
+
+        def fake_run(command, **kwargs):
+            calls.append(command)
+            if "gsettings" in command and "get" in command:
+                return SimpleNamespace(returncode=0, stdout="[('xkb', 'fr')]")
+            if "gsettings" in command and "set" in command:
+                return SimpleNamespace(returncode=0, stdout="")
+            return SimpleNamespace(returncode=1, stdout="")
+
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(clean_installer.shutil, "which", return_value=None):
+            clean_installer.activate("ergopti", "ergopti_plus")
+
+        writes = [call for call in calls if "gsettings" in call and "set" in call]
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(writes[0][-1], "[('xkb', 'fr'), ('xkb', 'ergopti')]")
 
     def test_merge_appends_only_missing_and_preserves_order(self):
         current = [("xkb", "fr"), ("xkb", "ergopti")]
