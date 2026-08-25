@@ -90,6 +90,7 @@ run_uninstall_without_artifacts_fails() {
         return 1
     fi
     grep -q -- '--uninstall requiert --installation-method clean|legacy' "$output"
+    ! grep -q 'command not found' "$output"
 }
 
 run_downloaded_uninstall() {
