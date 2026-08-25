@@ -44,7 +44,11 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		}
 
 		-- ui_restore pass-through so the deferred reload runs when fired.
-		local ui_restore_stub = { defer_reload = function(fn) if type(fn) == "function" then fn() end end }
+		local defer_reload_calls = 0
+		local ui_restore_stub = { defer_reload = function(fn)
+			defer_reload_calls = defer_reload_calls + 1
+			if type(fn) == "function" then fn() end
+		end }
 
 		git_busy = false
 		local watcher = MenuWatchers.start_config_watcher(
@@ -65,13 +69,20 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		-- quiescence hold (a lone .lua edit settles after EDIT_SETTLE_SEC).
 		clock = 1001
 
-		-- Debounce elapses while git is STILL writing the tree → must NOT reload.
+		-- The Git lock remains authoritative even beyond the historical 120-poll
+		-- diagnostic threshold. No deferred reload may be attempted while it exists.
 		git_busy = true
-		local fn1 = captured_fn
-		captured_fn = nil
-		fn1()
+		for poll = 1, 121 do
+			local held_fn = captured_fn
+			captured_fn = nil
+			helpers.assert_true(type(held_fn) == "function",
+				"persistent Git hold must retain poll ownership at tick " .. poll)
+			held_fn()
+		end
 		helpers.assert_true(reloads == 0, "reload must be HELD while a git operation is in progress")
 		helpers.assert_true(type(captured_fn) == "function", "the held reload must re-arm a poll timer")
+		helpers.assert_eq(defer_reload_calls, 0,
+			"a persistent Git lock must not cross the deferred-reload boundary")
 
 		-- git finishes → the next poll tick fires the reload exactly once.
 		git_busy = false
@@ -79,6 +90,54 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		captured_fn = nil
 		fn2()
 		helpers.assert_true(reloads == 1, "reload must fire once git has settled (got " .. reloads .. ")")
+
+		hs.pathwatcher, hs.timer = prev_pw, prev_timer
+	end)
+
+	helpers.it("rechecks Git ownership when the deferred reload is finally dispatched", function()
+		local prev_pw, prev_timer = hs.pathwatcher, hs.timer
+		local captured_cb, pending_timer, pending_reload
+		local reloads = 0
+		local clock = 1000
+
+		hs.pathwatcher = { new = function(_path, callback)
+			captured_cb = callback
+			return { start = function() end }
+		end }
+		hs.timer = {
+			doAfter = function(_delay, callback)
+				pending_timer = callback
+				return { stop = function() end }
+			end,
+			secondsSinceEpoch = function() return clock end,
+		}
+
+		git_busy = false
+		MenuWatchers.start_config_watcher(
+			"/fake/base/",
+			function() reloads = reloads + 1 end,
+			function() return 0 end,
+			{ defer_reload = function(callback) pending_reload = callback end }
+		)
+		captured_cb({ "/fake/base/modules/foo.lua" })
+		helpers.assert_true(type(pending_timer) == "function", "the change must arm a settle timer")
+		clock = 1001
+		pending_timer()
+		helpers.assert_true(type(pending_reload) == "function", "an idle poll must stage a deferred reload")
+
+		git_busy = true
+		pending_timer = nil
+		pending_reload()
+		helpers.assert_eq(reloads, 0, "Git becoming busy before dispatch must fence the reload")
+		helpers.assert_true(type(pending_timer) == "function",
+			"a fire-time Git refusal must re-arm the exact polling owner")
+
+		git_busy = false
+		pending_reload = nil
+		pending_timer()
+		helpers.assert_true(type(pending_reload) == "function", "the settled retry must reach dispatch")
+		pending_reload()
+		helpers.assert_eq(reloads, 1, "the retained reload must fire exactly once after Git settles")
 
 		hs.pathwatcher, hs.timer = prev_pw, prev_timer
 	end)
