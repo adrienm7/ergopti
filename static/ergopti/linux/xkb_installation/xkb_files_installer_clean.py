@@ -31,6 +31,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -106,7 +107,7 @@ def run_reported(command: list[str], label: str, env: dict[str, str] | None = No
     return False
 
 
-def compile_validation(staging_dir: Path, layout_id: str) -> bool:
+def compile_validation(extensions_root: Path, layout_id: str) -> bool:
     """Compile-test the staged package with xkbcli when it is available.
 
     Returns True when validation ran and succeeded. A missing or too-old
@@ -118,7 +119,7 @@ def compile_validation(staging_dir: Path, layout_id: str) -> bool:
         print("   ℹ️  xkbcli absent : compilation réelle ignorée (validation structurelle OK).")
         return True
     env = {
-        "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(staging_dir),
+        "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(extensions_root),
         # Keep the versioned path out of the way so the staging tree is authoritative.
         "XKB_CONFIG_VERSIONED_EXTENSIONS_PATH": "",
     }
@@ -163,13 +164,6 @@ def cleanup_previous_installations(roots: InstallerRoots) -> None:
     Idempotent: running an upgrade over any previous version or method ends in
     exactly one coherent package state.
     """
-    package_dir = roots.package_dir
-    if package_dir.exists():
-        shutil.rmtree(package_dir)
-        print(f"   🧹 Ancien paquet remplacé ({package_dir}).")
-    staging = package_dir.with_name(f".{PACKAGE_NAME}.staging")
-    if staging.exists():
-        shutil.rmtree(staging, ignore_errors=True)
     removed_links = remove_generation_two_links(roots.system_root)
     if removed_links:
         print(f"   🧹 {removed_links} lien(s) hérité(s) supprimé(s) dans {roots.system_root}.")
@@ -179,6 +173,38 @@ def cleanup_previous_installations(roots: InstallerRoots) -> None:
             f"   🧹 {stripped_lines} ligne(s) de règles héritée(s) retirée(s) "
             f"de {roots.system_root / 'rules' / 'evdev'}."
         )
+
+
+def recover_interrupted_package_swap(package_dir: Path) -> None:
+    """Restore the last known-good package after an interrupted rename pair."""
+    rollback_dir = package_dir.with_name(f".{PACKAGE_NAME}.rollback")
+    if not rollback_dir.exists():
+        return
+    if package_dir.exists():
+        shutil.rmtree(rollback_dir)
+        return
+    rollback_dir.rename(package_dir)
+
+
+def commit_staged_package(staged_package: Path, package_dir: Path) -> None:
+    """Atomically replace a package, restoring the previous one on failure."""
+    rollback_dir = package_dir.with_name(f".{PACKAGE_NAME}.rollback")
+    recover_interrupted_package_swap(package_dir)
+    if rollback_dir.exists():
+        shutil.rmtree(rollback_dir)
+    had_previous = package_dir.exists()
+    if had_previous:
+        package_dir.rename(rollback_dir)
+    try:
+        staged_package.rename(package_dir)
+    except BaseException:
+        if package_dir.exists():
+            shutil.rmtree(package_dir, ignore_errors=True)
+        if had_previous and rollback_dir.exists():
+            rollback_dir.rename(package_dir)
+        raise
+    if rollback_dir.exists():
+        shutil.rmtree(rollback_dir)
 
 
 def install_clean(
@@ -209,42 +235,47 @@ def install_clean(
     layout_id = validate_component_identifier(PACKAGE_NAME)
     patched_symbols = patch_symbols_default(symbols_content)
 
+    package_dir = roots.package_dir
+    package_dir.parent.mkdir(parents=True, exist_ok=True)
+    recover_interrupted_package_swap(package_dir)
+    with tempfile.TemporaryDirectory(
+        prefix=f".{PACKAGE_NAME}.staging-", dir=package_dir.parent.parent
+    ) as staging_name:
+        staging_root = Path(staging_name)
+        staged_package = staging_root / PACKAGE_NAME
+        (staged_package / "symbols").mkdir(parents=True)
+        (staged_package / "types").mkdir()
+        (staged_package / "rules").mkdir()
+
+        (staged_package / "symbols" / layout_id).write_text(
+            patched_symbols, encoding="utf-8"
+        )
+        (staged_package / "types" / layout_id).write_text(
+            types_content, encoding="utf-8"
+        )
+        variants = []
+        description = "Français — Ergopti"
+        if variant == VARIANT_PLUS:
+            description = "Français — Ergopti+"
+            variants.append(("plus", "Ergopti+"))
+        else:
+            variants.append(("plus", "Ergopti+ (avec Espanso)"))
+        (staged_package / "rules" / "evdev.xml").write_text(
+            build_registry_xml(layout_id, description, variants),
+            encoding="utf-8",
+        )
+        (staged_package / "rules" / "evdev.post").write_text(
+            build_evdev_post(layout_id),
+            encoding="utf-8",
+        )
+
+        if not compile_validation(staging_root, layout_id):
+            raise SystemExit(EXIT_VALIDATION)
+
+        commit_staged_package(staged_package, package_dir)
+
     print("🧼 Nettoyage des installations précédentes…")
     cleanup_previous_installations(roots)
-
-    package_dir = roots.package_dir
-    staging_dir = package_dir.with_name(f".{PACKAGE_NAME}.staging")
-    if staging_dir.exists():
-        shutil.rmtree(staging_dir, ignore_errors=True)
-    (staging_dir / "symbols").mkdir(parents=True)
-    (staging_dir / "types").mkdir()
-    (staging_dir / "rules").mkdir()
-
-    (staging_dir / "symbols" / layout_id).write_text(patched_symbols, encoding="utf-8")
-    (staging_dir / "types" / layout_id).write_text(types_content, encoding="utf-8")
-    variants = []
-    description = "Français — Ergopti"
-    if variant == VARIANT_PLUS:
-        description = "Français — Ergopti+"
-        variants.append(("plus", "Ergopti+"))
-    else:
-        variants.append(("plus", "Ergopti+ (avec Espanso)"))
-    (staging_dir / "rules" / "evdev.xml").write_text(
-        build_registry_xml(layout_id, description, variants),
-        encoding="utf-8",
-    )
-    (staging_dir / "rules" / "evdev.post").write_text(
-        build_evdev_post(layout_id),
-        encoding="utf-8",
-    )
-
-    if not compile_validation(staging_dir, layout_id):
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise SystemExit(EXIT_VALIDATION)
-
-    if package_dir.exists():
-        shutil.rmtree(package_dir)
-    staging_dir.rename(package_dir)
     print(f"📦 Paquet installé dans {package_dir}.")
 
     if xcompose_path is not None:
