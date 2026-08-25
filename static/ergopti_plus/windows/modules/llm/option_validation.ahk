@@ -169,6 +169,24 @@ LLM_Option_NormalizeAppProfileOverrides(Value) {
 	return Out
 }
 
+global LLM_OLLAMA_PORT_MIN := 1024
+global LLM_OLLAMA_PORT_MAX := 65535
+
+/** Normalizes the one Ollama port domain shared by menu, engine and client. */
+LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
+	global LLM_OLLAMA_PORT_MIN, LLM_OLLAMA_PORT_MAX
+	Normalized := false
+	if !IsInteger(Value)
+		return false
+	try Candidate := Integer(Value)
+	catch
+		return false
+	if Candidate < LLM_OLLAMA_PORT_MIN || Candidate > LLM_OLLAMA_PORT_MAX
+		return false
+	Normalized := Candidate
+	return true
+}
+
 /**
  * Validates and normalizes one public LLM option. Unknown keys fail closed so
  * every caller must consciously extend this schema when it adds a new option.
@@ -179,8 +197,7 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		"trigger_shortcut", true, "backend", true, "api_entry_id", true)
 	static IntegerKeys := Map(
 		"n_predictions", true, "min_words", true, "max_words", true,
-		"debounce_ms", true, "ctx_chars", true, "pred_indent", true,
-		"ollama_port", true)
+		"debounce_ms", true, "ctx_chars", true, "pred_indent", true)
 	static BooleanKeys := Map(
 		"enabled", true, "auto_profile_for_model", true,
 		"instant_on_word_end", true, "after_hotstring", true,
@@ -214,6 +231,8 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := LLM_Option_NormalizeModifierString(Value)
 		return Normalized is String
 	}
+	if (Key == "ollama_port")
+		return LLM_Option_TryNormalizeOllamaPort(Value, &Normalized)
 	if IntegerKeys.Has(Key) {
 		if !(Value is Integer) && !(Value is Float)
 			return false

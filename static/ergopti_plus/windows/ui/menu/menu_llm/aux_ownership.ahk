@@ -50,10 +50,10 @@ _LLM_Menu_ResetOllamaAuxState(*) {
 _LLM_Menu_PrepareOllamaPortCandidate(Candidate, StopGenerationFn := 0,
 		InvalidateFn := 0, CancelFn := 0) {
 	if !(Candidate is Map) || !Candidate.Has("ollama_port")
-			|| !IsInteger(Candidate["ollama_port"])
-			|| Candidate["ollama_port"] < 1024
-			|| Candidate["ollama_port"] > 65535
+			|| !LLM_Option_TryNormalizeOllamaPort(
+				Candidate["ollama_port"], &NormalizedPort)
 		return false
+	Candidate["ollama_port"] := NormalizedPort
 	try {
 		if HasMethod(StopGenerationFn, "Call")
 			StopGenerationFn.Call()
