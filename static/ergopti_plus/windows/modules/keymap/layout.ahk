@@ -461,13 +461,10 @@ _RemapEmit(SendStr, KeyChar, *) {
 ; The magic-key editor is suppressive too: its ``InputHook("L1 I")`` captures
 ; one remapped output for the editor instead of letting it reach the application.
 ;
-; Enumerated as a list rather than a chain of ors so another suppressive hook
-; is a one-line addition next to its siblings, and so the regression test can
-; require every _*InputHook global in the driver to appear here.
-global _EMIT_SUPPRESSING_HOOKS := [
-	"_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook",
-	"_MagicKeyEditorInputHook"
-]
+; Enumerated in the entry's pre-pump block rather than as a chain of ors so a
+; personal hotkey can emit safely before this module's auto-execute position,
+; and so the regression test can require every _*InputHook global in the driver
+; to appear in the registry.
 
 ; Capture hooks that deliberately do NOT suppress, listed so every hook in the
 ; driver is accounted for in exactly one of the two sets and a new one cannot

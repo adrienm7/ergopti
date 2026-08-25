@@ -79,3 +79,26 @@ _BEBFR_ErrorNetArmedBeforeFirstPump() {
 }
 Test("boot error net: armed before the first message pump, with #HotIf globals seeded",
     _BEBFR_ErrorNetArmedBeforeFirstPump)
+
+; A personal hotkey is armed as soon as its generated include executes, while the
+; auto-execute thread is still registering the built-in layout. A keypress in that
+; window can therefore reach SendNewResult before later module-level assignments.
+; The live 2026-08-25 crash was Shift+SC02E calling _EmitReachedScreen while its
+; suppressive-hook registry was still unset. Pin the registry before the include
+; that makes those user callbacks reachable.
+_BEBFR_EmitRegistryPrecedesPersonalHotkeys() {
+    SplitPath(A_ScriptDir, , &WindowsDir)
+    Src := ""
+    try Src := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
+    Assert(Src != "", "ErgoptiPlus.ahk must be readable for the personal-hotkey boot-order guard")
+    Code := _StripFullLineComments(Src)
+
+    RegistryPos := InStr(Code, "_EMIT_SUPPRESSING_HOOKS := [")
+    PersonalIncludePos := InStr(Code, "#Include *i _generated/personal_shortcuts.ahk")
+    Assert(RegistryPos > 0 && PersonalIncludePos > 0,
+        "the emit-hook registry and generated personal-shortcuts include must both exist in the entry")
+    Assert(RegistryPos < PersonalIncludePos,
+        "the emit-hook registry must be assigned before personal hotkeys become reachable, or an early SendNewResult raises UnsetError and aborts boot (early-personal-emit-unset-registry)")
+}
+Test("boot input: personal SendNewResult sees an initialised emit registry (early-personal-emit-unset-registry)",
+    _BEBFR_EmitRegistryPrecedesPersonalHotkeys)
