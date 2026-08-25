@@ -113,11 +113,7 @@ local function update_secure_field_state(element)
 		_state.is_secure_field = in_secure_app
 		return
 	end
-	local ok_role,    role    = pcall(function() return element:attributeValue("AXRole") end)
-	local ok_subrole, subrole = pcall(function() return element:attributeValue("AXSubrole") end)
-	local is_secure = (ok_role    and role    == "AXSecureTextField")
-	               or (ok_subrole and subrole == "AXSecureTextField")
-	               or in_secure_app
+	local is_secure = SecureFieldDetector.isElementSecure(element) or in_secure_app
 	if is_secure ~= _state.is_secure_field then
 		_state.is_secure_field = is_secure
 		if is_secure then

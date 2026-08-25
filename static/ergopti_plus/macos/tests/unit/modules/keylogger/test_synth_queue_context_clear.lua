@@ -31,6 +31,9 @@ local function load_tracker(focused_element)
 		refresh = function() end,
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
+		isElementSecure = function(element)
+			return element:attributeValue("AXRole") == "AXSecureTextField"
+		end,
 	}
 	local tracker = helpers.load_with_stubs("modules.keylogger.context_tracker", {
 		application = { watcher = { activated = 1 } },
