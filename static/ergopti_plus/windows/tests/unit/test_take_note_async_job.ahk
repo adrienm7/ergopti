@@ -24,8 +24,12 @@ class _TakeNoteFakeOps {
 	static send_count := 0
 	static warning_count := 0
 	static errors := []
+	static windows := []
 	static last_pattern := ""
+	static last_file_name := ""
+	static last_target := 0
 	static last_send := ""
+	static replacement_title_after_activate := ""
 
 	static Reset(NowTick := 100) {
 		_TakeNoteFakeOps.now_tick := NowTick
@@ -42,8 +46,12 @@ class _TakeNoteFakeOps {
 		_TakeNoteFakeOps.send_count := 0
 		_TakeNoteFakeOps.warning_count := 0
 		_TakeNoteFakeOps.errors := []
+		_TakeNoteFakeOps.windows := []
 		_TakeNoteFakeOps.last_pattern := ""
+		_TakeNoteFakeOps.last_file_name := ""
+		_TakeNoteFakeOps.last_target := 0
 		_TakeNoteFakeOps.last_send := ""
+		_TakeNoteFakeOps.replacement_title_after_activate := ""
 	}
 
 	static NowTick() {
@@ -74,25 +82,69 @@ class _TakeNoteFakeOps {
 	static WindowExists(Pattern) {
 		_TakeNoteFakeOps.last_pattern := Pattern
 		_TakeNoteFakeOps.calls.Push("window-exists")
+		if _TakeNoteFakeOps.windows.Length > 0 {
+			FileName := StrSplit(Pattern, " ahk_exe")[1]
+			for Candidate in _TakeNoteFakeOps.windows {
+				if InStr(Candidate.Title, FileName) > 0
+					return true
+			}
+			return false
+		}
 		return _TakeNoteFakeOps.window_exists
+	}
+
+	static FindWindow(FileName) {
+		_TakeNoteFakeOps.last_pattern := FileName
+		_TakeNoteFakeOps.last_file_name := FileName
+		_TakeNoteFakeOps.calls.Push("find-window")
+		if _TakeNoteFakeOps.windows.Length == 0
+			return _TakeNoteFakeOps.window_exists ? 4242 : 0
+		for Candidate in _TakeNoteFakeOps.windows {
+			if _TakeNoteTitleMatchesFile(Candidate.Title, FileName)
+				return Candidate.Hwnd
+		}
+		return 0
 	}
 
 	static Activate(Pattern) {
 		_TakeNoteFakeOps.last_pattern := Pattern
+		_TakeNoteFakeOps.last_target := Pattern
 		_TakeNoteFakeOps.calls.Push("activate")
 		if _TakeNoteFakeOps.focus_after_activate
 			_TakeNoteFakeOps.active := true
+		if _TakeNoteFakeOps.replacement_title_after_activate != "" {
+			for Candidate in _TakeNoteFakeOps.windows {
+				if Candidate.Hwnd == Pattern {
+					Candidate.Title := _TakeNoteFakeOps.replacement_title_after_activate
+					break
+				}
+			}
+			_TakeNoteFakeOps.replacement_title_after_activate := ""
+		}
 		return true
 	}
 
 	static IsActive(Pattern) {
 		_TakeNoteFakeOps.last_pattern := Pattern
+		_TakeNoteFakeOps.last_target := Pattern
 		_TakeNoteFakeOps.calls.Push("is-active")
 		return _TakeNoteFakeOps.active
 	}
 
+	static IsExactWindow(Hwnd, FileName) {
+		_TakeNoteFakeOps.calls.Push("is-exact-window")
+		if _TakeNoteFakeOps.windows.Length == 0
+			return _TakeNoteFakeOps.window_exists
+		for Candidate in _TakeNoteFakeOps.windows {
+			if Candidate.Hwnd == Hwnd
+				return _TakeNoteTitleMatchesFile(Candidate.Title, FileName)
+		}
+		return false
+	}
+
 	static Maximize(Pattern) {
 		_TakeNoteFakeOps.last_pattern := Pattern
+		_TakeNoteFakeOps.last_target := Pattern
 		_TakeNoteFakeOps.calls.Push("maximize")
 		_TakeNoteFakeOps.maximize_count += 1
 		return true
@@ -174,13 +226,74 @@ _TNAJ_EntryReturnsBeforeSideEffectsAndCompletesLater() {
 		"the newly launched note must receive its final input once")
 	AssertEqual("^{End}{Enter}", _TakeNoteFakeOps.last_send,
 		"the shared job must preserve the Win+N final-input behavior")
-	Assert(InStr(_TakeNoteFakeOps.last_pattern, "ahk_exe notepad.exe") > 0,
-		"every window operation must use the qualified Notepad pattern")
+	AssertEqual("Notes.txt", _TakeNoteFakeOps.last_file_name,
+		"every window lookup must retain the exact requested basename")
+	AssertEqual(4242, _TakeNoteFakeOps.last_target,
+		"focus and maximize must retain the exact enumerated HWND")
 	Assert(!_TakeNotePending.Has(JobId),
 		"successful publication must retire the completed job")
 }
 Test("take note async: entry returns before side effects and focused completion runs later (takenote-async-job)",
 	_TNAJ_EntryReturnsBeforeSideEffectsAndCompletesLater)
+
+_TNAJ_SubstringCollisionsNeverOwnTheRequestedDocument() {
+	global _TakeNotePending
+	_TNAJ_Reset()
+	_TakeNoteFakeOps.file_exists := true
+	_TakeNoteFakeOps.windows := [
+		{ Hwnd: 101, Title: "Old Notes.txt - Notepad" },
+		{ Hwnd: 202, Title: "Notes.txt.bak - Notepad" },
+		{ Hwnd: 212, Title: "Notes.txt - archive - Notepad" }
+	]
+	JobId := TakeNoteRequest(false, "C:\Notes", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual(1, _TakeNoteFakeOps.launch_count,
+		"substring collisions must not suppress launch of the exact requested document")
+	AssertTrue(_TakeNotePending.Has(JobId),
+		"the transaction must keep waiting while only colliding titles exist")
+	AssertEqual(0, _TakeNoteFakeOps.maximize_count)
+	AssertEqual(0, _TakeNoteFakeOps.send_count)
+
+	_TakeNoteFakeOps.windows.Push(
+		{ Hwnd: 303, Title: "*Notes.txt - Notepad" })
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual(303, _TakeNoteFakeOps.last_target,
+		"activation and maximize must retain the exact enumerated HWND")
+	AssertEqual(1, _TakeNoteFakeOps.maximize_count)
+	AssertEqual(1, _TakeNoteFakeOps.send_count)
+	AssertFalse(_TakeNotePending.Has(JobId))
+}
+Test("take note async: substring title collisions never own the requested document "
+	. "(ahk6-05-takenote-exact-title)",
+	_TNAJ_SubstringCollisionsNeverOwnTheRequestedDocument)
+
+_TNAJ_ExactTitleIsRevalidatedAfterActivation() {
+	global _TakeNotePending
+	_TNAJ_Reset()
+	_TakeNoteFakeOps.file_exists := true
+	_TakeNoteFakeOps.windows := [
+		{ Hwnd: 404, Title: "Notes.txt - Notepad" }
+	]
+	_TakeNoteFakeOps.replacement_title_after_activate :=
+		"Different.txt - Notepad"
+	JobId := TakeNoteRequest(false, "C:\Notes", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertTrue(_TakeNotePending.Has(JobId),
+		"a tab switch after enumeration must keep the exact-document job pending")
+	AssertEqual(0, _TakeNoteFakeOps.maximize_count)
+	AssertEqual(0, _TakeNoteFakeOps.send_count,
+		"a title that changed after activation must receive no final input")
+
+	_TakeNoteFakeOps.windows[1].Title := "Notes.txt - Notepad"
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(JobId))
+	AssertEqual(1, _TakeNoteFakeOps.maximize_count)
+	AssertEqual(0, _TakeNoteFakeOps.send_count,
+		"an already-open exact note must not receive the launch-only newline")
+}
+Test("take note async: exact title is revalidated after activation "
+	. "(ahk6-05-takenote-exact-title)",
+	_TNAJ_ExactTitleIsRevalidatedAfterActivation)
 
 _TNAJ_SuspendCancelsBeforeLaunch() {
 	global _TakeNotePending
