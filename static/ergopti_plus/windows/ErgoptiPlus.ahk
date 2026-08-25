@@ -1181,26 +1181,10 @@ if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected
 SetTimer(BuildTrayMenuDeferred, -MENU_BUILD_DEFER_MS)
 if _LangMenuBuildPending
 	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
-; Populate the IA submenu at boot ONLY when the feature is OFF. This must NOT be
-; gated on a flag set by LLM_Menu_Init: at boot the full menu — initMenu() →
-; LLM_Menu_Init() — is built only inside the DEFERRED BuildTrayMenuDeferred pass
-; (armed just above), so any such flag is still at its initial value when this
-; synchronous boot-tail line runs (an earlier flag-gated guard here never fired →
-; empty IA submenu when off, since the health-probe tick only rebuilds on a
-; backend-status CHANGE, which never happens while disabled).
-;
-; OFF: the build is cheap and the ONLY thing that would ever populate the submenu —
-; the model submenu skips the Ollama install-probe when deps aren't ready, so there
-; is no network call and no blocking.
-;
-; ON: do NOT build here. LLM_Menu_Init armed LLM_Menu_BootstrapOllama, which builds
-; the menu via LLM_Menu_OnDepsReady AFTER Ollama readiness is confirmed
-; ASYNCHRONOUSLY. Building at boot instead would run the model submenu's SYNCHRONOUS
-; /api/tags install-probe (_LLM_GetInstalledTagsCached → LLM_OllamaListModels) against
-; a still-cold daemon and block the keyboard thread for seconds — a stuck/empty menu
-; AND missed prediction-cancel on mouse/keystroke while the thread is frozen.
-if !_LLM_Menu["enabled"]
-	SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
+; The deferred boot worker owns the OFF-state IA population. It arms that
+; request only after the initial root publishes, so the LLM timer cannot
+; invalidate the boot generation and force a duplicate full submenu scan. The
+; enabled path is still owned by asynchronous dependency readiness.
 ; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().
