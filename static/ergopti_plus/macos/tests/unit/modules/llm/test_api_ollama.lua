@@ -150,7 +150,7 @@ helpers.describe("ApiOllama run-loop safety", function()
 		helpers.assert_true(source ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 
 		-- Extract the ensure_ollama_running function body (multiline match)
-		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
+		local fn_body = source:match("local function ensure_ollama_running%([^\n]*%)\n(.-)\nend\n")
 		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
 
 		local has_sync_exec = fn_body:find("ShellRunner%.exec") ~= nil
@@ -167,7 +167,7 @@ helpers.describe("ApiOllama run-loop safety", function()
 		local source = helpers.read_driver_source("local function read_ollama_port_override")
 		helpers.assert_true(source ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 
-		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
+		local fn_body = source:match("local function ensure_ollama_running%([^\n]*%)\n(.-)\nend\n")
 		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
 
 		local has_sleep = fn_body:find("TimerScheduler%.sleep_us") ~= nil
@@ -184,7 +184,7 @@ helpers.describe("ApiOllama run-loop safety", function()
 		local source = helpers.read_driver_source("local function read_ollama_port_override")
 		helpers.assert_true(source ~= nil, "modules/llm/api_ollama.lua source must be locatable")
 
-		local fn_body = source:match("local function ensure_ollama_running%(%)\n(.-)\nend\n")
+		local fn_body = source:match("local function ensure_ollama_running%([^\n]*%)\n(.-)\nend\n")
 		helpers.assert_true(fn_body, "could not locate ensure_ollama_running function body")
 
 		local has_spawn = fn_body:find("ShellRunner%.spawn") ~= nil
@@ -293,6 +293,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			local kill_done
 			local launch_server
 			local terminate_calls = 0
+			local settlements = {}
 			shell_runner.spawn = function(_, _, on_done)
 				spawn_calls = spawn_calls + 1
 				if spawn_calls == 1 then
@@ -317,11 +318,20 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			end
 
 			local ok, err = pcall(function()
-				helpers.assert_eq(ApiOllama.ensure_running(), true)
+				helpers.assert_eq(ApiOllama.ensure_running({
+					is_authorized = function() return true end,
+					on_settled = function(committed, reason)
+						settlements[#settlements + 1] = { committed, reason }
+					end,
+				}), true)
 				helpers.assert_eq(type(kill_done), "function")
 				kill_done()
 				helpers.assert_eq(type(launch_server), "function")
 				launch_server()
+				helpers.assert_eq(#settlements, 1,
+					"a real nested start refusal must settle the supervised request once")
+				helpers.assert_eq(settlements[1][1], false)
+				helpers.assert_true(tostring(settlements[1][2]):find("server task start", 1, true) ~= nil)
 				helpers.assert_eq(ApiOllama.ensure_running(), true,
 					"a failed nested serve launch must release the outer in-flight latch")
 				helpers.assert_eq(spawn_calls, 3, "retry must restart from stale-process cleanup")
@@ -332,6 +342,213 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			if not ok then error(err) end
 		end)
 	end
+
+	helpers.it("settles a supervised start through the real pause boundary", function()
+		reset_startup_state()
+		local original_spawn = shell_runner.spawn
+		local spawn_calls = 0
+		local settlements = {}
+		local authorized = true
+		shell_runner.spawn = function()
+			spawn_calls = spawn_calls + 1
+			return {
+				start = function() return true end,
+				terminate = function() return true, "settled" end,
+			}
+		end
+
+		local ok, err = pcall(function()
+			helpers.assert_true(ApiOllama.ensure_running({
+				is_authorized = function() return authorized end,
+				on_settled = function(committed, reason)
+					settlements[#settlements + 1] = { committed, reason }
+				end,
+			}))
+			helpers.assert_eq(#settlements, 0)
+			authorized = false
+			helpers.assert_true(ApiOllama.pause_warmup())
+			helpers.assert_eq(#settlements, 1)
+			helpers.assert_eq(settlements[1][1], false)
+			helpers.assert_eq(settlements[1][2], "startup quiesced")
+			helpers.assert_eq(spawn_calls, 1,
+				"pause must settle the kill owner before any serve spawn")
+		end)
+		shell_runner.spawn = original_spawn
+		if not ok then error(err) end
+	end)
+
+	helpers.it("settles a supervised start only after native publication", function()
+		reset_startup_state()
+		local original_spawn = shell_runner.spawn
+		local original_after = scheduler.after
+		local spawn_calls = 0
+		local kill_done
+		local launch_server
+		local settled = {}
+		local authorized = true
+
+		shell_runner.spawn = function(_, _, on_done)
+			spawn_calls = spawn_calls + 1
+			if spawn_calls == 1 then kill_done = on_done end
+			return {
+				start = function() return true end,
+				terminate = function() return true, "settled" end,
+			}
+		end
+		scheduler.after = function(_, callback)
+			local handle = { timer = {} }
+			launch_server = function()
+				handle.timer = nil
+				callback()
+			end
+			return handle, true
+		end
+
+		local ok, err = pcall(function()
+			helpers.assert_true(ApiOllama.ensure_running({
+				is_authorized = function() return authorized end,
+				on_settled = function(committed, reason)
+					settled[#settled + 1] = { committed, reason }
+				end,
+			}))
+			helpers.assert_eq(#settled, 0,
+				"async admission is not proof that the daemon was published")
+			kill_done()
+			helpers.assert_eq(#settled, 0)
+			launch_server()
+			helpers.assert_eq(#settled, 1)
+			helpers.assert_eq(settled[1][1], true)
+			helpers.assert_eq(spawn_calls, 2)
+		end)
+		shell_runner.spawn = original_spawn
+		scheduler.after = original_after
+		if not ok then error(err) end
+	end)
+
+	helpers.it("fences a supervised start whose runtime authority is superseded", function()
+		reset_startup_state()
+		local original_spawn = shell_runner.spawn
+		local original_after = scheduler.after
+		local spawn_calls = 0
+		local kill_done
+		local launch_server
+		local settled = {}
+		local authorized = true
+
+		shell_runner.spawn = function(_, _, on_done)
+			spawn_calls = spawn_calls + 1
+			kill_done = on_done
+			return {
+				start = function() return true end,
+				terminate = function() return true, "settled" end,
+			}
+		end
+		scheduler.after = function(_, callback)
+			local handle = { timer = {} }
+			launch_server = function()
+				handle.timer = nil
+				callback()
+			end
+			return handle, true
+		end
+
+		local ok, err = pcall(function()
+			helpers.assert_true(ApiOllama.ensure_running({
+				is_authorized = function() return authorized end,
+				on_settled = function(committed, reason)
+					settled[#settled + 1] = { committed, reason }
+				end,
+			}))
+			kill_done()
+			authorized = false
+			launch_server()
+			helpers.assert_eq(spawn_calls, 1,
+				"a superseded backend must be fenced before the Ollama serve spawn")
+			helpers.assert_eq(#settled, 1)
+			helpers.assert_eq(settled[1][1], false)
+		end)
+		shell_runner.spawn = original_spawn
+		scheduler.after = original_after
+		if not ok then error(err) end
+	end)
+
+	helpers.it("invalidates readiness when the current daemon exits", function()
+		reset_startup_state()
+		helpers.assert_true(set_upvalue(ApiOllama.is_ready, "_is_ready", true),
+			"the daemon-exit regression must seed the real readiness owner")
+		helpers.assert_true(set_upvalue(ApiOllama.reset_ready, "_warmup_gen", 41),
+			"the daemon-exit regression must seed the real warmup generation")
+		helpers.assert_true(set_upvalue(ApiOllama.warmup, "_warmup_active", true),
+			"the daemon-exit regression must seed the in-flight warmup owner")
+
+		local original_spawn = shell_runner.spawn
+		local original_after = scheduler.after
+		local spawn_calls = 0
+		local kill_done
+		local launch_server
+		local serve_done
+		local recovery_calls = 0
+		local original_recovery_owner = package.loaded["modules.llm.prediction_engine"]
+		package.loaded["modules.llm.prediction_engine"] = {
+			on_ollama_daemon_exit = function()
+				recovery_calls = recovery_calls + 1
+				return true
+			end,
+		}
+
+		shell_runner.spawn = function(_, _, on_done)
+			spawn_calls = spawn_calls + 1
+			if spawn_calls == 1 then
+				kill_done = on_done
+			else
+				serve_done = on_done
+			end
+			return {
+				start = function() return true end,
+				terminate = function() return true, "settled" end,
+			}
+		end
+		scheduler.after = function(_, callback)
+			local handle = { timer = {} }
+			launch_server = function()
+				handle.timer = nil
+				callback()
+			end
+			return handle, true
+		end
+
+		local ok, err = pcall(function()
+			helpers.assert_eq(ApiOllama.ensure_running(), true)
+			helpers.assert_eq(type(kill_done), "function")
+			kill_done()
+			helpers.assert_eq(type(launch_server), "function")
+			launch_server()
+			helpers.assert_eq(type(serve_done), "function")
+			helpers.assert_eq(ApiOllama.is_ready(), true)
+
+			serve_done()
+
+			helpers.assert_eq(ApiOllama.is_ready(), false,
+				"a dead daemon must invalidate the readiness verdict immediately")
+			helpers.assert_eq(get_upvalue(ApiOllama.reset_ready, "_warmup_gen"), 42,
+				"daemon death must fence warmup responses from the dead server")
+			helpers.assert_eq(get_upvalue(ApiOllama.warmup, "_warmup_active"), false,
+				"daemon death must release the stale warmup intent")
+			helpers.assert_eq(recovery_calls, 1,
+				"the current daemon must delegate exactly one recovery attempt")
+
+			helpers.assert_true(set_upvalue(ApiOllama.is_ready, "_is_ready", true))
+			serve_done()
+			helpers.assert_eq(ApiOllama.is_ready(), true,
+				"a duplicate stale completion must not demote a successor readiness verdict")
+			helpers.assert_eq(recovery_calls, 1,
+				"a duplicate stale completion must not request sibling recovery")
+		end)
+		shell_runner.spawn = original_spawn
+		scheduler.after = original_after
+		package.loaded["modules.llm.prediction_engine"] = original_recovery_owner
+		if not ok then error(err) end
+	end)
 
 	binary_resolver.resolve = original_resolve
 end)
