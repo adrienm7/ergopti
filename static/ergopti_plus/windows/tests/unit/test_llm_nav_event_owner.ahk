@@ -366,6 +366,14 @@ _LNEO_RenderAndPaintProbe(State, Record, Surface) {
 	return Result
 }
 
+_LNEO_RepaintDegradeProbe(State, Record) {
+	State.Calls.Push(Record)
+	State.Critical.Push(A_IsCritical)
+	if State.Throw
+		throw Error("injected repaint degradation failure")
+	return State.Result
+}
+
 _LNEO_QueueNativeDecision(State, Result, Receipt := 0) {
 	Envelope := Map("result", Result)
 	if Receipt is Map
@@ -2776,6 +2784,7 @@ Test("LLM nav event owner: poll claim cannot cross lifecycle fence",
 
 _LNEO_RepaintBuildRunsOutsideCriticalAndNeedsSuccess() {
 	global _LLM_NavEventOwnerPendingRepaints
+	global _LLM_NavEventOwnerRepaintFailures
 	State := _LNEO_Setup()
 	try {
 		Lifecycle := _LNEO_Lifecycle()
@@ -2799,6 +2808,8 @@ _LNEO_RepaintBuildRunsOutsideCriticalAndNeedsSuccess() {
 			"GUI/UIA repaint preparation must run outside Critical")
 		AssertEqual(1, _LLM_NavEventOwnerPendingRepaints.Count,
 			"a false renderer result must retain the repaint obligation")
+		AssertEqual(1, _LLM_NavEventOwnerRepaintFailures.Get(A.Token, 0),
+			"a transient failure must consume exactly one retry attempt")
 		AssertEqual(1, State.CompleteCalls.Length,
 			"repaint retry must not delay or duplicate native completion")
 
@@ -2810,6 +2821,8 @@ _LNEO_RepaintBuildRunsOutsideCriticalAndNeedsSuccess() {
 			"every repaint retry must remain outside Critical")
 		AssertEqual(0, _LLM_NavEventOwnerPendingRepaints.Count,
 			"only a positive renderer result may retire the repaint obligation")
+		AssertEqual(0, _LLM_NavEventOwnerRepaintFailures.Count,
+			"successful pixel publication must retire retry bookkeeping")
 		AssertEqual(1, State.CompleteCalls.Length,
 			"repaint retry must never acknowledge the receipt twice")
 	} finally _LNEO_Teardown()
@@ -2817,6 +2830,102 @@ _LNEO_RepaintBuildRunsOutsideCriticalAndNeedsSuccess() {
 
 Test("LLM nav event owner: repaint build is non-Critical and success-owned",
 	_LNEO_RepaintBuildRunsOutsideCriticalAndNeedsSuccess)
+
+_LNEO_PermanentRepaintFailureDegradesOnceAndRetiresDebt() {
+	global _LLM_NavEventOwnerPendingRepaints
+	global _LLM_NavEventOwnerRepaintFailures
+	global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS
+	State := _LNEO_Setup()
+	try {
+		Lifecycle := _LNEO_Lifecycle()
+		A := _LNEO_Presentation("A", 7, Lifecycle)
+		_LNEO_Publish(0, A)
+		Sequence := 17841
+		_LNEO_QueueNativeDecision(State,
+			_LNEO_SuppressResult(Sequence),
+			_LNEO_Receipt(Sequence, A.Token, 7))
+		AssertTrue(LLM_NavEventOwner_TestDispatch(
+			_LNEO_DigitSevenEvent(), State.Port) is Map,
+			"setup must queue one exact suppressed navigation receipt")
+		Render := { Calls: [], Critical: [], Results: [] }
+		Loop LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS + 2
+			Render.Results.Push(0)
+		Degrade := { Calls: [], Critical: [], Throw: false, Result: true }
+		Renderer := _LNEO_RenderProbe.Bind(Render)
+		Degrader := _LNEO_RepaintDegradeProbe.Bind(Degrade)
+
+		Loop LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS
+			AssertTrue(LLM_NavEventOwner_Drain(Renderer, Degrader),
+				"each bounded attempt must keep the service responsive")
+
+		AssertEqual(LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS,
+			Render.Calls.Length,
+			"a permanent renderer fault must consume only its named retry budget")
+		AssertEqual(1, Degrade.Calls.Length,
+			"budget exhaustion must request exactly one visible degradation")
+		AssertTrue(ObjPtr(Degrade.Calls[1]) == ObjPtr(A.Record),
+			"degradation must target the exact record whose pixels could not converge")
+		AssertEqual(0, Degrade.Critical[1],
+			"tooltip hide/degradation must run outside Critical")
+		AssertEqual(0, _LLM_NavEventOwnerPendingRepaints.Count,
+			"terminal degradation must retire the repaint service debt")
+		AssertEqual(0, _LLM_NavEventOwnerRepaintFailures.Count,
+			"terminal degradation must retire its retry bookkeeping")
+		AssertEqual(1, State.CompleteCalls.Length,
+			"bounded repaint retries must never duplicate native acknowledgement")
+
+		Loop 4
+			_LLM_NavEventOwnerService(Renderer, Degrader)
+		AssertEqual(LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS,
+			Render.Calls.Length,
+			"later watchdog ticks must not rebuild after terminal degradation")
+		AssertEqual(1, Degrade.Calls.Length,
+			"later watchdog ticks must not repeat terminal degradation")
+	} finally _LNEO_Teardown()
+}
+
+_LNEO_RepaintDegradeFailureStillStopsRebuildLoop() {
+	global _LLM_NavEventOwnerPendingRepaints
+	global _LLM_NavEventOwnerRepaintFailures
+	global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS
+	State := _LNEO_Setup()
+	try {
+		Lifecycle := _LNEO_Lifecycle()
+		A := _LNEO_Presentation("A", 7, Lifecycle)
+		_LNEO_Publish(0, A)
+		Sequence := 17842
+		_LNEO_QueueNativeDecision(State,
+			_LNEO_SuppressResult(Sequence),
+			_LNEO_Receipt(Sequence, A.Token, 6))
+		AssertTrue(LLM_NavEventOwner_TestDispatch(
+			_LNEO_DigitSevenEvent(), State.Port) is Map,
+			"setup must queue the repaint receipt")
+		Render := { Calls: [], Critical: [], Results: [] }
+		Loop LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS + 1
+			Render.Results.Push(0)
+		Degrade := { Calls: [], Critical: [], Throw: true, Result: false }
+		Renderer := _LNEO_RenderProbe.Bind(Render)
+		Degrader := _LNEO_RepaintDegradeProbe.Bind(Degrade)
+
+		Loop LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS
+			LLM_NavEventOwner_Drain(Renderer, Degrader)
+		AssertEqual(1, Degrade.Calls.Length,
+			"a throwing degradation boundary must still be invoked only once")
+		AssertEqual(0, _LLM_NavEventOwnerPendingRepaints.Count,
+			"a degradation exception must not resurrect the expensive repaint loop")
+		AssertEqual(0, _LLM_NavEventOwnerRepaintFailures.Count,
+			"a degradation exception must not retain retry bookkeeping")
+		LLM_NavEventOwner_Drain(Renderer, Degrader)
+		AssertEqual(LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS,
+			Render.Calls.Length,
+			"a degradation exception must still leave the GUI rebuild bounded")
+	} finally _LNEO_Teardown()
+}
+
+Test("LLM nav event owner: permanent repaint failure degrades once and stops rebuilding (ahk2-15)",
+	_LNEO_PermanentRepaintFailureDegradesOnceAndRetiresDebt)
+Test("LLM nav event owner: degradation failure cannot restart repaint loop (ahk2-15)",
+	_LNEO_RepaintDegradeFailureStillStopsRebuildLoop)
 
 _LNEO_QuiescenceBlocksCandidateButAllowsHide() {
 	global _LLM_NavEventOwnerLifecycleQuiesced

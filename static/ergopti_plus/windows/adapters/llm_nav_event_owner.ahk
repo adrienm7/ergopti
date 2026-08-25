@@ -34,6 +34,7 @@ global _LLM_NavEventOwnerRecords := Map()
 global _LLM_NavEventOwnerDrainActive := false
 global _LLM_NavEventOwnerClaimedReceipt := 0
 global _LLM_NavEventOwnerPendingRepaints := Map()
+global _LLM_NavEventOwnerRepaintFailures := Map()
 global _LLM_NavEventOwnerWakeMessage := 0x8057
 global _LLM_NavEventOwnerWakeFn := 0
 global _LLM_NavEventOwnerServiceFn := 0
@@ -47,6 +48,7 @@ global _LLM_NavEventOwnerLifecycleResumePort := 0
 global _LLM_NavEventOwnerRuntimeEpoch := 0
 global LLM_NAV_EVENT_OWNER_INPUT_LEVEL := 1
 global LLM_NAV_EVENT_OWNER_QUARANTINE_RETRY_MS := 1000
+global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS := 3
 global _LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
 global _LLM_NavEventOwnerReportTimes := Map()
 
@@ -269,6 +271,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 	global _LLM_NavEventOwnerRecords
 	global _LLM_NavEventOwnerClaimedReceipt
 	global _LLM_NavEventOwnerPendingRepaints
+	global _LLM_NavEventOwnerRepaintFailures
 	global _LLM_NavEventOwnerPreparedPlans, _LLM_NavEventOwnerCommittedPlan
 	global _LLM_NavEventOwnerLifecycleResumePlan
 	global _LLM_NavEventOwnerLifecycleResumePort
@@ -356,6 +359,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 		_LLM_NavEventOwnerRecords := Map()
 		_LLM_NavEventOwnerClaimedReceipt := 0
 		_LLM_NavEventOwnerPendingRepaints := Map()
+		_LLM_NavEventOwnerRepaintFailures := Map()
 		_LLM_NavEventOwnerPreparedPlans := Map()
 		_LLM_NavEventOwnerCommittedPlan := 0
 		_LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
@@ -1265,13 +1269,15 @@ _LLM_NavEventOwnerPollReceipt() {
 		return 0
 }
 
-_LLM_NavEventOwnerDrain(RenderFn := 0) {
+_LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0) {
 	global _LLM_NavEventOwnerDrainActive
 	global _LLM_NavEventOwnerPendingStopRecovery
 	global _LLM_NavEventOwnerClaimedReceipt
 	global _LLM_NavEventOwnerPendingRepaints
+	global _LLM_NavEventOwnerRepaintFailures
 	global _LLM_NavEventOwnerRecords
 	global _LLM_NavEventOwnerLifecycleQuiesced
+	global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS
 	; Suspend is a hard UI boundary. Native suspension prevents new decisions,
 	; while receipts committed just before it remain queued for the next resume;
 	; no asynchronous wake/timer may mutate records or pixels during the pause.
@@ -1284,6 +1290,9 @@ _LLM_NavEventOwnerDrain(RenderFn := 0) {
 	if !HasMethod(Renderer, "Call")
 			&& IsSet(_LLM_TooltipRenderOwnedNavigation)
 		Renderer := _LLM_TooltipRenderOwnedNavigation
+	Degrader := HasMethod(DegradeFn, "Call") ? DegradeFn : 0
+	if !HasMethod(Degrader, "Call") && IsSet(LLM_Tooltip_HideExact)
+		Degrader := LLM_Tooltip_HideExact
 	_LLM_NavEventOwnerDrainActive := true
 	try {
 		Loop 64 {
@@ -1317,8 +1326,11 @@ _LLM_NavEventOwnerDrain(RenderFn := 0) {
 						BreakDrain := true
 					} else {
 						_LLM_NavEventOwnerClaimedReceipt := 0
-						if Entry.Active
+						if Entry.Active {
 							_LLM_NavEventOwnerPendingRepaints[Token] := Entry
+							if !_LLM_NavEventOwnerRepaintFailures.Has(Token)
+								_LLM_NavEventOwnerRepaintFailures[Token] := 0
+						}
 						_LLM_NavEventOwnerCollectToken(Token)
 					}
 				}
@@ -1340,6 +1352,7 @@ _LLM_NavEventOwnerDrain(RenderFn := 0) {
 			RepaintFailure := ""
 			PauseWon := false
 			Ready := false
+			DegradeNeeded := false
 			PreviousCritical := Critical("On")
 			try {
 				if A_IsSuspended || _LLM_NavEventOwnerLifecycleQuiesced {
@@ -1352,6 +1365,7 @@ _LLM_NavEventOwnerDrain(RenderFn := 0) {
 						|| ObjPtr(_LLM_NavEventOwnerRecords[Token]) != ObjPtr(Entry)
 						|| !Entry.Active {
 					_LLM_NavEventOwnerPendingRepaints.Delete(Token)
+					_LLM_NavEventOwnerRepaintFailures.Delete(Token)
 				} else {
 					Ready := true
 				}
@@ -1376,17 +1390,46 @@ _LLM_NavEventOwnerDrain(RenderFn := 0) {
 				if _LLM_NavEventOwnerPendingRepaints.Has(Token)
 						&& ObjPtr(_LLM_NavEventOwnerPendingRepaints[Token])
 							== ObjPtr(Entry) {
-					if RepaintSucceeded
+					if RepaintSucceeded {
 						_LLM_NavEventOwnerPendingRepaints.Delete(Token)
-					else if !_LLM_NavEventOwnerRecords.Has(Token)
+						_LLM_NavEventOwnerRepaintFailures.Delete(Token)
+					} else if !_LLM_NavEventOwnerRecords.Has(Token)
 							|| ObjPtr(_LLM_NavEventOwnerRecords[Token])
 								!= ObjPtr(Entry)
-							|| !Entry.Active
+							|| !Entry.Active {
 						_LLM_NavEventOwnerPendingRepaints.Delete(Token)
+						_LLM_NavEventOwnerRepaintFailures.Delete(Token)
+					} else {
+						Attempts := _LLM_NavEventOwnerRepaintFailures.Get(Token, 0) + 1
+						_LLM_NavEventOwnerRepaintFailures[Token] := Attempts
+						if Attempts >= LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS {
+							; Retire the expensive GUI debt before crossing the hide
+							; boundary. A refusing/throwing exact hide is reported, but
+							; can never resurrect a 10 Hz rebuild loop.
+							_LLM_NavEventOwnerPendingRepaints.Delete(Token)
+							_LLM_NavEventOwnerRepaintFailures.Delete(Token)
+							DegradeNeeded := true
+						}
+					}
 				}
 			} finally Critical(PreviousCritical)
-			if RepaintFailure != ""
+			if RepaintFailure != "" && !DegradeNeeded
 				_LLM_NavEventOwnerReport(RepaintFailure)
+			if DegradeNeeded {
+				_LLM_NavEventOwnerReport(
+					"Navigation receipt repaint retry budget was exhausted; hiding its exact tooltip owner.")
+				Degraded := false
+				try {
+					if HasMethod(Degrader, "Call")
+						Degraded := Degrader.Call(Entry.Record)
+				} catch as Err {
+					_LLM_NavEventOwnerReport(
+						"Navigation repaint degradation failed: " . Err.Message . ".")
+				}
+				if !Degraded
+					_LLM_NavEventOwnerReport(
+						"Navigation repaint degradation was not acknowledged.")
+			}
 			if PauseWon
 				break
 		}
@@ -1394,8 +1437,8 @@ _LLM_NavEventOwnerDrain(RenderFn := 0) {
 	} finally _LLM_NavEventOwnerDrainActive := false
 }
 
-LLM_NavEventOwner_Drain(RenderFn := 0) {
-	return _LLM_NavEventOwnerDrain(RenderFn)
+LLM_NavEventOwner_Drain(RenderFn := 0, DegradeFn := 0) {
+	return _LLM_NavEventOwnerDrain(RenderFn, DegradeFn)
 }
 
 _LLM_NavEventOwnerRecoverNativeHealth(NativeErrorCode, RuntimeEpoch) {
@@ -1472,7 +1515,7 @@ _LLM_NavEventOwnerOnWake(*) {
 	return 0
 }
 
-_LLM_NavEventOwnerService(RenderFn := 0) {
+_LLM_NavEventOwnerService(RenderFn := 0, DegradeFn := 0) {
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
 	global _LLM_NavEventOwnerStartRollbackPending
 	global _LLM_NavEventOwnerStopPending
@@ -1480,7 +1523,7 @@ _LLM_NavEventOwnerService(RenderFn := 0) {
 	; receipts which were already suppressed. Drain them while fail-open
 	; quarantine blocks new decisions; a proved Stop disarms this timer instead.
 	if _LLM_NavEventOwnerStarted || _LLM_NavEventOwnerQuarantined
-		_LLM_NavEventOwnerDrain(RenderFn)
+		_LLM_NavEventOwnerDrain(RenderFn, DegradeFn)
 	if _LLM_NavEventOwnerStarted && !_LLM_NavEventOwnerQuarantined
 		_LLM_NavEventOwnerCheckNativeHealth()
 	if _LLM_NavEventOwnerStopPending {
