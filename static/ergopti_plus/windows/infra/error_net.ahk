@@ -44,6 +44,60 @@ _ShouldReleaseModifier(ModKey) {
 		return GetKeyState(ModKey) and !GetKeyState(ModKey, "P")
 }
 
+; Retire input state that can already be owned while startup is still partial.
+; This function is intentionally independent of the full OnExit transaction:
+; OnExit is registered only after the keylogger starts, while parse-time hotkeys
+; can acquire a synthetic modifier much earlier whenever startup pumps messages.
+; Every late global is IsSet-guarded so a fault before its include remains safe.
+; Optional callbacks provide a behavioural seam without injecting real keys or
+; toggling the machine's CapsLock LED in the headless suite.
+_ErgoptiFatalInputCleanup(ReleaseSyntheticFn := 0, CapsLedSyncFn := 0) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global CapsWordEnabled, LayerEnabled, _HardwareCapsLockOn
+
+	SyntheticStateAvailable := IsSet(_TH_SyntheticHeldKeys)
+		&& (_TH_SyntheticHeldKeys is Map)
+		&& IsSet(_TH_SyntheticReleasePendingKeys)
+		&& (_TH_SyntheticReleasePendingKeys is Map)
+	ActiveKeyCount := SyntheticStateAvailable ? _TH_SyntheticHeldKeys.Count : 0
+	PendingKeyCount := SyntheticStateAvailable ? _TH_SyntheticReleasePendingKeys.Count : 0
+	SyntheticReleased := true
+	if !IsObject(ReleaseSyntheticFn) and SyntheticStateAvailable
+		ReleaseSyntheticFn := TapHoldReleaseSyntheticKeys
+	if IsObject(ReleaseSyntheticFn) {
+		try SyntheticReleased := ReleaseSyntheticFn.Call() == true
+		catch
+			SyntheticReleased := false
+	}
+
+	CapsWordWasActive := IsSet(CapsWordEnabled) and CapsWordEnabled
+	LayerWasActive := IsSet(LayerEnabled) and LayerEnabled
+	if IsSet(CapsWordEnabled)
+		CapsWordEnabled := false
+	if IsSet(LayerEnabled)
+		LayerEnabled := false
+
+	CapsLedSynced := false
+	if !IsObject(CapsLedSyncFn) and IsSet(_HardwareCapsLockOn)
+		CapsLedSyncFn := UpdateCapsLockLED
+	if IsObject(CapsLedSyncFn) {
+		try {
+			CapsLedSyncFn.Call()
+			CapsLedSynced := true
+		}
+	}
+
+	try LoggerInfo("ErrorNet",
+		"Fatal input cleanup completed: synthetic_state={1}, synthetic_release={2}, active_keys={3}, pending_keys={4}, capsword_was_active={5}, layer_was_active={6}, caps_led_synced={7}.",
+		SyntheticStateAvailable ? "available" : "unavailable",
+		SyntheticReleased ? "proven" : "failed", ActiveKeyCount, PendingKeyCount,
+		CapsWordWasActive ? "true" : "false", LayerWasActive ? "true" : "false",
+		CapsLedSynced ? "true" : "false")
+	return Map(
+		"synthetic_released", SyntheticReleased,
+		"caps_led_synced", CapsLedSynced)
+}
+
 ; Recognises the benign vendor/UIA.ahk "orphaned pattern object" defect: when
 ; el.GetPattern(...) receives a null COM pointer (the target element went stale
 ; between an IsTextPatternAvailable probe and the GetPattern call — e.g. its
@@ -78,6 +132,10 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				try LoggerError("ErgoptiPlus", "Fatal startup error during phase '{1}': {2}",
 						_DriverBootPhase, Exc.Message
 								. (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
+				; A parse-time hotkey may already own a synthetic modifier even though
+				; the full OnExit transaction is not registered yet. Release that exact
+				; ledger before any logging I/O or modal dialog can delay the balancing Up.
+				_ErgoptiFatalInputCleanup()
 				; The ERROR line above only reaches disk once LOGGER_LOG_PATH is resolved (in
 				; LoggerInit) and the pending queue is flushed. Many fail-fast loaders run
 				; BEFORE LoggerInit, so a fault there would ExitApp with the line still in RAM:

@@ -92,10 +92,15 @@ global _HardwareCapsLockOn := GetKeyState("CapsLock", "T") ? true : false
 ; here so the LED can never disagree with the union of the logical states.
 UpdateCapsLockLED() {
 	global _HardwareCapsLockOn
-	if CapsWordEnabled or LayerEnabled or _HardwareCapsLockOn {
-		SetCapsLockState("On")
-	} else {
-		SetCapsLockState("Off")
+	LedOn := CapsWordEnabled or LayerEnabled or _HardwareCapsLockOn
+	SetCapsLockState(LedOn ? "On" : "Off")
+	try {
+		if LoggerIsDebugEnabled() {
+			LoggerDebug("CapsLockState",
+				"LED synchronized: led={1}, capsword={2}, nav_layer={3}, hardware_caps_lock={4}.",
+				LedOn ? "on" : "off", CapsWordEnabled ? "on" : "off",
+				LayerEnabled ? "on" : "off", _HardwareCapsLockOn ? "on" : "off")
+		}
 	}
 }
 

@@ -504,6 +504,7 @@ TapHoldSyntheticKeyDown(Key) {
 	FailureKind := ""
 	FailureKey := ""
 	RollbackFailedKeys := []
+	PressedKeys := []
 	try {
 		if A_IsSuspended {
 			Ok := false
@@ -539,6 +540,10 @@ TapHoldSyntheticKeyDown(Key) {
 						RollbackFailedKeys.Push(Name)
 					}
 				}
+				if Ok {
+					for _, Name in KeysToPress
+						PressedKeys.Push(Name)
+				}
 			}
 			; Counts describe only a fully proven OS transaction. No partial
 			; send can publish an owner that never reached the keyboard state.
@@ -564,6 +569,9 @@ TapHoldSyntheticKeyDown(Key) {
 				try LoggerError("TapHoldDispatch", "Synthetic Down transaction failed for '{1}' — no ownership counts were published.", _TH_SyntheticKeyLabel(Keys))
 			}
 		}
+	} else if (PressedKeys.Length > 0) and LoggerIsDebugEnabled() {
+		LoggerDebug("TapHoldDispatch", "Synthetic Down acquired for key(s) '{1}'.",
+			_TH_SyntheticKeyLabel(PressedKeys))
 	}
 	return Ok
 }
@@ -580,12 +588,15 @@ TapHoldSyntheticKeyUp(Key) {
 	Ok := true
 	FailedKeys := []
 	SkippedKeys := []
+	ReleasedKeys := []
 	try {
 		for _, Name in Keys {
 			; A tracked pending release is safe and necessary even during
 			; Suspend. Only the untracked fallback is forbidden while paused.
 			if _TH_SyntheticReleasePendingKeys.Has(Name) {
-				if !_TH_RetrySyntheticKeyRelease(Name) {
+				if _TH_RetrySyntheticKeyRelease(Name) {
+					ReleasedKeys.Push(Name)
+				} else {
 					Ok := false
 					FailedKeys.Push(Name)
 				}
@@ -600,7 +611,9 @@ TapHoldSyntheticKeyUp(Key) {
 					continue
 				}
 				_TH_MarkSyntheticKeyReleasePending(Name)
-				if !_TH_RetrySyntheticKeyRelease(Name) {
+				if _TH_RetrySyntheticKeyRelease(Name) {
+					ReleasedKeys.Push(Name)
+				} else {
 					Ok := false
 					FailedKeys.Push(Name)
 				}
@@ -613,7 +626,9 @@ TapHoldSyntheticKeyUp(Key) {
 				continue
 			}
 			_TH_MarkSyntheticKeyReleasePending(Name)
-			if !_TH_RetrySyntheticKeyRelease(Name) {
+			if _TH_RetrySyntheticKeyRelease(Name) {
+				ReleasedKeys.Push(Name)
+			} else {
 				Ok := false
 				FailedKeys.Push(Name)
 			}
@@ -625,6 +640,9 @@ TapHoldSyntheticKeyUp(Key) {
 
 	for _, Name in SkippedKeys
 		try LoggerDebug("TapHoldDispatch", "Not releasing untracked synthetic '{1}' while the driver is suspended.", Name)
+	if (ReleasedKeys.Length > 0) and LoggerIsDebugEnabled()
+		LoggerDebug("TapHoldDispatch", "Synthetic Up proven for key(s) '{1}'.",
+			_TH_SyntheticKeyLabel(ReleasedKeys))
 	if (FailedKeys.Length > 0)
 		try LoggerError("TapHoldDispatch", "Synthetic release remains pending for '{1}' after bounded retries.", _TH_SyntheticKeyLabel(FailedKeys))
 	return Ok

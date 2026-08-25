@@ -45,12 +45,23 @@ _BEBFR_ErrorNetExitsBeforeReady() {
     FlushPos := InStr(Body, "_LoggerFlush(true)")
     InitPos := InStr(Body, "LoggerInit()")
     SurfacePos := InStr(Body, "MsgBox")
+    InputCleanupPos := InStr(Body, "_ErgoptiFatalInputCleanup()")
     Assert(FlushPos > Guard && FlushPos < ExitPos,
         "the fatal-before-ready branch must force a log flush (_LoggerFlush(true)) before ExitApp so the fatal line survives")
     Assert(InitPos > Guard && InitPos < ExitPos,
         "the branch must resolve a log path (LoggerInit) when none exists yet, before flushing")
     Assert(SurfacePos > Guard && SurfacePos < ExitPos,
         "a fatal boot exit must surface a user-visible message (MsgBox) so the driver never silently 'does nothing'")
+    Assert(InputCleanupPos > Guard && InputCleanupPos < SurfacePos
+        && InputCleanupPos < StopHook && InputCleanupPos < StopKeylogger,
+        "fatal startup handling must release owned synthetic modifiers and resynchronise Caps state before any modal dialog or subsystem stop can strand the balancing key-up (fatal-startup-synthetic-modifier-latch)")
+
+    CleanupBody := _DriverFuncBody("_ErgoptiFatalInputCleanup")
+    Assert(CleanupBody != "" && InStr(CleanupBody, "TapHoldReleaseSyntheticKeys") > 0,
+        "fatal input cleanup must delegate exact transient-key ownership to the synthetic ledger")
+    Assert(InStr(CleanupBody, "UpdateCapsLockLED") > 0
+        && InStr(CleanupBody, "SetCapsLockState") = 0,
+        "fatal input cleanup must resynchronise through the single LED owner and never clear the user's hardware CapsLock intent directly")
 }
 Test("boot error net: startup faults clean up and exit instead of becoming half-driver", _BEBFR_ErrorNetExitsBeforeReady)
 
