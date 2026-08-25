@@ -134,7 +134,6 @@ global _LLM_Menu := Map(
 	"n_predictions",              3,
 	"min_words",                  3,
 	"max_words",                  15,
-	"language",                   "fr",
 	"debounce_ms",                500,
 	"ctx_chars",                  500,
 	"temperature",                "0.10",
