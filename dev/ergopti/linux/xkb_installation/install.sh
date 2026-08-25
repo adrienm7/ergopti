@@ -233,12 +233,12 @@ if [ "$WANT_YES" = true ] && [ "$WANT_UNINSTALL" != true ] \
         && { [ -z "$SELECTED_VERSION_ARG" ] || [ -z "$SELECTED_VARIANT_ARG" ]; }; then
     usage_error "--yes requiert --version et --variant"
 fi
-if [[ ! "$SELECTED_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
-        || "$SELECTED_BRANCH" == *..* \
-        || "$SELECTED_BRANCH" == */ \
-        || "$SELECTED_BRANCH" == *//*; then
+if [[ ! "$SELECTED_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]]; then
     usage_error "Branche invalide : $SELECTED_BRANCH"
 fi
+case "$SELECTED_BRANCH" in
+    *..* | */ | *//*) usage_error "Branche invalide : $SELECTED_BRANCH" ;;
+esac
 
 if [ "$WANT_YES" != true ] && [ ! -t 1 ]; then
     printf "%s❌ Erreur : terminal interactif requis.%s\n" "${RED}" "${NO_COLOR}" >&2
