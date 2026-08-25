@@ -514,7 +514,9 @@ function Write-TrackedManifest {
 			arguments = @($RecipeArguments)
 		}
 	}
-	$json = ($manifest | ConvertTo-Json -Depth 5) -replace "`r`n", "`n"
+	# Compact JSON avoids the version-specific indentation emitted by Windows
+	# PowerShell 5.1 and PowerShell 7 for the same ordered object.
+	$json = $manifest | ConvertTo-Json -Depth 5 -Compress
 	[System.IO.File]::WriteAllText(
 		$Path,
 		$json + "`n",
@@ -592,7 +594,10 @@ function Assert-TrackedManifest {
 		throw "The tracked provenance manifest contains a non-canonical source fingerprint."
 	}
 	if ($manifestFingerprint -cne $ExpectedSourceFingerprint) {
-		throw "The tracked vendor DLL source or build recipe is stale. Re-run with -UpdateTracked after reviewing the native changes."
+		throw (
+			"The tracked vendor DLL source or build recipe is stale: " +
+			"manifest $manifestFingerprint, current $ExpectedSourceFingerprint. " +
+			"Re-run with -UpdateTracked after reviewing the native changes.")
 	}
 	Assert-StringArrayContract -Label "Manifest fingerprint file" -Actual @($manifest.fingerprint_files) -Expected $ExpectedFingerprintFiles
 
@@ -648,7 +653,7 @@ foreach ($requiredSource in @($sourcePath, $headerPath, $definitionPath, $testSo
 		throw "Required native source is missing: $requiredSource"
 	}
 }
-$fingerprintFiles = @(
+[string[]]$fingerprintFiles = @(
 	Get-ChildItem -LiteralPath $sourceDir -File |
 		Where-Object {
 			$_.Extension -cin @(".c", ".h", ".def") -or
@@ -658,7 +663,10 @@ $fingerprintFiles = @(
 			$_.FullName.Substring($repoRoot.Length + 1).Replace("\", "/")
 		}
 	$buildScriptRelativePath
-) | Sort-Object -Unique
+)
+# PowerShell 5.1 and 7 sort punctuation differently under their default
+# cultures; provenance ordering must be byte-identical on every build host.
+[System.Array]::Sort($fingerprintFiles, [System.StringComparer]::Ordinal)
 
 $commonCompilerRecipeFlags = @(
 	"/nologo",
@@ -746,7 +754,16 @@ Assert-DependencyContract -DllPath $buildDllPath
 
 $builtHash = (Get-FileHash -LiteralPath $buildDllPath -Algorithm SHA256).Hash
 if ($UpdateTracked) {
-	Copy-Item -LiteralPath $buildDllPath -Destination $vendorDllPath -Force
+	$trackedHashBeforeUpdate = if (Test-Path -LiteralPath $vendorDllPath -PathType Leaf) {
+		(Get-FileHash -LiteralPath $vendorDllPath -Algorithm SHA256).Hash
+	} else {
+		""
+	}
+	if ($builtHash -cne $trackedHashBeforeUpdate) {
+		Copy-Item -LiteralPath $buildDllPath -Destination $vendorDllPath -Force
+	} else {
+		Write-Host "[native] Tracked DLL already matches the validated build; preserving it in place."
+	}
 	$publishedHash = (Get-FileHash -LiteralPath $vendorDllPath -Algorithm SHA256).Hash
 	if ($builtHash -cne $publishedHash) {
 		throw "The updated vendor DLL does not match the validated build output."
