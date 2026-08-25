@@ -39,6 +39,7 @@
 ; ===================================
 
 global _TSRC_Sent := []   ; Every payload handed to the send primitive, in order
+global _TSRC_FatalCapsLedSyncCount := 0
 
 ; Stands in for _AHK_SendInput so "{LCtrl Down}" / "{LCtrl Up}" can be counted.
 _TSRC_Record(Keys) {
@@ -74,6 +75,11 @@ _TSRC_Count(Payload) {
 			N++
 	}
 	return N
+}
+
+_TSRC_RecordFatalCapsLedSync() {
+	global _TSRC_FatalCapsLedSyncCount
+	_TSRC_FatalCapsLedSyncCount++
 }
 
 ; Records every low-level attempt and throws on the second modifier Down. The
@@ -430,6 +436,51 @@ _TSRC_ShutdownRefusesToDestroyPendingReleaseOwner() {
 		"the shutdown gate must reject an unproven synthetic release")
 }
 
+; The live 2026-08-25 startup crash interrupted a left-Shift tap-hold after its
+; synthetic Down and before its finally block. OnExit was not registered yet,
+; so the fatal branch left LShift logically down while the CapsLock LED stayed
+; off. The fatal input cleanup must drain that exact ledger and retire every
+; logical Caps mode before it opens a modal dialog or exits.
+_TSRC_FatalStartupDrainsSyntheticOwnerAndCapsModes() {
+	global CapsWordEnabled, LayerEnabled, _TSRC_FatalCapsLedSyncCount
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	_TSRC_Begin()
+	CapsWordEnabled := true
+	LayerEnabled := true
+	_TSRC_FatalCapsLedSyncCount := 0
+	try {
+		AssertEqual(true, TapHoldSyntheticKeyDown("LShift"),
+			"the live-crash fixture must first acquire one synthetic LShift owner")
+		CleanupFn := 0
+		try CleanupFn := % "_ErgoptiFatalInputCleanup" %
+		AssertTrue(IsObject(CleanupFn),
+			"the pre-ready error net must expose a behavioural fatal-input cleanup seam (fatal-startup-synthetic-modifier-latch)")
+		if !IsObject(CleanupFn)
+			return
+
+		Result := CleanupFn.Call(0, _TSRC_RecordFatalCapsLedSync)
+		AssertEqual(true, Result["synthetic_released"],
+			"fatal cleanup must prove the balancing Up before the process exits")
+		AssertEqual(1, _TSRC_Count("{LShift Up}"),
+			"fatal cleanup must emit exactly one balancing Up for the tracked LShift")
+		AssertEqual(0, _TH_SyntheticHeldKeys.Count,
+			"fatal cleanup must invalidate every active synthetic owner")
+		AssertEqual(0, _TH_SyntheticReleasePendingKeys.Count,
+			"a proven fatal cleanup Up must leave no release-pending owner")
+		AssertEqual(false, CapsWordEnabled,
+			"fatal cleanup must retire CapsWord before synchronising the LED")
+		AssertEqual(false, LayerEnabled,
+			"fatal cleanup must retire the navigation layer before synchronising the LED")
+		AssertEqual(1, _TSRC_FatalCapsLedSyncCount,
+			"fatal cleanup must invoke the single CapsLock LED owner exactly once")
+	}
+	finally {
+		CapsWordEnabled := false
+		LayerEnabled := false
+		_TSRC_End()
+	}
+}
+
 
 Test("taphold-synthetic-refcount: a combo hold keeps LCtrl down when an overlapping single hold releases",
 	_TSRC_ComboKeepsCtrlWhenOverlappingSingleHoldReleases)
@@ -451,3 +502,5 @@ Test("taphold synthetic transaction AHK-03: physical early release preserves an 
 	_TSRC_PhysicalEarlyReleaseDoesNotConsumeSyntheticOwner)
 Test("taphold synthetic transaction AHK-03: shutdown preserves a failed release owner",
 	_TSRC_ShutdownRefusesToDestroyPendingReleaseOwner)
+Test("fatal startup input cleanup: tracked LShift and Caps modes are retired before exit (fatal-startup-synthetic-modifier-latch)",
+	_TSRC_FatalStartupDrainsSyntheticOwnerAndCapsModes)

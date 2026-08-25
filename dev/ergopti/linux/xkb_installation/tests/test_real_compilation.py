@@ -20,6 +20,8 @@ LAYOUT_DIR = Path(__file__).resolve().parents[2]
 INSTALLER_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(INSTALLER_DIR))
 
+from layout_package import build_evdev_post, patch_symbols_default, variant_for_filename  # noqa: E402
+
 try:
     from xkbcommon.keymap import Keymap  # type: ignore
     from xkbcommon import xkbcommon  # type: ignore  # noqa: F401
@@ -60,37 +62,39 @@ class RealCompilationTests(unittest.TestCase):
             LAYOUT_DIR / "xkb_generation" / "data" / "xkb_types.txt"
         ).read_text(encoding="utf-8")
         for version_dir in sorted(LAYOUT_DIR.glob("v*")):
-            with tempfile_staging(version_dir, data_types) as staging:
-                self.compile_rmlvo(staging, "ergopti", None)
-                self.compile_rmlvo(staging, "ergopti", "plus")
+            for symbols_path in sorted(version_dir.glob("*.xkb")):
+                if variant_for_filename(symbols_path.name) is None:
+                    continue
+                with self.subTest(symbols=symbols_path.name):
+                    with tempfile_staging(symbols_path, data_types) as staging_root:
+                        self.compile_rmlvo(staging_root, "ergopti", None)
 
 
 import contextlib  # noqa: E402
 
 
 @contextlib.contextmanager
-def tempfile_staging(version_dir: Path, types_content: str):
-    """Materialise a per-package extensions tree for one version."""
+def tempfile_staging(symbols_path: Path, types_content: str):
+    """Materialise the exact package produced for one selected layout."""
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
-        staging = Path(tmp) / "ergopti"
-        (staging / "symbols").mkdir(parents=True)
-        (staging / "types").mkdir()
-        (staging / "rules").mkdir()
-        for symbols_path in sorted(version_dir.glob("*.xkb")):
-            content = symbols_path.read_text(encoding="utf-8")
-            # Mirror the installer's default-section patch.
-            content = content.replace(
-                f'xkb_symbols "{symbols_path.stem}"', 'xkb_symbols "default"', 1
-            )
-            (staging / "symbols" / "ergopti").write_text(content, encoding="utf-8")
-        (staging / "types" / "ergopti").write_text(types_content, encoding="utf-8")
-        (staging / "rules" / "evdev.xml").write_text(
+        staging_root = Path(tmp)
+        package = staging_root / "ergopti"
+        (package / "symbols").mkdir(parents=True)
+        (package / "types").mkdir()
+        (package / "rules").mkdir()
+        content = patch_symbols_default(symbols_path.read_text(encoding="utf-8"))
+        (package / "symbols" / "ergopti").write_text(content, encoding="utf-8")
+        (package / "types" / "ergopti").write_text(types_content, encoding="utf-8")
+        (package / "rules" / "evdev.xml").write_text(
             "<xkbConfigRegistry version='1.1'><layoutList/></xkbConfigRegistry>",
             encoding="utf-8",
         )
-        yield staging
+        (package / "rules" / "evdev.post").write_text(
+            build_evdev_post("ergopti"), encoding="utf-8"
+        )
+        yield staging_root
 
 
 if __name__ == "__main__":

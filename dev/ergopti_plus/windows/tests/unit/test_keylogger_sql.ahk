@@ -36,16 +36,36 @@ _KLSql_LlmGeneration_BuildsRealInsert() {
 Test("KL_BuildInserts: llm_generation reaches events_llm instead of being silently skipped (F19)", _KLSql_LlmGeneration_BuildsRealInsert)
 
 _KLSql_LlmGeneration_PersistsUsageAccounting() {
+	static ModuleHandle := 0
+	if !ModuleHandle
+		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
+	AssertTrue(ModuleHandle != 0,
+		"the real SQLite DLL must stay loaded for the accounting fixture lifetime")
 	Keylogger.next_event_id := 1
 	entry := Map(
 		"type", "llm_generation", "timestamp", "2026-08-20 10:00:00.000",
 		"prompt_tokens", 111, "completion_tokens", 222,
 		"total_tokens", 333, "est_cost_usd", 4.56789)
 	Sql := KL_BuildInserts(entry)[1]
-	for Column in ["prompt_tokens", "completion_tokens", "total_tokens", "est_cost_usd"]
-		AssertContains(Sql, Column, "events_llm must retain " . Column)
-	for Sentinel in ["111", "222", "333", "4.56789"]
-		AssertContains(Sql, Sentinel, "usage accounting value must reach the SQL row: " . Sentinel)
+	db := SQLite_Open(":memory:")
+	AssertTrue(db != 0, "the accounting regression must open the real SQLite adapter")
+	try {
+		AssertTrue(KLR_LoadSchema(db),
+			"the accounting regression must execute against the canonical production schema")
+		AssertTrue(SQLite_Exec(db, Sql),
+			"the production LLM INSERT must be accepted by the canonical schema")
+		Rows := SQLite_Query(db,
+			"SELECT prompt_tokens, completion_tokens, total_tokens, est_cost_usd "
+			. "FROM events_llm WHERE device_id=" . Keylogger._device_id_lit . " AND id=1;")
+		AssertEqual(1, Rows.Length,
+			"durable ingestion must publish exactly one accounting row")
+		AssertEqual(111, Rows[1]["prompt_tokens"], "prompt tokens must survive SQLite ingestion")
+		AssertEqual(222, Rows[1]["completion_tokens"], "completion tokens must survive SQLite ingestion")
+		AssertEqual(333, Rows[1]["total_tokens"], "total tokens must survive SQLite ingestion")
+		AssertEqual(4.56789, Rows[1]["est_cost_usd"], "estimated cost must survive SQLite ingestion")
+	} finally {
+		SQLite_Close(db)
+	}
 }
 Test("KL_BuildInserts: LLM usage and cost survive durable ingestion", _KLSql_LlmGeneration_PersistsUsageAccounting)
 

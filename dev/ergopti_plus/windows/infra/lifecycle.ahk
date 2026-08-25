@@ -224,6 +224,16 @@ _SuspendRestoreFromMarker() {
 _SuspendHandoffBeforeToggle() {
 		LoggerInfo("Lifecycle", "Restoring the pause that a menu-driven Reload would otherwise have dropped.")
 }
+
+; The native navigation hook is independent of AHK's Suspend command. Refuse
+; the transition unless it is quiesced first; if its own suspend operation
+; fails, stop/unhook it so a paused driver can never keep consuming digits.
+_LifecycleSetNavEventOwnerSuspended(Suspended) {
+	if !IsSet(LLM_NavEventOwner_QuiesceForLifecycle)
+		return true
+	return LLM_NavEventOwner_QuiesceForLifecycle(Suspended)
+}
+
 ToggleSuspend(*) {
 		global _SuspendPending, _SuspendPendingSince
 		; A second press while a suspend is PENDING must cancel it. Without this
@@ -246,6 +256,8 @@ ToggleSuspend(*) {
 		}
 		if _SuspendPrefixesAreClear() {
 				_SuspendPending := false
+				if !_LifecycleSetNavEventOwnerSuspended(true)
+					return
 				Suspend(1)
 				_SuspendStateWatchdog()
 				return
@@ -282,12 +294,16 @@ _SuspendPendingPoll() {
 		}
 		_SuspendPending := false
 		SetTimer(_SuspendPendingPoll, 0)
+		if !_LifecycleSetNavEventOwnerSuspended(true)
+			return
 		Suspend(1)
 		_SuspendStateWatchdog()
 }
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook, _OneShotShiftInputHook, _DeadKeyInputHook
 	global _MagicKeyEditorInputHook
+	if !_LifecycleSetNavEventOwnerSuspended(true)
+		return false
 	if IsSet(LLM_AuxInvalidate)
 		try LLM_AuxInvalidate("suspend")
 	; Release OS-level modifiers before even the lifecycle START log: LoggerStart
@@ -405,9 +421,11 @@ Ergopti_OnSuspendEnter() {
 		if IsSet(_LLM_Deps_PollTimer)
 				try SetTimer(_LLM_Deps_PollTimer, 0)
 		LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
+		return true
 }
 Ergopti_OnSuspendResume() {
 		LoggerStart("Lifecycle", "Resuming from suspend…")
+		NavEventOwnerReady := _LifecycleSetNavEventOwnerSuspended(false)
 		; Transfer any pre-pause fire batch to one new timer owner only after native
 		; Suspend has been lifted. A stale pre-pause callback cannot pass the new
 		; generation even if it was already queued in the message pump.
@@ -469,8 +487,12 @@ Ergopti_OnSuspendResume() {
 			and Features["shortcuts"].Has("wrap_text_if_selected")
 			and Features["shortcuts"]["wrap_text_if_selected"]
 			try SetTimer(UIASW_Start, -1)
-		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
+		if NavEventOwnerReady
+				LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
+		else
+				LoggerError("Lifecycle", "Resume completed with the navigation event owner unavailable; its retained plan will retry on the next lifecycle transition.")
 }
+
 _SuspendStateWatchdog() {
 		global _LastSuspendState
 		; Serialize the transition. This runs both from a 500 ms repeating timer and
@@ -492,16 +514,15 @@ _SuspendStateWatchdog() {
 				_SuspendRestoreFromMarker()
 		}
 		if (A_IsSuspended == _LastSuspendState) {
-				if !A_IsSuspended and IsSet(_TrayRootServiceRetained)
-						try _TrayRootServiceRetained()
-				; A trigger recovery SetTimer arm may fail or consume ownership while
-				; paused. The active watchdog is the final bounded wake-up backstop.
-				if !A_IsSuspended and IsSet(LLM_Menu_ServiceTriggerRecovery) {
-						try LLM_Menu_ServiceTriggerRecovery()
-						catch as Err
-								try LoggerError("Lifecycle",
-										"LLM trigger recovery watchdog service failed: {1}.",
-										Err.Message)
+				if !A_IsSuspended {
+						RootService := 0
+						TriggerService := 0
+						if IsSet(_TrayRootServiceRetained)
+								RootService := _TrayRootServiceRetained
+						if IsSet(LLM_Menu_ServiceTriggerRecovery)
+								TriggerService := LLM_Menu_ServiceTriggerRecovery
+						_TrayRootServiceRetainedWork(
+								RootService, TriggerService)
 				}
 				return
 		}
@@ -509,12 +530,9 @@ _SuspendStateWatchdog() {
 				return
 		_TransitionBusy := true
 		try {
-				_LastSuspendState := A_IsSuspended
-				UpdateTrayIcon()
-				if A_IsSuspended
-						Ergopti_OnSuspendEnter()
-				else
-						Ergopti_OnSuspendResume()
+				_LLM_NavEventOwnerApplyExternalSuspendTransition(
+					A_IsSuspended, Ergopti_OnSuspendEnter,
+					Ergopti_OnSuspendResume, Suspend, UpdateTrayIcon)
 		} finally {
 				_TransitionBusy := false
 		}
@@ -546,6 +564,18 @@ Ergopti_OnShutdown(reason, code) {
 		; return to a fully functional gesture subsystem.
 		try GestureReleaseLeftClick()
 		try GestureReleaseRightClick()
+		NavOwnerReady := false
+		try NavOwnerReady := LLM_NavEventOwner_PrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Navigation-owner shutdown preflight failed: {1}.", Err.Message)
+		if !NavOwnerReady {
+			try LoggerError("Lifecycle", "Shutdown refused because native keyboard receipts or holds remain owned.")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
+		ShutdownTerminal := false
+		try {
 		TerminalHandoff := ReloadTerminalHandoffClaim(reason)
 		RetainedTransition := (TerminalHandoff is Map)
 			? false : ConfigTransitionRetainedBarrier()
@@ -677,6 +707,7 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		ShutdownTerminal := true
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
 		try GestureScreenshotCancelAll("shutdown")
@@ -684,6 +715,8 @@ Ergopti_OnShutdown(reason, code) {
 		try HotstringPrefixWatcherOnShutdown()
 		try KL_Stop()
 		try UIASW_Stop("canceled")
+		try LLM_NavEventOwner_Stop(false, true)
+		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
 		try OllamaWV_Close()
@@ -710,6 +743,10 @@ Ergopti_OnShutdown(reason, code) {
 		} finally {
 			if OwnShutdownBundle
 				try _ConfigWriteTerminalRelease(ShutdownOwners)
+		}
+		} finally {
+			if !ShutdownTerminal
+				try LLM_NavEventOwner_CancelShutdown()
 		}
 }
 ; Build the full tray menu off the boot critical path (armed after "ready").
@@ -747,6 +784,8 @@ BuildTrayMenuDeferred() {
 		}
 		return true
 	} catch as e {
+		if _TrayRootErrorIsSilent(e)
+			return false
 		try LoggerError("TrayMenu", "Deferred tray-menu build failed: {1} [{2} at {3}:{4}]",
 			e.Message,
 			(e.HasProp("What") ? e.What : "?"),

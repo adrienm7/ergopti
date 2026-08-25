@@ -15,8 +15,9 @@
 ; This doubled every write to today.log and data.sql, inflating all downstream
 ; topology metrics by 2x (move counts, resize distributions, monitor-focus KPIs,
 ; virtual-desktop heuristics). The fix removes the redundant direct KL_AppendLog
-; and retains the single KL_Topo_LogEvent call, which already handles the "type"
-; key assignment.
+; and retains one call through the classifier's LogFn seam. Production defaults
+; that seam to KL_Topo_LogEvent, while behavioral tests can record the exact
+; event sequence without writing metrics.
 ;
 ; This test asserts that the debounce block in KL_Topo_Tick contains exactly one
 ; path that logs the pending event — i.e., KL_Topo_LogEvent appears and the raw
@@ -81,9 +82,14 @@ _TSA_CheckSingleAppend() {
 	Assert(DebounceBody != "",
 		'Debounce block "if (KLTopo.pending_ticks >= KLTopoConst.DEBOUNCE_TICKS) {" must be present')
 
-	; KL_Topo_LogEvent must be the single log call inside the debounce block.
-	Assert(InStr(DebounceBody, "KL_Topo_LogEvent("),
-		"KL_Topo_LogEvent must be called inside the debounce block")
+	; The production classifier emits once through its injectable sink. The
+	; default parameter is KL_Topo_LogEvent; pinning that wiring separately from
+	; the call keeps this guard resilient to the pure-classifier extraction.
+	Assert(InStr(DebounceBody, "LogFn.Call(change_type, KLTopo.pending_data)"),
+		"the debounce block must emit exactly once through its LogFn sink")
+	Classifier := _DriverFuncBody("KL_Topo_ProcessObservation")
+	Assert(InStr(Classifier, "LogFn := KL_Topo_LogEvent"),
+		"the production classifier sink must default to KL_Topo_LogEvent")
 
 	; The redundant direct KL_AppendLog(KLTopo.pending_data) must be absent.
 	Assert(!InStr(DebounceBody, "KL_AppendLog(KLTopo.pending_data)"),

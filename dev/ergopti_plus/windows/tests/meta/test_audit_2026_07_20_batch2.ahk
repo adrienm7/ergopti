@@ -26,11 +26,11 @@
 ;       cancel handle, so bumping the generation is the only way a cancel can
 ;       stop a late response mutating warmup state after a pause.
 ;
-; F-13  _TooltipTimerFn had no A_IsSuspended guard, though both sibling timers in
-;       the same file do. SetTimer bypasses native Suspend, so it fired while
-;       paused and called _ResetPrefixBuffer(), mutating hotstring-engine state.
-;       Invisible because the suspend reactor had already hidden the tooltip, so
-;       only the state mutation leaked.
+; F-13  _TooltipTimerFn had no A_IsSuspended guard. SetTimer bypasses native
+;       Suspend, so it fired while paused and mutated hotstring-engine state.
+;       The canonical deadline now delegates to an exact-owner helper which
+;       preserves the deadline across a compensable raw pause and rejects before
+;       TooltipHide; sibling callbacks still guard suspension directly.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -95,15 +95,34 @@ Test("llm-ollama: cancelling warmup invalidates in-flight callbacks (F-12)",
 	_A0720B2_WarmupCancelBumpsGeneration)
 
 
-; Class-wide, not site-specific: all three tooltip timers must hold the same
-; invariant, so a newly added timer in this file is covered automatically.
+; Class-wide: direct timer callbacks guard suspension themselves, while the
+; canonical safety deadline delegates to one exact-owner helper which performs
+; the guard before any hide attempt.
 _A0720B2_EveryTooltipTimerIsSuspendGuarded() {
-	for _, Fn in ["_TooltipTimerFn", "_TooltipDeferredShowFn", "_TooltipDequeuePollFn"] {
-		Body := _DriverFuncBody(Fn)
+	for _, Fn in ["_TooltipDeferredShowFn", "_TooltipDequeueDeadlineFn",
+			"_TooltipDequeuePollFn"] {
+		Body := _StripFullLineComments(_DriverFuncBody(Fn))
 		Assert(Body != "", Fn . " must exist in ui/tooltip/core.ahk")
 		Assert(InStr(Body, "A_IsSuspended") > 0,
-			Fn . " must bail out on A_IsSuspended — SetTimer callbacks bypass native Suspend, and _TooltipTimerFn in particular calls _ResetPrefixBuffer(), mutating hotstring-engine state while the driver is paused")
+			Fn . " must bail out on A_IsSuspended because SetTimer callbacks bypass native Suspend")
 	}
+	Timer := _StripFullLineComments(_DriverFuncBody("_TooltipTimerFn"))
+	Retry := _StripFullLineComments(
+		_DriverFuncBody("_TooltipTimerHideOrRetry"))
+	Assert(Timer != "" and Retry != "",
+		"the canonical tooltip timer and its exact-owner retry helper must remain discoverable")
+	Delegate := InStr(Timer, "_TooltipTimerHideOrRetry(")
+	Assert(Delegate > 0 and InStr(Timer, "TooltipHide(") == 0,
+		"the canonical timer must delegate instead of hiding or mutating tooltip state directly")
+	SuspendGuard := InStr(Retry, "if A_IsSuspended")
+	SuspendedRetry := InStr(Retry,
+		"return _TooltipScheduleTimerRetry(", true, SuspendGuard)
+	HideAttempt := InStr(Retry,
+		'TooltipHide("TimerFn", true, ExpectedGeneration, ExpectedSurface)',
+		true, SuspendedRetry)
+	Assert(SuspendGuard > 0 and SuspendedRetry > SuspendGuard
+		and HideAttempt > SuspendedRetry,
+		"the delegated timer must preserve its exact deadline and return before any hide while suspended")
 }
 Test("tooltip: every tooltip timer honours the suspend invariant (F-13)",
 	_A0720B2_EveryTooltipTimerIsSuspendGuarded)

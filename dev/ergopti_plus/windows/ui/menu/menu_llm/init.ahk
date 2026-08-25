@@ -35,7 +35,9 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	global _LLM_Menu, _LLM_Menu_Loaded
 	if _LLM_Menu_Loaded
 		return false
-	static _str_keys := ["model", "profile_id", "language", "temperature",
+	if !(saved_opts is Map)
+		throw TypeError("LLM saved options must be a Map.")
+	static _str_keys := ["model", "profile_id", "temperature",
 		"nav_modifiers", "val_modifiers", "trigger_shortcut", "backend",
 		"api_entry_id"]
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms",
@@ -45,26 +47,114 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 		"show_info_bar", "streaming", "show_all_at_once", "auto_raise_temp",
 		"auto_profile_for_model", "onboarding_seen", "inline_autotype"]
 	static _arr_keys := ["user_profiles", "disabled_apps"]
-	for key in _str_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
+	for key in _str_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because its scalar type is invalid.", key)
+	}
 	for key in ["nav_modifiers", "val_modifiers"] {
 		if !LLM_Menu_IsValidModifierString(_LLM_Menu[key]) {
 			LoggerError("LLM", "Ignoring invalid persisted {1} value: '{2}'.", key, _LLM_Menu[key])
 			_LLM_Menu[key] := (key == "val_modifiers") ? "alt" : ""
 		}
 	}
-	for key in _num_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
-	for key in _bool_keys
-		if saved_opts.Has(key)
-			_LLM_Menu[key] := saved_opts[key]
-	if !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"]
-		_LLM_Menu["streaming"] := false
-	for key in _arr_keys
-		if saved_opts.Has(key) && (saved_opts[key] is Array)
-			_LLM_Menu[key] := saved_opts[key]
+	for key in _num_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because it is not an integer.", key)
+	}
+	for key in _bool_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because it is not a Boolean.", key)
+	}
+	_LLM_Menu["streaming"] := LLM_EffectiveStreaming(
+		_LLM_Menu["backend"], _LLM_Menu["streaming"])
+	for key in _arr_keys {
+		if !saved_opts.Has(key)
+			continue
+		if LLM_Option_TryNormalize(key, saved_opts[key], &Normalized)
+			_LLM_Menu[key] := Normalized
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted '{1}' because its array shape is invalid.", key)
+	}
+	if saved_opts.Has("app_profile_overrides") {
+		if LLM_Option_TryNormalize("app_profile_overrides",
+				saved_opts["app_profile_overrides"], &NormalizedOverrides)
+			_LLM_Menu["app_profile_overrides"] := NormalizedOverrides
+		else
+			try LoggerError("LLM",
+				"Ignoring persisted app-profile overrides because their shape is invalid.")
+	}
+	return true
+}
+
+_LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
+		NavFn := 0) {
+	global _LLM_PROFILE_HOTKEY_STATUS_READY
+	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	if !FirstRestore
+		return true
+	; A rejected persisted trigger can still own its old native chord until the
+	; cleanup recovery proves Off. Do not publish any contextual variant while
+	; that global owner is still live, otherwise AHK precedence recreates the
+	; exact cross-owner ambiguity the collision policy rejected.
+	if _LLM_Menu_TriggerRecoveryPending()
+		return false
+	if !HasMethod(ProfileFn, "Call")
+		ProfileFn := LLM_Menu_BindProfileHotkeys
+	if !HasMethod(NavFn, "Call")
+		NavFn := LLM_Menu_BindNavHotkeys
+	ProfileStatus := ProfileFn.Call()
+	if !((ProfileStatus is Integer)
+			&& (ProfileStatus == _LLM_PROFILE_HOTKEY_STATUS_READY
+				|| ProfileStatus == _LLM_PROFILE_HOTKEY_STATUS_DEGRADED))
+		return false
+	NavReady := NavFn.Call()
+	return (NavReady is Integer) && NavReady == 1
+}
+
+_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
+		NavFn := 0) {
+	if _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn, NavFn)
+		return true
+	if _LLM_Menu_TriggerRecoveryPending()
+		throw TrayRootRetryPendingError(
+			"initial LLM trigger cleanup is pending before contextual hotkeys")
+	if _LLM_Menu_ProfileHotkeyRetryPending()
+		throw TrayRootRetryPendingError(
+			"initial LLM profile hotkeys are pending a bounded retry")
+	LoggerError("LLM",
+		"Initial LLM hotkey activation remained incomplete; retaining the tray build for retry.")
+	throw Error("initial LLM hotkey surface is incomplete")
+}
+
+_LLM_Menu_ApplyOllamaPortAtBoot(MenuState, SetPortFn := 0) {
+	if !(MenuState is Map) || !MenuState.Has("ollama_port")
+		throw Error("LLM boot state has no Ollama port.")
+	if !LLM_Option_TryNormalizeOllamaPort(
+			MenuState["ollama_port"], &NormalizedPort)
+		throw Error("LLM boot state contains an invalid Ollama port.")
+	if !HasMethod(SetPortFn, "Call")
+		SetPortFn := LLM_Ollama_SetPort
+	Result := SetPortFn.Call(NormalizedPort)
+	if !(Result is Integer) || Result != 1
+		throw Error("The Ollama client refused the validated boot port "
+			. NormalizedPort . ".")
+	MenuState["ollama_port"] := NormalizedPort
 	return true
 }
 
@@ -93,13 +183,9 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; would roll every LLM setting back in memory while disk keeps the new value.
 	; Restore persisted values exactly once; later builds use the published map.
 	FirstRestore := _LLM_Menu_RestoreSavedOptsOnce(saved_opts)
-	; Map-valued overrides are outside the scalar/array restore table. Install
-	; them before any model correction can persist a full detached candidate;
-	; otherwise an early correction would durably serialize the default empty Map
-	; over the user's application-specific profiles.
-	if FirstRestore && saved_opts.Has("app_profile_overrides")
-			&& (saved_opts["app_profile_overrides"] is Map)
-		_LLM_Menu["app_profile_overrides"] := saved_opts["app_profile_overrides"]
+	; _LLM_Menu_RestoreSavedOptsOnce installs Map-valued overrides before any
+	; model correction can persist a full detached candidate; otherwise an early
+	; correction could durably replace the user's overrides with the empty default.
 	if FirstRestore && _LLM_Menu_PruneOrphanProfileOverrides(_LLM_Menu)
 		LoggerWarn("LLM", "Removed orphan per-application profile override(s) during startup.")
 
@@ -111,8 +197,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 
 	; Apply the persisted Ollama port to the HTTP client BEFORE any request fires
 	; (bootstrap probe, warmup) so every call targets the user's configured port.
-	if IsSet(LLM_Ollama_SetPort) and _LLM_Menu.Has("ollama_port")
-		LLM_Ollama_SetPort(_LLM_Menu["ollama_port"])
+	_LLM_Menu_ApplyOllamaPortAtBoot(_LLM_Menu)
 
 	; Auto-correct legacy raw-tag configs (e.g. qwen2.5:3b) before the first
 	; bootstrap / bridge start so predictions do not silently fail.
@@ -139,8 +224,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; would be wasteful and noisy in the AHK Hotkey log; doing it here
 	; covers both fresh boots and post-Reload paths since LLM_Menu_Init is
 	; the only entry into the tray module.
-	LLM_Menu_BindProfileHotkeys()
-	LLM_Menu_BindNavHotkeys()
+	_LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore)
 
 	; (Removed) First-run LLM onboarding TrayTip — the unsolicited
 	; "Text predictions available" balloon was perceived as noise by users
@@ -155,7 +239,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; before this point (the "menu shows only the first items" bug). Re-populating
 	; _LLM_Menu_Handle in place later keeps the entry's position (see the persistent-
 	; Menu note at its declaration), so menu order is preserved. The population is
-	; armed UNCONDITIONALLY at the boot tail (SetTimer LLM_Menu_Build) — NOT signalled
+	; armed UNCONDITIONALLY at the boot tail (SetTimer LLM_Menu_RequestBuild) — NOT signalled
 	; from here via a flag: initMenu() itself runs inside the deferred tray-build pass,
 	; so any flag set here would be read by the boot tail long before this line runs.
 	if !_LLM_Menu_InTray {
@@ -171,7 +255,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 		TrayMenuStage_Add(t("menu.llm.title"), _LLM_Menu_Handle)
 	}
 
-	; Bootstrap Ollama silently on reload when the feature was already enabled.
+	; Bootstrap the selected backend silently on reload when the feature was enabled.
 	; show_ui=false so the install window NEVER opens automatically — the user
 	; must click the menu toggle to trigger a visible installation.
 	;
@@ -185,7 +269,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; the missing-install state in the menu so the user can re-trigger the
 	; install themselves when they're ready.
 	if _LLM_Menu["enabled"]
-		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+		LLM_Menu_ScheduleBackendLifecycle(false)
 
 	; Background health-tick: refreshes the dot on the shared cadence without
 	; waiting for the user to open the menu. The previous "probe on menu open"

@@ -295,8 +295,8 @@ _LLM_Menu_DisplayRows() {
 	; (multi) is enabled
 	Rows.Push(Map(
 "label",    t("menu.llm.show_streaming"),
-"checked",  _LLM_Menu["streaming"] && LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"],
-"disabled", !_LLM_Menu["show_all_at_once"] || !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"],
+"checked",  LLM_EffectiveStreaming(_LLM_Menu["backend"], _LLM_Menu["streaming"]),
+"disabled", !_LLM_Menu["show_all_at_once"] || !LLM_EffectiveStreaming(_LLM_Menu["backend"], true),
 		"action",   (*) => LLM_Menu_ToggleBool("streaming")))
 
 	; Show all predictions at once
@@ -405,14 +405,12 @@ _LLM_Menu_NavRows() {
  * @param {string} key     - The _LLM_Menu key to update.
  * @param {string} title   - Dialog title.
  * @param {string} prompt  - Dialog prompt text.
- * @param {number} min_val - Minimum valid value (0 = no minimum).
- * @param {number} max_val - Maximum valid value (0 = no maximum).
  */
-LLM_Menu_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
+LLM_Menu_PromptNumeric(key, title, prompt) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_PromptNumeric(key, title, prompt, min_val, max_val)
+		try return LLM_Menu_PromptNumeric(key, title, prompt)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
@@ -425,8 +423,7 @@ LLM_Menu_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
 	; IsInteger guard in LLM_Menu_PromptOllamaPort)
 	if !IsInteger(ib.Value)
 		return
-	val := Integer(ib.Value)
-	if (min_val > 0 && val < min_val) || (max_val > 0 && val > max_val)
+	if !LLM_Option_TryNormalize(key, Integer(ib.Value), &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM numeric '" . key . "' setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, key, val),
@@ -489,7 +486,7 @@ _LLM_MaybeResetRow(Rows, current, default_val, on_click) {
 
 LLM_Menu_PromptDebounce() {
 	LLM_Menu_PromptNumeric("debounce_ms", t("menu.llm.trigger_menu_title"),
-		t("menu.llm.debounce_prompt"), 50, 10000)
+		t("menu.llm.debounce_prompt"))
 }
 
 ; Ollama port has its own prompt (not LLM_Menu_PromptNumeric) because applying it
@@ -508,37 +505,43 @@ LLM_Menu_PromptOllamaPort() {
 	ib := InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
 	if (ib.Result != "OK" || ib.Value == "")
 		return
-	if !IsInteger(ib.Value)
-		return
-	val := Integer(ib.Value)
-	if (val < 1024 || val > 65535)
+	if !LLM_Option_TryNormalizeOllamaPort(ib.Value, &val)
 		return
 	return LLM_Menu_CommitMutation("the Ollama port setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"ollama_port", val), _LLM_Menu_ApplyOllamaPortCommitted)
+			"ollama_port", val), _LLM_Menu_ApplyOllamaPortCommitted,
+		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
 ; Resets the Ollama port to its shared default and applies it live.
 LLM_Menu_ResetOllamaPort(default_port) {
 	return LLM_Menu_CommitMutation("the Ollama port reset",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"ollama_port", default_port), _LLM_Menu_ApplyOllamaPortCommitted)
+			"ollama_port", default_port), _LLM_Menu_ApplyOllamaPortCommitted,
+		0, 0, 0, 0, 0, 0, _LLM_Menu_PrepareOllamaPortCandidate,
+		_LLM_Menu_PublishOllamaPortCandidate)
 }
 
 _LLM_Menu_ApplyOllamaPortCommitted(Candidate) {
-	LLM_Ollama_SetPort(Candidate["ollama_port"])
-	LLM_Menu_Build()
+	if !LLM_Ollama_SetPort(Candidate["ollama_port"])
+		return false
+	LLM_Engine_Init(LLM_Menu_BuildOpts())
+	LLM_Menu_RequestBuild("ollama_port_committed")
+	if Candidate.Get("enabled", false)
+			&& Candidate.Get("backend", "") == "ollama"
+		LLM_Menu_ScheduleBackendLifecycle(false)
 	return true
 }
 
 LLM_Menu_PromptCtxChars() {
 	LLM_Menu_PromptNumeric("ctx_chars", t("menu.llm.generation_menu_title"),
-		t("menu.llm.context_length_prompt"), 50, 10000)
+		t("menu.llm.context_length_prompt"))
 }
 
 LLM_Menu_PromptMinWords() {
 	LLM_Menu_PromptNumeric("min_words", t("menu.llm.generation_menu_title"),
-		t("menu.llm.min_words_prompt"), 1, 20)
+		t("menu.llm.min_words_prompt"))
 }
 
 LLM_Menu_PromptMaxWords() {
@@ -556,8 +559,7 @@ LLM_Menu_PromptMaxWords() {
 	; string in this menu-callback thread (mirrors LLM_Menu_PromptOllamaPort)
 	if !IsInteger(ib.Value)
 		return
-	val := Integer(ib.Value)
-	if (val < 0)
+	if !LLM_Option_TryNormalize("max_words", Integer(ib.Value), &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM maximum-word setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
@@ -576,18 +578,13 @@ LLM_Menu_PromptTemperature() {
 	if (ib.Result != "OK" || ib.Value == "")
 		return
 	; Accept the comma-decimal habit common on a French keyboard (the project's
-	; UI locale) by normalising "12,5" to "12.5" before validating
+	; UI locale) by normalising "0,7" to "0.7" before validating.
 	raw := StrReplace(ib.Value, ",", ".")
-	; Reject non-numeric typos before converting — Float() throws on a bad
-	; string in this menu-callback thread (mirrors LLM_Menu_PromptOllamaPort)
-	if !IsNumber(raw)
-		return
-	val := Float(raw)
-	if (val < 0.0 || val > 2.0)
+	if !LLM_Option_TryNormalizeTemperature(raw, &Normalized)
 		return
 	return LLM_Menu_CommitMutation("the LLM temperature setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"temperature", Format("{:.2f}", val)),
+			"temperature", Normalized),
 		_LLM_Menu_ApplyStandardCommitted)
 }
 
@@ -602,13 +599,7 @@ LLM_Menu_PromptNavModifiers() {
 	ib := InputBox(t("menu.llm.nav_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["nav_modifiers"])
 	if (ib.Result != "OK")
 		return
-	if !LLM_Menu_IsValidModifierString(ib.Value) {
-		LoggerError("LLM", "Rejected invalid navigation modifier configuration: '{1}'.", ib.Value)
-		return false
-	}
-	return LLM_Menu_CommitMutation("the LLM navigation-modifier setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"nav_modifiers", Trim(ib.Value)), _LLM_Menu_ApplyNavCommitted)
+	return LLM_Menu_CommitNavModifier("nav_modifiers", ib.Value)
 }
 
 LLM_Menu_PromptValModifiers() {
@@ -622,18 +613,11 @@ LLM_Menu_PromptValModifiers() {
 	ib := InputBox(t("menu.llm.val_modifiers_prompt"), t("menu.llm.nav_menu_title"), "w400 h120", _LLM_Menu["val_modifiers"])
 	if (ib.Result != "OK")
 		return
-	if !LLM_Menu_IsValidModifierString(ib.Value) {
-		LoggerError("LLM", "Rejected invalid validation modifier configuration: '{1}'.", ib.Value)
-		return false
-	}
-	return LLM_Menu_CommitMutation("the LLM validation-modifier setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"val_modifiers", Trim(ib.Value)), _LLM_Menu_ApplyNavCommitted)
+	return LLM_Menu_CommitNavModifier("val_modifiers", ib.Value)
 }
 
 _LLM_Menu_ApplyNavCommitted(*) {
-	_LLM_Menu_ApplyStandardCommitted()
-	return LLM_Menu_BindNavHotkeys() == true
+	return _LLM_Menu_ApplyStandardCommitted()
 }
 
 
@@ -667,7 +651,7 @@ LLM_Menu_PromptTriggerShortcut() {
 	; A partial native cleanup failure returns false but publishes an explicit
 	; recovery projection. Rebuild that warning instead of leaving a stale label
 	if Committed || LLM_Menu_TriggerNeedsAttention()
-		LLM_Menu_Build()
+		LLM_Menu_RequestBuild("setting_committed")
 	return Committed
 }
 
@@ -676,7 +660,7 @@ LLM_Menu_PromptTriggerShortcut() {
  */
 LLM_Menu_TriggerPrediction() {
 	global _LLM_Menu
-	if !_LLM_Menu["enabled"] || !LLM_Deps_IsReady()
+	if A_IsSuspended || !_LLM_Menu_BackendIsReadyForUse()
 		return
 	ctx := SubStr(_LLM_Bridge_Buffer, -_LLM_Menu["ctx_chars"])
 	if (ctx != "")

@@ -327,58 +327,154 @@ LLM_Menu_OnUserProfileClick(profile) {
 }
 
 _LLM_Menu_DeleteProfileCandidate(Candidate, ProfileId) {
-	for Index, Profile in Candidate["user_profiles"] {
-		if (Profile.Has("id") && Profile["id"] == ProfileId) {
-			Candidate["user_profiles"].RemoveAt(Index)
-			if Candidate["profile_id"] == ProfileId
-				Candidate["profile_id"] := "basic"
-			if Candidate.Has("app_profile_overrides")
-					&& (Candidate["app_profile_overrides"] is Map) {
-				for AppName, OverrideId in Candidate["app_profile_overrides"] {
-					if (OverrideId == ProfileId)
-						Candidate["app_profile_overrides"].Delete(AppName)
-				}
-			}
-			return true
+	if !(Candidate is Map) || !(ProfileId is String) || ProfileId == ""
+			|| !Candidate.Has("user_profiles")
+			|| !(Candidate["user_profiles"] is Array)
+			|| !Candidate.Has("profile_id")
+			|| !(Candidate["profile_id"] is String)
+		return false
+	Profiles := Candidate["user_profiles"]
+	SeenIds := Map()
+	MatchIndex := 0
+	for Index, Profile in Profiles {
+		if !(Profile is Map) || !Profile.Has("id")
+				|| !(Profile["id"] is String) || Profile["id"] == ""
+			return false
+		Id := Profile["id"]
+		if SeenIds.Has(Id)
+			return false
+		SeenIds[Id] := true
+		if Id == ProfileId
+			MatchIndex := Index
+	}
+	if MatchIndex == 0
+		return false
+
+	OverrideKeys := []
+	Overrides := 0
+	if Candidate.Has("app_profile_overrides") {
+		Overrides := Candidate["app_profile_overrides"]
+		if !(Overrides is Map)
+			return false
+		for AppName, OverrideId in Overrides {
+			if OverrideId == ProfileId
+				OverrideKeys.Push(AppName)
 		}
 	}
-	return false
+
+	Profiles.RemoveAt(MatchIndex)
+	if Candidate["profile_id"] == ProfileId
+		Candidate["profile_id"] := "basic"
+	if Overrides is Map {
+		for AppName in OverrideKeys
+			Overrides.Delete(AppName)
+	}
+	return true
 }
 
 _LLM_Menu_PruneOrphanProfileOverrides(MenuState) {
-	if !(MenuState is Map) || !(MenuState["app_profile_overrides"] is Map)
+	if !(MenuState is Map) || !MenuState.Has("app_profile_overrides")
+			|| !(MenuState["app_profile_overrides"] is Map)
+			|| !MenuState.Has("user_profiles")
+			|| !(MenuState["user_profiles"] is Array)
 		return false
 	Valid := Map("raw", true, "basic", true, "advanced", true, "batch_advanced", true)
 	for Profile in MenuState["user_profiles"] {
-		if (Profile is Map) && Profile.Has("id")
-			Valid[Profile["id"]] := true
+		if !(Profile is Map) || !Profile.Has("id")
+				|| !(Profile["id"] is String) || Profile["id"] == ""
+			return false
+		Valid[Profile["id"]] := true
 	}
-	Changed := false
+	OrphanKeys := []
 	for AppName, ProfileId in MenuState["app_profile_overrides"] {
-		if !Valid.Has(ProfileId) {
-			MenuState["app_profile_overrides"].Delete(AppName)
-			Changed := true
-		}
+		if !(ProfileId is String) || !Valid.Has(ProfileId)
+			OrphanKeys.Push(AppName)
 	}
-	return Changed
+	for AppName in OrphanKeys
+		MenuState["app_profile_overrides"].Delete(AppName)
+	return OrphanKeys.Length > 0
+}
+
+_LLM_Menu_NormalizeStoredUserProfiles(Profiles) {
+	if !(Profiles is Array)
+		return false
+	Out := []
+	Seen := Map()
+	Allowed := Map(
+		"id", true,
+		"label", true,
+		"system_single", true,
+		"system_multi", true,
+		"system_multi_template", true,
+		"raw_prompt", true,
+		"batch", true,
+		"stop_sequences", true)
+	for Profile in Profiles {
+		if !(Profile is Map)
+			return false
+		for Key in ["id", "label", "system_single", "system_multi"] {
+			if !Profile.Has(Key) || !(Profile[Key] is String)
+					|| (Key == "id" && Profile[Key] == "")
+				return false
+		}
+		if Seen.Has(Profile["id"])
+			return false
+		if !Profile.Has("batch") || !(Profile["batch"] is Integer)
+				|| (Profile["batch"] != 0 && Profile["batch"] != 1)
+			return false
+		Copy := Map()
+		for Key, Value in Profile {
+			if !(Key is String) || !Allowed.Has(Key)
+				return false
+			if (Key == "stop_sequences") {
+				if !(Value is Array)
+					return false
+				Sequences := []
+				for Sequence in Value {
+					if !(Sequence is String) || Sequence == ""
+						return false
+					Sequences.Push(Sequence)
+				}
+				Copy[Key] := Sequences
+				continue
+			}
+			if (Key == "batch") {
+				Copy[Key] := Value == 1
+				continue
+			}
+			if !(Value is String)
+				return false
+			Copy[Key] := Value
+		}
+		Seen[Copy["id"]] := true
+		Out.Push(Copy)
+	}
+	return Out
 }
 
 _LLM_Menu_SerializeUserProfiles(Profiles) {
+	Profiles := _LLM_Menu_NormalizeStoredUserProfiles(Profiles)
 	if !(Profiles is Array)
 		return false
 	Rows := []
 	for Profile in Profiles {
-		if !(Profile is Map) || !Profile.Has("id") || !(Profile["id"] is String)
-				|| Profile["id"] == ""
-			return false
 		Fields := []
-		for Key in ["id", "label", "system_single", "system_multi", "system_multi_template"] {
-			Value := Profile.Has(Key) ? Profile[Key] : ""
-			if !(Value is String)
-				return false
+		for Key in ["id", "label", "system_single", "system_multi"] {
+			Value := Profile[Key]
 			Fields.Push('"' . Key . '":"' . _LLM_MenuApiJsonEscape(Value) . '"')
 		}
-		Fields.Push('"batch":' . ((Profile.Has("batch") && Profile["batch"] == true) ? "true" : "false"))
+		for Key in ["system_multi_template", "raw_prompt"] {
+			if Profile.Has(Key)
+				Fields.Push('"' . Key . '":"'
+					. _LLM_MenuApiJsonEscape(Profile[Key]) . '"')
+		}
+		Fields.Push('"batch":' . (Profile["batch"] ? "true" : "false"))
+		if Profile.Has("stop_sequences") {
+			SequenceFields := []
+			for Sequence in Profile["stop_sequences"]
+				SequenceFields.Push('"' . _LLM_MenuApiJsonEscape(Sequence) . '"')
+			Fields.Push('"stop_sequences":[' . _LLM_MenuJoin(SequenceFields, ",") . ']')
+		}
 		Rows.Push("{" . _LLM_MenuJoin(Fields, ",") . "}")
 	}
 	return "v1:" . CryptoBase64EncodeUtf8("[" . _LLM_MenuJoin(Rows, ",") . "]")
@@ -395,20 +491,7 @@ _LLM_Menu_DeserializeUserProfiles(Payload) {
 		return false
 	if !(Parsed is Array)
 		return false
-	Validated := []
-	Seen := Map()
-	for Profile in Parsed {
-		if !(Profile is Map) || !Profile.Has("id") || !(Profile["id"] is String)
-				|| Profile["id"] == "" || Seen.Has(Profile["id"])
-			return false
-		for Key in ["label", "system_single", "system_multi", "system_multi_template"]
-			if Profile.Has(Key) && !(Profile[Key] is String)
-				return false
-		Profile["batch"] := Profile.Has("batch") && Profile["batch"] == true
-		Seen[Profile["id"]] := true
-		Validated.Push(Profile)
-	}
-	return Validated
+	return _LLM_Menu_NormalizeStoredUserProfiles(Parsed)
 }
 
 _LLM_Menu_SerializeAppProfileOverrides(Overrides) {
@@ -431,13 +514,16 @@ _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 		; Strict migration reader for the legacy app=profile;... representation.
 		Decoded := Map()
 		for Pair in StrSplit(Payload, ";") {
-			Pair := Trim(Pair)
 			if Pair == ""
-				continue
-			Parts := StrSplit(Pair, "=", , 2)
-			if Parts.Length != 2 || Parts[1] == "" || Parts[2] == "" || Decoded.Has(Parts[1])
 				return false
-			Decoded[Parts[1]] := Parts[2]
+			Separator := InStr(Pair, "=", true, -1)
+			if (Separator <= 1 || Separator == StrLen(Pair))
+				return false
+			AppName := SubStr(Pair, 1, Separator - 1)
+			ProfileId := SubStr(Pair, Separator + 1)
+			if Decoded.Has(AppName)
+				return false
+			Decoded[AppName] := ProfileId
 		}
 		return Decoded
 	}
@@ -463,8 +549,6 @@ _LLM_Menu_DeserializeAppProfileOverrides(Payload) {
 
 _LLM_Menu_ApplyProfileCommitted(*) {
 	_LLM_Menu_ApplyStandardCommitted()
-	if IsSet(LLM_Menu_BindProfileHotkeys)
-		(LLM_Menu_BindProfileHotkeys)()
 	return true
 }
 
@@ -703,15 +787,19 @@ LLM_Menu_AutoApplyProfileForModel(MenuState) {
  *
  * @returns {Array} Ordered profile id strings.
  */
-LLM_Menu_GetHotkeyProfileOrder() {
+LLM_Menu_GetHotkeyProfileOrder(MenuState := 0) {
 	global _LLM_Menu, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	State := MenuState is Map ? MenuState : _LLM_Menu
+	if !(State is Map) || !State.Has("user_profiles")
+			|| !(State["user_profiles"] is Array)
+		return []
 	out := []
 	for _, id in LLM_PROFILE_BUILTIN_ORDER {
 		out.Push(id)
 		if (out.Length >= LLM_PROFILE_HOTKEY_LIMIT)
 			return out
 	}
-	for p in _LLM_Menu["user_profiles"] {
+	for p in State["user_profiles"] {
 		if !(p is Map) or !p.Has("id")
 			continue
 		out.Push(p["id"])
@@ -719,6 +807,82 @@ LLM_Menu_GetHotkeyProfileOrder() {
 			return out
 	}
 	return out
+}
+
+_LLM_Menu_ProfileCandidateIds(MenuState) {
+	global LLM_PROFILE_BUILTIN_ORDER
+	if !(MenuState is Map) || !MenuState.Has("user_profiles")
+			|| !(MenuState["user_profiles"] is Array)
+		return 0
+	Ids := Map()
+	for Id in LLM_PROFILE_BUILTIN_ORDER {
+		if !(Id is String) || Id == "" || Ids.Has(Id)
+			return 0
+		Ids[Id] := true
+	}
+	for Profile in MenuState["user_profiles"] {
+		if !(Profile is Map) || !Profile.Has("id")
+				|| !(Profile["id"] is String) || Profile["id"] == ""
+				|| Ids.Has(Profile["id"])
+			return 0
+		Ids[Profile["id"]] := true
+	}
+	return Ids
+}
+
+_LLM_Menu_PrepareProfileOwnerCandidate(CandidateMenu,
+		AllowLifecycleResume := false) {
+	global _LLM_Menu_ProfileHotkeyOwner
+	if !(_LLM_Menu_ProfileHotkeyOwner is Map)
+			|| !_LLM_Menu_ProfileHotkeyOwner.Get("native", false)
+		return Map("changed", false)
+	Plan := _LLM_Menu_ProfileHotkeyOwner.Get("plan", 0)
+	Order := LLM_Menu_GetHotkeyProfileOrder(CandidateMenu)
+	CandidateIds := _LLM_Menu_ProfileCandidateIds(CandidateMenu)
+	if !(Plan is Array) || !(CandidateIds is Map)
+		return 0
+	Enabled := CandidateMenu.Get("enabled", false) ? 1 : 0
+	; Retired profile owners may still retain suppressed receipts after the
+	; active surface was disabled or otherwise remained byte-identical. Validate
+	; every retained token before taking the no-op path.
+	if !LLM_NavEventOwner_ProfileCandidateIsAdmissible(CandidateIds)
+		return 0
+	if LLM_NavEventOwner_ProfileSurfaceMatches(Order, Enabled)
+		return Map("changed", false)
+	Transaction := LLM_NavEventOwner_BeginProfileSwap(
+		Plan, Order, Enabled, CandidateIds, 0, AllowLifecycleResume)
+	if !(Transaction is Map)
+		return 0
+	Transaction["changed"] := true
+	return Transaction
+}
+
+_LLM_Menu_CommitProfileOwnerCandidate(Transaction) {
+	if !(Transaction is Map)
+		return false
+	if !Transaction.Get("changed", false)
+		return true
+	return LLM_NavEventOwner_CommitProfileSwap(Transaction)
+}
+
+_LLM_Menu_AbortProfileOwnerCandidate(Transaction) {
+	if !(Transaction is Map) || !Transaction.Get("changed", false)
+		return true
+	return LLM_NavEventOwner_AbortProfileSwap(Transaction)
+}
+
+_LLM_Menu_PublishCurrentNativeProfileOwner(
+		AllowLifecycleResume := false) {
+	global _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner
+	if !(_LLM_Menu_ProfileHotkeyOwner is Map)
+			|| !_LLM_Menu_ProfileHotkeyOwner.Get("native", false)
+		return true
+	if !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return false
+	Transaction := _LLM_Menu_PrepareProfileOwnerCandidate(
+		_LLM_Menu, AllowLifecycleResume)
+	return Transaction is Map
+		&& _LLM_Menu_CommitProfileOwnerCandidate(Transaction)
 }
 
 /**
@@ -744,59 +908,343 @@ LLM_Menu_GetProfileHotkeyHint(id) {
 ; keyed HotIf contexts on the function reference: a fresh lambda on each call
 ; would create a new context, orphaning the previous bindings and leaking them.
 global _LLM_PROFILE_HOTKEY_PRED := _LLM_Menu_IsProfileHotkeyActive.Bind()
+; Published only after all fixed Ctrl+digit variants exist and the dynamic
+; HotIf context has been reset. Partially-created native variants remain inert
+; because their stable predicate refuses while this owner is absent.
+global _LLM_Menu_ProfileHotkeyOwner := 0
+global _LLM_Menu_ProfileHotkeyFailureCount := 0
+global _LLM_PROFILE_HOTKEY_STATUS_READY := 1
+global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED := -1
+global _LLM_PROFILE_HOTKEY_RETRY_LIMIT := 3
 
 /**
  * Registers Ctrl+1 … Ctrl+9 globally so the user can switch profiles from
- * any focused app. Idempotent — calling this on every menu rebuild is safe
- * because AHK's ``Hotkey`` API replaces an existing binding when the same
- * key triple is re-registered. The hotkey only fires when the LLM feature
- * is enabled (paused / disabled scripts still get the bare Ctrl+<n> their
- * apps expect).
+ * any focused app. Production keeps those AHK variants inert and publishes the
+ * same fixed physical plan to the native event owner. Each admitted receipt
+ * retains its immutable profile order until exact completion. Test seams may
+ * still exercise the legacy callbacks without installing the native hook.
  */
-LLM_Menu_BindProfileHotkeys() {
-	global LLM_PROFILE_HOTKEY_LIMIT, _LLM_PROFILE_HOTKEY_PRED
-	; Stable predicate — same BoundFunc every call so AHK reuses the context
-	HotIf(_LLM_PROFILE_HOTKEY_PRED)
-	loop LLM_PROFILE_HOTKEY_LIMIT {
-		idx := A_Index
-		key := "^" . idx
-		try Hotkey(key, _LLM_Menu_MakeProfileHotkey(idx), "On")
+LLM_Menu_BindProfileHotkeys(HotkeyFn := 0, HotIfFn := 0, LogFn := 0,
+		ResetFn := 0, SelectFn := 0, KeyResolverFn := 0) {
+	global _LLM_PROFILE_HOTKEY_PRED, _LLM_Menu_ProfileHotkeyOwner
+	global _LLM_Menu_ProfileHotkeyFailureCount
+	global _LLM_PROFILE_HOTKEY_STATUS_READY
+	global _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	global _LLM_PROFILE_HOTKEY_RETRY_LIMIT
+	UseNativeOwner := !HasMethod(HotkeyFn, "Call")
+		&& !HasMethod(HotIfFn, "Call")
+		&& !HasMethod(ResetFn, "Call")
+		&& !HasMethod(SelectFn, "Call")
+		&& !HasMethod(KeyResolverFn, "Call")
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return LLM_Menu_BindProfileHotkeys(HotkeyFn, HotIfFn, LogFn,
+			ResetFn, SelectFn, KeyResolverFn)
+		finally Critical(InheritedCritical)
 	}
-	HotIf  ; reset
+	if (_LLM_Menu_ProfileHotkeyOwner is Map) {
+		return _LLM_Menu_ProfileHotkeyOwnerReady()
+			? _LLM_PROFILE_HOTKEY_STATUS_READY
+			: _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	}
+	if !HasMethod(HotkeyFn, "Call")
+		HotkeyFn := _LLM_Menu_ProfileNativeHotkey
+	if !HasMethod(HotIfFn, "Call")
+		HotIfFn := _LLM_Menu_ProfileNativeHotIf
+	if !HasMethod(ResetFn, "Call")
+		ResetFn := _LLM_Menu_ProfileNativeHotIf
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
+	KeyResolverFn := _LLM_Menu_HotkeyKeyResolverSnapshot(KeyResolverFn)
+	CandidatePlan := HasMethod(KeyResolverFn, "Call")
+		? _LLM_Menu_BuildProfileHotkeyPlan(SelectFn, KeyResolverFn) : false
+	TriggerConflict := CandidatePlan is Array
+		? _LLM_Menu_RuntimeTriggerPlanCollision(CandidatePlan, KeyResolverFn)
+		: Map("ok", false, "identity", "")
+
+	PreviousCritical := Critical("On")
+	OpenAttempted := false
+	Succeeded := false
+	FailureDetail := ""
+	ResetFailure := 0
+	TerminalStatus := 0
+	try {
+		try {
+			if !(CandidatePlan is Array)
+				throw Error("Profile hotkey physical ownership could not be resolved")
+			if !TriggerConflict["ok"]
+				throw Error("Profile hotkey collision ownership is malformed")
+			if TriggerConflict["identity"] != ""
+				throw Error("Profile hotkey chord is owned by the prediction trigger")
+			OpenAttempted := true
+			HotIfFn.Call(_LLM_PROFILE_HOTKEY_PRED)
+			for Entry in CandidatePlan
+				HotkeyFn.Call(Entry["native_spec"], Entry["callback"], "On")
+			Succeeded := true
+		} catch as e {
+			FailureDetail := "Profile hotkey transaction failed: " . e.Message
+		} finally {
+			if OpenAttempted {
+				try _LLM_Menu_ProfileCloseHotIf(HotIfFn, ResetFn)
+				catch as e {
+					ResetFailure := e
+					Succeeded := false
+					FailureDetail := e.Message
+				}
+			}
+			if Succeeded && !UseNativeOwner {
+				_LLM_Menu_ProfileHotkeyFailureCount := 0
+				_LLM_Menu_ProfileHotkeyOwner := Map(
+					"ready", true, "degraded", false,
+					"native", false, "plan", CandidatePlan)
+				TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_READY
+			} else if !Succeeded && !IsObject(ResetFailure) {
+				_LLM_Menu_ProfileHotkeyFailureCount := Min(
+					_LLM_Menu_ProfileHotkeyFailureCount + 1,
+					_LLM_PROFILE_HOTKEY_RETRY_LIMIT)
+				if (_LLM_Menu_ProfileHotkeyFailureCount
+						>= _LLM_PROFILE_HOTKEY_RETRY_LIMIT) {
+					_LLM_Menu_ProfileHotkeyOwner := Map(
+						"ready", false, "degraded", true, "plan", [])
+					TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+				}
+			}
+		}
+	} finally Critical(PreviousCritical)
+	if IsObject(ResetFailure) {
+		_LLM_Menu_LogProfileHotkeyFailure(FailureDetail, LogFn)
+		throw TrayRootFatalContextError(ResetFailure.Message, -1,
+			ResetFailure.Extra)
+	}
+	if Succeeded && UseNativeOwner {
+		NativePublished := _LLM_Menu_ActivateInitialNativeProfileOwner(
+			CandidatePlan)
+		PreviousCritical := Critical("On")
+		try {
+			if NativePublished {
+				_LLM_Menu_ProfileHotkeyFailureCount := 0
+				_LLM_Menu_ProfileHotkeyOwner := Map(
+					"ready", true, "degraded", false,
+					"native", true, "plan", CandidatePlan)
+				TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_READY
+			} else {
+				_LLM_Menu_ProfileHotkeyFailureCount := Min(
+					_LLM_Menu_ProfileHotkeyFailureCount + 1,
+					_LLM_PROFILE_HOTKEY_RETRY_LIMIT)
+				if (_LLM_Menu_ProfileHotkeyFailureCount
+						>= _LLM_PROFILE_HOTKEY_RETRY_LIMIT) {
+					_LLM_Menu_ProfileHotkeyOwner := Map(
+						"ready", false, "degraded", true,
+						"native", false, "plan", [])
+					TerminalStatus := _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+				}
+			}
+		} finally Critical(PreviousCritical)
+		if !NativePublished
+			FailureDetail := "Profile hotkey native ownership was refused"
+	}
+	if (TerminalStatus == _LLM_PROFILE_HOTKEY_STATUS_DEGRADED) {
+		_LLM_Menu_LogProfileHotkeyFailure(FailureDetail, LogFn)
+		return _LLM_PROFILE_HOTKEY_STATUS_DEGRADED
+	}
+	return TerminalStatus
+}
+
+_LLM_Menu_ActivateInitialNativeProfileOwner(Plan) {
+	global _LLM_Menu
+	if !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return false
+	Order := LLM_Menu_GetHotkeyProfileOrder(_LLM_Menu)
+	CandidateIds := _LLM_Menu_ProfileCandidateIds(_LLM_Menu)
+	if !(CandidateIds is Map)
+		return false
+	Enabled := _LLM_Menu.Get("enabled", false) ? 1 : 0
+	if !LLM_NavEventOwner_ProfileCandidateIsAdmissible(CandidateIds)
+		return false
+	if LLM_NavEventOwner_ProfileSurfaceMatches(Order, Enabled)
+		return true
+	Transaction := LLM_NavEventOwner_BeginProfileSwap(
+		Plan, Order, Enabled, CandidateIds)
+	return Transaction is Map
+		&& LLM_NavEventOwner_CommitProfileSwap(Transaction)
+}
+
+_LLM_Menu_ProfileNativeHotkey(Args*) {
+	Hotkey(Args*)
+}
+
+_LLM_Menu_ProfileNativeHotIf(Args*) {
+	HotIf(Args*)
+}
+
+_LLM_Menu_ProfileNativeSelect(ProfileId) {
+	return LLM_Menu_SetProfile(ProfileId)
+}
+
+_LLM_Menu_BuildProfileHotkeyPlan(SelectFn := 0, KeyResolverFn := 0) {
+	global LLM_PROFILE_HOTKEY_LIMIT
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
+	Plan := []
+	loop LLM_PROFILE_HOTKEY_LIMIT {
+		Index := A_Index
+		Plan.Push(Map("spec", "^" . Index,
+			"profile_idx", Index,
+			"callback", _LLM_Menu_MakeProfileHotkey(Index, SelectFn)))
+	}
+	if !_LLM_Menu_AttachPlanPhysicalIdentities(Plan, KeyResolverFn)
+		return false
+	return Plan
+}
+
+_LLM_Menu_ProfileCloseHotIf(HotIfFn, ResetFn) {
+	Loop 2 {
+		try {
+			HotIfFn.Call()
+			return true
+		} catch {
+		}
+	}
+	try {
+		ResetFn.Call()
+		return true
+	} catch as e {
+		throw Error("Profile HotIf reset could not be proven", -1, e.Message)
+	}
+}
+
+_LLM_Menu_LogProfileHotkeyFailure(Message, LogFn := 0) {
+	if HasMethod(LogFn, "Call") {
+		try LogFn.Call(Message)
+		return
+	}
+	try LoggerError("LLM", "Profile hotkey registration failed: {1}.",
+		Message)
+}
+
+_LLM_Menu_ProfileHotkeyOwnerReady() {
+	global _LLM_Menu_ProfileHotkeyOwner, LLM_PROFILE_HOTKEY_LIMIT
+	Owner := _LLM_Menu_ProfileHotkeyOwner
+	if !(Owner is Map)
+		return false
+	Ready := Owner.Get("ready", false)
+	Degraded := Owner.Get("degraded", false)
+	Plan := Owner.Get("plan", 0)
+	if !((Ready is Integer) && Ready == 1
+			&& (Degraded is Integer) && Degraded == 0
+			&& (Plan is Array) && Plan.Length == LLM_PROFILE_HOTKEY_LIMIT)
+		return false
+	SeenNative := Map()
+	SeenPhysical := Map()
+	Loop Plan.Length {
+		Index := A_Index
+		if !Plan.Has(Index)
+			return false
+		Entry := Plan[Index]
+		if !(Entry is Map)
+				|| Entry.Get("spec", "") != "^" . Index
+				|| !(Entry.Get("profile_idx", 0) is Integer)
+				|| Entry.Get("profile_idx", 0) != Index
+				|| !_LLM_Menu_PlanEntryDescriptorIsValid(Entry)
+				|| !HasMethod(Entry.Get("callback", 0), "Call")
+			return false
+		NativeId := Entry["native_id"]
+		PhysicalId := Entry["physical_id"]
+		if SeenNative.Has(NativeId) || SeenPhysical.Has(PhysicalId)
+			return false
+		SeenNative[NativeId] := true
+		SeenPhysical[PhysicalId] := true
+	}
+	return true
+}
+
+_LLM_Menu_ProfileHotkeyRetryPending() {
+	global _LLM_Menu_ProfileHotkeyOwner
+	global _LLM_Menu_ProfileHotkeyFailureCount
+	return !(_LLM_Menu_ProfileHotkeyOwner is Map)
+		&& _LLM_Menu_ProfileHotkeyFailureCount > 0
 }
 
 /**
  * Predicate used by ``HotIf`` to decide whether the Ctrl+<n> bindings are
- * active. True only when the LLM tray reports enabled AND there is at
- * least one configured profile to map onto — otherwise the keystroke
- * falls through to the active app unchanged.
+ * active. True only when the LLM tray reports enabled AND the concrete
+ * Ctrl+digit index maps to a configured profile. An ineligible variant lets
+ * Windows deliver the original physical event to the next eligible owner (or
+ * the app) unchanged. Cross-surface collisions are tracked separately.
  */
-_LLM_Menu_IsProfileHotkeyActive() {
-	global _LLM_Menu
+_LLM_Menu_ProfileHotkeyIndex(ThisHotkey) {
+	Identity := _LLM_Menu_NavNativeIdentity(ThisHotkey)
+	if Identity == ""
+		return 0
+	global _LLM_Menu_ProfileHotkeyOwner
+	PreviousCritical := Critical("On")
+	try {
+		if !(_LLM_Menu_ProfileHotkeyOwner is Map)
+			return 0
+		Plan := _LLM_Menu_ProfileHotkeyOwner.Get("plan", 0)
+		if !(Plan is Array)
+			return 0
+		for Entry in Plan {
+			if Entry is Map && Entry.Get("native_id", "") == Identity {
+				Index := Entry.Get("profile_idx", 0)
+				return (Index is Integer) && Index >= 1 && Index <= 9
+					? Index : 0
+			}
+		}
+		return 0
+	} finally Critical(PreviousCritical)
+}
+
+_LLM_Menu_IsProfileHotkeyActive(ThisHotkey := "") {
+	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Menu_ProfileHotkeyOwner
+	if !_LLM_Menu_Loaded || !_LLM_Menu_ProfileHotkeyOwnerReady()
+		return false
+	; Production variants are registration-only compatibility shells. The native
+	; hook owns the physical event and emits an immutable profile receipt instead.
+	if _LLM_Menu_ProfileHotkeyOwner.Get("native", false)
+		return false
 	if !IsSet(_LLM_Menu) or !_LLM_Menu["enabled"]
 		return false
-	order := LLM_Menu_GetHotkeyProfileOrder()
-	return order.Length > 0
+	Index := _LLM_Menu_ProfileHotkeyIndex(ThisHotkey)
+	if !Index
+		return false
+	Order := LLM_Menu_GetHotkeyProfileOrder()
+	if (Index > Order.Length)
+		return false
+	; Yield only when the published navigation owner has the exact same variant.
+	; A broad tooltip-visible gate would swallow Ctrl+digits while navigation uses
+	; Alt or Shift; AHK passes the concrete hotkey name to this predicate.
+	if LLM_Menu_NavOwnsSpec(ThisHotkey)
+		return false
+	return true
 }
 
 /**
- * Builds the closure assigned to a Ctrl+<n> shortcut. The closure resolves
- * the active profile order each time it fires (not at registration time)
- * so new user profiles created after boot are reachable without a reload.
+ * Builds the compatibility closure assigned to a Ctrl+<n> shortcut. Production
+ * disarms it after native ownership publishes; injected registration tests keep
+ * the legacy dynamic route available without installing a system hook.
  */
-_LLM_Menu_MakeProfileHotkey(idx) {
-	return (*) => _LLM_Menu_OnProfileHotkey(idx)
+_LLM_Menu_MakeProfileHotkey(idx, SelectFn := 0) {
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
+	return (*) => _LLM_Menu_OnProfileHotkey(idx, SelectFn)
 }
 
-_LLM_Menu_OnProfileHotkey(idx) {
-	; The HotIf predicate already guarantees the LLM is enabled and at
-	; least one profile is configured. We still guard against an out-of-
-	; range idx (user has fewer profiles than the bound 1..9) by sending
-	; the bare keystroke through so the app's own Ctrl+<n> handler runs.
-	order := LLM_Menu_GetHotkeyProfileOrder()
-	if (idx < 1 or idx > order.Length) {
-		Send "^" . idx
-		return
-	}
-	LLM_Menu_SetProfile(order[idx])
+_LLM_Menu_OnProfileHotkey(idx, SelectFn := 0) {
+	global _LLM_Menu_ProfileHotkeyOwner
+	if (_LLM_Menu_ProfileHotkeyOwner is Map)
+			&& _LLM_Menu_ProfileHotkeyOwner.Get("native", false)
+		return false
+	; The predicate owns only in-range digits. Recheck because the separate
+	; HotIf callback thread can observe a newer profile order; never synthesize a
+	; replacement chord here because that would not be native pass-through.
+	if !(idx is Integer) || idx < 1
+		return false
+	Order := LLM_Menu_GetHotkeyProfileOrder()
+	if (idx > Order.Length)
+		return false
+	if !HasMethod(SelectFn, "Call")
+		SelectFn := _LLM_Menu_ProfileNativeSelect
+	return SelectFn.Call(Order[idx])
 }

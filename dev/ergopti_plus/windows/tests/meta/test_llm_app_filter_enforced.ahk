@@ -23,13 +23,13 @@
 _LAFE_AssertDisabledAppsEnforced() {
 	Body := _DriverFuncBody("LLM_Engine_FirePrediction")
 	Assert(Body != "", "LLM_Engine_FirePrediction(buffer) must exist")
-	Assert(InStr(Body, "disabled_apps") > 0,
-		"LLM_Engine_FirePrediction must consult _LLM_Engine[disabled_apps] and suppress prediction in excluded apps — the flag is persisted + shown in the menu but was never enforced (llm-app-filter-enforced)")
-	Assert(InStr(Body, "WIGetFocused") > 0,
-		"LLM_Engine_FirePrediction must resolve the focused app via WIGetFocused to apply the disabled_apps filter (llm-app-filter-enforced)")
-	; The gate must actually suppress (return) on a match, not merely read the list.
-	DAPos := InStr(Body, "disabled_apps")
-	Assert(InStr(Body, "return", , DAPos) > 0,
-		"the disabled_apps gate must return (suppress the prediction) on a match (llm-app-filter-enforced)")
+	Gate := "if _LLM_Engine_ShouldSuppressForDisabledApps()`n`t`treturn"
+	GatePos := InStr(Body, Gate, true)
+	DispatchPreparationPos := InStr(Body, "backend_now :=", true)
+	Assert(GatePos > 0,
+		"LLM_Engine_FirePrediction must call the canonical disabled-app decision "
+		. "and return immediately when it suppresses (llm-app-filter-enforced)")
+	Assert(DispatchPreparationPos > 0 && GatePos < DispatchPreparationPos,
+		"the disabled-app gate must run before any backend dispatch preparation")
 }
 Test("LLM: prediction is suppressed in user-disabled apps (llm-app-filter-enforced)", _LAFE_AssertDisabledAppsEnforced)

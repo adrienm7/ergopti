@@ -175,16 +175,31 @@ Test("ownership predicate: a real prediction owns the surface for the whole disp
 
 _TestGrace_TooltipCentralGuard() {
 	Body := _DriverDirConcat("ui/tooltip")
+	Commit := _StripFullLineComments(
+		_DriverFuncBody("_LLM_TooltipCommitSurfaceState"))
 	; While a real prediction owns the surface, the hotstring lifecycle cannot tear
 	; it down - for the WHOLE display. Only authoritative hides pass: LLM (user
 	; dismiss/accept), TimerFn (auto-hide), Suspend.
 	Assert(InStr(RegExReplace(Body, "\s+", " "),
 		'DbgTag != "LLM" and DbgTag != "Suspend" and DbgTag != "TimerFn" and _llm_was_visible') > 0,
 		"TooltipHide must ignore hotstring-lifecycle hides while a real prediction owns the surface")
-	; The window opens the instant a real prediction renders.
-	Assert(InStr(Body, "ShownAt: Lifecycle.TimeoutOrigin") > 0
-		and InStr(Body, "SurfaceToken.LlmPresented := Record") > 0,
-		"the committed presentation record must own the show time that starts its grace window")
+	; The candidate stages one immutable show-time value, then publishes that exact
+	; value to both owners only after every detached-build validation has passed.
+	OriginSeedPos := InStr(Commit,
+		"NextTimeoutOrigin := Lifecycle.TimeoutOrigin")
+	OriginStampPos := InStr(Commit, "NextTimeoutOrigin := A_TickCount", true,
+		OriginSeedPos)
+	RecordStampPos := InStr(Commit, "ShownAt: NextTimeoutOrigin", true,
+		OriginStampPos)
+	LifecyclePublishPos := InStr(Commit,
+		"Lifecycle.TimeoutOrigin := NextTimeoutOrigin", true, RecordStampPos)
+	RecordPublishPos := InStr(Commit, "SurfaceToken.LlmPresented := Record", true,
+		LifecyclePublishPos)
+	Assert(OriginSeedPos > 0 and OriginStampPos > OriginSeedPos
+		and RecordStampPos > OriginStampPos
+		and LifecyclePublishPos > RecordStampPos
+		and RecordPublishPos > LifecyclePublishPos,
+		"the committed presentation record must publish the exact staged show time that starts its grace window")
 	; Both predicates must exist: ownership (whole display) + grace (min display).
 	Assert(InStr(Body, "LLM_TooltipOwnsSurface() {") > 0,
 		"the LLM_TooltipOwnsSurface predicate must be defined")

@@ -95,6 +95,50 @@ _LLM_Engine_AppNameForAcceptSource(Source) {
 	return AppName
 }
 
+; Pure consumer for the production privacy gate. Engine admission guarantees a
+; flat string array; the defensive type check keeps the hot path fail-closed if
+; a future internal writer bypasses that boundary.
+_LLM_Engine_AppIsExcluded(AppId) {
+	global _LLM_Engine
+	if !(AppId is String) || AppId == ""
+		return false
+	Apps := _LLM_Engine.Get("disabled_apps", [])
+	if !(Apps is Array)
+		return true
+	Needle := RegExReplace(StrLower(AppId), "\.exe$", "")
+	for App in Apps {
+		if !(App is String)
+			return true
+		if (RegExReplace(StrLower(App), "\.exe$", "") == Needle)
+			return true
+	}
+	return false
+}
+
+; Owns the complete disabled-app privacy decision so the production caller and
+; tests cannot disagree about invalid state, focus lookup, or name matching.
+_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
+	global _LLM_Engine
+	Apps := _LLM_Engine.Get("disabled_apps", [])
+	if !(Apps is Array) {
+		try LoggerError("LLM",
+			"Prediction suppressed because disabled-app state is not a validated array.")
+		return true
+	}
+	if (Apps.Length == 0)
+		return false
+	Focused := Map("appId", "")
+	try Focused := HasMethod(FocusFn, "Call") ? FocusFn.Call() : WIGetFocused()
+	AppId := (Focused is Map) ? Focused.Get("appId", "") : ""
+	if !(AppId is String) || AppId == ""
+		return false
+	if !_LLM_Engine_AppIsExcluded(AppId)
+		return false
+	try LoggerInfo("LLM", "Prediction suppressed - '{1}' is on the disabled-apps list.",
+		RegExReplace(StrLower(AppId), "\.exe$", ""))
+	return true
+}
+
 /**
  * Fires the actual LLM call after the debounce period expires.
  * Skips the call if context is identical to the last result's context.
@@ -117,10 +161,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	}
 	_LLM_Engine["timer_active"] := false
 
-	; Re-derive from live state at the request boundary as a backstop for editors
-	; that mutate an Array/Map in place before calling Init. A missed writer can
-	; therefore cause one cache miss, never a semantically stale cache hit.
-	_LLM_Engine_RefreshSemanticConfig()
+	; Semantic configuration is validated, detached and signed by
+	; LLM_Engine_Init. A fire consumes that immutable publication instead of
+	; sorting and re-encoding the complete option graph on every debounce tick.
 
 	; A debounce timer armed just before the user paused must not fire an HTTP
 	; request or paint a prediction — « pause = tout éteint ».
@@ -179,20 +222,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	; and shown in the menu but was previously never enforced. Resolve the focused process
 	; only when the list is non-empty, so no OS call runs on the per-fire path when the user
 	; has not excluded any app (llm-app-filter-enforced).
-	if (_LLM_Engine.Has("disabled_apps") && (_LLM_Engine["disabled_apps"] is Array)
-			&& _LLM_Engine["disabled_apps"].Length > 0) {
-		_focused_app := ""
-		try _focused_app := StrLower(WIGetFocused()["appId"])
-		if (_focused_app != "") {
-			_focused_app := RegExReplace(_focused_app, "\.exe$", "")
-			for _excluded_app in _LLM_Engine["disabled_apps"] {
-				if (StrLower(RegExReplace(_excluded_app, "\.exe$", "")) == _focused_app) {
-					try LoggerInfo("LLM", "Prediction suppressed - '{1}' is on the disabled-apps list.", _focused_app)
-					return
-				}
-			}
-		}
-	}
+	if _LLM_Engine_ShouldSuppressForDisabledApps()
+		return
 
 	backend_now := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
 	if (backend_now = "ollama" and IsSet(LLM_OllamaAllowInference) and !LLM_OllamaAllowInference()) {
@@ -400,11 +431,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	log_model := ""
 	dispatch_fn := ""
 	dispatch_stream_fn := ""
-	streaming_enabled := _LLM_Engine.Has("streaming") and _LLM_Engine["streaming"]
-	; Windows curl streaming is not reliable yet (logs: empty stdout / No stdout
-	; file). WinHTTP async matches macOS behaviour and completes on this driver.
-	if (backend == "ollama")
-		streaming_enabled := false
+	streaming_enabled := LLM_EffectiveStreaming(backend,
+		_LLM_Engine.Has("streaming") and _LLM_Engine["streaming"])
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "") {
@@ -417,9 +445,6 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
 			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens)
-		; No remote-streaming dispatcher — disable streaming for the API
-		; backend so the engine falls back to the async non-streaming path.
-		streaming_enabled := false
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -548,11 +573,14 @@ _LLM_Engine_ShowLoadingTooltip() {
 		return
 	_LLM_Engine_ApplyTooltipDisplayOpts(1)
 	RequestId := _LLM_Engine.Get("request_id", 0)
+	SemanticSignature := _LLM_Engine.Get("active_request_signature", "")
 	Source := _LLM_Engine_RequestAcceptSourceForRender(RequestId)
 	Meta := Map(
 		"offer_id", RequestId,
 		"accept_source", Source,
-		"app_name", (Source is Map) ? Source.Get("app_name", "") : ""
+		"app_name", (Source is Map) ? Source.Get("app_name", "") : "",
+		"render_guard", _LLM_Engine_RenderIdentityIsCurrent.Bind(
+			RequestId, SemanticSignature)
 	)
 	try LLM_Tooltip_ShowLoading(Meta)
 }
@@ -679,7 +707,8 @@ _LLM_Engine_DispatchVariant(state) {
 			break
 		}
 	}
-	if has_real_slot {
+	if (has_real_slot
+			and !(state.Has("show_all_at_once") and state["show_all_at_once"])) {
 		active_idx := 1
 		for i, s in preview_slots {
 			if (s != "" and s != LLM_TOOLTIP_PLACEHOLDER) {
@@ -846,6 +875,12 @@ _LLM_Engine_IsCurrent(state) {
 			state["semantic_signature"], _LLM_Engine.Get("active_request_signature", "")))
 }
 
+_LLM_Engine_RenderIdentityIsCurrent(RequestId, SemanticSignature) {
+	return _LLM_Engine_IsCurrent(Map(
+		"request_id", RequestId,
+		"semantic_signature", SemanticSignature))
+}
+
 _LLM_Engine_FinalizeRequest(state) {
 	global _LLM_Engine
 	if !_LLM_Engine_IsCurrent(state)
@@ -877,7 +912,8 @@ _LLM_Engine_FinalizeRequest(state) {
 	try LLM_ApiCommon_LogSummary((state.Has("is_batch") and state["is_batch"]) ? "batch" : "sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
 	try LoggerInfo("LLM", "Prediction received — {1} suggestion(s).", state["slots"].Length)
 	global _LLM_Ollama_IsReady
-	_LLM_Ollama_IsReady := true
+	if state.Get("backend", "") == "ollama"
+		_LLM_Ollama_IsReady := true
 
 	; Keylogger event — same shape as HS (modules/keylogger/init.lua /
 	; M.log_llm) so a tail of the unified log reads identically across
@@ -1011,13 +1047,23 @@ _LLM_Engine_GetActiveApiEntry() {
 	if (Type(entries) != "Array" or entries.Length == 0)
 		return ""
 	active_id := _LLM_Engine.Has("api_entry_id") ? _LLM_Engine["api_entry_id"] : ""
-	if (active_id != "") {
-		for , e in entries {
-			id := (e is Map and e.Has("Id")) ? e["Id"] : (e.HasOwnProp("Id") ? e.Id : "")
-			if (id == active_id)
-				return e
-		}
+	SeenIds := Map()
+	Matched := ""
+	for , e in entries {
+		if e is Map
+			id := e.Has("Id") ? e["Id"] : ""
+		else if IsObject(e)
+			id := e.HasOwnProp("Id") ? e.Id : ""
+		else
+			return ""
+		if !(id is String) || Trim(id) == "" || SeenIds.Has(id)
+			return ""
+		SeenIds[id] := true
+		if active_id != "" && id == active_id
+			Matched := e
 	}
+	if Matched != ""
+		return Matched
 	; Fallback: first entry. Better than silent zero predictions when the
 	; user has at least one entry configured but has not picked one yet.
 	return entries[1]
@@ -1115,7 +1161,7 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 	; caller's check and the paint. Painting after a supersede leaves a prediction
 	; for abandoned text on screen that the keystroke's deferred hide can no longer
 	; dismiss, because the paint itself bumps the tooltip generation it compares.
-	if (is_final and request_id != "" and !_LLM_Engine_IsCurrent(Map(
+	if (request_id != "" and !_LLM_Engine_IsCurrent(Map(
 			"request_id", request_id, "semantic_signature", semantic_signature))) {
 		try LoggerInfo("LLM", "Prediction superseded during render — discarding request #{1}.", request_id)
 		return
@@ -1135,6 +1181,10 @@ LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false, request_id := "
 			? RenderAcceptSource.Get("app_name", "") : "",
 		"is_final", is_final ? true : false
 	)
+	if request_id != ""
+		PresentationMeta["render_guard"] :=
+			_LLM_Engine_RenderIdentityIsCurrent.Bind(
+				request_id, semantic_signature)
 	; The common surface transaction publishes pixels, slots, active index,
 	; acceptance target and lifecycle metrics as one owner. A refused/stale render
 	; therefore cannot emit llm_suggested or replace the source of visible A.

@@ -26,26 +26,173 @@
 ;
 ; CONTRACT:
 ;   AppPicker_Show(opts) where opts is a Map with keys:
+;     owner    : stable logical setting name (required)
 ;     title    : window title (required)
 ;     prompt   : header label above the list (required)
 ;     initial  : Array of lowercase process names already selected (optional)
-;     on_save  : Func(selected_array) — called when user clicks OK.
+;     on_save  : callable(selected_array, receipt) — called when user clicks OK.
 ;                ``selected_array`` is an Array of lowercase process names.
+;                ``receipt`` must be claimed inside the durable candidate build.
 ;     ok_label : optional override for the OK button caption
 ;
-; The Gui is modal-by-default (OwnDialogs) so it stays on top of the
-; submenu that triggered it.
+; The Gui is deliberately nonmodal: more than one window can exist, so every
+; callback is fenced by the logical-owner receipt described below.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
 
+global _AppPickerOwnerEpochs := Map()
+global _AppPickerActiveReceipts := Map()
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 1/ Ownership receipts =======
+; =====================================
+; =====================================
+
+; Normalizes either an Array selection or the Metrics Map representation into
+; one detached set. The picker compares sets, not display order.
+AppPicker_NormalizeSelection(Value) {
+	Normalized := Map()
+	try {
+		if Value is Array {
+			for Item in Value {
+				Key := StrLower(Trim(String(Item)))
+				if (Key != "")
+					Normalized[Key] := true
+			}
+			return Normalized
+		}
+		if Value is Map {
+			for Item, Enabled in Value {
+				if !Enabled
+					continue
+				Key := StrLower(Trim(String(Item)))
+				if (Key != "")
+					Normalized[Key] := true
+			}
+			return Normalized
+		}
+	}
+	return false
+}
+
+AppPicker_SelectionsEqual(Left, Right) {
+	LeftSet := AppPicker_NormalizeSelection(Left)
+	RightSet := AppPicker_NormalizeSelection(Right)
+	if !(LeftSet is Map) || !(RightSet is Map)
+		return false
+	if (LeftSet.Count != RightSet.Count)
+		return false
+	for Key, _ in LeftSet {
+		if !RightSet.Has(Key)
+			return false
+	}
+	return true
+}
+
+; Opening a picker supersedes every older window for the same logical setting.
+; Different features use different owner names and remain independent.
+AppPicker_IssueReceipt(Owner, BaseSelection) {
+	global _AppPickerOwnerEpochs, _AppPickerActiveReceipts
+	if !(Owner is String) || (Owner == "")
+		return false
+	Base := AppPicker_NormalizeSelection(BaseSelection)
+	if !(Base is Map)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		Epoch := _AppPickerOwnerEpochs.Get(Owner, 0) + 1
+		_AppPickerOwnerEpochs[Owner] := Epoch
+		Receipt := Map("owner", Owner, "epoch", Epoch, "base", Base,
+			"state", "open")
+		_AppPickerActiveReceipts[Owner] := Receipt
+		return Receipt
+	} finally Critical(PreviousCritical)
+}
+
+; Any non-picker producer of the same setting advances the owner too. This is
+; the version half of the receipt contract: a value that changes A->B->A while
+; a window is open must not make that old window current again.
+AppPicker_AdvanceOwner(Owner) {
+	global _AppPickerOwnerEpochs, _AppPickerActiveReceipts
+	if !(Owner is String) || Owner == ""
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		_AppPickerOwnerEpochs[Owner] := _AppPickerOwnerEpochs.Get(Owner, 0) + 1
+		if _AppPickerActiveReceipts.Has(Owner) {
+			Receipt := _AppPickerActiveReceipts[Owner]
+			if (Receipt is Map) && Receipt.Get("state", "") == "open"
+				Receipt["state"] := "retired"
+			_AppPickerActiveReceipts.Delete(Owner)
+		}
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+; Claims exactly one still-current receipt while the caller owns its durable
+; configuration transaction. Both identity and detached base are checked: an
+; older GUI cannot overwrite a newer picker or a setting changed elsewhere.
+AppPicker_ClaimReceipt(Receipt, LiveSelection) {
+	global _AppPickerOwnerEpochs, _AppPickerActiveReceipts
+	PreviousCritical := Critical("On")
+	try {
+		if !(Receipt is Map) || !Receipt.Has("owner")
+				|| !Receipt.Has("epoch") || !Receipt.Has("base")
+				|| Receipt.Get("state", "") != "open"
+			return false
+		Owner := Receipt["owner"]
+		if !(Owner is String) || !_AppPickerActiveReceipts.Has(Owner)
+			return false
+		if (_AppPickerActiveReceipts[Owner] != Receipt)
+			return false
+		if (_AppPickerOwnerEpochs.Get(Owner, 0) != Receipt["epoch"])
+			return false
+		if !AppPicker_SelectionsEqual(Receipt["base"], LiveSelection)
+			return false
+		Receipt["state"] := "claimed"
+		_AppPickerActiveReceipts.Delete(Owner)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+AppPicker_RetireReceipt(Receipt) {
+	global _AppPickerActiveReceipts
+	if !(Receipt is Map) || !Receipt.Has("owner")
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		Owner := Receipt["owner"]
+		if _AppPickerActiveReceipts.Has(Owner)
+				&& _AppPickerActiveReceipts[Owner] == Receipt
+			_AppPickerActiveReceipts.Delete(Owner)
+		if (Receipt.Get("state", "") == "open")
+			Receipt["state"] := "retired"
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+AppPicker_InvokeSave(OnSave, Selected, Receipt) {
+	if !HasMethod(OnSave, "Call") {
+		AppPicker_RetireReceipt(Receipt)
+		return false
+	}
+	try return OnSave.Call(Selected, Receipt)
+	finally AppPicker_RetireReceipt(Receipt)
+}
+
 
 
 
 
 ; ===============================
 ; ===============================
-; ======= 1/ Public entry =======
+; ======= 2/ Public entry =======
 ; ===============================
 ; ===============================
 
@@ -58,6 +205,9 @@ AppPicker_Show(opts) {
 		prompt := opts.Has("prompt") ? opts["prompt"] : t("dialog.app_picker.prompt")
 		ok_label := opts.Has("ok_label") ? opts["ok_label"] : t("common.ok")
 		on_save := opts.Has("on_save") ? opts["on_save"] : ""
+		owner := opts.Has("owner") ? opts["owner"] : ""
+		if !HasMethod(on_save, "Call") || !(owner is String) || owner == ""
+				return false
 
 		initial := Map()
 		if opts.Has("initial") && opts["initial"] is Array {
@@ -92,12 +242,26 @@ AppPicker_Show(opts) {
 		btn_cancel := g.AddButton("x+5 yp",            t("common.cancel"))
 		Gui_HarmoniseButtonWidths([btn_ok, btn_cancel])
 
-		btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, on_save))
-		btn_cancel.OnEvent("Click", (*) => g.Destroy())
-		g.OnEvent("Close", (*) => g.Destroy())
-		g.OnEvent("Escape", (*) => g.Destroy())
-
-		g.Show()
+		; The owner is published only after construction succeeds and immediately
+		; before the window becomes actionable. A failed GUI build leaves no stale
+		; receipt, and the last window made usable is the newest logical owner.
+		receipt := AppPicker_IssueReceipt(owner, initial)
+		if !(receipt is Map) {
+				g.Destroy()
+				return false
+		}
+		try {
+				btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, on_save, receipt))
+				btn_cancel.OnEvent("Click", (*) => AppPicker_OnCancel(g, receipt))
+				g.OnEvent("Close", (*) => AppPicker_OnCancel(g, receipt))
+				g.OnEvent("Escape", (*) => AppPicker_OnCancel(g, receipt))
+				g.Show()
+				return receipt
+		} catch {
+				AppPicker_RetireReceipt(receipt)
+				try g.Destroy()
+				throw
+		}
 }
 
 ; Collect the ticked rows and hand them to the caller's on_save callback.
@@ -111,7 +275,7 @@ AppPicker_Show(opts) {
 ; silently, because the index always stayed in range (app-picker-listview-sort-
 ; index). The control is the only object the sort touches, so it is the only
 ; object allowed to answer "which app is on row N".
-AppPicker_OnOK(g, lv, on_save) {
+AppPicker_OnOK(g, lv, on_save, receipt) {
 		selected := []
 		row_idx := 0
 		loop {
@@ -124,8 +288,12 @@ AppPicker_OnOK(g, lv, on_save) {
 				selected.Push(proc)
 		}
 		g.Destroy()
-		if (on_save != "" && on_save is Func)
-				on_save(selected)
+		return AppPicker_InvokeSave(on_save, selected, receipt)
+}
+
+AppPicker_OnCancel(g, receipt) {
+		AppPicker_RetireReceipt(receipt)
+		g.Destroy()
 }
 
 
@@ -134,7 +302,7 @@ AppPicker_OnOK(g, lv, on_save) {
 
 ; ========================================
 ; ========================================
-; ======= 2/ Running-app discovery =======
+; ======= 3/ Running-app discovery =======
 ; ========================================
 ; ========================================
 

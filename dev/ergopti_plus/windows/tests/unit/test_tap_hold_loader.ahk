@@ -266,7 +266,7 @@ Test("TapHoldDuration: falls back when time_activation_seconds absent", TestTapH
 ; the failure is silent from the driver's side — nothing errors, the keystroke
 ; simply arrives.
 TestTapHold_DispatchGatesOnSuspend() {
-	Gated := ["TapHoldShouldSuppressHold", "TapHoldSyntheticKeyDown",
+	Gated := ["TapHoldOwnImmediateModifier", "TapHoldSyntheticKeyDown",
 		"TapHoldSyntheticKeyUp", "TapHoldDispatchTap"]
 	for Fn in Gated {
 		Body := _DriverFuncBody(Fn)

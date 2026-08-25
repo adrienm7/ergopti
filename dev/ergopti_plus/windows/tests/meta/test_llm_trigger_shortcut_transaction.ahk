@@ -25,8 +25,10 @@ _LLMTG_StagedPlanOwnsEveryBoundary() {
 	Body := _DriverFuncBody("_LLM_Menu_BuildTriggerShortcutPlan")
 	Assert(Body != "",
 		"_LLM_Menu_BuildTriggerShortcutPlan must remain source-visible")
-	AssertContains(Body, "_HotkeyRegistrarReserveOwned(",
+	AssertContains(Body, "_HotkeyRegistrarReserveResolvedOwned(",
 		"the candidate must be installed native-Off before the writer")
+	Assert(InStr(Body, "_HotkeyRegistrarReserveOwned(") = 0,
+		"the trigger builder must never reopen textual layout resolution")
 	Assert(InStr(Body, "_HotkeyRegistrarBindOwned(") = 0,
 		"the builder must never activate a callback before durability")
 	AssertContains(Body, "rollback_updates:",
@@ -127,18 +129,29 @@ _LLMTG_RecoveryIsTerminableAndPostLease() {
 	Assert(RetryPos > 0 && RunClaimedPos > RetryPos && CommitPos > RunClaimedPos,
 		"a later edit must claim and finish recovery before claiming a new plan")
 	Lifecycle := _DriverFuncBody("_SuspendStateWatchdog")
+	WatchdogWork := _DriverFuncBody("_TrayRootServiceRetainedWork")
 	Resume := _DriverFuncBody("LLM_Menu_OnResume")
 	Assert(Lifecycle != "", "_SuspendStateWatchdog must remain source-visible")
+	Assert(WatchdogWork != "",
+		"the retained-work watchdog boundary must remain source-visible")
 	Assert(Resume != "", "LLM_Menu_OnResume must remain source-visible")
-	AssertContains(Lifecycle, "LLM_Menu_ServiceTriggerRecovery()",
+	AssertContains(Lifecycle, "TriggerService := LLM_Menu_ServiceTriggerRecovery",
 		"the active watchdog must recover a refused timer arm")
+	AssertContains(Lifecycle, "_TrayRootServiceRetainedWork(",
+		"the active watchdog must use the typed retained-work boundary")
+	FatalPos := InStr(WatchdogWork, "TrayRootFatalContextError")
+	ReturnPos := FatalPos > 0
+		? InStr(WatchdogWork, "return false", , FatalPos) : 0
+	TriggerPos := InStr(WatchdogWork, "NextFn.Call()")
+	Assert(FatalPos > 0 && ReturnPos > FatalPos && TriggerPos > ReturnPos,
+		"fatal root context must end the watchdog pass before trigger recovery")
 	AssertContains(Resume, "LLM_Menu_ServiceTriggerRecovery()",
 		"resume must transfer a timer callback consumed during pause")
 	for Spec in [
-		{ body: Lifecycle, label: "watchdog" },
-		{ body: Resume, label: "resume" }
+		{ body: WatchdogWork, call: "NextFn.Call()", label: "watchdog" },
+		{ body: Resume, call: "LLM_Menu_ServiceTriggerRecovery()", label: "resume" }
 	] {
-		CallPos := InStr(Spec.body, "LLM_Menu_ServiceTriggerRecovery()")
+		CallPos := InStr(Spec.body, Spec.call)
 		CatchPos := CallPos > 0
 			? InStr(Spec.body, "catch as Err", , CallPos) : 0
 		LogPos := CatchPos > 0
@@ -154,11 +167,14 @@ _LLMTG_BootFailureIsVisibleAndStrictlyConsumed() {
 	ApplyBody := _DriverFuncBody("LLM_Menu_ApplyTriggerShortcut")
 	NotifyBody := _DriverFuncBody("_LLM_Menu_NotifyTriggerApplyFailure")
 	InitBody := _DriverFuncBody("LLM_Menu_Init")
+	RestoreBody := _DriverFuncBody("_LLM_Menu_RestoreSavedOptsOnce")
 	Assert(ApplyBody != "",
 		"LLM_Menu_ApplyTriggerShortcut must remain source-visible")
 	Assert(NotifyBody != "",
 		"_LLM_Menu_NotifyTriggerApplyFailure must remain source-visible")
 	Assert(InitBody != "", "LLM_Menu_Init must remain source-visible")
+	Assert(RestoreBody != "",
+		"_LLM_Menu_RestoreSavedOptsOnce must remain source-visible")
 	AssertContains(ApplyBody, "_LLM_Menu_NotifyTriggerApplyFailure(",
 		"boot replay refusal must have a user-visible terminal")
 	AssertContains(NotifyBody, "NotifierSend(",
@@ -171,12 +187,15 @@ _LLMTG_BootFailureIsVisibleAndStrictlyConsumed() {
 		"boot must reject malformed truthy activation statuses")
 	FirstRestorePos := InStr(InitBody, "if FirstRestore {")
 	ReplayPos := InStr(InitBody, "LLM_Menu_ApplyTriggerShortcut(")
-	OverridesGatePos := InStr(InitBody,
-		'if FirstRestore && saved_opts.Has("app_profile_overrides")')
 	Assert(FirstRestorePos > 0 && ReplayPos > FirstRestorePos,
 		"a root tray rebuild must not replay the stale boot trigger snapshot")
-	Assert(OverridesGatePos > 0,
-		"sibling app-profile state must carry the same one-shot restore condition")
+	AssertContains(RestoreBody, "if _LLM_Menu_Loaded",
+		"the restore owner must reject every post-boot replay")
+	AssertContains(RestoreBody, 'if saved_opts.Has("app_profile_overrides")',
+		"sibling app-profile state must remain inside the one-shot restore owner")
+	AssertContains(RestoreBody,
+		'LLM_Option_TryNormalize("app_profile_overrides"',
+		"the one-shot override restore must retain its typed admission boundary")
 }
 Test("[llm-trigger-tx-meta] boot failure is visible and strictly consumed",
 	_LLMTG_BootFailureIsVisibleAndStrictlyConsumed)

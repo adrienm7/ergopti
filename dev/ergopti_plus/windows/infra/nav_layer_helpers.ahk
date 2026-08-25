@@ -68,6 +68,55 @@ DisableLayer() {
 	UpdateCapsLockLED()
 }
 
+_TapHoldLayerWaitRelease(KeyName, TimeoutSec) {
+	return KeyWait(KeyName, "U T" . TimeoutSec)
+}
+
+_TapHoldLayerKeyIsDown(KeyName) {
+	return GetKeyState(KeyName, "P")
+}
+
+_TapHoldLayerTickNow() {
+	return A_TickCount
+}
+
+; Own one hold-layer gesture from the physical key-down through release.  The
+; layer is published before the first interruptible wait, so a second key that
+; arrives immediately is routed by the layer.  A quick isolated release is
+; reported as a tap only after DisableLayer has run.
+TapHoldOwnImmediateLayer(KeyName, TapThresholdSec, WaitReleaseFn := 0,
+	KeyIsDownFn := 0, TickNowFn := 0, ActivateFn := 0, DisableFn := 0) {
+	if !IsObject(WaitReleaseFn)
+		WaitReleaseFn := _TapHoldLayerWaitRelease
+	if !IsObject(KeyIsDownFn)
+		KeyIsDownFn := _TapHoldLayerKeyIsDown
+	if !IsObject(TickNowFn)
+		TickNowFn := _TapHoldLayerTickNow
+	if !IsObject(ActivateFn)
+		ActivateFn := ActivateLayer
+	if !IsObject(DisableFn)
+		DisableFn := DisableLayer
+
+	StartedAt := TickNowFn.Call()
+	if !ActivateFn.Call()
+		return Map("activated", false, "tap", false, "elapsed_ms", 0)
+
+	try {
+		while !WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+			if !KeyIsDownFn.Call(KeyName)
+				break
+		}
+	} finally {
+		DisableFn.Call()
+	}
+
+	ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
+	return Map(
+		"activated", true,
+		"tap", ElapsedMs <= TapThresholdSec * 1000,
+		"elapsed_ms", ElapsedMs)
+}
+
 ResetNumberOfRepetitions() {
 	SetNumberOfRepetitions(1)
 }

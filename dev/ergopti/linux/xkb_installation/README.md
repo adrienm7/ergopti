@@ -37,11 +37,8 @@ bash install.sh
 # Non interactif (CI, scripts)
 bash install.sh --yes --version v2_2_1 --variant ergopti_plus
 
-# Sans sudo : installation dans ~/.config/xkb (sessions Wayland uniquement)
-bash install.sh --user --variant ergopti_plus
-
-# Désinstallation (clean + restauration des sauvegardes legacy)
-bash install.sh --uninstall
+# Désinstallation non interactive (méthode déduite des fichiers installés)
+bash install.sh --uninstall --yes
 ```
 
 Notes :
@@ -53,6 +50,12 @@ Notes :
   distinctes (ê, j et plusieurs symboles changent de touche). Utilisez `--ansi` sur un clavier
   physique ANSI.
 - L'activation GNOME/KDE ajoute Ergopti à votre liste existante au lieu de la remplacer.
+- La désinstallation refuse de choisir si des artefacts clean et legacy coexistent, ou si aucune
+  installation n'est détectée. Dans le premier cas, relancez avec
+  `--installation-method clean|legacy` après avoir vérifié la méthode à retirer.
+- L'installation écrit dans les répertoires XKB système et requiert donc `sudo`. Un ancien mode
+  `--user` a été retiré : le chemin qu'il utilisait n'était pas chargé par libxkbcommon et son
+  isolation vis-à-vis des fichiers système n'était pas garantie.
 
 ### Surcharge des répertoires (tests / bac à sable)
 
@@ -65,6 +68,7 @@ exécute le vrai CLI sans droits root :
 | `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | Racine des extensions XKB |
 | `ERGOPTI_XKB_SYSTEM_ROOT` | `/usr/share/X11/xkb` | Arbre X11 hérité (liens + patch rules nettoyés) |
 | `ERGOPTI_XKB_CACHE_DIR` | `/var/lib/xkb` | Cache XKB purgé après installation |
+| `ERGOPTI_XKB_USER_HOME` | home de l'utilisateur appelant | Home isolé pour les tests XCompose |
 
 Codes de sortie du script Python clean : `0` succès - `2` erreur d'usage (argparse) -
 `3` paquet incohérent ou keymap non compilable - `4` installation abandonnée.

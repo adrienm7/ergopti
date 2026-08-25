@@ -134,7 +134,6 @@ global _LLM_Menu := Map(
 	"n_predictions",              3,
 	"min_words",                  3,
 	"max_words",                  15,
-	"language",                   "fr",
 	"debounce_ms",                500,
 	"ctx_chars",                  500,
 	"temperature",                "0.10",
@@ -205,12 +204,6 @@ global _LLM_Menu := Map(
 global LLM_PROFILE_ADVANCED_PARAMS_B := 2.0   ; ≥ 2B → advanced
 global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
 
-; Ordered profile list used by the Ctrl+<n> hotkeys. Index 1 maps to the
-; first row of the profile submenu (Ctrl+1), index 2 to Ctrl+2, etc. The
-; built-ins always come first so the shortcut layout stays stable across
-; sessions — appending user profiles after them lets a user keep their
-; muscle memory while still reaching their own profiles by index.
-global LLM_PROFILE_BUILTIN_ORDER := ["raw", "basic", "advanced", "batch_advanced"]
 ; How many Ctrl+<n> shortcuts we register. We stop at Ctrl+9 because Ctrl+0
 ; collides with browser zoom reset on too many apps to be worth binding.
 global LLM_PROFILE_HOTKEY_LIMIT := 9
@@ -250,8 +243,16 @@ LLM_Menu_ApplySharedDefaults() {
 	)
 
 	for shared_key, tray_key in _key_map {
-		if LLM_Defaults.Has(shared_key)
-			_LLM_Menu[tray_key] := LLM_Defaults[shared_key]
+		if !LLM_Defaults.Has(shared_key)
+			continue
+		if tray_key == "ollama_port" {
+			if !LLM_Option_TryNormalizeOllamaPort(
+					LLM_Defaults[shared_key], &NormalizedPort)
+				throw Error("Shared LLM default 'llm_ollama_port' is invalid.")
+			_LLM_Menu[tray_key] := NormalizedPort
+			continue
+		}
+		_LLM_Menu[tray_key] := LLM_Defaults[shared_key]
 	}
 }
 LLM_Menu_ApplySharedDefaults()
@@ -289,7 +290,10 @@ global LLM_MENU_BUILD_DEFER_MS := 200
 
 #Include persist.ahk
 #Include transactions.ahk
+#Include backend_lifecycle.ahk
+#Include aux_ownership.ahk
 #Include init.ahk
+#Include menu_build_coordinator.ahk
 #Include menu_main.ahk
 #Include menu_models.ahk
 #Include menu_api_entries.ahk

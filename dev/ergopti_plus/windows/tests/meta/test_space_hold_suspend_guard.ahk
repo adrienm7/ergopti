@@ -24,13 +24,9 @@
 _SHSG_AssertSpaceHoldSuspendGuard() {
 	Body := _DriverFuncBody("SpaceTapHold")
 	Assert(Body != "", "SpaceTapHold(HoldFn) must exist")
-	WaitIdx := InStr(Body, "ih.Wait()")
-	Assert(WaitIdx > 0, "SpaceTapHold must call ih.Wait()")
-	GuardIdx := InStr(Body, "A_IsSuspended", , WaitIdx + 1)
-	Assert(GuardIdx > WaitIdx,
-		"SpaceTapHold must re-check A_IsSuspended AFTER ih.Wait() — a live InputHook bypasses native Suspend and would leak a phantom modified keystroke (space-hold-inputhook-suspend-guard)")
-	CallIdx := InStr(Body, "HoldFn.Call", , WaitIdx + 1)
-	Assert(CallIdx > 0 and GuardIdx < CallIdx,
-		"SpaceTapHold's A_IsSuspended re-check must precede HoldFn.Call so a paused driver emits nothing (space-hold-inputhook-suspend-guard)")
+	Assert(InStr(Body, 'TapHoldOwnImmediateModifier("space",') > 0,
+		"Space must delegate to the shared owner which guards suspension and balances the modifier")
+	Assert(!InStr(Body, "InputHook(") and !InStr(Body, "ih.Wait()"),
+		"Space must not suppress/capture the first chord before arming its configured modifier")
 }
-Test("tap-holds: SpaceTapHold re-checks A_IsSuspended after ih.Wait() (space-hold-inputhook-suspend-guard)", _SHSG_AssertSpaceHoldSuspendGuard)
+Test("tap-holds: Space modifier ownership is immediate and suspend-safe (space-hold-inputhook-suspend-guard)", _SHSG_AssertSpaceHoldSuspendGuard)

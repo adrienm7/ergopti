@@ -32,10 +32,10 @@ SELECTED_BRANCH="${BRANCH:-$DEFAULT_BRANCH}"
 FORCE_INSTALLATION_METHOD=""
 WANT_UNINSTALL=false
 WANT_ANSI=false
-WANT_USER=false
 WANT_YES=false
 SELECTED_VERSION_ARG=""
 SELECTED_VARIANT_ARG=""
+UNINSTALL_METHOD_REQUIRED_MESSAGE="--uninstall requiert --installation-method clean|legacy"
 
 RED=$(printf '\033[31m')
 GREEN=$(printf '\033[32m')
@@ -51,7 +51,7 @@ unset FZF_DEFAULT_OPTS || true
 usage_error() {
     printf "${RED}❌ %s${NO_COLOR}\n" "$1" >&2
     echo "Usage : $0 [--installation-method clean|legacy] [--version v2_2_1]" \
-        "[--variant ergopti|ergopti_plus] [--ansi] [--user] [--uninstall] [--yes]" >&2
+        "[--variant ergopti|ergopti_plus] [--ansi] [--uninstall] [--yes]" >&2
     exit 1
 }
 
@@ -97,6 +97,92 @@ run_fzf() {
     fzf --height=12 --layout=reverse --border --inline-info "$@"
 }
 
+has_numbered_backup() {
+    local target backup suffix
+    for target in "$@"; do
+        for backup in "$target".*; do
+            [ -e "$backup" ] || continue
+            suffix="${backup#"$target".}"
+            if [[ "$suffix" =~ ^[0-9]+$ ]]; then
+                return 0
+            fi
+        done
+    done
+    return 1
+}
+
+has_legacy_installation() {
+    local system_root="$1"
+    local target
+    for target in \
+            "$system_root/symbols/fr" \
+            "$system_root/types/extra" \
+            "$system_root/rules/evdev.lst" \
+            "$system_root/rules/evdev.xml"; do
+        if [ -f "$target" ] && grep -qi 'ergopti' "$target" \
+                && has_numbered_backup "$target"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+has_clean_installation() {
+    local extensions_root="$1"
+    local system_root="$2"
+    local user_home="$3"
+    local component
+
+    if [ -d "$extensions_root/ergopti" ]; then
+        return 0
+    fi
+    for component in symbols types; do
+        if [ -d "$system_root/$component" ] \
+                && find "$system_root/$component" -maxdepth 1 \
+                    \( -type f -o -type l \) -iname '*ergopti*' -print -quit \
+                    2>/dev/null | grep -q .; then
+            return 0
+        fi
+    done
+    if [ -f "$system_root/rules/evdev" ] \
+            && grep -i 'ergopti' "$system_root/rules/evdev" | grep -q '='; then
+        return 0
+    fi
+    if [ -n "$user_home" ] && [ -f "$user_home/.XCompose" ] \
+            && grep -qFx '# Ergopti managed XCompose' "$user_home/.XCompose"; then
+        return 0
+    fi
+    return 1
+}
+
+infer_uninstall_method() {
+    local extensions_root="${ERGOPTI_XKB_EXTENSIONS_ROOT:-/usr/share/xkeyboard-config.d}"
+    local system_root="${ERGOPTI_XKB_SYSTEM_ROOT:-/usr/share/X11/xkb}"
+    local user_home="${ERGOPTI_XKB_USER_HOME:-${HOME:-}}"
+    local clean_found=false
+    local legacy_found=false
+
+    if has_clean_installation "$extensions_root" "$system_root" "$user_home"; then
+        clean_found=true
+    fi
+
+    if has_legacy_installation "$system_root"; then
+        legacy_found=true
+    fi
+
+    if [ "$clean_found" = true ] && [ "$legacy_found" = true ]; then
+        usage_error "$UNINSTALL_METHOD_REQUIRED_MESSAGE"
+    fi
+    if [ "$clean_found" != true ] && [ "$legacy_found" != true ]; then
+        usage_error "$UNINSTALL_METHOD_REQUIRED_MESSAGE"
+    fi
+    if [ "$clean_found" = true ]; then
+        FORCE_INSTALLATION_METHOD="clean"
+    else
+        FORCE_INSTALLATION_METHOD="legacy"
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --installation-method)
@@ -118,10 +204,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ansi)
             WANT_ANSI=true
-            shift
-            ;;
-        --user)
-            WANT_USER=true
             shift
             ;;
         --yes)
@@ -147,19 +229,33 @@ case "$SELECTED_VARIANT_ARG" in
     ergopti | ergopti_plus) ;;
     *) usage_error "Variante invalide : $SELECTED_VARIANT_ARG (ergopti|ergopti_plus)" ;;
 esac
-if [ "$WANT_YES" = true ] && { [ -z "$SELECTED_VERSION_ARG" ] || [ -z "$SELECTED_VARIANT_ARG" ]; }; then
+if [ "$WANT_YES" = true ] && [ "$WANT_UNINSTALL" != true ] \
+        && { [ -z "$SELECTED_VERSION_ARG" ] || [ -z "$SELECTED_VARIANT_ARG" ]; }; then
     usage_error "--yes requiert --version et --variant"
 fi
+if [[ ! "$SELECTED_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
+        || "$SELECTED_BRANCH" == *..* \
+        || "$SELECTED_BRANCH" == */ \
+        || "$SELECTED_BRANCH" == *//*; then
+    usage_error "Branche invalide : $SELECTED_BRANCH"
+fi
 
-if [ ! -t 1 ]; then
+if [ "$WANT_YES" != true ] && [ ! -t 1 ]; then
     printf "%s❌ Erreur : terminal interactif requis.%s\n" "${RED}" "${NO_COLOR}" >&2
     echo "(Si vous voyez ce message mais aucun bandeau d'accueil, le téléchargement du script a probablement échoué.)" >&2
     exit 1
 fi
 
 IS_LOCAL=false
+SCRIPT_DIR=""
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
-    IS_LOCAL=true
+    SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+    LOCAL_DRIVERS_ROOT=$(dirname "$SCRIPT_DIR")
+    if [ -f "$SCRIPT_DIR/detect_installation_method.sh" ] \
+            && find "$LOCAL_DRIVERS_ROOT" -maxdepth 1 -type d -name 'v*' -print -quit \
+                | grep -q .; then
+        IS_LOCAL=true
+    fi
 fi
 
 TEMP_DIR=$(mktemp -d -t ergopti-install.XXXXXX)
@@ -194,15 +290,13 @@ if ! command -v git >/dev/null 2>&1 && [ -f /etc/os-release ]; then
     esac
 fi
 
-for cmd in git python3 curl; do
+for cmd in git python3; do
     run_step "Vérification de $cmd" "$cmd disponible" command -v "$cmd"
 done
 
-log_section "Vérification de la disponibilité de fzf"
-if ! command -v fzf >/dev/null 2>&1; then
-    if [ "$WANT_UNINSTALL" = true ]; then
-        printf "${LOG_INDENT}${YELLOW}ℹ️  fzf absent : inutile pour la désinstallation.${NO_COLOR}\n"
-    else
+if [ "$WANT_UNINSTALL" != true ] && [ "$WANT_YES" != true ]; then
+    log_section "Vérification de la disponibilité de fzf"
+    if ! command -v fzf >/dev/null 2>&1; then
         printf "${LOG_INDENT}${YELLOW}⚠️  Fzf non trouvé. Lancement de l'installation locale de fzf...${NO_COLOR}\n"
         LOG_INDENT="${LOG_INDENT}   "
         run_step "Téléchargement de fzf" "Code source récupéré" \
@@ -211,9 +305,9 @@ if ! command -v fzf >/dev/null 2>&1; then
             run_with_retry 3 60 "$TEMP_DIR/fzf/install" --bin --no-update-rc --no-key-bindings --no-completion
         LOG_INDENT="${LOG_INDENT%   }"
         export PATH="$TEMP_DIR/fzf/bin:$PATH"
+    else
+        printf "${LOG_INDENT}${GREEN}✅ Fzf est déjà installé sur le système${NO_COLOR}\n"
     fi
-else
-    printf "${LOG_INDENT}${GREEN}✅ Fzf est déjà installé sur le système${NO_COLOR}\n"
 fi
 
 # ---------------------------------------------------------------------------
@@ -222,7 +316,6 @@ fi
 
 if [ "$IS_LOCAL" = true ]; then
     log_section "Mode local détecté"
-    SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
     DRIVERS_ROOT="$(dirname "$SCRIPT_DIR")"
     printf "${LOG_INDENT}Analyse des fichiers locaux dans : ${BOLD}$DRIVERS_ROOT${NO_COLOR}\n"
 else
@@ -233,6 +326,10 @@ else
     git remote add origin "$REPO_URL" >/dev/null 2>&1
     run_step "Récupération de la liste des fichiers" "Métadonnées synchronisées" \
         git fetch --depth 1 --filter=blob:none origin "$SELECTED_BRANCH"
+    git config core.sparseCheckout true
+    printf '%s\n' "$TARGET_DIR/$INSTALLER_REL_PATH" > .git/info/sparse-checkout
+    run_step "Téléchargement de l'installeur" "Installeur récupéré" \
+        git checkout "$SELECTED_BRANCH"
     DRIVERS_ROOT="$REPO_DIR/$TARGET_DIR"
 fi
 
@@ -243,18 +340,17 @@ fi
 if [ "$WANT_UNINSTALL" = true ]; then
     log_section "Désinstallation"
     INSTALLER_SCRIPTS_DIR="$DRIVERS_ROOT/$INSTALLER_REL_PATH"
-    if [ "$WANT_USER" = true ]; then
-        printf "${LOG_INDENT}Désinstallation utilisateur (%s).\n" "~/.config/xkb"
-        python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --user --uninstall \
-            || printf "${YELLOW}ℹ️  Rien n'a été désinstallé (paquet utilisateur déjà absent ?).%s\n" "${NO_COLOR}"
+    if [ -z "$FORCE_INSTALLATION_METHOD" ]; then
+        infer_uninstall_method
+    fi
+    if [ "$FORCE_INSTALLATION_METHOD" = "legacy" ]; then
+        run_step "Retrait de l'installation Legacy" "Installation Legacy retirée" \
+            sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --uninstall
+    elif [ "$FORCE_INSTALLATION_METHOD" = "clean" ]; then
+        run_step "Retrait du paquet Clean" "Paquet Clean retiré" \
+            sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --uninstall
     else
-        printf "${LOG_INDENT}Retire le paquet « ergopti » des répertoires d'extension,\n"
-        printf "${LOG_INDENT}ainsi que les liens hérités éventuels dans %s.\n" "/usr/share/X11/xkb"
-        sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --uninstall \
-            || printf "${YELLOW}ℹ️  Rien n'a été désinstallé (paquet déjà absent ?).%s\n" "${NO_COLOR}"
-        # Legacy uninstall: restore the pre-Ergopti backups when they exist.
-        sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --uninstall \
-            || true
+        usage_error "Méthode de désinstallation absente ou invalide"
     fi
     printf "\n${GREEN}Désinstallation terminée. Redémarrez la session pour retrouver votre disposition précédente.${NO_COLOR}\n"
     exit 0
@@ -377,11 +473,6 @@ fi
 printf "${LOG_INDENT}${GREEN}➡️  Variante : $SELECTED_VARIANT_RAW${NO_COLOR}\n"
 
 # Physical form: ISO by default, ANSI behind the flag.
-if [ "$WANT_ANSI" = true ]; then
-    PATTERN="${SUFFIX}_ansi.xkb"
-else
-    PATTERN=".xkb"
-fi
 XKB_FILENAME=""
 while IFS= read -r candidate; do
     candidate_lower="${candidate,,}"
@@ -486,33 +577,20 @@ fi
 XKB_FULL_PATH=$(realpath "$SELECTED_VERSION_DIR/$XKB_FILENAME")
 TYPES_FULL_PATH=$(realpath "$SELECTED_VERSION_DIR/$TYPES_FILENAME")
 
-XCOMPOSE_ARG=""
+INSTALLER_ARGS=(--xkb "$XKB_FULL_PATH" --types "$TYPES_FULL_PATH")
 if [ -n "$XCOMPOSE_FILENAME" ]; then
-    XCOMPOSE_ARG="--xcompose $(realpath "$SELECTED_VERSION_DIR/$XCOMPOSE_FILENAME")"
+    INSTALLER_ARGS+=(--xcompose "$(realpath "$SELECTED_VERSION_DIR/$XCOMPOSE_FILENAME")")
 fi
 
-VARIANT_ARG=""
-USER_ARG=""
 if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
-    VARIANT_ARG="--variant $VARIANT_ID"
-    if [ "$WANT_USER" = true ]; then
-        USER_ARG="--user"
-        printf "${LOG_INDENT}${BOLD}Mode utilisateur : installation dans ~/.config/xkb (sans sudo, sessions Wayland).${NO_COLOR}\n"
-        CMD="python3 $INSTALLER_FULL_PATH --xkb $XKB_FULL_PATH --types $TYPES_FULL_PATH $XCOMPOSE_ARG $VARIANT_ARG $USER_ARG"
-    fi
-elif [ "$WANT_USER" = true ]; then
-    printf "${LOG_INDENT}${YELLOW}⚠️  --user ignoré : la méthode legacy modifie les fichiers système.${NO_COLOR}\n"
+    INSTALLER_ARGS+=(--variant "$VARIANT_ID")
+elif [ "$WANT_YES" = true ] && [ -n "$XCOMPOSE_FILENAME" ]; then
+    INSTALLER_ARGS+=(--force-xcompose)
 fi
 
 printf "${LOG_INDENT}Méthode d'installation : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
 
-if [ "$WANT_USER" = true ] && [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
-    python3 $INSTALLER_FULL_PATH --xkb "$XKB_FULL_PATH" --types "$TYPES_FULL_PATH" \
-        $XCOMPOSE_ARG $VARIANT_ARG $USER_ARG
-else
-    printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copier les fichiers.\n"
-    printf "\n🚀 Exécution de l'installeur...\n"
-    tput cnorm >/dev/null 2>&1 || true
-    sudo python3 "$INSTALLER_FULL_PATH" --xkb "$XKB_FULL_PATH" --types "$TYPES_FULL_PATH" \
-        $XCOMPOSE_ARG $VARIANT_ARG
-fi
+printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copier les fichiers.\n"
+printf "\n🚀 Exécution de l'installeur...\n"
+tput cnorm >/dev/null 2>&1 || true
+sudo python3 "$INSTALLER_FULL_PATH" "${INSTALLER_ARGS[@]}"

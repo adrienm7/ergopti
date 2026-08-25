@@ -40,20 +40,17 @@ _SHEG_GuardPresent() {
 	; Move-resilient: locate SpaceTapHold() across the whole driver source via the
 	; framework helper instead of a pinned modules path
 	block := _DriverFuncBody("SpaceTapHold")
-	Assert(InStr(block, "ih.Input") > 0,
-		"space.ahk: SpaceTapHold() must check ih.Input before calling HoldFn to prevent phantom modifier on empty capture")
+	Assert(InStr(block, 'TapHoldOwnImmediateModifier("space",') > 0,
+		"space.ahk: SpaceTapHold() must use the immediate configured-modifier owner")
+	Assert(!InStr(block, "ih.Input") and !InStr(block, "HoldFn.Call"),
+		"Space must not retain the obsolete empty-capture path")
 }
 Test("SpaceTapHold: ih.Input guard present before HoldFn.Call (space-hold-empty-guard)", _SHEG_GuardPresent)
 
 
 _SHEG_HoldFnInsideGuard() {
 	block := _DriverFuncBody("SpaceTapHold")
-	posGuard   := InStr(block, "ih.Input")
-	posHoldFn  := InStr(block, "HoldFn.Call")
-	Assert(posGuard > 0 and posHoldFn > 0,
-		"space.ahk: both ih.Input guard and HoldFn.Call must be present in SpaceTapHold()")
-	; Guard must come before the call — HoldFn.Call is inside the guarded branch.
-	Assert(posGuard < posHoldFn,
-		"space.ahk: ih.Input check must precede HoldFn.Call in SpaceTapHold()")
+	Assert(!InStr(block, "InputHook(") and !InStr(block, "HoldFn"),
+		"Space no longer needs an empty-input guard because it never captures/replays the first chord")
 }
-Test("SpaceTapHold: ih.Input guard precedes HoldFn.Call (space-hold-empty-guard)", _SHEG_HoldFnInsideGuard)
+Test("SpaceTapHold: obsolete empty-capture dispatcher is absent (space-hold-empty-guard)", _SHEG_HoldFnInsideGuard)

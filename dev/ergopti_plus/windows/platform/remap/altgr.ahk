@@ -21,13 +21,40 @@
 ; ========================
 ; ========================
 
+_AltGrHoldModKey() {
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "alt_gr"), "alt_gr", "RAlt")
+}
+
+#HotIf not _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldHoldModifier(TapHold, "alt_gr") != ""
+SC01D & SC138::
+RAlt:: {
+	Result := TapHoldOwnImmediateModifier("alt_gr", "RAlt",
+		_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"))
+	if (Result["tap"] and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
+		DisableCapsWord()
+		AltGrTapHoldDispatchV2()
+	}
+}
+#HotIf
+
+#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldHoldModifier(TapHold, "alt_gr") != ""
+*$SC138:: {
+	Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
+		_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"))
+	if (Result["tap"] and A_PriorKey == "SC138") {
+		DisableCapsWord()
+		AltGrTapHoldDispatchV2()
+	}
+}
+#HotIf
+
 ; The standalone ``RAlt::`` hotkey below consumes every AltGr/Kana press while
 ; it is active, breaking native AltGr typing in any context where the user
 ; expects their Windows layout to handle the key. We therefore gate it on
 ; ``not IsOnboardingActive()`` so the wizard's Edit fields (and anything else
 ; the user types while the first-run wizard is up) receive AltGr characters
 ; from the OS instead of the tap-hold consuming them.
-#HotIf not LayerEnabled and not IsOnboardingActive() and TapHoldIsConfigured(TapHold, "alt_gr")
+#HotIf not LayerEnabled and not IsOnboardingActive() and TapHoldIsConfigured(TapHold, "alt_gr") and TapHoldHoldModifier(TapHold, "alt_gr") == "" and TapHoldHoldLayer(TapHold, "alt_gr") == ""
 ; Tap-hold on "AltGr"
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
@@ -53,7 +80,7 @@ RAlt Up:: {
 ; Kana/IME physical AltGr is scan code 138, not the RAlt scan code used by
 ; the standard layout handlers. Register it as a standalone tap-hold key and
 ; keep it mutually exclusive with the virtual-RAlt path above.
-#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsConfigured(TapHold, "alt_gr")
+#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsConfigured(TapHold, "alt_gr") and TapHoldHoldModifier(TapHold, "alt_gr") == "" and TapHoldHoldLayer(TapHold, "alt_gr") == ""
 SC138:: {
 		tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
 		if (tap and A_PriorKey == "SC138") {

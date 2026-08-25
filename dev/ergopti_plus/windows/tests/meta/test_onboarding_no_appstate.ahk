@@ -45,6 +45,20 @@
 ; =====================================================
 ; =====================================================
 
+_ONA_NativeLocaleNextDoesNotPublishPreview() {
+	Body := _StripFullLineComments(_DriverFuncBody("_Step1_Next"))
+	Assert(Body != "", "the native onboarding locale Next handler must remain source-visible")
+	AssertFalse(InStr(Body, "_I18nLocale") || InStr(Body, "_I18nCacheLoaded"),
+		"native Next must keep the preview locale detached until Finish commits it")
+	AnswerPos := InStr(Body, "global _ob_locale := locale.Code")
+	NavigatePos := InStr(Body, "_Onboarding_Navigate(_Onboarding_StepConfigDir)")
+	Assert(AnswerPos > 0 && NavigatePos > AnswerPos,
+		"native Next must still retain the selected answer before navigating to the next page")
+}
+Test("onboarding native locale Next remains detached until Finish "
+	. "(ahk6-02-onboarding-locale-preview)",
+	_ONA_NativeLocaleNextDoesNotPublishPreview)
+
 _ONA_CommitDoesNotUseAppState() {
 	Seg := _DriverFuncBody("_Onboarding_Commit")
 	Assert(Seg != "", "_Onboarding_Commit declaration must exist in the driver source")

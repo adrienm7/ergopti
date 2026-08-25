@@ -142,8 +142,8 @@ _AHK16_EveryRequestPathCarriesSemanticIdentity() {
 
 	FireBody := _DriverFuncBody("LLM_Engine_FirePrediction")
 	Assert(FireBody != "", "AHK-16 LLM_Engine_FirePrediction must exist in driver source")
-	Assert(InStr(FireBody, "_LLM_Engine_RefreshSemanticConfig()") > 0,
-		"AHK-16 fire boundary must re-derive semantic state after in-place collection mutations")
+	Assert(InStr(FireBody, "_LLM_Engine_RefreshSemanticConfig()") == 0,
+		"AHK2-18 unchanged fires must consume the signature committed by LLM_Engine_Init, not re-encode the full option graph")
 	AssertEqual(2, _AHK16_CountOccurrences(FireBody, "_LLM_Engine_CacheOwnsRequest("),
 		"AHK-16 exact and prefix cache branches must both verify semantic ownership")
 	AssertEqual(2, _AHK16_CountOccurrences(FireBody,

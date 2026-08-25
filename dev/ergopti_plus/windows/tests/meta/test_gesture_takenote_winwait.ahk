@@ -18,10 +18,10 @@ _GTN_WinWaitIsQualified() {
 		"GestureTakeNote must delegate to the shared note transaction")
 	Assert(!InStr(EntryBody, "WinWait") and !InStr(PollBody, "WinWait"),
 		"neither gesture dispatch nor its deferred worker may block in WinWait")
-	Assert(InStr(RequestBody, 'Pattern := FileName . " ahk_exe notepad.exe"') > 0,
-		"the one shared target must qualify the filename with notepad.exe")
-	Assert(InStr(PollBody, 'Ops.WindowExists(Job["pattern"])') > 0,
-		"every deferred window probe must consume the qualified shared pattern")
+	Assert(InStr(RequestBody, "FileName, Pattern") > 0,
+		"the shared job must retain the exact filename separately from diagnostics")
+	Assert(InStr(PollBody, 'Ops.FindWindow(Job["file_name"])') > 0,
+		"every deferred window probe must resolve the exact requested basename")
 }
 Test("TakeNote: the non-blocking shared job targets only the qualified Notepad window",
 	_GTN_WinWaitIsQualified)

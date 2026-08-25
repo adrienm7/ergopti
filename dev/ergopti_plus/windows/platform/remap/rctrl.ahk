@@ -60,7 +60,7 @@ _RCtrlHoldModKey() {
 ; ===============================================
 ; ===============================================
 
-#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 SC11D::
 {
 	if KS_IsDown("LShift") { ; LShift physically held → Delete
@@ -97,13 +97,13 @@ SC11D::
 
 ; ~ prefix: RCtrl passthrough so the OS still sees Ctrl during KeyWait.
 ; Explicit modifier pass-throughs so Shift+Tab, Ctrl+Tab, Win+Tab still work.
-#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "tab" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "tab" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 ~SC11D:: {
 	tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if (tap and A_PriorKey == "RControl") {
 		if !TapHoldReleasePhysicalKey("RCtrl")
 			return
-		TapHoldDispatchTap("right_ctrl", LLM_Tooltip_FireTabOrAccept.Bind(""))
+		_RCtrlTabTap()
 	}
 }
 
@@ -125,7 +125,7 @@ SC11D::
 ; =======================================
 ; =======================================
 
-#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 SC11D:: {
 	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
@@ -164,33 +164,12 @@ SC11D:: {
 ; + hold=<modifier> match no variant at all, and the hold the user just picked
 ; did nothing. A hold must arm on the hold alone, as CapsLock, Space, Escape,
 ; Enter, Backspace, Delete and Win already do.
-#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "right_ctrl") != "" and not LayerEnabled
 $SC11D:: {
-	ModKey := _RCtrlHoldModKey()
-	HoldGuardMs := TapHoldDuration(TapHold, "right_ctrl") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("right_ctrl", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "RCtrl hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
-	if tap {
-		if !TapHoldSyntheticKeyUp(ModKey)
-			return
-		_RCtrlDispatch()
-		return
-	}
-	; Bound the wait and release in a finally so a lost key-up or thrown Send can
-	; never latch the modifier Down (tap_holds/constants.ahk explains the cap)
-	try {
-		KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
+	Result := TapHoldOwnImmediateModifier("right_ctrl", "SC11D",
+		_RCtrlHoldModKey(), TapHoldDuration(TapHold, "right_ctrl"))
+	if Result["tap"]
+		_RCtrlDispatchOwnedTap()
 }
 #HotIf
 
@@ -208,40 +187,11 @@ $SC11D:: {
 
 ; No tap-action conjunct, for the reason given on block 7.4: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
-#HotIf not _RCtrlIsSpecialTap() and TapHoldHoldLayer(TapHold, "right_ctrl") != "" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and not LayerEnabled
 $SC11D:: {
-	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
-	if tap {
-		if (A_PriorKey == "RControl")
-			_RCtrlDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "right_ctrl") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("right_ctrl", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "RCtrl layer hold suppressed before activation because wheel activity was detected.")
-		return
-	}
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC11D", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC11D", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
+	Result := TapHoldOwnImmediateLayer("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
+	if (Result["tap"] and A_PriorKey == "RControl")
+		_RCtrlDispatchOwnedTap()
 }
 #HotIf
 
@@ -275,4 +225,33 @@ SC11D:: _RCtrlDispatch()
 
 _RCtrlDispatch() {
 	_TapHoldFireAction("right_ctrl")
+}
+
+_RCtrlDispatchOwnedTap() {
+	action := TapHoldTapAction(TapHold, "right_ctrl")
+	if (action == "tab") {
+		_RCtrlTabTap()
+	} else if (action == "one_shot_shift") {
+		TapHoldDispatchTap("right_ctrl", OneShotShift)
+	} else if (action == "backspace") {
+		TapHoldDispatchTap("right_ctrl", _RCtrlBackspaceTap)
+	} else {
+		_RCtrlDispatch()
+	}
+}
+
+_RCtrlTabTap() {
+	TapHoldDispatchTap("right_ctrl", LLM_Tooltip_FireTabOrAccept.Bind(""))
+}
+
+_RCtrlBackspaceTap() {
+	if KS_IsDown("LShift") {
+		TextPressKey("Delete", "")
+	} else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and KS_IsDown("SC038") {
+		OneShotShiftFix()
+		TextPressKey("Right", "")
+		TextPressKey("BackSpace", "")
+	} else {
+		TextPressKey("BackSpace", "")
+	}
 }

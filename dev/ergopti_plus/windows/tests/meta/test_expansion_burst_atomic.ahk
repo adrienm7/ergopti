@@ -156,14 +156,16 @@ _EBA_AssertTerminalTuiDeletionIsPaced() {
 	; repetitions without an observable delay between them.
 	Assert(InStr(Src, "_HSE_IsTerminalInputHost") > 0,
 		"the hotstring dispatcher must classify terminal input hosts before choosing its sender")
-	Assert(InStr(Src, "_HSE_BeginTerminalTransaction(") > 0,
+	Assert(InStr(Src, "_HSE_BeginOwnedTerminalTransaction(") > 0,
 		"the terminal branch must defer the behavior-tested edit beyond the visible InputHook callback")
 	Assert(InStr(Src, 'Burst .= "{BackSpace}"') > 0,
 		"terminal deletion must expand each Backspace token; repeat-count syntax bypasses pacing")
-	Assert(InStr(Src, "SetTimer(Runner, -Max(1, Floor(DelayMs)))") > 0,
+	Assert(InStr(Src, 'SetTimer(Runner, -Max(1, Floor(Owner["DelayMs"])))') > 0,
 		"the paced sender must run on a later timer turn so sleeps can yield real render opportunities")
-	Assert(InStr(Src, '_HSE_SetTerminalSendBlock("Send", BlockFn)') > 0,
-		"one BlockInput Send window must buffer physical typing for the full paced command")
+	Assert(InStr(Src, "LLM_NavEventOwner_BeginTerminalCapture") > 0,
+		"the terminal owner must acquire the native physical-input capture before scheduling")
+	Assert(InStr(Src, "BlockInput(") == 0,
+		"terminal pacing must not discard physical input through BlockInput Send mode")
 	Assert(InStr(Src, "SendEvent(Burst)") > 0,
 		"all explicit deletions and replacement text must remain one protected SendEvent command")
 }

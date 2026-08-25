@@ -158,6 +158,7 @@ _ToggleWpmWidgetGraph(menu, label, WriterFn := 0, NotifyFn := 0, HideFn := 0,
 
 OpenMetricsAppPicker(*) {
 	AppPicker_Show(Map(
+		"owner",    "metrics:disabled_apps",
 		"title",    t("dialog.metrics.exclude_title"),
 		"prompt",   t("dialog.metrics.exclude_prompt"),
 		"ok_label", t("dialog.metrics.exclude_ok"),
@@ -166,15 +167,15 @@ OpenMetricsAppPicker(*) {
 	))
 }
 
-OnMetricsAppPickerSave(Selected) {
-	return _MetricsSaveAppPickerAndReload(Selected)
+OnMetricsAppPickerSave(Selected, Receipt) {
+	return _MetricsSaveAppPickerAndReload(Selected, 0, 0, 0, Receipt)
 }
 
 _MetricsSaveAppPickerAndReload(Selected, WriterFn := 0, NotifyFn := 0,
-		ReloadFn := 0) {
+		ReloadFn := 0, Receipt := 0) {
 	; The picker result is normalized into a detached Map by the owned builder;
 	; the live exclusion lookup remains unchanged while config.toml is written.
-	Committed := MF_CommitDisabledApps(Selected, WriterFn, NotifyFn)
+	Committed := MF_CommitDisabledApps(Selected, WriterFn, NotifyFn, Receipt)
 	return _MetricsReloadAfterCommit(Committed, ReloadFn)
 }
 

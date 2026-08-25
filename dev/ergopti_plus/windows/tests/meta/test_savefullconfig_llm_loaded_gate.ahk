@@ -41,3 +41,14 @@ _SFLG_LlmPersistGatedOnLoaded() {
 }
 Test("config: flat [llm] persistence is gated on _LLM_Menu_Loaded (no boot-timer default clobber)",
 	_SFLG_LlmPersistGatedOnLoaded)
+
+_SFLG_AppOverridesUseCanonicalBootCodec() {
+	Body := _DriverFuncBody("initMenu")
+	Call := "_LLM_Menu_LoadAppProfileOverridesFromCache(_LlmSavedOpts, _IniCache)"
+	Assert(InStr(Body, Call) > 0,
+		"menu boot must restore app overrides through the canonical codec boundary")
+	Assert(InStr(Body, "_LLM_Menu_DeserializeAppProfileOverrides(") == 0,
+		"menu boot must not grow a second inline app-override parser")
+}
+Test("config: app-profile override boot restore uses the canonical codec (AHK-019)",
+	_SFLG_AppOverridesUseCanonicalBootCodec)

@@ -126,6 +126,10 @@ LLM_BackendCapabilities(Backend) {
 	return Map("streaming", false)
 }
 
+LLM_EffectiveStreaming(Backend, Requested) {
+	return !!Requested && LLM_BackendCapabilities(Backend)["streaming"]
+}
+
 global LLM_ENGINE_RUNTIME_POLICY_CONFIG_KEYS := [
 	"debounce_ms",
 	"instant_on_word_end",
@@ -393,6 +397,24 @@ _LLM_Engine["semantic_config_signature"] := _LLM_Engine_BuildSemanticConfigSigna
  */
 LLM_Engine_Init(opts) {
 	global _LLM_Engine, _I18nLocale
+	if !(opts is Map)
+		throw TypeError("LLM_Engine_Init options must be a Map.")
+	static _optionKeys := ["model", "profile_id", "backend", "n_predictions",
+		"min_words", "max_words", "debounce_ms", "ctx_chars", "language",
+		"temperature", "instant_on_word_end", "after_hotstring", "reset_on_nav",
+		"disable_url_bars", "disable_password_fields", "show_info_bar",
+		"streaming", "show_all_at_once", "pred_indent", "auto_raise_temp",
+		"nav_modifiers", "val_modifiers", "inline_autotype", "api_entry_id",
+		"ollama_port", "user_profiles", "disabled_apps", "api_entries",
+		"app_profile_overrides"]
+	ValidatedOpts := Map()
+	for Key in _optionKeys {
+		if !opts.Has(Key)
+			continue
+		if !LLM_Option_TryNormalize(Key, opts[Key], &Normalized)
+			throw TypeError("LLM_Engine_Init rejected invalid option '" . Key . "'.")
+		ValidatedOpts[Key] := Normalized
+	}
 	PreviousCritical := Critical("On")
 	try {
 		_LLM_Engine["enabled"] := true
@@ -403,27 +425,30 @@ LLM_Engine_Init(opts) {
 			"disable_url_bars", "disable_password_fields",
 			"show_info_bar", "streaming", "show_all_at_once",
 			"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
-			"inline_autotype", "api_entry_id"]
+			"inline_autotype", "api_entry_id", "ollama_port"]
 
 		for _, k in _keys
-			if opts.Has(k)
-				_LLM_Engine[k] := opts[k]
+			if ValidatedOpts.Has(k)
+				_LLM_Engine[k] := ValidatedOpts[k]
+
+		; The runtime publishes the effective capability, not a requested flag
+		; which every backend branch would later override. This keeps engine,
+		; menu, persistence, and dispatch on one truthful value.
+		_LLM_Engine["streaming"] := LLM_EffectiveStreaming(
+			_LLM_Engine.Get("backend", "ollama"),
+			_LLM_Engine.Get("streaming", false))
 
 		; The prediction language follows the active UI locale (the i18n single source
 		; of truth, infra/i18n.ahk) instead of a hardcoded "fr", so a user typing in their
 		; own language gets predictions in it. An explicit opts["language"] still wins.
-		if (!opts.Has("language") and IsSet(_I18nLocale) and _I18nLocale != "")
+		if (!ValidatedOpts.Has("language") and IsSet(_I18nLocale) and _I18nLocale != "")
 			_LLM_Engine["language"] := _I18nLocale
 
 		; Arrays require explicit type validation before replacing live state.
-		if opts.Has("user_profiles") && (opts["user_profiles"] is Array)
-			_LLM_Engine["user_profiles"] := opts["user_profiles"]
-		if opts.Has("disabled_apps") && (opts["disabled_apps"] is Array)
-			_LLM_Engine["disabled_apps"] := opts["disabled_apps"]
-		if opts.Has("api_entries") && (opts["api_entries"] is Array)
-			_LLM_Engine["api_entries"] := opts["api_entries"]
-		if opts.Has("app_profile_overrides") and (opts["app_profile_overrides"] is Map)
-			_LLM_Engine["app_profile_overrides"] := opts["app_profile_overrides"]
+		for Key in ["user_profiles", "disabled_apps", "api_entries",
+			"app_profile_overrides"]
+			if ValidatedOpts.Has(Key)
+				_LLM_Engine[Key] := ValidatedOpts[Key]
 
 		; A semantic change owns the same invalidation transaction regardless of
 		; which tray setter or editor produced it. Display-only updates compare

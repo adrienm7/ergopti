@@ -52,9 +52,10 @@ _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 	Assert(InStr(AcceptBody, "LLM_Tooltip_GetAcceptSnapshot()") > 0
 		and InStr(AcceptBody, "Presented.AcceptSource") > 0,
 		"canonical acceptance must consume the source from one presented-record snapshot")
-	Assert(InStr(AcceptBody,
-		"LLM_Tooltip_ClaimAcceptance(Presented.Record)") > 0,
-		"canonical acceptance must atomically claim the exact record it validated")
+	NormalizedAccept := RegExReplace(AcceptBody, "\s+", " ")
+	Assert(InStr(NormalizedAccept,
+		"LLM_Tooltip_ClaimAcceptance( Presented.Record, Presented.Surface, Presented.ActiveIdx)") > 0,
+		"canonical acceptance must atomically claim the exact record, surface, and immutable index it validated")
 	Assert(InStr(AcceptBody, "_LLM_Accept_IsAllowed(") > 0,
 		"canonical acceptance must delegate its complete decision to one policy predicate")
 	Assert(InStr(AcceptBody, "LLM_Bridge_OnAccept(") > 0,

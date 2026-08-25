@@ -511,7 +511,8 @@ _LLM_Menu_PullModel(name) {
 	; Rebuild after a short delay so the green dot appears once Ollama finishes
 	; (the user will close the window manually; this just keeps the menu fresh
 	; if they glance at it again while the terminal is still open).
-	SetTimer(() => LLM_Menu_Build(), -LLM_MENU_POST_PULL_REBUILD_MS)
+	SetTimer(LLM_Menu_RequestBuild.Bind("post_pull"),
+		-LLM_MENU_POST_PULL_REBUILD_MS)
 }
 
 _LLM_Menu_MakeOpenUrlHandler(url) {
@@ -576,26 +577,9 @@ _LLM_Menu_PromptDeleteCachedModel(name) {
 	choice := MsgBox(body, title, "YesNo Icon!")
 	if (choice != "Yes")
 		return
-	; AHK v2 closures capture outer-scope variables by reference, but `name`
-	; and `tag` are call-scoped parameters/locals here (not a for-loop
-	; variable), so the direct fat-arrow capture below is safe.
-	LLM_OllamaDeleteModel_Async(tag, (ok) => _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok))
-}
-
-/**
- * Completion callback for the async model-cache delete (F24). Invalidates
- * the install-status cache and rebuilds the tray so the green "installed"
- * dot disappears once Ollama confirms the model was removed.
- * @param {string}  name - Catalogue display name (logging only).
- * @param {string}  tag  - Resolved Ollama tag that was deleted.
- * @param {Boolean} ok   - True when the DELETE succeeded.
- */
-_LLM_Menu_OnDeleteCachedModelDone(name, tag, ok) {
-	global _LLM_InstalledTagsCacheAt
-	if !ok
-		try LoggerWarn("LLM", "Model cache delete failed for '{1}' (tag '{2}').", name, tag)
-	; Invalidate the install-status cache so the next rebuild reflects the
-	; new state immediately instead of waiting for the 2 s TTL.
-	_LLM_InstalledTagsCacheAt := 0
-	LLM_Menu_Build()
+	Owner := _LLM_Menu_BeginOllamaAux("menu_delete:" . tag, tag)
+	try LLM_OllamaDeleteModel_Async(tag,
+		(ok) => _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok, Owner), 0, Owner)
+	catch
+		LLM_AuxFinish(Owner)
 }

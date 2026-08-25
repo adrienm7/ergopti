@@ -26,59 +26,35 @@
 ; ===== 2.1) Asset URL parser ========
 ; ====================================
 
-; Walks the release JSON to find the ``assets`` array, then returns the
-; ``browser_download_url`` of the asset whose ``name`` exactly matches
-; ``AssetName``. Returns "" on any failure (no assets array, no match, …).
-; Bracket-aware so a "]" inside a quoted body field cannot confuse the
-; depth counter — same pattern as ``_Updater_SplitReleasesArray``.
+; Parses the release object and returns the ``browser_download_url`` of the
+; asset whose direct ``name`` field exactly matches ``AssetName``. GitHub asset
+; objects contain nested metadata (notably ``uploader``), so a flat-object regex
+; cannot identify their field boundary safely. Returns "" on malformed or
+; unusable input.
 _Updater_FindAssetUrl(Json, AssetName) {
-	if !RegExMatch(Json, '"assets"\s*:\s*\[', &Anchor)
+	if !(Json is String) || !(AssetName is String) || (AssetName == "")
 		return ""
-	StartPos := Anchor.Pos + Anchor.Len - 1   ; position of the "[" itself
-	Len := StrLen(Json)
-	Depth := 0
-    InQuotedString := false
-	Esc := false
-	EndPos := 0
-	pos := StartPos
-	while (pos <= Len) {
-		c := SubStr(Json, pos, 1)
-        if InQuotedString {
-			if Esc {
-				Esc := false
-			} else if (c == "\") {
-				Esc := true
-			} else if (c == '"') {
-                InQuotedString := false
-			}
-		} else {
-			if (c == '"') {
-                InQuotedString := true
-			} else if (c == "[") {
-				Depth += 1
-			} else if (c == "]") {
-				Depth -= 1
-				if (Depth == 0) {
-					EndPos := pos
-					break
-				}
-			}
-		}
-		pos += 1
+	try Release := JsonParse(Json)
+	catch {
+		return ""
 	}
-	if (EndPos == 0)
+	if !(Release is Map) || !Release.Has("assets")
 		return ""
-	AssetsBlock := SubStr(Json, StartPos, EndPos - StartPos + 1)
-
-	; Each asset is a flat JSON object; match the one whose "name" equals
-	; AssetName, then extract its "browser_download_url".
-	Escaped := RegExReplace(AssetName, "([\.\\\(\)\[\]\{\}\^\$\|\+\*\?])", "\$1")
-	Pattern := '\{[^{}]*"name"\s*:\s*"' . Escaped . '"[^{}]*\}'
-	if !RegExMatch(AssetsBlock, Pattern, &O)
+	Assets := Release["assets"]
+	if !(Assets is Array)
 		return ""
-	if !RegExMatch(O[0], '"browser_download_url"\s*:\s*"([^"]+)"', &U)
-		return ""
-	return U[1]
+	for _, Asset in Assets {
+		if !(Asset is Map)
+			continue
+		if !Asset.Has("name") || !Asset.Has("browser_download_url")
+			continue
+		Name := Asset["name"]
+		Url := Asset["browser_download_url"]
+		if (Name is String) && (Url is String)
+			&& (Name == AssetName) && (Url != "")
+			return Url
+	}
+	return ""
 }
 
 

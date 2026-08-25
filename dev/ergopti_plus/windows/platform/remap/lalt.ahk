@@ -80,7 +80,7 @@ _LAltHoldModKey() {
 ; =======================================
 ; =======================================
 
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
 SC038:: {
 	if (
 		KS_IsDown("SC11D") ; RCtrl physically held
@@ -120,35 +120,13 @@ SC038:: {
 ; ==================================
 ; ==================================
 
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
 SC038::
 {
 	UpdateLastSentCharacter("LAlt")
 
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC038", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	ElapsedMs := TickElapsed(CharacterSentTime, Now)
-	tap := (ElapsedMs <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if (tap and ElapsedMs >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))
 	}
 }
@@ -159,12 +137,12 @@ SC02A & SC038:: TextPressKey("Tab", "Shift") ; LShift held
 ; (hotkeys are load-time constructs), so the old `if` here was dead and the combo
 ; fired for every config. The extra condition must live in the #HotIf, which is
 ; re-evaluated live on each press so a tray change takes effect without a reload.
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and not LayerEnabled and TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled and TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
 SC11D & SC038:: {
 	OneShotShiftFix()
 	TextPressKey("Tab", "Shift")
 }
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
 #SC038:: TextPressKey("Tab", "Win") ; Doesn't fire when SendInput is used
 !SC038:: TextPressKey("Tab", "Alt")
 #HotIf
@@ -181,7 +159,7 @@ SC11D & SC038:: {
 ; ========================================
 ; ========================================
 
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
 SC038::
 {
 	if !TapHoldSyntheticKeyDown("LAlt")
@@ -252,33 +230,13 @@ SC038::
 #HotIf _LAltIsBackspaceLayer() and not LayerEnabled
 *SC038::
 {
-	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
-	if tap {
-		if (
-			A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
-			and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
-		) {
-			TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
-		}
-		return
-	}
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC038", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
+	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	if (
+		Result["tap"]
+		and A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
+		and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
+	) {
+		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
 	}
 }
 #HotIf
@@ -305,31 +263,10 @@ SC038::
 ; while honouring the configured hold modifier (CapsLock/Win already work this way).
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
-	ModKey := _LAltHoldModKey()
-	HoldGuardMs := TapHoldDuration(TapHold, "left_alt") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("left_alt", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "LAlt (backspace) hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
-	if tap {
-		if !TapHoldSyntheticKeyUp(ModKey)
-			return
+	Result := TapHoldOwnImmediateModifier("left_alt", "SC038",
+		_LAltHoldModKey(), TapHoldDuration(TapHold, "left_alt"))
+	if Result["tap"]
 		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
-		return
-	}
-	; Bound the wait and release in a finally so a lost key-up or thrown Send can
-	; never latch the modifier Down (tap_holds/constants.ahk explains the cap)
-	try {
-		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
 }
 #HotIf
 
@@ -353,31 +290,12 @@ $SC038:: {
 ; the conjunct (CapsLock, Space, Escape, Enter, Backspace, Delete, Win) already
 ; do. The tap branch below is safe with no action configured:
 ; _TapHoldInvokeConfiguredAction logs a native pass-through and returns.
-#HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") != "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
 $SC038:: {
-	ModKey := _LAltHoldModKey()
-	tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
-	if tap {
+	Result := TapHoldOwnImmediateModifier("left_alt", "SC038",
+		_LAltHoldModKey(), TapHoldDuration(TapHold, "left_alt"))
+	if Result["tap"]
 		_LAltDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "left_alt") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("left_alt", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "LAlt hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	; Bound the wait and release in a finally so a lost key-up or thrown Send can
-	; never latch the modifier Down (tap_holds/constants.ahk explains the cap)
-	try {
-		KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
 }
 #HotIf
 
@@ -395,34 +313,12 @@ $SC038:: {
 
 ; No tap-action conjunct, for the reason given on block 4.7: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
-#HotIf not _LAltIsSpecialTap() and TapHoldHoldLayer(TapHold, "left_alt") != "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") != "backspace" and TapHoldTapAction(TapHold, "left_alt") != "tab" and TapHoldHoldLayer(TapHold, "left_alt") != "" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
 $SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("SC038", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("SC038", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
-
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	ElapsedMs := TickElapsed(CharacterSentTime, Now)
-	tap := (ElapsedMs <= TapHoldDuration(TapHold, "left_alt") * 1000)
-	if (tap and ElapsedMs >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		_LAltDispatch()
 	}
 }

@@ -144,32 +144,10 @@ SC03A:: {
 	}
 
 	ModKey := _CapsLockHoldModKey()
-	HoldGuardMs := TapHoldDuration(TapHold, "caps_lock") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("caps_lock", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "CapsLock hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
-	if tap {
-		; Short press — release modifier then dispatch tap action.
-		if !TapHoldSyntheticKeyUp(ModKey)
-			return
+	Result := TapHoldOwnImmediateModifier("caps_lock", "CapsLock", ModKey,
+		TapHoldDuration(TapHold, "caps_lock"))
+	if Result["tap"]
 		_CapsLockDispatch(CtrlActivated)
-		return
-	}
-	; Long press — modifier stays armed until key-up. Bound the wait and release
-	; the modifier in a finally so a lost key-up (UAC focus steal, Suspend toggled
-	; mid-press) or a thrown Send can never latch Ctrl/Shift/Alt/Win Down forever
-	try {
-		KeyWait("CapsLock", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
 }
 #HotIf
 
@@ -194,40 +172,10 @@ $SC03A:: {
 	}
 
 	UpdateLastSentCharacter("CapsLock")
-	HoldGuardMs := TapHoldDuration(TapHold, "caps_lock") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("caps_lock", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "CapsLock layer hold suppressed before activation because wheel activity was detected.")
-		return
-	}
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("CapsLock", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("CapsLock", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
-
-	Now           := A_TickCount
-	CharTime      := LastSentCharacterKeyTime.Has("CapsLock") ? LastSentCharacterKeyTime["CapsLock"] : Now
-	ElapsedMs     := TickElapsed(CharTime, Now)
-	tap           := (ElapsedMs <= TapHoldDuration(TapHold, "caps_lock") * 1000)
+	Result := TapHoldOwnImmediateLayer("CapsLock", TapHoldDuration(TapHold, "caps_lock"))
 	if (
-		tap
-		and ElapsedMs >= TapMinDurationMs()
+		Result["tap"]
+		and Result["elapsed_ms"] >= TapMinDurationMs()
 		and A_PriorKey == "CapsLock"
 	) { ; A_PriorKey + TapMinDurationMs floor suppress spurious taps when CapsLock is brushed mid-roll
 		_CapsLockDispatch(False)

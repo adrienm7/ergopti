@@ -33,20 +33,29 @@
 ; ===================================================================
 
 _TLRCD_CheckLlmRenderClearsDequeue() {
-	Body := _DriverFuncBody("LLM_TooltipShow")
-	Assert(Body != "", "LLM_TooltipShow must exist in ui/tooltip/llm.ahk")
+	ShowBody := _DriverFuncBody("LLM_TooltipShow")
+	ReserveBody := _DriverFuncBody("_LLM_TooltipReserveLlmRender")
+	Assert(ShowBody != "", "LLM_TooltipShow must exist in the driver source")
+	Assert(ReserveBody != "",
+		"_LLM_TooltipReserveLlmRender must exist in the driver source")
 
-	DequeueActivePos := InStr(Body, "_TooltipDequeueActive := false")
-	DequeueItemsPos := InStr(Body, "_TooltipDequeueItems := 0")
-	CriticalOn := InStr(Body, 'Critical("On")')
-	CriticalOff := InStr(Body, "Critical(PreviousCritical)", true,
-		Max(DequeueActivePos, DequeueItemsPos))
-	BuildPos := InStr(Body, "_TooltipBuildGuiLlm(", true, CriticalOff)
+	DequeueActivePos := InStr(ReserveBody, "_TooltipDequeueActive := false")
+	DequeueItemsPos := InStr(ReserveBody, "_TooltipDequeueItems := 0")
+	CriticalOn := InStr(ReserveBody, 'Critical("On")')
 	Assert(CriticalOn > 0 and DequeueActivePos > CriticalOn
 		and DequeueItemsPos > CriticalOn,
 		"AHK-17: both dequeue variables must clear inside the LLM generation reservation so the poll cannot observe a half-cancelled cycle")
-	Assert(CriticalOff > DequeueActivePos and CriticalOff > DequeueItemsPos
-		and BuildPos > CriticalOff,
+	CriticalOff := InStr(ReserveBody, "Critical(PreviousCritical)", true,
+		Max(DequeueActivePos, DequeueItemsPos))
+	Assert(CriticalOff > DequeueActivePos and CriticalOff > DequeueItemsPos,
+		"AHK-17: both dequeue clears must commit before the reservation returns")
+
+	ReservationPos := InStr(ShowBody,
+		"Reservation := _LLM_TooltipReserveLlmRender(Meta)")
+	Assert(ReservationPos > 0,
+		"AHK-17: LLM_TooltipShow must reserve the generation before rendering")
+	BuildPos := InStr(ShowBody, "_TooltipBuildGuiLlm(", true, ReservationPos)
+	Assert(BuildPos > ReservationPos,
 		"AHK-17: dequeue cancellation must commit before detached GUI/UIA preparation can pump the always-armed 100 ms poll")
 }
 

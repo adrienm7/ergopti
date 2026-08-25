@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ צא",
 	"menu.global.reload": "🔄 טען מחדש",
 	"menu.global.reset_defaults": "↺ אפס לברירות מחדל",
+	"menu.global.starting": "מתחיל…",
 	"menu.global.setup_wizard": "אשף הגדרה…",
 	"menu.global.suspend": "⏸︎ השהה",
 	"menu.global.title": "פעולות גלובליות",

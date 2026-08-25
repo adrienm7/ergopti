@@ -13,14 +13,17 @@
 ; Exit (duplicating the wizard dismiss) through the stock menu, bypassing the
 ; driver's own shutdown handlers.
 ;
-; The fix moves A_TrayMenu.Delete() to BEFORE Onboarding_Run() so stock items
-; are gone from the first frame of the first-run wizard. On a normal (non-first-
-; run) boot Onboarding_Run() is a no-op, so the move is safe for all paths.
+; The fix invokes the safe bootstrap publisher BEFORE Onboarding_Run() so stock
+; items are gone and one inert replacement row exists from the first frame of
+; the first-run wizard. On a normal (non-first-run) boot Onboarding_Run() is a
+; no-op, so the same publication is safe for all paths.
 ;
 ; This test asserts (source introspection on the full ErgoptiPlus.ahk concat):
-;   A_TrayMenu.Delete() must appear at a LOWER source offset than
-;   Onboarding_Run() — encoding the ordering requirement that the stock menu is
-;   cleared before the blocking first-run wizard can display.
+;   _InstallSafeBootstrapTray() must appear at a LOWER source offset than
+;   Onboarding_Run(), and that helper must itself own Delete + Add + Disable.
+;   Looking for an arbitrary Delete() in the entrypoint is a false green: the
+;   updater-recovery path has an unrelated early Delete which normal boot never
+;   executes.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -35,23 +38,21 @@
 ; ===================================================================
 
 _TTMCBO_CheckTrayDeleteBeforeOnboarding() {
-	; Read ErgoptiPlus.ahk directly from the driver source tree (sibling of tests/)
-	EntryPath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
-	Source := ""
-	try Source := FileRead(EntryPath, "UTF-8")
-	Assert(Source != "", "ErgoptiPlus.ahk must be readable at " . EntryPath)
+	Source := _DriverSourceNoComments()
+	Assert(Source != "", "the concatenated production source must be readable")
+	BootstrapPos := InStr(Source, "_InstallSafeBootstrapTray()")
+	OnboardingPos := InStr(Source, "Onboarding_Run()", , Max(1, BootstrapPos))
+	Assert(BootstrapPos > 0 && OnboardingPos > BootstrapPos,
+		"AHK-21: the safe bootstrap publisher must run before the blocking onboarding wizard")
 
-	DeletePos    := InStr(Source, "A_TrayMenu.Delete()")
-	OnboardingPos := InStr(Source, "Onboarding_Run()")
-
-	Assert(DeletePos > 0,
-		"AHK-21: A_TrayMenu.Delete() must exist in ErgoptiPlus.ahk — it clears the stock AHK tray items so they are not available during the first-run onboarding wizard")
-	Assert(OnboardingPos > 0,
-		"AHK-21: Onboarding_Run() must exist in ErgoptiPlus.ahk")
-	Assert(DeletePos < OnboardingPos,
-		"AHK-21: A_TrayMenu.Delete() must appear BEFORE Onboarding_Run() in ErgoptiPlus.ahk — on first run Onboarding_Run blocks until the wizard commits, so the stock Pause/Suspend/Reload/Exit items must be removed before the wizard can be shown")
+	Bootstrap := _DriverFuncBody("_InstallSafeBootstrapTray")
+	Assert(Bootstrap != "", "the safe bootstrap helper must remain source-visible")
+	Assert(InStr(Bootstrap, "MenuObj.Delete()") > 0
+		&& InStr(Bootstrap, "MenuObj.Add(") > 0
+		&& InStr(Bootstrap, "MenuObj.Disable(") > 0,
+		"AHK-21: normal boot must replace stock actions with one inert row, not rely on an unrelated recovery-only Delete")
 }
 
 
-Test("meta ahk-21: A_TrayMenu.Delete() precedes Onboarding_Run() in ErgoptiPlus.ahk so stock tray items are not live during onboarding",
+Test("meta ahk-21: safe bootstrap publication precedes Onboarding_Run so stock tray items are not live during onboarding",
 	_TTMCBO_CheckTrayDeleteBeforeOnboarding)

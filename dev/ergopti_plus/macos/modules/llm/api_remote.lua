@@ -48,6 +48,7 @@ local _warmup_client = _http_adapter.new()   -- warmup has independent cancellat
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
+local ResponseClassifier = require("modules.llm.remote_response_classifier")
 local LOG            = "llm.api_remote"
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -68,6 +69,29 @@ if not ok_kl then keylogger = nil end
 --- Returns (providers_table, order_array, prices_table) on success, or three
 --- empty-catalogue equivalents on any failure so that a corrupted JSON file
 --- never aborts the full keymap-engine require chain.
+local function catalog_descriptor_is_valid(provider_id, desc)
+	if type(desc) ~= "table" then return false end
+	for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
+		if type(desc[key]) ~= "string" then return false end
+	end
+	if desc.label:match("^%s*$") then return false end
+	if desc.format ~= "openai" and desc.format ~= "anthropic" and desc.format ~= "gemini" then
+		return false
+	end
+	if provider_id ~= "openai_compat"
+		and (desc.base_url:match("^%s*$") or desc.default_model:match("^%s*$"))
+	then
+		return false
+	end
+	if desc.base_url ~= "" and not desc.base_url:match("^https?://%S+$") then return false end
+	return true
+end
+
+local function catalog_price_is_valid(value)
+	return type(value) == "number" and value == value and value >= 0
+		and value ~= math.huge and value ~= -math.huge
+end
+
 local function load_api_providers()
 	local path = Paths.shared_llm_path("api_providers.json")
 	if not path then
@@ -104,35 +128,26 @@ local function load_api_providers()
 			return {}, {}, {}
 		end
 		local out_providers = {}
+		local out_order = {}
+		local seen_providers = {}
 		for _, pid in ipairs(p_order) do
 			if type(pid) ~= "string" or pid == "" then
 				Logger.warn("llm.api_remote", "api_providers.json: skipping invalid provider_order entry.")
+			elseif seen_providers[pid] then
+				Logger.warn("llm.api_remote", "api_providers.json: duplicate provider_order entry '%s' skipped.", pid)
 			else
+				seen_providers[pid] = true
 				local desc = p_providers[pid]
-				if type(desc) ~= "table" then
-					Logger.warn("llm.api_remote", "api_providers.json: missing providers.%s — skipped.", tostring(pid))
+				if not catalog_descriptor_is_valid(pid, desc) then
+					Logger.warn("llm.api_remote", "api_providers.json: providers.%s has an invalid descriptor — skipped.", tostring(pid))
 				else
-					local invalid_descriptor = false
-					for _, key in ipairs({ "label", "base_url", "default_model", "format" }) do
-						if type(desc[key]) ~= "string"
-							or ((key == "label" or key == "format") and desc[key] == "") then
-							Logger.warn("llm.api_remote", "api_providers.json: providers.%s has invalid %s — skipped.", pid, key)
-							invalid_descriptor = true
-						end
-					end
-					local fmt = desc.format
-					if not invalid_descriptor then
-						if fmt ~= "openai" and fmt ~= "anthropic" and fmt ~= "gemini" then
-							Logger.warn("llm.api_remote", "api_providers.json: providers.%s invalid format '%s' — skipped.", pid, tostring(fmt))
-						else
-							out_providers[pid] = {
-								label         = desc.label,
-								base_url      = desc.base_url,
-								default_model = desc.default_model,
-								format        = fmt,
-							}
-						end
-					end
+					out_providers[pid] = {
+						label         = desc.label,
+						base_url      = desc.base_url,
+						default_model = desc.default_model,
+						format        = desc.format,
+					}
+					out_order[#out_order + 1] = pid
 				end
 			end
 		end
@@ -140,16 +155,16 @@ local function load_api_providers()
 		for model, row in pairs(p_prices) do
 			if type(model) == "string" and model ~= ""
 				and type(row) == "table"
-				and type(row["in"]) == "number" and row["in"] >= 0
-				and type(row["out"]) == "number" and row["out"] >= 0
+				and catalog_price_is_valid(row["in"])
+				and catalog_price_is_valid(row["out"])
 			then
 				out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
 			else
 				Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", tostring(model))
 			end
 		end
-		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #p_order, path)
-		return out_providers, p_order, out_prices
+		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #out_order, path)
+		return out_providers, out_order, out_prices
 	end)
 
 	if not ok then
@@ -909,72 +924,11 @@ local function estimate_cost(model, in_tokens, out_tokens)
 	local p = MODEL_PRICES[model]
 	return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
 end
+M.__estimate_cost_for_test = estimate_cost
 
---- Extract token usage from the provider response. Each format exposes the
---- same numeric fields under a top-level ``usage`` block (OpenAI shape) or
---- under ``usageMetadata`` (Gemini). We regex-scrape rather than re-parse
---- JSON (the response body has already been parsed once in parse_response;
---- doing it twice on every request is wasteful when this is a hot path).
-local function _extract_usage(format, body, model)
-	local out = { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0, est_cost_usd = 0.0 }
-	if not body or body == "" then return out end
-	if format == "gemini" then
-		out.prompt_tokens     = tonumber((body:match('"promptTokenCount"%s*:%s*(%d+)'))     or 0) or 0
-		out.completion_tokens = tonumber((body:match('"candidatesTokenCount"%s*:%s*(%d+)')) or 0) or 0
-		out.total_tokens      = tonumber((body:match('"totalTokenCount"%s*:%s*(%d+)'))      or 0) or 0
-	elseif format == "anthropic" then
-		out.prompt_tokens     = tonumber((body:match('"input_tokens"%s*:%s*(%d+)'))  or 0) or 0
-		out.completion_tokens = tonumber((body:match('"output_tokens"%s*:%s*(%d+)')) or 0) or 0
-		out.total_tokens      = out.prompt_tokens + out.completion_tokens
-	else
-		out.prompt_tokens     = tonumber((body:match('"prompt_tokens"%s*:%s*(%d+)'))     or 0) or 0
-		out.completion_tokens = tonumber((body:match('"completion_tokens"%s*:%s*(%d+)')) or 0) or 0
-		out.total_tokens      = tonumber((body:match('"total_tokens"%s*:%s*(%d+)'))      or 0) or 0
-	end
-	if out.total_tokens == 0 and out.prompt_tokens > 0 then
-		out.total_tokens = out.prompt_tokens + out.completion_tokens
-	end
-	out.est_cost_usd = estimate_cost(model, out.prompt_tokens, out.completion_tokens)
-	return out
-end
-
---- Pull the generated text out of a provider response. Each branch targets the
---- canonical "first choice / first candidate / first content block" path. When
---- the path is missing, returns "" — the caller treats that as a soft failure
---- (no tooltip) rather than a crash.
-local function parse_response(format, body)
-	if type(body) ~= "string" or body == "" then return "" end
-	local resp, _ = JsonCodec.decode(body)
-	if type(resp) ~= "table" then return "" end
-
-	if format == "anthropic" then
-		local content = resp.content
-		if type(content) == "table" and type(content[1]) == "table" then
-			return tostring(content[1].text or "")
-		end
-		return ""
-	end
-	if format == "gemini" then
-		local cand = resp.candidates
-		if type(cand) == "table" and type(cand[1]) == "table" then
-			local cnt = cand[1].content
-			if type(cnt) == "table" and type(cnt.parts) == "table" and type(cnt.parts[1]) == "table" then
-				return tostring(cnt.parts[1].text or "")
-			end
-		end
-		return ""
-	end
-	-- OpenAI shape: { choices = [ { message = { content = "..." } } ] }
-	local choices = resp.choices
-	if type(choices) == "table" and type(choices[1]) == "table" then
-		local msg = choices[1].message
-		if type(msg) == "table" then
-			return tostring(msg.content or "")
-		end
-	end
-	return ""
-end
-
+--- Extract token usage from the already-decoded provider root. Each format
+--- owns one exact top-level usage map, so nested prompt text cannot spoof
+--- telemetry fields.
 
 
 
@@ -1418,7 +1372,10 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 				return
 			end
 
-			local raw_text = parse_response(provider.format, body)
+			local classified = ResponseClassifier.classify(provider.format, body)
+			classified.usage.est_cost_usd = estimate_cost(tostring(model),
+				classified.usage.prompt_tokens, classified.usage.completion_tokens)
+			local raw_text = classified.text
 			if raw_text == "" then
 				Logger.warn(LOG, "[%s] #%d empty completion (could not parse).", model, req_id)
 				if keylogger and type(keylogger.log_llm_failed) == "function" then
@@ -1468,7 +1425,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			-- numeric fields under a top-level ``usage`` block (OpenAI shape)
 			-- or under ``usageMetadata`` (Gemini). Cost is computed from the
 			-- per-model price table in pricing.lua.
-			local usage = _extract_usage(provider.format, body, tostring(model))
+			local usage = classified.usage
 
 			Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s) in %dms", model, req_id, #results, ms)
 			if keylogger and type(keylogger.log_llm) == "function" then

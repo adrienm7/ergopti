@@ -1,7 +1,7 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/llm-parser.v1.json",
 	"description": "Cross-driver corpus for LLM response parser functions. Covers Ollama (non-streaming and streaming), OpenAI, Anthropic, and Gemini formats. Every vector must produce the same result in the applicable driver parsers. Vectors with a 'driver' array are scoped to the listed drivers only; absent or empty means all drivers.",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"vectors": [
 		{
 			"id": "ollama_nonstream_basic",
@@ -335,6 +335,105 @@
 			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"ligne un\\nligne deux\"}]}}]}",
 			"expected": {
 				"text": "ligne un\nligne deux",
+				"ok": true
+			}
+		},
+		{
+			"id": "openai_decoy_before_canonical_empty",
+			"description": "A reasoning content decoy must not replace an explicitly empty canonical OpenAI completion.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"reasoning\":{\"content\":\"secret\"},\"choices\":[{\"message\":{\"content\":\"\"}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "anthropic_decoy_before_canonical_empty",
+			"description": "A thinking block must not replace an explicitly empty canonical Anthropic text block.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"thinking\",\"text\":\"secret\"},{\"type\":\"text\",\"text\":\"\"}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "gemini_decoy_before_canonical_empty",
+			"description": "Metadata text must not replace an explicitly empty canonical Gemini part.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"metadata\":{\"text\":\"secret\"},\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"\"}]}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_complete_field_in_malformed_envelope",
+			"description": "A complete OpenAI content field inside a truncated root object is not a completion.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":\"wrong partial output\"}}]",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "openai_complete_field_in_valid_envelope",
+			"description": "The same OpenAI field becomes valid only when the complete root object is present.",
+			"parser": "remote",
+			"format": "openai",
+			"input": "{\"choices\":[{\"message\":{\"content\":\"wrong partial output\"}}]}",
+			"expected": {
+				"text": "wrong partial output",
+				"ok": true
+			}
+		},
+		{
+			"id": "anthropic_complete_field_in_malformed_envelope",
+			"description": "A complete Anthropic text field inside a truncated root object is not a completion.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"wrong partial output\"}]",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "anthropic_complete_field_in_valid_envelope",
+			"description": "The same Anthropic field becomes valid only when the complete root object is present.",
+			"parser": "remote",
+			"format": "anthropic",
+			"input": "{\"content\":[{\"type\":\"text\",\"text\":\"wrong partial output\"}]}",
+			"expected": {
+				"text": "wrong partial output",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_complete_field_in_malformed_envelope",
+			"description": "A complete Gemini text field inside a truncated root object is not a completion.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"wrong partial output\"}]}}]",
+			"expected": {
+				"text": "",
+				"ok": false
+			}
+		},
+		{
+			"id": "gemini_complete_field_in_valid_envelope",
+			"description": "The same Gemini field becomes valid only when the complete root object is present.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"wrong partial output\"}]}}]}",
+			"expected": {
+				"text": "wrong partial output",
 				"ok": true
 			}
 		},

@@ -64,6 +64,12 @@ _AHK04M_AllDispatchCallersConsumeTheVerdict() {
 		and InStr(SpaceTap, "&CommittedScreenEffect") > 0
 		and InStr(SpaceTap, "_PrefixCommitPostFireEffect(CommittedScreenEffect)") > 0,
 		"_SpaceTap must consume the verdict and canonical effect before committing fire-only state")
+	ReplayVisible := _DriverFuncBody("_HSE_ReplayVisibleTerminalChars")
+	Assert(InStr(ReplayVisible, "_OnPrefixChar(0, Char)") > 0,
+		"visible pre-admission suffixes must re-enter the real matcher after canonical commit")
+	InputHookBody := _DriverFuncBody("_OnPrefixChar")
+	Assert(InStr(InputHookBody, "_HSE_RetainTerminalReplayChar(Char)") > 0,
+		"partial native replay callbacks must remain ordered behind visible suffixes")
 }
 
 _AHK04M_NormalDispatchCommitsAfterOutput() {
@@ -81,7 +87,7 @@ _AHK04M_NormalDispatchCommitsAfterOutput() {
 		"HSE_ApplyExpansion must run only after the selected output branch succeeds")
 	Assert(_AHK04M_Count(Body, "if !Fired") >= 2,
 		"both Notepad and atomic branches must abort on failed output")
-	Assert(InStr(Body, "if (!IsObject(DeferredOwner) and Fired and IsSet(_ResetPrefixBuffer))") > 0,
+	Assert(InStr(Body, "if (!TerminalOwnershipTransferred and Fired and IsSet(_ResetPrefixBuffer))") > 0,
 		"the preview reset must be gated on output success")
 	Assert(InStr(Body, "catch as Err", , AtomicSend) > AtomicSend,
 		"the direct atomic SendInput path must convert an OS exception into a failed transaction")
@@ -110,16 +116,34 @@ _AHK04M_RawCallbackClassDeclaresAStatus() {
 	for Name in ["ShouldActivateDeadkey", "_EllipsisRawCallback"] {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", Name . " must exist in the driver source")
+		Assert(InStr(Body, "PrepareOnly := false") > 0,
+			Name . " must expose the preparation-only transaction seam")
+		PrepareGate := InStr(Body, "if PrepareOnly")
+		PreparedVerdict := InStr(Body, "Prepared: true", true, PrepareGate)
+		DirectSend := InStr(Body, "SendNewResult(")
+		Assert(PrepareGate > 0 and PreparedVerdict > PrepareGate and DirectSend > PreparedVerdict,
+			Name . " must return a prepared effect before any direct output is possible")
 		Assert(InStr(Body, "if SendNewResult(") > 0,
 			Name . " must gate its buffer effect on sender success")
 		Assert(InStr(Body, "Ok: true") > 0 and InStr(Body, "Ok: false") > 0,
 			Name . " must return an explicit {Ok, Bs, Ins} transaction verdict")
 	}
+	DeadkeyBuilder := _StripFullLineComments(_DriverFuncBody("CreateDeadkeyHotstring"))
+	Assert(InStr(DeadkeyBuilder, "PrepareOnly := false") > 0
+		and InStr(DeadkeyBuilder, "Delay, PrepareOnly") > 0,
+		"deadkey registration must forward preparation-only ownership to its callback")
 
 	Dispatch := _StripFullLineComments(_DriverFuncBody("_HSE_DispatchRawCallback"))
+	TerminalDispatch := _StripFullLineComments(_DriverFuncBody("_HSE_DispatchTerminalRawCallback"))
 	Owner := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
 	Assert(Dispatch != "", "_HSE_DispatchRawCallback must exist in the driver source")
+	Assert(TerminalDispatch != "", "_HSE_DispatchTerminalRawCallback must exist in the driver source")
 	Assert(Owner != "", "HSE_DispatchMatch must exist in the driver source")
+	PreparedCall := InStr(TerminalDispatch, "Spec.Callback)(EndChar, true")
+	OwnerBegin := InStr(TerminalDispatch, "_HSE_BeginOwnedTerminalTransaction")
+	Assert(PreparedCall > 0 and OwnerBegin > PreparedCall
+		and InStr(TerminalDispatch, "SendNewResult(") = 0,
+		"terminal raw callbacks must prepare first and delegate all output to the native-capture owner")
 	Gate := InStr(Dispatch, 'Effect.HasOwnProp("Ok")')
 	Mutation := InStr(Dispatch, "HSE_Buffer :=")
 	Assert(Gate > 0 and Mutation > Gate,

@@ -12,13 +12,14 @@
 
 _GTNWMG_CheckWinMaximizeGuard() {
 	Body := _DriverFuncBody("_TakeNotePoll")
-	ExistsPos := InStr(Body, 'Ops.WindowExists(Job["pattern"])')
-	ActivatePos := InStr(Body, 'Ops.Activate(Job["pattern"])', , ExistsPos)
-	ActivePos := InStr(Body, 'Ops.IsActive(Job["pattern"])', , ActivatePos)
-	MaximizePos := InStr(Body, 'Ops.Maximize(Job["pattern"])', , ActivePos)
-	Assert(ExistsPos > 0 and ActivatePos > ExistsPos and ActivePos > ActivatePos
-		and MaximizePos > ActivePos,
-		"the shared job must observe existence and focus before maximizing the explicit target")
+	FindPos := InStr(Body, 'WindowHwnd := Ops.FindWindow(Job["file_name"])')
+	ActivatePos := InStr(Body, "Ops.Activate(WindowHwnd)", , FindPos)
+	ActivePos := InStr(Body, "Ops.IsActive(WindowHwnd)", , ActivatePos)
+	ExactPos := InStr(Body, "Ops.IsExactWindow(WindowHwnd", , ActivePos)
+	MaximizePos := InStr(Body, "Ops.Maximize(WindowHwnd)", , ExactPos)
+	Assert(FindPos > 0 and ActivatePos > FindPos and ActivePos > ActivatePos
+		and ExactPos > ActivePos and MaximizePos > ExactPos,
+		"the shared job must resolve and retain one exact HWND before maximizing")
 }
 Test("TakeNote: shared job observes existence and focus before explicit maximize",
 	_GTNWMG_CheckWinMaximizeGuard)
@@ -31,21 +32,19 @@ _GTNWMG_CheckTimeoutIsLogged() {
 Test("TakeNote: shared job reports a bounded focus/launch timeout",
 	_GTNWMG_CheckTimeoutIsLogged)
 
-_GTNWMG_CheckTitleMatchModeRestored() {
+_GTNWMG_CheckExactHwndBoundary() {
 	Src := _DriverSourceNoComments()
 	StartPos := InStr(Src, "class _TakeNoteNative")
 	EndPos := InStr(Src, "_TakeNoteQueueFromFeatures(", , StartPos)
 	Assert(StartPos > 0 and EndPos > StartPos,
 		"the shared native note boundary must remain discoverable")
 	NativeBody := SubStr(Src, StartPos, EndPos - StartPos)
-	RestoreCount := 0
-	SearchPos := 1
-	while (Found := InStr(NativeBody, "SetTitleMatchMode(PreviousMode)", , SearchPos)) {
-		RestoreCount += 1
-		SearchPos := Found + 1
-	}
-	Assert(RestoreCount >= 4,
-		"exists, activate, active-observation, and maximize must each restore title-match state")
+	Assert(InStr(NativeBody, 'WinGetList("ahk_exe notepad.exe")') > 0,
+		"the native resolver must enumerate only Notepad windows")
+	Assert(InStr(NativeBody, "SetTitleMatchMode") = 0,
+		"exact HWND ownership must not depend on mutable title-match state")
+	Assert(InStr(NativeBody, '"ahk_id " . Hwnd') > 0,
+		"active observation and maximize must keep the enumerated HWND")
 }
-Test("TakeNote: every native window probe restores A_TitleMatchMode",
-	_GTNWMG_CheckTitleMatchModeRestored)
+Test("TakeNote: native window ownership uses one exact HWND",
+	_GTNWMG_CheckExactHwndBoundary)

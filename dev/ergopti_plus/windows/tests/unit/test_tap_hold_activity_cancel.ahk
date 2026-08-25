@@ -281,3 +281,188 @@ for _THAC_RegisteredCase in _THAC_AllKeyCases() {
 	Test("tap-hold: isolated and fresh presses still dispatch " . _THAC_RegisteredCase.Id,
 		_THAC_IsolatedTapAndFreshPressRecover.Bind(_THAC_RegisteredCase))
 }
+
+; Immediate synthetic-modifier ownership (AHK8-02).
+global _THMI_Events := []
+global _THMI_WaitResults := []
+global _THMI_KeyStates := []
+global _THMI_Ticks := []
+global _THMI_CancelReason := ""
+global _THMI_DownVerdict := true
+global _THMI_UpVerdict := true
+
+_THMI_Reset(WaitResults := [true], KeyStates := [], Ticks := [1000, 1050]) {
+	global _THMI_Events := []
+	global _THMI_WaitResults := WaitResults.Clone()
+	global _THMI_KeyStates := KeyStates.Clone()
+	global _THMI_Ticks := Ticks.Clone()
+	global _THMI_CancelReason := ""
+	global _THMI_DownVerdict := true
+	global _THMI_UpVerdict := true
+}
+
+_THMI_Down(ModKey) {
+	global _THMI_Events, _THMI_DownVerdict
+	_THMI_Events.Push("down:" . ModKey)
+	return _THMI_DownVerdict
+}
+
+_THMI_Up(ModKey) {
+	global _THMI_Events, _THMI_UpVerdict
+	_THMI_Events.Push("up:" . ModKey)
+	return _THMI_UpVerdict
+}
+
+_THMI_Wait(KeyName, TimeoutSec) {
+	global _THMI_Events, _THMI_WaitResults
+	_THMI_Events.Push("wait:" . KeyName)
+	return _THMI_WaitResults.RemoveAt(1)
+}
+
+_THMI_WaitThrows(KeyName, TimeoutSec) {
+	global _THMI_Events
+	_THMI_Events.Push("wait-throw:" . KeyName)
+	throw Error("injected release-wait failure")
+}
+
+_THMI_KeyIsDown(KeyName) {
+	global _THMI_Events, _THMI_KeyStates
+	_THMI_Events.Push("state:" . KeyName)
+	return _THMI_KeyStates.Length > 0 ? _THMI_KeyStates.RemoveAt(1) : false
+}
+
+_THMI_Tick() {
+	global _THMI_Ticks
+	return _THMI_Ticks.RemoveAt(1)
+}
+
+_THMI_Cancel(KeyId, GuardMs) {
+	global _THMI_Events, _THMI_CancelReason
+	_THMI_Events.Push("cancel:" . KeyId)
+	return _THMI_CancelReason
+}
+
+_THMI_CountEventPrefix(Prefix) {
+	global _THMI_Events
+	Count := 0
+	for Event in _THMI_Events {
+		if (SubStr(Event, 1, StrLen(Prefix)) == Prefix)
+			Count += 1
+	}
+	return Count
+}
+
+_THMI_JoinedEvents() {
+	global _THMI_Events
+	Joined := ""
+	for Event in _THMI_Events
+		Joined .= (Joined == "" ? "" : "|") . Event
+	return Joined
+}
+
+_THMI_ImmediateOwnerOrdersDownWaitUpThenTap() {
+	global _THMI_Events
+	_THMI_Reset()
+	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace", "LCtrl", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel)
+	AssertEqual(true, Result["activated"])
+	AssertEqual(true, Result["released"])
+	AssertEqual(true, Result["tap"])
+	AssertEqual("down:LCtrl|wait:BackSpace|up:LCtrl|cancel:backspace",
+		_THMI_JoinedEvents(),
+		"the configured modifier must own the first interposed event and release before tap admission")
+}
+Test("tap-hold modifier: Down owns the first event and Up precedes tap (tap-hold-modifier-immediate)",
+	_THMI_ImmediateOwnerOrdersDownWaitUpThenTap)
+
+_THMI_NativeModifierPassthroughKeepsThePhysicalEdge() {
+	global _THMI_Events
+	_THMI_Reset()
+	if (TapHoldOwnImmediateModifier.MaxParams < 11) {
+		Assert(false,
+			"the common owner must accept an explicit physical-pass-through mode (native-modifier-passthrough-race)")
+		return
+	}
+	Owner := TapHoldOwnImmediateModifier
+	Result := Owner.Call("left_shift", "SC02A", "LShift", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel, true)
+	AssertEqual(true, Result["activated"])
+	AssertEqual(true, Result["released"])
+	AssertEqual(true, Result["tap"])
+	AssertEqual("wait:SC02A|cancel:left_shift", _THMI_JoinedEvents(),
+		"a pass-through native Shift must use the physical edge already delivered by the ~ hotkey; reinjecting Shift races a fast Shift+key hotkey (native-modifier-passthrough-race)")
+}
+Test("tap-hold modifier: native pass-through owns the first chord without reinjection (native-modifier-passthrough-race)",
+	_THMI_NativeModifierPassthroughKeepsThePhysicalEdge)
+
+_THMI_ActivityCancelsOnlyTapNotHold() {
+	global _THMI_CancelReason
+	_THMI_Reset()
+	_THMI_CancelReason := "other input"
+	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace", "LCtrl", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel)
+	AssertEqual(true, Result["activated"], "activity must not suppress the hold")
+	AssertEqual(false, Result["tap"], "activity cancels only the tap output")
+	AssertEqual(1, _THMI_CountEventPrefix("down:"))
+	AssertEqual(1, _THMI_CountEventPrefix("up:"))
+}
+Test("tap-hold modifier: activity confirms hold and cancels only tap (tap-hold-modifier-immediate)",
+	_THMI_ActivityCancelsOnlyTapNotHold)
+
+_THMI_BoundedWaitRearmsUntilPhysicalRelease() {
+	_THMI_Reset([false, false, true], [true, true], [1000, 1400])
+	Result := TapHoldOwnImmediateModifier("space", "SC039", "LShift", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel)
+	AssertEqual(true, Result["released"])
+	AssertEqual(false, Result["tap"])
+	AssertEqual(3, _THMI_CountEventPrefix("wait:"))
+	AssertEqual(1, _THMI_CountEventPrefix("down:"))
+	AssertEqual(1, _THMI_CountEventPrefix("up:"))
+}
+Test("tap-hold modifier: bounded release waits re-arm without duplicating ownership (tap-hold-modifier-immediate)",
+	_THMI_BoundedWaitRearmsUntilPhysicalRelease)
+
+_THMI_ExceptionStillReleasesExactlyOnce() {
+	_THMI_Reset()
+	Threw := false
+	try TapHoldOwnImmediateModifier("escape", "Escape", "LAlt", 0.2,
+		_THMI_WaitThrows, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel)
+	catch
+		Threw := true
+	AssertEqual(true, Threw)
+	AssertEqual(1, _THMI_CountEventPrefix("down:"))
+	AssertEqual(1, _THMI_CountEventPrefix("up:"))
+}
+Test("tap-hold modifier: wait exceptions cannot latch the modifier (tap-hold-modifier-immediate)",
+	_THMI_ExceptionStillReleasesExactlyOnce)
+
+_THMI_RefusedEdgesFailClosed() {
+	global _THMI_DownVerdict, _THMI_UpVerdict
+	_THMI_Reset()
+	_THMI_DownVerdict := false
+	Result := TapHoldOwnImmediateModifier("delete", "Delete", "LWin", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel)
+	AssertEqual(false, Result["activated"])
+	AssertEqual(0, _THMI_CountEventPrefix("wait:"))
+	AssertEqual(0, _THMI_CountEventPrefix("up:"))
+
+	_THMI_Reset()
+	_THMI_UpVerdict := false
+	Result := TapHoldOwnImmediateModifier("enter", "Enter", "LCtrl", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel)
+	AssertEqual(false, Result["released"])
+	AssertEqual(false, Result["tap"], "an unproved Up must block tap output")
+}
+Test("tap-hold modifier: refused Down/Up cannot leak a tap (tap-hold-modifier-immediate)",
+	_THMI_RefusedEdgesFailClosed)
+
+_THMI_AllPickerKeysShareTheImmediateOwner() {
+	for KeyCase in _THAC_AllKeyCases() {
+		_THMI_Reset()
+		Result := TapHoldOwnImmediateModifier(KeyCase.Id, "SC" . Format("{:03X}", KeyCase.Sc), "LCtrl", 0.2,
+			_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel)
+		AssertEqual(true, Result["tap"], KeyCase.Id . " must be accepted by the shared owner")
+	}
+}
+Test("tap-hold modifier: shared owner accepts every picker identity (tap-hold-modifier-immediate)",
+	_THMI_AllPickerKeysShareTheImmediateOwner)

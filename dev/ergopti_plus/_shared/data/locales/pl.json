@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Zakończ",
 	"menu.global.reload": "🔄 Przeładuj",
 	"menu.global.reset_defaults": "↺ Przywróć domyślne",
+	"menu.global.starting": "Uruchamianie…",
 	"menu.global.setup_wizard": "Kreator konfiguracji…",
 	"menu.global.suspend": "⏸︎ Wstrzymaj",
 	"menu.global.title": "Akcje globalne",

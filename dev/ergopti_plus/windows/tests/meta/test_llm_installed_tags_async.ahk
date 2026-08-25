@@ -53,7 +53,7 @@ _MetaCheckInstalledTagsNonBlocking() {
 
 	; (2) The async probe must exist and genuinely run non-blocking: a curl CHILD on
 	; /api/tags (NOT WinHTTP — its async Send() still connects synchronously and could
-	; block the now-Critical tray build), polled via ProcessExist. Same contract as
+	; block the now-Critical tray build), polled via its durable terminal receipt. Same contract as
 	; LLM_OllamaIsRunning_Async (ollama-reachability-winhttp-connect-blocks).
 	AsyncBody := _DriverFuncBody("LLM_OllamaListModels_Async")
 	Assert(AsyncBody != "", "api_ollama.ahk must define LLM_OllamaListModels_Async()")
@@ -66,8 +66,13 @@ _MetaCheckInstalledTagsNonBlocking() {
 		"LLM_OllamaListModels_Async must hand off to _LLM_Ollama_TagsPoll (poll the child, don't block)")
 	PollBody := _DriverFuncBody("_LLM_Ollama_TagsPoll")
 	Assert(PollBody != "", "api_ollama.ahk must define _LLM_Ollama_TagsPoll()")
-	Assert(InStr(PollBody, "ProcessExist("),
-		"_LLM_Ollama_TagsPoll must poll the curl child via ProcessExist (non-blocking)")
+	Assert(InStr(PollBody, "_LLM_CurlTerminalComplete(") > 0
+		and InStr(PollBody, "ProcessExist(") = 0,
+		"_LLM_Ollama_TagsPoll must poll the durable terminal receipt, never a recyclable PID")
+	Assert(InStr(PollBody, "ReadTerminalFn.Call(") > 0
+		and InStr(PollBody, "_LLM_CurlTerminalOk(") > 0
+		and InStr(PollBody, "_LLM_Ollama_ParseTagNames(") > 0,
+		"the tags poll must require typed terminal evidence before parsing the canonical models array")
 
 	; (3) The blocking list call survives ONLY in the sanctioned off-hot-path warm.
 	WarmBody := _DriverFuncBody("_LLM_WarmInstalledTagsSync")
@@ -111,10 +116,14 @@ _MetaCheckInstalledTagsNonBlocking() {
 		. "path bypasses native Suspend like the health probe")
 
 	DoneBody := _DriverFuncBody("_LLM_Menu_OnInstalledTagsProbeDone")
+	OwnerGuard := _DriverFuncBody("_LLM_Menu_AuxOwnerIsCurrent")
 	Assert(DoneBody != "", "actions.ahk must define _LLM_Menu_OnInstalledTagsProbeDone()")
+	Assert(OwnerGuard != "", "the shared auxiliary menu-owner guard must exist")
 	Assert(InStr(DoneBody, "LLM_SetInstalledTagsCache("),
 		"_LLM_Menu_OnInstalledTagsProbeDone must stash the result via LLM_SetInstalledTagsCache")
-	Assert(InStr(DoneBody, "_LLM_InstalledTagsListChanged(") and InStr(DoneBody, "!A_IsSuspended"),
+	Assert(InStr(DoneBody, "_LLM_InstalledTagsListChanged(")
+			and InStr(DoneBody, "_LLM_Menu_AuxOwnerIsCurrent(Owner)")
+			and InStr(OwnerGuard, "A_IsSuspended"),
 		"_LLM_Menu_OnInstalledTagsProbeDone must repaint only on a real change and never "
 		. "while suspended (flip-guard, mirrors the health dot)")
 

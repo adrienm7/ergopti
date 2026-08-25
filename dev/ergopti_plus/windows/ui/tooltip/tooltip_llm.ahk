@@ -124,7 +124,7 @@ LLM_Tooltip_GetText() {
  * @param {Integer} idx - 1-based slot index.
  */
 LLM_Tooltip_SetActiveIdx(idx) {
-	LLM_TooltipSetActiveIdx(idx)
+    return LLM_TooltipSetActiveIdx(idx)
 }
 
 /**
@@ -155,8 +155,10 @@ LLM_Tooltip_GetAcceptSnapshot() {
 	return LLM_TooltipGetAcceptSnapshot()
 }
 
-LLM_Tooltip_ClaimAcceptance(ExpectedRecord) {
-	return LLM_TooltipClaimAcceptance(ExpectedRecord)
+LLM_Tooltip_ClaimAcceptance(ExpectedRecord, ExpectedSurface := 0,
+		ExpectedActiveIdx := 0) {
+	return LLM_TooltipClaimAcceptance(
+		ExpectedRecord, ExpectedSurface, ExpectedActiveIdx)
 }
 
 LLM_Tooltip_FinalizeAcceptance(Lifecycle, Accepted) {

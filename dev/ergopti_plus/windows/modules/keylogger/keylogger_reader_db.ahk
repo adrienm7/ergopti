@@ -284,6 +284,7 @@ KLR_PublishCandidate(candidate, sizes) {
 ; a dashboard was open: the old projection remains live until this candidate is
 ; completely rebuilt and atomically published.
 KLR_BuildColdCandidate(md, logPath) {
+		global KLRLastReplayFailure, KLRReplayDiagnosticFn
 		db := SQLite_Open(":memory:")
 		KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
 		if !db {
@@ -325,8 +326,13 @@ KLR_BuildColdCandidate(md, logPath) {
 		KLR_RebuildAggregates(db)
 		replayed := KLR_RebuildWalkerAggregates(db)
 		if (replayed < 0) {
+				Failure := KLRLastReplayFailure is Map
+						? KLRLastReplayFailure.Clone() : Map()
+				if Failure.Count && HasMethod(KLRReplayDiagnosticFn, "Call")
+						try KLRReplayDiagnosticFn.Call(Failure)
 				try SQLite_Close(db)
-				return Map("ok", false, "db", 0, "sizes", Map())
+				return Map("ok", false, "db", 0, "sizes", Map(),
+						"failure", Failure)
 		}
 		if (replayed > 0) {
 				; The live batch contains the same flushed events that replay consumed.
@@ -775,9 +781,67 @@ KLR_RebuildAggregates(db) {
 ; caller then retains the previous dashboard file rather than rendering a
 ; partially rebuilt (and therefore misleading) metric set.
 global KLRReplay := Map()
+global KLRLastReplayFailure := Map()
+global KLRReplayDiagnosticFn := KLR_ReportWalkerReplayFailure
+
+KLR_SanitizeReplayDiagnostic(Value) {
+		Text := RegExReplace(String(Value), "[\x00-\x1F\x7F]+", " ")
+		return SubStr(Text, 1, 240)
+}
+
+KLR_ReportWalkerReplayFailure(Failure) {
+		if !(Failure is Map)
+				return false
+		try LoggerError("KLReader",
+				"Walker replay rejected sweep={1} device={2} row={3} id={4} ts={5}: {6}.",
+				KLR_SanitizeReplayDiagnostic(Failure.Get("sweep", "unknown")),
+				KLR_SanitizeReplayDiagnostic(Failure.Get("device_id", "unknown")),
+				Failure.Get("row_index", 0),
+				KLR_SanitizeReplayDiagnostic(Failure.Get("row_id", "unknown")),
+				KLR_SanitizeReplayDiagnostic(Failure.Get("timestamp", "unknown")),
+				KLR_SanitizeReplayDiagnostic(Failure.Get("message", "unknown failure")))
+		return true
+}
+
+KLR_CaptureReplayFailure(Sweep, DeviceId, RowIndex, RowId, Timestamp,
+		Message, RootError := 0) {
+		global KLRLastReplayFailure
+		if KLRLastReplayFailure.Count
+				return false
+		KLRLastReplayFailure := Map(
+				"sweep", Sweep,
+				"device_id", DeviceId,
+				"row_index", RowIndex,
+				"row_id", RowId,
+				"timestamp", Timestamp,
+				"message", String(Message),
+				"root_error", RootError)
+		return true
+}
+
+KLR_ReplaySweep(db, sql, Consumer, Sweep, DeviceId) {
+		Failure := Map()
+		Delivered := SQLite_EachRow(db, sql, Consumer, 0, Failure)
+		if Delivered >= 0
+				return true
+		if Failure.Has("error") {
+				Err := Failure["error"]
+				KLR_CaptureReplayFailure(Sweep, DeviceId,
+						Failure.Get("row_index", 0),
+						Failure.Get("row_id", "unknown"),
+						Failure.Get("timestamp", "unknown"),
+						Err.Message, Err)
+		} else {
+				KLR_CaptureReplayFailure(Sweep, DeviceId, 0,
+						"unknown", "unknown",
+						"SQLite row iteration failed")
+		}
+		return false
+}
 
 KLR_RebuildWalkerAggregates(db) {
-		global KLRReplay
+		global KLRReplay, KLRLastReplayFailure
+		KLRLastReplayFailure := Map()
 		if !db
 				return -1
 
@@ -826,16 +890,35 @@ KLR_RebuildWalkerAggregates(db) {
 						system_sql := "SELECT ts, action, metadata_json FROM events_system"
 								. device_where . " ORDER BY ts, id;"
 
-						if (SQLite_EachRow(db, logical_sql, KLR_ReplayLogicalRow) < 0
-										|| SQLite_EachRow(db, window_sql, KLR_ReplayWindowRow) < 0
-										|| SQLite_EachRow(db, system_sql, KLR_ReplaySystemRow) < 0
-										|| !KLR_ReplayFlush()) {
+						if !KLR_ReplaySweep(db, logical_sql,
+								KLR_ReplayLogicalRow, "logical", device_id) {
+								ok := false
+								break
+						}
+						if !KLR_ReplaySweep(db, window_sql,
+								KLR_ReplayWindowRow, "window", device_id) {
+								ok := false
+								break
+						}
+						if !KLR_ReplaySweep(db, system_sql,
+								KLR_ReplaySystemRow, "system", device_id) {
+								ok := false
+								break
+						}
+						if !KLR_ReplayFlush() {
+								KLR_CaptureReplayFailure("flush", device_id, 0,
+										"unknown", "unknown",
+										"walker aggregate flush failed")
 								ok := false
 								break
 						}
 						replayed += KLRReplay["replayed"]
 				}
-		} catch {
+		} catch Error as Err {
+				KLR_CaptureReplayFailure("driver",
+						IsSet(device_id) ? device_id : "unknown", 0,
+						"unknown", "unknown",
+						Err.Message, Err)
 				ok := false
 		} finally {
 				KLW.ctx := saved_ctx

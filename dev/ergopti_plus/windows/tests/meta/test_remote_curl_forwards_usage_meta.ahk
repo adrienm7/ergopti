@@ -19,9 +19,9 @@
 ; well-formed rather than truncated: nothing logged, nothing missing, just a cost
 ; report that is silently always zero.
 ;
-; The unit suite already proves _LLMRemoteExtractUsage works on hand-written
-; bodies. That is exactly the trap — it proves the extractor works, never that
-; anything calls it. This test asserts the wiring.
+; The behavioral suite drives the real poll with deterministic terminal
+; receipts. This source guard independently pins the single-classifier wiring,
+; so a future transport cannot split text and usage back into two parses.
 ;
 ; SCOPE: source-level. The poll tail runs only on a real curl child exit.
 ; ==============================================================================
@@ -42,11 +42,11 @@ _RCFU_CurlPollExtractsAndForwardsUsage() {
 	Poll := _DriverFuncBody("_LLMRemote_PollCurl")
 	Assert(Poll != "", "_LLMRemote_PollCurl must exist in the driver source")
 
-	Assert(InStr(Poll, "_LLMRemoteExtractUsage(") > 0,
-		"_LLMRemote_PollCurl must extract the provider usage block. curl is the transport every shipping Windows host actually takes, so leaving the extraction to the WinHTTP sibling zeroes every token and cost metric on the API backend (remote-curl-drops-usage-meta)")
+	Assert(InStr(Poll, "_LLMRemoteClassifyTerminal(") > 0,
+		"_LLMRemote_PollCurl must classify terminal evidence, completion and usage through one parsed response owner")
 
-	Assert(RegExMatch(Poll, 'on_success\s*,\s*"on_success"\s*,\s*text\s*,') > 0,
-		"_LLMRemote_PollCurl must pass meta as the SECOND success argument, exactly as _LLMRemote_PollRequest does — an omitted positional argument is not an error at the AHK call boundary, so the engine simply reads its default and records zeros")
+	Assert(InStr(Poll, 'Classified["text"], Classified["usage"]') > 0,
+		"_LLMRemote_PollCurl must forward text and usage from the same classified root as the two success arguments")
 }
 
 ; The cost estimate is priced per model, so the entry has to remember which model

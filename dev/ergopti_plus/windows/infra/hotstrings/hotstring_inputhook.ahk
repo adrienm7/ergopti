@@ -1187,10 +1187,17 @@ _PrefixCommitPostFireEffect(Effect) {
 _OnPrefixChar(IH, Char) {
 	global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed, HSE_Buffer
 	global _PrefixPrivateResidue
+	global _HSE_TerminalOwner
 	; No hotstring preview tooltip and no expansion dispatch while the script is
 	; paused or the Hotstrings master gate is off — this watcher uses its OWN
 	; InputHook, so the HookDispatcher guard does not cover it.
 	if A_IsSuspended
+		return
+	; A partial native SendInput can already have delivered a replay prefix while
+	; the remaining physical edges stay owned for retry. Retain those deferred
+	; callbacks without mutating either canonical buffer; the successful retry
+	; replays the pre-admission suffix first, then this exact observed prefix.
+	if _HSE_RetainTerminalReplayChar(Char)
 		return
 	; I1 excludes this driver's synthetic output before OnChar.  Keep the HSE
 	; fallback guard for standalone/manual HSE suppression, but do not treat the
@@ -1276,10 +1283,16 @@ _OnPrefixChar(IH, Char) {
 		_HseFeedTick := HotPath_Now()
                 HSEMatch := HSE_FeedChar(Char, true)
 		HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick, Char)
-		; A deferred terminal edit owns the already-matched prefix. Preserve any
-		; newly typed physical suffix in both buffers, but do not start a second
-		; expansion that would compete for the same visible text.
+		; Physical input cannot pass the native hook after capture admission. A
+		; callback already posted just before admission can still arrive here; it is
+		; retained as visible trailing text. The owner erases/reinserts it on screen,
+		; then re-feeds it through this callback after canonical commit so a suffix
+		; can complete another hotstring exactly once.
 		if HSE_TerminalTransactionPending() {
+			if (_HSE_TerminalOwner is Map) && _HSE_TerminalOwner["Pending"] {
+				_HSE_TerminalOwner["TrailingText"] .= Char
+				_HSE_TerminalOwner["TrailingChars"].Push(Char)
+			}
 			_PrefixAppendTypedChar(Char)
 			return
 		}
