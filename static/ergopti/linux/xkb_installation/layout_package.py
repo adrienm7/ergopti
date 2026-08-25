@@ -15,6 +15,7 @@ tooling present on the host.
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 from dataclasses import dataclass
@@ -113,21 +114,33 @@ def user_roots() -> InstallerRoots:
 # ---------------------------------------------------------------------------
 
 
-def parse_gsettings_sources(text: str) -> list[tuple[str, str]]:
+def parse_gsettings_sources(text: str) -> list[tuple[str, str]] | None:
     """Parse ``gsettings get`` output for input-sources into (type, id) pairs.
 
     Handles the empty forms ``@a(ss) []`` and ``[]`` as well as populated
-    lists like ``[('xkb', 'fr'), ('xkb', 'ergopti+plus')]``. Unparsable text
-    yields an empty list so callers can fall back to append-only behaviour.
+    lists like ``[('xkb', 'fr'), ('xkb', 'ergopti')]``. ``None`` means the
+    value was not understood and must never be overwritten.
     """
     stripped = (text or "").strip()
     if not stripped or stripped in ("@a(ss) []", "[]"):
         return []
-    if not stripped.startswith("["):
-        return []
+    if stripped.startswith("@a(ss) "):
+        stripped = stripped[len("@a(ss) ") :].strip()
     pairs: list[tuple[str, str]] = []
-    for match in re.finditer(r"\(\s*'([^']*)'\s*,\s*'([^']*)'\s*\)", stripped):
-        pairs.append((match.group(1), match.group(2)))
+    try:
+        parsed = ast.literal_eval(stripped)
+    except (SyntaxError, ValueError):
+        return None
+    if not isinstance(parsed, list):
+        return None
+    for row in parsed:
+        if (
+            not isinstance(row, tuple)
+            or len(row) != 2
+            or not all(isinstance(value, str) for value in row)
+        ):
+            return None
+        pairs.append((row[0], row[1]))
     return pairs
 
 
