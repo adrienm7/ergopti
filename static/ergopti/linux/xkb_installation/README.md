@@ -37,11 +37,11 @@ bash install.sh
 # Non interactif (CI, scripts)
 bash install.sh --yes --version v2_2_1 --variant ergopti_plus
 
-# Sans sudo : installation dans ~/.config/xkb (sessions Wayland uniquement)
-bash install.sh --user --variant ergopti_plus
+# Désinstallation de la méthode clean (méthode par défaut)
+bash install.sh --installation-method clean --uninstall --yes
 
-# Désinstallation (clean + restauration des sauvegardes legacy)
-bash install.sh --uninstall
+# Désinstallation d'une ancienne installation legacy
+bash install.sh --installation-method legacy --uninstall --yes
 ```
 
 Notes :
@@ -53,6 +53,9 @@ Notes :
   distinctes (ê, j et plusieurs symboles changent de touche). Utilisez `--ansi` sur un clavier
   physique ANSI.
 - L'activation GNOME/KDE ajoute Ergopti à votre liste existante au lieu de la remplacer.
+- L'installation écrit dans les répertoires XKB système et requiert donc `sudo`. Un ancien mode
+  `--user` a été retiré : le chemin qu'il utilisait n'était pas chargé par libxkbcommon et son
+  isolation vis-à-vis des fichiers système n'était pas garantie.
 
 ### Surcharge des répertoires (tests / bac à sable)
 

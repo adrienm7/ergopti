@@ -56,7 +56,6 @@ from layout_package import (  # noqa: E402
     remove_generation_two_links,
     resolve_roots,
     strip_legacy_evdev_patch,
-    user_roots,
     validate_component_identifier,
     validate_layout_files,
 )
@@ -502,12 +501,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Créer aussi les liens pour les sessions X11 (Xorg) réelles",
     )
-    parser.add_argument(
-        "--user",
-        action="store_true",
-        help="Installer dans ~/.config/xkb sans sudo (visible des sessions "
-        "Wayland uniquement)",
-    )
     parser.add_argument("--uninstall", action="store_true", help="Désinstaller le paquet")
     args = parser.parse_args(argv)
     if not args.uninstall:
@@ -520,20 +513,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> int:
     force_utf8_stdio()
     args = parse_args(argv)
-    roots = user_roots() if args.user else resolve_roots()
+    roots = resolve_roots()
     check_root(roots)
     if args.uninstall:
         uninstall_clean(roots)
         return EXIT_OK
-    if args.user and args.support_x11:
-        print("ℹ️  Mode utilisateur : --support-x11 ignoré (aucun lien système créé).")
     try:
         install_clean(
             symbols_path=args.xkb,
             types_path=args.types,
             xcompose_path=args.xcompose,
             variant=args.variant,
-            support_x11=args.support_x11 and not args.user,
+            support_x11=args.support_x11,
             roots=roots,
         )
     except SystemExit as error:

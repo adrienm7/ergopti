@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+TEST_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+INSTALLER_DIR=$(dirname "$TEST_DIR")
+LINUX_DIR=$(dirname "$INSTALLER_DIR")
+TMP_ROOT=$(mktemp -d -t ergopti-install-entrypoint.XXXXXX)
+
+cleanup() {
+    rm -rf -- "$TMP_ROOT"
+}
+trap cleanup EXIT
+
+FAKE_BIN="$TMP_ROOT/bin"
+mkdir -p "$FAKE_BIN" "$TMP_ROOT/home"
+cat > "$FAKE_BIN/fzf" <<'EOF'
+#!/bin/sh
+printf 'called\n' >> "$FZF_MARKER"
+exit 97
+EOF
+cat > "$FAKE_BIN/sudo" <<'EOF'
+#!/bin/sh
+exec "$@"
+EOF
+chmod +x "$FAKE_BIN/fzf" "$FAKE_BIN/sudo"
+
+run_debian_detector() {
+    local detector_bin="$TMP_ROOT/detector-bin"
+    mkdir -p "$detector_bin"
+    cat > "$detector_bin/pkg-config" <<'EOF'
+#!/bin/sh
+exit 1
+EOF
+    cat > "$detector_bin/dpkg-query" <<'EOF'
+#!/bin/sh
+case "$*" in
+    *libxkbcommon0) printf '1.13.1-1\n' ;;
+    *xkeyboard-config) printf '2.45.0-1\n' ;;
+    *) exit 1 ;;
+esac
+EOF
+    chmod +x "$detector_bin/pkg-config" "$detector_bin/dpkg-query"
+    local output
+    output=$(PATH="$detector_bin:/usr/bin:/bin" \
+        bash "$INSTALLER_DIR/detect_installation_method.sh")
+    grep -qx 'METHOD=clean' <<< "$output"
+}
+
+run_non_interactive_install() {
+    local sandbox="$TMP_ROOT/non-interactive"
+    local local_linux="$sandbox/local tree/linux"
+    local output="$sandbox/output.log"
+    mkdir -p "$sandbox/system/symbols" "$sandbox/system/rules" "$sandbox/extensions"
+    mkdir -p "$(dirname "$local_linux")"
+    cp -R "$LINUX_DIR" "$local_linux"
+    : > "$sandbox/system/rules/evdev"
+    if ! env \
+        HOME="$TMP_ROOT/home" \
+        FZF_MARKER="$sandbox/fzf-called" \
+        PATH="$FAKE_BIN:$PATH" \
+        ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
+        ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
+        ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        bash "$local_linux/xkb_installation/install.sh" \
+            --installation-method clean \
+            --version v2_2_1 \
+            --variant ergopti \
+            --yes > "$output" 2>&1; then
+        cat "$output" >&2
+        return 1
+    fi
+    test ! -e "$sandbox/fzf-called"
+    test -f "$sandbox/extensions/ergopti/symbols/ergopti"
+}
+
+run_uninstall_requires_method() {
+    local output="$TMP_ROOT/uninstall-without-method.log"
+    if bash "$INSTALLER_DIR/install.sh" --uninstall --yes > "$output" 2>&1; then
+        printf 'uninstall without an installation method unexpectedly succeeded\n' >&2
+        return 1
+    fi
+    grep -q -- '--uninstall requiert --installation-method clean|legacy' "$output"
+}
+
+run_downloaded_uninstall() {
+    local sandbox="$TMP_ROOT/downloaded"
+    local source_repo="$sandbox/source-repo"
+    local downloaded="$sandbox/install.sh"
+    mkdir -p "$source_repo/static/ergopti/linux"
+    cp -R "$INSTALLER_DIR" "$source_repo/static/ergopti/linux/xkb_installation"
+    git -C "$source_repo" init -q
+    git -C "$source_repo" config user.email tests@example.invalid
+    git -C "$source_repo" config user.name tests
+    git -C "$source_repo" add .
+    git -C "$source_repo" commit -qm fixture
+    git -C "$source_repo" branch -M main
+    cp "$INSTALLER_DIR/install.sh" "$downloaded"
+
+    mkdir -p "$sandbox/extensions/ergopti/symbols" "$sandbox/system/rules"
+    printf 'installed\n' > "$sandbox/extensions/ergopti/symbols/ergopti"
+    : > "$sandbox/system/rules/evdev"
+
+    local rewrite_key="url.file://$source_repo.insteadOf"
+    if ! env \
+        HOME="$TMP_ROOT/home" \
+        FZF_MARKER="$sandbox/fzf-called" \
+        PATH="$FAKE_BIN:$PATH" \
+        BRANCH=main \
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0="$rewrite_key" \
+        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
+        ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
+        ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        bash "$downloaded" --installation-method clean --uninstall --yes \
+            > "$sandbox/output.log" 2>&1; then
+        cat "$sandbox/output.log" >&2
+        return 1
+    fi
+    test ! -e "$sandbox/extensions/ergopti"
+}
+
+run_debian_detector
+run_non_interactive_install
+run_uninstall_requires_method
+run_downloaded_uninstall
+printf 'install entrypoint tests: OK\n'

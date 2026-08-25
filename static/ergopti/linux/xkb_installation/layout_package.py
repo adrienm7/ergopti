@@ -91,24 +91,6 @@ def resolve_roots() -> InstallerRoots:
     )
 
 
-def user_roots() -> InstallerRoots:
-    """Roots for a per-user installation (no sudo required).
-
-    libxkbcommon reads ``$XDG_CONFIG_HOME/xkb`` (default ``~/.config/xkb``)
-    before the system tree, so a layout package installed there is picked up
-    by every libxkbcommon consumer — i.e. all Wayland compositors. Real X11
-    sessions cannot see it: the X server only knows its hard-coded path.
-    """
-    config_home = os.environ.get("XDG_CONFIG_HOME")
-    base = Path(config_home) if config_home else Path.home() / ".config"
-    return InstallerRoots(
-        extensions_root=base / "xkb",
-        system_root=DEFAULT_SYSTEM_ROOT,
-        cache_dir=base / "cache" / "xkb",
-        sandboxed=False,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Desktop-environment activation helpers (pure, unit-testable)
 # ---------------------------------------------------------------------------

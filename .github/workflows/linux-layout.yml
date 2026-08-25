@@ -72,6 +72,9 @@ jobs:
       - name: Run installer test suites (unit, consistency, sandbox)
         run: python static/ergopti/linux/xkb_installation/tests/run_all_tests.py
 
+      - name: Run the real shell entrypoint in isolated filesystems
+        run: bash static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh
+
   shell-lint:
     name: 'Shell syntax + shellcheck'
     runs-on: ubuntu-latest
@@ -85,9 +88,11 @@ jobs:
         run: |
           shellcheck -S error \
             static/ergopti/linux/xkb_installation/install.sh \
-            static/ergopti/linux/xkb_installation/detect_installation_method.sh
+            static/ergopti/linux/xkb_installation/detect_installation_method.sh \
+            static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh
 
       - name: bash syntax check
         run: |
           bash -n static/ergopti/linux/xkb_installation/install.sh
           bash -n static/ergopti/linux/xkb_installation/detect_installation_method.sh
+          bash -n static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh
