@@ -102,6 +102,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/timings/timings_config.ahk
 
 #Include ../infra/window_utils.ahk
+#Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
@@ -239,6 +240,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
+#Include unit/test_tooltip_position_cache_receipt.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_hotstring_engine.ahk
@@ -700,6 +702,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_uia_selection_background_poll.ahk
 #Include meta/test_uia_selection_snapshot.ahk
 #Include meta/test_tooltip_render_epoch.ahk
+#Include meta/test_tooltip_position_cache_receipt_wiring.ahk
 #Include meta/test_tooltip_llm_render_epoch.ahk
 #Include meta/test_llm_presented_record_single_source.ahk
 #Include meta/test_remote_poll_deadline.ahk

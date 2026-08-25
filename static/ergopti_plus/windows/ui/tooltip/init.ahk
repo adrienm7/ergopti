@@ -27,10 +27,12 @@
 ; INDEX: this file declares nothing itself; it #Include-s the tooltip
 ; sub-modules below. Functions and globals are hoisted into the global
 ; namespace, so load order is irrelevant; the order mirrors the call graph.
-;   tooltip/core.ahk    -- Engine state, timers, styles + public API.
-;   tooltip/helpers.ahk -- Internal rendering helpers (GUI build, border, etc.).
-;   tooltip/llm.ahk     -- LLM multi-slot prediction tooltip.
+;   tooltip/position_receipt.ahk -- Monitor/work-area/DPI cache identity.
+;   tooltip/core.ahk             -- Engine state, timers, styles + public API.
+;   tooltip/helpers.ahk          -- Internal rendering helpers (GUI build, border, etc.).
+;   tooltip/llm.ahk              -- LLM multi-slot prediction tooltip.
 
+#Include position_receipt.ahk
 #Include core.ahk
 #Include helpers.ahk
 #Include llm.ahk
