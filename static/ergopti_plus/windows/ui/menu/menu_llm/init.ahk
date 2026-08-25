@@ -37,7 +37,7 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 		return false
 	if !(saved_opts is Map)
 		throw TypeError("LLM saved options must be a Map.")
-	static _str_keys := ["model", "profile_id", "language", "temperature",
+	static _str_keys := ["model", "profile_id", "temperature",
 		"nav_modifiers", "val_modifiers", "trigger_shortcut", "backend",
 		"api_entry_id"]
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms",

@@ -48,6 +48,47 @@ LLM_Menu_DeepClone(Value) {
 	return Value
 }
 
+/**
+ * Converts the current tray state into a Map suitable for LLM_Engine_Init().
+ * Kept in this definitions-only transaction module so the complete projection
+ * can be exercised without registering actions.ahk's rescue hotkey.
+ * @returns {Map} Options map.
+ */
+LLM_Menu_BuildOpts() {
+	global _LLM_Menu
+	return Map(
+		"model",                   _LLM_Menu["model"],
+		"profile_id",              _LLM_Menu["profile_id"],
+		"user_profiles",           _LLM_Menu["user_profiles"],
+		"n_predictions",           _LLM_Menu["n_predictions"],
+		"min_words",               _LLM_Menu["min_words"],
+		"max_words",               _LLM_Menu["max_words"],
+		"language",                I18nGetLocale(),
+		"debounce_ms",             _LLM_Menu["debounce_ms"],
+		"ctx_chars",               _LLM_Menu["ctx_chars"],
+		"temperature",             _LLM_Menu["temperature"],
+		"instant_on_word_end",     _LLM_Menu["instant_on_word_end"],
+		"after_hotstring",         _LLM_Menu["after_hotstring"],
+		"reset_on_nav",            _LLM_Menu["reset_on_nav"],
+		"disable_url_bars",        _LLM_Menu["disable_url_bars"],
+		"disable_password_fields", _LLM_Menu["disable_password_fields"],
+		"disabled_apps",           _LLM_Menu["disabled_apps"],
+		"show_info_bar",           _LLM_Menu["show_info_bar"],
+		"streaming",               _LLM_Menu["streaming"],
+		"show_all_at_once",        _LLM_Menu["show_all_at_once"],
+		"pred_indent",             _LLM_Menu["pred_indent"],
+		"auto_raise_temp",         _LLM_Menu["auto_raise_temp"],
+		"nav_modifiers",           _LLM_Menu["nav_modifiers"],
+		"val_modifiers",           _LLM_Menu["val_modifiers"],
+		"backend",                 _LLM_Menu["backend"],
+		"ollama_port",             _LLM_Menu["ollama_port"],
+		"api_entries",             _LLM_Menu["api_entries"],
+		"api_entry_id",            _LLM_Menu["api_entry_id"],
+		"inline_autotype",         _LLM_Menu["inline_autotype"],
+		"app_profile_overrides",   _LLM_Menu["app_profile_overrides"]
+	)
+}
+
 _LLM_Menu_SetCandidateValue(Candidate, Key, Value) {
 	if !(Candidate is Map) || !(Key is String) || !Candidate.Has(Key)
 		return false
