@@ -219,6 +219,8 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
     PollFn := _LLM_CurlArtifactPortFn(Port, "poll", _LLMRemote_PollCurl)
     TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+    SweepFn := _LLM_CurlArtifactPortFn(Port, "schedule_orphan_sweep",
+        _LLM_Ollama_ScheduleOrphanSweep)
     curl_exe := A_WinDir . "\System32\curl.exe"
     if !FileExistsFn.Call(curl_exe)
         return false
@@ -229,6 +231,10 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
         _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
+    ; Remote-only users never enter either Ollama dispatcher. Schedule the same
+    ; bounded common reaper here so a prior crash cannot retain provider tokens,
+    ; typed payloads, bodies or terminal sidecars indefinitely.
+    try SweepFn.Call()
     uid := req_id . "_" . TickFn.Call()
     tmp_dir := TempDirFn.Call()
     tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"

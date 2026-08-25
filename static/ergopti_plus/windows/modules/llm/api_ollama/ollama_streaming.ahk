@@ -755,32 +755,37 @@ _LLM_Ollama_TempDir() {
 	return FileExist(dir) ? dir : A_Temp
 }
 
-; Wipes any leftover ``ergopti_ollama_*`` temp files older than 60 s. Runs on
+; Wipes every owned Ollama and remote curl artifact older than 60 s. Runs on
 ; a throttled background timer (see _LLM_Ollama_ScheduleOrphanSweep), never on
 ; the synchronous dispatch path, so a previous AHK instance that crashed mid-stream
 ; (Power loss, hard kill, …) never leaks files indefinitely. The 60 s
 ; window is generous — typical predictions complete in 1-3 s and any
 ; legitimate in-flight stream on a fresh AHK instance is younger than that.
-_LLM_Ollama_StreamCleanupOrphans() {
+_LLM_Ollama_StreamCleanupOrphans(RootDir := "", CurrentDir := "") {
 	now := A_Now
-	my_dir := _LLM_Ollama_TempDir()
-	; Legacy A_Temp-root files (older builds wrote ergopti_ollama_* straight into
+	if (RootDir = "")
+		RootDir := A_Temp
+	my_dir := CurrentDir != "" ? CurrentDir : _LLM_Ollama_TempDir()
+	; Legacy A_Temp-root files (older builds wrote artifacts straight into
 	; %TEMP%). NON-recursive ("F") — never walk the whole %TEMP% subtree: it holds
 	; 100k+ entries on a busy box and a recursive sweep took ~19 s per pass.
-	loop files, A_Temp . "\ergopti_ollama_*.json", "F"
+	; The family wildcard intentionally owns every sidecar extension (.json,
+	; .conf, .out, .out.status and .out.exit), rather than maintaining an
+	; incomplete extension list which silently leaks newly added receipts.
+	loop files, RootDir . "\ergopti_ollama_*", "F"
 		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
-	loop files, A_Temp . "\ergopti_ollama_*.out", "F"
+	loop files, RootDir . "\ergopti_remote_*", "F"
 		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
 	; Per-instance hardened dirs of prior instances. Scope the walk to our own
 	; ergopti_llm_* dirs, one level deep ("D") — a bounded handful, not all of %TEMP%.
 	; The current instance's own files are reaped by _LLM_Ollama_CleanupCurlFiles.
-	loop files, A_Temp . "\ergopti_llm_*", "D" {
+	loop files, RootDir . "\ergopti_llm_*", "D" {
 		inst_dir := A_LoopFilePath
 		if (inst_dir == my_dir)
 			continue
-		loop files, inst_dir . "\ergopti_ollama_*.json", "F"
+		loop files, inst_dir . "\ergopti_ollama_*", "F"
 			_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
-		loop files, inst_dir . "\ergopti_ollama_*.out", "F"
+		loop files, inst_dir . "\ergopti_remote_*", "F"
 			_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
 		; Reap the now-empty dir of a dead instance so PID dirs (160+ leaked) do not
 		; pile up and slow every future sweep. DirDelete(recurse=false) only deletes
@@ -818,5 +823,3 @@ _LLM_Ollama_TryDeleteIfOld(path, file_time, now) {
 _Q(s) {
 	return '"' . s . '"'
 }
-
-
