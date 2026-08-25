@@ -560,7 +560,8 @@ _TPS_PostPresentTokenGuardsEveryMutation() {
 		TimerCritical)
 	TimerCancel := InStr(StartTimer, "LLM_Engine_CancelTimer()", true,
 		TimerGuard)
-	TimerArm := InStr(StartTimer, "SetTimer(_LLM_Engine", true, TimerCancel)
+	TimerArm := InStr(StartTimer,
+		"ScheduleFn.Call(_LLM_Engine", true, TimerCancel)
 	Assert(Capture > 0 and TimerCritical > Capture and TimerGuard > TimerCritical
 		and TimerCancel > TimerGuard and TimerArm > TimerCancel,
 		"focus capture must stay outside Critical, then the surface token must be rechecked atomically with cancel + timer re-arm so a stale callback cannot evict newer LLM work")

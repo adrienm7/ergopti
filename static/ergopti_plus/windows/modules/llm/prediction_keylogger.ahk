@@ -52,7 +52,7 @@ _LLM_Engine_CaptureAcceptSource() {
  * Callers (llm_bridge.ahk) pass the current typed buffer.
  * @param {string} buffer - Full typed context up to the caret.
  */
-LLM_Engine_OnKeystroke(buffer, delay_override_ms := "") {
+LLM_Engine_OnKeystroke(buffer, delay_override_ms := "", ScheduleFn := SetTimer) {
 	global _LLM_Engine
 	local _c := Critical("On")
 	try {
@@ -77,8 +77,11 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "") {
 		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
 		; A word-end fast-fire (instant_on_word_end) passes a delay override; otherwise the
 		; configured debounce applies. Max(1, ...) keeps an override of 0 near-immediate.
-		_arm_ms := (delay_override_ms != "" and IsNumber(delay_override_ms)) ? Max(1, delay_override_ms) : _LLM_Engine["debounce_ms"]
-		SetTimer(_LLM_Engine["pending_timer"], -_arm_ms)
+		HasOverride := delay_override_ms != "" and IsNumber(delay_override_ms)
+		_arm_ms := HasOverride ? Max(1, delay_override_ms) : _LLM_Engine["debounce_ms"]
+		TimerPeriod := HasOverride ? -_arm_ms
+			: LLM_Option_DebounceTimerPeriod(_LLM_Engine["debounce_ms"])
+		ScheduleFn.Call(_LLM_Engine["pending_timer"], TimerPeriod)
 		_LLM_Engine["timer_active"] := true
 	} finally {
 		Critical(_c)
@@ -93,7 +96,8 @@ LLM_Engine_OnKeystroke(buffer, delay_override_ms := "") {
  * @param {number} delaySec - Optional timer delay in seconds (0 = immediate).
  * @param {string} buffer - Optional context override captured at schedule time.
  */
-LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset) {
+LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset,
+		ScheduleFn := SetTimer) {
 	global _LLM_Engine
 	if !_LLM_Engine["enabled"]
 		return false
@@ -110,9 +114,12 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset) {
 	; the guarded mutation span. A token-aware caller rechecks only at the exact
 	; cancel/re-arm transaction, so a stale callback cannot cancel a newer timer.
 	AcceptSource := _LLM_Engine_CaptureAcceptSource()
-	delay_ms := (delaySec != "" and IsNumber(delaySec))
+	HasOverride := delaySec != "" and IsNumber(delaySec)
+	delay_ms := HasOverride
 		? Max(1, Round(delaySec * 1000))
 		: _LLM_Engine["debounce_ms"]
+	TimerPeriod := HasOverride ? -delay_ms
+		: LLM_Option_DebounceTimerPeriod(_LLM_Engine["debounce_ms"])
 	PendingTimer := LLM_Engine_FirePrediction.Bind(buffer, AcceptSource)
 	PreviousCritical := Critical("On")
 	try {
@@ -121,7 +128,7 @@ LLM_Engine_StartTimer(delaySec := "", buffer := "", PublishGuard := unset) {
 		LLM_Engine_CancelTimer()
 		_LLM_Engine["last_buffer"] := buffer
 		_LLM_Engine["pending_timer"] := PendingTimer
-		SetTimer(_LLM_Engine["pending_timer"], -delay_ms)
+		ScheduleFn.Call(_LLM_Engine["pending_timer"], TimerPeriod)
 		_LLM_Engine["timer_active"] := true
 	} finally {
 		Critical(PreviousCritical)
