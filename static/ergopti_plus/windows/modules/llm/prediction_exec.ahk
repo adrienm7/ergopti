@@ -161,10 +161,9 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset) {
 	}
 	_LLM_Engine["timer_active"] := false
 
-	; Re-derive from live state at the request boundary as a backstop for editors
-	; that mutate an Array/Map in place before calling Init. A missed writer can
-	; therefore cause one cache miss, never a semantically stale cache hit.
-	_LLM_Engine_RefreshSemanticConfig()
+	; Semantic configuration is validated, detached and signed by
+	; LLM_Engine_Init. A fire consumes that immutable publication instead of
+	; sorting and re-encoding the complete option graph on every debounce tick.
 
 	; A debounce timer armed just before the user paused must not fire an HTTP
 	; request or paint a prediction — « pause = tout éteint ».
