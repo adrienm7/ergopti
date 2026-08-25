@@ -1743,16 +1743,20 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local dedup_stats   = ApiCommon.new_dedup_stats()
 	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
 
-	local function do_next()
-		-- Check if this request batch was cancelled dynamically
+	local function request_is_current()
 		if type(request_id_provider) == "function" then
 			local current_request_id = request_id_provider()
 			if initial_request_id ~= nil and current_request_id ~= initial_request_id then
 				Logger.debug(LOG, "Request batch cancelled: ID changed from %s to %s at step %d/%d",
 					tostring(initial_request_id), tostring(current_request_id), attempt_index, max_attempts)
-				return
+				return false
 			end
 		end
+		return true
+	end
+
+	local function do_next()
+		if not request_is_current() then return end
 
 		if #results >= requested_predictions or attempt_index > max_attempts then
 			if #results == 0 then if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return end
@@ -1772,6 +1776,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		local variant_partial = on_partial
 
 		local function request_variant(attempt, tokens, temp)
+			if not request_is_current() then return end
 			local post_fn = streaming and post_and_parse_streaming or post_and_parse
 			post_fn(model_name, system_prompt, full_text, tail_text,
 				temp, tokens, 1, false,
