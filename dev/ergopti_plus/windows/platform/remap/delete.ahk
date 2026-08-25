@@ -7,10 +7,8 @@
 ; Delete tap-hold: any action from GESTURE_ACTIONS on tap (default: delete),
 ; any hold modifier or nav layer on hold. Scancode SC153.
 ;
-; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
-; Phase 1 — KeyWait with timeout discriminates tap from hold.
-; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
-; Phase 2 (layer) — activate layer until key-up.
+; Modifier or layer ownership begins synchronously on physical key-down. The
+; owner is balanced on release before a quick isolated press emits the tap.
 ;
 ; Note: this remaps the physical Delete/Suppr key (SC153 — the EXTENDED scancode).
 ; SC053 is NumpadDel/NumpadDot, a different physical key: binding it meant the
@@ -50,28 +48,10 @@ _DeleteHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
 *$SC153:: {
-	tap := KeyWait("Delete", "T" . TapHoldDuration(TapHold, "delete"))
-	if tap {
-		if (A_PriorKey == "Delete")
-			_DeleteDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "delete") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("delete", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "Delete hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	ModKey := _DeleteHoldModKey()
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	try {
-		KeyWait("Delete", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
+	Result := TapHoldOwnImmediateModifier("delete", "Delete",
+		_DeleteHoldModKey(), TapHoldDuration(TapHold, "delete"))
+	if (Result["tap"] and A_PriorKey == "Delete")
+		_DeleteDispatch()
 }
 #HotIf
 
@@ -89,30 +69,9 @@ _DeleteHoldModKey() {
 
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
 *$SC153:: {
-	tap := KeyWait("Delete", "T" . TapHoldDuration(TapHold, "delete"))
-	if tap {
-		if (A_PriorKey == "Delete")
-			_DeleteDispatch()
-		return
-	}
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("Delete", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("Delete", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
+	Result := TapHoldOwnImmediateLayer("Delete", TapHoldDuration(TapHold, "delete"))
+	if (Result["tap"] and A_PriorKey == "Delete")
+		_DeleteDispatch()
 }
 #HotIf
 

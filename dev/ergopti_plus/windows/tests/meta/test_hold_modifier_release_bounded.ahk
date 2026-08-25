@@ -65,6 +65,11 @@ _HMRB_AssertBounded(RelPath, Anchor, Where) {
 	Src := _HMRB_ReadSource(RelPath)
 	Body := _HMRB_Block(Src, Anchor)
 	Assert(Body != "", Where . " generic hold-modifier #HotIf block must exist")
+	if InStr(Body, "TapHoldOwnImmediateModifier(") {
+		Assert(!InStr(Body, "KeyWait("),
+			Where . " must delegate release ownership to the shared bounded owner instead of waiting privately")
+		return
+	}
 	Assert(InStr(Body, "STUCK_MODIFIER_RELEASE_TIMEOUT_SEC") > 0,
 		Where . " long-press KeyWait must be capped by STUCK_MODIFIER_RELEASE_TIMEOUT_SEC so a lost key-up cannot block the modifier release forever")
 	Assert(InStr(Body, "finally") > 0,
@@ -105,26 +110,24 @@ Test("tap-holds: LAlt backspace hold-modifier release is bounded + in finally (h
 
 _HMRB_LAltGenericGuarded() {
 	Q := Chr(34)
-	Anchor := "not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, " . Q . "left_alt" . Q . ")"
+	Anchor := "TapHoldTapAction(TapHold, " . Q . "left_alt" . Q . ") != " . Q . "backspace" . Q . " and TapHoldHoldModifier(TapHold, " . Q . "left_alt" . Q . ")"
 	_HMRB_AssertBounded("platform/remap/lalt.ahk", Anchor, "lalt.ahk 4.7")
 	Body := _HMRB_Block(_HMRB_ReadSource("platform/remap/lalt.ahk"), Anchor)
-	SuppressIdx := InStr(Body, "TapHoldShouldSuppressHold")
-	DownIdx := InStr(Body, "TapHoldSyntheticKeyDown(ModKey)")
-	Assert(SuppressIdx > 0 and DownIdx > SuppressIdx,
-		"lalt.ahk 4.7 must not acquire the synthetic modifier before its wheel-cancellation guard (lalt-generic-cancel-releases-modifier)")
+	Assert(InStr(Body, "TapHoldOwnImmediateModifier(") > 0,
+		"lalt.ahk 4.7 must acquire before waiting; activity cancels only the tap")
 }
 Test("tap-holds: LAlt generic hold-modifier release is bounded + cancellation precedes acquisition (lalt-generic-cancel-releases-modifier)", _HMRB_LAltGenericGuarded)
 
 _HMRB_RCtrlGenericGuarded() {
 	Q := Chr(34)
-	_HMRB_AssertBounded("platform/remap/rctrl.ahk", "not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, " . Q . "right_ctrl" . Q . ")", "rctrl.ahk 7.4")
+	_HMRB_AssertBounded("platform/remap/rctrl.ahk", "TapHoldHoldModifier(TapHold, " . Q . "right_ctrl" . Q . ") != " . Q . Q, "rctrl.ahk 7.4")
 }
 Test("tap-holds: RCtrl generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_RCtrlGenericGuarded)
 
 _HMRB_SpaceGenericModifierGuarded() {
 	Src := _HMRB_ReadSource("platform/remap/space.ahk")
-	Body := _HMRB_Block(Src, "_SpaceHoldWithModifier(captured)")
-	_HMRB_AssertBounded("platform/remap/space.ahk", "_SpaceHoldWithModifier(captured)", "space.ahk _SpaceHoldWithModifier")
+	Body := _HMRB_Block(Src, "SpaceTapHold()")
+	_HMRB_AssertBounded("platform/remap/space.ahk", "SpaceTapHold()", "space.ahk SpaceTapHold")
 	Assert(!InStr(Body, "U T2"), "space.ahk generic modifier hold must not contain magic number " . Chr(34) . "U T2" . Chr(34) . " — use STUCK_MODIFIER_RELEASE_TIMEOUT_SEC")
 }
 Test("tap-holds: Space generic hold-modifier release is bounded + in finally (hold-modifier-unbounded-keywait)", _HMRB_SpaceGenericModifierGuarded)

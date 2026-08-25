@@ -87,45 +87,108 @@ Test("tap-holds: a hold gate never requires a configured tap action (taphold-hol
 
 ; =====================================================================
 ; =====================================================================
-; ======= 3/ Ratchet on keys with no hold gate at all =================
+; ======= 3/ Every picker key owns its modifier immediately ===========
 ; =====================================================================
 ; =====================================================================
 
-; Left Shift, Left Ctrl and Right Shift never read TapHoldHoldModifier /
-; TapHoldHoldLayer: their hold is whatever the `~` passthrough gives, i.e. the
-; key's own native modifier. Alt Gr has no hold concept at all (its gate is
-; TapHoldIsConfigured). The picker still offers all 32 hold options for them,
-; which is a real open defect — closing it means either honouring the choice
-; (dropping the `~` and suppressing the physical modifier on three very hot
-; keys) or filtering the picker in platform/remap + ui/menu. Until that is
-; decided, this ratchet at least stops the class from GROWING: a new key added
-; to the picker without a hold gate fails here.
-_THG_KnownKeysWithoutHoldGate() {
-	return Map("left_shift", true, "left_ctrl", true, "right_shift", true, "alt_gr", true)
+_THG_KeySourceFiles() {
+	return Map(
+		"escape", "escape.ahk", "tab", "tab.ahk",
+		"caps_lock", "capslock.ahk", "left_shift", "lshift_lctrl.ahk",
+		"left_ctrl", "lshift_lctrl.ahk", "win", "win.ahk",
+		"left_alt", "lalt.ahk", "space", "space.ahk",
+		"alt_gr", "altgr.ahk", "right_ctrl", "rctrl.ahk",
+		"right_shift", "rshift.ahk", "enter", "enter.ahk",
+		"backspace", "backspace.ahk", "delete", "delete.ahk")
 }
 
-_THG_NoNewKeyWithoutAHoldGate() {
-	Src := _DriverDirConcat("platform/remap")
-	Known := _THG_KnownKeysWithoutHoldGate()
+_THG_KeyModifierResolvers() {
+	return Map(
+		"escape", "_EscapeHoldModKey()", "tab", "_TabHoldModKey()",
+		"caps_lock", "_CapsLockHoldModKey()", "left_shift", "_LShiftHoldModKey()",
+		"left_ctrl", "_LCtrlHoldModKey()", "win", "_WinHoldModKey()",
+		"left_alt", "_LAltHoldModKey()", "space", "_SpaceHoldModKey()",
+		"alt_gr", "_AltGrHoldModKey()", "right_ctrl", "_RCtrlHoldModKey()",
+		"right_shift", "_RShiftHoldModKey()", "enter", "_EnterHoldModKey()",
+		"backspace", "_BackspaceHoldModKey()", "delete", "_DeleteHoldModKey()")
+}
+
+_THG_EveryPickerKeyUsesTheImmediateModifierOwner() {
 	Ids := _THG_PickerKeyIds()
 	Assert(Ids.Length > 0, "prerequisite: the picker key ids must be derivable from _TH_KeyDefs")
-
-	Covered := 0
+	Files := _THG_KeySourceFiles()
+	Resolvers := _THG_KeyModifierResolvers()
+	SplitPath(A_ScriptDir, , &DriverRoot)
+	AssertEqual(Ids.Length, Files.Count,
+		"the immediate-modifier source inventory must name every picker key")
 	for _, Id in Ids {
-		Reads := (InStr(Src, 'TapHoldHoldModifier(TapHold, "' . Id . '")') > 0
-			or InStr(Src, 'TapHoldHoldLayer(TapHold, "' . Id . '")') > 0)
-		if Reads {
-			Covered += 1
-			continue
-		}
-		Assert(Known.Has(Id),
-			"key '" . Id . "' is offered a hold picker in the tray menu but no #HotIf in platform/remap reads TapHoldHoldModifier or TapHoldHoldLayer for it — the selection persists, gets a checkmark and does nothing (taphold-hold-option-unreachable)")
+		Assert(Files.Has(Id), "missing source inventory for picker key '" . Id . "'")
+		KeySrc := _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . Files[Id], "UTF-8"))
+		Assert(InStr(KeySrc, 'TapHoldHoldModifier(TapHold, "' . Id . '")') > 0,
+			"key '" . Id . "' offers modifier holds but never reads the configured modifier")
+		Assert(InStr(KeySrc, 'TapHoldOwnImmediateModifier("' . Id . '",') > 0,
+			"key '" . Id . "' must synchronously enter the common modifier owner on physical key-down")
+		OwnerPos := InStr(KeySrc, 'TapHoldOwnImmediateModifier("' . Id . '",')
+		OwnerCall := SubStr(KeySrc, OwnerPos, 300)
+		ResolverIsDirect := InStr(OwnerCall, Resolvers[Id]) > 0
+		ResolverIsLocal := InStr(OwnerCall, ", ModKey,") > 0
+			and InStr(SubStr(KeySrc, Max(1, OwnerPos - 200), 200), "ModKey := " . Resolvers[Id]) > 0
+		Assert(ResolverIsDirect or ResolverIsLocal,
+			"key '" . Id . "' must pass the live configured resolver into the common owner, not a hard-coded modifier")
 	}
-	Assert(Covered > 0,
-		"prerequisite: at least one key must actually read its hold configuration")
 }
-Test("tap-holds: no new picker key ships without a hold gate (taphold-hold-option-unreachable)",
-	_THG_NoNewKeyWithoutAHoldGate)
+Test("tap-holds: every picker key uses immediate configured-modifier ownership (tap-hold-modifier-immediate)",
+	_THG_EveryPickerKeyUsesTheImmediateModifierOwner)
+
+_THG_SpecialTapBranchesYieldToConfiguredModifiers() {
+	Cases := [
+		{File: "lalt.ahk", Id: "left_alt", Action: "one_shot_shift"},
+		{File: "lalt.ahk", Id: "left_alt", Action: "tab"},
+		{File: "lalt.ahk", Id: "left_alt", Action: "alt_tab_monitor"},
+		{File: "rctrl.ahk", Id: "right_ctrl", Action: "backspace"},
+		{File: "rctrl.ahk", Id: "right_ctrl", Action: "tab"},
+		{File: "rctrl.ahk", Id: "right_ctrl", Action: "one_shot_shift"},
+		{File: "tab.ahk", Id: "tab", Action: "alt_tab_monitor"}
+	]
+	SplitPath(A_ScriptDir, , &DriverRoot)
+	for Item in Cases {
+		Src := _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . Item.File, "UTF-8"))
+		Needle := '#HotIf TapHoldTapAction(TapHold, "' . Item.Id . '") == "' . Item.Action . '"'
+		Pos := InStr(Src, Needle)
+		Assert(Pos > 0, Item.File . " must retain the special tap branch for " . Item.Action)
+		GateEnd := InStr(Src, "`n", , Pos)
+		Gate := SubStr(Src, Pos, GateEnd - Pos)
+		Assert(InStr(Gate, 'TapHoldHoldModifier(TapHold, "' . Item.Id . '") == ""') > 0,
+			Item.File . " special tap '" . Item.Action . "' must yield to a configured modifier owner instead of hard-coding its legacy hold")
+	}
+}
+Test("tap-holds: special taps cannot bypass the configured modifier (tap-hold-modifier-immediate)",
+	_THG_SpecialTapBranchesYieldToConfiguredModifiers)
+
+_THG_NativeShiftHoldsKeepPhysicalEdges() {
+	SplitPath(A_ScriptDir, , &DriverRoot)
+	Cases := [
+		{File: "lshift_lctrl.ahk", Resolver: "_LShiftHoldModKey", Handler: "_LShiftHandleHold", Sc: "SC02A"},
+		{File: "rshift.ahk", Resolver: "_RShiftHoldModKey", Handler: "_RShiftHandleHold", Sc: "SC036"}
+	]
+	for Item in Cases {
+		Src := _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . Item.File, "UTF-8"))
+		Gate := '#HotIf ' . Item.Resolver . '() == "' . (Item.Sc == "SC02A" ? "LShift" : "RShift") . '"'
+		GatePos := InStr(Src, Gate)
+		Assert(GatePos > 0, Item.File . " must select a dedicated native-Shift pass-through variant")
+		Variant := SubStr(Src, GatePos, 700)
+		Assert(InStr(Variant, "~*$" . Item.Sc . "::") > 0,
+			Item.File . " must deliver the physical Shift edge before a fast Shift+key chord is admitted")
+		Assert(InStr(Variant, Item.Handler . "(true)") > 0,
+			Item.File . " native variant must tell the common owner not to reinject its already-pass-through modifier (native-modifier-passthrough-race)")
+		HandlerBody := _DriverFuncBody(Item.Handler)
+		Assert(InStr(HandlerBody, "TapHoldOwnImmediateModifier(") > 0
+			and InStr(HandlerBody, "PhysicalModifierPassthrough") > 0,
+			Item.File . " native and remapped variants must share one owner wrapper with an explicit pass-through verdict")
+	}
+}
+Test("tap-holds: native Shift holds preserve their physical chord edge (native-modifier-passthrough-race)",
+	_THG_NativeShiftHoldsKeepPhysicalEdges)
 
 
 

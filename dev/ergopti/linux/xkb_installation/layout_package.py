@@ -15,6 +15,7 @@ tooling present on the host.
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 from dataclasses import dataclass
@@ -90,44 +91,38 @@ def resolve_roots() -> InstallerRoots:
     )
 
 
-def user_roots() -> InstallerRoots:
-    """Roots for a per-user installation (no sudo required).
-
-    libxkbcommon reads ``$XDG_CONFIG_HOME/xkb`` (default ``~/.config/xkb``)
-    before the system tree, so a layout package installed there is picked up
-    by every libxkbcommon consumer — i.e. all Wayland compositors. Real X11
-    sessions cannot see it: the X server only knows its hard-coded path.
-    """
-    config_home = os.environ.get("XDG_CONFIG_HOME")
-    base = Path(config_home) if config_home else Path.home() / ".config"
-    return InstallerRoots(
-        extensions_root=base / "xkb",
-        system_root=DEFAULT_SYSTEM_ROOT,
-        cache_dir=base / "cache" / "xkb",
-        sandboxed=False,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Desktop-environment activation helpers (pure, unit-testable)
 # ---------------------------------------------------------------------------
 
 
-def parse_gsettings_sources(text: str) -> list[tuple[str, str]]:
+def parse_gsettings_sources(text: str) -> list[tuple[str, str]] | None:
     """Parse ``gsettings get`` output for input-sources into (type, id) pairs.
 
     Handles the empty forms ``@a(ss) []`` and ``[]`` as well as populated
-    lists like ``[('xkb', 'fr'), ('xkb', 'ergopti+plus')]``. Unparsable text
-    yields an empty list so callers can fall back to append-only behaviour.
+    lists like ``[('xkb', 'fr'), ('xkb', 'ergopti')]``. ``None`` means the
+    value was not understood and must never be overwritten.
     """
     stripped = (text or "").strip()
     if not stripped or stripped in ("@a(ss) []", "[]"):
         return []
-    if not stripped.startswith("["):
-        return []
+    if stripped.startswith("@a(ss) "):
+        stripped = stripped[len("@a(ss) ") :].strip()
     pairs: list[tuple[str, str]] = []
-    for match in re.finditer(r"\(\s*'([^']*)'\s*,\s*'([^']*)'\s*\)", stripped):
-        pairs.append((match.group(1), match.group(2)))
+    try:
+        parsed = ast.literal_eval(stripped)
+    except (SyntaxError, ValueError):
+        return None
+    if not isinstance(parsed, list):
+        return None
+    for row in parsed:
+        if (
+            not isinstance(row, tuple)
+            or len(row) != 2
+            or not all(isinstance(value, str) for value in row)
+        ):
+            return None
+        pairs.append((row[0], row[1]))
     return pairs
 
 

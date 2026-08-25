@@ -97,6 +97,32 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 		helpers.assert_true(type(mod.PROVIDERS) == "table", "PROVIDERS must be a table (empty)")
 	end)
 
+	helpers.it("publishes only validated descriptors, order entries, and prices", function()
+		local fixture_path = helpers.shared("tests/corpus/api_provider_catalog_validation.json")
+		local fixture_file = assert(io.open(fixture_path, "r"))
+		local fixture = fixture_file:read("*a")
+		fixture_file:close()
+		local tmp = make_fake_path_stub(fixture)
+		package.loaded["modules.llm.api_remote"] = nil
+		local ok, mod = pcall(require, "modules.llm.api_remote")
+		cleanup(tmp)
+		helpers.assert_true(ok, "validated fixture must load without raising")
+		helpers.assert_eq(#mod.PROVIDER_ORDER, 2, "only validated, unique providers may publish in order")
+		helpers.assert_eq(mod.PROVIDER_ORDER[1], "valid")
+		helpers.assert_eq(mod.PROVIDER_ORDER[2], "openai_compat")
+		helpers.assert_true(mod.PROVIDERS.valid ~= nil)
+		helpers.assert_true(mod.PROVIDERS.openai_compat ~= nil)
+		for _, invalid_id in ipairs({ "empty_base", "empty_model", "bad_url", "space_model", "space_label", "object_label", "array_url", "null_model", "number_format", "unknown_format" }) do
+			helpers.assert_true(mod.PROVIDERS[invalid_id] == nil, invalid_id .. " must not publish")
+		end
+		helpers.assert_eq(mod.PROVIDERS.openai_compat.base_url, "")
+		helpers.assert_eq(mod.PROVIDERS.openai_compat.default_model, "")
+		helpers.assert_type(mod.__estimate_cost_for_test, "function")
+		helpers.assert_eq(mod.__estimate_cost_for_test("valid_integer", 1000000, 1000000), 3.0)
+		helpers.assert_eq(mod.__estimate_cost_for_test("valid_float", 1000000, 1000000), 0.875)
+		helpers.assert_eq(mod.__estimate_cost_for_test("string_price", 1000000, 1000000), 0.0)
+	end)
+
 	helpers.it("still loads normally when JSON is valid", function()
 		-- Reset to the real shared path (test helpers default)
 		package.loaded["infra.paths"] = {

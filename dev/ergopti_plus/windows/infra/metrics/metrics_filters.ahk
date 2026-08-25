@@ -229,7 +229,10 @@ MF_CommitEncryptionToggle(WriterFn := 0, NotifyFn := 0, ApplyFn := 0,
 	return _MF_NotifyEncryptionUnavailable(NotifyFn)
 }
 
-_MF_BuildDisabledAppsPlan(Selected) {
+_MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
+	if IsObject(Receipt)
+			&& !AppPicker_ClaimReceipt(Receipt, MF_DisabledList())
+		return false
 	Candidate := Map()
 	Persisted := []
 	for _, ProcessName in Selected {
@@ -248,11 +251,12 @@ _MF_BuildDisabledAppsPlan(Selected) {
 
 _MF_PublishDisabledAppsCandidate(Candidate) {
 	MetricsFilters.disabled_apps := Candidate
+	AppPicker_AdvanceOwner("metrics:disabled_apps")
 }
 
-MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0) {
+MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0, Receipt := 0) {
 	return MF_SaveBuiltToIni("the disabled metrics applications",
-		_MF_BuildDisabledAppsPlan.Bind(Selected), WriterFn, NotifyFn)
+		_MF_BuildDisabledAppsPlan.Bind(Selected, Receipt), WriterFn, NotifyFn)
 }
 
 

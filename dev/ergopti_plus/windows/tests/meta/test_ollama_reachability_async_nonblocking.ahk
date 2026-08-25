@@ -16,7 +16,7 @@
 ;
 ; THE FIX (the contract this test pins): the reachability probe runs a curl CHILD
 ; PROCESS (the same pattern the generation path already uses for exactly this
-; reason) and only polls ProcessExist — instant — so the AHK message loop is never
+; reason) and only polls a durable terminal receipt — instant — so the AHK message loop is never
 ; blocked. The connect happens in curl's own process.
 ;
 ; Source-level (mirrors the sibling async-contract meta tests): the function is
@@ -53,11 +53,15 @@ _MetaCheckReachabilityNonBlocking() {
 	Assert(InStr(Body, "_LLM_Ollama_PingPoll("),
 		"LLM_OllamaIsRunning_Async must hand off to _LLM_Ollama_PingPoll (poll the child, don't block)")
 
-	; The poll must check the child via ProcessExist (instant) — never a blocking wait.
+	; The poll must check the durable receipt — never a blocking wait or recyclable PID.
 	PollBody := _DriverFuncBody("_LLM_Ollama_PingPoll")
 	Assert(PollBody != "", "api_ollama.ahk must define _LLM_Ollama_PingPoll()")
-	Assert(InStr(PollBody, "ProcessExist("),
-		"_LLM_Ollama_PingPoll must poll the curl child via ProcessExist (non-blocking)")
+	Assert(InStr(PollBody, "_LLM_CurlTerminalComplete(") > 0
+		and InStr(PollBody, "ProcessExist(") = 0,
+		"_LLM_Ollama_PingPoll must poll the durable terminal receipt, never a recyclable PID")
+	Assert(InStr(PollBody, "ReadTerminalFn.Call(") > 0
+		and InStr(PollBody, "_LLM_OllamaPingTerminalOk(") > 0,
+		"_LLM_Ollama_PingPoll must classify exit, HTTP status, readable body, and the Ollama version schema before readiness")
 	; Either call shape satisfies the invariant. The completion callbacks now go
 	; through _LLM_InvokeCallback so a throw inside one cannot vanish, which
 	; changes the SPELLING of the hand-off but not the contract being asserted:

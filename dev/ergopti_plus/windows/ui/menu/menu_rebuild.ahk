@@ -26,6 +26,24 @@ global _TrayRootActive := false
 global _TrayRootLifecycleEpoch := 0
 global _TrayRootLatestAuthorizeFn := 0
 global _TrayRootLatestWorkerFn := 0
+global _TrayRootRetryGeneration := 0
+global _TrayRootAutomaticRetryCount := 0
+global _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT := 3
+
+; Expected retained work must not look like a fresh crash on every watchdog
+; tick. A fatal dynamic-context error is different: retire that exact root
+; generation and end the current logical thread so no later registration can
+; inherit an unproven HotIf context.
+class TrayRootRetryPendingError extends Error {
+}
+
+class TrayRootFatalContextError extends Error {
+}
+
+_TrayRootErrorIsSilent(Err) {
+	return (Err is TrayRootRetryPendingError)
+		or (Err is TrayRootFatalContextError)
+}
 
 TrayMenuStage_Begin() {
 	global _TrayMenuStage
@@ -128,17 +146,80 @@ _TrayRootRequestAndTryAcquire(AuthorizeFn := 0, WorkerFn := 0,
 		&RequestedGeneration := 0) {
 	global _TrayRootRequestedGeneration, _TrayRootActive
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	PreviousCritical := Critical("On")
 	try {
 		_TrayRootRequestedGeneration += 1
 		RequestedGeneration := _TrayRootRequestedGeneration
 		_TrayRootLatestAuthorizeFn := AuthorizeFn
 		_TrayRootLatestWorkerFn := WorkerFn
+		_TrayRootRetryGeneration := RequestedGeneration
+		_TrayRootAutomaticRetryCount := 0
 		if _TrayRootActive
 			return false
 		_TrayRootActive := true
 		return true
 	} finally Critical(PreviousCritical)
+}
+
+_TrayRootFinishOrdinaryFailure(TargetGeneration, IsAutomaticRetry) {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TrayRootRetryGeneration
+	global _TrayRootAutomaticRetryCount
+	global _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT
+	PreviousCritical := Critical("On")
+	try {
+		; A successor accepted while the failing worker yielded belongs to this
+		; owner. Keep ownership and let the drain loop rebuild that newer request.
+		if _TrayRootRequestedGeneration > TargetGeneration
+			return 0
+		if IsAutomaticRetry {
+			if _TrayRootRetryGeneration != TargetGeneration {
+				_TrayRootRetryGeneration := TargetGeneration
+				_TrayRootAutomaticRetryCount := 0
+			}
+			_TrayRootAutomaticRetryCount += 1
+			if _TrayRootAutomaticRetryCount >= _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT {
+				; Keep the last known-good native root, but acknowledge this failed
+				; generation so the watchdog cannot rebuild it forever.
+				_TrayRootPublishedGeneration := Max(
+					_TrayRootPublishedGeneration, TargetGeneration)
+				_TrayRootActive := false
+				return 2
+			}
+		}
+		_TrayRootActive := false
+		return 1
+	} finally Critical(PreviousCritical)
+}
+
+_TrayRootReportTerminalFailure(TargetGeneration, Message, LogFn := 0) {
+	global _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT
+	if HasMethod(LogFn, "Call") {
+		try LogFn.Call(TargetGeneration,
+			_TRAY_ROOT_AUTOMATIC_RETRY_LIMIT, Message)
+		return true
+	}
+	try LoggerError("Menu",
+		"Tray-root generation {1} retired after {2} automatic retries: {3}",
+		TargetGeneration, _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT, Message)
+	return true
+}
+
+_TrayRootFinishReportableFailure(TargetGeneration, IsAutomaticRetry,
+		Message, LogFn := 0) {
+	FailureOutcome := _TrayRootFinishOrdinaryFailure(
+		TargetGeneration, IsAutomaticRetry)
+	if FailureOutcome == 0
+		return 0
+	if FailureOutcome == 2 {
+		_TrayRootReportTerminalFailure(TargetGeneration, Message, LogFn)
+		return 2
+	}
+	if !IsAutomaticRetry
+		try LoggerError("Menu",
+			"Tray-root reconstruction failed and remains pending: {1}", Message)
+	return 1
 }
 
 _TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn) {
@@ -218,6 +299,17 @@ _TrayRootTryReleaseFailed(TargetGeneration) {
 	} finally Critical(PreviousCritical)
 }
 
+_TrayRootRetireFatal(TargetGeneration) {
+	global _TrayRootPublishedGeneration, _TrayRootActive
+	PreviousCritical := Critical("On")
+	try {
+		_TrayRootPublishedGeneration := Max(
+			_TrayRootPublishedGeneration, TargetGeneration)
+		_TrayRootActive := false
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0) {
 	if HasMethod(WorkerFn, "Call")
 		return WorkerFn.Call(PublishAuthorizeFn)
@@ -226,7 +318,7 @@ _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0) {
 	return initMenu(PublishAuthorizeFn)
 }
 
-_TrayRootDrain() {
+_TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {
 	loop {
 		_TrayRootClaimLatest(&TargetGeneration, &UpstreamAuthorizeFn,
 			&WorkerFn, &LifecycleEpoch)
@@ -234,12 +326,30 @@ _TrayRootDrain() {
 			TargetGeneration, LifecycleEpoch, UpstreamAuthorizeFn)
 		try Published := _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn)
 		catch as Err {
-			if !_TrayRootTryReleaseFailed(TargetGeneration)
+			if (Err is TrayRootFatalContextError) {
+				_TrayRootRetireFatal(TargetGeneration)
+				throw Err
+			}
+			if (Err is TrayRootRetryPendingError) {
+				if !_TrayRootTryReleaseFailed(TargetGeneration)
+					continue
+				throw Err
+			}
+			FailureOutcome := _TrayRootFinishReportableFailure(
+				TargetGeneration, IsAutomaticRetry, Err.Message, LogFn)
+			if FailureOutcome == 0
 				continue
-			try LoggerError("Menu", "Tray-root reconstruction failed and remains pending: {1}", Err.Message)
 			return false
 		}
 		if !((Published is Integer) and Published == 1) {
+			if !((Published is Integer) and Published == 0) {
+				FailureOutcome := _TrayRootFinishReportableFailure(
+					TargetGeneration, IsAutomaticRetry,
+					"worker returned an invalid publication verdict", LogFn)
+				if FailureOutcome == 0
+					continue
+				return false
+			}
 			; A newer request invalidated this detached stage: keep the same owner
 			; and immediately build the latest candidate. Suspend/upstream refusal
 			; has no newer generation, so release for its lifecycle-specific owner.
@@ -252,15 +362,54 @@ _TrayRootDrain() {
 	}
 }
 
-_TrayRootServiceRetained() {
-	global _TrayRootLatestAuthorizeFn
+_TrayRootServiceRetained(LogFn := 0) {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TrayRootLifecycleEpoch
+	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	; lifecycle.ahk is included before this module and arms its watchdog before
+	; the auto-execute thread reaches these top-level initializers. A timer tick
+	; in that window must be a no-op rather than reading a hoisted-but-unassigned
+	; tray-root field.
+	if !IsSet(_TrayRootRequestedGeneration)
+			|| !IsSet(_TrayRootPublishedGeneration)
+			|| !IsSet(_TrayRootActive)
+			|| !IsSet(_TrayRootLifecycleEpoch)
+			|| !IsSet(_TrayRootLatestAuthorizeFn)
+			|| !IsSet(_TrayRootLatestWorkerFn)
+		return true
 	; A caller-specific ticket (HSLR/updater) must be refreshed by that caller;
 	; replaying it here would spin forever on a deliberately stale generation.
 	if HasMethod(_TrayRootLatestAuthorizeFn, "Call")
 		return false
 	if !_TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn)
 		return true
-	return _TrayRootDrain()
+	return _TrayRootDrain(true, LogFn)
+}
+
+_TrayRootServiceRetainedWork(RootFn := 0, NextFn := 0, LogFn := 0) {
+	if HasMethod(RootFn, "Call") {
+		try RootFn.Call()
+		catch as Err {
+			; A failed HotIf reset can leave this logical thread's dynamic
+			; registration context selected. Retire the root and end this
+			; watchdog pass before any other native hotkey mutation runs.
+			if Err is TrayRootFatalContextError
+				return false
+		}
+	}
+	if HasMethod(NextFn, "Call") {
+		try NextFn.Call()
+		catch as Err {
+			if HasMethod(LogFn, "Call") {
+				try LogFn.Call(Err)
+			} else {
+				try LoggerError("Lifecycle",
+					"LLM trigger recovery watchdog service failed: {1}.",
+					Err.Message)
+			}
+		}
+	}
+	return true
 }
 
 _TrayRootOnSuspendEnter() {

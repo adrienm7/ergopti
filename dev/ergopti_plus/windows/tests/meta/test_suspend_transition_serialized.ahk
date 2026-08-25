@@ -15,18 +15,35 @@
 #Requires AutoHotkey v2.0
 
 _STS_TransitionSerialized() {
-	Body := _DriverFuncBody("_SuspendStateWatchdog")
-	Assert(Body != "", "_SuspendStateWatchdog must exist in infra/lifecycle.ahk")
+	Watchdog := _StripFullLineComments(
+		_DriverFuncBody("_SuspendStateWatchdog"))
+	Dispatch := _StripFullLineComments(
+		_DriverFuncBody("_LLM_NavEventOwnerApplyExternalSuspendTransition"))
+	Assert(Watchdog != "" and Dispatch != "",
+		"the suspend watchdog and its delegated edge dispatcher must remain discoverable")
 
-	BusyPos := InStr(Body, "_TransitionBusy")
-	EnterPos := InStr(Body, "Ergopti_OnSuspendEnter()")
-	ResumePos := InStr(Body, "Ergopti_OnSuspendResume()")
-	Assert(BusyPos > 0,
+	BusyCheck := InStr(Watchdog, "if _TransitionBusy")
+	BusySet := InStr(Watchdog, "_TransitionBusy := true", true, BusyCheck)
+	DispatchPos := InStr(Watchdog,
+		"_LLM_NavEventOwnerApplyExternalSuspendTransition(", true, BusySet)
+	EnterArg := InStr(Watchdog, "Ergopti_OnSuspendEnter", true, DispatchPos)
+	ResumeArg := InStr(Watchdog, "Ergopti_OnSuspendResume", true, EnterArg)
+	FinallyPos := InStr(Watchdog, "finally", true, ResumeArg)
+	BusyClear := InStr(Watchdog, "_TransitionBusy := false", true, FinallyPos)
+	Assert(BusyCheck > 0 and BusySet > BusyCheck,
 		"_SuspendStateWatchdog must guard against interleaved transitions with a _TransitionBusy flag (or Critical)")
-	Assert(EnterPos > BusyPos && ResumePos > BusyPos,
-		"the Enter/Resume reactor dispatch must run behind the transition-busy guard so a rapid double-toggle cannot interleave them")
-	Assert(InStr(Body, "finally") > 0 && InStr(Body, "_TransitionBusy := false") > 0,
+	Assert(DispatchPos > BusySet and EnterArg > DispatchPos
+		and ResumeArg > EnterArg and FinallyPos > ResumeArg,
+		"the delegated Enter/Resume reactor dispatch must remain inside the transition-busy transaction")
+	Assert(BusyClear > FinallyPos,
 		"the transition-busy guard must be reset in a finally so a throwing reactor never latches it")
+
+	SuspendedBranch := InStr(Dispatch, "if Suspended")
+	EnterCall := InStr(Dispatch, "EnterFn.Call()", true, SuspendedBranch)
+	ResumeCall := InStr(Dispatch, "ResumeFn.Call()", true, EnterCall)
+	Assert(SuspendedBranch > 0 and EnterCall > SuspendedBranch
+		and ResumeCall > EnterCall,
+		"the delegated edge dispatcher must still invoke exactly the selected enter or resume reactor")
 }
 Test("lifecycle: suspend enter/resume reactors are serialized against a rapid double-toggle",
 	_STS_TransitionSerialized)

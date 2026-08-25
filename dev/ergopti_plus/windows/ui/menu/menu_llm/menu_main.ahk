@@ -30,25 +30,44 @@
 ; ==============================================
 ; ==============================================
 
+global _LLM_MenuBuildCoordinator := 0
+
+_LLM_Menu_IsSuspended(*) {
+	return A_IsSuspended
+}
+
+_LLM_Menu_ReportBuildError(Err) {
+	try LoggerError("LLM", "LLM menu build remains pending after failure: {1} ({2}:{3}).",
+		Err.Message, Err.File, Err.Line)
+}
+
+_LLM_Menu_GetBuildCoordinator() {
+	global _LLM_MenuBuildCoordinator
+	PreviousCritical := Critical("On")
+	try {
+		if !(_LLM_MenuBuildCoordinator is LLMMenuBuildCoordinator)
+			_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(
+				LLM_Menu_Build, _LLM_Menu_IsSuspended,
+				_LLM_Menu_ReportBuildError)
+		return _LLM_MenuBuildCoordinator
+	} finally Critical(PreviousCritical)
+}
+
+LLM_Menu_RequestBuild(Reason := "unspecified") {
+	return _LLM_Menu_GetBuildCoordinator().Request(Reason)
+}
+
+LLM_Menu_ServiceBuilds() {
+	return _LLM_Menu_GetBuildCoordinator().Service()
+}
+
 /**
- * Builds (or rebuilds) the LLM submenu inside the tray.
- * Builds a detached Menu first, then replaces the tray entry in one short
- * critical publication. The previously published submenu remains callable when
- * an asynchronous dependency callback or a settings action requests a rebuild.
+ * Builds one detached LLM submenu candidate and submits it to the complete-root
+ * coordinator. Production callers request work through LLM_Menu_RequestBuild;
+ * the generation owner is the only caller of this raw build step.
  */
 LLM_Menu_Build() {
-global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
-static _Building := false
-static _RequestedGeneration := 0
-static _PublishedGeneration := 0
-_RequestedGeneration += 1
-if A_IsSuspended
-	return false
-if _Building
-return true
-while (_PublishedGeneration < _RequestedGeneration) {
-	TargetGeneration := _RequestedGeneration
-_Building := true
+	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
 	; Never clear the published submenu before its replacement is complete. A menu
 	; build can be preempted by timers and callbacks; an in-place Delete() exposed
 	; an empty or partial LLM tree and silently dropped the user's next click.
@@ -63,9 +82,9 @@ _Building := true
 
 	; Enable / Disable toggle. The checked state MUST reflect
 	; ``_LLM_Menu["enabled"]`` alone — that's the user's intent. We keep a
-	; separate ``_llm_is_operational`` flag (enabled AND deps ready) for the
-	; health dot below, because we still want a visual cue when the user
-	; has flipped the toggle ON but Ollama hasn't finished installing yet.
+	; separate ``_llm_is_operational`` flag (enabled AND active-backend ready)
+	; for the health dot below, because we still want a visual cue when the user
+	; has flipped the toggle ON but the selected backend is not usable yet.
 	; Previously the checkbox itself used _llm_is_operational, so clicking
 	; ON while Ollama was missing left the toggle visually OFF — the user
 	; thought the click did nothing.
@@ -75,7 +94,9 @@ _Building := true
 	; empty, with no visible control to switch the feature back on.
 	_deps_ready := false
 	try _deps_ready := LLM_Deps_IsReady()
-	_llm_is_operational := (_LLM_Menu["enabled"] && _deps_ready)
+	_backend_ready := false
+	try _backend_ready := _LLM_Menu_BackendIsReadyForUse()
+	_llm_is_operational := (_LLM_Menu["enabled"] && _backend_ready)
 
 	; Mirror the macOS menu (ui/menu/menu_llm/init.lua is_disabled): when the
 	; feature is OFF, render the FULL menu unchanged but grey out every settings
@@ -143,10 +164,10 @@ _Building := true
 	_LLM_Menu_InTray := true
 	Published := true
 
-	; Check the parent tray entry only when enabled AND Ollama is confirmed ready.
+	; Check the parent tray entry only when enabled and the active backend is ready.
 	; Both branches are guarded with try: the item may not exist yet if the updater
-	; timer fires LLM_Menu_Build() before initMenu has had a chance to register it.
-	if (_LLM_Menu["enabled"] && _deps_ready) {
+	; build request fires before initMenu has had a chance to register it.
+	if (_LLM_Menu["enabled"] && _backend_ready) {
 		try A_TrayMenu.Check(t("menu.llm.title"))
 	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
@@ -159,13 +180,9 @@ _Building := true
 			_LLM_Menu_Handle := OldHandle
 			try StagedHandle.Delete()
 		}
-		try LoggerError("LLM", "LLM_Menu_Build FAILED: {1} ({2}:{3}).", e.Message, e.File, e.Line)
-	} finally {
-		_Building := false
+		throw e
 	}
-	_PublishedGeneration := TargetGeneration
-}
-return true
+	return true
 }
 
 

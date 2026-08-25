@@ -48,6 +48,47 @@ LLM_Menu_DeepClone(Value) {
 	return Value
 }
 
+/**
+ * Converts the current tray state into a Map suitable for LLM_Engine_Init().
+ * Kept in this definitions-only transaction module so the complete projection
+ * can be exercised without registering actions.ahk's rescue hotkey.
+ * @returns {Map} Options map.
+ */
+LLM_Menu_BuildOpts() {
+	global _LLM_Menu
+	return Map(
+		"model",                   _LLM_Menu["model"],
+		"profile_id",              _LLM_Menu["profile_id"],
+		"user_profiles",           _LLM_Menu["user_profiles"],
+		"n_predictions",           _LLM_Menu["n_predictions"],
+		"min_words",               _LLM_Menu["min_words"],
+		"max_words",               _LLM_Menu["max_words"],
+		"language",                I18nGetLocale(),
+		"debounce_ms",             _LLM_Menu["debounce_ms"],
+		"ctx_chars",               _LLM_Menu["ctx_chars"],
+		"temperature",             _LLM_Menu["temperature"],
+		"instant_on_word_end",     _LLM_Menu["instant_on_word_end"],
+		"after_hotstring",         _LLM_Menu["after_hotstring"],
+		"reset_on_nav",            _LLM_Menu["reset_on_nav"],
+		"disable_url_bars",        _LLM_Menu["disable_url_bars"],
+		"disable_password_fields", _LLM_Menu["disable_password_fields"],
+		"disabled_apps",           _LLM_Menu["disabled_apps"],
+		"show_info_bar",           _LLM_Menu["show_info_bar"],
+		"streaming",               _LLM_Menu["streaming"],
+		"show_all_at_once",        _LLM_Menu["show_all_at_once"],
+		"pred_indent",             _LLM_Menu["pred_indent"],
+		"auto_raise_temp",         _LLM_Menu["auto_raise_temp"],
+		"nav_modifiers",           _LLM_Menu["nav_modifiers"],
+		"val_modifiers",           _LLM_Menu["val_modifiers"],
+		"backend",                 _LLM_Menu["backend"],
+		"ollama_port",             _LLM_Menu["ollama_port"],
+		"api_entries",             _LLM_Menu["api_entries"],
+		"api_entry_id",            _LLM_Menu["api_entry_id"],
+		"inline_autotype",         _LLM_Menu["inline_autotype"],
+		"app_profile_overrides",   _LLM_Menu["app_profile_overrides"]
+	)
+}
+
 _LLM_Menu_SetCandidateValue(Candidate, Key, Value) {
 	if !(Candidate is Map) || !(Key is String) || !Candidate.Has(Key)
 		return false
@@ -62,14 +103,30 @@ _LLM_Menu_ToggleCandidateBool(Candidate, Key) {
 	return true
 }
 
+_LLM_Menu_ApplyAppPickerSelection(Candidate, Selected, Receipt) {
+	if !(Candidate is Map) || !(Selected is Array)
+			|| !Candidate.Has("disabled_apps")
+		return false
+	if !AppPicker_ClaimReceipt(Receipt, Candidate["disabled_apps"])
+		return false
+	Candidate["disabled_apps"] := LLM_Menu_DeepClone(Selected)
+	return true
+}
+
 _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
 	global Features, _LLM_Menu
 	if !(CandidateFeatures is Map) || !(CandidateMenu is Map)
 		return false
+	DisabledAppsChanged := _LLM_Menu.Has("disabled_apps")
+		&& CandidateMenu.Has("disabled_apps")
+		&& !AppPicker_SelectionsEqual(_LLM_Menu["disabled_apps"],
+			CandidateMenu["disabled_apps"])
 	PreviousCritical := Critical("On")
 	try {
 		Features := CandidateFeatures
 		_LLM_Menu := CandidateMenu
+		if DisabledAppsChanged
+			AppPicker_AdvanceOwner("llm:disabled_apps")
 		return true
 	} finally Critical(PreviousCritical)
 }
@@ -87,7 +144,7 @@ _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
 ; Applies the ordinary post-commit tail shared by scalar LLM settings.
 _LLM_Menu_ApplyStandardCommitted(*) {
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("standard_committed")
 	return true
 }
 
@@ -96,19 +153,24 @@ _LLM_Menu_ApplyStandardCommitted(*) {
 ; trigger quiescence, full collector and strict TOML writer.
 LLM_Menu_CommitMutation(Context, MutateFn, ApplyFn := 0, WriterFn := 0,
 		NotifyFn := 0, AcquireFn := 0, SettleFn := 0, QuiesceFn := 0,
-		CollectFn := 0) {
+		CollectFn := 0, PrepareFn := 0, PublishFn := 0) {
 	PreviousCritical := Critical("Off")
 	try return _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn,
-		WriterFn, NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn)
+		WriterFn, NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn,
+		PrepareFn, PublishFn)
 	finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
-		NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn) {
+		NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn, PrepareFn,
+		PublishFn) {
 	global ConfigurationFile, Features, _LLM_Menu
 	if !(Context is String) || Context == "" || !HasMethod(MutateFn, "Call")
 		return ConfigReportPersistenceFailure("the LLM menu mutation", NotifyFn,
 			"the candidate mutation contract is invalid")
+	if HasMethod(PrepareFn, "Call") != HasMethod(PublishFn, "Call")
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			"candidate preparation requires a matching publication owner")
 	if !IsSet(ConfigurationFile) || !(ConfigurationFile is String)
 			|| ConfigurationFile == "" || !IsSet(Features) || !(Features is Map)
 			|| !IsSet(_LLM_Menu) || !(_LLM_Menu is Map) {
@@ -126,6 +188,9 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			"another configuration transaction owns the global barrier")
 	}
+	PreparedOwner := 0
+	PreparedProfileOwner := 0
+	ProfileOwnerCommitted := false
 	try {
 		try Settled := HasMethod(SettleFn, "Call")
 			? SettleFn.Call(Bundle) : _ConfigFullSaveSettleTerminal(Bundle)
@@ -164,6 +229,16 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"the detached LLM state could not be reconciled into Features")
 		}
+		try PreparedProfileOwner :=
+			_LLM_Menu_PrepareProfileOwnerCandidate(CandidateMenu)
+		catch as Err {
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"profile hotkey owner preparation raised: " . Err.Message)
+		}
+		if !(PreparedProfileOwner is Map) {
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"profile hotkey owner preparation was refused")
+		}
 		try Updates := HasMethod(CollectFn, "Call")
 			? CollectFn.Call(CandidateFeatures, CandidateMenu)
 			: _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
@@ -175,6 +250,17 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"candidate serialization returned no update batch")
 		}
+		if HasMethod(PrepareFn, "Call") {
+			; A false result is an ordinary native refusal. An exception means the
+			; preparation owner could not restore a process-wide invariant (for
+			; example the current HotIf criterion), so it must escape fail-fast.
+			; The surrounding finally still releases terminal admission.
+			PreparedOwner := PrepareFn.Call(CandidateMenu)
+			if !(PreparedOwner is Object) {
+				return ConfigReportPersistenceFailure(Context, NotifyFn,
+					"candidate preparation was refused")
+			}
+		}
 		OwnerToken := _ConfigWriteLeaseSelectOwner(Bundle, ConfigurationFile)
 		if !(OwnerToken is Object) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
@@ -183,7 +269,29 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		if !ConfigCommitBorrowedUpdates(OwnerToken, ConfigurationFile, Updates,
 				Context, WriterFn, NotifyFn)
 			return false
-		if !_LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
+		try {
+			PreviousCritical := Critical("On")
+			try {
+				if !_LLM_Menu_CommitProfileOwnerCandidate(
+						PreparedProfileOwner)
+					return ConfigReportPersistenceFailure(Context, NotifyFn,
+						"config.toml is durable but the profile hotkey owner commit was refused",
+						false)
+				ProfileOwnerCommitted := true
+				Published := HasMethod(PublishFn, "Call")
+					? PublishFn.Call(CandidateFeatures, CandidateMenu, PreparedOwner)
+					: _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu)
+			} finally Critical(PreviousCritical)
+		}
+		catch as Err {
+			return ConfigReportPersistenceFailure(Context, NotifyFn,
+				"config.toml is durable but live publication raised: "
+				. Err.Message, false)
+		}
+		if !((Published is Integer) && Published == 1) {
+			if PreparedProfileOwner.Get("changed", false)
+				_LLM_NavEventOwnerQuarantine(
+					"Durable profile state could not be published after its native owner commit")
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml is durable but live publication was refused", false)
 		}
@@ -200,7 +308,11 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			}
 		}
 		return true
-	} finally _ConfigWriteTerminalRelease(Bundle)
+	} finally {
+		if PreparedProfileOwner is Map && !ProfileOwnerCommitted
+			_LLM_Menu_AbortProfileOwnerCandidate(PreparedProfileOwner)
+		_ConfigWriteTerminalRelease(Bundle)
+	}
 }
 
 
@@ -392,14 +504,14 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 			; committed_new already proves both targets durable. Publish the same
 			; candidate so RAM never advertises the rolled-back old authority while
 			; the retained barrier forces lifecycle recovery of the WAL.
-			Published := _LLM_Menu_PublishCandidate(CandidateFeatures,
+			Published := _LLM_Menu_PublishApiEntriesCandidate(CandidateFeatures,
 				CandidateMenu)
 			if Published && HasMethod(ApplyFn, "Call")
 				try ApplyFn.Call(CandidateMenu)
 			return _LLM_Menu_ReportApiTransitionFailure(Context, CleanupResult,
 				NotifyFn, false)
 		}
-		if !_LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
+		if !_LLM_Menu_PublishApiEntriesCandidate(CandidateFeatures, CandidateMenu) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"both files are durable but live publication was refused", false)
 		}

@@ -7,10 +7,8 @@
 ; Escape tap-hold: any action from GESTURE_ACTIONS on tap (default: escape),
 ; any hold modifier or nav layer on hold. Scancode SC001.
 ;
-; Two-phase design (mirrors space.ahk) to prevent auto-repeat during long hold:
-; Phase 1 — KeyWait with timeout discriminates tap from hold.
-; Phase 2 (modifier) — arm modifier, capture next key, release on key-up.
-; Phase 2 (layer) — activate layer until key-up.
+; Modifier or layer ownership begins synchronously on physical key-down. The
+; owner is balanced on release before a quick isolated press emits the tap.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,28 +43,10 @@ _EscapeHoldModKey() {
 
 #HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
 *$SC001:: {
-	tap := KeyWait("Escape", "T" . TapHoldDuration(TapHold, "escape"))
-	if tap {
-		if (A_PriorKey == "Escape")
-			_EscapeDispatch()
-		return
-	}
-	HoldGuardMs := TapHoldDuration(TapHold, "escape") * 1100
-	if (HoldGuardMs < 250)
-		HoldGuardMs := 250
-	if (TapHoldShouldSuppressHold("escape", HoldGuardMs)) {
-		if LoggerIsDebugEnabled()
-			LoggerDebug("TapHold", "Escape hold suppressed after long press because wheel activity was detected.")
-		return
-	}
-	ModKey := _EscapeHoldModKey()
-	if !TapHoldSyntheticKeyDown(ModKey)
-		return
-	try {
-		KeyWait("Escape", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		TapHoldSyntheticKeyUp(ModKey)
-	}
+	Result := TapHoldOwnImmediateModifier("escape", "Escape",
+		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"))
+	if (Result["tap"] and A_PriorKey == "Escape")
+		_EscapeDispatch()
 }
 #HotIf
 
@@ -84,30 +64,9 @@ _EscapeHoldModKey() {
 
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
 *$SC001:: {
-	tap := KeyWait("Escape", "T" . TapHoldDuration(TapHold, "escape"))
-	if tap {
-		if (A_PriorKey == "Escape")
-			_EscapeDispatch()
-		return
-	}
-	ActivateLayer()
-	try {
-		; The cap is a failsafe for waits that hold a SYNTHETIC modifier Down: those
-		; must never latch it forever if the key-up event is lost. A hold LAYER holds no
-		; synthetic key, so there is nothing to latch. Applied verbatim, the cap simply
-		; dropped the layer out from under the user after five seconds of legitimate
-		; navigation, and base-layer letters then landed in the document until it
-		; re-armed. Re-arm the wait instead while the key is still physically down: every
-		; iteration stays bounded, which is the property test_hold_layer_release_bounded
-		; pins, and a timeout with the key already up means the key-up really was lost --
-		; exactly the case the failsafe exists for.
-		while !KeyWait("Escape", "U T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !GetKeyState("Escape", "P")
-				break
-		}
-	} finally {
-		DisableLayer()
-	}
+	Result := TapHoldOwnImmediateLayer("Escape", TapHoldDuration(TapHold, "escape"))
+	if (Result["tap"] and A_PriorKey == "Escape")
+		_EscapeDispatch()
 }
 #HotIf
 

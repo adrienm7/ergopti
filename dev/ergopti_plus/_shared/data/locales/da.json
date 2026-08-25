@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Afslut",
 	"menu.global.reload": "🔄 Genindlæs",
 	"menu.global.reset_defaults": "↺ Nulstil til standarder",
+	"menu.global.starting": "Starter…",
 	"menu.global.setup_wizard": "Opsætningsguide…",
 	"menu.global.suspend": "⏸︎ Suspendér",
 	"menu.global.title": "Globale handlinger",

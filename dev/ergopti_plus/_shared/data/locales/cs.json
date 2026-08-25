@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Ukončit",
 	"menu.global.reload": "🔄 Znovu načíst",
 	"menu.global.reset_defaults": "↺ Obnovit výchozí nastavení",
+	"menu.global.starting": "Spouštění…",
 	"menu.global.setup_wizard": "Průvodce nastavením…",
 	"menu.global.suspend": "⏸︎ Pozastavit",
 	"menu.global.title": "Globální akce",

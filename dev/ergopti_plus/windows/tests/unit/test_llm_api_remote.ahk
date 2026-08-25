@@ -49,6 +49,239 @@ _RemoteBuildUrl_TrailingSlashStripped() {
 Test("_LLMRemoteBuildUrl: trailing slash on base URL is stripped", _RemoteBuildUrl_TrailingSlashStripped)
 
 
+_RemoteCurlConfig_RejectsControlCharacterDirectives() {
+	HostileCases := [
+		["openai", 'secret`nheader = "X-Evil: yes"', "https://safe.invalid/v1"],
+		["openai", "secret`tcontinued", "https://safe.invalid/v1"],
+		["anthropic", "secret" . Chr(27) . "escape", "https://safe.invalid/v1"],
+		["openai", "secret`rinclude = injected", "https://safe.invalid/v1"],
+		["gemini", "secret", 'https://safe.invalid/v1`noutput = "stolen"'],
+		["openai", "secret" . Chr(127) . "delete", "https://safe.invalid/v1"],
+		["openai", "secret" . Chr(0x85) . "next-line", "https://safe.invalid/v1"]
+	]
+	for Vector in HostileCases
+		AssertEqual("", _LLMRemote_BuildCurlConfig(Vector[1], Vector[2], Vector[3]),
+			"(ahk2-12-curl-config-boundary) a control character must reject the complete curl config")
+
+	Valid := _LLMRemote_BuildCurlConfig("openai", 'token with spaces\and"quotes',
+		"https://safe.invalid/v1?q=é")
+	Assert(Valid != "",
+		"(ahk2-12-curl-config-boundary) ordinary escaped and Unicode values must remain valid")
+	AssertContains(Valid, "Authorization: Bearer token with spaces")
+}
+Test("remote curl config: control characters cannot inject directives (ahk2-12-curl-config-boundary)",
+	_RemoteCurlConfig_RejectsControlCharacterDirectives)
+
+
+_RemoteCurlControl_TempDir(State, *) {
+	State["temp_calls"] += 1
+	return A_Temp
+}
+
+_RemoteCurlControl_Write(State, *) {
+	State["write_calls"] += 1
+	return true
+}
+
+_RemoteCurlControl_Run(State, Command, WorkingDir, Options, &Pid) {
+	State["run_calls"] += 1
+	Pid := 4242
+}
+
+_RemoteCurlControl_Fail(State, *) {
+	State["fail_calls"] += 1
+}
+
+_RemoteCurlControl_DispatchRejectsBeforeArtifacts() {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_12_control_dispatch"
+	State := Map("temp_calls", 0, "write_calls", 0, "run_calls", 0,
+		"fail_calls", 0)
+	Port := Map(
+		"file_exists", (*) => true,
+		"temp_dir", _RemoteCurlControl_TempDir.Bind(State),
+		"write", _RemoteCurlControl_Write.Bind(State),
+		"delete", (*) => true,
+		"run", _RemoteCurlControl_Run.Bind(State),
+		"poll", (*) => true,
+		"tick", (*) => 6212)
+	Resolved := Map("Format", "openai", "Token", "secret`nheader = injected",
+		"Model", "model")
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved,
+			"https://safe.invalid/v1", '{"input":"private"}', (*) => 0,
+			_RemoteCurlControl_Fail.Bind(State), 1000, Port),
+			"curl availability must transfer terminal refusal to the dispatcher")
+		AssertEqual(1, State["fail_calls"],
+			"(ahk2-12-curl-config-boundary) invalid config input must fail exactly once")
+		AssertEqual(0, State["temp_calls"],
+			"invalid config input must be rejected before artifact paths are allocated")
+		AssertEqual(0, State["write_calls"],
+			"invalid config input must create neither payload nor credential artifact")
+		AssertEqual(0, State["run_calls"],
+			"invalid config input must never launch curl")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"invalid config input must not publish an async owner")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+Test("remote curl dispatch: invalid config is refused before artifacts "
+	. "(ahk2-12-curl-config-boundary)",
+	_RemoteCurlControl_DispatchRejectsBeforeArtifacts)
+
+
+_RemotePidReceipt_RecordSuccess(State, Text, Usage) {
+	State["success_calls"] += 1
+	State["text"] := Text
+	State["usage"] := Usage
+}
+
+_RemotePidReceipt_RecordFailure(State) {
+	State["fail_calls"] += 1
+}
+
+_RemotePidReceipt_RecordCleanup(State, Entry) {
+	State["cleanup_calls"] += 1
+}
+
+_RemotePidReceipt_ReadTerminal(State, StatusPath, ExitPath, BodyPath) {
+	State["terminal_reads"] += 1
+	return Map(
+		"complete", true,
+		"exit", 0,
+		"status", 200,
+		"body_read", true,
+		"body", '{"choices":[{"message":{"content":"receipt wins"}}]}')
+}
+
+_RemotePidReceipt_CompleteReceiptPrecedesRecycledPidAndDeadline() {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_04_remote_receipt_first"
+	State := Map(
+		"success_calls", 0,
+		"fail_calls", 0,
+		"cleanup_calls", 0,
+		"terminal_reads", 0,
+		"process_checks", 0,
+		"close_calls", 0,
+		"text", "",
+		"usage", 0)
+	ProcessExistsFn := (*) => (State["process_checks"] += 1, true)
+	CloseFn := (*) => (State["close_calls"] += 1, true)
+	Port := Map(
+		"process_exists", ProcessExistsFn,
+		"process_close", CloseFn,
+		"read_terminal", _RemotePidReceipt_ReadTerminal.Bind(State),
+		"cleanup", _RemotePidReceipt_RecordCleanup.Bind(State))
+	_LLM_Remote_Async[ReqId] := Map(
+		"transport", "curl",
+		"pid", 4242,
+		"tmp_payload", "payload",
+		"tmp_stdout", "body",
+		"tmp_config", "config",
+		"tmp_status", "status",
+		"tmp_exit", "exit",
+		"format", "openai",
+		"model_id_at_dispatch", "model",
+		"on_success", _RemotePidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _RemotePidReceipt_RecordFailure.Bind(State),
+		"cancelled", false,
+		"start_tick", A_TickCount - 5000,
+		"timeout_ms", 1)
+	try {
+		_LLMRemote_PollCurl(ReqId, Port)
+		AssertEqual(1, State["terminal_reads"],
+			"(ahk2-04-curl-receipt-first) the durable terminal receipt must be read before liveness or deadline")
+		AssertEqual(0, State["process_checks"],
+			"a complete receipt must make a recycled live PID irrelevant")
+		AssertEqual(0, State["close_calls"],
+			"the poller must never close a process selected only by a recyclable PID")
+		AssertEqual(1, State["success_calls"],
+			"the complete 2xx response must win even when the old numeric PID is live and the wall deadline passed")
+		AssertEqual(0, State["fail_calls"],
+			"a durable successful response must not be reclassified as timeout")
+		AssertEqual("receipt wins", State["text"],
+			"the terminal response body must reach the exact completion callback")
+		AssertEqual(1, State["cleanup_calls"],
+			"the terminal owner must clean its artifacts exactly once")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"the exact completed request must retire from the registry")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+Test("remote curl poll: terminal receipt precedes recycled PID and deadline "
+	. "(ahk2-04-curl-receipt-first)",
+	_RemotePidReceipt_CompleteReceiptPrecedesRecycledPidAndDeadline)
+
+
+_RemotePidReceipt_RunIncompleteBoundary(Mode) {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_04_remote_" . Mode
+	State := Map(
+		"success_calls", 0, "fail_calls", 0, "cleanup_calls", 0,
+		"terminate_calls", 0, "close_calls", 0,
+		"terminated_handle", 0, "closed_handle", 0)
+	Port := Map(
+		"open_process", (*) => 9301,
+		"terminate_process", (Handle) => (
+			State["terminate_calls"] += 1,
+			State["terminated_handle"] := Handle,
+			true),
+		"close_process", (Handle) => (
+			State["close_calls"] += 1,
+			State["closed_handle"] := Handle,
+			true),
+		"read_terminal", (*) => Map(
+			"complete", false, "exit", -1, "status", 0,
+			"body_read", false, "body", ""),
+		"cleanup", _RemotePidReceipt_RecordCleanup.Bind(State))
+	ProcessOwner := _LLM_CurlAdoptProcess(4242, Port)
+	_LLM_Remote_Async[ReqId] := Map(
+		"transport", "curl", "pid", 4242, "process_owner", ProcessOwner,
+		"tmp_payload", "payload", "tmp_stdout", "body", "tmp_config", "config",
+		"tmp_status", "status", "tmp_exit", "exit", "format", "openai",
+		"on_success", _RemotePidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _RemotePidReceipt_RecordFailure.Bind(State),
+		"cancelled", Mode == "cancel",
+		"start_tick", Mode == "timeout" ? A_TickCount - 5000 : A_TickCount,
+		"timeout_ms", Mode == "timeout" ? 1 : 100000)
+	try {
+		_LLMRemote_PollCurl(ReqId, Port)
+		AssertEqual(1, State["terminate_calls"],
+			Mode . " must terminate the exact retained process handle once")
+		AssertEqual(9301, State["terminated_handle"],
+			Mode . " must never reopen or close the recyclable numeric PID")
+		AssertEqual(1, State["close_calls"],
+			Mode . " must close the retained process handle once")
+		AssertEqual(9301, State["closed_handle"],
+			Mode . " cleanup must close the same exact handle it terminated")
+		AssertEqual(1, State["cleanup_calls"],
+			Mode . " must clean its exact artifact owner once")
+		AssertEqual(0, State["success_calls"],
+			Mode . " without a terminal receipt must never publish success")
+		AssertEqual(Mode == "timeout" ? 1 : 0, State["fail_calls"],
+			"timeout reports failure, while cancellation remains callback-silent")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			Mode . " must retire the exact registry entry")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+
+_RemotePidReceipt_TimeoutAndCancelUseExactHandle() {
+	_RemotePidReceipt_RunIncompleteBoundary("timeout")
+	_RemotePidReceipt_RunIncompleteBoundary("cancel")
+}
+Test("remote curl poll: timeout and cancellation terminate only the exact process handle "
+	. "(ahk2-04-curl-exact-process-owner)",
+	_RemotePidReceipt_TimeoutAndCancelUseExactHandle)
+
+
 
 
 ; ======================================================
@@ -355,6 +588,19 @@ _RemoteResolve_GeminiFormat() {
 Test("_LLMRemoteResolveEntry: gemini provider resolves to gemini format", _RemoteResolve_GeminiFormat)
 
 
+_RemoteResolve_ControlCharactersFailClosed() {
+	for Field in ["BaseUrl", "Token", "Model"] {
+		Entry := Map("Provider", "openai", "Token", "secret", "Model", "gpt-4o-mini",
+			"BaseUrl", "https://safe.invalid/v1")
+		Entry[Field] .= "`noutput = injected"
+		AssertEqual("", _LLMRemoteResolveEntry(Entry),
+			"(ahk2-12-curl-config-boundary) resolver must reject control characters in " . Field)
+	}
+}
+Test("remote resolver: control-bearing transport scalars fail closed (ahk2-12-curl-config-boundary)",
+	_RemoteResolve_ControlCharactersFailClosed)
+
+
 
 
 ; ===================================================
@@ -519,6 +765,52 @@ _RemoteCatalog_LoadedFromShared() {
 	AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("gpt-4o-mini"))
 }
 Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_LoadedFromShared)
+
+
+_RemoteCatalog_InvalidScalarsNeverPublish() {
+	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
+	oldProviders := LLM_API_PROVIDERS
+	oldOrder := LLM_API_PROVIDER_ORDER
+	oldPrices := LLM_REMOTE_MODEL_PRICES
+	oldSharedDir := _SharedDir
+	testRoot := A_Temp . "\ergopti-ahk013-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
+	fixture := FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\api_provider_catalog_validation.json", "UTF-8")
+	try {
+		DirCreate(testRoot . "\modules\llm")
+		FileAppend(fixture, testRoot . "\modules\llm\api_providers.json", "UTF-8")
+		_SharedDir := testRoot
+		_LLMRemote_LoadCatalog()
+
+		AssertEqual(2, LLM_API_PROVIDER_ORDER.Length,
+			"only the valid provider and the configurable compatibility provider may publish")
+		AssertEqual("valid", LLM_API_PROVIDER_ORDER[1])
+		AssertEqual("openai_compat", LLM_API_PROVIDER_ORDER[2])
+		AssertTrue(LLM_API_PROVIDERS.Has("valid"))
+		AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
+		for invalidId in ["empty_base", "empty_model", "bad_url", "space_model", "space_label", "object_label", "array_url", "null_model", "number_format", "unknown_format"]
+			AssertFalse(LLM_API_PROVIDERS.Has(invalidId), invalidId . " must not reach the published catalogue")
+		AssertEqual("", LLM_API_PROVIDERS["openai_compat"]["BaseUrl"])
+		AssertEqual("", LLM_API_PROVIDERS["openai_compat"]["DefaultModel"])
+		providerChoices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
+		AssertContains(providerChoices, "valid (Valid)")
+		AssertContains(providerChoices, "openai_compat (Compatible)")
+
+		AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("valid_integer"))
+		AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("valid_float"))
+		for invalidModel in ["string_price", "null_price", "container_price", "negative_price"]
+			AssertFalse(LLM_REMOTE_MODEL_PRICES.Has(invalidModel), invalidModel . " must remain unpriced")
+		AssertEqual(3.0, _LLMRemoteEstimateCost("valid_integer", 1000000, 1000000))
+		AssertEqual(0.875, _LLMRemoteEstimateCost("valid_float", 1000000, 1000000))
+		AssertEqual(0.0, _LLMRemoteEstimateCost("string_price", 1000000, 1000000))
+	} finally {
+		_SharedDir := oldSharedDir
+		LLM_API_PROVIDERS := oldProviders
+		LLM_API_PROVIDER_ORDER := oldOrder
+		LLM_REMOTE_MODEL_PRICES := oldPrices
+		try DirDelete(testRoot, true)
+	}
+}
+Test("api_providers.json: invalid descriptor and price scalars never publish", _RemoteCatalog_InvalidScalarsNeverPublish)
 
 
 _RemoteBuildContext_PrefixTail() {

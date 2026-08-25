@@ -101,11 +101,20 @@ class KLTopo {
 		static h            := 0
 		static state        := ""    ; "normal" | "maximized" | "minimized" | "snapped"
 		static monitor_idx  := 0
+		static monitor_id   := ""
 
 		; Pending change accumulator (debounce)
 		static pending_type := ""
 		static pending_data := unset
 		static pending_ticks := 0
+
+		; Monitor identity has its own debounce. A real cross-monitor drag also
+		; changes geometry, so sharing the accumulator makes window_move consume
+		; monitor_focus_change before it can become stable.
+		static monitor_pending_from := ""
+		static monitor_pending_to := ""
+		static monitor_pending_idx := 0
+		static monitor_pending_ticks := 0
 
 		; Virtual desktop heuristic
 		static seen_hwnds   := Map()    ; hwnd → last-seen tick
@@ -184,21 +193,35 @@ KL_Topo_Tick() {
 				cur_state := "minimized"
 		else {
 				; Snap detection
-				mon_w := KL_Topo_MonitorWidth(cx + cw // 2, cy + ch // 2)
+				monitor := KL_Topo_MonitorReceipt(cx + cw // 2, cy + ch // 2)
+				mon_w := monitor["width"]
 				if (mon_w > 0 and Abs(cw - mon_w // 2) <= KLTopoConst.SNAP_TOLERANCE_PX)
 						cur_state := "snapped"
 		}
 
-		; Monitor index
-		cur_mon := KL_Topo_MonitorIdx(cx + cw // 2, cy + ch // 2)
+		; Resolve the monitor once. Monitor enumeration indices are positional and
+		; can change after a topology refresh; the display name (or bounds fallback)
+		; is the stable identity used by the event classifier.
+		if !IsSet(monitor)
+				monitor := KL_Topo_MonitorReceipt(cx + cw // 2, cy + ch // 2)
 
 		app := Keylogger.session_app
+		KL_Topo_ProcessObservation(hwnd, cx, cy, cw, ch, cur_state,
+				monitor, app)
+}
 
+; Pure classifier/debounce boundary. The polling wrapper owns Win32 reads; this
+; function owns only one already-observed geometry/monitor tuple.
+KL_Topo_ProcessObservation(hwnd, cx, cy, cw, ch, cur_state, cur_mon, app,
+		LogFn := KL_Topo_LogEvent) {
+		monitor := KL_Topo_NormalizeMonitorReceipt(cur_mon)
 		; Compare with last snapshot
 		if (KLTopo.w = 0) {
 				; First observation — seed without emitting
 				KLTopo.x := cx, KLTopo.y := cy, KLTopo.w := cw, KLTopo.h := ch
-				KLTopo.state := cur_state, KLTopo.monitor_idx := cur_mon
+				KLTopo.state := cur_state
+				KLTopo.monitor_id := monitor["id"]
+				KLTopo.monitor_idx := monitor["index"]
 				KLTopo.hwnd := hwnd
 				return
 		}
@@ -222,41 +245,80 @@ KL_Topo_Tick() {
 				change_type := "window_move"
 				change_data["from_x"] := KLTopo.x, change_data["from_y"] := KLTopo.y
 				change_data["to_x"]   := cx,       change_data["to_y"]   := cy
-		} else if (cur_mon != KLTopo.monitor_idx and cur_mon > 0) {
-				change_type := "monitor_focus_change"
-				change_data["from_monitor"] := KLTopo.monitor_idx
-				change_data["to_monitor"]   := cur_mon
 		}
 
 		if (change_type = "") {
 				KLTopo.pending_ticks := 0
 				; Always sync snapshot on no-change tick
 				KLTopo.x := cx, KLTopo.y := cy, KLTopo.w := cw, KLTopo.h := ch
-				KLTopo.state := cur_state, KLTopo.monitor_idx := cur_mon
+				KLTopo.state := cur_state
+		} else {
+				; Debounce — require DEBOUNCE_TICKS consecutive ticks with same change_type
+				if (change_type = KLTopo.pending_type) {
+						KLTopo.pending_ticks += 1
+						KLTopo.pending_data  := change_data   ; keep the most recent geometry, not the overshoot
+				} else {
+						KLTopo.pending_type  := change_type
+						KLTopo.pending_data  := change_data
+						KLTopo.pending_ticks := 1
+				}
+
+				if (KLTopo.pending_ticks >= KLTopoConst.DEBOUNCE_TICKS) {
+						; KL_Topo_LogEvent sets the "type" key itself — the inline assignment and
+						; direct KL_AppendLog were redundant, causing every topology event to be
+						; written twice to today.log and data.sql (double-counting all metrics).
+						LogFn.Call(change_type, KLTopo.pending_data)
+						KLTopo.pending_ticks := 0
+						KLTopo.pending_type  := ""
+						; Update snapshot after logging
+						KLTopo.x := cx, KLTopo.y := cy, KLTopo.w := cw, KLTopo.h := ch
+						KLTopo.state := cur_state
+				}
+		}
+
+		KL_Topo_ProcessMonitorObservation(monitor, app, LogFn)
+}
+
+; Monitor changes are reduced independently from geometry changes. This is
+; what permits one settled cross-monitor drag to produce both facts while an
+; enumeration reorder for the same physical display produces neither.
+KL_Topo_ProcessMonitorObservation(monitor, app, LogFn := KL_Topo_LogEvent) {
+		cur_id := monitor["id"]
+		if (cur_id = "" or cur_id = KLTopo.monitor_id) {
+				KLTopo.monitor_pending_from := ""
+				KLTopo.monitor_pending_to := ""
+				KLTopo.monitor_pending_idx := 0
+				KLTopo.monitor_pending_ticks := 0
+				if (cur_id != "")
+						KLTopo.monitor_idx := monitor["index"]
 				return
 		}
 
-		; Debounce — require DEBOUNCE_TICKS consecutive ticks with same change_type
-		if (change_type = KLTopo.pending_type) {
-				KLTopo.pending_ticks += 1
-				KLTopo.pending_data  := change_data   ; keep the most recent geometry, not the overshoot
+		if (KLTopo.monitor_pending_from = KLTopo.monitor_id
+				and KLTopo.monitor_pending_to = cur_id) {
+				KLTopo.monitor_pending_ticks += 1
+				KLTopo.monitor_pending_idx := monitor["index"]
 		} else {
-				KLTopo.pending_type  := change_type
-				KLTopo.pending_data  := change_data
-				KLTopo.pending_ticks := 1
+				KLTopo.monitor_pending_from := KLTopo.monitor_id
+				KLTopo.monitor_pending_to := cur_id
+				KLTopo.monitor_pending_idx := monitor["index"]
+				KLTopo.monitor_pending_ticks := 1
 		}
 
-		if (KLTopo.pending_ticks >= KLTopoConst.DEBOUNCE_TICKS) {
-				; KL_Topo_LogEvent sets the "type" key itself — the inline assignment and
-				; direct KL_AppendLog were redundant, causing every topology event to be
-				; written twice to today.log and data.sql (double-counting all metrics).
-				KL_Topo_LogEvent(change_type, KLTopo.pending_data)
-				KLTopo.pending_ticks := 0
-				KLTopo.pending_type  := ""
-				; Update snapshot after logging
-				KLTopo.x := cx, KLTopo.y := cy, KLTopo.w := cw, KLTopo.h := ch
-				KLTopo.state := cur_state, KLTopo.monitor_idx := cur_mon
-		}
+		if (KLTopo.monitor_pending_ticks < KLTopoConst.DEBOUNCE_TICKS)
+				return
+
+		LogFn.Call("monitor_focus_change", Map(
+				"app", app,
+				"from_monitor", KLTopo.monitor_pending_from,
+				"to_monitor", KLTopo.monitor_pending_to
+		))
+		KLTopo.monitor_id := cur_id
+		KLTopo.monitor_idx := KLTopo.monitor_pending_idx
+		KLTopo.monitor_pending_from := ""
+		KLTopo.monitor_pending_to := ""
+		KLTopo.monitor_pending_idx := 0
+		KLTopo.monitor_pending_ticks := 0
 }
 
 KL_Topo_LogEvent(kind, data) {
@@ -307,28 +369,59 @@ KL_Topo_IsLikelyDesktopSwitch(prev_alive, incoming_last_seen, now) {
 ; ==================================
 ; ==================================
 
-KL_Topo_MonitorWidth(cx, cy) {
+KL_Topo_MonitorReceipt(cx, cy) {
 		n := MonitorGetCount()
 		loop n {
 				try {
 						MonitorGetWorkArea(A_Index, &ml, &mt, &mr, &mb)
-						if (cx >= ml and cx < mr and cy >= mt and cy < mb)
-								return mr - ml
+						if (cx >= ml and cx < mr and cy >= mt and cy < mb) {
+								name := ""
+								try name := MonitorGetName(A_Index)
+								if (name = "")
+										name := ml . "," . mt . "," . mr . "," . mb
+								return Map("id", name, "index", A_Index, "width", mr - ml)
+						}
 				}
 		}
-		return 0
+		return Map("id", "", "index", 0, "width", 0)
+}
+
+KL_Topo_NormalizeMonitorReceipt(receipt) {
+		if (receipt is Map) {
+				id := receipt.Get("id", "")
+				index := receipt.Get("index", 0)
+				width := receipt.Get("width", 0)
+				return Map("id", id, "index", index, "width", width)
+		}
+		; Compatibility for any direct callers predating monitor receipts.
+		index := IsNumber(receipt) ? receipt : 0
+		return Map("id", index > 0 ? "INDEX:" . index : "", "index", index, "width", 0)
+}
+
+KL_Topo_MonitorWidth(cx, cy) {
+		return KL_Topo_MonitorReceipt(cx, cy)["width"]
 }
 
 KL_Topo_MonitorIdx(cx, cy) {
-		n := MonitorGetCount()
-		loop n {
-				try {
-						MonitorGetWorkArea(A_Index, &ml, &mt, &mr, &mb)
-						if (cx >= ml and cx < mr and cy >= mt and cy < mb)
-								return A_Index
-				}
-		}
-		return 1
+		return KL_Topo_MonitorReceipt(cx, cy)["index"]
+}
+
+KL_Topo_ResetObservation() {
+		KLTopo.hwnd := 0
+		KLTopo.x := -99999
+		KLTopo.y := -99999
+		KLTopo.w := 0
+		KLTopo.h := 0
+		KLTopo.state := ""
+		KLTopo.monitor_idx := 0
+		KLTopo.monitor_id := ""
+		KLTopo.pending_type := ""
+		KLTopo.pending_data := unset
+		KLTopo.pending_ticks := 0
+		KLTopo.monitor_pending_from := ""
+		KLTopo.monitor_pending_to := ""
+		KLTopo.monitor_pending_idx := 0
+		KLTopo.monitor_pending_ticks := 0
 }
 
 
@@ -357,4 +450,5 @@ KL_Topo_Stop() {
 		; running and would otherwise accumulate across Stop/Start cycles.
 		KLTopo.seen_hwnds.Clear()
 		KLTopo.prev_hwnd := 0
+		KL_Topo_ResetObservation()
 }

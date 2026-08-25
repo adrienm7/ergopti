@@ -761,6 +761,7 @@
 	"menu.global.quit": "⏹ Quit",
 	"menu.global.reload": "🔄 Reload",
 	"menu.global.reset_defaults": "↺ Reset to defaults",
+	"menu.global.starting": "Starting…",
 	"menu.global.setup_wizard": "Setup wizard…",
 	"menu.global.suspend": "⏸︎ Suspend",
 	"menu.global.title": "Global actions",

@@ -126,6 +126,68 @@ helpers.describe("sqlite_writer — init validation", function()
 		helpers.assert_eq(ok, true)
 	end)
 
+	helpers.it("migrates every LLM accounting column on an existing cache", function()
+		local executed = {}
+		local closed = false
+		local db = {
+			exec = function(_, sql)
+				executed[#executed + 1] = sql
+				return 0
+			end,
+			nrows = function(_, sql)
+				if sql == "PRAGMA table_info(events_llm)" then
+					local rows = {
+						{ name = "device_id" }, { name = "id" }, { name = "count" },
+					}
+					local i = 0
+					return function()
+						i = i + 1
+						return rows[i]
+					end
+				end
+				return function() return nil end
+			end,
+			prepare = function()
+				return {
+					bind_values = function() return 0 end,
+					step = function() return 101 end,
+					finalize = function() return 0 end,
+				}
+			end,
+			close = function() closed = true; return 0 end,
+			errmsg = function() return "" end,
+		}
+		local sqlite = {
+			OK = 0, ERROR = 1, ROW = 100, DONE = 101,
+			open = function() return db end,
+		}
+		local sw = helpers.load_with_stubs("modules.keylogger.sqlite_writer", {
+			fs = { attributes = function() return { mode = "file" } end },
+			sqlite3 = sqlite,
+		})
+		sw.init({
+			paths = { sqlite_path = "/tmp/existing-accounting.sqlite" },
+			device_obj = {
+				device_id = "existing-device", name = "TestMac", os = "macOS",
+				os_version = "14.0", host_signature = "sig",
+				created_at = "2024-01-01 00:00:00",
+			},
+			device_id = "existing-device",
+		})
+		helpers.assert_true(sw.open_db(), "an existing cache must remain writable after migration")
+		local migration_sql = table.concat(executed, "\n")
+		for _, expected in ipairs({
+			"ALTER TABLE events_llm ADD COLUMN prompt_tokens INTEGER",
+			"ALTER TABLE events_llm ADD COLUMN completion_tokens INTEGER",
+			"ALTER TABLE events_llm ADD COLUMN total_tokens INTEGER",
+			"ALTER TABLE events_llm ADD COLUMN est_cost_usd REAL",
+		}) do
+			helpers.assert_true(migration_sql:find(expected, 1, true) ~= nil,
+				"existing caches must execute migration: " .. expected)
+		end
+		helpers.assert_eq(closed, false, "a successful migration must keep the writer open")
+	end)
+
 	-- The writer records what it is handed; the decision not to record while
 	-- paused is the ingest path's early return. Both cases below stated that with
 	-- assert_true(true) and a sentence.
@@ -265,6 +327,29 @@ helpers.describe("sqlite_writer — build_inserts", function()
 		helpers.assert_eq(#stmts, 1)
 		helpers.assert_true(stmts[1]:find("events_llm") ~= nil)
 		helpers.assert_true(stmts[1]:find("'accepted'") ~= nil)
+	end)
+
+	helpers.it("LLM accounting values survive the production SQL builder", function()
+		local sw = make_writer()
+		local stmt = sw.build_inserts({
+			type              = "llm_generation",
+			timestamp         = "2026-08-24 12:00:04.000",
+			app               = "Zed",
+			prompt_tokens     = 111,
+			completion_tokens = 222,
+			total_tokens      = 333,
+			est_cost_usd      = 4.56789,
+		})[1]
+		for _, column in ipairs({
+			"prompt_tokens", "completion_tokens", "total_tokens", "est_cost_usd",
+		}) do
+			helpers.assert_true(stmt:find(column, 1, true) ~= nil,
+				"events_llm must retain " .. column)
+		end
+		for _, value in ipairs({ "111", "222", "333", "4.56789" }) do
+			helpers.assert_true(stmt:find(value, 1, true) ~= nil,
+				"accounting value must reach the SQL row: " .. value)
+		end
 	end)
 
 	helpers.it("session_start entry produces one INSERT", function()

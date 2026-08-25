@@ -362,8 +362,6 @@ _PromptEdWeb_ApplyProfileForContext(MenuState, EditId, Epoch, Name, Batch,
 
 _PromptEdWeb_ApplyCommitted(*) {
 	_LLM_Menu_ApplyStandardCommitted()
-	if IsSet(LLM_Menu_BindProfileHotkeys)
-		(LLM_Menu_BindProfileHotkeys)()
 	return true
 }
 

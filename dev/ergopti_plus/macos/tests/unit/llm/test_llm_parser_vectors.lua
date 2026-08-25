@@ -3,17 +3,9 @@
 --- ==============================================================================
 --- MODULE: LLM Parser Corpus Consumer (Hammerspoon)
 --- DESCRIPTION:
---- Loads the shared cross-driver LLM parser corpus from
---- _shared/tests/corpus/llm/parser_test_vectors.json and validates each vector
---- against pure-Lua re-implementations of the HS parser logic.
----
---- WHY A RE-IMPLEMENTATION RATHER THAN CALLING THE MODULE DIRECTLY:
---- The parse_response function in api_remote.lua and the streaming line parser
---- in api_ollama.lua are both module-local. Exposing them solely for tests
---- would pollute the production API surface. The logic is small and
---- self-contained (JSON decode + table path walk), so duplicating it here
---- is the correct isolation boundary. Any divergence from the module source
---- becomes a test failure that mandates a fix in one of the two copies.
+--- Loads the shared cross-driver LLM parser corpus and validates remote vectors
+--- against the production classifier. Ollama-only helpers remain local because
+--- they exercise response shapes not exposed by the macOS backend.
 ---
 --- COVERAGE:
 --- 1. Corpus integrity — JSON file is readable and every vector has required
@@ -21,16 +13,14 @@
 --- 2. Ollama non-streaming — response field extraction + JSON unescape.
 --- 3. Ollama streaming line — message.content token extraction per NDJSON line.
 --- 4. Remote / OpenAI format — choices[1].message.content path.
---- 5. Remote / Anthropic format — content[1].text path.
+--- 5. Remote / Anthropic format — first content block typed as text.
 --- 6. Remote / Gemini format — candidates[1].content.parts[1].text path.
 --- 7. Edge cases — malformed JSON, empty body, null values, missing fields.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-
--- Bootstrap the hs stub so hs.json.decode is available
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+local JsonCodec = require("adapters.json_codec")
+local ResponseClassifier = require("modules.llm.remote_response_classifier")
 
 
 
@@ -52,8 +42,10 @@ local function read_corpus()
 	end
 	local raw = fh:read("*a")
 	fh:close()
-	local ok, result = pcall(require("hs").json.decode, raw)
-	if not ok then return nil, "JSON parse error: " .. tostring(result) end
+	local result, decode_err = JsonCodec.decode(raw)
+	if type(result) ~= "table" then
+		return nil, "JSON parse error: " .. tostring(decode_err)
+	end
 	return result, nil
 end
 
@@ -93,8 +85,8 @@ end
 --- @return string The extracted response text, or "".
 local function parse_ollama_nonstream(raw)
 	if type(raw) ~= "string" or raw == "" then return "" end
-	local ok, resp = pcall(require("hs").json.decode, raw)
-	if not ok or type(resp) ~= "table" then return "" end
+	local resp, _ = JsonCodec.decode(raw)
+	if type(resp) ~= "table" then return "" end
 	local text = resp["response"]
 	if type(text) ~= "string" then return "" end
 	return text
@@ -114,8 +106,8 @@ end
 local function parse_ollama_stream_line(line)
 	local result = { token = "", done = false }
 	if type(line) ~= "string" or line == "" then return result end
-	local ok, obj = pcall(require("hs").json.decode, line)
-	if not ok or type(obj) ~= "table" then return result end
+	local obj, _ = JsonCodec.decode(line)
+	if type(obj) ~= "table" then return result end
 	if obj.done == true then result.done = true end
 	if type(obj.message) == "table" and type(obj.message.content) == "string" then
 		result.token = obj.message.content
@@ -131,42 +123,7 @@ end
 --- @param body string The raw JSON response body.
 --- @return string The extracted text, or "".
 local function parse_remote(format, body)
-	if type(body) ~= "string" or body == "" then return "" end
-	local ok, resp = pcall(require("hs").json.decode, body)
-	if not ok or type(resp) ~= "table" then return "" end
-
-	if format == "anthropic" then
-		local content = resp.content
-		if type(content) == "table" and type(content[1]) == "table" then
-			local text = content[1].text
-			if type(text) == "string" then return text end
-		end
-		return ""
-	end
-
-	if format == "gemini" then
-		local cand = resp.candidates
-		if type(cand) == "table" and type(cand[1]) == "table" then
-			local cnt = cand[1].content
-			if type(cnt) == "table" and type(cnt.parts) == "table"
-				and type(cnt.parts[1]) == "table" then
-				local text = cnt.parts[1].text
-				if type(text) == "string" then return text end
-			end
-		end
-		return ""
-	end
-
-	-- OpenAI shape (default): choices[1].message.content
-	local choices = resp.choices
-	if type(choices) == "table" and type(choices[1]) == "table" then
-		local msg = choices[1].message
-		if type(msg) == "table" then
-			local text = msg.content
-			if type(text) == "string" then return text end
-		end
-	end
-	return ""
+	return ResponseClassifier.classify(format, body).text
 end
 
 
@@ -308,6 +265,42 @@ helpers.describe("LLM parser corpus — remote providers", function()
 			end)
 		end
 	end
+end)
+
+helpers.describe("LLM parser corpus — remote usage ownership", function()
+	local cases = {
+		{
+			format = "openai",
+			body = '{"metadata":{"usage":{"prompt_tokens":900,"completion_tokens":800,"total_tokens":1700}},"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":11,"completion_tokens":12,"total_tokens":23}}',
+			prompt = 11, completion = 12, total = 23,
+		},
+		{
+			format = "anthropic",
+			body = '{"metadata":{"usage":{"input_tokens":900,"output_tokens":800}},"content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":21,"output_tokens":22}}',
+			prompt = 21, completion = 22, total = 43,
+		},
+		{
+			format = "gemini",
+			body = '{"metadata":{"usageMetadata":{"promptTokenCount":900,"candidatesTokenCount":800,"totalTokenCount":1700}},"candidates":[{"content":{"parts":[{"text":"ok"}]}}],"usageMetadata":{"promptTokenCount":31,"candidatesTokenCount":32,"totalTokenCount":63}}',
+			prompt = 31, completion = 32, total = 63,
+		},
+	}
+	for _, case in ipairs(cases) do
+		helpers.it(case.format .. " uses only its canonical top-level usage map", function()
+			local usage = ResponseClassifier.classify(case.format, case.body).usage
+			helpers.assert_eq(usage.prompt_tokens, case.prompt)
+			helpers.assert_eq(usage.completion_tokens, case.completion)
+			helpers.assert_eq(usage.total_tokens, case.total)
+		end)
+	end
+
+	helpers.it("rejects negative and non-numeric usage fields", function()
+		local body = '{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":-1,"completion_tokens":"2","total_tokens":-3}}'
+		local usage = ResponseClassifier.classify("openai", body).usage
+		helpers.assert_eq(usage.prompt_tokens, 0)
+		helpers.assert_eq(usage.completion_tokens, 0)
+		helpers.assert_eq(usage.total_tokens, 0)
+	end)
 end)
 
 

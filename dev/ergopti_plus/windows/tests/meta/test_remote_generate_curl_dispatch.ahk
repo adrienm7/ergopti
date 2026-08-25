@@ -14,7 +14,7 @@
 ;
 ; The fix dispatches the remote POST through a curl child process (mirror of
 ; _LLM_Ollama_DispatchAsync): the connect happens in curl's own process and the AHK
-; message loop only polls ProcessExist. WinHTTP remains as a fallback only when curl
+; message loop only polls the durable terminal sidecar. WinHTTP remains as a fallback only when curl
 ; is unavailable on the host, and its resolve+connect is bounded by a short timeout.
 ;
 ; Meta-static because modules/llm is not in the headless runner's include graph, and
@@ -32,14 +32,19 @@ _RGC_AssertCurlDispatch() {
 
 	disp := _DriverFuncBody("_LLMRemote_DispatchCurl")
 	Assert(disp != "", "_LLMRemote_DispatchCurl must exist")
-	Assert(InStr(disp, "curl.exe") > 0 and InStr(disp, "Run(") > 0,
-		"_LLMRemote_DispatchCurl must launch a curl child via Run so the connect happens off the message-loop thread (remote-generate-connect-blocks)")
+	Assert(InStr(disp, "curl.exe") > 0 and InStr(disp, "RunFn.Call(") > 0,
+		"_LLMRemote_DispatchCurl must launch through its child-process port so the connect happens off the message-loop thread (remote-generate-connect-blocks)")
 	Assert(!InStr(disp, "http.Send") and !InStr(disp, "WinHttpRequest"),
 		"_LLMRemote_DispatchCurl must not perform a synchronous WinHTTP Send on the dispatch path (remote-generate-connect-blocks)")
+	runner := _DriverFuncBody("_LLM_CurlArtifactRun")
+	Assert(runner != "", "the default curl artifact runner must exist")
+	Assert(InStr(runner, "Run(") > 0,
+		"the default child-process port must delegate to AHK Run in production")
 
 	poll := _DriverFuncBody("_LLMRemote_PollCurl")
 	Assert(poll != "", "_LLMRemote_PollCurl must exist")
-	Assert(InStr(poll, "ProcessExist") > 0,
-		"_LLMRemote_PollCurl must poll ProcessExist (non-blocking), never block on the connect (remote-generate-connect-blocks)")
+	Assert(InStr(poll, "_LLM_CurlTerminalComplete(") > 0
+		and InStr(poll, "ProcessExist(") = 0,
+		"_LLMRemote_PollCurl must poll the durable sidecar without blocking or trusting a recyclable PID (remote-generate-connect-blocks)")
 }
 Test("LLM remote: generation dispatches through a curl child for a non-blocking connect (remote-generate-connect-blocks)", _RGC_AssertCurlDispatch)

@@ -152,8 +152,8 @@ _LIH_DeferredKillsAreExecuted() {
 	At := InStr(Src, "_LLM_RunCancelKills(Kills) {")
 	Assert(At > 0, "the deferred kill runner must exist")
 	Body := SubStr(Src, At, 500)
-	Assert(InStr(Body, "ProcessClose") > 0,
-		"the runner must close curl children")
+	Assert(InStr(Body, 'K["cancel"].Call()') > 0,
+		"the runner must invoke exact curl process-owner cancellation callbacks")
 	Assert(InStr(Body, ".Abort()") > 0,
 		"and abort WinHTTP requests — the remote backend defers both kinds")
 }

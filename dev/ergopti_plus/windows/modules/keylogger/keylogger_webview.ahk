@@ -226,7 +226,10 @@ KLWV_Open(which, metrics_dir) {
 		; launch so cached state from a previous open never bleeds in.
 		udir := A_Temp . "\ergopti_webview2_" . A_TickCount
 		WebView_SweepStaleProfiles("ergopti_webview2_")
-		DirCreate(udir)
+		if !_KLWV_CreateProfileDir(udir) {
+				try g.Destroy()
+				return false
+		}
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
 		; thqby's wrapper resolves WebView2 asynchronously through a
@@ -683,11 +686,35 @@ KLWV_DeleteRangeStage(stage) {
 ; Push the contents of the freshly-built prefetch.json to the page as a
 ; structured WebView2 message. The page bootstrap dispatches it to
 ; process_manifest just like the initial fetch.
-KLWV_PushPrefetch(which) {
+_KLWV_TryDiagnosticAppend(LogPath, Message, AppendFn := FileAppend) {
+		try {
+				AppendFn.Call(Message, LogPath, "UTF-8")
+				return true
+		} catch as err {
+				try OutputDebug("[keylogger] WebView diagnostic write failed: " . err.Message)
+				return false
+		}
+}
+
+_KLWV_CreateProfileDir(Path, CreateFn := DirCreate, ErrorFn := LoggerError) {
+		try {
+				CreateFn.Call(Path)
+				return true
+		} catch as err {
+				try ErrorFn.Call("Keylogger",
+						"KLWV_Open: cannot create WebView profile directory '{1}': {2}",
+						Path, err.Message)
+				return false
+		}
+}
+
+KLWV_PushPrefetch(which, DiagnosticAppendFn := FileAppend) {
 		global _ConfigDir, _AhkSubDir
 		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
 		if !KLWV.windows.Has(which) {
-				try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n", log, "UTF-8")
+				_KLWV_TryDiagnosticAppend(log,
+						"[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n",
+						DiagnosticAppendFn)
 				return false
 		}
 		; Prefer the in-memory JSON cache populated by KLPF_BuildAndWrite —
@@ -700,8 +727,9 @@ KLWV_PushPrefetch(which) {
 		if (body = "") {
 				path := KLPF_PrefetchPath(which)
 				if !FileExist(path) {
-						try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n",
-								log, "UTF-8")
+						_KLWV_TryDiagnosticAppend(log,
+								"[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n",
+								DiagnosticAppendFn)
 						return false
 				}
 				try body := FileRead(path, "UTF-8")
@@ -716,13 +744,17 @@ KLWV_PushPrefetch(which) {
 		entry := KLWV.windows[which]
 		try {
 				entry["webview"].PostWebMessageAsString(msg)
-				FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): pushed " . StrLen(msg) . " bytes`r`n", log, "UTF-8")
-				return true
 		} catch as err {
-				FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
+				_KLWV_TryDiagnosticAppend(log,
+						"[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n",
+						DiagnosticAppendFn)
 				try LoggerError("Keylogger", "KLWV_PushPrefetch: dashboard delivery failed for '{1}': {2}", which, err.Message)
 				return false
 		}
+		_KLWV_TryDiagnosticAppend(log,
+				"[" . A_Now . "] PushPrefetch(" . which . "): pushed " . StrLen(msg) . " bytes`r`n",
+				DiagnosticAppendFn)
+		return true
 }
 
 ; Inject the active locale strings directly into the WebView via ExecuteScriptAsync.

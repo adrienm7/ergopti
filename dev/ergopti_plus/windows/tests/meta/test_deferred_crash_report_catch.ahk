@@ -28,7 +28,7 @@ _DCRC_CheckCatchPresent() {
 	Body := _DriverFuncBody("_ErgoptiDeferredCrashReport")
 	Assert(Body != "", "_ErgoptiDeferredCrashReport must exist in infra/error_net.ahk")
 
-	TryPos := InStr(Body, "ShellRunner_Spawn(")
+	TryPos := InStr(Body, "CrashReportWorker_Start(")
 	Assert(TryPos > 0, "_ErgoptiDeferredCrashReport must launch the isolated crash worker")
 
 	CatchPos := InStr(Body, "} catch", , TryPos)

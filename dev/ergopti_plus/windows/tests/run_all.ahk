@@ -91,6 +91,8 @@ OnError(_FatalErrorHandler)
 ; anyway) — only its pure helpers (_Bundle_ResolveDir, ResolveLocalAppDataDir)
 ; are invoked directly by the regression test.
 #Include ../infra/bundle.ahk
+#Include ../infra/tray_bootstrap.ahk
+#Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../infra/logger.ahk
@@ -100,6 +102,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/timings/timings_config.ahk
 
 #Include ../infra/window_utils.ahk
+#Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
@@ -201,6 +204,9 @@ InstallHotstringHooks()
 #Include ../adapters/mouse_control.ahk
 #Include ../adapters/graphics_renderer.ahk
 #Include ../adapters/shell_runner.ahk
+#Include ../adapters/crash_report_worker.ahk
+#Include ../modules/diagnostics/crash_reporter.ahk
+#Include ../infra/error_net.ahk
 #Include ../modules/keymap/uia_selection_worker.ahk
 ; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
@@ -234,6 +240,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
+#Include unit/test_tooltip_position_cache_receipt.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_hotstring_engine.ahk
@@ -247,6 +254,8 @@ InstallSendNoOps()
 #Include unit/test_output_host_resolver_independent_of_metrics.ahk
 #Include unit/test_gesture_modifier_release_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
+#Include unit/test_tray_bootstrap_publication_transaction.ahk
+#Include unit/test_llm_menu_build_coordinator.ahk
 #Include unit/test_hotstring_count_policy.ahk
 #Include unit/test_prefix_watcher_index.ahk
 #Include unit/test_prefix_visible_suggestion_epoch.ahk
@@ -313,6 +322,7 @@ InstallSendNoOps()
 
 ; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
 ; registered at top level) so the file is safe to include in the headless runner.
+#Include ../infra/app_picker.ahk
 #Include ../infra/config_shortcuts.ahk
 #Include ../infra/metrics/metrics_filters.ahk
 #Include ../infra/metrics/metrics_shortcuts.ahk
@@ -344,12 +354,19 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_api_remote.ahk
+#Include unit/test_llm_crash_orphan_cleanup.ahk
+#Include unit/test_llm_temp_artifact_terminal_ownership.ahk
+#Include unit/test_llm_aux_request_ownership.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
+#Include unit/test_ollama_http_terminal_classification.ahk
+#Include unit/test_remote_curl_terminal_classification.ahk
 ; Remote catalogue load must fall back gracefully when api_providers.json is missing/malformed.
 #Include meta/test_remote_catalog_load_graceful.ahk
+#Include ../modules/llm/option_validation.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_semantic_config_identity.ahk
+#Include unit/test_llm_semantic_config_budget.ahk
 #Include unit/test_llm_defaults.ahk
 ; llm_bridge.ahk is needed by the canonical HSE -> LLM effect behaviour tests.
 #Include ../modules/keymap/llm_bridge.ahk
@@ -370,9 +387,10 @@ _LogBootProgress("loading LLM modules")
 #Include meta/test_ollama_reachability_async_nonblocking.ahk
 ; Orphan temp-file sweep is bounded + off the Critical dispatch path (llm-orphan-sweep-temp-recursion).
 #Include meta/test_llm_orphan_sweep_nonblocking.ahk
-; LLM_Menu_Build runs under Critical so deferred boot tasks cannot preempt it (menu-build-boot-preempt).
+; The coordinator serializes detached LLM menu builds and retains re-entrant work.
 #Include meta/test_llm_markchain_no_rerender.ahk
 #Include meta/test_llm_menu_build_critical.ahk
+#Include meta/test_llm_menu_build_coordinator.ahk
 _LogBootProgress("LLM modules + tests included")
 
 ; LLM tray menu -> config.toml persistence (contract-driven round-trips).
@@ -393,6 +411,7 @@ global _LLM_Menu_Loaded := false
 ; owns every native transition; this include registers no real hotkey.
 #Include ../ui/menu/menu_llm/trigger_journal.ahk
 #Include ../ui/menu/menu_llm/trigger_shortcut.ahk
+#Include ../adapters/llm_nav_event_owner.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
 ; harness; the regression suite calls only its one-shot saved-options seam.
@@ -401,10 +420,21 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/menu_profiles.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include ../ui/menu/menu_llm/transactions.ahk
+#Include ../ui/menu/menu_llm/backend_lifecycle.ahk
+#Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include unit/test_llm_backend_lifecycle_dispatch.ahk
 #Include unit/test_llm_menu_persistence.ahk
+#Include unit/test_llm_temperature_boundary.ahk
+#Include unit/test_llm_numeric_option_ranges.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
+#Include unit/test_app_picker_generation.ahk
+#Include meta/test_app_picker_generation_wiring.ahk
+#Include unit/test_llm_menu_locale_bridge.ahk
+#Include meta/test_llm_menu_locale_source.ahk
+#Include unit/test_llm_ollama_port_boundary.ahk
+#Include meta/test_llm_ollama_port_owner.ahk
 #Include unit/test_llm_menu_regressions.ahk
 ; The prompt-editor host is definitions-only until TryOpen is called. Load it so
 ; its deferred context fence can be exercised without creating a Gui/WebView.
@@ -527,7 +557,11 @@ global _AhkSubDir := ""
 ; driven headless and the buffer they fill read straight back — the previous
 ; test asserted only on KL_LogHotstring's row and missed this one entirely.
 #Include ../modules/keylogger/keylogger_hook.ahk
+#Include ../modules/keylogger/keylogger_mouse.ahk
+#Include ../modules/keylogger/keylogger_window_topology.ahk
 #Include unit/test_bounded_focus_snapshot.ahk
+#Include unit/test_keylogger_mouse_coordinates.ahk
+#Include unit/test_keylogger_window_topology.ahk
 #Include unit/test_hotstring_fire_log_privacy.ahk
 #Include unit/test_synthetic_typing_row_privacy.ahk
 ; The near-miss row — the third persisted sink, and the one that had no privacy
@@ -673,6 +707,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_uia_selection_background_poll.ahk
 #Include meta/test_uia_selection_snapshot.ahk
 #Include meta/test_tooltip_render_epoch.ahk
+#Include meta/test_tooltip_position_cache_receipt_wiring.ahk
 #Include meta/test_tooltip_llm_render_epoch.ahk
 #Include meta/test_llm_presented_record_single_source.ahk
 #Include meta/test_remote_poll_deadline.ahk
@@ -732,6 +767,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_suspend_bootstrap.ahk
+#Include meta/test_llm_backend_lifecycle_ownership.ahk
 #Include meta/test_llm_menu_disabled_greyed.ahk
 #Include meta/test_language_menu_deferred_publication.ahk
 #Include meta/test_llm_menu_layout_shared.ahk
@@ -785,6 +821,11 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_chord_notation.ahk
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_llm_trigger_shortcut_transactions.ahk
+#Include unit/test_llm_nav_event_owner.ahk
+#Include unit/test_llm_nav_hotkey_transaction.ahk
+#Include unit/test_llm_profile_hotkey_transaction.ahk
+#Include unit/test_llm_hotkey_cross_owner_collision.ahk
+#Include meta/test_llm_hotkey_cross_owner_policy.ahk
 #Include unit/test_llm_trigger_journal.ahk
 #Include meta/test_llm_trigger_shortcut_transaction.ahk
 #Include meta/test_llm_trigger_journal_lifecycle.ahk
@@ -1004,6 +1045,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_swap_exit_guard.ahk
 #Include meta/test_keyboard_hook_dispatch_error_logged.ahk
 #Include meta/test_tray_menu_cleared_before_onboarding.ahk
+#Include meta/test_tray_bootstrap_publication_transaction.ahk
 #Include meta/test_config_shortcuts_unescape_ordering.ahk
 #Include meta/test_gesture_selfactivated_bounded.ahk
 #Include meta/test_llm_api_no_entry_logged.ahk
@@ -1384,6 +1426,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_legacy_state_machine.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk
 #Include unit/test_shell_runner_tree_owned.ahk
+#Include unit/test_crash_report_worker_transport.ahk
 #Include unit/test_taphold_inherit_defaults_roundtrip.ahk
 #Include unit/test_taphold_synthetic_refcount_combo.ahk
 #Include unit/test_taphold_unreadable_blocks_rewrite.ahk

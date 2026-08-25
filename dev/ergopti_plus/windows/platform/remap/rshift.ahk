@@ -28,10 +28,28 @@
 ; ==========================
 ; ==========================
 
+_RShiftHoldModKey() {
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_shift"), "right_shift", "RShift")
+}
+
+_RShiftHandleHold(PhysicalModifierPassthrough) {
+	Result := TapHoldOwnImmediateModifier("right_shift", "SC036",
+		_RShiftHoldModKey(), TapHoldDuration(TapHold, "right_shift"),
+		,,,,,, PhysicalModifierPassthrough)
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "RShift")
+		_RShiftDispatch()
+}
+
+#HotIf _RShiftHoldModKey() == "RShift" and not LayerEnabled
+~*$SC036:: _RShiftHandleHold(true)
+#HotIf TapHoldHoldModifier(TapHold, "right_shift") != "" and _RShiftHoldModKey() != "RShift" and not LayerEnabled
+*$SC036:: _RShiftHandleHold(false)
+#HotIf
+
 ; Gate: any configured tap action activates the handler.
 ; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
 ; via the ~ prefix — no explicit hold logic is needed here.
-#HotIf TapHoldTapAction(TapHold, "right_shift") != "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "right_shift") != "" and TapHoldHoldModifier(TapHold, "right_shift") == "" and TapHoldHoldLayer(TapHold, "right_shift") == "" and not LayerEnabled
 ~$SC036::
 {
 	; Bounded (unlike a bare KeyWait): a lost SC036 key-up can never wedge

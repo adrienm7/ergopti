@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Avsluta",
 	"menu.global.reload": "🔄 Läs in på nytt",
 	"menu.global.reset_defaults": "↺ Återställ till standardvärden",
+	"menu.global.starting": "Startar…",
 	"menu.global.setup_wizard": "Installationsguide…",
 	"menu.global.suspend": "⏸︎ Pausa",
 	"menu.global.title": "Globala åtgärder",

@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ 退出",
 	"menu.global.reload": "🔄 重新加载",
 	"menu.global.reset_defaults": "↺ 恢复默认设置",
+	"menu.global.starting": "正在启动…",
 	"menu.global.setup_wizard": "设置向导…",
 	"menu.global.suspend": "⏸︎ 暂停",
 	"menu.global.title": "全局操作",

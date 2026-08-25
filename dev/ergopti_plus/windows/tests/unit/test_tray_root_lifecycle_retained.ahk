@@ -25,13 +25,16 @@ _TRLR_SaveRootState() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	return {
 		RequestedGeneration: _TrayRootRequestedGeneration,
 		PublishedGeneration: _TrayRootPublishedGeneration,
 		Active: _TrayRootActive,
 		LifecycleEpoch: _TrayRootLifecycleEpoch,
 		LatestAuthorizeFn: _TrayRootLatestAuthorizeFn,
-		LatestWorkerFn: _TrayRootLatestWorkerFn
+		LatestWorkerFn: _TrayRootLatestWorkerFn,
+		RetryGeneration: _TrayRootRetryGeneration,
+		AutomaticRetryCount: _TrayRootAutomaticRetryCount
 	}
 }
 
@@ -39,24 +42,30 @@ _TRLR_ResetRootState() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	_TrayRootRequestedGeneration := 0
 	_TrayRootPublishedGeneration := 0
 	_TrayRootActive := false
 	_TrayRootLifecycleEpoch := 0
 	_TrayRootLatestAuthorizeFn := 0
 	_TrayRootLatestWorkerFn := 0
+	_TrayRootRetryGeneration := 0
+	_TrayRootAutomaticRetryCount := 0
 }
 
 _TRLR_RestoreRootState(Saved) {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	_TrayRootRequestedGeneration := Saved.RequestedGeneration
 	_TrayRootPublishedGeneration := Saved.PublishedGeneration
 	_TrayRootActive := Saved.Active
 	_TrayRootLifecycleEpoch := Saved.LifecycleEpoch
 	_TrayRootLatestAuthorizeFn := Saved.LatestAuthorizeFn
 	_TrayRootLatestWorkerFn := Saved.LatestWorkerFn
+	_TrayRootRetryGeneration := Saved.RetryGeneration
+	_TrayRootAutomaticRetryCount := Saved.AutomaticRetryCount
 }
 
 
@@ -127,3 +136,42 @@ _TRLR_PausePulseRetainsAndReplaysLatestRoot() {
 }
 Test("tray root: pause pulse retains and replays latest generation exactly once (tray-root-lifecycle-retained)",
 	_TRLR_PausePulseRetainsAndReplaysLatestRoot)
+
+_TRLR_PreTrayServiceIsSafeBeforeInitializer() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TrayRootLifecycleEpoch
+	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	Saved := _TRLR_SaveRootState()
+	try {
+		for Field in ["requested", "published", "active", "epoch", "authorize", "worker"] {
+			; Keep a retained generation pending so omitting any one IsSet guard
+			; necessarily reaches the corresponding uninitialized field.  A
+			; quiescent fixture would let the worker guard disappear unnoticed.
+			_TrayRootRequestedGeneration := 1
+			_TrayRootPublishedGeneration := 0
+			_TrayRootActive := false
+			_TrayRootLifecycleEpoch := 0
+			_TrayRootLatestAuthorizeFn := 0
+			_TrayRootLatestWorkerFn := _TRLR_PreTrayWorkerMustNotRun
+			switch Field {
+				case "requested": _TrayRootRequestedGeneration := unset
+				case "published": _TrayRootPublishedGeneration := unset
+				case "active": _TrayRootActive := unset
+				case "epoch": _TrayRootLifecycleEpoch := unset
+				case "authorize": _TrayRootLatestAuthorizeFn := unset
+				case "worker": _TrayRootLatestWorkerFn := unset
+			}
+			AssertTrue(_TrayRootServiceRetained(),
+				"the pre-tray watchdog must no-op while tray-root field '" . Field . "' is uninitialized")
+		}
+	} finally {
+		_TRLR_RestoreRootState(Saved)
+	}
+}
+
+_TRLR_PreTrayWorkerMustNotRun(PublishAuthorizeFn) {
+	throw Error("the pre-tray guard must return before retained work starts")
+}
+Test("tray root: pre-tray watchdog tolerates uninitialized retained state "
+	. "(ahk6-04-pretray-watchdog)",
+	_TRLR_PreTrayServiceIsSafeBeforeInitializer)

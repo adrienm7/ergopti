@@ -821,3 +821,26 @@ _CFGFS_LlmCollectionDoesNotMutateLiveFeatures() {
 
 Test("config full save: detached LLM collection leaves live Features unchanged (config-full-save-generation)",
 	_CFGFS_LlmCollectionDoesNotMutateLiveFeatures)
+
+_CFGFS_LlmAppendRefusalAbortsWholeCollection() {
+	global Features, _LLM_Menu
+	CandidateFeatures := _HSDeepCloneMap(Features)
+	CandidateMenu := _HSDeepCloneMap(_LLM_Menu)
+	CandidateMenu["onboarding_seen"] := false
+	CandidateMenu["app_profile_overrides"] := Map()
+	CandidateMenu["user_profiles"] := Map("wrong", "container")
+	Thrown := false
+	Failure := ""
+	try _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
+	catch as Err {
+		Thrown := true
+		Failure := Err.Message . " @ " . Err.File . ":" . Err.Line . " " . Err.Stack
+	}
+	AssertTrue(Thrown,
+		"a refused LLM serialization must abort the full-save candidate, not persist a partial image")
+	AssertContains(Failure, "LLM menu persistence fields",
+		"the collector must consume the append helper's explicit refusal")
+}
+Test("config full save: LLM append refusal aborts the whole candidate "
+	. "(llm-persisted-option-type-boundary-collector-atomic)",
+	_CFGFS_LlmAppendRefusalAbortsWholeCollection)

@@ -227,8 +227,9 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		try {
 				isNotepad := false
 				try {
-						exe := OutputHostResolve()["Exe"]
-						isNotepad := (exe = "notepad.exe")
+						Host := OutputHostResolve()
+						isNotepad := Host["Valid"]
+								&& (StrLower(Host["Exe"]) = "notepad.exe")
 				}
 				if isNotepad {
 						; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),

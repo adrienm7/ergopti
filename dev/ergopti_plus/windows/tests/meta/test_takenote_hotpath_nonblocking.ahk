@@ -38,7 +38,7 @@ _TNNB_PollOwnsDeadlineAndSuspendGate() {
 		"the deferred note-window finalizer must stop at its finite wrap-safe launch deadline")
 	Assert(InStr(RescheduleBody, "Ops.Schedule(Job[" . Q . "timer" . Q . "], TAKE_NOTE_POLL_INTERVAL_MS)") > 0,
 		"the deferred note-window finalizer must use one-shot bounded polling rather than a blocking wait")
-	Assert(InStr(Body, "Ops.Maximize(Job[" . Q . "pattern" . Q . "])") > 0,
+	Assert(InStr(Body, "Ops.Maximize(WindowHwnd)") > 0,
 		"the deferred success path must retain the original maximize effect")
 	Assert(InStr(Body, "Ops.FileExists(") > 0 and InStr(Body, "Ops.Launch(") > 0
 		and InStr(Body, "Ops.SendFinal(") > 0,

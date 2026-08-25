@@ -16,6 +16,21 @@ global TAKE_NOTE_POLL_INTERVAL_MS := 50
 global TAKE_NOTE_LAUNCH_TIMEOUT_MS := 7000
 
 
+_TakeNoteTitleMatchesFile(Title, FileName) {
+	if !(Title is String) or !(FileName is String) or FileName == ""
+		return false
+	Title := Trim(Title)
+	if SubStr(Title, 1, 1) == "*"
+		Title := LTrim(SubStr(Title, 2))
+	; Notepad appends its localized product label after the last " - ". Taking
+	; the last separator rejects prefixes, backup extensions, and filenames that
+	; merely begin with the requested fixed Notes*.txt basename.
+	SeparatorPos := InStr(Title, " - ", , -1)
+	DocumentTitle := SeparatorPos > 0 ? SubStr(Title, 1, SeparatorPos - 1) : Title
+	return StrLower(DocumentTitle) == StrLower(FileName)
+}
+
+
 ; Injectable OS boundary. Tests replace this class with a deterministic clock
 ; and manually-driven timer queue, so they never launch or focus a real window.
 class _TakeNoteNative {
@@ -41,45 +56,38 @@ class _TakeNoteNative {
 		return true
 	}
 
-	static WindowExists(Pattern) {
-		PreviousMode := A_TitleMatchMode
-		try {
-			SetTitleMatchMode(2)
-			return WMExists(Pattern)
-		} finally {
-			SetTitleMatchMode(PreviousMode)
+	static FindWindow(FileName) {
+		try Hwnds := WinGetList("ahk_exe notepad.exe")
+		catch
+			return 0
+		for Hwnd in Hwnds {
+			try Title := WinGetTitle("ahk_id " . Hwnd)
+			catch
+				continue
+			if _TakeNoteTitleMatchesFile(Title, FileName)
+				return Hwnd
 		}
+		return 0
 	}
 
-	static Activate(Pattern) {
-		PreviousMode := A_TitleMatchMode
-		try {
-			SetTitleMatchMode(2)
-			return WMActivate(Pattern)
-		} finally {
-			SetTitleMatchMode(PreviousMode)
-		}
+	static Activate(Hwnd) {
+		return WMActivate(Hwnd)
 	}
 
-	static IsActive(Pattern) {
-		PreviousMode := A_TitleMatchMode
-		try {
-			SetTitleMatchMode(2)
-			return WinActive(Pattern) != 0
-		} finally {
-			SetTitleMatchMode(PreviousMode)
-		}
+	static IsActive(Hwnd) {
+		return WinActive("ahk_id " . Hwnd) != 0
 	}
 
-	static Maximize(Pattern) {
-		PreviousMode := A_TitleMatchMode
-		try {
-			SetTitleMatchMode(2)
-			WinMaximize(Pattern)
-			return true
-		} finally {
-			SetTitleMatchMode(PreviousMode)
-		}
+	static IsExactWindow(Hwnd, FileName) {
+		try Title := WinGetTitle("ahk_id " . Hwnd)
+		catch
+			return false
+		return _TakeNoteTitleMatchesFile(Title, FileName)
+	}
+
+	static Maximize(Hwnd) {
+		WinMaximize("ahk_id " . Hwnd)
+		return true
 	}
 
 	static SendFinal(Keys) {
@@ -149,7 +157,7 @@ TakeNoteRequest(DatedNotes, DestinationFolder, AppendNewlineOnLaunch := true, Op
 			: "Notes.txt"
 		FilePath := RTrim(DestinationFolder, "\/") . "\" . FileName
 		Pattern := FileName . " ahk_exe notepad.exe"
-		return _TakeNoteQueueFinalize(FilePath, Pattern,
+		return _TakeNoteQueueFinalize(FilePath, FileName, Pattern,
 			AppendNewlineOnLaunch, Ops)
 	} catch as Err {
 		try Ops.ReportError(Err.Message)
@@ -158,7 +166,8 @@ TakeNoteRequest(DatedNotes, DestinationFolder, AppendNewlineOnLaunch := true, Op
 }
 
 
-_TakeNoteQueueFinalize(FilePath, WinPattern, AppendNewlineOnLaunch, Ops := _TakeNoteNative) {
+_TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
+		AppendNewlineOnLaunch, Ops := _TakeNoteNative) {
 	global _TakeNotePending, _TakeNoteNextId
 	global TAKE_NOTE_POLL_INTERVAL_MS, TAKE_NOTE_LAUNCH_TIMEOUT_MS
 	JobId := ++_TakeNoteNextId
@@ -166,6 +175,7 @@ _TakeNoteQueueFinalize(FilePath, WinPattern, AppendNewlineOnLaunch, Ops := _Take
 	_TakeNotePending[JobId] := Map(
 		"phase", "queued",
 		"file_path", FilePath,
+		"file_name", FileName,
 		"pattern", WinPattern,
 		"append_on_launch", AppendNewlineOnLaunch,
 		"append_newline", false,
@@ -234,23 +244,30 @@ _TakeNotePoll(JobId) {
 			if !Ops.FileExists(Job["file_path"])
 				and !Ops.CreateEmptyFile(Job["file_path"])
 				throw Error("note file creation was refused")
-			WindowAlreadyOpen := Ops.WindowExists(Job["pattern"])
+			WindowAlreadyOpen := Ops.FindWindow(Job["file_name"]) != 0
 			Job["append_newline"] := Job["append_on_launch"] and !WindowAlreadyOpen
 			Job["phase"] := "waiting"
 			if !WindowAlreadyOpen and !Ops.Launch(Job["file_path"])
 				throw Error("Notepad launch was refused")
 		}
 
-		if !Ops.WindowExists(Job["pattern"]) {
+		WindowHwnd := Ops.FindWindow(Job["file_name"])
+		if !WindowHwnd {
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
-		if !Ops.Activate(Job["pattern"]) or !Ops.IsActive(Job["pattern"]) {
+		if !Ops.Activate(WindowHwnd) or !Ops.IsActive(WindowHwnd)
+			or !Ops.IsExactWindow(WindowHwnd, Job["file_name"]) {
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
-		if !Ops.Maximize(Job["pattern"])
+		if !Ops.Maximize(WindowHwnd)
 			throw Error("Notepad maximize was refused")
+		if !Ops.IsActive(WindowHwnd)
+			or !Ops.IsExactWindow(WindowHwnd, Job["file_name"]) {
+			_TakeNoteReschedule(JobId, Job)
+			return
+		}
 		if Job["append_newline"] and !Ops.SendFinal("^{End}{Enter}")
 			throw Error("final note input was refused")
 		_TakeNoteFinish(JobId)

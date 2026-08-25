@@ -209,6 +209,89 @@ _KLRSQL_CorruptColdLoadPublishesNothingAndRetries() {
 Test("Keylogger reader: corrupt SQL publishes no cache or offset (reader-sql-fail-loud)",
 	_KLRSQL_CorruptColdLoadPublishesNothingAndRetries)
 
+_KLRSQL_ReplayTypingInsert(Id, Timestamp, Character) {
+	Events := KL_JsonEncode([[Character, 0, Map()]])
+	return "INSERT INTO events_typing "
+		. "(device_id,id,ts,date,app,title,url,field_role,layout,document_path,"
+		. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,"
+		. "pause_before_ms,battery_level,audio_volume,wpm,text,rich_text,events_json) VALUES ("
+		. "'poison-device'," . Id . "," . SQLite_Q(Timestamp)
+		. ",'2026-08-24','editor.exe','fixture','','','fr','',"
+		. "0,0,0,0,0,0,NULL,NULL,0,'',''," . SQLite_Q(Events) . ");"
+}
+
+_KLRSQL_CaptureReplayDiagnostic(State, Failure) {
+	State.Push(Failure.Clone())
+}
+
+_KLRSQL_ConsumerFailureRetainsOwnedDiagnostic() {
+	global KLRReplayDiagnosticFn
+	ProbeDb := _KLRSQL_OpenMemory()
+	SQLite_Close(ProbeDb)
+	root := A_Temp . "\ergopti_klr_consumer_failure_" . A_TickCount
+	deviceDir := root . "\by_device\poison-device"
+	path := deviceDir . "\data.sql"
+	HadDiagnosticFn := IsSet(KLRReplayDiagnosticFn)
+	PreviousDiagnosticFn := HadDiagnosticFn ? KLRReplayDiagnosticFn : 0
+	Diagnostics := []
+	KLRReplayDiagnosticFn := _KLRSQL_CaptureReplayDiagnostic.Bind(Diagnostics)
+	try {
+		ConversionFailure := 0
+		try Integer("xx")
+		catch Error as Err
+			ConversionFailure := Err
+		AssertTrue(IsObject(ConversionFailure),
+			"the poison fixture must exercise a throwing Integer conversion")
+		DirCreate(deviceDir)
+		ValidSql := _KLRSQL_ReplayTypingInsert(
+			1, "2026-08-24 12:34:00.000", "a")
+		PoisonSql := _KLRSQL_ReplayTypingInsert(
+			2, "2026-08-24 12:xx:00.000", "b")
+		_KLRSQL_WriteFixture(path, ValidSql . PoisonSql)
+
+		Failed := KLR_BuildColdCandidate(root . "\", "")
+		AssertFalse(Failed.Get("ok", true),
+			"a throwing walker row must reject the unpublished cold candidate")
+		AssertEqual(0, Failed.Get("db", 0),
+			"the partially replayed database handle must be closed, never published")
+		AssertEqual(1, Diagnostics.Length,
+			"one poison row must emit exactly one owned replay diagnostic")
+		Failure := Failed.Get("failure", 0)
+		AssertTrue(Failure is Map,
+			"the cold-builder receipt must retain the replay failure context")
+		AssertEqual("logical", Failure.Get("sweep", ""),
+			"the diagnostic must name the failing replay statement family")
+		AssertEqual("poison-device", Failure.Get("device_id", ""),
+			"the diagnostic must retain the exact durable device owner")
+		AssertEqual(2, Failure.Get("row_index", 0),
+			"the diagnostic must identify the second delivered logical row")
+		AssertEqual(2, Failure.Get("row_id", 0),
+			"the diagnostic must retain the durable row id without logging its text")
+		AssertEqual("2026-08-24 12:xx:00.000", Failure.Get("timestamp", ""),
+			"the diagnostic must retain the malformed timestamp identity")
+		AssertTrue(InStr(Failure.Get("message", ""), "Number") > 0,
+			"the original Integer conversion cause must survive every replay layer")
+		AssertTrue(Failure.Get("root_error", 0) is Error,
+			"the replay receipt must retain the original Error object, not reconstruct one")
+		AssertEqual(Failure.Get("message", ""), Failure["root_error"].Message,
+			"the published diagnostic message must come from the retained root exception")
+
+		_KLRSQL_WriteFixture(path, ValidSql)
+		Control := KLR_BuildColdCandidate(root . "\", "")
+		AssertTrue(Control.Get("ok", false),
+			"a valid-only cold replay must still build a publishable candidate")
+		AssertEqual(1, Diagnostics.Length,
+			"the valid control must not emit a stale or duplicate diagnostic")
+		try SQLite_Close(Control.Get("db", 0))
+	} finally {
+		KLRReplayDiagnosticFn := HadDiagnosticFn ? PreviousDiagnosticFn : 0
+		try DirDelete(root, true)
+	}
+}
+
+Test("(ahk4-01-walker-replay-diagnostic) consumer failure keeps root context",
+	_KLRSQL_ConsumerFailureRetainsOwnedDiagnostic)
+
 _KLRSQL_BadDeltaPreservesLastGoodAndRetries() {
 	global _AhkSubDir
 	root := A_Temp . "\ergopti_klr_delta_invalid_" . A_TickCount

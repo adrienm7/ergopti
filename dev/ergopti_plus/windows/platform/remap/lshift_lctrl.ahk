@@ -34,10 +34,31 @@
 ; ===================================
 ; ===================================
 
+_LShiftHoldModKey() {
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_shift"), "left_shift", "LShift")
+}
+
+_LShiftHandleHold(PhysicalModifierPassthrough) {
+	Result := TapHoldOwnImmediateModifier("left_shift", "SC02A",
+		_LShiftHoldModKey(), TapHoldDuration(TapHold, "left_shift"),
+		,,,,,, PhysicalModifierPassthrough)
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LShift")
+		_LShiftDispatch()
+}
+
+; When Shift is configured to remain Shift, let the physical edge reach the OS
+; before this thread runs. That edge makes even a 4 ms Shift+key chord eligible
+; for other AHK hotkeys without waiting for a synthetic modifier injection.
+#HotIf _LShiftHoldModKey() == "LShift" and not LayerEnabled
+~*$SC02A:: _LShiftHandleHold(true)
+#HotIf TapHoldHoldModifier(TapHold, "left_shift") != "" and _LShiftHoldModKey() != "LShift" and not LayerEnabled
+*$SC02A:: _LShiftHandleHold(false)
+#HotIf
+
 ; Gate: any configured tap action activates the handler.
 ; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
 ; via the ~ prefix — no explicit hold logic is needed here.
-#HotIf TapHoldTapAction(TapHold, "left_shift") != "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_shift") != "" and TapHoldHoldModifier(TapHold, "left_shift") == "" and TapHoldHoldLayer(TapHold, "left_shift") == "" and not LayerEnabled
 ~$SC02A::
 {
 	DurationSec := TapHoldDuration(TapHold, "left_shift")
@@ -84,13 +105,30 @@ _LShiftDispatch() {
 ; ==========================
 ; ==========================
 
+_LCtrlHoldModKey() {
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_ctrl"), "left_ctrl", "LCtrl")
+}
+
+#HotIf TapHoldHoldModifier(TapHold, "left_ctrl") != "" and not LayerEnabled
+*$SC01D:: {
+	UpdateLastSentCharacter("LControl")
+	CapsUp := KS_IsUp("SC03A")
+	AltUp := KS_IsUp("SC038")
+	Result := TapHoldOwnImmediateModifier("left_ctrl", "SC01D",
+		_LCtrlHoldModKey(), TapHoldDuration(TapHold, "left_ctrl"))
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()
+		and A_PriorKey == "LControl" and CapsUp and AltUp)
+		_LCtrlDispatch()
+}
+#HotIf
+
 ; ~$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
 ; still work. $ prevents keyboard-hook re-entry. The AltGr (LCtrl+RAlt) case is
 ; handled by altgr.ahk which intercepts RAlt before this block fires.
 ; A_PriorKey == "LControl" guard: blocks the tap when another key was pressed
 ; during the hold window (combo use), while still allowing intentional taps.
 ; KS_IsUp guards: prevent spurious tap on CapsLock+LCtrl or LAlt+LCtrl release.
-#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") == "" and TapHoldHoldLayer(TapHold, "left_ctrl") == "" and not LayerEnabled
 ~$SC01D::
 {
 	UpdateLastSentCharacter("LControl")

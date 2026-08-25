@@ -203,8 +203,8 @@ _TPS_VisibleDecisionCommitHasOneTransitiveOwner() {
 		"_TooltipPresentStack\(Pos, Row, false, Items,\s*RenderGeneration, false, RebuildRequestSerial,\s*LifecyclePlan\)") > 0,
 		"the destack presenter must publish only its surviving rows")
 	Assert(RegExMatch(Llm,
-		"_TooltipPresentStack\(Pos, Row, false, \[\],\s*RenderGeneration, true, -1, 0, StateCommit\)") > 0,
-		"the direct rich LLM presenter must fence its generation and publish [] so replacing the shared surface retires the old hotstring decision")
+		"_TooltipPresentStack\(Pos, Row, false, \[\],\s*RenderGeneration, true, RequestSerial, 0, StateCommit\)") > 0,
+		"the direct rich LLM presenter must fence its generation and request serial, then publish [] so replacing the shared surface retires the old hotstring decision")
 
 	Build := _StripFullLineComments(_DriverFuncBody("_TooltipBuildGui"))
 	Assert(InStr(Build, "_TooltipActiveSurface :=") == 0,
@@ -248,6 +248,8 @@ _TPS_DeferredRequestTupleHasOneOwner() {
 	Timer := _StripFullLineComments(_DriverFuncBody("_TooltipTimerFn"))
 	TimerRetry := _StripFullLineComments(
 		_DriverFuncBody("_TooltipTimerHideOrRetry"))
+	TimerRetrySchedule := _StripFullLineComments(
+		_DriverFuncBody("_TooltipScheduleTimerRetry"))
 	DeadlineTimer := _StripFullLineComments(
 		_DriverFuncBody("_TooltipDequeueDeadlineFn"))
 	Poll := _StripFullLineComments(_DriverFuncBody("_TooltipDequeuePollFn"))
@@ -293,13 +295,27 @@ _TPS_DeferredRequestTupleHasOneOwner() {
 	Assert(InStr(Timer, "_TooltipTimerHideOrRetry(") > 0
 		and InStr(Timer, "_TooltipPendingRequest") == 0,
 		"a due one-shot must delegate to a liveness-preserving exact-owner retry instead of being consumed by a blind pending-request return")
+	SuspendGuard := InStr(TimerRetry, "if A_IsSuspended")
+	SuspendedDelegate := InStr(TimerRetry,
+		"_TooltipScheduleTimerRetry(", true, SuspendGuard)
 	HideAttempt := InStr(TimerRetry,
 		'TooltipHide("TimerFn", true, ExpectedGeneration, ExpectedSurface)')
-	RetryArm := InStr(TimerRetry,
-		"SetTimer(_TooltipTimerHideOrRetry.Bind(", true, HideAttempt)
-	Assert(HideAttempt > 0 and RetryArm > HideAttempt
+	RefusedDelegate := InStr(TimerRetry,
+		"_TooltipScheduleTimerRetry(", true, HideAttempt)
+	Assert(SuspendGuard > 0 and SuspendedDelegate > SuspendGuard
+		and HideAttempt > SuspendedDelegate
+		and RefusedDelegate > HideAttempt
 		and InStr(Poll, "if IsObject(_TooltipPendingRequest)") > 0,
-		"the exact old surface must be retried if B temporarily blocks its due hide; a refused B may not leave A immortal")
+		"the exact old surface must delegate both suspension and a refused due hide to the shared retry scheduler")
+	OwnerBind := InStr(TimerRetrySchedule,
+		"_TooltipTimerHideOrRetry.Bind(")
+	InjectedOneShot := RegExMatch(TimerRetrySchedule,
+		"ScheduleFn\.Call\(\s*Callback\s*,\s*-_TOOLTIP_OWNER_RETRY_MS\s*\)")
+	NativeOneShot := RegExMatch(TimerRetrySchedule,
+		"SetTimer\(\s*Callback\s*,\s*-_TOOLTIP_OWNER_RETRY_MS\s*\)")
+	Assert(OwnerBind > 0 and InjectedOneShot > OwnerBind
+		and NativeOneShot > InjectedOneShot,
+		"the shared exact-owner retry scheduler must arm injected and native timers as negative one-shots")
 	DeadlinePending := InStr(DeadlineTimer,
 		"if IsObject(_TooltipPendingRequest)")
 	DeadlineRetry := InStr(DeadlineTimer,
@@ -384,6 +400,11 @@ _TPS_LlmFailureAndTimerKeepExactSurfaceOwner() {
 	Hide := _StripFullLineComments(_DriverFuncBody("LLM_TooltipHide"))
 	Build := _StripFullLineComments(_DriverFuncBody("_TooltipBuildGuiLlm"))
 	Present := _StripFullLineComments(_DriverFuncBody("_TooltipPresentStack"))
+	Commit := _StripFullLineComments(
+		_DriverFuncBody("_LLM_TooltipCommitSurfaceState"))
+	Assert(Show != "" and Hide != "" and Build != "" and Present != ""
+		and Commit != "",
+		"the complete LLM presentation route must remain discoverable before its source-order invariants are scanned")
 	FailedBuild := InStr(Show,
 		"LLM_TooltipHide(false, RenderGeneration, RenderRequestSerial)")
 	Resolve := InStr(Show, 'HotstringsResolve("llm_prediction"')
@@ -412,6 +433,50 @@ _TPS_LlmFailureAndTimerKeepExactSurfaceOwner() {
 		"LLM hide must revalidate and retire the exact record/surface before resetting its chain or logging")
 	Assert(InStr(Build, 'TooltipHide("LlmPresentFail"') == 0,
 		"the detached builder must not run an under-fenced sibling hide before its caller can apply the captured request serial")
+
+	; A Tab acceptance claim is terminal for its shared offer lifecycle. The
+	; behavioral owner test proves the commit refuses B; these order checks prove
+	; the expected race propagates through the common presenter without being
+	; converted into a generic report or a hide of still-valid claimed A.
+	PauseGuard := InStr(Commit,
+		"LLM_NavEventOwner_LifecycleBarrierActive()")
+	PreviousTerminalGuard := InStr(Commit,
+		'if Previous.Lifecycle.Outcome != ""')
+	LifecycleResolve := InStr(Commit, 'Lifecycle := Meta.Get("lifecycle"',
+		true, PreviousTerminalGuard)
+	TerminalGuard := InStr(Commit, 'if Lifecycle.Outcome != ""', true,
+		LifecycleResolve)
+	SourceMutation := InStr(Commit, "Lifecycle.AcceptSource :=", true,
+		TerminalGuard)
+	AppMutation := InStr(Commit, "Lifecycle.AppName :=", true,
+		TerminalGuard)
+	SlotMutation := InStr(Commit, "Lifecycle.Slots :=", true,
+		TerminalGuard)
+	Attach := InStr(Commit, "LLM_NavEventOwner_AttachRecord(", true,
+		TerminalGuard)
+	Assert(PauseGuard > 0 and PreviousTerminalGuard > PauseGuard
+		and LifecycleResolve > PreviousTerminalGuard
+		and TerminalGuard > LifecycleResolve
+		and SourceMutation > TerminalGuard
+		and AppMutation > TerminalGuard and SlotMutation > TerminalGuard
+		and Attach > TerminalGuard,
+		"pause and terminal-owner guards must reject before lifecycle mutation or native-token attachment")
+	TerminalRethrow := InStr(Present,
+		"CommitError is TooltipLlmTerminalOutcomeError")
+	GenericReport := InStr(Present, "_UiOracleReportError(", true,
+		TerminalRethrow)
+	Assert(TerminalRethrow > 0 and GenericReport > TerminalRethrow,
+		"the common presenter must rethrow a terminal-offer race before its generic error reporter")
+	TerminalCatch := InStr(Show,
+		"_llm_build_err is TooltipLlmTerminalOutcomeError")
+	GenericLog := InStr(Show, 'LoggerError("LLM.tt"', true,
+		TerminalCatch)
+	GenericHide := InStr(Show,
+		"LLM_TooltipHide(false, RenderGeneration, RenderRequestSerial)",
+		true, GenericLog)
+	Assert(TerminalCatch > 0 and GenericLog > TerminalCatch
+		and GenericHide > GenericLog,
+		"LLM show must abandon a terminal same-offer candidate before generic logging or exact-owner hide")
 }
 
 ; The post-present hook runs after Critical by design because metrics and LLM
@@ -495,7 +560,8 @@ _TPS_PostPresentTokenGuardsEveryMutation() {
 		TimerCritical)
 	TimerCancel := InStr(StartTimer, "LLM_Engine_CancelTimer()", true,
 		TimerGuard)
-	TimerArm := InStr(StartTimer, "SetTimer(_LLM_Engine", true, TimerCancel)
+	TimerArm := InStr(StartTimer,
+		"ScheduleFn.Call(_LLM_Engine", true, TimerCancel)
 	Assert(Capture > 0 and TimerCritical > Capture and TimerGuard > TimerCritical
 		and TimerCancel > TimerGuard and TimerArm > TimerCancel,
 		"focus capture must stay outside Critical, then the surface token must be rechecked atomically with cancel + timer re-arm so a stale callback cannot evict newer LLM work")

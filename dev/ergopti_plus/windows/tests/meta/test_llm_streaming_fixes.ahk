@@ -122,3 +122,29 @@ _LLMSF_HandleRemovedByReference() {
 		"api_ollama.ahk must not compare handles by PID — Windows reuses PIDs of short-lived processes (llm-stream-pid-collision)")
 }
 Test("api_ollama: RemoveStreamHandle uses object reference (h != handle), not PID comparison (llm-stream-pid-collision)", _LLMSF_HandleRemovedByReference)
+
+
+_AHK011_EffectiveStreamingOwnsEveryWindowsBoundary() {
+	HelperName := "LLM_EffectiveStreaming"
+	Boundaries := [
+		["LLM_Engine_Init", "engine admission"],
+		["LLM_Engine_FirePrediction", "request dispatch"],
+		["_LLM_Menu_SyncToFeatures", "durable persistence"],
+		["_LLM_Menu_RestoreSavedOptsOnce", "saved-state restore"],
+		["LLM_Menu_ToggleBool", "menu mutation"],
+		["_LLM_Menu_ApplyBackendCommitted", "backend transition"],
+		["_LLM_Menu_DisplayRows", "visible menu state"]
+	]
+	for Boundary in Boundaries {
+		Body := _DriverFuncBody(Boundary[1])
+		Assert(Body != "",
+			Boundary[2] . " boundary must remain discoverable")
+		AssertContains(Body, HelperName . "(",
+			Boundary[2] . " must consume the one effective streaming policy")
+	}
+	DispatchBody := _DriverFuncBody("LLM_Engine_FirePrediction")
+	Assert(InStr(DispatchBody, "streaming_enabled := false") = 0,
+		"backend branches must not silently override the published setting")
+}
+Test("AHK-011: effective streaming policy owns every Windows boundary",
+	_AHK011_EffectiveStreamingOwnsEveryWindowsBoundary)

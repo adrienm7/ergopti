@@ -164,6 +164,14 @@ global TapHold := Map("keys", Map(), "layers", Map())
 ; short-circuits to false instead of throwing; HotstringEngineInit() resolves the
 ; real value (auto-probe + TOML override) later in boot.
 global _ALTGR_KANA_FIXUP := False
+; Personal hotkeys become callable before layout registration finishes. Their
+; callbacks may emit text while the auto-execute thread is still pumping, so the
+; registry read by _EmitReachedScreen must already exist. The entries are global
+; names because the owning InputHooks are initialised later in separate modules.
+global _EMIT_SUPPRESSING_HOOKS := [
+	"_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook",
+	"_MagicKeyEditorInputHook"
+]
 ; The global error net must distinguish a recoverable callback fault from an
 ; init fault. Before this reaches "ready", continuing would leave a resident
 ; half-driver with a subset of hooks/menu state registered.
@@ -308,11 +316,13 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/app_launcher.ahk
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
+#Include adapters/llm_nav_event_owner.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
 #Include adapters/graphics_renderer.ahk
 #Include adapters/tooltip_renderer.ahk
 #Include adapters/shell_runner.ahk
+#Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
 
 ; Compiled workers reuse this executable. Exit into the minimal worker loop as
@@ -464,6 +474,7 @@ if KLPF_IsWorkerInvocation()
 LLM_Defaults_Load()
 #Include _generated/llm_profiles_data.ahk
 #Include modules/llm/profiles.ahk
+#Include modules/llm/option_validation.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk
@@ -499,21 +510,14 @@ if !LLM_TriggerJournalRecoverAtBoot()
 	throw Error("LLM trigger journal recovery failed before configuration boot")
 
 #Include infra/feature_state.ahk
+#Include infra/tray_bootstrap.ahk
 
-_InstallSafeBootstrapTray() {
-	; The stock menu is unsafe during onboarding, but an empty visible tray root
-	; is also not a valid publication. Keep one inert branded row until the root
-	; coordinator atomically replaces it with the complete staged tree.
-	A_TrayMenu.Add("ErgoptiPlus", (*) => 0)
-	A_TrayMenu.Disable("ErgoptiPlus")
-}
-
-; AHK-21: clear the stock AHK tray items (Pause/Suspend/Reload/Exit/Edit)
-; BEFORE the blocking onboarding wizard so those stock actions are never live
+; AHK-21: atomically replace the stock AHK tray items
+; (Pause/Suspend/Reload/Exit/Edit) BEFORE the blocking onboarding wizard so
+; those stock actions are never live
 ; during first-run setup. On a normal (non-first-run) boot Onboarding_Run is
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
-A_TrayMenu.Delete()
 _InstallSafeBootstrapTray()
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
@@ -980,15 +984,15 @@ BootProfile_Mark("Config, features & shortcuts loaded")
 ; BuildTrayMenuDeferred armed right after "ready" (see the deferred-task block).
 ; Stock tray items (Pause/Suspend/Reload/Exit/Edit) are cleared once at boot,
 ; before Onboarding_Run (AHK-21), so they are never live during the first-run wizard.
-; This second Delete() is a safe no-op on an already-empty menu — kept to make the
-; comment block here accurate; _DriverReady stays false until "ready".
+; Replace the neutral pre-i18n brand row with a truthful localized status.
+; The helper owns Delete + Add + Disable under one Critical transaction, so no
+; tray click can observe an empty root. _DriverReady stays false until "ready".
 _DriverReady := false
 _LangMenuRef := ""
 _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
-A_TrayMenu.Delete()
-_InstallSafeBootstrapTray()
+_InstallSafeBootstrapTray(t("menu.global.starting"))
 if !(IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
 	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
@@ -1113,6 +1117,11 @@ _ReleasePhantomModifiers()
 RegisterAllHotstrings(false)
 BootProfile_Mark("Hotstrings registered (HSE complete)")
 HotstringPrefixWatcherInit()
+; Install the shared low-level keyboard arbiter after the prefix InputHook. Its
+; terminal capture then runs first in the hook chain and can hold physical edges
+; while paced terminal output completes. A failed native admission is reported
+; by the adapter and terminal expansions remain fail-open.
+LLM_NavEventOwner_EnsureStarted()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_Mark("Prefix watcher index complete")
 _DriverReady := true
@@ -1191,7 +1200,7 @@ if _LangMenuBuildPending
 ; a still-cold daemon and block the keyboard thread for seconds — a stuck/empty menu
 ; AND missed prediction-cancel on mouse/keystroke while the thread is frozen.
 if !_LLM_Menu["enabled"]
-	SetTimer(LLM_Menu_Build, -LLM_MENU_BUILD_DEFER_MS)
+	SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
 ; Warm the i18n EN/FR fallback caches off the critical path (the active locale is
 ; already parsed at boot). One JSON parse, only consulted on a missing key; a miss
 ; before this fires triggers a one-time lazy load inside t().

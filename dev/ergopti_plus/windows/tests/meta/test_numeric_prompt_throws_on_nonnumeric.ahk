@@ -72,16 +72,19 @@ _NPNN_PromptTemperatureGuardsFloat() {
 	Src := _NPNN_ReadSource("ui/menu/menu_llm/menu_settings.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_PromptTemperature")
 	Assert(Seg != "", "LLM_Menu_PromptTemperature declaration must exist in menu_settings.ahk")
-	Assert(InStr(Seg, "IsNumber") > 0,
-		"LLM_Menu_PromptTemperature must guard with IsNumber before Float() — a non-numeric typo would otherwise throw an unhandled error")
 	; The comma decimal is the common French-keyboard habit; the fix must
-	; normalise it to a dot so a Float() conversion of "0,7" does not throw.
+	; normalise it to a dot before the canonical temperature boundary.
 	; Build the expected substring from Chr() so the test stays ASCII-only and
 	; matches the exact StrReplace(value, ",", ".") normalisation the fix adds.
 	Comma  := Chr(44)
 	Dot    := Chr(46)
 	NormPat := "StrReplace(ib.Value, " . Chr(34) . Comma . Chr(34) . ", " . Chr(34) . Dot . Chr(34) . ")"
 	Assert(InStr(Seg, NormPat) > 0,
-		"LLM_Menu_PromptTemperature must normalise comma decimals to dots before Float() so a French-keyboard '0,7' is accepted, not thrown on")
+		"LLM_Menu_PromptTemperature must normalise comma decimals to dots so a French-keyboard '0,7' is accepted")
+	ValidatorPos := InStr(Seg, "LLM_Option_TryNormalizeTemperature(raw, &Normalized)")
+	Assert(ValidatorPos > InStr(Seg, NormPat),
+		"LLM_Menu_PromptTemperature must pass normalized input through the canonical bounded-decimal validator")
+	Assert(InStr(Seg, "Float(raw)") == 0,
+		"LLM_Menu_PromptTemperature must not bypass canonical validation with a direct Float conversion")
 }
-Test("menu_settings: LLM_Menu_PromptTemperature guards Float() and accepts comma decimals (numeric-prompt-throws-on-nonnumeric)", _NPNN_PromptTemperatureGuardsFloat)
+Test("menu_settings: LLM_Menu_PromptTemperature uses the canonical temperature boundary (numeric-prompt-throws-on-nonnumeric)", _NPNN_PromptTemperatureGuardsFloat)

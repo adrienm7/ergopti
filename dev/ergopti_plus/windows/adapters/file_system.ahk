@@ -54,8 +54,19 @@ FSRead(Path) {
 ; Creates the file if it does not exist.
 ; @param Path    {String} Absolute path to the file.
 ; @param Content {String} UTF-8 content to write.
+; @param OpenFn   {Func|0} Optional deterministic open seam for tests.
+; @param DeleteFn {Func|0} Optional deterministic cleanup seam for tests.
 ; @return {Boolean} True on success, false on error.
-FSWrite(Path, Content) {
+FSWrite(Path, Content, OpenFn := 0, DeleteFn := 0) {
+	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
+	ResolvedDelete := HasMethod(DeleteFn, "Call") ? DeleteFn : FileDelete
+	return _FSWriteComplete(Path, Content, ResolvedOpen, ResolvedDelete)
+}
+
+; Owns a write from the first successful open through either a complete close or
+; deletion of the partial artifact. OpenFn/DeleteFn make the short-write boundary
+; deterministic in tests without weakening the public FileSystem port.
+_FSWriteComplete(Path, Content, OpenFn, DeleteFn) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
@@ -64,7 +75,7 @@ FSWrite(Path, Content) {
 	Opened := false
 	Succeeded := false
 	try {
-		FH := FileOpen(Path, "w", "UTF-8-RAW")
+		FH := OpenFn.Call(Path, "w", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
 		Opened := true
@@ -84,7 +95,7 @@ FSWrite(Path, Content) {
 		if IsObject(FH)
 			try FH.Close()
 		if Opened && !Succeeded
-			try FileDelete(Path)
+			try DeleteFn.Call(Path)
 	}
 }
 

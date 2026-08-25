@@ -19,14 +19,14 @@
 --- - ollama_stream_line  — async streaming callback; tested in api_ollama unit.
 --- - driver=ahk vectors  — /api/generate format not used on macOS.
 ---
---- INLINE PARSERS:
---- The remote parse logic mirrors api_remote.lua's private parse_response().
---- The ollama chat parser mirrors api_ollama.lua's non-streaming extraction.
---- Both are replicated inline (not imported) because they are private to their
---- respective modules, and the corpus test must not change the module API.
+--- PARSERS:
+--- Remote vectors call the production classifier. The Ollama chat parser stays
+--- local because this consumer checks a driver-specific response shape.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local JsonCodec = require("adapters.json_codec")
+local ResponseClassifier = require("modules.llm.remote_response_classifier")
 
 
 
@@ -46,10 +46,10 @@ local function read_corpus()
 	end
 	local raw = fh:read("*a")
 	fh:close()
-	package.loaded["infra.logger"] = nil
-	helpers.load_with_stubs("infra.logger")
-	local ok, result = pcall(require("hs").json.decode, raw)
-	if not ok then return nil, "JSON parse error: " .. tostring(result) end
+	local result, decode_err = JsonCodec.decode(raw)
+	if type(result) ~= "table" then
+		return nil, "JSON parse error: " .. tostring(decode_err)
+	end
 	return result, nil
 end
 
@@ -71,8 +71,8 @@ local corpus_root, corpus_err = read_corpus()
 --- @return string Extracted assistant content, or "" on failure.
 local function parse_ollama_chat(body)
 	if type(body) ~= "string" or body == "" then return "" end
-	local ok_j, resp = pcall(require("hs").json.decode, body)
-	if not ok_j or type(resp) ~= "table" then return "" end
+	local resp, _ = JsonCodec.decode(body)
+	if type(resp) ~= "table" then return "" end
 	if type(resp.message) ~= "table" then return "" end
 	local content = resp.message.content
 	if type(content) ~= "string" then return "" end
@@ -85,38 +85,7 @@ end
 --- @param body string Raw JSON response body.
 --- @return string Extracted assistant text, or "" on failure.
 local function parse_remote(format, body)
-	if type(body) ~= "string" or body == "" then return "" end
-	local ok_j, resp = pcall(require("hs").json.decode, body)
-	if not ok_j or type(resp) ~= "table" then return "" end
-
-	if format == "anthropic" then
-		local content = resp.content
-		if type(content) == "table" and type(content[1]) == "table" then
-			return tostring(content[1].text or "")
-		end
-		return ""
-	end
-
-	if format == "gemini" then
-		local cand = resp.candidates
-		if type(cand) == "table" and type(cand[1]) == "table" then
-			local cnt = cand[1].content
-			if type(cnt) == "table"
-			and type(cnt.parts) == "table"
-			and type(cnt.parts[1]) == "table" then
-				return tostring(cnt.parts[1].text or "")
-			end
-		end
-		return ""
-	end
-
-	-- OpenAI (default)
-	local choices = resp.choices
-	if type(choices) == "table" and type(choices[1]) == "table" then
-		local msg = choices[1].message
-		if type(msg) == "table" then return tostring(msg.content or "") end
-	end
-	return ""
+	return ResponseClassifier.classify(format, body).text
 end
 
 --- Dispatches a corpus vector to the correct inline parser.

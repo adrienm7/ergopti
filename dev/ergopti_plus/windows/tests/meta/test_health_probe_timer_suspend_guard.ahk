@@ -61,9 +61,12 @@ Test("LLM tray: _LLM_Menu_FireHealthProbe has an A_IsSuspended guard (health-pro
 _HPTS_ProbeDoneSkipsRebuildWhileSuspended() {
 	Src := _HPTS_ReadSource("ui/menu/menu_llm/actions.ahk")
 	Seg := _DriverFuncBody("_LLM_Menu_OnHealthProbeDone")
+	OwnerGuard := _DriverFuncBody("_LLM_Menu_AuxOwnerIsCurrent")
 	Assert(Seg != "", "_LLM_Menu_OnHealthProbeDone(reachable) declaration must exist in actions.ahk")
-	Assert(InStr(Seg, "A_IsSuspended") > 0,
-		"_LLM_Menu_OnHealthProbeDone must skip LLM_Menu_Build() while A_IsSuspended - an async probe landing just after Pause would otherwise churn the tray menu")
+	Assert(OwnerGuard != "", "the shared auxiliary menu-owner guard must exist")
+	Assert(InStr(Seg, "_LLM_Menu_AuxOwnerIsCurrent(Owner)") > 0
+			&& InStr(OwnerGuard, "A_IsSuspended") > 0,
+		"_LLM_Menu_OnHealthProbeDone must delegate to the shared Suspend-aware owner guard before rebuilding the tray")
 }
 Test("LLM tray: _LLM_Menu_OnHealthProbeDone skips rebuild while suspended (health-probe-timer-not-suspend-guarded)", _HPTS_ProbeDoneSkipsRebuildWhileSuspended)
 

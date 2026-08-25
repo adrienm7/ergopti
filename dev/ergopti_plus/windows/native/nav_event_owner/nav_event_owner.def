@@ -1,0 +1,31 @@
+; static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.def
+; MODULE: Ergopti navigation event owner exports.
+; DESCRIPTION: Pins undecorated C names for the AutoHotkey DllCall adapter.
+
+LIBRARY "ergopti_nav_owner"
+
+EXPORTS
+	ErgoptiNav_Start
+	ErgoptiNav_Stop
+	ErgoptiNav_PreparePlan
+	ErgoptiNav_CommitPlan
+	ErgoptiNav_SetSuspended
+	ErgoptiNav_BeginTerminalCapture
+	ErgoptiNav_CommitTerminalCapture
+	ErgoptiNav_AbortTerminalCapture
+	ErgoptiNav_GetTerminalCapture
+	ErgoptiNav_BeginOwnerSwap
+	ErgoptiNav_CommitOwnerSwap
+	ErgoptiNav_AbortOwnerSwap
+	ErgoptiNav_ClaimOwner
+	ErgoptiNav_GetOwner
+	ErgoptiNav_BeginProfileSwap
+	ErgoptiNav_CommitProfileSwap
+	ErgoptiNav_AbortProfileSwap
+	ErgoptiNav_ProfilePendingMask
+	ErgoptiNav_CanStop
+	ErgoptiNav_PollReceipt
+	ErgoptiNav_CompleteReceipt
+	ErgoptiNav_PendingForToken
+	ErgoptiNav_GetLastOsError
+	ErgoptiNav_TestDispatch

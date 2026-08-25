@@ -568,15 +568,21 @@ _Stub_OutputHostIdentity() {
 }
 
 _Stub_OutputHostMetadata(Hwnd, Pid) {
-	global _Stub_OutputHostExe, _Stub_OutputHostTitle
-	return Map("Exe", _Stub_OutputHostExe, "Class", "fixture", "Title", _Stub_OutputHostTitle)
+	global _Stub_OutputHostExe
+	return Map("Exe", _Stub_OutputHostExe, "Class", "fixture")
+}
+
+_Stub_OutputHostTitleProbe(Hwnd, Pid) {
+	global _Stub_OutputHostTitle
+	return Map("Ok", true, "Title", _Stub_OutputHostTitle, "TimedOut", false)
 }
 
 _Stub_SetOutputHost(Exe, Title) {
 	global _Stub_OutputHostExe, _Stub_OutputHostTitle
 	_Stub_OutputHostExe := Exe
 	_Stub_OutputHostTitle := Title
-	OutputHostResolverConfigure(_Stub_OutputHostIdentity, _Stub_OutputHostMetadata)
+	OutputHostResolverConfigure(_Stub_OutputHostIdentity,
+		_Stub_OutputHostMetadata, _Stub_OutputHostTitleProbe)
 }
 
 SimulateNotepadActive() {
@@ -767,19 +773,25 @@ LLM_Tooltip_GetAcceptSnapshot() {
             or Record.Lifecycle.Outcome != ""
         return 0
     Text := _LLM_SlotGetTextStub(Record.Slots[Record.ActiveIdx])
-    return {
-        Record: Record, Text: Text, Slots: Record.Slots.Clone(),
+	return {
+		Record: Record, Surface: Record,
+		Text: Text, Slots: Record.Slots.Clone(),
         ActiveIdx: Record.ActiveIdx,
         AcceptSource: Record.Lifecycle.AcceptSource,
         AppName: Record.Lifecycle.AppName
     }
 }
 
-LLM_Tooltip_ClaimAcceptance(ExpectedRecord) {
-    global _Stub_LlmPresentedRecord
-    if !IsObject(_Stub_LlmPresentedRecord)
-            or ObjPtr(_Stub_LlmPresentedRecord) != ObjPtr(ExpectedRecord)
-            or _Stub_LlmPresentedRecord.Lifecycle.Outcome != ""
+LLM_Tooltip_ClaimAcceptance(ExpectedRecord, ExpectedSurface := 0,
+		ExpectedActiveIdx := 0) {
+	global _Stub_LlmPresentedRecord
+	if !IsObject(_Stub_LlmPresentedRecord)
+			or ObjPtr(_Stub_LlmPresentedRecord) != ObjPtr(ExpectedRecord)
+			or !IsObject(ExpectedSurface)
+			or ObjPtr(ExpectedSurface) != ObjPtr(ExpectedRecord)
+			or !(ExpectedActiveIdx is Integer)
+			or ExpectedActiveIdx != ExpectedRecord.ActiveIdx
+			or _Stub_LlmPresentedRecord.Lifecycle.Outcome != ""
         return 0
     _Stub_LlmPresentedRecord.Lifecycle.Outcome := "claimed"
     return _Stub_LlmPresentedRecord.Lifecycle

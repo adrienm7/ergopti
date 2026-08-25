@@ -84,6 +84,90 @@ _EngineInit_LanguageOptsOverride() {
 Test("LLM_Engine_Init: explicit opts language overrides the locale default", _EngineInit_LanguageOptsOverride)
 
 
+_AHK011_EngineInitPublishesEffectiveStreaming() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		for Backend in ["ollama", "api"] {
+			LLM_Engine_Init(Map("backend", Backend, "streaming", true))
+			AssertFalse(_LLM_Engine["streaming"],
+				Backend . " must not publish an enabled runtime setting while its "
+				. "backend has no supported streaming transport")
+		}
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("AHK-011: engine admission publishes only effective streaming",
+	_AHK011_EngineInitPublishesEffectiveStreaming)
+
+
+_AHK011_DispatchFixture(ShowAllAtOnce) {
+	global _LLM_Engine
+	return Map(
+		"ctx", "bonjour",
+		"request_id", _LLM_Engine["request_id"],
+		"semantic_signature", _LLM_Engine["active_request_signature"],
+		"slots", ["premiere"],
+		"requested", 2,
+		"attempt_index", 2,
+		"max_attempts", 4,
+		"base_temp", 0.1,
+		"dispatch_fn", (Temp, OnSuccess, OnFail) => 0,
+		"dispatch_stream_fn", "",
+		"streaming", false,
+		"show_all_at_once", ShowAllAtOnce)
+}
+
+
+_AHK011_AllAtOnceSuppressesEveryIntermediateFrame() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedCalls := _Stub_LlmTooltipCalls
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		_LLM_Engine["request_id"] := 11011
+		_LLM_Engine["active_request_signature"] := "ahk-011"
+		_Stub_LlmTooltipCalls := []
+		_LLM_Engine_DispatchVariant(_AHK011_DispatchFixture(true))
+		AssertEqual(0, _Stub_LlmTooltipCalls.Length,
+			"show_all_at_once must suppress the sibling preview emitted while "
+			. "the next sequential variant is dispatched")
+	} finally {
+		_LLM_Engine := SavedEngine
+		_Stub_LlmTooltipCalls := SavedCalls
+	}
+}
+Test("AHK-011: show-all-at-once suppresses every intermediate frame",
+	_AHK011_AllAtOnceSuppressesEveryIntermediateFrame)
+
+
+_AHK011_ProgressiveModeStillPaintsIntermediateFrame() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedCalls := _Stub_LlmTooltipCalls
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		_LLM_Engine["request_id"] := 11012
+		_LLM_Engine["active_request_signature"] := "ahk-011-control"
+		_Stub_LlmTooltipCalls := []
+		_LLM_Engine_DispatchVariant(_AHK011_DispatchFixture(false))
+		AssertEqual(1, _Stub_LlmTooltipCalls.Length,
+			"the progressive control must still publish one intermediate frame")
+		AssertFalse(_Stub_LlmTooltipCalls[1].is_final,
+			"the control frame must remain explicitly intermediate")
+		AssertEqual("premiere", _Stub_LlmTooltipCalls[1].slots[1],
+			"the progressive frame must carry the accumulated real slot")
+	} finally {
+		_LLM_Engine := SavedEngine
+		_Stub_LlmTooltipCalls := SavedCalls
+	}
+}
+Test("AHK-011: progressive mode retains its intermediate frame control",
+	_AHK011_ProgressiveModeStillPaintsIntermediateFrame)
+
+
 _LLM_TooltipVanishOnAccept() {
     global _TooltipDequeueActive
     _TooltipDequeueActive := true
@@ -108,8 +192,360 @@ _EngineInit_CopiesDisabledAppsArray() {
 	LLM_Engine_Init(Map("disabled_apps", apps))
 	AssertEqual(2, _LLM_Engine["disabled_apps"].Length)
 	AssertEqual("slack.exe", _LLM_Engine["disabled_apps"][1])
+	apps[1] := "mutated.exe"
+	AssertEqual("slack.exe", _LLM_Engine["disabled_apps"][1],
+		"engine admission must detach the caller-owned disabled-app array")
 }
 Test("LLM_Engine_Init: copies disabled_apps array from opts", _EngineInit_CopiesDisabledAppsArray)
+
+_EngineInit_DetachesNestedOptions() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	_LLM_Engine := SavedEngine.Clone()
+	try {
+		StopSequences := ["END"]
+		Profile := Map(
+			"id", "custom",
+			"label", "Custom",
+			"stop_sequences", StopSequences)
+		Profiles := [Profile]
+		ApiEntry := { Id: "api-1", Name: "Production" }
+		ApiEntries := [ApiEntry]
+		Overrides := Map("notepad", "custom")
+		LLM_Engine_Init(Map(
+			"user_profiles", Profiles,
+			"api_entries", ApiEntries,
+			"app_profile_overrides", Overrides))
+
+		StopSequences[1] := "MUTATED"
+		Profile["label"] := "Mutated"
+		Profiles.Push(Map("id", "late"))
+		ApiEntry.Name := "Mutated"
+		ApiEntries.Push(Map("Id", "api-2"))
+		Overrides["notepad"] := "basic"
+
+		AssertEqual(1, _LLM_Engine["user_profiles"].Length,
+			"engine admission must detach the caller-owned profile array")
+		AssertEqual("Custom", _LLM_Engine["user_profiles"][1]["label"],
+			"engine admission must detach each profile record")
+		AssertEqual("END", _LLM_Engine["user_profiles"][1]["stop_sequences"][1],
+			"engine admission must detach nested profile arrays")
+		AssertEqual(1, _LLM_Engine["api_entries"].Length,
+			"engine admission must detach the caller-owned API-entry array")
+		AssertEqual("Production", _LLM_Engine["api_entries"][1]["Name"],
+			"engine admission must detach each API-entry record")
+		AssertEqual("custom", _LLM_Engine["app_profile_overrides"]["notepad"],
+			"engine admission must detach the caller-owned override map")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("LLM_Engine_Init: composite options are deeply detached at admission "
+	. "(llm-persisted-option-type-boundary-detached)",
+	_EngineInit_DetachesNestedOptions)
+
+_EngineInit_RejectsNestedDisabledApps() {
+	global _LLM_Engine
+	SavedEnabled := _LLM_Engine["enabled"]
+	SavedModel := _LLM_Engine["model"]
+	SavedApps := _LLM_Engine["disabled_apps"]
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["model"] := "safe-model"
+	_LLM_Engine["disabled_apps"] := ["safe-app"]
+	try {
+		Thrown := false
+		Failure := ""
+		try LLM_Engine_Init(Map(
+			"model", "must-not-publish",
+			"disabled_apps", [["notepad"]]))
+		catch as Err {
+			Thrown := true
+			Assert(Err is TypeError,
+				"nested disabled_apps must fail with the admission TypeError")
+			Failure := Err.Message
+		}
+		AssertTrue(Thrown,
+			"a nonvalidated caller must fail fast on a nested disabled_apps value")
+		AssertContains(Failure, "disabled_apps",
+			"the admission error must identify the rejected option")
+		AssertFalse(_LLM_Engine["enabled"],
+			"failed validation must not enable the engine")
+		AssertEqual("safe-model", _LLM_Engine["model"],
+			"failed validation must not publish scalar options before the bad array")
+		AssertEqual("safe-app", _LLM_Engine["disabled_apps"][1],
+			"failed validation must not publish partial engine state")
+	} finally {
+		_LLM_Engine["enabled"] := SavedEnabled
+		_LLM_Engine["model"] := SavedModel
+		_LLM_Engine["disabled_apps"] := SavedApps
+	}
+}
+Test("LLM_Engine_Init: nested disabled_apps fails before hot-path publication "
+	. "(llm-persisted-option-type-boundary)",
+	_EngineInit_RejectsNestedDisabledApps)
+
+_EngineInit_AssertCompositeScalarRejected(Key, BadValue, Baseline, Slug) {
+	global _LLM_Engine
+	SavedEnabled := _LLM_Engine["enabled"]
+	SavedLanguage := _LLM_Engine["language"]
+	SavedTarget := _LLM_Engine[Key]
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["language"] := "safe-language"
+	_LLM_Engine[Key] := Baseline
+	try {
+		Thrown := false
+		Failure := ""
+		try LLM_Engine_Init(Map(
+			"language", "must-not-publish",
+			Key, BadValue))
+		catch as Err {
+			Thrown := true
+			Assert(Err is TypeError,
+				Slug . " must fail with the engine admission TypeError")
+			Failure := Err.Message
+		}
+		AssertTrue(Thrown, Slug . " must fail fast at engine admission")
+		AssertContains(Failure, Key,
+			Slug . " admission error must identify the rejected option")
+		AssertFalse(_LLM_Engine["enabled"],
+			Slug . " must not enable the engine before validation completes")
+		AssertEqual("safe-language", _LLM_Engine["language"],
+			Slug . " must not partially publish an earlier valid option")
+		AssertEqual(Baseline, _LLM_Engine[Key],
+			Slug . " must retain its seeded value")
+	} finally {
+		_LLM_Engine["enabled"] := SavedEnabled
+		_LLM_Engine["language"] := SavedLanguage
+		_LLM_Engine[Key] := SavedTarget
+	}
+}
+
+_EngineInit_RejectsCompositeString() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"model", [["bad"]], "safe-model", "composite string")
+}
+Test("LLM_Engine_Init: composite string is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-string)",
+	_EngineInit_RejectsCompositeString)
+
+_EngineInit_RejectsCompositeInteger() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"n_predictions", [[9]], 3, "composite integer")
+}
+Test("LLM_Engine_Init: composite integer is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-integer)",
+	_EngineInit_RejectsCompositeInteger)
+
+_EngineInit_RejectsCompositeBoolean() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"show_info_bar", [[true]], true, "composite boolean")
+}
+Test("LLM_Engine_Init: composite boolean is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-boolean)",
+	_EngineInit_RejectsCompositeBoolean)
+
+_EngineInit_RejectsCompositeTemperature() {
+	_EngineInit_AssertCompositeScalarRejected(
+		"temperature", [[0.25]], "0.10", "composite temperature")
+}
+Test("LLM_Engine_Init: composite temperature is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-temperature)",
+	_EngineInit_RejectsCompositeTemperature)
+
+_EngineInit_AssertCompositeContainerRejected(Key, BadValue, Baseline, Slug) {
+	global _LLM_Engine
+	SavedEnabled := _LLM_Engine["enabled"]
+	SavedLanguage := _LLM_Engine["language"]
+	SavedTarget := _LLM_Engine[Key]
+	_LLM_Engine["enabled"] := false
+	_LLM_Engine["language"] := "safe-language"
+	_LLM_Engine[Key] := Baseline
+	try {
+		Thrown := false
+		Failure := ""
+		try LLM_Engine_Init(Map(
+			"language", "must-not-publish",
+			Key, BadValue))
+		catch as Err {
+			Thrown := true
+			Assert(Err is TypeError,
+				Slug . " must fail with the engine admission TypeError")
+			Failure := Err.Message
+		}
+		AssertTrue(Thrown, Slug . " must fail fast at engine admission")
+		AssertContains(Failure, Key,
+			Slug . " admission error must identify the rejected option")
+		AssertFalse(_LLM_Engine["enabled"],
+			Slug . " must not enable the engine before validation completes")
+		AssertEqual("safe-language", _LLM_Engine["language"],
+			Slug . " must not partially publish an earlier valid option")
+		AssertEqual(Baseline, _LLM_Engine[Key],
+			Slug . " must retain the exact seeded container")
+	} finally {
+		_LLM_Engine["enabled"] := SavedEnabled
+		_LLM_Engine["language"] := SavedLanguage
+		_LLM_Engine[Key] := SavedTarget
+	}
+}
+
+_EngineInit_RejectsCompositeUserProfile() {
+	_EngineInit_AssertCompositeContainerRejected(
+		"user_profiles", [["bad"]], [], "composite user profile")
+}
+Test("LLM_Engine_Init: composite user profile is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-user-profiles)",
+	_EngineInit_RejectsCompositeUserProfile)
+
+_EngineInit_RejectsCompositeApiEntry() {
+	_EngineInit_AssertCompositeContainerRejected(
+		"api_entries", [["bad"]], [], "composite API entry")
+}
+Test("LLM_Engine_Init: composite API entry is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-api-entries)",
+	_EngineInit_RejectsCompositeApiEntry)
+
+_EngineInit_RejectsCompositeAppOverride() {
+	_EngineInit_AssertCompositeContainerRejected(
+		"app_profile_overrides", Map("notepad", []), Map(),
+		"composite app-profile override")
+}
+Test("LLM_Engine_Init: composite app override is rejected atomically "
+	. "(llm-persisted-option-type-boundary-engine-app-overrides)",
+	_EngineInit_RejectsCompositeAppOverride)
+
+_EngineInit_AcceptsManifestNumericRepresentations() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	try {
+		_LLM_Engine := SavedEngine.Clone()
+		LLM_Engine_Init(Map("n_predictions", 3.0, "temperature", 0.25))
+		AssertEqual(3, _LLM_Engine["n_predictions"],
+			"an integral manifest number must normalize to the engine integer")
+		AssertEqual("0.25", _LLM_Engine["temperature"],
+			"a numeric manifest temperature must normalize to the engine string")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("LLM_Engine_Init: valid manifest numeric representations remain accepted "
+	. "(llm-persisted-option-type-boundary-engine-valid-number)",
+	_EngineInit_AcceptsManifestNumericRepresentations)
+
+_EngineFinalize_ReadinessState(Backend, RequestId, Signature) {
+	return Map(
+		"request_id", RequestId,
+		"semantic_signature", Signature,
+		"slots", ["suggestion"],
+		"requested", 1,
+		"dedup_stats", Map("candidates", 1, "duplicates", 0, "kept", 1),
+		"model", "model",
+		"backend", Backend,
+		"ctx", "context",
+		"system_prompt", "system",
+		"is_batch", false,
+		"request_start", 0
+	)
+}
+
+_EngineFinalize_ReadyFlagBelongsToOllama() {
+	global _LLM_Engine, _LLM_Ollama_IsReady, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedReady := _LLM_Ollama_IsReady
+	SavedTooltipCalls := _Stub_LlmTooltipCalls
+	try {
+		RequestId := 731
+		Signature := "readiness-owner-signature"
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Engine["request_id"] := RequestId
+		_LLM_Engine["active_request_signature"] := Signature
+		_LLM_Engine["inline_autotype"] := false
+		_Stub_LlmTooltipCalls := []
+
+		_LLM_Ollama_IsReady := false
+		_LLM_Engine_FinalizeRequest(
+			_EngineFinalize_ReadinessState("api", RequestId, Signature))
+		AssertFalse(_LLM_Ollama_IsReady,
+			"(ahk2-13-backend-readiness-owner) remote API success must not publish Ollama readiness")
+		AssertEqual(1, _Stub_LlmTooltipCalls.Length,
+			"(ahk2-13-backend-readiness-owner) the remote control must still complete its ordinary final render")
+
+		_LLM_Ollama_IsReady := false
+		_LLM_Engine_FinalizeRequest(
+			_EngineFinalize_ReadinessState("ollama", RequestId, Signature))
+		AssertTrue(_LLM_Ollama_IsReady,
+			"(ahk2-13-backend-readiness-owner) Ollama success still owns its readiness publication")
+		AssertEqual(2, _Stub_LlmTooltipCalls.Length,
+			"(ahk2-13-backend-readiness-owner) both backend controls must reach the common finalizer")
+	} finally {
+		_LLM_Engine := SavedEngine
+		_LLM_Ollama_IsReady := SavedReady
+		_Stub_LlmTooltipCalls := SavedTooltipCalls
+	}
+}
+Test("LLM finalizer: Ollama readiness remains backend-owned (ahk2-13-backend-readiness-owner)",
+	_EngineFinalize_ReadyFlagBelongsToOllama)
+
+_EngineTypedRestoreFeedsValidatedAppFilter() {
+	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Engine
+	SavedMenu := _LLM_Menu
+	SavedLoaded := _LLM_Menu_Loaded
+	SavedEngine := _LLM_Engine
+	try {
+		_LLM_Menu := _LLM_Menu.Clone()
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Menu["disabled_apps"] := []
+		_LLM_Menu["n_predictions"] := 3
+		_LLM_Menu["show_info_bar"] := true
+		_LLM_Menu["app_profile_overrides"] := Map("safe", "basic")
+		_LLM_Menu_Loaded := false
+		AssertTrue(_LLM_Menu_RestoreSavedOptsOnce(Map(
+			"disabled_apps", [" Notepad.EXE "],
+			"n_predictions", [[99]],
+			"show_info_bar", [[false]],
+			"app_profile_overrides", Map("notepad", []))))
+		AssertEqual(3, _LLM_Menu["n_predictions"],
+			"invalid numeric restore must retain the menu default")
+		AssertTrue(_LLM_Menu["show_info_bar"],
+			"invalid boolean restore must retain the menu default")
+		AssertEqual("notepad.exe", _LLM_Menu["disabled_apps"][1],
+			"valid app exclusions must be normalized during restore")
+		AssertEqual("basic", _LLM_Menu["app_profile_overrides"]["safe"],
+			"invalid override values must retain the validated menu default")
+
+		LLM_Engine_Init(Map("disabled_apps", _LLM_Menu["disabled_apps"]))
+		FocusCalls := 0
+		FocusFn := (*) => (FocusCalls += 1, Map("appId", "Notepad.EXE"))
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn),
+			"the production privacy decision must suppress the restored app")
+		AssertEqual(1, FocusCalls,
+			"a nonempty validated exclusion list must resolve focus exactly once")
+		AllowedCalls := 0
+		AllowedFocusFn := (*) => (AllowedCalls += 1, Map("appId", "wordpad.exe"))
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(AllowedFocusFn),
+			"a non-excluded focused app must remain eligible for predictions")
+		AssertEqual(1, AllowedCalls,
+			"a nonempty exclusion list must resolve an allowed focus exactly once")
+		_LLM_Engine["disabled_apps"] := []
+		EmptyCalls := 0
+		EmptyFocusFn := (*) => (EmptyCalls += 1, Map("appId", "notepad.exe"))
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(EmptyFocusFn),
+			"an empty exclusion list must not suppress predictions")
+		AssertEqual(0, EmptyCalls,
+			"an empty exclusion list must avoid the focus lookup entirely")
+		_LLM_Engine["disabled_apps"] := Map("corrupt", true)
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(FocusFn),
+			"corrupt internal exclusion state must fail closed")
+		AssertEqual(1, FocusCalls,
+			"invalid internal state must be rejected before any focus query")
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Loaded := SavedLoaded
+		_LLM_Engine := SavedEngine
+	}
+}
+Test("LLM options: typed restore reaches the production app filter "
+	. "(llm-persisted-option-type-boundary-restore-engine-filter)",
+	_EngineTypedRestoreFeedsValidatedAppFilter)
 
 
 
@@ -293,10 +729,11 @@ Test("LLM_Engine_OnKeystroke: stores full buffer in last_buffer", _EngineOnKeyst
 
 _EngineOnKeystroke_KeepsFullBuffer() {
 	global _LLM_Engine
-	LLM_Engine_Init(Map("ctx_chars", 5, "debounce_ms", 9999))
-	LLM_Engine_OnKeystroke("ABCDEFGHIJ")
+	InputText := "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	LLM_Engine_Init(Map("ctx_chars", 50, "debounce_ms", 9999))
+	LLM_Engine_OnKeystroke(InputText)
 	; Truncation happens in PromptBuilder at fire time, not on each keystroke.
-	AssertEqual("ABCDEFGHIJ", _LLM_Engine["last_buffer"])
+	AssertEqual(InputText, _LLM_Engine["last_buffer"])
 	LLM_Engine_CancelTimer()
 }
 Test("LLM_Engine_OnKeystroke: keeps full buffer (ctx cap applied at fire)", _EngineOnKeystroke_KeepsFullBuffer)
@@ -512,6 +949,20 @@ _GetActiveEntry_ReturnsMatchedEntry() {
 	AssertEqual("anthropic", result["Provider"])
 }
 Test("_LLM_Engine_GetActiveApiEntry: returns entry matching api_entry_id", _GetActiveEntry_ReturnsMatchedEntry)
+
+
+_GetActiveEntry_RejectsDuplicateIdentity() {
+	global _LLM_Engine
+	e1 := Map("Id", "duplicate", "Provider", "openai", "Token", "t1", "Model", "m1")
+	e2 := Map("Id", "duplicate", "Provider", "anthropic", "Token", "t2", "Model", "m2")
+	_LLM_Engine["api_entries"] := [e1, e2]
+	_LLM_Engine["api_entry_id"] := "duplicate"
+	AssertEqual("", _LLM_Engine_GetActiveApiEntry(),
+		"an ambiguous durable identity must fail closed instead of choosing the first credential")
+}
+Test("_LLM_Engine_GetActiveApiEntry: rejects duplicate identities "
+	. "(api-entry-identity-cardinality)",
+	_GetActiveEntry_RejectsDuplicateIdentity)
 
 
 _GetActiveEntry_FallsBackToFirstOnUnknownId() {
@@ -844,22 +1295,94 @@ Test("LLM engine: loading spinner suppressed while a prediction is visible", _LL
 
 _LLM_EngineShowLoading_ShownWhenScreenEmpty() {
 	global _LLM_Engine, _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
-	_LLM_Engine := Map("inline_autotype", false)
+	_LLM_Engine := Map(
+		"inline_autotype", false,
+		"request_id", 41,
+		"active_request_signature", "sig-A")
 	_Stub_LlmTooltipVisible := false   ; nothing on screen
 	_Stub_LlmTooltipLoading := false
 	_Stub_LlmTooltipCalls := []
 	_LLM_Engine_ShowLoadingTooltip()
 	shown := false
+	LoadingCall := 0
 	for c in _Stub_LlmTooltipCalls {
-		if (c.HasOwnProp("loading") and c.loading)
+		if (c.HasOwnProp("loading") and c.loading) {
 			shown := true
+			LoadingCall := c
+		}
 	}
 	AssertTrue(shown, "loading spinner must paint when the screen is empty")
+	AssertTrue(IsObject(LoadingCall) && LoadingCall.meta.Has("render_guard")
+			&& HasMethod(LoadingCall.meta["render_guard"], "Call"),
+		"deferred loading must carry the exact request identity to publication")
+	LoadingGuard := LoadingCall.meta["render_guard"]
+	AssertTrue(LoadingGuard.Call(),
+		"loading identity must accept the request which scheduled it")
+	_LLM_Engine["request_id"] := 42
+	_LLM_Engine["active_request_signature"] := "sig-B"
+	AssertFalse(LoadingGuard.Call(),
+		"loading identity must reject after a later keystroke cancels its request")
 	; Leave the toggles in the default state so later suites are unaffected.
 	_Stub_LlmTooltipVisible := false
 	_Stub_LlmTooltipLoading := false
 }
 Test("LLM engine: loading spinner shown when no prediction is visible", _LLM_EngineShowLoading_ShownWhenScreenEmpty)
+
+
+_LLM_EnginePartialRender_RejectsSupersededIdentity() {
+	global _LLM_Engine, _Stub_LlmTooltipCalls
+	global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+	global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+	Saved := {
+		Engine: _LLM_Engine, Calls: _Stub_LlmTooltipCalls,
+		Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading,
+		Text: _Stub_LlmTooltipText, Presented: _Stub_LlmPresentedRecord
+	}
+	try {
+		_LLM_Engine := Map(
+			"request_id", 2,
+			"active_request_signature", "sig-B",
+			"profile_id", "",
+			"user_profiles", [],
+			"inline_autotype", false)
+		_Stub_LlmTooltipCalls := []
+
+		LLM_Engine_OnResults(
+			["stale-A"], "ctx-A", 1, false, 1, "sig-A")
+		AssertEqual(0, _Stub_LlmTooltipCalls.Length,
+			"a superseded intermediate callback must not repaint after its request was cancelled")
+
+		LLM_Engine_OnResults(
+			["live-B"], "ctx-B", 1, false, 2, "sig-B")
+		AssertEqual(1, _Stub_LlmTooltipCalls.Length,
+			"the current intermediate callback must still paint exactly once")
+		Call := _Stub_LlmTooltipCalls[1]
+		AssertFalse(Call.is_final,
+			"the control render must remain an intermediate tooltip update")
+		AssertEqual("live-B", Call.slots[1],
+			"the admitted intermediate render must carry the current request's slot")
+		AssertTrue(Call.meta.Has("render_guard")
+				&& HasMethod(Call.meta["render_guard"], "Call"),
+			"each identified render must carry its immutable publication guard")
+		RenderGuard := Call.meta["render_guard"]
+		AssertTrue(RenderGuard.Call(),
+			"the publication guard must accept the exact current request identity")
+		_LLM_Engine["request_id"] := 3
+		_LLM_Engine["active_request_signature"] := "sig-C"
+		AssertFalse(RenderGuard.Call(),
+			"the same bound guard must reject after a later keystroke supersedes its request")
+	} finally {
+		_LLM_Engine := Saved.Engine
+		_Stub_LlmTooltipCalls := Saved.Calls
+		_Stub_LlmTooltipVisible := Saved.Visible
+		_Stub_LlmTooltipLoading := Saved.Loading
+		_Stub_LlmTooltipText := Saved.Text
+		_Stub_LlmPresentedRecord := Saved.Presented
+	}
+}
+
+Test("LLM engine: superseded partial render cannot repaint (ahk026-partial-render-identity)",
+	_LLM_EnginePartialRender_RejectsSupersededIdentity)
 
 
 ; A5 follow-up — per-call token budget mirrors macOS fetch_batch scaling.

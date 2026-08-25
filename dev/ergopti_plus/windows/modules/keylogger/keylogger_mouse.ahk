@@ -116,17 +116,20 @@ class KLMouse {
 		static scroll_flush_fn  := unset     ; bound ref for SetTimer
 
 		; ── park / idle tracker ───────────────────────────────────────────────
-		static park_last_x      := -1        ; position at last poll
-		static park_last_y      := -1
+		static park_initialized := false     ; a prior poll owns park_last_*
+		static park_last_x      := 0         ; position at last poll
+		static park_last_y      := 0
 		static park_still_since := 0         ; tick when stillness began
-		static park_fired_x     := -9999     ; position of last fired park event
-		static park_fired_y     := -9999
+		static park_fired       := false     ; a prior event owns park_fired_*
+		static park_fired_x     := 0         ; position of last fired park event
+		static park_fired_y     := 0
 		static park_fired_at    := 0         ; tick of last park fire
 		static park_timer_fn    := unset
 
 		; ── distance accumulator ──────────────────────────────────────────────
-		static prev_x           := -1
-		static prev_y           := -1
+		static prev_initialized := false
+		static prev_x           := 0
+		static prev_y           := 0
 
 		; ── hotkey callback references (set by Start, used by Stop) ──────────
 		static hk_ldown         := unset
@@ -436,71 +439,91 @@ KL_Mouse_ParkTick() {
 	if (!A_IsSuspended and Keylogger.initialized) {
 		try filtered := MF_ShouldFilter()
 	}
+	return _KL_Mouse_ProcessParkSample(
+		KLMouse,
+		mx,
+		my,
+		A_TickCount,
+		A_IsSuspended,
+		filtered,
+		Keylogger.initialized,
+		KL_AppendLog.Bind(),
+		KL_BumpMouseDistance.Bind(),
+		Keylogger.session_app
+	)
+}
 
-	if (A_IsSuspended or filtered or !Keylogger.initialized) {
-		KLMouse.prev_x := mx
-		KLMouse.prev_y := my
-		KLMouse.park_last_x := -1
+_KL_Mouse_ProcessParkSample(State, mx, my, Now, Suspended, Filtered, Initialized,
+		AppendFn, DistanceFn, App) {
+	if (Suspended || Filtered || !Initialized) {
+		State.prev_x := mx
+		State.prev_y := my
+		State.prev_initialized := true
+		State.park_initialized := false
 		return
 	}
 
 	; Distance accumulation — feeds the typing flush's mouse_distance_px
-	if (KLMouse.prev_x >= 0) {
-		dx := mx - KLMouse.prev_x
-		dy := my - KLMouse.prev_y
+	if State.prev_initialized {
+		dx := mx - State.prev_x
+		dy := my - State.prev_y
 		d  := Sqrt(dx*dx + dy*dy)
 		if (d > 0)
-			KL_BumpMouseDistance(Round(d))
+			DistanceFn.Call(Round(d))
 	}
-	KLMouse.prev_x := mx
-	KLMouse.prev_y := my
+	State.prev_x := mx
+	State.prev_y := my
+	State.prev_initialized := true
 
 	; Park detection
-	if (KLMouse.park_last_x < 0) {
-		KLMouse.park_last_x      := mx
-		KLMouse.park_last_y      := my
-		KLMouse.park_still_since := A_TickCount
+	if !State.park_initialized {
+		State.park_initialized   := true
+		State.park_last_x        := mx
+		State.park_last_y        := my
+		State.park_still_since   := Now
 		return
 	}
-	dx   := mx - KLMouse.park_last_x
-	dy   := my - KLMouse.park_last_y
+	dx   := mx - State.park_last_x
+	dy   := my - State.park_last_y
 	moved := Sqrt(dx*dx + dy*dy)
 
 	if (moved > KLMouseConst.PARK_JITTER_PX) {
 		; Cursor moved — reset stillness clock
-		KLMouse.park_last_x      := mx
-		KLMouse.park_last_y      := my
-		KLMouse.park_still_since := A_TickCount
+		State.park_last_x      := mx
+		State.park_last_y      := my
+		State.park_still_since := Now
 		return
 	}
 
-	still_ms := (A_TickCount - KLMouse.park_still_since) & 0xFFFFFFFF
+	still_ms := (Now - State.park_still_since) & 0xFFFFFFFF
 	if (still_ms < KLMouseConst.PARK_IDLE_MS)
 		return
 
 	; Check distance from the last park fire to avoid adjacent duplicates
-	fdx := mx - KLMouse.park_fired_x
-	fdy := my - KLMouse.park_fired_y
-	fire_dist := Sqrt(fdx*fdx + fdy*fdy)
-	if (fire_dist < KLMouseConst.PARK_MIN_MOVE_PX
-			and (A_TickCount - (KLMouse.park_fired_at) & 0xFFFFFFFF) < 30000)
-		return
+	if State.park_fired {
+		fdx := mx - State.park_fired_x
+		fdy := my - State.park_fired_y
+		fire_dist := Sqrt(fdx*fdx + fdy*fdy)
+		if (fire_dist < KLMouseConst.PARK_MIN_MOVE_PX
+				&& ((Now - State.park_fired_at) & 0xFFFFFFFF) < 30000)
+			return
+	}
 
 	; Emit park event
-	app := Keylogger.session_app
-	KL_AppendLog(Map(
+	AppendFn.Call(Map(
 		"type",     "mouse_idle_park",
-		"app",      app,
+		"app",      App,
 		"x",        mx,
 		"y",        my,
 		"still_ms", still_ms
 	))
-	KLMouse.park_fired_x  := mx
-	KLMouse.park_fired_y  := my
-	KLMouse.park_fired_at := A_TickCount
+	State.park_fired    := true
+	State.park_fired_x  := mx
+	State.park_fired_y  := my
+	State.park_fired_at := Now
 
 	; Reset so we don't keep firing every PARK_CHECK_MS while still idle
-	KLMouse.park_still_since := A_TickCount
+	State.park_still_since := Now
 }
 
 

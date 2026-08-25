@@ -766,6 +766,7 @@
 	"menu.global.quit": "⏹ Çıkış",
 	"menu.global.reload": "🔄 Yeniden yükle",
 	"menu.global.reset_defaults": "↺ Varsayılanlara sıfırla",
+	"menu.global.starting": "Başlatılıyor…",
 	"menu.global.setup_wizard": "Kurulum sihirbazı…",
 	"menu.global.suspend": "⏸︎ Askıya al",
 	"menu.global.title": "Genel eylemler",

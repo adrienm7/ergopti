@@ -56,39 +56,30 @@ extract_version() {
 # ---------------------------------------------------------------------------
 
 probe_version() {
-    local probe
-    for probe in "${@}"; do
-        local bin=${probe%% *}
-        if ! command -v "$bin" >/dev/null 2>&1; then
-            continue
-        fi
-        local output=""
-        if output=$(eval "$probe" 2>/dev/null) && [ -n "$output" ]; then
-            local version
-            version=$(extract_version "$output")
-            if [ -n "$version" ]; then
-                printf '%s' "$version"
-                return 0
-            fi
-        fi
-    done
-    return 1
+    local bin=$1
+    shift
+    command -v "$bin" >/dev/null 2>&1 || return 1
+    local output=""
+    output=$("$@" 2>/dev/null) || return 1
+    [ -n "$output" ] || return 1
+    local version
+    version=$(extract_version "$output")
+    [ -n "$version" ] || return 1
+    printf '%s' "$version"
 }
 
 probe_libxkbcommon() {
-    probe_version \
-        "pkg-config --modversion xkbcommon" \
-        "pacman -Q libxkbcommon" \
-        "dpkg-query -W -f=\${Version} libxkbcommon0" \
-        "rpm -q --queryformat '%{VERSION}' libxkbcommon"
+    probe_version pkg-config pkg-config --modversion xkbcommon \
+        || probe_version pacman pacman -Q libxkbcommon \
+        || probe_version dpkg-query dpkg-query -W '-f=${Version}' libxkbcommon0 \
+        || probe_version rpm rpm -q --queryformat '%{VERSION}' libxkbcommon
 }
 
 probe_xkeyboardconfig() {
-    probe_version \
-        "pkg-config --modversion xkeyboard-config" \
-        "pacman -Q xkeyboard-config" \
-        "dpkg-query -W -f=\${Version} xkeyboard-config" \
-        "rpm -q --queryformat '%{VERSION}' xkeyboard-config"
+    probe_version pkg-config pkg-config --modversion xkeyboard-config \
+        || probe_version pacman pacman -Q xkeyboard-config \
+        || probe_version dpkg-query dpkg-query -W '-f=${Version}' xkeyboard-config \
+        || probe_version rpm rpm -q --queryformat '%{VERSION}' xkeyboard-config
 }
 
 # ---------------------------------------------------------------------------

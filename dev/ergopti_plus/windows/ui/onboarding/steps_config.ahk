@@ -261,11 +261,6 @@ _Step1_Next(g, lv, SortedLocales, DefaultIndex, *) {
 	locale := SortedLocales[selectedIndex]
 	global _ob_locale := locale.Code
 
-	; Switch locale in memory only — avoid Reload during the wizard
-	global _I18nLocale, _I18nCacheLoaded
-	_I18nLocale := locale.Code
-	_I18nCacheLoaded := false
-
 	_Onboarding_Navigate(_Onboarding_StepConfigDir)
 }
 

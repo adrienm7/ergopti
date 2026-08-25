@@ -103,17 +103,15 @@ _LLM_Menu_ApplyToggleCommitted(Candidate) {
 	global LLM_HEALTH_PROBE_INTERVAL_MS
 	LoggerInfo("LLM", "Toggle clicked — enabled: "
 		. (Candidate["enabled"] ? "true" : "false") . ".")
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("toggle_committed")
 	if Candidate["enabled"] {
 		; Model readiness is checked by the deferred bootstrap after this global
 		; barrier releases, so it cannot start a nested persistence transaction.
 		SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
-		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(true), -1)
+		LLM_Menu_ScheduleBackendLifecycle(true)
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
-		try LLM_Deps_Cancel()
-		try OllamaWV_Close()
-		try LLM_OllamaCancelWarmupRetry()
+		LLM_Menu_BackendLifecycleInvalidate(true)
 		LLM_Bridge_Stop()
 	}
 	return true
@@ -197,53 +195,12 @@ LLM_Menu_OnInstantToggle(*) {
  */
 LLM_Menu_ToggleBool(key) {
 	global _LLM_Menu
-	if (key == "streaming" && !LLM_BackendCapabilities(_LLM_Menu["backend"])["streaming"])
+	if (key == "streaming"
+			&& !LLM_EffectiveStreaming(_LLM_Menu["backend"], true))
 		return false
 	return LLM_Menu_CommitMutation("the LLM '" . key . "' setting",
 		(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, key),
 		_LLM_Menu_ApplyStandardCommitted)
-}
-
-LLM_Menu_BootstrapCurrentBackend(show_ui := true) {
-	global _LLM_Menu
-	if (_LLM_Menu["backend"] == "api") {
-		try LLM_Deps_Cancel()
-		try LLM_OllamaCancelWarmupRetry()
-		if A_IsSuspended {
-			_LLM_Menu["bootstrap_pending"] := true
-			return false
-		}
-		_LLM_Menu["bootstrap_pending"] := false
-		return LLM_Menu_TryStartBridge()
-	}
-	return LLM_Menu_BootstrapOllama(show_ui)
-}
-
-/**
- * Triggers the Ollama deps checker.
- * @param {boolean} show_ui - True when the user explicitly clicked the toggle.
- */
-LLM_Menu_BootstrapOllama(show_ui := true) {
-	global _LLM_Menu
-	if A_IsSuspended {
-		_LLM_Menu["bootstrap_pending"] := true
-		LoggerDebug("LLM", "BootstrapOllama deferred while suspended.")
-		return
-	}
-	_LLM_Menu["bootstrap_pending"] := false
-	LoggerInfo("LLM", "BootstrapOllama fired — deps state: " LLM_Deps_GetState() " show_ui=" (show_ui ? "true" : "false") ".")
-	if LLM_Deps_IsReady() {
-		LoggerInfo("LLM", "Ollama already ready — starting bridge directly.")
-		LLM_Menu_OnDepsReady()
-		return
-	}
-	LoggerInfo("LLM", "Ollama not ready — launching CheckAndInstall…")
-	LLM_Deps_CheckAndInstall(
-		_LLM_Menu["model"],
-		(*) => LLM_Menu_OnDepsReady(),
-		(msg) => LLM_Menu_OnDepsFailed(msg),
-		show_ui
-	)
 }
 
 
@@ -263,16 +220,21 @@ LLM_Menu_SetBackend(id) {
 }
 
 _LLM_Menu_ApplyBackendCommitted(Candidate) {
-	try LLM_AuxInvalidate("backend")
+	LLM_Menu_BackendLifecycleInvalidate(true)
 	try LLM_Engine_StopGeneration()
-	try LLM_Deps_Cancel()
-	try LLM_OllamaCancelWarmupRetry()
-	if !LLM_BackendCapabilities(Candidate["backend"])["streaming"]
-		Candidate["streaming"] := false
+	Candidate["streaming"] := LLM_EffectiveStreaming(
+		Candidate["backend"], Candidate["streaming"])
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("backend_committed")
 	if Candidate["enabled"]
-		SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+		LLM_Menu_ScheduleBackendLifecycle(false)
+	return true
+}
+
+_LLM_Menu_ApplyApiEntriesCommitted(Candidate) {
+	_LLM_Menu_ApplyStandardCommitted(Candidate)
+	if Candidate["enabled"] && Candidate["backend"] == "api"
+		LLM_Menu_ScheduleBackendLifecycle(false)
 	return true
 }
 
@@ -290,16 +252,13 @@ _LLM_Menu_SetModelCandidate(Candidate, Tag) {
 }
 
 _LLM_Menu_ApplyModelCommitted(Candidate) {
+	return LLM_Menu_ApplyModelLifecycleCommitted(Candidate,
+		_LLM_Menu_ApplyModelRuntimeCommitted)
+}
+
+_LLM_Menu_ApplyModelRuntimeCommitted(Candidate) {
 	LLM_Engine_Init(LLM_Menu_BuildOpts())
-	; Pre-load the new model into Ollama's GPU cache asynchronously so the
-	; first real prediction skips the cold-start penalty. No-op for the
-	; remote API backend — there's no local server to warm.
-	if (Candidate["backend"] == "ollama") {
-		global _LLM_Ollama_IsReady
-		_LLM_Ollama_IsReady := false
-		try LLM_OllamaScheduleWarmupRetry(Candidate["model"])
-	}
-	LLM_Menu_Build()
+	LLM_Menu_RequestBuild("model_committed")
 	return true
 }
 
@@ -368,24 +327,13 @@ _LLM_Menu_FireHealthProbe(Force := false) {
 		LoggerDebug("LLM", "Health probe resumed — physical input detected again.")
 	}
 	_LLM_Menu["last_health_probe_tick"] := now
+	Owner := _LLM_Menu_BeginOllamaAux("menu_health")
 	try {
-		LLM_OllamaIsRunning_Async((reachable) => _LLM_Menu_OnHealthProbeDone(reachable))
+		LLM_OllamaIsRunning_Async(
+			(reachable) => _LLM_Menu_OnHealthProbeDone(reachable, Owner), Owner)
+	} catch {
+		LLM_AuxFinish(Owner)
 	}
-}
-
-_LLM_Menu_OnHealthProbeDone(reachable) {
-	global _LLM_Menu
-	prev := _LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""
-	new_status := reachable ? "ok" : "ko"
-	_LLM_Menu["last_health_status"] := new_status
-	; Only repaint when the status actually flipped — avoids an infinite
-	; rebuild loop and keeps the menu stable when the user is not staring
-	; at it. Also skip the rebuild while suspended: a probe fired just before
-	; Pause could still land here and churn the tray menu, violating the
-	; "pause silences everything" invariant. The stashed status above still
-	; updates so the next unpaused build paints the correct dot.
-	if (prev != new_status and !A_IsSuspended)
-		LLM_Menu_Build()
 }
 
 /**
@@ -414,18 +362,11 @@ _LLM_Menu_FireInstalledTagsProbe() {
 	now := A_TickCount
 	if (_LLM_InstalledTagsCacheAt > 0 and (now - _LLM_InstalledTagsCacheAt) < LLM_INSTALLED_CACHE_TTL_MS)
 		return
-	try LLM_OllamaListModels_Async((tags) => _LLM_Menu_OnInstalledTagsProbeDone(tags))
-}
-
-_LLM_Menu_OnInstalledTagsProbeDone(tags) {
-	prev := _LLM_GetInstalledTagsCached()
-	LLM_SetInstalledTagsCache(tags)
-	; Repaint only when the installed SET actually changed (mirrors the health dot's
-	; flip-guard) and never while suspended — so a probe landing mid-build doesn't
-	; churn the tray, and the green dots appear a moment after the daemon answers.
-	; The next rebuild's probe sees a fresh cache and skips, so there is no loop.
-	if (_LLM_InstalledTagsListChanged(prev, IsSet(tags) ? tags : []) and !A_IsSuspended)
-		LLM_Menu_Build()
+	Owner := _LLM_Menu_BeginOllamaAux("menu_tags")
+	try LLM_OllamaListModels_Async(
+		(tags) => _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner), Owner)
+	catch
+		LLM_AuxFinish(Owner)
 }
 
 LLM_Menu_SetProfile(id) {
@@ -435,6 +376,11 @@ LLM_Menu_SetProfile(id) {
 }
 
 _LLM_Menu_SetProfileCandidate(Candidate, Id) {
+	if !(Candidate is Map) || !(Id is String) || Id == ""
+		return false
+	CandidateIds := _LLM_Menu_ProfileCandidateIds(Candidate)
+	if !(CandidateIds is Map) || !CandidateIds.Has(Id)
+		return false
 	; If the user picks a profile manually while auto-detection is on, they
 	; clearly want a non-default choice — turn auto off so the next model
 	; switch doesn't silently overwrite their pick. The recommended profile
@@ -478,6 +424,7 @@ LLM_Menu_SetIndent(lvl) {
 LLM_Menu_OpenAppPicker() {
 	global _LLM_Menu
 	AppPicker_Show(Map(
+		"owner",    "llm:disabled_apps",
 		"title",    t("menu.llm.exclude_from_ai"),
 		"prompt",   t("dialog.llm.exclude_prompt"),
 		"ok_label", t("dialog.llm.exclude_ok"),
@@ -486,10 +433,10 @@ LLM_Menu_OpenAppPicker() {
 	))
 }
 
-LLM_Menu_OnAppPickerSave(selected) {
+LLM_Menu_OnAppPickerSave(selected, receipt) {
 	return LLM_Menu_CommitMutation("the LLM disabled-applications setting",
-		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"disabled_apps", LLM_Menu_DeepClone(selected)),
+		(Candidate) => _LLM_Menu_ApplyAppPickerSelection(Candidate,
+			selected, receipt),
 		_LLM_Menu_ApplyStandardCommitted)
 }
 
@@ -525,10 +472,15 @@ LLM_Menu_TryStartBridge() {
 		return false
 	if (_LLM_Menu["backend"] == "ollama" && !LLM_Deps_IsReady())
 		return
+	if (_LLM_Menu["backend"] == "api"
+			&& !_LLM_Menu_SelectedApiEntryIsUsable())
+		return false
 	_LLM_Menu["bridge_pending"] := false
-	LLM_Menu_StartBridge()
+	if !LLM_Menu_StartBridge()
+		return false
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook && IsSet(LLM_Bridge_OnPrefixWatcherReady))
 		LLM_Bridge_OnPrefixWatcherReady()
+	return true
 }
 
 LLM_Menu_StartBridge() {
@@ -598,102 +550,6 @@ LLM_Menu_EnsureModelReady() {
 	return Committed
 }
 
-/**
- * Converts the current tray state into a Map suitable for LLM_Engine_Init().
- * @returns {Map} Options map.
- */
-LLM_Menu_BuildOpts() {
-	global _LLM_Menu
-	return Map(
-		"model",                   _LLM_Menu["model"],
-		"profile_id",              _LLM_Menu["profile_id"],
-		"user_profiles",           _LLM_Menu["user_profiles"],
-		"n_predictions",           _LLM_Menu["n_predictions"],
-		"min_words",               _LLM_Menu["min_words"],
-		"max_words",               _LLM_Menu["max_words"],
-		"language",                _LLM_Menu["language"],
-		"debounce_ms",             _LLM_Menu["debounce_ms"],
-		"ctx_chars",               _LLM_Menu["ctx_chars"],
-		"temperature",             _LLM_Menu["temperature"],
-		"instant_on_word_end",     _LLM_Menu["instant_on_word_end"],
-		"after_hotstring",         _LLM_Menu["after_hotstring"],
-		"reset_on_nav",            _LLM_Menu["reset_on_nav"],
-		"disable_url_bars",        _LLM_Menu["disable_url_bars"],
-		"disable_password_fields", _LLM_Menu["disable_password_fields"],
-		"disabled_apps",           _LLM_Menu["disabled_apps"],
-		"show_info_bar",           _LLM_Menu["show_info_bar"],
-		"streaming",               _LLM_Menu["streaming"],
-		"show_all_at_once",        _LLM_Menu["show_all_at_once"],
-		"pred_indent",             _LLM_Menu["pred_indent"],
-		"auto_raise_temp",         _LLM_Menu["auto_raise_temp"],
-		"nav_modifiers",           _LLM_Menu["nav_modifiers"],
-		"val_modifiers",           _LLM_Menu["val_modifiers"],
-		"backend",                 _LLM_Menu["backend"],
-		"ollama_port",             _LLM_Menu["ollama_port"],
-		"api_entries",             _LLM_Menu["api_entries"],
-		"api_entry_id",            _LLM_Menu["api_entry_id"],
-		"inline_autotype",         _LLM_Menu["inline_autotype"],
-		"app_profile_overrides",   _LLM_Menu["app_profile_overrides"]
-	)
-}
-
-
-
-
-
-; =============================================
-; =============================================
-; ======= 5/ Ollama Lifecycle Callbacks =======
-; =============================================
-; =============================================
-
-/**
- * Called by the deps checker when Ollama is confirmed ready.
- */
-LLM_Menu_OnDepsReady() {
-	global _LLM_Menu
-	if (_LLM_Menu["backend"] != "ollama")
-		return
-	if A_IsSuspended {
-		_LLM_Menu["bootstrap_pending"] := true
-		LoggerDebug("LLM", "Deps-ready callback deferred while suspended.")
-		return
-	}
-	LoggerInfo("LLM", "Ollama ready — LLM enabled: {1}.",
-		_LLM_Menu["enabled"] ? "true" : "false")
-	LLM_Menu_Build()
-	if _LLM_Menu["enabled"] {
-		LLM_Menu_TryStartBridge()
-		; Prime the current model so the first user keystroke does not
-		; pay the cold-start penalty. Async — no blocking on Build.
-		if (_LLM_Menu["backend"] == "ollama" and _LLM_Menu["model"] != "") {
-			global _LLM_Ollama_IsReady
-			_LLM_Ollama_IsReady := false
-			try LLM_OllamaScheduleWarmupRetry(_LLM_Menu["model"])
-		} else {
-			global _LLM_Ollama_IsReady
-			_LLM_Ollama_IsReady := true
-		}
-	}
-}
-
-/**
- * Called by the deps checker on permanent failure.
- * @param {string} msg - Failure reason.
- */
-LLM_Menu_OnDepsFailed(msg) {
-	global _LLM_Menu
-	if (_LLM_Menu["backend"] != "ollama")
-		return
-	if A_IsSuspended {
-		_LLM_Menu["bootstrap_pending"] := true
-		LoggerDebug("LLM", "Deps-failed callback deferred while suspended.")
-		return
-	}
-	_LLM_Menu["enabled"] := false
-	LLM_Menu_Build()
-}
-
 ; Replays the suspended lifecycle work from the resume watchdog, after native
 ; Suspend has released hotkeys. The one-shot avoids performing dependency work
 ; inside the watchdog callback itself.
@@ -710,10 +566,10 @@ LLM_Menu_OnResume() {
 			try LoggerError("LLM",
 				"Trigger shortcut recovery resume service failed: {1}.", Err.Message)
 	}
-	LLM_Menu_Build()
+	LLM_Menu_ServiceBuilds()
 	if _LLM_Menu["bootstrap_pending"] {
 		_LLM_Menu["bootstrap_pending"] := false
 		if _LLM_Menu["enabled"]
-			SetTimer(() => LLM_Menu_BootstrapCurrentBackend(false), -1)
+			LLM_Menu_ScheduleBackendLifecycle(false)
 	}
 }
