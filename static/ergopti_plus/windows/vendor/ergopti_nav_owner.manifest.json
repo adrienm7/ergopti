@@ -1,8 +1,8 @@
 {
     "schema_version":  1,
     "artifact_path":  "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll",
-    "source_fingerprint_sha256":  "3EC9BD81F0FF2B8583B28E7EC8D2B42CD386D24401E109F2E1FD5BD6C625D14C",
-    "dll_sha256":  "D074F59296E5AFDE90CD956E33EA4F565E26A764AF928CC956574135375856A5",
+    "source_fingerprint_sha256":  "352A1912963FC0850F76DCCB77E357E4BD41E39DD48C18732F69174A0B4BC148",
+    "dll_sha256":  "03E69E487CF1BFEAD45F236105551C4A65941295F9B61D4826C067EEFEC1AC32",
     "fingerprint_files":  [
                               "static/ergopti_plus/windows/native/nav_event_owner/CMakeLists.txt",
                               "static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c",

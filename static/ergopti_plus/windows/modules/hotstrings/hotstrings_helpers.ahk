@@ -112,7 +112,8 @@ CreateDeadkeyHotstring(MapKey, MappedValue, Delay) {
 	Combination := "ê" . MapKey
 	CreateRawCallbackHotstring(
 		"*?C", Combination,
-		(*) => ShouldActivateDeadkey(Combination, MappedValue, Delay),
+		(EndChar := "", PrepareOnly := false) =>
+			ShouldActivateDeadkey(Combination, MappedValue, Delay, PrepareOnly),
 		Map("TimeActivationSeconds", Delay, "Category", "distancesreduction", "Section", "dead_key_e_circumflex")
 	)
 }
@@ -121,7 +122,7 @@ CreateDeadkeyHotstring(MapKey, MappedValue, Delay) {
 ; the deadkey fires it has back-spaced 2 chars (the "ê" + the key) and sent
 ; MappedValue, so the net buffer change is { Bs: 2, Ins: MappedValue }; when it
 ; declines or the atomic send fails it returns Ok:false with no buffer effect.
-ShouldActivateDeadkey(Combination, MappedValue, Delay) {
+ShouldActivateDeadkey(Combination, MappedValue, Delay, PrepareOnly := false) {
 	if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Delay) {
 		; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
 		; This condition corrects problems such as writing "même" that give "mê⁂e"
@@ -133,27 +134,33 @@ ShouldActivateDeadkey(Combination, MappedValue, Delay) {
 		; a configurable key like ] or \ would break the pattern if embedded directly.
 		if (Ch3 != "" and !RegExMatch(Ch3, "^[A-Za-z]$") and Ch3 != MK) { ; Everything except a letter or the configured magic key
 			; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
+			if PrepareOnly
+				return { Prepared: true, Ok: true, Bs: 2, Ins: MappedValue }
 			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false)
 				return { Ok: true, Bs: 2, Ins: MappedValue }
 			return { Ok: false, Bs: 0, Ins: "" }
 		} else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
+			if PrepareOnly
+				return { Prepared: true, Ok: true, Bs: 2, Ins: MappedValue }
 			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false)
 				return { Ok: true, Bs: 2, Ins: MappedValue }
 			return { Ok: false, Bs: 0, Ins: "" }
 		}
 	}
-	return { Ok: false, Bs: 0, Ins: "" }
+	return { Prepared: PrepareOnly, Ok: false, Bs: 0, Ins: "" }
 }
 
 ; Ellipsis raw-callback: "..." → "…", but only after a letter (otherwise it would
 ; break code like the JS spread « [...a, ...b] »). Returns the { Ok, Bs, Ins }
 ; transaction for HSE resync (back-spaces the 3 dots, inserts "…"). Ok stays false
 ; unless the single output burst completed successfully.
-_EllipsisRawCallback(*) {
+_EllipsisRawCallback(EndChar := "", PrepareOnly := false) {
 	if (GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$") {
+		if PrepareOnly
+			return { Prepared: true, Ok: true, Bs: 3, Ins: "…" }
 		if SendNewResult("{BackSpace 3}…", False)
 			return { Ok: true, Bs: 3, Ins: "…" }
 		return { Ok: false, Bs: 0, Ins: "" }
 	}
-	return { Ok: false, Bs: 0, Ins: "" }
+	return { Prepared: PrepareOnly, Ok: false, Bs: 0, Ins: "" }
 }

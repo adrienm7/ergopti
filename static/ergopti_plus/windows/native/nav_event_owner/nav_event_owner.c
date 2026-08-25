@@ -35,6 +35,7 @@
 #define NAV_LOCK_SPIN_COUNT 4000u
 #define NAV_HELD_KEY_CAPACITY 32u
 #define NAV_INJECTED_MODIFIER_CAPACITY 16u
+#define NAV_TERMINAL_REPLAY_BATCH 128u
 
 #define NAV_RECEIPT_EMPTY 0u
 #define NAV_RECEIPT_QUEUED 1u
@@ -77,6 +78,21 @@ typedef struct NavInjectedModifierHold {
 	uint64_t extra_info;
 } NavInjectedModifierHold;
 
+/** Retains one exact physical keyboard edge until terminal output releases it. */
+typedef struct NavTerminalKeyEdge {
+	uint16_t vk;
+	uint16_t sc;
+	uint8_t key_up;
+	uint8_t extended;
+	uint8_t reserved[2];
+} NavTerminalKeyEdge;
+
+/** Injectable SendInput boundary shared by production and hook-free tests. */
+typedef uint32_t (*NavTerminalSendFn)(
+	const INPUT *events,
+	uint32_t event_count,
+	void *context);
+
 /** Owns every mutable field shared by the API and hook thread. */
 typedef struct NavState {
 	CRITICAL_SECTION lock;
@@ -117,6 +133,13 @@ typedef struct NavState {
 	NavHeldKey held_keys[NAV_HELD_KEY_CAPACITY];
 	NavInjectedModifierHold injected_modifiers[
 		NAV_INJECTED_MODIFIER_CAPACITY];
+	uint64_t terminal_token;
+	uint32_t terminal_phase;
+	uint32_t terminal_queued;
+	uint32_t terminal_replayed;
+	uint32_t terminal_last_os_error;
+	uint32_t terminal_release_kind;
+	NavTerminalKeyEdge terminal_events[ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY];
 } NavState;
 
 static INIT_ONCE g_nav_init_once = INIT_ONCE_STATIC_INIT;
@@ -232,6 +255,7 @@ static void NavResetSemanticStateLocked(NavState *state)
 	state->last_os_error = 0;
 	state->thread_start_status = ERGOPTI_NAV_STATUS_INVALID_STATE;
 	state->thread_exit_status = ERGOPTI_NAV_STATUS_INVALID_STATE;
+	state->running = 0;
 	state->suspended = 0;
 	state->transition = 0;
 	state->physical_modifiers_lr = 0;
@@ -250,6 +274,13 @@ static void NavResetSemanticStateLocked(NavState *state)
 	state->active_swap_ticket = 0;
 	state->next_swap_ticket = 0;
 	state->next_receipt_sequence = 0;
+	state->terminal_token = 0;
+	state->terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
+	state->terminal_queued = 0;
+	state->terminal_replayed = 0;
+	state->terminal_last_os_error = 0;
+	state->terminal_release_kind = ERGOPTI_NAV_TERMINAL_RELEASE_NONE;
+	memset(state->terminal_events, 0, sizeof(state->terminal_events));
 }
 
 
@@ -606,6 +637,53 @@ static bool NavHasPendingReceiptLocked(const NavState *state)
 
 
 
+/** Returns true while terminal capture owns suppressed physical input. */
+static bool NavHasTerminalDebtLocked(const NavState *state)
+{
+	return state->terminal_phase != ERGOPTI_NAV_TERMINAL_IDLE
+		|| state->terminal_queued != 0;
+}
+
+
+
+/**
+ * Captures one physical keyboard edge before navigation sees it.
+ *
+ * AHK SendEvent input and native replay input are injected and therefore pass
+ * this boundary. Every physical edge remains suppressed through release retry.
+ */
+static bool NavCaptureTerminalEventLocked(
+	NavState *state,
+	WPARAM message,
+	const KBDLLHOOKSTRUCT *event)
+{
+	NavTerminalKeyEdge *edge;
+	bool key_up;
+	if (!NavHasTerminalDebtLocked(state)
+			|| event == NULL
+			|| (event->flags & LLKHF_INJECTED) != 0)
+		return false;
+	if (message != WM_KEYDOWN && message != WM_SYSKEYDOWN
+			&& message != WM_KEYUP && message != WM_SYSKEYUP)
+		return false;
+	if (state->terminal_queued >= ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY) {
+		state->terminal_phase = ERGOPTI_NAV_TERMINAL_FAULTED;
+		state->terminal_last_os_error = ERROR_NOT_ENOUGH_MEMORY;
+		state->last_os_error = ERROR_NOT_ENOUGH_MEMORY;
+		return true;
+	}
+	key_up = message == WM_KEYUP || message == WM_SYSKEYUP;
+	edge = &state->terminal_events[state->terminal_queued++];
+	memset(edge, 0, sizeof(*edge));
+	edge->vk = (uint16_t)event->vkCode;
+	edge->sc = (uint16_t)(event->scanCode & 0xFFu);
+	edge->key_up = key_up ? 1 : 0;
+	edge->extended = (event->flags & LLKHF_EXTENDED) != 0 ? 1 : 0;
+	return true;
+}
+
+
+
 /**
  * Tests whether Stop may unhook without leaking a consumed edge or naked menu.
  *
@@ -617,7 +695,8 @@ static bool NavDrainCompleteLocked(const NavState *state)
 	return !NavHasSuppressHoldLocked(state)
 		&& state->menu_guard_passed_lr == 0
 		&& state->menu_guard_suppressed_lr == 0
-		&& !NavHasPendingReceiptLocked(state);
+		&& !NavHasPendingReceiptLocked(state)
+		&& !NavHasTerminalDebtLocked(state);
 }
 
 
@@ -1230,7 +1309,12 @@ static bool NavBuildHookEventLocked(
 	if ((native_event->flags & LLKHF_EXTENDED) != 0)
 		out_event->sc = (uint16_t)(out_event->sc | 0x100u);
 	out_event->kind = key_up ? ERGOPTI_NAV_EVENT_UP : ERGOPTI_NAV_EVENT_DOWN;
-	if ((native_event->flags & LLKHF_LOWER_IL_INJECTED) != 0) {
+	if ((uint64_t)native_event->dwExtraInfo
+			== ERGOPTI_NAV_TERMINAL_REPLAY_MARKER) {
+		/* Replayed physical input keeps physical routing semantics while the
+		 * private marker prevents the terminal capture from recapturing it. */
+		out_event->injected = ERGOPTI_NAV_INJECTION_PHYSICAL;
+	} else if ((native_event->flags & LLKHF_LOWER_IL_INJECTED) != 0) {
 		out_event->injected = ERGOPTI_NAV_INJECTION_LOWER_INTEGRITY;
 	} else if ((native_event->flags & LLKHF_INJECTED) != 0) {
 		out_event->injected = ERGOPTI_NAV_INJECTION_STANDARD;
@@ -1601,6 +1685,19 @@ static LRESULT CALLBACK NavLowLevelKeyboardProc(
 
 	EnterCriticalSection(&g_nav_state.lock);
 	hook = g_nav_state.hook;
+	if (NavCaptureTerminalEventLocked(
+			&g_nav_state,
+			message,
+			(const KBDLLHOOKSTRUCT *)data_pointer)) {
+		if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_FAULTED) {
+			wake_window = g_nav_state.wake_window;
+			wake_message = g_nav_state.wake_message;
+		}
+		LeaveCriticalSection(&g_nav_state.lock);
+		if (wake_window != NULL && wake_message != 0)
+			PostMessageW(wake_window, wake_message, 0, 0);
+		return 1;
+	}
 	if (!NavProcessHookEventLocked(
 			message,
 			(const KBDLLHOOKSTRUCT *)data_pointer,
@@ -2168,6 +2265,166 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitPlan(
 
 
 
+/** Sends one replay batch through the Win32 serialization boundary. */
+static uint32_t NavSendTerminalInputsSystem(
+	const INPUT *events,
+	uint32_t event_count,
+	void *context)
+{
+	(void)context;
+	return (uint32_t)SendInput(
+		(UINT)event_count,
+		(INPUT *)(uintptr_t)events,
+		(int)sizeof(INPUT));
+}
+
+
+
+/** Builds one replay batch from the oldest captured physical edges. */
+static uint32_t NavBuildTerminalReplayBatchLocked(
+	const NavState *state,
+	INPUT events[NAV_TERMINAL_REPLAY_BATCH])
+{
+	uint32_t index;
+	uint32_t count = state->terminal_queued < NAV_TERMINAL_REPLAY_BATCH
+		? state->terminal_queued : NAV_TERMINAL_REPLAY_BATCH;
+	memset(events, 0, sizeof(INPUT) * NAV_TERMINAL_REPLAY_BATCH);
+	for (index = 0; index < count; ++index) {
+		const NavTerminalKeyEdge *edge = &state->terminal_events[index];
+		events[index].type = INPUT_KEYBOARD;
+		if (edge->sc != 0) {
+			events[index].ki.wVk = 0;
+			events[index].ki.wScan = edge->sc;
+			events[index].ki.dwFlags = KEYEVENTF_SCANCODE;
+		} else {
+			/* LL hooks may report a virtual key without a scan code. Preserve
+			 * that edge through the VK SendInput form instead of emitting an
+			 * invalid scan-code-zero event. */
+			events[index].ki.wVk = edge->vk;
+			events[index].ki.wScan = 0;
+			events[index].ki.dwFlags = 0;
+		}
+		if (edge->extended)
+			events[index].ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
+		if (edge->key_up)
+			events[index].ki.dwFlags |= KEYEVENTF_KEYUP;
+		events[index].ki.dwExtraInfo =
+			(ULONG_PTR)ERGOPTI_NAV_TERMINAL_REPLAY_MARKER;
+	}
+	return count;
+}
+
+
+
+/** Removes one successfully replayed FIFO prefix under the state lock. */
+static void NavConsumeTerminalReplayLocked(NavState *state, uint32_t count)
+{
+	if (count >= state->terminal_queued) {
+		state->terminal_queued = 0;
+		memset(state->terminal_events, 0, sizeof(state->terminal_events));
+		return;
+	}
+	memmove(
+		state->terminal_events,
+		&state->terminal_events[count],
+		(state->terminal_queued - count) * sizeof(state->terminal_events[0]));
+	state->terminal_queued -= count;
+	memset(
+		&state->terminal_events[state->terminal_queued],
+		0,
+		count * sizeof(state->terminal_events[0]));
+}
+
+
+
+/** Replays one capture through an injectable SendInput-compatible sink. */
+static int32_t NavReleaseTerminalCapture(
+	uint64_t token,
+	uint32_t release_kind,
+	NavTerminalSendFn send_fn,
+	void *context)
+{
+	INPUT events[NAV_TERMINAL_REPLAY_BATCH];
+	uint32_t count;
+	uint32_t sent;
+	DWORD os_error;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (token == 0 || send_fn == NULL
+			|| (release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT
+				&& release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_ABORT))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+
+	for (;;) {
+		EnterCriticalSection(&g_nav_state.lock);
+		if (g_nav_state.terminal_token != token) {
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+		}
+		if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_FAULTED) {
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OS_ERROR;
+		}
+		if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_IDLE) {
+			int32_t idle_status = g_nav_state.terminal_release_kind == release_kind
+				? ERGOPTI_NAV_STATUS_OK : ERGOPTI_NAV_STATUS_INVALID_STATE;
+			LeaveCriticalSection(&g_nav_state.lock);
+			return idle_status;
+		}
+		if (g_nav_state.terminal_release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_NONE
+				&& g_nav_state.terminal_release_kind != release_kind) {
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_INVALID_STATE;
+		}
+		g_nav_state.terminal_release_kind = release_kind;
+		g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_REPLAYING;
+		count = NavBuildTerminalReplayBatchLocked(&g_nav_state, events);
+		if (count == 0) {
+			g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
+			g_nav_state.terminal_last_os_error = ERROR_SUCCESS;
+			g_nav_state.last_os_error = ERROR_SUCCESS;
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OK;
+		}
+		LeaveCriticalSection(&g_nav_state.lock);
+
+		SetLastError(ERROR_SUCCESS);
+		sent = send_fn(events, count, context);
+		os_error = GetLastError();
+		if (sent > count)
+			sent = 0;
+
+		EnterCriticalSection(&g_nav_state.lock);
+		if (g_nav_state.terminal_token != token) {
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+		}
+		if (sent != 0) {
+			NavConsumeTerminalReplayLocked(&g_nav_state, sent);
+			g_nav_state.terminal_replayed += sent;
+		}
+		if (sent != count) {
+			if (os_error == ERROR_SUCCESS)
+				os_error = ERROR_WRITE_FAULT;
+			g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_RELEASE_PENDING;
+			g_nav_state.terminal_last_os_error = os_error;
+			g_nav_state.last_os_error = os_error;
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OS_ERROR;
+		}
+		g_nav_state.terminal_last_os_error = ERROR_SUCCESS;
+		if (g_nav_state.terminal_queued == 0) {
+			g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
+			g_nav_state.last_os_error = ERROR_SUCCESS;
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OK;
+		}
+		LeaveCriticalSection(&g_nav_state.lock);
+	}
+}
+
+
+
 /** Implements ErgoptiNav_SetSuspended. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SetSuspended(
 	uint8_t suspended)
@@ -2177,7 +2434,91 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SetSuspended(
 	if (suspended > 1)
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	EnterCriticalSection(&g_nav_state.lock);
+	if (suspended && NavHasTerminalDebtLocked(&g_nav_state)) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_BUSY;
+	}
 	g_nav_state.suspended = suspended;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements ErgoptiNav_BeginTerminalCapture. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
+	uint64_t token)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (token == 0)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (!g_nav_state.running || g_nav_state.suspended
+			|| g_nav_state.draining || g_nav_state.transition
+			|| NavHasTerminalDebtLocked(&g_nav_state)) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_BUSY;
+	}
+	g_nav_state.terminal_token = token;
+	g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_CAPTURING;
+	g_nav_state.terminal_queued = 0;
+	g_nav_state.terminal_replayed = 0;
+	g_nav_state.terminal_last_os_error = ERROR_SUCCESS;
+	g_nav_state.terminal_release_kind = ERGOPTI_NAV_TERMINAL_RELEASE_NONE;
+	memset(g_nav_state.terminal_events, 0, sizeof(g_nav_state.terminal_events));
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements ErgoptiNav_CommitTerminalCapture. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitTerminalCapture(
+	uint64_t token)
+{
+	return NavReleaseTerminalCapture(
+		token,
+		ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT,
+		NavSendTerminalInputsSystem,
+		NULL);
+}
+
+
+
+/** Implements ErgoptiNav_AbortTerminalCapture. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AbortTerminalCapture(
+	uint64_t token)
+{
+	return NavReleaseTerminalCapture(
+		token,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT,
+		NavSendTerminalInputsSystem,
+		NULL);
+}
+
+
+
+/** Implements ErgoptiNav_GetTerminalCapture. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetTerminalCapture(
+	uint64_t token,
+	ErgoptiNav_TerminalCaptureSnapshot *out_snapshot)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (token == 0 || out_snapshot == NULL)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (g_nav_state.terminal_token != token) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	}
+	out_snapshot->token = g_nav_state.terminal_token;
+	out_snapshot->phase = g_nav_state.terminal_phase;
+	out_snapshot->queued = g_nav_state.terminal_queued;
+	out_snapshot->replayed = g_nav_state.terminal_replayed;
+	out_snapshot->last_os_error = g_nav_state.terminal_last_os_error;
+	out_snapshot->release_kind = g_nav_state.terminal_release_kind;
 	LeaveCriticalSection(&g_nav_state.lock);
 	return ERGOPTI_NAV_STATUS_OK;
 }
@@ -2567,6 +2908,13 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookDispatch(
 	message = event->kind == ERGOPTI_NAV_EVENT_UP ? WM_KEYUP : WM_KEYDOWN;
 
 	EnterCriticalSection(&g_nav_state.lock);
+	if (NavCaptureTerminalEventLocked(
+			&g_nav_state, message, &native_event)) {
+		memset(out_result, 0, sizeof(*out_result));
+		out_result->disposition = ERGOPTI_NAV_DISPOSITION_SUPPRESS;
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_OK;
+	}
 	if (!NavProcessHookEventLocked(
 			message,
 			&native_event,
@@ -2632,6 +2980,16 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookFlow(
 	message = event->kind == ERGOPTI_NAV_EVENT_UP ? WM_KEYUP : WM_KEYDOWN;
 
 	EnterCriticalSection(&g_nav_state.lock);
+	if (NavCaptureTerminalEventLocked(
+			&g_nav_state, message, &native_event)) {
+		memset(out_result, 0, sizeof(*out_result));
+		out_result->disposition = ERGOPTI_NAV_DISPOSITION_SUPPRESS;
+		LeaveCriticalSection(&g_nav_state.lock);
+		*out_mask_emitted = 0;
+		*out_pass_called = 0;
+		*out_mask_before_pass = 0;
+		return ERGOPTI_NAV_STATUS_OK;
+	}
 	if (!NavProcessHookEventLocked(
 			message,
 			&native_event,
@@ -2725,5 +3083,96 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestDrainComplete(
 	*out_complete = NavDrainCompleteLocked(&g_nav_state) ? 1 : 0;
 	LeaveCriticalSection(&g_nav_state.lock);
 	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements the hook-free terminal running-state seam. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetRunning(uint8_t running)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (running > 1)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	g_nav_state.running = running;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** State for the deterministic terminal replay sink. */
+typedef struct NavTestTerminalSendContext {
+	uint32_t remaining;
+	ErgoptiNav_TestEvent *events;
+	uint32_t capacity;
+	uint32_t count;
+} NavTestTerminalSendContext;
+
+
+
+/** Records one accepted replay prefix without injecting real input. */
+static uint32_t NavTestSendTerminalInputs(
+	const INPUT *events,
+	uint32_t event_count,
+	void *raw_context)
+{
+	NavTestTerminalSendContext *context =
+		(NavTestTerminalSendContext *)raw_context;
+	uint32_t accepted = event_count;
+	uint32_t index;
+	if (context->remaining != UINT32_MAX && accepted > context->remaining)
+		accepted = context->remaining;
+	for (index = 0; index < accepted; ++index) {
+		ErgoptiNav_TestEvent *out_event;
+		if (context->count >= context->capacity)
+			break;
+		out_event = &context->events[context->count++];
+		memset(out_event, 0, sizeof(*out_event));
+		out_event->vk = events[index].ki.wVk;
+		out_event->sc = events[index].ki.wScan;
+		if ((events[index].ki.dwFlags & KEYEVENTF_EXTENDEDKEY) != 0)
+			out_event->sc = (uint16_t)(out_event->sc | 0x100u);
+		out_event->kind =
+			(events[index].ki.dwFlags & KEYEVENTF_KEYUP) != 0
+				? ERGOPTI_NAV_EVENT_UP : ERGOPTI_NAV_EVENT_DOWN;
+		out_event->injected = ERGOPTI_NAV_INJECTION_PHYSICAL;
+		out_event->extra_info =
+			(uint64_t)events[index].ki.dwExtraInfo;
+	}
+	if (context->remaining != UINT32_MAX)
+		context->remaining -= accepted;
+	if (accepted != event_count)
+		SetLastError(ERROR_ACCESS_DENIED);
+	return accepted;
+}
+
+
+
+/** Implements the hook-free terminal replay seam. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCapture(
+	uint64_t token,
+	uint32_t release_kind,
+	uint32_t send_limit,
+	ErgoptiNav_TestEvent *out_events,
+	uint32_t event_capacity,
+	uint32_t *out_event_count)
+{
+	NavTestTerminalSendContext context;
+	if (out_event_count == NULL
+			|| (event_capacity != 0 && out_events == NULL))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	memset(&context, 0, sizeof(context));
+	context.remaining = send_limit;
+	context.events = out_events;
+	context.capacity = event_capacity;
+	*out_event_count = 0;
+	{
+		int32_t status = NavReleaseTerminalCapture(
+			token, release_kind, NavTestSendTerminalInputs, &context);
+		*out_event_count = context.count;
+		return status;
+	}
 }
 #endif

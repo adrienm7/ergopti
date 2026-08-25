@@ -10,6 +10,10 @@ EXPORTS
 	ErgoptiNav_PreparePlan
 	ErgoptiNav_CommitPlan
 	ErgoptiNav_SetSuspended
+	ErgoptiNav_BeginTerminalCapture
+	ErgoptiNav_CommitTerminalCapture
+	ErgoptiNav_AbortTerminalCapture
+	ErgoptiNav_GetTerminalCapture
 	ErgoptiNav_BeginOwnerSwap
 	ErgoptiNav_CommitOwnerSwap
 	ErgoptiNav_AbortOwnerSwap

@@ -2412,6 +2412,253 @@ static bool TestStopDrainBalancesConsumedHolds(void)
 
 
 
+/** Proves terminal capture suppresses physical input and replays exact edges. */
+static bool TestTerminalCaptureReplaysExactPhysicalEdges(void)
+{
+	const char *name = "terminal capture replays exact physical edges";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TerminalCaptureSnapshot snapshot;
+	ErgoptiNav_TestEvent replayed[10];
+	ErgoptiNav_Receipt receipt;
+	uint64_t generation = 0;
+	uint32_t replayed_count = 0;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	uint32_t index;
+	const uint16_t vks[6] = {
+		VK_LMENU, (uint16_t)'1', (uint16_t)'1', VK_LMENU,
+		(uint16_t)'Z', (uint16_t)'Z'
+	};
+	const uint16_t scans[6] = { 0x38, 0x02, 0x02, 0x38, 0, 0 };
+	const uint8_t kinds[6] = {
+		ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_EVENT_UP
+	};
+
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+			== ERGOPTI_NAV_STATUS_OK);
+	for (index = 0; index < 6; ++index) {
+		TEST_ASSERT(name, TestHookFlow(
+			name, vks[index], scans[index], kinds[index],
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+			&result, &mask, &passed, &ordered));
+		TEST_ASSERT(name,
+			result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+		TEST_ASSERT(name, result.receipt_created == 0);
+		TEST_ASSERT(name, passed == 0 && mask == 0);
+	}
+	/* AHK SendLevel-0 output is not physical and must cross the capture. */
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'X', 0x2D, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_STANDARD, ERGOPTI_NAV_AHK_SEND_LEVEL_BASE,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	TEST_ASSERT(name, passed == 1);
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &snapshot)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, snapshot.phase == ERGOPTI_NAV_TERMINAL_CAPTURING);
+	TEST_ASSERT(name, snapshot.queued == 6 && snapshot.replayed == 0);
+
+	TEST_ASSERT(name,
+		ErgoptiNav_TestReleaseTerminalCapture(
+			TEST_OWNER_B,
+			ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT,
+			UINT32_MAX,
+			replayed,
+			10,
+			&replayed_count) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, replayed_count == 6);
+	for (index = 0; index < 6; ++index) {
+		TEST_ASSERT(name, replayed[index].sc == scans[index]);
+		TEST_ASSERT(name,
+			replayed[index].vk == (scans[index] == 0 ? vks[index] : 0));
+		TEST_ASSERT(name, replayed[index].kind == kinds[index]);
+		TEST_ASSERT(name,
+			replayed[index].extra_info == ERGOPTI_NAV_TERMINAL_REPLAY_MARKER);
+	}
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &snapshot)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, snapshot.phase == ERGOPTI_NAV_TERMINAL_IDLE);
+	TEST_ASSERT(name, snapshot.queued == 0 && snapshot.replayed == 6);
+	TEST_ASSERT(name,
+		snapshot.release_kind == ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT);
+
+	/* The private replay marker is logical physical input for navigation. */
+	for (index = 0; index < 6; ++index) {
+		TEST_ASSERT(name, TestHookFlow(
+			name, vks[index], scans[index], kinds[index],
+			ERGOPTI_NAV_INJECTION_STANDARD,
+			ERGOPTI_NAV_TERMINAL_REPLAY_MARKER,
+			&result, &mask, &passed, &ordered));
+		if (index == 1 || index == 2)
+			TEST_ASSERT(name,
+				result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	}
+	TEST_ASSERT(name, ErgoptiNav_PollReceipt(&receipt) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, receipt.owner_token == owner.token);
+	TEST_ASSERT(name, receipt.target_index == 1);
+	return true;
+}
+
+
+
+/** Proves partial replay retains the exact FIFO suffix and lifecycle debt. */
+static bool TestTerminalCapturePartialReplayIsRetryable(void)
+{
+	const char *name = "terminal capture partial replay is retryable";
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TerminalCaptureSnapshot snapshot;
+	ErgoptiNav_TestEvent replayed[8];
+	uint32_t replayed_count = 0;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	uint8_t complete = 1;
+	TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(TEST_OWNER_C)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'A', 0x1E, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'A', 0x1E, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, TestHookFlow(
+		name, VK_LEFT, 0x14B, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	TEST_ASSERT(name,
+		ErgoptiNav_TestReleaseTerminalCapture(
+			TEST_OWNER_C,
+			ERGOPTI_NAV_TERMINAL_RELEASE_ABORT,
+			1,
+			replayed,
+			8,
+			&replayed_count) == ERGOPTI_NAV_STATUS_OS_ERROR);
+	TEST_ASSERT(name, replayed_count == 1);
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(TEST_OWNER_C, &snapshot)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		snapshot.phase == ERGOPTI_NAV_TERMINAL_RELEASE_PENDING);
+	TEST_ASSERT(name, snapshot.queued == 2 && snapshot.replayed == 1);
+	TEST_ASSERT(name,
+		ErgoptiNav_SetSuspended(1) == ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestBeginDrain() == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestDrainComplete(&complete) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, complete == 0);
+	/* Physical input arriving during a failed release joins the FIFO tail. */
+	TEST_ASSERT(name, TestHookFlow(
+		name, (uint16_t)'B', 0x30, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+		&result, &mask, &passed, &ordered));
+	memset(replayed, 0, sizeof(replayed));
+	replayed_count = 0;
+	TEST_ASSERT(name,
+		ErgoptiNav_TestReleaseTerminalCapture(
+			TEST_OWNER_C,
+			ERGOPTI_NAV_TERMINAL_RELEASE_ABORT,
+			UINT32_MAX,
+			replayed,
+			8,
+			&replayed_count) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, replayed_count == 3);
+	TEST_ASSERT(name,
+		replayed[0].sc == 0x1E
+			&& replayed[0].kind == ERGOPTI_NAV_EVENT_UP);
+	TEST_ASSERT(name,
+		replayed[1].sc == 0x14B
+			&& replayed[1].kind == ERGOPTI_NAV_EVENT_DOWN);
+	TEST_ASSERT(name,
+		replayed[2].sc == 0x30
+			&& replayed[2].kind == ERGOPTI_NAV_EVENT_DOWN);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestDrainComplete(&complete) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, complete == 1);
+	return true;
+}
+
+
+
+/** Proves capture admission is bounded and fails closed when storage exhausts. */
+static bool TestTerminalCaptureAdmissionAndOverflow(void)
+{
+	const char *name = "terminal capture admission and overflow";
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TerminalCaptureSnapshot snapshot;
+	uint32_t index;
+	uint8_t mask = 0;
+	uint8_t passed = 0;
+	uint8_t ordered = 0;
+	TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(0)
+			== ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(TEST_OWNER_A)
+			== ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_SetSuspended(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(TEST_OWNER_A)
+			== ERGOPTI_NAV_STATUS_BUSY);
+	TEST_ASSERT(name,
+		ErgoptiNav_SetSuspended(0) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(TEST_OWNER_A)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B)
+			== ERGOPTI_NAV_STATUS_BUSY);
+	for (index = 0; index <= ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY; ++index) {
+		TEST_ASSERT(name, TestHookFlow(
+			name, (uint16_t)'C', 0x2E, ERGOPTI_NAV_EVENT_DOWN,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0,
+			&result, &mask, &passed, &ordered));
+		TEST_ASSERT(name,
+			result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+	}
+	TEST_ASSERT(name,
+		ErgoptiNav_GetTerminalCapture(TEST_OWNER_A, &snapshot)
+			== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, snapshot.phase == ERGOPTI_NAV_TERMINAL_FAULTED);
+	TEST_ASSERT(name,
+		snapshot.queued == ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY);
+	TEST_ASSERT(name, snapshot.last_os_error == ERROR_NOT_ENOUGH_MEMORY);
+	TEST_ASSERT(name,
+		ErgoptiNav_TestReleaseTerminalCapture(
+			TEST_OWNER_A,
+			ERGOPTI_NAV_TERMINAL_RELEASE_ABORT,
+			UINT32_MAX,
+			NULL,
+			0,
+			&index) == ERGOPTI_NAV_STATUS_OS_ERROR);
+	return true;
+}
+
+
+
 /**
  * Proves malformed or incomplete plans cannot replace the current generation.
  *
@@ -2492,6 +2739,12 @@ int main(void)
 			TestMenuMaskSurvivesMultipleWinHolds},
 		{"stop drain balances consumed holds",
 			TestStopDrainBalancesConsumedHolds},
+		{"terminal capture replays exact physical edges",
+			TestTerminalCaptureReplaysExactPhysicalEdges},
+		{"terminal capture partial replay is retryable",
+			TestTerminalCapturePartialReplayIsRetryable},
+		{"terminal capture admission and overflow",
+			TestTerminalCaptureAdmissionAndOverflow},
 		{"plan validation is atomic", TestPlanValidationIsAtomic}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));

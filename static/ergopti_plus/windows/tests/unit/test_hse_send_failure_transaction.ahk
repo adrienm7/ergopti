@@ -412,16 +412,79 @@ _AHK002_StableCodeWindowBecomesTerminalImpl() {
 	}
 }
 
+_AHK002_TerminalCaptureAccept(*) {
+	return 1
+}
+
+_AHK002_TerminalCaptureSnapshot(Token) {
+	return Map("token", Token, "phase", 0, "queued", 0, "replayed", 0,
+		"last_os_error", 0, "release_kind", 2)
+}
+
 _AHK002_StableCodeWindowBecomesTerminal() {
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerPort
 	SavedEnabled := MetricsShortcuts.enabled
-	try _AHK04_RunIsolated(_AHK002_StableCodeWindowBecomesTerminalImpl)
+	SavedStarted := _LLM_NavEventOwnerStarted
+	SavedPort := _LLM_NavEventOwnerPort
+	try {
+		; AHK-002 owns host classification, not native hook installation. Its
+		; Codebuff path must nevertheless cross the real terminal owner boundary
+		; now that paced output refuses to run without keyboard capture.
+		_LLM_NavEventOwnerStarted := true
+		_LLM_NavEventOwnerPort := Map(
+			"begin_terminal", _AHK002_TerminalCaptureAccept,
+			"commit_terminal", _AHK002_TerminalCaptureAccept,
+			"abort_terminal", _AHK002_TerminalCaptureAccept,
+			"get_terminal", _AHK002_TerminalCaptureSnapshot)
+		_AHK04_RunIsolated(_AHK002_StableCodeWindowBecomesTerminalImpl)
+	}
 	finally {
+		_LLM_NavEventOwnerStarted := SavedStarted
+		_LLM_NavEventOwnerPort := SavedPort
 		MetricsShortcuts.enabled := SavedEnabled
 		_Stub_SetOutputHost("test.exe", "Test App")
 	}
 }
 Test("output host: same Code window can become terminal (ahk-002)",
 	_AHK002_StableCodeWindowBecomesTerminal)
+
+_AHK201_SecondaryTerminalMatchesBalanceAfterRefusalImpl() {
+	global HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer
+	global _HSE_TerminalOwner, _PrefixWatcherSuppressed
+	HeldOwner := Map("Pending", true)
+	_HSE_TerminalOwner := HeldOwner
+	_OHR_Reset("WindowsTerminal.exe", 1601, 2601, "Terminal")
+	loop 3 {
+		HSE_Buffer := "ab"
+		HSE_StartIsWordBoundary := true
+		_PrefixBuffer := "ab"
+		AssertFalse(HSE_DispatchMatch(_AHK04_NormalSpec(), ""),
+			"a secondary terminal match must decline while the first owner is held")
+		AssertTrue(_HSE_TerminalOwner == HeldOwner,
+			"a refusal must preserve the exact first terminal owner")
+		AssertEqual(0, _PrefixWatcherSuppressed,
+			"repeated refused matches must balance prefix suppression")
+		AssertEqual(0, Keylogger.synth_active,
+			"repeated refused matches must balance synthetic ownership")
+		AssertEqual("ab", HSE_Buffer,
+			"a refused secondary match must not publish canonical output")
+		AssertEqual("ab", _PrefixBuffer,
+			"a refused secondary match must not retire its preview context")
+	}
+}
+
+_AHK201_SecondaryTerminalMatchesBalanceAfterRefusal() {
+	global _HSE_TerminalOwner
+	SavedOwner := _HSE_TerminalOwner
+	try _AHK04_RunIsolated(
+		_AHK201_SecondaryTerminalMatchesBalanceAfterRefusalImpl)
+	finally {
+		_HSE_TerminalOwner := SavedOwner
+		_Stub_SetOutputHost("test.exe", "Test App")
+	}
+}
+Test("terminal owner: real secondary matches balance after held-owner refusal (ahk2-01)",
+	_AHK201_SecondaryTerminalMatchesBalanceAfterRefusal)
 
 
 
