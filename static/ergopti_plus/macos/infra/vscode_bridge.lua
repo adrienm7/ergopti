@@ -26,6 +26,7 @@ local LOG    = "vscode_bridge"
 -- ====================================
 
 local PORT          = 7878
+local SERVER_INTERFACE = "loopback"
 local EXT_ID        = "hs-caret-bridge"
 local EXT_VERSION   = "0.0.3"
 -- HOME is always set on macOS, but this concatenation runs at MODULE LOAD, so a
@@ -840,6 +841,12 @@ function M.start_server()
 	-- `_server` itself remains unpublished until the socket proves its bind
 	_server_cleanup = candidate
 
+	local interface_set, interface_result = xpcall(function()
+		return candidate:setInterface(SERVER_INTERFACE)
+	end, debug.traceback)
+	if not interface_set or interface_result ~= candidate then
+		return reject_server_candidate("interface configuration", interface_result)
+	end
 	local port_set, port_result = xpcall(function()
 		return candidate:setPort(PORT)
 	end, debug.traceback)
@@ -864,7 +871,7 @@ function M.start_server()
 
 	_server = candidate
 	_server_cleanup = nil
-	Logger.info(LOG, "HTTP server started successfully.")
+	Logger.info(LOG, "HTTP server started on %s:%d.", SERVER_INTERFACE, PORT)
 	return true
 end
 
