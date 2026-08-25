@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Windows equivalent of the Hammerspoon ollama_deps_checker.lua.
 ; Ensures the Ollama binary is installed and the local inference server is
-; reachable on http://localhost:11434.
+; reachable on the configured local Ollama endpoint.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Self-bootstrapping: hands install off to winget (native Ollama installer
@@ -265,7 +265,7 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
  *     a hidden subprocess.
  *
  * After the installer has been handed off, we keep a 3 s poll timer
- * pinging http://localhost:11434 . Once Ollama answers, the state
+ * pinging the configured local Ollama endpoint. Once Ollama answers, the state
  * flips to "ready" and on_ready fires.
  *
  * @param {string} model - Model tag to pull AFTER the daemon is up.
@@ -326,7 +326,9 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 	}
 
 	; Poll the daemon every 3 s. When it answers, fire on_ready.
-	LoggerInfo("LLM", "Polling http://localhost:11434 every 3 s until Ollama responds…")
+	global LLM_OLLAMA_BASE_URL
+	LoggerInfo("LLM", "Polling {1} every 3 s until Ollama responds…",
+		LLM_OLLAMA_BASE_URL)
 	global _LLM_Deps_PollStartTick := A_TickCount
 	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(
 		on_ready?, on_failed?, captured_epoch)

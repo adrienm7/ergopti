@@ -61,6 +61,12 @@ if (ssot === null) {
 	console.error('\x1b[31m[ERROR] Could not read llm_ollama_port from defaults.json.\x1b[0m');
 	process.exit(1);
 }
+if (!Number.isInteger(ssot) || ssot < 1024 || ssot > 65535) {
+	console.error(
+		`\x1b[31m[ERROR] llm_ollama_port must be an integer in the documented 1024..65535 range; got ${String(ssot)}.\x1b[0m`
+	);
+	process.exit(1);
+}
 
 const literalRe = new RegExp(`\\b${ssot}\\b`);
 const violations = [];

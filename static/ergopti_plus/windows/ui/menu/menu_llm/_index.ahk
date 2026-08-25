@@ -249,8 +249,16 @@ LLM_Menu_ApplySharedDefaults() {
 	)
 
 	for shared_key, tray_key in _key_map {
-		if LLM_Defaults.Has(shared_key)
-			_LLM_Menu[tray_key] := LLM_Defaults[shared_key]
+		if !LLM_Defaults.Has(shared_key)
+			continue
+		if tray_key == "ollama_port" {
+			if !LLM_Option_TryNormalizeOllamaPort(
+					LLM_Defaults[shared_key], &NormalizedPort)
+				throw Error("Shared LLM default 'llm_ollama_port' is invalid.")
+			_LLM_Menu[tray_key] := NormalizedPort
+			continue
+		}
+		_LLM_Menu[tray_key] := LLM_Defaults[shared_key]
 	}
 }
 LLM_Menu_ApplySharedDefaults()

@@ -508,10 +508,7 @@ LLM_Menu_PromptOllamaPort() {
 	ib := InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
 	if (ib.Result != "OK" || ib.Value == "")
 		return
-	if !IsInteger(ib.Value)
-		return
-	val := Integer(ib.Value)
-	if (val < 1024 || val > 65535)
+	if !LLM_Option_TryNormalizeOllamaPort(ib.Value, &val)
 		return
 	return LLM_Menu_CommitMutation("the Ollama port setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,

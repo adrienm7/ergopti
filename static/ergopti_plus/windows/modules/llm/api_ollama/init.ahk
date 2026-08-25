@@ -303,14 +303,25 @@ LLMApiLoadTimings() {
 ; from _shared/modules/llm/defaults.json) at boot — keeps 11434 in exactly one
 ; place. Mirrors LLMApiLoadTimings; called right after it in infra/boot.ahk, after
 ; LLM_Defaults_Load(). The per-user override is applied later by LLM_Menu_Init.
-LLM_Ollama_LoadDefaults() {
+LLM_Ollama_LoadDefaults(SetPortFn := 0) {
 	global LLM_Defaults, LLM_OLLAMA_KEEP_ALIVE
-	if IsSet(LLM_Defaults) and Type(LLM_Defaults) == "Map" {
-		if LLM_Defaults.Has("llm_ollama_port")
-			LLM_Ollama_SetPort(LLM_Defaults["llm_ollama_port"])
-		if LLM_Defaults.Has("llm_ollama_keep_alive")
-			LLM_OLLAMA_KEEP_ALIVE := LLM_Defaults["llm_ollama_keep_alive"]
-	}
+	if !IsSet(LLM_Defaults) || !(LLM_Defaults is Map)
+		return false
+	if !LLM_Defaults.Has("llm_ollama_port")
+			|| !LLM_Defaults.Has("llm_ollama_keep_alive")
+		return false
+	if !LLM_Option_TryNormalizeOllamaPort(
+			LLM_Defaults["llm_ollama_port"], &NormalizedPort)
+		return false
+	if !(LLM_Defaults["llm_ollama_keep_alive"] is String)
+		return false
+	if !HasMethod(SetPortFn, "Call")
+		SetPortFn := LLM_Ollama_SetPort
+	Result := SetPortFn.Call(NormalizedPort)
+	if !(Result is Integer) || Result != 1
+		return false
+	LLM_OLLAMA_KEEP_ALIVE := LLM_Defaults["llm_ollama_keep_alive"]
+	return true
 }
 
 ; Maximum number of in-flight async requests kept in the registry. Once we
@@ -382,15 +393,14 @@ global _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS := 40
  */
 LLM_Ollama_SetPort(port) {
 	global LLM_OLLAMA_PORT, LLM_OLLAMA_BASE_URL
-	if !IsInteger(port)
+	if !LLM_Option_TryNormalizeOllamaPort(port, &NormalizedPort)
 		return false
-	port := Integer(port)
-	if (port < 1024 || port > 65535)
-		return false
+	port := NormalizedPort
 	if port != LLM_OLLAMA_PORT
 		LLM_AuxInvalidate("ollama_port")
 	LLM_OLLAMA_PORT     := port
 	LLM_OLLAMA_BASE_URL := "http://localhost:" . port
+	try LoggerDebug("LLM", "Ollama endpoint set to {1}.", LLM_OLLAMA_BASE_URL)
 	return true
 }
 

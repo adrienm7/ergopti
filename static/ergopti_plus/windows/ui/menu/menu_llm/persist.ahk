@@ -165,15 +165,24 @@ _LLM_Menu_AppendPersistedUpdates(Updates, MenuState := 0) {
 	return true
 }
 
-_LLM_Menu_LogInvalidPersistedOption(Key) {
+_LLM_Menu_LogInvalidPersistedOption(Key, Value := unset) {
+	if IsSet(Value) {
+		DisplayValue := (Value is String) || (Value is Integer) || (Value is Float)
+			? String(Value) : "<" . Type(Value) . ">"
+		try LoggerError("LLM",
+			"Persisted option '{1}' has invalid value '{2}'; keeping the validated default.",
+			Key, DisplayValue)
+		return
+	}
 	try LoggerError("LLM",
-		"Persisted option '{1}' has the wrong type or element shape; keeping the validated default.",
+		"Persisted option '{1}' has an invalid type, shape, or value; keeping the validated default.",
 		Key)
 }
 
 _LLM_Menu_PutValidatedPersistedOption(Opts, Key, Value, SourceKey := "") {
 	if !LLM_Option_TryNormalize(Key, Value, &Normalized) {
-		_LLM_Menu_LogInvalidPersistedOption(SourceKey != "" ? SourceKey : Key)
+		_LLM_Menu_LogInvalidPersistedOption(
+			SourceKey != "" ? SourceKey : Key, Value)
 		return false
 	}
 	Opts[Key] := Normalized

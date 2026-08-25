@@ -142,6 +142,22 @@ _LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 	throw Error("initial LLM hotkey surface is incomplete")
 }
 
+_LLM_Menu_ApplyOllamaPortAtBoot(MenuState, SetPortFn := 0) {
+	if !(MenuState is Map) || !MenuState.Has("ollama_port")
+		throw Error("LLM boot state has no Ollama port.")
+	if !LLM_Option_TryNormalizeOllamaPort(
+			MenuState["ollama_port"], &NormalizedPort)
+		throw Error("LLM boot state contains an invalid Ollama port.")
+	if !HasMethod(SetPortFn, "Call")
+		SetPortFn := LLM_Ollama_SetPort
+	Result := SetPortFn.Call(NormalizedPort)
+	if !(Result is Integer) || Result != 1
+		throw Error("The Ollama client refused the validated boot port "
+			. NormalizedPort . ".")
+	MenuState["ollama_port"] := NormalizedPort
+	return true
+}
+
 /**
  * Bootstraps the tray menu and starts the LLM bridge if auto-start is enabled.
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
@@ -181,8 +197,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 
 	; Apply the persisted Ollama port to the HTTP client BEFORE any request fires
 	; (bootstrap probe, warmup) so every call targets the user's configured port.
-	if IsSet(LLM_Ollama_SetPort) and _LLM_Menu.Has("ollama_port")
-		LLM_Ollama_SetPort(_LLM_Menu["ollama_port"])
+	_LLM_Menu_ApplyOllamaPortAtBoot(_LLM_Menu)
 
 	; Auto-correct legacy raw-tag configs (e.g. qwen2.5:3b) before the first
 	; bootstrap / bridge start so predictions do not silently fail.
