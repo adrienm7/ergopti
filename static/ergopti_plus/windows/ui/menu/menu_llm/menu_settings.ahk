@@ -405,14 +405,12 @@ _LLM_Menu_NavRows() {
  * @param {string} key     - The _LLM_Menu key to update.
  * @param {string} title   - Dialog title.
  * @param {string} prompt  - Dialog prompt text.
- * @param {number} min_val - Minimum valid value (0 = no minimum).
- * @param {number} max_val - Maximum valid value (0 = no maximum).
  */
-LLM_Menu_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
+LLM_Menu_PromptNumeric(key, title, prompt) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_PromptNumeric(key, title, prompt, min_val, max_val)
+		try return LLM_Menu_PromptNumeric(key, title, prompt)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
@@ -425,8 +423,7 @@ LLM_Menu_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
 	; IsInteger guard in LLM_Menu_PromptOllamaPort)
 	if !IsInteger(ib.Value)
 		return
-	val := Integer(ib.Value)
-	if (min_val > 0 && val < min_val) || (max_val > 0 && val > max_val)
+	if !LLM_Option_TryNormalize(key, Integer(ib.Value), &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM numeric '" . key . "' setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, key, val),
@@ -489,7 +486,7 @@ _LLM_MaybeResetRow(Rows, current, default_val, on_click) {
 
 LLM_Menu_PromptDebounce() {
 	LLM_Menu_PromptNumeric("debounce_ms", t("menu.llm.trigger_menu_title"),
-		t("menu.llm.debounce_prompt"), 50, 10000)
+		t("menu.llm.debounce_prompt"))
 }
 
 ; Ollama port has its own prompt (not LLM_Menu_PromptNumeric) because applying it
@@ -539,12 +536,12 @@ _LLM_Menu_ApplyOllamaPortCommitted(Candidate) {
 
 LLM_Menu_PromptCtxChars() {
 	LLM_Menu_PromptNumeric("ctx_chars", t("menu.llm.generation_menu_title"),
-		t("menu.llm.context_length_prompt"), 50, 10000)
+		t("menu.llm.context_length_prompt"))
 }
 
 LLM_Menu_PromptMinWords() {
 	LLM_Menu_PromptNumeric("min_words", t("menu.llm.generation_menu_title"),
-		t("menu.llm.min_words_prompt"), 1, 20)
+		t("menu.llm.min_words_prompt"))
 }
 
 LLM_Menu_PromptMaxWords() {
@@ -562,8 +559,7 @@ LLM_Menu_PromptMaxWords() {
 	; string in this menu-callback thread (mirrors LLM_Menu_PromptOllamaPort)
 	if !IsInteger(ib.Value)
 		return
-	val := Integer(ib.Value)
-	if (val < 0)
+	if !LLM_Option_TryNormalize("max_words", Integer(ib.Value), &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM maximum-word setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,

@@ -224,9 +224,17 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	static StringKeys := Map(
 		"model", true, "profile_id", true, "language", true,
 		"trigger_shortcut", true, "backend", true, "api_entry_id", true)
-	static IntegerKeys := Map(
-		"n_predictions", true, "min_words", true, "max_words", true,
-		"debounce_ms", true, "ctx_chars", true, "pred_indent", true)
+	; These are semantic consumer bounds, not merely storage types. Keep every
+	; public integer in this one table so boot restore, menu persistence, runtime
+	; publication and interactive setters cannot disagree. max_words=0 is the
+	; documented unlimited sentinel; the finite ceiling bounds token arithmetic.
+	static IntegerRanges := Map(
+		"n_predictions", [1, 10],
+		"min_words", [1, 20],
+		"max_words", [0, 10000],
+		"debounce_ms", [50, 10000],
+		"ctx_chars", [50, 10000],
+		"pred_indent", [-7, 7])
 	static BooleanKeys := Map(
 		"enabled", true, "auto_profile_for_model", true,
 		"instant_on_word_end", true, "after_hotstring", true,
@@ -250,13 +258,16 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 	}
 	if (Key == "ollama_port")
 		return LLM_Option_TryNormalizeOllamaPort(Value, &Normalized)
-	if IntegerKeys.Has(Key) {
+	if IntegerRanges.Has(Key) {
 		if !(Value is Integer) && !(Value is Float)
 			return false
 		try Candidate := Integer(Value)
 		catch
 			return false
 		if (Candidate != Value)
+			return false
+		Range := IntegerRanges[Key]
+		if (Candidate < Range[1] || Candidate > Range[2])
 			return false
 		Normalized := Candidate
 		return true
@@ -284,6 +295,17 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		return Normalized is Map
 	}
 	return false
+}
+
+/**
+ * Converts a validated debounce delay into AutoHotkey's one-shot SetTimer
+ * period. A negative configured value must never be negated into a repeating
+ * timer; reject any value outside the same public option boundary first.
+ */
+LLM_Option_DebounceTimerPeriod(Value) {
+	if !LLM_Option_TryNormalize("debounce_ms", Value, &Normalized)
+		throw ValueError("Invalid LLM debounce delay.")
+	return -Normalized
 }
 
 /** Parses a persisted Boolean without comparing an object to scalar sentinels. */
