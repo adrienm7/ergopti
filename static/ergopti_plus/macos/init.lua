@@ -172,6 +172,36 @@ end
 i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
 i18n.init()
 
+local BOOT_FAILURE_ALERT_SECONDS = 5
+local CONFIG_PATH_BOOT_FAILURE =
+	"Config-path initialization did not commit — startup aborted before input or remap activation."
+
+--- Reports a pre-runtime boot failure, releases an optional early capability,
+--- and terminates the embedded Hammerspoon process. This boundary deliberately
+--- owns the only UI available before menus and notifications are initialized.
+--- @param detail string Developer-facing diagnostic.
+--- @param alert_key string|nil Localized user-facing alert key.
+--- @param before_exit function|nil Optional exact early-owner cleanup.
+local function abort_pre_runtime_boot(detail, alert_key, before_exit)
+	Logger.error(LOG, "%s", tostring(detail))
+	if before_exit ~= nil then
+		local cleanup_ok, cleanup_result = xpcall(before_exit, debug.traceback)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Pre-runtime boot cleanup did not settle before fatal exit: %s.",
+				tostring(cleanup_result))
+		end
+	end
+	pcall(function()
+		local alert = hs.alert
+		if type(alert) == "table" and type(alert.show) == "function" then
+			alert.show(
+				i18n.get(alert_key or "dialog.fatal_error.cannot_start"),
+				BOOT_FAILURE_ALERT_SECONDS)
+		end
+	end)
+	os.exit(1)
+end
+
 local config_paths       = require("infra.config_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
@@ -213,7 +243,7 @@ if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 -- can act on it.
 local config_paths_ready = config_paths.init(base_dir)
 if config_paths_ready ~= true then
-	Logger.error(LOG, "Config-path initialization did not commit — startup aborted before input or remap activation.")
+	abort_pre_runtime_boot(CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
@@ -229,23 +259,12 @@ Boot.mark("Path: log file open (retention purge deferred)")
 -- arm an input owner while its logger can still perform synchronous I/O on the
 -- Hammerspoon callback loop. Developer runs must therefore use the launcher too.
 local function abort_logger_boot(detail)
-	Logger.error(LOG, "Native asynchronous logger transport unavailable — startup aborted before input: %s.",
-		tostring(detail))
-	Logger.stop_async_sink()
-	-- i18n is initialized above, but menu/notifications are deliberately not: a
-	-- bounded native alert is the only visible fail-fast surface that cannot arm
-	-- input or leave an inert embedded Hammerspoon process behind.
-	local BOOT_FAILURE_ALERT_SECONDS = 5
-	pcall(function()
-		local alert = hs.alert
-		if type(alert) == "table" and type(alert.show) == "function" then
-			alert.show(
-				i18n.get("startup.native_logger_unavailable"),
-				BOOT_FAILURE_ALERT_SECONDS)
-		end
-	end)
-	os.exit(1)
-	return false
+	abort_pre_runtime_boot(
+		string.format(
+			"Native asynchronous logger transport unavailable — startup aborted before input: %s.",
+			tostring(detail)),
+		"startup.native_logger_unavailable",
+		Logger.stop_async_sink)
 end
 
 local logger_boot_mode, logger_boot_policy_err = Logger.classify_async_sink_boot_environment()
@@ -866,6 +885,7 @@ do
 	local ok_ob, onboarding_mod = pcall(require, "ui.onboarding")
 	if not ok_ob or type(onboarding_mod) ~= "table" then
 		Logger.error(LOG, "ui.onboarding failed to load (%s) — first-launch guard cannot run; aborting boot to avoid arming input modules without consent.", tostring(onboarding_mod))
+		emergency_exit_after_runtime_failure("onboarding", "module_load_failed")
 		return
 	end
 	local cfg_path = config_paths.get("ConfigTomlPath")
