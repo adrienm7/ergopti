@@ -431,6 +431,60 @@ Test("LLM_Engine_Init: valid manifest numeric representations remain accepted "
 	. "(llm-persisted-option-type-boundary-engine-valid-number)",
 	_EngineInit_AcceptsManifestNumericRepresentations)
 
+_EngineFinalize_ReadinessState(Backend, RequestId, Signature) {
+	return Map(
+		"request_id", RequestId,
+		"semantic_signature", Signature,
+		"slots", ["suggestion"],
+		"requested", 1,
+		"dedup_stats", Map("candidates", 1, "duplicates", 0, "kept", 1),
+		"model", "model",
+		"backend", Backend,
+		"ctx", "context",
+		"system_prompt", "system",
+		"is_batch", false,
+		"request_start", 0
+	)
+}
+
+_EngineFinalize_ReadyFlagBelongsToOllama() {
+	global _LLM_Engine, _LLM_Ollama_IsReady, _Stub_LlmTooltipCalls
+	SavedEngine := _LLM_Engine
+	SavedReady := _LLM_Ollama_IsReady
+	SavedTooltipCalls := _Stub_LlmTooltipCalls
+	try {
+		RequestId := 731
+		Signature := "readiness-owner-signature"
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Engine["request_id"] := RequestId
+		_LLM_Engine["active_request_signature"] := Signature
+		_LLM_Engine["inline_autotype"] := false
+		_Stub_LlmTooltipCalls := []
+
+		_LLM_Ollama_IsReady := false
+		_LLM_Engine_FinalizeRequest(
+			_EngineFinalize_ReadinessState("api", RequestId, Signature))
+		AssertFalse(_LLM_Ollama_IsReady,
+			"(ahk2-13-backend-readiness-owner) remote API success must not publish Ollama readiness")
+		AssertEqual(1, _Stub_LlmTooltipCalls.Length,
+			"(ahk2-13-backend-readiness-owner) the remote control must still complete its ordinary final render")
+
+		_LLM_Ollama_IsReady := false
+		_LLM_Engine_FinalizeRequest(
+			_EngineFinalize_ReadinessState("ollama", RequestId, Signature))
+		AssertTrue(_LLM_Ollama_IsReady,
+			"(ahk2-13-backend-readiness-owner) Ollama success still owns its readiness publication")
+		AssertEqual(2, _Stub_LlmTooltipCalls.Length,
+			"(ahk2-13-backend-readiness-owner) both backend controls must reach the common finalizer")
+	} finally {
+		_LLM_Engine := SavedEngine
+		_LLM_Ollama_IsReady := SavedReady
+		_Stub_LlmTooltipCalls := SavedTooltipCalls
+	}
+}
+Test("LLM finalizer: Ollama readiness remains backend-owned (ahk2-13-backend-readiness-owner)",
+	_EngineFinalize_ReadyFlagBelongsToOllama)
+
 _EngineTypedRestoreFeedsValidatedAppFilter() {
 	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Engine
 	SavedMenu := _LLM_Menu

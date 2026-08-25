@@ -913,7 +913,8 @@ _LLM_Engine_FinalizeRequest(state) {
 	try LLM_ApiCommon_LogSummary((state.Has("is_batch") and state["is_batch"]) ? "batch" : "sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
 	try LoggerInfo("LLM", "Prediction received — {1} suggestion(s).", state["slots"].Length)
 	global _LLM_Ollama_IsReady
-	_LLM_Ollama_IsReady := true
+	if state.Get("backend", "") == "ollama"
+		_LLM_Ollama_IsReady := true
 
 	; Keylogger event — same shape as HS (modules/keylogger/init.lua /
 	; M.log_llm) so a tail of the unified log reads identically across
