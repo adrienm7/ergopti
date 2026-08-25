@@ -896,6 +896,7 @@ end
 -- recourse exists for the entire remainder of a slow boot, instead of only
 -- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
 -- have all completed (F-MED-19).
+local function finish_boot_after_onboarding()
 local prestart_committed = StartupTransaction.run({
 	{
 		name = "gestures",
@@ -1493,3 +1494,13 @@ pcall(function()
 		kl.flush_pending_ready_notification()
 	end
 end)
+end -- finish_boot_after_onboarding
+
+local post_onboarding_boot_ok, post_onboarding_boot_error = xpcall(
+	finish_boot_after_onboarding,
+	debug.traceback
+)
+if post_onboarding_boot_ok ~= true then
+	emergency_exit_after_runtime_failure("boot", post_onboarding_boot_error)
+	return
+end
