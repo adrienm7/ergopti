@@ -78,6 +78,7 @@ local _req_counter = 0
 local _ollama_started = false
 local _ollama_starting = false
 local _ollama_start_generation = 0
+local _ollama_start_transaction = nil
 local _ollama_kill_task = nil
 local _ollama_launch_timer = nil
 local _ollama_serve_task = nil
@@ -145,6 +146,62 @@ local recover_warmup_resume
 local recover_warmup_after_client
 local begin_warmup_resume_activation
 local recover_ollama_start_after_settlement
+
+--- Settles the exact supervised startup request once.
+--- @param generation number Startup generation owned by the request.
+--- @param committed boolean Whether the daemon reached native publication.
+--- @param reason string Stable terminal diagnostic.
+--- @return boolean settled True when this generation owned a request.
+local function settle_ollama_start_transaction(generation, committed, reason)
+	local transaction = _ollama_start_transaction
+	if type(transaction) ~= "table" or transaction.generation ~= generation then return false end
+	_ollama_start_transaction = nil
+	local ok, callback_result = xpcall(function()
+		return transaction.on_settled(committed == true, reason)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Ollama startup settlement callback raised: %s.", tostring(callback_result))
+	end
+	return true
+end
+
+--- Checks the live authority attached to one supervised startup generation.
+--- Unsupervised starts preserve the historical explicit-caller contract.
+--- @param generation number Startup generation.
+--- @return boolean authorized
+local function ollama_start_authorized(generation)
+	local transaction = _ollama_start_transaction
+	if type(transaction) ~= "table" or transaction.generation ~= generation then return true end
+	local ok, authorized = xpcall(transaction.is_authorized, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Ollama startup authority check raised: %s.", tostring(authorized))
+		return false
+	end
+	return authorized == true
+end
+
+--- Publishes one optional supervised request on the exact startup generation.
+--- @param options table|nil Optional callbacks supplied by the orchestrator.
+--- @param generation number Startup generation.
+--- @return boolean committed
+local function register_ollama_start_transaction(options, generation)
+	if options == nil then return true end
+	if type(options) ~= "table" or type(options.on_settled) ~= "function"
+		or type(options.is_authorized) ~= "function" then
+		Logger.error(LOG, "ensure_running(): supervised options require on_settled and is_authorized callbacks.")
+		return false
+	end
+	if _ollama_start_transaction ~= nil then
+		Logger.error(LOG, "ensure_running(): another supervised startup request is already active.")
+		return false
+	end
+	_ollama_start_transaction = {
+		generation = generation,
+		on_settled = options.on_settled,
+		is_authorized = options.is_authorized,
+	}
+	return true
+end
 local has_pending_ollama_start_owner
 
 --- Returns whether either Ollama owner owes post-pause restoration.
@@ -380,6 +437,26 @@ function M.reset_ready()
 	Logger.debug(LOG, "Ollama readiness flag reset — next warmup must re-confirm (gen %d).", _warmup_gen)
 end
 
+--- Delegates recovery to the prediction runtime without introducing a require
+--- cycle through modules.llm. The runtime owns backend selection, the user gate,
+--- global pause and the retry controller, so this transport owner may only
+--- invalidate its own verdict and request recovery.
+--- @return boolean committed True when recovery was accepted or parked.
+local function delegate_daemon_exit_recovery()
+	local owner = package.loaded["modules.llm.prediction_engine"]
+	if type(owner) ~= "table" or type(owner.on_ollama_daemon_exit) ~= "function" then
+		Logger.warn(LOG,
+			"Ollama server exited before the prediction recovery owner was available; readiness remains false.")
+		return false
+	end
+	local ok, result = xpcall(owner.on_ollama_daemon_exit, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "Ollama daemon recovery was not accepted: %s.", tostring(result))
+		return false
+	end
+	return true
+end
+
 --- Returns whether a non-terminal daemon-start capability still exists.
 --- A published daemon deliberately remains outside pause ownership.
 --- @return boolean pending
@@ -498,9 +575,11 @@ local function quiesce_ollama_start()
 		and _ollama_start_acquisition_depth == 0 then
 		return true
 	end
+	local quiesced_generation = _ollama_start_generation
 	_ollama_start_generation = _ollama_start_generation + 1
 	_ollama_starting = false
 	_ollama_start_cleanup_pending = true
+	settle_ollama_start_transaction(quiesced_generation, false, "startup quiesced")
 	if _ollama_start_acquisition_depth > 0 then return false end
 	return settle_ollama_start_cleanup()
 end
@@ -572,31 +651,58 @@ local STREAM_TMPFILE_CLEANUP_SEC = 70
 -- permanently corrupted the CFRunLoop and killed timers/menubar/eventtaps.
 -- @return boolean accepted True when a daemon is running or one launch attempt
 -- was committed to native async ownership.
-local function ensure_ollama_running()
+local function ensure_ollama_running(options)
 	if _ollama_ambiguous_task ~= nil then _ollama_start_cleanup_pending = true end
 	if _ollama_start_cleanup_pending == true
 		and settle_ollama_start_cleanup() ~= true then
 		Logger.error(LOG, "Ollama startup cleanup remains unsettled; sibling launch fenced.")
 		return false
 	end
-	if _ollama_started then return true end
+	if _ollama_started then
+		if options ~= nil then
+			if register_ollama_start_transaction(options, _ollama_start_generation) ~= true then
+				return false
+			end
+			settle_ollama_start_transaction(_ollama_start_generation, true, "already running")
+		end
+		return true
+	end
 	if _ollama_start_pause_fenced == true then
 		_ollama_start_resume_pending = true
+		if options ~= nil then
+			if register_ollama_start_transaction(options, _ollama_start_generation) ~= true then
+				return false
+			end
+			settle_ollama_start_transaction(_ollama_start_generation, false, "startup paused")
+		end
 		return true
 	end
 	local paused, _, pause_state_ok = read_script_pause_state()
 	if pause_state_ok == true and paused == true then
 		_ollama_start_resume_pending = true
+		if options ~= nil then
+			if register_ollama_start_transaction(options, _ollama_start_generation) ~= true then
+				return false
+			end
+			settle_ollama_start_transaction(_ollama_start_generation, false, "startup paused")
+		end
 		return true
 	end
-	if _ollama_starting then return true end
+	if _ollama_starting then
+		return register_ollama_start_transaction(options, _ollama_start_generation)
+	end
 
 	_ollama_start_generation = _ollama_start_generation + 1
 	local my_generation = _ollama_start_generation
 	_ollama_starting = true
+	if register_ollama_start_transaction(options, my_generation) ~= true then
+		_ollama_starting = false
+		return false
+	end
 
 	local function fail_start(stage, result, ambiguous_task)
 		if my_generation ~= _ollama_start_generation then
+			settle_ollama_start_transaction(my_generation, false, "startup superseded")
 			if ambiguous_task ~= nil
 				and (_ollama_kill_task == ambiguous_task
 					or _ollama_serve_task == ambiguous_task) then
@@ -622,8 +728,13 @@ local function ensure_ollama_running()
 					tostring(stage))
 			end
 		end
-		Logger.error(LOG, "Ollama %s did not commit (result: %s); launch remains retryable.",
-			tostring(stage), tostring(result))
+		if stage == "runtime authority superseded" then
+			Logger.debug(LOG, "Ollama startup stopped at a superseded runtime boundary.")
+		else
+			Logger.error(LOG, "Ollama %s did not commit (result: %s); launch remains retryable.",
+				tostring(stage), tostring(result))
+		end
+		settle_ollama_start_transaction(my_generation, false, tostring(stage))
 		return false
 	end
 
@@ -644,7 +755,11 @@ local function ensure_ollama_running()
 				claimed = true
 			end
 			if not claimed then return end
-			if my_generation ~= _ollama_start_generation or not _ollama_starting then
+			if my_generation ~= _ollama_start_generation or not _ollama_starting
+				or ollama_start_authorized(my_generation) ~= true then
+				if my_generation == _ollama_start_generation and _ollama_starting then
+					fail_start("runtime authority superseded", false)
+				end
 				recover_ollama_start_after_settlement()
 				return
 			end
@@ -654,7 +769,11 @@ local function ensure_ollama_running()
 			local launch_observer_registered = false
 			local function activate_server()
 				local launch_ok, launch_err = xpcall(function()
-					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
+					if my_generation ~= _ollama_start_generation or not _ollama_starting
+						or ollama_start_authorized(my_generation) ~= true then
+						fail_start("runtime authority superseded", false)
+						return
+					end
 
 					-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
 					-- [OLLAMA-SERVER] prefix. The shared builder captures only the stable
@@ -663,6 +782,10 @@ local function ensure_ollama_running()
 					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
 					if not ollama_bin then
 						fail_start("server executable resolution", binary_err)
+						return
+					end
+					if ollama_start_authorized(my_generation) ~= true then
+						fail_start("runtime authority superseded", false)
 						return
 					end
 					local launch_cmd, command_err = OllamaServerCommand.build(
@@ -692,9 +815,21 @@ local function ensure_ollama_running()
 								recover_ollama_start_after_settlement()
 								return
 							end
+							if _ollama_started ~= true or _ollama_starting == true then
+								fail_start("server task exited before publication", false)
+								return
+							end
 							_ollama_started = false
 							_ollama_starting = false
-							Logger.warn(LOG, "Ollama server task exited; the next demand will relaunch it.")
+							M.reset_ready()
+							_warmup_active = false
+							if delegate_daemon_exit_recovery() == true then
+								Logger.warn(LOG,
+									"Ollama server task exited; readiness invalidated and recovery delegated.")
+							else
+								Logger.error(LOG,
+									"Ollama server task exited; readiness invalidated but recovery remains pending.")
+							end
 						end, debug.traceback)
 						if not done_ok then Logger.error(LOG, "Ollama server completion callback raised: %s", tostring(done_err)) end
 					end
@@ -711,7 +846,8 @@ local function ensure_ollama_running()
 					serve_handle = spawned
 					_ollama_serve_task = serve_handle
 					if my_generation ~= _ollama_start_generation or not _ollama_starting
-						or _ollama_start_pause_fenced == true then
+						or _ollama_start_pause_fenced == true
+						or ollama_start_authorized(my_generation) ~= true then
 						fail_start("server task creation superseded", spawned, serve_handle)
 						return
 					end
@@ -724,13 +860,15 @@ local function ensure_ollama_running()
 						return
 					end
 					if not serve_completed and (my_generation ~= _ollama_start_generation
-						or not _ollama_starting or _ollama_start_pause_fenced == true) then
+						or not _ollama_starting or _ollama_start_pause_fenced == true
+						or ollama_start_authorized(my_generation) ~= true) then
 						fail_start("server task start superseded", start_result, serve_handle)
 						return
 					end
 					if not serve_completed and my_generation == _ollama_start_generation then
 						_ollama_started = true
 						_ollama_starting = false
+						settle_ollama_start_transaction(my_generation, true, "daemon published")
 						Logger.debug(LOG, "Ollama server launched asynchronously.")
 					end
 				end, debug.traceback)
@@ -782,6 +920,7 @@ local function ensure_ollama_running()
 			local launch_current = my_generation == _ollama_start_generation
 				and _ollama_starting == true
 				and _ollama_start_pause_fenced ~= true
+				and ollama_start_authorized(my_generation) == true
 			if not schedule_ok or settle_committed ~= true
 				or type(launch_handle) ~= "table" or launch_handle.timer == nil
 				or launch_callback_ran or launch_current ~= true then
@@ -808,7 +947,8 @@ local function ensure_ollama_running()
 	kill_handle = spawned
 	_ollama_kill_task = kill_handle
 	if my_generation ~= _ollama_start_generation or not _ollama_starting
-		or _ollama_start_pause_fenced == true then
+		or _ollama_start_pause_fenced == true
+		or ollama_start_authorized(my_generation) ~= true then
 		return fail_start("stale-process task creation superseded", spawned, kill_handle)
 	end
 	_ollama_start_acquisition_depth = _ollama_start_acquisition_depth + 1
@@ -819,7 +959,8 @@ local function ensure_ollama_running()
 		return fail_start("stale-process task start", start_result, ambiguous)
 	end
 	if not kill_completed and (my_generation ~= _ollama_start_generation
-		or not _ollama_starting or _ollama_start_pause_fenced == true) then
+		or not _ollama_starting or _ollama_start_pause_fenced == true
+		or ollama_start_authorized(my_generation) ~= true) then
 		return fail_start("stale-process task start superseded", start_result, kill_handle)
 	end
 	return true
@@ -829,8 +970,10 @@ end
 --- Must be called by the LLM orchestrator only when the effective backend is
 --- Ollama — calling it unconditionally at require-time launches Ollama even for
 --- MLX or API users who never selected it.
-function M.ensure_running()
-	local ok, result = xpcall(ensure_ollama_running, debug.traceback)
+--- @param options table|nil Optional supervised transaction callbacks.
+--- @return boolean accepted True when native ownership or terminal settlement committed.
+function M.ensure_running(options)
+	local ok, result = xpcall(ensure_ollama_running, debug.traceback, options)
 	if not ok or result ~= true then
 		Logger.error(LOG, "ensure_running() did not commit: %s", tostring(result))
 		return false

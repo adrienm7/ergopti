@@ -58,6 +58,7 @@ package.loaded["modules.llm"] = {
 	},
 	get_current_model       = function() return "llama3" end,
 	get_backend             = function() return "ollama" end,
+	get_runtime_llm_enabled = function() return true end,
 	set_llm_model_mlx       = function(_) return true end,
 	set_llm_model_ollama    = function(_) return true end,
 	pause_deferred_profile_warmup = function() return true end,
@@ -81,7 +82,16 @@ package.loaded["modules.llm.api_mlx"] = {
 	resume_warmup = function() return true end,
 	stop_warmup = function() return true end,
 }
+local ollama_daemon_starts = 0
+local ollama_start_requests = {}
 package.loaded["modules.llm.api_ollama"] = {
+	ensure_running = function(options)
+		ollama_daemon_starts = ollama_daemon_starts + 1
+		if type(options) == "table" then
+			ollama_start_requests[#ollama_start_requests + 1] = options
+		end
+		return true
+	end,
 	stop_warmup = function() return true end,
 }
 package.loaded["modules.llm.api_remote"] = {
@@ -349,6 +359,163 @@ helpers.describe("prediction_engine — initial state", function()
 		helpers.assert_eq(type(preds), "table")
 		helpers.assert_eq(#preds, 0)
 	end)
+end)
+
+
+
+
+-- ======================================================
+-- ======================================================
+-- ======= 4.1/ Ollama daemon recovery ownership ========
+-- ======================================================
+-- ======================================================
+
+helpers.describe("prediction_engine - Ollama daemon recovery", function()
+	helpers.it("restarts only the active runtime and parks recovery while paused", function()
+		local core = package.loaded["modules.llm"]
+		local scheduler = require("adapters.timer_scheduler")
+		local original_backend = core.get_backend
+		local original_runtime = core.get_runtime_llm_enabled
+		local original_after = scheduler.after
+		local original_cancel = scheduler.cancel
+		local retry_callbacks = {}
+		scheduler.after = function(_, callback)
+			local handle = { timer = {} }
+			retry_callbacks[#retry_callbacks + 1] = function()
+				if handle.timer == nil then return end
+				handle.timer = nil
+				callback()
+			end
+			return handle, true
+		end
+		scheduler.cancel = function(handle)
+			handle.timer = nil
+			return true
+		end
+		local available = true
+		PE.set_runtime_guard(function() return available end)
+		local ok, err = xpcall(function()
+			helpers.assert_true(PE.set_llm_enabled(true))
+			ollama_daemon_starts = 0
+			ollama_start_requests = {}
+			warmup_schedule_reasons = {}
+
+			helpers.assert_eq(type(PE.on_ollama_daemon_exit), "function",
+				"the daemon supervisor must have a prediction-runtime recovery owner")
+			helpers.assert_eq(PE.on_ollama_daemon_exit(), true)
+			helpers.assert_eq(ollama_daemon_starts, 1)
+			helpers.assert_eq(#warmup_schedule_reasons, 0,
+				"warmup must wait for native daemon publication")
+			helpers.assert_eq(type(ollama_start_requests[1].on_settled), "function")
+			core.get_backend = function() error("backend identity temporarily unreadable") end
+			ollama_start_requests[1].on_settled(false, "spawn refused")
+			core.get_backend = original_backend
+			helpers.assert_eq(#retry_callbacks, 1,
+				"an unreadable settlement identity must retain intent behind an owned retry")
+			helpers.assert_eq(#warmup_schedule_reasons, 0)
+			retry_callbacks[1]()
+			helpers.assert_eq(ollama_daemon_starts, 2)
+			ollama_start_requests[2].on_settled(true, "published")
+			helpers.assert_eq(warmup_schedule_reasons[#warmup_schedule_reasons],
+				"ollama daemon exit")
+
+			available = false
+			helpers.assert_eq(PE.on_ollama_daemon_exit(), true,
+				"a paused runtime must retain recovery intent without reviving the daemon")
+			helpers.assert_eq(ollama_daemon_starts, 2)
+			available = true
+			PE.is_visible()
+			helpers.assert_eq(ollama_daemon_starts, 3,
+				"the first live runtime boundary after resume must settle parked recovery")
+			helpers.assert_eq(ollama_start_requests[3].is_authorized(), true)
+			available = false
+			helpers.assert_eq(ollama_start_requests[3].is_authorized(), false)
+			ollama_start_requests[3].on_settled(false, "startup quiesced")
+			helpers.assert_eq(#retry_callbacks, 1,
+				"pause during acquisition must park intent without arming a live retry")
+			available = true
+			PE.is_visible()
+			helpers.assert_eq(ollama_daemon_starts, 4,
+				"resume after an in-flight pause must acquire exactly one successor")
+			helpers.assert_eq(ollama_start_requests[4].is_authorized(), true)
+			core.get_backend = function() return "mlx" end
+			helpers.assert_eq(ollama_start_requests[4].is_authorized(), false,
+				"backend authority must stay live for every async startup boundary")
+			ollama_start_requests[4].on_settled(false, "authority superseded")
+			helpers.assert_eq(ollama_daemon_starts, 4)
+			helpers.assert_eq(#retry_callbacks, 1,
+				"a superseded backend must not arm an Ollama retry")
+			helpers.assert_eq(warmup_schedule_reasons[#warmup_schedule_reasons],
+				"ollama daemon exit")
+
+			helpers.assert_eq(PE.on_ollama_daemon_exit(), true)
+			helpers.assert_eq(ollama_daemon_starts, 4,
+				"a backend switch must not resurrect Ollama")
+		end, debug.traceback)
+		core.get_backend = original_backend
+		core.get_runtime_llm_enabled = original_runtime
+		scheduler.after = original_after
+		scheduler.cancel = original_cancel
+		PE.set_runtime_guard(function() return true end)
+		local disabled = PE.set_llm_enabled(false)
+		if not ok then error(err, 0) end
+		helpers.assert_true(disabled)
+	end)
+
+	for _, case in ipairs({
+		{ name = "false", cancel = function() return false end },
+		{ name = "nil", cancel = function() return nil end },
+		{ name = "throw", cancel = function() error("recovery timer cancel raised") end },
+	}) do
+		helpers.it("retains recovery cleanup debt when timer cancel returns " .. case.name, function()
+			local core = package.loaded["modules.llm"]
+			local scheduler = require("adapters.timer_scheduler")
+			local original_backend = core.get_backend
+			local original_after = scheduler.after
+			local original_cancel = scheduler.cancel
+			local retry_callbacks = {}
+			local retained_handle
+			scheduler.after = function(_, callback)
+				local handle = { timer = {} }
+				retained_handle = handle
+				retry_callbacks[#retry_callbacks + 1] = function()
+					if handle.timer == nil then return end
+					handle.timer = nil
+					callback()
+				end
+				return handle, true
+			end
+			scheduler.cancel = case.cancel
+			local ok, err = xpcall(function()
+				core.get_backend = function() return "ollama" end
+				helpers.assert_true(PE.set_llm_enabled(true))
+				ollama_start_requests = {}
+				helpers.assert_true(PE.on_ollama_daemon_exit())
+				local starts_after_recovery_start = ollama_daemon_starts
+				ollama_start_requests[1].on_settled(false, "spawn refused")
+				helpers.assert_eq(#retry_callbacks, 1)
+				helpers.assert_eq(PE.set_llm_enabled(false), false,
+					"disable must expose an unsettled recovery-timer owner")
+				helpers.assert_true(retained_handle.timer ~= nil,
+					"a refused exact timer cancellation must retain the same handle")
+
+				scheduler.cancel = function(handle)
+					handle.timer = nil
+					return true
+				end
+				helpers.assert_true(PE.set_llm_enabled(false),
+					"a later disable must retry and settle the retained owner")
+				retry_callbacks[1]()
+				helpers.assert_eq(ollama_daemon_starts, starts_after_recovery_start,
+					"a stale settled retry callback must never restart Ollama")
+			end, debug.traceback)
+			core.get_backend = original_backend
+			scheduler.after = original_after
+			scheduler.cancel = original_cancel
+			PE.set_llm_enabled(false)
+			if not ok then error(err, 0) end
+		end)
+	end
 end)
 
 
