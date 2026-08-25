@@ -17,8 +17,9 @@
 --- 2. Known-app guard: some security apps never expose a secure role (e.g. vault
 ---    unlock screens rendered in WebKit); the hardcoded list provides a second
 ---    line of defence for those cases.
---- 3. Fail-safe returns: every public method returns a safe default (false) on
----    any error so the caller can always treat the result as a plain boolean.
+--- 3. Fail-safe returns: an incomplete AX classification is treated as secure so
+---    neither local metrics nor LLM requests can capture credentials while a
+---    browser replaces its focused element.
 --- ==============================================================================
 
 local M = {}
@@ -67,13 +68,8 @@ local SECURE_APP_IDS = {
 -- =================================
 -- =================================
 
--- Cached AXRole of the focused element, populated by refresh()
-local _cached_role = nil
-
--- Cached AXSubrole of the focused element, populated by refresh(). Kept beside
--- the role because Chromium-family browsers report a password input as
--- AXRole = AXTextField with the secure marker demoted to the subrole.
-local _cached_subrole = nil
+-- Cached secure-field verdict for the focused element, populated by refresh().
+local _cached_secure = false
 
 
 
@@ -85,17 +81,34 @@ local _cached_subrole = nil
 -- ==================================
 -- ==================================
 
---- Re-reads the focused element via hs.axuielement and caches its AXRole and AXSubrole.
---- Uses applicationElementForPID + AXFocusedUIElement — the only stable HS API for this.
---- hs.axuielement.focusedElement() does not exist in Hammerspoon; accessing the focused
---- element requires going through the application's accessibility tree (H2 audit fix).
---- Errors are silently ignored; both cached attributes are reset to nil on failure.
+--- Classifies one focused accessibility element.
+--- AXRole and AXSubrole are one privacy decision: WebKit/Blink expose the secure
+--- marker only through AXSubrole, so either read failing leaves the classification
+--- uncertain and must fail closed.
+--- @param element userdata|table|nil Focused accessibility element.
+--- @return boolean True for a secure or incompletely classified element.
+function M.isElementSecure(element)
+	if not element then return false end
+	local ok_role, role    = pcall(function() return element:attributeValue("AXRole") end)
+	local ok_sub,  subrole = pcall(function() return element:attributeValue("AXSubrole") end)
+	if (ok_role and role == SECURE_ROLE) or (ok_sub and subrole == SECURE_ROLE) then
+		return true
+	end
+	if not ok_role or not ok_sub then
+		Logger.debug(LOG,
+			"AX secure-field classification incomplete (role_read=%s, subrole_read=%s); suppressing input.",
+			tostring(ok_role), tostring(ok_sub))
+		return true
+	end
+	return false
+end
+
+--- Re-reads the focused element and caches its secure-field verdict.
+--- Uses applicationElementForPID + AXFocusedUIElement, the stable Hammerspoon API
+--- for reaching the focused accessibility element.
 function M.refresh()
-	-- Every early exit below must clear BOTH attributes: leaving a stale subrole
-	-- behind would keep reporting a password field long after focus moved away.
 	local function clear_cache()
-		_cached_role    = nil
-		_cached_subrole = nil
+		_cached_secure = false
 	end
 
 	local ok, err = pcall(function()
@@ -113,19 +126,7 @@ function M.refresh()
 
 		local focused = app_el:attributeValue("AXFocusedUIElement")
 		if focused then
-			-- Each attribute is read in its OWN pcall. Sharing the outer one meant a
-			-- throw on the SECOND read aborted the closure and sent control to the
-			-- handler below, which clears BOTH — discarding an "AXSecureTextField"
-			-- already stored by the first read. isSecureField() then returned false
-			-- for a genuine password field: it failed OPEN, the exact mode this
-			-- module's own docstring calls "letting the keylogger record the user's
-			-- password characters". AX reads throw on a dead or replaced element, so
-			-- one of the two failing is ordinary. Mirrors the per-attribute pcalls
-			-- keylogger/context_tracker.lua already uses for the same two reads.
-			local ok_role, role    = pcall(function() return focused:attributeValue("AXRole") end)
-			local ok_sub,  subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
-			_cached_role    = ok_role and role    or nil
-			_cached_subrole = ok_sub  and subrole or nil
+			_cached_secure = M.isElementSecure(focused)
 		else
 			clear_cache()
 		end
@@ -143,9 +144,9 @@ end
 --- WebKit/Blink report AXRole = AXTextField and demote the marker to AXSubrole.
 --- Testing the role alone therefore fails OPEN on every Chrome/Edge/Brave/Arc
 --- login form, letting the keylogger record the user's password characters.
---- @return boolean True when either cached attribute is "AXSecureTextField".
+--- @return boolean True when the cached element is secure or classification was incomplete.
 function M.isSecureField()
-	return _cached_role == SECURE_ROLE or _cached_subrole == SECURE_ROLE
+	return _cached_secure
 end
 
 --- Returns true if the given app ID belongs to a known security-sensitive app.
