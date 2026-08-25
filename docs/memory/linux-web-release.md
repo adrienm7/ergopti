@@ -48,10 +48,13 @@ active deployment mode.
 Since libxkbcommon 1.13 + xkeyboard-config 2.45, layout packages install under
 `/usr/share/xkeyboard-config.d/<package>/{symbols,types,rules}` and compose
 rules through a `<ruleset>.post` file - never by patching the system
-`rules/evdev`. The Ergopti clean installer and the AUR PKGBUILD both rely on
-this; the sandbox tests override the roots via `ERGOPTI_XKB_*` env vars.
-Action: any new install target must keep the extensions-dir contract or
-explicitly justify an X11-only bridge.
+`rules/evdev`. The Ergopti clean installer relies on this contract; the sandbox
+tests override the roots via `ERGOPTI_XKB_*` env vars. The repository does not
+ship a separate AUR `PKGBUILD`: the former handwritten recipe referenced an
+absent tag and hook and drifted from the canonical package builder. Action: any
+new install target must reuse/generate from the canonical builder, pass a real
+package build in CI, and keep the extensions-dir contract unless it explicitly
+justifies an X11-only bridge.
 
 ### project-gsettings-input-sources-must-be-merged-not-set
 
