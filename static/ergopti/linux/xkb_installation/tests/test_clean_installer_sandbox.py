@@ -40,6 +40,8 @@ class CleanInstallerSandboxTests(unittest.TestCase):
         self.extensions_root = self.sandbox / "xkeyboard-config.d"
         self.system_root = self.sandbox / "X11" / "xkb"
         self.cache_dir = self.sandbox / "cache"
+        self.external_bin = self.sandbox / "bin"
+        self.external_bin.mkdir()
         for directory in (self.system_root / "symbols", self.system_root / "rules"):
             directory.mkdir(parents=True)
         self.package_dir = self.extensions_root / "ergopti"
@@ -49,6 +51,7 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             "ERGOPTI_XKB_SYSTEM_ROOT": str(self.system_root),
             "ERGOPTI_XKB_CACHE_DIR": str(self.cache_dir),
             "ERGOPTI_XKB_USER_HOME": str(self.sandbox / "home"),
+            "PATH": str(self.external_bin),
             "PYTHONIOENCODING": "utf-8",
         }
         # Generation-2 leftovers that an upgrade must neutralise.
