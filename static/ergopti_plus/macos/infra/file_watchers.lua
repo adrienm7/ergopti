@@ -49,15 +49,14 @@ local SCAN_MAX_DEPTH = 16
 -- (ui/menu/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
 local BOOT_SUPPRESS_SEC = 5
 
--- Max consecutive hold re-polls (each one 0.5 s tick) with NO new file activity,
--- before the hold is bypassed. Real activity resets the counter (see note_change),
--- so a genuine bulk write never trips it — only a quiet-but-stuck state (a STALE
--- index.lock left by a crashed git) climbs toward it. Capped so such a stale lock
--- cannot postpone auto-reload forever.
+-- Consecutive Git-hold re-polls before one visible warning is emitted. A live
+-- index.lock remains authoritative regardless of elapsed time: bypassing it can
+-- reload a half-checked-out tree. The counter saturates after the warning so a
+-- stale lock remains safe without flooding the log.
 -- The poll interval itself stays the bare literal 0.5 in hs.timer.doAfter below —
 -- a cross-driver single-source gate pins it to Linux's _debounce_sec
 -- (tools/test/test-file-watchers-constants-single-source.cjs).
-local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck repo
+local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 
 
 
@@ -303,10 +302,8 @@ function M.start(ctx)
 		callback_admissions[#callback_admissions + 1] = admission
 		return true
 	end
-	-- Consecutive hold re-polls with NO new file activity; reset to 0 by any real
-	-- file event (note_change) and by a fired reload, capped by
-	-- GIT_SETTLE_MAX_DEFERRALS so only a genuinely stuck state (a stale index.lock,
-	-- or an unending write stream) can ever bypass the hold.
+	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
+	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
 	local defer_count = 0
 	-- Distinct source paths changed since the current burst began, and the epoch
 	-- time (s) of the last change. Together they drive the adaptive settle: a lone
@@ -389,18 +386,24 @@ function M.start(ctx)
 		--   2. Git — a git operation holds .git/index.lock for the whole update, so
 		--      it is deferred exactly even if its file events pause partway through.
 		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
-		local hold, why
 		if not reload_gate.is_settled(elapsed, burst_count) then
-			hold, why = true, "filesystem settling"
-		else
-			local busy, repo = any_git_operation_in_progress()
-			if busy then
-				hold, why = true, "git operation in progress in " .. tostring(repo)
-			end
+			Logger.debug(LOG, "Reload held (filesystem settling) on '%s'.", base_dir)
+			arm_timer(msg)
+			return
 		end
-		if hold and defer_count < GIT_SETTLE_MAX_DEFERRALS then
-			defer_count = defer_count + 1
-			Logger.debug(LOG, "Reload held (%s) on '%s' (%d/%d).", why, base_dir, defer_count, GIT_SETTLE_MAX_DEFERRALS)
+		local busy, repo = any_git_operation_in_progress()
+		if busy then
+			if defer_count < GIT_HOLD_WARN_DEFERRALS then
+				defer_count = defer_count + 1
+				if defer_count == GIT_HOLD_WARN_DEFERRALS then
+					Logger.warn(LOG,
+						"Git operation in '%s' still owns the reload fence after %d checks; reload remains pending.",
+						tostring(repo), GIT_HOLD_WARN_DEFERRALS)
+				else
+					Logger.debug(LOG, "Reload held (git operation in progress in %s) on '%s' (%d/%d).",
+						tostring(repo), base_dir, defer_count, GIT_HOLD_WARN_DEFERRALS)
+				end
+			end
 			arm_timer(msg)
 			return
 		end
