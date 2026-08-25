@@ -905,17 +905,49 @@ function M.is_blocking_scroll()
 	return isBlockingScroll
 end
 
+--- Cancels the current gesture without committing an action.
+--- This is the lifecycle boundary used when input admission closes while the
+--- physical lift frame may never reach process_frame().
+--- @return boolean settled
+function M.cancel_current_gesture()
+	resetGS()
+	return true
+end
+
 --- Stops the engine and releases the scroll-blocker eventtap.
 --- Must be called from gestures init.lua M.stop() so the tap is not left armed
 --- across reloads (N reloads without stop → N concurrent scroll eventtaps).
+--- @return boolean settled True only after the exact eventtap is disabled.
 function M.stop()
-	if scrollBlocker then
-		pcall(function() scrollBlocker:stop() end)
-		scrollBlocker = nil
+	M.cancel_current_gesture()
+	local blocker = scrollBlocker
+	if blocker then
+		local stop_ok, stop_result = xpcall(function()
+			if type(blocker.stop) ~= "function" then
+				error("eventtap stop is unavailable")
+			end
+			return blocker:stop()
+		end, debug.traceback)
+		local probe_ok, enabled_or_error = xpcall(function()
+			if type(blocker.isEnabled) ~= "function" then
+				error("eventtap isEnabled is unavailable")
+			end
+			return blocker:isEnabled()
+		end, debug.traceback)
+		if not stop_ok or stop_result == nil or stop_result == false
+			or not probe_ok or enabled_or_error ~= false then
+			Logger.error(LOG,
+				"Gesture scroll-blocker teardown did not settle; exact handle retained " ..
+				"(stop=%s, enabled=%s).",
+				tostring(stop_result), tostring(enabled_or_error))
+			return false
+		end
+		if scrollBlocker == blocker then scrollBlocker = nil end
 	end
 	_state   = nil
 	_actions = nil
 	Logger.done(LOG, "Gestures engine stopped.")
+	return true
 end
 
 --- Registers a callback fired on every frame where at least one finger touches
