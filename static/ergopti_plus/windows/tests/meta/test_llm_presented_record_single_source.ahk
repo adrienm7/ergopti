@@ -105,8 +105,11 @@ _LPRS_StaleNavigationRepaintNeverHidesCurrentPixels() {
 		_DriverFuncBody("_LLM_NavEventOwnerRetryDrain"))
 	Service := _StripFullLineComments(
 		_DriverFuncBody("_LLM_NavEventOwnerService"))
+	Drain := _StripFullLineComments(
+		_DriverFuncBody("_LLM_NavEventOwnerDrain"))
 	Assert(Present != "" and Show != "" and Commit != "" and Render != ""
-		and ScheduleDrain != "" and RetryDrain != "" and Service != "",
+		and ScheduleDrain != "" and RetryDrain != "" and Service != ""
+		and Drain != "",
 		"navigation repaint ownership bodies must remain discoverable")
 
 	BeginPos := InStr(Present, "LLM_NavEventOwner_BeginSurfaceSwap(")
@@ -161,8 +164,12 @@ _LPRS_StaleNavigationRepaintNeverHidesCurrentPixels() {
 		"one-shot retry must schedule the distinct drain callback")
 	Assert(InStr(RetryDrain, "_LLM_NavEventOwnerDrain()") > 0,
 		"the distinct one-shot callback must drain navigation receipts")
-	Assert(InStr(Service, "_LLM_NavEventOwnerDrain(RenderFn)") > 0,
-		"the repeating service callback must retain its injectable receipt drain")
+	Assert(InStr(Service,
+		"_LLM_NavEventOwnerDrain(RenderFn, DegradeFn)") > 0,
+		"the repeating service callback must retain its injectable receipt drain and exact degradation boundary")
+	Assert(InStr(Drain, "Degrader := LLM_Tooltip_HideExact") > 0
+		and InStr(Drain, "Degrader.Call(Entry.Record)") > 0,
+		"production repaint exhaustion must hide the exact stale-pixel record, never an ambient tooltip")
 	Assert(InStr(Show, "SetTimer(_LLM_NavEventOwnerService, -1)") == 0,
 		"a repaint retry must not overwrite the repeating service timer")
 }
