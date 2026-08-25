@@ -145,6 +145,46 @@ function M.utf8_len(s)
 	return (ok and len) and len or #s
 end
 
+--- Replaces a UTF-8 buffer tail using one strict codepoint unit throughout.
+--- Unlike utf8_len(), this transaction boundary never falls back to byte length:
+--- malformed cursor state or an impossible delete count must be rejected before
+--- a caller constructs native Backspace or text events.
+--- @param buffer string The exact logical buffer before replacement.
+--- @param delete_count number The non-negative integer codepoint count to remove.
+--- @param replacement string The valid UTF-8 suffix to append.
+--- @return string|nil next_buffer The fully spliced buffer, or nil on refusal.
+--- @return string|nil error_message A privacy-safe refusal reason.
+function M.replace_utf8_tail(buffer, delete_count, replacement)
+	if type(buffer) ~= "string" then return nil, "buffer must be a string" end
+	if type(replacement) ~= "string" then return nil, "replacement must be a string" end
+	if type(delete_count) ~= "number" or delete_count < 0
+		or delete_count ~= math.floor(delete_count) then
+		return nil, "delete count must be a non-negative integer"
+	end
+
+	local buffer_ok, buffer_length = pcall(utf8_lib.len, buffer)
+	if not buffer_ok or type(buffer_length) ~= "number" then
+		return nil, "buffer is not valid UTF-8"
+	end
+	local replacement_ok, replacement_length = pcall(utf8_lib.len, replacement)
+	if not replacement_ok or type(replacement_length) ~= "number" then
+		return nil, "replacement is not valid UTF-8"
+	end
+	if delete_count > buffer_length then
+		return nil, "delete count exceeds buffer codepoint length"
+	end
+
+	local keep_count = buffer_length - delete_count
+	if keep_count == 0 then return replacement end
+	if delete_count == 0 then return buffer .. replacement end
+
+	local offset_ok, replacement_start = pcall(utf8_lib.offset, buffer, keep_count + 1)
+	if not offset_ok or type(replacement_start) ~= "number" then
+		return nil, "buffer tail boundary could not be resolved"
+	end
+	return buffer:sub(1, replacement_start - 1) .. replacement
+end
+
 --- Checks if a string ends with a specific UTF-8 suffix.
 --- @param s string The target string.
 --- @param suffix string The suffix to check for.

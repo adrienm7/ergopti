@@ -1584,6 +1584,19 @@ function M.apply_prediction(idx)
 	end
 	delete_count = res_deletes
 	text_to_type = res_text
+	local next_buffer, splice_error =
+		text_utils.replace_utf8_tail(_state.buffer, delete_count, text_to_type)
+	if next_buffer == nil then
+		Logger.error(LOG, "Prediction cursor context is invalid; output rejected before injection: %s.",
+			tostring(splice_error))
+		invalidate_cursor_context(true)
+		local cleanup_ok, cleanup_result = xpcall(M.reset_predictions, debug.traceback)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Invalid prediction context cleanup did not commit (result: %s).",
+				tostring(cleanup_result))
+		end
+		return false
+	end
 
 	Logger.start(LOG, "Applying prediction #%d: '%s' (%d deletion(s)).",
 		idx, tostring(text_to_type), delete_count)
@@ -1624,15 +1637,7 @@ function M.apply_prediction(idx)
 			-- Sync the in-memory buffer to reflect the accepted completion. Tagged
 			-- transaction events already carry their provenance independently of
 			-- whether the text path used direct key pairs or Cmd+V.
-			if delete_count == 0 then
-				_state.buffer = _state.buffer .. text_to_type
-			else
-				local ok, start_pos = pcall(utf8.offset, _state.buffer, -delete_count)
-				if not ok or not start_pos or delete_count >= #_state.buffer then
-					start_pos = 1
-				end
-				_state.buffer = (_state.buffer:sub(1, start_pos - 1) or "") .. text_to_type
-			end
+			_state.buffer = next_buffer
 			_state.llm_buffer = _state.buffer
 		end,
 		true,   -- is_final
