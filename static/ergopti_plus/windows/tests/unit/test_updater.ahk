@@ -63,6 +63,39 @@ _UpdaterTest_ParseVersion() {
 Test("Updater: version parsing", _UpdaterTest_ParseVersion)
 
 
+_UpdaterTest_NestedAssetMetadata() {
+	Url := "https://example.test/download/ErgoptiPlus.exe"
+	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '"}]}'
+	AssertEqual(Url, _Updater_FindAssetUrl(ReleaseJson, "ErgoptiPlus.exe"),
+		"(ahk7-01-updater-nested-asset) nested GitHub asset metadata must not hide the direct asset fields")
+}
+Test("Updater: nested GitHub asset metadata resolves the exact asset (ahk7-01-updater-nested-asset)",
+	_UpdaterTest_NestedAssetMetadata)
+
+
+_UpdaterTest_AssetResolutionIsStructuralAndExact() {
+	ReleaseJson := '{"assets":['
+		. '{"uploader":{"name":"ErgoptiPlus.exe","browser_download_url":"https://evil.test/nested.exe"},'
+		. '"name":"ErgoptiPlus.exe.bak","browser_download_url":"https://example.test/backup.exe"},'
+		. '{"name":"ErgoptiPlus.exe","browser_download_url":"https:\/\/example.test\/exact.exe"}'
+		. ']}'
+	AssertEqual("https://example.test/exact.exe", _Updater_FindAssetUrl(ReleaseJson, "ErgoptiPlus.exe"),
+		"(ahk7-01-updater-nested-asset) nested names and prefix collisions must not impersonate a direct exact asset")
+	AssertEqual("", _Updater_FindAssetUrl(ReleaseJson, "ergoptiplus.exe"),
+		"(ahk7-01-updater-nested-asset) release asset names are exact and case-sensitive")
+	AssertEqual("", _Updater_FindAssetUrl('{"assets":{"name":"ErgoptiPlus.exe"}}', "ErgoptiPlus.exe"),
+		"(ahk7-01-updater-nested-asset) assets must be an array")
+	AssertEqual("", _Updater_FindAssetUrl('{"assets":[{"name":7,"browser_download_url":false}]}', "ErgoptiPlus.exe"),
+		"(ahk7-01-updater-nested-asset) asset fields must be strings")
+	AssertEqual("", _Updater_FindAssetUrl('{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":""}]}', "ErgoptiPlus.exe"),
+		"(ahk7-01-updater-nested-asset) an empty download URL is not a usable asset")
+	AssertEqual("", _Updater_FindAssetUrl('{"assets":[}', "ErgoptiPlus.exe"),
+		"(ahk7-01-updater-nested-asset) malformed release JSON fails closed")
+}
+Test("Updater: asset resolution is structural and exact (ahk7-01-updater-nested-asset)",
+	_UpdaterTest_AssetResolutionIsStructuralAndExact)
+
+
 ; Regression: Updater_FetchLatestJson must call SetTimeouts before Req.Send()
 ; so synchronous WinHttp calls cannot block the AHK main thread indefinitely.
 ; Without SetTimeouts the default WinHttp timeout is ~60 s per phase — long
