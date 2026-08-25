@@ -207,7 +207,8 @@ _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal
 }
 
 ; Dispatch the POST through a curl child process so the connect happens in curl's own
-; process — the AHK message loop only polls ProcessExist. Mirrors _LLM_Ollama_DispatchAsync.
+; process — the AHK message loop only polls its durable terminal sidecar. Mirrors
+; _LLM_Ollama_DispatchAsync.
 ; Returns true once it owns the request (dispatched, or failed and fired on_fail); returns
 ; false ONLY when curl is unavailable, so the caller falls back to WinHTTP.
 _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms, Port := 0) {
@@ -255,7 +256,7 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     }
     ; URL and auth headers come from --config, never from argv (see
     ; _LLMRemote_BuildCurlConfig): argv has no ACL for a same-user reader.
-    curlCmd := '"' . curl_exe . '" -s -S -X POST '
+    curlCmd := '"' . curl_exe . '" -s -S -m ' . Max(1, Ceil(timeout_ms / 1000)) . ' -X POST '
         . '--config ' . _Q(tmp_config) . ' '
         . '--data-binary @' . _Q(tmp_payload) . ' '
         . '-o ' . _Q(tmp_stdout)
@@ -269,12 +270,13 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
         _LLM_InvokeCallback(on_fail, "on_fail")
         return true
     }
+    process_owner := _LLM_CurlAdoptProcess(pid, Port)
     _LLMRemote_TrimAsyncRegistry()
     ; ``model_id_at_dispatch`` is what the usage extractor prices the response
     ; against; the WinHTTP sibling has always recorded it and the curl transport
     ; (the only one reached on a host that ships curl.exe) must too.
     _LLM_Remote_Async[req_id] := Map(
-        "transport", "curl", "pid", pid,
+        "transport", "curl", "pid", pid, "process_owner", process_owner,
         "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout, "tmp_config", tmp_config,
         "tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
         "format", resolved["Format"], "model_id_at_dispatch", resolved["Model"],
@@ -299,14 +301,51 @@ _LLMRemoteClassifyTerminal(Format, Terminal, Model := "") {
 
 _LLMRemote_PollCurl(req_id, Port := 0) {
     global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
-    ProcessExistsFn := _LLM_CurlArtifactPortFn(Port, "process_exists", ProcessExist)
     ReadTerminalFn := _LLM_CurlArtifactPortFn(Port, "read_terminal", _LLM_CurlReadTerminal)
     CleanupFn := _LLM_CurlArtifactPortFn(Port, "cleanup", _LLMRemote_CurlCleanup)
     if !_LLM_Remote_Async.Has(req_id)
         return
     entry := _LLM_Remote_Async[req_id]
+    terminal := ReadTerminalFn.Call(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
+    ; The exit sidecar is written last by _LLM_CurlOwnedCommand. Resolve that
+    ; durable receipt before cancellation, deadline or PID state: the numeric PID
+    ; may already name an unrelated process by the time this timer runs.
+    if _LLM_CurlTerminalComplete(terminal) {
+        _LLM_CurlReleaseEntryProcess(entry, false, Port)
+        if entry["cancelled"] {
+            CleanupFn.Call(entry)
+            _LLM_Remote_Async.Delete(req_id)
+            return
+        }
+        on_success := entry["on_success"]
+        on_fail    := entry["on_fail"]
+        fmt        := entry["format"]
+        model_id   := entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : ""
+        body := terminal["body"]
+        Classified := _LLMRemoteClassifyTerminal(fmt, terminal, model_id)
+        if !Classified["terminal_ok"] {
+            try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4}.",
+                req_id, terminal["exit"], terminal["status"], StrLen(body))
+            CleanupFn.Call(entry)
+            _LLM_Remote_Async.Delete(req_id)
+            _LLM_InvokeCallback(on_fail, "on_fail")
+            return
+        }
+        if !Classified["ok"] {
+            try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, body_chars={3}).",
+                req_id, Classified["reason"], StrLen(body))
+            CleanupFn.Call(entry)
+            _LLM_Remote_Async.Delete(req_id)
+            _LLM_InvokeCallback(on_fail, "on_fail")
+            return
+        }
+        CleanupFn.Call(entry)
+        _LLM_Remote_Async.Delete(req_id)
+        _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
+        return
+    }
     if entry["cancelled"] {
-        try ProcessClose(entry["pid"])
+        _LLM_CurlReleaseEntryProcess(entry, true, Port)
         CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         return
@@ -315,43 +354,16 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         ; Hoisted above the Delete so the wrapper still has the callback, matching
         ; the sibling branches in _LLMRemote_PollRequest.
         on_fail := entry["on_fail"]
-        try ProcessClose(entry["pid"])
+        _LLM_CurlReleaseEntryProcess(entry, true, Port)
         CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
         _LLM_InvokeCallback(on_fail, "on_fail")
         return
     }
-    if ProcessExistsFn.Call(entry["pid"]) {
-        SetTimer(() => _LLMRemote_PollCurl(req_id, Port), -LLM_REMOTE_POLL_MS)
-        return
-    }
-    on_success := entry["on_success"]
-    on_fail    := entry["on_fail"]
-    fmt        := entry["format"]
-    model_id   := entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : ""
-    terminal := ReadTerminalFn.Call(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
-    body := terminal["body"]
-    Classified := _LLMRemoteClassifyTerminal(fmt, terminal, model_id)
-    if !Classified["terminal_ok"] {
-        try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4}.",
-            req_id, terminal["exit"], terminal["status"], StrLen(body))
-        CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
-        _LLM_InvokeCallback(on_fail, "on_fail")
-        return
-    }
-    if !Classified["ok"] {
-        try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, body_chars={3}).",
-            req_id, Classified["reason"], StrLen(body))
-        CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
-        _LLM_InvokeCallback(on_fail, "on_fail")
-        return
-    }
-    CleanupFn.Call(entry)
-    _LLM_Remote_Async.Delete(req_id)
-    _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
+    ; No terminal receipt yet. Poll the receipt itself until its bounded deadline;
+    ; ProcessExist(pid) cannot distinguish the original child from a recycled PID.
+    SetTimer(() => _LLMRemote_PollCurl(req_id, Port), -LLM_REMOTE_POLL_MS)
 }
 
 LLM_RemoteCancelAsync(req_id) {
@@ -368,8 +380,9 @@ LLM_RemoteCancelAsync(req_id) {
     entry["cancelled"] := true
     Kills := []
     if (entry.Has("transport") and entry["transport"] == "curl") {
-        if entry.Has("pid")
-            Kills.Push(Map("pid", entry["pid"]))
+        if entry.Has("process_owner")
+            Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
+                entry["process_owner"], true)))
     } else if entry.Has("http") {
         Kills.Push(Map("http", entry["http"]))
     }
@@ -388,8 +401,9 @@ LLM_RemoteCancelAllAsync() {
     for _id, entry in _LLM_Remote_Async {
         entry["cancelled"] := true
         if (entry.Has("transport") and entry["transport"] == "curl") {
-            if entry.Has("pid")
-                Kills.Push(Map("pid", entry["pid"]))
+            if entry.Has("process_owner")
+                Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
+                    entry["process_owner"], true)))
         } else if entry.Has("http") {
             Kills.Push(Map("http", entry["http"]))
         }
@@ -545,7 +559,7 @@ _LLMRemote_TrimAsyncRegistry() {
         if oldest_entry.Has("http")
             try oldest_entry["http"].Abort()
         if (oldest_entry.Has("transport") and oldest_entry["transport"] == "curl") {
-            try ProcessClose(oldest_entry["pid"])
+            _LLM_CurlReleaseEntryProcess(oldest_entry, true)
             _LLMRemote_CurlCleanup(oldest_entry)
         }
         ; Honour the async contract: exactly one of on_success / on_fail must

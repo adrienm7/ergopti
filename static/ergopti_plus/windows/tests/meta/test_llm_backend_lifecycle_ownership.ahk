@@ -52,9 +52,11 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must exist for the AHK-003 ownership guard")
 		OwnerPos := InStr(Body, "!LLM_AuxIsCurrent(Owner)")
-		ProcessPos := InStr(Body, "ProcessExist(pid)")
-		Assert(OwnerPos > 0 && ProcessPos > 0 && OwnerPos < ProcessPos,
-			Name . " must reject stale ownership before timeout or callback delivery")
+		ReceiptPos := InStr(Body, "ReadTerminalFn.Call(")
+		Assert(OwnerPos > 0 && ReceiptPos > 0 && OwnerPos < ReceiptPos,
+			Name . " must reject stale ownership before reading its durable receipt, timeout, or callback delivery")
+		Assert(InStr(Body, "ProcessExist(") = 0 && InStr(Body, "ProcessClose(") = 0,
+			Name . " must never fall back to recyclable PID liveness or termination")
 	}
 
 	for Producer in Map(

@@ -60,3 +60,117 @@ _OHTC_DeleteRequiresCompleteTerminalEvidence() {
 }
 Test("AHK-007 Ollama terminal: delete failure never logs or calls success (ahk-007-ollama-terminal-classification)",
 	_OHTC_DeleteRequiresCompleteTerminalEvidence)
+
+
+_OHTC_PidReceipt_ReadTerminal(State, *) {
+	State["terminal_reads"] += 1
+	return State["terminal"]
+}
+
+_OHTC_PidReceipt_Terminate(State, Handle) {
+	State["terminate_calls"] += 1
+	State["terminated_handle"] := Handle
+	return true
+}
+
+_OHTC_PidReceipt_Close(State, Handle) {
+	State["close_calls"] += 1
+	State["closed_handle"] := Handle
+	return true
+}
+
+_OHTC_PidReceipt_RecordResult(State, Value) {
+	State["callback_calls"] += 1
+	State["value"] := Value
+}
+
+_OHTC_PidReceipt_State(Terminal, Handle) {
+	return Map(
+		"terminal", Terminal,
+		"handle", Handle,
+		"terminal_reads", 0,
+		"terminate_calls", 0,
+		"close_calls", 0,
+		"terminated_handle", 0,
+		"closed_handle", 0,
+		"callback_calls", 0,
+		"value", "")
+}
+
+_OHTC_PidReceipt_Port(State) {
+	return Map(
+		"open_process", (*) => State["handle"],
+		"terminate_process", _OHTC_PidReceipt_Terminate.Bind(State),
+		"close_process", _OHTC_PidReceipt_Close.Bind(State),
+		"read_terminal", _OHTC_PidReceipt_ReadTerminal.Bind(State))
+}
+
+_OHTC_PidReceipt_Owner(Kind) {
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	if !IsSet(_LLM_AuxGeneration)
+		_LLM_AuxGeneration := 1
+	if !IsSet(_LLM_AuxOwnerCounter)
+		_LLM_AuxOwnerCounter := 0
+	if !IsSet(_LLM_AuxOwners)
+		_LLM_AuxOwners := Map()
+	return LLM_AuxBegin(Kind, Map(
+		"backend", "ollama", "endpoint", "http://127.0.0.1:11434"))
+}
+
+_OHTC_PidReceipt_AssertReleasedWithoutTerminate(State, Message) {
+	AssertEqual(1, State["terminal_reads"],
+		Message . ": the terminal receipt must be read exactly once")
+	AssertEqual(0, State["terminate_calls"],
+		Message . ": a complete receipt must never terminate a possibly recycled PID")
+	AssertEqual(1, State["close_calls"],
+		Message . ": the retained exact process handle must be released once")
+	AssertEqual(State["handle"], State["closed_handle"],
+		Message . ": cleanup must close the exact adopted handle")
+	AssertEqual(1, State["callback_calls"],
+		Message . ": the committed result must be delivered exactly once")
+}
+
+_OHTC_PidReceipt_AllAuxPollersResolveReceiptBeforeDeadline() {
+	PingState := _OHTC_PidReceipt_State(Map(
+		"complete", true, "exit", 0, "status", 200,
+		"body_read", true, "body", '{"version":"0.11.0"}'), 9101)
+	PingPort := _OHTC_PidReceipt_Port(PingState)
+	PingProcess := _LLM_CurlAdoptProcess(4242, PingPort)
+	PingOwner := _OHTC_PidReceipt_Owner("ahk2_04_ping")
+	_LLM_Ollama_PingPoll(PingProcess, "body", "status", "exit",
+		_OHTC_PidReceipt_RecordResult.Bind(PingState), A_TickCount - 100000,
+		PingOwner, PingPort)
+	_OHTC_PidReceipt_AssertReleasedWithoutTerminate(PingState, "ping")
+	AssertTrue(PingState["value"], "the typed Ollama version receipt must publish readiness")
+
+	TagsState := _OHTC_PidReceipt_State(Map(
+		"complete", true, "exit", 0, "status", 200,
+		"body_read", true, "body", '{"models":[{"name":"owned:model"}]}'), 9102)
+	TagsPort := _OHTC_PidReceipt_Port(TagsState)
+	TagsProcess := _LLM_CurlAdoptProcess(4243, TagsPort)
+	TagsOwner := _OHTC_PidReceipt_Owner("ahk2_04_tags")
+	_LLM_Ollama_TagsPoll(TagsProcess, "body", "status", "exit",
+		_OHTC_PidReceipt_RecordResult.Bind(TagsState), A_TickCount - 100000,
+		TagsOwner, TagsPort)
+	_OHTC_PidReceipt_AssertReleasedWithoutTerminate(TagsState, "tags")
+	AssertTrue(TagsState["value"] is Array,
+		"the tags receipt must publish the canonical Array")
+	AssertEqual("owned:model", TagsState["value"][1],
+		"the exact model from the terminal receipt must survive")
+
+	DeleteState := _OHTC_PidReceipt_State(Map(
+		"complete", true, "exit", 0, "status", 204,
+		"body_read", true, "body", ""), 9103)
+	DeletePort := _OHTC_PidReceipt_Port(DeleteState)
+	DeleteProcess := _LLM_CurlAdoptProcess(4244, DeletePort)
+	DeleteOwner := _OHTC_PidReceipt_Owner("ahk2_04_delete")
+	_LLM_Ollama_DeletePoll(DeleteProcess, "payload", "body", "status", "exit",
+		"owned:model", _OHTC_PidReceipt_RecordResult.Bind(DeleteState),
+		A_TickCount - 100000, DeleteOwner, DeletePort)
+	_OHTC_PidReceipt_AssertReleasedWithoutTerminate(DeleteState, "delete")
+	AssertTrue(DeleteState["value"],
+		"the complete 204 delete receipt must publish success")
+}
+Test("Ollama curl polls: terminal receipts precede deadline for every auxiliary child "
+	. "(ahk2-04-curl-receipt-first)",
+	_OHTC_PidReceipt_AllAuxPollersResolveReceiptBeforeDeadline)

@@ -319,6 +319,119 @@ _OllamaPollCurl_NoOpOnMissingId() {
 Test("_LLM_Ollama_PollCurl: no-op when the request id is no longer in the registry", _OllamaPollCurl_NoOpOnMissingId)
 
 
+_OllamaPidReceipt_RecordSuccess(State, Text) {
+	State["success_calls"] += 1
+	State["text"] := Text
+}
+
+_OllamaPidReceipt_RecordFailure(State, *) {
+	State["fail_calls"] += 1
+}
+
+_OllamaPidReceipt_CompleteGenerationPrecedesDeadline() {
+	global _LLM_Ollama_Async, _LLM_Ollama_Pending
+	ReqId := 999001
+	State := Map("success_calls", 0, "fail_calls", 0,
+		"close_calls", 0, "terminate_calls", 0, "text", "")
+	Port := Map(
+		"open_process", (*) => 9201,
+		"close_process", (*) => (State["close_calls"] += 1, true),
+		"terminate_process", (*) => (State["terminate_calls"] += 1, true),
+		"read_terminal", (*) => Map(
+			"complete", true, "exit", 0, "status", 200,
+			"body_read", true,
+			"body", '{"message":{"content":"owned generation"}}'))
+	ProcessOwner := _LLM_CurlAdoptProcess(4245, Port)
+	_LLM_Ollama_Pending := ""
+	_LLM_Ollama_Async[ReqId] := Map(
+		"pid", 4245,
+		"process_owner", ProcessOwner,
+		"tmp_payload", "payload",
+		"tmp_stdout", "body",
+		"tmp_status", "status",
+		"tmp_exit", "exit",
+		"on_success", _OllamaPidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _OllamaPidReceipt_RecordFailure.Bind(State),
+		"cancelled", false,
+		"start_tick", A_TickCount - 100000,
+		"timeout_ms", 1,
+		"payload_snip", "fixture")
+	try {
+		_LLM_Ollama_PollCurl(ReqId, Port)
+		AssertEqual(1, State["success_calls"],
+			"(ahk2-04-curl-receipt-first) a complete generation receipt must beat the wall deadline")
+		AssertEqual(0, State["fail_calls"],
+			"the committed generation must not be reclassified as timeout")
+		AssertEqual("owned generation", State["text"],
+			"the exact terminal body must reach the generation callback")
+		AssertEqual(0, State["terminate_calls"],
+			"a complete receipt must never terminate the process owner")
+		AssertEqual(1, State["close_calls"],
+			"the exact retained process handle must be closed once")
+		AssertFalse(_LLM_Ollama_Async.Has(ReqId),
+			"the completed generation must retire its registry slot")
+	} finally {
+		if _LLM_Ollama_Async.Has(ReqId)
+			_LLM_Ollama_Async.Delete(ReqId)
+		_LLM_Ollama_Pending := ""
+	}
+}
+Test("Ollama generation poll: terminal receipt precedes recycled PID and deadline "
+	. "(ahk2-04-curl-receipt-first)",
+	_OllamaPidReceipt_CompleteGenerationPrecedesDeadline)
+
+
+_OllamaPidReceipt_CancelUsesExactHandle() {
+	global _LLM_Ollama_Async, _LLM_Ollama_Pending
+	ReqId := 999002
+	State := Map("success_calls", 0, "fail_calls", 0,
+		"close_calls", 0, "terminate_calls", 0,
+		"terminated_handle", 0)
+	Port := Map(
+		"open_process", (*) => 9202,
+		"close_process", (*) => (State["close_calls"] += 1, true),
+		"terminate_process", (Handle) => (
+			State["terminate_calls"] += 1,
+			State["terminated_handle"] := Handle,
+			true),
+		"read_terminal", (*) => Map(
+			"complete", false, "exit", -1, "status", 0,
+			"body_read", false, "body", ""))
+	ProcessOwner := _LLM_CurlAdoptProcess(4246, Port)
+	_LLM_Ollama_Pending := ""
+	_LLM_Ollama_Async[ReqId] := Map(
+		"pid", 4246, "process_owner", ProcessOwner,
+		"tmp_payload", "payload", "tmp_stdout", "body",
+		"tmp_status", "status", "tmp_exit", "exit",
+		"on_success", _OllamaPidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _OllamaPidReceipt_RecordFailure.Bind(State),
+		"cancelled", true, "start_tick", A_TickCount,
+		"timeout_ms", 100000, "payload_snip", "fixture")
+	try {
+		_LLM_Ollama_PollCurl(ReqId, Port)
+		AssertEqual(1, State["terminate_calls"],
+			"cancel must terminate the exact retained generation handle once")
+		AssertEqual(9202, State["terminated_handle"],
+			"cancel must not reopen the recyclable numeric PID")
+		AssertEqual(1, State["close_calls"],
+			"cancel must close the exact generation handle once")
+		AssertEqual(0, State["success_calls"],
+			"cancelled generation must never publish success")
+		AssertEqual(0, State["fail_calls"],
+			"the existing cancellation contract remains callback-silent")
+		AssertFalse(_LLM_Ollama_Async.Has(ReqId),
+			"cancel must retire the exact generation registry slot")
+	} finally {
+		if _LLM_Ollama_Async.Has(ReqId)
+			_LLM_Ollama_Async.Delete(ReqId)
+		_LLM_Ollama_Pending := ""
+	}
+}
+Test("Ollama generation poll: cancellation terminates only the exact process handle "
+	. "(ahk2-04-curl-exact-process-owner)",
+	_OllamaPidReceipt_CancelUsesExactHandle)
+
+
 _OllamaCancelAllAsync_FlagsAll() {
 	global _LLM_Ollama_Async
 	; Inject two fake entries

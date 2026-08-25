@@ -53,7 +53,7 @@ _MetaCheckInstalledTagsNonBlocking() {
 
 	; (2) The async probe must exist and genuinely run non-blocking: a curl CHILD on
 	; /api/tags (NOT WinHTTP — its async Send() still connects synchronously and could
-	; block the now-Critical tray build), polled via ProcessExist. Same contract as
+	; block the now-Critical tray build), polled via its durable terminal receipt. Same contract as
 	; LLM_OllamaIsRunning_Async (ollama-reachability-winhttp-connect-blocks).
 	AsyncBody := _DriverFuncBody("LLM_OllamaListModels_Async")
 	Assert(AsyncBody != "", "api_ollama.ahk must define LLM_OllamaListModels_Async()")
@@ -66,9 +66,10 @@ _MetaCheckInstalledTagsNonBlocking() {
 		"LLM_OllamaListModels_Async must hand off to _LLM_Ollama_TagsPoll (poll the child, don't block)")
 	PollBody := _DriverFuncBody("_LLM_Ollama_TagsPoll")
 	Assert(PollBody != "", "api_ollama.ahk must define _LLM_Ollama_TagsPoll()")
-	Assert(InStr(PollBody, "ProcessExist("),
-		"_LLM_Ollama_TagsPoll must poll the curl child via ProcessExist (non-blocking)")
-	Assert(InStr(PollBody, "_LLM_CurlReadTerminal(") > 0
+	Assert(InStr(PollBody, "_LLM_CurlTerminalComplete(") > 0
+		and InStr(PollBody, "ProcessExist(") = 0,
+		"_LLM_Ollama_TagsPoll must poll the durable terminal receipt, never a recyclable PID")
+	Assert(InStr(PollBody, "ReadTerminalFn.Call(") > 0
 		and InStr(PollBody, "_LLM_CurlTerminalOk(") > 0
 		and InStr(PollBody, "_LLM_Ollama_ParseTagNames(") > 0,
 		"the tags poll must require typed terminal evidence before parsing the canonical models array")

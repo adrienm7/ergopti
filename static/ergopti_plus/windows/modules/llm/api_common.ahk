@@ -471,7 +471,8 @@ LLM_ApiCommon_LogSummary(mode, requested, stats, kept_count) {
  * Kills MUST be a snapshot taken under Critical, never a live Map: the entries
  * it refers to are mutated and deleted by the poll ticks that run in between.
  *
- * @param {Array} Kills - Array of Maps carrying "pid" and/or "http".
+ * @param {Array} Kills - Array of Maps carrying an exact cancel callback,
+ *                        a legacy PID, and/or a WinHTTP object.
  */
 LLM_DeferCancelKills(Kills) {
 	if (!IsObject(Kills) or Kills.Length == 0)
@@ -481,6 +482,8 @@ LLM_DeferCancelKills(Kills) {
 
 _LLM_RunCancelKills(Kills) {
 	for _, K in Kills {
+		if K.Has("cancel")
+			try K["cancel"].Call()
 		if (K.Has("pid") and K["pid"] > 0)
 			try ProcessClose(K["pid"])
 		if K.Has("http")
