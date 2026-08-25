@@ -228,62 +228,63 @@ function M.walk_typing(entry)
 				local k_hx = p5 and (p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
 				local k_hp = p6 and (p6 .. p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
 
-				local is_bracket_key = type(k_c) == "string" and k_c:sub(1, 1) == "[" and k_c:sub(-1) == "]"
-				local record_delay   = delay < C.MAX_KEYSTROKE_DELAY_MS and delay or 0
+				local ngram_delay = delay < C.MAX_KEYSTROKE_DELAY_MS and delay or 0
 
 				local entry_marks = {}
-				if is_synthetic or is_bracket_key or delay < C.MAX_KEYSTROKE_DELAY_MS then
-					C.push_ngram("ngram_chars", date_str, app, k_c, record_delay, false, synth_type); entry_marks.c = k_c
-					if k_bg then C.push_ngram("ngram_bigrams",    date_str, app, k_bg, record_delay, false, synth_type); entry_marks.bg = k_bg end
-					if k_tg then C.push_ngram("ngram_trigrams",   date_str, app, k_tg, record_delay, false, synth_type); entry_marks.tg = k_tg end
-					if k_qg then C.push_ngram("ngram_quadgrams",  date_str, app, k_qg, record_delay, false, synth_type); entry_marks.qg = k_qg end
-					if k_pg then C.push_ngram("ngram_pentagrams", date_str, app, k_pg, record_delay, false, synth_type); entry_marks.pg = k_pg end
-					if k_hx then C.push_ngram("ngram_hexagrams",  date_str, app, k_hx, record_delay, false, synth_type); entry_marks.hx = k_hx end
-					if k_hp then C.push_ngram("ngram_heptagrams", date_str, app, k_hp, record_delay, false, synth_type); entry_marks.hp = k_hp end
+				do
+					-- A long pause breaks n-gram continuity, but it never erases the
+					-- physical character or its raw timing from the other aggregates.
+					C.push_ngram("ngram_chars", date_str, app, k_c, ngram_delay, false, synth_type); entry_marks.c = k_c
+					if k_bg then C.push_ngram("ngram_bigrams",    date_str, app, k_bg, ngram_delay, false, synth_type); entry_marks.bg = k_bg end
+					if k_tg then C.push_ngram("ngram_trigrams",   date_str, app, k_tg, ngram_delay, false, synth_type); entry_marks.tg = k_tg end
+					if k_qg then C.push_ngram("ngram_quadgrams",  date_str, app, k_qg, ngram_delay, false, synth_type); entry_marks.qg = k_qg end
+					if k_pg then C.push_ngram("ngram_pentagrams", date_str, app, k_pg, ngram_delay, false, synth_type); entry_marks.pg = k_pg end
+					if k_hx then C.push_ngram("ngram_hexagrams",  date_str, app, k_hx, ngram_delay, false, synth_type); entry_marks.hx = k_hx end
+					if k_hp then C.push_ngram("ngram_heptagrams", date_str, app, k_hp, ngram_delay, false, synth_type); entry_marks.hp = k_hp end
 
 					if not is_synthetic then
 						C.bump_app_day(date_str, app, "chars", 1)
 						hr.c = hr.c + 1; m5.c = m5.c + 1
-						if record_delay > C.THINK_PAUSE_THRESHOLD_MS then
-							C.bump_app_day(date_str, app, "think_time_ms", record_delay)
+						if delay > C.THINK_PAUSE_THRESHOLD_MS then
+							C.bump_app_day(date_str, app, "think_time_ms", delay)
 							C.bump_app_day(date_str, app, "pauses", 1)
 						else
-							C.bump_app_day(date_str, app, "time_ms", record_delay)
+							C.bump_app_day(date_str, app, "time_ms", delay)
 						end
 						for _, t in ipairs(C.UI_PAUSE_BUCKETS_MS) do
-							if record_delay <= t then
+							if delay <= t then
 								local bkey = app_day_key .. "\1" .. tostring(t)
 								local row = C.gc(S.agg_batch.app_buckets, bkey, {
 									date=date_str, app=app, bucket_ms=t,
 									time_sum=0, credited=0, hs_in_t=0, hs_in_c=0, llm_in_t=0, llm_in_c=0,
 								})
-								row.time_sum = row.time_sum + record_delay
+								row.time_sum = row.time_sum + delay
 								row.credited = row.credited + 1
 							end
 						end
-						table.insert(ctx.recent_typing, { delay = record_delay })
+						table.insert(ctx.recent_typing, { delay = delay })
 						if #ctx.recent_typing > C.TRIGGER_LOOKBACK_LEN then
 							table.remove(ctx.recent_typing, 1)
 						end
 
-						if (not ctx.current_burst) or record_delay > C.BURST_GAP_MS then
+						if (not ctx.current_burst) or delay > C.BURST_GAP_MS then
 							C.finalize_burst(date_str, app, ctx.current_burst)
 							ctx.current_burst = { char_count = 1, sum_delays = 0, sum_delays_sq = 0, max_delay = 0 }
 						else
 							local b = ctx.current_burst
 							b.char_count    = b.char_count + 1
-							b.sum_delays    = b.sum_delays + record_delay
-							b.sum_delays_sq = b.sum_delays_sq + (record_delay * record_delay)
-							if record_delay > b.max_delay then b.max_delay = record_delay end
+							b.sum_delays    = b.sum_delays + delay
+							b.sum_delays_sq = b.sum_delays_sq + (delay * delay)
+							if delay > b.max_delay then b.max_delay = delay end
 						end
 
-						if (not ctx.current_session) or record_delay > C.SESSION_GAP_MS then
+						if (not ctx.current_session) or delay > C.SESSION_GAP_MS then
 							C.finalize_session(date_str, app, ctx.current_session)
 							ctx.current_session = { char_count = 1, total_ms = 0 }
 						else
 							local s = ctx.current_session
 							s.char_count = s.char_count + 1
-							s.total_ms   = s.total_ms + record_delay
+							s.total_ms   = s.total_ms + delay
 						end
 
 						if ctx.last_was_bs then
@@ -293,8 +294,8 @@ function M.walk_typing(entry)
 									er.cascade_max_len = ctx.bs_run_len
 								end
 							end
-							if record_delay <= C.MAX_KEYSTROKE_DELAY_MS then
-								er.recovery_sum_ms = er.recovery_sum_ms + record_delay
+							if delay <= C.MAX_KEYSTROKE_DELAY_MS then
+								er.recovery_sum_ms = er.recovery_sum_ms + delay
 								er.recovery_count  = er.recovery_count + 1
 							end
 							ctx.bs_run_len = 0; ctx.last_was_bs = false
@@ -328,7 +329,7 @@ function M.walk_typing(entry)
 							ctx.same_hand_run   = 0
 						end
 
-						if ctx.last_char == k_c and record_delay > 0 and record_delay <= C.AUTO_REPEAT_MAX_DELAY_MS then
+						if ctx.last_char == k_c and delay > 0 and delay <= C.AUTO_REPEAT_MAX_DELAY_MS then
 							eg.auto_repeat_count = eg.auto_repeat_count + 1
 						end
 						ctx.last_char = k_c

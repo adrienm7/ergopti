@@ -319,6 +319,53 @@ _KlgAggCorpus_RunVector(Vec) {
 		AssertTrue(Ctx != "")
 		AssertEqual("c", Ctx["p1"], "last p1 = 'c'")
 	}
+	else if (Id = "long_gap_preserves_chars_and_splits_runs") {
+		Row := _KlgAggCorpus_ReadAppDay("2024-06-01", "LongGapApp")
+		AssertTrue(Row != "", "app_day row exists")
+		AssertEqual(5, KLW_GetMap(Row, "chars", 0), "every physical character is counted")
+		AssertEqual(600, KLW_GetMap(Row, "time_ms", 0), "short delays stay in active typing time")
+		AssertEqual(2, KLW_GetMap(Row, "pauses", 0), "both long gaps are think pauses")
+		AssertEqual(310000, KLW_GetMap(Row, "think_time_ms", 0), "long gaps keep their raw delay")
+		AssertEqual(5, _KlgAggCorpus_CountNgram("ngram_chars"),
+			"long gaps break continuity without dropping the character unigram")
+		CharNgrams := KLW.batch["ngram"]["ngram_chars"]
+		TotalDelay := 0
+		DelayCount := 0
+		for _, Item in CharNgrams {
+			TotalDelay += KLW_GetMap(Item, "td", 0)
+			DelayCount += KLW_GetMap(Item, "cd", 0)
+		}
+		AssertEqual(Vec["expected"]["ngram_chars_total_delay_ms"], TotalDelay,
+			"only short gaps contribute to character n-gram timing")
+		AssertEqual(Vec["expected"]["ngram_chars_delay_count"], DelayCount,
+			"only short gaps contribute a character n-gram delay sample")
+		for Token in Vec["expected"]["ngram_zero_delay_tokens"] {
+			NgramKey := "2024-06-01" . Chr(1) . "LongGapApp" . Chr(1) . Token
+			AssertTrue(CharNgrams.Has(NgramKey), "long-gap character unigram exists: " . Token)
+			AssertEqual(0, KLW_GetMap(CharNgrams[NgramKey], "td", 0),
+				"long-gap unigram delay is clamped: " . Token)
+			AssertEqual(0, KLW_GetMap(CharNgrams[NgramKey], "cd", 0),
+				"long-gap unigram delay sample is absent: " . Token)
+		}
+
+		Key := "2024-06-01" . Chr(1) . "LongGapApp"
+		AssertTrue(KLW.batch["bursts"].Has(Key), "two closed bursts are aggregated")
+		AssertEqual(2, KLW.batch["bursts"][Key]["count_total"],
+			"9000 ms and 301000 ms split bursts")
+		AssertTrue(KLW.batch["sessions"].Has(Key), "the first session closes after five minutes")
+		AssertEqual(1, KLW.batch["sessions"][Key]["count_total"],
+			"only the five-minute gap splits sessions")
+
+		Ctx := _KlgAggCorpus_ReadCtx("LongGapApp")
+		AssertTrue(Ctx != "", "context exists")
+		AssertEqual(2, Ctx["current_burst"]["char_count"], "the final burst stays open with d+e")
+		AssertEqual(2, Ctx["current_session"]["char_count"], "the final session stays open with d+e")
+		AssertEqual("e", Ctx["p1"], "the newest character remains the context tail")
+		AssertEqual(5, Ctx["recent_typing"].Length,
+			"long-gap characters remain eligible for trigger attribution")
+		AssertEqual(9000, Ctx["recent_typing"][2]["delay"], "trigger attribution keeps the raw burst gap")
+		AssertEqual(301000, Ctx["recent_typing"][4]["delay"], "trigger attribution keeps the raw session gap")
+	}
 	else if (Id = "app_switch_accumulates_duration") {
 		AssertEqual(1, _KlgAggCorpus_CountEntries(KLW.batch["app_time"]), "1 app_time entry")
 		AssertEqual(8000, _KlgAggCorpus_SumAppTimeMs("AppA"), "app_time total = 8000")
