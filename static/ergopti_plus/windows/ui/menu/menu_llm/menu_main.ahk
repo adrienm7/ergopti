@@ -61,6 +61,17 @@ LLM_Menu_ServiceBuilds() {
 	return _LLM_Menu_GetBuildCoordinator().Service()
 }
 
+; An LLM repaint replaces only its detached submenu. Re-project the complete
+; root through the generation fence, but retain every sibling submenu already
+; built by InitSubMenus. The generic root worker invalidates and rebuilds those
+; siblings, including a recursive personal/extensions scan that the LLM state
+; cannot affect.
+_LLM_Menu_PublishRoot(PublishAuthorizeFn) {
+	try LoggerDebug("LLM",
+		"Publishing IA submenu through retained root projection.")
+	return initMenu(PublishAuthorizeFn)
+}
+
 /**
  * Builds one detached LLM submenu candidate and submits it to the complete-root
  * coordinator. Production callers request work through LLM_Menu_RequestBuild;
@@ -158,7 +169,7 @@ LLM_Menu_Build() {
 	; The LLM builder owns only a detached child. The root coordinator attaches
 	; it while publishing a complete root, so an asynchronous LLM rebuild can
 	; never expose an IA-only tray or mutate a root currently being staged.
-	if !RebuildTrayMenu()
+	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot, true, true)
 		throw Error("tray root coordinator refused the LLM subtree")
 	MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
 	_LLM_Menu_InTray := true

@@ -73,8 +73,7 @@ _MetaCheckBootDeferredTasks() {
 	for _, Probe in [
 		"SetTimer(WPMWidget_Show",
 		"SetTimer(BuildLanguageMenuDeferred",
-		"SetTimer(I18nWarmFallbacks",
-		"SetTimer(LLM_Menu_RequestBuild" ] {
+		"SetTimer(I18nWarmFallbacks" ] {
 		Pos := InStr(Body, Probe)
 		Assert(Pos > 0, "ErgoptiPlus.ahk must arm '" . Probe . "...' at boot")
 		Assert(Pos > ReadyPos,
@@ -82,6 +81,8 @@ _MetaCheckBootDeferredTasks() {
 			. "(arm at offset " . Pos . ", ready at " . ReadyPos . ") so the deferred "
 			. "task never preempts the still-running hotstring registration")
 	}
+	Assert(InStr(Body, "SetTimer(LLM_Menu_RequestBuild") == 0,
+		"the entrypoint must not arm LLM independently of the deferred root publication owner")
 }
 
 Test("meta boot: heavy deferred timers armed after 'ready'", _MetaCheckBootDeferredTasks)

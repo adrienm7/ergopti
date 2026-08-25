@@ -52,9 +52,12 @@ _LMBCM_AllProducersUseTheCoordinator() {
 
 _LMBCM_BootAndPostPullScheduleOwnedRequests() {
 	Source := _DriverSourceNoComments()
-	Assert(InStr(Source,
-		'SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)') > 0,
-		"cold boot must schedule an owned request, not the raw builder")
+	BootWorker := _DriverFuncBody("_TrayRootBuildBoot")
+	Assert(InStr(BootWorker,
+		"_TrayRootScheduleBootProjectionIfDisabled(") > 0
+		&& InStr(BootWorker,
+		'LLM_Menu_RequestBuild.Bind("boot")') > 0,
+		"the published cold root must schedule an owned request, not the raw builder")
 	PullBody := _DriverFuncBody("_LLM_Menu_PullModel")
 	Assert(InStr(PullBody,
 		'LLM_Menu_RequestBuild.Bind("post_pull")') > 0,
@@ -65,9 +68,11 @@ _LMBCM_BootAndPostPullScheduleOwnedRequests() {
 
 _LMBCM_RawBuilderIsSinglePassAndCoordinatorOwned() {
 	RawBody := _DriverFuncBody("LLM_Menu_Build")
+	RootWorkerBody := _DriverFuncBody("_LLM_Menu_PublishRoot")
 	FactoryBody := _DriverFuncBody("_LLM_Menu_GetBuildCoordinator")
 	RequestBody := _DriverFuncBody("LLM_Menu_RequestBuild")
-	Assert(RawBody != "" && FactoryBody != "" && RequestBody != "")
+	Assert(RawBody != "" && RootWorkerBody != ""
+		&& FactoryBody != "" && RequestBody != "")
 	Assert(InStr(RawBody, "static _Building") == 0
 		&& InStr(RawBody, "_RequestedGeneration") == 0,
 		"the raw builder must be one pass; generation ownership belongs to the coordinator")
@@ -76,6 +81,14 @@ _LMBCM_RawBuilderIsSinglePassAndCoordinatorOwned() {
 		"only the coordinator factory may receive the raw builder callback")
 	Assert(InStr(RequestBody, ".Request(Reason)") > 0,
 		"the public request boundary must delegate to the generation owner")
+	Assert(InStr(RawBody,
+		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot, true, true)") > 0,
+		"the detached LLM builder must request a narrow projection that promotes to a full rebuild on contention")
+	Assert(InStr(RootWorkerBody, "initMenu(PublishAuthorizeFn)") > 0,
+		"the LLM root projection must attach the staged submenu through the root publication fence")
+	Assert(InStr(RootWorkerBody, "InitSubMenus(") == 0
+		&& InStr(RootWorkerBody, "_HS_InvalidatePersonalCache(") == 0,
+		"an LLM-only repaint must reuse sibling submenus instead of repeating the full personal/extensions scan")
 }
 
 Test("llm menu coordinator: every producer transfers to one owner (ahk-010-menu-build-coordinator-wiring)",

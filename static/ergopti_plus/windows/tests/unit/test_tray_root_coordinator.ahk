@@ -140,6 +140,67 @@ _TRC_ConcurrentRequestPublishesLatest() {
 Test("tray root: concurrent requests coalesce to latest (tray-root-owner-generation)",
 	_TRC_ConcurrentRequestPublishesLatest)
 
+_TRC_NarrowProjectionWorker(*) {
+	return true
+}
+
+_TRC_QueuedNarrowProjectionPromotesToFullWorker() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TrayRootLatestWorkerFn
+	Saved := _TRC_SaveState()
+	try {
+		_TRC_ResetState()
+		_TrayRootActive := true
+		AssertFalse(_TrayRootRequestAndTryAcquire(0,
+			_TRC_NarrowProjectionWorker, &RequestedGeneration, true),
+			"a projection request must queue behind the current root owner")
+		AssertEqual(0, _TrayRootLatestWorkerFn,
+			"a queued narrow projection must promote its successor to the full generic worker")
+
+		_TRC_ResetState()
+		_TrayRootRequestedGeneration := 2
+		_TrayRootPublishedGeneration := 1
+		AssertTrue(_TrayRootRequestAndTryAcquire(0,
+			_TRC_NarrowProjectionWorker, &RequestedGeneration, true),
+			"an idle owner may acquire retained root work")
+		AssertEqual(0, _TrayRootLatestWorkerFn,
+			"a retained unpublished full root must not be downgraded to a narrow projection")
+
+		_TRC_ResetState()
+		AssertTrue(_TrayRootRequestAndTryAcquire(0,
+			_TRC_NarrowProjectionWorker, &RequestedGeneration, true),
+			"a settled idle root must admit the narrow projection")
+		AssertTrue(HasMethod(_TrayRootLatestWorkerFn, "Call"),
+			"the settled idle root must retain the narrow worker")
+	} finally {
+		_TRC_RestoreState(Saved)
+	}
+}
+Test("tray root: queued narrow projection promotes to full worker (tray-root-narrow-contention)",
+	_TRC_QueuedNarrowProjectionPromotesToFullWorker)
+
+_TRC_RecordBootProjectionTimer(State, CallbackFn, Period) {
+	State["calls"].Push(Map("callback", CallbackFn, "period", Period))
+}
+
+_TRC_BootProjectionArmsOnlyForDisabledLlm() {
+	State := Map("calls", [])
+	ScheduleFn := _TRC_RecordBootProjectionTimer.Bind(State)
+	RequestFn := (*) => true
+	AssertFalse(_TrayRootScheduleBootProjectionIfDisabled(
+		true, RequestFn, ScheduleFn, 200),
+		"enabled LLM boot remains owned by asynchronous dependency readiness")
+	AssertEqual(0, State["calls"].Length)
+	AssertTrue(_TrayRootScheduleBootProjectionIfDisabled(
+		false, RequestFn, ScheduleFn, 200),
+		"disabled LLM boot must arm exactly one retained menu request")
+	AssertEqual(1, State["calls"].Length)
+	AssertTrue(HasMethod(State["calls"][1]["callback"], "Call"))
+	AssertEqual(-200, State["calls"][1]["period"])
+}
+Test("tray root: boot LLM projection arms once only when disabled (tray-root-boot-llm-arm)",
+	_TRC_BootProjectionArmsOnlyForDisabledLlm)
+
 _TRC_FailingWorker(PublishAuthorizeFn) {
 	global _TRC_Builds, _TRC_FailureMode, _TRC_ExpectedError
 	BuildNumber := _TRC_Builds.Length + 1

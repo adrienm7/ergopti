@@ -47,6 +47,11 @@ _TRF_ProductionChainForwardsExactTerminalAuthorization() {
 	Assert(InStr(BootBuild,
 		"Published := initMenu(PublishAuthorizeFn)") > 0,
 		"the deferred boot worker must pass its terminal authorizer to initMenu")
+	LlmProjection := _DriverFuncBody("_LLM_Menu_PublishRoot")
+	Assert(LlmProjection != "", "_LLM_Menu_PublishRoot() must exist")
+	Assert(InStr(LlmProjection,
+		"initMenu(PublishAuthorizeFn)") > 0,
+		"the narrow LLM projection must pass its terminal authorizer to initMenu")
 
 	InitBody := _DriverFuncBody("initMenu")
 	Assert(InitBody != "", "initMenu() must exist")
@@ -70,8 +75,8 @@ _TRF_ProductionChainForwardsExactTerminalAuthorization() {
 	DriverSource := _DriverSourceNoComments()
 	Assert(DriverSource != "", "driver source must be readable")
 	StrReplace(DriverSource, "initMenu(", "", true, &InitMenuSiteCount)
-	AssertEqual(3, InitMenuSiteCount,
-		"initMenu may appear only at its declaration and the two coordinator-owned production workers")
+	AssertEqual(4, InitMenuSiteCount,
+		"initMenu may appear only at its declaration and the three coordinator-owned production workers")
 	StrReplace(DriverSource, "TrayMenuStage_Publish(", "", true,
 		&PublishSiteCount)
 	AssertEqual(2, PublishSiteCount,

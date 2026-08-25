@@ -755,6 +755,7 @@ Ergopti_OnShutdown(reason, code) {
 ; MenuSuspend exists.
 _TrayRootBuildBoot(PublishAuthorizeFn) {
 	global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
+	global _LLM_Menu, LLM_MENU_BUILD_DEFER_MS
 	_SavedReady := _DriverReady
 	_DriverReady := false
 	try {
@@ -769,6 +770,17 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	if _LangMenuBuildPending
 		SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 	BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
+	; The independent LLM timer used to preempt this root worker, invalidate
+	; its generation, and force a second full InitSubMenus scan. Arm the cheap
+	; OFF-state population only after this root and its boot finalizer publish.
+	; A retained/retried boot worker reaches the same ownership seam.
+	if _TrayRootScheduleBootProjectionIfDisabled(
+			_LLM_Menu["enabled"], LLM_Menu_RequestBuild.Bind("boot"),
+			SetTimer, LLM_MENU_BUILD_DEFER_MS) {
+		try LoggerDebug("TrayMenu",
+			"Deferred root published; arming boot IA submenu build in {1} ms.",
+			LLM_MENU_BUILD_DEFER_MS)
+	}
 	return true
 }
 
