@@ -31,6 +31,52 @@ local M = {}
 -- UTF-8 codepoint byte pattern: leading byte followed by 0–3 continuation bytes.
 local UTF8_CHAR = "[%z\\1-\\127\\194-\\244][\\128-\\191]*"
 
+--- Decodes one Unicode scalar value at a byte boundary.
+--- The lead/second-byte ranges reject overlong encodings, UTF-16 surrogates,
+--- and values above U+10FFFF rather than merely checking continuation shape.
+--- @param s string
+--- @param i number
+--- @return number|nil byte_count
+--- @return number|nil codepoint
+--- @return number|nil error_position
+local function decode_at(s, i)
+	local b1 = s:byte(i)
+	if not b1 then return nil, nil, i end
+	if b1 <= 0x7F then return 1, b1 end
+
+	local byte_count
+	local codepoint
+	local b2 = s:byte(i + 1)
+	if b1 >= 0xC2 and b1 <= 0xDF then
+		byte_count = 2
+		if not b2 or b2 < 0x80 or b2 > 0xBF then return nil, nil, i + 1 end
+		codepoint = (b1 - 0xC0) * 0x40 + b2 - 0x80
+	elseif b1 >= 0xE0 and b1 <= 0xEF then
+		byte_count = 3
+		local b2_min = (b1 == 0xE0) and 0xA0 or 0x80
+		local b2_max = (b1 == 0xED) and 0x9F or 0xBF
+		if not b2 or b2 < b2_min or b2 > b2_max then return nil, nil, i + 1 end
+		local b3 = s:byte(i + 2)
+		if not b3 or b3 < 0x80 or b3 > 0xBF then return nil, nil, i + 2 end
+		codepoint = (b1 - 0xE0) * 0x1000 + (b2 - 0x80) * 0x40 + b3 - 0x80
+	elseif b1 >= 0xF0 and b1 <= 0xF4 then
+		byte_count = 4
+		local b2_min = (b1 == 0xF0) and 0x90 or 0x80
+		local b2_max = (b1 == 0xF4) and 0x8F or 0xBF
+		if not b2 or b2 < b2_min or b2 > b2_max then return nil, nil, i + 1 end
+		local b3 = s:byte(i + 2)
+		if not b3 or b3 < 0x80 or b3 > 0xBF then return nil, nil, i + 2 end
+		local b4 = s:byte(i + 3)
+		if not b4 or b4 < 0x80 or b4 > 0xBF then return nil, nil, i + 3 end
+		codepoint = (b1 - 0xF0) * 0x40000 + (b2 - 0x80) * 0x1000
+			+ (b3 - 0x80) * 0x40 + b4 - 0x80
+	else
+		return nil, nil, i
+	end
+
+	return byte_count, codepoint
+end
+
 --- Returns the number of UTF-8 codepoints in s.
 --- Returns nil, byte_position on malformed input (Lua 5.3 contract).
 --- @param s string
@@ -40,22 +86,9 @@ local function utf8_len(s)
 	local n = 0
 	local i = 1
 	while i <= #s do
-		local byte = s:byte(i)
-		if not byte then return nil, i end
-		local clen
-		if     byte < 0x80 then clen = 1
-		elseif byte < 0xC0 then return nil, i   -- continuation byte at start
-		elseif byte < 0xE0 then clen = 2
-		elseif byte < 0xF0 then clen = 3
-		elseif byte < 0xF8 then clen = 4
-		else return nil, i                       -- invalid leading byte
-		end
-		-- Validate continuation bytes
-		for j = 1, clen - 1 do
-			local cb = s:byte(i + j)
-			if not cb or cb < 0x80 or cb >= 0xC0 then return nil, i + j end
-		end
-		i = i + clen
+		local byte_count, _, error_position = decode_at(s, i)
+		if not byte_count then return nil, error_position end
+		i = i + byte_count
 		n = n + 1
 	end
 	return n
@@ -75,19 +108,11 @@ local function utf8_offset(s, n)
 		local count = 0
 		local i = 1
 		while i <= #s do
-			local byte = s:byte(i)
-			if not byte then return nil end
-			local clen
-			if     byte < 0x80 then clen = 1
-			elseif byte < 0xC0 then return nil
-			elseif byte < 0xE0 then clen = 2
-			elseif byte < 0xF0 then clen = 3
-			elseif byte < 0xF8 then clen = 4
-			else return nil
-			end
+			local byte_count = decode_at(s, i)
+			if not byte_count then return nil end
 			count = count + 1
 			if count == n then return i end
-			i = i + clen
+			i = i + byte_count
 		end
 		return nil  -- n beyond end
 	else
@@ -109,27 +134,11 @@ local function utf8_codes(s)
 	local i = 1
 	return function()
 		if i > #s then return nil end
-		local byte = s:byte(i)
-		if not byte then return nil end
-		local clen, cp
-		if     byte < 0x80 then clen, cp = 1, byte
-		elseif byte < 0xC0 then return nil
-		elseif byte < 0xE0 then
-			clen = 2
-			cp = (byte - 0xC0) * 0x40 + (s:byte(i+1) or 0) - 0x80
-		elseif byte < 0xF0 then
-			clen = 3
-			cp = (byte - 0xE0) * 0x1000 + ((s:byte(i+1) or 0) - 0x80) * 0x40 + (s:byte(i+2) or 0) - 0x80
-		elseif byte < 0xF8 then
-			clen = 4
-			cp = (byte - 0xF0) * 0x40000 + ((s:byte(i+1) or 0) - 0x80) * 0x1000
-				+ ((s:byte(i+2) or 0) - 0x80) * 0x40 + (s:byte(i+3) or 0) - 0x80
-		else
-			return nil
-		end
+		local byte_count, codepoint = decode_at(s, i)
+		if not byte_count then return nil end
 		local pos = i
-		i = i + clen
-		return pos, cp
+		i = i + byte_count
+		return pos, codepoint
 	end
 end
 

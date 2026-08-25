@@ -688,15 +688,27 @@ end
 --- @param source_variant string|nil Telemetry variant tag.
 --- @param is_private boolean|nil True when the payload is PII and must be redacted.
 function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_private)
+	local next_buffer, splice_error =
+		text_utils.replace_utf8_tail(CoreState.buffer, deletes, result_text)
+	if next_buffer == nil then
+		Logger.error(LOG, "Dynamic replacement cursor context is invalid; output rejected: %s.",
+			tostring(splice_error))
+		CoreState.buffer = ""
+		CoreState.llm_buffer = ""
+		CoreState.start_is_word_boundary = false
+		local cleanup_ok, cleanup_result = xpcall(LLMBridge.reset_predictions, debug.traceback)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Dynamic replacement context cleanup did not commit (result: %s).",
+				tostring(cleanup_result))
+		end
+		return false
+	end
+
 	return Expander.perform_text_replacement(
 		deletes,
 		emit_action,
 		function()
-			local ok, start_pos = pcall(utf8.offset, CoreState.buffer, -deletes)
-			if not ok or not start_pos or deletes >= #CoreState.buffer then
-				start_pos = 1
-			end
-			CoreState.buffer = (CoreState.buffer:sub(1, start_pos - 1) or "") .. result_text
+			CoreState.buffer = next_buffer
 		end,
 		true, -- is_final (suppress rescan)
 		false, -- is_ignored
