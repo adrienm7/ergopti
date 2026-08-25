@@ -13,7 +13,9 @@ cleanup() {
 trap cleanup EXIT
 
 FAKE_BIN="$TMP_ROOT/bin"
-mkdir -p "$FAKE_BIN" "$TMP_ROOT/home"
+ISOLATED_EXTERNAL_BIN="$TMP_ROOT/external-bin"
+mkdir -p "$FAKE_BIN" "$ISOLATED_EXTERNAL_BIN" "$TMP_ROOT/home"
+export ISOLATED_EXTERNAL_BIN
 cat > "$FAKE_BIN/fzf" <<'EOF'
 #!/bin/sh
 printf 'called\n' >> "$FZF_MARKER"
@@ -21,7 +23,9 @@ exit 97
 EOF
 cat > "$FAKE_BIN/sudo" <<'EOF'
 #!/bin/sh
-exec "$@"
+command_path=$(command -v "$1") || exit 127
+shift
+PATH="$ISOLATED_EXTERNAL_BIN" exec "$command_path" "$@"
 EOF
 chmod +x "$FAKE_BIN/fzf" "$FAKE_BIN/sudo"
 
