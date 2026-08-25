@@ -62,6 +62,7 @@ run_non_interactive_install() {
         ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
         ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        ERGOPTI_XKB_USER_HOME="$sandbox/home" \
         bash "$local_linux/xkb_installation/install.sh" \
             --installation-method clean \
             --version v2_2_1 \
@@ -113,12 +114,31 @@ run_downloaded_uninstall() {
         ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
         ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        ERGOPTI_XKB_USER_HOME="$sandbox/home" \
         bash "$downloaded" --installation-method clean --uninstall --yes \
             > "$sandbox/output.log" 2>&1; then
         cat "$sandbox/output.log" >&2
         return 1
     fi
     test ! -e "$sandbox/extensions/ergopti"
+
+    if env \
+        HOME="$TMP_ROOT/home" \
+        PATH="$FAKE_BIN:$PATH" \
+        BRANCH=main \
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0="$rewrite_key" \
+        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
+        ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
+        ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        ERGOPTI_XKB_USER_HOME="$sandbox/home" \
+        bash "$downloaded" --installation-method clean --uninstall --yes \
+            > "$sandbox/noop-output.log" 2>&1; then
+        printf 'empty uninstall unexpectedly reported success\n' >&2
+        return 1
+    fi
+    ! grep -q 'Désinstallation terminée' "$sandbox/noop-output.log"
 }
 
 run_debian_detector
