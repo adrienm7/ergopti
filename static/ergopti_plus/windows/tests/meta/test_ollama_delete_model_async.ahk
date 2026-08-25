@@ -47,7 +47,7 @@ Test("api_ollama: LLM_OllamaDeleteModel_Async spawns a curl child, never a sync 
 _ODMA_AssertDeletePollConsumesTypedTerminal() {
 	Poll := _DriverFuncBody("_LLM_Ollama_DeletePoll")
 	Assert(Poll != "", "_LLM_Ollama_DeletePoll must exist")
-	Assert(InStr(Poll, "_LLM_CurlReadTerminal(") > 0,
+	Assert(InStr(Poll, "ReadTerminalFn.Call(") > 0,
 		"the delete poll must read exit, HTTP status, and body ownership together")
 	Assert(InStr(Poll, "_LLM_OllamaFinishDelete(") > 0,
 		"the delete poll must delegate callback and logging to the typed terminal finisher")

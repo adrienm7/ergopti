@@ -145,6 +145,50 @@ _LAO_ReplacedOwnerCancelsResourcesExactlyOnce() {
 Test("[ahk-008-aux-owner] replacement cancels timer process and finalizer exactly once",
 	_LAO_ReplacedOwnerCancelsResourcesExactlyOnce)
 
+
+_LAO_StaleCurlOwnerReleasesExactProcessHandle() {
+	_LAO_ResetOwners()
+	State := Map("terminate_calls", 0, "close_calls", 0,
+		"terminated_handle", 0, "closed_handle", 0)
+	Port := Map(
+		"open_process", (*) => 9401,
+		"terminate_process", (Handle) => (
+			State["terminate_calls"] += 1,
+			State["terminated_handle"] := Handle,
+			true),
+		"close_process", (Handle) => (
+			State["close_calls"] += 1,
+			State["closed_handle"] := Handle,
+			true))
+	ProcessOwner := _LLM_CurlAdoptProcess(4247, Port)
+	OldOwner := LLM_AuxBegin("menu_tags", _LAO_Context())
+	AssertTrue(LLM_AuxBindResources(OldOwner, Map(
+		"process_pid", 4247,
+		"process_owner", ProcessOwner,
+		"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port))),
+		"the exact process handle must attach to the current auxiliary owner")
+	NewOwner := LLM_AuxBegin("menu_tags", _LAO_Context())
+	AssertFalse(LLM_AuxIsCurrent(OldOwner),
+		"replacement must make the old generation stale before cleanup")
+	AssertTrue(LLM_AuxIsCurrent(NewOwner),
+		"the replacement generation must remain current")
+	AssertEqual(1, State["terminate_calls"],
+		"stale-generation cleanup must terminate the exact retained process once")
+	AssertEqual(9401, State["terminated_handle"],
+		"stale-generation cleanup must not search by recyclable PID")
+	AssertEqual(1, State["close_calls"],
+		"stale-generation cleanup must close the retained handle once")
+	AssertEqual(9401, State["closed_handle"],
+		"the same exact handle must own termination and close")
+	LLM_AuxInvalidate("test_cleanup")
+	AssertEqual(1, State["terminate_calls"],
+		"later invalidation must not terminate the retired process twice")
+	AssertEqual(1, State["close_calls"],
+		"later invalidation must not close the retired handle twice")
+}
+Test("[ahk2-04-curl-exact-process-owner] stale auxiliary generation releases exact handle once",
+	_LAO_StaleCurlOwnerReleasesExactProcessHandle)
+
 _LAO_BoundaryFailuresStillRetireExactResources() {
 	_LAO_ResetOwners()
 	ResetState := Map("cancel_calls", 0, "finalizer_calls", 0)

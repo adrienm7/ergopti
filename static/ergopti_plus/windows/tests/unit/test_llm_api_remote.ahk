@@ -132,6 +132,156 @@ Test("remote curl dispatch: invalid config is refused before artifacts "
 	_RemoteCurlControl_DispatchRejectsBeforeArtifacts)
 
 
+_RemotePidReceipt_RecordSuccess(State, Text, Usage) {
+	State["success_calls"] += 1
+	State["text"] := Text
+	State["usage"] := Usage
+}
+
+_RemotePidReceipt_RecordFailure(State) {
+	State["fail_calls"] += 1
+}
+
+_RemotePidReceipt_RecordCleanup(State, Entry) {
+	State["cleanup_calls"] += 1
+}
+
+_RemotePidReceipt_ReadTerminal(State, StatusPath, ExitPath, BodyPath) {
+	State["terminal_reads"] += 1
+	return Map(
+		"complete", true,
+		"exit", 0,
+		"status", 200,
+		"body_read", true,
+		"body", '{"choices":[{"message":{"content":"receipt wins"}}]}')
+}
+
+_RemotePidReceipt_CompleteReceiptPrecedesRecycledPidAndDeadline() {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_04_remote_receipt_first"
+	State := Map(
+		"success_calls", 0,
+		"fail_calls", 0,
+		"cleanup_calls", 0,
+		"terminal_reads", 0,
+		"process_checks", 0,
+		"close_calls", 0,
+		"text", "",
+		"usage", 0)
+	ProcessExistsFn := (*) => (State["process_checks"] += 1, true)
+	CloseFn := (*) => (State["close_calls"] += 1, true)
+	Port := Map(
+		"process_exists", ProcessExistsFn,
+		"process_close", CloseFn,
+		"read_terminal", _RemotePidReceipt_ReadTerminal.Bind(State),
+		"cleanup", _RemotePidReceipt_RecordCleanup.Bind(State))
+	_LLM_Remote_Async[ReqId] := Map(
+		"transport", "curl",
+		"pid", 4242,
+		"tmp_payload", "payload",
+		"tmp_stdout", "body",
+		"tmp_config", "config",
+		"tmp_status", "status",
+		"tmp_exit", "exit",
+		"format", "openai",
+		"model_id_at_dispatch", "model",
+		"on_success", _RemotePidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _RemotePidReceipt_RecordFailure.Bind(State),
+		"cancelled", false,
+		"start_tick", A_TickCount - 5000,
+		"timeout_ms", 1)
+	try {
+		_LLMRemote_PollCurl(ReqId, Port)
+		AssertEqual(1, State["terminal_reads"],
+			"(ahk2-04-curl-receipt-first) the durable terminal receipt must be read before liveness or deadline")
+		AssertEqual(0, State["process_checks"],
+			"a complete receipt must make a recycled live PID irrelevant")
+		AssertEqual(0, State["close_calls"],
+			"the poller must never close a process selected only by a recyclable PID")
+		AssertEqual(1, State["success_calls"],
+			"the complete 2xx response must win even when the old numeric PID is live and the wall deadline passed")
+		AssertEqual(0, State["fail_calls"],
+			"a durable successful response must not be reclassified as timeout")
+		AssertEqual("receipt wins", State["text"],
+			"the terminal response body must reach the exact completion callback")
+		AssertEqual(1, State["cleanup_calls"],
+			"the terminal owner must clean its artifacts exactly once")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"the exact completed request must retire from the registry")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+Test("remote curl poll: terminal receipt precedes recycled PID and deadline "
+	. "(ahk2-04-curl-receipt-first)",
+	_RemotePidReceipt_CompleteReceiptPrecedesRecycledPidAndDeadline)
+
+
+_RemotePidReceipt_RunIncompleteBoundary(Mode) {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_04_remote_" . Mode
+	State := Map(
+		"success_calls", 0, "fail_calls", 0, "cleanup_calls", 0,
+		"terminate_calls", 0, "close_calls", 0,
+		"terminated_handle", 0, "closed_handle", 0)
+	Port := Map(
+		"open_process", (*) => 9301,
+		"terminate_process", (Handle) => (
+			State["terminate_calls"] += 1,
+			State["terminated_handle"] := Handle,
+			true),
+		"close_process", (Handle) => (
+			State["close_calls"] += 1,
+			State["closed_handle"] := Handle,
+			true),
+		"read_terminal", (*) => Map(
+			"complete", false, "exit", -1, "status", 0,
+			"body_read", false, "body", ""),
+		"cleanup", _RemotePidReceipt_RecordCleanup.Bind(State))
+	ProcessOwner := _LLM_CurlAdoptProcess(4242, Port)
+	_LLM_Remote_Async[ReqId] := Map(
+		"transport", "curl", "pid", 4242, "process_owner", ProcessOwner,
+		"tmp_payload", "payload", "tmp_stdout", "body", "tmp_config", "config",
+		"tmp_status", "status", "tmp_exit", "exit", "format", "openai",
+		"on_success", _RemotePidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _RemotePidReceipt_RecordFailure.Bind(State),
+		"cancelled", Mode == "cancel",
+		"start_tick", Mode == "timeout" ? A_TickCount - 5000 : A_TickCount,
+		"timeout_ms", Mode == "timeout" ? 1 : 100000)
+	try {
+		_LLMRemote_PollCurl(ReqId, Port)
+		AssertEqual(1, State["terminate_calls"],
+			Mode . " must terminate the exact retained process handle once")
+		AssertEqual(9301, State["terminated_handle"],
+			Mode . " must never reopen or close the recyclable numeric PID")
+		AssertEqual(1, State["close_calls"],
+			Mode . " must close the retained process handle once")
+		AssertEqual(9301, State["closed_handle"],
+			Mode . " cleanup must close the same exact handle it terminated")
+		AssertEqual(1, State["cleanup_calls"],
+			Mode . " must clean its exact artifact owner once")
+		AssertEqual(0, State["success_calls"],
+			Mode . " without a terminal receipt must never publish success")
+		AssertEqual(Mode == "timeout" ? 1 : 0, State["fail_calls"],
+			"timeout reports failure, while cancellation remains callback-silent")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			Mode . " must retire the exact registry entry")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+
+_RemotePidReceipt_TimeoutAndCancelUseExactHandle() {
+	_RemotePidReceipt_RunIncompleteBoundary("timeout")
+	_RemotePidReceipt_RunIncompleteBoundary("cancel")
+}
+Test("remote curl poll: timeout and cancellation terminate only the exact process handle "
+	. "(ahk2-04-curl-exact-process-owner)",
+	_RemotePidReceipt_TimeoutAndCancelUseExactHandle)
+
+
 
 
 ; ======================================================

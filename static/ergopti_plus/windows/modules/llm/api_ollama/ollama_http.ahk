@@ -53,18 +53,6 @@ _LLM_OllamaAuxDeletePaths(Paths, DeleteFn := 0) {
 	return true
 }
 
-_LLM_OllamaAuxCancelProcess(Pid, ProcessExistsFn := 0, ProcessCloseFn := 0) {
-	if !IsInteger(Pid) || Pid <= 0
-		return true
-	if !HasMethod(ProcessExistsFn, "Call")
-		ProcessExistsFn := ProcessExist
-	if !HasMethod(ProcessCloseFn, "Call")
-		ProcessCloseFn := ProcessClose
-	if ProcessExistsFn.Call(Pid)
-		try ProcessCloseFn.Call(Pid)
-	return true
-}
-
 _LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid) {
 	Run(Command, WorkingDir, Options, &Pid)
 }
@@ -81,12 +69,99 @@ _LLM_CurlOwnedCommand(CurlCommand, StatusPath, ExitPath) {
 		. ' & exit /b !_ergopti_ec!"'
 }
 
+_LLM_CurlOpenProcessExact(Pid) {
+	; A retained process HANDLE identifies the exact kernel object even after its
+	; numeric PID is recycled. PROCESS_TERMINATE is the only destructive right;
+	; SYNCHRONIZE lets future owners wait on this exact object without reopening it.
+	return DllCall("Kernel32\OpenProcess", "UInt", 0x00100001,
+		"Int", false, "UInt", Pid, "Ptr")
+}
+
+_LLM_CurlTerminateProcessExact(Handle) {
+	return DllCall("Kernel32\TerminateProcess", "Ptr", Handle,
+		"UInt", 1, "Int") != 0
+}
+
+_LLM_CurlWaitProcessExact(Handle) {
+	return DllCall("Kernel32\WaitForSingleObject", "Ptr", Handle,
+		"UInt", 0, "UInt")
+}
+
+_LLM_CurlCloseProcessExact(Handle) {
+	return DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
+}
+
+_LLM_CurlAdoptProcess(Pid, Port := 0) {
+	OpenFn := _LLM_CurlArtifactPortFn(Port, "open_process", _LLM_CurlOpenProcessExact)
+	Handle := 0
+	if IsInteger(Pid) and Pid > 0
+		try Handle := OpenFn.Call(Pid)
+	return Map("pid", IsInteger(Pid) ? Pid : 0,
+		"handle", Handle, "released", false)
+}
+
+_LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
+	if !(ProcessOwner is Map)
+		return true
+	Handle := 0
+	PreviousCritical := Critical("On")
+	try {
+		if ProcessOwner.Get("released", false)
+			return true
+		ProcessOwner["released"] := true
+		Handle := ProcessOwner.Get("handle", 0)
+		ProcessOwner["handle"] := 0
+	} finally Critical(PreviousCritical)
+	if !Handle
+		return true
+	TerminateFn := _LLM_CurlArtifactPortFn(Port,
+		"terminate_process", _LLM_CurlTerminateProcessExact)
+	CloseFn := _LLM_CurlArtifactPortFn(Port,
+		"close_process", _LLM_CurlCloseProcessExact)
+	Succeeded := true
+	if Terminate {
+		try Succeeded := TerminateFn.Call(Handle) && Succeeded
+		catch
+			Succeeded := false
+	}
+	try Succeeded := CloseFn.Call(Handle) && Succeeded
+	catch
+		Succeeded := false
+	return Succeeded
+}
+
+_LLM_CurlReleaseEntryProcess(Entry, Terminate := false, Port := 0) {
+	if !(Entry is Map) or !Entry.Has("process_owner")
+		return true
+	return _LLM_CurlReleaseProcess(Entry["process_owner"], Terminate, Port)
+}
+
+_LLM_CurlProcessExited(ProcessOwner, Port := 0) {
+	if !(ProcessOwner is Map) or ProcessOwner.Get("released", false)
+		return true
+	Handle := ProcessOwner.Get("handle", 0)
+	if !Handle
+		return false
+	WaitFn := _LLM_CurlArtifactPortFn(Port,
+		"wait_process", _LLM_CurlWaitProcessExact)
+	try Result := WaitFn.Call(Handle)
+	catch
+		return false
+	; WAIT_OBJECT_0 is the sole proof that this exact retained process exited.
+	return Result = 0
+}
+
 _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath) {
-	Result := Map("exit", -1, "status", 0, "body_read", false, "body", "")
+	Result := Map("complete", false, "exit", -1,
+		"status", 0, "body_read", false, "body", "")
 	try {
 		ExitText := Trim(FileRead(ExitPath, "UTF-8-RAW"))
-		if RegExMatch(ExitText, "^-?\d+$")
+		if RegExMatch(ExitText, "^-?\d+$") {
 			Result["exit"] := Integer(ExitText)
+			; _LLM_CurlOwnedCommand writes this file last. A valid integer is the
+			; durable commit receipt; PID liveness is only advisory and can be stale.
+			Result["complete"] := true
+		}
 	}
 	try {
 		StatusText := Trim(FileRead(StatusPath, "UTF-8-RAW"))
@@ -98,6 +173,14 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath) {
 		Result["body_read"] := true
 	}
 	return Result
+}
+
+_LLM_CurlTerminalComplete(Result) {
+	if !(Result is Map)
+		return false
+	; Preserve deterministic legacy fixtures which predate the explicit field.
+	return Result.Get("complete", false)
+		or (Result.Has("exit") and Result["exit"] != -1)
 }
 
 _LLM_CurlTerminalOk(Result) {
@@ -207,7 +290,7 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 	; handling (the menu build that ran during the boot bootstrap was measured stuck
 	; for ~14 s entirely on this). It is the same reason the generation path already
 	; uses curl. A curl child does the connect in its OWN process; we only poll
-	; ProcessExist (instant), so the AHK message loop is NEVER blocked.
+	; its terminal sidecar (instant), so the AHK message loop is NEVER blocked.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_ping")
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
@@ -225,11 +308,13 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Run(cmd, , "Hide", &pid)
+		ProcessOwner := _LLM_CurlAdoptProcess(pid)
 		if !LLM_AuxBindResources(Owner, Map(
 				"process_pid", pid,
-				"cancel", _LLM_OllamaAuxCancelProcess.Bind(pid)))
+				"process_owner", ProcessOwner,
+				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
 			return Owner
-		_LLM_Ollama_PingPoll(pid, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
+		_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
 	} catch {
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 	}
@@ -240,30 +325,32 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
  * Polls a reachability-ping curl child WITHOUT blocking the message loop. Reachable
  * requires a successful curl exit, 2xx status, readable body, and the canonical
  * ``GET /api/version`` JSON schema. Mirrors the generation poll at a shorter bound.
- * @param {integer}  pid        - curl child PID (0 if Run failed).
+ * @param {Map}      ProcessOwner - Exact retained curl process HANDLE owner.
  * @param {string}   tmp_out    - Temp file curl writes the response body to.
  * @param {function} on_result  - Callback receiving the boolean reachability.
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_PingPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner) {
+_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner, Port := 0) {
 	if !LLM_AuxIsCurrent(Owner)
 		return
-	; 4 s backstop: curl -m 2 should exit by ~2 s, but ProcessClose if it overruns so
-	; a wedged child can never keep the poll chain (or its temp handle) alive.
-	if (pid > 0 and ProcessExist(pid)) {
-		if (_LLM_DeadlineExpired(start_tick, 4000)) {
-			try ProcessClose(pid)
-			_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
-			return
-		}
-		LLM_AuxSchedule(Owner,
-			() => _LLM_Ollama_PingPoll(pid, tmp_out, tmp_status, tmp_exit,
-				on_result, start_tick, Owner), -150)
+	ReadTerminalFn := _LLM_CurlArtifactPortFn(Port,
+		"read_terminal", _LLM_CurlReadTerminal)
+	Terminal := ReadTerminalFn.Call(tmp_status, tmp_exit, tmp_out)
+	if _LLM_CurlTerminalComplete(Terminal) {
+		_LLM_CurlReleaseProcess(ProcessOwner, false, Port)
+		reachable := _LLM_OllamaPingTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
+		_LLM_OllamaInvokeAuxResult(Owner, on_result, reachable)
 		return
 	}
-	Terminal := _LLM_CurlReadTerminal(tmp_status, tmp_exit, tmp_out)
-	reachable := _LLM_OllamaPingTerminalOk(Terminal["exit"], Terminal["status"], Terminal["body_read"], Terminal["body"])
-	_LLM_OllamaInvokeAuxResult(Owner, on_result, reachable)
+	; Curl owns a 2 s max-time; this 4 s backstop retires a missing receipt.
+	if _LLM_DeadlineExpired(start_tick, 4000) {
+		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
+		return
+	}
+	LLM_AuxSchedule(Owner,
+		() => _LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit,
+			on_result, start_tick, Owner, Port), -150)
 }
 
 /**
@@ -328,7 +415,7 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 	; WinHttpRequest async mode (Open(...,true) + Send()) still performs the TCP connect
 	; SYNCHRONOUSLY on the calling thread, so against a busy daemon it could block the
 	; tray build (which runs under Critical) for up to its timeout. curl does the connect
-	; in its own process; we only poll ProcessExist (instant), so the loop never blocks.
+	; in its own process; we only poll its terminal sidecar, so the loop never blocks.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_tags")
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
@@ -345,11 +432,13 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Run(cmd, , "Hide", &pid)
+		ProcessOwner := _LLM_CurlAdoptProcess(pid)
 		if !LLM_AuxBindResources(Owner, Map(
 				"process_pid", pid,
-				"cancel", _LLM_OllamaAuxCancelProcess.Bind(pid)))
+				"process_owner", ProcessOwner,
+				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
 			return Owner
-		_LLM_Ollama_TagsPoll(pid, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
+		_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
 	} catch {
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
 	}
@@ -365,32 +454,33 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
  * @param {function} on_result  - Callback receiving an Array of tag names ([] on failure).
  * @param {integer}  start_tick - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_TagsPoll(pid, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner) {
+_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, start_tick, Owner, Port := 0) {
 	if !LLM_AuxIsCurrent(Owner)
 		return
-	if (pid > 0 and ProcessExist(pid)) {
-		; 4 s backstop: curl -m 2 should exit by ~2 s; ProcessClose a wedged child so it
-		; can never keep the poll chain (or its temp handle) alive.
-		if (_LLM_DeadlineExpired(start_tick, 4000)) {
-			try ProcessClose(pid)
-			_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
-			return
-		}
-		LLM_AuxSchedule(Owner,
-			() => _LLM_Ollama_TagsPoll(pid, tmp_out, tmp_status, tmp_exit,
-				on_result, start_tick, Owner), -150)
+	ReadTerminalFn := _LLM_CurlArtifactPortFn(Port,
+		"read_terminal", _LLM_CurlReadTerminal)
+	Terminal := ReadTerminalFn.Call(tmp_status, tmp_exit, tmp_out)
+	if _LLM_CurlTerminalComplete(Terminal) {
+		_LLM_CurlReleaseProcess(ProcessOwner, false, Port)
+		tags := _LLM_CurlTerminalOk(Terminal) ? _LLM_Ollama_ParseTagNames(Terminal["body"]) : []
+		_LLM_OllamaInvokeAuxResult(Owner, on_result, tags)
 		return
 	}
-	Terminal := _LLM_CurlReadTerminal(tmp_status, tmp_exit, tmp_out)
-	tags := _LLM_CurlTerminalOk(Terminal) ? _LLM_Ollama_ParseTagNames(Terminal["body"]) : []
-	_LLM_OllamaInvokeAuxResult(Owner, on_result, tags)
+	if _LLM_DeadlineExpired(start_tick, 4000) {
+		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
+		return
+	}
+	LLM_AuxSchedule(Owner,
+		() => _LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit,
+			on_result, start_tick, Owner, Port), -150)
 }
 
 /**
  * Removes the local copy of an Ollama model via the daemon's
  * ``DELETE /api/delete`` endpoint. Non-blocking — mirrors
  * ``LLM_OllamaListModels_Async``: a curl child performs the request and we
- * only poll ``ProcessExist`` (instant), so the tray-menu/message-loop thread
+ * only poll the terminal sidecar (instant), so the tray-menu/message-loop thread
  * is never frozen for the DELETE's up-to-10 s round trip. Every sibling
  * Ollama HTTP surface had already been migrated to this pattern; the
  * "Delete model cache" action was the one that was missed (F24).
@@ -443,11 +533,13 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		RunFn.Call(cmdLine, "", "Hide", &pid)
+		ProcessOwner := _LLM_CurlAdoptProcess(pid, Port)
 		if !LLM_AuxBindResources(Owner, Map(
 				"process_pid", pid,
-				"cancel", _LLM_OllamaAuxCancelProcess.Bind(pid)))
+				"process_owner", ProcessOwner,
+				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port)))
 			return Owner
-		PollFn.Call(pid, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, TickFn.Call(), Owner)
+		PollFn.Call(ProcessOwner, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, TickFn.Call(), Owner, Port)
 	} catch as e {
 		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
@@ -467,27 +559,28 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
  * @param {function} on_result   - Callback receiving a Boolean (true on success).
  * @param {integer}  start_tick  - A_TickCount at dispatch, for the deadline backstop.
  */
-_LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tmp_status, tmp_exit, tag, on_result, start_tick, Owner) {
+_LLM_Ollama_DeletePoll(ProcessOwner, tmp_payload, tmp_out, tmp_status, tmp_exit, tag, on_result, start_tick, Owner, Port := 0) {
 	global LLM_OLLAMA_POLL_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	if !LLM_AuxIsCurrent(Owner)
 		return
-	if (pid > 0 and ProcessExist(pid)) {
-		; 5 s backstop beyond curl's own -m ceiling: ProcessClose a wedged
-		; child so it can never keep the poll chain (or its temp files) alive.
-		if (_LLM_DeadlineExpired(start_tick, LLM_OLLAMA_DELETE_TIMEOUT_MS + 5000)) {
-			try ProcessClose(pid)
-			try LoggerWarn("LLM.ollama", "Ollama delete '{1}' timed out.", tag)
-			_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
+	ReadTerminalFn := _LLM_CurlArtifactPortFn(Port,
+		"read_terminal", _LLM_CurlReadTerminal)
+	Terminal := ReadTerminalFn.Call(tmp_status, tmp_exit, tmp_out)
+	if _LLM_CurlTerminalComplete(Terminal) {
+		_LLM_CurlReleaseProcess(ProcessOwner, false, Port)
+		if !LLM_AuxIsCurrent(Owner)
 			return
-		}
-		LLM_AuxSchedule(Owner,
-			() => _LLM_Ollama_DeletePoll(pid, tmp_payload, tmp_out, tmp_status,
-				tmp_exit, tag, on_result, start_tick, Owner), -LLM_OLLAMA_POLL_MS)
+		try _LLM_OllamaFinishDelete(Terminal, tag, on_result)
+		finally LLM_AuxFinish(Owner)
 		return
 	}
-	Terminal := _LLM_CurlReadTerminal(tmp_status, tmp_exit, tmp_out)
-	if !LLM_AuxIsCurrent(Owner)
+	if _LLM_DeadlineExpired(start_tick, LLM_OLLAMA_DELETE_TIMEOUT_MS + 5000) {
+		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		try LoggerWarn("LLM.ollama", "Ollama delete '{1}' timed out.", tag)
+		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 		return
-	try _LLM_OllamaFinishDelete(Terminal, tag, on_result)
-	finally LLM_AuxFinish(Owner)
+	}
+	LLM_AuxSchedule(Owner,
+		() => _LLM_Ollama_DeletePoll(ProcessOwner, tmp_payload, tmp_out, tmp_status,
+			tmp_exit, tag, on_result, start_tick, Owner, Port), -LLM_OLLAMA_POLL_MS)
 }

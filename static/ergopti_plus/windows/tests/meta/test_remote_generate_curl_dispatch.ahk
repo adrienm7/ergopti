@@ -14,7 +14,7 @@
 ;
 ; The fix dispatches the remote POST through a curl child process (mirror of
 ; _LLM_Ollama_DispatchAsync): the connect happens in curl's own process and the AHK
-; message loop only polls ProcessExist. WinHTTP remains as a fallback only when curl
+; message loop only polls the durable terminal sidecar. WinHTTP remains as a fallback only when curl
 ; is unavailable on the host, and its resolve+connect is bounded by a short timeout.
 ;
 ; Meta-static because modules/llm is not in the headless runner's include graph, and
@@ -43,7 +43,8 @@ _RGC_AssertCurlDispatch() {
 
 	poll := _DriverFuncBody("_LLMRemote_PollCurl")
 	Assert(poll != "", "_LLMRemote_PollCurl must exist")
-	Assert(InStr(poll, "ProcessExist") > 0,
-		"_LLMRemote_PollCurl must poll ProcessExist (non-blocking), never block on the connect (remote-generate-connect-blocks)")
+	Assert(InStr(poll, "_LLM_CurlTerminalComplete(") > 0
+		and InStr(poll, "ProcessExist(") = 0,
+		"_LLMRemote_PollCurl must poll the durable sidecar without blocking or trusting a recyclable PID (remote-generate-connect-blocks)")
 }
 Test("LLM remote: generation dispatches through a curl child for a non-blocking connect (remote-generate-connect-blocks)", _RGC_AssertCurlDispatch)

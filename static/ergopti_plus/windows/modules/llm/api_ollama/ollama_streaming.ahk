@@ -96,13 +96,16 @@ _LLM_Ollama_DispatchAsync(job) {
 	tmp_dir := _LLM_Ollama_TempDir()
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
+	terminal := _LLM_CurlTerminalPaths(tmp_stdout)
 	_LLM_Ollama_TrimAsyncRegistry()
 	; AHK-28: mark the slot busy synchronously so DrainPending's
 	; _LLM_Ollama_Async.Count > 0 coalescing check sees it before the
 	; deferred spawn runs. FSWrite + Run are deferred via SetTimer(-1)
 	; to release the Critical region before the blocking OS calls.
 	_LLM_Ollama_Async[req_id] := Map(
-		"pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+		"pid", 0, "process_owner", 0,
+		"tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+		"tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
 		"on_success", job["on_success"], "on_fail", job["on_fail"],
 		"cancelled", false, "start_tick", A_TickCount,
 		"timeout_ms", LLM_OLLAMA_TIMEOUT + 5000, "payload_snip", "")
@@ -113,7 +116,7 @@ _LLM_Ollama_DispatchAsync(job) {
 ; Critical region. The slot in _LLM_Ollama_Async was reserved synchronously
 ; in _LLM_Ollama_DispatchAsync so the coalescing count is correct throughout.
 _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
-	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL
+	global _LLM_Ollama_Async, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT
 	; This SetTimer(-1) tick is the only step of the dispatch chain that runs
 	; OUTSIDE the Critical region where the slot was reserved, so it is the
 	; one place a Suspend or a cancel (LLM_OllamaCancelAllAsync) landing in the
@@ -146,11 +149,15 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		return
 	}
 	curl_exe := A_WinDir . "\System32\curl.exe"
-	cmdLine := '"' . curl_exe . '" -s -S -X POST '
+	entry := _LLM_Ollama_Async[req_id]
+	cmdLine := '"' . curl_exe . '" -s -S -m '
+		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' -X POST '
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
 		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
 		. '-o ' . _Q(tmp_stdout)
+	cmdLine := _LLM_CurlOwnedCommand(cmdLine,
+		entry["tmp_status"], entry["tmp_exit"])
 	pid := 0
 	try {
 		Run(cmdLine, , "Hide", &pid)
@@ -163,10 +170,13 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		return
 	}
 	payload_snip := StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload
+	ProcessOwner := _LLM_CurlAdoptProcess(pid)
 	if _LLM_Ollama_Async.Has(req_id) {
 		_LLM_Ollama_Async[req_id]["pid"]          := pid
+		_LLM_Ollama_Async[req_id]["process_owner"] := ProcessOwner
 		_LLM_Ollama_Async[req_id]["payload_snip"] := payload_snip
-	}
+	} else
+		_LLM_CurlReleaseProcess(ProcessOwner, true)
 	_LLM_Ollama_PollCurl(req_id)
 }
 
@@ -215,8 +225,9 @@ LLM_OllamaCancelAllAsync() {
 	Kills := []
 	for _id, entry in _LLM_Ollama_Async {
 		entry["cancelled"] := true
-		if (entry.Has("pid") and entry["pid"] > 0)
-			Kills.Push(Map("pid", entry["pid"]))
+		if entry.Has("process_owner") and entry["process_owner"] is Map
+			Kills.Push(Map("cancel", _LLM_CurlReleaseProcess.Bind(
+				entry["process_owner"], true)))
 	}
 	LLM_DeferCancelKills(Kills)
 	LLM_OllamaCancelStreams()
@@ -250,22 +261,51 @@ LLM_OllamaNoteInferenceSuccess() {
 }
 
 ; Polls a non-streaming curl child until stdout is ready or the slot times out.
-_LLM_Ollama_PollCurl(req_id) {
+_LLM_Ollama_PollCurl(req_id, Port := 0) {
 	global _LLM_Ollama_Async, LLM_OLLAMA_POLL_MS
 	if !_LLM_Ollama_Async.Has(req_id)
 		return
 	entry := _LLM_Ollama_Async[req_id]
+	Terminal := Map("complete", false, "exit", -1,
+		"status", 0, "body_read", false, "body", "")
+	ReadTerminalFn := _LLM_CurlArtifactPortFn(Port,
+		"read_terminal", _LLM_CurlReadTerminal)
+	if entry.Has("tmp_status") and entry.Has("tmp_exit") and entry.Has("tmp_stdout")
+		Terminal := ReadTerminalFn.Call(
+			entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
+	if _LLM_CurlTerminalComplete(Terminal) {
+		_LLM_CurlReleaseEntryProcess(entry, false, Port)
+		if entry["cancelled"] {
+			_LLM_Ollama_CleanupCurlFiles(entry)
+			_LLM_Ollama_Async.Delete(req_id)
+			_LLM_Ollama_DrainPending()
+			return
+		}
+		on_success := entry["on_success"]
+		on_fail := entry["on_fail"]
+		body := Terminal["body"]
+		_LLM_Ollama_CleanupCurlFiles(entry)
+		_LLM_Ollama_Async.Delete(req_id)
+		if !_LLM_CurlTerminalOk(Terminal) or body == "" {
+			try LoggerWarn("LLM.ollama", "curl terminal failure (exit={1}, status={2}, body_chars={3}).",
+				Terminal["exit"], Terminal["status"], StrLen(body))
+			_LLM_InvokeCallback(on_fail, "on_fail")
+			_LLM_Ollama_DrainPending()
+			return
+		}
+		try _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry)
+		_LLM_Ollama_DrainPending()
+		return
+	}
 	if entry["cancelled"] {
-		if entry.Has("pid") and entry["pid"] > 0
-			try ProcessClose(entry["pid"])
+		_LLM_CurlReleaseEntryProcess(entry, true, Port)
 		_LLM_Ollama_CleanupCurlFiles(entry)
 		_LLM_Ollama_Async.Delete(req_id)
 		_LLM_Ollama_DrainPending()
 		return
 	}
 	if (entry.Has("start_tick") and entry.Has("timeout_ms") and _LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
-		if entry.Has("pid") and entry["pid"] > 0
-			try ProcessClose(entry["pid"])
+		_LLM_CurlReleaseEntryProcess(entry, true, Port)
 		elapsed := entry.Has("start_tick") ? TickElapsed(entry["start_tick"]) : 0
 		try LoggerWarn("LLM.ollama", "curl request timed out after {1} ms.", elapsed)
 		on_fail := entry["on_fail"]
@@ -275,29 +315,7 @@ _LLM_Ollama_PollCurl(req_id) {
 		_LLM_Ollama_DrainPending()
 		return
 	}
-	if entry.Has("pid") and entry["pid"] > 0 and ProcessExist(entry["pid"]) {
-		SetTimer(() => _LLM_Ollama_PollCurl(req_id), -LLM_OLLAMA_POLL_MS)
-		return
-	}
-	on_success := entry["on_success"]
-	on_fail    := entry["on_fail"]
-	body := ""
-	try {
-		if entry.Has("tmp_stdout") and FileExist(entry["tmp_stdout"])
-			body := FileRead(entry["tmp_stdout"], "UTF-8-RAW")
-	} catch {
-		body := ""
-	}
-	_LLM_Ollama_CleanupCurlFiles(entry)
-	_LLM_Ollama_Async.Delete(req_id)
-	if (body == "") {
-		try LoggerWarn("LLM.ollama", "curl finished with empty stdout.")
-		_LLM_InvokeCallback(on_fail, "on_fail")
-		_LLM_Ollama_DrainPending()
-		return
-	}
-	try _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry)
-	_LLM_Ollama_DrainPending()
+	SetTimer(() => _LLM_Ollama_PollCurl(req_id, Port), -LLM_OLLAMA_POLL_MS)
 }
 
 _LLM_Ollama_CleanupCurlFiles(entry) {
@@ -307,6 +325,10 @@ _LLM_Ollama_CleanupCurlFiles(entry) {
 		try FSDelete(entry["tmp_payload"])
 	if entry.Has("tmp_stdout") and entry["tmp_stdout"] != ""
 		try FSDelete(entry["tmp_stdout"])
+	if entry.Has("tmp_status") and entry["tmp_status"] != ""
+		try FSDelete(entry["tmp_status"])
+	if entry.Has("tmp_exit") and entry["tmp_exit"] != ""
+		try FSDelete(entry["tmp_exit"])
 }
 
 /**
@@ -430,8 +452,7 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	; Kill the curl child so it does not keep writing to the temp file
 	; after we abandon the registry entry — the PID would otherwise
 	; accumulate until it expires naturally (up to 3 min).
-	if oldest_entry.Has("pid") and oldest_entry["pid"] > 0
-		try ProcessClose(oldest_entry["pid"])
+	_LLM_CurlReleaseEntryProcess(oldest_entry, true)
 	_LLM_Ollama_CleanupCurlFiles(oldest_entry)
 	; Honour the async contract: exactly one of on_success / on_fail must
 	; fire. Without this the caller (e.g. the prediction engine slot state
@@ -471,8 +492,8 @@ _LLM_Ollama_TrimAsyncRegistry() {
  * @param {function} on_partial    - Called as on_partial(accumulated_text) per token.
  * @param {function} on_success    - Called as on_success(final_text) at end-of-stream.
  * @param {function} on_fail       - Called on any failure.
- * @returns {Object} A handle ``{ Pid, Cancelled }`` callers can pass to
- *                   LLM_OllamaCancelStream to terminate the curl process.
+ * @returns {Object} A handle retaining the exact process object; callers pass it
+ *                   to LLM_OllamaCancelStream to terminate the curl process.
  */
 LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
 	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
@@ -488,7 +509,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	if !FSWrite(tmp_payload, payload) {
 		_LLM_InvokeCallback(on_fail, "on_fail")
-		return { Pid: 0, Cancelled: false }
+		return { Pid: 0, ProcessOwner: 0, Cancelled: false }
 	}
 
 	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
@@ -496,16 +517,19 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; shell redirects (> file) silently produce empty/missing stdout — logs showed
 	; "Streaming finished with empty response. No stdout file."
 	curl_exe := A_WinDir . "\System32\curl.exe"
-	cmdLine := '"' . curl_exe . '" -N -s -S -X POST '
+	cmdLine := '"' . curl_exe . '" -N -s -S -m '
+		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' -X POST '
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
 		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
 		. '-o ' . _Q(tmp_stdout)
 
-	handle := { Pid: 0, Cancelled: false, TmpPayload: tmp_payload, TmpStdout: tmp_stdout }
+	handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
+		TmpPayload: tmp_payload, TmpStdout: tmp_stdout }
 	try {
 		Run(cmdLine, , "Hide", &pid)
 		handle.Pid := pid
+		handle.ProcessOwner := _LLM_CurlAdoptProcess(pid)
 	} catch {
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_CleanupStreamFiles(handle)
@@ -532,6 +556,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	global LLM_OLLAMA_POLL_MS
 	if handle.Cancelled {
+		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		try LoggerInfo("LLM.ollama", "Streaming cancelled (newer prediction).")
@@ -539,8 +564,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		return
 	}
 	if (state.Has("start_tick") and state.Has("timeout_ms") and _LLM_DeadlineExpired(state["start_tick"], state["timeout_ms"])) {
-		if (handle.Pid > 0)
-			try ProcessClose(handle.Pid)
+		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		_LLM_Ollama_RemoveStreamHandle(handle)
 		elapsed := state.Has("start_tick") ? TickElapsed(state["start_tick"]) : 0
@@ -563,10 +587,11 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	} catch {
 	}
 	; Still alive? Schedule the next tick.
-	if ProcessExist(handle.Pid) {
+	if !_LLM_CurlProcessExited(handle.ProcessOwner) {
 		SetTimer(() => _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail), -LLM_OLLAMA_POLL_MS)
 		return
 	}
+	_LLM_CurlReleaseProcess(handle.ProcessOwner)
 	; Process exited: flush whatever is left on disk before declaring the
 	; result. The child's stdout can lag its exit by a few ms, so hand off to
 	; the re-armed flush tick (no blocking Sleep) which retries the read a
@@ -714,8 +739,9 @@ LLM_OllamaCancelStream(handle) {
 	; Deferred for the same reason as the async cancellation: this is reached from
 	; the per-keystroke Critical via LLM_OllamaCancelStreams, and killing the curl
 	; child is OS work that must not run with the message pump suspended.
-	if (handle.Pid > 0)
-		LLM_DeferCancelKills([Map("pid", handle.Pid)])
+	if handle.HasOwnProp("ProcessOwner") and handle.ProcessOwner is Map
+		LLM_DeferCancelKills([Map("cancel",
+			_LLM_CurlReleaseProcess.Bind(handle.ProcessOwner, true))])
 }
 
 _LLM_Ollama_CleanupStreamFiles(handle) {

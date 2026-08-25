@@ -113,11 +113,62 @@ _LCNC_DeferralUsesANewThread() {
 
 	Runner := _DriverFuncBody("_LLM_RunCancelKills")
 	Assert(Runner != "", "_LLM_RunCancelKills() must exist in the driver source")
-	Assert(InStr(Runner, "ProcessClose(") > 0,
-		"_LLM_RunCancelKills must be the one place that actually kills the transport")
+	Assert(InStr(Runner, 'K["cancel"].Call()') > 0,
+		"_LLM_RunCancelKills must invoke exact process-owner cancellation callbacks rather than reopening a recyclable PID")
+	Assert(InStr(Runner, ".Abort()") > 0,
+		"_LLM_RunCancelKills must still abort exact WinHTTP transports")
 }
 Test("LLM: the deferred cancellation runs on a thread of its own (llm-cancel-under-critical)",
 	_LCNC_DeferralUsesANewThread)
+
+
+_LCNC_CurlPollersNeverTrustOrKillByPid() {
+	ReceiptPollers := [
+		"_LLMRemote_PollCurl",
+		"_LLM_Ollama_PingPoll",
+		"_LLM_Ollama_TagsPoll",
+		"_LLM_Ollama_DeletePoll",
+		"_LLM_Ollama_PollCurl"
+	]
+	for _, Name in ReceiptPollers {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist for the curl ownership ratchet")
+		Assert(InStr(Body, "_LLM_CurlTerminalComplete(") > 0,
+			Name . " must resolve the durable terminal receipt before deadline or cancellation")
+		Assert(InStr(Body, "ProcessExist(") = 0,
+			Name . " must never treat a recyclable PID as completion authority")
+		Assert(InStr(Body, "ProcessClose(") = 0,
+			Name . " must never terminate whichever process currently owns a recycled PID")
+	}
+	Stream := _DriverFuncBody("_LLM_Ollama_StreamPoll")
+	Assert(Stream != "", "the streaming curl poller must remain in the ownership class")
+	Assert(InStr(Stream, "_LLM_CurlProcessExited(") > 0,
+		"streaming cannot wait for a terminal sidecar, so it must poll the exact retained process handle")
+	Assert(InStr(Stream, "ProcessExist(") = 0 and InStr(Stream, "ProcessClose(") = 0,
+		"streaming must neither observe nor terminate by recyclable PID")
+
+	for _, Name in [
+		"LLM_OllamaCancelAllAsync",
+		"LLM_OllamaCancelStream",
+		"LLM_RemoteCancelAsync",
+		"LLM_RemoteCancelAllAsync",
+		"_LLM_Ollama_TrimAsyncRegistry",
+		"_LLMRemote_TrimAsyncRegistry"
+	] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist for the curl cancellation ratchet")
+		Assert(InStr(Body, 'Map("pid"') = 0 and InStr(Body, "ProcessClose(") = 0,
+			Name . " must carry the exact retained process owner, never a numeric PID kill request")
+	}
+	Owner := _DriverFuncBody("_LLM_CurlReleaseProcess")
+	Assert(Owner != "", "the exact curl process-release owner must exist")
+	Assert(InStr(Owner, "TerminateFn.Call(Handle)") > 0
+		and InStr(Owner, "CloseFn.Call(Handle)") > 0,
+		"the exact handle must own both termination and close")
+}
+Test("LLM: every curl poll cancel and trim path owns an exact process handle "
+	. "(ahk2-04-curl-exact-process-owner)",
+	_LCNC_CurlPollersNeverTrustOrKillByPid)
 
 
 
