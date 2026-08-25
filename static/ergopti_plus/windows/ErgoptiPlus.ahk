@@ -1109,6 +1109,11 @@ _ReleasePhantomModifiers()
 RegisterAllHotstrings(false)
 BootProfile_Mark("Hotstrings registered (HSE complete)")
 HotstringPrefixWatcherInit()
+; Install the shared low-level keyboard arbiter after the prefix InputHook. Its
+; terminal capture then runs first in the hook chain and can hold physical edges
+; while paced terminal output completes. A failed native admission is reported
+; by the adapter and terminal expansions remain fail-open.
+LLM_NavEventOwner_EnsureStarted()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_Mark("Prefix watcher index complete")
 _DriverReady := true

@@ -50,8 +50,8 @@ _OHRSO_ResolverAndDispatchOwnBoundedReceipts() {
 		&& InStr(InvalidBody, '"Valid", false') > 0
 		&& InStr(ResolveBody, '"focus_changed"') > 0,
 		"the resolver must publish a typed receipt and reject mixed identities")
-	AssertEqual(1, _OHRSO_Count(DispatchBody, "OutputHostResolve(true)"),
-		"one dispatch must acquire exactly one title-bearing receipt")
+	AssertEqual(2, _OHRSO_Count(DispatchBody, "OutputHostResolve(true)"),
+		"normal and raw dispatch must each acquire exactly one title-bearing receipt")
 	AssertEqual(0, _OHRSO_Count(DispatchBody, "HostSnapshot"),
 		"terminal ownership must reuse the dispatch receipt")
 }

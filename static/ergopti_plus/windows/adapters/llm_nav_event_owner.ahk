@@ -979,6 +979,50 @@ LLM_NavEventOwner_TestDispatch(Event, Port := 0) {
 		return 0
 }
 
+LLM_NavEventOwner_BeginTerminalCapture(Token, Port := 0) {
+	if !(Token is Integer) || Token <= 0
+		return false
+	if !LLM_NavEventOwner_EnsureStarted(Port)
+		return false
+	Fn := _LLM_NavEventOwnerPortFn("begin_terminal", Port)
+	try Status := HasMethod(Fn, "Call")
+		? Fn.Call(Token) : _LLM_NavEventOwnerNativeBeginTerminalCapture(Token)
+	catch as Err {
+		_LLM_NavEventOwnerReport(
+			"Terminal keyboard capture admission failed: " . Err.Message . ".")
+		return false
+	}
+	return (Status is Integer) && Status == 1
+}
+
+LLM_NavEventOwner_ReleaseTerminalCapture(Token, Committed, Port := 0) {
+	if !(Token is Integer) || Token <= 0
+		return false
+	Name := Committed ? "commit_terminal" : "abort_terminal"
+	DefaultFn := Committed
+		? _LLM_NavEventOwnerNativeCommitTerminalCapture
+		: _LLM_NavEventOwnerNativeAbortTerminalCapture
+	Fn := _LLM_NavEventOwnerPortFn(Name, Port)
+	try Status := HasMethod(Fn, "Call")
+		? Fn.Call(Token) : DefaultFn.Call(Token)
+	catch as Err {
+		_LLM_NavEventOwnerReport(
+			"Terminal keyboard replay failed: " . Err.Message . ".")
+		return false
+	}
+	return (Status is Integer) && Status == 1
+}
+
+LLM_NavEventOwner_GetTerminalCapture(Token, Port := 0) {
+	if !(Token is Integer) || Token <= 0
+		return 0
+	Fn := _LLM_NavEventOwnerPortFn("get_terminal", Port)
+	try return HasMethod(Fn, "Call")
+		? Fn.Call(Token) : _LLM_NavEventOwnerNativeGetTerminalCapture(Token)
+	catch
+		return 0
+}
+
 _LLM_NavEventOwnerRecordFromSurface(Surface) {
 	if !IsObject(Surface) || !IsSet(_LLM_TooltipPresentedFromSurface)
 		return 0
@@ -1519,6 +1563,8 @@ _LLM_NavEventOwnerService(RenderFn := 0, DegradeFn := 0) {
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
 	global _LLM_NavEventOwnerStartRollbackPending
 	global _LLM_NavEventOwnerStopPending
+	if IsSet(_HSE_RetryTerminalReplay)
+		try _HSE_RetryTerminalReplay()
 	; A refused quarantine Stop deliberately retains the only service route for
 	; receipts which were already suppressed. Drain them while fail-open
 	; quarantine blocks new decisions; a proved Stop disarms this timer instead.
@@ -1667,6 +1713,50 @@ _LLM_NavEventOwnerNativeSuspend(Value) {
 	_LLM_NavEventOwnerNativeRequireOk(Status,
 		"Navigation owner suspend transition")
 	return 1
+}
+
+_LLM_NavEventOwnerNativeBeginTerminalCapture(Token) {
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_BeginTerminalCapture"), "UInt64", Token, "Int")
+	if Status == 5
+		return 0
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Terminal keyboard capture admission")
+	return 1
+}
+
+_LLM_NavEventOwnerNativeCommitTerminalCapture(Token) {
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_CommitTerminalCapture"), "UInt64", Token, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Terminal keyboard capture commit")
+	return 1
+}
+
+_LLM_NavEventOwnerNativeAbortTerminalCapture(Token) {
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_AbortTerminalCapture"), "UInt64", Token, "Int")
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Terminal keyboard capture abort")
+	return 1
+}
+
+_LLM_NavEventOwnerNativeGetTerminalCapture(Token) {
+	Snapshot := Buffer(28, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport(
+		"ErgoptiNav_GetTerminalCapture"), "UInt64", Token,
+		"Ptr", Snapshot, "Int")
+	if Status == 8
+		return 0
+	_LLM_NavEventOwnerNativeRequireOk(Status,
+		"Terminal keyboard capture snapshot")
+	return Map(
+		"token", NumGet(Snapshot, 0, "UInt64"),
+		"phase", NumGet(Snapshot, 8, "UInt"),
+		"queued", NumGet(Snapshot, 12, "UInt"),
+		"replayed", NumGet(Snapshot, 16, "UInt"),
+		"last_os_error", NumGet(Snapshot, 20, "UInt"),
+		"release_kind", NumGet(Snapshot, 24, "UInt"))
 }
 
 _LLM_NavEventOwnerNativePreparePlan(Plan) {
@@ -1863,7 +1953,12 @@ _LLM_NavEventOwnerNativeEnsureLoaded() {
 	Names := [
 		"ErgoptiNav_Start", "ErgoptiNav_Stop",
 		"ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
-		"ErgoptiNav_SetSuspended", "ErgoptiNav_BeginOwnerSwap",
+		"ErgoptiNav_SetSuspended",
+		"ErgoptiNav_BeginTerminalCapture",
+		"ErgoptiNav_CommitTerminalCapture",
+		"ErgoptiNav_AbortTerminalCapture",
+		"ErgoptiNav_GetTerminalCapture",
+		"ErgoptiNav_BeginOwnerSwap",
 		"ErgoptiNav_CommitOwnerSwap", "ErgoptiNav_AbortOwnerSwap",
 		"ErgoptiNav_ClaimOwner",
 		"ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",

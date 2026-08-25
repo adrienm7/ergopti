@@ -37,13 +37,15 @@ extern "C" {
 // =================================
 // =================================
 
-#define ERGOPTI_NAV_ABI_VERSION 1u
+#define ERGOPTI_NAV_ABI_VERSION 2u
 #define ERGOPTI_NAV_ROUTE_COUNT 12u
 #define ERGOPTI_NAV_MAX_SLOTS 10u
 #define ERGOPTI_NAV_RECEIPT_CAPACITY 64u
 #define ERGOPTI_NAV_NO_ROUTE 0xFFu
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_MAX 100u
 #define ERGOPTI_NAV_AHK_SEND_LEVEL_BASE 0xFFC3D44Du
+#define ERGOPTI_NAV_TERMINAL_CAPTURE_CAPACITY 8192u
+#define ERGOPTI_NAV_TERMINAL_REPLAY_MARKER 0x4552475054524D31ull
 
 /** Return codes shared by every fallible API entry point. */
 typedef enum ErgoptiNav_Status {
@@ -98,6 +100,22 @@ typedef enum ErgoptiNav_Disposition {
 	ERGOPTI_NAV_DISPOSITION_PASS = 0,
 	ERGOPTI_NAV_DISPOSITION_SUPPRESS = 1
 } ErgoptiNav_Disposition;
+
+/** Lifecycle phases of the bounded terminal keyboard capture. */
+typedef enum ErgoptiNav_TerminalPhase {
+	ERGOPTI_NAV_TERMINAL_IDLE = 0,
+	ERGOPTI_NAV_TERMINAL_CAPTURING = 1,
+	ERGOPTI_NAV_TERMINAL_RELEASE_PENDING = 2,
+	ERGOPTI_NAV_TERMINAL_REPLAYING = 3,
+	ERGOPTI_NAV_TERMINAL_FAULTED = 4
+} ErgoptiNav_TerminalPhase;
+
+/** Canonical reason for releasing a terminal capture. */
+typedef enum ErgoptiNav_TerminalReleaseKind {
+	ERGOPTI_NAV_TERMINAL_RELEASE_NONE = 0,
+	ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT = 1,
+	ERGOPTI_NAV_TERMINAL_RELEASE_ABORT = 2
+} ErgoptiNav_TerminalReleaseKind;
 
 
 
@@ -205,6 +223,21 @@ typedef struct ErgoptiNav_DispatchResult {
 	uint64_t receipt_sequence;
 } ErgoptiNav_DispatchResult;
 
+/**
+ * Reports a terminal capture without exposing its raw keyboard queue.
+ *
+ * Layout: token@0:u64, phase@8:u32, queued@12:u32, replayed@16:u32,
+ * last_os_error@20:u32, release_kind@24:u32.
+ */
+typedef struct ErgoptiNav_TerminalCaptureSnapshot {
+	uint64_t token;
+	uint32_t phase;
+	uint32_t queued;
+	uint32_t replayed;
+	uint32_t last_os_error;
+	uint32_t release_kind;
+} ErgoptiNav_TerminalCaptureSnapshot;
+
 #pragma pack(pop)
 
 #if defined(__cplusplus)
@@ -246,6 +279,13 @@ ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TestEvent) == 16, "Test event ABI si
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TestEvent, extra_info) == 8, "Test event marker offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_DispatchResult) == 12, "Dispatch result ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_DispatchResult, receipt_sequence) == 4, "Dispatch sequence offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalCaptureSnapshot) == 28, "Terminal snapshot ABI size changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, token) == 0, "Terminal token offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, phase) == 8, "Terminal phase offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, queued) == 12, "Terminal queue offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, replayed) == 16, "Terminal replay offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, last_os_error) == 20, "Terminal error offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, release_kind) == 24, "Terminal release offset changed.");
 
 #undef ERGOPTI_NAV_STATIC_ASSERT
 
@@ -313,6 +353,23 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitPlan(
  */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_SetSuspended(
 	uint8_t suspended);
+
+/** Starts one bounded physical-keyboard capture for terminal paced output. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
+	uint64_t token);
+
+/** Replays every captured edge after the canonical terminal edit commits. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitTerminalCapture(
+	uint64_t token);
+
+/** Replays every captured edge after the terminal edit aborts. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AbortTerminalCapture(
+	uint64_t token);
+
+/** Copies the exact capture/replay receipt for one token. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetTerminalCapture(
+	uint64_t token,
+	ErgoptiNav_TerminalCaptureSnapshot *out_snapshot);
 
 
 
@@ -499,6 +556,21 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestBeginDrain(void);
 /** Reports whether every suppress hold and menu disguise obligation drained. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestDrainComplete(
 	uint8_t *out_complete);
+
+/** Enables public terminal-capture APIs without installing a hook. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetRunning(uint8_t running);
+
+/**
+ * Releases a capture through the production replay loop and a deterministic
+ * SendInput sink. send_limit is the maximum accepted prefix, or UINT32_MAX.
+ */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestReleaseTerminalCapture(
+	uint64_t token,
+	uint32_t release_kind,
+	uint32_t send_limit,
+	ErgoptiNav_TestEvent *out_events,
+	uint32_t event_capacity,
+	uint32_t *out_event_count);
 #endif
 
 #if defined(__cplusplus)
