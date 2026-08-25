@@ -446,6 +446,47 @@ if (!tarLine) {
 	}
 }
 
+// The documentation page must expose the one self-contained entrypoint. The
+// individual Python helpers import sibling modules and are not standalone
+// downloads; advertising them separately produces an installer that fails at
+// import time. Keep the uninstall command wired through Svelte interpolation,
+// not through a literal `${branch}` in markup.
+const LAYOUT_INSTALL_PAGE = 'src/routes/utilisation/installation_linux.svelte';
+const layoutInstallPageSrc = read(LAYOUT_INSTALL_PAGE);
+const scriptEnd = layoutInstallPageSrc.indexOf('</script>');
+const layoutInstallMarkup = layoutInstallPageSrc.slice(scriptEnd + '</script>'.length);
+
+if (!/const uninstallCmd = `\$\{cmd\} -s -- --installation-method clean --uninstall --yes`;/.test(layoutInstallPageSrc)) {
+	errors.push(
+		`${LAYOUT_INSTALL_PAGE}: the uninstall command must reuse the self-contained install.sh ` +
+		`entrypoint with explicit non-interactive arguments.`
+	);
+}
+if (!layoutInstallMarkup.includes('{uninstallCmd}')) {
+	errors.push(
+		`${LAYOUT_INSTALL_PAGE}: the uninstall command must be rendered as a Svelte expression.`
+	);
+}
+if (layoutInstallMarkup.includes('${branch}')) {
+	errors.push(
+		`${LAYOUT_INSTALL_PAGE}: contains a literal \${branch} in markup; Svelte will not interpolate it.`
+	);
+}
+for (const staleSurface of [
+	'urlInstallSh',
+	'urlDetectSh',
+	'urlInstallerClean',
+	'urlInstallerLegacy',
+	'--user'
+]) {
+	if (layoutInstallPageSrc.includes(staleSurface)) {
+		errors.push(
+			`${LAYOUT_INSTALL_PAGE}: must not advertise stale surface "${staleSurface}"; ` +
+			`only install.sh is a supported standalone entrypoint.`
+		);
+	}
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);

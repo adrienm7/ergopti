@@ -1,33 +1,13 @@
 <script>
-	import { onMount } from 'svelte';
 	import Ergopti from '$lib/components/Ergopti.svelte';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import { getRelease, getRawUrl } from '$lib/js/getGitHubRelease.js';
 	import { branchForInstall } from '$lib/js/isDev.js';
-
-	/** @type {Awaited<ReturnType<typeof getRelease>>} */
-	let release = null;
 
 	const branch = branchForInstall();
 
 	// Commande bash d'installation : pointe vers le bon branch selon le contexte
 	const cmd = `branch="${branch}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
-
-	// URLs des scripts d'installation (servis depuis le raw du dépôt au bon branch)
-	const urlInstallSh = getRawUrl('static/ergopti/linux/xkb_installation/install.sh');
-	const urlDetectSh = getRawUrl(
-		'static/ergopti/linux/xkb_installation/detect_installation_method.sh'
-	);
-	const urlInstallerClean = getRawUrl(
-		'static/ergopti/linux/xkb_installation/xkb_files_installer_clean.py'
-	);
-	const urlInstallerLegacy = getRawUrl(
-		'static/ergopti/linux/xkb_installation/xkb_files_installer_legacy.py'
-	);
-
-	onMount(async () => {
-		release = await getRelease();
-	});
+	const uninstallCmd = `${cmd} -s -- --installation-method clean --uninstall --yes`;
 </script>
 
 <h2 id="linux"><i class="icon-linux purple" style="margin-right:0.15em"></i>Installation Linux</h2>
@@ -65,21 +45,6 @@
 >
 	<i class="icon-linux"></i> Copier le code bash d'installation
 </button>
-
-<div class="download-buttons" style="margin-top: 1em;">
-	<a href={urlInstallSh} download="install.sh">
-		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>
-	</a>
-	<a href={urlDetectSh} download="detect_installation_method.sh">
-		<button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button>
-	</a>
-	<a href={urlInstallerClean} download="xkb_files_installer_clean.py">
-		<button><i class="icon-linux"></i> Installateur Clean</button>
-	</a>
-	<a href={urlInstallerLegacy} download="xkb_files_installer_legacy.py">
-		<button><i class="icon-linux"></i> Installateur Legacy</button>
-	</a>
-</div>
 
 <p>
 	Après l'installation, <strong>redémarrer l'ordinateur</strong> pour que les changements prennent effet.
@@ -133,21 +98,7 @@
 </p>
 <code
 	style="display:inline-block; width:100%; padding:1em; text-align:left"
-	>branch="${branch}"; curl -fsSL
-	"https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh"
-	| BRANCH="$branch" bash -s -- --uninstall</code
->
-
-<h4>Mode utilisateur (sans sudo)</h4>
-<p>
-	Sur Wayland, vous pouvez installer la disposition dans votre home
-	(<code>~/.config/xkb</code>) sans aucun droit administrateur :
-</p>
-<code
-	style="display:inline-block; width:100%; padding:1em; text-align:left"
-	>branch="${branch}"; curl -fsSL
-	"https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh"
-	| BRANCH="$branch" bash -s -- --user --variant ergopti_plus</code
+	>{uninstallCmd}</code
 >
 <p>
 	L'installeur accepte aussi <code>--version v2_2_1</code>, <code>--ansi</code> et le mode
