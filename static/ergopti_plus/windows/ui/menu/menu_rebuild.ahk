@@ -26,6 +26,9 @@ global _TrayRootActive := false
 global _TrayRootLifecycleEpoch := 0
 global _TrayRootLatestAuthorizeFn := 0
 global _TrayRootLatestWorkerFn := 0
+global _TrayRootRetryGeneration := 0
+global _TrayRootAutomaticRetryCount := 0
+global _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT := 3
 
 ; Expected retained work must not look like a fresh crash on every watchdog
 ; tick. A fatal dynamic-context error is different: retire that exact root
@@ -143,17 +146,80 @@ _TrayRootRequestAndTryAcquire(AuthorizeFn := 0, WorkerFn := 0,
 		&RequestedGeneration := 0) {
 	global _TrayRootRequestedGeneration, _TrayRootActive
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	PreviousCritical := Critical("On")
 	try {
 		_TrayRootRequestedGeneration += 1
 		RequestedGeneration := _TrayRootRequestedGeneration
 		_TrayRootLatestAuthorizeFn := AuthorizeFn
 		_TrayRootLatestWorkerFn := WorkerFn
+		_TrayRootRetryGeneration := RequestedGeneration
+		_TrayRootAutomaticRetryCount := 0
 		if _TrayRootActive
 			return false
 		_TrayRootActive := true
 		return true
 	} finally Critical(PreviousCritical)
+}
+
+_TrayRootFinishOrdinaryFailure(TargetGeneration, IsAutomaticRetry) {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TrayRootRetryGeneration
+	global _TrayRootAutomaticRetryCount
+	global _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT
+	PreviousCritical := Critical("On")
+	try {
+		; A successor accepted while the failing worker yielded belongs to this
+		; owner. Keep ownership and let the drain loop rebuild that newer request.
+		if _TrayRootRequestedGeneration > TargetGeneration
+			return 0
+		if IsAutomaticRetry {
+			if _TrayRootRetryGeneration != TargetGeneration {
+				_TrayRootRetryGeneration := TargetGeneration
+				_TrayRootAutomaticRetryCount := 0
+			}
+			_TrayRootAutomaticRetryCount += 1
+			if _TrayRootAutomaticRetryCount >= _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT {
+				; Keep the last known-good native root, but acknowledge this failed
+				; generation so the watchdog cannot rebuild it forever.
+				_TrayRootPublishedGeneration := Max(
+					_TrayRootPublishedGeneration, TargetGeneration)
+				_TrayRootActive := false
+				return 2
+			}
+		}
+		_TrayRootActive := false
+		return 1
+	} finally Critical(PreviousCritical)
+}
+
+_TrayRootReportTerminalFailure(TargetGeneration, Message, LogFn := 0) {
+	global _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT
+	if HasMethod(LogFn, "Call") {
+		try LogFn.Call(TargetGeneration,
+			_TRAY_ROOT_AUTOMATIC_RETRY_LIMIT, Message)
+		return true
+	}
+	try LoggerError("Menu",
+		"Tray-root generation {1} retired after {2} automatic retries: {3}",
+		TargetGeneration, _TRAY_ROOT_AUTOMATIC_RETRY_LIMIT, Message)
+	return true
+}
+
+_TrayRootFinishReportableFailure(TargetGeneration, IsAutomaticRetry,
+		Message, LogFn := 0) {
+	FailureOutcome := _TrayRootFinishOrdinaryFailure(
+		TargetGeneration, IsAutomaticRetry)
+	if FailureOutcome == 0
+		return 0
+	if FailureOutcome == 2 {
+		_TrayRootReportTerminalFailure(TargetGeneration, Message, LogFn)
+		return 2
+	}
+	if !IsAutomaticRetry
+		try LoggerError("Menu",
+			"Tray-root reconstruction failed and remains pending: {1}", Message)
+	return 1
 }
 
 _TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn) {
@@ -252,7 +318,7 @@ _TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn := 0) {
 	return initMenu(PublishAuthorizeFn)
 }
 
-_TrayRootDrain() {
+_TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {
 	loop {
 		_TrayRootClaimLatest(&TargetGeneration, &UpstreamAuthorizeFn,
 			&WorkerFn, &LifecycleEpoch)
@@ -264,14 +330,26 @@ _TrayRootDrain() {
 				_TrayRootRetireFatal(TargetGeneration)
 				throw Err
 			}
-			if !_TrayRootTryReleaseFailed(TargetGeneration)
-				continue
-			if (Err is TrayRootRetryPendingError)
+			if (Err is TrayRootRetryPendingError) {
+				if !_TrayRootTryReleaseFailed(TargetGeneration)
+					continue
 				throw Err
-			try LoggerError("Menu", "Tray-root reconstruction failed and remains pending: {1}", Err.Message)
+			}
+			FailureOutcome := _TrayRootFinishReportableFailure(
+				TargetGeneration, IsAutomaticRetry, Err.Message, LogFn)
+			if FailureOutcome == 0
+				continue
 			return false
 		}
 		if !((Published is Integer) and Published == 1) {
+			if !((Published is Integer) and Published == 0) {
+				FailureOutcome := _TrayRootFinishReportableFailure(
+					TargetGeneration, IsAutomaticRetry,
+					"worker returned an invalid publication verdict", LogFn)
+				if FailureOutcome == 0
+					continue
+				return false
+			}
 			; A newer request invalidated this detached stage: keep the same owner
 			; and immediately build the latest candidate. Suspend/upstream refusal
 			; has no newer generation, so release for its lifecycle-specific owner.
@@ -284,7 +362,7 @@ _TrayRootDrain() {
 	}
 }
 
-_TrayRootServiceRetained() {
+_TrayRootServiceRetained(LogFn := 0) {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
@@ -305,7 +383,7 @@ _TrayRootServiceRetained() {
 		return false
 	if !_TrayRootAcquireRetained(&TargetGeneration, &AuthorizeFn, &WorkerFn)
 		return true
-	return _TrayRootDrain()
+	return _TrayRootDrain(true, LogFn)
 }
 
 _TrayRootServiceRetainedWork(RootFn := 0, NextFn := 0, LogFn := 0) {

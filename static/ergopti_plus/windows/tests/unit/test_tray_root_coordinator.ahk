@@ -16,12 +16,15 @@ global _TRC_ApplyCalls := 0
 global _TRC_FailureMode := ""
 global _TRC_ExpectedError := 0
 global _TRC_TriggerCalls := 0
+global _TRC_PermanentFailureMode := ""
+global _TRC_TerminalReports := []
 
 _TRC_SaveState() {
 	global _TrayMenuStage
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	return {
 		Stage: _TrayMenuStage,
 		Requested: _TrayRootRequestedGeneration,
@@ -30,6 +33,8 @@ _TRC_SaveState() {
 		Lifecycle: _TrayRootLifecycleEpoch,
 		Authorize: _TrayRootLatestAuthorizeFn,
 		Worker: _TrayRootLatestWorkerFn,
+		RetryGeneration: _TrayRootRetryGeneration,
+		AutomaticRetryCount: _TrayRootAutomaticRetryCount,
 		CriticalLevel: A_IsCritical
 	}
 }
@@ -39,6 +44,7 @@ _TRC_ResetState() {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	global _TRC_Builds, _TRC_ApplyCalls, _TRC_FailureMode
 	global _TRC_TriggerCalls
 	_TrayMenuStage := false
@@ -48,6 +54,8 @@ _TRC_ResetState() {
 	_TrayRootLifecycleEpoch := 0
 	_TrayRootLatestAuthorizeFn := 0
 	_TrayRootLatestWorkerFn := 0
+	_TrayRootRetryGeneration := 0
+	_TrayRootAutomaticRetryCount := 0
 	_TRC_Builds := []
 	_TRC_ApplyCalls := 0
 	_TRC_FailureMode := ""
@@ -59,6 +67,7 @@ _TRC_RestoreState(Saved) {
 	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
 	global _TrayRootActive, _TrayRootLifecycleEpoch
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
+	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	_TrayMenuStage := Saved.Stage
 	_TrayRootRequestedGeneration := Saved.Requested
 	_TrayRootPublishedGeneration := Saved.Published
@@ -66,6 +75,8 @@ _TRC_RestoreState(Saved) {
 	_TrayRootLifecycleEpoch := Saved.Lifecycle
 	_TrayRootLatestAuthorizeFn := Saved.Authorize
 	_TrayRootLatestWorkerFn := Saved.Worker
+	_TrayRootRetryGeneration := Saved.RetryGeneration
+	_TrayRootAutomaticRetryCount := Saved.AutomaticRetryCount
 	Critical(Saved.CriticalLevel)
 }
 
@@ -282,6 +293,92 @@ _TRC_OrdinaryFailureRemainsRetryable() {
 }
 Test("tray root: ordinary failure remains retryable (tray-root-error-control)",
 	_TRC_OrdinaryFailureRemainsRetryable)
+
+_TRC_PermanentFailureWorker(PublishAuthorizeFn) {
+	global _TRC_Builds, _TRC_PermanentFailureMode
+	_TRC_Builds.Push(_TRC_Builds.Length + 1)
+	if _TRC_PermanentFailureMode == "malformed"
+		return "1"
+	throw Error("injected permanent root failure")
+}
+
+_TRC_CaptureTerminalReport(TargetGeneration, RetryCount, Message) {
+	global _TRC_TerminalReports
+	_TRC_TerminalReports.Push({
+		TargetGeneration: TargetGeneration,
+		RetryCount: RetryCount,
+		Message: Message
+	})
+}
+
+_TRC_RecoveryWorker(PublishAuthorizeFn) {
+	global _TRC_Builds
+	_TRC_Builds.Push(_TRC_Builds.Length + 1)
+	return PublishAuthorizeFn.Call()
+}
+
+_TRC_PermanentAutomaticFailureRetiresExactGeneration() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration
+	global _TrayRootActive, _TRC_Builds
+	global _TRC_PermanentFailureMode, _TRC_TerminalReports
+	Saved := _TRC_SaveState()
+	try {
+		for _, Mode in ["throw", "malformed"] {
+			_TRC_ResetState()
+			_TRC_PermanentFailureMode := Mode
+			_TRC_TerminalReports := []
+			AssertFalse(RebuildTrayMenu(0, _TRC_PermanentFailureWorker, false),
+				"the caller-visible " . Mode . " failure must retain its exact generation")
+			AssertEqual(1, _TRC_Builds.Length)
+
+			; Three automatic watchdog attempts are the complete retry budget. The
+			; direct caller attempt above is deliberately not counted against it.
+			loop 3
+				AssertFalse(_TrayRootServiceRetained(_TRC_CaptureTerminalReport))
+			AssertEqual(4, _TRC_Builds.Length,
+				"one direct attempt plus three watchdog retries must be the hard bound")
+			AssertEqual(1, _TrayRootRequestedGeneration)
+			AssertEqual(1, _TrayRootPublishedGeneration,
+				"the exhausted generation must retire without replacing the safe root")
+			AssertFalse(_TrayRootActive)
+			AssertEqual(1, _TRC_TerminalReports.Length,
+				"only exhaustion may emit the terminal watchdog diagnostic")
+			AssertEqual(1, _TRC_TerminalReports[1].TargetGeneration)
+			AssertEqual(3, _TRC_TerminalReports[1].RetryCount)
+
+			AssertTrue(_TrayRootServiceRetained(_TRC_CaptureTerminalReport),
+				"an exhausted generation must become an idle watchdog no-op")
+			AssertEqual(4, _TRC_Builds.Length,
+				"the same failed generation must never be rebuilt after exhaustion")
+			AssertEqual(1, _TRC_TerminalReports.Length)
+
+			AssertFalse(RebuildTrayMenu(0, _TRC_PermanentFailureWorker, false),
+				"a genuinely new generation must receive a fresh retry budget")
+			loop 2
+				AssertFalse(_TrayRootServiceRetained(_TRC_CaptureTerminalReport))
+			AssertEqual(1, _TrayRootPublishedGeneration,
+				"a previous generation's exhausted budget must not leak into its successor")
+			AssertEqual(1, _TRC_TerminalReports.Length)
+			AssertFalse(_TrayRootServiceRetained(_TRC_CaptureTerminalReport))
+			AssertEqual(2, _TrayRootPublishedGeneration)
+			AssertEqual(2, _TRC_TerminalReports.Length)
+			AssertEqual(2, _TRC_TerminalReports[2].TargetGeneration)
+			AssertEqual(3, _TRC_TerminalReports[2].RetryCount)
+
+			AssertTrue(RebuildTrayMenu(0, _TRC_RecoveryWorker, false),
+				"work after an exhausted successor must still publish normally")
+			AssertEqual(9, _TRC_Builds.Length)
+			AssertEqual(3, _TrayRootRequestedGeneration)
+			AssertEqual(3, _TrayRootPublishedGeneration)
+			AssertFalse(_TrayRootActive)
+		}
+	} finally {
+		_TRC_RestoreState(Saved)
+	}
+}
+Test("tray root: permanent automatic failure retires after a bounded budget "
+	. "(ahk6-03-tray-root-retry-budget)",
+	_TRC_PermanentAutomaticFailureRetiresExactGeneration)
 
 _TRC_TypedErrorsHaveNarrowSilentClassification() {
 	AssertTrue(_TrayRootErrorIsSilent(
