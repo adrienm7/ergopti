@@ -3,6 +3,30 @@
 
 #Requires AutoHotkey v2.0
 
+; Generous but finite admission budgets. These protect boot/config inputs from
+; turning canonical signature construction into an unbounded per-request walk.
+; Counts are per public option; the character budget includes keys and values.
+global LLM_OPTION_MAX_SCALAR_CHARS := 65536
+global LLM_OPTION_MAX_COLLECTION_ITEMS := 512
+global LLM_OPTION_MAX_PROFILE_ITEMS := 64
+global LLM_OPTION_MAX_API_ENTRIES := 64
+global LLM_OPTION_MAX_RECORD_FIELDS := 32
+global LLM_OPTION_MAX_STOP_SEQUENCES := 64
+global LLM_OPTION_MAX_AGGREGATE_CHARS := 1048576
+
+_LLM_Option_TryConsumeString(Value, &AggregateChars, AllowEmpty := true) {
+	global LLM_OPTION_MAX_SCALAR_CHARS, LLM_OPTION_MAX_AGGREGATE_CHARS
+	if !(Value is String)
+		return false
+	Length := StrLen(Value)
+	if (!AllowEmpty && Length == 0) || Length > LLM_OPTION_MAX_SCALAR_CHARS
+		return false
+	if AggregateChars > LLM_OPTION_MAX_AGGREGATE_CHARS - Length
+		return false
+	AggregateChars += Length
+	return true
+}
+
 /**
  * Returns a detached, normalized string array or false when any element has
  * the wrong type or is empty after trimming. No caller may treat false as an
@@ -10,15 +34,19 @@
  * mandatory at every boundary.
  */
 LLM_Option_NormalizeStringArray(Value, Lowercase := false) {
+	global LLM_OPTION_MAX_COLLECTION_ITEMS
 	if !(Value is Array)
+		return false
+	if Value.Length > LLM_OPTION_MAX_COLLECTION_ITEMS
 		return false
 	Out := []
 	Seen := Map()
+	AggregateChars := 0
 	for Item in Value {
 		if !(Item is String)
 			return false
 		Normalized := Trim(Item)
-		if (Normalized == "")
+		if !_LLM_Option_TryConsumeString(Normalized, &AggregateChars, false)
 			return false
 		if Lowercase
 			Normalized := StrLower(Normalized)
@@ -56,7 +84,8 @@ LLM_Option_NormalizeModifierArray(Value) {
  */
 LLM_Option_NormalizeModifierString(Value) {
 	global CHORD_SEPARATOR
-	if !(Value is String)
+	AggregateChars := 0
+	if !_LLM_Option_TryConsumeString(Value, &AggregateChars)
 		return false
 	Value := Trim(Value)
 	if (Value == "")
@@ -73,25 +102,34 @@ LLM_Option_NormalizeModifierString(Value) {
 
 /** Returns a detached, schema-safe custom-profile array or false. */
 LLM_Option_NormalizeUserProfiles(Value) {
+	global LLM_OPTION_MAX_PROFILE_ITEMS, LLM_OPTION_MAX_RECORD_FIELDS,
+		LLM_OPTION_MAX_STOP_SEQUENCES
 	if !(Value is Array)
+		return false
+	if Value.Length > LLM_OPTION_MAX_PROFILE_ITEMS
 		return false
 	Out := []
 	SeenIds := Map()
+	AggregateChars := 0
 	for Profile in Value {
 		if !(Profile is Map) || !Profile.Has("id")
 				|| !(Profile["id"] is String) || Profile["id"] == ""
 				|| SeenIds.Has(Profile["id"])
 			return false
+		if Profile.Count > LLM_OPTION_MAX_RECORD_FIELDS
+			return false
 		Copy := Map()
 		for Key, Item in Profile {
-			if !(Key is String)
+			if !_LLM_Option_TryConsumeString(Key, &AggregateChars, false)
 				return false
 			if (Key == "stop_sequences") {
 				if !(Item is Array)
+						|| Item.Length > LLM_OPTION_MAX_STOP_SEQUENCES
 					return false
 				Sequences := []
 				for Sequence in Item {
-					if !(Sequence is String) || Sequence == ""
+					if !_LLM_Option_TryConsumeString(
+							Sequence, &AggregateChars, false)
 						return false
 					Sequences.Push(Sequence)
 				}
@@ -99,6 +137,9 @@ LLM_Option_NormalizeUserProfiles(Value) {
 				continue
 			}
 			if IsObject(Item)
+				return false
+			if (Item is String)
+					&& !_LLM_Option_TryConsumeString(Item, &AggregateChars)
 				return false
 			Copy[Key] := Item
 		}
@@ -120,10 +161,14 @@ LLM_Option_NormalizeUserProfiles(Value) {
 
 /** Returns detached API-entry records whose consumer-visible fields are typed. */
 LLM_Option_NormalizeApiEntries(Value) {
+	global LLM_OPTION_MAX_API_ENTRIES, LLM_OPTION_MAX_RECORD_FIELDS
 	if !(Value is Array)
+		return false
+	if Value.Length > LLM_OPTION_MAX_API_ENTRIES
 		return false
 	Out := []
 	SeenIds := Map()
+	AggregateChars := 0
 	for Entry in Value {
 		if (Entry is Map) {
 			if !Entry.Has("Id")
@@ -140,8 +185,16 @@ LLM_Option_NormalizeApiEntries(Value) {
 		if !(EntryId is String) || EntryId == "" || SeenIds.Has(EntryId)
 			return false
 		Copy := Map()
+		FieldCount := 0
 		for Key, Item in Properties {
-			if !(Key is String) || IsObject(Item)
+			FieldCount += 1
+			if FieldCount > LLM_OPTION_MAX_RECORD_FIELDS
+				return false
+			if !_LLM_Option_TryConsumeString(Key, &AggregateChars, false)
+					|| IsObject(Item)
+				return false
+			if (Item is String)
+					&& !_LLM_Option_TryConsumeString(Item, &AggregateChars)
 				return false
 			Copy[Key] := Item
 		}
@@ -156,13 +209,18 @@ LLM_Option_NormalizeApiEntries(Value) {
 
 /** Returns a detached app -> profile-id map or false for any invalid pair. */
 LLM_Option_NormalizeAppProfileOverrides(Value) {
+	global LLM_OPTION_MAX_COLLECTION_ITEMS
 	if !(Value is Map)
+		return false
+	if Value.Count > LLM_OPTION_MAX_COLLECTION_ITEMS
 		return false
 	Out := Map()
 	Out.CaseSense := Value.CaseSense
+	AggregateChars := 0
 	for AppName, ProfileId in Value {
-		if !(AppName is String) || AppName == ""
-				|| !(ProfileId is String) || ProfileId == ""
+		if !_LLM_Option_TryConsumeString(AppName, &AggregateChars, false)
+				|| !_LLM_Option_TryConsumeString(
+					ProfileId, &AggregateChars, false)
 			return false
 		Out[AppName] := ProfileId
 	}
@@ -245,7 +303,8 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		"inline_autotype", true)
 	Normalized := false
 	if StringKeys.Has(Key) {
-		if !(Value is String)
+		AggregateChars := 0
+		if !_LLM_Option_TryConsumeString(Value, &AggregateChars)
 			return false
 		Normalized := Value
 		return true

@@ -729,11 +729,11 @@ Test("LLM_Engine_OnKeystroke: stores full buffer in last_buffer", _EngineOnKeyst
 
 _EngineOnKeystroke_KeepsFullBuffer() {
 	global _LLM_Engine
-	Buffer := "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	InputText := "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	LLM_Engine_Init(Map("ctx_chars", 50, "debounce_ms", 9999))
-	LLM_Engine_OnKeystroke(Buffer)
+	LLM_Engine_OnKeystroke(InputText)
 	; Truncation happens in PromptBuilder at fire time, not on each keystroke.
-	AssertEqual(Buffer, _LLM_Engine["last_buffer"])
+	AssertEqual(InputText, _LLM_Engine["last_buffer"])
 	LLM_Engine_CancelTimer()
 }
 Test("LLM_Engine_OnKeystroke: keeps full buffer (ctx cap applied at fire)", _EngineOnKeystroke_KeepsFullBuffer)

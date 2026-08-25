@@ -365,6 +365,7 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/test_llm_prediction_engine.ahk
 #Include unit/test_llm_semantic_config_identity.ahk
+#Include unit/test_llm_semantic_config_budget.ahk
 #Include unit/test_llm_defaults.ahk
 ; llm_bridge.ahk is needed by the canonical HSE -> LLM effect behaviour tests.
 #Include ../modules/keymap/llm_bridge.ahk
