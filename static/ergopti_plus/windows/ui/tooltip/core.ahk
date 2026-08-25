@@ -794,6 +794,7 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
 	NavSwap := 0
 	NavSwapCommitted := false
 	NavSurfaceCleared := false
+	NavBoundaryFailed := false
     _llm_on_screen := false
     _llm_was_visible := false
     _llm_was_loading := false
@@ -876,9 +877,10 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
             _TooltipActiveSurface := 0
 				NavSurfaceCleared := true
 				if NavSwap is Map {
-					if !LLM_NavEventOwner_CommitSurfaceSwap(NavSwap)
-						throw Error("Navigation owner hide commit failed.")
-					NavSwapCommitted := true
+					if LLM_NavEventOwner_CommitSurfaceSwap(NavSwap)
+						NavSwapCommitted := true
+					else
+						NavBoundaryFailed := true
 				}
 			}
         }
@@ -909,7 +911,7 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
     if IsSet(_LLM_TooltipScheduleMetricDrain)
         _LLM_TooltipScheduleMetricDrain()
     _TooltipQueueSurfaceDisposal(RetiredSurface)
-    return true
+    return !NavBoundaryFailed
 }
 
 ; Releases hidden Gui objects after TooltipHide has returned to the keyboard

@@ -434,7 +434,8 @@ _LNEO_Presentation(Label, SlotCount, Lifecycle, ActiveIdx := 1,
 	}
 	Surface := {
 		LlmPresented: Record, Generation: SlotCount,
-		RenderedActiveIdx: ActiveIdx
+		RenderedActiveIdx: ActiveIdx,
+		Rows: [], Border: 0, ContentHwnds: [], BorderHwnds: []
 	}
 	Token := LLM_NavEventOwner_AttachRecord(Record, Surface)
 	AssertTrue(Token is Integer && Token > 0,
@@ -1637,6 +1638,52 @@ _LNEO_SwapCommitFailureQuarantinesAfterPublication() {
 
 Test("LLM nav event owner: post-publication commit failure quarantines fail open",
 	_LNEO_SwapCommitFailureQuarantinesAfterPublication)
+
+_LNEO_TooltipHideContainsOwnerQuarantine() {
+	global _LLM_NavEventOwnerQuarantined, _LLM_NavEventOwnerStarted
+	global _LLM_NavEventOwnerReportTimes, _TooltipActiveSurface
+	for CommitMode in ["refuse", "throw"] {
+		State := _LNEO_Setup()
+		try {
+			Lifecycle := _LNEO_Lifecycle()
+			A := _LNEO_Presentation("A", 7, Lifecycle)
+			_LNEO_Publish(0, A)
+			State.CommitSwapMode := CommitMode
+			State.StopMode := "refuse"
+			_LLM_NavEventOwnerReportTimes := Map()
+			Failure := 0
+			Result := "unset"
+			try Result := TooltipHide("LLM", true, unset, A.Surface)
+			catch Error as Err
+				Failure := Err
+
+			AssertFalse(IsObject(Failure),
+				CommitMode . ": a proved fail-open quarantine must not escape the hide caller")
+			AssertFalse(Result,
+				CommitMode . ": a quarantined hide must return a contained false result")
+			AssertFalse(IsObject(_TooltipActiveSurface),
+				CommitMode . ": the quarantined hide must keep the already-retired pixels hidden")
+			AssertTrue(_LLM_NavEventOwnerQuarantined,
+				CommitMode . ": the native boundary must remain explicitly quarantined")
+			AssertFalse(_LLM_NavEventOwnerStarted,
+				CommitMode . ": AHK hotkey probes must stay fail-open after quarantine")
+			AssertEqual(1, _LLM_NavEventOwnerReportTimes.Count,
+				CommitMode . ": one failed hide boundary must publish one bounded diagnostic")
+			Followup := LLM_NavEventOwner_BeginSurfaceSwap(0, 0)
+			AssertTrue(Followup is Map && !Followup["native"],
+				CommitMode . ": later UI teardown must remain available without the failed native owner")
+			AssertTrue(LLM_NavEventOwner_CommitSurfaceSwap(Followup),
+				CommitMode . ": the contained fail-open path must remain usable")
+		} finally {
+			State.StopMode := "accept"
+			SetTimer(_LLM_NavEventOwnerQuarantineNow, 0)
+			_LNEO_Teardown()
+		}
+	}
+}
+
+Test("(ahk2-08-tooltip-hide-quarantine) real hide contains owner quarantine",
+	_LNEO_TooltipHideContainsOwnerQuarantine)
 
 _LNEO_CriticalCommitFailureDefersBlockingStop() {
 	global _LLM_NavEventOwnerStarted, _TooltipActiveSurface
