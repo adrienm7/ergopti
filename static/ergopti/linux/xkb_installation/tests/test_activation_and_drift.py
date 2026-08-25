@@ -1,6 +1,7 @@
 """Tests for desktop activation merge helpers and repository-level drift."""
 
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 from pathlib import Path
@@ -103,6 +104,76 @@ class KDEMergeTests(unittest.TestCase):
         merged, added = merge_kde_layout_list(["us"], ["ergopti", "us"])
         self.assertTrue(added)
         self.assertEqual(merged, ["us", "ergopti"])
+
+
+class OwnedDesktopTeardownTests(unittest.TestCase):
+    def test_deactivate_removes_only_ergopti_desktop_entries(self):
+        calls = []
+
+        def fake_run(command, **kwargs):
+            calls.append(command)
+            if "gsettings" in command and "get" in command:
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout="[('xkb', 'fr'), ('xkb', 'ergopti'), ('ibus', 'mozc-jp'), "
+                    "('xkb', 'ergopti+plus')]",
+                )
+            if "kreadconfig6" in command:
+                return SimpleNamespace(returncode=0, stdout="us,ergopti,fr,ergopti+plus")
+            return SimpleNamespace(returncode=0, stdout="")
+
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(clean_installer.shutil, "which", return_value="kwriteconfig6"):
+            self.assertEqual(
+                clean_installer.deactivate("ergopti"),
+                clean_installer.CleanupStatus.CHANGED,
+            )
+
+        gsettings_writes = [
+            call for call in calls if "gsettings" in call and "set" in call
+        ]
+        self.assertEqual(len(gsettings_writes), 1)
+        self.assertEqual(
+            gsettings_writes[0][-1],
+            "[('xkb', 'fr'), ('ibus', 'mozc-jp')]",
+        )
+        kde_writes = [call for call in calls if "kwriteconfig6" in call]
+        self.assertEqual(len(kde_writes), 1)
+        self.assertEqual(kde_writes[0][-1], "us,fr")
+
+    def test_xcompose_include_is_idempotent_and_external_edits_survive_uninstall(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "user home"
+            home.mkdir()
+            destination = home / ".XCompose"
+            destination.write_text('include "%L"\n<Multi_key> <a> : "alpha"\n', encoding="utf-8")
+            managed = root / "package with spaces" / "compose" / "ergopti.XCompose"
+            managed.parent.mkdir(parents=True)
+            managed.write_text('<Multi_key> <e> : "ergopti"\n', encoding="utf-8")
+
+            with mock.patch("builtins.print"):
+                self.assertTrue(clean_installer.install_user_xcompose(managed, home=home))
+                self.assertFalse(clean_installer.install_user_xcompose(managed, home=home))
+            installed = destination.read_text(encoding="utf-8")
+            self.assertIn('include "%L"', installed)
+            self.assertIn('"alpha"', installed)
+            self.assertEqual(installed.count("# Ergopti managed XCompose"), 1)
+            self.assertFalse((home / ".XCompose.bak").exists())
+
+            with destination.open("a", encoding="utf-8") as stream:
+                stream.write('<Multi_key> <z> : "external-after-install"\n')
+            with mock.patch("builtins.print"):
+                self.assertEqual(
+                    clean_installer.remove_user_xcompose_include(home=home),
+                    clean_installer.CleanupStatus.CHANGED,
+                )
+            restored = destination.read_text(encoding="utf-8")
+            self.assertIn('include "%L"', restored)
+            self.assertIn('"alpha"', restored)
+            self.assertIn('"external-after-install"', restored)
+            self.assertNotIn("Ergopti managed XCompose", restored)
 
 
 class TypesFileDriftGuard(unittest.TestCase):

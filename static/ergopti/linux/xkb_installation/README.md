@@ -68,6 +68,7 @@ exécute le vrai CLI sans droits root :
 | `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | Racine des extensions XKB |
 | `ERGOPTI_XKB_SYSTEM_ROOT` | `/usr/share/X11/xkb` | Arbre X11 hérité (liens + patch rules nettoyés) |
 | `ERGOPTI_XKB_CACHE_DIR` | `/var/lib/xkb` | Cache XKB purgé après installation |
+| `ERGOPTI_XKB_USER_HOME` | home de l'utilisateur appelant | Home isolé pour les tests XCompose |
 
 Codes de sortie du script Python clean : `0` succès - `2` erreur d'usage (argparse) -
 `3` paquet incohérent ou keymap non compilable - `4` installation abandonnée.

@@ -29,10 +29,22 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
+from enum import Enum
 from pathlib import Path
+
+XCOMPOSE_OWNER_MARKER = "# Ergopti managed XCompose"
+XCOMPOSE_MANAGED_NAME = "ergopti.XCompose"
+ENV_USER_HOME = "ERGOPTI_XKB_USER_HOME"
+
+
+class CleanupStatus(Enum):
+    ABSENT = "absent"
+    CHANGED = "changed"
+    FAILED = "failed"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -263,6 +275,12 @@ def install_clean(
             build_evdev_post(layout_id),
             encoding="utf-8",
         )
+        if xcompose_path is not None:
+            (staged_package / "compose").mkdir()
+            shutil.copy2(
+                xcompose_path,
+                staged_package / "compose" / XCOMPOSE_MANAGED_NAME,
+            )
 
         if not compile_validation(staging_root, layout_id):
             raise SystemExit(EXIT_VALIDATION)
@@ -273,8 +291,11 @@ def install_clean(
     cleanup_previous_installations(roots)
     print(f"📦 Paquet installé dans {package_dir}.")
 
-    if xcompose_path is not None:
-        install_user_xcompose(xcompose_path)
+    managed_xcompose = package_dir / "compose" / XCOMPOSE_MANAGED_NAME
+    if managed_xcompose.is_file():
+        install_user_xcompose(managed_xcompose)
+    else:
+        remove_user_xcompose_include()
 
     if support_x11:
         create_legacy_symlinks(package_dir, layout_id, roots.system_root)
@@ -283,21 +304,127 @@ def install_clean(
     activate(layout_id, variant)
 
 
-def install_user_xcompose(source: Path) -> None:
+def resolve_user_identity() -> tuple[Path, int | None, int | None]:
+    """Return the invoking user's home and ownership, even while under sudo."""
+    sandbox_home = os.environ.get(ENV_USER_HOME)
+    if sandbox_home:
+        return Path(sandbox_home), None, None
     sudo_user = os.environ.get("SUDO_USER", "")
-    home = Path.home() if not sudo_user else Path(os.path.expanduser(f"~{sudo_user}"))
-    destination = home / ".XCompose"
+    if sudo_user:
+        try:
+            import pwd
+
+            user = pwd.getpwnam(sudo_user)
+            return Path(user.pw_dir), user.pw_uid, user.pw_gid
+        except (ImportError, KeyError):
+            pass
+    uid_fn = getattr(os, "getuid", None)
+    gid_fn = getattr(os, "getgid", None)
+    uid = uid_fn() if callable(uid_fn) else None
+    gid = gid_fn() if callable(gid_fn) else None
+    return Path.home(), uid, gid
+
+
+def write_user_text(
+    destination: Path,
+    content: str,
+    uid: int | None,
+    gid: int | None,
+) -> None:
+    """Atomically replace a user file without following a crafted temp symlink."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    previous_mode = (
+        stat.S_IMODE(destination.stat().st_mode) if destination.exists() else 0o600
+    )
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.ergopti-",
+        dir=destination.parent,
+        text=True,
+    )
+    temporary = Path(temporary_name)
     try:
-        if source.resolve() == destination.resolve():
-            print("   ℹ️  .XCompose déjà en place.")
-            return
-        if destination.exists():
-            shutil.copy2(destination, destination.with_suffix(".bak"))
-            destination.unlink()
-        shutil.copy(source, destination)
-        print(f"   ✅ ~/.XCompose mis à jour ({destination.stat().st_size} octets).")
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            stream.write(content)
+        temporary.chmod(previous_mode)
+        chown = getattr(os, "chown", None)
+        if callable(chown) and uid is not None and gid is not None:
+            chown(temporary, uid, gid)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def compose_include_line(source: Path) -> str:
+    escaped = str(source).replace("\\", "\\\\").replace('"', '\\"')
+    return f'include "{escaped}"'
+
+
+def strip_owned_xcompose_block(content: str) -> tuple[list[str], bool]:
+    """Remove the exact marker and its following include, never adjacent user data."""
+    lines = content.splitlines()
+    kept: list[str] = []
+    removed = False
+    index = 0
+    while index < len(lines):
+        if lines[index].strip() != XCOMPOSE_OWNER_MARKER:
+            kept.append(lines[index])
+            index += 1
+            continue
+        removed = True
+        index += 1
+        if index < len(lines) and lines[index].lstrip().startswith('include "'):
+            index += 1
+    return kept, removed
+
+
+def install_user_xcompose(source: Path, home: Path | None = None) -> bool:
+    """Append one owned include while preserving the user's Compose rules."""
+    resolved_home, uid, gid = resolve_user_identity()
+    if home is not None:
+        resolved_home, uid, gid = home, None, None
+    destination = resolved_home / ".XCompose"
+    try:
+        existing = destination.read_text(encoding="utf-8") if destination.exists() else ""
+        kept, _ = strip_owned_xcompose_block(existing)
+        include_line = compose_include_line(source)
+        content = "\n".join(kept)
+        if content and not content.endswith("\n"):
+            content += "\n"
+        content += f"{XCOMPOSE_OWNER_MARKER}\n{include_line}\n"
+        if destination.exists() and destination.read_text(encoding="utf-8") == content:
+            print("   ℹ️  Inclusion ~/.XCompose déjà en place.")
+            return False
+        write_user_text(destination, content, uid, gid)
+        print("   ✅ Inclusion Ergopti ajoutée à ~/.XCompose.")
+        return True
     except OSError as error:
-        print(f"   ⚠️  .XCompose non installé : {error}")
+        print(f"   ⚠️  Inclusion .XCompose non installée : {error}")
+        return False
+
+
+def remove_user_xcompose_include(home: Path | None = None) -> CleanupStatus:
+    """Remove only the line owned by Ergopti, preserving all external edits."""
+    resolved_home, uid, gid = resolve_user_identity()
+    if home is not None:
+        resolved_home, uid, gid = home, None, None
+    destination = resolved_home / ".XCompose"
+    if not destination.exists():
+        return CleanupStatus.ABSENT
+    try:
+        existing = destination.read_text(encoding="utf-8")
+        kept, removed = strip_owned_xcompose_block(existing)
+        if not removed:
+            return CleanupStatus.ABSENT
+        content = "\n".join(kept)
+        if content.strip():
+            write_user_text(destination, content + "\n", uid, gid)
+        else:
+            destination.unlink()
+        print("   🗑️  Inclusion Ergopti retirée de ~/.XCompose.")
+        return CleanupStatus.CHANGED
+    except OSError as error:
+        print(f"   ⚠️  Inclusion .XCompose non retirée : {error}")
+        return CleanupStatus.FAILED
 
 
 def create_legacy_symlinks(package_dir: Path, layout_id: str, system_root: Path) -> None:
@@ -435,9 +562,107 @@ def activate(layout_id: str, variant: str) -> None:
     print("   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition n'est pas active.")
 
 
-def uninstall_clean(roots: InstallerRoots) -> None:
+def deactivate(layout_id: str) -> CleanupStatus:
+    """Remove only Ergopti desktop entries and preserve every other source."""
+    sudo_user = os.environ.get("SUDO_USER")
+    prefix = ["sudo", "-u", sudo_user] if sudo_user else []
+    owned_ids = {layout_id, f"{layout_id}+plus"}
+    changed = False
+    failed = False
+
+    def run_capture(command: list[str]) -> str | None:
+        try:
+            result = subprocess.run(
+                prefix + command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return result.stdout if result.returncode == 0 else None
+
+    current_raw = run_capture(
+        ["gsettings", "get", "org.gnome.desktop.input-sources", "sources"]
+    )
+    if current_raw is not None:
+        current_sources = parse_gsettings_sources(current_raw)
+        if current_sources is None:
+            failed = True
+        else:
+            kept_sources = [
+                pair
+                for pair in current_sources
+                if not (pair[0] == "xkb" and pair[1] in owned_ids)
+            ]
+            if kept_sources != current_sources:
+                if run_reported(
+                    prefix
+                    + [
+                        "gsettings",
+                        "set",
+                        "org.gnome.desktop.input-sources",
+                        "sources",
+                        format_gsettings_sources(kept_sources),
+                    ],
+                    "GNOME : sources Ergopti retirées",
+                ):
+                    changed = True
+                else:
+                    failed = True
+
+    current_list = None
+    for reader in ("kreadconfig6", "kreadconfig5"):
+        current_list = run_capture(
+            [reader, "--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList"]
+        )
+        if current_list is not None:
+            break
+    if current_list is not None:
+        current_ids = parse_kde_layout_list(current_list)
+        kept_ids = [entry for entry in current_ids if entry not in owned_ids]
+        if kept_ids != current_ids:
+            writer = "kwriteconfig6" if shutil.which("kwriteconfig6") else "kwriteconfig5"
+            if run_reported(
+                prefix
+                + [
+                    writer,
+                    "--file",
+                    "kxkbrc",
+                    "--group",
+                    "Layout",
+                    "--key",
+                    "LayoutList",
+                    ",".join(kept_ids),
+                ],
+                "KDE : dispositions Ergopti retirées",
+            ):
+                changed = True
+                run_reported(
+                    prefix
+                    + ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
+                    "KDE : reconfiguration de KWin",
+                )
+            else:
+                failed = True
+    if failed:
+        return CleanupStatus.FAILED
+    return CleanupStatus.CHANGED if changed else CleanupStatus.ABSENT
+
+
+def uninstall_clean(roots: InstallerRoots) -> bool:
     package_dir = roots.package_dir
-    removed = False
+    compose_status = remove_user_xcompose_include()
+    desktop_status = deactivate(PACKAGE_NAME)
+    if CleanupStatus.FAILED in (compose_status, desktop_status):
+        print(
+            "❌ Désinstallation interrompue : une référence utilisateur Ergopti "
+            "n'a pas pu être retirée. Le paquet est conservé."
+        )
+        return False
+    removed = CleanupStatus.CHANGED in (compose_status, desktop_status)
     if package_dir.exists():
         shutil.rmtree(package_dir)
         print(f"🗑️  {package_dir} supprimé.")
@@ -463,6 +688,7 @@ def uninstall_clean(roots: InstallerRoots) -> None:
         removed = True
     if not removed:
         print("ℹ️  Rien à désinstaller.")
+    return removed
 
 
 def force_utf8_stdio() -> None:
@@ -516,8 +742,7 @@ def main(argv: list[str]) -> int:
     roots = resolve_roots()
     check_root(roots)
     if args.uninstall:
-        uninstall_clean(roots)
-        return EXIT_OK
+        return EXIT_OK if uninstall_clean(roots) else EXIT_INSTALL_ABORTED
     try:
         install_clean(
             symbols_path=args.xkb,
