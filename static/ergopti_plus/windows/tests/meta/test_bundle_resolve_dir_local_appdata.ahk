@@ -106,6 +106,32 @@ _BRDL_CheckUsesSharedResolver() {
 		"_Bundle_ResolveDir must resolve Local AppData via the shared ResolveLocalAppDataDir() helper")
 }
 
+_BRDL_CheckUnzipCommandEscapesLiteralPaths() {
+	ZipPath := "C:\Users\O'Brien\App Data\Local\Temp\bundle.zip"
+	DestDir := "C:\Users\O'Brien\App Data\Local\Ergopti\bundle-stage"
+	Command := _Bundle_BuildUnzipCommand(ZipPath, DestDir)
+
+	AssertContains(Command,
+		"-LiteralPath 'C:\Users\O''Brien\App Data\Local\Temp\bundle.zip'",
+		"PowerShell literal-path quoting must double every embedded apostrophe in the archive path")
+	AssertContains(Command,
+		"-DestinationPath 'C:\Users\O''Brien\App Data\Local\Ergopti\bundle-stage'",
+		"PowerShell literal-path quoting must double every embedded apostrophe in the staging path")
+	AssertFalse(InStr(Command, "-LiteralPath '" . ZipPath . "'"),
+		"the raw apostrophe-bearing archive path must never be interpolated into -Command")
+}
+
+_BRDL_CheckUnzipCommandPreservesOrdinaryFormat() {
+	ZipPath := "C:\Users\Admin User\AppData\Local\Temp\bundle.zip"
+	DestDir := "C:\Users\Admin User\AppData\Local\Ergopti\bundle-stage"
+	Expected := "powershell -NoProfile -ExecutionPolicy Bypass -Command "
+		. Chr(34) . "Expand-Archive -LiteralPath '" . ZipPath
+		. "' -DestinationPath '" . DestDir . "' -Force" . Chr(34)
+
+	AssertEqual(Expected, _Bundle_BuildUnzipCommand(ZipPath, DestDir),
+		"paths without apostrophes must retain the existing command format byte-for-byte")
+}
+
 
 Test("meta bundle-resolve-dir: _Bundle_ResolveDir() executes without throwing and returns a real path",
 	_BRDL_CheckResolveDirExecutesAndReturnsPath)
@@ -118,3 +144,9 @@ Test("meta bundle-resolve-dir: does not use A_AppData with '..' traversal",
 
 Test("meta bundle-resolve-dir: uses the shared ResolveLocalAppDataDir() helper, not A_LocalAppData",
 	_BRDL_CheckUsesSharedResolver)
+
+Test("bundle bootstrap quotes apostrophe-bearing PowerShell paths (ahk6-01-bundle-powershell-quote)",
+	_BRDL_CheckUnzipCommandEscapesLiteralPaths)
+
+Test("bundle bootstrap preserves ordinary PowerShell command format (ahk6-01-bundle-powershell-quote)",
+	_BRDL_CheckUnzipCommandPreservesOrdinaryFormat)
