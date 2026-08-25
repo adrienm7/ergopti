@@ -34,6 +34,7 @@ _LBLD_State() {
 		"stop", 0,
 		"deps_ready", false,
 		"deps_checks", 0,
+		"deps_models", [],
 		"build", 0,
 		"warmup", 0,
 		"failed", 0,
@@ -50,14 +51,15 @@ _LBLD_Port(State) {
 		"stop_bridge", (*) => State["stop"] += 1,
 		"deps_ready", (*) => State["deps_ready"],
 		"deps_check", (Model, OnReady, OnFailed, ShowUi) =>
-			_LBLD_RecordDepsCheck(State, OnReady, OnFailed),
+			_LBLD_RecordDepsCheck(State, Model, OnReady, OnFailed),
 		"menu_build", (*) => State["build"] += 1,
 		"warmup", (*) => State["warmup"] += 1,
 		"deps_failed", (*) => State["failed"] += 1)
 }
 
-_LBLD_RecordDepsCheck(State, OnReady, OnFailed) {
+_LBLD_RecordDepsCheck(State, Model, OnReady, OnFailed) {
 	State["deps_checks"] += 1
+	State["deps_models"].Push(Model)
 	State["ready_callbacks"].Push(OnReady)
 	State["failed_callbacks"].Push(OnFailed)
 	return true
@@ -251,6 +253,108 @@ _LBLD_PredictionReadinessIsBackendSpecific() {
 		"a ready Ollama backend must not consult the API-entry resolver")
 }
 
+_LBLD_ModelChangeRejectsCapturedCallbacks() {
+	global _LLM_Menu
+	State := _LBLD_State()
+	Port := _LBLD_Port(State)
+	_LBLD_Reset(_LBLD_Menu("ollama", true))
+	Intent := _LLM_Menu_CaptureBackendLifecycleIntent(false)
+	AssertTrue(LLM_Menu_RunBackendLifecycle(Intent, Port))
+	AssertEqual("local-a", State["deps_models"][1])
+	OldReady := State["ready_callbacks"][1]
+	OldFailed := State["failed_callbacks"][1]
+	_LLM_Menu["model"] := "local-b"
+
+	OldReady.Call()
+	OldFailed.Call("stale-model")
+	AssertEqual(0, State["start"],
+		"(ahk3-01-model-lifecycle-owner) a ready callback for model A must not start model B")
+	AssertEqual(0, State["build"],
+		"a stale model callback must not rebuild the current menu")
+	AssertEqual(0, State["warmup"],
+		"a stale model callback must not warm the newly selected model")
+	AssertEqual(0, State["failed"],
+		"a failure for model A must not disable model B")
+}
+
+_LBLD_RecordModelApply(State, *) {
+	State["model_apply"] += 1
+	return true
+}
+
+_LBLD_ApplyModelCommitRetiresAndReplacesIntent() {
+	global _LLM_Menu
+	State := _LBLD_State()
+	State["model_apply"] := 0
+	Port := _LBLD_Port(State)
+	_LBLD_Reset(_LBLD_Menu("ollama", true))
+	LLM_Menu_RunBackendLifecycle(
+		_LLM_Menu_CaptureBackendLifecycleIntent(false), Port)
+	OldReady := State["ready_callbacks"][1]
+	OldFailed := State["failed_callbacks"][1]
+
+	Candidate := _LBLD_Menu("ollama", true)
+	Candidate["model"] := "local-b"
+	_LLM_Menu := Candidate
+	AssertTrue(LLM_Menu_ApplyModelLifecycleCommitted(Candidate,
+		_LBLD_RecordModelApply.Bind(State),
+		(Callback, Period) => _LBLD_Schedule(State, Callback, Period), Port),
+		"the real model apply boundary must publish one replacement lifecycle")
+	AssertEqual(1, State["cancel"],
+		"model commit must retire Ollama work owned by the previous model")
+	AssertEqual(1, State["model_apply"],
+		"the ordinary model runtime apply must still complete once")
+	AssertEqual(1, State["scheduled"].Length,
+		"enabled model B must receive one replacement lifecycle intent")
+
+	OldReady.Call()
+	OldFailed.Call("stale-model")
+	AssertEqual(0, State["start"])
+	AssertEqual(0, State["failed"])
+	State["scheduled"][1]["callback"].Call()
+	AssertEqual("local-b", State["deps_models"][2],
+		"the replacement dependency check must own exact model B")
+	State["ready_callbacks"][2].Call()
+	AssertEqual(1, State["start"],
+		"the current model B callback must remain executable")
+	AssertEqual(1, State["build"])
+	AssertEqual(1, State["warmup"])
+}
+
+_LBLD_ModelAbaKeepsOnlyFinalIntentCurrent() {
+	global _LLM_Menu
+	State := _LBLD_State()
+	State["model_apply"] := 0
+	Port := _LBLD_Port(State)
+	_LBLD_Reset(_LBLD_Menu("ollama", true))
+	LLM_Menu_RunBackendLifecycle(
+		_LLM_Menu_CaptureBackendLifecycleIntent(false), Port)
+	OldAReady := State["ready_callbacks"][1]
+	ScheduleFn := (Callback, Period) => _LBLD_Schedule(State, Callback, Period)
+	ApplyFn := _LBLD_RecordModelApply.Bind(State)
+
+	CandidateB := _LBLD_Menu("ollama", true)
+	CandidateB["model"] := "local-b"
+	_LLM_Menu := CandidateB
+	LLM_Menu_ApplyModelLifecycleCommitted(CandidateB, ApplyFn, ScheduleFn, Port)
+	State["scheduled"][1]["callback"].Call()
+	BReady := State["ready_callbacks"][2]
+
+	CandidateA := _LBLD_Menu("ollama", true)
+	_LLM_Menu := CandidateA
+	LLM_Menu_ApplyModelLifecycleCommitted(CandidateA, ApplyFn, ScheduleFn, Port)
+	State["scheduled"][2]["callback"].Call()
+	CurrentAReady := State["ready_callbacks"][3]
+
+	OldAReady.Call()
+	BReady.Call()
+	AssertEqual(0, State["start"],
+		"(ahk3-01-model-lifecycle-owner) A-B-A must not revive either superseded receipt")
+	CurrentAReady.Call()
+	AssertEqual(1, State["start"],
+		"the final A generation must remain live after an A-B-A cycle")
+}
+
 Test("[ahk-003] backend lifecycle dispatch is backend-specific and owned",
 	_LBLD_ApiNeverConsultsOllama)
 Test("[ahk-003] Ollama lifecycle remains dependency-gated",
@@ -267,3 +371,12 @@ Test("[ahk-003] API admission uses the real selected-entry resolver",
 	_LBLD_SelectedApiEntryUsesRealResolver)
 Test("[ahk-003] prediction readiness is dispatched by backend",
 	_LBLD_PredictionReadinessIsBackendSpecific)
+Test("[ahk3-01] model changes reject captured dependency callbacks "
+	. "(ahk3-01-model-lifecycle-owner)",
+	_LBLD_ModelChangeRejectsCapturedCallbacks)
+Test("[ahk3-01] model apply retires and replaces lifecycle ownership "
+	. "(ahk3-01-model-lifecycle-owner)",
+	_LBLD_ApplyModelCommitRetiresAndReplacesIntent)
+Test("[ahk3-01] model A-B-A keeps only the final generation current "
+	. "(ahk3-01-model-lifecycle-owner)",
+	_LBLD_ModelAbaKeepsOnlyFinalIntentCurrent)
