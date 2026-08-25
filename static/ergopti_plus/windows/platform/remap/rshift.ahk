@@ -32,13 +32,18 @@ _RShiftHoldModKey() {
 	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_shift"), "right_shift", "RShift")
 }
 
-#HotIf TapHoldHoldModifier(TapHold, "right_shift") != "" and not LayerEnabled
-*$SC036:: {
+_RShiftHandleHold(PhysicalModifierPassthrough) {
 	Result := TapHoldOwnImmediateModifier("right_shift", "SC036",
-		_RShiftHoldModKey(), TapHoldDuration(TapHold, "right_shift"))
+		_RShiftHoldModKey(), TapHoldDuration(TapHold, "right_shift"),
+		,,,,,, PhysicalModifierPassthrough)
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "RShift")
 		_RShiftDispatch()
 }
+
+#HotIf _RShiftHoldModKey() == "RShift" and not LayerEnabled
+~*$SC036:: _RShiftHandleHold(true)
+#HotIf TapHoldHoldModifier(TapHold, "right_shift") != "" and _RShiftHoldModKey() != "RShift" and not LayerEnabled
+*$SC036:: _RShiftHandleHold(false)
 #HotIf
 
 ; Gate: any configured tap action activates the handler.

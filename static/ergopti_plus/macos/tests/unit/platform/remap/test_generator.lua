@@ -324,6 +324,39 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			helpers.assert_true(found[id] == true, "missing tap-hold matrix rule for " .. id)
 		end
 	end)
+
+	helpers.it("emits a native Shift hold in Karabiner's immediate transaction", function()
+		local shift_action = {
+			id = "shift",
+			label = "Shift",
+			karabiner_to = { { key_code = "left_shift" } },
+		}
+		local shift_key = {
+			id = "left_shift",
+			label = "Left Shift",
+			from = { key_code = "left_shift", modifiers = { optional = { "any" } } },
+		}
+		local result = Generator.build_karabiner_json(
+			make_state({ tap_hold_config = { left_shift = { tap = "none", hold = "shift" } } }),
+			{NONE_ACTION, shift_action}, {shift_key}, {}, nil, "/fake/data_dir/"
+		)
+		local manipulator = nil
+		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+			if type(rule.description) == "string" and rule.description:find("Left Shift", 1, true) then
+				manipulator = rule.manipulators[1]
+				break
+			end
+		end
+		helpers.assert_not_nil(manipulator, "native Shift tap/hold rule must exist")
+		local shift_event_index = nil
+		for index, event in ipairs(manipulator.to or {}) do
+			if event.key_code == "left_shift" then shift_event_index = index end
+		end
+		helpers.assert_not_nil(shift_event_index,
+			"the Shift edge must be part of Karabiner's immediate `to` transaction, not a deferred Hammerspoon injection")
+		helpers.assert_nil(manipulator.to_if_alone,
+			"native Shift must not be delayed behind to_if_alone when its hold output is the same physical modifier")
+	end)
 end)
 
 

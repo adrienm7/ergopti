@@ -375,6 +375,26 @@ _THMI_ImmediateOwnerOrdersDownWaitUpThenTap() {
 Test("tap-hold modifier: Down owns the first event and Up precedes tap (tap-hold-modifier-immediate)",
 	_THMI_ImmediateOwnerOrdersDownWaitUpThenTap)
 
+_THMI_NativeModifierPassthroughKeepsThePhysicalEdge() {
+	global _THMI_Events
+	_THMI_Reset()
+	if (TapHoldOwnImmediateModifier.MaxParams < 11) {
+		Assert(false,
+			"the common owner must accept an explicit physical-pass-through mode (native-modifier-passthrough-race)")
+		return
+	}
+	Owner := TapHoldOwnImmediateModifier
+	Result := Owner.Call("left_shift", "SC02A", "LShift", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up, _THMI_Cancel, true)
+	AssertEqual(true, Result["activated"])
+	AssertEqual(true, Result["released"])
+	AssertEqual(true, Result["tap"])
+	AssertEqual("wait:SC02A|cancel:left_shift", _THMI_JoinedEvents(),
+		"a pass-through native Shift must use the physical edge already delivered by the ~ hotkey; reinjecting Shift races a fast Shift+key hotkey (native-modifier-passthrough-race)")
+}
+Test("tap-hold modifier: native pass-through owns the first chord without reinjection (native-modifier-passthrough-race)",
+	_THMI_NativeModifierPassthroughKeepsThePhysicalEdge)
+
 _THMI_ActivityCancelsOnlyTapNotHold() {
 	global _THMI_CancelReason
 	_THMI_Reset()
