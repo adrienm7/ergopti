@@ -152,11 +152,21 @@ _Bundle_VerifyStaging(StagingDir) {
 ; ``DestDir``. Returns true on success, false otherwise. We rely on PowerShell
 ; because AHK v2 has no built-in unzip and adding a COM-based extractor would
 ; bloat the bundle module for no real gain.
+_Bundle_BuildUnzipCommand(ZipPath, DestDir) {
+	; PowerShell single-quoted literals escape an embedded apostrophe by
+	; doubling it. LocalAppData is user-controlled and a legal Windows profile
+	; name may contain one, so neither path can be interpolated raw.
+	QuotedZipPath := StrReplace(ZipPath, "'", "''")
+	QuotedDestDir := StrReplace(DestDir, "'", "''")
+	return "powershell -NoProfile -ExecutionPolicy Bypass -Command "
+		. '"' . "Expand-Archive -LiteralPath '" . QuotedZipPath
+		. "' -DestinationPath '" . QuotedDestDir . "' -Force" . '"'
+}
+
 _Bundle_Unzip(ZipPath, DestDir) {
 	; -NoProfile keeps cold-start fast; -Command is a single string we build
 	; via FormatTime-free concatenation to avoid quoting surprises.
-	Cmd := "powershell -NoProfile -ExecutionPolicy Bypass -Command "
-		. '"' . "Expand-Archive -LiteralPath '" . ZipPath . "' -DestinationPath '" . DestDir . "' -Force" . '"'
+	Cmd := _Bundle_BuildUnzipCommand(ZipPath, DestDir)
 	ExitCode := 1
 	try {
 		ExitCode := RunWait(Cmd, , "Hide")
