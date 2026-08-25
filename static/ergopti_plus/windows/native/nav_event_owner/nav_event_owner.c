@@ -112,6 +112,8 @@ typedef struct NavState {
 	uint8_t physical_modifiers_lr;
 	uint8_t active_plan_valid;
 	uint8_t prepared_plan_valid;
+	uint8_t profile_plan_valid;
+	uint8_t profile_transition;
 	uint8_t startup_cancelled;
 	uint8_t draining;
 	uint8_t menu_guard_passed_lr;
@@ -121,13 +123,22 @@ typedef struct NavState {
 	uint8_t menu_guard_suppressed_lr;
 	ErgoptiNav_Binding active_plan[ERGOPTI_NAV_ROUTE_COUNT];
 	ErgoptiNav_Binding prepared_plan[ERGOPTI_NAV_ROUTE_COUNT];
+	ErgoptiNav_Binding profile_plan[ERGOPTI_NAV_PROFILE_ROUTE_COUNT];
+	ErgoptiNav_Binding staged_profile_plan[ERGOPTI_NAV_PROFILE_ROUTE_COUNT];
 	uint64_t active_plan_generation;
 	uint64_t prepared_plan_generation;
 	uint64_t next_plan_generation;
 	ErgoptiNav_Owner active_owner;
 	ErgoptiNav_Owner staged_owner;
+	ErgoptiNav_ProfileOwner profile_owner;
+	ErgoptiNav_ProfileOwner staged_profile_owner;
 	uint64_t active_swap_ticket;
 	uint64_t next_swap_ticket;
+	uint64_t active_profile_swap_ticket;
+	uint64_t next_profile_swap_ticket;
+	uint64_t profile_plan_generation;
+	uint64_t staged_profile_plan_generation;
+	uint64_t next_profile_plan_generation;
 	uint64_t next_receipt_sequence;
 	NavReceiptSlot receipts[ERGOPTI_NAV_RECEIPT_CAPACITY];
 	NavHeldKey held_keys[NAV_HELD_KEY_CAPACITY];
@@ -245,8 +256,12 @@ static void NavResetSemanticStateLocked(NavState *state)
 {
 	memset(state->active_plan, 0, sizeof(state->active_plan));
 	memset(state->prepared_plan, 0, sizeof(state->prepared_plan));
+	memset(state->profile_plan, 0, sizeof(state->profile_plan));
+	memset(state->staged_profile_plan, 0, sizeof(state->staged_profile_plan));
 	memset(&state->active_owner, 0, sizeof(state->active_owner));
 	memset(&state->staged_owner, 0, sizeof(state->staged_owner));
+	memset(&state->profile_owner, 0, sizeof(state->profile_owner));
+	memset(&state->staged_profile_owner, 0, sizeof(state->staged_profile_owner));
 	memset(state->receipts, 0, sizeof(state->receipts));
 	memset(state->held_keys, 0, sizeof(state->held_keys));
 	memset(state->injected_modifiers, 0, sizeof(state->injected_modifiers));
@@ -262,6 +277,8 @@ static void NavResetSemanticStateLocked(NavState *state)
 	state->downstream_modifiers_lr = 0;
 	state->active_plan_valid = 0;
 	state->prepared_plan_valid = 0;
+	state->profile_plan_valid = 0;
+	state->profile_transition = 0;
 	state->startup_cancelled = 0;
 	state->draining = 0;
 	state->menu_guard_passed_lr = 0;
@@ -273,6 +290,11 @@ static void NavResetSemanticStateLocked(NavState *state)
 	state->next_plan_generation = 0;
 	state->active_swap_ticket = 0;
 	state->next_swap_ticket = 0;
+	state->active_profile_swap_ticket = 0;
+	state->next_profile_swap_ticket = 0;
+	state->profile_plan_generation = 0;
+	state->staged_profile_plan_generation = 0;
+	state->next_profile_plan_generation = 0;
 	state->next_receipt_sequence = 0;
 	state->terminal_token = 0;
 	state->terminal_phase = ERGOPTI_NAV_TERMINAL_IDLE;
@@ -295,7 +317,6 @@ static void NavCloseHandle(HANDLE handle)
 	if (handle != NULL)
 		CloseHandle(handle);
 }
-
 
 
 
@@ -346,6 +367,61 @@ static bool NavOwnerIsValid(const ErgoptiNav_Owner *owner)
 		&& owner->active_index >= 1
 		&& owner->active_index <= owner->slot_count
 		&& owner->require_index_match <= 1;
+}
+
+
+
+/** Validates one immutable profile-order owner. */
+static bool NavProfileOwnerIsValid(const ErgoptiNav_ProfileOwner *owner)
+{
+	if (owner == NULL || !NavBytesAreZero(owner->reserved, sizeof(owner->reserved)))
+		return false;
+	if (owner->token == 0)
+		return owner->epoch == 0 && owner->profile_count == 0;
+	return owner->epoch != 0
+		&& owner->profile_count >= 1
+		&& owner->profile_count <= ERGOPTI_NAV_PROFILE_ROUTE_COUNT;
+}
+
+
+
+/** Validates the fixed, collision-free Ctrl+digit profile route family. */
+static bool NavProfilePlanIsValid(
+	const ErgoptiNav_Binding bindings[ERGOPTI_NAV_PROFILE_ROUTE_COUNT])
+{
+	uint16_t targets = 0;
+	uint32_t index;
+	uint32_t prior;
+	for (index = 0; index < ERGOPTI_NAV_PROFILE_ROUTE_COUNT; ++index) {
+		const ErgoptiNav_Binding *binding = &bindings[index];
+		uint16_t target_bit;
+		if (!NavBytesAreZero(binding->reserved, sizeof(binding->reserved))
+				|| (binding->axis != ERGOPTI_NAV_AXIS_VK
+					&& binding->axis != ERGOPTI_NAV_AXIS_SC)
+				|| binding->code == 0
+				|| (binding->axis == ERGOPTI_NAV_AXIS_VK && binding->code > 0xFFu)
+				|| (binding->axis == ERGOPTI_NAV_AXIS_SC && binding->code > 0x1FFu)
+				|| (binding->modifiers & 0xF0u) != 0
+				|| binding->action != ERGOPTI_NAV_ACTION_PROFILE_SELECT
+				|| binding->pass_through != 0
+				|| binding->delta != 0
+				|| binding->target < 1
+				|| binding->target > ERGOPTI_NAV_PROFILE_ROUTE_COUNT
+				|| binding->input_level > ERGOPTI_NAV_AHK_SEND_LEVEL_MAX)
+			return false;
+		target_bit = (uint16_t)(1u << (binding->target - 1u));
+		if ((targets & target_bit) != 0)
+			return false;
+		targets = (uint16_t)(targets | target_bit);
+		for (prior = 0; prior < index; ++prior) {
+			const ErgoptiNav_Binding *other = &bindings[prior];
+			if (binding->axis == other->axis
+					&& binding->code == other->code
+					&& binding->modifiers == other->modifiers)
+				return false;
+		}
+	}
+	return targets == 0x01FFu;
 }
 
 
@@ -546,6 +622,73 @@ static int32_t NavFindRouteLocked(
 			return (int32_t)index;
 	}
 	return -1;
+}
+
+
+
+/** Finds the fixed profile-selection route matching an event. */
+static int32_t NavFindProfileRouteLocked(
+	const NavState *state,
+	const ErgoptiNav_TestEvent *event)
+{
+	uint32_t index;
+	if (!state->profile_plan_valid)
+		return -1;
+	for (index = 0; index < ERGOPTI_NAV_PROFILE_ROUTE_COUNT; ++index) {
+		if (NavEventMatchesBinding(event, &state->profile_plan[index]))
+			return (int32_t)index;
+	}
+	return -1;
+}
+
+
+
+/** Finds a consumed route sharing the event identity, regardless of modifiers. */
+static const ErgoptiNav_Binding *NavFindConsumedIdentityBindingLocked(
+	const NavState *state,
+	const ErgoptiNav_TestEvent *event)
+{
+	uint32_t index;
+	if (state->active_plan_valid) {
+		for (index = 0; index < ERGOPTI_NAV_ROUTE_COUNT; ++index) {
+			const ErgoptiNav_Binding *binding = &state->active_plan[index];
+			if (!binding->pass_through
+					&& NavEventCode(event, binding->axis) == binding->code)
+				return binding;
+		}
+	}
+	if (state->profile_plan_valid) {
+		for (index = 0; index < ERGOPTI_NAV_PROFILE_ROUTE_COUNT; ++index) {
+			const ErgoptiNav_Binding *binding = &state->profile_plan[index];
+			if (!binding->pass_through
+					&& NavEventCode(event, binding->axis) == binding->code)
+				return binding;
+		}
+	}
+	return NULL;
+}
+
+
+
+/** Returns immutable profile target bits retained by queued or claimed receipts. */
+static uint16_t NavProfilePendingMaskLocked(
+	const NavState *state,
+	uint64_t owner_token)
+{
+	uint16_t mask = 0;
+	uint32_t index;
+	for (index = 0; index < ERGOPTI_NAV_RECEIPT_CAPACITY; ++index) {
+		const NavReceiptSlot *slot = &state->receipts[index];
+		if (slot->state != NAV_RECEIPT_EMPTY
+				&& slot->receipt.action == ERGOPTI_NAV_ACTION_PROFILE_SELECT
+				&& slot->receipt.owner_token == owner_token
+				&& slot->receipt.target_index >= 1
+				&& slot->receipt.target_index <= ERGOPTI_NAV_PROFILE_ROUTE_COUNT) {
+			mask = (uint16_t)(mask
+				| (uint16_t)(1u << (slot->receipt.target_index - 1u)));
+		}
+	}
+	return mask;
 }
 
 
@@ -850,11 +993,14 @@ static bool NavDispatchLocked(
 	ErgoptiNav_DispatchResult *result)
 {
 	int32_t held_index;
+	int32_t nav_route_index;
+	int32_t profile_route_index;
 	int32_t route_index;
 	int32_t free_held_index = -1;
 	int32_t receipt_index;
-	uint8_t target_index;
+	uint8_t target_index = 0;
 	uint8_t modifier_bit;
+	bool profile_route = false;
 	const uint8_t menu_bits =
 		NAV_MOD_LALT | NAV_MOD_RALT | NAV_MOD_LWIN | NAV_MOD_RWIN;
 	const uint8_t disguise_bits =
@@ -916,11 +1062,35 @@ static bool NavDispatchLocked(
 	if (event->kind == ERGOPTI_NAV_EVENT_UP)
 		return false;
 
-	route_index = NavFindRouteLocked(state, event);
-	if (route_index < 0)
+	nav_route_index = NavFindRouteLocked(state, event);
+	profile_route_index = NavFindProfileRouteLocked(state, event);
+	if (nav_route_index >= 0 && state->active_owner.token != 0) {
+		route_index = nav_route_index;
+		binding = &state->active_plan[route_index];
+	} else if (profile_route_index >= 0 && state->profile_owner.token != 0) {
+		route_index = profile_route_index;
+		binding = &state->profile_plan[route_index];
+		profile_route = true;
+	} else if (nav_route_index >= 0) {
+		route_index = nav_route_index;
+		binding = &state->active_plan[route_index];
+	} else if (profile_route_index >= 0) {
+		route_index = profile_route_index;
+		binding = &state->profile_plan[route_index];
+		profile_route = true;
+	} else {
+		binding = NavFindConsumedIdentityBindingLocked(state, event);
+		if (binding != NULL) {
+			free_held_index = NavFindFreeHeldKeyLocked(state);
+			NavLatchPassForRefusalLocked(
+				state,
+				binding,
+				event,
+				free_held_index);
+		}
 		return false;
+	}
 	result->route_index = (uint8_t)route_index;
-	binding = &state->active_plan[route_index];
 	if (!binding->pass_through && state->held_key_overflowed)
 		return false;
 	if (!binding->pass_through)
@@ -928,11 +1098,18 @@ static bool NavDispatchLocked(
 
 	if (state->startup_cancelled
 			|| state->draining
-			|| state->transition
 			|| state->suspended
-			|| state->active_owner.token == 0
 			|| !NavInputIsEligible(event, binding)
-			|| !NavTryComputeTarget(&state->active_owner, binding, &target_index)) {
+			|| (profile_route
+				? (state->profile_transition
+					|| state->profile_owner.token == 0
+					|| binding->target > state->profile_owner.profile_count)
+				: (state->transition
+					|| state->active_owner.token == 0
+					|| !NavTryComputeTarget(
+						&state->active_owner,
+						binding,
+						&target_index)))) {
 		NavLatchPassForRefusalLocked(
 			state,
 			binding,
@@ -940,6 +1117,8 @@ static bool NavDispatchLocked(
 			free_held_index);
 		return false;
 	}
+	if (profile_route)
+		target_index = binding->target;
 
 	if (!binding->pass_through && free_held_index < 0) {
 		NavLatchPassForRefusalLocked(
@@ -972,17 +1151,26 @@ static bool NavDispatchLocked(
 	memset(&receipt_slot->receipt, 0, sizeof(receipt_slot->receipt));
 	receipt_slot->receipt.sequence = NavNextIdentity(
 		&state->next_receipt_sequence);
-	receipt_slot->receipt.owner_token = state->active_owner.token;
-	receipt_slot->receipt.owner_epoch = state->active_owner.epoch;
-	receipt_slot->receipt.plan_generation = state->active_plan_generation;
+	receipt_slot->receipt.owner_token = profile_route
+		? state->profile_owner.token
+		: state->active_owner.token;
+	receipt_slot->receipt.owner_epoch = profile_route
+		? state->profile_owner.epoch
+		: state->active_owner.epoch;
+	receipt_slot->receipt.plan_generation = profile_route
+		? state->profile_plan_generation
+		: state->active_plan_generation;
 	receipt_slot->receipt.route_index = (uint8_t)route_index;
 	receipt_slot->receipt.action = binding->action;
 	receipt_slot->receipt.delta = binding->delta;
-	receipt_slot->receipt.from_index = state->active_owner.active_index;
+	receipt_slot->receipt.from_index = profile_route
+		? 0
+		: state->active_owner.active_index;
 	receipt_slot->receipt.target_index = target_index;
 	receipt_slot->receipt.pass_through = binding->pass_through;
 	receipt_slot->state = NAV_RECEIPT_QUEUED;
-	state->active_owner.active_index = target_index;
+	if (!profile_route)
+		state->active_owner.active_index = target_index;
 
 	if (!binding->pass_through) {
 		NavSetHeldKey(
@@ -1267,12 +1455,20 @@ static bool NavModifierInputIsEligibleLocked(
 	if (event->injected == ERGOPTI_NAV_INJECTION_PHYSICAL)
 		return true;
 	if (event->injected == ERGOPTI_NAV_INJECTION_LOWER_INTEGRITY
-			|| !state->active_plan_valid
+			|| (!state->active_plan_valid && !state->profile_plan_valid)
 			|| !NavTryDecodeAhkSendLevel(event, &send_level))
 		return false;
-	for (index = 0; index < ERGOPTI_NAV_ROUTE_COUNT; ++index) {
-		if (send_level <= state->active_plan[index].input_level)
-			return false;
+	if (state->active_plan_valid) {
+		for (index = 0; index < ERGOPTI_NAV_ROUTE_COUNT; ++index) {
+			if (send_level <= state->active_plan[index].input_level)
+				return false;
+		}
+	}
+	if (state->profile_plan_valid) {
+		for (index = 0; index < ERGOPTI_NAV_PROFILE_ROUTE_COUNT; ++index) {
+			if (send_level <= state->profile_plan[index].input_level)
+				return false;
+		}
 	}
 	return true;
 }
@@ -2672,6 +2868,166 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetOwner(
 // ======= 7/ Public Receipt Lifecycle =======
 // =========================================
 // =========================================
+
+/** Implements ErgoptiNav_BeginProfileSwap. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginProfileSwap(
+	uint64_t expected_token,
+	const ErgoptiNav_Binding *bindings,
+	uint32_t binding_count,
+	const ErgoptiNav_ProfileOwner *next_owner,
+	uint64_t *out_ticket,
+	uint16_t *out_pending_mask)
+{
+	ErgoptiNav_Binding candidate[ERGOPTI_NAV_PROFILE_ROUTE_COUNT];
+	uint64_t generation;
+	uint64_t ticket;
+	uint16_t pending_mask;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (bindings == NULL
+			|| next_owner == NULL
+			|| out_ticket == NULL
+			|| out_pending_mask == NULL
+			|| binding_count != ERGOPTI_NAV_PROFILE_ROUTE_COUNT)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	memcpy(candidate, bindings, sizeof(candidate));
+	if (!NavProfilePlanIsValid(candidate) || !NavProfileOwnerIsValid(next_owner))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+
+	EnterCriticalSection(&g_nav_state.lock);
+	if (!g_nav_state.running
+			|| g_nav_state.startup_cancelled
+			|| g_nav_state.suspended
+			|| g_nav_state.draining) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_STATE;
+	}
+	if (g_nav_state.profile_transition) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_BUSY;
+	}
+	if (g_nav_state.profile_owner.token != expected_token) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	}
+	pending_mask = NavProfilePendingMaskLocked(&g_nav_state, expected_token);
+	ticket = NavNextIdentity(&g_nav_state.next_profile_swap_ticket);
+	generation = NavNextIdentity(&g_nav_state.next_profile_plan_generation);
+	memcpy(g_nav_state.staged_profile_plan, candidate, sizeof(candidate));
+	g_nav_state.staged_profile_owner = *next_owner;
+	g_nav_state.active_profile_swap_ticket = ticket;
+	g_nav_state.staged_profile_plan_generation = generation;
+	g_nav_state.profile_transition = 1;
+	LeaveCriticalSection(&g_nav_state.lock);
+	*out_ticket = ticket;
+	*out_pending_mask = pending_mask;
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements ErgoptiNav_CommitProfileSwap. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitProfileSwap(
+	uint64_t ticket)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (ticket == 0)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (!g_nav_state.profile_transition
+			|| g_nav_state.active_profile_swap_ticket != ticket) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_NOT_FOUND;
+	}
+	memcpy(
+		g_nav_state.profile_plan,
+		g_nav_state.staged_profile_plan,
+		sizeof(g_nav_state.profile_plan));
+	g_nav_state.profile_owner = g_nav_state.staged_profile_owner;
+	g_nav_state.profile_plan_generation =
+		g_nav_state.staged_profile_plan_generation;
+	g_nav_state.profile_plan_valid = 1;
+	memset(
+		g_nav_state.staged_profile_plan,
+		0,
+		sizeof(g_nav_state.staged_profile_plan));
+	memset(
+		&g_nav_state.staged_profile_owner,
+		0,
+		sizeof(g_nav_state.staged_profile_owner));
+	g_nav_state.active_profile_swap_ticket = 0;
+	g_nav_state.staged_profile_plan_generation = 0;
+	g_nav_state.profile_transition = 0;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements ErgoptiNav_AbortProfileSwap. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AbortProfileSwap(
+	uint64_t ticket)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (ticket == 0)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	if (!g_nav_state.profile_transition
+			|| g_nav_state.active_profile_swap_ticket != ticket) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_NOT_FOUND;
+	}
+	memset(
+		g_nav_state.staged_profile_plan,
+		0,
+		sizeof(g_nav_state.staged_profile_plan));
+	memset(
+		&g_nav_state.staged_profile_owner,
+		0,
+		sizeof(g_nav_state.staged_profile_owner));
+	g_nav_state.active_profile_swap_ticket = 0;
+	g_nav_state.staged_profile_plan_generation = 0;
+	g_nav_state.profile_transition = 0;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements ErgoptiNav_ProfilePendingMask. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ProfilePendingMask(
+	uint64_t owner_token,
+	uint16_t *out_pending_mask)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (owner_token == 0 || out_pending_mask == NULL)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	*out_pending_mask = NavProfilePendingMaskLocked(&g_nav_state, owner_token);
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements ErgoptiNav_CanStop. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CanStop(
+	uint8_t *out_can_stop)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (out_can_stop == NULL)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	*out_can_stop = NavDrainCompleteLocked(&g_nav_state) ? 1 : 0;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
 
 /** Implements ErgoptiNav_PollReceipt. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PollReceipt(

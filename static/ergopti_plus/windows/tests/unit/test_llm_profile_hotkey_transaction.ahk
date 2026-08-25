@@ -915,3 +915,25 @@ _LPHT_ProfileRangeRoutesExactlyOnce() {
 
 Test("[llm-profile-hotkeys] profile digits select or pass through exactly once",
 	_LPHT_ProfileRangeRoutesExactlyOnce)
+
+_LPHT_NativeOwnerDisarmsLegacyProfileCallbackCore() {
+	global _LLM_Menu_ProfileHotkeyOwner, _LPHT_Hotkeys
+	Status := _LPHT_ProfileBindSelectPort()
+	AssertTrue((Status is Integer) && Status == 1)
+	RegisteredSpec := _LPHT_RegisteredSpec("^6")
+	AssertTrue(_LPHT_Hotkeys.Has(RegisteredSpec))
+	Route := _LPHT_Hotkeys[RegisteredSpec]
+	_LLM_Menu_ProfileHotkeyOwner["native"] := true
+	AssertFalse(Route["predicate"].Call(RegisteredSpec),
+		"the native owner must make every legacy HotIf variant inert")
+	AssertFalse(Route["callback"].Call(RegisteredSpec),
+		"the legacy callback must not select after native ownership publishes")
+}
+
+_LPHT_NativeOwnerDisarmsLegacyProfileCallback() {
+	return _LPHT_WithFixture(
+		_LPHT_NativeOwnerDisarmsLegacyProfileCallbackCore)
+}
+
+Test("[llm-profile-hotkeys] native owner disarms legacy callback (ahk-029)",
+	_LPHT_NativeOwnerDisarmsLegacyProfileCallback)

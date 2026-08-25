@@ -564,6 +564,18 @@ Ergopti_OnShutdown(reason, code) {
 		; return to a fully functional gesture subsystem.
 		try GestureReleaseLeftClick()
 		try GestureReleaseRightClick()
+		NavOwnerReady := false
+		try NavOwnerReady := LLM_NavEventOwner_PrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Navigation-owner shutdown preflight failed: {1}.", Err.Message)
+		if !NavOwnerReady {
+			try LoggerError("Lifecycle", "Shutdown refused because native keyboard receipts or holds remain owned.")
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
+		ShutdownTerminal := false
+		try {
 		TerminalHandoff := ReloadTerminalHandoffClaim(reason)
 		RetainedTransition := (TerminalHandoff is Map)
 			? false : ConfigTransitionRetainedBarrier()
@@ -695,6 +707,7 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		ShutdownTerminal := true
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
 		try GestureScreenshotCancelAll("shutdown")
@@ -730,6 +743,10 @@ Ergopti_OnShutdown(reason, code) {
 		} finally {
 			if OwnShutdownBundle
 				try _ConfigWriteTerminalRelease(ShutdownOwners)
+		}
+		} finally {
+			if !ShutdownTerminal
+				try LLM_NavEventOwner_CancelShutdown()
 		}
 }
 ; Build the full tray menu off the boot critical path (armed after "ready").

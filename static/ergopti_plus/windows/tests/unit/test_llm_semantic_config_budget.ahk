@@ -132,6 +132,24 @@ Test("AHK2-18 semantic config: exact count and string boundaries remain accepted
 	. "(ahk2-18-semantic-config-budget)",
 	_LSCB_ValidBoundaryControlsRemainAccepted)
 
+_LSCB_UserProfilesCannotShadowBuiltinIds() {
+	for Id in ["raw", "basic", "advanced", "batch_advanced"] {
+		Profiles := [Map(
+			"id", Id, "label", "Shadow",
+			"raw_prompt", "prompt", "batch", false)]
+		AssertFalse(LLM_Option_TryNormalize(
+			"user_profiles", Profiles, &Normalized),
+			"a custom profile must not shadow built-in id '" . Id . "'")
+	}
+	AssertTrue(LLM_Option_TryNormalize("user_profiles", [Map(
+		"id", "custom", "label", "Custom",
+		"raw_prompt", "prompt", "batch", false)], &Normalized),
+		"a distinct custom profile id must remain accepted")
+}
+
+Test("LLM profile ids: custom profiles cannot shadow built-ins (ahk-029)",
+	_LSCB_UserProfilesCannotShadowBuiltinIds)
+
 _LSCB_OversizeNeverPublishesThroughRestoreOrEngine() {
 	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Engine,
 		LLM_OPTION_MAX_SCALAR_CHARS, LLM_OPTION_MAX_COLLECTION_ITEMS,

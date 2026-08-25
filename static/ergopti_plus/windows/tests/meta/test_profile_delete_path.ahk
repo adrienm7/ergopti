@@ -30,11 +30,19 @@ _TPD_Check() {
 	Assert(InStr(Candidate, 'Candidate["profile_id"] := "basic"') > 0,
 		"deleting the active profile must select a valid built-in fallback")
 	Assert(InStr(Publisher, "LLM_Menu_BindProfileHotkeys") == 0,
-		"fixed profile variants resolve live order and must not rebind post-commit")
+		"fixed profile variants must not rebind post-commit")
+	Transaction := _DriverFuncBody("_LLM_Menu_CommitMutationNonCritical")
 	Callback := _DriverFuncBody("_LLM_Menu_OnProfileHotkey")
-	Assert(Callback != ""
-		&& InStr(Callback, "LLM_Menu_GetHotkeyProfileOrder()") > 0,
-		"profile callbacks must resolve the committed order when they fire")
+	Assert(Transaction != "" && Callback != "",
+		"the menu transaction and legacy callback must remain reachable")
+	Assert(InStr(Transaction,
+		"_LLM_Menu_PrepareProfileOwnerCandidate(CandidateMenu)") > 0
+		&& InStr(Transaction,
+		"_LLM_Menu_CommitProfileOwnerCandidate(") > 0,
+		"profile CRUD must fence native admission before writing and publish it with RAM")
+	Assert(InStr(Callback, 'Get("native", false)') > 0
+		&& InStr(Callback, "return false") > 0,
+		"the legacy callback must remain inert after native profile ownership")
 }
 
 Test("LLMTray: profiles can be deleted", _TPD_Check)

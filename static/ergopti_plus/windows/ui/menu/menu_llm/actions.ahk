@@ -376,6 +376,11 @@ LLM_Menu_SetProfile(id) {
 }
 
 _LLM_Menu_SetProfileCandidate(Candidate, Id) {
+	if !(Candidate is Map) || !(Id is String) || Id == ""
+		return false
+	CandidateIds := _LLM_Menu_ProfileCandidateIds(Candidate)
+	if !(CandidateIds is Map) || !CandidateIds.Has(Id)
+		return false
 	; If the user picks a profile manually while auto-detection is on, they
 	; clearly want a non-default choice — turn auto off so the next model
 	; switch doesn't silently overwrite their pick. The recommended profile

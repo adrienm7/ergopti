@@ -37,8 +37,9 @@ extern "C" {
 // =================================
 // =================================
 
-#define ERGOPTI_NAV_ABI_VERSION 2u
+#define ERGOPTI_NAV_ABI_VERSION 3u
 #define ERGOPTI_NAV_ROUTE_COUNT 12u
+#define ERGOPTI_NAV_PROFILE_ROUTE_COUNT 9u
 #define ERGOPTI_NAV_MAX_SLOTS 10u
 #define ERGOPTI_NAV_RECEIPT_CAPACITY 64u
 #define ERGOPTI_NAV_NO_ROUTE 0xFFu
@@ -71,7 +72,8 @@ typedef enum ErgoptiNav_Axis {
 /** Route actions supported by the twelve-entry navigation plan. */
 typedef enum ErgoptiNav_Action {
 	ERGOPTI_NAV_ACTION_CYCLE = 1,
-	ERGOPTI_NAV_ACTION_JUMP = 2
+	ERGOPTI_NAV_ACTION_JUMP = 2,
+	ERGOPTI_NAV_ACTION_PROFILE_SELECT = 3
 } ErgoptiNav_Action;
 
 /** Generic AHK modifier bits expected in bindings and test events. */
@@ -166,6 +168,14 @@ typedef struct ErgoptiNav_Owner {
 	uint8_t require_index_match;
 	uint8_t reserved[5];
 } ErgoptiNav_Owner;
+
+/** Immutable profile-order owner published beside the fixed Ctrl+digit plan. */
+typedef struct ErgoptiNav_ProfileOwner {
+	uint64_t token;
+	uint64_t epoch;
+	uint8_t profile_count;
+	uint8_t reserved[7];
+} ErgoptiNav_ProfileOwner;
 
 /**
  * Carries one immutable semantic navigation commit to AutoHotkey.
@@ -265,6 +275,10 @@ ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_Owner, active_index) == 17, "Owner
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_Owner, require_index_match) == 18, "Owner index-match offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_Owner, reserved) == 19, "Owner reserved offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_Receipt) == 40, "Receipt ABI size changed.");
+ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_ProfileOwner) == 24, "Profile owner ABI size changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_ProfileOwner, token) == 0, "Profile owner token offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_ProfileOwner, epoch) == 8, "Profile owner epoch offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_ProfileOwner, profile_count) == 16, "Profile owner count offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_Receipt, sequence) == 0, "Receipt sequence offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_Receipt, owner_token) == 8, "Receipt token offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_Receipt, owner_epoch) == 16, "Receipt epoch offset changed.");
@@ -442,6 +456,32 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ClaimOwner(
  */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetOwner(
 	ErgoptiNav_Owner *out_owner);
+
+/** Fences profile admission and stages one exact order owner and fixed plan. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginProfileSwap(
+	uint64_t expected_token,
+	const ErgoptiNav_Binding *bindings,
+	uint32_t binding_count,
+	const ErgoptiNav_ProfileOwner *next_owner,
+	uint64_t *out_ticket,
+	uint16_t *out_pending_mask);
+
+/** Publishes a profile owner staged by ErgoptiNav_BeginProfileSwap. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitProfileSwap(
+	uint64_t ticket);
+
+/** Aborts a staged profile owner and restores fail-open admission. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AbortProfileSwap(
+	uint64_t ticket);
+
+/** Returns pending target bits for one retained profile-owner token. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ProfilePendingMask(
+	uint64_t owner_token,
+	uint16_t *out_pending_mask);
+
+/** Reports whether Stop can unhook without losing any suppressed input debt. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CanStop(
+	uint8_t *out_can_stop);
 
 
 
