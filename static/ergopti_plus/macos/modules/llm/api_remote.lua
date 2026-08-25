@@ -1585,15 +1585,20 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local initial_request_id     = type(request_id_provider) == "function" and request_id_provider() or nil
 	local initial_identity       = _identity_generation
 
-	local function do_next()
-		if initial_identity ~= _identity_generation then return end
+	local function request_is_current()
+		if initial_identity ~= _identity_generation then return false end
 		if type(request_id_provider) == "function" then
 			local cur = request_id_provider()
 			if initial_request_id ~= nil and cur ~= initial_request_id then
 				Logger.debug(LOG, "Sequential batch cancelled (id changed).")
-				return
+				return false
 			end
 		end
+		return true
+	end
+
+	local function do_next()
+		if not request_is_current() then return end
 		if #results >= requested_predictions or attempt_index > max_attempts then
 			if #results == 0 then
 				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -1610,6 +1615,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		local primary_tokens = tonumber(max_predict)
 
 		local function request_variant(attempt, tokens, temp)
+			if not request_is_current() then return end
 			post_and_parse(model_name, system_prompt, full_text, tail_text,
 				temp, tokens, 1, false,
 				function(preds)
