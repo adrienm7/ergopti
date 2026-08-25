@@ -187,6 +187,35 @@ LLM_Option_TryNormalizeOllamaPort(Value, &Normalized) {
 	return true
 }
 
+LLM_Option_TryNormalizeTemperature(Value, &Normalized) {
+	Normalized := false
+	if Value is String {
+		; Only unsigned ordinary decimal notation is a stable configuration
+		; image. IsNumber also accepts hexadecimal, exponent, sign and surrounding
+		; whitespace, which changes meaning when persistence rewrites the value.
+		if !RegExMatch(Value, "^(?:0|1|2)(?:\.\d{1,2})?$")
+			return false
+		try Candidate := Float(Value)
+		catch
+			return false
+	} else if (Value is Integer) || (Value is Float) {
+		try Candidate := Value + 0.0
+		catch
+			return false
+	} else {
+		return false
+	}
+	; This comparison also rejects non-finite/NaN candidates because they cannot
+	; satisfy both ordered bounds.
+	if !(Candidate >= 0.0 && Candidate <= 2.0)
+		return false
+	Rounded := Round(Candidate, 2)
+	if Abs(Candidate - Rounded) > 0.0000000001
+		return false
+	Normalized := Format("{:.2f}", Rounded)
+	return true
+}
+
 /**
  * Validates and normalizes one public LLM option. Unknown keys fail closed so
  * every caller must consciously extend this schema when it adds a new option.
@@ -213,20 +242,8 @@ LLM_Option_TryNormalize(Key, Value, &Normalized) {
 		Normalized := Value
 		return true
 	}
-	if (Key == "temperature") {
-		if (Value is String) {
-			if !IsNumber(Value)
-				return false
-			Normalized := Value
-			return true
-		}
-		if !(Value is Integer) && !(Value is Float)
-			return false
-		try Normalized := Format("{:.17g}", Value + 0.0)
-		catch
-			return false
-		return true
-	}
+	if (Key == "temperature")
+		return LLM_Option_TryNormalizeTemperature(Value, &Normalized)
 	if (Key == "nav_modifiers" || Key == "val_modifiers") {
 		Normalized := LLM_Option_NormalizeModifierString(Value)
 		return Normalized is String
