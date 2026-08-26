@@ -5,8 +5,8 @@
 
 	const branch = branchForInstall();
 
-	// Commande bash d'installation : pointe vers le bon branch selon le contexte
-	const cmd = `branch="${branch}"; curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/$branch/static/ergopti/linux/xkb_installation/install.sh" | BRANCH="$branch" bash`;
+	// Keep the copy-paste command valid in POSIX shells and fish.
+	const cmd = `curl -fsSL "https://raw.githubusercontent.com/adrienm7/ergopti/${branch}/static/ergopti/linux/xkb_installation/install.sh" | env BRANCH="${branch}" bash`;
 	const uninstallCmd = `${cmd} -s -- --uninstall --yes`;
 </script>
 
@@ -130,7 +130,6 @@
 		<code>setxkbmap</code> et de purger le cache XKB pour une application immédiate des changements.
 	</li>
 </ul>
-
 <h4>Méthode Legacy (compatibilité)</h4>
 <p>Voici un résumé de ce que réalise l'installateur Legacy :</p>
 <ul>

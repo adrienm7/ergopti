@@ -467,6 +467,18 @@ if (!layoutInstallMarkup.includes('{uninstallCmd}')) {
 		`${LAYOUT_INSTALL_PAGE}: the uninstall command must be rendered as a Svelte expression.`
 	);
 }
+if (!layoutInstallPageSrc.includes('| env BRANCH="${branch}" bash`')) {
+	errors.push(
+		`${LAYOUT_INSTALL_PAGE}: the copy-paste command must pass BRANCH through env so it works ` +
+			`in fish as well as POSIX shells.`
+	);
+}
+if (/branch="\$\{branch\}";/.test(layoutInstallPageSrc) || /\$branch/.test(layoutInstallPageSrc)) {
+	errors.push(
+		`${LAYOUT_INSTALL_PAGE}: the copy-paste command must not rely on a shell-local branch ` +
+			`assignment or expansion.`
+	);
+}
 if (layoutInstallMarkup.includes('${branch}')) {
 	errors.push(
 		`${LAYOUT_INSTALL_PAGE}: contains a literal \${branch} in markup; Svelte will not interpolate it.`
