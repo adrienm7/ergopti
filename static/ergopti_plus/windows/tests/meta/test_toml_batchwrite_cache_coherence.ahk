@@ -4,7 +4,7 @@
 ; MODULE: TOML BatchWrite Cache Coherence Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "toml-batchwrite-cache-mutation" finding.
-; TOML_BatchWrite must deep-copy the cached Map before mutating it, and must
+; TOML_BatchWrite must deep-copy the parsed Map before mutating it, and must
 ; invalidate the cache on every failure return path, not only on success.
 ; =============================================================================
 
@@ -36,14 +36,15 @@ _TBCC_DeepCopyPresent() {
 		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
 		"the public writer must delegate to the implementation whose cache isolation is checked below")
 
-	; The cached Map must be cloned before any mutation so that a write failure
-	; cannot leave stale un-persisted values in the in-memory cache.
-	Assert(InStr(Seg, "Cached.Clone()") > 0,
-		"TOML_BatchWrite must Clone() the cached Map before mutating it (F37)")
+	; The parsed Map must be cloned before any mutation so that candidate
+	; rendering and publication cannot mutate their source snapshot.
+	Assert(RegExMatch(Seg,
+		"Sections\s*:=\s*[A-Za-z_][A-Za-z0-9_]*\.Clone\(\)") > 0,
+		"TOML_BatchWrite must Clone() the parsed Map before mutating it (F37)")
 	Assert(InStr(Seg, "Sections[sec].Clone()") > 0,
 		"TOML_BatchWrite must Clone() each section Map before mutating it (F37)")
 }
-Test("toml_helpers: TOML_BatchWrite deep-copies cached Map before mutation", _TBCC_DeepCopyPresent)
+Test("toml_helpers: TOML_BatchWrite deep-copies parsed Map before mutation", _TBCC_DeepCopyPresent)
 
 
 _TBCC_FailurePathsInvalidateCache() {
