@@ -104,6 +104,11 @@ local _ingest_timer_committed = false
 --- timer/database has been released. No later init may publish over that debt.
 local _init_cleanup_pending = false
 
+--- Last foreign-sync failure already surfaced by the log-manager boundary.
+--- Repeated ingest ticks retain the retry without alternating two ERROR lines
+--- with infra.fs_dir's own diagnostic; a changed failure is reported again.
+local _foreign_sync_error_key = nil
+
 --- Registered post-ingest listeners — called after every successful ingest cycle.
 --- Each entry is a function(); errors are swallowed so one broken listener cannot
 --- prevent the others from firing. Register via M.on_ingest_done().
@@ -1222,6 +1227,29 @@ local function _flush_local_data_sql_outbox(db)
 	return _clear_local_outbox(db)
 end
 
+--- Runs foreign ledger sync behind one checked boundary for ingest and startup.
+---@param on_applied fun(device_id:string):boolean|nil|nil
+---@return string[] synced_devices
+local function _sync_foreign_data_sql(on_applied)
+	local call_ok, result_or_err, detail = xpcall(function()
+		return Export.sync_foreign_data_sql(on_applied)
+	end, debug.traceback)
+	if call_ok and type(result_or_err) == "table" then
+		_foreign_sync_error_key = nil
+		return result_or_err
+	end
+
+	local failure_kind = call_ok and "did not commit" or "raised"
+	local failure_detail = call_ok and detail or result_or_err
+	local error_key = failure_kind .. ":" .. tostring(failure_detail)
+	if _foreign_sync_error_key ~= error_key then
+		Logger.error(LOG, "Foreign data.sql sync %s: %s.",
+			failure_kind, tostring(failure_detail))
+		_foreign_sync_error_key = error_key
+	end
+	return {}
+end
+
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
@@ -1232,12 +1260,10 @@ function M.ingest_once()
 	local db = SqliteWriter.get_db()
 	if not db then return end
 
-	local foreign_devices = {}
-	local foreign_ok, foreign_result = pcall(Export.sync_foreign_data_sql, function(device_id)
+	local foreign_devices = _sync_foreign_data_sql(function(device_id)
 		if not _rebuild_aggregates_from_raw(db, { device_id }) then return false end
 		return _mark_aggregate_cache_rebuilt(db)
 	end)
-	if foreign_ok and type(foreign_result) == "table" then foreign_devices = foreign_result end
 	-- A previous cache transaction may have committed while data.sql was locked.
 	-- Drain that exact source batch first so a tmp-cache loss can never make it
 	-- invisible to sync/replay, and so we never allocate new ids for old JSONL.
@@ -1688,7 +1714,7 @@ local function _init(core_state)
 			-- Foreign ledgers also carry raw rows only. Import them before the
 			-- deterministic aggregate walk so cross-device totals survive a normal
 			-- TMPDIR purge and older caches gain the missing foreign aggregates.
-			pcall(Export.sync_foreign_data_sql)
+			_sync_foreign_data_sql()
 			if _rebuild_aggregates_from_raw(db) then
 				if recovery_cursor then _persist_recovery_state(db, recovery_cursor) end
 				if _mark_aggregate_cache_rebuilt(db) then
