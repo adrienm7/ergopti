@@ -23,10 +23,10 @@
 local M = {}
 local hs        = hs
 local Logger    = require("infra.logger")
+local Notifications = require("infra.notifications")
 local DeferredWork = require("infra.deferred_work")
 local text_utils = require("infra.text_utils")
 local i18n      = require("infra.i18n")
-local dialog    = require("infra.dialog_util")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
 local ManifestMenu = require("infra.manifest_menu")
@@ -119,6 +119,25 @@ local function get_update_menu_label()
 	return Updater.get_update_menu_label()
 end
 
+--- Surfaces an update outcome without entering a nested modal run loop.
+--- Notification refusal remains diagnostic-only so the updater owner can still
+--- settle and the menu never stays wedged in checking/installing state.
+--- @param title string Localised notification title.
+--- @param message string Localised notification body.
+--- @param kind string Notification severity.
+--- @return boolean dispatched
+local function notify_update(title, message, kind)
+	local call_ok, dispatched, detail = xpcall(function()
+		return Notifications.notify(title, message, kind)
+	end, debug.traceback)
+	if not call_ok or dispatched ~= true then
+		Logger.warn(LOG, "Update notification could not be dispatched: %s.",
+			tostring(call_ok and detail or dispatched))
+		return false
+	end
+	return true
+end
+
 --- Settles one exact install owner and refreshes the menu on success.
 --- @param install_token table Exact token returned by Updater.begin_install.
 --- @param next_state string Terminal updater state.
@@ -198,7 +217,8 @@ local function replace_and_reload(zip_path, update_menu_fn, install_token)
 	local target = app_bundle_path()
 	if not target then
 		Logger.error(LOG, "Cannot determine .app bundle path — aborting install.")
-		dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+		notify_update(i18n.get("common.error_title"),
+			i18n.get("menu.about.update.install_error"), "error")
 		settle_install(install_token, "idle", update_menu_fn)
 		return
 	end
@@ -231,7 +251,8 @@ local function replace_and_reload(zip_path, update_menu_fn, install_token)
 		end
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
-			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.error_title"),
+				i18n.get("menu.about.update.install_error"), "error")
 			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
@@ -240,7 +261,8 @@ local function replace_and_reload(zip_path, update_menu_fn, install_token)
 		local ok_attr = hs.fs.attributes(new_app)
 		if not ok_attr then
 			Logger.error(LOG, "Unzipped archive does not contain ErgoptiPlus.app at %s.", new_app)
-			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.error_title"),
+				i18n.get("menu.about.update.install_error"), "error")
 			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
@@ -253,7 +275,8 @@ local function replace_and_reload(zip_path, update_menu_fn, install_token)
 		local ok_bak = os.rename(target, backup_app)
 		if not ok_bak then
 			Logger.error(LOG, "Could not move current .app to backup at %s.", backup_app)
-			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.error_title"),
+				i18n.get("menu.about.update.install_error"), "error")
 			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
@@ -269,7 +292,8 @@ local function replace_and_reload(zip_path, update_menu_fn, install_token)
 				Logger.error(LOG, "Could not move new .app to %s AND restore failed — the previous app is at %s.",
 					target, backup_app)
 			end
-			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.error_title"),
+				i18n.get("menu.about.update.install_error"), "error")
 			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
@@ -326,7 +350,7 @@ local function one_click_update(channel, update_menu_fn)
 				return
 			end
 			if not ok then
-				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
+				notify_update(i18n.get("common.error_title"), err, "error")
 				settle_install(install_token, "available", update_menu_fn)
 				return
 			end
@@ -345,7 +369,8 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.warn(LOG, "One-click check: network unreachable (HTTP %d).", status)
 			Updater.set_update_state("idle")
 			update_menu_fn()
-			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.network_error"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.warning"),
+				i18n.get("menu.about.update.network_error"), "warning")
 			return
 		end
 		if channel == "dev" and body:match("^%s*%[") then
@@ -356,7 +381,8 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.warn(LOG, "One-click check: tag parse failed.")
 			Updater.set_update_state("idle")
 			update_menu_fn()
-			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.parse_error"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.warning"),
+				i18n.get("menu.about.update.parse_error"), "warning")
 			return
 		end
 		if not Updater.is_newer_version(latest, current) then
@@ -364,7 +390,7 @@ local function one_click_update(channel, update_menu_fn)
 			Updater.set_update_state("idle")
 			update_menu_fn()
 			local msg = i18n.get("menu.about.update.up_to_date"):gsub("{version}", text_utils.escape_gsub_replacement(current))
-			dialog.block_alert(i18n.get("menu.about.changelog"), msg, i18n.get("button.ok"))
+			notify_update(i18n.get("menu.about.changelog"), msg, "success")
 			return
 		end
 
@@ -374,7 +400,8 @@ local function one_click_update(channel, update_menu_fn)
 				ASSET_NAME, latest, tostring(asset_error))
 			Updater.set_update_state("idle")
 			update_menu_fn()
-			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.warning"),
+				i18n.get("menu.about.update.no_asset"), "warning")
 			return
 		end
 
@@ -384,7 +411,8 @@ local function one_click_update(channel, update_menu_fn)
 			Logger.error(LOG, "One-click check: validated release could not be cached.")
 			Updater.set_update_state("idle")
 			update_menu_fn()
-			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
+			notify_update(i18n.get("common.warning"),
+				i18n.get("menu.about.update.no_asset"), "warning")
 			return
 		end
 		local install_token = Updater.begin_install()
@@ -398,7 +426,7 @@ local function one_click_update(channel, update_menu_fn)
 				return
 			end
 			if not ok then
-				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
+				notify_update(i18n.get("common.error_title"), err, "error")
 				settle_install(install_token, "available", update_menu_fn)
 				return
 			end

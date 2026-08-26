@@ -38,6 +38,7 @@ local function run_cached_update(opts)
 		install_tasks = 0,
 		started_tasks = 0,
 		alerts = 0,
+		notifications = {},
 		menu_updates = 0,
 	}
 	local update_state = "available"
@@ -79,6 +80,20 @@ local function run_cached_update(opts)
 	}
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() observed.alerts = observed.alerts + 1 end,
+	}
+	package.loaded["infra.notifications"] = {
+		notify = function(title, body, kind)
+			observed.notifications[#observed.notifications + 1] = {
+				title = title,
+				body = body,
+				kind = kind,
+			}
+			if opts.notification_throw then error("notification sentinel") end
+			if opts.notification_result ~= nil then
+				return opts.notification_result, "notification refusal"
+			end
+			return true
+		end,
 	}
 	package.loaded["ui.changelog"] = { open = function() end }
 	package.loaded["infra.manifest_menu"] = {
@@ -137,6 +152,20 @@ end
 
 
 helpers.describe("menu_about: self-update archive integrity", function()
+	helpers.it("keeps HTTP and task completion paths free of blocking modals", function()
+		local source = helpers.read_driver_source("local function get_update_menu_label")
+		helpers.assert_not_nil(source,
+			"the production update-flow source must be discoverable")
+		helpers.assert_true(source:find("hs.http.asyncGet", 1, true) ~= nil,
+			"the source guard must still cover the native HTTP completion boundary")
+		helpers.assert_true(source:find("TaskLifecycle.native", 1, true) ~= nil,
+			"the source guard must still cover the native task completion boundary")
+		helpers.assert_nil(source:find("block_alert", 1, true),
+			"an async update completion must never enter a nested modal run loop")
+		helpers.assert_true(source:find("local function notify_update", 1, true) ~= nil,
+			"the async outcome must retain a non-blocking user-visible surface")
+	end)
+
 	helpers.it("refuses unsafe cached metadata before dispatching a download", function()
 		local result = run_cached_update({
 			cached = { tag = TAG, zip_url = "https://evil.test/archive.zip", sha256 = DIGEST },
@@ -149,6 +178,11 @@ helpers.describe("menu_about: self-update archive integrity", function()
 		helpers.assert_eq(result.writes, 0)
 		helpers.assert_eq(result.install_tasks, 0)
 		helpers.assert_eq(result.state, "available")
+		helpers.assert_eq(result.alerts, 0,
+			"metadata refusal must never open a modal from the update action")
+		helpers.assert_eq(#result.notifications, 1,
+			"metadata refusal must remain visible through one non-blocking notification")
+		helpers.assert_eq(result.notifications[1].kind, "error")
 	end)
 
 	helpers.it("rejects a digest mismatch before writing or unzipping the archive", function()
@@ -164,6 +198,28 @@ helpers.describe("menu_about: self-update archive integrity", function()
 		helpers.assert_eq(result.writes, 0)
 		helpers.assert_eq(result.install_tasks, 0)
 		helpers.assert_eq(result.state, "available")
+		helpers.assert_eq(result.alerts, 0,
+			"digest failure inside asyncGet must never park the main run loop")
+		helpers.assert_eq(#result.notifications, 1,
+			"digest failure must remain visible without a modal")
+		helpers.assert_eq(result.notifications[1].kind, "error")
+	end)
+
+	helpers.it("settles the updater even when non-blocking notification raises", function()
+		local result = run_cached_update({
+			cached = { tag = TAG, zip_url = "https://evil.test/archive.zip", sha256 = DIGEST },
+			metadata_valid = false,
+			body = "archive",
+			actual_digest = DIGEST,
+			notification_throw = true,
+		})
+
+		helpers.assert_eq(result.state, "available",
+			"notification failure must not strand the exact install owner")
+		helpers.assert_eq(result.alerts, 0,
+			"notification failure must never fall back to a modal")
+		helpers.assert_eq(#result.notifications, 1,
+			"the non-blocking notification boundary must be attempted exactly once")
 	end)
 
 	helpers.it("writes and starts installation only after the digest matches", function()
@@ -180,5 +236,8 @@ helpers.describe("menu_about: self-update archive integrity", function()
 		helpers.assert_eq(result.written_body, body)
 		helpers.assert_eq(result.install_tasks, 1)
 		helpers.assert_eq(result.started_tasks, 1)
+		helpers.assert_eq(result.alerts, 0)
+		helpers.assert_eq(#result.notifications, 0,
+			"a successful verified dispatch must not emit a failure notification")
 	end)
 end)
