@@ -578,8 +578,11 @@ _LLM_Menu_PromptDeleteCachedModel(name) {
 	if (choice != "Yes")
 		return
 	Owner := _LLM_Menu_BeginOllamaAux("menu_delete:" . tag, tag)
+	_LLM_Menu_RecordDeleteReconcile(Owner, name, tag)
 	try LLM_OllamaDeleteModel_Async(tag,
 		(ok) => _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok, Owner), 0, Owner)
-	catch
+	catch {
+		_LLM_Menu_ClearDeleteReconcile(Owner)
 		LLM_AuxFinish(Owner)
+	}
 }
