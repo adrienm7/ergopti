@@ -424,6 +424,36 @@ local function classify_source(prefs_file)
 	return nil
 end
 
+--- Compares two exact source classifications.
+--- @param left table|nil First source snapshot.
+--- @param right table|nil Second source snapshot.
+--- @return boolean equal Whether both snapshots describe the same bytes/state.
+local function same_source(left, right)
+	return type(left) == "table"
+		and type(right) == "table"
+		and left.status == right.status
+		and (left.status ~= "ok" or left.content == right.content)
+end
+
+--- Adopts a demonstrably changed, valid external source as the baseline for a
+--- later explicit save. The rejected candidate never overwrites the external
+--- winner; malformed or unreadable bytes never become overwrite authority.
+--- @param prefs_file string Destination path.
+--- @param expected_source table Snapshot used by the rejected publication.
+--- @return boolean adopted Whether the exact external source became the baseline.
+local function adopt_changed_source(prefs_file, expected_source)
+	local current_source = classify_source(prefs_file)
+	if type(current_source) ~= "table" or same_source(expected_source, current_source) then
+		return false
+	end
+	if current_source.status == "ok" then
+		local decode_ok, decoded = pcall(TomlCodec.decode, current_source.content)
+		if not decode_ok or type(decoded) ~= "table" then return false end
+	end
+	_source_snapshots[prefs_file] = current_source
+	return true
+end
+
 --- Load preferences from the TOML configuration file and normalise
 --- it to the flat dict the rest of the codebase expects.
 --- @param prefs_file string Path to <config_dir>/hammerspoon/config.toml.
@@ -592,8 +622,13 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		expected_source
 	)
 	if not write_ok or written ~= true then
-		Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved.",
-			tostring(prefs_file))
+		if adopt_changed_source(prefs_file, expected_source) then
+			Logger.warn(LOG, "Preferences changed externally; the stale save was refused. "
+				.. "Review the external edit, then repeat the setting change to save it.")
+		else
+			Logger.error(LOG, "Cannot atomically replace '%s' — settings NOT saved.",
+				tostring(prefs_file))
+		end
 		return false
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
