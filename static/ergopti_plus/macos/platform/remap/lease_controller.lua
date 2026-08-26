@@ -41,6 +41,7 @@ local HEARTBEAT_INTERVAL_SEC = 5 -- Bounds Core Service reset recovery without a
 local HEARTBEAT_RETRY_SEC = 1.0
 local MAX_CONSECUTIVE_HEARTBEAT_FAILURES = 2
 local FALLBACK_RETRY_SEC = 1.0
+local FALLBACK_MAX_ATTEMPTS = 3
 local TOKEN_ALLOCATION_ATTEMPTS = 8
 local MAX_PROTOCOL_BUFFER_BYTES = 64
 local MAX_PING_SEQUENCE = 2147483647
@@ -328,14 +329,22 @@ end
 local function create_stop_barrier(on_done)
 	local pending = {}
 	local remaining = 0
+	local terminal_reason = nil
 	for token, generation in pairs(_state.retiring) do
 		if not generation.safe then
-			pending[token] = true
-			remaining = remaining + 1
+			if generation.fallback_exhausted then
+				terminal_reason = terminal_reason
+					or generation.fallback_exhausted_reason
+					or "fallback-retry-exhausted"
+			else
+				pending[token] = true
+				remaining = remaining + 1
+			end
 		end
 	end
 	if remaining == 0 then
-		invoke_callback("lease.stop", on_done, true, "already-stopped")
+		invoke_callback("lease.stop", on_done, terminal_reason == nil,
+			terminal_reason or "already-stopped")
 		return nil
 	end
 	local callbacks = {}
@@ -343,8 +352,8 @@ local function create_stop_barrier(on_done)
 	local barrier = {
 		pending = pending,
 		remaining = remaining,
-		ok = true,
-		reason = "stopped",
+		ok = terminal_reason == nil,
+		reason = terminal_reason or "stopped",
 		callbacks = callbacks,
 	}
 	_state.stop_barriers[#_state.stop_barriers + 1] = barrier
@@ -441,6 +450,25 @@ local function spawn_current_helper(arguments, on_done, on_chunk)
 	return ShellRunner.spawn(helper_path, arguments, on_done, on_chunk), nil
 end
 
+--- Settles every logical operation retained by one failed generation.
+--- The caller must publish its complete terminal state before invoking this
+--- helper because callbacks may immediately re-enter the controller.
+--- @param generation table Failed generation whose callbacks must settle.
+local function settle_generation_failure_callbacks(generation)
+	if not generation.failure_reason then return end
+	settle_callbacks("lease.start", generation.start_callbacks, false, generation.failure_reason)
+	if generation.command then
+		settle_callbacks("lease.command", generation.command.callbacks,
+			false, generation.failure_reason)
+		generation.command = nil
+	end
+	if generation.queued_command then
+		settle_callbacks("lease.command", generation.queued_command.callbacks,
+			false, generation.failure_reason)
+		generation.queued_command = nil
+	end
+end
+
 --- Publishes one exact-generation fence completion to every overlapping stop
 --- operation. A successful fallback is degraded but satisfies the caller's
 --- desired stopped state, so aggregate stop callbacks report true only after
@@ -479,19 +507,7 @@ local function mark_generation_safe(generation, protocol_ok, reason)
 		if phase == "idle" then published_token = nil end
 		invoke_callback("lease.phase", _state.phase_listener, phase, published_token)
 	end
-	if generation.failure_reason then
-		settle_callbacks("lease.start", generation.start_callbacks, false, generation.failure_reason)
-		if generation.command then
-			settle_callbacks("lease.command", generation.command.callbacks,
-				false, generation.failure_reason)
-			generation.command = nil
-		end
-		if generation.queued_command then
-			settle_callbacks("lease.command", generation.queued_command.callbacks,
-				false, generation.failure_reason)
-			generation.queued_command = nil
-		end
-	end
+	settle_generation_failure_callbacks(generation)
 	for index = 1, #ready_barriers do settle_stop_barrier(ready_barriers[index]) end
 end
 
@@ -571,6 +587,37 @@ end
 
 local fallback_revoke
 
+--- Terminates one bounded fallback series without claiming native safety.
+--- Exact Karabiner variables remain fenced, but logical callers receive a
+--- stable degraded result instead of waiting forever for an unavailable tool.
+--- @param generation table Generation whose revocation could not be proven.
+--- @param reason string Stable terminal reason.
+local function terminalize_fallback_failure(generation, reason)
+	if generation.safe or generation.fallback_exhausted then return end
+	release_generation_timer(generation, "fallback_retry_timer", "Lease fallback retry timer")
+	generation.fallback_started = false
+	generation.fallback_exhausted = true
+	generation.fallback_exhausted_reason = reason
+
+	local ready_barriers = {}
+	for index = #_state.stop_barriers, 1, -1 do
+		local barrier = _state.stop_barriers[index]
+		if barrier.pending[generation.token] then
+			barrier.pending[generation.token] = nil
+			barrier.remaining = barrier.remaining - 1
+			barrier.ok = false
+			barrier.reason = reason
+			if barrier.remaining == 0 then ready_barriers[#ready_barriers + 1] = barrier end
+		end
+	end
+	Logger.error(LOG,
+		"Fallback revocation for Karabiner lease %s stopped after %d attempt(s) (%s); variables remain fenced.",
+		generation.token, generation.fallback_attempts or 0, reason)
+	settle_generation_failure_callbacks(generation)
+	settle_callbacks("fallback_revoke", generation.fallback_callbacks, false, reason)
+	for index = 1, #ready_barriers do settle_stop_barrier(ready_barriers[index]) end
+end
+
 --- Retries a failed helper launch without a synchronous spin on the HS runloop.
 --- Once the detached helper launches, it owns all per-attempt timeouts and
 --- retries independently of Hammerspoon's lifetime.
@@ -600,20 +647,19 @@ local function schedule_fallback_retry(generation, reason)
 		generation.fallback_started = false
 		Logger.error(LOG, "Could not schedule fallback helper retry for lease %s: %s.",
 			generation.token, tostring(schedule_ok and "invalid handle" or timer_or_err))
-		-- Do not settle any stop caller: without a successful fence, reporting a
-		-- result would permit teardown to outrun a late generation writer.
+		terminalize_fallback_failure(generation, "fallback-retry-unavailable")
 		return false
 	end
 	armed = true
 	return true
 end
 
---- Revokes one captured generation through a detached retrying helper.
+--- Revokes one captured generation through a bounded detached helper series.
 ---
 --- This is intentionally redundant with the retained native guardian. It covers
 --- an outer helper killed by SIGKILL while Hammerspoon remains alive. Each
---- native CLI writer is bounded, while the helper retries
---- transient failures until exact revocation succeeds even if HS then exits.
+--- native CLI writer is bounded, while Hammerspoon retries transient launch
+--- failures at most FALLBACK_MAX_ATTEMPTS times before retaining a loud fence.
 --- Captured variable names make it harmless to any newer generation.
 --- @param generation table Generation to revoke.
 --- @param reason string Diagnostic reason.
@@ -627,13 +673,27 @@ fallback_revoke = function(generation, reason, on_done)
 		settle_callbacks("fallback_revoke", generation.fallback_callbacks, true, "fallback-revoked")
 		return
 	end
+	if generation.fallback_exhausted then
+		settle_callbacks("fallback_revoke", generation.fallback_callbacks, false,
+			generation.fallback_exhausted_reason or "fallback-retry-exhausted")
+		return
+	end
 	if generation.fallback_started then return end
 	generation.fallback_started = true
+	generation.fallback_attempts = (generation.fallback_attempts or 0) + 1
 	Logger.warn(LOG, "Starting detached fallback revoker for lease %s (%s).",
 		generation.token, tostring(reason))
+	local function retry_or_exhaust()
+		if generation.fallback_attempts >= FALLBACK_MAX_ATTEMPTS then
+			terminalize_fallback_failure(generation, "fallback-retry-exhausted")
+			return
+		end
+		schedule_fallback_retry(generation, reason)
+	end
 	local handle, helper_error = spawn_current_helper(
 		{ REVOKE_FLAG, KePaths.CLI, generation.mode, generation.revoked },
 		function(exit_code, _stdout, stderr)
+			if generation.safe or generation.fallback_exhausted then return end
 			local revoked = exit_code == 0
 			if revoked then
 				generation.fallback_revoked = true
@@ -644,14 +704,14 @@ fallback_revoke = function(generation, reason, on_done)
 			else
 				Logger.error(LOG, "Detached fallback exited before revoking lease %s (exit %s): %s",
 					generation.token, tostring(exit_code), tostring(stderr))
-				schedule_fallback_retry(generation, reason)
+				retry_or_exhaust()
 			end
 		end
 	)
 	if not handle then
 		Logger.error(LOG, "Cannot launch native fallback revoker for lease %s: %s",
 			generation.token, tostring(helper_error or "task construction failed"))
-		schedule_fallback_retry(generation, reason)
+		retry_or_exhaust()
 		return
 	end
 	local start_ok, started = false, false
@@ -661,7 +721,7 @@ fallback_revoke = function(generation, reason, on_done)
 	if not start_ok or not started then
 		Logger.error(LOG, "Could not launch detached fallback revoker for lease %s; retrying.",
 			generation.token)
-		schedule_fallback_retry(generation, reason)
+		retry_or_exhaust()
 	end
 end
 
@@ -1780,6 +1840,9 @@ function M.status()
 		token = generation and generation.token or nil,
 		mode = generation and generation.mode or nil,
 		revoked = generation and generation.revoked or nil,
+		fallback_attempts = generation and generation.fallback_attempts or nil,
+		fallback_exhausted = generation and generation.fallback_exhausted == true or false,
+		fallback_exhausted_reason = generation and generation.fallback_exhausted_reason or nil,
 		activation_blocked = generation ~= nil and (
 			generation.latest_intent_kind == "pause"
 			or (generation.reconciling_command
