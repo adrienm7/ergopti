@@ -643,11 +643,11 @@ local function reserve_staging_area(real_path)
 	)
 end
 
---- Removes an adapter-owned transaction sidecar.
---- @param path string Sidecar path.
+--- Removes a pathname or accepts authoritative absence after a concurrent delete.
+--- @param path string Pathname to remove.
 --- @return boolean removed_or_absent
 --- @return string|nil error_message
-local function remove_owned_sidecar(path)
+local function remove_path_or_absent(path)
 	local call_ok, removed, remove_err, remove_code = pcall(os.remove, path)
 	if call_ok and removed == true then return true end
 	if call_ok and remove_code == ENOENT_ERROR_CODE then return true end
@@ -669,7 +669,7 @@ end
 local function release_staging_area(area, payload_published)
 	if type(area) ~= "table" then return true end
 	if payload_published ~= true then
-		local payload_removed, payload_err = remove_owned_sidecar(area.payload_path)
+		local payload_removed, payload_err = remove_path_or_absent(area.payload_path)
 		if not payload_removed then return false, payload_err end
 	end
 	if not hs or not hs.fs or type(hs.fs.rmdir) ~= "function" then
@@ -1414,9 +1414,9 @@ function M.delete(path)
 	-- Already absent — contract says this is a no-op success
 	if not M.exists(path) then return true end
 
-	local ok, result = pcall(os.remove, path)
-	if not ok or not result then
-		Logger.error(LOG, "delete(): os.remove failed for '%s' — %s", path, tostring(result))
+	local removed, remove_err = remove_path_or_absent(path)
+	if not removed then
+		Logger.error(LOG, "delete(): os.remove failed for '%s' — %s.", path, tostring(remove_err))
 		return false
 	end
 	return true
