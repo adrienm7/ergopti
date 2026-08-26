@@ -14,6 +14,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local EventProvenance = require("adapters.event_provenance")
+local KeyState = require("adapters.key_state")
 local SyntheticInput = require("adapters.synthetic_input")
 local Keycodes = require("infra.keycodes")
 local LOG = "tooltip_llm"
@@ -621,7 +622,15 @@ local function start_watchers()
 		return false, fence_events
 	end)
 	if ok_flags then
-		if not activate_watcher(watcher_flags, "modifier") then activation_ok = false end
+		if not activate_watcher(watcher_flags, "modifier") then
+			activation_ok = false
+		else
+			-- A Shift key may already be held before the tooltip paints, in which
+			-- case no flagsChanged event belongs to this watcher session. Sample the
+			-- live device-side state after activation so the first Shift-Tab follows
+			-- the same direction advertised by the footer.
+			_shift_side = KeyState.get_shift_side()
+		end
 	else
 		activation_ok = false
 		Logger.error(LOG, "Failed to mount modifier event listener: %s.", tostring(watcher_flags))

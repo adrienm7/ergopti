@@ -61,6 +61,7 @@ local function load_tooltip(spec, faults)
 	-- them with the fresh hs stub so deferred-action assertions cannot inspect a
 	-- different timer table and pass without ever draining the real queue.
 	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["adapters.key_state"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 
@@ -1714,6 +1715,41 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 		drain_deferred_actions(context.timers)
 		helpers.assert_eq(accepted, { 2 },
 			"Down then Enter must accept row two exactly once in physical event order")
+	end)
+
+	helpers.it("(HS-060) samples a held right Shift before the first Shift-Tab", function()
+		local original_check
+		local original_masks
+		local ok, err = xpcall(function()
+			local context = load_tooltip(CASES[1])
+			original_check = hs.eventtap.checkKeyboardModifiers
+			original_masks = hs.eventtap.event.rawFlagMasks
+			local masks = {
+				deviceLeftShift = 0x40,
+				deviceRightShift = 0x80,
+			}
+			hs.eventtap.event.rawFlagMasks = masks
+			hs.eventtap.checkKeyboardModifiers = function(raw)
+				helpers.assert_eq(raw, true,
+					"watcher activation must request device-specific modifier state")
+				return { shift = true, _raw = masks.deviceRightShift }
+			end
+
+			helpers.assert_eq(context.tooltip.show_predictions(
+				{ "first", "second", "third" }, 1, true), true)
+			local key_watcher = context.created[CASES[1].watcher_count]
+
+			-- Deliberately do not deliver a flagsChanged event. Right Shift was held
+			-- before the tooltip painted, so activation must have sampled it already.
+			helpers.assert_eq(key_watcher.fn(
+				hardware_key_event(48, { shift = true }, "\t")), true)
+			helpers.assert_eq(context.tooltip.get_current_index(), 2,
+				"right Shift-Tab must follow the advertised forward direction")
+		end, debug.traceback)
+		hs.eventtap.checkKeyboardModifiers = original_check
+		hs.eventtap.event.rawFlagMasks = original_masks
+		package.loaded["adapters.key_state"] = nil
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("(llm-navigation-action-order) a later arrow cannot cancel an earlier accepted Tab", function()
