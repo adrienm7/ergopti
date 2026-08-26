@@ -1092,6 +1092,7 @@ _RegisterScriptAltGrHotkeys()
 ; them in forward order so first-declared (prominent) sections win HSE's
 ; first-registered-wins collision tiebreak, matching the old effective order.
 #InputLevel 2
+#Include infra/clipboard_history_paste.ahk
 #Include modules/keymap/layout.ahk
 #Include modules/shortcuts.ahk
 #Include platform/remap.ahk
