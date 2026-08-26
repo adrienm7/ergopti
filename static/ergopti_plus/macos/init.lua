@@ -296,6 +296,29 @@ Boot.mark("Path: native asynchronous logger transport committed")
 Logger.install_runtime_error_capture()
 Boot.mark("Path: runtime error capture installed")
 
+-- A factory-reset transaction moves user configuration immediately before its
+-- controlled reload handoff. Reconcile its durable decision before onboarding,
+-- overrides, preferences, or any default seeding can observe those paths.
+local reset_recovery_ok, reset_recovery_result = xpcall(function()
+	local FactoryResetJournal = require("infra.factory_reset_journal")
+	local config_path = config_paths.get("ConfigTomlPath")
+	local journal_path = FactoryResetJournal.path_for(config_path)
+	local owner, owner_detail = FactoryResetJournal.create(journal_path)
+	if type(owner) ~= "table" then error(owner_detail or "factory-reset journal owner unavailable") end
+	if owner:reconcile() ~= true then error("factory-reset journal reconciliation refused") end
+	return true
+end, debug.traceback)
+if not reset_recovery_ok or reset_recovery_result ~= true then
+	abort_pre_runtime_boot(
+		"Factory-reset recovery did not settle before configuration load: "
+			.. tostring(reset_recovery_result),
+		"dialog.fatal_error.cannot_start",
+		Logger.stop_async_sink
+	)
+	return
+end
+Boot.mark("Factory-reset recovery reconciled")
+
 -- TOML hotstring snapshot cache. The shared parser walks every source byte by
 -- hand, which dominates the "Hotstring groups registered" boot phase; caching the
 -- parsed result as a precompiled Lua chunk makes every boot with unchanged files

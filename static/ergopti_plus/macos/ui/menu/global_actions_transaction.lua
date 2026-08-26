@@ -73,6 +73,11 @@ function M.create(deps)
 		or type(deps.file_mover.capture) ~= "function"
 		or type(deps.file_mover.move) ~= "function"
 		or type(deps.file_mover.restore) ~= "function"
+		or type(deps.reset_journal) ~= "table"
+		or type(deps.reset_journal.prepare) ~= "function"
+		or type(deps.reset_journal.mark_commit) ~= "function"
+		or type(deps.reset_journal.mark_prepared) ~= "function"
+		or type(deps.reset_journal.clear) ~= "function"
 		or type(deps.gestures) ~= "table"
 		or type(deps.gestures.get_action) ~= "function"
 		or type(deps.gestures.set_action) ~= "function"
@@ -599,6 +604,7 @@ function M.create(deps)
 	--- @param transaction table Active reset transaction.
 	--- @return boolean committed
 	local function apply_post_karabiner_steps(transaction)
+		local entries = {}
 		for _, path in ipairs(transaction.reset_paths) do
 			local capture_ok, entry, detail = xpcall(function()
 				return deps.file_mover.capture(path)
@@ -606,15 +612,46 @@ function M.create(deps)
 			if not capture_ok or type(entry) ~= "table" then
 				Logger.error(LOG, "Reset file snapshot failed for '%s': %s.",
 					path, tostring(detail or entry))
+				for index = #entries, 1, -1 do
+					call_exact("Reset capture cleanup", deps.file_mover.restore, entries[index])
+				end
 				return false
 			end
+			entries[#entries + 1] = entry
+		end
+
+		if run_step(
+			transaction,
+			"Durable reset recovery journal",
+			function() return deps.reset_journal:prepare(entries) end,
+			function() return deps.reset_journal:clear() end
+		) ~= true then
+			for index = #entries, 1, -1 do
+				call_exact("Reset capture cleanup", deps.file_mover.restore, entries[index])
+			end
+			return false
+		end
+
+		for _, entry in ipairs(entries) do
+			if run_step(
+				transaction,
+				"Retained reset capability '" .. entry.path .. "'",
+				function() return true end,
+				function() return deps.file_mover.restore(entry) end
+			) ~= true then return false end
 			if run_step(
 				transaction,
 				"Recoverable reset move '" .. entry.path .. "'",
 				function() return deps.file_mover.move(entry) end,
-				function() return deps.file_mover.restore(entry) end
+				function() return true end
 			) ~= true then return false end
 		end
+		if run_step(
+			transaction,
+			"Durable reset commit marker",
+			function() return deps.reset_journal:mark_commit() end,
+			function() return deps.reset_journal:mark_prepared() end
+		) ~= true then return false end
 		return true
 	end
 
