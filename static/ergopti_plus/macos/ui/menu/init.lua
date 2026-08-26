@@ -489,6 +489,95 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 	table.sort(global_gesture_slots)
+
+	--- Applies the keymap-backed portion of one detached Enable All snapshot.
+	--- Section and preview setters require exact true; terminator setters retain
+	--- their established nil-on-success contract while still rejecting false.
+	--- @param snapshot table Detached preference candidate or inverse.
+	--- @return boolean committed
+	local function apply_enable_feature_snapshot(snapshot)
+		if type(snapshot) ~= "table" or type(keymap) ~= "table" then return false end
+		local function call_feature(label, fn, nil_is_success, ...)
+			if type(fn) ~= "function" then
+				Logger.error(LOG, "Enable All %s is unavailable.", label)
+				return false
+			end
+			local call_ok, result = xpcall(function(...) return fn(...) end,
+				debug.traceback, ...)
+			local committed = call_ok and (result == true or (nil_is_success and result == nil))
+			if not committed then
+				Logger.error(LOG, "Enable All %s did not commit: %s.", label, tostring(result))
+			end
+			return committed
+		end
+
+		local section_batches = { enabled = {}, disabled = {} }
+		for group_name, sections in pairs(snapshot.section_states or {}) do
+			if type(sections) == "table" then
+				local enabled_sections = {}
+				local disabled_sections = {}
+				for section_name, enabled in pairs(sections) do
+					local target = enabled == false and disabled_sections or enabled_sections
+					target[#target + 1] = section_name
+				end
+				table.sort(enabled_sections)
+				table.sort(disabled_sections)
+				if #enabled_sections > 0 then
+					section_batches.enabled[#section_batches.enabled + 1] = {
+						name = group_name, sections = enabled_sections, enable_group = false,
+					}
+				end
+				if #disabled_sections > 0 then
+					section_batches.disabled[#section_batches.disabled + 1] = {
+						name = group_name, sections = disabled_sections, enable_group = false,
+					}
+				end
+			end
+		end
+		table.sort(section_batches.enabled, function(left, right) return left.name < right.name end)
+		table.sort(section_batches.disabled, function(left, right) return left.name < right.name end)
+		if #section_batches.enabled > 0 and not call_feature(
+			"section enable batch", keymap.set_groups_sections_enabled, false,
+			section_batches.enabled, true) then return false end
+		if #section_batches.disabled > 0 and not call_feature(
+			"section disable batch", keymap.set_groups_sections_enabled, false,
+			section_batches.disabled, false) then return false end
+		local group_names = {}
+		for group_name in pairs(snapshot.hotstrings or {}) do
+			group_names[#group_names + 1] = group_name
+		end
+		table.sort(group_names)
+		for _, group_name in ipairs(group_names) do
+			local enabled = snapshot.hotstrings[group_name] == true
+			local method = enabled and keymap.enable_group or keymap.disable_group
+			if not call_feature(
+				"hotstring group '" .. tostring(group_name) .. "'",
+				method,
+				false,
+				group_name
+			) then return false end
+		end
+
+		for terminator, enabled in pairs(snapshot.terminator_states or {}) do
+			if not call_feature(
+				"terminator '" .. tostring(terminator) .. "'",
+				keymap.set_terminator_enabled,
+				true,
+				terminator,
+				enabled
+			) then return false end
+		end
+		for _, item in ipairs({
+			{ key = "preview_star_enabled", fn = "set_preview_star_enabled" },
+			{ key = "preview_autocorrect_enabled", fn = "set_preview_autocorrect_enabled" },
+			{ key = "preview_ai_enabled", fn = "set_preview_ai_enabled" },
+		}) do
+			if snapshot[item.key] ~= nil and not call_feature(
+				item.fn, keymap[item.fn], false, snapshot[item.key]) then return false end
+		end
+		return true
+	end
+
 	local global_actions_owner = GlobalActionsTransaction.create({
 		state = state,
 		capture_preferences = function()
@@ -499,6 +588,25 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		save_preferences = save_prefs,
 		restore_state = PreferencesTransaction.restore_table,
+		ensure_enable_ready = function()
+			return KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
+				"enable all features")
+		end,
+		apply_enable_features = apply_enable_feature_snapshot,
+		restore_enable_features = apply_enable_feature_snapshot,
+		list_enable_terminators = function()
+			local keys = {}
+			local defs = type(keymap) == "table"
+				and type(keymap.get_terminator_defs) == "function"
+				and keymap.get_terminator_defs() or nil
+			if type(defs) ~= "table" then return keys end
+			for _, def in ipairs(defs) do
+				if type(def) == "table" and type(def.key) == "string" then
+					keys[#keys + 1] = def.key
+				end
+			end
+			return keys
+		end,
 		settings = {
 			get = hs.settings.get,
 			set = hs.settings.set,
@@ -523,6 +631,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return TerminationCoordinator.is_pending()
 		end,
 		notify_success = function(kind)
+			if kind == "enable" then
+				return notifications.notify(
+					i18n.get("notify.all_features_enabled"), nil, "success")
+			end
 			if kind == "disable" then
 				return notifications.notify(
 					i18n.get("notify.all_features_disabled"), nil, "error")
@@ -546,93 +658,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function set_all_enabled(enabled)
-		if enabled ~= true then
-			if not global_actions_owner then
-				Logger.error(LOG, "Disable All transaction owner is unavailable.")
-				return false
-			end
-			return global_actions_owner.disable_all()
-		end
-		return run_global_exclusive("Enable All", function()
-		if not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
-			"enable all features") then
+		if not global_actions_owner then
+			Logger.error(LOG, "%s transaction owner is unavailable.",
+				enabled == true and "Enable All" or "Disable All")
 			return false
 		end
-		-- 1. Set global states
-		state.keymap                 = enabled
-		state.gestures               = enabled
-		state.shortcuts              = enabled
-		state.llm_enabled            = enabled
-		state.keylogger_enabled      = enabled
-		state.script_control_enabled = enabled
-		
-		if core_mods.dyn_hot_mod then state.personal_info = enabled end
-
-		-- 2. Hotstrings groups, sections, and terminators
-		if keymap then
-			for name in pairs(state.hotstrings) do 
-				state.hotstrings[name] = enabled
-				
-				local secs = type(keymap.get_sections) == "function" and keymap.get_sections(name) or nil
-				if type(secs) == "table" then
-					for _, sec in ipairs(secs) do
-						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-							if enabled then
-								pcall(keymap.enable_section, name, sec.name)
-							else
-								pcall(keymap.disable_section, name, sec.name)
-							end
-						end
-					end
-				end
-			end
-
-			local defs = type(keymap.get_terminator_defs) == "function" and keymap.get_terminator_defs() or {}
-			for _, def in ipairs(defs) do
-				if type(def) == "table" and def.key then
-					state.terminator_states[def.key] = enabled
-					if type(keymap.set_terminator_enabled) == "function" then
-						pcall(keymap.set_terminator_enabled, def.key, enabled)
-					end
-				end
-			end
-		end
-
-		-- 3. Preview tooltip toggles
-		if keymap then
-			state.preview_star_enabled        = enabled
-			state.preview_autocorrect_enabled = enabled
-			state.preview_ai_enabled          = enabled
-			if type(keymap.set_preview_star_enabled)        == "function" then pcall(keymap.set_preview_star_enabled,        enabled) end
-			if type(keymap.set_preview_autocorrect_enabled) == "function" then pcall(keymap.set_preview_autocorrect_enabled, enabled) end
-			if type(keymap.set_preview_ai_enabled)          == "function" then pcall(keymap.set_preview_ai_enabled,          enabled) end
-		end
-
-		-- 4. Individual shortcut keys
-		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.list_shortcuts) == "function" then
-			local ok, list = pcall(core_mods.shortcuts_mod.list_shortcuts)
-			if ok and type(list) == "table" then
-				for _, s in ipairs(list) do
-					if type(s) == "table" and s.id then
-						if enabled then
-							if type(core_mods.shortcuts_mod.enable) == "function" then pcall(core_mods.shortcuts_mod.enable, s.id) end
-						else
-							if type(core_mods.shortcuts_mod.disable) == "function" then pcall(core_mods.shortcuts_mod.disable, s.id) end
-						end
-					end
-				end
-			end
-		end
-		
-		if save_prefs() ~= true then return false end
-
-		-- Sync engines only after the candidate was acknowledged.
-		sync_state_to_modules(state, false)
-		
-		notify_feature(enabled and i18n.get("notify.all_features_enabled") or i18n.get("notify.all_features_disabled"), enabled)
-		if type(updateMenu) == "function" then updateMenu() end
-		return true
-		end)
+		if enabled == true then return global_actions_owner.enable_all() end
+		return global_actions_owner.disable_all()
 	end
 
 	local function reset_all_defaults()
