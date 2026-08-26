@@ -442,6 +442,29 @@ local function defer_runtime_action(label, fn, ...)
 	end)
 end
 
+
+--- Schedules a consumed-key mutation and preserves its ordering against every
+--- later physical event. A context invalidation that does not cross the shared
+--- physical fence remains loud because replaying into an unknown app is unsafe.
+--- @param label string Diagnostic label.
+--- @param fn function Deferred mutation.
+--- @param ... any Arguments.
+--- @return boolean scheduled
+local function defer_consumed_action(label, fn, ...)
+	local args = table.pack(...)
+	local generation = _ui_generation
+	return SyntheticInput.defer_consumed_input_action(label, function()
+		if generation ~= _ui_generation or not _watcher_session_active
+			or not runtime_available() then
+			Logger.error(LOG,
+				"Consumed input action '%s' was invalidated before execution; unsafe replay was suppressed.",
+				label)
+			return false
+		end
+		return fn(table.unpack(args, 1, args.n))
+	end)
+end
+
 --- Commits the O(1) navigation state before Quartz can deliver a following key.
 --- Canvas rendering remains deferred, but Enter must observe the row selected by
 --- an immediately preceding arrow or Shift-Tab in the same physical event order.
@@ -651,7 +674,7 @@ local function start_watchers()
 				if not has_other_modifiers then
 					-- Tab always accepts directly, regardless of prior navigation
 					local index = _state.current_index
-					local scheduled = defer_runtime_action("LLM tooltip Tab acceptance",
+					local scheduled = defer_consumed_action("LLM tooltip Tab acceptance",
 						accept_prediction, index)
 					return finish(scheduled)
 				end
@@ -671,13 +694,13 @@ local function start_watchers()
 				--     let the keystroke flow through to the application.
 				if _state.navigation_started then
 					local index = _state.current_index
-					local scheduled = defer_runtime_action("LLM tooltip Enter acceptance",
+					local scheduled = defer_consumed_action("LLM tooltip Enter acceptance",
 						accept_prediction, index)
 					return finish(scheduled)
 				end
 				if _state.enter_validates then
 					local index = _state.current_index
-					local scheduled = defer_runtime_action("LLM tooltip validating Enter",
+					local scheduled = defer_consumed_action("LLM tooltip validating Enter",
 						accept_prediction, index)
 					return finish(scheduled)
 				end
@@ -727,7 +750,7 @@ local function start_watchers()
 				local pred_index = MAC_KEYCODES_NUMBERS[keycode]
 				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 				if pred_index <= preds_count then
-					local scheduled = defer_runtime_action("LLM tooltip numbered acceptance",
+					local scheduled = defer_consumed_action("LLM tooltip numbered acceptance",
 						accept_prediction, pred_index)
 					return finish(scheduled)
 				end
