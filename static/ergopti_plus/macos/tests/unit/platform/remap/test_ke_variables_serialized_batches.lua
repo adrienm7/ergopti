@@ -69,6 +69,7 @@ local function fresh_bridge(options)
 		payloads = {},
 		logs = {},
 		stop_calls = {},
+		order = {},
 		engine = {},
 		start_results = options.start_results or {},
 		timer_results = options.timer_results or {},
@@ -119,6 +120,7 @@ local function fresh_bridge(options)
 		end,
 		token = function() return ctx.current_token end,
 		stop = function(reason, on_done)
+			ctx.order[#ctx.order + 1] = "stop"
 			local stop_index = #ctx.stop_calls + 1
 			ctx.stop_calls[#ctx.stop_calls + 1] = {
 				reason = reason,
@@ -306,6 +308,31 @@ end
 -- =========================================
 
 helpers.describe("karabiner variables: serialized latest-wins writes", function()
+	helpers.it("announces a poisoned generation before requesting its exact fence", function()
+		local bridge, ctx = fresh_bridge()
+		local notifications = {}
+		local stale_notifications = 0
+		local stale_observer = function() stale_notifications = stale_notifications + 1 end
+
+		helpers.assert_true(bridge.set_recovery_observer(stale_observer))
+		helpers.assert_true(bridge.set_recovery_observer(function(token, reason)
+			ctx.order[#ctx.order + 1] = "recovery"
+			notifications[#notifications + 1] = { token = token, reason = reason }
+		end))
+		helpers.assert_true(bridge.clear_recovery_observer(stale_observer) == false,
+			"stale teardown must not erase the replacement lifecycle observer")
+		helpers.assert_true(bridge.set(LAYER_VARIABLE, LAYER_ON))
+		ctx.fire_timer(1)
+
+		helpers.assert_eq(stale_notifications, 0)
+		helpers.assert_eq(#notifications, 1)
+		helpers.assert_eq(notifications[1].token, TOKEN)
+		helpers.assert_eq(notifications[1].reason, "writer-timeout")
+		helpers.assert_eq(ctx.order[1], "recovery",
+			"the owner must retain recovery intent before exact STOP can publish IDLE")
+		helpers.assert_eq(ctx.order[2], "stop")
+	end)
+
 	helpers.it("ke-variables-latest-wins keeps one writer active and finishes OFF", function()
 		local bridge, ctx = fresh_bridge()
 

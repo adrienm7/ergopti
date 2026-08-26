@@ -69,6 +69,7 @@ local _poison_settlements = {}
 local _timer_cleanup_backlog = {}
 local _child_cleanup_backlog = {}
 local _fence_requested_tokens = {}
+local _recovery_observer = nil
 
 -- Revisions describe logical user intent, not subprocess completion. They stay
 -- monotonic across lease generations so an old asynchronous probe can never
@@ -99,6 +100,28 @@ local function invoke_callback(callback, ok, reason, revision)
 	end, debug.traceback)
 	if not called then
 		Logger.error(LOG, "Karabiner variable callback threw: %s", tostring(err))
+	end
+end
+
+--- Announces one first-time poison to the remap lifecycle owner before STOP can
+--- publish IDLE. The observer retains recovery intent while the exact fence is
+--- pending; it never owns or delays the safety-critical fence itself.
+--- @param token string Exact poisoned token.
+--- @param reason string Stable poison reason.
+local function notify_recovery_observer(token, reason)
+	local observer = _recovery_observer
+	if type(observer) ~= "function" then
+		Logger.error(LOG,
+			"Karabiner variable writer has no recovery observer for poisoned lease %s.",
+			tostring(token))
+		return
+	end
+	local notified, notify_err = xpcall(function()
+		observer(token, reason)
+	end, debug.traceback)
+	if not notified then
+		Logger.error(LOG, "Karabiner variable-writer recovery observer threw: %s.",
+			tostring(notify_err))
 	end
 end
 
@@ -619,6 +642,7 @@ poison_token = function(token, reason, detached_batch)
 	-- no callback may run while the exact generation remains unfenced by request.
 	for _, batch in ipairs(batches) do queue_poison_settlement(token, batch) end
 	Logger.error(LOG, "Karabiner variable writer poisoned exact lease %s: %s", token, tostring(reason))
+	notify_recovery_observer(token, reason)
 	fence_exact_token(token, reason)
 end
 
@@ -900,6 +924,32 @@ end
 -- ======= 3/ Public Variable Writes =======
 -- =========================================
 -- =========================================
+
+--- Publishes the current lifecycle owner notified when a variable write poisons
+--- an exact lease. A fresh remap lifecycle replaces the stale callback from its
+--- predecessor; exact clear-by-identity prevents old teardown from erasing it.
+--- @param observer function Callback fn(token, reason), invoked before fencing.
+--- @return boolean registered True only when the observer became authoritative.
+function M.set_recovery_observer(observer)
+	if type(observer) ~= "function" then
+		Logger.error(LOG, "set_recovery_observer(): observer must be a function.")
+		return false
+	end
+	_recovery_observer = observer
+	return true
+end
+
+--- Releases the exact lifecycle observer during remap teardown.
+--- @param observer function Exact observer capability returned by the owner.
+--- @return boolean cleared True only when the current owner was released.
+function M.clear_recovery_observer(observer)
+	if type(observer) ~= "function" or observer ~= _recovery_observer then
+		Logger.error(LOG, "clear_recovery_observer(): observer does not own recovery.")
+		return false
+	end
+	_recovery_observer = nil
+	return true
+end
 
 --- Queues one Karabiner engine variable through the shared serializer.
 --- @param name string The variable name, as it appears in the generated config.
