@@ -334,6 +334,19 @@ function M.init(core_state)
 end
 
 
+--- Drops a consumed terminator only when replaying after replacement failure is unsafe.
+--- The dedicated diagnostic prevents a replacement-side error from masking the separate
+--- loss of the user's held Enter, Tab, or printable terminator.
+--- @param pending table Prepared replay owner.
+--- @param status any Replacement terminal status.
+local function discard_after_replacement_failure(pending, status)
+	if M.cancel_prepared(pending) ~= true then return end
+	Logger.error(LOG,
+		"Held terminator was not replayed because replacement ended with status '%s'.",
+		tostring(status))
+end
+
+
 --- Queues a terminator to be replayed once the replacement has landed.
 ---
 --- @param spec table { kind = "key"|"text", key?: string, chars: string,
@@ -411,7 +424,8 @@ function M.prepare(spec)
 				pending.transaction_complete = true
 				M.flush_if_delivered()
 			else
-				M.cancel_prepared(pending)
+				discard_after_replacement_failure(
+					pending, pending.transaction.completion_status)
 			end
 			return
 		end
@@ -490,7 +504,7 @@ function M.prepare(spec)
 		pending.transaction, function(_transaction, status)
 		if _pending ~= pending then return end
 		if status ~= "complete" then
-			M.cancel_prepared(pending)
+			discard_after_replacement_failure(pending, status)
 			return
 		end
 		pending.transaction_complete = true

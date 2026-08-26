@@ -173,6 +173,34 @@ local function new_transaction(fixture)
 end
 
 
+local function capture_replay_errors(callback)
+	local Logger = require("infra.logger")
+	local original_error = Logger.error
+	local errors = {}
+	Logger.error = function(log, format_string, ...)
+		if log == "keymap.terminator_replay" then
+			errors[#errors + 1] = string.format(format_string, ...)
+		end
+	end
+	local outcome = table.pack(xpcall(function() callback(errors) end, debug.traceback))
+	Logger.error = original_error
+	if not outcome[1] then error(outcome[2], 0) end
+	return errors
+end
+
+
+local function count_failed_terminator_errors(errors)
+	local count = 0
+	for _, message in ipairs(errors) do
+		if message:find("Held terminator", 1, true)
+			and message:find("failed", 1, true) then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+
 --- Replaces one named module upvalue for an otherwise unreachable hardening path.
 --- @param fn function Closure that owns the upvalue.
 --- @param target string Upvalue name.
@@ -216,6 +244,57 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		helpers.assert_eq(#fixture.sent, 1)
 		helpers.assert_eq(fixture.sent[1].key, "return")
 		helpers.assert_true(not fixture.replay.is_pending())
+	end)
+
+	helpers.it("reports a held terminator dropped after replacement failure", function()
+		local fixture = load_gate()
+		local errors = capture_replay_errors(function()
+			local tx = new_transaction(fixture)
+			local producer = fixture.synthetic.retain(tx)
+			helpers.assert_true(fixture.synthetic.seal(tx))
+			helpers.assert_true(fixture.replay.arm({
+				kind = "key", key = "return", chars = "\r", transaction = tx,
+			}), "the physical Enter must be owned before the replacement fails")
+
+			helpers.assert_true(fixture.synthetic.fail(tx, "paced target refused output"))
+			helpers.assert_true(fixture.synthetic.release(tx, producer))
+			fire_hs_lifecycle(fixture)
+
+			helpers.assert_eq(tx.completion_status, "failed")
+			helpers.assert_true(not fixture.replay.is_pending(),
+				"an unsafe replay must release its reservation after the failed replacement")
+			helpers.assert_eq(#fixture.sent, 0,
+				"submitting a partially replaced line would be more destructive than dropping Enter")
+		end)
+		helpers.assert_eq(count_failed_terminator_errors(errors), 1,
+			"the consumed Enter loss must have one terminator-specific ERROR")
+	end)
+
+	helpers.it("reports the same loss when the replacement completion callback is lost", function()
+		local fixture = load_gate()
+		local errors = capture_replay_errors(function()
+			local tx = new_transaction(fixture)
+			local producer = fixture.synthetic.retain(tx)
+			helpers.assert_true(fixture.synthetic.seal(tx))
+			helpers.assert_true(fixture.replay.arm({
+				kind = "key", key = "return", chars = "\r", transaction = tx,
+			}))
+
+			-- Model complete loss of the adapter's deferred completion delivery. The
+			-- recurring watchdog must still surface the consumed key loss from the
+			-- transaction's immutable terminal fields.
+			tx.complete_callbacks = {}
+			helpers.assert_true(fixture.synthetic.fail(tx, "paced target refused output"))
+			helpers.assert_true(fixture.synthetic.release(tx, producer))
+			helpers.assert_eq(tx.completion_status, "failed")
+			helpers.assert_true(fixture.replay.is_pending())
+			helpers.assert_true(fire_timer(fixture, 0.25))
+
+			helpers.assert_true(not fixture.replay.is_pending())
+			helpers.assert_eq(#fixture.sent, 0)
+		end)
+		helpers.assert_eq(count_failed_terminator_errors(errors), 1,
+			"the watchdog must emit the same terminator-specific ERROR exactly once")
 	end)
 
 	helpers.it("replays exactly once after an already-complete transaction", function()
