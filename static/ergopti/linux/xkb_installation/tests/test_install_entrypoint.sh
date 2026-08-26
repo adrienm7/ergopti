@@ -25,9 +25,20 @@ cat > "$FAKE_BIN/sudo" <<'EOF'
 #!/bin/sh
 command_path=$(command -v "$1") || exit 127
 shift
-PATH="$ISOLATED_EXTERNAL_BIN" exec "$command_path" "$@"
+ERGOPTI_TEST_ELEVATED=1 PATH="$ISOLATED_EXTERNAL_BIN" exec "$command_path" "$@"
 EOF
-chmod +x "$FAKE_BIN/fzf" "$FAKE_BIN/sudo"
+cat > "$FAKE_BIN/gsettings" <<'EOF'
+#!/bin/sh
+if [ "${ERGOPTI_TEST_ELEVATED:-}" = 1 ]; then
+    printf 'desktop activation ran with elevated privileges\n' >&2
+    exit 98
+fi
+printf '%s\n' "$*" >> "$GSETTINGS_LOG"
+case "$1" in
+    get) printf '@a(ss) []\n' ;;
+esac
+EOF
+chmod +x "$FAKE_BIN/fzf" "$FAKE_BIN/sudo" "$FAKE_BIN/gsettings"
 
 run_debian_detector() {
     local detector_bin="$TMP_ROOT/detector-bin"
@@ -62,6 +73,7 @@ run_non_interactive_install() {
     if ! env \
         HOME="$TMP_ROOT/home" \
         FZF_MARKER="$sandbox/fzf-called" \
+        GSETTINGS_LOG="$sandbox/gsettings.log" \
         PATH="$FAKE_BIN:$PATH" \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
@@ -77,6 +89,8 @@ run_non_interactive_install() {
     fi
     test ! -e "$sandbox/fzf-called"
     test -f "$sandbox/extensions/ergopti/symbols/ergopti"
+    grep -q '^get org.gnome.desktop.input-sources sources$' "$sandbox/gsettings.log"
+    grep -q '^set org.gnome.desktop.input-sources sources' "$sandbox/gsettings.log"
 }
 
 run_uninstall_without_artifacts_fails() {
