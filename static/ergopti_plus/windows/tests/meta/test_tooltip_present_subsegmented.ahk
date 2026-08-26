@@ -567,6 +567,38 @@ _TPS_PostPresentTokenGuardsEveryMutation() {
 		"focus capture must stay outside Critical, then the surface token must be rechecked atomically with cancel + timer re-arm so a stale callback cannot evict newer LLM work")
 }
 
+; AHK-003 / A1-03 (audit 2026-08-26): both production and headless suggestion
+; publishers used bare catches, so a metrics failure cleared the visible owner
+; without leaving any diagnostic. Keep the sink error observable without
+; placing trigger, output or category text in the log.
+_AHK003_SuggestionPublishFailureIsObservable() {
+	Metric := _StripFullLineComments(
+		_DriverFuncBody("_NotifySuggestionShownForSurface"))
+	Diagnostic := _StripFullLineComments(
+		_DriverFuncBody("_PrefixLogSuggestionPublishFailure"))
+	Assert(Metric != "" and Diagnostic != "",
+		"the suggestion publisher and its privacy-safe failure diagnostic must exist")
+
+	GuardedCall := InStr(Metric, "KL_LogHotstringSuggestedGuarded(")
+	GuardedCatch := InStr(Metric, "catch as Err", true, GuardedCall)
+	GuardedReport := InStr(Metric,
+		"_PrefixLogSuggestionPublishFailure(Err)", true, GuardedCatch)
+	FallbackCall := InStr(Metric, "KL_LogHotstringSuggested(", true,
+		GuardedReport)
+	FallbackCatch := InStr(Metric, "catch as Err", true, FallbackCall)
+	FallbackReport := InStr(Metric,
+		"_PrefixLogSuggestionPublishFailure(Err)", true, FallbackCatch)
+	Assert(GuardedCall > 0 and GuardedCatch > GuardedCall
+		and GuardedReport > GuardedCatch and FallbackCall > GuardedReport
+		and FallbackCatch > FallbackCall and FallbackReport > FallbackCatch,
+		"production and headless suggestion sink failures must cross the same observable rejection boundary")
+	Assert(InStr(Diagnostic, 'LoggerError("PrefixWatcher"') > 0,
+		"the failure boundary must emit through the central logger")
+	Assert(InStr(Diagnostic, "Trigger") = 0 and InStr(Diagnostic, "Output") = 0
+		and InStr(Diagnostic, "Category") = 0,
+		"the diagnostic must not disclose typed suggestion content")
+}
+
 
 Test("meta tooltip-present: every sub-step of the present sequence carries its own mark",
 	_TPS_EveryStepCarriesItsOwnMark)
@@ -578,6 +610,8 @@ Test("meta tooltip-present: pixels and visible decisions share one transitive co
 	_TPS_VisibleDecisionCommitHasOneTransitiveOwner)
 Test("meta tooltip-present: post-present surface token guards state, log and timer mutations",
 	_TPS_PostPresentTokenGuardsEveryMutation)
+Test("AHK-003: suggestion metrics publication failures are observable",
+	_AHK003_SuggestionPublishFailureIsObservable)
 Test("meta tooltip-present: deferred request tuple and serial share one owner",
 	_TPS_DeferredRequestTupleHasOneOwner)
 Test("meta tooltip-present: dequeue poll carries generation plus surface identity",

@@ -439,6 +439,13 @@ _PrefixClearSuggestionIfOwned(Record, SurfaceToken) {
 	return false
 }
 
+; Suggestion contents may contain typed personal data. Report only the sink
+; failure itself when publication cannot complete, never the trigger or output.
+_PrefixLogSuggestionPublishFailure(Err) {
+	try LoggerError("PrefixWatcher",
+		"Suggestion metrics publication failed: {1}.", Err.Message)
+}
+
 ; Atomically bind the metric state to the surface that actually won the pixel
 ; commit, while leaving privacy checks and keylogger work outside Critical. The
 ; keylogger's final queue mutation rechecks the same token and marks the record
@@ -481,6 +488,8 @@ _NotifySuggestionShownForSurface(Trigger, Output, Category, IsPrivate,
 		try Published := KL_LogHotstringSuggestedGuarded(Trigger, Output,
 			Category, TooltipSurfaceTokenIsCurrent.Bind(SurfaceToken),
 			_PrefixSuggestionMarkPublished.Bind(Record))
+		catch as Err
+			_PrefixLogSuggestionPublishFailure(Err)
 	} else if TooltipSurfaceTokenIsCurrent(SurfaceToken) {
 		; Headless unit harnesses do not include the production keylogger. Preserve
 		; their recording stub while production always uses the guarded queue path.
@@ -488,7 +497,8 @@ _NotifySuggestionShownForSurface(Trigger, Output, Category, IsPrivate,
 			KL_LogHotstringSuggested(Trigger, Output, Category)
 			Record.SuggestedPublished := true
 			Published := true
-		} catch {
+		} catch as Err {
+			_PrefixLogSuggestionPublishFailure(Err)
 			Published := false
 		}
 	}
