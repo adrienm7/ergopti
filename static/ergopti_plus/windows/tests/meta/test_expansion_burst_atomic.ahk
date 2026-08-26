@@ -160,7 +160,7 @@ _EBA_AssertTerminalTuiDeletionIsPaced() {
 		"the terminal branch must defer the behavior-tested edit beyond the visible InputHook callback")
 	Assert(InStr(Src, 'Burst .= "{BackSpace}"') > 0,
 		"terminal deletion must expand each Backspace token; repeat-count syntax bypasses pacing")
-	Assert(InStr(Src, 'SetTimer(Runner, -Max(1, Floor(Owner["DelayMs"])))') > 0,
+	Assert(InStr(Src, 'SetTimer(Runner, -Max(1, Floor(DelayMs)))') > 0,
 		"the paced sender must run on a later timer turn so sleeps can yield real render opportunities")
 	Assert(InStr(Src, "LLM_NavEventOwner_BeginTerminalCapture") > 0,
 		"the terminal owner must acquire the native physical-input capture before scheduling")
@@ -171,3 +171,31 @@ _EBA_AssertTerminalTuiDeletionIsPaced() {
 }
 Test("hotstrings: terminal TUI deletion uses explicit paced events in one protected transaction (terminal-stale-render)",
 	_EBA_AssertTerminalTuiDeletionIsPaced)
+
+; AHK-002 / A1-02 (audit 2026-08-26): the native SetTimer arm used to sit
+; after the injected scheduler's try/catch. At that point the pending owner and
+; native capture were already published, so an arming failure bypassed the
+; behavior-tested rejection path and wedged every later hotstring transaction.
+_AHK002_DefaultTerminalSchedulerSharesFailureBoundary() {
+	Begin := _StripFullLineComments(
+		_DriverFuncBody("_HSE_BeginOwnedTerminalTransaction"))
+	NativeScheduler := _StripFullLineComments(
+		_DriverFuncBody("_HSE_DefaultTerminalScheduler"))
+	Assert(Begin != "", "_HSE_BeginOwnedTerminalTransaction must exist")
+	Assert(NativeScheduler != "", "the production terminal scheduler must exist")
+	Assert(InStr(NativeScheduler,
+		'SetTimer(Runner, -Max(1, Floor(DelayMs)))') > 0,
+		"the production adapter must still defer terminal output by the configured delay")
+	Assert(InStr(Begin,
+		"SchedulerFn := _HSE_DefaultTerminalScheduler") > 0,
+		"a missing scheduler must normalize to the production adapter before scheduling")
+	Assert(InStr(Begin,
+		'SchedulerFn.Call(Runner, Owner["DelayMs"])') > 0,
+		"production and injected scheduling must traverse the same fallible call")
+	Assert(InStr(Begin, "SetTimer(") = 0,
+		"the owner transaction must not keep an unprotected native timer tail")
+	Assert(InStr(Begin, "_HSE_RejectTerminalOwner(Owner)") > 0,
+		"every scheduler failure must retire the pending owner and native capture")
+}
+Test("AHK-002: native terminal scheduling shares the owner rejection boundary",
+	_AHK002_DefaultTerminalSchedulerSharesFailureBoundary)
