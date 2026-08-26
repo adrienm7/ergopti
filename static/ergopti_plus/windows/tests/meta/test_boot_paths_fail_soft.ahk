@@ -81,6 +81,22 @@ _BPF_LockedPathsTomlFallsBack() {
 		"a readable paths.toml must still provide its override")
 }
 
+_BPF_PathsTomlStripsOnlyUnquotedInlineComments() {
+	Path := A_Temp . "\ergopti_test_paths_comments_" . A_TickCount . ".toml"
+	try FileDelete(Path)
+	try {
+		FileAppend('ConfigDirPath = "D:/cfg" # operator note' . "`n"
+			. 'HashPath = "D:/configs/#team" # another note' . "`n", Path, "UTF-8")
+		Result := ReadPathsToml(Path)
+		Assert(Result.Has("ConfigDirPath"),
+			"an inline comment after a paths.toml value must not discard the assignment")
+		AssertEqual("D:\cfg", Result["ConfigDirPath"])
+		Assert(Result.Has("HashPath"), "the second fixture row must be parsed")
+		AssertEqual("D:\configs\#team", Result["HashPath"],
+			"a hash inside the quoted path is data and must never start a comment")
+	} finally try FileDelete(Path)
+}
+
 
 
 
@@ -161,6 +177,8 @@ _BPF_CapsLockGuardCoversEveryRegistration() {
 
 Test("meta boot-paths-fail-soft: a locked paths.toml falls back instead of throwing",
 	_BPF_LockedPathsTomlFallsBack)
+Test("AHK-007: paths.toml strips only unquoted inline comments",
+	_BPF_PathsTomlStripsOnlyUnquotedInlineComments)
 Test("meta boot-paths-fail-soft: the always-armed rescue hotkey is guarded",
 	_BPF_RescueHotkeyIsGuarded)
 Test("meta boot-paths-fail-soft: layer registrations clear HotIf in a finally",

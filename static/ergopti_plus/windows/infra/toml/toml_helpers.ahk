@@ -908,6 +908,7 @@ ReadPathsToml(FilePath) {
 				if (Line == "" or SubStr(Line, 1, 1) == "#") {
 						continue
 				}
+				Line := TOML_StripInlineComment(Line)
 				if RegExMatch(Line, '^(\S+)\s*=\s*"(.*)"$', &Match) {
 						Result[Match[1]] := StrReplace(Match[2], "/", "\")
 				}
