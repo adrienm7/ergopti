@@ -69,6 +69,8 @@ local SHA256_PREFIX = "sha256:"
 local _update_state       = "idle"
 local _cached_release     = nil
 local _last_notified_tag  = ""
+local _install_generation = 0
+local _install_token      = nil
 local _bg_timer           = nil
 local _bg_timer_committed = false
 local _boot_timer         = nil  -- one-shot boot-check; tracked so stop_background_checks() can cancel it
@@ -377,11 +379,63 @@ end
 
 function M.clear_cached_release()
 	_cached_release = nil
-	_update_state = "idle"
+	return M.set_update_state("idle")
 end
 
 function M.set_update_state(state)
-	if type(state) == "string" then _update_state = state end
+	if state ~= "idle" and state ~= "checking" and state ~= "available" then
+		Logger.error(LOG, "Update state transition refused — invalid state %s.", tostring(state))
+		return false
+	end
+	if _install_token ~= nil then
+		Logger.debug(LOG, "Update state transition to %s refused while an install owner is active.", state)
+		return false
+	end
+	_update_state = state
+	Logger.debug(LOG, "Update state changed to %s.", state)
+	return true
+end
+
+--- Acquires the sole owner of a bundle installation and publishes installing.
+--- @return table|nil token Opaque exact install owner.
+--- @return string|nil reason Stable refusal detail.
+function M.begin_install()
+	if _install_token ~= nil then
+		Logger.warn(LOG, "Concurrent update installation refused while another install owner is active.")
+		return nil, "an update installation is already active"
+	end
+	_install_generation = _install_generation + 1
+	_install_token = { generation = _install_generation }
+	_update_state = "installing"
+	Logger.debug(LOG, "Update install owner %d acquired.", _install_generation)
+	return _install_token, nil
+end
+
+--- Returns whether token is the exact active install owner.
+--- @param token table|nil Candidate owner.
+--- @return boolean current Whether the candidate owns the install.
+function M.is_install_current(token)
+	return token ~= nil and token == _install_token
+end
+
+--- Releases the exact install owner into one non-install terminal state.
+--- @param token table|nil Exact owner returned by begin_install.
+--- @param next_state string "idle" or "available".
+--- @return boolean settled Whether the owner committed its terminal state.
+function M.finish_install(token, next_state)
+	if next_state ~= "idle" and next_state ~= "available" then
+		Logger.error(LOG, "Update install settlement refused — invalid state %s.", tostring(next_state))
+		return false
+	end
+	if token == nil or token ~= _install_token then
+		Logger.warn(LOG, "Stale update install settlement refused.")
+		return false
+	end
+	local generation = token.generation
+	_install_token = nil
+	_update_state = next_state
+	Logger.debug(LOG, "Update install owner %s settled as %s.", tostring(generation), next_state)
+	return true
 end
 
 function M.set_cached_release(release)
@@ -402,13 +456,12 @@ end
 -- ================================
 
 local function notify_new_version(tag, update_menu_fn)
-	-- Availability and the menu refresh are recorded FIRST, unconditionally. The
-	-- tag guard below suppresses a repeated NOTIFICATION, which is all it was ever
-	-- meant to do — gating the state on it too meant that after a channel or
-	-- interval change the "Update to vX" entry silently vanished while the release
-	-- was still cached, because the second pass returned before setting either.
-	_update_state = "available"
-	if type(update_menu_fn) == "function" then pcall(update_menu_fn) end
+	-- Availability and the menu refresh precede the repeated-notification guard,
+	-- but only the install owner may replace "installing". A poll response can
+	-- start before the menu acquires that owner and complete during the bundle
+	-- swap, so its generation fence alone is not an install-state authority.
+	local state_published = M.set_update_state("available")
+	if state_published and type(update_menu_fn) == "function" then pcall(update_menu_fn) end
 
 	if M.normalize_tag(_last_notified_tag) == M.normalize_tag(tag) then return end
 	_last_notified_tag = tag
