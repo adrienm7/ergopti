@@ -42,6 +42,7 @@ local function run_cached_update(opts)
 	}
 	local update_state = "available"
 	local cached = opts.cached
+	local install_token = nil
 
 	package.loaded["modules.updater"] = {
 		INTERVAL_PRESETS = {},
@@ -52,6 +53,19 @@ local function run_cached_update(opts)
 		get_update_menu_label = function() return "update" end,
 		get_cached_release = function() return cached end,
 		set_update_state = function(value) update_state = value end,
+		begin_install = function()
+			if install_token ~= nil then return nil end
+			install_token = {}
+			update_state = "installing"
+			return install_token
+		end,
+		is_install_current = function(token) return token == install_token end,
+		finish_install = function(token, value)
+			if token ~= install_token then return false end
+			install_token = nil
+			update_state = value
+			return true
+		end,
 		validate_install_asset = function() return opts.metadata_valid == true, "unsafe metadata" end,
 		clear_cached_release = function() cached = nil end,
 		release_api_url = function() return "https://api.github.test/releases/latest" end,

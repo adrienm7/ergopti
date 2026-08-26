@@ -118,6 +118,20 @@ local function get_update_menu_label()
 	return Updater.get_update_menu_label()
 end
 
+--- Settles one exact install owner and refreshes the menu on success.
+--- @param install_token table Exact token returned by Updater.begin_install.
+--- @param next_state string Terminal updater state.
+--- @param update_menu_fn function Rebuild callback.
+--- @return boolean settled Whether the exact owner committed its terminal.
+local function settle_install(install_token, next_state, update_menu_fn)
+	if Updater.finish_install(install_token, next_state) ~= true then
+		Logger.error(LOG, "Update install owner could not settle as %s.", tostring(next_state))
+		return false
+	end
+	update_menu_fn()
+	return true
+end
+
 --- Downloads a validated release asset and verifies its SHA-256 before writing.
 --- Calls cb(ok, err_msg) when done.
 --- @param release table Validated release metadata.
@@ -175,13 +189,16 @@ end
 --- loop is not blocked during the copy.
 --- @param zip_path string Path to the downloaded ErgoptiPlus.app.zip
 --- @param update_menu_fn function Rebuild callback
-local function replace_and_reload(zip_path, update_menu_fn)
+local function replace_and_reload(zip_path, update_menu_fn, install_token)
+	if Updater.is_install_current(install_token) ~= true then
+		Logger.error(LOG, "Update bundle replacement refused for a stale install owner.")
+		return
+	end
 	local target = app_bundle_path()
 	if not target then
 		Logger.error(LOG, "Cannot determine .app bundle path — aborting install.")
 		dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-		Updater.set_update_state("idle")
-		update_menu_fn()
+		settle_install(install_token, "idle", update_menu_fn)
 		return
 	end
 
@@ -207,11 +224,14 @@ local function replace_and_reload(zip_path, update_menu_fn)
 	local unzip_task
 	unzip_task = TaskLifecycle.native("Update archive extraction", "/usr/bin/unzip", function(exit_code, _, stderr)
 		if unzip_task then M._active_tasks[unzip_task] = nil end  -- guarded clear: never write a nil key
+		if Updater.is_install_current(install_token) ~= true then
+			Logger.warn(LOG, "Stale update archive completion ignored.")
+			return
+		end
 		if exit_code ~= 0 then
 			Logger.error(LOG, "unzip failed (exit %d): %s.", exit_code, stderr or "")
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			Updater.set_update_state("idle")
-			update_menu_fn()
+			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
 
@@ -220,8 +240,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		if not ok_attr then
 			Logger.error(LOG, "Unzipped archive does not contain ErgoptiPlus.app at %s.", new_app)
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			Updater.set_update_state("idle")
-			update_menu_fn()
+			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
 
@@ -234,8 +253,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		if not ok_bak then
 			Logger.error(LOG, "Could not move current .app to backup at %s.", backup_app)
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			Updater.set_update_state("idle")
-			update_menu_fn()
+			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
 		local ok_mv = os.rename(new_app, target)
@@ -251,8 +269,7 @@ local function replace_and_reload(zip_path, update_menu_fn)
 					target, backup_app)
 			end
 			dialog.block_alert(i18n.get("common.error_title"), i18n.get("menu.about.update.install_error"), i18n.get("button.ok"))
-			Updater.set_update_state("idle")
-			update_menu_fn()
+			settle_install(install_token, "idle", update_menu_fn)
 			return
 		end
 
@@ -263,22 +280,24 @@ local function replace_and_reload(zip_path, update_menu_fn)
 		pcall(hs.execute, "/bin/rm -rf " .. text_utils.shell_quote(backup_app)
 			.. " " .. text_utils.shell_quote(tmp_dir))
 
-		Logger.success(LOG, "Update installed at %s — reloading.", target)
+		if Updater.finish_install(install_token, "idle") ~= true then
+			Logger.error(LOG, "Installed update could not settle its exact owner; reload refused.")
+			return
+		end
 		Updater.clear_cached_release()
+		Logger.success(LOG, "Update installed at %s — reloading.", target)
 		-- Short delay lets the log flush before hs.reload tears everything down.
 		hs.timer.doAfter(0.3, function() hs.reload() end)
 	end, { "-o", zip_path, "-d", tmp_dir })
 	if not unzip_task then
-		Updater.set_update_state("idle")
-		update_menu_fn()
+		settle_install(install_token, "idle", update_menu_fn)
 		return
 	end
 
 	M._active_tasks[unzip_task] = true
 	if not TaskLifecycle.start(unzip_task, "Update archive extraction") then
 		M._active_tasks[unzip_task] = nil
-		Updater.set_update_state("idle")
-		update_menu_fn()
+		settle_install(install_token, "idle", update_menu_fn)
 	end
 end
 
@@ -295,18 +314,22 @@ local function one_click_update(channel, update_menu_fn)
 
 	local cached = Updater.get_cached_release()
 	if state == "available" and cached then
-		Updater.set_update_state("installing")
+		local install_token = Updater.begin_install()
+		if not install_token then return end
 		update_menu_fn()
 		Logger.start(LOG, "Installing cached update %s…", cached.tag)
 		local zip_path = (hs.fs.temporaryDirectory() or "/tmp") .. "ErgoptiPlus_" .. os.time() .. ".app.zip"
 		download_to_file(cached, zip_path, function(ok, err)
-			if not ok then
-				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
-				Updater.set_update_state("available")
-				update_menu_fn()
+			if Updater.is_install_current(install_token) ~= true then
+				Logger.warn(LOG, "Stale cached update download completion ignored.")
 				return
 			end
-			replace_and_reload(zip_path, update_menu_fn)
+			if not ok then
+				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
+				settle_install(install_token, "available", update_menu_fn)
+				return
+			end
+			replace_and_reload(zip_path, update_menu_fn, install_token)
 		end)
 		return
 	end
@@ -363,18 +386,22 @@ local function one_click_update(channel, update_menu_fn)
 			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
 			return
 		end
-		Updater.set_update_state("installing")
+		local install_token = Updater.begin_install()
+		if not install_token then return end
 		update_menu_fn()
 
 		local zip_path = (hs.fs.temporaryDirectory() or "/tmp") .. "ErgoptiPlus_" .. os.time() .. ".app.zip"
 		download_to_file(release, zip_path, function(ok, err)
-			if not ok then
-				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
-				Updater.set_update_state("available")
-				update_menu_fn()
+			if Updater.is_install_current(install_token) ~= true then
+				Logger.warn(LOG, "Stale checked update download completion ignored.")
 				return
 			end
-			replace_and_reload(zip_path, update_menu_fn)
+			if not ok then
+				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
+				settle_install(install_token, "available", update_menu_fn)
+				return
+			end
+			replace_and_reload(zip_path, update_menu_fn, install_token)
 		end)
 	end)
 end
