@@ -933,6 +933,37 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			"generation fencing must not discard current-render acceptance")
 	end)
 
+	helpers.it("(HS-059) refused Tab scheduling preserves the selected fallback row", function()
+		local context = load_tooltip(CASES[1])
+		local synthetic = require("adapters.synthetic_input")
+		local original_defer = synthetic.defer_consumed_input_action
+		local accepted = {}
+		local ok, err = xpcall(function()
+			context.tooltip.set_accept_callback(function(index)
+				accepted[#accepted + 1] = index
+				return true
+			end)
+			helpers.assert_eq(context.tooltip.show_predictions(
+				{ "first", "second", "third" }, 1, true), true)
+			helpers.assert_eq(context.tooltip.navigate(2), true)
+			helpers.assert_eq(context.tooltip.get_current_index(), 3,
+				"the fixture must visibly select row three before Tab")
+
+			synthetic.defer_consumed_input_action = function() return false end
+			local key_watcher = context.created[CASES[1].watcher_count]
+			helpers.assert_eq(key_watcher.fn(hardware_key_event(48, {}, "\t")), false,
+				"a refused tooltip action must pass Tab to the keymap fallback")
+			helpers.assert_eq(accepted, {},
+				"the refused tooltip owner must not invoke its acceptance callback")
+			helpers.assert_eq(context.tooltip.get_current_index(), 3,
+				"falling through must preserve the row that keymap will accept")
+			helpers.assert_eq(synthetic.stats().pending_ordered_input_actions, 0,
+				"a refused schedule must leave no deferred action for a later key")
+		end, debug.traceback)
+		synthetic.defer_consumed_input_action = original_defer
+		if not ok then error(err, 0) end
+	end)
+
 	for _, action in ipairs({
 		{ label = "Tab", keycode = 48, characters = "\t" },
 		{ label = "Enter", keycode = 36, characters = "\r", enter_validates = true },
