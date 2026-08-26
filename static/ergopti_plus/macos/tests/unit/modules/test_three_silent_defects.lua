@@ -35,7 +35,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("input-source upgrade: the script returns a parseable count", function()
 	helpers.it("coerces both counts to text before concatenating", function()
-		local src = helpers.read_driver_source("upgrade_active_list")
+		local src = helpers.read_driver_source("upgrade_active_list_async")
 		helpers.assert_true(src ~= nil and src ~= "", "input_sources must be locatable")
 
 		local code = src:gsub("%-%-[^\n]*", "")

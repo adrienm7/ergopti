@@ -28,6 +28,8 @@ local Timings = require("infra.timings")
 local WIRED_MS = {
 	-- modules/keymap/expander.lua: safely above one 60 Hz render turn.
 	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
+	-- modules/keymap/input_sources.lua: hard deadline for mutation subprocesses.
+	{ "ui", "input_source_operation_timeout_ms", 10000 },
 	-- keylogger/init.lua
 	{ "keylogger", "micro_idle_timeout_ms",  30000 },
 	{ "keylogger", "session_timeout_ms",    300000 },
