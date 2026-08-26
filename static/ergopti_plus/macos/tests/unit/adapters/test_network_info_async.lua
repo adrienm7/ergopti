@@ -146,13 +146,51 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 			"isInternetReachable() must return false when the async ping probe fails")
 	end)
 
-	helpers.it("isVpnActive() detects a utun interface in ifconfig output", function()
-		local NI = reload_network_info(
-			make_hs_task_stub(0, "utun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380\n"))
+	helpers.it("isVpnActive() ignores baseline utun interfaces without a tunnel address (HS-021)", function()
+		local ifconfig_output = table.concat({
+			"utun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380",
+			"\tinet6 fe80::1234%utun0 prefixlen 64 scopeid 0x17",
+			"en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500",
+			"\tinet 192.168.1.20 netmask 0xffffff00 broadcast 192.168.1.255",
+			"",
+		}, "\n")
+		local NI = reload_network_info(make_hs_task_stub(0, ifconfig_output))
 
-		local result = NI.isVpnActive()
-		helpers.assert_true(result == true,
-			"isVpnActive() must return true once the async ifconfig probe finds a utun interface")
+		helpers.assert_true(NI.isVpnActive() == false,
+			"a baseline utun carrying only link-local IPv6 must not inherit an address from another interface")
+	end)
+
+	helpers.it("isVpnActive() detects an up utun interface with an IPv4 tunnel address (HS-021)", function()
+		local ifconfig_output = table.concat({
+			"utun4: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380",
+			"\tinet 10.8.0.2 --> 10.8.0.2 netmask 0xffffffff",
+			"",
+		}, "\n")
+		local NI = reload_network_info(make_hs_task_stub(0, ifconfig_output))
+
+		helpers.assert_true(NI.isVpnActive() == true,
+			"an up utun carrying an IPv4 tunnel address must report an active VPN")
+	end)
+
+	helpers.it("isVpnActive() detects non-link-local IPv6 only on an up utun interface (HS-021)", function()
+		local active_output = table.concat({
+			"utun5: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380",
+			"\tinet6 fd00::42 prefixlen 64",
+			"",
+		}, "\n")
+		local down_output = table.concat({
+			"utun5: flags=8050<POINTOPOINT,RUNNING,MULTICAST> mtu 1380",
+			"\tinet6 fd00::42 prefixlen 64",
+			"",
+		}, "\n")
+
+		local active = reload_network_info(make_hs_task_stub(0, active_output))
+		helpers.assert_true(active.isVpnActive() == true,
+			"an up utun carrying a non-link-local IPv6 address must report an active VPN")
+
+		local down = reload_network_info(make_hs_task_stub(0, down_output))
+		helpers.assert_true(down.isVpnActive() == false,
+			"an addressed utun without the UP flag must not report an active VPN")
 	end)
 
 	helpers.it("isVpnActive() returns false when no utun interface is present", function()
@@ -214,7 +252,16 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 		_G.hs.task = {
 			new = function(_exe, cb, _args)
 				return {
-					start     = function() if cb then cb(0, "utun0: flags=8051<UP> mtu 1380\n", "") end return true end,
+					start     = function()
+						if cb then
+							cb(0, table.concat({
+								"utun0: flags=8051<UP,POINTOPOINT,RUNNING,MULTICAST> mtu 1380",
+								"\tinet 10.8.0.2 --> 10.8.0.2 netmask 0xffffffff",
+								"",
+							}, "\n"), "")
+						end
+						return true
+					end,
 					isRunning = function() return false end,
 					terminate = function() end,
 				}
