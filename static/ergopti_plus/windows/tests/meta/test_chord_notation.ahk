@@ -58,6 +58,18 @@ _Chord_RunAll() {
 	if !Data.Has("canonicalize") || !Data.Has("rejects") || !Data.Has("equals")
 		return
 
+	_Chord_EmptyTokenRejectsPresent() {
+		Seen := Map()
+		for Vector in Data["rejects"]
+			Seen[Vector["id"]] := true
+		for Required in ["leading_separator", "trailing_separator", "doubled_separator"] {
+			AssertTrue(Seen.Has(Required),
+				"the shared corpus must retain empty-token regression " . Required)
+		}
+	}
+	Test("chord corpus: empty-token regressions are retained",
+		_Chord_EmptyTokenRejectsPresent)
+
 
 
 
