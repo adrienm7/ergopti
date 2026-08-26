@@ -40,11 +40,13 @@ _LMBCM_AllProducersUseTheCoordinator() {
 		Assert(InStr(Body, "LLM_Menu_Build()") == 0,
 			Name . " must never call the raw detached builder")
 	}
-	DeleteBody := _DriverFuncBody("_LLM_Menu_OnDeleteCachedModelDone")
-	Assert(InStr(DeleteBody, "if A_IsSuspended") == 0,
-		"delete completion must retain its repaint request during Suspend")
+	DeletePromptBody := _DriverFuncBody("_LLM_Menu_PromptDeleteCachedModel")
+	Assert(InStr(DeletePromptBody, "_LLM_Menu_RecordDeleteReconcile") > 0,
+		"delete dispatch must retain reconciliation before suspension can cancel it")
 
 	ResumeBody := _DriverFuncBody("LLM_Menu_OnResume")
+	Assert(InStr(ResumeBody, "_LLM_Menu_ServiceDeleteReconcile()") > 0,
+		"resume must consume retained delete reconciliation")
 	Assert(InStr(ResumeBody, "LLM_Menu_ServiceBuilds()") > 0,
 		"resume must drain retained work without inventing a new generation")
 	Assert(InStr(ResumeBody, "LLM_Menu_Build()") == 0)

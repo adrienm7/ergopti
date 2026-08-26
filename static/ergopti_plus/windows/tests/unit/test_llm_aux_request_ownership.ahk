@@ -379,9 +379,13 @@ Test("[ahk-008-aux-owner] stale remote readiness aborts before completion",
 
 _LAO_CurrentResultsStaySilentDuringSuspend() {
 	global _LLM_Menu, _LLM_InstalledTagsCacheAt
+	global _LLM_Menu_DeleteReconcilePending
 	SavedMenu := _LLM_Menu
 	HadAt := IsSet(_LLM_InstalledTagsCacheAt)
 	SavedAt := HadAt ? _LLM_InstalledTagsCacheAt : 0
+	HadPending := IsSet(_LLM_Menu_DeleteReconcilePending)
+	SavedPending := HadPending ? _LLM_Menu_DeleteReconcilePending : 0
+	_LLM_Menu_DeleteReconcilePending := Map()
 	WasSuspended := A_IsSuspended
 	Builds := []
 	Warnings := []
@@ -392,21 +396,37 @@ _LAO_CurrentResultsStaySilentDuringSuspend() {
 		_LLM_InstalledTagsCacheAt := 777
 		DeleteOwner := LLM_AuxBegin("menu_delete:model-a",
 			_LAO_Context("http://localhost:11434", "model-a"))
+		_LLM_Menu_RecordDeleteReconcile(DeleteOwner, "Model A", "model-a")
 		if !WasSuspended
 			Suspend(1)
 		AssertTrue(_LLM_OllamaInvokeAuxResult(DeleteOwner,
 			(Ok) => _LLM_Menu_OnDeleteCachedModelDone("Model A", "model-a", Ok,
-				(*) => Builds.Push("delete"), (*) => Warnings.Push("delete")), false),
+				DeleteOwner, (*) => Builds.Push("delete"),
+				(*) => Warnings.Push("delete")), false),
 			"the transport must terminally consume a current result during Suspend")
-		AssertEqual(777, _LLM_InstalledTagsCacheAt,
-			"a delete completion during Suspend must not invalidate menu cache state")
+		AssertEqual(0, _LLM_InstalledTagsCacheAt,
+			"a suspended delete completion must expire the stale installed-tags cache")
 		AssertEqual(0, Builds.Length,
 			"a delete completion during Suspend must not rebuild the tray")
 		AssertEqual(0, Warnings.Length,
 			"a discarded suspended completion must not show a live failure warning")
 		AssertFalse(LLM_AuxIsCurrent(DeleteOwner),
-			"a deliberately discarded suspended delete result must still finish once")
+			"a retained suspended delete result must still finish once")
+		if !WasSuspended
+			Suspend(0)
+		AssertTrue(_LLM_Menu_ServiceDeleteReconcile(
+			(*) => Builds.Push("resume"), (*) => Warnings.Push("resume")),
+			"resume must consume the retained delete reconciliation")
+		AssertEqual(1, Builds.Length,
+			"resume must request exactly one installed-tags repaint")
+		AssertEqual(1, Warnings.Length,
+			"a failed suspended deletion must report its terminal on resume")
+		AssertFalse(_LLM_Menu_ServiceDeleteReconcile(
+			(*) => Builds.Push("duplicate"), (*) => Warnings.Push("duplicate")),
+			"the retained reconciliation must be one-shot")
 
+		if !A_IsSuspended
+			Suspend(1)
 		_LLM_Menu := Map("enabled", true, "backend", "api", "api_entry_id", "prod",
 			"api_entries", [Map("Id", "prod", "Name", "Prod", "Provider", "openai",
 				"BaseUrl", "https://b.invalid/v1", "Token", "secret", "Model", "b")])
@@ -425,10 +445,84 @@ _LAO_CurrentResultsStaySilentDuringSuspend() {
 			Suspend(0)
 		_LLM_Menu := SavedMenu
 		_LLM_InstalledTagsCacheAt := HadAt ? SavedAt : unset
+		_LLM_Menu_DeleteReconcilePending := HadPending ? SavedPending : unset
 	}
 }
-Test("[ahk-008-aux-owner] current delete and API results are silent during Suspend",
+Test("[ahk-021] suspended delete terminal reconciles once on resume",
 	_LAO_CurrentResultsStaySilentDuringSuspend)
+
+_LAO_DeletePublishesWhileDisabled() {
+	global _LLM_Menu, _LLM_InstalledTagsCacheAt
+	global _LLM_Menu_DeleteReconcilePending
+	SavedMenu := _LLM_Menu
+	SavedAt := _LLM_InstalledTagsCacheAt
+	HadPending := IsSet(_LLM_Menu_DeleteReconcilePending)
+	SavedPending := HadPending ? _LLM_Menu_DeleteReconcilePending : 0
+	_LLM_Menu_DeleteReconcilePending := Map()
+	Builds := []
+	Warnings := []
+	try {
+		_LAO_ResetOwners()
+		_LLM_Menu := Map("enabled", false, "backend", "ollama")
+		_LLM_InstalledTagsCacheAt := 888
+		Owner := LLM_AuxBegin("menu_delete:model-b",
+			_LAO_Context("http://localhost:11434", "model-b"))
+		_LLM_Menu_RecordDeleteReconcile(Owner, "Model B", "model-b")
+		AssertTrue(_LLM_Menu_OnDeleteCachedModelDone("Model B", "model-b", false,
+			Owner, (*) => Builds.Push("build"), (*) => Warnings.Push("warning")),
+			"a current delete must publish while generation is disabled")
+		AssertEqual(0, _LLM_InstalledTagsCacheAt,
+			"the disabled-state completion must expire installed tags")
+		AssertEqual(1, Builds.Length,
+			"the configurable disabled menu must repaint exactly once")
+		AssertEqual(1, Warnings.Length,
+			"a failed disabled-state deletion must report its failure")
+		AssertEqual(0, _LLM_Menu_DeleteReconcilePending.Count,
+			"a published terminal must consume its retained obligation")
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_InstalledTagsCacheAt := SavedAt
+		_LLM_Menu_DeleteReconcilePending := HadPending ? SavedPending : unset
+	}
+}
+Test("[ahk-021] delete terminal publishes while LLM is disabled",
+	_LAO_DeletePublishesWhileDisabled)
+
+_LAO_SuspendInvalidationRetainsDeleteReconcile() {
+	global _LLM_Menu, _LLM_InstalledTagsCacheAt
+	global _LLM_Menu_DeleteReconcilePending
+	SavedMenu := _LLM_Menu
+	SavedAt := _LLM_InstalledTagsCacheAt
+	HadPending := IsSet(_LLM_Menu_DeleteReconcilePending)
+	SavedPending := HadPending ? _LLM_Menu_DeleteReconcilePending : 0
+	Builds := []
+	try {
+		_LAO_ResetOwners()
+		_LLM_Menu := Map("enabled", true, "backend", "ollama")
+		_LLM_InstalledTagsCacheAt := 999
+		_LLM_Menu_DeleteReconcilePending := Map()
+		Owner := LLM_AuxBegin("menu_delete:model-c",
+			_LAO_Context("http://localhost:11434", "model-c"))
+		_LLM_Menu_RecordDeleteReconcile(Owner, "Model C", "model-c")
+		LLM_AuxInvalidate("suspend")
+		AssertFalse(LLM_AuxIsCurrent(Owner),
+			"suspend must retire the exact delete transport owner")
+		AssertEqual(1, _LLM_Menu_DeleteReconcilePending.Count,
+			"transport cancellation must retain the cache obligation")
+		AssertTrue(_LLM_Menu_ServiceDeleteReconcile((*) => Builds.Push("resume")),
+			"resume must reconcile even when cancellation prevented a callback")
+		AssertEqual(0, _LLM_InstalledTagsCacheAt,
+			"resume must expire cache after a cancelled delete")
+		AssertEqual(1, Builds.Length,
+			"cancelled delete reconciliation must request exactly one repaint")
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_InstalledTagsCacheAt := SavedAt
+		_LLM_Menu_DeleteReconcilePending := HadPending ? SavedPending : unset
+	}
+}
+Test("[ahk-021] suspend cancellation retains delete reconciliation",
+	_LAO_SuspendInvalidationRetainsDeleteReconcile)
 
 _LAO_EndpointInvalidationResetsDerivedState() {
 	global _LLM_Menu, _LLM_InstalledTagsCache, _LLM_InstalledTagsCacheAt

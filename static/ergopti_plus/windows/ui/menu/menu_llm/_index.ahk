@@ -107,6 +107,12 @@ global LLM_HEALTH_PROBE_INTERVAL_MS := 10000
 ; so opening the menu twice in a second cannot spawn two children.
 global LLM_HEALTH_PROBE_THROTTLE_MS := 3000
 
+; Model deletions remain configurable while LLM generation is disabled. A
+; suspend boundary can also cancel their transport before its callback runs,
+; so retain the resulting cache-reconciliation obligation independently from
+; the short-lived auxiliary request owner.
+global _LLM_Menu_DeleteReconcilePending := Map()
+
 
 
 
