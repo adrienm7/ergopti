@@ -169,6 +169,8 @@ _JsonParseString(&text, &pos) {
 	len := StrLen(text)
 	while (pos <= len) {
 		c := SubStr(text, pos, 1)
+		if (Ord(c) < 0x20)
+			throw Error("JSON: unescaped control character at position " . pos . ".", -1)
 		if (c == '"') {
 			pos++
 			return out
@@ -200,15 +202,19 @@ _JsonParseString(&text, &pos) {
 					cp := Integer("0x" . hex)
 					; UTF-16 surrogate pair: high surrogate (D800-DBFF) must be followed
 					; by a low surrogate (DC00-DFFF) to form a non-BMP codepoint.
-					if (cp >= 0xD800 and cp <= 0xDBFF and SubStr(text, pos, 2) == "\u") {
+					if (cp >= 0xD800 and cp <= 0xDBFF) {
+						if (SubStr(text, pos, 2) != "\u")
+							throw Error("JSON: high surrogate without low surrogate at position " . pos . ".", -1)
 						hex2 := SubStr(text, pos + 2, 4)
-						if RegExMatch(hex2, "^[0-9A-Fa-f]{4}$") {
-							low := Integer("0x" . hex2)
-							if (low >= 0xDC00 and low <= 0xDFFF) {
-								pos += 6
-								cp := 0x10000 + (cp - 0xD800) * 0x400 + (low - 0xDC00)
-							}
-						}
+						if !RegExMatch(hex2, "^[0-9A-Fa-f]{4}$")
+							throw Error("JSON: invalid low surrogate at position " . (pos + 2) . ".", -1)
+						low := Integer("0x" . hex2)
+						if (low < 0xDC00 or low > 0xDFFF)
+							throw Error("JSON: high surrogate without low surrogate at position " . pos . ".", -1)
+						pos += 6
+						cp := 0x10000 + (cp - 0xD800) * 0x400 + (low - 0xDC00)
+					} else if (cp >= 0xDC00 and cp <= 0xDFFF) {
+						throw Error("JSON: isolated low surrogate at position " . (pos - 4) . ".", -1)
 					}
 					out .= Chr(cp)
 				default:
@@ -225,6 +231,8 @@ _JsonParseString(&text, &pos) {
 			pos++
 			while (pos <= len) {
 				cc := SubStr(text, pos, 1)
+				if (Ord(cc) < 0x20)
+					throw Error("JSON: unescaped control character at position " . pos . ".", -1)
 				if (cc == '"' or cc == "\" or cc == '``')
 					break
 				pos++
