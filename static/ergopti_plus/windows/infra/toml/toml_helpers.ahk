@@ -536,9 +536,9 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; that felt stuck. Two QPC reads, gated by the profiler floor.
 		_hpTomlWrite := HotPath_Now()
 
-		Cached := BuildOnly && IsSet(ProvidedContent)
+		Parsed := BuildOnly && IsSet(ProvidedContent)
 			? _ParseTomlFileImpl(Path, false, false, ProvidedContent)
-			: (BuildOnly ? TOML_ParseFreshFile(Path) : ParseTomlFile(Path))
+			: TOML_ParseFreshFile(Path)
 		; Refuse to rebuild a file we could not read. Everything below serializes
 		; ONLY what this parse returned and then moves the result over the original,
 		; so proceeding on a failed read would replace the user's whole config with
@@ -548,10 +548,9 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				try LoggerError("TomlWrite", "Refusing to write '{1}': the current contents could not be read, and rewriting from an unread file would discard every setting it holds.", Path)
 				return false
 		}
-		; Deep-copy the cached Map before mutating: ParseTomlFile returns the
-		; live cache object by reference, so mutating it directly would corrupt
-		; the cache on any write failure, leaving un-persisted values in memory.
-		Sections := Cached.Clone()
+		; Deep-copy the parsed Map before mutating so candidate rendering and
+		; publication share the same side-effect-free transformation.
+		Sections := Parsed.Clone()
 		for sec in Sections
 				Sections[sec] := Sections[sec].Clone()
 		; Track section order so the on-disk layout stays stable across writes.
