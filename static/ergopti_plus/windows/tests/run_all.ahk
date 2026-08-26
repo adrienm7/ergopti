@@ -105,6 +105,7 @@ OnError(_FatalErrorHandler)
 #Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
+#Include ../infra/clipboard_history_paste.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
 #Include ../infra/hotstrings/hotstring_engine_main.ahk
 #Include ../infra/hotstrings/hotstring_buffer_effects.ahk
@@ -1396,6 +1397,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_wpm_rebuilt_surface_is_sized.ahk
 #Include unit/test_activate_hotstrings_commits_synchronously.ahk
 #Include unit/test_cache_builder_strips_header_comment.ahk
+#Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
 #Include unit/test_config_toml_single_writer.ahk
 #Include unit/test_derived_toml_caches_not_memoised_on_failed_read.ahk
@@ -1433,6 +1435,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_tap_hold_global_transaction_20260813.ahk
 #Include unit/test_tooltip_row_band_elision.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_clipboard_history_paste_wiring.ahk
 #Include meta/test_fast_timer_inventory.ahk
 #Include meta/test_gestures_bulk_actions_ahk_reachable.ahk
 #Include meta/test_gesture_constants_available_to_onboarding.ahk

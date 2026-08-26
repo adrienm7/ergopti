@@ -1288,7 +1288,7 @@ _RegisterRollsAltGrHotkeys()
 ; ================================
 
 #HotIf IsSet(Features) and Features["layout"]["ergopti_base"]
-^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste doesn't work
+^SC02F:: ClipboardHistoryPaste()
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
