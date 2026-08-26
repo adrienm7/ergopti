@@ -931,6 +931,24 @@ function M.classify_no_follow(path)
 	return nil, "absent"
 end
 
+--- Allocates one process-unique temporary regular file through Lua's POSIX
+--- os.tmpname() boundary. On macOS Lua creates the file while choosing the name,
+--- so another user cannot pre-create a symlink in the selection/open gap.
+--- Callers own the returned pathname and must remove it explicitly.
+--- @return string|nil path Owned regular-file pathname.
+--- @return string|nil detail Concrete allocation or classification failure.
+function M.create_secure_temp_file()
+	local call_ok, path = pcall(os.tmpname)
+	if not call_ok or type(path) ~= "string" or path == "" then
+		return nil, tostring(path or "os.tmpname returned no pathname")
+	end
+	local attributes, status, detail = M.classify_no_follow(path)
+	if status ~= "ok" or type(attributes) ~= "table" or attributes.mode ~= "file" then
+		return nil, tostring(detail or "os.tmpname did not create a regular file")
+	end
+	return path
+end
+
 --- Acquires the stable adjacent writer locks for several paths in lexical
 --- resolved-path order. Ordering prevents two cooperating multi-path writers
 --- from deadlocking each other. The returned group is also returned on partial

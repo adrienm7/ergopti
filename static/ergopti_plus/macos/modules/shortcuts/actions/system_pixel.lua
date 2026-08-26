@@ -20,6 +20,7 @@ local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
+local FileSystem    = require("adapters.file_system")
 local TaskLifecycle = require("adapters.task_lifecycle")
 
 local LOG = "shortcuts.actions.system"
@@ -64,13 +65,42 @@ local function operation_is_authorized(operation)
 		and operation.generation == _generation
 end
 
---- Releases the logical operation after its exact native slot is gone.
+--- Removes the exact capture file owned by one operation. A refused cleanup
+--- remains attached to the operation and blocks every successor.
 --- @param operation table Operation identity.
+--- @return boolean settled
+local function remove_temp_capture(operation)
+	local path = operation.temp_path
+	if type(path) ~= "string" or path == "" then return true end
+	local call_ok, removed, detail = xpcall(
+		FileSystem.remove_exact, debug.traceback, path)
+	if call_ok == true and removed == true then
+		operation.temp_path = nil
+		return true
+	end
+	local classify_ok, _, status = xpcall(
+		FileSystem.classify_no_follow, debug.traceback, path)
+	if classify_ok == true and status == "absent" then
+		operation.temp_path = nil
+		return true
+	end
+	Logger.error(LOG, "Pixel capture cleanup retained '%s': %s.",
+		path, tostring(call_ok == true and detail or removed))
+	return false
+end
+
+--- Releases the logical operation after its exact native slot and capture file
+--- are both gone.
+--- @param operation table Operation identity.
+--- @return boolean settled
 local function finish_operation(operation)
 	if _current_operation == operation and operation.slot == nil
 		and operation.acquiring ~= true then
+		operation.authorized = false
+		if remove_temp_capture(operation) ~= true then return false end
 		_current_operation = nil
 	end
+	return _current_operation ~= operation
 end
 
 --- Releases one exact native task identity after its terminal callback.
@@ -307,7 +337,7 @@ local function start_task_phase(operation, label, executable, args, on_terminal)
 end
 
 --- Creates one top-level user operation. Concurrent work and cleanup debt are
---- rejected rather than overlapped over the shared temp file/clipboard sink.
+--- rejected rather than overlapped over an owned capture or clipboard sink.
 --- @param label string Stable operation label.
 --- @return table|nil operation
 local function begin_operation(label)
@@ -319,7 +349,11 @@ local function begin_operation(label)
 		if _current_operation.authorized ~= true and _current_operation.slot then
 			terminate_task_slot(_current_operation, _current_operation.slot,
 				label .. " admission cleanup")
+		elseif _current_operation.slot == nil
+			and _current_operation.acquiring ~= true then
+			finish_operation(_current_operation)
 		end
+		if not _current_operation then return begin_operation(label) end
 		Logger.warn(LOG, "%s refused while prior pixel work remains owned.", tostring(label))
 		return nil
 	end
@@ -331,6 +365,7 @@ local function begin_operation(label)
 		authorized = true,
 		slot = nil,
 		acquiring = false,
+		temp_path = nil,
 	}
 	_current_operation = operation
 	return operation
@@ -383,7 +418,16 @@ end
 --- @param y number Y screen coordinate.
 --- @param on_hex function Called as on_hex(hex_or_nil) with "#a1b2c3" or nil.
 local function pixel_hex_at(operation, x, y, on_hex)
-	local tmpfile = "/tmp/_hs_pixel_cap.png"
+	local allocation_ok, tmpfile, allocation_detail = xpcall(
+		FileSystem.create_secure_temp_file, debug.traceback)
+	if allocation_ok ~= true or type(tmpfile) ~= "string" or tmpfile == "" then
+		operation.authorized = false
+		finish_operation(operation)
+		Logger.error(LOG, "Pixel capture temporary-file allocation failed: %s.",
+			tostring(allocation_ok == true and allocation_detail or tmpfile))
+		return false
+	end
+	operation.temp_path = tmpfile
 	local safe_x  = math.floor(tonumber(x) or 0) - 1
 	local safe_y  = math.floor(tonumber(y) or 0) - 1
 
@@ -394,10 +438,10 @@ local function pixel_hex_at(operation, x, y, on_hex)
 	-- Bare Python source: with argv there is no shell, so the `python3 -c "…"`
 	-- wrapper and its quoting are gone and the interpreter receives the program
 	-- exactly as written here.
-	local py_src = string.format([[
-import struct,zlib
+	local py_src = [[
+import struct,sys,zlib
 try:
-  data=open('%s','rb').read()
+  data=open(sys.argv[1],'rb').read()
   w,h=struct.unpack('>II',data[16:24])
   ct=data[25];bpp=4 if ct==6 else 3
   i,chunks=8,b''
@@ -409,13 +453,13 @@ try:
   raw=zlib.decompress(chunks)
   cx=w//2;cy=h//2;off=cy*(1+w*bpp)+1+cx*bpp
   r,g,b=raw[off],raw[off+1],raw[off+2]
-  print('#%%02x%%02x%%02x' %% (r,g,b))
+  print('#%02x%02x%02x' % (r,g,b))
 except Exception:
   pass
-]], tmpfile)
+]]
 
 	return start_task_phase(operation, "Pixel screencapture", SCREENCAPTURE_BIN,
-		{ "-x", "-R", region, tmpfile }, function(cap_code)
+		{ "-x", "-t", "png", "-R", region, tmpfile }, function(cap_code)
 		if cap_code ~= 0 then
 			Logger.error(LOG, "screencapture exited with code %s — pixel read aborted.",
 				tostring(cap_code))
@@ -423,7 +467,7 @@ except Exception:
 			return true
 		end
 		return start_task_phase(operation, "Pixel extractor", PYTHON_BIN,
-			{ "-c", py_src }, function(py_code, stdout)
+			{ "-c", py_src, tmpfile }, function(py_code, stdout)
 			local hex = (py_code == 0) and type(stdout) == "string"
 				and stdout:match("(#%x%x%x%x%x%x)") or nil
 			if hex then
