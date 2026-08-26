@@ -434,6 +434,28 @@ function M.update_private_status()
 	end
 end
 
+--- Reads one application property without allowing a dying native object to
+--- abort the rest of the foreground-switch transaction.
+--- @param app_object table The active hs.application object.
+--- @param reader_name string Native reader method name.
+--- @param app_name string Display name used only for diagnostics.
+--- @return any value The native value, or nil when the read was rejected.
+local function read_active_app_property(app_object, reader_name, app_name)
+	local ok, value = pcall(function()
+		local reader = app_object[reader_name]
+		if type(reader) ~= "function" then
+			error(reader_name .. "() is unavailable", 0)
+		end
+		return reader(app_object)
+	end)
+	if not ok then
+		Logger.warn(LOG, "Failed to read %s() for active app '%s': %s.",
+			reader_name, tostring(app_name), tostring(value))
+		return nil
+	end
+	return value
+end
+
 --- Application watcher callback: fires when a new application gains focus.
 --- Logs the time spent in the previous app, updates all context fields,
 --- and re-attaches the accessibility observer to the new app.
@@ -452,10 +474,7 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	-- delivering activations while paused, so the gate has to live here.
 	if _is_paused() then return end
 
-	local now        = hs.timer.absoluteTime() / 1000000
-	local new_bundle = app_object:bundleID()
-	local new_path   = app_object:path()
-	local new_pid    = app_object:pid()
+	local now = hs.timer.absoluteTime() / 1000000
 
 	-- Log time spent in the previous app before switching context
 	if _state.active_app_name and _state.active_app_name ~= app_name then
@@ -466,6 +485,13 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 			_log_manager.log_app_switch(_state.active_app_name, app_name, duration_ms)
 		end
 	end
+
+	-- Each reader crosses into a process that may already be terminating. Keep
+	-- the reads independent so one refusal cannot suppress the remaining state
+	-- publication or retain the previous application's AX observer.
+	local new_bundle = read_active_app_property(app_object, "bundleID", app_name)
+	local new_path   = read_active_app_property(app_object, "path", app_name)
+	local new_pid    = read_active_app_property(app_object, "pid", app_name)
 
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now
