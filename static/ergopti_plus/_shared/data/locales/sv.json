@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "Antal förslag: %s",
 	"menu.llm.off": "❌ AI inaktiverat (klicka för att aktivera)",
 	"menu.llm.ollama_model_hint": "Ollama-modellidentifierare, t.ex.: qwen2.5:1.5b eller llama3.2:3b",
+	"menu.llm.open_source_failed": "Det gick inte att öppna modellens källsida.",
 	"menu.llm.ollama_port_label": "Ollama-serverport: %s",
 	"menu.llm.ollama_port_prompt": "Port för den lokala Ollama-servern (1024-65535). Standard: 11434.",
 	"menu.llm.ollama_port_title": "Ollama-serverport",

@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "Öneri sayısı: %s",
 	"menu.llm.off": "❌ AI devre dışı (etkinleştirmek için tıklayın)",
 	"menu.llm.ollama_model_hint": "Ollama model tanımlayıcısı, ör.: qwen2.5:1.5b veya llama3.2:3b",
+	"menu.llm.open_source_failed": "Modelin kaynak sayfası açılamadı.",
 	"menu.llm.ollama_port_label": "Ollama sunucu bağlantı noktası: %s",
 	"menu.llm.ollama_port_prompt": "Yerel Ollama sunucusunun bağlantı noktası (1024-65535). Varsayılan: 11434.",
 	"menu.llm.ollama_port_title": "Ollama sunucu bağlantı noktası",

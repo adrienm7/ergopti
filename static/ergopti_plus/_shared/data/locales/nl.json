@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "Aantal suggesties: %s",
 	"menu.llm.off": "❌ AI uitgeschakeld (klik om in te schakelen)",
 	"menu.llm.ollama_model_hint": "Ollama-modelidentificator, bijv.: qwen2.5:1.5b of llama3.2:3b",
+	"menu.llm.open_source_failed": "De bronpagina van het model kon niet worden geopend.",
 	"menu.llm.ollama_port_label": "Ollama-serverpoort: %s",
 	"menu.llm.ollama_port_prompt": "Poort van de lokale Ollama-server (1024-65535). Standaard: 11434.",
 	"menu.llm.ollama_port_title": "Ollama-serverpoort",
