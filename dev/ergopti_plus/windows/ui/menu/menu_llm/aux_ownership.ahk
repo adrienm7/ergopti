@@ -27,6 +27,74 @@ _LLM_Menu_AuxOwnerIsCurrent(Owner, Backend := "ollama") {
 	return _LLM_Menu.Get("backend", "") == Backend
 }
 
+_LLM_Menu_DeleteOwnerIsCurrent(Owner) {
+	global _LLM_Menu
+	return LLM_AuxIsCurrent(Owner)
+		&& _LLM_Menu is Map
+		&& _LLM_Menu.Get("backend", "") == "ollama"
+}
+
+_LLM_Menu_RecordDeleteReconcile(Owner, Name, Tag) {
+	global _LLM_Menu_DeleteReconcilePending
+	if !(Owner is Map) || !Owner.Has("token")
+		return false
+	PreviousCritical := Critical("On")
+	try _LLM_Menu_DeleteReconcilePending[Owner["token"]] := Map(
+		"name", Name, "tag", Tag, "has_result", false, "ok", false)
+	finally Critical(PreviousCritical)
+	return true
+}
+
+_LLM_Menu_UpdateDeleteReconcile(Owner, Ok) {
+	global _LLM_Menu_DeleteReconcilePending
+	if !(Owner is Map) || !Owner.Has("token")
+		return false
+	Token := Owner["token"]
+	if !_LLM_Menu_DeleteReconcilePending.Has(Token)
+		return false
+	Pending := _LLM_Menu_DeleteReconcilePending[Token]
+	Pending["has_result"] := true
+	Pending["ok"] := !!Ok
+	return true
+}
+
+_LLM_Menu_ClearDeleteReconcile(Owner) {
+	global _LLM_Menu_DeleteReconcilePending
+	if !(Owner is Map) || !Owner.Has("token")
+		return false
+	Token := Owner["token"]
+	if !_LLM_Menu_DeleteReconcilePending.Has(Token)
+		return false
+	_LLM_Menu_DeleteReconcilePending.Delete(Token)
+	return true
+}
+
+_LLM_Menu_ServiceDeleteReconcile(BuildFn := 0, WarnFn := 0) {
+	global _LLM_Menu_DeleteReconcilePending, _LLM_InstalledTagsCacheAt
+	if A_IsSuspended
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_Menu_DeleteReconcilePending.Count == 0
+			return false
+		Pending := _LLM_Menu_DeleteReconcilePending
+		_LLM_Menu_DeleteReconcilePending := Map()
+		_LLM_InstalledTagsCacheAt := 0
+	} finally Critical(PreviousCritical)
+	for _, Record in Pending {
+		if !Record["has_result"] || Record["ok"]
+			continue
+		if HasMethod(WarnFn, "Call")
+			WarnFn.Call(Record["name"], Record["tag"])
+		else
+			try LoggerWarn("LLM",
+				"Model cache delete failed for '{1}' (tag '{2}').",
+				Record["name"], Record["tag"])
+	}
+	_LLM_Menu_AuxBuild(BuildFn)
+	return true
+}
+
 _LLM_Menu_AuxBuild(BuildFn := 0) {
 	if HasMethod(BuildFn, "Call") {
 		if A_IsSuspended
@@ -38,8 +106,10 @@ _LLM_Menu_AuxBuild(BuildFn := 0) {
 
 _LLM_Menu_ResetOllamaAuxState(*) {
 	global _LLM_Menu, _LLM_InstalledTagsCache, _LLM_InstalledTagsCacheAt
+	global _LLM_Menu_DeleteReconcilePending
 	_LLM_InstalledTagsCache := []
 	_LLM_InstalledTagsCacheAt := 0
+	_LLM_Menu_DeleteReconcilePending := Map()
 	if _LLM_Menu is Map {
 		_LLM_Menu["last_health_probe_tick"] := 0
 		_LLM_Menu["last_health_status"] := ""
@@ -133,13 +203,17 @@ _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok, Owner := 0,
 	global _LLM_InstalledTagsCacheAt
 	PreviousCritical := Critical("On")
 	try {
-		if !_LLM_Menu_AuxOwnerIsCurrent(Owner)
+		if !_LLM_Menu_DeleteOwnerIsCurrent(Owner)
 			return false
 		_LLM_InstalledTagsCacheAt := 0
+		_LLM_Menu_UpdateDeleteReconcile(Owner, ok)
 		if !LLM_AuxFinish(Owner)
 			return false
 	} finally Critical(PreviousCritical)
-	if !ok && !A_IsSuspended {
+	if A_IsSuspended
+		return true
+	_LLM_Menu_ClearDeleteReconcile(Owner)
+	if !ok {
 		if HasMethod(WarnFn, "Call")
 			WarnFn.Call(name, tag)
 		else

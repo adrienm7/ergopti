@@ -519,6 +519,40 @@ TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 Test("ApplyConfigToml: unknown sections warn but do not abort other overrides",
 	TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash)
 
+TestFMv2_ApplyUnknownStaticLeafIsRejected() {
+	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _FM_WriteFixture("unknown_static_leaf",
+			"[script]`r`n"
+			. "locael = " . '"' . "en" . '"' . "`r`n"
+			. "locale = " . '"' . "es" . '"' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(1, Applied,
+			"only the known static leaf must count as applied")
+		AssertFalse(Features["script"].Has("locael"),
+			"a typo must not create a parasite key in a static section")
+		AssertEqual("es", Features["script"]["locale"],
+			"rejecting a typo must not abort the following valid override")
+		Errors := []
+		for Line in Captured
+			if InStr(Line, "[ERROR]", true)
+				Errors.Push(Line)
+		AssertEqual(1, Errors.Length,
+			"an unknown static leaf must emit exactly one ERROR")
+		AssertTrue(InStr(Errors[1], "[script].locael", true) > 0,
+			"the error must name the rejected leaf")
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: unknown static leaf keys are loudly rejected",
+	TestFMv2_ApplyUnknownStaticLeafIsRejected)
+
 TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped() {
 	; hotstrings.personal.<name> is seeded at runtime from the user's own
 	; personal_hotstrings.toml section names (EnsurePersonalHotstringFeature) --

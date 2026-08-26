@@ -566,6 +566,7 @@ LLM_Menu_OnResume() {
 			try LoggerError("LLM",
 				"Trigger shortcut recovery resume service failed: {1}.", Err.Message)
 	}
+	_LLM_Menu_ServiceDeleteReconcile()
 	LLM_Menu_ServiceBuilds()
 	if _LLM_Menu["bootstrap_pending"] {
 		_LLM_Menu["bootstrap_pending"] := false

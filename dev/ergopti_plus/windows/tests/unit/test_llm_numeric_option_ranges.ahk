@@ -195,3 +195,88 @@ _LNR_ConfiguredDebounceConsumersArmOneShotTimers() {
 Test("AHK2-06 numeric options: both configured debounce consumers arm one-shot timers "
 	. "(ahk2-06-numeric-option-ranges)",
 	_LNR_ConfiguredDebounceConsumersArmOneShotTimers)
+
+_LNR_InvalidPromptValuesNotifyWithoutMutation() {
+	global _LLM_Menu
+	SavedMenu := _LLM_Menu
+	Notices := []
+	NotifyFn := (Body, Title) => Notices.Push(Map("body", Body, "title", Title))
+	Normalized := "sentinel"
+	try {
+		_LLM_Menu := LLM_Menu_DeepClone(SavedMenu)
+		_LLM_Menu["debounce_ms"] := 500
+		IntegerCases := Map(
+			"debounce_ms", "abc",
+			"ctx_chars", "49",
+			"min_words", "0",
+			"max_words", "10001")
+		for Key, Raw in IntegerCases {
+			Before := Notices.Length
+			AssertFalse(_LLM_Menu_TryNormalizeIntegerPrompt(
+				"OK", Raw, Key, &Normalized, NotifyFn))
+			AssertEqual(Before + 1, Notices.Length,
+				"each invalid integer family must publish exactly one message: " . Key)
+			AssertEqual(false, Normalized)
+		}
+
+		Before := Notices.Length
+		AssertFalse(_LLM_Menu_TryNormalizePortPrompt(
+			"OK", "70000", &Normalized, NotifyFn))
+		AssertEqual(Before + 1, Notices.Length,
+			"an invalid port must publish exactly one message")
+
+		Before := Notices.Length
+		AssertFalse(_LLM_Menu_TryNormalizeTemperaturePrompt(
+			"OK", "abc", &Normalized, NotifyFn))
+		AssertEqual(Before + 1, Notices.Length,
+			"an invalid temperature must publish exactly one message")
+
+		for Field in ["api_name", "api_model", "profile_create", "profile_edit"] {
+			Before := Notices.Length
+			AssertFalse(_LLM_Menu_TryRequiredPrompt(
+				"OK", "  ", &Normalized, NotifyFn))
+			AssertEqual(Before + 1, Notices.Length,
+				"each required dialog family must publish exactly one message: " . Field)
+		}
+
+		Providers := Map("openai", Map())
+		Before := Notices.Length
+		AssertFalse(_LLM_Menu_TryProviderPrompt(
+			"OK", "typo", Providers, &Normalized, NotifyFn))
+		AssertEqual(Before + 1, Notices.Length,
+			"an unknown provider must publish exactly one message")
+		AssertEqual("", Normalized,
+			"an unknown provider must never coerce to a different provider")
+		AssertEqual(500, _LLM_Menu["debounce_ms"],
+			"validation feedback must not mutate menu state")
+		for Notice in Notices {
+			AssertTrue(Notice["body"] != "",
+				"invalid input feedback must resolve a localized body")
+			AssertTrue(Notice["title"] != "",
+				"invalid input feedback must resolve a localized title")
+		}
+	} finally _LLM_Menu := SavedMenu
+}
+Test("[ahk-022] invalid LLM prompt values notify once without mutation",
+	_LNR_InvalidPromptValuesNotifyWithoutMutation)
+
+_LNR_CancelledPromptsStaySilent() {
+	Notices := []
+	NotifyFn := (Body, Title) => Notices.Push(Body)
+	Providers := Map("openai", Map())
+	Normalized := "sentinel"
+	AssertFalse(_LLM_Menu_TryNormalizeIntegerPrompt(
+		"Cancel", "abc", "debounce_ms", &Normalized, NotifyFn))
+	AssertFalse(_LLM_Menu_TryNormalizePortPrompt(
+		"Cancel", "70000", &Normalized, NotifyFn))
+	AssertFalse(_LLM_Menu_TryNormalizeTemperaturePrompt(
+		"Cancel", "abc", &Normalized, NotifyFn))
+	AssertFalse(_LLM_Menu_TryRequiredPrompt(
+		"Cancel", "", &Normalized, NotifyFn))
+	AssertFalse(_LLM_Menu_TryProviderPrompt(
+		"Cancel", "typo", Providers, &Normalized, NotifyFn))
+	AssertEqual(0, Notices.Length,
+		"cancelling a native prompt must remain silent")
+}
+Test("[ahk-022] cancelled LLM prompts remain silent",
+	_LNR_CancelledPromptsStaySilent)

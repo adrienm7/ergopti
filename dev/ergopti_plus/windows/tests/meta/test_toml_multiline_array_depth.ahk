@@ -32,31 +32,64 @@
 ; ===================================================================
 ; ===================================================================
 
+_TTMAD_OpeningLineIgnoresQuotedClosingBracket() {
+	Path := A_Temp . "\ergopti-toml-multiline-opener-" . A_ScriptHwnd . ".toml"
+	try {
+		try FileDelete(Path)
+		FileAppend(
+			'[sample]`nitems = ["x]y",`n  "second"`n]`nafter = "kept"`n',
+			Path, "UTF-8")
+		Parsed := ParseTomlFile(Path)
+		AssertTrue(Parsed["sample"]["items"] is Array,
+			"a quoted ] on the opening line must not turn the array into raw text")
+		AssertEqual(2, Parsed["sample"]["items"].Length)
+		AssertEqual("x]y", Parsed["sample"]["items"][1])
+		AssertEqual("second", Parsed["sample"]["items"][2])
+		AssertEqual("kept", Parsed["sample"]["after"],
+			"parsing the multiline array must preserve following keys")
+	} finally {
+		global _ParseTomlCache
+		if _ParseTomlCache.Has(Path)
+			_ParseTomlCache.Delete(Path)
+		try FileDelete(Path)
+	}
+}
+Test("toml_helpers: quoted closing bracket on array opener stays multiline",
+	_TTMAD_OpeningLineIgnoresQuotedClosingBracket)
+
 _TTMAD_BracketDepthCounter() {
-	; Move-resilient: scan the toml module dir via the framework helper instead of a
-	; pinned infra/toml/toml_helpers.ahk read. The Depth++/Depth--/Depth <= 0/InStr2
-	; tokens are unique to toml_helpers.ahk within infra/toml, so the scope stays tight.
-	Src := _DriverDirConcat("infra/toml")
-	Assert(Src != "", "infra/toml/toml_helpers.ahk must be readable")
+	Helper := _DriverFuncBody("_TOML_ArrayBracketDepth")
+	Parser := _DriverFuncBody("_ParseTomlFileImpl")
+	Assert(Helper != "" && Parser != "",
+		"the TOML bracket scanner and parser must both exist")
 
 	; The Depth variable must exist — it is the bracket-depth counter
-	Assert(InStr(Src, "Depth") > 0,
+	Assert(InStr(Helper, "Depth") > 0,
 		"toml_helpers.ahk must use a Depth counter for multi-line array bracket tracking")
 
 	; Depth must be incremented when an opening bracket is found
-	Assert(InStr(Src, "Depth++") > 0,
+	Assert(InStr(Helper, "Depth++") > 0,
 		"toml_helpers.ahk must increment Depth on unquoted '[' (bracket-depth counter)")
 
 	; Depth must be decremented when a closing bracket is found
-	Assert(InStr(Src, "Depth--") > 0,
+	Assert(InStr(Helper, "Depth--") > 0,
 		"toml_helpers.ahk must decrement Depth on unquoted ']' (bracket-depth counter)")
 
 	; Termination condition must be depth-based, not naive InStr
-	Assert(InStr(Src, "Depth <= 0") > 0,
+	Assert(InStr(Parser, "Depth <= 0") > 0,
 		'toml_helpers.ahk must terminate the multi-line array accumulation when Depth <= 0, not via naive InStr(Line, "]")')
 
-	; Quote-state flag (InStr2) must be present to skip ] inside strings
-	Assert(InStr(Src, "InStr2") > 0,
-		"toml_helpers.ahk must track quote state (InStr2) so ] inside quoted strings does not close the array prematurely")
+	Assert(InStr(Helper, "InString") > 0 && InStr(Helper, "Escaped") > 0,
+		"the bracket scanner must track quoted strings and escaped quotes")
+	CallCount := 0
+	Pos := 1
+	while Found := InStr(Parser, "_TOML_ArrayBracketDepth(", , Pos) {
+		CallCount += 1
+		Pos := Found + 1
+	}
+	Assert(CallCount >= 2,
+		"both the opening-line detector and continuation path must share the quote-aware scanner")
+	Assert(InStr(Parser, '!InStr(val, "]")') == 0,
+		"the opening-line detector must not use the old raw closing-bracket probe")
 }
 Test("toml_helpers: multi-line array uses bracket-depth counter with quote-state tracking", _TTMAD_BracketDepthCounter)

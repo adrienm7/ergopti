@@ -26,6 +26,9 @@
 	"rejects": [
 		{ "id": "empty_string", "input": "" },
 		{ "id": "separator_only", "input": "+" },
+		{ "id": "leading_separator", "input": "+Ctrl+S" },
+		{ "id": "trailing_separator", "input": "Ctrl+S+" },
+		{ "id": "doubled_separator", "input": "Ctrl++S" },
 		{ "id": "trailing_modifier", "input": "Ctrl+Shift" },
 		{ "id": "bare_modifier", "input": "ctrl" },
 		{ "id": "unknown_modifier", "input": "hyper+s" },

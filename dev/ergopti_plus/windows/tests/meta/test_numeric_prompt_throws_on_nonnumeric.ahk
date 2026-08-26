@@ -54,8 +54,8 @@ _NPNN_PromptNumericGuardsInteger() {
 	Src := _NPNN_ReadSource("ui/menu/menu_llm/menu_settings.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_PromptNumeric")
 	Assert(Seg != "", "LLM_Menu_PromptNumeric declaration must exist in menu_settings.ahk")
-	Assert(InStr(Seg, "IsInteger") > 0,
-		"LLM_Menu_PromptNumeric must guard with IsInteger before Integer() — a non-numeric typo would otherwise throw an unhandled error in the menu-callback thread")
+	Assert(InStr(Seg, "_LLM_Menu_TryNormalizeIntegerPrompt") > 0,
+		"LLM_Menu_PromptNumeric must delegate to the behavior-tested feedback boundary")
 }
 Test("menu_settings: LLM_Menu_PromptNumeric guards Integer() with IsInteger (numeric-prompt-throws-on-nonnumeric)", _NPNN_PromptNumericGuardsInteger)
 
@@ -63,8 +63,8 @@ _NPNN_PromptMaxWordsGuardsInteger() {
 	Src := _NPNN_ReadSource("ui/menu/menu_llm/menu_settings.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_PromptMaxWords")
 	Assert(Seg != "", "LLM_Menu_PromptMaxWords declaration must exist in menu_settings.ahk")
-	Assert(InStr(Seg, "IsInteger") > 0,
-		"LLM_Menu_PromptMaxWords must guard with IsInteger before Integer() — a non-numeric typo would otherwise throw an unhandled error")
+	Assert(InStr(Seg, "_LLM_Menu_TryNormalizeIntegerPrompt") > 0,
+		"LLM_Menu_PromptMaxWords must delegate to the behavior-tested feedback boundary")
 }
 Test("menu_settings: LLM_Menu_PromptMaxWords guards Integer() with IsInteger (numeric-prompt-throws-on-nonnumeric)", _NPNN_PromptMaxWordsGuardsInteger)
 
@@ -72,18 +72,8 @@ _NPNN_PromptTemperatureGuardsFloat() {
 	Src := _NPNN_ReadSource("ui/menu/menu_llm/menu_settings.ahk")
 	Seg := _DriverFuncBody("LLM_Menu_PromptTemperature")
 	Assert(Seg != "", "LLM_Menu_PromptTemperature declaration must exist in menu_settings.ahk")
-	; The comma decimal is the common French-keyboard habit; the fix must
-	; normalise it to a dot before the canonical temperature boundary.
-	; Build the expected substring from Chr() so the test stays ASCII-only and
-	; matches the exact StrReplace(value, ",", ".") normalisation the fix adds.
-	Comma  := Chr(44)
-	Dot    := Chr(46)
-	NormPat := "StrReplace(ib.Value, " . Chr(34) . Comma . Chr(34) . ", " . Chr(34) . Dot . Chr(34) . ")"
-	Assert(InStr(Seg, NormPat) > 0,
-		"LLM_Menu_PromptTemperature must normalise comma decimals to dots so a French-keyboard '0,7' is accepted")
-	ValidatorPos := InStr(Seg, "LLM_Option_TryNormalizeTemperature(raw, &Normalized)")
-	Assert(ValidatorPos > InStr(Seg, NormPat),
-		"LLM_Menu_PromptTemperature must pass normalized input through the canonical bounded-decimal validator")
+	Assert(InStr(Seg, "_LLM_Menu_TryNormalizeTemperaturePrompt") > 0,
+		"LLM_Menu_PromptTemperature must delegate to the behavior-tested feedback boundary")
 	Assert(InStr(Seg, "Float(raw)") == 0,
 		"LLM_Menu_PromptTemperature must not bypass canonical validation with a direct Float conversion")
 }

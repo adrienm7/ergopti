@@ -105,6 +105,16 @@ helpers.describe("preview masking: what happens when it cannot decide", function
 				.. "mistake does not end in a secret on screen")
 	end)
 
+	helpers.it("fails closed for every malformed shared policy", function()
+		local vectors = corpus().invalid_policies or {}
+		helpers.assert_true(#vectors >= 6,
+			"the malformed-policy corpus must retain its type, range, and relation cases")
+		for _, vector in ipairs(vectors) do
+			helpers.assert_eq(Mask.mask(vector.value, vector.policy), vector.expected,
+				"invalid policy " .. tostring(vector.id) .. " must fail closed")
+		end
+	end)
+
 	helpers.it("masks a field nobody classified", function()
 		local Fields = helpers.load_module("infra.personal_info_fields")
 		helpers.assert_true(Fields.is_masked("some_field_added_next_year"),

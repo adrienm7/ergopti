@@ -136,9 +136,17 @@ function M.parse(str)
 	end
 
 	local tokens = {}
-	for token in str:gmatch("[^%" .. SEPARATOR .. "]+") do
+	local token_start = 1
+	while true do
+		local separator_at = str:find(SEPARATOR, token_start, true)
+		local token = str:sub(token_start, separator_at and separator_at - 1 or #str)
 		token = token:match("^%s*(.-)%s*$")
-		if token ~= "" then tokens[#tokens + 1] = token end
+		if token == "" then
+			return nil, "a chord cannot contain an empty token"
+		end
+		tokens[#tokens + 1] = token
+		if not separator_at then break end
+		token_start = separator_at + #SEPARATOR
 	end
 	if #tokens == 0 then
 		return nil, "a chord must name a key"

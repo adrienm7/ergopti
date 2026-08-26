@@ -498,6 +498,43 @@ TestTL_LoadExtTomlFileUsesCurrentSection() {
 Test("LoadExtTomlFile: registers entries without undefined category/section locals",
 	TestTL_LoadExtTomlFileUsesCurrentSection)
 
+TestTL_LoadExtSimpleEntriesUnescapeTomlStrings() {
+	global _Stub_HotstringRegistrations, _Stub_RecordedSends
+	TmpPath := A_ScriptDir . "\test_ext_simple_escapes.toml"
+	try {
+		try FileDelete(TmpPath)
+		FileAppend(
+			'[[custom]]`n'
+			. 'escapedoutput = "say \"hi\""`n'
+			. '"escaped\"trigger" = "value"`n',
+			TmpPath, "UTF-8")
+		ResetHotstringRecorders()
+		LoadExtTomlFile(TmpPath, "Custom")
+		AssertTrue(_Stub_HotstringRegistrations.Length >= 2,
+			"both escape-aware simple entries must register their variants")
+		OutputBinding := 0
+		FoundEscapedTrigger := false
+		for Binding in _Stub_HotstringRegistrations {
+			if InStr(Binding.spec, "escapedoutput") and !IsObject(OutputBinding)
+				OutputBinding := Binding
+			if InStr(Binding.spec, 'escaped"trigger')
+				FoundEscapedTrigger := true
+		}
+		AssertTrue(IsObject(OutputBinding),
+			"the bare simple trigger must register")
+		OutputBinding.callback.Call()
+		AssertEqual('say "hi"', _Stub_RecordedSends[2].args[1],
+			"the engine callback must receive the unescaped output")
+		AssertTrue(FoundEscapedTrigger,
+			"the engine must receive the unescaped quoted trigger")
+	} finally {
+		try FileDelete(TmpPath)
+		ResetHotstringRecorders()
+	}
+}
+Test("LoadExtTomlFile: simple entries unescape quoted triggers and outputs",
+	TestTL_LoadExtSimpleEntriesUnescapeTomlStrings)
+
 
 
 
@@ -630,4 +667,40 @@ TestTL_ParseGroupConfigPriority() {
 Test("ParseTomlGroupConfig: reads [_meta] and per-section priority",
 	TestTL_ParseGroupConfigPriority)
 
-
+TestTL_MetadataHeadersAcceptInlineComments() {
+	global HotstringGroupConfig
+	Path := A_Temp . "\toml_group_commented_headers_test.toml"
+	try {
+		try FileDelete(Path)
+		FileAppend(
+			"[_meta] # package defaults`n"
+			. "delay = 0.35`n"
+			. 'sections_order = ["foo", "bar"] # display order`n`n'
+			. "[_meta.sections.foo] # first section`n"
+			. "priority = 65`n`n"
+			. "[_meta.section_delays] # compact overrides`n"
+			. "bar = 0.75`n`n"
+			. "[[foo]]`n",
+			Path, "UTF-8")
+		if HotstringGroupConfig.Has(Path)
+			HotstringGroupConfig.Delete(Path)
+		Cfg := ParseTomlGroupConfig("", Path)
+		AssertEqual(0.35, Cfg.Delay,
+			"commented [_meta] must retain file-level metadata")
+		AssertEqual(65, Cfg.Sections["foo"].Priority,
+			"commented per-section metadata headers must parse")
+		AssertEqual(0.75, Cfg.Sections["bar"].Delay,
+			"commented section-delay headers must parse")
+		Order := ReadTomlSectionsOrder("", Path)
+		AssertEqual(2, Order.Length,
+			"commented [_meta] must expose sections_order")
+		AssertEqual("foo", Order[1])
+		AssertEqual("bar", Order[2])
+	} finally {
+		if HotstringGroupConfig.Has(Path)
+			HotstringGroupConfig.Delete(Path)
+		try FileDelete(Path)
+	}
+}
+Test("toml metadata: inline-commented headers parse in both readers",
+	TestTL_MetadataHeadersAcceptInlineComments)

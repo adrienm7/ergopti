@@ -477,6 +477,11 @@ _HSE_RunOwnedTerminalTransaction(Owner) {
 	return _HSE_FinishTerminalOwner(Owner, OutputSucceeded, TrailingText)
 }
 
+_HSE_DefaultTerminalScheduler(Runner, DelayMs) {
+	SetTimer(Runner, -Max(1, Floor(DelayMs)))
+	return true
+}
+
 _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 	global _HSE_TerminalOwner
 	if HSE_TerminalTransactionPending() {
@@ -498,8 +503,10 @@ _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 	}
 	Owner["CaptureAdmitted"] := true
 	Runner := _HSE_RunOwnedTerminalTransaction.Bind(Owner)
-	try Scheduled := HasMethod(SchedulerFn, "Call")
-		? _SendVerdictSucceeded(SchedulerFn.Call(Runner, Owner["DelayMs"])) : true
+	if !HasMethod(SchedulerFn, "Call")
+		SchedulerFn := _HSE_DefaultTerminalScheduler
+	try Scheduled := _SendVerdictSucceeded(
+		SchedulerFn.Call(Runner, Owner["DelayMs"]))
 	catch as Err {
 		if !Owner["Pending"]
 			return Owner
@@ -512,8 +519,6 @@ _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 		_HSE_RejectTerminalOwner(Owner)
 		return false
 	}
-	if !HasMethod(SchedulerFn, "Call")
-		SetTimer(Runner, -Max(1, Floor(Owner["DelayMs"])))
 	return Owner
 }
 

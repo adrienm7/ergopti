@@ -16,6 +16,7 @@ _AHK022_AllPortBoundariesUseOneOwner() {
 		"load_defaults", _DriverFuncBody("LLM_Ollama_LoadDefaults"),
 		"shared_defaults", _DriverFuncBody("LLM_Menu_ApplySharedDefaults"),
 		"prompt", _DriverFuncBody("LLM_Menu_PromptOllamaPort"),
+		"prompt_boundary", _DriverFuncBody("_LLM_Menu_TryNormalizePortPrompt"),
 		"prepare", _DriverFuncBody("_LLM_Menu_PrepareOllamaPortCandidate"),
 		"boot_apply", _DriverFuncBody("_LLM_Menu_ApplyOllamaPortAtBoot"),
 		"menu_init", _DriverFuncBody("LLM_Menu_Init"),
@@ -24,9 +25,11 @@ _AHK022_AllPortBoundariesUseOneOwner() {
 		Assert(Body != "", "AHK-022 source guard must resolve " . Name)
 
 	for Name in ["option", "set_port", "load_defaults", "shared_defaults",
-			"prompt", "prepare", "boot_apply"]
+			"prompt_boundary", "prepare", "boot_apply"]
 		AssertContains(Bodies[Name], "LLM_Option_TryNormalizeOllamaPort(",
 			Name . " must delegate to the canonical port boundary")
+	AssertContains(Bodies["prompt"], "_LLM_Menu_TryNormalizePortPrompt(",
+		"the native prompt must delegate to the behavior-tested feedback boundary")
 
 	for Name in ["set_port", "prompt", "prepare"] {
 		AssertFalse(InStr(Bodies[Name], "< 1024") > 0,

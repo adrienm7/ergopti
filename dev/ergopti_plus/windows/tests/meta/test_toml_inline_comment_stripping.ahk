@@ -110,18 +110,17 @@ _TIC_SectionHeaderDropsItsComment() {
 ; as a class so a fix to one parser cannot quietly skip the others.
 _TIC_AllHeaderParsersStripComments() {
 	Checked := 0
-	for Name in ["ApplyConfigToml", "ReadTomlSectionsOrder", "LoadHotstringsSection"] {
+	Names := ["ApplyConfigToml", "ParseTomlGroupConfig",
+		"ReadTomlSectionsOrder", "LoadHotstringsSection"]
+	for Name in Names {
 		Body := _DriverFuncBody(Name)
-		if (Body == "")
-			continue
-		if (InStr(Body, "^\[") == 0)
-			continue
+		Assert(Body != "", Name . " must exist for the header-parser class guard")
 		Checked += 1
 		Assert(InStr(Body, "TOML_StripInlineComment(") > 0,
 			Name . " matches a section header but never strips an inline comment first — its anchored pattern fails on a commented header, the line falls through to the key parser, and the section pointer is left on the PREVIOUS section so the following keys are applied to the wrong one")
 	}
-	Assert(Checked >= 2,
-		"expected at least two sibling header parsers to police (found " . Checked . ")")
+	Assert(Checked == Names.Length,
+		"every named sibling header parser must be checked")
 }
 
 

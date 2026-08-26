@@ -43,6 +43,15 @@ global _SuspendPending := false
 global SUSPEND_DEFER_TIMEOUT_MS := 2000
 global _SuspendPendingSince := 0
 
+; Watchdog state is initialized by this include, but the timer starts only after
+; every boot subsystem reaches its ready boundary. Starting from boot.ahk let an
+; onboarding message pump consume the marker before these globals existed;
+; starting here would still let the reactor tear down subsystems whose later
+; auto-execute initialization had not finished.
+global SUSPEND_WATCHDOG_MS := 500
+global _LastSuspendState := A_IsSuspended
+global _SuspendWatchdogStarted := false
+
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
 ; latch across Suspend and cannot be cleared by synthetic events — they must be
@@ -182,7 +191,7 @@ _SuspendHandoffBeforeReload(Path) {
 
 _SuspendHandoffPrepareMarker(Path) {
 	return SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
-		FSAtomicMoveReplace, FSDelete)
+		FSAtomicMoveReplace, FSDeleteStrict)
 }
 
 _SuspendHandoffCommitMarker(Path) {
@@ -190,7 +199,7 @@ _SuspendHandoffCommitMarker(Path) {
 }
 
 _SuspendHandoffCancelMarker(Path) {
-	return SuspendHandoffAbort(Path, FSExists, FSDelete)
+	return SuspendHandoffAbort(Path, FSStrictExists, FSDeleteStrict)
 }
 
 ; Surfaces hand-off failures without a modal dialog on the keyboard thread.
@@ -214,10 +223,10 @@ _SuspendRestoreFromMarker() {
 		Path := _SuspendMarkerPath()
 		; Refused or interrupted preparations are inert. Their cleanup result is
 		; surfaced, but cannot suppress consumption of separately committed intent.
-		SuspendHandoffDiscardPending(Path, FSExists, FSDelete,
+		SuspendHandoffDiscardPending(Path, FSStrictExists, FSDeleteStrict,
 			_SuspendHandoffFailure)
 		return SuspendHandoffConsume(Path, A_IsSuspended,
-				FSExists, FSMove, FSDelete, ToggleSuspend,
+				FSStrictExists, FSMove, FSDeleteStrict, ToggleSuspend,
 				_SuspendHandoffBeforeToggle, _SuspendHandoffFailure)
 }
 
@@ -493,6 +502,16 @@ Ergopti_OnSuspendResume() {
 				LoggerError("Lifecycle", "Resume completed with the navigation event owner unavailable; its retained plan will retry on the next lifecycle transition.")
 }
 
+SuspendWatchdogStart() {
+	global _LastSuspendState, _SuspendWatchdogStarted, SUSPEND_WATCHDOG_MS
+	if _SuspendWatchdogStarted
+		throw Error("suspend watchdog already started")
+	_LastSuspendState := A_IsSuspended
+	SetTimer(_SuspendStateWatchdog, SUSPEND_WATCHDOG_MS)
+	_SuspendWatchdogStarted := true
+	return true
+}
+
 _SuspendStateWatchdog() {
 		global _LastSuspendState
 		; Serialize the transition. This runs both from a 500 ms repeating timer and
@@ -755,6 +774,7 @@ Ergopti_OnShutdown(reason, code) {
 ; MenuSuspend exists.
 _TrayRootBuildBoot(PublishAuthorizeFn) {
 	global _DriverReady, _LangMenuBuildPending, LANG_MENU_DEFER_MS
+	global _LLM_Menu, LLM_MENU_BUILD_DEFER_MS
 	_SavedReady := _DriverReady
 	_DriverReady := false
 	try {
@@ -769,6 +789,17 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	if _LangMenuBuildPending
 		SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 	BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")
+	; The independent LLM timer used to preempt this root worker, invalidate
+	; its generation, and force a second full InitSubMenus scan. Arm the cheap
+	; OFF-state population only after this root and its boot finalizer publish.
+	; A retained/retried boot worker reaches the same ownership seam.
+	if _TrayRootScheduleBootProjectionIfDisabled(
+			_LLM_Menu["enabled"], LLM_Menu_RequestBuild.Bind("boot"),
+			SetTimer, LLM_MENU_BUILD_DEFER_MS) {
+		try LoggerDebug("TrayMenu",
+			"Deferred root published; arming boot IA submenu build in {1} ms.",
+			LLM_MENU_BUILD_DEFER_MS)
+	}
 	return true
 }
 

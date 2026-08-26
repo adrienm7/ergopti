@@ -86,7 +86,7 @@ _FTI_Inventory() {
 		"_UIA_SelectionPollTimer",      "500",   ; cross-process COM round-trip
 		"WPMWidget_Tick",               "500",   ; only armed while the WPM widget is visible
 		"BoundFn",                      "?",     ; generic scheduler adapter, period is the caller's
-		"_SuspendStateWatchdog",        "?",     ; period is a non-global constant
+		"_SuspendStateWatchdog",        "500",   ; lifecycle transitions and one-shot boot restore
 		"SimulateActivity",             "?")     ; randomised interval, awake mode only
 }
 
