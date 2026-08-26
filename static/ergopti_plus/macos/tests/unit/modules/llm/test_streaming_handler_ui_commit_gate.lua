@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SharedParser = require("llm.parser")
 
 local NIL_RESULT = {}
 
@@ -80,7 +81,8 @@ end
 --- @return table fixture Observable fixture fields.
 local function load_fixture(render_result, reset_result, mark_result, timer_new)
 	package.loaded["modules.llm.parser"] = {
-		strip_thinking = function(raw) return raw end,
+		strip_thinking = SharedParser.strip_thinking,
+		new_thinking_filter = SharedParser.new_thinking_filter,
 		process_prediction = function(_buffer, _tail, raw) return prediction(" " .. raw) end,
 	}
 	package.loaded["adapters.timer_scheduler"] = nil
@@ -330,6 +332,57 @@ end
 -- ==========================================================
 
 helpers.describe("streaming_handler: UI render commits prediction state", function()
+	helpers.it("withholds accumulated thinking output until the visible answer arrives", function()
+		local fixture = load_fixture(true)
+
+		fixture.partial("<thi")
+		helpers.assert_eq(fixture.renders, 0,
+			"a possible opening tag tail must not become a live prediction")
+
+		fixture.partial("<think>reasoning")
+		helpers.assert_eq(fixture.renders, 0,
+			"an unterminated thinking block must remain private")
+
+		fixture.partial("<think>reasoning</think>answer")
+		helpers.assert_eq(fixture.renders, 1,
+			"the first visible answer must render exactly once")
+		helpers.assert_eq(#fixture.pending.value, 1)
+		helpers.assert_eq(fixture.pending.value[1].to_type, " answer")
+		helpers.assert_true(not fixture.pending.value[1].to_type:find("reasoning", 1, true),
+			"thinking text must never enter the live prediction pool")
+	end)
+
+	helpers.it("preserves cumulative visible text and closes a broken prefix stream", function()
+		local fixture = load_fixture(true)
+
+		fixture.partial("answer")
+		fixture.partial("answer continued")
+		helpers.assert_eq(fixture.renders, 2)
+		helpers.assert_eq(#fixture.pending.value, 1)
+		helpers.assert_eq(fixture.pending.value[1].to_type, " answer continued")
+
+		fixture.partial("rewritten response")
+		fixture.partial("rewritten response continued")
+		helpers.assert_eq(fixture.renders, 2,
+			"a non-prefix snapshot must close interim publication for the request")
+		helpers.assert_eq(fixture.pending.value[1].to_type, " answer continued")
+	end)
+
+	helpers.it("ignores a partial callback delivered after the final response", function()
+		local fixture = load_fixture(true)
+
+		fixture.partial("answer")
+		fixture.success({ prediction(" final") }, 25, true, false)
+		helpers.assert_eq(fixture.renders, 2)
+		helpers.assert_eq(fixture.pending.value[1].to_type, " final")
+
+		fixture.partial("answer delivered late")
+		helpers.assert_eq(fixture.renders, 2,
+			"a terminal request must not reopen its streaming placeholder")
+		helpers.assert_eq(#fixture.pending.value, 1)
+		helpers.assert_eq(fixture.pending.value[1].to_type, " final")
+	end)
+
 	for _, case in ipairs({
 		{ name = "false", value = false },
 		{ name = "nil", value = nil },

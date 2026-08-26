@@ -281,13 +281,50 @@ function M.build_callbacks(ctx)
 
 	-- ── Streaming partial callback ────────────────────────────────────────────
 
+	local partial_thinking_filter = (ctx.is_streaming_enabled and is_streaming_multi)
+		and Parser.new_thinking_filter()
+		or nil
+	local partial_raw_seen = ""
+	local partial_visible = ""
+	local partial_stream_valid = true
+	local partial_filter_settled = false
+
+	--- Converts one cumulative backend snapshot into filtered visible text.
+	--- @param partial_raw string Accumulated raw response from the backend.
+	--- @return string|nil visible Filtered accumulated text, or nil when unchanged/invalid.
+	local function filter_partial_snapshot(partial_raw)
+		if partial_filter_settled or not partial_stream_valid then return nil end
+		if partial_raw:sub(1, #partial_raw_seen) ~= partial_raw_seen then
+			partial_stream_valid = false
+			Logger.warn(LOG,
+				"Streaming partial broke the cumulative-prefix contract — suppressing interim output.")
+			return nil
+		end
+
+		local delta = partial_raw:sub(#partial_raw_seen + 1)
+		partial_raw_seen = partial_raw
+		if delta == "" then return nil end
+
+		partial_visible = partial_visible .. partial_thinking_filter:feed(delta)
+		return partial_visible
+	end
+
+	--- Settles the request-local filter after the canonical final path takes over.
+	local function settle_partial_filter()
+		if partial_filter_settled or partial_thinking_filter == nil then return end
+		partial_filter_settled = true
+		-- The final callback already carries the complete, independently filtered
+		-- prediction set, so a withheld ordinary tail must not be rendered twice.
+		partial_thinking_filter:flush()
+	end
+
 	-- on_partial_cb: nil when streaming multi is off (all-at-once mode suppresses interim tokens)
 	local on_partial_cb = (ctx.is_streaming_enabled and is_streaming_multi) and function(partial_raw)
 		if not runtime_available() then return end
 		if not request_is_current() then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
 
-		local stripped = Parser.strip_thinking(partial_raw)
+		local stripped = filter_partial_snapshot(partial_raw)
 		if not stripped or stripped:gsub("%s", "") == "" then return end
 
 		-- Split on === separator used in batch-mode prompts; each completed block is a prediction
@@ -378,6 +415,7 @@ function M.build_callbacks(ctx)
 		-- when no replacement watchdog is installed, so revalidate before logging,
 		-- filtering, or painting anything for the old request.
 		if is_final and not request_is_current() then return end
+		if is_final then settle_partial_filter() end
 
 		-- Reset the consecutive-failure counter only for a still-current response;
 		-- a stale success must not mask failures counted by its successor.
@@ -515,6 +553,7 @@ function M.build_callbacks(ctx)
 		-- proving the watchdog stopped. Do not let its stale failure update counters
 		-- or mutate the successor's surface.
 		if not request_is_current() then return end
+		settle_partial_filter()
 
 		-- Track consecutive failures to detect persistent issues (e.g. server
 		-- crashed, still loading weights, or misconfigured endpoint)
