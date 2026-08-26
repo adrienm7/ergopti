@@ -22,6 +22,7 @@ local LOG     = "keylogger.aggregator"
 
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
 local Export       = require("modules.keylogger.export")
+local AggHelper    = require("keylogger.aggregator_helpers")
 
 local S = require("modules.keylogger.aggregator.state")
 local C = require("modules.keylogger.aggregator.core")
@@ -81,36 +82,53 @@ local function json_lit(tbl)
 	return "'" .. (s:gsub("'", "''")) .. "'"
 end
 
---- Builds a SQLite expression that MERGES the incoming esrc_json into the stored
---- one by summing each source key, instead of replacing it.
+local NUMBER_MAP_JSON_COLUMNS = {
+	esrc_json = true,
+	e_buckets_json = true,
+	length_buckets_json = true,
+}
+
+--- Builds a SQLite expression that merges an incoming JSON number map into the
+--- stored map by summing every key present in the current batch delta.
 ---
---- item.esrc is a per-tick DELTA: the batch row is deleted after each successful
---- flush, so `esrc_json=excluded.esrc_json` discarded every count accumulated by
---- previous ticks. The n-gram's total `c` kept summing correctly while its
---- hotstring/LLM/manual source split silently reflected only the last flush
---- window, so the dashboard's "typed vs expanded" breakdown was wrong for every
---- n-gram seen in more than one tick.
+--- These maps are per-tick deltas: every successful flush deletes the batch row.
+--- Assigning `excluded.<column>` therefore leaves only the latest window while
+--- the scalar totals keep accumulating and make the loss hard to notice.
 ---
 --- MIRRORS the Windows driver's KLW_EsrcMergeExpr (keylogger_walker_sql.ahk),
---- which has carried this merge — and its own regression test — since it was
---- fixed there.
---- @param esrc table|nil The per-tick source-count delta.
---- @return string A SQL expression usable as the esrc_json assignment.
-local function esrc_merge_expr(esrc)
-	if type(esrc) ~= "table" or next(esrc) == nil then
-		return "COALESCE(esrc_json,'{}')"
+--- generalized to every number-map distribution owned by this writer.
+--- @param column string One of NUMBER_MAP_JSON_COLUMNS.
+--- @param delta table|nil The per-tick number-map delta.
+--- @return string A SQL expression usable as the column assignment.
+local function number_map_merge_expr(column, delta)
+	if not NUMBER_MAP_JSON_COLUMNS[column] then
+		error("unsupported JSON number-map column: " .. tostring(column))
 	end
-	local parts = { "json_set(COALESCE(esrc_json,'{}')" }
-	for k in pairs(esrc) do
+	if type(delta) ~= "table" or next(delta) == nil then
+		return string.format("COALESCE(%s,'{}')", column)
+	end
+	local parts = { string.format("json_set(COALESCE(%s,'{}')", column) }
+	for k in pairs(delta) do
 		-- The result is spliced into a string.format template, so "%" must be
 		-- doubled as well as the SQL quote escaped.
 		local path = "$." .. tostring(k):gsub("'", "''"):gsub("%%", "%%%%")
 		parts[#parts + 1] = string.format(
-			",'%s',COALESCE(json_extract(esrc_json,'%s'),0)+COALESCE(json_extract(excluded.esrc_json,'%s'),0)",
-			path, path, path)
+			",'%s',COALESCE(json_extract(%s,'%s'),0)+COALESCE(json_extract(excluded.%s,'%s'),0)",
+			path, column, path, column, path)
 	end
 	parts[#parts + 1] = ")"
 	return table.concat(parts)
+end
+
+--- Builds the bounded append expression for the session-duration JSON array.
+--- Stored samples come first, so once the shared cap is reached later flushes
+--- cannot displace earlier samples and every driver observes the same bound.
+--- @return string A SQL expression usable as the durations_json assignment.
+local function session_durations_merge_expr()
+	return "(SELECT json_group_array(duration) FROM ("
+		.. "SELECT value AS duration FROM json_each(COALESCE(durations_json,'[]')) "
+		.. "UNION ALL SELECT value FROM json_each(COALESCE(excluded.durations_json,'[]')) "
+		.. "LIMIT " .. AggHelper.SESSION_DURATIONS_CAP .. "))"
 end
 
 local function sq(s)
@@ -213,7 +231,7 @@ function M.flush()
 				"INSERT INTO %s (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES (%s,%s,%s,%s,%d,%d,%d,%d,%s) "
 				.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
 				.. "c=c+excluded.c, td=td+excluded.td, cd=cd+excluded.cd, e=e+excluded.e, "
-				.. "esrc_json=" .. esrc_merge_expr(item.esrc),
+				.. "esrc_json=" .. number_map_merge_expr("esrc_json", item.esrc),
 				tbl_name, d, sq(date_str), sq(app), sq(token),
 				i(item.c), i(item.td), i(item.cd), i(item.e),
 				json_lit(item.esrc)))
@@ -291,7 +309,7 @@ function M.flush()
 			"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) VALUES (%s,%s,%s,%s,%d,%d,%d,%d,%s) "
 			.. "ON CONFLICT(device_id, date, app, hour) DO UPDATE SET "
 			.. "c=c+excluded.c, e=e+excluded.e, em=em+excluded.em, es=es+excluded.es, "
-			.. "e_buckets_json=excluded.e_buckets_json",
+			.. "e_buckets_json=" .. number_map_merge_expr("e_buckets_json", row.e_buckets),
 			d, sq(row.date), sq(row.app), sq(row.hour),
 			i(row.c), i(row.e), i(row.em), i(row.es), json_lit(row.e_buckets)))
 		if ok then S.agg_batch.hourly[key] = nil end
@@ -302,7 +320,7 @@ function M.flush()
 			"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) VALUES (%s,%s,%s,%s,%d,%d,%d,%s) "
 			.. "ON CONFLICT(device_id, date, app, slot) DO UPDATE SET "
 			.. "c=c+excluded.c, e=e+excluded.e, es=es+excluded.es, "
-			.. "e_buckets_json=excluded.e_buckets_json",
+			.. "e_buckets_json=" .. number_map_merge_expr("e_buckets_json", row.e_buckets),
 			d, sq(row.date), sq(row.app), sq(row.slot),
 			i(row.c), i(row.e), i(row.es), json_lit(row.e_buckets)))
 		if ok then S.agg_batch.hourly_min5[key] = nil end
@@ -366,7 +384,7 @@ function M.flush()
 			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
 			.. "count_total=count_total+excluded.count_total,"
 			.. "max_cpm=MAX(max_cpm, excluded.max_cpm),max_chars=MAX(max_chars, excluded.max_chars),"
-			.. "length_buckets_json=excluded.length_buckets_json,"
+			.. "length_buckets_json=" .. number_map_merge_expr("length_buckets_json", row.length_buckets) .. ","
 			.. "inter_delay_count=inter_delay_count+excluded.inter_delay_count,"
 			.. "inter_delay_sum=inter_delay_sum+excluded.inter_delay_sum,"
 			.. "inter_delay_sumsq=inter_delay_sumsq+excluded.inter_delay_sumsq",
@@ -385,7 +403,7 @@ function M.flush()
 			.. "longest_ms=MAX(longest_ms, excluded.longest_ms),"
 			.. "longest_chars=MAX(longest_chars, excluded.longest_chars),"
 			.. "total_active_ms=total_active_ms+excluded.total_active_ms,"
-			.. "durations_json=excluded.durations_json",
+			.. "durations_json=" .. session_durations_merge_expr(),
 			d, sq(row.date), sq(row.app),
 			i(row.count_total), i(row.longest_ms), i(row.longest_chars), i(row.total_active_ms),
 			json_lit(row.durations)))
