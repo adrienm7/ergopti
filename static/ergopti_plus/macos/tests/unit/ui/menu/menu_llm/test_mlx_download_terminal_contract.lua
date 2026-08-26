@@ -59,6 +59,11 @@ local function with_fixture(plan, callback)
 				gates = {},
 				notifications = {},
 				os_commands = {},
+				pid_identity_probes = 0,
+				raw_pid_signals = 0,
+				verified_pid_signals = 0,
+				verified_term_signals = 0,
+				verified_kill_signals = 0,
 				requirement_failures = {},
 				requirement_successes = 0,
 				saves = 0,
@@ -157,10 +162,34 @@ local function with_fixture(plan, callback)
 				return file_handle(path, mode)
 			end
 
+			local function pid_alive_result()
+				local alive = plan.pid_alive
+				if type(alive) == "table" then alive = table.remove(alive, 1) end
+				return result_value(alive, false)
+			end
+
 			os.execute = function(command)
 				records.os_commands[#records.os_commands + 1] = command
 				if command:find("chmod", 1, true) then
 					return result_value(plan.chmod_mode, true)
+				end
+				if command:find("MLX_EXPECTED_SCRIPT=", 1, true) then
+					records.pid_identity_probes = records.pid_identity_probes + 1
+					local alive = pid_alive_result()
+					if alive ~= true and alive ~= 0 then return nil, "exit", 72 end
+					if plan.pid_identity == false then return nil, "exit", 73 end
+					if plan.pid_identity == "unknown" then return nil, "exit", 74 end
+					local result = result_value(plan.kill_mode, true)
+					if result == true or result == 0 then
+						records.verified_pid_signals = records.verified_pid_signals + 1
+						if command:find("kill %-TERM", 1, false) then
+							records.verified_term_signals = records.verified_term_signals + 1
+						elseif command:find("kill %-KILL", 1, false) then
+							records.verified_kill_signals = records.verified_kill_signals + 1
+						end
+						return true, "exit", 0
+					end
+					return result
 				end
 				if command:find("kill %-0", 1, false) then
 					if plan.pause_reattach_on_pid_probe == true
@@ -168,14 +197,11 @@ local function with_fixture(plan, callback)
 						records.reentrant_reattach_pid_pause =
 							controls.pause_reattached_download()
 					end
-					local alive = plan.pid_alive
-					if type(alive) == "table" then
-						local next_value = table.remove(alive, 1)
-						return result_value(next_value, false)
-					end
-					return result_value(alive, false)
+					return pid_alive_result()
 				end
-				if command:find("kill %-TERM", 1, false) then
+				if command:find("kill %-TERM", 1, false)
+					or command:find("kill %-KILL", 1, false) then
+					records.raw_pid_signals = records.raw_pid_signals + 1
 					return result_value(plan.kill_mode, true)
 				end
 				return true, "exit", 0
@@ -228,14 +254,16 @@ local function with_fixture(plan, callback)
 							model = raw:match('"model":"([^"]+)"'),
 							log_path = raw:match('"log_path":"([^"]+)"'),
 							exit_path = raw:match('"exit_path":"([^"]+)"'),
+							script_path = raw:match('"script_path":"([^"]+)"'),
 							repo = raw:match('"repo":"([^"]+)"'),
 						}
 					end,
 					encode = function(value)
 						return string.format(
-							'{"model":"%s","log_path":"%s","exit_path":"%s","repo":"%s","pid":%s}',
+							'{"model":"%s","log_path":"%s","exit_path":"%s","script_path":"%s","repo":"%s","pid":%s}',
 							tostring(value.model or ""), tostring(value.log_path or ""),
-							tostring(value.exit_path or ""), tostring(value.repo or ""),
+							tostring(value.exit_path or ""), tostring(value.script_path or ""),
+							tostring(value.repo or ""),
 							tostring(value.pid or 0))
 					end,
 				},
@@ -583,12 +611,14 @@ local function with_fixture(plan, callback)
 					model = "B",
 					log_path = "/tmp/hs_mlx_dl_reattach.log",
 					exit_path = "/tmp/hs_mlx_dl_reattach.log.exit",
+					script_path = "/tmp/hs_mlx_dl_reattach.py",
 					pid = 4242,
 					repo = "org/model",
 				}
 				controls.files["/tmp/hs_mlx_active_download.json"] =
 					'{"model":"B","log_path":"/tmp/hs_mlx_dl_reattach.log",'
 					.. '"exit_path":"/tmp/hs_mlx_dl_reattach.log.exit",'
+					.. '"script_path":"/tmp/hs_mlx_dl_reattach.py",'
 					.. '"repo":"org/model","pid":4242}'
 				return obj.reattach_download(session)
 			end
@@ -2077,7 +2107,6 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 			fixture.controls.window.on_cancel()
 			helpers.assert_eq(#fixture.records.completions, 1)
 			helpers.assert_eq(fixture.records.completions[1][1], false)
-			fixture.controls.exit_code = 0
 			tail:complete(0)
 			fixture.controls.fire(0.5)
 			helpers.assert_eq(fixture.records.server_starts, 0)
@@ -2120,6 +2149,139 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 				"a duplicate retired-tail callback cannot remove the successor session")
 			helpers.assert_eq(#fixture.records.completions, 1)
 			helpers.assert_eq(fixture.records.server_starts, 0)
+		end)
+	end)
+end)
+
+
+
+
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= HS-036/ Detached PID Identity & Exit Proof =======
+-- ==========================================================
+-- ==========================================================
+
+local function assert_successor_admitted(fixture)
+	helpers.assert_eq(fixture.obj.pull_model("C", "org/other", nil, nil,
+		{is_current = function() return true end}), true,
+		"settled detached cleanup must release the single download slot")
+end
+
+helpers.describe("HS-036 detached download cleanup owns a process identity", function()
+	helpers.it("trusts the current download exit file before any PID signal", function()
+		with_fixture({pid_alive = true, pid_identity = true}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			launch_detached_download(fixture)
+			local tail = fixture.controls.latest("tail")
+			fixture.controls.exit_code = 1
+
+			fixture.controls.window.on_cancel()
+			tail:complete(0)
+
+			helpers.assert_eq(fixture.records.raw_pid_signals, 0,
+				"an authoritative exit file must suppress the legacy raw PID signal")
+			helpers.assert_eq(fixture.records.verified_pid_signals, 0,
+				"an authoritative exit file must suppress even a verified PID signal")
+			assert_successor_admitted(fixture)
+		end)
+	end)
+
+	helpers.it("trusts the reattached exit file before any PID signal", function()
+		with_fixture({pid_alive = true, pid_identity = true}, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			local tail = fixture.controls.latest("tail")
+			fixture.controls.exit_code = 1
+
+			fixture.controls.window.on_cancel()
+			tail:complete(0)
+
+			helpers.assert_eq(fixture.records.raw_pid_signals, 0)
+			helpers.assert_eq(fixture.records.verified_pid_signals, 0)
+			assert_successor_admitted(fixture)
+		end)
+	end)
+
+	helpers.it("releases a current-download PID recycled by another process", function()
+		with_fixture({pid_alive = true, pid_identity = false}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			launch_detached_download(fixture)
+			local tail = fixture.controls.latest("tail")
+
+			fixture.controls.window.on_cancel()
+			tail:complete(0)
+
+			helpers.assert_eq(fixture.records.pid_identity_probes, 1,
+				"cleanup must verify the exact Python script before signalling a live PID")
+			helpers.assert_eq(fixture.records.raw_pid_signals, 0,
+				"a recycled PID must never reach an unverified signal call")
+			helpers.assert_eq(fixture.records.verified_pid_signals, 0,
+				"a mismatched process identity must never receive a signal")
+			assert_successor_admitted(fixture)
+		end)
+	end)
+
+	helpers.it("releases a reattached PID recycled by another process", function()
+		with_fixture({pid_alive = true, pid_identity = false}, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			local tail = fixture.controls.latest("tail")
+
+			fixture.controls.window.on_cancel()
+			tail:complete(0)
+
+			helpers.assert_eq(fixture.records.pid_identity_probes, 1)
+			helpers.assert_eq(fixture.records.raw_pid_signals, 0)
+			helpers.assert_eq(fixture.records.verified_pid_signals, 0)
+			assert_successor_admitted(fixture)
+		end)
+	end)
+
+	helpers.it("bounds verified TERM retries before KILL escalation", function()
+		local plan = {pid_alive = true, pid_identity = true}
+		with_fixture(plan, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			launch_detached_download(fixture)
+			local tail = fixture.controls.latest("tail")
+
+			fixture.controls.window.on_cancel()
+			for _ = 1, 3 do fixture.controls.fire(0.25) end
+			helpers.assert_eq(fixture.records.verified_term_signals, 4,
+				"cleanup must bound graceful termination attempts")
+			helpers.assert_eq(fixture.records.verified_kill_signals, 0)
+
+			fixture.controls.fire(0.25)
+			helpers.assert_eq(fixture.records.verified_term_signals, 4)
+			helpers.assert_eq(fixture.records.verified_kill_signals, 1,
+				"a still-owned PID must escalate after the bounded TERM budget")
+			helpers.assert_eq(fixture.records.raw_pid_signals, 0)
+
+			plan.pid_alive = false
+			fixture.controls.fire(0.25)
+			tail:complete(0)
+			assert_successor_admitted(fixture)
+		end)
+	end)
+
+	helpers.it("retains an inconclusive identity without signalling", function()
+		local plan = {pid_alive = true, pid_identity = "unknown"}
+		with_fixture(plan, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			launch_detached_download(fixture)
+			local tail = fixture.controls.latest("tail")
+
+			fixture.controls.window.on_cancel()
+			tail:complete(0)
+			helpers.assert_eq(fixture.records.verified_pid_signals, 0)
+			helpers.assert_eq(fixture.records.raw_pid_signals, 0)
+			helpers.assert_eq(fixture.obj.pull_model("C", "org/other", nil, nil,
+				{is_current = function() return true end}), false,
+				"an inconclusive identity must retain the cleanup owner")
+
+			plan.pid_identity = false
+			fixture.controls.fire(0.25)
+			assert_successor_admitted(fixture)
 		end)
 	end)
 end)
