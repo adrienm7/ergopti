@@ -22,6 +22,7 @@
 local M = {}
 
 local Logger     = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
@@ -248,10 +249,10 @@ function M.open(ctx)
 		html_string       = final_html,
 		on_navigation     = function(action)
 			if action == "didFinishNavigation" then
-				hs.timer.doAfter(0.15, function()
+				DeferredWork.after(0.15, function()
 					if not _ready then flush_queue() end
 					if _ctx then inject_catalogue(_ctx) end
-				end)
+				end, "model_browser.navigation")
 			end
 			return true
 		end,
@@ -263,9 +264,9 @@ function M.open(ctx)
 	})
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
-	hs.timer.doAfter(1.5, function()
+	DeferredWork.after(1.5, function()
 		if _wv and not _ready then flush_queue() end
-	end)
+	end, "model_browser.ready_fallback")
 
 	Logger.success(LOG, "Model browser created.")
 end

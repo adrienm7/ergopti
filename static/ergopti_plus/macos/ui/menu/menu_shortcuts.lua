@@ -15,6 +15,7 @@
 local M = {}
 local hs = hs
 local Logger        = require("infra.logger")
+local DeferredWork  = require("infra.deferred_work")
 local fs_dir       = require("infra.fs_dir")
 local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
@@ -561,11 +562,11 @@ function M.build(ctx)
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
 									return
 								end
-								hs.timer.doAfter(0.05, function()
+								DeferredWork.after(0.05, function()
 									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. keyname, a, spec) then
 										assign()
 									end
-								end)
+								end, "menu_shortcuts.action_parameter")
 								return
 							end
 

@@ -26,6 +26,7 @@ local toml_codec   = require("infra.toml.codec")
 local notifications = require("infra.notifications")
 local Paths        = require("infra.paths")
 local Logger       = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local text_utils   = require("infra.text_utils")
 local ManifestReader = require("infra.manifest_reader")
 local FileSystem    = require("adapters.file_system")
@@ -488,9 +489,9 @@ local function commit(answers)
 	close_webview()
 
 	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
-	hs.timer.doAfter(1.5, function()
+	DeferredWork.after(1.5, function()
 		hs.reload()
-	end)
+	end, "onboarding.reload")
 end
 
 
@@ -511,7 +512,7 @@ local function handle_message(body)
 
 	if action == "ready" then
 		-- JS page finished loading — inject initial data
-		hs.timer.doAfter(0.05, inject_init_data)
+		DeferredWork.after(0.05, inject_init_data, "onboarding.ready")
 
 	elseif action == "previewLocale" then
 		-- User hovered/clicked a language row — inject its strings live
@@ -711,7 +712,7 @@ function M.run(config_path)
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
 				Logger.debug(LOG, "Navigation finished — injecting initData.")
-				hs.timer.doAfter(0.05, inject_init_data)
+				DeferredWork.after(0.05, inject_init_data, "onboarding.navigation")
 			end
 			return true
 		end,

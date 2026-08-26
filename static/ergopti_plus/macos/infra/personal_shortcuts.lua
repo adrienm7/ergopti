@@ -31,6 +31,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local text_utils = require("infra.text_utils")
+local DeferredWork = require("infra.deferred_work")
 local LOG    = "personal_shortcuts"
 
 
@@ -170,7 +171,7 @@ end
 function M.open()
 	local path = resolve_path()
 	if not ensure_file(path) then return false end
-	local scheduled_ok, timer_or_err = pcall(hs.timer.doAfter, 0, function()
+	local scheduled = DeferredWork.after(0, function()
 		local call_ok, _, launched, _, exit_code = pcall(
 			hs.execute,
 			"open " .. text_utils.shell_quote(path)
@@ -179,8 +180,8 @@ function M.open()
 			Logger.error(LOG, "Personal shortcuts editor launch failed (exit type: %s).",
 				type(call_ok and exit_code or launched))
 		end
-	end)
-	if not scheduled_ok or timer_or_err == nil then
+	end, "personal_shortcuts.open")
+	if scheduled ~= true then
 		Logger.error(LOG, "Personal shortcuts editor launch could not be scheduled.")
 		return false
 	end

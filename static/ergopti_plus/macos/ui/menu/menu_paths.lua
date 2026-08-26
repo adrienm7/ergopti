@@ -23,6 +23,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local text_utils = require("infra.text_utils")
 local i18n   = require("infra.i18n")
 local Paths  = require("infra.paths")
@@ -316,7 +317,7 @@ local function handle_message(body)
 	if action == "ready" then
 		inject_init_data()
 	elseif action == "browse" then
-		hs.timer.doAfter(0, function()
+		DeferredWork.after(0, function()
 			Logger.start(LOG, "Opening native folder picker…")
 			local picked = pick_dir(ConfigPaths.get_config_dir())
 			Logger.success(LOG, "Picker returned: '%s'.", tostring(picked))
@@ -325,15 +326,15 @@ local function handle_message(body)
 					return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
 				end
 				local js = "window.applyBrowseResult(" .. js_str(picked) .. ")"
-				hs.timer.doAfter(0.1, function()
+				DeferredWork.after(0.1, function()
 					if _webview then
 						pcall(function() _webview:evaluateJavaScript(js) end)
 					end
-				end)
+				end, "menu_paths.browse_result")
 			else
 				Logger.warn(LOG, "browse: picker returned nothing — user cancelled.")
 			end
-		end)
+		end, "menu_paths.browse")
 	elseif action == "save" then
 		apply_and_reload(type(body.configDir) == "string" and body.configDir or "")
 	elseif action == "cancel" then
@@ -399,7 +400,7 @@ local function open_editor_impl()
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
 				Logger.debug(LOG, "Navigation finished — injecting initData.")
-				hs.timer.doAfter(0.05, inject_init_data)
+				DeferredWork.after(0.05, inject_init_data, "menu_paths.navigation")
 			end
 			return true
 		end,
@@ -446,7 +447,7 @@ function M.build_menu_item()
 	return {
 		label  = i18n.get("menu.paths.menu_item"),
 		action = function()
-			hs.timer.doAfter(0.05, M.open_editor)
+			DeferredWork.after(0.05, M.open_editor, "menu_paths.open_editor")
 		end,
 	}
 end

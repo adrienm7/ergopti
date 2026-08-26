@@ -26,6 +26,7 @@ local Paths         = require("infra.paths")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local FileSystem    = require("adapters.file_system")
+local DeferredWork  = require("infra.deferred_work")
 local LOG           = "hotstring_editor"
 
 
@@ -395,17 +396,14 @@ local function handle_message(msg)
 				return
 			end
 			if type(_update_menu) == "function" then
-				local scheduled, timer_or_err = xpcall(function()
-					return hs.timer.doAfter(0, function()
-						local updated, update_err = xpcall(_update_menu, debug.traceback)
-						if not updated then
-							Logger.error(LOG, "Deferred menu refresh failed: %s.", tostring(update_err))
-						end
-					end)
-				end, debug.traceback)
-				if not scheduled or timer_or_err == nil or timer_or_err == false then
-					Logger.error(LOG, "Deferred menu refresh could not be scheduled: %s.",
-						tostring(timer_or_err))
+				local scheduled = DeferredWork.after(0, function()
+					local updated, update_err = xpcall(_update_menu, debug.traceback)
+					if not updated then
+						Logger.error(LOG, "Deferred menu refresh failed: %s.", tostring(update_err))
+					end
+				end, "hotstring_editor.refresh_menu")
+				if scheduled ~= true then
+					Logger.error(LOG, "Deferred menu refresh could not be scheduled.")
 				end
 			end
 		else

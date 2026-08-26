@@ -13,6 +13,7 @@
 local M = {}
 local hs     = hs
 local i18n   = require("infra.i18n")
+local DeferredWork = require("infra.deferred_work")
 local Labels = require("menu.labels")
 local text_utils = require("infra.text_utils")
 local dialog = require("infra.dialog_util")
@@ -127,9 +128,9 @@ end
 
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return end
-	hs.timer.doAfter(0, function()
+	DeferredWork.after(0, function()
 		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-	end)
+	end, "menu_hotstrings_custom.open_toml")
 end
 
 local function toml_path_for_group(ctx, group_name)
@@ -424,7 +425,9 @@ function M.build_custom(ctx, counts)
 			label    = i18n.get("menu.hotstrings.open_editor"),
 			disabled = paused or nil,
 			action       = not paused and function()
-				hs.timer.doAfter(0, function() pcall(ctx.hotstring_editor.open) end)
+				DeferredWork.after(0,
+					function() pcall(ctx.hotstring_editor.open) end,
+					"menu_hotstrings_custom.open_editor")
 			end or nil,
 		},
 		{

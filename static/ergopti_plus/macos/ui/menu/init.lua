@@ -33,6 +33,7 @@ local TrayMenu      = require("adapters.tray_menu")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local TimerScheduler = require("adapters.timer_scheduler")
+local DeferredWork = require("infra.deferred_work")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
@@ -181,7 +182,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- init.lua initializes only the resolver. The editor owns its reload callback
 	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
-		MenuPaths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
+		MenuPaths.init(base_dir, function()
+			return DeferredWork.after(0.25,
+				function() pcall(hs.reload) end,
+				"menu.reload_after_paths")
+		end)
 	end
 	core_mods.keymap = keymap
 	core_mods.gestures = gestures
@@ -897,12 +902,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     "none")
 		end
 		pcall(core_mods.shortcuts_mod.set_extras, {
-			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end) end,
+			open_init = function()
+				return DeferredWork.after(0, function()
+					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua"))
+				end, "menu.open_init")
+			end,
 			open_personal_toml = function()
-				hs.timer.doAfter(0, function()
+				return DeferredWork.after(0, function()
 					local personal_path = MenuPaths.get("PersonalTomlPath")
 					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
-				end)
+				end, "menu.open_personal_toml")
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
 			add_hotstring = function()
@@ -931,8 +941,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
-			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath"))) end) end,
-			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end) end,
+			open_config = function()
+				return DeferredWork.after(0, function()
+					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath")))
+				end, "menu.open_config")
+			end,
+			open_logs = function()
+				return DeferredWork.after(0,
+					function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end,
+					"menu.open_logs")
+			end,
 		})
 
 		-- Wire the active-wrap-pairs getter eagerly at startup so the wrap-selection
@@ -983,7 +1002,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		enable_all                = function() return set_all_enabled(true) end,
 		disable_all               = function() return set_all_enabled(false) end,
 		reset_defaults            = function() return reset_all_defaults() end,
-		open_paths                = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
+		open_paths                = function()
+			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths")
+		end,
 		reload                    = function()
 			return do_reload("menu")
 		end,
@@ -1001,7 +1022,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_console              = function() pcall(hs.openConsole) end,
-		open_paths_editor         = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
+		open_paths_editor         = function()
+			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
+		end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
 			if ok and type(ed.open) == "function" then pcall(ed.open) end

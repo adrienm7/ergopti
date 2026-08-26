@@ -18,6 +18,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
+local DeferredWork = require("infra.deferred_work")
 local LOG = "ui_builder"
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
@@ -174,7 +175,13 @@ function M.warmup_webkit()
 		pcall(function() wv:html("<html><body></body></html>") end)
 		pcall(function() wv:hide() end)
 		-- Hold the warmup webview for 5 s so WebKit fully initialises, then release.
-		hs.timer.doAfter(5, function() pcall(function() wv:delete() end) end)
+		if DeferredWork.after(5,
+			function() pcall(function() wv:delete() end) end,
+			"ui_builder.webkit_warmup") ~= true
+		then
+			pcall(function() wv:delete() end)
+			error("WebKit warmup cleanup could not be scheduled")
+		end
 	end)
 	if ok then
 		Logger.success(LOG, "WebKit warmup scheduled.")
@@ -282,10 +289,7 @@ function M.force_focus(wv, is_new, lifecycle)
 			end, debug.traceback)
 			return ok == true and result == true
 		end
-		local ok, handle = xpcall(function()
-			return hs.timer.doAfter(delay, callback)
-		end, debug.traceback)
-		return ok == true and handle ~= nil and handle ~= false
+		return DeferredWork.after(delay, callback, label or "ui_builder.force_focus")
 	end
 	if not current() then return false end
 
@@ -414,10 +418,7 @@ function M.show_webview(opts)
 			end, debug.traceback)
 			return ok == true and result == true
 		end
-		local ok, handle = xpcall(function()
-			return hs.timer.doAfter(delay, callback)
-		end, debug.traceback)
-		return ok == true and handle ~= nil and handle ~= false
+		return DeferredWork.after(delay, callback, label or "ui_builder.webview")
 	end
 
 	local prefix = "ErgoptiPlus"
