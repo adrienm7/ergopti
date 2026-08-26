@@ -191,7 +191,7 @@ _SuspendHandoffBeforeReload(Path) {
 
 _SuspendHandoffPrepareMarker(Path) {
 	return SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
-		FSAtomicMoveReplace, FSDelete)
+		FSAtomicMoveReplace, FSDeleteStrict)
 }
 
 _SuspendHandoffCommitMarker(Path) {
@@ -199,7 +199,7 @@ _SuspendHandoffCommitMarker(Path) {
 }
 
 _SuspendHandoffCancelMarker(Path) {
-	return SuspendHandoffAbort(Path, FSExists, FSDelete)
+	return SuspendHandoffAbort(Path, FSStrictExists, FSDeleteStrict)
 }
 
 ; Surfaces hand-off failures without a modal dialog on the keyboard thread.
@@ -223,10 +223,10 @@ _SuspendRestoreFromMarker() {
 		Path := _SuspendMarkerPath()
 		; Refused or interrupted preparations are inert. Their cleanup result is
 		; surfaced, but cannot suppress consumption of separately committed intent.
-		SuspendHandoffDiscardPending(Path, FSExists, FSDelete,
+		SuspendHandoffDiscardPending(Path, FSStrictExists, FSDeleteStrict,
 			_SuspendHandoffFailure)
 		return SuspendHandoffConsume(Path, A_IsSuspended,
-				FSExists, FSMove, FSDelete, ToggleSuspend,
+				FSStrictExists, FSMove, FSDeleteStrict, ToggleSuspend,
 				_SuspendHandoffBeforeToggle, _SuspendHandoffFailure)
 }
 

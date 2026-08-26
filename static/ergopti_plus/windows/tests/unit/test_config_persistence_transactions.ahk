@@ -481,13 +481,15 @@ global _CPT_HandoffFailures := 0
 global _CPT_BeforeToggleCalls := 0
 global _CPT_HandoffMoveCalls := 0
 global _CPT_HandoffCancelCalls := 0
+global _CPT_HandoffProbeThrows := false
+global _CPT_HandoffDeleteThrows := false
 
 _CPT_ResetHandoffFakes() {
 	global _CPT_MarkerExists, _CPT_ClaimExists, _CPT_PendingExists
 	global _CPT_HandoffWriteOk, _CPT_HandoffMoveOk
 	global _CPT_HandoffDeleteOk, _CPT_ReloadCalls, _CPT_ToggleCalls
 	global _CPT_HandoffFailures, _CPT_BeforeToggleCalls, _CPT_HandoffMoveCalls
-	global _CPT_HandoffCancelCalls
+	global _CPT_HandoffCancelCalls, _CPT_HandoffProbeThrows, _CPT_HandoffDeleteThrows
 	_CPT_MarkerExists := false
 	_CPT_ClaimExists := false
 	_CPT_PendingExists := false
@@ -500,6 +502,8 @@ _CPT_ResetHandoffFakes() {
 	_CPT_BeforeToggleCalls := 0
 	_CPT_HandoffMoveCalls := 0
 	_CPT_HandoffCancelCalls := 0
+	_CPT_HandoffProbeThrows := false
+	_CPT_HandoffDeleteThrows := false
 }
 
 _CPT_HandoffPrepare(Path) {
@@ -519,7 +523,9 @@ _CPT_HandoffCommit(Path) {
 }
 
 _CPT_HandoffExists(Path) {
-	global _CPT_MarkerExists, _CPT_ClaimExists
+	global _CPT_MarkerExists, _CPT_ClaimExists, _CPT_HandoffProbeThrows
+	if _CPT_HandoffProbeThrows
+		throw OSError(5, A_ThisFunc, "injected access-denied probe")
 	return (Path == "marker.claim") ? _CPT_ClaimExists : _CPT_MarkerExists
 }
 
@@ -536,6 +542,9 @@ _CPT_HandoffMove(Source, Destination, Overwrite) {
 
 _CPT_HandoffDelete(Path) {
 	global _CPT_HandoffDeleteOk, _CPT_MarkerExists, _CPT_ClaimExists
+	global _CPT_HandoffDeleteThrows
+	if _CPT_HandoffDeleteThrows
+		throw OSError(5, A_ThisFunc, "injected access-denied delete")
 	if _CPT_HandoffDeleteOk {
 		if (Path == "marker.claim")
 			_CPT_ClaimExists := false
@@ -1055,6 +1064,52 @@ _CPT_MarkerDeleteFailureNeverToggles() {
 }
 Test("AHK-15-persistence: suspend marker delete failure never toggles",
 	_CPT_MarkerDeleteFailureNeverToggles)
+
+_CPT_StrictProbeErrorRetainsSourceForRetry() {
+	global _CPT_MarkerExists, _CPT_ClaimExists, _CPT_HandoffProbeThrows
+	global _CPT_ToggleCalls, _CPT_HandoffFailures
+	_CPT_ResetHandoffFakes()
+	_CPT_MarkerExists := true
+	_CPT_HandoffProbeThrows := true
+	AssertFalse(SuspendHandoffConsume("marker", false,
+		_CPT_HandoffExists, _CPT_HandoffMove, _CPT_HandoffDelete, _CPT_Toggle,
+		_CPT_BeforeToggle, _CPT_HandoffFailure))
+	AssertTrue(_CPT_MarkerExists, "a failed probe must retain the source intent")
+	AssertFalse(_CPT_ClaimExists, "a failed probe must not invent a claim")
+	AssertEqual(0, _CPT_ToggleCalls, "a failed probe must never toggle suspend")
+	AssertEqual(1, _CPT_HandoffFailures, "a probe error must be surfaced exactly once")
+
+	_CPT_HandoffProbeThrows := false
+	AssertTrue(SuspendHandoffConsume("marker", false,
+		_CPT_HandoffExists, _CPT_HandoffMove, _CPT_HandoffDelete, _CPT_Toggle,
+		_CPT_BeforeToggle, _CPT_HandoffFailure))
+	AssertEqual(1, _CPT_ToggleCalls, "the retained source must remain retryable")
+}
+Test("AHK-006: strict marker probe errors are loud and retryable",
+	_CPT_StrictProbeErrorRetainsSourceForRetry)
+
+_CPT_StrictDeleteErrorRetainsClaimForRetry() {
+	global _CPT_MarkerExists, _CPT_ClaimExists, _CPT_HandoffDeleteThrows
+	global _CPT_ToggleCalls, _CPT_HandoffFailures
+	_CPT_ResetHandoffFakes()
+	_CPT_MarkerExists := true
+	_CPT_HandoffDeleteThrows := true
+	AssertFalse(SuspendHandoffConsume("marker", false,
+		_CPT_HandoffExists, _CPT_HandoffMove, _CPT_HandoffDelete, _CPT_Toggle,
+		_CPT_BeforeToggle, _CPT_HandoffFailure))
+	AssertFalse(_CPT_MarkerExists, "the source must remain atomically claimed")
+	AssertTrue(_CPT_ClaimExists, "a failed delete must retain the stable claim")
+	AssertEqual(0, _CPT_ToggleCalls, "a failed delete must never toggle suspend")
+	AssertEqual(1, _CPT_HandoffFailures, "a delete error must be surfaced exactly once")
+
+	_CPT_HandoffDeleteThrows := false
+	AssertTrue(SuspendHandoffConsume("marker", false,
+		_CPT_HandoffExists, _CPT_HandoffMove, _CPT_HandoffDelete, _CPT_Toggle,
+		_CPT_BeforeToggle, _CPT_HandoffFailure))
+	AssertEqual(1, _CPT_ToggleCalls, "the retained claim must remain retryable")
+}
+Test("AHK-006: strict marker delete errors are loud and retryable",
+	_CPT_StrictDeleteErrorRetainsClaimForRetry)
 
 _CPT_ConsumedMarkerTogglesExactlyOnce() {
 	global _CPT_MarkerExists, _CPT_ToggleCalls, _CPT_HandoffFailures

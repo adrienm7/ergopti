@@ -199,6 +199,22 @@ _MRS_HelperPersistsBeforeReloading() {
 Test("menu: ReloadPreservingSuspend terminally publishes pause after acceptance (menu-reload-drops-suspend)",
 	_MRS_HelperPersistsBeforeReloading)
 
+_MRS_SuspendProtocolUsesStrictFilesystemPrimitives() {
+	Prepare := _DriverFuncBody("_SuspendHandoffPrepareMarker")
+	Cancel := _DriverFuncBody("_SuspendHandoffCancelMarker")
+	Restore := _DriverFuncBody("_SuspendRestoreFromMarker")
+	Assert(Prepare != "" and Cancel != "" and Restore != "",
+		"every lifecycle wrapper for the suspend hand-off must exist")
+	Assert(InStr(Prepare, "FSDeleteStrict") > 0,
+		"preparation cleanup must not hide filesystem errors as absence")
+	Assert(InStr(Cancel, "FSStrictExists") > 0 and InStr(Cancel, "FSDeleteStrict") > 0,
+		"cancellation must probe and delete inert intent through strict adapters")
+	Assert(InStr(Restore, "FSStrictExists") > 0 and InStr(Restore, "FSDeleteStrict") > 0,
+		"boot restore must preserve probe and delete errors for retry")
+}
+Test("AHK-006: suspend hand-off lifecycle wrappers use strict filesystem adapters",
+	_MRS_SuspendProtocolUsesStrictFilesystemPrimitives)
+
 
 
 
