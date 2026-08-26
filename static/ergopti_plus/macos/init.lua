@@ -1443,6 +1443,7 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	personal_info_path       = personal_info_toml_path,
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
 	-- and the pathwatcher is recursive, so these two would otherwise register as

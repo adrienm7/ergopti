@@ -86,7 +86,8 @@ local function load_personal_info(config_path, logs)
 			return fence.allow
 		end,
 	}
-	personal_info.start("", keymap, config_path)
+	personal_info.start("", keymap, config_path,
+		function(_, publish) return publish() end)
 	return personal_info, fence
 end
 
@@ -156,6 +157,22 @@ end
 -- ===================================================
 
 helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-gate)", function()
+	helpers.it("refuses startup without an owned registry-refresh transaction", function()
+		package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
+		local registrations = 0
+		local started = personal_info.start("", {
+			get_trigger_char = function() return "â˜…" end,
+			register_interceptor = function() registrations = registrations + 1 end,
+			register_preview_provider = function() registrations = registrations + 1 end,
+		}, "/unowned/personal_info.toml")
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(registrations, 0,
+			"startup must not publish callbacks without the registry transaction owner")
+		personal_info.stop()
+		package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+	end)
+
 	helpers.it("publishes neither memory nor disk until preview revocation and filesystem commit", function()
 		local config_path = os.tmpname()
 		with_cleanup(function()
@@ -359,7 +376,8 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 					return true, "created"
 				end,
 			}, function()
-				return personal_info.start("", keymap, config_path)
+				return personal_info.start("", keymap, config_path,
+					function(_, publish) return publish() end)
 			end)
 
 			helpers.assert_eq(started, false,
@@ -416,7 +434,8 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 					return false, "error", write_failure
 				end,
 			}, function()
-				return personal_info.start("", keymap, config_path)
+				return personal_info.start("", keymap, config_path,
+					function(_, publish) return publish() end)
 			end)
 
 			helpers.assert_eq(started, false,

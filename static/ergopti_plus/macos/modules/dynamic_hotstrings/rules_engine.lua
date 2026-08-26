@@ -376,6 +376,60 @@ end
 -- ============================================
 -- ============================================
 
+--- Normalises the personal fields used by prefix registration and menu counts.
+--- @param personal_data table Personal-information snapshot.
+--- @return string phone
+--- @return string formatted_phone
+--- @return string ssn_raw
+--- @return string ssn
+--- @return string iban_raw
+--- @return string iban
+local function prefix_values(personal_data)
+	personal_data = type(personal_data) == "table" and personal_data or {}
+	local phone = type(personal_data.phone_number) == "string"
+		and personal_data.phone_number or tostring(personal_data.phone_number or "")
+	local formatted_phone = type(personal_data.phone_number_clean) == "string"
+		and personal_data.phone_number_clean or tostring(personal_data.phone_number_clean or "")
+	local ssn = type(personal_data.social_security_number) == "string"
+		and personal_data.social_security_number or tostring(personal_data.social_security_number or "")
+	local iban = type(personal_data.iban) == "string"
+		and personal_data.iban or tostring(personal_data.iban or "")
+	return phone, formatted_phone, ssn:gsub("%s+", ""), ssn,
+		iban:gsub("%s+", ""), iban
+end
+
+--- Publishes prefix counts into the exact section descriptors owned by the menu.
+--- @param personal_data table Personal-information snapshot.
+local function publish_prefix_counts(personal_data)
+	local phone, formatted_phone, ssn_raw, _, iban_raw = prefix_values(personal_data)
+	local counts = SharedEngine.compute_prefix_counts(phone, formatted_phone, ssn_raw, iban_raw)
+	if type(_sections) ~= "table" then return end
+	for _, section in ipairs(_sections) do
+		if type(section) == "table" and counts[section.name] ~= nil then
+			section.count = counts[section.name]
+		end
+	end
+end
+
+--- Captures mutable section counts that live outside the Registry snapshot.
+--- @return table snapshot
+local function snapshot_section_counts()
+	local snapshot = {}
+	for index, section in ipairs(_sections or {}) do
+		if type(section) == "table" then snapshot[index] = { count = section.count } end
+	end
+	return snapshot
+end
+
+--- Restores section counts after a rejected personal-data transaction.
+--- @param snapshot table Previously captured counts.
+local function restore_section_counts(snapshot)
+	for index, record in pairs(snapshot or {}) do
+		local section = type(_sections) == "table" and _sections[index] or nil
+		if type(section) == "table" then section.count = record.count end
+	end
+end
+
 --- Generates and registers all prefix-based hotstrings based on the user's personal data.
 local function register_prefix_entries()
 	if type(_personal_data) ~= "table" then return true end
@@ -420,24 +474,8 @@ local function register_prefix_entries()
 		return out
 	end
 
-	local phone  = type(_personal_data.phone_number) == "string" and _personal_data.phone_number or tostring(_personal_data.phone_number or "")
-	local fphone = type(_personal_data.phone_number_clean) == "string" and _personal_data.phone_number_clean or tostring(_personal_data.phone_number_clean or "")
-	local ssn    = type(_personal_data.social_security_number) == "string" and _personal_data.social_security_number or tostring(_personal_data.social_security_number or "")
-	local iban   = type(_personal_data.iban) == "string" and _personal_data.iban or tostring(_personal_data.iban or "")
-
-	-- Strip decorative spaces for prefix matching (SSN and IBAN contain spaces)
-	local ssn_raw  = ssn:gsub("%s+", "")
-	local iban_raw = iban:gsub("%s+", "")
-
-	-- Update section counts in the registry so build_groups shows accurate totals.
-	local counts = SharedEngine.compute_prefix_counts(phone, fphone, ssn_raw, iban_raw)
-	if type(_sections) == "table" then
-		for _, sec in ipairs(_sections) do
-			if type(sec) == "table" and counts[sec.name] ~= nil then
-				sec.count = counts[sec.name]
-			end
-		end
-	end
+	local phone, fphone, ssn_raw, ssn, iban_raw, iban = prefix_values(_personal_data)
+	publish_prefix_counts(_personal_data)
 
 	require_void_commit("group-context registration", _km.set_group_context, GROUP_NAME)
 	local function add_mapping(trigger, replacement, options)
@@ -567,6 +605,63 @@ function M.inject_data(personal_data, trigger_char)
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Personal-data prefix registration failed (details withheld; terminal type: %s).",
 			type(committed))
+		return false
+	end
+	return true
+end
+
+--- Replaces every baked personal prefix inside one Registry transaction, then
+--- invokes the caller's publication as the final fallible step. The Registry
+--- snapshot owns mapping/group rollback; this module separately restores its
+--- personal-data pointer and mutable menu counts when any step refuses.
+--- @param personal_data table Complete validated personal-information snapshot.
+--- @param publisher function Callback that must return exact true after disk and
+---   live PersonalInfo publication commit.
+--- @return boolean committed
+function M.refresh_personal_data(personal_data, publisher)
+	if type(personal_data) ~= "table" or type(publisher) ~= "function" then
+		Logger.error(LOG, "Personal-data refresh requires a table and publication callback.")
+		return false
+	end
+	if not _active_start_token or not _km then
+		Logger.error(LOG, "Personal-data refresh refused before RulesEngine start commitment.")
+		return false
+	end
+	for _, capability in ipairs({
+		"disable_group", "enable_group", "is_group_enabled", "registry_transaction",
+	}) do
+		if type(_km[capability]) ~= "function" then
+			Logger.error(LOG, "Personal-data refresh requires keymap.%s.", capability)
+			return false
+		end
+	end
+	if not invalidate_preview_snapshot("Personal-data refresh") then return false end
+
+	local token = _active_start_token
+	local keymap = _km
+	local previous_data = _personal_data
+	local counts_snapshot = snapshot_section_counts()
+	local ok, committed = xpcall(function()
+		return keymap.registry_transaction("dynamic_personal_data_refresh", function()
+			if _active_start_token ~= token or _km ~= keymap then return false end
+			_personal_data = personal_data
+			if keymap.is_group_enabled(GROUP_NAME) then
+				if keymap.disable_group(GROUP_NAME) ~= true then return false end
+				if keymap.enable_group(GROUP_NAME) ~= true then return false end
+			else
+				publish_prefix_counts(personal_data)
+			end
+			if _active_start_token ~= token or _km ~= keymap then return false end
+			local published_ok, published = xpcall(publisher, debug.traceback)
+			if not published_ok or published ~= true then return false end
+			return true
+		end)
+	end, debug.traceback)
+	if not ok or committed ~= true then
+		_personal_data = previous_data
+		restore_section_counts(counts_snapshot)
+		Logger.error(LOG, "Personal-data registry and publication transaction rolled back "
+			.. "(failure content withheld).")
 		return false
 	end
 	return true

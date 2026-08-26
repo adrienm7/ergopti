@@ -119,7 +119,8 @@ function M.start(base_dir, keymap_module, info_toml_path)
 
 	-- Start the personal info tracker
 	if not run_start_step("personal-info start", function()
-		return PersonalInfo.start(base_dir, keymap_module, info_toml_path)
+		return PersonalInfo.start(base_dir, keymap_module, info_toml_path,
+			RulesEngine.refresh_personal_data)
 	end) then
 		return rollback_start("personal-info start")
 	end

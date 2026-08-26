@@ -60,6 +60,7 @@ local _info_toml_path  = ""
 local _source_snapshot = nil
 
 local _keymap    = nil
+local _refresh_personal_data = nil
 local _active_start_token = nil
 local _starting_token = nil
 local ManifestReader = require("infra.manifest_reader")
@@ -106,6 +107,7 @@ local function rollback_start(token, reason)
 		_state = STATE_IDLE
 		_combo = ""
 		_keymap = nil
+		_refresh_personal_data = nil
 	end
 	Logger.error(LOG, "Personal info tracker start rolled back after %s.", tostring(reason))
 	return false
@@ -367,24 +369,33 @@ end
 --- snapshot that the rejected save attempted to replace. Ordinary I/O failures
 --- against unchanged bytes keep the current runtime state, preserving rollback.
 --- @param expected_source table Snapshot used by the rejected publication.
+--- @return boolean adopted True only after registry and live state commit.
 local function adopt_changed_config(expected_source)
 	local config, was_missing, current_source = load_config(_info_toml_path)
 	if type(config) ~= "table" or was_missing or type(current_source) ~= "table"
 		or current_source.status ~= "ok"
 	then
-		return
+		return false
 	end
 	if type(expected_source) == "table"
 		and expected_source.status == current_source.status
 		and expected_source.content == current_source.content
 	then
-		return
+		return false
 	end
-	if type(config.info) ~= "table" or type(config.letters) ~= "table" then return end
-	replace_table_contents(_info, config.info)
-	replace_table_contents(_letters, config.letters)
-	_source_snapshot = current_source
+	if type(config.info) ~= "table" or type(config.letters) ~= "table" then return false end
+	local adopted = _refresh_personal_data(config.info, function()
+		replace_table_contents(_info, config.info)
+		replace_table_contents(_letters, config.letters)
+		_source_snapshot = current_source
+		return true
+	end)
+	if adopted ~= true then
+		Logger.error(LOG, "Personal-info external winner could not refresh live prefix mappings.")
+		return false
+	end
 	Logger.warn(LOG, "Personal-info save rejected a stale candidate and adopted the external winner.")
+	return true
 end
 
 --- Persists updated info fields through a preview-fenced atomic transaction.
@@ -399,6 +410,10 @@ function M.save_info(new_info)
 		Logger.error(LOG, "save_info() called before the personal-info path was initialized.")
 		return false
 	end
+	if type(_refresh_personal_data) ~= "function" then
+		Logger.error(LOG, "Personal-info save refused because its registry refresher is unavailable.")
+		return false
+	end
 	Logger.debug(LOG, "Saving personal info to '%s'…", _info_toml_path)
 
 	local candidate = build_info_candidate(new_info)
@@ -410,15 +425,21 @@ function M.save_info(new_info)
 		return false
 	end
 	local expected_source = _source_snapshot
-	if FileSystem.write_if_unchanged(_info_toml_path, content, expected_source) ~= true then
-		Logger.error(LOG, "Personal-info atomic publication did not commit.")
+	local committed = _refresh_personal_data(candidate, function()
+		if FileSystem.write_if_unchanged(_info_toml_path, content, expected_source) ~= true then
+			return false
+		end
+		-- Preserve the shared table identity held by dependent engines. This is the
+		-- final fallible transaction callback: no registry operation follows it.
+		replace_table_contents(_info, candidate)
+		_source_snapshot = { status = "ok", content = content }
+		return true
+	end)
+	if committed ~= true then
+		Logger.error(LOG, "Personal-info registry and atomic publication did not commit.")
 		adopt_changed_config(expected_source)
 		return false
 	end
-
-	-- Preserve the shared table identity held by dependent engines
-	replace_table_contents(_info, candidate)
-	_source_snapshot = { status = "ok", content = content }
 
 	Logger.info(LOG, "Personal info configuration saved successfully.")
 	return true
@@ -851,10 +872,11 @@ end
 --- @param base_dir string Base configuration directory.
 --- @param keymap_module table The active keymap module reference.
 --- @param info_toml_path string|nil Absolute path to personal_info.toml (optional override).
-function M.start(base_dir, keymap_module, info_toml_path)
+--- @param refresh_personal_data function RulesEngine transaction boundary.
+function M.start(base_dir, keymap_module, info_toml_path, refresh_personal_data)
 	Logger.debug(LOG, "Starting personal info tracker…")
 	if _active_start_token then
-		if _keymap == keymap_module then return true end
+		if _keymap == keymap_module and _refresh_personal_data == refresh_personal_data then return true end
 		Logger.error(LOG, "Personal info tracker already owns a different keymap.")
 		return false
 	end
@@ -862,9 +884,14 @@ function M.start(base_dir, keymap_module, info_toml_path)
 		Logger.error(LOG, "Personal info tracker start refused because another start is in progress.")
 		return false
 	end
+	if type(refresh_personal_data) ~= "function" then
+		Logger.error(LOG, "Personal info tracker requires a registry refresh transaction.")
+		return false
+	end
 
 	local token = {}
 	_starting_token = token
+	_refresh_personal_data = refresh_personal_data
 	if type(base_dir) == "string" then _base_dir = base_dir end
 
 	-- Resolve the TOML path: explicit override > default relative to base_dir
@@ -998,6 +1025,7 @@ function M.stop()
 	_starting_token = nil
 	M.disable()
 	_keymap = nil
+	_refresh_personal_data = nil
 end
 
 return M

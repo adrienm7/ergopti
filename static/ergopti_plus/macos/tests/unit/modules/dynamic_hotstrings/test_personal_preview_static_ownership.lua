@@ -184,7 +184,8 @@ helpers.describe("personal preview and static engine ownership", function()
 		Keymap.set_preview_autocorrect_enabled(true)
 
 		PersonalInfo.start("", Keymap,
-			helpers.shared("core/config_schema/examples/personal_info.example.toml"))
+			helpers.shared("core/config_schema/examples/personal_info.example.toml"),
+			function(_, publish) return publish() end)
 		PersonalInfo.enable()
 
 		local tap = find_keydown_tap(hs_stub)
