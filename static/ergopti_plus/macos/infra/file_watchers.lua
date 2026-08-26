@@ -4,7 +4,8 @@
 --- MODULE: Auto-Reload File Watchers
 --- DESCRIPTION:
 --- Boot-time hs.pathwatcher setup that reloads Hammerspoon when the user edits a
---- hotstring TOML (in the shared dir, the personal dir tree, or in place) or any
+--- hotstring TOML (in the shared dir, the personal dir tree, or in place), the
+--- standalone personal-info config when it falls outside those trees, or any
 --- project .lua file. The required hotstrings/project watchers and any available
 --- personal-root watcher commit as one startup transaction so boot never
 --- publishes a partially armed required reload surface.
@@ -76,17 +77,29 @@ local function canonical_path(p)
 	return (p:gsub("\\", "/"):lower())
 end
 
+--- Tests whether an exact path is covered by a recursive directory watcher.
+--- @param path string Candidate absolute path.
+--- @param root string Candidate recursive root.
+--- @return boolean covered
+local function path_is_within(path, root)
+	local key = canonical_path(path):gsub("/+$", "")
+	local prefix = canonical_path(root):gsub("/+$", "")
+	if key == "" or prefix == "" then return false end
+	return key == prefix or key:sub(1, #prefix + 1) == prefix .. "/"
+end
+
 --- Arms every auto-reload watcher. Pins them in _G.script_watchers (the GC root
 --- init.lua's shutdown callback stops on quit).
 --- @param ctx table { hotstrings_dir: string, base_dir: string,
----   personal_hotstrings_dir: string, self_written_files: string[] } — absolute
----   paths resolved by the boot script.
+---   personal_hotstrings_dir: string, personal_info_path: string,
+---   self_written_files: string[] } — absolute paths resolved by the boot script.
 --- @return boolean committed True only when both required watchers, plus the
 ---   personal watcher when available, are started and their owner is published.
 function M.start(ctx)
-	local hotstrings_dir = ctx.hotstrings_dir
-	local base_dir       = ctx.base_dir
-	local personal_dir   = ctx.personal_hotstrings_dir or ""
+	local hotstrings_dir     = ctx.hotstrings_dir
+	local base_dir           = ctx.base_dir
+	local personal_dir       = ctx.personal_hotstrings_dir or ""
+	local personal_info_path = ctx.personal_info_path or ""
 
 	-- Files this session writes ITSELF, which must never look like an external
 	-- change. The hotstrings directory resolves to the config ROOT whenever that
@@ -486,6 +499,34 @@ function M.start(ctx)
 	if personal_root ~= "" and not acquire_watcher(personal_root, personal_hotstrings_changed,
 		"Personal hotstrings watcher", true) then
 		return rollback_startup()
+	end
+
+	-- The normal configuration topology puts personal_info.toml below the
+	-- recursively watched hotstrings root. Bundle fallback moves hotstrings_dir
+	-- into the application bundle while personal_info.toml remains beside the
+	-- user's config tree, so neither directory watcher can observe subsequent
+	-- external edits. Arm one exact required watcher only for that uncovered
+	-- topology; duplicating it in the normal topology would double reload bursts.
+	if personal_info_path ~= ""
+		and not path_is_within(personal_info_path, hotstrings_dir)
+		and not path_is_within(personal_info_path, personal_root)
+	then
+		local personal_info_key = canonical_path(personal_info_path)
+		local function personal_info_changed(paths)
+			if not lifecycle_active then return end
+			local hit = {}
+			for _, path in ipairs(paths) do
+				if canonical_path(path) == personal_info_key
+					and not is_runtime_artefact(path) then
+					hit[#hit + 1] = path
+				end
+			end
+			if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
+		end
+		if not acquire_watcher(personal_info_path, personal_info_changed,
+			"Personal-info configuration watcher", false) then
+			return rollback_startup()
+		end
 	end
 
 	-- HTML/CSS/JS are webview assets loaded at open-time — only .lua changes

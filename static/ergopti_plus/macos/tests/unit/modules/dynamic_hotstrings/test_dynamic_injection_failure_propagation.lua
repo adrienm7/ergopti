@@ -15,6 +15,11 @@ local helpers = require("tests.helpers")
 local function noop() end
 
 
+local function refresh_personal_data(_, publisher)
+	return publisher() == true
+end
+
+
 local function api(overrides)
 	return setmetatable(overrides or {}, {
 		__index = function(target, key)
@@ -323,7 +328,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local file = assert(io.open(toml_path, "w"))
 		file:write('[info]\nfirst_name = "Alice"\n\n[letters]\np = "first_name"\n')
 		file:close()
-		personal.start("", fake_keymap, toml_path)
+		personal.start("", fake_keymap, toml_path, refresh_personal_data)
 		personal.enable()
 		os.remove(toml_path)
 
@@ -371,7 +376,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local file = assert(io.open(toml_path, "w"))
 		file:write('[info]\nfirst_name = "Alice"\n\n[letters]\np = "first_name"\n')
 		file:close()
-		personal.start("", fake_keymap, toml_path)
+		personal.start("", fake_keymap, toml_path, refresh_personal_data)
 		personal.enable()
 		os.remove(toml_path)
 
