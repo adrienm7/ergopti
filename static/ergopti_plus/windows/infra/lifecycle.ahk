@@ -43,6 +43,15 @@ global _SuspendPending := false
 global SUSPEND_DEFER_TIMEOUT_MS := 2000
 global _SuspendPendingSince := 0
 
+; Watchdog state is initialized by this include, but the timer starts only after
+; every boot subsystem reaches its ready boundary. Starting from boot.ahk let an
+; onboarding message pump consume the marker before these globals existed;
+; starting here would still let the reactor tear down subsystems whose later
+; auto-execute initialization had not finished.
+global SUSPEND_WATCHDOG_MS := 500
+global _LastSuspendState := A_IsSuspended
+global _SuspendWatchdogStarted := false
+
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
 ; latch across Suspend and cannot be cleared by synthetic events — they must be
@@ -491,6 +500,16 @@ Ergopti_OnSuspendResume() {
 				LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 		else
 				LoggerError("Lifecycle", "Resume completed with the navigation event owner unavailable; its retained plan will retry on the next lifecycle transition.")
+}
+
+SuspendWatchdogStart() {
+	global _LastSuspendState, _SuspendWatchdogStarted, SUSPEND_WATCHDOG_MS
+	if _SuspendWatchdogStarted
+		throw Error("suspend watchdog already started")
+	_LastSuspendState := A_IsSuspended
+	SetTimer(_SuspendStateWatchdog, SUSPEND_WATCHDOG_MS)
+	_SuspendWatchdogStarted := true
+	return true
 }
 
 _SuspendStateWatchdog() {

@@ -14,8 +14,9 @@
 #Requires AutoHotkey v2.0
 
 ; File name of the one-shot marker that carries a pause across a Reload. This
-; module is included before boot arms _SuspendStateWatchdog: onboarding pumps
-; messages, so the callback can run long before lifecycle.ahk's later include.
+; module is included before boot so the marker path contract is available early.
+; The consuming watchdog is deliberately armed only by lifecycle.ahk, after all
+; state used by ToggleSuspend has initialized.
 global SUSPEND_MARKER_FILENAME := "suspend_restore.marker"
 
 
