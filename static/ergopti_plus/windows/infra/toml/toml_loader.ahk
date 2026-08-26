@@ -44,7 +44,8 @@ global _HOTSTRING_ENTRY_PATTERN :=
 ; Defined once here so the displayed count helpers can recognise EXACTLY the two
 ; shapes that actually get registered, never a looser `key =` form that would
 ; over-count malformed or non-entry lines versus the registered rows.
-global _HOTSTRING_SIMPLE_ENTRY_PATTERN := 'i)^(?:"([^"]+)"|([A-Za-z0-9_.-]+))\s*=\s*"([^"]+)"'
+global _HOTSTRING_SIMPLE_ENTRY_PATTERN :=
+	'i)^(?:"((?:[^"\\]|\\.)*)"|([A-Za-z0-9_.-]+))\s*=\s*"((?:[^"\\]|\\.)*)"\s*$'
 
 ; A TOML section header, accepting ONE or MORE brackets — `[snippets]` and
 ; `[[snippets]]` are both valid and both register hotstrings.
@@ -505,13 +506,11 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
 				if (CurrentSection == "_meta" or InStr(CurrentSection, "_meta.")) {
 						continue
 				}
-				if !RegExMatch(Line, '^(?:"[^"]+"|[A-Za-z0-9_.-]+)\s*=') {
-						continue
-				}
 				if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
 						if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleM) {
-								Trigger := (SimpleM[1] != "") ? SimpleM[1] : SimpleM[2]
-								Output  := SimpleM[3]
+								Trigger := UnescapeTomlString(
+									(SimpleM[1] != "") ? SimpleM[1] : SimpleM[2])
+								Output  := UnescapeTomlString(SimpleM[3])
 								Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
 								; Same marker substitution on the replacement as on the trigger:
 								; an extension pack whose output is the magic key must emit the
