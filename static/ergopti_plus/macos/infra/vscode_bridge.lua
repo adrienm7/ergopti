@@ -769,7 +769,7 @@ local _server_cleanup = nil
 local function handle_server_request(method, path, _headers, body)
 	if path == "/caret" and method == "POST" then
 		local ok, data = pcall(hs.json.decode, body)
-		if ok and data then
+		if ok and type(data) == "table" then
 			data._ts = hs.timer.secondsSinceEpoch()
 			_caret = data
 		end
