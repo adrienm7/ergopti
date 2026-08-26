@@ -54,6 +54,7 @@ local function new_context(config)
 		sends = {},
 		delivered = {},
 		failures = {},
+		rejected = {},
 		route_calls = 0,
 		activation_order = {},
 	}
@@ -254,6 +255,10 @@ local function new_context(config)
 			if state.delivered_mode == "false" then
 				return false, "synthetic delivery refusal"
 			end
+			return true
+		end,
+		on_rejected = function(record)
+			state.rejected[#state.rejected + 1] = record
 			return true
 		end,
 		on_failed = function(message)
@@ -715,7 +720,16 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 		local full_refusal, full_detail = context.transport.enqueue("absolute-overflow", "error")
 		helpers.assert_nil(full_refusal)
 		helpers.assert_contains(full_detail, "capacity")
-		helpers.assert_eq(context.transport.status().queued, 8192)
+		local saturated = context.transport.status()
+		helpers.assert_eq(saturated.queued, 8192)
+		helpers.assert_eq(saturated.dropped_total, 2,
+			"every refused producer record must remain visible in the health snapshot")
+		helpers.assert_eq(saturated.dropped_noncritical, 1)
+		helpers.assert_eq(saturated.dropped_critical, 1)
+		helpers.assert_eq(saturated.dropped_by_variant.trace, 1)
+		helpers.assert_eq(saturated.dropped_by_variant.error, 1)
+		helpers.assert_eq(saturated.rejected_error_fallback_queued, 1,
+			"an ERROR refused by the native queue must retain one bounded fallback owner")
 		helpers.assert_eq(#context.state.failures, 0,
 			"producer-side capacity refusal must not call the fail-safe on the HID stack")
 
@@ -723,6 +737,55 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 		helpers.assert_eq(#context.state.failures, 1,
 			"the next timer-owned pump must surface producer-side capacity refusal")
 		helpers.assert_contains(context.state.failures[1], "capacity")
+		helpers.assert_eq(#context.state.rejected, 1,
+			"the timer-owned fallback must release the exact refused ERROR")
+		helpers.assert_eq(context.state.rejected[1].line, "absolute-overflow")
+		helpers.assert_eq(context.state.rejected[1].variant, "error")
+		helpers.assert_eq(context.transport.status().rejected_error_fallback_queued, 0)
+	end)
+
+	helpers.it("bounds rejected ERROR fallback ownership and timer work per tick", function()
+		local context = new_context()
+		configure(context)
+		for index = 1, 7168 do
+			local retained, enqueue_err = context.transport.enqueue(
+				"fallback-normal-" .. tostring(index), "info")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+		end
+		for index = 1, 1024 do
+			local retained, enqueue_err = context.transport.enqueue(
+				"fallback-critical-" .. tostring(index), "warn")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+		end
+
+		for index = 1, 65 do
+			local retained, enqueue_err, fallback = context.transport.enqueue(
+				"rejected-error-" .. tostring(index), "error")
+			helpers.assert_nil(retained)
+			helpers.assert_contains(enqueue_err, "capacity")
+			if index <= 64 then
+				helpers.assert_type(fallback, "table",
+					"each bounded slot must return the exact record Logger can annotate")
+			else
+				helpers.assert_nil(fallback,
+					"the sixty-fifth refusal must not grow fallback memory beyond its cap")
+			end
+		end
+		local saturated = context.transport.status()
+		helpers.assert_eq(saturated.dropped_total, 65)
+		helpers.assert_eq(saturated.dropped_critical, 65)
+		helpers.assert_eq(saturated.rejected_error_fallback_queued, 64)
+		helpers.assert_eq(saturated.rejected_error_fallback_overflow, 1)
+
+		context.state.pump()
+		helpers.assert_eq(#context.state.rejected, 8,
+			"one pump tick must release only the documented bounded fallback quota")
+		helpers.assert_eq(context.transport.status().rejected_error_fallback_queued, 56)
+		for _ = 1, 7 do context.state.pump() end
+		helpers.assert_eq(#context.state.rejected, 64)
+		helpers.assert_eq(context.state.rejected[1].line, "rejected-error-1")
+		helpers.assert_eq(context.state.rejected[64].line, "rejected-error-64")
+		helpers.assert_eq(context.transport.status().rejected_error_fallback_queued, 0)
 	end)
 
 	helpers.it("drains the maximum admitted backlog in FIFO batches before the two-second deadline", function()
