@@ -154,6 +154,25 @@ _PIMV_EveryVectorMatches() {
 Test("personal-info mask: every shared vector is reproduced byte for byte (preview-masking-cross-driver)",
 	_PIMV_EveryVectorMatches)
 
+_PIMV_InvalidPoliciesFailClosed() {
+	global _SharedDir
+	Path := _SharedDir . "\tests\corpus\personal_info\mask_vectors.json"
+	Data := JsonParse(FileRead(Path, "UTF-8"))
+	AssertTrue(Data is Map and Data.Has("invalid_policies")
+		and Data["invalid_policies"] is Array,
+		"the shared malformed-policy corpus must decode")
+	Vectors := Data["invalid_policies"]
+	AssertTrue(Vectors.Length >= 6,
+		"malformed-policy coverage must retain its type, range, and relation cases")
+	for Vector in Vectors {
+		AssertEqual(Vector["expected"],
+			PersonalInfoMaskValue(Vector["value"], Vector["policy"]),
+			"invalid policy " . Vector["id"] . " must fail closed")
+	}
+}
+Test("personal-info mask: every malformed shared policy fails closed",
+	_PIMV_InvalidPoliciesFailClosed)
+
 
 ; What is TYPED is never what the bubble shows. The mask is a display function
 ; and has no route to the injection path; this pins the other direction — that a

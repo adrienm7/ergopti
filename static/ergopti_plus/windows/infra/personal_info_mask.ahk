@@ -135,10 +135,10 @@ _PIMaskIsSeparator(Ch) {
 ; ==========================
 ; ==========================
 
-; Whether a policy Map carries every key the mask needs.
+; Whether a policy Map is safe for display masking.
 ; @param Policy The [policy] block, as parsed.
-; @return "" when the policy is usable, otherwise the name of the missing key.
-PersonalInfoMaskPolicyMissingKey(Policy) {
+; @return "" when the policy is usable, otherwise the invalid field/relation.
+PersonalInfoMaskPolicyInvalidField(Policy) {
 	global PI_MASK_REQUIRED_POLICY
 	if !(Policy is Map) {
 		return "policy"
@@ -147,6 +147,21 @@ PersonalInfoMaskPolicyMissingKey(Policy) {
 		if !Policy.Has(Key) {
 			return Key
 		}
+	}
+	if (Type(Policy["mask_char"]) != "String" or Policy["mask_char"] == "") {
+		return "mask_char"
+	}
+	for _, Key in ["reveal_head", "reveal_tail", "min_length_to_reveal"] {
+		if (Type(Policy[Key]) != "Integer" or Policy[Key] < 0) {
+			return Key
+		}
+	}
+	if (Type(Policy["preserve_separators"]) != "Integer"
+		or (Policy["preserve_separators"] != 0 and Policy["preserve_separators"] != 1)) {
+		return "preserve_separators"
+	}
+	if (Policy["reveal_head"] + Policy["reveal_tail"] >= Policy["min_length_to_reveal"]) {
+		return "reveal_window"
 	}
 	return ""
 }
@@ -167,7 +182,7 @@ PersonalInfoMaskValue(Value, Policy) {
 	; Fail CLOSED. A caller with a broken policy gets everything hidden rather
 	; than everything shown: the whole point of this module is that a mistake
 	; must not end in a secret on screen.
-	if (PersonalInfoMaskPolicyMissingKey(Policy) != "") {
+	if (PersonalInfoMaskPolicyInvalidField(Policy) != "") {
 		Hidden := ""
 		Loop Chars.Length {
 			Hidden .= PI_MASK_FALLBACK_CHAR
@@ -376,9 +391,9 @@ _PIMaskLoadDeclaration() {
 		return _PIMaskFailClosedDeclaration()
 	}
 	Policy := Parsed["policy"]
-	Missing := PersonalInfoMaskPolicyMissingKey(Policy)
-	if (Missing != "") {
-		try LoggerError("PersonalInfoMask", "The shared policy is missing '{1}' — masking every personal-info preview.", Missing)
+	Invalid := PersonalInfoMaskPolicyInvalidField(Policy)
+	if (Invalid != "") {
+		try LoggerError("PersonalInfoMask", "The shared policy is invalid at '{1}' — masking every personal-info preview.", Invalid)
 		return _PIMaskFailClosedDeclaration()
 	}
 
