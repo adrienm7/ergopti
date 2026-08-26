@@ -120,6 +120,48 @@ _LBLD_OllamaRemainsDepsGated() {
 		"the current ready callback must schedule one model warmup")
 }
 
+_LBLD_ProjectRoot(State, Port, FirstRestore) {
+	global _LLM_Menu
+	State["projections"] += 1
+	if _LLM_Menu_ShouldScheduleInitialBackendLifecycle(
+			FirstRestore, _LLM_Menu) {
+		LLM_Menu_ScheduleBackendLifecycle(false,
+			(Callback, Period) => _LBLD_Schedule(State, Callback, Period), Port)
+	}
+	return true
+}
+
+_LBLD_MenuBuildProjection(State, Port) {
+	State["build"] += 1
+	return _LBLD_ProjectRoot(State, Port, false)
+}
+
+_LBLD_InitialProjectionReachesTerminalLifecycle() {
+	State := _LBLD_State()
+	State["projections"] := 0
+	Port := _LBLD_Port(State)
+	Port["deps_ready"] := (*) => true
+	Port["menu_build"] := (*) => _LBLD_MenuBuildProjection(State, Port)
+	_LBLD_Reset(_LBLD_Menu("ollama", true))
+	_LBLD_ProjectRoot(State, Port, true)
+
+	Drained := 0
+	while State["scheduled"].Length > 0 {
+		Drained += 1
+		AssertTrue(Drained <= 4,
+			"root projection must not create an unbounded lifecycle queue")
+		State["scheduled"].RemoveAt(1)["callback"].Call()
+	}
+	AssertEqual(2, State["projections"],
+		"readiness must publish exactly one replacement root")
+	AssertEqual(1, State["build"],
+		"readiness must request exactly one menu build")
+	AssertEqual(1, State["start"],
+		"the original lifecycle must survive its root projection and start once")
+	AssertEqual(1, State["warmup"],
+		"the original lifecycle must warm exactly once after bridge start")
+}
+
 _LBLD_StaleOllamaWorkCannotMutateApi() {
 	State := _LBLD_State()
 	Port := _LBLD_Port(State)
@@ -359,6 +401,9 @@ Test("[ahk-003] backend lifecycle dispatch is backend-specific and owned",
 	_LBLD_ApiNeverConsultsOllama)
 Test("[ahk-003] Ollama lifecycle remains dependency-gated",
 	_LBLD_OllamaRemainsDepsGated)
+Test("[ahk-019] Ollama readiness projection reaches one terminal lifecycle "
+	. "(backend-lifecycle-root-projection)",
+	_LBLD_InitialProjectionReachesTerminalLifecycle)
 Test("[ahk-003] stale Ollama lifecycle cannot mutate the API backend",
 	_LBLD_StaleOllamaWorkCannotMutateApi)
 Test("[ahk-003] A-B-A backend changes keep old lifecycle intents stale",
