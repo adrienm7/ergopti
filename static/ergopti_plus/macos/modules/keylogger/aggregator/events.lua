@@ -479,7 +479,9 @@ function M.walk_system_event(entry)
 	-- the typing path too. They vanished from the heatmap entirely.
 	if action == "karabiner_press" and type(entry.keycode) == "number" then
 		local app = entry.app or "Unknown"
-		local kk  = date_str .. "" .. app .. "" .. tostring(entry.keycode)
+		-- Keep the sentinel escaped in source: a literal control byte renders as an
+		-- empty separator in audit output even though it is present at runtime.
+		local kk  = date_str .. "\1" .. app .. "\1" .. tostring(entry.keycode)
 		local row = C.gc(S.agg_batch.kc_ngram, kk,
 			{ date = date_str, app = app, keycode = entry.keycode, count = 0 })
 		row.count = row.count + 1
