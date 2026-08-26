@@ -38,6 +38,7 @@ local MODULE_KEYS = {
 	"chord",
 	"adapters.hotkey_registrar",
 	"infra.termination_coordinator",
+	"infra.factory_reset_journal",
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.global_actions_transaction",
 	"ui.menu.menu_gestures",
@@ -437,10 +438,16 @@ local function with_menu_fixture(options, callback)
 
 	local file_mover = {}
 	function file_mover.capture(path)
+		local existed = observations.files[path] ~= nil
 		return {
 			path = path,
 			backup = path .. ".ergopti-reset-backup",
 			content = observations.files[path],
+			existed = existed,
+			identity = existed and {
+				dev = 1,
+				ino = path == "/virtual/config.toml" and 1 or 2,
+			} or nil,
 			moved = false,
 		}
 	end
@@ -464,6 +471,33 @@ local function with_menu_fixture(options, callback)
 	end
 	package.loaded["ui.menu.recoverable_file_moves"] = {
 		create = function() return file_mover end,
+	}
+	local reset_journal = {
+		prepare = function(_, entries)
+			return perform(observations, "reset-journal:prepared", function()
+				observations.reset_journal_phase = "prepared"
+				observations.reset_journal_entries = clone(entries)
+			end)
+		end,
+		mark_commit = function()
+			return perform(observations, "reset-journal:commit", function()
+				observations.reset_journal_phase = "commit"
+			end)
+		end,
+		mark_prepared = function()
+			return perform(observations, "reset-journal:rollback", function()
+				observations.reset_journal_phase = "prepared"
+			end)
+		end,
+		clear = function()
+			return perform(observations, "reset-journal:cleared", function()
+				observations.reset_journal_phase = "cleared"
+			end)
+		end,
+	}
+	package.loaded["infra.factory_reset_journal"] = {
+		path_for = function(path) return path .. ".ergopti-reset-journal-v1.json" end,
+		create = function() return reset_journal end,
 	}
 
 	for _, module_name in ipairs({
@@ -966,9 +1000,26 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			with_menu_fixture({ failures = { reload = fail(mode) } }, function(observations)
 				helpers.assert_eq(observations.actions.reset_defaults(), false)
 				assert_fully_restored(observations)
+				helpers.assert_eq(observations.reset_journal_phase, "cleared",
+					"a refused reload must settle the restored journal")
 				helpers.assert_eq(observations.calls["karabiner-restore"], 1)
 				helpers.assert_eq(observations.reload_commits, 0)
 			end)
+		end
+	end)
+
+	helpers.it("rolls back every durable journal boundary refusal", function()
+		for _, label in ipairs({ "reset-journal:prepared", "reset-journal:commit" }) do
+			for _, mode in ipairs({ "false", "nil", "throw", "false-after", "throw-after" }) do
+				with_menu_fixture({ failures = { [label] = fail(mode) } }, function(observations)
+					helpers.assert_eq(observations.actions.reset_defaults(), false,
+						label .. " " .. mode .. " must refuse the reset")
+					assert_fully_restored(observations)
+					helpers.assert_eq(observations.reset_journal_phase, "cleared",
+						"the restored transaction must durably settle its journal")
+					helpers.assert_eq(observations.reload_commits, 0)
+				end)
+			end
 		end
 	end)
 
@@ -1009,6 +1060,14 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			helpers.assert_nil(observations.files["/virtual/config.toml"])
 			helpers.assert_not_nil(observations.files[
 				"/virtual/config.toml.ergopti-reset-backup"])
+			helpers.assert_eq(observations.reset_journal_phase, "commit",
+				"the accepted reload must leave one durable commit decision")
+			helpers.assert_eq(#observations.reset_journal_entries, 2,
+				"the journal must own every reset pathname")
+			for _, entry in ipairs(observations.reset_journal_entries) do
+				helpers.assert_true(entry.existed == true and type(entry.identity) == "table",
+					"each existing reset file must retain its inode identity")
+			end
 		end)
 	end)
 
@@ -1034,6 +1093,8 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			observations.reload_abort = nil
 			abort("native fence refused")
 			assert_fully_restored(observations)
+			helpers.assert_eq(observations.reset_journal_phase, "cleared",
+				"an aborted reload lease must settle the restored journal")
 			helpers.assert_eq(observations.reload_commits, 0)
 		end)
 	end)

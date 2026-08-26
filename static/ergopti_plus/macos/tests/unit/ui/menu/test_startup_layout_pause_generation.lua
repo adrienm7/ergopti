@@ -106,6 +106,23 @@ package.loaded["ui.menu.menu_paths"] = {
 	get_config_dir = function() return "/tmp/ergopti-test" end,
 	open_editor = function() end,
 }
+package.loaded["infra.factory_reset_journal"] = {
+	path_for = function(config_path)
+		if type(config_path) ~= "string" or config_path == "" then return nil end
+		return config_path .. ".ergopti-reset-journal-v1.json"
+	end,
+	create = function(journal_path)
+		if type(journal_path) ~= "string" or journal_path == "" then
+			return nil, "journal path must be a non-empty string"
+		end
+		return {
+			prepare = function() return true end,
+			mark_commit = function() return true end,
+			mark_prepared = function() return true end,
+			clear = function() return true end,
+		}
+	end,
+}
 package.loaded["ui.menu.menu_state"] = {
 	sync_state_to_modules = function() return true end,
 }

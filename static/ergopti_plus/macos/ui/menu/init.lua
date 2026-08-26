@@ -37,6 +37,7 @@ local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
+local FactoryResetJournal = require("infra.factory_reset_journal")
 
 local LOG = "menu"
 local load_errors = {}
@@ -473,6 +474,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local gestures_core_mod = safe_require("modules.gestures", "gestures core")
 	local file_mover = RecoverableFileMoves.create()
+	local reset_journal_path = FactoryResetJournal.path_for(MenuPaths.get("ConfigTomlPath"))
+	local reset_journal, reset_journal_detail = FactoryResetJournal.create(reset_journal_path)
+	if type(reset_journal) ~= "table" then
+		Logger.error(LOG, "Factory-reset journal owner is unavailable: %s.", tostring(reset_journal_detail))
+		return nil
+	end
 	local script_defaults = core_mods.shortcuts_mod
 		and core_mods.shortcuts_mod.DEFAULT_STATE
 		and core_mods.shortcuts_mod.DEFAULT_STATE.script_control_shortcuts
@@ -613,6 +620,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			get_keys = function() return hs.settings.getKeys() end,
 		},
 		file_mover = file_mover,
+		reset_journal = reset_journal,
 		reset_paths = {
 			MenuPaths.get("ConfigTomlPath"),
 			MenuPaths.get("KarabinerConfigPath"),
