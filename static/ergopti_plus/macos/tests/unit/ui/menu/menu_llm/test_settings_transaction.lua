@@ -725,7 +725,64 @@ end)
 
 -- ==============================================
 -- ==============================================
--- ======= 2/ Every production entry path =======
+-- ======= 2/ Finite Numeric Boundary ===========
+-- ==============================================
+-- ==============================================
+
+helpers.describe("HS-055 LLM settings reject non-finite numbers", function()
+	for _, case in ipairs({
+		{name = "NaN", value = 0 / 0},
+		{name = "positive infinity", value = math.huge},
+		{name = "negative infinity", value = -math.huge},
+	}) do
+		helpers.it("refuses " .. case.name .. " before every mutation boundary", function()
+			with_fixture({}, function(fixture)
+				local result = fixture.manager.apply_setting_transaction({
+					key = "llm_temperature",
+					value = case.value,
+					runtime_fn = "set_llm_temperature",
+					publish_setting = true,
+				})
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(fixture.state.llm_temperature, 0.2)
+				helpers.assert_eq(fixture.runtime.llm_temperature, 0.2)
+				helpers.assert_eq(fixture.settings_store.llm_temperature, 0.2)
+				helpers.assert_eq(fixture.persisted().llm_temperature, 0.2)
+				helpers.assert_eq(fixture.rendered().llm_temperature, 0.2)
+				helpers.assert_eq(fixture.calls.runtime_get, 0)
+				helpers.assert_eq(fixture.calls.runtime, 0)
+				helpers.assert_eq(fixture.calls.save, 0)
+				helpers.assert_eq(fixture.calls.settings, 0)
+				helpers.assert_eq(fixture.calls.menu, 0)
+				helpers.assert_true(#fixture.errors >= 1,
+					"the finite-value refusal must be visible in the file log")
+			end)
+		end)
+	end
+
+	helpers.it("rejects prompt overflow through the real debounce entry path", function()
+		with_fixture({}, function(fixture)
+			fixture.set_prompt("1e999")
+			helpers.assert_eq(fixture.manager.set_debounce(), false)
+			helpers.assert_eq(fixture.state.llm_debounce, 0.5)
+			helpers.assert_eq(fixture.runtime.llm_debounce, 0.5)
+			helpers.assert_eq(fixture.settings_store.llm_debounce, 0.5)
+			helpers.assert_eq(fixture.calls.runtime_get, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.settings, 0)
+			helpers.assert_eq(fixture.calls.menu, 0)
+		end)
+	end)
+end)
+
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 3/ Every production entry path =======
 -- ==============================================
 -- ==============================================
 
