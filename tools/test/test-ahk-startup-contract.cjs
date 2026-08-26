@@ -56,9 +56,10 @@ if (!entry.includes('ERGOPTI_STARTUP_SMOKE_DIR') || !entry.includes('_DriverStar
 if (!entry.includes('EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"],')) {
 	errors.push('the startup smoke must continue after first-run personal-shortcuts creation instead of escaping through Reload');
 }
-const smokeMenuBuild = entry.indexOf('if !BuildTrayMenuDeferred()');
+const smokeReady = entry.indexOf('_DriverBootPhase := "ready"');
+const smokeMenuBuild = entry.indexOf('BuildTrayMenuDeferred()', smokeReady);
 const smokeExit = entry.indexOf('DllCall("ExitProcess", "UInt", 0)', smokeMenuBuild);
-if (smokeMenuBuild < 0 || smokeExit < 0 || smokeMenuBuild > smokeExit) {
+if (smokeReady < 0 || smokeMenuBuild < 0 || smokeExit < 0 || smokeMenuBuild > smokeExit) {
 	errors.push('the startup smoke must consume the deferred tray-menu build before reporting a clean boot');
 }
 if (!lifecycle.includes('BuildTrayMenuDeferred()')

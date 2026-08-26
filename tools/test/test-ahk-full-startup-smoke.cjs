@@ -64,20 +64,30 @@ function main() {
 		// from replacing a maintainer's live driver.
 		fs.writeFileSync(wrapper,
 			'\uFEFF#Requires AutoHotkey v2.0+\n#Include ErgoptiPlus.ahk\n', 'utf8');
-		for (const fixture of ['fresh-config', 'existing-config']) {
+		for (const fixture of ['fresh-config', 'existing-config', 'suspend-marker']) {
 			const configRoot = path.join(scratch, fixture);
 			fs.mkdirSync(configRoot, { recursive: true });
+			const markerBearing = fixture === 'suspend-marker';
+			const marker = path.join(configRoot, 'suspend_restore.marker');
+			if (markerBearing) fs.writeFileSync(marker, '1\n', 'utf8');
 			const result = spawnSync(ahk, ['/ErrorStdOut', wrapper], {
 				cwd: WINDOWS,
 				encoding: 'utf8',
 				timeout: 120000,
-				env: { ...process.env, ERGOPTI_STARTUP_SMOKE_DIR: configRoot },
+				env: {
+					...process.env,
+					ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
+					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : '',
+				},
 			});
 			if (result.error) return fail(`${fixture}: ${result.error.message}`);
 			if (result.status !== 0) {
 				const output = `${result.stdout || ''}${result.stderr || ''}`.trim();
 				const logs = logTail(configRoot);
 				return fail(`${fixture} exited ${result.status}.${output ? `\n${output}` : ''}${logs ? `\n${logs}` : ''}`);
+			}
+			if (markerBearing && fs.existsSync(marker)) {
+				return fail(`${fixture}: startup reached ready without consuming the suspend marker.`);
 			}
 			// Reuse the first fixture once so the no-bootstrap path is exercised too.
 			if (fixture === 'fresh-config') {
@@ -94,7 +104,7 @@ function main() {
 				}
 			}
 		}
-		console.log('\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, and independent config boots reached ready.\x1b[0m');
+		console.log('\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, and suspend-marker boots reached ready.\x1b[0m');
 		return 0;
 	} finally {
 		fs.rmSync(wrapper, { force: true });

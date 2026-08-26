@@ -521,8 +521,9 @@ if !LLM_TriggerJournalRecoverAtBoot()
 _InstallSafeBootstrapTray()
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
-		; Reproduce that hazard without an interactive window: at least one suspend
-		; watchdog tick must execute here, before the later lifecycle include.
+		; Reproduce that hazard without an interactive window: the suspend watchdog
+		; must remain unarmed here until the later lifecycle include initializes all
+		; state consumed by marker restoration.
 		_StartupSmokePumpUntil := A_TickCount + 650
 		while (A_TickCount < _StartupSmokePumpUntil)
 				Sleep(20)
@@ -1124,15 +1125,27 @@ HotstringPrefixWatcherInit()
 LLM_NavEventOwner_EnsureStarted()
 HotstringPrefixWatcherRebuildIndex()
 BootProfile_Mark("Prefix watcher index complete")
+SuspendWatchdogStart()
 _DriverReady := true
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 if (_DriverStartupSmokeDir != "") {
+		_StartupSmokeExpectedSuspend :=
+				EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1"
+		if _StartupSmokeExpectedSuspend {
+				_StartupSmokeSuspendUntil := A_TickCount + 750
+				while (!A_IsSuspended and A_TickCount < _StartupSmokeSuspendUntil)
+						Sleep(20)
+				if !A_IsSuspended
+						throw Error("suspend marker was not restored before ready")
+		}
 		; Ready precedes the deferred tray build in production, so process-alive at
 		; this point used to miss deterministic post-ready boot failures. Exercise
 		; that first deferred owner synchronously and consume its status before the
 		; isolated smoke exits; this caught Func("...") -> Invalid base in LLM replay.
-		if !BuildTrayMenuDeferred()
+		; A suspended driver deliberately retains tray-root work for resume; only
+		; active fixtures can require this deferred owner to publish immediately.
+		if !_StartupSmokeExpectedSuspend and !BuildTrayMenuDeferred()
 				throw Error("deferred tray-menu construction failed after ready")
 		try _LoggerFlush(true)
 		; This isolated probe has just materialised a deep native Menu tree and must
