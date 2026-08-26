@@ -549,6 +549,26 @@ local function with_menu_fixture(options, callback)
 	local keymap = {
 		get_sections = function() return {} end,
 		get_terminator_defs = function() return {} end,
+		enable_group = function(name)
+			return perform(observations, "keymap-group:" .. name, function() end)
+		end,
+		disable_group = function(name)
+			return perform(observations, "keymap-group:" .. name, function() end)
+		end,
+		set_terminator_enabled = function(key)
+			local result = perform(observations, "terminator:" .. key, function() end)
+			if result ~= true then return result end
+			return nil
+		end,
+		set_preview_star_enabled = function()
+			return perform(observations, "preview-star", function() end)
+		end,
+		set_preview_autocorrect_enabled = function()
+			return perform(observations, "preview-autocorrect", function() end)
+		end,
+		set_preview_ai_enabled = function()
+			return perform(observations, "preview-ai", function() end)
+		end,
 	}
 	local karabiner = {
 		snapshot_settings = function() return clone(observations.karabiner_state) end,
@@ -742,9 +762,112 @@ end)
 
 
 
+-- ==========================================================
+-- ==========================================================
+-- ======= 2/ Enable-All Exact Transaction Boundaries =======
+-- ==========================================================
+-- ==========================================================
+
+helpers.describe("HS-050 enable-all is one exact global transaction", function()
+	helpers.it("refuses shortcut enable failures before persistence", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_menu_fixture({ failures = { ["named-shortcut:alpha"] = fail(mode) } },
+				function(observations)
+					observations.named_shortcut = false
+					helpers.assert_eq(observations.actions.enable_all(), false,
+						"a named shortcut " .. mode .. " must refuse Enable All")
+					helpers.assert_eq(observations.named_shortcut, false)
+					helpers.assert_eq(observations.calls.preferences or 0, 0,
+						"preferences must stay untouched until every enable commits")
+					helpers.assert_eq(
+						count_notification(observations, "notify.all_features_enabled"),
+						0
+					)
+				end)
+		end
+	end)
+
+	helpers.it("rolls back runtime sync failures before persistence", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_menu_fixture({ failures = { ["runtime-sync"] = fail(mode) } },
+				function(observations)
+					observations.named_shortcut = false
+					helpers.assert_eq(observations.actions.enable_all(), false,
+						"a runtime sync " .. mode .. " must refuse Enable All")
+					helpers.assert_eq(observations.named_shortcut, false)
+					helpers.assert_eq(observations.persisted, observations.initial_state)
+					helpers.assert_eq(observations.calls.preferences or 0, 0,
+						"runtime commitment must precede preference publication")
+					helpers.assert_eq(
+						count_notification(observations, "notify.all_features_enabled"),
+						0
+					)
+				end)
+		end
+	end)
+
+	helpers.it("compensates exact keymap feature refusals before persistence", function()
+		for _, case in ipairs({
+			{ boundary = "keymap-group:common", modes = { "false", "nil", "throw" } },
+			{ boundary = "preview-star", modes = { "false", "nil", "throw" } },
+			{ boundary = "terminator:space", modes = { "false", "throw" } },
+		}) do
+			for _, mode in ipairs(case.modes) do
+				with_menu_fixture({ failures = { [case.boundary] = fail(mode) } },
+					function(observations)
+						helpers.assert_eq(observations.actions.enable_all(), false,
+							case.boundary .. " " .. mode .. " must refuse Enable All")
+						helpers.assert_eq(observations.calls.preferences or 0, 0)
+						helpers.assert_eq(
+							count_notification(observations, "notify.all_features_enabled"),
+							0
+						)
+					end)
+			end
+		end
+	end)
+
+	helpers.it("restores every runtime after preference publication refuses", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_menu_fixture({ failures = { preferences = fail(mode) } },
+				function(observations)
+					observations.named_shortcut = false
+					helpers.assert_eq(observations.actions.enable_all(), false)
+					helpers.assert_eq(observations.state, observations.initial_state)
+					helpers.assert_eq(observations.named_shortcut, false)
+					helpers.assert_eq(observations.persisted, observations.initial_state)
+					helpers.assert_eq(
+						count_notification(observations, "notify.all_features_enabled"),
+						0
+					)
+				end)
+		end
+	end)
+
+	helpers.it("publishes success only after the final preference commit", function()
+		with_menu_fixture({}, function(observations)
+			observations.named_shortcut = false
+			helpers.assert_eq(observations.actions.enable_all(), true)
+			helpers.assert_eq(observations.named_shortcut, true)
+			helpers.assert_eq(observations.calls.preferences, 1)
+			helpers.assert_eq(observations.persisted.shortcuts, true)
+			helpers.assert_eq(observations.calls["karabiner-clear"] or 0, 0)
+			helpers.assert_eq(observations.calls["karabiner-reset"] or 0, 0)
+			helpers.assert_eq(
+				count_notification(observations, "notify.all_features_enabled"),
+				1
+			)
+		end)
+	end)
+end)
+
+
+
+
+
 -- =============================================================
 -- =============================================================
--- ======= 2/ Factory Reset Exact Transaction Boundaries =======
+-- ======= 3/ Factory Reset Exact Transaction Boundaries =======
 -- =============================================================
 -- =============================================================
 
@@ -922,7 +1045,7 @@ end)
 
 -- ========================================================
 -- ========================================================
--- ======= 3/ Recoverable File Move Native Contract =======
+-- ======= 4/ Recoverable File Move Native Contract =======
 -- ========================================================
 -- ========================================================
 
