@@ -26,8 +26,9 @@
 ---    isActive() is true cancels the previous request first.
 --- 4. Timeout enforcement: a TimerScheduler transaction must commit before the
 ---    network request is dispatched. Exact cleanup debt blocks every successor.
---- 5. encodeForQuery: thin pass-through to hs.http.encodeForQuery so callers
----    (api_remote.lua) have no direct hs.http dependency for URL encoding.
+--- 5. encodeForQuery: uses hs.http.encodeForQuery when available and a local
+---    RFC 3986 component encoder after a reported native refusal, so callers
+---    never receive raw query syntax disguised as an encoded value.
 --- 6. Generation guard: cancel()'s doc claims it "synchronously and
 ---    unconditionally" prevents a superseded callback from firing, but
 ---    hs.http.asyncPost/asyncGet may already have queued their OS-level
@@ -510,17 +511,44 @@ end
 -- =========================================
 -- =========================================
 
+--- Percent-encodes one query component without relying on native services.
+--- Iterating bytes rather than codepoints is intentional: RFC 3986 encodes the
+--- UTF-8 representation, and every byte outside the ASCII unreserved set must
+--- become an uppercase `%HH` triplet.
+--- @param value any Value to encode.
+--- @return string encoded Percent-encoded component.
+local function encode_query_component(value)
+	local raw = tostring(value or "")
+	local encoded = {}
+	for index = 1, #raw do
+		local byte = raw:byte(index)
+		local unreserved = (byte >= 0x41 and byte <= 0x5A)
+			or (byte >= 0x61 and byte <= 0x7A)
+			or (byte >= 0x30 and byte <= 0x39)
+			or byte == 0x2D or byte == 0x2E or byte == 0x5F or byte == 0x7E
+		encoded[#encoded + 1] = unreserved and string.char(byte)
+			or string.format("%%%02X", byte)
+	end
+	return table.concat(encoded)
+end
+
 --- URL-encodes a string for safe inclusion in a query string.
---- Thin pass-through to hs.http.encodeForQuery with a fallback that returns
---- the input unchanged when hs is unavailable (headless unit tests).
+--- Native failures are reported without including the possibly sensitive value,
+--- then handled by the deterministic in-process encoder above.
 --- @param str string The string to encode.
 --- @return string The percent-encoded string.
 local function encodeForQuery(str)
 	if hs and hs.http and hs.http.encodeForQuery then
 		local ok, result = pcall(hs.http.encodeForQuery, str)
-		if ok then return result end
+		if ok and type(result) == "string" then return result end
+		Logger.error(LOG, "encodeForQuery(): native query encoder failed; using "
+			.. "the internal percent encoder — %s.",
+			ok and ("unexpected " .. type(result) .. " result") or "native exception")
+	else
+		Logger.error(LOG, "encodeForQuery(): native query encoder is unavailable; "
+			.. "using the internal percent encoder.")
 	end
-	return tostring(str or "")
+	return encode_query_component(str)
 end
 
 -- The module table is itself the default singleton instance, extended with
