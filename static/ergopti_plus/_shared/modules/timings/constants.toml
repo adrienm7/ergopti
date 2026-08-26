@@ -489,6 +489,10 @@ post_install_refresh_ms = 1500
 # HS: menu_keyboard_layout.lua TIS_CALL_DELAY.
 tis_call_delay_ms = 100
 
+# Hard deadline for a native keyboard input-source mutation subprocess.
+# HS: keymap/input_sources.lua INPUT_SOURCE_OPERATION_TIMEOUT_SEC.
+input_source_operation_timeout_ms = 10000
+
 # Karabiner ready notification debounce delay.
 # HS: ke_lifecycle.lua KARABINER_READY_NOTIFY_DELAY_SEC.
 karabiner_ready_notify_delay_ms = 2500

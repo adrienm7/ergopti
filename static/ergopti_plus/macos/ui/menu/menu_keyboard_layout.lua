@@ -104,11 +104,11 @@ local parse_active_layouts          = input_sources.parse_active_layouts
 local compute_active_layouts_fast   = input_sources.compute_active_layouts_fast
 local refresh_active_layouts_async  = input_sources.refresh_active_layouts_async
 local list_active_keyboard_layouts  = input_sources.list_active_keyboard_layouts
-local set_input_source              = input_sources.set_input_source
-local enable_and_select_source      = input_sources.enable_and_select_source
+local set_input_source_async        = input_sources.set_input_source_async
+local enable_and_select_source_async = input_sources.enable_and_select_source_async
 local is_legacy_ergopti_id          = input_sources.is_legacy_ergopti_id
 local migrate_legacy_id             = input_sources.migrate_legacy_id
-local upgrade_active_list           = input_sources.upgrade_active_list
+local upgrade_active_list_async     = input_sources.upgrade_active_list_async
 local clean_layout_name             = input_sources.clean_layout_name
 local resolve_installed_ergopti_version = input_sources.resolve_installed_ergopti_version
 local ergopti_in_active_layouts     = input_sources.ergopti_in_active_layouts
@@ -174,7 +174,10 @@ local function run_install_and_chain(install_fn, legacy_active, update_menu)
 	pcall(function() ok = install_fn() end)
 	if ok and type(legacy_active) == "table" and #legacy_active > 0 then
 		Logger.info(LOG, "Install succeeded — auto-upgrading %d legacy entry(ies) in the active list.", #legacy_active)
-		pcall(upgrade_active_list, legacy_active)
+		upgrade_active_list_async(legacy_active, function()
+			schedule_menu_refresh(update_menu)
+		end)
+		return
 	end
 	schedule_menu_refresh(update_menu)
 end
@@ -354,10 +357,11 @@ function M.build(ctx)
 			label = string.format(i18n.get("menu.layout.update_list"), old_str, latest_str),
 			action    = function()
 				defer_tis_call(function()
-					local ok = upgrade_active_list(legacy_active)
-					if ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_ok"), nil, "success") end
-					if not ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_fail"), nil, "error") end
-					schedule_menu_refresh(update_menu)
+					upgrade_active_list_async(legacy_active, function(ok)
+						if ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_ok"), nil, "success") end
+						if not ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_fail"), nil, "error") end
+						schedule_menu_refresh(update_menu)
+					end)
 				end)
 			end,
 		}
@@ -397,10 +401,12 @@ function M.build(ctx)
 					label = string.format("%s v%s", var.label, latest_str),
 					action    = function()
 						defer_tis_call(function()
-							local ok = enable_and_select_source(id, var.label, bundle_full_path, internal_name)
-							if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
-							if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
-							schedule_menu_refresh(update_menu)
+							enable_and_select_source_async(id, var.label, bundle_full_path, internal_name,
+								function(ok)
+									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
+									if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
+									schedule_menu_refresh(update_menu)
+								end)
 						end)
 					end,
 				}
@@ -493,7 +499,7 @@ function M.build(ctx)
 			local row_label = display_for_record(r)
 			-- Capture both the localised name (r.name, used by hs.keycodes.setLayout)
 			-- and the raw KeyboardLayout Name (r.id, used to resolve the stable TIS ID
-			-- for Ergopti variants). set_input_source tries them in order.
+			-- for Ergopti variants). set_input_source_async tries them in order.
 			local target_localised = r.name
 			local target_kl_name   = r.id
 			rows[#rows + 1] = {
@@ -507,8 +513,9 @@ function M.build(ctx)
 					-- Defer the TIS call out of the menu-click frame so the
 					-- input-source change notification doesn't re-enter HS.
 					defer_tis_call(function()
-						set_input_source(target_localised, target_kl_name)
-						schedule_menu_refresh(update_menu)
+						set_input_source_async(target_localised, target_kl_name, function()
+							schedule_menu_refresh(update_menu)
+						end)
 					end)
 				end,
 			}
@@ -712,11 +719,15 @@ end
 --- Switches the active keyboard layout given a raw KeyboardLayout Name (as stored
 --- in state.layout_on_pause / state.layout_on_resume). Resolves the localised name
 --- from the live HIToolbox list so hs.keycodes.setLayout receives the correct form.
---- Falls back to the TIS osascript path when setLayout fails (Ergopti on Sequoia).
+--- Falls back to the asynchronous TIS osascript path when setLayout fails.
 --- @param kl_name string Raw KeyboardLayout Name from HIToolbox, e.g. "Ergopti_v2_2_2_plus".
---- @return boolean true on success.
-function M.set_layout_by_kl_name(kl_name)
-	if type(kl_name) ~= "string" or kl_name == "" then return false end
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True for an immediate switch or committed fallback child.
+function M.set_layout_by_kl_name_async(kl_name, on_done)
+	if type(kl_name) ~= "string" or kl_name == "" then
+		if type(on_done) == "function" then pcall(on_done, false, nil, "invalid_name") end
+		return false
+	end
 	-- Resolve the localised display name from the live record list so
 	-- hs.keycodes.setLayout gets the correct form (e.g. "French", "Ergopti+").
 	local localised = kl_name
@@ -727,21 +738,15 @@ function M.set_layout_by_kl_name(kl_name)
 			break
 		end
 	end
-	return set_input_source(localised, kl_name)
+	return set_input_source_async(localised, kl_name, on_done)
 end
 
 --- Schedules the pause / resume keyboard-layout switch on a DEFERRED run-loop
 --- cycle instead of running it inline.
 ---
---- This MUST be deferred and never called synchronously from the pause-change
---- callback: that callback runs inside the script-control eventtap callback
---- (script_control.dispatch_action → _on_pause_change), and set_layout_by_kl_name
---- spawns BLOCKING /usr/bin/osascript subprocesses (run_osascript_isolated — one
---- to enumerate the TIS sources, one to select the target). Stalling the eventtap
---- callback for the hundreds of ms those take makes macOS disable the tap with
---- kCGEventTapDisabledByTimeout, after which AltGr+Enter stops toggling pause
---- entirely. Deferring lets the eventtap callback return immediately so the tap
---- stays alive.
+--- This remains deferred so synchronous hs.keycodes attempts cannot re-enter the
+--- script-control eventtap. The subprocess fallback itself is asynchronous and
+--- deadline-bounded; deferral only separates the in-process TIS notification.
 --- @param is_paused boolean Current pause state (true just entered pause).
 --- @param state table Menu state exposing layout_pause_switch_enabled / layout_on_pause / layout_on_resume.
 --- @param schedule function|nil Injectable scheduler(fn) for tests; defaults to hs.timer.doAfter(0, fn).
@@ -758,8 +763,8 @@ function M.schedule_pause_layout_switch(is_paused, state, schedule)
 	end
 	schedule(function()
 		-- Look the setter up on M at call time so a test stub on the module is honoured.
-		if type(M.set_layout_by_kl_name) == "function" then
-			pcall(M.set_layout_by_kl_name, target)
+		if type(M.set_layout_by_kl_name_async) == "function" then
+			pcall(M.set_layout_by_kl_name_async, target, nil)
 		end
 	end)
 	return target
