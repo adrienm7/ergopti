@@ -65,7 +65,7 @@ helpers.describe("infra/file_watchers — reload deferral during git pull (macos
 			secondsSinceEpoch = function() return clock end,
 		}
 		hs.fs.attributes = function(_p) return nil end   -- no personal-hotstrings tree
-		hs.reload = function() reloads = reloads + 1 end
+		hs.reload = function() reloads = reloads + 1; return true end
 
 		_G.script_watchers = nil
 		git_busy = false
@@ -114,6 +114,62 @@ helpers.describe("infra/file_watchers — reload deferral during git pull (macos
 		captured_fn = nil
 		fn2()
 		helpers.assert_true(reloads == 1, "reload must fire once git has settled (got " .. reloads .. ")")
+
+		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
+			prev_pw, prev_timer, prev_attr, prev_reload
+		_G.script_watchers = nil
+	end)
+
+	helpers.it("retains one source burst until hs.reload accepts it", function()
+		local prev_pw, prev_timer, prev_attr, prev_reload =
+			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
+		local watch_cbs, captured_fn = {}, nil
+		local clock, reload_attempts = 0, 0
+
+		hs.pathwatcher = { new = function(_path, callback)
+			watch_cbs[#watch_cbs + 1] = callback
+			local watcher = {}
+			function watcher:start() return watcher end
+			function watcher:stop() return watcher end
+			return watcher
+		end }
+		hs.timer = {
+			doAfter = function(_delay, callback)
+				captured_fn = callback
+				return { stop = function() return true end }
+			end,
+			secondsSinceEpoch = function() return clock end,
+		}
+		hs.fs.attributes = function(_path) return nil end
+		hs.reload = function()
+			reload_attempts = reload_attempts + 1
+			return reload_attempts > 1
+		end
+
+		_G.script_watchers = nil
+		defer_reload_calls = 0
+		FW.start({
+			hotstrings_dir = "/fake/hotstrings/",
+			base_dir = "/fake/base/",
+			personal_hotstrings_dir = "/fake/personal",
+		})
+		clock = 1000
+		for _, callback in ipairs(watch_cbs) do
+			callback({ "/fake/base/modules/refused.lua" })
+		end
+		clock = 1001
+		local first = captured_fn
+		captured_fn = nil
+		first()
+
+		helpers.assert_eq(1, reload_attempts, "the first reload attempt must reach hs.reload")
+		helpers.assert_true(type(captured_fn) == "function",
+			"a refused hs.reload must retain the source burst and re-arm its polling owner")
+		local retry = captured_fn
+		captured_fn = nil
+		retry()
+		helpers.assert_eq(2, reload_attempts, "the retained source burst must retry exactly once")
+		helpers.assert_eq(nil, captured_fn, "an accepted reload must settle the retained burst")
 
 		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
 			prev_pw, prev_timer, prev_attr, prev_reload

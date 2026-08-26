@@ -66,6 +66,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	local burst_paths     = {}
 	local burst_count     = 0
 	local last_change_sec = 0
+	local reload_refusal_logged = false
 
 	-- ``fire_reload`` is forward-declared so the debounce closure can call it
 	-- while ``fire_reload`` itself re-arms through ``arm_reload`` (the Lua
@@ -144,18 +145,47 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 			arm_reload()
 			return
 		end
-		burst_paths, burst_count, defer_count = {}, 0, 0
+		-- A settled filesystem burst is still owned until the exclusive reload
+		-- transaction accepts it. Refusal is non-terminal and must re-arm this owner.
 		local reload_generation = _lifecycle_generation
-		ui_restore.defer_reload(function()
-			if not _lifecycle_active or reload_generation ~= _lifecycle_generation then return end
-			if git_status.operation_in_progress(base_dir) then
-				Logger.info(LOG,
-					"Reload aborted at fire time: a Git operation started during the UI hold; re-arming.")
-				arm_reload()
-				return
+		local callback_invoked = false
+		local defer_ok, deferred = xpcall(function()
+			return ui_restore.defer_reload(function()
+				callback_invoked = true
+				if not _lifecycle_active or reload_generation ~= _lifecycle_generation then return end
+				if git_status.operation_in_progress(base_dir) then
+					Logger.info(LOG,
+						"Reload aborted at fire time: a Git operation started during the UI hold; re-arming.")
+					arm_reload()
+					return
+				end
+				local request_ok, accepted = xpcall(on_reload, debug.traceback)
+				if not request_ok or accepted ~= true then
+					if not reload_refusal_logged then
+						reload_refusal_logged = true
+						Logger.warn(LOG,
+							"Menu reload request was refused; the source-file burst remains pending for retry: %s.",
+							tostring(request_ok and accepted or accepted))
+					else
+						Logger.debug(LOG, "Menu reload request remains refused; retaining the source-file burst.")
+					end
+					arm_reload()
+					return false
+				end
+				burst_paths, burst_count, defer_count = {}, 0, 0
+				reload_refusal_logged = false
+				return true
+			end)
+		end, debug.traceback)
+		if (not defer_ok or deferred ~= true) and not callback_invoked then
+			if not reload_refusal_logged then
+				reload_refusal_logged = true
+				Logger.warn(LOG,
+					"Deferred menu reload owner refused the source-file burst; retaining it for retry: %s.",
+					tostring(defer_ok and deferred or deferred))
 			end
-			on_reload()
-		end)
+			arm_reload()
+		end
 	end
 
 	--- The files the driver rewrites itself, as a set keyed by path. config.toml is
@@ -229,6 +259,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		if matched then
 			Logger.debug(LOG, "File change detected (%d distinct in burst) — settle armed.", burst_count)
 			last_change_sec = hs.timer.secondsSinceEpoch()
+			reload_refusal_logged = false
 			-- A genuine file event resets the stuck-state counter.
 			defer_count = 0
 			arm_reload()
