@@ -1397,6 +1397,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_wpm_rebuilt_surface_is_sized.ahk
 #Include unit/test_activate_hotstrings_commits_synchronously.ahk
 #Include unit/test_cache_builder_strips_header_comment.ahk
+#Include unit/test_bundle_skip_validation.ahk
 #Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
 #Include unit/test_config_toml_single_writer.ahk
