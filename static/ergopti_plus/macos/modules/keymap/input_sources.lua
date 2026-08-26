@@ -26,7 +26,6 @@ local text_utils = require("infra.text_utils")
 local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")
 local ShellRunner = require("adapters.shell_runner")
-local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "menu.keyboard_layout"
 
@@ -68,13 +67,10 @@ local INPUT_SOURCE_OPERATION_TIMEOUT_SEC =
 local _active_layouts_cache = nil
 -- Epoch seconds of the last async refresh (throttle anchor); 0 forces a refresh.
 local _active_layouts_last_refresh = 0
--- Guards against overlapping async refreshes.
-local _active_layouts_refreshing = false
--- GC-root for in-flight probe task handles. An async task handle that is not
--- referenced from a reachable table can be collected before the subprocess
--- finishes, which silently drops its completion callback (see adapters/shell_runner's
--- identical pin). Keys are the live handles; cleared in the callback / on a failed start.
-local _active_probe_tasks = {}
+-- Exact active read-only probe owner. ShellRunner retains every native task
+-- through settlement; this owner additionally fences cache publication and the
+-- watchdog so a late terminal cannot overwrite a successor.
+local _active_probe_owner = nil
 
 -- Input-source mutations are serialized. A timed-out child remains the exact
 -- owner until its native completion callback settles, so a successor cannot
@@ -364,12 +360,14 @@ import subprocess, sys, plistlib, json
 
 DOMAIN = "com.apple.HIToolbox"
 KEY    = "AppleEnabledInputSources"
+CHILD_TIMEOUT = float(sys.argv[1])
 
 # Read via cfprefsd (defaults export) — reflects System Settings changes
 # immediately, unlike reading the plist file directly which can be stale.
 try:
     raw = subprocess.check_output(
-        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL)
+        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL,
+        timeout=CHILD_TIMEOUT)
     prefs = plistlib.loads(raw)
 except Exception as e:
     print("ERR:" + str(e)); sys.exit(1)
@@ -439,60 +437,182 @@ local function compute_active_layouts_fast(current_name)
 	return out
 end
 
---- Refreshes _active_layouts_cache asynchronously via hs.task so the expensive
---- python3 + `defaults export` round-trip NEVER blocks a menu open. The probe is
---- passed inline with `python3 -c` (a single argv element — no temp file, no
---- shell quoting). On a headless run (no hs.task — unit tests / CLI) the probe is
---- skipped and the previous cache is kept. on_done (if given) fires when complete.
---- @param on_done function|nil Callback invoked after the cache is updated.
-local function refresh_active_layouts_async(on_done)
-	if _active_layouts_refreshing then
-		if on_done then Logger.pcall(LOG, on_done) end
-		return
+--- Delivers every completion waiter owned by one probe exactly once.
+--- @param owner table Probe owner.
+local function deliver_probe_waiters(owner)
+	local waiters = owner.waiters or {}
+	owner.waiters = {}
+	for _, waiter in ipairs(waiters) do
+		Logger.pcall(LOG, waiter)
 	end
-	_active_layouts_refreshing = true
+end
 
-	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
-		and hs.keycodes.currentLayout() or nil
 
-	local function finish(raw_out)
-		_active_layouts_refreshing = false
-		local records = parse_active_layouts(raw_out, current_name)
+--- Retires one logical probe without discarding its native task capability.
+--- ShellRunner keeps a timed-out task pinned until the real completion callback;
+--- the generation identity here only controls cache and successor publication.
+--- @param owner table Probe owner.
+local function retire_active_probe(owner)
+	if owner.retired == true then return false end
+	owner.retired = true
+	if _active_probe_owner == owner then
+		_active_probe_owner = nil
+	end
+	deliver_probe_waiters(owner)
+	return true
+end
+
+
+--- Publishes a terminal only after every capability required by that outcome
+--- has settled. Timeout may release the read-only slot after SIGTERM acceptance;
+--- ordinary completion waits for both task and watchdog settlement.
+--- @param owner table Probe owner.
+local function finalize_active_probe(owner)
+	if owner.retired == true then return false end
+	if owner.timed_out == true then
+		if owner.deadline_settled == true
+			and (owner.termination_accepted == true or owner.task_settled == true) then
+			return retire_active_probe(owner)
+		end
+		return false
+	end
+	if owner.failure_reason ~= nil then
+		if owner.deadline_settled == true and owner.task_settled == true then
+			return retire_active_probe(owner)
+		end
+		return false
+	end
+	if owner.completion_received ~= true
+		or owner.deadline_settled ~= true
+		or owner.task_settled ~= true then
+		return false
+	end
+	if _active_probe_owner == owner then
+		local records = parse_active_layouts(owner.raw_output, owner.current_name)
 		if records then
 			_active_layouts_cache = records
 			Logger.debug(LOG, "Active layouts refreshed asynchronously: %d.", #records)
 		else
-			Logger.warn(LOG, "Async active-layout probe returned unparseable output — keeping previous cache.")
+			Logger.warn(LOG,
+				"Async active-layout probe returned unparseable output — keeping previous cache.")
 		end
-		if on_done then Logger.pcall(LOG, on_done) end
+	end
+	return retire_active_probe(owner)
+end
+
+
+--- Retries termination of a timed-out exact probe.
+--- @param owner table Probe owner.
+--- @return boolean accepted
+local function retry_active_probe_termination(owner)
+	if owner.retired == true or owner.timed_out ~= true then return false end
+	local accepted, state = owner.handle.terminate()
+	if accepted ~= true then
+		Logger.error(LOG,
+			"Active keyboard-layout probe termination was refused; exact ownership is retained.")
+		return false
+	end
+	owner.termination_accepted = true
+	if state == "settled" then owner.task_settled = true end
+	finalize_active_probe(owner)
+	return true
+end
+
+
+--- Refreshes _active_layouts_cache asynchronously through one deadline-owned
+--- python3 process. Concurrent callers join the same owner. A timed-out task
+--- remains pinned by ShellRunner but loses cache authority before a successor is
+--- admitted, so a late native callback cannot clear or overwrite that successor.
+--- @param on_done function|nil Callback invoked after this logical probe settles.
+--- @return boolean accepted True only when a new probe start commits.
+local function refresh_active_layouts_async(on_done)
+	if _active_probe_owner ~= nil then
+		if type(on_done) == "function" then
+			_active_probe_owner.waiters[#_active_probe_owner.waiters + 1] = on_done
+		end
+		if _active_probe_owner.timed_out == true
+			and _active_probe_owner.termination_accepted ~= true then
+			retry_active_probe_termination(_active_probe_owner)
+		end
+		return false
 	end
 
-	if hs.task and type(hs.task.new) == "function" then
-		-- Non-blocking: the click handler returns immediately; the cache updates
-		-- when python3 finishes and is read on the NEXT open. The handle is
-		-- forward-declared ABOVE its callback (closure-nil rule) and pinned in a
-		-- GC root for the whole subprocess lifetime — python3 cold-start is
-		-- 300 ms–1 s and an unreferenced async handle could be collected before it
-		-- fires, dropping the callback so finish() never runs and the refresh flag
-		-- stays wedged true for the session.
-		local probe_task
-		probe_task = TaskLifecycle.native("Active keyboard-layout probe", "/usr/bin/python3", function(_code, stdout, _stderr)
-				if probe_task then _active_probe_tasks[probe_task] = nil end
-				Logger.pcall(LOG, finish, stdout)
-			end, { "-c", ACTIVE_LAYOUTS_PY })
-		if probe_task then
-			_active_probe_tasks[probe_task] = true
-			if not TaskLifecycle.start(probe_task, "Active keyboard-layout probe") then
-				_active_probe_tasks[probe_task] = nil
-				probe_task = nil
-				finish(nil)
+	local owner = {
+		waiters = {},
+		current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
+			and hs.keycodes.currentLayout() or nil,
+		deadline_settled = false,
+		task_settled = false,
+		completion_received = false,
+		termination_accepted = false,
+		timed_out = false,
+		retired = false,
+	}
+	if type(on_done) == "function" then owner.waiters[1] = on_done end
+	_active_probe_owner = owner
+
+	local child_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
+	local handle = ShellRunner.spawn("/usr/bin/python3",
+		{ "-c", ACTIVE_LAYOUTS_PY, tostring(child_timeout) },
+		function(exit_code, stdout, _stderr)
+			if owner.retired == true or owner.timed_out == true then return end
+			owner.completion_received = true
+			owner.raw_output = exit_code == 0 and stdout or nil
+			if TimerScheduler.cancel(owner.deadline) == true then
+				owner.deadline_settled = true
 			end
-		else
-			finish(nil)
-		end
-	else
-		finish(nil)
+			finalize_active_probe(owner)
+		end)
+	owner.handle = handle
+	local observed_task = handle.onSettled(function()
+		owner.task_settled = true
+		finalize_active_probe(owner)
+	end)
+	if observed_task ~= true then
+		Logger.error(LOG, "Active keyboard-layout probe settlement could not be observed.")
 	end
+	if handle.isSettled() then
+		owner.task_settled = true
+		owner.deadline_settled = true
+		owner.failure_reason = "construction_failed"
+		finalize_active_probe(owner)
+		return false
+	end
+
+	local deadline, deadline_committed = TimerScheduler.after(
+		INPUT_SOURCE_OPERATION_TIMEOUT_SEC,
+		function()
+			if owner.retired == true or owner.completion_received == true then return end
+			owner.timed_out = true
+			Logger.error(LOG,
+				"Active keyboard-layout probe timed out after %.1f seconds; terminating the exact child.",
+				INPUT_SOURCE_OPERATION_TIMEOUT_SEC)
+			retry_active_probe_termination(owner)
+		end)
+	owner.deadline = deadline
+	local observed_deadline = TimerScheduler.onSettled(deadline, function()
+		owner.deadline_settled = true
+		finalize_active_probe(owner)
+	end)
+	if observed_deadline ~= true then
+		Logger.error(LOG, "Active keyboard-layout probe deadline settlement could not be observed.")
+	end
+	if deadline_committed ~= true then
+		owner.failure_reason = "deadline_unavailable"
+		local terminated, state = handle.terminate()
+		if terminated == true and state == "settled" then owner.task_settled = true end
+		finalize_active_probe(owner)
+		return false
+	end
+
+	if handle.start() ~= true then
+		owner.failure_reason = "start_failed"
+		if TimerScheduler.cancel(deadline) == true then owner.deadline_settled = true end
+		if handle.isSettled() then owner.task_settled = true end
+		finalize_active_probe(owner)
+		return false
+	end
+	return true
 end
 
 --- Schedules a throttled async active-layout refresh so rapid menu opens never
