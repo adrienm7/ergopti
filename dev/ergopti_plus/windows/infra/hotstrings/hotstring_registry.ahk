@@ -263,8 +263,9 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
 			; LoadExtTomlFile registers through CreateCaseSensitiveHotstrings. The
 			; preview side ignored it entirely, so those entries expanded without
 			; ever being previewable.
-			Trigger := (SimpleMatch[1] != "") ? SimpleMatch[1] : SimpleMatch[2]
-			Output := SimpleMatch[3]
+			Trigger := UnescapeTomlString(
+				(SimpleMatch[1] != "") ? SimpleMatch[1] : SimpleMatch[2])
+			Output := UnescapeTomlString(SimpleMatch[3])
 		} else {
 			continue
 		}

@@ -109,17 +109,25 @@ _LCtrlHoldModKey() {
 	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_ctrl"), "left_ctrl", "LCtrl")
 }
 
-#HotIf TapHoldHoldModifier(TapHold, "left_ctrl") != "" and not LayerEnabled
-*$SC01D:: {
+_LCtrlHandleHold(PhysicalModifierPassthrough) {
 	UpdateLastSentCharacter("LControl")
 	CapsUp := KS_IsUp("SC03A")
 	AltUp := KS_IsUp("SC038")
 	Result := TapHoldOwnImmediateModifier("left_ctrl", "SC01D",
-		_LCtrlHoldModKey(), TapHoldDuration(TapHold, "left_ctrl"))
+		_LCtrlHoldModKey(), TapHoldDuration(TapHold, "left_ctrl"),
+		,,,,,, PhysicalModifierPassthrough)
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()
 		and A_PriorKey == "LControl" and CapsUp and AltUp)
 		_LCtrlDispatch()
 }
+
+; Keep native Ctrl on the physical edge that Windows and applications already
+; own. Replacing it with a synthetic modifier can release Ctrl before a later
+; injected key arrives, as Windows clipboard history does after Enter/click.
+#HotIf _LCtrlHoldModKey() == "LCtrl" and not LayerEnabled
+~*$SC01D:: _LCtrlHandleHold(true)
+#HotIf TapHoldHoldModifier(TapHold, "left_ctrl") != "" and _LCtrlHoldModKey() != "LCtrl" and not LayerEnabled
+*$SC01D:: _LCtrlHandleHold(false)
 #HotIf
 
 ; ~$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos

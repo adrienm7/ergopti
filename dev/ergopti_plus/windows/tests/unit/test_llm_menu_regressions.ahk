@@ -33,6 +33,10 @@ _LLM_Regress_RecordN(n) {
 	_LLM_Regress_LastN := n
 }
 
+_LLM_Regress_Throw(*) {
+	throw Error("injected ShellExecute failure")
+}
+
 ; Production-equivalent factory (must match menu_models.ahk _LLM_Menu_MakeSetNHandler).
 _LLM_Regress_MakeSetNHandler(n) {
 	return (name, pos, menu) => _LLM_Regress_RecordN(n)
@@ -399,3 +403,36 @@ Test_LLM_Regression_ModelMenuSkipsInstallProbeWhenNotReady() {
 }
 Test("LLM regression: install probe is skipped (non-blocking) until deps are ready",
 	Test_LLM_Regression_ModelMenuSkipsInstallProbeWhenNotReady)
+
+Test_LLM_Regression_OpenSourceUrlReportsShellFailure() {
+	Runs := []
+	Notices := []
+	Diagnostics := []
+	SuccessRunner := (Url) => Runs.Push(Url)
+	NotifyFn := (Body, Title) => Notices.Push(Map("body", Body, "title", Title))
+	LogFn := (Url, Err) => Diagnostics.Push(Map("url", Url, "error", Err.Message))
+	Url := "https://example.invalid/model"
+
+	AssertTrue(_LLM_Menu_OpenUrl(Url, SuccessRunner, NotifyFn, LogFn),
+		"a successful ShellExecute boundary must report success")
+	AssertEqual(1, Runs.Length,
+		"the injected URL runner must be called exactly once")
+	AssertEqual(0, Notices.Length,
+		"a successful launch must not show failure feedback")
+	AssertEqual(0, Diagnostics.Length,
+		"a successful launch must not emit an error diagnostic")
+
+	ThrowingRunner := _LLM_Regress_Throw
+	AssertFalse(_LLM_Menu_OpenUrl(Url, ThrowingRunner, NotifyFn, LogFn),
+		"a ShellExecute exception must return failure")
+	AssertEqual(1, Notices.Length,
+		"a failed launch must publish exactly one native feedback message")
+	AssertEqual(1, Diagnostics.Length,
+		"a failed launch must publish exactly one central diagnostic")
+	AssertEqual(Url, Diagnostics[1]["url"],
+		"the diagnostic must retain the exact failed URL")
+	AssertTrue(Notices[1]["body"] != "" && Notices[1]["title"] != "",
+		"failure feedback must resolve localized text")
+}
+Test("[ahk-023] model source URL reports ShellExecute failures",
+	Test_LLM_Regression_OpenSourceUrlReportsShellFailure)

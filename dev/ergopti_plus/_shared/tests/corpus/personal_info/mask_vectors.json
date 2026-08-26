@@ -7,6 +7,44 @@
 		"min_length_to_reveal": 12,
 		"preserve_separators": true
 	},
+	"invalid_policies": [
+		{
+			"id": "oversized_reveal",
+			"value": "SECRET",
+			"policy": { "mask_char": "•", "reveal_head": 999, "reveal_tail": 0, "min_length_to_reveal": 0, "preserve_separators": true },
+			"expected": "••••••"
+		},
+		{
+			"id": "string_reveal_count",
+			"value": "SECRET",
+			"policy": { "mask_char": "•", "reveal_head": "2", "reveal_tail": 1, "min_length_to_reveal": 6, "preserve_separators": true },
+			"expected": "••••••"
+		},
+		{
+			"id": "negative_reveal_count",
+			"value": "SECRET",
+			"policy": { "mask_char": "•", "reveal_head": 1, "reveal_tail": -1, "min_length_to_reveal": 6, "preserve_separators": true },
+			"expected": "••••••"
+		},
+		{
+			"id": "empty_mask_character",
+			"value": "SECRET",
+			"policy": { "mask_char": "", "reveal_head": 1, "reveal_tail": 1, "min_length_to_reveal": 6, "preserve_separators": true },
+			"expected": "••••••"
+		},
+		{
+			"id": "reveal_window_covers_threshold",
+			"value": "SECRET",
+			"policy": { "mask_char": "•", "reveal_head": 2, "reveal_tail": 4, "min_length_to_reveal": 6, "preserve_separators": true },
+			"expected": "••••••"
+		},
+		{
+			"id": "string_separator_flag",
+			"value": "SECRET",
+			"policy": { "mask_char": "•", "reveal_head": 1, "reveal_tail": 1, "min_length_to_reveal": 6, "preserve_separators": "true" },
+			"expected": "••••••"
+		}
+	],
 	"vectors": [
 		{
 			"id": "iban_spaced",

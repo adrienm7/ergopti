@@ -265,6 +265,12 @@ ApplyConfigToml(Features, FilePath) {
 		; properties are both accepted to match the legacy Features shape.
 		try {
 			if (Type(Node) == "Map") {
+				if (!IsDynamicPersonalNamespace and !Node.Has(Key)) {
+					try LoggerError("TomlConfigLoader",
+						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
+						CurrentSection, Key)
+					continue
+				}
 				; Refuse to flatten a seeded Map node (e.g. {enabled:...}) into a scalar via a
 				; colliding flat-form [section] key (or vice versa) — that clobbers the shape and
 				; crashes a later [...]["enabled"] access (toml-loader-shape-mismatch).
@@ -275,6 +281,12 @@ ApplyConfigToml(Features, FilePath) {
 				}
 				Node[Key] := Value
 			} else if IsObject(Node) {
+				if (!IsDynamicPersonalNamespace and !Node.HasOwnProp(Key)) {
+					try LoggerError("TomlConfigLoader",
+						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
+						CurrentSection, Key)
+					continue
+				}
 				Node.%Key% := Value
 			} else {
 				try LoggerError("TomlConfigLoader",

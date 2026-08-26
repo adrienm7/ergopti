@@ -583,7 +583,7 @@ if [ -n "$XCOMPOSE_FILENAME" ]; then
 fi
 
 if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
-    INSTALLER_ARGS+=(--variant "$VARIANT_ID")
+    INSTALLER_ARGS+=(--variant "$VARIANT_ID" --skip-activation)
 elif [ "$WANT_YES" = true ] && [ -n "$XCOMPOSE_FILENAME" ]; then
     INSTALLER_ARGS+=(--force-xcompose)
 fi
@@ -594,3 +594,6 @@ printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copie
 printf "\n🚀 Exécution de l'installeur...\n"
 tput cnorm >/dev/null 2>&1 || true
 sudo python3 "$INSTALLER_FULL_PATH" "${INSTALLER_ARGS[@]}"
+if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
+    python3 "$INSTALLER_FULL_PATH" --activate-only --variant "$VARIANT_ID"
+fi

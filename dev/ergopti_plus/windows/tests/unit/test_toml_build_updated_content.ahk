@@ -93,6 +93,30 @@ Test("toml candidate: detached render fresh-reads after ownership acquisition "
 	. "(toml-build-updated-content-fresh-read)",
 	_TBUI_DetachedBuildBypassesStaleCache)
 
+_TBUI_OrdinaryWriteBypassesStaleCache() {
+	Path := _TBUI_NewPath()
+	V1 := '[existing]`nold = "cached"`n'
+	V2 := '[existing]`nold = "disk"`nunrelated = "keep"`n'
+	try {
+		AssertTrue(FSWrite(Path, V1))
+		Cached := ParseTomlFile(Path)
+		AssertEqual("cached", Cached["existing"]["old"])
+		AssertTrue(FSWrite(Path, V2))
+		AssertTrue(TOML_BatchWrite(Path,
+			[{ Section: "script", Key: "locale", Value: "fr" }]))
+		Published := FSRead(Path)
+		AssertContains(Published, 'old = "disk"',
+			"ordinary writes must not resurrect values from a warmed cache")
+		AssertContains(Published, 'unrelated = "keep"',
+			"ordinary writes must preserve external edits made after cache warmup")
+		AssertContains(Published, 'locale = "fr"',
+			"the requested update must still be published")
+	} finally FSDelete(Path)
+}
+Test("toml writer: ordinary write fresh-reads after cache warmup "
+	. "(toml-batchwrite-fresh-read)",
+	_TBUI_OrdinaryWriteBypassesStaleCache)
+
 _TBUI_CandidateCarriesExactOldAuthority() {
 	Path := _TBUI_NewPath()
 	try {

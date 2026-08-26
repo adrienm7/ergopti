@@ -25,9 +25,9 @@
 ;   unless some OTHER trigger rebuilt it. When the feature is enabled the
 ;   health-probe tick rebuilds on the first backend-status change and masks the
 ;   bug; when it is OFF nothing ever rebuilds, so the submenu is empty forever —
-;   no enable toggle, no way to turn the feature back on. THE FIX: arm
-;   LLM_Menu_Build at the boot tail (the module is always loaded) and drop the
-;   race-prone flag entirely.
+;   no enable toggle, no way to turn the feature back on. THE FIX: arm the owned
+;   LLM request from the successful deferred root-build owner (the module is
+;   always loaded) and drop the race-prone flag entirely.
 ;
 ; THIRD REGRESSION (boot-time synchronous /api/tags block when ON):
 ;   Arming the boot build UNCONDITIONALLY then froze the keyboard thread when the
@@ -38,6 +38,13 @@
 ;   the probe is skipped when deps aren't ready). When ON, LLM_Menu_BootstrapOllama
 ;   (armed in LLM_Menu_Init) builds the menu via LLM_Menu_OnDepsReady AFTER Ollama
 ;   readiness is confirmed asynchronously, so the build never blocks the boot thread.
+;
+; FOURTH REGRESSION (LLM timer invalidates the boot root generation):
+;   The independent 200 ms LLM timer preempted the 16 ms deferred root worker on
+;   every measured boot. Its nested RebuildTrayMenu request replaced the boot
+;   worker, discarded the staged root, and forced a second InitSubMenus scan.
+;   The boot finalizer never ran and 354-604 ms of filesystem/menu work was
+;   repeated. The LLM request must be armed only after the boot root publishes.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -69,29 +76,28 @@ _MetaCheckLlmTrayDeferredBuild() {
 	; boot runs only inside the deferred tray build) but read by the synchronous boot
 	; tail that runs FIRST, so it was always false there and the build never armed.
 	Assert(!InStr(InitBody, "_LLM_Menu_BuildPending"),
-		"LLM_Menu_Init must NOT use the _LLM_Menu_BuildPending flag — arming is now unconditional at the boot tail (the deferred initMenu set the flag too late to gate the build)")
+		"LLM_Menu_Init must NOT use the _LLM_Menu_BuildPending flag — the published root owner reads restored state directly")
 
-	; The boot tail must arm the deferred build for the OFF case, gated on the feature
-	; being disabled — NOT unconditionally (that blocked the boot thread on a cold
-	; /api/tags probe when ON) and NOT behind the race-prone _LLM_Menu_BuildPending
-	; flag (which was always false here, so the build never armed at all).
-	BootBody := _DriverSourceConcat()
-	Assert(BootBody != "", "driver source must be readable")
-	Assert(InStr(BootBody,
-		'SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)') > 0,
-		"ErgoptiPlus.ahk boot tail must arm one owned LLM menu request (for the OFF case)")
-	Assert(!InStr(BootBody, "_LLM_Menu_BuildPending"),
-		"ErgoptiPlus.ahk must NOT gate the LLM_Menu_Build arming on _LLM_Menu_BuildPending — that flag is set by the deferred initMenu and is still false when this synchronous boot-tail line runs, so the build was never armed when the feature was OFF")
-	; The boot build must be gated on the feature being OFF, immediately before the
-	; SetTimer — when ON, the menu is built by the async deps-bootstrap path instead,
-	; so the boot thread never hits the synchronous /api/tags install-probe.
-	GatePos  := InStr(BootBody, 'if !_LLM_Menu["enabled"]')
-	ArmPos   := InStr(BootBody,
-		'SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)')
-	Assert(GatePos > 0,
-		'ErgoptiPlus.ahk must gate the boot IA build on (if !_LLM_Menu["enabled"]) so it never runs the synchronous /api/tags probe at boot when ON')
-	Assert(GatePos < ArmPos and (ArmPos - GatePos) < 60,
-		'the (if !_LLM_Menu["enabled"]) gate must immediately precede the owned build-request timer — the ON path builds via LLM_Menu_BootstrapOllama after async Ollama-readiness, never at boot')
+	; The successful deferred root owner must arm the LLM request for the OFF case.
+	; An independent boot-tail timer can preempt and invalidate that root generation.
+	DriverBody := _DriverSourceConcat()
+	Assert(DriverBody != "", "driver source must be readable")
+	BootWorkerBody := _DriverFuncBody("_TrayRootBuildBoot")
+	Assert(BootWorkerBody != "", "_TrayRootBuildBoot must remain source-visible")
+	RootPos := InStr(BootWorkerBody, "initMenu(PublishAuthorizeFn)")
+	ArmPos := InStr(BootWorkerBody,
+		"_TrayRootScheduleBootProjectionIfDisabled(")
+	Assert(RootPos > 0 && ArmPos > RootPos,
+		"the boot worker must arm the LLM request only after its root publishes")
+	Assert(!InStr(DriverBody, "_LLM_Menu_BuildPending"),
+		"the driver must not restore the race-prone _LLM_Menu_BuildPending bridge")
+	; When ON, async dependency readiness remains the only build owner.
+	EnabledPos := InStr(BootWorkerBody, '_LLM_Menu["enabled"]', false,
+		ArmPos)
+	RequestPos := InStr(BootWorkerBody,
+		'LLM_Menu_RequestBuild.Bind("boot")', false, ArmPos)
+	Assert(EnabledPos > ArmPos && RequestPos > EnabledPos,
+		"_TrayRootBuildBoot must pass restored LLM enabled state and the owned boot request to the scheduler gate")
 }
 
 Test("meta llm: LLM_Menu_Init defers the IA submenu build", _MetaCheckLlmTrayDeferredBuild)

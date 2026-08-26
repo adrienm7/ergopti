@@ -150,9 +150,10 @@ ChordParse(chordString) {
 	tokens := []
 	for _, raw in StrSplit(chordString, CHORD_SEPARATOR) {
 		trimmed := Trim(raw)
-		if (trimmed != "") {
-			tokens.Push(trimmed)
+		if (trimmed = "") {
+			return Map("ok", false, "err", "a chord cannot contain an empty token")
 		}
+		tokens.Push(trimmed)
 	}
 	if (tokens.Length = 0) {
 		return Map("ok", false, "err", "a chord must name a key")

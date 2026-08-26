@@ -231,6 +231,7 @@ def install_clean(
     variant: str,
     support_x11: bool,
     roots: InstallerRoots,
+    activate_desktop: bool = True,
 ) -> None:
     """Install the layout package through the extensions-directory contract."""
     if variant not in SUPPORTED_VARIANTS:
@@ -307,7 +308,8 @@ def install_clean(
         create_legacy_symlinks(package_dir, layout_id, roots.system_root)
 
     purge_cache(roots)
-    activate(layout_id, variant)
+    if activate_desktop:
+        activate(layout_id, variant)
 
 
 def resolve_user_identity() -> tuple[Path, int | None, int | None]:
@@ -475,13 +477,10 @@ def activate(layout_id: str, variant: str) -> None:
     overwrote it, silently removing the user's other keyboards. The merge
     helpers below append our layouts only when missing.
     """
-    sudo_user = os.environ.get("SUDO_USER")
-    prefix = ["sudo", "-u", sudo_user] if sudo_user else []
-
     def run_capture(command: list[str]) -> str | None:
         try:
             result = subprocess.run(
-                prefix + command,
+                command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 text=True,
@@ -493,10 +492,9 @@ def activate(layout_id: str, variant: str) -> None:
         return result.stdout if result.returncode == 0 else None
 
     def run_report(command: list[str], label: str) -> bool:
-        return run_reported(prefix + command, label)
+        return run_reported(command, label)
 
     wanted = [("xkb", layout_id)]
-
     print("🚀 Activation (best-effort, sans écraser vos dispositions)…")
 
     # --- GNOME / Wayland (mutter) ---
@@ -746,9 +744,21 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Créer aussi les liens pour les sessions X11 (Xorg) réelles",
     )
+    parser.add_argument(
+        "--skip-activation",
+        action="store_true",
+        help="Installer le paquet sans toucher à la session de bureau.",
+    )
+    parser.add_argument(
+        "--activate-only",
+        action="store_true",
+        help="Activer le paquet déjà installé dans la session de bureau courante.",
+    )
     parser.add_argument("--uninstall", action="store_true", help="Désinstaller le paquet")
     args = parser.parse_args(argv)
-    if not args.uninstall:
+    if args.activate_only and (args.uninstall or args.skip_activation):
+        parser.error("--activate-only est incompatible avec --uninstall et --skip-activation")
+    if not args.uninstall and not args.activate_only:
         missing = [name for name in ("--xkb", "--types") if getattr(args, name.lstrip("-")) is None]
         if missing:
             parser.error("les options suivantes sont requises : " + ", ".join(missing))
@@ -759,6 +769,9 @@ def main(argv: list[str]) -> int:
     force_utf8_stdio()
     args = parse_args(argv)
     roots = resolve_roots()
+    if args.activate_only:
+        activate(PACKAGE_NAME, args.variant)
+        return EXIT_OK
     check_root(roots)
     if args.uninstall:
         return EXIT_OK if uninstall_clean(roots) else EXIT_INSTALL_ABORTED
@@ -770,6 +783,7 @@ def main(argv: list[str]) -> int:
             variant=args.variant,
             support_x11=args.support_x11,
             roots=roots,
+            activate_desktop=not args.skip_activation,
         )
     except SystemExit as error:
         # install_clean already printed a diagnostic; map its aborts to the

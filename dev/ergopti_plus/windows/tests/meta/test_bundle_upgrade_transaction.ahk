@@ -16,3 +16,14 @@ _BUT_StagesBeforeReplacingLiveBundle() {
 		"a failed staging commit must restore the preserved live bundle")
 }
 Test("bundle: upgrade stages and rolls back before replacing live runtime (bundle-upgrade-transaction)", _BUT_StagesBeforeReplacingLiveBundle)
+
+_BUT_MatchingMarkerValidatesLiveTree() {
+	Body := _DriverFuncBody("Bundle_Init")
+	Assert(Body != "", "Bundle_Init must exist")
+	Assert(InStr(Body, "_Bundle_LiveTreeCanSkip(BundleDir, Existing)") > 0,
+		"the marker fast path must delegate to the behaviourally tested live-tree verifier")
+	Assert(InStr(Body, 'Existing != "" and Existing == BUNDLE_VERSION) {') == 0,
+		"marker equality alone must never return early from compiled-bundle bootstrap")
+}
+Test("AHK-005: Bundle_Init verifies the live tree before its marker fast path",
+	_BUT_MatchingMarkerValidatesLiveTree)

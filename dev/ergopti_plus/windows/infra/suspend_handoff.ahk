@@ -14,8 +14,9 @@
 #Requires AutoHotkey v2.0
 
 ; File name of the one-shot marker that carries a pause across a Reload. This
-; module is included before boot arms _SuspendStateWatchdog: onboarding pumps
-; messages, so the callback can run long before lifecycle.ahk's later include.
+; module is included before boot so the marker path contract is available early.
+; The consuming watchdog is deliberately armed only by lifecycle.ahk, after all
+; state used by ToggleSuspend has initialized.
 global SUSPEND_MARKER_FILENAME := "suspend_restore.marker"
 
 
@@ -82,9 +83,26 @@ SuspendHandoffAbort(Path, ExistsFn, DeleteFn) {
 		return true
 	Ok := true
 	for Candidate in [Path . ".pending.stage", Path . ".pending"] {
-		if ExistsFn.Call(Candidate) and !DeleteFn.Call(Candidate)
+		try Exists := ExistsFn.Call(Candidate)
+		catch {
 			Ok := false
-		if ExistsFn.Call(Candidate)
+			continue
+		}
+		if Exists {
+			try Deleted := DeleteFn.Call(Candidate)
+			catch {
+				Ok := false
+				continue
+			}
+			if !Deleted
+				Ok := false
+		}
+		try StillExists := ExistsFn.Call(Candidate)
+		catch {
+			Ok := false
+			continue
+		}
+		if StillExists
 			Ok := false
 	}
 	return Ok
@@ -152,6 +170,12 @@ SuspendHandoffDiscardPending(Path, ExistsFn, DeleteFn, FailureFn := 0) {
 ; next boot resumes from the retained claim instead of losing ownership with
 ; the old process identity. A failed claim/delete reports once and leaves
 ; ToggleFn untouched.
+_SuspendHandoffConsumeFailure(FailureFn, Stage, Path) {
+	if HasMethod(FailureFn, "Call")
+		try FailureFn.Call(Stage, Path)
+	return false
+}
+
 SuspendHandoffConsume(Path, IsSuspended, ExistsFn, MoveFn, DeleteFn, ToggleFn, BeforeToggleFn := 0, FailureFn := 0) {
 	if !(HasMethod(ExistsFn, "Call") and HasMethod(MoveFn, "Call")
 			and HasMethod(DeleteFn, "Call") and HasMethod(ToggleFn, "Call"))
@@ -159,32 +183,36 @@ SuspendHandoffConsume(Path, IsSuspended, ExistsFn, MoveFn, DeleteFn, ToggleFn, B
 	if (Path == "")
 		return true
 	ClaimPath := Path . ".claim"
-	Claimed := ExistsFn.Call(ClaimPath)
-	SourceExists := ExistsFn.Call(Path)
+	try {
+		Claimed := ExistsFn.Call(ClaimPath)
+		SourceExists := ExistsFn.Call(Path)
+	} catch {
+		return _SuspendHandoffConsumeFailure(FailureFn, "probe", Path)
+	}
 	if !Claimed {
 		if !SourceExists
 			return true
-		if !MoveFn.Call(Path, ClaimPath, false) {
-			if HasMethod(FailureFn, "Call")
-				try FailureFn.Call("claim", Path)
-			return false
-		}
+		try Moved := MoveFn.Call(Path, ClaimPath, false)
+		catch
+			return _SuspendHandoffConsumeFailure(FailureFn, "claim", Path)
+		if !Moved
+			return _SuspendHandoffConsumeFailure(FailureFn, "claim", Path)
 	} else if SourceExists {
 		; Both files express the same desired state: the replacement process must
 		; be suspended. Coalesce them before toggling so the source cannot replay
 		; on a later boot. Source goes first; a later claim-delete failure still
 		; leaves the stable claim carrying the unconsumed intent.
-		if !DeleteFn.Call(Path) {
-			if HasMethod(FailureFn, "Call")
-				try FailureFn.Call("coalesce", Path)
-			return false
-		}
+		try Deleted := DeleteFn.Call(Path)
+		catch
+			return _SuspendHandoffConsumeFailure(FailureFn, "coalesce", Path)
+		if !Deleted
+			return _SuspendHandoffConsumeFailure(FailureFn, "coalesce", Path)
 	}
-	if !DeleteFn.Call(ClaimPath) {
-		if HasMethod(FailureFn, "Call")
-			try FailureFn.Call("consume", ClaimPath)
-		return false
-	}
+	try Consumed := DeleteFn.Call(ClaimPath)
+	catch
+		return _SuspendHandoffConsumeFailure(FailureFn, "consume", ClaimPath)
+	if !Consumed
+		return _SuspendHandoffConsumeFailure(FailureFn, "consume", ClaimPath)
 	if IsSuspended
 		return true
 	if HasMethod(BeforeToggleFn, "Call")

@@ -417,12 +417,14 @@ global _LLM_Menu_Loaded := false
 ; harness; the regression suite calls only its one-shot saved-options seam.
 #Include ../ui/menu/menu_llm/init.ahk
 _LogBootProgress("loading menu_llm/persist")
+#Include ../ui/menu/menu_llm/menu_models.ahk
 #Include ../ui/menu/menu_llm/menu_profiles.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include ../ui/menu/menu_llm/transactions.ahk
 #Include ../ui/menu/menu_llm/backend_lifecycle.ahk
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/menu_settings.ahk
 #Include unit/test_llm_backend_lifecycle_dispatch.ahk
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_temperature_boundary.ahk
@@ -1396,6 +1398,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_wpm_rebuilt_surface_is_sized.ahk
 #Include unit/test_activate_hotstrings_commits_synchronously.ahk
 #Include unit/test_cache_builder_strips_header_comment.ahk
+#Include unit/test_bundle_skip_validation.ahk
+#Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
 #Include unit/test_config_toml_single_writer.ahk
 #Include unit/test_derived_toml_caches_not_memoised_on_failed_read.ahk
@@ -1433,6 +1437,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_tap_hold_global_transaction_20260813.ahk
 #Include unit/test_tooltip_row_band_elision.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_clipboard_history_paste_wiring.ahk
 #Include meta/test_fast_timer_inventory.ahk
 #Include meta/test_gestures_bulk_actions_ahk_reachable.ahk
 #Include meta/test_gesture_constants_available_to_onboarding.ahk

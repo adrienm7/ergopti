@@ -158,6 +158,11 @@ _LLM_Menu_ApplyOllamaPortAtBoot(MenuState, SetPortFn := 0) {
 	return true
 }
 
+_LLM_Menu_ShouldScheduleInitialBackendLifecycle(FirstRestore, MenuState) {
+	return FirstRestore && MenuState is Map
+		&& MenuState.Get("enabled", false)
+}
+
 /**
  * Bootstraps the tray menu and starts the LLM bridge if auto-start is enabled.
  * @param {Map} saved_opts - Persisted settings loaded from INI/registry.
@@ -268,7 +273,7 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; CPU with the input pipeline. The build_warning_row below now surfaces
 	; the missing-install state in the menu so the user can re-trigger the
 	; install themselves when they're ready.
-	if _LLM_Menu["enabled"]
+	if _LLM_Menu_ShouldScheduleInitialBackendLifecycle(FirstRestore, _LLM_Menu)
 		LLM_Menu_ScheduleBackendLifecycle(false)
 
 	; Background health-tick: refreshes the dot on the shared cadence without

@@ -117,13 +117,6 @@ HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
 ; matcher anchor on different sets and previewed expansions silently never fire.
 TooltipDequeueInit()
 
-; Arm the suspend watchdog so the pause reactor (Ergopti_OnSuspendEnter/Resume)
-; fires even when suspend is toggled outside ToggleSuspend. 500 ms is well under
-; human perception for the tear-down yet costs nothing while idle.
-SUSPEND_WATCHDOG_MS := 500
-global _LastSuspendState := A_IsSuspended
-SetTimer(_SuspendStateWatchdog, SUSPEND_WATCHDOG_MS)
-
 ; _LogoDir: fully-normalized absolute path avoids any '..' traversal that
 ; TraySetIcon may refuse to resolve on some Windows configurations.
 global _LogoDir := _StaticDir . "\img\logo"

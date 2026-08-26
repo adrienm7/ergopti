@@ -40,6 +40,18 @@ class TrayRootRetryPendingError extends Error {
 class TrayRootFatalContextError extends Error {
 }
 
+_TrayRootScheduleBootProjectionIfDisabled(IsEnabled, RequestFn,
+		ScheduleFn, DelayMs) {
+	if IsEnabled
+		return false
+	if !HasMethod(RequestFn, "Call") || !HasMethod(ScheduleFn, "Call")
+		throw TypeError("Boot tray projection requires callable request and scheduler owners")
+	if !(DelayMs is Integer) || DelayMs <= 0
+		throw ValueError("Boot tray projection delay must be a positive integer")
+	ScheduleFn.Call(RequestFn, -DelayMs)
+	return true
+}
+
 _TrayRootErrorIsSilent(Err) {
 	return (Err is TrayRootRetryPendingError)
 		or (Err is TrayRootFatalContextError)
@@ -143,14 +155,22 @@ TrayMenuStage_Publish(AuthorizeFn := 0, ApplyFn := 0) {
 }
 
 _TrayRootRequestAndTryAcquire(AuthorizeFn := 0, WorkerFn := 0,
-		&RequestedGeneration := 0) {
+		&RequestedGeneration := 0, ForceFullWorkerWhenQueued := false) {
 	global _TrayRootRequestedGeneration, _TrayRootActive
 	global _TrayRootLatestAuthorizeFn, _TrayRootLatestWorkerFn
 	global _TrayRootRetryGeneration, _TrayRootAutomaticRetryCount
 	PreviousCritical := Critical("On")
 	try {
+		HadPendingRoot := _TrayRootRequestedGeneration
+			> _TrayRootPublishedGeneration
 		_TrayRootRequestedGeneration += 1
 		RequestedGeneration := _TrayRootRequestedGeneration
+		; A narrow projection can safely reuse sibling submenus only when it owns
+		; a settled idle root. If a full rebuild is active or retained, its
+		; successor must remain full: that worker may have refreshed only part of
+		; SubMenus before its generation is invalidated.
+		if (_TrayRootActive || HadPendingRoot) && ForceFullWorkerWhenQueued
+			WorkerFn := 0
 		_TrayRootLatestAuthorizeFn := AuthorizeFn
 		_TrayRootLatestWorkerFn := WorkerFn
 		_TrayRootRetryGeneration := RequestedGeneration
@@ -638,13 +658,14 @@ _RebuildHotstringsLiveOnce() {
 ; hotstring section toggles rebuild in-process via RebuildHotstringsLive; other
 ; state-changing toggles (layout, tap-holds, shortcuts) still call Reload().
 RebuildTrayMenu(PublishAuthorizeFn := 0, WorkerFn := 0,
-		QueuedOutcome := true) {
+		QueuedOutcome := true, ForceFullWorkerWhenQueued := false) {
 	; Every root reconstruction—tray click, editor projection, updater, HSLR—uses
 	; one generation owner. A request delivered while an older detached tree is
 	; building only invalidates that tree; it never enters TrayMenuStage_Begin
 	; recursively or throws out of the user callback.
 	Acquired := _TrayRootRequestAndTryAcquire(
-		PublishAuthorizeFn, WorkerFn, &RequestedGeneration)
+		PublishAuthorizeFn, WorkerFn, &RequestedGeneration,
+		ForceFullWorkerWhenQueued)
 	if !Acquired
 		return QueuedOutcome
 	return _TrayRootDrain()

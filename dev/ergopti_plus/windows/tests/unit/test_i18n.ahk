@@ -25,12 +25,14 @@ _I18nTestReset() {
 	global _I18nCache, _I18nCacheLoaded
 	global _I18nCacheEn, _I18nCacheEnLoaded
 	global _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed
 	_I18nCache        := Map()
 	_I18nCacheLoaded  := false
 	_I18nCacheEn      := Map()
 	_I18nCacheEnLoaded := false
 	_I18nCacheFr      := Map()
 	_I18nCacheFrLoaded := false
+	_I18nFallbacksWarmed := false
 }
 
 ; Pause/suspend regression for i18n (locales must load even if script paused; t() fallback must work)
@@ -285,7 +287,8 @@ _I18nLazyCacheFreshTsvServedWithoutJson() {
 	; must be served verbatim, proving the fast path skips the JSON parse entirely.
 	FileAppend('{"k": "fromjson"}', Path, "UTF-8")
 	FileSetTime("20000101000000", Path, "M")
-	FileAppend("k`tfromtsv`n", TsvPath, "UTF-8-RAW")
+	FileAppend("k`tfromtsv`n" . _I18N_TSV_SENTINEL . "1`n",
+		TsvPath, "UTF-8-RAW")
 	_I18nLoadFile(Path)
 	AssertEqual("fromtsv", _I18nCache["k"], "a fresh .tsv must be served without re-parsing the .json")
 	FileDelete(Path)
@@ -293,6 +296,35 @@ _I18nLazyCacheFreshTsvServedWithoutJson() {
 	_I18nTestReset()
 }
 Test("i18n cache: a fresh .tsv is served without re-parsing the .json", _I18nLazyCacheFreshTsvServedWithoutJson)
+
+_I18nLazyCacheRejectsFreshPartialTsv() {
+	_I18nTestReset()
+	global _I18nCache
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	Path := A_Temp . "\i18n_test_locale.json"
+	if FileExist(Path)
+		FileDelete(Path)
+	if FileExist(TsvPath)
+		FileDelete(TsvPath)
+	try {
+		FileAppend('{"a": "json-a", "b": "json-b"}', Path, "UTF-8")
+		FileSetTime("20000101000000", Path, "M")
+		FileAppend("a`tcached-a`n", TsvPath, "UTF-8-RAW")
+		_I18nLoadFile(Path)
+		AssertEqual("json-a", _I18nCache["a"],
+			"a fresh but incomplete cache must not override canonical JSON")
+		AssertEqual("json-b", _I18nCache["b"],
+			"keys beyond a truncated cache prefix must be recovered from JSON")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		if FileExist(TsvPath)
+			FileDelete(TsvPath)
+		_I18nTestReset()
+	}
+}
+Test("i18n cache: fresh partial .tsv rebuilds from canonical JSON",
+	_I18nLazyCacheRejectsFreshPartialTsv)
 
 
 
@@ -304,6 +336,46 @@ Test("i18n cache: a fresh .tsv is served without re-parsing the .json", _I18nLaz
 ; ======= 3/ t() fallback =======
 ; ===============================
 ; ===============================
+
+_I18nFallbackWarmupRetriesAfterTransientFailure() {
+	global _SharedDir, _I18nLocale, _I18nFallbacksWarmed
+	global _I18nCacheEnLoaded, _I18nCacheFrLoaded
+	SavedSharedDir := _SharedDir
+	SavedLocale := _I18nLocale
+	Root := A_Temp . "\ergopti-i18n-fallback-retry-" . A_ScriptHwnd
+	try {
+		if DirExist(Root)
+			DirDelete(Root, true)
+		DirCreate(Root . "\data\locales")
+		_SharedDir := Root
+		_I18nLocale := "de"
+		_I18nTestReset()
+
+		_I18nEnsureFallbacksLoaded()
+		AssertFalse(_I18nFallbacksWarmed,
+			"failed fallback loads must remain retryable")
+		AssertFalse(_I18nCacheEnLoaded)
+		AssertFalse(_I18nCacheFrLoaded)
+
+		FileAppend('{"retry.key": "English"}',
+			Root . "\data\locales\en.json", "UTF-8")
+		FileAppend('{"retry.key": "Francais"}',
+			Root . "\data\locales\fr.json", "UTF-8")
+		_I18nEnsureFallbacksLoaded()
+		AssertTrue(_I18nFallbacksWarmed,
+			"a later successful load must complete fallback warmup")
+		AssertTrue(_I18nCacheEnLoaded)
+		AssertTrue(_I18nCacheFrLoaded)
+	} finally {
+		_SharedDir := SavedSharedDir
+		_I18nLocale := SavedLocale
+		_I18nTestReset()
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("i18n fallback: failed warmup retries when locale files become available",
+	_I18nFallbackWarmupRetriesAfterTransientFailure)
 
 _I18nTFallbackWhenEmpty() {
 	_I18nTestReset()

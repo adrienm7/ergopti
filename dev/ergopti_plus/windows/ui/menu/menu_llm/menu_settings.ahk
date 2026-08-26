@@ -400,6 +400,70 @@ _LLM_Menu_NavRows() {
 ; =============================================
 ; =============================================
 
+_LLM_Menu_NotifyInvalidInput(NotifyFn := 0) {
+	Body := t("menu.llm.invalid_input")
+	Title := t("common.error_title")
+	if HasMethod(NotifyFn, "Call")
+		NotifyFn.Call(Body, Title)
+	else
+		MsgBox(Body, Title, "Icon!")
+	return false
+}
+
+_LLM_Menu_TryNormalizeIntegerPrompt(Result, Raw, Key, &Normalized,
+		NotifyFn := 0) {
+	Normalized := false
+	if Result != "OK"
+		return false
+	if Raw == "" || !IsInteger(Raw)
+		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	if !LLM_Option_TryNormalize(Key, Integer(Raw), &Normalized)
+		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	return true
+}
+
+_LLM_Menu_TryNormalizePortPrompt(Result, Raw, &Normalized, NotifyFn := 0) {
+	Normalized := false
+	if Result != "OK"
+		return false
+	if !LLM_Option_TryNormalizeOllamaPort(Raw, &Normalized)
+		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	return true
+}
+
+_LLM_Menu_TryNormalizeTemperaturePrompt(Result, Raw, &Normalized,
+		NotifyFn := 0) {
+	Normalized := false
+	if Result != "OK"
+		return false
+	Raw := StrReplace(Raw, ",", ".")
+	if !LLM_Option_TryNormalizeTemperature(Raw, &Normalized)
+		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	return true
+}
+
+_LLM_Menu_TryRequiredPrompt(Result, Raw, &Normalized, NotifyFn := 0) {
+	Normalized := ""
+	if Result != "OK"
+		return false
+	Normalized := Trim(Raw)
+	if Normalized == ""
+		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	return true
+}
+
+_LLM_Menu_TryProviderPrompt(Result, Raw, Providers, &ProviderId,
+		NotifyFn := 0) {
+	ProviderId := ""
+	if Result != "OK"
+		return false
+	Candidate := Trim(Raw)
+	if !(Providers is Map) || !Providers.Has(Candidate)
+		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	ProviderId := Candidate
+	return true
+}
+
 /**
  * Opens an InputBox for a numeric setting, validates, and applies it.
  * @param {string} key     - The _LLM_Menu key to update.
@@ -415,15 +479,7 @@ LLM_Menu_PromptNumeric(key, title, prompt) {
 	}
 	global _LLM_Menu
 	ib := InputBox(prompt, title, "w400 h120", _LLM_Menu[key])
-	if (ib.Result != "OK" || ib.Value == "")
-		return
-	; Reject non-numeric typos before converting — Integer() throws on a bad
-	; string (e.g. "abc" or "12,5"), and this runs in a menu-callback thread
-	; where the error would surface as an unhandled AHK dialog (mirrors the
-	; IsInteger guard in LLM_Menu_PromptOllamaPort)
-	if !IsInteger(ib.Value)
-		return
-	if !LLM_Option_TryNormalize(key, Integer(ib.Value), &val)
+	if !_LLM_Menu_TryNormalizeIntegerPrompt(ib.Result, ib.Value, key, &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM numeric '" . key . "' setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate, key, val),
@@ -503,9 +559,7 @@ LLM_Menu_PromptOllamaPort() {
 	global _LLM_Menu
 	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
 	ib := InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
-	if (ib.Result != "OK" || ib.Value == "")
-		return
-	if !LLM_Option_TryNormalizeOllamaPort(ib.Value, &val)
+	if !_LLM_Menu_TryNormalizePortPrompt(ib.Result, ib.Value, &val)
 		return
 	return LLM_Menu_CommitMutation("the Ollama port setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
@@ -553,13 +607,8 @@ LLM_Menu_PromptMaxWords() {
 	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.max_words_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["max_words"])
-	if (ib.Result != "OK" || ib.Value == "")
-		return
-	; Reject non-numeric typos before converting — Integer() throws on a bad
-	; string in this menu-callback thread (mirrors LLM_Menu_PromptOllamaPort)
-	if !IsInteger(ib.Value)
-		return
-	if !LLM_Option_TryNormalize("max_words", Integer(ib.Value), &val)
+	if !_LLM_Menu_TryNormalizeIntegerPrompt(ib.Result, ib.Value,
+			"max_words", &val)
 		return
 	return LLM_Menu_CommitMutation("the LLM maximum-word setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
@@ -575,12 +624,8 @@ LLM_Menu_PromptTemperature() {
 	}
 	global _LLM_Menu
 	ib := InputBox(t("menu.llm.temperature_prompt"), t("menu.llm.generation_menu_title"), "w400 h120", _LLM_Menu["temperature"])
-	if (ib.Result != "OK" || ib.Value == "")
-		return
-	; Accept the comma-decimal habit common on a French keyboard (the project's
-	; UI locale) by normalising "0,7" to "0.7" before validating.
-	raw := StrReplace(ib.Value, ",", ".")
-	if !LLM_Option_TryNormalizeTemperature(raw, &Normalized)
+	if !_LLM_Menu_TryNormalizeTemperaturePrompt(ib.Result, ib.Value,
+			&Normalized)
 		return
 	return LLM_Menu_CommitMutation("the LLM temperature setting",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,

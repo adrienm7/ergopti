@@ -102,9 +102,9 @@ local function declaration()
 		return _declaration
 	end
 
-	local valid, missing = Mask.validate_policy(parsed.policy)
+	local valid, invalid = Mask.validate_policy(parsed.policy)
 	if not valid then
-		Logger.error(LOG, "The shared policy is missing '%s' — masking everything.", tostring(missing))
+		Logger.error(LOG, "The shared policy is invalid at '%s' — masking everything.", tostring(invalid))
 		_declaration = FAIL_CLOSED
 		return _declaration
 	end
