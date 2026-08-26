@@ -123,6 +123,96 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 			"runtime restoration must run exactly once after the conflict")
 	end)
 
+	helpers.it("adopts a valid external winner so the next explicit save can commit", function()
+		local path = "/virtual/config.toml"
+		local initial = "[features]\npreview_star_enabled = false\n"
+		local external = "[features]\npreview_star_enabled = true\n"
+		local disk = initial
+		local attempts = 0
+		local expected_sources = {}
+		local preferences = load_preferences({
+			read_with_status = function(read_path)
+				helpers.assert_eq(read_path, path)
+				return disk, "ok"
+			end,
+			write_if_unchanged = function(write_path, content, expected_source)
+				helpers.assert_eq(write_path, path)
+				attempts = attempts + 1
+				expected_sources[attempts] = expected_source
+				if attempts == 1 then disk = external end
+				if expected_source.status ~= "ok" or disk ~= expected_source.content then
+					return false, "source changed"
+				end
+				disk = content
+				return true
+			end,
+		})
+		local loaded, load_status = preferences.load(path)
+		helpers.assert_eq(load_status, "ok")
+		helpers.assert_type(loaded, "table")
+		local transaction = require("ui.menu.preferences_transaction")
+		local state = { preview_star_enabled = false }
+		local restores = 0
+		local save = transaction.bind(preferences, {
+			path = path,
+			state = state,
+			hotfiles = {},
+			core_modules = {},
+			initial_state = state,
+			initial_preferences = state,
+			restore_runtime = function(snapshot)
+				restores = restores + 1
+				helpers.assert_eq(snapshot.preview_star_enabled, false)
+				return true
+			end,
+		})
+
+		state.preview_star_enabled = true
+		helpers.assert_eq(save(), false,
+			"the stale first candidate must not overwrite an external winner")
+		helpers.assert_eq(disk, external,
+			"the first conflict must preserve the external bytes exactly")
+		helpers.assert_eq(state.preview_star_enabled, false,
+			"the rejected menu mutation must roll back before a retry")
+		helpers.assert_eq(restores, 1)
+
+		state.preview_star_enabled = true
+		helpers.assert_eq(save(), true,
+			"a second explicit save must use the adopted external source identity")
+		helpers.assert_eq(attempts, 2)
+		helpers.assert_eq(expected_sources[1], { status = "ok", content = initial })
+		helpers.assert_eq(expected_sources[2], { status = "ok", content = external },
+			"the retry must compare against the exact valid external winner")
+		helpers.assert_true(disk ~= external,
+			"the second explicit user intent must publish its encoded preferences")
+	end)
+
+	helpers.it("never adopts malformed external preferences as a writable baseline", function()
+		local path = "/virtual/config.toml"
+		local initial = "[features]\npreview_star_enabled = false\n"
+		local malformed = "[features\npreview_star_enabled = true\n"
+		local disk = initial
+		local attempts = 0
+		local expected_sources = {}
+		local preferences = load_preferences({
+			read_with_status = function() return disk, "ok" end,
+			write_if_unchanged = function(_, _, expected_source)
+				attempts = attempts + 1
+				expected_sources[attempts] = expected_source
+				if attempts == 1 then disk = malformed end
+				return false, "source changed"
+			end,
+		})
+		preferences.load(path)
+
+		helpers.assert_eq(preferences.save(path, {}, {}, {}), false)
+		helpers.assert_eq(preferences.save(path, {}, {}, {}), false)
+		helpers.assert_eq(disk, malformed)
+		helpers.assert_eq(expected_sources[1], { status = "ok", content = initial })
+		helpers.assert_eq(expected_sources[2], { status = "ok", content = initial },
+			"invalid external bytes must never become an overwrite authorization")
+	end)
+
 end)
 
 helpers.describe("menu preference side effects are success-gated", function()
