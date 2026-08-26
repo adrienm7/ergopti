@@ -608,6 +608,9 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 				if (Line == "" or SubStr(Line, 1, 1) == "#") {
 						continue
 				}
+				Line := Trim(TOML_StripInlineComment(Line), " `t")
+				if (Line == "")
+						continue
 				if (SubStr(Line, 1, 2) == "[[") {
 						break
 				}
@@ -693,6 +696,9 @@ ReadTomlSectionsOrder(CategoryName, FilePath := "") {
 				if (Line == "" or SubStr(Line, 1, 1) == "#") {
 						continue
 				}
+				Line := Trim(TOML_StripInlineComment(Line), " `t")
+				if (Line == "")
+						continue
 				if (Line == "[_meta]") {
 						InMeta := true
 						continue
