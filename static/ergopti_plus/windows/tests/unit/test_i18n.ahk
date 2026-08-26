@@ -25,12 +25,14 @@ _I18nTestReset() {
 	global _I18nCache, _I18nCacheLoaded
 	global _I18nCacheEn, _I18nCacheEnLoaded
 	global _I18nCacheFr, _I18nCacheFrLoaded
+	global _I18nFallbacksWarmed
 	_I18nCache        := Map()
 	_I18nCacheLoaded  := false
 	_I18nCacheEn      := Map()
 	_I18nCacheEnLoaded := false
 	_I18nCacheFr      := Map()
 	_I18nCacheFrLoaded := false
+	_I18nFallbacksWarmed := false
 }
 
 ; Pause/suspend regression for i18n (locales must load even if script paused; t() fallback must work)
@@ -334,6 +336,46 @@ Test("i18n cache: fresh partial .tsv rebuilds from canonical JSON",
 ; ======= 3/ t() fallback =======
 ; ===============================
 ; ===============================
+
+_I18nFallbackWarmupRetriesAfterTransientFailure() {
+	global _SharedDir, _I18nLocale, _I18nFallbacksWarmed
+	global _I18nCacheEnLoaded, _I18nCacheFrLoaded
+	SavedSharedDir := _SharedDir
+	SavedLocale := _I18nLocale
+	Root := A_Temp . "\ergopti-i18n-fallback-retry-" . A_ScriptHwnd
+	try {
+		if DirExist(Root)
+			DirDelete(Root, true)
+		DirCreate(Root . "\data\locales")
+		_SharedDir := Root
+		_I18nLocale := "de"
+		_I18nTestReset()
+
+		_I18nEnsureFallbacksLoaded()
+		AssertFalse(_I18nFallbacksWarmed,
+			"failed fallback loads must remain retryable")
+		AssertFalse(_I18nCacheEnLoaded)
+		AssertFalse(_I18nCacheFrLoaded)
+
+		FileAppend('{"retry.key": "English"}',
+			Root . "\data\locales\en.json", "UTF-8")
+		FileAppend('{"retry.key": "Francais"}',
+			Root . "\data\locales\fr.json", "UTF-8")
+		_I18nEnsureFallbacksLoaded()
+		AssertTrue(_I18nFallbacksWarmed,
+			"a later successful load must complete fallback warmup")
+		AssertTrue(_I18nCacheEnLoaded)
+		AssertTrue(_I18nCacheFrLoaded)
+	} finally {
+		_SharedDir := SavedSharedDir
+		_I18nLocale := SavedLocale
+		_I18nTestReset()
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("i18n fallback: failed warmup retries when locale files become available",
+	_I18nFallbackWarmupRetriesAfterTransientFailure)
 
 _I18nTFallbackWhenEmpty() {
 	_I18nTestReset()
