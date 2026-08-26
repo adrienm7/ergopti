@@ -946,10 +946,25 @@ _StartInputHook() {
 	; discarded real typing after a hotstring expansion.
 	Hook := InputHook("V L0 I1")
 	Hook.KeyOpt("{All}", "+N")            ; notify OnKeyDown for every key
-	Hook.OnChar    := _OnPrefixCharProfiled
-	Hook.OnKeyDown := _OnPrefixKeyDown
+	Hook.OnChar    := _OnPrefixCharGuarded
+	Hook.OnKeyDown := _OnPrefixKeyDownGuarded
 	Hook.Start()
 	_PrefixInputHook := Hook
+}
+
+; InputHook permanently disables one of its callbacks when an exception escapes
+; that callback. Keep this boundary outside both the profiler and the workers so
+; setup calls added before their narrower try regions cannot silence the hook.
+_OnPrefixCharGuarded(IH, Char) {
+	try _OnPrefixCharProfiled(IH, Char)
+	catch as Err
+		try LoggerError("PrefixWatcher", "OnChar callback failed: {1}.", Err.Message)
+}
+
+_OnPrefixKeyDownGuarded(IH, VK, SC) {
+	try _OnPrefixKeyDown(IH, VK, SC)
+	catch as Err
+		try LoggerError("PrefixWatcher", "OnKeyDown callback failed: {1}.", Err.Message)
 }
 
 ; Profiling shim around _OnPrefixChar: times the entire per-keystroke match +
