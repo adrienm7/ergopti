@@ -79,13 +79,28 @@ end
 -- =========================================
 -- =========================================
 
---- Whether a policy table is usable.
+--- Whether a policy table is safe for display masking.
 --- @param policy table|nil
---- @return boolean ok, string|nil missing_key
+--- @return boolean ok, string|nil invalid_field
 function M.validate_policy(policy)
 	if type(policy) ~= "table" then return false, "policy" end
 	for _, key in ipairs(REQUIRED_POLICY) do
 		if policy[key] == nil then return false, key end
+	end
+	if type(policy.mask_char) ~= "string" or policy.mask_char == "" then
+		return false, "mask_char"
+	end
+	for _, key in ipairs({ "reveal_head", "reveal_tail", "min_length_to_reveal" }) do
+		local value = policy[key]
+		if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
+			return false, key
+		end
+	end
+	if type(policy.preserve_separators) ~= "boolean" then
+		return false, "preserve_separators"
+	end
+	if policy.reveal_head + policy.reveal_tail >= policy.min_length_to_reveal then
+		return false, "reveal_window"
 	end
 	return true
 end

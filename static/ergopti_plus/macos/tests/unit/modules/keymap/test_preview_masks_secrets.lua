@@ -63,6 +63,21 @@ local MASK_CHAR = "•"
 -- nothing and report success.
 local MIN_VECTORS = 15
 
+--- The malformed shared policy corpus, decoded.
+--- @return table
+local function invalid_policy_vectors()
+	local root = helpers.driver_root and helpers.driver_root() or "."
+	local path = root .. "/../_shared/tests/corpus/personal_info/mask_vectors.json"
+	local handle = io.open(path, "r")
+	helpers.assert_not_nil(handle,
+		"the malformed-policy corpus must be readable or this test asserts nothing")
+	local raw = handle:read("*a")
+	handle:close()
+	local ok, decoded = pcall(require("hs").json.decode, raw)
+	helpers.assert_true(ok and type(decoded) == "table", "the malformed-policy corpus must decode")
+	return decoded.invalid_policies or {}
+end
+
 
 
 
@@ -166,6 +181,16 @@ helpers.describe("preview masking: what happens when it cannot decide", function
 			"a caller with a broken policy must get everything hidden rather than "
 				.. "everything shown — the whole point of the shared masker is that a "
 				.. "mistake does not end in a secret on screen")
+	end)
+
+	helpers.it("fails closed for every malformed shared policy", function()
+		local vectors = invalid_policy_vectors()
+		helpers.assert_true(#vectors >= 6,
+			"the malformed-policy corpus must retain its type, range, and relation cases")
+		for _, vector in ipairs(vectors) do
+			helpers.assert_eq(Mask.mask(vector.value, vector.policy), vector.expected,
+				"invalid policy " .. tostring(vector.id) .. " must fail closed")
+		end
 	end)
 
 	helpers.it("masks a field nobody classified", function()
