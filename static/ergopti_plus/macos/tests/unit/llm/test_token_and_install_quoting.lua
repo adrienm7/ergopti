@@ -57,22 +57,36 @@ end)
 
 helpers.describe("layout_install: the privileged install is POSIX-quoted", function()
 	helpers.it("install_system quotes every interpolated path", function()
-		local src = helpers.read_driver_unit("local function install_system")
-		helpers.assert_true(src ~= nil and src ~= "",
-			"layout_install must be locatable by its install_system symbol")
+		local dispatched_script = nil
+		local install = helpers.load_with_stubs("modules.keymap.layout_install", {
+			execute = function()
+				return "", false, "exit", 1
+			end,
+			osascript = {
+				applescript = function(script)
+					dispatched_script = script
+					return false, nil, "cancelled"
+				end,
+			},
+		})
+		local text_utils = require("infra.text_utils")
+		local source_dir = "/tmp/O'Brien/$cache/`layout`/"
+		local bundle_name = "Ergopti_v2.0.0.bundle"
 
-		local at = src:find("local function install_system", 1, true)
-		helpers.assert_true(at ~= nil, "install_system must exist")
-		local body = src:sub(at, at + 1600):gsub("%-%-[^\n]*", "")
+		install.install_system(source_dir, bundle_name)
+		helpers.assert_true(type(dispatched_script) == "string" and dispatched_script ~= "",
+			"install_system must dispatch the production AppleScript transaction")
 
-		helpers.assert_true(body:find("shell_quote", 1, true) ~= nil,
-			"install_system must route its interpolated paths through shell_quote. It builds a "
-				.. "command run WITH ADMINISTRATOR PRIVILEGES, so an apostrophe in a relocated "
-				.. "bundle path closing the quoted run early is the worst possible place for it")
-
-		helpers.assert_true(body:find("'%%s", 1, false) == nil,
-			"no raw %s may remain inside hand-written single quotes — that is precisely the shape "
-				.. "the quoting campaign replaced everywhere else")
+		local source_assignment = "source="
+			.. text_utils.shell_quote(source_dir .. bundle_name) .. ";"
+		local target_assignment = "target="
+			.. text_utils.shell_quote(install.SYSTEM_LAYOUTS_DIR:gsub("/+$", "")) .. ";"
+		helpers.assert_true(
+			dispatched_script:find(text_utils.applescript_escape(source_assignment), 1, true) ~= nil,
+			"the privileged source path must survive both POSIX and AppleScript quoting")
+		helpers.assert_true(
+			dispatched_script:find(text_utils.applescript_escape(target_assignment), 1, true) ~= nil,
+			"the privileged destination path must survive both quoting layers")
 	end)
 
 	helpers.it("path_exists does not shell out with %q", function()

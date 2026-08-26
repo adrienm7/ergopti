@@ -229,67 +229,139 @@ local function version_str(v)
 	return table.concat(parts, ".")
 end
 
+--- Builds a same-filesystem replacement transaction for one bundle scope.
+--- The source is copied and structurally verified before installed bundles move
+--- into a rollback directory. The exit trap restores every moved bundle unless
+--- the staged bundle reaches its final name.
+--- @param target_dir string Keyboard Layouts directory receiving the bundle.
+--- @param bundles_dir string Directory containing the source bundle.
+--- @param bundle_name string Basename of the source bundle.
+--- @return string|nil command POSIX shell command, or nil on invalid input.
+--- @return string|nil detail Validation failure detail.
+local function build_install_transaction(target_dir, bundles_dir, bundle_name)
+	if type(target_dir) ~= "string" or target_dir == "" then
+		return nil, "target directory is missing"
+	end
+	if type(bundles_dir) ~= "string" or bundles_dir == "" then
+		return nil, "source directory is missing"
+	end
+	if type(bundle_name) ~= "string"
+		or not bundle_name:match("^Ergopti_v[%d%.]+%.bundle$") then
+		return nil, "bundle name is invalid"
+	end
+
+	local target = target_dir:gsub("/+$", "")
+	local source_dir = bundles_dir:match("/$") and bundles_dir or (bundles_dir .. "/")
+	local sq = text_utils.shell_quote
+	return table.concat({
+		"target=" .. sq(target) .. ";",
+		"source=" .. sq(source_dir .. bundle_name) .. ";",
+		"name=" .. sq(bundle_name) .. ";",
+		'mkdir -p "$target" || exit 1;',
+		'work="$(mktemp -d "$target/.ergopti-install.XXXXXX")" || exit 1;',
+		'stage="$work/$name";',
+		'backup="$work/backup";',
+		'mkdir "$backup" || { rm -rf "$work"; exit 1; };',
+		'cp -R "$source" "$stage" || { rm -rf "$work"; exit 1; };',
+		'test -f "$stage/Contents/Info.plist" || { rm -rf "$work"; exit 1; };',
+		'committed=0;',
+		'restore_install() {',
+			'if [ "$committed" -eq 0 ]; then',
+				'restore_ok=1;',
+				'for prior in "$backup"/Ergopti_v*.bundle; do',
+					'[ -e "$prior" ] || continue;',
+					'mv "$prior" "$target/" || restore_ok=0;',
+				'done;',
+				'if [ "$restore_ok" -eq 1 ]; then',
+					'rm -rf "$work";',
+				'fi;',
+				'return;',
+			'fi;',
+			'rm -rf "$work";',
+		'};',
+		'trap restore_install 0;',
+		"trap 'exit 1' 1 2 15;",
+		'for prior in "$target"/Ergopti_v*.bundle; do',
+			'[ -e "$prior" ] || continue;',
+			'mv "$prior" "$backup/" || exit 1;',
+		'done;',
+		'[ ! -e "$target/$name" ] || exit 1;',
+		'mv "$stage" "$target/$name" || exit 1;',
+		'committed=1;',
+		'rm -rf "$backup" || true;',
+		'trap - 0 1 2 15;',
+		'rm -rf "$work" || true;',
+		'exit 0;',
+	}, " ")
+end
+
+--- Executes one user-owned shell replacement and invalidates discovery state.
+--- @param target_dir string Keyboard Layouts directory receiving the bundle.
+--- @param bundles_dir string Directory containing the source bundle.
+--- @param bundle_name string Basename of the source bundle.
+--- @return boolean committed Whether the replacement committed.
+--- @return any detail Native output or validation/exception detail.
+local function execute_install_transaction(target_dir, bundles_dir, bundle_name)
+	local command, detail = build_install_transaction(target_dir, bundles_dir, bundle_name)
+	if not command then return false, detail end
+	local call_ok, output, native_ok = pcall(hs.execute, command)
+	invalidate_bundle_caches()
+	if not call_ok then return false, output end
+	if native_ok ~= true then return false, output end
+	return true, output
+end
+
+--- Removes obsolete bundles from the scope that did not receive the new copy.
+--- This is deliberately post-commit: refusal can leave two valid copies, never
+--- zero valid copies.
+--- @param dir string Keyboard Layouts directory to clean.
+--- @param scope_label string Developer-facing scope name for diagnostics.
+--- @return boolean
+local function cleanup_other_scope(dir, scope_label)
+	local target = dir:gsub("/+$", "")
+	local command = "rm -rf " .. text_utils.shell_quote(target) .. "/Ergopti_v*.bundle"
+	local call_ok, output, native_ok = pcall(hs.execute, command)
+	invalidate_bundle_caches()
+	if not call_ok or native_ok ~= true then
+		Logger.warn(LOG, "Post-install %s cleanup failed: %s.", scope_label, tostring(output))
+		return false
+	end
+	return true
+end
+
 --- Copies the latest bundle to the user's Keyboard Layouts directory.
---- Removes any Ergopti_v*.bundle from BOTH the user and system directories
---- first, so a user install always becomes the single canonical copy.
+--- The user replacement commits before obsolete system copies are removed.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_user(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
-	-- Remove the system-scope copy first (requires no privilege since we only
-	-- touch the user's own Library here — system removal is skipped silently
-	-- when it fails due to permission; the user will see an outdated entry in
-	-- the system folder but it won't conflict because macOS prefers the user
-	-- scope when both exist for the same bundle identifier).
-	hs.execute("rm -rf " .. text_utils.shell_quote((SYSTEM_LAYOUTS_DIR:gsub("/$", ""))) .. "/Ergopti_v*.bundle")
-	-- Every path is POSIX-quoted: these come from the user-configurable layout
-	-- directories, and Lua's %q escapes for a LUA literal — it leaves $, backticks
-	-- and ! for /bin/sh to expand. The glob stays OUTSIDE the quotes so the shell
-	-- still expands it.
-	local sq = text_utils.shell_quote
-	local cmd = string.format(
-		'mkdir -p %s && rm -rf %s/Ergopti_v*.bundle && cp -R %s %s',
-		sq(USER_LAYOUTS_DIR),
-		sq((USER_LAYOUTS_DIR:gsub("/$", ""))),
-		sq(bundles_dir .. bundle_name),
-		sq(USER_LAYOUTS_DIR)
-	)
-	local out, ok = hs.execute(cmd)
-	if ok then
-		invalidate_bundle_caches()
+	local committed, detail = execute_install_transaction(
+		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
+	if committed then
+		cleanup_other_scope(SYSTEM_LAYOUTS_DIR, "system scope")
 		Logger.success(LOG, "User install done — %s.", bundle_name)
 		pcall(notifications.notify, i18n.get("menu.layout.installed_user"), nil, "success")
 		return true
 	end
-	Logger.error(LOG, "User install failed: %s.", tostring(out))
+	Logger.error(LOG, "User install failed: %s.", tostring(detail))
 	return false
 end
 
 --- Copies the latest bundle to /Library/Keyboard Layouts/ via osascript with
---- administrator privileges. Triggers a macOS password prompt. Removes any
---- Ergopti_v*.bundle from BOTH the user and system directories first, so the
---- system copy becomes the single canonical installation.
+--- administrator privileges. Triggers a macOS password prompt. The system
+--- replacement commits before obsolete user copies are removed.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_system(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
-	-- Remove both the user copy (no privilege needed) and the old system copy
-	-- (done inside the privileged shell so both are cleaned atomically).
-	hs.execute("rm -rf " .. text_utils.shell_quote((USER_LAYOUTS_DIR:gsub("/$", ""))) .. "/Ergopti_v*.bundle")
-	-- POSIX-quoted, like the rm above and the 41 sites migrated by the quoting
-	-- campaign. This one kept raw %s inside hand-written single quotes, so an
-	-- apostrophe anywhere in the bundle path -- a relocated install, a user
-	-- directory like /Users/O'Brien -- closed the quoted run early and broke the
-	-- PRIVILEGED shell command. The glob must stay outside the quoting, so the
-	-- directory is quoted separately and concatenated.
-	local shell_cmd = string.format(
-		"rm -rf %s && cp -R %s %s",
-		text_utils.shell_quote(SYSTEM_LAYOUTS_DIR .. "Ergopti_v") .. "*.bundle",
-		text_utils.shell_quote(bundles_dir .. bundle_name),
-		text_utils.shell_quote(SYSTEM_LAYOUTS_DIR)
-	)
+	local shell_cmd, command_detail = build_install_transaction(
+		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name)
+	if not shell_cmd then
+		Logger.error(LOG, "System install failed: %s.", tostring(command_detail))
+		return false
+	end
 	-- TWO layers, and only the inner one was handled. shell_cmd above is correctly
 	-- quoted for /bin/sh, but shell_quote wraps in SINGLE quotes and escapes only
 	-- the single quote — so a `\` or a `"` anywhere in bundles_dir, bundle_name or
@@ -300,12 +372,13 @@ local function install_system(bundles_dir, bundle_name)
 		"do shell script \"%s\" with administrator privileges",
 		shell_cmd
 	)
-	local ok = false
+	local call_ok, native_ok = false, false
 	if hs.osascript and type(hs.osascript.applescript) == "function" then
-		ok = hs.osascript.applescript(script) and true or false
+		call_ok, native_ok = pcall(hs.osascript.applescript, script)
 	end
-	if ok then
-		invalidate_bundle_caches()
+	invalidate_bundle_caches()
+	if call_ok and native_ok == true then
+		cleanup_other_scope(USER_LAYOUTS_DIR, "user scope")
 		Logger.success(LOG, "System install done — %s.", bundle_name)
 		pcall(notifications.notify, i18n.get("menu.layout.installed_system"), nil, "success")
 		return true
