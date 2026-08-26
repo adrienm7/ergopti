@@ -38,3 +38,29 @@ _HSPIP_PhysicalFeedsDeclareProvenance() {
 		"physical keydown resets must route through the paired transaction whose engine mutation declares IsPhysical=true")
 }
 Test("HSE: physical feeds outside the InputHook declare IsPhysical", _HSPIP_PhysicalFeedsDeclareProvenance)
+
+; AHK-001 / A1-01 (audit 2026-08-26): AutoHotkey permanently stops invoking an
+; InputHook callback after an exception escapes it. The prefix hook used to bind
+; its large worker functions directly, leaving their setup calls outside the
+; workers' narrower try regions. Keep the registration pointed at one guarded
+; boundary per callback so every present and future sibling call is contained.
+_AHK001_PrefixInputHookCallbacksAreContained() {
+	StartHook := _DriverFuncBody("_StartInputHook")
+	CharBoundary := _DriverFuncBody("_OnPrefixCharGuarded")
+	KeyBoundary := _DriverFuncBody("_OnPrefixKeyDownGuarded")
+	Assert(StartHook != "", "_StartInputHook must exist")
+	Assert(CharBoundary != "", "the OnChar InputHook boundary must exist")
+	Assert(KeyBoundary != "", "the OnKeyDown InputHook boundary must exist")
+	Assert(InStr(StartHook, "Hook.OnChar    := _OnPrefixCharGuarded") > 0,
+		"the InputHook must bind OnChar through its exception boundary")
+	Assert(InStr(StartHook, "Hook.OnKeyDown := _OnPrefixKeyDownGuarded") > 0,
+		"the InputHook must bind OnKeyDown through its exception boundary")
+	Assert(InStr(CharBoundary, "try _OnPrefixCharProfiled(IH, Char)") > 0
+		and InStr(CharBoundary, "catch as Err") > 0,
+		"the OnChar boundary must contain profiling and every worker failure")
+	Assert(InStr(KeyBoundary, "try _OnPrefixKeyDown(IH, VK, SC)") > 0
+		and InStr(KeyBoundary, "catch as Err") > 0,
+		"the OnKeyDown boundary must contain every worker failure")
+}
+Test("AHK-001: prefix InputHook callbacks contain every exception",
+	_AHK001_PrefixInputHookCallbacksAreContained)
