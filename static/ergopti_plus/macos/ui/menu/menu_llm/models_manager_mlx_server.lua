@@ -728,6 +728,7 @@ function M.install(ctx)
 				tostring(target_model), tostring(obj._server_port), tostring(target_port))
 			if running
 				and lifecycle.stop_requested ~= true
+				and lifecycle.startup_closed ~= true
 				and same_server_identity(lifecycle.identity, target_identity) then
 				-- isRunning() means the PROCESS is alive, not that the model is loaded.
 				-- Resolving on it fired the second caller's on_success while the first
@@ -965,6 +966,9 @@ function M.install(ctx)
 			fail_server_start = function()
 				if startup_confirmed or startup_closed then return false end
 				startup_closed = true
+				if type(launched_lifecycle) == "table" then
+					launched_lifecycle.startup_closed = true
+				end
 				local owns_server_state = obj._server_owner == nil or obj._server_owner == task
 				if owns_server_state then
 					obj._server_ready = false
@@ -1046,11 +1050,11 @@ function M.install(ctx)
 				if startup_closed or startup_confirmed then return end
 				if not demand_or_close() then return end
 				if retries <= 0 then
-					-- 60 s elapsed without the server answering — release the prediction
-					-- lock so the user is not silently stuck; log for diagnosis
-					Logger.error(LOG, "MLX server for model '%s' did not become ready within 60s — releasing prediction lock.",
+					-- A logically failed process cannot accept another waiter: the closed
+					-- startup has no remaining callback capable of draining that queue
+					Logger.error(LOG, "MLX server for model '%s' did not become ready within 60s — retiring the failed owner.",
 						tostring(target_model))
-					fail_server_start()
+					close_after_async_error()
 					return
 				end
 				-- Use curl --no-keepalive so each probe opens a fresh TCP connection.
@@ -1590,6 +1594,7 @@ function M.install(ctx)
 					epoch = next_server_transition_epoch(),
 					authorized = true,
 					start_committed = false,
+					startup_closed = false,
 					requirement_requests = {},
 					primary_is_current = still_current,
 					readiness_task_owner = nil,
