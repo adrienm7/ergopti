@@ -41,7 +41,6 @@ local function build_fixture(backend, save_results, options)
 		llm_profile_shortcuts = {},
 		llm_trigger_shortcut = false,
 	}
-	local committed_enabled = false
 	local last_attempted_enabled = false
 	local runtime_enabled = false
 	local runtime_backend = options.runtime_backend or backend
@@ -413,13 +412,7 @@ local function build_fixture(backend, save_results, options)
 		save_prefs = function()
 			calls.saves = calls.saves + 1
 			last_attempted_enabled = state.llm_enabled
-			local result = save_results[calls.saves]
-			if result == true then
-				committed_enabled = state.llm_enabled
-			else
-				state.llm_enabled = committed_enabled
-			end
-			return result
+			return save_results[calls.saves]
 		end,
 		update_menu = function() calls.updates = calls.updates + 1 end,
 		active_tasks = {},
@@ -452,14 +445,18 @@ local function assert_rejected_activation(backend)
 	action()
 	helpers.assert_eq(state.llm_enabled, false)
 	helpers.assert_eq(calls.saves, 1)
+	helpers.assert_eq(calls.keymap_states, { true, false },
+		"a rejected persistence write must reapply the previous prediction lock")
+	helpers.assert_eq(calls.get_runtime_enabled(), false,
+		"runtime predictions must match the last durable preference")
 	helpers.assert_eq(calls.bootstrap, 0,
 		"a rejected " .. backend .. " activation must not start dependency setup")
 	helpers.assert_eq(calls.requirements, 0,
 		"a rejected " .. backend .. " activation must not start model requirements")
 	helpers.assert_eq(calls.notifications, 0,
 		"a rejected " .. backend .. " activation must not announce success")
-	helpers.assert_eq(calls.updates, 0,
-		"a rejected " .. backend .. " activation must not publish an enabled menu")
+	helpers.assert_eq(calls.updates, 1,
+		"a rejected " .. backend .. " activation must repaint the restored preference")
 end
 
 helpers.describe("LLM activation: external work waits for preference commit", function()
