@@ -1,12 +1,11 @@
 ﻿; static/ergopti_plus/windows/tests/unit/test_clipboard_history_paste.ahk
 
 ; ==============================================================================
-; MODULE: Clipboard-history paste modifier provenance regression
+; MODULE: Clipboard-history LCtrl ownership regression
 ; DESCRIPTION:
-; Windows clipboard history can synthesize the Ctrl+V edge used to insert a
-; selected item. The Ergopti physical V key is SC02F, so the control-layer
-; compatibility route must not trust a logical Ctrl edge that Windows can
-; release while AutoHotkey re-emits the shortcut.
+; Windows clipboard history emits LCtrl and its later V as separate injected
+; edges after Enter or a click. An identity LCtrl tap-hold must keep the native
+; edge instead of replacing it with a synthetic Ctrl that is released first.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -21,20 +20,54 @@
 ; ===================================
 ; ===================================
 
-global _CHP_Sent := []
+global _CHP_Events := []
+global _CHP_Ticks := []
 
-_CHP_Record(Payload) {
-	global _CHP_Sent
-	_CHP_Sent.Push(Payload)
+_CHP_Reset() {
+	global _CHP_Events, _CHP_Ticks
+	_CHP_Events := []
+	_CHP_Ticks := [1000, 1010]
+}
+
+_CHP_Record(Label) {
+	global _CHP_Events
+	_CHP_Events.Push(Label)
 	return true
 }
 
-_CHP_ProbePhysical() {
-	return true
+_CHP_Wait(KeyName, TimeoutSec) {
+	return _CHP_Record("wait:" . KeyName)
 }
 
-_CHP_ProbeSynthetic() {
+_CHP_KeyIsDown(KeyName) {
+	_CHP_Record("down-state:" . KeyName)
 	return false
+}
+
+_CHP_Tick() {
+	global _CHP_Ticks
+	return _CHP_Ticks.RemoveAt(1)
+}
+
+_CHP_Down(KeyName) {
+	return _CHP_Record("synthetic-down:" . KeyName)
+}
+
+_CHP_Up(KeyName) {
+	return _CHP_Record("synthetic-up:" . KeyName)
+}
+
+_CHP_Cancel(KeyId, GuardMs) {
+	_CHP_Record("cancel:" . KeyId)
+	return ""
+}
+
+_CHP_JoinedEvents() {
+	global _CHP_Events
+	Joined := ""
+	for _, Event in _CHP_Events
+		Joined .= (Joined == "" ? "" : "|") . Event
+	return Joined
 }
 
 
@@ -47,27 +80,26 @@ _CHP_ProbeSynthetic() {
 ; =====================================
 ; =====================================
 
-_CHP_TestPhysicalCtrlKeepsShortcut() {
-	global _CHP_Sent
-	_CHP_Sent := []
-	Assert(ClipboardHistoryPaste(_CHP_ProbePhysical, _CHP_Record))
-	AssertEqual(1, _CHP_Sent.Length,
-		"physical Ctrl paste must publish exactly one sender transaction")
-	AssertEqual("^v", _CHP_Sent[1],
-		"physical Ctrl paste must keep the ordinary shortcut sequence")
+_CHP_NativeLCtrlKeepsWindowsEdge() {
+	_CHP_Reset()
+	Result := TapHoldOwnImmediateModifier("left_ctrl", "SC01D", "LCtrl", 0.2,
+		_CHP_Wait, _CHP_KeyIsDown, _CHP_Tick, _CHP_Down, _CHP_Up, _CHP_Cancel, true)
+	Assert(Result["released"], "the native LCtrl release must settle")
+	AssertEqual("wait:SC01D|cancel:left_ctrl", _CHP_JoinedEvents(),
+		"native LCtrl must remain pass-through until Windows delivers the later V; a synthetic Down/Up pair releases Ctrl too early")
 }
 
-_CHP_TestSyntheticCtrlOwnsCompleteTransaction() {
-	global _CHP_Sent
-	_CHP_Sent := []
-	Assert(ClipboardHistoryPaste(_CHP_ProbeSynthetic, _CHP_Record))
-	AssertEqual(1, _CHP_Sent.Length,
-		"clipboard-history paste must publish exactly one sender transaction")
-	AssertEqual("{Ctrl up}{Ctrl down}v{Ctrl up}", _CHP_Sent[1],
-		"logical-only Ctrl must be replaced by a complete owned Ctrl transaction")
+_CHP_RemappedLCtrlStillOwnsSyntheticModifier() {
+	_CHP_Reset()
+	Result := TapHoldOwnImmediateModifier("left_ctrl", "SC01D", "LShift", 0.2,
+		_CHP_Wait, _CHP_KeyIsDown, _CHP_Tick, _CHP_Down, _CHP_Up, _CHP_Cancel, false)
+	Assert(Result["released"], "the remapped LCtrl release must settle")
+	AssertEqual("synthetic-down:LShift|wait:SC01D|synthetic-up:LShift|cancel:left_ctrl",
+		_CHP_JoinedEvents(),
+		"a non-native LCtrl hold must retain its paired synthetic modifier owner")
 }
 
-Test("clipboard-history paste: physical Ctrl keeps the ordinary shortcut",
-	_CHP_TestPhysicalCtrlKeepsShortcut)
-Test("clipboard-history paste: synthetic Ctrl owns a complete modifier transaction",
-	_CHP_TestSyntheticCtrlOwnsCompleteTransaction)
+Test("clipboard-history paste: native LCtrl keeps the Windows modifier edge (clipboard-history-lctrl-passthrough)",
+	_CHP_NativeLCtrlKeepsWindowsEdge)
+Test("clipboard-history paste: remapped LCtrl retains synthetic ownership (clipboard-history-lctrl-passthrough)",
+	_CHP_RemappedLCtrlStillOwnsSyntheticModifier)

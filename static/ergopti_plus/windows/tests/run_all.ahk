@@ -105,7 +105,6 @@ OnError(_FatalErrorHandler)
 #Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
-#Include ../infra/clipboard_history_paste.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
 #Include ../infra/hotstrings/hotstring_engine_main.ahk
 #Include ../infra/hotstrings/hotstring_buffer_effects.ahk

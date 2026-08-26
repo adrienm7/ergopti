@@ -165,30 +165,37 @@ _THG_SpecialTapBranchesYieldToConfiguredModifiers() {
 Test("tap-holds: special taps cannot bypass the configured modifier (tap-hold-modifier-immediate)",
 	_THG_SpecialTapBranchesYieldToConfiguredModifiers)
 
-_THG_NativeShiftHoldsKeepPhysicalEdges() {
-	SplitPath(A_ScriptDir, , &DriverRoot)
+_THG_NativeModifierHoldsKeepPhysicalEdges() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "",
+		"prerequisite: the driver source must be readable for native modifier wiring")
 	Cases := [
-		{File: "lshift_lctrl.ahk", Resolver: "_LShiftHoldModKey", Handler: "_LShiftHandleHold", Sc: "SC02A"},
-		{File: "rshift.ahk", Resolver: "_RShiftHoldModKey", Handler: "_RShiftHandleHold", Sc: "SC036"}
+		{Id: "left_shift", Resolver: "_LShiftHoldModKey", Handler: "_LShiftHandleHold",
+			Sc: "SC02A", Native: "LShift"},
+		{Id: "right_shift", Resolver: "_RShiftHoldModKey", Handler: "_RShiftHandleHold",
+			Sc: "SC036", Native: "RShift"},
+		{Id: "left_ctrl", Resolver: "_LCtrlHoldModKey", Handler: "_LCtrlHandleHold",
+			Sc: "SC01D", Native: "LCtrl"}
 	]
 	for Item in Cases {
-		Src := _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . Item.File, "UTF-8"))
-		Gate := '#HotIf ' . Item.Resolver . '() == "' . (Item.Sc == "SC02A" ? "LShift" : "RShift") . '"'
+		Gate := '#HotIf ' . Item.Resolver . '() == "' . Item.Native . '"'
 		GatePos := InStr(Src, Gate)
-		Assert(GatePos > 0, Item.File . " must select a dedicated native-Shift pass-through variant")
+		Assert(GatePos > 0,
+			Item.Id . " must select a dedicated native-modifier pass-through variant")
 		Variant := SubStr(Src, GatePos, 700)
 		Assert(InStr(Variant, "~*$" . Item.Sc . "::") > 0,
-			Item.File . " must deliver the physical Shift edge before a fast Shift+key chord is admitted")
+			Item.Id . " must deliver its physical modifier edge before the following key is admitted")
 		Assert(InStr(Variant, Item.Handler . "(true)") > 0,
-			Item.File . " native variant must tell the common owner not to reinject its already-pass-through modifier (native-modifier-passthrough-race)")
+			Item.Id . " native variant must tell the common owner not to reinject its already-pass-through modifier (native-modifier-passthrough-race)")
 		HandlerBody := _DriverFuncBody(Item.Handler)
+		Assert(HandlerBody != "", Item.Handler . " must exist in the driver source")
 		Assert(InStr(HandlerBody, "TapHoldOwnImmediateModifier(") > 0
 			and InStr(HandlerBody, "PhysicalModifierPassthrough") > 0,
-			Item.File . " native and remapped variants must share one owner wrapper with an explicit pass-through verdict")
+			Item.Id . " native and remapped variants must share one owner wrapper with an explicit pass-through verdict")
 	}
 }
-Test("tap-holds: native Shift holds preserve their physical chord edge (native-modifier-passthrough-race)",
-	_THG_NativeShiftHoldsKeepPhysicalEdges)
+Test("tap-holds: native modifier holds preserve their physical chord edge (native-modifier-passthrough-race)",
+	_THG_NativeModifierHoldsKeepPhysicalEdges)
 
 
 

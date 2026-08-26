@@ -1,24 +1,30 @@
 ﻿; static/ergopti_plus/windows/tests/meta/test_clipboard_history_paste_wiring.ahk
 
 ; ==============================================================================
-; MODULE: Clipboard-history paste control-layer wiring regression
+; MODULE: Clipboard-history LCtrl wiring regression
 ; DESCRIPTION:
-; The behavioural unit test exercises the provenance router without loading
-; layout.ahk, whose top-level hotkeys cannot enter the headless runner. This
-; move-resilient source check proves the physical Ctrl+SC02F binding actually
-; delegates to that tested router instead of restoring the unsafe direct send.
+; The behavioural test proves the common owner's pass-through mode. This source
+; guard proves the active LCtrl identity hotkey selects that mode, which is the
+; wiring that previously released Windows' injected Ctrl before its delayed V.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_ClipboardHistoryPasteHotkeyUsesProvenanceRoute() {
-	Src := _DriverDirConcat("modules/keymap")
-	Assert(Src != "", "the keymap source set must be readable")
-	Assert(InStr(Src, "^SC02F:: ClipboardHistoryPaste()") > 0,
-		"Ctrl+SC02F must delegate to the clipboard-history provenance router")
-	Assert(InStr(Src, '^SC02F:: SendFinalResult("^v")') == 0,
-		"Ctrl+SC02F must never trust the transient logical Ctrl edge directly")
+_ClipboardHistoryPasteLCtrlUsesNativePassthrough() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "the driver source must be readable")
+	Gate := '#HotIf _LCtrlHoldModKey() == "LCtrl"'
+	GatePos := InStr(Src, Gate)
+	Assert(GatePos > 0,
+		"identity LCtrl must have a dedicated native pass-through gate")
+	Variant := SubStr(Src, GatePos, 700)
+	Assert(InStr(Variant, "~*$SC01D:: _LCtrlHandleHold(true)") > 0,
+		"the LCtrl identity variant must preserve Windows' Ctrl edge and tell the common owner not to reinject it")
+	Body := _DriverFuncBody("_LCtrlHandleHold")
+	Assert(Body != "", "_LCtrlHandleHold must exist in the driver source")
+	Assert(InStr(Body, "PhysicalModifierPassthrough") > 0,
+		"the shared LCtrl handler must forward its native-pass-through verdict")
 }
 
-Test("clipboard-history paste: control-layer hotkey uses the provenance route",
-	_ClipboardHistoryPasteHotkeyUsesProvenanceRoute)
+Test("clipboard-history paste: LCtrl wiring preserves the Windows modifier edge (clipboard-history-lctrl-passthrough)",
+	_ClipboardHistoryPasteLCtrlUsesNativePassthrough)
