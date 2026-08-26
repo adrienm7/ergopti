@@ -59,6 +59,8 @@ helpers.describe("Registry — hotstring counting regressions", function()
 			mappings_lookup = {},
 			mappings_by_tail_char = {},
 			mappings_by_star_tail_char = {},
+			SECTION_DELAYS = {},
+			recompute_word_timeout = function() end,
 			seq_counter = 0,
 			magic_key = "★"
 		}
@@ -237,6 +239,7 @@ helpers.describe("Registry — section priority from the shared override file", 
 				groups = { rolls = { enabled = true, sections = { sec1 = { enabled = true } } } },
 				mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
 				mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+				SECTION_DELAYS = {}, recompute_word_timeout = function() end,
 			}
 			helpers.assert_eq(Registry.init(state), true)
 			Registry.load_toml("rolls", "dummy.toml")

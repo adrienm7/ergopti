@@ -75,6 +75,17 @@ local function copy_map(source)
 	return out
 end
 
+--- Copies a two-level ownership map without retaining mutable child aliases.
+--- @param source table|nil
+--- @return table
+local function copy_nested_map(source)
+	local out = {}
+	for owner, values in pairs(source or {}) do
+		out[owner] = type(values) == "table" and copy_map(values) or values
+	end
+	return out
+end
+
 --- Copies group records while retaining their immutable section descriptors.
 --- @param source table
 --- @return table
@@ -98,7 +109,7 @@ local function snapshot_registry()
 		mapping_values             = mapping_values,
 		groups                     = copy_groups(_state.groups),
 		group_post_load_hooks      = copy_map(_state.group_post_load_hooks),
-		section_delays             = copy_map(_state.SECTION_DELAYS),
+		section_delays             = copy_nested_map(_state.SECTION_DELAYS),
 		seq_counter                = _state.seq_counter,
 		group_order_counter        = _state.group_order_counter,
 		current_group              = _state.current_group,
@@ -154,6 +165,17 @@ local function run_transaction(label, mutation)
 	Logger.error(LOG, "Registry mutation '%s' rolled back "
 		.. "(details withheld; terminal type: %s).", tostring(label), type(committed))
 	return false
+end
+
+--- Replaces one group's complete section-delay ownership and resizes the word timeout.
+--- Passing nil removes the owner; outer multi-step mutations provide rollback.
+--- @param name string
+--- @param delays table|nil
+local function replace_group_section_delays(name, delays)
+	_state.SECTION_DELAYS[name] = delays
+	if type(_state.recompute_word_timeout) == "function" then
+		_state.recompute_word_timeout()
+	end
 end
 
 --- Injects the shared state and the registry's callback table.
@@ -288,6 +310,7 @@ function M.load_file(name, path)
 
 		_state.current_group = nil
 		record_group(name, path, "lua")
+		replace_group_section_delays(name, nil)
 		_callbacks.sort_mappings()
 		Logger.success(LOG, "Lua mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
 		return true
@@ -442,20 +465,18 @@ function M.load_toml(name, path)
 	_state.current_group = nil
 	_callbacks.sort_mappings()
 
-	-- Per-section delay overrides from [_meta.section_delays] (seconds). Merge
-	-- into the shared map so mapping_fires can apply them (precedence: user >
-	-- section > group > base), then resize the word-inactivity timeout so a long
-	-- per-section window (e.g. comma_j = 5 s) is not cut short by the timeout.
+	-- Per-section delay overrides from [_meta.section_delays] (seconds). Replace
+	-- this group's complete ownership so colliding section names in other files
+	-- stay independent and removed overrides cannot survive a same-file reload.
+	local group_section_delays = {}
 	if type(data.meta) == "table" and type(data.meta.section_delays) == "table" then
 		for sec_name, secs in pairs(data.meta.section_delays) do
 			if type(secs) == "number" then
-				_state.SECTION_DELAYS[sec_name] = secs
+				group_section_delays[sec_name] = secs
 			end
 		end
-		if type(_state.recompute_word_timeout) == "function" then
-			_state.recompute_word_timeout()
-		end
 	end
+	replace_group_section_delays(name, group_section_delays)
 
 	-- Preserve group_order across reloads: ensure_group_order() stamped it earlier,
 	-- but overwriting the table would silently drop the value and break sort stability
@@ -588,6 +609,7 @@ function M.disable_group(name)
 		-- is the only other place it is dropped and this path deliberately does not
 		-- sort. Without this the disabled group's triggers keep classifying as present.
 		_callbacks.drop_classify_cache()
+		replace_group_section_delays(name, nil)
 
 		Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
 		return true
@@ -627,6 +649,7 @@ function M.register_lua_group(name, meta_description, sections)
 		meta_description = meta_description,
 		sections         = type(sections) == "table" and sections or {},
 	}
+	replace_group_section_delays(name, nil)
 	Logger.debug(LOG, "Lua group '%s' registered.", name)
 end
 

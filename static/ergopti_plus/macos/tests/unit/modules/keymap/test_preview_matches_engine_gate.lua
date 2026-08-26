@@ -48,7 +48,7 @@ helpers.describe("delay resolution: the engine and the preview share one chain",
 
 		s.DELAYS.STAR_TRIGGER = 0.9
 		s.DELAYS.autocorrection = 0.3
-		s.SECTION_DELAYS["comma_j"] = 5.0
+		s.SECTION_DELAYS.autocorrection = { comma_j = 5.0 }
 
 		helpers.assert_eq(s.resolve_mapping_delay({ has_magic = true }), 0.9,
 			"a star trigger takes the star delay")
