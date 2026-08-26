@@ -674,14 +674,28 @@ helpers.describe("Adapter contract vectors: TooltipRenderer", function()
 			"isVisible() must return false/nil after hide()")
 	end)
 
-	helpers.it("show with a minimal payload leaves a definite visibility state", function()
-		adapter.hide()
-		adapter.show({ lines = { { text = "Test", size = 14 } } })
-		local visible = adapter.isVisible()
-		helpers.assert_true(visible == true or visible == false or visible == nil,
-			"show() must resolve visibility to a definite value, not leave it unset — "
-				.. "the accept path reads it to decide whether to dismiss")
-		adapter.hide()
+	helpers.it("show with valid draw calls makes the tooltip visible", function()
+		local native_styledtext_new = hs.styledtext.new
+		local ok, err = pcall(function()
+			-- The plain-Lua stub cannot create Hammerspoon userdata. Model the
+			-- renderer's equivalent structured block without replacing the adapter,
+			-- facade, or native canvas boundary under test.
+			hs.styledtext.new = function(text) return { preds = text } end
+			adapter.hide()
+			adapter.show({
+				draw_calls = {
+					{ type = "rect", id = "bg" },
+					{ type = "text", id = "row_text_0", text = "Test" },
+				},
+				duration_sec = 0,
+			})
+			local visible = adapter.isVisible()
+			helpers.assert_eq(visible, true,
+				"show() must translate the port payload into a committed tooltip render")
+			adapter.hide()
+		end)
+		hs.styledtext.new = native_styledtext_new
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("updateElement does not make an invisible tooltip appear", function()
