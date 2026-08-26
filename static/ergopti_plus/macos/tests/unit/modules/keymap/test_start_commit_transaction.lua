@@ -240,6 +240,7 @@ local function load_fixture()
 		prewarm_ignored_win_watchers = function() return true end,
 		stop = function() tracking_stops = tracking_stops + 1; return true end,
 		is_ignored_window = function() return false, 1 end,
+		is_secure_field = function() return false, 1 end,
 	})
 	package.loaded["keymap.terminators"] = api({ matches_magic_event = function() return false end })
 	package.loaded["infra.logger"] = api({

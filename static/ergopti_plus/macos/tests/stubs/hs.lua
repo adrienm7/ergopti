@@ -974,6 +974,86 @@ M.application = {
 	},
 }
 
+local AX_APPLICATION_ELEMENTS = {}
+local AX_OBSERVERS = setmetatable({}, { __mode = "v" })
+local AX_OBSERVER_COUNT = 0
+
+local function default_ax_application_element(pid)
+	local element = AX_APPLICATION_ELEMENTS[pid]
+	if element then return element end
+	local focused = {
+		attributeValue = function(_, attribute)
+			if attribute == "AXRole" then return "AXTextField" end
+			if attribute == "AXSubrole" then return "AXStandardTextField" end
+			return nil
+		end,
+	}
+	element = {
+		attributeValue = function(_, attribute)
+			if attribute == "AXFocusedUIElement" then return focused end
+			return nil
+		end,
+	}
+	AX_APPLICATION_ELEMENTS[pid] = element
+	return element
+end
+
+M.axuielement = {
+	applicationElementForPID = default_ax_application_element,
+	applicationElement = default_ax_application_element,
+	__set_application_element_for_pid = function(pid, element)
+		AX_APPLICATION_ELEMENTS[pid] = element
+	end,
+	observer = {
+		new = function(pid)
+			if type(pid) ~= "number" then error("pid must be a number", 0) end
+			local watcher = {
+				pid = pid,
+				running = false,
+				callback_fn = nil,
+				registrations = {},
+			}
+			function watcher:callback(...)
+				if select("#", ...) == 0 then return self.callback_fn end
+				local fn = ...
+				self.callback_fn = fn
+				return self
+			end
+			function watcher:addWatcher(element, notification)
+				self.registrations[element] = self.registrations[element] or {}
+				self.registrations[element][notification] = true
+				return self
+			end
+			function watcher:removeWatcher(element, notification)
+				local notifications = self.registrations[element]
+				if notifications then notifications[notification] = nil end
+				return self
+			end
+			function watcher:watching(element)
+				if element then return self.registrations[element] or {} end
+				return self.registrations
+			end
+			function watcher:start() self.running = true; return self end
+			function watcher:stop() self.running = false; return self end
+			function watcher:isRunning() return self.running end
+			AX_OBSERVER_COUNT = AX_OBSERVER_COUNT + 1
+			AX_OBSERVERS[AX_OBSERVER_COUNT] = watcher
+			return watcher
+		end,
+		__emit = function(pid, element, notification, details)
+			for _, watcher in pairs(AX_OBSERVERS) do
+				local registrations = watcher.registrations[element]
+				if watcher.pid == pid and watcher.running and registrations
+					and registrations[notification] and type(watcher.callback_fn) == "function"
+				then
+					watcher.callback_fn(watcher, element, notification, details or {})
+				end
+			end
+		end,
+		__watchers = AX_OBSERVERS,
+	},
+}
+
 M.window = {
 	focusedWindow = function() return nil end,
 	frontmostWindow = function() return nil end,
@@ -1137,8 +1217,11 @@ function M.__reset()
 	for i = #APPLICATION_QUERIES, 1, -1 do APPLICATION_QUERIES[i] = nil end
 	for i = #APPLICATION_QUERY_WATCHER_COUNTS, 1, -1 do APPLICATION_QUERY_WATCHER_COUNTS[i] = nil end
 	for id in pairs(APPLICATION_WATCHERS) do APPLICATION_WATCHERS[id] = nil end
+	for pid in pairs(AX_APPLICATION_ELEMENTS) do AX_APPLICATION_ELEMENTS[pid] = nil end
+	for id in pairs(AX_OBSERVERS) do AX_OBSERVERS[id] = nil end
 	for i = #CANVASES, 1, -1 do CANVASES[i] = nil end
 	APPLICATION_WATCHER_COUNT = 0
+	AX_OBSERVER_COUNT = 0
 	INPUT_SOURCE_CALLBACK = nil
 	M.http.__reset()
 	if M.fs and M.fs.__reset_entries then M.fs.__reset_entries() end

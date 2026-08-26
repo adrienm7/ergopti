@@ -27,6 +27,7 @@ local Logger      = require("infra.logger")
 local Timings     = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
+local SecureFieldDetector = require("adapters.secure_field_detector")
 
 local LOG = "keymap.utils"
 
@@ -744,14 +745,16 @@ local _ignored_win_cache_value = nil
 -- (focus change, first call, or TTL elapsed). Watchers set this to true
 -- synchronously whenever the focused window/app is known to have changed.
 local _ignored_win_cache_dirty = true
--- One cheap NSWorkspace watcher plus two narrowly scoped AX watchers. Never use
+-- One cheap NSWorkspace watcher plus three narrowly scoped AX watchers. Never use
 -- hs.window.filter here: its first access enumerates every application's windows
 -- and has already stalled the Hammerspoon runloop for multiple seconds.
 local _ignored_win_app_watcher = nil
 local _ignored_win_focus_watcher = nil
 local _ignored_win_title_watcher = nil
+local _secure_field_focus_watcher = nil
 local _ignored_win_focus_owner = nil
 local _ignored_win_title_owner = nil
+local _secure_field_focus_owner = nil
 local _ignored_win_titles_ref   = nil
 local _ignored_win_patterns_ref = nil
 local _ignored_win_context_generation = 0
@@ -760,6 +763,7 @@ local _ignored_win_context_generation = 0
 -- before the owning event taps exist.
 local _ignored_win_stopped = true
 local _ignored_win_last_identity = nil
+local _secure_field_cache_value = nil
 local schedule_ignored_win_refresh
 local arm_ignored_win_ttl_refresh
 
@@ -769,6 +773,7 @@ local function invalidate_ignored_win_cache()
 	if _ignored_win_stopped then return end
 	_ignored_win_cache_dirty = true
 	_ignored_win_cache_value = nil
+	_secure_field_cache_value = nil
 	_ignored_win_context_generation = _ignored_win_context_generation + 1
 	-- Every scheduled refresh carries this epoch. If native timer cancellation
 	-- fails, the old callback can still run but may not publish its stale probe.
@@ -825,7 +830,8 @@ end
 local function stop_context_watcher(field, label)
 	local watcher
 	if field == "focus" then watcher = _ignored_win_focus_watcher
-	else watcher = _ignored_win_title_watcher end
+	elseif field == "title" then watcher = _ignored_win_title_watcher
+	else watcher = _secure_field_focus_watcher end
 	if not watcher then return true end
 	local ok, err = pcall(function() watcher:stop() end)
 	if not ok then
@@ -835,9 +841,12 @@ local function stop_context_watcher(field, label)
 	if field == "focus" then
 		_ignored_win_focus_watcher = nil
 		_ignored_win_focus_owner = nil
-	else
+	elseif field == "title" then
 		_ignored_win_title_watcher = nil
 		_ignored_win_title_owner = nil
+	else
+		_secure_field_focus_watcher = nil
+		_secure_field_focus_owner = nil
 	end
 	return true
 end
@@ -863,6 +872,11 @@ end
 local function ensure_ignored_win_context_watchers(app, win, watch_title)
 	local app_key = app_owner_key(app)
 	local win_key = window_owner_key(win)
+	if _secure_field_focus_owner ~= app_key
+		and not stop_context_watcher("secure", "secure-field focus")
+	then
+		return false
+	end
 	if _ignored_win_title_owner ~= win_key and not stop_context_watcher("title", "title") then
 		return false
 	end
@@ -885,6 +899,17 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 		end
 		_ignored_win_focus_watcher = watcher
 		_ignored_win_focus_owner = app_key
+	end
+
+	if not _secure_field_focus_watcher then
+		local watcher, detail = SecureFieldDetector.watchFocusedElementChanges(
+			app, invalidate_ignored_win_cache)
+		if not watcher then
+			Logger.warn(LOG, "Secure-field focus watcher setup failed: %s.", tostring(detail))
+			return false
+		end
+		_secure_field_focus_watcher = watcher
+		_secure_field_focus_owner = app_key
 	end
 
 	if watch_title ~= true then
@@ -917,6 +942,7 @@ end
 local function mark_ignored_win_unknown()
 	_ignored_win_cache_dirty = true
 	_ignored_win_cache_value = nil
+	_secure_field_cache_value = nil
 	_ignored_win_context_generation = _ignored_win_context_generation + 1
 	_ignored_win_last_identity = nil
 	return nil
@@ -946,6 +972,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 	_ignored_win_cache_time  = now
 	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
+	_secure_field_cache_value = nil
 	if not ensure_ignored_win_watchers() then return mark_ignored_win_unknown() end
 
 	-- Use the focused window directly rather than frontmostApplication() so that
@@ -970,6 +997,7 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 		end
 		observe_ignored_win_identity(win, app_name, "<hammerspoon>")
 		_ignored_win_cache_value = true
+		_secure_field_cache_value = false
 		return true
 	end
 
@@ -979,6 +1007,10 @@ local function probe_ignored_window(ignored_titles, ignored_patterns, now)
 		return mark_ignored_win_unknown()
 	end
 	observe_ignored_win_identity(win, app_name, title)
+	local secure = SecureFieldDetector.isSecureApp(app_name) == true and true
+		or SecureFieldDetector.inspectFocusedElement(app)
+	if type(secure) ~= "boolean" then return mark_ignored_win_unknown() end
+	_secure_field_cache_value = secure
 
 	-- Exact-title match.
 	if type(ignored_titles) == "table" and ignored_titles[title] then
@@ -1118,6 +1150,27 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	return _ignored_win_cache_value, _ignored_win_context_generation
 end
 
+
+--- Returns the cached secure-field classification without performing AX work.
+--- The cache shares focus identity, TTL, invalidation, and refresh ownership with
+--- is_ignored_window(); nil means the current field is not yet classified.
+--- @param now number|nil Current epoch timestamp (seconds) from the caller.
+--- @return boolean|nil secure
+--- @return integer context_generation
+function M.is_secure_field(now)
+	if not now then now = hs.timer.secondsSinceEpoch() end
+	if _ignored_win_stopped then return nil, _ignored_win_context_generation end
+	if _ignored_win_cache_dirty or _secure_field_cache_value == nil then
+		schedule_ignored_win_refresh()
+		return nil, _ignored_win_context_generation
+	end
+	if (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC then
+		invalidate_ignored_win_cache()
+		return nil, _ignored_win_context_generation
+	end
+	return _secure_field_cache_value, _ignored_win_context_generation
+end
+
 --- Reopens ignored-window tracking before the keymap taps start.
 --- Watchers and AX reads remain deferred; this method only publishes live refs.
 --- @param ignored_titles table Exact ignored-window titles.
@@ -1141,7 +1194,9 @@ function M.start_ignored_win_tracking(ignored_titles, ignored_patterns)
 		if TimerScheduler.cancel(_ignored_win_ttl_handle) ~= true then return nil end
 		_ignored_win_ttl_handle = nil
 	end
-	if _ignored_win_app_watcher or _ignored_win_focus_watcher or _ignored_win_title_watcher then
+	if _ignored_win_app_watcher or _ignored_win_focus_watcher or _ignored_win_title_watcher
+		or _secure_field_focus_watcher
+	then
 		-- A previous teardown retained an exact watcher capability because its
 		-- stop/unsubscribe raised. Reopening would mistake a half-dead object for
 		-- valid coverage; require the caller to retry stop() first.
@@ -1154,6 +1209,7 @@ function M.start_ignored_win_tracking(ignored_titles, ignored_patterns)
 	_ignored_win_patterns_ref = next_patterns
 	_ignored_win_cache_dirty = true
 	_ignored_win_cache_value = nil
+	_secure_field_cache_value = nil
 	return _ignored_win_context_generation
 end
 
@@ -1227,8 +1283,10 @@ function M.stop()
 	end
 	if not stop_context_watcher("title", "title") then settled = false end
 	if not stop_context_watcher("focus", "focus") then settled = false end
+	if not stop_context_watcher("secure", "secure-field focus") then settled = false end
 	_ignored_win_cache_dirty = true
 	_ignored_win_cache_value = nil
+	_secure_field_cache_value = nil
 	_ignored_win_last_identity = nil
 	_ignored_win_titles_ref = nil
 	_ignored_win_patterns_ref = nil
