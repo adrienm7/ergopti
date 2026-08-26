@@ -327,6 +327,7 @@ function M.start(ctx)
 	local burst_paths     = {}
 	local burst_count     = 0
 	local last_change_sec = 0
+	local reload_refusal_logged = false
 
 	-- ``fire_reload`` is forward-declared so the debounce timer closure can call it
 	-- while ``fire_reload`` itself re-arms through ``arm_timer``. The Lua
@@ -382,6 +383,7 @@ function M.start(ctx)
 			end
 		end
 		last_change_sec = now
+		reload_refusal_logged = false
 		-- Genuine activity resets the stuck-state counter, so an ongoing write never
 		-- bypasses the hold; only a quiet-but-stuck state climbs toward the cap.
 		defer_count = 0
@@ -420,30 +422,64 @@ function M.start(ctx)
 			arm_timer(msg)
 			return
 		end
-		-- Tree is settled and consistent: clear the burst and reload.
-		burst_paths, burst_count, defer_count = {}, 0, 0
+		-- Tree is settled and consistent. The burst remains owned until the reload
+		-- coordinator explicitly accepts it; an exclusive global action may still
+		-- refuse this one-shot delivery after all filesystem gates have cleared.
 		local reload_generation = lifecycle_generation
-		ui_restore.defer_reload(function()
-			if not lifecycle_active or reload_generation ~= lifecycle_generation then return end
-			-- Re-check at FIRE time, not only at schedule time. defer_reload holds
-			-- the reload for as long as a UI stays open — seconds, or minutes if
-			-- the user leaves a window up — and the verdict computed before that
-			-- wait says nothing about the tree now. A pull that starts during the
-			-- hold would otherwise be re-exec'd into mid-write, which is the
-			-- half-updated-tree boot failure the gate exists to prevent.
-			local busy, repo = any_git_operation_in_progress()
-			if busy then
-				Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
-					.. "UI hold — re-arming.", tostring(repo))
-				arm_timer(msg)
-				return
+		local callback_invoked = false
+		local defer_ok, deferred = xpcall(function()
+			return ui_restore.defer_reload(function()
+				callback_invoked = true
+				if not lifecycle_active or reload_generation ~= lifecycle_generation then return end
+				-- Re-check at FIRE time, not only at schedule time. defer_reload holds
+				-- the reload for as long as a UI stays open — seconds, or minutes if
+				-- the user leaves a window up — and the verdict computed before that
+				-- wait says nothing about the tree now. A pull that starts during the
+				-- hold would otherwise be re-exec'd into mid-write, which is the
+				-- half-updated-tree boot failure the gate exists to prevent.
+				local busy, repo = any_git_operation_in_progress()
+				if busy then
+					Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
+						.. "UI hold — re-arming.", tostring(repo))
+					arm_timer(msg)
+					return
+				end
+				local request_ok, accepted = xpcall(function()
+					-- snapshot() is a safety net for any UI still open at reload time;
+					-- under normal deferral they are already closed so it saves nothing.
+					ui_restore.snapshot()
+					pcall(function()
+						notifications.notify(i18n.get("init.reload_title"),
+							msg or i18n.get("init.reload_files"), "info")
+					end)
+					return hs.reload()
+				end, debug.traceback)
+				if not request_ok or accepted ~= true then
+					if not reload_refusal_logged then
+						reload_refusal_logged = true
+						Logger.warn(LOG,
+							"Reload request was refused; the source-file burst remains pending for retry: %s.",
+							tostring(request_ok and accepted or accepted))
+					else
+						Logger.debug(LOG, "Reload request remains refused; retaining the source-file burst.")
+					end
+					arm_timer(msg)
+					return false
+				end
+				burst_paths, burst_count, defer_count = {}, 0, 0
+				reload_refusal_logged = false
+				return true
+			end)
+		end, debug.traceback)
+		if (not defer_ok or deferred ~= true) and not callback_invoked then
+			if not reload_refusal_logged then
+				reload_refusal_logged = true
+				Logger.warn(LOG,
+					"Deferred reload owner refused the source-file burst; retaining it for retry: %s.",
+					tostring(defer_ok and deferred or deferred))
 			end
-			-- snapshot() is a safety net for any UI still open at reload time;
-			-- under normal deferral they are already closed so it saves nothing
-			ui_restore.snapshot()
-			pcall(notifications.notify, i18n.get("init.reload_title"), msg or i18n.get("init.reload_files"), "info")
-			hs.reload()
-		end)
+			arm_timer(msg)
+		end
 	end
 
 

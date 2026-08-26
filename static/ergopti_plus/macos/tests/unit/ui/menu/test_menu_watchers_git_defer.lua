@@ -53,7 +53,7 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		git_busy = false
 		local watcher = MenuWatchers.start_config_watcher(
 			"/fake/base/",
-			function() reloads = reloads + 1 end,   -- on_reload
+			function() reloads = reloads + 1; return true end, -- on_reload
 			function() return 0 end,                 -- get_suppress_until: never suppress
 			ui_restore_stub
 		)
@@ -115,9 +115,9 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		git_busy = false
 		MenuWatchers.start_config_watcher(
 			"/fake/base/",
-			function() reloads = reloads + 1 end,
+			function() reloads = reloads + 1; return true end,
 			function() return 0 end,
-			{ defer_reload = function(callback) pending_reload = callback end }
+			{ defer_reload = function(callback) pending_reload = callback; return true end }
 		)
 		captured_cb({ "/fake/base/modules/foo.lua" })
 		helpers.assert_true(type(pending_timer) == "function", "the change must arm a settle timer")
@@ -138,6 +138,51 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		helpers.assert_true(type(pending_reload) == "function", "the settled retry must reach dispatch")
 		pending_reload()
 		helpers.assert_eq(reloads, 1, "the retained reload must fire exactly once after Git settles")
+
+		hs.pathwatcher, hs.timer = prev_pw, prev_timer
+	end)
+
+	helpers.it("retains one source burst until the menu reload callback accepts it", function()
+		local prev_pw, prev_timer = hs.pathwatcher, hs.timer
+		local captured_cb, pending_timer
+		local clock, reload_attempts = 1000, 0
+
+		hs.pathwatcher = { new = function(_path, callback)
+			captured_cb = callback
+			return { start = function() return true end, stop = function() return true end }
+		end }
+		hs.timer = {
+			doAfter = function(_delay, callback)
+				pending_timer = callback
+				return { stop = function() return true end }
+			end,
+			secondsSinceEpoch = function() return clock end,
+		}
+
+		git_busy = false
+		MenuWatchers.start_config_watcher(
+			"/fake/base/",
+			function()
+				reload_attempts = reload_attempts + 1
+				return reload_attempts > 1
+			end,
+			function() return 0 end,
+			{ defer_reload = function(callback) callback() end }
+		)
+		captured_cb({ "/fake/base/modules/refused.lua" })
+		clock = 1001
+		local first = pending_timer
+		pending_timer = nil
+		first()
+
+		helpers.assert_eq(1, reload_attempts, "the first reload attempt must reach the menu callback")
+		helpers.assert_true(type(pending_timer) == "function",
+			"a refused menu reload must retain the source burst and re-arm its polling owner")
+		local retry = pending_timer
+		pending_timer = nil
+		retry()
+		helpers.assert_eq(2, reload_attempts, "the retained source burst must retry exactly once")
+		helpers.assert_eq(nil, pending_timer, "an accepted reload must settle the retained burst")
 
 		hs.pathwatcher, hs.timer = prev_pw, prev_timer
 	end)
