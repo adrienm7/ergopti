@@ -498,6 +498,43 @@ TestTL_LoadExtTomlFileUsesCurrentSection() {
 Test("LoadExtTomlFile: registers entries without undefined category/section locals",
 	TestTL_LoadExtTomlFileUsesCurrentSection)
 
+TestTL_LoadExtSimpleEntriesUnescapeTomlStrings() {
+	global _Stub_HotstringRegistrations, _Stub_RecordedSends
+	TmpPath := A_ScriptDir . "\test_ext_simple_escapes.toml"
+	try {
+		try FileDelete(TmpPath)
+		FileAppend(
+			'[[custom]]`n'
+			. 'escapedoutput = "say \"hi\""`n'
+			. '"escaped\"trigger" = "value"`n',
+			TmpPath, "UTF-8")
+		ResetHotstringRecorders()
+		LoadExtTomlFile(TmpPath, "Custom")
+		AssertTrue(_Stub_HotstringRegistrations.Length >= 2,
+			"both escape-aware simple entries must register their variants")
+		OutputBinding := 0
+		FoundEscapedTrigger := false
+		for Binding in _Stub_HotstringRegistrations {
+			if InStr(Binding.spec, "escapedoutput") and !IsObject(OutputBinding)
+				OutputBinding := Binding
+			if InStr(Binding.spec, 'escaped"trigger')
+				FoundEscapedTrigger := true
+		}
+		AssertTrue(IsObject(OutputBinding),
+			"the bare simple trigger must register")
+		OutputBinding.callback.Call()
+		AssertEqual('say "hi"', _Stub_RecordedSends[2].args[1],
+			"the engine callback must receive the unescaped output")
+		AssertTrue(FoundEscapedTrigger,
+			"the engine must receive the unescaped quoted trigger")
+	} finally {
+		try FileDelete(TmpPath)
+		ResetHotstringRecorders()
+	}
+}
+Test("LoadExtTomlFile: simple entries unescape quoted triggers and outputs",
+	TestTL_LoadExtSimpleEntriesUnescapeTomlStrings)
+
 
 
 
@@ -667,4 +704,3 @@ TestTL_MetadataHeadersAcceptInlineComments() {
 }
 Test("toml metadata: inline-commented headers parse in both readers",
 	TestTL_MetadataHeadersAcceptInlineComments)
-

@@ -64,7 +64,9 @@ _PICR_MakeFixture() {
 	FileAppend(
 		'[_meta]`ndescription = "not a hotstring"`n'
 		. '[snippets]`n"sbx" = { output = "single bracket", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }`n'
-		. 'simplekey = "simple value"`n',
+		. 'simplekey = "simple value"`n'
+		. 'escapedoutput = "say \"hi\""`n'
+		. '"escaped\"trigger" = "value"`n',
 		Root . "\otherpack.toml", "UTF-8")
 	return Root
 }
@@ -163,6 +165,16 @@ _PICR_EveryAcceptedShapeIsIndexed() {
 			'a bare key = "value" entry must be indexed: LoadExtTomlFile registers that shape through '
 			. 'CreateCaseSensitiveHotstrings, so it expands. Matching only the inline-table pattern here left it '
 			. 'un-previewable (preview-index-grammar-stricter-than-engine)')
+		Assert(Set.Has("escapedoutput"),
+			"a simple entry with an escaped quote in its output must be indexed")
+		Assert(Index.Has("escapedoutput")
+			and Index["escapedoutput"] is Array
+			and Index["escapedoutput"].Length >= 1,
+			"the escaped-output trigger must have an indexed preview row")
+		AssertEqual('say "hi"', Index["escapedoutput"][1].Output,
+			"the preview must receive the same unescaped output as the engine")
+		Assert(Set.Has('escaped"trigger'),
+			"a quoted simple trigger must be parsed and unescaped before indexing")
 		; The preview ranks colliding candidates by Priority so the non-dimmed row
 		; is the one the engine will fire. LoadExtTomlFile registers every ext-pack
 		; entry at HSE_PRIORITY_PACKAGE, while the index's own fallback is
