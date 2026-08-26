@@ -1126,12 +1126,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		-- replaying it after focus moved would inject the old app's key into the new.
 		invalidate_window_context()
 	end
-	if is_ignored == false and _window_context_reconcile_pending then
-		_window_context_reconcile_pending = false
-		arm_observed_context_reconcile(true)
-	end
 	if is_ignored ~= false then
 		return internal_loopback == true
+	end
+	local is_secure = km_utils.is_secure_field(now)
+	if is_secure ~= false then
+		return internal_loopback == true
+	end
+	if _window_context_reconcile_pending then
+		_window_context_reconcile_pending = false
+		arm_observed_context_reconcile(true)
 	end
 
 	local dt  = now - CoreState.last_key_time
