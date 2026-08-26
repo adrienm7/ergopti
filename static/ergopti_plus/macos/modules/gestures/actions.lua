@@ -393,8 +393,19 @@ function M.trigger_lookup(explicit_parent)
 	local requested_parent = explicit_parent or current_action_parent()
 	local parent = requested_parent == SHORTCUT_ACTION_PARENT
 		and SHORTCUT_ACTION_PARENT or GESTURE_ACTION_PARENT
-	if not aux_admission_open(parent) or _lookup_operations[parent] ~= nil then
-		return false
+	if not aux_admission_open(parent) then return false end
+	if _lookup_operations[parent] ~= nil then
+		local cleanup_ok, cleanup_result = xpcall(
+			cleanup_lookup_operation, debug.traceback, parent)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG,
+				"Dictionary lookup mouse-up cleanup remains pending for '%s': %s.",
+				parent, tostring(cleanup_result))
+			return false
+		end
+		-- Cleanup may synchronously cross a lifecycle boundary. Revalidate the
+		-- composite fence before acquiring the replacement lookup transaction.
+		if not aux_admission_open(parent) then return false end
 	end
 	local acquired, prepared, timer_token = xpcall(function()
 		return AuxOwner.prepare_after(0.05, "dictionary lookup", function()

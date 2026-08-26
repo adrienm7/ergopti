@@ -64,6 +64,7 @@ local function fresh_actions(options)
 		search_cleanup_results = {},
 		clipboard_restore_calls = 0,
 		lookup_cleanup_results = {},
+		errors = {},
 	}
 	calls.controls = controls
 	local clipboard_data = { ["public.utf8-plain-text"] = "original" }
@@ -473,7 +474,15 @@ local function fresh_actions(options)
 	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
 	package.loaded["infra.paths"] = { shared = function() return "Z:/missing" end }
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local logger = helpers.make_logger_stub()
+	logger.error = function(module_name, message, ...)
+		local ok, rendered = pcall(string.format, message, ...)
+		calls.errors[#calls.errors + 1] = {
+			module_name = module_name,
+			message = ok and rendered or tostring(message),
+		}
+	end
+	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 
 	local event_types = { rightMouseDown = 1, rightMouseUp = 2 }
@@ -1109,6 +1118,43 @@ helpers.describe("gesture Actions lookup transaction", function()
 				end)
 		end
 	end
+
+	helpers.it("retries retained lookup mouse-up debt before the next lookup", function()
+		local actions, calls = fresh_actions({ up_post_mode = "false" })
+		helpers.assert_eq(actions.trigger_lookup("gestures"), false)
+		local exact_up = calls.mouse_post_attempts[2]
+		helpers.assert_eq(calls.mouse_post_attempts[3] == exact_up, true,
+			"initial cleanup must retain the exact refused mouse-up")
+
+		calls.controls.up_post_mode = "success"
+		helpers.assert_eq(actions.trigger_lookup("gestures"), true,
+			"the next lookup must first settle retained release debt")
+		helpers.assert_eq(calls.mouse_post_attempts[4] == exact_up, true,
+			"recovery must retry the exact retained mouse-up identity")
+		helpers.assert_eq(#calls.after, 2,
+			"a fresh lookup may acquire its timer only after cleanup commits")
+		helpers.assert_eq(calls.fire(calls.after[1].token), false,
+			"the rolled-back timer from the failed lookup must remain inert")
+		helpers.assert_eq(calls.fire(calls.after[2].token), true)
+		helpers.assert_eq(#calls.keys, 1)
+	end)
+
+	helpers.it("reports retained lookup mouse-up debt when recovery still refuses", function()
+		local actions, calls = fresh_actions({ up_post_mode = "false" })
+		helpers.assert_eq(actions.trigger_lookup("gestures"), false)
+		local exact_up = calls.mouse_post_attempts[2]
+		local errors_before = #calls.errors
+
+		helpers.assert_eq(actions.trigger_lookup("gestures"), false)
+		helpers.assert_eq(calls.mouse_post_attempts[4] == exact_up, true,
+			"recovery must retry the exact retained mouse-up identity")
+		helpers.assert_eq(#calls.after, 1,
+			"a refused cleanup may not acquire a sibling lookup timer")
+		helpers.assert_eq(#calls.errors, errors_before + 1)
+		helpers.assert_true(calls.errors[#calls.errors].message:find(
+			"Dictionary lookup mouse-up cleanup remains pending", 1, true) ~= nil,
+			"ongoing lookup disability must remain visible in the log")
+	end)
 end)
 
 
