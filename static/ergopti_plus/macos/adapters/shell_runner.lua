@@ -23,6 +23,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 
 local LOG = "adapters.shell_runner"
 
@@ -280,11 +281,9 @@ function M.spawn(executable, args, on_done, on_chunk)
 		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), tostring(err))
 		if type(_G.ergopti_report_crash) == "function" then
 			local report_ctx = "shell_runner." .. label .. ": " .. tostring(err)
-			if type(hs.timer) == "table" and type(hs.timer.doAfter) == "function" then
-				hs.timer.doAfter(0, function() pcall(_G.ergopti_report_crash, report_ctx) end)
-			else
-				pcall(_G.ergopti_report_crash, report_ctx)
-			end
+			DeferredWork.after(0,
+				function() pcall(_G.ergopti_report_crash, report_ctx) end,
+				"shell_runner.crash_report")
 		end
 	end
 

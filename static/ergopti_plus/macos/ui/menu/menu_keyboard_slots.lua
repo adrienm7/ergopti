@@ -29,6 +29,7 @@ local M = {}
 local hs           = hs
 local i18n         = require("infra.i18n")
 local Logger       = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local ActionPicker = require("ui.action_picker")
 local KbShortcuts  = require("modules.shortcuts")
 
@@ -144,7 +145,9 @@ local function add_binding_to(prefix, ctx)
 		-- The second picker is opened on the next tick: the shared webview needs
 		-- the first window torn down before it will build another, and chaining
 		-- them synchronously leaves the user staring at nothing.
-		hs.timer.doAfter(0.05, function() choose_action_for(slot_id, ctx) end)
+		DeferredWork.after(0.05,
+			function() choose_action_for(slot_id, ctx) end,
+			"menu_keyboard_slots.action_picker")
 	end)
 end
 

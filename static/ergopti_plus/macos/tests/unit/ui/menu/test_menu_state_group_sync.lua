@@ -17,6 +17,15 @@
 
 local helpers = require("tests.helpers")
 
+local original_deferred_work = package.loaded["infra.deferred_work"]
+local original_subject = package.loaded["ui.menu.menu_state"]
+local DeferredWork = {
+	after = function(_, callback)
+		callback()
+		return true
+	end,
+}
+package.loaded["infra.deferred_work"] = DeferredWork
 local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
 
 --- True when `list` contains the string `needle`.
@@ -108,7 +117,7 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 	helpers.it("does NOT start the keylogger synchronously during sync", function()
 		-- ROOT CAUSE ENCODED: keylogger.start (~1.3 s of SQLite + rotation work) ran
 		-- inline during sync_state_to_modules and dominated boot. It must be deferred
-		-- via hs.timer; a regression to a synchronous start fails the count below.
+		-- through retained deferred work; a synchronous regression fails the count below.
 		local started = { count = 0 }
 		local fake_kl = {
 			set_options       = function() end,
@@ -117,9 +126,11 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 			stop              = function() return true end,
 		}
 
-		local saved_doAfter = _G.hs.timer.doAfter
 		local deferred = {}
-		_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end  -- record, don't fire
+		DeferredWork.after = function(_delay, callback)
+			deferred[#deferred + 1] = callback
+			return true
+		end
 
 		MenuState.sync_state_to_modules(
 			{ hotstrings = {}, keylogger_enabled = true },
@@ -128,19 +139,21 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		)
 
 		helpers.assert_eq(started.count, 0)        -- not started inline
-		helpers.assert_true(#deferred >= 1, "keylogger start must be scheduled via hs.timer")
+		helpers.assert_true(#deferred >= 1,
+			"keylogger start must be scheduled through the retained owner")
 
 		-- Firing the deferred callbacks must then actually start it.
 		for _, fn in ipairs(deferred) do pcall(fn) end
-		_G.hs.timer.doAfter = saved_doAfter
 		helpers.assert_eq(started.count, 1)        -- started exactly once, later
 	end)
 
 	helpers.it("discards an enabled timer superseded by rollback to disabled", function()
 		local started = 0
 		local deferred = {}
-		local old_do_after = _G.hs.timer.doAfter
-		_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end
+		DeferredWork.after = function(_delay, callback)
+			deferred[#deferred + 1] = callback
+			return true
+		end
 		local deps = {
 			keymap = {}, hotstring_editor = {}, save_prefs = function() return true end,
 			apply_metrics_shortcut = function() return true end,
@@ -155,7 +168,6 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		MenuState.sync_state_to_modules({ hotstrings = {}, keylogger_enabled = true }, {}, false, deps)
 		MenuState.sync_state_to_modules({ hotstrings = {}, keylogger_enabled = false }, {}, false, deps)
 		deferred[1]()
-		_G.hs.timer.doAfter = old_do_after
 		helpers.assert_eq(started, 0,
 			"a failed enable rolled back to disabled must fence its deferred keylogger start")
 	end)
@@ -163,8 +175,10 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 	helpers.it("rolls persisted enabled state back when deferred start is rejected", function()
 		local deferred = {}
 		local save_calls = 0
-		local old_do_after = _G.hs.timer.doAfter
-		_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end
+		DeferredWork.after = function(_delay, callback)
+			deferred[#deferred + 1] = callback
+			return true
+		end
 		local state = { hotstrings = {}, keylogger_enabled = true }
 		MenuState.sync_state_to_modules(state, {}, false, {
 			keymap = {}, hotstring_editor = {},
@@ -177,7 +191,6 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		})
 
 		for _, fn in ipairs(deferred) do fn() end
-		_G.hs.timer.doAfter = old_do_after
 		helpers.assert_eq(false, state.keylogger_enabled,
 			"a rejected deferred start must not leave the restored checkmark enabled")
 		helpers.assert_eq(1, save_calls,
@@ -188,8 +201,10 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		for _, outcome in ipairs({ "false", "throw" }) do
 			local deferred = {}
 			local save_calls = 0
-			local old_do_after = _G.hs.timer.doAfter
-			_G.hs.timer.doAfter = function(_delay, fn) deferred[#deferred + 1] = fn end
+			DeferredWork.after = function(_delay, callback)
+				deferred[#deferred + 1] = callback
+				return true
+			end
 			local state = { hotstrings = {}, keylogger_enabled = true }
 			MenuState.sync_state_to_modules(state, {}, false, {
 				keymap = {}, hotstring_editor = {},
@@ -210,7 +225,6 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 				local fired, fire_err = pcall(callback)
 				if not fired then callback_ok, callback_err = false, fire_err end
 			end
-			_G.hs.timer.doAfter = old_do_after
 			helpers.assert_eq(true, callback_ok,
 				"a " .. outcome .. " rollback persistence result must remain inside the guarded timer callback: "
 					.. tostring(callback_err))
@@ -219,3 +233,6 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		end
 	end)
 end)
+
+package.loaded["infra.deferred_work"] = original_deferred_work
+package.loaded["ui.menu.menu_state"] = original_subject

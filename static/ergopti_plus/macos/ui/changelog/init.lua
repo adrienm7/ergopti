@@ -24,6 +24,7 @@
 local M = {}
 
 local Logger     = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
@@ -259,12 +260,12 @@ function M.open(opts)
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
-				hs.timer.doAfter(0.15, function()
+				DeferredWork.after(0.15, function()
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
 					-- fallback timeout is beaten and we get the native proxy path.
 					fetch_and_inject(channel)
-				end)
+				end, "changelog.navigation")
 			end
 			return true
 		end,
@@ -277,9 +278,9 @@ function M.open(opts)
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	hs.timer.doAfter(1.5, function()
+	DeferredWork.after(1.5, function()
 		if _wv and not _ready then flush_queue() end
-	end)
+	end, "changelog.ready_fallback")
 
 	Logger.success(LOG, "Changelog window created.")
 end

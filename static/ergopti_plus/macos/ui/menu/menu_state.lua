@@ -15,6 +15,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG    = "menu_state"
 
@@ -321,10 +322,10 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- call above registers the hotkey and this second enable() ensures it is
 	-- active once the tap is stable. 0.1s is enough — the event tap is live
 	-- well before 1s in practice; the original 1.0s was unnecessarily long.
-	hs.timer.doAfter(0.1, function()
+	DeferredWork.after(0.1, function()
 		if deps._metrics_hk and deps._metrics_hk[1] then try("metrics_hotkey:enable", function() deps._metrics_hk[1]:enable() end) end
 		if deps._apps_time_hk and deps._apps_time_hk[1] then try("apps_time_hotkey:enable", function() deps._apps_time_hk[1]:enable() end) end
-	end)
+	end, "menu_state.hotkey_warmup")
 
 	-- Sync keylogger engine
 	local kl = core_mods.keylogger
@@ -359,7 +360,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			-- harmless — defer it off the boot critical path so the menubar/UI become
 			-- interactive ~1.3 s sooner. The shortcuts ref is captured for the closure.
 			local _shortcuts_ref = core_mods.shortcuts_mod
-			hs.timer.doAfter(KEYLOGGER_START_DELAY_SEC, function()
+			DeferredWork.after(KEYLOGGER_START_DELAY_SEC, function()
 				if keylogger_generation ~= _keylogger_start_generation then return end
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
@@ -375,7 +376,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				end
 				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
-			end)
+			end, "menu_state.keylogger_start")
 		else
 			if type(kl.stop) == "function" then
 				local stop_ok, stopped = try("keylogger.stop", kl.stop)

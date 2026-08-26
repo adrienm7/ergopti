@@ -23,6 +23,7 @@
 local M = {}
 local hs        = hs
 local Logger    = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local text_utils = require("infra.text_utils")
 local i18n      = require("infra.i18n")
 local dialog    = require("infra.dialog_util")
@@ -287,7 +288,7 @@ local function replace_and_reload(zip_path, update_menu_fn, install_token)
 		Updater.clear_cached_release()
 		Logger.success(LOG, "Update installed at %s — reloading.", target)
 		-- Short delay lets the log flush before hs.reload tears everything down.
-		hs.timer.doAfter(0.3, function() hs.reload() end)
+		DeferredWork.after(0.3, function() hs.reload() end, "menu_about.reload")
 	end, { "-o", zip_path, "-d", tmp_dir })
 	if not unzip_task then
 		settle_install(install_token, "idle", update_menu_fn)

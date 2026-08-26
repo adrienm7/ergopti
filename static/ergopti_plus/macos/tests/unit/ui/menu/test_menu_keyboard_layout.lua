@@ -336,7 +336,10 @@ helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-ti
 		with_stubbed_setter(function(calls)
 			local captured = nil
 			local state = { layout_pause_switch_enabled = true, layout_on_pause = "Ergopti_v2_2_2_plus", layout_on_resume = "French" }
-			local target = kbd.schedule_pause_layout_switch(true, state, function(f) captured = f end)
+			local target = kbd.schedule_pause_layout_switch(true, state, function(f)
+				captured = f
+				return true
+			end)
 			-- It returns the pause target and schedules exactly one deferred job…
 			helpers.assert_eq(target, "Ergopti_v2_2_2_plus")
 			helpers.assert_true(type(captured) == "function", "switch must be scheduled, not run inline")
@@ -353,7 +356,10 @@ helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-ti
 		with_stubbed_setter(function(calls)
 			local captured = nil
 			local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti_v2_2_2_plus" }
-			local target = kbd.schedule_pause_layout_switch(false, state, function(f) captured = f end)
+			local target = kbd.schedule_pause_layout_switch(false, state, function(f)
+				captured = f
+				return true
+			end)
 			helpers.assert_eq(target, "Ergopti_v2_2_2_plus")
 			captured()
 			helpers.assert_eq(calls[1], "Ergopti_v2_2_2_plus")
@@ -367,6 +373,25 @@ helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-ti
 			local target = kbd.schedule_pause_layout_switch(true, state, function() scheduled = true end)
 			helpers.assert_nil(target)
 			helpers.assert_true(not scheduled, "disabled feature must not schedule anything")
+			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+
+	helpers.it("refuses to claim a switch when the scheduler does not commit", function()
+		with_stubbed_setter(function(calls)
+			local captured = nil
+			local state = {
+				layout_pause_switch_enabled = true,
+				layout_on_pause = "French",
+				layout_on_resume = "Ergopti+",
+			}
+			local target = kbd.schedule_pause_layout_switch(true, state, function(callback)
+				captured = callback
+				return false
+			end)
+			helpers.assert_nil(target)
+			helpers.assert_type(captured, "function",
+				"the refusal must come from the scheduler boundary, not a skipped request")
 			helpers.assert_eq(#calls, 0)
 		end)
 	end)

@@ -23,6 +23,7 @@ local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("infra.logger")
+local DeferredWork   = require("infra.deferred_work")
 
 local LOG = "menu.gestures"
 local gesture_toggle_debt = nil
@@ -200,7 +201,7 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				hs.timer.doAfter(0.05, function()
+				DeferredWork.after(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
 					-- The %s inside the search-URL prompt is LITERAL — it is the
 					-- placeholder the user has to type — so this string is never run
@@ -218,9 +219,9 @@ function M.build(ctx)
 							pcall(gestures.set_action_parameter, slot, a, value)
 							local conflict = apply_action()
 							if type(conflict) == "table" then
-								hs.timer.doAfter(0.3, function()
+								DeferredWork.after(0.3, function()
 									pcall(dialog.block_alert, i18n.get("menu.gestures.conflict_title"), conflict.msg or "", i18n.get("menu.gestures.open_settings"), "OK", "warning")
-								end)
+								end, "menu_gestures.parameter_conflict")
 							end
 							return
 						end
@@ -230,19 +231,19 @@ function M.build(ctx)
 							"OK", nil, "warning")
 						prior = value or prior
 					end
-				end)
+				end, "menu_gestures.action_parameter")
 				return
 			end
 			local conflict = apply_action()
 			if type(conflict) == "table" then
-				hs.timer.doAfter(0.3, function()
+				DeferredWork.after(0.3, function()
 					local ok_c, clicked = pcall(dialog.block_alert,
 						i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
 						i18n.get("menu.gestures.open_settings"), "OK", "warning")
 					if ok_c and clicked == i18n.get("menu.gestures.open_settings") then
 						pcall(hs.execute, "open " .. text_utils.shell_quote(conflict.url or ""))
 					end
-				end)
+				end, "menu_gestures.action_conflict")
 			end
 		end)
 	end
@@ -316,7 +317,9 @@ function M.build(ctx)
 		local change_action_item = {
 			label  = i18n.get("menu.gestures.change_action"),
 			action = (state.gestures and not paused) and function()
-				hs.timer.doAfter(0.05, function() open_action_chooser(slot, names, current) end)
+				DeferredWork.after(0.05,
+					function() open_action_chooser(slot, names, current) end,
+					"menu_gestures.action_chooser")
 			end or nil,
 			disabled = not state.gestures or paused or nil,
 		}

@@ -23,6 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
@@ -138,12 +139,10 @@ M._version_gt        = version_gt
 --- we wait POST_INSTALL_REFRESH_DELAY seconds before refreshing.
 --- @param update_menu function|nil Callback that rebuilds the menu structure.
 local function schedule_menu_refresh(update_menu)
-	if type(update_menu) ~= "function" then return end
-	if hs.timer and type(hs.timer.doAfter) == "function" then
-		hs.timer.doAfter(POST_INSTALL_REFRESH_DELAY, function() pcall(update_menu) end)
-	else
-		pcall(update_menu)
-	end
+	if type(update_menu) ~= "function" then return false end
+	return DeferredWork.after(POST_INSTALL_REFRESH_DELAY,
+		function() pcall(update_menu) end,
+		"menu_keyboard_layout.refresh")
 end
 
 --- Defers `fn` so it runs AFTER the current menu-click handler has unwound.
@@ -151,16 +150,14 @@ end
 --- TISDisableInputSource — synchronously trigger macOS input-source change
 --- notifications that hs.keycodes observes. Running them inside the menu
 --- callback frame has been observed to re-enter Lua state and crash
---- Hammerspoon. A short hs.timer.doAfter() gives the click handler a chance
+--- Hammerspoon. A short retained deferral gives the click handler a chance
 --- to return before the TIS mutation is dispatched.
 --- @param fn function The TIS-touching callback to defer.
 local function defer_tis_call(fn)
-	if type(fn) ~= "function" then return end
-	if hs.timer and type(hs.timer.doAfter) == "function" then
-		hs.timer.doAfter(TIS_CALL_DELAY, function() pcall(fn) end)
-	else
-		pcall(fn)
-	end
+	if type(fn) ~= "function" then return false end
+	return DeferredWork.after(TIS_CALL_DELAY,
+		function() pcall(fn) end,
+		"menu_keyboard_layout.tis_call")
 end
 
 --- Wraps an install action so that, on success, every legacy Ergopti entry
@@ -749,7 +746,7 @@ end
 --- deadline-bounded; deferral only separates the in-process TIS notification.
 --- @param is_paused boolean Current pause state (true just entered pause).
 --- @param state table Menu state exposing layout_pause_switch_enabled / layout_on_pause / layout_on_resume.
---- @param schedule function|nil Injectable scheduler(fn) for tests; defaults to hs.timer.doAfter(0, fn).
+--- @param schedule function|nil Injectable scheduler(fn) for tests.
 --- @return string|nil The target layout that was scheduled, or nil when no switch is needed.
 function M.schedule_pause_layout_switch(is_paused, state, schedule)
 	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
@@ -759,14 +756,20 @@ function M.schedule_pause_layout_switch(is_paused, state, schedule)
 	-- Resolve hs.timer lazily so the module stays loadable in the cross-platform
 	-- test harness where hs is absent and the scheduler is injected.
 	if type(schedule) ~= "function" then
-		schedule = function(fn) hs.timer.doAfter(0, fn) end
+		schedule = function(fn)
+			return DeferredWork.after(0, fn, "menu_keyboard_layout.pause_switch")
+		end
 	end
-	schedule(function()
+	local scheduled = schedule(function()
 		-- Look the setter up on M at call time so a test stub on the module is honoured.
 		if type(M.set_layout_by_kl_name_async) == "function" then
 			pcall(M.set_layout_by_kl_name_async, target, nil)
 		end
 	end)
+	if scheduled ~= true then
+		Logger.error(LOG, "Pause layout switch could not be scheduled.")
+		return nil
+	end
 	return target
 end
 

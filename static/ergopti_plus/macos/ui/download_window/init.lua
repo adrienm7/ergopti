@@ -28,6 +28,7 @@
 local M = {}
 
 local Logger     = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
@@ -309,7 +310,7 @@ local function ensure_webview(title)
 		})
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-		hs.timer.doAfter(1.0, function()
+		DeferredWork.after(1.0, function()
 				if _wv and not _ready then
 						_ready = true
 						local q = _queued
@@ -318,7 +319,7 @@ local function ensure_webview(title)
 								pcall(function() _wv:evaluateJavaScript(code) end)
 						end
 				end
-		end)
+		end, "download_window.ready_fallback")
 end
 
 
@@ -626,13 +627,13 @@ function M.complete(success, _model_name, error_kind)
         -- the window when it fires. The session identity exists for exactly this
         -- and was applied to one deferred-hide site; these two never got it.
         local sid = M.session_id()
-        hs.timer.doAfter(4, function()
+        DeferredWork.after(4, function()
             if M.session_id() ~= sid then
                 Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
                 return
             end
             pcall(M.hide)
-        end)
+        end, "download_window.success_dismiss")
     end
 end
 
@@ -694,14 +695,14 @@ function M.set_error(msg)
     -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
     -- window is open, not that it is still this operation's.
     local sid = M.session_id()
-    hs.timer.doAfter(ERROR_AUTO_DISMISS_SEC, function()
+    DeferredWork.after(ERROR_AUTO_DISMISS_SEC, function()
         if not _wv then return end
         if M.session_id() ~= sid then
             Logger.debug(LOG, "Error auto-dismiss skipped: the window now belongs to a newer operation.")
             return
         end
         pcall(M.hide)
-    end)
+    end, "download_window.error_dismiss")
 end
 
 return M

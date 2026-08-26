@@ -21,6 +21,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local original_deferred_work = package.loaded["infra.deferred_work"]
+local original_subject = package.loaded["ui.menu.menu_keyboard_slots"]
+local DeferredWork = {}
+package.loaded["infra.deferred_work"] = DeferredWork
 
 
 
@@ -55,6 +59,10 @@ end
 --- whether a webview opens.
 --- @return table ui, table shortcuts, table picker
 local function fresh()
+	DeferredWork.after = function(_, callback)
+		callback()
+		return true
+	end
 	local ui = helpers.load_with_stubs("ui.menu.menu_keyboard_slots")
 	local shortcuts = require("modules.shortcuts")
 	local picker = require("ui.action_picker")
@@ -63,10 +71,6 @@ local function fresh()
 	picker.open = function(opts, on_confirm)
 		picker.opened[#picker.opened + 1] = { opts = opts, confirm = on_confirm }
 	end
-
-	-- hs.timer.doAfter defers the second picker; run it immediately so a case can
-	-- follow the whole flow without a real timer.
-	_G.hs.timer.doAfter = function(_, fn) fn() end
 
 	return ui, shortcuts, picker
 end
@@ -284,3 +288,6 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+package.loaded["infra.deferred_work"] = original_deferred_work
+package.loaded["ui.menu.menu_keyboard_slots"] = original_subject

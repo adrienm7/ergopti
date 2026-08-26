@@ -9,6 +9,7 @@
 local M = {}
 local hs            = hs
 local Logger        = require("infra.logger")
+local DeferredWork  = require("infra.deferred_work")
 local text_utils = require("infra.text_utils")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
@@ -75,9 +76,9 @@ M.DEFAULT_STATE = {
 
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return end
-	hs.timer.doAfter(0, function()
+	DeferredWork.after(0, function()
 		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-	end)
+	end, "menu_hotstrings.open_toml")
 end
 
 local function toml_path_for_group(ctx, group_name)
@@ -275,7 +276,11 @@ local function buildPersonalInfoItems(ctx, description)
 		},
 		{
 			label = i18n.get("menu.shortcuts.edit_personal_info"),
-			action    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
+			action    = function()
+				return DeferredWork.after(0.1,
+					function() pcall(ctx.personal_info.open_editor) end,
+					"menu_hotstrings.open_personal_info")
+			end,
 		},
 	}
 end
