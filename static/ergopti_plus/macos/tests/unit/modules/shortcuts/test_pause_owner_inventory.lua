@@ -168,6 +168,7 @@ local function load_inventory_context(options)
 		admission_open = function() return ctx.fence == nil end,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
+		after = function() return { kind = "one-shot" }, true end,
 		every = function() return { kind = "watchdog" }, true end,
 		cancel = function() return true end,
 	}

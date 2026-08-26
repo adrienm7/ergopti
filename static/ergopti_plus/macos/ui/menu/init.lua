@@ -32,6 +32,7 @@ local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
+local TimerScheduler = require("adapters.timer_scheduler")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
@@ -795,27 +796,34 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- Honour the live pause state once KE's first deploy/prime has settled. The
 	-- callback runs four seconds after this code, so capturing the boot-time
 	-- `false` would let a pause in that window get overwritten by the resume layout.
-	hs.timer.doAfter(STARTUP_LAYOUT_SWITCH_DELAY_SEC, function()
-		local kbd_layout_mod = menu_mods.keyboard_layout
-		if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
-			local live_paused = false
-			local shortcuts_mod = core_mods.shortcuts_mod
-			if shortcuts_mod and type(shortcuts_mod.is_paused) == "function" then
-				local ok_pause, paused_or_err = pcall(shortcuts_mod.is_paused)
-				if not ok_pause then
-					Logger.error(LOG, "Startup layout callback could not read live pause state: %s.",
-						tostring(paused_or_err))
-					return
+	local _, startup_layout_timer_committed = TimerScheduler.after(
+		STARTUP_LAYOUT_SWITCH_DELAY_SEC,
+		function()
+			local kbd_layout_mod = menu_mods.keyboard_layout
+			if kbd_layout_mod
+				and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
+				local live_paused = false
+				local shortcuts_mod = core_mods.shortcuts_mod
+				if shortcuts_mod and type(shortcuts_mod.is_paused) == "function" then
+					local ok_pause, paused_or_err = pcall(shortcuts_mod.is_paused)
+					if not ok_pause then
+						Logger.error(LOG,
+							"Startup layout callback could not read live pause state: %s.",
+							tostring(paused_or_err))
+						return
+					end
+					live_paused = paused_or_err == true
 				end
-				live_paused = paused_or_err == true
+				local ok_switch, switch_err = pcall(
+					kbd_layout_mod.schedule_pause_layout_switch, live_paused, state)
+				if not ok_switch then
+					Logger.error(LOG, "Startup layout callback raised: %s.", tostring(switch_err))
+				end
 			end
-			local ok_switch, switch_err = pcall(
-				kbd_layout_mod.schedule_pause_layout_switch, live_paused, state)
-			if not ok_switch then
-				Logger.error(LOG, "Startup layout callback raised: %s.", tostring(switch_err))
-			end
-		end
-	end)
+		end)
+	if startup_layout_timer_committed ~= true then
+		Logger.error(LOG, "Startup layout switch timer did not commit.")
+	end
 
 	if core_mods.shortcuts_mod then
 		if type(core_mods.shortcuts_mod.set_on_pause_change) == "function" then
@@ -1144,26 +1152,32 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- click renders instantly. Without this, building the keyboard-layout and
 	-- apps submenus on first open would synchronously spawn python3 plus several
 	-- directory scans — the dominant cause of slow menubar opens.
-	hs.timer.doAfter(MENU_CACHE_PRIME_DELAY_SEC, function()
-		if menu_mods.keyboard_layout and type(menu_mods.keyboard_layout.prime) == "function" then
-			pcall(menu_mods.keyboard_layout.prime, ctx)
-		end
-		if menu_mods.apps and type(menu_mods.apps.prime) == "function" then
-			pcall(menu_mods.apps.prime, ctx)
-		end
-		if menu_mods.karabiner and type(menu_mods.karabiner.prime) == "function" then
-			pcall(menu_mods.karabiner.prime, ctx)
-		end
-		-- Now that the expensive submenu caches are warm, build the menu tree once
-		-- off the boot path and PRIME the static menu: rebuild_menu_cache() pushes
-		-- it as a native NSMenu so the user's FIRST (and every) click opens
-		-- instantly, never paying the per-click native rebuild of the callback form.
-		ctx.paused = core_mods.shortcuts_mod
-			and type(core_mods.shortcuts_mod.is_paused) == "function"
-			and core_mods.shortcuts_mod.is_paused() or false
-		_menu_primed = true
-		rebuild_menu_cache()
-	end)
+	local _, cache_prime_timer_committed = TimerScheduler.after(
+		MENU_CACHE_PRIME_DELAY_SEC,
+		function()
+			if menu_mods.keyboard_layout
+				and type(menu_mods.keyboard_layout.prime) == "function" then
+				pcall(menu_mods.keyboard_layout.prime, ctx)
+			end
+			if menu_mods.apps and type(menu_mods.apps.prime) == "function" then
+				pcall(menu_mods.apps.prime, ctx)
+			end
+			if menu_mods.karabiner and type(menu_mods.karabiner.prime) == "function" then
+				pcall(menu_mods.karabiner.prime, ctx)
+			end
+			-- Now that the expensive submenu caches are warm, build the menu tree once
+			-- off the boot path and PRIME the static menu: rebuild_menu_cache() pushes
+			-- it as a native NSMenu so the user's FIRST (and every) click opens
+			-- instantly, never paying the per-click native rebuild of the callback form.
+			ctx.paused = core_mods.shortcuts_mod
+				and type(core_mods.shortcuts_mod.is_paused) == "function"
+				and core_mods.shortcuts_mod.is_paused() or false
+			_menu_primed = true
+			rebuild_menu_cache()
+		end)
+	if cache_prime_timer_committed ~= true then
+		Logger.error(LOG, "Menu cache-prime timer did not commit.")
+	end
 
 	-- Background update poller — parity with AHK ErgoptiPlus.ahk boot path.
 	local update_channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
