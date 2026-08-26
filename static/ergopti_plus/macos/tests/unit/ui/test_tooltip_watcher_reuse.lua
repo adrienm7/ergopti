@@ -1003,6 +1003,27 @@ helpers.describe("tooltip rendering is committed atomically", function()
 		end)
 	end
 
+	helpers.it("(HS-049) passes through a shortcut beyond the live prediction pool", function()
+		local context = load_tooltip(CASES[1])
+		local synthetic = require("adapters.synthetic_input")
+		local accepts = 0
+		context.tooltip.set_accept_callback(function()
+			accepts = accepts + 1
+			return true
+		end)
+		helpers.assert_eq(context.tooltip.show_predictions(
+			{ "one", "two", "three" }, 1, true, nil, "alt", nil, nil, nil, nil, 5), true)
+		local key_watcher = context.created[CASES[1].watcher_count]
+
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(21, { alt = true }, "4")), false,
+			"Alt+4 must remain available to the application while only three predictions exist")
+		helpers.assert_eq(accepts, 0)
+		helpers.assert_eq(synthetic.stats().pending_ordered_input_actions, 0,
+			"an unavailable slot must not acquire deferred input ownership")
+		helpers.assert_true(context.tooltip.is_visible(),
+			"a missing streaming slot need not dismiss the live prediction pool")
+	end)
+
 	for _, spec in ipairs(CASES) do
 		helpers.it("(tooltip-watcher-reuse) " .. spec.label
 			.. " rejects an old CG callback delivered during a new watcher epoch", function()

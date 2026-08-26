@@ -754,7 +754,8 @@ local function start_watchers()
 						accept_prediction, pred_index)
 					return finish(scheduled)
 				end
-				return finish(true)
+				-- Reserved streaming slots are visual capacity, not input ownership.
+				return finish(false)
 			end
 		end
 		
