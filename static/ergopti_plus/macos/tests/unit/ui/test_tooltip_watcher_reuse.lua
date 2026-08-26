@@ -1347,14 +1347,19 @@ helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
 	helpers.it("(tooltip-watcher-reuse) guarded hotstring hide leaves an active dequeue set intact", function()
 		local spec = CASES[2]
 		local context = load_tooltip(spec)
-		context.tooltip.show_stacked({
+		helpers.assert_eq(context.tooltip.show_stacked({
 			{ text = "short", duration = 1 },
 			{ text = "long", duration = 2 },
-		}, true)
+		}, true), true, "the dequeue fixture must become visibly active")
 
 		helpers.assert_eq(#context.created, spec.watcher_count,
 			"the initial dequeue render must mount one complete dismissal set")
-		context.tooltip.hide()
+		helpers.assert_eq(context.tooltip.hide(), false,
+			"a guarded hide must not report that a visible dequeue surface was hidden")
+		helpers.assert_eq(context.tooltip.is_visible(), true,
+			"the active dequeue surface must remain logically visible")
+		helpers.assert_eq(context.renderer.stacked_visible, true,
+			"the active dequeue canvas must remain natively visible")
 		for _, watcher in ipairs(context.created) do
 			helpers.assert_true(watcher:isEnabled(),
 				"guarded hide must not tear down watchers owned by an active dequeue cycle")
