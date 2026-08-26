@@ -2084,34 +2084,46 @@ local function find_proven_legacy_block(rules, complex, prepared)
 	return candidates[1]
 end
 
---- Detects an untagged rule carrying historical ErgoptiPlus structure.
---- Detection is deliberately conservative: a false match aborts without
+--- Describes every historical ErgoptiPlus signature carried by an untagged
+--- rule. Detection is deliberately conservative: a false match aborts without
 --- writing, whereas a missed legacy rule would remain active after a crash.
 --- @param rule any Existing rule candidate.
 --- @param prepared table Validated migration context.
---- @return boolean suspicious Whether ownership must be resolved first.
-local function looks_like_legacy_ergopti_rule(rule, prepared)
-	if type(rule) ~= "table" or type(rule.description) ~= "string" then return false end
-	if deep_equal(rule, prepared.capsword)
-		or deep_equal(rule, prepared.layer_keys)
-		or deep_equal(rule, prepared.combos)
-		or LegacyReleaseFixtures.is_exact_release_control_rule(rule, prepared) then
-		return true
+--- @return table reasons Dense diagnostic reason array; empty means personal.
+local function legacy_ergopti_signature_reasons(rule, prepared)
+	local reasons = {}
+	if type(rule) ~= "table" or type(rule.description) ~= "string" then return reasons end
+	if deep_equal(rule, prepared.capsword) then
+		reasons[#reasons + 1] = "matches the historical CapsWord anchor"
+	elseif deep_equal(rule, prepared.layer_keys) then
+		reasons[#reasons + 1] = "matches the historical layer-key anchor"
+	elseif deep_equal(rule, prepared.combos) then
+		reasons[#reasons + 1] = "matches the historical combo anchor"
+	elseif LegacyReleaseFixtures.is_exact_release_control_rule(rule, prepared) then
+		reasons[#reasons + 1] = "matches a historical script-control rule"
 	end
 
-	local function contains_runtime_signature(value)
-		if type(value) ~= "table" then return false end
-		if type(value.name) == "string" and starts_with(value.name, "ke_held_") then return true end
+	local found_variable = false
+	local found_log = false
+	local seen = {}
+	local function collect_runtime_signatures(value)
+		if type(value) ~= "table" or seen[value] then return end
+		seen[value] = true
+		if type(value.name) == "string" and starts_with(value.name, "ke_held_") then
+			found_variable = true
+		end
 		if type(value.shell_command) == "string"
 			and value.shell_command:find("karabiner_kc.log", 1, true) then
-			return true
+			found_log = true
 		end
-		for _, nested in pairs(value) do
-			if type(nested) == "table" and contains_runtime_signature(nested) then return true end
-		end
-		return false
+		for _, nested in pairs(value) do collect_runtime_signatures(nested) end
 	end
-	return contains_runtime_signature(rule)
+	collect_runtime_signatures(rule)
+	if found_variable then reasons[#reasons + 1] = "uses a ke_held_* variable" end
+	if found_log then
+		reasons[#reasons + 1] = "references karabiner_kc.log in a shell command"
+	end
+	return reasons
 end
 
 --- Classifies every removable rule before the merge mutates an output table.
@@ -2119,9 +2131,11 @@ end
 --- @param complex table Existing complex_modifications object.
 --- @param prepared table|nil State-independent migration context.
 --- @return table|nil removal_set Indices proven to be managed.
---- @return string|nil error_message Ambiguous legacy residue.
+--- @return string|nil error_message Historical proof failure.
+--- @return table conflicts Unowned signature conflicts in this rule array.
 local function classify_managed_rules(existing_rules, complex, prepared)
 	local removal_set = {}
+	local conflicts = {}
 	if prepared then
 		local proven_range, range_err = find_proven_legacy_block(
 			existing_rules,
@@ -2141,16 +2155,42 @@ local function classify_managed_rules(existing_rules, complex, prepared)
 
 	if prepared then
 		for index, rule in ipairs(existing_rules) do
-			if not removal_set[index] and looks_like_legacy_ergopti_rule(rule, prepared) then
-				return nil, string.format(
-					"ambiguous legacy ErgoptiPlus rule at index %d ('%s') — refusing to modify personal configuration",
-					index,
-					tostring(rule.description)
-				)
+			if not removal_set[index] then
+				local reasons = legacy_ergopti_signature_reasons(rule, prepared)
+				if #reasons > 0 then
+					conflicts[#conflicts + 1] = {
+						rule_index = index,
+						description = tostring(rule.description),
+						reasons = reasons,
+					}
+				end
 			end
 		end
 	end
-	return removal_set
+	return removal_set, nil, conflicts
+end
+
+--- Formats one actionable refusal for every unowned historical signature.
+--- @param conflicts table Dense cross-profile conflict array.
+--- @return string detail Single complete remediation diagnostic.
+local function format_legacy_signature_conflicts(conflicts)
+	local items = {}
+	for _, conflict in ipairs(conflicts) do
+		items[#items + 1] = string.format(
+			"profile %d rule %d ('%s'): %s",
+			conflict.profile_index,
+			conflict.rule_index,
+			conflict.description,
+			table.concat(conflict.reasons, ", ")
+		)
+	end
+	local noun = #conflicts == 1 and "rule" or "rules"
+	return string.format(
+		"%d ambiguous legacy ErgoptiPlus %s: %s. No personal configuration was modified; rename the personal signature if the rule is user-owned, or remove stale ErgoptiPlus rules, then regenerate",
+		#conflicts,
+		noun,
+		table.concat(items, "; ")
+	)
 end
 
 --- Replaces exact managed rules while preserving personal-rule order.
@@ -2159,22 +2199,9 @@ end
 --- personal rule.
 --- @param existing_rules table Rules in the user's selected profile.
 --- @param incoming_rules table Validated rules for the new generation.
---- @param complex table Existing complex_modifications object.
---- @param prepared table|nil State-independent migration context.
---- @return table|nil merged_rules Non-destructive merged rule list.
---- @return string|nil error_message Ambiguous legacy residue.
-local function merge_managed_rule_block(
-	existing_rules,
-	incoming_rules,
-	complex,
-	prepared
-)
-	local removal_set, classify_err = classify_managed_rules(
-		existing_rules,
-		complex,
-		prepared
-	)
-	if not removal_set then return nil, classify_err end
+--- @param removal_set table Indices proven to be managed.
+--- @return table merged_rules Non-destructive merged rule list.
+local function merge_managed_rule_block(existing_rules, incoming_rules, removal_set)
 	local retained = {}
 	local insertion_index = nil
 	for index, rule in ipairs(existing_rules) do
@@ -2336,7 +2363,8 @@ function M.merge_into_existing_config(
 		end
 	end
 
-	local merged_rules_by_profile = {}
+	local classified_profiles = {}
+	local signature_conflicts = {}
 	for profile_index, profile in ipairs(existing.profiles) do
 		local is_selected = profile_index == target_index_or_err
 		local complex = profile.complex_modifications
@@ -2344,24 +2372,41 @@ function M.merge_into_existing_config(
 		if complex then
 			local existing_rules = complex.rules
 			if existing_rules ~= nil or is_selected then
-				local merged_rules, merge_err = merge_managed_rule_block(
+				local removal_set, classify_err, profile_conflicts = classify_managed_rules(
 					existing_rules or {},
-					is_selected and generated_complex.rules or {},
 					complex,
 					prepared_legacy
 				)
-				if not merged_rules then
-					Logger.error(LOG, "Merge aborted in profile %d: %s.", profile_index, merge_err)
-					return nil, merge_err
+				if not removal_set then
+					Logger.error(LOG, "Merge aborted in profile %d: %s.", profile_index, classify_err)
+					return nil, classify_err
 				end
-				merged_rules_by_profile[profile_index] = merged_rules
+				for _, conflict in ipairs(profile_conflicts) do
+					conflict.profile_index = profile_index
+					signature_conflicts[#signature_conflicts + 1] = conflict
+				end
+				classified_profiles[profile_index] = {
+					existing_rules = existing_rules or {},
+					incoming_rules = is_selected and generated_complex.rules or {},
+					removal_set = removal_set,
+				}
 			end
 		end
 	end
-	for profile_index, merged_rules in pairs(merged_rules_by_profile) do
+	if #signature_conflicts > 0 then
+		local detail = format_legacy_signature_conflicts(signature_conflicts)
+		Logger.error(LOG, "Merge aborted: %s.", detail)
+		return nil, detail
+	end
+
+	for profile_index, classified in pairs(classified_profiles) do
 		local profile = existing.profiles[profile_index]
 		if profile.complex_modifications == nil then profile.complex_modifications = {} end
-		profile.complex_modifications.rules = merged_rules
+		profile.complex_modifications.rules = merge_managed_rule_block(
+			classified.existing_rules,
+			classified.incoming_rules,
+			classified.removal_set
+		)
 	end
 	Logger.debug(
 		LOG,

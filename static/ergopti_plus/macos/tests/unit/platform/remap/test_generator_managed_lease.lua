@@ -1129,6 +1129,49 @@ helpers.describe("Karabiner generator non-destructive managed merge", function()
 		end
 	end)
 
+	helpers.it("reports every personal legacy-signature conflict with one remediation", function()
+		install_legacy_static_fixtures()
+		local generated, build_err, legacy_rules, migration_context = build(TOKEN)
+		helpers.assert_not_nil(generated, build_err)
+
+		local variable_rule = personal_rule("personal variable owner")
+		variable_rule.manipulators[1].to = {
+			{ set_variable = { name = "ke_held_personal_macro", value = 1 } },
+		}
+		local shell_rule = personal_rule("personal log rotation")
+		shell_rule.manipulators[1].to = {
+			{ shell_command = "echo personal >> /tmp/karabiner_kc.log.backup" },
+		}
+
+		local path = "/merge/personal-signature-conflicts.json"
+		local existing = existing_config({ shell_rule })
+		existing.profiles[1].complex_modifications.rules = { variable_rule }
+		local original_json = _G.hs.json.encode(existing)
+		file_data[path] = original_json
+
+		local result, merge_err = Generator.merge_into_existing_config(
+			generated,
+			path,
+			legacy_rules,
+			migration_context
+		)
+		helpers.assert_nil(result,
+			"personal signature collisions must remain fail-closed")
+		helpers.assert_type(merge_err, "string")
+		helpers.assert_true(merge_err:find("2 ambiguous legacy ErgoptiPlus rules", 1, true) ~= nil,
+			"one diagnostic must aggregate every conflicting personal rule")
+		helpers.assert_true(merge_err:find("profile 1 rule 1", 1, true) ~= nil)
+		helpers.assert_true(merge_err:find("profile 2 rule 1", 1, true) ~= nil)
+		helpers.assert_true(merge_err:find("ke_held_", 1, true) ~= nil,
+			"the diagnostic must identify the variable-signature family")
+		helpers.assert_true(merge_err:find("karabiner_kc.log", 1, true) ~= nil,
+			"the diagnostic must identify the log-path signature family")
+		helpers.assert_true(merge_err:find("rename the personal signature", 1, true) ~= nil)
+		helpers.assert_true(merge_err:find("remove stale ErgoptiPlus rules", 1, true) ~= nil)
+		helpers.assert_eq(file_data[path], original_json,
+			"diagnosis must not mutate the personal Karabiner configuration")
+	end)
+
 	helpers.it("migrates a proven A graph across config and layout B so crash leaves it inert (legacy-a-to-b-crash-inert)", function()
 		install_legacy_static_fixtures()
 		local old_state, old_actions, keys = legacy_layout_scenario("q", "logical_escape")
