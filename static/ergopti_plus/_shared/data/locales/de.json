@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Keine Einrückung",
 	"menu.llm.indent_space": "Leerzeichen",
 	"menu.llm.indent_spaces": "Leerzeichen",
+	"menu.llm.invalid_input": "Der eingegebene Wert ist ungültig oder fehlt. Halte dich an das im Dialog angegebene Format.",
 	"menu.llm.inline_autotype": "✍️ Inline-Autotippen (Copilot-Stil)",
 	"menu.llm.instant_on_word_end": "Sofortvorschlag am Wortende",
 	"menu.llm.launch_download_prompt": "Möchten Sie den Download starten?",

@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Bez odsazení",
 	"menu.llm.indent_space": "mezera",
 	"menu.llm.indent_spaces": "mezery",
+	"menu.llm.invalid_input": "Zadaná hodnota je neplatná nebo chybí. Dodržte formát uvedený ve výzvě.",
 	"menu.llm.inline_autotype": "✍️ Inline auto-psaní (styl Copilot)",
 	"menu.llm.instant_on_word_end": "Okamžitý návrh na konci slova",
 	"menu.llm.launch_download_prompt": "Chcete spustit stahování?",

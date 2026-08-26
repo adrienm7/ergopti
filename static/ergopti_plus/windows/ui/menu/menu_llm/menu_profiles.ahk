@@ -571,9 +571,8 @@ LLM_Menu_PromptCreateProfile() {
 
 	; Step 1: label
 	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
-	if (ib_label.Result != "OK" || Trim(ib_label.Value) == "")
+	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &plabel)
 		return
-	plabel := Trim(ib_label.Value)
 
 	; Step 2: system prompt (multi-line via Edit control)
 	ib_prompt := InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
@@ -626,10 +625,7 @@ LLM_Menu_PromptEditProfile(profile) {
 
 	ib_label := InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
 		profile.Has("label") ? profile["label"] : "")
-	if (ib_label.Result != "OK")
-		return
-	new_label := Trim(ib_label.Value)
-	if (new_label == "")
+	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &new_label)
 		return
 
 	ib_prompt := InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",

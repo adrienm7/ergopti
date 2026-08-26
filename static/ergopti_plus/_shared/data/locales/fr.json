@@ -1071,6 +1071,7 @@
 	"menu.llm.indent_none": "Aucune indentation",
 	"menu.llm.indent_space": "espace",
 	"menu.llm.indent_spaces": "espaces",
+	"menu.llm.invalid_input": "La valeur saisie est invalide ou manquante. Respectez le format indiqué dans l’invite.",
 	"menu.llm.inline_autotype": "✍️ Saisie automatique en ligne (style Copilot)",
 	"menu.llm.instant_on_word_end": "Suggestion instantanée en fin de mot",
 	"menu.llm.launch_download_prompt": "Voulez-vous lancer le téléchargement ?",

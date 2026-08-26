@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Inget indrag",
 	"menu.llm.indent_space": "blanksteg",
 	"menu.llm.indent_spaces": "blanksteg",
+	"menu.llm.invalid_input": "Det angivna värdet är ogiltigt eller saknas. Följ formatet som visas i uppmaningen.",
 	"menu.llm.inline_autotype": "✍️ Inline auto-skrivning (Copilot-stil)",
 	"menu.llm.instant_on_word_end": "Omedelbar förslag vid ordslut",
 	"menu.llm.launch_download_prompt": "Vill du starta nedladdningen?",

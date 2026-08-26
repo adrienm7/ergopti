@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Bez wcięcia",
 	"menu.llm.indent_space": "spacja",
 	"menu.llm.indent_spaces": "spacje",
+	"menu.llm.invalid_input": "Wprowadzona wartość jest nieprawidłowa lub jej brakuje. Użyj formatu podanego w komunikacie.",
 	"menu.llm.inline_autotype": "✍️ Wpisywanie w miejscu (styl Copilot)",
 	"menu.llm.instant_on_word_end": "Natychmiastowa sugestia na końcu słowa",
 	"menu.llm.launch_download_prompt": "Czy chcesz rozpocząć pobieranie?",

@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Girinti yok",
 	"menu.llm.indent_space": "boşluk",
 	"menu.llm.indent_spaces": "boşluklar",
+	"menu.llm.invalid_input": "Girilen değer geçersiz veya eksik. İstemde gösterilen biçimi izleyin.",
 	"menu.llm.inline_autotype": "✍️ Satır içi otomatik yazma (Copilot tarzı)",
 	"menu.llm.instant_on_word_end": "Kelime sonunda anlık öneri",
 	"menu.llm.launch_download_prompt": "İndirmeyi başlatmak istiyor musunuz?",

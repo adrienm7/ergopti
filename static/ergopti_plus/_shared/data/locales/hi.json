@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "कोई इंडेंटेशन नहीं",
 	"menu.llm.indent_space": "स्थान",
 	"menu.llm.indent_spaces": "स्पेस",
+	"menu.llm.invalid_input": "दर्ज किया गया मान अमान्य है या मौजूद नहीं है। प्रॉम्प्ट में दिखाए गए प्रारूप का पालन करें।",
 	"menu.llm.inline_autotype": "✍️ इनलाइन ऑटो-टाइप (Copilot शैली)",
 	"menu.llm.instant_on_word_end": "शब्द के अंत में तत्काल सुझाव",
 	"menu.llm.launch_download_prompt": "क्या आप डाउनलोड शुरू करना चाहते हैं?",

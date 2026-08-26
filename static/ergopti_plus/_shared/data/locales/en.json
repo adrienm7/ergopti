@@ -1071,6 +1071,7 @@
 	"menu.llm.indent_none": "No indentation",
 	"menu.llm.indent_space": "space",
 	"menu.llm.indent_spaces": "spaces",
+	"menu.llm.invalid_input": "The entered value is invalid or missing. Follow the format shown in the prompt.",
 	"menu.llm.inline_autotype": "✍️ Inline auto-type (Copilot-style)",
 	"menu.llm.instant_on_word_end": "Instant suggestion at word end",
 	"menu.llm.launch_download_prompt": "Do you want to start the download?",

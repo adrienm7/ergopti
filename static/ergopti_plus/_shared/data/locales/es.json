@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Sin sangría",
 	"menu.llm.indent_space": "espacio",
 	"menu.llm.indent_spaces": "espacios",
+	"menu.llm.invalid_input": "El valor introducido no es válido o falta. Sigue el formato indicado en el mensaje.",
 	"menu.llm.inline_autotype": "✍️ Auto-escritura en línea (estilo Copilot)",
 	"menu.llm.instant_on_word_end": "Sugerencia instantánea al final de palabra",
 	"menu.llm.launch_download_prompt": "¿Desea iniciar la descarga?",

@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "ללא הזחה",
 	"menu.llm.indent_space": "רווח",
 	"menu.llm.indent_spaces": "רווחים",
+	"menu.llm.invalid_input": "הערך שהוזן חסר או אינו תקין. יש לפעול לפי התבנית המוצגת בהנחיה.",
 	"menu.llm.inline_autotype": "✍️ הקלדה אוטומטית מובנית (סגנון Copilot)",
 	"menu.llm.instant_on_word_end": "הצעה מיידית בסוף מילה",
 	"menu.llm.launch_download_prompt": "האם להתחיל את ההורדה?",

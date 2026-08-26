@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Geen inspringing",
 	"menu.llm.indent_space": "spatie",
 	"menu.llm.indent_spaces": "spaties",
+	"menu.llm.invalid_input": "De ingevoerde waarde is ongeldig of ontbreekt. Volg de indeling die in de prompt wordt getoond.",
 	"menu.llm.inline_autotype": "✍️ Inline auto-typen (Copilot-stijl)",
 	"menu.llm.instant_on_word_end": "Directe suggestie aan het einde van een woord",
 	"menu.llm.launch_download_prompt": "Wilt u de download starten?",

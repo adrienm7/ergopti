@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Nessun rientro",
 	"menu.llm.indent_space": "spazio",
 	"menu.llm.indent_spaces": "spazi",
+	"menu.llm.invalid_input": "Il valore inserito non è valido o è mancante. Segui il formato indicato nel messaggio.",
 	"menu.llm.inline_autotype": "✍️ Auto-digitazione in linea (stile Copilot)",
 	"menu.llm.instant_on_word_end": "Suggerimento istantaneo a fine parola",
 	"menu.llm.launch_download_prompt": "Vuoi avviare il download?",

@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "インデントなし",
 	"menu.llm.indent_space": "スペース",
 	"menu.llm.indent_spaces": "スペース",
+	"menu.llm.invalid_input": "入力した値が無効か、入力されていません。プロンプトに示された形式に従ってください。",
 	"menu.llm.inline_autotype": "✍️ インライン自動入力（Copilot 風）",
 	"menu.llm.instant_on_word_end": "単語末での即時提案",
 	"menu.llm.launch_download_prompt": "ダウンロードを開始しますか？",

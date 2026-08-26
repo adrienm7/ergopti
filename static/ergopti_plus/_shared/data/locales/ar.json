@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "بدون مسافة بادئة",
 	"menu.llm.indent_space": "مسافة",
 	"menu.llm.indent_spaces": "مسافات",
+	"menu.llm.invalid_input": "القيمة المُدخلة غير صالحة أو مفقودة. اتبع التنسيق الموضح في المطالبة.",
 	"menu.llm.inline_autotype": "✍️ كتابة تلقائية مضمنة (نمط Copilot)",
 	"menu.llm.instant_on_word_end": "اقتراح فوري عند نهاية الكلمة",
 	"menu.llm.launch_download_prompt": "هل تريد بدء التنزيل؟",
