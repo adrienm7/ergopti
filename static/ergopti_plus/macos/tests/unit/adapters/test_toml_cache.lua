@@ -91,7 +91,7 @@ local SAMPLE = {
 
 helpers.describe("adapters.toml_cache: snapshot round-trip + invalidation", function()
 	helpers.it("stores then loads a structurally identical table", function()
-		cache.store(SRC, SAMPLE)
+		helpers.assert_eq(cache.store(SRC, SAMPLE, cache.capture_source(SRC)), true)
 		local loaded = cache.load(SRC)
 		helpers.assert_true(loaded ~= nil, "snapshot should load on an unchanged source")
 		helpers.assert_true(helpers.deep_equal(loaded, SAMPLE),
@@ -108,14 +108,16 @@ helpers.describe("adapters.toml_cache: snapshot round-trip + invalidation", func
 	end)
 
 	helpers.it("rejects the snapshot when the source mtime changed", function()
-		cur_mtime = 1000.5; cache.store(SRC, SAMPLE)
+		cur_mtime = 1000.5
+		helpers.assert_eq(cache.store(SRC, SAMPLE, cache.capture_source(SRC)), true)
 		cur_mtime = 2000.7  -- simulate the user editing the file
 		helpers.assert_nil(cache.load(SRC), "a stale (mtime) snapshot must be a miss")
 		cur_mtime = 1000.5
 	end)
 
 	helpers.it("rejects the snapshot when the source size changed", function()
-		cur_size = 4242; cache.store(SRC, SAMPLE)
+		cur_size = 4242
+		helpers.assert_eq(cache.store(SRC, SAMPLE, cache.capture_source(SRC)), true)
 		cur_size = 9999  -- different byte count → different content
 		helpers.assert_nil(cache.load(SRC), "a stale (size) snapshot must be a miss")
 		cur_size = 4242
@@ -130,7 +132,7 @@ helpers.describe("adapters.toml_cache: snapshot round-trip + invalidation", func
 		local disabled = helpers.load_with_stubs("adapters.toml_cache", { fs = fs_override })
 		-- init() not called → _cache_dir nil.
 		helpers.assert_nil(disabled.load(SRC), "disabled cache must always miss")
-		disabled.store(SRC, SAMPLE)  -- must not raise
+		helpers.assert_eq(disabled.store(SRC, SAMPLE), false)  -- must not raise
 		helpers.assert_true(disabled.stats().enabled == false, "stats must report disabled")
 	end)
 
