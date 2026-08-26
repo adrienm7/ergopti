@@ -212,33 +212,34 @@ local function rollback_aux_timer(token, context)
 	return true
 end
 
---- Constructs one lookup mouse event without crossing the native post boundary.
+--- Prepares one exactly tagged lookup mouse event without crossing the native boundary.
 --- @param event_type integer Native mouse event type.
 --- @param position table Current pointer position.
---- @return table|userdata|nil event Native event candidate.
+--- @param parent string Stable action parent.
+--- @param phase string Provenance phase.
+--- @return table|nil event Opaque SyntheticInput event owner.
 --- @return string|nil detail Construction refusal detail.
-local function construct_lookup_mouse_event(event_type, position)
-	local ok, event_or_error = xpcall(function()
-		return hs.eventtap.event.newMouseEvent(event_type, position)
+local function construct_lookup_mouse_event(event_type, position, parent, phase)
+	local ok, event_or_error, detail = xpcall(function()
+		return SyntheticInput.prepare_mouse_event(parent, event_type, position, {
+			phase = phase,
+		})
 	end, debug.traceback)
-	if not ok or event_or_error == nil or event_or_error == false then
-		return nil, tostring(event_or_error)
+	if not ok or event_or_error == nil then
+		return nil, ok and tostring(detail) or tostring(event_or_error)
 	end
-	local method_ok, post_method = pcall(function() return event_or_error.post end)
-	if not method_ok or type(post_method) ~= "function" then
-		return nil, tostring(post_method)
-	end
-	return event_or_error, nil
+	return event_or_error
 end
 
 --- Posts one preconstructed lookup mouse event with exact native result handling.
---- @param event table|userdata Native event candidate.
+--- @param event table Opaque SyntheticInput event owner.
 --- @return boolean committed
 --- @return string|nil detail Native refusal detail.
 local function post_lookup_mouse_event(event)
-	local ok, result_or_error = xpcall(function() return event:post() end, debug.traceback)
-	if not ok or result_or_error == nil or result_or_error == false then
-		return false, tostring(result_or_error)
+	local ok, result_or_error, detail = xpcall(
+		SyntheticInput.post_mouse_event, debug.traceback, event)
+	if not ok or result_or_error ~= true then
+		return false, ok and tostring(detail) or tostring(result_or_error)
 	end
 	return true, nil
 end
@@ -257,7 +258,12 @@ local function post_lookup_mouse_boundary(operation, event, is_down)
 	if is_down then operation.mouse_down_owned = true end
 	local posted, detail = post_lookup_mouse_event(event)
 	operation.boundary_active = false
-	if is_down ~= true and posted == true then operation.mouse_down_owned = false end
+	if is_down then
+		operation.down_event = nil
+	elseif posted == true then
+		operation.up_event = nil
+		operation.mouse_down_owned = false
+	end
 	return posted, detail
 end
 
@@ -279,9 +285,18 @@ local function cleanup_lookup_operation(parent)
 	if operation.mouse_down_owned == true then
 		local posted = post_lookup_mouse_boundary(operation, operation.up_event, false)
 		mouse_settled = posted == true
+	else
+		for _, field in ipairs({ "down_event", "up_event" }) do
+			local event = operation[field]
+			if event ~= nil then
+				local discarded = SyntheticInput.discard_mouse_event(event)
+				if discarded then operation[field] = nil else mouse_settled = false end
+			end
+		end
 	end
 	if timer_settled and mouse_settled and operation.boundary_active ~= true
-		and operation.mouse_down_owned ~= true then
+		and operation.mouse_down_owned ~= true and operation.down_event == nil
+		and operation.up_event == nil then
 		if _lookup_operations[parent] == operation then
 			_lookup_operations[parent] = nil
 		end
@@ -394,6 +409,7 @@ function M.trigger_lookup(explicit_parent)
 	local operation = {
 		parent = parent,
 		timer_token = timer_token,
+		down_event = nil,
 		up_event = nil,
 		mouse_down_owned = false,
 		boundary_active = false,
@@ -423,16 +439,17 @@ function M.trigger_lookup(explicit_parent)
 		return false
 	end
 	local down_event, down_error = construct_lookup_mouse_event(
-		event_types_or_error.rightMouseDown, position_or_error)
+		event_types_or_error.rightMouseDown, position_or_error, parent, "down")
+	operation.down_event = down_event
 	local up_event, up_error = construct_lookup_mouse_event(
-		event_types_or_error.rightMouseUp, position_or_error)
+		event_types_or_error.rightMouseUp, position_or_error, parent, "up")
+	operation.up_event = up_event
 	if down_event == nil or up_event == nil then
 		cleanup_lookup_operation(parent)
 		Logger.error(LOG, "Dictionary lookup mouse event construction failed: %s / %s.",
 			tostring(down_error), tostring(up_error))
 		return false
 	end
-	operation.up_event = up_event
 	if not aux_admission_open(parent) then
 		cleanup_lookup_operation(parent)
 		return false
