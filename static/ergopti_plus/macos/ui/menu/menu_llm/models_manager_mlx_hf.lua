@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local M = {}
+local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
 
 local hs            = hs
 local notifications = require("infra.notifications")
@@ -494,7 +495,12 @@ function M.install(ctx)
 			for _, family in ipairs(provider.families or {}) do
 				for _, m in ipairs(family.models or {}) do
 					if m.name == model_name and m.urls and m.urls.mlx then
-						return (m.urls.mlx:gsub("^https?://huggingface%.co/", ""))
+						local repository = m.urls.mlx:gsub(
+							"^https?://huggingface%.co/", "")
+						if MlxRepo.is_valid(repository) then return repository end
+						Logger.error(LOG,
+							"Preset MLX repository identifier is invalid; entry refused.")
+						return nil
 					end
 				end
 			end
@@ -504,7 +510,7 @@ function M.install(ctx)
 		-- mlx_lm.server / huggingface_hub resolve it natively. Without this
 		-- fallback, check_requirements would refuse any model the user adds
 		-- via the "Ajouter un modèle personnalisé" menu entry.
-		if type(model_name) == "string" and model_name:match("^[%w%._%-]+/[%w%._%-]+$") then
+		if MlxRepo.is_valid(model_name) then
 			return model_name
 		end
 		return nil

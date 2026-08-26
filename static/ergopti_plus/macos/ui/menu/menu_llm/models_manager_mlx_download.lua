@@ -29,6 +29,7 @@ local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
+local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -502,6 +503,15 @@ function M.install(ctx)
 	end
 
 	function obj.pull_model(target_model, repo, on_success, on_cancel, opts)
+		if MlxRepo.is_valid(repo) ~= true then
+			Logger.error(LOG,
+				"Model download refused an invalid HuggingFace repository identifier.")
+			if type(on_cancel) == "function" then
+				Logger.callback(LOG, "MLX invalid repository cancellation",
+					on_cancel, "invalid_repo")
+			end
+			return false
+		end
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
 		local requirement_lifecycle = type(opts) == "table"
 			and opts._requirement_lifecycle or nil
