@@ -10,8 +10,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TooltipContext = require("tests.support.tooltip_context_watchers")
 
 local IDLE_TIMEOUT_SEC = 10
+local restore_context = function() end
 
 local CASES = {
 	{
@@ -54,7 +56,9 @@ local DEQUEUE_RETRY_TIMER_FAILURES = {
 --- @param faults table|nil Fault kind keyed by eventtap creation index.
 --- @return table Test context.
 local function load_tooltip(spec, faults)
+	restore_context()
 	local Config = helpers.load_with_stubs("ui.tooltip.config")
+	restore_context = TooltipContext.install()
 	Config.settings.timeout_sec = IDLE_TIMEOUT_SEC
 	Config.settings.llm_timeout_sec = IDLE_TIMEOUT_SEC
 	-- These adapters retain hs.timer/eventtap objects in module locals. Reload
@@ -1820,3 +1824,5 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			"superseded AX renders must coalesce instead of notifying the final row twice")
 	end)
 end)
+
+restore_context()
