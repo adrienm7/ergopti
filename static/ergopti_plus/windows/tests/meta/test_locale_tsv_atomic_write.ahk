@@ -13,8 +13,8 @@
 ; outright) leaves the live cache absent or truncated at an arbitrary byte.
 ; That damage is PERMANENT and silent: _I18nTsvIsFresh is a pure mtime compare,
 ; so the torn file is newer than its .json and is declared fresh forever, and
-; _I18nParseTSV has no line-count or sentinel check, so it happily parses the
-; surviving prefix. Every key past the truncation renders as the EN fallback or
+; A reader without a terminal sentinel happily parses the surviving prefix.
+; Every key past the truncation renders as the EN fallback or
 ; as its raw dotted name, and the "No translation for" warning only fires on a
 ; total miss, so nothing in the logs ever names the cause.
 ;
@@ -110,14 +110,13 @@ Test("locale: every .tsv cache writer publishes atomically, not FileDelete+FileA
 ; ===================================================
 ; ===================================================
 
-; Defence in depth for the read side. Even if a truncated cache is somehow
-; published, a cache that parses to zero keys must be treated as damage and the
-; JSON re-parsed - otherwise the module header's "self-healing cache" claim only
-; covers a MISSING file, never a corrupt one.
-_LTAW_EmptyFastCacheFallsThroughToJson() {
+; Defence in depth for the read side. A non-empty prefix is still damaged, so
+; fast-path acceptance must require the writer's terminal completeness proof.
+_LTAW_FastCacheRequiresCompletenessProof() {
 	Body := _DriverFuncBody("_I18nLoadLocaleMap")
 	Assert(Body != "", "_I18nLoadLocaleMap() must exist in the driver source")
-	Assert(RegExMatch(Body, "Fast\.Count\s*>\s*0") > 0,
-		"_I18nLoadLocaleMap must only accept the .tsv fast path when it parsed at least one key: every shipped locale has thousands of entries, so an empty parse is a truncated cache and must fall through to the JSON source")
+	Assert(InStr(Body, "ParseStatus.Complete") > 0,
+		"_I18nLoadLocaleMap must require the terminal TSV completeness proof before accepting any fast-cache prefix")
 }
-Test("locale: an empty .tsv fast-cache parse falls through to the JSON source (locale-tsv-non-atomic-write)", _LTAW_EmptyFastCacheFallsThroughToJson)
+Test("locale: .tsv fast-cache acceptance requires a completeness proof (locale-tsv-non-atomic-write)",
+	_LTAW_FastCacheRequiresCompletenessProof)
