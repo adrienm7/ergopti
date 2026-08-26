@@ -41,6 +41,12 @@ package.path = SHARED_LUA .. "/?.lua;" .. SHARED_LUA .. "/?/init.lua;" .. packag
 
 local parser = require("llm.parser")
 
+local E_ACUTE = string.char(0xC3, 0xA9)
+local HAN = string.char(0xE6, 0xBC, 0xA2)
+local UTF8_WINDOW_AFTER = "aa" .. E_ACUTE .. "a/aa" .. HAN:rep(8) .. "aaa"
+local UTF8_WINDOW_TAIL = HAN .. UTF8_WINDOW_AFTER
+local UTF8_WINDOW_CORRECTED = "d" .. UTF8_WINDOW_AFTER
+
 -- The curated input vectors. Each exercises a distinct path of the algorithm.
 -- full_text is the whole buffer; tail_text is its trailing slice; block is the
 -- raw model output. min/max are the word limits the caller resolves.
@@ -129,6 +135,14 @@ local VECTORS = {
 		full_text = "this is a fairly long buffer of context exceeding sixty chars here weater",
 		tail_text = "here weater",
 		block = "TAIL_CORRECTED: here weather\nNEXT_WORDS: today", min_words = 1, max_words = 15,
+	},
+	{
+		id = "advanced_utf8_url_window",
+		description = "A byte-long URL with accents and CJK keeps codepoint deletion units.",
+		full_text = "https://segment/segment/segment/" .. UTF8_WINDOW_TAIL,
+		tail_text = UTF8_WINDOW_TAIL,
+		block = "TAIL_CORRECTED: " .. UTF8_WINDOW_CORRECTED .. "\nNEXT_WORDS: next",
+		min_words = 1, max_words = 15,
 	},
 	{
 		id = "advanced_append_only_no_change",
@@ -232,7 +246,7 @@ table.insert(lines, "\t]")
 table.insert(lines, "}")
 
 local OUT = ROOT .. "/static/ergopti_plus/_shared/tests/corpus/llm/process_prediction_vectors.json"
-local fh = assert(io.open(OUT, "w"))
+local fh = assert(io.open(OUT, "wb"))
 fh:write(table.concat(lines, "\n") .. "\n")
 fh:close()
 io.stderr:write("\nWrote " .. #VECTORS .. " vectors to " .. OUT .. "\n")
