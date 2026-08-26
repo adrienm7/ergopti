@@ -410,6 +410,44 @@ local function fresh_actions(options)
 		__index = function() return function() return false end end,
 	})
 	package.loaded["adapters.synthetic_input"] = setmetatable({
+		prepare_mouse_event = function(_, event_type, position)
+			local event = _G.hs.eventtap.event.newMouseEvent(event_type, position)
+			if event == nil or event == false then return nil, "constructor refused" end
+			return { event = event, active = true, attempted = false }
+		end,
+		prepare_mouse_cleanup_event = function(_, event_type, position)
+			local event = _G.hs.eventtap.event.newMouseEvent(event_type, position)
+			if event == nil or event == false then return nil, "constructor refused" end
+			return { event = event, active = true, attempted = false }
+		end,
+		post_mouse_event = function(owner)
+			if type(owner) ~= "table" or owner.active ~= true then return false end
+			owner.attempted = true
+			local result = owner.event:post()
+			if result == nil or result == false then return false end
+			owner.active = false
+			return true
+		end,
+		discard_mouse_event = function(owner)
+			if type(owner) ~= "table" or owner.active ~= true or owner.attempted == true then
+				return false
+			end
+			owner.active = false
+			return true
+		end,
+		prepare_mouse_handoff = function(owners)
+			local events = {}
+			for index, owner in ipairs(owners) do
+				if type(owner) ~= "table" or owner.active ~= true
+					or owner.attempted == true then return nil, "unavailable" end
+				events[index] = owner.event
+			end
+			return { owners = owners, events = events }
+		end,
+		commit_mouse_handoff = function(handoff)
+			for _, owner in ipairs(handoff.owners) do owner.active = false end
+			return handoff.events
+		end,
 		emit_key_stroke = function(mods, key)
 			if controls.search_reenter == "emit" and key == "c" then
 				controls.search_reenter = nil

@@ -3,7 +3,8 @@
 --- ==============================================================================
 --- MODULE: Synthetic Input Adapter
 --- DESCRIPTION:
---- Builds explicitly tagged Quartz keyboard events and normally dispatches them
+--- Builds explicitly tagged Quartz keyboard and mouse events. Keyboard payloads
+--- are normally dispatched
 --- in one eventtap callback-return batch. Terminal compatibility transfers a
 --- sealed callback batch to the same process-wide FIFO, then target-posts it with
 --- bounded pacing after callback return; timer/menu producers use one tagged
@@ -41,6 +42,13 @@ local SOURCE_PID_PROPERTY = assert(properties.eventSourceUnixProcessID,
 	"adapters.synthetic_input: eventSourceUnixProcessID is unavailable")
 local OTHER_MOUSE_UP_EVENT_TYPE = assert(event_types.otherMouseUp,
 	"adapters.synthetic_input: otherMouseUp is unavailable")
+local MOUSE_UP_EVENT_TYPES = {
+	[assert(event_types.leftMouseUp,
+		"adapters.synthetic_input: leftMouseUp is unavailable")] = true,
+	[assert(event_types.rightMouseUp,
+		"adapters.synthetic_input: rightMouseUp is unavailable")] = true,
+	[OTHER_MOUSE_UP_EVENT_TYPE] = true,
+}
 local MOUSE_BUTTON_PROPERTY = assert(properties.mouseEventButtonNumber,
 	"adapters.synthetic_input: mouseEventButtonNumber is unavailable")
 local new_key_event = assert(event_api.newKeyEvent,
@@ -170,6 +178,8 @@ local PHYSICAL_OWNER_MARKER = {}
 local RESERVED_OWNER_MARKER = {}
 local IDLE_WAITER_MARKER = {}
 local ADMISSION_FENCE_MARKER = {}
+local PREPARED_MOUSE_MARKER = {}
+local MOUSE_HANDOFF_MARKER = {}
 
 local _generation = 0
 local _active_transactions = {}
@@ -177,6 +187,7 @@ local _active_transaction_count = 0
 local _idle_callbacks = {}
 local _idle_waiter_cleanup = {}
 local _admission_fence = nil
+local _prepared_mouse_count = 0
 -- Scheduler-owned recurring handles remain lifecycle debt until cancel()
 -- proves the exact native candidate stopped. A refusal keeps that capability
 -- strongly owned and pause/reload admission closed while its next tick retries
@@ -215,6 +226,7 @@ local _inflight_batch = nil
 local _pump_watchdog = nil
 local _pump_watchdog_batch = nil
 local _pump_watchdog_tag = nil
+local wake_idle_waiters
 
 local _callback_stack = {}
 local _transaction_stack = {}
@@ -549,6 +561,269 @@ discard_record = function(tag)
 end
 
 
+--- Validates one opaque prepared-mouse owner, including handed-off retry debt.
+--- @param owner table Candidate returned by prepare_mouse_event().
+--- @return table|nil prepared Exact owner, or nil.
+local function prepared_mouse(owner)
+	if type(owner) ~= "table" or owner._marker ~= PREPARED_MOUSE_MARKER
+		or owner.event == nil or type(owner.tag) ~= "number" then
+		return nil
+	end
+	return owner
+end
+
+
+--- Validates one mouse owner that has not crossed a native boundary.
+--- @param owner table Candidate returned by prepare_mouse_event().
+--- @return table|nil prepared Exact active owner, or nil.
+local function active_prepared_mouse(owner)
+	owner = prepared_mouse(owner)
+	if owner == nil or owner.active ~= true or owner.attempted == true
+		or owner.handoff_pending == true then return nil end
+	return owner
+end
+
+
+--- Releases one pre-handoff lifecycle owner exactly once.
+--- @param owner table Prepared mouse owner.
+--- @param wake boolean|nil Whether to schedule idle waiters immediately.
+local function release_prepared_mouse(owner, wake)
+	if owner.lifecycle_counted ~= true then return end
+	owner.lifecycle_counted = false
+	_prepared_mouse_count = _prepared_mouse_count - 1
+	assert(_prepared_mouse_count >= 0,
+		"adapters.synthetic_input: prepared mouse count underflow")
+	if wake ~= false and _prepared_mouse_count == 0 and wake_idle_waiters ~= nil then
+		wake_idle_waiters()
+	end
+end
+
+
+--- Constructs and tags one mouse event without handing it to Quartz.
+--- The opaque owner must subsequently be posted, callback-returned, or discarded.
+--- Provenance-only mouse events deliberately do not publish an action epoch: the
+--- owned event must not invalidate typed or LLM context merely because an
+--- Ergopti gesture used a mouse button internally.
+--- @param owner string Stable producer/feature owner.
+--- @param event_type integer Native mouse event type.
+--- @param position table Native mouse position.
+--- @param options table|nil { phase, modifiers, source_state_id }.
+--- @param cleanup boolean Whether this is an already-owned release/compensation.
+--- @return table|nil prepared Opaque prepared event owner.
+--- @return string|nil detail Construction/tagging refusal detail.
+local function prepare_mouse_event(owner, event_type, position, options, cleanup)
+	if type(owner) ~= "string" or owner == "" then
+		return nil, "owner must be a non-empty string"
+	end
+	if math.tointeger(event_type) == nil then return nil, "event_type must be an integer" end
+	if type(position) ~= "table" then return nil, "position must be a table" end
+	if options == nil then options = {} end
+	if type(options) ~= "table" then return nil, "options must be a table" end
+	local phase = options.phase
+	if type(phase) ~= "string" or phase == "" then
+		return nil, "phase must be a non-empty string"
+	end
+	if cleanup == true and (phase ~= "up" or MOUSE_UP_EVENT_TYPES[event_type] ~= true) then
+		return nil, "cleanup mouse events must be mouseUp events in the up phase"
+	end
+	if _admission_fence ~= nil and cleanup ~= true then
+		return nil, "lifecycle admission is fenced"
+	end
+
+	local constructed, event_or_error = xpcall(function()
+		return new_mouse_event(event_type, position, options.modifiers)
+	end, debug.traceback)
+	if not constructed or event_or_error == nil or event_or_error == false then
+		return nil, tostring(event_or_error)
+	end
+	local method_ok, post_method = pcall(function() return event_or_error.post end)
+	if not method_ok or type(post_method) ~= "function" then
+		return nil, method_ok and "event.post is unavailable" or tostring(post_method)
+	end
+	local property_ok, set_property = pcall(function() return event_or_error.setProperty end)
+	if not property_ok or type(set_property) ~= "function" then
+		return nil, property_ok and "event.setProperty is unavailable" or tostring(set_property)
+	end
+
+	if options.source_state_id ~= nil then
+		local source_property = properties.eventSourceStateID
+		if source_property == nil then return nil, "eventSourceStateID is unavailable" end
+		local state_ok, state_result = xpcall(function()
+			return set_property(event_or_error, source_property, options.source_state_id)
+		end, debug.traceback)
+		if not state_ok or state_result == nil or state_result == false then
+			return nil, tostring(state_result)
+		end
+	end
+
+	_generation = _generation + 1
+	local tag = register_record({
+		generation = _generation,
+		owner = owner,
+		effect = "action",
+		batch = 0,
+		ordinal = 1,
+		phase = phase,
+		control = false,
+		loopback = false,
+	})
+	local tagged, tag_result = xpcall(function()
+		return set_property(event_or_error, USER_DATA_PROPERTY, tag)
+	end, debug.traceback)
+	if not tagged or tag_result == nil or tag_result == false then
+		discard_record(tag)
+		return nil, tostring(tag_result)
+	end
+	local prepared = {
+		_marker = PREPARED_MOUSE_MARKER,
+		active = true,
+		attempted = false,
+		handed_off = false,
+		handoff_pending = false,
+		committed = false,
+		lifecycle_counted = true,
+		event = event_or_error,
+		tag = tag,
+	}
+	_prepared_mouse_count = _prepared_mouse_count + 1
+	return prepared
+end
+
+
+--- Prepares one forward mouse action while lifecycle admission is open.
+--- @param owner string Stable producer/feature owner.
+--- @param event_type integer Native mouse event type.
+--- @param position table Native mouse position.
+--- @param options table|nil { phase, modifiers, source_state_id }.
+--- @return table|nil prepared Opaque prepared event owner.
+--- @return string|nil detail Construction/tagging refusal detail.
+function M.prepare_mouse_event(owner, event_type, position, options)
+	return prepare_mouse_event(owner, event_type, position, options, false)
+end
+
+
+--- Prepares an already-owned mouseUp cleanup even after admission is fenced.
+--- This capability cannot authorize a new down or drag action.
+--- @param owner string Stable producer/feature owner.
+--- @param event_type integer Native mouse-up event type.
+--- @param position table Native mouse position.
+--- @param options table|nil { phase="up", modifiers, source_state_id }.
+--- @return table|nil prepared Opaque prepared event owner.
+--- @return string|nil detail Construction/tagging refusal detail.
+function M.prepare_mouse_cleanup_event(owner, event_type, position, options)
+	return prepare_mouse_event(owner, event_type, position, options, true)
+end
+
+
+--- Discards one event that definitely never crossed a native handoff boundary.
+--- @param owner table Opaque owner returned by prepare_mouse_event().
+--- @return boolean discarded
+function M.discard_mouse_event(owner)
+	owner = active_prepared_mouse(owner)
+	if owner == nil then return false end
+	discard_record(owner.tag)
+	owner.active = false
+	owner.event = nil
+	release_prepared_mouse(owner)
+	return true
+end
+
+
+--- Posts one prepared event while retaining its provenance after uncertainty.
+--- A false/throw after post() was attempted leaves the same owner retryable: the
+--- first native call may already have handed Quartz the event, so its tag cannot
+--- be revoked and compensating/retry logic must keep exact ownership.
+--- @param owner table Opaque owner returned by prepare_mouse_event().
+--- @return boolean committed
+--- @return string|nil detail Native refusal detail.
+function M.post_mouse_event(owner)
+	owner = prepared_mouse(owner)
+	if owner == nil or owner.committed == true then
+		return false, "prepared mouse event is unavailable"
+	end
+	if owner.attempted ~= true then
+		if owner.active ~= true then return false, "prepared mouse event is not active" end
+		owner.active = false
+		owner.attempted = true
+		owner.handed_off = true
+		-- Do not schedule an idle waiter between ownership transfer and the native
+		-- post boundary. The waiter's periodic owner wakes after this turn.
+		release_prepared_mouse(owner, false)
+	elseif owner.handed_off ~= true then
+		return false, "prepared mouse event was not handed off"
+	end
+	local posted, result_or_error = xpcall(function()
+		return owner.event:post()
+	end, debug.traceback)
+	if not posted or result_or_error == nil or result_or_error == false then
+		return false, tostring(result_or_error)
+	end
+	owner.committed = true
+	return true
+end
+
+
+--- Validates and freezes prepared events for one eventtap callback handoff.
+--- Lifecycle ownership remains active until commit_mouse_handoff() is called at
+--- the callback's final non-reentrant boundary.
+--- @param owners table Dense array of prepared mouse-event owners.
+--- @return table|nil handoff Opaque validated handoff owner.
+--- @return string|nil detail Validation refusal detail.
+function M.prepare_mouse_handoff(owners)
+	if type(owners) ~= "table" or #owners == 0 then
+		return nil, "owners must be a non-empty array"
+	end
+	local seen = {}
+	for index, owner in ipairs(owners) do
+		if active_prepared_mouse(owner) == nil or owner.attempted == true then
+			return nil, "prepared mouse event at index " .. tostring(index) .. " is unavailable"
+		end
+		if seen[owner] then return nil, "prepared mouse event is duplicated" end
+		seen[owner] = true
+	end
+	local handoff = {
+		_marker = MOUSE_HANDOFF_MARKER,
+		active = true,
+		owners = {},
+		events = {},
+	}
+	for index, owner in ipairs(owners) do
+		owner.handoff_pending = true
+		handoff.owners[index] = owner
+		handoff.events[index] = owner.event
+	end
+	return handoff
+end
+
+
+--- Commits one prepared callback handoff at the final non-reentrant boundary.
+--- No native operation is performed here; the returned events must be returned
+--- immediately by the owning eventtap callback.
+--- @param handoff table Opaque owner returned by prepare_mouse_handoff().
+--- @return table events Raw native events for the callback return value.
+function M.commit_mouse_handoff(handoff)
+	assert(type(handoff) == "table" and handoff._marker == MOUSE_HANDOFF_MARKER
+		and handoff.active == true,
+		"adapters.synthetic_input.commit_mouse_handoff: invalid handoff owner")
+	-- The callback must return to Quartz without another scheduler/native
+	-- boundary. Accepted idle waiters retain their periodic fallback and wake
+	-- after this callback has returned.
+	for _, owner in ipairs(handoff.owners) do
+		assert(prepared_mouse(owner) ~= nil and owner.active == true
+			and owner.attempted ~= true and owner.handoff_pending == true,
+			"adapters.synthetic_input.commit_mouse_handoff: prepared owner changed")
+		owner.active = false
+		owner.attempted = true
+		owner.handed_off = true
+		owner.handoff_pending = false
+		owner.committed = true
+		release_prepared_mouse(owner, false)
+	end
+	handoff.active = false
+	return handoff.events
+end
+
+
 --- Invokes a transaction lifecycle callback with logging isolation.
 --- @param label string Callback description.
 --- @param callback function Callback.
@@ -574,6 +849,7 @@ local function lifecycle_is_idle()
 	return _active_transaction_count == 0
 		and _deferred_post_callback_count == 0
 		and _periodic_cleanup_count == 0
+		and _prepared_mouse_count == 0
 end
 
 
@@ -663,10 +939,23 @@ local function stop_idle_waiter(owner)
 end
 
 
+--- Removes one waiter from the slow-path queue after its periodic owner wins.
+--- @param owner table Idle waiter owner.
+local function remove_queued_idle_waiter(owner)
+	for index = #_idle_callbacks, 1, -1 do
+		if _idle_callbacks[index] == owner then
+			table.remove(_idle_callbacks, index)
+			return
+		end
+	end
+end
+
+
 --- Publishes one already-stopped idle waiter exactly once.
 --- @param owner table Idle waiter owner.
 finish_idle_waiter = function(owner)
 	if owner.callback_delivered == true then return end
+	remove_queued_idle_waiter(owner)
 	owner.callback_delivered = true
 	owner.settling = false
 	run_logged("when_idle", owner.callback)
@@ -692,6 +981,21 @@ local function invoke_when_idle(owner)
 	return enqueue_deferred_call("when_idle", function()
 		settle_idle_waiter(owner)
 	end, table.pack(), false, true)
+end
+
+
+--- Schedules every accepted idle waiter after the last lifecycle owner closes.
+wake_idle_waiters = function()
+	if not lifecycle_is_idle() or #_idle_callbacks == 0 then return end
+	local waiters = _idle_callbacks
+	_idle_callbacks = {}
+	for _, owner in ipairs(waiters) do
+		if owner.active == true then
+			-- The periodic timer remains the authoritative fallback if every
+			-- one-shot dispatcher refuses this fast completion path.
+			invoke_when_idle(owner)
+		end
+	end
 end
 
 
@@ -832,17 +1136,7 @@ try_complete = function(tx)
 	for _, callback in ipairs(tx.complete_callbacks) do
 		invoke_lifecycle("on_complete", callback, tx, status)
 	end
-	if _active_transaction_count == 0 and #_idle_callbacks > 0 then
-		local waiters = _idle_callbacks
-		_idle_callbacks = {}
-		for _, owner in ipairs(waiters) do
-			if owner.active == true then
-				-- The periodic timer remains the authoritative fallback if every
-				-- one-shot dispatcher refuses this fast completion path.
-				invoke_when_idle(owner)
-			end
-		end
-	end
+	wake_idle_waiters()
 end
 
 
@@ -3645,6 +3939,7 @@ function M.stats()
 			_deferred_lifecycle_tail - _deferred_lifecycle_head + 1),
 		pending_post_callback_actions = _deferred_post_callback_count,
 		pending_periodic_cleanup = _periodic_cleanup_count,
+		prepared_mouse_events = _prepared_mouse_count,
 		pump_started = _pump_tap ~= nil,
 		stale_context_tags = _stale_context_count,
 	}
