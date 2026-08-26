@@ -26,6 +26,7 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
+local text_utils    = require("infra.text_utils")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -36,6 +37,11 @@ if not ok_dw then download_window = nil end
 -- Same LOG tag as the parent manager so download log lines stay grouped under
 -- "menu_llm.mlx" exactly as before the split.
 local LOG = "menu_llm.mlx"
+local PID_GONE_EXIT = 72
+local PID_IDENTITY_MISMATCH_EXIT = 73
+local PID_IDENTITY_UNKNOWN_EXIT = 74
+local PID_SIGNAL_REFUSED_EXIT = 75
+local PID_TERM_ATTEMPT_LIMIT = 4
 
 
 
@@ -396,6 +402,105 @@ function M.install(ctx)
 		return ok == true and (result == true or result == 0)
 	end
 
+	--- Derives the only Python script path owned by one detached-download log.
+	--- @param log_path string Detached log path.
+	--- @return string|nil script_path Canonical sibling script path.
+	local function derive_download_script_path(log_path)
+		if type(log_path) ~= "string" then return nil end
+		local stem = log_path:match("^(/tmp/hs_mlx_dl_[%w_-]+)%.log$")
+		if stem == nil then return nil end
+		return stem .. ".py"
+	end
+
+	--- Reads the process-authored exit proof without conflating access refusal with absence.
+	--- @param path string Exact detached-process exit path.
+	--- @param label string Stable diagnostic label.
+	--- @return boolean|nil exists Exact existence, or nil when the probe is inconclusive.
+	local function probe_download_exit_file(path, label)
+		if type(path) ~= "string" or path == "" then return nil end
+		local results = table.pack(Logger.callback(LOG, label .. " open", io.open, path, "r"))
+		if results[1] ~= true then
+			Logger.error(LOG, "%s raised: %s.", label, tostring(results[2]))
+			return nil
+		end
+		local handle = results[2]
+		if handle == nil or handle == false then
+			local errno = tonumber(results[4])
+			if errno == nil or errno == 2 then return false end
+			Logger.error(LOG, "%s was refused: %s.", label, tostring(results[3]))
+			return nil
+		end
+		local close_ok, closed = Logger.callback(LOG, label .. " close", function()
+			return handle:close()
+		end)
+		if close_ok ~= true or closed == false or closed == nil then
+			Logger.error(LOG, "%s close was refused: %s.", label, tostring(closed))
+			return nil
+		end
+		return true
+	end
+
+	--- Signals a detached process only while PID and exact script identity still agree.
+	--- @param pid number Detached process identifier.
+	--- @param script_path string Exact Python script path persisted for this owner.
+	--- @param signal_name string TERM or KILL.
+	--- @param label string Stable diagnostic label.
+	--- @return string outcome Identity-aware signal outcome.
+	local function signal_verified_download_pid(pid, script_path, signal_name, label)
+		if type(pid) ~= "number" or pid <= 0 or pid % 1 ~= 0
+			or type(script_path) ~= "string" or script_path == ""
+			or (signal_name ~= "TERM" and signal_name ~= "KILL") then
+			Logger.error(LOG, "%s refused invalid process identity inputs.", label)
+			return "identity_unknown"
+		end
+		local command = "MLX_EXPECTED_SCRIPT=" .. text_utils.shell_quote(script_path) .. "; "
+			.. "MLX_PID=" .. tostring(pid) .. "; "
+			.. "if ! kill -0 -- \"$MLX_PID\" 2>/dev/null; then exit "
+			.. tostring(PID_GONE_EXIT) .. "; fi; "
+			.. "MLX_COMM=$(/bin/ps -o comm= -p \"$MLX_PID\" 2>/dev/null); "
+			.. "MLX_ARGS=$(/bin/ps -o args= -p \"$MLX_PID\" 2>/dev/null); "
+			.. "if [ -z \"$MLX_COMM\" ] || [ -z \"$MLX_ARGS\" ]; then "
+			.. "if kill -0 -- \"$MLX_PID\" 2>/dev/null; then exit "
+			.. tostring(PID_IDENTITY_UNKNOWN_EXIT) .. "; else exit "
+			.. tostring(PID_GONE_EXIT) .. "; fi; fi; "
+			.. "case \"$MLX_COMM\" in *[Pp][Yy][Tt][Hh][Oo][Nn]*) ;; *) exit "
+			.. tostring(PID_IDENTITY_MISMATCH_EXIT) .. ";; esac; "
+			.. "printf '%s' \"$MLX_ARGS\" | /usr/bin/grep -Fq -- \"$MLX_EXPECTED_SCRIPT\" "
+			.. "|| exit " .. tostring(PID_IDENTITY_MISMATCH_EXIT) .. "; "
+			.. "kill -" .. signal_name .. " -- \"$MLX_PID\" 2>/dev/null || exit "
+			.. tostring(PID_SIGNAL_REFUSED_EXIT)
+		local results = table.pack(Logger.callback(LOG, label, os.execute, command))
+		if results[1] ~= true then return "probe_failed" end
+		local result = results[2]
+		local exit_code = tonumber(results[4])
+		if result == true or result == 0 or exit_code == 0 then return "signalled" end
+		if exit_code == PID_GONE_EXIT then return "gone" end
+		if exit_code == PID_IDENTITY_MISMATCH_EXIT then return "not_owned" end
+		if exit_code == PID_IDENTITY_UNKNOWN_EXIT then return "identity_unknown" end
+		if exit_code == PID_SIGNAL_REFUSED_EXIT then return "signal_refused" end
+		return "probe_failed"
+	end
+
+	--- Chooses a bounded escalation signal for one retained detached PID owner.
+	--- @param owner table Exact logical download owner.
+	--- @return string signal_name TERM or KILL.
+	local function next_pid_cleanup_signal(owner)
+		local attempts = owner.partial.pid_term_attempts or 0
+		if attempts >= PID_TERM_ATTEMPT_LIMIT then return "KILL" end
+		return "TERM"
+	end
+
+	--- Records only an identity-verified TERM boundary, not an inconclusive probe.
+	--- @param owner table Exact logical download owner.
+	--- @param signal_name string Attempted signal.
+	--- @param outcome string Identity-aware signal outcome.
+	local function record_pid_cleanup_attempt(owner, signal_name, outcome)
+		if signal_name == "TERM"
+			and (outcome == "signalled" or outcome == "signal_refused") then
+			owner.partial.pid_term_attempts = (owner.partial.pid_term_attempts or 0) + 1
+		end
+	end
+
 	function obj.pull_model(target_model, repo, on_success, on_cancel, opts)
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
 		local requirement_lifecycle = type(opts) == "table"
@@ -647,28 +752,33 @@ function M.install(ctx)
 					release_download_owner(owner)
 					return true
 				end
-				local ok_probe, alive = Logger.callback(LOG,
-					"MLX detached-download cleanup probe", os.execute,
-					"kill -0 " .. tostring(pid) .. " 2>/dev/null")
-				if not ok_probe then
-					Logger.error(LOG, "MLX detached-download cleanup probe raised: %s.",
-						tostring(alive))
-					return schedule_pid_cleanup()
+				local exit_exists = probe_download_exit_file(owner.partial.exit_path,
+					"MLX detached-download cleanup exit-file probe")
+				if exit_exists == nil then return schedule_pid_cleanup(), false end
+				if exit_exists == true then
+					owner.partial.pid = nil
+					Logger.callback(LOG, "MLX detached-download cleanup exit-file removal",
+						os.remove, owner.partial.exit_path)
+					remove_owned_session()
+					release_download_owner(owner)
+					return true, true
 				end
-				if alive == true or alive == 0 then
-					local ok_kill, killed = Logger.callback(LOG,
-						"MLX detached-download cleanup signal", os.execute,
-						"kill -TERM " .. tostring(pid) .. " 2>/dev/null")
-					if not ok_kill or (killed ~= true and killed ~= 0) then
-						Logger.error(LOG, "MLX detached-download cleanup signal was refused: %s.",
-							tostring(killed))
-					end
-					return schedule_pid_cleanup()
+				local signal_name = next_pid_cleanup_signal(owner)
+				local outcome = signal_verified_download_pid(pid, owner.partial.script_path,
+					signal_name, "MLX detached-download cleanup identity probe")
+				record_pid_cleanup_attempt(owner, signal_name, outcome)
+				if outcome == "gone" or outcome == "not_owned" then
+					owner.partial.pid = nil
+					remove_owned_session()
+					release_download_owner(owner)
+					return true, true
 				end
-				owner.partial.pid = nil
-				remove_owned_session()
-				release_download_owner(owner)
-				return true
+				if outcome ~= "signalled" then
+					Logger.error(LOG,
+						"MLX detached-download cleanup retained PID %d after %s.",
+						pid, outcome)
+				end
+				return schedule_pid_cleanup(), outcome == "signalled"
 			end
 
 			-- silent=true suppresses the "Annulé" notification and complete() so callers that
@@ -710,17 +820,6 @@ function M.install(ctx)
 					signalled = signal_owned_task("launcher", "download",
 						"MLX detached download launcher") and signalled
 				end
-				if owner.partial.pid then
-					local ok_kill, killed = Logger.callback(LOG,
-						"MLX detached-download cancellation signal", os.execute,
-						"kill -TERM " .. tostring(owner.partial.pid) .. " 2>/dev/null")
-					if not ok_kill or (killed ~= true and killed ~= 0) then
-						Logger.error(LOG, "MLX detached-download cancellation signal was refused: %s.",
-							tostring(killed))
-						signalled = false
-					end
-					schedule_pid_cleanup()
-				end
 				if reason ~= "stale"
 					and not cancellation_continuation_current(reason) then
 					release_download_owner(owner)
@@ -756,6 +855,10 @@ function M.install(ctx)
 					return false
 				end
 				if not retrying then settle_cancel(reason or "user_cancelled") end
+				if owner.partial.pid then
+					local _, pid_signalled = poll_pid_cleanup()
+					if pid_signalled ~= true then signalled = false end
+				end
 				release_download_owner(owner)
 				return signalled
 			end
@@ -928,6 +1031,7 @@ function M.install(ctx)
 			local clean_repo = repo:gsub("[%c%s]", "")
 			local script_path = "/tmp/hs_mlx_dl_" .. _rand_id .. ".sh"
 			local py_path     = "/tmp/hs_mlx_dl_" .. _rand_id .. ".py"
+			owner.partial.script_path = py_path
 			local script_project_venv_python_escaped = project_venv_python_escaped
 			local safe_repo_bash = "models--" .. clean_repo:gsub("/", "--")
 
@@ -1094,8 +1198,8 @@ function M.install(ctx)
 
 			-- Persist session so a future HS reload can reattach tail -f without restarting the download
 			local _session_json = string.format(
-				"{\"model\":\"%s\",\"log_path\":\"%s\",\"exit_path\":\"%s\",\"repo\":\"%s\"}",
-				target_model, _log_path, _exit_path, clean_repo
+				"{\"model\":\"%s\",\"log_path\":\"%s\",\"exit_path\":\"%s\",\"script_path\":\"%s\",\"repo\":\"%s\"}",
+				target_model, _log_path, _exit_path, py_path, clean_repo
 			)
 			if not publish_owned_file(session_file, _session_json,
 				"MLX download session") then
@@ -1940,13 +2044,16 @@ function M.install(ctx)
 
 	--- Reattaches the download UI and log tail to an already-running detached Python download.
 	--- Called after a Hammerspoon reload when /tmp/hs_mlx_active_download.json exists.
-	--- @param session table Decoded JSON session: { model, log_path, exit_path, pid, repo }.
+	--- @param session table Decoded JSON session: { model, log_path, exit_path, script_path, pid, repo }.
 	--- @param opts table|nil Optional `is_current` and `on_terminal` callbacks.
 	function obj.reattach_download(session, opts)
 		if type(session) ~= "table" then return false end
 		local model     = session.model     or "?"
 		local log_path  = session.log_path  or ""
 		local exit_path = session.exit_path or ""
+		local derived_script_path = derive_download_script_path(log_path)
+		local script_path = session.script_path == derived_script_path
+			and session.script_path or derived_script_path
 		local pid       = tonumber(session.pid)
 		local session_file = "/tmp/hs_mlx_active_download.json"
 
@@ -1963,7 +2070,12 @@ function M.install(ctx)
 			attempt_generation = 1,
 			tasks = { launcher = nil, tail = nil },
 			timers = {},
-			partial = { pid = pid, log_path = log_path, exit_path = exit_path },
+			partial = {
+				pid = pid,
+				log_path = log_path,
+				exit_path = exit_path,
+				script_path = script_path,
+			},
 			registered = true,
 			revoked = false,
 			terminal_sent = false,
@@ -2114,6 +2226,10 @@ function M.install(ctx)
 		end
 
 		local function probe_exit_file(read_code)
+			if read_code ~= true then
+				return probe_download_exit_file(exit_path,
+					"MLX reattached exit-file probe")
+			end
 			local ok_open, handle = Logger.callback(LOG,
 				"MLX reattached exit-file probe", io.open, exit_path, "r")
 			if ok_open ~= true then return nil, "probe_failed" end
@@ -2203,23 +2319,34 @@ function M.install(ctx)
 
 		cleanup_reattached = function()
 			if owner.tasks.tail then signal_tail() end
+			local exists = probe_exit_file(false)
+			if exists == nil then return schedule_reattached_cleanup() end
 			local live_pid = owner.partial.pid
-			if live_pid then
-				local ok_probe, alive = Logger.callback(LOG,
-					"MLX reattached PID cleanup probe", os.execute,
-					"kill -0 " .. tostring(live_pid) .. " 2>/dev/null")
-				if not ok_probe then return schedule_reattached_cleanup() end
-				if alive == true or alive == 0 then
-					Logger.callback(LOG, "MLX reattached PID cleanup signal", os.execute,
-						"kill -TERM " .. tostring(live_pid) .. " 2>/dev/null")
+			if exists == true then
+				owner.partial.pid = nil
+				owner.partial.pid_settled = true
+				Logger.callback(LOG, "MLX reattached exit-file removal",
+					os.remove, exit_path)
+			elseif live_pid then
+				local signal_name = next_pid_cleanup_signal(owner)
+				local outcome = signal_verified_download_pid(live_pid,
+					owner.partial.script_path, signal_name,
+					"MLX reattached PID cleanup identity probe")
+				record_pid_cleanup_attempt(owner, signal_name, outcome)
+				if outcome == "gone" or outcome == "not_owned" then
+					owner.partial.pid = nil
+					owner.partial.pid_settled = true
+				elseif outcome == "signalled" then
+					return schedule_reattached_cleanup()
+				else
+					Logger.error(LOG, "MLX reattached cleanup retained PID %d after %s.",
+						live_pid, outcome)
 					return schedule_reattached_cleanup()
 				end
-				owner.partial.pid = nil
-			else
-				local exists = probe_exit_file(false)
-				if exists == nil then return schedule_reattached_cleanup() end
-				if exists ~= true then return schedule_reattached_cleanup() end
+			elseif owner.partial.pid_settled ~= true then
+				return schedule_reattached_cleanup()
 			end
+			cancel_owner_timer(owner, "cleanup")
 			if owner.tasks.tail ~= nil then return schedule_reattached_cleanup() end
 			if owner.remove_session() ~= true then return schedule_reattached_cleanup() end
 			if owner.retry_pending then
@@ -2264,18 +2391,17 @@ function M.install(ctx)
 			owner.retry_pending = retrying
 			owner.keep_registered = retrying
 			cancel_owner_timers(owner)
-			signal_tail()
-			if owner.partial.pid then
-				Logger.callback(LOG, "MLX reattached cancellation signal", os.execute,
-					"kill -TERM " .. tostring(owner.partial.pid) .. " 2>/dev/null")
-			end
+			cleanup_reattached()
 			local continuation_authorized = reattached_business_authorized()
 			if not retrying and continuation_authorized then
 				settle_reattached(false, reason or "user_cancelled", silent)
 				continuation_authorized = reattached_business_authorized()
 			end
-			if owner_has_native_work(owner) then schedule_reattached_cleanup()
-			else cleanup_reattached() end
+			if owner_has_native_work(owner) and owner.timers.cleanup == nil then
+				schedule_reattached_cleanup()
+			elseif not owner_has_native_work(owner) then
+				cleanup_reattached()
+			end
 			return continuation_authorized
 		end
 		owner.cancel = do_cancel_reattached
