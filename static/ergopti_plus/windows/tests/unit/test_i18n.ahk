@@ -285,7 +285,8 @@ _I18nLazyCacheFreshTsvServedWithoutJson() {
 	; must be served verbatim, proving the fast path skips the JSON parse entirely.
 	FileAppend('{"k": "fromjson"}', Path, "UTF-8")
 	FileSetTime("20000101000000", Path, "M")
-	FileAppend("k`tfromtsv`n", TsvPath, "UTF-8-RAW")
+	FileAppend("k`tfromtsv`n" . _I18N_TSV_SENTINEL . "1`n",
+		TsvPath, "UTF-8-RAW")
 	_I18nLoadFile(Path)
 	AssertEqual("fromtsv", _I18nCache["k"], "a fresh .tsv must be served without re-parsing the .json")
 	FileDelete(Path)
@@ -293,6 +294,35 @@ _I18nLazyCacheFreshTsvServedWithoutJson() {
 	_I18nTestReset()
 }
 Test("i18n cache: a fresh .tsv is served without re-parsing the .json", _I18nLazyCacheFreshTsvServedWithoutJson)
+
+_I18nLazyCacheRejectsFreshPartialTsv() {
+	_I18nTestReset()
+	global _I18nCache
+	TsvPath := A_Temp . "\i18n_test_locale.tsv"
+	Path := A_Temp . "\i18n_test_locale.json"
+	if FileExist(Path)
+		FileDelete(Path)
+	if FileExist(TsvPath)
+		FileDelete(TsvPath)
+	try {
+		FileAppend('{"a": "json-a", "b": "json-b"}', Path, "UTF-8")
+		FileSetTime("20000101000000", Path, "M")
+		FileAppend("a`tcached-a`n", TsvPath, "UTF-8-RAW")
+		_I18nLoadFile(Path)
+		AssertEqual("json-a", _I18nCache["a"],
+			"a fresh but incomplete cache must not override canonical JSON")
+		AssertEqual("json-b", _I18nCache["b"],
+			"keys beyond a truncated cache prefix must be recovered from JSON")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		if FileExist(TsvPath)
+			FileDelete(TsvPath)
+		_I18nTestReset()
+	}
+}
+Test("i18n cache: fresh partial .tsv rebuilds from canonical JSON",
+	_I18nLazyCacheRejectsFreshPartialTsv)
 
 
 

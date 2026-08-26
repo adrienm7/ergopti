@@ -54,6 +54,10 @@ global _I18nCacheFrLoaded := false
 ; Keeps t() O(1) on misses (no re-entry into _I18nEnsureFallbacksLoaded).
 global _I18nFallbacksWarmed := false
 
+; Terminal record proving that a TSV cache reached the end of publication.
+; The count also rejects a complete-looking file whose record prefix was lost.
+global _I18N_TSV_SENTINEL := "#!ergopti-i18n-cache-v1 count="
+
 
 
 
@@ -108,12 +112,20 @@ _I18nUnescapeTSV(s) {
 ; unescaping values and substituting ★ with the configured MagicKey — the same
 ; post-processing the JSON path applies. A tight Loop Parse keeps this ~23x faster
 ; than the recursive-descent JsonParse for the identical key/value set.
-_I18nParseTSV(Content, MagicKey) {
+_I18nParseTSV(Content, MagicKey, Status := unset) {
+	global _I18N_TSV_SENTINEL
 	m := Map()
+	ExpectedCount := -1
 	Loop Parse Content, "`n", "`r" {
 		line := A_LoopField
 		if (line == "")
 			continue
+		if (InStr(line, _I18N_TSV_SENTINEL, true) == 1) {
+			RawCount := SubStr(line, StrLen(_I18N_TSV_SENTINEL) + 1)
+			if RegExMatch(RawCount, "^\d+$")
+				ExpectedCount := RawCount + 0
+			continue
+		}
 		p := InStr(line, "`t")
 		if (!p)
 			continue
@@ -125,6 +137,8 @@ _I18nParseTSV(Content, MagicKey) {
 			v := StrReplace(v, "★", MagicKey)
 		m[k] := v
 	}
+	if IsSet(Status) and IsObject(Status)
+		Status.Complete := ExpectedCount >= 0 and ExpectedCount == m.Count
 	return m
 }
 
@@ -148,6 +162,7 @@ _I18nTsvIsFresh(TsvPath, JsonPath) {
 ; MagicKey-independent), LF line endings, UTF-8 without BOM. Best-effort: a
 ; read-only install directory simply means every boot keeps parsing the JSON.
 _I18nWriteTsvCache(TsvPath, Parsed) {
+	global _I18N_TSV_SENTINEL
 	try {
 		Content := ""
 		for Key, Val in Parsed {
@@ -160,14 +175,14 @@ _I18nWriteTsvCache(TsvPath, Parsed) {
 				Esc := StrReplace(Esc, "`n", "\n")
 			Content .= Key . "`t" . Esc . "`n"
 		}
+		Content .= _I18N_TSV_SENTINEL . Parsed.Count . "`n"
 		; Stage then rename. FileDelete + FileAppend is a two-step publication that
 		; leaves the LIVE cache absent or half-written between the two calls, and a
 		; Reload lands in that window routinely (the layout-change watcher reloads
 		; on any Windows layout switch, and #SingleInstance replacement can kill the
-		; process mid-write). _I18nTsvIsFresh is a pure mtime compare and
-		; _I18nParseTSV has no line-count or sentinel check, so a torn file is served
-		; as "fresh" forever and every key past the truncation silently degrades to
-		; the EN fallback or to its raw dotted name. FileMove over an existing target
+		; process mid-write). The terminal sentinel now rejects a torn file, but an
+		; atomic publication still avoids needless JSON reparsing after interruption.
+		; FileMove over an existing target
 		; is an atomic NTFS rename, so the cache is always either the old one or the
 		; new one, never a prefix of the new one (locale-tsv-non-atomic-write).
 		; Mirrors _HotstringsCacheWriteTsv, which was fixed first.
@@ -198,15 +213,14 @@ _I18nLoadLocaleMap(JsonPath, MagicKey) {
 	; ── Fast path: a fresh .tsv cache ──
 	if FileExist(TsvPath) and _I18nTsvIsFresh(TsvPath, JsonPath) {
 		try {
-			Fast := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey)
-			; A cache that parses to zero keys is damage, not content: every shipped
-			; locale carries thousands of entries. Falling through to the JSON makes
-			; the "self-healing cache" contract in this module's header true for a
-			; TRUNCATED cache too, not only for a missing one, and the slow path
-			; rewrites the cache on its way out.
-			if (Fast.Count > 0)
+			ParseStatus := { Complete: false }
+			Fast := _I18nParseTSV(FileRead(TsvPath, "UTF-8"), MagicKey,
+				ParseStatus)
+			; Only a terminal sentinel with the exact parsed cardinality proves that
+			; the cache is complete. Old-format and truncated caches rebuild once.
+			if ParseStatus.Complete
 				return { Cache: Fast, Ok: true, Fast: true }
-			try LoggerWarn("i18n", "Fast cache '{1}' parsed to 0 keys; rebuilding from JSON.", TsvPath)
+			try LoggerWarn("i18n", "Fast cache '{1}' is incomplete; rebuilding from JSON.", TsvPath)
 		} catch as err {
 			try LoggerWarn("i18n", "Fast cache '{1}' unreadable ({2}); rebuilding from JSON.", TsvPath, err.Message)
 		}
