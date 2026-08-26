@@ -294,4 +294,54 @@ helpers.describe("kc_bridge — _file_offset advances while the keylogger is dis
 		helpers.assert_true(ok, "cold-start EOF refusal scenario must complete: " .. tostring(err))
 	end)
 
+	helpers.it("HS-054 preserves the cursor when the drain EOF probe fails", function()
+		tmp_dir = fresh_tmp_dir()
+		ensure_metrics_dir()
+		local kc = load_kc_bridge_with_tmp_path()
+		helpers.assert_eq(kc.init({ active_app_name = "TextEdit" }, nil, {}, {},
+			function() return true end), true)
+
+		local logged = {}
+		kc.set_log_manager({
+			log_karabiner_press = function(kc_num)
+				logged[#logged + 1] = kc_num
+			end,
+		})
+		append_ke_line("a")
+		captured_watcher_cb()
+		helpers.assert_eq(#logged, 1, "the positive control must drain the first row")
+		local offset_before = kc.get_stats().offset
+		helpers.assert_true(offset_before > 0, "the EOF failure must occur after cursor progress")
+
+		append_ke_line("b")
+		local saved_open = io.open
+		local ledger_path = tmp_dir .. "/metrics/karabiner_kc.log"
+		local injected = false
+		io.open = function(path, mode)
+			local handle, open_error = saved_open(path, mode)
+			if path ~= ledger_path or mode ~= "r" or injected or not handle then
+				return handle, open_error
+			end
+			injected = true
+			return {
+				seek = function(_, whence, offset)
+					if whence == "end" then return nil, "injected EOF seek failure" end
+					return handle:seek(whence, offset)
+				end,
+				lines = function() return handle:lines() end,
+				close = function() return handle:close() end,
+			}
+		end
+
+		local call_ok, call_error = xpcall(captured_watcher_cb, debug.traceback)
+		io.open = saved_open
+		helpers.assert_true(call_ok,
+			"the EOF error path must not escape the watcher: " .. tostring(call_error))
+		helpers.assert_true(injected, "the test must inject the EOF seek refusal")
+		helpers.assert_eq(#logged, 1,
+			"a failed EOF probe must process neither the old row nor the new row")
+		helpers.assert_eq(kc.get_stats().offset, offset_before,
+			"a failed EOF probe must preserve the last trusted byte offset")
+	end)
+
 end)
