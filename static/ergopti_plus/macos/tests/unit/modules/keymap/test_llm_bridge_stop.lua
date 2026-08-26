@@ -1,11 +1,12 @@
 --- tests/unit/modules/keymap/test_llm_bridge_stop.lua
 
 --- ==============================================================================
---- MODULE: LLM Bridge M.stop() Regression Tests
+--- MODULE: LLM Bridge Lifecycle and Fallback Regression Tests
 --- DESCRIPTION:
 --- Guards the escape-trap lifecycle in modules/keymap/llm_bridge.lua with a
 --- self-contained dependency fixture that cannot inherit another test's partial
---- tooltip or prediction-engine double.
+--- tooltip or prediction-engine double. It also exercises fallback key routing
+--- after the tooltip deliberately passes through a physical input event.
 ---
 --- ROOT CAUSE ENCODED:
 --- arm_escape_trap() created a persistent hs.eventtap that intercepted Escape.
@@ -102,8 +103,9 @@ local function make_tooltip(fixture)
 end
 
 --- Builds the prediction-engine surface consumed by the bridge.
+--- @param fixture table Mutable scenario state.
 --- @return table engine Strict prediction-engine double.
-local function make_prediction_engine()
+local function make_prediction_engine(fixture)
 	local enabled = false
 	return {
 		set_preview_ai_enabled = noop,
@@ -141,10 +143,10 @@ local function make_prediction_engine()
 		start_timer_word_end = return_true,
 		stop_timer = return_true,
 		handle_chain_signal = return_false,
-		is_visible = return_false,
+		is_visible = function() return fixture.engine_visible == true end,
 		is_chain_pending = return_false,
-		get_predictions = return_empty_table,
-		get_current_index = function() return 1 end,
+		get_predictions = function() return fixture.predictions or {} end,
+		get_current_index = function() return fixture.current_index end,
 		navigate = return_false,
 		normalize_mods = return_empty_table,
 		get_navigation_mods = return_empty_table,
@@ -170,7 +172,7 @@ local function with_bridge_fixture(callback, options)
 	local outcome = table.pack(xpcall(function()
 		local fixture = {}
 		fixture.tooltip = make_tooltip(fixture)
-		fixture.engine = make_prediction_engine()
+		fixture.engine = make_prediction_engine(fixture)
 		package.loaded["ui.tooltip"] = fixture.tooltip
 		package.loaded["modules.llm.prediction_engine"] = fixture.engine
 		package.loaded["infra.logger"] = nil
@@ -237,9 +239,41 @@ end)
 
 
 
+-- ===========================================================
+-- ===========================================================
+-- ======= 3/ Fallback Prediction Selection ==================
+-- ===========================================================
+-- ===========================================================
+
+helpers.describe("llm_bridge fallback prediction selection", function()
+	helpers.it("(HS-059) Tab accepts the currently selected row", function()
+		with_bridge_fixture(function(fixture)
+			fixture.engine_visible = true
+			fixture.predictions = { "first", "second", "third" }
+			fixture.current_index = 3
+			fixture.engine.set_llm_enabled(true)
+
+			local accepted = {}
+			fixture.bridge.apply_prediction = function(index)
+				accepted[#accepted + 1] = index
+				return true
+			end
+
+			helpers.assert_eq(fixture.bridge.handle_llm_keys(48, {}, false), true,
+				"the keymap fallback must consume a visible bare Tab")
+			helpers.assert_eq(accepted, { 3 },
+				"the fallback must accept the same row the tooltip still highlights")
+		end)
+	end)
+end)
+
+
+
+
+
 -- ==============================================================
 -- ==============================================================
--- ======= 3/ escape trap stopped when M.stop() is called =======
+-- ======= 4/ escape trap stopped when M.stop() is called =======
 -- ==============================================================
 -- ==============================================================
 
