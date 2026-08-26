@@ -246,6 +246,7 @@ local _deferred_lifecycle_dispatcher = nil
 local _deferred_lifecycle_backup_dispatcher = nil
 local _deferred_lifecycle_fallback_timer = nil
 local _deferred_post_callback_count = 0
+local _ordered_input = { count = 0, replays = {}, head = 1, tail = 0 }
 local _owned_completion_depth = 0
 
 
@@ -319,6 +320,25 @@ local function defer_diagnostic(level, format, ...)
 end
 
 
+--- Commits physical events that were consumed behind an ordered input action.
+--- The action may enqueue synthetic output while it runs, so replay owners are
+--- appended only after the last accepted action has completed.
+function _ordered_input.release_replays()
+	if _ordered_input.count ~= 0 then return end
+	while _ordered_input.head <= _ordered_input.tail do
+		local owner = _ordered_input.replays[_ordered_input.head]
+		if owner and owner.status == "prepared" then
+			_ordered_input.commit_replay(owner)
+		end
+		_ordered_input.replays[_ordered_input.head] = nil
+		_ordered_input.head = _ordered_input.head + 1
+	end
+	_ordered_input.replays = {}
+	_ordered_input.head = 1
+	_ordered_input.tail = 0
+end
+
+
 --- Drains lifecycle callbacks only from a timer callback, never from CGEventTap.
 local function drain_deferred_lifecycle()
 	_deferred_lifecycle_fallback_timer = nil
@@ -326,13 +346,19 @@ local function drain_deferred_lifecycle()
 		local call = _deferred_lifecycle_calls[_deferred_lifecycle_head]
 		_deferred_lifecycle_calls[_deferred_lifecycle_head] = nil
 		_deferred_lifecycle_head = _deferred_lifecycle_head + 1
+		run_logged(call.label, call.callback,
+			table.unpack(call.args, 1, call.args.n))
 		if call.post_callback then
 			_deferred_post_callback_count = _deferred_post_callback_count - 1
 			assert(_deferred_post_callback_count >= 0,
 				"adapters.synthetic_input: post-callback count underflow")
 		end
-		run_logged(call.label, call.callback,
-			table.unpack(call.args, 1, call.args.n))
+		if call.ordered_input then
+			_ordered_input.count = _ordered_input.count - 1
+			assert(_ordered_input.count >= 0,
+				"adapters.synthetic_input: ordered-input count underflow")
+			_ordered_input.release_replays()
+		end
 	end
 	_deferred_lifecycle_head = 1
 	_deferred_lifecycle_tail = 0
@@ -395,8 +421,13 @@ end
 --- @param discard_on_refusal boolean|nil Remove this exact FIFO entry if no
 ---        dispatcher could be armed. Callers returning false must never leave a
 ---        callback that a later unrelated enqueue can revive.
+--- @param ordered_input boolean|nil Whether later physical input must be replayed
+---        only after this accepted callback completes.
 --- @return boolean scheduled
-local function enqueue_deferred_call(label, callback, args, post_callback, discard_on_refusal)
+local function enqueue_deferred_call(label, callback, args, post_callback,
+	discard_on_refusal, ordered_input)
+	assert(ordered_input ~= true or post_callback == true,
+		"adapters.synthetic_input: ordered input must be lifecycle-owned")
 	_deferred_lifecycle_tail = _deferred_lifecycle_tail + 1
 	local index = _deferred_lifecycle_tail
 	_deferred_lifecycle_calls[index] = {
@@ -404,9 +435,13 @@ local function enqueue_deferred_call(label, callback, args, post_callback, disca
 		callback = callback,
 		args = args,
 		post_callback = post_callback == true,
+		ordered_input = ordered_input == true,
 	}
 	if post_callback then
 		_deferred_post_callback_count = _deferred_post_callback_count + 1
+	end
+	if ordered_input then
+		_ordered_input.count = _ordered_input.count + 1
 	end
 	if start_deferred_lifecycle_dispatcher() then return true end
 	if post_callback or discard_on_refusal == true then
@@ -418,6 +453,10 @@ local function enqueue_deferred_call(label, callback, args, post_callback, disca
 	end
 	if post_callback then
 		_deferred_post_callback_count = _deferred_post_callback_count - 1
+	end
+	if ordered_input then
+		_ordered_input.count = _ordered_input.count - 1
+		_ordered_input.release_replays()
 	end
 	return false
 end
@@ -466,6 +505,22 @@ function M.defer_after_callback(label, fn, ...)
 	assert(type(fn) == "function",
 		"adapters.synthetic_input.defer_after_callback: fn must be a function")
 	return enqueue_deferred_call(label, fn, table.pack(...), true)
+end
+
+
+--- Schedules one consumed physical-key action behind the eventtap return.
+--- Any later physical event is copied, consumed, and replayed only after this
+--- callback has completed and appended all synthetic output it owns.
+--- @param label string Diagnostic label.
+--- @param fn function Callback.
+--- @param ... any Callback arguments.
+--- @return boolean scheduled
+function M.defer_consumed_input_action(label, fn, ...)
+	assert(type(label) == "string" and label ~= "",
+		"adapters.synthetic_input.defer_consumed_input_action: label must be non-empty")
+	assert(type(fn) == "function",
+		"adapters.synthetic_input.defer_consumed_input_action: fn must be a function")
+	return enqueue_deferred_call(label, fn, table.pack(...), true, nil, true)
 end
 
 
@@ -3446,7 +3501,7 @@ end
 
 --- Commits a prepared physical replay behind the already-preserved FIFO suffix.
 --- @param owner table Owner returned by prepare_physical_replay().
-local function commit_physical_replay(owner)
+function _ordered_input.commit_replay(owner)
 	local batch = owner.batch
 	batch.status = "queued"
 	_pending_count = _pending_count + 1
@@ -3455,6 +3510,18 @@ local function commit_physical_replay(owner)
 	_deferred_queue[_deferred_tail] = batch
 	owner.committed = true
 	owner.status = "queued"
+end
+
+
+--- Retains one copied physical event until ordered callback work completes.
+--- @param owner table Prepared physical replay owner.
+function _ordered_input.retain_replay(owner)
+	if _ordered_input.count == 0 then
+		_ordered_input.commit_replay(owner)
+		return
+	end
+	_ordered_input.tail = _ordered_input.tail + 1
+	_ordered_input.replays[_ordered_input.tail] = owner
 end
 
 
@@ -3659,7 +3726,8 @@ end
 --- @param event userdata|table Physical event to fence.
 --- @return table|nil fence { events, batches, consume_original }, or nil.
 function M.claim_physical_fence(event)
-	if _pending_count == 0 and _pending_loopback_count == 0 then return nil end
+	if _pending_count == 0 and _pending_loopback_count == 0
+		and _ordered_input.count == 0 then return nil end
 	_lifecycle_defer_depth = _lifecycle_defer_depth + 1
 	local ok, adoption_or_err = xpcall(function()
 		local adoption
@@ -3669,7 +3737,8 @@ function M.claim_physical_fence(event)
 			adoption = { batches = {}, events = nil, remaining_batches = {} }
 		end
 		local physical_owner = nil
-		if #adoption.remaining_batches > 0 then
+		local ordered_input_pending = _ordered_input.count > 0
+		if #adoption.remaining_batches > 0 or ordered_input_pending then
 			physical_owner = prepare_physical_replay(event)
 			if physical_owner == nil then return nil end
 		end
@@ -3678,7 +3747,11 @@ function M.claim_physical_fence(event)
 		-- the exact physical copy, tag, and autonomous owner all exist.
 		commit_pending_adoption(adoption)
 		if physical_owner then
-			commit_physical_replay(physical_owner)
+			if ordered_input_pending then
+				_ordered_input.retain_replay(physical_owner)
+			else
+				_ordered_input.commit_replay(physical_owner)
+			end
 			adoption.consume_original = true
 		end
 
@@ -3938,6 +4011,9 @@ function M.stats()
 		pending_lifecycle_callbacks = math.max(0,
 			_deferred_lifecycle_tail - _deferred_lifecycle_head + 1),
 		pending_post_callback_actions = _deferred_post_callback_count,
+		pending_ordered_input_actions = _ordered_input.count,
+		pending_ordered_physical_replays = math.max(0,
+			_ordered_input.tail - _ordered_input.head + 1),
 		pending_periodic_cleanup = _periodic_cleanup_count,
 		prepared_mouse_events = _prepared_mouse_count,
 		pump_started = _pump_tap ~= nil,
