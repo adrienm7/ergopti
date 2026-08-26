@@ -28,6 +28,14 @@ local function clone_value(value)
 	return clone
 end
 
+--- Reports whether a numeric candidate can be safely published and persisted.
+--- @param value any Candidate value.
+--- @return boolean finite True for non-numbers and finite numbers only.
+local function is_finite_number(value)
+	return type(value) ~= "number"
+		or (value == value and value ~= math.huge and value ~= -math.huge)
+end
+
 --- Invokes one optional injected dependency with visible, exact settlement.
 --- @param label string Operation-specific callback label.
 --- @param fn function|nil Injected dependency.
@@ -313,6 +321,11 @@ function M.new(deps)
 		if type(options) ~= "table" or type(options.key) ~= "string"
 			or options.key == "" or type(options.runtime_fn) ~= "string" then
 			Logger.error(LOG, "LLM setting transaction refused invalid options.")
+			return false
+		end
+		if not is_finite_number(options.value) then
+			Logger.error(LOG, "LLM setting '%s' refused a non-finite numeric value.",
+				tostring(options.key))
 			return false
 		end
 		if type(deps.state) ~= "table" then
