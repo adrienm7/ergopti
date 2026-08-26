@@ -306,7 +306,8 @@ _I18nEnsureFallbacksLoaded() {
 		_I18nLoadInto("en", &_I18nCacheEn, &_I18nCacheEnLoaded)
 	if _I18nLocale != "fr" and !_I18nCacheFrLoaded
 		_I18nLoadInto("fr", &_I18nCacheFr, &_I18nCacheFrLoaded)
-	_I18nFallbacksWarmed := true
+	_I18nFallbacksWarmed := (_I18nLocale == "en" or _I18nCacheEnLoaded)
+		and (_I18nLocale == "fr" or _I18nCacheFrLoaded)
 }
 
 ; Ensure the active locale and both fallback locales are loaded.
