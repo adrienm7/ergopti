@@ -187,9 +187,8 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	def_name := existing != "" ? _LLM_MenuApiEntryGet(existing, "Name", "") : ""
 	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
 		"w420 h130", def_name)
-	if (ib.Result != "OK" or Trim(ib.Value) == "")
+	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_name)
 		return
-	new_name := Trim(ib.Value)
 
 	; Step 2 — provider id.
 	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
@@ -199,20 +198,15 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		t("menu.llm.api_dialog_title"), "w520 h150", def_provider)
 	if (ib.Result != "OK")
 		return
-	provider_id := Trim(ib.Value)
-	if !LLM_API_PROVIDERS.Has(provider_id)
-		provider_id := "openai_compat"
-	; The coerced fallback is not guaranteed to exist: when api_providers.json is
-	; missing, corrupt or has a malformed entry, api_remote.ahk resets
-	; LLM_API_PROVIDERS to an empty Map — the backend is silently disabled but
-	; "api" is still offered in the menu. Indexing an empty Map THROWS in AHK v2,
-	; so this path crashed instead of explaining itself.
-	if !LLM_API_PROVIDERS.Has(provider_id) {
+	if LLM_API_PROVIDERS.Count == 0 {
 		try LoggerError("LLM.menu",
 			"Cannot add an API entry: the provider catalogue is empty (api_providers.json failed to load).")
 		try MsgBox(t("menu.llm.api_providers_unavailable"), t("menu.llm.api_dialog_title"), "Iconx")
 		return
 	}
+	if !_LLM_Menu_TryProviderPrompt(ib.Result, ib.Value,
+			LLM_API_PROVIDERS, &provider_id)
+		return
 	provider := LLM_API_PROVIDERS[provider_id]
 
 	; Step 3 — base URL (prefilled with the provider default).
@@ -236,9 +230,8 @@ _LLM_Menu_PromptApiEntry(EditId) {
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
 	ib := InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_dialog_title"),
 		"w420 h130", def_model)
-	if (ib.Result != "OK" or Trim(ib.Value) == "")
+	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model)
 		return
-	new_model := Trim(ib.Value)
 
 	; Persist.
 	new_entry := Map(

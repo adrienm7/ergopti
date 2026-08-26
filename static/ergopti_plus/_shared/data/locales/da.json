@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "Ingen indrykning",
 	"menu.llm.indent_space": "mellemrum",
 	"menu.llm.indent_spaces": "mellemrum",
+	"menu.llm.invalid_input": "Den indtastede værdi er ugyldig eller mangler. Følg formatet, der vises i prompten.",
 	"menu.llm.inline_autotype": "✍️ Inline auto-skrivning (Copilot-stil)",
 	"menu.llm.instant_on_word_end": "Øjeblikkeligt forslag ved ordafslutning",
 	"menu.llm.launch_download_prompt": "Vil du starte downloaden?",

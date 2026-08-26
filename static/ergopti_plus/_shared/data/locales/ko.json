@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "들여쓰기 없음",
 	"menu.llm.indent_space": "공백",
 	"menu.llm.indent_spaces": "공백",
+	"menu.llm.invalid_input": "입력한 값이 없거나 올바르지 않습니다. 프롬프트에 표시된 형식을 따르세요.",
 	"menu.llm.inline_autotype": "✍️ 인라인 자동 입력 (Copilot 스타일)",
 	"menu.llm.instant_on_word_end": "단어 끝에 즉시 제안",
 	"menu.llm.launch_download_prompt": "다운로드를 시작하시겠습니까?",

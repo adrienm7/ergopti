@@ -1076,6 +1076,7 @@
 	"menu.llm.indent_none": "无缩进",
 	"menu.llm.indent_space": "空格",
 	"menu.llm.indent_spaces": "空格",
+	"menu.llm.invalid_input": "输入的值无效或缺失。请遵循提示中显示的格式。",
 	"menu.llm.inline_autotype": "✍️ 内联自动输入（Copilot 风格）",
 	"menu.llm.instant_on_word_end": "单词结尾立即建议",
 	"menu.llm.launch_download_prompt": "是否要开始下载？",
