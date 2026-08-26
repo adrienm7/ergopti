@@ -219,18 +219,8 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 								continue
 						}
 						PendingVal .= " " . Line
-						; Count unquoted ] to detect the real closing bracket — ignores ] inside strings
-						InStr2 := false
-						Depth := 0
-						Loop Parse PendingVal {
-								c := A_LoopField
-								if (c == '"')
-										InStr2 := !InStr2
-								if (!InStr2 and c == "[")
-										Depth++
-								if (!InStr2 and c == "]")
-										Depth--
-						}
+						; Count only unquoted brackets to detect the real terminator.
+						Depth := _TOML_ArrayBracketDepth(PendingVal)
 						if (Depth <= 0) {
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
@@ -273,8 +263,9 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 				; stays data and a hash after the closing quote is still a comment.
 				val := TOML_StripInlineComment(val)
 
-				; Detect opening of a multi-line array: value starts with [ but has no ]
-				if (SubStr(val, 1, 1) = "[" && !InStr(val, "]")) {
+				; A quoted ] on the opening line is data, not the array terminator.
+				if (SubStr(val, 1, 1) = "["
+						&& _TOML_ArrayBracketDepth(val) > 0) {
 						PendingKey := key
 						PendingVal := val
 						continue
@@ -287,6 +278,37 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 		if StoreCache
 			_ParseTomlCache[Path] := Sections
 		return Sections
+}
+
+; Return the net bracket depth outside double-quoted TOML strings. Backslash
+; escapes are consumed only inside a string so an escaped quote cannot expose a
+; data bracket to the structural scanner.
+_TOML_ArrayBracketDepth(Value) {
+		Depth := 0
+		InString := false
+		Escaped := false
+		Loop Parse Value {
+				Char := A_LoopField
+				if Escaped {
+						Escaped := false
+						continue
+				}
+				if (InString and Char == "\") {
+						Escaped := true
+						continue
+				}
+				if (Char == '"') {
+						InString := !InString
+						continue
+				}
+				if !InString {
+						if (Char == "[")
+								Depth++
+						else if (Char == "]")
+								Depth--
+				}
+		}
+		return Depth
 }
 
 ; Cut a line at its first UNQUOTED ``#`` and trim what remains. This is the
