@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "建议数量: %s",
 	"menu.llm.off": "❌ AI 已禁用（单击启用）",
 	"menu.llm.ollama_model_hint": "Ollama模型标识，例：qwen2.5:1.5b 或 llama3.2:3b",
+	"menu.llm.open_source_failed": "无法打开模型来源页面。",
 	"menu.llm.ollama_port_label": "Ollama 服务器端口：%s",
 	"menu.llm.ollama_port_prompt": "本地 Ollama 服务器的端口（1024-65535）。默认：11434。",
 	"menu.llm.ollama_port_title": "Ollama 服务器端口",

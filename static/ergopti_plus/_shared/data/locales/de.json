@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "Anzahl der Vorschläge: %s",
 	"menu.llm.off": "❌ KI deaktiviert (zum Aktivieren klicken)",
 	"menu.llm.ollama_model_hint": "Ollama-Modellkennung, z. B.: qwen2.5:1.5b oder llama3.2:3b",
+	"menu.llm.open_source_failed": "Die Quellseite des Modells konnte nicht geöffnet werden.",
 	"menu.llm.ollama_port_label": "Ollama-Server-Port: %s",
 	"menu.llm.ollama_port_prompt": "Port des lokalen Ollama-Servers (1024-65535). Standard: 11434.",
 	"menu.llm.ollama_port_title": "Ollama-Server-Port",

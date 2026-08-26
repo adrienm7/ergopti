@@ -520,8 +520,30 @@ _LLM_Menu_MakeOpenUrlHandler(url) {
 	return (*) => _LLM_Menu_OpenUrl(captured)
 }
 
-_LLM_Menu_OpenUrl(url) {
-	try Run(url)
+_LLM_Menu_RunUrl(url) {
+	Run(url)
+}
+
+_LLM_Menu_OpenUrl(url, RunFn := 0, NotifyFn := 0, LogFn := 0) {
+	if !HasMethod(RunFn, "Call")
+		RunFn := _LLM_Menu_RunUrl
+	try {
+		RunFn.Call(url)
+		return true
+	} catch as Err {
+		if HasMethod(LogFn, "Call")
+			LogFn.Call(url, Err)
+		else
+			try LoggerError("LLM.menu",
+				"Model source URL launch failed for '{1}': {2}", url, Err.Message)
+		Body := t("menu.llm.open_source_failed")
+		Title := t("common.error_title")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Body, Title)
+		else
+			try MsgBox(Body, Title, "Iconx")
+		return false
+	}
 }
 
 

@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "عدد الاقتراحات: %s",
 	"menu.llm.off": "❌ الذكاء الاصطناعي معطّل (انقر للتفعيل)",
 	"menu.llm.ollama_model_hint": "معرّف نموذج Ollama، مثال: qwen2.5:1.5b أو llama3.2:3b",
+	"menu.llm.open_source_failed": "تعذّر فتح صفحة مصدر النموذج.",
 	"menu.llm.ollama_port_label": "منفذ خادم Ollama: %s",
 	"menu.llm.ollama_port_prompt": "منفذ خادم Ollama المحلي (1024-65535). الافتراضي: 11434.",
 	"menu.llm.ollama_port_title": "منفذ خادم Ollama",

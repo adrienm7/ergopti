@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "सुझावों की संख्या: %s",
 	"menu.llm.off": "❌ AI अक्षम (सक्षम करने के लिए क्लिक करें)",
 	"menu.llm.ollama_model_hint": "Ollama मॉडल पहचानकर्ता, उदाहरण के लिए: qwen2.5:1.5b या llama3.2:3b",
+	"menu.llm.open_source_failed": "मॉडल का स्रोत पृष्ठ नहीं खोला जा सका।",
 	"menu.llm.ollama_port_label": "Ollama सर्वर पोर्ट: %s",
 	"menu.llm.ollama_port_prompt": "स्थानीय Ollama सर्वर का पोर्ट (1024-65535)। डिफ़ॉल्ट: 11434।",
 	"menu.llm.ollama_port_title": "Ollama सर्वर पोर्ट",

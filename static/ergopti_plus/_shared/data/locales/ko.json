@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "제안 수: %s",
 	"menu.llm.off": "❌ AI 비활성화 (활성화하려면 클릭)",
 	"menu.llm.ollama_model_hint": "Ollama 모델 식별자, 예: qwen2.5:1.5b 또는 llama3.2:3b",
+	"menu.llm.open_source_failed": "모델 소스 페이지를 열 수 없습니다.",
 	"menu.llm.ollama_port_label": "Ollama 서버 포트: %s",
 	"menu.llm.ollama_port_prompt": "로컬 Ollama 서버의 포트 (1024-65535). 기본값: 11434.",
 	"menu.llm.ollama_port_title": "Ollama 서버 포트",

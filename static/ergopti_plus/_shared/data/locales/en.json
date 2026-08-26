@@ -1123,6 +1123,7 @@
 	"model_browser.count_label": "{n} of {total} models",
 	"menu.llm.off": "❌ AI disabled (click to enable)",
 	"menu.llm.ollama_model_hint": "Ollama model identifier, e.g.: qwen2.5:1.5b or llama3.2:3b",
+	"menu.llm.open_source_failed": "Unable to open the model source page.",
 	"menu.llm.on": "✅ AI enabled (click to disable)",
 	"menu.llm.params_active": "Parameters (Active): ",
 	"menu.llm.params_total": "Parameters (Total): ",

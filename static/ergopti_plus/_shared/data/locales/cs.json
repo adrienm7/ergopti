@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "Počet návrhů: %s",
 	"menu.llm.off": "❌ AI deaktivováno (kliknutím aktivujete)",
 	"menu.llm.ollama_model_hint": "Identifikátor modelu Ollama, např.: qwen2.5:1.5b nebo llama3.2:3b",
+	"menu.llm.open_source_failed": "Stránku zdroje modelu se nepodařilo otevřít.",
 	"menu.llm.ollama_port_label": "Port serveru Ollama: %s",
 	"menu.llm.ollama_port_prompt": "Port místního serveru Ollama (1024-65535). Výchozí: 11434.",
 	"menu.llm.ollama_port_title": "Port serveru Ollama",

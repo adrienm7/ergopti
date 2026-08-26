@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "מספר הצעות: %s",
 	"menu.llm.off": "❌ AI מושבת (לחץ להפעלה)",
 	"menu.llm.ollama_model_hint": "מזהה מודל Ollama, לדוגמה: qwen2.5:1.5b או llama3.2:3b",
+	"menu.llm.open_source_failed": "לא ניתן לפתוח את דף המקור של המודל.",
 	"menu.llm.ollama_port_label": "פורט שרת Ollama: %s",
 	"menu.llm.ollama_port_prompt": "הפורט של שרת ה-Ollama המקומי (1024-65535). ברירת מחדל: 11434.",
 	"menu.llm.ollama_port_title": "פורט שרת Ollama",

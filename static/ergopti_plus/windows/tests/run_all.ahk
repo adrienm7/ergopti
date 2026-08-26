@@ -418,6 +418,7 @@ global _LLM_Menu_Loaded := false
 ; harness; the regression suite calls only its one-shot saved-options seam.
 #Include ../ui/menu/menu_llm/init.ahk
 _LogBootProgress("loading menu_llm/persist")
+#Include ../ui/menu/menu_llm/menu_models.ahk
 #Include ../ui/menu/menu_llm/menu_profiles.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include ../ui/menu/menu_llm/transactions.ahk

@@ -1108,6 +1108,7 @@
 	"menu.llm.num_predictions_label": "Numero di suggerimenti: %s",
 	"menu.llm.off": "❌ IA disattivata (clicca per attivare)",
 	"menu.llm.ollama_model_hint": "Identificatore modello Ollama, es.: qwen2.5:1.5b o llama3.2:3b",
+	"menu.llm.open_source_failed": "Impossibile aprire la pagina sorgente del modello.",
 	"menu.llm.ollama_port_label": "Porta del server Ollama: %s",
 	"menu.llm.ollama_port_prompt": "Porta del server Ollama locale (1024-65535). Predefinita: 11434.",
 	"menu.llm.ollama_port_title": "Porta del server Ollama",
