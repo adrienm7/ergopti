@@ -148,6 +148,12 @@ _Bundle_VerifyStaging(StagingDir) {
 	return DirExist(StagingDir) and DirExist(StagingDir . "\static")
 }
 
+_Bundle_LiveTreeCanSkip(BundleDir, ExistingVersion) {
+	if (ExistingVersion == "" or ExistingVersion != BUNDLE_VERSION)
+		return false
+	return _Bundle_VerifyStaging(BundleDir)
+}
+
 ; Runs PowerShell's Expand-Archive synchronously to unzip ``ZipPath`` into
 ; ``DestDir``. Returns true on success, false otherwise. We rely on PowerShell
 ; because AHK v2 has no built-in unzip and adding a COM-based extractor would
@@ -213,12 +219,16 @@ Bundle_Init() {
 	if !DirExist(ParentDir) {
 		try DirCreate(ParentDir)
 	}
-	; Skip if the marker matches the embedded version.
+	; A matching marker is metadata, not proof that the prior extraction is
+	; complete. Verify the live tree before accepting the fast path so a partial
+	; or externally damaged bundle repairs itself on the next compiled boot.
 	Existing := _Bundle_ReadMarker(BundleDir)
-	if (Existing != "" and Existing == BUNDLE_VERSION) {
+	if _Bundle_LiveTreeCanSkip(BundleDir, Existing) {
 		OutputDebug("[bundle] Marker matches '" . BUNDLE_VERSION . "' — skipping extraction.")
 		return
 	}
+	if (Existing != "" and Existing == BUNDLE_VERSION)
+		OutputDebug("[bundle] Marker matches but the live tree failed verification — rebuilding.")
 
 	; Extract into a sibling staging directory. The live bundle remains intact
 	; until the archive and marker have both been verified.
