@@ -299,6 +299,45 @@ _LAO_ApiValidationRequiresExactEntryOwner() {
 Test("[ahk-008-aux-owner] API validation is bound to the exact entry generation",
 	_LAO_ApiValidationRequiresExactEntryOwner)
 
+_LAO_ApiValidationPublishesWhileDisabled() {
+	global _LLM_Menu
+	SavedMenu := _LLM_Menu
+	Notices := []
+	try {
+		_LAO_ResetOwners()
+		_LLM_Menu := Map("enabled", false, "backend", "api", "api_entry_id", "prod",
+			"api_entries", [Map("Id", "prod", "Name", "Prod", "Provider", "openai",
+				"BaseUrl", "https://b.invalid/v1", "Token", "secret", "Model", "b")])
+		NotifyFn := (Reachable, Name) => Notices.Push(Map(
+			"reachable", Reachable, "name", Name))
+		Owner := LLM_AuxBegin("api_validation:prod", Map(
+			"backend", "api", "endpoint", "https://b.invalid/v1", "identity", "prod"))
+		AssertTrue(_LLM_Menu_OnApiValidationDone(true, "Prod", "prod", Owner, NotifyFn),
+			"a configuration action must report its current result while LLM is disabled")
+		AssertEqual(1, Notices.Length,
+			"the disabled configuration action must notify exactly once")
+
+		BackendOwner := LLM_AuxBegin("api_validation:prod", Map(
+			"backend", "api", "endpoint", "https://b.invalid/v1", "identity", "prod"))
+		_LLM_Menu["backend"] := "ollama"
+		AssertFalse(_LLM_Menu_OnApiValidationDone(false, "Prod", "prod",
+			BackendOwner, NotifyFn),
+			"a backend switch must still reject an obsolete validation result")
+		_LLM_Menu["backend"] := "api"
+		_LLM_Menu["api_entries"] := []
+		DeletedOwner := LLM_AuxBegin("api_validation:prod", Map(
+			"backend", "api", "endpoint", "https://b.invalid/v1", "identity", "prod"))
+		AssertFalse(_LLM_Menu_OnApiValidationDone(false, "Prod", "prod",
+			DeletedOwner, NotifyFn),
+			"a deleted entry must still reject an obsolete validation result")
+		AssertEqual(1, Notices.Length,
+			"only the current disabled-state completion may notify")
+	} finally _LLM_Menu := SavedMenu
+}
+Test("[ahk-020] API validation reports while LLM is disabled "
+	. "(api-validation-disabled-feedback)",
+	_LAO_ApiValidationPublishesWhileDisabled)
+
 _LAO_ApiEntryPublicationRetiresValidationFirst() {
 	_LAO_ResetOwners()
 	OldOwner := LLM_AuxBegin("api_validation:prod", Map(

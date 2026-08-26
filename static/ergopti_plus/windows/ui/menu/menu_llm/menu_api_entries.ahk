@@ -323,8 +323,7 @@ _LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
 	try {
 		if !LLM_AuxIsCurrent(Owner) || A_IsSuspended
 			return false
-		if !(_LLM_Menu is Map) || !_LLM_Menu.Get("enabled", false)
-				|| _LLM_Menu.Get("backend", "") != "api"
+		if !(_LLM_Menu is Map) || _LLM_Menu.Get("backend", "") != "api"
 			return false
 		Matches := 0
 		CurrentName := Name
