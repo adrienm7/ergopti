@@ -33,7 +33,12 @@ helpers.describe("updater: channel switch clears cached release", function()
 		local upd = fresh_packaged()
 
 		-- Seed a cached release as if a previous stable-channel check completed.
-		upd.set_cached_release({ tag = "v2.5.0", url = "https://example.com/v2.5.0" })
+		helpers.assert_eq(upd.set_cached_release({
+			tag = "v2.5.0",
+			zip_url = "https://github.com/adrienm7/ergopti/releases/download/"
+				.. "v2.5.0/ErgoptiPlus.app.zip",
+			sha256 = string.rep("a", 64),
+		}), true)
 		upd.set_update_state("available")
 		helpers.assert_true(upd.get_cached_release() ~= nil, "cached release must be set before switch")
 

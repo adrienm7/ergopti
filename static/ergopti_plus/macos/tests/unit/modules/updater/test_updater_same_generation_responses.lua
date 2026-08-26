@@ -36,9 +36,10 @@ end
 --- @return string body JSON response body.
 local function release_body(tag)
 	return string.format(
-		[[{"tag_name":"%s","body":"notes","assets":[{"name":"ErgoptiPlus.app.zip","browser_download_url":"https://example.test/%s.zip"}]}]],
+		[[{"tag_name":"%s","body":"notes","assets":[{"name":"ErgoptiPlus.app.zip","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/ErgoptiPlus.app.zip","digest":"sha256:%s"}]}]],
 		tag,
-		tag
+		tag,
+		string.rep("a", 64)
 	)
 end
 

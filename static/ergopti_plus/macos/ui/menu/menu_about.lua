@@ -30,6 +30,7 @@ local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
 local ManifestMenu = require("infra.manifest_menu")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local Crypto    = require("adapters.crypto")
 local LOG       = "menu_about"
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
@@ -117,17 +118,36 @@ local function get_update_menu_label()
 	return Updater.get_update_menu_label()
 end
 
---- Downloads a URL to a local file path using hs.http.asyncGet.
+--- Downloads a validated release asset and verifies its SHA-256 before writing.
 --- Calls cb(ok, err_msg) when done.
---- @param url string
+--- @param release table Validated release metadata.
 --- @param dest string Absolute file path
 --- @param cb function
-local function download_to_file(url, dest, cb)
+local function download_to_file(release, dest, cb)
+	local valid, validation_error = Updater.validate_install_asset(release)
+	if valid ~= true then
+		Logger.error(LOG, "Update download refused before dispatch — %s.", tostring(validation_error))
+		cb(false, i18n.get("menu.about.update.install_error"))
+		return
+	end
+	local url = release.zip_url
+	local expected_digest = release.sha256
 	Logger.trace(LOG, "Downloading %s → %s…", url, dest)
 	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
 		if status ~= 200 or not body or #body == 0 then
-			Logger.error(LOG, "Download failed: HTTP %d for %s.", status, url)
+			Logger.error(LOG, "Download failed: HTTP %s for %s.", tostring(status), url)
 			cb(false, i18n.get("menu.about.update.network_error"))
+			return
+		end
+		local actual_digest = Crypto.sha256_bytes(body)
+		if actual_digest == "" then
+			Logger.error(LOG, "Downloaded update archive could not be hashed.")
+			cb(false, i18n.get("menu.about.update.install_error"))
+			return
+		end
+		if actual_digest ~= expected_digest then
+			Logger.error(LOG, "Downloaded update archive failed SHA-256 verification.")
+			cb(false, i18n.get("menu.about.update.install_error"))
 			return
 		end
 		-- Write binary via io.open in "wb" mode — safe for .zip payloads.
@@ -279,7 +299,7 @@ local function one_click_update(channel, update_menu_fn)
 		update_menu_fn()
 		Logger.start(LOG, "Installing cached update %s…", cached.tag)
 		local zip_path = (hs.fs.temporaryDirectory() or "/tmp") .. "ErgoptiPlus_" .. os.time() .. ".app.zip"
-		download_to_file(cached.zip_url, zip_path, function(ok, err)
+		download_to_file(cached, zip_path, function(ok, err)
 			if not ok then
 				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
 				Updater.set_update_state("available")
@@ -324,9 +344,10 @@ local function one_click_update(channel, update_menu_fn)
 			return
 		end
 
-		local zip_url = Updater.parse_asset_url(body)
-		if zip_url == "" then
-			Logger.error(LOG, "One-click check: asset '%s' not found in release %s.", ASSET_NAME, latest)
+		local release, asset_error = Updater.parse_install_asset(body, latest)
+		if not release then
+			Logger.error(LOG, "One-click check: asset '%s' refused in release %s — %s.",
+				ASSET_NAME, latest, tostring(asset_error))
 			Updater.set_update_state("idle")
 			update_menu_fn()
 			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
@@ -334,12 +355,19 @@ local function one_click_update(channel, update_menu_fn)
 		end
 
 		Logger.success(LOG, "New version %s found, starting install…", latest)
-		Updater.set_cached_release({ tag = latest, notes = Updater.parse_notes(body), zip_url = zip_url })
+		release.notes = Updater.parse_notes(body)
+		if Updater.set_cached_release(release) ~= true then
+			Logger.error(LOG, "One-click check: validated release could not be cached.")
+			Updater.set_update_state("idle")
+			update_menu_fn()
+			dialog.block_alert(i18n.get("common.warning"), i18n.get("menu.about.update.no_asset"), i18n.get("button.ok"))
+			return
+		end
 		Updater.set_update_state("installing")
 		update_menu_fn()
 
 		local zip_path = (hs.fs.temporaryDirectory() or "/tmp") .. "ErgoptiPlus_" .. os.time() .. ".app.zip"
-		download_to_file(zip_url, zip_path, function(ok, err)
+		download_to_file(release, zip_path, function(ok, err)
 			if not ok then
 				dialog.block_alert(i18n.get("common.error_title"), err, i18n.get("button.ok"))
 				Updater.set_update_state("available")

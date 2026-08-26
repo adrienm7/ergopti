@@ -10,8 +10,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Fail-safe return: sha256() returns "" on any failure rather than
 ---    propagating an exception, matching the port contract error_behavior.
---- 2. OpenSSL delegation: macOS ships with openssl in /usr/bin so we shell out
----    rather than bundling a pure-Lua implementation.
+--- 2. Text compatibility: sha256() preserves the existing OpenSSL-backed port
+---    contract used by shared domain code.
+--- 3. Binary integrity: sha256_bytes() hashes arbitrary bytes through hs.hash,
+---    so archives containing NUL bytes never cross a shell boundary.
 --- ==============================================================================
 
 local M = {}
@@ -53,6 +55,32 @@ function M.sha256(data)
 	end)
 	if not ok then
 		Logger.error(LOG, "sha256(): unexpected error — %s", tostring(result))
+		return ""
+	end
+	return type(result) == "string" and result or ""
+end
+
+--- Computes the SHA-256 digest of an arbitrary binary string.
+--- @param data string The exact byte string to hash.
+--- @return string Lowercase hex digest (64 chars), or "" on failure.
+function M.sha256_bytes(data)
+	local ok, result = pcall(function()
+		if type(data) ~= "string" then return "" end
+		if type(hs.hash) ~= "table" or type(hs.hash.new) ~= "function" then return "" end
+		local context = hs.hash.new("SHA256")
+		if not context then return "" end
+		local appended = context:append(data)
+		if not appended then return "" end
+		local finished = appended:finish()
+		if not finished then return "" end
+		local digest = finished:value()
+		if type(digest) ~= "string" then return "" end
+		digest = digest:lower()
+		if #digest ~= 64 or not digest:match("^[0-9a-f]+$") then return "" end
+		return digest
+	end)
+	if not ok then
+		Logger.error(LOG, "sha256_bytes(): unexpected error — %s", tostring(result))
 		return ""
 	end
 	return type(result) == "string" and result or ""

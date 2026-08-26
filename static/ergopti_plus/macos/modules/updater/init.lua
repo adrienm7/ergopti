@@ -63,6 +63,7 @@ local ASSET_NAME = "ErgoptiPlus.app.zip"
 local BUNDLED_ID = "com.ergopti.app"
 local USER_AGENT = "ErgoptiPlus-Updater/1.0"
 local DEV_PAGE_SIZE = 10
+local SHA256_PREFIX = "sha256:"
 
 -- Module state shared with menu_about.lua
 local _update_state       = "idle"
@@ -246,6 +247,78 @@ function M.parse_asset_url(body)
 	return ReleaseParser.parse_asset_url(body, ASSET_NAME)
 end
 
+--- Validates one self-update release record against the exact GitHub release
+--- asset owned by this repository. The exact URL check rejects alternate
+--- schemes, userinfo, query strings, fragments, repositories, tags, and names.
+--- @param release table Candidate release record.
+--- @return boolean valid Whether the record is safe for download.
+--- @return string|nil reason Stable diagnostic on refusal.
+function M.validate_install_asset(release)
+	if type(release) ~= "table" then return false, "release metadata is not a table" end
+	local tag = release.tag
+	if type(tag) ~= "string" or not tag:match("^[%w][%w%.%+%-]*$") then
+		return false, "release tag is invalid"
+	end
+	local expected_url = string.format(
+		"https://github.com/%s/%s/releases/download/%s/%s",
+		GH_OWNER,
+		GH_REPO,
+		tag,
+		ASSET_NAME
+	)
+	if type(release.zip_url) ~= "string" or release.zip_url ~= expected_url then
+		return false, "release asset URL does not match the selected repository and tag"
+	end
+	if type(release.sha256) ~= "string"
+		or #release.sha256 ~= 64
+		or not release.sha256:match("^[0-9a-f]+$") then
+		return false, "release asset SHA-256 is invalid"
+	end
+	return true, nil
+end
+
+--- Parses and validates the exact installable asset from one GitHub release.
+--- @param body string GitHub release JSON body.
+--- @param expected_tag string Release tag selected by the version engine.
+--- @return table|nil release Validated release record.
+--- @return string|nil reason Stable diagnostic on refusal.
+function M.parse_install_asset(body, expected_tag)
+	if type(body) ~= "string" or body == "" then return nil, "release body is empty" end
+	if type(expected_tag) ~= "string" or expected_tag == "" then
+		return nil, "expected release tag is empty"
+	end
+	local decode_ok, decoded, decode_error = pcall(JsonCodec.decode, body)
+	if not decode_ok or decode_error ~= nil or type(decoded) ~= "table" then
+		return nil, "release JSON is invalid"
+	end
+	if decoded.tag_name ~= expected_tag then
+		return nil, "release tag does not match the selected version"
+	end
+	if type(decoded.assets) ~= "table" then return nil, "release assets are missing" end
+
+	local selected = nil
+	for _, asset in ipairs(decoded.assets) do
+		if type(asset) == "table" and asset.name == ASSET_NAME then
+			if selected ~= nil then return nil, "release contains duplicate install assets" end
+			selected = asset
+		end
+	end
+	if not selected then return nil, "release install asset is missing" end
+
+	local digest = selected.digest
+	if type(digest) ~= "string" or digest:sub(1, #SHA256_PREFIX) ~= SHA256_PREFIX then
+		return nil, "release asset SHA-256 is missing"
+	end
+	local release = {
+		tag = expected_tag,
+		zip_url = selected.browser_download_url,
+		sha256 = digest:sub(#SHA256_PREFIX + 1):lower(),
+	}
+	local valid, reason = M.validate_install_asset(release)
+	if valid ~= true then return nil, reason end
+	return release, nil
+end
+
 local function normalize_release_json(body, channel)
 	if channel == "dev" and body:match("^%s*%[") then
 		return M.pick_latest_prerelease_json(body)
@@ -312,7 +385,13 @@ function M.set_update_state(state)
 end
 
 function M.set_cached_release(release)
+	local valid, reason = M.validate_install_asset(release)
+	if valid ~= true then
+		Logger.error(LOG, "Cached release refused — %s.", tostring(reason))
+		return false, reason
+	end
 	_cached_release = release
+	return true, nil
 end
 
 
@@ -389,26 +468,28 @@ local function background_tick(channel, update_menu_fn, generation)
 				latest, _cached_release.tag)
 			return
 		end
-		-- Only a response that survived parsing and monotonicity may supersede an
-		-- older request or its ETag. A newer HTTP failure must not erase a valid
-		-- older completion that is still in flight.
+		local is_newer = M.is_newer_version(latest, current)
+		local install_release = nil
+		if is_newer then
+			local asset_error
+			install_release, asset_error = M.parse_install_asset(body, latest)
+			if not install_release then
+				Logger.warn(LOG, "Background check: release asset refused for %s — %s.",
+					latest, tostring(asset_error))
+				return
+			end
+		end
+		-- Only a response that survived parsing, monotonicity, and install-asset
+		-- validation may supersede an older request or its ETag.
 		_poll_response_seq = request_seq
 		if response_etag ~= nil then store_fetch_cache(channel, response_etag, body) end
-		if not M.is_newer_version(latest, current) then
+		if not is_newer then
 			Logger.debug(LOG, "Background check: up to date (%s).", current)
 			return
 		end
-		local zip_url = M.parse_asset_url(body)
-		if zip_url == "" then
-			Logger.warn(LOG, "Background check: asset missing in %s.", latest)
-			return
-		end
-		_cached_release = {
-			tag     = latest,
-			notes   = M.parse_notes(body),
-			zip_url = zip_url,
-			raw     = body,
-		}
+		install_release.notes = M.parse_notes(body)
+		install_release.raw = body
+		if M.set_cached_release(install_release) ~= true then return end
 		notify_new_version(latest, update_menu_fn)
 	end)
 end
