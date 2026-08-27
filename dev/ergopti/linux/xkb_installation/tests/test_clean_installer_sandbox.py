@@ -15,6 +15,8 @@ X11 bridge) or non-fatal by contract (activation commands may be absent), so
 the test runs on any platform.
 """
 
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
@@ -29,6 +31,7 @@ INSTALLER_DIR = Path(__file__).resolve().parents[1]
 LAYOUT_VERSION_DIR = INSTALLER_DIR.parent / "v2_2_1"
 sys.path.insert(0, str(INSTALLER_DIR))
 
+import desktop_activation as activation  # noqa: E402
 import xkb_files_installer_clean as clean_installer  # noqa: E402
 from layout_package import InstallerRoots  # noqa: E402
 
@@ -104,7 +107,10 @@ class CleanInstallerSandboxTests(unittest.TestCase):
         symbols_content = symbols.read_text(encoding="utf-8")
         self.assertIn('xkb_symbols "default"', symbols_content)
         self.assertIn("ERGOPTI_SEVEN_LEVEL", symbols_content)
-        self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 2)
+        # One unindexed rule plus one per layout position: without the indexed
+        # rules the custom types vanish as soon as a second layout is kept.
+        self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 10)
+        self.assertIn("! layout[2]", post.read_text(encoding="utf-8"))
         names = [node.text for node in ET.parse(registry).getroot().iter("name")]
         self.assertEqual(names, ["ergopti"])
 
@@ -131,6 +137,60 @@ class CleanInstallerSandboxTests(unittest.TestCase):
         self.assertTrue(
             (self.system_root / "rules" / "evdev").read_text(encoding="utf-8").strip()
         )
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX file modes")
+    def test_the_installed_package_is_readable_by_every_session(self):
+        """The privileged process may run with umask 077; the compositor of
+        the unprivileged user must still be able to read the package."""
+        previous = os.umask(0o077)
+        try:
+            result = self.run_installer()
+        finally:
+            os.umask(previous)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertEqual(self.package_dir.stat().st_mode & 0o777, 0o755)
+        for path in self.package_dir.rglob("*"):
+            expected = 0o755 if path.is_dir() else 0o644
+            self.assertEqual(path.stat().st_mode & 0o777, expected, path)
+
+    def test_an_unwritable_root_is_a_readable_error_not_a_traceback(self):
+        roots = InstallerRoots(
+            extensions_root=self.extensions_root,
+            system_root=self.system_root,
+            cache_dir=self.cache_dir,
+            sandboxed=True,
+        )
+        with mock.patch("builtins.print"), mock.patch.object(
+            Path, "mkdir", side_effect=OSError(30, "Read-only file system")
+        ):
+            with self.assertRaises(SystemExit) as caught:
+                clean_installer.install_clean(
+                    symbols_path=LAYOUT_VERSION_DIR / "Ergopti_v2_2_1_plus.xkb",
+                    types_path=LAYOUT_VERSION_DIR / "xkb_types.txt",
+                    xcompose_path=None,
+                    variant="ergopti_plus",
+                    roots=roots,
+                )
+        message = str(caught.exception.code)
+        self.assertIn("Read-only file system", message)
+        self.assertIn("lecture seule", message)
+        self.assertIn(str(self.extensions_root), message)
+
+    def test_a_forced_clean_install_is_refused_on_an_old_libxkbcommon(self):
+        roots = InstallerRoots(
+            extensions_root=self.extensions_root,
+            system_root=self.system_root,
+            cache_dir=self.cache_dir,
+            sandboxed=False,
+        )
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "libxkbcommon_version", return_value=(1, 6, 0)
+        ):
+            with self.assertRaises(SystemExit) as caught:
+                clean_installer.enforce_clean_prerequisites(roots)
+        message = str(caught.exception.code)
+        self.assertIn("1.6.0", message)
+        self.assertIn("legacy", message)
 
     def test_failed_compile_preserves_the_previous_package_byte_for_byte(self):
         """A rejected upgrade must not remove the layout that still works."""
@@ -170,7 +230,6 @@ class CleanInstallerSandboxTests(unittest.TestCase):
                     types_path=LAYOUT_VERSION_DIR / "xkb_types.txt",
                     xcompose_path=None,
                     variant="ergopti_plus",
-                    support_x11=False,
                     roots=roots,
                 )
 
@@ -262,7 +321,7 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             clean_installer, "write_user_text", side_effect=OSError("read-only home")
         ), mock.patch.object(
             clean_installer,
-            "deactivate",
+            "deactivate_desktop_entries",
             return_value=clean_installer.CleanupStatus.ABSENT,
         ):
             self.assertFalse(clean_installer.uninstall_clean(roots))
@@ -288,7 +347,9 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             clean_installer,
             "remove_user_xcompose_include",
             return_value=clean_installer.CleanupStatus.ABSENT,
-        ), mock.patch.object(clean_installer.subprocess, "run", side_effect=fake_run):
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(activation.subprocess, "run", side_effect=fake_run):
             self.assertFalse(clean_installer.uninstall_clean(roots))
         self.assertTrue(self.package_dir.exists())
 
@@ -310,7 +371,9 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             clean_installer,
             "remove_user_xcompose_include",
             return_value=clean_installer.CleanupStatus.ABSENT,
-        ), mock.patch.object(clean_installer.subprocess, "run", side_effect=fake_run):
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(activation.subprocess, "run", side_effect=fake_run):
             self.assertEqual(
                 clean_installer.main(["--uninstall"]),
                 clean_installer.EXIT_INSTALL_ABORTED,

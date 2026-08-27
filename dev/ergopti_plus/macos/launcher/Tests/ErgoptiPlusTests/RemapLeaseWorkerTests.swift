@@ -2223,6 +2223,16 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			Darwin.pipe($0.baseAddress!)
 		}, 0)
 		guard parentPipe[0] >= 0, parentPipe[1] >= 0 else { return }
+		// The spawned inner must not retain the writer that this test closes to
+		// publish parent EOF; otherwise it waits for STOP while the outer waits
+		// forever for an EOF that the inherited descriptor keeps suppressed.
+		for descriptor in parentPipe {
+			let flags = fcntl(descriptor, F_GETFD)
+			XCTAssertGreaterThanOrEqual(flags, 0)
+			if flags >= 0 {
+				XCTAssertEqual(fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC), 0)
+			}
+		}
 		defer {
 			for descriptor in parentPipe where descriptor >= 0 { Darwin.close(descriptor) }
 		}
@@ -3493,23 +3503,30 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 
 	/// Proves healthy heartbeat traffic repeatedly renews bounded inner waits.
 	func testInnerSilenceDeadlineAcceptsHealthyHeartbeatCycles() throws {
-		let writer = Process()
-		let output = Pipe()
-		writer.executableURL = URL(fileURLWithPath: "/bin/sh")
-		writer.arguments = [
-			"-c",
-			"sleep 0.05; printf 'HEARTBEAT 1 1\\n'; "
-				+ "sleep 0.05; printf 'HEARTBEAT 1 2\\n'; "
-				+ "sleep 0.05; printf 'HEARTBEAT 1 3\\n'; sleep 0.2",
-		]
-		writer.standardOutput = output
-		try writer.run()
+		var sockets = [Int32](repeating: -1, count: 2)
+		let socketStatus = sockets.withUnsafeMutableBufferPointer { buffer in
+			Darwin.socketpair(AF_UNIX, SOCK_STREAM, 0, buffer.baseAddress!)
+		}
+		XCTAssertEqual(socketStatus, 0)
+		guard socketStatus == 0 else { return }
 		defer {
-			if writer.isRunning { writer.terminate() }
-			writer.waitUntilExit()
+			_ = Darwin.close(sockets[0])
+			_ = Darwin.close(sockets[1])
+		}
+		let writerFinished = DispatchSemaphore(value: 0)
+		let writerDescriptor = sockets[0]
+		DispatchQueue.global(qos: .userInitiated).async {
+			for sequence in UInt32(1)...UInt32(3) {
+				usleep(50_000)
+				guard writeLeaseLine(
+					"HEARTBEAT 1 \(sequence)",
+					to: writerDescriptor
+				) else { break }
+			}
+			writerFinished.signal()
 		}
 		let channel = SocketLeaseInnerChannel(
-			descriptor: output.fileHandleForReading.fileDescriptor
+			descriptor: sockets[1]
 		)
 
 		for sequence in UInt32(1)...UInt32(3) {
@@ -3518,6 +3535,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				.command(.heartbeat(kLeaseModeActive, sequence))
 			)
 		}
+		XCTAssertEqual(writerFinished.wait(timeout: .now() + 1), .success)
 	}
 
 

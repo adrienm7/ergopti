@@ -59,7 +59,7 @@ def generate_xcompose(
     for trigger, output in mapped_symbols.items():
         symbol_name = mappings.get(output, output)
         if symbol_name not in ["uparrow", "downarrow", "infinity"]:
-            lines.append(f'<{symbol_name}> : "{trigger}"')
+            lines.append(f"<{symbol_name}> : {compose_string(trigger)}")
     lines.append("")
 
     first = True
@@ -89,8 +89,7 @@ def generate_xcompose(
         if any(char in trigger for char in [" ", " ", " "]):
             continue
 
-        output_str = f'"{output}"' if '"' not in output else f"'{output}'"
-        lines.append(f"<{trigger}>\t: {output_str}")
+        lines.append(f"<{trigger}>\t: {compose_string(output)}")
 
         for action_id, output in sorted(by_deadkey[deadkey]):
             seq: list[str] = []
@@ -110,10 +109,21 @@ def generate_xcompose(
                 left_action = mappings.get(action_id, action_id)
                 seq.append(f"<{left_action}>")
 
-            out_str = f'"{output}"' if '"' not in output else f"'{output}'"
-            lines.append(f"{' '.join(seq)}\t: {out_str}")
+            lines.append(f"{' '.join(seq)}\t: {compose_string(output)}")
     content = 'include "%L"\n\n' + "\n".join(lines) + "\n"
     return content
+
+
+def compose_string(text: str) -> str:
+    """Render ``text`` as a Compose file string literal.
+
+    Compose strings are always double-quoted; a backslash or a double quote
+    inside them must be escaped or the parser reports an unterminated string
+    and drops the sequences that follow. Single quotes are not a string
+    delimiter in that grammar, so they cannot serve as a fallback.
+    """
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def parse_actions(xml_text: str) -> Any:

@@ -20,6 +20,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 PACKAGE_NAME = "ergopti"
 
@@ -133,12 +134,25 @@ def format_gsettings_sources(pairs: list[tuple[str, str]]) -> str:
 
 
 def merge_gsettings_source(
-    pairs: list[tuple[str, str]], new_entries: list[tuple[str, str]]
+    pairs: list[tuple[str, str]],
+    new_entries: list[tuple[str, str]],
+    make_primary: bool = False,
 ) -> tuple[list[tuple[str, str]], bool]:
-    """Append entries that are missing; never reorder or drop existing ones.
+    """Merge entries into the user's source list without ever dropping one.
 
-    Returns the merged list and whether anything was added.
+    By default entries are appended, which preserves the existing order. GNOME
+    types with the *first* source in the list, so appending leaves a freshly
+    installed layout inactive until the user cycles input sources by hand;
+    ``make_primary`` moves the requested entries to the front instead. Nothing
+    is ever removed either way.
+
+    Returns the merged list and whether the value changed.
     """
+    if make_primary:
+        wanted = list(dict.fromkeys(new_entries))
+        remainder = [pair for pair in pairs if pair not in set(wanted)]
+        merged = wanted + remainder
+        return merged, merged != pairs
     existing = set(pairs)
     merged = list(pairs)
     added = False
@@ -149,6 +163,44 @@ def merge_gsettings_source(
         existing.add(entry)
         added = True
     return merged, added
+
+
+@dataclass(frozen=True)
+class LayoutSpec:
+    """One XKB layout selection: a layout name and an optional variant.
+
+    The clean method installs a standalone layout (``ergopti``); the legacy
+    method registers a variant of the system ``fr`` layout
+    (``fr`` + ``Ergopti_v2_2_1``). Desktops spell that pair differently:
+    GNOME joins it with ``+``, KDE keeps two aligned lists, ``setxkbmap`` and
+    every compositor take two separate settings. Modelling the pair once keeps
+    each spelling derivable and testable.
+    """
+
+    layout: str
+    variant: str = ""
+
+    @classmethod
+    def parse(cls, identifier: str) -> "LayoutSpec":
+        """Parse the GNOME spelling ``layout`` or ``layout+variant``."""
+        layout, _, variant = (identifier or "").partition("+")
+        validate_component_identifier(layout)
+        if variant:
+            validate_component_identifier(variant)
+        return cls(layout, variant)
+
+    @property
+    def gnome_id(self) -> str:
+        return f"{self.layout}+{self.variant}" if self.variant else self.layout
+
+    @property
+    def rmlvo_variant(self) -> str:
+        return self.variant
+
+
+def is_ergopti_source(identifier: str) -> bool:
+    """Whether a desktop layout identifier belongs to any Ergopti install."""
+    return "ergopti" in (identifier or "").lower()
 
 
 def parse_kde_layout_list(text: str | None) -> list[str]:
@@ -172,6 +224,59 @@ def merge_kde_layout_list(current: list[str], new_ids: list[str]) -> tuple[list[
     return merged, added
 
 
+def parse_kde_layouts(layout_list: str | None, variant_list: str | None) -> list[LayoutSpec]:
+    """Combine Plasma's aligned ``LayoutList`` and ``VariantList`` values.
+
+    ``VariantList`` is index-aligned with ``LayoutList`` and may be shorter or
+    absent; a missing entry means "no variant". Empty layout entries are
+    dropped because Plasma ignores them as well.
+    """
+    layouts = [part.strip() for part in (layout_list or "").split(",")]
+    variants = [part.strip() for part in (variant_list or "").split(",")]
+    specs: list[LayoutSpec] = []
+    for index, layout in enumerate(layouts):
+        if not layout:
+            continue
+        variant = variants[index] if index < len(variants) else ""
+        specs.append(LayoutSpec(layout, variant))
+    return specs
+
+
+def format_kde_layouts(specs: list[LayoutSpec]) -> tuple[str, str]:
+    """Render specs back into aligned ``LayoutList`` and ``VariantList`` values."""
+    return (
+        ",".join(spec.layout for spec in specs),
+        ",".join(spec.variant for spec in specs),
+    )
+
+
+def merge_layout_specs(
+    current: list[LayoutSpec], wanted: list[LayoutSpec]
+) -> tuple[list[LayoutSpec], bool]:
+    """Put ``wanted`` first without dropping any existing spec.
+
+    The first layout is the one a desktop activates at login, so a freshly
+    installed layout that is merely appended stays inactive until the user
+    cycles layouts by hand.
+    """
+    ordered = list(dict.fromkeys(wanted))
+    remainder = [spec for spec in current if spec not in set(ordered)]
+    merged = ordered + remainder
+    return merged, merged != current
+
+
+def remove_layout_specs(
+    current: list[LayoutSpec], owned: "Callable[[LayoutSpec], bool]"
+) -> tuple[list[LayoutSpec], bool]:
+    """Drop the specs ``owned`` accepts; keep the order of the others."""
+    kept = [spec for spec in current if not owned(spec)]
+    return kept, kept != current
+
+
+def is_ergopti_spec(spec: LayoutSpec) -> bool:
+    return is_ergopti_source(spec.layout) or is_ergopti_source(spec.variant)
+
+
 def patch_symbols_default(content: str) -> str:
     """Rename the symbols section to ``default`` so GUI pickers resolve it.
 
@@ -188,17 +293,30 @@ def patch_symbols_default(content: str) -> str:
     return "default partial alphanumeric_keys\n" + patched
 
 
+# XKB supports at most four simultaneous layouts (groups).
+MAX_XKB_LAYOUTS = 4
+
+
 def build_evdev_post(layout_id: str) -> str:
     """Build the composable ``rules/evdev.post`` fragment.
 
     libxkbcommon >= 1.13 appends this file after the main ruleset, which binds
     our custom types to the layout without ever touching the system rules file.
+
+    Rules semantics that are easy to get wrong: an unindexed ``layout`` rule
+    only matches configurations with a *single* layout, and ``layout[N]`` only
+    matches multi-layout configurations. GNOME and KDE compile every configured
+    input source into one keymap, so a user who keeps ``us`` next to Ergopti
+    needs the indexed rules or the custom types are never loaded and every key
+    falls back to ONE_LEVEL (dead Shift and AltGr, issue #84).
     """
     identifier = validate_component_identifier(layout_id)
-    return (
-        "! layout\t=\ttypes\n"
-        f"  {identifier}\t=\t+{identifier}\n"
-    )
+    sections = ["! layout\t=\ttypes\n" f"  {identifier}\t=\t+{identifier}\n"]
+    for index in range(1, MAX_XKB_LAYOUTS + 1):
+        sections.append(
+            f"! layout[{index}]\t=\ttypes\n" f"  {identifier}\t=\t+{identifier}\n"
+        )
+    return "".join(sections)
 
 
 def build_registry_xml(
@@ -311,6 +429,113 @@ def ansi_base_name_for_variant(version_dir: str, variant: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Compiled keymap inspection
+# ---------------------------------------------------------------------------
+#
+# Both compilers dump a keymap as text, with two spellings: libxkbcommon
+# numbers groups and levels (``type[1]=``, ``map[Shift]= 3``) while Xorg's
+# xkbcomp keeps the symbolic names (``type[Group1]=``, ``map[Shift]= Level3``).
+# Every helper accepts both. They exist because "the keymap compiled" proves
+# nothing: a key whose type is unknown silently falls back to ONE_LEVEL, which
+# users experience as a dead Shift key (issue #84).
+
+_KEY_TYPE_RE = re.compile(r'type(?:\[\s*(?:Group)?(\d+)\s*\])?\s*=\s*"([^"]+)"')
+
+
+def _component_name(key: str) -> str:
+    name = key.strip()
+    return name if name.startswith("<") else f"<{name}>"
+
+
+def keymap_defines_type(keymap: str, type_name: str) -> bool:
+    """Whether the compiled keymap carries a definition of ``type_name``."""
+    return re.search(r'type\s+"' + re.escape(type_name) + r'"\s*\{', keymap) is not None
+
+
+def keymap_key_block(keymap: str, key: str) -> str | None:
+    """Return the body of ``key <NAME> { ... };`` or ``None`` when absent."""
+    pattern = re.compile(r"key\s+" + re.escape(_component_name(key)) + r"\s*\{(.*?)\};", re.DOTALL)
+    match = pattern.search(keymap)
+    return match.group(1) if match else None
+
+
+def keymap_key_type(keymap: str, key: str, group: int = 1) -> str | None:
+    """Return the key type bound to ``key`` for ``group`` (1-based).
+
+    A ``type=`` entry without an index applies to every group; an indexed
+    entry wins for its own group. ``None`` means the key is absent or has no
+    explicit type.
+    """
+    block = keymap_key_block(keymap, key)
+    if block is None:
+        return None
+    default = None
+    for index, name in _KEY_TYPE_RE.findall(block):
+        if not index:
+            default = name
+        elif int(index) == group:
+            return name
+    return default
+
+
+def keymap_key_symbols(keymap: str, key: str, group: int = 1) -> list[str]:
+    """Return the keysym names bound to ``key`` for ``group`` (1-based)."""
+    block = keymap_key_block(keymap, key)
+    if block is None:
+        return []
+    match = re.search(
+        r"symbols\[\s*(?:Group)?" + str(group) + r"\s*\]\s*=\s*\[([^\]]*)\]", block
+    )
+    if not match:
+        return []
+    return [part.strip() for part in match.group(1).split(",") if part.strip()]
+
+
+def keymap_type_block(keymap: str, type_name: str) -> str | None:
+    """Return the body of ``type "NAME" { ... };`` or ``None`` when absent."""
+    pattern = re.compile(r'type\s+"' + re.escape(type_name) + r'"\s*\{(.*?)\};', re.DOTALL)
+    match = pattern.search(keymap)
+    return match.group(1) if match else None
+
+
+def keymap_type_level(keymap: str, type_name: str, modifier: str) -> int | None:
+    """Return the level ``modifier`` alone selects in ``type_name``; ``None`` if unmapped."""
+    block = keymap_type_block(keymap, type_name)
+    if block is None:
+        return None
+    match = re.search(
+        r"map\s*\[\s*" + re.escape(modifier) + r"\s*\]\s*=\s*(?:Level)?(\d+)", block
+    )
+    return int(match.group(1)) if match else None
+
+
+def keymap_type_preserves(keymap: str, type_name: str, modifier: str) -> bool:
+    """Whether ``type_name`` keeps ``modifier`` in the event after selecting a level."""
+    block = keymap_type_block(keymap, type_name)
+    if block is None:
+        return False
+    return (
+        re.search(
+            r"preserve\s*\[\s*" + re.escape(modifier) + r"\s*\]\s*=\s*" + re.escape(modifier) + r"\b",
+            block,
+        )
+        is not None
+    )
+
+
+def parse_version(text: str) -> tuple[int, ...] | None:
+    """Extract the first ``major.minor[.patch]`` version found in ``text``."""
+    match = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?", text or "")
+    if not match:
+        return None
+    return tuple(int(part or 0) for part in match.groups())
+
+
+def format_version(version: tuple[int, ...]) -> str:
+    return ".".join(str(part) for part in version)
+
+
+# ---------------------------------------------------------------------------
 # Previous-installation migration
 # ---------------------------------------------------------------------------
 #
@@ -326,12 +551,63 @@ def ansi_base_name_for_variant(version_dir: str, variant: str) -> str:
 # can coexist for the same layout.
 
 
+_TYPE_BLOCK_RE = re.compile(r'type\s+"([^"]+)"\s*\{.*?\};', re.DOTALL)
+
+
+def insert_type_sections(destination: str, source: str) -> tuple[str, list[str]]:
+    """Insert or replace the ``type`` blocks of ``source`` inside ``destination``.
+
+    ``destination`` is a system types file such as ``types/extra``: one or
+    more ``xkb_types "name" { ... };`` sections. A ``type`` block is only valid
+    *inside* such a section, so new blocks are inserted before the closing
+    ``};`` of the last section; appending after it makes Xorg's ``xkbcomp``
+    reject the whole ``complete`` types file and makes libxkbcommon silently
+    drop the type, which is exactly how the Shift and AltGr layers died.
+
+    Existing blocks with the same type name are replaced in place. Returns the
+    new content and the names of the inserted or replaced types.
+    """
+    blocks = _TYPE_BLOCK_RE.findall(source)
+    if not blocks:
+        raise ValueError("source types file defines no type block")
+    content = destination
+    handled: list[str] = []
+    for match in _TYPE_BLOCK_RE.finditer(source):
+        name = match.group(1)
+        block = match.group(0)
+        existing = re.compile(
+            r'type\s+"' + re.escape(name) + r'"\s*\{.*?\};', re.DOTALL
+        )
+        if existing.search(content):
+            content = existing.sub(lambda _m, b=block: b, content, count=1)
+        else:
+            closing = content.rstrip().rfind("};")
+            if closing == -1:
+                raise ValueError("destination types file has no xkb_types section")
+            indented = "\n".join(
+                ("    " + line) if line.strip() else line for line in block.splitlines()
+            )
+            head = content[:closing].rstrip("\n")
+            tail = content[closing:]
+            content = f"{head}\n\n{indented}\n{tail}"
+        handled.append(name)
+    if not content.endswith("\n"):
+        content += "\n"
+    return content, handled
+
+
+_RULE_HEADER_RE = re.compile(r"^\s*!")
+
+
 def strip_ergopti_rule_lines(rules_content: str) -> tuple[str, int]:
     """Remove rule lines previously injected for Ergopti by older installers.
 
     Only assignment lines (they contain ``=``) mentioning ``ergopti`` are
-    removed; section headers and unrelated content are preserved. Returns the
-    cleaned content and the number of removed lines.
+    removed, together with the ``= types`` section headers those installers
+    appended when the removal leaves them without any entry; headers that
+    still hold entries and unrelated content are preserved, and a file that
+    carried nothing of ours is returned untouched. Returns the cleaned content
+    and the number of removed lines.
     """
     kept: list[str] = []
     removed = 0
@@ -340,7 +616,27 @@ def strip_ergopti_rule_lines(rules_content: str) -> tuple[str, int]:
             removed += 1
             continue
         kept.append(line)
-    return "".join(kept), removed
+    if removed == 0:
+        return rules_content, 0
+    result: list[str] = []
+    index = 0
+    while index < len(kept):
+        line = kept[index]
+        if _RULE_HEADER_RE.match(line) and "=" in line and "types" in line:
+            end = index + 1
+            while end < len(kept) and not _RULE_HEADER_RE.match(kept[end]):
+                end += 1
+            body = kept[index + 1 : end]
+            if not any(entry.strip() and not entry.lstrip().startswith("//") for entry in body):
+                # An emptied section is what the generation-2 installer left
+                # behind: dropping it with its blank lines restores the file.
+                removed += 1
+                index = end
+                continue
+        result.append(line)
+        index += 1
+    cleaned = "".join(result)
+    return cleaned.rstrip("\n") + "\n" if cleaned.strip() else "", removed
 
 
 def find_stale_bridge_links(system_root: Path) -> list[Path]:
