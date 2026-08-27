@@ -72,6 +72,21 @@ local _source_snapshot = nil
 -- placeholder — never hardcoded here.
 local _default_priority = nil
 
+--- Releases one exact native bridge callback before dropping its Lua owner.
+--- @param usercontent any Candidate or committed usercontent controller.
+--- @return boolean released Whether callback release completed.
+local function release_usercontent(usercontent)
+	if not usercontent or type(usercontent.setCallback) ~= "function" then
+		Logger.error(LOG, "Cannot release webview usercontent callback.")
+		return false
+	end
+	local released = pcall(function() usercontent:setCallback(nil) end)
+	if not released then
+		Logger.error(LOG, "Failed to release webview usercontent callback.")
+	end
+	return released
+end
+
 --- Returns the group name personal hotstrings are registered under.
 --- Read from the keymap module so the editor and the boot loader cannot drift.
 --- Public so the invariant "the editor reloads into the boot group" is
@@ -458,42 +473,70 @@ function M.open(open_mode)
 		return
 	end
 
+	-- Fail before acquiring a native controller. A missing manifest entry has no
+	-- webview to own or eventually release that controller.
+	local geo = ui_builder.get_app_geometry("hotstring_editor")
+	if not geo then return end
+
 	-- Initialize the User Content bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsEditor")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Failed to create webview usercontent bridge.")
 		return
 	end
-	
-	_usercontent = uc
-	_usercontent:setCallback(function(message)
-		if message and type(message.body) == "table" then
-			local body = message.body
-			if body.action == "ready" then body.open_mode = _pending_mode end
-			handle_message(body)
-		end
+
+	local callback_ok = pcall(function()
+		uc:setCallback(function(message)
+			if message and type(message.body) == "table" then
+				local body = message.body
+				if body.action == "ready" then body.open_mode = _pending_mode end
+				handle_message(body)
+			end
+		end)
 	end)
+	if not callback_ok then
+		Logger.error(LOG, "Failed to register webview usercontent callback.")
+		release_usercontent(uc)
+		return
+	end
 
 	-- Prepare standardized UI styles
 	local masks = hs.webview.windowMasks
 	local window_style = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8) + (masks["miniaturizable"] or 4)
 
-	-- Request the webview creation/focus from the centralized UI builder
-	local geo = ui_builder.get_app_geometry("hotstring_editor")
-	if not geo then return end
-	_webview = ui_builder.show_webview({
-		frame       = ui_builder.get_centered_frame(geo.width, geo.height),
-		title       = i18n.get("editor.hotstrings.window_title"),
-		style_masks = window_style,
-		usercontent = _usercontent,
-		assets_dir = ASSETS_DIR,
-		on_close   = function()
-			_is_focused = false
-			if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
-			_webview     = nil
-			_usercontent = nil
-		end
-	})
+	-- Stage both native owners locally. Module state becomes visible only after
+	-- the factory returns the webview that owns this exact controller.
+	local webview
+	local closed = false
+	local show_ok, candidate = xpcall(function()
+		return ui_builder.show_webview({
+			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
+			title       = i18n.get("editor.hotstrings.window_title"),
+			style_masks = window_style,
+			usercontent = uc,
+			assets_dir = ASSETS_DIR,
+			on_close   = function()
+				closed = true
+				if _webview == webview then
+					_is_focused = false
+					if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
+					_webview = nil
+				end
+				if _usercontent == uc then
+					_usercontent = nil
+					release_usercontent(uc)
+				end
+			end,
+		})
+	end, debug.traceback)
+	webview = candidate
+	if show_ok ~= true or not webview or closed then
+		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstring editor webview.") end
+		release_usercontent(uc)
+		return
+	end
+	_usercontent = uc
+	_webview = webview
 end
 
 --- Returns true when the editor window is currently open.
@@ -504,10 +547,13 @@ end
 
 --- Closes the Hotstring Editor window and cleans up resources.
 function M.close()
-	if _webview then
-		if type(_webview.delete) == "function" then pcall(function() _webview:delete() end) end
-		_webview     = nil
-		_usercontent = nil
+	local webview = _webview
+	local usercontent = _usercontent
+	_webview = nil
+	_usercontent = nil
+	if usercontent then release_usercontent(usercontent) end
+	if webview then
+		if type(webview.delete) == "function" then pcall(function() webview:delete() end) end
 		_is_focused  = false
 		if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
 	end

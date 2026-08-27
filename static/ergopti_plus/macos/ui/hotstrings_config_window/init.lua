@@ -51,6 +51,21 @@ local LOG = "hotstrings_config_window"
 local _webview     = nil
 local _usercontent = nil
 
+--- Releases one exact native bridge callback before dropping its Lua owner.
+--- @param usercontent any Candidate or committed usercontent controller.
+--- @return boolean released Whether callback release completed.
+local function release_usercontent(usercontent)
+	if not usercontent or type(usercontent.setCallback) ~= "function" then
+		Logger.error(LOG, "Cannot release webview usercontent callback.")
+		return false
+	end
+	local released = pcall(function() usercontent:setCallback(nil) end)
+	if not released then
+		Logger.error(LOG, "Failed to release webview usercontent callback.")
+	end
+	return released
+end
+
 -- Module-level config set by M.setup() before the first M.open() call.
 local _config = {
 	personal_dir   = nil,
@@ -828,43 +843,71 @@ function M.open()
 		return
 	end
 
+	-- Fail before acquiring a native controller. A missing manifest entry has no
+	-- webview to own or eventually release that controller.
+	local geo = ui_builder.get_app_geometry("hotstrings_config_window")
+	if not geo then return end
+
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hotstrings_config_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
 		return
 	end
-	_usercontent = uc
-	_usercontent:setCallback(on_message)
+	local callback_ok = pcall(function() uc:setCallback(on_message) end)
+	if not callback_ok then
+		Logger.error(LOG, "Failed to register webview usercontent callback.")
+		release_usercontent(uc)
+		return
+	end
 
-	local geo = ui_builder.get_app_geometry("hotstrings_config_window")
-	if not geo then return end
-	_webview = ui_builder.show_webview({
-		frame        = ui_builder.get_centered_frame(geo.width, geo.height),
-		title        = i18n.get("hs_config.window_title"),
-		style_masks  = { "titled", "closable", "resizable", "utility" },
-		usercontent  = _usercontent,
-		assets_dir    = ASSETS_DIR,
-		on_navigation = function(action)
-			if action == "didFinishNavigation" then
-				push_state()
-			end
-			return true
-		end,
-		on_close = function()
-			_webview     = nil
-			_usercontent = nil
-		end,
-	})
+	-- Stage both native owners locally. Module state becomes visible only after
+	-- the factory returns the webview that owns this exact controller.
+	local webview
+	local closed = false
+	local show_ok, candidate = xpcall(function()
+		return ui_builder.show_webview({
+			frame        = ui_builder.get_centered_frame(geo.width, geo.height),
+			title        = i18n.get("hs_config.window_title"),
+			style_masks  = { "titled", "closable", "resizable", "utility" },
+			usercontent  = uc,
+			assets_dir    = ASSETS_DIR,
+			on_navigation = function(action)
+				if action == "didFinishNavigation" then
+					push_state()
+				end
+				return true
+			end,
+			on_close = function()
+				closed = true
+				if _webview == webview then _webview = nil end
+				if _usercontent == uc then
+					_usercontent = nil
+					release_usercontent(uc)
+				end
+			end,
+		})
+	end, debug.traceback)
+	webview = candidate
+	if show_ok ~= true or not webview or closed then
+		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstrings config webview.") end
+		release_usercontent(uc)
+		return
+	end
+	_usercontent = uc
+	_webview = webview
 	Logger.info(LOG, "Hotstrings config window opened.")
 end
 
 --- Close and destroy the window.
 function M.close()
-	if _webview and type(_webview.delete) == "function" then
-		pcall(function() _webview:delete() end)
-	end
-	_webview     = nil
+	local webview = _webview
+	local usercontent = _usercontent
+	_webview = nil
 	_usercontent = nil
+	if usercontent then release_usercontent(usercontent) end
+	if webview and type(webview.delete) == "function" then
+		pcall(function() webview:delete() end)
+	end
 end
 
 return M
