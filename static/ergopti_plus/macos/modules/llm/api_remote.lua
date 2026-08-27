@@ -894,7 +894,13 @@ end
 --- Query parameters that carry a credential. Gemini authenticates by URL
 --- (`?key=<token>`) rather than by header, so the finished request URL contains
 --- the decrypted API key verbatim.
-local CREDENTIAL_QUERY_PARAMS = { "key", "api_key", "apikey", "access_token", "token" }
+local CREDENTIAL_QUERY_PARAMS = {
+	key = true,
+	api_key = true,
+	apikey = true,
+	access_token = true,
+	token = true,
+}
 
 --- Redact credentials from a URL so it can be written to a log file.
 ---
@@ -908,15 +914,29 @@ local CREDENTIAL_QUERY_PARAMS = { "key", "api_key", "apikey", "access_token", "t
 --- (which endpoint and model were hit) while removing the part that must never
 --- be persisted.
 --- @param url string The URL about to be logged.
---- @return string The URL with every credential parameter's value replaced.
+--- @return string The URL with userinfo and credential parameter values replaced.
 local function redact_url(url)
 	local out = tostring(url or "")
-	for _, param in ipairs(CREDENTIAL_QUERY_PARAMS) do
-		-- Match the parameter after "?" or "&", case-insensitively, and replace
-		-- everything up to the next separator.
-		out = out:gsub("([%?&]" .. param .. "=)[^&#]*", "%1REDACTED")
-		out = out:gsub("([%?&]" .. param:upper() .. "=)[^&#]*", "%1REDACTED")
-	end
+
+	-- Userinfo is credential-bearing regardless of its spelling. Keep the
+	-- scheme and authority visible for diagnostics, but never persist either
+	-- the username or password. The greedy userinfo capture deliberately ends
+	-- at the last '@' in the authority so an embedded '@' cannot expose a tail.
+	out = out:gsub("^([%a][%w+%.%-]*://)([^/%?#]*@)([^/%?#]+)",
+		function(scheme, _userinfo, authority)
+			return scheme .. "REDACTED@" .. authority
+		end, 1)
+
+	-- Preserve the original query-name spelling and every non-credential
+	-- parameter. Only the comparison is case-folded; values stop at the next
+	-- query separator or fragment boundary.
+	out = out:gsub("([%?&])([^=&#]*)(=)([^&#]*)",
+		function(delimiter, name, equals, value)
+			if CREDENTIAL_QUERY_PARAMS[name:lower()] then
+				return delimiter .. name .. equals .. "REDACTED"
+			end
+			return delimiter .. name .. equals .. value
+		end)
 	return out
 end
 
