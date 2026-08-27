@@ -839,10 +839,17 @@ _LLMRemoteParseStructuredState(Format, Body) {
 			candidate := root["candidates"][1]
 			if (candidate is Map) and candidate.Has("content") and (candidate["content"] is Map) {
 				content := candidate["content"]
-				if content.Has("parts") and (content["parts"] is Array)
-					for _, part in content["parts"]
-						if (part is Map) and part.Has("text") and Type(part["text"]) == "String"
+				if content.Has("parts") and (content["parts"] is Array) {
+					for _, part in content["parts"] {
+						if !(part is Map)
+							continue
+						if part.Has("thought") and part["thought"] == true
+							continue
+						if part.Has("text") and Type(part["text"]) == "String"
 							return Map("valid", true, "recognized", true, "text", part["text"])
+					}
+					return Map("valid", true, "recognized", true, "text", "")
+				}
 			}
 		}
 	} else if root.Has("choices") and (root["choices"] is Array) and root["choices"].Length {
@@ -882,11 +889,9 @@ _LLMRemoteNavAnthropic(root) {
     return ""
 }
 
-; Gemini: ``candidates[1].content.parts[1].text``. AHK arrays are 1-indexed, so
-; the first candidate is index 1. Returns the FIRST text part of the first
-; candidate — the cross-driver corpus contract (gemini_multipart_uses_first)
-; requires first-part-only, mirroring the Anthropic/OpenAI navigators; a later
-; part is a continuation/decoy, not a fragment to concatenate.
+; Gemini: use the first ordinary text part from the first candidate. Thought
+; summaries are valid text-bearing Parts but are not user-facing completions;
+; function-call Parts carry no text and are skipped naturally.
 _LLMRemoteNavGemini(root) {
     if !root.Has("candidates") or !(root["candidates"] is Array) or root["candidates"].Length < 1
         return ""
@@ -897,7 +902,11 @@ _LLMRemoteNavGemini(root) {
     if !content.Has("parts") or !(content["parts"] is Array)
         return ""
     for _idx, part in content["parts"] {
-        if (part is Map) and part.Has("text") and Type(part["text"]) == "String"
+        if !(part is Map)
+            continue
+        if part.Has("thought") and part["thought"] == true
+            continue
+        if part.Has("text") and Type(part["text"]) == "String"
             return part["text"]
     }
     return ""

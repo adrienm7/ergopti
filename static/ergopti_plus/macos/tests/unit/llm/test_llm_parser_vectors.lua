@@ -5,15 +5,13 @@
 --- DESCRIPTION:
 --- Loads the shared cross-driver LLM parser corpus from
 --- _shared/tests/corpus/llm/parser_test_vectors.json and validates each vector
---- against pure-Lua re-implementations of the HS parser logic.
+--- against the production HS remote parser and focused Ollama fixtures.
 ---
---- WHY A RE-IMPLEMENTATION RATHER THAN CALLING THE MODULE DIRECTLY:
---- The parse_response function in api_remote.lua and the streaming line parser
---- in api_ollama.lua are both module-local. Exposing them solely for tests
---- would pollute the production API surface. The logic is small and
---- self-contained (JSON decode + table path walk), so duplicating it here
---- is the correct isolation boundary. Any divergence from the module source
---- becomes a test failure that mandates a fix in one of the two copies.
+--- PRODUCTION BOUNDARY:
+--- Remote vectors call api_remote.lua's explicit regression seam. Copying that
+--- private parser here would let production and the test drift independently.
+--- The Ollama fixtures remain local because this module covers two distinct
+--- wire shapes and their production paths have dedicated behavioral suites.
 ---
 --- COVERAGE:
 --- 1. Corpus integrity — JSON file is readable and every vector has required
@@ -22,7 +20,7 @@
 --- 3. Ollama streaming line — message.content token extraction per NDJSON line.
 --- 4. Remote / OpenAI format — choices[1].message.content path.
 --- 5. Remote / Anthropic format — content[1].text path.
---- 6. Remote / Gemini format — candidates[1].content.parts[1].text path.
+--- 6. Remote / Gemini format — first non-thought text part.
 --- 7. Edge cases — malformed JSON, empty body, null values, missing fields.
 --- ==============================================================================
 
@@ -31,6 +29,8 @@ local helpers = require("tests.helpers")
 -- Bootstrap the hs stub so hs.json.decode is available
 package.loaded["infra.logger"] = nil
 helpers.load_with_stubs("infra.logger")
+package.loaded["modules.llm.api_remote"] = nil
+local ApiRemote = helpers.load_with_stubs("modules.llm.api_remote", {})
 
 
 
@@ -131,42 +131,7 @@ end
 --- @param body string The raw JSON response body.
 --- @return string The extracted text, or "".
 local function parse_remote(format, body)
-	if type(body) ~= "string" or body == "" then return "" end
-	local ok, resp = pcall(require("hs").json.decode, body)
-	if not ok or type(resp) ~= "table" then return "" end
-
-	if format == "anthropic" then
-		local content = resp.content
-		if type(content) == "table" and type(content[1]) == "table" then
-			local text = content[1].text
-			if type(text) == "string" then return text end
-		end
-		return ""
-	end
-
-	if format == "gemini" then
-		local cand = resp.candidates
-		if type(cand) == "table" and type(cand[1]) == "table" then
-			local cnt = cand[1].content
-			if type(cnt) == "table" and type(cnt.parts) == "table"
-				and type(cnt.parts[1]) == "table" then
-				local text = cnt.parts[1].text
-				if type(text) == "string" then return text end
-			end
-		end
-		return ""
-	end
-
-	-- OpenAI shape (default): choices[1].message.content
-	local choices = resp.choices
-	if type(choices) == "table" and type(choices[1]) == "table" then
-		local msg = choices[1].message
-		if type(msg) == "table" then
-			local text = msg.content
-			if type(text) == "string" then return text end
-		end
-	end
-	return ""
+	return ApiRemote.__parse_response_for_test(format, body)
 end
 
 
@@ -179,6 +144,11 @@ end
 -- ============================================
 
 helpers.describe("LLM parser corpus — integrity", function()
+	helpers.it("remote vectors execute the production parser seam", function()
+		helpers.assert_eq(type(ApiRemote.__parse_response_for_test), "function",
+			"api_remote must expose the exact parser used by request completion")
+	end)
+
 	helpers.it("corpus file is readable and parseable", function()
 		helpers.assert_eq(corpus_err, nil, "corpus_err should be nil: " .. tostring(corpus_err))
 		helpers.assert_true(corpus ~= nil, "corpus must not be nil")

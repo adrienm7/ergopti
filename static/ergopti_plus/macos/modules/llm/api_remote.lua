@@ -1113,7 +1113,7 @@ local function _extract_usage(format, body, model)
 end
 
 --- Pull the generated text out of a provider response. Each branch targets the
---- canonical "first choice / first candidate / first content block" path. When
+--- canonical first choice/candidate and its first publishable text block. When
 --- the path is missing, returns "" — the caller treats that as a soft failure
 --- (no tooltip) rather than a crash.
 local function parse_response(format, body)
@@ -1132,8 +1132,14 @@ local function parse_response(format, body)
 		local cand = resp.candidates
 		if type(cand) == "table" and type(cand[1]) == "table" then
 			local cnt = cand[1].content
-			if type(cnt) == "table" and type(cnt.parts) == "table" and type(cnt.parts[1]) == "table" then
-				return tostring(cnt.parts[1].text or "")
+			if type(cnt) == "table" and type(cnt.parts) == "table" then
+				for _, part in ipairs(cnt.parts) do
+					if type(part) == "table"
+					and part.thought ~= true
+					and type(part.text) == "string" then
+						return part.text
+					end
+				end
 			end
 		end
 		return ""
@@ -1856,9 +1862,9 @@ function M.is_thinking_model(name)
 		or name:find("reasoning") ~= nil
 end
 
---- Exposed for the regression test only. The invariant being guarded is "no log
---- line ever contains the token", and that cannot be asserted without being able
---- to run the thing that produces the logged string.
+--- Exposed for regression tests only. These invariants cannot be asserted
+--- without running the exact helpers used by the production request path.
 M.__redact_url_for_test = redact_url
+M.__parse_response_for_test = parse_response
 
 return M

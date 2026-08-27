@@ -12,21 +12,23 @@
 ---    (driver=macos vectors only; driver=ahk vectors use /api/generate format.)
 --- 2. remote/openai     — choices[1].message.content extraction.
 --- 3. remote/anthropic  — content[1].text extraction.
---- 4. remote/gemini     — candidates[1].content.parts[1].text extraction.
+--- 4. remote/gemini     — first non-thought text part extraction.
 --- 5. all               — all parsers tested on adversarial / malformed input.
 ---
 --- SKIPPED:
 --- - ollama_stream_line  — async streaming callback; tested in api_ollama unit.
 --- - driver=ahk vectors  — /api/generate format not used on macOS.
 ---
---- INLINE PARSERS:
---- The remote parse logic mirrors api_remote.lua's private parse_response().
---- The ollama chat parser mirrors api_ollama.lua's non-streaming extraction.
---- Both are replicated inline (not imported) because they are private to their
---- respective modules, and the corpus test must not change the module API.
+--- PRODUCTION BOUNDARY:
+--- Remote vectors call api_remote.lua's explicit regression seam. The Ollama
+--- chat parser remains local because its production path has a separate direct
+--- behavioral suite.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+package.loaded["modules.llm.api_remote"] = nil
+local ApiRemote = helpers.load_with_stubs("modules.llm.api_remote", {})
 
 
 
@@ -85,38 +87,7 @@ end
 --- @param body string Raw JSON response body.
 --- @return string Extracted assistant text, or "" on failure.
 local function parse_remote(format, body)
-	if type(body) ~= "string" or body == "" then return "" end
-	local ok_j, resp = pcall(require("hs").json.decode, body)
-	if not ok_j or type(resp) ~= "table" then return "" end
-
-	if format == "anthropic" then
-		local content = resp.content
-		if type(content) == "table" and type(content[1]) == "table" then
-			return tostring(content[1].text or "")
-		end
-		return ""
-	end
-
-	if format == "gemini" then
-		local cand = resp.candidates
-		if type(cand) == "table" and type(cand[1]) == "table" then
-			local cnt = cand[1].content
-			if type(cnt) == "table"
-			and type(cnt.parts) == "table"
-			and type(cnt.parts[1]) == "table" then
-				return tostring(cnt.parts[1].text or "")
-			end
-		end
-		return ""
-	end
-
-	-- OpenAI (default)
-	local choices = resp.choices
-	if type(choices) == "table" and type(choices[1]) == "table" then
-		local msg = choices[1].message
-		if type(msg) == "table" then return tostring(msg.content or "") end
-	end
-	return ""
+	return ApiRemote.__parse_response_for_test(format, body)
 end
 
 --- Dispatches a corpus vector to the correct inline parser.
@@ -176,6 +147,11 @@ end
 -- ======================================
 
 helpers.describe("llm_parser corpus — integrity", function()
+	helpers.it("remote vectors execute the production parser seam", function()
+		helpers.assert_eq(type(ApiRemote.__parse_response_for_test), "function",
+			"api_remote must expose the exact parser used by request completion")
+	end)
+
 	helpers.it("corpus file is readable and parseable", function()
 		helpers.assert_true(corpus_root ~= nil,
 			"corpus load error: " .. tostring(corpus_err))
