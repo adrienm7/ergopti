@@ -143,6 +143,45 @@ _KLSql_UnknownType_StillSkipped() {
 Test("KL_BuildInserts: genuinely unknown type still returns empty array", _KLSql_UnknownType_StillSkipped)
 
 
+_KLSql_EveryEventKindReplaysWithStableIdentity() {
+	EventTypes := [
+		"typing", "app_switch", "window_switch", "shortcut", "system_event",
+		"hotstring", "hotstring_suggested", "hotstring_dismissed",
+		"hotstring_near_miss", "manual_typed_known_trigger",
+		"llm_generation", "llm_generation_failed", "llm_suggested",
+		"llm_dismissed", "llm_accepted", "session_start", "session_end",
+		"idle_start", "idle_end", "ergo_event", "window_resize", "window_move",
+		"window_state_change", "monitor_focus_change", "virtual_desktop_switch",
+		"mouse_click", "mouse_drag", "mouse_scroll", "mouse_idle_park",
+		"volume_change", "screen_recording_start", "screen_recording_end",
+		"network_change", "internet_up", "internet_down", "vpn_connected",
+		"vpn_disconnected", "clipboard_copy", "clipboard_paste", "paste_burst",
+		"roi_snapshot", "new_trigger_candidate", "trigger_halflife"]
+	Keylogger.next_event_id := 700
+	for EventType in EventTypes {
+		Entry := Map("type", EventType, "timestamp", "2026-08-27 21:30:00.000",
+			"app", "AuditFixture", "events", [])
+		StableId := KL_AssignStableEventId(Entry)
+		DurableLine := KL_JsonEncode(Entry)
+		ReplayA := KL_JsonDecode(DurableLine)
+		ReplayB := KL_JsonDecode(DurableLine)
+		NextBeforeReplay := Keylogger.next_event_id
+		RowsA := KL_BuildInserts(ReplayA)
+		RowsB := KL_BuildInserts(ReplayB)
+		AssertEqual(1, RowsA.Length,
+			EventType . " must remain a persistable event kind in the replay matrix")
+		AssertEqual(RowsA[1], RowsB[1],
+			EventType . " must replay to the same primary-key identity after a crash")
+		AssertContains(RowsA[1], ", " . StableId . ",",
+			EventType . " must use the id serialized before journal publication")
+		AssertEqual(NextBeforeReplay, Keylogger.next_event_id,
+			EventType . " replay must not allocate a fresh identifier")
+	}
+}
+Test("keylogger SQL: every event kind replays with stable journal identity (journal-stable-event-id)",
+	_KLSql_EveryEventKindReplaysWithStableIdentity)
+
+
 
 
 

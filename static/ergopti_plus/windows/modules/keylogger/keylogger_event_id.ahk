@@ -44,6 +44,22 @@ KL_ScanMaxEventId(sql_text, device_id_lit) {
 	return max_id
 }
 
+; Scans the uncommitted JSONL tail for stable ids already published before a
+; crash. Decoding each complete line avoids treating an `_event_id` substring
+; inside captured text or nested metadata as the record's durable identity.
+KL_ScanMaxJournalEventId(journal_text) {
+	max_id := 0
+	for line in StrSplit(journal_text, "`n", "`r") {
+		if (line = "")
+			continue
+		entry := KL_JsonDecode(line)
+		if (entry is Map && entry.Has("_event_id")
+				&& entry["_event_id"] is Integer && entry["_event_id"] > 0)
+			max_id := Max(max_id, entry["_event_id"])
+	}
+	return max_id
+}
+
 ; Selects the larger of the persisted identifier and one past the highest
 ; identifier already stored for this device.
 KL_ResolveStartId(persisted_next_id, max_id_in_sql) {
