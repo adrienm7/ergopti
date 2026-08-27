@@ -481,7 +481,17 @@ EOF
     grep -q 'requiert Python >= 3.8' "$output"
     grep -q 'PYTHON=python3.11' "$output"
     # The override names another interpreter and the same run then succeeds.
-    if ! sandbox_env "$sandbox" PATH="$old_bin:$FAKE_BIN:$PATH" PYTHON="$(command -v python3)" \
+    # `python3` is not that interpreter everywhere: openSUSE Leap 15.6 ships
+    # 3.6 under that name, which is the very version the guard above refuses,
+    # so honour the interpreter the harness was given -- e2e_distro.sh exports
+    # it as PYTHON precisely for hosts whose default is below the floor.
+    local above_floor
+    above_floor=$(command -v "${PYTHON:-python3}")
+    if ! "$above_floor" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)'; then
+        printf 'the override interpreter %s is itself below the floor\n' "$above_floor" >&2
+        return 1
+    fi
+    if ! sandbox_env "$sandbox" PATH="$old_bin:$FAKE_BIN:$PATH" PYTHON="$above_floor" \
         bash "$INSTALLER_DIR/install.sh" --diagnose > "$sandbox/override.log" 2>&1; then
         cat "$sandbox/override.log" >&2
         return 1
@@ -533,6 +543,68 @@ run_uninstall_without_artifacts_fails() {
     grep -q -- '--uninstall requiert --installation-method clean|legacy' "$output"
     grep -q 'Artefacts Clean  : aucun' "$output"
     ! grep -q 'command not found' "$output"
+}
+
+# Reproduces git 2.25 (Ubuntu 20.04, still supported): a filtered fetch into a
+# repository that is not already partial is refused there, while every newer git
+# declares the extension on its own. Without this stand-in the whole class is
+# invisible to a developer machine and only the distribution matrix sees it.
+run_downloaded_install_on_git_without_implicit_partial_clone() {
+    local sandbox="$TMP_ROOT/old-git"
+    local source_repo="$sandbox/source-repo"
+    local downloaded="$sandbox/install.sh"
+    local old_git_bin="$sandbox/old-git-bin"
+    local output="$sandbox/output.log"
+    mkdir -p "$source_repo/static/ergopti/linux" "$old_git_bin" \
+        "$sandbox/extensions/ergopti/symbols" "$sandbox/system/rules"
+    cp -R "$INSTALLER_DIR" "$source_repo/static/ergopti/linux/xkb_installation"
+    git -C "$source_repo" init -q
+    git -C "$source_repo" config user.email tests@example.invalid
+    git -C "$source_repo" config user.name tests
+    git -C "$source_repo" add .
+    git -C "$source_repo" commit -qm fixture
+    git -C "$source_repo" branch -M main
+    cp "$INSTALLER_DIR/install.sh" "$downloaded"
+    printf 'installed\n' > "$sandbox/extensions/ergopti/symbols/ergopti"
+    : > "$sandbox/system/rules/evdev"
+
+    REAL_GIT=$(command -v git)
+    export REAL_GIT
+    cat > "$old_git_bin/git" <<'EOF'
+#!/bin/sh
+# git 2.25 checks the extension before it looks at anything else, so the
+# refusal depends only on the repository configuration, never on the remote.
+case " $* " in
+    *" fetch "*" --filter="*)
+        if ! "$REAL_GIT" config --get extensions.partialClone > /dev/null; then
+            printf 'fatal: --filter can only be used when extensions.partialClone is set\n' >&2
+            exit 128
+        fi
+        ;;
+esac
+exec "$REAL_GIT" "$@"
+EOF
+    chmod +x "$old_git_bin/git"
+
+    local rewrite_key="url.file://$source_repo.insteadOf"
+    if ! env \
+        HOME="$TMP_ROOT/home" \
+        PATH="$old_git_bin:$FAKE_BIN:$PATH" \
+        BRANCH=main \
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0="$rewrite_key" \
+        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
+        ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
+        ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        ERGOPTI_XKB_USER_HOME="$sandbox/home" \
+        ERGOPTI_INSTALL_LOG="$sandbox/install.log" \
+        bash "$downloaded" --uninstall --yes > "$output" 2>&1; then
+        cat "$output" >&2
+        return 1
+    fi
+    ! grep -q 'extensions.partialClone' "$output"
+    test ! -e "$sandbox/extensions/ergopti"
 }
 
 run_downloaded_uninstall() {
@@ -687,5 +759,6 @@ run_diagnose_mode
 run_python_floor_guard
 run_unsupported_host_guard
 run_uninstall_without_artifacts_fails
+run_downloaded_install_on_git_without_implicit_partial_clone
 run_downloaded_uninstall
 printf 'install entrypoint tests: OK\n'

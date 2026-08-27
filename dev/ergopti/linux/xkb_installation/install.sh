@@ -617,6 +617,13 @@ else
     git init "$REPO_DIR" >/dev/null 2>&1
     cd "$REPO_DIR"
     git remote add origin "$REPO_URL" >/dev/null 2>&1
+    # `git fetch --filter` into a repository that is not already partial is
+    # refused by git 2.25 (Ubuntu 20.04) with "--filter can only be used when
+    # extensions.partialClone is set"; newer git sets the extension itself.
+    # Declaring it up front is what `git clone --filter` does internally and
+    # keeps the blob-less fetch working on every supported git.
+    git config core.repositoryformatversion 1 >/dev/null 2>&1
+    git config extensions.partialClone origin >/dev/null 2>&1
     run_step "Récupération de la liste des fichiers" "Métadonnées synchronisées" \
         git fetch --depth 1 --filter=blob:none origin "$SELECTED_BRANCH"
     git config core.sparseCheckout true
