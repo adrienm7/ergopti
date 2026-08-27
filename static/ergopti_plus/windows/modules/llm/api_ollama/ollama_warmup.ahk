@@ -40,7 +40,7 @@ LLM_OllamaWarmup(model) {
 	payload := LLM_BuildOllamaPayload(model, "", " ", 0, false, "", 1, false)
 	payload := RegExReplace(payload, '"num_predict":\d+', '"num_predict":1', , 1)
 	try {
-		_LLM_Ollama_WarmupHttp := ComObject("WinHttp.WinHttpRequest.5.1")
+		_LLM_Ollama_WarmupHttp := CurlAsyncRequest()
 		_LLM_Ollama_WarmupHttp.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", true)
 		_LLM_Ollama_WarmupHttp.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
 			LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT)
@@ -171,6 +171,5 @@ LLM_OllamaCancelWarmupRetry(reset_backoff := false) {
 	if _LLM_Ollama_IsReady
 		_LLM_Ollama_WarmupStartedTick := 0
 }
-
 
 

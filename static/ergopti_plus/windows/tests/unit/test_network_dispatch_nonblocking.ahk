@@ -1,0 +1,141 @@
+﻿; tests/unit/test_network_dispatch_nonblocking.ahk
+;
+; ==============================================================================
+; MODULE: Network Dispatch Non-Blocking Regression Tests
+; DESCRIPTION:
+; Holds a real loopback HTTP response while proving that the shared Windows curl
+; transport returns promptly and continues pumping AHK timers. Also ratchets every
+; production network entrypoint implicated by AHK-027 onto a child transport.
+; ==============================================================================
+
+_NDB_Delete(Path) {
+	try FileDelete(Path)
+}
+
+_NDB_WaitForFile(Path, TimeoutMs := 5000) {
+	Started := A_TickCount
+	while !FileExist(Path) {
+		if ((A_TickCount - Started) & 0xFFFFFFFF) >= TimeoutMs
+			return false
+		Sleep(10)
+	}
+	return true
+}
+
+_NDB_ChildTransportPumpsHeartbeat() {
+	Nonce := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+		. "_" . A_TickCount
+	ScriptPath := A_Temp . "\ergopti_http_listener_" . Nonce . ".ps1"
+	ReadyPath := A_Temp . "\ergopti_http_listener_" . Nonce . ".ready"
+	Script := "param([string]$ReadyPath)" . "`n"
+		. "$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)" . "`n"
+		. "$listener.Start()" . "`n"
+		. "[System.IO.File]::WriteAllText($ReadyPath, [string]$listener.LocalEndpoint.Port)" . "`n"
+		. "$client = $listener.AcceptTcpClient()" . "`n"
+		. "Start-Sleep -Milliseconds 900" . "`n"
+		. "$stream = $client.GetStream()" . "`n"
+		. "$text = 'HTTP/1.1 200 OK' + [char]13 + [char]10 + 'Content-Length: 2' + [char]13 + [char]10 + 'Connection: close' + [char]13 + [char]10 + [char]13 + [char]10 + 'OK'" . "`n"
+		. "$bytes = [System.Text.Encoding]::ASCII.GetBytes($text)" . "`n"
+		. "$stream.Write($bytes, 0, $bytes.Length)" . "`n"
+		. "$stream.Dispose()" . "`n"
+		. "$client.Dispose()" . "`n"
+		. "$listener.Stop()" . "`n"
+	Server := 0
+	Req := 0
+	Beats := 0
+	Beat(*) {
+		Beats += 1
+	}
+	try {
+		_NDB_Delete(ScriptPath)
+		_NDB_Delete(ReadyPath)
+		AssertTrue(FSWrite(ScriptPath, Script),
+			"the delayed loopback listener fixture must be staged")
+		Server := ShellRunner_SpawnTreeOwned("powershell.exe", [
+			"-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden",
+			"-ExecutionPolicy", "Bypass", "-File", ScriptPath, ReadyPath
+		], (*) => 0)
+		AssertTrue(Server.start(), "the delayed loopback listener must start")
+		AssertTrue(_NDB_WaitForFile(ReadyPath),
+			"the delayed loopback listener must publish its port")
+		Port := Integer(Trim(FileRead(ReadyPath, "UTF-8-RAW")))
+
+		SetTimer(Beat, 10)
+		Req := CurlAsyncRequest()
+		Req.Open("GET", "http://127.0.0.1:" . Port . "/held", true)
+		Req.SetTimeouts(500, 500, 500, 2500)
+		DispatchStarted := A_TickCount
+		AssertTrue(Req.Send())
+		DispatchMs := (A_TickCount - DispatchStarted) & 0xFFFFFFFF
+		WaitStarted := A_TickCount
+		while !Req.WaitForResponse(0) {
+			if (((A_TickCount - WaitStarted) & 0xFFFFFFFF) >= 5000)
+				break
+			Sleep(10)
+		}
+		WaitMs := (A_TickCount - WaitStarted) & 0xFFFFFFFF
+		SetTimer(Beat, 0)
+
+		AssertTrue(DispatchMs < 750,
+			"network dispatch must return before the held response (ms="
+			. DispatchMs . ")")
+		AssertTrue(Req.WaitForResponse(0),
+			"the delayed loopback response must complete within its hard deadline")
+		AssertTrue(WaitMs >= 700,
+			"positive control: the server must actually withhold the response")
+		AssertTrue(Beats >= 20,
+			"AHK timers must keep advancing while the child waits (beats="
+			. Beats . ")")
+		AssertEqual(200, Req.Status)
+		AssertEqual("OK", Req.ResponseText)
+		for Path in [Req.ConfigPath, Req.BodyPath, Req.HeaderPath]
+			AssertFalse(FileExist(Path),
+				"terminal HTTP cleanup must remove private transport artifacts")
+	} finally {
+		SetTimer(Beat, 0)
+		if IsObject(Req) && !Req.WaitForResponse(0)
+			Req.Abort()
+		if IsObject(Server)
+			try Server.terminate()
+		_NDB_Delete(ScriptPath)
+		_NDB_Delete(ReadyPath)
+	}
+}
+Test("HTTP transport: held response never stalls the AHK heartbeat (network-dispatch-nonblocking)",
+	_NDB_ChildTransportPumpsHeartbeat)
+
+_NDB_EveryProductionEntrypointUsesChildTransport() {
+	for FunctionName in [
+		"_Updater_PrepareLatestAsyncTransport",
+		"_Updater_PrepareReleasesListAsyncTransport",
+		"_CLW_DoFetch",
+		"LLM_RemoteIsReady_Async",
+		"LLM_OllamaWarmup"
+	] {
+		Body := _DriverFuncBody(FunctionName)
+		Assert(InStr(Body, "CurlAsyncRequest()") > 0,
+			FunctionName . " must construct the tree-owned curl transport")
+		Assert(!InStr(Body, "ComObject(") and !InStr(Body, "WinHttp"),
+			FunctionName . " must not construct WinHTTP on the AHK thread")
+	}
+	for FunctionName in [
+		"LLM_OllamaIsRunning_Async",
+		"LLM_OllamaListModels_Async",
+		"_LLMRemote_DispatchCurl"
+	] {
+		Body := _DriverFuncBody(FunctionName)
+		Assert(InStr(Body, "curl") > 0,
+			FunctionName . " must dispatch its established curl child")
+		Assert(!InStr(Body, "ComObject("),
+			FunctionName . " must not construct WinHTTP")
+	}
+	GenerateBody := _DriverFuncBody("LLM_RemoteGenerate_Async")
+	Assert(!InStr(GenerateBody, "_LLMRemote_DispatchWinHttp("),
+		"remote generation must fail closed if curl is unavailable")
+	EnsureBody := _DriverFuncBody("LLM_Menu_EnsureModelReady")
+	Assert(!InStr(EnsureBody, "Sync")
+		and InStr(EnsureBody, "LLM_InstalledTagsCacheReady()") > 0,
+		"model readiness must wait for its async cache instead of probing inline")
+}
+Test("HTTP transport: every production entrypoint owns a child transport (network-dispatch-nonblocking)",
+	_NDB_EveryProductionEntrypointUsesChildTransport)

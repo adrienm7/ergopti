@@ -34,13 +34,220 @@ global HTTP_TIMEOUT_MS := 30000
 ; Monotonic counter guarding a reentrant HTTPPost call from clobbering a newer
 ; in-flight request's active-slot state (see HTTPPost's MyGeneration comment).
 global _HTTP_REQUEST_GENERATION := 0
+; Unique namespace for the private curl config/body/header artifacts used by
+; CurlAsyncRequest. Secrets and URLs never travel through the process command line.
+global _HTTP_CURL_REQUEST_COUNTER := 0
 
 
 
 
 ; =======================================================
 ; =======================================================
-; ======= 1/ Adapter Methods ============================
+; ======= 1/ Non-blocking internal transport ============
+; =======================================================
+; =======================================================
+
+_HTTP_CurlNextRequestId() {
+	global _HTTP_CURL_REQUEST_COUNTER
+	PreviousCritical := Critical("On")
+	try return ++_HTTP_CURL_REQUEST_COUNTER
+	finally Critical(PreviousCritical)
+}
+
+_HTTP_CurlConfigQuote(Value) {
+	Escaped := StrReplace(String(Value), "\", "\\")
+	Escaped := StrReplace(Escaped, '"', '\"')
+	return '"' . Escaped . '"'
+}
+
+_HTTP_CurlScalarIsSafe(Value) {
+	return Value is String && !RegExMatch(Value, "[\x00-\x1F\x7F-\x9F]")
+}
+
+_HTTP_CurlSweepOrphans() {
+	CurrentPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+	Loop Files A_Temp . "\ergopti_http_*.*", "F" {
+		if !RegExMatch(A_LoopFileName,
+				"^ergopti_http_(\d+)_\d+\.(?:conf|body|headers)$", &Match)
+			continue
+		OwnerPid := Integer(Match[1])
+		TooOld := false
+		try TooOld := DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") > 86400
+		OwnerAlive := false
+		if (OwnerPid == CurrentPid)
+			OwnerAlive := true
+		else
+			try OwnerAlive := ProcessExist(OwnerPid) == OwnerPid
+		if (!OwnerAlive || TooOld)
+			try FSDelete(A_LoopFileFullPath)
+	}
+}
+
+_HTTP_CurlParseHeaders(RawHeaders) {
+	Result := Map("status", 0, "headers", Map())
+	Normalized := StrReplace(RawHeaders, "`r`n", "`n")
+	for Block in StrSplit(Normalized, "`n`n") {
+		if !RegExMatch(Block, "m)^HTTP/\S+\s+(\d{3})(?:\s|$)", &Match)
+			continue
+		Headers := Map()
+		for Line in StrSplit(Block, "`n") {
+			Colon := InStr(Line, ":")
+			if (Colon <= 1)
+				continue
+			Name := StrLower(Trim(SubStr(Line, 1, Colon - 1)))
+			Headers[Name] := Trim(SubStr(Line, Colon + 1))
+		}
+		Result := Map("status", Integer(Match[1]), "headers", Headers)
+	}
+	return Result
+}
+
+/**
+ * WinHttpRequest async mode can still block its caller during DNS/connect/Send.
+ * This compatibility transport performs every network phase in a tree-owned
+ * curl child while retaining the small WinHTTP-like surface used by existing
+ * updater and LLM state machines.
+ */
+class CurlAsyncRequest {
+	__New() {
+		Id := DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_"
+			. _HTTP_CurlNextRequestId()
+		Base := A_Temp . "\ergopti_http_" . Id
+		this.ConfigPath := Base . ".conf"
+		this.BodyPath := Base . ".body"
+		this.HeaderPath := Base . ".headers"
+		this.Method := ""
+		this.Url := ""
+		this.Headers := Map()
+		this.ConnectTimeoutMs := 5000
+		this.TotalTimeoutMs := 30000
+		this.Handle := 0
+		this.Completed := false
+		this.Aborted := false
+		this.Status := 0
+		this.ResponseText := ""
+		this.ResponseHeaders := Map()
+	}
+
+	Open(Method, Url, Async := true) {
+		if !Async
+			throw ValueError("CurlAsyncRequest only supports asynchronous dispatch.")
+		Method := StrUpper(String(Method))
+		if !(Method == "GET" || Method == "POST" || Method == "DELETE")
+			throw ValueError("Unsupported asynchronous HTTP method.", -1, Method)
+		if !_HTTP_CurlScalarIsSafe(Url)
+			throw ValueError("HTTP URL contains a control character.")
+		this.Method := Method
+		this.Url := Url
+	}
+
+	SetRequestHeader(Name, Value) {
+		if !_HTTP_CurlScalarIsSafe(Name) || !_HTTP_CurlScalarIsSafe(Value)
+			throw ValueError("HTTP header contains a control character.")
+		this.Headers[String(Name)] := String(Value)
+	}
+
+	SetTimeouts(ResolveMs, ConnectMs, SendMs, ReceiveMs) {
+		this.ConnectTimeoutMs := Max(1, Integer(ResolveMs) + Integer(ConnectMs))
+		this.TotalTimeoutMs := Max(1, Integer(ResolveMs) + Integer(ConnectMs)
+			+ Integer(SendMs) + Integer(ReceiveMs))
+	}
+
+	Send(Body := "") {
+		if (this.Method == "" || this.Url == "")
+			throw Error("CurlAsyncRequest.Open must succeed before Send.")
+		if IsObject(this.Handle) || this.Completed
+			throw Error("CurlAsyncRequest.Send may run only once.")
+		CurlExe := A_WinDir . "\System32\curl.exe"
+		if !FileExist(CurlExe)
+			throw Error("The Windows curl transport is unavailable.")
+		_HTTP_CurlSweepOrphans()
+
+		Config := "url = " . _HTTP_CurlConfigQuote(this.Url) . "`n"
+		Config .= "request = " . _HTTP_CurlConfigQuote(this.Method) . "`n"
+		Config .= "silent`nshow-error`n"
+		Config .= "connect-timeout = " . Ceil(this.ConnectTimeoutMs / 1000) . "`n"
+		Config .= "max-time = " . Ceil(this.TotalTimeoutMs / 1000) . "`n"
+		Config .= "dump-header = " . _HTTP_CurlConfigQuote(this.HeaderPath) . "`n"
+		Config .= "output = " . _HTTP_CurlConfigQuote("-") . "`n"
+		for Name, Value in this.Headers
+			Config .= "header = "
+				. _HTTP_CurlConfigQuote(Name . ": " . Value) . "`n"
+		if (Body != "") {
+			if !FSWrite(this.BodyPath, String(Body))
+				throw Error("Could not stage the asynchronous HTTP request body.")
+			Config .= "data-binary = "
+				. _HTTP_CurlConfigQuote("@" . this.BodyPath) . "`n"
+		}
+		if !FSWrite(this.ConfigPath, Config) {
+			this._Cleanup()
+			throw Error("Could not stage the asynchronous HTTP request config.")
+		}
+
+		this.Handle := ShellRunner_SpawnTreeOwned(CurlExe,
+			["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"))
+		if !IsObject(this.Handle) || !this.Handle.start() {
+			this.Handle := 0
+			this.Completed := true
+			this._Cleanup()
+			throw Error("Could not launch the asynchronous HTTP child.")
+		}
+		return true
+	}
+
+	WaitForResponse(TimeoutSeconds := 0) {
+		return this.Completed
+	}
+
+	GetResponseHeader(Name) {
+		return this.ResponseHeaders.Get(StrLower(String(Name)), "")
+	}
+
+	Abort() {
+		if this.Completed
+			return true
+		this.Aborted := true
+		Succeeded := true
+		Handle := this.Handle
+		this.Handle := 0
+		if IsObject(Handle) {
+			try Succeeded := Handle.terminate()
+			catch
+				Succeeded := false
+		}
+		this.Completed := true
+		this._Cleanup()
+		return Succeeded
+	}
+
+	_OnDone(ExitCode, Stdout, Stderr) {
+		if this.Completed
+			return
+		this.Handle := 0
+		HeaderText := ""
+		try HeaderText := FileRead(this.HeaderPath, "UTF-8-RAW")
+		Parsed := _HTTP_CurlParseHeaders(HeaderText)
+		if (ExitCode == 0) {
+			this.Status := Parsed["status"]
+			this.ResponseHeaders := Parsed["headers"]
+			this.ResponseText := Stdout
+		}
+		this.Completed := true
+		this._Cleanup()
+	}
+
+	_Cleanup() {
+		for Path in [this.ConfigPath, this.BodyPath, this.HeaderPath]
+			try FSDelete(Path)
+	}
+}
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 2/ Adapter Methods ============================
 ; =======================================================
 ; =======================================================
 

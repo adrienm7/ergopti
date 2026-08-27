@@ -2384,7 +2384,7 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 }
 
 ; Async, non-blocking sibling of Updater_FetchLatestJson. Dispatches the GitHub
-; Releases request in WinHTTP async mode (Open(…, true)) and returns at once;
+; Releases request in a tree-owned curl child and returns at once;
 ; OnJson(Json) is invoked later from a poll timer once the response completes
 ; (Json == "" on any failure). This is what the background poller uses, so a
 ; slow or stalled network can never block the AHK main thread — and therefore
@@ -2718,7 +2718,7 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 	Record := Owner.Record
 	Req := IsObject(FactoryFn)
 		? FactoryFn.Call()
-		: ComObject("WinHttp.WinHttpRequest.5.1")
+		: CurlAsyncRequest()
 	if !IsObject(Req)
 		throw TypeError("Async transport factory did not return an object")
 	; Publish the exact transport immediately after construction. Every later
@@ -2753,7 +2753,7 @@ _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
 	Record := Owner.Record
 	Req := IsObject(FactoryFn)
 		? FactoryFn.Call()
-		: ComObject("WinHttp.WinHttpRequest.5.1")
+		: CurlAsyncRequest()
 	if !IsObject(Req)
 		throw TypeError("Async transport factory did not return an object")
 	Record["http"] := Req
@@ -3034,7 +3034,7 @@ _Updater_AbortStagingOnExit() {
 }
 
 ; Async, non-blocking sibling of Updater_FetchReleasesListJson. Dispatches the
-; GitHub releases-list request in WinHTTP async mode (Open(…, true)) and returns
+; GitHub releases-list request in a tree-owned curl child and returns
 ; at once; OnJson(Json) is invoked from a poll timer once the response completes
 ; (Json == "" on any failure). Used by _Updater_OpenChangelogWindow so the
 ; changelog GUI build never blocks the keyboard hook on a slow network.

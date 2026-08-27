@@ -14,8 +14,8 @@
 ;
 ; The fix dispatches the remote POST through a curl child process (mirror of
 ; _LLM_Ollama_DispatchAsync): the connect happens in curl's own process and the AHK
-; message loop only polls the durable terminal sidecar. WinHTTP remains as a fallback only when curl
-; is unavailable on the host, and its resolve+connect is bounded by a short timeout.
+; message loop only polls the durable terminal sidecar. A missing curl transport
+; fails closed instead of falling back to a blocking WinHTTP request.
 ;
 ; Meta-static because modules/llm is not in the headless runner's include graph, and
 ; the live POST cannot be exercised without a remote-API key.
@@ -28,7 +28,9 @@ _RGC_AssertCurlDispatch() {
 	gen := _DriverFuncBody("LLM_RemoteGenerate_Async")
 	Assert(gen != "", "LLM_RemoteGenerate_Async must exist")
 	Assert(InStr(gen, "_LLMRemote_DispatchCurl(req_id") > 0,
-		"LLM_RemoteGenerate_Async must try the curl child (_LLMRemote_DispatchCurl) before the blocking WinHTTP path (remote-generate-connect-blocks)")
+		"LLM_RemoteGenerate_Async must dispatch through the curl child")
+	Assert(!InStr(gen, "_LLMRemote_DispatchWinHttp("),
+		"remote generation must never fall back to WinHTTP on the AHK thread")
 
 	disp := _DriverFuncBody("_LLMRemote_DispatchCurl")
 	Assert(disp != "", "_LLMRemote_DispatchCurl must exist")
