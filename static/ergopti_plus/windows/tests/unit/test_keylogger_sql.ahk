@@ -182,6 +182,66 @@ Test("keylogger SQL: every event kind replays with stable journal identity (jour
 	_KLSql_EveryEventKindReplaysWithStableIdentity)
 
 
+_KLSql_SustainedTypingKeepsRamQueueBounded() {
+	SavedPending := Keylogger._pending_entries
+	State := Map("lines", [], "flushes", 0)
+	Port := Map(
+		"open", (*) => State,
+		"encode", (Entry) => KL_JsonEncode(Entry),
+		"append", (Sink, Line) => (Sink["lines"].Push(Line), true),
+		"flush", (Sink) => (Sink["flushes"] += 1, true))
+	try {
+		Keylogger._pending_entries := []
+		Loop 40 {
+			Entry := Map("type", "shortcut", "timestamp", "2026-08-27 21:30:00.000",
+				"app", "SustainedTyping", "shortcut", "Ctrl+S")
+			KL_AssignStableEventId(Entry)
+			Keylogger._pending_entries.Push(Entry)
+			Result := _KL_JournalPendingEntries(Port)
+			AssertTrue(Result["ok"],
+				"each active-typing tick must complete its lightweight durable handoff")
+			AssertEqual(0, Keylogger._pending_entries.Length,
+				"the RAM queue must remain bounded instead of growing for the whole session")
+		}
+		AssertEqual(40, State["lines"].Length,
+			"every sustained-input tick must leave a durable JSONL record before a crash")
+		AssertEqual(40, State["flushes"],
+			"each tick must cross the explicit durability boundary before returning")
+	} finally {
+		Keylogger._pending_entries := SavedPending
+	}
+}
+Test("keylogger journal: sustained typing drains RAM every tick (sustained-typing-durability)",
+	_KLSql_SustainedTypingKeepsRamQueueBounded)
+
+
+_KLSql_JournalFailureRetainsUnprovenEntries() {
+	SavedPending := Keylogger._pending_entries
+	try {
+		Keylogger._pending_entries := [
+			Map("type", "shortcut", "_event_id", 901),
+			Map("type", "shortcut", "_event_id", 902)]
+		State := Map("lines", [])
+		Port := Map(
+			"open", (*) => State,
+			"encode", (Entry) => KL_JsonEncode(Entry),
+			"append", (Sink, Line) => (Sink["lines"].Push(Line), true),
+			"flush", (*) => false)
+		Result := _KL_JournalPendingEntries(Port)
+		AssertFalse(Result["ok"],
+			"an unproved flush must fail the durable handoff")
+		AssertEqual(2, Keylogger._pending_entries.Length,
+			"every unflushed event must return to RAM for retry")
+		AssertEqual(901, Keylogger._pending_entries[1]["_event_id"],
+			"retry must preserve the original event order and stable identity")
+	} finally {
+		Keylogger._pending_entries := SavedPending
+	}
+}
+Test("keylogger journal: flush failure retains the batch (sustained-typing-durability)",
+	_KLSql_JournalFailureRetainsUnprovenEntries)
+
+
 
 
 

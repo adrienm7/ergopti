@@ -394,11 +394,15 @@ KL_OpenTodayFh() {
 ; @param fh {File} An open File object. Anything else is ignored.
 KL_FlushTodayFh(fh) {
     if !IsObject(fh)
-        return
+		return false
     ; The read IS the flush — the handle value itself is deliberately unused.
-    try _ := fh.Handle
+    try {
+		_ := fh.Handle
+		return true
+	}
     catch as err {
         try LoggerWarn("Keylogger", "today.log flush failed: {1}.", err.Message)
+		return false
     }
 }
 
@@ -537,6 +541,8 @@ KL_SaveState() {
 
 
 #Include keylogger_json.ahk
+
+#Include keylogger_journal.ahk
 
 
 
@@ -1094,6 +1100,14 @@ KL_IngestOnce(force := false, rollover_owned := false) {
     ; during the typing-burst deferral below.
     if (IsSet(KL_Mig_IsActive) && KL_Mig_IsActive() && !Keylogger._shutting_down)
         return Map("ok", false, "eof", false, "reason", "migrating")
+    ; The ingest timer can beat the midnight timer. Only the rollover
+    ; transaction owns a date change: never publish a new-day journal row into
+    ; yesterday's file merely because SQL is deferred during active typing.
+    if (!rollover_owned && Keylogger.today_log_date != "" && Keylogger.today_log_date != KL_Today())
+        return KL_DayRollover()
+    if (Keylogger.today_log_date = "")
+        Keylogger.today_log_date := KL_Today()
+
     ; Guard against running the heavy SQL/I/O path during a typing burst.
     ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
     ; from RAM and then defer — that would leave entries on disk only, where
@@ -1104,16 +1118,14 @@ KL_IngestOnce(force := false, rollover_owned := false) {
     ; RAM only, so quitting or reloading within INGEST_IDLE_MS of a keystroke
     ; used to throw away the whole closing batch (session_end, idle_end, the
     ; final roi_snapshot), leaving events_session with an unpaired session_start.
-    if (!force and !Keylogger._shutting_down and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS)
-        return Map("ok", true, "eof", false, "reason", "typing")
-
-    ; The ingest timer can beat the midnight timer. Only the rollover
-    ; transaction owns a date change: never reset the offset here, or the
-    ; next midnight pass will see today's date and skip rotation entirely.
-    if (!rollover_owned && Keylogger.today_log_date != "" && Keylogger.today_log_date != KL_Today())
-        return KL_DayRollover()
-    if (Keylogger.today_log_date = "")
-        Keylogger.today_log_date := KL_Today()
+    if (!force and !Keylogger._shutting_down and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS) {
+		JournalResult := _KL_JournalPendingEntries()
+		if !JournalResult["ok"]
+			return Map("ok", false, "eof", false,
+				"reason", JournalResult["reason"])
+		return Map("ok", true, "eof", false, "reason", "typing",
+			"journaled", JournalResult["journaled"])
+	}
     ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
     ; entirely (COM ScriptControl is x86-only and silently empties Maps
     ; on 64-bit hosts). The JSONL pass is still used to drain anything
