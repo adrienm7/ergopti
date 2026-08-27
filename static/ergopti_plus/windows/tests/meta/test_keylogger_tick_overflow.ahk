@@ -175,8 +175,10 @@ _KLTO_KeyloggerIngestWrapSafe() {
 	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS") > 0,
 		"keylogger.ahk must mask live-push idle guard with & 0xFFFFFFFF (tickcount-wrap)")
 
-	; Password cache TTL must be masked
-	Assert(InStr(Src, "(KLPasswordCache.last_at) & 0xFFFFFFFF) >= KLPW_CACHE_TTL_MS") > 0,
+	; Password cache TTL must be masked regardless of whether the predicate is
+	; expressed as a fresh (< TTL) or expired (>= TTL) comparison.
+	Assert(InStr(Src, "(A_TickCount - KLPasswordCache.last_at) & 0xFFFFFFFF") > 0
+		and InStr(Src, "KLPW_CACHE_TTL_MS") > 0,
 		"keylogger module must mask password cache TTL with & 0xFFFFFFFF (tickcount-wrap)")
 }
 Test("keylogger: keylogger.ahk ingest and password-cache guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_KeyloggerIngestWrapSafe)

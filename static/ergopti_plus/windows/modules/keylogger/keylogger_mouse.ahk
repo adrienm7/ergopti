@@ -155,6 +155,7 @@ class KLMouse {
 ; =================================
 
 KL_Mouse_OnLDown(*) {
+		KL_InvalidatePasswordFocus()
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my)
@@ -203,6 +204,7 @@ KL_Mouse_OnLUp(*) {
 }
 
 KL_Mouse_OnRDown(*) {
+		KL_InvalidatePasswordFocus()
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my)
@@ -251,6 +253,7 @@ KL_Mouse_OnRUp(*) {
 }
 
 KL_Mouse_OnMDown(*) {
+		KL_InvalidatePasswordFocus()
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my)

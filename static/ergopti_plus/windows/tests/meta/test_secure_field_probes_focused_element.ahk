@@ -103,27 +103,58 @@ Test("privacy: every UIA IsPassword verdict is read from the focused element (ke
 
 
 
-; ============================================================
-; ============================================================
-; ======= 3/ The latching cache is still the amplifier =======
-; ============================================================
-; ============================================================
+; =============================================================
+; =============================================================
+; ======= 3/ Cache identity follows the focused element =======
+; =============================================================
+; =============================================================
 
-; Prerequisite half: the per-HWND cache is what turns one wrong answer into a
-; window-wide, self-renewing leak. If it ever gained focus-change invalidation
-; the assertion above would still be right, but the severity recorded here would
-; have rotted -- so pin what makes it load-bearing.
-_SFPF_VerdictCacheIsKeyedOnTheControlHwnd() {
-	Body := _DriverFuncBody("KL_IsFocusedFieldPassword")
-	Assert(Body != "", "KL_IsFocusedFieldPassword must exist")
-	Assert(InStr(Body, "ControlGetFocus") > 0 && InStr(Body, "KLPasswordCache.last_hwnd") > 0,
-		"prerequisite: the verdict is still cached per focused-control HWND, which for any "
-		. "single-HWND UI framework is per WINDOW -- one wrong answer covers every field in "
-		. "it")
-	Assert(InStr(Body, "KLPW_CACHE_TTL_MS") > 0,
-		"prerequisite: the stale entry is refreshed by re-running the detector, so a probe "
-		. "that answers about the window re-commits the same wrong verdict forever")
+; A UIA RuntimeId plus a focus-event generation now scopes every negative cache
+; hit. Keeping this structural guard beside the focused-element probe prevents a
+; later optimisation from silently collapsing the key back to HWND-only.
+_SFPF_VerdictCacheIsKeyedOnTheFocusedElement() {
+	CacheBody := _DriverFuncBody("KL_TryGetPwCachedVerdict")
+	Assert(CacheBody != "", "KL_TryGetPwCachedVerdict must exist")
+	Assert(InStr(CacheBody, "last_hwnd") > 0
+		and InStr(CacheBody, "last_focus_generation") > 0
+		and InStr(CacheBody, "last_element_id") > 0,
+		"the cache key must include host HWND, focus generation and UIA element identity")
+	Assert(InStr(CacheBody, "focus_tracking_active") > 0,
+		"a negative verdict must fail closed when the focus invalidator is unavailable")
+
+	InvalidateBody := _DriverFuncBody("KL_InvalidatePasswordFocus")
+	Assert(InStr(InvalidateBody, "focus_generation += 1") > 0
+		and InStr(InvalidateBody, 'current_element_id := ""') > 0,
+		"every focus event must retire the published element identity before reuse")
+
+	AsyncBody := _DriverFuncBody("KL_AsyncPasswordDetect")
+	Assert(InStr(AsyncBody, 'Verdict.Get("element_id"') > 0
+		and InStr(AsyncBody, "CurrentFocus.Generation = FocusGeneration") > 0,
+		"a deferred UIA verdict must publish only to the exact focus generation it probed")
+
+	StartBody := _DriverFuncBody("KL_Hook_Start")
+	StopBody := _DriverFuncBody("KL_Hook_Stop")
+	Assert(InStr(StartBody, "KL_PasswordFocusTrackingStart()") > 0
+		and InStr(StopBody, "KL_PasswordFocusTrackingStop()") > 0,
+		"the focused-element invalidator must be lifecycle-paired with the keylogger hook")
+	TrackerStopBody := _DriverFuncBody("KL_PasswordFocusTrackingStop")
+	UnhookFencePos := InStr(TrackerStopBody, "if !Unhooked")
+	CallbackFreePos := InStr(TrackerStopBody, "KL_FreePasswordFocusCallback")
+	CallbackClearPos := InStr(TrackerStopBody, "KLPasswordCache.focus_callback := 0")
+	Assert(UnhookFencePos > 0
+		and CallbackFreePos > UnhookFencePos
+		and CallbackClearPos > CallbackFreePos,
+		"a failed native unhook must retain the callback thunk and ownership fields for a safe retry")
+
+	KeyBody := _DriverFuncBody("KL_Hook_OnKeyDown")
+	KeyInvalidatePos := InStr(KeyBody, "KL_InvalidatePasswordFocus()")
+	KeyFilterPos := InStr(KeyBody, "MF_ShouldFilter()")
+	Assert(KeyFilterPos > 0 and KeyInvalidatePos > KeyFilterPos,
+		"Tab must retire the source-field verdict after its own filter and before the destination field's first character")
+	for HandlerName in ["KL_Mouse_OnLDown", "KL_Mouse_OnRDown", "KL_Mouse_OnMDown"]
+		Assert(InStr(_DriverFuncBody(HandlerName), "KL_InvalidatePasswordFocus()") > 0,
+			HandlerName . " must invalidate a same-HWND focused element before reuse")
 }
 
-Test("privacy: the keylogger password verdict is still cached per HWND (keylogger-secure-field-window-scoped-probe)",
-	_SFPF_VerdictCacheIsKeyedOnTheControlHwnd)
+Test("privacy: the keylogger password verdict cache is focused-element scoped (audit-ahk-003-element-cache-key)",
+	_SFPF_VerdictCacheIsKeyedOnTheFocusedElement)

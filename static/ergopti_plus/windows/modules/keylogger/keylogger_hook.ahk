@@ -435,6 +435,7 @@ KL_Hook_OnChar(ih, c) {
 KL_Hook_OnKeyDown(ih, vk, sc) {
 		if A_IsSuspended
 				return
+		PotentialFocusMove := (vk = 0x09)
 
 		; An uncaught exception inside an InputHook callback silently disables the
 		; hook permanently. Wrap the entire body so any runtime error is logged and
@@ -541,6 +542,12 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				}
 		} catch as kl_err {
 				try LoggerError("keylogger_hook", "KL_Hook_OnKeyDown unhandled exception — hook kept alive: {1}", kl_err.Message)
+		} finally {
+				; The application processes Tab only after this observer returns. Retire
+				; any source-field verdict after the optional [TAB] privacy check, so a
+				; delayed EVENT_OBJECT_FOCUS still cannot expose the destination field.
+				if PotentialFocusMove
+						KL_InvalidatePasswordFocus()
 		}
 }
 
@@ -600,6 +607,7 @@ KL_Hook_Start() {
 		; Idempotent — multiple Start calls are no-ops once subscribed.
 		if KLHook.HasOwnProp("registered") && KLHook.registered
 				return
+		KL_PasswordFocusTrackingStart()
 
 		; Subscribe the keylogger's keyboard handlers to the shared HookDispatcher
 		; instead of opening a second InputHook. The dispatcher already owns the
@@ -629,6 +637,7 @@ KL_Hook_Start() {
 }
 
 KL_Hook_Stop() {
+		KL_PasswordFocusTrackingStop()
 		if KLHook.HasOwnProp("flush_timer") && IsObject(KLHook.flush_timer) {
 				try SetTimer(KLHook.flush_timer, 0)
 		}
