@@ -4183,3 +4183,87 @@ _UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
 }
 Test("Updater AHK-047: explicit channel changes override cross-channel semver ordering (updater-cross-channel-install-2026-08-28)",
 	_UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy)
+
+class _UpdaterTestDeadlineWorker {
+	__New(State) {
+		this.State := State
+	}
+
+	terminate() {
+		this.State.Terminations += 1
+		return true
+	}
+}
+
+_UpdaterTest_RecordDeadlineFailure(State, Message, Options) {
+	State.Notices += 1
+	State.Message := Message
+	return true
+}
+
+_UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup() {
+	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
+	global _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch
+	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
+	global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	Enforce := _UpdaterTest_ResolveFunction("_Updater_EnforceDownloadDeadline")
+	Saved := {
+		InProgress: _UpdaterDownloadInProgress,
+		Worker: _UpdaterDownloadWorker,
+		Request: _UpdaterDownloadRequest,
+		Artifacts: _UpdaterDownloadArtifacts,
+		StartedTick: _UpdaterDownloadStartedTick,
+		Epoch: _UpdaterSelfUpdateEpoch,
+		SwapOwner: _UpdaterSwapOwner,
+		ExitIntent: _UpdaterExitIntent,
+		ExitInvocation: _UpdaterExitInvocation
+	}
+	TempDir := A_Temp . "\ergopti-updater-deadline-" . A_TickCount
+	DirCreate(TempDir)
+	NewExe := TempDir . "\ErgoptiPlus_new.exe"
+	SwapScript := TempDir . "\swap_update.ps1"
+	FileAppend("partial", NewExe, "UTF-8-RAW")
+	FileAppend("partial", SwapScript, "UTF-8-RAW")
+	State := { Terminations: 0, Notices: 0, Message: "" }
+	try {
+		_UpdaterDownloadInProgress := true
+		_UpdaterDownloadWorker := _UpdaterTestDeadlineWorker(State)
+		_UpdaterDownloadRequest := 0
+		_UpdaterDownloadArtifacts := { NewExe: NewExe, SwapScript: SwapScript }
+		_UpdaterDownloadStartedTick := 100
+		_UpdaterSelfUpdateEpoch := 51
+		_UpdaterSwapOwner := 0
+		_UpdaterExitIntent := 0
+		_UpdaterExitInvocation := 0
+		AssertEqual(true, Enforce.Call(
+			100 + UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, false,
+			_UpdaterTest_RecordDeadlineFailure.Bind(State)),
+			"the wall-clock boundary must terminate the exact transaction")
+		AssertEqual(1, State.Terminations,
+			"deadline expiry must terminate the owned process tree exactly once")
+		AssertEqual(false, _UpdaterDownloadInProgress,
+			"deadline expiry must release the global download owner")
+		Assert(!FileExist(NewExe),
+			"deadline expiry must delete the partial executable")
+		Assert(!FileExist(SwapScript),
+			"deadline expiry must delete the partial swap worker")
+		AssertEqual(1, State.Notices,
+			"deadline expiry must publish one visible failure terminal")
+	} finally {
+		_UpdaterDownloadInProgress := Saved.InProgress
+		_UpdaterDownloadWorker := Saved.Worker
+		_UpdaterDownloadRequest := Saved.Request
+		_UpdaterDownloadArtifacts := Saved.Artifacts
+		_UpdaterDownloadStartedTick := Saved.StartedTick
+		_UpdaterSelfUpdateEpoch := Saved.Epoch
+		_UpdaterSwapOwner := Saved.SwapOwner
+		_UpdaterExitIntent := Saved.ExitIntent
+		_UpdaterExitInvocation := Saved.ExitInvocation
+		try FileDelete(NewExe)
+		try FileDelete(SwapScript)
+		try DirDelete(TempDir)
+	}
+}
+Test("Updater AHK-049: absolute download deadline terminates and cleans staging (updater-absolute-download-deadline-2026-08-28)",
+	_UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup)
