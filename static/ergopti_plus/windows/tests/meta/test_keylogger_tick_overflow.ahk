@@ -113,11 +113,13 @@ _KLTO_WatchersStopDrainMasked() {
 		"keylogger_watchers.ahk must NOT use bare unmasked A_TickCount - KLWatch.session_started_at in drain (F31)")
 
 	; Positive: masked idle_end form must be present
-	Assert(InStr(Src, 'KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF)') > 0,
+	Assert(RegExMatch(Src,
+		's)KL_LogSession\("idle_end",\s*\(A_TickCount\s*-\s*KLWatch\.idle_started_at\)\s*&\s*0xFFFFFFFF') > 0,
 		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF in drain (F31)")
 
 	; Positive: masked session_end form must be present
-	Assert(InStr(Src, 'KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF)') > 0,
+	Assert(RegExMatch(Src,
+		's)KL_LogSession\("session_end",\s*\(A_TickCount\s*-\s*KLWatch\.session_started_at\)\s*&\s*0xFFFFFFFF') > 0,
 		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF in drain (F31)")
 }
 Test("keylogger: KL_Watchers_Stop drain paths mask A_TickCount durations with & 0xFFFFFFFF (F31)", _KLTO_WatchersStopDrainMasked)

@@ -1011,11 +1011,15 @@ KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
 
 #Include keylogger_llm_journal.ahk
 
-KL_LogSession(kind, duration_ms := unset) {
+KL_LogSession(kind, duration_ms := unset, PublishCommit := 0) {
     e := Map("type", kind)
     if IsSet(duration_ms)
         e["duration_ms"] := duration_ms
-    KL_AppendLog(e)
+	if HasMethod(PublishCommit, "Call") {
+		RejectedBySuspend := false
+		return KL_AppendLog(e, &RejectedBySuspend, , PublishCommit)
+	}
+	return KL_AppendLog(e)
 }
 
 
@@ -1643,7 +1647,8 @@ KL_Stop() {
     try KL_Hook_Stop()
     ; Drain idle / session state and unhook OnMessage handlers so the
     ; JSONL never ends with a dangling session_start / idle_start.
-    try KL_Watchers_Stop()
+	WatchersStopped := false
+	try WatchersStopped := KL_Watchers_Stop()
     try KL_Mouse_Stop()
     try KL_Sensors_Stop()
     try KL_Topo_Stop()
@@ -1685,10 +1690,10 @@ KL_Stop() {
     }
 	StateSaved := KL_SaveState()
 	HandleClosed := KL_CloseTodayFh()
-	if !IngestComplete or !StateSaved or !HandleClosed {
+	if !WatchersStopped or !IngestComplete or !StateSaved or !HandleClosed {
 		try LoggerError("Keylogger",
-			"Shutdown persistence incomplete (ingest={1}, state={2}, close={3}).",
-			IngestComplete, StateSaved, HandleClosed)
+			"Shutdown persistence incomplete (watchers={1}, ingest={2}, state={3}, close={4}).",
+			WatchersStopped, IngestComplete, StateSaved, HandleClosed)
 		return false
 	}
     Keylogger.initialized := false
