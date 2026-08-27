@@ -607,6 +607,60 @@ _Updater_ValidateBootReadyEventName(Name) {
 		? Name : ""
 }
 
+_Updater_SwapFailureTerminalPath() {
+	LocalAppData := ResolveLocalAppDataDir()
+	if (LocalAppData == "")
+		return ""
+	return LocalAppData . "\Ergopti\updates\swap_update.ps1.log.terminal"
+}
+
+; The inherited path is a capability, not an arbitrary file-read request. Only
+; the exact bounded receipt owned by this updater installation is accepted.
+_Updater_LoadSwapFailureTerminal(CandidatePath, ExpectedPath := "") {
+	if (Type(CandidatePath) != "String" or CandidatePath == "")
+		return ""
+	if (ExpectedPath == "")
+		ExpectedPath := _Updater_SwapFailureTerminalPath()
+	if (Type(ExpectedPath) != "String" or ExpectedPath == ""
+		or StrCompare(CandidatePath, ExpectedPath, false) != 0)
+		return ""
+	Terminal := FSReadBounded(CandidatePath, 2048)
+	if !(Terminal is String)
+		return ""
+	Terminal := RTrim(Terminal, "`r`n")
+	if !RegExMatch(Terminal, "^SWAP_ERROR:[^`r`n]{1,2000}$")
+		return ""
+	return Terminal
+}
+
+_Updater_ArmInheritedSwapFailureNotice() {
+	global _UpdaterInheritedSwapFailure
+	if (_UpdaterInheritedSwapFailure == "")
+		return false
+	return TimerArmOneShotMs(_Updater_SurfaceInheritedSwapFailure, 1)
+}
+
+_Updater_SurfaceInheritedSwapFailure(*) {
+	global _UpdaterInheritedSwapFailure, _UpdaterInheritedSwapFailurePath
+	Terminal := _UpdaterInheritedSwapFailure
+	if (Terminal == "")
+		return false
+	try LoggerError("Updater", "Previous executable replacement failed after shutdown: {1}.", Terminal)
+	try {
+		MsgBox(t("updater.install_error") . "`n`n" . Terminal,
+			t("updater.title_update"), "Icon!")
+		if (_UpdaterInheritedSwapFailurePath != ""
+			and !FSDelete(_UpdaterInheritedSwapFailurePath))
+			throw Error("Consumed swap failure receipt could not be deleted")
+		_UpdaterInheritedSwapFailure := ""
+		_UpdaterInheritedSwapFailurePath := ""
+		return true
+	} catch as Err {
+		try LoggerError("Updater", "Could not surface the inherited swap failure: {1}.", Err.Message)
+		return false
+	}
+}
+
 _Updater_SignalInheritedBootReady() {
 	global _UpdaterInheritedBootReadyName
 	Name := _UpdaterInheritedBootReadyName
@@ -1663,6 +1717,7 @@ _Updater_BuildSwapWorkerScript() {
 		. '$ErrorActionPreference="Stop";$R=$null;$C=$null;$A=$null;$F=$null;$P=$null' . "`n"
 		. 'function Diag($M){try{[IO.File]::AppendAllText($DiagnosticPath,$M+[Environment]::NewLine)}catch{}}' . "`n"
 		. 'function RemoveBest($Path,$Label){try{if($Path -and [IO.File]::Exists($Path)){[IO.File]::Delete($Path)}}catch{Diag($Label+":"+$_.Exception.Message)}}' . "`n"
+		. 'function WriteTerminal($Path,$Message){$Temp=$Path+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "terminal-temp";RemoveBest $Path "terminal-stale";$Clean=($Message -replace "[\r\n]+"," ");if($Clean.Length -gt 2000){$Clean=$Clean.Substring(0,2000)};[IO.File]::WriteAllText($Temp,$Clean,$Utf8);[IO.File]::Move($Temp,$Path)}finally{RemoveBest $Temp "terminal-temp-cleanup"}}' . "`n"
 		. 'function PublishCopy($Source,$Destination){$Temp=$Destination+".tmp";try{RemoveBest $Temp "precopy-temp";if([IO.File]::Exists($Destination)){throw "Unique publish destination already exists"};[IO.File]::Copy($Source,$Temp,$false);$Expected=[IO.FileInfo]::new($Source).Length;if($Expected -le 0 -or [IO.FileInfo]::new($Temp).Length -ne $Expected){throw "Pre-copy size mismatch"};[IO.File]::Move($Temp,$Destination);if([IO.FileInfo]::new($Destination).Length -ne $Expected){throw "Published copy size mismatch"};return $Destination}finally{RemoveBest $Temp "precopy-temp-cleanup"}}' . "`n"
 		. 'function WriteClaim($Claim,$Target,$Stage){$Temp=$Claim+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "claim-temp";RemoveBest $Claim "claim-stale";[IO.File]::WriteAllText($Temp,$Target+[Environment]::NewLine+$Stage,$Utf8);[IO.File]::Move($Temp,$Claim)}finally{RemoveBest $Temp "claim-temp-cleanup"}}' . "`n"
 		. 'function StopExact($Process){if($null -eq $Process){return $true};try{$Exact=$Process.Handle;$Process.Refresh();if(!$Process.HasExited){$Process.Kill()};if(!$Process.WaitForExit(5000)){Diag("exact-stop-timeout");return $false};return $true}catch{Diag("exact-stop:"+$_.Exception.Message);return $false}}' . "`n"
@@ -1672,7 +1727,7 @@ _Updater_BuildSwapWorkerScript() {
 		. '  $P=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset);$H=$P.SafeWaitHandle;$P.SafeWaitHandle=[Microsoft.Win32.SafeHandles.SafeWaitHandle]::new([IntPtr]$ParentHandle,$true);$H.Dispose()' . "`n"
 		. '  if(!$R.Set()){throw "Ready signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($C,$P));if($G -eq 1){exit 20};if($G -ne 0){throw "Commit wait failed"}' . "`n"
 		. '  if(!$A.Set()){throw "Ack signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($F,$P));if($G -eq 1){exit 21};if($G -ne 0){throw "FinalExit wait failed"};$P.WaitOne()|Out-Null' . "`n"
-		. '  $B=$CurrentExe+".bak";$Had=[IO.File]::Exists($CurrentExe);$Retired=(!$Had -and [IO.File]::Exists($B));$Installed=$false;$Token=[Guid]::NewGuid().ToString("N");$Candidate=$CurrentExe+"."+$Token+".candidate.exe";$RecoveryPath=$CurrentExe+"."+$Token+".recovery.exe";$RecoveryStage=$CurrentExe+"."+$Token+".republish.exe";$RecoveryClaim=$RecoveryPath+".claim";$Recovery=$null' . "`n"
+		. '  $B=$CurrentExe+".bak";$Had=[IO.File]::Exists($CurrentExe);$Retired=(!$Had -and [IO.File]::Exists($B));$Installed=$false;$Token=[Guid]::NewGuid().ToString("N");$Candidate=$CurrentExe+"."+$Token+".candidate.exe";$RecoveryPath=$CurrentExe+"."+$Token+".recovery.exe";$RecoveryStage=$CurrentExe+"."+$Token+".republish.exe";$RecoveryClaim=$RecoveryPath+".claim";$Recovery=$null;$TerminalPath=$DiagnosticPath+".terminal";RemoveBest $TerminalPath "terminal-stale"' . "`n"
 		. '  try {' . "`n"
 		. '    PublishCopy $NewExe $Candidate|Out-Null;$OldSource=if($Had){$CurrentExe}elseif($Retired){$B}else{$null}' . "`n"
 		. '    if($null -ne $OldSource){PublishCopy $OldSource $RecoveryPath|Out-Null;PublishCopy $OldSource $RecoveryStage|Out-Null;WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$Recovery=$RecoveryPath}' . "`n"
@@ -1680,14 +1735,14 @@ _Updater_BuildSwapWorkerScript() {
 		. '    $Child=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false' . "`n"
 		. '    RemoveBest $RecoveryClaim "success-claim-cleanup";RemoveBest $B "success-bak-cleanup";RemoveBest $RecoveryStage "success-stage-cleanup";RemoveBest $Recovery "success-recovery-cleanup";exit 0' . "`n"
 		. '  } catch {' . "`n"
-		. '    $Failure=$_;if($Failure.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw $Failure};RemoveBest $Candidate "rollback-candidate-cleanup";$Restored=(!$Installed -and $Had -and [IO.File]::Exists($CurrentExe))' . "`n"
+		. '    $Failure=$_;if($Failure.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw $Failure};$TerminalMessage="SWAP_ERROR:"+$Failure.Exception.Message;try{WriteTerminal $TerminalPath $TerminalMessage}catch{Diag("terminal-write:"+$_.Exception.Message)};RemoveBest $Candidate "rollback-candidate-cleanup";$Restored=(!$Installed -and $Had -and [IO.File]::Exists($CurrentExe))' . "`n"
 		. '    for($I=0;$I -lt $RestoreAttempts -and !$Restored;$I++){' . "`n"
 		. '      try{$Source=if([IO.File]::Exists($RecoveryStage)){$RecoveryStage}elseif([IO.File]::Exists($B)){$B}else{$null};if($null -eq $Source){break};if([IO.File]::Exists($CurrentExe)){$Bad=$CurrentExe+"."+$Token+".failed.exe";RemoveBest $Bad "rollback-failed-stale";[IO.File]::Replace($Source,$CurrentExe,$Bad,$true);RemoveBest $Bad "rollback-failed-cleanup"}else{[IO.File]::Move($Source,$CurrentExe)};$Restored=$true}' . "`n"
 		. '      catch{Diag("rollback-restore-"+$I+":"+$_.Exception.Message);if(($I+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}' . "`n"
 		. '    }' . "`n"
-		. '    $DriverReady=$false;if($Restored){try{$RestoredChild=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false;$DriverReady=$true;RemoveBest $RecoveryClaim "rollback-claim-cleanup";RemoveBest $B "rollback-bak-cleanup";RemoveBest $RecoveryStage "rollback-stage-cleanup";RemoveBest $Recovery "rollback-recovery-cleanup"}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-relaunch:"+$_.Exception.Message)}}' . "`n"
+		. '    $OldTerminal=[Environment]::GetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL");[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$TerminalPath);try{$DriverReady=$false;if($Restored){try{$RestoredChild=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false;$DriverReady=$true;RemoveBest $RecoveryClaim "rollback-claim-cleanup";RemoveBest $B "rollback-bak-cleanup";RemoveBest $RecoveryStage "rollback-stage-cleanup";RemoveBest $Recovery "rollback-recovery-cleanup"}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-relaunch:"+$_.Exception.Message)}}' . "`n"
 		. '    for($RecoveryAttempt=0;$RecoveryAttempt -lt $RestoreAttempts -and !$DriverReady -and $null -ne $Recovery -and [IO.File]::Exists($Recovery);$RecoveryAttempt++){try{if(![IO.File]::Exists($RecoveryStage)){PublishCopy $Recovery $RecoveryStage|Out-Null};WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$RecoveryChild=StartReady $Recovery $BootReadyTimeoutMs $ProbationMs $true;$DriverReady=$true;Diag("rollback-recovery:"+$Recovery)}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-recovery-"+$RecoveryAttempt+":"+$_.Exception.Message);if(($RecoveryAttempt+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}}' . "`n"
-		. '    if(!$DriverReady){throw "Rollback could not start either canonical or recovery driver"};throw $Failure' . "`n"
+		. '    if(!$DriverReady){throw "Rollback could not start either canonical or recovery driver"}}finally{[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$OldTerminal)};throw $Failure' . "`n"
 		. '  }' . "`n"
 		. '} catch {$M="SWAP_ERROR:"+$_.Exception.Message;Diag($M);[Console]::Error.WriteLine($M);exit 1}' . "`n"
 		. 'finally{foreach($W in @($R,$C,$A,$F,$P)){if($null -ne $W){$W.Dispose()}}}'

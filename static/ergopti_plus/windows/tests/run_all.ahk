@@ -1180,6 +1180,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_callback_suspend_guard.ahk
 #Include meta/test_altgr_dispatch_resume_aware.ahk
 #Include meta/test_updater_self_update_bak_rollback.ahk
+#Include meta/test_updater_swap_failure_receipt.ahk
 #Include meta/test_bundle_resolve_dir_local_appdata.ahk
 #Include meta/test_personal_shortcuts_compiled_include_path.ahk
 #Include meta/test_personal_shortcuts_generator_encoding.ahk
