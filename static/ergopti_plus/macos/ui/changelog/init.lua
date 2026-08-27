@@ -44,6 +44,7 @@ local _wv       = nil
 local _ucc      = nil
 local _ready    = false
 local _queued   = {}
+local _fetch_generation = 0
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/changelog/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
@@ -62,14 +63,23 @@ local ASSETS_DIR = (Paths.shared("ui/changelog") or "") .. "/"
 
 --- Safely runs JS in the webview, queuing it when the page is not ready yet.
 --- @param code string Raw JavaScript to evaluate.
-local function eval(code)
+--- @param generation number|nil Fetch generation that owns this publication.
+local function eval(code, generation)
+	if generation ~= nil and generation ~= _fetch_generation then return end
 	if not _wv then return end
 	if _ready and type(_wv.evaluateJavaScript) == "function" then
 		pcall(function() _wv:evaluateJavaScript(code) end)
 	else
-		table.insert(_queued, code)
+		table.insert(_queued, {code = code, generation = generation})
 		if #_queued > 300 then table.remove(_queued, 1) end
 	end
+end
+
+--- Advances the fetch generation and invalidates every earlier publication.
+--- @return number generation Newly active generation.
+local function next_fetch_generation()
+	_fetch_generation = _fetch_generation + 1
+	return _fetch_generation
 end
 
 --- Escapes a Lua string for safe injection into a JS string literal.
@@ -100,6 +110,7 @@ end
 --- automatically to the dev endpoint so pre-releases are shown.
 --- @param channel string "main" or "dev"
 local function fetch_and_inject(channel)
+	local request_generation = next_fetch_generation()
 	local url = channel == "dev"
 		and (GH_BASE .. "?per_page=20")
 		or  (GH_BASE .. "?per_page=20")
@@ -107,11 +118,13 @@ local function fetch_and_inject(channel)
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
 
 	hs.http.asyncGet(url, UA_HEADER, function(status, body, _)
+		if request_generation ~= _fetch_generation then return end
 		Logger.debug(LOG, "GitHub API: HTTP %s, body_len=%s.", tostring(status), tostring(body and #body or "nil"))
 
 		if status ~= 200 or not body or body == "" then
 			Logger.warn(LOG, "GitHub API returned %s — injecting error.", tostring(status))
-			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_network"))))
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_network"))),
+				request_generation)
 			return
 		end
 
@@ -119,7 +132,8 @@ local function fetch_and_inject(channel)
 		local ok, data = pcall(hs.json.decode, body)
 		if not ok or type(data) ~= "table" then
 			Logger.warn(LOG, "GitHub API JSON parse failed.")
-			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))))
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
 			return
 		end
 
@@ -138,12 +152,14 @@ local function fetch_and_inject(channel)
 		local ok_enc, json = pcall(hs.json.encode, releases)
 		if not ok_enc or not json then
 			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
-			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))))
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
 			return
 		end
 
 		Logger.done(LOG, "Injecting %d release(s) into changelog UI.", #releases)
-		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)))
+		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
+			request_generation)
 	end)
 end
 
@@ -162,8 +178,10 @@ local function flush_queue()
 	_ready = true
 	local q = _queued
 	_queued = {}
-	for _, code in ipairs(q) do
-		pcall(function() _wv:evaluateJavaScript(code) end)
+	for _, pending in ipairs(q) do
+		if pending.generation == nil or pending.generation == _fetch_generation then
+			pcall(function() _wv:evaluateJavaScript(pending.code) end)
+		end
 	end
 end
 
@@ -222,6 +240,7 @@ function M.open(opts)
 		return
 	end
 
+	next_fetch_generation()
 	Logger.start(LOG, "Opening changelog window (channel=%s)…", channel)
 
 	ensure_ucc()
@@ -271,6 +290,7 @@ function M.open(opts)
 			return true
 		end,
 		on_close          = function()
+			next_fetch_generation()
 			_wv    = nil
 			_ready = false
 			_queued = {}
@@ -289,6 +309,7 @@ end
 --- Closes the changelog window if open.
 function M.close()
 	if not _wv then return end
+	next_fetch_generation()
 	pcall(function() _wv:delete() end)
 	_wv    = nil
 	_ready = false
