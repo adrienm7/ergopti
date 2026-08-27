@@ -1643,6 +1643,50 @@ _Updater_IsNewerVersion(Latest, Current) {
 	return _Updater_CompareVersions(Latest, Current) > 0
 }
 
+; Returns the immutable release channel stamped into the running executable.
+; The source-tree placeholder is deliberately treated as dev, matching
+; Updater_LoadChannel(). Compiled release artifacts are stamped main or dev by
+; the release workflow.
+_Updater_InstalledChannel() {
+	global BUNDLE_CHANNEL
+	if IsSet(BUNDLE_CHANNEL)
+		and (BUNDLE_CHANNEL == "main" or BUNDLE_CHANNEL == "dev")
+		return BUNDLE_CHANNEL
+	return "dev"
+}
+
+; Enforces the tag family emitted by .github/workflows/ci.yml for each channel.
+; Stable releases are ordinary semver; dev releases use v0.0.0-dev.N.
+_Updater_TagMatchesChannel(Tag, Channel) {
+	Parsed := _Updater_ParseVersion(Tag)
+	if !IsObject(Parsed)
+		return false
+	if (Channel == "main")
+		return Parsed.PreParts == 0
+	if (Channel != "dev")
+		return false
+	return Parsed.Maj == 0 and Parsed.Min == 0 and Parsed.Pat == 0
+		and IsObject(Parsed.PreParts) and Parsed.PreParts.Length == 2
+		and Parsed.PreParts[1] == "dev"
+		and RegExMatch(Parsed.PreParts[2], "^[1-9]\d*$")
+}
+
+; A deliberate channel change is an artifact-family migration, not an
+; ordinary version upgrade. Its candidate is therefore eligible even when
+; semver orders the CI dev family below the installed stable version. Within
+; one channel, the strict newer-only rule remains unchanged.
+_Updater_ShouldOfferCandidate(Latest, Current, SelectedChannel,
+	InstalledChannel) {
+	if !_Updater_TagMatchesChannel(Latest, SelectedChannel)
+		return false
+	if (SelectedChannel != InstalledChannel) {
+		if (InstalledChannel != "main" and InstalledChannel != "dev")
+			return false
+		return true
+	}
+	return _Updater_IsNewerVersion(Latest, Current)
+}
+
 
 
 ; ==========================================

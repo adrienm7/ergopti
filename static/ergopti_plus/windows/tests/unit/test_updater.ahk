@@ -4114,3 +4114,72 @@ _UpdaterTest_IntervalPublicationReassertsDurableCandidate() {
 }
 Test("Updater AHK-34: interval publication replaces stale reentrant live state (updater-global-config-barrier)",
 	_UpdaterTest_IntervalPublicationReassertsDurableCandidate)
+
+_UpdaterTest_RecordCrossChannelInstall(State, Release) {
+	State.Installs += 1
+	State.Tag := Release.Tag
+	return true
+}
+
+_UpdaterTest_RecordCrossChannelRebuild(State) {
+	State.Rebuilds += 1
+	return true
+}
+
+_UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
+	global UPDATER_LATEST_RELEASE, UPDATER_REQUEST_ORIGIN_MANUAL
+	ShouldOffer := _UpdaterTest_ResolveFunction("_Updater_ShouldOfferCandidate")
+	Publish := _UpdaterTest_ResolveFunction("_Updater_PublishOneClickRelease")
+	Workflow := FileRead(A_ScriptDir . "\..\..\..\..\.github\workflows\ci.yml", "UTF-8")
+	TagTemplate := 'tag="v0.0.0-dev.${next_n}"'
+	Assert(InStr(Workflow, TagTemplate) > 0,
+		"the regression must consume the exact dev tag family owned by CI")
+	DevCandidate := StrReplace(
+		SubStr(TagTemplate, 6, StrLen(TagTemplate) - 6), "${next_n}", "117")
+	AssertEqual(true, ShouldOffer.Call(
+		DevCandidate, "1.0.0", "dev", "main"),
+		"an explicit stable-to-dev transition must offer the CI dev candidate")
+	AssertEqual(false, ShouldOffer.Call(
+		DevCandidate, "1.0.0", "main", "main"),
+		"ordinary same-channel checks must retain strict semver ordering")
+	AssertEqual(false, ShouldOffer.Call(
+		"v1.1.0", "1.0.0", "dev", "main"),
+		"a stable candidate must never satisfy a selected dev channel")
+	AssertEqual(true, ShouldOffer.Call(
+		"v1.1.0", "0.0.0-dev.117", "main", "dev"),
+		"an explicit dev-to-stable transition must offer a stable candidate")
+	AssertEqual(false, ShouldOffer.Call(
+		"not-semver", "1.0.0", "dev", "main"),
+		"channel migration must fail closed on malformed release metadata")
+
+	Saved := _UpdaterTest_SaveRequestState()
+	HadLatest := IsSet(UPDATER_LATEST_RELEASE)
+	if HadLatest
+		SavedLatest := UPDATER_LATEST_RELEASE
+	try {
+		_UpdaterTest_ResetRequestState()
+		Request := _Updater_NewRequestContext(
+			UPDATER_REQUEST_ORIGIN_MANUAL, false, "dev")
+		Release := { Tag: DevCandidate, RawJson: "{}" }
+		State := { Rebuilds: 0, Installs: 0, Tag: "" }
+		AssertEqual(true, Publish.Call(
+			Release, Request, false,
+			_UpdaterTest_RecordCrossChannelRebuild.Bind(State),
+			0, _UpdaterTest_RecordCrossChannelInstall.Bind(State)),
+			"the selected dev candidate must cross publication into staging")
+		AssertEqual(1, State.Rebuilds,
+			"candidate publication must refresh the visible updater state once")
+		AssertEqual(1, State.Installs,
+			"the explicit channel migration must invoke staging exactly once")
+		AssertEqual(DevCandidate, State.Tag,
+			"staging must receive the exact CI-generated candidate")
+	} finally {
+		_UpdaterTest_RestoreRequestState(Saved)
+		if HadLatest
+			UPDATER_LATEST_RELEASE := SavedLatest
+		else
+			UPDATER_LATEST_RELEASE := unset
+	}
+}
+Test("Updater AHK-047: explicit channel changes override cross-channel semver ordering (updater-cross-channel-install-2026-08-28)",
+	_UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy)

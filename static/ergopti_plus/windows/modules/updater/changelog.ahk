@@ -161,7 +161,8 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
-	if !_Updater_IsNewerVersion(Latest, Current) {
+	if !_Updater_ShouldOfferCandidate(
+		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
