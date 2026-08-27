@@ -291,7 +291,15 @@ jobs:
       - name: Run Swift launcher tests
         env:
           SWIFT_BACKTRACE: enable=yes
-        run: swift test --package-path static/ergopti_plus/macos/launcher
+        run: |
+          set -euo pipefail
+          xctest_log="$(mktemp)"
+          trap 'rm -f "$xctest_log"' EXIT
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher 2>&1 | tee "$xctest_log"
+          if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
+              echo "::error::the XCTest process ended without its successful suite summary"
+              exit 1
+          fi
         timeout-minutes: 10
 
   # ─────────────────────────────────────────────────
