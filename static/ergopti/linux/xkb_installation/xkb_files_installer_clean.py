@@ -44,11 +44,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from desktop_activation import (  # noqa: E402
     CleanupStatus,
-    ENV_USER_HOME,
+    XkbcompProbe,
     activate_layout,
     deactivate_layouts,
+    libxkbcommon_version,
     rerun_unprivileged,
     resolve_user_identity,
+    run_cli,
     running_as_root,
     verify_keymap,
 )
@@ -59,6 +61,7 @@ from layout_package import (  # noqa: E402
     EXIT_VALIDATION,
     InstallerRoots,
     LayoutSpec,
+    MIN_LIBXKBCOMMON_CLEAN,
     PACKAGE_NAME,
     SUPPORTED_VARIANTS,
     VARIANT_PLUS,
@@ -66,12 +69,18 @@ from layout_package import (  # noqa: E402
     build_evdev_post,
     build_registry_xml,
     patch_symbols_default,
+    format_version,
     remove_generation_two_links,
     resolve_roots,
     strip_legacy_evdev_patch,
     validate_component_identifier,
     validate_layout_files,
 )
+
+# Modes applied to the committed package so every session can read it even
+# when the privileged process runs with a restrictive umask.
+PACKAGE_DIR_MODE = 0o755
+PACKAGE_FILE_MODE = 0o644
 
 
 def check_root(roots: InstallerRoots) -> None:
@@ -92,25 +101,86 @@ def read_text(path: Path) -> str:
         raise SystemExit(f"Erreur : lecture impossible de {path} ({error}).")
 
 
+def xkbcomp_probe_for(package_dir: Path, layout_id: str) -> XkbcompProbe:
+    """Explicit components that let Xorg's compiler check a clean package."""
+    return XkbcompProbe(
+        symbols=f"pc+{layout_id}+inet(evdev)",
+        types=f"complete+{layout_id}",
+        include_dirs=(package_dir,),
+    )
+
+
 def compile_validation(extensions_root: Path, layout_id: str) -> bool:
-    """Compile-test the staged package with libxkbcommon when it is available.
+    """Compile-test the staged package with the real compilers.
 
     The keymap must carry the custom type alone *and* next to another layout:
     rules that only match single-layout configurations compile fine and leave
     the Shift and AltGr layers dead for every user who keeps a second keyboard.
-    A missing xkbcli is not fatal: the structural validator already guarantees
-    symbol/types coherence, and CI exercises the real compiler.
+    Without any compiler the package is installed unverified, with a warning:
+    the structural validator already guarantees symbol/types coherence, and
+    CI exercises the real compilers on every supported distribution.
     """
-    print(f"   🔎 Compilation de contrôle via xkbcli (layout {layout_id})…")
+    print(f"   🔎 Compilation de contrôle du paquet mis en scène (layout {layout_id})…")
     verdict = verify_keymap(
-        LayoutSpec(layout_id), ERGOPTI_TYPE_NAME, extensions_root=extensions_root
+        LayoutSpec(layout_id),
+        ERGOPTI_TYPE_NAME,
+        extensions_root=extensions_root,
+        xkbcomp_probe=xkbcomp_probe_for(extensions_root / PACKAGE_NAME, layout_id),
     )
     if verdict is None:
-        print("   ℹ️  xkbcli absent : compilation réelle ignorée (validation structurelle OK).")
+        print("   ⚠️  Paquet installé sans vérification par un compilateur (validation structurelle OK).")
         return True
     if not verdict:
-        print("   ❌ Le paquet ne fournit pas ses couches ; installation annulée.")
+        print("   ❌ Le paquet ne fournit pas ses couches ; installation annulée, rien n'a été modifié.")
     return verdict
+
+
+def enforce_clean_prerequisites(roots: InstallerRoots) -> None:
+    """Refuse the clean method on a host whose libxkbcommon cannot read it.
+
+    Only libxkbcommon >= 1.13 reads the extensions directories. A forced clean
+    install on an older library copies files nobody loads, and the session
+    then keeps its previous layout while the installer reports success.
+    """
+    if roots.sandboxed:
+        return
+    version = libxkbcommon_version()
+    if version is None:
+        print(
+            "   ⚠️  Version de libxkbcommon indéterminée : la méthode Clean requiert "
+            f"libxkbcommon >= {format_version(MIN_LIBXKBCOMMON_CLEAN)} ; la compilation de contrôle tranchera."
+        )
+        return
+    if version < MIN_LIBXKBCOMMON_CLEAN:
+        raise SystemExit(
+            f"Erreur : libxkbcommon {format_version(version)} détecté, la méthode Clean requiert "
+            f">= {format_version(MIN_LIBXKBCOMMON_CLEAN)} (répertoires d'extensions XKB). "
+            "Relancez avec --installation-method legacy."
+        )
+    print(f"   ✅ libxkbcommon {format_version(version)} lit les répertoires d'extensions XKB.")
+
+
+def make_world_readable(root: Path) -> None:
+    """Give the package the modes every session needs, whatever the umask was."""
+    try:
+        root.chmod(PACKAGE_DIR_MODE)
+        for path in root.rglob("*"):
+            path.chmod(PACKAGE_DIR_MODE if path.is_dir() else PACKAGE_FILE_MODE)
+    except OSError as error:
+        print(f"   ⚠️  Droits du paquet non normalisés ({error}) : vérifiez que {root} est lisible par tous.")
+
+
+def filesystem_error(action: str, path: Path, error: OSError) -> SystemExit:
+    """Turn an OSError into a message that names the path, the cause and the fix."""
+    hint = ""
+    if getattr(error, "errno", None) == 30:
+        hint = (
+            " Le système de fichiers est en lecture seule (distribution immuable ?) : "
+            "cet installeur ne peut pas y écrire."
+        )
+    elif getattr(error, "errno", None) in (1, 13):
+        hint = " Relancez avec sudo, ou vérifiez les droits du répertoire parent."
+    return SystemExit(f"Erreur : {action} impossible dans {path} ({error}).{hint}")
 
 
 def cleanup_previous_installations(roots: InstallerRoots) -> None:
@@ -189,47 +259,63 @@ def install_clean(
 
     layout_id = validate_component_identifier(PACKAGE_NAME)
     patched_symbols = patch_symbols_default(symbols_content)
+    enforce_clean_prerequisites(roots)
 
     package_dir = roots.package_dir
-    package_dir.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        package_dir.parent.mkdir(parents=True, exist_ok=True)
+        package_dir.parent.chmod(PACKAGE_DIR_MODE)
+    except OSError as error:
+        raise filesystem_error("création du répertoire d'extensions", package_dir.parent, error) from error
     recover_interrupted_package_swap(package_dir)
-    with tempfile.TemporaryDirectory(
-        prefix=f".{PACKAGE_NAME}.staging-", dir=package_dir.parent.parent
-    ) as staging_name:
+    try:
+        staging = tempfile.TemporaryDirectory(
+            prefix=f".{PACKAGE_NAME}.staging-", dir=package_dir.parent.parent
+        )
+    except OSError as error:
+        raise filesystem_error("mise en scène du paquet", package_dir.parent.parent, error) from error
+    with staging as staging_name:
         staging_root = Path(staging_name)
         staged_package = staging_root / PACKAGE_NAME
-        (staged_package / "symbols").mkdir(parents=True)
-        (staged_package / "types").mkdir()
-        (staged_package / "rules").mkdir()
+        try:
+            (staged_package / "symbols").mkdir(parents=True)
+            (staged_package / "types").mkdir()
+            (staged_package / "rules").mkdir()
 
-        (staged_package / "symbols" / layout_id).write_text(
-            patched_symbols, encoding="utf-8"
-        )
-        (staged_package / "types" / layout_id).write_text(
-            types_content, encoding="utf-8"
-        )
-        description = "Français — Ergopti"
-        if variant == VARIANT_PLUS:
-            description = "Français — Ergopti+"
-        (staged_package / "rules" / "evdev.xml").write_text(
-            build_registry_xml(layout_id, description, []),
-            encoding="utf-8",
-        )
-        (staged_package / "rules" / "evdev.post").write_text(
-            build_evdev_post(layout_id),
-            encoding="utf-8",
-        )
-        if xcompose_path is not None:
-            (staged_package / "compose").mkdir()
-            shutil.copy2(
-                xcompose_path,
-                staged_package / "compose" / XCOMPOSE_MANAGED_NAME,
+            (staged_package / "symbols" / layout_id).write_text(
+                patched_symbols, encoding="utf-8"
             )
+            (staged_package / "types" / layout_id).write_text(
+                types_content, encoding="utf-8"
+            )
+            description = "Français — Ergopti"
+            if variant == VARIANT_PLUS:
+                description = "Français — Ergopti+"
+            (staged_package / "rules" / "evdev.xml").write_text(
+                build_registry_xml(layout_id, description, []),
+                encoding="utf-8",
+            )
+            (staged_package / "rules" / "evdev.post").write_text(
+                build_evdev_post(layout_id),
+                encoding="utf-8",
+            )
+            if xcompose_path is not None:
+                (staged_package / "compose").mkdir()
+                shutil.copy2(
+                    xcompose_path,
+                    staged_package / "compose" / XCOMPOSE_MANAGED_NAME,
+                )
+            make_world_readable(staged_package)
+        except OSError as error:
+            raise filesystem_error("écriture du paquet", staged_package, error) from error
 
         if not compile_validation(staging_root, layout_id):
             raise SystemExit(EXIT_VALIDATION)
 
-        commit_staged_package(staged_package, package_dir)
+        try:
+            commit_staged_package(staged_package, package_dir)
+        except OSError as error:
+            raise filesystem_error("installation du paquet", package_dir, error) from error
 
     print("🧼 Nettoyage des installations précédentes…")
     cleanup_previous_installations(roots)
@@ -440,24 +526,6 @@ def uninstall_clean(roots: InstallerRoots, deactivate_desktop: bool = True) -> b
     return removed
 
 
-def force_utf8_stdio() -> None:
-    """Keep the CLI alive on consoles that cannot encode every glyph.
-
-    The installer prints progress glyphs; on a cp1252 terminal (or any host
-    with a legacy ANSI code page) the default print encoding raises
-    UnicodeEncodeError mid-install. Reconfigure both streams to UTF-8 with
-    replacement characters so output degrades instead of crashing.
-    """
-    for stream in (sys.stdout, sys.stderr):
-        reconfigure = getattr(stream, "reconfigure", None)
-        if reconfigure is None:
-            continue
-        try:
-            reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            continue
-
-
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Installeur Ergopti (méthode clean)")
     parser.add_argument("--xkb", type=Path, help="Fichier .xkb de la disposition")
@@ -526,11 +594,21 @@ def run_activation_phase(variant: str, roots: InstallerRoots) -> int:
         print(f"      python3 {Path(__file__).resolve()} --activate-only --variant {variant}")
         return EXIT_INSTALL_ABORTED
     print("🔎 Vérification du paquet installé…")
-    verify_keymap(
+    verdict = verify_keymap(
         LayoutSpec(PACKAGE_NAME),
         ERGOPTI_TYPE_NAME,
         extensions_root=roots.extensions_root if roots.sandboxed else None,
+        xkbcomp_probe=xkbcomp_probe_for(roots.package_dir, PACKAGE_NAME),
     )
+    if verdict is False:
+        print(
+            "❌ La disposition installée est inutilisable par cette session : activation annulée.\n"
+            f"   Le paquet reste dans {roots.package_dir} pour analyse ; lancez "
+            "`install.sh --diagnose` et joignez sa sortie au rapport de bug."
+        )
+        return EXIT_INSTALL_ABORTED
+    if verdict is None:
+        print("   ⚠️  Disposition activée sans vérification : installez xkbcli pour la contrôler.")
     activate(PACKAGE_NAME, variant)
     return EXIT_OK
 
@@ -563,7 +641,6 @@ def run_deactivation_phase() -> int:
 
 
 def main(argv: list[str]) -> int:
-    force_utf8_stdio()
     args = parse_args(argv)
     roots = resolve_roots()
     if args.activate_only:
@@ -584,13 +661,18 @@ def main(argv: list[str]) -> int:
             activate_desktop=not args.skip_activation,
         )
     except SystemExit as error:
-        # install_clean already printed a diagnostic; map its aborts to the
-        # documented exit codes so scripts can branch on them.
+        # install_clean either printed its diagnostic and raised an exit code,
+        # or raised the message itself: print it, never swallow it, and map
+        # the abort to the documented exit codes so scripts can branch on it.
         code = error.code
-        return code if isinstance(code, int) else EXIT_INSTALL_ABORTED
+        if isinstance(code, int):
+            return code
+        if code:
+            print(f"❌ {code}", file=sys.stderr)
+        return EXIT_INSTALL_ABORTED
     print("\n✨ Installation terminée. Redémarrez la session pour tout prendre en compte.")
     return EXIT_OK
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(run_cli(main, sys.argv[1:]))

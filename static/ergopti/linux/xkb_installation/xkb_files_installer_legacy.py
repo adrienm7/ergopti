@@ -34,9 +34,7 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 import sys
-import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,11 +44,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from desktop_activation import (  # noqa: E402
     CleanupStatus,
+    XkbcompProbe,
     activate_layout,
+    compile_with_xkbcomp,
     deactivate_layouts,
-    keymap_has_type,
+    inspect_keymap,
     rerun_unprivileged,
     resolve_user_identity,
+    run_cli,
     running_as_root,
     verify_keymap,
 )
@@ -202,11 +203,22 @@ def update_lst_file(lst_path: Path, symbol_name: str, display_name: str) -> Opti
     )
     if variant_section_index == -1:
         raise LegacyInstallError(f"Could not find '! variant' section in {lst_path}.")
+    section_end = next(
+        (
+            index
+            for index in range(variant_section_index + 1, len(lines))
+            if lines[index].startswith("!")
+        ),
+        len(lines),
+    )
     new_line = f"  {symbol_name:<15} {LEGACY_BASE_LAYOUT}: {display_name}\n"
     backup = backup_file(lst_path)
     replaced = False
-    for index, line in enumerate(lines):
-        if symbol_name in line:
+    # Only the variant section may be rewritten: an older installer could have
+    # left the same name in another section, and replacing that line would
+    # move the entry out of the section desktops read variants from.
+    for index in range(variant_section_index + 1, section_end):
+        if lines[index].split()[:1] == [symbol_name]:
             lines[index] = new_line
             replaced = True
             break
@@ -329,10 +341,27 @@ def update_xkb_types_file(source_types: Path, dest_types_file: Path) -> Optional
     return backup
 
 
+# Content of the backup written when no ``~/.XCompose`` existed before the
+# installation: restoring it means removing the file, not emptying it (an
+# empty Compose file would silence the locale's own sequences).
+XCOMPOSE_ABSENT_SENTINEL = "# Ergopti legacy installer: no .XCompose existed before the installation\n"
+
+
 def install_xcompose_file(xcompose_file: Path, force: bool = True) -> None:
     """Copy the Compose file into the desktop user's home, with a backup."""
     home_dir, uid, gid = resolve_user_identity()
     dest_xcompose = home_dir / ".XCompose"
+    if not dest_xcompose.exists() and not find_backups(dest_xcompose):
+        try:
+            home_dir.mkdir(parents=True, exist_ok=True)
+            sentinel = dest_xcompose.with_name(".XCompose.1")
+            sentinel.write_text(XCOMPOSE_ABSENT_SENTINEL, encoding="utf-8")
+            chown = getattr(os, "chown", None)
+            if callable(chown) and uid is not None and gid is not None:
+                chown(sentinel, uid, gid)
+        except OSError as error:
+            logging.error("Failed to record the absence of %s: %s", dest_xcompose, error)
+            return
     if dest_xcompose.exists():
         if force:
             logging.info(
@@ -412,14 +441,14 @@ def cleanup_previous_generations(roots: InstallerRoots) -> None:
 # Verification
 # ---------------------------------------------------------------------------
 
-XKBCOMP_KEYMAP_TEMPLATE = """xkb_keymap {{
-\txkb_keycodes  {{ include "evdev+aliases(qwerty)" }};
-\txkb_types     {{ include "complete" }};
-\txkb_compat    {{ include "complete" }};
-\txkb_symbols   {{ include "{symbols}" }};
-\txkb_geometry  {{ include "pc(pc105)" }};
-}};
-"""
+def xkbcomp_probe_for(roots: InstallerRoots, spec: LayoutSpec) -> XkbcompProbe:
+    """Explicit components that let Xorg's compiler check the patched tree."""
+    symbols = f"pc+{spec.layout}({spec.variant})+inet(evdev)" if spec.variant else f"pc+{spec.layout}+inet(evdev)"
+    return XkbcompProbe(
+        symbols=symbols,
+        types="complete",
+        include_dirs=(roots.system_root,) if roots.sandboxed else (),
+    )
 
 
 def xkbcomp_check(roots: InstallerRoots, spec: LayoutSpec) -> Optional[bool]:
@@ -432,30 +461,17 @@ def xkbcomp_check(roots: InstallerRoots, spec: LayoutSpec) -> Optional[bool]:
     if not xkbcomp:
         logging.info("xkbcomp absent: Xorg-side compilation check skipped.")
         return None
-    symbols = f"pc+{spec.layout}({spec.variant})+inet(evdev)" if spec.variant else f"pc+{spec.layout}+inet(evdev)"
-    handle, temporary = tempfile.mkstemp(prefix="ergopti-", suffix=".xkb", text=True)
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write(XKBCOMP_KEYMAP_TEMPLATE.format(symbols=symbols))
-        command = [xkbcomp]
-        if roots.sandboxed:
-            command.append(f"-I{roots.system_root}")
-        command += ["-xkb", temporary, "-"]
-        result = subprocess.run(
-            command, capture_output=True, text=True, timeout=60, check=False
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        logging.warning("xkbcomp could not run: %s", error)
-        return None
-    finally:
-        Path(temporary).unlink(missing_ok=True)
-    if result.returncode != 0:
-        logging.error("xkbcomp rejected the installed layout:")
-        for line in (result.stderr or "").strip().splitlines()[:12]:
+    result = compile_with_xkbcomp(xkbcomp, xkbcomp_probe_for(roots, spec))
+    if not result.succeeded:
+        logging.error("xkbcomp rejected the installed layout (%s):", result.command_line())
+        for line in result.diagnostics.strip().splitlines()[:12]:
             logging.error("   %s", line)
         return False
-    if not keymap_has_type(result.stdout, ERGOPTI_TYPE_NAME):
-        logging.error("xkbcomp compiled the layout without the %s type.", ERGOPTI_TYPE_NAME)
+    problems = inspect_keymap(result.keymap or "", ERGOPTI_TYPE_NAME)
+    if problems:
+        logging.error("xkbcomp compiled the layout but it is unusable:")
+        for problem in problems:
+            logging.error("   %s", problem)
         return False
     logging.info("xkbcomp compiled the layout with the %s type.", ERGOPTI_TYPE_NAME)
     return True
@@ -468,15 +484,12 @@ def compile_check(roots: InstallerRoots, spec: LayoutSpec) -> Optional[bool]:
     when any installed compiler rejects the tree or drops the type.
     """
     include_roots = [roots.system_root] if roots.sandboxed else None
-    verdicts = [
-        verify_keymap(spec, ERGOPTI_TYPE_NAME, include_roots=include_roots),
-        xkbcomp_check(roots, spec),
-    ]
-    if False in verdicts:
-        return False
-    if all(verdict is None for verdict in verdicts):
-        return None
-    return True
+    return verify_keymap(
+        spec,
+        ERGOPTI_TYPE_NAME,
+        include_roots=include_roots,
+        xkbcomp_probe=xkbcomp_probe_for(roots, spec),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -547,6 +560,14 @@ def deactivate_desktop_entries() -> CleanupStatus:
     return deactivate_layouts()
 
 
+def mentions_ergopti(path: Path) -> bool:
+    """Whether a system file still carries anything the legacy installer wrote."""
+    try:
+        return "ergopti" in path.read_text(encoding="utf-8", errors="replace").lower()
+    except OSError:
+        return False
+
+
 def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> bool:
     """Restore every file the legacy installer touched, from its first backup.
 
@@ -559,20 +580,39 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
         return False
     changed = False
     home_dir, _uid, _gid = resolve_user_identity()
-    targets = list(legacy_paths(roots.system_root).touched()) + [home_dir / ".XCompose"]
+    system_targets = list(legacy_paths(roots.system_root).touched())
+    targets = system_targets + [home_dir / ".XCompose"]
     for target in targets:
         backups = find_backups(target)
         if not backups:
             continue
         pristine = backups[0]
+        if target in system_targets and not mentions_ergopti(target):
+            # A package upgrade already replaced the file with its own
+            # pristine copy: restoring an older backup over it would downgrade
+            # the distribution's file. Only the stale backups go.
+            logging.info(
+                "%s no longer mentions Ergopti (package upgrade?): kept as is, backups removed.",
+                target,
+            )
+            for backup in backups:
+                backup.unlink(missing_ok=True)
+            changed = True
+            continue
         try:
-            shutil.copy(pristine, target)
+            if pristine.read_text(encoding="utf-8", errors="replace") == XCOMPOSE_ABSENT_SENTINEL:
+                target.unlink(missing_ok=True)
+                logging.info("Removed %s: no file existed before the installation", target)
+            else:
+                shutil.copy(pristine, target)
+                logging.info("Restored %s from %s", target, pristine.name)
         except OSError as error:
             logging.error("Could not restore %s: %s", target, error)
             continue
-        logging.info("Restored %s from %s", target, pristine.name)
-        for extra in backups[1:]:
-            extra.unlink(missing_ok=True)
+        # The pristine content is back in place: the copies are redundant and
+        # would make a later run believe an installation is still present.
+        for backup in backups:
+            backup.unlink(missing_ok=True)
         changed = True
     removed_lines = strip_legacy_evdev_patch(roots.system_root)
     if removed_lines:
@@ -623,8 +663,16 @@ def run_activation_phase(layout_id: Optional[str], roots: InstallerRoots) -> int
         )
         return EXIT_INSTALL_ABORTED
     print("🔎 Vérification de la disposition installée…")
-    include_roots = [roots.system_root] if roots.sandboxed else None
-    verify_keymap(spec, ERGOPTI_TYPE_NAME, include_roots=include_roots)
+    verdict = compile_check(roots, spec)
+    if verdict is False:
+        print(
+            "❌ La disposition installée est inutilisable par cette session : activation annulée.\n"
+            "   Les fichiers système restent en place pour analyse ; lancez "
+            "`install.sh --diagnose` et joignez sa sortie au rapport de bug."
+        )
+        return EXIT_INSTALL_ABORTED
+    if verdict is None:
+        print("   ⚠️  Disposition activée sans vérification : installez xkbcli ou xkbcomp pour la contrôler.")
     activate_layout([spec])
     return EXIT_OK
 
@@ -748,4 +796,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(run_cli(main, sys.argv[1:]))

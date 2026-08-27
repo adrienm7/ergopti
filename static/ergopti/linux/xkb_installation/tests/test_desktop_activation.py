@@ -5,6 +5,8 @@ reported success, and the session kept the previous layout. Every test here
 pins one of the reasons that could happen again.
 """
 
+from __future__ import annotations
+
 import sys
 import unittest
 from pathlib import Path
@@ -21,6 +23,49 @@ from layout_package import LayoutSpec  # noqa: E402
 ERGOPTI = LayoutSpec("ergopti")
 LEGACY = LayoutSpec("fr", "Ergopti_v2_2_1")
 TYPE = "ERGOPTI_SEVEN_LEVEL"
+
+# A compiled keymap as libxkbcommon dumps it (numeric groups and levels): the
+# probe key bound to the custom type with its seven levels, and the type
+# mapping Ctrl to level 5 while preserving it.
+GOOD_KEYMAP = """xkb_keymap {
+xkb_types "complete" {
+	type "ERGOPTI_SEVEN_LEVEL" {
+		modifiers= Shift+Lock+Control+Mod4+Alt+LevelThree;
+		map[Lock]= 2;
+		map[Shift]= 3;
+		map[Control]= 5;
+		preserve[Control]= Control;
+		map[LevelThree]= 6;
+	};
+};
+xkb_symbols "pc+ergopti+inet(evdev)" {
+	key <AD01>               {
+		type= "ERGOPTI_SEVEN_LEVEL",
+		symbols[1]= [ egrave, Egrave, Egrave, egrave, z, grave, doublelowquotemark ]
+	};
+};
+};
+"""
+# The same key when the type is unknown to the compiler: the silent fallback
+# of issue #84, a keymap that compiles and types nothing but lowercase.
+DEAD_KEYMAP = """xkb_keymap {
+xkb_types "complete" { };
+xkb_symbols "pc+ergopti+inet(evdev)" {
+	key <AD01>               {
+		type= "ONE_LEVEL",
+		symbols[1]= [ egrave ]
+	};
+};
+};
+"""
+
+
+def compiled(keymap, command=("xkbcli", "compile-keymap"), diagnostics=""):
+    return activation.CompileResult(list(command), keymap, diagnostics, {})
+
+
+def failed(diagnostics="xkbcommon: ERROR: Couldn't look up rules", command=("xkbcli", "compile-keymap")):
+    return activation.CompileResult(list(command), None, diagnostics, {})
 
 
 def gsettings_session(initial: dict[str, str], writes: list[list[str]], accept: bool = True):
@@ -363,6 +408,21 @@ class OwningDesktopTests(unittest.TestCase):
         _, output, _ = self.run_activation(environ)
         self.assertIn("sway/config", output)
 
+    def test_a_compositor_session_never_writes_the_gnome_setting(self):
+        """gsettings exists on the reporter's Arch box and accepted the write,
+        while Hyprland never reads it; a success line about GNOME on a
+        Hyprland session is noise that hides the real instruction."""
+        environ = {"XDG_CURRENT_DESKTOP": "Hyprland", "XDG_SESSION_TYPE": "wayland"}
+        applied, output, writes = self.run_activation(environ)
+        self.assertFalse(applied)
+        self.assertEqual(writes, [])
+        self.assertIn("Réglage GNOME ignoré", output)
+        self.assertIn("non activée automatiquement", output)
+
+    def test_an_unidentified_session_still_tries_every_setting(self):
+        _, _, writes = self.run_activation({"XDG_SESSION_TYPE": "wayland"})
+        self.assertTrue(any(write[3] == "sources" for write in writes))
+
     def test_gnome_does_not_get_a_manual_block_when_the_write_sticks(self):
         environ = {"XDG_CURRENT_DESKTOP": "ubuntu:GNOME", "XDG_SESSION_TYPE": "wayland"}
         applied, output, writes = self.run_activation(environ)
@@ -370,6 +430,7 @@ class OwningDesktopTests(unittest.TestCase):
         self.assertEqual([write[3] for write in writes if write[3] == "sources"], ["sources"])
         self.assertNotIn("environment.d", output)
         self.assertNotIn("hyprland", output.lower())
+        self.assertIn("Disposition activée", output)
 
     def test_an_unknown_wayland_session_falls_back_to_environment_d(self):
         _, output, _ = self.run_activation({"XDG_SESSION_TYPE": "wayland"})
@@ -409,54 +470,150 @@ class SetxkbmapTests(unittest.TestCase):
         self.assertEqual(activation.setxkbmap_arguments(ERGOPTI), ["-layout", "ergopti"])
 
 
+class KeymapInspectionTests(unittest.TestCase):
+    """A keymap that compiles is not a keymap that works (issue #84)."""
+
+    def test_a_good_keymap_has_no_problem_and_a_readable_summary(self):
+        self.assertEqual(activation.inspect_keymap(GOOD_KEYMAP, TYPE), [])
+        summary = activation.describe_probe(GOOD_KEYMAP, TYPE)
+        self.assertIn("7 niveaux", summary)
+        self.assertIn("Ctrl → niveau 5 (z)", summary)
+
+    def test_the_one_level_fallback_is_named_as_the_cause(self):
+        problems = activation.inspect_keymap(DEAD_KEYMAP, TYPE)
+        joined = "\n".join(problems)
+        self.assertIn("n'est pas défini", joined)
+        self.assertIn("ONE_LEVEL", joined)
+
+    def test_a_missing_probe_key_means_the_symbols_never_loaded(self):
+        problems = activation.inspect_keymap("xkb_keymap { xkb_symbols { }; };", TYPE)
+        self.assertTrue(any("absente" in problem for problem in problems))
+
+    def test_a_type_without_a_ctrl_level_is_rejected(self):
+        keymap = GOOD_KEYMAP.replace("\t\tmap[Control]= 5;\n", "").replace("\t\tpreserve[Control]= Control;\n", "")
+        problems = activation.inspect_keymap(keymap, TYPE)
+        self.assertTrue(any("Ctrl" in problem for problem in problems), problems)
+
+    def test_a_type_that_drops_ctrl_is_rejected(self):
+        keymap = GOOD_KEYMAP.replace("\t\tpreserve[Control]= Control;\n", "")
+        problems = activation.inspect_keymap(keymap, TYPE)
+        self.assertTrue(any("preserve" in problem for problem in problems), problems)
+
+    def test_the_group_carrying_ergopti_is_the_one_inspected(self):
+        multi = GOOD_KEYMAP.replace(
+            '\t\ttype= "ERGOPTI_SEVEN_LEVEL",',
+            '\t\ttype[1]= "ALPHABETIC",\n\t\ttype[2]= "ERGOPTI_SEVEN_LEVEL",',
+        ).replace("symbols[1]=", "symbols[2]=")
+        self.assertEqual(activation.inspect_keymap(multi, TYPE, group=2), [])
+        self.assertTrue(activation.inspect_keymap(multi, TYPE, group=1))
+
+    def test_xkbcomp_spelling_is_understood_too(self):
+        keymap = GOOD_KEYMAP.replace("symbols[1]=", "symbols[Group1]=").replace("map[Control]= 5", "map[Control]= Level5")
+        self.assertEqual(activation.inspect_keymap(keymap, TYPE), [])
+
+    def test_relevant_diagnostics_keep_the_cause_and_drop_the_chatter(self):
+        diagnostics = (
+            "xkbcommon: WARNING: [XKB-407] Multiple definitions of the ONE_LEVEL key type; Earlier definition ignored\n"
+            "xkbcommon: WARNING: [XKB-302] ergopti:24:75: deprecated keysym name \"masculine\"\n"
+            "xkbcommon: ERROR: [XKB-822] Couldn't find file \"symbols/ergopti\" for symbols include\n"
+            "xkbcommon: WARNING: something about ERGOPTI_SEVEN_LEVEL not defined\n"
+        )
+        kept = activation.relevant_diagnostics(diagnostics, (TYPE, "ergopti"))
+        self.assertEqual(len(kept), 3, kept)
+        self.assertTrue(any("Couldn't find file" in line for line in kept))
+        self.assertTrue(any("not defined" in line for line in kept))
+        self.assertFalse(any("Multiple definitions" in line for line in kept))
+
+    def test_relevant_diagnostics_fall_back_to_the_last_lines(self):
+        kept = activation.relevant_diagnostics("line one\nline two\n", ("ergopti",), limit=1)
+        self.assertEqual(kept, ["line two"])
+
+
 class KeymapVerificationTests(unittest.TestCase):
-    def run_verify(self, keymaps_by_layouts, spec=ERGOPTI):
-        compiled: list[str] = []
+    def run_verify(self, keymaps_by_layouts, spec=ERGOPTI, xkbcomp_probe=None, tools=("xkbcli",)):
+        seen: list[str] = []
+        printed: list[str] = []
 
-        def fake_capture(command, timeout=15, env=None):
-            layouts = command[command.index("--layout") + 1]
-            compiled.append(layouts)
-            return keymaps_by_layouts.get(layouts)
+        def fake_compiler(command, environment=None, timeout=60):
+            if "compile-keymap" in command:
+                layouts = command[command.index("--layout") + 1]
+                seen.append(layouts)
+                keymap = keymaps_by_layouts.get(layouts)
+            else:
+                seen.append("xkbcomp")
+                keymap = keymaps_by_layouts.get("xkbcomp")
+            if keymap is None:
+                return activation.CompileResult(command, None, "xkbcommon: ERROR: Couldn't look up rules", dict(environment or {}))
+            return activation.CompileResult(command, keymap, "", dict(environment or {}))
 
-        with mock.patch("builtins.print"), mock.patch.object(
-            activation.shutil, "which", return_value="/usr/bin/xkbcli"
-        ), mock.patch.object(activation, "run_capture", side_effect=fake_capture):
-            verdict = activation.verify_keymap(spec, TYPE)
-        return verdict, compiled
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
+        ), mock.patch.object(
+            activation.shutil, "which", side_effect=lambda name: f"/usr/bin/{name}" if name in tools else None
+        ), mock.patch.object(activation, "run_compiler", side_effect=fake_compiler):
+            verdict = activation.verify_keymap(spec, TYPE, xkbcomp_probe=xkbcomp_probe)
+        return verdict, seen, "\n".join(printed)
 
     def test_the_type_must_survive_a_companion_layout_in_both_orders(self):
-        good = f'type "{TYPE}" {{'
-        verdict, compiled = self.run_verify({"ergopti": good, "ergopti,us": good, "us,ergopti": good})
+        verdict, seen, output = self.run_verify(
+            {"ergopti": GOOD_KEYMAP, "ergopti,us": GOOD_KEYMAP, "us,ergopti": GOOD_KEYMAP.replace("symbols[1]=", "symbols[2]=").replace('type= "ERGOPTI_SEVEN_LEVEL"', 'type[2]= "ERGOPTI_SEVEN_LEVEL"')}
+        )
         self.assertTrue(verdict)
-        self.assertEqual(compiled, ["ergopti", "ergopti,us", "us,ergopti"])
+        self.assertEqual(seen, ["ergopti", "ergopti,us", "us,ergopti"])
+        self.assertIn("Keymap vérifiée", output)
 
     def test_a_type_lost_in_multi_layout_configurations_fails(self):
         """The exact failure of an unindexed ``! layout = types`` rule."""
-        good = f'type "{TYPE}" {{'
-        verdict, _ = self.run_verify({"ergopti": good, "ergopti,us": "xkb_keymap {}", "us,ergopti": good})
+        verdict, _, output = self.run_verify(
+            {"ergopti": GOOD_KEYMAP, "ergopti,us": DEAD_KEYMAP, "us,ergopti": GOOD_KEYMAP}
+        )
         self.assertFalse(verdict)
+        self.assertIn("ergopti,us", output)
+        self.assertIn("ONE_LEVEL", output)
 
-    def test_a_layout_that_does_not_compile_fails(self):
-        verdict, _ = self.run_verify({})
+    def test_a_layout_that_does_not_compile_fails_with_the_compiler_output(self):
+        verdict, _, output = self.run_verify({})
         self.assertFalse(verdict)
+        self.assertIn("Couldn't look up rules", output)
+        self.assertIn("Commande :", output)
 
-    def test_missing_compiler_is_unverified_not_broken(self):
-        with mock.patch("builtins.print"), mock.patch.object(
-            activation.shutil, "which", return_value=None
-        ):
-            self.assertIsNone(activation.verify_keymap(ERGOPTI, TYPE))
+    def test_missing_compilers_are_unverified_not_broken(self):
+        verdict, seen, output = self.run_verify({}, tools=())
+        self.assertIsNone(verdict)
+        self.assertEqual(seen, [])
+        self.assertIn("xkbcli absent", output)
+
+    def test_xkbcomp_alone_can_verify_when_a_probe_is_given(self):
+        probe = activation.XkbcompProbe("pc+ergopti+inet(evdev)", "complete+ergopti", (Path("/pkg"),))
+        verdict, seen, output = self.run_verify({"xkbcomp": GOOD_KEYMAP}, xkbcomp_probe=probe, tools=("xkbcomp",))
+        self.assertTrue(verdict)
+        self.assertEqual(seen, ["xkbcomp"])
+        self.assertIn("xkbcomp", output)
+
+    def test_xkbcomp_rejecting_the_layout_fails_even_when_libxkbcommon_passes(self):
+        probe = activation.XkbcompProbe("pc+fr(Ergopti_v2_2_1)+inet(evdev)", "complete")
+        verdict, seen, _ = self.run_verify(
+            {"ergopti": GOOD_KEYMAP, "ergopti,us": GOOD_KEYMAP, "us,ergopti": GOOD_KEYMAP.replace("symbols[1]=", "symbols[2]=").replace('type= "ERGOPTI_SEVEN_LEVEL"', 'type[2]= "ERGOPTI_SEVEN_LEVEL"')},
+            xkbcomp_probe=probe,
+            tools=("xkbcli", "xkbcomp"),
+        )
+        self.assertFalse(verdict)
+        self.assertEqual(seen[-1], "xkbcomp")
 
     def test_legacy_spec_compiles_with_its_variant(self):
-        good = f'type "{TYPE}" {{'
         captured: list[list[str]] = []
 
-        def fake_capture(command, timeout=15, env=None):
+        def fake_compiler(command, environment=None, timeout=60):
             captured.append(command)
-            return good
+            keymap = GOOD_KEYMAP
+            if command[command.index("--layout") + 1].startswith("us"):
+                keymap = GOOD_KEYMAP.replace("symbols[1]=", "symbols[2]=").replace('type= "ERGOPTI_SEVEN_LEVEL"', 'type[2]= "ERGOPTI_SEVEN_LEVEL"')
+            return activation.CompileResult(command, keymap, "", dict(environment or {}))
 
         with mock.patch("builtins.print"), mock.patch.object(
-            activation.shutil, "which", return_value="/usr/bin/xkbcli"
-        ), mock.patch.object(activation, "run_capture", side_effect=fake_capture):
+            activation.shutil, "which", side_effect=lambda name: "/usr/bin/xkbcli" if name == "xkbcli" else None
+        ), mock.patch.object(activation, "run_compiler", side_effect=fake_compiler):
             self.assertTrue(activation.verify_keymap(LEGACY, TYPE, include_roots=[Path("/sandbox")]))
         first = captured[0]
         self.assertEqual(first[first.index("--layout") + 1], "fr")
@@ -464,6 +621,65 @@ class KeymapVerificationTests(unittest.TestCase):
         self.assertIn("--include-defaults", first)
         second = captured[1]
         self.assertEqual(second[second.index("--variant") + 1], "Ergopti_v2_2_1,")
+
+    def test_the_staging_environment_makes_the_compiler_talkative(self):
+        captured: list[dict[str, str]] = []
+
+        def fake_compiler(command, environment=None, timeout=60):
+            captured.append(dict(environment or {}))
+            return activation.CompileResult(command, GOOD_KEYMAP.replace("symbols[1]=", "symbols[2]=").replace('type= "ERGOPTI_SEVEN_LEVEL"', 'type[2]= "ERGOPTI_SEVEN_LEVEL"') if command[command.index("--layout") + 1].startswith("us") else GOOD_KEYMAP, "", dict(environment or {}))
+
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation.shutil, "which", side_effect=lambda name: "/usr/bin/xkbcli" if name == "xkbcli" else None
+        ), mock.patch.object(activation, "run_compiler", side_effect=fake_compiler):
+            activation.verify_keymap(ERGOPTI, TYPE, extensions_root=Path("/staging"))
+        environment = captured[0]
+        self.assertEqual(environment["XKB_LOG_LEVEL"], "warning")
+        self.assertEqual(environment["XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH"].replace("\\", "/"), "/staging")
+        self.assertEqual(environment["XKB_CONFIG_VERSIONED_EXTENSIONS_PATH"], "")
+
+
+class CompilerRunnerTests(unittest.TestCase):
+    def test_a_missing_binary_is_a_readable_failure(self):
+        result = activation.run_compiler(["/nonexistent/xkbcli-for-tests", "compile-keymap"])
+        self.assertFalse(result.succeeded)
+        self.assertIn("introuvable", result.diagnostics)
+        self.assertIn("xkbcli-for-tests", result.command_line())
+
+    def test_stderr_is_kept_for_the_report(self):
+        result = activation.run_compiler(
+            [sys.executable, "-c", "import sys; sys.stderr.write('boom\\n'); sys.exit(1)"]
+        )
+        self.assertFalse(result.succeeded)
+        self.assertIn("boom", result.diagnostics)
+
+    def test_an_empty_keymap_is_a_failure(self):
+        result = activation.run_compiler([sys.executable, "-c", "pass"])
+        self.assertFalse(result.succeeded)
+        self.assertIn("aucune keymap", result.diagnostics)
+
+
+class CliGuardTests(unittest.TestCase):
+    def test_a_crash_becomes_a_report_and_an_exit_code(self):
+        def crash(argv):
+            raise RuntimeError("unexpected condition")
+
+        with mock.patch("sys.stderr") as stderr:
+            code = activation.run_cli(crash, [])
+        self.assertEqual(code, activation.EXIT_INSTALL_ABORTED)
+        written = "".join(str(call.args[0]) for call in stderr.write.call_args_list if call.args)
+        self.assertIn("unexpected condition", written)
+        self.assertIn("Erreur interne", written)
+
+    def test_system_exit_passes_through(self):
+        def leave(argv):
+            raise SystemExit(3)
+
+        with self.assertRaises(SystemExit):
+            activation.run_cli(leave, [])
+
+    def test_the_return_value_is_forwarded(self):
+        self.assertEqual(activation.run_cli(lambda argv: 7, []), 7)
 
 
 class DeactivationTests(unittest.TestCase):
@@ -551,16 +767,78 @@ class InstallerWiringTests(unittest.TestCase):
 
     def test_clean_activate_only_verifies_the_keymap_before_activating(self):
         order = []
+
+        def verify(*args, **kwargs):
+            order.append("verify")
+            return True
+
         with mock.patch("builtins.print"), mock.patch.object(
             clean_installer, "running_as_root", return_value=False
         ), mock.patch.object(
-            clean_installer, "verify_keymap", side_effect=lambda *a, **k: order.append("verify")
+            clean_installer, "verify_keymap", side_effect=verify
         ), mock.patch.object(
             clean_installer, "activate_layout", side_effect=lambda *a, **k: order.append("activate")
         ):
             code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertEqual(code, clean_installer.EXIT_OK)
         self.assertEqual(order, ["verify", "activate"])
+
+    def test_clean_activation_aborts_when_the_installed_package_is_unusable(self):
+        """Activating a package whose layers are dead is issue #84 with a
+        success message on top; the failure must reach the exit code."""
+        printed: list[str] = []
+        with mock.patch(
+            "builtins.print", side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a))
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", return_value=False
+        ), mock.patch.object(clean_installer, "activate_layout") as activate:
+            code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
+        self.assertEqual(code, clean_installer.EXIT_INSTALL_ABORTED)
+        activate.assert_not_called()
+        self.assertIn("--diagnose", "\n".join(printed))
+
+    def test_clean_activation_without_a_compiler_warns_and_continues(self):
+        printed: list[str] = []
+        with mock.patch(
+            "builtins.print", side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a))
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", return_value=None
+        ), mock.patch.object(clean_installer, "activate_layout") as activate:
+            code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
+        self.assertEqual(code, clean_installer.EXIT_OK)
+        activate.assert_called_once()
+        self.assertIn("sans vérification", "\n".join(printed))
+
+    def test_clean_activation_gives_xorg_a_probe_into_the_package(self):
+        seen = {}
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k) or True
+        ), mock.patch.object(clean_installer, "activate_layout"):
+            clean_installer.main(["--activate-only", "--variant", "ergopti"])
+        probe = seen["xkbcomp_probe"]
+        self.assertEqual(probe.symbols, "pc+ergopti+inet(evdev)")
+        self.assertEqual(probe.types, "complete+ergopti")
+        self.assertTrue(str(probe.include_dirs[0]).endswith("ergopti"))
+
+    def test_a_message_raised_as_system_exit_is_printed_not_swallowed(self):
+        """``read_text`` raises SystemExit with the message: the CLI used to
+        return code 4 without ever printing it."""
+        with mock.patch("sys.stderr") as stderr, mock.patch.dict(
+            clean_installer.os.environ, {"ERGOPTI_XKB_EXTENSIONS_ROOT": "/tmp/sandbox-extensions"}
+        ):
+            code = clean_installer.main(
+                ["--xkb", "/nonexistent/layout.xkb", "--types", "/nonexistent/types.txt", "--skip-activation"]
+            )
+        self.assertEqual(code, clean_installer.EXIT_INSTALL_ABORTED)
+        written = "".join(str(call.args[0]) for call in stderr.write.call_args_list if call.args)
+        self.assertIn("lecture impossible", written)
+        self.assertIn("layout.xkb", written)
 
     def test_a_real_install_verifies_through_the_distribution_search_path(self):
         """Overriding the search path would prove the files exist, not that the
@@ -620,13 +898,37 @@ class InstallerWiringTests(unittest.TestCase):
         roots = legacy_installer.resolve_roots()
         with mock.patch("builtins.print"), mock.patch.object(
             legacy_installer, "running_as_root", return_value=False
-        ), mock.patch.object(legacy_installer, "verify_keymap"), mock.patch.object(
+        ), mock.patch.object(legacy_installer, "compile_check", return_value=True), mock.patch.object(
             legacy_installer, "activate_layout"
         ) as activate:
             self.assertEqual(
                 legacy_installer.run_activation_phase("Ergopti_v2_2_1", roots), legacy_installer.EXIT_OK
             )
         activate.assert_called_once_with([LEGACY])
+
+    def test_legacy_activation_aborts_when_the_tree_is_unusable(self):
+        roots = legacy_installer.resolve_roots()
+        with mock.patch("builtins.print"), mock.patch.object(
+            legacy_installer, "running_as_root", return_value=False
+        ), mock.patch.object(legacy_installer, "compile_check", return_value=False), mock.patch.object(
+            legacy_installer, "activate_layout"
+        ) as activate:
+            self.assertEqual(
+                legacy_installer.run_activation_phase("Ergopti_v2_2_1", roots),
+                legacy_installer.EXIT_INSTALL_ABORTED,
+            )
+        activate.assert_not_called()
+
+    def test_legacy_compile_check_gives_xorg_the_variant_probe(self):
+        seen = {}
+        roots = legacy_installer.InstallerRoots(Path("/ext"), Path("/sys"), Path("/cache"), sandboxed=True)
+        with mock.patch.object(
+            legacy_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k) or True
+        ):
+            self.assertTrue(legacy_installer.compile_check(roots, LEGACY))
+        self.assertEqual(seen["xkbcomp_probe"].symbols, "pc+fr(Ergopti_v2_2_1)+inet(evdev)")
+        self.assertEqual(seen["xkbcomp_probe"].types, "complete")
+        self.assertEqual([str(p) for p in seen["include_roots"]], [str(Path("/sys"))])
 
     def test_legacy_activation_reruns_unprivileged_when_root(self):
         roots = legacy_installer.resolve_roots()
@@ -651,13 +953,38 @@ class EntrypointWiringTests(unittest.TestCase):
 
     def test_privileged_calls_go_through_the_helper(self):
         self.assertNotIn("sudo python3", self.script)
-        self.assertEqual(self.script.count("as_root python3"), 3)
+        self.assertNotIn("sudo \"$PYTHON_BIN\"", self.script)
+        self.assertEqual(self.script.count('as_root "$PYTHON_BIN"'), 3)
 
     def test_activation_runs_outside_privileges_for_both_methods(self):
         activation_lines = [line.strip() for line in self.script.splitlines() if "--activate-only" in line]
         self.assertEqual(len(activation_lines), 2, activation_lines)
         for line in activation_lines:
-            self.assertTrue(line.startswith("python3"), line)
+            self.assertTrue(line.startswith('ACTIVATION_COMMAND=("$PYTHON_BIN"'), line)
+            self.assertNotIn("as_root", line)
+
+    def test_a_failed_activation_stops_the_script_with_the_diagnostic_hint(self):
+        index = self.script.index('"${ACTIVATION_COMMAND[@]}"')
+        self.assertIn("--diagnose", self.script[index : index + 600])
+
+    def test_the_interpreter_floor_is_checked_before_any_installer_runs(self):
+        self.assertLess(self.script.index("check_python"), self.script.index('as_root "$PYTHON_BIN"'))
+        self.assertIn("MIN_PYTHON_MINOR=8", self.script)
+
+    def test_no_installer_run_writes_bytecode_into_the_users_checkout(self):
+        """Root-owned __pycache__ left in the temporary checkout made the
+        cleanup fail, and the failure became the exit code of a successful
+        installation."""
+        invocations = [line for line in self.script.splitlines() if '"$PYTHON_BIN" "' in line or '"$PYTHON_BIN" -B' in line]
+        self.assertEqual(len(invocations), 8, invocations)
+        for line in invocations:
+            self.assertIn('"$PYTHON_BIN" -B', line)
+
+    def test_the_exit_trap_cannot_turn_a_success_into_a_failure(self):
+        cleanup = self.script[self.script.index("cleanup() {") : self.script.index("trap cleanup EXIT")]
+        self.assertIn("set +e", cleanup)
+        self.assertIn("trap - ERR", cleanup)
+        self.assertIn('rm -rf "$TEMP_DIR" 2>/dev/null || true', cleanup)
 
     def test_uninstall_leaves_the_session_before_removing_the_files(self):
         for script in ("xkb_files_installer_legacy.py", "xkb_files_installer_clean.py"):

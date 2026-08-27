@@ -15,6 +15,8 @@ able to fail:
   libxkbcommon and rejected by xkbcomp.
 """
 
+from __future__ import annotations
+
 import os
 import re
 import shutil
@@ -55,8 +57,14 @@ HAVE_EXTENSIONS = xkbcli_version() >= (1, 13, 0)
 HAVE_SYSTEM_TREE = SYSTEM_XKB.is_dir() and (SYSTEM_XKB / "types" / "extra").is_file()
 
 
-def has_type(keymap: str | None) -> bool:
+def has_type(result) -> bool:
+    keymap = result.keymap if isinstance(result, activation.CompileResult) else result
     return keymap is not None and activation.keymap_has_type(keymap, ERGOPTI_TYPE_NAME)
+
+
+def usable(result, group: int = 1) -> bool:
+    """The strong form of ``has_type``: the probe key really binds the type."""
+    return result.succeeded and not activation.inspect_keymap(result.keymap, ERGOPTI_TYPE_NAME, group=group)
 
 
 @unittest.skipUnless(HAVE_EXTENSIONS, "xkbcli >= 1.13 (XKB extensions directories) not installed")
@@ -110,7 +118,14 @@ class CleanPackageCompilationTests(unittest.TestCase):
         self.assertIn("Keymap vérifiée", result.stdout)
         for layouts in ([ERGOPTI], [ERGOPTI, US], [US, ERGOPTI], [US, LayoutSpec("fr"), ERGOPTI]):
             with self.subTest(layouts=activation.describe_rmlvo(layouts)):
-                self.assertTrue(has_type(self.compile(layouts)))
+                result = self.compile(layouts)
+                self.assertTrue(has_type(result))
+                self.assertTrue(usable(result, layouts.index(ERGOPTI) + 1), result.diagnostics)
+        # The installed package must be readable by every session, whatever
+        # the umask of the privileged process was.
+        package = self.extensions_root / "ergopti"
+        self.assertEqual(package.stat().st_mode & 0o777, 0o755)
+        self.assertEqual((package / "symbols" / "ergopti").stat().st_mode & 0o777, 0o644)
 
     def test_unindexed_rules_lose_the_type_in_multi_layout_configurations(self):
         """Reproduces issue #84 for the clean method, proving the fence can fail."""
@@ -121,6 +136,10 @@ class CleanPackageCompilationTests(unittest.TestCase):
         self.assertTrue(has_type(self.compile([ERGOPTI])))
         self.assertFalse(has_type(self.compile([ERGOPTI, US])))
         self.assertFalse(has_type(self.compile([US, ERGOPTI])))
+        # The dead keymap still compiles: only the probe reveals the fallback.
+        dead = self.compile([ERGOPTI, US])
+        self.assertTrue(dead.succeeded)
+        self.assertFalse(usable(dead))
 
     def test_verify_keymap_reports_the_multi_layout_regression(self):
         result = self.install()
@@ -185,7 +204,9 @@ class LegacyTreeCompilationTests(unittest.TestCase):
         self.assertNotIn("could not be verified", result.stderr)
         for layouts in ([LEGACY], [LEGACY, US], [US, LEGACY]):
             with self.subTest(layouts=activation.describe_rmlvo(layouts)):
-                self.assertTrue(has_type(self.compile(layouts)))
+                result = self.compile(layouts)
+                self.assertTrue(has_type(result))
+                self.assertTrue(usable(result, layouts.index(LEGACY) + 1), result.diagnostics)
         if XKBCOMP:
             self.assertTrue(legacy.xkbcomp_check(self.roots(), LEGACY))
 

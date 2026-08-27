@@ -115,7 +115,13 @@
 <p>
 	L'installeur accepte aussi <code>--version v2_2_1</code>, <code>--ansi</code> et le mode
 	totalement non interactif (<code>--yes --version … --variant …</code>) pour les installations
-	scriptées.
+	scriptées. Chaque exécution est recopiée dans un journal dont le chemin est affiché en premier.
+</p>
+<p>
+	Si la disposition ne fonctionne pas, relancez la commande ci-dessus en ajoutant
+	<code>-s -- --diagnose</code> après <code>bash</code> : le rapport obtenu (système, session, versions
+	XKB, fichiers installés, réglages du bureau, compilation réelle de la disposition) est ce qu'il faut
+	joindre à un rapport de bug. Il ne demande aucun droit administrateur et ne modifie rien.
 </p>
 
 <h3>Détails techniques de l'installation</h3>
@@ -138,8 +144,11 @@
 	</li>
 	<li>
 		<strong>Vérification puis activation</strong> : la disposition est compilée avec
-		<code>xkbcli</code> pour prouver que le type personnalisé est chargé, le cache XKB est purgé, puis
-		la disposition est activée dans votre session (voir ci-dessus).
+		<code>xkbcli</code> (et <code>xkbcomp</code> quand il est présent), seule puis à côté d'une
+		autre disposition, pour prouver que la touche È est bien liée au type personnalisé et que
+		<kbd>Ctrl</kbd> conserve sa couche ; une disposition inutilisable arrête l'installation au lieu d'annoncer
+		un succès. Le cache XKB est ensuite purgé, puis la disposition est activée dans votre session (voir
+		ci-dessus).
 	</li>
 </ul>
 <h4>Méthode Legacy (compatibilité)</h4>
