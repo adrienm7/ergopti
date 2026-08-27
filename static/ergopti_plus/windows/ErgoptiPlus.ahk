@@ -196,8 +196,7 @@ global _ALTGR_KANA_FIXUP := False
 ; registry read by _EmitReachedScreen must already exist. The entries are global
 ; names because the owning InputHooks are initialised later in separate modules.
 global _EMIT_SUPPRESSING_HOOKS := [
-	"_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook",
-	"_MagicKeyEditorInputHook"
+	"_SpaceHoldInputHook", "_MagicKeyEditorInputHook"
 ]
 ; The global error net must distinguish a recoverable callback fault from an
 ; init fault. Before this reaches "ready", continuing would leave a resident
@@ -1105,6 +1104,7 @@ global _FmtCountCache := Map()
 #Include ui/paths_editor/init.ahk
 #Include ui/personal_info_editor/init.ahk
 
+#Include infra/suppressive_inputhook_ownership.ahk
 #Include infra/lifecycle.ahk
 
 #Include infra/script_altgr_hotkeys.ahk
@@ -1267,8 +1267,7 @@ CheckKeyboardLayoutChange() {
 		pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
 	inputBusy := (IsSet(InDeadKeySequence) and InDeadKeySequence)
 		or (IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook))
-		or (IsSet(_OneShotShiftInputHook) and IsObject(_OneShotShiftInputHook))
-		or (IsSet(_DeadKeyInputHook) and IsObject(_DeadKeyInputHook))
+		or SIHO_HasActive()
 		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
 		
 		if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {

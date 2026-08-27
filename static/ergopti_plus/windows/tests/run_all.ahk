@@ -137,6 +137,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/hotstrings/hotstrings_config.ahk
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
+#Include ../infra/suppressive_inputhook_ownership.ahk
 #Include ../infra/config_transition.ahk
 #Include ../infra/config_transition_runtime.ahk
 ; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
@@ -227,6 +228,7 @@ InstallSendNoOps()
 #Include meta/test_feature_io_impl_no_global.ahk
 #Include meta/test_isset_no_property_arg.ahk
 #Include unit/test_adapter_contract_vectors.ahk
+#Include unit/test_suppressive_inputhook_ownership.ahk
 #Include unit/test_window_manager_force_foreground.ahk
 #Include unit/test_take_note_async_job.ahk
 #Include unit/test_text_sender_modifiers.ahk
