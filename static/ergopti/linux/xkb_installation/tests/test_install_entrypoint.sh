@@ -481,7 +481,17 @@ EOF
     grep -q 'requiert Python >= 3.8' "$output"
     grep -q 'PYTHON=python3.11' "$output"
     # The override names another interpreter and the same run then succeeds.
-    if ! sandbox_env "$sandbox" PATH="$old_bin:$FAKE_BIN:$PATH" PYTHON="$(command -v python3)" \
+    # `python3` is not that interpreter everywhere: openSUSE Leap 15.6 ships
+    # 3.6 under that name, which is the very version the guard above refuses,
+    # so honour the interpreter the harness was given -- e2e_distro.sh exports
+    # it as PYTHON precisely for hosts whose default is below the floor.
+    local above_floor
+    above_floor=$(command -v "${PYTHON:-python3}")
+    if ! "$above_floor" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)'; then
+        printf 'the override interpreter %s is itself below the floor\n' "$above_floor" >&2
+        return 1
+    fi
+    if ! sandbox_env "$sandbox" PATH="$old_bin:$FAKE_BIN:$PATH" PYTHON="$above_floor" \
         bash "$INSTALLER_DIR/install.sh" --diagnose > "$sandbox/override.log" 2>&1; then
         cat "$sandbox/override.log" >&2
         return 1
