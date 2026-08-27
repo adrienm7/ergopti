@@ -313,6 +313,44 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		helpers.assert_eq(fixture.sent[1].key, "tab")
 	end)
 
+	helpers.it("admits the next terminator after an activated predecessor", function()
+		local fixture = load_gate()
+		local first_tx = new_transaction(fixture)
+		local first_producer = fixture.synthetic.retain(first_tx)
+		helpers.assert_true(fixture.synthetic.seal(first_tx))
+		helpers.assert_true(fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r", transaction = first_tx,
+		}))
+
+		helpers.assert_true(fixture.replay.flush_now("superseded transaction"),
+			"the first reserved terminator must transfer to the synthetic FIFO")
+		helpers.assert_eq(#fixture.sent, 0,
+			"activation must not overtake the retained predecessor")
+
+		local second_tx = new_transaction(fixture)
+		local second_producer = fixture.synthetic.retain(second_tx)
+		helpers.assert_true(fixture.synthetic.seal(second_tx))
+		helpers.assert_true(fixture.replay.arm({
+			kind = "key", key = "tab", chars = "\t", transaction = second_tx,
+		}), "the activated predecessor must not refuse the next expansion")
+		helpers.assert_true(fixture.replay.is_pending(),
+			"the second terminator must own the logical replay slot")
+
+		helpers.assert_true(fixture.synthetic.release(first_tx, first_producer))
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 1)
+		helpers.assert_eq(fixture.sent[1].key, "return")
+		helpers.assert_true(fixture.replay.is_pending(),
+			"the first completion callback must not clear its successor")
+
+		helpers.assert_true(fixture.synthetic.release(second_tx, second_producer))
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 2)
+		helpers.assert_eq(fixture.sent[2].key, "tab")
+		helpers.assert_true(not fixture.replay.is_pending())
+		helpers.assert_eq(fixture.synthetic.stats().active_transactions, 0)
+	end)
+
 	helpers.it("sends a printable terminator through the direct text path", function()
 		local fixture = load_gate()
 		local tx = new_transaction(fixture)
