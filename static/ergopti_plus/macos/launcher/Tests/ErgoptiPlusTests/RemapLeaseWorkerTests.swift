@@ -4264,12 +4264,14 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			initialMode: kLeaseModeActive,
 			heartbeatSeconds: 5
 		)
+		let guardianRegistration = ScriptedLeaseGuardianRegistration(armResult: true)
+		guardianRegistration.childCloseDescriptors = [parentPipe[1]]
 		var clockReads = 0
 		let runtime = KarabinerLeaseOuterRuntime(
 			identity: identity,
 			detached: false,
 			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
-			guardianRegistration: ScriptedLeaseGuardianRegistration(armResult: true),
+			guardianRegistration: guardianRegistration,
 			parentInputDescriptor: parentPipe[0],
 			parentOutputDescriptor: nullDescriptor,
 			uptime: {
