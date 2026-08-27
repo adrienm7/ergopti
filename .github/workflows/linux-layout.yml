@@ -188,9 +188,13 @@ jobs:
             prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon libxkbcommon-utils xkeyboard-config xkbcomp sudo curl shadow-utils util-linux
             expect: any
             flags: ''
+          # No coreutils and no curl here: the Rocky 9 image ships
+          # coreutils-single and curl-minimal, and asking for the full packages
+          # is a conflict dnf refuses rather than a no-op. Both variants provide
+          # the binaries the installer calls.
           - distro: rocky-9
             image: rockylinux:9
-            prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon xkeyboard-config xkbcomp sudo curl shadow-utils util-linux
+            prep: dnf install -y bash findutils grep sed gawk diffutils git python3 libxkbcommon xkeyboard-config xkbcomp sudo shadow-utils util-linux
             expect: legacy
             flags: ''
           - distro: opensuse-tumbleweed
