@@ -132,6 +132,42 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		package.loaded["ui.hotstring_editor"] = nil
 	end)
 
+	helpers.it("preserves unknown brace groups when loading the shared frontend", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local source = "[[_meta]]\n"
+		local editor, dispatch, state = load_editor({}, {
+			parse = function()
+				return {
+					sections_order = { "literal" },
+					sections = {
+						literal = {
+							description = "Literal",
+							entries = {
+								{
+									trigger = "brace",
+									output = "voir {N.B.} et {fooBAR}; {ENTER}/{bs}",
+								},
+							},
+						},
+					},
+				}, true
+			end,
+		}, {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return source, "ok"
+			end,
+		})
+		editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "ready" })
+
+		local javascript = table.concat(state.javascript, "\n")
+		helpers.assert_contains(javascript, "voir {N.B.} et {fooBAR}; {Enter}/{BackSpace}",
+			"the editor may canonicalize known aliases but must preserve unknown braces")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
 	helpers.it("publishes neither a baseline nor a save after a refused read", function()
 		local path = os.tmpname()
 		local sentinel = "PRIVATE-PERSONAL-HOTSTRINGS-SENTINEL"
