@@ -17,8 +17,9 @@ local SENTINEL = "[_meta]\ndelay = 0.33\n"
 local function install_config_stub()
 	local store = { sets = 0, clears = 0 }
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
-		set_override = function()
+		set_override = function(...)
 			store.sets = store.sets + 1
+			store.last_set = { ... }
 			return true
 		end,
 		clear_override = function()
@@ -148,6 +149,107 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		helpers.assert_eq(committed, true)
 		helpers.assert_contains(read_fixture(path), "delay = 0.42")
 		helpers.assert_eq(notifications, 1)
+		os.remove(path)
+	end)
+
+	helpers.it("rejects hostile colors before any personal or shared publication", function()
+		local path = fixture_path("hostile_color")
+		local store = install_config_stub()
+		local reads = 0
+		local writes = 0
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function()
+				reads = reads + 1
+				return SENTINEL, "ok"
+			end,
+			write_if_unchanged = function()
+				writes = writes + 1
+				return true
+			end,
+		}
+		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		local notifications = 0
+		win._on_config_changed = function() notifications = notifications + 1 end
+		local hostile = '#abc"\n[injected]\nvalue = "owned'
+
+		for _, body in ipairs({
+			{
+				action = "set_color", group = "personal", personal_path = path,
+				hex = hostile,
+			},
+			{ action = "set_color", group = "common", category = "rolls", hex = hostile },
+			{
+				action = "set_color", group = "ext:demo", category = "ext.demo",
+				ext_id = "demo", hex = hostile,
+			},
+		}) do
+			helpers.assert_eq(win._on_message({ body = body }), false,
+				"untrusted color bytes must be rejected by the host bridge")
+		end
+
+		helpers.assert_eq(reads, 0, "invalid input must be rejected before reading personal data")
+		helpers.assert_eq(writes, 0, "invalid input must never reach the personal writer")
+		helpers.assert_eq(store.sets, 0, "invalid input must never reach the shared override setter")
+		helpers.assert_eq(notifications, 0, "rejected input must publish no UI state")
+		helpers.assert_eq(read_fixture(path), SENTINEL)
+		os.remove(path)
+	end)
+
+	helpers.it("rejects hostile section names before constructing a TOML header", function()
+		local path = fixture_path("hostile_section")
+		install_config_stub()
+		local reads = 0
+		local writes = 0
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function()
+				reads = reads + 1
+				return SENTINEL, "ok"
+			end,
+			write_if_unchanged = function()
+				writes = writes + 1
+				return true
+			end,
+		}
+		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+
+		helpers.assert_eq(win._on_message({ body = {
+			action = "set_color",
+			group = "personal",
+			personal_path = path,
+			section = 'safe]\n[injected',
+			hex = "#abcdef",
+		} }), false)
+		helpers.assert_eq(reads, 0, "invalid headers must be rejected before reading personal data")
+		helpers.assert_eq(writes, 0, "invalid headers must never reach publication")
+		helpers.assert_eq(read_fixture(path), SENTINEL)
+		os.remove(path)
+	end)
+
+	helpers.it("accepts the shortest and longest supported hexadecimal colors", function()
+		local path = fixture_path_with_content("valid_colors", '[_meta]\ncolor = "#000000"\n')
+		local store = install_config_stub()
+		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		local notifications = 0
+		win._on_config_changed = function() notifications = notifications + 1 end
+
+		helpers.assert_eq(win._on_message({ body = {
+			action = "set_color", group = "common", category = "rolls", hex = "#abc",
+		} }), true)
+		helpers.assert_eq(store.sets, 1)
+		helpers.assert_eq(store.last_set, { "rolls", nil, "color", "#abc" })
+		helpers.assert_eq(win._on_message({ body = {
+			action = "set_color", group = "personal", personal_path = path,
+			hex = "#A1b2C3D4",
+		} }), true)
+
+		local content = read_fixture(path)
+		local _, color_count = content:gsub("color%s*=", "")
+		helpers.assert_eq(color_count, 1)
+		local decoded = require("infra.toml.codec").decode(content)
+		helpers.assert_type(decoded, "table")
+		helpers.assert_eq(decoded._meta.color, "#A1b2C3D4")
+		helpers.assert_eq(notifications, 2)
 		os.remove(path)
 	end)
 

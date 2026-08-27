@@ -29,6 +29,7 @@ local hs                = hs
 local ui_builder        = require("ui.ui_builder")
 local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
 local TomlReader        = require("infra.toml.reader")
 local TomlRecordEditor  = require("infra.toml.record_editor")
 local FileSystem        = require("adapters.file_system")
@@ -515,6 +516,14 @@ end
 --- @param field string "delay" or "color".
 --- @param value string|number|nil The new value, or nil to remove the field.
 local function patch_personal_toml(toml_path, section, field, value)
+	if not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "patch_personal_toml: section must be a supported bare identifier.")
+		return false
+	end
+	if field == "color" and value ~= nil and not ConfigSchema.is_color(value) then
+		Logger.error(LOG, "patch_personal_toml: color must contain 3 to 8 hexadecimal digits.")
+		return false
+	end
 	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, toml_path)
 	if not read_ok or read_status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "patch_personal_toml: source read did not commit for '%s' — %s.",
@@ -532,7 +541,11 @@ local function patch_personal_toml(toml_path, section, field, value)
 		elseif field == "show_tooltip" then
 			val_str = value and "true" or "false"
 		else
-			val_str = '"' .. tostring(value) .. '"'
+			val_str = ConfigSchema.encode_basic_string(value)
+			if not val_str then
+				Logger.error(LOG, "patch_personal_toml: string field received an invalid value type.")
+				return false
+			end
 		end
 	end
 	local patched, patch_err = TomlRecordEditor.patch_table_field(
@@ -637,7 +650,15 @@ local function on_message(msg)
 	local action  = body.action
 	local cat     = body.category
 	local group   = body.group
-	local sec     = (type(body.section) == "string" and body.section ~= "") and body.section or nil
+	local sec     = body.section == "" and nil or body.section
+	if not ConfigSchema.is_section(sec) then
+		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid section.")
+		return false
+	end
+	if action == "set_color" and not ConfigSchema.is_color(body.hex) then
+		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid color.")
+		return false
+	end
 
 	-- Global bulk operations affect all common categories only
 	if action == "reset_all" then
@@ -680,7 +701,7 @@ local function on_message(msg)
 			committed = patch_personal_toml(toml_path, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
 			committed = patch_personal_toml(toml_path, sec, "delay", nil)
-		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
+		elseif action == "set_color" then
 			committed = patch_personal_toml(toml_path, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			committed = patch_personal_toml(toml_path, sec, "color", nil)
@@ -704,7 +725,7 @@ local function on_message(msg)
 			committed = hotstrings_config.set_override(override_key, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
 			committed = hotstrings_config.clear_override(override_key, sec, "delay")
-		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
+		elseif action == "set_color" then
 			committed = hotstrings_config.set_override(override_key, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			committed = hotstrings_config.clear_override(override_key, sec, "color")
@@ -726,7 +747,7 @@ local function on_message(msg)
 			committed = hotstrings_config.set_override(cat, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
 			committed = hotstrings_config.clear_override(cat, sec, "delay")
-		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
+		elseif action == "set_color" then
 			committed = hotstrings_config.set_override(cat, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			committed = hotstrings_config.clear_override(cat, sec, "color")
