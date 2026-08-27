@@ -37,14 +37,16 @@
 ; ==============================================
 ; ==============================================
 
-; Extract the WAIT_TIMEOUT branch: from the 0x102 comparison to the ExitApp that
-; closes it. Everything the yielding instance is able to do lives in there.
+; Extract the non-owner branch from its classified decision to ExitApp.
+; Everything the rejecting instance is able to do lives in there.
 _MYIR_YieldBranch() {
 	Src := _DriverSourceNoComments()
-	GatePos := InStr(Src, "_DriverMutexWait == 0x102")
-	Assert(GatePos > 0, "the single-owner mutex WAIT_TIMEOUT branch must still exist")
-	ExitPos := InStr(Src, "ExitApp(0)", , GatePos)
-	Assert(ExitPos > GatePos, "the yield branch must still exit")
+	GatePos := InStr(Src,
+		"_DriverMutexDecision != DRIVER_MUTEX_ACQUIRED")
+	Assert(GatePos > 0,
+		"the single-owner mutex rejection branch must still exist")
+	ExitPos := InStr(Src, "ExitApp(", , GatePos)
+	Assert(ExitPos > GatePos, "the mutex rejection branch must still exit")
 	return SubStr(Src, GatePos, ExitPos - GatePos)
 }
 
