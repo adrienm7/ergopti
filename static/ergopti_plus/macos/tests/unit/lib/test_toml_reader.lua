@@ -113,6 +113,21 @@ beta = "Beta section"
 		os.remove(path)
 	end)
 
+	helpers.it("preserves the first section after a UTF-8 BOM", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local body = bom .. [==[[[personal]]
+"star" = { output = "." }
+]==]
+		local path = write_temp("bom", body)
+		local data, committed = reader.parse(path)
+		helpers.assert_eq(committed, true, "a BOM-prefixed readable file must still commit")
+		helpers.assert_true(type(data.sections.personal) == "table",
+			"the first BOM-prefixed section header must be recognized")
+		helpers.assert_eq(data.sections.personal.entries[1].trigger, "star")
+		helpers.assert_eq(data.sections.personal.entries[1].output, ".")
+		os.remove(path)
+	end)
+
 	helpers.it("decodes escape sequences", function()
 		local body = [==[
 [[s]]

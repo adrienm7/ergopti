@@ -53,7 +53,9 @@ local LOG    = "adapters.toml_cache"
 --- `is_case_sensitive_strict`: a snapshot written by the older parser has the
 --- field absent, and an absent flag reads as false — the exact silent
 --- mis-registration the version stamp exists to prevent.
-local CACHE_VERSION = 3
+--- Version 4 invalidates snapshots from the BOM-blind parser. Version 3 may
+--- contain a committed empty/partial result for an unchanged valid source.
+local CACHE_VERSION = 4
 
 --- Chunk size used to stream the source file while building the content
 --- fingerprint. The WHOLE file is hashed, one chunk at a time; this constant is
