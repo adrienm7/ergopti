@@ -30,6 +30,10 @@
 --- 7. HS-089 — Surrogate escapes emitted invalid CESU-8 and out-of-range
 ---    escapes silently became U+FFFD. Fix: accept only Unicode scalar values,
 ---    while retaining escaped U+0000 as valid TOML data.
+---
+--- 8. HS-090 — Inline-table duplicates overwrote silently and table headers
+---    below arrays of tables resolved against the array container instead of
+---    its latest element. Fix: track structural kinds and declaration owners.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -126,6 +130,109 @@ helpers.describe("toml_codec: heterogeneous arrays", function()
 		helpers.assert_eq(decoded.ids[2], 1, "second value keeps its exact content")
 		helpers.assert_eq(type(decoded.ids[3]), "boolean", "third value keeps its boolean type")
 		helpers.assert_eq(decoded.ids[3], true, "third value keeps its exact content")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0c/ Structural definition ownership =========================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: structural definition ownership", function()
+
+	helpers.it("rejects duplicate normalized keys inside inline tables", function()
+		local sources = {
+			't = { x = 1, x = 2 }\n',
+			't = { x = 1, "x" = 2 }\n',
+			't = { nested = { y = 1, y = 2 } }\n',
+		}
+
+		for index, source in ipairs(sources) do
+			helpers.assert_eq(codec.decode(source), nil,
+				"inline duplicate #" .. index .. " must reject the whole document")
+		end
+	end)
+
+	helpers.it("attaches a regular child table to the latest array element", function()
+		local got = codec.decode('[[a]]\nx = 1\n[a.b]\ny = 2\n')
+
+		helpers.assert_true(type(got) == "table", "a child of an array element is valid TOML")
+		helpers.assert_eq(#got.a, 1)
+		helpers.assert_eq(got.a[1].x, 1)
+		helpers.assert_eq(got.a[1].b.y, 2,
+			"the child table must belong to the latest element")
+		helpers.assert_eq(got.a.b, nil,
+			"the array container must never masquerade as the latest element")
+	end)
+
+	helpers.it("owns repeated child paths independently for each array generation", function()
+		local got = codec.decode([==[
+[[a]]
+x = 1
+[a.b]
+y = 10
+[[a]]
+x = 2
+[a.b]
+y = 20
+]==])
+
+		helpers.assert_true(type(got) == "table", "each AOT element may define its own child table")
+		helpers.assert_eq(#got.a, 2)
+		helpers.assert_eq(got.a[1].b.y, 10)
+		helpers.assert_eq(got.a[2].b.y, 20)
+	end)
+
+	helpers.it("supports nested arrays of tables under their latest parent element", function()
+		local got = codec.decode([==[
+[[fruits]]
+name = "apple"
+[[fruits.varieties]]
+name = "red delicious"
+[[fruits.varieties]]
+name = "granny smith"
+[[fruits]]
+name = "banana"
+[[fruits.varieties]]
+name = "plantain"
+]==])
+
+		helpers.assert_true(type(got) == "table", "the canonical nested-AOT form must decode")
+		helpers.assert_eq(#got.fruits, 2)
+		helpers.assert_eq(#got.fruits[1].varieties, 2)
+		helpers.assert_eq(got.fruits[1].varieties[1].name, "red delicious")
+		helpers.assert_eq(got.fruits[1].varieties[2].name, "granny smith")
+		helpers.assert_eq(#got.fruits[2].varieties, 1)
+		helpers.assert_eq(got.fruits[2].varieties[1].name, "plantain")
+	end)
+
+	helpers.it("rejects conflicts between regular tables, arrays, and arrays of tables", function()
+		local sources = {
+			'[a]\nx = 1\n[[a]]\ny = 2\n',
+			'[[a]]\nx = 1\n[a]\ny = 2\n',
+			'a = []\n[[a]]\nx = 1\n',
+			'a = { x = 1 }\n[a.b]\ny = 2\n',
+			'[[a]]\n[[a.b]]\nx = 1\n[a.b]\ny = 2\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok, "structural conflict #" .. index .. " must not raise")
+			helpers.assert_eq(got, nil,
+				"structural conflict #" .. index .. " must fail closed")
+		end
+	end)
+
+	helpers.it("still permits repeated headers for one array of tables", function()
+		local got = codec.decode('[[a]]\nx = 1\n[[a]]\nx = 2\n')
+
+		helpers.assert_true(type(got) == "table", "repeating an AOT header appends an element")
+		helpers.assert_eq(#got.a, 2)
+		helpers.assert_eq(got.a[1].x, 1)
+		helpers.assert_eq(got.a[2].x, 2)
 	end)
 
 end)

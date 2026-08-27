@@ -55,7 +55,9 @@ local LOG    = "adapters.toml_cache"
 --- mis-registration the version stamp exists to prevent.
 --- Version 4 invalidates snapshots from the BOM-blind parser. Version 3 may
 --- contain a committed empty/partial result for an unchanged valid source.
-local CACHE_VERSION = 4
+--- Version 5 invalidates snapshots produced before duplicate definitions were
+--- rejected transactionally by the shared reader.
+local CACHE_VERSION = 5
 
 --- Chunk size used to stream the source file while building the content
 --- fingerprint. The WHOLE file is hashed, one chunk at a time; this constant is

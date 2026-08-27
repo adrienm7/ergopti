@@ -176,6 +176,63 @@ helpers.describe("toml_reader.load", function()
 	end)
 end)
 
+helpers.describe("toml_reader: duplicate definition commitment", function()
+	helpers.it("rejects a duplicate trigger transaction before any registration", function()
+		local body = [==[
+[[s]]
+"dup" = { output = "first" }
+"dup" = { output = "second" }
+]==]
+		local path = write_temp("duplicate_trigger", body)
+		local data, committed = reader.parse(path)
+
+		helpers.assert_eq(committed, false,
+			"a duplicate trigger must invalidate the complete read transaction")
+		helpers.assert_eq(data.sections, {}, "no partial section may escape a rejected parse")
+
+		local calls = {}
+		local count = reader.load(path, {
+			add = function(trigger, output)
+				calls[#calls + 1] = { trigger, output }
+			end,
+		})
+		helpers.assert_eq(count, 0, "a rejected parse must register zero entries")
+		helpers.assert_eq(#calls, 0, "the keymap boundary must remain untouched")
+		os.remove(path)
+	end)
+
+	helpers.it("allows the same trigger in two distinct sections", function()
+		local body = [==[
+[[first]]
+"shared" = { output = "one" }
+[[second]]
+"shared" = { output = "two" }
+]==]
+		local path = write_temp("cross_section_trigger", body)
+		local data, committed = reader.parse(path)
+
+		helpers.assert_eq(committed, true,
+			"cross-section collisions remain a registry-priority concern")
+		helpers.assert_eq(data.sections.first.entries[1].output, "one")
+		helpers.assert_eq(data.sections.second.entries[1].output, "two")
+		os.remove(path)
+	end)
+
+	helpers.it("rejects duplicate fields inside a hotstring inline table", function()
+		local body = [==[
+[[s]]
+"dup" = { output = "first", output = "second" }
+]==]
+		local path = write_temp("duplicate_inline_field", body)
+		local data, committed = reader.parse(path)
+
+		helpers.assert_eq(committed, false,
+			"an inline-table duplicate must invalidate the complete read transaction")
+		helpers.assert_eq(data.sections, {}, "no partially decoded entry may escape")
+		os.remove(path)
+	end)
+end)
+
 helpers.describe("toml_reader.parse: per-entry priority", function()
 	-- Regression: parse_entry previously skipped numeric inline-table values, so a
 	-- personal hotstring's `priority = N` was silently dropped and the macOS loader
