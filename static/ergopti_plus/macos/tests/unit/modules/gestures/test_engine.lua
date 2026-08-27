@@ -495,6 +495,56 @@ end)
 -- ================================================
 
 helpers.describe("gestures.engine: finger count tracking", function()
+	helpers.it("keeps a locked 2-finger scroll native through a sustained ghost contact (ghost-third-finger-2026-08-27)", function()
+		local fired = make_fired()
+		local E = fresh_engine()
+		E.init(make_state({
+			ga = {
+				swipe_2_up   = "none",
+				swipe_2_down = "none",
+				swipe_3_up   = "tab_prev",
+				swipe_3_down = "tab_next",
+			},
+			modes = {
+				swipe_3_up   = "incremental",
+				swipe_3_down = "incremental",
+			},
+			sensitivities = {
+				swipe_3_up   = 3.5,
+				swipe_3_down = 3.5,
+			},
+		}), fired.actions)
+		reset_engine(E)
+
+		-- Reproduce the photographed trace: a vertical gesture starts and locks at
+		-- two fingers, then the raw device reports a third contact for more than
+		-- the 50 ms candidate threshold while the two real contacts keep moving.
+		_time = 0
+		E.process_frame({ make_touch(100, 100), make_touch(110, 100) })
+		_time = 0.01
+		E.process_frame({ make_touch(100, 104), make_touch(110, 104) })
+
+		for frame = 1, 8 do
+			_time = 0.01 + frame * 0.008
+			local y = 104 + frame * 2
+			E.process_frame({
+				make_touch(100, y),
+				make_touch(110, y),
+				make_touch(165, y - 60),
+			})
+			helpers.assert_true(not E.is_blocking_scroll(),
+				"a rejected late contact must not swallow the native 2-finger scroll")
+		end
+
+		_time = 0.09
+		E.process_frame({})
+
+		for _, action in ipairs(fired.singles) do
+			helpers.assert_true(action ~= "tab_prev" and action ~= "tab_next",
+				"a sustained ghost contact during 2-finger scroll must not fire a 3-finger tab action")
+		end
+	end)
+
 	helpers.it("maxFingers tracks the peak seen during a gesture", function()
 		-- We verify that a 3-finger gesture is not mis-classified as 2-finger even
 		-- if the first frame had only 2 contacts.
