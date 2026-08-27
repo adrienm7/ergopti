@@ -49,7 +49,25 @@ Notes :
 - Les variantes `_ansi` ne sont pas fusionnables avec les ISO : ce sont de vraies dispositions
   distinctes (ê, j et plusieurs symboles changent de touche). Utilisez `--ansi` sur un clavier
   physique ANSI.
-- L'activation GNOME/KDE ajoute Ergopti à votre liste existante au lieu de la remplacer.
+- L'activation GNOME/KDE place Ergopti **en tête** de votre liste existante sans en retirer
+  aucune : GNOME saisit avec la première source de la liste, donc une disposition ajoutée en
+  fin de liste resterait inactive.
+- L'activation ne s'exécute **jamais** sous `sudo`. GNOME conserve la liste des dispositions
+  dans le dconf de l'utilisateur, joignable par son bus D-Bus de session : un écrit root
+  atterrit dans les réglages de root et ne change rien de visible (issue #84). `install.sh`
+  copie les fichiers sous `sudo`, puis relance l'installeur sans privilèges avec
+  `--activate-only`. Lancé en root malgré tout, celui-ci redescend vers l'utilisateur du
+  bureau (`runuser`) en reconstruisant `XDG_RUNTIME_DIR` et `DBUS_SESSION_BUS_ADDRESS`.
+- La valeur écrite est **relue** ensuite : dconf renvoie un succès même quand l'écriture n'a
+  rien changé, et un tel silence est exactement le mode de panne de l'issue #84.
+- Seul le bureau qui possède le réglage compte comme activé. `gsettings` réussit sous Sway,
+  Hyprland ou niri sans que ces compositeurs le lisent : dans ce cas l'installeur affiche le
+  fragment de configuration exact à coller dans le fichier du compositeur, avec repli sur
+  `~/.config/environment.d/` pour un compositeur Wayland inconnu.
+- Après installation, `xkbcli compile-keymap` vérifie que la disposition se résout via le
+  chemin de recherche de la distribution **et** contient le type `ERGOPTI_SEVEN_LEVEL`. Cette
+  vérification ne dépend d'aucun bureau : elle distingue « paquet invisible » de
+  « session qui n'utilise pas la disposition ».
 - La désinstallation refuse de choisir si des artefacts clean et legacy coexistent, ou si aucune
   installation n'est détectée. Dans le premier cas, relancez avec
   `--installation-method clean|legacy` après avoir vérifié la méthode à retirer.
@@ -78,7 +96,10 @@ Codes de sortie du script Python clean : `0` succès - `2` erreur d'usage (argpa
 - `install.sh` : script shell complet d'installation interactif (téléchargement, sélection,
   installation)
 - `layout_package.py` : cœur partagé et testable (contenus canoniques, validation
-  symbols/types, helpers d'activation GNOME/KDE)
+  symbols/types, helpers de fusion GNOME/KDE)
+- `desktop_activation.py` : activation de session partagée par les deux installeurs
+  (détection du bureau, abandon des privilèges, écriture puis relecture, instructions
+  manuelles par compositeur, vérification de la keymap)
 
 Scripts utilisés par `install.sh` :
 
