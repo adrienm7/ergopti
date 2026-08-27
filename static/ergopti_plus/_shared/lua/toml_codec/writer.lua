@@ -498,7 +498,11 @@ function M.batch_write(path, updates, file_adapter)
 		end
 	end
 
-	for section, entries in pairs(pending) do
+	local pending_sections = {}
+	for section in pairs(pending) do pending_sections[#pending_sections + 1] = section end
+	table.sort(pending_sections)
+	for _, section in ipairs(pending_sections) do
+		local entries = pending[section]
 		-- Check whether the section header already exists anywhere in lines
 		local section_exists = false
 		for _, line in ipairs(lines) do

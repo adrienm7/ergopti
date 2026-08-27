@@ -145,6 +145,58 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 		helpers.assert_eq(decoded.script["my-key"], "new")
 	end)
 
+	helpers.it("batch_write appends new sections in deterministic order", function()
+		local updates = {
+			{ section = "hotstrings", key = "enabled", value = true },
+			{ section = "hotstrings", key = "expansion_delay", value = 15 },
+			{ section = "metrics", key = "enabled", value = false },
+			{ section = "gestures", key = "enabled", value = true },
+		}
+		local function capture_with_pending_order(section_order)
+			local captured
+			local original_pairs = pairs
+			pairs = function(subject)
+				if type(subject) == "table"
+					and subject.gestures and subject.hotstrings and subject.metrics then
+					local index = 0
+					return function()
+						index = index + 1
+						local section = section_order[index]
+						if section then return section, subject[section] end
+					end
+				end
+				return original_pairs(subject)
+			end
+			local call_ok, call_err = xpcall(function()
+				local wrote = writer.batch_write("/controlled/config.toml", updates, {
+					read_with_status = function() return nil, "absent" end,
+					write = function(_path, content)
+						captured = content
+						return true
+					end,
+				})
+				helpers.assert_eq(wrote, true)
+			end, debug.traceback)
+			pairs = original_pairs
+			if not call_ok then error(call_err, 0) end
+			return captured
+		end
+
+		local ascending = capture_with_pending_order({ "gestures", "hotstrings", "metrics" })
+		local descending = capture_with_pending_order({ "metrics", "hotstrings", "gestures" })
+		helpers.assert_eq(descending, ascending,
+			"equivalent fresh writes must not depend on Lua hash iteration order")
+		local gestures_at = assert(ascending:find("[gestures]", 1, true))
+		local hotstrings_at = assert(ascending:find("[hotstrings]", 1, true))
+		local metrics_at = assert(ascending:find("[metrics]", 1, true))
+		helpers.assert_true(gestures_at < hotstrings_at and hotstrings_at < metrics_at,
+			"new section headers must use the codec's lexical order")
+		local enabled_at = assert(ascending:find("enabled = true", hotstrings_at, true))
+		local delay_at = assert(ascending:find("expansion_delay = 15", hotstrings_at, true))
+		helpers.assert_true(enabled_at < delay_at,
+			"updates inside one section must retain caller order")
+	end)
+
 	helpers.it("batch_write refuses to overwrite an unreadable existing source", function()
 		local write_opens = 0
 		with_file_stubs(function(candidate, mode)
