@@ -135,7 +135,10 @@ _CrashReportWorkerFallbackSource(MappingName) {
 		. '$n=$v.ReadInt32(0);if($n-lt 1-or $n-gt ' . CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES . '){throw "invalid payload length"};'
 		. '$b=New-Object byte[] $n;$null=$v.ReadArray(4,$b,0,$n);$v.Dispose();$m.Dispose();'
 		. '$s=[Text.Encoding]::UTF8.GetString($b)|ConvertFrom-Json;'
-		. '$d=Join-Path $s.config_dir "autohotkey\crash_reports";[IO.Directory]::CreateDirectory($d)|Out-Null;'
+		. '$d=Join-Path $s._transport_config_dir "autohotkey\crash_reports";[IO.Directory]::CreateDirectory($d)|Out-Null;'
+		. '$r=@{error_msg="[redacted error message]";error_extra="[redacted error context]";error_what="[redacted error context]";error_file="[redacted source path]";stack_trace="[redacted stack]";script_dir="[redacted path]";active_window_title="[redacted window title]";active_window_process="[redacted process]";config_dir="[redacted path]";log_tail="[redacted log]"};'
+		. 'foreach($k in $r.Keys){if(($s.PSObject.Properties.Name-contains $k)-and [string]$s.$k-ne ""){$s.$k=$r[$k]}};'
+		. '$s.PSObject.Properties.Remove("_transport_script_dir");$s.PSObject.Properties.Remove("_transport_config_dir");'
 		. '$p=Join-Path $d ((Get-Date -Format "yyyy-MM-ddTHH-mm-ss")+"_"+[guid]::NewGuid().ToString("N")+".json");'
 		. '[IO.File]::WriteAllText($p,($s|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false));Write-Output ("OK:"+$p)'
 }

@@ -15,10 +15,9 @@
 ; 2. No confirmation: the old opt-in prompt added friction with zero privacy
 ;    benefit — the report is local-only and contains no PII. The user sees a
 ;    single dialog showing the path of the saved file.
-; 3. Rich diagnostics: the report includes everything from the Debug > Diagnostic
-;    system (OS, CPU, RAM, DPI, adapter status, session counters) PLUS the full
-;    in-memory log ring buffer (up to 200 lines) so a single report is almost
-;    always enough to reproduce and fix the crash.
+; 3. Privacy-bounded diagnostics: the report keeps structured system, adapter,
+;    and session state while replacing free-form error text, paths, window
+;    context, and log bodies with explicit redaction markers.
 ; 4. Driver-scoped directory: reports live under <config_dir>/autohotkey/crash_reports/
 ;    so they are co-located with the AHK logs and config under the autohotkey/
 ;    subfolder, separate from any Hammerspoon reports.
@@ -62,8 +61,8 @@ global _CrashReporter_Modifiers := [
 ; =============================
 
 ; Builds a rich crash report Map from an AHK Error object.
-; Captures error details, full system info (mirrors healthcheck), stuck modifiers,
-; adapter status, session counters, and the complete in-memory log ring buffer.
+; Captures structured system, adapter, and session state, then replaces every
+; free-form privacy source with an explicit marker before returning.
 ; @param ErrorObj {Error} The AHK v2 Error object caught by the global handler.
 ; @return {Map} Report with all diagnostic fields documented below.
 CrashReport_Build(ErrorObj) {
@@ -190,9 +189,8 @@ CrashReport_Build(ErrorObj) {
 	}
 
 	; ── In-memory log ring buffer (all 200 lines, most recent last) ───────────
-	; This is the single most valuable diagnostic field: it captures the full
-	; sequence of events leading up to the crash without requiring the user to
-	; locate a log file. The ring buffer never contains keystrokes or PII.
+	; Capture once so the redaction boundary can retain the line count. The raw
+	; bodies never leave CrashReport_Build or reach the artifact.
 	LogLines := ""
 	try {
 		Snapshot := LoggerRingBufferSnapshot()
@@ -245,12 +243,12 @@ CrashReport_Build(ErrorObj) {
 		; ── Module state ──
 		"keylogger_initialized", KeyloggerInit,
 		"config_dir",           ConfigDir,
-		; ── Full log ring buffer (up to 200 lines) ──
+		; ── Log line-count source; bodies are redacted before publication ──
 		"log_tail",             LogLines,
 	)
 
 	try LoggerDone("CrashReporter", "Crash report built (ts={1}, type={2}).", Ts, ErrorType)
-	return Report
+	return _CrashReport_RedactCanonical(Report)
 }
 
 ; Writes a crash report Map to disk as a JSON file under autohotkey/crash_reports/.
@@ -426,34 +424,84 @@ _CrashReport_FoldHash(Str) {
 	return Format("{:08x}", Acc)
 }
 
-; Serialises a crash report Map to a formatted JSON string.
-; @param Report {Map}
-; @return {String} Pretty-printed JSON string.
-_CrashReport_ToJson(Report) {
-	Fields := [
-		; Identification
+; Replaces every free-form source that can carry user data while preserving the
+; canonical schema. The function clones its input so a caller retaining the
+; diagnostic Map never observes a half-redacted mutation.
+_CrashReport_RedactCanonical(Report) {
+	if !(Report is Map)
+		return Map()
+	Redacted := Report.Clone()
+	Fixed := Map(
+		"error_msg", "[redacted error message]",
+		"error_extra", "[redacted error context]",
+		"error_what", "[redacted error context]",
+		"error_file", "[redacted source path]",
+		"script_dir", "[redacted path]",
+		"active_window_title", "[redacted window title]",
+		"active_window_process", "[redacted process]",
+		"config_dir", "[redacted path]")
+	for Key, Marker in Fixed {
+		if Redacted.Has(Key) && String(Redacted[Key]) != ""
+			Redacted[Key] := Marker
+	}
+	for Key, Label in Map("stack_trace", "stack", "log_tail", "log") {
+		if !Redacted.Has(Key)
+			continue
+		Value := String(Redacted[Key])
+		if (Value == "")
+			continue
+		if RegExMatch(Value, "^\[redacted \d+ " . Label . " lines?\]$")
+			continue
+		LineCount := StrLen(Value) - StrLen(StrReplace(Value, "`n")) + 1
+		Redacted[Key] := "[redacted " . LineCount . " " . Label
+			. (LineCount == 1 ? " line]" : " lines]")
+	}
+	return Redacted
+}
+
+_CrashReport_CanonicalFields() {
+	return [
 		"version", "driver", "timestamp",
-		; Error details
 		"error_type", "error_msg", "error_extra", "error_what",
 		"error_file", "error_line", "stack_trace",
-		; System environment
 		"os_name", "os_build", "os_arch",
 		"ahk_version", "ahk_bitness",
 		"cpu_name", "cpu_cores",
 		"ram_total_gb", "ram_free_gb",
 		"screen_resolution", "dpi", "dpi_scale",
 		"locale", "script_dir", "git_hash", "username_hash",
-		; Runtime context
 		"uptime_sec", "active_window_title", "active_window_process",
 		"stuck_modifiers",
-		; Adapter / session health
 		"adapters_ok", "adapters_failed",
 		"session_warnings", "session_errors",
-		; Module state
 		"keylogger_initialized", "config_dir",
-		; Log tail
-		"log_tail",
+		"log_tail"
 	]
+}
+
+; Serialises a crash report Map to a formatted JSON string.
+; @param Report {Map}
+; @return {String} Pretty-printed JSON string.
+_CrashReport_ToJson(Report) {
+	return _CrashReport_EncodeFields(
+		_CrashReport_RedactCanonical(Report), _CrashReport_CanonicalFields())
+}
+
+; The isolated worker needs two raw paths to perform its local git probe and
+; choose the destination directory. They live in pagefile-backed IPC only and
+; are removed by both worker implementations before the canonical artifact is
+; written. Every report field in the same envelope is already redacted.
+_CrashReport_ToWorkerJson(Report) {
+	SafeReport := _CrashReport_RedactCanonical(Report)
+	Fields := _CrashReport_CanonicalFields()
+	for Key in ["_transport_script_dir", "_transport_config_dir"] {
+		if SafeReport.Has(Key)
+			Fields.Push(Key)
+	}
+	return _CrashReport_EncodeFields(SafeReport, Fields)
+}
+
+_CrashReport_EncodeFields(Report, Fields) {
 	Parts := []
 	Q     := Chr(34)
 

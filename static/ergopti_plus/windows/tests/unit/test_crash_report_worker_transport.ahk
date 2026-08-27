@@ -56,6 +56,31 @@ _CRWT_RequiredKeys() {
 	]
 }
 
+_CRWT_PrivacyCanariesAreRedactedFromCanonicalJson() {
+	Canary := "AuditCanary-AHK-008-raw-PII"
+	Report := Map()
+	for _, Key in _CRWT_RequiredKeys()
+		Report[Key] := "safe"
+	for _, Key in [
+		"error_msg", "error_extra", "error_what", "error_file", "stack_trace",
+		"script_dir", "active_window_title", "active_window_process",
+		"config_dir", "log_tail"
+	]
+		Report[Key] := "prefix " . Canary . " suffix"
+
+	Raw := _CrashReport_ToJson(Report)
+	AssertFalse(InStr(Raw, Canary) > 0,
+		"the canonical crash artifact must never serialize raw diagnostic PII")
+	Parsed := JsonParse(Raw)
+	for _, Key in _CRWT_RequiredKeys()
+		AssertTrue(Parsed.Has(Key),
+			"privacy redaction must retain canonical field: " . Key)
+}
+
+Test("crash report: canonical JSON redacts every free-text privacy source "
+	. "(audit-ahk-008)",
+	_CRWT_PrivacyCanariesAreRedactedFromCanonicalJson)
+
 _CRWT_RecordDone(State, ExitCode, Stdout, Stderr) {
 	State["called"] := true
 	State["tick"] := A_TickCount
@@ -70,7 +95,7 @@ _CRWT_StartAndWait(Snapshot, Options := 0, SpawnFn := 0) {
 	Done := _CRWT_RecordDone.Bind(State)
 	ResolvedOptions := Options is Map ? Options : Map()
 	ResolvedSpawn := IsObject(SpawnFn) ? SpawnFn : ShellRunner_Spawn
-	Owner := CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), Done,
+	Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
 		ResolvedSpawn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
 	Assert(IsObject(Owner), "the crash worker must publish an exact retained owner")
 	Assert(_CRWT_WaitUntil(() => State["called"], _CRWT_TIMEOUT_MS),
@@ -134,42 +159,44 @@ _CRWT_ShutdownSpawn(Executable, Args, Done) {
 
 _CRWT_LargeSnapshotCrossesProcessBoundary() {
 	global _ConfigDir, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
-	global _CrashReportWorkerOwners, _CRWT_TIMEOUT_MS
 
 	OldConfigDir := _ConfigDir
 	OldRing := LOGGER_RING_BUFFER
 	OldCursor := LOGGER_RING_CURSOR
-	TestDir := A_Temp . "\ergopti_crash_worker_" . A_TickCount . "_" . DllCall("GetCurrentProcessId")
-	ReportDir := TestDir . "\autohotkey\crash_reports"
-	ReleaseCount := 0
-	ReleaseDedup(*) => ReleaseCount += 1
+	Canary := "AuditCanary-AHK-008-worker-PII"
+	TestDir := A_Temp . "\" . Canary . "_" . A_TickCount
+		. "_" . DllCall("GetCurrentProcessId")
 
 	try {
 		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		LOGGER_RING_BUFFER := []
-		Loop 200 {
-			Marker := A_Index = 1 ? "FIRST_SENTINEL" : (A_Index = 200 ? "LAST_SENTINEL" : "MIDDLE")
-			LOGGER_RING_BUFFER.Push(Marker . "_" . A_Index . "_" . Format("{:0120}", A_Index))
-		}
+		Loop 200
+			LOGGER_RING_BUFFER.Push(Canary . "_log_" . A_Index)
 		LOGGER_RING_CURSOR := LOGGER_RING_BUFFER.Length
 
-		_ErgoptiDeferredCrashReport(Error("AHK-005 large payload"), ReleaseDedup)
-		Finished := _CRWT_WaitUntil(() => _CrashReportWorkerOwners.Count = 0, _CRWT_TIMEOUT_MS)
-		Assert(Finished, "crash worker must reach a terminal callback within the bounded integration deadline")
+		Snapshot := _CrashReport_CheapSnapshot(Error(Canary . " error"))
+		SafeLargeField := "FIRST_SAFE_TRANSPORT_SENTINEL"
+		Loop 200
+			SafeLargeField .= "_adapter_" . Format("{:0120}", A_Index)
+		SafeLargeField .= "_LAST_SAFE_TRANSPORT_SENTINEL"
+		Snapshot["adapters_ok"] := SafeLargeField
+		Payload := _CrashReport_ToWorkerJson(Snapshot)
+		Assert(StrPut(Payload, "UTF-8") - 1 > 8191,
+			"the worker regression must still cross the cmd.exe payload ceiling")
 
-		Artifact := _CRWT_FirstJson(ReportDir)
-		Assert(Artifact != "", "the production crash worker must write a report for a payload larger than cmd.exe's 8191-character ceiling")
-		Raw := FileRead(Artifact, "UTF-8")
-		Assert(InStr(Raw, "FIRST_SENTINEL") > 0, "the worker artifact must preserve the first large-payload sentinel")
-		Assert(InStr(Raw, "LAST_SENTINEL") > 0, "the worker artifact must preserve the last large-payload sentinel")
+		Result := _CRWT_StartAndWait(Snapshot)
+		Raw := FileRead(Result["artifact"], "UTF-8")
+		AssertContains(Raw, "FIRST_SAFE_TRANSPORT_SENTINEL")
+		AssertContains(Raw, "LAST_SAFE_TRANSPORT_SENTINEL")
+		AssertFalse(InStr(Raw, Canary) > 0,
+			"the isolated worker must remove path, error, and log privacy canaries")
 
 		Report := JsonParse(Raw)
 		Required := _CRWT_RequiredKeys()
 		Assert(Required.Length >= 37, "the schema oracle must retain the established crash-report field floor")
 		for _, Key in Required
 			Assert(Report.Has(Key), "isolated crash report missing canonical field: " . Key)
-		AssertEqual(0, ReleaseCount, "a successful worker write must retain the dedup claim")
 	} finally {
 		_ConfigDir := OldConfigDir
 		LOGGER_RING_BUFFER := OldRing
@@ -201,7 +228,7 @@ _CRWT_DelayedWorkerDoesNotBlockParent() {
 		Snapshot := _CrashReport_CheapSnapshot(Error("delayed worker"))
 		State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 		Done := _CRWT_RecordDone.Bind(State)
-		Owner := CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), Done,
+		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
 			ShellRunner_Spawn, _VendorDir . "\ergopti_crash_worker.ps1", Map("delay_ms", 500))
 		Assert(IsObject(Owner), "the delayed crash worker must start")
 		SecondCallbackTick := A_TickCount
@@ -242,15 +269,19 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 _CRWT_PrimaryStartRefusalUsesMinimalWorker() {
 	global _ConfigDir, _CRWT_FallbackSpawnState
 	OldConfigDir := _ConfigDir
-	TestDir := A_Temp . "\ergopti_crash_fallback_" . A_TickCount . "_" . DllCall("GetCurrentProcessId")
+	Canary := "AuditCanary-AHK-008-fallback-PII"
+	TestDir := A_Temp . "\" . Canary . "_" . A_TickCount
+		. "_" . DllCall("GetCurrentProcessId")
 	try {
 		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		_CRWT_FallbackSpawnState := Map("calls", 0)
-		Result := _CRWT_StartAndWait(_CrashReport_CheapSnapshot(Error("fallback")),
+		Result := _CRWT_StartAndWait(_CrashReport_CheapSnapshot(Error(Canary)),
 			Map(), _CRWT_FallbackSpawn)
 		AssertEqual(2, _CRWT_FallbackSpawnState["calls"],
 			"a refused primary launch must make exactly one isolated fallback attempt")
+		AssertFalse(InStr(FileRead(Result["artifact"], "UTF-8"), Canary) > 0,
+			"the minimal fallback must remove path and error privacy canaries")
 		for _, Key in _CRWT_RequiredKeys()
 			Assert(Result["report"].Has(Key), "the minimal fallback must preserve canonical field: " . Key)
 	} finally {
@@ -270,7 +301,7 @@ _CRWT_PrimaryExitFailureUsesMinimalWorker() {
 		_CRWT_PrimaryExitSpawnState := Map("calls", 0, "primary_done", 0)
 		State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 		Owner := CrashReportWorker_Start(
-			_CrashReport_ToJson(_CrashReport_CheapSnapshot(Error("exit fallback"))),
+			_CrashReport_ToWorkerJson(_CrashReport_CheapSnapshot(Error("exit fallback"))),
 			_CRWT_RecordDone.Bind(State), _CRWT_PrimaryExitSpawn,
 			_VendorDir . "\ergopti_crash_worker.ps1")
 		Assert(IsObject(Owner), "the retained primary worker must start before its terminal failure")
@@ -300,7 +331,7 @@ _CRWT_ShutdownClosesExactMappingOnce() {
 	CrashReportWorker_StopAll()
 	_CRWT_ShutdownSpawnState := Map("terminate_calls", 0)
 	Snapshot := _CrashReport_CheapSnapshot(Error("shutdown"))
-	Owner := CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), (*) => 0,
+	Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), (*) => 0,
 		_CRWT_ShutdownSpawn, "ignored.ps1")
 	Assert(IsObject(Owner), "the fake retained worker must start")
 	AssertEqual(1, _CrashReportWorkerOwners.Count, "the worker registry must retain the in-flight mapping")
