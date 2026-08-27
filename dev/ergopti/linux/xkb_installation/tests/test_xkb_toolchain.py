@@ -158,7 +158,17 @@ class LegacyTreeCompilationTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.sandbox = Path(self._tmp.name)
         self.system_root = self.sandbox / "xkb"
-        shutil.copytree(SYSTEM_XKB.resolve(), self.system_root, symlinks=False)
+        # Materialise the real files rather than link to them, so nothing the
+        # sandbox writes can reach the host tree. openSUSE Tumbleweed ships
+        # `compiled` as a symlink to a cache directory that a container never
+        # creates, and following a dangling link aborts the whole copy: skip
+        # those, they carry no keymap data.
+        shutil.copytree(
+            SYSTEM_XKB.resolve(),
+            self.system_root,
+            symlinks=False,
+            ignore_dangling_symlinks=True,
+        )
         self.env = {
             **os.environ,
             "ERGOPTI_XKB_EXTENSIONS_ROOT": str(self.sandbox / "xkeyboard-config.d"),
