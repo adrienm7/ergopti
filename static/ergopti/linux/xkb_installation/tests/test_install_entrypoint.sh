@@ -137,19 +137,37 @@ export FAKE_KEYMAP="$GOOD_KEYMAP"
 run_debian_detector() {
     local detector_bin="$TMP_ROOT/detector-bin"
     mkdir -p "$detector_bin"
-    cat > "$detector_bin/pkg-config" <<'EOF'
-#!/bin/sh
-exit 1
-EOF
+    # The detector stops at the first probe that answers, so any probe binary
+    # the host happens to ship decides the method instead of the scenario: a
+    # runner with libxkbcommon-tools answers `xkbcli --version` with its own
+    # 1.6, and the whole Debian scenario silently becomes a legacy one. Stub
+    # the entire probe surface, read from the detector itself so that a probe
+    # added there later cannot re-open the leak without a stub.
+    local probes probe
+    probes=$(grep -oE 'probe_version [a-z0-9-]+' \
+        "$INSTALLER_DIR/detect_installation_method.sh" | awk '{ print $2 }' | sort -u)
+    # A renamed helper would produce an empty list and silently restore the
+    # leak this stubbing exists to close.
+    if ! grep -qx 'xkbcli' <<< "$probes"; then
+        printf 'no probe list read from the detector: %s\n' "$probes" >&2
+        return 1
+    fi
+    while read -r probe; do
+        printf '#!/bin/sh\nexit 1\n' > "$detector_bin/$probe"
+    done <<< "$probes"
+    # Debian and Ubuntu name the data package xkb-data: the detector asks for
+    # that name, so the stand-in must answer that name and not the upstream
+    # one. Answering the wrong name left the version to be deduced from
+    # /usr/share/xkeyboard-config-2, that is, from the host again.
     cat > "$detector_bin/dpkg-query" <<'EOF'
 #!/bin/sh
 case "$*" in
     *libxkbcommon0) printf '1.13.1-1\n' ;;
-    *xkeyboard-config) printf '2.45.0-1\n' ;;
+    *xkb-data) printf '2.45.0-1\n' ;;
     *) exit 1 ;;
 esac
 EOF
-    chmod +x "$detector_bin/pkg-config" "$detector_bin/dpkg-query"
+    chmod +x "$detector_bin"/*
     local output
     output=$(XDG_SESSION_TYPE=wayland PATH="$detector_bin:/usr/bin:/bin" \
         bash "$INSTALLER_DIR/detect_installation_method.sh")
