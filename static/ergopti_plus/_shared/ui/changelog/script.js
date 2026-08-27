@@ -14,8 +14,8 @@
  *    and WKWebView (macOS/Hammerspoon) with automatic detection.
  * 2. Client-side fetch fallback: if the native bridge does not inject releases,
  *    the script fetches directly from the GitHub API so a browser preview works.
- * 3. Markdown rendering: marked.js (CDN) converts release body text to HTML
- *    without a build step or server dependency.
+ * 3. Markdown rendering: pinned marked.js converts release body text to HTML,
+ *    and pinned DOMPurify sanitizes it before it reaches the document.
  * ==============================================================================
  */
 
@@ -311,6 +311,40 @@ function clearContent() {
 }
 
 /**
+ * Renders remote release text without interpreting its markup.
+ * @param {string} raw
+ * @return {string}
+ */
+function _plainTextReleaseBody(raw) {
+	return (
+		'<pre style="white-space:pre-wrap;color:#c8c8cc;font-size:12px">' +
+		_escHtml(raw) +
+		'</pre>'
+	);
+}
+
+/**
+ * Converts remote Markdown to sanitized HTML, or safely falls back to text.
+ * @param {string} raw
+ * @return {string}
+ */
+function _renderReleaseBody(raw) {
+	if (
+		typeof marked !== 'undefined' &&
+		typeof DOMPurify !== 'undefined' &&
+		typeof DOMPurify.sanitize === 'function'
+	) {
+		try {
+			marked.setOptions({ breaks: true, gfm: true });
+			return DOMPurify.sanitize(marked.parse(raw), { USE_PROFILES: { html: true } });
+		} catch (e) {
+			return _plainTextReleaseBody(raw);
+		}
+	}
+	return _plainTextReleaseBody(raw);
+}
+
+/**
  * Selects and displays a release by index.
  * @param {number} idx
  */
@@ -352,21 +386,7 @@ function selectRelease(idx) {
 		return;
 	}
 
-	// Render via marked.js if available, else fall back to pre-formatted plain text.
-	if (typeof marked !== 'undefined') {
-		try {
-			marked.setOptions({ breaks: true, gfm: true });
-			bodyEl.innerHTML = marked.parse(raw);
-		} catch (e) {
-			bodyEl.innerHTML =
-				'<pre style="white-space:pre-wrap;color:#c8c8cc;font-size:12px">' +
-				_escHtml(raw) +
-				'</pre>';
-		}
-	} else {
-		bodyEl.innerHTML =
-			'<pre style="white-space:pre-wrap;color:#c8c8cc;font-size:12px">' + _escHtml(raw) + '</pre>';
-	}
+	bodyEl.innerHTML = _renderReleaseBody(raw);
 }
 
 /** Opens the currently selected release page on GitHub. */
