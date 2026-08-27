@@ -141,11 +141,18 @@ git -C "$BARE_REPO" config receive.shallowUpdate true
 git -C "$REPO_ROOT" push --quiet "$BARE_REPO" HEAD:refs/heads/dev
 git -C "$BARE_REPO" symbolic-ref HEAD refs/heads/dev
 chown -R "$USER_NAME" "$BARE_REPO"
-GIT_REDIRECT=(
-    GIT_CONFIG_COUNT=1
-    "GIT_CONFIG_KEY_0=url.file://$BARE_REPO.insteadOf"
-    GIT_CONFIG_VALUE_0=https://github.com/adrienm7/ergopti.git
-)
+# The redirection has to live in the user's own git configuration:
+# GIT_CONFIG_COUNT is only honoured from git 2.31, so on Ubuntu 20.04's 2.25
+# it was ignored and the piped entry point fetched github.com for real,
+# exactly what the bare mirror above exists to avoid. GIT_ALLOW_PROTOCOL
+# makes a redirection that failed to apply an error rather than a silent
+# network round trip.
+{
+    printf '[url "file://%s"]\n' "$BARE_REPO"
+    printf '\tinsteadOf = https://github.com/adrienm7/ergopti.git\n'
+} > "$USER_HOME/.gitconfig"
+chown "$USER_NAME" "$USER_HOME/.gitconfig"
+GIT_REDIRECT=(GIT_ALLOW_PROTOCOL=file)
 
 # run_as_user VAR=value ... -- command args
 run_as_user() {
