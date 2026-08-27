@@ -225,6 +225,11 @@ private final class GuardianTerminationRecorder {
 	}
 }
 
+/// Converts an unexpected test-runtime exit into an XCTest failure.
+private func failUnexpectedGuardianTermination(_ status: Int32) {
+	XCTFail("a test-owned guardian runtime requested process exit status \(status)")
+}
+
 /// Thread-safe capture for a startup call executed beside a real flock holder.
 private final class GuardianStartupRecorder {
 	private let lock = NSLock()
@@ -572,6 +577,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var secondRuntime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: replacementGeneration
 		)
 		XCTAssertTrue(secondRuntime?.startObservingForTesting() == true)
@@ -672,6 +678,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let runtime = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			singletonContentionObserved: { contentionObserved.signal() },
 			generation: guardianGeneration
 		)
@@ -737,6 +744,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let runtime = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 
@@ -915,6 +923,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
@@ -947,6 +956,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
@@ -1349,6 +1359,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 					}
 				)
 			},
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
@@ -1420,6 +1431,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 					}
 				)
 			},
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
@@ -1490,6 +1502,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
 			executor: executor,
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
@@ -1568,6 +1581,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			paths: fixture.paths,
 			executor: executor,
 			maximumUnacknowledgedRecords: 1,
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
@@ -1612,7 +1626,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
-			executor: executor
+			executor: executor,
+			terminateProcess: failUnexpectedGuardianTermination,
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
 		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
@@ -1657,6 +1672,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
 			executor: executor,
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
@@ -1688,7 +1704,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
-			executor: executor
+			executor: executor,
+			terminateProcess: failUnexpectedGuardianTermination,
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
 		XCTAssertTrue(FileManager.default.fileExists(
@@ -1722,6 +1739,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var replacement: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
 			executor: executor,
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(replacement?.processRecordsOnceForTesting() == true)
@@ -1768,7 +1786,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
-			executor: executor
+			executor: executor,
+			terminateProcess: failUnexpectedGuardianTermination,
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
 
@@ -1811,7 +1830,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let executor = GuardianRecordingLeaseCLIExecutor()
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
-			executor: executor
+			executor: executor,
+			terminateProcess: failUnexpectedGuardianTermination,
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
 		let forgedRetirement = LeaseGuardianRecord(
@@ -1989,6 +2009,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: guardianGeneration
 		)
 		XCTAssertTrue(runtime?.startObservingForTesting() == true)
@@ -2027,6 +2048,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var priorRuntime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			generation: priorGeneration
 		)
 		XCTAssertTrue(priorRuntime?.startObservingForTesting() == true)
@@ -2045,6 +2067,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		let replacement = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
+			terminateProcess: failUnexpectedGuardianTermination,
 			singletonProbeObserved: {
 				singletonProbeEntered.signal()
 				_ = releaseSingletonProbe.wait(timeout: .now() + 5)
@@ -2332,7 +2355,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: fixture.paths,
 			executor: PosixLeaseCLIExecutor(),
-			cliPath: cli.path
+			cliPath: cli.path,
+			terminateProcess: failUnexpectedGuardianTermination,
 		)
 		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
 		let fenceDeadline = ProcessInfo.processInfo.systemUptime + 2
