@@ -276,6 +276,153 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 		end)
 	end)
 
+	for _, case in ipairs({
+		{
+			label = "unknown fields",
+			update = { ["PRIVATE-ATTACKER-KEY"] = "PRIVATE-ATTACKER-VALUE" },
+			private_sentinel = "PRIVATE-ATTACKER",
+		},
+		{
+			label = "non-string field values",
+			update = { iban = { "PRIVATE-IBAN-VALUE" } },
+			private_sentinel = "PRIVATE-IBAN-VALUE",
+		},
+	}) do
+		helpers.it("rejects " .. case.label .. " before preview or filesystem ownership", function()
+			local config_path = os.tmpname()
+			with_cleanup(function()
+				local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
+				local file = assert(io.open(config_path, "wb"))
+				assert(file:write(initial))
+				assert(file:close())
+
+				local logs = {}
+				local personal_info, fence = load_personal_info(config_path, logs)
+				local file_system = require("adapters.file_system")
+				local live_info = personal_info.get_info()
+				local old_iban = live_info.iban
+				local writes = 0
+				fence.allow = true
+
+				local committed = with_adapter_overrides(file_system, {
+					write_if_unchanged = function()
+						writes = writes + 1
+						return true
+					end,
+				}, function()
+					return personal_info.save_info(case.update)
+				end)
+
+				helpers.assert_eq(committed, false,
+					"an invalid member must reject the complete save transaction")
+				helpers.assert_eq(fence.calls, 0,
+					"schema validation must happen before preview revocation")
+				helpers.assert_eq(writes, 0,
+					"schema validation must happen before filesystem publication")
+				helpers.assert_eq(read_file(config_path), initial,
+					"an invalid member must preserve every committed byte")
+				helpers.assert_true(personal_info.get_info() == live_info,
+					"an invalid member must preserve the published table identity")
+				helpers.assert_nil(live_info["PRIVATE-ATTACKER-KEY"],
+					"unknown fields must never enter the live expansion map")
+				helpers.assert_eq(live_info.iban, old_iban,
+					"a non-string value must never replace the live field")
+				helpers.assert_true(not table.concat(logs, "\n"):find(
+					case.private_sentinel, 1, true),
+					"invalid personal data must remain absent from diagnostics")
+			end, function()
+				os.remove(config_path)
+				package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+			end)
+		end)
+	end
+
+	helpers.it("drops pre-existing unknown live fields from memory and serialized bytes", function()
+		local config_path = os.tmpname()
+		with_cleanup(function()
+			local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
+			local file = assert(io.open(config_path, "wb"))
+			assert(file:write(initial))
+			assert(file:close())
+
+			local logs = {}
+			local personal_info, fence = load_personal_info(config_path, logs)
+			local file_system = require("adapters.file_system")
+			local live_info = personal_info.get_info()
+			local private_key = "PRIVATE-LEGACY-KEY"
+			local private_value = "PRIVATE-LEGACY-VALUE"
+			live_info[private_key] = private_value
+			local captured = nil
+			fence.allow = true
+
+			local committed = with_adapter_overrides(file_system, {
+				write_if_unchanged = function(_, content)
+					captured = content
+					return true
+				end,
+			}, function()
+				return personal_info.save_info({ first_name = "Bob" })
+			end)
+
+			helpers.assert_eq(committed, true,
+				"a valid update must remain usable while canonicalizing legacy pollution")
+			helpers.assert_type(captured, "string", "the writer must receive canonical bytes")
+			helpers.assert_true(not captured:find(private_key, 1, true),
+				"the immutable schema must exclude unknown serialized keys")
+			helpers.assert_true(not captured:find(private_value, 1, true),
+				"the immutable schema must exclude unknown serialized values")
+			helpers.assert_nil(live_info[private_key],
+				"successful publication must remove unknown live fields")
+			helpers.assert_eq(live_info.first_name, "Bob",
+				"the known update must still publish")
+			helpers.assert_true(not table.concat(logs, "\n"):find(private_value, 1, true),
+				"legacy personal data must remain absent from diagnostics")
+		end, function()
+			os.remove(config_path)
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		end)
+	end)
+
+	helpers.it("escapes and reloads carriage returns without raw TOML controls", function()
+		local config_path = os.tmpname()
+		with_cleanup(function()
+			local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
+			local file = assert(io.open(config_path, "wb"))
+			assert(file:write(initial))
+			assert(file:close())
+
+			local personal_info, fence = load_personal_info(config_path, {})
+			local file_system = require("adapters.file_system")
+			local captured = nil
+			fence.allow = true
+			local committed = with_adapter_overrides(file_system, {
+				write_if_unchanged = function(path, content)
+					captured = content
+					local target = assert(io.open(path, "wb"))
+					assert(target:write(content))
+					assert(target:close())
+					return true
+				end,
+			}, function()
+				return personal_info.save_info({ first_name = "A\rB" })
+			end)
+
+			helpers.assert_eq(committed, true, "a known string field must commit")
+			helpers.assert_type(captured, "string", "the writer must receive a TOML payload")
+			helpers.assert_true(captured:find('first_name = "A\\rB"', 1, true) ~= nil,
+				"a carriage return must be emitted as the TOML \\r escape")
+			helpers.assert_true(captured:find("\r", 1, true) == nil,
+				"a basic TOML string must never contain a raw carriage return")
+
+			local reloaded = load_personal_info(config_path, {})
+			helpers.assert_eq(reloaded.get_info().first_name, "A\rB",
+				"the escaped field must round-trip to the exact original string")
+		end, function()
+			os.remove(config_path)
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		end)
+	end)
+
 	helpers.it("preserves and adopts an external edit that wins after the loaded snapshot", function()
 		local config_path = os.tmpname()
 		with_cleanup(function()
