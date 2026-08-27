@@ -346,6 +346,9 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 							e.is_case_sensitive and "true" or "false",
 							e.final_result      and "true" or "false"
 						)
+						if e.is_case_sensitive_strict == true then
+							line = line .. ", is_case_sensitive_strict = true"
+						end
 						-- Individual collision-priority override — written only when
 						-- set so entries that inherit the source default stay free
 						-- of the key (matches the AHK editor's on-disk format).

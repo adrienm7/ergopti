@@ -261,6 +261,7 @@ local function load_js_data(open_mode)
 							auto_expand       = (e.auto_expand == true),
 							is_case_sensitive = (e.is_case_sensitive == true),
 							final_result      = (e.final_result == true),
+							is_case_sensitive_strict = (e.is_case_sensitive_strict == true),
 							-- Optional per-hotstring collision priority; nil (omitted
 							-- from the JSON) when the entry inherits the source default.
 							priority          = type(e.priority) == "number" and e.priority or nil,

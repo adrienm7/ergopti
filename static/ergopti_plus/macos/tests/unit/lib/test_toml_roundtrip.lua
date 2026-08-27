@@ -114,7 +114,8 @@ helpers.describe("toml roundtrip: entries", function()
 			sections = { s = { description = "S", entries = {
 				{ trigger = "x", output = "X",
 				  is_word = true, auto_expand = true,
-				  is_case_sensitive = true, final_result = true },
+				  is_case_sensitive = true, final_result = true,
+				  is_case_sensitive_strict = true },
 			} } },
 		}
 		local parsed = roundtrip(data)
@@ -122,6 +123,9 @@ helpers.describe("toml roundtrip: entries", function()
 		helpers.assert_eq(e.is_word, true)
 		helpers.assert_eq(e.auto_expand, true)
 		helpers.assert_eq(e.is_case_sensitive, true)
+		helpers.assert_eq(e.final_result, true)
+		helpers.assert_eq(e.is_case_sensitive_strict, true,
+			"strict-case matching must survive a write-parse roundtrip")
 	end)
 
 	helpers.it("preserves multiple entries in order", function()
