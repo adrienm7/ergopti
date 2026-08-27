@@ -1134,18 +1134,31 @@ Test("LLM_Engine_FirePrediction: empty context returns early without bumping req
 
 _FirePrediction_RearmsWhenOllamaNotReady() {
 	global _LLM_Engine, _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick
-	_LLM_Ollama_IsReady := false
-	_LLM_Ollama_WarmupStartedTick := A_TickCount
-	LLM_Engine_Init(Map("model", "Qwen3.5-0.8B", "debounce_ms", 500))
-	LLM_Engine_CancelTimer()
-	LLM_Engine_FirePrediction("hello world context here")
-	Assert(_LLM_Engine["timer_active"],
-		"FirePrediction must re-arm debounce while Ollama warmup is pending")
-	Assert(_LLM_Engine.Has("pending_timer") && IsObject(_LLM_Engine["pending_timer"]),
-		"pending_timer must be set for deferred retry")
-	LLM_Engine_CancelTimer()
-	_LLM_Ollama_IsReady := true
-	_LLM_Ollama_WarmupStartedTick := 0
+	PreviousCritical := Critical("On")
+	SavedEngine := _LLM_Engine
+	SavedReady := _LLM_Ollama_IsReady
+	SavedWarmupTick := _LLM_Ollama_WarmupStartedTick
+	try {
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Ollama_IsReady := false
+		_LLM_Ollama_WarmupStartedTick := Max(1, A_TickCount)
+		LLM_Engine_Init(Map("backend", "ollama", "model", "Qwen3.5-0.8B",
+			"debounce_ms", 500, "disable_password_fields", false,
+			"disabled_apps", []))
+		LLM_Engine_CancelTimer()
+		LLM_Engine_FirePrediction("hello world context here")
+		Assert(_LLM_Engine["timer_active"],
+			"FirePrediction must re-arm debounce while Ollama warmup is pending")
+		Assert(_LLM_Engine.Has("pending_timer")
+			&& IsObject(_LLM_Engine["pending_timer"]),
+			"pending_timer must be set for deferred retry")
+	} finally {
+		LLM_Engine_CancelTimer()
+		_LLM_Engine := SavedEngine
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_Ollama_WarmupStartedTick := SavedWarmupTick
+		Critical(PreviousCritical)
+	}
 }
 Test("LLM_Engine_FirePrediction: re-arms timer when Ollama not ready",
 	_FirePrediction_RearmsWhenOllamaNotReady)
