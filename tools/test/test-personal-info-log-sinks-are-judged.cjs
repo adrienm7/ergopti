@@ -273,6 +273,12 @@ const JUDGED = [
 		why: '"replacement" describes replacing the updater channel lifecycle; the constant log call interpolates no hotstring trigger, replacement text or other value.'
 	},
 	{
+		file: 'modules/updater/self_update.ahk',
+		match: 'Previous executable replacement failed after shutdown: {1}.',
+		verdict: 'not-personal',
+		why: 'the interpolation is a bounded SWAP_ERROR receipt produced by the native updater worker; it contains a filesystem or process failure, never hotstring content.'
+	},
+	{
 		file: 'ui/menu/menu_llm/actions.ahk',
 		match: 'direct install trigger',
 		verdict: 'not-personal',
