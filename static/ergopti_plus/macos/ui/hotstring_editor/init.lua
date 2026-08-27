@@ -61,6 +61,8 @@ local _keymap          = nil
 local _webview         = nil
 local _usercontent     = nil
 local _hotkey          = nil
+local _hotkey_chord    = nil
+local _retired_hotkeys = {}
 local _is_focused      = false
 local _pending_mode    = "menu"
 local _file_ready      = false
@@ -601,31 +603,50 @@ end
 --- @param mods table Array of modifier keys (e.g., {"cmd", "alt"}).
 --- @param key string The character key.
 function M.set_shortcut(mods, key)
-	if M.clear_shortcut() ~= true then return false end
-	if type(mods) == "table" and type(key) == "string" and key ~= "" then
-		local chord, chord_err = Chord.format(mods, key)
-		if not chord then
-			Logger.error(LOG, "Cannot bind editor shortcut: %s.", tostring(chord_err))
-			return false
-		end
-		-- Toggle: close the editor if already open, otherwise open it.
-		local handle = Hotkeys.bind(chord, function()
-			if _webview then M.close() else M.open("shortcut") end
-		end)
-		if not handle then return false end
-		_hotkey = handle
+	local chord, chord_err = Chord.format(mods, key)
+	if not chord then
+		Logger.error(LOG, "Cannot bind editor shortcut: %s.", tostring(chord_err))
+		return false
 	end
+	if _hotkey and _hotkey_chord == chord then return true end
+
+	-- Bind the candidate before releasing the acknowledged handle. Native bind
+	-- refusal must leave the previous shortcut fully live.
+	local candidate = Hotkeys.bind(chord, function()
+		if _webview then M.close() else M.open("shortcut") end
+	end)
+	if not candidate then return false end
+
+	local previous = _hotkey
+	if previous and Hotkeys.unbind(previous) ~= true then
+		-- unbind() fences delivery before attempting the native delete. Roll the
+		-- candidate back and re-enable the exact prior owner before reporting failure.
+		if Hotkeys.unbind(candidate) ~= true then
+			_retired_hotkeys[#_retired_hotkeys + 1] = candidate
+		end
+		Hotkeys.setEnabled(previous, true)
+		return false
+	end
+	_hotkey = candidate
+	_hotkey_chord = chord
 	return true
 end
 
 --- Unbinds the global hotkey if set.
 function M.clear_shortcut()
+	for index = #_retired_hotkeys, 1, -1 do
+		if Hotkeys.unbind(_retired_hotkeys[index]) == true then
+			table.remove(_retired_hotkeys, index)
+		end
+	end
 	if not _hotkey then return true end
 	if Hotkeys.unbind(_hotkey) ~= true then
+		Hotkeys.setEnabled(_hotkey, true)
 		Logger.error(LOG, "Editor shortcut release did not commit; handle retained for retry.")
 		return false
 	end
 	_hotkey = nil
+	_hotkey_chord = nil
 	return true
 end
 
