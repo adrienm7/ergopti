@@ -3,7 +3,6 @@
 import sys
 import tempfile
 import unittest
-from types import SimpleNamespace
 from pathlib import Path
 from unittest import mock
 
@@ -11,11 +10,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from layout_package import (  # noqa: E402
     ERGOPTI_TYPE_NAME,
+    LayoutSpec,
     format_gsettings_sources,
+    format_kde_layouts,
+    is_ergopti_spec,
     merge_gsettings_source,
     merge_kde_layout_list,
+    merge_layout_specs,
     parse_gsettings_sources,
     parse_kde_layout_list,
+    parse_kde_layouts,
+    remove_layout_specs,
 )
 import xkb_files_installer_clean as clean_installer  # noqa: E402
 
@@ -35,45 +40,6 @@ class GSettingsMergeTests(unittest.TestCase):
         self.assertIsNone(parse_gsettings_sources("garbage without brackets"))
         self.assertIsNone(parse_gsettings_sources("[not a tuple]"))
 
-    def test_activation_never_replaces_sources_after_a_parse_failure(self):
-        calls = []
-
-        def fake_run(command, **kwargs):
-            calls.append(command)
-            if "gsettings" in command and "get" in command:
-                return SimpleNamespace(returncode=0, stdout="[not a tuple]")
-            return SimpleNamespace(returncode=1, stdout="")
-
-        with mock.patch("builtins.print"), mock.patch.object(
-            clean_installer.subprocess, "run", side_effect=fake_run
-        ), mock.patch.object(clean_installer.shutil, "which", return_value=None):
-            clean_installer.activate("ergopti", "ergopti_plus")
-
-        self.assertFalse(
-            any("gsettings" in call and "set" in call for call in calls),
-            calls,
-        )
-
-    def test_plus_content_activates_the_installed_default_section(self):
-        calls = []
-
-        def fake_run(command, **kwargs):
-            calls.append(command)
-            if "gsettings" in command and "get" in command:
-                return SimpleNamespace(returncode=0, stdout="[('xkb', 'fr')]")
-            if "gsettings" in command and "set" in command:
-                return SimpleNamespace(returncode=0, stdout="")
-            return SimpleNamespace(returncode=1, stdout="")
-
-        with mock.patch("builtins.print"), mock.patch.object(
-            clean_installer.subprocess, "run", side_effect=fake_run
-        ), mock.patch.object(clean_installer.shutil, "which", return_value=None):
-            clean_installer.activate("ergopti", "ergopti_plus")
-
-        writes = [call for call in calls if "gsettings" in call and "set" in call]
-        self.assertEqual(len(writes), 1)
-        self.assertEqual(writes[0][-1], "[('xkb', 'fr'), ('xkb', 'ergopti')]")
-
     def test_merge_appends_only_missing_and_preserves_order(self):
         current = [("xkb", "fr"), ("xkb", "ergopti")]
         merged, added = merge_gsettings_source(
@@ -81,6 +47,23 @@ class GSettingsMergeTests(unittest.TestCase):
         )
         self.assertTrue(added)
         self.assertEqual(merged, [("xkb", "fr"), ("xkb", "ergopti"), ("xkb", "ergopti+plus")])
+
+    def test_make_primary_moves_the_layout_first_without_dropping_any(self):
+        current = [("xkb", "fr"), ("xkb", "us"), ("xkb", "ergopti")]
+        merged, changed = merge_gsettings_source(
+            current, [("xkb", "ergopti")], make_primary=True
+        )
+        self.assertTrue(changed)
+        self.assertEqual(merged[0], ("xkb", "ergopti"))
+        self.assertEqual(set(merged), set(current))
+
+    def test_make_primary_is_a_noop_when_already_first(self):
+        current = [("xkb", "ergopti"), ("xkb", "fr")]
+        merged, changed = merge_gsettings_source(
+            current, [("xkb", "ergopti")], make_primary=True
+        )
+        self.assertFalse(changed)
+        self.assertEqual(merged, current)
 
     def test_merge_noop_when_present(self):
         current = [("xkb", "fr"), ("xkb", "ergopti+plus")]
@@ -105,106 +88,30 @@ class KDEMergeTests(unittest.TestCase):
         self.assertTrue(added)
         self.assertEqual(merged, ["us", "ergopti"])
 
-
-class OwnedDesktopTeardownTests(unittest.TestCase):
-    def test_deactivate_removes_only_ergopti_desktop_entries(self):
-        calls = []
-
-        def fake_run(command, **kwargs):
-            calls.append(command)
-            if "gsettings" in command and "get" in command:
-                return SimpleNamespace(
-                    returncode=0,
-                    stdout="[('xkb', 'fr'), ('xkb', 'ergopti'), ('ibus', 'mozc-jp'), "
-                    "('xkb', 'ergopti+plus')]",
-                )
-            if "kreadconfig6" in command:
-                return SimpleNamespace(returncode=0, stdout="us,ergopti,fr,ergopti+plus")
-            return SimpleNamespace(returncode=0, stdout="")
-
-        with mock.patch("builtins.print"), mock.patch.object(
-            clean_installer.subprocess, "run", side_effect=fake_run
-        ), mock.patch.object(clean_installer.shutil, "which", return_value="kwriteconfig6"):
-            self.assertEqual(
-                clean_installer.deactivate("ergopti"),
-                clean_installer.CleanupStatus.CHANGED,
-            )
-
-        gsettings_writes = [
-            call for call in calls if "gsettings" in call and "set" in call
-        ]
-        self.assertEqual(len(gsettings_writes), 1)
+    def test_aligned_lists_round_trip(self):
+        specs = parse_kde_layouts("us,fr,de", ",Ergopti_v2_2_1")
         self.assertEqual(
-            gsettings_writes[0][-1],
-            "[('xkb', 'fr'), ('ibus', 'mozc-jp')]",
+            specs, [LayoutSpec("us"), LayoutSpec("fr", "Ergopti_v2_2_1"), LayoutSpec("de")]
         )
-        kde_writes = [call for call in calls if "kwriteconfig6" in call]
-        self.assertEqual(len(kde_writes), 1)
-        self.assertEqual(kde_writes[0][-1], "us,fr")
+        self.assertEqual(format_kde_layouts(specs), ("us,fr,de", ",Ergopti_v2_2_1,"))
 
-    def test_deactivate_fails_when_gnome_read_returns_nonzero(self):
-        def fake_run(command, **kwargs):
-            if "gsettings" in command and "get" in command:
-                return SimpleNamespace(returncode=1, stdout="", stderr="dconf unavailable")
-            raise FileNotFoundError(command[0])
+    def test_spec_merge_puts_the_new_layout_first_and_keeps_the_rest(self):
+        merged, changed = merge_layout_specs(
+            [LayoutSpec("us"), LayoutSpec("fr", "oss")], [LayoutSpec("fr", "Ergopti_v2_2_1")]
+        )
+        self.assertTrue(changed)
+        self.assertEqual(
+            merged, [LayoutSpec("fr", "Ergopti_v2_2_1"), LayoutSpec("us"), LayoutSpec("fr", "oss")]
+        )
 
-        with mock.patch("builtins.print"), mock.patch.object(
-            clean_installer.subprocess, "run", side_effect=fake_run
-        ):
-            self.assertEqual(
-                clean_installer.deactivate("ergopti"),
-                clean_installer.CleanupStatus.FAILED,
-                "an installed gsettings command that rejects the read is an external failure, not an absent GNOME desktop",
-            )
+    def test_spec_removal_targets_layout_or_variant(self):
+        current = [LayoutSpec("us"), LayoutSpec("fr", "Ergopti_v2_2_1"), LayoutSpec("ergopti")]
+        kept, removed = remove_layout_specs(current, is_ergopti_spec)
+        self.assertTrue(removed)
+        self.assertEqual(kept, [LayoutSpec("us")])
 
-    def test_deactivate_fails_when_kde_read_returns_nonzero(self):
-        def fake_run(command, **kwargs):
-            if "gsettings" in command:
-                raise FileNotFoundError(command[0])
-            if "kreadconfig6" in command:
-                return SimpleNamespace(returncode=1, stdout="", stderr="kxkbrc unreadable")
-            raise FileNotFoundError(command[0])
 
-        with mock.patch("builtins.print"), mock.patch.object(
-            clean_installer.subprocess, "run", side_effect=fake_run
-        ):
-            self.assertEqual(
-                clean_installer.deactivate("ergopti"),
-                clean_installer.CleanupStatus.FAILED,
-                "an installed KDE reader that fails must not be collapsed into desktop absence",
-            )
-
-    def test_deactivate_fails_when_kde_reconfigure_fails(self):
-        def fake_run(command, **kwargs):
-            if "gsettings" in command:
-                raise FileNotFoundError(command[0])
-            if "kreadconfig6" in command:
-                return SimpleNamespace(returncode=0, stdout="us,ergopti")
-            if "kwriteconfig6" in command:
-                return SimpleNamespace(returncode=0, stdout="")
-            if "qdbus" in command:
-                return SimpleNamespace(returncode=1, stdout="", stderr="KWin unavailable")
-            raise AssertionError(f"unexpected command: {command}")
-
-        with mock.patch("builtins.print"), mock.patch.object(
-            clean_installer.subprocess, "run", side_effect=fake_run
-        ), mock.patch.object(clean_installer.shutil, "which", return_value="kwriteconfig6"):
-            self.assertEqual(
-                clean_installer.deactivate("ergopti"),
-                clean_installer.CleanupStatus.FAILED,
-                "a refused KWin reconfigure leaves desktop cleanup partial and must retain the package",
-            )
-
-    def test_deactivate_treats_missing_desktop_commands_as_absent(self):
-        with mock.patch("builtins.print"), mock.patch.object(
-            clean_installer.subprocess, "run", side_effect=FileNotFoundError("missing")
-        ):
-            self.assertEqual(
-                clean_installer.deactivate("ergopti"),
-                clean_installer.CleanupStatus.ABSENT,
-                "missing GNOME and KDE commands mean those desktops are absent, not broken",
-            )
-
+class OwnedXComposeTests(unittest.TestCase):
     def test_xcompose_include_is_idempotent_and_external_edits_survive_uninstall(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

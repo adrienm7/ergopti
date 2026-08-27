@@ -11,6 +11,8 @@ know about extensions directories: the structural coherence tests then remain
 the active fence.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import unittest
