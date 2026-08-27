@@ -2,10 +2,15 @@
 #
 # Dedicated gate for the Ergopti XKB layout installation stack:
 #   - unit + sandbox tests for the Python installers (layout_package core,
-#     clean installer end-to-end against temporary roots);
+#     both installers end-to-end against temporary roots, the diagnostic);
+#   - the same suites on the oldest supported interpreter (3.8);
 #   - coherence checks over every generated layout shipped in the repository
 #     (symbols must only reference types their version defines - issue #84);
-#   - shellcheck over the bash entry points.
+#   - shellcheck over the bash entry points;
+#   - a real installation on a matrix of distributions, old and new, with each
+#     distribution's own libxkbcommon, xkeyboard-config, compilers and Python,
+#     including a replay of the exact host of issue #84 (Arch Linux, fish,
+#     wlroots compositor, generation-2 leftovers).
 
 name: Linux layout installer
 
@@ -69,11 +74,32 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run installer test suites (unit, consistency, sandbox)
+      # The runner's own libxkbcommon (1.6 on Ubuntu 24.04) and Xorg's xkbcomp
+      # give the legacy-tree compilation tests a real system tree to work on;
+      # the clean-method compilation tests need >= 1.13 and run in the matrix.
+      - name: Install the XKB compilers of this runner
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libxkbcommon-tools x11-xkb-utils xkb-data
+
+      - name: Run installer test suites (unit, consistency, sandbox, real compilers where present)
         run: python static/ergopti/linux/xkb_installation/tests/run_all_tests.py
 
       - name: Run the real shell entrypoint in isolated filesystems
         run: bash static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh
+
+  python-floor:
+    name: 'Installer tests on Python 3.8 (oldest supported)'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+
+      # Ubuntu 20.04 and Debian 11 ship 3.8/3.9: the installers must import and
+      # run there, not only on the interpreter the maintainer develops with.
+      - name: Run installer test suites
+        run: python static/ergopti/linux/xkb_installation/tests/run_all_tests.py
 
   shell-lint:
     name: 'Shell syntax + shellcheck'
@@ -84,15 +110,112 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: shellcheck (installer entry points)
+      - name: shellcheck (installer entry points and test drivers)
         run: |
           shellcheck -S error \
             static/ergopti/linux/xkb_installation/install.sh \
             static/ergopti/linux/xkb_installation/detect_installation_method.sh \
-            static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh
+            static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh \
+            static/ergopti/linux/xkb_installation/tests/e2e_distro.sh
 
       - name: bash syntax check
         run: |
           bash -n static/ergopti/linux/xkb_installation/install.sh
           bash -n static/ergopti/linux/xkb_installation/detect_installation_method.sh
           bash -n static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh
+          bash -n static/ergopti/linux/xkb_installation/tests/e2e_distro.sh
+
+  # ─────────────────────────────────────────────────
+  # Real installation per distribution
+  # ─────────────────────────────────────────────────
+  # Each container is the real package manager, the real libxkbcommon and
+  # xkeyboard-config of that distribution, its own compilers and its own
+  # Python. The e2e driver creates an unprivileged user with passwordless sudo
+  # (or doas), runs the documented piped command, verifies the compiled keymap
+  # with the distribution's tools independently of the installer, uninstalls
+  # and requires the system tree to be byte-for-byte pristine.
+  #
+  # `expect` pins the method the detector must choose where the distribution's
+  # libxkbcommon leaves no doubt (>= 1.13 with Wayland: clean; older: legacy);
+  # `any` lets rolling releases move without editing this file. The Arch entry
+  # replays issue #84: the reporter's distribution, shell and compositor, with
+  # the leftovers of the previous installer generation planted first.
+  distro-e2e:
+    name: 'Linux · real install (${{ matrix.distro }})'
+    runs-on: ubuntu-latest
+    needs: [tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: arch
+            image: archlinux:latest
+            prep: pacman -Syu --noconfirm --needed bash coreutils findutils grep sed gawk diffutils git python libxkbcommon xkeyboard-config xorg-xkbcomp sudo fish curl dbus dconf gsettings-desktop-schemas glib2 shadow util-linux which
+            expect: clean
+            flags: --replay-issue-84 --use-fish --gnome-dbus
+          - distro: ubuntu-26.04
+            image: ubuntu:26.04
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools xkb-data x11-xkb-utils sudo curl ca-certificates dbus dconf-service dconf-gsettings-backend gsettings-desktop-schemas libglib2.0-bin
+            expect: clean
+            flags: --gnome-dbus
+          - distro: debian-sid
+            image: debian:sid-slim
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools xkb-data x11-xkb-utils sudo curl ca-certificates
+            expect: any
+            flags: ''
+          - distro: debian-13
+            image: debian:trixie-slim
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools xkb-data x11-xkb-utils sudo curl ca-certificates
+            expect: any
+            flags: ''
+          - distro: ubuntu-24.04
+            image: ubuntu:24.04
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools xkb-data x11-xkb-utils sudo curl ca-certificates dbus dconf-service dconf-gsettings-backend gsettings-desktop-schemas libglib2.0-bin
+            expect: legacy
+            flags: --gnome-dbus
+          - distro: ubuntu-22.04
+            image: ubuntu:22.04
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools xkb-data x11-xkb-utils sudo curl ca-certificates
+            expect: legacy
+            flags: ''
+          - distro: ubuntu-20.04
+            image: ubuntu:20.04
+            prep: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon0 xkb-data x11-xkb-utils sudo curl ca-certificates
+            expect: legacy
+            flags: ''
+          - distro: fedora
+            image: fedora:latest
+            prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon libxkbcommon-utils xkeyboard-config xorg-x11-xkb-utils sudo curl shadow-utils util-linux
+            expect: any
+            flags: ''
+          - distro: rocky-9
+            image: rockylinux:9
+            prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon xkeyboard-config xorg-x11-xkb-utils sudo curl shadow-utils util-linux
+            expect: legacy
+            flags: ''
+          - distro: opensuse-tumbleweed
+            image: opensuse/tumbleweed:latest
+            prep: zypper --non-interactive install bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools libxkbcommon0 xkeyboard-config xkbcomp sudo curl shadow util-linux
+            expect: any
+            flags: ''
+          - distro: opensuse-leap-15.6
+            image: opensuse/leap:15.6
+            prep: zypper --non-interactive install bash coreutils findutils grep sed gawk diffutils git python3 python311 libxkbcommon0 xkeyboard-config xkbcomp sudo curl shadow util-linux
+            expect: legacy
+            flags: --python python3.11 --check-python-floor
+          - distro: alpine-edge
+            image: alpine:edge
+            prep: apk add --no-cache bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon libxkbcommon-tools xkeyboard-config xkbcomp doas curl shadow util-linux
+            expect: any
+            flags: --privilege doas
+    container:
+      image: ${{ matrix.image }}
+    timeout-minutes: 25
+    steps:
+      - name: Prepare the container
+        run: ${{ matrix.prep }}
+
+      - uses: actions/checkout@v4
+
+      - name: Install, verify with the distribution's compilers, uninstall
+        run: bash static/ergopti/linux/xkb_installation/tests/e2e_distro.sh --expect-method ${{ matrix.expect }} ${{ matrix.flags }}
