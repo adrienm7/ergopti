@@ -93,6 +93,7 @@
 		"test:color-presets-parity": "node ./tools/test/test-color-presets-parity.cjs",
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",
 		"test:action-picker-bridge": "node ./tools/test/test-action-picker-bridge.cjs",
+		"test:changelog-markdown-safety": "node ./tools/test/test-changelog-markdown-safety.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"verify": "node ./tools/test/verify-change.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
