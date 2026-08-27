@@ -141,9 +141,9 @@ _LCS_WrapperIsWidelyUsed() {
 		Pos := F + M.Len
 		Uses += 1
 	}
-	; Roughly fifty hand-offs across the Ollama, streaming and remote backends,
-	; plus the definition itself.
-	Assert(Uses >= 40,
+	; The exact-owner consolidation keeps thirty-eight hand-offs across the
+	; Ollama, streaming and remote backends, plus the definition itself.
+	Assert(Uses >= 38,
 		"the LLM backends must actually route their callbacks through the wrapper (found only " . Uses . " use(s)) — a scan that finds almost none means the calls were removed rather than wrapped")
 }
 
