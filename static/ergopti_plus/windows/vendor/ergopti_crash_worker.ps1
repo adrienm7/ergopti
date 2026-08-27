@@ -32,6 +32,30 @@ function Test-CrashFault {
 	return ($Faults -split ",") -contains $Name
 }
 
+function Protect-CrashReportPrivacy {
+	param([Parameter(Mandatory = $true)]$Snapshot)
+	$redactions = @{
+		error_msg = "[redacted error message]"
+		error_extra = "[redacted error context]"
+		error_what = "[redacted error context]"
+		error_file = "[redacted source path]"
+		stack_trace = "[redacted stack]"
+		script_dir = "[redacted path]"
+		active_window_title = "[redacted window title]"
+		active_window_process = "[redacted process]"
+		config_dir = "[redacted path]"
+		log_tail = "[redacted log]"
+	}
+	foreach ($name in $redactions.Keys) {
+		$property = $Snapshot.PSObject.Properties[$name]
+		if ($null -ne $property -and [string]$property.Value -ne "") {
+			Set-CrashField $Snapshot $name $redactions[$name]
+		}
+	}
+	$Snapshot.PSObject.Properties.Remove("_transport_script_dir")
+	$Snapshot.PSObject.Properties.Remove("_transport_config_dir")
+}
+
 $mapping = [IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting(
 	$MappingName,
 	[IO.MemoryMappedFiles.MemoryMappedFileRights]::Read
@@ -57,6 +81,11 @@ try {
 }
 
 $snapshot = [Text.Encoding]::UTF8.GetString($payloadBytes) | ConvertFrom-Json
+$transportScriptDir = [string]$snapshot._transport_script_dir
+$transportConfigDir = [string]$snapshot._transport_config_dir
+if ([string]::IsNullOrWhiteSpace($transportConfigDir)) {
+	throw "Crash-report transport has no destination directory"
+}
 $enrichmentErrors = [Collections.Generic.List[string]]::new()
 if ($DelayMs -gt 0) {
 	Start-Sleep -Milliseconds ([Math]::Min($DelayMs, 2000))
@@ -95,7 +124,7 @@ try {
 
 try {
 	if (Test-CrashFault "git") { throw "Injected git fault" }
-	$gitHash = & git -C ([string]$snapshot.script_dir) rev-parse --short HEAD 2>$null
+	$gitHash = & git -C $transportScriptDir rev-parse --short HEAD 2>$null
 	if ($LASTEXITCODE -eq 0) {
 		Set-CrashField $snapshot "git_hash" ([string]$gitHash).Trim()
 	}
@@ -103,10 +132,11 @@ try {
 
 Set-CrashField $snapshot "enrichment_errors" $enrichmentErrors.ToArray()
 
-$reportDir = Join-Path ([string]$snapshot.config_dir) "autohotkey\crash_reports"
+$reportDir = Join-Path $transportConfigDir "autohotkey\crash_reports"
 [IO.Directory]::CreateDirectory($reportDir) | Out-Null
 $reportName = "{0}_{1}.json" -f (Get-Date -Format "yyyy-MM-ddTHH-mm-ss"), [guid]::NewGuid().ToString("N")
 $reportPath = Join-Path $reportDir $reportName
+Protect-CrashReportPrivacy $snapshot
 [IO.File]::WriteAllText(
 	$reportPath,
 	($snapshot | ConvertTo-Json -Depth 8),

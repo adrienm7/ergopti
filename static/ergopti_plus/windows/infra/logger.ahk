@@ -519,8 +519,8 @@ _LoggerRefreshFastFlags() {
 ; pre-init window behave exactly like the post-init one for every level, in both
 ; directions (logger-preinit-level-drop).
 ;
-; The ring buffer is intentionally NOT filtered: it feeds crash reports, where
-; more boot context is strictly better.
+; The ring buffer is intentionally NOT level-filtered so live debugging retains
+; boot context. Crash reports consume only its redacted line-count summary.
 _LoggerDropPreInitBelowLevel() {
 		global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_MIN_LEVEL
 		Before := _LOGGER_PENDING.Length
