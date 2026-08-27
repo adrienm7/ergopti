@@ -799,8 +799,98 @@ local function rtrim_slash(s)
 	return (tostring(s or ""):gsub("/+$", ""))
 end
 
---- Build the per-provider request URL. Gemini bakes the model and API key
---- into the path; the OpenAI / Anthropic / OpenAI-compat shapes use a fixed
+--- Validates and normalizes one remote provider base URL without logging it.
+--- Userinfo, query strings, fragments, and whitespace are refused because they
+--- can smuggle credentials or alter every endpoint appended by this module.
+--- @param raw any Candidate base URL.
+--- @return string|nil normalized Valid HTTP(S) base without trailing slashes.
+--- @return string reason Privacy-safe refusal reason.
+local function normalize_base_url(raw)
+	if type(raw) ~= "string" or raw == "" then
+		return nil, "base URL is empty"
+	end
+	if raw:find("[%c%s]") then
+		return nil, "base URL contains whitespace or control characters"
+	end
+	if raw:find("\\", 1, true) then
+		return nil, "base URL contains a backslash"
+	end
+
+	local scheme, authority, suffix = raw:match("^([%a][%w+%.%-]*)://([^/?#]+)(.*)$")
+	if not scheme or not authority then
+		return nil, "base URL must include a scheme and host"
+	end
+	scheme = scheme:lower()
+	if scheme ~= "http" and scheme ~= "https" then
+		return nil, "base URL scheme must be http or https"
+	end
+	if authority:find("@", 1, true) then
+		return nil, "base URL authority must not contain userinfo"
+	end
+	if suffix:find("?", 1, true) or suffix:find("#", 1, true) then
+		return nil, "base URL must not contain a query or fragment"
+	end
+
+	local host = authority
+	local port
+	if authority:sub(1, 1) == "[" then
+		local bracket_host, remainder = authority:match("^(%[[^%]]+%])(.*)$")
+		local bracket_value = bracket_host and bracket_host:sub(2, -2) or ""
+		if bracket_value == ""
+			or not bracket_value:match("^[%w:%.%%%-]+$")
+			or not bracket_value:find(":", 1, true)
+			or not bracket_value:find("[%x]") then
+			return nil, "base URL host is invalid"
+		end
+		host = bracket_host
+		if remainder ~= "" then
+			port = remainder:match("^:(%d+)$")
+			if not port then return nil, "base URL port is invalid" end
+		end
+	else
+		local host_with_port, port_text = authority:match("^([^:]+):(%d+)$")
+		if host_with_port then
+			host = host_with_port
+			port = port_text
+		elseif authority:find(":", 1, true) then
+			return nil, "base URL port is invalid"
+		end
+		if not host:match("^[%w%._%-]+$") or not host:find("[%w]") then
+			return nil, "base URL host is invalid"
+		end
+	end
+	if port then
+		local numeric_port = tonumber(port)
+		if not numeric_port or numeric_port < 1 or numeric_port > 65535 then
+			return nil, "base URL port is outside 1..65535"
+		end
+	end
+
+	return rtrim_slash(scheme .. "://" .. authority .. suffix), "ok"
+end
+
+--- Resolves and validates the effective base URL for one entry/provider pair.
+--- @param entry table Active remote entry.
+--- @param provider table Provider descriptor.
+--- @return string|nil normalized
+--- @return string reason
+local function resolve_base_url(entry, provider)
+	local raw = entry.base_url
+	if raw == nil or raw == "" then raw = provider.base_url end
+	return normalize_base_url(raw)
+end
+
+--- Reports an endpoint refusal without persisting the rejected URL itself.
+--- @param operation string Semantic operation.
+--- @param entry table Active remote entry.
+--- @param reason string Privacy-safe validation detail.
+local function log_endpoint_refusal(operation, entry, reason)
+	Logger.error(LOG,
+		"Remote %s refused invalid endpoint configuration for provider '%s' (entry '%s'): %s.",
+		tostring(operation), tostring(entry and entry.provider),
+		tostring(entry and entry.id), tostring(reason))
+end
+
 --- Query parameters that carry a credential. Gemini authenticates by URL
 --- (`?key=<token>`) rather than by header, so the finished request URL contains
 --- the decrypted API key verbatim.
@@ -830,19 +920,42 @@ local function redact_url(url)
 	return out
 end
 
---- endpoint with the model in the JSON payload.
-local function build_url(base_url, format, model, token)
-	local base = rtrim_slash(base_url)
+--- Builds the per-provider inference URL from validated components. Gemini
+--- places one encoded model segment in the path; the OpenAI, Anthropic, and
+--- compatible shapes use fixed endpoints with the model in the JSON payload.
+--- @param base string Validated base URL.
+--- @param format string Provider wire format.
+--- @param model string Candidate model resource name.
+--- @param token string Decrypted API token.
+--- @return string|nil url
+--- @return string|nil reason
+local function build_url(base, format, model, token)
 	if format == "anthropic" then
-		return base .. "/messages"
+		return base .. "/messages", nil
 	end
 	if format == "gemini" then
 		-- Gemini: /models/<model>:generateContent?key=<token>
+		if type(model) ~= "string" then return nil, "model name must be a string" end
+		if model:sub(1, 7) == "models/" then model = model:sub(8) end
+		if model == "" then return nil, "Gemini model name is empty" end
+		local segment = _http_adapter.encodePathSegment(model)
 		local enc = _http_adapter.encodeForQuery(token)
-		return base .. "/models/" .. model .. ":generateContent?key=" .. enc
+		return base .. "/models/" .. segment .. ":generateContent?key=" .. enc, nil
 	end
 	-- OpenAI / OpenAI-compatible
-	return base .. "/chat/completions"
+	return base .. "/chat/completions", nil
+end
+
+--- Builds the provider's authenticated models endpoint from a validated base.
+--- @param base string Validated base URL.
+--- @param format string Provider wire format.
+--- @param token string Decrypted API token.
+--- @return string url
+local function build_models_url(base, format, token)
+	if format == "gemini" then
+		return base .. "/models?key=" .. _http_adapter.encodeForQuery(token)
+	end
+	return base .. "/models"
 end
 
 --- Compute the per-provider auth headers. Gemini carries auth via the URL
@@ -1098,11 +1211,11 @@ function M.warmup(_model_name, _profile, on_acquired)
 			report_acquisition(false)
 			return
 		end
-		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
-		if base == "" then
+		local base, base_error = resolve_base_url(entry, provider)
+		if not base then
 			_warmup_active = false
 			accepted = false
-			Logger.debug(LOG, "warmup: empty base_url for provider '%s'.", entry.provider)
+			log_endpoint_refusal("warmup", entry, base_error)
 			report_acquisition(false)
 			return
 		end
@@ -1117,13 +1230,7 @@ function M.warmup(_model_name, _profile, on_acquired)
 
 		local identity_entry = find_active_entry()
 		local format = provider.format
-		local ping_url
-		if format == "gemini" then
-			local enc = _http_adapter.encodeForQuery(token)
-			ping_url = rtrim_slash(base) .. "/models?key=" .. enc
-		else
-			ping_url = rtrim_slash(base) .. "/models"
-		end
+		local ping_url = build_models_url(base, format, token)
 
 		local dispatch_committed = false
 		local pending_response = nil
@@ -1315,8 +1422,14 @@ function M.check_availability(_model_name, on_available, on_missing)
 			accepted = false
 			return
 		end
-		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
-		if base == "" or (entry.token or "") == "" then
+		local base, base_error = resolve_base_url(entry, provider)
+		if not base then
+			log_endpoint_refusal("availability check", entry, base_error)
+			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+			accepted = false
+			return
+		end
+		if (entry.token or "") == "" then
 			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 			accepted = false
 			return
@@ -1325,13 +1438,7 @@ function M.check_availability(_model_name, on_available, on_missing)
 		local identity_entry = find_active_entry()
 		local format = provider.format
 		local my_identity = _identity_generation
-		local url
-		if format == "gemini" then
-			local enc = _http_adapter.encodeForQuery(entry.token)
-			url = rtrim_slash(base) .. "/models?key=" .. enc
-		else
-			url = rtrim_slash(base) .. "/models"
-		end
+		local url = build_models_url(base, format, entry.token)
 
 		local dispatched = _check_client.get(url, build_headers(format, entry.token), function(r)
 			local callback_paused, _, callback_state_ok = read_script_pause_state()
@@ -1384,9 +1491,14 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
-	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
+	local base, base_error = resolve_base_url(entry, provider)
 	local model = (model_name and model_name ~= "") and model_name or (entry.model and entry.model ~= "" and entry.model) or provider.default_model
-	if base == "" or model == "" then
+	if not base then
+		log_endpoint_refusal("inference", entry, base_error)
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+	if type(model) ~= "string" or model == "" then
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
@@ -1419,6 +1531,13 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		end
 	end
 
+	local url, url_error = build_url(base, provider.format, model, entry.token or "")
+	if not url then
+		log_endpoint_refusal("inference", entry, url_error)
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
 	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens)
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
@@ -1427,7 +1546,6 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		return
 	end
 
-	local url     = build_url(base, provider.format, model, entry.token or "")
 	local headers = build_headers(provider.format, entry.token or "")
 	local t0      = TimerScheduler.now()
 

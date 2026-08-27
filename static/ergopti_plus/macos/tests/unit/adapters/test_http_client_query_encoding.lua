@@ -72,6 +72,18 @@ helpers.describe("http_client query encoding fails safe", function()
 		end)
 	end)
 
+	helpers.it("encodes path segments without query-specific native substitutions", function()
+		with_encoder(function()
+			return "native-query-result"
+		end, function(HttpClient, errors)
+			local raw = "models/family name/" .. string.char(0xC3, 0xA9)
+			helpers.assert_eq(HttpClient.encodePathSegment(raw),
+				"models%2Ffamily%20name%2F%C3%A9")
+			helpers.assert_eq(errors, {},
+				"path encoding must not consult or report the native query encoder")
+		end)
+	end)
+
 	helpers.it("also encodes after missing or non-string native results", function()
 		local cases = {
 			{ label = "missing", native = nil },
