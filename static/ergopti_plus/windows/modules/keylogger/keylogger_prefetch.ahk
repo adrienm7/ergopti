@@ -82,6 +82,9 @@ class KLPFWorker {
 		static spawn_fn := 0
 		; Test seam for atomic-publication failure; production uses KLPF_MoveAtomic.
 		static publish_fn := 0
+		; Range-only deterministic seams. Production uses FileDelete/KL_JsonEncode.
+		static range_delete_fn := 0
+		static range_encode_fn := 0
 }
 
 KLPF_IsWorkerInvocation() {
@@ -90,6 +93,15 @@ KLPF_IsWorkerInvocation() {
 						return true
 		}
 		return false
+}
+
+_KLPF_DeleteRangeStage(Path) {
+	try FileDelete(Path)
+	return true
+}
+
+_KLPF_EncodeRangeApps(Apps) {
+	return KL_JsonEncode(Apps)
 }
 
 KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true) {
@@ -183,17 +195,49 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 				return false
 		}
 		job_key := "range:" . which
-		KLPF_CancelBuild(job_key)
+		if KLPFWorker.jobs.Has(job_key) {
+				KLPF_CancelBuild(job_key)
+				if KLPFWorker.jobs.Has(job_key) {
+						KLPF_InvokeTerminal(terminal, "canceled")
+						return false
+				}
+		}
 		generation := ++KLPFWorker.generation
 		stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage."
 				. KLPFWorker.owner_id . "." . generation . ".json"
-		try FileDelete(stage)
-		try apps_json := KL_JsonEncode(query["apps"])
+		job := Map(
+				"generation", generation,
+				"epoch", epoch,
+				"stage", stage,
+				"handle", 0,
+				"kind", "range",
+				"on_terminal", terminal
+		)
+		KLPFWorker.jobs[job_key] := job
+
+		DeleteFn := IsObject(KLPFWorker.range_delete_fn)
+				? KLPFWorker.range_delete_fn : _KLPF_DeleteRangeStage
+		try DeleteFn.Call(stage)
 		catch as err {
-				try LoggerError("KLReader", "Could not encode selected-range projection request: {1}", err.Message)
-				KLPF_InvokeTerminal(terminal, "failed")
+				try LoggerError("KLReader", "Could not clear selected-range stage: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
 				return false
 		}
+		if !KLPFWorker.jobs.Has(job_key)
+				|| KLPFWorker.jobs[job_key]["generation"] != generation
+				return false
+
+		EncodeFn := IsObject(KLPFWorker.range_encode_fn)
+				? KLPFWorker.range_encode_fn : _KLPF_EncodeRangeApps
+		try apps_json := EncodeFn.Call(query["apps"])
+		catch as err {
+				try LoggerError("KLReader", "Could not encode selected-range projection request: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		if !KLPFWorker.jobs.Has(job_key)
+				|| KLPFWorker.jobs[job_key]["generation"] != generation
+				return false
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
 				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir,
@@ -210,20 +254,20 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 		try handle := spawn.Call(executable, args, done)
 		catch as err {
 				try LoggerError("KLReader", "Could not spawn selected-range projection worker: {1}", err.Message)
-				KLPF_InvokeTerminal(terminal, "failed")
+				KLPF_CompleteJob(job_key, generation, "failed")
 				return false
 		}
-		; Publish ownership before start(): a test seam or very fast worker may
-		; complete synchronously from start(), and that terminal callback must see
-		; and retire the live job instead of racing an as-yet-unregistered entry.
-		KLPFWorker.jobs[job_key] := Map(
-				"generation", generation,
-				"epoch", epoch,
-				"stage", stage,
-				"handle", handle,
-				"kind", "range",
-				"on_terminal", terminal
-		)
+		PreviousCritical := Critical("On")
+		try {
+				if !KLPFWorker.jobs.Has(job_key)
+						|| KLPFWorker.jobs[job_key]["generation"] != generation {
+						try handle.terminate()
+						return false
+				}
+				job["handle"] := handle
+		} finally {
+				Critical(PreviousCritical)
+		}
 		try started := handle.start()
 		catch as err {
 				try LoggerError("KLReader", "Could not start selected-range projection worker: {1}", err.Message)
@@ -251,8 +295,11 @@ KLPF_CancelBuild(which) {
 				; Record a suspend/replacement that interrupts that yielded region; the
 				; completing owner will downgrade its terminal before delivery.
 				job["cancel_requested"] := true
-				Terminated := false
-				try Terminated := job["handle"].terminate()
+				HasProcessOwner := IsObject(job["handle"])
+						&& HasMethod(job["handle"], "terminate")
+				Terminated := !HasProcessOwner
+				if HasProcessOwner
+						try Terminated := job["handle"].terminate()
 				return (Terminated is Integer) && Terminated == true
 		}
 		; Claim terminal ownership before terminate(): a process handle is allowed
@@ -261,8 +308,11 @@ KLPF_CancelBuild(which) {
 		; so OnExit can refuse and retry instead of orphaning a detached worker.
 		job["terminal_claimed"] := true
 		job["cancel_requested"] := true
-		Terminated := false
-		try Terminated := job["handle"].terminate()
+		HasProcessOwner := IsObject(job["handle"])
+				&& HasMethod(job["handle"], "terminate")
+		Terminated := !HasProcessOwner
+		if HasProcessOwner
+				try Terminated := job["handle"].terminate()
 		if !((Terminated is Integer) && Terminated == true)
 				return false
 		FSDelete(job["stage"])

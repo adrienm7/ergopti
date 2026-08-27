@@ -147,6 +147,74 @@ _KLPFW_ShutdownOwnsEveryProcessAndStage() {
 Test("keylogger prefetch: shutdown joins unique process owners (prefetch-shutdown-owner)",
 	_KLPFW_ShutdownOwnsEveryProcessAndStage)
 
+
+_KLPFW_ReenterRange() {
+	return KLPF_RequestRange("typing", A_Temp . "\\metrics",
+		_KLPFW_Query(), 902)
+}
+
+_KLPFW_ReenterFromDelete(*) {
+	KLPFWorker.range_delete_fn := 0
+	_KLPFW_ReenterRange()
+	return true
+}
+
+_KLPFW_ReenterFromEncode(*) {
+	KLPFWorker.range_encode_fn := 0
+	_KLPFW_ReenterRange()
+	return "[]"
+}
+
+_KLPFW_ReenterFromSpawn(*) {
+	KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+	_KLPFW_ReenterRange()
+	Handle := {}
+	Handle.start := _KLPFW_FakeStart
+	Handle.terminate := _KLPFW_FakeTerminate
+	return Handle
+}
+
+_KLPFW_RangeReservationSurvivesEveryReentrantSeam() {
+	SavedJobs := KLPFWorker.jobs
+	SavedGeneration := KLPFWorker.generation
+	SavedSpawn := KLPFWorker.spawn_fn
+	SavedDelete := KLPFWorker.range_delete_fn
+	SavedEncode := KLPFWorker.range_encode_fn
+	try {
+		for SeamName in ["delete", "encode", "spawn"] {
+			KLPFWorker.jobs := Map()
+			KLPFWorker.generation := 0
+			KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+			KLPFWorker.range_delete_fn := 0
+			KLPFWorker.range_encode_fn := 0
+			switch SeamName {
+			case "delete":
+				KLPFWorker.range_delete_fn := _KLPFW_ReenterFromDelete
+			case "encode":
+				KLPFWorker.range_encode_fn := _KLPFW_ReenterFromEncode
+			case "spawn":
+				KLPFWorker.spawn_fn := _KLPFW_ReenterFromSpawn
+			}
+			AssertFalse(KLPF_RequestRange("typing", A_Temp . "\\metrics",
+				_KLPFW_Query(), 901),
+				"the superseded outer " . SeamName . " request must stop")
+			Assert(KLPFWorker.jobs.Has("range:typing")
+				&& KLPFWorker.jobs["range:typing"]["generation"] = 2
+				&& KLPFWorker.jobs["range:typing"]["epoch"] = 902,
+				"the reentrant " . SeamName . " request must remain the sole owner")
+			AssertTrue(KLPF_CancelBuild("range:typing"))
+		}
+	} finally {
+		KLPFWorker.jobs := SavedJobs
+		KLPFWorker.generation := SavedGeneration
+		KLPFWorker.spawn_fn := SavedSpawn
+		KLPFWorker.range_delete_fn := SavedDelete
+		KLPFWorker.range_encode_fn := SavedEncode
+	}
+}
+Test("keylogger prefetch: range reserves before every reentrant effect (range-prefetch-reservation)",
+	_KLPFW_RangeReservationSurvivesEveryReentrantSeam)
+
 global _KLPFW_FakeTerminated := 0
 global _KLPFW_FakeArgs := []
 
