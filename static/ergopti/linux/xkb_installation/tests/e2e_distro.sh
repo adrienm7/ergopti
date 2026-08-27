@@ -133,13 +133,29 @@ case "$PRIVILEGE" in
 esac
 
 # The piped entry point fetches the installer from GitHub; a bare mirror of
-# this checkout stands in for it so the run needs no network. The checkout may
-# be shallow and detached (pull requests), hence a push of HEAD rather than a
-# clone.
+# this checkout stands in for it so the run needs no network. The mirror is
+# seeded from the tracked files rather than pushed from HEAD: the CI checkout
+# is shallow and detached, a mirror pushed from it inherits that boundary, and
+# git 2.25 (Ubuntu 20.04) cannot fetch --depth 1 from a shallow repository --
+# it re-forks upload-pack until the container runs out of processes, which
+# surfaces as hundreds of "the remote end hung up unexpectedly".
+SEED_REPO="$WORK/mirror-seed"
+mkdir -p "$SEED_REPO"
+git -C "$REPO_ROOT" archive HEAD | tar -x -C "$SEED_REPO"
 git init --quiet --bare "$BARE_REPO"
-git -C "$BARE_REPO" config receive.shallowUpdate true
-git -C "$REPO_ROOT" push --quiet "$BARE_REPO" HEAD:refs/heads/dev
+git -C "$SEED_REPO" init --quiet
+git -C "$SEED_REPO" config user.email e2e@example.invalid
+git -C "$SEED_REPO" config user.name e2e
+# -f as well: a file that is tracked upstream but matches a .gitignore
+# pattern would otherwise be dropped from the mirror.
+git -C "$SEED_REPO" add -A -f
+git -C "$SEED_REPO" commit --quiet -m "mirror of the commit under test"
+git -C "$SEED_REPO" push --quiet "$BARE_REPO" HEAD:refs/heads/dev
 git -C "$BARE_REPO" symbolic-ref HEAD refs/heads/dev
+# The oldest git in the matrix cannot serve a shallow mirror, and what it
+# produces then is a fork storm rather than a readable message: refuse one.
+[ "$(git -C "$BARE_REPO" rev-parse --is-shallow-repository)" = false ] \
+    || die "the mirror is shallow: git 2.25 cannot fetch --depth 1 from it"
 chown -R "$USER_NAME" "$BARE_REPO"
 # The redirection has to live in the user's own git configuration:
 # GIT_CONFIG_COUNT is only honoured from git 2.31, so on Ubuntu 20.04's 2.25
