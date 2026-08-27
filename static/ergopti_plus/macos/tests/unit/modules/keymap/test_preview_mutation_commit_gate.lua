@@ -139,6 +139,7 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 			"add", "load_file", "load_toml", "disable_section", "enable_section",
 			"set_sections_enabled", "disable_group", "register_lua_group", "enable_group",
 			"sort_mappings", "set_repeat_feature_enabled", "set_terminator_enabled",
+			"set_terminators_enabled",
 			"add_custom_terminator", "remove_custom_terminator",
 		}
 		for _, name in ipairs(writers) do

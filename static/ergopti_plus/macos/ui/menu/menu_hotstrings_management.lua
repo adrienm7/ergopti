@@ -20,6 +20,7 @@ local i18n              = require("infra.i18n")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG               = "menu_hotstrings"
 
 
@@ -106,34 +107,40 @@ function M.build_management(ctx)
 	-- expose the same set: enable all / disable all / reset the built-in
 	-- terminators to their catalogue defaults. Custom terminators are managed
 	-- individually below and are left untouched here.
-	local function bulk_set_terminators(enabled)
-		for _, d in ipairs(defs) do
-			if type(d) == "table" and not d.custom and d.key then
-				if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
-					pcall(ctx.keymap.set_terminator_enabled, d.key, enabled)
-				end
-				state.terminator_states[d.key] = enabled
-			end
-		end
+	local function commit_terminator_changes(changes, reason)
+		local keymap = ctx.keymap
+		local committed = KeymapLifecycle.commit_mutation(ctx, reason, function()
+			if not keymap or type(keymap.set_terminators_enabled) ~= "function" then return false end
+			return keymap.set_terminators_enabled(changes)
+		end)
+		if not committed then return false end
+		for key, enabled in pairs(changes) do state.terminator_states[key] = enabled end
 		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
+		return true
+	end
+
+	local function bulk_set_terminators(enabled)
+		local changes = {}
+		for _, d in ipairs(defs) do
+			if type(d) == "table" and not d.custom and d.key then
+				changes[d.key] = enabled
+			end
+		end
+		return commit_terminator_changes(changes, "bulk word-expander toggle")
 	end
 	local function reset_terminators()
+		local changes = {}
 		for _, d in ipairs(defs) do
 			if type(d) == "table" and not d.custom and d.key then
 				-- default_enabled is true unless the catalogue marks it false (slash/backslash)
-				local def_on = (d.default_enabled ~= false)
-				if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
-					pcall(ctx.keymap.set_terminator_enabled, d.key, def_on)
-				end
-				state.terminator_states[d.key] = def_on
+				changes[d.key] = (d.default_enabled ~= false)
 			end
 		end
-		if ctx.save_prefs() ~= true then return false end
-		ctx.updateMenu()
+		return commit_terminator_changes(changes, "reset word expanders")
 	end
-	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() bulk_set_terminators(true)  end or nil }
-	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() bulk_set_terminators(false) end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() return bulk_set_terminators(true)  end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() return bulk_set_terminators(false) end or nil }
 	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, action = not paused and reset_terminators or nil }
 	exp_sub[#exp_sub + 1] = { separator = true }
 
@@ -162,14 +169,20 @@ function M.build_management(ctx)
 						local nv = true
 						if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
 							nv = not ctx.keymap.is_terminator_enabled(k)
-							if type(ctx.keymap.set_terminator_enabled) == "function" then
-								pcall(ctx.keymap.set_terminator_enabled, k, nv)
-							end
 						end
+						local committed = KeymapLifecycle.commit_mutation(ctx,
+							"toggle word expander", function()
+								if not ctx.keymap or type(ctx.keymap.set_terminator_enabled) ~= "function" then
+									return false
+								end
+								return ctx.keymap.set_terminator_enabled(k, nv)
+							end)
+						if not committed then return false end
 						state.terminator_states[k] = nv
 						if ctx.save_prefs() ~= true then return false end
 						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
+						return true
 					end end)(def.key, lbl) or nil,
 				}
 			end

@@ -608,6 +608,7 @@ M.is_repeat_feature_enabled  = Registry.is_repeat_feature_enabled
 M.set_repeat_feature_enabled = preview_fenced_registry_mutation(Registry.set_repeat_feature_enabled)
 
 M.set_terminator_enabled   = preview_fenced_registry_mutation(Registry.set_terminator_enabled)
+M.set_terminators_enabled  = preview_fenced_registry_mutation(Registry.set_terminators_enabled)
 M.is_terminator_enabled    = Registry.is_terminator_enabled
 M.get_terminator_defs      = Registry.get_terminator_defs
 M.add_custom_terminator    = preview_fenced_registry_mutation(Registry.add_custom_terminator)

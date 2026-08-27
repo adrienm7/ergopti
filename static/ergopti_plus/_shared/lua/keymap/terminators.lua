@@ -91,19 +91,24 @@ end
 -- path stays O(1).
 local _chars_set   = {}
 local _consume_set = {}
-local function rebuild_cache()
-	_chars_set   = {}
-	_consume_set = {}
+local function build_cache(enabled)
+	local chars_set = {}
+	local consume_set = {}
 	for _, def in ipairs(M.TERMINATOR_DEFS) do
-		if def.key and _enabled[def.key] and def.chars then
+		if def.key and enabled[def.key] and def.chars then
 			for _, c in ipairs(def.chars) do
 				if type(c) == "string" and c ~= "" then
-					_chars_set[c] = true
-					if def.consume then _consume_set[c] = true end
+					chars_set[c] = true
+					if def.consume then consume_set[c] = true end
 				end
 			end
 		end
 	end
+	return chars_set, consume_set
+end
+
+local function rebuild_cache()
+	_chars_set, _consume_set = build_cache(_enabled)
 end
 rebuild_cache()
 
@@ -218,13 +223,54 @@ end
 -- =========================================
 -- =========================================
 
+--- Enables or disables several terminators as one cache publication.
+--- Invalid input leaves both the enabled-state table and hot-path caches intact.
+--- @param changes table Map of terminator key to exact boolean state.
+--- @return boolean committed
+function M.set_terminators_enabled(changes)
+	if type(changes) ~= "table" then
+		Logger.error(LOG, "set_terminators_enabled: changes must be a table (got '%s').", type(changes))
+		return false
+	end
+
+	local candidate = {}
+	for key, enabled in pairs(_enabled) do candidate[key] = enabled end
+	local count = 0
+	for key, enabled in pairs(changes) do
+		if type(key) ~= "string" or key == "" or _enabled[key] == nil then
+			Logger.error(LOG, "set_terminators_enabled: unknown terminator key '%s'.", tostring(key))
+			return false
+		end
+		if type(enabled) ~= "boolean" then
+			Logger.error(LOG, "set_terminators_enabled: state for '%s' must be boolean (got '%s').",
+				key, type(enabled))
+			return false
+		end
+		candidate[key] = enabled
+		count = count + 1
+	end
+
+	local ok, chars_or_err, consume_set = xpcall(function()
+		return build_cache(candidate)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "set_terminators_enabled: cache rebuild refused — %s.", tostring(chars_or_err))
+		return false
+	end
+
+	_enabled = candidate
+	_chars_set = chars_or_err
+	_consume_set = consume_set
+	Logger.debug(LOG, "Terminator batch committed (%d change(s)).", count)
+	return true
+end
+
 --- Enables or disables a terminator by key.
 --- @param key string The terminator key identifier.
 --- @param en boolean True to enable, false to disable.
+--- @return boolean committed
 function M.set_terminator_enabled(key, en)
-	_enabled[key] = (en ~= false)
-	rebuild_cache()
-	Logger.debug(LOG, "Terminator '%s': %s.", key, en and "enabled" or "disabled")
+	return M.set_terminators_enabled({ [key] = en })
 end
 
 --- Returns true if the given terminator key is currently enabled.
