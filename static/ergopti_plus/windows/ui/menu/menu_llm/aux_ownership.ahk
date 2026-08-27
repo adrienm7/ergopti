@@ -186,13 +186,21 @@ _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner := 0, BuildFn := 0) {
 	try {
 		if !_LLM_Menu_AuxOwnerIsCurrent(Owner)
 			return false
+		WasReady := LLM_InstalledTagsCacheReady()
 		Previous := _LLM_GetInstalledTagsCached()
 		Current := IsSet(tags) && (tags is Array) ? tags : []
 		LLM_SetInstalledTagsCache(Current)
 		Changed := _LLM_InstalledTagsListChanged(Previous, Current)
+		MustResumeBridge := !WasReady
 		if !LLM_AuxFinish(Owner)
 			return false
 	} finally Critical(PreviousCritical)
+	if MustResumeBridge {
+		if IsSet(LLM_Menu_EnsureModelReady)
+			LLM_Menu_EnsureModelReady()
+		if IsSet(LLM_Menu_TryStartBridge)
+			LLM_Menu_TryStartBridge()
+	}
 	if Changed
 		_LLM_Menu_AuxBuild(BuildFn)
 	return true

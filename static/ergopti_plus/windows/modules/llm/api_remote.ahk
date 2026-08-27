@@ -105,17 +105,14 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
     Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens)
 
-    ; Prefer a curl child process so the synchronous DNS resolve + TCP connect (which
-    ; WinHttpRequest.5.1 performs on the message-loop thread even in "async" mode) never
-    ; freezes typing. _LLMRemote_DispatchCurl returns true once it owns the request
-    ; (dispatched, or already failed via on_fail); only fall through to the WinHTTP path
-    ; when curl is unavailable on this host (remote-generate-connect-blocks).
+    ; The curl child is the only production transport. Falling back to WinHTTP
+    ; would put DNS/connect/Send back on the cooperative AHK thread.
     if (_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
             on_fail, timeout_ms, 0, reservation))
         return req_id
-
-    _LLMRemote_DispatchWinHttp(req_id, resolved, Url, Payload, on_success,
-        on_fail, timeout_ms, 0, reservation)
+    try LoggerError("LLM.remote",
+        "Remote generation refused because the non-blocking curl transport is unavailable.")
+    _LLMRemote_FailReserved(req_id, reservation, on_fail)
     return req_id
 }
 
@@ -724,52 +721,9 @@ _LLMRemoteResolveEntry(Entry) {
     return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model)
 }
 
-; Probes the API endpoint with a lightweight call (the providers' canonical
-; "list models" endpoint when available, falling back to a HEAD on the base
-; URL). Returns true when the endpoint is reachable AND the auth token is
-; accepted. Used by the tray menu's health-dot helper for "api" backends.
-LLM_RemoteIsReady(Entry) {
-    global LLM_API_PROVIDERS
-
-    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
-    if !LLM_API_PROVIDERS.Has(ProviderId) {
-        return false
-    }
-    Provider := LLM_API_PROVIDERS[ProviderId]
-    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", Provider["BaseUrl"])
-    Token    := _LLMRemoteEntryGet(Entry, "Token", "")
-    if (BaseUrl == "" or Token == "") {
-        return false
-    }
-
-    ; The cheap-ping URL per provider: ``/models`` for OpenAI-shaped APIs, the
-    ; same path for Anthropic, ``/models?key=...`` for Gemini. A 200 confirms
-    ; both reachability and auth.
-    ProvFmt := Provider["Format"]
-    PingUrl := ""
-    if (ProvFmt == "openai" or ProvFmt == "anthropic") {
-        PingUrl := RTrim(BaseUrl, "/") . "/models"
-    } else if (ProvFmt == "gemini") {
-        PingUrl := RTrim(BaseUrl, "/") . "/models?key=" . Token
-    }
-    if (PingUrl == "") {
-        return false
-    }
-    try {
-        Http := ComObject("WinHttp.WinHttpRequest.5.1")
-        Http.Open("GET", PingUrl, false)
-        Http.SetTimeouts(2000, 2000, 2000, 2000)
-        _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
-        Http.Send()
-        return (Http.Status >= 200 and Http.Status < 300)
-    } catch {
-        return false
-    }
-}
-
 ; Per-phase timeout (ms) for the readiness ping. Same value the sync path
-; used, but here it is non-blocking: WinHTTP runs the request on its own
-; thread and we poll for completion, so even a hung connect never freezes
+; used, but here it is non-blocking: curl runs in its own process and we poll
+; for completion, so even a hung connect never freezes
 ; the main message pump.
 global LLM_REMOTE_READY_PING_TIMEOUT_MS := 2000
 ; Absolute-time cap (ms) for the readiness poll loop. Sized one cadence above
@@ -782,8 +736,8 @@ global LLM_REMOTE_READY_PING_DEADLINE_MS := 3000
 global LLM_REMOTE_READY_PING_POLL_MS := 250
 
 /**
- * Async variant of LLM_RemoteIsReady. Same probe (provider /models endpoint),
- * but the WinHTTP request is opened async and polled, so the caller (the tray
+ * Probes the provider /models endpoint in a tree-owned curl child, so the caller
+ * (the tray
  * save path) returns immediately and the message pump keeps running. Invokes
  * ``on_result(bool)`` from a polling tick once the ping resolves, times out,
  * or fails. Mirrors LLM_OllamaIsRunning_Async.
@@ -844,7 +798,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0) {
     }
 
     try {
-        Http := ComObject("WinHttp.WinHttpRequest.5.1")
+        Http := CurlAsyncRequest()
         Http.Open("GET", PingUrl, true)
         Http.SetTimeouts(LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS,
                         LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS)

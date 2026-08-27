@@ -513,8 +513,8 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 ; ========================================
 
 /**
- * Fetches releases from GitHub (asynchronous WinHTTP) and injects them via JS.
- * Defers to next message-loop tick; fetch is non-blocking async WinHttp.
+ * Fetches releases from GitHub in a tree-owned curl child and injects them via JS.
+ * Defers to next message-loop tick; every network phase stays off the AHK thread.
  * @param {string} Channel - "main" or "dev".
  */
 _CLW_FetchAndInject(Channel, Request := unset) {
@@ -542,11 +542,9 @@ _CLW_DoFetch(Context) {
 	Url := "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=20"
 
 	try {
-		Req := ComObject("WinHttp.WinHttpRequest.5.1")
-		; Open async (true) so Send returns immediately and a slow or stalled
-		; network can never block the AHK main thread — and therefore never freeze
-		; keyboard remapping. Completion is harvested via a non-blocking SetTimer
-		; poll, mirroring _Updater_FetchLatestJsonAsync / _Updater_PollAsync.
+		Req := CurlAsyncRequest()
+		; The child owns DNS, connect, Send and response wait. Completion is
+		; harvested via the existing non-blocking SetTimer poll.
 		Req.Open("GET", Url, true)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Changelog/1.0")

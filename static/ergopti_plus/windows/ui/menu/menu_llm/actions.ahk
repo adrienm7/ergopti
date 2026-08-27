@@ -519,11 +519,13 @@ LLM_Menu_EnsureModelReady() {
 	; LLM_Deps_IsReady() == true, where the same probe returns in milliseconds.
 	if !LLM_Deps_IsReady()
 		return true
-	; Deps are confirmed up — refresh the installed-tags cache with ONE synchronous
-	; probe so the model auto-correct below reads a trustworthy snapshot. This is the
-	; only sanctioned blocking /api/tags call (off the keyboard hot path, gated on
-	; deps-ready above); the tray build itself stays non-blocking via the async probe.
-	_LLM_WarmInstalledTagsSync()
+	; Deps are confirmed up, but DNS/connect/Send must still stay off the AHK
+	; thread. The first bridge start waits for the same async cache probe used by
+	; the tray; its terminal callback retries this function with a committed snapshot.
+	if !LLM_InstalledTagsCacheReady() {
+		_LLM_Menu_FireInstalledTagsProbe()
+		return false
+	}
 	model := _LLM_Menu["model"]
 	if (model == "")
 		model := _LLM_DefaultFor("llm_model", _LLM_LOCAL_DEFAULTS["llm_model"])

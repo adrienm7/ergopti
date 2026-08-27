@@ -16,15 +16,13 @@
 ; a) menu_api_entries.ahk's save path no longer calls the blocking
 ;    LLM_RemoteIsReady(); it dispatches LLM_RemoteIsReady_Async() and surfaces
 ;    the TrayTip from the poll callback, so the message pump keeps running.
-; b) api_remote.ahk defines LLM_RemoteIsReady_Async, which opens the WinHTTP
-;    request async (Open(..., true)) and polls for completion via a relaxed
-;    SetTimer loop with an absolute-time deadline.
+; b) api_remote.ahk defines LLM_RemoteIsReady_Async, which launches a tree-owned
+;    curl request and polls it via a relaxed SetTimer loop with an absolute deadline.
 ;
 ; This is a meta-static test (scans source text): menu_api_entries.ahk is not
 ; in the headless run_all include graph, and LLM_RemoteIsReady_Async makes a
-; live ComObject/SetTimer/network call, so neither can be exercised behaviorally
-; without blocking the CI runner. If the save path reverts to the synchronous
-; probe, or the async helper loses its async Open, this test fails.
+; live network call, so the entrypoint mapping is guarded statically here while
+; the shared transport has a real delayed-listener heartbeat regression.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -73,10 +71,12 @@ _RAVB_AsyncProbeExists() {
 }
 Test("api_remote: LLM_RemoteIsReady_Async is defined (remote-api-validate-blocks-message-pump)", _RAVB_AsyncProbeExists)
 
-_RAVB_AsyncProbeOpensAsync() {
+_RAVB_AsyncProbeUsesChildTransport() {
 	Body := _DriverFuncBody("LLM_RemoteIsReady_Async")
 	Assert(Body != "", "LLM_RemoteIsReady_Async must exist in modules/llm/api_remote.ahk")
-	Assert(InStr(Body, 'Http.Open("GET", PingUrl, true)') > 0,
-		"LLM_RemoteIsReady_Async must open the WinHTTP request async (Open(..., true)) so the readiness ping never blocks the main thread (remote-api-validate-blocks-message-pump)")
+	Assert(InStr(Body, "CurlAsyncRequest()") > 0,
+		"remote readiness must use the tree-owned curl transport")
+	Assert(!InStr(Body, "ComObject(") and !InStr(Body, "WinHttp"),
+		"remote readiness must never construct WinHTTP on the AHK thread")
 }
-Test("api_remote: LLM_RemoteIsReady_Async opens WinHTTP async (remote-api-validate-blocks-message-pump)", _RAVB_AsyncProbeOpensAsync)
+Test("api_remote: readiness uses a child transport (remote-api-validate-blocks-message-pump)", _RAVB_AsyncProbeUsesChildTransport)

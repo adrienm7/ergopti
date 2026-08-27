@@ -10,8 +10,8 @@
 ; main thread a synchronous WinHttp Send blocks until the network responds —
 ; on a slow or captive network this freezes keyboard remapping for seconds.
 ;
-; The fix opens the request asynchronously (Req.Open(..., true)) and harvests
-; the response via a non-blocking SetTimer poll calling WaitForResponse(0),
+; The fix launches CurlAsyncRequest and harvests the response via a non-blocking
+; SetTimer poll calling WaitForResponse(0),
 ; mirroring _Updater_FetchLatestJsonAsync / _Updater_PollAsync. This test asserts
 ; the synchronous open is gone and the async poll pattern is present, so a
 ; regression back to a blocking fetch fails CI.
@@ -55,13 +55,15 @@ _CLFA_FetchIsAsync() {
 	SyncOpen := "Req.Open(" . Q . "GET" . Q . ", Url, false)"
 	Assert(!InStr(Body, SyncOpen),
 		"_CLW_DoFetch must NOT open the request synchronously (Url, false) — it blocks the main thread (HIGH-05)")
+	Assert(InStr(Body, "CurlAsyncRequest()") > 0 and !InStr(Body, "ComObject("),
+		"_CLW_DoFetch must put DNS/connect/Send in the tree-owned curl child")
 	; The completion poll lives in the sibling _CLW_PollFetch in the same module;
 	; scan the whole source so the async harvesting machinery is detected wherever
 	; the refactor placed it.
 	Assert(InStr(Src, "WaitForResponse(0)") > 0,
 		"changelog_window must harvest the response via the non-blocking WaitForResponse(0) poll (HIGH-05)")
 }
-Test("meta changelog-fetch-async: _CLW_DoFetch uses async WinHttp poll, not sync open (HIGH-05)", _CLFA_FetchIsAsync)
+Test("meta changelog-fetch-async: _CLW_DoFetch uses child-process HTTP (HIGH-05)", _CLFA_FetchIsAsync)
 
 
 

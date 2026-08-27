@@ -225,9 +225,8 @@ LLM_PickBestInstalledDisplayName() {
 		if LLM_IsModelInstalled(name)
 			return name
 	}
-	; Non-blocking: read the background-refreshed cache, never the synchronous
-	; GET /api/tags (which froze the keyboard thread). The only caller
-	; (LLM_Menu_EnsureModelReady) warms it first via _LLM_WarmInstalledTagsSync.
+	; Non-blocking: read the background-refreshed cache. The bridge-start caller
+	; waits for LLM_InstalledTagsCacheReady() before reaching this fallback.
 	installed := _LLM_GetInstalledTagsCached()
 	return (installed.Length > 0) ? installed[1] : ""
 }
@@ -464,8 +463,7 @@ _LLM_IsNumber(v) {
 ; per model row at build time and froze the keyboard thread for up to ~20 s on a
 ; cold/slow daemon (AUDIT_AHK_2026-06-19 / TODO.md). The single writer is
 ; ``LLM_SetInstalledTagsCache``, fed by the async tray probe
-; (LLM_Menu_FireInstalledTagsProbe) and the deps-ready one-shot warm
-; (_LLM_WarmInstalledTagsSync). The TTL only throttles how often the async probe
+; (LLM_Menu_FireInstalledTagsProbe). The TTL only throttles how often the async probe
 ; re-queries the daemon; the read path never consults it.
 global LLM_INSTALLED_CACHE_TTL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] installed_cache_ttl_ms)
 global _LLM_InstalledTagsCache := unset
@@ -486,6 +484,11 @@ _LLM_GetInstalledTagsCached() {
 	return IsSet(_LLM_InstalledTagsCache) ? _LLM_InstalledTagsCache : []
 }
 
+LLM_InstalledTagsCacheReady() {
+	global _LLM_InstalledTagsCache
+	return IsSet(_LLM_InstalledTagsCache)
+}
+
 /**
  * Replaces the in-memory installed-tags snapshot and stamps the refresh time. The
  * SINGLE writer for the cache that _LLM_GetInstalledTagsCached reads — fed by the
@@ -498,28 +501,6 @@ LLM_SetInstalledTagsCache(tags) {
 	_LLM_InstalledTagsCache   := (tags is Array) ? tags : []
 	_LLM_InstalledTagsCacheAt := A_TickCount
 	try LoggerDebug("LLM.models", "Installed-tags cache updated ({1} tag(s)).", _LLM_InstalledTagsCache.Length)
-}
-
-/**
- * Blocking one-shot that refreshes the installed-tags cache via the synchronous
- * GET /api/tags. Used ONLY off the keyboard hot path — LLM_Menu_EnsureModelReady at
- * enable/bridge-start, already guarded by LLM_Deps_IsReady() — so the model
- * auto-correct reads a trustworthy snapshot before the engine fires. The tray build
- * NEVER calls this; it relies on the async LLM_Menu_FireInstalledTagsProbe.
- * @returns {Array} The freshly-fetched tag list (or [] on failure).
- */
-_LLM_WarmInstalledTagsSync() {
-	tags := []
-	try {
-		; LLM_OllamaListModels lives in api_ollama.ahk; treat it as optional so this
-		; module stays loadable in tests that stub the Ollama layer out.
-		if IsSet(LLM_OllamaListModels)
-			tags := LLM_OllamaListModels()
-	} catch {
-		tags := []
-	}
-	LLM_SetInstalledTagsCache(tags)
-	return tags
 }
 
 /**

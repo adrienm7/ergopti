@@ -273,22 +273,6 @@ LLM_OllamaAllowInference() {
 }
 
 /**
- * Checks whether the Ollama server is reachable (blocking, short timeout).
- * @returns {boolean} True if the server responds to GET /.
- */
-LLM_OllamaIsRunning() {
-	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("GET", LLM_OLLAMA_BASE_URL, false)
-		http.SetTimeouts(500, 500, 500, 500)
-		http.Send()
-		return (http.Status == 200)
-	} catch {
-		return false
-	}
-}
-
-/**
  * Async health probe — same intent as LLM_OllamaIsRunning but never blocks
  * the AHK message loop. Invokes ``on_result(bool)`` from a polling tick.
  * Used by the tray menu's rebuild path so the health dot reflects the
@@ -369,9 +353,8 @@ _LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 
 /**
  * Extracts the model tag names from an Ollama ``GET /api/tags`` JSON body. Shared
- * by the blocking ``LLM_OllamaListModels`` and the non-blocking
- * ``LLM_OllamaListModels_Async`` so the two cannot drift in how they read the
- * daemon's reply (single source of truth for the parse).
+ * by ``LLM_OllamaListModels_Async`` so parsing remains independent from the
+ * child-process transport.
  * @param {string} raw - Raw JSON response text from /api/tags.
  * @returns {Array} Array of tag-name strings (empty when none / on no match).
  */
@@ -391,31 +374,7 @@ _LLM_Ollama_ParseTagNames(raw) {
 }
 
 /**
- * Returns the list of locally available model tags from Ollama (blocking).
- * Kept ONLY for off-the-hot-path callers that can tolerate a synchronous round
- * trip (the model browser window, the deps-ready one-shot cache warm). The tray
- * menu build MUST NOT call this — use ``LLM_OllamaListModels_Async`` instead, or it
- * freezes the keyboard thread for up to ~20 s on a cold daemon.
- * @returns {Array} Array of model name strings, or empty array on error.
- */
-LLM_OllamaListModels() {
-	models := []
-	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("GET", LLM_OLLAMA_BASE_URL "/api/tags", false)
-		http.SetTimeouts(5000, 5000, 5000, 5000)
-		http.Send()
-		if (http.Status != 200)
-			return models
-
-		models := _LLM_Ollama_ParseTagNames(http.ResponseText)
-	} catch {
-	}
-	return models
-}
-
-/**
- * Non-blocking variant of ``LLM_OllamaListModels`` — fetches the locally-installed
+ * Fetches the locally-installed
  * model tags from ``GET /api/tags`` through a curl child + a polling tick
  * (mirrors ``LLM_OllamaIsRunning_Async``), so the keyboard/menu thread is NEVER
  * frozen on a cold or slow daemon. The blocking version, called per catalogue row
