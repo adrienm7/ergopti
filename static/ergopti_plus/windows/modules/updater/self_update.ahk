@@ -425,7 +425,8 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
-	if (Latest == "" or !_Updater_IsNewerVersion(Latest, Current)) {
+	if (Latest == "" or !_Updater_ShouldOfferCandidate(
+		Latest, Current, Request.Channel, _Updater_InstalledChannel())) {
 		try LoggerDebug("Updater", "Background check: up to date ({1}).", Current)
 		return
 	}
