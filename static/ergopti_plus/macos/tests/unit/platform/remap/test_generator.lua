@@ -129,6 +129,26 @@ end
 -- ============================================================
 
 helpers.describe("Generator.build_karabiner_json: structural skeleton", function()
+	helpers.it("rejects duplicate action ids before building any rules", function()
+		local result, detail = Generator.build_karabiner_json(
+			make_state(),
+			{
+				{id = "duplicate", label = "First", karabiner_to = {{key_code = "a"}}},
+				{id = "duplicate", label = "Second", karabiner_to = {{key_code = "b"}}},
+			},
+			{},
+			{},
+			{},
+			"/fake/data_dir/"
+		)
+		helpers.assert_nil(result,
+			"the primary generator path must fail closed on duplicate ids")
+		helpers.assert_type(detail, "string",
+			"duplicate rejection must expose an actionable diagnostic")
+		helpers.assert_true(detail:find("duplicate", 1, true) ~= nil,
+			"the diagnostic must identify the duplicate id")
+	end)
+
 	helpers.it("returns a table with a profiles array", function()
 		-- No capsword.json on disk — load_json_file returns nil, which is
 		-- gracefully skipped by the generator.
