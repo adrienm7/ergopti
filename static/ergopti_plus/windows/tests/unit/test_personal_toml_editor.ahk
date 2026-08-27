@@ -159,9 +159,10 @@ TestPE_NormLeft() {
 Test("NormaliseOutput: {left} alias is title-cased to {Left}", TestPE_NormLeft)
 
 TestPE_NormUnknownToken() {
-	AssertEqual("{Foobar}", NormaliseOutput("{foobar}"))
+	AssertEqual("voir {N.B.} et {fooBAR}; {Y}",
+		NormaliseOutput("voir {N.B.} et {fooBAR}; {Y}"))
 }
-Test("NormaliseOutput: unknown {token} keeps capitalised first letter",
+Test("NormaliseOutput: unknown brace groups remain byte-identical",
 	TestPE_NormUnknownToken)
 
 TestPE_NormUnmatchedBrace() {

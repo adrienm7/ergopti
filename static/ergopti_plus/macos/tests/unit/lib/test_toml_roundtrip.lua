@@ -108,6 +108,23 @@ helpers.describe("toml roundtrip: entries", function()
 		helpers.assert_eq(parsed.sections.s.entries[1].output, "Hello world")
 	end)
 
+	helpers.it("preserves unknown brace groups while canonicalizing known aliases", function()
+		local data = {
+			sections_order = { "s" },
+			sections = { s = { description = "S", entries = {
+				{ trigger = "code{JSON}", output = "voir {N.B.} et {fooBAR}; {ENTER}/{bs}",
+				  is_word = false, auto_expand = false,
+				  is_case_sensitive = false, final_result = false },
+			} } },
+		}
+		local parsed = roundtrip(data)
+		local entry = parsed.sections.s.entries[1]
+		helpers.assert_eq(entry.trigger, "code{JSON}",
+			"an unknown brace group in a trigger must remain byte-identical")
+		helpers.assert_eq(entry.output, "voir {N.B.} et {fooBAR}; {Enter}/{BackSpace}",
+			"only recognized key aliases may be canonicalized")
+	end)
+
 	helpers.it("preserves boolean flags", function()
 		local data = {
 			sections_order = { "s" },

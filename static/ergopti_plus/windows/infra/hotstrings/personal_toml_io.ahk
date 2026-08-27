@@ -105,8 +105,8 @@ NormaliseOutput(s) {
 				if Aliases.Has(Lower) {
 					Result .= "{" . Aliases[Lower] . "}"
 				} else {
-					; Capitalise first letter for unknown tokens
-					Result .= "{" . StrUpper(SubStr(Inner, 1, 1)) . SubStr(Inner, 2) . "}"
+					; Unknown brace groups can be prose or code, so preserve them exactly.
+					Result .= "{" . Inner . "}"
 				}
 				i := j + 1
 				continue

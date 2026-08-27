@@ -181,7 +181,7 @@ local function esc(s)
 	-- Normalize token aliases e.g. {Esc} → {Escape}, {return} → {Enter}
 	s = s:gsub("{([^}]+)}", function(name)
 		local canon = TOKEN_CANONICAL[name:lower()]
-		return "{" .. (canon or (name:sub(1,1):upper() .. name:sub(2):lower())) .. "}"
+		return "{" .. (canon or name) .. "}"
 	end)
 
 	return BasicString.escape_body(s)

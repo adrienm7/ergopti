@@ -207,7 +207,7 @@ local function normalise_output(s)
 	
 	s = s:gsub("{([^}]+)}", function(name)
 		local c = aliases[name:lower()]
-		return "{" .. (c or (name:sub(1,1):upper() .. name:sub(2))) .. "}"
+		return "{" .. (c or name) .. "}"
 	end)
 	return s
 end
