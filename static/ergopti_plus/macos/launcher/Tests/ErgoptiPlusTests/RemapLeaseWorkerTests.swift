@@ -2227,7 +2227,11 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		// publish parent EOF; otherwise it waits for STOP while the outer waits
 		// forever for an EOF that the inherited descriptor keeps suppressed.
 		for descriptor in parentPipe {
-			XCTAssertEqual(makeLeaseDescriptorCloseOnExec(descriptor), 0)
+			let flags = fcntl(descriptor, F_GETFD)
+			XCTAssertGreaterThanOrEqual(flags, 0)
+			if flags >= 0 {
+				XCTAssertEqual(fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC), 0)
+			}
 		}
 		defer {
 			for descriptor in parentPipe where descriptor >= 0 { Darwin.close(descriptor) }
