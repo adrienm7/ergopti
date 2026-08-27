@@ -2755,7 +2755,10 @@ enum KarabinerLeaseWorker {
 			_ = Darwin.signal(SIGHUP, SIG_IGN)
 			_ = Darwin.signal(SIGINT, SIG_DFL)
 			_ = Darwin.signal(SIGTERM, SIG_DFL)
-			return RemapLeaseGuardianRuntime(paths: paths).run()
+			return RemapLeaseGuardianRuntime(
+				paths: paths,
+				terminateProcess: terminateRemapLeaseGuardianProcess
+			).run()
 		}
 		#endif
 		if arguments[1] == kRemapGuardianStatusFlag {
@@ -2789,7 +2792,9 @@ enum KarabinerLeaseWorker {
 			_ = Darwin.signal(SIGHUP, SIG_IGN)
 			_ = Darwin.signal(SIGINT, SIG_DFL)
 			_ = Darwin.signal(SIGTERM, SIG_DFL)
-			return RemapLeaseGuardianRuntime().run()
+			return RemapLeaseGuardianRuntime(
+				terminateProcess: terminateRemapLeaseGuardianProcess
+			).run()
 		}
 
 		if arguments[1] == kKarabinerLeaseInnerFlag {

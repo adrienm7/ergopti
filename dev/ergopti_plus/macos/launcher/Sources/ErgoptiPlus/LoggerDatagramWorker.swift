@@ -456,9 +456,15 @@ final class LoggerRecordSink {
 	/// Purges dated archives by filename and undated topical views by mtime.
 	private func purgeOldLogs() {
 		guard directoryDescriptor >= 0 else { return }
-		let duplicate = Darwin.dup(directoryDescriptor)
-		guard duplicate >= 0, let directory = Darwin.fdopendir(duplicate) else {
-			if duplicate >= 0 { Darwin.close(duplicate) }
+		let scanDescriptor = ".".withCString { currentDirectory in
+			Darwin.openat(
+				directoryDescriptor,
+				currentDirectory,
+				O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
+			)
+		}
+		guard scanDescriptor >= 0, let directory = Darwin.fdopendir(scanDescriptor) else {
+			if scanDescriptor >= 0 { Darwin.close(scanDescriptor) }
 			return
 		}
 		defer { Darwin.closedir(directory) }
