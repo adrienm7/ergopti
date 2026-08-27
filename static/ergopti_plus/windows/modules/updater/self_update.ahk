@@ -506,6 +506,8 @@ _Updater_OnTrayMsg(wParam, lParam, msg, hwnd, ShowFn := 0) {
 global _Updater_PromptGui := unset
 global _UpdaterDownloadWorker := 0
 global _UpdaterDownloadRequest := 0
+global _UpdaterDownloadArtifacts := 0
+global _UpdaterDownloadStartedTick := 0
 global _UpdaterStagingTransportCounter := 0
 global UPDATER_STAGING_ENV_MAX_CHARS := 7000
 global _UpdaterSwapOwner := 0
@@ -1170,6 +1172,7 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
+	global _UpdaterDownloadStartedTick
 	global UPDATER_REQUEST_POLICY_ALLOW
 	Outcome := {
 		Reserved: false,
@@ -1191,6 +1194,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
 			_UpdaterDownloadInProgress := true
 			Outcome.Epoch := ++_UpdaterSelfUpdateEpoch
 			_UpdaterDownloadRequest := Request
+			_UpdaterDownloadStartedTick := A_TickCount
 			Outcome.Reserved := true
 		}
 	} finally {
@@ -1363,6 +1367,10 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	StagingEpoch := Reservation.Epoch
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
+	if !_Updater_RegisterDownloadArtifacts(StagingEpoch, NewExe, SwapScriptPath) {
+		_Updater_EndDownloadTransaction(StagingEpoch)
+		return false
+	}
 
 	_Updater_StartStagingWorker(AssetUrl, Asset.Digest, NewExe, SwapScriptPath,
 		CurrentExe, Release.Tag, StagingEpoch)
@@ -1572,7 +1580,7 @@ _Updater_MonitorStagingWorker(*) {
 		return
 	}
 	if !A_IsSuspended
-		return
+		return _Updater_EnforceDownloadDeadline()
 	_Updater_CancelSelfUpdateForSuspend()
 }
 
@@ -1582,6 +1590,24 @@ _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 	try return _UpdaterDownloadInProgress
 		and _UpdaterSelfUpdateEpoch == StagingEpoch
 	finally Critical(PreviousCritical)
+}
+
+_Updater_RegisterDownloadArtifacts(StagingEpoch, NewExe, SwapScriptPath) {
+	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadArtifacts
+	PreviousCritical := Critical("On")
+	try {
+		if (!_UpdaterDownloadInProgress
+			or _UpdaterSelfUpdateEpoch != StagingEpoch)
+			return false
+		_UpdaterDownloadArtifacts := {
+			NewExe: NewExe,
+			SwapScript: SwapScriptPath
+		}
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Suspend entry is an event, not a state that a 250 ms poll may sample later.
@@ -1596,11 +1622,13 @@ _Updater_CancelSelfUpdateForSuspend() {
 _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
+	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterSelfUpdateEpoch
 	Worker := 0
 	Owner := 0
 	Request := 0
+	Artifacts := 0
 	HadTransaction := false
 	PreviousCritical := Critical("On")
 	try {
@@ -1610,8 +1638,12 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		Worker := IsObject(_UpdaterDownloadWorker) ? _UpdaterDownloadWorker : 0
 		Owner := (_UpdaterSwapOwner is Map) ? _UpdaterSwapOwner : 0
 		Request := IsObject(_UpdaterDownloadRequest) ? _UpdaterDownloadRequest : 0
+		Artifacts := IsObject(_UpdaterDownloadArtifacts)
+			? _UpdaterDownloadArtifacts : 0
 		_UpdaterDownloadWorker := 0
 		_UpdaterDownloadRequest := 0
+		_UpdaterDownloadArtifacts := 0
+		_UpdaterDownloadStartedTick := 0
 		_UpdaterSwapOwner := 0
 		_UpdaterExitIntent := 0
 		_UpdaterExitInvocation := 0
@@ -1624,6 +1656,13 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		try Worker.terminate()
 	if (Owner is Map)
 		_Updater_CloseSwapOwner(Owner, true)
+	if IsObject(Artifacts) {
+		for Name in ["NewExe", "SwapScript"] {
+			Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
+			if (Path != "" and FSExists(Path) and !FSDelete(Path))
+				try LoggerError("Updater", "Could not delete cancelled staging artifact '{1}'.", Path)
+		}
+	}
 	SetTimer(_Updater_MonitorStagingWorker, 0)
 	; Process teardown wins before the visible terminal. RequestMayPublish queues
 	; exactly one manual notice for resume; a second cancellation has no Request.
@@ -1635,6 +1674,28 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 			try TimerArmOneShotMs((*) => _Updater_RebuildMenu(), 50)
 	}
 	return HadTransaction
+}
+
+; Enforces one monotonic wall-clock budget for the entire hidden download
+; process. This is independent from HttpWebRequest's per-operation timeouts.
+_Updater_EnforceDownloadDeadline(NowTick := unset, RebuildMenu := true,
+	NotifyFn := 0) {
+	global _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick
+	global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	if !_UpdaterDownloadInProgress or !_UpdaterDownloadStartedTick
+		return false
+	if !IsSet(NowTick)
+		NowTick := A_TickCount
+	if !TickExpired(_UpdaterDownloadStartedTick,
+		UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, NowTick)
+		return false
+	if !_Updater_CancelSelfUpdateTransaction(
+		"Update download exceeded its absolute wall-clock deadline.",
+		RebuildMenu, false)
+		return false
+	_Updater_SurfaceFailure("updater.install_error_download",
+		"Absolute download deadline exceeded.", NotifyFn)
+	return true
 }
 
 ; The only staging completion callback running in AHK. The worker's READY
@@ -2611,7 +2672,8 @@ _Updater_CancelExitIntentAfterLifecycleTeardown(Message) {
 ; it accidentally.
 _Updater_TransferExitIntentAfterShutdownGates() {
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
-	global _UpdaterDownloadInProgress
+	global _UpdaterDownloadInProgress, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadStartedTick
 	Owner := _Updater_ExitInvocationOwner()
 	if !(Owner is Map)
 		return true
@@ -2626,6 +2688,8 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 			_UpdaterExitIntent := 0
 			_UpdaterExitInvocation := 0
 			_UpdaterDownloadInProgress := false
+			_UpdaterDownloadArtifacts := 0
+			_UpdaterDownloadStartedTick := 0
 			Transferred := true
 		}
 	} finally {
@@ -2648,12 +2712,15 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 ; while both callbacks still target the same staging filenames.
 _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
 	PreviousCritical := Critical("On")
 	try {
 		if (StagingEpoch and _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
 		_UpdaterDownloadInProgress := false
 		_UpdaterDownloadRequest := 0
+		_UpdaterDownloadArtifacts := 0
+		_UpdaterDownloadStartedTick := 0
 	} finally {
 		Critical(PreviousCritical)
 	}
