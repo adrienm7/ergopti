@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Hammerspoon implementation of the HttpClient port contract defined in
 --- static/ergopti_plus/_shared/core/ports/HttpClient.spec.js. Wraps hs.http.asyncPost,
---- hs.http.asyncGet, and hs.http.encodeForQuery behind a stable adapter surface
+--- hs.http.asyncGet, and URL component encoding behind a stable adapter surface
 --- so domain modules can make HTTP requests without a direct dependency on hs.http.
 ---
 --- FACTORY PATTERN:
@@ -29,7 +29,9 @@
 --- 5. encodeForQuery: uses hs.http.encodeForQuery when available and a local
 ---    RFC 3986 component encoder after a reported native refusal, so callers
 ---    never receive raw query syntax disguised as an encoded value.
---- 6. Generation guard: cancel()'s doc claims it "synchronously and
+--- 6. encodePathSegment: always applies the deterministic RFC 3986 encoder;
+---    query-specific native substitutions can never leak into a URL path.
+--- 7. Generation guard: cancel()'s doc claims it "synchronously and
 ---    unconditionally" prevents a superseded callback from firing, but
 ---    hs.http.asyncPost/asyncGet may already have queued their OS-level
 ---    completion before cancel() runs (the task handle does not guarantee
@@ -532,7 +534,7 @@ end
 --- become an uppercase `%HH` triplet.
 --- @param value any Value to encode.
 --- @return string encoded Percent-encoded component.
-local function encode_query_component(value)
+local function encode_rfc3986_component(value)
 	local raw = tostring(value or "")
 	local encoded = {}
 	for index = 1, #raw do
@@ -563,7 +565,14 @@ local function encodeForQuery(str)
 		Logger.error(LOG, "encodeForQuery(): native query encoder is unavailable; "
 			.. "using the internal percent encoder.")
 	end
-	return encode_query_component(str)
+	return encode_rfc3986_component(str)
+end
+
+--- Percent-encodes a string as one RFC 3986 path segment.
+--- @param value any Value to encode.
+--- @return string encoded Percent-encoded path segment.
+local function encodePathSegment(value)
+	return encode_rfc3986_component(value)
 end
 
 -- The module table is itself the default singleton instance, extended with
@@ -571,5 +580,6 @@ end
 local M = new()
 M.new            = new
 M.encodeForQuery = encodeForQuery
+M.encodePathSegment = encodePathSegment
 
 return M
