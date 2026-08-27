@@ -27,7 +27,7 @@ local Bom = require("toml_codec.bom")
 ---
 --- FEATURES & RATIONALE:
 --- 1. Round-trip for the HS state shape: scalars (string, number,
----    boolean), homogeneous arrays of scalars, maps (rendered as
+---    boolean), arrays with independently typed values, maps (rendered as
 ---    ``[section]`` headers), and nested maps (rendered as
 ---    ``[parent.child]`` dotted-section headers). The state contains
 ---    section_states (depth 2), gesture_actions / shortcut_keys
@@ -552,13 +552,6 @@ local function coerce_value(raw)
 		-- Propagate any element-level parse errors
 		for _, v in ipairs(out) do
 			if v == PARSE_ERROR then return PARSE_ERROR end
-		end
-		-- TOML forbids mixed-type arrays
-		if #out > 1 then
-			local first_type = type(out[1])
-			for i = 2, #out do
-				if type(out[i]) ~= first_type then return PARSE_ERROR end
-			end
 		end
 		return out
 	end

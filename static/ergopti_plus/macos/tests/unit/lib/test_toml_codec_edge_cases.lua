@@ -19,6 +19,9 @@
 --- 4. HS-086 — A table header below a scalar either raised from navigation or
 ---    silently replaced the scalar for arrays of tables. Fix: reject both
 ---    collisions through the documented nil-return contract.
+---
+--- 5. HS-087 — Mixed-type arrays were rejected even though TOML 1.0 permits
+---    heterogeneous values. Fix: preserve each independently coerced value.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -91,6 +94,30 @@ helpers.describe("toml_codec: scalar-table collisions", function()
 			helpers.assert_eq(got, nil,
 				"scalar/AoT collision #" .. index .. " must preserve the invalid-state signal")
 		end
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0c/ Heterogeneous arrays ====================================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: heterogeneous arrays", function()
+
+	helpers.it("preserves each value with its TOML type", function()
+		local decoded = codec.decode('ids = ["a", 1, true]\n')
+
+		helpers.assert_true(type(decoded) == "table", "mixed arrays are valid TOML")
+		helpers.assert_eq(#decoded.ids, 3, "every mixed-array value must survive")
+		helpers.assert_eq(type(decoded.ids[1]), "string", "first value keeps its string type")
+		helpers.assert_eq(decoded.ids[1], "a", "first value keeps its exact content")
+		helpers.assert_eq(type(decoded.ids[2]), "number", "second value keeps its number type")
+		helpers.assert_eq(decoded.ids[2], 1, "second value keeps its exact content")
+		helpers.assert_eq(type(decoded.ids[3]), "boolean", "third value keeps its boolean type")
+		helpers.assert_eq(decoded.ids[3], true, "third value keeps its exact content")
 	end)
 
 end)

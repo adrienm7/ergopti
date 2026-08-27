@@ -71,6 +71,19 @@ describe("shared toml_codec.decode is live in the managers", function()
 		end
 	end)
 
+	it("preserves heterogeneous arrays with typed values", function()
+		local decoded = codec.decode('ids = ["a", 1, true]\n')
+
+		assert_true(type(decoded) == "table", "mixed arrays are valid TOML")
+		assert_eq(#decoded.ids, 3, "every mixed-array value must survive")
+		assert_eq(type(decoded.ids[1]), "string", "first value keeps its string type")
+		assert_eq(decoded.ids[1], "a", "first value keeps its exact content")
+		assert_eq(type(decoded.ids[2]), "number", "second value keeps its number type")
+		assert_eq(decoded.ids[2], 1, "second value keeps its exact content")
+		assert_eq(type(decoded.ids[3]), "boolean", "third value keeps its boolean type")
+		assert_eq(decoded.ids[3], true, "third value keeps its exact content")
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 
