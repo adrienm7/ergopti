@@ -104,7 +104,7 @@ _THSB_SuspendAndShutdownShareEarlySyntheticCleanup() {
 		Assert(Body != "", Fn . " must exist for synthetic-key lifecycle parity")
 		ReleasePos := Fn == "Ergopti_OnShutdown"
 			? InStr(Body, "try SyntheticReleased := TapHoldShutdownReleaseGate()")
-			: InStr(Body, "try TapHoldReleaseSyntheticKeys()")
+			: InStr(Body, "TapHoldReleaseSyntheticKeys()")
 		Assert(ReleasePos > 0,
 			Fn . " must call the bounded synthetic-key owner drain")
 		if (Fn == "Ergopti_OnShutdown") {

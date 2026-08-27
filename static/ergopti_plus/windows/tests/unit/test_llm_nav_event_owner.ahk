@@ -2571,12 +2571,14 @@ _LNEO_ExternalSuspendRefusalRestoresRunningState() {
 	HelperBody := _DriverFuncBodyOrEmpty(
 		"_LLM_NavEventOwnerApplyExternalSuspendTransition")
 	Barrier := InStr(EnterBody,
-		"if !_LifecycleSetNavEventOwnerSuspended(true)")
+		'if !_LifecycleRunRequiredStep(Transition, "navigation-event"')
+	NavCall := InStr(EnterBody,
+		"_LifecycleSetNavEventOwnerSuspended(true)", , Max(1, Barrier))
 	ReturnFalse := InStr(EnterBody, "return false", , Max(1, Barrier))
 	FirstTeardown := InStr(EnterBody, "LLM_AuxInvalidate")
-	Assert(Barrier > 0 and ReturnFalse > Barrier
+	Assert(Barrier > 0 and NavCall > Barrier and ReturnFalse > NavCall
 		and FirstTeardown > ReturnFalse,
-		"external suspend must prove the native owner boundary before any teardown")
+		"external suspend must record and reject a failed native owner boundary before any teardown")
 	Assert(HelperBody != ""
 		and InStr(WatchdogBody,
 			"_LLM_NavEventOwnerApplyExternalSuspendTransition(") > 0,
@@ -2614,6 +2616,40 @@ _LNEO_ExternalSuspendRefusalRestoresRunningState() {
 
 Test("LLM nav event owner: refused external suspend restores running state before teardown",
 	_LNEO_ExternalSuspendRefusalRestoresRunningState)
+
+_LNEO_ExternalSuspendNeedsCompensation(State) {
+	return true
+}
+
+_LNEO_ExternalSuspendPartialTeardownRunsResumeCompensation() {
+	global _LastSuspendState
+	SavedLast := IsSet(_LastSuspendState) ? _LastSuspendState : false
+	State := {
+		EnterCalls: 0, ResumeCalls: 0, SuspendCalls: [], IconCalls: 0
+	}
+	try {
+		_LastSuspendState := false
+		Result := _LLM_NavEventOwnerApplyExternalSuspendTransition(true,
+			_LNEO_ExternalSuspendEnter.Bind(State),
+			_LNEO_ExternalSuspendResume.Bind(State),
+			_LNEO_ExternalSuspendToggle.Bind(State),
+			_LNEO_ExternalSuspendIcon.Bind(State),
+			_LNEO_ExternalSuspendNeedsCompensation.Bind(State))
+		AssertFalse(Result,
+			"a partial teardown remains a failed suspend transition")
+		AssertEqual(1, State.SuspendCalls.Length,
+			"partial teardown failure must lift native Suspend once")
+		AssertEqual(0, State.SuspendCalls[1],
+			"partial teardown compensation must restore native running state")
+		AssertEqual(1, State.ResumeCalls,
+			"partial teardown failure must run the resume reactor once")
+		AssertFalse(_LastSuspendState,
+			"compensated transition must leave the watchdog mirror running")
+	} finally _LastSuspendState := SavedLast
+}
+
+Test("LLM nav event owner: partial external suspend teardown runs resume compensation",
+	_LNEO_ExternalSuspendPartialTeardownRunsResumeCompensation)
 
 _LNEO_CommitPlanAckCannotPublishAcrossRuntimeAba() {
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerCommittedPlan

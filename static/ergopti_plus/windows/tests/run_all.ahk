@@ -138,6 +138,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
 #Include ../infra/suppressive_inputhook_ownership.ahk
+#Include ../infra/lifecycle_transition.ahk
 #Include ../infra/config_transition.ahk
 #Include ../infra/config_transition_runtime.ahk
 ; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
@@ -1214,6 +1215,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_mutex_yield_is_recorded.ahk
 #Include meta/test_suspend_deferral_bounded.ahk
 #Include meta/test_suspend_lifecycle_logged.ahk
+#Include unit/test_lifecycle_transition.ahk
 #Include meta/test_dead_state_and_single_source.ahk
 #Include meta/test_discarded_config_is_reported.ahk
 #Include meta/test_sql_replay_is_idempotent.ahk

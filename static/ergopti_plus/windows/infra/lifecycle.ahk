@@ -13,6 +13,7 @@
 
 #Include suspend_handoff.ahk
 #Include reload_terminal_handoff.ahk
+#Include lifecycle_transition.ahk
 
 ActivateEdit(*) {
 		Edit()
@@ -311,18 +312,26 @@ _SuspendPendingPoll() {
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
-	if !_LifecycleSetNavEventOwnerSuspended(true)
+	Transition := LifecycleTransitionBegin("suspend")
+	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
+			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
+		LifecycleTransitionFinish(Transition)
+		_LifecycleLogTransitionDebt(Transition)
 		return false
+	}
 	if IsSet(LLM_AuxInvalidate)
-		try LLM_AuxInvalidate("suspend")
+		_LifecycleRunRequiredStep(Transition, "llm-aux-context",
+			LLM_AuxInvalidate.Bind("suspend"))
 	; Release OS-level modifiers before even the lifecycle START log: LoggerStart
 	; flushes synchronously to disk and a slow/locked config drive must not delay
 	; the balancing Up. The same bounded owner drain is the first shutdown step.
-	try TapHoldReleaseSyntheticKeys()
+	_LifecycleRunRequiredStep(Transition, "tap-hold-synthetic-keys",
+		() => TapHoldReleaseSyntheticKeys(), true)
 	; Invalidate every detached tray-root ticket before the first yielding log.
 	; The requested generation remains retained for a fresh resume owner.
 	if IsSet(_TrayRootOnSuspendEnter)
-		try _TrayRootOnSuspendEnter()
+		_LifecycleRunRequiredStep(Transition, "tray-root",
+			() => _TrayRootOnSuspendEnter())
 	; The suspend/resume machine tears down a dozen subsystems that native
 	; Suspend does not touch — InputHooks, timers and OnMessage handlers all
 	; bypass it — and it emitted NOTHING. So "pause = tout éteint", the invariant
@@ -331,87 +340,105 @@ Ergopti_OnSuspendEnter() {
 	; identical output. This pair makes the bracket searchable, and an ENTER with
 	; no matching entered line now marks a teardown that died halfway.
 	LoggerStart("Lifecycle", "Entering suspend…")
+	LifecycleTransitionMarkStarted(Transition)
 	; Screenshot children are external processes: stopping their AHK polls does
 	; not stop their disk or clipboard work. Retire every owner first, then ask
 	; the shared process lifecycle to terminate each tree exactly once.
 	if IsSet(GestureScreenshotCancelAll)
-		try GestureScreenshotCancelAll("suspended")
+		_LifecycleRunRequiredStep(Transition, "gesture-screenshot",
+			() => GestureScreenshotCancelAll("suspended"))
 	; Retire every deferred hotstring callback before any subsystem state is
 	; cleared. Fired records remain queued and receive one fresh owner on resume;
 	; derived render/near-miss callbacks from this generation become inert.
 	if IsSet(HotstringPrefixWatcherOnSuspend) {
-		try HotstringPrefixWatcherOnSuspend()
-		catch as Err
-			try LoggerError("Lifecycle", "Deferred hotstring suspend invalidation failed: {1}.", Err.Message)
+		_LifecycleRunRequiredStep(Transition, "hotstring-prefix-watcher",
+			HotstringPrefixWatcherOnSuspend)
 	}
 	; A clipboard-selection poll is timer-driven, so native Suspend does not
 	; stop it. Cancel before any other teardown to restore the clipboard and
 	; prevent its callback from injecting after pause.
 	if IsSet(GetSelectionCancel)
-		try GetSelectionCancel()
+		_LifecycleRunRequiredStep(Transition, "selection-capture",
+			() => GetSelectionCancel())
 	if IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook)
-		try _SpaceHoldInputHook.Stop()
-	try SIHO_StopAll()
+		_LifecycleRunRequiredStep(Transition, "space-hold-input-hook",
+			() => _SpaceHoldInputHook.Stop())
+	_LifecycleRunRequiredStep(Transition, "suppressive-input-hooks",
+		() => SIHO_StopAll())
 	if IsSet(_MagicKeyEditorInputHook) and IsObject(_MagicKeyEditorInputHook)
-		try _MagicKeyEditorInputHook.Stop()
-		try TooltipHide("Suspend", true)
-		try LLM_Tooltip_Hide(true)
-		try LLM_Engine_CancelTimer()
+		_LifecycleRunRequiredStep(Transition, "magic-key-editor-input-hook",
+			() => _MagicKeyEditorInputHook.Stop())
+	_LifecycleRunRequiredStep(Transition, "suspend-tooltip",
+		TooltipHide.Bind("Suspend", true))
+	_LifecycleRunRequiredStep(Transition, "llm-tooltip", LLM_Tooltip_Hide.Bind(true))
+	_LifecycleRunRequiredStep(Transition, "llm-generation-timer", LLM_Engine_CancelTimer)
 		; Stop in-flight generation AND clear the prediction cache so a suggestion
 		; produced before the pause cannot re-render after resume on a rebuilt
 		; context ("pause = tout eteint" invariant). StopGeneration drops last_ctx /
 		; last_results, bumps request_id, and cancels async streams.
-		try LLM_Engine_StopGeneration()
+	_LifecycleRunRequiredStep(Transition, "llm-generation", LLM_Engine_StopGeneration)
 		; Cancel the Ollama warm-up retry timer so it does not make background HTTP
 		; calls while the driver is paused ("pause = tout éteint" invariant).
-		try LLM_OllamaCancelWarmupRetry()
+	_LifecycleRunRequiredStep(Transition, "ollama-warmup", LLM_OllamaCancelWarmupRetry)
 		; Stop the LLM pointer-dismiss poll timer + its pass-through mouse hotkeys.
 		; SetTimer/Hotkey callbacks bypass native Suspend, so without this the
 		; 50 ms MouseGetPos poll keeps firing for the whole pause ("pause = tout
 		; éteint" invariant). Re-armed from Ergopti_OnSuspendResume when the bridge
 		; is active.
-		try _LLM_PointerWatch_Stop()
+	_LifecycleRunRequiredStep(Transition, "llm-pointer-watch",
+		() => _LLM_PointerWatch_Stop())
 		; Disarm the 20 Hz canonical focus-snapshot poll. Its WM_GETTEXT transaction is
 		; bounded, but every repeating SetTimer still bypasses native Suspend. Re-arm
 		; from Ergopti_OnSuspendResume only when metrics are enabled.
-		try MF_StopFocusRefresh()
+	_LifecycleRunRequiredStep(Transition, "metrics-focus-refresh",
+		MF_StopFocusRefresh, true)
 		; Cancel in-flight background update checks so a stale async callback cannot
 		; surface a TrayTip or rebuild the menu while paused ("pause = tout éteint").
-		try _Updater_CancelAsyncChecks(UPDATER_CANCEL_REASON_SUSPEND)
+	_LifecycleRunRequiredStep(Transition, "updater-checks",
+		_Updater_CancelAsyncChecks.Bind(UPDATER_CANCEL_REASON_SUSPEND), true)
 		; A self-update owns a separate tree-owned staging process or an exact
 		; suspended swap child. Cancel it on the suspend EVENT itself: sampling
 		; A_IsSuspended from a later poll loses a rapid Pause→Resume pulse.
-		try _Updater_CancelSelfUpdateForSuspend()
+	_LifecycleRunRequiredStep(Transition, "updater-self-update",
+		_Updater_CancelSelfUpdateForSuspend)
 		; A metrics projection can be a multi-second detached AHK process.  Native
 		; Suspend only disarms hotkeys, so explicitly kill its process tree rather
 		; than letting SQLite/JSON work continue throughout a paused driver.
-		try KLPF_CancelBuild("typing")
-		try KLPF_CancelBuild("apps")
-		try KLPF_CancelBuild("range:typing")
+	_LifecycleRunRequiredStep(Transition, "keylogger-prefetch-typing",
+		() => KLPF_CancelBuild("typing"))
+	_LifecycleRunRequiredStep(Transition, "keylogger-prefetch-apps",
+		() => KLPF_CancelBuild("apps"))
+	_LifecycleRunRequiredStep(Transition, "keylogger-prefetch-range",
+		() => KLPF_CancelBuild("range:typing"))
 		; The selection probe is a persistent detached AHK process. Native Suspend
 		; cannot stop it, so retire request ownership and its process tree before
 		; entering the paused state.
-		try UIASW_Stop("canceled")
+	_LifecycleRunRequiredStep(Transition, "uia-selection-worker",
+		UIASW_Stop.Bind("canceled"))
 		; Preserve an hours-long at-rest proof scan at its exact stream cursor while
 		; disarming its one-shot slice/marker timers. Native Suspend does not stop
 		; timers, so the migration must be lifecycle-owned explicitly.
-		if IsSet(KL_Mig_OnSuspend)
-				try KL_Mig_OnSuspend()
-		try StopActivitySimulation()
+	if IsSet(KL_Mig_OnSuspend)
+		_LifecycleRunRequiredStep(Transition, "keylogger-text-migration",
+			KL_Mig_OnSuspend)
+	_LifecycleRunRequiredStep(Transition, "keep-awake",
+		() => StopActivitySimulation())
 		; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
 		; was in progress when the user pauses the driver outlives the suspend because
 		; SetTimer callbacks bypass native Suspend — the button stays logically held
 		; until the next mouse event. Release both hold states unconditionally here so
 		; no synthetic button-down leaks into the suspended window ("pause = tout éteint").
-	try GestureReleaseLeftClick()
-	try GestureReleaseRightClick()
+	_LifecycleRunRequiredStep(Transition, "gesture-left-hold",
+		() => GestureReleaseLeftClick())
+	_LifecycleRunRequiredStep(Transition, "gesture-right-hold",
+		() => GestureReleaseRightClick())
 	; AHK-16: CapsWord keeps the hardware CapsLock LED lit (via UpdateCapsLockLED)
 		; and continues arming its mouse-cancel HookDispatcher listeners even when the
 		; driver is suspended — the LED misleads the user and the listeners fire through
 		; native Suspend. DisableCapsWord resets CapsWordEnabled, unregisters mouse
 		; listeners, and corrects the LED ("pause = tout éteint" invariant).
-		if IsSet(DisableCapsWord)
-				try DisableCapsWord()
+	if IsSet(DisableCapsWord)
+		_LifecycleRunRequiredStep(Transition, "caps-word", () => DisableCapsWord())
 		; Reset OneShotShift so a shift armed just before suspension is not applied
 		; to the first keystroke after resume ("pause = tout éteint" invariant)
 		global OneShotShiftEnabled := False
@@ -421,27 +448,34 @@ Ergopti_OnSuspendEnter() {
 		; surviving buffer would fire a stale trigger on the first post-resume terminator
 		; and BackSpace into unrelated text. Mirrors RebuildHotstringsLive/_LockWorkstationEmit;
 		; _ResetPrefixBuffer() on resume keeps the preview buffer paired with the engine.
-		if IsSet(HSE_HardReset)
-				try HSE_HardReset()
-		global _LLM_Deps_PollTimer
-		if IsSet(_LLM_Deps_PollTimer)
-				try SetTimer(_LLM_Deps_PollTimer, 0)
-		LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
-		return true
+	if IsSet(HSE_HardReset)
+		_LifecycleRunRequiredStep(Transition, "hotstring-engine", HSE_HardReset)
+	global _LLM_Deps_PollTimer
+	if IsSet(_LLM_Deps_PollTimer)
+		_LifecycleRunRequiredStep(Transition, "llm-dependency-poll",
+			() => SetTimer(_LLM_Deps_PollTimer, 0))
+	if !LifecycleTransitionFinish(Transition) {
+		_LifecycleLogTransitionDebt(Transition)
+		return false
+	}
+	LoggerSuccess("Lifecycle", "Suspend entered — all suspend-bypassing subsystems torn down.")
+	return true
 }
 Ergopti_OnSuspendResume() {
+		Transition := LifecycleTransitionBegin("resume")
 		LoggerStart("Lifecycle", "Resuming from suspend…")
-		NavEventOwnerReady := _LifecycleSetNavEventOwnerSuspended(false)
+		LifecycleTransitionMarkStarted(Transition)
+		_LifecycleRunRequiredStep(Transition, "navigation-event",
+			() => _LifecycleSetNavEventOwnerSuspended(false), true)
 		; Transfer any pre-pause fire batch to one new timer owner only after native
 		; Suspend has been lifted. A stale pre-pause callback cannot pass the new
 		; generation even if it was already queued in the message pump.
 		if IsSet(HotstringPrefixWatcherOnResume) {
-				try HotstringPrefixWatcherOnResume()
-				catch as Err
-						try LoggerError("Lifecycle", "Deferred hotstring resume transfer failed: {1}.", Err.Message)
+				_LifecycleRunRequiredStep(Transition, "hotstring-prefix-watcher",
+					HotstringPrefixWatcherOnResume)
 		}
 		if IsSet(_ResetPrefixBuffer)
-				try _ResetPrefixBuffer()
+				_LifecycleRunRequiredStep(Transition, "prefix-buffer", _ResetPrefixBuffer)
 		; Replay a prefix-index rebuild deferred because it was requested while
 		; suspended (a live hotstring section toggle during pause), so the preview
 		; index re-syncs with the engine registry instead of staying diverged.
@@ -449,54 +483,71 @@ Ergopti_OnSuspendResume() {
 		if IsSet(_PrefixIndexRebuildPending) and _PrefixIndexRebuildPending {
 				_PrefixIndexRebuildPending := false
 				if IsSet(HotstringPrefixWatcherRebuildIndex)
-						try HotstringPrefixWatcherRebuildIndex()
+						_LifecycleRunRequiredStep(Transition, "prefix-index",
+							HotstringPrefixWatcherRebuildIndex)
 		}
 		global _LLM_Deps_PollTimer, _LLM_Deps_Checking
 		if IsSet(_LLM_Deps_PollTimer) and IsSet(_LLM_Deps_Checking) and _LLM_Deps_Checking
-				try SetTimer(_LLM_Deps_PollTimer, 3000)
+				_LifecycleRunRequiredStep(Transition, "llm-dependency-poll",
+					() => SetTimer(_LLM_Deps_PollTimer, 3000))
 		; Re-arm the LLM pointer-dismiss watcher stopped in Ergopti_OnSuspendEnter,
 		; but only when the bridge is still active — _LLM_PointerWatch_Start is a
 		; no-op when already armed, so this is safe to call unconditionally on the
 		; active path.
 		global _LLM_Bridge_Active
 		if IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
-				try _LLM_PointerWatch_Start()
+				_LifecycleRunRequiredStep(Transition, "llm-pointer-watch",
+					() => _LLM_PointerWatch_Start())
 		; Re-arm the metrics focus poll disarmed in Ergopti_OnSuspendEnter, gated on
 		; the same feature flag that armed it at boot. Without this the cache would
 		; stay frozen after the first pause and every metrics privacy filter would
 		; read a stale foreground window for the rest of the session.
 		if IsSet(MetricsShortcuts) and MetricsShortcuts.enabled
-				try MF_StartFocusRefresh()
+				_LifecycleRunRequiredStep(Transition, "metrics-focus-refresh",
+					MF_StartFocusRefresh, true)
 		; Range-worker cancellation is delivered while native Suspend is active,
 		; when WebView mutation is forbidden. Release the page-side request latch
 		; now, on the first resumed stack, instead of leaving every later filter
 		; click blocked behind loading_data until the watchdog expires.
 		if IsSet(KLWV_OnSuspendResume)
-				try KLWV_OnSuspendResume()
+				_LifecycleRunRequiredStep(Transition, "keylogger-webview",
+					KLWV_OnSuspendResume)
 		; Re-arm exactly one migration continuation (active slice, durable marker,
 		; or deferred posture sync) after all pause guards have been lifted.
 		if IsSet(KL_Mig_OnResume)
-				try KL_Mig_OnResume()
+				_LifecycleRunRequiredStep(Transition, "keylogger-text-migration",
+					KL_Mig_OnResume)
 		; Deferred dependency callbacks are not allowed to rebuild the tray or
 		; start the bridge while native Suspend is active. Replay the pending work
 		; only after the resume transition has completed.
 		if IsSet(LLM_Menu_OnResume)
-				try LLM_Menu_OnResume()
+				_LifecycleRunRequiredStep(Transition, "llm-menu",
+					() => LLM_Menu_OnResume())
 		; Drain the exact manual updater terminals retained across pause only after
 		; native Suspend has lifted. Background work remains intentionally silent.
 		if IsSet(Updater_OnSuspendResume)
-				try Updater_OnSuspendResume()
+				_LifecycleRunRequiredStep(Transition, "updater",
+					Updater_OnSuspendResume, true)
 		; Suspend terminates the persistent UIA process. Warm its lightweight
 		; source entry again after the transition so the first selection-wrap after
 		; resume cannot race a cold worker; UIASW_Start remains feature/suspend safe.
 		if IsSet(Features) and Features.Has("shortcuts")
 			and Features["shortcuts"].Has("wrap_text_if_selected")
 			and Features["shortcuts"]["wrap_text_if_selected"]
-			try SetTimer(UIASW_Start, -1)
-		if NavEventOwnerReady
-				LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
-		else
-				LoggerError("Lifecycle", "Resume completed with the navigation event owner unavailable; its retained plan will retry on the next lifecycle transition.")
+			_LifecycleRunRequiredStep(Transition, "uia-selection-worker",
+				() => SetTimer(UIASW_Start, -1))
+		if !LifecycleTransitionFinish(Transition) {
+				_LifecycleLogTransitionDebt(Transition)
+				return false
+		}
+		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
+		return true
+}
+
+_LifecycleLogTransitionDebt(Transaction) {
+	for Debt in Transaction.debt
+		try LoggerError("Lifecycle", "{1} transition owner '{2}' failed: {3}.",
+			Transaction.phase, Debt.owner, Debt.message)
 }
 
 SuspendWatchdogStart() {
@@ -548,7 +599,8 @@ _SuspendStateWatchdog() {
 		try {
 				_LLM_NavEventOwnerApplyExternalSuspendTransition(
 					A_IsSuspended, Ergopti_OnSuspendEnter,
-					Ergopti_OnSuspendResume, Suspend, UpdateTrayIcon)
+					Ergopti_OnSuspendResume, Suspend, UpdateTrayIcon,
+					LifecycleTransitionNeedsCompensation.Bind("suspend"))
 		} finally {
 				_TransitionBusy := false
 		}
