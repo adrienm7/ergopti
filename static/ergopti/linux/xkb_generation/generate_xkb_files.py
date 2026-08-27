@@ -133,9 +133,7 @@ def main(
             dest_types = out_dir / src_types.name
 
             # read/write preserves UTF-8 encoding
-            dest_types.write_text(
-                src_types.read_text(encoding="utf-8"), encoding="utf-8"
-            )
+            dest_types.write_bytes(src_types.read_bytes())
         except OSError:
             logger.error("Failed to copy xkb types files into %s", out_dir)
 
@@ -222,7 +220,9 @@ def save_file(file_path: Union[str, Path], content: str) -> None:
     """
     logger.info("Writing output to %s", file_path)
     file_path = Path(file_path)
-    with open(file_path, "w", encoding="utf-8") as file:
+    # LF on every OS: the shipped layouts are compared byte-for-byte by tests
+    # and the repository stores text as LF.
+    with open(file_path, "w", encoding="utf-8", newline="\n") as file:
         file.write(content)
 
 

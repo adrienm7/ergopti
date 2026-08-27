@@ -15,7 +15,7 @@ include "%L"
 <dollar>	: "$"
 <dollar> <equal>	: " => "
 
-<quotedbl>	: '"'
+<quotedbl>	: "\""
 <quotedbl> <backslash>	: "*/"
 
 <apostrophe>	: "'"
@@ -51,7 +51,7 @@ include "%L"
 <greater> <percent>	: ">="
 
 <parenleft>	: "("
-<parenleft> <numbersign>	: '("'
+<parenleft> <numbersign>	: "(\""
 
 <plus>	: "+"
 <plus> <question>	: " -> "
@@ -213,7 +213,7 @@ include "%L"
 <dead_circumflex> <Y>	: "Ŷ"
 <dead_circumflex> <Z>	: "Ẑ"
 <dead_circumflex> <asciicircum>	: "^"
-<dead_circumflex> <underscore>	: "\"
+<dead_circumflex> <underscore>	: "\\"
 <dead_circumflex> <a>	: "â"
 <dead_circumflex> <b>	: "ó"
 <dead_circumflex> <c>	: "ç"
@@ -260,10 +260,10 @@ include "%L"
 <question> <plus>	: " <- "
 
 <bracketleft>	: "["
-<bracketleft> <numbersign>	: '["'
-<bracketleft> <parenright>	: ' = "'
+<bracketleft> <numbersign>	: "[\""
+<bracketleft> <parenright>	: " = \""
 
-<backslash>	: "\"
+<backslash>	: "\\"
 <backslash> <quotedbl>	: "/*"
 
 <c>	: "c"
@@ -854,8 +854,8 @@ include "%L"
 
 <numbersign>	: "#"
 <numbersign> <exclam>	: " := "
-<numbersign> <parenleft>	: '")'
-<numbersign> <bracketleft>	: '"]'
-<numbersign> <bracketright>	: '"]'
+<numbersign> <parenleft>	: "\")"
+<numbersign> <bracketleft>	: "\"]"
+<numbersign> <bracketright>	: "\"]"
 <numbersign> <Ccedilla>	: " := "
 <numbersign> <ccedilla>	: " := "
