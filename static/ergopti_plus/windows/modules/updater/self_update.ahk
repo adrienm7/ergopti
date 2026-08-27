@@ -26,12 +26,15 @@
 ; ===== 2.1) Authenticated asset parser ========
 ; ====================================
 
-; Parses the release object and returns the exact asset URL plus the SHA-256
-; digest authenticated by GitHub's release API. Asset objects contain nested
-; metadata, so a flat-object regex cannot identify their field boundary safely.
-; Returns 0 on malformed, unauthenticated or unusable input.
-_Updater_FindAsset(Json, AssetName) {
-	if !(Json is String) || !(AssetName is String) || (AssetName == "")
+; Parses the release object and returns the exact repository asset URL plus the
+; SHA-256 digest authenticated by GitHub's release API. Asset objects contain
+; nested metadata, so a flat-object regex cannot identify their field boundary
+; safely. Returns 0 on malformed, unauthenticated, foreign or unusable input.
+_Updater_FindAsset(Json, AssetName, Tag) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(Json is String) || !(AssetName is String) || !(Tag is String)
+		return 0
+	if (AssetName == "" || Tag == "")
 		return 0
 	try Release := JsonParse(Json)
 	catch {
@@ -42,6 +45,8 @@ _Updater_FindAsset(Json, AssetName) {
 	Assets := Release["assets"]
 	if !(Assets is Array)
 		return 0
+	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
+		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
 	for _, Asset in Assets {
 		if !(Asset is Map)
 			continue
@@ -51,7 +56,7 @@ _Updater_FindAsset(Json, AssetName) {
 		Url := Asset["browser_download_url"]
 		if !(Name is String) || (Name !== AssetName)
 			continue
-		if !(Url is String) || (Url == "") || !Asset.Has("digest")
+		if !(Url is String) || (Url !== ExpectedUrl) || !Asset.Has("digest")
 			return 0
 		DigestField := Asset["digest"]
 		if !(DigestField is String)
@@ -1291,7 +1296,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
 		? BUNDLE_RELEASE_ASSET : "ErgoptiPlus.exe"
-	Asset := _Updater_FindAsset(Release.RawJson, AssetName)
+	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
