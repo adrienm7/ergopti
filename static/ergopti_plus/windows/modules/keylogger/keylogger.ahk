@@ -526,9 +526,9 @@ KL_SaveState() {
 ; already exist, and the schema's `INSERT OR IGNORE INTO events_* (device_id,
 ; id, ...)` SILENTLY DROPS the colliding rows — permanent, invisible data
 ; loss. The defence does not trust state.json alone: at startup it scans the
-; existing data.sql for the highest id already persisted for THIS device and
-; starts after it. Pure helpers (no OS calls beyond the one FileRead in
-; KL_ScanMaxEventId) so the resolve arithmetic stays unit-testable.
+; existing data.sql and the uncommitted today.log tail for the highest id
+; already published for THIS device, then starts after it. Parsing and resolve
+; helpers remain pure so the recovery arithmetic stays unit-testable.
 
 #Include keylogger_event_id.ahk
 
@@ -650,6 +650,7 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 		; mutation; the optional commit is memory-only and shares that transaction.
 		if IsSet(PublishGuard) && !PublishGuard.Call()
 			return false
+		KL_AssignStableEventId(entry)
 		Keylogger._pending_entries.Push(entry)
 		if IsSet(PublishCommit)
 			PublishCommit.Call()
@@ -1483,7 +1484,25 @@ KL_Init(metrics_dir) {
             }
         }
     }
-    max_id := KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit)
+    ; Entries receive their id before JSONL publication. If the process died
+    ; before advancing the journal offset, reserve past those durable ids too;
+    ; otherwise a producer firing early in the next boot could collide with an
+    ; uncommitted line before the ingest timer replays it.
+    journal_text := ""
+    try {
+        if FileExist(Keylogger.today_log_path) {
+            journal_fh := FileOpen(Keylogger.today_log_path, "r", "UTF-8")
+            if IsObject(journal_fh) {
+                journal_fh.Seek(Min(Max(0, Keylogger.today_log_offset),
+                    journal_fh.Length), 0)
+                journal_text := journal_fh.Read()
+                journal_fh.Close()
+            }
+        }
+    }
+    max_id := Max(
+        KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit),
+        KL_ScanMaxJournalEventId(journal_text))
     Keylogger.next_event_id := KL_ResolveStartId(Keylogger.next_event_id, max_id)
 
     if (Keylogger.today_log_date = "")

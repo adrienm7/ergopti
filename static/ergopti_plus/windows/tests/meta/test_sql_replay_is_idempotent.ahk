@@ -75,8 +75,18 @@ _SRII_ReplayContractIsDocumented() {
 		"the (device_id, id) primary key must remain documented in the keylogger module — INSERT OR IGNORE deduplicates a replayed batch only because that key makes the repeat a conflict")
 }
 
+_SRII_AppendAssignsIdentityBeforeQueuePublication() {
+	Body := _DriverFuncBody("KL_AppendLog")
+	AssignAt := InStr(Body, "KL_AssignStableEventId(entry)")
+	PublishAt := InStr(Body, "Keylogger._pending_entries.Push(entry)")
+	Assert(AssignAt > 0 and PublishAt > AssignAt,
+		"KL_AppendLog must serialize one stable event id before the entry can reach today.log")
+}
+
 
 Test("meta keylogger: every INSERT tolerates a replayed batch",
 	_SRII_EveryInsertIsIgnoreOnConflict)
 Test("meta keylogger: the replay contract's primary key is documented",
 	_SRII_ReplayContractIsDocumented)
+Test("meta keylogger: journal identity precedes queue publication (journal-stable-event-id)",
+	_SRII_AppendAssignsIdentityBeforeQueuePublication)
