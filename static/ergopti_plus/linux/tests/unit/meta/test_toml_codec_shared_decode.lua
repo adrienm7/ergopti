@@ -49,6 +49,14 @@ end
 
 describe("shared toml_codec.decode is live in the managers", function()
 
+	it("recognizes the first section after a UTF-8 BOM", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local got = codec.decode(bom .. '[info]\nfirst_name = "Ada"\n')
+		assert_true(type(got) == "table" and type(got.info) == "table",
+			"the shared Linux codec must recognize a BOM-prefixed first section")
+		assert_eq(got.info.first_name, "Ada")
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 

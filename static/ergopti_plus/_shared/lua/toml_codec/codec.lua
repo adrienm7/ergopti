@@ -17,6 +17,7 @@ local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 o
 -- table-first so a 5.4 interpreter keeps using the modern spelling.
 local table_unpack = table.unpack or unpack
 local RecordScanner = require("toml_codec.record_scanner")
+local Bom = require("toml_codec.bom")
 --- MODULE: TOML Codec (shared)
 --- DESCRIPTION:
 --- Generic TOML encoder + decoder for arbitrarily nested Lua tables.
@@ -632,6 +633,7 @@ function M.decode(content)
 	-- until the brackets balance, then coerces the joined text as one array.
 	local pending = nil
 	if type(content) ~= "string" or content == "" then return root end
+	content = Bom.strip_prefix(content)
 	for line in (content .. "\n"):gmatch("([^\r\n]*)\r?\n") do
 		local trimmed = trim(strip_comments(line))
 

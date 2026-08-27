@@ -160,6 +160,21 @@ end
 
 describe("Linux loader: every schema flag survives TOML → mapping", function()
 
+	it("loads the first hotstring section after a UTF-8 BOM", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local path = write_temp_toml(bom .. '[[probe]]\n"zqx" = { output = "expanded" }\n')
+		assert_true(path ~= nil, "could not write the BOM fixture.")
+
+		local loader = require("modules.hotstrings.loader")
+		local mappings = loader.load({ path })
+		os.remove(path)
+
+		assert_true(#mappings == 1,
+			"the BOM-prefixed first section must survive the shared reader and Linux loader.")
+		assert_true(mappings[1].trigger == "zqx" and mappings[1].replacement == "expanded",
+			"the BOM-prefixed mapping changed while crossing the Linux loader.")
+	end)
+
 	for _, flag_value in ipairs({ true, false }) do
 		it(string.format("carries every schema flag through when all are %s", tostring(flag_value)), function()
 			local path = write_temp_toml(toml_with_all_flags(flag_value))

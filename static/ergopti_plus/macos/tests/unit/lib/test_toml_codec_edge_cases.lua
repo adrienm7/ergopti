@@ -23,6 +23,34 @@ local codec   = helpers.load_with_stubs("infra.toml.codec")
 
 -- =====================================================================
 -- =====================================================================
+-- ======= 0/ UTF-8 BOM at the stream boundary =========================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: UTF-8 BOM", function()
+
+	helpers.it("decodes the first section instead of leaking its values to root", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local got = codec.decode(bom .. '[info]\nname = "Ada"\n')
+		helpers.assert_true(type(got) == "table", "a BOM-prefixed document must decode")
+		helpers.assert_true(type(got.info) == "table",
+			"the first BOM-prefixed section header must be recognized")
+		helpers.assert_eq(got.info.name, "Ada")
+		helpers.assert_eq(got.name, nil, "section values must not leak into the root table")
+	end)
+
+	helpers.it("preserves BOM bytes that are data rather than the stream prefix", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local got = codec.decode('[info]\nname = "A' .. bom .. 'B"\n')
+		helpers.assert_eq(got.info.name, "A" .. bom .. "B",
+			"only the exact stream-prefix BOM may be removed")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
 -- ======= 1/ Single-quoted strings with '#' inside ====================
 -- =====================================================================
 -- =====================================================================

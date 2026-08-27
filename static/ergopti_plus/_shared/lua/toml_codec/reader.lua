@@ -32,6 +32,7 @@ if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
 local LOG    = "toml_reader"
+local Bom    = require("toml_codec.bom")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
@@ -448,9 +449,14 @@ function M.parse(path)
 	local mode             = "top"   -- "top" | "meta" | "meta_sections" | "meta_section" | "section"
 	local current_sec      = nil
 	local current_meta_sec = nil
+	local first_line       = true
 
 	local read_ok, read_err = pcall(function()
 		for raw_line in f:lines() do
+			if first_line then
+				raw_line = Bom.strip_prefix(raw_line)
+				first_line = false
+			end
 			local line = raw_line:match("^%s*(.-)%s*$")
 
 			-- Skip blank lines and TOML comments
