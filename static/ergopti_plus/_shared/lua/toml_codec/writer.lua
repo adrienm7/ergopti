@@ -415,14 +415,33 @@ function M.batch_write(path, updates, file_adapter)
 		return false, "updates must be a table."
 	end
 
-	-- Build a lookup: section_lower → key_lower → update entry
+	-- Validate the complete batch before acquiring the source snapshot. A bad
+	-- row must be a typed refusal with zero filesystem side effects, and two
+	-- rows must never compete for the same logical TOML key.
 	local lookup = {}
-	for _, u in ipairs(updates) do
-		if type(u.section) == "string" and type(u.key) == "string" then
-			local sl = u.section:lower()
-			if not lookup[sl] then lookup[sl] = {} end
-			lookup[sl][u.key:lower()] = u
+	local function reject_row(index, reason)
+		local detail = "Invalid update row at index " .. tostring(index) .. ": " .. reason
+		Logger.error(LOG, "batch_write: %s.", detail)
+		return false, detail
+	end
+	for index, u in ipairs(updates) do
+		if type(u) ~= "table" then return reject_row(index, "row must be a table") end
+		if type(u.section) ~= "string" or u.section == "" then
+			return reject_row(index, "section must be a non-empty string")
 		end
+		if type(u.key) ~= "string" or u.key == "" then
+			return reject_row(index, "key must be a non-empty string")
+		end
+		local value_type = type(u.value)
+		if value_type ~= "string" and value_type ~= "boolean" and value_type ~= "number" then
+			return reject_row(index, "value must be a string, boolean, or number")
+		end
+
+		local sl = u.section:lower()
+		local kl = u.key:lower()
+		if not lookup[sl] then lookup[sl] = {} end
+		if lookup[sl][kl] then return reject_row(index, "logical key is duplicated") end
+		lookup[sl][kl] = u
 	end
 
 	-- Serialise a Lua value to a TOML literal
@@ -454,7 +473,7 @@ function M.batch_write(path, updates, file_adapter)
 		if hdr then
 			current_section = hdr:lower()
 		else
-			local key = trimmed:match("^([%w_]+)%s*=")
+			local key = trimmed:match("^([%w_%-]+)%s*=")
 			if key then
 				local kl = key:lower()
 				local bucket = lookup[current_section]

@@ -64,6 +64,87 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 		end)
 	end)
 
+	helpers.it("batch_write rejects malformed rows before any I/O (batch-write-row-validation)", function()
+		local invalid_rows = {
+			"not a row",
+			{ section = nil, key = "value", value = "x" },
+			{ section = "", key = "value", value = "x" },
+			{ section = "script", key = nil, value = "x" },
+			{ section = "script", key = "", value = "x" },
+			{ section = "script", key = "value" },
+			{ section = "script", key = "value", value = {} },
+		}
+
+		for index, row in ipairs(invalid_rows) do
+			local reads = 0
+			local writes = 0
+			local adapter = {
+				read_with_status = function()
+					reads = reads + 1
+					return nil, "absent"
+				end,
+				write = function()
+					writes = writes + 1
+					return true
+				end,
+			}
+			local call_ok, wrote, err = pcall(writer.batch_write,
+				"/controlled/config.toml", { row }, adapter)
+			helpers.assert_eq(call_ok, true,
+				"invalid row " .. index .. " must return a typed refusal, not raise")
+			helpers.assert_eq(wrote, false)
+			helpers.assert_true(type(err) == "string" and err ~= "")
+			helpers.assert_eq(reads, 0, "validation must precede source acquisition")
+			helpers.assert_eq(writes, 0, "invalid rows must never reach publication")
+		end
+	end)
+
+	helpers.it("batch_write rejects duplicate logical rows before any I/O", function()
+		local reads = 0
+		local call_ok, wrote, err = pcall(writer.batch_write,
+			"/controlled/config.toml", {
+				{ section = "Script", key = "my-key", value = "first" },
+				{ section = "script", key = "MY-KEY", value = "second" },
+			}, {
+				read_with_status = function()
+					reads = reads + 1
+					return nil, "absent"
+				end,
+				write = function() return true end,
+			})
+		helpers.assert_eq(call_ok, true)
+		helpers.assert_eq(wrote, false)
+		helpers.assert_true(type(err) == "string" and err ~= "")
+		helpers.assert_eq(reads, 0, "duplicate rows must fail before reading the destination")
+	end)
+
+	helpers.it("batch_write updates a hyphenated key exactly once (batch-write-hyphenated-key)", function()
+		local initial = "[script]\nmy-key = \"old\"\n"
+		local captured
+		local adapter = {
+			read_with_status = function() return initial, "ok" end,
+			write_if_unchanged = function(_path, content, expected_source)
+				helpers.assert_eq(expected_source.status, "ok")
+				helpers.assert_eq(expected_source.content, initial)
+				captured = content
+				return true
+			end,
+			write = function() error("classified publication must stay serialized") end,
+		}
+		local ok = writer.batch_write("/controlled/config.toml", {
+			{ section = "script", key = "my-key", value = "new" },
+		}, adapter)
+
+		helpers.assert_eq(ok, true)
+		local _, occurrences = captured:gsub("my%-key%s*=", "")
+		helpers.assert_eq(occurrences, 1, "the existing key must be replaced, never appended")
+		helpers.assert_contains(captured, 'my-key = "new"')
+		helpers.assert_eq(captured:find('my-key = "old"', 1, true), nil)
+		local decoded = codec.decode(captured)
+		helpers.assert_true(type(decoded) == "table", "the published file must remain valid TOML")
+		helpers.assert_eq(decoded.script["my-key"], "new")
+	end)
+
 	helpers.it("batch_write refuses to overwrite an unreadable existing source", function()
 		local write_opens = 0
 		with_file_stubs(function(candidate, mode)
