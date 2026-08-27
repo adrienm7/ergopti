@@ -199,7 +199,7 @@ jobs:
             flags: ''
           - distro: opensuse-tumbleweed
             image: opensuse/tumbleweed:latest
-            prep: zypper --non-interactive install bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools libxkbcommon0 xkeyboard-config xkbcomp sudo curl shadow util-linux
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon-tools libxkbcommon0 xkeyboard-config xkbcomp sudo curl shadow util-linux
             expect: any
             flags: ''
           - distro: opensuse-leap-15.6

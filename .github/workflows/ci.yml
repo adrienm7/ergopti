@@ -1019,7 +1019,7 @@ jobs:
             prep: apk add --no-cache bash coreutils findutils grep sed
           - distro: opensuse
             image: opensuse/tumbleweed:latest
-            prep: zypper --non-interactive install bash coreutils findutils grep sed
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed
     container:
       image: ${{ matrix.image }}
     steps:
