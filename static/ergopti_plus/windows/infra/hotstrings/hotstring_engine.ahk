@@ -48,14 +48,9 @@
 ; slow paste targets (Teams/Word) without blocking perceptibly.
 global SEND_INSTANT_PASTE_DELAY_MS := 200
 
-; Process-wide reentrancy guard for SendInstant's clipboard dance. The
-; deferred restore (SetTimer above) keeps A_Clipboard = payload for
-; SEND_INSTANT_PASTE_DELAY_MS; if a second SendInstant fires in that window
-; (e.g. a fast follow-up wrap key) it would overwrite A_Clipboard before the
-; first paste settled, racing the not-yet-restored clipboard and corrupting
-; the user's data. While this flag is true a second SendInstant skips the
-; clipboard route entirely (send-instant-sleep-clipboard-on-keyboard-thread).
-global _SEND_INSTANT_CLIP_BUSY := false
+; The adapter's CB_TryBeginPasteTransaction owns the process-wide clipboard
+; lease across this complete deferred interval. A contender must take its
+; clipboard-free path before snapshotting or publishing another payload.
 
 ; Timeout (s) for ClipWait in GetSelection. A real selection copies in
 ; <100 ms; GetSelection runs on the keyboard thread (case-conversion /

@@ -441,7 +441,6 @@ _GestureToggleTitleCaseSelection(Text) {
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
 _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
-		global _SEND_INSTANT_CLIP_BUSY
 		try {
 				; A user's later copy owns a different sequence and must survive this
 				; deferred cleanup rather than being replaced with our old snapshot.
@@ -450,12 +449,10 @@ _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
 		} finally {
 				if OwnerToken
 						CB_EndOwnedTransaction(OwnerToken)
-				_SEND_INSTANT_CLIP_BUSY := false
 		}
 }
 
 GesturePastePlain() {
-		global _SEND_INSTANT_CLIP_BUSY
 		if not WinActive("ahk_exe EXCEL.EXE") {
 				; Strip rich formatting only when the clipboard holds text. CB_Read()
 				; returns "" for non-text payloads (image/file list); the self-assign
@@ -465,7 +462,8 @@ GesturePastePlain() {
 						; Skip the save/restore dance while SendInstant is already mid-flight
 						; to avoid a second thread trampling the in-flight clipboard before
 						; the first paste settles.
-						if _SEND_INSTANT_CLIP_BUSY {
+						OwnerToken := CB_TryBeginPasteTransaction("gesture_paste_plain")
+						if !OwnerToken {
 								SendFinalResult("^v")
 								return
 						}
@@ -476,16 +474,14 @@ GesturePastePlain() {
 						; SendInstant's save/paste/deferred-restore guarantee.
 						OldClip := CB_SaveAll()
 						if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
+								CB_EndOwnedTransaction(OwnerToken)
 								try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot failed; using native paste.")
 								SendFinalResult("^v")
 								return
 						}
 						PlainText := CB_Read()
-						_SEND_INSTANT_CLIP_BUSY := true
 						OwnedSequence := 0
-						OwnerToken := 0
 						try {
-								OwnerToken := CB_BeginOwnedTransaction("gesture_paste_plain", true)
 								if !CB_Write(PlainText)
 										throw Error("clipboard write failed")
 								OwnedSequence := CB_GetSequenceNumber()
@@ -494,11 +490,10 @@ GesturePastePlain() {
 								SendFinalResult("^v")
 								SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 						} catch as e {
-								if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
-										CB_RestoreAll(OldClip)
-								if OwnerToken
-										CB_EndOwnedTransaction(OwnerToken)
-								_SEND_INSTANT_CLIP_BUSY := false
+								try {
+										if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
+												CB_RestoreAll(OldClip)
+								} finally CB_EndOwnedTransaction(OwnerToken)
 								try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard and guard restored: {1}.", e.Message)
 						}
 				} else {

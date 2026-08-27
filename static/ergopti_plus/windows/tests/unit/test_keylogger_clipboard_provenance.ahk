@@ -189,7 +189,8 @@ _KCP_EveryDeferredPastePairsOwnership() {
 		FinishBody := _DriverFuncBody(Pair[2])
 		Assert(StartBody != "" && FinishBody != "",
 			"ownership pair must remain reachable: " . Pair[1] . " -> " . Pair[2])
-		Assert(InStr(StartBody, "CB_BeginOwnedTransaction") > 0,
+		Assert(InStr(StartBody, "CB_BeginOwnedTransaction") > 0
+			or InStr(StartBody, "CB_TryBeginPasteTransaction") > 0,
 			Pair[1] . " must acquire shared clipboard ownership before its asynchronous mutation")
 		Assert(InStr(FinishBody, "CB_EndOwnedTransaction") > 0,
 			Pair[2] . " must release shared clipboard ownership on the deferred terminal path")

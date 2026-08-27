@@ -393,7 +393,6 @@ SendFinalResult(Text, OnlyText := False, DeclareBufferEffect := false) {
 }
 
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
-	global _SEND_INSTANT_CLIP_BUSY
 	try {
 		; A delayed restore owns exactly the payload sequence it wrote. A user copy
 		; (or another clipboard producer) after Ctrl+V must win over our stale
@@ -403,9 +402,6 @@ _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 	} finally {
 		if OwnerToken
 			CB_EndOwnedTransaction(OwnerToken)
-		; Release even when the clipboard is locked: a failed restore must not
-		; permanently force every later expansion onto the slow text path.
-		_SEND_INSTANT_CLIP_BUSY := false
 	}
 }
 
@@ -414,7 +410,6 @@ SendInstant(Text, Prefix := "") {
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
 	; these two injections lets a physical key land between erase and paste.
 	; Uses try so the user's clipboard is restored even on error/crash.
-	global _SEND_INSTANT_CLIP_BUSY
 	if _SendHook {
 		try {
 			Hook := _SendHook
@@ -430,7 +425,8 @@ SendInstant(Text, Prefix := "") {
 	; {Text} route so the two dances never interleave.
 	; SendInput (not SendEvent) is used here to stay atomic and avoid interleaving
 	; with the InputHook, which processes SendEvent characters as physical input.
-	if _SEND_INSTANT_CLIP_BUSY {
+	OwnerToken := CB_TryBeginPasteTransaction("hotstring_send_instant")
+	if !OwnerToken {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
@@ -450,6 +446,7 @@ SendInstant(Text, Prefix := "") {
 	; renders slightly worse in Notepad, which is precisely the trade the
 	; reentrancy branch above already accepts.
 	if (CB_IsBusy() or CB_HasImage()) {
+		CB_EndOwnedTransaction(OwnerToken)
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
@@ -461,15 +458,13 @@ SendInstant(Text, Prefix := "") {
 	}
 	OldClipboard := CB_SaveAll()
 	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {
+		CB_EndOwnedTransaction(OwnerToken)
 		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot failed; expansion was not injected.")
 		return false
 	}
-	_SEND_INSTANT_CLIP_BUSY := true
-	OwnerToken := 0
 	RestoreCallback := false
 	RestoreTimerArmed := false
 	try {
-		OwnerToken := CB_BeginOwnedTransaction("hotstring_send_instant", true)
 		if !CB_Write(Text)
 			throw Error("clipboard write failed")
 		OwnedSequence := CB_GetSequenceNumber()
@@ -491,9 +486,7 @@ SendInstant(Text, Prefix := "") {
 		if RestoreTimerArmed
 			try SetTimer(RestoreCallback, 0)
 		try CB_RestoreAll(OldClipboard)
-		if OwnerToken
-			try CB_EndOwnedTransaction(OwnerToken)
-		_SEND_INSTANT_CLIP_BUSY := false
+		finally CB_EndOwnedTransaction(OwnerToken)
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
