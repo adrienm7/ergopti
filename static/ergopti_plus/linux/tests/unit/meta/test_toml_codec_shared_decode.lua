@@ -104,6 +104,31 @@ describe("shared toml_codec.decode is live in the managers", function()
 		end
 	end)
 
+	it("enforces Unicode scalar values while preserving escaped U+0000", function()
+		local invalid = {
+			'key = "\\uD800"\n',
+			'key = "\\uDFFF"\n',
+			'key = "\\uD83D\\uDE00"\n',
+			'key = "\\U00110000"\n',
+		}
+
+		for index, source in ipairs(invalid) do
+			local ok, got = pcall(codec.decode, source)
+			assert_true(ok, "invalid scalar #" .. index .. " must not raise")
+			assert_nil(got, "invalid scalar #" .. index .. " must fail closed")
+		end
+
+		local got = codec.decode(
+			'below = "\\uD7FF"\nabove = "\\uE000"\nmaximum = "\\U0010FFFF"\nnull = "\\u0000value"\n')
+		assert_true(type(got) == "table", "valid scalar boundaries must decode")
+		assert_eq(got.below, "\xED\x9F\xBF")
+		assert_eq(got.above, "\xEE\x80\x80")
+		assert_eq(got.maximum, "\xF4\x8F\xBF\xBF")
+		assert_eq(#got.null, 6, "escaped U+0000 must remain part of the string")
+		assert_eq(got.null:byte(1), 0)
+		assert_eq(got.null:sub(2), "value")
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 

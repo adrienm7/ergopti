@@ -11,7 +11,7 @@
 ---    and rejected with PARSE_ERROR. Fix: track single-quoted regions too.
 ---
 --- 2. F28 — \UXXXXXXXX escape with codepoint > 0x10FFFF caused utf8.char to
----    throw, crashing the decode. Fix: clamp invalid codepoints to U+FFFD.
+---    throw, crashing the decode. The original guard substituted U+FFFD.
 ---
 --- 3. F51 — TOML special float literals inf / -inf / nan were treated as bare
 ---    strings instead of numbers. Fix: match them before the number patterns.
@@ -26,6 +26,10 @@
 --- 6. HS-088 — Valid numeric literals with separators, non-decimal bases, or
 ---    a fractional mantissa plus exponent fell through as bare strings. Fix:
 ---    validate the full TOML numeric grammar before converting the value.
+---
+--- 7. HS-089 — Surrogate escapes emitted invalid CESU-8 and out-of-range
+---    escapes silently became U+FFFD. Fix: accept only Unicode scalar values,
+---    while retaining escaped U+0000 as valid TOML data.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -220,7 +224,7 @@ end)
 -- =====================================================================
 -- =====================================================================
 
-helpers.describe("toml_codec: \\U codepoint range", function()
+helpers.describe("toml_codec: Unicode escape scalar values", function()
 
 	helpers.it("valid \\U codepoint (U+1F600) decodes to the emoji", function()
 		local src = 'key = "\\U0001F600"\n'
@@ -231,15 +235,47 @@ helpers.describe("toml_codec: \\U codepoint range", function()
 			"\\U0001F600 must decode to the emoji glyph")
 	end)
 
-	helpers.it("out-of-range \\U codepoint (above U+10FFFF) decodes to replacement char", function()
-		-- 0x00110000 is one past the maximum valid Unicode codepoint.
-		-- The codec must not throw; it must substitute U+FFFD.
-		local src = 'key = "\\U00110000"\n'
-		local got = codec.decode(src)
-		helpers.assert_true(got ~= nil, "decode must not throw for out-of-range \\U codepoint")
-		-- U+FFFD replacement character = EF BF BD in UTF-8
-		helpers.assert_eq(got.key, "\xEF\xBF\xBD",
-			"out-of-range \\U codepoint must decode to U+FFFD replacement character")
+	helpers.it("rejects surrogate escapes instead of emitting invalid CESU-8", function()
+		local sources = {
+			'key = "\\uD800"\n',
+			'key = "\\uDFFF"\n',
+			'key = "\\uD83D\\uDE00"\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok,
+				"surrogate escape #" .. index .. " must return nil rather than raise")
+			helpers.assert_eq(got, nil,
+				"TOML escapes must be Unicode scalar values, not UTF-16 surrogate units")
+		end
+	end)
+
+	helpers.it("rejects codepoints above U+10FFFF instead of silently replacing them", function()
+		local ok, got = pcall(codec.decode, 'key = "\\U00110000"\n')
+
+		helpers.assert_true(ok, "out-of-range escapes must fail closed without raising")
+		helpers.assert_eq(got, nil,
+			"an invalid Unicode scalar must not masquerade as a replacement character")
+	end)
+
+	helpers.it("accepts the scalar boundaries around the surrogate range", function()
+		local got = codec.decode(
+			'below = "\\uD7FF"\nabove = "\\uE000"\nmaximum = "\\U0010FFFF"\n')
+
+		helpers.assert_true(type(got) == "table", "valid scalar boundaries must decode")
+		helpers.assert_eq(got.below, "\xED\x9F\xBF", "U+D7FF must remain valid")
+		helpers.assert_eq(got.above, "\xEE\x80\x80", "U+E000 must remain valid")
+		helpers.assert_eq(got.maximum, "\xF4\x8F\xBF\xBF", "U+10FFFF must remain valid")
+	end)
+
+	helpers.it("preserves an escaped U+0000 as exact string data", function()
+		local got = codec.decode('key = "\\u0000value"\n')
+
+		helpers.assert_true(type(got) == "table", "an escaped null scalar is valid TOML")
+		helpers.assert_eq(#got.key, 6, "the escaped null and trailing bytes must all survive")
+		helpers.assert_eq(got.key:byte(1), 0, "the first decoded scalar must be U+0000")
+		helpers.assert_eq(got.key:sub(2), "value", "the trailing value must remain byte-exact")
 	end)
 
 end)

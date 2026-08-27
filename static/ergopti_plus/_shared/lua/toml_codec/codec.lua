@@ -270,9 +270,16 @@ local split_kv, parse_key
 
 --- Validates and unescapes a TOML basic-string body (without surrounding quotes).
 --- Returns the unescaped string, or nil if it contains an invalid escape sequence
---- or a null byte.
+--- or a raw null byte.
+local function is_unicode_scalar(codepoint)
+	return type(codepoint) == "number"
+		and codepoint >= 0
+		and codepoint <= 0x10FFFF
+		and not (codepoint >= 0xD800 and codepoint <= 0xDFFF)
+end
+
 local function unescape_string(s)
-	-- Reject null bytes anywhere in the value
+	-- Reject raw null bytes. An escaped U+0000 remains valid TOML string data.
 	if s:find("\0") then return nil end
 	-- Validate escape sequences before performing substitution
 	local i = 1
@@ -285,11 +292,13 @@ local function unescape_string(s)
 				-- \uXXXX — must be exactly 4 hex digits
 				local hex = s:sub(i + 2, i + 5)
 				if not hex:match("^%x%x%x%x$") then return nil end
+				if not is_unicode_scalar(tonumber(hex, 16)) then return nil end
 				i = i + 6
 			elseif e == "U" then
 				-- \UXXXXXXXX — must be exactly 8 hex digits
 				local hex = s:sub(i + 2, i + 9)
 				if not hex:match("^%x%x%x%x%x%x%x%x$") then return nil end
+				if not is_unicode_scalar(tonumber(hex, 16)) then return nil end
 				i = i + 10
 			elseif e == '"' or e == "\\" or e == "n" or e == "t" or e == "r"
 				or e == "b" or e == "f" then
@@ -306,12 +315,7 @@ local function unescape_string(s)
 	     :gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\r", "\r")
 	     :gsub("\\b", "\8"):gsub("\\f", "\12")
 	     :gsub("\\u(%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
-	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h)
-	         local cp = tonumber(h, 16)
-	         -- Codepoints above U+10FFFF are not valid Unicode; utf8_lib.char would throw.
-	         if cp > 0x10FFFF then return "\xEF\xBF\xBD" end  -- replacement char U+FFFD
-	         return utf8_lib.char(cp)
-	     end)
+	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
 	     :gsub("\1", "\\"):gsub("\2", '"')
 	return s
 end
