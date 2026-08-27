@@ -340,3 +340,50 @@ _UIASW_ResultRequiresExactContext() {
 
 Test("UIA worker: snapshots are bound to window, control and input generation (uia-worker-context)",
 	_UIASW_ResultRequiresExactContext)
+
+_UIASW_AuditAhk009Snapshot(InputEpoch := 400) {
+	return {
+		Text: "secret",
+		Hwnd: 100,
+		Control: 200,
+		InputEpoch: InputEpoch,
+		CapturedAt: 300,
+		Consumed: false
+	}
+}
+
+_UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator() {
+	for Invalidator in [
+		"mouse-down", "Left", "Right", "Home", "End", "Backspace", "Delete",
+		"Ctrl+X", "Ctrl+V", "Ctrl+Z"
+	] {
+		Snapshot := _UIASW_AuditAhk009Snapshot()
+		AssertEqual("", UIASW_ConsumeSelectionSnapshot(
+			Snapshot, 100, 200, 401, 10, 750),
+			Invalidator . " must invalidate text captured in the previous input epoch")
+		AssertFalse(Snapshot.Consumed,
+			Invalidator . " must not consume or revive the stale capability")
+	}
+	for Fixture in [
+		["foreground window", 101, 200, 401, 10],
+		["focused control", 100, 201, 401, 10],
+		["capture age", 100, 200, 401, 751]
+	] {
+		AssertEqual("", UIASW_ConsumeSelectionSnapshot(
+			_UIASW_AuditAhk009Snapshot(401),
+			Fixture[2], Fixture[3], Fixture[4], Fixture[5], 750),
+			"a changed " . Fixture[1] . " must invalidate the selection capability")
+	}
+
+	Fresh := _UIASW_AuditAhk009Snapshot(401)
+	AssertEqual("secret", UIASW_ConsumeSelectionSnapshot(
+		Fresh, 100, 200, 401, 10, 750),
+		"an exact current-epoch selection must remain consumable")
+	AssertEqual("", UIASW_ConsumeSelectionSnapshot(
+		Fresh, 100, 200, 401, 10, 750),
+		"a fresh selection capability must remain one-shot")
+}
+
+Test("UIA selection: physical epoch invalidates cached caret provenance "
+	. "(audit-ahk-009)",
+	_UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator)

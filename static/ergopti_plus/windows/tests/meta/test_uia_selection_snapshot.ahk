@@ -19,14 +19,15 @@ Test_UIASelectionCacheIsWindowBoundAndSingleUse() {
 	Assert(CriticalPos > 0 && ContextPos > CriticalPos && PublishPos > ContextPos
 		&& RestorePos > PublishPos,
 		"live-context validation and cache publication must share one Critical transaction, or a physical character can clear the old cache between them and have stale UIA text republished afterward")
-	Assert(InStr(Getter, "Snapshot.Hwnd != WIGetForegroundHwnd") > 0,
-		"UIA consumer must reject a selection from a different foreground window")
-	Assert(InStr(Getter, "Snapshot.Control != WIGetFocusedControlToken") > 0,
-		"UIA consumer must reject a selection from a different focused control")
-	Assert(InStr(Getter, "Elapsed > UIA_SELECTION_MAX_AGE_MS") > 0,
-		"UIA consumer must reject expired selection snapshots")
-	Assert(InStr(Getter, "Snapshot.Consumed := true") > 0,
-		"UIA consumer must consume a selection exactly once")
+	Assert(InStr(Getter, "UIASW_ConsumeSelectionSnapshot") > 0,
+		"UIA consumer must delegate to the behavioral capability validator")
+	Assert(InStr(Getter, "WIGetForegroundHwnd()") > 0
+		and InStr(Getter, "WIGetFocusedControlToken()") > 0,
+		"UIA consumer must validate the live window and focused control")
+	Assert(InStr(Getter, "_UIA_CurrentInputEpoch()") > 0,
+		"UIA consumer must reject a snapshot after any physical-input generation change")
+	Assert(InStr(Getter, 'Critical("On")') > 0,
+		"live context validation and one-shot consumption must be one transaction")
 	Assert(InStr(Watcher, "_UIA_SelectionCache := 0") > 0,
 		"a non-wrapping physical character must invalidate a pending UIA selection")
 }
