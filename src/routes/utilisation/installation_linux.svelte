@@ -71,41 +71,52 @@
 		<strong>Méthode "Clean"</strong> (recommandée) : installe la disposition dans un répertoire
 		d'extensions dédié (<code>/usr/share/xkeyboard-config.d/ergopti/</code>) sans modifier aucun
 		fichier système. Cette méthode nécessite <code>libxkbcommon</code> ≥ 1.13.0 et
-		<code>xkeyboard-config</code> ≥ 2.45 (Arch et Fedora récentes la proposent).
+		<code>xkeyboard-config</code> ≥ 2.45 (Arch et Fedora récentes la proposent) ainsi qu'une
+		<strong>session Wayland</strong> : seul <code>libxkbcommon</code> lit ce répertoire, le serveur
+		Xorg compile ses dispositions avec son propre <code>xkbcomp</code> et ne le voit pas.
 	</li>
 	<li>
 		<strong>Méthode "Legacy"</strong> : modifie directement les fichiers système XKB (<code
 			>/usr/share/X11/xkb/</code
-		>). Compatible avec toutes les versions, mais moins propre. C'est la méthode qui était utilisée
+		>), avec une sauvegarde numérotée de chaque fichier touché. Compatible avec toutes les versions
+		et avec les sessions X11 (Xorg), mais moins propre. C'est la méthode qui était utilisée
 		historiquement.
 	</li>
 </ul>
 <p>
-	Le script de détection choisit automatiquement la méthode optimale selon votre système, puis
-	chacune de ses étapes affiche son résultat (plus rien n'est silencieux). Les couches Maj,
-	Verr Maj et AltGr sont fournies par un fichier de <em>types</em> désormais <strong>toujours
-	inclus</strong> : la couche raccourcis (<kbd>Ctrl</kbd>/<kbd>Alt</kbd>/<kbd>Win</kbd>) rend
-	la lettre de base Ergopti de chaque touche — et sur les touches sans lettre simple comme
-	<kbd>é</kbd>, <kbd>à</kbd>, <kbd>ê</kbd>, elle rend respectivement <kbd-output>C</kbd-output>,
-	<kbd-output>V</kbd-output>, <kbd-output>Z</kbd-output> pour garder Copier/Coller/Annuler sous les
-	doigts.
-	La réinstallation par-dessus une version précédente (y compris l'ancienne méthode) nettoie
-	automatiquement les restes de l'installation antérieure. Enfin, la variante « Ergopti++ » n'est
-	plus proposée à l'installation : elle sature la table XCompose ; utilisez Ergopti ou Ergopti+.
+	Le script de détection choisit automatiquement la méthode optimale selon votre système et votre
+	session, puis chacune de ses étapes affiche son résultat (plus rien n'est silencieux). Les couches
+	Maj, Verr Maj et AltGr sont fournies par un fichier de <em>types</em> désormais
+	<strong>toujours inclus</strong> : la couche raccourcis (<kbd>Ctrl</kbd>/<kbd>Alt</kbd>/<kbd
+		>Win</kbd
+	>) rend la lettre de base Ergopti de chaque touche — et sur les touches sans lettre simple comme
+	<kbd>é</kbd>, <kbd>à</kbd>, <kbd>ê</kbd>, <kbd>è</kbd>, elle rend respectivement
+	<kbd-output>C</kbd-output>, <kbd-output>V</kbd-output>, <kbd-output>X</kbd-output>,
+	<kbd-output>Z</kbd-output> pour garder Copier/Coller/Couper/Annuler sous les doigts. Après la
+	copie des fichiers, l'installeur compile réellement la disposition (seule, puis à côté d'une autre
+	disposition comme <code>us</code>) et vérifie que ce type personnalisé est bien présent avant de
+	déclarer l'installation réussie. La réinstallation par-dessus une version précédente (y compris
+	l'ancienne méthode) nettoie automatiquement les restes de l'installation antérieure. Enfin, la
+	variante « Ergopti++ » n'est plus proposée à l'installation : elle sature la table XCompose ;
+	utilisez Ergopti ou Ergopti+.
+</p>
+<p>
+	L'activation dans la session s'exécute toujours <strong>sans</strong> <code>sudo</code> : sur
+	GNOME (et ses dérivés) la disposition est placée en tête de vos sources de saisie existantes sans
+	en retirer aucune, sur KDE Plasma elle est ajoutée en tête de la liste des dispositions, sur une
+	session X11 elle est appliquée immédiatement avec <code>setxkbmap</code>. Les compositeurs qui
+	gèrent eux-mêmes leur clavier (Hyprland, Sway, niri, river, Wayfire, labwc) n'ont pas de réglage
+	commun : l'installeur affiche alors le fragment de configuration exact à coller dans leur fichier.
 </p>
 <p>
 	Le script demande les droits <code>sudo</code>. Pour désinstaller :
 </p>
-<code
-	style="display:inline-block; width:100%; padding:1em; text-align:left"
-	>{uninstallCmd}</code
->
+<code style="display:inline-block; width:100%; padding:1em; text-align:left">{uninstallCmd}</code>
 <p>
 	L'installeur accepte aussi <code>--version v2_2_1</code>, <code>--ansi</code> et le mode
 	totalement non interactif (<code>--yes --version … --variant …</code>) pour les installations
 	scriptées.
 </p>
-
 
 <h3>Détails techniques de l'installation</h3>
 
@@ -119,15 +130,16 @@
 		aucun fichier système existant.
 	</li>
 	<li>
-		<strong>.XCompose</strong> : création (ou remplacement s'il existe déjà) du fichier
-		<code>.XCompose</code>
-		dans le home de l'utilisateur (<code>~/.XCompose</code>). Cela permet d'utiliser les touches
-		mortes ainsi que les sorties en plusieurs caractères, comme les ponctuations avec espaces
-		insécables automatiques.
+		<strong>.XCompose</strong> : le fichier Compose d'Ergopti est copié dans le paquet et une ligne
+		<code>include</code>
+		est ajoutée à votre <code>~/.XCompose</code> sans toucher au reste du fichier (elle est retirée à
+		la désinstallation). Cela permet d'utiliser les touches mortes ainsi que les sorties en plusieurs
+		caractères, comme les ponctuations avec espaces insécables automatiques.
 	</li>
 	<li>
-		<strong>Activation</strong> : le script tente d'appliquer la disposition via
-		<code>setxkbmap</code> et de purger le cache XKB pour une application immédiate des changements.
+		<strong>Vérification puis activation</strong> : la disposition est compilée avec
+		<code>xkbcli</code> pour prouver que le type personnalisé est chargé, le cache XKB est purgé, puis
+		la disposition est activée dans votre session (voir ci-dessus).
 	</li>
 </ul>
 <h4>Méthode Legacy (compatibilité)</h4>
@@ -149,10 +161,10 @@
 
 	<li>
 		<strong>XKB Types</strong> : ajout (ou mise à jour si elles existent déjà) des définitions de
-		types personnalisées d'<Ergopti></Ergopti> dans le fichier
-		<code>/usr/share/X11/xkb/types/extra</code>. Les types définissent l'association entre le numéro
-		de couche défini dans XKB Symbols avec les modificateurs qui doivent être pressés pour atterrir
-		sur cette couche.
+		types personnalisées d'<Ergopti></Ergopti> <em>à l'intérieur</em> de la section
+		<code>xkb_types</code> du fichier <code>/usr/share/X11/xkb/types/extra</code>, que toutes les
+		dispositions incluent. Les types définissent l'association entre le numéro de couche défini dans
+		XKB Symbols avec les modificateurs qui doivent être pressés pour atterrir sur cette couche.
 	</li>
 
 	<li>
@@ -172,9 +184,15 @@
 	</li>
 
 	<li>
-		<strong>Activation</strong> : enfin, le script tente d'appliquer la disposition : d'abord via
-		<code>localectl set-x11-keymap</code> (si disponible), puis via <code>setxkbmap</code> dans la session
-		X de l'utilisateur. Ces actions sont « best‑effort » et peuvent échouer sans annuler l'installation.
+		<strong>Vérification</strong> : la disposition est compilée avec <code>xkbcli</code> et avec
+		<code>xkbcomp</code> (le compilateur de Xorg) quand ils sont installés ; si le type personnalisé
+		manque, chaque fichier touché est restauré depuis sa sauvegarde et l'installation est annulée.
+	</li>
+	<li>
+		<strong>Activation</strong> : la disposition est activée dans votre session (voir ci-dessus)
+		sous l'identifiant <code>fr</code> + variante <code>Ergopti_vX_Y_Z</code>. Sur une session X11
+		sans gestionnaire de disposition, l'installeur indique la commande
+		<code>localectl set-x11-keymap</code> qui la rend permanente.
 	</li>
 </ul>
 
