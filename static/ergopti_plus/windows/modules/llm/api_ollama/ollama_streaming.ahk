@@ -170,7 +170,18 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		return
 	}
 	payload_snip := StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload
-	ProcessOwner := _LLM_CurlAdoptProcess(pid)
+	try ProcessOwner := _LLM_CurlAdoptProcess(pid)
+	catch {
+		try FSDelete(tmp_payload)
+		if _LLM_Ollama_Async.Has(req_id) {
+			Entry := _LLM_Ollama_Async[req_id]
+			_LLM_Ollama_Async.Delete(req_id)
+			if !Entry["cancelled"]
+				_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
+		}
+		_LLM_Ollama_DrainPending()
+		return
+	}
 	if _LLM_Ollama_Async.Has(req_id) {
 		_LLM_Ollama_Async[req_id]["pid"]          := pid
 		_LLM_Ollama_Async[req_id]["process_owner"] := ProcessOwner

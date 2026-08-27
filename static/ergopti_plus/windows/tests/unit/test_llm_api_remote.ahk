@@ -745,6 +745,8 @@ _RemoteCancelPublication_Open(State, Pid) {
 	State["opens"] += 1
 	if State.Get("cancel_during_open", false)
 		LLM_RemoteCancelAllAsync()
+	if State.Get("fail_open", false)
+		return 0
 	return 9313
 }
 
@@ -849,6 +851,55 @@ _RemoteCancelPublication_CurlAdoptBoundary() {
 }
 Test("api_remote: cancellation during curl adoption retires exact owner (remote-cancel-publication-race)",
 	_RemoteCancelPublication_CurlAdoptBoundary)
+
+
+_RemoteAdoptionFailure_Record(State, *) {
+	State["fail_calls"] += 1
+}
+
+_RemoteAdoptionFailure_AbortsDispatch() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["fail_open"] := true
+	State["fail_calls"] := 0
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	ReqId := 891303
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(1, State["opens"],
+			"the launched curl child must be offered to the exact-handle adoption boundary")
+		AssertEqual(1, State["fail_calls"],
+			"failed exact-handle adoption must fail the request exactly once")
+		AssertEqual(0, State["polls"],
+			"a process that was not adopted must never enter the async poll registry")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"failed adoption must retire the reservation synchronously")
+		Assert(State["deletes"] > 0,
+			"failed adoption must attempt to remove every pre-poll artifact")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: null exact-handle adoption aborts dispatch (curl-adoption-failure)",
+	_RemoteAdoptionFailure_AbortsDispatch)
+
+
+_RemoteAdoptionFailure_ReleaseCannotClaimSuccess() {
+	State := _RemoteCancelPublication_NewState()
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	Owner := Map("pid", 7315, "handle", 0, "released", false)
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, true, Port),
+		"release without an exact retained process handle must report failure")
+	AssertEqual(0, State["terminates"],
+		"release must not fall back to terminating a recyclable numeric PID")
+}
+Test("curl owner: release without exact handle cannot report success (curl-adoption-failure)",
+	_RemoteAdoptionFailure_ReleaseCannotClaimSuccess)
 
 
 class _RemoteCancelPublicationHttp {
