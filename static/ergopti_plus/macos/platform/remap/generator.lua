@@ -2265,6 +2265,7 @@ end
 --- @return table|nil config Merged configuration ready to be JSON-encoded.
 --- @return string|nil error_message Validation or read failure.
 --- @return table|nil source_snapshot Exact classified source used for the merge.
+--- @return boolean|nil changed Whether managed rules differ from the source.
 function M.merge_into_existing_config(
 	hs_config,
 	karabiner_out,
@@ -2314,7 +2315,7 @@ function M.merge_into_existing_config(
 	end
 	if read_status == "absent" then
 		Logger.debug(LOG, "No existing karabiner.json — using generated managed config unchanged.")
-		return hs_config, nil, { status = "absent" }
+		return hs_config, nil, { status = "absent" }, true
 	end
 	if read_status ~= "ok" or type(raw) ~= "string" then
 		local err = "existing karabiner.json could not be read: "
@@ -2427,14 +2428,19 @@ function M.merge_into_existing_config(
 		return nil, detail
 	end
 
+	local changed = false
 	for profile_index, classified in pairs(classified_profiles) do
 		local profile = existing.profiles[profile_index]
-		if profile.complex_modifications == nil then profile.complex_modifications = {} end
-		profile.complex_modifications.rules = merge_managed_rule_block(
+		local merged_rules = merge_managed_rule_block(
 			classified.existing_rules,
 			classified.incoming_rules,
 			classified.removal_set
 		)
+		if not deep_equal(merged_rules, classified.existing_rules) then
+			if profile.complex_modifications == nil then profile.complex_modifications = {} end
+			profile.complex_modifications.rules = merged_rules
+			changed = true
+		end
 	end
 	Logger.debug(
 		LOG,
@@ -2443,7 +2449,7 @@ function M.merge_into_existing_config(
 		#legacy_fingerprints,
 		target_index_or_err
 	)
-	return existing, nil, { status = "ok", content = raw }
+	return existing, nil, { status = "ok", content = raw }, changed
 end
 
 --- Re-reads, merges, encodes, and publishes the current Karabiner config.
@@ -2477,7 +2483,7 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
-	local merge_ok, merged, merge_err, source_snapshot = pcall(
+	local merge_ok, merged, merge_err, source_snapshot, merge_changed = pcall(
 		M.merge_into_existing_config,
 		hs_config,
 		karabiner_out,
@@ -2495,6 +2501,36 @@ function M.merge_and_deploy_config(
 		local detail = "merge failed: exact source snapshot is missing"
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
+	end
+	if type(merge_changed) ~= "boolean" then
+		local detail = "merge failed: semantic change verdict is missing"
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
+	if merge_changed == false then
+		local read_ok, current, current_status, current_detail = pcall(
+			FileSystem.read_with_status,
+			karabiner_out
+		)
+		if not read_ok or current_status ~= source_snapshot.status
+			or (current_status == "ok" and current ~= source_snapshot.content) then
+			local reason
+			if not read_ok then
+				reason = "read raised: " .. tostring(current)
+			elseif current_status ~= source_snapshot.status then
+				reason = tostring(current_detail or current_status)
+			else
+				reason = "exact bytes differ"
+			end
+			local detail = "source changed before unchanged confirmation: " .. tostring(reason)
+			Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+			return false, detail, 0
+		end
+		Logger.debug(
+			LOG,
+			"Karabiner managed rules are unchanged; publication skipped after exact source revalidation."
+		)
+		return true, "unchanged", 0
 	end
 
 	local encode_ok, content = pcall(hs.json.encode, merged, true)
