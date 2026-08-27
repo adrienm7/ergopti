@@ -60,9 +60,14 @@ M.DEFAULT_INTERVAL_SEC = DEFAULT_INTERVAL_SEC
 M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
 
 local ASSET_NAME = "ErgoptiPlus.app.zip"
-local BUNDLED_ID = "com.ergopti.app"
+local BUNDLED_ID = "com.ergoptiplus.app.hammerspoon"
 local USER_AGENT = "ErgoptiPlus-Updater/1.0"
 local DEV_PAGE_SIZE = 10
+local _launcher_version = (function()
+	local ok, value = pcall(os.getenv, "ERGOPTI_LAUNCHER_VERSION")
+	if ok and type(value) == "string" and value ~= "" then return value end
+	return nil
+end)()
 
 -- Module state shared with menu_about.lua
 local _update_state       = "idle"
@@ -159,10 +164,7 @@ end
 
 function M.current_version()
 	if M.is_local_source() then return "local" end
-	local info = hs.processInfo
-	if info and info.version and info.version ~= "" then
-		return info.version
-	end
+	if _launcher_version then return _launcher_version end
 	return "local"
 end
 

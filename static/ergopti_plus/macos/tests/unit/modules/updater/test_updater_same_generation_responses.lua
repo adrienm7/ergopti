@@ -76,8 +76,13 @@ local function fresh_updater()
 		end,
 	}
 
+	local real_getenv = os.getenv
+	os.getenv = function(name)
+		if name == "ERGOPTI_LAUNCHER_VERSION" then return "1.0.0" end
+		return real_getenv(name)
+	end
 	local updater = helpers.load_with_stubs("modules.updater", {
-		processInfo = { bundleID = "com.ergopti.app", version = "1.0.0" },
+		processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon", version = "1.1.1" },
 		http = {
 			asyncGet = function(url, headers, callback)
 				requests[#requests + 1] = {
@@ -88,6 +93,7 @@ local function fresh_updater()
 			end,
 		},
 	})
+	os.getenv = real_getenv
 	return updater, requests, messages, notifications
 end
 

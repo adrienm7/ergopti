@@ -37,14 +37,10 @@ local LOG       = "menu_about"
 -- local variable is collected once the enclosing function returns).
 M._active_tasks = {}
 
--- Detect source vs bundled at module load time so DEFAULT_STATE carries the
--- right channel seed before preferences.lua hydrates the shared state table.
-local _BUNDLED_ID = "com.ergopti.app"
-local _is_local   = (function()
-	local info = hs and hs.processInfo
-	if not info then return true end
-	return (info.bundleID or "") ~= _BUNDLED_ID
-end)()
+-- Detect source vs bundled at module load time through the updater's canonical
+-- packaged-identity boundary. The Lua process is the nested Hammerspoon bundle,
+-- not the outer ErgoptiPlus application.
+local _is_local = Updater.is_local_source()
 
 M.DEFAULT_STATE = {
 	-- "dev" from source (all releases are pre-releases), "main" from bundled app.
@@ -65,8 +61,6 @@ M.DEFAULT_STATE = {
 local GH_OWNER      = "adrienm7"
 local GH_REPO       = "ergopti"
 local ASSET_NAME    = "ErgoptiPlus.app.zip"
-local BUNDLED_ID    = "com.ergopti.app"
-
 local function is_local_source()
 	return Updater.is_local_source()
 end

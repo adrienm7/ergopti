@@ -77,7 +77,7 @@ local function fresh_updater(scheduler, http_calls)
 	package.loaded["adapters.timer_scheduler"] = scheduler
 	package.loaded["modules.updater"] = nil
 	return helpers.load_with_stubs("modules.updater", {
-		processInfo = { bundleID = "com.ergopti.app", version = "1.0.0" },
+		processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon", version = "1.1.1" },
 		http = {
 			asyncGet = function()
 				http_calls.count = http_calls.count + 1

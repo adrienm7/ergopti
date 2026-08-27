@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 local function fresh_packaged()
 	package.loaded["modules.updater"] = nil
 	return helpers.load_with_stubs("modules.updater", {
-		processInfo = { bundleID = "com.ergopti.app", version = "1.0.0" },
+		processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon", version = "1.1.1" },
 	})
 end
 
