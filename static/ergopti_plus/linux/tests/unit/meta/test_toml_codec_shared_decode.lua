@@ -84,6 +84,26 @@ describe("shared toml_codec.decode is live in the managers", function()
 		assert_eq(decoded.ids[3], true, "third value keeps its exact content")
 	end)
 
+	it("decodes TOML numeric forms with their numeric type", function()
+		local vectors = {
+			{ literal = "1_000", expected = 1000 },
+			{ literal = "0xFF", expected = 255 },
+			{ literal = "0o17", expected = 15 },
+			{ literal = "0b1010", expected = 10 },
+			{ literal = "1.0e3", expected = 1000 },
+			{ literal = "1_2.3_4e2", expected = 1234 },
+		}
+
+		for _, vector in ipairs(vectors) do
+			local decoded = codec.decode("value = " .. vector.literal .. "\n")
+			assert_true(type(decoded) == "table", "numeric literal must decode: " .. vector.literal)
+			assert_eq(type(decoded.value), "number",
+				"shared codec must preserve the numeric type: " .. vector.literal)
+			assert_eq(decoded.value, vector.expected,
+				"shared codec numeric value mismatch: " .. vector.literal)
+		end
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 

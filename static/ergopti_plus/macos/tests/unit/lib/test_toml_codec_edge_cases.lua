@@ -22,6 +22,10 @@
 ---
 --- 5. HS-087 — Mixed-type arrays were rejected even though TOML 1.0 permits
 ---    heterogeneous values. Fix: preserve each independently coerced value.
+---
+--- 6. HS-088 — Valid numeric literals with separators, non-decimal bases, or
+---    a fractional mantissa plus exponent fell through as bare strings. Fix:
+---    validate the full TOML numeric grammar before converting the value.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -118,6 +122,60 @@ helpers.describe("toml_codec: heterogeneous arrays", function()
 		helpers.assert_eq(decoded.ids[2], 1, "second value keeps its exact content")
 		helpers.assert_eq(type(decoded.ids[3]), "boolean", "third value keeps its boolean type")
 		helpers.assert_eq(decoded.ids[3], true, "third value keeps its exact content")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0d/ TOML numeric literals ==================================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: numeric literal forms", function()
+
+	helpers.it("decodes every supported TOML numeric form as a number", function()
+		local vectors = {
+			{ literal = "1_000", expected = 1000 },
+			{ literal = "0xFF", expected = 255 },
+			{ literal = "0o17", expected = 15 },
+			{ literal = "0b1010", expected = 10 },
+			{ literal = "1.0e3", expected = 1000 },
+			{ literal = "1_2.3_4e2", expected = 1234 },
+		}
+
+		for _, vector in ipairs(vectors) do
+			local decoded = codec.decode("value = " .. vector.literal .. "\n")
+			helpers.assert_true(type(decoded) == "table",
+				"numeric literal must decode: " .. vector.literal)
+			helpers.assert_eq(type(decoded.value), "number",
+				"numeric literal must not fall through as a string: " .. vector.literal)
+			helpers.assert_eq(decoded.value, vector.expected,
+				"numeric literal has the wrong value: " .. vector.literal)
+		end
+	end)
+
+	helpers.it("does not coerce malformed lookalikes by merely deleting underscores", function()
+		local literals = { "+0xFF", "1__0", "_1", "1_", "0x_FF", "1_.0", "1._0", "1e_2" }
+
+		for _, literal in ipairs(literals) do
+			local decoded = codec.decode("value = " .. literal .. "\n")
+			helpers.assert_eq(type(decoded.value), "string",
+				"malformed numeric lookalike must retain the codec's bare-string fallback: " .. literal)
+			helpers.assert_eq(decoded.value, literal,
+				"malformed numeric lookalike must remain byte-exact: " .. literal)
+		end
+	end)
+
+	helpers.it("round-trips the scientific notation emitted by the encoder", function()
+		local encoded = codec.encode({ value = 1.5e-7 })
+		local decoded = codec.decode(encoded)
+
+		helpers.assert_eq(type(decoded.value), "number",
+			"the codec must decode its own fractional-exponent output as a number")
+		helpers.assert_eq(decoded.value, 1.5e-7,
+			"scientific notation must round-trip without changing the value")
 	end)
 
 end)

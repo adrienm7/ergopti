@@ -468,6 +468,96 @@ local function collapse_multiline_continuations(body)
 	return table.concat(out)
 end
 
+--- Return true only when every underscore separates two digits from the
+--- supplied TOML digit alphabet. Validation precedes underscore removal so
+--- malformed lookalikes cannot become valid merely by deleting separators.
+local function valid_digit_run(raw, digit_pattern)
+	if type(raw) ~= "string" or raw == "" then return false end
+	local previous_was_digit = false
+	for index = 1, #raw do
+		local char = raw:sub(index, index)
+		if char == "_" then
+			if not previous_was_digit then return false end
+			local next_char = raw:sub(index + 1, index + 1)
+			if next_char == "" or not next_char:match(digit_pattern) then return false end
+			previous_was_digit = false
+		elseif char:match(digit_pattern) then
+			previous_was_digit = true
+		else
+			return false
+		end
+	end
+	return previous_was_digit
+end
+
+local function compact_number(raw)
+	return (raw:gsub("_", ""))
+end
+
+local function valid_decimal_integer(raw)
+	if not valid_digit_run(raw, "^[0-9]$") then return false end
+	local compact = compact_number(raw)
+	return #compact == 1 or compact:sub(1, 1) ~= "0"
+end
+
+--- Parse the TOML 1.0 numeric grammar implemented by this codec.
+--- Returns value, true for a recognized numeric form and nil, false otherwise.
+--- A recognized but unrepresentable value returns PARSE_ERROR, true so it can
+--- never fall through and masquerade as a user string.
+local function parse_number(raw)
+	if raw == "inf" or raw == "+inf" then return math.huge, true end
+	if raw == "-inf" then return -math.huge, true end
+	if raw == "nan" or raw == "+nan" or raw == "-nan" then return 0 / 0, true end
+
+	local prefix = raw:sub(1, 2)
+	local base, digit_pattern
+	if prefix == "0x" then
+		base, digit_pattern = 16, "^[0-9A-Fa-f]$"
+	elseif prefix == "0o" then
+		base, digit_pattern = 8, "^[0-7]$"
+	elseif prefix == "0b" then
+		base, digit_pattern = 2, "^[01]$"
+	end
+	if base then
+		local digits = raw:sub(3)
+		if not valid_digit_run(digits, digit_pattern) then return nil, false end
+		local value = tonumber(compact_number(digits), base)
+		return value or PARSE_ERROR, true
+	end
+
+	local unsigned = raw
+	local first = unsigned:sub(1, 1)
+	if first == "+" or first == "-" then unsigned = unsigned:sub(2) end
+	if unsigned == "" then return nil, false end
+
+	local exponent_at = unsigned:find("[eE]")
+	local mantissa = unsigned
+	if exponent_at then
+		if unsigned:find("[eE]", exponent_at + 1) then return nil, false end
+		mantissa = unsigned:sub(1, exponent_at - 1)
+		local exponent = unsigned:sub(exponent_at + 1)
+		local exponent_sign = exponent:sub(1, 1)
+		if exponent_sign == "+" or exponent_sign == "-" then exponent = exponent:sub(2) end
+		if not valid_digit_run(exponent, "^[0-9]$") then return nil, false end
+	end
+
+	local dot_at = mantissa:find(".", 1, true)
+	if dot_at then
+		if mantissa:find(".", dot_at + 1, true) then return nil, false end
+		local integer_part = mantissa:sub(1, dot_at - 1)
+		local fractional_part = mantissa:sub(dot_at + 1)
+		if not valid_decimal_integer(integer_part)
+			or not valid_digit_run(fractional_part, "^[0-9]$") then
+			return nil, false
+		end
+	elseif not valid_decimal_integer(mantissa) then
+		return nil, false
+	end
+
+	local value = tonumber(compact_number(raw))
+	return value or PARSE_ERROR, true
+end
+
 --- Coerce a raw RHS into a Lua value (string / boolean / number / array / inline-table).
 --- Returns PARSE_ERROR on malformed input so M.decode can return nil.
 local function coerce_value(raw)
@@ -556,13 +646,8 @@ local function coerce_value(raw)
 		return out
 	end
 	-- Numbers — including TOML 1.0 special float literals
-	if raw == "inf"  or raw == "+inf"  then return  math.huge end
-	if raw == "-inf"                   then return -math.huge end
-	if raw == "nan"  or raw == "+nan" or raw == "-nan" then return 0/0 end
-	local int = raw:match("^[%+%-]?%d+$")
-	if int then return tonumber(int) end
-	local flt = raw:match("^[%+%-]?%d+%.%d+$") or raw:match("^[%+%-]?%d+[eE][%+%-]?%d+$")
-	if flt then return tonumber(flt) end
+	local number, is_number = parse_number(raw)
+	if is_number then return number end
 	-- Bare key fallback — treat as string
 	return raw
 end
