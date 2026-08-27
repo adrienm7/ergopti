@@ -944,6 +944,11 @@ private final class LeaseGuardianWatch {
 	}
 }
 
+/// Terminates the production guardian after its final serialized drain.
+func terminateRemapLeaseGuardianProcess(_ status: Int32) {
+	Darwin.exit(status)
+}
+
 /// launchd-owned process that waits on exact record locks and fences abandonment.
 final class RemapLeaseGuardianRuntime {
 	private let paths: LeaseGuardianPaths
@@ -980,7 +985,7 @@ final class RemapLeaseGuardianRuntime {
 			writeGuardianFileAtomically(data: data, path: path, directory: directory)
 		},
 		maximumUnacknowledgedRecords: Int = kGuardianMaximumUnacknowledgedRecords,
-		terminateProcess: @escaping (Int32) -> Void = { Darwin.exit($0) },
+		terminateProcess: @escaping (Int32) -> Void,
 		activationGateLocker: @escaping (Int32) -> LeaseGuardianGateLockResult =
 			lockGuardianActivationGate,
 		activationGateRetrySleep: @escaping (useconds_t) -> Void = { usleep($0) },
