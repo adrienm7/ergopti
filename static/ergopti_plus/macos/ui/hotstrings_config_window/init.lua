@@ -193,6 +193,19 @@ local function stem(toml_path)
 	return name
 end
 
+--- Resolves a personal category through the server-owned directory catalogue.
+--- The WebView receives display data, not filesystem authority: a bridge
+--- message may identify a rendered category, but it may never choose a path.
+--- @param category any Expected `personal:<stem>` category identifier.
+--- @return string|nil toml_path
+local function personal_toml_path(category)
+	if type(category) ~= "string" or category == "" then return nil end
+	for _, toml_path in ipairs(list_toml_files(_config.personal_dir)) do
+		if category == "personal:" .. stem(toml_path) then return toml_path end
+	end
+	return nil
+end
+
 --- Discovers installed extensions that expose hotstrings.
 --- Returns an array of { ext_id, label, files = { { toml_path, stem } } }.
 --- Each extension lives in a subdirectory of extensions_dir and must have a
@@ -429,7 +442,6 @@ local function build_state()
 				)
 				entry.delay_overridden = false
 				entry.color_overridden = false
-				entry.personal_path    = toml_path
 				table.insert(personal_entries, entry)
 			end
 		end
@@ -695,8 +707,12 @@ local function on_message(msg)
 	local committed = false
 
 	-- Per-category mutations — dispatch by group
-	if group == "personal" and type(body.personal_path) == "string" then
-		local toml_path = body.personal_path
+	if group == "personal" then
+		local toml_path = personal_toml_path(cat)
+		if not toml_path then
+			Logger.error(LOG, "Rejected a personal hotstrings mutation for an unknown native category.")
+			return false
+		end
 		if action == "set_delay" and type(body.ms) == "number" then
 			committed = patch_personal_toml(toml_path, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
