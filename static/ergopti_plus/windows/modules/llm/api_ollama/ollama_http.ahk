@@ -93,9 +93,23 @@ _LLM_CurlCloseProcessExact(Handle) {
 
 _LLM_CurlAdoptProcess(Pid, Port := 0) {
 	OpenFn := _LLM_CurlArtifactPortFn(Port, "open_process", _LLM_CurlOpenProcessExact)
-	Handle := 0
-	if IsInteger(Pid) and Pid > 0
-		try Handle := OpenFn.Call(Pid)
+	if !IsInteger(Pid) or Pid <= 0
+		throw ValueError("Cannot adopt curl without a positive process id.", -1, Pid)
+	try Handle := OpenFn.Call(Pid)
+	catch as Err {
+		try LoggerError("LLM.transport",
+			"Failed to retain the exact curl process handle for PID {1}: {2}.",
+			Pid, Err.Message)
+		throw Error("Failed to retain the exact curl process handle for PID "
+			. Pid . ".", -1, Err.Message)
+	}
+	if !Handle {
+		try LoggerError("LLM.transport",
+			"Failed to retain the exact curl process handle for PID {1} (win32={2}).",
+			Pid, A_LastError)
+		throw Error("Failed to retain the exact curl process handle for PID "
+			. Pid . ".", -1, "win32=" . A_LastError)
+	}
 	return Map("pid", IsInteger(Pid) ? Pid : 0,
 		"handle", Handle, "released", false)
 }
@@ -113,7 +127,7 @@ _LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 		ProcessOwner["handle"] := 0
 	} finally Critical(PreviousCritical)
 	if !Handle
-		return true
+		return false
 	TerminateFn := _LLM_CurlArtifactPortFn(Port,
 		"terminate_process", _LLM_CurlTerminateProcessExact)
 	CloseFn := _LLM_CurlArtifactPortFn(Port,

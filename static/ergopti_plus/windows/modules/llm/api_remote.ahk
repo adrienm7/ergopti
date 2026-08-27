@@ -392,7 +392,13 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
         return true
     }
     reservation["pid"] := pid
-    process_owner := _LLM_CurlAdoptProcess(pid, Port)
+    try process_owner := _LLM_CurlAdoptProcess(pid, Port)
+    catch {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config,
+            terminal, DeleteFn)
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
     reservation["process_owner"] := process_owner
     if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
         _LLMRemote_QueueCurlReservationCancel(req_id, reservation, Port)
