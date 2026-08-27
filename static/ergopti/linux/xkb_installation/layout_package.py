@@ -596,12 +596,18 @@ def insert_type_sections(destination: str, source: str) -> tuple[str, list[str]]
     return content, handled
 
 
+_RULE_HEADER_RE = re.compile(r"^\s*!")
+
+
 def strip_ergopti_rule_lines(rules_content: str) -> tuple[str, int]:
     """Remove rule lines previously injected for Ergopti by older installers.
 
     Only assignment lines (they contain ``=``) mentioning ``ergopti`` are
-    removed; section headers and unrelated content are preserved. Returns the
-    cleaned content and the number of removed lines.
+    removed, together with the ``= types`` section headers those installers
+    appended when the removal leaves them without any entry; headers that
+    still hold entries and unrelated content are preserved, and a file that
+    carried nothing of ours is returned untouched. Returns the cleaned content
+    and the number of removed lines.
     """
     kept: list[str] = []
     removed = 0
@@ -610,7 +616,27 @@ def strip_ergopti_rule_lines(rules_content: str) -> tuple[str, int]:
             removed += 1
             continue
         kept.append(line)
-    return "".join(kept), removed
+    if removed == 0:
+        return rules_content, 0
+    result: list[str] = []
+    index = 0
+    while index < len(kept):
+        line = kept[index]
+        if _RULE_HEADER_RE.match(line) and "=" in line and "types" in line:
+            end = index + 1
+            while end < len(kept) and not _RULE_HEADER_RE.match(kept[end]):
+                end += 1
+            body = kept[index + 1 : end]
+            if not any(entry.strip() and not entry.lstrip().startswith("//") for entry in body):
+                # An emptied section is what the generation-2 installer left
+                # behind: dropping it with its blank lines restores the file.
+                removed += 1
+                index = end
+                continue
+        result.append(line)
+        index += 1
+    cleaned = "".join(result)
+    return cleaned.rstrip("\n") + "\n" if cleaned.strip() else "", removed
 
 
 def find_stale_bridge_links(system_root: Path) -> list[Path]:

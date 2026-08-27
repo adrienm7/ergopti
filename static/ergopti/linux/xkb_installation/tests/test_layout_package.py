@@ -206,17 +206,35 @@ class LegacyCleanupTests(unittest.TestCase):
         "  ergopti = +ergopti\n"
     )
 
-    def test_strip_removes_only_assignment_lines(self):
+    def test_strip_removes_the_assignments_and_the_section_they_emptied(self):
         cleaned, removed = strip_ergopti_rule_lines(self.OLD_RULES)
-        self.assertEqual(removed, 2)
-        self.assertIn("! layout = types", cleaned)
+        self.assertEqual(removed, 3)
+        self.assertNotIn("! layout = types", cleaned, "an emptied section header is litter")
+        self.assertIn("! model = types\n  * = complete\n", cleaned)
         self.assertNotIn("Ergopti_v2_2_1_plus", cleaned)
         self.assertNotIn("ergopti =", cleaned)
+
+    def test_strip_keeps_a_section_that_still_holds_foreign_entries(self):
+        rules = "! layout = types\n  foreign = +foreign\n  ergopti = +ergopti\n"
+        cleaned, removed = strip_ergopti_rule_lines(rules)
+        self.assertEqual(removed, 1)
+        self.assertEqual(cleaned, "! layout = types\n  foreign = +foreign\n")
+
+    def test_strip_restores_a_file_the_old_installer_appended_to_byte_for_byte(self):
+        """The generation-2 installer appended a blank line, a header and the
+        rule; the reporter of issue #84 still carried it at line 750."""
+        stock = "! model = types\n  * = complete\n\n! option = types\n  caps:internal = +caps(internal)\n"
+        patched = stock + "\n! layout = types\n  Ergopti_v2_2_1 = +Ergopti_v2_2_1\n"
+        cleaned, removed = strip_ergopti_rule_lines(patched)
+        self.assertEqual(removed, 2)
+        self.assertEqual(cleaned, stock)
 
     def test_strip_without_matches_is_noop(self):
         cleaned, removed = strip_ergopti_rule_lines("! model = types\n")
         self.assertEqual(removed, 0)
         self.assertEqual(cleaned, "! model = types\n")
+        untouched = "! layout = types\n\n! model = types\n  * = complete\n"
+        self.assertEqual(strip_ergopti_rule_lines(untouched), (untouched, 0))
 
     def test_stale_link_detection_and_removal(self):
         import tempfile
@@ -242,7 +260,7 @@ class LegacyCleanupTests(unittest.TestCase):
             rules_path = rules_dir / "evdev"
             rules_path.write_text(self.OLD_RULES, encoding="utf-8")
             removed = strip_legacy_evdev_patch(Path(tmp))
-            self.assertEqual(removed, 2)
+            self.assertEqual(removed, 3)
             content = rules_path.read_text(encoding="utf-8")
             self.assertNotIn("+Ergopti_v2_2_1_plus", content)
 
