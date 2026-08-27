@@ -403,6 +403,7 @@ helpers.describe("hotstrings config: override inputs stay data", function()
 		helpers.assert_type(serialize, "function",
 			"the public setter must retain the production serializer")
 		local hostile = '#abc"\n[injected]\nvalue = "owned'
+			.. string.char(1) .. string.char(127)
 		local content, serialize_err = serialize({
 			rolls = { color = hostile, sections = {} },
 		}, nil, {})
@@ -416,6 +417,10 @@ helpers.describe("hotstrings config: override inputs stay data", function()
 			"hostile bytes must round-trip as one string value")
 		helpers.assert_nil(decoded.injected,
 			"string content must never create a sibling TOML table")
+		helpers.assert_true(content:find(string.char(1), 1, true) == nil,
+			"the serializer must not publish a raw C0 control")
+		helpers.assert_true(content:find(string.char(127), 1, true) == nil,
+			"the serializer must not publish raw DEL")
 		local _, color_count = content:gsub("color%s*=", "")
 		helpers.assert_eq(color_count, 1, "the candidate must contain exactly one color field")
 

@@ -161,6 +161,18 @@ y = 20
 		end
 	end)
 
+	it("round-trips escaped control bytes without publishing raw controls", function()
+		local source = "a" .. string.char(1) .. "b" .. string.char(127)
+		local encoded = codec.encode({ value = source })
+		assert_true(encoded:find(string.char(1), 1, true) == nil,
+			"shared encoder must not publish raw C0 controls")
+		assert_true(encoded:find(string.char(127), 1, true) == nil,
+			"shared encoder must not publish raw DEL")
+		local decoded = codec.decode(encoded)
+		assert_true(type(decoded) == "table", "shared encoder output must decode")
+		assert_eq(decoded.value, source)
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 

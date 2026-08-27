@@ -36,6 +36,7 @@ if not _ok_i18n or type(i18n) ~= "table" then
 end
 local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
+local BasicString = require("toml_codec.basic_string")
 
 
 
@@ -169,9 +170,6 @@ local TOKEN_CANONICAL = {
 local function esc(s)
 	if type(s) ~= "string" then s = tostring(s or "") end
 
-	s = s:gsub("\\", "\\\\")
-	s = s:gsub("\"",  "\\\"")
-
 	-- Normalize literal newlines → {Enter} and tabs → {Tab} so the on-disk
 	-- format never mixes raw \n / \t with {Enter} / {Tab} for the same kind
 	-- of payload (matches the AHK side's EscapeTomlValue behaviour)
@@ -186,7 +184,7 @@ local function esc(s)
 		return "{" .. (canon or (name:sub(1,1):upper() .. name:sub(2):lower())) .. "}"
 	end)
 
-	return s
+	return BasicString.escape_body(s)
 end
 
 -- Forward declaration: publish_content() revalidates through this helper.
@@ -432,7 +430,7 @@ function M.batch_write(path, updates, file_adapter)
 		if type(v) == "boolean" then return v and "true" or "false" end
 		if type(v) == "number"  then return tostring(v) end
 		-- String: quote and escape
-		return "\"" .. tostring(v):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+		return "\"" .. BasicString.escape_body(tostring(v)) .. "\""
 	end
 
 	-- Read existing lines (empty table only when absence is proven).

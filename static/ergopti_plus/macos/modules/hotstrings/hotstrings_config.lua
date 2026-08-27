@@ -34,6 +34,7 @@ local TomlReader = require("infra.toml.reader")
 local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
+local BasicString = require("toml_codec.basic_string")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
@@ -203,12 +204,7 @@ local function parse_overrides(path)
 				if global_owned_record then
 					local wd = line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
 					if wd then
-						-- Single-pass unescape so \\n decodes as backslash+n not newline
-						wd = wd:gsub('\\(.)', function(c)
-								return ({n="\n", r="\r", t="\t", ['\\']='\\', ['"']='"'})[c]
-									or ('\\'..c)
-							end)
-						word_delimiters = wd
+						word_delimiters = BasicString.unescape_body(wd)
 					end
 				end
 				if not global_owned_record then

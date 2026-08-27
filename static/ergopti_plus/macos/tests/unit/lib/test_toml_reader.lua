@@ -233,6 +233,28 @@ helpers.describe("toml_reader: duplicate definition commitment", function()
 	end)
 end)
 
+helpers.describe("toml_reader: basic-string control characters", function()
+	helpers.it("decodes escaped controls without accepting their raw form", function()
+		local escaped_path = write_temp("escaped_controls", [==[
+[[s]]
+"t" = { output = "a\u0001b\u007Fc" }
+]==])
+		local data, committed = reader.parse(escaped_path)
+		helpers.assert_eq(committed, true)
+		helpers.assert_eq(data.sections.s.entries[1].output,
+			"a" .. string.char(1) .. "b" .. string.char(127) .. "c")
+		os.remove(escaped_path)
+
+		local raw_path = write_temp("raw_control", '[[s]]\n"t" = { output = "a'
+			.. string.char(1) .. 'b" }\n')
+		local rejected, raw_committed = reader.parse(raw_path)
+		helpers.assert_eq(raw_committed, false,
+			"a raw forbidden control must reject the complete read transaction")
+		helpers.assert_eq(rejected.sections, {})
+		os.remove(raw_path)
+	end)
+end)
+
 helpers.describe("toml_reader.parse: per-entry priority", function()
 	-- Regression: parse_entry previously skipped numeric inline-table values, so a
 	-- personal hotstring's `priority = N` was silently dropped and the macOS loader

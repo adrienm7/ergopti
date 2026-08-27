@@ -26,6 +26,7 @@ if not ok_editor then ui_editor = nil end
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
 local FileSystem = require("adapters.file_system")
+local BasicString = require("toml_codec.basic_string")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -232,13 +233,8 @@ local function parse_toml_section(content, section)
 			-- DEFAULT_CONFIG on every restart; match the sibling parser's class.
 			local key, val = line:match('^([%w_%-]+)%s*=%s*"(.*)"$')
 			if key then
-				-- Single-pass unescape: process \\(.) left-to-right so \\n is correctly
-			-- decoded as backslash+n, not as newline (the chained-gsub bug corrupted
-			-- \\n because \n was replaced before \\  was resolved)
-			val = val:gsub('\\(.)', function(c)
-					return ({n="\n", r="\r", t="\t", ['"']='"', ['\\']='\\'})[c] or ('\\'..c)
-				end)
-				result[key] = val
+				local decoded = BasicString.unescape_body(val)
+				if decoded ~= nil then result[key] = decoded end
 			end
 		end
 	end
@@ -249,12 +245,7 @@ end
 --- @param s string
 --- @return string
 local function escape_toml(s)
-	s = s:gsub("\\", "\\\\")
-	s = s:gsub('"',  '\\"')
-	s = s:gsub("\r", "\\r")
-	s = s:gsub("\n", "\\n")
-	s = s:gsub("\t", "\\t")
-	return s
+	return BasicString.escape_body(s)
 end
 
 --- Builds an isolated candidate without publishing partial edits to live consumers.
