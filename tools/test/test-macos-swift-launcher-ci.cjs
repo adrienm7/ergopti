@@ -16,7 +16,9 @@
  * so adding a job at only one of those sites created another false green.
  * Later, `swift test` began running XCTest followed by an empty swift-testing
  * runner. A dead XCTest process omitted its suite summary, but the second runner
- * supplied exit 0. The workflow therefore needs an independent XCTest verdict.
+ * supplied exit 0. XCTest-created guardian runtimes also inherited the production
+ * `Darwin.exit` boundary, so asynchronous cleanup could kill the whole runner.
+ * The workflow needs an independent verdict and tests need explicit termination.
  *
  * FEATURES & RATIONALE:
  * 1. Requires release compilation and XCTest execution on `macos-*`; an Ubuntu
@@ -44,6 +46,10 @@ const PACKAGE = fs.readFileSync(
 const SWIFT_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'launcher');
 const MAIN_SWIFT = fs.readFileSync(
 	path.join(SWIFT_ROOT, 'Sources', 'ErgoptiPlus', 'main.swift'),
+	'utf8'
+);
+const LEASE_WORKER_TESTS = fs.readFileSync(
+	path.join(SWIFT_ROOT, 'Tests', 'ErgoptiPlusTests', 'RemapLeaseWorkerTests.swift'),
 	'utf8'
 );
 const POSIX_SHIM = fs.readFileSync(
@@ -176,6 +182,16 @@ check(/func runPOSIXTestHelper\s*\(/.test(SWIFT_SOURCES),
 	'the real launcher must implement the cross-process POSIX test helper');
 check(!/^let k[A-Za-z0-9_]*\s*(?::[^=]+)?=/m.test(MAIN_SWIFT),
 	'shared constants must not live in executable main.swift globals');
+check(
+	!/terminateProcess:\s*@escaping\s*\(Int32\)\s*->\s*Void\s*=\s*\{\s*Darwin\.exit/s.test(SWIFT_SOURCES),
+	'(macos-xctest-explicit-termination-2026-08-27) guardian runtimes must choose process termination explicitly'
+);
+const guardianRuntimeTestCalls = (LEASE_WORKER_TESTS.match(/RemapLeaseGuardianRuntime\s*\(/g) || []).length;
+const explicitTestTerminations = (LEASE_WORKER_TESTS.match(/terminateProcess\s*:/g) || []).length;
+check(guardianRuntimeTestCalls >= 25,
+	'the guardian-runtime termination guard must cover the complete XCTest call-site class');
+check(explicitTestTerminations === guardianRuntimeTestCalls,
+	'(macos-xctest-explicit-termination-2026-08-27) every XCTest guardian runtime must replace process exit');
 
 const macosGate = withoutFullLineComments(jobBody('macos-ok'));
 check(macosGate.length > 100, '`macos-ok` is absent or empty');
