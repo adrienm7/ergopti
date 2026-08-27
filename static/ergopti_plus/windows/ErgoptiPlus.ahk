@@ -51,6 +51,19 @@ if A_IsCompiled {
 		EnvGet("ERGOPTI_UPDATER_BOOT_READY"))
 	try EnvSet("ERGOPTI_UPDATER_BOOT_READY", "")
 }
+global _UpdaterInheritedSwapFailurePath := ""
+global _UpdaterInheritedSwapFailure := ""
+if A_IsCompiled {
+	try {
+		_UpdaterInheritedSwapFailurePath := EnvGet(
+			"ERGOPTI_UPDATER_SWAP_TERMINAL")
+		_UpdaterInheritedSwapFailure := _Updater_LoadSwapFailureTerminal(
+			_UpdaterInheritedSwapFailurePath)
+		if (_UpdaterInheritedSwapFailure == "")
+			_UpdaterInheritedSwapFailurePath := ""
+	}
+	try EnvSet("ERGOPTI_UPDATER_SWAP_TERMINAL", "")
+}
 
 ; --- Single-owner gate: establish exclusivity BEFORE any hook/log/message pump ---
 ; #SingleInstance Force only replaces the previous instance at the END of THIS
@@ -1161,6 +1174,7 @@ if (_DriverStartupSmokeDir != "") {
 ; canonical Current.exe and request the guarded OnExit handoff. A canonical
 ; Current.exe similarly retires the old recovery copy only after it is ready.
 _Updater_ArmRecoveryMaintenanceAfterReady()
+_Updater_ArmInheritedSwapFailureNotice()
 
 ; Warm the persistent selection worker after the ready contract is published.
 ; Its dedicated source entry parses only UIA + the worker, so this does not
