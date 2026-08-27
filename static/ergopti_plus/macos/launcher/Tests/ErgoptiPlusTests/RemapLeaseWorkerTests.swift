@@ -574,10 +574,11 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		firstRuntime = nil
 
 		let replacementGeneration = "abcdef1234567890abcdef1234567890"
+		let replacementTermination = GuardianTerminationRecorder()
 		var secondRuntime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
 			paths: paths,
 			executor: GuardianRecordingLeaseCLIExecutor(),
-			terminateProcess: failUnexpectedGuardianTermination,
+			terminateProcess: replacementTermination.terminate,
 			generation: replacementGeneration
 		)
 		XCTAssertTrue(secondRuntime?.startObservingForTesting() == true)
@@ -597,6 +598,12 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertTrue(registration.arm(),
 			"a launchd replacement must durably ACK a fresh exact generation")
 		registration.cancelBeforeActivation()
+		try FileManager.default.removeItem(at: home)
+		XCTAssertEqual(
+			replacementTermination.wait(timeout: 2),
+			LeaseWorkerExit.success.rawValue,
+			"fixture teardown must join the replacement guardian's expected exit"
+		)
 		secondRuntime = nil
 	}
 	#endif
@@ -4248,6 +4255,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var activationDeadline = LeasePrivateCommandDeadline()
 		activationDeadline.arm(for: .activate(kLeaseModeActive), now: 0)
 		let boundaryTime = try XCTUnwrap(activationDeadline.deadline)
+		let acknowledgementBoundaryRead = 3
 		let identity = LeaseIdentity(
 			cliPath: "/unused/karabiner_cli",
 			token: token,
@@ -4266,21 +4274,21 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			parentOutputDescriptor: nullDescriptor,
 			uptime: {
 				clockReads += 1
-				if clockReads == 3 {
-					_ = self.waitForFile(at: acknowledgementMarker, timeout: 2)
+				if clockReads == acknowledgementBoundaryRead {
+					XCTAssertTrue(self.waitForFile(at: acknowledgementMarker, timeout: 2))
+					if parentPipe[1] >= 0 {
+						_ = Darwin.close(parentPipe[1])
+						parentPipe[1] = -1
+					}
 				}
-				if clockReads >= 5, parentPipe[1] >= 0 {
-					_ = Darwin.close(parentPipe[1])
-					parentPipe[1] = -1
-				}
-				return clockReads >= 3 ? boundaryTime : 0
+				return clockReads >= acknowledgementBoundaryRead ? boundaryTime : 0
 			}
 		)
 
 		let exitCode = runtime.run()
 
 		XCTAssertEqual(exitCode, LeaseWorkerExit.success.rawValue)
-		XCTAssertGreaterThanOrEqual(clockReads, 5)
+		XCTAssertGreaterThanOrEqual(clockReads, acknowledgementBoundaryRead)
 	}
 
 	/// Proves EOF preempts an in-flight pause before any PAUSED acknowledgement.
