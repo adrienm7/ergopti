@@ -100,6 +100,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/timings/timings_config.ahk
 
 #Include ../infra/window_utils.ahk
+#Include ../infra/external_url_policy.ahk
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
@@ -289,6 +290,7 @@ InstallSendNoOps()
 #Include unit/test_i18n.ahk
 #Include unit/test_locale_probe_is_silent.ahk
 #Include unit/test_window_utils.ahk
+#Include unit/test_external_url_policy.ahk
 #Include unit/test_text_utils.ahk
 #Include unit/test_registry.ahk
 #Include unit/test_personal_toml_io.ahk

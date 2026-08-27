@@ -194,8 +194,9 @@ local function ensure_ucc()
 			M.close()
 			if type(cb) == "function" then pcall(cb, body.name) end
 		elseif body.action == "open_url" and type(body.url) == "string" then
-			Logger.info(LOG, "Opening model source URL: %s.", body.url)
-			pcall(hs.urlevent.openURL, body.url)
+			if ui_builder.open_http_url(body.url) then
+				Logger.info(LOG, "Opened model source URL.")
+			end
 		end
 	end)
 end

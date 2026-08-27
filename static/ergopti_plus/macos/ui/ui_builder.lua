@@ -194,9 +194,48 @@ end
 
 
 
+-- ==========================================
+-- ==========================================
+-- ======= 2/ External URL Operations =======
+-- ==========================================
+-- ==========================================
+
+--- Opens an absolute HTTP(S) URL through the system handler.
+--- Untrusted webview messages reach this boundary, so the native side owns the
+--- scheme allowlist and basic syntax validation even when the frontend already
+--- constrains its links.
+--- @param url any Candidate URL from a webview bridge.
+--- @return boolean True when the native open request was accepted.
+function M.open_http_url(url)
+	if type(url) ~= "string" then
+		Logger.warn(LOG, "Refusing external URL: only absolute HTTP and HTTPS URLs are allowed.")
+		return false
+	end
+	local scheme, authority_and_path = url:match("^([%a][%w+%.%-]*)://(.+)$")
+	if not scheme
+		or (scheme:lower() ~= "http" and scheme:lower() ~= "https")
+		or authority_and_path:find("[%s%c]")
+		or authority_and_path:match("^[/?#]")
+	then
+		Logger.warn(LOG, "Refusing external URL: only absolute HTTP and HTTPS URLs are allowed.")
+		return false
+	end
+
+	local ok, accepted = pcall(hs.urlevent.openURL, url)
+	if not ok or accepted == false then
+		Logger.error(LOG, "Failed to open a validated external HTTP URL.")
+		return false
+	end
+	return true
+end
+
+
+
+
+
 -- ====================================
 -- ====================================
--- ======= 2/ Window Management =======
+-- ======= 3/ Window Management =======
 -- ====================================
 -- ====================================
 
