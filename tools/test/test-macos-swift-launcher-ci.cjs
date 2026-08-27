@@ -5,8 +5,8 @@
  * MODULE: macOS Swift Launcher CI Guard
  * DESCRIPTION:
  * Proves that the native ErgoptiPlus launcher is built and its XCTest target is
- * executed on a real macOS runner, and that this result participates in the
- * required macOS aggregate gate.
+ * executed to an explicit XCTest verdict on a real macOS runner, and that this
+ * result participates in the required macOS aggregate gate.
  *
  * ROOT CAUSE ENCODED:
  * The Hammerspoon unit and virtual-keyboard jobs both run on Ubuntu. The native
@@ -14,13 +14,18 @@
  * XCTest could go red, while `macos-ok` still reported success. The aggregate
  * also treated `skipped` as green and repeated dependency names outside `needs`,
  * so adding a job at only one of those sites created another false green.
+ * Later, `swift test` began running XCTest followed by an empty swift-testing
+ * runner. A dead XCTest process omitted its suite summary, but the second runner
+ * supplied exit 0. The workflow therefore needs an independent XCTest verdict.
  *
  * FEATURES & RATIONALE:
  * 1. Requires release compilation and XCTest execution on `macos-*`; an Ubuntu
  *    source grep cannot substitute for Darwin process and signal semantics.
  * 2. Requires `macos-ok` to consume `toJSON(needs)` and accept only `success`,
  *    so every declared dependency is gated and skipped work is never green.
- * 3. Floors the dependency count and checks Package.swift's test target, which
+ * 3. Requires the test step to capture line-buffered XCTest output and reject a
+ *    missing successful suite summary, even when `swift test` itself exits 0.
+ * 4. Floors the dependency count and checks Package.swift's test target, which
  *    prevents a syntactically present but vacuous `swift test` step.
  * ==============================================================================
  */
@@ -77,6 +82,15 @@ function jobBody(name) {
 	return nextJob ? rest.slice(0, nextJob.index) : rest;
 }
 
+function stepBody(job, name) {
+	const marker = new RegExp(`^      - name:\\s*['\"]?${escapeRegExp(name)}['\"]?\\s*\\r?$`, 'm');
+	const match = marker.exec(job);
+	if (!match) return '';
+	const rest = job.slice(match.index + match[0].length);
+	const nextStep = /\r?\n      -\s+/.exec(rest);
+	return nextStep ? rest.slice(0, nextStep.index) : rest;
+}
+
 function withoutFullLineComments(source) {
 	return source.replace(/^\s*#.*$/gm, '');
 }
@@ -111,10 +125,31 @@ check(/(?:^|\s)--product\s+ErgoptiPlus(?:\s|$)/.test(buildLine),
 	'the Swift build step must compile the ErgoptiPlus executable product');
 check(!buildLine.includes('|| true'), 'the Swift build step must not swallow compilation failure');
 
-const testLine = swiftJob.split(/\r?\n/).find((line) => /\brun:\s*swift test\b/.test(line)) || '';
-check(testLine.includes('--package-path static/ergopti_plus/macos/launcher'),
+const testStep = stepBody(swiftJob, 'Run Swift launcher tests');
+check(testStep.length > 100,
+	'`Run Swift launcher tests` is absent or too small to enforce a trustworthy XCTest verdict');
+check(/script -q \/dev\/null swift test\b/.test(testStep),
+	'the Swift test step must use a pseudo-terminal so the last completed XCTest is visible');
+check(testStep.includes('--package-path static/ergopti_plus/macos/launcher'),
 	'the Swift test step must execute the packaged launcher test target');
-check(!testLine.includes('|| true'), 'the Swift test step must not swallow XCTest failure');
+check(!testStep.includes('|| true'), 'the Swift test step must not swallow XCTest failure');
+check(/set -euo pipefail/.test(testStep),
+	'the Swift test step must propagate failures through its log-capture pipeline');
+const logVariable = /\b([A-Za-z_][A-Za-z0-9_]*)=["']?\$\(mktemp\)["']?/.exec(testStep)?.[1] || '';
+check(logVariable.length > 0,
+	'the Swift test step must allocate one transcript file with mktemp');
+check(
+	logVariable.length > 0 && new RegExp(`\\btee\\s+["']?\\$${escapeRegExp(logVariable)}\\b`).test(testStep),
+	'the Swift test step must capture the complete pseudo-terminal transcript'
+);
+check(
+	logVariable.length > 0 && new RegExp(
+		`grep\\s+-Fq\\s+["']Test Suite 'All tests' passed["']\\s+["']?\\$${escapeRegExp(logVariable)}\\b`
+	).test(testStep),
+	'(macos-xctest-summary-required-2026-08-27) the Swift test step must require the successful summary from that transcript'
+);
+check(/::error::[^\n]*XCTest[^\n]*summary/.test(testStep) && /\bexit 1\b/.test(testStep),
+	'(macos-xctest-summary-required-2026-08-27) a missing XCTest summary must fail the job explicitly');
 check(
 	/\.testTarget\s*\(\s*name:\s*"ErgoptiPlusTests"/s.test(PACKAGE),
 	'Package.swift must register the ErgoptiPlusTests target that CI claims to run'
@@ -169,4 +204,4 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log('[OK] macOS CI builds the release Swift launcher, runs XCTest, and gates every dependency success-only.');
+console.log('[OK] macOS CI requires a completed XCTest summary and gates every dependency success-only.');
