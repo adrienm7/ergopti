@@ -88,6 +88,65 @@ _KLPFW_ReadWorkerContract() {
 Test("keylogger: prefetch projection is staged by a generation-fenced detached worker",
 	_KLPFW_ReadWorkerContract)
 
+
+_KLPFW_TerminateJoined(*) {
+	return true
+}
+
+_KLPFW_TerminateUnconfirmed(*) {
+	return false
+}
+
+_KLPFW_ShutdownOwnsEveryProcessAndStage() {
+	FirstOwner := KLPF_NewOwnerId()
+	SecondOwner := KLPF_NewOwnerId()
+	Assert(FirstOwner != SecondOwner && RegExMatch(FirstOwner, "^[0-9A-Fa-f-]+$"),
+		"each parent process must mint an unforgeable stage namespace")
+	BuildBody := _DriverFuncBody("KLPF_RequestBuild")
+	RangeBody := _DriverFuncBody("KLPF_RequestRange")
+	Assert(InStr(BuildBody, "KLPFWorker.owner_id") > 0
+		&& InStr(RangeBody, "KLPFWorker.owner_id") > 0,
+		"both stage families must include the immutable parent owner id")
+
+	SavedJobs := KLPFWorker.jobs
+	try {
+		KLPFWorker.jobs := Map()
+		for JobKey, TerminateFn in Map(
+			"typing", _KLPFW_TerminateJoined,
+			"range:typing", _KLPFW_TerminateJoined) {
+			Handle := {}
+			Handle.terminate := TerminateFn
+			KLPFWorker.jobs[JobKey] := Map(
+				"generation", KLPFWorker.jobs.Count + 1,
+				"stage", A_Temp . "\\missing-stage",
+				"handle", Handle,
+				"kind", InStr(JobKey, "range:") = 1 ? "range" : "prefetch",
+				"on_terminal", 0)
+		}
+		AssertTrue(KLPF_CancelAll(),
+			"shutdown must synchronously confirm every worker tree is gone")
+		AssertEqual(KLPFWorker.jobs.Count, 0)
+
+		Handle := {}
+		Handle.terminate := _KLPFW_TerminateUnconfirmed
+		KLPFWorker.jobs["apps"] := Map(
+			"generation", 9, "stage", A_Temp . "\\missing-stage",
+			"handle", Handle, "kind", "prefetch", "on_terminal", 0)
+		AssertFalse(KLPF_CancelAll(),
+			"an unconfirmed process-tree termination must fail closed")
+	} finally {
+		KLPFWorker.jobs := SavedJobs
+	}
+
+	Lifecycle := _DriverFuncBody("Ergopti_OnShutdown")
+	CancelPos := InStr(Lifecycle, "KLPF_CancelAll()")
+	TerminalPos := InStr(Lifecycle, "ShutdownTerminal := true")
+	Assert(CancelPos > 0 && CancelPos < TerminalPos,
+		"OnExit must join prefetch workers before terminal ownership transfer")
+}
+Test("keylogger prefetch: shutdown joins unique process owners (prefetch-shutdown-owner)",
+	_KLPFW_ShutdownOwnsEveryProcessAndStage)
+
 global _KLPFW_FakeTerminated := 0
 global _KLPFW_FakeArgs := []
 
@@ -98,6 +157,7 @@ _KLPFW_FakeStart(*) {
 _KLPFW_FakeTerminate(*) {
 	global _KLPFW_FakeTerminated
 	_KLPFW_FakeTerminated += 1
+	return true
 }
 
 _KLPFW_FakeSpawn(executable, args, done) {
@@ -187,6 +247,7 @@ _KLPFW_SyncDoneSpawn(executable, args, done) {
 
 _KLPFW_DoneOnTerminate(done, *) {
 	done.Call(1, "", "terminated synchronously")
+	return true
 }
 
 _KLPFW_DoneOnTerminateSpawn(executable, args, done) {

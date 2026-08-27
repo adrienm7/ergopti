@@ -742,6 +742,18 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		PrefetchStopped := false
+		try PrefetchStopped := KLPF_CancelAll()
+		catch as Err
+			try LoggerError("Lifecycle", "Keylogger prefetch shutdown failed: {1}.", Err.Message)
+		if !PrefetchStopped {
+			try LoggerError("Lifecycle",
+				"Shutdown refused because a metrics projection worker is still alive.")
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		; The reload-specific durable commit is still allowed to refuse. It must
 		; precede every producer stop; ReloadTerminalInvoke will run the matching
 		; abort callback when this OnExit returns nonzero later in the preflight.
