@@ -23,26 +23,25 @@
 
 
 ; ====================================
-; ===== 2.1) Asset URL parser ========
+; ===== 2.1) Authenticated asset parser ========
 ; ====================================
 
-; Parses the release object and returns the ``browser_download_url`` of the
-; asset whose direct ``name`` field exactly matches ``AssetName``. GitHub asset
-; objects contain nested metadata (notably ``uploader``), so a flat-object regex
-; cannot identify their field boundary safely. Returns "" on malformed or
-; unusable input.
-_Updater_FindAssetUrl(Json, AssetName) {
+; Parses the release object and returns the exact asset URL plus the SHA-256
+; digest authenticated by GitHub's release API. Asset objects contain nested
+; metadata, so a flat-object regex cannot identify their field boundary safely.
+; Returns 0 on malformed, unauthenticated or unusable input.
+_Updater_FindAsset(Json, AssetName) {
 	if !(Json is String) || !(AssetName is String) || (AssetName == "")
-		return ""
+		return 0
 	try Release := JsonParse(Json)
 	catch {
-		return ""
+		return 0
 	}
 	if !(Release is Map) || !Release.Has("assets")
-		return ""
+		return 0
 	Assets := Release["assets"]
 	if !(Assets is Array)
-		return ""
+		return 0
 	for _, Asset in Assets {
 		if !(Asset is Map)
 			continue
@@ -50,11 +49,18 @@ _Updater_FindAssetUrl(Json, AssetName) {
 			continue
 		Name := Asset["name"]
 		Url := Asset["browser_download_url"]
-		if (Name is String) && (Url is String)
-			&& (Name == AssetName) && (Url != "")
-			return Url
+		if !(Name is String) || (Name !== AssetName)
+			continue
+		if !(Url is String) || (Url == "") || !Asset.Has("digest")
+			return 0
+		DigestField := Asset["digest"]
+		if !(DigestField is String)
+			return 0
+		if !RegExMatch(DigestField, "i)^sha256:([0-9a-f]{64})$", &Match)
+			return 0
+		return { Url: Url, Digest: StrLower(Match[1]) }
 	}
-	return ""
+	return 0
 }
 
 
@@ -1226,15 +1232,15 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
 		? BUNDLE_RELEASE_ASSET : "ErgoptiPlus.exe"
-	AssetUrl := _Updater_FindAssetUrl(Release.RawJson, AssetName)
+	Asset := _Updater_FindAsset(Release.RawJson, AssetName)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
 	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 		return false
 	}
-	if (AssetUrl == "") {
-		try LoggerError("Updater", "No asset named '{1}' in release '{2}'.", AssetName, Release.Tag)
+	if !IsObject(Asset) {
+		try LoggerError("Updater", "No authenticated asset named '{1}' in release '{2}'.", AssetName, Release.Tag)
 		if HasSuspendOverride {
 			if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 				return false
@@ -1244,6 +1250,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		MsgBox(t("updater.install_error_no_asset"), t("updater.title_update"), "Icon!")
 		return false
 	}
+	AssetUrl := Asset.Url
 	if !A_IsCompiled {
 		; Running from source — replacing the .ahk would be wrong, and the
 		; user is almost certainly developing on this very tree. Bail with a
@@ -1302,8 +1309,8 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
 
-	_Updater_StartStagingWorker(AssetUrl, NewExe, SwapScriptPath, CurrentExe,
-		Release.Tag, StagingEpoch)
+	_Updater_StartStagingWorker(AssetUrl, Asset.Digest, NewExe, SwapScriptPath,
+		CurrentExe, Release.Tag, StagingEpoch)
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
 	if IsObject(RebuildFn)
@@ -1353,7 +1360,7 @@ _Updater_EncodeUtf8Payload(Text) {
 ; environment names, then pass only a small single-line bootstrap to cmd.exe.
 ; This avoids synchronous script-file I/O on the menu thread and preserves
 ; release metadata as data rather than interpolating it into PowerShell syntax.
-_Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, NewExe,
+_Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs) {
 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
@@ -1370,6 +1377,7 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, NewExe,
 	Environment := [
 		{ Name: Prefix . "_SCRIPT", Value: ScriptPayload },
 		{ Name: Prefix . "_URL", Value: AssetUrl },
+		{ Name: Prefix . "_DIGEST", Value: ExpectedSha256 },
 		{ Name: Prefix . "_NEW_EXE", Value: NewExe },
 		{ Name: Prefix . "_SWAP_PATH", Value: SwapScriptPath },
 		{ Name: Prefix . "_CURRENT", Value: CurrentExe },
@@ -1397,7 +1405,7 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, NewExe,
 		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
 		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$swapPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i)};'
 		. '$worker=[ScriptBlock]::Create($source);'
-		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
+		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
 		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
 		. ') $swapPayload'
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
@@ -1434,7 +1442,7 @@ _Updater_ClearStagingTransport(Transport) {
 		try EnvSet(Pair.Name, "")
 }
 
-_Updater_StartStagingWorker(AssetUrl, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch) {
+_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch) {
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	StagingScript := _Updater_BuildStagingWorkerScript()
@@ -1449,7 +1457,7 @@ _Updater_StartStagingWorker(AssetUrl, NewExe, SwapScriptPath, CurrentExe, Tag, S
 	StartError := ""
 	try {
 		Transport := _Updater_BuildStagingTransport(
-			StagingScript, SwapScript, AssetUrl, NewExe, SwapScriptPath, CurrentExe,
+			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			Worker := ShellRunner_SpawnTreeOwned(
@@ -1609,7 +1617,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 ; Returns a self-contained worker script. Paths and URLs are passed as argv,
 ; never interpolated into the script, so release metadata cannot alter commands.
 _Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)' . "`n"
+	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)' . "`n"
 		. '$ErrorActionPreference = "Stop"' . "`n"
 		. 'try {' . "`n"
 		. '  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $NewExe) | Out-Null' . "`n"
@@ -1629,6 +1637,9 @@ _Updater_BuildStagingWorkerScript() {
 		. '  $ActualSize = (Get-Item -LiteralPath $NewExe).Length' . "`n"
 		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Content-Length mismatch" }' . "`n"
 		. '  if ($ActualSize -lt $MinimumSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Downloaded file is too small" }' . "`n"
+		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { Remove-Item -LiteralPath $NewExe -Force; throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
+		. '  $ActualDigest = (Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()' . "`n"
+		. '  if ($ActualDigest -cne $ExpectedSha256) { Remove-Item -LiteralPath $NewExe -Force; throw "SHA-256 digest mismatch" }' . "`n"
 		. '  $SwapSource = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
 		. '  $Utf8 = [Text.UTF8Encoding]::new($false)' . "`n"
 		. '  [System.IO.File]::WriteAllText($SwapScriptPath, $SwapSource, $Utf8)' . "`n"

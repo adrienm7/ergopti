@@ -65,8 +65,12 @@ Test("Updater: version parsing", _UpdaterTest_ParseVersion)
 
 _UpdaterTest_NestedAssetMetadata() {
 	Url := "https://example.test/download/ErgoptiPlus.exe"
-	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '"}]}'
-	AssertEqual(Url, _Updater_FindAssetUrl(ReleaseJson, "ErgoptiPlus.exe"),
+	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}'
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe")
+	Assert(IsObject(Asset),
+		"(ahk7-01-updater-nested-asset) an exact authenticated asset must resolve")
+	AssertEqual(Url, Asset.Url,
 		"(ahk7-01-updater-nested-asset) nested GitHub asset metadata must not hide the direct asset fields")
 }
 Test("Updater: nested GitHub asset metadata resolves the exact asset (ahk7-01-updater-nested-asset)",
@@ -77,23 +81,53 @@ _UpdaterTest_AssetResolutionIsStructuralAndExact() {
 	ReleaseJson := '{"assets":['
 		. '{"uploader":{"name":"ErgoptiPlus.exe","browser_download_url":"https://evil.test/nested.exe"},'
 		. '"name":"ErgoptiPlus.exe.bak","browser_download_url":"https://example.test/backup.exe"},'
-		. '{"name":"ErgoptiPlus.exe","browser_download_url":"https:\/\/example.test\/exact.exe"}'
+		. '{"name":"ErgoptiPlus.exe","browser_download_url":"https:\/\/example.test\/exact.exe",'
+		. '"digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}'
 		. ']}'
-	AssertEqual("https://example.test/exact.exe", _Updater_FindAssetUrl(ReleaseJson, "ErgoptiPlus.exe"),
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe")
+	Assert(IsObject(Asset), "an exact authenticated asset must resolve")
+	AssertEqual("https://example.test/exact.exe", Asset.Url,
 		"(ahk7-01-updater-nested-asset) nested names and prefix collisions must not impersonate a direct exact asset")
-	AssertEqual("", _Updater_FindAssetUrl(ReleaseJson, "ergoptiplus.exe"),
+	Assert(!IsObject(_Updater_FindAsset(ReleaseJson, "ergoptiplus.exe")),
 		"(ahk7-01-updater-nested-asset) release asset names are exact and case-sensitive")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":{"name":"ErgoptiPlus.exe"}}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":{"name":"ErgoptiPlus.exe"}}', "ErgoptiPlus.exe")),
 		"(ahk7-01-updater-nested-asset) assets must be an array")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":[{"name":7,"browser_download_url":false}]}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":7,"browser_download_url":false}]}', "ErgoptiPlus.exe")),
 		"(ahk7-01-updater-nested-asset) asset fields must be strings")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":""}]}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":""}]}', "ErgoptiPlus.exe")),
 		"(ahk7-01-updater-nested-asset) an empty download URL is not a usable asset")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":[}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[}', "ErgoptiPlus.exe")),
 		"(ahk7-01-updater-nested-asset) malformed release JSON fails closed")
 }
 Test("Updater: asset resolution is structural and exact (ahk7-01-updater-nested-asset)",
 	_UpdaterTest_AssetResolutionIsStructuralAndExact)
+
+
+_UpdaterTest_AssetRequiresGitHubSha256Digest() {
+	Url := "https://example.test/download/ErgoptiPlus.exe"
+	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	Asset := _Updater_FindAsset('{"assets":[{"name":"ErgoptiPlus.exe",'
+		. '"browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}',
+		"ErgoptiPlus.exe")
+	Assert(IsObject(Asset),
+		"an exact release asset with a GitHub SHA-256 digest must be accepted")
+	AssertEqual(Url, Asset.Url,
+		"the authenticated asset must preserve its exact download URL")
+	AssertEqual(Digest, Asset.Digest,
+		"the authenticated asset must expose the normalized lowercase SHA-256 digest")
+
+	for InvalidJson in [
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '"}]}',
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":""}]}',
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"md5:' . Digest . '"}]}',
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:1234"}]}'
+	] {
+		Assert(!IsObject(_Updater_FindAsset(InvalidJson, "ErgoptiPlus.exe")),
+			"a release asset without one exact trusted SHA-256 digest must fail closed")
+	}
+}
+Test("Updater: release asset requires GitHub SHA-256 authentication (updater-authenticated-asset-2026-08-28)",
+	_UpdaterTest_AssetRequiresGitHubSha256Digest)
 
 
 ; Regression: Updater_FetchLatestJson must call SetTimeouts before Req.Send()
@@ -335,6 +369,10 @@ _UpdaterTest_StagingWorkerScriptContract() {
 		"Updater staging worker script must apply a streaming timeout")
 	AssertEqual(true, InStr(Script, "$ActualSize -ne $ExpectedSize") > 0,
 		"Updater staging worker script must keep the truncated-download integrity check")
+	AssertEqual(true, InStr(Script, "Get-FileHash -LiteralPath $NewExe -Algorithm SHA256") > 0,
+		"Updater staging worker must hash the persisted executable before publishing READY")
+	AssertEqual(true, InStr(Script, "$ActualDigest -cne $ExpectedSha256") > 0,
+		"Updater staging worker must reject a byte-mutated executable before swap publication")
 	AssertEqual(true, InStr(Script, 'Write-Output "READY"') > 0,
 		"Updater staging worker script must emit the readiness token only after staging succeeds")
 }

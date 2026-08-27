@@ -3214,7 +3214,7 @@ _Updater_ParsePublishedAt(Json) {
 ; Each entry: { Tag, Body, HtmlUrl, PublishedAt, Prerelease, RawJson }. The original
 ; API order is preserved (GitHub returns most-recent first) so callers do not
 ; need to sort. RawJson carries the per-release JSON chunk so changelog-list install
-; can resolve the asset download URL via _Updater_FindAssetUrl (AHK-07).
+; can resolve the authenticated asset via _Updater_FindAsset (AHK-07).
 Updater_ParseReleasesList(Json, MainOnly := false) {
 	out := []
 	for _, chunk in _Updater_SplitReleasesArray(Json) {
