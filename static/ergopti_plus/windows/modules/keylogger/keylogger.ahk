@@ -1642,6 +1642,7 @@ KL_Stop() {
     ; ingest guard bypasses on _shutting_down, so leaving it armed would publish a
     ; ledger missing the closing batch.
     try KL_Mig_Cancel()
+	PrefetchStopped := KLPF_CancelAll()
     ; Release the keystroke hook FIRST so no late event lands in a
     ; buffer we are about to flush + serialise.
     try KL_Hook_Stop()
@@ -1690,10 +1691,11 @@ KL_Stop() {
     }
 	StateSaved := KL_SaveState()
 	HandleClosed := KL_CloseTodayFh()
-	if !WatchersStopped or !IngestComplete or !StateSaved or !HandleClosed {
+	if !PrefetchStopped or !WatchersStopped or !IngestComplete
+		or !StateSaved or !HandleClosed {
 		try LoggerError("Keylogger",
-			"Shutdown persistence incomplete (watchers={1}, ingest={2}, state={3}, close={4}).",
-			WatchersStopped, IngestComplete, StateSaved, HandleClosed)
+			"Shutdown persistence incomplete (prefetch={1}, watchers={2}, ingest={3}, state={4}, close={5}).",
+			PrefetchStopped, WatchersStopped, IngestComplete, StateSaved, HandleClosed)
 		return false
 	}
     Keylogger.initialized := false

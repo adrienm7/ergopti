@@ -62,8 +62,21 @@ KLPF_PrefetchPath(which) {
 ; disposable AHK worker and atomically publishes its finished staging file.
 ; The monotonic generation is the ownership fence: a cancelled/late worker can
 ; finish, but can never replace a newer dashboard result.
+KLPF_NewOwnerId() {
+	Guid := Buffer(16, 0)
+	Result := DllCall("Ole32\CoCreateGuid", "Ptr", Guid.Ptr, "HRESULT")
+	if Result != 0
+		throw OSError(Result, "CoCreateGuid failed")
+	TextBuffer := Buffer(78, 0)
+	if DllCall("Ole32\StringFromGUID2", "Ptr", Guid.Ptr,
+		"Ptr", TextBuffer.Ptr, "Int", 39, "Int") <= 0
+		throw Error("StringFromGUID2 failed")
+	return StrReplace(StrReplace(StrGet(TextBuffer, "UTF-16"), "{"), "}")
+}
+
 class KLPFWorker {
 		static generation := 0
+		static owner_id := KLPF_NewOwnerId()
 		static jobs := Map()
 		; Test seam: production leaves this at 0 and always uses ShellRunner.
 		static spawn_fn := 0
@@ -104,7 +117,8 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		}
 
 		generation := ++KLPFWorker.generation
-		stage := KLPF_PrefetchPath(which) . ".stage." . generation
+		stage := KLPF_PrefetchPath(which) . ".stage."
+				. KLPFWorker.owner_id . "." . generation
 		; Reserve the scheduler slot before any filesystem/process work. A timer may
 		; interrupt FileDelete or ShellRunner construction; it must observe this job
 		; and coalesce rather than start a sibling worker in that window.
@@ -128,7 +142,8 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 						KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
 						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
 		done := KLPF_OnWorkerDone.Bind(which, generation)
-		spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
+		spawn := IsObject(KLPFWorker.spawn_fn)
+				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
 		try handle := spawn.Call(executable, args, done)
 		catch as err {
 				try LoggerError("KLReader", "Could not spawn background metrics projection for '{1}': {2}", which, err.Message)
@@ -170,7 +185,8 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 		job_key := "range:" . which
 		KLPF_CancelBuild(job_key)
 		generation := ++KLPFWorker.generation
-		stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage." . generation . ".json"
+		stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage."
+				. KLPFWorker.owner_id . "." . generation . ".json"
 		try FileDelete(stage)
 		try apps_json := KL_JsonEncode(query["apps"])
 		catch as err {
@@ -189,7 +205,8 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS,
 						query["start_date"], query["end_date"], apps_json]
 		done := KLPF_OnWorkerDone.Bind(job_key, generation)
-		spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
+		spawn := IsObject(KLPFWorker.spawn_fn)
+				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
 		try handle := spawn.Call(executable, args, done)
 		catch as err {
 				try LoggerError("KLReader", "Could not spawn selected-range projection worker: {1}", err.Message)
@@ -227,21 +244,45 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 
 KLPF_CancelBuild(which) {
 		if !KLPFWorker.jobs.Has(which)
-				return
+				return true
 		job := KLPFWorker.jobs[which]
 		if job.Get("terminal_claimed", false) {
 				; Completion keeps the registry entry through atomic publish and callback.
 				; Record a suspend/replacement that interrupts that yielded region; the
 				; completing owner will downgrade its terminal before delivery.
 				job["cancel_requested"] := true
-				try job["handle"].terminate()
-				return
+				Terminated := false
+				try Terminated := job["handle"].terminate()
+				return (Terminated is Integer) && Terminated == true
 		}
 		; Claim terminal ownership before terminate(): a process handle is allowed
-		; to invoke done synchronously while being killed. Deleting the job first
-		; makes that callback stale, so cancel remains the one terminal outcome.
-		KLPF_CompleteJob(which, job["generation"], "canceled")
-		try job["handle"].terminate()
+		; to invoke done synchronously while being killed. Tree-owned terminate()
+		; confirms ActiveProcesses=0; an unconfirmed result retains this exact job
+		; so OnExit can refuse and retry instead of orphaning a detached worker.
+		job["terminal_claimed"] := true
+		job["cancel_requested"] := true
+		Terminated := false
+		try Terminated := job["handle"].terminate()
+		if !((Terminated is Integer) && Terminated == true)
+				return false
+		FSDelete(job["stage"])
+		KLPF_InvokeTerminal(job["on_terminal"], "canceled")
+		if KLPFWorker.jobs.Has(which)
+				&& KLPFWorker.jobs[which]["generation"] = job["generation"]
+				KLPFWorker.jobs.Delete(which)
+		return true
+}
+
+KLPF_CancelAll() {
+		Keys := []
+		for JobKey in KLPFWorker.jobs
+				Keys.Push(JobKey)
+		AllTerminated := true
+		for JobKey in Keys {
+				if !KLPF_CancelBuild(JobKey)
+						AllTerminated := false
+		}
+		return AllTerminated && KLPFWorker.jobs.Count = 0
 }
 
 KLPF_InvokeTerminal(on_terminal, status, stage := "") {
