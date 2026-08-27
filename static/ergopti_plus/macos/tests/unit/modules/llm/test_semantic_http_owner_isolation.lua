@@ -226,7 +226,9 @@ helpers.describe("LLM semantic HTTP ownership", function()
 			helpers.assert_eq(states.inference.requests[1].cancelled, false,
 				"starting warmup must not cancel pending inference")
 
-			states.warmup.requests[1].deliver({ ok = true, status = 200, body = "" })
+			states.warmup.requests[1].deliver({
+				ok = true, status = 200, body = [[{"data":[]}]],
+			})
 			states.inference.requests[1].deliver({
 				ok = true,
 				status = 200,
@@ -262,8 +264,12 @@ helpers.describe("LLM semantic HTTP ownership", function()
 			helpers.assert_eq(states.availability.requests[1].cancelled, false,
 				"warmup dispatch must not supersede availability")
 
-			states.warmup.requests[1].deliver({ ok = true, status = 200, body = "" })
-			states.availability.requests[1].deliver({ ok = true, status = 200, body = "" })
+			states.warmup.requests[1].deliver({
+				ok = true, status = 200, body = [[{"data":[]}]],
+			})
+			states.availability.requests[1].deliver({
+				ok = true, status = 200, body = [[{"data":[]}]],
+			})
 			helpers.assert_eq(api.is_ready(), true)
 			helpers.assert_eq(available, 1,
 				"availability must complete after warmup even when dispatched first")
@@ -294,7 +300,9 @@ helpers.describe("LLM semantic HTTP ownership", function()
 				"stop_warmup must cancel its exact request")
 			helpers.assert_eq(availability_request.cancelled, false,
 				"stop_warmup must not cancel pending availability")
-			availability_request.deliver({ ok = true, status = 200, body = "" })
+			availability_request.deliver({
+				ok = true, status = 200, body = [[{"data":[]}]],
+			})
 			helpers.assert_eq(lease_releases, 1,
 				"pending availability must still complete and release its caller lease")
 			helpers.assert_eq(missing, 0)

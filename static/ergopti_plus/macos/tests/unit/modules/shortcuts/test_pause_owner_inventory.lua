@@ -3368,7 +3368,7 @@ local function load_remote_native_http()
 			state.get_calls = state.get_calls + 1
 			state.callbacks[#state.callbacks + 1] = callback
 			local task = new_task()
-			if state.sync_get == true then callback(200, "{}", {}) end
+			if state.sync_get == true then callback(200, [[{"data":[]}]], {}) end
 			return task
 		end,
 		asyncPost = function(_, _, _, callback)
@@ -3440,7 +3440,7 @@ helpers.describe("HS-012 real Remote HTTP pause ownership", function()
 			helpers.assert_true(script_control.pause_all())
 			helpers.assert_eq(native.cancel_handles[2], task,
 				"pause retry must settle the same inference handle")
-			native.callbacks[1](200, "{}", {})
+			native.callbacks[1](200, [[{"data":[]}]], {})
 			helpers.assert_eq(deliveries, 0,
 				"logical revocation must fence a queued native response")
 			helpers.assert_true(script_control.resume_all())
@@ -3509,7 +3509,7 @@ helpers.describe("HS-012 real Remote HTTP pause ownership", function()
 			helpers.assert_eq(script_control.is_paused(), false,
 				"refused availability cancellation must prevent PAUSED publication")
 			helpers.assert_eq(native.cancel_handles[1], task)
-			native.callbacks[2](200, "{}", {})
+			native.callbacks[2](200, [[{"data":[]}]], {})
 			helpers.assert_eq(available, 1)
 			helpers.assert_eq(missing, 0)
 
@@ -3647,7 +3647,7 @@ local function load_commit_staged_backend(kind, options)
 		end
 		if mode == "sync_false" then
 			on_done(kind == "remote"
-				and { ok = true, status = 200, body = "" }
+				and { ok = true, status = 200, body = [[{"data":[]}]] }
 				or { status = 200 })
 			return false
 		end
@@ -3658,7 +3658,7 @@ local function load_commit_staged_backend(kind, options)
 			initial_callback = on_done
 		else
 			on_done(kind == "remote"
-				and { ok = true, status = 200, body = "" }
+				and { ok = true, status = 200, body = [[{"data":[]}]] }
 				or { status = 200 })
 		end
 		return true
@@ -3694,7 +3694,7 @@ local function load_commit_staged_backend(kind, options)
 		end,
 		fire_initial = function()
 			initial_callback(kind == "remote"
-				and { ok = true, status = 200, body = "" }
+				and { ok = true, status = 200, body = [[{"data":[]}]] }
 				or { status = 200 })
 		end,
 	}
@@ -4187,14 +4187,14 @@ helpers.describe("HS-012 real Remote warmup generation", function()
 			ApiRemote.warmup()
 			helpers.assert_eq(type(callback), "function",
 				"positive control must dispatch the real Remote warmup callback")
-			callback({ ok = true, status = 200, body = "" })
+			callback({ ok = true, status = 200, body = [[{"data":[]}]] })
 			helpers.assert_eq(ApiRemote.is_ready(), true,
 				"positive control proves the production callback can publish readiness")
 			ApiRemote.warmup()
 			local late_callback = callback
 			helpers.assert_eq(ApiRemote.pause_warmup(), false,
 				"non-exact HTTP settlement must reject the pause owner")
-			late_callback({ ok = true, status = 200, body = "" })
+			late_callback({ ok = true, status = 200, body = [[{"data":[]}]] })
 			helpers.assert_eq(ApiRemote.is_ready(), false,
 				"the generation fence must beat a refused native cancellation")
 			helpers.assert_eq(ApiRemote.resume_warmup(), false,
@@ -4204,7 +4204,7 @@ helpers.describe("HS-012 real Remote warmup generation", function()
 			helpers.assert_eq(ApiRemote.is_ready(), false,
 				"readiness stays fenced until the resumed request completes")
 			helpers.assert_eq(get_calls, 3)
-			callback({ ok = true, status = 200, body = "" })
+			callback({ ok = true, status = 200, body = [[{"data":[]}]] })
 			helpers.assert_eq(ApiRemote.is_ready(), true)
 			helpers.assert_true(ApiRemote.resume_warmup())
 			helpers.assert_eq(get_calls, 3,

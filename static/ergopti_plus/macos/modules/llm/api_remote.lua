@@ -865,6 +865,47 @@ local function build_headers(format, token)
 	return headers
 end
 
+
+--- Verifies that a successful models response belongs to the configured API.
+--- A generic HTTP 2xx only proves that something answered at the URL; captive
+--- portals and reverse-proxy error pages must not publish backend readiness.
+--- @param format string Provider wire format.
+--- @param response table HTTP response.
+--- @return boolean valid True only for a provider-shaped models catalogue.
+--- @return string reason Privacy-safe refusal reason.
+local function models_response_is_valid(format, response)
+	if type(response) ~= "table" or response.ok ~= true then
+		return false, "HTTP request failed"
+	end
+	if type(response.body) ~= "string" or response.body == "" then
+		return false, "response body is empty"
+	end
+	local decode_ok, decoded, decode_error = pcall(JsonCodec.decode, response.body)
+	if not decode_ok or decode_error ~= nil or type(decoded) ~= "table" then
+		return false, "response body is not valid JSON"
+	end
+	local catalogue_key = format == "gemini" and "models" or "data"
+	if type(decoded[catalogue_key]) ~= "table" then
+		return false, "models catalogue is missing"
+	end
+	return true, "ok"
+end
+
+
+--- Logs a provider-identity refusal without exposing response bytes or tokens.
+--- @param operation string Health operation label.
+--- @param entry table Active API entry.
+--- @param response table HTTP response.
+--- @param reason string Privacy-safe refusal reason.
+local function log_models_response_refusal(operation, entry, response, reason)
+	Logger.warn(LOG,
+		"Remote %s received an invalid models response (provider=%s, status=%s, reason=%s).",
+		operation,
+		tostring(entry and entry.provider),
+		tostring(type(response) == "table" and response.status or nil),
+		tostring(reason))
+end
+
 --- Build the JSON payload for the chosen provider format. We keep the body
 --- minimal but correct: one system message + one user message + temperature.
 --- Streaming is OFF — the engine-level pacing already protects paid quotas,
@@ -1094,13 +1135,17 @@ function M.warmup(_model_name, _profile, on_acquired)
 			end
 			_warmup_active = false
 			local was_ready = _is_ready
-			_is_ready = r.ok
+			local response_valid, refusal_reason = models_response_is_valid(format, r)
+			_is_ready = response_valid
 			if _is_ready and not was_ready then
 				Logger.info(LOG, "Remote API ready (provider=%s, model=%s).",
 					tostring(entry.provider), tostring(entry.model))
+			elseif type(r) == "table" and r.ok == true then
+				log_models_response_refusal("warmup", entry, r, refusal_reason)
 			elseif not _is_ready then
 				Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
-					tostring(r.status), tostring(entry.provider))
+					tostring(type(r) == "table" and r.status or nil),
+					tostring(entry.provider))
 			end
 		end
 		local dispatch_ok, dispatched_or_err = xpcall(function()
@@ -1294,10 +1339,17 @@ function M.check_availability(_model_name, on_available, on_missing)
 				or my_identity ~= _identity_generation
 				or find_active_entry() ~= identity_entry
 				or callback_state_ok ~= true or callback_paused == true then return end
-			if r.ok then
+			local response_valid, refusal_reason = models_response_is_valid(format, r)
+			if response_valid then
 				if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
 			else
-				if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", r.status == 0) end
+				if type(r) == "table" and r.ok == true then
+					log_models_response_refusal("availability check", entry, r, refusal_reason)
+				end
+				if type(on_missing) == "function" then
+					ApiCommon.protected_call(on_missing, "on_missing",
+						type(r) == "table" and r.status == 0)
+				end
 			end
 		end)
 		if dispatched ~= true then accepted = false end
