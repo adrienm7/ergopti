@@ -427,6 +427,8 @@ end
 --- Existing profile-level parameters belong to the user and may affect personal
 --- rules, so managed tap/hold and simultaneous rules carry their own values.
 --- A per-key tap timeout already present on a manipulator remains authoritative.
+--- The simultaneous threshold is one user-visible global for every managed rule;
+--- only personal rules outside this generated graph retain a local threshold.
 --- @param rules table Ungated ErgoptiPlus rules.
 --- @param tap_hold_timeout_ms number Default tap/hold timeout.
 --- @param simultaneous_threshold_ms number Simultaneous chord threshold.

@@ -736,6 +736,81 @@ helpers.describe("Karabiner generator managed lease gates", function()
 		helpers.assert_eq(simultaneous_threshold, 67,
 			"managed simultaneous rules must carry the configured threshold locally")
 	end)
+
+	helpers.it("keeps the global simultaneous window authoritative only for managed rules", function()
+		local saved_capsword = file_data["/managed/capsword.json"]
+		local saved_layer_keys = file_data["/managed/layer_keys.json"]
+		local saved_combos = file_data["/managed/combos.json"]
+		install_legacy_static_fixtures()
+		file_data["/managed/combos.json"] = _G.hs.json.encode({
+			description = "Managed simultaneous precedence probe",
+			manipulators = {
+				{
+					type = "basic",
+					from = {
+						simultaneous = { { key_code = "a" }, { key_code = "b" } },
+					},
+					parameters = {
+						["basic.simultaneous_threshold_milliseconds"] = 500,
+					},
+					to = { { key_code = "f19" } },
+				},
+			},
+		})
+
+		local generated, build_err, legacy_rules = build_with(
+			state({ simultaneous_threshold_ms = 67 }),
+			{ { id = "none", label = "None", karabiner_to = {} } },
+			{},
+			{}
+		)
+		file_data["/managed/capsword.json"] = saved_capsword
+		file_data["/managed/layer_keys.json"] = saved_layer_keys
+		file_data["/managed/combos.json"] = saved_combos
+		helpers.assert_not_nil(generated, build_err)
+
+		local source_threshold = nil
+		for _, rule in ipairs(legacy_rules) do
+			if rule.description == "Managed simultaneous precedence probe" then
+				source_threshold = rule.manipulators[1].parameters
+					["basic.simultaneous_threshold_milliseconds"]
+			end
+		end
+		helpers.assert_eq(source_threshold, 500,
+			"the fixture must prove that the managed source carried a local value")
+
+		local managed_threshold = nil
+		for _, rule in ipairs(generated.profiles[1].complex_modifications.rules) do
+			if rule.description:find("Managed simultaneous precedence probe", 1, true) then
+				managed_threshold = rule.manipulators[1].parameters
+					["basic.simultaneous_threshold_milliseconds"]
+			end
+		end
+		helpers.assert_eq(managed_threshold, 67,
+			"the user-visible global window must govern every managed simultaneous rule")
+
+		local personal = personal_rule("personal simultaneous timing")
+		personal.manipulators[1].from = {
+			simultaneous = { { key_code = "x" }, { key_code = "y" } },
+		}
+		personal.manipulators[1].parameters = {
+			["basic.simultaneous_threshold_milliseconds"] = 500,
+		}
+		local path = "/merge/personal-simultaneous-timing.json"
+		file_data[path] = _G.hs.json.encode(existing_config({ personal }))
+
+		local merged, merge_err = Generator.merge_into_existing_config(generated, path)
+		helpers.assert_not_nil(merged, merge_err)
+		local personal_threshold = nil
+		for _, rule in ipairs(merged.profiles[2].complex_modifications.rules) do
+			if rule.description == "personal simultaneous timing" then
+				personal_threshold = rule.manipulators[1].parameters
+					["basic.simultaneous_threshold_milliseconds"]
+			end
+		end
+		helpers.assert_eq(personal_threshold, 500,
+			"regeneration must never rewrite a personal simultaneous rule")
+	end)
 end)
 
 
