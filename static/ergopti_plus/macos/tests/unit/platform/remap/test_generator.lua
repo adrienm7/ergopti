@@ -344,6 +344,85 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			helpers.assert_true(found[id] == true, "missing tap-hold matrix rule for " .. id)
 		end
 	end)
+
+	helpers.it("logs one physical press and release from every sticky companion", function()
+		local sticky_shift = {
+			id = "sticky_shift",
+			label = "Sticky Shift",
+			karabiner_to = { { set_variable = { name = "sticky_shift", value = 1 } } },
+		}
+		local shift = {
+			id = "shift",
+			label = "Shift",
+			karabiner_to = { { key_code = "left_shift" } },
+		}
+		local result = Generator.build_karabiner_json(
+			make_state({
+				tap_hold_config = {
+					right_option = { tap = "sticky_shift", hold = "shift" },
+				},
+			}),
+			{NONE_ACTION, sticky_shift, shift},
+			{
+				{
+					id = "right_option",
+					label = "Right Option sticky ledger probe",
+					from = { key_code = "right_option" },
+				},
+			},
+			{},
+			nil,
+			"/fake/data_dir/"
+		)
+		local sticky_rule = nil
+		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+			if rule.description:find("Right Option sticky ledger probe", 1, true) then
+				sticky_rule = rule
+				break
+			end
+		end
+		helpers.assert_not_nil(sticky_rule, "the sticky-equivalent rule must be generated")
+		helpers.assert_true(#sticky_rule.manipulators > 1,
+			"the fixture must exercise companion manipulators before the main rule")
+
+		local press_command = "echo 'right_option' >> '/tmp/ergopti_test/metrics/karabiner_kc.log'"
+		local release_command = "echo 'U:right_option' >> '/tmp/ergopti_test/metrics/karabiner_kc.log'"
+		local press_events = {}
+		local release_events = {}
+		local held_left_command_covered = false
+		for index, manipulator in ipairs(sticky_rule.manipulators) do
+			local press_count = 0
+			for _, event in ipairs(manipulator.to or {}) do
+				if event.shell_command == press_command then
+					press_count = press_count + 1
+					helpers.assert_nil(press_events[event],
+						"each manipulator must own a fresh press event")
+					press_events[event] = true
+				end
+			end
+			local release_count = 0
+			for _, event in ipairs(manipulator.to_after_key_up or {}) do
+				if event.shell_command == release_command then
+					release_count = release_count + 1
+					helpers.assert_nil(release_events[event],
+						"each manipulator must own a fresh release event")
+					release_events[event] = true
+				end
+			end
+			helpers.assert_eq(press_count, 1,
+				"manipulator " .. index .. " must log one physical press")
+			helpers.assert_eq(release_count, 1,
+				"manipulator " .. index .. " must log one physical release")
+			for _, condition in ipairs(manipulator.conditions or {}) do
+				if condition.name == "ergopti_ke_held_left_command_" .. TEST_LEASE_TOKEN
+					and condition.value == 1 then
+					held_left_command_covered = true
+				end
+			end
+		end
+		helpers.assert_true(held_left_command_covered,
+			"the regression must cover the live sticky-while-command companion")
+	end)
 end)
 
 
