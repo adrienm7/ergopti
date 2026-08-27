@@ -64,10 +64,13 @@ Test("Updater: version parsing", _UpdaterTest_ParseVersion)
 
 
 _UpdaterTest_NestedAssetMetadata() {
-	Url := "https://example.test/download/ErgoptiPlus.exe"
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	Url := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
 	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}'
-	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe")
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
 	Assert(IsObject(Asset),
 		"(ahk7-01-updater-nested-asset) an exact authenticated asset must resolve")
 	AssertEqual(Url, Asset.Url,
@@ -78,25 +81,29 @@ Test("Updater: nested GitHub asset metadata resolves the exact asset (ahk7-01-up
 
 
 _UpdaterTest_AssetResolutionIsStructuralAndExact() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	ExactUrl := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
 	ReleaseJson := '{"assets":['
 		. '{"uploader":{"name":"ErgoptiPlus.exe","browser_download_url":"https://evil.test/nested.exe"},'
 		. '"name":"ErgoptiPlus.exe.bak","browser_download_url":"https://example.test/backup.exe"},'
-		. '{"name":"ErgoptiPlus.exe","browser_download_url":"https:\/\/example.test\/exact.exe",'
+		. '{"name":"ErgoptiPlus.exe","browser_download_url":"' . ExactUrl . '",'
 		. '"digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}'
 		. ']}'
-	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe")
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
 	Assert(IsObject(Asset), "an exact authenticated asset must resolve")
-	AssertEqual("https://example.test/exact.exe", Asset.Url,
+	AssertEqual(ExactUrl, Asset.Url,
 		"(ahk7-01-updater-nested-asset) nested names and prefix collisions must not impersonate a direct exact asset")
-	Assert(!IsObject(_Updater_FindAsset(ReleaseJson, "ergoptiplus.exe")),
+	Assert(!IsObject(_Updater_FindAsset(ReleaseJson, "ergoptiplus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) release asset names are exact and case-sensitive")
-	Assert(!IsObject(_Updater_FindAsset('{"assets":{"name":"ErgoptiPlus.exe"}}', "ErgoptiPlus.exe")),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":{"name":"ErgoptiPlus.exe"}}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) assets must be an array")
-	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":7,"browser_download_url":false}]}', "ErgoptiPlus.exe")),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":7,"browser_download_url":false}]}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) asset fields must be strings")
-	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":""}]}', "ErgoptiPlus.exe")),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":""}]}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) an empty download URL is not a usable asset")
-	Assert(!IsObject(_Updater_FindAsset('{"assets":[}', "ErgoptiPlus.exe")),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) malformed release JSON fails closed")
 }
 Test("Updater: asset resolution is structural and exact (ahk7-01-updater-nested-asset)",
@@ -104,11 +111,14 @@ Test("Updater: asset resolution is structural and exact (ahk7-01-updater-nested-
 
 
 _UpdaterTest_AssetRequiresGitHubSha256Digest() {
-	Url := "https://example.test/download/ErgoptiPlus.exe"
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	Url := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
 	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	Asset := _Updater_FindAsset('{"assets":[{"name":"ErgoptiPlus.exe",'
-		. '"browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}',
-		"ErgoptiPlus.exe")
+	ReleaseJson := '{"assets":[{"name":"ErgoptiPlus.exe",'
+		. '"browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}'
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
 	Assert(IsObject(Asset),
 		"an exact release asset with a GitHub SHA-256 digest must be accepted")
 	AssertEqual(Url, Asset.Url,
@@ -122,8 +132,17 @@ _UpdaterTest_AssetRequiresGitHubSha256Digest() {
 		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"md5:' . Digest . '"}]}',
 		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:1234"}]}'
 	] {
-		Assert(!IsObject(_Updater_FindAsset(InvalidJson, "ErgoptiPlus.exe")),
+		Assert(!IsObject(_Updater_FindAsset(InvalidJson, "ErgoptiPlus.exe", Tag)),
 			"a release asset without one exact trusted SHA-256 digest must fail closed")
+	}
+	for ForeignJson in [
+		StrReplace(ReleaseJson,
+			"github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+			"example.invalid/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO),
+		StrReplace(ReleaseJson, "/" . Tag . "/", "/v9.9.8/")
+	] {
+		Assert(!IsObject(_Updater_FindAsset(ForeignJson, "ErgoptiPlus.exe", Tag)),
+			"a foreign repository or tag URL must fail closed")
 	}
 }
 Test("Updater: release asset requires GitHub SHA-256 authentication (updater-authenticated-asset-2026-08-28)",
