@@ -941,6 +941,7 @@ class Keylogger {
 	static lifecycle_generation := 0
     static _pending_entries := []
 	static _retry_snapshots := []
+	static _flush_in_progress := false
     ; Ledger location + lifecycle flag, read by modules/keylogger/
     ; keylogger_text_migration.ahk. AHK v2 THROWS on an undeclared static, so a
     ; missing field here is a crash in the migration test rather than a skip.

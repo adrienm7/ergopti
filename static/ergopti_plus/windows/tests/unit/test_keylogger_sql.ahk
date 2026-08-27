@@ -242,6 +242,23 @@ Test("keylogger journal: flush failure retains the batch (sustained-typing-durab
 	_KLSql_JournalFailureRetainsUnprovenEntries)
 
 
+_KLSql_ShutdownRefusesDetachedFlushDebt() {
+	Saved := Keylogger._flush_in_progress
+	try {
+		Keylogger._flush_in_progress := true
+		AssertFalse(KL_FlushShutdownReady(),
+			"OnExit must refuse while a detached snapshot has only a local owner")
+		Keylogger._flush_in_progress := false
+		AssertTrue(KL_FlushShutdownReady(),
+			"shutdown may proceed once the interrupted flush released its debt")
+	} finally {
+		Keylogger._flush_in_progress := Saved
+	}
+}
+Test("keylogger shutdown: detached flush debt refuses exit (onexit-detached-flush-debt)",
+	_KLSql_ShutdownRefusesDetachedFlushDebt)
+
+
 
 
 

@@ -46,6 +46,20 @@ _KL_JournalRestoreSnapshot(Snapshot, StartIndex := 1) {
 	}
 }
 
+; OnExit interrupts the current AHK thread. A detached flush keeps its only
+; snapshot in that interrupted thread until it publishes or restores it, so
+; terminal teardown must refuse while this latch is held. Returning from the
+; OnExit callback lets that exact owner resume; a later exit attempt can then
+; observe the cleared latch without stealing or duplicating the snapshot.
+KL_FlushShutdownReady() {
+	PreviousCritical := Critical("On")
+	try {
+		return !Keylogger._flush_in_progress
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 ; Publishes the current RAM queue to the append-only JSONL journal. A true
 ; result proves every detached entry crossed the OS-visible flush boundary.
 ; Failed or unflushed entries are restored ahead of entries accepted while the
