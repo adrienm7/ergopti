@@ -42,9 +42,11 @@ local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local TokenCrypto    = require("modules.llm.api_token_crypto")
 local _http_adapter  = require("adapters.http_client")
-local _infer_client  = _http_adapter.new()   -- used for inference POST requests
-local _check_client  = _http_adapter.new()   -- used for explicit availability checks
-local _warmup_client = _http_adapter.new()   -- warmup has independent cancellation ownership
+local REQUEST_TIMEOUT_MS = Timings.ms("llm", "request_timeout_ms")
+local _http_options = { timeout_ms = REQUEST_TIMEOUT_MS }
+local _infer_client  = _http_adapter.new(_http_options)   -- used for inference POST requests
+local _check_client  = _http_adapter.new(_http_options)   -- used for explicit availability checks
+local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independent cancellation ownership
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
@@ -162,8 +164,6 @@ end
 
 local MODEL_PRICES
 M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES = load_api_providers()
-
-local REQUEST_TIMEOUT_S = Timings.sec("llm", "request_timeout_ms")
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy from _shared/modules/llm/inference.json (api_common.lua) so the

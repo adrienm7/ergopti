@@ -9,7 +9,7 @@
 --- so domain modules can make HTTP requests without a direct dependency on hs.http.
 ---
 --- FACTORY PATTERN:
---- require("adapters.http_client").new() returns a fresh independent instance.
+--- require("adapters.http_client").new(options) returns a fresh independent instance.
 --- Each LLM backend owns its own instance so concurrent requests from different
 --- backends do not cancel each other (the old singleton model allowed api_mlx's
 --- warmup to cancel api_ollama's in-flight request).
@@ -103,8 +103,23 @@ local TIMEOUT_CLEANUP_PENDING_ERROR = "timeout cleanup pending"
 --- Creates and returns a new independent HttpClient instance.
 --- Each instance manages its own in-flight request slot and timeout timer,
 --- so concurrent users (e.g. different LLM backends) do not interfere.
+--- @param options table|nil Optional configuration (`timeout_ms` overrides the default).
 --- @return table A fresh HttpClient instance with post/get/cancel/isActive methods.
-local function new()
+local function new(options)
+	if options ~= nil and type(options) ~= "table" then
+		error("HttpClient.new(): options must be a table", 2)
+	end
+	options = options or {}
+	local timeout_ms = options.timeout_ms
+	if timeout_ms == nil then
+		timeout_ms = DEFAULT_TIMEOUT_MS
+	elseif type(timeout_ms) ~= "number"
+		or timeout_ms ~= timeout_ms
+		or timeout_ms == math.huge
+		or timeout_ms == -math.huge
+		or timeout_ms <= 0 then
+		error("HttpClient.new(): timeout_ms must be a finite positive number", 2)
+	end
 	local inst = {}
 
 	-- Per-instance state
@@ -268,7 +283,7 @@ local function new()
 		-- never a same-named nil global declared below it
 		local timeout_handle
 		local schedule_ok, handle_or_err, committed = xpcall(function()
-			return TimerScheduler.after(DEFAULT_TIMEOUT_MS / MS_PER_SEC, function()
+			return TimerScheduler.after(timeout_ms / MS_PER_SEC, function()
 				if _cancelled or not _request_active or my_generation ~= _generation
 					or _timeout_timer ~= timeout_handle then
 					return
@@ -281,7 +296,7 @@ local function new()
 				_cancelled = true
 				_request_active = false
 				_cancel_active_task()
-				Logger.warn(LOG, "Request timed out after %dms.", DEFAULT_TIMEOUT_MS)
+				Logger.warn(LOG, "Request timed out after %dms.", timeout_ms)
 				invoke_callback(callback, {
 					ok = false,
 					status = 0,

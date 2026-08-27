@@ -38,7 +38,7 @@ chain_fallback_ms = 500
 
 # HTTP request hard timeout for the remote LLM API.
 # AHK: api_remote.ahk LLM_REMOTE_TIMEOUT_MS.
-# HS:  api_remote.lua REQUEST_TIMEOUT_S.
+# HS:  api_remote.lua REQUEST_TIMEOUT_MS.
 request_timeout_ms = 30000
 
 # Hard deadline for one macOS Keychain security(1) subprocess. This does not
