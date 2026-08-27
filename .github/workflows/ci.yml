@@ -2168,22 +2168,46 @@ jobs:
           Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
           Write-Host "BUNDLE_CHANNEL     stamped: $channel"
 
-      - name: Download AutoHotkey v2 runtime and Ahk2Exe
+      - name: Download authenticated Windows compiler toolchain
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
-          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "$env:TEMP\AutoHotkey" -Force
-          gh release download --repo AutoHotkey/Ahk2Exe --pattern "*.zip" --dir "$env:TEMP\Ahk2ExeZip"
-          $z = Get-ChildItem "$env:TEMP\Ahk2ExeZip" -Filter "*.zip" | Select-Object -First 1
-          Expand-Archive -Path $z.FullName -DestinationPath "$env:TEMP\Ahk2Exe" -Force
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+          $runtimeUrl = $contract.runtime.url
+          $runtimeSha256 = $contract.runtime.sha256
+          $compilerTag = $contract.compiler.tag
+          $compilerAsset = $contract.compiler.asset
+          $compilerUrl = $contract.compiler.url
+          $compilerSha256 = $contract.compiler.sha256
+          $runtimeArchive = "$env:TEMP\$($contract.runtime.asset)"
+          $compilerArchive = "$env:TEMP\$compilerAsset"
+
+          Invoke-WebRequest -Uri $runtimeUrl -OutFile $runtimeArchive -UseBasicParsing
+          Invoke-WebRequest -Uri $compilerUrl -OutFile $compilerArchive -UseBasicParsing
+          $runtimeActual = (Get-FileHash -LiteralPath $runtimeArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $compilerActual = (Get-FileHash -LiteralPath $compilerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($runtimeActual -cne $runtimeSha256) {
+              throw "AutoHotkey v$($contract.runtime.version) archive digest mismatch: $runtimeActual"
+          }
+          if ($compilerActual -cne $compilerSha256) {
+              throw "Ahk2Exe $compilerTag archive digest mismatch: $compilerActual"
+          }
+
+          Expand-Archive -LiteralPath $runtimeArchive -DestinationPath "$env:TEMP\AutoHotkey" -Force
+          Expand-Archive -LiteralPath $compilerArchive -DestinationPath "$env:TEMP\Ahk2Exe" -Force
+          if (-not (Test-Path -LiteralPath "$env:TEMP\AutoHotkey\AutoHotkey64.exe" -PathType Leaf)) {
+              throw "The authenticated AutoHotkey archive has no expected runtime."
+          }
+          if (-not (Test-Path -LiteralPath "$env:TEMP\Ahk2Exe\Ahk2Exe.exe" -PathType Leaf)) {
+              throw "The authenticated Ahk2Exe archive has no expected compiler."
+          }
+          Write-Host "Authenticated compiler toolchain: AutoHotkey v$($contract.runtime.version) + $compilerTag"
 
       - name: Compile ErgoptiPlus.ahk
         shell: pwsh
         run: |
-          $ahk2exe = Get-ChildItem "$env:TEMP\Ahk2Exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1 -ExpandProperty FullName
-          $runtime = Get-ChildItem "$env:TEMP\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
+          $ahk2exe = "$env:TEMP\Ahk2Exe\Ahk2Exe.exe"
+          $runtime = "$env:TEMP\AutoHotkey\AutoHotkey64.exe"
           $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
           $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
           $icon = "${{ github.workspace }}\static\favicon.ico"
@@ -2198,6 +2222,57 @@ jobs:
               exit 1
           }
           Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
+
+      - name: Sign and verify ErgoptiPlus.exe
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+          WINDOWS_SIGNER_SUBJECT: ${{ secrets.WINDOWS_SIGNER_SUBJECT }}
+        run: |
+          foreach ($required in @(
+              "WINDOWS_SIGNING_CERTIFICATE_BASE64",
+              "WINDOWS_SIGNING_CERTIFICATE_PASSWORD",
+              "WINDOWS_SIGNER_SUBJECT")) {
+              if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($required))) {
+                  throw "Required Windows signing secret '$required' is missing."
+              }
+          }
+
+          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $pfx = "$env:RUNNER_TEMP\ergopti-windows-signing.pfx"
+          $signTools = @(Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+              -Recurse -Filter "signtool.exe" -File |
+              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+              Sort-Object FullName -Descending)
+          if ($signTools.Count -eq 0) {
+              throw "No x64 signtool.exe was found on the Windows runner."
+          }
+          $signTool = $signTools[0].FullName
+
+          try {
+              [IO.File]::WriteAllBytes(
+                  $pfx,
+                  [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
+              & $signTool sign /fd SHA256 /td SHA256 `
+                  /tr "https://timestamp.digicert.com" `
+                  /f $pfx /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD $exe
+              if ($LASTEXITCODE -ne 0) {
+                  throw "signtool failed with exit code $LASTEXITCODE."
+              }
+          } finally {
+              Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($signature.Status -ne 'Valid') {
+              throw "ErgoptiPlus.exe Authenticode status is '$($signature.Status)', expected 'Valid'."
+          }
+          if ($null -eq $signature.SignerCertificate -or
+              $signature.SignerCertificate.Subject -cne $env:WINDOWS_SIGNER_SUBJECT) {
+              throw "Unexpected Authenticode publisher '$($signature.SignerCertificate.Subject)'."
+          }
+          Write-Host "Verified Authenticode publisher: $($signature.SignerCertificate.Subject)"
 
       - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
         # The unit test suite (test-ahk job) runs against source .ahk files with

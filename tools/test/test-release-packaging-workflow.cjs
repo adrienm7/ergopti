@@ -19,6 +19,18 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..', '..');
 const workflowPath = path.join(root, '.github', 'workflows', 'ci.yml');
 const workflow = fs.readFileSync(workflowPath, 'utf8');
+const windowsToolchainContractPath = path.join(
+	root,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'updater',
+	'windows_release_toolchain.json'
+);
+const windowsToolchainContract = JSON.parse(
+	fs.readFileSync(windowsToolchainContractPath, 'utf8')
+);
 const errors = [];
 
 const stampStep = workflow.match(
@@ -32,6 +44,79 @@ if (!stampStep) {
 	}
 	if (/windows\\lib\\bundle\.ahk/.test(stampStep[1])) {
 		errors.push('the Windows release still stamps the removed lib/bundle.ahk path');
+	}
+}
+
+const windowsToolchainStep = workflow.match(
+	/- name: Download authenticated Windows compiler toolchain([\s\S]*?)(?=\n\s{6}- name:)/
+);
+if (!windowsToolchainStep) {
+	errors.push('the Windows release must have one authenticated compiler-toolchain step');
+} else {
+	const body = windowsToolchainStep[1];
+	if (
+		!body.includes('windows_release_toolchain.json') ||
+		!body.includes('ConvertFrom-Json')
+	) {
+		errors.push('the Windows compiler toolchain must consume its shared authenticated contract');
+	}
+	for (const token of [
+		'$contract.runtime.url',
+		'$contract.runtime.sha256',
+		'$contract.compiler.url',
+		'$contract.compiler.sha256',
+		'Get-FileHash',
+	]) {
+		if (!body.includes(token)) {
+			errors.push(`the Windows compiler toolchain is missing pinned token ${token}`);
+		}
+	}
+	if (/gh release download|--pattern\s+['"]?\*\.zip|Select-Object\s+-First\s+1/i.test(body)) {
+		errors.push('the Windows compiler toolchain must not select a mutable or ambiguous archive');
+	}
+}
+
+for (const [component, expected] of Object.entries({
+	runtime: {
+		version: '2.0.19',
+		asset: 'AutoHotkey_2.0.19.zip',
+		sha256: '4e0d0e65655066a646a210951320feaef0729a3597177131adaec4066bef5869',
+	},
+	compiler: {
+		tag: 'Ahk2Exe1.1.37.02a2',
+		asset: 'Ahk2Exe1.1.37.02a2.zip',
+		sha256: 'c29b8c3a5124850d79fc9e66e2ca79677c377d7f31631ad3022ba159c5d9e3be',
+	},
+})) {
+	for (const [field, value] of Object.entries(expected)) {
+		if (windowsToolchainContract[component]?.[field] !== value) {
+			errors.push(`the Windows ${component} contract must pin ${field}=${value}`);
+		}
+	}
+	if (!/^https:\/\/github\.com\/AutoHotkey\//.test(windowsToolchainContract[component]?.url)) {
+		errors.push(`the Windows ${component} contract must use an exact official GitHub URL`);
+	}
+}
+
+const windowsSigningStep = workflow.match(
+	/- name: Sign and verify ErgoptiPlus\.exe([\s\S]*?)(?=\n\s{6}- name:)/
+);
+if (!windowsSigningStep) {
+	errors.push('the Windows release must sign and verify the compiled executable');
+} else {
+	const body = windowsSigningStep[1];
+	for (const token of [
+		'WINDOWS_SIGNING_CERTIFICATE_BASE64',
+		'WINDOWS_SIGNING_CERTIFICATE_PASSWORD',
+		'WINDOWS_SIGNER_SUBJECT',
+		'signtool',
+		'Get-AuthenticodeSignature',
+		"Status -ne 'Valid'",
+		'SignerCertificate.Subject',
+	]) {
+		if (!body.includes(token)) {
+			errors.push(`the Windows signing gate is missing ${token}`);
+		}
 	}
 }
 
