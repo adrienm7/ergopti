@@ -449,6 +449,9 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	if !_LLM_Ollama_Async.Has(oldest_id)
 		return
 	oldest_entry := _LLM_Ollama_Async[oldest_id]
+	; Detach before cleanup or callbacks: either boundary can re-enter dispatch,
+	; and the terminated owner must no longer participate in successor trimming.
+	_LLM_Ollama_Async.Delete(oldest_id)
 	; Kill the curl child so it does not keep writing to the temp file
 	; after we abandon the registry entry — the PID would otherwise
 	; accumulate until it expires naturally (up to 3 min).
@@ -459,7 +462,6 @@ _LLM_Ollama_TrimAsyncRegistry() {
 	; machine) hangs forever waiting for a callback that will never arrive.
 	if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
 		_LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail")
-	_LLM_Ollama_Async.Delete(oldest_id)
 }
 
 

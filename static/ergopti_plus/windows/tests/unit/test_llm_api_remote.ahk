@@ -923,6 +923,49 @@ _RemoteTrimRegistry_DropsOldestWhenAtCap() {
 Test("_LLMRemote_TrimAsyncRegistry: removes oldest entry when at cap", _RemoteTrimRegistry_DropsOldestWhenAtCap)
 
 
+_RemoteTrimRegistry_ReentrantSuccessor(State, *) {
+	State["callbacks"] += 1
+	if State["callbacks"] != 1
+		return
+	_LLMRemote_ReserveRequest(77013, (*) => 0, (*) => 0, 1000, 13,
+		_RemoteCancelPublication_Resolved())
+}
+
+_RemoteTrimRegistry_DetachesBeforeReentrantCallback() {
+	global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+	OldMax := LLM_REMOTE_MAX_INFLIGHT
+	State := Map("callbacks", 0)
+	LLM_REMOTE_MAX_INFLIGHT := 2
+	_LLM_Remote_Async := Map(
+		77011, Map("cancelled", false,
+			"on_fail", _RemoteTrimRegistry_ReentrantSuccessor.Bind(State)),
+		77012, Map("cancelled", false, "on_fail", (*) => 0))
+	Err := ""
+	try _LLMRemote_TrimAsyncRegistry()
+	catch as Caught
+		Err := Caught.Message
+	finally LLM_REMOTE_MAX_INFLIGHT := OldMax
+	try {
+		AssertEqual("", Err,
+			"remote trim must not delete an owner already detached by reentrant work")
+		AssertEqual(1, State["callbacks"],
+			"the displaced remote owner must emit exactly one terminal callback")
+		AssertFalse(_LLM_Remote_Async.Has(77011),
+			"the displaced owner must be absent before its callback starts")
+		AssertTrue(_LLM_Remote_Async.Has(77012),
+			"the surviving request must remain registered")
+		AssertTrue(_LLM_Remote_Async.Has(77013),
+			"the callback's successor must not be trimmed or removed by its predecessor")
+		AssertEqual(2, _LLM_Remote_Async.Count,
+			"remote trim plus one reentrant successor must finish exactly at the cap")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: trim detaches owner before reentrant callback (async-trim-detach-before-callback)",
+	_RemoteTrimRegistry_DetachesBeforeReentrantCallback)
+
+
 
 
 

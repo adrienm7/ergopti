@@ -670,6 +670,9 @@ _LLMRemote_TrimAsyncRegistry() {
     if !_LLM_Remote_Async.Has(oldest_id)
         return
     oldest_entry := _LLM_Remote_Async[oldest_id]
+    ; Detach before cleanup or callbacks: either boundary can re-enter dispatch,
+    ; and the terminated owner must no longer participate in successor trimming.
+    _LLM_Remote_Async.Delete(oldest_id)
         ; Abort the live WinHTTP request so the COM object + socket are
         ; released now rather than lingering until WinHTTP's own timeout.
         if oldest_entry.Has("http")
@@ -683,7 +686,6 @@ _LLMRemote_TrimAsyncRegistry() {
         ; machine) hangs forever waiting for a callback that will never arrive.
         if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
             _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail")
-        _LLM_Remote_Async.Delete(oldest_id)
         return
 }
 

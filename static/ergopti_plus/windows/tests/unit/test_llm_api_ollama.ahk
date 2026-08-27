@@ -503,6 +503,50 @@ _OllamaTrimRegistry_DropsOldestWhenAtCap() {
 Test("_LLM_Ollama_TrimAsyncRegistry: removes oldest entry when at cap", _OllamaTrimRegistry_DropsOldestWhenAtCap)
 
 
+_OllamaTrimRegistry_ReentrantSuccessor(State, *) {
+	global _LLM_Ollama_Async
+	State["callbacks"] += 1
+	if State["callbacks"] != 1
+		return
+	_LLM_Ollama_TrimAsyncRegistry()
+	_LLM_Ollama_Async[88013] := Map("cancelled", false, "on_fail", (*) => 0)
+}
+
+_OllamaTrimRegistry_DetachesBeforeReentrantCallback() {
+	global _LLM_Ollama_Async, LLM_OLLAMA_MAX_INFLIGHT
+	OldMax := LLM_OLLAMA_MAX_INFLIGHT
+	State := Map("callbacks", 0)
+	LLM_OLLAMA_MAX_INFLIGHT := 2
+	_LLM_Ollama_Async := Map(
+		88011, Map("cancelled", false,
+			"on_fail", _OllamaTrimRegistry_ReentrantSuccessor.Bind(State)),
+		88012, Map("cancelled", false, "on_fail", (*) => 0))
+	Err := ""
+	try _LLM_Ollama_TrimAsyncRegistry()
+	catch as Caught
+		Err := Caught.Message
+	finally LLM_OLLAMA_MAX_INFLIGHT := OldMax
+	try {
+		AssertEqual("", Err,
+			"Ollama trim must not delete an owner already detached by reentrant work")
+		AssertEqual(1, State["callbacks"],
+			"the displaced Ollama owner must emit exactly one terminal callback")
+		AssertFalse(_LLM_Ollama_Async.Has(88011),
+			"the displaced owner must be absent before its callback starts")
+		AssertTrue(_LLM_Ollama_Async.Has(88012),
+			"the surviving Ollama request must remain registered")
+		AssertTrue(_LLM_Ollama_Async.Has(88013),
+			"the callback's successor must not be trimmed or removed by its predecessor")
+		AssertEqual(2, _LLM_Ollama_Async.Count,
+			"Ollama trim plus one reentrant successor must finish exactly at the cap")
+	} finally {
+		_LLM_Ollama_Async := Map()
+	}
+}
+Test("api_ollama: trim detaches owner before reentrant callback (async-trim-detach-before-callback)",
+	_OllamaTrimRegistry_DetachesBeforeReentrantCallback)
+
+
 _OllamaTrimRegistry_NoOpBelowCap() {
 	global _LLM_Ollama_Async, LLM_OLLAMA_MAX_INFLIGHT
 	_LLM_Ollama_Async := Map()
