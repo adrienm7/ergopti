@@ -545,6 +545,23 @@ run_uninstall_without_artifacts_fails() {
     ! grep -q 'command not found' "$output"
 }
 
+# `git fetch` must reach the fixture repository and nothing else.
+# GIT_CONFIG_COUNT looks like the way to inject the rewrite, but git only
+# honours it from 2.31: on Ubuntu 20.04's 2.25 it is ignored, the rewrite
+# never applies and the scenario quietly fetches the real repository over the
+# network -- which is how a sparse checkout of a path that lives on another
+# branch came to fail here. A ~/.gitconfig is read by every supported git, and
+# GIT_ALLOW_PROTOCOL turns a rewrite that did not apply into an immediate
+# error instead of a silent round trip to github.com.
+make_local_origin_home() {
+    local home="$1" source_repo="$2"
+    mkdir -p "$home"
+    {
+        printf '[url "file://%s"]\n' "$source_repo"
+        printf '\tinsteadOf = https://github.com/adrienm7/ergopti.git\n'
+    } > "$home/.gitconfig"
+}
+
 # Reproduces git 2.25 (Ubuntu 20.04, still supported): a filtered fetch into a
 # repository that is not already partial is refused there, while every newer git
 # declares the extension on its own. Without this stand-in the whole class is
@@ -586,14 +603,13 @@ exec "$REAL_GIT" "$@"
 EOF
     chmod +x "$old_git_bin/git"
 
-    local rewrite_key="url.file://$source_repo.insteadOf"
+    local git_home="$sandbox/git-home"
+    make_local_origin_home "$git_home" "$source_repo"
     if ! env \
-        HOME="$TMP_ROOT/home" \
+        HOME="$git_home" \
         PATH="$old_git_bin:$FAKE_BIN:$PATH" \
         BRANCH=main \
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0="$rewrite_key" \
-        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        GIT_ALLOW_PROTOCOL=file \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
         ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
@@ -625,15 +641,14 @@ run_downloaded_uninstall() {
     printf 'installed\n' > "$sandbox/extensions/ergopti/symbols/ergopti"
     : > "$sandbox/system/rules/evdev"
 
-    local rewrite_key="url.file://$source_repo.insteadOf"
+    local git_home="$sandbox/git-home"
+    make_local_origin_home "$git_home" "$source_repo"
     if ! env \
-        HOME="$TMP_ROOT/home" \
+        HOME="$git_home" \
         FZF_MARKER="$sandbox/fzf-called" \
         PATH="$FAKE_BIN:$PATH" \
         BRANCH=main \
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0="$rewrite_key" \
-        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        GIT_ALLOW_PROTOCOL=file \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
         ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
@@ -662,13 +677,11 @@ EOF
     printf 'ergopti\n' > "$legacy_root/system/rules/evdev.lst"
     printf 'stock rules\n' > "$legacy_root/system/rules/evdev.lst.1"
     env \
-        HOME="$TMP_ROOT/home" \
+        HOME="$git_home" \
         PATH="$dispatch_bin:$FAKE_BIN:$PATH" \
         SUDO_LOG="$sudo_log" \
         BRANCH=main \
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0="$rewrite_key" \
-        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        GIT_ALLOW_PROTOCOL=file \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$legacy_root/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$legacy_root/system" \
         ERGOPTI_XKB_CACHE_DIR="$legacy_root/cache" \
@@ -682,13 +695,11 @@ EOF
     mkdir -p "$clean_v1_root/system/rules" "$clean_v1_root/extensions"
     printf '  ergopti = +ergopti\n' > "$clean_v1_root/system/rules/evdev"
     env \
-        HOME="$TMP_ROOT/home" \
+        HOME="$git_home" \
         PATH="$dispatch_bin:$FAKE_BIN:$PATH" \
         SUDO_LOG="$sudo_log" \
         BRANCH=main \
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0="$rewrite_key" \
-        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        GIT_ALLOW_PROTOCOL=file \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$clean_v1_root/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$clean_v1_root/system" \
         ERGOPTI_XKB_CACHE_DIR="$clean_v1_root/cache" \
@@ -706,13 +717,11 @@ EOF
     printf 'ergopti\n' > "$ambiguous_root/system/rules/evdev.lst"
     printf 'stock rules\n' > "$ambiguous_root/system/rules/evdev.lst.1"
     if env \
-        HOME="$TMP_ROOT/home" \
+        HOME="$git_home" \
         PATH="$dispatch_bin:$FAKE_BIN:$PATH" \
         SUDO_LOG="$sudo_log" \
         BRANCH=main \
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0="$rewrite_key" \
-        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        GIT_ALLOW_PROTOCOL=file \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$ambiguous_root/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$ambiguous_root/system" \
         ERGOPTI_XKB_CACHE_DIR="$ambiguous_root/cache" \
@@ -728,12 +737,10 @@ EOF
     test ! -s "$sudo_log"
 
     if env \
-        HOME="$TMP_ROOT/home" \
+        HOME="$git_home" \
         PATH="$FAKE_BIN:$PATH" \
         BRANCH=main \
-        GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0="$rewrite_key" \
-        GIT_CONFIG_VALUE_0="https://github.com/adrienm7/ergopti.git" \
+        GIT_ALLOW_PROTOCOL=file \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
         ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
