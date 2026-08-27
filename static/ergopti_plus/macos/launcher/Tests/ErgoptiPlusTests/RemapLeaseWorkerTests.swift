@@ -2223,6 +2223,12 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			Darwin.pipe($0.baseAddress!)
 		}, 0)
 		guard parentPipe[0] >= 0, parentPipe[1] >= 0 else { return }
+		// The spawned inner must not retain the writer that this test closes to
+		// publish parent EOF; otherwise it waits for STOP while the outer waits
+		// forever for an EOF that the inherited descriptor keeps suppressed.
+		for descriptor in parentPipe {
+			XCTAssertEqual(makeLeaseDescriptorCloseOnExec(descriptor), 0)
+		}
 		defer {
 			for descriptor in parentPipe where descriptor >= 0 { Darwin.close(descriptor) }
 		}
