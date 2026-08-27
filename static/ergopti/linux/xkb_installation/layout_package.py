@@ -20,6 +20,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 PACKAGE_NAME = "ergopti"
 
@@ -164,6 +165,44 @@ def merge_gsettings_source(
     return merged, added
 
 
+@dataclass(frozen=True)
+class LayoutSpec:
+    """One XKB layout selection: a layout name and an optional variant.
+
+    The clean method installs a standalone layout (``ergopti``); the legacy
+    method registers a variant of the system ``fr`` layout
+    (``fr`` + ``Ergopti_v2_2_1``). Desktops spell that pair differently:
+    GNOME joins it with ``+``, KDE keeps two aligned lists, ``setxkbmap`` and
+    every compositor take two separate settings. Modelling the pair once keeps
+    each spelling derivable and testable.
+    """
+
+    layout: str
+    variant: str = ""
+
+    @classmethod
+    def parse(cls, identifier: str) -> "LayoutSpec":
+        """Parse the GNOME spelling ``layout`` or ``layout+variant``."""
+        layout, _, variant = (identifier or "").partition("+")
+        validate_component_identifier(layout)
+        if variant:
+            validate_component_identifier(variant)
+        return cls(layout, variant)
+
+    @property
+    def gnome_id(self) -> str:
+        return f"{self.layout}+{self.variant}" if self.variant else self.layout
+
+    @property
+    def rmlvo_variant(self) -> str:
+        return self.variant
+
+
+def is_ergopti_source(identifier: str) -> bool:
+    """Whether a desktop layout identifier belongs to any Ergopti install."""
+    return "ergopti" in (identifier or "").lower()
+
+
 def parse_kde_layout_list(text: str | None) -> list[str]:
     """Split ``kreadconfig LayoutList`` output on commas."""
     if not text:
@@ -185,6 +224,59 @@ def merge_kde_layout_list(current: list[str], new_ids: list[str]) -> tuple[list[
     return merged, added
 
 
+def parse_kde_layouts(layout_list: str | None, variant_list: str | None) -> list[LayoutSpec]:
+    """Combine Plasma's aligned ``LayoutList`` and ``VariantList`` values.
+
+    ``VariantList`` is index-aligned with ``LayoutList`` and may be shorter or
+    absent; a missing entry means "no variant". Empty layout entries are
+    dropped because Plasma ignores them as well.
+    """
+    layouts = [part.strip() for part in (layout_list or "").split(",")]
+    variants = [part.strip() for part in (variant_list or "").split(",")]
+    specs: list[LayoutSpec] = []
+    for index, layout in enumerate(layouts):
+        if not layout:
+            continue
+        variant = variants[index] if index < len(variants) else ""
+        specs.append(LayoutSpec(layout, variant))
+    return specs
+
+
+def format_kde_layouts(specs: list[LayoutSpec]) -> tuple[str, str]:
+    """Render specs back into aligned ``LayoutList`` and ``VariantList`` values."""
+    return (
+        ",".join(spec.layout for spec in specs),
+        ",".join(spec.variant for spec in specs),
+    )
+
+
+def merge_layout_specs(
+    current: list[LayoutSpec], wanted: list[LayoutSpec]
+) -> tuple[list[LayoutSpec], bool]:
+    """Put ``wanted`` first without dropping any existing spec.
+
+    The first layout is the one a desktop activates at login, so a freshly
+    installed layout that is merely appended stays inactive until the user
+    cycles layouts by hand.
+    """
+    ordered = list(dict.fromkeys(wanted))
+    remainder = [spec for spec in current if spec not in set(ordered)]
+    merged = ordered + remainder
+    return merged, merged != current
+
+
+def remove_layout_specs(
+    current: list[LayoutSpec], owned: "Callable[[LayoutSpec], bool]"
+) -> tuple[list[LayoutSpec], bool]:
+    """Drop the specs ``owned`` accepts; keep the order of the others."""
+    kept = [spec for spec in current if not owned(spec)]
+    return kept, kept != current
+
+
+def is_ergopti_spec(spec: LayoutSpec) -> bool:
+    return is_ergopti_source(spec.layout) or is_ergopti_source(spec.variant)
+
+
 def patch_symbols_default(content: str) -> str:
     """Rename the symbols section to ``default`` so GUI pickers resolve it.
 
@@ -201,17 +293,30 @@ def patch_symbols_default(content: str) -> str:
     return "default partial alphanumeric_keys\n" + patched
 
 
+# XKB supports at most four simultaneous layouts (groups).
+MAX_XKB_LAYOUTS = 4
+
+
 def build_evdev_post(layout_id: str) -> str:
     """Build the composable ``rules/evdev.post`` fragment.
 
     libxkbcommon >= 1.13 appends this file after the main ruleset, which binds
     our custom types to the layout without ever touching the system rules file.
+
+    Rules semantics that are easy to get wrong: an unindexed ``layout`` rule
+    only matches configurations with a *single* layout, and ``layout[N]`` only
+    matches multi-layout configurations. GNOME and KDE compile every configured
+    input source into one keymap, so a user who keeps ``us`` next to Ergopti
+    needs the indexed rules or the custom types are never loaded and every key
+    falls back to ONE_LEVEL (dead Shift and AltGr, issue #84).
     """
     identifier = validate_component_identifier(layout_id)
-    return (
-        "! layout\t=\ttypes\n"
-        f"  {identifier}\t=\t+{identifier}\n"
-    )
+    sections = ["! layout\t=\ttypes\n" f"  {identifier}\t=\t+{identifier}\n"]
+    for index in range(1, MAX_XKB_LAYOUTS + 1):
+        sections.append(
+            f"! layout[{index}]\t=\ttypes\n" f"  {identifier}\t=\t+{identifier}\n"
+        )
+    return "".join(sections)
 
 
 def build_registry_xml(
@@ -337,6 +442,51 @@ def ansi_base_name_for_variant(version_dir: str, variant: str) -> str:
 #
 # An upgrade must neutralise those leftovers or two competing type mappings
 # can coexist for the same layout.
+
+
+_TYPE_BLOCK_RE = re.compile(r'type\s+"([^"]+)"\s*\{.*?\};', re.DOTALL)
+
+
+def insert_type_sections(destination: str, source: str) -> tuple[str, list[str]]:
+    """Insert or replace the ``type`` blocks of ``source`` inside ``destination``.
+
+    ``destination`` is a system types file such as ``types/extra``: one or
+    more ``xkb_types "name" { ... };`` sections. A ``type`` block is only valid
+    *inside* such a section, so new blocks are inserted before the closing
+    ``};`` of the last section; appending after it makes Xorg's ``xkbcomp``
+    reject the whole ``complete`` types file and makes libxkbcommon silently
+    drop the type, which is exactly how the Shift and AltGr layers died.
+
+    Existing blocks with the same type name are replaced in place. Returns the
+    new content and the names of the inserted or replaced types.
+    """
+    blocks = _TYPE_BLOCK_RE.findall(source)
+    if not blocks:
+        raise ValueError("source types file defines no type block")
+    content = destination
+    handled: list[str] = []
+    for match in _TYPE_BLOCK_RE.finditer(source):
+        name = match.group(1)
+        block = match.group(0)
+        existing = re.compile(
+            r'type\s+"' + re.escape(name) + r'"\s*\{.*?\};', re.DOTALL
+        )
+        if existing.search(content):
+            content = existing.sub(lambda _m, b=block: b, content, count=1)
+        else:
+            closing = content.rstrip().rfind("};")
+            if closing == -1:
+                raise ValueError("destination types file has no xkb_types section")
+            indented = "\n".join(
+                ("    " + line) if line.strip() else line for line in block.splitlines()
+            )
+            head = content[:closing].rstrip("\n")
+            tail = content[closing:]
+            content = f"{head}\n\n{indented}\n{tail}"
+        handled.append(name)
+    if not content.endswith("\n"):
+        content += "\n"
+    return content, handled
 
 
 def strip_ergopti_rule_lines(rules_content: str) -> tuple[str, int]:

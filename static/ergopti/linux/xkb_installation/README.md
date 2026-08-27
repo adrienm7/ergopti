@@ -13,7 +13,7 @@ Deux méthodes d’installation sont proposées :
 | ----------------------------- | ---------------------------------------- | ----------------------------------------- |
 | **Script Python**             | `xkb_files_installer_clean.py`           | `xkb_files_installer_legacy.py`           |
 | **Script d’installation**     | `install.sh --installation-method clean` | `install.sh --installation-method legacy` |
-| **Version requise**           | libxkbcommon >= 1.13.0                   | Toutes versions                           |
+| **Version requise**           | libxkbcommon >= 1.13.0, session Wayland  | Toutes versions, X11 et Wayland           |
 | **Emplacement**               | `/usr/share/xkeyboard-config.d/ergopti/` | `/usr/share/X11/xkb/`                     |
 | **Modification système**      | Non                                      | Oui                                       |
 | **Conflit avec mises à jour** | Non                                      | Possible                                  |
@@ -22,11 +22,25 @@ Deux méthodes d’installation sont proposées :
 
 ## Détails des méthodes
 
+### Méthode Clean
+
+Seul libxkbcommon lit les répertoires d'extensions. Le serveur Xorg compile ses dispositions avec
+son propre `xkbcomp` depuis l'arbre hérité et ne les voit pas : le détecteur choisit donc la
+méthode Legacy pour toute session X11, et aussi quand le type de session est indéterminé (SSH,
+console). Le fragment `rules/evdev.post` du paquet déclare la règle `layout = types` sous sa forme
+non indexée **et** indexée (`layout[1]` à `layout[4]`) : une règle non indexée ne s'applique qu'aux
+configurations à une seule disposition, alors que GNOME et KDE compilent toutes les sources
+configurées dans une même keymap.
+
 ### Méthode Legacy
 
 Le script legacy crée des sauvegardes comme `fichier.ext.1`, `fichier.ext.2`, etc. La commande
 `install.sh --uninstall` restaure automatiquement la première sauvegarde (état pré-Ergopti) de
-chaque fichier touché.
+chaque fichier touché. Le type personnalisé est inséré _à l'intérieur_ de la section `xkb_types`
+de `types/extra` : un bloc ajouté après la section est une erreur de syntaxe que `xkbcomp` rejette
+et que libxkbcommon ignore silencieusement. L'installation est transactionnelle : si le résultat
+ne compile pas avec le type présent (`xkbcli`, et `xkbcomp` quand il est installé), chaque fichier
+touché est restauré.
 
 ## Modes et options de l'installeur
 
@@ -65,9 +79,16 @@ Notes :
   fragment de configuration exact à coller dans le fichier du compositeur, avec repli sur
   `~/.config/environment.d/` pour un compositeur Wayland inconnu.
 - Après installation, `xkbcli compile-keymap` vérifie que la disposition se résout via le
-  chemin de recherche de la distribution **et** contient le type `ERGOPTI_SEVEN_LEVEL`. Cette
-  vérification ne dépend d'aucun bureau : elle distingue « paquet invisible » de
-  « session qui n'utilise pas la disposition ».
+  chemin de recherche de la distribution **et** contient le type `ERGOPTI_SEVEN_LEVEL`, seule
+  puis à côté de `us` dans les deux ordres. Cette vérification ne dépend d'aucun bureau : elle
+  distingue « paquet invisible » de « session qui n'utilise pas la disposition ».
+- Sur GNOME, `mru-sources` est aligné sur `sources` : gnome-shell active au démarrage la première
+  entrée de la liste des dispositions récentes, pas la première de `sources`.
+- Sur KDE Plasma, `LayoutList` et `VariantList` sont deux listes alignées par index et `Use=true`
+  est obligatoire ; la méthode Legacy y est écrite comme `fr` + `Ergopti_vX_Y_Z`, jamais avec le
+  `+` de GNOME. Un signal D-Bus `org.kde.keyboard.reloadConfig` demande la relecture.
+- Les fichiers `.XCompose` générés échappent les antislashs et guillemets dans les chaînes : un
+  `"\"` non échappé faisait ignorer les séquences suivantes par libxkbcommon.
 - La désinstallation refuse de choisir si des artefacts clean et legacy coexistent, ou si aucune
   installation n'est détectée. Dans le premier cas, relancez avec
   `--installation-method clean|legacy` après avoir vérifié la méthode à retirer.
@@ -81,12 +102,12 @@ L'installeur lit ces variables d'environnement avant ses chemins par défaut ; e
 d'exécuter toute l'installation dans un dossier temporaire — c'est ainsi que la suite de tests
 exécute le vrai CLI sans droits root :
 
-| Variable | Défaut | Rôle |
-| --- | --- | --- |
-| `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | Racine des extensions XKB |
-| `ERGOPTI_XKB_SYSTEM_ROOT` | `/usr/share/X11/xkb` | Arbre X11 hérité (liens + patch rules nettoyés) |
-| `ERGOPTI_XKB_CACHE_DIR` | `/var/lib/xkb` | Cache XKB purgé après installation |
-| `ERGOPTI_XKB_USER_HOME` | home de l'utilisateur appelant | Home isolé pour les tests XCompose |
+| Variable                      | Défaut                          | Rôle                                            |
+| ----------------------------- | ------------------------------- | ----------------------------------------------- |
+| `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | Racine des extensions XKB                       |
+| `ERGOPTI_XKB_SYSTEM_ROOT`     | `/usr/share/X11/xkb`            | Arbre X11 hérité (liens + patch rules nettoyés) |
+| `ERGOPTI_XKB_CACHE_DIR`       | `/var/lib/xkb`                  | Cache XKB purgé après installation              |
+| `ERGOPTI_XKB_USER_HOME`       | home de l'utilisateur appelant  | Home isolé pour les tests XCompose              |
 
 Codes de sortie du script Python clean : `0` succès - `2` erreur d'usage (argparse) -
 `3` paquet incohérent ou keymap non compilable - `4` installation abandonnée.
@@ -99,7 +120,8 @@ Codes de sortie du script Python clean : `0` succès - `2` erreur d'usage (argpa
   symbols/types, helpers de fusion GNOME/KDE)
 - `desktop_activation.py` : activation de session partagée par les deux installeurs
   (détection du bureau, abandon des privilèges, écriture puis relecture, instructions
-  manuelles par compositeur, vérification de la keymap)
+  manuelles par compositeur, vérification de la keymap, retrait des entrées à la
+  désinstallation)
 
 Scripts utilisés par `install.sh` :
 
@@ -108,8 +130,9 @@ Scripts utilisés par `install.sh` :
 - `xkb_files_installer_legacy.py` : installeur Python legacy (modification des fichiers système)
 
 Tests (`python tests/run_all_tests.py`) : unitaires du cœur, cohérence de toutes les versions
-générées, bout-en-bout bac à sable via les variables ci-dessus, compilation RMLVO réelle quand
-le paquet Python `xkbcommon` est présent.
+générées, bout-en-bout bac à sable des deux installeurs via les variables ci-dessus, compilation
+réelle avec `xkbcli` (>= 1.13 pour la méthode Clean) et `xkbcomp` quand ils sont installés, dont
+la reproduction des deux régressions historiques (règle non indexée, type hors section).
 
 ## Références
 

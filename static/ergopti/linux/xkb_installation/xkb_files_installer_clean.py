@@ -9,8 +9,9 @@ Implements the libxkbcommon >= 1.13 "XKB extensions directories" contract:
 
 Nothing outside that directory is modified: the custom types reach the keymap
 through the composable ``rules/evdev.post`` fragment instead of patching the
-system ``rules/evdev`` file, and the legacy X11 tree is only touched when the
-user explicitly asks for X11 (non-Xwayland) session support.
+system ``rules/evdev`` file. Only libxkbcommon reads that directory, so this
+method serves Wayland sessions; Xorg compiles keymaps with its own ``xkbcomp``
+from the legacy tree and needs the legacy installer.
 
 Hardening rules enforced here:
 
@@ -19,6 +20,8 @@ Hardening rules enforced here:
   the whole keymap, e.g. a dead Shift layer);
 - the installation is staged then moved into place, so a failure never leaves
   a half-installed package behind;
+- the staged package is compiled with libxkbcommon, alone and next to another
+  layout, and must carry the custom type in every case before it is committed;
 - every best-effort activation step reports its outcome instead of swallowing
   errors silently;
 - ``--uninstall`` removes exactly what was installed.
@@ -30,33 +33,22 @@ import argparse
 import os
 import shutil
 import stat
-import subprocess
 import sys
 import tempfile
-from enum import Enum
 from pathlib import Path
 
 XCOMPOSE_OWNER_MARKER = "# Ergopti managed XCompose"
 XCOMPOSE_MANAGED_NAME = "ergopti.XCompose"
-ENV_USER_HOME = "ERGOPTI_XKB_USER_HOME"
-
-
-class CleanupStatus(Enum):
-    ABSENT = "absent"
-    CHANGED = "changed"
-    FAILED = "failed"
-
-
-class CommandCaptureStatus(Enum):
-    ABSENT = "absent"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from desktop_activation import (  # noqa: E402
+    CleanupStatus,
+    ENV_USER_HOME,
     activate_layout,
+    deactivate_layouts,
     rerun_unprivileged,
+    resolve_user_identity,
     running_as_root,
     verify_keymap,
 )
@@ -66,17 +58,13 @@ from layout_package import (  # noqa: E402
     EXIT_OK,
     EXIT_VALIDATION,
     InstallerRoots,
+    LayoutSpec,
     PACKAGE_NAME,
     SUPPORTED_VARIANTS,
     VARIANT_PLUS,
     VARIANT_STANDARD,
     build_evdev_post,
     build_registry_xml,
-    format_gsettings_sources,
-    merge_gsettings_source,
-    merge_kde_layout_list,
-    parse_gsettings_sources,
-    parse_kde_layout_list,
     patch_symbols_default,
     remove_generation_two_links,
     resolve_roots,
@@ -104,82 +92,25 @@ def read_text(path: Path) -> str:
         raise SystemExit(f"Erreur : lecture impossible de {path} ({error}).")
 
 
-def run_reported(command: list[str], label: str, env: dict[str, str] | None = None) -> bool:
-    """Run a best-effort command and report its outcome; never raise."""
-    effective_env = os.environ.copy()
-    if env:
-        effective_env.update(env)
-    try:
-        result = subprocess.run(
-            command,
-            env=effective_env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        print(f"   ⚠️  {label} : impossible de lancer la commande ({error}).")
-        return False
-    if result.returncode == 0:
-        print(f"   ✅ {label}.")
-        return True
-    output = (result.stdout or "").strip()
-    detail = f" — {output.splitlines()[0]}" if output else ""
-    print(f"   ⚠️  {label} : échec (code {result.returncode}){detail}.")
-    return False
-
-
 def compile_validation(extensions_root: Path, layout_id: str) -> bool:
-    """Compile-test the staged package with xkbcli when it is available.
+    """Compile-test the staged package with libxkbcommon when it is available.
 
-    Returns True when validation ran and succeeded. A missing or too-old
-    xkbcli is not fatal: the structural validator already guarantees symbol/
-    types coherence, and CI exercises both paths.
+    The keymap must carry the custom type alone *and* next to another layout:
+    rules that only match single-layout configurations compile fine and leave
+    the Shift and AltGr layers dead for every user who keeps a second keyboard.
+    A missing xkbcli is not fatal: the structural validator already guarantees
+    symbol/types coherence, and CI exercises the real compiler.
     """
-    xkbcli = shutil.which("xkbcli")
-    if not xkbcli:
+    print(f"   🔎 Compilation de contrôle via xkbcli (layout {layout_id})…")
+    verdict = verify_keymap(
+        LayoutSpec(layout_id), ERGOPTI_TYPE_NAME, extensions_root=extensions_root
+    )
+    if verdict is None:
         print("   ℹ️  xkbcli absent : compilation réelle ignorée (validation structurelle OK).")
         return True
-    env = {
-        "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(extensions_root),
-        # Keep the versioned path out of the way so the staging tree is authoritative.
-        "XKB_CONFIG_VERSIONED_EXTENSIONS_PATH": "",
-    }
-    command = [
-        xkbcli,
-        "compile-keymap",
-        "--rules",
-        "evdev",
-        "--model",
-        "pc105",
-        "--layout",
-        layout_id,
-        "--test",
-    ]
-    print(f"   🔎 Compilation de contrôle via xkbcli (layout {layout_id})…")
-    try:
-        result = subprocess.run(
-            command,
-            env={**os.environ, **env},
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        print(f"   ⚠️  Validation xkbcli impossible ({error}); installation poursuivie.")
-        return True
-    if result.returncode == 0:
-        print("   ✅ La keymap compile (types inclus).")
-        return True
-    output = (result.stdout or "").strip()
-    print("   ❌ La keymap ne compile pas ; installation annulée.")
-    for line in output.splitlines()[:20]:
-        print(f"      {line}")
-    return False
+    if not verdict:
+        print("   ❌ Le paquet ne fournit pas ses couches ; installation annulée.")
+    return verdict
 
 
 def cleanup_previous_installations(roots: InstallerRoots) -> None:
@@ -236,7 +167,6 @@ def install_clean(
     types_path: Path,
     xcompose_path: Path | None,
     variant: str,
-    support_x11: bool,
     roots: InstallerRoots,
     activate_desktop: bool = True,
 ) -> None:
@@ -311,33 +241,9 @@ def install_clean(
     else:
         remove_user_xcompose_include()
 
-    if support_x11:
-        create_legacy_symlinks(package_dir, layout_id, roots.system_root)
-
     purge_cache(roots)
     if activate_desktop:
         activate(layout_id, variant)
-
-
-def resolve_user_identity() -> tuple[Path, int | None, int | None]:
-    """Return the invoking user's home and ownership, even while under sudo."""
-    sandbox_home = os.environ.get(ENV_USER_HOME)
-    if sandbox_home:
-        return Path(sandbox_home), None, None
-    sudo_user = os.environ.get("SUDO_USER", "")
-    if sudo_user:
-        try:
-            import pwd
-
-            user = pwd.getpwnam(sudo_user)
-            return Path(user.pw_dir), user.pw_uid, user.pw_gid
-        except (ImportError, KeyError):
-            pass
-    uid_fn = getattr(os, "getuid", None)
-    gid_fn = getattr(os, "getgid", None)
-    uid = uid_fn() if callable(uid_fn) else None
-    gid = gid_fn() if callable(gid_fn) else None
-    return Path.home(), uid, gid
 
 
 def write_user_text(
@@ -442,26 +348,6 @@ def remove_user_xcompose_include(home: Path | None = None) -> CleanupStatus:
         return CleanupStatus.FAILED
 
 
-def create_legacy_symlinks(package_dir: Path, layout_id: str, system_root: Path) -> None:
-    """Bridge into the legacy tree so real X11 sessions can load the layout."""
-    created = 0
-    for component in ("symbols", "types"):
-        target = system_root / component / layout_id
-        source = package_dir / component / layout_id
-        try:
-            if target.exists() or target.is_symlink():
-                target.unlink()
-            target.symlink_to(source)
-            created += 1
-        except OSError as error:
-            print(f"   ⚠️  Lien X11 {component} non créé : {error}")
-    print(
-        f"   🔗 Support X11 (Xorg) : {created}/2 liens créés dans {system_root}."
-        if created
-        else "   ⚠️  Aucun lien X11 créé."
-    )
-
-
 def purge_cache(roots: InstallerRoots) -> None:
     cache = roots.cache_dir
     if not cache.exists():
@@ -485,109 +371,28 @@ def activate(layout_id: str, variant: str) -> bool:
     call-site symmetry because both variants ship under the same layout id.
     """
     del variant
-    return activate_layout([layout_id])
+    return activate_layout([LayoutSpec(layout_id)])
 
 
-def deactivate(layout_id: str) -> CleanupStatus:
-    """Remove only Ergopti desktop entries and preserve every other source.
+def deactivate_desktop_entries() -> CleanupStatus:
+    """Remove the desktop entries, dropping privileges when run as root.
 
-    Runs unprivileged for the same reason as ``activate``: the entries live in
-    the user's dconf and Plasma configuration, which root cannot reach.
+    dconf and the Plasma configuration belong to the user's session; reading
+    them as root returns root's empty settings and would report "nothing to
+    remove" while the user's list still carries the layout.
     """
-    owned_ids = {layout_id, f"{layout_id}+plus"}
-    changed = False
-    failed = False
-
-    def run_capture(command: list[str]) -> tuple[CommandCaptureStatus, str]:
-        try:
-            result = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                timeout=15,
-                check=False,
-            )
-        except FileNotFoundError:
-            return CommandCaptureStatus.ABSENT, ""
-        except (subprocess.TimeoutExpired, OSError):
-            return CommandCaptureStatus.FAILED, ""
-        if result.returncode != 0:
-            return CommandCaptureStatus.FAILED, ""
-        return CommandCaptureStatus.SUCCEEDED, result.stdout
-
-    gnome_status, current_raw = run_capture(
-        ["gsettings", "get", "org.gnome.desktop.input-sources", "sources"]
-    )
-    if gnome_status is CommandCaptureStatus.FAILED:
-        failed = True
-    elif gnome_status is CommandCaptureStatus.SUCCEEDED:
-        current_sources = parse_gsettings_sources(current_raw)
-        if current_sources is None:
-            failed = True
-        else:
-            kept_sources = [
-                pair
-                for pair in current_sources
-                if not (pair[0] == "xkb" and pair[1] in owned_ids)
-            ]
-            if kept_sources != current_sources:
-                if run_reported(
-                    [
-                        "gsettings",
-                        "set",
-                        "org.gnome.desktop.input-sources",
-                        "sources",
-                        format_gsettings_sources(kept_sources),
-                    ],
-                    "GNOME : sources Ergopti retirées",
-                ):
-                    changed = True
-                else:
-                    failed = True
-
-    kde_status = CommandCaptureStatus.ABSENT
-    current_list = ""
-    for reader in ("kreadconfig6", "kreadconfig5"):
-        read_status, read_output = run_capture(
-            [reader, "--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList"]
+    if running_as_root():
+        code = rerun_unprivileged(
+            [sys.executable or "python3", str(Path(__file__).resolve()), "--deactivate-only"]
         )
-        if read_status is CommandCaptureStatus.ABSENT:
-            continue
-        kde_status = read_status
-        current_list = read_output
-        break
-    if kde_status is CommandCaptureStatus.FAILED:
-        failed = True
-    elif kde_status is CommandCaptureStatus.SUCCEEDED:
-        current_ids = parse_kde_layout_list(current_list)
-        kept_ids = [entry for entry in current_ids if entry not in owned_ids]
-        if kept_ids != current_ids:
-            writer = "kwriteconfig6" if shutil.which("kwriteconfig6") else "kwriteconfig5"
-            if run_reported(
-                [
-                    writer,
-                    "--file",
-                    "kxkbrc",
-                    "--group",
-                    "Layout",
-                    "--key",
-                    "LayoutList",
-                    ",".join(kept_ids),
-                ],
-                "KDE : dispositions Ergopti retirées",
-            ):
-                changed = True
-                if not run_reported(
-                    ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
-                    "KDE : reconfiguration de KWin",
-                ):
-                    failed = True
-            else:
-                failed = True
-    if failed:
-        return CleanupStatus.FAILED
-    return CleanupStatus.CHANGED if changed else CleanupStatus.ABSENT
+        if code is None:
+            print(
+                "   ⚠️  Retrait de la session impossible en root : relancez "
+                "sans sudo avec --deactivate-only si la disposition reste listée."
+            )
+            return CleanupStatus.ABSENT
+        return CleanupStatus.ABSENT if code == 0 else CleanupStatus.FAILED
+    return deactivate_layouts()
 
 
 def uninstall_clean(roots: InstallerRoots, deactivate_desktop: bool = True) -> bool:
@@ -599,7 +404,7 @@ def uninstall_clean(roots: InstallerRoots, deactivate_desktop: bool = True) -> b
     """
     package_dir = roots.package_dir
     compose_status = remove_user_xcompose_include()
-    desktop_status = deactivate(PACKAGE_NAME) if deactivate_desktop else CleanupStatus.ABSENT
+    desktop_status = deactivate_desktop_entries() if deactivate_desktop else CleanupStatus.ABSENT
     if CleanupStatus.FAILED in (compose_status, desktop_status):
         print(
             "❌ Désinstallation interrompue : une référence utilisateur Ergopti "
@@ -667,11 +472,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Variante installée",
     )
     parser.add_argument(
-        "--support-x11",
-        action="store_true",
-        help="Créer aussi les liens pour les sessions X11 (Xorg) réelles",
-    )
-    parser.add_argument(
         "--skip-activation",
         action="store_true",
         help="Installer le paquet sans toucher à la session de bureau.",
@@ -701,7 +501,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return args
 
 
-
 def run_activation_phase(variant: str, roots: InstallerRoots) -> int:
     """Run the unprivileged half of the installation.
 
@@ -728,13 +527,12 @@ def run_activation_phase(variant: str, roots: InstallerRoots) -> int:
         return EXIT_INSTALL_ABORTED
     print("🔎 Vérification du paquet installé…")
     verify_keymap(
-        PACKAGE_NAME,
+        LayoutSpec(PACKAGE_NAME),
         ERGOPTI_TYPE_NAME,
-        roots.extensions_root if roots.sandboxed else None,
+        extensions_root=roots.extensions_root if roots.sandboxed else None,
     )
     activate(PACKAGE_NAME, variant)
     return EXIT_OK
-
 
 
 def run_deactivation_phase() -> int:
@@ -753,7 +551,7 @@ def run_deactivation_phase() -> int:
             "sans sudo si la disposition reste listée."
         )
         return EXIT_OK
-    status = deactivate(PACKAGE_NAME)
+    status = deactivate_layouts()
     if status is CleanupStatus.FAILED:
         print("   ❌ Les entrées de bureau Ergopti n'ont pas pu être retirées.")
         return EXIT_INSTALL_ABORTED
@@ -762,6 +560,7 @@ def run_deactivation_phase() -> int:
     else:
         print("   ℹ️  Aucune entrée de bureau Ergopti à retirer.")
     return EXIT_OK
+
 
 def main(argv: list[str]) -> int:
     force_utf8_stdio()
@@ -781,7 +580,6 @@ def main(argv: list[str]) -> int:
             types_path=args.types,
             xcompose_path=args.xcompose,
             variant=args.variant,
-            support_x11=args.support_x11,
             roots=roots,
             activate_desktop=not args.skip_activation,
         )
