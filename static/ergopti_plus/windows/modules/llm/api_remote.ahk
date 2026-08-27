@@ -89,12 +89,17 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
 
     _LLM_Remote_AsyncCounter += 1
     req_id := _LLM_Remote_AsyncCounter
+    timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+    reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+        timeout_ms, A_TickCount)
 
     resolved := _LLMRemoteResolveEntry(Entry)
     if (resolved == "") {
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
         return req_id
     }
+    reservation["format"] := resolved["Format"]
+    reservation["model_id_at_dispatch"] := resolved["Model"]
 
     req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
@@ -105,35 +110,125 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     ; freezes typing. _LLMRemote_DispatchCurl returns true once it owns the request
     ; (dispatched, or already failed via on_fail); only fall through to the WinHTTP path
     ; when curl is unavailable on this host (remote-generate-connect-blocks).
-    timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
-    if (_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms))
+    if (_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success,
+            on_fail, timeout_ms, 0, reservation))
         return req_id
 
+    _LLMRemote_DispatchWinHttp(req_id, resolved, Url, Payload, on_success,
+        on_fail, timeout_ms, 0, reservation)
+    return req_id
+}
+
+_LLMRemote_ReserveRequest(req_id, on_success, on_fail, timeout_ms, start_tick,
+        Resolved := 0) {
+    global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+    ResolvedFormat := Resolved is Map ? Resolved["Format"] : ""
+    ResolvedModel := Resolved is Map ? Resolved["Model"] : ""
+    reservation := Map(
+        "transport", "pending",
+        "format", ResolvedFormat,
+        "model_id_at_dispatch", ResolvedModel,
+        "on_success", on_success, "on_fail", on_fail,
+        "cancelled", false, "start_tick", start_tick, "timeout_ms", timeout_ms)
+    ; Publish before trim or transport work so a reentrant CancelAll always sees
+    ; this invocation. Critical closes the only gap between the capacity snapshot
+    ; and ownership publication; trim callbacks run after the owner is visible.
+    PreviousCritical := Critical("On")
     try {
-        http := ComObject("WinHttp.WinHttpRequest.5.1")
+        needs_trim := _LLM_Remote_Async.Count >= LLM_REMOTE_MAX_INFLIGHT
+        _LLM_Remote_Async[req_id] := reservation
+    } finally Critical(PreviousCritical)
+    if needs_trim
+        _LLMRemote_TrimAsyncRegistry()
+    return reservation
+}
+
+_LLMRemote_RequestOwns(req_id, reservation) {
+    global _LLM_Remote_Async
+    return _LLM_Remote_Async.Has(req_id)
+        && ObjPtr(_LLM_Remote_Async[req_id]) == ObjPtr(reservation)
+}
+
+_LLMRemote_DeleteOwned(req_id, reservation) {
+    global _LLM_Remote_Async
+    Deleted := false
+    PreviousCritical := Critical("On")
+    try {
+        if (_LLM_Remote_Async.Has(req_id)
+                and ObjPtr(_LLM_Remote_Async[req_id]) == ObjPtr(reservation)) {
+            _LLM_Remote_Async.Delete(req_id)
+            Deleted := true
+        }
+    } finally Critical(PreviousCritical)
+    return Deleted
+}
+
+_LLMRemote_FailReserved(req_id, reservation, on_fail) {
+    if !_LLMRemote_DeleteOwned(req_id, reservation)
+        return false
+    if !reservation["cancelled"]
+        _LLM_InvokeCallback(on_fail, "on_fail")
+    return true
+}
+
+_LLMRemote_CancelCurlReservation(req_id, reservation, Port := 0) {
+    _LLM_CurlReleaseEntryProcess(reservation, true, Port)
+    _LLMRemote_CurlCleanup(reservation)
+    _LLMRemote_DeleteOwned(req_id, reservation)
+}
+
+_LLMRemote_QueueCurlReservationCancel(req_id, reservation, Port := 0) {
+    if reservation.Get("cancel_cleanup_queued", false)
+        return
+    reservation["cancel_cleanup_queued"] := true
+    LLM_DeferCancelKills([Map("cancel",
+        _LLMRemote_CancelCurlReservation.Bind(req_id, reservation, Port))])
+}
+
+_LLMRemote_DispatchWinHttp(req_id, resolved, Url, Payload, on_success, on_fail,
+        timeout_ms, Port := 0, Reservation := 0) {
+    global LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS
+    CreateHttpFn := _LLM_CurlArtifactPortFn(Port, "create_http",
+        (*) => ComObject("WinHttp.WinHttpRequest.5.1"))
+    PollFn := _LLM_CurlArtifactPortFn(Port, "poll", _LLMRemote_PollRequest)
+    TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
+    reservation := Reservation is Map ? Reservation
+        : _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+            timeout_ms, TickFn.Call(), resolved)
+    if !_LLMRemote_RequestOwns(req_id, reservation)
+        return false
+    if reservation["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return true
+    }
+    try {
+        http := CreateHttpFn.Call()
+        reservation["transport"] := "winhttp"
+        reservation["http"] := http
+        if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+            _LLMRemote_DeleteOwned(req_id, reservation)
+            return true
+        }
         http.Open("POST", Url, true)
-        http.SetTimeouts(LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
+        http.SetTimeouts(LLM_REMOTE_CONNECT_TIMEOUT_MS, LLM_REMOTE_CONNECT_TIMEOUT_MS,
+            LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
         http.SetRequestHeader("Content-Type", "application/json")
         _LLMRemoteSetAuthHeaders(http, resolved["Format"], resolved["Token"])
+        if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+            _LLMRemote_DeleteOwned(req_id, reservation)
+            return true
+        }
         http.Send(Payload)
     } catch as err {
-        _LLM_InvokeCallback(on_fail, "on_fail")
-        return req_id
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
     }
-
-    _LLMRemote_TrimAsyncRegistry()
-    ; Record the start tick and timeout duration so the poll loop can self-cancel
-    ; when WinHTTP silently stalls (CDN silent drop, network change mid-request).
-    ; Uses wrap-safe elapsed-delta arithmetic via _LLM_DeadlineExpired.
-    ; Falls back to 30 s when LLM_REMOTE_TIMEOUT_MS is still the 0 sentinel.
-    timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
-    _LLM_Remote_Async[req_id] := Map(
-        "http", http, "format", resolved["Format"],
-        "model_id_at_dispatch", resolved["Model"],
-        "on_success", on_success, "on_fail", on_fail, "cancelled", false,
-        "start_tick", A_TickCount, "timeout_ms", timeout_ms)
-    _LLMRemote_PollRequest(req_id)
-    return req_id
+    if !_LLMRemote_RequestOwns(req_id, reservation) or reservation["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, reservation)
+        return true
+    }
+    PollFn.Call(req_id)
+    return true
 }
 
 ; True iff curl.exe is present on this host (Windows 10+ ships it at System32\curl.exe).
@@ -211,7 +306,8 @@ _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal
 ; _LLM_Ollama_DispatchAsync.
 ; Returns true once it owns the request (dispatched, or failed and fired on_fail); returns
 ; false ONLY when curl is unavailable, so the caller falls back to WinHTTP.
-_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, timeout_ms, Port := 0) {
+_LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
+        timeout_ms, Port := 0, Reservation := 0) {
     global _LLM_Remote_Async
     FileExistsFn := _LLM_CurlArtifactPortFn(Port, "file_exists", FileExist)
     TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
@@ -222,14 +318,24 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
     SweepFn := _LLM_CurlArtifactPortFn(Port, "schedule_orphan_sweep",
         _LLM_Ollama_ScheduleOrphanSweep)
+    reservation := Reservation is Map ? Reservation
+        : _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
+            timeout_ms, TickFn.Call(), resolved)
+    owns_fallback_reservation := !(Reservation is Map)
     curl_exe := A_WinDir . "\System32\curl.exe"
-    if !FileExistsFn.Call(curl_exe)
+    if !FileExistsFn.Call(curl_exe) {
+        if owns_fallback_reservation
+            _LLMRemote_DeleteOwned(req_id, reservation)
         return false
+    }
+    if !_LLMRemote_RequestOwns(req_id, reservation)
+        return true
+    reservation["transport"] := "curl"
     config_image := _LLMRemote_BuildCurlConfig(
         resolved["Format"], resolved["Token"], Url)
     if (config_image == "") {
         try LoggerWarn("LLM.remote", "Rejected curl config input containing control characters.")
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
         return true
     }
     ; Remote-only users never enter either Ollama dispatcher. Schedule the same
@@ -242,16 +348,31 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
     tmp_config  := tmp_dir . "\ergopti_remote_" . uid . ".conf"
     terminal    := _LLM_CurlTerminalPaths(tmp_stdout)
+    reservation["tmp_payload"] := tmp_payload
+    reservation["tmp_stdout"] := tmp_stdout
+    reservation["tmp_config"] := tmp_config
+    reservation["tmp_status"] := terminal["status"]
+    reservation["tmp_exit"] := terminal["exit"]
     if !WriteFn.Call(tmp_payload, Payload) {
         _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "Failed to write curl payload file.")
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        _LLMRemote_DeleteOwned(req_id, reservation)
         return true
     }
     if !WriteFn.Call(tmp_config, config_image) {
         _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "Failed to write curl config file — request abandoned rather than sent with the token on the command line.")
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
+    if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
+        _LLMRemote_DeleteOwned(req_id, reservation)
         return true
     }
     ; URL and auth headers come from --config, never from argv (see
@@ -267,21 +388,16 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail, tim
     } catch as err {
         _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "curl launch failed: {1}.", err.Message)
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
         return true
     }
+    reservation["pid"] := pid
     process_owner := _LLM_CurlAdoptProcess(pid, Port)
-    _LLMRemote_TrimAsyncRegistry()
-    ; ``model_id_at_dispatch`` is what the usage extractor prices the response
-    ; against; the WinHTTP sibling has always recorded it and the curl transport
-    ; (the only one reached on a host that ships curl.exe) must too.
-    _LLM_Remote_Async[req_id] := Map(
-        "transport", "curl", "pid", pid, "process_owner", process_owner,
-        "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout, "tmp_config", tmp_config,
-        "tmp_status", terminal["status"], "tmp_exit", terminal["exit"],
-        "format", resolved["Format"], "model_id_at_dispatch", resolved["Model"],
-        "on_success", on_success, "on_fail", on_fail,
-        "cancelled", false, "start_tick", TickFn.Call(), "timeout_ms", timeout_ms)
+    reservation["process_owner"] := process_owner
+    if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
+        _LLMRemote_QueueCurlReservationCancel(req_id, reservation, Port)
+        return true
+    }
     PollFn.Call(req_id)
     return true
 }

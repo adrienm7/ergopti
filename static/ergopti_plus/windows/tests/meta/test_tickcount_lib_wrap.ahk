@@ -129,12 +129,13 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		["_TakeNoteQueueFinalize", '"deadline", A_TickCount +', '"started_tick"'],
 		["_TakeNotePoll", 'A_TickCount >= Job["deadline"]', "TickExpired("],
 		["_CrashReport_SysInfo", "Deadline := A_TickCount +", "TickExpired("],
-		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', '"start_tick"'],
+		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', "_LLMRemote_ReserveRequest("],
+		["_LLMRemote_ReserveRequest", '"deadline_tick", A_TickCount +', '"start_tick"'],
 		["_LLMRemote_PollRequest", 'entry.Has("deadline_tick")', "_LLM_DeadlineExpired("],
 		["SpotlightMouseAt", '_Spotlight_State["Deadline"] := A_TickCount +', '"StartedTick"'],
 		["_SpotlightTick", 'A_TickCount >= _Spotlight_State["Deadline"]', "TickExpired("]
 	]
-	Assert(Cases.Length >= 15,
+	Assert(Cases.Length >= 16,
 		"tickcount absolute-deadline ratchet must enumerate the complete audited sibling class")
 	for Spec in Cases {
 		Body := _DriverFuncBody(Spec[1])

@@ -735,6 +735,180 @@ _RemoteCancelAllAsync_FlagsAll() {
 Test("LLM_RemoteCancelAllAsync: cancels every in-flight entry", _RemoteCancelAllAsync_FlagsAll)
 
 
+_RemoteCancelPublication_Run(State, Command, WorkingDir, Options, &Pid) {
+	State["runs"] += 1
+	LLM_RemoteCancelAllAsync()
+	Pid := 7313
+}
+
+_RemoteCancelPublication_Open(State, Pid) {
+	State["opens"] += 1
+	if State.Get("cancel_during_open", false)
+		LLM_RemoteCancelAllAsync()
+	return 9313
+}
+
+_RemoteCancelPublication_Terminate(State, Handle) {
+	State["terminates"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Close(State, Handle) {
+	State["closes"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Delete(State, Path) {
+	State["deletes"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Poll(State, ReqId) {
+	State["polls"] += 1
+}
+
+_RemoteCancelPublication_CurlPort(State, RunFn) {
+	return Map(
+		"file_exists", (*) => true,
+		"temp_dir", (*) => A_Temp,
+		"write", (*) => true,
+		"delete", _RemoteCancelPublication_Delete.Bind(State),
+		"run", RunFn,
+		"poll", _RemoteCancelPublication_Poll.Bind(State),
+		"tick", (*) => 1313,
+		"schedule_orphan_sweep", (*) => true,
+		"open_process", _RemoteCancelPublication_Open.Bind(State),
+		"terminate_process", _RemoteCancelPublication_Terminate.Bind(State),
+		"close_process", _RemoteCancelPublication_Close.Bind(State))
+}
+
+_RemoteCancelPublication_NewState() {
+	return Map("runs", 0, "opens", 0, "terminates", 0, "closes", 0,
+		"deletes", 0, "polls", 0, "aborts", 0, "sends", 0)
+}
+
+_RemoteCancelPublication_Resolved() {
+	return Map("Format", "openai", "Token", "secret", "Model", "model")
+}
+
+_RemoteCancelPublication_CurlRunBoundary() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_Run.Bind(State))
+	ReqId := 891301
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, (*) => 0, 1000, Port))
+		Sleep(30)
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"cancellation inside Run must not be overwritten by a live publication")
+		AssertEqual(0, State["polls"],
+			"a request cancelled during Run must never arm its poll")
+		AssertEqual(1, State["terminates"],
+			"the process returned by a reentrant Run boundary must be terminated exactly once")
+		AssertEqual(1, State["closes"],
+			"the exact adopted process handle must be closed exactly once")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: cancellation during curl Run cannot miss unpublished owner (remote-cancel-publication-race)",
+	_RemoteCancelPublication_CurlRunBoundary)
+
+
+_RemoteCancelPublication_RunWithoutCancel(State, Command, WorkingDir, Options, &Pid) {
+	State["runs"] += 1
+	Pid := 7314
+}
+
+_RemoteCancelPublication_CurlAdoptBoundary() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["cancel_during_open"] := true
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	ReqId := 891302
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, (*) => 0, 1000, Port))
+		Sleep(30)
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"cancellation inside process adoption must retire the reserved owner")
+		AssertEqual(0, State["polls"],
+			"a request cancelled during adoption must never arm its poll")
+		AssertEqual(1, State["terminates"],
+			"the process adopted after cancellation must be terminated exactly once")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: cancellation during curl adoption retires exact owner (remote-cancel-publication-race)",
+	_RemoteCancelPublication_CurlAdoptBoundary)
+
+
+class _RemoteCancelPublicationHttp {
+	__New(State) {
+		this.State := State
+	}
+
+	Open(*) {
+	}
+
+	SetTimeouts(*) {
+	}
+
+	SetRequestHeader(*) {
+	}
+
+	Send(*) {
+		this.State["sends"] += 1
+		LLM_RemoteCancelAllAsync()
+	}
+
+	Abort() {
+		this.State["aborts"] += 1
+	}
+}
+
+_RemoteCancelPublication_CreateHttp(State) {
+	return _RemoteCancelPublicationHttp(State)
+}
+
+_RemoteCancelPublication_WinHttpBoundary() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	Port := Map(
+		"create_http", _RemoteCancelPublication_CreateHttp.Bind(State),
+		"poll", _RemoteCancelPublication_Poll.Bind(State),
+		"tick", (*) => 1314)
+	ReqId := 891303
+	try {
+		AssertTrue(_LLMRemote_DispatchWinHttp(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, (*) => 0, 1000, Port))
+		Sleep(30)
+		AssertEqual(1, State["sends"],
+			"the WinHTTP seam must inject cancellation from inside Send")
+		AssertEqual(1, State["aborts"],
+			"the request cancelled during Send must be aborted exactly once")
+		AssertEqual(0, State["polls"],
+			"a request cancelled during Send must never arm its poll")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"WinHTTP cancellation must retire the exact reserved owner")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: cancellation during WinHTTP Send cannot miss unpublished owner (remote-cancel-publication-race)",
+	_RemoteCancelPublication_WinHttpBoundary)
+
+
 _RemoteTrimRegistry_DropsOldestWhenAtCap() {
 	global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
 	_LLM_Remote_Async := Map()
