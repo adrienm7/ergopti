@@ -69,6 +69,25 @@ local function read_fixture(path)
 	return content
 end
 
+--- Installs one faithful personal-directory listing before the subject captures
+--- the directory adapter, then returns the setup root and rendered category.
+--- @param path string Personal fixture path.
+--- @return string personal_dir
+--- @return string category
+--- @return string native_path
+local function install_personal_catalogue(path)
+	local dir, name = path:match("^(.*)[/\\]([^/\\]+)%.toml$")
+	assert(type(dir) == "string" and dir ~= "")
+	assert(type(name) == "string" and name ~= "")
+	package.loaded["infra.fs_dir"] = {
+		entries = function(candidate)
+			if candidate == dir then return { name .. ".toml" } end
+			return {}
+		end,
+	}
+	return dir, "personal:" .. name, dir .. "/" .. name .. ".toml"
+end
+
 --- Finds a named closure upvalue recursively from the real bridge handler.
 --- @param fn function Closure to inspect.
 --- @param wanted string Upvalue name.
@@ -110,12 +129,15 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 				read_with_status = function() return SENTINEL, "ok" end,
 				write_if_unchanged = function() return false end,
 			}
+			local personal_dir, category = install_personal_catalogue(path)
 			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+			win.setup({ personal_dir = personal_dir })
 			local notifications = 0
 			win._on_config_changed = function() notifications = notifications + 1 end
 
 			local committed = win._on_message({ body = {
 				action = "set_delay",
+				category = category,
 				group = "personal",
 				personal_path = path,
 				ms = 420,
@@ -135,12 +157,15 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local path = fixture_path("success")
 		install_config_stub()
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		win.setup({ personal_dir = personal_dir })
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
 		local committed = win._on_message({ body = {
 			action = "set_delay",
+			category = category,
 			group = "personal",
 			personal_path = path,
 			ms = 420,
@@ -150,6 +175,53 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		helpers.assert_contains(read_fixture(path), "delay = 0.42")
 		helpers.assert_eq(notifications, 1)
 		os.remove(path)
+	end)
+
+	helpers.it("resolves personal files from the native catalogue, never the bridge path (hs-071)", function()
+		install_config_stub()
+		package.loaded["infra.fs_dir"] = {
+			entries = function(dir)
+				helpers.assert_eq(dir, "/personal")
+				return { "allowed.toml" }
+			end,
+		}
+		local reads = {}
+		local writes = {}
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(path)
+				reads[#reads + 1] = path
+				return SENTINEL, "ok"
+			end,
+			write_if_unchanged = function(path)
+				writes[#writes + 1] = path
+				return true
+			end,
+		}
+		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		win.setup({ personal_dir = "/personal" })
+
+		helpers.assert_eq(win._on_message({ body = {
+			action = "set_delay",
+			category = "personal:allowed",
+			group = "personal",
+			personal_path = "/outside/attacker-selected.toml",
+			ms = 420,
+		} }), true)
+		helpers.assert_eq(reads, { "/personal/allowed.toml" },
+			"the client-supplied path must never reach the read boundary")
+		helpers.assert_eq(writes, { "/personal/allowed.toml" },
+			"the client-supplied path must never reach the publication boundary")
+
+		helpers.assert_eq(win._on_message({ body = {
+			action = "set_delay",
+			category = "personal:missing",
+			group = "personal",
+			personal_path = "/personal/allowed.toml",
+			ms = 500,
+		} }), false,
+			"an undiscovered category must not become writable through a forged path")
+		helpers.assert_eq(#reads, 1, "a missing native catalogue entry must fail before reading")
+		helpers.assert_eq(#writes, 1, "a missing native catalogue entry must fail before publishing")
 	end)
 
 	helpers.it("rejects hostile colors before any personal or shared publication", function()
@@ -229,7 +301,9 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local path = fixture_path_with_content("valid_colors", '[_meta]\ncolor = "#000000"\n')
 		local store = install_config_stub()
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		win.setup({ personal_dir = personal_dir })
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
@@ -239,7 +313,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		helpers.assert_eq(store.sets, 1)
 		helpers.assert_eq(store.last_set, { "rolls", nil, "color", "#abc" })
 		helpers.assert_eq(win._on_message({ body = {
-			action = "set_color", group = "personal", personal_path = path,
+			action = "set_color", category = category, group = "personal", personal_path = path,
 			hex = "#A1b2C3D4",
 		} }), true)
 
@@ -263,12 +337,15 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local path = fixture_path_with_content("nested_array", initial)
 		install_config_stub()
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		win.setup({ personal_dir = personal_dir })
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
 		helpers.assert_eq(win._on_message({ body = {
 			action = "set_delay",
+			category = category,
 			group = "personal",
 			personal_path = path,
 			ms = 420,
@@ -302,17 +379,20 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			install_config_stub()
 			local reads = 0
 			local writes = 0
+			local personal_dir, category, native_path = install_personal_catalogue(path)
 			package.loaded["adapters.file_system"] = {
 				read_with_status = function(candidate)
-					helpers.assert_eq(candidate, path)
+					helpers.assert_eq(candidate, native_path)
 					reads = reads + 1
 					return nil, case.status, case.detail
 				end,
 				write_if_unchanged = function() writes = writes + 1 return true end,
 			}
 			local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+			win.setup({ personal_dir = personal_dir })
 			local committed = win._on_message({ body = {
-				action = "set_delay", group = "personal", personal_path = path, ms = 420,
+				action = "set_delay", category = category,
+				group = "personal", personal_path = path, ms = 420,
 			} })
 
 			helpers.assert_eq(committed, false)
@@ -328,24 +408,27 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local path = fixture_path("retarget")
 		install_config_stub()
 		local events = {}
+		local personal_dir, category, native_path = install_personal_catalogue(path)
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function(candidate)
-				helpers.assert_eq(candidate, path)
+				helpers.assert_eq(candidate, native_path)
 				events[#events + 1] = "read"
 				return SENTINEL, "ok"
 			end,
 			write_if_unchanged = function(candidate)
-				helpers.assert_eq(candidate, path)
+				helpers.assert_eq(candidate, native_path)
 				events[#events + 1] = "retarget-refused"
 				return false
 			end,
 		}
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		win.setup({ personal_dir = personal_dir })
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
 		helpers.assert_eq(win._on_message({ body = {
-			action = "set_delay", group = "personal", personal_path = path, ms = 420,
+			action = "set_delay", category = category,
+			group = "personal", personal_path = path, ms = 420,
 		} }), false)
 		helpers.assert_eq(events[1], "read")
 		helpers.assert_eq(events[2], "retarget-refused")
@@ -360,9 +443,10 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local external = "[_meta]\ndelay = 0.91\n# external winner\n"
 		install_config_stub()
 		local publications = 0
+		local personal_dir, category, native_path = install_personal_catalogue(path)
 		package.loaded["adapters.file_system"] = {
 			read_with_status = function(candidate)
-				helpers.assert_eq(candidate, path)
+				helpers.assert_eq(candidate, native_path)
 				return SENTINEL, "ok"
 			end,
 			-- Causal old-code seam: an unconditional publication would erase B.
@@ -378,6 +462,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			end,
 			write_if_unchanged = function(candidate, _content, expected_source)
 				publications = publications + 1
+				helpers.assert_eq(candidate, native_path)
 				helpers.assert_eq(expected_source,
 					{ status = "ok", content = SENTINEL },
 					"the exact patch input must cross the publication boundary")
@@ -388,11 +473,13 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			end,
 		}
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
+		win.setup({ personal_dir = personal_dir })
 		local notifications = 0
 		win._on_config_changed = function() notifications = notifications + 1 end
 
 		helpers.assert_eq(win._on_message({ body = {
-			action = "set_delay", group = "personal", personal_path = path, ms = 420,
+			action = "set_delay", category = category,
+			group = "personal", personal_path = path, ms = 420,
 		} }), false)
 		helpers.assert_eq(publications, 1)
 		helpers.assert_eq(read_fixture(path), external,
