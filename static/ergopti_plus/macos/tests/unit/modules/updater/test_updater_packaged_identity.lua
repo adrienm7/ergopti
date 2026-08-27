@@ -31,6 +31,27 @@ helpers.describe("updater: packaged launcher identity", function()
 				"the packaged nested Hammerspoon process must enable updater controls")
 			helpers.assert_eq(updater.current_version(), OUTER_VERSION,
 				"release comparison must use the outer ErgoptiPlus version")
+			helpers.assert_eq(updater.default_channel(), "dev",
+				"a packaged prerelease must select the prerelease feed")
+		end, debug.traceback)
+
+		os.getenv = real_getenv
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("keeps stable launcher versions on the stable channel", function()
+		local real_getenv = os.getenv
+		os.getenv = function(name)
+			if name == "ERGOPTI_LAUNCHER_VERSION" then return "1.2.3" end
+			return real_getenv(name)
+		end
+
+		local ok, failure = xpcall(function()
+			package.loaded["modules.updater"] = nil
+			local updater = helpers.load_with_stubs("modules.updater", {
+				processInfo = { bundleID = INNER_BUNDLE_ID, version = "1.1.1" },
+			})
+			helpers.assert_eq(updater.default_channel(), "main")
 		end, debug.traceback)
 
 		os.getenv = real_getenv

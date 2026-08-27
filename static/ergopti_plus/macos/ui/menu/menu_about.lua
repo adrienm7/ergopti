@@ -37,14 +37,9 @@ local LOG       = "menu_about"
 -- local variable is collected once the enclosing function returns).
 M._active_tasks = {}
 
--- Detect source vs bundled at module load time through the updater's canonical
--- packaged-identity boundary. The Lua process is the nested Hammerspoon bundle,
--- not the outer ErgoptiPlus application.
-local _is_local = Updater.is_local_source()
-
 M.DEFAULT_STATE = {
-	-- "dev" from source (all releases are pre-releases), "main" from bundled app.
-	update_channel = _is_local and "dev" or "main",
+	-- Source checkouts and packaged prereleases both follow the development feed.
+	update_channel = Updater.default_channel(),
 	update_check_interval_seconds = Updater.get_check_interval(),
 }
 
