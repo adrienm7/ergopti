@@ -1057,7 +1057,15 @@ if MetricsShortcuts.enabled {
 		; dragged back onto the critical path, AND the interruption pumps the message
 		; queue, painting a tray click queued during boot against a half-built menu.
 		; See the deferred-task block after LoggerSuccess("…ready").)
-		KL_Init(_ConfigDir . "metrics")
+		KeyloggerReady := false
+		try KeyloggerReady := KL_Init(_ConfigDir . "metrics")
+		catch as Err
+			try LoggerError("Keylogger", "Initialization failed: {1}.", Err.Message)
+		if !KeyloggerReady {
+			LoggerError("ErgoptiPlus",
+				"Startup aborted because keylogger persistence is unavailable.")
+			ExitApp(1)
+		}
 		MetricsBindingsReady := MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
 		if !((MetricsBindingsReady is Integer) && MetricsBindingsReady == 1)
 			try LoggerError("MetricsShortcuts",

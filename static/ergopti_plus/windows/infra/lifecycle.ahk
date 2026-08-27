@@ -793,7 +793,13 @@ Ergopti_OnShutdown(reason, code) {
 		try GestureScreenshotCancelAll("shutdown")
 		try HotstringPrefixWatcherStop()
 		try HotstringPrefixWatcherOnShutdown()
-		try KL_Stop()
+		KeyloggerStopped := false
+		try KeyloggerStopped := KL_Stop()
+		catch as Err
+			try LoggerError("Lifecycle", "Terminal keylogger stop failed: {1}.", Err.Message)
+		if !KeyloggerStopped
+			try LoggerError("Lifecycle",
+				"Terminal keylogger stop retained persistence debt; exit will continue under the durable journal contract.")
 		try UIASW_Stop("canceled")
 		try LLM_NavEventOwner_Stop(false, true)
 		try CrashReportWorker_StopAll()

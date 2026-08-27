@@ -73,3 +73,33 @@ _KLSD_InitWiresHardening() {
 		"KL_Init must scan data.sql via KL_ScanMaxEventId so the resolved start id is one past the highest id already on disk for this device")
 }
 Test("keylogger: KL_Init resolves next_event_id against data.sql (kl-stop-dead-no-exit-flush)", _KLSD_InitWiresHardening)
+
+
+_KLSD_LifecycleFailsClosedAndLogsCentrally() {
+	InitBody := _DriverFuncBody("KL_Init")
+	StopBody := _DriverFuncBody("KL_Stop")
+	Main := _KLSD_ReadSource("ErgoptiPlus.ahk")
+	Lifecycle := _KLSD_ReadSource("infra/lifecycle.ahk")
+	Module := _KLSD_ReadSource("modules/keylogger/keylogger.ahk")
+	BootstrapAt := InStr(InitBody, "KL_BootstrapDataSql()")
+	PublishAt := InStr(InitBody, "Keylogger.initialized := true")
+	Assert(BootstrapAt > 0 and PublishAt > BootstrapAt,
+		"KL_Init must prove the ledger before publishing initialized state")
+	Assert(InStr(Main, "KeyloggerReady := KL_Init(") > 0
+		and InStr(Main, "if !KeyloggerReady") > 0,
+		"startup must consume KL_Init failure before starting keylogger producers")
+	JournalAt := InStr(StopBody, "_KL_JournalPendingEntries()")
+	StoppedAt := InStr(StopBody, "Keylogger.initialized := false")
+	Assert(JournalAt > 0 and StoppedAt > JournalAt
+		and InStr(SubStr(StopBody, JournalAt, StoppedAt - JournalAt),
+			'if !FlushComplete or !JournalResult["ok"]') > 0,
+		"KL_Stop must retain initialized state when the final journal handoff fails")
+	Assert(InStr(Lifecycle, "KeyloggerStopped := KL_Stop()") > 0
+		and InStr(Lifecycle, "if !KeyloggerStopped") > 0,
+		"OnExit must consume terminal keylogger persistence failure")
+	Assert(InStr(Module, "Keylogger.log", true) = 0
+		and InStr(Module, 'HasProp("log")', true) = 0,
+		"persistence diagnostics must use the initialized central logger, never a dead optional sink")
+}
+Test("keylogger lifecycle: init and stop fail closed (keylogger-lifecycle-fail-closed)",
+	_KLSD_LifecycleFailsClosedAndLogsCentrally)

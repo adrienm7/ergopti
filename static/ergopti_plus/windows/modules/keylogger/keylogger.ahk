@@ -180,9 +180,6 @@ class Keylogger {
     static _ingest_timer    := unset
     static _midnight_timer  := unset
 
-    ; Logger reference (infra/logger.ahk).
-    static log              := unset
-
     ; In-RAM queue of entries awaiting ingest. Populated by KL_AppendLog
     ; alongside the JSONL today.log write, drained by KL_IngestOnce.
     ; This avoids the round-trip through KL_JsonDecode (COM ScriptControl
@@ -408,10 +405,15 @@ KL_FlushTodayFh(fh) {
 
 KL_CloseTodayFh() {
     if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
-        try Keylogger._today_fh.Close()
+		try Keylogger._today_fh.Close()
+		catch as Err {
+			try LoggerError("Keylogger", "Cannot close today.log: {1}.", Err.Message)
+			return false
+		}
         Keylogger._today_fh := unset
         Keylogger._today_fh_date := ""
     }
+	return true
 }
 
 
@@ -1074,8 +1076,8 @@ KL_ReadNewTodayLog() {
         return Map("ok", true, "offset", fh.Pos, "entries", entries,
             "eof", fh.AtEOF)
     } catch as err {
-        if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-            Keylogger.log.Error("Cannot read today.log for ingest: " . err.Message)
+        try LoggerError("Keylogger", "Cannot read today.log for ingest: {1}.",
+			err.Message)
         return Map("ok", false, "offset", Keylogger.today_log_offset,
             "entries", [], "eof", false)
     } finally {
@@ -1189,9 +1191,9 @@ KL_IngestOnce(force := false, rollover_owned := false) {
 				Critical(previous_critical)
 			}
 			; Leave today_log_offset alone so the next tick retries the same chunk.
-			if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-				Keylogger.log.Error("Cannot open today.log: " . err.Message . " — "
-					. pending_snapshot.Length . " pending entry(ies) re-queued.")
+			try LoggerError("Keylogger",
+				"Cannot open today.log: {1}; {2} pending entry(ies) re-queued.",
+				err.Message, pending_snapshot.Length)
 			return Map("ok", false, "eof", false, "reason", "today_log_open_failed")
 		}
 		if IsObject(fh) {
@@ -1203,8 +1205,9 @@ KL_IngestOnce(force := false, rollover_owned := false) {
 					fh.Write(line . "`n")
 					pending_logged_count += 1
 				} catch as err {
-					if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-						Keylogger.log.Error("Cannot append pending keylogger event to today.log: " . err.Message)
+					try LoggerError("Keylogger",
+						"Cannot append pending keylogger event to today.log: {1}.",
+						err.Message)
 					break
 				}
 			}
@@ -1290,8 +1293,9 @@ KL_IngestOnce(force := false, rollover_owned := false) {
             }
         }
         ; Leave today_log_offset alone so the next tick retries the same chunk.
-        if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-            Keylogger.log.Error("Cannot append to data.sql: " . err.Message . " — " . pending_requeue_count . " unwritten pending entry(ies) re-queued.")
+        try LoggerError("Keylogger",
+			"Cannot append to data.sql: {1}; {2} unwritten pending entry(ies) re-queued.",
+			err.Message, pending_requeue_count)
         return Map("ok", false, "eof", false, "reason", "sql_failed")
     }
     old_offset := Keylogger.today_log_offset
@@ -1368,8 +1372,8 @@ KL_DayRollover() {
             "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n",
             Keylogger.data_sql_path, "UTF-8")
         catch as err {
-            if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-                Keylogger.log.Error("Cannot write day rollover marker: " . err.Message)
+            try LoggerError("Keylogger", "Cannot write day rollover marker: {1}.",
+				err.Message)
             return Map("ok", false, "reason", "marker_failed")
         }
 
@@ -1377,8 +1381,8 @@ KL_DayRollover() {
         if FileExist(Keylogger.today_log_path) {
             try FileDelete(Keylogger.today_log_path)
             catch as err {
-                if Keylogger.HasProp("log") && IsObject(Keylogger.log)
-                    Keylogger.log.Error("Cannot delete rolled today.log: " . err.Message)
+                try LoggerError("Keylogger", "Cannot delete rolled today.log: {1}.",
+					err.Message)
                 return Map("ok", false, "reason", "delete_failed")
             }
         }
@@ -1430,8 +1434,18 @@ KL_MidnightCheck() {
 ; ======================================
 
 KL_BootstrapDataSql() {
-    if FileExist(Keylogger.data_sql_path)
-        return true
+    if FileExist(Keylogger.data_sql_path) {
+		try {
+			Probe := FileOpen(Keylogger.data_sql_path, "a", "UTF-8")
+			if !IsObject(Probe)
+				throw Error("append handle unavailable")
+			Probe.Close()
+			return true
+		} catch as Err {
+			try LoggerError("Keylogger", "data.sql is not writable: {1}.", Err.Message)
+			return false
+		}
+	}
     header := "-- ergopti metrics — device " . Keylogger.device_id
         .  " — schema_version " . KeylogConst.SCHEMA_VERSION . "`n"
         .  "-- This file is APPEND-ONLY. Do not edit by hand.`n"
@@ -1461,7 +1475,7 @@ KL_BootstrapDataSql() {
 
 KL_Init(metrics_dir) {
     if Keylogger.initialized
-        return  ; idempotent.
+		return true
 
     KL_MkdirP(metrics_dir)
 
@@ -1519,6 +1533,11 @@ KL_Init(metrics_dir) {
 
     if (Keylogger.today_log_date = "")
         Keylogger.today_log_date := KL_Today()
+	if !KL_BootstrapDataSql() {
+		try LoggerError("Keylogger",
+			"Initialization refused because the durable ledger is unavailable.")
+		return false
+	}
 
 	InitCritical := Critical("On")
 	try {
@@ -1528,28 +1547,39 @@ KL_Init(metrics_dir) {
 	} finally {
 		Critical(InitCritical)
 	}
-    KL_BootstrapDataSql()
-    try KL_AppCat_Init(metrics_dir)
+	try {
+		try KL_AppCat_Init(metrics_dir)
 
-    ; Initialise the walker batch dicts. KL_LoadState() above already
-    ; restored the per-app n-gram context (KLW.ctx) if state.json had one.
-    try KLW_ResetBatch()
+		; Initialise the walker batch dicts. KL_LoadState() above already
+		; restored the per-app n-gram context (KLW.ctx) if state.json had one.
+		try KLW_ResetBatch()
 
-    ; Background timers — Bind() captures the function reference for SetTimer.
-    Keylogger._ingest_timer   := KL_IngestOnce.Bind()
-    Keylogger._midnight_timer := KL_MidnightCheck.Bind()
-    SetTimer(Keylogger._ingest_timer,   KeylogConst.INGEST_TICK_MS)
-    SetTimer(Keylogger._midnight_timer, KeylogConst.MIDNIGHT_CHECK_TICK_MS)
+		; Background timers — Bind() captures the function reference for SetTimer.
+		Keylogger._ingest_timer   := KL_IngestOnce.Bind()
+		Keylogger._midnight_timer := KL_MidnightCheck.Bind()
+		SetTimer(Keylogger._ingest_timer,   KeylogConst.INGEST_TICK_MS)
+		SetTimer(Keylogger._midnight_timer, KeylogConst.MIDNIGHT_CHECK_TICK_MS)
 
-    ; Initial ingest pass to drain anything buffered while the script was
-    ; not running.
-    SetTimer(KL_IngestOnce.Bind(), -250)
+		; Initial ingest pass to drain anything buffered while the script was
+		; not running.
+		SetTimer(KL_IngestOnce.Bind(), -250)
 
-    ; Bring data.sql in line with the at-rest posture the config just restored.
-    ; A no-op unless they disagree, and deferred either way: the comparison is
-    ; cheap but the rewrite it may start is not, and neither belongs on the boot
-    ; critical path.
-    KL_Mig_RequestPostureSync(KL_MIG_BOOT_DELAY_MS)
+		; Bring data.sql in line with the at-rest posture the config just restored.
+		; A no-op unless they disagree, and deferred either way: the comparison is
+		; cheap but the rewrite it may start is not, and neither belongs on the boot
+		; critical path.
+		if !KL_Mig_RequestPostureSync(KL_MIG_BOOT_DELAY_MS)
+			throw Error("at-rest posture sync could not be scheduled")
+	} catch as Err {
+		try SetTimer(Keylogger._ingest_timer, 0)
+		try SetTimer(Keylogger._midnight_timer, 0)
+		RollbackCritical := Critical("On")
+		try Keylogger.initialized := false
+		finally Critical(RollbackCritical)
+		try LoggerError("Keylogger", "Initialization rolled back: {1}.", Err.Message)
+		return false
+	}
+	return true
 }
 
 ; Publish the terminal ownership lease before any other subsystem drains into
@@ -1590,7 +1620,7 @@ KL_CancelShutdown() {
 
 KL_Stop() {
     if !Keylogger.initialized
-        return
+		return true
     ; Raise the shutdown bypass BEFORE any teardown. Every *_Stop() below drains a
     ; CLOSING lifecycle event (session_end, idle_end, vpn_disconnected,
     ; screen_recording_end, the final roi_snapshot) through KL_AppendLog, whose
@@ -1601,7 +1631,8 @@ KL_Stop() {
     ; the flag only just before the trailing KL_FlushBuffer() protected the two
     ; explicit flushes but none of the six module drains that carry most of the
     ; shutdown write traffic.
-    KL_BeginShutdown()
+	if !KL_BeginShutdown()
+		return false
     ; Drop any in-flight ledger rewrite before the shutdown drain: its staging
     ; file describes a data.sql that the flush below is about to extend, and the
     ; ingest guard bypasses on _shutting_down, so leaving it armed would publish a
@@ -1626,20 +1657,42 @@ KL_Stop() {
         SetTimer(Keylogger._midnight_timer, 0)
     ; _shutting_down was raised at the top of this function (see the comment
     ; there) so the module drains above could emit their closing events too.
-    KL_FlushBuffer()
+	FlushComplete := KL_FlushBuffer()
+	JournalResult := _KL_JournalPendingEntries()
+	if !FlushComplete or !JournalResult["ok"] {
+		try LoggerError("Keylogger",
+			"Shutdown retained durable debt (flush={1}, journal={2}).",
+			FlushComplete, JournalResult["ok"])
+		return false
+	}
     ; force := true — the typing-idle guard would otherwise return before the
     ; pending drain, and there is no next tick left to defer to. Looped because
     ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
     ; flushed once the reader reaches EOF, so a backlog has to be walked out.
+	IngestComplete := false
     loop KeylogConst.SHUTDOWN_INGEST_MAX_PASSES {
         ingest_result := KL_IngestOnce(true)
         ; A rollover result carries no "eof" key — nothing left to walk either way.
-        if (!ingest_result["ok"] or KL_GetMap(ingest_result, "eof", true))
+		if !ingest_result["ok"] {
+			try LoggerError("Keylogger", "Shutdown ingest failed ({1}).",
+				KL_GetMap(ingest_result, "reason", "unknown"))
+			break
+		}
+		if KL_GetMap(ingest_result, "eof", true) {
+			IngestComplete := true
             break
+		}
     }
-    KL_SaveState()
-    KL_CloseTodayFh()
+	StateSaved := KL_SaveState()
+	HandleClosed := KL_CloseTodayFh()
+	if !IngestComplete or !StateSaved or !HandleClosed {
+		try LoggerError("Keylogger",
+			"Shutdown persistence incomplete (ingest={1}, state={2}, close={3}).",
+			IngestComplete, StateSaved, HandleClosed)
+		return false
+	}
     Keylogger.initialized := false
+	return true
 }
 
 
