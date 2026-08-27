@@ -136,6 +136,43 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 end)
 
 helpers.describe("prompt editor: messages are bound to an immutable context", function()
+	helpers.it("settles one create context before a re-entrant save can replay it", function()
+		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+			local bridge
+			local save_message
+			local saved_profiles = {}
+
+			editor.open(nil, function(saved)
+				saved_profiles[#saved_profiles + 1] = saved
+				if #saved_profiles == 1 then
+					bridge.callback({ body = save_message })
+				end
+			end)
+			bridge = state.bridges[1]
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = latest_init_payload(state, hs_stub)
+			save_message = {
+				action = "save",
+				edit_id = context.edit_id,
+				epoch = context.epoch,
+				name = "Created once",
+				batch = false,
+				prompt = "Do this once",
+			}
+
+			bridge.callback({ body = save_message })
+
+			helpers.assert_eq(#saved_profiles, 1,
+				"one create context must deliver at most one profile")
+			helpers.assert_true(type(saved_profiles[1].id) == "string"
+				and saved_profiles[1].id:match("^custom_%d+_%d+$") ~= nil,
+				"the create context must own one generated profile id")
+			helpers.assert_eq(state.deletes, 1,
+				"the settled create context must close exactly once")
+		end)
+	end)
+
 	helpers.it("rejects stale epochs and preserves a context opened by on_save", function()
 		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
 			local saves_a, saves_b, saves_c = 0, 0, 0

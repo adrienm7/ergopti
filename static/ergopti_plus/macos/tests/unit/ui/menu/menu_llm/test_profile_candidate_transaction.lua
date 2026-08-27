@@ -211,6 +211,9 @@ local function with_fixture(options, body)
 				end
 				if options.editor_update then
 					local result = callback(options.editor_update)
+					if options.editor_double_callback then
+						callback(options.editor_duplicate_update or options.editor_update)
+					end
 					if options.editor_returns_nil then return nil end
 					return result
 				end
@@ -799,6 +802,32 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			helpers.assert_eq(fixture.notifications(), 1)
 			helpers.assert_eq(fixture.save_count(), 1)
 			helpers.assert_eq(fixture.menu_count(), 1)
+		end)
+	end)
+
+	helpers.it("HS-075 latches a duplicate Edit callback after the first transaction refuses", function()
+		local original = {id = "custom", label = "Original"}
+		local updated = {id = "custom", label = "Updated"}
+		with_fixture({
+			initial_profiles = {original},
+			editor_update = updated,
+			editor_double_callback = true,
+		}, function(fixture)
+			fixture.plan_save({
+				{mode = "false"},
+				{mode = "ok"},
+			})
+			local edit_row = find_child_row(fixture.manager.get_menu_item().menu,
+				"Original", "menu.profiles.edit_profile")
+			helpers.assert_eq(edit_row.action(), true)
+			fixture.fire_timer()
+
+			helpers.assert_eq(fixture.state.llm_user_profiles[1], original,
+				"a duplicate editor delivery must not retry a refused edit")
+			helpers.assert_eq(fixture.notifications(), 0,
+				"a refused edit must not become a later duplicate success")
+			helpers.assert_eq(fixture.save_count(), 2,
+				"only the failed publication and its rollback may reach persistence")
 		end)
 	end)
 

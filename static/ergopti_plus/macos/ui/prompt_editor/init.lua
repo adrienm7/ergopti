@@ -68,12 +68,17 @@ local ASSETS_DIR = (Paths.shared("ui/prompt_editor") or "") .. "/"
 local function new_context(existing, on_save)
 	_context_serial = _context_serial + 1
 	local is_edit = type(existing) == "table"
+	local edit_id = is_edit and type(existing.id) == "string" and existing.id or ""
+	local profile_id = edit_id ~= "" and edit_id
+		or ("custom_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999)))
 	return {
-		edit_id = is_edit and type(existing.id) == "string" and existing.id or "",
+		edit_id = edit_id,
 		epoch = _context_serial,
 		on_save = on_save,
+		profile_id = profile_id,
+		settled = false,
 		payload = {
-			edit_id = is_edit and type(existing.id) == "string" and existing.id or "",
+			edit_id = edit_id,
 			epoch = _context_serial,
 			title = is_edit and i18n.get("prompt_editor.title_edit")
 				or i18n.get("prompt_editor.title_new"),
@@ -91,6 +96,7 @@ end
 --- @return boolean
 local function message_matches(body, context)
 	return _active_context == context
+		and context.settled ~= true
 		and body.edit_id == context.edit_id
 		and body.epoch == context.epoch
 end
@@ -166,14 +172,14 @@ function M.open(existing, on_save)
 		if not active or not message_matches(body, active) then return end
 
 		if body.action == "cancel" then
+			active.settled = true
 			close_window(window)
 		elseif body.action == "save" then
-			local id = active.edit_id ~= "" and active.edit_id
-				or ("custom_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999)))
+			active.settled = true
 			local callback = active.on_save
 			if type(callback) == "function" then
 				pcall(callback, {
-					id = id,
+					id = active.profile_id,
 					label = type(body.name) == "string" and body.name
 						or i18n.get("prompt_editor.default_label"),
 					batch = body.batch == true,

@@ -1055,6 +1055,7 @@ local function build_profile_menu(
 						if not settle_profile_mutation_recovery(deps) then return false end
 						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 						local timer_fired = false
+						local editor_settled = false
 						local function open_profile_editor()
 							if timer_fired then return false end
 							timer_fired = true
@@ -1064,6 +1065,8 @@ local function build_profile_menu(
 								prompt_editor.open,
 								profile,
 								function(updated)
+									if editor_settled then return false end
+									editor_settled = true
 									if type(updated) ~= "table" then return false end
 									if not settle_profile_mutation_recovery(deps) then return false end
 									if type(replace_profile) ~= "function"
