@@ -185,12 +185,12 @@ jobs:
             flags: ''
           - distro: fedora
             image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon libxkbcommon-utils xkeyboard-config xorg-x11-xkb-utils sudo curl shadow-utils util-linux
+            prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon libxkbcommon-utils xkeyboard-config xkbcomp sudo curl shadow-utils util-linux
             expect: any
             flags: ''
           - distro: rocky-9
             image: rockylinux:9
-            prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon xkeyboard-config xorg-x11-xkb-utils sudo curl shadow-utils util-linux
+            prep: dnf install -y bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon xkeyboard-config xkbcomp sudo curl shadow-utils util-linux
             expect: legacy
             flags: ''
           - distro: opensuse-tumbleweed
@@ -205,7 +205,7 @@ jobs:
             flags: --python python3.11 --check-python-floor
           - distro: alpine-edge
             image: alpine:edge
-            prep: apk add --no-cache bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon libxkbcommon-tools xkeyboard-config xkbcomp doas curl shadow util-linux
+            prep: apk add --no-cache bash coreutils findutils grep sed gawk diffutils git python3 libxkbcommon xkbcli xkeyboard-config xkbcomp doas curl shadow util-linux
             expect: any
             flags: --privilege doas
     container:
