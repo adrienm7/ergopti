@@ -74,9 +74,137 @@ esac
 EOF
     chmod +x "$detector_bin/pkg-config" "$detector_bin/dpkg-query"
     local output
-    output=$(PATH="$detector_bin:/usr/bin:/bin" \
+    output=$(XDG_SESSION_TYPE=wayland PATH="$detector_bin:/usr/bin:/bin" \
         bash "$INSTALLER_DIR/detect_installation_method.sh")
     grep -qx 'METHOD=clean' <<< "$output"
+    # Same versions under Xorg: the X server compiles with xkbcomp from the
+    # legacy tree and never sees extension directories.
+    output=$(XDG_SESSION_TYPE=x11 PATH="$detector_bin:/usr/bin:/bin" \
+        bash "$INSTALLER_DIR/detect_installation_method.sh" || true)
+    grep -qx 'METHOD=legacy' <<< "$output"
+    grep -q 'X11' <<< "$output"
+    # No session information at all (SSH, console) must not pick a method
+    # that only Wayland can see.
+    output=$(env -u XDG_SESSION_TYPE -u WAYLAND_DISPLAY -u DISPLAY PATH="$detector_bin:/usr/bin:/bin" \
+        bash "$INSTALLER_DIR/detect_installation_method.sh" || true)
+    grep -qx 'METHOD=legacy' <<< "$output"
+}
+
+write_legacy_fixture() {
+    local system="$1"
+    mkdir -p "$system/symbols" "$system/types" "$system/rules"
+    cat > "$system/symbols/fr" <<'EOF'
+partial default alphanumeric_keys
+xkb_symbols "basic" {
+    include "latin"
+    name[Group1]="French";
+};
+EOF
+    cat > "$system/types/extra" <<'EOF'
+default partial xkb_types "default" {
+    virtual_modifiers LevelThree;
+
+    type "FOUR_LEVEL_X" {
+        modifiers = Shift + LevelThree;
+        map[Shift] = Level2;
+    };
+};
+EOF
+    cat > "$system/rules/evdev.lst" <<'EOF'
+! model
+  pc105           Generic 105-key PC
+
+! layout
+  fr              French
+
+! variant
+  oss             fr: French (alt.)
+
+! option
+EOF
+    cat > "$system/rules/evdev.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<xkbConfigRegistry version="1.1">
+  <layoutList>
+    <layout>
+      <configItem><name>fr</name><description>French</description></configItem>
+      <variantList>
+        <variant><configItem><name>oss</name><description>French (alt.)</description></configItem></variant>
+      </variantList>
+    </layout>
+  </layoutList>
+</xkbConfigRegistry>
+EOF
+}
+
+run_non_interactive_legacy_install() {
+    local sandbox="$TMP_ROOT/legacy-install"
+    local local_linux="$sandbox/local tree/linux"
+    local output="$sandbox/output.log"
+    mkdir -p "$sandbox/extensions" "$sandbox/home"
+    write_legacy_fixture "$sandbox/system"
+    cp "$sandbox/system/types/extra" "$sandbox/pristine-extra"
+    printf "[('xkb', 'us')]\n" > "$sandbox/gsettings.state"
+    mkdir -p "$(dirname "$local_linux")"
+    cp -R "$LINUX_DIR" "$local_linux"
+    if ! env \
+        HOME="$TMP_ROOT/home" \
+        FZF_MARKER="$sandbox/fzf-called" \
+        GSETTINGS_LOG="$sandbox/gsettings.log" \
+        GSETTINGS_STATE="$sandbox/gsettings.state" \
+        GSETTINGS_ELEVATED_MARKER="$sandbox/gsettings-elevated" \
+        XDG_CURRENT_DESKTOP="GNOME" \
+        XDG_SESSION_TYPE="x11" \
+        PATH="$FAKE_BIN:$PATH" \
+        ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
+        ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
+        ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        ERGOPTI_XKB_USER_HOME="$sandbox/home" \
+        bash "$local_linux/xkb_installation/install.sh" \
+            --installation-method legacy \
+            --version v2_2_1 \
+            --variant ergopti \
+            --yes > "$output" 2>&1; then
+        cat "$output" >&2
+        return 1
+    fi
+    test ! -e "$sandbox/fzf-called"
+    # The type block sits inside the xkb_types section: it precedes the final
+    # closing brace and the section count is unchanged.
+    local extra="$sandbox/system/types/extra"
+    grep -q 'type "ERGOPTI_SEVEN_LEVEL"' "$extra"
+    test "$(grep -c 'xkb_types' "$extra")" -eq 1
+    test "$(grep -n 'type "ERGOPTI_SEVEN_LEVEL"' "$extra" | cut -d: -f1)" -lt "$(grep -n '^};' "$extra" | tail -1 | cut -d: -f1)"
+    cmp -s "$sandbox/pristine-extra" "$extra.1"
+    grep -q 'xkb_symbols "Ergopti_v2_2_1"' "$sandbox/system/symbols/fr"
+    grep -q '<name>Ergopti_v2_2_1</name>' "$sandbox/system/rules/evdev.xml"
+    # Desktop activation uses the fr+variant spelling, first in the list, and
+    # never runs with elevated privileges.
+    grep -qx "\[('xkb', 'fr+Ergopti_v2_2_1'), ('xkb', 'us')\]" "$sandbox/gsettings.state"
+    test ! -e "$sandbox/gsettings-elevated"
+    grep -q 'valeur confirmée' "$output"
+    # An X11 session without a layout manager is told how to persist the layout.
+    grep -q 'Installation terminée' "$output"
+
+    if ! env \
+        HOME="$TMP_ROOT/home" \
+        GSETTINGS_LOG="$sandbox/gsettings.log" \
+        GSETTINGS_STATE="$sandbox/gsettings.state" \
+        GSETTINGS_ELEVATED_MARKER="$sandbox/gsettings-elevated" \
+        PATH="$FAKE_BIN:$PATH" \
+        ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
+        ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
+        ERGOPTI_XKB_CACHE_DIR="$sandbox/cache" \
+        ERGOPTI_XKB_USER_HOME="$sandbox/home" \
+        bash "$local_linux/xkb_installation/install.sh" \
+            --installation-method legacy --uninstall --yes > "$sandbox/uninstall.log" 2>&1; then
+        cat "$sandbox/uninstall.log" >&2
+        return 1
+    fi
+    cmp -s "$sandbox/pristine-extra" "$extra"
+    ! grep -q 'Ergopti_v2_2_1' "$sandbox/system/symbols/fr"
+    grep -qx "\[('xkb', 'us')\]" "$sandbox/gsettings.state"
+    test ! -e "$sandbox/gsettings-elevated"
 }
 
 run_non_interactive_install() {
@@ -280,6 +408,7 @@ EOF
 
 run_debian_detector
 run_non_interactive_install
+run_non_interactive_legacy_install
 run_uninstall_without_artifacts_fails
 run_downloaded_uninstall
 printf 'install entrypoint tests: OK\n'

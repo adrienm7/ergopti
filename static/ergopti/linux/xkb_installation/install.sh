@@ -13,7 +13,9 @@
 #   - the custom types file is always installed: without it the Shift layer
 #     and the AltGr layers cannot work (issue #84);
 #   - `--uninstall` removes a previously installed layout;
-#   - every activation step reports success or failure instead of hiding it.
+#   - every activation step reports success or failure instead of hiding it;
+#   - privileged file writes go through sudo (or doas, or run directly as
+#     root) while desktop activation always runs as the invoking user.
 #
 # Usage:
 #   bash install.sh [--installation-method clean|legacy] [--ansi] [--uninstall]
@@ -95,6 +97,21 @@ run_with_retry() {
 
 run_fzf() {
     fzf --height=12 --layout=reverse --border --inline-info "$@"
+}
+
+# Privileged file writes only. Desktop activation must never go through
+# here: dconf and D-Bus belong to the user's session (issue #84).
+as_root() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    elif command -v doas >/dev/null 2>&1; then
+        doas "$@"
+    else
+        printf "${RED}❌ Ni sudo ni doas n'est disponible : relancez ce script en root.${NO_COLOR}\n" >&2
+        exit 1
+    fi
 }
 
 has_numbered_backup() {
@@ -343,15 +360,17 @@ if [ "$WANT_UNINSTALL" = true ]; then
     if [ -z "$FORCE_INSTALLATION_METHOD" ]; then
         infer_uninstall_method
     fi
+    # The desktop entries live in the user's dconf and Plasma config, which
+    # the privileged process cannot reach: drop them from this shell first.
     if [ "$FORCE_INSTALLATION_METHOD" = "legacy" ]; then
+        python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --deactivate-only || true
         run_step "Retrait de l'installation Legacy" "Installation Legacy retirée" \
-            sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --uninstall
+            as_root python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" \
+                --uninstall --skip-activation
     elif [ "$FORCE_INSTALLATION_METHOD" = "clean" ]; then
-        # The desktop entries live in the user's dconf and Plasma config, which
-        # the privileged process cannot reach: drop them from this shell first.
         python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --deactivate-only || true
         run_step "Retrait du paquet Clean" "Paquet Clean retiré" \
-            sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" \
+            as_root python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" \
                 --uninstall --skip-activation
     else
         usage_error "Méthode de désinstallation absente ou invalide"
@@ -557,6 +576,9 @@ if [ -n "$FORCE_INSTALLATION_METHOD" ]; then
         INSTALLER_METHOD="Legacy (système) [forcée]"
     fi
     printf "${LOG_INDENT}${YELLOW}⚠️  Méthode forcée via argument : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
+    if [ "$FORCE_INSTALLATION_METHOD" = "clean" ] && [ "${XDG_SESSION_TYPE:-}" = "x11" ]; then
+        printf "${LOG_INDENT}${YELLOW}⚠️  Session X11 détectée : Xorg ignore les répertoires d'extensions XKB, la méthode Clean n'y sera pas visible.${NO_COLOR}\n"
+    fi
 elif [ -f "$INSTALLER_SCRIPTS_DIR/detect_installation_method.sh" ]; then
     DETECT_OUTPUT=$(bash "$INSTALLER_SCRIPTS_DIR/detect_installation_method.sh") || true
     printf "%s\n" "$DETECT_OUTPUT" | sed "s/^/${LOG_INDENT}/"
@@ -611,10 +633,10 @@ fi
 
 printf "${LOG_INDENT}Méthode d'installation : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
 
-printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copier les fichiers.\n"
+printf "${LOG_INDENT}Le script va maintenant demander les droits administrateur pour copier les fichiers.\n"
 printf "\n🚀 Exécution de l'installeur...\n"
 tput cnorm >/dev/null 2>&1 || true
-sudo python3 "$INSTALLER_FULL_PATH" "${INSTALLER_ARGS[@]}"
+as_root python3 "$INSTALLER_FULL_PATH" "${INSTALLER_ARGS[@]}"
 
 # Desktop activation deliberately runs *outside* sudo: GNOME keeps the layout
 # list in the user's dconf database, reached over the user's D-Bus session bus,
@@ -626,3 +648,5 @@ if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
 else
     python3 "$INSTALLER_FULL_PATH" --activate-only --layout-id "$LEGACY_LAYOUT_ID"
 fi
+
+printf "\n${GREEN}${BOLD}✨ Installation terminée.${NO_COLOR} Déconnectez-vous puis reconnectez-vous (ou redémarrez) pour que la session recharge la disposition.\n"

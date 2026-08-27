@@ -29,6 +29,7 @@ INSTALLER_DIR = Path(__file__).resolve().parents[1]
 LAYOUT_VERSION_DIR = INSTALLER_DIR.parent / "v2_2_1"
 sys.path.insert(0, str(INSTALLER_DIR))
 
+import desktop_activation as activation  # noqa: E402
 import xkb_files_installer_clean as clean_installer  # noqa: E402
 from layout_package import InstallerRoots  # noqa: E402
 
@@ -104,7 +105,10 @@ class CleanInstallerSandboxTests(unittest.TestCase):
         symbols_content = symbols.read_text(encoding="utf-8")
         self.assertIn('xkb_symbols "default"', symbols_content)
         self.assertIn("ERGOPTI_SEVEN_LEVEL", symbols_content)
-        self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 2)
+        # One unindexed rule plus one per layout position: without the indexed
+        # rules the custom types vanish as soon as a second layout is kept.
+        self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 10)
+        self.assertIn("! layout[2]", post.read_text(encoding="utf-8"))
         names = [node.text for node in ET.parse(registry).getroot().iter("name")]
         self.assertEqual(names, ["ergopti"])
 
@@ -170,7 +174,6 @@ class CleanInstallerSandboxTests(unittest.TestCase):
                     types_path=LAYOUT_VERSION_DIR / "xkb_types.txt",
                     xcompose_path=None,
                     variant="ergopti_plus",
-                    support_x11=False,
                     roots=roots,
                 )
 
@@ -262,7 +265,7 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             clean_installer, "write_user_text", side_effect=OSError("read-only home")
         ), mock.patch.object(
             clean_installer,
-            "deactivate",
+            "deactivate_desktop_entries",
             return_value=clean_installer.CleanupStatus.ABSENT,
         ):
             self.assertFalse(clean_installer.uninstall_clean(roots))
@@ -288,7 +291,7 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             clean_installer,
             "remove_user_xcompose_include",
             return_value=clean_installer.CleanupStatus.ABSENT,
-        ), mock.patch.object(clean_installer.subprocess, "run", side_effect=fake_run):
+        ), mock.patch.object(activation.subprocess, "run", side_effect=fake_run):
             self.assertFalse(clean_installer.uninstall_clean(roots))
         self.assertTrue(self.package_dir.exists())
 
@@ -310,7 +313,7 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             clean_installer,
             "remove_user_xcompose_include",
             return_value=clean_installer.CleanupStatus.ABSENT,
-        ), mock.patch.object(clean_installer.subprocess, "run", side_effect=fake_run):
+        ), mock.patch.object(activation.subprocess, "run", side_effect=fake_run):
             self.assertEqual(
                 clean_installer.main(["--uninstall"]),
                 clean_installer.EXIT_INSTALL_ABORTED,

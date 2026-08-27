@@ -49,22 +49,45 @@ Since libxkbcommon 1.13 + xkeyboard-config 2.45, layout packages install under
 `/usr/share/xkeyboard-config.d/<package>/{symbols,types,rules}` and compose
 rules through a `<ruleset>.post` file - never by patching the system
 `rules/evdev`. The Ergopti clean installer relies on this contract; the sandbox
-tests override the roots via `ERGOPTI_XKB_*` env vars. The repository does not
-ship a separate AUR `PKGBUILD`: the former handwritten recipe referenced an
-absent tag and hook and drifted from the canonical package builder. Action: any
-new install target must reuse/generate from the canonical builder, pass a real
-package build in CI, and keep the extensions-dir contract unless it explicitly
-justifies an X11-only bridge.
+tests override the roots via `ERGOPTI_XKB_*` env vars. Two limits measured on
+libxkbcommon 1.13.1: an unindexed `! layout = types` rule only matches
+single-layout configurations, so the `.post` fragment must also carry
+`layout[1]`..`layout[4]` or the custom type vanishes as soon as GNOME/KDE
+compile a second input source (dead Shift/AltGr, issue #84); and only
+libxkbcommon reads extensions directories, Xorg's `xkbcomp` never does, so the
+detector routes X11 and unknown sessions to the legacy method. The repository
+does not ship a separate AUR `PKGBUILD`: the former handwritten recipe
+referenced an absent tag and hook and drifted from the canonical package
+builder. Action: any new install target must reuse/generate from the canonical
+builder, pass a real package build in CI, keep the extensions-dir contract, and
+prove the type with `xkbcli compile-keymap` for `ergopti`, `ergopti,us` and
+`us,ergopti`; never reintroduce an X11 symlink bridge, which cannot carry the
+types rule.
+
+### project-legacy-xkb-types-go-inside-the-section
+
+The legacy installer edits `types/extra`, a single
+`default partial xkb_types "default" { ... };` section that `complete`
+includes. A `type` block appended after the closing `};` is a syntax error:
+Xorg's `xkbcomp` rejects the whole `complete` file and libxkbcommon drops the
+block with no diagnostic, so "it compiles" proves nothing. Action: insert
+through `insert_type_sections()` (inside the last section), then require the
+type name in the compiled keymap; roll every backed-up file back otherwise.
 
 ### project-gsettings-input-sources-must-be-merged-not-set
 
 GNOME stores the user's keyboard list in `org.gnome.desktop.input-sources
 sources`; writing a single-entry list silently deletes the user's other
 keyboards (reported as "my old layout disappeared"). The installer reads,
-merges, then writes only when something was added. Action: reuse
-`merge_gsettings_source()` from `layout_package.py`; never hand-write a
-sources value.
-
+merges with the new layout first, writes, then reads the value back: dconf
+reports success even when a root process wrote into root's own database.
+gnome-shell activates `mru-sources[0]` at login, not `sources[0]`, so the
+most-recently-used list is aligned as well. Plasma keeps `LayoutList` and
+`VariantList` index-aligned and ignores both unless `Use=true`; the legacy
+layout is `fr` + `Ergopti_<version>` there, never GNOME's `fr+variant`.
+Action: reuse `merge_gsettings_source()` / `merge_layout_specs()` from
+`layout_package.py`, run activation as the desktop user, and never hand-write
+a sources value.
 
 ## Release artifacts
 

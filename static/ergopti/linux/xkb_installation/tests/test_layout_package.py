@@ -9,11 +9,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from layout_package import (  # noqa: E402
+    LayoutSpec,
     build_evdev_post,
     build_registry_xml,
     extract_defined_types,
     extract_referenced_types,
     find_stale_bridge_links,
+    insert_type_sections,
     patch_symbols_default,
     remove_generation_two_links,
     strip_ergopti_rule_lines,
@@ -72,6 +74,16 @@ class RegistryAndRulesTests(unittest.TestCase):
         self.assertIn("! layout\t=\ttypes", text)
         self.assertIn("ergopti\t=\t+ergopti", text)
 
+    def test_evdev_post_matches_every_layout_position(self):
+        """An unindexed rule only matches single-layout configurations, and
+        GNOME/KDE compile every configured source into one keymap: without
+        the indexed rules the custom types vanish as soon as ``us`` is kept
+        next to Ergopti (issue #84)."""
+        text = build_evdev_post("ergopti")
+        for index in range(1, 5):
+            self.assertIn(f"! layout[{index}]\t=\ttypes", text)
+        self.assertEqual(text.count("ergopti\t=\t+ergopti"), 5)
+
     def test_registry_xml_lists_variants_and_parses(self):
         xml_text = build_registry_xml(
             "ergopti", "Français — Ergopti", [("plus", "Ergopti+")]
@@ -86,6 +98,79 @@ class RegistryAndRulesTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate_component_identifier(unsafe)
         self.assertEqual(validate_component_identifier("ergopti"), "ergopti")
+
+
+EXTRA_SAMPLE = """default partial xkb_types "default" {
+    virtual_modifiers LevelThree;
+
+    type "FOUR_LEVEL_X" {
+        modifiers = Shift + LevelThree;
+        map[Shift] = Level2;
+    };
+};
+"""
+
+
+def assert_type_inside_section(case: unittest.TestCase, content: str) -> None:
+    """The type block must be followed by the section's own closing brace.
+
+    Checking ``rindex("};")`` is not enough: an appended block ends with a
+    ``};`` of its own, so only a column-zero ``};`` *after* the block proves
+    the block sits inside the section.
+    """
+    import re
+
+    start = content.index('type "ERGOPTI_SEVEN_LEVEL"')
+    block_end = content.index("};", start) + 2
+    case.assertRegex(
+        content[block_end:],
+        r"(?m)^\};\s*$",
+        "the xkb_types section must close after the inserted type block",
+    )
+
+
+class InsertTypeSectionsTests(unittest.TestCase):
+    """The legacy method must place the type inside the xkb_types section.
+
+    A block appended after the closing ``};`` is a syntax error: Xorg's
+    xkbcomp rejects the whole ``complete`` types file and libxkbcommon drops
+    the type without a diagnostic, which is how Shift and AltGr died.
+    """
+
+    def test_new_type_lands_inside_the_last_section(self):
+        merged, handled = insert_type_sections(EXTRA_SAMPLE, TYPES_SAMPLE)
+        self.assertEqual(handled, ["ERGOPTI_SEVEN_LEVEL"])
+        assert_type_inside_section(self, merged)
+        self.assertEqual(merged.count("xkb_types"), 1)
+        self.assertIn('type "FOUR_LEVEL_X"', merged)
+
+    def test_existing_type_is_replaced_in_place(self):
+        once, _ = insert_type_sections(EXTRA_SAMPLE, TYPES_SAMPLE)
+        updated_source = TYPES_SAMPLE.replace("map[LevelThree] = Level3;", "map[LevelThree] = Level3;\n        map[Lock] = Level2;")
+        twice, _ = insert_type_sections(once, updated_source)
+        self.assertEqual(twice.count('type "ERGOPTI_SEVEN_LEVEL"'), 1)
+        self.assertIn("map[Lock] = Level2;", twice)
+        self.assertEqual(twice.count("xkb_types"), 1)
+
+    def test_rejects_a_destination_without_section(self):
+        with self.assertRaises(ValueError):
+            insert_type_sections("// nothing here\n", TYPES_SAMPLE)
+
+    def test_rejects_a_source_without_type(self):
+        with self.assertRaises(ValueError):
+            insert_type_sections(EXTRA_SAMPLE, "xkb_types { include \"complete\" };")
+
+
+class LayoutSpecTests(unittest.TestCase):
+    def test_parse_splits_the_gnome_spelling(self):
+        self.assertEqual(LayoutSpec.parse("fr+Ergopti_v2_2_1"), LayoutSpec("fr", "Ergopti_v2_2_1"))
+        self.assertEqual(LayoutSpec.parse("ergopti"), LayoutSpec("ergopti"))
+        self.assertEqual(LayoutSpec("fr", "Ergopti_v2_2_1").gnome_id, "fr+Ergopti_v2_2_1")
+
+    def test_parse_rejects_unsafe_identifiers(self):
+        for unsafe in ("", "../x", "fr+../x", "a b"):
+            with self.assertRaises(ValueError):
+                LayoutSpec.parse(unsafe)
 
 
 class CoherenceValidationTests(unittest.TestCase):
