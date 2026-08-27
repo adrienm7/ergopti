@@ -82,6 +82,55 @@ local function fresh_runtime(effects)
 end
 
 helpers.describe("keymap semantic mutations wait for native preview revocation", function()
+	helpers.it("rejects malformed magic keys and custom collisions before preview revocation", function()
+		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
+		local Keymap = fresh_runtime(effects)
+		local Registry = assert(package.loaded["modules.keymap.registry"])
+		local Bridge = assert(package.loaded["modules.keymap.llm_bridge"])
+
+		helpers.assert_true(Keymap.set_trigger_char("a"))
+		helpers.assert_true(Keymap.set_base_delay(0))
+		helpers.assert_true(Keymap.add("olda", "promised", {
+			auto_expand = true,
+			is_case_sensitive = true,
+			is_case_sensitive_strict = true,
+		}) ~= false)
+		helpers.assert_true(Keymap.sort_mappings() ~= false)
+		local mapping = Registry.mappings_for_literal_magic_tail("d")[1]
+		helpers.assert_not_nil(mapping)
+		Bridge.update_preview("old")
+		_G.hs.timer.__fire_all()
+		helpers.assert_true(effects.visible)
+
+		local hides_before_collision = effects.hide_calls
+		local collision_result = Keymap.add_custom_terminator(
+			"custom_comma", ",", "duplicate comma", true)
+		local hides_after_collision = effects.hide_calls
+		local collision_live = false
+		for _, def in ipairs(Keymap.get_terminator_defs()) do
+			if def.key == "custom_comma" then collision_live = true; break end
+		end
+		if collision_live then Keymap.remove_custom_terminator("custom_comma") end
+
+		Bridge.update_preview("old")
+		_G.hs.timer.__fire_all()
+		helpers.assert_true(effects.visible)
+		local hides_before_invalid = effects.hide_calls
+		local invalid_result = Keymap.set_trigger_char(string.char(0xC2))
+		local hides_after_invalid = effects.hide_calls
+		local trigger_after_invalid = Keymap.get_trigger_char()
+
+		helpers.assert_eq(collision_result, false)
+		helpers.assert_eq(collision_live, false)
+		helpers.assert_eq(hides_after_collision, hides_before_collision,
+			"a duplicate character must be rejected before touching the visible lease")
+		helpers.assert_eq(invalid_result, false)
+		helpers.assert_eq(trigger_after_invalid, "a")
+		helpers.assert_eq(hides_after_invalid, hides_before_invalid,
+			"malformed UTF-8 must be rejected before touching the visible lease")
+		helpers.assert_true(Keymap.owns_visible_magic_action(mapping, "old"))
+	end)
+
 	helpers.it("keeps the old engine state and lease when canvas hide fails", function()
 		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
 		local Keymap = fresh_runtime(effects)
@@ -140,7 +189,7 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 			"set_sections_enabled", "disable_group", "register_lua_group", "enable_group",
 			"sort_mappings", "set_repeat_feature_enabled", "set_terminator_enabled",
 			"set_terminators_enabled",
-			"add_custom_terminator", "remove_custom_terminator",
+			"remove_custom_terminator",
 		}
 		for _, name in ipairs(writers) do
 			local escaped = name:gsub("_", "_")

@@ -235,11 +235,11 @@ const portContract = {
 	 *
 	 * addCustom(key, chars, label, consumed) — Add a user-defined terminator.
 	 *   @param {string}   key     Unique identifier (must not collide with TERMINATOR_DEFS keys).
-	 *   @param {string[]} chars   Characters for this slot.
+	 *   @param {string[]} chars   Characters for this slot (must not collide with any existing slot).
 	 *   @param {string}   label   Display label.
 	 *   @param {boolean}  consumed
-	 *   @returns {void}
-	 *   @error_behavior "log_and_return" on key collision.
+	 *   @returns {boolean} True only when the slot is committed.
+	 *   @error_behavior "log_and_return_false" on key or character collision.
 	 *
 	 * all() — Return a copy of the full catalogue (enabled + disabled).
 	 *   @returns {TerminatorDef[]}

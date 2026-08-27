@@ -75,6 +75,94 @@ helpers.describe("menu_state: hotstring group sync applies only the delta", func
 	end)
 end)
 
+helpers.describe("menu_state: custom terminator restore quarantines rejected rows", function()
+	helpers.it("retains only exact committed custom definitions and persists the repair", function()
+		local add_calls = {}
+		local save_calls = 0
+		local state = {
+			hotstrings = {},
+			custom_terminators = {
+				{ key = "custom_ok", char = "@", label = "valid", consume = false },
+				{ key = "custom_bad", char = ",", label = "collision", consume = true },
+			},
+			terminator_states = { custom_ok = false, custom_bad = true },
+		}
+		local saved = {
+			terminator_states = { custom_ok = false, custom_bad = true },
+		}
+		local committed = MenuState.sync_state_to_modules(state, saved, false, {
+			keymap = {
+				set_llm_model = function() return true end,
+				get_terminator_defs = function() return {} end,
+				remove_custom_terminator = function() return true end,
+				validate_custom_terminator = function(key)
+					return key == "custom_ok"
+				end,
+				add_custom_terminator = function(key)
+					add_calls[#add_calls + 1] = key
+					return true
+				end,
+				set_terminator_enabled = function() return true end,
+			},
+			hotstring_editor = {},
+			core_mods = {},
+			save_prefs = function()
+				save_calls = save_calls + 1
+				return true
+			end,
+		})
+
+		helpers.assert_eq(committed, true,
+			"successful quarantine persistence must leave startup usable")
+		helpers.assert_eq(add_calls, { "custom_ok" },
+			"invalid persisted rows must be rejected before runtime mutation")
+		helpers.assert_eq(#state.custom_terminators, 1)
+		helpers.assert_eq(state.custom_terminators[1].key, "custom_ok")
+		helpers.assert_nil(state.terminator_states.custom_bad)
+		helpers.assert_eq(save_calls, 1,
+			"the repaired state must replace the invalid persisted row")
+	end)
+
+	for _, outcome in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("does not quarantine a valid row after a runtime " .. outcome, function()
+			local save_calls = 0
+			local state = {
+				hotstrings = {},
+				custom_terminators = {
+					{ key = "custom_runtime", char = "@", label = "valid", consume = false },
+				},
+				terminator_states = { custom_runtime = true },
+			}
+			local committed = MenuState.sync_state_to_modules(state,
+				{ terminator_states = { custom_runtime = true } }, false, {
+					keymap = {
+						set_llm_model = function() return true end,
+						get_terminator_defs = function() return {} end,
+						remove_custom_terminator = function() return true end,
+						validate_custom_terminator = function() return true end,
+						add_custom_terminator = function()
+							if outcome == "throw" then error("injected restore refusal", 0) end
+							if outcome == "false" then return false end
+							return nil
+						end,
+						set_terminator_enabled = function() return true end,
+					},
+					hotstring_editor = {},
+					core_mods = {},
+					save_prefs = function() save_calls = save_calls + 1; return true end,
+				})
+
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(#state.custom_terminators, 1,
+				"a runtime refusal is not evidence that persisted data is invalid")
+			helpers.assert_eq(state.custom_terminators[1].key, "custom_runtime")
+			helpers.assert_eq(state.terminator_states.custom_runtime, true)
+			helpers.assert_eq(save_calls, 0,
+				"runtime refusal must not rewrite valid preferences")
+		end)
+	end
+end)
+
 helpers.describe("menu_state: gesture boot restore requires an exact lifecycle commit", function()
 	for _, desired in ipairs({ false, true }) do
 		for _, mode in ipairs({ "false", "nil", "throw" }) do
