@@ -54,6 +54,7 @@ local DEDUPLICATION_ENABLED = M.DEDUPLICATION_ENABLED
 local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
 local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms")    -- Kill the task if the server accepts but never sends a token
 local NON_STREAM_TIMEOUT_SEC     = Timings.sec("llm", "non_stream_timeout_ms")  -- Non-streaming inference hard timeout; prevents a hung server from blocking on_fail indefinitely
+local COMPLETION_CONTEXT_CODEPOINTS = 240
 -- Safety-net delay before the fallback removal of the streaming payload temp
 -- file (seconds). on_done removes it immediately in the normal case; this is
 -- only reached if on_done fires late or not at all. Must be strictly greater
@@ -70,6 +71,14 @@ local _ctx = nil
 -- also keeps a strong registry, but this request layer must retain its own debt so
 -- it can prevent a sibling HTTP dispatch until the predecessor is proven inert.
 local _non_stream_timer_cleanup = {}
+
+--- Returns the final autocomplete context without splitting a UTF-8 sequence.
+--- @param full_text string|nil Full text preceding the cursor.
+--- @return string UTF-8-safe suffix containing at most 240 codepoints.
+local function completion_prompt(full_text)
+	local context = type(full_text) == "string" and full_text or ""
+	return text_utils.utf8_sub(context, -COMPLETION_CONTEXT_CODEPOINTS)
+end
 
 --- Retains one exact non-stream timeout capability for a later cleanup attempt.
 --- @param handle table|nil TimerScheduler handle.
@@ -253,8 +262,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
     local effective_model = _ctx.read_active_model_arg() or _ctx.server_model_id() or _ctx.model_hf_path() or model_name
     if line_mode then
         -- For plain autocomplete, completion endpoint is more reliable than chat formatting
-        local ctx = type(full_text) == "string" and full_text or ""
-        local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
+        local prompt = completion_prompt(full_text)
         prompt_preview = prompt
         endpoint = _ctx.completions_endpoint()
         payload = {
@@ -495,8 +503,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local effective_model = _ctx.read_active_model_arg() or _ctx.server_model_id() or _ctx.model_hf_path() or model_name
 	local payload, endpoint, prompt_preview
 	if line_mode then
-		local ctx    = type(full_text) == "string" and full_text or ""
-		local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
+		local prompt = completion_prompt(full_text)
 		prompt_preview = prompt
 		endpoint = _ctx.completions_endpoint()
 		payload = {
