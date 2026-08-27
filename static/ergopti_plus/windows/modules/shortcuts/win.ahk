@@ -129,9 +129,7 @@ if Features["shortcuts"]["move"] {
 				SetTimer(AwakeCheckMouseMoved, 150)
 				; Use InputHook to detect any keypress -- does not conflict with other hotkeys
 				try {
-						AwakeInputHook := InputHook("L0 I")
-						AwakeInputHook.OnChar := AwakeCancelOnKeypress
-						AwakeInputHook.OnKeyDown := AwakeCancelOnKeypress
+						AwakeInputHook := AwakeCreateCancellationHook()
 						AwakeInputHook.Start()
 				} catch as Err {
 						LoggerError("shortcuts", "Keep-awake keypress-cancel InputHook arming failed: {1}.", Err.Message)
@@ -210,6 +208,8 @@ if Features["shortcuts"]["move"] {
 				; Ignore key presses with modifiers to prevent the trigger hotkey
 				; from instantly deactivating the keep-awake mode silently.
 				if Type(ih) == "InputHook" {
+						if Type(arg1) == "Integer" and AwakeIsIgnoredModifierKey(arg1)
+								return
 						if GetKeyState("Ctrl") or GetKeyState("Alt") or GetKeyState("LWin") or GetKeyState("RWin")
 								return
 				}
@@ -217,6 +217,23 @@ if Features["shortcuts"]["move"] {
 				if ActivitySimulation {
 						StopActivitySimulation()
 				}
+		}
+
+		AwakeCreateCancellationHook() {
+				; Keep cancellation observational: V preserves the triggering input, while
+				; N is required for navigation and other non-text key notifications.
+				Hook := InputHook("V L0 I")
+				Hook.KeyOpt("{All}", "N")
+				Hook.OnChar := AwakeCancelOnKeypress
+				Hook.OnKeyDown := AwakeCancelOnKeypress
+				return Hook
+		}
+
+		AwakeIsIgnoredModifierKey(VirtualKey) {
+				return VirtualKey == GetKeyVK("Ctrl") or VirtualKey == GetKeyVK("Alt")
+						or VirtualKey == GetKeyVK("LWin") or VirtualKey == GetKeyVK("RWin")
+						or VirtualKey == GetKeyVK("LCtrl") or VirtualKey == GetKeyVK("RCtrl")
+						or VirtualKey == GetKeyVK("LAlt") or VirtualKey == GetKeyVK("RAlt")
 		}
 
 		SimulateActivity(ResetOnly := False) {

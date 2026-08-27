@@ -58,7 +58,11 @@ Test("shortcuts: StopActivitySimulation only notifies when keep-awake was actual
 _KASNG_ArmingFailuresAreLogged() {
 	Body := _DriverFuncBody("StartActivitySimulation")
 	Assert(Body != "", "StartActivitySimulation must exist in modules/shortcuts/win.ahk")
-	Assert(InStr(Body, "Hotkey(") > 0 && InStr(Body, "InputHook(") > 0,
+	FactoryBody := _DriverFuncBody("AwakeCreateCancellationHook")
+	Assert(FactoryBody != "",
+		"AwakeCreateCancellationHook must own the production keypress observer")
+	Assert(InStr(Body, "Hotkey(") > 0 && InStr(Body, "AwakeCreateCancellationHook()") > 0
+		&& InStr(FactoryBody, "InputHook(") > 0,
 		"StartActivitySimulation must arm both the mouse and keypress cancellation paths")
 	; Each OS-boundary arming block must report its failure rather than swallow it.
 	Assert(InStr(Body, "Keep-awake mouse-cancel hook arming failed") > 0,

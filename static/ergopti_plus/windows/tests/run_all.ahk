@@ -323,6 +323,7 @@ InstallSendNoOps()
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
 ; include paths are resolved relative to the tests/ directory.
 #Include unit/test_shortcuts.ahk
+#Include unit/test_keepawake_visible_cancellation.ahk
 
 ; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
 ; registered at top level) so the file is safe to include in the headless runner.
