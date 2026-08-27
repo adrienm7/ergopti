@@ -24,7 +24,7 @@ local function fresh_packaged()
 	-- registry, so every fresh updater fixture needs the matching fresh adapter
 	package.loaded["adapters.timer_scheduler"] = nil
 	return helpers.load_with_stubs("modules.updater", {
-		processInfo = { bundleID = "com.ergopti.app", version = "1.0.0" },
+		processInfo = { bundleID = "com.ergoptiplus.app.hammerspoon", version = "1.1.1" },
 	})
 end
 
