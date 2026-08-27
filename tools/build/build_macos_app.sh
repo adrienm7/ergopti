@@ -446,7 +446,7 @@ generate_info_plist() {
 			<!-- Sparkle wiring. SUFeedURL points at a channel-scoped appcast
 			     hosted on GitHub Releases. SUPublicEDKey must match the
 			     private key the CI signing step uses. -->
-			<key>SUFeedURL</key>                      <string>https://github.com/$GH_OWNER/$GH_REPO/releases/latest/download/appcast-$ERGOPTI_CHANNEL.xml</string>
+			<key>SUFeedURL</key>                      <string>https://github.com/$GH_OWNER/$GH_REPO/releases/download/sparkle-feed/appcast-$ERGOPTI_CHANNEL.xml</string>
 			<key>SUPublicEDKey</key>                  <string>$SPARKLE_PUBLIC_KEY</string>
 			<key>SUEnableAutomaticChecks</key>        <true/>
 			<key>SUScheduledCheckInterval</key>       <integer>86400</integer>
