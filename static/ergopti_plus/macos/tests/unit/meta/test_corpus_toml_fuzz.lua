@@ -101,20 +101,14 @@ end)
 -- =============================================
 
 helpers.describe("toml_fuzz corpus — no-crash contract", function()
-	helpers.it("pcall(codec.decode, input) never raises for any vector", function()
+	helpers.it("codec.decode never raises for any vector", function()
 		if not corpus or not codec_ok then return end
 		for _, v in ipairs(corpus) do
-			-- The only contract here is that decode does not propagate an
-			-- unhandled error past pcall. ok=false is acceptable for bad input.
-			local ok_call = pcall(codec.decode, v.input)
-			-- A boolean false from pcall means the function errored — that is
-			-- permitted for malformed TOML, but the error must be caught, not
-			-- propagate as an OS-level abort or uncatchable panic.
-			-- We re-run with explicit capture only to produce a useful message:
-			local _, result = pcall(codec.decode, v.input)
-			_ = result -- silence unused warning; we only care about no unhandled panic
-			helpers.assert_true(type(ok_call) == "boolean",
-				"vector '" .. v.id .. "': pcall returned a non-boolean (should never happen)")
+			local ok_call, result = pcall(codec.decode, v.input)
+			if not ok_call then
+				error("vector '" .. v.id .. "': codec.decode raised instead of returning nil: "
+					.. tostring(result))
+			end
 		end
 	end)
 end)
@@ -145,17 +139,16 @@ helpers.describe("toml_fuzz corpus — expect contract", function()
 		end
 	end)
 
-	helpers.it("expect=error vectors decode to nil or raise (graceful failure)", function()
+	helpers.it("expect=error vectors return nil without raising", function()
 		if not corpus or not codec_ok then return end
 		for _, v in ipairs(corpus) do
 			if v.expect ~= "error" then goto continue end
 			local ok_call, result = pcall(codec.decode, v.input)
-			-- Two valid outcomes for malformed TOML:
-			--   a) pcall returns false (codec raised an error) — preferred
-			--   b) pcall returns true but result is nil (codec returned nil on error)
-			-- Either way the caller receives a signal that parsing failed.
-			local graceful = not ok_call or result == nil
-			helpers.assert_true(graceful,
+			if not ok_call then
+				error("vector '" .. v.id .. "': codec.decode raised instead of returning nil: "
+					.. tostring(result))
+			end
+			helpers.assert_true(result == nil,
 				"vector '" .. v.id .. "': expect=error but decode returned a table ("
 				.. type(result) .. ") — codec should reject this input")
 			::continue::

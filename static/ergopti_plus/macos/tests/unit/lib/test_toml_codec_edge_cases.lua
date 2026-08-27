@@ -15,6 +15,10 @@
 ---
 --- 3. F51 — TOML special float literals inf / -inf / nan were treated as bare
 ---    strings instead of numbers. Fix: match them before the number patterns.
+---
+--- 4. HS-086 — A table header below a scalar either raised from navigation or
+---    silently replaced the scalar for arrays of tables. Fix: reject both
+---    collisions through the documented nil-return contract.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -44,6 +48,49 @@ helpers.describe("toml_codec: UTF-8 BOM", function()
 		local got = codec.decode('[info]\nname = "A' .. bom .. 'B"\n')
 		helpers.assert_eq(got.info.name, "A" .. bom .. "B",
 			"only the exact stream-prefix BOM may be removed")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0b/ Scalar-table collisions fail closed =====================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: scalar-table collisions", function()
+
+	helpers.it("returns nil instead of raising for a regular table header", function()
+		local sources = {
+			'tap_hold = "oops"\n[tap_hold.keys]\na = 1\n',
+			'a = 1\n[a.b]\nx = 1\n',
+			'a = true\n[a.b]\nx = 1\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok,
+				"scalar/header collision #" .. index .. " must return nil, not raise: " .. tostring(got))
+			helpers.assert_eq(got, nil,
+				"scalar/header collision #" .. index .. " must fail closed")
+		end
+	end)
+
+	helpers.it("returns nil instead of replacing a scalar with an array of tables", function()
+		local sources = {
+			'a = "oops"\n[[a]]\nx = 1\n',
+			'a = 1\n[[a]]\nx = 1\n',
+			'a = false\n[[a]]\nx = 1\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok,
+				"scalar/AoT collision #" .. index .. " must return nil, not raise: " .. tostring(got))
+			helpers.assert_eq(got, nil,
+				"scalar/AoT collision #" .. index .. " must preserve the invalid-state signal")
+		end
 	end)
 
 end)

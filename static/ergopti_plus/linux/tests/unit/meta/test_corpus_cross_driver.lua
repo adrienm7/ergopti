@@ -352,8 +352,11 @@ describe("Corpus: toml/fuzz_corpus.json", function()
 			assert_true(#fuzz_inputs > 0,
 				"no fuzz input was extracted from the corpus — the regex above stopped matching, so this test measured nothing")
 
-			for _, input in ipairs(fuzz_inputs) do
-				pcall(decode, input)   -- a rejection is a correct outcome here
+			for index, input in ipairs(fuzz_inputs) do
+				local ok_call, result = pcall(decode, input)
+				if not ok_call then
+					error("fuzz input #" .. index .. " raised instead of returning nil: " .. tostring(result))
+				end
 			end
 
 			-- Called directly: if the fuzz sweep left the codec unable to parse
