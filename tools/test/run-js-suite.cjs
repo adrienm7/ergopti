@@ -211,6 +211,7 @@ const CHECKS = [
 	{ name: 'name parity (text_utils + action_picker + manifest_menu symmetric across drivers)', cmd: 'node', args: ['tools/test/test-name-parity.cjs'], repro: 'node tools/test/test-name-parity.cjs' },
 	{ name: 'git-mv resilience (every path pin in the three suites resolves — macOS + Linux files, AHK dirs)', cmd: 'node', args: ['tools/test/test-git-mv-resilience.cjs'], repro: 'node tools/test/test-git-mv-resilience.cjs' },
 	{ name: 'shared UI JavaScript syntax (every browser script parses before WebView injection)', cmd: 'node', args: ['tools/test/test-shared-ui-js-syntax.cjs'], repro: 'node tools/test/test-shared-ui-js-syntax.cjs' },
+	{ name: 'changelog remote content and native bridge stay inside their authenticated boundary', cmd: 'node', args: ['tools/test/test-changelog-security.cjs'], repro: 'npm run test:changelog-security' },
 	{ name: 'metrics manifest payload contract (reader vocabulary reaches real consumers)', cmd: 'node', args: ['tools/test/test-metrics-manifest-contract.cjs'], repro: 'node tools/test/test-metrics-manifest-contract.cjs' },
 	{ name: 'typing-speed source toggles (net expansion gain and filter semantics)', cmd: 'node', args: ['tools/test/test-metrics-speed-source-filters.cjs'], repro: 'node tools/test/test-metrics-speed-source-filters.cjs' },
 	{ name: 'Linux metrics SQLite bridge (persistent manifest + selected-range refresh)', cmd: 'node', args: ['tools/test/test-linux-metrics-sqlite-bridge.cjs'], repro: 'node tools/test/test-linux-metrics-sqlite-bridge.cjs' },

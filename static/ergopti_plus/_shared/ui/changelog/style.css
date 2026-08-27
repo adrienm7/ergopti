@@ -231,8 +231,18 @@ body {
 }
 
 /* ================================= */
-/* ===== 3.1) Markdown Rendering ==== */
+/* ===== 3.1) Release Notes ========= */
 /* ================================= */
+
+#release-body .release-notes-plain {
+	color: #c8c8cc;
+	font-family: 'SF Mono', 'Fira Mono', monospace;
+	font-size: 12px;
+	line-height: 1.7;
+	margin: 0;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
 
 #release-body h1,
 #release-body h2,

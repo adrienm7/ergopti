@@ -49,7 +49,9 @@ _CLRS_ReadyIsNotGatedAway() {
 		"the bridge must capture manual request provenance before reading the one-shot page message")
 	MsgPos := CapturePos > 0 ? InStr(Body, "TryGetWebMessageAsString", , CapturePos) : 0
 	Assert(MsgPos > 0, "prerequisite: the handler still reads the page message")
-	ReadyPos := MsgPos > 0 ? InStr(Body, 'if (Msg == "ready")', , MsgPos) : 0
+	SessionPos := MsgPos > 0 ? InStr(Body, 'Payload["session"] !== ExpectedSession', , MsgPos) : 0
+	ActionPos := SessionPos > 0 ? InStr(Body, 'Action := Payload.Has("action")', , SessionPos) : 0
+	ReadyPos := ActionPos > 0 ? InStr(Body, 'if (Action == "ready")', , ActionPos) : 0
 	ReadyHandlerPos := ReadyPos > 0 ? InStr(Body, "_CLW_OnPageReady()", , ReadyPos) : 0
 	BornPausedPos := ReadyHandlerPos > 0
 		? InStr(Body, "Request.BornSuspended", , ReadyHandlerPos)
@@ -57,10 +59,11 @@ _CLRS_ReadyIsNotGatedAway() {
 	PolicyPos := BornPausedPos > 0
 		? InStr(Body, "_Updater_RequestMayPublish(Request)", , BornPausedPos)
 		: 0
-	Assert(CapturePos > 0 and MsgPos > CapturePos and ReadyPos > MsgPos
+	Assert(CapturePos > 0 and MsgPos > CapturePos and SessionPos > MsgPos
+		and ActionPos > SessionPos and ReadyPos > ActionPos
 		and ReadyHandlerPos > ReadyPos and BornPausedPos > ReadyHandlerPos
 		and PolicyPos > BornPausedPos,
-		'the one-shot `ready` lifecycle signal must route before both captured pause gates, while every user action after it remains guarded. Gating `ready` strands the window because resume re-triggers nothing')
+		'the authenticated one-shot `ready` lifecycle signal must route before both captured pause gates, while every user action after it remains guarded. Gating `ready` strands the window because resume re-triggers nothing')
 }
 Test("meta changelog-ready-not-stranded: the suspend guard exempts the page's ready signal",
 	_CLRS_ReadyIsNotGatedAway)

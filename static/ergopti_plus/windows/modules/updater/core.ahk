@@ -2241,6 +2241,22 @@ Updater_CurrentReleaseUrl() {
 ; Shared manual URL boundary for both About-menu links and changelog actions.
 ; Refuse a born-paused click before URL resolution or Run, then retain the
 ; immutable request across either yielding operation.
+_Updater_IsAllowedManualUrl(Url) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(Url is String) || Url == ""
+		return false
+	if RegExMatch(Url, "[\x00-\x20\x7f]")
+		return false
+	AllowedRoot := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+	if SubStr(Url, 1, StrLen(AllowedRoot)) !== AllowedRoot
+		return false
+	Suffix := SubStr(Url, StrLen(AllowedRoot) + 1)
+	if Suffix == ""
+		return true
+	Boundary := SubStr(Suffix, 1, 1)
+	return Boundary == "/" || Boundary == "?" || Boundary == "#"
+}
+
 _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
@@ -2265,6 +2281,10 @@ _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, Not
 			if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 				return false
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+			return false
+		}
+		if !_Updater_IsAllowedManualUrl(Url) {
+			try LoggerWarn("Updater", "Refused a manual URL outside the repository HTTPS allowlist.")
 			return false
 		}
 		if IsObject(RunFn)
