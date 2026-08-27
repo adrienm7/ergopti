@@ -113,9 +113,10 @@ probe_libxkbcommon() {
 }
 
 probe_xkeyboardconfig() {
+    # Debian and Ubuntu package xkeyboard-config as xkb-data.
     probe_version pkg-config pkg-config --modversion xkeyboard-config \
         || probe_version pacman pacman -Q xkeyboard-config \
-        || probe_version dpkg-query dpkg-query -W '-f=${Version}' xkeyboard-config \
+        || probe_version dpkg-query dpkg-query -W '-f=${Version}' xkb-data \
         || probe_version rpm rpm -q --queryformat '%{VERSION}' xkeyboard-config \
         || probe_version apk apk list --installed xkeyboard-config \
         || probe_version xbps-query xbps-query -p pkgver xkeyboard-config

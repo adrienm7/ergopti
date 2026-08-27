@@ -53,7 +53,19 @@ bash install.sh --yes --version v2_2_1 --variant ergopti_plus
 
 # Désinstallation non interactive (méthode déduite des fichiers installés)
 bash install.sh --uninstall --yes
+
+# Rapport de diagnostic, sans droits root, à joindre à un rapport de bug
+bash install.sh --diagnose
+
+# Autre interpréteur (l'installeur requiert Python >= 3.8)
+PYTHON=python3.11 bash install.sh
 ```
+
+Le rapport de diagnostic (`xkb_diagnose.py`) décrit le système, la session graphique et le
+bureau reconnu, les outils et versions XKB, l'état des deux méthodes sur le disque, les réglages
+GNOME/KDE, puis compile chaque disposition Ergopti trouvée avec les compilateurs du système.
+Chaque exécution de `install.sh` est en outre recopiée dans un journal dont le chemin est affiché
+en premier (`/tmp/ergopti-install.log` par défaut, `ERGOPTI_INSTALL_LOG` pour le déplacer).
 
 Notes :
 
@@ -82,6 +94,29 @@ Notes :
   chemin de recherche de la distribution **et** contient le type `ERGOPTI_SEVEN_LEVEL`, seule
   puis à côté de `us` dans les deux ordres. Cette vérification ne dépend d'aucun bureau : elle
   distingue « paquet invisible » de « session qui n'utilise pas la disposition ».
+- « Ça compile » ne suffit pas : une touche dont le type est inconnu retombe silencieusement sur
+  `ONE_LEVEL` (Maj morte, symptôme exact de l'issue #84). La vérification exige donc que la
+  touche sonde `<AD01>` (è) soit liée au type dans le groupe qui porte Ergopti, que le type
+  envoie Ctrl au niveau 5 et le conserve (`preserve`), ce qui fait de Ctrl+è un Ctrl+Z. En cas
+  d'échec, la commande exacte et les diagnostics du compilateur sont affichés, et l'installation
+  s'arrête avec un code non nul au lieu d'annoncer un succès.
+- Xorg n'a pas `xkbcli` : `xkbcomp` vérifie le paquet Clean via `-I<paquet>` et l'arbre Legacy via
+  `pc+fr(variante)`. Sans aucun compilateur, l'installation est marquée « non vérifiée » et
+  `install.sh` propose d'installer le paquet qui fournit `xkbcli` (`libxkbcommon-tools`,
+  `libxkbcommon-utils`…).
+- La méthode Clean forcée sur une libxkbcommon < 1.13 est refusée avant toute écriture : la
+  bibliothèque n'y lit pas les répertoires d'extensions, et les fichiers copiés ne seraient jamais
+  chargés.
+- Seul le bureau qui possède le réglage est écrit : sous Hyprland, Sway ou niri, `gsettings`
+  n'est pas touché (il accepterait l'écriture sans que le compositeur la lise) et le fragment de
+  configuration du compositeur est affiché à la place. Une session qui ne s'identifie pas
+  (variables `XDG_*` absentes) tente tous les réglages.
+- Le paquet Clean est installé avec les modes 0755/0644 quel que soit l'umask du processus
+  privilégié ; un `/usr` en lecture seule (distribution immuable) produit un message qui nomme le
+  chemin et la cause ; NixOS et Guix sont refusés d'emblée avec la piste à suivre.
+- À la désinstallation Legacy, un fichier système que le gestionnaire de paquets a déjà remplacé
+  (il ne mentionne plus Ergopti) n'est pas écrasé par une sauvegarde plus ancienne : seules les
+  sauvegardes sont retirées.
 - Sur GNOME, `mru-sources` est aligné sur `sources` : gnome-shell active au démarrage la première
   entrée de la liste des dispositions récentes, pas la première de `sources`.
 - Sur KDE Plasma, `LayoutList` et `VariantList` sont deux listes alignées par index et `Use=true`
@@ -129,10 +164,23 @@ Scripts utilisés par `install.sh` :
 - `xkb_files_installer_clean.py` : installeur Python propre (extensions directories)
 - `xkb_files_installer_legacy.py` : installeur Python legacy (modification des fichiers système)
 
+- `xkb_diagnose.py` : rapport de diagnostic (`install.sh --diagnose`)
+
 Tests (`python tests/run_all_tests.py`) : unitaires du cœur, cohérence de toutes les versions
 générées, bout-en-bout bac à sable des deux installeurs via les variables ci-dessus, compilation
 réelle avec `xkbcli` (>= 1.13 pour la méthode Clean) et `xkbcomp` quand ils sont installés, dont
-la reproduction des deux régressions historiques (règle non indexée, type hors section).
+la reproduction des deux régressions historiques (règle non indexée, type hors section), et le
+rapport de diagnostic. `tests/test_install_entrypoint.sh` exécute le vrai `install.sh` avec des
+doublures de `sudo`, `fzf`, `gsettings`, `xkbcli` et `xkbcomp`.
+
+`tests/e2e_distro.sh` est le test de bout en bout que le workflow `linux-layout.yml` exécute
+dans un conteneur de chaque distribution (Arch, Ubuntu 20.04 à 26.04, Debian 13 et sid, Fedora,
+Rocky 9, openSUSE Tumbleweed et Leap 15.6, Alpine edge) : suites de tests avec le Python de la
+distribution, installation par la commande documentée depuis un utilisateur non privilégié avec
+`sudo` ou `doas`, vérification indépendante de la keymap avec les compilateurs de la distribution,
+registre `xkbcli list`, session GNOME simulée sur un bus D-Bus privé avec un vrai dconf,
+désinstallation puis comparaison octet par octet de l'arbre système. L'entrée Arch rejoue l'hôte
+de l'issue #84 (fish, compositeur wlroots, restes de la génération 2 de l'installeur).
 
 ## Références
 

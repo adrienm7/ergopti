@@ -10,6 +10,8 @@ the custom type must land *inside* the ``xkb_types`` section, and any step
 that leaves the tree unusable must roll every touched file back.
 """
 
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
@@ -198,11 +200,33 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         for path, original in self.originals.items():
             self.assertEqual(path.read_bytes(), original, f"{path} was not restored")
+            self.assertFalse(
+                path.with_name(f"{path.name}.1").exists(),
+                f"{path.name}.1 must not linger once the pristine content is back",
+            )
         self.assertEqual(
             (self.home / ".XCompose").read_text(encoding="utf-8"),
             "user compose\n",
             "the user's own Compose file must come back from the sandbox home, not root's",
         )
+        self.assertFalse((self.home / ".XCompose.1").exists())
+
+    @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
+    def test_a_compose_file_created_from_nothing_is_removed_on_uninstall(self):
+        """Without a previous ``~/.XCompose`` there is nothing to restore; the
+        file the installer wrote must go instead of staying forever."""
+        compose = self.sandbox / "Ergopti.XCompose"
+        compose.write_text('include "%L"\n<Multi_key> <e> : "ergopti"\n', encoding="utf-8")
+        result = self.run_installer("--skip-activation", "--xcompose", str(compose), "--force-xcompose")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertEqual((self.home / ".XCompose").read_bytes(), compose.read_bytes())
+        self.assertEqual(
+            (self.home / ".XCompose.1").read_text(encoding="utf-8"), legacy.XCOMPOSE_ABSENT_SENTINEL
+        )
+        result = self.run_installer("--uninstall", "--skip-activation", with_layout=False)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertFalse((self.home / ".XCompose").exists())
+        self.assertFalse((self.home / ".XCompose.1").exists())
 
     def test_a_tree_that_does_not_compile_is_rolled_back(self):
         roots = self.roots()
@@ -250,6 +274,44 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         ):
             self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
         self.assertEqual((self.home / ".XCompose").read_text(encoding="utf-8"), "user compose\n")
+
+    def test_uninstall_after_a_package_upgrade_keeps_the_new_system_file(self):
+        """A distribution upgrade of xkeyboard-config replaces ``types/extra``
+        with its own pristine copy; restoring the older ``.1`` backup over it
+        would downgrade the file. Only the stale backups may go."""
+        pristine = self.paths.types_extra.read_bytes()
+        backup = legacy.update_xkb_types_file(LAYOUT_VERSION_DIR / "xkb_types.txt", self.paths.types_extra)
+        self.assertIsNotNone(backup)
+        upgraded = pristine + b"\n// upgraded by the package manager\n"
+        self.paths.types_extra.write_bytes(upgraded)
+        with mock.patch.dict(os.environ, self.env, clear=False), mock.patch.object(
+            legacy, "purge_cache"
+        ):
+            self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(self.paths.types_extra.read_bytes(), upgraded)
+        self.assertFalse(backup.exists(), "the stale backup must not linger")
+
+    def test_the_lst_edit_only_rewrites_the_variant_section(self):
+        """A leftover line with the same name in another section must not be
+        turned into the variant entry: desktops read variants from the
+        ``! variant`` section only."""
+        self.paths.evdev_lst.write_text(
+            "! layout\n  fr              French\n  Ergopti_v2_2_1  Ergopti (stale layout entry)\n"
+            "\n! variant\n  oss             fr: French (alt.)\n\n! option\n",
+            encoding="utf-8",
+        )
+        legacy.update_lst_file(self.paths.evdev_lst, "Ergopti_v2_2_1", "Français — Ergopti")
+        content = self.paths.evdev_lst.read_text(encoding="utf-8")
+        layout_section = content[: content.index("! variant")]
+        variant_section = content[content.index("! variant") : content.index("! option")]
+        self.assertIn("Ergopti (stale layout entry)", layout_section)
+        self.assertIn("Ergopti_v2_2_1  fr: Français — Ergopti", variant_section)
+        self.assertEqual(variant_section.count("Ergopti_v2_2_1"), 1)
+        # Re-registering updates the variant line in place.
+        legacy.update_lst_file(self.paths.evdev_lst, "Ergopti_v2_2_1", "Français — Ergopti v2")
+        content = self.paths.evdev_lst.read_text(encoding="utf-8")
+        self.assertEqual(content.count("Ergopti_v2_2_1"), 2)
+        self.assertIn("Ergopti v2", content)
 
     def test_install_removes_a_conflicting_clean_package(self):
         package = self.extensions_root / "ergopti" / "symbols"

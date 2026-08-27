@@ -9,26 +9,34 @@ as root writes into root's dconf and silently changes nothing (issue #84).
 The module therefore owns four responsibilities:
 
 - refuse, or drop back to, the desktop user before touching any session state;
-- apply the layout on the desktops that expose a documented setting
-  (GNOME-based sessions through gsettings, KDE Plasma through kwriteconfig,
-  X11 through setxkbmap) and report each outcome;
+- apply the layout on the desktop that owns the setting (GNOME-based sessions
+  through gsettings, KDE Plasma through kwriteconfig, X11 through setxkbmap)
+  and report each outcome, without pretending a write into a setting nobody
+  reads is an activation;
 - print an exact, copy-pasteable instruction for every other session, because
-  wlroots compositors (Sway, Hyprland, niri, river, …) have no shared setting
+  wlroots compositors (Sway, Hyprland, niri, river, ...) have no shared setting
   and can only be configured from their own configuration file;
-- prove, with libxkbcommon's own compiler, that the installed layout resolves
-  and carries the custom key type, alone and next to another layout.
+- prove, with the real compilers, that the installed layout resolves, binds
+  the custom key type to its keys and carries the Ctrl level, alone and next
+  to another layout; a compiler's own diagnostics are printed whenever a check
+  fails so a bug report contains the cause and not just the symptom.
 
 Everything here is best-effort by contract: a desktop we cannot reach is
-reported to the user, never silently swallowed and never fatal.
+reported to the user, never silently swallowed and never fatal. A keymap that
+does not verify, on the other hand, is a failed installation.
 """
 
 from __future__ import annotations
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
+import traceback
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Callable
@@ -36,15 +44,22 @@ from typing import Callable
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from layout_package import (  # noqa: E402
+    EXIT_INSTALL_ABORTED,
     LayoutSpec,
     format_gsettings_sources,
     format_kde_layouts,
-    is_ergopti_source,
     is_ergopti_spec,
+    keymap_defines_type,
+    keymap_key_block,
+    keymap_key_symbols,
+    keymap_key_type,
+    keymap_type_level,
+    keymap_type_preserves,
     merge_gsettings_source,
     merge_layout_specs,
     parse_gsettings_sources,
     parse_kde_layouts,
+    parse_version,
     remove_layout_specs,
 )
 
@@ -70,6 +85,27 @@ KDE_USE_KEY = "Use"
 # the custom type: ``us`` ships with every xkeyboard-config.
 COMPANION_LAYOUT = LayoutSpec("us")
 
+# Key used to prove that the compiled keymap really binds the custom type: it
+# carries è on every Ergopti variant, ISO and ANSI alike, and its Ctrl level is
+# what turns Ctrl+è into Ctrl+Z.
+PROBE_KEY = "<AD01>"
+# The modifier whose dedicated level is the "custom Ctrl layer" feature.
+CONTROL_MODIFIER = "Control"
+
+# libxkbcommon only prints fatal errors by default; these make it report every
+# diagnostic on stderr so a failed check can be explained.
+XKB_DIAGNOSTIC_ENV = {"XKB_LOG_LEVEL": "warning", "XKB_LOG_VERBOSITY": "10"}
+
+# Compiler chatter that never explains a failure and would bury the real cause.
+_DIAGNOSTIC_NOISE = (
+    "multiple definitions of the",
+    "earlier definition ignored",
+    "deprecated keysym name",
+    "are not supported by x",
+)
+# Words that mark a line worth showing even when it does not name the component.
+_DIAGNOSTIC_SIGNALS = ("error", "can't", "cannot", "couldn't", "could not", "abandon", "exiting", "not defined", "no such")
+
 # Desktops whose keyboard layout list lives in the GNOME input-sources schema.
 GNOME_DESKTOP_TOKENS = frozenset(
     {
@@ -87,6 +123,21 @@ GNOME_DESKTOP_TOKENS = frozenset(
 )
 KDE_DESKTOP_TOKENS = frozenset({"kde", "plasma", "kde-plasma"})
 
+# Package that provides ``xkbcli`` per distribution family (os-release ID or
+# ID_LIKE token). Arch ships it inside libxkbcommon itself.
+XKBCLI_PACKAGES = {
+    "debian": "libxkbcommon-tools (apt)",
+    "ubuntu": "libxkbcommon-tools (apt)",
+    "fedora": "libxkbcommon-utils (dnf)",
+    "rhel": "libxkbcommon-utils (dnf)",
+    "centos": "libxkbcommon-utils (dnf)",
+    "suse": "libxkbcommon-tools (zypper)",
+    "opensuse": "libxkbcommon-tools (zypper)",
+    "arch": "libxkbcommon (pacman)",
+    "alpine": "libxkbcommon-tools (apk)",
+    "void": "libxkbcommon (xbps)",
+}
+
 
 class CleanupStatus(Enum):
     ABSENT = "absent"
@@ -98,6 +149,56 @@ class CommandCaptureStatus(Enum):
     ABSENT = "absent"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+
+
+# ---------------------------------------------------------------------------
+# Process-wide guards
+# ---------------------------------------------------------------------------
+
+
+def force_utf8_stdio() -> None:
+    """Keep the CLI alive on consoles that cannot encode every glyph.
+
+    The installers print progress glyphs; on a latin-1 terminal the default
+    print encoding raises UnicodeEncodeError mid-install. Reconfigure both
+    streams to UTF-8 with replacement characters so output degrades instead
+    of crashing.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            continue
+
+
+def run_cli(main: Callable[[list[str]], int], argv: list[str]) -> int:
+    """Run an installer entry point and turn any crash into a usable report.
+
+    A Python traceback on its own is what users paste into bug reports; the
+    trailer adds the interpreter and host so the report is reproducible.
+    """
+    force_utf8_stdio()
+    try:
+        return main(argv)
+    except KeyboardInterrupt:
+        print("\n⚠️  Interrompu par l'utilisateur.", file=sys.stderr)
+        return 130
+    except SystemExit:
+        raise
+    except Exception:  # noqa: BLE001 - last-resort report for the bug tracker
+        print(
+            "\n❌ Erreur interne de l'installeur. Copiez le bloc ci-dessous dans le rapport de bug :",
+            file=sys.stderr,
+        )
+        traceback.print_exc()
+        print(
+            f"   Python {platform.python_version()} ({sys.executable}) sur {platform.platform()}",
+            file=sys.stderr,
+        )
+        return EXIT_INSTALL_ABORTED
 
 
 # ---------------------------------------------------------------------------
@@ -214,11 +315,54 @@ def compositor_hint(tokens: set[str]) -> tuple[str, Callable[[LayoutSpec], list[
     return None
 
 
+def owning_desktop(tokens: set[str]) -> str | None:
+    """Name the component that owns the keyboard setting, when the session says.
+
+    ``gnome`` and ``kde`` expose a setting the installer can write; a
+    ``compositor`` keeps its own configuration file; ``None`` means the session
+    did not identify itself, in which case every writable setting is tried.
+    """
+    if is_gnome_session(tokens):
+        return "gnome"
+    if is_kde_session(tokens):
+        return "kde"
+    if compositor_hint(tokens) is not None:
+        return "compositor"
+    return None
+
+
 def describe_session(environ: dict[str, str] | None = None) -> str:
     """One-line human description used in every activation report."""
     env = os.environ if environ is None else environ
     desktop = env.get("XDG_CURRENT_DESKTOP") or "<inconnu>"
     return f"session {session_type(env)}, bureau {desktop}"
+
+
+def os_release() -> dict[str, str]:
+    """Return the ``/etc/os-release`` fields, or an empty mapping elsewhere."""
+    fields: dict[str, str] = {}
+    for candidate in ("/etc/os-release", "/usr/lib/os-release"):
+        try:
+            content = Path(candidate).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line in content.splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key.strip():
+                fields[key.strip()] = value.strip().strip('"').strip("'")
+        break
+    return fields
+
+
+def xkbcli_package_hint() -> str:
+    """Name the package that provides ``xkbcli`` on this distribution."""
+    fields = os_release()
+    tokens = [fields.get("ID", "")] + fields.get("ID_LIKE", "").split()
+    for token in tokens:
+        token = token.strip().lower()
+        if token in XKBCLI_PACKAGES:
+            return XKBCLI_PACKAGES[token]
+    return "libxkbcommon-tools ou libxkbcommon-utils selon la distribution"
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +444,12 @@ def session_bus_env(user: str) -> dict[str, str]:
 def shell_quote(value: str) -> str:
     """Quote one argument for a POSIX shell command line."""
     return "'" + value.replace("'", "'\\''") + "'"
+
+
+def shell_join(command: list[str], environment: dict[str, str] | None = None) -> str:
+    """Render a command line the user can paste back into a terminal."""
+    prefix = [f"{key}={shell_quote(value)}" for key, value in sorted((environment or {}).items())]
+    return " ".join(prefix + [shell_quote(part) if " " in part or not part else part for part in command])
 
 
 def build_drop_command(
@@ -417,6 +567,51 @@ def run_reported(command: list[str], label: str, timeout: int = 30) -> bool:
     for line in (result.stdout or "").strip().splitlines()[:10]:
         print(f"      {line}")
     return False
+
+
+# Version probes, first hit wins. The library's own tool comes first because it
+# is distribution-independent; the package managers cover hosts without it.
+LIBXKBCOMMON_VERSION_PROBES = (
+    ["xkbcli", "--version"],
+    ["pkg-config", "--modversion", "xkbcommon"],
+    ["pacman", "-Q", "libxkbcommon"],
+    ["dpkg-query", "-W", "-f=${Version}", "libxkbcommon0"],
+    ["rpm", "-q", "--queryformat", "%{VERSION}", "libxkbcommon"],
+    ["apk", "list", "--installed", "libxkbcommon"],
+    ["xbps-query", "-p", "pkgver", "libxkbcommon"],
+)
+XKEYBOARD_CONFIG_VERSION_PROBES = (
+    ["pkg-config", "--modversion", "xkeyboard-config"],
+    ["pacman", "-Q", "xkeyboard-config"],
+    # Debian and Ubuntu package xkeyboard-config as xkb-data.
+    ["dpkg-query", "-W", "-f=${Version}", "xkb-data"],
+    ["rpm", "-q", "--queryformat", "%{VERSION}", "xkeyboard-config"],
+    ["apk", "list", "--installed", "xkeyboard-config"],
+    ["xbps-query", "-p", "pkgver", "xkeyboard-config"],
+)
+
+
+def probe_version(probes) -> tuple[tuple[int, ...], list[str]] | None:
+    """Return the first version a probe reports, with the probe that answered."""
+    for command in probes:
+        if not shutil.which(command[0]):
+            continue
+        version = parse_version(run_capture(command) or "")
+        if version:
+            return version, list(command)
+    return None
+
+
+def libxkbcommon_version() -> tuple[int, ...] | None:
+    """Return the installed libxkbcommon version; ``None`` when nothing answers."""
+    found = probe_version(LIBXKBCOMMON_VERSION_PROBES)
+    return found[0] if found else None
+
+
+def xkeyboard_config_version() -> tuple[int, ...] | None:
+    """Return the installed xkeyboard-config version; ``None`` when nothing answers."""
+    found = probe_version(XKEYBOARD_CONFIG_VERSION_PROBES)
+    return found[0] if found else None
 
 
 # ---------------------------------------------------------------------------
@@ -662,11 +857,11 @@ def manual_instructions(spec: LayoutSpec, tokens: set[str], kind: str) -> list[s
         return []
     path, builder = hint if hint is not None else (GENERIC_WAYLAND_FILE, _environment_lines)
     lines = [
-        "   ℹ️  Votre session gère elle-même sa disposition clavier.",
-        f"      Ajoutez ceci dans {path} :",
+        "   ℹ️  Votre session gère elle-même sa disposition clavier : elle ne lit ni GNOME ni KDE.",
+        f"      Dans {path}, remplacez la disposition actuelle par :",
     ]
     lines.extend(f"        {line}" for line in builder(spec))
-    lines.append("      Puis reconnectez-vous.")
+    lines.append("      Puis rechargez la configuration du compositeur ou reconnectez-vous.")
     return lines
 
 
@@ -701,8 +896,73 @@ def persistence_instructions(spec: LayoutSpec) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Keymap verification
+# Keymap compilation
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CompileResult:
+    """Outcome of one keymap compilation, with everything a bug report needs."""
+
+    command: list[str]
+    keymap: str | None
+    diagnostics: str
+    environment: dict[str, str]
+
+    @property
+    def succeeded(self) -> bool:
+        return self.keymap is not None
+
+    def command_line(self) -> str:
+        return shell_join(self.command, self.environment)
+
+
+@dataclass(frozen=True)
+class XkbcompProbe:
+    """What to feed Xorg's ``xkbcomp``, which resolves no RMLVO rules for
+    extension packages: explicit components and extra include directories."""
+
+    symbols: str
+    types: str
+    include_dirs: tuple[Path, ...] = ()
+
+
+XKBCOMP_KEYMAP_TEMPLATE = """xkb_keymap {{
+\txkb_keycodes  {{ include "evdev+aliases(qwerty)" }};
+\txkb_types     {{ include "{types}" }};
+\txkb_compat    {{ include "complete" }};
+\txkb_symbols   {{ include "{symbols}" }};
+\txkb_geometry  {{ include "pc(pc105)" }};
+}};
+"""
+
+
+def run_compiler(
+    command: list[str], environment: dict[str, str] | None = None, timeout: int = 60
+) -> CompileResult:
+    """Run a keymap compiler, keeping its stderr for the failure report."""
+    environment = dict(environment or {})
+    try:
+        result = subprocess.run(
+            command,
+            env={**os.environ, **environment} if environment else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            errors="replace",
+            timeout=timeout,
+            check=False,
+        )
+    except FileNotFoundError:
+        return CompileResult(command, None, f"{command[0]} : commande introuvable", environment)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return CompileResult(command, None, f"{command[0]} : {error}", environment)
+    diagnostics = result.stderr or ""
+    if result.returncode != 0 or not (result.stdout or "").strip():
+        if not diagnostics.strip():
+            diagnostics = f"code de sortie {result.returncode}, aucune keymap produite"
+        return CompileResult(command, None, diagnostics, environment)
+    return CompileResult(command, result.stdout, diagnostics, environment)
 
 
 def rmlvo_arguments(layouts: list[LayoutSpec]) -> list[str]:
@@ -720,8 +980,8 @@ def compile_rmlvo(
     layouts: list[LayoutSpec],
     include_roots: list[Path] | None = None,
     extensions_root: Path | None = None,
-) -> str | None:
-    """Compile a keymap with libxkbcommon's own compiler; ``None`` on failure.
+) -> CompileResult:
+    """Compile a keymap with libxkbcommon's own compiler.
 
     ``include_roots`` are searched before the default paths, which is how a
     sandboxed system tree shadows the host's. ``extensions_root`` replaces the
@@ -734,22 +994,177 @@ def compile_rmlvo(
         command += ["--include", str(root)]
     if include_roots:
         command.append("--include-defaults")
-    env = None
+    environment = dict(XKB_DIAGNOSTIC_ENV)
     if extensions_root is not None:
-        env = {
-            "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(extensions_root),
-            # Keep the versioned path out of the way so the staging tree is authoritative.
-            "XKB_CONFIG_VERSIONED_EXTENSIONS_PATH": "",
-        }
-    return run_capture(command, timeout=60, env=env)
+        environment["XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH"] = str(extensions_root)
+        # Keep the versioned path out of the way so the staging tree is authoritative.
+        environment["XKB_CONFIG_VERSIONED_EXTENSIONS_PATH"] = ""
+    return run_compiler(command, environment)
+
+
+def compile_with_xkbcomp(xkbcomp: str, probe: XkbcompProbe) -> CompileResult:
+    """Compile explicit components through Xorg's compiler.
+
+    libxkbcommon and ``xkbcomp`` parse the tree independently, and only the
+    latter is what an Xorg session actually uses. For a clean package the
+    probe adds the package directory to the search path, which proves the
+    files are valid XKB even where libxkbcommon predates extension
+    directories.
+    """
+    handle, temporary = tempfile.mkstemp(prefix="ergopti-", suffix=".xkb", text=True)
+    command = [xkbcomp]
+    command += [f"-I{directory}" for directory in probe.include_dirs]
+    command += ["-xkb", temporary, "-"]
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(XKBCOMP_KEYMAP_TEMPLATE.format(symbols=probe.symbols, types=probe.types))
+        return run_compiler(command)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def keymap_has_type(keymap: str, type_name: str) -> bool:
-    return f'type "{type_name}"' in keymap
+    return keymap_defines_type(keymap, type_name)
 
 
 def describe_rmlvo(layouts: list[LayoutSpec]) -> str:
     return ",".join(spec.gnome_id for spec in layouts)
+
+
+def relevant_diagnostics(diagnostics: str, needles: tuple[str, ...] = (), limit: int = 12) -> list[str]:
+    """Keep the compiler lines that explain a failure.
+
+    Errors and every mention of ``needles`` (the component under test) are
+    kept; the routine chatter both compilers emit for a perfectly good keymap
+    is dropped so it cannot bury the cause. When nothing qualifies, the last
+    lines are returned as they are.
+    """
+    kept: list[str] = []
+    fallback: list[str] = []
+    lowered_needles = tuple(needle.lower() for needle in needles if needle)
+    for raw in diagnostics.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        fallback.append(line)
+        lowered = line.lower()
+        names_component = any(needle in lowered for needle in lowered_needles)
+        if not names_component and any(marker in lowered for marker in _DIAGNOSTIC_NOISE):
+            continue
+        if names_component or any(signal in lowered for signal in _DIAGNOSTIC_SIGNALS):
+            kept.append(line)
+    chosen = kept or fallback
+    return chosen[-limit:]
+
+
+def inspect_keymap(keymap: str, required_type: str, probe_key: str = PROBE_KEY, group: int = 1) -> list[str]:
+    """Return every reason a compiled keymap would leave the Ergopti layers dead.
+
+    "It compiles" is not enough: a key whose type is unknown falls back to
+    ONE_LEVEL without an error, which is exactly the dead Shift key of issue
+    #84. The probe key must therefore be bound to the custom type in the
+    group that carries Ergopti, and the type must map Ctrl to its own level
+    while preserving it, or Ctrl+è would not act as Ctrl+Z.
+    """
+    problems: list[str] = []
+    if not keymap_defines_type(keymap, required_type):
+        problems.append(f"le type {required_type} n'est pas défini dans la keymap compilée")
+    if keymap_key_block(keymap, probe_key) is None:
+        problems.append(
+            f"la touche {probe_key} est absente de la keymap : les symboles Ergopti n'ont pas été chargés"
+        )
+        return problems
+    effective = keymap_key_type(keymap, probe_key, group)
+    if effective != required_type:
+        problems.append(
+            f"la touche {probe_key} (è) utilise le type {effective or 'implicite'} au lieu de "
+            f"{required_type} : les couches Maj et AltGr resteraient mortes"
+        )
+    if not problems:
+        level = keymap_type_level(keymap, required_type, CONTROL_MODIFIER)
+        if level is None:
+            problems.append(
+                f"le type {required_type} ne définit aucun niveau pour Ctrl : Ctrl+è ne donnerait pas Ctrl+Z"
+            )
+        elif not keymap_type_preserves(keymap, required_type, CONTROL_MODIFIER):
+            problems.append(
+                f"le type {required_type} ne conserve pas Ctrl (preserve) : Ctrl+è produirait z sans Ctrl"
+            )
+    return problems
+
+
+def describe_probe(keymap: str, required_type: str, probe_key: str = PROBE_KEY, group: int = 1) -> str:
+    """Summarise what the probe key does, for the success line and diagnostics."""
+    symbols = keymap_key_symbols(keymap, probe_key, group)
+    level = keymap_type_level(keymap, required_type, CONTROL_MODIFIER)
+    control = ""
+    if level is not None:
+        keysym = symbols[level - 1] if 0 < level <= len(symbols) else "?"
+        control = f", Ctrl → niveau {level} ({keysym})"
+    return f"{probe_key} : {len(symbols)} niveaux {symbols}{control}"
+
+
+def _report_failure(label: str, problems: list[str], result: CompileResult, needles: tuple[str, ...]) -> None:
+    print(f"   ❌ {label}")
+    for problem in problems:
+        print(f"      • {problem}")
+    print(f"      Commande : {result.command_line()}")
+    for line in relevant_diagnostics(result.diagnostics, needles):
+        print(f"      | {line}")
+
+
+def _verify_with_xkbcli(
+    xkbcli: str,
+    spec: LayoutSpec,
+    required_type: str,
+    include_roots: list[Path] | None,
+    extensions_root: Path | None,
+    probe_key: str,
+) -> bool:
+    cases = [[spec], [spec, COMPANION_LAYOUT], [COMPANION_LAYOUT, spec]]
+    needles = (required_type, spec.layout, spec.variant, "ergopti")
+    summary = ""
+    for layouts in cases:
+        label = describe_rmlvo(layouts)
+        group = layouts.index(spec) + 1
+        result = compile_rmlvo(xkbcli, layouts, include_roots, extensions_root)
+        if not result.succeeded:
+            _report_failure(
+                f"libxkbcommon : la configuration « {label} » ne compile pas, la disposition "
+                "n'est pas visible par libxkbcommon.",
+                [],
+                result,
+                needles,
+            )
+            return False
+        problems = inspect_keymap(result.keymap or "", required_type, probe_key, group)
+        if problems:
+            _report_failure(f"libxkbcommon : « {label} » compile mais la disposition est inutilisable.", problems, result, needles)
+            return False
+        if not summary:
+            summary = describe_probe(result.keymap or "", required_type, probe_key, group)
+    print(
+        f"   ✅ Keymap vérifiée par libxkbcommon : « {spec.gnome_id} » compile avec {required_type}, "
+        f"seule et à côté de « {COMPANION_LAYOUT.gnome_id} » ({summary})."
+    )
+    return True
+
+
+def _verify_with_xkbcomp(xkbcomp: str, probe: XkbcompProbe, spec: LayoutSpec, required_type: str, probe_key: str) -> bool:
+    needles = (required_type, spec.layout, spec.variant, "ergopti")
+    result = compile_with_xkbcomp(xkbcomp, probe)
+    if not result.succeeded:
+        _report_failure("xkbcomp (Xorg) rejette la disposition.", [], result, needles)
+        return False
+    problems = inspect_keymap(result.keymap or "", required_type, probe_key, 1)
+    if problems:
+        _report_failure("xkbcomp (Xorg) compile la disposition mais elle est inutilisable.", problems, result, needles)
+        return False
+    print(
+        f"   ✅ Keymap vérifiée par xkbcomp (Xorg) : « {probe.symbols} » compile avec {required_type} "
+        f"({describe_probe(result.keymap or '', required_type, probe_key, 1)})."
+    )
+    return True
 
 
 def verify_keymap(
@@ -757,43 +1172,46 @@ def verify_keymap(
     required_type: str,
     include_roots: list[Path] | None = None,
     extensions_root: Path | None = None,
+    xkbcomp_probe: XkbcompProbe | None = None,
+    probe_key: str = PROBE_KEY,
 ) -> bool | None:
-    """Prove the installed layout resolves and carries the custom types.
+    """Prove the installed layout resolves and delivers the custom type.
 
-    The check compiles the layout exactly as a compositor would, alone and
-    next to a companion layout in both orders, because rules that only match
-    single-layout configurations are the failure that killed the Shift and
-    AltGr layers for every user who kept a second keyboard (issue #84). A pass
-    with a dead Shift key then means the session is not using the layout; a
-    failure means the package itself is wrong.
+    libxkbcommon's compiler resolves the layout exactly as a Wayland
+    compositor would, alone and next to a companion layout in both orders,
+    because rules that only match single-layout configurations are the
+    failure that killed the Shift and AltGr layers for every user who kept a
+    second keyboard (issue #84). Xorg's ``xkbcomp`` compiles the explicit
+    components when a probe is given: it is what an X11 session uses, and the
+    only compiler available on hosts without ``xkbcli``.
 
-    Returns ``None`` when libxkbcommon's compiler is not installed, so callers
-    can distinguish "unverified" from "broken".
+    Returns ``False`` when any available compiler rejects the layout or
+    produces dead layers, ``None`` when no compiler is installed (unverified,
+    with the package to install printed), ``True`` otherwise.
     """
+    verdicts: list[bool] = []
     xkbcli = shutil.which("xkbcli")
-    if not xkbcli:
-        print("   ℹ️  xkbcli absent : vérification de la keymap impossible.")
+    if xkbcli:
+        verdicts.append(_verify_with_xkbcli(xkbcli, spec, required_type, include_roots, extensions_root, probe_key))
+    else:
+        print(
+            "   ℹ️  xkbcli absent : la résolution de la disposition par libxkbcommon (sessions Wayland) "
+            f"ne peut pas être vérifiée. Paquet à installer : {xkbcli_package_hint()}."
+        )
+    if xkbcomp_probe is not None:
+        xkbcomp = shutil.which("xkbcomp")
+        if xkbcomp:
+            verdicts.append(_verify_with_xkbcomp(xkbcomp, xkbcomp_probe, spec, required_type, probe_key))
+        else:
+            print("   ℹ️  xkbcomp absent : la compilation Xorg n'est pas vérifiée.")
+    if False in verdicts:
+        return False
+    if not verdicts:
+        print(
+            "   ⚠️  Aucun compilateur XKB disponible (xkbcli, xkbcomp) : la disposition "
+            "installée n'a pas pu être vérifiée."
+        )
         return None
-    cases = [[spec], [spec, COMPANION_LAYOUT], [COMPANION_LAYOUT, spec]]
-    for layouts in cases:
-        label = describe_rmlvo(layouts)
-        keymap = compile_rmlvo(xkbcli, layouts, include_roots, extensions_root)
-        if keymap is None:
-            print(
-                f"   ❌ La configuration « {label} » ne compile pas : la disposition "
-                "n'est pas visible par libxkbcommon."
-            )
-            return False
-        if not keymap_has_type(keymap, required_type):
-            print(
-                f"   ❌ « {label} » compile mais sans le type {required_type} : "
-                "les couches Maj et AltGr resteraient mortes."
-            )
-            return False
-    print(
-        f"   ✅ Keymap vérifiée : « {spec.gnome_id} » compile avec {required_type}, "
-        "seule et à côté d'une autre disposition."
-    )
     return True
 
 
@@ -878,13 +1296,21 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
     """Activate the layout in the current desktop session.
 
     ``specs`` is ordered by preference; the first one becomes the active
-    layout. Returns True when at least one desktop accepted the change.
+    layout. Returns True when the desktop that owns the setting accepted the
+    change. A setting is only written when the session either identifies
+    itself as its owner or does not identify itself at all: gsettings and
+    kwriteconfig succeed under Sway or Hyprland without those compositors
+    ever reading them, and reporting that as success is how a layout stays
+    silently inactive.
     """
     if not specs:
         raise ValueError("activate_layout requires at least one layout")
     primary = specs[0]
+    env = os.environ if environ is None else environ
     tokens = desktop_tokens(environ)
     kind = session_type(environ)
+    owner = owning_desktop(tokens)
+    desktop = env.get("XDG_CURRENT_DESKTOP") or "inconnu"
     print(f"🚀 Activation de « {primary.gnome_id} » ({describe_session(environ)})…")
     if running_as_root():
         print(
@@ -892,24 +1318,32 @@ def activate_layout(specs: list[LayoutSpec], environ: dict[str, str] | None = No
             "votre session utilisateur, l'écriture serait sans effet."
         )
         return False
-    gnome_applied = apply_gnome(specs, tokens)
-    kde_applied = apply_kde(specs, tokens)
+    gnome_applied = False
+    if owner in (None, "gnome"):
+        gnome_applied = apply_gnome(specs, tokens)
+    else:
+        print(f"   ℹ️  Réglage GNOME ignoré : le bureau « {desktop} » ne le lit pas.")
+    kde_applied = False
+    if owner in (None, "kde"):
+        kde_applied = apply_kde(specs, tokens)
+    else:
+        print(f"   ℹ️  Réglage KDE ignoré : le bureau « {desktop} » ne le lit pas.")
     x11_applied = apply_x11(primary, environ)
-    # A successful write only counts when the desktop that owns the setting is
-    # the one running: gsettings and kwriteconfig succeed on compositors that
-    # never read them, and treating that as success is how a layout silently
-    # stays inactive.
     handled = (
-        (gnome_applied and is_gnome_session(tokens))
-        or (kde_applied and is_kde_session(tokens))
+        (gnome_applied and owner == "gnome")
+        or (kde_applied and owner == "kde")
         or x11_applied
     )
     if not handled:
         for line in manual_instructions(primary, tokens, kind):
             print(line)
-    if x11_applied and not (is_gnome_session(tokens) or is_kde_session(tokens)):
+    if x11_applied and owner not in ("gnome", "kde"):
         for line in persistence_instructions(primary):
             print(line)
+    if handled:
+        print("   ✅ Disposition activée pour cette session ; elle sera rechargée à la prochaine connexion.")
+    else:
+        print("   ⚠️  Disposition non activée automatiquement : appliquez les instructions ci-dessus.")
     print(
         "   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition "
         "n'est pas active."

@@ -429,6 +429,113 @@ def ansi_base_name_for_variant(version_dir: str, variant: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Compiled keymap inspection
+# ---------------------------------------------------------------------------
+#
+# Both compilers dump a keymap as text, with two spellings: libxkbcommon
+# numbers groups and levels (``type[1]=``, ``map[Shift]= 3``) while Xorg's
+# xkbcomp keeps the symbolic names (``type[Group1]=``, ``map[Shift]= Level3``).
+# Every helper accepts both. They exist because "the keymap compiled" proves
+# nothing: a key whose type is unknown silently falls back to ONE_LEVEL, which
+# users experience as a dead Shift key (issue #84).
+
+_KEY_TYPE_RE = re.compile(r'type(?:\[\s*(?:Group)?(\d+)\s*\])?\s*=\s*"([^"]+)"')
+
+
+def _component_name(key: str) -> str:
+    name = key.strip()
+    return name if name.startswith("<") else f"<{name}>"
+
+
+def keymap_defines_type(keymap: str, type_name: str) -> bool:
+    """Whether the compiled keymap carries a definition of ``type_name``."""
+    return re.search(r'type\s+"' + re.escape(type_name) + r'"\s*\{', keymap) is not None
+
+
+def keymap_key_block(keymap: str, key: str) -> str | None:
+    """Return the body of ``key <NAME> { ... };`` or ``None`` when absent."""
+    pattern = re.compile(r"key\s+" + re.escape(_component_name(key)) + r"\s*\{(.*?)\};", re.DOTALL)
+    match = pattern.search(keymap)
+    return match.group(1) if match else None
+
+
+def keymap_key_type(keymap: str, key: str, group: int = 1) -> str | None:
+    """Return the key type bound to ``key`` for ``group`` (1-based).
+
+    A ``type=`` entry without an index applies to every group; an indexed
+    entry wins for its own group. ``None`` means the key is absent or has no
+    explicit type.
+    """
+    block = keymap_key_block(keymap, key)
+    if block is None:
+        return None
+    default = None
+    for index, name in _KEY_TYPE_RE.findall(block):
+        if not index:
+            default = name
+        elif int(index) == group:
+            return name
+    return default
+
+
+def keymap_key_symbols(keymap: str, key: str, group: int = 1) -> list[str]:
+    """Return the keysym names bound to ``key`` for ``group`` (1-based)."""
+    block = keymap_key_block(keymap, key)
+    if block is None:
+        return []
+    match = re.search(
+        r"symbols\[\s*(?:Group)?" + str(group) + r"\s*\]\s*=\s*\[([^\]]*)\]", block
+    )
+    if not match:
+        return []
+    return [part.strip() for part in match.group(1).split(",") if part.strip()]
+
+
+def keymap_type_block(keymap: str, type_name: str) -> str | None:
+    """Return the body of ``type "NAME" { ... };`` or ``None`` when absent."""
+    pattern = re.compile(r'type\s+"' + re.escape(type_name) + r'"\s*\{(.*?)\};', re.DOTALL)
+    match = pattern.search(keymap)
+    return match.group(1) if match else None
+
+
+def keymap_type_level(keymap: str, type_name: str, modifier: str) -> int | None:
+    """Return the level ``modifier`` alone selects in ``type_name``; ``None`` if unmapped."""
+    block = keymap_type_block(keymap, type_name)
+    if block is None:
+        return None
+    match = re.search(
+        r"map\s*\[\s*" + re.escape(modifier) + r"\s*\]\s*=\s*(?:Level)?(\d+)", block
+    )
+    return int(match.group(1)) if match else None
+
+
+def keymap_type_preserves(keymap: str, type_name: str, modifier: str) -> bool:
+    """Whether ``type_name`` keeps ``modifier`` in the event after selecting a level."""
+    block = keymap_type_block(keymap, type_name)
+    if block is None:
+        return False
+    return (
+        re.search(
+            r"preserve\s*\[\s*" + re.escape(modifier) + r"\s*\]\s*=\s*" + re.escape(modifier) + r"\b",
+            block,
+        )
+        is not None
+    )
+
+
+def parse_version(text: str) -> tuple[int, ...] | None:
+    """Extract the first ``major.minor[.patch]`` version found in ``text``."""
+    match = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?", text or "")
+    if not match:
+        return None
+    return tuple(int(part or 0) for part in match.groups())
+
+
+def format_version(version: tuple[int, ...]) -> str:
+    return ".".join(str(part) for part in version)
+
+
+# ---------------------------------------------------------------------------
 # Previous-installation migration
 # ---------------------------------------------------------------------------
 #
