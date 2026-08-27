@@ -14,11 +14,10 @@
 --- a stray 3rd finger instantly set maxFingers=3 and the live-fire path fired
 --- swipe_3_up/swipe_3_down.
 ---
---- Fix: the fast-path is now skipped when `lockedDir` is set AND the incoming
---- finger count is active on that axis. This also covers the default setup,
---- where 2-finger slots are all `none` and therefore cannot set a live-fire
---- marker before a stray 3rd finger arrives. A genuine 3-finger gesture whose
---- contacts land before direction lock still takes the fast-path immediately.
+--- Fix: once a 2-finger gesture has locked its direction, later higher raw
+--- counts are ignored for the rest of the contact sequence. A genuine 3-finger
+--- gesture that starts with 3 contacts, or whose 3rd contact lands before the
+--- direction lock, still takes the fast-path immediately.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")

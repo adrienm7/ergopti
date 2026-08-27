@@ -200,6 +200,7 @@ local function resetGS()
 		candidateFingers = nil,
 		candidateSince   = nil,
 		candidateFrames  = 0,
+		lateUpgradeRejected = false,
 		-- Candidate drop confirmation state (leaving)
 		tentativeLifting       = false,
 		tentativeLiftingSince  = nil,
@@ -587,6 +588,29 @@ function M.process_frame(touches)
 		return
 	end
 
+	-- Once a two-finger gesture has locked its direction, it belongs to native
+	-- scrolling for the rest of that contact sequence. Some touch devices report
+	-- a ghost third contact for longer than the generic spike-confirmation window;
+	-- promoting that late count executes a configured three-finger action and
+	-- swallows the user's scroll. A real three-finger gesture still starts at
+	-- three contacts or joins before the direction lock is established.
+	local late_two_finger_upgrade = n > 2
+		and gs.active
+		and gs.maxFingers == 2
+		and gs.lockedDir ~= nil
+	if late_two_finger_upgrade then
+		stopScrollBlock()
+		if not gs.lateUpgradeRejected then
+			Logger.debug(LOG,
+				"Late finger-count upgrade ignored for locked 2-finger scroll: 2 -> %d.", n)
+			gs.lateUpgradeRejected = true
+		end
+		return
+	elseif gs.lateUpgradeRejected then
+		Logger.debug(LOG, "Locked 2-finger scroll returned to its accepted contact count.")
+		gs.lateUpgradeRejected = false
+	end
+
 	if n >= 3 and _state and _state.enabled and not _state.suspended then startScrollBlock() end
 
 	if n >= 2 then
@@ -732,13 +756,10 @@ function M.process_frame(touches)
 				-- diagonal is bound.
 				--
 				-- Exception: when a direction is already locked AND the INCOMING
-				-- finger count has active actions on that axis (e.g., swipe_3_up
-				-- during a 2-finger vertical scroll), skip the fast-path and require
-				-- candidate confirmation. This also covers the default configuration,
-				-- where 2-finger slots are all "none": a stray 3rd finger must not be
-				-- promoted to the 3-finger tab action merely because no 2-finger live
-				-- action fired first. A genuine 3-finger gesture that lands before the
-				-- direction is locked still takes the fast-path below.
+				-- finger count has active actions on that axis, skip the fast-path and
+				-- require candidate confirmation. Locked 2-finger gestures are handled
+				-- earlier and never reach this branch because their ownership stays
+				-- with native scrolling for the complete contact sequence.
 				local inert = finger_count_is_inert(gs.maxFingers, gs.lockedDir)
 				local new_count_active_on_locked_axis = gs.lockedDir ~= nil
 					and not finger_count_is_inert(n, gs.lockedDir)
