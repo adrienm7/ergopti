@@ -36,6 +36,21 @@ _KLEI_ReturnsLastIdForRequestedDevice() {
 Test("keylogger event id: parses the final device row (event-id-tail-anchor)",
 	_KLEI_ReturnsLastIdForRequestedDevice)
 
+_KLEI_ReturnsMaximumAcrossOutOfOrderRows() {
+	sql := "INSERT INTO events_typing VALUES ('device-a', 117, 'a');`n"
+		. "INSERT INTO events_typing VALUES ('device-a', 204, 'b');`n"
+		. "INSERT INTO events_typing VALUES ('other', 999, 'c');`n"
+		. "INSERT INTO events_hotstring VALUES ('device-a', 204, 'duplicate');`n"
+		. "INSERT INTO events_typing VALUES ('device-a', 203, 'detached-flush');"
+
+	AssertEqual(KL_ScanMaxEventId(sql, "'device-a'"), 204,
+		"recovery must compute the maximum even when a detached flush appends an older id last")
+	AssertEqual(KL_ResolveStartId(100, KL_ScanMaxEventId(sql, "'device-a'")), 205,
+		"restart must advance beyond every durable id instead of colliding with 204")
+}
+Test("keylogger event id: out-of-order detached flush recovers maximum (event-id-recovery-max)",
+	_KLEI_ReturnsMaximumAcrossOutOfOrderRows)
+
 _KLEI_ReturnsZeroWhenDeviceIsAbsent() {
 	sql := "INSERT INTO events_typing VALUES ('other', 91, 'a');"
 	AssertEqual(KL_ScanMaxEventId(sql, "'missing'"), 0,
