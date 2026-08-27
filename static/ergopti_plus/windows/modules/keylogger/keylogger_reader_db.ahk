@@ -1017,6 +1017,7 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false) {
 				devices := SQLite_Query(db,
 						"SELECT DISTINCT device_id FROM ("
 						. "SELECT device_id FROM events_typing "
+						. "UNION SELECT device_id FROM events_shortcut "
 						. "UNION SELECT device_id FROM events_llm WHERE kind='accepted' "
 						. "AND context=" . accepted_marker . " "
 						. "UNION SELECT device_id FROM events_window_switch "
@@ -1038,14 +1039,19 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false) {
 
 						device_where := " WHERE device_id=" . SQLite_Q(device_id)
 						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, title, layout, "
-								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes "
+								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes, "
+								. "'' AS shortcut_key "
 								. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
 								. "ON p.device_id=t.device_id AND p.event_id=t.id"
 								. " WHERE t.device_id=" . SQLite_Q(device_id)
 								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
 								. "'' AS title, '' AS layout, '' AS events_json, context, prediction, "
-								. "COALESCE(deletes,0) AS deletes FROM events_llm"
+								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key FROM events_llm"
 								. device_where . " AND kind='accepted' AND context=" . accepted_marker
+								. " UNION ALL SELECT ts, id, 'shortcut' AS source_kind, app, "
+								. "'' AS title, '' AS layout, '' AS events_json, '' AS context, "
+								. "'' AS prediction, 0 AS deletes, key AS shortcut_key "
+								. "FROM events_shortcut" . device_where
 								. " ORDER BY id;"
 						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch"
 								. device_where . " ORDER BY ts, id;"
@@ -1145,6 +1151,14 @@ KLR_LlmAcceptedRowToEntry(row) {
 		)
 }
 
+KLR_ShortcutRowToEntry(row) {
+		return Map(
+				"timestamp", KLR_RowValue(row, "ts", ""),
+				"app", KLR_RowValue(row, "app", "Unknown"),
+				"key", KLR_RowValue(row, "shortcut_key", "")
+		)
+}
+
 KLR_WindowRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
@@ -1174,7 +1188,13 @@ KLR_ReplayTypingRow(row) {
 }
 
 KLR_ReplayLogicalRow(row) {
-		if (KLR_RowValue(row, "source_kind", "typing") = "llm_accepted") {
+		source_kind := KLR_RowValue(row, "source_kind", "typing")
+		if (source_kind = "shortcut") {
+				if !KLW_WalkShortcut(KLR_ShortcutRowToEntry(row))
+						return true
+				return KLR_ReplayCountAndMaybeFlush()
+		}
+		if (source_kind = "llm_accepted") {
 				entry := KLR_LlmAcceptedRowToEntry(row)
 				if !entry
 						return true

@@ -29,6 +29,40 @@
 ; ================================
 ; ================================
 
+; Add one canonical shortcut event to the same n-gram state used by legacy
+; typing payloads that carry meta.sc. Dedicated events_shortcut rows bypass the
+; typing buffer, so both live callers and cold replay enter through this helper.
+KLW_WalkShortcut(entry) {
+		if !(entry is Map)
+				return false
+		shortcut_key := KLW_GetMap(entry, "key", "")
+		if (Type(shortcut_key) != "String" || shortcut_key = "")
+				return false
+		app := KLW_GetMap(entry, "app", "Unknown")
+		ts := KLW_GetMap(entry, "timestamp", "")
+		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
+		app_day_key := date_str . Chr(1) . app
+		ctx := KLW_GetAppCtx(app)
+		prev_sc := ctx["prev_sc"]
+		sc_tbl := KLW.batch["sc_ngram"]["ngram_shortcuts"]
+		scbg_tbl := KLW.batch["sc_ngram"]["ngram_shortcut_bigrams"]
+		sk := app_day_key . Chr(1) . shortcut_key
+		if !sc_tbl.Has(sk)
+				sc_tbl[sk] := Map("date", date_str, "app", app,
+						"token", shortcut_key, "count", 0)
+		sc_tbl[sk]["count"] += 1
+		if (prev_sc != "") {
+				bgt := prev_sc . "→" . shortcut_key
+				bk := app_day_key . Chr(1) . bgt
+				if !scbg_tbl.Has(bk)
+						scbg_tbl[bk] := Map("date", date_str, "app", app,
+								"token", bgt, "count", 0)
+				scbg_tbl[bk]["count"] += 1
+		}
+		ctx["prev_sc"] := shortcut_key
+		return true
+}
+
 ; Replays a typing entry and pushes every metric into KLW.batch.
 ; Mirrors the Lua _walk_typing_entry() byte-for-byte.
 KLW_WalkTypingEntry(entry) {
