@@ -311,7 +311,6 @@ global DeadkeyMappingCurrency := Map(
 ; ============================
 
 global InDeadKeySequence := false
-global _DeadKeyInputHook := ""
 
 DeadKey(Mapping) {
 	global InDeadKeySequence
@@ -321,7 +320,12 @@ DeadKey(Mapping) {
 	; and capture/remap the user's next physical key (deadkey-inputhook-no-timeout-no-suspend-guard).
 	if A_IsSuspended
 		return
-	InDeadKeySequence := true
+	EntryCritical := Critical("On")
+	try {
+		if InDeadKeySequence
+			return
+		InDeadKeySequence := true
+	} finally Critical(EntryCritical)
 	try {
 		; Callers dispatch dead keys from inside Critical("On") (LayerDispatch's
 		; SerializeSymbols path, AltGrShiftDispatch's unconditional wrap) so their
@@ -339,13 +343,14 @@ DeadKey(Mapping) {
 				"L1 T2",
 				"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
 			)
-			global _DeadKeyInputHook := ih
+			OwnerToken := SIHO_StartOwned(ih, "dead-key", true)
+			if !OwnerToken
+				return
 			try {
-				ih.Start()
 				ih.Wait()
 			} finally {
 				try ih.Stop()
-				_DeadKeyInputHook := ""
+				SIHO_Unregister(OwnerToken, ih)
 			}
 		} finally {
 			Critical(_AtCrit)
@@ -446,17 +451,12 @@ _RemapEmit(SendStr, KeyChar, *) {
 ;
 ; This is the same rule SendNewResult already applies when its send throws — a
 ; character that did not reach the application must not advance the ring. The
-; check is on the HOOK, not on InDeadKeySequence: DeadKey clears the hook before
-; emitting its own result but leaves the sequence flag set until afterwards, so
-; gating on the flag would suppress the push for the one character that IS
-; visible.
-; FOUR hooks share this shape, not one. The dead-key hook was the one the
-; original probe used, but _OneShotShiftInputHook and _SpaceHoldInputHook are
-; both armed "L1" with VisibleText off and consume the character an emit just
-; produced in exactly the same way. Tap RCtrl for a one-shot shift and type "a":
-; the ring recorded "a" (dead-key hook empty, so the old check passed), the armed
-; OSS hook ate that "a", and OneShotShift emitted and recorded "A" — two ring
-; entries for one visible capital.
+; check is on live HOOK ownership, not on InDeadKeySequence: DeadKey unregisters
+; the hook before emitting its own result but leaves the sequence flag set until
+; afterwards, so gating on the flag would suppress the push for the one character
+; that IS visible. DeadKey and OneShotShift use the shared ownership registry;
+; the two remaining singleton hooks are listed below. All four are suppressive
+; and consume an emitted character in exactly the same way.
 ;
 ; The magic-key editor is suppressive too: its ``InputHook("L1 I")`` captures
 ; one remapped output for the editor instead of letting it reach the application.
@@ -476,6 +476,8 @@ global _EMIT_NONSUPPRESSING_HOOKS := ["_PrefixInputHook"]
 
 _EmitReachedScreen() {
 	global _EMIT_SUPPRESSING_HOOKS
+	if SIHO_HasActive()
+		return false
 	for HookName in _EMIT_SUPPRESSING_HOOKS {
 		; Read through the global namespace: these hooks live in four different
 		; modules and only one of them is this file's own.

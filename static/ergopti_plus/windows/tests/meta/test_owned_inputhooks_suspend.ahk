@@ -1,21 +1,20 @@
 ﻿; tests/meta/test_owned_inputhooks_suspend.ahk
 #Requires AutoHotkey v2.0
 
-_OIH_AssertSuspendOwnedHook(FunctionName, HookName) {
+_OIH_AssertSuspendOwnedHook(FunctionName, OwnerName) {
 	Body := _DriverFuncBody(FunctionName)
 	Lifecycle := _DriverFuncBody("Ergopti_OnSuspendEnter")
-	Q := Chr(34)
-	Assert(InStr(Body, "global " . HookName . " :=") > 0,
-		FunctionName . " must publish its live InputHook for lifecycle ownership")
-	Assert(InStr(Body, "finally") > 0 and InStr(Body, HookName . " := " . Q . Q) > 0,
-		FunctionName . " must clear its InputHook owner in finally")
-	Assert(InStr(Lifecycle, HookName . ".Stop()") > 0,
-		"Suspend enter must synchronously stop " . HookName . " before input can be swallowed")
+	Assert(InStr(Body, "SIHO_StartOwned(") > 0 and InStr(Body, '"' . OwnerName . '"') > 0,
+		FunctionName . " must publish every live hook through the shared owner registry")
+	Assert(InStr(Body, "finally") > 0 and InStr(Body, "SIHO_Unregister(") > 0,
+		FunctionName . " must unregister its exact owner token in finally")
+	Assert(InStr(Lifecycle, "SIHO_StopAll()") > 0,
+		"Suspend enter must synchronously stop all registered suppressive hooks")
 }
 
 _OIH_SpaceAndOneShotHooksStopOnSuspend() {
-	_OIH_AssertSuspendOwnedHook("OneShotShift", "_OneShotShiftInputHook")
-	_OIH_AssertSuspendOwnedHook("DeadKey", "_DeadKeyInputHook")
+	_OIH_AssertSuspendOwnedHook("OneShotShift", "one-shot-shift")
+	_OIH_AssertSuspendOwnedHook("DeadKey", "dead-key")
 	Space := _DriverFuncBody("SpaceTapHold")
 	Assert(InStr(Space, 'TapHoldOwnImmediateModifier("space",') > 0
 		and !InStr(Space, "InputHook("),
