@@ -119,35 +119,93 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 
 	-- Re-register custom terminators created by the user (persisted in state)
 	if keymap and type(keymap.add_custom_terminator) == "function" then
-		local desired_custom = {}
-		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
-			if type(ct) == "table" and type(ct.key) == "string" then desired_custom[ct.key] = true end
-		end
+		local custom_runtime_failed = false
 		if type(keymap.get_terminator_defs) == "function"
 			and type(keymap.remove_custom_terminator) == "function" then
 			local defs = keymap.get_terminator_defs()
 			for index = #(type(defs) == "table" and defs or {}), 1, -1 do
 				local def = defs[index]
-				if type(def) == "table" and def.custom == true and not desired_custom[def.key] then
-					try("keymap.remove_custom_terminator", keymap.remove_custom_terminator, def.key)
+				if type(def) == "table" and def.custom == true then
+					if not try_exact("keymap.remove_custom_terminator",
+						keymap.remove_custom_terminator, def.key) then
+						custom_runtime_failed = true
+					end
 				end
 			end
 		end
-		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
-			if type(ct) == "table" and ct.key and ct.char then
-				try("keymap.add_custom_terminator", keymap.add_custom_terminator, ct.key, ct.char, ct.label or ct.char, ct.consume or false)
-				-- Resolved from the persisted states rather than read off an
-				-- undefined global. `enabled_ct` was never assigned anywhere, so it
-				-- was always nil and this branch never ran: a custom terminator the
-				-- user had DISABLED came back enabled on every restart. It has to be
-				-- re-applied here and not by the terminator_states loop above,
-				-- because that loop runs before add_custom_terminator has created
-				-- the key it would be setting.
-				local enabled_ct = type(saved.terminator_states) == "table"
-					and saved.terminator_states[ct.key] or nil
-				if enabled_ct ~= nil and type(keymap.set_terminator_enabled) == "function" then
-					try("keymap.set_terminator_enabled", keymap.set_terminator_enabled, ct.key, enabled_ct)
+		local accepted_custom = {}
+		local accepted_keys = {}
+		local rejected_keys = {}
+		local custom_repaired = false
+		local persisted_custom = type(state.custom_terminators) == "table"
+			and state.custom_terminators or {}
+		for _, ct in ipairs(not custom_runtime_failed and persisted_custom or {}) do
+			if type(ct) == "table" and type(ct.key) == "string" and not accepted_keys[ct.key] then
+				local consume = ct.consume
+				if consume == nil then consume = false end
+				local label = ct.label or ct.char
+				local validation_ok, candidate_valid = xpcall(function()
+					return type(keymap.validate_custom_terminator) == "function"
+						and keymap.validate_custom_terminator(
+							ct.key, ct.char, label, consume) == true
+				end, debug.traceback)
+				if not validation_ok then
+					custom_runtime_failed = true
+					sync_failed = true
+					Logger.warn(LOG, "sync_state_to_modules: custom terminator validation failed — %s",
+						tostring(candidate_valid))
+					break
 				end
+				if candidate_valid then
+					local ok_add, added = xpcall(keymap.add_custom_terminator,
+						debug.traceback, ct.key, ct.char, label, consume)
+					if not ok_add or added ~= true then
+						custom_runtime_failed = true
+						sync_failed = true
+						Logger.warn(LOG, "sync_state_to_modules: custom terminator restore did not commit — %s",
+							tostring(added))
+						break
+					end
+					accepted_keys[ct.key] = true
+					accepted_custom[#accepted_custom + 1] = {
+						key = ct.key, char = ct.char, label = label, consume = consume,
+					}
+					-- Resolved from the persisted states rather than read off an
+					-- undefined global. `enabled_ct` was never assigned anywhere, so it
+					-- was always nil and this branch never ran: a custom terminator the
+					-- user had DISABLED came back enabled on every restart. It has to be
+					-- re-applied here and not by the terminator_states loop above,
+					-- because that loop runs before add_custom_terminator has created
+					-- the key it would be setting.
+					local enabled_ct = type(saved.terminator_states) == "table"
+						and saved.terminator_states[ct.key] or nil
+					if enabled_ct ~= nil and not try_exact("keymap.set_terminator_enabled",
+						keymap.set_terminator_enabled, ct.key, enabled_ct) then
+						custom_runtime_failed = true
+						break
+					end
+				else
+					custom_repaired = true
+					rejected_keys[ct.key] = true
+					Logger.warn(LOG, "sync_state_to_modules: rejected one invalid custom terminator.")
+				end
+			else
+				custom_repaired = true
+				if type(ct) == "table" and type(ct.key) == "string" then
+					rejected_keys[ct.key] = true
+				end
+			end
+		end
+		if not custom_runtime_failed then
+			state.custom_terminators = accepted_custom
+			if type(state.terminator_states) == "table" then
+				for key in pairs(rejected_keys) do
+					if not accepted_keys[key] then state.terminator_states[key] = nil end
+				end
+			end
+			if custom_repaired and save_prefs() ~= true then
+				sync_failed = true
+				Logger.error(LOG, "Rejected custom terminators could not be removed from preferences.")
 			end
 		end
 	end

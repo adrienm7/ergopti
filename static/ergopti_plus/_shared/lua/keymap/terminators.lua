@@ -277,7 +277,7 @@ end
 --- @param key string The terminator key identifier.
 --- @return boolean
 function M.is_terminator_enabled(key)
-	return _enabled[key] ~= false
+	return _enabled[key] == true
 end
 
 --- Returns the full terminator definitions table (by reference — do not mutate).
@@ -295,40 +295,81 @@ end
 -- =========================================
 -- =========================================
 
+--- Validates one exact canonical UTF-8 scalar.
+--- @param char any Candidate character.
+--- @return boolean valid
+--- @return string|nil reason Stable refusal reason.
+function M.validate_character(char)
+	if type(char) ~= "string" or char == "" then return false, "invalid_character" end
+	local ok, length = pcall(utf8_lib.len, char)
+	if not ok or length ~= 1 then return false, "invalid_character" end
+	return true
+end
+
+
+--- Validates one custom terminator candidate against catalogue identities.
+--- An existing custom key may be replayed or updated, but built-in keys and
+--- characters owned by any other slot remain immutable.
+--- @param key any Candidate slot identifier.
+--- @param char any Candidate character.
+--- @param label any Candidate display label.
+--- @param consume any Candidate consume policy.
+--- @return boolean valid
+--- @return string|nil reason Stable refusal reason.
+function M.validate_custom_terminator(key, char, label, consume)
+	if type(key) ~= "string" or key == "" then return false, "invalid_key" end
+	local char_valid, char_reason = M.validate_character(char)
+	if not char_valid then return false, char_reason end
+	if type(label) ~= "string" or label == "" then return false, "invalid_label" end
+	if type(consume) ~= "boolean" then return false, "invalid_consume" end
+
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key == key and def.custom ~= true then return false, "key_collision" end
+		if def.key ~= key then
+			for _, existing_char in ipairs(type(def.chars) == "table" and def.chars or {}) do
+				if existing_char == char then return false, "character_collision" end
+			end
+		end
+	end
+	return true
+end
+
 --- Adds or updates a user-defined terminator.
 --- Idempotent: calling with the same key updates the existing definition in place.
 --- @param key string Unique identifier (e.g. "custom_dot").
 --- @param char string The trigger character.
 --- @param label string Human-readable label shown in the menu.
 --- @param consume boolean Whether to swallow the character after expansion.
+--- @return boolean committed
 function M.add_custom_terminator(key, char, label, consume)
-	if type(key) ~= "string" or type(char) ~= "string" then
-		Logger.error(LOG, "add_custom_terminator: invalid key or char (key='%s', char='%s').",
-			tostring(key), tostring(char))
-		return
+	local valid, reason = M.validate_custom_terminator(key, char, label, consume)
+	if not valid then
+		Logger.error(LOG, "add_custom_terminator: candidate refused (%s).", tostring(reason))
+		return false
 	end
 	-- Update in place if the key already exists (idempotent on reload).
 	for _, def in ipairs(M.TERMINATOR_DEFS) do
 		if def.key == key then
 			def.chars   = { char }
 			def.label   = label
-			def.consume = consume or false
+			def.consume = consume
 			rebuild_cache()
 			Logger.debug(LOG, "Custom terminator '%s' updated.", key)
-			return
+			return true
 		end
 	end
 	table.insert(M.TERMINATOR_DEFS, {
 		key             = key,
 		chars           = { char },
 		label           = label,
-		consume         = consume or false,
+		consume         = consume,
 		default_enabled = true,
 		custom          = true,
 	})
 	_enabled[key] = true
 	rebuild_cache()
 	Logger.info(LOG, "Custom terminator '%s' added.", key)
+	return true
 end
 
 --- Removes a user-defined terminator (no-op on built-in terminators).
@@ -340,10 +381,11 @@ function M.remove_custom_terminator(key)
 			_enabled[key] = nil
 			rebuild_cache()
 			Logger.info(LOG, "Custom terminator '%s' removed.", key)
-			return
+			return true
 		end
 	end
 	Logger.warn(LOG, "remove_custom_terminator: key '%s' not found or not custom.", tostring(key))
+	return false
 end
 
 
@@ -360,14 +402,23 @@ end
 --- magic key, so both the mapping database AND the terminator set stay in
 --- sync on the same character.
 --- @param magic_key string The new trigger character.
+--- @return boolean committed
 function M.update_magic_key(magic_key)
+	local valid, reason = M.validate_character(magic_key)
+	if not valid then
+		Logger.error(LOG, "update_magic_key: candidate refused (%s).", tostring(reason))
+		return false
+	end
 	for _, def in ipairs(M.TERMINATOR_DEFS) do
 		if def.key == "star" then
 			def.chars = { magic_key }
 			def.label = magic_key .. " : Touche magique"
+			rebuild_cache()
+			return true
 		end
 	end
-	rebuild_cache()
+	Logger.error(LOG, "update_magic_key: star definition is unavailable.")
+	return false
 end
 
 

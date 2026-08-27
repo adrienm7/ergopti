@@ -504,15 +504,19 @@ end
 --- pre-assign CoreState.magic_key here — Registry handles it atomically.
 --- @param char string The new trigger character (must be a non-empty string).
 function M.set_trigger_char(char)
-	if type(char) ~= "string" or char == "" then
-		Logger.warn(LOG, "set_trigger_char: received an invalid value ('%s') — ignored.", tostring(char))
+	local valid, reason = Terminators.validate_character(char)
+	if not valid then
+		Logger.warn(LOG, "set_trigger_char: candidate refused (%s).", tostring(reason))
 		return false
 	end
 	if LLMBridge.invalidate_hotstring_preview() ~= true then
 		Logger.error(LOG, "Trigger-key change refused because the active hotstring preview could not be revoked.")
 		return false
 	end
-	Registry.update_trigger_char(char)
+	if Registry.update_trigger_char(char) ~= true then
+		Logger.error(LOG, "Trigger-key change refused because the registry did not commit.")
+		return false
+	end
 	Logger.debug(LOG, "Trigger char: '%s'.", char)
 	return true
 end
@@ -611,7 +615,13 @@ M.set_terminator_enabled   = preview_fenced_registry_mutation(Registry.set_termi
 M.set_terminators_enabled  = preview_fenced_registry_mutation(Registry.set_terminators_enabled)
 M.is_terminator_enabled    = Registry.is_terminator_enabled
 M.get_terminator_defs      = Registry.get_terminator_defs
-M.add_custom_terminator    = preview_fenced_registry_mutation(Registry.add_custom_terminator)
+M.validate_custom_terminator = Registry.validate_custom_terminator
+local add_custom_terminator_fenced = preview_fenced_registry_mutation(
+	Registry.add_custom_terminator)
+function M.add_custom_terminator(...)
+	if Terminators.validate_custom_terminator(...) ~= true then return false end
+	return add_custom_terminator_fenced(...)
+end
 M.remove_custom_terminator = preview_fenced_registry_mutation(Registry.remove_custom_terminator)
 
 

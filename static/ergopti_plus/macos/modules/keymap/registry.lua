@@ -244,6 +244,7 @@ M.set_terminator_enabled   = Terminators.set_terminator_enabled
 M.set_terminators_enabled  = Terminators.set_terminators_enabled
 M.is_terminator_enabled    = Terminators.is_terminator_enabled
 M.get_terminator_defs      = Terminators.get_terminator_defs
+M.validate_custom_terminator = Terminators.validate_custom_terminator
 M.add_custom_terminator    = Terminators.add_custom_terminator
 M.remove_custom_terminator = Terminators.remove_custom_terminator
 
@@ -976,18 +977,24 @@ end
 --- _state.magic_key before invoking update_trigger_char.
 ---
 --- @param char string The new trigger character.
+--- @return boolean committed
 function M.update_trigger_char(char)
-	if type(char) ~= "string" or char == "" then
-		Logger.error(LOG, "update_trigger_char: char must be a non-empty string."); return
+	local valid, reason = Terminators.validate_character(char)
+	if not valid then
+		Logger.error(LOG, "update_trigger_char: candidate refused (%s).", tostring(reason))
+		return false
 	end
-	if not require_state("update_trigger_char") then return end
+	if not require_state("update_trigger_char") then return false end
 
 	local old_char = _state.magic_key
-	Terminators.update_magic_key(char)
+	if Terminators.update_magic_key(char) ~= true then
+		Logger.error(LOG, "update_trigger_char: terminator update did not commit.")
+		return false
+	end
 
 	if old_char == char then
 		Logger.debug(LOG, "update_trigger_char: key unchanged ('%s') — skipping rename.", char)
-		return
+		return true
 	end
 
 	Logger.start(LOG, "Renaming magic key '%s' → '%s' across %d mapping(s)…", old_char, char, #_state.mappings)
@@ -1037,6 +1044,7 @@ function M.update_trigger_char(char)
 		Logger.debug(LOG, "Magic-key byte length changed (%d → %d) — lookup rebuilt and mappings re-sorted.", old_len, new_len)
 	end
 	Logger.success(LOG, "Magic-key rename complete (%d mapping(s) renamed).", renamed)
+	return true
 end
 
 return M
