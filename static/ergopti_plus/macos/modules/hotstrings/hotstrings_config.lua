@@ -33,6 +33,7 @@ local Paths      = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
 local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
+local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
@@ -306,23 +307,14 @@ local function parse_overrides(path)
 	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough
 end
 
---- Escapes a string for a TOML basic string.
---- @param value string Raw string.
---- @return string escaped
-local function escape_toml_string(value)
-	return (value:gsub("\\", "\\\\")
-		:gsub('"', '\\"')
-		:gsub("\t", "\\t")
-		:gsub("\n", "\\n")
-		:gsub("\r", "\\r"))
-end
-
 --- Serializes the in-memory override table back to TOML.
 --- @param overrides table The override table (same shape as parse_overrides).
 --- @param word_delimiters string|nil The [__global__] word_delimiters value, if set.
 --- @param global_passthrough string[] Exact raw records for unowned [__global__] keys.
---- @return string The serialized TOML content.
+--- @return string|nil content The serialized TOML content.
+--- @return string|nil error_detail Validation failure without untrusted bytes.
 local function serialize_overrides(overrides, word_delimiters, global_passthrough)
+	if type(overrides) ~= "table" then return nil, "override root must be a table" end
 	local out = {
 		"# Hotstrings — overrides utilisateur",
 		"# Édité depuis la fenêtre « Délais & couleurs hotstrings ».",
@@ -346,8 +338,7 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 		-- escapes — a tab becomes \9 — which round-trips through Lua and not
 		-- through `word_delimiters%s*=%s*"(.-)"`.
 		if has_word_delimiters then
-			local escaped = escape_toml_string(word_delimiters)
-			table.insert(out, 'word_delimiters = "' .. escaped .. '"')
+			table.insert(out, "word_delimiters = " .. ConfigSchema.encode_basic_string(word_delimiters))
 		end
 		for _, assignment in ipairs(global_passthrough or {}) do
 			table.insert(out, assignment)
@@ -357,7 +348,13 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 
 	-- Stable ordering: alphabetical category, alphabetical section.
 	local cats = {}
-	for cat, _ in pairs(overrides) do table.insert(cats, cat) end
+	for cat, entry in pairs(overrides) do
+		if not ConfigSchema.is_category(cat) then
+			return nil, "override category must be a bare supported identifier"
+		end
+		if type(entry) ~= "table" then return nil, "override category entry must be a table" end
+		table.insert(cats, cat)
+	end
 	table.sort(cats)
 
 	for _, cat in ipairs(cats) do
@@ -370,7 +367,9 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 				table.insert(out, string.format("delay = %s", tostring(entry.delay)))
 			end
 			if entry.color ~= nil then
-				table.insert(out, string.format("color = \"%s\"", entry.color))
+				local encoded = ConfigSchema.encode_basic_string(entry.color)
+				if not encoded then return nil, "override color must be a string" end
+				table.insert(out, "color = " .. encoded)
 			end
 			if entry.show_tooltip ~= nil then
 				table.insert(out, string.format("show_tooltip = %s", entry.show_tooltip and "true" or "false"))
@@ -381,9 +380,20 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 			table.insert(out, "")
 		end
 
+		if entry.sections ~= nil and type(entry.sections) ~= "table" then
+			return nil, "override sections must be a table"
+		end
 		if entry.sections then
 			local secs = {}
-			for s, _ in pairs(entry.sections) do table.insert(secs, s) end
+			for sec, section_entry in pairs(entry.sections) do
+				if not ConfigSchema.is_section(sec) then
+					return nil, "override section must be a bare supported identifier"
+				end
+				if type(section_entry) ~= "table" then
+					return nil, "override section entry must be a table"
+				end
+				table.insert(secs, sec)
+			end
 			table.sort(secs)
 			for _, sec in ipairs(secs) do
 				local s_entry = entry.sections[sec]
@@ -394,7 +404,9 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 						table.insert(out, string.format("delay = %s", tostring(s_entry.delay)))
 					end
 					if s_entry.color ~= nil then
-						table.insert(out, string.format("color = \"%s\"", s_entry.color))
+						local encoded = ConfigSchema.encode_basic_string(s_entry.color)
+						if not encoded then return nil, "override color must be a string" end
+						table.insert(out, "color = " .. encoded)
 					end
 					if s_entry.show_tooltip ~= nil then
 						table.insert(out, string.format("show_tooltip = %s", s_entry.show_tooltip and "true" or "false"))
@@ -462,7 +474,12 @@ local function save_to_disk(overrides, word_delimiters)
 		Logger.error(LOG, "Override save refused because the source read did not commit.")
 		return false
 	end
-	local content = serialize_overrides(overrides, word_delimiters, _state.global_passthrough)
+	local content, serialize_err = serialize_overrides(overrides, word_delimiters, _state.global_passthrough)
+	if not content then
+		Logger.error(LOG, "Override save refused because the candidate schema is invalid: %s.",
+			tostring(serialize_err))
+		return false
+	end
 	local ok, committed = pcall(
 		FileSystem.write_if_unchanged,
 		_state.path,
@@ -708,6 +725,14 @@ function M.set_override(category, section, field, value)
 		Logger.error(LOG, "set_override(): field must be 'delay', 'color', 'show_tooltip', or 'priority', got '%s'.", tostring(field))
 		return false
 	end
+	if not ConfigSchema.is_category(category) or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "set_override(): category and section must be supported bare identifiers.")
+		return false
+	end
+	if field == "color" and not ConfigSchema.is_color(value) then
+		Logger.error(LOG, "set_override(): color must contain 3 to 8 hexadecimal digits.")
+		return false
+	end
 
 	local candidate = clone_value(_state.overrides)
 	candidate[category] = candidate[category] or { sections = {} }
@@ -740,6 +765,10 @@ function M.clear_override(category, section, field)
 	if not require_state("clear_override") then return false end
 	if _state.writes_blocked then
 		Logger.error(LOG, "Override clear refused because the source read did not commit.")
+		return false
+	end
+	if not ConfigSchema.is_category(category) or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "clear_override(): category and section must be supported bare identifiers.")
 		return false
 	end
 	local candidate = clone_value(_state.overrides)
@@ -900,7 +929,7 @@ end
 --- @param delimiters string|nil Candidate delimiter value.
 --- @return string content Candidate file content.
 local function patch_word_delimiters(existing, delimiters)
-	local encoded = delimiters and ('"' .. escape_toml_string(delimiters) .. '"') or nil
+	local encoded = delimiters and ConfigSchema.encode_basic_string(delimiters) or nil
 	return TomlRecordEditor.patch_table_field(
 		existing,
 		"[__global__]",
